@@ -1,7 +1,18 @@
 export type NodeKind = 'artifact' | 'process';
 
+export interface PrimaryEdge {
+  from: string;
+  to: string;
+  kind: 'input' | 'output';
+}
+
+export interface FeedbackEdge {
+  artifact: string;
+  process: string;
+}
+
 export interface Graph {
   nodes: Map<string, NodeKind>;
-  primaryEdges: Array<{ from: string; to: string; kind: 'input' | 'output' }>;
-  feedbackEdges: Array<{ artifact: string; process: string }>;
+  primaryEdges: PrimaryEdge[];
+  feedbackEdges: FeedbackEdge[];
 }
