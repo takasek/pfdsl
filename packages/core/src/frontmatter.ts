@@ -1,6 +1,5 @@
 import { parse as parseYaml } from 'yaml';
-import type { Frontmatter, LoadResult } from './types/index.js';
-import type { Diagnostic } from './types/index.js';
+import type { Diagnostic, Frontmatter, LoadResult } from './types/index.js';
 
 export function loadFrontmatter(source: string): LoadResult {
   if (!source.startsWith('---')) {
