@@ -1,0 +1,228 @@
+---
+title: PFDSL 実装計画フロー
+version: 0.2
+dsl_version: 0.0.2
+description: PFDSL v0.0.2 仕様に基づくツールチェーン実装のプロセスフロー記述
+tags: [implementation, roadmap]
+
+layout:
+  direction: TB
+
+artifact:
+  spec_v0_0_2:
+    title: PFDSL仕様書 v0.0.2
+  core_architecture:
+    title: コアアーキテクチャ文書
+  repo_scaffold:
+    title: リポジトリ骨格
+  build_config:
+    title: ビルド設定
+  shared_types:
+    title: 共有型定義
+  token_spec:
+    title: トークン規則
+  ast_schema:
+    title: ASTスキーマ
+  diagnostic_schema:
+    title: 診断スキーマ
+  graph_schema:
+    title: グラフスキーマ
+  lexer:
+    title: Lexer実装
+  frontmatter_loader:
+    title: Frontmatterローダ
+  parser:
+    title: Parser実装
+  normalizer:
+    title: Normalizer実装
+  validator:
+    title: Validator実装
+  canonical_sorter:
+    title: 正準順序ソータ
+  formatter:
+    title: Formatter実装
+  core_modules:
+    title: コアモジュール群
+    parts: [lexer, frontmatter_loader, parser, normalizer, validator, canonical_sorter, formatter]
+  core_library:
+    title: コアライブラリ (@pfdsl/core)
+  graphviz_exporter:
+    title: Graphvizエクスポータ
+  preview_engine:
+    title: プレビューエンジン
+  vscode_shell:
+    title: VSCode拡張シェル
+  language_service:
+    title: 言語サービス (LSP)
+  preview_panel:
+    title: プレビューパネル
+  format_command:
+    title: フォーマットコマンド
+  hover_support:
+    title: ホバーサポート
+  diagnostics_ui:
+    title: 診断UI
+  syntax_highlight:
+    title: シンタックスハイライト
+  vscode_extension:
+    title: VSCode拡張統合
+  rc_extension:
+    title: リリース候補版
+  published_extension:
+    title: 公開版拡張
+  workflow_usage:
+    title: 日常運用知見
+  cli_tool:
+    title: CLIツール
+  ci_integration:
+    title: CI連携
+  diff_analyzer:
+    title: 差分解析ツール
+
+process:
+  define_architecture:
+    title: アーキテクチャ定義
+  define_repo_structure:
+    title: リポジトリ構造設計
+  define_build_policy:
+    title: ビルドポリシー策定
+  define_shared_types:
+    title: 共有型定義
+  define_token_rules:
+    title: トークン規則定義
+  define_ast_schema:
+    title: ASTスキーマ定義
+  define_diagnostic_schema:
+    title: 診断スキーマ定義
+  define_graph_schema:
+    title: グラフスキーマ定義
+  implement_lexer:
+    title: Lexer実装
+  implement_frontmatter_loader:
+    title: Frontmatterローダ実装
+  implement_parser:
+    title: Parser実装
+  implement_normalizer:
+    title: Normalizer実装
+  implement_validator:
+    title: Validator実装
+  implement_canonical_sorter:
+    title: 正準順序ソータ実装
+  implement_formatter:
+    title: Formatter実装
+  integrate_core_modules:
+    title: コアモジュール統合
+  package_core_library:
+    title: コアライブラリパッケージング
+  implement_graphviz_exporter:
+    title: Graphvizエクスポータ実装
+  implement_preview_engine:
+    title: プレビューエンジン実装
+  create_vscode_extension_shell:
+    title: VSCode拡張シェル作成
+  implement_language_service:
+    title: 言語サービス実装
+  implement_preview_panel:
+    title: プレビューパネル実装
+  implement_format_command:
+    title: フォーマットコマンド実装
+  implement_hover_support:
+    title: ホバーサポート実装
+  implement_diagnostics_ui:
+    title: 診断UI実装
+  implement_syntax_highlight:
+    title: シンタックスハイライト実装
+  integrate_vscode_extension:
+    title: VSCode拡張統合
+  package_release_candidate:
+    title: RCパッケージング
+  release_marketplace:
+    title: Marketplace公開
+  adopt_daily_workflow:
+    title: 日常ワークフロー導入
+  implement_cli_wrapper:
+    title: CLIラッパー実装
+  implement_ci_actions:
+    title: CI Actions実装
+  implement_diff_analysis:
+    title: 差分解析実装
+---
+
+# Phase 0: アーキテクチャ定義
+
+spec_v0_0_2 >> define_architecture -> core_architecture
+
+core_architecture >> define_repo_structure -> repo_scaffold
+core_architecture >> define_build_policy -> build_config
+core_architecture >> define_shared_types -> shared_types
+
+core_architecture >> define_token_rules -> token_spec
+core_architecture >> define_ast_schema -> ast_schema
+core_architecture >> define_diagnostic_schema -> diagnostic_schema
+core_architecture >> define_graph_schema -> graph_schema
+
+# Phase 1: コア層実装
+
+# Frontmatter は Lexer より前に分離する
+shared_types >> implement_frontmatter_loader -> frontmatter_loader
+
+[token_spec, shared_types] >> implement_lexer -> lexer
+
+[token_spec, ast_schema, lexer, frontmatter_loader, shared_types]
+  >> implement_parser -> parser
+
+[parser, graph_schema] >> implement_normalizer -> normalizer
+
+[normalizer, graph_schema] >> implement_canonical_sorter -> canonical_sorter
+
+[normalizer, diagnostic_schema] >> implement_validator -> validator
+
+[parser, canonical_sorter] >> implement_formatter -> formatter
+
+[lexer, frontmatter_loader, parser, normalizer, validator, canonical_sorter, formatter]
+  >> integrate_core_modules -> core_modules
+
+[core_modules, build_config, repo_scaffold]
+  >> package_core_library -> core_library
+
+# Phase 2: 出力層
+
+core_library >> implement_graphviz_exporter -> graphviz_exporter
+
+[core_library, graphviz_exporter] >> implement_preview_engine -> preview_engine
+
+core_library >> implement_cli_wrapper -> cli_tool
+
+# Phase 3: VSCode 拡張
+
+repo_scaffold >> create_vscode_extension_shell -> vscode_shell
+
+[vscode_shell, core_library] >> implement_language_service -> language_service
+[vscode_shell, preview_engine] >> implement_preview_panel -> preview_panel
+[vscode_shell, core_library] >> implement_format_command -> format_command
+[vscode_shell, core_library] >> implement_hover_support -> hover_support
+[vscode_shell, core_library] >> implement_diagnostics_ui -> diagnostics_ui
+vscode_shell >> implement_syntax_highlight -> syntax_highlight
+
+[language_service, preview_panel, format_command, hover_support, diagnostics_ui, syntax_highlight]
+  >> integrate_vscode_extension -> vscode_extension
+
+# Phase 4: リリース
+
+vscode_extension >> package_release_candidate -> rc_extension
+
+rc_extension >> release_marketplace -> published_extension
+
+# Phase 5: 日常運用・継続改善
+
+published_extension >> adopt_daily_workflow -> workflow_usage
+
+# 運用知見を実装プロセスへフィードバック (生成元は変更しない)
+workflow_usage >>? implement_validator
+workflow_usage >>? implement_formatter
+workflow_usage >>? implement_preview_engine
+
+# 周辺ツール
+
+[published_extension, cli_tool] >> implement_ci_actions -> ci_integration
+[published_extension, cli_tool] >> implement_diff_analysis -> diff_analyzer
