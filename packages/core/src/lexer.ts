@@ -1,5 +1,4 @@
-import type { Token, TokenType, Position } from './types/index.js';
-import type { Diagnostic } from './types/index.js';
+import type { Token, TokenType, Position, Diagnostic } from './types/index.js';
 
 export interface LexResult {
   tokens: Token[];
@@ -21,16 +20,25 @@ export function lex(source: string): LexResult {
     let result = '';
     for (let i = 0; i < count; i++) {
       if (pos >= source.length) break;
-      const ch = source[pos]!;
+      const cp = source.codePointAt(pos)!;
+      const charLen = cp > 0xFFFF ? 2 : 1;
+      const ch = source.slice(pos, pos + charLen);
       result += ch;
       if (ch === '\n') { line++; column = 1; } else { column++; }
-      pos++;
+      pos += charLen;
     }
     return result;
   }
 
   function peek(offset = 0): string {
-    return source[pos + offset] ?? '';
+    let p = pos;
+    for (let i = 0; i < offset; i++) {
+      if (p >= source.length) return '';
+      p += (source.codePointAt(p)! > 0xFFFF) ? 2 : 1;
+    }
+    if (p >= source.length) return '';
+    const cp = source.codePointAt(p)!;
+    return cp > 0xFFFF ? source.slice(p, p + 2) : source[p]!;
   }
 
   function makeToken(
