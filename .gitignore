@@ -1,0 +1,24 @@
+# deps
+node_modules/
+
+# build
+dist/
+*.tsbuildinfo
+
+# test
+coverage/
+
+# env
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+
+# editor
+.vscode/
+.idea/
+
+# pnpm
+.pnpm-store/
