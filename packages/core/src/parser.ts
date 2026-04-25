@@ -70,12 +70,14 @@ export function parseTokens(tokens: Token[]): ParseResult {
       }
       skipSeparators();
       const rb = peek();
-      if (rb.type === 'RBRACKET') advance();
-      else diagnostics.push({ severity: 'error', code: 'P011',
+      if (rb.type === 'RBRACKET') {
+        advance();
+        return { type: 'artifact-expr', ids, start, end: rb.end };
+      }
+      diagnostics.push({ severity: 'error', code: 'P011',
         message: 'Expected ] to close artifact set',
         range: { start: rb.start, end: rb.end } });
-      const end = peek();
-      return { type: 'artifact-expr', ids, start, end: { ...end.start } };
+      return { type: 'artifact-expr', ids, start, end: rb.start };
     }
 
     const id = parseId();
@@ -106,7 +108,7 @@ export function parseTokens(tokens: Token[]): ParseResult {
         return null;
       }
       return { type: 'output-edge', process: processId, artifact,
-        start: processId.start, end: artifact.end } as OutputEdgeStatement;
+        start: processId.start, end: artifact.end };
     }
 
     // Parse artifact-expr (single ID or [id, ...])
@@ -141,10 +143,10 @@ export function parseTokens(tokens: Token[]): ParseResult {
     if (peek().type !== 'ARROW_OUTPUT') {
       if (op === '>>') {
         return { type: 'input-edge', artifact: head, process: processId,
-          start: head.start, end: processId.end } as InputEdgeStatement;
+          start: head.start, end: processId.end };
       } else {
         return { type: 'feedback-edge', artifact: head, process: processId,
-          start: head.start, end: processId.end } as FeedbackEdgeStatement;
+          start: head.start, end: processId.end };
       }
     }
 
@@ -168,12 +170,14 @@ export function parseTokens(tokens: Token[]): ParseResult {
         diagnostics.push({ severity: 'error', code: 'P008',
           message: 'Expected process identifier in chain continuation',
           range: { start: peek().start, end: peek().end } });
+        skipToStatementEnd();
         break;
       }
       if (peek().type !== 'ARROW_OUTPUT') {
         diagnostics.push({ severity: 'error', code: 'P009',
           message: 'Expected -> in chain continuation',
           range: { start: peek().start, end: peek().end } });
+        skipToStatementEnd();
         break;
       }
       advance();
@@ -182,6 +186,7 @@ export function parseTokens(tokens: Token[]): ParseResult {
         diagnostics.push({ severity: 'error', code: 'P010',
           message: 'Expected artifact expression in chain continuation',
           range: { start: peek().start, end: peek().end } });
+        skipToStatementEnd();
         break;
       }
       segments.push({ op: segOp, process: segProcess, output: segOutput });
@@ -189,7 +194,7 @@ export function parseTokens(tokens: Token[]): ParseResult {
 
     const last = segments[segments.length - 1]!;
     return { type: 'chain', head, segments,
-      start: head.start, end: last.output.end } as ChainStatement;
+      start: head.start, end: last.output.end };
   }
 
   const statements: Statement[] = [];
