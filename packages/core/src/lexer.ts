@@ -1,0 +1,158 @@
+import type { Token, TokenType, Position } from './types/index.js';
+import type { Diagnostic } from './types/index.js';
+
+export interface LexResult {
+  tokens: Token[];
+  diagnostics: Diagnostic[];
+}
+
+export function lex(source: string): LexResult {
+  const tokens: Token[] = [];
+  const diagnostics: Diagnostic[] = [];
+  let pos = 0;
+  let line = 1;
+  let column = 1;
+
+  function currentPos(): Position {
+    return { line, column, offset: pos };
+  }
+
+  function advance(count = 1): string {
+    let result = '';
+    for (let i = 0; i < count; i++) {
+      if (pos >= source.length) break;
+      const ch = source[pos]!;
+      result += ch;
+      if (ch === '\n') { line++; column = 1; } else { column++; }
+      pos++;
+    }
+    return result;
+  }
+
+  function peek(offset = 0): string {
+    return source[pos + offset] ?? '';
+  }
+
+  function makeToken(
+    type: TokenType, value: string, raw: string,
+    start: Position, end: Position,
+  ): Token {
+    return { type, value, raw, start, end };
+  }
+
+  while (pos < source.length) {
+    const ch = peek();
+
+    // Skip horizontal whitespace
+    if (ch === ' ' || ch === '\t' || ch === '\r') { advance(); continue; }
+
+    // Newline token
+    if (ch === '\n') {
+      const start = currentPos();
+      advance();
+      tokens.push(makeToken('NEWLINE', '\n', '\n', start, currentPos()));
+      continue;
+    }
+
+    // Comment: # to EOL (only outside quoted strings)
+    if (ch === '#') {
+      while (pos < source.length && peek() !== '\n') advance();
+      continue;
+    }
+
+    // Operators (longest match: >>? before >>)
+    if (ch === '>' && peek(1) === '>' && peek(2) === '?') {
+      const start = currentPos(); advance(3);
+      tokens.push(makeToken('ARROW_FEEDBACK', '>>?', '>>?', start, currentPos()));
+      continue;
+    }
+    if (ch === '>' && peek(1) === '>') {
+      const start = currentPos(); advance(2);
+      tokens.push(makeToken('ARROW_INPUT', '>>', '>>', start, currentPos()));
+      continue;
+    }
+    if (ch === '-' && peek(1) === '>') {
+      const start = currentPos(); advance(2);
+      tokens.push(makeToken('ARROW_OUTPUT', '->', '->', start, currentPos()));
+      continue;
+    }
+
+    // Single-char tokens
+    if (ch === '[') { const s = currentPos(); advance(); tokens.push(makeToken('LBRACKET', '[', '[', s, currentPos())); continue; }
+    if (ch === ']') { const s = currentPos(); advance(); tokens.push(makeToken('RBRACKET', ']', ']', s, currentPos())); continue; }
+    if (ch === ',') { const s = currentPos(); advance(); tokens.push(makeToken('COMMA', ',', ',', s, currentPos())); continue; }
+    if (ch === ';') { const s = currentPos(); advance(); tokens.push(makeToken('SEMICOLON', ';', ';', s, currentPos())); continue; }
+
+    // Quoted ID
+    if (ch === '"') {
+      const start = currentPos();
+      advance(); // consume opening "
+      let value = '';
+      let raw = '"';
+      let closed = false;
+      while (pos < source.length) {
+        const c = peek();
+        if (c === '"') { advance(); raw += '"'; closed = true; break; }
+        if (c === '\n') break;  // unclosed
+        if (c === '\\') {
+          advance(); raw += '\\';
+          const esc = peek();
+          if      (esc === '"')  { value += '"';  raw += '"';  advance(); }
+          else if (esc === '\\') { value += '\\'; raw += '\\'; advance(); }
+          else if (esc === 'n')  { value += '\n'; raw += 'n';  advance(); }
+          else if (esc === 't')  { value += '\t'; raw += 't';  advance(); }
+          else { value += '\\' + esc; raw += esc; advance(); }
+        } else {
+          value += c; raw += c; advance();
+        }
+      }
+      if (!closed) {
+        diagnostics.push({ severity: 'error', code: 'L001', message: 'Unclosed quoted identifier',
+          range: { start, end: currentPos() } });
+      }
+      tokens.push(makeToken('ID', value, raw, start, currentPos()));
+      continue;
+    }
+
+    // Bare ID: Unicode letters/numbers + _ -
+    // (- followed by > is already caught above as ARROW_OUTPUT; > followed by > is ARROW_INPUT)
+    if (isBareIdStart(ch)) {
+      const start = currentPos();
+      let value = '';
+      while (pos < source.length) {
+        const c = peek();
+        // Stop before operators
+        if (c === '>' && peek(1) === '>') break;
+        if (c === '-' && peek(1) === '>') break;
+        if (!isBareIdChar(c)) break;
+        value += c;
+        advance();
+      }
+      if (value.length > 0) {
+        tokens.push(makeToken('ID', value, value, start, currentPos()));
+        continue;
+      }
+    }
+
+    // Unknown character
+    const errStart = currentPos();
+    const unknown = advance();
+    diagnostics.push({
+      severity: 'error', code: 'L002',
+      message: `Unexpected character: ${JSON.stringify(unknown)}`,
+      range: { start: errStart, end: currentPos() },
+    });
+  }
+
+  tokens.push(makeToken('EOF', '', '', currentPos(), currentPos()));
+  return { tokens, diagnostics };
+}
+
+function isBareIdStart(ch: string): boolean {
+  return isBareIdChar(ch);
+}
+
+function isBareIdChar(ch: string): boolean {
+  if (ch === '_' || ch === '-') return true;
+  return /[\p{L}\p{N}]/u.test(ch);
+}
