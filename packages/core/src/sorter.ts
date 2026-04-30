@@ -6,7 +6,7 @@ export function sortEdges(edges: EdgeSet, graph: Graph): NormalizedEdge[] {
 
   function find(x: string): string {
     if (!parent.has(x)) parent.set(x, x);
-    const p = parent.get(x)!;
+    const p = parent.get(x) ?? x;
     if (p === x) return x;
     const root = find(p);
     parent.set(x, root);
@@ -40,8 +40,13 @@ export function sortEdges(edges: EdgeSet, graph: Graph): NormalizedEdge[] {
     if (kind === 'artifact' && !hasIncoming.has(id)) ranks.set(id, 0);
   }
 
+  // In a DAG, rank propagation converges in at most V passes.
+  // Cap iterations to guard against infinite loops on cyclic primary graphs.
   let changed = true;
-  while (changed) {
+  let iterations = 0;
+  const maxIterations = graph.nodes.size + 1;
+  while (changed && iterations < maxIterations) {
+    iterations++;
     changed = false;
     for (const e of graph.primaryEdges) {
       const r = (ranks.get(e.from) ?? 0) + 1;

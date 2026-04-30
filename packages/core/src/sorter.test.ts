@@ -57,4 +57,12 @@ describe('sortEdges', () => {
     const result = sorted('x >> P2 -> y\na >> P1 -> b');
     expect(result[0]).toMatchObject({ artifact: 'a' });
   });
+
+  it('cyclic primary graph: terminates without hanging', () => {
+    // A -> P1 -> B -> P2 -> A forms a cycle on the primary graph
+    const start = Date.now();
+    const result = sorted('A >> P1 -> B\nB >> P2 -> A');
+    expect(Date.now() - start).toBeLessThan(1000);
+    expect(result.length).toBe(4);
+  });
 });
