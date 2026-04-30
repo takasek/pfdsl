@@ -16,8 +16,7 @@ function zeroPos(): Position {
 }
 
 function zeroRange() {
-  const p = zeroPos();
-  return { start: p, end: p };
+  return { start: zeroPos(), end: zeroPos() };
 }
 
 export function normalize(doc: Document, fm: Frontmatter | null): NormalizeResult {
