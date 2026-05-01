@@ -76,9 +76,9 @@ describe('lex', () => {
     expect(result.diagnostics).toHaveLength(0);
   });
 
-  it('# starts a comment until EOL', () => {
-    expect(types('A # comment\nB')).toEqual(['ID', 'NEWLINE', 'ID', 'EOF']);
-    expect(values('A # comment\nB')).toEqual(['A', '\n', 'B', '']);
+  it('# starts a comment until EOL (emitted as COMMENT token)', () => {
+    expect(types('A # comment\nB')).toEqual(['ID', 'COMMENT', 'NEWLINE', 'ID', 'EOF']);
+    expect(values('A # comment\nB')).toEqual(['A', '# comment', '\n', 'B', '']);
   });
 
   it('whitespace (space, tab) is skipped', () => {

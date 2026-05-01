@@ -62,9 +62,12 @@ export function lex(source: string): LexResult {
       continue;
     }
 
-    // Comment: # to EOL (only outside quoted strings)
+    // Comment: # to EOL (emitted as COMMENT token; parser skips it)
     if (ch === '#') {
-      while (pos < source.length && peek() !== '\n') advance();
+      const start = currentPos();
+      let raw = '';
+      while (pos < source.length && peek() !== '\n') raw += advance();
+      tokens.push(makeToken('COMMENT', raw, raw, start, currentPos()));
       continue;
     }
 

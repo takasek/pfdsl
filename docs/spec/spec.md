@@ -248,13 +248,46 @@ statement は以下で区切られる。
 * 改行
 * ;
 
-空行は無視される。
+空行（連続する改行2個以上）は強制終端として扱われる。
+
+7.1 行継続
+
+末尾トークン (`<id>` または `]`) と継続オペレータ (`>>`, `>>?`, `->`) の間に
+改行が入っても、同一 statement として扱う。
+
+* 改行は最大1個まで（途中に空行があれば終端）
+* 改行と継続オペレータの間にコメント行を挟んでもよい（コメントは改行カウントをリセット）
+* 継続オペレータを行末に置くこと（例: `A >>\n P -> B`）は禁止 — 行頭オペレータのみ継続合図
+
+例:
+
+```pfdsl
+[a, b, c]
+  >> proc -> result      # OK: 末尾 ] の後改行→行頭 >>
+
+A >> P
+  -> B                   # OK: 末尾 ID(P) の後改行→行頭 ->
+
+[a, b]
+# 注釈
+  >> proc -> result      # OK: コメント挟みは継続
+
+[a, b]
+
+  >> proc -> result      # NG: 空行で強制終端
+
+A >>
+  P -> B                 # NG: 行末オペレータ
+```
 
 ⸻
 
 8. 構文
 
-<graph> ::= <statement> (<separator> <statement>)* <separator> ::= newline+ | ';' <statement> ::= <chain> | <edge>
+<graph> ::= <statement> (<separator> <statement>)* <separator> ::= newline{2,} | ';' <statement> ::= <chain> | <edge>
+
+(注) 末尾トークンと継続オペレータの間の単一改行は statement separator
+ではなく行継続として扱う (§7.1)。
 
 <chain> ::= <artifact-expr> <input-op> <process-id> '->' <artifact-expr>
 ( <input-op> <process-id> '->' <artifact-expr> )*

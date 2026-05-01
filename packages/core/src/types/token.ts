@@ -7,6 +7,7 @@ export type TokenType =
   | 'COMMA'           // ,
   | 'SEMICOLON'       // ;
   | 'NEWLINE'
+  | 'COMMENT'         // # ... (to EOL)
   | 'ID'
   | 'EOF';
 

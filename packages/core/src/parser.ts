@@ -1,4 +1,4 @@
-import type { Token } from './types/index.js';
+import type { Token, TokenType } from './types/index.js';
 import type {
   Document, Statement, ChainStatement, ChainSegment,
   InputEdgeStatement, FeedbackEdgeStatement, OutputEdgeStatement,
@@ -27,7 +27,71 @@ export function parseTokens(tokens: Token[]): ParseResult {
   }
 
   function skipSeparators(): void {
-    while (peek().type === 'NEWLINE' || peek().type === 'SEMICOLON') advance();
+    while (
+      peek().type === 'NEWLINE' ||
+      peek().type === 'SEMICOLON' ||
+      peek().type === 'COMMENT'
+    ) advance();
+  }
+
+  // Continuation: a NEWLINE-and/or-COMMENT run is consumed only if the next
+  // significant token is one of `ops` AND no blank line sits inside the run.
+  // A "blank line" is two or more consecutive NEWLINEs (COMMENT resets the
+  // run, so `NEWLINE COMMENT NEWLINE` is still continuation-eligible).
+  // Returns true and advances pos if continuation succeeded, else leaves pos
+  // untouched so the NEWLINE remains a statement terminator.
+  function tryContinuation(...ops: TokenType[]): boolean {
+    let i = pos;
+    let consecutive = 0;
+    let maxConsecutive = 0;
+    while (i < tokens.length) {
+      const t = tokens[i]!.type;
+      if (t === 'NEWLINE') {
+        consecutive++;
+        if (consecutive > maxConsecutive) maxConsecutive = consecutive;
+      } else if (t === 'COMMENT') {
+        consecutive = 0;
+      } else {
+        break;
+      }
+      i++;
+    }
+    if (
+      i > pos &&
+      i < tokens.length &&
+      ops.includes(tokens[i]!.type) &&
+      maxConsecutive <= 1
+    ) {
+      pos = i;
+      return true;
+    }
+    return false;
+  }
+
+  // Lookahead from current ID position to detect output-edge form
+  // `proc -> art`, allowing a single NEWLINE / inline COMMENTs in between.
+  function isOutputEdgeStart(): boolean {
+    if (peek().type !== 'ID') return false;
+    let i = pos + 1;
+    let consecutive = 0;
+    let maxConsecutive = 0;
+    while (i < tokens.length) {
+      const t = tokens[i]!.type;
+      if (t === 'NEWLINE') {
+        consecutive++;
+        if (consecutive > maxConsecutive) maxConsecutive = consecutive;
+      } else if (t === 'COMMENT') {
+        consecutive = 0;
+      } else {
+        break;
+      }
+      i++;
+    }
+    return (
+      i < tokens.length &&
+      tokens[i]!.type === 'ARROW_OUTPUT' &&
+      maxConsecutive <= 1
+    );
   }
 
   function parseId(): IdNode | null {
@@ -94,11 +158,10 @@ export function parseTokens(tokens: Token[]): ParseResult {
   }
 
   function parseStatement(): Statement | null {
-    const t = peek();
-
-    // Output edge: ID '->' artifact
-    if (t.type === 'ID' && peek(1).type === 'ARROW_OUTPUT') {
+    // Output edge: ID '->' artifact (NEWLINE / inline COMMENT allowed between)
+    if (isOutputEdgeStart()) {
       const processId = parseId()!;
+      tryContinuation('ARROW_OUTPUT');
       advance(); // consume ->
       const artifact = parseArtifactExpr();
       if (!artifact) {
@@ -120,6 +183,7 @@ export function parseTokens(tokens: Token[]): ParseResult {
       return null;
     }
 
+    tryContinuation('ARROW_INPUT', 'ARROW_FEEDBACK');
     const opToken = peek();
     if (opToken.type !== 'ARROW_INPUT' && opToken.type !== 'ARROW_FEEDBACK') {
       diagnostics.push({ severity: 'error', code: 'P005',
@@ -140,6 +204,7 @@ export function parseTokens(tokens: Token[]): ParseResult {
     }
 
     // Not followed by ->: simple edge
+    tryContinuation('ARROW_OUTPUT');
     if (peek().type !== 'ARROW_OUTPUT') {
       if (op === '>>') {
         return { type: 'input-edge', artifact: head, process: processId,
@@ -162,7 +227,9 @@ export function parseTokens(tokens: Token[]): ParseResult {
 
     const segments: ChainSegment[] = [{ op, process: processId, output: firstOutput }];
 
-    while (peek().type === 'ARROW_INPUT' || peek().type === 'ARROW_FEEDBACK') {
+    while (true) {
+      tryContinuation('ARROW_INPUT', 'ARROW_FEEDBACK');
+      if (peek().type !== 'ARROW_INPUT' && peek().type !== 'ARROW_FEEDBACK') break;
       const segOp: '>>' | '>>?' = peek().type === 'ARROW_INPUT' ? '>>' : '>>?';
       advance();
       const segProcess = parseId();
@@ -173,6 +240,7 @@ export function parseTokens(tokens: Token[]): ParseResult {
         skipToStatementEnd();
         break;
       }
+      tryContinuation('ARROW_OUTPUT');
       if (peek().type !== 'ARROW_OUTPUT') {
         diagnostics.push({ severity: 'error', code: 'P009',
           message: 'Expected -> in chain continuation',
