@@ -1,1 +1,83 @@
-export {};
+import { loadFrontmatter } from './frontmatter.js';
+import { lex } from './lexer.js';
+import { parseTokens } from './parser.js';
+import { normalize } from './normalizer.js';
+import { buildGraph as buildGraphInternal } from './graph.js';
+import { sortEdges } from './sorter.js';
+import { validate } from './validator.js';
+import { formatEdges } from './formatter.js';
+import type { Document, Frontmatter, Diagnostic } from './types/index.js';
+
+export type { TokenType, Position, Token } from './types/index.js';
+export type {
+  IdNode, ArtifactExpr, ChainSegment,
+  ChainStatement, InputEdgeStatement, FeedbackEdgeStatement, OutputEdgeStatement,
+  Statement, Document,
+} from './types/index.js';
+export type { NormalizedEdge, EdgeSet } from './types/index.js';
+export type { NodeKind, PrimaryEdge, FeedbackEdge, Graph } from './types/index.js';
+export type { DiagnosticSeverity, Range, Diagnostic } from './types/index.js';
+export type { ArtifactMeta, ProcessMeta, Frontmatter, LoadResult } from './types/index.js';
+
+export type { LexResult } from './lexer.js';
+export type { ParseResult } from './parser.js';
+export type { NormalizeResult } from './normalizer.js';
+
+export interface ParseDocResult {
+  document: Document;
+  frontmatter: Frontmatter | null;
+  diagnostics: Diagnostic[];
+}
+
+export interface FormatResult {
+  output: string;
+  diagnostics: Diagnostic[];
+}
+
+export function parse(source: string): ParseDocResult {
+  const { frontmatter, body, diagnostics: fmDiags, bodyStartLine } = loadFrontmatter(source);
+  const { tokens, diagnostics: lexDiags } = lex(body);
+  // Adjust token positions by bodyStartLine offset
+  const lineOffset = bodyStartLine - 1;
+  if (lineOffset > 0) {
+    for (const t of tokens) {
+      t.start = { ...t.start, line: t.start.line + lineOffset };
+      t.end   = { ...t.end,   line: t.end.line   + lineOffset };
+    }
+  }
+  const { document, diagnostics: parseDiags } = parseTokens(tokens);
+  return {
+    document,
+    frontmatter,
+    diagnostics: [...fmDiags, ...lexDiags, ...parseDiags],
+  };
+}
+
+export {
+  normalize as normalizeDocument,
+  buildGraphInternal as buildGraph,
+  validate as validateGraph,
+  sortEdges,
+  formatEdges,
+};
+
+export function format(source: string): FormatResult {
+  const diagnostics: Diagnostic[] = [];
+  const { frontmatter, body, diagnostics: fmDiags } = loadFrontmatter(source);
+  diagnostics.push(...fmDiags);
+
+  const { tokens, diagnostics: lexDiags } = lex(body);
+  diagnostics.push(...lexDiags);
+
+  const { document, diagnostics: parseDiags } = parseTokens(tokens);
+  diagnostics.push(...parseDiags);
+
+  const { edges, nodeKinds, diagnostics: normDiags } = normalize(document, frontmatter);
+  diagnostics.push(...normDiags);
+
+  const graph = buildGraphInternal(edges, nodeKinds);
+  diagnostics.push(...validate(edges, graph, frontmatter));
+
+  const sorted = sortEdges(edges, graph);
+  return { output: formatEdges(sorted), diagnostics };
+}
