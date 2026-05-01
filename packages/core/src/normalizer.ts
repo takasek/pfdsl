@@ -2,8 +2,9 @@ import type {
   Document, Statement, ArtifactExpr,
   EdgeSet, NormalizedEdge,
   Frontmatter,
-  Diagnostic, Position,
+  Diagnostic,
 } from './types/index.js';
+import { zeroRange } from './position.js';
 
 export interface NormalizeResult {
   edges: EdgeSet;
@@ -11,17 +12,16 @@ export interface NormalizeResult {
   diagnostics: Diagnostic[];
 }
 
-function zeroPos(): Position {
-  return { line: 1, column: 1, offset: 0 };
-}
-
-function zeroRange() {
-  return { start: zeroPos(), end: zeroPos() };
+function edgeKey(edge: NormalizedEdge): string {
+  return edge.kind === 'output'
+    ? `output\0${edge.process}\0${edge.artifact}`
+    : `${edge.kind}\0${edge.artifact}\0${edge.process}`;
 }
 
 export function normalize(doc: Document, fm: Frontmatter | null): NormalizeResult {
   const diagnostics: Diagnostic[] = [];
   const rawEdges: NormalizedEdge[] = [];
+  const seenEdges = new Set<string>();
   const nodeKinds = new Map<string, 'artifact' | 'process'>();
 
   // Pre-populate from front matter (takes priority)
@@ -49,18 +49,13 @@ export function normalize(doc: Document, fm: Frontmatter | null): NormalizeResul
   }
 
   function addEdge(edge: NormalizedEdge): void {
-    const dup = rawEdges.some(e => {
-      if (e.kind !== edge.kind) return false;
-      if (edge.kind === 'input'    && e.kind === 'input')    return e.artifact === edge.artifact && e.process === edge.process;
-      if (edge.kind === 'feedback' && e.kind === 'feedback') return e.artifact === edge.artifact && e.process === edge.process;
-      if (edge.kind === 'output'   && e.kind === 'output')   return e.process  === edge.process  && e.artifact === edge.artifact;
-      return false;
-    });
-    if (dup) {
+    const key = edgeKey(edge);
+    if (seenEdges.has(key)) {
       diagnostics.push({ severity: 'warning', code: 'N003',
         message: 'Duplicate edge', range: zeroRange() });
       return;
     }
+    seenEdges.add(key);
     rawEdges.push(edge);
   }
 

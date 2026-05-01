@@ -11,6 +11,10 @@ export interface ExportOptions {
 
 const DEFAULT_FEEDBACK_COLOR = '#888888';
 
+const QUOTE_BACKSLASH_RE = /\\/g;
+const QUOTE_DQUOTE_RE = /"/g;
+const QUOTE_NEWLINE_RE = /\n/g;
+
 export function exportDot(
   graph: Graph,
   frontmatter: Frontmatter | null = null,
@@ -65,5 +69,8 @@ function lookupTitle(id: string, kind: NodeKind, fm: Frontmatter | null): string
 }
 
 function quote(s: string): string {
-  return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n') + '"';
+  return '"' + s
+    .replace(QUOTE_BACKSLASH_RE, '\\\\')
+    .replace(QUOTE_DQUOTE_RE, '\\"')
+    .replace(QUOTE_NEWLINE_RE, '\\n') + '"';
 }

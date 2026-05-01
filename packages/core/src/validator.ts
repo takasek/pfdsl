@@ -1,7 +1,5 @@
-import type { EdgeSet, Graph, Frontmatter, Diagnostic, Position } from './types/index.js';
-
-function zeroPos(): Position { return { line: 1, column: 1, offset: 0 }; }
-function zeroRange() { return { start: zeroPos(), end: zeroPos() }; }
+import type { EdgeSet, Graph, Frontmatter, Diagnostic } from './types/index.js';
+import { zeroRange } from './position.js';
 
 export function validate(edges: EdgeSet, graph: Graph, fm: Frontmatter | null): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];

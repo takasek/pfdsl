@@ -40,8 +40,8 @@ export function sortEdges(edges: EdgeSet, graph: Graph): NormalizedEdge[] {
     if (kind === 'artifact' && !hasIncoming.has(id)) ranks.set(id, 0);
   }
 
-  // In a DAG, rank propagation converges in at most V passes.
-  // Cap iterations to guard against infinite loops on cyclic primary graphs.
+  // Rank propagation converges in at most V passes on a DAG; cap iterations to
+  // guard against cyclic primary graphs.
   let changed = true;
   let iterations = 0;
   const maxIterations = graph.nodes.size + 1;
@@ -70,19 +70,20 @@ export function sortEdges(edges: EdgeSet, graph: Graph): NormalizedEdge[] {
     /* output */               return 2;
   }
 
-  function edgeComponentKey(e: NormalizedEdge): string {
-    const ref = e.kind === 'output' ? e.process : e.artifact;
-    return componentKey(ref);
+  function edgeLexKey(e: NormalizedEdge): string {
+    return e.kind === 'output'
+      ? `${e.process}\0${e.artifact}`
+      : `${e.artifact}\0${e.process}`;
   }
 
-  function edgeLexKey(e: NormalizedEdge): string {
-    if (e.kind === 'input')    return `${e.artifact}\0${e.process}`;
-    if (e.kind === 'feedback') return `${e.artifact}\0${e.process}`;
-    return `${e.process}\0${e.artifact}`;
+  const compKeys = new Map<NormalizedEdge, string>();
+  for (const e of edges.edges) {
+    const ref = e.kind === 'output' ? e.process : e.artifact;
+    compKeys.set(e, componentKey(ref));
   }
 
   return [...edges.edges].sort((a, b) => {
-    const ck = edgeComponentKey(a).localeCompare(edgeComponentKey(b));
+    const ck = compKeys.get(a)!.localeCompare(compKeys.get(b)!);
     if (ck !== 0) return ck;
     const rk = edgeRank(a) - edgeRank(b);
     if (rk !== 0) return rk;

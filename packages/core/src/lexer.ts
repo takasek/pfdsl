@@ -1,5 +1,7 @@
 import type { Token, TokenType, Position, Diagnostic } from './types/index.js';
 
+const BARE_ID_RE = /[\p{L}\p{N}]/u;
+
 export interface LexResult {
   tokens: Token[];
   diagnostics: Diagnostic[];
@@ -51,10 +53,8 @@ export function lex(source: string): LexResult {
   while (pos < source.length) {
     const ch = peek();
 
-    // Skip horizontal whitespace
     if (ch === ' ' || ch === '\t' || ch === '\r') { advance(); continue; }
 
-    // Newline token
     if (ch === '\n') {
       const start = currentPos();
       advance();
@@ -127,7 +127,7 @@ export function lex(source: string): LexResult {
 
     // Bare ID: Unicode letters/numbers + _ -
     // (- followed by > is already caught above as ARROW_OUTPUT; > followed by > is ARROW_INPUT)
-    if (isBareIdStart(ch)) {
+    if (isBareIdChar(ch)) {
       const start = currentPos();
       let value = '';
       while (pos < source.length) {
@@ -159,11 +159,7 @@ export function lex(source: string): LexResult {
   return { tokens, diagnostics };
 }
 
-function isBareIdStart(ch: string): boolean {
-  return isBareIdChar(ch);
-}
-
 function isBareIdChar(ch: string): boolean {
   if (ch === '_' || ch === '-') return true;
-  return /[\p{L}\p{N}]/u.test(ch);
+  return BARE_ID_RE.test(ch);
 }

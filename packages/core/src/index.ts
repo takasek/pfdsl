@@ -41,8 +41,8 @@ export function parse(source: string): ParseDocResult {
   const lineOffset = bodyStartLine - 1;
   if (lineOffset > 0) {
     for (const t of tokens) {
-      t.start = { ...t.start, line: t.start.line + lineOffset };
-      t.end   = { ...t.end,   line: t.end.line   + lineOffset };
+      t.start.line += lineOffset;
+      t.end.line   += lineOffset;
     }
   }
   const { document, diagnostics: parseDiags } = parseTokens(tokens);

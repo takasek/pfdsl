@@ -35,6 +35,15 @@ function readSource(file: string): string {
   return readFileSync(file, 'utf-8');
 }
 
+function diagText(diags: Diagnostic[], file: string): string {
+  return diags.map(d => formatDiagnostic(d, file)).join('\n') + '\n';
+}
+
+function failIfErrors(diags: Diagnostic[], file: string): CommandResult | null {
+  const errs = diags.filter(d => d.severity === 'error');
+  return errs.length > 0 ? fail(diagText(errs, file)) : null;
+}
+
 export function runCheck(file: string): CommandResult {
   const source = readSource(file);
   const { document, frontmatter, diagnostics: parseDiags } = parse(source);
@@ -54,10 +63,8 @@ export interface FmtOptions { write?: boolean }
 export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
   const source = readSource(file);
   const { output, diagnostics } = format(source);
-  const errs = diagnostics.filter(d => d.severity === 'error');
-  if (errs.length > 0) {
-    return fail(errs.map(d => formatDiagnostic(d, file)).join('\n') + '\n');
-  }
+  const failed = failIfErrors(diagnostics, file);
+  if (failed) return failed;
   if (opts.write) {
     writeFileSync(file, output, 'utf-8');
     return ok();
@@ -68,15 +75,11 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 export function runNormalize(file: string): CommandResult {
   const source = readSource(file);
   const { document, frontmatter, diagnostics: parseDiags } = parse(source);
-  const errs = parseDiags.filter(d => d.severity === 'error');
-  if (errs.length > 0) {
-    return fail(errs.map(d => formatDiagnostic(d, file)).join('\n') + '\n');
-  }
+  const failedParse = failIfErrors(parseDiags, file);
+  if (failedParse) return failedParse;
   const { edges, nodeKinds, diagnostics: normDiags } = normalizeDocument(document, frontmatter);
-  const nerrs = normDiags.filter(d => d.severity === 'error');
-  if (nerrs.length > 0) {
-    return fail(nerrs.map(d => formatDiagnostic(d, file)).join('\n') + '\n');
-  }
+  const failedNorm = failIfErrors(normDiags, file);
+  if (failedNorm) return failedNorm;
   const graph = buildGraph(edges, nodeKinds);
   const sorted = sortEdges(edges, graph);
   return ok(formatEdges(sorted));
@@ -87,10 +90,8 @@ export async function runGraph(file: string, opts: GraphOptions = {}): Promise<C
   const fmt = opts.format ?? 'dot';
   const source = readSource(file);
   const { document, frontmatter, diagnostics: parseDiags } = parse(source);
-  const errs = parseDiags.filter(d => d.severity === 'error');
-  if (errs.length > 0) {
-    return fail(errs.map(d => formatDiagnostic(d, file)).join('\n') + '\n');
-  }
+  const failed = failIfErrors(parseDiags, file);
+  if (failed) return failed;
   const { edges, nodeKinds } = normalizeDocument(document, frontmatter);
   const graph = buildGraph(edges, nodeKinds);
   const dot = exportDot(graph, frontmatter);
