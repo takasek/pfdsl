@@ -1,4 +1,4 @@
-PFDSL仕様書 v0.0.2
+PFDSL仕様書 v0.0.3
 
 1. 目的
 
@@ -58,16 +58,18 @@ title: 設計
 
 すべて任意とする。
 
-| key         | 内容           |
-| ----------- | ------------ |
-| title       | 文書名          |
-| version     | 文書バージョン      |
-| dsl_version | PFDSL仕様バージョン |
-| description | 文書説明         |
-| tags        | 任意タグ         |
-| layout      | レイアウト補助情報    |
-| artifact    | 成果物定義        |
-| process     | プロセス定義       |
+| key          | 内容                                         |
+| ------------ | ------------------------------------------ |
+| title        | 文書名                                        |
+| version      | 文書バージョン                                    |
+| dsl_version  | PFDSL仕様バージョン                               |
+| description  | 文書説明                                       |
+| tags         | 任意タグ                                       |
+| layout       | レイアウト補助情報                                  |
+| artifact     | 成果物定義                                      |
+| process      | プロセス定義                                     |
+| statusStyles | status → DOT属性 マッピング（§2.7参照）              |
+| tagStyles    | tag → DOT属性 マッピング（§2.7参照）                 |
 
 未定義キーを含んでもよい。処理系は無視してよい。
 
@@ -81,6 +83,8 @@ artifact:
 spec:
 title: 仕様書
 owner: po
+status: done
+tags: [external, critical]
 
 process:
 impl:
@@ -89,6 +93,7 @@ owner: dev-team
 estimate: 5d
 
 title は表示名として利用してよい。
+status / tags は §2.7 を参照。
 
 ⸻
 
@@ -139,6 +144,58 @@ direction: LR
 * BT
 
 layout 以下の未定義キーは実装依存とする。
+
+⸻
+
+2.7 Artifact status / tags / Style マッピング
+
+Artifact に対し進捗状態 status と任意ラベル tags を付与してよい。可視化バックエンド（Graphviz 等）はこれらを node 属性へ反映してよい。対象は Artifact のみ（Process には適用しない）。
+
+2.7.1 status
+
+artifact:
+spec:
+status: done
+
+* 列挙値: done | wip | todo | blocked
+* 1 Artifact につき 0 個または 1 個
+* 列挙外の値は error
+
+2.7.2 tags
+
+artifact:
+spec:
+tags: [external, critical]
+
+* 任意文字列の配列（0..N 個）
+* 検証は行わない（自由ラベル）
+* tagStyles に未定義のタグでも error/warning とせず無視する
+
+2.7.3 statusStyles / tagStyles
+
+statusStyles:
+done:    { fillcolor: lightgray, style: filled, fontcolor: dimgray }
+wip:     { fillcolor: lightyellow, style: filled }
+blocked: { fillcolor: salmon, style: filled }
+
+tagStyles:
+external: { color: blue }
+critical: { penwidth: "3" }
+
+* 値は属性マップ（プロジェクト共通スタイル）
+* 許可属性: fillcolor | color | fontcolor | style | penwidth
+* statusStyles のキーは status 列挙値のみ許可（列挙外は error）
+* tagStyles のキーは任意文字列
+* 許可外属性キーは error
+
+2.7.4 適用順
+
+可視化処理系は次の順で属性を合成してよい。
+
+1. tags 配列を逆順走査し、tagStyles[tag] を順次マージ（後マージ勝ち = 先頭タグ最終勝者）
+2. statusStyles[status] を最後にマージ（status が全体最終勝者）
+
+statusStyles / tagStyles 未定義時は属性追加なし（通常描画）。組み込み既定スタイルは持たない。
 
 ⸻
 
@@ -473,6 +530,13 @@ artifact.C.parts = [Ca, Cb]
 * 自己参照は error
 * parts 循環参照は error としてよい
 
+15.6 status / Style 制約
+
+* artifact.X.status は §2.7.1 の列挙値のみ許可。列挙外は error
+* statusStyles のキーは §2.7.1 の列挙値のみ許可。列挙外は error
+* statusStyles / tagStyles の属性キーは §2.7.3 の許可属性のみ。許可外は error
+* tags 配列の各要素は任意文字列（検証なし）
+
 ⸻
 
 16. エラー方針
@@ -484,6 +548,7 @@ strict mode を標準とする。
 * 単一生成元違反: error
 * 不正YAML: error
 * 不正parts参照: error
+* 不正 status / statusStyles / tagStyles: error
 * 重複edge: warning可
 
 ⸻
@@ -536,9 +601,16 @@ parts: [Ca, Cb]
 
 19. バージョン
 
-本仕様は PFDSL仕様書 v0.0.2 とする。
+本仕様は PFDSL仕様書 v0.0.3 とする。
 
-v0.0.1 からの主な変更点：
+v0.0.2 からの主な変更点：
+
+* Artifact に status (enum) / tags (任意配列) を追加
+* front matter に statusStyles / tagStyles マッピングを追加
+* Style 適用順（tags 逆順マージ → status 最終上書き）を規定
+* 制約 §15.6 / エラー方針に status / Style 検証を追加
+
+v0.0.1 から v0.0.2 の主な変更点：
 
 * Artifact に parts 構造を追加
 * Primary / Feedback 二層グラフを明文化

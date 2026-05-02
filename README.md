@@ -41,7 +41,7 @@ docs/                        ADRs, plans, sample .pfdsl files
 ```bash
 pnpm install
 pnpm -r build
-pnpm -r test       # 113 tests across 4 packages
+pnpm -r test       # 128 tests across 4 packages
 pnpm -r typecheck
 ```
 
@@ -118,3 +118,34 @@ Key syntax:
 - Trailing tokens (`<id>` or `]`) may be followed by a single newline (and
   optional comment lines) before a continuation operator (`>>`, `>>?`,
   `->`); blank lines force statement termination.
+
+## Artifact status & tags (DOT styling)
+
+Annotate artifacts with progress `status` (enum) and free-form `tags`,
+then map them to DOT node attributes via frontmatter.
+
+```pfdsl
+---
+artifact:
+  spec:
+    status: done
+    tags: [external, critical]
+  impl:
+    status: wip
+statusStyles:
+  done: { fillcolor: lightgray, style: filled }
+  wip:  { fillcolor: lightyellow, style: filled }
+tagStyles:
+  external: { color: blue }
+  critical: { penwidth: "3" }
+---
+spec >> P -> impl
+```
+
+- `status` ∈ `done | wip | todo | blocked` (one per artifact)
+- `tags` — arbitrary string array; undefined entries in `tagStyles` are silently ignored
+- Allowed style attrs: `fillcolor | color | fontcolor | style | penwidth`
+- Apply order: `tags` reverse-merge (first tag wins) → `statusStyles` overrides last
+- Applies to artifact nodes only
+
+See [docs/spec/spec.md §2.7](docs/spec/spec.md) for full rules.
