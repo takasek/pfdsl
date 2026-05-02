@@ -1,13 +1,13 @@
 import type {
   Document, Statement, ArtifactExpr,
-  EdgeSet, NormalizedEdge,
+  NormalizedEdge,
   Frontmatter,
   Diagnostic,
 } from './types/index.js';
 import { zeroRange } from './position.js';
 
 export interface NormalizeResult {
-  edges: EdgeSet;
+  edges: NormalizedEdge[];
   nodeKinds: Map<string, 'artifact' | 'process'>;
   diagnostics: Diagnostic[];
 }
@@ -118,5 +118,5 @@ export function normalize(doc: Document, fm: Frontmatter | null): NormalizeResul
 
   for (const stmt of doc.statements) processStmt(stmt);
 
-  return { edges: { edges: rawEdges }, nodeKinds, diagnostics };
+  return { edges: rawEdges, nodeKinds, diagnostics };
 }

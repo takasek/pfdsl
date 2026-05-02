@@ -1,12 +1,16 @@
-import type { EdgeSet, Graph, Frontmatter, Diagnostic } from './types/index.js';
+import type { NormalizedEdge, NodeKind, Frontmatter, Diagnostic } from './types/index.js';
 import { zeroRange } from './position.js';
 
-export function validate(edges: EdgeSet, graph: Graph, fm: Frontmatter | null): Diagnostic[] {
+export function validate(
+  edges: NormalizedEdge[],
+  nodeKinds: Map<string, NodeKind>,
+  fm: Frontmatter | null,
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
   // V001: single-source constraint (Primary Graph)
   const artifactGenerators = new Map<string, string[]>();
-  for (const e of edges.edges) {
+  for (const e of edges) {
     if (e.kind === 'output') {
       const gens = artifactGenerators.get(e.artifact) ?? [];
       gens.push(e.process);
@@ -24,13 +28,13 @@ export function validate(edges: EdgeSet, graph: Graph, fm: Frontmatter | null): 
   // V002 / V003: process completeness
   const processInputCount  = new Map<string, number>();
   const processOutputCount = new Map<string, number>();
-  for (const [id, kind] of graph.nodes) {
+  for (const [id, kind] of nodeKinds) {
     if (kind === 'process') {
       processInputCount.set(id, 0);
       processOutputCount.set(id, 0);
     }
   }
-  for (const e of edges.edges) {
+  for (const e of edges) {
     if (e.kind === 'input' || e.kind === 'feedback') {
       processInputCount.set(e.process, (processInputCount.get(e.process) ?? 0) + 1);
     } else {
@@ -50,7 +54,7 @@ export function validate(edges: EdgeSet, graph: Graph, fm: Frontmatter | null): 
   const artifactMeta = fm?.artifact ?? {};
   for (const [artifactId, meta] of Object.entries(artifactMeta)) {
     for (const partId of meta.parts ?? []) {
-      if (graph.nodes.get(partId) === 'process') {
+      if (nodeKinds.get(partId) === 'process') {
         diagnostics.push({ severity: 'error', code: 'V004',
           message: `Parts member '${partId}' of '${artifactId}' is a process`,
           range: zeroRange() });

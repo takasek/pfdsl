@@ -1,6 +1,6 @@
-import type { EdgeSet, NormalizedEdge, Graph } from './types/index.js';
+import type { NormalizedEdge, Graph } from './types/index.js';
 
-export function sortEdges(edges: EdgeSet, graph: Graph): NormalizedEdge[] {
+export function sortEdges(edges: NormalizedEdge[], graph: Graph): NormalizedEdge[] {
   // Union-Find for connected components (primary graph, undirected)
   const parent = new Map<string, string>();
 
@@ -77,12 +77,12 @@ export function sortEdges(edges: EdgeSet, graph: Graph): NormalizedEdge[] {
   }
 
   const compKeys = new Map<NormalizedEdge, string>();
-  for (const e of edges.edges) {
+  for (const e of edges) {
     const ref = e.kind === 'output' ? e.process : e.artifact;
     compKeys.set(e, componentKey(ref));
   }
 
-  return [...edges.edges].sort((a, b) => {
+  return [...edges].sort((a, b) => {
     const ck = compKeys.get(a)!.localeCompare(compKeys.get(b)!);
     if (ck !== 0) return ck;
     const rk = edgeRank(a) - edgeRank(b);

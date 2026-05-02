@@ -48,8 +48,7 @@ export function runCheck(file: string): CommandResult {
   const source = readSource(file);
   const { document, frontmatter, diagnostics: parseDiags } = parse(source);
   const { edges, nodeKinds, diagnostics: normDiags } = normalizeDocument(document, frontmatter);
-  const graph = buildGraph(edges, nodeKinds);
-  const valDiags = validateGraph(edges, graph, frontmatter);
+  const valDiags = validateGraph(edges, nodeKinds, frontmatter);
   const all = [...parseDiags, ...normDiags, ...valDiags];
   const lines = all.map(d => formatDiagnostic(d, file));
   const errCount = all.filter(d => d.severity === 'error').length;

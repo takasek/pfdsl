@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse, normalizeDocument, buildGraph, validateGraph, sortEdges, format } from './index.js';
+import { parse, normalizeDocument, validateGraph, format } from './index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const samplePath = resolve(__dirname, '../../../docs/pfdsl_implementation_flow.pfdsl');
@@ -22,14 +22,13 @@ describe('public API', () => {
     const { edges, diagnostics } = normalizeDocument(document, frontmatter);
     const errors = diagnostics.filter(d => d.severity === 'error');
     expect(errors).toHaveLength(0);
-    expect(edges.edges.length).toBeGreaterThan(0);
+    expect(edges.length).toBeGreaterThan(0);
   });
 
   it('validateGraph: sample file passes validation', () => {
     const { document, frontmatter } = parse(sampleSource);
     const { edges, nodeKinds } = normalizeDocument(document, frontmatter);
-    const graph = buildGraph(edges, nodeKinds);
-    const diags = validateGraph(edges, graph, frontmatter);
+    const diags = validateGraph(edges, nodeKinds, frontmatter);
     const errors = diags.filter(d => d.severity === 'error');
     expect(errors).toHaveLength(0);
   });

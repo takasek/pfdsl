@@ -1,11 +1,11 @@
-import type { EdgeSet, Graph, NodeKind, PrimaryEdge, FeedbackEdge } from './types/index.js';
+import type { NormalizedEdge, Graph, NodeKind, PrimaryEdge, FeedbackEdge } from './types/index.js';
 
-export function buildGraph(edges: EdgeSet, nodeKinds: Map<string, NodeKind>): Graph {
+export function buildGraph(edges: NormalizedEdge[], nodeKinds: Map<string, NodeKind>): Graph {
   const nodes = new Map<string, NodeKind>(nodeKinds);
   const primaryEdges: PrimaryEdge[] = [];
   const feedbackEdges: FeedbackEdge[] = [];
 
-  for (const edge of edges.edges) {
+  for (const edge of edges) {
     if (edge.kind === 'input') {
       if (!nodes.has(edge.artifact)) nodes.set(edge.artifact, 'artifact');
       if (!nodes.has(edge.process))  nodes.set(edge.process,  'process');

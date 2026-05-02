@@ -7,7 +7,7 @@ import type { NormalizedEdge } from './types/index.js';
 function edges(src: string, fm = null): NormalizedEdge[] {
   const { tokens } = lex(src);
   const { document } = parseTokens(tokens);
-  return normalize(document, fm).edges.edges;
+  return normalize(document, fm).edges;
 }
 
 describe('normalize', () => {

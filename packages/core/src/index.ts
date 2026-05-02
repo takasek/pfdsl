@@ -14,7 +14,7 @@ export type {
   ChainStatement, InputEdgeStatement, FeedbackEdgeStatement, OutputEdgeStatement,
   Statement, Document,
 } from './types/index.js';
-export type { NormalizedEdge, EdgeSet } from './types/index.js';
+export type { NormalizedEdge } from './types/index.js';
 export type { NodeKind, PrimaryEdge, FeedbackEdge, Graph } from './types/index.js';
 export type { DiagnosticSeverity, Range, Diagnostic } from './types/index.js';
 export type { ArtifactMeta, ProcessMeta, Frontmatter, LoadResult } from './types/index.js';
@@ -76,7 +76,7 @@ export function format(source: string): FormatResult {
   diagnostics.push(...normDiags);
 
   const graph = buildGraphInternal(edges, nodeKinds);
-  diagnostics.push(...validate(edges, graph, frontmatter));
+  diagnostics.push(...validate(edges, nodeKinds, frontmatter));
 
   const sorted = sortEdges(edges, graph);
   return { output: formatEdges(sorted), diagnostics };

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { lex } from './lexer.js';
 import { parseTokens } from './parser.js';
 import { normalize } from './normalizer.js';
-import { buildGraph } from './graph.js';
 import { validate } from './validator.js';
 import type { Frontmatter } from './types/index.js';
 
@@ -10,8 +9,7 @@ function diagnose(src: string, fm: Frontmatter | null = null) {
   const { tokens } = lex(src);
   const { document } = parseTokens(tokens);
   const { edges, nodeKinds } = normalize(document, fm);
-  const graph = buildGraph(edges, nodeKinds);
-  return validate(edges, graph, fm);
+  return validate(edges, nodeKinds, fm);
 }
 
 function codes(src: string, fm: Frontmatter | null = null): string[] {
