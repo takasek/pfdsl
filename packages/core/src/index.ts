@@ -17,7 +17,11 @@ export type {
 export type { NormalizedEdge } from './types/index.js';
 export type { NodeKind, PrimaryEdge, FeedbackEdge, Graph } from './types/index.js';
 export type { DiagnosticSeverity, Range, Diagnostic } from './types/index.js';
-export type { ArtifactMeta, ProcessMeta, Frontmatter, LoadResult } from './types/index.js';
+export type {
+  ArtifactMeta, ProcessMeta, Frontmatter, LoadResult,
+  Status, StyleAttr, NodeStyle,
+} from './types/index.js';
+export { STATUS_VALUES, STYLE_ATTRS } from './types/index.js';
 
 export type { LexResult } from './lexer.js';
 export type { ParseResult } from './parser.js';

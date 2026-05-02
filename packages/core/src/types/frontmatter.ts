@@ -1,9 +1,18 @@
 import type { Diagnostic } from './diagnostic.js';
 
+export const STATUS_VALUES = ['done', 'wip', 'todo', 'blocked'] as const;
+export type Status = typeof STATUS_VALUES[number];
+
+export const STYLE_ATTRS = ['fillcolor', 'color', 'fontcolor', 'style', 'penwidth'] as const;
+export type StyleAttr = typeof STYLE_ATTRS[number];
+export type NodeStyle = Partial<Record<StyleAttr, string>>;
+
 export interface ArtifactMeta {
   title?: string;
   owner?: string;
   parts?: string[];
+  status?: Status;
+  tags?: string[];
   [key: string]: unknown;
 }
 
@@ -25,6 +34,8 @@ export interface Frontmatter {
   };
   artifact?: Record<string, ArtifactMeta>;
   process?: Record<string, ProcessMeta>;
+  statusStyles?: Partial<Record<Status, NodeStyle>>;
+  tagStyles?: Record<string, NodeStyle>;
   [key: string]: unknown;
 }
 
