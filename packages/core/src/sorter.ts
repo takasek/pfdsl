@@ -32,25 +32,35 @@ export function sortEdges(edges: NormalizedEdge[], graph: Graph): NormalizedEdge
     return componentMin.get(find(nodeId)) ?? nodeId;
   }
 
-  // Rank: iterative BFS until stable
-  const hasIncoming = new Set(graph.primaryEdges.map(e => e.to));
-  const ranks = new Map<string, number>();
-
-  for (const [id, kind] of graph.nodes) {
-    if (kind === 'artifact' && !hasIncoming.has(id)) ranks.set(id, 0);
+  // Rank = longest-path distance from any source. Computed via Kahn's
+  // topological order in O(V + E). Nodes left unranked (cycles in the primary
+  // graph — already a validation error) fall back to 0.
+  const inDegree = new Map<string, number>();
+  const adjacency = new Map<string, string[]>();
+  for (const id of graph.nodes.keys()) {
+    inDegree.set(id, 0);
+    adjacency.set(id, []);
+  }
+  for (const e of graph.primaryEdges) {
+    inDegree.set(e.to, (inDegree.get(e.to) ?? 0) + 1);
+    adjacency.get(e.from)!.push(e.to);
   }
 
-  // Rank propagation converges in at most V passes on a DAG; cap iterations to
-  // guard against cyclic primary graphs.
-  let changed = true;
-  let iterations = 0;
-  const maxIterations = graph.nodes.size + 1;
-  while (changed && iterations < maxIterations) {
-    iterations++;
-    changed = false;
-    for (const e of graph.primaryEdges) {
-      const r = (ranks.get(e.from) ?? 0) + 1;
-      if (r > (ranks.get(e.to) ?? -1)) { ranks.set(e.to, r); changed = true; }
+  const ranks = new Map<string, number>();
+  const queue: string[] = [];
+  for (const [id, deg] of inDegree) {
+    if (deg === 0) { ranks.set(id, 0); queue.push(id); }
+  }
+
+  for (let head = 0; head < queue.length; head++) {
+    const u = queue[head]!;
+    const ru = ranks.get(u)!;
+    for (const v of adjacency.get(u)!) {
+      const rv = ranks.get(v) ?? -1;
+      if (ru + 1 > rv) ranks.set(v, ru + 1);
+      const remaining = inDegree.get(v)! - 1;
+      inDegree.set(v, remaining);
+      if (remaining === 0) queue.push(v);
     }
   }
 

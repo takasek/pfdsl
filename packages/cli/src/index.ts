@@ -9,8 +9,7 @@ import {
   format,
   type Diagnostic,
 } from '@pfdsl/core';
-import { exportDot } from '@pfdsl/graphviz-exporter';
-import { renderDotToSvg } from '@pfdsl/preview-engine';
+import { renderGraph } from '@pfdsl/preview-engine';
 
 export interface CommandResult {
   stdout: string;
@@ -93,13 +92,8 @@ export async function runGraph(file: string, opts: GraphOptions = {}): Promise<C
   if (failed) return failed;
   const { edges, nodeKinds } = normalizeDocument(document, frontmatter);
   const graph = buildGraph(edges, nodeKinds);
-  const dot = exportDot(graph, frontmatter);
-  if (fmt === 'dot') return ok(dot);
-  if (fmt === 'svg') {
-    const svg = await renderDotToSvg(dot);
-    return ok(svg.endsWith('\n') ? svg : svg + '\n');
-  }
-  return fail(`unknown format: ${fmt}\n`, 2);
+  const out = await renderGraph(graph, frontmatter, { format: fmt });
+  return ok(out.endsWith('\n') ? out : out + '\n');
 }
 
 export interface DiffReport {

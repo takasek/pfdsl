@@ -62,22 +62,13 @@ export {
 };
 
 export function format(source: string): FormatResult {
-  const diagnostics: Diagnostic[] = [];
-  const { frontmatter, body, diagnostics: fmDiags } = loadFrontmatter(source);
-  diagnostics.push(...fmDiags);
-
-  const { tokens, diagnostics: lexDiags } = lex(body);
-  diagnostics.push(...lexDiags);
-
-  const { document, diagnostics: parseDiags } = parseTokens(tokens);
-  diagnostics.push(...parseDiags);
-
+  const { document, frontmatter, diagnostics: parseDiags } = parse(source);
   const { edges, nodeKinds, diagnostics: normDiags } = normalize(document, frontmatter);
-  diagnostics.push(...normDiags);
-
   const graph = buildGraphInternal(edges, nodeKinds);
-  diagnostics.push(...validate(edges, nodeKinds, frontmatter));
-
+  const valDiags = validate(edges, nodeKinds, frontmatter);
   const sorted = sortEdges(edges, graph);
-  return { output: formatEdges(sorted), diagnostics };
+  return {
+    output: formatEdges(sorted),
+    diagnostics: [...parseDiags, ...normDiags, ...valDiags],
+  };
 }

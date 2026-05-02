@@ -20,7 +20,6 @@
   },
   "dependencies": {
     "@pfdsl/core": "workspace:*",
-    "@pfdsl/graphviz-exporter": "workspace:*",
     "@pfdsl/preview-engine": "workspace:*"
   },
   "files": ["dist"],

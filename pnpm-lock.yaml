@@ -17,9 +17,6 @@ importers:
       '@pfdsl/core':
         specifier: workspace:*
         version: link:../core
-      '@pfdsl/graphviz-exporter':
-        specifier: workspace:*
-        version: link:../graphviz-exporter
       '@pfdsl/preview-engine':
         specifier: workspace:*
         version: link:../preview-engine
