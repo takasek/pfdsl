@@ -46,4 +46,30 @@ describe('loadFrontmatter', () => {
     const result = loadFrontmatter(src);
     expect(result.bodyStartLine).toBe(5);
   });
+
+  it('parses status, tags, statusStyles, tagStyles', () => {
+    const src = [
+      '---',
+      'artifact:',
+      '  spec:',
+      '    status: done',
+      '    tags: [external, critical]',
+      'statusStyles:',
+      '  done: { fillcolor: lightgray, style: filled }',
+      'tagStyles:',
+      '  external: { color: blue }',
+      '  critical: { penwidth: "3" }',
+      '---',
+      'spec >> P -> X',
+      '',
+    ].join('\n');
+    const result = loadFrontmatter(src);
+    expect(result.diagnostics).toHaveLength(0);
+    const fm = result.frontmatter!;
+    expect(fm.artifact?.spec?.status).toBe('done');
+    expect(fm.artifact?.spec?.tags).toEqual(['external', 'critical']);
+    expect(fm.statusStyles?.done?.fillcolor).toBe('lightgray');
+    expect(fm.tagStyles?.external?.color).toBe('blue');
+    expect(fm.tagStyles?.critical?.penwidth).toBe('3');
+  });
 });

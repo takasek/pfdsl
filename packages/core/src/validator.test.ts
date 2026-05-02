@@ -56,4 +56,54 @@ describe('validate', () => {
   it('valid chain: no errors', () => {
     expect(diagnose('req >> design -> spec\nspec >> impl -> code')).toHaveLength(0);
   });
+
+  it('V007: invalid status enum value', () => {
+    const fm = { artifact: { A: { status: 'finished' } } } as unknown as Frontmatter;
+    expect(codes('A >> P -> B', fm)).toContain('V007');
+  });
+
+  it('V007: valid status values pass', () => {
+    const fm: Frontmatter = { artifact: { A: { status: 'done' }, B: { status: 'wip' } } };
+    expect(codes('A >> P -> B', fm).filter(c => c === 'V007')).toHaveLength(0);
+  });
+
+  it('V008: invalid statusStyles key', () => {
+    const fm = {
+      statusStyles: { finished: { fillcolor: 'gray' } },
+    } as unknown as Frontmatter;
+    expect(codes('A >> P -> B', fm)).toContain('V008');
+  });
+
+  it('V009: invalid attribute in statusStyles', () => {
+    const fm = {
+      statusStyles: { done: { bogus: 'x' } },
+    } as unknown as Frontmatter;
+    expect(codes('A >> P -> B', fm)).toContain('V009');
+  });
+
+  it('V009: invalid attribute in tagStyles', () => {
+    const fm = {
+      tagStyles: { external: { invalidAttr: 'x' } },
+    } as unknown as Frontmatter;
+    expect(codes('A >> P -> B', fm)).toContain('V009');
+  });
+
+  it('tags: arbitrary strings produce no error', () => {
+    const fm: Frontmatter = {
+      artifact: { A: { tags: ['anything', 'goes', 'here'] } },
+    };
+    const cs = codes('A >> P -> B', fm);
+    expect(cs).not.toContain('V007');
+    expect(cs).not.toContain('V008');
+    expect(cs).not.toContain('V009');
+  });
+
+  it('tagStyles: undefined tag used by artifact emits no error', () => {
+    const fm: Frontmatter = {
+      artifact: { A: { tags: ['undefined-tag'] } },
+      tagStyles: { other: { color: 'blue' } },
+    };
+    const cs = codes('A >> P -> B', fm);
+    expect(cs).not.toContain('V009');
+  });
 });

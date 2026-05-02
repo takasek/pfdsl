@@ -1,4 +1,5 @@
 import type { NormalizedEdge, NodeKind, Frontmatter, Diagnostic } from './types/index.js';
+import { STATUS_VALUES, STYLE_ATTRS } from './types/index.js';
 import { zeroRange } from './position.js';
 
 export function validate(
@@ -51,7 +52,10 @@ export function validate(
   }
 
   // V004 / V005 / V006: parts constraints
+  // V007: artifact.status enum check
   const artifactMeta = fm?.artifact ?? {};
+  const statusSet: ReadonlySet<string> = new Set(STATUS_VALUES);
+  const styleAttrSet: ReadonlySet<string> = new Set(STYLE_ATTRS);
   for (const [artifactId, meta] of Object.entries(artifactMeta)) {
     for (const partId of meta.parts ?? []) {
       if (nodeKinds.get(partId) === 'process') {
@@ -62,6 +66,37 @@ export function validate(
       if (partId === artifactId) {
         diagnostics.push({ severity: 'error', code: 'V005',
           message: `'${artifactId}' cannot include itself in parts`,
+          range: zeroRange() });
+      }
+    }
+    if (meta.status !== undefined && !statusSet.has(meta.status)) {
+      diagnostics.push({ severity: 'error', code: 'V007',
+        message: `Invalid status '${meta.status}' on artifact '${artifactId}'. Allowed: ${STATUS_VALUES.join(', ')}`,
+        range: zeroRange() });
+    }
+  }
+
+  // V008: statusStyles keys must be valid Status enum
+  // V009: statusStyles/tagStyles attribute keys must be in STYLE_ATTRS
+  for (const [key, style] of Object.entries(fm?.statusStyles ?? {})) {
+    if (!statusSet.has(key)) {
+      diagnostics.push({ severity: 'error', code: 'V008',
+        message: `Invalid statusStyles key '${key}'. Allowed: ${STATUS_VALUES.join(', ')}`,
+        range: zeroRange() });
+    }
+    for (const attr of Object.keys(style ?? {})) {
+      if (!styleAttrSet.has(attr)) {
+        diagnostics.push({ severity: 'error', code: 'V009',
+          message: `Invalid style attribute '${attr}' in statusStyles.${key}. Allowed: ${STYLE_ATTRS.join(', ')}`,
+          range: zeroRange() });
+      }
+    }
+  }
+  for (const [key, style] of Object.entries(fm?.tagStyles ?? {})) {
+    for (const attr of Object.keys(style ?? {})) {
+      if (!styleAttrSet.has(attr)) {
+        diagnostics.push({ severity: 'error', code: 'V009',
+          message: `Invalid style attribute '${attr}' in tagStyles.${key}. Allowed: ${STYLE_ATTRS.join(', ')}`,
           range: zeroRange() });
       }
     }
