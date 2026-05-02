@@ -48,7 +48,7 @@ export function exportDot(
   }
   for (const e of graph.feedbackEdges) {
     lines.push(
-      `  ${quote(e.artifact)} -> ${quote(e.process)} [style=dashed, color=${quote(feedbackColor)}];`
+      `  ${quote(e.artifact)} -> ${quote(e.process)} [style=dashed, color=${quote(feedbackColor)}, constraint=false];`
     );
   }
 
@@ -58,7 +58,8 @@ export function exportDot(
 
 function nodeAttrs(id: string, kind: NodeKind, fm: Frontmatter | null): string {
   const shape = kind === 'process' ? 'ellipse' : 'box';
-  const label = lookupTitle(id, kind, fm) ?? id;
+  const title = lookupTitle(id, kind, fm);
+  const label = title ? `${id}\n${title}` : id;
   return `[shape=${shape}, label=${quote(label)}]`;
 }
 

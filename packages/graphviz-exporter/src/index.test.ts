@@ -37,7 +37,7 @@ describe('exportDot', () => {
     const src = 'req >> design -> spec\nspec >>? design\n';
     const { graph, frontmatter } = buildFromSource(src);
     const dot = exportDot(graph, frontmatter);
-    expect(dot).toMatch(/"spec" -> "design" \[style=dashed, color="#888888"\];/);
+    expect(dot).toMatch(/"spec" -> "design" \[style=dashed, color="#888888", constraint=false\];/);
   });
 
   it('uses frontmatter title for node label', () => {
@@ -51,8 +51,8 @@ req >> design -> spec
 `;
     const { graph, frontmatter } = buildFromSource(src);
     const dot = exportDot(graph, frontmatter);
-    expect(dot).toContain('"req" [shape=box, label="要求仕様書"]');
-    expect(dot).toContain('"design" [shape=ellipse, label="設計"]');
+    expect(dot).toContain('"req" [shape=box, label="req\\n要求仕様書"]');
+    expect(dot).toContain('"design" [shape=ellipse, label="design\\n設計"]');
   });
 
   it('honors layout.direction in frontmatter', () => {
