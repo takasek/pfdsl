@@ -94,4 +94,114 @@ req >> design -> spec
     const dot = exportDot(graph, frontmatter);
     expect(dot).toContain('"a\\"b"');
   });
+
+  it('applies statusStyles to artifact with status', () => {
+    const src = `---
+artifact:
+  spec: { status: done }
+statusStyles:
+  done: { fillcolor: lightgray, style: filled }
+---
+spec >> P -> X
+`;
+    const { graph, frontmatter } = buildFromSource(src);
+    const dot = exportDot(graph, frontmatter);
+    expect(dot).toMatch(/"spec" \[shape=box, label="spec", fillcolor="lightgray", style="filled"\]/);
+  });
+
+  it('applies tagStyles to artifact with tags', () => {
+    const src = `---
+artifact:
+  spec: { tags: [external] }
+tagStyles:
+  external: { color: blue }
+---
+spec >> P -> X
+`;
+    const { graph, frontmatter } = buildFromSource(src);
+    const dot = exportDot(graph, frontmatter);
+    expect(dot).toMatch(/"spec" \[shape=box, label="spec", color="blue"\]/);
+  });
+
+  it('first tag in array wins on conflicting attribute', () => {
+    const src = `---
+artifact:
+  spec: { tags: [a, b] }
+tagStyles:
+  a: { color: red }
+  b: { color: blue }
+---
+spec >> P -> X
+`;
+    const { graph, frontmatter } = buildFromSource(src);
+    const dot = exportDot(graph, frontmatter);
+    expect(dot).toContain('color="red"');
+    expect(dot).not.toContain('color="blue"');
+  });
+
+  it('status overrides tag on conflicting attribute', () => {
+    const src = `---
+artifact:
+  spec: { status: done, tags: [external] }
+statusStyles:
+  done: { color: gray }
+tagStyles:
+  external: { color: blue }
+---
+spec >> P -> X
+`;
+    const { graph, frontmatter } = buildFromSource(src);
+    const dot = exportDot(graph, frontmatter);
+    expect(dot).toContain('color="gray"');
+    expect(dot).not.toContain('color="blue"');
+  });
+
+  it('non-conflicting tag and status attributes both applied', () => {
+    const src = `---
+artifact:
+  spec: { status: done, tags: [external] }
+statusStyles:
+  done: { fillcolor: lightgray, style: filled }
+tagStyles:
+  external: { color: blue, penwidth: "3" }
+---
+spec >> P -> X
+`;
+    const { graph, frontmatter } = buildFromSource(src);
+    const dot = exportDot(graph, frontmatter);
+    expect(dot).toContain('fillcolor="lightgray"');
+    expect(dot).toContain('style="filled"');
+    expect(dot).toContain('color="blue"');
+    expect(dot).toContain('penwidth="3"');
+  });
+
+  it('undefined tagStyles entries are ignored without error', () => {
+    const src = `---
+artifact:
+  spec: { tags: [missing] }
+tagStyles:
+  other: { color: blue }
+---
+spec >> P -> X
+`;
+    const { graph, frontmatter } = buildFromSource(src);
+    const dot = exportDot(graph, frontmatter);
+    expect(dot).toMatch(/"spec" \[shape=box, label="spec"\]/);
+  });
+
+  it('does not apply status/tags to process nodes', () => {
+    const src = `---
+process:
+  P: {}
+artifact:
+  spec: { status: done }
+statusStyles:
+  done: { fillcolor: lightgray }
+---
+spec >> P -> X
+`;
+    const { graph, frontmatter } = buildFromSource(src);
+    const dot = exportDot(graph, frontmatter);
+    expect(dot).toMatch(/"P" \[shape=ellipse, label="P"\]/);
+  });
 });
