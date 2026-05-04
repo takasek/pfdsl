@@ -6,7 +6,9 @@ import { buildGraph as buildGraphInternal } from './graph.js';
 import { sortEdges } from './sorter.js';
 import { validate } from './validator.js';
 import { formatEdges } from './formatter.js';
-import type { Document, Frontmatter, Diagnostic } from './types/index.js';
+import type {
+  Document, Frontmatter, Diagnostic, Graph, NodeKind, NormalizedEdge,
+} from './types/index.js';
 
 export type { TokenType, Position, Token } from './types/index.js';
 export type {
@@ -38,6 +40,15 @@ export interface FormatResult {
   diagnostics: Diagnostic[];
 }
 
+export interface AnalyzeResult {
+  document: Document;
+  frontmatter: Frontmatter | null;
+  edges: NormalizedEdge[];
+  nodeKinds: Map<string, NodeKind>;
+  graph: Graph;
+  diagnostics: Diagnostic[];
+}
+
 export function parse(source: string): ParseDocResult {
   const { frontmatter, body, diagnostics: fmDiags, bodyStartLine } = loadFrontmatter(source);
   const { tokens, diagnostics: lexDiags } = lex(body);
@@ -64,6 +75,21 @@ export {
   sortEdges,
   formatEdges,
 };
+
+export function analyze(source: string): AnalyzeResult {
+  const { document, frontmatter, diagnostics: parseDiags } = parse(source);
+  const { edges, nodeKinds, diagnostics: normDiags } = normalize(document, frontmatter);
+  const valDiags = validate(edges, nodeKinds, frontmatter);
+  const graph = buildGraphInternal(edges, nodeKinds);
+  return {
+    document,
+    frontmatter,
+    edges,
+    nodeKinds,
+    graph,
+    diagnostics: [...parseDiags, ...normDiags, ...valDiags],
+  };
+}
 
 export function format(source: string): FormatResult {
   const { document, frontmatter, diagnostics: parseDiags } = parse(source);
