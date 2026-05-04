@@ -2,7 +2,7 @@ import { loadFrontmatter } from './frontmatter.js';
 import { lex } from './lexer.js';
 import { parseTokens } from './parser.js';
 import { normalize } from './normalizer.js';
-import { buildGraph as buildGraphInternal } from './graph.js';
+import { buildGraph } from './graph.js';
 import { sortEdges } from './sorter.js';
 import { validate } from './validator.js';
 import { formatEdges } from './formatter.js';
@@ -71,7 +71,7 @@ export function parse(source: string): ParseDocResult {
 
 export {
   normalize as normalizeDocument,
-  buildGraphInternal as buildGraph,
+  buildGraph,
   validate as validateGraph,
   sortEdges,
   formatEdges,
@@ -81,7 +81,7 @@ export function analyze(source: string): AnalyzeResult {
   const { document, frontmatter, diagnostics: parseDiags } = parse(source);
   const { edges, nodeKinds, diagnostics: normDiags } = normalize(document, frontmatter);
   const valDiags = validate(edges, nodeKinds, frontmatter);
-  const graph = buildGraphInternal(edges, nodeKinds);
+  const graph = buildGraph(edges, nodeKinds);
   return {
     document,
     frontmatter,
@@ -95,7 +95,7 @@ export function analyze(source: string): AnalyzeResult {
 export function format(source: string): FormatResult {
   const { document, frontmatter, diagnostics: parseDiags } = parse(source);
   const { edges, nodeKinds, diagnostics: normDiags } = normalize(document, frontmatter);
-  const graph = buildGraphInternal(edges, nodeKinds);
+  const graph = buildGraph(edges, nodeKinds);
   const valDiags = validate(edges, nodeKinds, frontmatter);
   const sorted = sortEdges(edges, graph);
   return {
