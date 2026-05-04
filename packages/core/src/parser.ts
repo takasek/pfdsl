@@ -33,14 +33,10 @@ export function parseTokens(tokens: Token[]): ParseResult {
     ) advance();
   }
 
-  // Continuation: a NEWLINE-and/or-COMMENT run is consumed only if the next
-  // significant token is one of `ops` AND no blank line sits inside the run.
-  // A "blank line" is two or more consecutive NEWLINEs (COMMENT resets the
-  // run, so `NEWLINE COMMENT NEWLINE` is still continuation-eligible).
-  // Returns true and advances pos if continuation succeeded, else leaves pos
-  // untouched so the NEWLINE remains a statement terminator.
-  function tryContinuation(...ops: TokenType[]): boolean {
-    let i = pos;
+  // Skip NEWLINE/COMMENT run. blankLine = 2+ consecutive NEWLINEs (COMMENT
+  // resets the count, so `NEWLINE COMMENT NEWLINE` is not a blank line).
+  function scanContinuation(start: number): { next: number; blankLine: boolean } {
+    let i = start;
     let consecutive = 0;
     let maxConsecutive = 0;
     while (i < tokens.length) {
@@ -55,42 +51,26 @@ export function parseTokens(tokens: Token[]): ParseResult {
       }
       i++;
     }
-    if (
-      i > pos &&
-      i < tokens.length &&
-      ops.includes(tokens[i]!.type) &&
-      maxConsecutive <= 1
-    ) {
-      pos = i;
+    return { next: i, blankLine: maxConsecutive > 1 };
+  }
+
+  // Consume a NEWLINE/COMMENT run only if the next significant token is one
+  // of `ops` AND no blank line sits inside the run. Otherwise pos untouched
+  // so the NEWLINE remains a statement terminator.
+  function tryContinuation(...ops: TokenType[]): boolean {
+    const { next, blankLine } = scanContinuation(pos);
+    if (next > pos && next < tokens.length && !blankLine && ops.includes(tokens[next]!.type)) {
+      pos = next;
       return true;
     }
     return false;
   }
 
-  // Lookahead from current ID position to detect output-edge form
-  // `proc -> art`, allowing a single NEWLINE / inline COMMENTs in between.
+  // Lookahead: ID then ARROW_OUTPUT (single NEWLINE / inline COMMENTs allowed)
   function isOutputEdgeStart(): boolean {
     if (peek().type !== 'ID') return false;
-    let i = pos + 1;
-    let consecutive = 0;
-    let maxConsecutive = 0;
-    while (i < tokens.length) {
-      const t = tokens[i]!.type;
-      if (t === 'NEWLINE') {
-        consecutive++;
-        if (consecutive > maxConsecutive) maxConsecutive = consecutive;
-      } else if (t === 'COMMENT') {
-        consecutive = 0;
-      } else {
-        break;
-      }
-      i++;
-    }
-    return (
-      i < tokens.length &&
-      tokens[i]!.type === 'ARROW_OUTPUT' &&
-      maxConsecutive <= 1
-    );
+    const { next, blankLine } = scanContinuation(pos + 1);
+    return !blankLine && next < tokens.length && tokens[next]!.type === 'ARROW_OUTPUT';
   }
 
   function parseId(): IdNode | null {
