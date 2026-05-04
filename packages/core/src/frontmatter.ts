@@ -6,16 +6,27 @@ export function loadFrontmatter(source: string): LoadResult {
     return { frontmatter: null, body: source, bodyStartLine: 1, diagnostics: [] };
   }
 
-  const lines = source.split('\n');
-  let closingIndex = -1;
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i]?.trimEnd() === '---') {
-      closingIndex = i;
-      break;
+  const firstNl = source.indexOf('\n');
+  let closingLineStart = -1;
+  let closingLineEnd = -1;
+  let lineNum = 2;
+  if (firstNl !== -1) {
+    let lineStart = firstNl + 1;
+    while (lineStart <= source.length) {
+      const nl = source.indexOf('\n', lineStart);
+      const lineEnd = nl === -1 ? source.length : nl;
+      if (source.slice(lineStart, lineEnd).trimEnd() === '---') {
+        closingLineStart = lineStart;
+        closingLineEnd = lineEnd;
+        break;
+      }
+      if (nl === -1) break;
+      lineStart = nl + 1;
+      lineNum++;
     }
   }
 
-  if (closingIndex === -1) {
+  if (closingLineStart === -1) {
     const diag: Diagnostic = {
       severity: 'error',
       code: 'FM001',
@@ -25,9 +36,13 @@ export function loadFrontmatter(source: string): LoadResult {
     return { frontmatter: null, body: source, bodyStartLine: 1, diagnostics: [diag] };
   }
 
-  const yamlText = lines.slice(1, closingIndex).join('\n');
-  const body = lines.slice(closingIndex + 1).join('\n');
-  const bodyStartLine = closingIndex + 2;
+  const yamlText = closingLineStart > firstNl + 1
+    ? source.slice(firstNl + 1, closingLineStart - 1)
+    : '';
+  const body = closingLineEnd === source.length
+    ? ''
+    : source.slice(closingLineEnd + 1);
+  const bodyStartLine = lineNum + 1;
 
   const diagnostics: Diagnostic[] = [];
   let frontmatter: Frontmatter | null = null;
