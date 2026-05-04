@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
-import { sortEdges, formatEdges } from '@pfdsl/core';
+import { sortEdges, formatEdges, hasErrors } from '@pfdsl/core';
 import { analyzeDocument, LANGUAGE_ID } from './analyze.js';
 
 export function registerFormatter(context: vscode.ExtensionContext): void {
   const provider: vscode.DocumentFormattingEditProvider = {
     provideDocumentFormattingEdits(doc) {
       const { edges, graph, diagnostics } = analyzeDocument(doc);
-      if (diagnostics.some(d => d.severity === 'error')) return [];
+      if (hasErrors(diagnostics)) return [];
       const output = formatEdges(sortEdges(edges, graph));
       const source = doc.getText();
       if (output === source) return [];

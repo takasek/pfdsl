@@ -4,6 +4,7 @@ import {
   sortEdges,
   formatEdges,
   format,
+  hasErrors,
   type Diagnostic,
 } from '@pfdsl/core';
 import { renderGraph, type RenderFormat } from '@pfdsl/preview-engine';
@@ -36,15 +37,15 @@ function diagText(diags: Diagnostic[], file: string): string {
 }
 
 function failIfErrors(diags: Diagnostic[], file: string): CommandResult | null {
+  if (!hasErrors(diags)) return null;
   const errs = diags.filter(d => d.severity === 'error');
-  return errs.length > 0 ? fail(diagText(errs, file)) : null;
+  return fail(diagText(errs, file));
 }
 
 export function runCheck(file: string): CommandResult {
   const { diagnostics } = analyze(readSource(file));
   const lines = diagnostics.map(d => formatDiagnostic(d, file));
-  const hasErr = diagnostics.some(d => d.severity === 'error');
-  if (hasErr) {
+  if (hasErrors(diagnostics)) {
     return { stdout: '', stderr: lines.join('\n') + '\n', exitCode: 1 };
   }
   return { stdout: lines.length ? lines.join('\n') + '\n' : 'OK\n', stderr: '', exitCode: 0 };

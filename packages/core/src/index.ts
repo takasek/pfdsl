@@ -77,6 +77,10 @@ export {
   formatEdges,
 };
 
+export function hasErrors(diags: readonly Diagnostic[]): boolean {
+  return diags.some(d => d.severity === 'error');
+}
+
 export function analyze(source: string): AnalyzeResult {
   const { document, frontmatter, diagnostics: parseDiags } = parse(source);
   const { edges, nodeKinds, diagnostics: normDiags } = normalize(document, frontmatter);
