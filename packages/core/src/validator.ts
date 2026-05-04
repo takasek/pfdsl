@@ -2,6 +2,9 @@ import type { NormalizedEdge, NodeKind, Frontmatter, Diagnostic } from './types/
 import { STATUS_VALUES, STYLE_ATTRS } from './types/index.js';
 import { zeroRange } from './position.js';
 
+const STATUS_SET: ReadonlySet<string> = new Set(STATUS_VALUES);
+const STYLE_ATTR_SET: ReadonlySet<string> = new Set(STYLE_ATTRS);
+
 export function validate(
   edges: NormalizedEdge[],
   nodeKinds: Map<string, NodeKind>,
@@ -54,8 +57,6 @@ export function validate(
   // V004 / V005 / V006: parts constraints
   // V007: artifact.status enum check
   const artifactMeta = fm?.artifact ?? {};
-  const statusSet: ReadonlySet<string> = new Set(STATUS_VALUES);
-  const styleAttrSet: ReadonlySet<string> = new Set(STYLE_ATTRS);
   for (const [artifactId, meta] of Object.entries(artifactMeta)) {
     for (const partId of meta.parts ?? []) {
       if (nodeKinds.get(partId) === 'process') {
@@ -69,7 +70,7 @@ export function validate(
           range: zeroRange() });
       }
     }
-    if (meta.status !== undefined && !statusSet.has(meta.status)) {
+    if (meta.status !== undefined && !STATUS_SET.has(meta.status)) {
       diagnostics.push({ severity: 'error', code: 'V007',
         message: `Invalid status '${meta.status}' on artifact '${artifactId}'. Allowed: ${STATUS_VALUES.join(', ')}`,
         range: zeroRange() });
@@ -79,13 +80,13 @@ export function validate(
   // V008: statusStyles keys must be valid Status enum
   // V009: statusStyles/tagStyles attribute keys must be in STYLE_ATTRS
   for (const [key, style] of Object.entries(fm?.statusStyles ?? {})) {
-    if (!statusSet.has(key)) {
+    if (!STATUS_SET.has(key)) {
       diagnostics.push({ severity: 'error', code: 'V008',
         message: `Invalid statusStyles key '${key}'. Allowed: ${STATUS_VALUES.join(', ')}`,
         range: zeroRange() });
     }
     for (const attr of Object.keys(style ?? {})) {
-      if (!styleAttrSet.has(attr)) {
+      if (!STYLE_ATTR_SET.has(attr)) {
         diagnostics.push({ severity: 'error', code: 'V009',
           message: `Invalid style attribute '${attr}' in statusStyles.${key}. Allowed: ${STYLE_ATTRS.join(', ')}`,
           range: zeroRange() });
@@ -94,7 +95,7 @@ export function validate(
   }
   for (const [key, style] of Object.entries(fm?.tagStyles ?? {})) {
     for (const attr of Object.keys(style ?? {})) {
-      if (!styleAttrSet.has(attr)) {
+      if (!STYLE_ATTR_SET.has(attr)) {
         diagnostics.push({ severity: 'error', code: 'V009',
           message: `Invalid style attribute '${attr}' in tagStyles.${key}. Allowed: ${STYLE_ATTRS.join(', ')}`,
           range: zeroRange() });
@@ -102,11 +103,11 @@ export function validate(
     }
   }
 
-  // Cycle detection in parts
   const visited = new Set<string>();
   const inStack = new Set<string>();
+  const path: string[] = [];
 
-  function detectCycle(id: string, path: string[]): void {
+  function detectCycle(id: string): void {
     if (inStack.has(id)) {
       diagnostics.push({ severity: 'error', code: 'V006',
         message: `Cycle in parts: ${[...path, id].join(' → ')}`,
@@ -116,13 +117,13 @@ export function validate(
     if (visited.has(id)) return;
     visited.add(id);
     inStack.add(id);
-    for (const part of artifactMeta[id]?.parts ?? []) {
-      detectCycle(part, [...path, id]);
-    }
+    path.push(id);
+    for (const part of artifactMeta[id]?.parts ?? []) detectCycle(part);
+    path.pop();
     inStack.delete(id);
   }
 
-  for (const id of Object.keys(artifactMeta)) detectCycle(id, []);
+  for (const id of Object.keys(artifactMeta)) detectCycle(id);
 
   return diagnostics;
 }
