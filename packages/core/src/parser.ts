@@ -1,10 +1,9 @@
-import type { Token, TokenType } from './types/index.js';
 import type {
+  Token, TokenType, Diagnostic,
   Document, Statement, ChainStatement, ChainSegment,
   InputEdgeStatement, FeedbackEdgeStatement, OutputEdgeStatement,
   ArtifactExpr, IdNode,
 } from './types/index.js';
-import type { Diagnostic } from './types/index.js';
 
 export interface ParseResult {
   document: Document;
