@@ -3,10 +3,6 @@ import { analyze, type AnalyzeResult } from '@pfdsl/core';
 
 export const LANGUAGE_ID = 'pfdsl';
 
-export { analyze };
-export type { AnalyzeResult };
-export { format as formatSource } from '@pfdsl/core';
-
 interface CacheEntry {
   version: number;
   result: AnalyzeResult;
