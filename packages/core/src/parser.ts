@@ -137,11 +137,10 @@ export function parseTokens(tokens: Token[]): ParseResult {
   }
 
   function parseStatement(): Statement | null {
-    // Output edge: ID '->' artifact (NEWLINE / inline COMMENT allowed between)
     if (isOutputEdgeStart()) {
       const processId = parseId()!;
       tryContinuation('ARROW_OUTPUT');
-      advance(); // consume ->
+      advance();
       const artifact = parseArtifactExpr();
       if (!artifact) {
         diagnostics.push({ severity: 'error', code: 'P004',
@@ -153,7 +152,6 @@ export function parseTokens(tokens: Token[]): ParseResult {
         start: processId.start, end: artifact.end };
     }
 
-    // Parse artifact-expr (single ID or [id, ...])
     const head = parseArtifactExpr();
     if (!head) {
       diagnostics.push({ severity: 'error', code: 'P001',
@@ -182,7 +180,6 @@ export function parseTokens(tokens: Token[]): ParseResult {
       return null;
     }
 
-    // Not followed by ->: simple edge
     tryContinuation('ARROW_OUTPUT');
     if (peek().type !== 'ARROW_OUTPUT') {
       if (op === '>>') {
@@ -194,7 +191,6 @@ export function parseTokens(tokens: Token[]): ParseResult {
       }
     }
 
-    // Chain: artifact op process -> output (op process -> output)*
     advance(); // consume ->
     const firstOutput = parseArtifactExpr();
     if (!firstOutput) {

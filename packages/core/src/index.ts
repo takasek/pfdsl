@@ -53,7 +53,6 @@ export interface AnalyzeResult {
 export function parse(source: string): ParseDocResult {
   const { frontmatter, body, diagnostics: fmDiags, bodyStartLine } = loadFrontmatter(source);
   const { tokens, diagnostics: lexDiags } = lex(body);
-  // Adjust token positions by bodyStartLine offset
   const lineOffset = bodyStartLine - 1;
   if (lineOffset > 0) {
     for (const t of tokens) {

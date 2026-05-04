@@ -64,7 +64,6 @@ export function lex(source: string): LexResult {
       continue;
     }
 
-    // Comment: # to EOL (emitted as COMMENT token; parser skips it)
     if (ch === '#') {
       const start = currentPos();
       let raw = '';
@@ -90,13 +89,11 @@ export function lex(source: string): LexResult {
       continue;
     }
 
-    // Single-char tokens
     if (ch === '[') { const s = currentPos(); advance(); tokens.push(makeToken('LBRACKET', '[', '[', s, currentPos())); continue; }
     if (ch === ']') { const s = currentPos(); advance(); tokens.push(makeToken('RBRACKET', ']', ']', s, currentPos())); continue; }
     if (ch === ',') { const s = currentPos(); advance(); tokens.push(makeToken('COMMA', ',', ',', s, currentPos())); continue; }
     if (ch === ';') { const s = currentPos(); advance(); tokens.push(makeToken('SEMICOLON', ';', ';', s, currentPos())); continue; }
 
-    // Quoted ID
     if (ch === '"') {
       const start = currentPos();
       advance(); // consume opening "
@@ -127,8 +124,7 @@ export function lex(source: string): LexResult {
       continue;
     }
 
-    // Bare ID: Unicode letters/numbers + _ -
-    // (- followed by > is already caught above as ARROW_OUTPUT; > followed by > is ARROW_INPUT)
+    // (`-` followed by `>` already caught as ARROW_OUTPUT; `>>` already caught as ARROW_INPUT)
     if (isBareIdChar(ch)) {
       const start = currentPos();
       let value = '';
@@ -147,7 +143,6 @@ export function lex(source: string): LexResult {
       }
     }
 
-    // Unknown character
     const errStart = currentPos();
     const unknown = advance();
     diagnostics.push({
