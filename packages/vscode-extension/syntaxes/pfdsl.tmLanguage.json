@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "PFDSL",
+  "scopeName": "source.pfdsl",
+  "patterns": [
+    { "include": "#frontmatter" },
+    { "include": "#body" }
+  ],
+  "repository": {
+    "frontmatter": {
+      "begin": "\\A---\\s*$",
+      "end": "^---\\s*$",
+      "name": "meta.embedded.block.frontmatter",
+      "contentName": "source.yaml",
+      "patterns": [
+        { "include": "source.yaml" }
+      ]
+    },
+    "body": {
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#arrow" },
+        { "include": "#bracket" },
+        { "include": "#punctuation" },
+        { "include": "#string" },
+        { "include": "#identifier" }
+      ]
+    },
+    "comment": {
+      "match": "#.*$",
+      "name": "comment.line.number-sign.pfdsl"
+    },
+    "arrow": {
+      "patterns": [
+        { "match": ">>\\?", "name": "keyword.operator.arrow.feedback.pfdsl" },
+        { "match": ">>",    "name": "keyword.operator.arrow.input.pfdsl" },
+        { "match": "->",    "name": "keyword.operator.arrow.output.pfdsl" }
+      ]
+    },
+    "bracket": {
+      "match": "[\\[\\]]",
+      "name": "punctuation.section.brackets.pfdsl"
+    },
+    "punctuation": {
+      "patterns": [
+        { "match": ",", "name": "punctuation.separator.comma.pfdsl" },
+        { "match": ";", "name": "punctuation.terminator.statement.pfdsl" }
+      ]
+    },
+    "string": {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double.pfdsl",
+      "patterns": [
+        { "match": "\\\\.", "name": "constant.character.escape.pfdsl" }
+      ]
+    },
+    "identifier": {
+      "match": "[\\p{L}\\p{N}_][\\p{L}\\p{N}_-]*",
+      "name": "variable.other.pfdsl"
+    }
+  }
+}
