@@ -23,7 +23,11 @@ canonical sorter → formatter, plus the public `format()` entry point.
 - `@pfdsl/preview-engine` — wraps `@hpcc-js/wasm` Graphviz; renders DOT/SVG.
 - `@pfdsl/cli` — `pfdsl` binary: `check` / `fmt` / `normalize` / `graph` / `diff`.
 
-Phase 3 (VSCode extension) — planned. See [docs/superpowers/plans/](docs/superpowers/plans/).
+**Phase 3 (VSCode extension) — complete.**
+- `@pfdsl/vscode-extension` — in-process language features: syntax
+  highlighting, diagnostics, hover metadata, document formatter, and a
+  live SVG preview panel. Sources share a single per-document analysis
+  cache keyed on `TextDocument.version`.
 
 ## Repo layout
 
@@ -32,6 +36,7 @@ packages/core/               @pfdsl/core              — DSL pipeline (parse / 
 packages/graphviz-exporter/  @pfdsl/graphviz-exporter — Graph → DOT
 packages/preview-engine/     @pfdsl/preview-engine    — DOT → SVG (Graphviz wasm)
 packages/cli/                @pfdsl/cli               — `pfdsl` CLI
+packages/vscode-extension/   @pfdsl/vscode-extension  — VSCode language extension
 docs/spec/                   Language specification (spec.md)
 docs/                        ADRs, plans, sample .pfdsl files
 ```
@@ -74,6 +79,21 @@ pfdsl help
 
 Exit codes: `0` ok, `1` validation/IO error, `2` usage error.
 
+## VSCode extension
+
+```bash
+pnpm --filter @pfdsl/vscode-extension build
+```
+
+Open the repo in VS Code and press `F5` to launch an Extension Development
+Host with `@pfdsl/vscode-extension` loaded. In the host, `.pfdsl` files get:
+
+- syntax highlighting (TextMate grammar; YAML embedded in frontmatter)
+- inline diagnostics (parse / normalize / validate)
+- hover metadata for artifacts and processes (title, owner, status, tags, parts)
+- `Format Document` / `pfdsl.format`
+- `PFDSL: Open Preview to the Side` (`pfdsl.preview`) — live SVG, refreshes on edit
+
 ## Library
 
 ```ts
@@ -91,15 +111,14 @@ console.log(output);
 // proc -> result
 ```
 
-Render to SVG:
+One-shot pipeline (parse + normalize + validate + buildGraph) and SVG render:
 
 ```ts
-import { parse, normalizeDocument, buildGraph } from '@pfdsl/core';
+import { analyze } from '@pfdsl/core';
 import { renderGraph } from '@pfdsl/preview-engine';
 
-const { document, frontmatter } = parse(source);
-const { edges, nodeKinds } = normalizeDocument(document, frontmatter);
-const graph = buildGraph(edges, nodeKinds);
+const { graph, frontmatter, diagnostics } = analyze(source);
+if (diagnostics.some(d => d.severity === 'error')) throw new Error('invalid source');
 const svg = await renderGraph(graph, frontmatter, { format: 'svg' });
 ```
 
