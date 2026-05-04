@@ -1,7 +1,12 @@
 import * as vscode from 'vscode';
+import { registerDiagnostics } from './diagnostics.js';
+import { registerFormatter } from './format.js';
+import { registerHover } from './hover.js';
 
-export function activate(_context: vscode.ExtensionContext): void {
-  // features registered in subsequent commits
+export function activate(context: vscode.ExtensionContext): void {
+  registerDiagnostics(context);
+  registerFormatter(context);
+  registerHover(context);
 }
 
 export function deactivate(): void {
