@@ -1,9 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import {
-  parse,
-  normalizeDocument,
-  buildGraph,
-  validateGraph,
+  analyze,
   sortEdges,
   formatEdges,
   format,
@@ -44,14 +41,10 @@ function failIfErrors(diags: Diagnostic[], file: string): CommandResult | null {
 }
 
 export function runCheck(file: string): CommandResult {
-  const source = readSource(file);
-  const { document, frontmatter, diagnostics: parseDiags } = parse(source);
-  const { edges, nodeKinds, diagnostics: normDiags } = normalizeDocument(document, frontmatter);
-  const valDiags = validateGraph(edges, nodeKinds, frontmatter);
-  const all = [...parseDiags, ...normDiags, ...valDiags];
-  const lines = all.map(d => formatDiagnostic(d, file));
-  const errCount = all.filter(d => d.severity === 'error').length;
-  if (errCount > 0) {
+  const { diagnostics } = analyze(readSource(file));
+  const lines = diagnostics.map(d => formatDiagnostic(d, file));
+  const hasErr = diagnostics.some(d => d.severity === 'error');
+  if (hasErr) {
     return { stdout: '', stderr: lines.join('\n') + '\n', exitCode: 1 };
   }
   return { stdout: lines.length ? lines.join('\n') + '\n' : 'OK\n', stderr: '', exitCode: 0 };
@@ -71,27 +64,18 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 }
 
 export function runNormalize(file: string): CommandResult {
-  const source = readSource(file);
-  const { document, frontmatter, diagnostics: parseDiags } = parse(source);
-  const failedParse = failIfErrors(parseDiags, file);
-  if (failedParse) return failedParse;
-  const { edges, nodeKinds, diagnostics: normDiags } = normalizeDocument(document, frontmatter);
-  const failedNorm = failIfErrors(normDiags, file);
-  if (failedNorm) return failedNorm;
-  const graph = buildGraph(edges, nodeKinds);
-  const sorted = sortEdges(edges, graph);
-  return ok(formatEdges(sorted));
+  const { edges, graph, diagnostics } = analyze(readSource(file));
+  const failed = failIfErrors(diagnostics, file);
+  if (failed) return failed;
+  return ok(formatEdges(sortEdges(edges, graph)));
 }
 
 export interface GraphOptions { format?: 'dot' | 'svg' }
 export async function runGraph(file: string, opts: GraphOptions = {}): Promise<CommandResult> {
   const fmt = opts.format ?? 'dot';
-  const source = readSource(file);
-  const { document, frontmatter, diagnostics: parseDiags } = parse(source);
-  const failed = failIfErrors(parseDiags, file);
+  const { graph, frontmatter, diagnostics } = analyze(readSource(file));
+  const failed = failIfErrors(diagnostics, file);
   if (failed) return failed;
-  const { edges, nodeKinds } = normalizeDocument(document, frontmatter);
-  const graph = buildGraph(edges, nodeKinds);
   const out = await renderGraph(graph, frontmatter, { format: fmt });
   return ok(out.endsWith('\n') ? out : out + '\n');
 }
@@ -106,10 +90,7 @@ export interface DiffReport {
 }
 
 function loadGraph(file: string) {
-  const source = readSource(file);
-  const { document, frontmatter } = parse(source);
-  const { edges, nodeKinds } = normalizeDocument(document, frontmatter);
-  return buildGraph(edges, nodeKinds);
+  return analyze(readSource(file)).graph;
 }
 
 function edgeKey(from: string, to: string): string {
