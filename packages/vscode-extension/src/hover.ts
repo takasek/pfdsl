@@ -1,12 +1,11 @@
 import * as vscode from 'vscode';
+import { ID_PATTERN } from '@pfdsl/core';
 import { analyzeDocument, LANGUAGE_ID } from './analyze.js';
-
-const ID_RE = /[\p{L}\p{N}_][\p{L}\p{N}_-]*/u;
 
 export function registerHover(context: vscode.ExtensionContext): void {
   const provider: vscode.HoverProvider = {
     provideHover(doc, pos) {
-      const range = doc.getWordRangeAtPosition(pos, ID_RE);
+      const range = doc.getWordRangeAtPosition(pos, ID_PATTERN);
       if (!range) return null;
       const id = doc.getText(range);
 

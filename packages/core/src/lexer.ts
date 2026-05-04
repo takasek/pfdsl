@@ -1,5 +1,7 @@
 import type { Token, TokenType, Position, Diagnostic } from './types/index.js';
 
+export const ID_PATTERN = /[\p{L}\p{N}_][\p{L}\p{N}_-]*/u;
+
 const BARE_ID_RE = /[\p{L}\p{N}]/u;
 
 export interface LexResult {

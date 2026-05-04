@@ -24,6 +24,7 @@ export type {
   Status, StyleAttr, NodeStyle,
 } from './types/index.js';
 export { STATUS_VALUES, STYLE_ATTRS } from './types/index.js';
+export { ID_PATTERN } from './lexer.js';
 
 export type { LexResult } from './lexer.js';
 export type { ParseResult } from './parser.js';
