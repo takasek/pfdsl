@@ -205,7 +205,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
       if (fmt !== undefined && fmt !== 'dot' && fmt !== 'svg') {
         return fail(`unknown format: ${String(fmt)}\n`, 2);
       }
-      return runGraph(f, fmt ? { format: fmt as RenderFormat } : {});
+      return runGraph(f, fmt ? { format: fmt } : {});
     }
     case 'diff': {
       const [a, b] = positional;

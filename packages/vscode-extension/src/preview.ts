@@ -37,10 +37,12 @@ ${body}
 </html>`;
 }
 
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+};
+
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[c]!));
+  return s.replace(/[&<>"']/g, c => HTML_ESCAPES[c]!);
 }
 
 export function registerPreview(context: vscode.ExtensionContext): void {
