@@ -61,21 +61,7 @@ function nodeAttrs(id: string, kind: NodeKind, fm: Frontmatter | null): string {
   const shape = kind === 'process' ? 'ellipse' : 'box';
   const title = lookupTitle(id, kind, fm);
   const label = title ? `${id}\n${title}` : id;
-
-  const styleAttrs: NodeStyle = {};
-  if (kind === 'artifact' && fm) {
-    const meta = fm.artifact?.[id];
-    // tags reverse iteration: later assignment wins → first tag in array prevails
-    const tags = meta?.tags ?? [];
-    for (let i = tags.length - 1; i >= 0; i--) {
-      const tag = tags[i];
-      if (tag !== undefined) Object.assign(styleAttrs, fm.tagStyles?.[tag] ?? {});
-    }
-    // status is applied last to win over tags
-    if (meta?.status) {
-      Object.assign(styleAttrs, fm.statusStyles?.[meta.status] ?? {});
-    }
-  }
+  const styleAttrs = resolveStyleAttrs(id, kind, fm);
 
   const attrs: string[] = [`shape=${shape}`, `label=${quote(label)}`];
   for (const key of STYLE_ATTRS) {
@@ -83,6 +69,21 @@ function nodeAttrs(id: string, kind: NodeKind, fm: Frontmatter | null): string {
     if (v !== undefined) attrs.push(`${key}=${quote(v)}`);
   }
   return `[${attrs.join(', ')}]`;
+}
+
+function resolveStyleAttrs(id: string, kind: NodeKind, fm: Frontmatter | null): NodeStyle {
+  if (kind !== 'artifact' || !fm) return {};
+  const meta = fm.artifact?.[id];
+  const styleAttrs: NodeStyle = {};
+  // tags reverse iter: later Object.assign wins → first tag in array prevails
+  const tags = meta?.tags ?? [];
+  for (let i = tags.length - 1; i >= 0; i--) {
+    const tag = tags[i];
+    if (tag !== undefined) Object.assign(styleAttrs, fm.tagStyles?.[tag] ?? {});
+  }
+  // status applied last to win over tags
+  if (meta?.status) Object.assign(styleAttrs, fm.statusStyles?.[meta.status] ?? {});
+  return styleAttrs;
 }
 
 function lookupTitle(id: string, kind: NodeKind, fm: Frontmatter | null): string | undefined {
