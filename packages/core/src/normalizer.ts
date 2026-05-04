@@ -63,56 +63,36 @@ export function normalize(doc: Document, fm: Frontmatter | null): NormalizeResul
     return expr.ids.map(i => i.value);
   }
 
+  function addEdgesFor(
+    kind: NormalizedEdge['kind'],
+    artifactIds: readonly string[],
+    proc: string,
+  ): void {
+    inferKind(proc, 'process');
+    for (const a of artifactIds) {
+      inferKind(a, 'artifact');
+      addEdge(kind === 'output'
+        ? { kind, process: proc, artifact: a }
+        : { kind, artifact: a, process: proc });
+    }
+  }
+
   function processStmt(stmt: Statement): void {
     switch (stmt.type) {
       case 'chain': {
         let currentArtifacts = ids(stmt.head);
         for (const seg of stmt.segments) {
           const proc = seg.process.value;
-          for (const a of currentArtifacts) {
-            inferKind(a, 'artifact');
-            inferKind(proc, 'process');
-            addEdge(seg.op === '>>'
-              ? { kind: 'input',    artifact: a, process: proc }
-              : { kind: 'feedback', artifact: a, process: proc });
-          }
+          addEdgesFor(seg.op === '>>' ? 'input' : 'feedback', currentArtifacts, proc);
           const outArtifacts = ids(seg.output);
-          for (const a of outArtifacts) {
-            inferKind(a, 'artifact');
-            inferKind(proc, 'process');
-            addEdge({ kind: 'output', process: proc, artifact: a });
-          }
+          addEdgesFor('output', outArtifacts, proc);
           currentArtifacts = outArtifacts;
         }
         break;
       }
-      case 'input-edge': {
-        const proc = stmt.process.value;
-        for (const a of ids(stmt.artifact)) {
-          inferKind(a, 'artifact');
-          inferKind(proc, 'process');
-          addEdge({ kind: 'input', artifact: a, process: proc });
-        }
-        break;
-      }
-      case 'feedback-edge': {
-        const proc = stmt.process.value;
-        for (const a of ids(stmt.artifact)) {
-          inferKind(a, 'artifact');
-          inferKind(proc, 'process');
-          addEdge({ kind: 'feedback', artifact: a, process: proc });
-        }
-        break;
-      }
-      case 'output-edge': {
-        const proc = stmt.process.value;
-        for (const a of ids(stmt.artifact)) {
-          inferKind(a, 'artifact');
-          inferKind(proc, 'process');
-          addEdge({ kind: 'output', process: proc, artifact: a });
-        }
-        break;
-      }
+      case 'input-edge':    addEdgesFor('input',    ids(stmt.artifact), stmt.process.value); break;
+      case 'feedback-edge': addEdgesFor('feedback', ids(stmt.artifact), stmt.process.value); break;
+      case 'output-edge':   addEdgesFor('output',   ids(stmt.artifact), stmt.process.value); break;
     }
   }
 
