@@ -1,83 +1,123 @@
 ---
 title: PFDSL 実装計画フロー
-version: 0.2
-dsl_version: 0.0.2
-description: PFDSL v0.0.2 仕様に基づくツールチェーン実装のプロセスフロー記述
+version: 0.3
+dsl_version: 0.0.3
+description: PFDSL 仕様に基づくツールチェーン実装のプロセスフロー記述
 tags: [implementation, roadmap]
 
 layout:
   direction: TB
 
+statusStyles:
+  done:    { fillcolor: lightgray, style: filled, fontcolor: dimgray }
+  wip:     { fillcolor: lightyellow, style: filled }
+  todo:    { fillcolor: white, style: filled }
+  blocked: { fillcolor: salmon, style: filled }
+
 artifact:
   spec_v0_0_2:
     title: PFDSL仕様書 v0.0.2
+    status: done
   core_architecture:
     title: コアアーキテクチャ文書
+    status: done
   repo_scaffold:
     title: リポジトリ骨格
+    status: done
   build_config:
     title: ビルド設定
+    status: done
   shared_types:
     title: 共有型定義
+    status: done
   token_spec:
     title: トークン規則
+    status: done
   ast_schema:
     title: ASTスキーマ
+    status: done
   diagnostic_schema:
     title: 診断スキーマ
+    status: done
   graph_schema:
     title: グラフスキーマ
+    status: done
   lexer:
     title: Lexer実装
+    status: done
   frontmatter_loader:
     title: Frontmatterローダ
+    status: done
   parser:
     title: Parser実装
+    status: done
   normalizer:
     title: Normalizer実装
+    status: done
   validator:
     title: Validator実装
+    status: done
   canonical_sorter:
     title: 正準順序ソータ
+    status: done
   formatter:
     title: Formatter実装
+    status: done
   core_modules:
     title: コアモジュール群
     parts: [lexer, frontmatter_loader, parser, normalizer, validator, canonical_sorter, formatter]
+    status: done
   core_library:
     title: コアライブラリ (@pfdsl/core)
+    status: done
   graphviz_exporter:
     title: Graphvizエクスポータ
+    status: done
   preview_engine:
     title: プレビューエンジン
+    status: done
   vscode_shell:
     title: VSCode拡張シェル
+    status: todo
   language_service:
     title: 言語サービス (LSP)
+    status: todo
   preview_panel:
     title: プレビューパネル
+    status: todo
   format_command:
     title: フォーマットコマンド
+    status: todo
   hover_support:
     title: ホバーサポート
+    status: todo
   diagnostics_ui:
     title: 診断UI
+    status: todo
   syntax_highlight:
     title: シンタックスハイライト
+    status: todo
   vscode_extension:
     title: VSCode拡張統合
+    status: todo
   rc_extension:
     title: リリース候補版
+    status: todo
   published_extension:
     title: 公開版拡張
+    status: todo
   workflow_usage:
     title: 日常運用知見
+    status: todo
   cli_tool:
     title: CLIツール
+    status: done
   ci_integration:
     title: CI連携
+    status: todo
   diff_analyzer:
     title: 差分解析ツール
+    status: todo
 
 process:
   define_architecture:
