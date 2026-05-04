@@ -78,28 +78,28 @@ artifact:
     status: done
   vscode_shell:
     title: VSCode拡張シェル
-    status: todo
+    status: done
   language_service:
     title: 言語サービス (LSP)
-    status: todo
+    status: done
   preview_panel:
     title: プレビューパネル
-    status: todo
+    status: done
   format_command:
     title: フォーマットコマンド
-    status: todo
+    status: done
   hover_support:
     title: ホバーサポート
-    status: todo
+    status: done
   diagnostics_ui:
     title: 診断UI
-    status: todo
+    status: done
   syntax_highlight:
     title: シンタックスハイライト
-    status: todo
+    status: done
   vscode_extension:
     title: VSCode拡張統合
-    status: todo
+    status: done
   rc_extension:
     title: リリース候補版
     status: todo
