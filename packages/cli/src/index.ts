@@ -6,7 +6,7 @@ import {
   format,
   type Diagnostic,
 } from '@pfdsl/core';
-import { renderGraph } from '@pfdsl/preview-engine';
+import { renderGraph, type RenderFormat } from '@pfdsl/preview-engine';
 
 export interface CommandResult {
   stdout: string;
@@ -70,7 +70,7 @@ export function runNormalize(file: string): CommandResult {
   return ok(formatEdges(sortEdges(edges, graph)));
 }
 
-export interface GraphOptions { format?: 'dot' | 'svg' }
+export interface GraphOptions { format?: RenderFormat }
 export async function runGraph(file: string, opts: GraphOptions = {}): Promise<CommandResult> {
   const fmt = opts.format ?? 'dot';
   const { graph, frontmatter, diagnostics } = analyze(readSource(file));
@@ -204,7 +204,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
       if (fmt !== undefined && fmt !== 'dot' && fmt !== 'svg') {
         return fail(`unknown format: ${String(fmt)}\n`, 2);
       }
-      return runGraph(f, fmt ? { format: fmt as 'dot' | 'svg' } : {});
+      return runGraph(f, fmt ? { format: fmt as RenderFormat } : {});
     }
     case 'diff': {
       const [a, b] = positional;
