@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { clearAnalyzeCache } from './analyze.js';
 import { registerDiagnostics } from './diagnostics.js';
 import { registerFormatter } from './format.js';
 import { registerHover } from './hover.js';
@@ -11,4 +12,6 @@ export function activate(context: vscode.ExtensionContext): void {
   registerPreview(context);
 }
 
-export function deactivate(): void {}
+export function deactivate(): void {
+  clearAnalyzeCache();
+}
