@@ -4,7 +4,7 @@ import { analyzeDocument, LANGUAGE_ID } from './analyze.js';
 
 interface PreviewState {
   panel: vscode.WebviewPanel;
-  uri: vscode.Uri;
+  doc: vscode.TextDocument;
 }
 
 async function renderForDocument(doc: vscode.TextDocument): Promise<{ svg?: string; error?: string }> {
@@ -17,11 +17,6 @@ async function renderForDocument(doc: vscode.TextDocument): Promise<{ svg?: stri
   } catch (e) {
     return { error: `Render failed: ${(e as Error).message}` };
   }
-}
-
-function findOpenDocument(uri: vscode.Uri): vscode.TextDocument | undefined {
-  const key = uri.toString();
-  return vscode.workspace.textDocuments.find(d => d.uri.toString() === key);
 }
 
 function buildHtml(body: string): string {
@@ -52,13 +47,8 @@ export function registerPreview(context: vscode.ExtensionContext): void {
   let current: PreviewState | null = null;
 
   async function update(state: PreviewState): Promise<void> {
-    const doc = findOpenDocument(state.uri);
-    if (!doc) {
-      state.panel.webview.html = buildHtml(`<div class="err">Document not open: ${escapeHtml(state.uri.fsPath)}</div>`);
-      return;
-    }
-    const { svg, error } = await renderForDocument(doc);
-    state.panel.title = `PFDSL Preview — ${state.uri.path.split('/').pop() ?? ''}`;
+    const { svg, error } = await renderForDocument(state.doc);
+    state.panel.title = `PFDSL Preview — ${state.doc.uri.path.split('/').pop() ?? ''}`;
     state.panel.webview.html = buildHtml(
       error ? `<div class="err">${escapeHtml(error)}</div>` : svg ?? '',
     );
@@ -71,10 +61,10 @@ export function registerPreview(context: vscode.ExtensionContext): void {
         vscode.window.showInformationMessage('Open a .pfdsl file first.');
         return;
       }
-      const uri = editor.document.uri;
+      const doc = editor.document;
 
       if (current) {
-        current.uri = uri;
+        current.doc = doc;
         current.panel.reveal(vscode.ViewColumn.Beside, true);
         await update(current);
         return;
@@ -87,13 +77,13 @@ export function registerPreview(context: vscode.ExtensionContext): void {
         { enableScripts: false, retainContextWhenHidden: true },
       );
       context.subscriptions.push(panel);
-      current = { panel, uri };
+      current = { panel, doc };
       panel.onDidDispose(() => { current = null; });
       await update(current);
     }),
 
     vscode.workspace.onDidChangeTextDocument(async e => {
-      if (current && e.document.uri.toString() === current.uri.toString()) {
+      if (current && e.document === current.doc) {
         await update(current);
       }
     }),
