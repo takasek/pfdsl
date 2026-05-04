@@ -1,33 +1,32 @@
-import {
-  parse,
-  normalizeDocument,
-  buildGraph,
-  validateGraph,
-  format as formatSource,
-  type Diagnostic,
-  type Frontmatter,
-  type Graph,
-  type NodeKind,
-} from '@pfdsl/core';
+import type * as vscode from 'vscode';
+import { analyze, type AnalyzeResult } from '@pfdsl/core';
 
-export interface AnalyzeResult {
-  diagnostics: Diagnostic[];
-  frontmatter: Frontmatter | null;
-  graph: Graph | null;
-  nodeKinds: Map<string, NodeKind>;
+export const LANGUAGE_ID = 'pfdsl';
+
+export { analyze };
+export type { AnalyzeResult };
+export { format as formatSource } from '@pfdsl/core';
+
+interface CacheEntry {
+  version: number;
+  result: AnalyzeResult;
 }
 
-export function analyze(source: string): AnalyzeResult {
-  const { document, frontmatter, diagnostics: parseDiags } = parse(source);
-  const { edges, nodeKinds, diagnostics: normDiags } = normalizeDocument(document, frontmatter);
-  const valDiags = validateGraph(edges, nodeKinds, frontmatter);
-  const graph = buildGraph(edges, nodeKinds);
-  return {
-    diagnostics: [...parseDiags, ...normDiags, ...valDiags],
-    frontmatter,
-    graph,
-    nodeKinds,
-  };
+const cache = new Map<string, CacheEntry>();
+
+export function analyzeDocument(doc: vscode.TextDocument): AnalyzeResult {
+  const key = doc.uri.toString();
+  const entry = cache.get(key);
+  if (entry && entry.version === doc.version) return entry.result;
+  const result = analyze(doc.getText());
+  cache.set(key, { version: doc.version, result });
+  return result;
 }
 
-export { formatSource };
+export function dropAnalyzeCache(uri: vscode.Uri): void {
+  cache.delete(uri.toString());
+}
+
+export function clearAnalyzeCache(): void {
+  cache.clear();
+}

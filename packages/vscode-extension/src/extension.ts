@@ -11,6 +11,4 @@ export function activate(context: vscode.ExtensionContext): void {
   registerPreview(context);
 }
 
-export function deactivate(): void {
-  // no-op
-}
+export function deactivate(): void {}

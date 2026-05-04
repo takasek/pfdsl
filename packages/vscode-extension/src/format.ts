@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { formatSource } from './analyze.js';
+import { formatSource, LANGUAGE_ID } from './analyze.js';
 
 export function registerFormatter(context: vscode.ExtensionContext): void {
   const provider: vscode.DocumentFormattingEditProvider = {
@@ -18,10 +18,10 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
   };
 
   context.subscriptions.push(
-    vscode.languages.registerDocumentFormattingEditProvider('pfdsl', provider),
+    vscode.languages.registerDocumentFormattingEditProvider(LANGUAGE_ID, provider),
     vscode.commands.registerCommand('pfdsl.format', async () => {
       const editor = vscode.window.activeTextEditor;
-      if (!editor || editor.document.languageId !== 'pfdsl') return;
+      if (!editor || editor.document.languageId !== LANGUAGE_ID) return;
       await vscode.commands.executeCommand('editor.action.formatDocument');
     }),
   );

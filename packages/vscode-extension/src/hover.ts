@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { analyze } from './analyze.js';
+import { analyzeDocument, LANGUAGE_ID } from './analyze.js';
 
 const ID_RE = /[\p{L}\p{N}_][\p{L}\p{N}_-]*/u;
 
@@ -10,25 +10,25 @@ export function registerHover(context: vscode.ExtensionContext): void {
       if (!range) return null;
       const id = doc.getText(range);
 
-      const { frontmatter, nodeKinds } = analyze(doc.getText());
+      const { frontmatter, nodeKinds } = analyzeDocument(doc);
       const kind = nodeKinds.get(id);
       if (!kind) return null;
 
       const lines: string[] = [`**${id}** _(${kind})_`];
-      const meta = kind === 'artifact'
-        ? frontmatter?.artifact?.[id]
-        : frontmatter?.process?.[id];
-
-      if (meta) {
-        if (meta.title) lines.push(`title: ${meta.title}`);
-        if (typeof (meta as Record<string, unknown>).owner === 'string') {
-          lines.push(`owner: ${(meta as Record<string, unknown>).owner as string}`);
+      if (kind === 'artifact') {
+        const meta = frontmatter?.artifact?.[id];
+        if (meta) {
+          if (meta.title)        lines.push(`title: ${meta.title}`);
+          if (meta.owner)        lines.push(`owner: ${meta.owner}`);
+          if (meta.status)       lines.push(`status: ${meta.status}`);
+          if (meta.tags?.length) lines.push(`tags: ${meta.tags.join(', ')}`);
+          if (meta.parts?.length) lines.push(`parts: ${meta.parts.join(', ')}`);
         }
-        if (kind === 'artifact') {
-          const am = meta as { status?: string; tags?: string[]; parts?: string[] };
-          if (am.status) lines.push(`status: ${am.status}`);
-          if (am.tags?.length) lines.push(`tags: ${am.tags.join(', ')}`);
-          if (am.parts?.length) lines.push(`parts: ${am.parts.join(', ')}`);
+      } else {
+        const meta = frontmatter?.process?.[id];
+        if (meta) {
+          if (meta.title) lines.push(`title: ${meta.title}`);
+          if (meta.owner) lines.push(`owner: ${meta.owner}`);
         }
       }
 
@@ -38,5 +38,5 @@ export function registerHover(context: vscode.ExtensionContext): void {
     },
   };
 
-  context.subscriptions.push(vscode.languages.registerHoverProvider('pfdsl', provider));
+  context.subscriptions.push(vscode.languages.registerHoverProvider(LANGUAGE_ID, provider));
 }
