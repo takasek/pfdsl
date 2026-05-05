@@ -25,6 +25,11 @@ describe('validate', () => {
     expect(codes('A >> P -> C\nB >> Q -> C')).toContain('V001');
   });
 
+  it('V001: feedback edges do not count as generators', () => {
+    // P generates C once; Q only feedback-reads C. Must not emit V001.
+    expect(codes('A >> P -> C\nC >>? Q\nB >> Q -> D')).not.toContain('V001');
+  });
+
   it('V002: process with no inputs', () => {
     expect(codes('P -> B')).toContain('V002');
   });
@@ -37,6 +42,14 @@ describe('validate', () => {
     const fm: Frontmatter = { artifact: { C: { parts: ['P'] } } };
     const diags = diagnose('A >> P -> B', fm);
     expect(diags.map(d => d.code)).toContain('V004');
+  });
+
+  it('V004: parts member is a front-matter-only process (not in body)', () => {
+    const fm: Frontmatter = {
+      process: { ghost: {} },
+      artifact: { C: { parts: ['ghost'] } },
+    };
+    expect(codes('', fm)).toContain('V004');
   });
 
   it('V005: parts self-reference', () => {

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { lex } from './lexer.js';
 import { parseTokens } from './parser.js';
 import { normalize } from './normalizer.js';
-import type { NormalizedEdge } from './types/index.js';
+import type { NormalizedEdge, Frontmatter } from './types/index.js';
 
 function edges(src: string, fm = null): NormalizedEdge[] {
   const { tokens } = lex(src);
@@ -72,5 +72,29 @@ describe('normalize', () => {
     expect(nodeKinds.get('A')).toBe('artifact');
     expect(nodeKinds.get('P')).toBe('process');
     expect(nodeKinds.get('B')).toBe('artifact');
+  });
+
+  it('N001: same ID declared as both artifact and process in front matter', () => {
+    const fm = { artifact: { X: {} }, process: { X: {} } } as Frontmatter;
+    const { tokens } = lex('');
+    const { document } = parseTokens(tokens);
+    const { diagnostics } = normalize(document, fm);
+    expect(diagnostics.some(d => d.severity === 'error' && d.code === 'N001')).toBe(true);
+  });
+
+  it('front matter only: artifact-only ID registered as artifact even without body usage', () => {
+    const fm = { artifact: { lonely: {} } } as Frontmatter;
+    const { tokens } = lex('');
+    const { document } = parseTokens(tokens);
+    const { nodeKinds } = normalize(document, fm);
+    expect(nodeKinds.get('lonely')).toBe('artifact');
+  });
+
+  it('front matter only: process-only ID registered as process even without body usage', () => {
+    const fm = { process: { idle: {} } } as Frontmatter;
+    const { tokens } = lex('');
+    const { document } = parseTokens(tokens);
+    const { nodeKinds } = normalize(document, fm);
+    expect(nodeKinds.get('idle')).toBe('process');
   });
 });

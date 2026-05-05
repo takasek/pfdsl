@@ -105,4 +105,30 @@ describe('lex', () => {
     const result = lex('@');
     expect(result.diagnostics.some(d => d.severity === 'error')).toBe(true);
   });
+
+  describe('bare-id forbidden characters split tokens (spec §4.1)', () => {
+    it('semicolon splits IDs', () => {
+      expect(types('a;b')).toEqual(['ID', 'SEMICOLON', 'ID', 'EOF']);
+    });
+
+    it('right bracket splits IDs', () => {
+      expect(types('a]b')).toEqual(['ID', 'RBRACKET', 'ID', 'EOF']);
+    });
+
+    it('left bracket splits IDs', () => {
+      expect(types('a[b')).toEqual(['ID', 'LBRACKET', 'ID', 'EOF']);
+    });
+
+    it('# starts a comment mid-id (does not extend the ID)', () => {
+      const result = lex('a#b');
+      expect(result.tokens.map(t => t.type)).toEqual(['ID', 'COMMENT', 'EOF']);
+      expect(result.tokens[0]?.value).toBe('a');
+      expect(result.tokens[1]?.value).toBe('#b');
+    });
+
+    it('double-quote starts a quoted-id mid-id', () => {
+      expect(types('a"b"')).toEqual(['ID', 'ID', 'EOF']);
+      expect(values('a"b"')).toEqual(['a', 'b', '']);
+    });
+  });
 });

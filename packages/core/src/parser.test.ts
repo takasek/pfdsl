@@ -143,6 +143,11 @@ describe('parseTokens', () => {
       expect(diagnostics.filter(d => d.severity === 'error').length).toBeGreaterThan(0);
     });
 
+    it('forbid trailing arrow: A >> P ->\\n B errors', () => {
+      const { diagnostics } = parse('A >> P ->\n B');
+      expect(diagnostics.filter(d => d.severity === 'error').length).toBeGreaterThan(0);
+    });
+
     it('forbid ID adjacent to ID without separator: A B errors', () => {
       const { diagnostics } = parse('A B');
       expect(diagnostics.filter(d => d.severity === 'error').length).toBeGreaterThan(0);
