@@ -77,11 +77,14 @@ describe('parseTokens', () => {
     expect(document.statements).toHaveLength(2);
   });
 
-  it('syntax error: produces diagnostic and continues', () => {
+  it('syntax error: produces diagnostic and continues; second statement parses correctly', () => {
     const { document, diagnostics } = parse('>> garbage\nA >> P');
-    expect(diagnostics.length).toBeGreaterThan(0);
-    // Should still parse the valid second statement
-    expect(document.statements.length).toBeGreaterThan(0);
+    expect(diagnostics.some(d => d.severity === 'error' && d.code === 'P001')).toBe(true);
+    expect(document.statements).toHaveLength(1);
+    const stmt = document.statements[0] as InputEdgeStatement;
+    expect(stmt.type).toBe('input-edge');
+    expect(stmt.artifact.ids[0]?.value).toBe('A');
+    expect(stmt.process.value).toBe('P');
   });
 
   it('chain with feedback op: A >>? P -> B', () => {

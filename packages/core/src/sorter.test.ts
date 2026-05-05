@@ -45,12 +45,18 @@ describe('sortEdges', () => {
     expect(inputs[1]).toEqual({ kind: 'input', artifact: 'b', process: 'P' });
   });
 
-  it('feedback edges placed by process rank', () => {
-    const result = sorted('req >> design -> spec\nspec >>? design');
-    const fbIdx = result.findIndex(e => e.kind === 'feedback');
-    const outIdx = result.findIndex(e => e.kind === 'output');
-    expect(fbIdx).toBeGreaterThan(-1);
-    expect(fbIdx).toBeLessThan(outIdx);
+  it('feedback edges placed by process rank (spec §14.5): sits between target process inputs and outputs', () => {
+    // Chain: req(0) >> design(1) -> spec(2) >> impl(3) -> code(4)
+    // Feedback spec >>? impl: source artifact is in main component; edge rank = impl rank (3).
+    // At rank 3, kind ordering puts feedback (1) before output (2).
+    const result = sorted('req >> design -> spec\nspec >> impl -> code\nspec >>? impl');
+    expect(result).toEqual([
+      { kind: 'input',    artifact: 'req',  process: 'design' },
+      { kind: 'output',   process: 'design', artifact: 'spec' },
+      { kind: 'input',    artifact: 'spec', process: 'impl' },
+      { kind: 'feedback', artifact: 'spec', process: 'impl' },
+      { kind: 'output',   process: 'impl',  artifact: 'code' },
+    ]);
   });
 
   it('separate connected components: smaller min-ID component first', () => {
@@ -58,11 +64,17 @@ describe('sortEdges', () => {
     expect(result[0]).toMatchObject({ artifact: 'a' });
   });
 
-  it('cyclic primary graph: terminates without hanging', () => {
-    // A -> P1 -> B -> P2 -> A forms a cycle on the primary graph
+  it('cyclic primary graph: terminates and emits all edges with rank-0 fallback', () => {
+    // A -> P1 -> B -> P2 -> A forms a cycle on the primary graph.
+    // No source ⇒ all ranks fall back to 0 ⇒ stable sort by kind then lex key.
     const start = Date.now();
     const result = sorted('A >> P1 -> B\nB >> P2 -> A');
     expect(Date.now() - start).toBeLessThan(1000);
-    expect(result.length).toBe(4);
+    expect(result).toEqual([
+      { kind: 'input',  artifact: 'A',  process: 'P1' },
+      { kind: 'input',  artifact: 'B',  process: 'P2' },
+      { kind: 'output', process: 'P1', artifact: 'B'  },
+      { kind: 'output', process: 'P2', artifact: 'A'  },
+    ]);
   });
 });

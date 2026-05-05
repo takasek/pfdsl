@@ -101,9 +101,13 @@ describe('lex', () => {
     expect(bToken?.start.column).toBe(1);
   });
 
-  it('unknown character: produces error diagnostic', () => {
+  it('unknown character: produces L002 error with position and message', () => {
     const result = lex('@');
-    expect(result.diagnostics.some(d => d.severity === 'error')).toBe(true);
+    const err = result.diagnostics.find(d => d.severity === 'error');
+    expect(err?.code).toBe('L002');
+    expect(err?.message).toContain('@');
+    expect(err?.range.start).toEqual({ line: 1, column: 1, offset: 0 });
+    expect(err?.range.end).toEqual({ line: 1, column: 2, offset: 1 });
   });
 
   describe('bare-id forbidden characters split tokens (spec §4.1)', () => {

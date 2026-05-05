@@ -95,6 +95,26 @@ req >> design -> spec
     expect(dot).toContain('"a\\"b"');
   });
 
+  it('escapes backslash in IDs', () => {
+    const { graph, frontmatter } = buildFromSource('"a\\\\b" >> P -> X\n');
+    const dot = exportDot(graph, frontmatter);
+    // Source ID value is `a\b`; DOT must double the backslash → `"a\\b"`.
+    expect(dot).toContain('"a\\\\b"');
+  });
+
+  it('escapes newline in title labels', () => {
+    const src = `---
+artifact:
+  spec: { title: "line1\\nline2" }
+---
+spec >> P -> X
+`;
+    const { graph, frontmatter } = buildFromSource(src);
+    const dot = exportDot(graph, frontmatter);
+    // label embeds id + "\n" + title; the title's literal newline must be re-escaped.
+    expect(dot).toContain('label="spec\\nline1\\nline2"');
+  });
+
   it('applies statusStyles to artifact with status', () => {
     const src = `---
 artifact:

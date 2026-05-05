@@ -54,11 +54,12 @@ describe('check', () => {
 });
 
 describe('fmt', () => {
-  it('prints formatted output to stdout', async () => {
+  it('prints canonical formatted output to stdout', async () => {
     const r = await run(['fmt', join(dir, 'valid.pfdsl')]);
     expect(r.exitCode).toBe(0);
-    expect(r.stdout).toContain('>>');
-    expect(r.stdout.endsWith('\n')).toBe(true);
+    expect(r.stdout).toBe(
+      'req >> design\ndesign -> spec\nspec >> impl\nimpl -> code\n'
+    );
   });
   it('--write rewrites the file', async () => {
     const f = join(dir, 'fmt-write.pfdsl');

@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { formatEdges } from './formatter.js';
+import { lex } from './lexer.js';
+import { parseTokens } from './parser.js';
+import { normalize } from './normalizer.js';
 import type { NormalizedEdge } from './types/index.js';
 
 describe('formatEdges', () => {
@@ -30,8 +33,28 @@ describe('formatEdges', () => {
     expect(formatEdges(edges)).toBe('A >> P\nP -> B\n');
   });
 
-  it('IDs with spaces use as-is (formatter trusts input)', () => {
+  it('IDs with spaces use as-is (formatter trusts input — known spec gap; output is not re-parseable as one ID)', () => {
     const edges: NormalizedEdge[] = [{ kind: 'input', artifact: 'my artifact', process: 'P' }];
-    expect(formatEdges(edges)).toBe('my artifact >> P\n');
+    const out = formatEdges(edges);
+    expect(out).toBe('my artifact >> P\n');
+    // Document the gap: spaced output is rejected on re-parse (not round-trip safe).
+    const { tokens } = lex(out);
+    const parsed = parseTokens(tokens);
+    const norm = normalize(parsed.document, null);
+    const allErrors = [...parsed.diagnostics, ...norm.diagnostics].filter(d => d.severity === 'error');
+    expect(allErrors.length).toBeGreaterThan(0);
+  });
+
+  it('bare-id edges round-trip through lex/parse/normalize unchanged', () => {
+    const edges: NormalizedEdge[] = [
+      { kind: 'input',  artifact: 'A', process: 'P' },
+      { kind: 'output', process: 'P', artifact: 'B' },
+    ];
+    const { tokens } = lex(formatEdges(edges));
+    const parsed = parseTokens(tokens);
+    const norm = normalize(parsed.document, null);
+    const allErrors = [...parsed.diagnostics, ...norm.diagnostics].filter(d => d.severity === 'error');
+    expect(allErrors).toHaveLength(0);
+    expect(norm.edges).toEqual(edges);
   });
 });
