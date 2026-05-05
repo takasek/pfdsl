@@ -9,6 +9,7 @@ import { zeroRange } from './position.js';
 export interface NormalizeResult {
   edges: NormalizedEdge[];
   nodeKinds: Map<string, 'artifact' | 'process'>;
+  isolatedNodes: Set<string>;
   diagnostics: Diagnostic[];
 }
 
@@ -23,6 +24,8 @@ export function normalize(doc: Document, fm: Frontmatter | null): NormalizeResul
   const rawEdges: NormalizedEdge[] = [];
   const seenEdges = new Set<string>();
   const nodeKinds = new Map<string, 'artifact' | 'process'>();
+  const declaredNodes = new Set<string>(); // node-decl で宣言されたID（孤立候補）
+  const edgeNodes = new Set<string>();     // edge に参加したID
 
   // Pre-populate from front matter (takes priority)
   for (const id of Object.keys(fm?.artifact ?? {})) {
@@ -57,6 +60,11 @@ export function normalize(doc: Document, fm: Frontmatter | null): NormalizeResul
     }
     seenEdges.add(key);
     rawEdges.push(edge);
+    if (edge.kind === 'output') {
+      edgeNodes.add(edge.process); edgeNodes.add(edge.artifact);
+    } else {
+      edgeNodes.add(edge.artifact); edgeNodes.add(edge.process);
+    }
   }
 
   function ids(expr: ArtifactExpr): string[] {
@@ -93,10 +101,27 @@ export function normalize(doc: Document, fm: Frontmatter | null): NormalizeResul
       case 'input-edge':    addEdgesFor('input',    ids(stmt.artifact), stmt.process.value); break;
       case 'feedback-edge': addEdgesFor('feedback', ids(stmt.artifact), stmt.process.value); break;
       case 'output-edge':   addEdgesFor('output',   ids(stmt.artifact), stmt.process.value); break;
+      case 'node-decl': {
+        const id = stmt.id.value;
+        declaredNodes.add(id);
+        // kind: front matter優先、なければArtifact既定（§5.1.3）
+        if (!nodeKinds.has(id)) nodeKinds.set(id, 'artifact');
+        break;
+      }
     }
   }
 
   for (const stmt of doc.statements) processStmt(stmt);
 
-  return { edges: rawEdges, nodeKinds, diagnostics };
+  // 孤立node: node-declで宣言 or front matter定義 かつ edge参加なし
+  const isolatedNodes = new Set<string>();
+  for (const id of declaredNodes) {
+    if (!edgeNodes.has(id)) isolatedNodes.add(id);
+  }
+  // front matter宣言のみのnodeも孤立扱い
+  for (const id of nodeKinds.keys()) {
+    if (!edgeNodes.has(id) && !isolatedNodes.has(id)) isolatedNodes.add(id);
+  }
+
+  return { edges: rawEdges, nodeKinds, isolatedNodes, diagnostics };
 }

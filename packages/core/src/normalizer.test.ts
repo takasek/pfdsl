@@ -97,4 +97,30 @@ describe('normalize', () => {
     const { nodeKinds } = normalize(document, fm);
     expect(nodeKinds.get('idle')).toBe('process');
   });
+
+  it('node-decl: isolated artifact in isolatedNodes', () => {
+    const { tokens } = lex('lonely');
+    const { document } = parseTokens(tokens);
+    const { nodeKinds, isolatedNodes, edges } = normalize(document, null);
+    expect(edges).toHaveLength(0);
+    expect(nodeKinds.get('lonely')).toBe('artifact');
+    expect(isolatedNodes.has('lonely')).toBe(true);
+  });
+
+  it('node-decl: node that also appears in edge is not isolated', () => {
+    const { tokens } = lex('A\nA >> P -> B');
+    const { document } = parseTokens(tokens);
+    const { isolatedNodes } = normalize(document, null);
+    expect(isolatedNodes.has('A')).toBe(false);
+    expect(isolatedNodes.has('P')).toBe(false);
+    expect(isolatedNodes.has('B')).toBe(false);
+  });
+
+  it('front matter process without edges → isolated', () => {
+    const fm = { process: { idle: {} } } as Frontmatter;
+    const { tokens } = lex('');
+    const { document } = parseTokens(tokens);
+    const { isolatedNodes } = normalize(document, fm);
+    expect(isolatedNodes.has('idle')).toBe(true);
+  });
 });
