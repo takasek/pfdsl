@@ -1,5 +1,9 @@
 import type { NormalizedEdge, Graph } from './types/index.js';
 
+export function sortIsolated(isolatedNodes: Set<string>): string[] {
+  return [...isolatedNodes].sort();
+}
+
 export function sortEdges(edges: NormalizedEdge[], graph: Graph): NormalizedEdge[] {
   // Union-Find for connected components (primary graph, undirected)
   const parent = new Map<string, string>();

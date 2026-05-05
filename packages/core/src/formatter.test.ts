@@ -57,4 +57,18 @@ describe('formatEdges', () => {
     expect(allErrors).toHaveLength(0);
     expect(norm.edges).toEqual(edges);
   });
+
+  it('isolated nodes output after edges', () => {
+    const edges: NormalizedEdge[] = [
+      { kind: 'input',  artifact: 'A', process: 'P' },
+      { kind: 'output', process: 'P', artifact: 'B' },
+    ];
+    const result = formatEdges(edges, ['isolated_a', 'isolated_b']);
+    expect(result).toBe('A >> P\nP -> B\nisolated_a\nisolated_b\n');
+  });
+
+  it('isolated-only (no edges) output', () => {
+    const result = formatEdges([], ['lone']);
+    expect(result).toBe('lone\n');
+  });
 });
