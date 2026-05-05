@@ -81,15 +81,13 @@ describe('normalize', () => {
 });
 
 describe('graph', () => {
-  it('default format is dot', async () => {
-    const r = await run(['graph', join(dir, 'valid.pfdsl')]);
-    expect(r.exitCode).toBe(0);
-    expect(r.stdout.startsWith('digraph PFDSL')).toBe(true);
-  });
-  it('format=dot explicit', async () => {
-    const r = await run(['graph', join(dir, 'valid.pfdsl'), '--format', 'dot']);
-    expect(r.exitCode).toBe(0);
-    expect(r.stdout).toContain('digraph PFDSL');
+  it('format=dot (default and explicit produce identical output)', async () => {
+    const implicit = await run(['graph', join(dir, 'valid.pfdsl')]);
+    const explicit = await run(['graph', join(dir, 'valid.pfdsl'), '--format', 'dot']);
+    expect(implicit.exitCode).toBe(0);
+    expect(explicit.exitCode).toBe(0);
+    expect(implicit.stdout.startsWith('digraph PFDSL')).toBe(true);
+    expect(implicit.stdout).toBe(explicit.stdout);
   });
   it('format=svg renders SVG', async () => {
     const r = await run(['graph', join(dir, 'valid.pfdsl'), '--format', 'svg']);

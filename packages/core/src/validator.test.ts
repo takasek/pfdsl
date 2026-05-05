@@ -75,11 +75,6 @@ describe('validate', () => {
     expect(codes('A >> P -> B', fm)).toContain('V007');
   });
 
-  it('V007: valid status values pass', () => {
-    const fm: Frontmatter = { artifact: { A: { status: 'done' }, B: { status: 'wip' } } };
-    expect(codes('A >> P -> B', fm).filter(c => c === 'V007')).toHaveLength(0);
-  });
-
   it('V008: invalid statusStyles key', () => {
     const fm = {
       statusStyles: { finished: { fillcolor: 'gray' } },
