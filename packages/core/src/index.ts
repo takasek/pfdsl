@@ -3,7 +3,7 @@ import { lex } from './lexer.js';
 import { parseTokens } from './parser.js';
 import { normalize } from './normalizer.js';
 import { buildGraph } from './graph.js';
-import { sortEdges } from './sorter.js';
+import { sortEdges, sortIsolated } from './sorter.js';
 import { validate } from './validator.js';
 import { formatEdges } from './formatter.js';
 import type {
@@ -14,7 +14,7 @@ export type { TokenType, Position, Token } from './types/index.js';
 export type {
   IdNode, ArtifactExpr, ChainSegment,
   ChainStatement, InputEdgeStatement, FeedbackEdgeStatement, OutputEdgeStatement,
-  Statement, Document,
+  NodeDeclStatement, Statement, Document,
 } from './types/index.js';
 export type { NormalizedEdge } from './types/index.js';
 export type { NodeKind, PrimaryEdge, FeedbackEdge, Graph } from './types/index.js';
@@ -46,6 +46,7 @@ export interface AnalyzeResult {
   frontmatter: Frontmatter | null;
   edges: NormalizedEdge[];
   nodeKinds: Map<string, NodeKind>;
+  isolatedNodes: Set<string>;
   graph: Graph;
   diagnostics: Diagnostic[];
 }
@@ -73,6 +74,7 @@ export {
   buildGraph,
   validate as validateGraph,
   sortEdges,
+  sortIsolated,
   formatEdges,
 };
 
@@ -82,7 +84,7 @@ export function hasErrors(diags: readonly Diagnostic[]): boolean {
 
 export function analyze(source: string): AnalyzeResult {
   const { document, frontmatter, diagnostics: parseDiags } = parse(source);
-  const { edges, nodeKinds, diagnostics: normDiags } = normalize(document, frontmatter);
+  const { edges, nodeKinds, isolatedNodes, diagnostics: normDiags } = normalize(document, frontmatter);
   const valDiags = validate(edges, nodeKinds, frontmatter);
   const graph = buildGraph(edges, nodeKinds);
   return {
@@ -90,6 +92,7 @@ export function analyze(source: string): AnalyzeResult {
     frontmatter,
     edges,
     nodeKinds,
+    isolatedNodes,
     graph,
     diagnostics: [...parseDiags, ...normDiags, ...valDiags],
   };
@@ -97,12 +100,13 @@ export function analyze(source: string): AnalyzeResult {
 
 export function format(source: string): FormatResult {
   const { document, frontmatter, diagnostics: parseDiags } = parse(source);
-  const { edges, nodeKinds, diagnostics: normDiags } = normalize(document, frontmatter);
+  const { edges, nodeKinds, isolatedNodes, diagnostics: normDiags } = normalize(document, frontmatter);
   const graph = buildGraph(edges, nodeKinds);
   const valDiags = validate(edges, nodeKinds, frontmatter);
   const sorted = sortEdges(edges, graph);
+  const isolated = sortIsolated(isolatedNodes);
   return {
-    output: formatEdges(sorted),
+    output: formatEdges(sorted, isolated),
     diagnostics: [...parseDiags, ...normDiags, ...valDiags],
   };
 }
