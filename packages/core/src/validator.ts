@@ -29,13 +29,14 @@ export function validate(
     }
   }
 
-  // V002 / V003: process completeness
+  // V002 / V003: process completeness — edge参加processのみ (§15.2)
   const processInputCount  = new Map<string, number>();
   const processOutputCount = new Map<string, number>();
-  for (const [id, kind] of nodeKinds) {
-    if (kind === 'process') {
-      processInputCount.set(id, 0);
-      processOutputCount.set(id, 0);
+  for (const e of edges) {
+    const p = e.kind === 'output' ? e.process : e.process;
+    if (!processInputCount.has(p)) {
+      processInputCount.set(p, 0);
+      processOutputCount.set(p, 0);
     }
   }
   for (const e of edges) {

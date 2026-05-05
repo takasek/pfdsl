@@ -114,4 +114,18 @@ describe('validate', () => {
     const cs = codes('A >> P -> B', fm);
     expect(cs).not.toContain('V009');
   });
+
+  it('V002/V003: isolated process (no edges) does not trigger completeness errors', () => {
+    const cs = codes('idle_process');
+    expect(cs).not.toContain('V002');
+    expect(cs).not.toContain('V003');
+  });
+
+  it('V002/V003: process with output but no input still triggers V002', () => {
+    expect(codes('P -> B')).toContain('V002');
+  });
+
+  it('V002/V003: process with input but no output still triggers V003', () => {
+    expect(codes('A >> P')).toContain('V003');
+  });
 });
