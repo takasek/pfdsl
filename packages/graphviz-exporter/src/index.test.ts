@@ -18,6 +18,24 @@ describe('exportDot', () => {
     expect(dot.endsWith('}\n')).toBe(true);
   });
 
+  it('full-DOT snapshot for minimal chain (locks node order, edge order, attribute set)', () => {
+    const { graph, frontmatter } = buildFromSource('req >> design -> spec\nspec >>? design\n');
+    expect(exportDot(graph, frontmatter)).toMatchInlineSnapshot(`
+      "digraph PFDSL {
+        rankdir=LR;
+
+        "design" [shape=ellipse, label="design"];
+        "req" [shape=box, label="req"];
+        "spec" [shape=box, label="spec"];
+
+        "req" -> "design";
+        "design" -> "spec";
+        "spec" -> "design" [style=dashed, color="#888888", constraint=false];
+      }
+      "
+    `);
+  });
+
   it('uses box for artifacts and ellipse for processes', () => {
     const { graph, frontmatter } = buildFromSource('req >> design -> spec\n');
     const dot = exportDot(graph, frontmatter);

@@ -21,10 +21,15 @@ describe('sortEdges', () => {
     expect(result[1]).toEqual({ kind: 'output', process: 'P', artifact: 'B' });
   });
 
-  it('sequential chain: rank ordering A >> P -> B >> Q -> C', () => {
+  it('sequential chain: rank-driven full edge order A >> P -> B >> Q -> C (locks spec §14.2)', () => {
+    // ranks: A=0, P=1, B=2, Q=3, C=4. Edges sort by source-side rank, then kind, then lex.
     const result = sorted('A >> P -> B >> Q -> C');
-    const kinds = result.map(e => e.kind);
-    expect(kinds).toEqual(['input', 'output', 'input', 'output']);
+    expect(result).toEqual([
+      { kind: 'input',  artifact: 'A', process: 'P' },
+      { kind: 'output', process: 'P', artifact: 'B' },
+      { kind: 'input',  artifact: 'B', process: 'Q' },
+      { kind: 'output', process: 'Q', artifact: 'C' },
+    ]);
   });
 
   it('within same rank: >> before ->', () => {

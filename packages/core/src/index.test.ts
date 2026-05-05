@@ -33,12 +33,11 @@ describe('public API', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('format: produces non-empty output for sample file', () => {
+  it('format: matches golden canonical output for sample file (locks spec §14 ordering)', () => {
     const { output, diagnostics } = format(sampleSource);
     const errors = diagnostics.filter(d => d.severity === 'error');
     expect(errors).toHaveLength(0);
-    expect(output.length).toBeGreaterThan(0);
-    expect(output.endsWith('\n')).toBe(true);
+    expect(output).toMatchSnapshot();
   });
 
   it('format is idempotent (format of format = format)', () => {
