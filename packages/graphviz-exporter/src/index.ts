@@ -16,6 +16,27 @@ const QUOTE_BACKSLASH_RE = /\\/g;
 const QUOTE_DQUOTE_RE = /"/g;
 const QUOTE_NEWLINE_RE = /\n/g;
 
+const CJK_RE = /[　-鿿豈-﫿！-｠]/u;
+
+// @hpcc-js/wasm Graphviz has no CJK font metrics → measures CJK chars as ASCII width.
+// Compute a minimum node width so the rendered SVG doesn't clip Japanese labels.
+function calcMinWidth(label: string): number | undefined {
+  if (!CJK_RE.test(label)) return undefined;
+  let maxUnits = 0;
+  for (const line of label.split('\n')) {
+    let units = 0;
+    for (const ch of line) {
+      const cp = ch.codePointAt(0) ?? 0;
+      const isCjk = (cp >= 0x3000 && cp <= 0x9FFF) ||
+                    (cp >= 0xF900 && cp <= 0xFAFF) ||
+                    (cp >= 0xFF01 && cp <= 0xFF60);
+      units += isCjk ? 2 : 1;
+    }
+    maxUnits = Math.max(maxUnits, units);
+  }
+  return Math.max(0.75, maxUnits * 0.1 + 0.3);
+}
+
 export function exportDot(
   graph: Graph,
   frontmatter: Frontmatter | null = null,
@@ -63,7 +84,9 @@ function nodeAttrs(id: string, kind: NodeKind, fm: Frontmatter | null): string {
   const label = title ? `${id}\n${title}` : id;
   const styleAttrs = resolveStyleAttrs(id, kind, fm);
 
+  const minWidth = calcMinWidth(label);
   const attrs: string[] = [`shape=${shape}`, `label=${quote(label)}`];
+  if (minWidth !== undefined) attrs.push(`width=${minWidth.toFixed(2)}`);
   for (const key of STYLE_ATTRS) {
     const v = styleAttrs[key];
     if (v !== undefined) attrs.push(`${key}=${quote(v)}`);

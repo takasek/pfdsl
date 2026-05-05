@@ -69,8 +69,10 @@ req >> design -> spec
 `;
     const { graph, frontmatter } = buildFromSource(src);
     const dot = exportDot(graph, frontmatter);
-    expect(dot).toContain('"req" [shape=box, label="req\\n要求仕様書"]');
-    expect(dot).toContain('"design" [shape=ellipse, label="design\\n設計"]');
+    // "要求仕様書" = 5 CJK = 10 units → 10*0.1+0.3 = 1.30
+    expect(dot).toContain('"req" [shape=box, label="req\\n要求仕様書", width=1.30]');
+    // widest line is "design" = 6 ASCII = 6 units → 6*0.1+0.3 = 0.90
+    expect(dot).toContain('"design" [shape=ellipse, label="design\\n設計", width=0.90]');
   });
 
   it('honors layout.direction in frontmatter', () => {
@@ -105,6 +107,17 @@ req >> design -> spec
     const dot = exportDot(graph, frontmatter);
     expect(dot).toContain('label="開発フロー"');
     expect(dot).toContain('labelloc="t";');
+  });
+
+  it('sets minimum width for nodes with CJK labels to compensate wasm font metrics', () => {
+    const { graph, frontmatter } = buildFromSource('スキャン >> OCR -> アンケートのtsv\n');
+    const dot = exportDot(graph, frontmatter);
+    // 「スキャン」: artifact (box), 4 CJK → 8 units → max(0.75, 0.8+0.3) = 1.10
+    expect(dot).toMatch(/"スキャン" \[shape=box, label="スキャン", width=1\.10\]/);
+    // 「アンケートのtsv」: artifact (box), 6 CJK + 3 ASCII → 15 units → max(0.75, 1.5+0.3) = 1.80
+    expect(dot).toMatch(/"アンケートのtsv" \[shape=box, label="アンケートのtsv", width=1\.80\]/);
+    // 「OCR」: process (ellipse), ASCII only → no width attr
+    expect(dot).toMatch(/"OCR" \[shape=ellipse, label="OCR"\]/);
   });
 
   it('escapes quotes and backslashes in IDs and labels', () => {
