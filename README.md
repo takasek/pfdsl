@@ -12,22 +12,14 @@ spec >>? design                       # feedback loop
 code >> review -> review_report
 ```
 
-## Status
+## Features
 
-**Phase 1 (core library) — complete.** `@pfdsl/core` provides the full
-pipeline: lexer → parser → normalizer → graph builder → validator →
-canonical sorter → formatter, plus the public `format()` entry point.
+- **Pipeline** — lexer → parser → normalizer → validator → canonical sorter → formatter (`@pfdsl/core`)
+- **DOT / SVG** — Graphviz export and Wasm-based rendering (`@pfdsl/graphviz-exporter`, `@pfdsl/preview-engine`)
+- **CLI** — `pfdsl check / fmt / normalize / graph / diff` (`@pfdsl/cli`)
+- **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
 
-**Phase 2 (DOT export, preview, CLI) — complete.**
-- `@pfdsl/graphviz-exporter` — `Graph` + `Frontmatter` → DOT.
-- `@pfdsl/preview-engine` — wraps `@hpcc-js/wasm` Graphviz; renders DOT/SVG.
-- `@pfdsl/cli` — `pfdsl` binary: `check` / `fmt` / `normalize` / `graph` / `diff`.
-
-**Phase 3 (VSCode extension) — complete.**
-- `@pfdsl/vscode-extension` — in-process language features: syntax
-  highlighting, diagnostics, hover metadata, document formatter, and a
-  live SVG preview panel. Sources share a single per-document analysis
-  cache keyed on `TextDocument.version`.
+Roadmap progress lives in [docs/pfdsl_implementation_flow.pfdsl](docs/pfdsl_implementation_flow.pfdsl) (written in PFDSL itself).
 
 ## Repo layout
 
