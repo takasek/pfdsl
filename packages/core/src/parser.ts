@@ -2,7 +2,7 @@ import type {
   Token, TokenType, Diagnostic,
   Document, Statement, ChainStatement, ChainSegment,
   InputEdgeStatement, FeedbackEdgeStatement, OutputEdgeStatement,
-  ArtifactExpr, IdNode,
+  NodeDeclStatement, ArtifactExpr, IdNode,
 } from './types/index.js';
 
 export interface ParseResult {
@@ -73,6 +73,25 @@ export function parseTokens(tokens: Token[]): ParseResult {
     return !blankLine && next < tokens.length && tokens[next]!.type === 'ARROW_OUTPUT';
   }
 
+  // Lookahead: ID stands alone (no operator follows, accounting for line continuation)
+  function isNodeDeclStart(): boolean {
+    if (peek().type !== 'ID') return false;
+    const afterId = pos + 1;
+    if (afterId >= tokens.length) return true;
+    const t = tokens[afterId]!.type;
+    // Immediately followed by operator → not node-decl
+    if (t === 'ARROW_INPUT' || t === 'ARROW_FEEDBACK' || t === 'ARROW_OUTPUT') return false;
+    // Followed by NEWLINE/COMMENT → check for line continuation
+    if (t === 'NEWLINE' || t === 'COMMENT') {
+      const { next, blankLine } = scanContinuation(afterId);
+      if (!blankLine && next < tokens.length) {
+        const nt = tokens[next]!.type;
+        if (nt === 'ARROW_INPUT' || nt === 'ARROW_FEEDBACK' || nt === 'ARROW_OUTPUT') return false;
+      }
+    }
+    return t === 'NEWLINE' || t === 'SEMICOLON' || t === 'EOF' || t === 'COMMENT';
+  }
+
   function parseId(): IdNode | null {
     const t = peek();
     if (t.type !== 'ID') return null;
@@ -137,6 +156,11 @@ export function parseTokens(tokens: Token[]): ParseResult {
   }
 
   function parseStatement(): Statement | null {
+    if (isNodeDeclStart()) {
+      const id = parseId()!;
+      return { type: 'node-decl', id, start: id.start, end: id.end } satisfies NodeDeclStatement;
+    }
+
     if (isOutputEdgeStart()) {
       const processId = parseId()!;
       tryContinuation('ARROW_OUTPUT');

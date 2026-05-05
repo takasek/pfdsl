@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { lex } from './lexer.js';
 import { parseTokens } from './parser.js';
-import type { ChainStatement, InputEdgeStatement, FeedbackEdgeStatement, OutputEdgeStatement } from './types/index.js';
+import type { ChainStatement, InputEdgeStatement, FeedbackEdgeStatement, OutputEdgeStatement, NodeDeclStatement } from './types/index.js';
 
 function parse(src: string) {
   const { tokens } = lex(src);
@@ -156,15 +156,58 @@ describe('parseTokens', () => {
       expect(diagnostics.filter(d => d.severity === 'error').length).toBeGreaterThan(0);
     });
 
-    it('semicolon still works as explicit terminator: A;B errors at B (no operator)', () => {
-      const { diagnostics } = parse('A; B');
-      // A alone is invalid edge (needs >>), B alone too — both error.
-      expect(diagnostics.filter(d => d.severity === 'error').length).toBeGreaterThan(0);
+    it('semicolon separates node-decls: A; B are two valid node-decls', () => {
+      const { document, diagnostics } = parse('A; B');
+      expect(diagnostics.filter(d => d.severity === 'error')).toHaveLength(0);
+      expect(document.statements).toHaveLength(2);
+      expect(document.statements[0]!.type).toBe('node-decl');
+      expect(document.statements[1]!.type).toBe('node-decl');
     });
 
     it('blank line + comment + statement: terminator wins', () => {
       const { diagnostics } = parse('[a, b]\n\n# note\n  >> P -> X');
       expect(diagnostics.filter(d => d.severity === 'error').length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('node-decl', () => {
+    it('single standalone ID → node-decl', () => {
+      const { document, diagnostics } = parse('A');
+      expect(diagnostics.filter(d => d.severity === 'error')).toHaveLength(0);
+      expect(document.statements).toHaveLength(1);
+      const stmt = document.statements[0] as NodeDeclStatement;
+      expect(stmt.type).toBe('node-decl');
+      expect(stmt.id.value).toBe('A');
+    });
+
+    it('multiple node-decls on separate lines', () => {
+      const { document, diagnostics } = parse('A\nB\nC');
+      expect(diagnostics.filter(d => d.severity === 'error')).toHaveLength(0);
+      expect(document.statements).toHaveLength(3);
+      expect(document.statements.every(s => s.type === 'node-decl')).toBe(true);
+    });
+
+    it('node-decl mixed with edges', () => {
+      const { document, diagnostics } = parse('isolated\nA >> P -> B');
+      expect(diagnostics.filter(d => d.severity === 'error')).toHaveLength(0);
+      expect(document.statements).toHaveLength(2);
+      expect(document.statements[0]!.type).toBe('node-decl');
+      expect(document.statements[1]!.type).toBe('chain');
+    });
+
+    it('node-decl with comment after', () => {
+      const { document, diagnostics } = parse('A # comment');
+      expect(diagnostics.filter(d => d.severity === 'error')).toHaveLength(0);
+      expect(document.statements).toHaveLength(1);
+      expect(document.statements[0]!.type).toBe('node-decl');
+    });
+
+    it('quoted ID as node-decl', () => {
+      const { document, diagnostics } = parse('"isolated node"');
+      expect(diagnostics.filter(d => d.severity === 'error')).toHaveLength(0);
+      const stmt = document.statements[0] as NodeDeclStatement;
+      expect(stmt.type).toBe('node-decl');
+      expect(stmt.id.value).toBe('isolated node');
     });
   });
 });

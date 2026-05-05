@@ -53,11 +53,19 @@ export interface OutputEdgeStatement {
   end: Position;
 }
 
+export interface NodeDeclStatement {
+  type: 'node-decl';
+  id: IdNode;
+  start: Position;
+  end: Position;
+}
+
 export type Statement =
   | ChainStatement
   | InputEdgeStatement
   | FeedbackEdgeStatement
-  | OutputEdgeStatement;
+  | OutputEdgeStatement
+  | NodeDeclStatement;
 
 export interface Document {
   type: 'document';
