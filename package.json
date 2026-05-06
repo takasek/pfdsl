@@ -8,6 +8,7 @@
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.14",
     "typescript": "^5.4.0"
   }
 }
