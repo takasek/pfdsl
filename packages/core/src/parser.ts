@@ -72,7 +72,7 @@ export function parseTokens(tokens: Token[]): ParseResult {
 			next > pos &&
 			next < tokens.length &&
 			!blankLine &&
-			ops.includes(tokens[next]?.type)
+			ops.includes(tokens[next]!.type)
 		) {
 			pos = next;
 			return true;

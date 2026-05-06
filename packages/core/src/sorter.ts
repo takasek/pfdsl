@@ -104,7 +104,7 @@ export function sortEdges(
 	}
 
 	return [...edges].sort((a, b) => {
-		const ck = compKeys.get(a)?.localeCompare(compKeys.get(b)!);
+		const ck = compKeys.get(a)!.localeCompare(compKeys.get(b)!);
 		if (ck !== 0) return ck;
 		const rk = edgeRank(a) - edgeRank(b);
 		if (rk !== 0) return rk;
