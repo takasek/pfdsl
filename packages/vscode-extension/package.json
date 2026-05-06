@@ -1,68 +1,76 @@
 {
-  "name": "@pfdsl/vscode-extension",
-  "displayName": "PFDSL",
-  "description": "Process Flow DSL language support",
-  "version": "0.0.1",
-  "private": true,
-  "publisher": "pfdsl",
-  "engines": {
-    "vscode": "^1.85.0"
-  },
-  "categories": ["Programming Languages", "Visualization"],
-  "main": "./dist/extension.cjs",
-  "contributes": {
-    "languages": [
-      {
-        "id": "pfdsl",
-        "aliases": ["PFDSL", "pfdsl"],
-        "extensions": [".pfdsl"],
-        "configuration": "./language-configuration.json"
-      }
-    ],
-    "grammars": [
-      {
-        "language": "pfdsl",
-        "scopeName": "source.pfdsl",
-        "path": "./syntaxes/pfdsl.tmLanguage.json",
-        "embeddedLanguages": {
-          "meta.embedded.block.frontmatter": "yaml"
-        }
-      }
-    ],
-    "commands": [
-      {
-        "command": "pfdsl.format",
-        "title": "PFDSL: Format Document"
-      },
-      {
-        "command": "pfdsl.preview",
-        "title": "PFDSL: Open Preview to the Side"
-      }
-    ],
-    "menus": {
-      "editor/title": [
-        {
-          "when": "editorLangId == pfdsl",
-          "command": "pfdsl.preview",
-          "group": "navigation"
-        }
-      ]
-    }
-  },
-  "scripts": {
-    "build": "node esbuild.config.mjs",
-    "watch": "node esbuild.config.mjs --watch",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
-  },
-  "dependencies": {
-    "@pfdsl/core": "workspace:*",
-    "@pfdsl/preview-engine": "workspace:*"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/vscode": "^1.85.0",
-    "esbuild": "^0.21.0",
-    "vitest": "^1.6.0"
-  }
+	"name": "@pfdsl/vscode-extension",
+	"displayName": "PFDSL",
+	"description": "Process Flow DSL language support",
+	"version": "0.0.1",
+	"private": true,
+	"publisher": "pfdsl",
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"categories": [
+		"Programming Languages",
+		"Visualization"
+	],
+	"main": "./dist/extension.cjs",
+	"contributes": {
+		"languages": [
+			{
+				"id": "pfdsl",
+				"aliases": [
+					"PFDSL",
+					"pfdsl"
+				],
+				"extensions": [
+					".pfdsl"
+				],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "pfdsl",
+				"scopeName": "source.pfdsl",
+				"path": "./syntaxes/pfdsl.tmLanguage.json",
+				"embeddedLanguages": {
+					"meta.embedded.block.frontmatter": "yaml"
+				}
+			}
+		],
+		"commands": [
+			{
+				"command": "pfdsl.format",
+				"title": "PFDSL: Format Document"
+			},
+			{
+				"command": "pfdsl.preview",
+				"title": "PFDSL: Open Preview to the Side"
+			}
+		],
+		"menus": {
+			"editor/title": [
+				{
+					"when": "editorLangId == pfdsl",
+					"command": "pfdsl.preview",
+					"group": "navigation"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"build": "node esbuild.config.mjs",
+		"watch": "node esbuild.config.mjs --watch",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests"
+	},
+	"dependencies": {
+		"@pfdsl/core": "workspace:*",
+		"@pfdsl/preview-engine": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^20.0.0",
+		"@types/vscode": "^1.85.0",
+		"esbuild": "^0.21.0",
+		"vitest": "^1.6.0"
+	}
 }

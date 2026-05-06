@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { run } from './index.js';
+import { run } from "./index.js";
 
 const argv = process.argv.slice(2);
 const result = await run(argv);

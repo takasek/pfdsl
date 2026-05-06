@@ -1,11 +1,11 @@
-import { defineConfig } from 'vitest/config';
-import { resolve } from 'node:path';
+import { resolve } from "node:path";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      '@pfdsl/core': resolve(__dirname, '../core/src/index.ts'),
-    },
-  },
-  test: { include: ['src/**/*.test.ts'] },
+	resolve: {
+		alias: {
+			"@pfdsl/core": resolve(__dirname, "../core/src/index.ts"),
+		},
+	},
+	test: { include: ["src/**/*.test.ts"] },
 });

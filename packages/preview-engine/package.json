@@ -1,29 +1,31 @@
 {
-  "name": "@pfdsl/preview-engine",
-  "version": "0.0.1",
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "tsup src/index.ts --format esm --dts",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@pfdsl/core": "workspace:*",
-    "@pfdsl/graphviz-exporter": "workspace:*",
-    "@hpcc-js/wasm": "^2.18.0"
-  },
-  "files": ["dist"],
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "tsup": "^8.0.0",
-    "vitest": "^1.6.0"
-  }
+	"name": "@pfdsl/preview-engine",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsup src/index.ts --format esm --dts",
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@pfdsl/core": "workspace:*",
+		"@pfdsl/graphviz-exporter": "workspace:*",
+		"@hpcc-js/wasm": "^2.18.0"
+	},
+	"files": [
+		"dist"
+	],
+	"devDependencies": {
+		"@types/node": "^20.0.0",
+		"tsup": "^8.0.0",
+		"vitest": "^1.6.0"
+	}
 }
