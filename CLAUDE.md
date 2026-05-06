@@ -10,4 +10,6 @@
 
 論理単位ごとに分割する。1コミット = 1つの一貫した変更。Conventional Commits 準拠（`feat(scope): ...`, `refactor: ...`, `docs: ...`, `feat!: ...` 破壊的）。
 
+コミットメッセージは**英語**。
+
 直近の履歴 (`git log --oneline`) を参考にスタイルを合わせる。
