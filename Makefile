@@ -1,4 +1,9 @@
-.PHONY: build test typecheck lint format vscode-build vscode-dev vscode-watch
+.PHONY: setup build test typecheck lint format vscode-build vscode-dev vscode-watch
+
+setup:
+	pnpm install
+	cp scripts/pre-commit .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
 
 build:
 	pnpm -r build

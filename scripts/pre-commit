@@ -1,0 +1,7 @@
+#!/bin/sh
+pnpm biome check --write packages/ --no-errors-on-unmatched
+
+if ! git diff --quiet; then
+  echo "Biome formatted files. Review changes and re-stage."
+  exit 1
+fi
