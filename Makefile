@@ -37,6 +37,11 @@ vscode-build: build-deps
 .PHONY: vscode-dev
 vscode-dev: vscode-build
 	code packages/vscode-extension
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Run 'make vscode-watch' in another terminal"
+	@echo "  2. Press F5 in the opened VSCode window"
+	@echo "  3. After editing deps (core/graphviz-exporter), run 'make build-deps' then restart watch"
 
 .PHONY: vscode-watch
 vscode-watch: build-deps
