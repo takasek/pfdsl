@@ -324,13 +324,8 @@ export function parseTokens(tokens: Token[]): ParseResult {
 			}
 			tryContinuation("ARROW_OUTPUT");
 			if (peek().type !== "ARROW_OUTPUT") {
-				diagnostics.push({
-					severity: "error",
-					code: "P009",
-					message: "Expected -> in chain continuation",
-					range: { start: peek().start, end: peek().end },
-				});
-				skipToStatementEnd();
+				// Chain ends with bare `>> process` — output defined elsewhere (semantic check)
+				segments.push({ op: segOp, process: segProcess, output: null });
 				break;
 			}
 			advance();
@@ -354,7 +349,7 @@ export function parseTokens(tokens: Token[]): ParseResult {
 			head,
 			segments,
 			start: head.start,
-			end: last.output.end,
+			end: last.output?.end ?? last.process.end,
 		};
 	}
 

@@ -98,6 +98,16 @@ describe("parseTokens", () => {
 		expect(stmt.process.value).toBe("P");
 	});
 
+	it("chain ending with bare >> process: A >> P -> B >> Q", () => {
+		const { document, diagnostics } = parse("A >> P -> B >> Q");
+		expect(diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
+		const stmt = document.statements[0] as ChainStatement;
+		expect(stmt.type).toBe("chain");
+		expect(stmt.segments).toHaveLength(2);
+		expect(stmt.segments[1]?.process.value).toBe("Q");
+		expect(stmt.segments[1]?.output).toBeNull();
+	});
+
 	it("chain with feedback op: A >>? P -> B", () => {
 		const { document } = parse("A >>? P -> B");
 		const stmt = document.statements[0] as ChainStatement;

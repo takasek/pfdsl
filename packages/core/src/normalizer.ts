@@ -118,9 +118,11 @@ export function normalize(
 						currentArtifacts,
 						proc,
 					);
-					const outArtifacts = ids(seg.output);
-					addEdgesFor("output", outArtifacts, proc);
-					currentArtifacts = outArtifacts;
+					if (seg.output !== null) {
+						const outArtifacts = ids(seg.output);
+						addEdgesFor("output", outArtifacts, proc);
+						currentArtifacts = outArtifacts;
+					}
 				}
 				break;
 			}

@@ -18,7 +18,8 @@ export interface ArtifactExpr {
 export interface ChainSegment {
 	op: ">>" | ">>?";
 	process: IdNode;
-	output: ArtifactExpr;
+	/** null when chain ends with bare `>> process` (output defined elsewhere) */
+	output: ArtifactExpr | null;
 }
 
 export interface ChainStatement {
