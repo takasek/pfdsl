@@ -46,3 +46,7 @@ vscode-dev: vscode-build
 .PHONY: vscode-watch
 vscode-watch: build-deps
 	pnpm --filter @pfdsl/vscode-extension watch
+
+.PHONY: vscode-package
+vscode-package: vscode-build
+	cd packages/vscode-extension && vsce package --no-dependencies
