@@ -1,10 +1,13 @@
 {
-	"name": "@pfdsl/vscode-extension",
+	"name": "pfdsl",
 	"displayName": "PFDSL",
-	"description": "Process Flow DSL language support",
+	"description": "A DSL to define and visualize PFD (Process Flow Diagram) as code",
 	"version": "0.0.1",
-	"private": true,
-	"publisher": "pfdsl",
+	"publisher": "takasek",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/takasek/pfdsl"
+	},
 	"engines": {
 		"vscode": "^1.85.0"
 	},
