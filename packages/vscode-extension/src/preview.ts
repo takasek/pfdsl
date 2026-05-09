@@ -1,65 +1,114 @@
-import { renderGraph } from "@pfdsl/preview-engine";
+import { exportDot } from "@pfdsl/graphviz-exporter";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 
 interface PreviewState {
 	panel: vscode.WebviewPanel;
 	doc: vscode.TextDocument;
+	pendingDot: string | null;
 }
 
-async function renderForDocument(
-	doc: vscode.TextDocument,
-): Promise<{ svg?: string; error?: string }> {
+type MessageFromWebview =
+	| { type: "ready" }
+	| { type: "nodeClick"; nodeId: string };
+
+function dotForDocument(doc: vscode.TextDocument): {
+	dot?: string;
+	error?: string;
+} {
 	const { graph, frontmatter, diagnostics } = analyzeDocument(doc);
 	const fatal = diagnostics.find((d) => d.severity === "error");
 	if (fatal) return { error: `${fatal.code}: ${fatal.message}` };
 	try {
-		const svg = await renderGraph(graph, frontmatter, { format: "svg" });
-		return { svg };
+		return { dot: exportDot(graph, frontmatter) };
 	} catch (e) {
-		return { error: `Render failed: ${(e as Error).message}` };
+		return { error: `Export failed: ${(e as Error).message}` };
 	}
 }
 
-function buildHtml(body: string): string {
+function buildHtml(scriptUri: vscode.Uri, cspSource: string): string {
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${cspSource} 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:;" />
 <style>
-  body { margin: 0; padding: 12px; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
-  svg { max-width: 100%; height: auto; }
-  .err { color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
+  #root { width: 100%; height: 100%; overflow: hidden; cursor: grab; position: relative; }
+  #inner { position: absolute; top: 0; left: 0; }
+  .err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
 </style>
 </head>
 <body>
-${body}
+<div id="root"><div id="inner"></div></div>
+<script src="${scriptUri}"></script>
 </body>
 </html>`;
 }
 
-const HTML_ESCAPES: Record<string, string> = {
-	"&": "&amp;",
-	"<": "&lt;",
-	">": "&gt;",
-	'"': "&quot;",
-	"'": "&#39;",
-};
-
-function escapeHtml(s: string): string {
-	return s.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]!);
+function jumpToNode(doc: vscode.TextDocument, nodeId: string): void {
+	const text = doc.getText();
+	const idx = text.indexOf(nodeId);
+	if (idx === -1) return;
+	const pos = doc.positionAt(idx);
+	vscode.window.showTextDocument(doc, {
+		selection: new vscode.Range(pos, pos.translate(0, nodeId.length)),
+		preserveFocus: false,
+	});
 }
 
 export function registerPreview(context: vscode.ExtensionContext): void {
 	let current: PreviewState | null = null;
 
-	async function update(state: PreviewState): Promise<void> {
-		const { svg, error } = await renderForDocument(state.doc);
+	function sendUpdate(state: PreviewState): void {
+		const { dot, error } = dotForDocument(state.doc);
 		state.panel.title = `PFDSL Preview — ${state.doc.uri.path.split("/").pop() ?? ""}`;
-		state.panel.webview.html = buildHtml(
-			error ? `<div class="err">${escapeHtml(error)}</div>` : (svg ?? ""),
+		if (state.pendingDot !== null) {
+			// webview not ready yet — store for when ready signal arrives
+			state.pendingDot = dot ?? null;
+			return;
+		}
+		state.panel.webview.postMessage(
+			error ? { type: "error", message: error } : { type: "render", dot },
 		);
+	}
+
+	function createPanel(doc: vscode.TextDocument): PreviewState {
+		const scriptUri = vscode.Uri.joinPath(
+			context.extensionUri,
+			"dist",
+			"webview.js",
+		);
+		const panel = vscode.window.createWebviewPanel(
+			"pfdslPreview",
+			"PFDSL Preview",
+			{ viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
+			{
+				enableScripts: true,
+				retainContextWhenHidden: true,
+				localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "dist")],
+			},
+		);
+		const webviewScriptUri = panel.webview.asWebviewUri(scriptUri);
+		panel.webview.html = buildHtml(webviewScriptUri, panel.webview.cspSource);
+
+		const { dot } = dotForDocument(doc);
+		const state: PreviewState = { panel, doc, pendingDot: dot ?? null };
+
+		panel.webview.onDidReceiveMessage((msg: MessageFromWebview) => {
+			if (msg.type === "ready" && state.pendingDot !== null) {
+				panel.webview.postMessage({ type: "render", dot: state.pendingDot });
+				state.pendingDot = null;
+			} else if (msg.type === "nodeClick") {
+				jumpToNode(state.doc, msg.nodeId);
+			}
+		});
+
+		panel.onDidDispose(() => {
+			current = null;
+		});
+		context.subscriptions.push(panel);
+		return state;
 	}
 
 	context.subscriptions.push(
@@ -74,27 +123,16 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 			if (current) {
 				current.doc = doc;
 				current.panel.reveal(vscode.ViewColumn.Beside, true);
-				await update(current);
+				sendUpdate(current);
 				return;
 			}
 
-			const panel = vscode.window.createWebviewPanel(
-				"pfdslPreview",
-				"PFDSL Preview",
-				{ viewColumn: vscode.ViewColumn.Beside, preserveFocus: true },
-				{ enableScripts: false, retainContextWhenHidden: true },
-			);
-			context.subscriptions.push(panel);
-			current = { panel, doc };
-			panel.onDidDispose(() => {
-				current = null;
-			});
-			await update(current);
+			current = createPanel(doc);
 		}),
 
-		vscode.workspace.onDidChangeTextDocument(async (e) => {
+		vscode.workspace.onDidChangeTextDocument((e) => {
 			if (current && e.document === current.doc) {
-				await update(current);
+				sendUpdate(current);
 			}
 		}),
 	);

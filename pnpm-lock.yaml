@@ -90,12 +90,15 @@ importers:
 
   packages/vscode-extension:
     dependencies:
+      '@hpcc-js/wasm':
+        specifier: ^2.18.0
+        version: 2.33.5
       '@pfdsl/core':
         specifier: workspace:*
         version: link:../core
-      '@pfdsl/preview-engine':
+      '@pfdsl/graphviz-exporter':
         specifier: workspace:*
-        version: link:../preview-engine
+        version: link:../graphviz-exporter
     devDependencies:
       '@types/node':
         specifier: ^20.0.0

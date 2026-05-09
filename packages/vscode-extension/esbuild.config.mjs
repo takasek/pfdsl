@@ -2,7 +2,7 @@ import { build, context } from "esbuild";
 
 const watch = process.argv.includes("--watch");
 
-const options = {
+const extensionOptions = {
 	entryPoints: ["src/extension.ts"],
 	bundle: true,
 	outfile: "dist/extension.cjs",
@@ -14,9 +14,23 @@ const options = {
 	logLevel: "info",
 };
 
+const webviewOptions = {
+	entryPoints: ["src/webview.ts"],
+	bundle: true,
+	outfile: "dist/webview.js",
+	platform: "browser",
+	format: "iife",
+	target: "es2020",
+	sourcemap: true,
+	logLevel: "info",
+};
+
 if (watch) {
-	const ctx = await context(options);
-	await ctx.watch();
+	const [extCtx, wvCtx] = await Promise.all([
+		context(extensionOptions),
+		context(webviewOptions),
+	]);
+	await Promise.all([extCtx.watch(), wvCtx.watch()]);
 } else {
-	await build(options);
+	await Promise.all([build(extensionOptions), build(webviewOptions)]);
 }

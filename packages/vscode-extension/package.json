@@ -67,8 +67,9 @@
 		"test": "vitest run --passWithNoTests"
 	},
 	"dependencies": {
+		"@hpcc-js/wasm": "^2.18.0",
 		"@pfdsl/core": "workspace:*",
-		"@pfdsl/preview-engine": "workspace:*"
+		"@pfdsl/graphviz-exporter": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0",
