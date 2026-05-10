@@ -5,7 +5,7 @@ import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 interface PreviewState {
 	panel: vscode.WebviewPanel;
 	doc: vscode.TextDocument;
-	pendingDot: string | null;
+	webviewReady: boolean;
 }
 
 type MessageFromWebview =
@@ -41,7 +41,7 @@ function buildHtml(scriptUri: vscode.Uri, cspSource: string): string {
 </head>
 <body>
 <div id="root"><div id="inner"></div></div>
-<script src="${scriptUri}"></script>
+<script type="module" src="${scriptUri}"></script>
 </body>
 </html>`;
 }
@@ -61,13 +61,9 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 	let current: PreviewState | null = null;
 
 	function sendUpdate(state: PreviewState): void {
+		if (!state.webviewReady) return;
 		const { dot, error } = dotForDocument(state.doc);
 		state.panel.title = `PFDSL Preview — ${state.doc.uri.path.split("/").pop() ?? ""}`;
-		if (state.pendingDot !== null) {
-			// webview not ready yet — store for when ready signal arrives
-			state.pendingDot = dot ?? null;
-			return;
-		}
 		state.panel.webview.postMessage(
 			error ? { type: "error", message: error } : { type: "render", dot },
 		);
@@ -92,13 +88,12 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 		const webviewScriptUri = panel.webview.asWebviewUri(scriptUri);
 		panel.webview.html = buildHtml(webviewScriptUri, panel.webview.cspSource);
 
-		const { dot } = dotForDocument(doc);
-		const state: PreviewState = { panel, doc, pendingDot: dot ?? null };
+		const state: PreviewState = { panel, doc, webviewReady: false };
 
 		panel.webview.onDidReceiveMessage((msg: MessageFromWebview) => {
-			if (msg.type === "ready" && state.pendingDot !== null) {
-				panel.webview.postMessage({ type: "render", dot: state.pendingDot });
-				state.pendingDot = null;
+			if (msg.type === "ready") {
+				state.webviewReady = true;
+				sendUpdate(state);
 			} else if (msg.type === "nodeClick") {
 				jumpToNode(state.doc, msg.nodeId);
 			}

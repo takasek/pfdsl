@@ -19,7 +19,7 @@ const webviewOptions = {
 	bundle: true,
 	outfile: "dist/webview.js",
 	platform: "browser",
-	format: "iife",
+	format: "esm",
 	target: "es2020",
 	sourcemap: true,
 	logLevel: "info",

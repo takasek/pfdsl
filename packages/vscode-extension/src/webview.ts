@@ -107,12 +107,6 @@ window.addEventListener("message", async (event) => {
 		const g = await getGraphviz();
 		const svg = g.dot(msg.dot, "svg");
 		inner.innerHTML = svg;
-		const svgEl = inner.querySelector("svg");
-		if (svgEl) {
-			svgEl.removeAttribute("width");
-			svgEl.removeAttribute("height");
-			svgEl.style.overflow = "visible";
-		}
 	} catch (e) {
 		inner.innerHTML = `<div class="err">${escapeHtml((e as Error).message)}</div>`;
 	}
