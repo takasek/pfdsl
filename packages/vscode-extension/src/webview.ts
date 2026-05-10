@@ -13,10 +13,22 @@ declare const acquireVsCodeApi: () => {
 };
 const vscode = acquireVsCodeApi();
 
+const DEBUG =
+	(window as unknown as { __PFDSL_DEBUG__?: boolean }).__PFDSL_DEBUG__ ?? false;
+function log(...args: unknown[]) {
+	if (DEBUG) console.log("[pfdsl]", ...args);
+}
+
+log("webview script start");
+
 let gv: Awaited<ReturnType<typeof Graphviz.load>> | null = null;
 
 async function getGraphviz() {
-	if (!gv) gv = await Graphviz.load();
+	if (!gv) {
+		log("Graphviz.load() start");
+		gv = await Graphviz.load();
+		log("Graphviz.load() done");
+	}
 	return gv;
 }
 
@@ -98,6 +110,7 @@ function escapeHtml(s: string): string {
 
 window.addEventListener("message", async (event) => {
 	const msg = event.data as MessageToWebview;
+	log("message received:", msg.type);
 	if (msg.type === "error") {
 		inner.innerHTML = `<div class="err">${escapeHtml(msg.message)}</div>`;
 		return;
@@ -105,11 +118,23 @@ window.addEventListener("message", async (event) => {
 	if (msg.type !== "render") return;
 	try {
 		const g = await getGraphviz();
+		log("calling g.dot()");
 		const svg = g.dot(msg.dot, "svg");
+		log("svg length:", svg.length);
 		inner.innerHTML = svg;
+		const svgEl = inner.querySelector("svg");
+		if (svgEl) {
+			log(
+				"svg size:",
+				svgEl.getAttribute("width"),
+				svgEl.getAttribute("height"),
+			);
+		}
 	} catch (e) {
+		log("render error:", (e as Error).message);
 		inner.innerHTML = `<div class="err">${escapeHtml((e as Error).message)}</div>`;
 	}
 });
 
+log("sending ready");
 vscode.postMessage({ type: "ready" });

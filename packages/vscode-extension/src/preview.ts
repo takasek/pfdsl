@@ -26,7 +26,11 @@ function dotForDocument(doc: vscode.TextDocument): {
 	}
 }
 
-function buildHtml(scriptUri: vscode.Uri, cspSource: string): string {
+function buildHtml(
+	scriptUri: vscode.Uri,
+	cspSource: string,
+	isDebug: boolean,
+): string {
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,6 +42,7 @@ function buildHtml(scriptUri: vscode.Uri, cspSource: string): string {
   #inner { position: absolute; top: 0; left: 0; }
   .err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
 </style>
+<script>window.__PFDSL_DEBUG__ = ${isDebug};</script>
 </head>
 <body>
 <div id="root"><div id="inner"></div></div>
@@ -86,7 +91,12 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 			},
 		);
 		const webviewScriptUri = panel.webview.asWebviewUri(scriptUri);
-		panel.webview.html = buildHtml(webviewScriptUri, panel.webview.cspSource);
+		const isDebug = context.extensionMode === vscode.ExtensionMode.Development;
+		panel.webview.html = buildHtml(
+			webviewScriptUri,
+			panel.webview.cspSource,
+			isDebug,
+		);
 
 		const state: PreviewState = { panel, doc, webviewReady: false };
 
