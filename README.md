@@ -28,7 +28,7 @@ packages/core/               @pfdsl/core              — DSL pipeline (parse / 
 packages/graphviz-exporter/  @pfdsl/graphviz-exporter — Graph → DOT
 packages/preview-engine/     @pfdsl/preview-engine    — DOT → SVG (Graphviz wasm)
 packages/cli/                @pfdsl/cli               — `pfdsl` CLI
-packages/vscode-extension/   @pfdsl/vscode-extension  — VSCode language extension
+packages/vscode-extension/   @pfdsl/vscode-extension  — VSCode language extension ([README](packages/vscode-extension/README.md))
 docs/spec/                   Language specification (spec.md)
 docs/samples/                Syntax samples — .pfdsl + .dot + .svg pairs
 docs/                        ADRs, plans, roadmap
@@ -73,6 +73,8 @@ pfdsl help
 Exit codes: `0` ok, `1` validation/IO error, `2` usage error.
 
 ## VSCode extension
+
+See [packages/vscode-extension/README.md](packages/vscode-extension/README.md) for full feature docs.
 
 ```bash
 pnpm --filter @pfdsl/vscode-extension build
