@@ -1,0 +1,23 @@
+digraph PFDSL {
+  rankdir=LR;
+
+  subgraph cluster_backend {
+    label="Backend";
+    color="lightyellow";
+    "api_spec" [shape=box, label="api_spec"];
+    "build_api" [shape=ellipse, label="build_api"];
+    "endpoint" [shape=box, label="endpoint"];
+  }
+  subgraph cluster_frontend {
+    label="Frontend";
+    color="lightblue";
+    "build_ui" [shape=ellipse, label="build_ui"];
+    "component" [shape=box, label="component"];
+    "ui_mockup" [shape=box, label="ui_mockup"];
+  }
+
+  "api_spec" -> "build_api";
+  "build_api" -> "endpoint";
+  "ui_mockup" -> "build_ui";
+  "build_ui" -> "component";
+}

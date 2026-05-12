@@ -1,0 +1,12 @@
+digraph PFDSL {
+  rankdir=LR;
+
+  "binary" [shape=box, label="binary"];
+  "build" [shape=ellipse, label="build"];
+  "docs" [shape=box, label="docs"];
+  "source" [shape=box, label="source"];
+
+  "source" -> "build";
+  "build" -> "binary";
+  "build" -> "docs";
+}

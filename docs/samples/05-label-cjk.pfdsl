@@ -1,0 +1,8 @@
+---
+artifact:
+  D1: { label: 紙のアンケート }
+  D2: { label: デジタルアンケート }
+process:
+  P1: { label: スキャン }
+---
+D1 >> P1 -> D2

@@ -1,0 +1,8 @@
+---
+artifact:
+  customer_data: { tags: [external] }
+  report:        { tags: [external] }
+tagStyles:
+  external: { color: "#0066cc", penwidth: "2" }
+---
+customer_data >> analyze -> report

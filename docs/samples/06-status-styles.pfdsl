@@ -1,0 +1,12 @@
+---
+artifact:
+  requirements: { status: done }
+  spec:         { status: wip }
+  code:         { status: todo }
+statusStyles:
+  done: { fillcolor: "#d4edda", style: filled }
+  wip:  { fillcolor: "#fff3cd", style: filled }
+  todo: { fillcolor: "#f8f9fa", style: filled }
+---
+requirements >> design -> spec
+spec >> implement -> code

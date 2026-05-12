@@ -1,0 +1,15 @@
+---
+group:
+  frontend: { label: Frontend, color: lightblue }
+  backend:  { label: Backend,  color: lightyellow }
+artifact:
+  api_spec:  { group: backend }
+  endpoint:  { group: backend }
+  ui_mockup: { group: frontend }
+  component: { group: frontend }
+process:
+  build_api: { group: backend }
+  build_ui:  { group: frontend }
+---
+api_spec >> build_api -> endpoint
+ui_mockup >> build_ui -> component

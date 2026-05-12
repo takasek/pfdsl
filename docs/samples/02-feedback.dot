@@ -1,0 +1,15 @@
+digraph PFDSL {
+  rankdir=LR;
+
+  "bug_report" [shape=box, label="bug_report"];
+  "code" [shape=box, label="code"];
+  "implement" [shape=ellipse, label="implement"];
+  "spec" [shape=box, label="spec"];
+  "verify" [shape=ellipse, label="verify"];
+
+  "spec" -> "implement";
+  "implement" -> "code";
+  "code" -> "verify";
+  "verify" -> "bug_report";
+  "bug_report" -> "implement" [style=dashed, color="#888888", constraint=false];
+}

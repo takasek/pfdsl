@@ -1,6 +1,14 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildGraph, normalizeDocument, parse } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
 import { exportDot } from "./index.js";
+
+const samplesDir = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	"../../../docs/samples",
+);
 
 function buildFromSource(src: string) {
 	const { document, frontmatter } = parse(src);
@@ -426,4 +434,21 @@ a >> P -> b
 		const posG2 = dot.indexOf("cluster_g2");
 		expect(posG1).toBeLessThan(posG2);
 	});
+});
+
+describe("fixture files", () => {
+	const files = readdirSync(samplesDir)
+		.filter((f) => f.endsWith(".pfdsl"))
+		.sort();
+	for (const f of files) {
+		it(f.replace(".pfdsl", ""), () => {
+			const src = readFileSync(resolve(samplesDir, f), "utf-8");
+			const expected = readFileSync(
+				resolve(samplesDir, f.replace(".pfdsl", ".dot")),
+				"utf-8",
+			);
+			const { graph, frontmatter } = buildFromSource(src);
+			expect(exportDot(graph, frontmatter)).toBe(expected);
+		});
+	}
 });

@@ -1,0 +1,10 @@
+digraph PFDSL {
+  rankdir=LR;
+
+  "analyze" [shape=ellipse, label="analyze"];
+  "customer_data" [shape=box, label="customer_data", color="#0066cc", penwidth="2"];
+  "report" [shape=box, label="report", color="#0066cc", penwidth="2"];
+
+  "customer_data" -> "analyze";
+  "analyze" -> "report";
+}

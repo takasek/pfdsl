@@ -1,0 +1,12 @@
+digraph PFDSL {
+  rankdir=LR;
+
+  "database" [shape=box, label="database"];
+  "migrate" [shape=ellipse, label="migrate"];
+  "schema" [shape=box, label="schema"];
+  "seed_data" [shape=box, label="seed_data"];
+
+  "schema" -> "migrate";
+  "seed_data" -> "migrate";
+  "migrate" -> "database";
+}

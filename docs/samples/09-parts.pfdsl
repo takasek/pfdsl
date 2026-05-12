@@ -1,0 +1,13 @@
+---
+artifact:
+  D0: { label: Source }
+  D1:
+    label: Release Package
+    parts: [D2, D3, D4]
+  D2: { label: Binary }
+  D3: { label: Config }
+  D4: { label: Release Notes }
+process:
+  P1: { label: Build }
+---
+D0 >> P1 -> D1

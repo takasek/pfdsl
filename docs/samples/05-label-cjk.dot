@@ -1,0 +1,10 @@
+digraph PFDSL {
+  rankdir=LR;
+
+  "D1" [shape=box, label="D1\n紙のアンケート", width=1.70];
+  "D2" [shape=box, label="D2\nデジタルアンケート", width=2.10];
+  "P1" [shape=ellipse, label="P1\nスキャン", width=1.10];
+
+  "D1" -> "P1";
+  "P1" -> "D2";
+}

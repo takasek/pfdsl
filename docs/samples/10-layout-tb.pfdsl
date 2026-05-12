@@ -1,0 +1,6 @@
+---
+layout:
+  direction: TB
+---
+requirements >> design -> spec
+spec >> implement -> code
