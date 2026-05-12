@@ -156,7 +156,7 @@ pfdsl/
 - **出力**: DOT 文字列
 - **要件**:
   - Artifact は箱、Process は楕円(PFD慣例)で表現
-  - front matter の `title` を label に反映 (未指定時はID表示)
+  - front matter の `label` を node label に反映 (未指定時はID表示)
   - Feedback edge は点線 + 別色
   - layout.direction を `rankdir` にマッピング
 
@@ -224,7 +224,7 @@ pfdsl/
 
 ### Task 3.6: Hover Support
 
-- ID にホバー時、front matter の title / description / owner / tags を表示
+- ID にホバー時、front matter の label / description / owner / tags を表示
 - parts 宣言がある場合は構造図を小さくレンダリング
 
 ### Task 3.7: Diagnostics UI

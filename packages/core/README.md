@@ -74,12 +74,12 @@ All AST / token / diagnostic / graph types are exported as type-only.
 ---                              # optional YAML frontmatter
 artifact:
   spec:
-    title: 仕様書
+    label: 仕様書
 process:
   design:
-    title: 設計
+    label: 設計
   build:
-    title: 実装
+    label: 実装
     parts: [design]              # composition (build is decomposed into design)
 ---
 

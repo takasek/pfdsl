@@ -83,7 +83,7 @@ Host with `@pfdsl/vscode-extension` loaded. In the host, `.pfdsl` files get:
 
 - syntax highlighting (TextMate grammar; YAML embedded in frontmatter)
 - inline diagnostics (parse / normalize / validate)
-- hover metadata for artifacts and processes (title, owner, status, tags, parts)
+- hover metadata for artifacts and processes (label, owner, status, tags, parts)
 - `Format Document` / `pfdsl.format`
 - `PFDSL: Open Preview to the Side` (`pfdsl.preview`) — live SVG, refreshes on edit
 
