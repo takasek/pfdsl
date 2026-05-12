@@ -1,7 +1,7 @@
 # PFDSL — Process Flow DSL
 
-A small DSL for describing process flows as artifacts (deliverables) and
-processes (activities), and the input/output edges between them. Sources
+A small DSL for describing process flows as artifacts and processes, and
+the input/output edges between them. Sources
 parse to a canonical edge list that can be re-emitted, validated, diffed,
 and rendered to Graphviz (DOT or SVG).
 
