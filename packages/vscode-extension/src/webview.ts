@@ -1,7 +1,7 @@
 import { Graphviz } from "@hpcc-js/wasm";
 
 type MessageToWebview =
-	| { type: "render"; dot: string }
+	| { type: "render"; dot: string; focusNodeId?: string }
 	| { type: "error"; message: string };
 
 type MessageFromWebview =
@@ -41,10 +41,47 @@ let panY = 0;
 let dragging = false;
 let startX = 0;
 let startY = 0;
+let hasPositioned = false;
 
 function applyTransform() {
 	inner.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
 	inner.style.transformOrigin = "0 0";
+}
+
+function centerGraph() {
+	const w = inner.offsetWidth;
+	const h = inner.offsetHeight;
+	panX = (root.clientWidth - w * scale) / 2;
+	panY = (root.clientHeight - h * scale) / 2;
+	log("centerGraph", {
+		w,
+		h,
+		rootW: root.clientWidth,
+		rootH: root.clientHeight,
+		panX,
+		panY,
+		scale,
+	});
+	applyTransform();
+}
+
+function focusNode(nodeId: string) {
+	const nodes = inner.querySelectorAll("g.node");
+	for (const node of nodes) {
+		const title = node.querySelector("title");
+		if (title?.textContent === nodeId) {
+			const nodeRect = node.getBoundingClientRect();
+			const rootRect = root.getBoundingClientRect();
+			panX +=
+				root.clientWidth / 2 -
+				(nodeRect.left + nodeRect.width / 2 - rootRect.left);
+			panY +=
+				root.clientHeight / 2 -
+				(nodeRect.top + nodeRect.height / 2 - rootRect.top);
+			applyTransform();
+			return;
+		}
+	}
 }
 
 root.addEventListener(
@@ -86,7 +123,7 @@ root.addEventListener("dblclick", () => {
 	scale = 1;
 	panX = 0;
 	panY = 0;
-	applyTransform();
+	requestAnimationFrame(() => centerGraph());
 });
 
 inner.addEventListener("click", (e) => {
@@ -129,6 +166,16 @@ window.addEventListener("message", async (event) => {
 				svgEl.getAttribute("width"),
 				svgEl.getAttribute("height"),
 			);
+		}
+		if (!hasPositioned) {
+			hasPositioned = true;
+			const focusNodeId = msg.focusNodeId;
+			log("scheduling center, focusNodeId:", focusNodeId);
+			requestAnimationFrame(() => {
+				log("rAF fired, inner.offsetWidth:", inner.offsetWidth);
+				centerGraph();
+				if (focusNodeId) focusNode(focusNodeId);
+			});
 		}
 	} catch (e) {
 		log("render error:", (e as Error).message);

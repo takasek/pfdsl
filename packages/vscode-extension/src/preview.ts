@@ -1,3 +1,4 @@
+import type { AnalyzeResult, IdNode, Statement } from "@pfdsl/core";
 import { exportDot } from "@pfdsl/graphviz-exporter";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
@@ -6,6 +7,49 @@ interface PreviewState {
 	panel: vscode.WebviewPanel;
 	doc: vscode.TextDocument;
 	webviewReady: boolean;
+	pendingFocusNodeId?: string;
+}
+
+function idsOfStatement(stmt: Statement): IdNode[] {
+	switch (stmt.type) {
+		case "chain": {
+			const ids: IdNode[] = [...stmt.head.ids];
+			for (const seg of stmt.segments) {
+				ids.push(seg.process);
+				if (seg.output) ids.push(...seg.output.ids);
+			}
+			return ids;
+		}
+		case "input-edge":
+			return [...stmt.artifact.ids, stmt.process];
+		case "feedback-edge":
+			return [...stmt.artifact.ids, stmt.process];
+		case "output-edge":
+			return [stmt.process, ...stmt.artifact.ids];
+		case "node-decl":
+			return [stmt.id];
+	}
+}
+
+function nodeIdAtCursor(
+	result: AnalyzeResult,
+	pos: vscode.Position,
+): string | undefined {
+	// vscode pos: 0-indexed; core positions: 1-indexed
+	const line = pos.line + 1;
+	const col = pos.character + 1;
+	for (const stmt of result.document.statements) {
+		for (const id of idsOfStatement(stmt)) {
+			if (
+				id.start.line === line &&
+				col >= id.start.column &&
+				col <= id.end.column
+			) {
+				return id.value;
+			}
+		}
+	}
+	return undefined;
 }
 
 type MessageFromWebview =
@@ -68,13 +112,20 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 	function sendUpdate(state: PreviewState): void {
 		if (!state.webviewReady) return;
 		const { dot, error } = dotForDocument(state.doc);
+		const focusNodeId = state.pendingFocusNodeId;
+		delete state.pendingFocusNodeId;
 		state.panel.title = `PFDSL Preview — ${state.doc.uri.path.split("/").pop() ?? ""}`;
 		state.panel.webview.postMessage(
-			error ? { type: "error", message: error } : { type: "render", dot },
+			error
+				? { type: "error", message: error }
+				: { type: "render", dot, focusNodeId },
 		);
 	}
 
-	function createPanel(doc: vscode.TextDocument): PreviewState {
+	function createPanel(
+		doc: vscode.TextDocument,
+		focusNodeId?: string,
+	): PreviewState {
 		const scriptUri = vscode.Uri.joinPath(
 			context.extensionUri,
 			"dist",
@@ -98,7 +149,12 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 			isDebug,
 		);
 
-		const state: PreviewState = { panel, doc, webviewReady: false };
+		const state: PreviewState = {
+			panel,
+			doc,
+			webviewReady: false,
+			...(focusNodeId ? { pendingFocusNodeId: focusNodeId } : {}),
+		};
 
 		panel.webview.onDidReceiveMessage((msg: MessageFromWebview) => {
 			if (msg.type === "ready") {
@@ -132,7 +188,9 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 				return;
 			}
 
-			current = createPanel(doc);
+			const result = analyzeDocument(doc);
+			const focusNodeId = nodeIdAtCursor(result, editor.selection.active);
+			current = createPanel(doc, focusNodeId);
 		}),
 
 		vscode.workspace.onDidChangeTextDocument((e) => {
