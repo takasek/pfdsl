@@ -41,6 +41,18 @@ for (const f of files) {
   console.log(`${base} → .dot + .svg`);
 }
 
+// --- Generate dogfood .dot + .svg ---
+
+const dogfoodBase = resolve(root, "docs/pfdsl_implementation_flow");
+const dogfoodSrc = readFileSync(`${dogfoodBase}.pfdsl`, "utf-8");
+const { document: dogDoc, frontmatter: dogFm } = parse(dogfoodSrc);
+const { edges: dogEdges, nodeKinds: dogKinds } = normalizeDocument(dogDoc, dogFm);
+const dogGraph = buildGraph(dogEdges, dogKinds);
+const dogDot = exportDot(dogGraph, dogFm);
+writeFileSync(`${dogfoodBase}.dot`, dogDot);
+execSync(`dot -Tsvg "${dogfoodBase}.dot" -o "${dogfoodBase}.svg"`);
+console.log("pfdsl_implementation_flow → .dot + .svg");
+
 // --- Generate README.md from samples.tsv ---
 
 const tsv = readFileSync(resolve(samplesDir, "samples.tsv"), "utf-8");
@@ -83,6 +95,15 @@ ${dot}\`\`\`
 
 `;
 }
+
+readme += `## Real-world example
+
+[pfdsl_implementation_flow.pfdsl](../pfdsl_implementation_flow.pfdsl) — the PFDSL toolchain roadmap, written in PFDSL itself.
+
+<img src="../pfdsl_implementation_flow.svg">
+
+[Source](../pfdsl_implementation_flow.pfdsl) · [DOT](../pfdsl_implementation_flow.dot)
+`;
 
 writeFileSync(resolve(samplesDir, "README.md"), readme);
 console.log("README.md generated");

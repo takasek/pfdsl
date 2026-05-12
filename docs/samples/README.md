@@ -393,3 +393,10 @@ digraph PFDSL {
 
 ---
 
+## Real-world example
+
+[pfdsl_implementation_flow.pfdsl](../pfdsl_implementation_flow.pfdsl) — the PFDSL toolchain roadmap, written in PFDSL itself.
+
+<img src="../pfdsl_implementation_flow.svg">
+
+[Source](../pfdsl_implementation_flow.pfdsl) · [DOT](../pfdsl_implementation_flow.dot)

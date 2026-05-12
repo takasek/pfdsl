@@ -30,7 +30,8 @@ packages/preview-engine/     @pfdsl/preview-engine    — DOT → SVG (Graphviz 
 packages/cli/                @pfdsl/cli               — `pfdsl` CLI
 packages/vscode-extension/   @pfdsl/vscode-extension  — VSCode language extension
 docs/spec/                   Language specification (spec.md)
-docs/                        ADRs, plans, sample .pfdsl files
+docs/samples/                Syntax samples — .pfdsl + .dot + .svg pairs
+docs/                        ADRs, plans, roadmap
 ```
 
 ## Quick start
@@ -115,6 +116,10 @@ const svg = await renderGraph(graph, frontmatter, { format: 'svg' });
 ```
 
 API reference: [packages/core/README.md](packages/core/README.md).
+
+## Samples
+
+Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/samples/](docs/samples/README.md).
 
 ## Spec
 
