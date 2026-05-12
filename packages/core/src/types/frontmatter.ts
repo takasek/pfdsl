@@ -19,12 +19,20 @@ export interface ArtifactMeta {
 	parts?: string[];
 	status?: Status;
 	tags?: string[];
+	group?: string;
 	[key: string]: unknown;
 }
 
 export interface ProcessMeta {
 	title?: string;
 	owner?: string;
+	group?: string;
+	[key: string]: unknown;
+}
+
+export interface GroupMeta {
+	label?: string;
+	color?: string;
 	[key: string]: unknown;
 }
 
@@ -40,6 +48,7 @@ export interface Frontmatter {
 	};
 	artifact?: Record<string, ArtifactMeta>;
 	process?: Record<string, ProcessMeta>;
+	group?: Record<string, GroupMeta>;
 	statusStyles?: Partial<Record<Status, NodeStyle>>;
 	tagStyles?: Record<string, NodeStyle>;
 	[key: string]: unknown;

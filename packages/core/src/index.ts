@@ -31,6 +31,7 @@ export type {
 	FeedbackEdgeStatement,
 	Frontmatter,
 	Graph,
+	GroupMeta,
 	IdNode,
 	InputEdgeStatement,
 	LoadResult,

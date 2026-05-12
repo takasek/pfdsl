@@ -1,4 +1,4 @@
-# PFDSL仕様書 v0.0.4
+# PFDSL仕様書 v0.0.5
 
 ## 1. 目的
 
@@ -67,6 +67,7 @@ process:
 | layout       | レイアウト補助情報                                  |
 | artifact     | 成果物定義                                      |
 | process      | プロセス定義                                     |
+| group        | グループ定義（§2.8参照）                             |
 | statusStyles | status → DOT属性 マッピング（§2.7参照）              |
 | tagStyles    | tag → DOT属性 マッピング（§2.7参照）                 |
 
@@ -95,6 +96,7 @@ process:
 
 title は表示名として利用してよい。
 status / tags は §2.7 を参照。
+artifact / process に対して group を指定することで、ノードをグループへ所属させてよい（§2.8参照）。
 
 ---
 
@@ -211,6 +213,59 @@ tagStyles:
 2. statusStyles[status] を最後にマージ（status が全体最終勝者）
 
 statusStyles / tagStyles 未定義時は属性追加なし（通常描画）。組み込み既定スタイルは持たない。
+
+---
+
+### 2.8 Group 定義
+
+任意の Artifact または Process を、名前付きグループへ所属させてよい。グループは可視化バックエンドでの領域分割（Graphviz の `subgraph cluster`）に対応する。意味論には影響しない。
+
+#### 2.8.1 グループ宣言
+
+```yaml
+group:
+  g1:
+    label: "データ取込層"
+    color: lightblue
+```
+
+* キーがグループ ID（front matter 内で一意）
+* label: 可視化時のグループ表示名（省略可）
+* color: 可視化時のグループ枠色（省略可、値は可視化バックエンド依存）
+* 未定義キーは処理系が無視してよい
+
+#### 2.8.2 ノードのグループ所属
+
+```yaml
+artifact:
+  raw_data:
+    group: g1
+  processed:
+    group: g1
+process:
+  ingest:
+    group: g1
+```
+
+* Artifact / Process のメタデータに `group: <グループID>` を指定する
+* 1 ノードは 0 または 1 グループにのみ所属できる
+* `group` に指定したIDが `group` セクションに存在しない場合、処理系は警告なく無視してよい
+
+#### 2.8.3 Graphviz 出力
+
+```dot
+subgraph cluster_g1 {
+  label="データ取込層";
+  color="lightblue";
+  "raw_data" [shape=box, label="raw_data"];
+  "processed" [shape=box, label="processed"];
+  "ingest" [shape=ellipse, label="ingest"];
+}
+```
+
+* クラスタ名は `cluster_<グループID>`
+* label / color が未指定の場合は対応する属性行を省略する
+* edge はグループ外（digraph 直下）に出力する
 
 ---
 
@@ -672,9 +727,16 @@ artifact:
 
 ## 19. バージョン
 
-本仕様は PFDSL仕様書 v0.0.4 とする。
+本仕様は PFDSL仕様書 v0.0.5 とする。
 
-v0.0.3 からの主な変更点：
+v0.0.4 からの主な変更点：
+
+* §2.2 front matter キー一覧に `group` を追加
+* §2.3 IDメタデータに `group` 参照を追記
+* §2.8 Group 定義を新設（グループ宣言・ノード所属・Graphviz cluster 出力）
+* Artifact / Process メタデータに `group` フィールドを追加
+
+v0.0.3 からの主な変更点（v0.0.4）：
 
 * §8 構文に node-decl（孤立 node 宣言）を追加
 * §3.1/§3.2 に孤立 node 宣言の記述を追加

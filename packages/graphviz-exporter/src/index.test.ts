@@ -272,3 +272,158 @@ spec >> P -> X
 		expect(dot).toMatch(/"P" \[shape=ellipse, label="P"\]/);
 	});
 });
+
+describe("group / subgraph cluster", () => {
+	it("nodes with a declared group are emitted inside subgraph cluster_<id>", () => {
+		const src = `---
+group:
+  g1:
+    label: "Data Ingestion"
+    color: lightblue
+artifact:
+  raw_data:
+    group: g1
+  processed:
+    group: g1
+process:
+  ingest:
+    group: g1
+---
+raw_data >> ingest -> processed
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toContain("subgraph cluster_g1 {");
+		expect(dot).toContain('label="Data Ingestion";');
+		expect(dot).toContain('color="lightblue";');
+		expect(dot).toContain('"raw_data"');
+		expect(dot).toContain('"processed"');
+		expect(dot).toContain('"ingest"');
+		expect(dot).toContain('"raw_data" -> "ingest";');
+		expect(dot).toContain('"ingest" -> "processed";');
+	});
+
+	it("full-DOT snapshot with group", () => {
+		const src = `---
+group:
+  g1:
+    label: "Data Ingestion"
+    color: lightblue
+artifact:
+  raw_data:
+    group: g1
+  processed:
+    group: g1
+process:
+  ingest:
+    group: g1
+---
+raw_data >> ingest -> processed
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		expect(exportDot(graph, frontmatter)).toMatchInlineSnapshot(`
+			"digraph PFDSL {
+			  rankdir=LR;
+
+			  subgraph cluster_g1 {
+			    label="Data Ingestion";
+			    color="lightblue";
+			    "ingest" [shape=ellipse, label="ingest"];
+			    "processed" [shape=box, label="processed"];
+			    "raw_data" [shape=box, label="raw_data"];
+			  }
+
+			  "raw_data" -> "ingest";
+			  "ingest" -> "processed";
+			}
+			"
+		`);
+	});
+
+	it("ungrouped nodes are emitted flat alongside grouped subgraphs", () => {
+		const src = `---
+group:
+  g1: {}
+artifact:
+  a:
+    group: g1
+  b: {}
+process:
+  P: {}
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toContain("subgraph cluster_g1 {");
+		const subgraphStart = dot.indexOf("subgraph cluster_g1 {");
+		const subgraphEnd = dot.indexOf("}", subgraphStart);
+		expect(dot.slice(subgraphStart, subgraphEnd)).toContain('"a"');
+		expect(dot.slice(subgraphEnd)).toContain('"b"');
+		expect(dot.slice(subgraphEnd)).toContain('"P"');
+	});
+
+	it("group with no label or color emits bare subgraph block", () => {
+		const src = `---
+group:
+  g1: {}
+artifact:
+  a:
+    group: g1
+process:
+  P: {}
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toContain("subgraph cluster_g1 {");
+		// subgraph block has no cluster-level label or color lines
+		const clusterBlock = dot.slice(
+			dot.indexOf("subgraph cluster_g1 {"),
+			dot.indexOf("  }") + 3,
+		);
+		expect(clusterBlock).not.toMatch(/^\s+label=/m);
+		expect(clusterBlock).not.toMatch(/^\s+color=/m);
+	});
+
+	it("node with group referencing undeclared group id is rendered flat without error", () => {
+		const src = `---
+artifact:
+  a:
+    group: nonexistent
+process:
+  P: {}
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).not.toContain("subgraph");
+		expect(dot).toContain('"a" [shape=box');
+	});
+
+	it("multiple groups emit cluster blocks sorted by group id", () => {
+		const src = `---
+group:
+  g2:
+    label: "Second"
+  g1:
+    label: "First"
+artifact:
+  a:
+    group: g1
+  b:
+    group: g2
+process:
+  P: {}
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		const posG1 = dot.indexOf("cluster_g1");
+		const posG2 = dot.indexOf("cluster_g2");
+		expect(posG1).toBeLessThan(posG2);
+	});
+});

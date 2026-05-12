@@ -56,8 +56,45 @@ export function exportDot(
 	}
 	lines.push("");
 
+	const nodeGroup = new Map<string, string>();
+	if (frontmatter?.group) {
+		for (const [id, meta] of Object.entries(frontmatter.artifact ?? {})) {
+			if (meta.group !== undefined) nodeGroup.set(id, meta.group);
+		}
+		for (const [id, meta] of Object.entries(frontmatter.process ?? {})) {
+			if (meta.group !== undefined) nodeGroup.set(id, meta.group);
+		}
+	}
+
 	const nodeIds = [...graph.nodes.keys()].sort();
+	const groupedNodes = new Map<string, string[]>();
+	const ungroupedIds: string[] = [];
 	for (const id of nodeIds) {
+		const gid = nodeGroup.get(id);
+		if (gid !== undefined && frontmatter?.group?.[gid] !== undefined) {
+			if (!groupedNodes.has(gid)) groupedNodes.set(gid, []);
+			groupedNodes.get(gid)!.push(id);
+		} else {
+			ungroupedIds.push(id);
+		}
+	}
+
+	for (const gid of [...groupedNodes.keys()].sort()) {
+		const gm = frontmatter!.group![gid]!;
+		lines.push(`  subgraph cluster_${gid} {`);
+		if (gm.label !== undefined)
+			lines.push(`    label=${quote(String(gm.label))};`);
+		if (gm.color !== undefined)
+			lines.push(`    color=${quote(String(gm.color))};`);
+		for (const id of groupedNodes.get(gid)!) {
+			lines.push(
+				`    ${quote(id)} ${nodeAttrs(id, graph.nodes.get(id)!, frontmatter)};`,
+			);
+		}
+		lines.push("  }");
+	}
+
+	for (const id of ungroupedIds) {
 		const kind = graph.nodes.get(id)!;
 		lines.push(`  ${quote(id)} ${nodeAttrs(id, kind, frontmatter)};`);
 	}

@@ -15,6 +15,7 @@ export type { NormalizedEdge } from "./edge.js";
 export type {
 	ArtifactMeta,
 	Frontmatter,
+	GroupMeta,
 	LoadResult,
 	NodeStyle,
 	ProcessMeta,
