@@ -96,14 +96,40 @@ function buildHtml(
 }
 
 function jumpToNode(doc: vscode.TextDocument, nodeId: string): void {
-	const text = doc.getText();
-	const idx = text.indexOf(nodeId);
-	if (idx === -1) return;
-	const pos = doc.positionAt(idx);
-	vscode.window.showTextDocument(doc, {
-		selection: new vscode.Range(pos, pos.translate(0, nodeId.length)),
-		preserveFocus: false,
-	});
+	const result = analyzeDocument(doc);
+	let targetPos: vscode.Position | undefined;
+	outer: for (const stmt of result.document.statements) {
+		for (const id of idsOfStatement(stmt)) {
+			if (id.value === nodeId) {
+				targetPos = new vscode.Position(id.start.line - 1, id.start.column - 1);
+				break outer;
+			}
+		}
+	}
+	if (!targetPos) return;
+	const range = new vscode.Range(
+		targetPos,
+		targetPos.translate(0, nodeId.length),
+	);
+	const existingEditor = vscode.window.visibleTextEditors.find(
+		(e) => e.document === doc,
+	);
+	if (existingEditor) {
+		existingEditor.selection = new vscode.Selection(
+			targetPos,
+			targetPos.translate(0, nodeId.length),
+		);
+		existingEditor.revealRange(range);
+		vscode.window.showTextDocument(doc, {
+			viewColumn: existingEditor.viewColumn,
+			preserveFocus: false,
+		});
+	} else {
+		vscode.window.showTextDocument(doc, {
+			selection: range,
+			preserveFocus: false,
+		});
+	}
 }
 
 export function registerPreview(context: vscode.ExtensionContext): void {

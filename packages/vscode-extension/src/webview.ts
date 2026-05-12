@@ -119,19 +119,19 @@ window.addEventListener("mouseup", () => {
 	root.style.cursor = "grab";
 });
 
-root.addEventListener("dblclick", () => {
+root.addEventListener("dblclick", (e) => {
+	const node = (e.target as Element).closest("g.node");
+	if (node) {
+		const title = node.querySelector("title");
+		if (title?.textContent) {
+			vscode.postMessage({ type: "nodeClick", nodeId: title.textContent });
+			return;
+		}
+	}
 	scale = 1;
 	panX = 0;
 	panY = 0;
 	requestAnimationFrame(() => centerGraph());
-});
-
-inner.addEventListener("click", (e) => {
-	const node = (e.target as Element).closest("g.node");
-	if (!node) return;
-	const title = node.querySelector("title");
-	if (!title?.textContent) return;
-	vscode.postMessage({ type: "nodeClick", nodeId: title.textContent });
 });
 
 const HTML_ESCAPES: Record<string, string> = {

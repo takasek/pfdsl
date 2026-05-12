@@ -47,7 +47,8 @@
 			},
 			{
 				"command": "pfdsl.preview",
-				"title": "PFDSL: Open Preview to the Side"
+				"title": "PFDSL: Open Preview to the Side",
+				"icon": "$(open-preview)"
 			}
 		],
 		"menus": {
