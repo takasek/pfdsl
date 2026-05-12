@@ -118,8 +118,8 @@ export function exportDot(
 
 function nodeAttrs(id: string, kind: NodeKind, fm: Frontmatter | null): string {
 	const shape = kind === "process" ? "ellipse" : "box";
-	const title = lookupTitle(id, kind, fm);
-	const label = title ? `${id}\n${title}` : id;
+	const nodeLabel = lookupLabel(id, kind, fm);
+	const label = nodeLabel ? `${id}\n${nodeLabel}` : id;
 	const styleAttrs = resolveStyleAttrs(id, kind, fm);
 
 	const minWidth = calcMinWidth(label);
@@ -152,14 +152,14 @@ function resolveStyleAttrs(
 	return styleAttrs;
 }
 
-function lookupTitle(
+function lookupLabel(
 	id: string,
 	kind: NodeKind,
 	fm: Frontmatter | null,
 ): string | undefined {
 	if (!fm) return undefined;
 	const meta = kind === "process" ? fm.process?.[id] : fm.artifact?.[id];
-	return meta?.title;
+	return meta?.label;
 }
 
 function quote(s: string): string {

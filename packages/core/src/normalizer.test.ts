@@ -104,7 +104,7 @@ describe("normalize", () => {
 	});
 
 	it("front matter artifact declaration takes priority", () => {
-		const fm = { artifact: { P: { title: "Override" } } };
+		const fm = { artifact: { P: { label: "Override" } } };
 		const { diagnostics } = (() => {
 			const { tokens } = lex("A >> P");
 			const { document } = parseTokens(tokens);

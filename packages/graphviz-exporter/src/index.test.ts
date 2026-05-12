@@ -62,12 +62,12 @@ describe("exportDot", () => {
 		);
 	});
 
-	it("uses frontmatter title for node label", () => {
+	it("uses frontmatter label for node label", () => {
 		const src = `---
 artifact:
-  req: { title: 要求仕様書 }
+  req: { label: 要求仕様書 }
 process:
-  design: { title: 設計 }
+  design: { label: 設計 }
 ---
 req >> design -> spec
 `;
@@ -147,16 +147,16 @@ req >> design -> spec
 		expect(dot).toContain('"a\\\\b"');
 	});
 
-	it("escapes newline in title labels", () => {
+	it("escapes newline in labels", () => {
 		const src = `---
 artifact:
-  spec: { title: "line1\\nline2" }
+  spec: { label: "line1\\nline2" }
 ---
 spec >> P -> X
 `;
 		const { graph, frontmatter } = buildFromSource(src);
 		const dot = exportDot(graph, frontmatter);
-		// label embeds id + "\n" + title; the title's literal newline must be re-escaped.
+		// label embeds id + "\n" + label; the literal newline must be re-escaped.
 		expect(dot).toContain('label="spec\\nline1\\nline2"');
 	});
 

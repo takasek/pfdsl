@@ -16,176 +16,182 @@ statusStyles:
 
 artifact:
   spec_v0_0_2:
-    title: PFDSL仕様書 v0.0.2
+    label: PFDSL仕様書 v0.0.2
     status: done
   core_architecture:
-    title: コアアーキテクチャ文書
+    label: コアアーキテクチャ文書
     status: done
   repo_scaffold:
-    title: リポジトリ骨格
+    label: リポジトリ骨格
     status: done
   build_config:
-    title: ビルド設定
+    label: ビルド設定
     status: done
   shared_types:
-    title: 共有型定義
+    label: 共有型定義
     status: done
   token_spec:
-    title: トークン規則
+    label: トークン規則
     status: done
   ast_schema:
-    title: ASTスキーマ
+    label: ASTスキーマ
     status: done
   diagnostic_schema:
-    title: 診断スキーマ
+    label: 診断スキーマ
     status: done
   graph_schema:
-    title: グラフスキーマ
+    label: グラフスキーマ
     status: done
   lexer:
-    title: Lexer実装
+    label: Lexer実装
     status: done
   frontmatter_loader:
-    title: Frontmatterローダ
+    label: Frontmatterローダ
     status: done
   parser:
-    title: Parser実装
+    label: Parser実装
     status: done
   normalizer:
-    title: Normalizer実装
+    label: Normalizer実装
     status: done
   validator:
-    title: Validator実装
+    label: Validator実装
     status: done
   canonical_sorter:
-    title: 正準順序ソータ
+    label: 正準順序ソータ
     status: done
   formatter:
-    title: Formatter実装
+    label: Formatter実装
     status: done
   core_modules:
-    title: コアモジュール群
+    label: コアモジュール群
     parts: [lexer, frontmatter_loader, parser, normalizer, validator, canonical_sorter, formatter]
     status: done
   core_library:
-    title: コアライブラリ (@pfdsl/core)
+    label: コアライブラリ (@pfdsl/core)
+    status: done
+  group_types:
+    label: GroupMeta型定義 (v0.0.5)
+    status: done
+  group_subgraph_export:
+    label: subgraph cluster エクスポート (v0.0.5)
     status: done
   graphviz_exporter:
-    title: Graphvizエクスポータ
+    label: Graphvizエクスポータ
     status: done
   preview_engine:
-    title: プレビューエンジン
+    label: プレビューエンジン
     status: done
   vscode_shell:
-    title: VSCode拡張シェル
+    label: VSCode拡張シェル
     status: done
   language_service:
-    title: 言語サービス (LSP)
+    label: 言語サービス (LSP)
     status: done
   preview_panel:
-    title: プレビューパネル
+    label: プレビューパネル
     status: done
   format_command:
-    title: フォーマットコマンド
+    label: フォーマットコマンド
     status: done
   hover_support:
-    title: ホバーサポート
+    label: ホバーサポート
     status: done
   diagnostics_ui:
-    title: 診断UI
+    label: 診断UI
     status: done
   syntax_highlight:
-    title: シンタックスハイライト
+    label: シンタックスハイライト
     status: done
   vscode_extension:
-    title: VSCode拡張統合
+    label: VSCode拡張統合
     status: done
   rc_extension:
-    title: リリース候補版
+    label: リリース候補版
     status: todo
   published_extension:
-    title: 公開版拡張
+    label: 公開版拡張
     status: todo
   workflow_usage:
-    title: 日常運用知見
+    label: 日常運用知見
     status: todo
   cli_tool:
-    title: CLIツール
+    label: CLIツール
     status: done
   ci_integration:
-    title: CI連携
+    label: CI連携
     status: todo
   diff_analyzer:
-    title: 差分解析ツール
+    label: 差分解析ツール
     status: todo
 
 process:
   define_architecture:
-    title: アーキテクチャ定義
+    label: アーキテクチャ定義
   define_repo_structure:
-    title: リポジトリ構造設計
+    label: リポジトリ構造設計
   define_build_policy:
-    title: ビルドポリシー策定
+    label: ビルドポリシー策定
   define_shared_types:
-    title: 共有型定義
+    label: 共有型定義
   define_token_rules:
-    title: トークン規則定義
+    label: トークン規則定義
   define_ast_schema:
-    title: ASTスキーマ定義
+    label: ASTスキーマ定義
   define_diagnostic_schema:
-    title: 診断スキーマ定義
+    label: 診断スキーマ定義
   define_graph_schema:
-    title: グラフスキーマ定義
+    label: グラフスキーマ定義
   implement_lexer:
-    title: Lexer実装
+    label: Lexer実装
   implement_frontmatter_loader:
-    title: Frontmatterローダ実装
+    label: Frontmatterローダ実装
   implement_parser:
-    title: Parser実装
+    label: Parser実装
   implement_normalizer:
-    title: Normalizer実装
+    label: Normalizer実装
   implement_validator:
-    title: Validator実装
+    label: Validator実装
   implement_canonical_sorter:
-    title: 正準順序ソータ実装
+    label: 正準順序ソータ実装
   implement_formatter:
-    title: Formatter実装
+    label: Formatter実装
   integrate_core_modules:
-    title: コアモジュール統合
+    label: コアモジュール統合
   package_core_library:
-    title: コアライブラリパッケージング
+    label: コアライブラリパッケージング
   implement_graphviz_exporter:
-    title: Graphvizエクスポータ実装
+    label: Graphvizエクスポータ実装
   implement_preview_engine:
-    title: プレビューエンジン実装
+    label: プレビューエンジン実装
   create_vscode_extension_shell:
-    title: VSCode拡張シェル作成
+    label: VSCode拡張シェル作成
   implement_language_service:
-    title: 言語サービス実装
+    label: 言語サービス実装
   implement_preview_panel:
-    title: プレビューパネル実装
+    label: プレビューパネル実装
   implement_format_command:
-    title: フォーマットコマンド実装
+    label: フォーマットコマンド実装
   implement_hover_support:
-    title: ホバーサポート実装
+    label: ホバーサポート実装
   implement_diagnostics_ui:
-    title: 診断UI実装
+    label: 診断UI実装
   implement_syntax_highlight:
-    title: シンタックスハイライト実装
+    label: シンタックスハイライト実装
   integrate_vscode_extension:
-    title: VSCode拡張統合
+    label: VSCode拡張統合
   package_release_candidate:
-    title: RCパッケージング
+    label: RCパッケージング
   release_marketplace:
-    title: Marketplace公開
+    label: Marketplace公開
   adopt_daily_workflow:
-    title: 日常ワークフロー導入
+    label: 日常ワークフロー導入
   implement_cli_wrapper:
-    title: CLIラッパー実装
+    label: CLIラッパー実装
   implement_ci_actions:
-    title: CI Actions実装
+    label: CI Actions実装
   implement_diff_analysis:
-    title: 差分解析実装
+    label: 差分解析実装
 ---
 
 # Phase 0: アーキテクチャ定義
@@ -228,6 +234,10 @@ shared_types >> implement_frontmatter_loader -> frontmatter_loader
 # Phase 2: 出力層
 
 core_library >> implement_graphviz_exporter -> graphviz_exporter
+
+# v0.0.5: group 概念 (subgraph cluster)
+shared_types >> implement_group_types -> group_types
+[graphviz_exporter, group_types] >> implement_group_subgraph_export -> group_subgraph_export
 
 [core_library, graphviz_exporter] >> implement_preview_engine -> preview_engine
 

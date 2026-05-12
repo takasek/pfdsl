@@ -17,7 +17,7 @@ export function registerHover(context: vscode.ExtensionContext): void {
 			if (kind === "artifact") {
 				const meta = frontmatter?.artifact?.[id];
 				if (meta) {
-					if (meta.title) lines.push(`title: ${meta.title}`);
+					if (meta.label) lines.push(`label: ${meta.label}`);
 					if (meta.owner) lines.push(`owner: ${meta.owner}`);
 					if (meta.status) lines.push(`status: ${meta.status}`);
 					if (meta.tags?.length) lines.push(`tags: ${meta.tags.join(", ")}`);
@@ -26,7 +26,7 @@ export function registerHover(context: vscode.ExtensionContext): void {
 			} else {
 				const meta = frontmatter?.process?.[id];
 				if (meta) {
-					if (meta.title) lines.push(`title: ${meta.title}`);
+					if (meta.label) lines.push(`label: ${meta.label}`);
 					if (meta.owner) lines.push(`owner: ${meta.owner}`);
 				}
 			}
