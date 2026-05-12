@@ -12,6 +12,57 @@ spec >>? design                       # feedback loop
 code >> review -> review_report
 ```
 
+![](docs/readme-example.svg)
+
+## Spec
+
+Language specification: [docs/spec/spec.md](docs/spec/spec.md)
+
+Key syntax:
+- `A >> P -> B` — A is input to process P, B is output of P
+- `[a, b] >> P` — set notation (Cartesian product over edges)
+- `R >>? P` — feedback edge (does not affect rank/topology)
+- `A >> P -> B >> Q -> C` — chain (multi-segment statement)
+- `# ...` — comment to end of line
+- Trailing tokens (`<id>` or `]`) may be followed by a single newline (and
+  optional comment lines) before a continuation operator (`>>`, `>>?`,
+  `->`); blank lines force statement termination.
+
+## Artifact status & tags (DOT styling)
+
+Annotate artifacts with progress `status` (enum) and free-form `tags`,
+then map them to DOT node attributes via frontmatter.
+
+```pfdsl
+---
+artifact:
+  spec:
+    status: done
+    tags: [external, critical]
+  impl:
+    status: wip
+statusStyles:
+  done: { fillcolor: lightgray, style: filled }
+  wip:  { fillcolor: lightyellow, style: filled }
+tagStyles:
+  external: { color: blue }
+  critical: { penwidth: "3" }
+---
+spec >> P -> impl
+```
+
+- `status` ∈ `done | wip | todo | blocked` (one per artifact)
+- `tags` — arbitrary string array; undefined entries in `tagStyles` are silently ignored
+- Allowed style attrs: `fillcolor | color | fontcolor | style | penwidth`
+- Apply order: `tags` reverse-merge (first tag wins) → `statusStyles` overrides last
+- Applies to artifact nodes only
+
+See [docs/spec/spec.md §2.7](docs/spec/spec.md) for full rules.
+
+## Samples
+
+Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/samples/](docs/samples/README.md).
+
 ## Features
 
 - **Pipeline** — lexer → parser → normalizer → validator → canonical sorter → formatter (`@pfdsl/core`)
@@ -20,19 +71,6 @@ code >> review -> review_report
 - **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
 
 Roadmap progress lives in [docs/pfdsl_implementation_flow.pfdsl](docs/pfdsl_implementation_flow.pfdsl) (written in PFDSL itself).
-
-## Repo layout
-
-```
-packages/core/               @pfdsl/core              — DSL pipeline (parse / validate / format)
-packages/graphviz-exporter/  @pfdsl/graphviz-exporter — Graph → DOT
-packages/preview-engine/     @pfdsl/preview-engine    — DOT → SVG (Graphviz wasm)
-packages/cli/                @pfdsl/cli               — `pfdsl` CLI
-packages/vscode-extension/   @pfdsl/vscode-extension  — VSCode language extension ([README](packages/vscode-extension/README.md))
-docs/spec/                   Language specification (spec.md)
-docs/samples/                Syntax samples — .pfdsl + .dot + .svg pairs
-docs/                        ADRs, plans, roadmap
-```
 
 ## Quick start
 
@@ -119,51 +157,15 @@ const svg = await renderGraph(graph, frontmatter, { format: 'svg' });
 
 API reference: [packages/core/README.md](packages/core/README.md).
 
-## Samples
+## Repo layout
 
-Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/samples/](docs/samples/README.md).
-
-## Spec
-
-Language specification: [docs/spec/spec.md](docs/spec/spec.md).
-
-Key syntax:
-- `A >> P -> B` — A is input to process P, B is output of P
-- `[a, b] >> P` — set notation (Cartesian product over edges)
-- `R >>? P` — feedback edge (does not affect rank/topology)
-- `A >> P -> B >> Q -> C` — chain (multi-segment statement)
-- `# ...` — comment to end of line
-- Trailing tokens (`<id>` or `]`) may be followed by a single newline (and
-  optional comment lines) before a continuation operator (`>>`, `>>?`,
-  `->`); blank lines force statement termination.
-
-## Artifact status & tags (DOT styling)
-
-Annotate artifacts with progress `status` (enum) and free-form `tags`,
-then map them to DOT node attributes via frontmatter.
-
-```pfdsl
----
-artifact:
-  spec:
-    status: done
-    tags: [external, critical]
-  impl:
-    status: wip
-statusStyles:
-  done: { fillcolor: lightgray, style: filled }
-  wip:  { fillcolor: lightyellow, style: filled }
-tagStyles:
-  external: { color: blue }
-  critical: { penwidth: "3" }
----
-spec >> P -> impl
 ```
-
-- `status` ∈ `done | wip | todo | blocked` (one per artifact)
-- `tags` — arbitrary string array; undefined entries in `tagStyles` are silently ignored
-- Allowed style attrs: `fillcolor | color | fontcolor | style | penwidth`
-- Apply order: `tags` reverse-merge (first tag wins) → `statusStyles` overrides last
-- Applies to artifact nodes only
-
-See [docs/spec/spec.md §2.7](docs/spec/spec.md) for full rules.
+packages/core/               @pfdsl/core              — DSL pipeline (parse / validate / format)
+packages/graphviz-exporter/  @pfdsl/graphviz-exporter — Graph → DOT
+packages/preview-engine/     @pfdsl/preview-engine    — DOT → SVG (Graphviz wasm)
+packages/cli/                @pfdsl/cli               — `pfdsl` CLI
+packages/vscode-extension/   @pfdsl/vscode-extension  — VSCode language extension ([README](packages/vscode-extension/README.md))
+docs/spec/                   Language specification (spec.md)
+docs/samples/                Syntax samples — .pfdsl + .dot + .svg pairs
+docs/                        ADRs, plans, roadmap
+```
