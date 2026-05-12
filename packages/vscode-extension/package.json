@@ -53,6 +53,10 @@
 			{
 				"command": "pfdsl.export",
 				"title": "PFDSL: Export…"
+			},
+			{
+				"command": "pfdsl.normalize",
+				"title": "PFDSL: Show Normalized Edges"
 			}
 		],
 		"menus": {

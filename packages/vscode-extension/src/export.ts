@@ -1,4 +1,5 @@
 import { Graphviz } from "@hpcc-js/wasm";
+import { formatEdges, sortEdges } from "@pfdsl/core";
 import { exportDot } from "@pfdsl/graphviz-exporter";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
@@ -9,7 +10,10 @@ async function getGraphviz() {
 	return gv;
 }
 
+const outputChannel = vscode.window.createOutputChannel("PFDSL");
+
 export function registerExport(context: vscode.ExtensionContext): void {
+	context.subscriptions.push(outputChannel);
 	context.subscriptions.push(
 		vscode.commands.registerCommand("pfdsl.export", async () => {
 			const editor = vscode.window.activeTextEditor;
@@ -52,6 +56,22 @@ export function registerExport(context: vscode.ExtensionContext): void {
 			}
 			await vscode.workspace.fs.writeFile(saveUri, content);
 			vscode.window.showInformationMessage(`Exported: ${saveUri.fsPath}`);
+		}),
+
+		vscode.commands.registerCommand("pfdsl.normalize", () => {
+			const editor = vscode.window.activeTextEditor;
+			if (!editor || editor.document.languageId !== LANGUAGE_ID) {
+				vscode.window.showInformationMessage("Open a .pfdsl file first.");
+				return;
+			}
+			const { edges, graph, diagnostics } = analyzeDocument(editor.document);
+			if (diagnostics.some((d) => d.severity === "error")) {
+				vscode.window.showErrorMessage("Fix errors before normalizing.");
+				return;
+			}
+			outputChannel.clear();
+			outputChannel.appendLine(formatEdges(sortEdges(edges, graph)));
+			outputChannel.show(true);
 		}),
 	);
 }
