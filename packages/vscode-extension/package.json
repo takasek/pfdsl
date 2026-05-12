@@ -2,7 +2,7 @@
 	"name": "pfdsl",
 	"displayName": "PFDSL",
 	"description": "A DSL to define and visualize PFD (Process Flow Diagram) as code",
-	"version": "0.0.1",
+	"version": "0.0.5",
 	"publisher": "takasek",
 	"repository": {
 		"type": "git",
