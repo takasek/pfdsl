@@ -28,6 +28,7 @@ format:
 build-deps:
 	pnpm --filter @pfdsl/core build
 	pnpm --filter @pfdsl/graphviz-exporter build
+	pnpm --filter @pfdsl/metadata-exporter build
 	pnpm --filter @pfdsl/preview-engine build
 
 .PHONY: vscode-build
