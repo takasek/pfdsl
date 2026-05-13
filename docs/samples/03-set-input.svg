@@ -12,7 +12,7 @@
 <!-- database -->
 <g id="node1" class="node">
 <title>database</title>
-<polygon fill="none" stroke="black" points="282.91,-63 220.41,-63 220.41,-27 282.91,-27 282.91,-63"/>
+<polygon fill="none" stroke="black" stroke-width="2" points="282.91,-63 220.41,-63 220.41,-27 282.91,-27 282.91,-63"/>
 <text xml:space="preserve" text-anchor="middle" x="251.66" y="-39.95" font-family="Times,serif" font-size="14.00">database</text>
 </g>
 <!-- migrate -->
@@ -24,32 +24,32 @@
 <!-- migrate&#45;&gt;database -->
 <g id="edge3" class="edge">
 <title>migrate&#45;&gt;database</title>
-<path fill="none" stroke="black" d="M184.86,-45C192.69,-45 200.94,-45 208.85,-45"/>
-<polygon fill="black" stroke="black" points="208.6,-48.5 218.6,-45 208.6,-41.5 208.6,-48.5"/>
+<path fill="none" stroke="black" d="M184.86,-45C192.44,-45 200.42,-45 208.1,-45"/>
+<polygon fill="black" stroke="black" points="207.93,-48.5 217.93,-45 207.93,-41.5 207.93,-48.5"/>
 </g>
 <!-- schema -->
 <g id="node3" class="node">
 <title>schema</title>
-<polygon fill="none" stroke="black" points="63.25,-90 6,-90 6,-54 63.25,-54 63.25,-90"/>
+<polygon fill="none" stroke="black" stroke-width="2" points="63.25,-90 6,-90 6,-54 63.25,-54 63.25,-90"/>
 <text xml:space="preserve" text-anchor="middle" x="34.62" y="-66.95" font-family="Times,serif" font-size="14.00">schema</text>
 </g>
 <!-- schema&#45;&gt;migrate -->
 <g id="edge1" class="edge">
 <title>schema&#45;&gt;migrate</title>
-<path fill="none" stroke="black" d="M63.49,-65.05C74.12,-62.39 86.53,-59.3 98.38,-56.34"/>
-<polygon fill="black" stroke="black" points="99.16,-59.75 108.01,-53.94 97.46,-52.96 99.16,-59.75"/>
+<path fill="none" stroke="black" d="M64.05,-64.91C74.59,-62.28 86.81,-59.23 98.48,-56.32"/>
+<polygon fill="black" stroke="black" points="99.1,-59.77 107.95,-53.95 97.4,-52.98 99.1,-59.77"/>
 </g>
 <!-- seed_data -->
 <g id="node4" class="node">
 <title>seed_data</title>
-<polygon fill="none" stroke="black" points="69.25,-36 0,-36 0,0 69.25,0 69.25,-36"/>
+<polygon fill="none" stroke="black" stroke-width="2" points="69.25,-36 0,-36 0,0 69.25,0 69.25,-36"/>
 <text xml:space="preserve" text-anchor="middle" x="34.62" y="-12.95" font-family="Times,serif" font-size="14.00">seed_data</text>
 </g>
 <!-- seed_data&#45;&gt;migrate -->
 <g id="edge2" class="edge">
 <title>seed_data&#45;&gt;migrate</title>
-<path fill="none" stroke="black" d="M69.56,-26.47C78.74,-28.76 88.82,-31.27 98.51,-33.69"/>
-<polygon fill="black" stroke="black" points="97.62,-37.08 108.17,-36.1 99.31,-30.28 97.62,-37.08"/>
+<path fill="none" stroke="black" d="M70.16,-26.62C79.23,-28.88 89.14,-31.35 98.68,-33.73"/>
+<polygon fill="black" stroke="black" points="97.6,-37.07 108.15,-36.1 99.3,-30.28 97.6,-37.07"/>
 </g>
 </g>
 </svg>

@@ -2,10 +2,10 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "database" [shape=box, label="database"];
+  "database" [shape=box, label="database", penwidth="2"];
   "migrate" [shape=ellipse, label="migrate"];
-  "schema" [shape=box, label="schema"];
-  "seed_data" [shape=box, label="seed_data"];
+  "schema" [shape=box, label="schema", penwidth="2"];
+  "seed_data" [shape=box, label="seed_data", penwidth="2"];
 
   "schema" -> "migrate";
   "seed_data" -> "migrate";

@@ -21,8 +21,8 @@ digraph PFDSL {
   newrank=true;
 
   "design" [shape=ellipse, label="design"];
-  "requirements" [shape=box, label="requirements"];
-  "spec" [shape=box, label="spec"];
+  "requirements" [shape=box, label="requirements", penwidth="2"];
+  "spec" [shape=box, label="spec", penwidth="2"];
 
   "requirements" -> "design";
   "design" -> "spec";
@@ -53,10 +53,10 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "bug_report" [shape=box, label="bug_report"];
+  "bug_report" [shape=box, label="bug_report", penwidth="2"];
   "code" [shape=box, label="code"];
   "implement" [shape=ellipse, label="implement"];
-  "spec" [shape=box, label="spec"];
+  "spec" [shape=box, label="spec", penwidth="2"];
   "verify" [shape=ellipse, label="verify"];
 
   "spec" -> "implement";
@@ -89,10 +89,10 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "database" [shape=box, label="database"];
+  "database" [shape=box, label="database", penwidth="2"];
   "migrate" [shape=ellipse, label="migrate"];
-  "schema" [shape=box, label="schema"];
-  "seed_data" [shape=box, label="seed_data"];
+  "schema" [shape=box, label="schema", penwidth="2"];
+  "seed_data" [shape=box, label="seed_data", penwidth="2"];
 
   "schema" -> "migrate";
   "seed_data" -> "migrate";
@@ -122,10 +122,10 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "binary" [shape=box, label="binary"];
+  "binary" [shape=box, label="binary", penwidth="2"];
   "build" [shape=ellipse, label="build"];
-  "docs" [shape=box, label="docs"];
-  "source" [shape=box, label="source"];
+  "docs" [shape=box, label="docs", penwidth="2"];
+  "source" [shape=box, label="source", penwidth="2"];
 
   "source" -> "build";
   "build" -> "binary";
@@ -162,8 +162,8 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "D1" [shape=box, label="D1\n紙のアンケート", width=1.70];
-  "D2" [shape=box, label="D2\nデジタルアンケート", width=2.10];
+  "D1" [shape=box, label="D1\n紙のアンケート", width=1.70, penwidth="2"];
+  "D2" [shape=box, label="D2\nデジタルアンケート", width=2.10, penwidth="2"];
   "P1" [shape=ellipse, label="P1\nスキャン", width=1.10];
 
   "D1" -> "P1";
@@ -214,7 +214,7 @@ digraph PFDSL {
   "processed" [shape=box, label="processed", xlabel="done, external", fillcolor="#d4edda", color="#0066cc", style="filled", penwidth="2"];
   "raw_data" [shape=box, label="raw_data", xlabel="external, sensitive", color="#0066cc", style="dashed", penwidth="2"];
   "report" [shape=box, label="report", xlabel="todo, external", fillcolor="#f8f9fa", color="#0066cc", style="filled", penwidth="2"];
-  "spec" [shape=box, label="spec", xlabel="wip", fillcolor="#fff3cd", style="filled"];
+  "spec" [shape=box, label="spec", xlabel="wip", fillcolor="#fff3cd", style="filled", penwidth="2"];
 
   "raw_data" -> "ingest";
   "ingest" -> "processed";
@@ -263,16 +263,16 @@ digraph PFDSL {
   subgraph cluster_backend {
     label="Backend";
     color="lightyellow";
-    "api_spec" [shape=box, label="api_spec"];
+    "api_spec" [shape=box, label="api_spec", penwidth="2"];
     "build_api" [shape=ellipse, label="build_api"];
-    "endpoint" [shape=box, label="endpoint"];
+    "endpoint" [shape=box, label="endpoint", penwidth="2"];
   }
   subgraph cluster_frontend {
     label="Frontend";
     color="lightblue";
     "build_ui" [shape=ellipse, label="build_ui"];
-    "component" [shape=box, label="component"];
-    "ui_mockup" [shape=box, label="ui_mockup"];
+    "component" [shape=box, label="component", penwidth="2"];
+    "ui_mockup" [shape=box, label="ui_mockup", penwidth="2"];
   }
 
   "api_spec" -> "build_api";
@@ -316,11 +316,11 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "D0" [shape=box, label="D0\nSource"];
-  "D1" [shape=box, label="D1\nRelease Package"];
-  "D2" [shape=box, label="D2\nBinary"];
-  "D3" [shape=box, label="D3\nConfig"];
-  "D4" [shape=box, label="D4\nRelease Notes"];
+  "D0" [shape=box, label="D0\nSource", penwidth="2"];
+  "D1" [shape=box, label="D1\nRelease Package", penwidth="2"];
+  "D2" [shape=box, label="D2\nBinary", penwidth="2"];
+  "D3" [shape=box, label="D3\nConfig", penwidth="2"];
+  "D4" [shape=box, label="D4\nRelease Notes", penwidth="2"];
   "P1" [shape=ellipse, label="P1\nBuild"];
 
   "D0" -> "P1";
@@ -355,10 +355,10 @@ digraph PFDSL {
   rankdir=TB;
   newrank=true;
 
-  "code" [shape=box, label="code"];
+  "code" [shape=box, label="code", penwidth="2"];
   "design" [shape=ellipse, label="design"];
   "implement" [shape=ellipse, label="implement"];
-  "requirements" [shape=box, label="requirements"];
+  "requirements" [shape=box, label="requirements", penwidth="2"];
   "spec" [shape=box, label="spec"];
 
   "requirements" -> "design";

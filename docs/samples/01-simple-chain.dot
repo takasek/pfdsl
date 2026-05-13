@@ -3,8 +3,8 @@ digraph PFDSL {
   newrank=true;
 
   "design" [shape=ellipse, label="design"];
-  "requirements" [shape=box, label="requirements"];
-  "spec" [shape=box, label="spec"];
+  "requirements" [shape=box, label="requirements", penwidth="2"];
+  "spec" [shape=box, label="spec", penwidth="2"];
 
   "requirements" -> "design";
   "design" -> "spec";

@@ -2,10 +2,10 @@ digraph PFDSL {
   rankdir=TB;
   newrank=true;
 
-  "code" [shape=box, label="code"];
+  "code" [shape=box, label="code", penwidth="2"];
   "design" [shape=ellipse, label="design"];
   "implement" [shape=ellipse, label="implement"];
-  "requirements" [shape=box, label="requirements"];
+  "requirements" [shape=box, label="requirements", penwidth="2"];
   "spec" [shape=box, label="spec"];
 
   "requirements" -> "design";

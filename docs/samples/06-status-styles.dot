@@ -7,7 +7,7 @@ digraph PFDSL {
   "processed" [shape=box, label="processed", xlabel="done, external", fillcolor="#d4edda", color="#0066cc", style="filled", penwidth="2"];
   "raw_data" [shape=box, label="raw_data", xlabel="external, sensitive", color="#0066cc", style="dashed", penwidth="2"];
   "report" [shape=box, label="report", xlabel="todo, external", fillcolor="#f8f9fa", color="#0066cc", style="filled", penwidth="2"];
-  "spec" [shape=box, label="spec", xlabel="wip", fillcolor="#fff3cd", style="filled"];
+  "spec" [shape=box, label="spec", xlabel="wip", fillcolor="#fff3cd", style="filled", penwidth="2"];
 
   "raw_data" -> "ingest";
   "ingest" -> "processed";

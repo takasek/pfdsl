@@ -12,7 +12,7 @@
 <!-- D1 -->
 <g id="node1" class="node">
 <title>D1</title>
-<polygon fill="none" stroke="black" points="122.4,-47.68 0,-47.68 0,-8.18 122.4,-8.18 122.4,-47.68"/>
+<polygon fill="none" stroke="black" stroke-width="2" points="122.4,-47.68 0,-47.68 0,-8.18 122.4,-8.18 122.4,-47.68"/>
 <text xml:space="preserve" text-anchor="middle" x="61.2" y="-30.38" font-family="Times,serif" font-size="14.00">D1</text>
 <text xml:space="preserve" text-anchor="middle" x="61.2" y="-13.88" font-family="Times,serif" font-size="14.00">紙のアンケート</text>
 </g>
@@ -26,21 +26,21 @@
 <!-- D1&#45;&gt;P1 -->
 <g id="edge1" class="edge">
 <title>D1&#45;&gt;P1</title>
-<path fill="none" stroke="black" d="M122.55,-27.93C130.48,-27.93 138.62,-27.93 146.57,-27.93"/>
-<polygon fill="black" stroke="black" points="146.54,-31.43 156.54,-27.93 146.54,-24.43 146.54,-31.43"/>
+<path fill="none" stroke="black" d="M123.39,-27.93C131.18,-27.93 139.15,-27.93 146.94,-27.93"/>
+<polygon fill="black" stroke="black" points="146.67,-31.43 156.67,-27.93 146.67,-24.43 146.67,-31.43"/>
 </g>
 <!-- D2 -->
 <g id="node2" class="node">
 <title>D2</title>
-<polygon fill="none" stroke="black" points="447.78,-47.68 296.58,-47.68 296.58,-8.18 447.78,-8.18 447.78,-47.68"/>
+<polygon fill="none" stroke="black" stroke-width="2" points="447.78,-47.68 296.58,-47.68 296.58,-8.18 447.78,-8.18 447.78,-47.68"/>
 <text xml:space="preserve" text-anchor="middle" x="372.18" y="-30.38" font-family="Times,serif" font-size="14.00">D2</text>
 <text xml:space="preserve" text-anchor="middle" x="372.18" y="-13.88" font-family="Times,serif" font-size="14.00">デジタルアンケート</text>
 </g>
 <!-- P1&#45;&gt;D2 -->
 <g id="edge2" class="edge">
 <title>P1&#45;&gt;D2</title>
-<path fill="none" stroke="black" d="M260.89,-27.93C268.61,-27.93 276.76,-27.93 284.99,-27.93"/>
-<polygon fill="black" stroke="black" points="284.72,-31.43 294.72,-27.93 284.72,-24.43 284.72,-31.43"/>
+<path fill="none" stroke="black" d="M260.89,-27.93C268.4,-27.93 276.31,-27.93 284.31,-27.93"/>
+<polygon fill="black" stroke="black" points="284.13,-31.43 294.13,-27.93 284.13,-24.43 284.13,-31.43"/>
 </g>
 </g>
 </svg>

@@ -2,10 +2,10 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "bug_report" [shape=box, label="bug_report"];
+  "bug_report" [shape=box, label="bug_report", penwidth="2"];
   "code" [shape=box, label="code"];
   "implement" [shape=ellipse, label="implement"];
-  "spec" [shape=box, label="spec"];
+  "spec" [shape=box, label="spec", penwidth="2"];
   "verify" [shape=ellipse, label="verify"];
 
   "spec" -> "implement";

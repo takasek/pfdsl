@@ -22,7 +22,7 @@
 <!-- api_spec -->
 <g id="node1" class="node">
 <title>api_spec</title>
-<polygon fill="none" stroke="black" points="86.38,-52 23.12,-52 23.12,-16 86.38,-16 86.38,-52"/>
+<polygon fill="none" stroke="black" stroke-width="2" points="86.38,-52 23.12,-52 23.12,-16 86.38,-16 86.38,-52"/>
 <text xml:space="preserve" text-anchor="middle" x="54.75" y="-28.95" font-family="Times,serif" font-size="14.00">api_spec</text>
 </g>
 <!-- build_api -->
@@ -34,20 +34,20 @@
 <!-- api_spec&#45;&gt;build_api -->
 <g id="edge1" class="edge">
 <title>api_spec&#45;&gt;build_api</title>
-<path fill="none" stroke="black" d="M86.57,-34C96.24,-34 107.23,-34 118.08,-34"/>
-<polygon fill="black" stroke="black" points="117.76,-37.5 127.76,-34 117.76,-30.5 117.76,-37.5"/>
+<path fill="none" stroke="black" d="M87.19,-34C96.65,-34 107.34,-34 117.9,-34"/>
+<polygon fill="black" stroke="black" points="117.74,-37.5 127.74,-34 117.74,-30.5 117.74,-37.5"/>
 </g>
 <!-- endpoint -->
 <g id="node3" class="node">
 <title>endpoint</title>
-<polygon fill="none" stroke="black" points="326.94,-52 263.69,-52 263.69,-16 326.94,-16 326.94,-52"/>
+<polygon fill="none" stroke="black" stroke-width="2" points="326.94,-52 263.69,-52 263.69,-16 326.94,-16 326.94,-52"/>
 <text xml:space="preserve" text-anchor="middle" x="295.32" y="-28.95" font-family="Times,serif" font-size="14.00">endpoint</text>
 </g>
 <!-- build_api&#45;&gt;endpoint -->
 <g id="edge2" class="edge">
 <title>build_api&#45;&gt;endpoint</title>
-<path fill="none" stroke="black" d="M221.21,-34C231.33,-34 242.03,-34 252.04,-34"/>
-<polygon fill="black" stroke="black" points="251.87,-37.5 261.87,-34 251.87,-30.5 251.87,-37.5"/>
+<path fill="none" stroke="black" d="M221.21,-34C231.23,-34 241.83,-34 251.76,-34"/>
+<polygon fill="black" stroke="black" points="251.51,-37.5 261.51,-34 251.51,-30.5 251.51,-37.5"/>
 </g>
 <!-- build_ui -->
 <g id="node4" class="node">
@@ -58,26 +58,26 @@
 <!-- component -->
 <g id="node5" class="node">
 <title>component</title>
-<polygon fill="none" stroke="black" points="333.69,-137 256.94,-137 256.94,-101 333.69,-101 333.69,-137"/>
+<polygon fill="none" stroke="black" stroke-width="2" points="333.69,-137 256.94,-137 256.94,-101 333.69,-101 333.69,-137"/>
 <text xml:space="preserve" text-anchor="middle" x="295.32" y="-113.95" font-family="Times,serif" font-size="14.00">component</text>
 </g>
 <!-- build_ui&#45;&gt;component -->
 <g id="edge4" class="edge">
 <title>build_ui&#45;&gt;component</title>
-<path fill="none" stroke="black" d="M217.19,-119C226.19,-119 235.8,-119 245.08,-119"/>
-<polygon fill="black" stroke="black" points="245.07,-122.5 255.07,-119 245.07,-115.5 245.07,-122.5"/>
+<path fill="none" stroke="black" d="M217.19,-119C226.09,-119 235.6,-119 244.79,-119"/>
+<polygon fill="black" stroke="black" points="244.68,-122.5 254.68,-119 244.68,-115.5 244.68,-122.5"/>
 </g>
 <!-- ui_mockup -->
 <g id="node6" class="node">
 <title>ui_mockup</title>
-<polygon fill="none" stroke="black" points="93.5,-137 16,-137 16,-101 93.5,-101 93.5,-137"/>
+<polygon fill="none" stroke="black" stroke-width="2" points="93.5,-137 16,-137 16,-101 93.5,-101 93.5,-137"/>
 <text xml:space="preserve" text-anchor="middle" x="54.75" y="-113.95" font-family="Times,serif" font-size="14.00">ui_mockup</text>
 </g>
 <!-- ui_mockup&#45;&gt;build_ui -->
 <g id="edge3" class="edge">
 <title>ui_mockup&#45;&gt;build_ui</title>
-<path fill="none" stroke="black" d="M93.89,-119C102.83,-119 112.51,-119 121.96,-119"/>
-<polygon fill="black" stroke="black" points="121.78,-122.5 131.78,-119 121.78,-115.5 121.78,-122.5"/>
+<path fill="none" stroke="black" d="M94.21,-119C103.15,-119 112.8,-119 122.21,-119"/>
+<polygon fill="black" stroke="black" points="121.99,-122.5 131.99,-119 121.99,-115.5 121.99,-122.5"/>
 </g>
 </g>
 </svg>

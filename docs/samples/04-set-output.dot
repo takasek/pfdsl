@@ -2,10 +2,10 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "binary" [shape=box, label="binary"];
+  "binary" [shape=box, label="binary", penwidth="2"];
   "build" [shape=ellipse, label="build"];
-  "docs" [shape=box, label="docs"];
-  "source" [shape=box, label="source"];
+  "docs" [shape=box, label="docs", penwidth="2"];
+  "source" [shape=box, label="source", penwidth="2"];
 
   "source" -> "build";
   "build" -> "binary";

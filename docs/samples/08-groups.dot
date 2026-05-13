@@ -5,16 +5,16 @@ digraph PFDSL {
   subgraph cluster_backend {
     label="Backend";
     color="lightyellow";
-    "api_spec" [shape=box, label="api_spec"];
+    "api_spec" [shape=box, label="api_spec", penwidth="2"];
     "build_api" [shape=ellipse, label="build_api"];
-    "endpoint" [shape=box, label="endpoint"];
+    "endpoint" [shape=box, label="endpoint", penwidth="2"];
   }
   subgraph cluster_frontend {
     label="Frontend";
     color="lightblue";
     "build_ui" [shape=ellipse, label="build_ui"];
-    "component" [shape=box, label="component"];
-    "ui_mockup" [shape=box, label="ui_mockup"];
+    "component" [shape=box, label="component", penwidth="2"];
+    "ui_mockup" [shape=box, label="ui_mockup", penwidth="2"];
   }
 
   "api_spec" -> "build_api";

@@ -2,11 +2,11 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "D0" [shape=box, label="D0\nSource"];
-  "D1" [shape=box, label="D1\nRelease Package"];
-  "D2" [shape=box, label="D2\nBinary"];
-  "D3" [shape=box, label="D3\nConfig"];
-  "D4" [shape=box, label="D4\nRelease Notes"];
+  "D0" [shape=box, label="D0\nSource", penwidth="2"];
+  "D1" [shape=box, label="D1\nRelease Package", penwidth="2"];
+  "D2" [shape=box, label="D2\nBinary", penwidth="2"];
+  "D3" [shape=box, label="D3\nConfig", penwidth="2"];
+  "D4" [shape=box, label="D4\nRelease Notes", penwidth="2"];
   "P1" [shape=ellipse, label="P1\nBuild"];
 
   "D0" -> "P1";

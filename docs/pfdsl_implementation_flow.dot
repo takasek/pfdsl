@@ -8,7 +8,7 @@ digraph PFDSL {
   "ast_schema" [shape=box, label="ast_schema\nASTスキーマ", width=1.40, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "build_config" [shape=box, label="build_config\nビルド設定", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "canonical_sorter" [shape=box, label="canonical_sorter\n正準順序ソータ", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "ci_integration" [shape=box, label="ci_integration\nCI連携", width=1.70, xlabel="todo", fillcolor="white", style="filled"];
+  "ci_integration" [shape=box, label="ci_integration\nCI連携", width=1.70, xlabel="todo", fillcolor="white", style="filled", penwidth="2"];
   "cli_tool" [shape=box, label="cli_tool\nCLIツール", width=1.20, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "core_architecture" [shape=box, label="core_architecture\nコアアーキテクチャ文書", width=2.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "core_library" [shape=box, label="core_library\nコアライブラリ (@pfdsl/core)", width=3.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
@@ -24,13 +24,13 @@ digraph PFDSL {
   "define_token_rules" [shape=ellipse, label="define_token_rules\nトークン規則定義", width=2.10];
   "diagnostic_schema" [shape=box, label="diagnostic_schema\n診断スキーマ", width=2.00, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "diagnostics_ui" [shape=box, label="diagnostics_ui\n診断UI", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "diff_analyzer" [shape=box, label="diff_analyzer\n差分解析ツール", width=1.70, xlabel="todo", fillcolor="white", style="filled"];
+  "diff_analyzer" [shape=box, label="diff_analyzer\n差分解析ツール", width=1.70, xlabel="todo", fillcolor="white", style="filled", penwidth="2"];
   "format_command" [shape=box, label="format_command\nフォーマットコマンド", width=2.30, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "formatter" [shape=box, label="formatter\nFormatter実装", width=1.60, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "frontmatter_loader" [shape=box, label="frontmatter_loader\nFrontmatterローダ", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "graph_schema" [shape=box, label="graph_schema\nグラフスキーマ", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "graphviz_exporter" [shape=box, label="graphviz_exporter\nGraphvizエクスポータ", width=2.30, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "group_subgraph_export" [shape=box, label="group_subgraph_export\nsubgraph cluster エクスポート (v0.0.5)", width=4.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
+  "group_subgraph_export" [shape=box, label="group_subgraph_export\nsubgraph cluster エクスポート (v0.0.5)", width=4.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "group_types" [shape=box, label="group_types\nGroupMeta型定義 (v0.0.5)", width=2.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "hover_support" [shape=box, label="hover_support\nホバーサポート", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "implement_canonical_sorter" [shape=ellipse, label="implement_canonical_sorter\n正準順序ソータ実装", width=2.90];
@@ -68,13 +68,13 @@ digraph PFDSL {
   "release_marketplace" [shape=ellipse, label="release_marketplace\nMarketplace公開", width=2.20];
   "repo_scaffold" [shape=box, label="repo_scaffold\nリポジトリ骨格", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "shared_types" [shape=box, label="shared_types\n共有型定義", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "spec_v0_0_2" [shape=box, label="spec_v0_0_2\nPFDSL仕様書 v0.0.2", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
+  "spec_v0_0_2" [shape=box, label="spec_v0_0_2\nPFDSL仕様書 v0.0.2", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "syntax_highlight" [shape=box, label="syntax_highlight\nシンタックスハイライト", width=2.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "token_spec" [shape=box, label="token_spec\nトークン規則", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "validator" [shape=box, label="validator\nValidator実装", width=1.60, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "vscode_extension" [shape=box, label="vscode_extension\nVSCode拡張統合", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "vscode_shell" [shape=box, label="vscode_shell\nVSCode拡張シェル", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "workflow_usage" [shape=box, label="workflow_usage\n日常運用知見", width=1.70, xlabel="todo", fillcolor="white", style="filled"];
+  "workflow_usage" [shape=box, label="workflow_usage\n日常運用知見", width=1.70, xlabel="todo", fillcolor="white", style="filled", penwidth="2"];
 
   "spec_v0_0_2" -> "define_architecture";
   "define_architecture" -> "core_architecture";
