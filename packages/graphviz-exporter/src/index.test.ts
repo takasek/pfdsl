@@ -180,7 +180,7 @@ spec >> P -> X
 		const { graph, frontmatter } = buildFromSource(src);
 		const dot = exportDot(graph, frontmatter);
 		expect(dot).toMatch(
-			/"spec" \[shape=box, label="spec", fillcolor="lightgray", style="filled"\]/,
+			/"spec" \[shape=box, label="spec", xlabel="done", fillcolor="lightgray", style="filled"\]/,
 		);
 	});
 
@@ -195,7 +195,9 @@ spec >> P -> X
 `;
 		const { graph, frontmatter } = buildFromSource(src);
 		const dot = exportDot(graph, frontmatter);
-		expect(dot).toMatch(/"spec" \[shape=box, label="spec", color="blue"\]/);
+		expect(dot).toMatch(
+			/"spec" \[shape=box, label="spec", xlabel="external", color="blue"\]/,
+		);
 	});
 
 	it("first tag in array wins on conflicting attribute", () => {
@@ -261,7 +263,7 @@ spec >> P -> X
 `;
 		const { graph, frontmatter } = buildFromSource(src);
 		const dot = exportDot(graph, frontmatter);
-		expect(dot).toMatch(/"spec" \[shape=box, label="spec"\]/);
+		expect(dot).toMatch(/"spec" \[shape=box, label="spec", xlabel="missing"\]/);
 	});
 
 	it("does not apply status/tags to process nodes", () => {

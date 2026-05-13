@@ -121,15 +121,32 @@ function nodeAttrs(id: string, kind: NodeKind, fm: Frontmatter | null): string {
 	const nodeLabel = lookupLabel(id, kind, fm);
 	const label = nodeLabel ? `${id}\n${nodeLabel}` : id;
 	const styleAttrs = resolveStyleAttrs(id, kind, fm);
+	const xlabel = buildXlabel(id, kind, fm);
 
 	const minWidth = calcMinWidth(label);
 	const attrs: string[] = [`shape=${shape}`, `label=${quote(label)}`];
 	if (minWidth !== undefined) attrs.push(`width=${minWidth.toFixed(2)}`);
+	if (xlabel !== undefined) attrs.push(`xlabel=${quote(xlabel)}`);
 	for (const key of STYLE_ATTRS) {
 		const v = styleAttrs[key];
 		if (v !== undefined) attrs.push(`${key}=${quote(v)}`);
 	}
 	return `[${attrs.join(", ")}]`;
+}
+
+function buildXlabel(
+	id: string,
+	kind: NodeKind,
+	fm: Frontmatter | null,
+): string | undefined {
+	if (!fm) return undefined;
+	const parts: string[] = [];
+	if (kind === "artifact") {
+		const meta = fm.artifact?.[id];
+		if (meta?.status) parts.push(meta.status);
+		for (const tag of meta?.tags ?? []) parts.push(tag);
+	}
+	return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
 function resolveStyleAttrs(
