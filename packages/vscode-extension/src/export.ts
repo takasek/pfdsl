@@ -1,6 +1,7 @@
 import { Graphviz } from "@hpcc-js/wasm";
 import { formatEdges, sortEdges } from "@pfdsl/core";
 import { exportDot } from "@pfdsl/graphviz-exporter";
+import { extractMetadata, toTsv } from "@pfdsl/metadata-exporter";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 
@@ -23,13 +24,16 @@ export function registerExport(context: vscode.ExtensionContext): void {
 			}
 			const doc = editor.document;
 
-			const pick = await vscode.window.showQuickPick(
-				[
-					{ label: "DOT", description: ".dot" },
-					{ label: "SVG", description: ".svg" },
-				],
-				{ title: "Export as…" },
-			);
+			const FORMATS = [
+				{ label: "DOT", description: ".dot" },
+				{ label: "SVG", description: ".svg" },
+				{ label: "TSV", description: ".tsv" },
+				{ label: "All (DOT + SVG + TSV)", description: "all" },
+			] as const;
+
+			const pick = await vscode.window.showQuickPick([...FORMATS], {
+				title: "Export as…",
+			});
 			if (!pick) return;
 
 			const { graph, frontmatter, diagnostics } = analyzeDocument(doc);
@@ -39,10 +43,41 @@ export function registerExport(context: vscode.ExtensionContext): void {
 			}
 
 			const dot = exportDot(graph, frontmatter);
-			const ext = pick.description!;
-			const baseName = doc.uri.path.replace(/\.pfdsl$/, "") + ext;
+			const tsvContent = toTsv(extractMetadata(graph, frontmatter));
+			const base = doc.uri.path.replace(/\.pfdsl$/, "");
+
+			if (pick.description === "all") {
+				const dirUri = await vscode.window.showSaveDialog({
+					defaultUri: vscode.Uri.file(base + ".dot"),
+					filters: { DOT: ["dot"] },
+					title: "Save base path (extensions added automatically)",
+				});
+				if (!dirUri) return;
+				const stem = dirUri.fsPath.replace(/\.[^.]+$/, "");
+				const g = await getGraphviz();
+				await Promise.all([
+					vscode.workspace.fs.writeFile(
+						vscode.Uri.file(`${stem}.dot`),
+						Buffer.from(dot, "utf8"),
+					),
+					vscode.workspace.fs.writeFile(
+						vscode.Uri.file(`${stem}.svg`),
+						Buffer.from(g.dot(dot, "svg"), "utf8"),
+					),
+					vscode.workspace.fs.writeFile(
+						vscode.Uri.file(`${stem}.tsv`),
+						Buffer.from(tsvContent, "utf8"),
+					),
+				]);
+				vscode.window.showInformationMessage(
+					`Exported: ${stem}.dot / .svg / .tsv`,
+				);
+				return;
+			}
+
+			const ext = pick.description;
 			const saveUri = await vscode.window.showSaveDialog({
-				defaultUri: vscode.Uri.file(baseName),
+				defaultUri: vscode.Uri.file(base + ext),
 				filters: { [pick.label]: [ext.slice(1)] },
 			});
 			if (!saveUri) return;
@@ -50,9 +85,11 @@ export function registerExport(context: vscode.ExtensionContext): void {
 			let content: Uint8Array;
 			if (ext === ".dot") {
 				content = Buffer.from(dot, "utf8");
-			} else {
+			} else if (ext === ".svg") {
 				const g = await getGraphviz();
 				content = Buffer.from(g.dot(dot, "svg"), "utf8");
+			} else {
+				content = Buffer.from(tsvContent, "utf8");
 			}
 			await vscode.workspace.fs.writeFile(saveUri, content);
 			vscode.window.showInformationMessage(`Exported: ${saveUri.fsPath}`);

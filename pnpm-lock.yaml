@@ -115,6 +115,9 @@ importers:
       '@pfdsl/graphviz-exporter':
         specifier: workspace:*
         version: link:../graphviz-exporter
+      '@pfdsl/metadata-exporter':
+        specifier: workspace:*
+        version: link:../metadata-exporter
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
