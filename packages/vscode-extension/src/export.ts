@@ -48,7 +48,7 @@ export function registerExport(context: vscode.ExtensionContext): void {
 
 			if (pick.description === "all") {
 				const dirUri = await vscode.window.showSaveDialog({
-					defaultUri: vscode.Uri.file(base + ".dot"),
+					defaultUri: vscode.Uri.file(`${base}.dot`),
 					filters: { DOT: ["dot"] },
 					title: "Save base path (extensions added automatically)",
 				});
