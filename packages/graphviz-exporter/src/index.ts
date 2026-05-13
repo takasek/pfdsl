@@ -146,7 +146,7 @@ function buildXlabel(
 		if (meta?.status) parts.push(meta.status);
 		for (const tag of meta?.tags ?? []) parts.push(tag);
 	}
-	return parts.length > 0 ? parts.join(" ") : undefined;
+	return parts.length > 0 ? parts.join(", ") : undefined;
 }
 
 function resolveStyleAttrs(

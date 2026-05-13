@@ -200,6 +200,41 @@ spec >> P -> X
 		);
 	});
 
+	it("xlabel joins multiple tags with comma separator", () => {
+		const src = `---
+artifact:
+  spec: { tags: [external, sensitive] }
+tagStyles:
+  external: { color: blue }
+  sensitive: { style: dashed }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toMatch(
+			/"spec" \[shape=box, label="spec", xlabel="external, sensitive"/,
+		);
+	});
+
+	it("xlabel joins status and tags with comma separator", () => {
+		const src = `---
+artifact:
+  spec: { status: done, tags: [external] }
+statusStyles:
+  done: { fillcolor: lightgray, style: filled }
+tagStyles:
+  external: { color: blue }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toMatch(
+			/"spec" \[shape=box, label="spec", xlabel="done, external"/,
+		);
+	});
+
 	it("first tag in array wins on conflicting attribute", () => {
 		const src = `---
 artifact:
