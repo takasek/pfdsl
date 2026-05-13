@@ -33,7 +33,7 @@ build-deps:
 
 .PHONY: vscode-build
 vscode-build: build-deps
-	pnpm --filter @pfdsl/vscode-extension build
+	pnpm --filter pfdsl build
 
 .PHONY: vscode-dev
 vscode-dev: vscode-build
@@ -46,7 +46,7 @@ vscode-dev: vscode-build
 
 .PHONY: vscode-watch
 vscode-watch: build-deps
-	pnpm --filter @pfdsl/vscode-extension watch
+	pnpm --filter pfdsl watch
 
 .PHONY: vscode-package
 vscode-package: vscode-build
