@@ -1,5 +1,69 @@
 import type { Frontmatter, Graph, NodeKind, NodeStyle } from "@pfdsl/core";
 import { STYLE_ATTRS } from "@pfdsl/core";
+import { createCanvas } from "canvas";
+
+const _ctx = createCanvas(1, 1).getContext("2d");
+_ctx.font = "14pt Times New Roman";
+
+const MIN_WRAP_RATIO = 0.3;
+const LINE_HEAD_FORBIDDEN = /[、。，．）}\]」』】！？!?]/;
+const LINE_END_FORBIDDEN = /[（{[「『【]/;
+const BREAK_CHARS = /[、。，．,.\s()（）「」『』【】[\]=]/;
+
+function measureTextWidth(text: string): number {
+	return _ctx.measureText(text).width;
+}
+
+function wrapLabel(text: string, maxWidthPx: number): string {
+	if (measureTextWidth(text) <= maxWidthPx) return text;
+
+	const lines: string[] = [];
+	let currentLine = "";
+
+	for (let i = 0; i < text.length; i++) {
+		const char = text[i]!;
+		const testLine = currentLine + char;
+
+		if (measureTextWidth(testLine) > maxWidthPx && currentLine.length > 0) {
+			let breakIndex = -1;
+
+			if (!BREAK_CHARS.test(char)) {
+				for (let j = currentLine.length - 1; j >= 0; j--) {
+					const breakChar = currentLine[j]!;
+					if (BREAK_CHARS.test(breakChar)) {
+						if (LINE_END_FORBIDDEN.test(breakChar)) continue;
+						const widthToBreak = measureTextWidth(
+							currentLine.substring(0, j + 1),
+						);
+						if (widthToBreak > maxWidthPx * MIN_WRAP_RATIO) {
+							breakIndex = j;
+							break;
+						}
+					}
+				}
+			}
+
+			if (breakIndex >= 0) {
+				const breakChar = currentLine[breakIndex]!;
+				if (LINE_HEAD_FORBIDDEN.test(breakChar)) {
+					lines.push(currentLine.substring(0, breakIndex + 1));
+					currentLine = currentLine.substring(breakIndex + 1) + char;
+				} else {
+					lines.push(currentLine.substring(0, breakIndex));
+					currentLine = currentLine.substring(breakIndex + 1) + char;
+				}
+			} else {
+				lines.push(currentLine);
+				currentLine = char;
+			}
+		} else {
+			currentLine = testLine;
+		}
+	}
+
+	if (currentLine) lines.push(currentLine);
+	return lines.join("\n");
+}
 
 export interface ExportOptions {
 	/** Override rankdir; defaults to frontmatter.layout.direction or 'LR'. */
@@ -140,12 +204,28 @@ function nodeAttrs(
 ): string {
 	const shape = kind === "process" ? "ellipse" : "box";
 	const nodeLabel = lookupLabel(id, kind, fm);
-	const label = nodeLabel ? `${id}\n${nodeLabel}` : id;
+	const description = lookupDescription(id, kind, fm);
+
+	const maxWidth =
+		typeof fm?.layout?.maxWidth === "number" ? fm.layout.maxWidth : undefined;
+	const wrappedNodeLabel =
+		nodeLabel && maxWidth ? wrapLabel(nodeLabel, maxWidth) : nodeLabel;
+	const label = wrappedNodeLabel ? `${id}\n${wrappedNodeLabel}` : id;
+
+	const wrappingOccurred = wrappedNodeLabel !== nodeLabel;
+	const originalLabel = nodeLabel ?? id;
+	const tooltip = description
+		? `${originalLabel}\n\n${description}`
+		: wrappingOccurred
+			? originalLabel
+			: undefined;
+
 	const styleAttrs = resolveStyleAttrs(id, kind, fm);
 	const xlabel = buildXlabel(id, kind, fm);
 
 	const minWidth = calcMinWidth(label);
 	const attrs: string[] = [`shape=${shape}`, `label=${quote(label)}`];
+	if (tooltip !== undefined) attrs.push(`tooltip=${quote(tooltip)}`);
 	if (minWidth !== undefined) attrs.push(`width=${minWidth.toFixed(2)}`);
 	if (xlabel !== undefined) attrs.push(`xlabel=${quote(xlabel)}`);
 	for (const key of STYLE_ATTRS) {
@@ -205,6 +285,16 @@ function lookupLabel(
 	if (!fm) return undefined;
 	const meta = kind === "process" ? fm.process?.[id] : fm.artifact?.[id];
 	return meta?.label;
+}
+
+function lookupDescription(
+	id: string,
+	kind: NodeKind,
+	fm: Frontmatter | null,
+): string | undefined {
+	if (!fm) return undefined;
+	const meta = kind === "process" ? fm.process?.[id] : fm.artifact?.[id];
+	return meta?.description;
 }
 
 function quote(s: string): string {

@@ -531,6 +531,100 @@ req >> design -> spec
 	});
 });
 
+describe("label wrapping", () => {
+	it("does not wrap label when layout.maxWidth is not set", () => {
+		const longLabel =
+			"ソースコード、SpreadSheet、JIRA、Confluenceなど複数のドキュメントソース";
+		const src = `---
+artifact:
+  spec: { label: "${longLabel}" }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		const m = dot.match(/"spec" \[.*?label="([^"]+)"/);
+		expect(m).not.toBeNull();
+		// Only one \n separator (id vs label), no wrapping
+		expect(m![1]!.split("\\n").length).toBe(2);
+	});
+
+	it("wraps long label when layout.maxWidth is set", () => {
+		const src = `---
+layout:
+  maxWidth: 80
+artifact:
+  spec: { label: "ソースコード、SpreadSheet、JIRA、Confluenceなど複数のドキュメントソース" }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		const m = dot.match(/"spec" \[.*?label="([^"]+)"/);
+		expect(m).not.toBeNull();
+		// More than one \n → wrapping occurred
+		expect(m![1]!.split("\\n").length).toBeGreaterThan(2);
+	});
+
+	it("prefers breaking at punctuation (、ends the line)", () => {
+		const src = `---
+layout:
+  maxWidth: 80
+artifact:
+  spec: { label: "ソースコード、JIRA、Confluenceなどのドキュメント" }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		const m = dot.match(/"spec" \[.*?label="([^"]+)"/);
+		expect(m).not.toBeNull();
+		const lines = m![1]!.split("\\n").slice(1); // drop id line
+		// At least one wrapped line should end with 、
+		const endsWithPunct = lines.some((l) => l.endsWith("、"));
+		expect(endsWithPunct).toBe(true);
+	});
+
+	it("tooltip preserves original unwrapped label when wrapping occurs", () => {
+		const originalLabel = "ソースコード、SpreadSheet、JIRA、Confluence";
+		const src = `---
+layout:
+  maxWidth: 50
+artifact:
+  spec: { label: "${originalLabel}" }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toContain(`tooltip="${originalLabel}"`);
+	});
+
+	it("tooltip includes description when present", () => {
+		const src = `---
+artifact:
+  spec: { label: "要求仕様書", description: "詳細な説明文" }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toContain('tooltip="要求仕様書\\n\\n詳細な説明文"');
+	});
+
+	it("tooltip includes description for process nodes too", () => {
+		const src = `---
+process:
+  P: { label: "処理", description: "詳細" }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toContain('tooltip="処理\\n\\n詳細"');
+	});
+});
+
 describe("fixture files", () => {
 	const files = readdirSync(samplesDir)
 		.filter((f) => f.endsWith(".pfdsl"))
