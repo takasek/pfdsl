@@ -51,3 +51,21 @@ vscode-watch: build-deps
 .PHONY: vscode-package
 vscode-package: vscode-build
 	cd packages/vscode-extension && vsce package --no-dependencies
+
+.PHONY: gen-samples
+gen-samples: build-deps
+	node scripts/gen-samples.mjs
+
+.PHONY: push
+push:
+	@if ! git diff --quiet HEAD -- docs/samples; then \
+		echo "docs/samples に差分があります。コミットしてから push してください。"; \
+		git diff --stat HEAD -- docs/samples; \
+		exit 1; \
+	fi
+	$(MAKE) gen-samples
+	@if ! git diff --quiet HEAD -- docs/samples; then \
+		echo "gen-samples で docs/samples が更新されました。自動コミットします。"; \
+		git add docs/samples docs/pfdsl_implementation_flow.* && git commit -m "chore: regenerate docs/samples"; \
+	fi
+	git push
