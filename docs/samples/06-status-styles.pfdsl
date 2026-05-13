@@ -1,12 +1,17 @@
 ---
 artifact:
-  requirements: { status: done }
-  spec:         { status: wip }
-  code:         { status: todo }
+  raw_data:  { tags: [external, sensitive] }
+  spec:      { status: wip }
+  processed: { status: done, tags: [external] }
+  report:    { status: todo, tags: [external] }
 statusStyles:
   done: { fillcolor: "#d4edda", style: filled }
   wip:  { fillcolor: "#fff3cd", style: filled }
   todo: { fillcolor: "#f8f9fa", style: filled }
+tagStyles:
+  external:  { color: "#0066cc", penwidth: "2" }
+  sensitive: { style: dashed }
 ---
-requirements >> design -> spec
-spec >> implement -> code
+raw_data >> ingest -> processed
+spec >> analyze -> report
+processed >> analyze

@@ -170,23 +170,28 @@ digraph PFDSL {
 
 ---
 
-## 06-status-styles — Status styles
+## 06-status-styles — Status & tag styles
 
-`status:` on artifacts + `statusStyles:` maps status values to DOT node attributes.
+`status:` + `tags:` on artifacts; `statusStyles:` and `tagStyles:` apply DOT attributes. Multiple tags merge; `status` wins conflicts.
 
 ```pfdsl
 ---
 artifact:
-  requirements: { status: done }
-  spec:         { status: wip }
-  code:         { status: todo }
+  raw_data:  { tags: [external, sensitive] }
+  spec:      { status: wip }
+  processed: { status: done, tags: [external] }
+  report:    { status: todo, tags: [external] }
 statusStyles:
   done: { fillcolor: "#d4edda", style: filled }
   wip:  { fillcolor: "#fff3cd", style: filled }
   todo: { fillcolor: "#f8f9fa", style: filled }
+tagStyles:
+  external:  { color: "#0066cc", penwidth: "2" }
+  sensitive: { style: dashed }
 ---
-requirements >> design -> spec
-spec >> implement -> code
+raw_data >> ingest -> processed
+spec >> analyze -> report
+processed >> analyze
 ```
 
 <img src="06-status-styles.svg">
@@ -198,53 +203,18 @@ spec >> implement -> code
 digraph PFDSL {
   rankdir=LR;
 
-  "code" [shape=box, label="code", fillcolor="#f8f9fa", style="filled"];
-  "design" [shape=ellipse, label="design"];
-  "implement" [shape=ellipse, label="implement"];
-  "requirements" [shape=box, label="requirements", fillcolor="#d4edda", style="filled"];
-  "spec" [shape=box, label="spec", fillcolor="#fff3cd", style="filled"];
-
-  "requirements" -> "design";
-  "design" -> "spec";
-  "spec" -> "implement";
-  "implement" -> "code";
-}
-```
-
-</details>
-
----
-
-## 07-tag-styles — Tag styles
-
-`tags:` on artifacts + `tagStyles:` applies DOT attributes per tag.
-
-```pfdsl
----
-artifact:
-  customer_data: { tags: [external] }
-  report:        { tags: [external] }
-tagStyles:
-  external: { color: "#0066cc", penwidth: "2" }
----
-customer_data >> analyze -> report
-```
-
-<img src="07-tag-styles.svg">
-
-<details>
-<summary>DOT</summary>
-
-```dot
-digraph PFDSL {
-  rankdir=LR;
-
   "analyze" [shape=ellipse, label="analyze"];
-  "customer_data" [shape=box, label="customer_data", color="#0066cc", penwidth="2"];
-  "report" [shape=box, label="report", color="#0066cc", penwidth="2"];
+  "ingest" [shape=ellipse, label="ingest"];
+  "processed" [shape=box, label="processed", xlabel="done, external", fillcolor="#d4edda", color="#0066cc", style="filled", penwidth="2"];
+  "raw_data" [shape=box, label="raw_data", xlabel="external, sensitive", color="#0066cc", style="dashed", penwidth="2"];
+  "report" [shape=box, label="report", xlabel="todo, external", fillcolor="#f8f9fa", color="#0066cc", style="filled", penwidth="2"];
+  "spec" [shape=box, label="spec", xlabel="wip", fillcolor="#fff3cd", style="filled"];
 
-  "customer_data" -> "analyze";
+  "raw_data" -> "ingest";
+  "ingest" -> "processed";
+  "spec" -> "analyze";
   "analyze" -> "report";
+  "processed" -> "analyze";
 }
 ```
 

@@ -4,8 +4,7 @@ id	summary	description
 03-set-input	Set input	`[A, B] >> P` expands to two input edges.
 04-set-output	Set output	`P -> [A, B]` expands to two output edges.
 05-label-cjk	Label + CJK	`label:` sets the display name shown below the node ID. CJK labels get a computed `width=` to prevent clipping in the wasm renderer.
-06-status-styles	Status styles	`status:` on artifacts + `statusStyles:` maps status values to DOT node attributes.
-07-tag-styles	Tag styles	`tags:` on artifacts + `tagStyles:` applies DOT attributes per tag.
+06-status-styles	Status & tag styles	`status:` + `tags:` on artifacts; `statusStyles:` and `tagStyles:` apply DOT attributes. Multiple tags merge; `status` wins conflicts.
 08-groups	Groups	`group:` on nodes + `group:` declarations produce `subgraph cluster_<id>` blocks.
 09-parts	Parts	`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names.
 10-layout-tb	Layout direction	`layout.direction: TB` sets `rankdir=TB`. Default is `LR`.
