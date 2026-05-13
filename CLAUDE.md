@@ -6,7 +6,11 @@
 作業を進めたらこのファイルの該当 artifact の status を更新する。
 新規 artifact / process を追加した場合も同ファイルに追記。
 
-## コミット粒度
+## 実装方針
+
+t-wadaのTDDで。適切な粒度でコミットすること。
+
+### コミット粒度
 
 論理単位ごとに分割する。1コミット = 1つの一貫した変更。Conventional Commits 準拠（`feat(scope): ...`, `refactor: ...`, `docs: ...`, `feat!: ...` 破壊的）。
 
