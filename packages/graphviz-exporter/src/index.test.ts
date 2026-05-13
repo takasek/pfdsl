@@ -36,8 +36,8 @@ describe("exportDot", () => {
 			  newrank=true;
 
 			  "design" [shape=ellipse, label="design"];
-			  "req" [shape=box, label="req"];
-			  "spec" [shape=box, label="spec"];
+			  "req" [shape=box, label="req", penwidth="2"];
+			  "spec" [shape=box, label="spec", penwidth="2"];
 
 			  "req" -> "design";
 			  "design" -> "spec";
@@ -50,9 +50,9 @@ describe("exportDot", () => {
 	it("uses box for artifacts and ellipse for processes", () => {
 		const { graph, frontmatter } = buildFromSource("req >> design -> spec\n");
 		const dot = exportDot(graph, frontmatter);
-		expect(dot).toMatch(/"req" \[shape=box, label="req"\]/);
+		expect(dot).toMatch(/"req" \[shape=box, label="req", penwidth="2"\]/);
 		expect(dot).toMatch(/"design" \[shape=ellipse, label="design"\]/);
-		expect(dot).toMatch(/"spec" \[shape=box, label="spec"\]/);
+		expect(dot).toMatch(/"spec" \[shape=box, label="spec", penwidth="2"\]/);
 	});
 
 	it("emits primary edges as solid arrows", () => {
@@ -84,7 +84,7 @@ req >> design -> spec
 		const dot = exportDot(graph, frontmatter);
 		// "要求仕様書" = 5 CJK = 10 units → 10*0.1+0.3 = 1.30
 		expect(dot).toContain(
-			'"req" [shape=box, label="req\\n要求仕様書", width=1.30]',
+			'"req" [shape=box, label="req\\n要求仕様書", width=1.30, penwidth="2"]',
 		);
 		// widest line is "design" = 6 ASCII = 6 units → 6*0.1+0.3 = 0.90
 		expect(dot).toContain(
@@ -133,11 +133,11 @@ req >> design -> spec
 		const dot = exportDot(graph, frontmatter);
 		// 「スキャン」: artifact (box), 4 CJK → 8 units → max(0.75, 0.8+0.3) = 1.10
 		expect(dot).toMatch(
-			/"スキャン" \[shape=box, label="スキャン", width=1\.10\]/,
+			/"スキャン" \[shape=box, label="スキャン", width=1\.10, penwidth="2"\]/,
 		);
 		// 「アンケートのtsv」: artifact (box), 6 CJK + 3 ASCII → 15 units → max(0.75, 1.5+0.3) = 1.80
 		expect(dot).toMatch(
-			/"アンケートのtsv" \[shape=box, label="アンケートのtsv", width=1\.80\]/,
+			/"アンケートのtsv" \[shape=box, label="アンケートのtsv", width=1\.80, penwidth="2"\]/,
 		);
 		// 「OCR」: process (ellipse), ASCII only → no width attr
 		expect(dot).toMatch(/"OCR" \[shape=ellipse, label="OCR"\]/);
@@ -181,7 +181,7 @@ spec >> P -> X
 		const { graph, frontmatter } = buildFromSource(src);
 		const dot = exportDot(graph, frontmatter);
 		expect(dot).toMatch(
-			/"spec" \[shape=box, label="spec", xlabel="done", fillcolor="lightgray", style="filled"\]/,
+			/"spec" \[shape=box, label="spec", xlabel="done", fillcolor="lightgray", style="filled", penwidth="2"\]/,
 		);
 	});
 
@@ -197,7 +197,7 @@ spec >> P -> X
 		const { graph, frontmatter } = buildFromSource(src);
 		const dot = exportDot(graph, frontmatter);
 		expect(dot).toMatch(
-			/"spec" \[shape=box, label="spec", xlabel="external", color="blue"\]/,
+			/"spec" \[shape=box, label="spec", xlabel="external", color="blue", penwidth="2"\]/,
 		);
 	});
 
@@ -299,7 +299,9 @@ spec >> P -> X
 `;
 		const { graph, frontmatter } = buildFromSource(src);
 		const dot = exportDot(graph, frontmatter);
-		expect(dot).toMatch(/"spec" \[shape=box, label="spec", xlabel="missing"\]/);
+		expect(dot).toMatch(
+			/"spec" \[shape=box, label="spec", xlabel="missing", penwidth="2"\]/,
+		);
 	});
 
 	it("does not apply status/tags to process nodes", () => {
@@ -376,8 +378,8 @@ raw_data >> ingest -> processed
 			    label="Data Ingestion";
 			    color="lightblue";
 			    "ingest" [shape=ellipse, label="ingest"];
-			    "processed" [shape=box, label="processed"];
-			    "raw_data" [shape=box, label="raw_data"];
+			    "processed" [shape=box, label="processed", penwidth="2"];
+			    "raw_data" [shape=box, label="raw_data", penwidth="2"];
 			  }
 
 			  "raw_data" -> "ingest";
@@ -472,6 +474,60 @@ a >> P -> b
 		const posG1 = dot.indexOf("cluster_g1");
 		const posG2 = dot.indexOf("cluster_g2");
 		expect(posG1).toBeLessThan(posG2);
+	});
+});
+
+describe("boundary artifact penwidth", () => {
+	it("source artifact (no incoming primary edges) gets penwidth=2", () => {
+		const { graph, frontmatter } = buildFromSource("req >> design -> spec\n");
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toMatch(/"req" \[shape=box, label="req", penwidth="2"\]/);
+	});
+
+	it("sink artifact (no outgoing primary edges) gets penwidth=2", () => {
+		const { graph, frontmatter } = buildFromSource("req >> design -> spec\n");
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toMatch(/"spec" \[shape=box, label="spec", penwidth="2"\]/);
+	});
+
+	it("middle artifact (has both in and out) does not get penwidth", () => {
+		const { graph, frontmatter } = buildFromSource(
+			"req >> P1 -> mid\nmid >> P2 -> out\n",
+		);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).not.toMatch(/"mid" \[.*penwidth/);
+	});
+
+	it("process nodes do not get boundary penwidth", () => {
+		const { graph, frontmatter } = buildFromSource("req >> design -> spec\n");
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).not.toMatch(/"design" \[.*penwidth/);
+	});
+
+	it("user-specified penwidth in tagStyles is not overridden", () => {
+		const src = `---
+artifact:
+  req: { tags: [critical] }
+tagStyles:
+  critical: { penwidth: "5" }
+---
+req >> design -> spec
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		// req: source, user-specified penwidth="5" → boundary logic skips it
+		expect(dot).toMatch(
+			/"req" \[shape=box, label="req", xlabel="critical", penwidth="5"\]/,
+		);
+		expect(dot).not.toMatch(/"req" \[.*penwidth="2"/);
+	});
+
+	it("sink artifact with feedback edge out still gets penwidth=2", () => {
+		const { graph, frontmatter } = buildFromSource(
+			"req >> design -> spec\nspec >>? design\n",
+		);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toMatch(/"spec" \[shape=box, label="spec", penwidth="2"\]/);
 	});
 });
 

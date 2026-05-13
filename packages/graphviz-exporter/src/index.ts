@@ -67,6 +67,19 @@ export function exportDot(
 		}
 	}
 
+	const hasIncoming = new Set<string>();
+	const hasOutgoing = new Set<string>();
+	for (const e of graph.primaryEdges) {
+		hasIncoming.add(e.to);
+		hasOutgoing.add(e.from);
+	}
+	const boundaryArtifacts = new Set<string>();
+	for (const [id, kind] of graph.nodes) {
+		if (kind === "artifact" && (!hasIncoming.has(id) || !hasOutgoing.has(id))) {
+			boundaryArtifacts.add(id);
+		}
+	}
+
 	const nodeIds = [...graph.nodes.keys()].sort();
 	const groupedNodes = new Map<string, string[]>();
 	const ungroupedIds: string[] = [];
@@ -89,7 +102,7 @@ export function exportDot(
 			lines.push(`    color=${quote(String(gm.color))};`);
 		for (const id of groupedNodes.get(gid)!) {
 			lines.push(
-				`    ${quote(id)} ${nodeAttrs(id, graph.nodes.get(id)!, frontmatter)};`,
+				`    ${quote(id)} ${nodeAttrs(id, graph.nodes.get(id)!, frontmatter, boundaryArtifacts)};`,
 			);
 		}
 		lines.push("  }");
@@ -97,7 +110,9 @@ export function exportDot(
 
 	for (const id of ungroupedIds) {
 		const kind = graph.nodes.get(id)!;
-		lines.push(`  ${quote(id)} ${nodeAttrs(id, kind, frontmatter)};`);
+		lines.push(
+			`  ${quote(id)} ${nodeAttrs(id, kind, frontmatter, boundaryArtifacts)};`,
+		);
 	}
 
 	if (graph.primaryEdges.length > 0 || graph.feedbackEdges.length > 0) {
@@ -117,7 +132,12 @@ export function exportDot(
 	return `${lines.join("\n")}\n`;
 }
 
-function nodeAttrs(id: string, kind: NodeKind, fm: Frontmatter | null): string {
+function nodeAttrs(
+	id: string,
+	kind: NodeKind,
+	fm: Frontmatter | null,
+	boundaryArtifacts: Set<string> = new Set(),
+): string {
 	const shape = kind === "process" ? "ellipse" : "box";
 	const nodeLabel = lookupLabel(id, kind, fm);
 	const label = nodeLabel ? `${id}\n${nodeLabel}` : id;
@@ -131,6 +151,13 @@ function nodeAttrs(id: string, kind: NodeKind, fm: Frontmatter | null): string {
 	for (const key of STYLE_ATTRS) {
 		const v = styleAttrs[key];
 		if (v !== undefined) attrs.push(`${key}=${quote(v)}`);
+	}
+	if (
+		kind === "artifact" &&
+		boundaryArtifacts.has(id) &&
+		styleAttrs.penwidth === undefined
+	) {
+		attrs.push(`penwidth="2"`);
 	}
 	return `[${attrs.join(", ")}]`;
 }
