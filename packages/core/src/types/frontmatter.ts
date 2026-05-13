@@ -15,6 +15,7 @@ export type NodeStyle = Partial<Record<StyleAttr, string>>;
 
 export interface ArtifactMeta {
 	label?: string;
+	description?: string;
 	owner?: string;
 	parts?: string[];
 	status?: Status;
@@ -25,6 +26,7 @@ export interface ArtifactMeta {
 
 export interface ProcessMeta {
 	label?: string;
+	description?: string;
 	owner?: string;
 	group?: string;
 	[key: string]: unknown;
