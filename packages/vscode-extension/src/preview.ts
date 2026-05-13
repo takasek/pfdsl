@@ -1,4 +1,9 @@
-import type { AnalyzeResult, IdNode, Statement } from "@pfdsl/core";
+import type {
+	AnalyzeResult,
+	Frontmatter,
+	IdNode,
+	Statement,
+} from "@pfdsl/core";
 import { exportDot } from "@pfdsl/graphviz-exporter";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
@@ -56,6 +61,20 @@ type MessageFromWebview =
 	| { type: "ready" }
 	| { type: "nodeClick"; nodeId: string };
 
+function buildDescriptions(fm: Frontmatter | null): Record<string, string> {
+	const result: Record<string, string> = {};
+	if (!fm) return result;
+	for (const id of Object.keys(fm.artifact ?? {})) {
+		const desc = fm.artifact?.[id]?.description;
+		if (typeof desc === "string" && desc) result[id] = desc;
+	}
+	for (const id of Object.keys(fm.process ?? {})) {
+		const desc = fm.process?.[id]?.description;
+		if (typeof desc === "string" && desc) result[id] = desc;
+	}
+	return result;
+}
+
 function dotForDocument(doc: vscode.TextDocument): {
 	dot?: string;
 	error?: string;
@@ -85,11 +104,13 @@ function buildHtml(
   #root { width: 100%; height: 100%; overflow: hidden; cursor: grab; position: relative; }
   #inner { position: absolute; top: 0; left: 0; }
   .err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
+  #tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 320px; pointer-events: none; display: none; z-index: 100; white-space: pre-wrap; word-break: break-word; }
 </style>
 <script>window.__PFDSL_DEBUG__ = ${isDebug};</script>
 </head>
 <body>
 <div id="root"><div id="inner"></div></div>
+<div id="tooltip"></div>
 <script type="module" src="${scriptUri}"></script>
 </body>
 </html>`;
@@ -141,11 +162,18 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 		const focusNodeId = state.pendingFocusNodeId;
 		delete state.pendingFocusNodeId;
 		state.panel.title = `PFDSL Preview — ${state.doc.uri.path.split("/").pop() ?? ""}`;
-		state.panel.webview.postMessage(
-			error
-				? { type: "error", message: error }
-				: { type: "render", dot, focusNodeId },
-		);
+		if (error) {
+			state.panel.webview.postMessage({ type: "error", message: error });
+		} else {
+			const { frontmatter } = analyzeDocument(state.doc);
+			const descriptions = buildDescriptions(frontmatter);
+			state.panel.webview.postMessage({
+				type: "render",
+				dot,
+				focusNodeId,
+				descriptions,
+			});
+		}
 	}
 
 	function createPanel(

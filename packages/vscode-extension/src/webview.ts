@@ -1,7 +1,12 @@
 import { Graphviz } from "@hpcc-js/wasm";
 
 type MessageToWebview =
-	| { type: "render"; dot: string; focusNodeId?: string }
+	| {
+			type: "render";
+			dot: string;
+			focusNodeId?: string;
+			descriptions?: Record<string, string>;
+	  }
 	| { type: "error"; message: string };
 
 type MessageFromWebview =
@@ -34,6 +39,31 @@ async function getGraphviz() {
 
 const root = document.getElementById("root") as HTMLDivElement;
 const inner = document.getElementById("inner") as HTMLDivElement;
+const tooltip = document.getElementById("tooltip") as HTMLDivElement;
+
+let descriptions: Record<string, string> = {};
+
+root.addEventListener("mousemove", (e) => {
+	const node = (e.target as Element).closest?.("g.node");
+	if (!node) {
+		tooltip.style.display = "none";
+		return;
+	}
+	const nodeId = node.querySelector("title")?.textContent;
+	const desc = nodeId ? descriptions[nodeId] : undefined;
+	if (!desc) {
+		tooltip.style.display = "none";
+		return;
+	}
+	tooltip.textContent = desc;
+	tooltip.style.left = `${e.clientX + 14}px`;
+	tooltip.style.top = `${e.clientY + 14}px`;
+	tooltip.style.display = "block";
+});
+
+root.addEventListener("mouseleave", () => {
+	tooltip.style.display = "none";
+});
 
 let scale = 1;
 let panX = 0;
@@ -153,6 +183,7 @@ window.addEventListener("message", async (event) => {
 		return;
 	}
 	if (msg.type !== "render") return;
+	descriptions = msg.descriptions ?? {};
 	try {
 		const g = await getGraphviz();
 		log("calling g.dot()");
