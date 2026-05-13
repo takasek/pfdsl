@@ -18,6 +18,7 @@ requirements >> design -> spec
 ```dot
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "design" [shape=ellipse, label="design"];
   "requirements" [shape=box, label="requirements"];
@@ -50,6 +51,7 @@ bug_report >>? implement
 ```dot
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "bug_report" [shape=box, label="bug_report"];
   "code" [shape=box, label="code"];
@@ -85,6 +87,7 @@ digraph PFDSL {
 ```dot
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "database" [shape=box, label="database"];
   "migrate" [shape=ellipse, label="migrate"];
@@ -117,6 +120,7 @@ source >> build -> [binary, docs]
 ```dot
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "binary" [shape=box, label="binary"];
   "build" [shape=ellipse, label="build"];
@@ -156,6 +160,7 @@ D1 >> P1 -> D2
 ```dot
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "D1" [shape=box, label="D1\n紙のアンケート", width=1.70];
   "D2" [shape=box, label="D2\nデジタルアンケート", width=2.10];
@@ -202,6 +207,7 @@ processed >> analyze
 ```dot
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "analyze" [shape=ellipse, label="analyze"];
   "ingest" [shape=ellipse, label="ingest"];
@@ -252,6 +258,7 @@ ui_mockup >> build_ui -> component
 ```dot
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   subgraph cluster_backend {
     label="Backend";
@@ -307,6 +314,7 @@ D0 >> P1 -> D1
 ```dot
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "D0" [shape=box, label="D0\nSource"];
   "D1" [shape=box, label="D1\nRelease Package"];
@@ -345,6 +353,7 @@ spec >> implement -> code
 ```dot
 digraph PFDSL {
   rankdir=TB;
+  newrank=true;
 
   "code" [shape=box, label="code"];
   "design" [shape=ellipse, label="design"];

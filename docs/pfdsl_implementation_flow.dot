@@ -1,5 +1,6 @@
 digraph PFDSL {
   rankdir=TB;
+  newrank=true;
   label="PFDSL 実装計画フロー";
   labelloc="t";
 

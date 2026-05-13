@@ -1,5 +1,6 @@
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "D1" [shape=box, label="D1\n紙のアンケート", width=1.70];
   "D2" [shape=box, label="D2\nデジタルアンケート", width=2.10];

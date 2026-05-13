@@ -1,5 +1,6 @@
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "analyze" [shape=ellipse, label="analyze"];
   "ingest" [shape=ellipse, label="ingest"];

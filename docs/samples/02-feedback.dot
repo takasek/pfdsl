@@ -1,5 +1,6 @@
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "bug_report" [shape=box, label="bug_report"];
   "code" [shape=box, label="code"];

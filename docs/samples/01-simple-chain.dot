@@ -1,5 +1,6 @@
 digraph PFDSL {
   rankdir=LR;
+  newrank=true;
 
   "design" [shape=ellipse, label="design"];
   "requirements" [shape=box, label="requirements"];
