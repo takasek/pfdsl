@@ -31,19 +31,20 @@ describe("exportDot", () => {
 			"req >> design -> spec\nspec >>? design\n",
 		);
 		expect(exportDot(graph, frontmatter)).toMatchInlineSnapshot(`
-      "digraph PFDSL {
-        rankdir=LR;
+			"digraph PFDSL {
+			  rankdir=LR;
+			  newrank=true;
 
-        "design" [shape=ellipse, label="design"];
-        "req" [shape=box, label="req"];
-        "spec" [shape=box, label="spec"];
+			  "design" [shape=ellipse, label="design"];
+			  "req" [shape=box, label="req"];
+			  "spec" [shape=box, label="spec"];
 
-        "req" -> "design";
-        "design" -> "spec";
-        "spec" -> "design" [style=dashed, color="#888888", constraint=false];
-      }
-      "
-    `);
+			  "req" -> "design";
+			  "design" -> "spec";
+			  "spec" -> "design" [style=dashed, color="#888888", constraint=false];
+			}
+			"
+		`);
 	});
 
 	it("uses box for artifacts and ellipse for processes", () => {
@@ -369,6 +370,7 @@ raw_data >> ingest -> processed
 		expect(exportDot(graph, frontmatter)).toMatchInlineSnapshot(`
 			"digraph PFDSL {
 			  rankdir=LR;
+			  newrank=true;
 
 			  subgraph cluster_g1 {
 			    label="Data Ingestion";

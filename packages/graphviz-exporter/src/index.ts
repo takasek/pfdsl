@@ -50,6 +50,7 @@ export function exportDot(
 	const lines: string[] = [];
 	lines.push("digraph PFDSL {");
 	lines.push(`  rankdir=${rankdir};`);
+	lines.push("  newrank=true;");
 	if (graphLabel !== undefined) {
 		lines.push(`  label=${quote(String(graphLabel))};`);
 		lines.push('  labelloc="t";');
