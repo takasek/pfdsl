@@ -16,8 +16,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@pfdsl/core": "workspace:*",
-		"canvas": "^3.2.3"
+		"@pfdsl/core": "workspace:*"
 	},
 	"files": [
 		"dist"
