@@ -65,7 +65,8 @@ type MessageToWebview =
 			descriptions?: Record<string, string>;
 	  }
 	| { type: "error"; message: string }
-	| { type: "focus"; nodeId: string };
+	| { type: "focus"; nodeId: string }
+	| { type: "clearFocus" };
 
 type MessageFromWebview =
 	| { type: "ready" }
@@ -269,13 +270,27 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 		vscode.window.onDidChangeTextEditorSelection((e) => {
 			if (!current || e.textEditor.document !== current.doc) return;
 			const sel = e.selections[0];
-			if (!sel) return;
+			if (!sel || sel.isEmpty) {
+				current.panel.webview.postMessage({
+					type: "clearFocus",
+				} satisfies MessageToWebview);
+				return;
+			}
+			const selectedText = e.textEditor.document.getText(sel);
 			const result = analyzeDocument(current.doc);
-			const nodeId = nodeIdAtCursor(result, sel.active);
-			if (nodeId) {
+			const allIds = new Set(
+				result.document.statements
+					.flatMap(idsOfStatement)
+					.map((id) => id.value),
+			);
+			if (allIds.has(selectedText)) {
 				current.panel.webview.postMessage({
 					type: "focus",
-					nodeId,
+					nodeId: selectedText,
+				} satisfies MessageToWebview);
+			} else {
+				current.panel.webview.postMessage({
+					type: "clearFocus",
 				} satisfies MessageToWebview);
 			}
 		}),

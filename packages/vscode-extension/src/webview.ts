@@ -8,7 +8,8 @@ type MessageToWebview =
 			descriptions?: Record<string, string>;
 	  }
 	| { type: "error"; message: string }
-	| { type: "focus"; nodeId: string };
+	| { type: "focus"; nodeId: string }
+	| { type: "clearFocus" };
 
 type MessageFromWebview =
 	| { type: "ready" }
@@ -95,6 +96,13 @@ function centerGraph() {
 		scale,
 	});
 	applyTransform();
+}
+
+function clearFocusHighlight() {
+	for (const node of inner.querySelectorAll("g.node.pfdsl-focused")) {
+		node.classList.remove("pfdsl-focused");
+	}
+	lastFocusedNodeId = undefined;
 }
 
 function focusNode(nodeId: string) {
@@ -189,6 +197,10 @@ window.addEventListener("message", async (event) => {
 	}
 	if (msg.type === "focus") {
 		focusNode(msg.nodeId);
+		return;
+	}
+	if (msg.type === "clearFocus") {
+		clearFocusHighlight();
 		return;
 	}
 	if (msg.type !== "render") return;
