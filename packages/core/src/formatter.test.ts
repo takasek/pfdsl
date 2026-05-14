@@ -98,22 +98,22 @@ describe("formatAsFlows", () => {
 		expect(formatAsFlows(edges)).toBe("A >> P -> B\n");
 	});
 
-	it("multiple inputs → comma-separated", () => {
+	it("multiple inputs → bracketed", () => {
 		const edges: NormalizedEdge[] = [
 			{ kind: "input", artifact: "A", process: "P" },
 			{ kind: "input", artifact: "B", process: "P" },
 			{ kind: "output", process: "P", artifact: "C" },
 		];
-		expect(formatAsFlows(edges)).toBe("A, B >> P -> C\n");
+		expect(formatAsFlows(edges)).toBe("[A, B] >> P -> C\n");
 	});
 
-	it("multiple outputs → comma-separated", () => {
+	it("multiple outputs → bracketed", () => {
 		const edges: NormalizedEdge[] = [
 			{ kind: "input", artifact: "A", process: "P" },
 			{ kind: "output", process: "P", artifact: "B" },
 			{ kind: "output", process: "P", artifact: "C" },
 		];
-		expect(formatAsFlows(edges)).toBe("A >> P -> B, C\n");
+		expect(formatAsFlows(edges)).toBe("A >> P -> [B, C]\n");
 	});
 
 	it("input-only process (sink) → artifact >> process", () => {
@@ -160,7 +160,7 @@ describe("formatAsFlows", () => {
 			{ kind: "input", artifact: "B", process: "P" },
 			{ kind: "output", process: "P", artifact: "C" },
 		];
-		expect(formatAsFlows(edges)).toBe("Q -> B\nA, B >> P -> C\n");
+		expect(formatAsFlows(edges)).toBe("Q -> B\n[A, B] >> P -> C\n");
 	});
 
 	it("isolated nodes after flows", () => {

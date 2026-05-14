@@ -68,8 +68,10 @@ export function formatAsFlows(
 		const { inputs, outputs, feedbacks } = byProcess.get(proc)!;
 		for (const fb of feedbacks) lines.push(`${fb} >>? ${proc}`);
 		if (inputs.length === 0 && outputs.length === 0) continue;
-		let stmt = inputs.length > 0 ? `${inputs.join(", ")} >> ${proc}` : proc;
-		if (outputs.length > 0) stmt += ` -> ${outputs.join(", ")}`;
+		const fmtIds = (ids: string[]) =>
+			ids.length === 1 ? ids[0]! : `[${ids.join(", ")}]`;
+		let stmt = inputs.length > 0 ? `${fmtIds(inputs)} >> ${proc}` : proc;
+		if (outputs.length > 0) stmt += ` -> ${fmtIds(outputs)}`;
 		lines.push(stmt);
 	}
 
