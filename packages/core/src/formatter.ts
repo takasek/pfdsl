@@ -58,10 +58,11 @@ export function formatAsFlows(
 		}
 	}
 
-	const processOrder = [...byProcess.keys()].sort(
-		(a, b) =>
-			(rankProxy.get(a) ?? offset * 2) - (rankProxy.get(b) ?? offset * 2),
-	);
+	const processOrder = [...byProcess.keys()].sort((a, b) => {
+		const diff =
+			(rankProxy.get(a) ?? offset * 2) - (rankProxy.get(b) ?? offset * 2);
+		return diff !== 0 ? diff : a.localeCompare(b);
+	});
 
 	const lines: string[] = [];
 	for (const proc of processOrder) {

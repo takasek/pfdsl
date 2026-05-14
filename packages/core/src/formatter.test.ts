@@ -139,6 +139,23 @@ describe("formatAsFlows", () => {
 		expect(formatAsFlows(edges)).toBe("X >>? P\nA >> P -> B\n");
 	});
 
+	it("same rank: processes sorted alphabetically", () => {
+		// P_a and P_b both at rank 1; A feeds both.
+		// sortEdges emits input edges lex-sorted (A\0P_a < A\0P_b),
+		// then output edges lex-sorted (P_a\0Y < P_b\0X) → P_a rankProxy < P_b.
+		// Tiebreaker: localeCompare ensures alphabetical when rankProxy equals.
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "A", process: "P_a" },
+			{ kind: "input", artifact: "A", process: "P_b" },
+			{ kind: "output", process: "P_a", artifact: "Y" },
+			{ kind: "output", process: "P_b", artifact: "X" },
+		];
+		const result = formatAsFlows(edges);
+		const lines = result.trimEnd().split("\n");
+		expect(lines[0]).toMatch(/P_a/);
+		expect(lines[1]).toMatch(/P_b/);
+	});
+
 	it("two processes maintain order", () => {
 		const edges: NormalizedEdge[] = [
 			{ kind: "input", artifact: "A", process: "P1" },

@@ -1,4 +1,5 @@
 import {
+	format,
 	formatAsFlows,
 	formatEdges,
 	hasErrors,
@@ -52,22 +53,26 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 		provideDocumentRangeFormattingEdits(doc, range) {
 			const source = doc.getText();
 			const { frontmatter } = extractFrontmatter(source);
-			const frontmatterLines = frontmatter
+			const frontmatterLineCount = frontmatter
 				? frontmatter.split("\n").length - 1
 				: 0;
 
-			// selection is entirely in frontmatter → nothing to do
-			if (range.end.line < frontmatterLines) return [];
+			// selection entirely in frontmatter → nothing to do
+			if (range.end.line < frontmatterLineCount) return [];
 
-			const body = buildFormattedBody(doc, "flows");
-			if (body === null) return [];
-			const output = frontmatter + body;
-			if (output === source) return [];
-			const fullRange = new vscode.Range(
-				doc.positionAt(0),
-				doc.positionAt(source.length),
+			// Expand to full lines, clamped below the frontmatter
+			const startLine = Math.max(range.start.line, frontmatterLineCount);
+			const endLine = range.end.line;
+			const selectedRange = new vscode.Range(
+				new vscode.Position(startLine, 0),
+				doc.lineAt(endLine).rangeIncludingLineBreak.end,
 			);
-			return [vscode.TextEdit.replace(fullRange, output)];
+			const selectedText = doc.getText(selectedRange);
+
+			const { output, diagnostics } = format(selectedText, { style: "flows" });
+			if (hasErrors(diagnostics)) return [];
+			if (output === selectedText) return [];
+			return [vscode.TextEdit.replace(selectedRange, output)];
 		},
 	};
 
