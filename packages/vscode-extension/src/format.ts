@@ -1,45 +1,20 @@
-import {
-	format,
-	formatAsFlows,
-	formatEdges,
-	hasErrors,
-	sortEdges,
-	sortIsolated,
-} from "@pfdsl/core";
+import { format, hasErrors } from "@pfdsl/core";
 import * as vscode from "vscode";
-import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
+import { LANGUAGE_ID } from "./analyze.js";
 
-function extractFrontmatter(source: string): {
-	frontmatter: string;
-	body: string;
-} {
-	if (!source.startsWith("---")) return { frontmatter: "", body: source };
+function extractFrontmatterLineCount(source: string): number {
+	if (!source.startsWith("---")) return 0;
 	const match = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
-	if (!match) return { frontmatter: "", body: source };
-	return { frontmatter: match[0], body: source.slice(match[0].length) };
-}
-
-function buildFormattedBody(
-	doc: vscode.TextDocument,
-	mode: "flat" | "flows",
-): string | null {
-	const { edges, graph, isolatedNodes, diagnostics } = analyzeDocument(doc);
-	if (hasErrors(diagnostics)) return null;
-	const sorted = sortEdges(edges, graph);
-	const isolated = sortIsolated(isolatedNodes);
-	return mode === "flows"
-		? formatAsFlows(sorted, isolated)
-		: formatEdges(sorted, isolated);
+	if (!match) return 0;
+	return match[0].split("\n").length - 1;
 }
 
 export function registerFormatter(context: vscode.ExtensionContext): void {
 	const docProvider: vscode.DocumentFormattingEditProvider = {
 		provideDocumentFormattingEdits(doc) {
 			const source = doc.getText();
-			const { frontmatter } = extractFrontmatter(source);
-			const body = buildFormattedBody(doc, "flows");
-			if (body === null) return [];
-			const output = frontmatter + body;
+			const { output, diagnostics } = format(source, { style: "flows" });
+			if (hasErrors(diagnostics)) return [];
 			if (output === source) return [];
 			const fullRange = new vscode.Range(
 				doc.positionAt(0),
@@ -52,10 +27,7 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 	const rangeProvider: vscode.DocumentRangeFormattingEditProvider = {
 		provideDocumentRangeFormattingEdits(doc, range) {
 			const source = doc.getText();
-			const { frontmatter } = extractFrontmatter(source);
-			const frontmatterLineCount = frontmatter
-				? frontmatter.split("\n").length - 1
-				: 0;
+			const frontmatterLineCount = extractFrontmatterLineCount(source);
 
 			// selection entirely in frontmatter → nothing to do
 			if (range.end.line < frontmatterLineCount) return [];
@@ -115,10 +87,7 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 			if (!sel.isEmpty) {
 				// Format selection only
 				const source = doc.getText();
-				const { frontmatter } = extractFrontmatter(source);
-				const frontmatterLineCount = frontmatter
-					? frontmatter.split("\n").length - 1
-					: 0;
+				const frontmatterLineCount = extractFrontmatterLineCount(source);
 				if (sel.end.line < frontmatterLineCount) return;
 				const startLine = Math.max(sel.start.line, frontmatterLineCount);
 				const selectedRange = new vscode.Range(
@@ -135,11 +104,10 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 			} else {
 				// Format whole document
 				const source = doc.getText();
-				const { frontmatter } = extractFrontmatter(source);
-				const body = buildFormattedBody(doc, pick.mode);
-				if (body === null) return;
-				const output = frontmatter + body;
-				if (output === source) return;
+				const { output, diagnostics } = format(source, {
+					style: pick.mode,
+				});
+				if (hasErrors(diagnostics) || output === source) return;
 				const fullRange = new vscode.Range(
 					doc.positionAt(0),
 					doc.positionAt(source.length),
