@@ -1,13 +1,6 @@
-import { format, hasErrors } from "@pfdsl/core";
+import { format, hasErrors, loadFrontmatter } from "@pfdsl/core";
 import * as vscode from "vscode";
 import { LANGUAGE_ID } from "./analyze.js";
-
-function extractFrontmatterLineCount(source: string): number {
-	if (!source.startsWith("---")) return 0;
-	const match = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
-	if (!match) return 0;
-	return match[0].split("\n").length - 1;
-}
 
 export function registerFormatter(context: vscode.ExtensionContext): void {
 	const docProvider: vscode.DocumentFormattingEditProvider = {
@@ -27,7 +20,7 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 	const rangeProvider: vscode.DocumentRangeFormattingEditProvider = {
 		provideDocumentRangeFormattingEdits(doc, range) {
 			const source = doc.getText();
-			const frontmatterLineCount = extractFrontmatterLineCount(source);
+			const frontmatterLineCount = loadFrontmatter(source).bodyStartLine - 1;
 
 			// selection entirely in frontmatter → nothing to do
 			if (range.end.line < frontmatterLineCount) return [];
@@ -87,7 +80,7 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 			if (!sel.isEmpty) {
 				// Format selection only
 				const source = doc.getText();
-				const frontmatterLineCount = extractFrontmatterLineCount(source);
+				const frontmatterLineCount = loadFrontmatter(source).bodyStartLine - 1;
 				if (sel.end.line < frontmatterLineCount) return;
 				const startLine = Math.max(sel.start.line, frontmatterLineCount);
 				const selectedRange = new vscode.Range(

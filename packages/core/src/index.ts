@@ -104,6 +104,7 @@ export {
 	buildGraph,
 	formatAsFlows,
 	formatEdges,
+	loadFrontmatter,
 	normalize as normalizeDocument,
 	sortEdges,
 	sortIsolated,
