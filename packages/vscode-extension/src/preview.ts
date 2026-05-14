@@ -6,7 +6,8 @@ import type {
 } from "@pfdsl/core";
 import { exportDot } from "@pfdsl/graphviz-exporter";
 import * as vscode from "vscode";
-import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
+import { analyzeDocument } from "./analyze.js";
+import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
 	panel: vscode.WebviewPanel;
@@ -242,11 +243,8 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("pfdsl.preview", async () => {
-			const editor = vscode.window.activeTextEditor;
-			if (!editor || editor.document.languageId !== LANGUAGE_ID) {
-				vscode.window.showInformationMessage("Open a .pfdsl file first.");
-				return;
-			}
+			const editor = requireActivePfdslEditor();
+			if (!editor) return;
 			const doc = editor.document;
 
 			if (current) {

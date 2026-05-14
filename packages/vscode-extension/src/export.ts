@@ -3,7 +3,8 @@ import { formatEdges, sortEdges } from "@pfdsl/core";
 import { exportDot } from "@pfdsl/graphviz-exporter";
 import { extractMetadata, toTsv } from "@pfdsl/metadata-exporter";
 import * as vscode from "vscode";
-import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
+import { analyzeDocument } from "./analyze.js";
+import { requireActivePfdslEditor } from "./utils.js";
 
 let gv: Awaited<ReturnType<typeof Graphviz.load>> | null = null;
 async function getGraphviz() {
@@ -17,11 +18,8 @@ export function registerExport(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(outputChannel);
 	context.subscriptions.push(
 		vscode.commands.registerCommand("pfdsl.export", async () => {
-			const editor = vscode.window.activeTextEditor;
-			if (!editor || editor.document.languageId !== LANGUAGE_ID) {
-				vscode.window.showInformationMessage("Open a .pfdsl file first.");
-				return;
-			}
+			const editor = requireActivePfdslEditor();
+			if (!editor) return;
 			const doc = editor.document;
 
 			const FORMATS = [
@@ -96,11 +94,8 @@ export function registerExport(context: vscode.ExtensionContext): void {
 		}),
 
 		vscode.commands.registerCommand("pfdsl.normalize", () => {
-			const editor = vscode.window.activeTextEditor;
-			if (!editor || editor.document.languageId !== LANGUAGE_ID) {
-				vscode.window.showInformationMessage("Open a .pfdsl file first.");
-				return;
-			}
+			const editor = requireActivePfdslEditor();
+			if (!editor) return;
 			const { edges, graph, diagnostics } = analyzeDocument(editor.document);
 			if (diagnostics.some((d) => d.severity === "error")) {
 				vscode.window.showErrorMessage("Fix errors before normalizing.");
