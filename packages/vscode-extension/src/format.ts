@@ -36,7 +36,7 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 		provideDocumentFormattingEdits(doc) {
 			const source = doc.getText();
 			const { frontmatter } = extractFrontmatter(source);
-			const body = buildFormattedBody(doc, "flat");
+			const body = buildFormattedBody(doc, "flows");
 			if (body === null) return [];
 			const output = frontmatter + body;
 			if (output === source) return [];
@@ -59,7 +59,7 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 			// selection is entirely in frontmatter → nothing to do
 			if (range.end.line < frontmatterLines) return [];
 
-			const body = buildFormattedBody(doc, "flat");
+			const body = buildFormattedBody(doc, "flows");
 			if (body === null) return [];
 			const output = frontmatter + body;
 			if (output === source) return [];
@@ -87,14 +87,14 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 			const pick = await vscode.window.showQuickPick(
 				[
 					{
-						label: "Flat",
-						description: "One edge per line  (A >> P,  P -> B)",
-						mode: "flat" as const,
-					},
-					{
 						label: "Flows",
 						description: "Per-process grouped  (A >> P -> B)",
 						mode: "flows" as const,
+					},
+					{
+						label: "Flat",
+						description: "One edge per line  (A >> P,  P -> B)",
+						mode: "flat" as const,
 					},
 				],
 				{ placeHolder: "Choose format style" },

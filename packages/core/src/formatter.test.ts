@@ -149,6 +149,20 @@ describe("formatAsFlows", () => {
 		expect(formatAsFlows(edges)).toBe("A >> P1 -> B\nB >> P2 -> C\n");
 	});
 
+	it("source process (no inputs) orders before processes that depend on its output", () => {
+		// Q (rank 0, source) -> B (rank 1) -> P (rank 2) -> C (rank 3)
+		// Also A (rank 0) -> P
+		// sortedEdges: A>>P(rank 0,kind 0), Q->B(rank 0,kind 2), B>>P(rank 1,kind 0), P->C(rank 2,kind 2)
+		// first-appearance order gives [P, Q] which is WRONG; rank order is [Q, P]
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "A", process: "P" },
+			{ kind: "output", process: "Q", artifact: "B" },
+			{ kind: "input", artifact: "B", process: "P" },
+			{ kind: "output", process: "P", artifact: "C" },
+		];
+		expect(formatAsFlows(edges)).toBe("Q -> B\nA, B >> P -> C\n");
+	});
+
 	it("isolated nodes after flows", () => {
 		const edges: NormalizedEdge[] = [
 			{ kind: "input", artifact: "A", process: "P" },

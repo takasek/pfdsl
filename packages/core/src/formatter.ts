@@ -27,19 +27,41 @@ export function formatAsFlows(
 	sortedIsolated: string[] = [],
 ): string {
 	const byProcess = new Map<string, ProcessEntry>();
-	const processOrder: string[] = [];
 
 	for (const e of sortedEdges) {
 		let entry = byProcess.get(e.process);
 		if (!entry) {
 			entry = { inputs: [], outputs: [], feedbacks: [] };
 			byProcess.set(e.process, entry);
-			processOrder.push(e.process);
 		}
 		if (e.kind === "input") entry.inputs.push(e.artifact);
 		else if (e.kind === "output") entry.outputs.push(e.artifact);
 		else entry.feedbacks.push(e.artifact);
 	}
+
+	// Rank proxy: index of first output/feedback edge for each process.
+	// Output/feedback edges sort by rank(process), giving a rank-ordered
+	// sequence. Sink processes (no output/feedback) fall back to first
+	// input edge index + offset, placing them last.
+	const rankProxy = new Map<string, number>();
+	const offset = sortedEdges.length;
+	for (let i = 0; i < sortedEdges.length; i++) {
+		const e = sortedEdges[i]!;
+		if (e.kind !== "input" && !rankProxy.has(e.process)) {
+			rankProxy.set(e.process, i);
+		}
+	}
+	for (let i = 0; i < sortedEdges.length; i++) {
+		const e = sortedEdges[i]!;
+		if (e.kind === "input" && !rankProxy.has(e.process)) {
+			rankProxy.set(e.process, i + offset);
+		}
+	}
+
+	const processOrder = [...byProcess.keys()].sort(
+		(a, b) =>
+			(rankProxy.get(a) ?? offset * 2) - (rankProxy.get(b) ?? offset * 2),
+	);
 
 	const lines: string[] = [];
 	for (const proc of processOrder) {
