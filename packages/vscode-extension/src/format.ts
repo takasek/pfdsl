@@ -69,7 +69,10 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 			);
 			const selectedText = doc.getText(selectedRange);
 
-			const { output, diagnostics } = format(selectedText, { style: "flows" });
+			const { output, diagnostics } = format(selectedText, {
+				style: "flows",
+				skipValidation: true,
+			});
 			if (hasErrors(diagnostics)) return [];
 			if (output === selectedText) return [];
 			return [vscode.TextEdit.replace(selectedRange, output)];
@@ -125,6 +128,7 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 				const selectedText = doc.getText(selectedRange);
 				const { output, diagnostics } = format(selectedText, {
 					style: pick.mode,
+					skipValidation: true,
 				});
 				if (hasErrors(diagnostics) || output === selectedText) return;
 				await editor.edit((eb) => eb.replace(selectedRange, output));

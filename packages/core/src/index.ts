@@ -133,6 +133,7 @@ export function analyze(source: string): AnalyzeResult {
 
 export interface FormatOptions {
 	style?: "flat" | "flows";
+	skipValidation?: boolean;
 }
 
 export function format(source: string, opts: FormatOptions = {}): FormatResult {
@@ -158,7 +159,9 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 		diagnostics: normDiags,
 	} = normalize(document, frontmatter);
 	const graph = buildGraph(edges, nodeKinds);
-	const valDiags = validate(edges, nodeKinds, frontmatter);
+	const valDiags = opts.skipValidation
+		? []
+		: validate(edges, nodeKinds, frontmatter);
 	const sorted = sortEdges(edges, graph);
 	const isolated = sortIsolated(isolatedNodes);
 	const formattedBody =
