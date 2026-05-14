@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatAsFlows, formatEdges } from "./formatter.js";
+import {
+	formatAsFlows,
+	formatEdges,
+	splitBodyIntoSegments,
+} from "./formatter.js";
 import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
@@ -82,6 +86,68 @@ describe("formatEdges", () => {
 	it("isolated-only (no edges) output", () => {
 		const result = formatEdges([], ["lone"]);
 		expect(result).toBe("lone\n");
+	});
+});
+
+describe("splitBodyIntoSegments", () => {
+	it("empty string → empty array", () => {
+		expect(splitBodyIntoSegments("")).toEqual([]);
+	});
+
+	it("pure edge lines → single edge segment", () => {
+		expect(splitBodyIntoSegments("A >> P\nP -> B\n")).toEqual([
+			{ kind: "edges", text: "A >> P\nP -> B\n" },
+		]);
+	});
+
+	it("comment-only body → single comment segment", () => {
+		expect(splitBodyIntoSegments("# hello\n")).toEqual([
+			{ kind: "comment", text: "# hello\n" },
+		]);
+	});
+
+	it("blank line alone → comment segment", () => {
+		expect(splitBodyIntoSegments("\n")).toEqual([
+			{ kind: "comment", text: "\n" },
+		]);
+	});
+
+	it("comment before edges → [comment, edges]", () => {
+		expect(splitBodyIntoSegments("# section\nA >> P\n")).toEqual([
+			{ kind: "comment", text: "# section\n" },
+			{ kind: "edges", text: "A >> P\n" },
+		]);
+	});
+
+	it("edges then comment → [edges, comment]", () => {
+		expect(splitBodyIntoSegments("A >> P\n# tail\n")).toEqual([
+			{ kind: "edges", text: "A >> P\n" },
+			{ kind: "comment", text: "# tail\n" },
+		]);
+	});
+
+	it("comment between edge blocks → three segments", () => {
+		expect(splitBodyIntoSegments("A >> P\n# mid\nP -> B\n")).toEqual([
+			{ kind: "edges", text: "A >> P\n" },
+			{ kind: "comment", text: "# mid\n" },
+			{ kind: "edges", text: "P -> B\n" },
+		]);
+	});
+
+	it("blank line between edge blocks is treated as comment separator", () => {
+		expect(splitBodyIntoSegments("A >> P\n\nP -> B\n")).toEqual([
+			{ kind: "edges", text: "A >> P\n" },
+			{ kind: "comment", text: "\n" },
+			{ kind: "edges", text: "P -> B\n" },
+		]);
+	});
+
+	it("inline comment after edge is part of edge segment (not split)", () => {
+		// Lines starting with # are comment; lines not starting with # are edges
+		// "A >> P # note" doesn't start with # → edge segment
+		expect(splitBodyIntoSegments("A >> P # note\n")).toEqual([
+			{ kind: "edges", text: "A >> P # note\n" },
+		]);
 	});
 });
 

@@ -1,5 +1,33 @@
 import type { NormalizedEdge } from "./types/index.js";
 
+export type BodySegment =
+	| { kind: "edges"; text: string }
+	| { kind: "comment"; text: string };
+
+export function splitBodyIntoSegments(body: string): BodySegment[] {
+	if (body === "") return [];
+	const lines = body.split("\n");
+	// split("\n") on "A\nB\n" gives ["A", "B", ""] — trailing empty is not a real line
+	const hasTrailingNewline = body.endsWith("\n");
+	const realLines = hasTrailingNewline ? lines.slice(0, -1) : lines;
+
+	const segments: BodySegment[] = [];
+	let current: BodySegment | null = null;
+
+	for (const line of realLines) {
+		const isComment = line === "" || line.startsWith("#");
+		const kind: BodySegment["kind"] = isComment ? "comment" : "edges";
+		if (current && current.kind === kind) {
+			current.text += `${line}\n`;
+		} else {
+			if (current) segments.push(current);
+			current = { kind, text: `${line}\n` };
+		}
+	}
+	if (current) segments.push(current);
+	return segments;
+}
+
 export function formatEdges(
 	sortedEdges: NormalizedEdge[],
 	sortedIsolated: string[] = [],

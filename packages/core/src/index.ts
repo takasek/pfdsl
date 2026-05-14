@@ -1,4 +1,8 @@
-import { formatAsFlows, formatEdges } from "./formatter.js";
+import {
+	formatAsFlows,
+	formatEdges,
+	splitBodyIntoSegments,
+} from "./formatter.js";
 import { loadFrontmatter } from "./frontmatter.js";
 import { buildGraph } from "./graph.js";
 import { lex } from "./lexer.js";
@@ -143,6 +147,8 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 		diagnostics: fmDiags,
 		bodyStartLine,
 	} = loadFrontmatter(source);
+
+	// Parse full body for diagnostics and nodeKinds (needed for per-segment sort)
 	const { tokens, diagnostics: lexDiags } = lex(body);
 	const lineOffset = bodyStartLine - 1;
 	if (lineOffset > 0) {
@@ -155,20 +161,34 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	const {
 		edges,
 		nodeKinds,
-		isolatedNodes,
 		diagnostics: normDiags,
 	} = normalize(document, frontmatter);
-	const graph = buildGraph(edges, nodeKinds);
 	const valDiags = opts.skipValidation
 		? []
 		: validate(edges, nodeKinds, frontmatter);
-	const sorted = sortEdges(edges, graph);
-	const isolated = sortIsolated(isolatedNodes);
-	const formattedBody =
-		opts.style === "flows"
-			? formatAsFlows(sorted, isolated)
-			: formatEdges(sorted, isolated);
+
 	const frontmatterSection = source.slice(0, source.length - body.length);
+
+	// Format segment by segment to preserve comment lines
+	const segments = splitBodyIntoSegments(body);
+	const formattedBody = segments
+		.map((seg) => {
+			if (seg.kind === "comment") return seg.text;
+			const { tokens: segToks } = lex(seg.text);
+			const { document: segDoc } = parseTokens(segToks);
+			const { edges: segEdges, isolatedNodes: segIsolated } = normalize(
+				segDoc,
+				frontmatter,
+			);
+			const segGraph = buildGraph(segEdges, nodeKinds);
+			const segSorted = sortEdges(segEdges, segGraph);
+			const segIso = sortIsolated(segIsolated);
+			return opts.style === "flows"
+				? formatAsFlows(segSorted, segIso)
+				: formatEdges(segSorted, segIso);
+		})
+		.join("");
+
 	return {
 		output: frontmatterSection + formattedBody,
 		diagnostics: [

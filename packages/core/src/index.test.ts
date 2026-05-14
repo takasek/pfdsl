@@ -48,4 +48,28 @@ describe("public API", () => {
 		const { output: second } = format(first);
 		expect(second).toBe(first);
 	});
+
+	it("format: preserves comment lines in place", () => {
+		const src = "# section A\nA >> P\nP -> B\n";
+		const { output } = format(src, { style: "flows" });
+		expect(output).toBe("# section A\nA >> P -> B\n");
+	});
+
+	it("format: preserves comment between two edge blocks", () => {
+		const src = "A >> P\nP -> B\n# separator\nX >> Q\nQ -> Y\n";
+		const { output } = format(src, { style: "flows" });
+		expect(output).toBe("A >> P -> B\n# separator\nX >> Q -> Y\n");
+	});
+
+	it("format: preserves trailing comment", () => {
+		const src = "A >> P\nP -> B\n# end\n";
+		const { output } = format(src, { style: "flat" });
+		expect(output).toBe("A >> P\nP -> B\n# end\n");
+	});
+
+	it("format: comment-only body passes through unchanged", () => {
+		const src = "# just a comment\n";
+		const { output } = format(src);
+		expect(output).toBe("# just a comment\n");
+	});
 });
