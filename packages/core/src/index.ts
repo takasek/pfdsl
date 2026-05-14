@@ -131,7 +131,11 @@ export function analyze(source: string): AnalyzeResult {
 	};
 }
 
-export function format(source: string): FormatResult {
+export interface FormatOptions {
+	style?: "flat" | "flows";
+}
+
+export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	const {
 		frontmatter,
 		body,
@@ -157,7 +161,10 @@ export function format(source: string): FormatResult {
 	const valDiags = validate(edges, nodeKinds, frontmatter);
 	const sorted = sortEdges(edges, graph);
 	const isolated = sortIsolated(isolatedNodes);
-	const formattedBody = formatEdges(sorted, isolated);
+	const formattedBody =
+		opts.style === "flows"
+			? formatAsFlows(sorted, isolated)
+			: formatEdges(sorted, isolated);
 	const frontmatterSection = source.slice(0, source.length - body.length);
 	return {
 		output: frontmatterSection + formattedBody,

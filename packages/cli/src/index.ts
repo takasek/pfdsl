@@ -57,10 +57,13 @@ export function runCheck(file: string): CommandResult {
 
 export interface FmtOptions {
 	write?: boolean;
+	flows?: boolean;
 }
 export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	const source = readSource(file);
-	const { output, diagnostics } = format(source);
+	const { output, diagnostics } = format(source, {
+		style: opts.flows ? "flows" : "flat",
+	});
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
 	if (opts.write) {
@@ -156,7 +159,8 @@ export const HELP = `pfdsl <command> [options]
 
 Commands:
   check <file>             Validate a .pfdsl file
-  fmt <file> [--write]     Format a .pfdsl file (prints to stdout, or rewrites with --write)
+  fmt <file> [--write] [--flows]
+                           Format a .pfdsl file; --flows groups per-process (A >> P -> B)
   normalize <file>         Print canonical edge list
   graph <file> [--format dot|svg]
                            Print Graphviz DOT (default) or SVG
@@ -206,8 +210,11 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 		}
 		case "fmt": {
 			const f = positional[0];
-			if (!f) return fail("usage: pfdsl fmt <file> [--write]\n", 2);
-			return runFmt(f, { write: flags.write === true });
+			if (!f) return fail("usage: pfdsl fmt <file> [--write] [--flows]\n", 2);
+			return runFmt(f, {
+				write: flags.write === true,
+				flows: flags.flows === true,
+			});
 		}
 		case "normalize": {
 			const f = positional[0];

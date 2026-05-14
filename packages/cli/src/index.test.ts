@@ -54,12 +54,17 @@ describe("check", () => {
 });
 
 describe("fmt", () => {
-	it("prints canonical formatted output to stdout", async () => {
+	it("prints flat formatted output to stdout (default)", async () => {
 		const r = await run(["fmt", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe(
 			"req >> design\ndesign -> spec\nspec >> impl\nimpl -> code\n",
 		);
+	});
+	it("--flows groups each process with its inputs and outputs", async () => {
+		const r = await run(["fmt", join(dir, "valid.pfdsl"), "--flows"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("req >> design -> spec\nspec >> impl -> code\n");
 	});
 	it("--write rewrites the file", async () => {
 		const f = join(dir, "fmt-write.pfdsl");
