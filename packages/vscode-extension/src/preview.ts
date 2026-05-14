@@ -57,6 +57,16 @@ function nodeIdAtCursor(
 	return undefined;
 }
 
+type MessageToWebview =
+	| {
+			type: "render";
+			dot: string;
+			focusNodeId?: string;
+			descriptions?: Record<string, string>;
+	  }
+	| { type: "error"; message: string }
+	| { type: "focus"; nodeId: string };
+
 type MessageFromWebview =
 	| { type: "ready" }
 	| { type: "nodeClick"; nodeId: string };
@@ -250,6 +260,20 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 		vscode.workspace.onDidChangeTextDocument((e) => {
 			if (current && e.document === current.doc) {
 				sendUpdate(current);
+			}
+		}),
+
+		vscode.window.onDidChangeTextEditorSelection((e) => {
+			if (!current || e.textEditor.document !== current.doc) return;
+			const sel = e.selections[0];
+			if (!sel) return;
+			const result = analyzeDocument(current.doc);
+			const nodeId = nodeIdAtCursor(result, sel.active);
+			if (nodeId) {
+				current.panel.webview.postMessage({
+					type: "focus",
+					nodeId,
+				} satisfies MessageToWebview);
 			}
 		}),
 	);
