@@ -213,6 +213,10 @@ window.addEventListener("message", async (event) => {
 				centerGraph();
 				if (focusNodeId) focusNode(focusNodeId);
 			});
+		} else if (lastFocusedNodeId) {
+			requestAnimationFrame(() => {
+				if (lastFocusedNodeId) focusNode(lastFocusedNodeId);
+			});
 		}
 	} catch (e) {
 		log("render error:", (e as Error).message);
