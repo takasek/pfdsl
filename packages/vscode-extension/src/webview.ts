@@ -100,12 +100,10 @@ function centerGraph() {
 function focusNode(nodeId: string) {
 	const nodes = inner.querySelectorAll("g.node");
 	for (const node of nodes) {
-		node.classList.remove("pfdsl-focused");
-	}
-	lastFocusedNodeId = nodeId;
-	for (const node of nodes) {
 		const title = node.querySelector("title");
 		if (title?.textContent === nodeId) {
+			for (const n of nodes) n.classList.remove("pfdsl-focused");
+			lastFocusedNodeId = nodeId;
 			node.classList.add("pfdsl-focused");
 			const nodeRect = node.getBoundingClientRect();
 			const rootRect = root.getBoundingClientRect();
