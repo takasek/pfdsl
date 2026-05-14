@@ -62,7 +62,7 @@ export interface FmtOptions {
 export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	const source = readSource(file);
 	const { output, diagnostics } = format(source, {
-		style: opts.mode ?? "flat",
+		style: opts.mode ?? "flows",
 	});
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
