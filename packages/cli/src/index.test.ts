@@ -61,10 +61,21 @@ describe("fmt", () => {
 			"req >> design\ndesign -> spec\nspec >> impl\nimpl -> code\n",
 		);
 	});
-	it("--flows groups each process with its inputs and outputs", async () => {
-		const r = await run(["fmt", join(dir, "valid.pfdsl"), "--flows"]);
+	it("--mode flows groups each process with its inputs and outputs", async () => {
+		const r = await run(["fmt", join(dir, "valid.pfdsl"), "--mode", "flows"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("req >> design -> spec\nspec >> impl -> code\n");
+	});
+	it("--mode flat is explicit flat (same as default)", async () => {
+		const r = await run(["fmt", join(dir, "valid.pfdsl"), "--mode", "flat"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"req >> design\ndesign -> spec\nspec >> impl\nimpl -> code\n",
+		);
+	});
+	it("--mode unknown rejects", async () => {
+		const r = await run(["fmt", join(dir, "valid.pfdsl"), "--mode", "pretty"]);
+		expect(r.exitCode).toBe(2);
 	});
 	it("--write rewrites the file", async () => {
 		const f = join(dir, "fmt-write.pfdsl");

@@ -57,12 +57,12 @@ export function runCheck(file: string): CommandResult {
 
 export interface FmtOptions {
 	write?: boolean;
-	flows?: boolean;
+	mode?: "flat" | "flows";
 }
 export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	const source = readSource(file);
 	const { output, diagnostics } = format(source, {
-		style: opts.flows ? "flows" : "flat",
+		style: opts.mode ?? "flat",
 	});
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
@@ -159,8 +159,8 @@ export const HELP = `pfdsl <command> [options]
 
 Commands:
   check <file>             Validate a .pfdsl file
-  fmt <file> [--write] [--flows]
-                           Format a .pfdsl file; --flows groups per-process (A >> P -> B)
+  fmt <file> [--write] [--mode flat|flows]
+                           Format a .pfdsl file; flows groups per-process (A >> P -> B)
   normalize <file>         Print canonical edge list
   graph <file> [--format dot|svg]
                            Print Graphviz DOT (default) or SVG
@@ -210,10 +210,18 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 		}
 		case "fmt": {
 			const f = positional[0];
-			if (!f) return fail("usage: pfdsl fmt <file> [--write] [--flows]\n", 2);
+			if (!f)
+				return fail(
+					"usage: pfdsl fmt <file> [--write] [--mode flat|flows]\n",
+					2,
+				);
+			const mode = flags.mode;
+			if (mode !== undefined && mode !== "flat" && mode !== "flows") {
+				return fail(`unknown mode: ${String(mode)}\n`, 2);
+			}
 			return runFmt(f, {
 				write: flags.write === true,
-				flows: flags.flows === true,
+				mode: mode || undefined,
 			});
 		}
 		case "normalize": {
