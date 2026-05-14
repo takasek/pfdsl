@@ -314,8 +314,9 @@ function nodeAttrs(
 	boundaryArtifacts: Set<string> = new Set(),
 ): string {
 	const shape = kind === "process" ? "ellipse" : "box";
-	const nodeLabel = lookupLabel(id, kind, fm);
-	const description = lookupDescription(id, kind, fm);
+	const meta = lookupMeta(id, kind, fm);
+	const nodeLabel = meta?.label;
+	const description = meta?.description;
 
 	const maxWidth =
 		typeof fm?.layout?.maxWidth === "number" ? fm.layout.maxWidth : undefined;
@@ -388,24 +389,13 @@ function resolveStyleAttrs(
 	return styleAttrs;
 }
 
-function lookupLabel(
+function lookupMeta(
 	id: string,
 	kind: NodeKind,
 	fm: Frontmatter | null,
-): string | undefined {
+): { label?: string; description?: string } | undefined {
 	if (!fm) return undefined;
-	const meta = kind === "process" ? fm.process?.[id] : fm.artifact?.[id];
-	return meta?.label;
-}
-
-function lookupDescription(
-	id: string,
-	kind: NodeKind,
-	fm: Frontmatter | null,
-): string | undefined {
-	if (!fm) return undefined;
-	const meta = kind === "process" ? fm.process?.[id] : fm.artifact?.[id];
-	return meta?.description;
+	return kind === "process" ? fm.process?.[id] : fm.artifact?.[id];
 }
 
 function quote(s: string): string {
