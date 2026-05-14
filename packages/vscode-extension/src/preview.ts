@@ -115,6 +115,9 @@ function buildHtml(
   #inner { position: absolute; top: 0; left: 0; }
   .err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
   #tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 320px; pointer-events: none; display: none; z-index: 100; white-space: pre-wrap; word-break: break-word; }
+  g.node.pfdsl-focused ellipse,
+  g.node.pfdsl-focused polygon,
+  g.node.pfdsl-focused path { filter: drop-shadow(0 0 5px currentColor); stroke-width: 2.5; }
 </style>
 <script>window.__PFDSL_DEBUG__ = ${isDebug};</script>
 </head>
