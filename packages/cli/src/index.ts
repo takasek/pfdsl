@@ -221,7 +221,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			}
 			return runFmt(f, {
 				write: flags.write === true,
-				mode: mode || undefined,
+				...(mode ? { mode } : {}),
 			});
 		}
 		case "normalize": {
