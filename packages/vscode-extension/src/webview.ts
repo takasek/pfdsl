@@ -7,7 +7,8 @@ type MessageToWebview =
 			focusNodeId?: string;
 			descriptions?: Record<string, string>;
 	  }
-	| { type: "error"; message: string };
+	| { type: "error"; message: string }
+	| { type: "focus"; nodeId: string };
 
 type MessageFromWebview =
 	| { type: "ready" }
@@ -186,6 +187,10 @@ window.addEventListener("message", async (event) => {
 	log("message received:", msg.type);
 	if (msg.type === "error") {
 		inner.innerHTML = `<div class="err">${escapeHtml(msg.message)}</div>`;
+		return;
+	}
+	if (msg.type === "focus") {
+		focusNode(msg.nodeId);
 		return;
 	}
 	if (msg.type !== "render") return;
