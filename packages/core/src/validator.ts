@@ -41,13 +41,9 @@ export function validate(
 	const processInputCount = new Map<string, number>();
 	const processOutputCount = new Map<string, number>();
 	for (const e of edges) {
-		const p = e.kind === "output" ? e.process : e.process;
-		if (!processInputCount.has(p)) {
-			processInputCount.set(p, 0);
-			processOutputCount.set(p, 0);
-		}
-	}
-	for (const e of edges) {
+		if (!processInputCount.has(e.process)) processInputCount.set(e.process, 0);
+		if (!processOutputCount.has(e.process))
+			processOutputCount.set(e.process, 0);
 		if (e.kind === "input" || e.kind === "feedback") {
 			processInputCount.set(
 				e.process,
