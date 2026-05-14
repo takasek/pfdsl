@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatEdges } from "./formatter.js";
+import { formatAsFlows, formatEdges } from "./formatter.js";
 import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
@@ -82,5 +82,78 @@ describe("formatEdges", () => {
 	it("isolated-only (no edges) output", () => {
 		const result = formatEdges([], ["lone"]);
 		expect(result).toBe("lone\n");
+	});
+});
+
+describe("formatAsFlows", () => {
+	it("empty → empty string", () => {
+		expect(formatAsFlows([])).toBe("");
+	});
+
+	it("input + output for same process → single chained line", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "A", process: "P" },
+			{ kind: "output", process: "P", artifact: "B" },
+		];
+		expect(formatAsFlows(edges)).toBe("A >> P -> B\n");
+	});
+
+	it("multiple inputs → comma-separated", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "A", process: "P" },
+			{ kind: "input", artifact: "B", process: "P" },
+			{ kind: "output", process: "P", artifact: "C" },
+		];
+		expect(formatAsFlows(edges)).toBe("A, B >> P -> C\n");
+	});
+
+	it("multiple outputs → comma-separated", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "A", process: "P" },
+			{ kind: "output", process: "P", artifact: "B" },
+			{ kind: "output", process: "P", artifact: "C" },
+		];
+		expect(formatAsFlows(edges)).toBe("A >> P -> B, C\n");
+	});
+
+	it("input-only process (sink) → artifact >> process", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "A", process: "P" },
+		];
+		expect(formatAsFlows(edges)).toBe("A >> P\n");
+	});
+
+	it("output-only process (source) → process -> artifact", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "output", process: "P", artifact: "B" },
+		];
+		expect(formatAsFlows(edges)).toBe("P -> B\n");
+	});
+
+	it("feedback edge → separate line before main statement", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "A", process: "P" },
+			{ kind: "feedback", artifact: "X", process: "P" },
+			{ kind: "output", process: "P", artifact: "B" },
+		];
+		expect(formatAsFlows(edges)).toBe("X >>? P\nA >> P -> B\n");
+	});
+
+	it("two processes maintain order", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "A", process: "P1" },
+			{ kind: "output", process: "P1", artifact: "B" },
+			{ kind: "input", artifact: "B", process: "P2" },
+			{ kind: "output", process: "P2", artifact: "C" },
+		];
+		expect(formatAsFlows(edges)).toBe("A >> P1 -> B\nB >> P2 -> C\n");
+	});
+
+	it("isolated nodes after flows", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "A", process: "P" },
+			{ kind: "output", process: "P", artifact: "B" },
+		];
+		expect(formatAsFlows(edges, ["lone"])).toBe("A >> P -> B\nlone\n");
 	});
 });

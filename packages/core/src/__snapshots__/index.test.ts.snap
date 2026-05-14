@@ -1,7 +1,202 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`public API > format: matches golden canonical output for sample file (locks spec §14 ordering) 1`] = `
-"spec_v0_0_2 >> define_architecture
+"---
+title: PFDSL 実装計画フロー
+version: 0.3
+dsl_version: 0.0.3
+description: PFDSL 仕様に基づくツールチェーン実装のプロセスフロー記述
+tags: [implementation, roadmap]
+
+layout:
+  direction: TB
+
+statusStyles:
+  done:    { fillcolor: lightgray, style: filled, fontcolor: dimgray }
+  wip:     { fillcolor: lightyellow, style: filled }
+  todo:    { fillcolor: white, style: filled }
+  blocked: { fillcolor: salmon, style: filled }
+
+artifact:
+  spec_v0_0_2:
+    label: PFDSL仕様書 v0.0.2
+    status: done
+  core_architecture:
+    label: コアアーキテクチャ文書
+    status: done
+  repo_scaffold:
+    label: リポジトリ骨格
+    status: done
+  build_config:
+    label: ビルド設定
+    status: done
+  shared_types:
+    label: 共有型定義
+    status: done
+  token_spec:
+    label: トークン規則
+    status: done
+  ast_schema:
+    label: ASTスキーマ
+    status: done
+  diagnostic_schema:
+    label: 診断スキーマ
+    status: done
+  graph_schema:
+    label: グラフスキーマ
+    status: done
+  lexer:
+    label: Lexer実装
+    status: done
+  frontmatter_loader:
+    label: Frontmatterローダ
+    status: done
+  parser:
+    label: Parser実装
+    status: done
+  normalizer:
+    label: Normalizer実装
+    status: done
+  validator:
+    label: Validator実装
+    status: done
+  canonical_sorter:
+    label: 正準順序ソータ
+    status: done
+  formatter:
+    label: Formatter実装
+    status: done
+  core_modules:
+    label: コアモジュール群
+    parts: [lexer, frontmatter_loader, parser, normalizer, validator, canonical_sorter, formatter]
+    status: done
+  core_library:
+    label: コアライブラリ (@pfdsl/core)
+    status: done
+  group_types:
+    label: GroupMeta型定義 (v0.0.5)
+    status: done
+  group_subgraph_export:
+    label: subgraph cluster エクスポート (v0.0.5)
+    status: done
+  graphviz_exporter:
+    label: Graphvizエクスポータ
+    status: done
+  preview_engine:
+    label: プレビューエンジン
+    status: done
+  vscode_shell:
+    label: VSCode拡張シェル
+    status: done
+  language_service:
+    label: 言語サービス (LSP)
+    status: done
+  preview_panel:
+    label: プレビューパネル
+    status: done
+  format_command:
+    label: フォーマットコマンド
+    status: done
+  hover_support:
+    label: ホバーサポート
+    status: done
+  diagnostics_ui:
+    label: 診断UI
+    status: done
+  syntax_highlight:
+    label: シンタックスハイライト
+    status: done
+  vscode_extension:
+    label: VSCode拡張統合
+    status: done
+  rc_extension:
+    label: リリース候補版
+    status: todo
+  published_extension:
+    label: 公開版拡張
+    status: todo
+  workflow_usage:
+    label: 日常運用知見
+    status: todo
+  cli_tool:
+    label: CLIツール
+    status: done
+  ci_integration:
+    label: CI連携
+    status: todo
+  diff_analyzer:
+    label: 差分解析ツール
+    status: todo
+
+process:
+  define_architecture:
+    label: アーキテクチャ定義
+  define_repo_structure:
+    label: リポジトリ構造設計
+  define_build_policy:
+    label: ビルドポリシー策定
+  define_shared_types:
+    label: 共有型定義
+  define_token_rules:
+    label: トークン規則定義
+  define_ast_schema:
+    label: ASTスキーマ定義
+  define_diagnostic_schema:
+    label: 診断スキーマ定義
+  define_graph_schema:
+    label: グラフスキーマ定義
+  implement_lexer:
+    label: Lexer実装
+  implement_frontmatter_loader:
+    label: Frontmatterローダ実装
+  implement_parser:
+    label: Parser実装
+  implement_normalizer:
+    label: Normalizer実装
+  implement_validator:
+    label: Validator実装
+  implement_canonical_sorter:
+    label: 正準順序ソータ実装
+  implement_formatter:
+    label: Formatter実装
+  integrate_core_modules:
+    label: コアモジュール統合
+  package_core_library:
+    label: コアライブラリパッケージング
+  implement_graphviz_exporter:
+    label: Graphvizエクスポータ実装
+  implement_preview_engine:
+    label: プレビューエンジン実装
+  create_vscode_extension_shell:
+    label: VSCode拡張シェル作成
+  implement_language_service:
+    label: 言語サービス実装
+  implement_preview_panel:
+    label: プレビューパネル実装
+  implement_format_command:
+    label: フォーマットコマンド実装
+  implement_hover_support:
+    label: ホバーサポート実装
+  implement_diagnostics_ui:
+    label: 診断UI実装
+  implement_syntax_highlight:
+    label: シンタックスハイライト実装
+  integrate_vscode_extension:
+    label: VSCode拡張統合
+  package_release_candidate:
+    label: RCパッケージング
+  release_marketplace:
+    label: Marketplace公開
+  adopt_daily_workflow:
+    label: 日常ワークフロー導入
+  implement_cli_wrapper:
+    label: CLIラッパー実装
+  implement_ci_actions:
+    label: CI Actions実装
+  implement_diff_analysis:
+    label: 差分解析実装
+---
+spec_v0_0_2 >> define_architecture
 define_architecture -> core_architecture
 core_architecture >> define_ast_schema
 core_architecture >> define_build_policy

@@ -1,4 +1,4 @@
-import { formatEdges } from "./formatter.js";
+import { formatAsFlows, formatEdges } from "./formatter.js";
 import { loadFrontmatter } from "./frontmatter.js";
 import { buildGraph } from "./graph.js";
 import { lex } from "./lexer.js";
@@ -98,6 +98,7 @@ export function parse(source: string): ParseDocResult {
 
 export {
 	buildGraph,
+	formatAsFlows,
 	formatEdges,
 	normalize as normalizeDocument,
 	sortEdges,
@@ -131,7 +132,21 @@ export function analyze(source: string): AnalyzeResult {
 }
 
 export function format(source: string): FormatResult {
-	const { document, frontmatter, diagnostics: parseDiags } = parse(source);
+	const {
+		frontmatter,
+		body,
+		diagnostics: fmDiags,
+		bodyStartLine,
+	} = loadFrontmatter(source);
+	const { tokens, diagnostics: lexDiags } = lex(body);
+	const lineOffset = bodyStartLine - 1;
+	if (lineOffset > 0) {
+		for (const t of tokens) {
+			t.start.line += lineOffset;
+			t.end.line += lineOffset;
+		}
+	}
+	const { document, diagnostics: parseDiags } = parseTokens(tokens);
 	const {
 		edges,
 		nodeKinds,
@@ -142,8 +157,16 @@ export function format(source: string): FormatResult {
 	const valDiags = validate(edges, nodeKinds, frontmatter);
 	const sorted = sortEdges(edges, graph);
 	const isolated = sortIsolated(isolatedNodes);
+	const formattedBody = formatEdges(sorted, isolated);
+	const frontmatterSection = source.slice(0, source.length - body.length);
 	return {
-		output: formatEdges(sorted, isolated),
-		diagnostics: [...parseDiags, ...normDiags, ...valDiags],
+		output: frontmatterSection + formattedBody,
+		diagnostics: [
+			...fmDiags,
+			...lexDiags,
+			...parseDiags,
+			...normDiags,
+			...valDiags,
+		],
 	};
 }
