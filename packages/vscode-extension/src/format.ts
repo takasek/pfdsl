@@ -107,18 +107,41 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 			if (!pick) return;
 
 			const doc = editor.document;
-			const source = doc.getText();
-			const { frontmatter } = extractFrontmatter(source);
-			const body = buildFormattedBody(doc, pick.mode);
-			if (body === null) return;
-			const output = frontmatter + body;
-			if (output === source) return;
+			const sel = editor.selection;
 
-			const fullRange = new vscode.Range(
-				doc.positionAt(0),
-				doc.positionAt(source.length),
-			);
-			await editor.edit((eb) => eb.replace(fullRange, output));
+			if (!sel.isEmpty) {
+				// Format selection only
+				const source = doc.getText();
+				const { frontmatter } = extractFrontmatter(source);
+				const frontmatterLineCount = frontmatter
+					? frontmatter.split("\n").length - 1
+					: 0;
+				if (sel.end.line < frontmatterLineCount) return;
+				const startLine = Math.max(sel.start.line, frontmatterLineCount);
+				const selectedRange = new vscode.Range(
+					new vscode.Position(startLine, 0),
+					doc.lineAt(sel.end.line).rangeIncludingLineBreak.end,
+				);
+				const selectedText = doc.getText(selectedRange);
+				const { output, diagnostics } = format(selectedText, {
+					style: pick.mode,
+				});
+				if (hasErrors(diagnostics) || output === selectedText) return;
+				await editor.edit((eb) => eb.replace(selectedRange, output));
+			} else {
+				// Format whole document
+				const source = doc.getText();
+				const { frontmatter } = extractFrontmatter(source);
+				const body = buildFormattedBody(doc, pick.mode);
+				if (body === null) return;
+				const output = frontmatter + body;
+				if (output === source) return;
+				const fullRange = new vscode.Range(
+					doc.positionAt(0),
+					doc.positionAt(source.length),
+				);
+				await editor.edit((eb) => eb.replace(fullRange, output));
+			}
 		}),
 	);
 }
