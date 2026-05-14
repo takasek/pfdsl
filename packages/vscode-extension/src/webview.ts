@@ -42,6 +42,7 @@ const inner = document.getElementById("inner") as HTMLDivElement;
 const tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
 let descriptions: Record<string, string> = {};
+let lastFocusedNodeId: string | undefined;
 
 root.addEventListener("mousemove", (e) => {
 	const node = (e.target as Element).closest?.("g.node");
@@ -98,8 +99,13 @@ function centerGraph() {
 function focusNode(nodeId: string) {
 	const nodes = inner.querySelectorAll("g.node");
 	for (const node of nodes) {
+		node.classList.remove("pfdsl-focused");
+	}
+	lastFocusedNodeId = nodeId;
+	for (const node of nodes) {
 		const title = node.querySelector("title");
 		if (title?.textContent === nodeId) {
+			node.classList.add("pfdsl-focused");
 			const nodeRect = node.getBoundingClientRect();
 			const rootRect = root.getBoundingClientRect();
 			panX +=
