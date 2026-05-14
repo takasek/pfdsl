@@ -1,16 +1,10 @@
-import { Graphviz } from "@hpcc-js/wasm";
 import { formatEdges, sortEdges } from "@pfdsl/core";
 import { exportDot } from "@pfdsl/graphviz-exporter";
 import { extractMetadata, toTsv } from "@pfdsl/metadata-exporter";
+import { renderDotToSvg } from "@pfdsl/preview-engine";
 import * as vscode from "vscode";
 import { analyzeDocument } from "./analyze.js";
 import { requireActivePfdslEditor } from "./utils.js";
-
-let gv: Awaited<ReturnType<typeof Graphviz.load>> | null = null;
-async function getGraphviz() {
-	if (!gv) gv = await Graphviz.load();
-	return gv;
-}
 
 const outputChannel = vscode.window.createOutputChannel("PFDSL");
 
@@ -52,7 +46,6 @@ export function registerExport(context: vscode.ExtensionContext): void {
 				});
 				if (!dirUri) return;
 				const stem = dirUri.fsPath.replace(/\.[^.]+$/, "");
-				const g = await getGraphviz();
 				await Promise.all([
 					vscode.workspace.fs.writeFile(
 						vscode.Uri.file(`${stem}.dot`),
@@ -60,7 +53,7 @@ export function registerExport(context: vscode.ExtensionContext): void {
 					),
 					vscode.workspace.fs.writeFile(
 						vscode.Uri.file(`${stem}.svg`),
-						Buffer.from(g.dot(dot, "svg"), "utf8"),
+						Buffer.from(await renderDotToSvg(dot), "utf8"),
 					),
 					vscode.workspace.fs.writeFile(
 						vscode.Uri.file(`${stem}.tsv`),
@@ -84,8 +77,7 @@ export function registerExport(context: vscode.ExtensionContext): void {
 			if (ext === ".dot") {
 				content = Buffer.from(dot, "utf8");
 			} else if (ext === ".svg") {
-				const g = await getGraphviz();
-				content = Buffer.from(g.dot(dot, "svg"), "utf8");
+				content = Buffer.from(await renderDotToSvg(dot), "utf8");
 			} else {
 				content = Buffer.from(tsvContent, "utf8");
 			}

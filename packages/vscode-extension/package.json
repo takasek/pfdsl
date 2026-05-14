@@ -79,7 +79,8 @@
 		"@hpcc-js/wasm": "^2.18.0",
 		"@pfdsl/core": "workspace:*",
 		"@pfdsl/graphviz-exporter": "workspace:*",
-		"@pfdsl/metadata-exporter": "workspace:*"
+		"@pfdsl/metadata-exporter": "workspace:*",
+		"@pfdsl/preview-engine": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0",
