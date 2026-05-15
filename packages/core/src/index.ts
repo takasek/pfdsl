@@ -19,6 +19,8 @@ import type {
 } from "./types/index.js";
 import { validate } from "./validator.js";
 
+export type { DiffReport } from "./diff.js";
+export { diffGraphs } from "./diff.js";
 export type { LexResult } from "./lexer.js";
 export { ID_PATTERN } from "./lexer.js";
 export type { NormalizeResult } from "./normalizer.js";
