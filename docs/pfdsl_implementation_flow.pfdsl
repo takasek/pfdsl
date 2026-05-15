@@ -108,19 +108,19 @@ artifact:
     status: done
   rc_extension:
     label: リリース候補版
-    status: todo
+    status: done
   published_extension:
     label: 公開版拡張
-    status: todo
+    status: done
   workflow_usage:
     label: 日常運用知見
     status: todo
   cli_tool:
     label: CLIツール
     status: done
-  ci_integration:
-    label: CI連携
-    status: todo
+  metadata_exporter:
+    label: メタデータエクスポータ
+    status: done
   diff_analyzer:
     label: 差分解析ツール
     status: todo
@@ -188,8 +188,8 @@ process:
     label: 日常ワークフロー導入
   implement_cli_wrapper:
     label: CLIラッパー実装
-  implement_ci_actions:
-    label: CI Actions実装
+  implement_metadata_exporter:
+    label: メタデータエクスポータ実装
   implement_diff_analysis:
     label: 差分解析実装
 ---
@@ -274,5 +274,5 @@ workflow_usage >>? implement_preview_engine
 
 # 周辺ツール
 
-[published_extension, cli_tool] >> implement_ci_actions -> ci_integration
+core_library >> implement_metadata_exporter -> metadata_exporter
 [published_extension, cli_tool] >> implement_diff_analysis -> diff_analyzer

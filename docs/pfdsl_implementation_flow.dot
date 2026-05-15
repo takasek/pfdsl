@@ -8,7 +8,6 @@ digraph PFDSL {
   "ast_schema" [shape=box, label="ast_schema\nASTスキーマ", width=1.40, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "build_config" [shape=box, label="build_config\nビルド設定", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "canonical_sorter" [shape=box, label="canonical_sorter\n正準順序ソータ", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "ci_integration" [shape=box, label="ci_integration\nCI連携", width=1.70, xlabel="todo", fillcolor="white", style="filled", penwidth="2"];
   "cli_tool" [shape=box, label="cli_tool\nCLIツール", width=1.20, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "core_architecture" [shape=box, label="core_architecture\nコアアーキテクチャ文書", width=2.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "core_library" [shape=box, label="core_library\nコアライブラリ (@pfdsl/core)", width=3.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
@@ -34,7 +33,6 @@ digraph PFDSL {
   "group_types" [shape=box, label="group_types\nGroupMeta型定義 (v0.0.5)", width=2.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "hover_support" [shape=box, label="hover_support\nホバーサポート", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "implement_canonical_sorter" [shape=ellipse, label="implement_canonical_sorter\n正準順序ソータ実装", width=2.90];
-  "implement_ci_actions" [shape=ellipse, label="implement_ci_actions\nCI Actions実装", width=2.30];
   "implement_cli_wrapper" [shape=ellipse, label="implement_cli_wrapper\nCLIラッパー実装", width=2.40];
   "implement_diagnostics_ui" [shape=ellipse, label="implement_diagnostics_ui\n診断UI実装", width=2.70];
   "implement_diff_analysis" [shape=ellipse, label="implement_diff_analysis\n差分解析実装", width=2.60];
@@ -47,6 +45,7 @@ digraph PFDSL {
   "implement_hover_support" [shape=ellipse, label="implement_hover_support\nホバーサポート実装", width=2.60];
   "implement_language_service" [shape=ellipse, label="implement_language_service\n言語サービス実装", width=2.90];
   "implement_lexer" [shape=ellipse, label="implement_lexer\nLexer実装", width=1.80];
+  "implement_metadata_exporter" [shape=ellipse, label="implement_metadata_exporter\nメタデータエクスポータ実装", width=3.00];
   "implement_normalizer" [shape=ellipse, label="implement_normalizer\nNormalizer実装", width=2.30];
   "implement_parser" [shape=ellipse, label="implement_parser\nParser実装", width=1.90];
   "implement_preview_engine" [shape=ellipse, label="implement_preview_engine\nプレビューエンジン実装", width=2.70];
@@ -57,14 +56,15 @@ digraph PFDSL {
   "integrate_vscode_extension" [shape=ellipse, label="integrate_vscode_extension\nVSCode拡張統合", width=2.90];
   "language_service" [shape=box, label="language_service\n言語サービス (LSP)", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "lexer" [shape=box, label="lexer\nLexer実装", width=1.20, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
+  "metadata_exporter" [shape=box, label="metadata_exporter\nメタデータエクスポータ", width=2.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "normalizer" [shape=box, label="normalizer\nNormalizer実装", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "package_core_library" [shape=ellipse, label="package_core_library\nコアライブラリパッケージング", width=3.10];
   "package_release_candidate" [shape=ellipse, label="package_release_candidate\nRCパッケージング", width=2.80];
   "parser" [shape=box, label="parser\nParser実装", width=1.30, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "preview_engine" [shape=box, label="preview_engine\nプレビューエンジン", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "preview_panel" [shape=box, label="preview_panel\nプレビューパネル", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "published_extension" [shape=box, label="published_extension\n公開版拡張", width=2.20, xlabel="todo", fillcolor="white", style="filled"];
-  "rc_extension" [shape=box, label="rc_extension\nリリース候補版", width=1.70, xlabel="todo", fillcolor="white", style="filled"];
+  "published_extension" [shape=box, label="published_extension\n公開版拡張", width=2.20, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
+  "rc_extension" [shape=box, label="rc_extension\nリリース候補版", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "release_marketplace" [shape=ellipse, label="release_marketplace\nMarketplace公開", width=2.20];
   "repo_scaffold" [shape=box, label="repo_scaffold\nリポジトリ骨格", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "shared_types" [shape=box, label="shared_types\n共有型定義", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
@@ -171,9 +171,8 @@ digraph PFDSL {
   "release_marketplace" -> "published_extension";
   "published_extension" -> "adopt_daily_workflow";
   "adopt_daily_workflow" -> "workflow_usage";
-  "published_extension" -> "implement_ci_actions";
-  "cli_tool" -> "implement_ci_actions";
-  "implement_ci_actions" -> "ci_integration";
+  "core_library" -> "implement_metadata_exporter";
+  "implement_metadata_exporter" -> "metadata_exporter";
   "published_extension" -> "implement_diff_analysis";
   "cli_tool" -> "implement_diff_analysis";
   "implement_diff_analysis" -> "diff_analyzer";
