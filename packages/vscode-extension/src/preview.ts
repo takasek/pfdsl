@@ -1,5 +1,6 @@
 import type {
 	AnalyzeResult,
+	DiffReport,
 	Frontmatter,
 	IdNode,
 	Statement,
@@ -14,6 +15,7 @@ interface PreviewState {
 	doc: vscode.TextDocument;
 	webviewReady: boolean;
 	pendingFocusNodeId?: string;
+	pendingDiff?: DiffReport | null; // null = clearDiff
 }
 
 function idsOfStatement(stmt: Statement): IdNode[] {
@@ -67,7 +69,9 @@ type MessageToWebview =
 	  }
 	| { type: "error"; message: string }
 	| { type: "focus"; nodeId: string }
-	| { type: "clearFocus" };
+	| { type: "clearFocus" }
+	| { type: "diff"; report: DiffReport }
+	| { type: "clearDiff" };
 
 type MessageFromWebview =
 	| { type: "ready" }
@@ -112,20 +116,24 @@ function buildHtml(
 <meta charset="UTF-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${cspSource} 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:;" />
 <style>
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
-  #root { width: 100%; height: 100%; overflow: hidden; cursor: grab; position: relative; }
-  #inner { position: absolute; top: 0; left: 0; }
-  .err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
-  #tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 320px; pointer-events: none; display: none; z-index: 100; white-space: pre-wrap; word-break: break-word; }
-  g.node.pfdsl-focused ellipse,
-  g.node.pfdsl-focused polygon,
-  g.node.pfdsl-focused path { filter: drop-shadow(0 0 5px currentColor); stroke-width: 2.5; }
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
+body { display: flex; flex-direction: column; }
+#root { flex: 1; min-height: 0; overflow: hidden; cursor: grab; position: relative; }
+#inner { position: absolute; top: 0; left: 0; }
+.err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
+#tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 320px; pointer-events: none; display: none; z-index: 100; white-space: pre-wrap; word-break: break-word; }
+#diff-panel { display: none; flex-shrink: 0; max-height: 200px; overflow-y: auto; padding: 6px 12px; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size, 12px); border-top: 1px solid var(--vscode-panel-border, #333); background: var(--vscode-editor-background); }
+.diff-add { color: var(--vscode-gitDecoration-addedResourceForeground, #4caf50); white-space: pre; }
+.diff-remove { color: var(--vscode-gitDecoration-deletedResourceForeground, #f44336); white-space: pre; }
+.diff-none { color: var(--vscode-descriptionForeground, #888); font-style: italic; }
+g.node.pfdsl-focused ellipse, g.node.pfdsl-focused polygon, g.node.pfdsl-focused path { filter: drop-shadow(0 0 5px currentColor); stroke-width: 2.5; }
 </style>
 <script>window.__PFDSL_DEBUG__ = ${isDebug};</script>
 </head>
 <body>
 <div id="root"><div id="inner"></div></div>
 <div id="tooltip"></div>
+<div id="diff-panel"></div>
 <script type="module" src="${scriptUri}"></script>
 </body>
 </html>`;
@@ -168,7 +176,9 @@ function jumpToNode(doc: vscode.TextDocument, nodeId: string): void {
 	}
 }
 
-export function registerPreview(context: vscode.ExtensionContext): void {
+export function registerPreview(context: vscode.ExtensionContext): {
+	postDiff(report: DiffReport | null): void;
+} {
 	let current: PreviewState | null = null;
 
 	function sendUpdate(state: PreviewState): void {
@@ -188,6 +198,15 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 				focusNodeId,
 				descriptions,
 			});
+		}
+		if ("pendingDiff" in state) {
+			const d = state.pendingDiff;
+			delete state.pendingDiff;
+			state.panel.webview.postMessage(
+				d == null
+					? ({ type: "clearDiff" } satisfies MessageToWebview)
+					: ({ type: "diff", report: d } satisfies MessageToWebview),
+			);
 		}
 	}
 
@@ -239,6 +258,19 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 		});
 		context.subscriptions.push(panel);
 		return state;
+	}
+
+	function postDiff(report: DiffReport | null): void {
+		if (!current) return;
+		if (current.webviewReady) {
+			current.panel.webview.postMessage(
+				report == null
+					? ({ type: "clearDiff" } satisfies MessageToWebview)
+					: ({ type: "diff", report } satisfies MessageToWebview),
+			);
+		} else {
+			current.pendingDiff = report;
+		}
 	}
 
 	context.subscriptions.push(
@@ -293,4 +325,5 @@ export function registerPreview(context: vscode.ExtensionContext): void {
 			}
 		}),
 	);
+	return { postDiff };
 }
