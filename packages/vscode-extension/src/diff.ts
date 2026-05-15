@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import { analyze, type DiffReport, diffGraphs } from "@pfdsl/core";
@@ -36,6 +36,7 @@ export function registerDiff(
 					prompt: "Commit hash, branch, tag, or HEAD~N",
 				});
 				if (ref === undefined) return;
+				if (!ref.trim()) return;
 
 				const workspaceFolder = vscode.workspace.getWorkspaceFolder(
 					editor.document.uri,
@@ -47,17 +48,17 @@ export function registerDiff(
 				const workspaceRoot = workspaceFolder.uri.fsPath;
 				const relPath = relative(workspaceRoot, editor.document.uri.fsPath);
 
-				try {
-					otherContent = execSync(`git show ${ref}:${relPath}`, {
-						cwd: workspaceRoot,
-						encoding: "utf-8",
-					});
-				} catch {
+				const gitResult = spawnSync("git", ["show", `${ref}:${relPath}`], {
+					cwd: workspaceRoot,
+					encoding: "utf-8",
+				});
+				if (gitResult.status !== 0 || gitResult.error) {
 					vscode.window.showErrorMessage(
 						`PFDSL: File not found at ref "${ref}" (${relPath})`,
 					);
 					return;
 				}
+				otherContent = gitResult.stdout;
 			} else {
 				const uris = await vscode.window.showOpenDialog({
 					filters: { "PFDSL files": ["pfdsl"] },
