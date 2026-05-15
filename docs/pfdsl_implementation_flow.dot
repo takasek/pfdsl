@@ -5,9 +5,11 @@ digraph PFDSL {
   labelloc="t";
 
   "adopt_daily_workflow" [shape=ellipse, label="adopt_daily_workflow\n日常ワークフロー導入", width=2.30];
+  "agent_skill" [shape=box, label="agent_skill\nAI agentスキル (pfdsl読み書き)", width=3.30, xlabel="todo", fillcolor="yellow", style="filled", penwidth="2"];
   "ast_schema" [shape=box, label="ast_schema\nASTスキーマ", width=1.40, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "build_config" [shape=box, label="build_config\nビルド設定", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "canonical_sorter" [shape=box, label="canonical_sorter\n正準順序ソータ", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
+  "cli_published" [shape=box, label="cli_published\nCLI npm公開", width=1.60, xlabel="todo", fillcolor="yellow", style="filled", penwidth="2"];
   "cli_tool" [shape=box, label="cli_tool\nCLIツール", width=1.20, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "core_architecture" [shape=box, label="core_architecture\nコアアーキテクチャ文書", width=2.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "core_library" [shape=box, label="core_library\nコアライブラリ (@pfdsl/core)", width=3.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
@@ -23,7 +25,7 @@ digraph PFDSL {
   "define_token_rules" [shape=ellipse, label="define_token_rules\nトークン規則定義", width=2.10];
   "diagnostic_schema" [shape=box, label="diagnostic_schema\n診断スキーマ", width=2.00, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "diagnostics_ui" [shape=box, label="diagnostics_ui\n診断UI", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "diff_analyzer" [shape=box, label="diff_analyzer\n差分解析ツール", width=1.70, xlabel="todo", fillcolor="white", style="filled", penwidth="2"];
+  "diff_analyzer" [shape=box, label="diff_analyzer\n差分解析ツール", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "format_command" [shape=box, label="format_command\nフォーマットコマンド", width=2.30, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "formatter" [shape=box, label="formatter\nFormatter実装", width=1.60, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "frontmatter_loader" [shape=box, label="frontmatter_loader\nFrontmatterローダ", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
@@ -63,6 +65,7 @@ digraph PFDSL {
   "parser" [shape=box, label="parser\nParser実装", width=1.30, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "preview_engine" [shape=box, label="preview_engine\nプレビューエンジン", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "preview_panel" [shape=box, label="preview_panel\nプレビューパネル", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
+  "publish_cli" [shape=ellipse, label="publish_cli\nCLI npm公開", width=1.40];
   "published_extension" [shape=box, label="published_extension\n公開版拡張", width=2.20, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "rc_extension" [shape=box, label="rc_extension\nリリース候補版", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "release_marketplace" [shape=ellipse, label="release_marketplace\nMarketplace公開", width=2.20];
@@ -74,7 +77,8 @@ digraph PFDSL {
   "validator" [shape=box, label="validator\nValidator実装", width=1.60, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "vscode_extension" [shape=box, label="vscode_extension\nVSCode拡張統合", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "vscode_shell" [shape=box, label="vscode_shell\nVSCode拡張シェル", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "workflow_usage" [shape=box, label="workflow_usage\n日常運用知見", width=1.70, xlabel="todo", fillcolor="white", style="filled", penwidth="2"];
+  "workflow_usage" [shape=box, label="workflow_usage\n日常運用知見", width=1.70, xlabel="todo", fillcolor="yellow", style="filled", penwidth="2"];
+  "write_agent_skill" [shape=ellipse, label="write_agent_skill\nAI agentスキル作成", width=2.10];
 
   "spec_v0_0_2" -> "define_architecture";
   "define_architecture" -> "core_architecture";
@@ -173,9 +177,12 @@ digraph PFDSL {
   "adopt_daily_workflow" -> "workflow_usage";
   "core_library" -> "implement_metadata_exporter";
   "implement_metadata_exporter" -> "metadata_exporter";
-  "published_extension" -> "implement_diff_analysis";
   "cli_tool" -> "implement_diff_analysis";
   "implement_diff_analysis" -> "diff_analyzer";
+  "cli_tool" -> "publish_cli";
+  "publish_cli" -> "cli_published";
+  "cli_tool" -> "write_agent_skill";
+  "write_agent_skill" -> "agent_skill";
   "workflow_usage" -> "implement_validator" [style=dashed, color="#888888", constraint=false];
   "workflow_usage" -> "implement_formatter" [style=dashed, color="#888888", constraint=false];
   "workflow_usage" -> "implement_preview_engine" [style=dashed, color="#888888", constraint=false];
