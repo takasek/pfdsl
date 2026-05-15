@@ -57,6 +57,14 @@
 			{
 				"command": "pfdsl.normalize",
 				"title": "PFDSL: Show Normalized Edges"
+			},
+			{
+				"command": "pfdsl.diff",
+				"title": "PFDSL: Diff..."
+			},
+			{
+				"command": "pfdsl.clearDiff",
+				"title": "PFDSL: Clear Diff"
 			}
 		],
 		"menus": {
