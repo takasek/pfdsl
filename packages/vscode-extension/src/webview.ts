@@ -9,7 +9,19 @@ type MessageToWebview =
 	  }
 	| { type: "error"; message: string }
 	| { type: "focus"; nodeId: string }
-	| { type: "clearFocus" };
+	| { type: "clearFocus" }
+	| {
+			type: "diff";
+			report: {
+				addedNodes: string[];
+				removedNodes: string[];
+				addedEdges: string[];
+				removedEdges: string[];
+				addedFeedback: string[];
+				removedFeedback: string[];
+			};
+	  }
+	| { type: "clearDiff" };
 
 type MessageFromWebview =
 	| { type: "ready" }
@@ -45,6 +57,44 @@ const tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
 let descriptions: Record<string, string> = {};
 let lastFocusedNodeId: string | undefined;
+
+const diffPanel = document.getElementById("diff-panel") as HTMLDivElement;
+type StoredDiff = {
+	addedNodes: string[];
+	removedNodes: string[];
+	addedEdges: string[];
+	removedEdges: string[];
+	addedFeedback: string[];
+	removedFeedback: string[];
+};
+let currentDiff: StoredDiff | null = null;
+
+function renderDiffPanel(report: StoredDiff): void {
+	const lines: string[] = [];
+	for (const n of report.addedNodes) lines.push(`+ node  ${n}`);
+	for (const n of report.removedNodes) lines.push(`- node  ${n}`);
+	for (const e of report.addedEdges) lines.push(`+ edge  ${e}`);
+	for (const e of report.removedEdges) lines.push(`- edge  ${e}`);
+	for (const f of report.addedFeedback) lines.push(`+ feedback  ${f}`);
+	for (const f of report.removedFeedback) lines.push(`- feedback  ${f}`);
+	if (lines.length === 0) {
+		diffPanel.innerHTML = `<span class="diff-none">No structural differences</span>`;
+	} else {
+		diffPanel.innerHTML = lines
+			.map(
+				(l) =>
+					`<div class="${l.startsWith("+") ? "diff-add" : "diff-remove"}">${escapeHtml(l)}</div>`,
+			)
+			.join("");
+	}
+	diffPanel.style.display = "block";
+}
+
+function clearDiffPanel(): void {
+	currentDiff = null;
+	diffPanel.innerHTML = "";
+	diffPanel.style.display = "none";
+}
 
 root.addEventListener("mousemove", (e) => {
 	const node = (e.target as Element).closest?.("g.node");
@@ -203,6 +253,15 @@ window.addEventListener("message", async (event) => {
 		clearFocusHighlight();
 		return;
 	}
+	if (msg.type === "diff") {
+		currentDiff = msg.report;
+		renderDiffPanel(msg.report);
+		return;
+	}
+	if (msg.type === "clearDiff") {
+		clearDiffPanel();
+		return;
+	}
 	if (msg.type !== "render") return;
 	descriptions = msg.descriptions ?? {};
 	try {
@@ -233,6 +292,7 @@ window.addEventListener("message", async (event) => {
 				if (lastFocusedNodeId) focusNode(lastFocusedNodeId);
 			});
 		}
+		if (currentDiff) renderDiffPanel(currentDiff);
 	} catch (e) {
 		log("render error:", (e as Error).message);
 		inner.innerHTML = `<div class="err">${escapeHtml((e as Error).message)}</div>`;
