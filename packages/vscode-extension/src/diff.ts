@@ -86,7 +86,8 @@ export function registerDiff(
 			}
 
 			const currentGraph = analyzeDocument(editor.document).graph;
-			const report = diffGraphs(currentGraph, otherResult.graph);
+			// a=ref, b=current: addedNodes = added in current since ref, removedNodes = removed
+			const report = diffGraphs(otherResult.graph, currentGraph);
 
 			await vscode.commands.executeCommand("pfdsl.preview");
 			postDiff(report);
