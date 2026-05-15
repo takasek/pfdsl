@@ -118,6 +118,9 @@ importers:
       '@pfdsl/metadata-exporter':
         specifier: workspace:*
         version: link:../metadata-exporter
+      '@pfdsl/preview-engine':
+        specifier: workspace:*
+        version: link:../preview-engine
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
