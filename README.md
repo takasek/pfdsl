@@ -69,6 +69,7 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 - **DOT / SVG** — Graphviz export and Wasm-based rendering (`@pfdsl/graphviz-exporter`, `@pfdsl/preview-engine`)
 - **CLI** — `pfdsl check / fmt / normalize / graph / diff` (`@pfdsl/cli`)
 - **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
+- **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`)
 
 Roadmap progress lives in [docs/pfdsl_implementation_flow.pfdsl](docs/pfdsl_implementation_flow.pfdsl) (written in PFDSL itself).
 
@@ -126,6 +127,20 @@ Host with `@pfdsl/vscode-extension` loaded. In the host, `.pfdsl` files get:
 - hover metadata for artifacts and processes (label, owner, status, tags, parts)
 - `Format Document` / `pfdsl.format`
 - `PFDSL: Open Preview to the Side` (`pfdsl.preview`) — live SVG, refreshes on edit
+
+## Claude Code skill
+
+A skill for Claude Code is bundled at `.claude/skills/pfdsl/`. It provides PFDSL syntax reference, CLI command guidance, and workflow steps for editing `.pfdsl` files. Claude Code picks it up automatically when working in this repo.
+
+To regenerate after spec or sample changes:
+
+```bash
+make gen-skill
+# or install elsewhere:
+node scripts/gen-skill.mjs --out ~/.claude/skills/pfdsl
+```
+
+The `--out` path must contain `/.claude/` (safety check). The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alongside `SKILL.md`.
 
 ## Library
 
