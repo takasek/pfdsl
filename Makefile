@@ -56,6 +56,10 @@ vscode-package: vscode-build
 gen-samples: build-deps
 	node scripts/gen-samples.mjs
 
+.PHONY: gen-skill
+gen-skill:
+	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
+
 .PHONY: push
 push:
 	@if ! git diff --quiet HEAD -- docs/samples; then \

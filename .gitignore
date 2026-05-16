@@ -22,3 +22,7 @@ coverage/
 
 # pnpm
 .pnpm-store/
+
+# claude
+.claude/settings.local.json
+.superpowers/
