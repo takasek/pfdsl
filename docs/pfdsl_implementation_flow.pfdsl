@@ -129,7 +129,7 @@ artifact:
     status: todo
   agent_skill:
     label: AI agentスキル (pfdsl読み書き)
-    status: todo
+    status: done
 
 process:
   define_architecture:
