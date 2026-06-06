@@ -95,6 +95,7 @@ description: |
 title: ...
 layout:
   direction: LR   # LR | RL | TB | BT (default LR)
+  maxWidth: 120   # label wrap width in px (optional)
 
 artifact:
   <id>:
@@ -140,7 +141,8 @@ node packages/cli/dist/cli.js diff <file-a> <file-b>
 ## Key constraints
 
 - **V001 single-producer**: each artifact has at most one producing process (\`->\`)
-- **V002 process completeness**: every process needs ≥1 input (\`>>\`) and ≥1 output (\`->\`)
+- **V002 process needs inputs**: every non-isolated process needs ≥1 input (\`>>\`)
+- **V003 process needs outputs**: every non-isolated process needs ≥1 output (\`->\`)
 
 ## Typical task: update status in implementation_flow.pfdsl
 
@@ -152,7 +154,7 @@ node packages/cli/dist/cli.js diff <file-a> <file-b>
 
 Read these when deeper detail is needed:
 
-- \`references/spec.md\` — full PFDSL spec v0.0.5 (syntax rules, grammar, all frontmatter fields)
+- \`references/spec.md\` — full PFDSL spec v0.0.6 (syntax rules, grammar, all frontmatter fields)
 - \`references/samples.md\` — annotated .pfdsl examples showing each language feature
 
 ---
