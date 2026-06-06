@@ -436,6 +436,24 @@ a >> P -> b
 		expect(clusterBlock).not.toMatch(/^\s+color=/m);
 	});
 
+	it("renders hex color code in group cluster", () => {
+		const src = `---
+group:
+  g1:
+    color: "#ff0000"
+artifact:
+  a:
+    group: g1
+process:
+  P: {}
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toContain('color="#ff0000";');
+	});
+
 	it("node with group referencing undeclared group id is rendered flat without error", () => {
 		const src = `---
 artifact:
