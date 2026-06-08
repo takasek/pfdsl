@@ -126,7 +126,7 @@ artifact:
     status: done
   cli_published:
     label: CLI npm公開
-    status: todo
+    status: wip
   agent_skill:
     label: AI agentスキル (pfdsl読み書き)
     status: todo
