@@ -3,7 +3,7 @@
 // Run: node scripts/gen-skill.mjs --out .claude/skills/pfdsl
 // The --out path must contain '.claude/' (safety check).
 
-import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,7 +13,7 @@ const root = resolve(__dirname, "..");
 // --- Parse args ---
 
 const outIdx = process.argv.indexOf("--out");
-if (outIdx === -1 || !process.argv[outIdx + 1]) {
+if (outIdx === -1 || !process.argv[outIdx + 1] || process.argv[outIdx + 1].startsWith("-")) {
   console.error("Usage: node scripts/gen-skill.mjs --out <skill-dir>");
   console.error("Example: node scripts/gen-skill.mjs --out .claude/skills/pfdsl");
   process.exit(2);
@@ -21,8 +21,8 @@ if (outIdx === -1 || !process.argv[outIdx + 1]) {
 
 const outDir = resolve(process.cwd(), process.argv[outIdx + 1]);
 
-if (!outDir.includes("/.claude/")) {
-  console.error(`Error: output path must contain '/.claude/' — got: ${outDir}`);
+if (!outDir.split(/[\\/]/).includes(".claude")) {
+  console.error(`Error: output path must contain a '.claude' directory component — got: ${outDir}`);
   console.error("This check prevents accidentally writing to the wrong location.");
   process.exit(1);
 }
@@ -33,6 +33,7 @@ mkdirSync(refsDir, { recursive: true });
 // --- 1. Copy spec ---
 
 const specSrc = readFileSync(resolve(root, "docs/spec/spec.md"), "utf-8");
+const specVersion = specSrc.match(/^# PFDSL仕様書 (v[\d.]+)/m)?.[1] ?? "unknown";
 writeFileSync(resolve(refsDir, "spec.md"), specSrc);
 console.log("references/spec.md ← docs/spec/spec.md");
 
@@ -46,20 +47,29 @@ const rows = tsv
   .slice(1)
   .map((line) => {
     const [id, summary, description] = line.split("\t");
-    return { id, summary, description };
+    return { id: id.trim(), summary: summary?.trim() ?? "", description: description?.trim() ?? "" };
   });
 
 let samplesMd = `# PFDSL Samples Reference\n\nAnnotated .pfdsl files illustrating each language feature.\n\n`;
+let sampleCount = 0;
 
 for (const { id, summary, description } of rows) {
   const pfdslPath = resolve(samplesDir, `${id}.pfdsl`);
-  if (!existsSync(pfdslPath)) continue;
+  if (!existsSync(pfdslPath)) {
+    console.warn(`  warn: ${id}.pfdsl not found, skipping`);
+    continue;
+  }
   const src = readFileSync(pfdslPath, "utf-8");
-  samplesMd += `## ${id} — ${summary}\n\n${description}\n\n\`\`\`pfdsl\n${src}\`\`\`\n\n---\n\n`;
+  const fence = src.includes("```") ? "````" : "```";
+  samplesMd += `## ${id} — ${summary}\n\n${description}\n\n${fence}pfdsl\n${src}${fence}\n\n---\n\n`;
+  sampleCount++;
 }
 
+if (sampleCount === 0) {
+  console.warn("warn: no sample .pfdsl files found — references/samples.md will contain no examples");
+}
 writeFileSync(resolve(refsDir, "samples.md"), samplesMd);
-console.log("references/samples.md ← docs/samples/*.pfdsl");
+console.log(`references/samples.md ← docs/samples/*.pfdsl (${sampleCount} samples)`);
 
 // --- 3. Write SKILL.md ---
 
@@ -154,7 +164,7 @@ node packages/cli/dist/cli.js diff <file-a> <file-b>
 
 Read these when deeper detail is needed:
 
-- \`references/spec.md\` — full PFDSL spec v0.0.6 (syntax rules, grammar, all frontmatter fields)
+- \`references/spec.md\` — full PFDSL spec ${specVersion} (syntax rules, grammar, all frontmatter fields)
 - \`references/samples.md\` — annotated .pfdsl examples showing each language feature
 
 ---

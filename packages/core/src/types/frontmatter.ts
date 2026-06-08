@@ -46,6 +46,7 @@ export interface Frontmatter {
 	tags?: string[];
 	layout?: {
 		direction?: "LR" | "RL" | "TB" | "BT";
+		maxWidth?: number;
 		[key: string]: unknown;
 	};
 	artifact?: Record<string, ArtifactMeta>;
