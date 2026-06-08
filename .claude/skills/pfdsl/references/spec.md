@@ -37,7 +37,7 @@ front matter はファイル先頭にのみ記述できる。
 ---
 title: 開発フロー
 version: 1.2
-dsl_version: 0.0.2
+dslVersion: 0.0.2
 tags: [web, review]
 
 layout:
@@ -63,7 +63,7 @@ process:
 | ------------ | ------------------------------------------ |
 | title        | 文書名                                        |
 | version      | 文書バージョン                                    |
-| dsl_version  | PFDSL仕様バージョン                               |
+| dslVersion   | PFDSL仕様バージョン                               |
 | description  | 文書説明                                       |
 | tags         | 任意タグ                                       |
 | layout       | レイアウト補助情報                                  |
@@ -749,6 +749,7 @@ artifact:
 
 v0.0.5 からの主な変更点（v0.0.6）：
 
+* §2.2 `dsl_version` キーを `dslVersion` に改名（camelCase 統一）
 * §2.3 Artifact / Process メタデータに `description` フィールドを追加（可視化時ツールチップ）
 * §2.6 `layout.maxWidth` フィールドを追加（ラベル折り返し幅、px単位）
 

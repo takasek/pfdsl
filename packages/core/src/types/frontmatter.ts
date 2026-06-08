@@ -41,7 +41,7 @@ export interface GroupMeta {
 export interface Frontmatter {
 	title?: string;
 	version?: string | number;
-	dsl_version?: string;
+	dslVersion?: string;
 	description?: string;
 	tags?: string[];
 	layout?: {

@@ -1,7 +1,7 @@
 ---
 title: PFDSL 実装計画フロー
 version: 0.3
-dsl_version: 0.0.3
+dslVersion: 0.0.6
 description: PFDSL 仕様に基づくツールチェーン実装のプロセスフロー記述
 tags: [implementation, roadmap]
 
