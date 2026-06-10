@@ -1,0 +1,91 @@
+---
+title: 採用プロセス
+layout:
+  direction: LR
+  maxWidth: 120
+
+artifact:
+  job_description:
+    label: 求人票
+    status: done
+    description: 職種・必須スキル・歓迎スキル・待遇を記載した求人票
+    owner: HR
+  resume:
+    label: 応募書類
+    status: done
+    description: 履歴書・職務経歴書・ポートフォリオ
+    owner: 応募者
+  screening_result:
+    label: 書類選考結果
+    status: done
+    description: 合否判定と所見を記録したスプレッドシート
+    owner: HR
+  interview_sheet:
+    label: 面接評価シート
+    status: wip
+    description: 技術・カルチャーフィットの評価軸と記録
+    owner: 面接官
+  assignment:
+    label: 技術課題
+    status: done
+    description: 応募者に出題するコーディング課題
+    owner: 面接官
+  technical_result:
+    label: 技術課題提出物
+    status: wip
+    description: コーディング課題・設計課題の成果物
+    owner: 応募者
+  final_evaluation:
+    label: 最終評価報告書
+    status: todo
+    description: 面接・技術課題を総合した採用判定レポート
+    owner: 採用委員会
+  offer_letter:
+    label: 内定通知書
+    status: todo
+    description: 処遇条件を記載した内定オファーレター
+    owner: HR
+
+process:
+  screen_resume:
+    label: 書類選考
+    description: 求人票の要件に照らして応募書類を評価する
+    owner: HR
+  prepare_assignment:
+    label: 課題作成
+    owner: 面接官
+  conduct_interview:
+    label: 面接実施
+    description: 技術面接・HR面接を実施し評価シートに記録する
+    owner: 面接官
+  solve_assignment:
+    label: 課題実施
+    description: 応募者が技術課題に取り組み成果物を提出する
+    owner: 応募者
+  evaluate_final:
+    label: 最終評価
+    description: 面接シートと技術課題を総合して採用判定する
+    owner: 採用委員会
+  extend_offer:
+    label: オファー提示
+    description: 最終評価に基づき処遇を決定し内定通知書を作成する
+    owner: HR
+
+statusStyles:
+  done:    { fillcolor: "#d4edda", style: filled }
+  wip:     { fillcolor: "#fff3cd", style: filled }
+  todo:    { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
+---
+
+[job_description, resume] >> screen_resume -> screening_result
+
+job_description >> prepare_assignment -> assignment
+
+[screening_result, job_description] >> conduct_interview -> interview_sheet
+
+assignment >> solve_assignment -> technical_result
+
+[interview_sheet, technical_result] >> evaluate_final -> final_evaluation
+
+final_evaluation >> extend_offer -> offer_letter

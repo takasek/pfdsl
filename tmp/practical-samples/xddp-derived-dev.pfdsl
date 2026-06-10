@@ -1,0 +1,93 @@
+---
+title: XDDP風派生開発フロー
+layout:
+  direction: LR
+  maxWidth: 130
+
+artifact:
+  change_request:
+    label: 変更要求書
+    status: done
+    description: 顧客からの変更要求（問題・目的・制約）
+    owner: PL
+  usdm:
+    label: 変更要求仕様書（USDM）
+    status: done
+    description: 要求・理由・仕様をUSDM形式で構造化した文書
+    owner: PL
+  base_code:
+    label: ベースコード
+    status: done
+    description: 変更対象の既存ソースコード
+    owner: リポジトリ
+  understanding_doc:
+    label: 既存コード理解資料
+    status: done
+    description: 変更箇所の構造・依存関係・影響範囲を記述した調査メモ
+    owner: Dev
+  change_design:
+    label: 変更設計書
+    status: wip
+    description: どこをどう変えるかを記述した変更三点セットの設計部分
+    owner: Dev
+  change_impl:
+    label: 変更実装（差分コード）
+    status: wip
+    description: 変更箇所のみを切り出した差分コード。変更三点セットの実装部分
+    owner: Dev
+  change_test_spec:
+    label: 変更テスト仕様書
+    status: todo
+    description: 変更仕様を確認するためのテストケース一覧
+    owner: Test
+  test_result:
+    label: テスト結果報告書
+    status: todo
+    description: 変更テスト仕様書に沿った実行結果と合否
+    owner: Test
+  defect_report:
+    label: 不具合票
+    status: todo
+    description: テストで発見した不具合の原因・再現手順・修正方針
+    owner: Test
+
+process:
+  write_usdm:
+    label: USDM作成
+    description: 変更要求書をUSDM形式の仕様書に変換する
+    owner: PL
+  investigate_base:
+    label: ベースコード調査
+    description: 変更箇所の現状コードを読み理解資料にまとめる
+    owner: Dev
+  design_change:
+    label: 変更設計
+    description: USDMと既存コード理解資料をもとに変更設計書を作成する
+    owner: Dev
+  implement_change:
+    label: 変更実装
+    description: 変更設計書に基づき差分コードを実装する
+    owner: Dev
+  test_change:
+    label: 変更テスト
+    description: 変更テスト仕様書を実行し結果を記録する
+    owner: Test
+
+statusStyles:
+  done:    { fillcolor: "#d4edda", style: filled }
+  wip:     { fillcolor: "#fff3cd", style: filled }
+  todo:    { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
+---
+
+change_request >> write_usdm -> usdm
+
+base_code >> investigate_base -> understanding_doc
+
+[usdm, understanding_doc] >> design_change -> [change_design, change_test_spec]
+
+[change_design, understanding_doc, base_code] >> implement_change -> change_impl
+
+defect_report >>? implement_change
+
+[change_test_spec, change_impl] >> test_change -> [test_result, defect_report]

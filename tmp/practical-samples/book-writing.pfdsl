@@ -1,0 +1,110 @@
+---
+title: 技術書執筆・出版フロー
+layout:
+  direction: LR
+  maxWidth: 130
+
+artifact:
+  proposal:
+    label: 企画書
+    status: done
+    description: 書籍の目的・対象読者・章構成案
+    owner: 著者
+  outline:
+    label: 章構成案
+    status: done
+    owner: 著者
+  manuscript:
+    label: 書籍原稿
+    status: wip
+    description: 全章を束ねた書籍原稿
+    owner: 著者
+    parts: [ch01, ch02, ch03, ch04, ch05]
+  ch01:
+    label: 第1章原稿
+    status: done
+    owner: 著者
+  ch02:
+    label: 第2章原稿
+    status: done
+    owner: 著者
+  ch03:
+    label: 第3章原稿
+    status: wip
+    owner: 著者
+  ch04:
+    label: 第4章原稿
+    status: todo
+    owner: 著者
+  ch05:
+    label: 第5章原稿
+    status: todo
+    owner: 著者
+  review_comment:
+    label: 査読コメント
+    status: wip
+    description: 査読者による技術的正確性・可読性への指摘
+    owner: 査読者
+  revised_manuscript:
+    label: 修正済み原稿
+    status: todo
+    owner: 著者
+  copyedited_manuscript:
+    label: 校正済み原稿
+    status: todo
+    owner: 編集者
+  print_ready_pdf:
+    label: 印刷用PDF
+    status: todo
+    owner: DTP
+
+process:
+  compile:
+    label: 原稿統合
+    description: 各章を束ねて書籍原稿を構成する
+    owner: 著者
+  plan:
+    label: 企画立案
+    description: 出版社と合意した企画書をもとに章構成案を策定する
+    owner: 著者
+  write:
+    label: 執筆
+    description: 章構成案に沿って各章の原稿を執筆する
+    owner: 著者
+  peer_review:
+    label: 査読
+    description: 技術的正確性・サンプルコードの動作を確認する
+    owner: 査読者
+  revise:
+    label: 著者改訂
+    description: 査読コメントを反映して原稿を修正する
+    owner: 著者
+  copyedit:
+    label: 校正・編集
+    description: 文章の流れ・表記ゆれ・レイアウトを整える
+    owner: 編集者
+  typeset:
+    label: 組版・PDF化
+    description: 校正済み原稿をDTPで組んで印刷用PDFを生成する
+    owner: DTP
+
+statusStyles:
+  done:    { fillcolor: "#d4edda", style: filled }
+  wip:     { fillcolor: "#fff3cd", style: filled }
+  todo:    { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
+---
+
+proposal >> plan -> outline
+
+outline >> write -> [ch01, ch02, ch03, ch04, ch05]
+
+[ch01, ch02, ch03, ch04, ch05] >> compile -> manuscript
+
+manuscript >> peer_review -> review_comment
+
+[manuscript, review_comment] >> revise -> revised_manuscript
+
+revised_manuscript >> copyedit -> copyedited_manuscript
+
+copyedited_manuscript >> typeset -> print_ready_pdf
