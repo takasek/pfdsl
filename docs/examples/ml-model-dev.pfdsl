@@ -1,0 +1,93 @@
+---
+title: 機械学習モデル開発・運用フロー
+layout:
+  direction: LR
+  maxWidth: 130
+
+artifact:
+  raw_dataset:
+    label: 生データセット
+    status: done
+    description: 収集した未加工のトレーニング用データ
+    owner: Data Engineer
+  feature_spec:
+    label: 特徴量定義書
+    status: done
+    description: 使用する特徴量の定義・前処理ルールを記載した文書
+    owner: ML Engineer
+  prepared_dataset:
+    label: 加工済みデータセット
+    description: クリーニング・特徴量エンジニアリング済みのデータセット
+    owner: Data Engineer
+  trained_model:
+    label: 学習済みモデル
+    description: トレーニング完了後のモデルアーティファクト
+    owner: ML Engineer
+  eval_report:
+    label: 評価レポート
+    description: 精度指標・混同行列・スライス評価を記載した評価結果文書
+    owner: ML Engineer
+  serving_model:
+    label: サービング中モデル
+    description: 本番環境にデプロイされ推論リクエストを処理しているモデル
+    owner: MLOps
+  traffic_snapshot:
+    label: 本番トラフィックスナップショット
+    status: done
+    description: 本番の入力データを時点固定で切り出した観測用データセット
+    owner: MLOps
+  drift_report:
+    label: ドリフト検知レポート
+    description: 学習時とのデータ分布差異・精度劣化を記録したレポート
+    owner: MLOps
+  retrain_dataset:
+    label: 再学習用データセット
+    description: ドリフト検知後に収集・加工した最新期間のデータセット
+    owner: Data Engineer
+
+process:
+  prepare_data:
+    label: データ準備
+    description: 生データをクリーニングし特徴量定義書に従って特徴量を生成する
+    owner: Data Engineer
+  train_model:
+    label: モデル学習
+    description: 加工済みデータセットでモデルをトレーニングする
+    owner: ML Engineer
+  evaluate_model:
+    label: モデル評価
+    description: 保留テストセットで精度・公平性を評価し評価レポートを作成する
+    owner: ML Engineer
+  deploy_model:
+    label: モデルデプロイ
+    description: 評価を通過したモデルを本番環境にデプロイする
+    owner: MLOps
+  monitor_drift:
+    label: ドリフト監視
+    description: 本番データ分布を定期観測し学習時との乖離を検知する
+    owner: MLOps
+  collect_retrain_data:
+    label: 再学習データ収集
+    description: ドリフト期間以降のデータを収集・加工して再学習用データセットを作成する
+    owner: Data Engineer
+
+statusStyles:
+  done:    { fillcolor: "#d4edda", style: filled }
+  wip:     { fillcolor: "#fff3cd", style: filled }
+  todo:    { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
+---
+
+[raw_dataset, feature_spec] >> prepare_data -> prepared_dataset
+
+prepared_dataset >> train_model -> trained_model
+
+[trained_model, prepared_dataset] >> evaluate_model -> eval_report
+
+[trained_model, eval_report] >> deploy_model -> serving_model
+
+[serving_model, traffic_snapshot, prepared_dataset] >> monitor_drift -> drift_report
+
+[drift_report, traffic_snapshot] >> collect_retrain_data -> retrain_dataset
+
+retrain_dataset >>? train_model

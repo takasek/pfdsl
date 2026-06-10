@@ -1,0 +1,114 @@
+---
+title: OSS 脆弱性 Coordinated Disclosure フロー
+layout:
+  direction: LR
+  maxWidth: 130
+
+group:
+  private:
+    label: 非公開フェーズ（Embargo）
+    color: "#fdf2f8"
+  public:
+    label: 公開フェーズ
+    color: "#eafaf1"
+
+artifact:
+  base_code:
+    label: ベースコード
+    status: done
+    description: 脆弱性が存在する公開リポジトリのソースコード
+    owner: 開発チーム
+    group: private
+  vulnerability_report:
+    label: 脆弱性報告（非公開）
+    status: done
+    description: 外部研究者から受け取った脆弱性の詳細・再現手順・PoC
+    owner: セキュリティ担当
+    group: private
+  triage_result:
+    label: トリアージ結果
+    status: done
+    description: 影響範囲・深刻度（CVSS）・影響バージョンを評価した記録
+    owner: セキュリティ担当
+    group: private
+  cveid:
+    label: 予約済み CVE ID
+    description: MITRE/NVD から払い出した CVE 識別子
+    owner: セキュリティ担当
+    group: private
+  fix_patch:
+    label: 修正パッチ（非公開）
+    description: 非公開ブランチで開発・テスト済みの脆弱性修正コード
+    owner: 開発チーム
+    group: private
+  patch_review_record:
+    label: パッチレビュー記録
+    description: セキュリティ観点のコードレビューと承認記録
+    owner: セキュリティ担当
+    group: private
+  disclosure_plan:
+    label: 公開調整計画
+    description: 公開日・連携先（ディストリビュータ・下流パッケージ）・通知スケジュールを記載した計画書
+    owner: セキュリティ担当
+    group: private
+  fixed_release:
+    label: 修正済みリリース
+    description: パッチを含む正式リリース版（タグ・配布物）
+    owner: リリースマネージャー
+    group: public
+  security_advisory:
+    label: セキュリティアドバイザリ
+    description: CVE・影響バージョン・修正方法・回避策を記載した公開勧告文書
+    owner: セキュリティ担当
+    group: public
+
+process:
+  triage_vuln:
+    label: 脆弱性トリアージ
+    description: 報告を検証し影響範囲と深刻度を評価してトリアージ結果を作成する
+    owner: セキュリティ担当
+    group: private
+  reserve_cve:
+    label: CVE 予約
+    description: MITRE に連絡し CVE ID を非公開状態で予約する
+    owner: セキュリティ担当
+    group: private
+  develop_fix:
+    label: 修正開発
+    description: 非公開ブランチで脆弱性を修正するコードを開発しテストする
+    owner: 開発チーム
+    group: private
+  review_patch:
+    label: パッチレビュー
+    description: 修正パッチをセキュリティ観点でレビューし承認する
+    owner: セキュリティ担当
+    group: private
+  coordinate_disclosure:
+    label: 公開調整
+    description: 公開日を設定しディストリビュータ・下流パッケージ管理者と事前共有して公開調整計画を作成する
+    owner: セキュリティ担当
+    group: private
+  publish_fix:
+    label: 修正版・アドバイザリ公開
+    description: 調整した公開日に修正済みリリースとセキュリティアドバイザリを同時公開する
+    owner: リリースマネージャー
+    group: public
+
+statusStyles:
+  done:    { fillcolor: "#d4edda", style: filled }
+  wip:     { fillcolor: "#fff3cd", style: filled }
+  todo:    { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
+---
+
+vulnerability_report >> triage_vuln -> triage_result
+
+triage_result >> reserve_cve -> cveid
+
+[triage_result, vulnerability_report, base_code] >> develop_fix -> fix_patch
+
+fix_patch >> review_patch -> patch_review_record
+
+[patch_review_record, cveid] >> coordinate_disclosure -> disclosure_plan
+
+[patch_review_record, disclosure_plan] >> publish_fix -> [fixed_release, security_advisory]

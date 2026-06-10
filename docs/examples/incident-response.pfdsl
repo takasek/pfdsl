@@ -1,0 +1,86 @@
+---
+title: 本番障害対応フロー
+layout:
+  direction: LR
+  maxWidth: 130
+
+artifact:
+  alert:
+    label: 監視アラート
+    status: done
+    description: 監視システムが検知した異常の通知
+    owner: SRE
+  triage_record:
+    label: トリアージ記録
+    status: done
+    description: 影響範囲・重大度・対応優先度を記録した初動判断メモ
+    owner: 当直 SRE
+  mitigation_record:
+    label: 暫定対応記録
+    description: 実施した応急処置（ロールバック・切り替え等）の内容と結果の記録
+    owner: SRE
+  service_restored:
+    label: サービス復旧確認
+    description: サービスが正常動作に戻ったことを示す確認記録
+    owner: SRE
+  rca_draft:
+    label: 根本原因分析（草稿）
+    description: 障害の技術的原因を特定した調査記録
+    owner: 担当エンジニア
+  timeline:
+    label: 障害タイムライン
+    description: 検知から復旧までのイベントを時系列で記録した文書
+    owner: 当直 SRE
+  postmortem_doc:
+    label: ポストモーテム文書
+    description: 原因・影響・対応経緯・再発防止策を記載した公式記録
+    owner: Engineering Manager
+  action_items:
+    label: 改善アクションリスト
+    description: ポストモーテムで合意した再発防止アクションの一覧
+    owner: Engineering Manager
+  runbook:
+    label: ランブック（更新版）
+    description: 今回の知見を反映した障害対応手順書
+    owner: SRE
+
+process:
+  triage:
+    label: トリアージ
+    description: アラートを受け影響範囲と重大度を判断し対応を開始する
+    owner: 当直 SRE
+  apply_mitigation:
+    label: 応急対応
+    description: ロールバックや迂回経路切り替えでサービスを早期復旧する
+    owner: SRE
+  investigate:
+    label: 根本原因調査
+    description: ログ・メトリクス・コードを精査し障害の根本原因を特定する
+    owner: 担当エンジニア
+  conduct_postmortem:
+    label: ポストモーテム実施
+    description: 関係者が集まりタイムラインを確認し再発防止策を合意する
+    owner: Engineering Manager
+  update_runbook:
+    label: ランブック更新
+    description: ポストモーテムの知見を反映し次回対応手順を改善する
+    owner: SRE
+
+statusStyles:
+  done:    { fillcolor: "#d4edda", style: filled }
+  wip:     { fillcolor: "#fff3cd", style: filled }
+  todo:    { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
+---
+
+alert >> triage -> triage_record
+
+triage_record >> apply_mitigation -> [mitigation_record, service_restored]
+
+[triage_record, service_restored, mitigation_record] >> investigate -> [rca_draft, timeline]
+
+[rca_draft, timeline] >> conduct_postmortem -> [postmortem_doc, action_items]
+
+[postmortem_doc, action_items] >> update_runbook -> runbook
+
+runbook >>? triage

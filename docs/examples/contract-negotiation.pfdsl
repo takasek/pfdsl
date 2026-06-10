@@ -1,0 +1,94 @@
+---
+title: 業務委託契約締結フロー
+layout:
+  direction: LR
+  maxWidth: 130
+
+artifact:
+  sow:
+    label: 業務概要（SOW）
+    status: done
+    description: 発注側が作成した業務範囲・成果物・スケジュールの概要
+    owner: 発注側 BizDev
+  contract_draft:
+    label: 契約書ドラフト
+    status: done
+    description: 発注側が初稿として作成した業務委託契約書
+    owner: 発注側 Legal
+  negotiation_memo:
+    label: 交渉メモ
+    description: 受注側から提示された修正要求と発注側の回答を記録した往復メモ
+    owner: 双方 BizDev
+  revised_draft:
+    label: 修正契約書ドラフト
+    description: 交渉内容を反映した改訂版契約書ドラフト
+    owner: 発注側 Legal
+  orderer_legal_opinion:
+    label: 発注側リーガルチェック意見書
+    description: 発注側法務による契約書の法的問題点・修正指示
+    owner: 発注側 Legal
+  vendor_legal_opinion:
+    label: 受注側リーガルチェック意見書
+    description: 受注側法務による契約書の法的問題点・修正指示
+    owner: 受注側 Legal
+  final_contract:
+    label: 最終契約書
+    description: 双方のリーガルチェックを経て合意に至った最終版契約書
+    owner: 発注側 Legal
+  signed_contract:
+    label: 締結済み契約書
+    description: 双方が押印・署名した有効な業務委託契約書
+    owner: 双方
+
+process:
+  draft_contract:
+    label: 契約書起草
+    description: SOW をもとに業務委託契約書の初稿を作成する
+    owner: 発注側 Legal
+  negotiate_terms:
+    label: 条件交渉
+    description: 受注側と契約条件を複数回往復して合意点を探り交渉メモを作成する
+    owner: 双方 BizDev
+  revise_draft:
+    label: ドラフト改訂
+    description: 交渉メモの合意内容を契約書本文に反映する
+    owner: 発注側 Legal
+  review_orderer_legal:
+    label: 発注側リーガルチェック
+    description: 発注側法務が契約書を審査し意見書を作成する
+    owner: 発注側 Legal
+  review_vendor_legal:
+    label: 受注側リーガルチェック
+    description: 受注側法務が契約書を審査し意見書を作成する
+    owner: 受注側 Legal
+  finalize_contract:
+    label: 最終版確定
+    description: 双方の意見書を反映し条文を最終調整して最終契約書を確定する
+    owner: 発注側 Legal
+  execute_contract:
+    label: 契約締結（押印）
+    description: 双方の代表者が最終契約書に署名・押印して契約を締結する
+    owner: 双方
+
+statusStyles:
+  done:    { fillcolor: "#d4edda", style: filled }
+  wip:     { fillcolor: "#fff3cd", style: filled }
+  todo:    { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
+---
+
+sow >> draft_contract -> contract_draft
+
+contract_draft >> negotiate_terms -> negotiation_memo
+
+[contract_draft, negotiation_memo] >> revise_draft -> revised_draft
+
+revised_draft >> review_orderer_legal -> orderer_legal_opinion
+
+revised_draft >> review_vendor_legal -> vendor_legal_opinion
+
+[revised_draft, orderer_legal_opinion, vendor_legal_opinion] >> finalize_contract -> final_contract
+
+revised_draft >>? negotiate_terms
+
+final_contract >> execute_contract -> signed_contract

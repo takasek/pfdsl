@@ -1,0 +1,136 @@
+---
+title: 技術カンファレンス開催フロー
+layout:
+  direction: LR
+  maxWidth: 130
+
+group:
+  planning:
+    label: 企画・準備フェーズ
+    color: "#e8f4fd"
+  event_day:
+    label: 当日運営
+    color: "#fef9e7"
+  post:
+    label: 事後処理
+    color: "#eafaf1"
+
+artifact:
+  event_plan:
+    label: 開催企画書
+    status: done
+    description: 開催規模・日程・予算・コンセプトを定めた企画書
+    owner: 運営リーダー
+    group: planning
+  cfp_announcement:
+    label: CFP 告知文
+    status: done
+    description: 募集テーマ・応募要件・締切を記載した Call for Proposals 告知
+    owner: プログラム委員会
+    group: planning
+  session_proposals:
+    label: セッション応募一覧
+    status: done
+    description: 応募者から提出されたセッション提案の全件リスト
+    owner: プログラム委員会
+    group: planning
+  program:
+    label: 確定プログラム
+    description: 採択セッション・タイムテーブル・登壇者情報を確定したプログラム
+    owner: プログラム委員会
+    group: planning
+  venue_contract:
+    label: 会場契約書
+    description: 会場との賃貸・利用契約書
+    owner: 運営事務局
+    group: planning
+  sponsor_agreements:
+    label: スポンサー協賛合意書
+    description: 各スポンサーとの協賛内容・金額・特典を定めた合意書
+    owner: スポンサー担当
+    group: planning
+  operation_manual:
+    label: 当日運営マニュアル
+    description: 役割分担・タイムライン・緊急連絡先を記載した当日運営手順書
+    owner: 運営リーダー
+    group: planning
+  event_record:
+    label: 開催記録
+    description: 参加者数・発生トラブル・会場状況を記録した当日ログ
+    owner: 運営事務局
+    group: event_day
+  session_videos:
+    label: セッション録画
+    description: 各セッションの収録動画ファイル
+    owner: 映像担当
+    group: event_day
+  satisfaction_survey:
+    label: 参加者アンケート結果
+    description: 参加者から回収した満足度・感想・改善要望のアンケートデータ
+    owner: 運営事務局
+    group: post
+  conference_report:
+    label: 開催レポート
+    description: 開催概要・統計・ハイライト・改善提案をまとめた公式レポート
+    owner: 運営リーダー
+    group: post
+
+process:
+  recruit_cfp:
+    label: CFP 募集
+    description: CFP 告知を公開し応募者からセッション提案を受け付ける
+    owner: プログラム委員会
+    group: planning
+  select_sessions:
+    label: セッション採択
+    description: 応募一覧をレビュースコアリングし採択セッションを決定する
+    owner: プログラム委員会
+    group: planning
+  arrange_venue:
+    label: 会場手配
+    description: 企画書の規模・日程に合う会場を確保し契約する
+    owner: 運営事務局
+    group: planning
+  recruit_sponsors:
+    label: スポンサー募集
+    description: 企画書と告知内容をもとに協賛企業と交渉し合意書を締結する
+    owner: スポンサー担当
+    group: planning
+  prepare_operations:
+    label: 当日準備
+    description: プログラム・会場・スポンサー情報を統合して運営マニュアルを作成する
+    owner: 運営リーダー
+    group: planning
+  run_event:
+    label: 当日運営
+    description: マニュアルに従い受付・進行・会場管理を行い開催記録と録画を取得する
+    owner: 運営事務局
+    group: event_day
+  compile_report:
+    label: 開催レポート作成
+    description: 開催記録・アンケート・録画をもとに開催レポートを作成する
+    owner: 運営リーダー
+    group: post
+
+statusStyles:
+  done:    { fillcolor: "#d4edda", style: filled }
+  wip:     { fillcolor: "#fff3cd", style: filled }
+  todo:    { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
+---
+
+cfp_announcement >> recruit_cfp -> session_proposals
+
+session_proposals >> select_sessions -> program
+
+event_plan >> arrange_venue -> venue_contract
+
+[event_plan, cfp_announcement] >> recruit_sponsors -> sponsor_agreements
+
+[program, venue_contract, sponsor_agreements] >> prepare_operations -> operation_manual
+
+operation_manual >> run_event -> [event_record, session_videos]
+
+[event_record, session_videos] >> compile_report -> conference_report
+
+satisfaction_survey >> compile_report
