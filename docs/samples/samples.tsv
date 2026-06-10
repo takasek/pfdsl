@@ -8,3 +8,4 @@ id	summary	description
 08-groups	Groups	`group:` on nodes + `group:` declarations produce `subgraph cluster_<id>` blocks.
 09-parts	Parts	`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names.
 10-layout-tb	Layout direction	`layout.direction: TB` sets `rankdir=TB`. Default is `LR`.
+11-practical-web-dev	Practical integrated example	Real-world flow combining feedback edges, set notation, multi-output, status styling, and owner metadata. Demonstrates the quality guidelines: essential artifact in outputs, single revision pattern, no implicit dependencies.
