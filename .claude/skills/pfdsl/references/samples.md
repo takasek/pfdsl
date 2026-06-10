@@ -150,7 +150,7 @@ spec >> implement -> code
 
 ## 11-practical-web-dev — Practical integrated example
 
-Real-world flow combining feedback edges, set notation, multi-output, status styling, and owner metadata. Demonstrates the quality guidelines: essential artifact in outputs, single revision pattern, no implicit dependencies.
+Real-world flow combining feedback edges, set notation, multi-output, status styling, and owner metadata. Demonstrates the quality guidelines: essential artifact in outputs, single revision pattern, no implicit dependencies. Includes an organizational learning loop (review findings feed back into checklist curation).
 
 ```pfdsl
 ---
@@ -200,6 +200,15 @@ artifact:
     status: todo
     description: 本番リリース内容の変更点まとめ
     owner: Tech Lead
+  coding_standard:
+    label: コーディング規約
+    status: done
+    description: 組織共通のコーディング規約・設計原則
+  checklist:
+    label: レビュー観点表
+    status: done
+    description: 過去の指摘を反映して整備されるレビュー観点のチェックリスト
+    owner: Reviewer
 
 process:
   design:
@@ -222,6 +231,10 @@ process:
     label: リリース
     description: 本番デプロイとリリースノート作成
     owner: Tech Lead
+  curate_checklist:
+    label: 観点表整備
+    description: 規約と過去のレビュー指摘をもとに観点表を更新する
+    owner: Reviewer
 
 statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
@@ -234,7 +247,11 @@ requirement >> design -> design_doc
 
 design_doc >> implement -> implementation
 
-implementation >> review_code -> review_comment
+coding_standard >> curate_checklist -> checklist
+
+[implementation, checklist] >> review_code -> review_comment
+
+review_comment >>? curate_checklist
 
 review_comment >>? implement
 
