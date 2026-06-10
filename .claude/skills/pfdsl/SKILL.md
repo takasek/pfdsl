@@ -79,6 +79,18 @@ node packages/cli/dist/cli.js diff <file-a> <file-b>
 - **V002 process needs inputs**: every non-isolated process needs ≥1 input (`>>`)
 - **V003 process needs outputs**: every non-isolated process needs ≥1 output (`->`)
 
+## Writing quality PFDs
+
+PFD はタスクリストではなく成果物の変換グラフ。書き終えたら `check` と `graph --format dot` の両方で検証する。
+
+- **成果物は「モノ」**: 文書・コード・データ等。「理解」「合意」は議事録・承認済み仕様書など形あるものに置き換える
+- **暗黙依存禁止**: プロセスが参照するものは全て `>>` で入力に。変換元 artifact の入力漏れが典型ミス（例: 差分実装プロセスに base_code を入れ忘れる）
+- **出力は本質成果物**: 副次物（リリースノート等）だけを出力にしない。主産物も `-> [main, note]` で並記
+- **改版は1パターンに統一**: `指摘 >>? 元プロセス`（同一 artifact を更新）か `[原稿, 指摘] >> 改訂 -> 改版artifact`（明示的改版）のどちらか。併用は同一現実の二重表現
+- **生成者の整合**: プロセスは自分が作るものだけを出力する（面接プロセスが応募者の提出物を生成しない）
+- **parts メンバーもエッジに参加させる**: `[ch1, ch2] >> merge -> book`（spec §17.4）。エッジ無しの parts メンバーは図上で孤立ノードになり散乱する
+- **description と graph の整合**: 「X と Y を作成」と書くなら両方を `->` 出力にする
+
 ## Typical task: update status in implementation_flow.pfdsl
 
 1. Find the artifact ID in `docs/pfdsl_implementation_flow.pfdsl` frontmatter `artifact:` section
