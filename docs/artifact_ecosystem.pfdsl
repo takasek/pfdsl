@@ -146,7 +146,11 @@ process:
     description: お題に対しスキルの品質ガイドに従って PFD を書く
   review_examples:
     label: 実践例レビュー
-    description: 品質ガイド+ツール検証で実践例を監査し知見を抽出する
+    description: "品質ガイド（skill）とツール検証で実践例を監査し知見を抽出する。toolchain は世代をまたぐ還流入力"
+  maintain_samples:
+    label: カタログ整備
+    description: 仕様の機能集合に対応する最小サンプルを追加・改訂する
+    group: generation
   record_insights:
     label: 知見外化
     description: "議論で確定した方法論判断を ADR に、効果を体感した局面を payoff_log に外化する。独立した作業ではなく対話の中で同時に行われる"
@@ -193,13 +197,17 @@ user_intent >> discuss -> dialogue
 
 spec >> maintain_template -> skill_template
 
+spec >> maintain_samples -> feature_samples
+
 [findings, adrs] >>? maintain_template
 
 [spec, skill_template, feature_samples] >> gen_skill -> skill
 
 [skill, dialogue] >> write_examples -> examples
 
-examples >> review_examples -> findings
+[examples, skill] >> review_examples -> findings
+
+toolchain >>? review_examples
 
 [findings, dialogue] >> record_insights -> [adrs, payoff_log]
 
@@ -213,7 +221,7 @@ findings >>? file_issues
 
 gh_issues >> map_deps -> issues_flow
 
-[gh_issues, issues_flow, ops_skill] >> develop -> [toolchain, impl_flow, issue_updates]
+[gh_issues, issues_flow, ops_skill, spec] >> develop -> [toolchain, impl_flow, issue_updates]
 
 impl_flow >>? develop
 
@@ -223,4 +231,4 @@ toolchain >> publish_cli -> published_cli
 
 [feature_samples, impl_flow, toolchain] >> render_previews -> sample_previews
 
-toolchain >> update_readme -> readme
+[toolchain, published_cli] >> update_readme -> readme
