@@ -45,7 +45,7 @@ artifact:
   lint_checker:
     label: "lint拡張checker (#4)"
     status: todo
-    description: 循環検出・終端監査・parts警告・strict >>?・サマリ
+    description: lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため
   featured_toolchain:
     label: 次期仕様対応ツールチェーン
     status: todo
