@@ -55,7 +55,7 @@ artifact:
   decisions:
     label: 方法論判断
     group: practice
-    description: "対話で確定した方法論・運用の判断と効果の体感。ADR 化（record_insights）と品質ガイド即時反映（maintain_template）の2経路で消費 — スキル改善は issue を通さない。実体はセッションログと反映先コミットで検証可能"
+    description: "対話で確定した方法論・運用の判断。品質ガイド即時反映（maintain_template）で消費 — スキル改善は issue を通さない。ADR 級の判断は discuss が adrs として直接外化する。実体はセッションログと反映先コミットで検証可能"
   examples:
     label: 実践例
     status: done
@@ -136,7 +136,7 @@ process:
     description: "仕様変更・対話の判断・レビュー知見・ADR 決定を品質ガイドへ反映する。スキル改善は issue を通さず対話から直接行う"
   discuss:
     label: 設計対話
-    description: "ユーザーの関心・意図を起点にリポジトリの現状知識を前提として議論し、お題・提案・判断の3種に出力を確定させる"
+    description: "ユーザーの関心・意図を起点に議論し、お題・提案・判断を確定させ、ADR・効果局面ログへの外化までを一体の活動として行う。外化されない議論は成果物を生まない。レビュー知見は次の対話への還流"
     group: practice
   maintain_spec:
     label: 仕様改訂
@@ -159,10 +159,6 @@ process:
     label: カタログ整備
     description: 仕様の機能集合に対応する最小サンプルを追加・改訂する
     group: generation
-  record_insights:
-    label: 知見外化
-    description: "議論で確定した方法論判断を ADR に、効果を体感した局面を payoff_log に外化する。独立した作業ではなく対話の中で同時に行われる"
-    group: decision
   write_article:
     label: 記事執筆
     description: ADR 群を外部読者向け記事に編集する
@@ -199,7 +195,9 @@ statusStyles:
     style: filled
 ---
 
-user_intent >> discuss -> [topics, proposals, decisions]
+user_intent >> discuss -> [topics, proposals, decisions, adrs, payoff_log]
+
+findings >>? discuss
 
 gh_issues >> maintain_spec -> spec
 
@@ -216,8 +214,6 @@ spec >> maintain_samples -> feature_samples
 [examples, skill] >> review_examples -> findings
 
 toolchain >>? review_examples
-
-[findings, decisions] >> record_insights -> [adrs, payoff_log]
 
 [adrs, payoff_log] >> distill_ops -> ops_skill
 
