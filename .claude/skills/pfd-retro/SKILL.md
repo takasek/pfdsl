@@ -2,16 +2,19 @@
 name: pfd-retro
 description: |
   Use after a sustained stretch of design dialogue or work sessions, when the
-  user asks for a retrospective, or before consolidating ADRs — audits the
-  PFDs, the session's events, and the knowledge artifacts for the failure
-  modes that practice has actually produced, then routes findings into ops
-  improvements. Complements pfd-ops (which runs the cycle; this skill
-  improves it).
+  user asks for a retrospective, before consolidating ADRs — or when deeply
+  reviewing ANY .pfdsl diagram (layers A/B are session-independent review
+  prompts). Audits the PFDs, the session's events, and the knowledge
+  artifacts for the failure modes that practice has actually produced, then
+  routes findings into ops improvements. Complements pfd-ops (which runs the
+  cycle; this skill improves it).
 ---
 
 # PFD retrospective audit
 
 ユーザーの気付きに依存していた監査を再現可能にする。対象3層: 図（PFD）、セッションで実際に起きたこと、知識成果物。各問いには実例があり、すべて実際に検出された誤りに由来する。
+
+A・B 層はセッション文脈不要 — 任意の PFD のレビューに単体で適用できる（品質ガイドが「書くときのルール」、A・B は「問い詰めるときのプロンプト」）。C・D 層はふりかえり固有。
 
 ## A. 図 vs 現実
 
