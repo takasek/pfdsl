@@ -31,6 +31,10 @@
 		"tsup": "^8.0.0",
 		"vitest": "^1.6.0"
 	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/takasek/pfdsl"
+	},
 	"publishConfig": {
 		"access": "public"
 	}
