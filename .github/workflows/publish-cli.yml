@@ -1,0 +1,31 @@
+name: Publish CLI to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter "@pfdsl/cli..." build
+
+      - run: pnpm --filter "@pfdsl/cli..." test
+
+      - run: pnpm publish --no-git-checks --provenance
+        working-directory: packages/cli

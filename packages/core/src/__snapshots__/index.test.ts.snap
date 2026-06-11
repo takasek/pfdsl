@@ -14,7 +14,7 @@ layout:
 statusStyles:
   done:    { fillcolor: lightgray, style: filled, fontcolor: dimgray }
   wip:     { fillcolor: lightyellow, style: filled }
-  todo:    { fillcolor: white, style: filled }
+  todo:    { fillcolor: yellow, style: filled }
   blocked: { fillcolor: salmon, style: filled }
 
 artifact:
@@ -111,21 +111,27 @@ artifact:
     status: done
   rc_extension:
     label: リリース候補版
-    status: todo
+    status: done
   published_extension:
     label: 公開版拡張
-    status: todo
+    status: done
   workflow_usage:
     label: 日常運用知見
     status: todo
   cli_tool:
     label: CLIツール
     status: done
-  ci_integration:
-    label: CI連携
-    status: todo
+  metadata_exporter:
+    label: メタデータエクスポータ
+    status: done
   diff_analyzer:
     label: 差分解析ツール
+    status: done
+  cli_published:
+    label: CLI npm公開
+    status: wip
+  agent_skill:
+    label: AI agentスキル (pfdsl読み書き)
     status: todo
 
 process:
@@ -191,10 +197,14 @@ process:
     label: 日常ワークフロー導入
   implement_cli_wrapper:
     label: CLIラッパー実装
-  implement_ci_actions:
-    label: CI Actions実装
+  implement_metadata_exporter:
+    label: メタデータエクスポータ実装
   implement_diff_analysis:
     label: 差分解析実装
+  publish_cli:
+    label: CLI npm公開
+  write_agent_skill:
+    label: AI agentスキル作成
 ---
 
 # Phase 0: アーキテクチャ定義
@@ -202,10 +212,11 @@ process:
 spec_v0_0_2 >> define_architecture
 define_architecture -> core_architecture
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_library
 core_modules
@@ -229,7 +240,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -240,6 +250,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -250,12 +261,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -267,6 +280,7 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 core_architecture >> define_build_policy
 core_architecture >> define_repo_structure
@@ -275,9 +289,10 @@ define_build_policy -> build_config
 define_repo_structure -> repo_scaffold
 define_shared_types -> shared_types
 adopt_daily_workflow
+agent_skill
 ast_schema
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_library
 core_modules
@@ -299,7 +314,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -310,6 +324,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -320,12 +335,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -336,6 +353,7 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 core_architecture >> define_ast_schema
 core_architecture >> define_diagnostic_schema
@@ -346,9 +364,10 @@ define_diagnostic_schema -> diagnostic_schema
 define_graph_schema -> graph_schema
 define_token_rules -> token_spec
 adopt_daily_workflow
+agent_skill
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_library
 core_modules
@@ -367,7 +386,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -378,6 +396,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -388,12 +407,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -405,6 +426,7 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 # Phase 1: コア層実装
 
@@ -412,10 +434,11 @@ workflow_usage
 shared_types >> implement_frontmatter_loader
 implement_frontmatter_loader -> frontmatter_loader
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -440,7 +463,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -450,6 +472,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -460,12 +483,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -477,15 +502,17 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 shared_types >> implement_lexer
 token_spec >> implement_lexer
 implement_lexer -> lexer
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -511,7 +538,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -521,6 +547,7 @@ implement_frontmatter_loader
 implement_graphviz_exporter
 implement_hover_support
 implement_language_service
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -530,12 +557,14 @@ implement_validator
 integrate_core_modules
 integrate_vscode_extension
 language_service
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -546,6 +575,7 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 ast_schema >> implement_parser
 frontmatter_loader >> implement_parser
@@ -554,9 +584,10 @@ shared_types >> implement_parser
 token_spec >> implement_parser
 implement_parser -> parser
 adopt_daily_workflow
+agent_skill
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -581,7 +612,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -592,6 +622,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_preview_engine
 implement_preview_panel
@@ -600,11 +631,13 @@ implement_validator
 integrate_core_modules
 integrate_vscode_extension
 language_service
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -615,15 +648,17 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 graph_schema >> implement_normalizer
 parser >> implement_normalizer
 implement_normalizer -> normalizer
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -648,7 +683,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -659,6 +693,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_parser
 implement_preview_engine
 implement_preview_panel
@@ -668,10 +703,12 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 package_core_library
 package_release_candidate
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -684,14 +721,16 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 graph_schema >> implement_canonical_sorter
 normalizer >> implement_canonical_sorter
 implement_canonical_sorter -> canonical_sorter
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -715,7 +754,6 @@ graphviz_exporter
 group_subgraph_export
 group_types
 hover_support
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -726,6 +764,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -736,11 +775,13 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -753,15 +794,17 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 diagnostic_schema >> implement_validator
 normalizer >> implement_validator
 implement_validator -> validator
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -786,7 +829,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -797,6 +839,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -806,11 +849,13 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -822,14 +867,16 @@ token_spec
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 canonical_sorter >> implement_formatter
 parser >> implement_formatter
 implement_formatter -> formatter
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -854,7 +901,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -864,6 +910,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -874,11 +921,13 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -891,6 +940,7 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 canonical_sorter >> integrate_core_modules
 formatter >> integrate_core_modules
@@ -901,9 +951,10 @@ parser >> integrate_core_modules
 validator >> integrate_core_modules
 integrate_core_modules -> core_modules
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -926,7 +977,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -937,6 +987,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -945,10 +996,12 @@ implement_syntax_highlight
 implement_validator
 integrate_vscode_extension
 language_service
+metadata_exporter
 package_core_library
 package_release_candidate
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -960,15 +1013,17 @@ token_spec
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 build_config >> package_core_library
 core_modules >> package_core_library
 repo_scaffold >> package_core_library
 package_core_library -> core_library
 adopt_daily_workflow
+agent_skill
 ast_schema
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 create_vscode_extension_shell
@@ -992,7 +1047,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -1003,6 +1057,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -1013,11 +1068,13 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -1029,16 +1086,18 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 # Phase 2: 出力層
 
 core_library >> implement_graphviz_exporter
 implement_graphviz_exporter -> graphviz_exporter
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_modules
@@ -1062,7 +1121,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -1072,6 +1130,7 @@ implement_frontmatter_loader
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -1082,12 +1141,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -1100,6 +1161,7 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 # v0.0.5: group 概念 (subgraph cluster)
 graphviz_exporter >> implement_group_subgraph_export
@@ -1108,10 +1170,11 @@ implement_group_types -> group_types
 group_types >> implement_group_subgraph_export
 implement_group_subgraph_export -> group_subgraph_export
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -1134,7 +1197,6 @@ frontmatter_loader
 graph_schema
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -1145,6 +1207,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -1155,12 +1218,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -1172,15 +1237,17 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 core_library >> implement_preview_engine
 graphviz_exporter >> implement_preview_engine
 implement_preview_engine -> preview_engine
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_modules
@@ -1204,7 +1271,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -1215,6 +1281,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_panel
@@ -1224,11 +1291,13 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -1241,14 +1310,16 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 core_library >> implement_cli_wrapper
 implement_cli_wrapper -> cli_tool
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 core_architecture
 core_modules
 create_vscode_extension_shell
@@ -1272,7 +1343,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_diagnostics_ui
 implement_diff_analysis
 implement_format_command
@@ -1282,6 +1352,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -1292,12 +1363,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -1310,16 +1383,18 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 # Phase 3: VSCode 拡張
 
 repo_scaffold >> create_vscode_extension_shell
 create_vscode_extension_shell -> vscode_shell
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -1344,7 +1419,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -1355,6 +1429,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -1365,12 +1440,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -1381,6 +1458,7 @@ token_spec
 validator
 vscode_extension
 workflow_usage
+write_agent_skill
 
 core_library >> implement_diagnostics_ui
 core_library >> implement_format_command
@@ -1400,10 +1478,11 @@ implement_language_service -> language_service
 implement_preview_panel -> preview_panel
 implement_syntax_highlight -> syntax_highlight
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_modules
@@ -1425,13 +1504,13 @@ graphviz_exporter
 group_subgraph_export
 group_types
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diff_analysis
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -1439,10 +1518,12 @@ implement_validator
 integrate_core_modules
 integrate_vscode_extension
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -1453,6 +1534,7 @@ token_spec
 validator
 vscode_extension
 workflow_usage
+write_agent_skill
 
 diagnostics_ui >> integrate_vscode_extension
 format_command >> integrate_vscode_extension
@@ -1462,10 +1544,11 @@ preview_panel >> integrate_vscode_extension
 syntax_highlight >> integrate_vscode_extension
 integrate_vscode_extension -> vscode_extension
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -1488,7 +1571,6 @@ graphviz_exporter
 group_subgraph_export
 group_types
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -1499,6 +1581,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -1507,11 +1590,13 @@ implement_syntax_highlight
 implement_validator
 integrate_core_modules
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -1522,16 +1607,18 @@ token_spec
 validator
 vscode_shell
 workflow_usage
+write_agent_skill
 
 # Phase 4: リリース
 
 vscode_extension >> package_release_candidate
 package_release_candidate -> rc_extension
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -1557,7 +1644,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -1568,6 +1654,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -1578,11 +1665,13 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 release_marketplace
 repo_scaffold
@@ -1593,14 +1682,16 @@ token_spec
 validator
 vscode_shell
 workflow_usage
+write_agent_skill
 
 rc_extension >> release_marketplace
 release_marketplace -> published_extension
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -1626,7 +1717,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -1637,6 +1727,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -1647,12 +1738,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 repo_scaffold
 shared_types
 spec_v0_0_2
@@ -1662,15 +1755,17 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 
 # Phase 5: 日常運用・継続改善
 
 published_extension >> adopt_daily_workflow
 adopt_daily_workflow -> workflow_usage
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -1696,7 +1791,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -1707,6 +1801,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_engine
@@ -1717,12 +1812,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 rc_extension
 release_marketplace
 repo_scaffold
@@ -1733,16 +1830,18 @@ token_spec
 validator
 vscode_extension
 vscode_shell
+write_agent_skill
 
 # 運用知見を実装プロセスへフィードバック (生成元は変更しない)
 workflow_usage >>? implement_formatter
 workflow_usage >>? implement_preview_engine
 workflow_usage >>? implement_validator
 adopt_daily_workflow
+agent_skill
 ast_schema
 build_config
 canonical_sorter
-ci_integration
+cli_published
 cli_tool
 core_architecture
 core_library
@@ -1768,7 +1867,6 @@ group_subgraph_export
 group_types
 hover_support
 implement_canonical_sorter
-implement_ci_actions
 implement_cli_wrapper
 implement_diagnostics_ui
 implement_diff_analysis
@@ -1778,6 +1876,7 @@ implement_graphviz_exporter
 implement_hover_support
 implement_language_service
 implement_lexer
+implement_metadata_exporter
 implement_normalizer
 implement_parser
 implement_preview_panel
@@ -1786,12 +1885,14 @@ integrate_core_modules
 integrate_vscode_extension
 language_service
 lexer
+metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
 parser
 preview_engine
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -1803,21 +1904,23 @@ token_spec
 validator
 vscode_extension
 vscode_shell
+write_agent_skill
 
 # 周辺ツール
 
-cli_tool >> implement_ci_actions
 cli_tool >> implement_diff_analysis
-published_extension >> implement_ci_actions
-published_extension >> implement_diff_analysis
-implement_ci_actions -> ci_integration
+cli_tool >> publish_cli
+cli_tool >> write_agent_skill
 implement_diff_analysis -> diff_analyzer
+publish_cli -> cli_published
+write_agent_skill -> agent_skill
+core_library >> implement_metadata_exporter
+implement_metadata_exporter -> metadata_exporter
 adopt_daily_workflow
 ast_schema
 build_config
 canonical_sorter
 core_architecture
-core_library
 core_modules
 create_vscode_extension_shell
 define_architecture
@@ -1864,6 +1967,7 @@ package_release_candidate
 parser
 preview_engine
 preview_panel
+published_extension
 rc_extension
 release_marketplace
 repo_scaffold
