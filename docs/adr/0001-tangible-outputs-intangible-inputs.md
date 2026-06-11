@@ -30,7 +30,7 @@ PFD（Process Flow Diagram）の成果物として「理解」「合意」のよ
 2. **status 管理不能**: done/wip/todo の判定に外部判断が必要になる
 3. **引き継ぎ不能**: 後続プロセスへの確実な受け渡しができない
 
-XDDP（Extended Derivative Development Process、清水吉男）のスペックアウトは
+XDDP（eXtreme Derivative Development Process、清水吉男）のスペックアウトは
 「理解の外化」の制度化として、この方向性と整合している。
 
 一方、不定形入力の明示はむしろ**依存の可視化**として価値がある。
