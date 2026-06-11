@@ -163,7 +163,7 @@ process:
     group: practice
   review_examples:
     label: 実践例レビュー
-    description: "品質ガイド（skill）とツール検証で実践例を監査し知見を抽出する。toolchain は世代をまたぐ還流入力"
+    description: "品質ガイド（skill）とツール検証で実践例を監査し知見を抽出する。skill・toolchain は世代をまたぐ還流入力（ADR-0011）"
     group: practice
   maintain_samples:
     label: カタログ整備
@@ -223,11 +223,13 @@ spec >> maintain_samples -> feature_samples
 
 [spec, skill_template, feature_samples] >> gen_skill -> skill
 
-[skill, topics] >> write_examples -> examples
+topics >> write_examples -> examples
 
-[examples, skill] >> review_examples -> findings
+skill >>? write_examples
 
-toolchain >>? review_examples
+examples >> review_examples -> findings
+
+[skill, toolchain] >>? review_examples
 
 [adrs, payoff_log] >> distill_ops -> ops_skill
 
@@ -239,7 +241,9 @@ findings >>? file_issues
 
 gh_issues >> map_deps -> issues_flow
 
-[gh_issues, issues_flow, ops_skill, spec] >> develop -> [toolchain, impl_flow, issue_updates]
+[gh_issues, issues_flow, spec] >> develop -> [toolchain, impl_flow, issue_updates]
+
+ops_skill >>? develop
 
 impl_flow >>? develop
 
