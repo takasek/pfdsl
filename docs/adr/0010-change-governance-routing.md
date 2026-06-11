@@ -21,11 +21,11 @@
 変更対象によって入力経路を分ける。
 
 - **仕様改訂**は `gh_issues`（GitHub Issues）を唯一の入力とする。
-  経路: `proposals >> issue_management -> gh_issues >> maintain_spec -> spec`。
+  経路: `proposals >> file_issues -> gh_issues >> maintain_spec -> spec`。
   `decisions` から `maintain_spec` への直結エッジは存在しない。
 
 - **スキル・品質ガイドの改善**は `decisions`（対話の判断）から直結する。
-  経路: `decisions >> improve_skill -> skill`。
+  経路: `[spec, decisions] >> maintain_template -> skill_template`（gen_skill 経由で skill に反映）。
   issue 管理ゲートを挟まない。
 
 この接続パターンを図に固定することで、変更経路は `graph` コマンドの出力から
