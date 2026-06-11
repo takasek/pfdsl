@@ -17,13 +17,16 @@ importers:
 
   packages/cli:
     dependencies:
+      '@hpcc-js/wasm':
+        specifier: ^2.18.0
+        version: 2.33.5
+    devDependencies:
       '@pfdsl/core':
         specifier: workspace:*
         version: link:../core
       '@pfdsl/preview-engine':
         specifier: workspace:*
         version: link:../preview-engine
-    devDependencies:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.39
