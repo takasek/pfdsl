@@ -59,8 +59,18 @@ artifact:
     label: マルチファイル意味論方針
     status: todo
     description: 共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料
+  adr_corpus:
+    label: "ADR 群 (docs/adr)"
+    status: done
+    description: 実践ラウンドから蒸留した方法論の設計決定記録6本
+  article:
+    label: "公開記事 (#12)"
+    status: todo
+    description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
 
 process:
+  write_article:
+    label: 記事執筆
   draft_multifile_specs:
     label: 階層・プリセット共同起草
     description: "#5 と #6 は決定が往復で形成される相互依存のため分割せず共同設計する。共有決定は方針記録として外化"
@@ -109,3 +119,5 @@ skill_gen >> restructure_skillgen -> restructured_gen
 cli_tool >> publish_cli -> published_cli
 
 [restructured_gen, published_cli] >> package_skill -> portable_skill
+
+adr_corpus >> write_article -> article
