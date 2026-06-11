@@ -139,19 +139,16 @@ process:
   review_examples:
     label: 実践例レビュー
     description: 品質ガイド+ツール検証で実践例を監査し知見を抽出する
-  record_adr:
-    label: ADR 記録
-    description: 議論で確定した方法論判断を ADR に外化する
-  record_payoff:
-    label: 局面記録
-    description: PFD の効果を体感した局面を日付・局面・効果・参照で記録する
+  record_insights:
+    label: 知見外化
+    description: "議論で確定した方法論判断を ADR に、効果を体感した局面を payoff_log に外化する。独立した作業ではなく対話の中で同時に行われる"
     group: decision
   write_article:
     label: 記事執筆
     description: ADR 群を外部読者向け記事に編集する
   file_issues:
     label: issue 管理
-    description: "起票・更新・クローズ。develop の完了報告を受けて issue を閉じ、issues_flow と同期する"
+    description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、issues_flow と同期する"
   map_deps:
     label: 依存整理
     description: issue 間の依存を PFD 化し着手順を導出する
@@ -182,9 +179,7 @@ statusStyles:
     style: filled
 ---
 
-dialogue >> maintain_spec -> spec
-
-gh_issues >>? maintain_spec
+[dialogue, gh_issues] >> maintain_spec -> spec
 
 spec >> maintain_template -> skill_template
 
@@ -196,15 +191,15 @@ spec >> maintain_template -> skill_template
 
 examples >> review_examples -> findings
 
-[findings, dialogue] >> record_adr -> adrs
-
-dialogue >> record_payoff -> payoff_log
+[findings, dialogue] >> record_insights -> [adrs, payoff_log]
 
 [adrs, payoff_log] >> distill_ops -> ops_skill
 
 [adrs, payoff_log] >> write_article -> article
 
-findings >> file_issues -> gh_issues
+dialogue >> file_issues -> gh_issues
+
+findings >>? file_issues
 
 gh_issues >> map_deps -> issues_flow
 
