@@ -55,8 +55,15 @@ artifact:
   portable_skill:
     label: "配布可能スキル (#11)"
     status: todo
+  multifile_policy:
+    label: マルチファイル意味論方針
+    status: todo
+    description: ID スコープ・設定継承の解決順・ファイル間参照の設計方針。階層PFD(#5)と共有プリセット(#6)が共有する前提
 
 process:
+  design_multifile:
+    label: マルチファイル方針設計
+    description: 階層とプリセットが別々の継承機構を発明しないよう共通方針を先に定める
   draft_hierarchy:
     label: 階層仕様起草
   draft_presets:
@@ -87,9 +94,11 @@ statusStyles:
   blocked: { fillcolor: "#f8d7da", style: filled }
 ---
 
-spec_v006 >> draft_hierarchy -> hierarchy_spec
+spec_v006 >> design_multifile -> multifile_policy
 
-spec_v006 >> draft_presets -> presets_spec
+[spec_v006, multifile_policy] >> draft_hierarchy -> hierarchy_spec
+
+[spec_v006, multifile_policy] >> draft_presets -> presets_spec
 
 spec_v006 >> draft_criteria -> criteria_spec
 
