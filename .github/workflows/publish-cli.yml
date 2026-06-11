@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -26,7 +27,5 @@ jobs:
 
       - run: pnpm --filter "@pfdsl/cli..." test
 
-      - run: pnpm publish --no-git-checks
+      - run: pnpm publish --no-git-checks --provenance
         working-directory: packages/cli
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
