@@ -29,3 +29,5 @@ jobs:
 
       - run: pnpm publish --no-git-checks --provenance
         working-directory: packages/cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
