@@ -44,10 +44,18 @@ artifact:
     label: ユーザーの関心・意図
     group: practice
     description: "何を作るか・何を問うかの源泉。不定形のフロー外リソース（ADR-0001 の実証例）"
-  dialogue:
-    label: 対話記録
+  topics:
+    label: 実践お題
     group: practice
-    description: "ユーザーとの設計対話の内容。セッションログとして実体化する検証可能な成果物。方法論判断・お題・仕様提案の供給源"
+    description: "対話で設定された実践 PFD の題材・シナリオ。write_examples の入力"
+  proposals:
+    label: 作業・仕様提案
+    group: practice
+    description: "対話で生まれた作業項目・仕様変更案。正式化は必ず file_issues を通る — 仕様変更が issue を経由する唯一の入口"
+  decisions:
+    label: 方法論判断
+    group: practice
+    description: "対話で確定した方法論・運用の判断と効果の体感。ADR 化（record_insights）と品質ガイド即時反映（maintain_template）の2経路で消費 — スキル改善は issue を通さない。実体はセッションログと反映先コミットで検証可能"
   examples:
     label: 実践例
     status: done
@@ -125,14 +133,14 @@ process:
     group: generation
   maintain_template:
     label: テンプレート整備
-    description: 仕様変更・レビュー知見・ADR 決定を品質ガイドへ反映する
+    description: "仕様変更・対話の判断・レビュー知見・ADR 決定を品質ガイドへ反映する。スキル改善は issue を通さず対話から直接行う"
   discuss:
     label: 設計対話
-    description: "ユーザーの関心・意図を起点にリポジトリの現状知識を前提として議論する。全ての知識成果物の上流活動"
+    description: "ユーザーの関心・意図を起点にリポジトリの現状知識を前提として議論し、お題・提案・判断の3種に出力を確定させる"
     group: practice
   maintain_spec:
     label: 仕様改訂
-    description: "設計対話と仕様提案 issue を仕様書に反映する。提案→起草→統合の詳細は issues_flow 参照"
+    description: "仕様提案 issue を仕様書に反映する。仕様変更は必ず issue を通す（外部消費者・互換性に関わるため）。提案→起草→統合の詳細は issues_flow 参照"
     group: generation
   publish_cli:
     label: CLI 公開
@@ -191,11 +199,11 @@ statusStyles:
     style: filled
 ---
 
-user_intent >> discuss -> dialogue
+user_intent >> discuss -> [topics, proposals, decisions]
 
-[dialogue, gh_issues] >> maintain_spec -> spec
+gh_issues >> maintain_spec -> spec
 
-spec >> maintain_template -> skill_template
+[spec, decisions] >> maintain_template -> skill_template
 
 spec >> maintain_samples -> feature_samples
 
@@ -203,19 +211,19 @@ spec >> maintain_samples -> feature_samples
 
 [spec, skill_template, feature_samples] >> gen_skill -> skill
 
-[skill, dialogue] >> write_examples -> examples
+[skill, topics] >> write_examples -> examples
 
 [examples, skill] >> review_examples -> findings
 
 toolchain >>? review_examples
 
-[findings, dialogue] >> record_insights -> [adrs, payoff_log]
+[findings, decisions] >> record_insights -> [adrs, payoff_log]
 
 [adrs, payoff_log] >> distill_ops -> ops_skill
 
 [adrs, payoff_log] >> write_article -> article
 
-dialogue >> file_issues -> gh_issues
+proposals >> file_issues -> gh_issues
 
 findings >>? file_issues
 
