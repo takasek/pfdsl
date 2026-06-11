@@ -54,8 +54,8 @@ artifact:
     status: todo
   published_cli:
     label: npm公開済みCLI
-    status: todo
-    description: roadmap 既存項目（docs/pfdsl_implementation_flow.pfdsl の cli_published に対応）
+    status: wip
+    description: roadmap 既存項目（docs/pfdsl_implementation_flow.pfdsl の cli_published に対応）。作業ブランチ worktree-feat+cli-publish で実装済み、残は merge・NPM_TOKEN・tag push
   portable_skill:
     label: "配布可能スキル (#11)"
     status: todo
