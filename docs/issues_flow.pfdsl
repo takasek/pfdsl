@@ -76,9 +76,9 @@ artifact:
     status: todo
     description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
   viewer_ux:
-    label: "描画・preview UX 改善 (#15, #16)"
+    label: "描画・preview UX 改善 (#15, #16, #17)"
     status: todo
-    description: "group クラスタの塗りつぶし描画と、graph ノード⇔YAML 定義間のジャンプ・トグル"
+    description: "group クラスタの塗りつぶし描画、graph ノード⇔YAML 定義間のジャンプ・トグル、大規模図の閲覧支援"
 
 process:
   write_article:
