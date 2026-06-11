@@ -59,6 +59,11 @@ artifact:
     status: done
     group: decision
     description: "docs/adr/。方法論の設計決定記録。記事の原稿素材、ガイド改訂の根拠"
+  payoff_log:
+    label: 効果局面ログ
+    status: done
+    group: decision
+    description: "docs/pfd_payoff_log.md。PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材。効果を体感した時に追記"
   article:
     label: 公開記事
     status: todo
@@ -101,6 +106,10 @@ process:
   record_adr:
     label: ADR 記録
     description: 議論で確定した方法論判断を ADR に外化する
+  record_payoff:
+    label: 局面記録
+    description: PFD の効果を体感した局面を日付・局面・効果・参照で記録する
+    group: decision
   write_article:
     label: 記事執筆
     description: ADR 群を外部読者向け記事に編集する
@@ -140,7 +149,9 @@ examples >> review_examples -> findings
 
 [findings, dialogue] >> record_adr -> adrs
 
-adrs >> write_article -> article
+dialogue >> record_payoff -> payoff_log
+
+[adrs, payoff_log] >> write_article -> article
 
 findings >> file_issues -> gh_issues
 
