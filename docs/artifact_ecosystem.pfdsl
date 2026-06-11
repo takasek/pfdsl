@@ -61,7 +61,7 @@ artifact:
   decisions:
     label: 方法論判断
     group: dialogue
-    description: "対話で確定した方法論・運用の判断。品質ガイド即時反映（maintain_template）で消費 — スキル改善は issue を通さない。ADR 級の判断は discuss が adrs として直接外化する。実体はセッションログと反映先コミットで検証可能"
+    description: "対話で確定した方法論・運用の判断。品質ガイド即時反映（maintain_template）とADR 起草（draft_adrs）の2経路で消費 — スキル改善は issue を通さない。実体はセッションログと反映先コミットで検証可能"
   examples:
     label: 実践例
     status: done
@@ -143,8 +143,12 @@ process:
     group: generation
   discuss:
     label: 設計対話
-    description: "ユーザーの関心・意図を起点に議論し、お題・提案・判断を確定させ、ADR・効果局面ログへの外化までを一体の活動として行う。外化されない議論は成果物を生まない。レビュー知見は次の対話への還流"
+    description: "ユーザーの関心・意図を起点に議論し、お題・提案・判断を確定させる。効果局面ログへの追記（数行の事実記録）までは対話の終端動作。レビュー知見は次の対話への還流"
     group: dialogue
+  draft_adrs:
+    label: ADR 起草
+    description: "対話で確定した判断を ADR 文書に起草する。委譲可能な独立作業 — 参照する図・成果物の実物と突合して ID・経路を検証する（突合を欠くと捏造が発生することが実証済み）"
+    group: decision
   maintain_spec:
     label: 仕様改訂
     description: "仕様提案 issue を仕様書に反映する。仕様変更は必ず issue を通す（外部消費者・互換性に関わるため）。提案→起草→統合の詳細は issues_flow 参照"
@@ -209,7 +213,9 @@ statusStyles:
     style: filled
 ---
 
-user_intent >> discuss -> [topics, proposals, decisions, adrs, payoff_log]
+user_intent >> discuss -> [topics, proposals, decisions, payoff_log]
+
+decisions >> draft_adrs -> adrs
 
 findings >>? discuss
 
