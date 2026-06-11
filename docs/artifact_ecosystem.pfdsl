@@ -89,8 +89,17 @@ artifact:
     status: done
     group: planning
     description: "packages/。check/graph/fmt/diff。実装の本質成果物"
+  ops_skill:
+    label: PFD運用スキル
+    status: done
+    group: generation
+    description: ".claude/skills/pfd-ops/。PFD によるプロジェクト運用プロトコル。着手判断・進捗更新・成果物追加・知見振り分けの手順書。手書き（生成対象外）"
 
 process:
+  distill_ops:
+    label: 運用プロトコル蒸留
+    description: ADR と効果局面ログから運用手順を抽出しスキル化する
+    group: generation
   maintain_template:
     label: テンプレート整備
     description: 仕様変更・レビュー知見・ADR 決定を品質ガイドへ反映する
@@ -151,12 +160,14 @@ examples >> review_examples -> findings
 
 dialogue >> record_payoff -> payoff_log
 
+[adrs, payoff_log] >> distill_ops -> ops_skill
+
 [adrs, payoff_log] >> write_article -> article
 
 findings >> file_issues -> gh_issues
 
 gh_issues >> map_deps -> issues_flow
 
-[gh_issues, issues_flow] >> develop -> [cli_tool, impl_flow]
+[gh_issues, issues_flow, ops_skill] >> develop -> [cli_tool, impl_flow]
 
 impl_flow >>? develop
