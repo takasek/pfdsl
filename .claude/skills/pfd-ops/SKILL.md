@@ -38,6 +38,7 @@ description: |
 2. **実行**: 対応する GitHub issue が一次情報。PFD の読み書きは pfdsl スキルの品質ガイドに従う。まとまった執筆・実装は subagent に委譲し、本体は指示と評価に専念する
 3. **反映 — 終端ゲート（全項目を明示的に確認。「該当なし」も判断として記録）**:
    - [ ] 出力 artifact の status を更新した（issues_flow / implementation_flow）
+   - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
    - [ ] 知見を3経路に振り分けた（品質ガイド改訂 / ADR / 新 issue + 依存チェーン追加）
    - [ ] PFD が効いた局面があれば `docs/pfd_payoff_log.md` に追記した
    - [ ] 実行中に発見した新プロセス・成果物を計画 PFD に追記した（消費者を明示できないものは作らない）
