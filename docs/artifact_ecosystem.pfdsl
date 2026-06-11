@@ -121,6 +121,11 @@ artifact:
     status: done
     group: generation
     description: ".claude/skills/pfd-ops/ と /pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル（選択→実行→終端ゲート→報告）。手書き（生成対象外）"
+  retro_skill:
+    label: ふりかえり監査スキル
+    status: done
+    group: generation
+    description: ".claude/skills/pfd-retro/ と /pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）"
   sample_previews:
     label: サンプル描画物
     status: done
@@ -135,7 +140,7 @@ artifact:
 process:
   distill_ops:
     label: 運用プロトコル蒸留
-    description: ADR と効果局面ログから運用手順を抽出しスキル化する
+    description: ADR と効果局面ログから運用手順・監査カタログを抽出しスキル化する
     group: generation
   maintain_template:
     label: テンプレート整備
@@ -237,7 +242,9 @@ examples >> review_examples -> findings
 
 [skill, toolchain] >>? review_examples
 
-[adrs, payoff_log] >> distill_ops -> ops_skill
+[adrs, payoff_log] >> distill_ops -> [ops_skill, retro_skill]
+
+retro_skill >>? discuss
 
 [adrs, payoff_log] >> write_article -> article
 
