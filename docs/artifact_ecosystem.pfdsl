@@ -1,0 +1,151 @@
+---
+title: リポジトリ成果物の生態系
+description: 各成果物の生成元と利用局面を明示し、形骸化（消費者のない成果物）を構造的に検出可能にする。新しい知識成果物を追加する際は本図に消費者を書けることを確認する
+layout:
+  direction: LR
+  maxWidth: 130
+
+group:
+  generation:
+    label: スキル生成系
+    color: "#e8f4fd"
+  practice:
+    label: 実践ループ
+    color: "#fef9e7"
+  decision:
+    label: 意思決定・公開
+    color: "#fdf2f8"
+  planning:
+    label: 計画・実装
+    color: "#eafaf1"
+
+artifact:
+  spec:
+    label: 言語仕様書
+    status: done
+    group: generation
+    description: "docs/spec/spec.md。一次情報。スキル生成と全ドキュメントの根拠。改版の依存は docs/issues_flow.pfdsl 参照"
+  skill_template:
+    label: スキルテンプレート
+    status: done
+    group: generation
+    description: "scripts/gen-skill.mjs 内（#10 で Markdown 分離予定）。品質ガイドの正本。知見・ADR の反映先"
+  feature_samples:
+    label: 機能カタログ
+    status: done
+    group: generation
+    description: "docs/samples/。1機能1ファイルの最小例。skill の references/samples.md の生成元"
+  skill:
+    label: AI agent スキル
+    status: done
+    group: generation
+    description: ".claude/skills/pfdsl/。make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点"
+  dialogue:
+    label: 設計対話
+    group: practice
+    description: "ユーザーとの議論。不定形のフロー外リソース（ADR-0001 の実証例）。お題設定と方法論判断の源泉"
+  examples:
+    label: 実践例
+    status: done
+    group: practice
+    description: "docs/examples/。品質ガイドの実証とレビュー素材。スキル参照への採録候補"
+  findings:
+    label: レビュー知見
+    status: done
+    group: practice
+    description: "実践例レビューで得た品質知見。ガイド改訂・ADR・issue の3経路で消費される"
+  adrs:
+    label: ADR
+    status: done
+    group: decision
+    description: "docs/adr/。方法論の設計決定記録。記事の原稿素材、ガイド改訂の根拠"
+  article:
+    label: 公開記事
+    status: todo
+    group: decision
+    description: "ADR 群を素材とした外部公開記事。本生態系の最終納品物のひとつ"
+  gh_issues:
+    label: GitHub issues
+    status: done
+    group: planning
+    description: "github.com/takasek/pfdsl/issues。作業項目の一次情報"
+  issues_flow:
+    label: issue 依存グラフ
+    status: done
+    group: planning
+    description: "docs/issues_flow.pfdsl。着手可能順序の導出。issue 追加時に更新"
+  impl_flow:
+    label: 実装ロードマップ
+    status: done
+    group: planning
+    description: "docs/pfdsl_implementation_flow.pfdsl。実装進捗の dogfooding 記録。作業完了時に status 更新"
+  cli_tool:
+    label: CLI ツールチェーン
+    status: done
+    group: planning
+    description: "packages/。check/graph/fmt/diff。実装の本質成果物"
+
+process:
+  maintain_template:
+    label: テンプレート整備
+    description: 仕様変更・レビュー知見・ADR 決定を品質ガイドへ反映する
+  gen_skill:
+    label: スキル生成
+    description: make gen-skill
+  write_examples:
+    label: 実践例執筆
+    description: お題に対しスキルの品質ガイドに従って PFD を書く
+  review_examples:
+    label: 実践例レビュー
+    description: 品質ガイド+ツール検証で実践例を監査し知見を抽出する
+  record_adr:
+    label: ADR 記録
+    description: 議論で確定した方法論判断を ADR に外化する
+  write_article:
+    label: 記事執筆
+    description: ADR 群を外部読者向け記事に編集する
+  file_issues:
+    label: issue 起票
+  map_deps:
+    label: 依存整理
+    description: issue 間の依存を PFD 化し着手順を導出する
+  develop:
+    label: ツールチェーン開発
+    description: 着手可能 issue を実装し進捗をロードマップに記録する
+
+statusStyles:
+  done:
+    fillcolor: "#d4edda"
+    style: filled
+  wip:
+    fillcolor: "#fff3cd"
+    style: filled
+  todo:
+    fillcolor: "#f8f9fa"
+    style: filled
+  blocked:
+    fillcolor: "#f8d7da"
+    style: filled
+---
+
+spec >> maintain_template -> skill_template
+
+[findings, adrs] >>? maintain_template
+
+[spec, skill_template, feature_samples] >> gen_skill -> skill
+
+[skill, dialogue] >> write_examples -> examples
+
+examples >> review_examples -> findings
+
+[findings, dialogue] >> record_adr -> adrs
+
+adrs >> write_article -> article
+
+findings >> file_issues -> gh_issues
+
+gh_issues >> map_deps -> issues_flow
+
+[gh_issues, issues_flow] >> develop -> [cli_tool, impl_flow]
+
+impl_flow >>? develop
