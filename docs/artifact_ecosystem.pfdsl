@@ -94,6 +94,16 @@ artifact:
     status: done
     group: generation
     description: ".claude/skills/pfd-ops/ と /pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル（選択→実行→終端ゲート→報告）。手書き（生成対象外）"
+  sample_previews:
+    label: サンプル描画物
+    status: done
+    group: generation
+    description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samples で再生成。サンプル・ロードマップ変更時に更新（make push がドリフト検知）。README から参照される"
+  readme:
+    label: README
+    status: done
+    group: decision
+    description: "README.md。外部利用者向けの導入文書。CLI のインストール手順・サンプル描画物への参照を含むため、CLI 公開形態やサンプル変更時に追従更新が必要"
 
 process:
   distill_ops:
@@ -130,6 +140,14 @@ process:
   develop:
     label: ツールチェーン開発
     description: 着手可能 issue を実装し進捗をロードマップに記録する
+  render_previews:
+    label: サンプル描画
+    description: "make gen-samples。機能カタログとロードマップを dot/svg に描画する"
+    group: generation
+  update_readme:
+    label: README 更新
+    description: CLI の提供形態・サンプル構成の変更を導入文書に反映する
+    group: decision
 
 statusStyles:
   done:
@@ -171,3 +189,7 @@ gh_issues >> map_deps -> issues_flow
 [gh_issues, issues_flow, ops_skill] >> develop -> [cli_tool, impl_flow]
 
 impl_flow >>? develop
+
+[feature_samples, impl_flow, cli_tool] >> render_previews -> sample_previews
+
+[cli_tool, sample_previews] >> update_readme -> readme
