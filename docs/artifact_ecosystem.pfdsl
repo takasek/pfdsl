@@ -6,18 +6,24 @@ layout:
   maxWidth: 130
 
 group:
+  dialogue:
+    label: 対話
+    color: "#f3e8fd"
   generation:
-    label: スキル生成系
+    label: 仕様・スキル整備
     color: "#e8f4fd"
   practice:
     label: 実践ループ
     color: "#fef9e7"
   decision:
-    label: 意思決定・公開
+    label: 知識記録
     color: "#fdf2f8"
   planning:
     label: 計画・実装
     color: "#eafaf1"
+  release:
+    label: 公開・配布
+    color: "#fde8e8"
 
 artifact:
   spec:
@@ -42,19 +48,19 @@ artifact:
     description: ".claude/skills/pfdsl/。make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点"
   user_intent:
     label: ユーザーの関心・意図
-    group: practice
+    group: dialogue
     description: "何を作るか・何を問うかの源泉。不定形のフロー外リソース（ADR-0001 の実証例）"
   topics:
     label: 実践お題
-    group: practice
+    group: dialogue
     description: "対話で設定された実践 PFD の題材・シナリオ。write_examples の入力"
   proposals:
     label: 作業・仕様提案
-    group: practice
+    group: dialogue
     description: "対話で生まれた作業項目・仕様変更案。正式化は必ず file_issues を通る — 仕様変更が issue を経由する唯一の入口"
   decisions:
     label: 方法論判断
-    group: practice
+    group: dialogue
     description: "対話で確定した方法論・運用の判断。品質ガイド即時反映（maintain_template）で消費 — スキル改善は issue を通さない。ADR 級の判断は discuss が adrs として直接外化する。実体はセッションログと反映先コミットで検証可能"
   examples:
     label: 実践例
@@ -104,7 +110,7 @@ artifact:
   published_cli:
     label: npm 公開 CLI
     status: done
-    group: planning
+    group: release
     description: "@pfdsl/cli（npm）。外部利用者向け配布物。toolchain の CLI 部分が変更されたら公開が必要 — v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC、公開作業は自動化済み）"
   issue_updates:
     label: issue 更新内容
@@ -118,12 +124,12 @@ artifact:
   sample_previews:
     label: サンプル描画物
     status: done
-    group: generation
+    group: release
     description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samples で再生成。サンプル・ロードマップ変更時に更新（make push がドリフト検知）。GitHub 上の閲覧用終端成果物（README からリンクされるが README 執筆の入力ではない）"
   readme:
     label: README
     status: done
-    group: decision
+    group: release
     description: "README.md。外部利用者向けの導入文書。CLI のインストール手順・サンプル描画物への参照を含むため、CLI 公開形態やサンプル変更時に追従更新が必要"
 
 process:
@@ -134,10 +140,11 @@ process:
   maintain_template:
     label: テンプレート整備
     description: "仕様変更・対話の判断・レビュー知見・ADR 決定を品質ガイドへ反映する。スキル改善は issue を通さず対話から直接行う"
+    group: generation
   discuss:
     label: 設計対話
     description: "ユーザーの関心・意図を起点に議論し、お題・提案・判断を確定させ、ADR・効果局面ログへの外化までを一体の活動として行う。外化されない議論は成果物を生まない。レビュー知見は次の対話への還流"
-    group: practice
+    group: dialogue
   maintain_spec:
     label: 仕様改訂
     description: "仕様提案 issue を仕様書に反映する。仕様変更は必ず issue を通す（外部消費者・互換性に関わるため）。提案→起草→統合の詳細は issues_flow 参照"
@@ -145,16 +152,19 @@ process:
   publish_cli:
     label: CLI 公開
     description: "自動化済み: v* tag push → GitHub Actions → npm publish。手作業は tag push のみ"
-    group: planning
+    group: release
   gen_skill:
     label: スキル生成
     description: make gen-skill
+    group: generation
   write_examples:
     label: 実践例執筆
     description: お題に対しスキルの品質ガイドに従って PFD を書く
+    group: practice
   review_examples:
     label: 実践例レビュー
     description: "品質ガイド（skill）とツール検証で実践例を監査し知見を抽出する。toolchain は世代をまたぐ還流入力"
+    group: practice
   maintain_samples:
     label: カタログ整備
     description: 仕様の機能集合に対応する最小サンプルを追加・改訂する
@@ -162,23 +172,27 @@ process:
   write_article:
     label: 記事執筆
     description: ADR 群を外部読者向け記事に編集する
+    group: decision
   file_issues:
     label: issue 管理
     description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、issues_flow と同期する"
+    group: planning
   map_deps:
     label: 依存整理
     description: issue 間の依存を PFD 化し着手順を導出する
+    group: planning
   develop:
     label: ツールチェーン開発
     description: 着手可能 issue を実装し進捗をロードマップに記録する
+    group: planning
   render_previews:
     label: サンプル描画
     description: "make gen-samples。機能カタログとロードマップを dot/svg に描画する"
-    group: generation
+    group: release
   update_readme:
     label: README 更新
     description: CLI の提供形態・サンプル構成の変更を導入文書に反映する
-    group: decision
+    group: release
 
 statusStyles:
   done:
