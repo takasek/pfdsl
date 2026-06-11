@@ -27,5 +27,5 @@ jobs:
 
       - run: pnpm --filter "@pfdsl/cli..." test
 
-      - run: pnpm publish --no-git-checks --provenance
+      - run: npm publish --provenance --access public
         working-directory: packages/cli
