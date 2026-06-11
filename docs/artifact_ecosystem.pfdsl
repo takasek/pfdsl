@@ -40,10 +40,14 @@ artifact:
     status: done
     group: generation
     description: ".claude/skills/pfdsl/。make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点"
-  dialogue:
-    label: 設計対話
+  user_intent:
+    label: ユーザーの関心・意図
     group: practice
-    description: "ユーザーとの議論。不定形のフロー外リソース（ADR-0001 の実証例）。お題設定と方法論判断の源泉"
+    description: "何を作るか・何を問うかの源泉。不定形のフロー外リソース（ADR-0001 の実証例）"
+  dialogue:
+    label: 対話記録
+    group: practice
+    description: "ユーザーとの設計対話の内容。セッションログとして実体化する検証可能な成果物。方法論判断・お題・仕様提案の供給源"
   examples:
     label: 実践例
     status: done
@@ -122,6 +126,10 @@ process:
   maintain_template:
     label: テンプレート整備
     description: 仕様変更・レビュー知見・ADR 決定を品質ガイドへ反映する
+  discuss:
+    label: 設計対話
+    description: "ユーザーの関心・意図を起点にリポジトリの現状知識を前提として議論する。全ての知識成果物の上流活動"
+    group: practice
   maintain_spec:
     label: 仕様改訂
     description: "設計対話と仕様提案 issue を仕様書に反映する。提案→起草→統合の詳細は issues_flow 参照"
@@ -178,6 +186,8 @@ statusStyles:
     fillcolor: "#f8d7da"
     style: filled
 ---
+
+user_intent >> discuss -> dialogue
 
 [dialogue, gh_issues] >> maintain_spec -> spec
 
