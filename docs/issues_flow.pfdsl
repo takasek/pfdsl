@@ -67,6 +67,10 @@ artifact:
     label: "ADR 群 (docs/adr)"
     status: done
     description: 実践ラウンドから蒸留した方法論の設計決定記録6本
+  dir_convention:
+    label: ".pfdsl/ 規約移行 (#14)"
+    status: todo
+    description: 計画・生態系 PFD を既約ディレクトリへ移行し pfd-ops をプロジェクト非依存化。ADR-0007
   article:
     label: "公開記事 (#12)"
     status: todo
@@ -98,6 +102,8 @@ process:
     label: CLI公開
   package_skill:
     label: スキルパッケージング
+  migrate_convention:
+    label: 規約移行
 
 statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
@@ -126,6 +132,8 @@ skill_gen >> restructure_skillgen -> restructured_gen
 
 cli_tool >> publish_cli -> published_cli
 
-[restructured_gen, published_cli] >> package_skill -> portable_skill
+[restructured_gen, published_cli, dir_convention] >> package_skill -> portable_skill
+
+adr_corpus >> migrate_convention -> dir_convention
 
 adr_corpus >> write_article -> article
