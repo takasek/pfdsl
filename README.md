@@ -84,21 +84,16 @@ pnpm -r typecheck
 
 ## CLI
 
-After `pnpm -r build`, run the CLI in one of these ways:
-
 ```bash
-# Run directly (no install):
-node packages/cli/dist/cli.js help
-
-# Or add a shell alias (recommended for daily use):
-echo "alias pfdsl='node $PWD/packages/cli/dist/cli.js'" >> ~/.zshrc
-source ~/.zshrc
+npm install -g @pfdsl/cli
+pfdsl --help
 ```
 
-> Note: `pnpm link --global` from this workspace links the root package
-> (named `pfdsl`) instead of `@pfdsl/cli`, so it does not expose the
-> binary. Use the alias above, or rename the root package, if you want
-> a global `pfdsl` command via pnpm.
+For development (from this repo after `pnpm -r build`):
+
+```bash
+node packages/cli/dist/cli.js help
+```
 
 ```bash
 pfdsl check <file>                    # validate
