@@ -58,16 +58,12 @@ artifact:
   multifile_policy:
     label: マルチファイル意味論方針
     status: todo
-    description: ID スコープ・設定継承の解決順・ファイル間参照の設計方針。階層PFD(#5)と共有プリセット(#6)が共有する前提
+    description: 共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料
 
 process:
-  design_multifile:
-    label: マルチファイル方針設計
-    description: 階層とプリセットが別々の継承機構を発明しないよう共通方針を先に定める
-  draft_hierarchy:
-    label: 階層仕様起草
-  draft_presets:
-    label: 共有プリセット仕様起草
+  draft_multifile_specs:
+    label: 階層・プリセット共同起草
+    description: "#5 と #6 は決定が往復で形成される相互依存のため分割せず共同設計する。共有決定は方針記録として外化"
   draft_criteria:
     label: 合否基準仕様起草
   draft_revises:
@@ -94,11 +90,7 @@ statusStyles:
   blocked: { fillcolor: "#f8d7da", style: filled }
 ---
 
-spec_v006 >> design_multifile -> multifile_policy
-
-[spec_v006, multifile_policy] >> draft_hierarchy -> hierarchy_spec
-
-[spec_v006, multifile_policy] >> draft_presets -> presets_spec
+spec_v006 >> draft_multifile_specs -> [hierarchy_spec, presets_spec, multifile_policy]
 
 spec_v006 >> draft_criteria -> criteria_spec
 
@@ -106,7 +98,7 @@ spec_v006 >> draft_revises -> revises_spec
 
 spec_v006 >> write_design_notes -> design_notes
 
-[hierarchy_spec, presets_spec, criteria_spec, revises_spec, design_notes] >> integrate_spec -> spec_v007
+[hierarchy_spec, presets_spec, criteria_spec, revises_spec, design_notes, multifile_policy] >> integrate_spec -> spec_v007
 
 [spec_v006, findings_r12, cli_tool] >> implement_lints -> lint_checker
 
