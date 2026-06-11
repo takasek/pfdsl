@@ -93,7 +93,7 @@ artifact:
     label: PFD運用スキル
     status: done
     group: generation
-    description: ".claude/skills/pfd-ops/。PFD によるプロジェクト運用プロトコル。着手判断・進捗更新・成果物追加・知見振り分けの手順書。手書き（生成対象外）"
+    description: ".claude/skills/pfd-ops/ と /goal コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル（選択→実行→終端ゲート→報告）。手書き（生成対象外）"
 
 process:
   distill_ops:
