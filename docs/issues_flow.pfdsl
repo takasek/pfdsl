@@ -75,6 +75,10 @@ artifact:
     label: "公開記事 (#12)"
     status: todo
     description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
+  viewer_ux:
+    label: "描画・preview UX 改善 (#15, #16)"
+    status: todo
+    description: "group クラスタの塗りつぶし描画と、graph ノード⇔YAML 定義間のジャンプ・トグル"
 
 process:
   write_article:
@@ -104,6 +108,8 @@ process:
     label: スキルパッケージング
   migrate_convention:
     label: 規約移行
+  improve_viewer:
+    label: ビューア改善
 
 statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
@@ -137,3 +143,5 @@ cli_tool >> publish_cli -> published_cli
 adr_corpus >> migrate_convention -> dir_convention
 
 adr_corpus >> write_article -> article
+
+cli_tool >> improve_viewer -> viewer_ux
