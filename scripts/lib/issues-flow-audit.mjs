@@ -1,4 +1,4 @@
-// Pure logic for auditing sync between GitHub issues and issues_flow.pfdsl.
+// Pure logic for auditing sync between GitHub issues and .pfdsl/plan.pfdsl.
 // Zero I/O. No imports.
 
 /**
