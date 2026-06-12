@@ -86,7 +86,7 @@ artifact:
     description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
   i14_dir_convention:
     label: ".pfdsl/ 規約移行 (#14)"
-    status: todo
+    status: done
     tags: [ "priority:high" ]
     description: 計画・生態系 PFD を既約ディレクトリへ移行し pfd-ops をプロジェクト非依存化。ADR-0007
     updated_at: 2026-06-12T08:19:00Z
