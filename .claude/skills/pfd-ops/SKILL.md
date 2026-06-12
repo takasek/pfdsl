@@ -14,7 +14,7 @@ description: |
 
 ## このリポジトリの運用ファイル
 
-- `docs/issues_flow.pfdsl` — オープン issue の依存グラフ（issue が一次情報、図は依存構造のみ）
+- `docs/issues_flow.pfdsl` — オープン issue の依存グラフ（issue が一次情報、図は依存構造のみ。同期規約と監査は `scripts/audit-issues-flow.mjs` — ファイル冒頭 description 参照）
 - `docs/pfdsl_implementation_flow.pfdsl` — ツールチェーン実装ロードマップ
 - `docs/artifact_ecosystem.pfdsl` — リポジトリ成果物の生成元と利用局面
 - `docs/adr/` — 方法論の設計決定記録（改訂規約は同ディレクトリ README）
