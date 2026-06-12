@@ -87,7 +87,8 @@ artifact:
   i18_issue_sync:
     label: "issue⇔flow 同期機構 (#18)"
     status: todo
-    description: "flow:managed ラベル・updated_at 齟齬検出 (staled)・監査スクリプト。priority:high。artifact メタデータは #13 と接点"
+    tags: ["priority:high"]
+    description: "flow:managed ラベル・updated_at 齟齬検出 (staled)・監査スクリプト。artifact メタデータは #13 と接点"
   i19_pr_diff_images:
     label: "PR差分画像自動添付 (#19)"
     status: todo
@@ -131,6 +132,9 @@ process:
     label: issue同期実装
   automate_pr_diff:
     label: PR差分画像自動化
+
+tagStyles:
+  "priority:high": { color: "#b60205", penwidth: "2" }
 
 statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
