@@ -4,7 +4,7 @@
 
 `docs/pfdsl_implementation_flow.pfdsl` がツールチェーン実装の進捗を PFDSL 自身で記述している（dogfooding）。各 artifact に `status: done | wip | todo | blocked` が付与され、`statusStyles` で可視化される。
 作業を進めたらこのファイルの該当 artifact の status を更新する。
-新規 artifact / process を追加した場合も同ファイルに追記。
+ツールチェーン実装に関わる新規 artifact / process は同ファイルに追記。知識成果物・スキルの追加は「成果物の生態系」の図に登録する（境界: 実装物 = roadmap、知識・能力 = ecosystem）。
 
 ## 成果物の生態系
 
@@ -17,6 +17,8 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 ### コミット粒度
 
 論理単位ごとに分割する。1コミット = 1つの一貫した変更。Conventional Commits 準拠（`feat(scope): ...`, `refactor: ...`, `docs: ...`, `feat!: ...` 破壊的）。
+
+変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。
 
 コミットメッセージは**英語**。
 
