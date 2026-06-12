@@ -45,7 +45,7 @@ artifact:
   lint_checker:
     label: "lint拡張checker (#4)"
     status: todo
-    description: 循環検出・終端監査・parts警告・strict >>?・サマリ
+    description: lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため
   featured_toolchain:
     label: 次期仕様対応ツールチェーン
     status: todo
@@ -54,8 +54,8 @@ artifact:
     status: todo
   published_cli:
     label: npm公開済みCLI
-    status: wip
-    description: roadmap 既存項目（docs/pfdsl_implementation_flow.pfdsl の cli_published に対応）。作業ブランチ worktree-feat+cli-publish で実装済み、残は merge・NPM_TOKEN・tag push
+    status: done
+    description: "@pfdsl/cli 0.0.3 公開済み（roadmap の cli_published に対応）。npm install -g @pfdsl/cli で利用可"
   portable_skill:
     label: "配布可能スキル (#11)"
     status: todo
@@ -66,7 +66,7 @@ artifact:
   adr_corpus:
     label: "ADR 群 (docs/adr)"
     status: done
-    description: 実践ラウンドから蒸留した方法論の設計決定記録6本
+    description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
   dir_convention:
     label: ".pfdsl/ 規約移行 (#14)"
     status: todo
@@ -75,6 +75,18 @@ artifact:
     label: "公開記事 (#12)"
     status: todo
     description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
+  viewer_ux:
+    label: "描画・preview UX 改善 (#15, #16, #17)"
+    status: todo
+    description: "group クラスタの塗りつぶし描画、graph ノード⇔YAML 定義間のジャンプ・トグル、大規模図の閲覧支援"
+  issue_sync:
+    label: "issue⇔flow 同期機構 (#18)"
+    status: todo
+    description: "flow:managed ラベル・updated_at 齟齬検出 (staled)・監査スクリプト。priority:high。artifact メタデータは #13 と接点"
+  pr_diff_images:
+    label: "PR差分画像自動添付 (#19)"
+    status: todo
+    description: "merge トリガーで .pfdsl 差分の前後画像を生成し PR description に追記する GitHub Actions"
 
 process:
   write_article:
@@ -104,6 +116,12 @@ process:
     label: スキルパッケージング
   migrate_convention:
     label: 規約移行
+  improve_viewer:
+    label: ビューア改善
+  implement_issue_sync:
+    label: issue同期実装
+  automate_pr_diff:
+    label: PR差分画像自動化
 
 statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
@@ -137,3 +155,9 @@ cli_tool >> publish_cli -> published_cli
 adr_corpus >> migrate_convention -> dir_convention
 
 adr_corpus >> write_article -> article
+
+cli_tool >> improve_viewer -> viewer_ux
+
+cli_tool >> implement_issue_sync -> issue_sync
+
+published_cli >> automate_pr_diff -> pr_diff_images

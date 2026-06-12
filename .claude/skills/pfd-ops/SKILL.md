@@ -17,8 +17,9 @@ description: |
 - `docs/issues_flow.pfdsl` — オープン issue の依存グラフ（issue が一次情報、図は依存構造のみ）
 - `docs/pfdsl_implementation_flow.pfdsl` — ツールチェーン実装ロードマップ
 - `docs/artifact_ecosystem.pfdsl` — リポジトリ成果物の生成元と利用局面
-- `docs/adr/` — 方法論の設計決定記録
+- `docs/adr/` — 方法論の設計決定記録（改訂規約は同ディレクトリ README）
 - `docs/pfd_payoff_log.md` — PFD が効いた局面の事例ログ
+- `docs/review-prompts.md` — PFD を問い詰める A/B 監査カタログ（一次情報）
 
 ## 運用プロトコル
 
@@ -29,6 +30,7 @@ description: |
 5. **成果物の門番**: 消費者を書けない成果物は作らない（終端監査の運用適用）。新しい種類の成果物は artifact_ecosystem.pfdsl に producer・consumer・利用局面を登録してから作る
 6. **知見の振り分け**: 実践・レビューで得た知見は3経路に振り分ける — 即時ルール化（pfdsl スキルの品質ガイド改訂）/ 設計決定（ADR）/ 作業項目（issue + 依存グラフ更新）。PFD の効果を体感した局面は payoff_log に日付・局面・効果・参照で追記
 7. **学習ループ**: 実践→レビュー→ガイド改訂→再実践。ラウンド比較で「ルールで消えたミス / 残ったミス」を分離計測し、残ったものは lint 要件（ツール側）へ送る（ADR-0006）
+8. **定期監査**: 次のいずれかで pfd-retro を起動する — 設計対話が長く続いた後 / ADR が数本たまった時 / 同一 PFD に連続修正が入った時 / セッションの締め際。ユーザーの気付きを待たない。findings は本プロトコル6の経路で振り分ける
 
 ## ワークサイクル（/pfd-cycle の手順）
 
@@ -38,7 +40,8 @@ description: |
 2. **実行**: 対応する GitHub issue が一次情報。PFD の読み書きは pfdsl スキルの品質ガイドに従う。まとまった執筆・実装は subagent に委譲し、本体は指示と評価に専念する
 3. **反映 — 終端ゲート（全項目を明示的に確認。「該当なし」も判断として記録）**:
    - [ ] 出力 artifact の status を更新した（issues_flow / implementation_flow）
-   - [ ] 知見を3経路に振り分けた（品質ガイド改訂 / ADR / 新 issue + 依存チェーン追加）
+   - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
+   - [ ] 知見を3経路に振り分けた（品質ガイド改訂 / ADR / 新 issue + 依存チェーン追加）。ADR 化した判断は適用ルールのガイド蒸留要否も判定した
    - [ ] PFD が効いた局面があれば `docs/pfd_payoff_log.md` に追記した
    - [ ] 実行中に発見した新プロセス・成果物を計画 PFD に追記した（消費者を明示できないものは作らない）
    - [ ] 変更した全 .pfdsl が `check` を通過する
