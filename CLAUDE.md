@@ -8,7 +8,7 @@
 
 ## 成果物の生態系
 
-`docs/artifact_ecosystem.pfdsl` がリポジトリ内成果物（spec / skill / examples / ADR / issues / roadmap）の生成元と利用局面を定義する。新しい種類の成果物を追加するとき・既存成果物の置き場や用途に迷ったときはまずこの図を見る。消費者を書けない成果物は作らない（終端監査）。
+`.pfdsl/ecosystem.pfdsl` がリポジトリ内成果物（spec / skill / examples / ADR / issues / roadmap）の生成元と利用局面を定義する。新しい種類の成果物を追加するとき・既存成果物の置き場や用途に迷ったときはまずこの図を見る。消費者を書けない成果物は作らない（終端監査）。
 
 ## 実装方針
 

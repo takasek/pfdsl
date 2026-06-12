@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Audits sync between GitHub issues and docs/issues_flow.pfdsl.
+// Audits sync between GitHub issues and .pfdsl/plan.pfdsl.
 // Usage: node scripts/audit-issues-flow.mjs [--fix]
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -15,9 +15,9 @@ const root = resolve(__dirname, "..");
 
 const fix = process.argv.includes("--fix");
 
-// --- Read and split issues_flow.pfdsl ---
+// --- Read and split plan.pfdsl ---
 
-const flowPath = resolve(root, "docs/issues_flow.pfdsl");
+const flowPath = resolve(root, ".pfdsl/plan.pfdsl");
 const raw = readFileSync(flowPath, "utf-8");
 
 // File starts with "---\n"; frontmatter ends at the next line where trimEnd()==="---"
@@ -29,7 +29,7 @@ for (let i = 1; i < lines.length; i++) {
 		break;
 	}
 }
-if (fmEnd === -1) throw new Error("No closing --- found in issues_flow.pfdsl");
+if (fmEnd === -1) throw new Error("No closing --- found in plan.pfdsl");
 
 const fmText = lines.slice(1, fmEnd).join("\n") + "\n";
 const body = lines.slice(fmEnd + 1).join("\n");
@@ -83,7 +83,7 @@ function printFindings(findings) {
 }
 
 if (findings.length === 0) {
-	console.log("issues_flow is in sync");
+	console.log("plan.pfdsl is in sync");
 	process.exit(0);
 }
 
@@ -114,7 +114,7 @@ const docAfter = doc.toString();
 if (docAfter !== docBefore) {
 	const newRaw = "---\n" + docAfter + "---\n" + body;
 	writeFileSync(flowPath, newRaw, "utf-8");
-	console.log("updated docs/issues_flow.pfdsl");
+	console.log("updated .pfdsl/plan.pfdsl");
 }
 
 // 4. Report remaining manual findings
