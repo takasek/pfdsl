@@ -1,6 +1,6 @@
 ---
 title: Issue 依存フロー（2026-06）
-description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理
+description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue 対応 artifact の id は iN_ prefix（N = issue 番号）
 layout:
   direction: LR
   maxWidth: 130
@@ -20,43 +20,43 @@ artifact:
     label: スキル生成系（現行）
     status: done
     description: scripts/gen-skill.mjs と docs/samples 構成
-  hierarchy_spec:
+  i5_hierarchy_spec:
     label: "階層PFD仕様案 (#5)"
     status: todo
-  presets_spec:
+  i6_presets_spec:
     label: "共有プリセット仕様案 (#6)"
     status: todo
-  criteria_spec:
+  i7_criteria_spec:
     label: "合否基準仕様案 (#7)"
     status: todo
-  revises_spec:
+  i8_revises_spec:
     label: "改版チェーン仕様案 (#8)"
     status: todo
-  location_spec:
+  i13_location_spec:
     label: "location/command 仕様案 (#13)"
     status: todo
     description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
-  design_notes:
+  i9_design_notes:
     label: "設計判断ノート・分岐なし方針 (#9)"
     status: todo
   spec_v007:
     label: 仕様書 v0.0.7（統合）
     status: todo
-  lint_checker:
+  i4_lint_checker:
     label: "lint拡張checker (#4)"
     status: todo
     description: lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため
   featured_toolchain:
     label: 次期仕様対応ツールチェーン
     status: todo
-  restructured_gen:
+  i10_restructured_gen:
     label: "再構成済みスキル生成系 (#10)"
     status: todo
   published_cli:
     label: npm公開済みCLI
     status: done
     description: "@pfdsl/cli 0.0.3 公開済み（roadmap の cli_published に対応）。npm install -g @pfdsl/cli で利用可"
-  portable_skill:
+  i11_portable_skill:
     label: "配布可能スキル (#11)"
     status: todo
   multifile_policy:
@@ -66,24 +66,29 @@ artifact:
   adr_corpus:
     label: "ADR 群 (docs/adr)"
     status: done
-    description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
-  dir_convention:
+    description: 実践ラウンドから蒸留した方法論の設計決定記録6本
+  i14_dir_convention:
     label: ".pfdsl/ 規約移行 (#14)"
     status: todo
     description: 計画・生態系 PFD を既約ディレクトリへ移行し pfd-ops をプロジェクト非依存化。ADR-0007
-  article:
+  i12_article:
     label: "公開記事 (#12)"
     status: todo
     description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
-  viewer_ux:
-    label: "描画・preview UX 改善 (#15, #16, #17)"
+  i15_group_fill:
+    label: "group クラスタ塗りつぶし描画 (#15)"
     status: todo
-    description: "group クラスタの塗りつぶし描画、graph ノード⇔YAML 定義間のジャンプ・トグル、大規模図の閲覧支援"
-  issue_sync:
+  i16_def_jump:
+    label: "graph⇔YAML 定義ジャンプ・トグル (#16)"
+    status: todo
+  i17_graph_nav:
+    label: "大規模図の閲覧支援 (#17)"
+    status: todo
+  i18_issue_sync:
     label: "issue⇔flow 同期機構 (#18)"
     status: todo
     description: "flow:managed ラベル・updated_at 齟齬検出 (staled)・監査スクリプト。priority:high。artifact メタデータは #13 と接点"
-  pr_diff_images:
+  i19_pr_diff_images:
     label: "PR差分画像自動添付 (#19)"
     status: todo
     description: "merge トリガーで .pfdsl 差分の前後画像を生成し PR description に追記する GitHub Actions"
@@ -116,8 +121,12 @@ process:
     label: スキルパッケージング
   migrate_convention:
     label: 規約移行
-  improve_viewer:
-    label: ビューア改善
+  fill_group_clusters:
+    label: クラスタ塗り実装
+  implement_def_jump:
+    label: 定義ジャンプ実装
+  implement_graph_nav:
+    label: 閲覧支援実装
   implement_issue_sync:
     label: issue同期実装
   automate_pr_diff:
@@ -130,34 +139,38 @@ statusStyles:
   blocked: { fillcolor: "#f8d7da", style: filled }
 ---
 
-spec_v006 >> draft_multifile_specs -> [hierarchy_spec, presets_spec, multifile_policy]
+spec_v006 >> draft_multifile_specs -> [i5_hierarchy_spec, i6_presets_spec, multifile_policy]
 
-spec_v006 >> draft_criteria -> criteria_spec
+spec_v006 >> draft_criteria -> i7_criteria_spec
 
-spec_v006 >> draft_revises -> revises_spec
+spec_v006 >> draft_revises -> i8_revises_spec
 
-spec_v006 >> draft_location -> location_spec
+spec_v006 >> draft_location -> i13_location_spec
 
-spec_v006 >> write_design_notes -> design_notes
+spec_v006 >> write_design_notes -> i9_design_notes
 
-[hierarchy_spec, presets_spec, criteria_spec, revises_spec, location_spec, design_notes, multifile_policy] >> integrate_spec -> spec_v007
+[i5_hierarchy_spec, i6_presets_spec, i7_criteria_spec, i8_revises_spec, i13_location_spec, i9_design_notes, multifile_policy] >> integrate_spec -> spec_v007
 
-[spec_v006, findings_r12, cli_tool] >> implement_lints -> lint_checker
+[spec_v006, findings_r12, cli_tool] >> implement_lints -> i4_lint_checker
 
-[spec_v007, lint_checker] >> implement_spec_features -> featured_toolchain
+[spec_v007, i4_lint_checker] >> implement_spec_features -> featured_toolchain
 
-skill_gen >> restructure_skillgen -> restructured_gen
+skill_gen >> restructure_skillgen -> i10_restructured_gen
 
 cli_tool >> publish_cli -> published_cli
 
-[restructured_gen, published_cli, dir_convention] >> package_skill -> portable_skill
+[i10_restructured_gen, published_cli, i14_dir_convention] >> package_skill -> i11_portable_skill
 
-adr_corpus >> migrate_convention -> dir_convention
+adr_corpus >> migrate_convention -> i14_dir_convention
 
-adr_corpus >> write_article -> article
+adr_corpus >> write_article -> i12_article
 
-cli_tool >> improve_viewer -> viewer_ux
+cli_tool >> fill_group_clusters -> i15_group_fill
 
-cli_tool >> implement_issue_sync -> issue_sync
+cli_tool >> implement_def_jump -> i16_def_jump
 
-published_cli >> automate_pr_diff -> pr_diff_images
+cli_tool >> implement_graph_nav -> i17_graph_nav
+
+cli_tool >> implement_issue_sync -> i18_issue_sync
+
+published_cli >> automate_pr_diff -> i19_pr_diff_images
