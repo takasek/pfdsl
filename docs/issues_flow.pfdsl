@@ -79,6 +79,14 @@ artifact:
     label: "描画・preview UX 改善 (#15, #16, #17)"
     status: todo
     description: "group クラスタの塗りつぶし描画、graph ノード⇔YAML 定義間のジャンプ・トグル、大規模図の閲覧支援"
+  issue_sync:
+    label: "issue⇔flow 同期機構 (#18)"
+    status: todo
+    description: "flow:managed ラベル・updated_at 齟齬検出 (staled)・監査スクリプト。priority:high。artifact メタデータは #13 と接点"
+  pr_diff_images:
+    label: "PR差分画像自動添付 (#19)"
+    status: todo
+    description: "merge トリガーで .pfdsl 差分の前後画像を生成し PR description に追記する GitHub Actions"
 
 process:
   write_article:
@@ -110,6 +118,10 @@ process:
     label: 規約移行
   improve_viewer:
     label: ビューア改善
+  implement_issue_sync:
+    label: issue同期実装
+  automate_pr_diff:
+    label: PR差分画像自動化
 
 statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
@@ -145,3 +157,7 @@ adr_corpus >> migrate_convention -> dir_convention
 adr_corpus >> write_article -> article
 
 cli_tool >> improve_viewer -> viewer_ux
+
+cli_tool >> implement_issue_sync -> issue_sync
+
+published_cli >> automate_pr_diff -> pr_diff_images
