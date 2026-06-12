@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm test *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm build *)",
+      "Bash(pnpm biome *)",
+      "Bash(pnpm -r *)",
+      "Bash(pnpm -C *)",
+      "Bash(pnpm --filter *)",
+      "Bash(node packages/cli/dist/cli.js *)",
+      "Bash(node scripts/*)",
+      "Bash(pfdsl check *)",
+      "Bash(command -v *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(gh issue edit *)"
+    ]
+  }
+}
