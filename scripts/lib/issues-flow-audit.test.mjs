@@ -182,14 +182,18 @@ describe("computeFindings", () => {
 		const f = findings.find((f) => f.type === "closed_in_flow");
 		assert.ok(f);
 		assert.equal(f.fixable, false);
+		assert.ok(f.detail.includes("delete the chain"), "detail should guide cleanup");
 	});
 
-	it("no finding for closed issue with status done", () => {
+	it("closed_in_flow: artifact for closed issue with status done also emits finding", () => {
 		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "done", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-02-01T00:00:00Z" }];
 		const findings = computeFindings(artifacts, issues);
-		// closed+done => no findings at all (skip freshness)
-		assert.equal(findings.filter((f) => f.issueNumber === 5).length, 0);
+		const matching = findings.filter((f) => f.issueNumber === 5);
+		assert.equal(matching.length, 1);
+		assert.equal(matching[0].type, "closed_in_flow");
+		assert.equal(matching[0].fixable, false);
+		assert.ok(matching[0].detail.includes("delete the chain"), "detail should guide cleanup");
 	});
 
 	it("stale_updated_at: open issue with mismatched updatedAt", () => {

@@ -57,16 +57,14 @@ export function computeFindings(artifacts, issues) {
 		}
 
 		if (iss.state === "CLOSED") {
-			if (art.status !== "done") {
-				findings.push({
-					type: "closed_in_flow",
-					issueNumber: art.issueNumber,
-					artifactId: art.id,
-					detail: `issue is closed but artifact status is "${art.status}"`,
-					fixable: false,
-				});
-			}
-			// closed+done: skip all freshness checks
+			findings.push({
+				type: "closed_in_flow",
+				issueNumber: art.issueNumber,
+				artifactId: art.id,
+				detail: `issue is closed — delete the chain if terminal, or strip the iN_ prefix to demote it to a plain done artifact if downstream processes consume it`,
+				fixable: false,
+			});
+			// skip all freshness checks for closed issues
 			continue;
 		}
 

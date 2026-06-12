@@ -3,7 +3,8 @@ title: Issue 依存フロー（2026-06）
 description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue 対応
   artifact の id は iN_ prefix（N = issue 番号）。登録 issue は flow:managed ラベル、対象外は
   flow:exempt。updated_at は同期時点の GitHub updatedAt スナップショット — 同期監査・更新は
-  scripts/audit-issues-flow.mjs（--fix で機械的修復）
+  scripts/audit-issues-flow.mjs（--fix で機械的修復）。issue close 時は flow から削除（終端はチェーンごと、下流入力が残るものは
+  iN_ prefix を外し一般 done artifact へ降格）— iN_ id はオープン issue のみ参照する
 layout:
   direction: LR
   maxWidth: 130
