@@ -26,15 +26,12 @@ export function parseIssueArtifacts(frontmatter) {
 }
 
 /**
- * @param {{ id: string, issueNumber: number, status: string|undefined, updatedAt: string|undefined, priorities: string[] }[]} artifacts
+ * @param {{ id: string, issueNumber: number, status: string|undefined, updatedAt: string|undefined, priorities: string[] }[]} artifacts - priorities must be pre-sorted (parseIssueArtifacts guarantees this)
  * @param {{ number: number, state: "OPEN"|"CLOSED", labels: string[], updatedAt: string }[]} issues
- * @returns {{ type: string, issueNumber: number, artifactId: string|undefined, detail: string, fixable: boolean }[]}
+ * @returns {{ type: string, issueNumber: number, artifactId: string|undefined, detail: string, fixVia?: "file"|"github" }[]}
  */
 export function computeFindings(artifacts, issues) {
-	const artifactsByIssue = new Map();
-	for (const a of artifacts) {
-		artifactsByIssue.set(a.issueNumber, a);
-	}
+	const artifactIssueNumbers = new Set(artifacts.map((a) => a.issueNumber));
 	const issuesByNumber = new Map();
 	for (const iss of issues) {
 		issuesByNumber.set(iss.number, iss);
@@ -51,7 +48,6 @@ export function computeFindings(artifacts, issues) {
 				issueNumber: art.issueNumber,
 				artifactId: art.id,
 				detail: `issue #${art.issueNumber} not found in issues list`,
-				fixable: false,
 			});
 			continue;
 		}
@@ -62,7 +58,6 @@ export function computeFindings(artifacts, issues) {
 				issueNumber: art.issueNumber,
 				artifactId: art.id,
 				detail: `issue is closed — delete the chain if terminal, or strip the iN_ prefix to demote it to a plain done artifact if downstream processes consume it`,
-				fixable: false,
 			});
 			// skip all freshness checks for closed issues
 			continue;
@@ -78,7 +73,6 @@ export function computeFindings(artifacts, issues) {
 				issueNumber: art.issueNumber,
 				artifactId: art.id,
 				detail: `issue has flow:exempt label but has an artifact in the flow`,
-				fixable: false,
 			});
 		}
 
@@ -88,7 +82,7 @@ export function computeFindings(artifacts, issues) {
 				issueNumber: art.issueNumber,
 				artifactId: art.id,
 				detail: `open issue with artifact is missing "flow:managed" label`,
-				fixable: true,
+				fixVia: "github",
 			});
 		}
 
@@ -100,20 +94,19 @@ export function computeFindings(artifacts, issues) {
 				issueNumber: art.issueNumber,
 				artifactId: art.id,
 				detail: `artifact: ${artVal}, issue: ${iss.updatedAt}`,
-				fixable: true,
+				fixVia: "file",
 			});
 		}
 
 		// Priority drift
 		const issuePriorities = iss.labels.filter((l) => l.startsWith("priority:")).sort();
-		const artPriorities = [...art.priorities].sort();
-		if (JSON.stringify(issuePriorities) !== JSON.stringify(artPriorities)) {
+		if (JSON.stringify(issuePriorities) !== JSON.stringify(art.priorities)) {
 			findings.push({
 				type: "priority_drift",
 				issueNumber: art.issueNumber,
 				artifactId: art.id,
-				detail: `artifact: [${artPriorities.join(", ")}], issue: [${issuePriorities.join(", ")}]`,
-				fixable: true,
+				detail: `artifact: [${art.priorities.join(", ")}], issue: [${issuePriorities.join(", ")}]`,
+				fixVia: "file",
 			});
 		}
 	}
@@ -121,7 +114,7 @@ export function computeFindings(artifacts, issues) {
 	// Check each issue for missing artifact
 	for (const iss of issues) {
 		if (iss.state !== "OPEN") continue;
-		if (artifactsByIssue.has(iss.number)) continue;
+		if (artifactIssueNumbers.has(iss.number)) continue;
 
 		const hasManaged = iss.labels.includes("flow:managed");
 		const hasExempt = iss.labels.includes("flow:exempt");
@@ -136,7 +129,6 @@ export function computeFindings(artifacts, issues) {
 				issueNumber: iss.number,
 				artifactId: undefined,
 				detail: `issue has flow:managed label but no artifact in the flow`,
-				fixable: false,
 			});
 		} else {
 			findings.push({
@@ -144,7 +136,6 @@ export function computeFindings(artifacts, issues) {
 				issueNumber: iss.number,
 				artifactId: undefined,
 				detail: `open issue has no artifact and no flow label`,
-				fixable: false,
 			});
 		}
 	}
@@ -156,14 +147,14 @@ export function computeFindings(artifacts, issues) {
 }
 
 /**
- * Applies fixable findings to the yaml Document in place.
+ * Applies file-fixable findings to the yaml Document in place.
  * @param {import("yaml").Document} doc
- * @param {{ type: string, issueNumber: number, artifactId: string|undefined, fixable: boolean }[]} findings
+ * @param {{ type: string, issueNumber: number, artifactId: string|undefined, fixVia?: "file"|"github" }[]} findings
  * @param {Map<number, { number: number, state: string, labels: string[], updatedAt: string }>} issuesByNumber
  */
 export function applyFixes(doc, findings, issuesByNumber) {
 	for (const finding of findings) {
-		if (!finding.fixable) continue;
+		if (finding.fixVia !== "file") continue;
 		const { type, artifactId, issueNumber } = finding;
 		const issue = issuesByNumber.get(issueNumber);
 		if (!issue) continue;

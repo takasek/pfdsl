@@ -6,15 +6,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 
 import { parseIssueArtifacts, computeFindings, applyFixes } from "./lib/issues-flow-audit.mjs";
+import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-
-const require_ = createRequire(new URL("../packages/core/package.json", import.meta.url));
-const { parseDocument } = require_("yaml");
 
 const fix = process.argv.includes("--fix");
 
@@ -35,8 +32,7 @@ for (let i = 1; i < lines.length; i++) {
 if (fmEnd === -1) throw new Error("No closing --- found in issues_flow.pfdsl");
 
 const fmText = lines.slice(1, fmEnd).join("\n") + "\n";
-// body includes the closing --- line and everything after
-const body = lines.slice(fmEnd).join("\n");
+const body = lines.slice(fmEnd + 1).join("\n");
 
 // --- Fetch issues from GitHub ---
 
@@ -67,8 +63,8 @@ let issues = fetchIssues();
 let findings = computeFindings(artifacts, issues);
 
 function printFindings(findings) {
-	const fixable = findings.filter((f) => f.fixable);
-	const manual = findings.filter((f) => !f.fixable);
+	const fixable = findings.filter((f) => f.fixVia);
+	const manual = findings.filter((f) => !f.fixVia);
 
 	if (fixable.length > 0) {
 		console.log("fixable:");
@@ -100,7 +96,7 @@ if (!fix) {
 // --- Apply fixes ---
 
 // 1. Add flow:managed label to issues missing it
-const missingLabel = findings.filter((f) => f.type === "missing_label");
+const missingLabel = findings.filter((f) => f.fixVia === "github");
 for (const f of missingLabel) {
 	execFileSync("gh", ["issue", "edit", String(f.issueNumber), "--add-label", "flow:managed"]);
 }
@@ -116,13 +112,13 @@ applyFixes(doc, findings, issuesByNumber);
 const docAfter = doc.toString();
 
 if (docAfter !== docBefore) {
-	const newRaw = "---\n" + docAfter + "---\n" + body.replace(/^---\n/, "");
+	const newRaw = "---\n" + docAfter + "---\n" + body;
 	writeFileSync(flowPath, newRaw, "utf-8");
 	console.log("updated docs/issues_flow.pfdsl");
 }
 
 // 4. Report remaining manual findings
-const remaining = findings.filter((f) => !f.fixable);
+const remaining = findings.filter((f) => !f.fixVia);
 if (remaining.length > 0) {
 	console.log("remaining manual findings:");
 	printFindings(remaining);
