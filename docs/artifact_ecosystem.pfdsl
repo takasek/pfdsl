@@ -112,6 +112,10 @@ artifact:
     status: done
     group: release
     description: "@pfdsl/cli（npm）。外部利用者向け配布物。toolchain の CLI 部分が変更されたら公開が必要 — v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC、公開作業は自動化済み）"
+  pull_request:
+    label: Pull Request
+    group: planning
+    description: "ブランチ上の変更束のレビュー・統合単位（github.com/takasek/pfdsl/pulls）。レビュー指摘はブランチ上の修正で解消してからマージする"
   issue_updates:
     label: issue 更新内容
     group: planning
@@ -197,7 +201,11 @@ process:
     group: planning
   develop:
     label: ツールチェーン開発
-    description: 着手可能 issue を実装し進捗をロードマップに記録する
+    description: 着手可能 issue をブランチ上で実装し PR にまとめる
+    group: planning
+  merge_pr:
+    label: レビュー・マージ
+    description: "PR をレビューし main へ統合する。成果物はマージで正本になり、進捗・issue 更新もここで確定する"
     group: planning
   render_previews:
     label: サンプル描画
@@ -259,7 +267,9 @@ findings >>? file_issues
 
 gh_issues >> map_deps -> issues_flow
 
-[gh_issues, issues_flow, spec] >> develop -> [toolchain, impl_flow, issue_updates]
+[gh_issues, issues_flow, spec] >> develop -> pull_request
+
+pull_request >> merge_pr -> [toolchain, impl_flow, issue_updates]
 
 ops_skill >>? develop
 
