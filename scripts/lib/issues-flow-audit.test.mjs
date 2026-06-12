@@ -1,0 +1,370 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+
+import {
+	parseIssueArtifacts,
+	computeFindings,
+	applyFixes,
+} from "./issues-flow-audit.mjs";
+
+const require_ = createRequire(new URL("../../packages/core/package.json", import.meta.url));
+const { parseDocument } = require_("yaml");
+
+// ---------------------------------------------------------------------------
+// parseIssueArtifacts
+// ---------------------------------------------------------------------------
+
+describe("parseIssueArtifacts", () => {
+	it("returns empty array when no artifact key", () => {
+		const result = parseIssueArtifacts({});
+		assert.deepEqual(result, []);
+	});
+
+	it("ignores non-iN_ artifacts", () => {
+		const fm = {
+			artifact: {
+				spec_v006: { label: "Spec", status: "done" },
+				cli_tool: { label: "CLI", status: "done" },
+				findings_r12: { label: "Findings", status: "done" },
+			},
+		};
+		const result = parseIssueArtifacts(fm);
+		assert.deepEqual(result, []);
+	});
+
+	it("parses iN_ artifacts and extracts issueNumber", () => {
+		const fm = {
+			artifact: {
+				i4_lint_checker: { label: "Lint", status: "todo", tags: ["priority:high"] },
+				i11_portable_skill: { label: "Skill", status: "todo", tags: ["priority:high"] },
+			},
+		};
+		const result = parseIssueArtifacts(fm);
+		assert.equal(result.length, 2);
+		assert.equal(result[0].id, "i4_lint_checker");
+		assert.equal(result[0].issueNumber, 4);
+		assert.equal(result[0].status, "todo");
+		assert.deepEqual(result[0].priorities, ["priority:high"]);
+		assert.equal(result[1].issueNumber, 11);
+	});
+
+	it("extracts updatedAt when present", () => {
+		const fm = {
+			artifact: {
+				i5_hierarchy_spec: { label: "H", status: "todo", updated_at: "2026-06-01T00:00:00Z" },
+			},
+		};
+		const result = parseIssueArtifacts(fm);
+		assert.equal(result[0].updatedAt, "2026-06-01T00:00:00Z");
+	});
+
+	it("updatedAt is undefined when absent", () => {
+		const fm = {
+			artifact: {
+				i5_hierarchy_spec: { label: "H", status: "todo" },
+			},
+		};
+		const result = parseIssueArtifacts(fm);
+		assert.equal(result[0].updatedAt, undefined);
+	});
+
+	it("priorities is empty array when tags absent", () => {
+		const fm = {
+			artifact: {
+				i5_hierarchy_spec: { label: "H", status: "todo" },
+			},
+		};
+		const result = parseIssueArtifacts(fm);
+		assert.deepEqual(result[0].priorities, []);
+	});
+
+	it("priorities filters only priority: tags and sorts them", () => {
+		const fm = {
+			artifact: {
+				i5_hierarchy_spec: {
+					label: "H",
+					status: "todo",
+					tags: ["foo", "priority:high", "priority:low", "bar"],
+				},
+			},
+		};
+		const result = parseIssueArtifacts(fm);
+		assert.deepEqual(result[0].priorities, ["priority:high", "priority:low"]);
+	});
+
+	it("mixes iN_ and non-iN_ artifacts correctly", () => {
+		const fm = {
+			artifact: {
+				spec_v006: { label: "Spec", status: "done" },
+				i18_issue_sync: { label: "Sync", status: "todo", tags: ["priority:high"] },
+				cli_tool: { label: "CLI", status: "done" },
+			},
+		};
+		const result = parseIssueArtifacts(fm);
+		assert.equal(result.length, 1);
+		assert.equal(result[0].issueNumber, 18);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// computeFindings
+// ---------------------------------------------------------------------------
+
+describe("computeFindings", () => {
+	// Helper: open issue with matching artifact but no flow:managed label
+	it("missing_label: open issue with artifact but no flow:managed", () => {
+		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const issues = [{ number: 5, state: "OPEN", labels: [], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		const f = findings.find((f) => f.type === "missing_label");
+		assert.ok(f);
+		assert.equal(f.issueNumber, 5);
+		assert.equal(f.artifactId, "i5_hierarchy_spec");
+		assert.equal(f.fixable, true);
+	});
+
+	it("no missing_label when flow:managed is present", () => {
+		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		assert.ok(!findings.find((f) => f.type === "missing_label"));
+	});
+
+	it("exempt_conflict: open issue with artifact AND flow:exempt label", () => {
+		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed", "flow:exempt"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		const f = findings.find((f) => f.type === "exempt_conflict");
+		assert.ok(f);
+		assert.equal(f.fixable, false);
+	});
+
+	it("missing_artifact: open issue with flow:managed but no artifact", () => {
+		const issues = [{ number: 99, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings([], issues);
+		const f = findings.find((f) => f.type === "missing_artifact");
+		assert.ok(f);
+		assert.equal(f.issueNumber, 99);
+		assert.equal(f.artifactId, undefined);
+		assert.equal(f.fixable, false);
+	});
+
+	it("untriaged: open issue with no artifact and no flow labels", () => {
+		const issues = [{ number: 99, state: "OPEN", labels: [], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings([], issues);
+		const f = findings.find((f) => f.type === "untriaged");
+		assert.ok(f);
+		assert.equal(f.issueNumber, 99);
+		assert.equal(f.fixable, false);
+	});
+
+	it("no finding: open issue with flow:exempt and no artifact", () => {
+		const issues = [{ number: 99, state: "OPEN", labels: ["flow:exempt"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings([], issues);
+		assert.equal(findings.length, 0);
+	});
+
+	it("unknown_issue: artifact whose issueNumber is not in issues list", () => {
+		const artifacts = [{ id: "i99_foo", issueNumber: 99, status: "todo", updatedAt: undefined, priorities: [] }];
+		const findings = computeFindings(artifacts, []);
+		const f = findings.find((f) => f.type === "unknown_issue");
+		assert.ok(f);
+		assert.equal(f.issueNumber, 99);
+		assert.equal(f.artifactId, "i99_foo");
+		assert.equal(f.fixable, false);
+	});
+
+	it("closed_in_flow: artifact for closed issue with status !== done", () => {
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const issues = [{ number: 5, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		const f = findings.find((f) => f.type === "closed_in_flow");
+		assert.ok(f);
+		assert.equal(f.fixable, false);
+	});
+
+	it("no finding for closed issue with status done", () => {
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "done", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const issues = [{ number: 5, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-02-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		// closed+done => no findings at all (skip freshness)
+		assert.equal(findings.filter((f) => f.issueNumber === 5).length, 0);
+	});
+
+	it("stale_updated_at: open issue with mismatched updatedAt", () => {
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		const f = findings.find((f) => f.type === "stale_updated_at");
+		assert.ok(f);
+		assert.equal(f.fixable, true);
+		assert.ok(f.detail.includes("2026-01-01T00:00:00Z"));
+		assert.ok(f.detail.includes("2026-06-01T00:00:00Z"));
+	});
+
+	it("stale_updated_at: artifact missing updatedAt shows (none)", () => {
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: undefined, priorities: [] }];
+		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		const f = findings.find((f) => f.type === "stale_updated_at");
+		assert.ok(f);
+		assert.ok(f.detail.includes("(none)"));
+	});
+
+	it("no stale_updated_at when updatedAt matches", () => {
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: [] }];
+		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		assert.ok(!findings.find((f) => f.type === "stale_updated_at"));
+	});
+
+	it("priority_drift: issue priority labels differ from artifact priorities", () => {
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: ["priority:high"] }];
+		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed", "priority:low"], updatedAt: "2026-06-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		const f = findings.find((f) => f.type === "priority_drift");
+		assert.ok(f);
+		assert.equal(f.fixable, true);
+	});
+
+	it("no priority_drift when both have no priority labels", () => {
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: [] }];
+		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		assert.ok(!findings.find((f) => f.type === "priority_drift"));
+	});
+
+	it("one pair can yield multiple findings", () => {
+		// stale_updated_at + priority_drift + missing_label all at once
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: ["priority:high"] }];
+		const issues = [{ number: 5, state: "OPEN", labels: ["priority:low"], updatedAt: "2026-06-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		assert.ok(findings.find((f) => f.type === "missing_label"));
+		assert.ok(findings.find((f) => f.type === "stale_updated_at"));
+		assert.ok(findings.find((f) => f.type === "priority_drift"));
+	});
+
+	it("findings are ordered by issueNumber ascending", () => {
+		const artifacts = [
+			{ id: "i10_foo", issueNumber: 10, status: "todo", updatedAt: undefined, priorities: [] },
+			{ id: "i3_bar", issueNumber: 3, status: "todo", updatedAt: undefined, priorities: [] },
+		];
+		const issues = [
+			{ number: 10, state: "OPEN", labels: [], updatedAt: "2026-06-01T00:00:00Z" },
+			{ number: 3, state: "OPEN", labels: [], updatedAt: "2026-06-01T00:00:00Z" },
+		];
+		const findings = computeFindings(artifacts, issues);
+		const nums = findings.map((f) => f.issueNumber);
+		// all 3s should come before 10s
+		const first10 = nums.indexOf(10);
+		const last3 = nums.lastIndexOf(3);
+		assert.ok(last3 < first10 || first10 === -1);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// applyFixes
+// ---------------------------------------------------------------------------
+
+describe("applyFixes", () => {
+	it("round-trip: preserves double-quoted label and adds updated_at", () => {
+		const yaml = `artifact:
+  i5_hierarchy_spec:
+    label: "階層PFD仕様案 (#5)"
+    status: todo
+  i6_presets_spec:
+    label: "共有プリセット仕様案 (#6)"
+    status: todo
+`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "stale_updated_at",
+				issueNumber: 6,
+				artifactId: "i6_presets_spec",
+				detail: "artifact: (none), issue: 2026-06-01T00:00:00Z",
+				fixable: true,
+			},
+		];
+		const issuesByNumber = new Map([
+			[6, { number: 6, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }],
+		]);
+		applyFixes(doc, findings, issuesByNumber);
+		const out = doc.toString();
+		// quoted label preserved verbatim
+		assert.ok(out.includes('"階層PFD仕様案 (#5)"'), "quoted label should be preserved");
+		// updated_at added
+		assert.ok(out.includes("updated_at: 2026-06-01T00:00:00Z"), "updated_at should be added");
+	});
+
+	it("priority_drift: replaces priority tags, preserves non-priority tags", () => {
+		const yaml = `artifact:
+  i5_foo:
+    label: Foo
+    status: todo
+    tags:
+      - priority:high
+      - foo
+`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "priority_drift",
+				issueNumber: 5,
+				artifactId: "i5_foo",
+				detail: "artifact: [priority:high], issue: [priority:low]",
+				fixable: true,
+			},
+		];
+		const issuesByNumber = new Map([
+			[5, { number: 5, state: "OPEN", labels: ["flow:managed", "priority:low"], updatedAt: "2026-06-01T00:00:00Z" }],
+		]);
+		applyFixes(doc, findings, issuesByNumber);
+		const obj = doc.toJS();
+		assert.deepEqual(obj.artifact.i5_foo.tags, ["foo", "priority:low"]);
+	});
+
+	it("priority_drift: removing last tag deletes the key", () => {
+		const yaml = `artifact:
+  i5_foo:
+    label: Foo
+    status: todo
+    tags:
+      - priority:high
+`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "priority_drift",
+				issueNumber: 5,
+				artifactId: "i5_foo",
+				detail: "artifact: [priority:high], issue: []",
+				fixable: true,
+			},
+		];
+		// issue has no priority labels
+		const issuesByNumber = new Map([
+			[5, { number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }],
+		]);
+		applyFixes(doc, findings, issuesByNumber);
+		const obj = doc.toJS();
+		assert.equal(obj.artifact.i5_foo.tags, undefined);
+	});
+
+	it("ignores non-fixable finding types", () => {
+		const yaml = `artifact:
+  i5_foo:
+    label: Foo
+    status: todo
+`;
+		const doc = parseDocument(yaml);
+		const before = doc.toString();
+		const findings = [
+			{ type: "unknown_issue", issueNumber: 5, artifactId: "i5_foo", detail: "", fixable: false },
+			{ type: "closed_in_flow", issueNumber: 5, artifactId: "i5_foo", detail: "", fixable: false },
+		];
+		applyFixes(doc, findings, new Map());
+		assert.equal(doc.toString(), before);
+	});
+});

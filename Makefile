@@ -11,6 +11,7 @@ build:
 .PHONY: test
 test:
 	pnpm -r test
+	node --test "scripts/lib/*.test.mjs"
 
 .PHONY: typecheck
 typecheck:
