@@ -128,6 +128,11 @@ artifact:
     label: "Obsidian プラグイン (#3)"
     status: todo
     updated_at: 2026-06-12T08:18:35Z
+  i29_node25_cli_fix:
+    label: "Node25 yaml バンドル修正 (#29)"
+    status: todo
+    description: 新規ビルドの CLI が Node25 で起動不能 — 再現条件・修正方針は issue #29 が一次情報
+    updated_at: 2026-06-12T10:53:40Z
 
 process:
   write_article:
@@ -171,6 +176,8 @@ process:
     label: 202606バグ修正
   build_obsidian_plugin:
     label: Obsidianプラグイン実装
+  fix_node25_bundle:
+    label: yamlバンドル修正
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -221,3 +228,5 @@ published_cli >> automate_pr_diff -> i19_pr_diff_images
 cli_tool >> fix_202606_bugs -> i1_bug_fixes
 
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
+
+cli_tool >> fix_node25_bundle -> i29_node25_cli_fix
