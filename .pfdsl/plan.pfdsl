@@ -108,12 +108,6 @@ artifact:
     label: "大規模図の閲覧支援 (#17)"
     status: todo
     updated_at: 2026-06-12T08:19:05Z
-  i18_issue_sync:
-    label: "issue⇔flow 同期機構 (#18)"
-    status: done
-    tags: [ "priority:high" ]
-    description: "flow:managed ラベル・updated_at 齟齬検出 (staled)・監査スクリプト。artifact メタデータは #13 と接点"
-    updated_at: 2026-06-12T08:19:07Z
   i19_pr_diff_images:
     label: "PR差分画像自動添付 (#19)"
     status: todo
@@ -168,8 +162,6 @@ process:
     label: 定義ジャンプ実装
   implement_graph_nav:
     label: 閲覧支援実装
-  implement_issue_sync:
-    label: issue同期実装
   automate_pr_diff:
     label: PR差分画像自動化
   fix_202606_bugs:
@@ -221,7 +213,6 @@ cli_tool >> implement_def_jump -> i16_def_jump
 
 cli_tool >> implement_graph_nav -> i17_graph_nav
 
-cli_tool >> implement_issue_sync -> i18_issue_sync
 
 published_cli >> automate_pr_diff -> i19_pr_diff_images
 
