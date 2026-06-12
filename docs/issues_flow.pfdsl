@@ -3,8 +3,9 @@ title: Issue 依存フロー（2026-06）
 description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue 対応
   artifact の id は iN_ prefix（N = issue 番号）。登録 issue は flow:managed ラベル、対象外は
   flow:exempt。updated_at は同期時点の GitHub updatedAt スナップショット — 同期監査・更新は
-  scripts/audit-issues-flow.mjs（--fix で機械的修復）。issue close 時は flow から削除（終端はチェーンごと、下流入力が残るものは
-  iN_ prefix を外し一般 done artifact へ降格）— iN_ id はオープン issue のみ参照する
+  scripts/audit-issues-flow.mjs（--fix で機械的修復）。issue close 時は flow
+  から削除（終端はチェーンごと、下流入力が残るものは iN_ prefix を外し一般 done artifact へ降格）— iN_ id はオープン
+  issue のみ参照する
 layout:
   direction: LR
   maxWidth: 130
@@ -27,28 +28,28 @@ artifact:
   i5_hierarchy_spec:
     label: "階層PFD仕様案 (#5)"
     status: todo
-    updated_at: 2026-06-10T17:51:21Z
+    updated_at: 2026-06-12T08:18:39Z
   i6_presets_spec:
     label: "共有プリセット仕様案 (#6)"
     status: todo
-    updated_at: 2026-06-10T17:51:30Z
+    updated_at: 2026-06-12T08:18:40Z
   i7_criteria_spec:
     label: "合否基準仕様案 (#7)"
     status: todo
-    updated_at: 2026-06-10T17:51:40Z
+    updated_at: 2026-06-12T08:18:42Z
   i8_revises_spec:
     label: "改版チェーン仕様案 (#8)"
     status: todo
-    updated_at: 2026-06-10T17:59:15Z
+    updated_at: 2026-06-12T08:18:44Z
   i13_location_spec:
     label: "location/command 仕様案 (#13)"
     status: todo
     description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
-    updated_at: 2026-06-11T01:47:06Z
+    updated_at: 2026-06-12T08:18:58Z
   i9_design_notes:
     label: "設計判断ノート・分岐なし方針 (#9)"
     status: todo
-    updated_at: 2026-06-10T17:52:01Z
+    updated_at: 2026-06-12T08:18:46Z
   spec_v007:
     label: 仕様書 v0.0.7（統合）
     status: todo
@@ -57,14 +58,14 @@ artifact:
     status: todo
     tags: [ "priority:high" ]
     description: lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため
-    updated_at: 2026-06-11T20:31:20Z
+    updated_at: 2026-06-12T08:18:37Z
   featured_toolchain:
     label: 次期仕様対応ツールチェーン
     status: todo
   i10_restructured_gen:
     label: "再構成済みスキル生成系 (#10)"
     status: todo
-    updated_at: 2026-06-10T23:49:15Z
+    updated_at: 2026-06-12T08:18:47Z
   published_cli:
     label: npm公開済みCLI
     status: done
@@ -74,7 +75,7 @@ artifact:
     label: "配布可能スキル (#11)"
     status: todo
     tags: [ "priority:high" ]
-    updated_at: 2026-06-11T20:32:42Z
+    updated_at: 2026-06-12T08:18:55Z
   multifile_policy:
     label: マルチファイル意味論方針
     status: todo
@@ -88,45 +89,45 @@ artifact:
     status: todo
     tags: [ "priority:high" ]
     description: 計画・生態系 PFD を既約ディレクトリへ移行し pfd-ops をプロジェクト非依存化。ADR-0007
-    updated_at: 2026-06-11T20:31:21Z
+    updated_at: 2026-06-12T08:19:00Z
   i12_article:
     label: "公開記事 (#12)"
     status: todo
     description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
-    updated_at: 2026-06-11T00:56:11Z
+    updated_at: 2026-06-12T08:18:56Z
   i15_group_fill:
     label: "group クラスタ塗りつぶし描画 (#15)"
     status: todo
-    updated_at: 2026-06-11T19:48:43Z
+    updated_at: 2026-06-12T08:19:02Z
   i16_def_jump:
     label: "graph⇔YAML 定義ジャンプ・トグル (#16)"
     status: todo
     tags: [ "priority:high" ]
-    updated_at: 2026-06-11T20:31:21Z
+    updated_at: 2026-06-12T08:19:03Z
   i17_graph_nav:
     label: "大規模図の閲覧支援 (#17)"
     status: todo
-    updated_at: 2026-06-11T19:53:56Z
+    updated_at: 2026-06-12T08:19:05Z
   i18_issue_sync:
     label: "issue⇔flow 同期機構 (#18)"
     status: done
     tags: [ "priority:high" ]
     description: "flow:managed ラベル・updated_at 齟齬検出 (staled)・監査スクリプト。artifact メタデータは #13 と接点"
-    updated_at: 2026-06-12T01:20:51Z
+    updated_at: 2026-06-12T08:19:07Z
   i19_pr_diff_images:
     label: "PR差分画像自動添付 (#19)"
     status: todo
     description: "merge トリガーで .pfdsl 差分の前後画像を生成し PR description に追記する GitHub Actions"
-    updated_at: 2026-06-12T00:41:46Z
+    updated_at: 2026-06-12T08:19:09Z
   i1_bug_fixes:
     label: "202606 バグ修正 (#1)"
     status: todo
     description: バグの完全リストと消化状況は issue #1 が一次情報
-    updated_at: 2026-06-10T17:50:06Z
+    updated_at: 2026-06-12T08:18:33Z
   i3_obsidian_plugin:
     label: "Obsidian プラグイン (#3)"
     status: todo
-    updated_at: 2026-06-10T17:49:56Z
+    updated_at: 2026-06-12T08:18:35Z
 
 process:
   write_article:
