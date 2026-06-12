@@ -26,7 +26,7 @@ export function parseIssueArtifacts(frontmatter) {
 }
 
 /**
- * @param {{ id: string, issueNumber: number, status: string|undefined, updatedAt: string|undefined, priorities: string[] }[]} artifacts - priorities must be pre-sorted (parseIssueArtifacts guarantees this)
+ * @param {{ id: string, issueNumber: number, status: string|undefined, updatedAt: string|undefined, priorities: string[], hasDownstream?: boolean }[]} artifacts - priorities must be pre-sorted (parseIssueArtifacts guarantees this)
  * @param {{ number: number, state: "OPEN"|"CLOSED", labels: string[], updatedAt: string }[]} issues
  * @returns {{ type: string, issueNumber: number, artifactId: string|undefined, detail: string, fixVia?: "file"|"github" }[]}
  */
@@ -53,6 +53,10 @@ export function computeFindings(artifacts, issues) {
 		}
 
 		if (iss.state === "CLOSED") {
+			// closed + done + has downstream = expected state, no action needed
+			if (art.status === "done" && art.hasDownstream) {
+				continue;
+			}
 			findings.push({
 				type: "closed_in_flow",
 				issueNumber: art.issueNumber,

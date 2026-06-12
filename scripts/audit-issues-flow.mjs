@@ -57,6 +57,25 @@ const doc = parseDocument(fmText);
 const fm = doc.toJS();
 const artifacts = parseIssueArtifacts(fm);
 
+// Mark artifacts that are consumed (have downstream) in the flow body
+function getConsumedArtifactIds(body) {
+	const consumed = new Set();
+	for (const line of body.split('\n')) {
+		const idx = line.indexOf('>>');
+		if (idx < 0) continue;
+		const left = line.slice(0, idx);
+		for (const m of left.matchAll(/\b([a-z][a-z0-9_]*)\b/g)) {
+			consumed.add(m[1]);
+		}
+	}
+	return consumed;
+}
+
+const consumedIds = getConsumedArtifactIds(body);
+for (const art of artifacts) {
+	art.hasDownstream = consumedIds.has(art.id);
+}
+
 // --- First pass: compute and print findings ---
 
 let issues = fetchIssues();
