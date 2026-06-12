@@ -30,7 +30,7 @@ artifact:
     label: 言語仕様書
     status: done
     group: generation
-    description: "docs/spec/spec.md。一次情報だが不変の外部入力ではない — 実装知見からの仕様提案（issue 経由）で改訂される。改版の詳細依存は docs/issues_flow.pfdsl 参照"
+    description: "docs/spec/spec.md。一次情報だが不変の外部入力ではない — 実装知見からの仕様提案（issue 経由）で改訂される。改版の詳細依存は .pfdsl/plan.pfdsl 参照"
   skill_template:
     label: スキルテンプレート
     status: done
@@ -96,7 +96,7 @@ artifact:
     label: issue 依存グラフ
     status: done
     group: planning
-    description: "docs/issues_flow.pfdsl。着手可能順序の導出。issue 追加時に更新"
+    description: ".pfdsl/plan.pfdsl。着手可能順序の導出。issue 追加時に更新"
   impl_flow:
     label: 実装ロードマップ
     status: done

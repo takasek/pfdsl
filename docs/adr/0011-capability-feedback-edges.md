@@ -55,5 +55,5 @@ R2 を採用する。**フロー内で生産される能力成果物（スキル
 ## References
 
 - ADR-0002（改版の表現）
-- docs/artifact_ecosystem.pfdsl
+- `docs/artifact_ecosystem.pfdsl` (→ `.pfdsl/ecosystem.pfdsl`)
 - issue #4（循環検出 lint）

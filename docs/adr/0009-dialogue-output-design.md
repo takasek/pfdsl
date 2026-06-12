@@ -59,6 +59,6 @@ ADR は対話の直接出力ではない。`decisions >> draft_adrs -> adrs` —
 
 ## References
 
-- docs/artifact_ecosystem.pfdsl
+- `docs/artifact_ecosystem.pfdsl` (→ `.pfdsl/ecosystem.pfdsl`)
 - ADR-0001（出力の有形性）
 - ADR-0004（プロセス粒度の決定基準）

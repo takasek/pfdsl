@@ -36,5 +36,5 @@ PFDSL の `group` はレイアウト補助であり、Graphviz の cluster に�
 ## References
 
 - docs/spec/spec.md §2.8
-- docs/artifact_ecosystem.pfdsl
+- `docs/artifact_ecosystem.pfdsl` (→ `.pfdsl/ecosystem.pfdsl`)
 - ADR-0004

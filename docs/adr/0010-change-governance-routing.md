@@ -54,6 +54,6 @@
 
 ## References
 
-- docs/artifact_ecosystem.pfdsl
-- docs/issues_flow.pfdsl
+- `docs/artifact_ecosystem.pfdsl` (→ `.pfdsl/ecosystem.pfdsl`)
+- `docs/issues_flow.pfdsl` (→ `.pfdsl/plan.pfdsl`)
 - ADR-0007（ディレクトリ規約）
