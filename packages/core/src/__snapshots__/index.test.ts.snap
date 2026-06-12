@@ -129,7 +129,7 @@ artifact:
     status: done
   cli_published:
     label: CLI npm公開
-    description: "作業ブランチ worktree-feat+cli-publish で実装済み（tsup バンドル・tag push 起動の publish ワークフロー）。残: merge・NPM_TOKEN 設定・tag push。計画は同ブランチの docs/superpowers/plans/2026-06-07-cli-publish.md"
+    description: "@pfdsl/cli 0.0.3 を npm 公開済み。tag push 起動の GitHub Actions + Trusted Publishing (OIDC)。tsup でワークスペース依存をバンドル（@hpcc-js/wasm のみ外部）"
     status: done
   agent_skill:
     label: AI agentスキル (pfdsl読み書き)
