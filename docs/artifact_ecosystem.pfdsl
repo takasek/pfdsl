@@ -71,7 +71,7 @@ artifact:
     label: レビュー知見
     status: done
     group: practice
-    description: "実践例レビューで得た品質知見。ガイド改訂・ADR・issue の3経路で消費される"
+    description: "実践例レビューで得た品質知見。次世代の対話・整備への還流入力（消費先の一次情報は本図のエッジ）"
   adrs:
     label: ADR
     status: done
@@ -119,7 +119,7 @@ artifact:
   issue_updates:
     label: issue 更新内容
     group: planning
-    description: "develop 完了時に発生する issue への反映事項（クローズ・進捗・新発見の起票種）。フロー内で生まれる不定形情報（ADR-0001 と緊張するが、実体は merge コミットと flow 更新で検証可能）。issue 管理への還流シグナル"
+    description: "マージ時に確定する issue への反映事項（クローズ・進捗・新発見の起票種）。フロー内で生まれる不定形情報（ADR-0001 と緊張するが、実体は merge コミットと flow 更新で検証可能）。issue 管理への還流シグナル"
   ops_skill:
     label: PFD運用スキル
     status: done
@@ -181,7 +181,7 @@ process:
     group: practice
   review_examples:
     label: 実践例レビュー
-    description: "品質ガイド（skill）とツール検証で実践例を監査し知見を抽出する。skill・toolchain は世代をまたぐ還流入力（ADR-0011）"
+    description: "品質ガイドとツール検証で実践例を監査し知見を抽出する。能力成果物は世代をまたぐ還流入力（ADR-0011。対象は本図のエッジが一次情報）"
     group: practice
   maintain_samples:
     label: カタログ整備
