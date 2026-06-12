@@ -66,7 +66,7 @@ artifact:
   adr_corpus:
     label: "ADR 群 (docs/adr)"
     status: done
-    description: 実践ラウンドから蒸留した方法論の設計決定記録6本
+    description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
   i14_dir_convention:
     label: ".pfdsl/ 規約移行 (#14)"
     status: todo
