@@ -55,10 +55,10 @@ artifact:
     status: todo
   i4_lint_checker:
     label: "lint拡張checker (#4)"
-    status: todo
+    status: wip
     tags: [ "priority:high" ]
     description: lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため
-    updated_at: 2026-06-12T08:18:37Z
+    updated_at: 2026-06-13T13:49:00Z
   featured_toolchain:
     label: 次期仕様対応ツールチェーン
     status: todo
