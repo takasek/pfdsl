@@ -1,11 +1,8 @@
 ---
 title: Issue 依存フロー（2026-06）
-description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue 対応
-  artifact の id は iN_ prefix（N = issue 番号）。登録 issue は flow:managed ラベル、対象外は
-  flow:exempt。updated_at は同期時点の GitHub updatedAt スナップショット — 同期監査・更新は
-  scripts/audit-issues-flow.mjs（--fix で機械的修復）。issue close 時は flow
-  から削除（終端はチェーンごと、下流入力が残るものは iN_ prefix を外し一般 done artifact へ降格）— iN_ id はオープン
-  issue のみ参照する
+description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue
+  管理規約・同期手段は sibling plan.md と pfd-ops スキルの references/github-issues-backend.md
+  参照
 layout:
   direction: LR
   maxWidth: 130
@@ -103,7 +100,7 @@ artifact:
     label: "graph⇔YAML 定義ジャンプ・トグル (#16)"
     status: todo
     tags: [ "priority:high" ]
-    updated_at: 2026-06-12T08:19:03Z
+    updated_at: 2026-06-13T22:07:14Z
   i17_graph_nav:
     label: "大規模図の閲覧支援 (#17)"
     status: todo
@@ -113,6 +110,12 @@ artifact:
     status: todo
     description: "merge トリガーで .pfdsl 差分の前後画像を生成し PR description に追記する GitHub Actions"
     updated_at: 2026-06-12T08:19:09Z
+  i37_orphan_lint:
+    label: "孤児process検出lint (#37)"
+    status: todo
+    description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
+      要件経路、dogfood #16 由来）"
+    updated_at: 2026-06-13T22:11:33Z
   i1_bug_fixes:
     label: "202606 バグ修正 (#1)"
     status: todo
@@ -170,6 +173,8 @@ process:
     label: Obsidianプラグイン実装
   fix_node25_bundle:
     label: yamlバンドル修正
+  implement_orphan_lint:
+    label: 孤児検出lint実装
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -221,3 +226,5 @@ cli_tool >> fix_202606_bugs -> i1_bug_fixes
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 cli_tool >> fix_node25_bundle -> i29_node25_cli_fix
+
+cli_tool >> implement_orphan_lint -> i37_orphan_lint
