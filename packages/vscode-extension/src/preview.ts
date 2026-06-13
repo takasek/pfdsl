@@ -8,6 +8,7 @@ import type {
 import { exportDot } from "@pfdsl/graphviz-exporter";
 import * as vscode from "vscode";
 import { analyzeDocument } from "./analyze.js";
+import { findFrontmatterDefinition } from "./jump.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
@@ -139,14 +140,26 @@ g.node.pfdsl-focused ellipse, g.node.pfdsl-focused polygon, g.node.pfdsl-focused
 </html>`;
 }
 
-function jumpToNode(doc: vscode.TextDocument, nodeId: string): void {
-	const result = analyzeDocument(doc);
+function jumpToNode(
+	doc: vscode.TextDocument,
+	nodeId: string,
+	preferDefinition = false,
+): void {
 	let targetPos: vscode.Position | undefined;
-	outer: for (const stmt of result.document.statements) {
-		for (const id of idsOfStatement(stmt)) {
-			if (id.value === nodeId) {
-				targetPos = new vscode.Position(id.start.line - 1, id.start.column - 1);
-				break outer;
+	if (preferDefinition) {
+		targetPos = findFrontmatterDefinition(doc, nodeId);
+	}
+	if (!targetPos) {
+		const result = analyzeDocument(doc);
+		outer: for (const stmt of result.document.statements) {
+			for (const id of idsOfStatement(stmt)) {
+				if (id.value === nodeId) {
+					targetPos = new vscode.Position(
+						id.start.line - 1,
+						id.start.column - 1,
+					);
+					break outer;
+				}
 			}
 		}
 	}
@@ -164,10 +177,13 @@ function jumpToNode(doc: vscode.TextDocument, nodeId: string): void {
 			targetPos.translate(0, nodeId.length),
 		);
 		existingEditor.revealRange(range);
-		vscode.window.showTextDocument(doc, {
-			viewColumn: existingEditor.viewColumn,
-			preserveFocus: false,
-		});
+		const vc = existingEditor.viewColumn;
+		if (vc !== undefined) {
+			vscode.window.showTextDocument(doc, {
+				viewColumn: vc,
+				preserveFocus: false,
+			});
+		}
 	} else {
 		vscode.window.showTextDocument(doc, {
 			selection: range,
@@ -249,7 +265,13 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				state.webviewReady = true;
 				sendUpdate(state);
 			} else if (msg.type === "nodeClick") {
-				jumpToNode(state.doc, msg.nodeId);
+				const editor = vscode.window.visibleTextEditors.find(
+					(e) => e.document === state.doc,
+				);
+				const cursorId = editor
+					? nodeIdAtCursor(analyzeDocument(state.doc), editor.selection.active)
+					: undefined;
+				jumpToNode(state.doc, msg.nodeId, cursorId === msg.nodeId);
 			}
 		});
 

@@ -65,6 +65,17 @@
 			{
 				"command": "pfdsl.clearDiff",
 				"title": "PFDSL: Clear Diff"
+			},
+			{
+				"command": "pfdsl.jumpToDefinition",
+				"title": "PFDSL: Go to Frontmatter Definition"
+			}
+		],
+		"keybindings": [
+			{
+				"command": "pfdsl.jumpToDefinition",
+				"key": "alt+f12",
+				"when": "editorLangId == pfdsl"
 			}
 		],
 		"menus": {
@@ -72,6 +83,13 @@
 				{
 					"when": "editorLangId == pfdsl",
 					"command": "pfdsl.preview",
+					"group": "navigation"
+				}
+			],
+			"editor/context": [
+				{
+					"when": "editorLangId == pfdsl",
+					"command": "pfdsl.jumpToDefinition",
 					"group": "navigation"
 				}
 			]
