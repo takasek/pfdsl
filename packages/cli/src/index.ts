@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import {
+	type AnalyzeOptions,
 	analyze,
 	auditGraph,
 	diffGraphs as coreDiffGraphs,
@@ -48,10 +49,15 @@ function failIfErrors(diags: Diagnostic[], file: string): CommandResult | null {
 export interface CheckOptions {
 	audit?: boolean;
 	summary?: boolean;
+	strict?: boolean;
 }
 
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
-	const { diagnostics, edges, nodeKinds } = analyze(readSource(file));
+	const analyzeOpts: AnalyzeOptions = { strict: opts.strict };
+	const { diagnostics, edges, nodeKinds } = analyze(
+		readSource(file),
+		analyzeOpts,
+	);
 	const lines = diagnostics.map((d) => formatDiagnostic(d, file));
 	if (hasErrors(diagnostics)) {
 		return { stdout: "", stderr: `${lines.join("\n")}\n`, exitCode: 1 };
@@ -160,7 +166,11 @@ export function runDiff(fileA: string, fileB: string): CommandResult {
 export const HELP = `pfdsl <command> [options]
 
 Commands:
-  check <file>             Validate a .pfdsl file
+  check <file> [--audit] [--summary] [--strict]
+                           Validate a .pfdsl file
+                           --audit   list terminal artifacts and external inputs
+                           --summary print artifact/process/edge counts
+                           --strict  error if feedback source not reachable from target process
   fmt <file> [--write] [--mode flat|flows]
                            Format a .pfdsl file; flows groups per-process (A >> P -> B)
   normalize <file>         Print canonical edge list
@@ -211,6 +221,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			return runCheck(f, {
 				audit: flags.audit === true,
 				summary: flags.summary === true,
+				strict: flags.strict === true,
 			});
 		}
 		case "fmt": {

@@ -107,6 +107,7 @@ export function parse(source: string): ParseDocResult {
 	};
 }
 
+export type { ValidateOptions } from "./validator.js";
 export {
 	buildGraph,
 	formatAsFlows,
@@ -122,7 +123,14 @@ export function hasErrors(diags: readonly Diagnostic[]): boolean {
 	return diags.some((d) => d.severity === "error");
 }
 
-export function analyze(source: string): AnalyzeResult {
+export interface AnalyzeOptions {
+	strict?: boolean;
+}
+
+export function analyze(
+	source: string,
+	opts: AnalyzeOptions = {},
+): AnalyzeResult {
 	const { document, frontmatter, diagnostics: parseDiags } = parse(source);
 	const {
 		edges,
@@ -130,7 +138,9 @@ export function analyze(source: string): AnalyzeResult {
 		isolatedNodes,
 		diagnostics: normDiags,
 	} = normalize(document, frontmatter);
-	const valDiags = validate(edges, nodeKinds, frontmatter);
+	const valDiags = validate(edges, nodeKinds, frontmatter, {
+		strict: opts.strict,
+	});
 	const graph = buildGraph(edges, nodeKinds);
 	return {
 		document,
