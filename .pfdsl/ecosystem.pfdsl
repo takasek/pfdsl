@@ -154,7 +154,7 @@ artifact:
     label: 計画 companion
     status: done
     group: planning
-    description: ".pfdsl/plan.md。plan.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ）。pfd-ops skill が読む L4 ホスト"
+    description: ".pfdsl/plan.md。plan.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd-ops skill が読む L4 ホスト"
 
 process:
   distill_ops:

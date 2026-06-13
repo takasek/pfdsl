@@ -4,7 +4,7 @@
 
 ## バックエンド
 
-GitHub Issues（github.com/takasek/pfdsl/issues）。規約と採用手順は pfd-ops スキルの `references/github-issues-backend.md`（L3 プリセット）に従う。
+GitHub Issues。規約と採用手順は pfd-ops スキルの `references/github-issues-backend.md`（L3 プリセット）に従う。
 
 ## このリポのインスタンス値
 
@@ -12,7 +12,14 @@ GitHub Issues（github.com/takasek/pfdsl/issues）。規約と採用手順は pf
 - 同期監査スクリプト: `scripts/audit-issues-flow.mjs`（`--fix` で機械的修復）
 - 監査対象: `.pfdsl/plan.pfdsl`
 
-## 着手時の終端ゲート（issue 固有項目）
+## 運用対象の計画 PFD
+
+ワークサイクルの選択ステップが列挙する対象:
+
+- `.pfdsl/plan.pfdsl` — オープン issue の依存グラフ
+- `docs/pfdsl_implementation_flow.pfdsl` — ツールチェーン実装ロードマップ
+
+## 終端ゲート追加項目（issue 固有、完了時に確認）
 
 汎用ゲート（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え:
 
