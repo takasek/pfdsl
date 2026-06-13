@@ -138,9 +138,12 @@ export function analyze(
 		isolatedNodes,
 		diagnostics: normDiags,
 	} = normalize(document, frontmatter);
-	const valDiags = validate(edges, nodeKinds, frontmatter, {
-		strict: opts.strict,
-	});
+	const valDiags = validate(
+		edges,
+		nodeKinds,
+		frontmatter,
+		opts.strict ? { strict: true } : undefined,
+	);
 	const graph = buildGraph(edges, nodeKinds);
 	return {
 		document,

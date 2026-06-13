@@ -1,6 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import {
-	type AnalyzeOptions,
 	analyze,
 	auditGraph,
 	diffGraphs as coreDiffGraphs,
@@ -53,10 +52,9 @@ export interface CheckOptions {
 }
 
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
-	const analyzeOpts: AnalyzeOptions = { strict: opts.strict };
 	const { diagnostics, edges, nodeKinds } = analyze(
 		readSource(file),
-		analyzeOpts,
+		opts.strict ? { strict: true } : undefined,
 	);
 	const lines = diagnostics.map((d) => formatDiagnostic(d, file));
 	if (hasErrors(diagnostics)) {
