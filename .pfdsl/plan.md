@@ -4,7 +4,7 @@
 
 ## バックエンド
 
-GitHub Issues。規約と採用手順は pfd-ops スキルの `references/github-issues-backend.md`（L3 プリセット）に従う。
+GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/github-issues-backend.md`（L3 プリセット）に従う。
 
 ## このリポのインスタンス値
 
