@@ -133,6 +133,35 @@ describe("validate", () => {
 		expect(codes("A >> P")).toContain("V003");
 	});
 
+	describe("W001: parts member without edges", () => {
+		it("warns when a parts member has no edges in the graph", () => {
+			const fm: Frontmatter = {
+				artifact: { bundle: { parts: ["orphan"] } },
+			};
+			// 'orphan' appears only in parts, never in body edges
+			expect(codes("A >> P -> bundle", fm)).toContain("W001");
+		});
+
+		it("does not warn when a parts member participates in at least one edge", () => {
+			const fm: Frontmatter = {
+				artifact: { bundle: { parts: ["piece"] } },
+			};
+			// 'piece' appears in body as an artifact with edges
+			expect(codes("A >> P -> piece\npiece >> Q -> bundle", fm)).not.toContain(
+				"W001",
+			);
+		});
+
+		it("warning severity is 'warning', not 'error'", () => {
+			const fm: Frontmatter = {
+				artifact: { bundle: { parts: ["orphan"] } },
+			};
+			const diags = diagnose("A >> P -> bundle", fm);
+			const w001 = diags.find((d) => d.code === "W001");
+			expect(w001?.severity).toBe("warning");
+		});
+	});
+
 	describe("V010: primary-graph cycle detection", () => {
 		it("detects a direct cycle between two processes", () => {
 			// a >> p -> b  +  b >> q -> a  forms a cycle in the primary graph
