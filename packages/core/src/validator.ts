@@ -10,10 +10,15 @@ import { STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
 const STATUS_SET: ReadonlySet<string> = new Set(STATUS_VALUES);
 const STYLE_ATTR_SET: ReadonlySet<string> = new Set(STYLE_ATTRS);
 
+export interface ValidateOptions {
+	strict?: boolean;
+}
+
 export function validate(
 	edges: NormalizedEdge[],
 	nodeKinds: Map<string, NodeKind>,
 	fm: Frontmatter | null,
+	options?: ValidateOptions,
 ): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
 
@@ -242,6 +247,41 @@ export function validate(
 		}
 		for (const n of allNodes) {
 			if (color.get(n) === "white") dfsV010(n);
+		}
+	}
+
+	// V011: strict-mode feedback validation
+	// In strict mode, for each feedback edge A >>? P, verify that P can reach A
+	// in the primary graph (P directly or transitively produces A).
+	if (options?.strict) {
+		// Build reverse adjacency for reachability: from a process, what artifacts can be reached?
+		function primaryReachable(startProcess: string): Set<string> {
+			const reachable = new Set<string>();
+			const queue: string[] = [startProcess];
+			while (queue.length > 0) {
+				const node = queue.shift()!;
+				for (const neighbor of primaryAdj.get(node) ?? []) {
+					if (!reachable.has(neighbor)) {
+						reachable.add(neighbor);
+						queue.push(neighbor);
+					}
+				}
+			}
+			return reachable;
+		}
+
+		for (const e of edges) {
+			if (e.kind === "feedback") {
+				const reachable = primaryReachable(e.process);
+				if (!reachable.has(e.artifact)) {
+					diagnostics.push({
+						severity: "error",
+						code: "V011",
+						message: `Feedback artifact '${e.artifact}' is not reachable from process '${e.process}' in the primary graph`,
+						range: zeroRange(),
+					});
+				}
+			}
 		}
 	}
 
