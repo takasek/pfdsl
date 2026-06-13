@@ -19,9 +19,11 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 - `.pfdsl/plan.pfdsl` — オープン issue の依存グラフ
 - `docs/pfdsl_implementation_flow.pfdsl` — ツールチェーン実装ロードマップ
 
-## 終端ゲート追加項目（issue 固有、完了時に確認）
+## 終端ゲート追加項目（issue 固有）
 
-汎用ゲート（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え:
+**タイミング規約**: issue クローズと flow 確定は **PR マージ時**に行う（生態系図 merge_pr: 成果物・進捗・issue 更新はマージで正本になる）。PR 作成時点では行わない — PR がレビューで変わる/却下される可能性があるため。サイクルが PR 作成で終わる場合、下記2項目は「マージ時に実施」と記録して未了のまま閉じてよい。
+
+汎用ゲート（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、**マージ時に**:
 
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
-- [ ] close 時の降格規則を適用した（終端はチェーンごと削除、下流入力が残るものは `iN_` prefix を外す）
+- [ ] close 時の降格規則を適用した（定義は L3 reference。専属 process も含めて削除する）
