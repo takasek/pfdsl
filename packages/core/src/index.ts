@@ -1,3 +1,8 @@
+import { auditGraph } from "./audit.js";
+
+export type { AuditResult } from "./audit.js";
+export { auditGraph };
+
 import {
 	formatAsFlows,
 	formatEdges,
