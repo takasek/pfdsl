@@ -1,6 +1,42 @@
 // Pure logic for auditing sync between GitHub issues and .pfdsl/plan.pfdsl.
 // Zero I/O. No imports.
 
+export const FLOW_LABELS = [
+	{ name: "flow:managed", description: "tracked in .pfdsl/plan.pfdsl" },
+	{ name: "flow:exempt", description: "intentionally out of .pfdsl/plan.pfdsl scope" },
+];
+
+/**
+ * @param {{ name: string, description: string }[]} expectedLabels
+ * @param {{ name: string, description: string }[]} actualLabels
+ * @returns {{ type: string, name: string, description: string, detail: string, fixVia: "github" }[]}
+ */
+export function computeLabelFindings(expectedLabels, actualLabels) {
+	const actualByName = new Map(actualLabels.map((l) => [l.name, l]));
+	const findings = [];
+	for (const expected of expectedLabels) {
+		const actual = actualByName.get(expected.name);
+		if (!actual) {
+			findings.push({
+				type: "label_missing",
+				name: expected.name,
+				description: expected.description,
+				detail: `label "${expected.name}" does not exist`,
+				fixVia: "github",
+			});
+		} else if (actual.description !== expected.description) {
+			findings.push({
+				type: "label_description_mismatch",
+				name: expected.name,
+				description: expected.description,
+				detail: `expected: "${expected.description}", actual: "${actual.description}"`,
+				fixVia: "github",
+			});
+		}
+	}
+	return findings;
+}
+
 /**
  * @param {object} frontmatter - parsed YAML object
  * @returns {{ id: string, issueNumber: number, status: string|undefined, updatedAt: string|undefined, priorities: string[] }[]}

@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseIssueArtifacts, computeFindings, applyFixes } from "./lib/issues-flow-audit.mjs";
+import { parseIssueArtifacts, computeFindings, applyFixes, computeLabelFindings, FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
 import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,6 +33,13 @@ if (fmEnd === -1) throw new Error("No closing --- found in plan.pfdsl");
 
 const fmText = lines.slice(1, fmEnd).join("\n") + "\n";
 const body = lines.slice(fmEnd + 1).join("\n");
+
+// --- Fetch labels from GitHub ---
+
+function fetchLabels() {
+	const out = execFileSync("gh", ["label", "list", "--json", "name,description", "--limit", "100"]);
+	return JSON.parse(out).map((l) => ({ name: l.name, description: l.description ?? "" }));
+}
 
 // --- Fetch issues from GitHub ---
 
@@ -74,6 +81,30 @@ function getConsumedArtifactIds(body) {
 const consumedIds = getConsumedArtifactIds(body);
 for (const art of artifacts) {
 	art.hasDownstream = consumedIds.has(art.id);
+}
+
+// --- Check labels ---
+
+const labels = fetchLabels();
+const labelFindings = computeLabelFindings(FLOW_LABELS, labels);
+
+if (labelFindings.length > 0) {
+	console.log("label:");
+	for (const f of labelFindings) {
+		console.log(`  ${f.type} [${f.name}] ${f.detail}`);
+	}
+	if (fix) {
+		for (const f of labelFindings) {
+			if (f.type === "label_missing") {
+				execFileSync("gh", ["label", "create", f.name, "--description", f.description, "--color", "ededed"]);
+			} else if (f.type === "label_description_mismatch") {
+				execFileSync("gh", ["label", "edit", f.name, "--description", f.description]);
+			}
+		}
+		console.log("fixed label findings");
+	} else {
+		process.exit(1);
+	}
 }
 
 // --- First pass: compute and print findings ---
