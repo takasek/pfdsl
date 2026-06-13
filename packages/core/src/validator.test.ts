@@ -162,6 +162,41 @@ describe("validate", () => {
 		});
 	});
 
+	describe("V011: strict-mode feedback validation", () => {
+		function strictCodes(src: string): string[] {
+			const { tokens } = lex(src);
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, null);
+			return validate(edges, nodeKinds, null, { strict: true }).map(
+				(d) => d.code,
+			);
+		}
+
+		it("does not report V011 in non-strict mode even when feedback target is unreachable", () => {
+			// X >>? P  — X is never produced by P in primary graph
+			expect(codes("a >> p -> b\nx >>? p")).not.toContain("V011");
+		});
+
+		it("does not report V011 in strict mode when P can reach A in the primary graph", () => {
+			// a >> p -> b   b >>? q -> c   q produces b in primary, so feedback b>>?q is valid
+			expect(strictCodes("a >> p -> b\nb >>? p")).not.toContain("V011");
+		});
+
+		it("reports V011 in strict mode when feedback artifact is not reachable from its process", () => {
+			// x is never an output of p in the primary graph
+			expect(strictCodes("a >> p -> b\nx >>? p")).toContain("V011");
+		});
+
+		it("V011 severity is error", () => {
+			const { tokens } = lex("a >> p -> b\nx >>? p");
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, null);
+			const diags = validate(edges, nodeKinds, null, { strict: true });
+			const v011 = diags.find((d) => d.code === "V011");
+			expect(v011?.severity).toBe("error");
+		});
+	});
+
 	describe("V010: primary-graph cycle detection", () => {
 		it("detects a direct cycle between two processes", () => {
 			// a >> p -> b  +  b >> q -> a  forms a cycle in the primary graph
