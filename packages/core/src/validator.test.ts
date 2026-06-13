@@ -132,4 +132,26 @@ describe("validate", () => {
 	it("V002/V003: process with input but no output still triggers V003", () => {
 		expect(codes("A >> P")).toContain("V003");
 	});
+
+	describe("V010: primary-graph cycle detection", () => {
+		it("detects a direct cycle between two processes", () => {
+			// a >> p -> b  +  b >> q -> a  forms a cycle in the primary graph
+			expect(codes("a >> p -> b\nb >> q -> a")).toContain("V010");
+		});
+
+		it("detects a longer cycle spanning three processes", () => {
+			expect(codes("a >> p -> b\nb >> q -> c\nc >> r -> a")).toContain("V010");
+		});
+
+		it("does not report V010 for a valid acyclic graph", () => {
+			expect(
+				codes("req >> design -> spec\nspec >> impl -> code"),
+			).not.toContain("V010");
+		});
+
+		it("does not report V010 when only a feedback edge forms the return path", () => {
+			// primary: a >> p -> b. feedback: b >>? p. No primary-graph cycle.
+			expect(codes("a >> p -> b\nb >>? p")).not.toContain("V010");
+		});
+	});
 });
