@@ -167,5 +167,60 @@ export function validate(
 
 	for (const id of Object.keys(artifactMeta)) detectCycle(id);
 
+	// V010: primary-graph cycle detection
+	// Build adjacency map from primary edges only (feedback edges are exempt)
+	const primaryAdj = new Map<string, string[]>();
+	for (const e of edges) {
+		if (e.kind === "input") {
+			// artifact -> process
+			const adj = primaryAdj.get(e.artifact) ?? [];
+			adj.push(e.process);
+			primaryAdj.set(e.artifact, adj);
+		} else if (e.kind === "output") {
+			// process -> artifact
+			const adj = primaryAdj.get(e.process) ?? [];
+			adj.push(e.artifact);
+			primaryAdj.set(e.process, adj);
+		}
+	}
+	{
+		const color = new Map<string, "white" | "gray" | "black">();
+		const allNodes = new Set<string>();
+		for (const e of edges) {
+			if (e.kind !== "feedback") {
+				allNodes.add(e.kind === "output" ? e.process : e.artifact);
+				allNodes.add(e.kind === "output" ? e.artifact : e.process);
+			}
+		}
+		for (const n of allNodes) color.set(n, "white");
+
+		let cycleReported = false;
+		function dfsV010(id: string): boolean {
+			if (color.get(id) === "gray") return true;
+			if (color.get(id) === "black") return false;
+			color.set(id, "gray");
+			for (const neighbor of primaryAdj.get(id) ?? []) {
+				if (dfsV010(neighbor)) {
+					if (!cycleReported) {
+						cycleReported = true;
+						diagnostics.push({
+							severity: "error",
+							code: "V010",
+							message: `Primary graph contains a cycle involving '${id}' → '${neighbor}'`,
+							range: zeroRange(),
+						});
+					}
+					color.set(id, "black");
+					return false;
+				}
+			}
+			color.set(id, "black");
+			return false;
+		}
+		for (const n of allNodes) {
+			if (color.get(n) === "white") dfsV010(n);
+		}
+	}
+
 	return diagnostics;
 }
