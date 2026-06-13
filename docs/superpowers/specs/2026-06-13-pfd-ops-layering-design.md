@@ -30,9 +30,11 @@ PFD という概念だけから導ける手順。固有名詞ゼロ。
 
 汎用スキルは「ここに従え」とディスパッチするだけで、具体を持たない。宛先は L3/L4 が `.pfdsl` 内に書く。
 
-- **作業項目の一次情報と同期手段**: 「`plan.pfdsl` は依存構造のみ。一次情報の所在と同期手段はそのファイルの `description` と `ecosystem.pfdsl` に従え」
-- **知見の振り分け**: 「実践・レビューで得た知見は記録先成果物へ振り分けよ。宛先候補 = `ecosystem.pfdsl` に登録された知識系成果物（その producer プロセスが受け皿）」
-- **終端ゲートの追加項目**: 汎用項目に、リポ固有チェック（issue クローズ等）を合成する。固有項目の出所も `ecosystem.pfdsl` / 各 description
+- **作業項目の一次情報と同期手段**: 「`plan.pfdsl` とその sibling `plan.md` に従え。一次情報の所在と同期手段はそこに書かれている」
+- **知見の振り分け**: 「実践・レビューで得た知見は記録先成果物へ振り分けよ。宛先候補 = `ecosystem.pfdsl` の知識系成果物と、手続きは sibling `ecosystem.md`」
+- **終端ゲートの追加項目**: 汎用項目に、リポ固有チェック（issue クローズ等）を合成する。固有項目の出所は対応する `.md` companion
+
+ディスパッチの宛先は次節の `.md` companion 規約で統一する。
 
 ### L3: バックエンド・プリセット（汎用ではないがベストプラクティスとして配布可能）
 
@@ -51,8 +53,24 @@ PFD という概念だけから導ける手順。固有名詞ゼロ。
 - ADR 改訂規約 / review-prompts.md
 - 学習ループのラウンド比較・残存ミスの lint 要件送り（ツールチェーン開発固有）
 - implementation_flow ロードマップ
+- L3 のインスタンス化（バックエンド = GitHub、監査スクリプトの実パス、リポ URL）
 
-L4 のホストは既存の `ecosystem.pfdsl` と各運用ファイルの `description`。新規ファイルは作らない（`plan.pfdsl` が既にこのパターンを実証）。
+L4 のホストは2つに分かれる。ノード単体の同一性事実（パス・直接の producer/consumer）は `.pfdsl` の `description` に1行で残す。複数ノードをまたぐ手続き・根拠・プロトコル（学習ループ、知見振り分け、ゲート項目の根拠）は、後述の `.md` companion に置く。
+
+### `.md` companion 規約（L1/L2 の機構、中身は L4）
+
+各運用 `.pfdsl` ファイルに、同名 sibling の Markdown を任意で対にできる。
+
+- `ecosystem.pfdsl` ↔ `ecosystem.md`: グラフが運べない散文（学習ループ手続き、知見振り分けプロトコル、終端ゲートの根拠）
+- `plan.pfdsl` ↔ `plan.md`: このリポの issue 管理バインディング（採用バックエンド、監査スクリプトの実パス、L3 reference へのポインタ）
+
+境界規則:
+- `.pfdsl` description = ノード単体の同一性。何で・どこにあり・直接の producer/consumer。1行の事実
+- `.md` companion = 複数ノードをまたぐ手続き・根拠・単一ノードに紐づかないプロトコル
+
+規約自体（「skill は `<file>.pfdsl` とその sibling `<file>.md` を読め」）は汎用（L1/L2）で SKILL.md に記載する。`.md` の中身は L4（リポ固有）。`.md` は任意 — 散文が必要な `.pfdsl` にだけ作る（例: `impl_flow.md` は不要なら作らない）。
+
+この規約により、以前の「固有層ホスト = ecosystem + description」案で description に詰め込めなかった手続き知に、グラフと対になる明示的な置き場ができる。単一の汎用 ops ファイルと違い、各 `.md` は対応するグラフにスコープされるため雑多な寄せ集めにならない。
 
 ## 配布物の構造
 
@@ -73,14 +91,17 @@ L4 のホストは既存の `ecosystem.pfdsl` と各運用ファイルの `descr
 ## このリポの移行
 
 1. SKILL.md を L1+L2 に縮約。消える固有事項を L4 ホストへ移転:
-   - payoff_log 追記条件 → 既に `payoff_log` artifact description にあり。重複を排し description へ寄せる
-   - 品質ガイド改訂経路 → `skill_template` artifact / `maintain_template` process description
-   - ラウンド比較・lint 要件送り → 該当 ADR/artifact description（実装計画で適切な居場所を特定）
-   - 終端ゲートの issue 固有項目 → L3 reference へ
-2. L3 規約を `references/github-issues-backend.md` に新設。現 SKILL.md と `plan.pfdsl` description の issue 規約をここへ集約
-3. `plan.pfdsl` description: 現状の自己記述を維持しつつ、規約本体は L3 reference 参照に薄化可（実装計画で判断）
-4. `ecosystem.pfdsl` の `ops_skill` description を層構造を反映して更新
-5. このリポは L3 採用リポ第1号として dogfood する
+   - payoff_log 追記条件 → ノード事実は `payoff_log` description（既出）。効果収集という運用動機は `ecosystem.md`
+   - 品質ガイド改訂経路 → `skill_template` / `maintain_template` description（ノード事実）+ 手続きの流れは `ecosystem.md`
+   - 学習ループ（ラウンド比較・残存ミス→lint 要件送り）→ `ecosystem.md`（ADR-0006 を根拠として参照）
+   - 知見振り分けプロトコル（3経路の運用手順）→ `ecosystem.md`
+   - 終端ゲートの issue 固有項目 → `plan.md`（L3 reference を指す）
+2. `ecosystem.md` を新設。上記の手続き知を集約。グラフと対になる散文ホスト
+3. `plan.md` を新設。このリポの issue 管理バインディング（バックエンド = GitHub、監査スクリプト実パス、L3 reference へのポインタ）。現 `plan.pfdsl` frontmatter の規約散文をここへ移し、description はノード事実に絞る
+4. L3 規約を `references/github-issues-backend.md` に新設。現 SKILL.md と `plan.pfdsl` description の issue 規約（再利用可能な部分）をここへ集約。リポ固有のインスタンス値は `plan.md` 側
+5. `ecosystem.pfdsl` の `ops_skill` description を層構造を反映して更新
+6. `ecosystem.md` / `plan.md` 自体を `ecosystem.pfdsl` に成果物登録する（このリポの終端監査ルール: 消費者を書けない成果物は作らない。consumer = pfd-ops skill が読む。producer = 対応する .pfdsl を整備する process）
+7. このリポは L3 採用リポ第1号として dogfood する
 
 ## pfd-cycle / pfd-retro コマンド
 
@@ -88,8 +109,8 @@ L4 のホストは既存の `ecosystem.pfdsl` と各運用ファイルの `descr
 
 ## 検証
 
-- 思考実験: 「GitHub Issue を使わず plan.pfdsl だけで運用する架空リポ」が SKILL.md だけで1サイクル回せるか（L3 非依存の確認）
-- このリポで実際に1サイクル（/pfd-cycle）を回し、L1+L2+L3 reference の合成で従来と同等に運用できるか
+- 思考実験: 「GitHub Issue を使わず plan.pfdsl だけで運用する架空リポ」が SKILL.md だけで1サイクル回せるか（L3 非依存の確認）。.md companion が無い `.pfdsl` でも破綻しないこと
+- このリポで実際に1サイクル（/pfd-cycle）を回し、L1+L2 + `.md` companion + L3 reference の合成で従来と同等に運用できるか
 - 変更した全 .pfdsl が `check` を通過
 - audit-issues-flow.mjs のテストが移動後も通る
 
