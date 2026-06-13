@@ -265,7 +265,7 @@ examples >> review_examples -> findings
 
 [skill, toolchain, retro_skill] >>? review_examples
 
-[adrs, payoff_log] >> distill_ops -> [ops_skill, retro_skill, review_prompts, ecosystem_md, plan_md]
+[adrs, payoff_log] >> distill_ops -> [ops_skill, retro_skill, review_prompts, ecosystem_md]
 
 retro_skill >>? discuss
 
@@ -275,7 +275,7 @@ proposals >> file_issues -> gh_issues
 
 findings >>? file_issues
 
-gh_issues >> map_deps -> issues_flow
+gh_issues >> map_deps -> [issues_flow, plan_md]
 
 [gh_issues, issues_flow, spec] >> develop -> pull_request
 
