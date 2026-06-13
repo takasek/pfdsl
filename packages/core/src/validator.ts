@@ -77,7 +77,21 @@ export function validate(
 
 	// V004 / V005 / V006: parts constraints
 	// V007: artifact.status enum check
+	// W001: parts member without edges
 	const artifactMeta = fm?.artifact ?? {};
+
+	// Collect all artifact/process ids that appear in at least one edge
+	const nodesWithEdges = new Set<string>();
+	for (const e of edges) {
+		if (e.kind === "input" || e.kind === "feedback") {
+			nodesWithEdges.add(e.artifact);
+			nodesWithEdges.add(e.process);
+		} else {
+			nodesWithEdges.add(e.process);
+			nodesWithEdges.add(e.artifact);
+		}
+	}
+
 	for (const [artifactId, meta] of Object.entries(artifactMeta)) {
 		for (const partId of meta.parts ?? []) {
 			if (nodeKinds.get(partId) === "process") {
@@ -93,6 +107,15 @@ export function validate(
 					severity: "error",
 					code: "V005",
 					message: `'${artifactId}' cannot include itself in parts`,
+					range: zeroRange(),
+				});
+			}
+			// W001: parts member with no edges (§17.4: should be input to a merge process)
+			if (!nodesWithEdges.has(partId) && nodeKinds.get(partId) !== "process") {
+				diagnostics.push({
+					severity: "warning",
+					code: "W001",
+					message: `Parts member '${partId}' of '${artifactId}' has no edges`,
 					range: zeroRange(),
 				});
 			}
