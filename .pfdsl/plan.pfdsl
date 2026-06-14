@@ -116,6 +116,11 @@ artifact:
     description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
       要件経路、dogfood #16 由来）"
     updated_at: 2026-06-13T22:11:33Z
+  i40_flow_automation:
+    label: "issue close 時の flow 自動同期 (#40)"
+    status: todo
+    description: "audit --fix の closed_in_flow auto-fix（チェーン削除/降格）+ issues.closed Action で flow 変更 PR を自動起票。#37 と相補（孤児を源で防ぐ）"
+    updated_at: 2026-06-14T00:13:54Z
   i1_bug_fixes:
     label: "202606 バグ修正 (#1)"
     status: todo
@@ -167,6 +172,8 @@ process:
     label: Obsidianプラグイン実装
   implement_orphan_lint:
     label: 孤児検出lint実装
+  automate_flow_close:
+    label: flow自動同期実装
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -218,3 +225,5 @@ cli_tool >> fix_202606_bugs -> i1_bug_fixes
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 cli_tool >> implement_orphan_lint -> i37_orphan_lint
+
+cli_tool >> automate_flow_close -> i40_flow_automation
