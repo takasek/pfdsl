@@ -5,6 +5,7 @@ import {
 	parseIssueArtifacts,
 	computeFindings,
 	applyFixes,
+	applyClosedInFlowFixes,
 	computeLabelFindings,
 } from "./issues-flow-audit.mjs";
 import { parseDocument } from "./yaml-require.mjs";
@@ -158,7 +159,7 @@ describe("computeFindings", () => {
 		const findings = computeFindings(artifacts, issues);
 		const f = findings.find((f) => f.type === "closed_in_flow");
 		assert.ok(f);
-		assert.equal(f.fixVia, undefined);
+		assert.equal(f.fixVia, "flow");
 		assert.ok(f.detail.includes("delete the chain"), "detail should guide cleanup");
 	});
 
@@ -169,7 +170,7 @@ describe("computeFindings", () => {
 		const matching = findings.filter((f) => f.issueNumber === 5);
 		assert.equal(matching.length, 1);
 		assert.equal(matching[0].type, "closed_in_flow");
-		assert.equal(matching[0].fixVia, undefined);
+		assert.equal(matching[0].fixVia, "flow");
 		assert.ok(matching[0].detail.includes("delete the chain"), "detail should guide cleanup");
 	});
 
@@ -343,10 +344,139 @@ describe("applyFixes", () => {
 		const before = doc.toString();
 		const findings = [
 			{ type: "unknown_issue", issueNumber: 5, artifactId: "i5_foo", detail: "" },
-			{ type: "closed_in_flow", issueNumber: 5, artifactId: "i5_foo", detail: "" },
+			{ type: "closed_in_flow", issueNumber: 5, artifactId: "i5_foo", detail: "", fixVia: "flow" },
 		];
 		applyFixes(doc, findings, new Map());
 		assert.equal(doc.toString(), before);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// applyClosedInFlowFixes
+// ---------------------------------------------------------------------------
+
+describe("applyClosedInFlowFixes", () => {
+	// Case A1: terminal artifact, sole-output process → remove artifact, process, and edge line
+	it("A1: terminal sole-output — removes artifact, process, and edge from body", () => {
+		const yaml = `artifact:
+  cli_tool:
+    label: CLI
+    status: done
+  i16_def_jump:
+    label: def-jump feature
+    status: todo
+process:
+  implement_def_jump:
+    label: Implement def-jump
+`;
+		const body = `\ncli_tool >> implement_def_jump -> i16_def_jump\n`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "closed_in_flow",
+				issueNumber: 16,
+				artifactId: "i16_def_jump",
+				detail: "issue is closed",
+				fixVia: "flow",
+				hasDownstream: false,
+			},
+		];
+		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const fm = doc.toJS();
+		// artifact removed from frontmatter
+		assert.equal(fm.artifact.i16_def_jump, undefined, "artifact should be removed");
+		// sole-output process removed from frontmatter
+		assert.equal(fm.process?.implement_def_jump, undefined, "sole-output process should be removed");
+		// edge line removed from body
+		assert.ok(!newBody.includes("implement_def_jump"), "edge should be removed from body");
+		assert.ok(!newBody.includes("i16_def_jump"), "artifact should not appear in body");
+	});
+
+	// Case A2: terminal artifact, multi-output process → remove artifact from list, keep process and edge
+	it("A2: terminal multi-output — removes artifact from list, keeps process and other outputs", () => {
+		const yaml = `artifact:
+  spec_v006:
+    label: Spec v0.0.6
+    status: done
+  i5_hierarchy_spec:
+    label: Hierarchy spec
+    status: todo
+  multifile_policy:
+    label: Policy
+    status: todo
+process:
+  draft_multifile_specs:
+    label: Draft multi-file specs
+`;
+		const body = `\nspec_v006 >> draft_multifile_specs -> [i5_hierarchy_spec, multifile_policy]\n`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "closed_in_flow",
+				issueNumber: 5,
+				artifactId: "i5_hierarchy_spec",
+				detail: "issue is closed",
+				fixVia: "flow",
+				hasDownstream: false,
+			},
+		];
+		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const fm = doc.toJS();
+		// closed artifact removed from frontmatter
+		assert.equal(fm.artifact.i5_hierarchy_spec, undefined, "closed artifact should be removed");
+		// multi-output process kept
+		assert.ok(fm.process?.draft_multifile_specs, "multi-output process should be kept");
+		// other artifact kept
+		assert.ok(fm.artifact.multifile_policy, "other output should remain in frontmatter");
+		// body still has the edge but without the closed artifact
+		assert.ok(!newBody.includes("i5_hierarchy_spec"), "closed artifact should not appear in body");
+		assert.ok(newBody.includes("multifile_policy"), "other output should remain in body");
+		assert.ok(newBody.includes("draft_multifile_specs"), "process should remain in body");
+	});
+
+	// Case B: non-terminal, not done → demote: strip iN_ prefix, set status done, update body refs
+	it("B: non-terminal not-done — strips prefix, sets done, updates body refs", () => {
+		const yaml = `artifact:
+  cli_tool:
+    label: CLI
+    status: done
+  i16_def_jump:
+    label: def-jump feature
+    status: todo
+    updated_at: "2026-01-01T00:00:00Z"
+    tags:
+      - priority:high
+process:
+  implement_def_jump:
+    label: Implement def-jump
+  use_def_jump:
+    label: Use def-jump
+`;
+		const body = `\ncli_tool >> implement_def_jump -> i16_def_jump\ni16_def_jump >> use_def_jump -> cli_tool\n`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "closed_in_flow",
+				issueNumber: 16,
+				artifactId: "i16_def_jump",
+				detail: "issue is closed",
+				fixVia: "flow",
+				hasDownstream: true,
+			},
+		];
+		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const fm = doc.toJS();
+		// old id gone
+		assert.equal(fm.artifact.i16_def_jump, undefined, "old prefixed id should be removed");
+		// new id present with status done
+		assert.ok(fm.artifact.def_jump, "demoted artifact should exist");
+		assert.equal(fm.artifact.def_jump.status, "done");
+		// priority drift fields removed
+		assert.equal(fm.artifact.def_jump.updated_at, undefined, "updated_at should be removed");
+		assert.equal(fm.artifact.def_jump.tags, undefined, "tags should be removed");
+		// body refs updated
+		assert.ok(!newBody.includes("i16_def_jump"), "old id should not appear in body");
+		assert.ok(newBody.includes("def_jump"), "new id should appear in body");
 	});
 });
 
