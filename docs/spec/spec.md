@@ -109,6 +109,8 @@ artifact / process に対して group を指定することで、ノードをグ
 
 #### artifact 専用フィールド
 
+`status` / `tags` も Artifact 専用フィールドである（§2.7 参照）。Process に指定した場合の扱いは §2.7 冒頭に定める。
+
 **criteria** — 成果物が完了（`status: done`）とみなされる条件（任意文字列）。モデル内で完了根拠を自己文書化する。1 Artifact につき 0 または 1 個。§15.7 参照。
 
 **location** — 成果物の実体ファイル・リソースへのポインタ（パス、glob、または URL）。相対パスの基準は含む `.pfdsl` ファイルの位置。グラフ意味論に影響しない。1 Artifact につき 0 または 1 個。§15.8 参照。
@@ -694,6 +696,7 @@ artifact.C.parts = [Ca, Cb]
 * `status: done` かつ `criteria:` 未設定の Artifact: warning
 * strict mode では error に昇格してよい
 * `criteria:` を Process に指定した場合は error
+* `status` が `done` 以外の Artifact に `criteria:` を設定することは有効（事前宣言として許容）。warning / error は発しない
 
 ### 15.8 location / command 制約
 
@@ -715,6 +718,7 @@ artifact.C.parts = [Ca, Cb]
 * 線形チェーン制約: `revises:` チェーンは単方向の単一リンクリストでなければならない（最新版 → 前版 → … の方向）。複数の Artifact が同一 Artifact を `revises:` で参照することは error（分岐した改版系列）
 * 循環参照は error
 * `revises:` を Process に指定した場合は error
+* クロスファイル revises はマルチファイル仕様（将来版）に委ねる（`location:` のクロスファイル参照扱いと同様、§15.8 参照）
 
 ---
 
@@ -816,7 +820,7 @@ review_result >> reject -> revision_request
 revision_request >>? impl -> code
 ```
 
-`review_result`（承認/差し戻しの判断）が成果物。条件分岐構文は存在しない（§19参照）。
+`review_result`（承認/差し戻しの判断）が成果物。`approve` / `reject` はそれぞれ承認処理・差し戻し処理プロセス。条件分岐構文は存在しない（§19参照）。
 
 ---
 
