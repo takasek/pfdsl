@@ -301,14 +301,36 @@ export function applyClosedInFlowFixes(doc, body, findings) {
 			// Case B: non-terminal not-done — demote by stripping iN_ prefix
 			const newId = artifactId.replace(/^i\d+_/, "");
 
-			// Get existing artifact data, remove priority fields
-			const existingNode = doc.getIn(["artifact", artifactId]);
-			const existingData = existingNode?.toJSON ? existingNode.toJSON() : (existingNode ?? {});
-			const { updated_at: _u, tags: _t, ...rest } = existingData;
+			// Reuse the existing YAML Map node to preserve scalar quoting/styling.
+			// Do NOT call toJSON(): it flattens nodes into plain strings, which causes
+			// setIn to re-emit them as PLAIN scalars. A value like
+			//   description: some text #4 more text
+			// is parsed as value="some text" comment="4 more text", and toJSON()
+			// silently discards the comment — the data is lost permanently.
+			const mapNode = doc.getIn(["artifact", artifactId]);
 
-			// Remove old id, add new id with status done and cleaned fields
 			doc.deleteIn(["artifact", artifactId]);
-			doc.setIn(["artifact", newId], { ...rest, status: "done" });
+			doc.setIn(["artifact", newId], mapNode);
+
+			// After reuse, fix up PLAIN scalars whose original text contained ' #':
+			// the YAML parser stored the ' #...' portion as an inline comment on the
+			// node. Reconstruct the full value and force-quote so the next parse
+			// doesn't truncate it again.
+			if (mapNode && mapNode.items) {
+				for (const pair of mapNode.items) {
+					const val = pair.value;
+					if (val && val.type === "PLAIN" && typeof val.comment === "string" && val.comment.length > 0) {
+						val.value = val.value + " #" + val.comment;
+						val.comment = undefined;
+						val.type = "QUOTE_DOUBLE";
+					}
+				}
+			}
+
+			// Set status to done and remove issue-tracking fields.
+			doc.setIn(["artifact", newId, "status"], "done");
+			doc.deleteIn(["artifact", newId, "tags"]);
+			doc.deleteIn(["artifact", newId, "updated_at"]);
 
 			// Update all references in body
 			// Use word-boundary regex: match artifactId as a whole word token
