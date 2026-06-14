@@ -1,0 +1,40 @@
+name: 'PFD Flow Sync'
+description: 'Sync .pfdsl/plan.pfdsl after an issue close (audit --fix + PR)'
+inputs:
+  issue-number:
+    description: 'The issue number that was closed'
+    required: true
+  token:
+    description: 'GitHub token with contents:write, pull-requests:write, issues:write'
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 24
+        cache: pnpm
+
+    - run: pnpm install --frozen-lockfile
+      shell: bash
+
+    - name: Apply flow sync (audit --fix)
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+      run: node scripts/audit-issues-flow.mjs --fix || true
+      shell: bash
+
+    - name: Open PR if plan.pfdsl changed
+      uses: peter-evans/create-pull-request@v8
+      with:
+        add-paths: .pfdsl/plan.pfdsl
+        branch: flow-sync/issue-${{ inputs.issue-number }}
+        commit-message: "chore(plan): sync flow after #${{ inputs.issue-number }} closed"
+        title: "chore(plan): sync flow after #${{ inputs.issue-number }} closed"
+        body: |
+          Mechanical `.pfdsl/plan.pfdsl` sync (`audit-issues-flow.mjs --fix`) following the close of issue #${{ inputs.issue-number }}.
+
+          Terminal chains are removed (artifact + sole producing process + edge); artifacts with remaining downstream are demoted by stripping the `iN_` prefix. Review and merge if correct.
