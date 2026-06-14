@@ -1,4 +1,4 @@
-# PFDSL仕様書 v0.0.6
+# PFDSL仕様書 v0.0.7
 
 ## 1. 目的
 
@@ -89,6 +89,9 @@ artifact:
     owner: po
     status: done
     tags: [external, critical]
+    criteria: Tech Lead 承認かつ未解決設計質問がすべて解消されていること
+    location: docs/spec/spec.md
+    revises: spec_v1
 
 process:
   impl:
@@ -96,12 +99,29 @@ process:
     description: バックエンド実装処理
     owner: dev-team
     estimate: 5d
+    command: make build
 ```
 
 label は表示名として利用してよい。
 description は可視化バックエンドでのツールチップ（tooltip）に使用してよい。
 status / tags は §2.7 を参照。
 artifact / process に対して group を指定することで、ノードをグループへ所属させてよい（§2.8参照）。
+
+#### artifact 専用フィールド（criteria / location / revises）
+
+`status` / `tags` も Artifact 専用フィールドである（§2.7 参照）。
+
+**criteria** — 成果物が完了（`status: done`）とみなされる条件（任意文字列）。モデル内で完了根拠を自己文書化する。1 Artifact につき 0 または 1 個。§15.7 参照。
+
+**location** — 成果物の実体ファイル・リソースへのポインタ（パス、glob、または URL）。相対パスの基準は含む `.pfdsl` ファイルの位置。グラフ意味論に影響しない。1 Artifact につき 0 または 1 個。§15.8 参照。
+
+**revises** — この成果物が改版する元成果物の ID（同一ファイル内）。バージョン系列を明示する。1 Artifact につき 0 または 1 個。§15.9 参照。
+
+可視化バックエンドは `criteria:` / `location:` を tooltip に `description:` と並べて表示してよい。`location:` を Graphviz の `href` 属性として出力してよい。
+
+#### process 専用フィールド
+
+**command** — プロセスに対応する実行可能なコマンド文字列（任意文字列）。グラフ意味論に影響しない。1 Process につき 0 または 1 個。
 
 ---
 
@@ -671,11 +691,42 @@ artifact.C.parts = [Ca, Cb]
 * statusStyles / tagStyles の属性キーは §2.7.3 の許可属性のみ。許可外は error
 * tags 配列の各要素は任意文字列（検証なし）
 
+### 15.7 criteria 制約
+
+* `status: done` かつ `criteria:` 未設定の Artifact: warning
+* strict mode では error に昇格してよい
+* `criteria:` を Process に指定した場合は error
+* `status` が `done` 以外の Artifact に `criteria:` を設定することは有効（事前宣言として許容）。warning / error は発しない
+
+### 15.8 location / command 制約
+
+`location:` の値は次の規則で分類する:
+
+* `://` を含む → URL（検証対象外）
+* `*` / `?` / `{` のいずれかを含む → glob（検証対象外）
+* それ以外 → ファイルパス
+
+URL に分類されない `?` を含む文字列（例: `docs/file?v=1`）は glob とみなす。クエリ文字列形式のローカルパスを使う場合は `file://` 形式の URL として記述すること。
+
+ファイルパスの場合、処理系はファイルの存在を検証してよい（dead link 検出）。相対パスは含む `.pfdsl` ファイルからの相対として解決する。クロスファイル参照（別 `.pfdsl` への相対パス）は構文上許容するが、その意味論の完全な定義はマルチファイル仕様（将来版）に委ねる。
+
+* `location:` を Process に指定した場合は error
+* `command:` を Artifact に指定した場合は error
+
+### 15.9 revises 制約
+
+* `revises:` に指定した ID は同一ファイル内の Artifact ID でなければならない。存在しない場合は error
+* 自己参照（`revises: self_id`）は error
+* 線形チェーン制約: `revises:` チェーンは単方向の単一リンクリストでなければならない（最新版 → 前版 → … の方向）。複数の Artifact が同一 Artifact を `revises:` で参照することは error（分岐した改版系列）
+* 循環参照は error
+* `revises:` を Process に指定した場合は error
+* クロスファイル revises はマルチファイル仕様（将来版）に委ねる（`location:` のクロスファイル参照扱いと同様、§15.8 参照）
+
 ---
 
 ## 16. エラー方針
 
-strict mode を標準とする。
+処理系は以下をエラーまたは警告として報告する。`criteria:` 制約（§15.7）は独立した severity を持ち、strict option として個別に設定可能とする。
 
 * 構文不正: error
 * 型矛盾: error
@@ -683,6 +734,11 @@ strict mode を標準とする。
 * 不正YAML: error
 * 不正parts参照: error
 * 不正 status / statusStyles / tagStyles: error
+* `location:` / `revises:` / `criteria:` を Process に指定: error
+* `command:` を Artifact に指定: error
+* `status: done` かつ `criteria:` 未設定: warning（strict mode では error）
+* `location:` ファイルパスが存在しない: warning（任意実装）
+* `revises:` 参照先不在 / 自己参照 / 分岐 / 循環: error
 * 重複edge: warning可
 
 ---
@@ -726,6 +782,48 @@ artifact:
     parts: [Ca, Cb]
 ```
 
+### 17.5 criteria / location / revises / command
+
+front matter:
+
+```yaml
+artifact:
+  spec_v2:
+    label: 設計書 v2
+    status: done
+    criteria: Tech Lead 承認かつ未解決設計質問がすべて解消されていること
+    location: docs/spec/spec.md
+    revises: spec_v1
+  spec_v1:
+    label: 設計書 v1
+    status: done
+
+process:
+  revise_spec:
+    label: 設計書改訂
+    command: make gen-spec
+```
+
+本文（フロー edge）:
+
+```pfdsl
+spec_v1 >> revise_spec -> spec_v2
+```
+
+`revises:` は edge を自動生成しない。`spec_v1 >> revise_spec -> spec_v2` というフロー edge は引き続き必要。`revises:` はその改版意図を宣言するメタデータとして追加する。
+
+### 17.6 条件分岐の表現
+
+条件的な結果は決定成果物として外化する。
+
+```pfdsl
+review_result >> approve -> approved_spec
+review_result >> reject -> revision_request
+revision_request >>? impl -> code
+```
+
+`review_result`（承認/差し戻しの判断）が成果物。`approve` / `reject` はそれぞれ承認処理・差し戻し処理プロセス。条件分岐構文は存在しない（§19参照）。
+
 ---
 
 ## 18. 設計原則
@@ -743,9 +841,36 @@ artifact:
 
 ---
 
-## 19. バージョン
+## 19. 条件分岐の不在
 
-本仕様は PFDSL仕様書 v0.0.6 とする。
+PFDSL は制御フローではなく成果物フローを記述する。次の構造は表現しない。
+
+* 条件分岐（if A then B else C）
+* ループ（until done）
+* 例外フロー（on error goto）
+
+**設計判断**: 分岐構文を追加すると字句解析・意味論・可視化のいずれも複雑化する。また「条件が必要」に見える場面は多くの場合、設計が不明瞭な状態を示す。PFD の問いは「どの成果物があればどのプロセスが動くか」であり、条件はその成果物の定義に帰着する。
+
+条件的な結果は決定成果物として外化する（§17.6 参照）。`>>?` フィードバック入力（§9.2）は条件を表現するのではなく、条件の結果として生まれた成果物を既存プロセスへ再入力するためのものである。
+
+---
+
+## 20. バージョン
+
+本仕様は PFDSL仕様書 v0.0.7 とする。
+
+v0.0.6 からの主な変更点（v0.0.7）：
+
+* §2.3 `status` / `tags` が Artifact 専用フィールドであることを明記（§2.7 参照）
+* §2.3 Artifact に `criteria:` フィールドを追加（完了条件の自己文書化）
+* §2.3 Artifact に `location:` フィールドを追加（実体ファイル/URL へのポインタ）
+* §2.3 Artifact に `revises:` フィールドを追加（バージョン系列の明示）
+* §2.3 Process に `command:` フィールドを追加（実行手順の記述）
+* §15.7 criteria 制約を追加（`status: done` + `criteria:` 欠如 → warning）
+* §15.8 location 妥当性制約を追加（ファイルパス存在検証、任意実装）
+* §15.9 revises 制約を追加（参照先存在・自己参照禁止・線形性・循環禁止）
+* §17.5 / §17.6 例を追加
+* §19 条件分岐の不在を新設（設計判断の明文化）
 
 v0.0.5 からの主な変更点（v0.0.6）：
 

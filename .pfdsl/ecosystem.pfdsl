@@ -31,6 +31,11 @@ artifact:
     status: done
     group: generation
     description: "docs/spec/spec.md。一次情報だが不変の外部入力ではない — 実装知見からの仕様提案（issue 経由）で改訂される。改版の詳細依存は .pfdsl/plan.pfdsl 参照"
+  spec_proposals:
+    label: spec 提案文書群
+    status: done
+    group: generation
+    description: "docs/spec/proposals/。各 spec 改版候補の起草文書（概要・仕様変更・設計判断・影響範囲）。draft_proposals が生成し maintain_spec が消費して spec 改版に統合する。マージ後も歴史的記録として保持（ecosystem.md でライフサイクル規約を管理）"
   skill_template:
     label: スキルテンプレート
     status: done
@@ -173,9 +178,13 @@ process:
     label: ADR 起草
     description: "対話で確定した判断を ADR 文書に起草する。委譲可能な独立作業 — 参照する図・成果物の実物と突合して ID・経路を検証する（突合を欠くと捏造が発生することが実証済み）"
     group: decision
+  draft_proposals:
+    label: 仕様提案起草
+    description: "issue を起点に spec 提案文書（spec_proposals）を起草する。フィールド設計・制約・例示を記述。maintain_spec（統合フェーズ）の前段"
+    group: generation
   maintain_spec:
-    label: 仕様改訂
-    description: "仕様提案 issue を仕様書に反映する。仕様変更は必ず issue を通す（外部消費者・互換性に関わるため）。提案→起草→統合の詳細は issues_flow 参照"
+    label: 仕様改訂（統合）
+    description: "spec_proposals を既存仕様に統合して spec を改版する。外部レビュー（Opus 等）を推奨 — cross-proposal constraints は統合時にのみ検出される。仕様変更は必ず issue を通す"
     group: generation
   publish_cli:
     label: CLI 公開
@@ -247,7 +256,11 @@ decisions >> draft_adrs -> adrs
 
 findings >>? discuss
 
-gh_issues >> maintain_spec -> spec
+gh_issues >> draft_proposals -> spec_proposals
+
+spec_proposals >> maintain_spec -> spec
+
+spec >>? maintain_spec
 
 [spec, decisions] >> maintain_template -> skill_template
 

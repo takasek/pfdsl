@@ -22,6 +22,24 @@
 
 PFD の効果を体感した局面は `docs/pfd_payoff_log.md`（`payoff_log` artifact）に **日付・局面・効果・参照** の形式で追記する。pfdsl の効果実証が目的（このリポ固有の動機）。
 
+## spec_proposals ライフサイクル
+
+`docs/spec/proposals/*.md` は `draft_proposals` が生成し `maintain_spec`（integrate フェーズ）が消費する中間成果物。
+
+- **作成タイミング**: issue 着手時、spec 改版の起草フェーズ
+- **消費**: `maintain_spec` で spec 本文に統合される
+- **マージ後**: 削除しない。歴史的記録として残す（spec §20 の変更点リストと対になる証跡）
+- **形式**: 概要 / 仕様変更 / 設計判断 / 影響範囲 の4セクション（詳細 + 完全チェックリストは ADR-0012）
+
+### 起草チェックリスト（最頻発ミス）
+
+統合（`integrate_spec`）時の Opus 外部レビューで繰り返し指摘された項目:
+
+- [ ] 型専用フィールドを追加した場合、逆型指定の error を制約節（§15.X）と §16 の両方に対称記載した
+- [ ] 例示は front matter と flow edge が self-consistent（metadata フィールドを示す例は対応 edge も明示）
+
+上記は個別 proposal 段階では見えず、統合時に他フィールドとの対称性比較で発覚する。`integrate_spec` では外部レビューを推奨する。
+
 ## 終端ゲートの根拠
 
 汎用ゲート項目（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、このリポでは issue 固有項目を合成する。issue 固有項目は `plan.md` を参照。

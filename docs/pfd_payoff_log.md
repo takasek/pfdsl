@@ -2,6 +2,12 @@
 
 PFD が効果を発揮した局面の事例ログ。体感した時点で追記する。公開記事（issue #12）の具体エピソード素材であり、消費者は .pfdsl/ecosystem.pfdsl の write_article プロセス。
 
+## 2026-06-15 仕様統合に外部レビューを組み込む
+- 局面: spec v0.0.7 の `integrate_spec`（4提案統合）で Opus を外部レビュアーとして3ラウンド呼んだ
+- 効果: 15件の指摘のうち最重要は「cross-proposal constraints」— 個別提案では見えない制約（`command:` を Artifact に指定禁止、`strict mode` 定義の矛盾、分類規則のエッジケース）が統合時に表面化した。単一プロポーザルのレビューでは発見できない型の欠陥であり、統合 = 複数提案の相互参照フェーズでこそ外部読者視点が機能する
+- 学習: `integrate_spec` は「貼り合わせ」でなく「cross-validation」が主仕事。Opus review を maintain_spec の推奨手順として description に記録
+- 参照: PR #51、commit 7d0685a〜a018823、docs/spec/proposals/
+
 ## 2026-06-11 着手可能集合の機械導出
 - 局面: オープン issue 8件の優先順位づけ
 - 効果: issue を PFD 化すると「入力が全部 done のプロセス」列挙 = 並列着手リストが status から機械的に導出できた（9本並列を即答）
