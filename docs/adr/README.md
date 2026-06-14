@@ -25,3 +25,4 @@
 - **ADR-0012** [spec proposals のフォーマットと役割](0012-spec-proposals-format.md) — 4セクション構造・マージ後保持・型対称フィールドと自己完結例の検査点を規約化する
 - **ADR-0013** [v0.0.8 依存順序](0013-v008-dependency-order.md) — integrate_multifile は i52 フィーチャードツールチェーン必須、draft_multifile_specs は並行着手可
 - **ADR-0014** [ゲート項目の反実仮想テスト](0014-gate-item-counterfactual-test.md) — 条件付きゲート項目は充足を反証可能テストで先判定しデフォルトを「書かない」に倒す、payoff は「PFD なしで判断が違ったか」を引用できる時のみ記録する
+- **ADR-0015** [samples は TSV 管理、examples は frontmatter 管理](0015-samples-tsv-examples-frontmatter.md) — 最小構文サンプルは TSV でメタデータ外部管理、realistic domain examples は frontmatter で管理する意図的非対称方針
