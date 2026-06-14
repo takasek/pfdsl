@@ -21,11 +21,11 @@ jobs:
   sync-flow:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
@@ -40,7 +40,7 @@ jobs:
         run: node scripts/audit-issues-flow.mjs --fix || true
 
       - name: Open PR if plan.pfdsl changed
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           add-paths: .pfdsl/plan.pfdsl
           branch: flow-sync/issue-${{ github.event.issue.number }}
