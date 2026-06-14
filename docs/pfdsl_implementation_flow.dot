@@ -9,7 +9,7 @@ digraph PFDSL {
   "ast_schema" [shape=box, label="ast_schema\nASTスキーマ", width=1.40, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "build_config" [shape=box, label="build_config\nビルド設定", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "canonical_sorter" [shape=box, label="canonical_sorter\n正準順序ソータ", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
-  "cli_published" [shape=box, label="cli_published\nCLI npm公開", tooltip="CLI npm公開\n\n作業ブランチ worktree-feat+cli-publish で実装済み（tsup バンドル・tag push 起動の publish ワークフロー）。残: merge・NPM_TOKEN 設定・tag push。計画は同ブランチの docs/superpowers/plans/2026-06-07-cli-publish.md", width=1.60, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
+  "cli_published" [shape=box, label="cli_published\nCLI npm公開", tooltip="CLI npm公開\n\n@pfdsl/cli 0.0.4 を npm 公開済み。tag push 起動の GitHub Actions + Trusted Publishing (OIDC)。tsup でワークスペース依存をバンドル（@hpcc-js/wasm のみ外部）。0.0.3 は起動時 \"Dynamic require of process\" エラーで broken → tsup.config.ts に createRequire banner 追加で修正（PR #24）", width=1.60, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "cli_tool" [shape=box, label="cli_tool\nCLIツール", width=1.20, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "core_architecture" [shape=box, label="core_architecture\nコアアーキテクチャ文書", width=2.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "core_library" [shape=box, label="core_library\nコアライブラリ (@pfdsl/core)", width=3.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
