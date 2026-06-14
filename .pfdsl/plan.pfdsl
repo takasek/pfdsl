@@ -32,7 +32,7 @@ artifact:
     updated_at: 2026-06-12T08:18:40Z
   i7_criteria_spec:
     label: "合否基準仕様案 (#7)"
-    status: todo
+    status: wip
     updated_at: 2026-06-14T01:06:54Z
     tags:
       - priority:high
