@@ -96,11 +96,6 @@ artifact:
     label: "group クラスタ塗りつぶし描画 (#15)"
     status: todo
     updated_at: 2026-06-12T08:19:02Z
-  i16_def_jump:
-    label: "graph⇔YAML 定義ジャンプ・トグル (#16)"
-    status: todo
-    tags: [ "priority:high" ]
-    updated_at: 2026-06-13T22:07:14Z
   i17_graph_nav:
     label: "大規模図の閲覧支援 (#17)"
     status: todo
@@ -155,8 +150,6 @@ process:
     label: 規約移行
   fill_group_clusters:
     label: クラスタ塗り実装
-  implement_def_jump:
-    label: 定義ジャンプ実装
   implement_graph_nav:
     label: 閲覧支援実装
   automate_pr_diff:
@@ -205,8 +198,6 @@ adr_corpus >> migrate_convention -> i14_dir_convention
 adr_corpus >> write_article -> i12_article
 
 cli_tool >> fill_group_clusters -> i15_group_fill
-
-cli_tool >> implement_def_jump -> i16_def_jump
 
 cli_tool >> implement_graph_nav -> i17_graph_nav
 
