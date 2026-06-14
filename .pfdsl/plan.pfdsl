@@ -50,12 +50,6 @@ artifact:
   spec_v007:
     label: 仕様書 v0.0.7（統合）
     status: todo
-  i4_lint_checker:
-    label: "lint拡張checker (#4)"
-    status: wip
-    tags: [ "priority:high" ]
-    description: lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため
-    updated_at: 2026-06-13T13:49:00Z
   featured_toolchain:
     label: 次期仕様対応ツールチェーン
     status: todo
@@ -96,11 +90,6 @@ artifact:
     label: "group クラスタ塗りつぶし描画 (#15)"
     status: todo
     updated_at: 2026-06-12T08:19:02Z
-  i16_def_jump:
-    label: "graph⇔YAML 定義ジャンプ・トグル (#16)"
-    status: todo
-    tags: [ "priority:high" ]
-    updated_at: 2026-06-13T22:07:14Z
   i17_graph_nav:
     label: "大規模図の閲覧支援 (#17)"
     status: todo
@@ -116,11 +105,6 @@ artifact:
     description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
       要件経路、dogfood #16 由来）"
     updated_at: 2026-06-13T22:11:33Z
-  i40_flow_automation:
-    label: "issue close 時の flow 自動同期 (#40)"
-    status: todo
-    description: "audit --fix の closed_in_flow auto-fix（チェーン削除/降格）+ issues.closed Action で flow 変更 PR を自動起票。#37 と相補（孤児を源で防ぐ）"
-    updated_at: 2026-06-14T00:13:54Z
   i1_bug_fixes:
     label: "202606 バグ修正 (#1)"
     status: todo
@@ -130,6 +114,10 @@ artifact:
     label: "Obsidian プラグイン (#3)"
     status: todo
     updated_at: 2026-06-12T08:18:35Z
+  lint_checker:
+    label: lint拡張checker (#4)
+    status: done
+    description: lint 候補の完全リストは issue
 process:
   write_article:
     label: 記事執筆
@@ -160,8 +148,6 @@ process:
     label: 規約移行
   fill_group_clusters:
     label: クラスタ塗り実装
-  implement_def_jump:
-    label: 定義ジャンプ実装
   implement_graph_nav:
     label: 閲覧支援実装
   automate_pr_diff:
@@ -172,8 +158,6 @@ process:
     label: Obsidianプラグイン実装
   implement_orphan_lint:
     label: 孤児検出lint実装
-  automate_flow_close:
-    label: flow自動同期実装
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -197,9 +181,9 @@ spec_v006 >> write_design_notes -> i9_design_notes
 
 [i5_hierarchy_spec, i6_presets_spec, i7_criteria_spec, i8_revises_spec, i13_location_spec, i9_design_notes, multifile_policy] >> integrate_spec -> spec_v007
 
-[spec_v006, findings_r12, cli_tool] >> implement_lints -> i4_lint_checker
+[spec_v006, findings_r12, cli_tool] >> implement_lints -> lint_checker
 
-[spec_v007, i4_lint_checker] >> implement_spec_features -> featured_toolchain
+[spec_v007, lint_checker] >> implement_spec_features -> featured_toolchain
 
 skill_gen >> restructure_skillgen -> i10_restructured_gen
 
@@ -213,7 +197,6 @@ adr_corpus >> write_article -> i12_article
 
 cli_tool >> fill_group_clusters -> i15_group_fill
 
-cli_tool >> implement_def_jump -> i16_def_jump
 
 cli_tool >> implement_graph_nav -> i17_graph_nav
 
@@ -226,4 +209,3 @@ cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 cli_tool >> implement_orphan_lint -> i37_orphan_lint
 
-cli_tool >> automate_flow_close -> i40_flow_automation
