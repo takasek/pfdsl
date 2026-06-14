@@ -31,10 +31,10 @@ runs:
       uses: peter-evans/create-pull-request@v8
       with:
         add-paths: .pfdsl/plan.pfdsl
-        branch: flow-sync/issue-${{ inputs.issue-number }}
+        branch: flow-sync/pending
         commit-message: "chore(plan): sync flow after #${{ inputs.issue-number }} closed"
-        title: "chore(plan): sync flow after #${{ inputs.issue-number }} closed"
+        title: "chore(plan): sync flow (pending closed issues)"
         body: |
-          Mechanical `.pfdsl/plan.pfdsl` sync (`audit-issues-flow.mjs --fix`) following the close of issue #${{ inputs.issue-number }}.
+          Mechanical `.pfdsl/plan.pfdsl` sync (`audit-issues-flow.mjs --fix`). Triggered by close of issue #${{ inputs.issue-number }}.
 
           Terminal chains are removed (artifact + sole producing process + edge); artifacts with remaining downstream are demoted by stripping the `iN_` prefix. Review and merge if correct.
