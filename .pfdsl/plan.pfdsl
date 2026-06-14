@@ -105,11 +105,6 @@ artifact:
     description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
       要件経路、dogfood #16 由来）"
     updated_at: 2026-06-13T22:11:33Z
-  i1_bug_fixes:
-    label: "202606 バグ修正 (#1)"
-    status: todo
-    description: バグの完全リストと消化状況は issue #1 が一次情報
-    updated_at: 2026-06-12T08:18:33Z
   i3_obsidian_plugin:
     label: "Obsidian プラグイン (#3)"
     status: todo
@@ -152,8 +147,6 @@ process:
     label: 閲覧支援実装
   automate_pr_diff:
     label: PR差分画像自動化
-  fix_202606_bugs:
-    label: 202606バグ修正
   build_obsidian_plugin:
     label: Obsidianプラグイン実装
   implement_orphan_lint:
@@ -203,7 +196,6 @@ cli_tool >> implement_graph_nav -> i17_graph_nav
 
 published_cli >> automate_pr_diff -> i19_pr_diff_images
 
-cli_tool >> fix_202606_bugs -> i1_bug_fixes
 
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
