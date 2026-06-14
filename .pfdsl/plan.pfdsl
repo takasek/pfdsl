@@ -33,7 +33,9 @@ artifact:
   i7_criteria_spec:
     label: "合否基準仕様案 (#7)"
     status: todo
-    updated_at: 2026-06-12T08:18:42Z
+    updated_at: 2026-06-14T01:06:54Z
+    tags:
+      - priority:high
   i8_revises_spec:
     label: "改版チェーン仕様案 (#8)"
     status: todo
@@ -42,7 +44,9 @@ artifact:
     label: "location/command 仕様案 (#13)"
     status: todo
     description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
-    updated_at: 2026-06-12T08:18:58Z
+    updated_at: 2026-06-14T02:42:21Z
+    tags:
+      - priority:high
   i9_design_notes:
     label: "設計判断ノート・分岐なし方針 (#9)"
     status: todo
@@ -109,6 +113,15 @@ artifact:
     label: "Obsidian プラグイン (#3)"
     status: todo
     updated_at: 2026-06-12T08:18:35Z
+  i43_audit_distribution:
+    label: "L3資産の階層化配布 (#43)"
+    status: todo
+    description: "audit コア + flow-sync action を skill
+      同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは
+      #11"
+    updated_at: 2026-06-14T01:03:07Z
+    tags:
+      - priority:high
   lint_checker:
     label: "lint拡張checker (#4)"
     status: done
@@ -151,6 +164,8 @@ process:
     label: Obsidianプラグイン実装
   implement_orphan_lint:
     label: 孤児検出lint実装
+  layer_audit_assets:
+    label: L3資産階層化
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -182,7 +197,9 @@ skill_gen >> restructure_skillgen -> i10_restructured_gen
 
 cli_tool >> publish_cli -> published_cli
 
-[i10_restructured_gen, published_cli, i14_dir_convention] >> package_skill -> i11_portable_skill
+[i10_restructured_gen, published_cli, i14_dir_convention, i43_audit_distribution] >> package_skill -> i11_portable_skill
+
+cli_tool >> layer_audit_assets -> i43_audit_distribution
 
 adr_corpus >> migrate_convention -> i14_dir_convention
 
