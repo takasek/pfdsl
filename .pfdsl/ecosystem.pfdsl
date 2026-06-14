@@ -86,7 +86,7 @@ artifact:
     label: 効果局面ログ
     status: done
     group: decision
-    description: "docs/pfd_payoff_log.md。PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材。効果を体感した時に追記"
+    description: "docs/pfd_payoff_log.md。PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材（write_article）と運用スキル蒸留の入力（distill_ops）。追記条件は ADR-0014 反実仮想テスト（冒頭規約参照）"
   article:
     label: 公開記事
     status: todo
@@ -176,7 +176,7 @@ process:
     group: dialogue
   draft_adrs:
     label: ADR 起草
-    description: "対話で確定した判断を ADR 文書に起草する。委譲可能な独立作業 — 参照する図・成果物の実物と突合して ID・経路を検証する（突合を欠くと捏造が発生することが実証済み）"
+    description: "対話で確定した判断を ADR 文書に起草する。委譲可能な独立作業 — 参照する図・成果物の実物と突合して ID・経路を検証する（突合を欠くと捏造が発生することが実証済み）。ファイル作成と同じコミットで docs/adr/README.md の一覧に追記する"
     group: decision
   draft_proposals:
     label: 仕様提案起草
