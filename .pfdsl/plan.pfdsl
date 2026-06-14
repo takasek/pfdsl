@@ -30,27 +30,6 @@ artifact:
     label: "共有プリセット仕様案 (#6)"
     status: todo
     updated_at: 2026-06-12T08:18:40Z
-  i7_criteria_spec:
-    label: "合否基準仕様案 (#7)"
-    status: wip
-    updated_at: 2026-06-14T01:06:54Z
-    tags:
-      - priority:high
-  i8_revises_spec:
-    label: "改版チェーン仕様案 (#8)"
-    status: wip
-    updated_at: 2026-06-12T08:18:44Z
-  i13_location_spec:
-    label: "location/command 仕様案 (#13)"
-    status: wip
-    description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
-    updated_at: 2026-06-14T15:39:05Z
-    tags:
-      - priority:high
-  i9_design_notes:
-    label: "設計判断ノート・分岐なし方針 (#9)"
-    status: wip
-    updated_at: 2026-06-12T08:18:46Z
   spec_v007:
     label: 仕様書 v0.0.7（統合）
     status: wip
@@ -127,6 +106,19 @@ artifact:
     description: "audit コア + flow-sync action を skill
       同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは
       #11"
+  criteria_spec:
+    label: "合否基準仕様案 (#7)"
+    status: done
+  revises_spec:
+    label: "改版チェーン仕様案 (#8)"
+    status: done
+  design_notes:
+    label: "設計判断ノート・分岐なし方針 (#9)"
+    status: done
+  location_spec:
+    label: "location/command 仕様案 (#13)"
+    status: done
+    description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
 process:
   write_article:
     label: 記事執筆
@@ -182,15 +174,15 @@ statusStyles:
 
 spec_v006 >> draft_multifile_specs -> [i5_hierarchy_spec, i6_presets_spec, multifile_policy]
 
-spec_v006 >> draft_criteria -> i7_criteria_spec
+spec_v006 >> draft_criteria -> criteria_spec
 
-spec_v006 >> draft_revises -> i8_revises_spec
+spec_v006 >> draft_revises -> revises_spec
 
-spec_v006 >> draft_location -> i13_location_spec
+spec_v006 >> draft_location -> location_spec
 
-spec_v006 >> write_design_notes -> i9_design_notes
+spec_v006 >> write_design_notes -> design_notes
 
-[i7_criteria_spec, i8_revises_spec, i13_location_spec, i9_design_notes] >> integrate_spec -> spec_v007
+[criteria_spec, revises_spec, location_spec, design_notes] >> integrate_spec -> spec_v007
 
 spec_v006 >>? integrate_spec
 
