@@ -20,6 +20,7 @@ description: |
 - **作業項目の一次情報と同期手段**: `plan.pfdsl` とその sibling `plan.md` に従う
 - **知見の振り分け先・運用手続き**: `ecosystem.pfdsl` の知識系成果物と、その sibling `ecosystem.md`
 - **issue バックエンド規約**: companion が指す references（例: `references/github-issues-backend.md`）
+- **Claude 向け指示の置き場**: 配布スキルに同梱すべき規約（PR 本文規約等）は `references/` に置く。project CLAUDE.md は採用リポ固有の非配布設定のみ、global CLAUDE.md は全リポ横断設定のみ。「採用リポの Claude にも届けたい」指示は references/ へ
 
 ## 運用プロトコル
 
