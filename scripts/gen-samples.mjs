@@ -4,6 +4,17 @@
 // Requires graphviz `dot` CLI to be installed.
 
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+
+function parseFrontmatter(src) {
+  const m = src.match(/^---\n([\s\S]*?)\n---/);
+  if (!m) return {};
+  const result = {};
+  for (const line of m[1].split("\n")) {
+    const kv = line.match(/^([a-zA-Z_]\w*):\s+(.*)/);
+    if (kv) result[kv[1]] = kv[2].trim();
+  }
+  return result;
+}
 import { execSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,17 +64,11 @@ writeFileSync(`${dogfoodBase}.dot`, dogDot);
 execSync(`dot -Tsvg "${dogfoodBase}.dot" -o "${dogfoodBase}.svg"`);
 console.log("pfdsl_implementation_flow → .dot + .svg");
 
-// --- Generate README.md from samples.tsv ---
+// --- Generate README.md from frontmatter ---
 
-const tsv = readFileSync(resolve(samplesDir, "samples.tsv"), "utf-8");
-const rows = tsv
-  .trim()
-  .split("\n")
-  .slice(1) // skip header
-  .map((line) => {
-    const [id, summary, description] = line.split("\t");
-    return { id, summary, description };
-  });
+const sampleFiles = readdirSync(samplesDir)
+  .filter((f) => f.endsWith(".pfdsl"))
+  .sort();
 
 let readme = `# PFDSL Samples
 
@@ -71,29 +76,16 @@ Re-generate: \`node scripts/gen-samples.mjs\`
 
 `;
 
-for (const { id, summary, description } of rows) {
-  const src = readFileSync(resolve(samplesDir, `${id}.pfdsl`), "utf-8");
+for (const f of sampleFiles) {
+  const id = f.replace(".pfdsl", "");
+  const src = readFileSync(resolve(samplesDir, f), "utf-8");
   const dot = readFileSync(resolve(samplesDir, `${id}.dot`), "utf-8");
-  readme += `## ${id} — ${summary}
-
-${description}
-
-\`\`\`pfdsl
-${src}\`\`\`
-
-<img src="${id}.svg">
-
-<details>
-<summary>DOT</summary>
-
-\`\`\`dot
-${dot}\`\`\`
-
-</details>
-
----
-
-`;
+  const fm = parseFrontmatter(src);
+  const title = fm.title ?? id;
+  const description = fm.description ?? "";
+  readme += `## ${id} — ${title}\n\n`;
+  if (description) readme += `${description}\n\n`;
+  readme += `\`\`\`pfdsl\n${src}\`\`\`\n\n<img src="${id}.svg">\n\n<details>\n<summary>DOT</summary>\n\n\`\`\`dot\n${dot}\`\`\`\n\n</details>\n\n---\n\n`;
 }
 
 readme += `## Real-world example
