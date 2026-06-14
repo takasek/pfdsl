@@ -1,5 +1,1 @@
----
-title: Simple chain
-description: "`>>` (artifact→process) and `->` (process→artifact)."
----
 requirements >> design -> spec

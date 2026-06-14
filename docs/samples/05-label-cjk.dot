@@ -1,8 +1,6 @@
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Label + CJK";
-  labelloc="t";
 
   "D1" [shape=box, label="D1\n紙のアンケート", width=1.70, penwidth="2"];
   "D2" [shape=box, label="D2\nデジタルアンケート", width=2.10, penwidth="2"];

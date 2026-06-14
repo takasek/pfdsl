@@ -1,6 +1,4 @@
 ---
-title: Status & tag styles
-description: "`status:` + `tags:` on artifacts; `statusStyles:` and `tagStyles:` apply DOT attributes. Multiple tags merge; `status` wins conflicts."
 artifact:
   raw_data:  { tags: [external, sensitive] }
   spec:      { status: wip }

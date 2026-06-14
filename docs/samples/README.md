@@ -4,13 +4,9 @@ Re-generate: `node scripts/gen-samples.mjs`
 
 ## 01-simple-chain — Simple chain
 
-"`>>` (artifact→process) and `->` (process→artifact)."
+`>>` (artifact→process) and `->` (process→artifact).
 
 ```pfdsl
----
-title: Simple chain
-description: "`>>` (artifact→process) and `->` (process→artifact)."
----
 requirements >> design -> spec
 ```
 
@@ -23,8 +19,6 @@ requirements >> design -> spec
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Simple chain";
-  labelloc="t";
 
   "design" [shape=ellipse, label="design"];
   "requirements" [shape=box, label="requirements", penwidth="2"];
@@ -41,13 +35,9 @@ digraph PFDSL {
 
 ## 02-feedback — Feedback edge
 
-"`>>?` renders as a dashed edge with `constraint=false` — does not affect rank."
+`>>?` renders as a dashed edge with `constraint=false` — does not affect rank.
 
 ```pfdsl
----
-title: Feedback edge
-description: "`>>?` renders as a dashed edge with `constraint=false` — does not affect rank."
----
 spec >> implement -> code
 code >> verify -> bug_report
 bug_report >>? implement
@@ -62,8 +52,6 @@ bug_report >>? implement
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Feedback edge";
-  labelloc="t";
 
   "bug_report" [shape=box, label="bug_report", penwidth="2"];
   "code" [shape=box, label="code"];
@@ -85,13 +73,9 @@ digraph PFDSL {
 
 ## 03-set-input — Set input
 
-"`[A, B] >> P` expands to two input edges."
+`[A, B] >> P` expands to two input edges.
 
 ```pfdsl
----
-title: Set input
-description: "`[A, B] >> P` expands to two input edges."
----
 [schema, seed_data] >> migrate -> database
 ```
 
@@ -104,8 +88,6 @@ description: "`[A, B] >> P` expands to two input edges."
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Set input";
-  labelloc="t";
 
   "database" [shape=box, label="database", penwidth="2"];
   "migrate" [shape=ellipse, label="migrate"];
@@ -124,13 +106,9 @@ digraph PFDSL {
 
 ## 04-set-output — Set output
 
-"`P -> [A, B]` expands to two output edges."
+`P -> [A, B]` expands to two output edges.
 
 ```pfdsl
----
-title: Set output
-description: "`P -> [A, B]` expands to two output edges."
----
 source >> build -> [binary, docs]
 ```
 
@@ -143,8 +121,6 @@ source >> build -> [binary, docs]
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Set output";
-  labelloc="t";
 
   "binary" [shape=box, label="binary", penwidth="2"];
   "build" [shape=ellipse, label="build"];
@@ -163,12 +139,10 @@ digraph PFDSL {
 
 ## 05-label-cjk — Label + CJK
 
-"`label:` sets the display name shown below the node ID. CJK labels get a computed `width=` to prevent clipping in the wasm renderer."
+`label:` sets the display name shown below the node ID. CJK labels get a computed `width=` to prevent clipping in the wasm renderer.
 
 ```pfdsl
 ---
-title: Label + CJK
-description: "`label:` sets the display name shown below the node ID. CJK labels get a computed `width=` to prevent clipping in the wasm renderer."
 artifact:
   D1: { label: 紙のアンケート }
   D2: { label: デジタルアンケート }
@@ -187,8 +161,6 @@ D1 >> P1 -> D2
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Label + CJK";
-  labelloc="t";
 
   "D1" [shape=box, label="D1\n紙のアンケート", width=1.70, penwidth="2"];
   "D2" [shape=box, label="D2\nデジタルアンケート", width=2.10, penwidth="2"];
@@ -205,12 +177,10 @@ digraph PFDSL {
 
 ## 06-status-styles — Status & tag styles
 
-"`status:` + `tags:` on artifacts; `statusStyles:` and `tagStyles:` apply DOT attributes. Multiple tags merge; `status` wins conflicts."
+`status:` + `tags:` on artifacts; `statusStyles:` and `tagStyles:` apply DOT attributes. Multiple tags merge; `status` wins conflicts.
 
 ```pfdsl
 ---
-title: Status & tag styles
-description: "`status:` + `tags:` on artifacts; `statusStyles:` and `tagStyles:` apply DOT attributes. Multiple tags merge; `status` wins conflicts."
 artifact:
   raw_data:  { tags: [external, sensitive] }
   spec:      { status: wip }
@@ -238,8 +208,6 @@ processed >> analyze
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Status & tag styles";
-  labelloc="t";
 
   "analyze" [shape=ellipse, label="analyze"];
   "ingest" [shape=ellipse, label="ingest"];
@@ -262,12 +230,10 @@ digraph PFDSL {
 
 ## 08-groups — Groups
 
-"`group:` on nodes + `group:` declarations produce `subgraph cluster_<id>` blocks."
+`group:` on nodes + `group:` declarations produce `subgraph cluster_<id>` blocks.
 
 ```pfdsl
 ---
-title: Groups
-description: "`group:` on nodes + `group:` declarations produce `subgraph cluster_<id>` blocks."
 group:
   frontend: { label: Frontend, color: lightblue }
   backend:  { label: Backend,  color: lightyellow }
@@ -293,8 +259,6 @@ ui_mockup >> build_ui -> component
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Groups";
-  labelloc="t";
 
   subgraph cluster_backend {
     label="Backend";
@@ -324,12 +288,10 @@ digraph PFDSL {
 
 ## 09-parts — Parts
 
-"`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names."
+`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names.
 
 ```pfdsl
 ---
-title: Parts
-description: "`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names."
 artifact:
   D0: { label: Source }
   D1:
@@ -353,8 +315,6 @@ D0 >> P1 -> D1
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Parts";
-  labelloc="t";
 
   "D0" [shape=box, label="D0\nSource", penwidth="2"];
   "D1" [shape=box, label="D1\nRelease Package", penwidth="2"];
@@ -374,12 +334,10 @@ digraph PFDSL {
 
 ## 10-layout-tb — Layout direction
 
-"`layout.direction: TB` sets `rankdir=TB`. Default is `LR`."
+`layout.direction: TB` sets `rankdir=TB`. Default is `LR`.
 
 ```pfdsl
 ---
-title: Layout direction
-description: "`layout.direction: TB` sets `rankdir=TB`. Default is `LR`."
 layout:
   direction: TB
 ---
@@ -396,8 +354,6 @@ spec >> implement -> code
 digraph PFDSL {
   rankdir=TB;
   newrank=true;
-  label="Layout direction";
-  labelloc="t";
 
   "code" [shape=box, label="code", penwidth="2"];
   "design" [shape=ellipse, label="design"];

@@ -4,13 +4,9 @@ Annotated .pfdsl files illustrating each language feature.
 
 ## 01-simple-chain — Simple chain
 
-"`>>` (artifact→process) and `->` (process→artifact)."
+`>>` (artifact→process) and `->` (process→artifact).
 
 ```pfdsl
----
-title: Simple chain
-description: "`>>` (artifact→process) and `->` (process→artifact)."
----
 requirements >> design -> spec
 ```
 
@@ -18,13 +14,9 @@ requirements >> design -> spec
 
 ## 02-feedback — Feedback edge
 
-"`>>?` renders as a dashed edge with `constraint=false` — does not affect rank."
+`>>?` renders as a dashed edge with `constraint=false` — does not affect rank.
 
 ```pfdsl
----
-title: Feedback edge
-description: "`>>?` renders as a dashed edge with `constraint=false` — does not affect rank."
----
 spec >> implement -> code
 code >> verify -> bug_report
 bug_report >>? implement
@@ -34,13 +26,9 @@ bug_report >>? implement
 
 ## 03-set-input — Set input
 
-"`[A, B] >> P` expands to two input edges."
+`[A, B] >> P` expands to two input edges.
 
 ```pfdsl
----
-title: Set input
-description: "`[A, B] >> P` expands to two input edges."
----
 [schema, seed_data] >> migrate -> database
 ```
 
@@ -48,13 +36,9 @@ description: "`[A, B] >> P` expands to two input edges."
 
 ## 04-set-output — Set output
 
-"`P -> [A, B]` expands to two output edges."
+`P -> [A, B]` expands to two output edges.
 
 ```pfdsl
----
-title: Set output
-description: "`P -> [A, B]` expands to two output edges."
----
 source >> build -> [binary, docs]
 ```
 
@@ -62,12 +46,10 @@ source >> build -> [binary, docs]
 
 ## 05-label-cjk — Label + CJK
 
-"`label:` sets the display name shown below the node ID. CJK labels get a computed `width=` to prevent clipping in the wasm renderer."
+`label:` sets the display name shown below the node ID. CJK labels get a computed `width=` to prevent clipping in the wasm renderer.
 
 ```pfdsl
 ---
-title: Label + CJK
-description: "`label:` sets the display name shown below the node ID. CJK labels get a computed `width=` to prevent clipping in the wasm renderer."
 artifact:
   D1: { label: 紙のアンケート }
   D2: { label: デジタルアンケート }
@@ -81,12 +63,10 @@ D1 >> P1 -> D2
 
 ## 06-status-styles — Status & tag styles
 
-"`status:` + `tags:` on artifacts; `statusStyles:` and `tagStyles:` apply DOT attributes. Multiple tags merge; `status` wins conflicts."
+`status:` + `tags:` on artifacts; `statusStyles:` and `tagStyles:` apply DOT attributes. Multiple tags merge; `status` wins conflicts.
 
 ```pfdsl
 ---
-title: Status & tag styles
-description: "`status:` + `tags:` on artifacts; `statusStyles:` and `tagStyles:` apply DOT attributes. Multiple tags merge; `status` wins conflicts."
 artifact:
   raw_data:  { tags: [external, sensitive] }
   spec:      { status: wip }
@@ -109,12 +89,10 @@ processed >> analyze
 
 ## 08-groups — Groups
 
-"`group:` on nodes + `group:` declarations produce `subgraph cluster_<id>` blocks."
+`group:` on nodes + `group:` declarations produce `subgraph cluster_<id>` blocks.
 
 ```pfdsl
 ---
-title: Groups
-description: "`group:` on nodes + `group:` declarations produce `subgraph cluster_<id>` blocks."
 group:
   frontend: { label: Frontend, color: lightblue }
   backend:  { label: Backend,  color: lightyellow }
@@ -135,12 +113,10 @@ ui_mockup >> build_ui -> component
 
 ## 09-parts — Parts
 
-"`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names."
+`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names.
 
 ```pfdsl
 ---
-title: Parts
-description: "`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names."
 artifact:
   D0: { label: Source }
   D1:
@@ -159,12 +135,10 @@ D0 >> P1 -> D1
 
 ## 10-layout-tb — Layout direction
 
-"`layout.direction: TB` sets `rankdir=TB`. Default is `LR`."
+`layout.direction: TB` sets `rankdir=TB`. Default is `LR`.
 
 ```pfdsl
 ---
-title: Layout direction
-description: "`layout.direction: TB` sets `rankdir=TB`. Default is `LR`."
 layout:
   direction: TB
 ---

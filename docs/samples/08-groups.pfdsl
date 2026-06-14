@@ -1,6 +1,4 @@
 ---
-title: Groups
-description: "`group:` on nodes + `group:` declarations produce `subgraph cluster_<id>` blocks."
 group:
   frontend: { label: Frontend, color: lightblue }
   backend:  { label: Backend,  color: lightyellow }

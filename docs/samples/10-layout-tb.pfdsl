@@ -1,6 +1,4 @@
 ---
-title: Layout direction
-description: "`layout.direction: TB` sets `rankdir=TB`. Default is `LR`."
 layout:
   direction: TB
 ---

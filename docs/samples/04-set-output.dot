@@ -1,8 +1,6 @@
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Set output";
-  labelloc="t";
 
   "binary" [shape=box, label="binary", penwidth="2"];
   "build" [shape=ellipse, label="build"];

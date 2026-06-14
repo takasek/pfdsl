@@ -1,8 +1,6 @@
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
-  label="Simple chain";
-  labelloc="t";
 
   "design" [shape=ellipse, label="design"];
   "requirements" [shape=box, label="requirements", penwidth="2"];

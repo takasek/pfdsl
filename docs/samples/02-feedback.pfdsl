@@ -1,7 +1,3 @@
----
-title: Feedback edge
-description: "`>>?` renders as a dashed edge with `constraint=false` — does not affect rank."
----
 spec >> implement -> code
 code >> verify -> bug_report
 bug_report >>? implement
