@@ -115,7 +115,7 @@ artifact:
     updated_at: 2026-06-12T08:18:35Z
   i43_audit_distribution:
     label: "L3資産の階層化配布 (#43)"
-    status: todo
+    status: done
     description: "audit コア + flow-sync action を skill
       同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは
       #11"
