@@ -7,7 +7,7 @@ import {
 	applyFixes,
 	applyClosedInFlowFixes,
 	computeLabelFindings,
-} from "./issues-flow-audit.mjs";
+} from "../../.claude/skills/pfd-ops/lib/issues-flow-audit.mjs";
 import { parseDocument } from "./yaml-require.mjs";
 
 // ---------------------------------------------------------------------------
