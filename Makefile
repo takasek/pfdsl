@@ -57,15 +57,26 @@ vscode-package: vscode-build
 gen-samples: build-deps
 	node scripts/gen-samples.mjs
 
+.PHONY: check-docs
+check-docs:
+	@for f in docs/samples/*.pfdsl docs/examples/*.pfdsl docs/pfdsl_implementation_flow.pfdsl; do \
+		echo "check $$f"; \
+		node packages/cli/dist/cli.js check "$$f" || exit 1; \
+	done
+	@for f in docs/samples/*.pfdsl docs/examples/*.pfdsl docs/pfdsl_implementation_flow.pfdsl; do \
+		node packages/cli/dist/cli.js graph "$$f" --format dot > /dev/null || exit 1; \
+	done
+	@echo "check-docs: all passed"
+
 .PHONY: gen-skill
-gen-skill:
+gen-skill: check-docs
 	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
 
 .PHONY: push
-push:
-	@if ! git diff --quiet HEAD -- docs/samples; then \
-		echo "docs/samples に差分があります。コミットしてから push してください。"; \
-		git diff --stat HEAD -- docs/samples; \
+push: check-docs
+	@if ! git diff --quiet HEAD -- docs/samples docs/examples .claude/skills; then \
+		echo "docs/samples, docs/examples, または .claude/skills に差分があります。コミットしてから push してください。"; \
+		git diff --stat HEAD -- docs/samples docs/examples .claude/skills; \
 		exit 1; \
 	fi
 	$(MAKE) gen-samples
