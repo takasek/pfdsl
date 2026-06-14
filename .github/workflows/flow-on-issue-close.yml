@@ -1,8 +1,8 @@
 name: flow on issue close
 
-# issue が閉じたら audit --fix を走らせ、plan.pfdsl の変更（closed_in_flow の
-# チェーン削除/降格、updated_at 同期）を PR として起票する。人がレビューして merge。
-# 自動コミットでなく自動 PR — flow 変更は必ず人の目を通す。
+# When an issue is closed, run `audit --fix` and open a PR with the resulting
+# plan.pfdsl changes (closed_in_flow chain removal/demotion, updated_at sync)
+# for human review. Auto-PR, not auto-commit: flow changes always get a human eye.
 
 on:
   issues:
@@ -35,8 +35,8 @@ jobs:
       - name: Apply flow sync (audit --fix)
         env:
           GH_TOKEN: ${{ github.token }}
-        # --fix は残存 manual finding があると非ゼロ終了する。plan.pfdsl の変更だけ
-        # 拾えればよいので失敗しても続行する。
+        # --fix exits non-zero when manual findings remain. We only care about
+        # the plan.pfdsl changes, so keep going even if it fails.
         run: node scripts/audit-issues-flow.mjs --fix || true
 
       - name: Open PR if plan.pfdsl changed
@@ -47,6 +47,6 @@ jobs:
           commit-message: "chore(plan): sync flow after #${{ github.event.issue.number }} closed"
           title: "chore(plan): sync flow after #${{ github.event.issue.number }} closed"
           body: |
-            issue #${{ github.event.issue.number }} のクローズに伴う `.pfdsl/plan.pfdsl` の機械同期（`audit-issues-flow.mjs --fix`）。
+            Mechanical `.pfdsl/plan.pfdsl` sync (`audit-issues-flow.mjs --fix`) following the close of issue #${{ github.event.issue.number }}.
 
-            終端チェーンは削除（artifact + 専属 process + edge）、下流が残るものは `iN_` prefix を外して降格。レビューして問題なければ merge。
+            Terminal chains are removed (artifact + sole producing process + edge); artifacts with remaining downstream are demoted by stripping the `iN_` prefix. Review and merge if correct.
