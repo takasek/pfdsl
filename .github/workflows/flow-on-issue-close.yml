@@ -1,0 +1,52 @@
+name: flow on issue close
+
+# When an issue is closed, run `audit --fix` and open a PR with the resulting
+# plan.pfdsl changes (closed_in_flow chain removal/demotion, updated_at sync)
+# for human review. Auto-PR, not auto-commit: flow changes always get a human eye.
+
+on:
+  issues:
+    types: [closed]
+
+concurrency:
+  group: flow-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply flow sync (audit --fix)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # --fix exits non-zero when manual findings remain. We only care about
+        # the plan.pfdsl changes, so keep going even if it fails.
+        run: node scripts/audit-issues-flow.mjs --fix || true
+
+      - name: Open PR if plan.pfdsl changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          add-paths: .pfdsl/plan.pfdsl
+          branch: flow-sync/issue-${{ github.event.issue.number }}
+          commit-message: "chore(plan): sync flow after #${{ github.event.issue.number }} closed"
+          title: "chore(plan): sync flow after #${{ github.event.issue.number }} closed"
+          body: |
+            Mechanical `.pfdsl/plan.pfdsl` sync (`audit-issues-flow.mjs --fix`) following the close of issue #${{ github.event.issue.number }}.
+
+            Terminal chains are removed (artifact + sole producing process + edge); artifacts with remaining downstream are demoted by stripping the `iN_` prefix. Review and merge if correct.

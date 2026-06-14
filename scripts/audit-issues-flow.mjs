@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseIssueArtifacts, computeFindings, applyFixes, computeLabelFindings, FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
+import { parseIssueArtifacts, computeFindings, applyFixes, applyClosedInFlowFixes, computeLabelFindings, FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
 import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -155,14 +155,15 @@ for (const f of missingLabel) {
 issues = fetchIssues();
 findings = computeFindings(artifacts, issues);
 
-// 3. Apply document fixes
+// 3. Apply document and body fixes
 const issuesByNumber = new Map(issues.map((i) => [i.number, i]));
 const docBefore = doc.toString();
 applyFixes(doc, findings, issuesByNumber);
+const newBody = applyClosedInFlowFixes(doc, body, findings);
 const docAfter = doc.toString();
 
-if (docAfter !== docBefore) {
-	const newRaw = "---\n" + docAfter + "---\n" + body;
+if (docAfter !== docBefore || newBody !== body) {
+	const newRaw = "---\n" + docAfter + "---\n" + newBody;
 	writeFileSync(flowPath, newRaw, "utf-8");
 	console.log("updated .pfdsl/plan.pfdsl");
 }
