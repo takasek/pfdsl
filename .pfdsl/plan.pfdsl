@@ -53,9 +53,15 @@ artifact:
     updated_at: 2026-06-12T08:18:46Z
   spec_v007:
     label: 仕様書 v0.0.7（統合）
+    status: wip
+  i52_featured_toolchain:
+    label: "spec v0.0.7 実装済みツールチェーン (#52)"
     status: todo
-  featured_toolchain:
-    label: 次期仕様対応ツールチェーン
+    updated_at: 2026-06-15T00:00:00Z
+    tags:
+      - priority:high
+  spec_v008:
+    label: 仕様書 v0.0.8（マルチファイル統合）
     status: todo
   i10_restructured_gen:
     label: "再構成済みスキル生成系 (#10)"
@@ -146,6 +152,8 @@ process:
     label: lint実装
   implement_spec_features:
     label: 新仕様実装
+  integrate_multifile:
+    label: マルチファイル仕様統合
   restructure_skillgen:
     label: 生成系再構成
   publish_cli:
@@ -191,7 +199,9 @@ spec_v006 >> write_design_notes -> i9_design_notes
 
 [spec_v006, findings_r12, cli_tool] >> implement_lints -> lint_checker
 
-[spec_v007, lint_checker] >> implement_spec_features -> featured_toolchain
+[spec_v007, lint_checker] >> implement_spec_features -> i52_featured_toolchain
+
+[i5_hierarchy_spec, i6_presets_spec, multifile_policy, i52_featured_toolchain] >> integrate_multifile -> spec_v008
 
 skill_gen >> restructure_skillgen -> i10_restructured_gen
 
