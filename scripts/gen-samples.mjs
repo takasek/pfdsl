@@ -3,7 +3,7 @@
 // Run from repo root: node scripts/gen-samples.mjs
 // Requires graphviz `dot` CLI to be installed.
 
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -71,8 +71,20 @@ Re-generate: \`node scripts/gen-samples.mjs\`
 
 `;
 
+const tsvIds = new Set(rows.map((r) => r.id));
+for (const f of readdirSync(samplesDir).filter((f) => f.endsWith(".pfdsl"))) {
+  if (!tsvIds.has(f.replace(".pfdsl", ""))) {
+    console.warn(`  warn: ${f} exists but has no entry in samples.tsv — will not appear in README`);
+  }
+}
+
 for (const { id, summary, description } of rows) {
-  const src = readFileSync(resolve(samplesDir, `${id}.pfdsl`), "utf-8");
+  const pfdslPath = resolve(samplesDir, `${id}.pfdsl`);
+  if (!existsSync(pfdslPath)) {
+    console.warn(`  warn: ${id}.pfdsl not found, skipping`);
+    continue;
+  }
+  const src = readFileSync(pfdslPath, "utf-8");
   const dot = readFileSync(resolve(samplesDir, `${id}.dot`), "utf-8");
   readme += `## ${id} — ${summary}
 

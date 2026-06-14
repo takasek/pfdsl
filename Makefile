@@ -74,9 +74,9 @@ gen-skill: check-docs
 
 .PHONY: push
 push: check-docs
-	@if ! git diff --quiet HEAD -- docs/samples docs/examples .claude/skills; then \
-		echo "docs/samples, docs/examples, または .claude/skills に差分があります。コミットしてから push してください。"; \
-		git diff --stat HEAD -- docs/samples docs/examples .claude/skills; \
+	@if ! git diff --quiet HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills; then \
+		echo "docs/samples, docs/examples, docs/pfdsl_implementation_flow.pfdsl, または .claude/skills に差分があります。コミットしてから push してください。"; \
+		git diff --stat HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills; \
 		exit 1; \
 	fi
 	$(MAKE) gen-samples

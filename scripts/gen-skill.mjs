@@ -88,6 +88,13 @@ const rows = tsv
     return { id: id.trim(), summary: summary?.trim() ?? "", description: description?.trim() ?? "" };
   });
 
+const tsvIds = new Set(rows.map((r) => r.id));
+for (const f of readdirSync(samplesDir).filter((f) => f.endsWith(".pfdsl"))) {
+  if (!tsvIds.has(f.replace(".pfdsl", ""))) {
+    console.warn(`  warn: ${f} exists but has no entry in samples.tsv — will not appear in references/samples.md`);
+  }
+}
+
 let samplesMd = `# PFDSL Samples Reference\n\nAnnotated .pfdsl files illustrating each language feature.\n\n`;
 let sampleCount = 0;
 
