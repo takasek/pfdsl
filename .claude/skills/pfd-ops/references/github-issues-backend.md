@@ -21,15 +21,25 @@ Closes #<issue番号>
 
 複数 issue の場合は1行ずつ列挙する。これにより PR マージ時に GitHub が issue を自動 close し、`flow-on-issue-close` ワークフローが起動する。
 
+## 自動同期（flow-on-issue-close）
+
+issue が close されると `.github/workflows/flow-on-issue-close.yml` が起動し、`audit-issues-flow.mjs --fix` で `plan.pfdsl` を機械修復して PR を作成する。
+
+PR マージ時に issue が自動 close されるには、PR 本文に `Closes #<issue番号>` を含める必要がある（「PR 本文規約」参照）。
+
 ## 同期監査
 
 `scripts/audit-issues-flow.mjs` が GitHub issues と `plan.pfdsl` の同期を機械監査する（ラベル・updatedAt・priority 突合）。`--fix` で機械的修復。
 
-スクリプトは `resolve(__dirname, "..")` をリポルートとして `.pfdsl/plan.pfdsl` を解決するため、リポ `scripts/` 配下に置く。
-
 ## 採用手順
 
-1. `scripts/audit-issues-flow.mjs` と `scripts/lib/`（`issues-flow-audit.mjs`, `yaml-require.mjs`）をリポ `scripts/` に設置する
-2. GitHub に `flow:managed` / `flow:exempt` ラベルを作成する（`audit-issues-flow.mjs --fix` が未作成ラベルを自動生成する）
-3. `plan.pfdsl` を依存構造のみのグラフとして用意し、issue artifact に `iN_` prefix を付ける
-4. リポの `plan.md` で本プリセットを指し、スクリプト実パス・リポ URL を記載する
+1. `pfd-ops` スキルをリポの `.claude/skills/pfd-ops/` に設置する
+2. `pfd-ops/install/` 以下のファイルをリポルートからの相対パスを保ったままコピーする:
+   - `.github/workflows/flow-on-issue-close.yml` — issue close 時の自動同期ワークフロー
+   - `.github/workflows/check-pfd-ops-sync.yml` — install/ との sync チェック CI
+   - `scripts/audit-issues-flow.mjs` — 手動監査スクリプト
+   - `scripts/lib/issues-flow-audit.mjs` — 監査ロジック（ライブラリ）
+   - `scripts/lib/yaml-require.mjs` — YAML パーサーユーティリティ
+3. GitHub に `flow:managed` / `flow:exempt` ラベルを作成する（`audit-issues-flow.mjs --fix` が未作成ラベルを自動生成する）
+4. `plan.pfdsl` を依存構造のみのグラフとして用意し、issue artifact に `iN_` prefix を付ける
+5. リポの `plan.md` で本プリセットを指し、リポ URL を記載する

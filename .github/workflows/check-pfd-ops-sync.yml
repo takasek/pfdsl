@@ -1,0 +1,59 @@
+name: check pfd-ops install sync
+
+on:
+  push:
+    paths:
+      - '.claude/skills/pfd-ops/install/**'
+      - '.github/workflows/**'
+      - 'scripts/**'
+  pull_request:
+    paths:
+      - '.claude/skills/pfd-ops/install/**'
+      - '.github/workflows/**'
+      - 'scripts/**'
+
+jobs:
+  sync-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check pfd-ops/install in sync with deployed locations
+        run: |
+          # Known top-level dirs under install/ and their repo-root destinations.
+          # Add an entry here when adding a new install/ subdir; unknown dirs fail the check.
+          declare -A KNOWN=(
+            [".github"]="."
+            ["scripts"]="."
+          )
+
+          fail=0
+
+          # 1. Reject unknown top-level subdirs
+          for dir in .claude/skills/pfd-ops/install/*/; do
+            name=$(basename "$dir")
+            if [[ -z "${KNOWN[$name]+x}" ]]; then
+              echo "ERROR: unknown install/ subdir '$name' — add to KNOWN in check-pfd-ops-sync.yml"
+              fail=1
+            fi
+          done
+
+          # 2. Each file under install/ must match the file at the same relative path from repo root
+          while IFS= read -r src; do
+            rel="${src#.claude/skills/pfd-ops/install/}"
+            dst="$rel"
+            if [ ! -f "$dst" ]; then
+              echo "MISSING: $dst (canonical: $src)"
+              fail=1
+            elif ! diff -q "$src" "$dst" > /dev/null; then
+              echo "OUT OF SYNC: $dst differs from canonical $src"
+              diff "$src" "$dst" || true
+              fail=1
+            fi
+          done < <(find .claude/skills/pfd-ops/install -type f | sort)
+
+          if [ $fail -ne 0 ]; then
+            echo ""
+            echo "Fix: edit canonical under .claude/skills/pfd-ops/install/, then copy to the matching repo path."
+            exit 1
+          fi
+          echo "All pfd-ops install files in sync."
