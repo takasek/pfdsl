@@ -129,7 +129,7 @@ artifact:
     label: PFD運用スキル
     status: done
     group: generation
-    description: ".claude/skills/pfd-ops/ と /pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。汎用層（L1+L2）= SKILL.md 本文、GitHub Issues プリセット（L3）= references/、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
+    description: ".claude/skills/pfd-ops/ と /pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。汎用層（L1+L2）= SKILL.md 本文、GitHub Issues プリセット（L3）= references/、デプロイ可能ファイル群（L3.5）= install/（CI で identity 強制）、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
   retro_skill:
     label: ふりかえり監査スキル
     status: done
