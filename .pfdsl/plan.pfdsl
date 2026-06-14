@@ -39,27 +39,25 @@ artifact:
   i8_revises_spec:
     label: "改版チェーン仕様案 (#8)"
     status: wip
-    updated_at: 2026-06-15T00:00:00Z
+    updated_at: 2026-06-12T08:18:44Z
   i13_location_spec:
     label: "location/command 仕様案 (#13)"
     status: wip
     description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
-    updated_at: 2026-06-14T02:42:21Z
+    updated_at: 2026-06-14T15:39:05Z
     tags:
       - priority:high
   i9_design_notes:
     label: "設計判断ノート・分岐なし方針 (#9)"
     status: wip
-    updated_at: 2026-06-15T00:00:00Z
+    updated_at: 2026-06-12T08:18:46Z
   spec_v007:
     label: 仕様書 v0.0.7（統合）
     status: wip
   i52_featured_toolchain:
     label: "spec v0.0.7 実装済みツールチェーン (#52)"
     status: todo
-    updated_at: 2026-06-15T00:00:00Z
-    tags:
-      - priority:high
+    updated_at: 2026-06-14T15:29:24Z
   spec_v008:
     label: 仕様書 v0.0.8（マルチファイル統合）
     status: todo
