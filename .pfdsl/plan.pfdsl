@@ -110,9 +110,9 @@ artifact:
     status: todo
     updated_at: 2026-06-12T08:18:35Z
   lint_checker:
-    label: lint拡張checker (#4)
+    label: "lint拡張checker (#4)"
     status: done
-    description: lint 候補の完全リストは issue
+    description: "lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため"
 process:
   write_article:
     label: 記事執筆
