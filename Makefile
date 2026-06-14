@@ -59,11 +59,9 @@ gen-samples: build-deps
 
 .PHONY: check-docs
 check-docs:
-	@for f in docs/samples/*.pfdsl docs/examples/*.pfdsl docs/pfdsl_implementation_flow.pfdsl; do \
+	@find docs -name "*.pfdsl" | sort | while read f; do \
 		echo "check $$f"; \
 		node packages/cli/dist/cli.js check "$$f" || exit 1; \
-	done
-	@for f in docs/samples/*.pfdsl docs/examples/*.pfdsl docs/pfdsl_implementation_flow.pfdsl; do \
 		node packages/cli/dist/cli.js graph "$$f" --format dot > /dev/null || exit 1; \
 	done
 	@echo "check-docs: all passed"

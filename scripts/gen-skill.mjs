@@ -36,7 +36,9 @@ function parseFrontmatterTitle(src) {
   const m = src.match(/^---\n([\s\S]*?)\n---/);
   if (!m) return null;
   const line = m[1].split("\n").find((l) => l.startsWith("title:"));
-  return line ? line.replace(/^title:\s*/, "").trim() : null;
+  if (!line) return null;
+  const raw = line.replace(/^title:\s*/, "").trim();
+  return raw.replace(/^(["'])(.*)\1$/, "$2");
 }
 
 function buildExamplesIndexMd(dir) {
