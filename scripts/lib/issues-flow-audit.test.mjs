@@ -434,6 +434,44 @@ process:
 		assert.ok(newBody.includes("draft_multifile_specs"), "process should remain in body");
 	});
 
+
+		it("B: description containing ' #' survives write→re-parse round-trip without truncation", () => {
+			const yaml = `artifact:
+  cli_tool:
+    label: CLI
+    status: done
+  i4_lint_checker:
+    label: Lint checker
+    description: lint 候補の完全リストは issue #4 が一次情報
+    status: todo
+process:
+  use_lint:
+    label: Use lint
+`;
+			const body = `\ncli_tool >> run_lint -> i4_lint_checker\ni4_lint_checker >> use_lint -> cli_tool\n`;
+			const doc = parseDocument(yaml);
+			const findings = [
+				{
+					type: "closed_in_flow",
+					issueNumber: 4,
+					artifactId: "i4_lint_checker",
+					detail: "issue is closed",
+					fixVia: "flow",
+					hasDownstream: true,
+				},
+			];
+			applyClosedInFlowFixes(doc, body, findings);
+			// Re-parse the emitted YAML to simulate the next file read
+			const emitted = doc.toString();
+			const reparsed = parseDocument(emitted).toJS();
+			const desc = reparsed.artifact?.lint_checker?.description;
+			assert.equal(
+				desc,
+				"lint 候補の完全リストは issue #4 が一次情報",
+				`description was truncated at ' #': got "${desc}"`,
+			);
+		});
+
 	// Case B: non-terminal, not done → demote: strip iN_ prefix, set status done, update body refs
 	it("B: non-terminal not-done — strips prefix, sets done, updates body refs", () => {
 		const yaml = `artifact:
