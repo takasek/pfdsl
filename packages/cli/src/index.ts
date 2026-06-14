@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import {
 	analyze,
+	auditGraph,
 	diffGraphs as coreDiffGraphs,
 	type Diagnostic,
 	type DiffReport,
@@ -44,14 +45,49 @@ function failIfErrors(diags: Diagnostic[], file: string): CommandResult | null {
 	return fail(diagText(errs, file));
 }
 
-export function runCheck(file: string): CommandResult {
-	const { diagnostics } = analyze(readSource(file));
+export interface CheckOptions {
+	audit?: boolean;
+	summary?: boolean;
+	strict?: boolean;
+}
+
+export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
+	const { diagnostics, edges, nodeKinds } = analyze(
+		readSource(file),
+		opts.strict ? { strict: true } : undefined,
+	);
 	const lines = diagnostics.map((d) => formatDiagnostic(d, file));
 	if (hasErrors(diagnostics)) {
 		return { stdout: "", stderr: `${lines.join("\n")}\n`, exitCode: 1 };
 	}
+
+	const extraLines: string[] = [];
+
+	if (opts.audit) {
+		const { terminals, externalInputs } = auditGraph(edges, nodeKinds);
+		extraLines.push(`terminal artifacts: ${terminals.join(", ")}`);
+		extraLines.push(`external inputs: ${externalInputs.join(", ")}`);
+	}
+
+	if (opts.summary) {
+		const artifactCount = [...nodeKinds.values()].filter(
+			(k) => k === "artifact",
+		).length;
+		const processCount = [...nodeKinds.values()].filter(
+			(k) => k === "process",
+		).length;
+		const primaryEdgeCount = edges.filter(
+			(e) => e.kind === "input" || e.kind === "output",
+		).length;
+		const { terminals, externalInputs } = auditGraph(edges, nodeKinds);
+		extraLines.push(
+			`artifacts: ${artifactCount}, processes: ${processCount}, edges: ${primaryEdgeCount}, external_inputs: ${externalInputs.length}, terminals: ${terminals.length}`,
+		);
+	}
+
+	const allLines = [...lines, ...extraLines];
 	return {
-		stdout: lines.length ? `${lines.join("\n")}\n` : "OK\n",
+		stdout: allLines.length ? `${allLines.join("\n")}\n` : "OK\n",
 		stderr: "",
 		exitCode: 0,
 	};
@@ -128,7 +164,11 @@ export function runDiff(fileA: string, fileB: string): CommandResult {
 export const HELP = `pfdsl <command> [options]
 
 Commands:
-  check <file>             Validate a .pfdsl file
+  check <file> [--audit] [--summary] [--strict]
+                           Validate a .pfdsl file
+                           --audit   list terminal artifacts and external inputs
+                           --summary print artifact/process/edge counts
+                           --strict  error if feedback source not reachable from target process
   fmt <file> [--write] [--mode flat|flows]
                            Format a .pfdsl file; flows groups per-process (A >> P -> B)
   normalize <file>         Print canonical edge list
@@ -176,7 +216,11 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 		case "check": {
 			const f = positional[0];
 			if (!f) return fail("usage: pfdsl check <file>\n", 2);
-			return runCheck(f);
+			return runCheck(f, {
+				audit: flags.audit === true,
+				summary: flags.summary === true,
+				strict: flags.strict === true,
+			});
 		}
 		case "fmt": {
 			const f = positional[0];

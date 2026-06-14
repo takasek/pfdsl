@@ -10,10 +10,15 @@ import { STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
 const STATUS_SET: ReadonlySet<string> = new Set(STATUS_VALUES);
 const STYLE_ATTR_SET: ReadonlySet<string> = new Set(STYLE_ATTRS);
 
+export interface ValidateOptions {
+	strict?: boolean;
+}
+
 export function validate(
 	edges: NormalizedEdge[],
 	nodeKinds: Map<string, NodeKind>,
 	fm: Frontmatter | null,
+	options?: ValidateOptions,
 ): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
 
@@ -77,7 +82,21 @@ export function validate(
 
 	// V004 / V005 / V006: parts constraints
 	// V007: artifact.status enum check
+	// W001: parts member without edges
 	const artifactMeta = fm?.artifact ?? {};
+
+	// Collect all artifact/process ids that appear in at least one edge
+	const nodesWithEdges = new Set<string>();
+	for (const e of edges) {
+		if (e.kind === "input" || e.kind === "feedback") {
+			nodesWithEdges.add(e.artifact);
+			nodesWithEdges.add(e.process);
+		} else {
+			nodesWithEdges.add(e.process);
+			nodesWithEdges.add(e.artifact);
+		}
+	}
+
 	for (const [artifactId, meta] of Object.entries(artifactMeta)) {
 		for (const partId of meta.parts ?? []) {
 			if (nodeKinds.get(partId) === "process") {
@@ -93,6 +112,15 @@ export function validate(
 					severity: "error",
 					code: "V005",
 					message: `'${artifactId}' cannot include itself in parts`,
+					range: zeroRange(),
+				});
+			}
+			// W001: parts member with no edges (§17.4: should be input to a merge process)
+			if (!nodesWithEdges.has(partId) && nodeKinds.get(partId) !== "process") {
+				diagnostics.push({
+					severity: "warning",
+					code: "W001",
+					message: `Parts member '${partId}' of '${artifactId}' has no edges`,
 					range: zeroRange(),
 				});
 			}
@@ -166,6 +194,96 @@ export function validate(
 	}
 
 	for (const id of Object.keys(artifactMeta)) detectCycle(id);
+
+	// V010: primary-graph cycle detection
+	// Build adjacency map from primary edges only (feedback edges are exempt)
+	const primaryAdj = new Map<string, string[]>();
+	for (const e of edges) {
+		if (e.kind === "input") {
+			// artifact -> process
+			const adj = primaryAdj.get(e.artifact) ?? [];
+			adj.push(e.process);
+			primaryAdj.set(e.artifact, adj);
+		} else if (e.kind === "output") {
+			// process -> artifact
+			const adj = primaryAdj.get(e.process) ?? [];
+			adj.push(e.artifact);
+			primaryAdj.set(e.process, adj);
+		}
+	}
+	{
+		const color = new Map<string, "white" | "gray" | "black">();
+		const allNodes = new Set<string>();
+		for (const e of edges) {
+			if (e.kind !== "feedback") {
+				allNodes.add(e.kind === "output" ? e.process : e.artifact);
+				allNodes.add(e.kind === "output" ? e.artifact : e.process);
+			}
+		}
+		for (const n of allNodes) color.set(n, "white");
+
+		let cycleReported = false;
+		function dfsV010(id: string): boolean {
+			if (color.get(id) === "gray") return true;
+			if (color.get(id) === "black") return false;
+			color.set(id, "gray");
+			for (const neighbor of primaryAdj.get(id) ?? []) {
+				if (dfsV010(neighbor)) {
+					if (!cycleReported) {
+						cycleReported = true;
+						diagnostics.push({
+							severity: "error",
+							code: "V010",
+							message: `Primary graph contains a cycle involving '${id}' → '${neighbor}'`,
+							range: zeroRange(),
+						});
+					}
+					color.set(id, "black");
+					return false;
+				}
+			}
+			color.set(id, "black");
+			return false;
+		}
+		for (const n of allNodes) {
+			if (color.get(n) === "white") dfsV010(n);
+		}
+	}
+
+	// V011: strict-mode feedback validation
+	// In strict mode, for each feedback edge A >>? P, verify that P can reach A
+	// in the primary graph (P directly or transitively produces A).
+	if (options?.strict) {
+		// Build reverse adjacency for reachability: from a process, what artifacts can be reached?
+		function primaryReachable(startProcess: string): Set<string> {
+			const reachable = new Set<string>();
+			const queue: string[] = [startProcess];
+			while (queue.length > 0) {
+				const node = queue.shift()!;
+				for (const neighbor of primaryAdj.get(node) ?? []) {
+					if (!reachable.has(neighbor)) {
+						reachable.add(neighbor);
+						queue.push(neighbor);
+					}
+				}
+			}
+			return reachable;
+		}
+
+		for (const e of edges) {
+			if (e.kind === "feedback") {
+				const reachable = primaryReachable(e.process);
+				if (!reachable.has(e.artifact)) {
+					diagnostics.push({
+						severity: "error",
+						code: "V011",
+						message: `Feedback artifact '${e.artifact}' is not reachable from process '${e.process}' in the primary graph`,
+						range: zeroRange(),
+					});
+				}
+			}
+		}
+	}
 
 	return diagnostics;
 }

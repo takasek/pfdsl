@@ -141,6 +141,46 @@ describe("diff", () => {
 	});
 });
 
+describe("check --audit", () => {
+	it("shows terminal artifacts and external inputs for a valid file", async () => {
+		// valid.pfdsl: req >> design -> spec\nspec >> impl -> code
+		// external inputs: req; terminals: code
+		const r = await run(["check", join(dir, "valid.pfdsl"), "--audit"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toMatch(/terminal artifacts:.*code/);
+		expect(r.stdout).toMatch(/external inputs:.*req/);
+	});
+
+	it("does not show audit output when file has errors", async () => {
+		const r = await run(["check", join(dir, "invalid.pfdsl"), "--audit"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).not.toMatch(/terminal artifacts/);
+	});
+});
+
+describe("check --summary", () => {
+	it("shows counts of artifacts, processes, edges, external_inputs, terminals", async () => {
+		// valid.pfdsl: 4 artifacts (req, spec, impl, code... wait: req,spec,code=artifacts, design,impl=processes)
+		// Actually: req >> design -> spec\nspec >> impl -> code
+		// artifacts: req, spec, code (3), processes: design, impl (2)
+		// primary edges: req->design, design->spec, spec->impl, impl->code = 4
+		// external_inputs: req (1), terminals: code (1)
+		const r = await run(["check", join(dir, "valid.pfdsl"), "--summary"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toMatch(/artifacts: 3/);
+		expect(r.stdout).toMatch(/processes: 2/);
+		expect(r.stdout).toMatch(/edges: 4/);
+		expect(r.stdout).toMatch(/external_inputs: 1/);
+		expect(r.stdout).toMatch(/terminals: 1/);
+	});
+
+	it("does not show summary output when file has errors", async () => {
+		const r = await run(["check", join(dir, "invalid.pfdsl"), "--summary"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).not.toMatch(/artifacts:/);
+	});
+});
+
 describe("help / unknown", () => {
 	it("help prints usage", async () => {
 		const r = await run(["help"]);
