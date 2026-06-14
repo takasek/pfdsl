@@ -34,12 +34,11 @@ PR マージ時に issue が自動 close されるには、PR 本文に `Closes 
 ## 採用手順
 
 1. `pfd-ops` スキルをリポの `.claude/skills/pfd-ops/` に設置する
-2. `pfd-ops/install/` 以下のファイルをリポルートからの相対パスを保ったままコピーする:
-   - `.github/workflows/flow-on-issue-close.yml` — issue close 時の自動同期ワークフロー
-   - `.github/workflows/check-pfd-ops-sync.yml` — install/ との sync チェック CI（自身も install/ で管理されるため drift 検出対象）
-   - `scripts/audit-issues-flow.mjs` — 手動監査スクリプト
-   - `scripts/lib/issues-flow-audit.mjs` — 監査ロジック（ライブラリ）
-   - `scripts/lib/yaml-require.mjs` — YAML パーサーユーティリティ
+2. `pfd-ops/install/` 以下のファイルをリポルートに一括コピーする（相対パス保持）:
+   ```sh
+   cp -r .claude/skills/pfd-ops/install/. .
+   ```
+   install/ 内ファイルと deployed コピーの identity は `check-pfd-ops-sync.yml` CI が自動検証する。
 3. GitHub に `flow:managed` / `flow:exempt` ラベルを作成する（`audit-issues-flow.mjs --fix` が未作成ラベルを自動生成する）
 4. `plan.pfdsl` を依存構造のみのグラフとして用意し、issue artifact に `iN_` prefix を付ける
 5. リポの `plan.md` で本プリセットを指し、リポ URL を記載する
