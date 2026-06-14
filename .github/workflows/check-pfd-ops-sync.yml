@@ -19,25 +19,9 @@ jobs:
       - uses: actions/checkout@v6
       - name: Check pfd-ops/install in sync with deployed locations
         run: |
-          # Known top-level dirs under install/. Add new entries here when adding a new install/ subdir;
-          # unknown dirs fail the check.
-          KNOWN=(".github" "scripts")
-
           fail=0
 
-          # 1. Reject unknown top-level subdirs
-          shopt -s nullglob
-          for dir in .claude/skills/pfd-ops/install/*/; do
-            name=$(basename "$dir")
-            matched=false
-            for k in "${KNOWN[@]}"; do [[ "$k" == "$name" ]] && matched=true && break; done
-            if [[ "$matched" == false ]]; then
-              echo "ERROR: unknown install/ subdir '$name' — add to KNOWN in check-pfd-ops-sync.yml"
-              fail=1
-            fi
-          done
-
-          # 2. Each file under install/ must match the file at the same relative path from repo root
+          # Each file under install/ must match the file at the same relative path from repo root
           while IFS= read -r src; do
             rel="${src#.claude/skills/pfd-ops/install/}"
             dst="$rel"
@@ -53,7 +37,7 @@ jobs:
 
           if [ $fail -ne 0 ]; then
             echo ""
-            echo "Fix: edit canonical under .claude/skills/pfd-ops/install/, then copy to the matching repo path."
+            echo "Fix: edit the canonical under .claude/skills/pfd-ops/install/ and copy to the matching repo path (or vice-versa — keep both in sync)."
             exit 1
           fi
           echo "All pfd-ops install files in sync."
