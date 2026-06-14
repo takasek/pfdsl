@@ -22,3 +22,6 @@
 - **ADR-0009** [対話の出力設計](0009-dialogue-output-design.md) — 対話はプロセス（discuss）、出力は3種のシグナルと永続記録への外化、記録までが対話という一体の活動
 - **ADR-0010** [変更ガバナンスの経路設計](0010-change-governance-routing.md) — 仕様改訂は issues ゲート必須、スキル・品質ガイドは対話の判断から直結、ガバナンスをエッジ形状で恒久化する
 - **ADR-0011** [能力成果物の世代還流](0011-capability-feedback-edges.md) — 能力成果物が自身の生産チェーン上流に入力されるときは前世代スナップショットとして `>>?` で表し、Primary graph の循環を防ぐ
+- **ADR-0012** [spec proposals のフォーマットと役割](0012-spec-proposals-format.md) — 4セクション構造・マージ後保持・型対称フィールドと自己完結例の検査点を規約化する
+- **ADR-0013** [v0.0.8 依存順序](0013-v008-dependency-order.md) — integrate_multifile は i52 フィーチャードツールチェーン必須、draft_multifile_specs は並行着手可
+- **ADR-0014** [ゲート項目の反実仮想テスト](0014-gate-item-counterfactual-test.md) — 条件付きゲート項目は充足を反証可能テストで先判定しデフォルトを「書かない」に倒す、payoff は「PFD なしで判断が違ったか」を引用できる時のみ記録する
