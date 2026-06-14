@@ -1,0 +1,52 @@
+name: flow on issue close
+
+# issue が閉じたら audit --fix を走らせ、plan.pfdsl の変更（closed_in_flow の
+# チェーン削除/降格、updated_at 同期）を PR として起票する。人がレビューして merge。
+# 自動コミットでなく自動 PR — flow 変更は必ず人の目を通す。
+
+on:
+  issues:
+    types: [closed]
+
+concurrency:
+  group: flow-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply flow sync (audit --fix)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # --fix は残存 manual finding があると非ゼロ終了する。plan.pfdsl の変更だけ
+        # 拾えればよいので失敗しても続行する。
+        run: node scripts/audit-issues-flow.mjs --fix || true
+
+      - name: Open PR if plan.pfdsl changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          add-paths: .pfdsl/plan.pfdsl
+          branch: flow-sync/issue-${{ github.event.issue.number }}
+          commit-message: "chore(plan): sync flow after #${{ github.event.issue.number }} closed"
+          title: "chore(plan): sync flow after #${{ github.event.issue.number }} closed"
+          body: |
+            issue #${{ github.event.issue.number }} のクローズに伴う `.pfdsl/plan.pfdsl` の機械同期（`audit-issues-flow.mjs --fix`）。
+
+            終端チェーンは削除（artifact + 専属 process + edge）、下流が残るものは `iN_` prefix を外して降格。レビューして問題なければ merge。
