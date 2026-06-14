@@ -108,24 +108,21 @@ artifact:
     status: todo
     description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
       要件経路、dogfood #16 由来）"
-    updated_at: 2026-06-13T22:11:33Z
+    updated_at: 2026-06-14T14:00:45Z
   i3_obsidian_plugin:
     label: "Obsidian プラグイン (#3)"
     status: todo
     updated_at: 2026-06-12T08:18:35Z
-  i43_audit_distribution:
-    label: "L3資産の階層化配布 (#43)"
-    status: wip
-    description: "audit コア + flow-sync action を skill
-      同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは
-      #11"
-    updated_at: 2026-06-14T01:03:07Z
-    tags:
-      - priority:high
   lint_checker:
     label: "lint拡張checker (#4)"
     status: done
     description: "lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため"
+  audit_distribution:
+    label: "L3資産の階層化配布 (#43)"
+    status: done
+    description: "audit コア + flow-sync action を skill
+      同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは
+      #11"
 process:
   write_article:
     label: 記事執筆
@@ -197,9 +194,9 @@ skill_gen >> restructure_skillgen -> i10_restructured_gen
 
 cli_tool >> publish_cli -> published_cli
 
-[i10_restructured_gen, published_cli, i14_dir_convention, i43_audit_distribution] >> package_skill -> i11_portable_skill
+[i10_restructured_gen, published_cli, i14_dir_convention, audit_distribution] >> package_skill -> i11_portable_skill
 
-cli_tool >> layer_audit_assets -> i43_audit_distribution
+cli_tool >> layer_audit_assets -> audit_distribution
 
 adr_corpus >> migrate_convention -> i14_dir_convention
 
