@@ -1,4 +1,6 @@
 ---
+title: Label + CJK
+description: "`label:` sets the display name shown below the node ID. CJK labels get a computed `width=` to prevent clipping in the wasm renderer."
 artifact:
   D1: { label: 紙のアンケート }
   D2: { label: デジタルアンケート }

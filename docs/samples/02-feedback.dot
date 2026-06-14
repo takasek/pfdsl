@@ -1,6 +1,8 @@
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
+  label="Feedback edge";
+  labelloc="t";
 
   "bug_report" [shape=box, label="bug_report", penwidth="2"];
   "code" [shape=box, label="code"];

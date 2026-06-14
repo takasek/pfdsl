@@ -1,1 +1,5 @@
+---
+title: Set output
+description: "`P -> [A, B]` expands to two output edges."
+---
 source >> build -> [binary, docs]

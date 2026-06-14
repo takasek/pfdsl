@@ -1,6 +1,8 @@
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
+  label="Set input";
+  labelloc="t";
 
   "database" [shape=box, label="database", penwidth="2"];
   "migrate" [shape=ellipse, label="migrate"];

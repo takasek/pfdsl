@@ -1,6 +1,8 @@
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
+  label="Parts";
+  labelloc="t";
 
   "D0" [shape=box, label="D0\nSource", penwidth="2"];
   "D1" [shape=box, label="D1\nRelease Package", penwidth="2"];

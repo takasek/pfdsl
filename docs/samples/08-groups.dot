@@ -1,6 +1,8 @@
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
+  label="Groups";
+  labelloc="t";
 
   subgraph cluster_backend {
     label="Backend";

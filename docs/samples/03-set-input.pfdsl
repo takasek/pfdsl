@@ -1,1 +1,5 @@
+---
+title: Set input
+description: "`[A, B] >> P` expands to two input edges."
+---
 [schema, seed_data] >> migrate -> database

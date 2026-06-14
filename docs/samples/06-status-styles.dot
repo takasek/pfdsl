@@ -1,6 +1,8 @@
 digraph PFDSL {
   rankdir=LR;
   newrank=true;
+  label="Status & tag styles";
+  labelloc="t";
 
   "analyze" [shape=ellipse, label="analyze"];
   "ingest" [shape=ellipse, label="ingest"];

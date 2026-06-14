@@ -1,4 +1,6 @@
 ---
+title: Parts
+description: "`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names."
 artifact:
   D0: { label: Source }
   D1:
