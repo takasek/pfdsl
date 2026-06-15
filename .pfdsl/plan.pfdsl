@@ -40,10 +40,6 @@ artifact:
   spec_v008:
     label: 仕様書 v0.0.8（マルチファイル統合）
     status: todo
-  i10_restructured_gen:
-    label: "再構成済みスキル生成系 (#10)"
-    status: todo
-    updated_at: 2026-06-12T08:18:47Z
   published_cli:
     label: npm公開済みCLI
     status: done
@@ -119,6 +115,9 @@ artifact:
     label: "location/command 仕様案 (#13)"
     status: done
     description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
+  restructured_gen:
+    label: "再構成済みスキル生成系 (#10)"
+    status: done
 process:
   write_article:
     label: 記事執筆
@@ -192,11 +191,11 @@ spec_v006 >>? integrate_spec
 
 [i5_hierarchy_spec, i6_presets_spec, multifile_policy, i52_featured_toolchain] >> integrate_multifile -> spec_v008
 
-skill_gen >> restructure_skillgen -> i10_restructured_gen
+skill_gen >> restructure_skillgen -> restructured_gen
 
 cli_tool >> publish_cli -> published_cli
 
-[i10_restructured_gen, published_cli, i14_dir_convention, audit_distribution] >> package_skill -> i11_portable_skill
+[restructured_gen, published_cli, i14_dir_convention, audit_distribution] >> package_skill -> i11_portable_skill
 
 cli_tool >> layer_audit_assets -> audit_distribution
 
