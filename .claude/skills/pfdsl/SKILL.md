@@ -35,7 +35,7 @@ layout:
 artifact:
   <id>:
     label: 人間向けラベル
-    status: done       # done | wip | todo | blocked
+    status: done       # todo=未着手 | wip=PR open | done=main済み | blocked=外部要因
     description: ...
     owner: ...
     tags: [tag1, tag2]
