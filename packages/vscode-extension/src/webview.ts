@@ -6,6 +6,7 @@ type MessageToWebview =
 			dot: string;
 			focusNodeId?: string;
 			descriptions?: Record<string, string>;
+			nodeStatuses?: Record<string, string>;
 	  }
 	| { type: "error"; message: string }
 	| { type: "focus"; nodeId: string }
@@ -54,9 +55,79 @@ async function getGraphviz() {
 const root = document.getElementById("root") as HTMLDivElement;
 const inner = document.getElementById("inner") as HTMLDivElement;
 const tooltip = document.getElementById("tooltip") as HTMLDivElement;
+const toolbar = document.getElementById("toolbar") as HTMLDivElement;
 
 let descriptions: Record<string, string> = {};
 let lastFocusedNodeId: string | undefined;
+let nodeStatuses: Record<string, string> = {};
+let activeFilter: string | null = null;
+
+const STATUS_ORDER = ["done", "wip", "todo", "blocked"] as const;
+
+function applyFilter(filter: string | null) {
+	activeFilter = filter;
+	const allNodes = inner.querySelectorAll<SVGGElement>("g.node");
+	const hiddenIds = new Set<string>();
+
+	for (const node of allNodes) {
+		const id = node.querySelector("title")?.textContent ?? "";
+		const show = filter === null || nodeStatuses[id] === filter;
+		node.style.display = show ? "" : "none";
+		if (!show) hiddenIds.add(id);
+	}
+
+	for (const edge of inner.querySelectorAll<SVGGElement>("g.edge")) {
+		const title = edge.querySelector("title")?.textContent ?? "";
+		const arrow = title.indexOf("->");
+		const src = arrow >= 0 ? title.slice(0, arrow) : "";
+		const tgt = arrow >= 0 ? title.slice(arrow + 2) : "";
+		edge.style.display =
+			!hiddenIds.has(src) && !hiddenIds.has(tgt) ? "" : "none";
+	}
+
+	for (const btn of toolbar.querySelectorAll<HTMLButtonElement>(
+		".filter-btn",
+	)) {
+		btn.classList.toggle("active", btn.dataset.status === (filter ?? ""));
+	}
+}
+
+function updateToolbar(statuses: Record<string, string>) {
+	nodeStatuses = statuses;
+	const present = new Set(Object.values(statuses));
+
+	if (present.size === 0) {
+		toolbar.style.display = "none";
+		return;
+	}
+
+	const label = document.createElement("span");
+	label.className = "filter-label";
+	label.textContent = "Filter:";
+
+	const allBtn = document.createElement("button");
+	allBtn.className = `filter-btn${activeFilter === null ? " active" : ""}`;
+	allBtn.dataset.status = "";
+	allBtn.textContent = "All";
+
+	const statusBtns = STATUS_ORDER.filter((s) => present.has(s)).map((s) => {
+		const btn = document.createElement("button");
+		btn.className = `filter-btn${activeFilter === s ? " active" : ""}`;
+		btn.dataset.status = s;
+		btn.textContent = s;
+		return btn;
+	});
+
+	toolbar.replaceChildren(label, allBtn, ...statusBtns);
+	toolbar.style.display = "flex";
+}
+
+toolbar.addEventListener("click", (e) => {
+	const btn = (e.target as Element).closest<HTMLButtonElement>(".filter-btn");
+	if (!btn) return;
+	const status = btn.dataset.status ?? "";
+	applyFilter(status === "" ? null : status);
+});
 
 const diffPanel = document.getElementById("diff-panel") as HTMLDivElement;
 type StoredDiff = {
@@ -264,12 +335,14 @@ window.addEventListener("message", async (event) => {
 	}
 	if (msg.type !== "render") return;
 	descriptions = msg.descriptions ?? {};
+	if (msg.nodeStatuses !== undefined) updateToolbar(msg.nodeStatuses);
 	try {
 		const g = await getGraphviz();
 		log("calling g.dot()");
 		const svg = g.dot(msg.dot, "svg");
 		log("svg length:", svg.length);
 		inner.innerHTML = svg;
+		if (activeFilter !== null) applyFilter(activeFilter);
 		const svgEl = inner.querySelector("svg");
 		if (svgEl) {
 			log(

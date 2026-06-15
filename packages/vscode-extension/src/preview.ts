@@ -67,6 +67,7 @@ type MessageToWebview =
 			dot: string;
 			focusNodeId?: string;
 			descriptions?: Record<string, string>;
+			nodeStatuses?: Record<string, string>;
 	  }
 	| { type: "error"; message: string }
 	| { type: "focus"; nodeId: string }
@@ -88,6 +89,15 @@ function buildDescriptions(fm: Frontmatter | null): Record<string, string> {
 	for (const id of Object.keys(fm.process ?? {})) {
 		const desc = fm.process?.[id]?.description;
 		if (typeof desc === "string" && desc) result[id] = desc;
+	}
+	return result;
+}
+
+function buildNodeStatuses(fm: Frontmatter | null): Record<string, string> {
+	const result: Record<string, string> = {};
+	if (!fm) return result;
+	for (const [id, meta] of Object.entries(fm.artifact ?? {})) {
+		if (meta.status) result[id] = meta.status;
 	}
 	return result;
 }
@@ -128,10 +138,16 @@ body { display: flex; flex-direction: column; }
 .diff-remove { color: var(--vscode-gitDecoration-deletedResourceForeground, #f44336); white-space: pre; }
 .diff-none { color: var(--vscode-descriptionForeground, #888); font-style: italic; }
 g.node.pfdsl-focused ellipse, g.node.pfdsl-focused polygon, g.node.pfdsl-focused path { filter: drop-shadow(0 0 5px currentColor); stroke-width: 2.5; }
+#toolbar { display: none; flex-shrink: 0; padding: 3px 8px; gap: 4px; align-items: center; border-bottom: 1px solid var(--vscode-panel-border, #333); background: var(--vscode-editor-background); }
+.filter-label { font-size: 11px; color: var(--vscode-descriptionForeground, #888); margin-right: 2px; }
+.filter-btn { padding: 1px 8px; border: 1px solid var(--vscode-button-border, #555); background: transparent; color: var(--vscode-editor-foreground); cursor: pointer; font-size: 11px; border-radius: 3px; }
+.filter-btn:hover { background: var(--vscode-button-secondaryHoverBackground, #444); }
+.filter-btn.active { background: var(--vscode-button-background, #0e639c); color: var(--vscode-button-foreground, #fff); border-color: transparent; }
 </style>
 <script>window.__PFDSL_DEBUG__ = ${isDebug};</script>
 </head>
 <body>
+<div id="toolbar"></div>
 <div id="root"><div id="inner"></div></div>
 <div id="tooltip"></div>
 <div id="diff-panel"></div>
@@ -208,11 +224,13 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		} else {
 			const { frontmatter } = analyzeDocument(state.doc);
 			const descriptions = buildDescriptions(frontmatter);
+			const nodeStatuses = buildNodeStatuses(frontmatter);
 			state.panel.webview.postMessage({
 				type: "render",
 				dot,
 				focusNodeId,
 				descriptions,
+				nodeStatuses,
 			});
 		}
 		if ("pendingDiff" in state) {
