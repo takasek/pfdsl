@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT — generated from docs/examples/ in https://github.com/takasek/pfdsl -->
+
 # PFDSL Examples Reference
 
 Realistic domain examples demonstrating the quality guide.

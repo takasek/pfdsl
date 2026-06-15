@@ -46,7 +46,7 @@ function buildExamplesIndexMd(dir) {
     .filter((f) => f.endsWith(".pfdsl"))
     .sort();
 
-  let md = `# PFDSL Examples Reference\n\nRealistic domain examples demonstrating the quality guide.\n\n`;
+  let md = `<!-- DO NOT EDIT — generated from docs/examples/ in https://github.com/takasek/pfdsl -->\n\n# PFDSL Examples Reference\n\nRealistic domain examples demonstrating the quality guide.\n\n`;
   let count = 0;
 
   for (const f of files) {
@@ -68,14 +68,15 @@ function buildExamplesIndexMd(dir) {
 
 const specSrc = readFileSync(resolve(root, "docs/spec/spec.md"), "utf-8");
 const specVersion = specSrc.match(/^# PFDSL仕様書 (v[\d.]+)/m)?.[1] ?? "unknown";
-const specHeader = `<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->\n\n`;
-writeFileSync(resolve(refsDir, "spec.md"), specHeader + specSrc);
+const baseHeader = (src) =>
+  `<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/${src} -->\n\n`;
+writeFileSync(resolve(refsDir, "spec.md"), baseHeader("docs/spec/spec.md") + specSrc);
 console.log("references/spec.md ← docs/spec/spec.md");
 
 // --- 1b. Copy review prompts ---
 
 const promptsSrc = readFileSync(resolve(root, "docs/review-prompts.md"), "utf-8");
-writeFileSync(resolve(refsDir, "review-prompts.md"), promptsSrc);
+writeFileSync(resolve(refsDir, "review-prompts.md"), baseHeader("docs/review-prompts.md") + promptsSrc);
 console.log("references/review-prompts.md ← docs/review-prompts.md");
 
 // --- 2. Generate samples.md from TSV ---
@@ -98,7 +99,7 @@ for (const f of readdirSync(samplesDir).filter((f) => f.endsWith(".pfdsl"))) {
   }
 }
 
-let samplesMd = `# PFDSL Samples Reference\n\nAnnotated .pfdsl files illustrating each language feature.\n\n`;
+let samplesMd = `<!-- DO NOT EDIT — generated from docs/samples/ in https://github.com/takasek/pfdsl -->\n\n# PFDSL Samples Reference\n\nAnnotated .pfdsl files illustrating each language feature.\n\n`;
 let sampleCount = 0;
 
 for (const { id, summary, description } of rows) {

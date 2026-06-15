@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT — generated from docs/samples/ in https://github.com/takasek/pfdsl -->
+
 # PFDSL Samples Reference
 
 Annotated .pfdsl files illustrating each language feature.
