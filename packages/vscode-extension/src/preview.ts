@@ -128,11 +128,14 @@ body { display: flex; flex-direction: column; }
 .diff-remove { color: var(--vscode-gitDecoration-deletedResourceForeground, #f44336); white-space: pre; }
 .diff-none { color: var(--vscode-descriptionForeground, #888); font-style: italic; }
 g.node.pfdsl-focused ellipse, g.node.pfdsl-focused polygon, g.node.pfdsl-focused path { filter: drop-shadow(0 0 5px currentColor); stroke-width: 2.5; }
+#minimap { position: absolute; bottom: 12px; right: 12px; width: 160px; height: 120px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border, #555); border-radius: 4px; overflow: hidden; z-index: 50; opacity: 0.85; display: none; cursor: crosshair; }
+#minimap-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
+#minimap-vp { position: absolute; border: 1.5px solid var(--vscode-focusBorder, #007fd4); background: rgba(0,127,212,0.12); pointer-events: none; }
 </style>
 <script>window.__PFDSL_DEBUG__ = ${isDebug};</script>
 </head>
 <body>
-<div id="root"><div id="inner"></div></div>
+<div id="root"><div id="inner"></div><div id="minimap"><div id="minimap-svg"></div><div id="minimap-vp"></div></div></div>
 <div id="tooltip"></div>
 <div id="diff-panel"></div>
 <script type="module" src="${scriptUri}"></script>

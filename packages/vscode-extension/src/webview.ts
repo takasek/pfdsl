@@ -118,6 +118,53 @@ root.addEventListener("mouseleave", () => {
 	tooltip.style.display = "none";
 });
 
+const MINIMAP_W = 160;
+const MINIMAP_H = 120;
+const minimap = document.getElementById("minimap") as HTMLDivElement;
+const minimapSvg = document.getElementById("minimap-svg") as HTMLDivElement;
+const minimapVp = document.getElementById("minimap-vp") as HTMLDivElement;
+let mmScale = 1;
+let svgNatW = 0;
+let svgNatH = 0;
+
+function updateMinimapVp() {
+	if (!svgNatW || !svgNatH) return;
+	const vx = (-panX / scale) * mmScale;
+	const vy = (-panY / scale) * mmScale;
+	const vw = (root.clientWidth / scale) * mmScale;
+	const vh = (root.clientHeight / scale) * mmScale;
+	minimapVp.style.left = `${vx}px`;
+	minimapVp.style.top = `${vy}px`;
+	minimapVp.style.width = `${vw}px`;
+	minimapVp.style.height = `${vh}px`;
+}
+
+function refreshMinimap() {
+	const svgEl = inner.querySelector("svg");
+	if (!svgEl) {
+		minimap.style.display = "none";
+		return;
+	}
+	svgNatW = inner.offsetWidth;
+	svgNatH = inner.offsetHeight;
+	if (!svgNatW || !svgNatH) {
+		minimap.style.display = "none";
+		return;
+	}
+	mmScale = Math.min(MINIMAP_W / svgNatW, MINIMAP_H / svgNatH);
+	const clone = svgEl.cloneNode(true) as SVGSVGElement;
+	const scaledW = svgNatW * mmScale;
+	const scaledH = svgNatH * mmScale;
+	clone.setAttribute("width", String(scaledW));
+	clone.setAttribute("height", String(scaledH));
+	clone.style.width = `${scaledW}px`;
+	clone.style.height = `${scaledH}px`;
+	minimapSvg.innerHTML = "";
+	minimapSvg.appendChild(clone);
+	minimap.style.display = "block";
+	updateMinimapVp();
+}
+
 let scale = 1;
 let panX = 0;
 let panY = 0;
@@ -129,6 +176,7 @@ let hasPositioned = false;
 function applyTransform() {
 	inner.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
 	inner.style.transformOrigin = "0 0";
+	updateMinimapVp();
 }
 
 function centerGraph() {
@@ -227,6 +275,16 @@ root.addEventListener("dblclick", (e) => {
 	requestAnimationFrame(() => centerGraph());
 });
 
+minimap.addEventListener("click", (e) => {
+	if (!svgNatW || !svgNatH) return;
+	const rect = minimap.getBoundingClientRect();
+	const gx = (e.clientX - rect.left) / mmScale;
+	const gy = (e.clientY - rect.top) / mmScale;
+	panX = root.clientWidth / 2 - gx * scale;
+	panY = root.clientHeight / 2 - gy * scale;
+	applyTransform();
+});
+
 const HTML_ESCAPES: Record<string, string> = {
 	"&": "&amp;",
 	"<": "&lt;",
@@ -286,10 +344,16 @@ window.addEventListener("message", async (event) => {
 				log("rAF fired, inner.offsetWidth:", inner.offsetWidth);
 				centerGraph();
 				if (focusNodeId) focusNode(focusNodeId);
+				refreshMinimap();
 			});
 		} else if (lastFocusedNodeId) {
 			requestAnimationFrame(() => {
 				if (lastFocusedNodeId) focusNode(lastFocusedNodeId);
+				refreshMinimap();
+			});
+		} else {
+			requestAnimationFrame(() => {
+				refreshMinimap();
 			});
 		}
 		if (currentDiff) renderDiffPanel(currentDiff);
