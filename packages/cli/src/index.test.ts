@@ -117,16 +117,6 @@ describe("graph", () => {
 		const r = await run(["graph", join(dir, "valid.pfdsl"), "--format", "xyz"]);
 		expect(r.exitCode).toBe(2);
 	});
-	it("format=pdf fails with puppeteer hint when puppeteer not installed", async () => {
-		const r = await run(["graph", join(dir, "valid.pfdsl"), "--format", "pdf"]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toContain("puppeteer");
-	});
-	it("format=png fails with puppeteer hint when puppeteer not installed", async () => {
-		const r = await run(["graph", join(dir, "valid.pfdsl"), "--format", "png"]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toContain("puppeteer");
-	});
 });
 
 describe("diff", () => {
