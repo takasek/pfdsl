@@ -30,11 +30,11 @@ PFD という概念だけから導ける手順。固有名詞ゼロ。
 
 汎用スキルは「ここに従え」とディスパッチするだけで、具体を持たない。宛先は移行後の最終形では `.pfdsl` の sibling `.md` companion（次節の規約で統一）。
 
-- **作業項目の一次情報と同期手段**: 「`roadmap.pfdsl` とその sibling `plan.md` に従え。一次情報の所在と同期手段は `plan.md` に書かれている」
+- **作業項目の一次情報と同期手段**: 「`roadmap.pfdsl` とその sibling `roadmap.md` に従え。一次情報の所在と同期手段は `roadmap.md` に書かれている」
 - **知見の振り分け**: 「実践・レビューで得た知見は記録先成果物へ振り分けよ。宛先候補 = `ecosystem.pfdsl` の知識系成果物（ノード）と、振り分け手続きは sibling `ecosystem.md`」
 - **終端ゲートの追加項目**: 汎用項目に、リポ固有チェック（issue クローズ等）を合成する。固有項目の出所は対応する `.md` companion
 
-注: 移行前の現状は規約散文が `roadmap.pfdsl` frontmatter description に同居している。移行（後述 §3）でこれを `plan.md` へ移し、description はノード事実に絞る。L2 のディスパッチ先は移行後の最終形（`.md` companion）で記述する。
+注: 移行前の現状は規約散文が `roadmap.pfdsl` frontmatter description に同居している。移行（後述 §3）でこれを `roadmap.md` へ移し、description はノード事実に絞る。L2 のディスパッチ先は移行後の最終形（`.md` companion）で記述する。
 
 ### L3: バックエンド・プリセット（汎用ではないがベストプラクティスとして配布可能）
 
@@ -53,16 +53,16 @@ PFD という概念だけから導ける手順。固有名詞ゼロ。
 - ADR 改訂規約 / review-prompts.md
 - 学習ループのラウンド比較・残存ミスの lint 要件送り（ツールチェーン開発固有）
 - implementation_flow ロードマップ
-- L3 のインスタンス化（採用バックエンド = GitHub、監査スクリプトの実パス、リポ URL）— `plan.md` がこの L4 ホスト
+- L3 のインスタンス化（採用バックエンド = GitHub、監査スクリプトの実パス、リポ URL）— `roadmap.md` がこの L4 ホスト
 
-L4 のホストは2つに分かれる。ノード単体の同一性事実（パス・直接の producer/consumer）は `.pfdsl` の `description` に1行で残す。複数ノードをまたぐ手続き・根拠・プロトコル（学習ループ、知見振り分け、ゲート項目の根拠、L3 インスタンス化）は、後述の `.md` companion に置く。`plan.md` / `ecosystem.md` の中身はいずれも L4（リポ固有）。
+L4 のホストは2つに分かれる。ノード単体の同一性事実（パス・直接の producer/consumer）は `.pfdsl` の `description` に1行で残す。複数ノードをまたぐ手続き・根拠・プロトコル（学習ループ、知見振り分け、ゲート項目の根拠、L3 インスタンス化）は、後述の `.md` companion に置く。`roadmap.md` / `ecosystem.md` の中身はいずれも L4（リポ固有）。
 
 ### `.md` companion 規約
 
 companion の**機構**（仕組み）は L2 に属し SKILL.md に記載、companion の**中身**は L4（リポ固有）に属す — この2層を混同しないこと。各運用 `.pfdsl` ファイルに、同名 sibling の Markdown を任意で対にできる。
 
 - `ecosystem.pfdsl` ↔ `ecosystem.md`: グラフが運べない散文（学習ループ手続き、知見振り分けプロトコル、終端ゲートの根拠）
-- `roadmap.pfdsl` ↔ `plan.md`: このリポの issue 管理バインディング（採用バックエンド、監査スクリプトの実パス、L3 reference へのポインタ）
+- `roadmap.pfdsl` ↔ `roadmap.md`: このリポの issue 管理バインディング（採用バックエンド、監査スクリプトの実パス、L3 reference へのポインタ）
 
 境界規則:
 - `.pfdsl` description = ノード単体の同一性。何で・どこにあり・直接の producer/consumer。1行の事実
@@ -89,23 +89,23 @@ companion の**機構**（仕組み）は L2 に属し SKILL.md に記載、comp
 これは移行後の想定形であり、現状のパスとは異なる。スクリプトは現在 `scripts/audit-issues-flow.mjs` + `scripts/lib/`（`issues-flow-audit.mjs`, `yaml-require.mjs`, `issues-flow-audit.test.mjs`）にある。
 
 **先送り事項（実装計画で詰める）**:
-- 原本の置き場: リポ `scripts/` 残置 + 配布時コピー vs スキル `scripts/` へ移動。lib 依存とこのリポ内パス参照（roadmap.pfdsl / plan.md など）への影響を見て決める
+- 原本の置き場: リポ `scripts/` 残置 + 配布時コピー vs スキル `scripts/` へ移動。lib 依存とこのリポ内パス参照（roadmap.pfdsl / roadmap.md など）への影響を見て決める
 - テスト `issues-flow-audit.test.mjs` の扱い: 配布物に同梱 / 除外 / スキル外（リポ `scripts/`）に残置のいずれか
 
 ## このリポの移行
 
 移行は終端監査ルール（消費者を書けない成果物は作らない）を順序で守る — `.md` 成果物の登録を、その新設より先に行う。
 
-1. **成果物登録を先行**: `ecosystem.md` / `plan.md` を `ecosystem.pfdsl` に artifact 登録する（consumer = pfd-ops skill が読む。producer = 対応する `.pfdsl` を整備する process）。登録を済ませてから以降の新設に進む
+1. **成果物登録を先行**: `ecosystem.md` / `roadmap.md` を `ecosystem.pfdsl` に artifact 登録する（consumer = pfd-ops skill が読む。producer = 対応する `.pfdsl` を整備する process）。登録を済ませてから以降の新設に進む
 2. **現 SKILL.md の固有事項を棚卸し**し、移転先と移転する具体内容を確定する。現 SKILL.md の記述を正本とし、移転先 description が現状その内容を持っていない場合は description も更新する（「既出」と仮定しない）:
    - payoff_log 追記条件（日付・局面・効果・参照の形式、効果体感時に追記）→ 運用手続きとして `ecosystem.md`。`payoff_log` description（ecosystem.pfdsl:84）は現状「効果を体感した時に追記」までで形式に言及がないため、必要なら1行追補
    - 品質ガイド改訂経路（知見・ADR を品質ガイドのどこへ反映するか）→ 手続きは `ecosystem.md`。`skill_template`(:38) / `maintain_template`(:154) description はプロセス定義のみで経路の手続きを持たないため、ノード事実は description・流れは `ecosystem.md` に分離
    - 学習ループ（ラウンド比較・残存ミス→lint 要件送り）→ `ecosystem.md`（ADR-0006「ルール＋ツールの二層構造」を根拠参照）
    - 知見振り分けプロトコル（3経路の運用手順）→ `ecosystem.md`
-   - 終端ゲートの issue 固有項目（issue クローズ等）→ `plan.md`（L3 reference を指す）
+   - 終端ゲートの issue 固有項目（issue クローズ等）→ `roadmap.md`（L3 reference を指す）
 3. `ecosystem.md` を新設。手順2で `ecosystem.md` 行きとした手続き知を集約。グラフと対になる散文ホスト
-4. `plan.md` を新設。このリポの issue 管理バインディング（採用バックエンド = GitHub、監査スクリプト実パス、L3 reference へのポインタ）。現 `roadmap.pfdsl` frontmatter の規約散文をここへ移し、description はノード事実に絞る
-5. L3 規約を `references/github-issues-backend.md` に新設。現 SKILL.md と `roadmap.pfdsl` description の issue 規約のうち**再利用可能な部分**（iN_ prefix・ラベル・close 降格・監査スクリプト運用・採用手順）をここへ集約。リポ固有のインスタンス値（実パス・URL）は `plan.md` 側
+4. `roadmap.md` を新設。このリポの issue 管理バインディング（採用バックエンド = GitHub、監査スクリプト実パス、L3 reference へのポインタ）。現 `roadmap.pfdsl` frontmatter の規約散文をここへ移し、description はノード事実に絞る
+5. L3 規約を `references/github-issues-backend.md` に新設。現 SKILL.md と `roadmap.pfdsl` description の issue 規約のうち**再利用可能な部分**（iN_ prefix・ラベル・close 降格・監査スクリプト運用・採用手順）をここへ集約。リポ固有のインスタンス値（実パス・URL）は `roadmap.md` 側
 6. SKILL.md を L1+L2 に縮約（手順2で移転先を確定した固有事項を削除し、L2 ディスパッチへ置換）
 7. `ecosystem.pfdsl` の `ops_skill` description を更新。現 description は `".claude/skills/pfd-ops/ と /pfd-cycle コマンド。…手書き（生成対象外）"`。更新案: 層構成（L1+L2 本文 / references の L3 / sibling `.md` companion）への言及を1行で加える形にし、ノード事実の粒度を保つ
 

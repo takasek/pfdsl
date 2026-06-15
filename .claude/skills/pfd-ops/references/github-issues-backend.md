@@ -1,6 +1,6 @@
 # GitHub Issues バックエンド（pfd-ops プリセット）
 
-PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有ではなく、採用したいリポが選べる再利用可能パターン。採用リポは `plan.md` でこのプリセットを指す。
+PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有ではなく、採用したいリポが選べる再利用可能パターン。採用リポは `roadmap.md` でこのプリセットを指す。
 
 ## 規約
 
@@ -41,4 +41,4 @@ PR マージ時に issue が自動 close されるには、PR 本文に `Closes 
    install/ 内ファイルと deployed コピーの identity は `check-pfd-ops-sync.yml` CI が自動検証する（設計根拠: ADR-0016）。
 3. GitHub に `flow:managed` / `flow:exempt` ラベルを作成する（`audit-issues-flow.mjs --fix` が未作成ラベルを自動生成する）
 4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、issue artifact に `iN_` prefix を付ける
-5. リポの `plan.md` で本プリセットを指し、リポ URL を記載する
+5. リポの `roadmap.md` で本プリセットを指し、リポ URL を記載する

@@ -1,4 +1,4 @@
-# plan.md — issue 管理バインディング（roadmap.pfdsl の companion）
+# roadmap.md — issue 管理バインディング（roadmap.pfdsl の companion）
 
 `roadmap.pfdsl` は issue 依存構造のみ管理する。issue の一次情報と同期手段はここに書く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
 
