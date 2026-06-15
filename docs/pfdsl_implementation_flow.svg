@@ -118,7 +118,7 @@
 <!-- cli_published -->
 <g id="node6" class="node">
 <title>cli_published</title>
-<g id="a_node6"><a xlink:title="CLI npm公開&#10;&#10;作業ブランチ worktree&#45;feat+cli&#45;publish で実装済み（tsup バンドル・tag push 起動の publish ワークフロー）。残: merge・NPM_TOKEN 設定・tag push。計画は同ブランチの docs/superpowers/plans/2026&#45;06&#45;07&#45;cli&#45;publish.md">
+<g id="a_node6"><a xlink:title="CLI npm公開&#10;&#10;@pfdsl/cli 0.0.4 を npm 公開済み。tag push 起動の GitHub Actions + Trusted Publishing (OIDC)。tsup でワークスペース依存をバンドル（@hpcc&#45;js/wasm のみ外部）。0.0.3 は起動時 &quot;Dynamic require of process&quot; エラーで broken → tsup.config.ts に createRequire banner 追加で修正（PR #24）">
 <polygon fill="lightgray" stroke="black" stroke-width="2" points="1052.74,-889.29 937.54,-889.29 937.54,-848.29 1052.74,-848.29 1052.74,-889.29"/>
 <text xml:space="preserve" text-anchor="middle" x="995.14" y="-871.99" font-family="Times,serif" font-size="14.00" fill="dimgray">cli_published</text>
 <text xml:space="preserve" text-anchor="middle" x="995.14" y="-855.49" font-family="Times,serif" font-size="14.00" fill="dimgray">CLI npm公開</text>
