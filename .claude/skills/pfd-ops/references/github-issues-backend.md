@@ -1,10 +1,10 @@
 # GitHub Issues バックエンド（pfd-ops プリセット）
 
-PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有ではなく、採用したいリポが選べる再利用可能パターン。採用リポは `plan.md` でこのプリセットを指す。
+PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有ではなく、採用したいリポが選べる再利用可能パターン。採用リポは `roadmap.md` でこのプリセットを指す。
 
 ## 規約
 
-- **一次情報**: GitHub issue 本体。`plan.pfdsl` は依存構造のみ管理する
+- **一次情報**: GitHub issue 本体。`roadmap.pfdsl` は依存構造のみ管理する
 - **id 規約**: issue 対応 artifact の id は `iN_` prefix（N = issue 番号）。`iN_` id はオープン issue のみ参照する
 - **ラベル**: 登録 issue は `flow:managed`、対象外は `flow:exempt`
 - **updated_at**: 同期時点の GitHub `updatedAt` スナップショット
@@ -23,13 +23,13 @@ Closes #<issue番号>
 
 ## 自動同期（flow-on-issue-close）
 
-issue が close されると `.github/workflows/flow-on-issue-close.yml` が起動し、`audit-issues-flow.mjs --fix` で `plan.pfdsl` を機械修復して PR を作成する。
+issue が close されると `.github/workflows/flow-on-issue-close.yml` が起動し、`audit-issues-flow.mjs --fix` で `roadmap.pfdsl` を機械修復して PR を作成する。
 
 PR マージ時に issue が自動 close されるには、PR 本文に `Closes #<issue番号>` を含める必要がある（「PR 本文規約」参照）。
 
 ## 同期監査
 
-`scripts/audit-issues-flow.mjs` が GitHub issues と `plan.pfdsl` の同期を機械監査する（ラベル・updatedAt・priority 突合）。`--fix` で機械的修復。
+`scripts/audit-issues-flow.mjs` が GitHub issues と `roadmap.pfdsl` の同期を機械監査する（ラベル・updatedAt・priority 突合）。`--fix` で機械的修復。
 
 ## 採用手順
 
@@ -40,5 +40,5 @@ PR マージ時に issue が自動 close されるには、PR 本文に `Closes 
    ```
    install/ 内ファイルと deployed コピーの identity は `check-pfd-ops-sync.yml` CI が自動検証する（設計根拠: ADR-0016）。
 3. GitHub に `flow:managed` / `flow:exempt` ラベルを作成する（`audit-issues-flow.mjs --fix` が未作成ラベルを自動生成する）
-4. `plan.pfdsl` を依存構造のみのグラフとして用意し、issue artifact に `iN_` prefix を付ける
-5. リポの `plan.md` で本プリセットを指し、リポ URL を記載する
+4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、issue artifact に `iN_` prefix を付ける
+5. リポの `roadmap.md` で本プリセットを指し、リポ URL を記載する

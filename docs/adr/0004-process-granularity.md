@@ -55,4 +55,4 @@
 ## References
 
 - `.claude/skills/pfdsl/SKILL.md`
-- `docs/issues_flow.pfdsl` (→ `.pfdsl/plan.pfdsl`)
+- `docs/issues_flow.pfdsl` (→ `.pfdsl/roadmap.pfdsl`)

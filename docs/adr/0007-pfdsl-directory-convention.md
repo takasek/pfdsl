@@ -13,13 +13,13 @@
 
 既約ディレクトリ `.pfdsl/` を PFD 置き場の規約とする。
 
-- **既約ファイル名**: `plan.pfdsl`（計画 PFD）、`ecosystem.pfdsl`（生態系 PFD）
+- **既約ファイル名**: `roadmap.pfdsl`（計画 PFD）、`ecosystem.pfdsl`（生態系 PFD）
 - 追加の `.pfdsl` ファイルはディレクトリ内に自由に併置できる
 - 将来のプロジェクト設定（共有プリセット #6）も `.pfdsl/config.yaml` に置く
 
 ## Rationale
 
-1. **運用スキルのプロジェクト非依存化**: pfd-ops スキルが「`.pfdsl/plan.pfdsl` を読め」と書けるようになり、リポジトリ固有のパスをハードコードする必要がなくなる。これはスキルのプラグイン配布（#11）の前提条件である。
+1. **運用スキルのプロジェクト非依存化**: pfd-ops スキルが「`.pfdsl/roadmap.pfdsl` を読め」と書けるようになり、リポジトリ固有のパスをハードコードする必要がなくなる。これはスキルのプラグイン配布（#11）の前提条件である。
 
 2. **設定置き場問題の同時解決**: #6 で検討している共有プリセット設定の置き場として `.pfdsl/config.yaml` を自然に確保できる。
 
@@ -31,7 +31,7 @@
 
 **本リポジトリの移行は2段階**:
 
-- `docs/issues_flow.pfdsl` → `.pfdsl/plan.pfdsl` および `docs/artifact_ecosystem.pfdsl` → `.pfdsl/ecosystem.pfdsl` は即座に移行可能。CLAUDE.md と pfd-ops スキルのパス記述を更新し、スキルをプロジェクト非依存化する。
+- `docs/issues_flow.pfdsl` → `.pfdsl/roadmap.pfdsl` および `docs/artifact_ecosystem.pfdsl` → `.pfdsl/ecosystem.pfdsl` は即座に移行可能。CLAUDE.md と pfd-ops スキルのパス記述を更新し、スキルをプロジェクト非依存化する。
 - `docs/pfdsl_implementation_flow.pfdsl` は `Makefile` および `gen-samples` が参照しているため、生成系再構成（#10）と同時に移行する。
 
 移行作業は issue #14 で管理する。

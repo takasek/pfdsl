@@ -1,7 +1,7 @@
 ---
 title: Issue 依存フロー（2026-06）
 description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue
-  管理規約・同期手段は sibling plan.md と pfd-ops スキルの references/github-issues-backend.md
+  管理規約・同期手段は sibling roadmap.md と pfd-ops スキルの references/github-issues-backend.md
   参照
 layout:
   direction: LR

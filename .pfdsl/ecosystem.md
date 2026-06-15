@@ -8,7 +8,7 @@
 
 1. **即時ルール化** — pfdsl スキルの品質ガイド改訂（`skill_template` artifact = scripts/gen-skill.mjs 内）。スキル改善は issue を通さず対話から直接行う（`maintain_template` プロセス）
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
-3. **作業項目** — issue 起票 + 依存グラフ更新（`plan.pfdsl`。手段は plan.md 参照）
+3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
 このリポが pfdsl スキルの上流であるため経路1（品質ガイド改訂）が成立する。配布先リポでは経路1は存在しない場合がある。
 
@@ -42,4 +42,4 @@ PFD の効果を体感した局面は `docs/pfd_payoff_log.md`（`payoff_log` ar
 
 ## 終端ゲートの根拠
 
-汎用ゲート項目（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、このリポでは issue 固有項目を合成する。issue 固有項目は `plan.md` を参照。
+汎用ゲート項目（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、このリポでは issue 固有項目を合成する。issue 固有項目は `roadmap.md` を参照。

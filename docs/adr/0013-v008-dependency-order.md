@@ -6,7 +6,7 @@
 ## Context
 
 spec v0.0.7 の策定中に、v0.0.8 候補（マルチファイル意味論: #5 階層 PFD、#6 共有プリセット）の
-スコープを決める必要が生じた。当初 plan.pfdsl では v0.0.7 に #5/#6 も含まれていたが、
+スコープを決める必要が生じた。当初 roadmap.pfdsl では v0.0.7 に #5/#6 も含まれていたが、
 設計複雑度と依存構造を踏まえて延期した。
 
 延期後の問題: マルチファイル仕様（i5/i6 提案 + multifile_policy）は
@@ -56,7 +56,7 @@ spec v0.0.8 の統合フェーズには着手できない。
 
 ## References
 
-- `.pfdsl/plan.pfdsl`（integrate_multifile フローライン）
+- `.pfdsl/roadmap.pfdsl`（integrate_multifile フローライン）
 - ADR-0010（変更ガバナンス経路設計）
 - issue #5（階層 PFD）、#6（共有プリセット）、#52（v0.0.7 実装）
 - `docs/spec/proposals/i13-location.md`（location: クロスファイル注記）
