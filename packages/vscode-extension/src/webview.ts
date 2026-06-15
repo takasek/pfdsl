@@ -152,9 +152,11 @@ function refreshMinimap() {
 		return;
 	}
 	mmScale = Math.min(MINIMAP_W / svgNatW, MINIMAP_H / svgNatH);
-	const clone = svgEl.cloneNode(true) as SVGSVGElement;
 	const scaledW = svgNatW * mmScale;
 	const scaledH = svgNatH * mmScale;
+	minimap.style.width = `${scaledW}px`;
+	minimap.style.height = `${scaledH}px`;
+	const clone = svgEl.cloneNode(true) as SVGSVGElement;
 	clone.setAttribute("width", String(scaledW));
 	clone.setAttribute("height", String(scaledH));
 	clone.style.width = `${scaledW}px`;
@@ -274,6 +276,20 @@ root.addEventListener("dblclick", (e) => {
 	panY = 0;
 	requestAnimationFrame(() => centerGraph());
 });
+
+minimap.addEventListener("mousedown", (e) => {
+	e.stopPropagation();
+});
+minimap.addEventListener("dblclick", (e) => {
+	e.stopPropagation();
+});
+minimap.addEventListener(
+	"wheel",
+	(e) => {
+		e.stopPropagation();
+	},
+	{ passive: true },
+);
 
 minimap.addEventListener("click", (e) => {
 	if (!svgNatW || !svgNatH) return;
