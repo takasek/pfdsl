@@ -285,5 +285,134 @@ export function validate(
 		}
 	}
 
+	// W002: status:done artifact without criteria
+	// V012: criteria on process
+	// V013: location on process
+	// V014: command on artifact
+	// V015: revises on process
+	const processMeta = fm?.process ?? {};
+	for (const [pid, meta] of Object.entries(processMeta)) {
+		if ((meta as Record<string, unknown>).criteria !== undefined) {
+			diagnostics.push({
+				severity: "error",
+				code: "V012",
+				message: `'criteria' is not allowed on process '${pid}'`,
+				range: zeroRange(),
+			});
+		}
+		if ((meta as Record<string, unknown>).location !== undefined) {
+			diagnostics.push({
+				severity: "error",
+				code: "V013",
+				message: `'location' is not allowed on process '${pid}'`,
+				range: zeroRange(),
+			});
+		}
+		if ((meta as Record<string, unknown>).revises !== undefined) {
+			diagnostics.push({
+				severity: "error",
+				code: "V015",
+				message: `'revises' is not allowed on process '${pid}'`,
+				range: zeroRange(),
+			});
+		}
+	}
+	for (const [aid, meta] of Object.entries(artifactMeta)) {
+		if (meta.status === "done" && meta.criteria === undefined) {
+			diagnostics.push({
+				severity: options?.strict ? "error" : "warning",
+				code: "W002",
+				message: `Artifact '${aid}' has status:done but no 'criteria' field`,
+				range: zeroRange(),
+			});
+		}
+		if ((meta as Record<string, unknown>).command !== undefined) {
+			diagnostics.push({
+				severity: "error",
+				code: "V014",
+				message: `'command' is not allowed on artifact '${aid}'`,
+				range: zeroRange(),
+			});
+		}
+	}
+
+	// V016: revises target not found
+	// V017: revises self-reference
+	// V018: revises branching (multiple artifacts revise same target)
+	// V019: revises cycle
+	const revisesTargets = new Map<string, string>(); // aid -> target
+	for (const [aid, meta] of Object.entries(artifactMeta)) {
+		const target = meta.revises;
+		if (target === undefined) continue;
+		if (target === aid) {
+			diagnostics.push({
+				severity: "error",
+				code: "V017",
+				message: `Artifact '${aid}' revises itself`,
+				range: zeroRange(),
+			});
+			continue;
+		}
+		if (artifactMeta[target] === undefined) {
+			diagnostics.push({
+				severity: "error",
+				code: "V016",
+				message: `'revises' target '${target}' of artifact '${aid}' not found in this file`,
+				range: zeroRange(),
+			});
+			continue;
+		}
+		revisesTargets.set(aid, target);
+	}
+
+	// V018: branching — multiple artifacts revise the same target
+	const revisedBy = new Map<string, string[]>();
+	for (const [aid, target] of revisesTargets) {
+		const arr = revisedBy.get(target) ?? [];
+		arr.push(aid);
+		revisedBy.set(target, arr);
+	}
+	for (const [target, revisors] of revisedBy) {
+		if (revisors.length > 1) {
+			diagnostics.push({
+				severity: "error",
+				code: "V018",
+				message: `Artifact '${target}' is revised by multiple artifacts: ${revisors.join(", ")}`,
+				range: zeroRange(),
+			});
+		}
+	}
+
+	// V019: cycle in revises chain
+	{
+		const color = new Map<string, "white" | "gray" | "black">();
+		for (const id of Object.keys(artifactMeta)) color.set(id, "white");
+		let cycleReported = false;
+		function dfsRevises(id: string): boolean {
+			if (color.get(id) === "gray") return true;
+			if (color.get(id) === "black") return false;
+			color.set(id, "gray");
+			const target = revisesTargets.get(id);
+			if (target !== undefined && dfsRevises(target)) {
+				if (!cycleReported) {
+					cycleReported = true;
+					diagnostics.push({
+						severity: "error",
+						code: "V019",
+						message: `Cycle detected in 'revises' chain involving '${id}'`,
+						range: zeroRange(),
+					});
+				}
+				color.set(id, "black");
+				return false;
+			}
+			color.set(id, "black");
+			return false;
+		}
+		for (const id of Object.keys(artifactMeta)) {
+			if (color.get(id) === "white") dfsRevises(id);
+		}
+	}
+
 	return diagnostics;
 }
