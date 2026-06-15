@@ -167,10 +167,21 @@ function refreshMinimap() {
 	updateMinimapVp();
 }
 
+function panToMinimapPoint(clientX: number, clientY: number) {
+	if (!svgNatW || !svgNatH) return;
+	const rect = minimap.getBoundingClientRect();
+	const gx = (clientX - rect.left) / mmScale;
+	const gy = (clientY - rect.top) / mmScale;
+	panX = root.clientWidth / 2 - gx * scale;
+	panY = root.clientHeight / 2 - gy * scale;
+	applyTransform();
+}
+
 let scale = 1;
 let panX = 0;
 let panY = 0;
 let dragging = false;
+let minimapDragging = false;
 let startX = 0;
 let startY = 0;
 let hasPositioned = false;
@@ -251,6 +262,10 @@ root.addEventListener("mousedown", (e) => {
 });
 
 window.addEventListener("mousemove", (e) => {
+	if (minimapDragging) {
+		panToMinimapPoint(e.clientX, e.clientY);
+		return;
+	}
 	if (!dragging) return;
 	panX = e.clientX - startX;
 	panY = e.clientY - startY;
@@ -259,6 +274,7 @@ window.addEventListener("mousemove", (e) => {
 
 window.addEventListener("mouseup", () => {
 	dragging = false;
+	minimapDragging = false;
 	root.style.cursor = "grab";
 });
 
@@ -279,6 +295,8 @@ root.addEventListener("dblclick", (e) => {
 
 minimap.addEventListener("mousedown", (e) => {
 	e.stopPropagation();
+	minimapDragging = true;
+	panToMinimapPoint(e.clientX, e.clientY);
 });
 minimap.addEventListener("dblclick", (e) => {
 	e.stopPropagation();
@@ -290,16 +308,6 @@ minimap.addEventListener(
 	},
 	{ passive: true },
 );
-
-minimap.addEventListener("click", (e) => {
-	if (!svgNatW || !svgNatH) return;
-	const rect = minimap.getBoundingClientRect();
-	const gx = (e.clientX - rect.left) / mmScale;
-	const gy = (e.clientY - rect.top) / mmScale;
-	panX = root.clientWidth / 2 - gx * scale;
-	panY = root.clientHeight / 2 - gy * scale;
-	applyTransform();
-});
 
 const HTML_ESCAPES: Record<string, string> = {
 	"&": "&amp;",
