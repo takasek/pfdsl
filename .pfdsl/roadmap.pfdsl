@@ -61,6 +61,7 @@ artifact:
   i17_graph_nav:
     label: "大規模図の閲覧支援 (#17)"
     status: todo
+    description: "設計未確定（issue 本文参照）。implement_graph_nav 着手前にどの機能（minimap / neighborhood focus / filter）を作るかをユーザーと合意すること。"
     updated_at: 2026-06-12T08:19:05Z
   i37_orphan_lint:
     label: "孤児process検出lint (#37)"
