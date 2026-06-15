@@ -104,7 +104,7 @@ artifact:
       #11"
   i63_adr_0015:
     label: "ADR-0015 install/パラダイム (#63)"
-    status: todo
+    status: wip
     updated_at: 2026-06-15T00:00:00Z
   criteria_spec:
     label: "合否基準仕様案 (#7)"
