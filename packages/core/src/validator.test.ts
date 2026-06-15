@@ -346,11 +346,33 @@ describe("validate", () => {
 			expect(codes("", fm)).toContain("V019");
 		});
 
+		it("reports all independent cycles, not just the first", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					a: { revises: "b" },
+					b: { revises: "a" },
+					c: { revises: "d" },
+					d: { revises: "c" },
+				},
+			};
+			const cs = codes("", fm);
+			expect(cs.filter((c) => c === "V019")).toHaveLength(2);
+		});
+
 		it("no V019 for acyclic revises chain", () => {
 			const fm: Frontmatter = {
 				artifact: { v3: { revises: "v2" }, v2: { revises: "v1" }, v1: {} },
 			};
 			expect(codes("", fm)).not.toContain("V019");
+		});
+	});
+
+	describe("V016: revises non-string value", () => {
+		it("errors when revises is a non-string type from YAML", () => {
+			const fm = {
+				artifact: { v2: { revises: 42 } },
+			} as unknown as Frontmatter;
+			expect(codes("v2 >> P -> B", fm)).toContain("V016");
 		});
 	});
 });

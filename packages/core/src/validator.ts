@@ -292,7 +292,8 @@ export function validate(
 	// V015: revises on process
 	const processMeta = fm?.process ?? {};
 	for (const [pid, meta] of Object.entries(processMeta)) {
-		if ((meta as Record<string, unknown>).criteria !== undefined) {
+		const m = meta as Record<string, unknown>;
+		if (m.criteria !== undefined) {
 			diagnostics.push({
 				severity: "error",
 				code: "V012",
@@ -300,7 +301,7 @@ export function validate(
 				range: zeroRange(),
 			});
 		}
-		if ((meta as Record<string, unknown>).location !== undefined) {
+		if (m.location !== undefined) {
 			diagnostics.push({
 				severity: "error",
 				code: "V013",
@@ -308,7 +309,7 @@ export function validate(
 				range: zeroRange(),
 			});
 		}
-		if ((meta as Record<string, unknown>).revises !== undefined) {
+		if (m.revises !== undefined) {
 			diagnostics.push({
 				severity: "error",
 				code: "V015",
@@ -342,8 +343,17 @@ export function validate(
 	// V019: revises cycle
 	const revisesTargets = new Map<string, string>(); // aid -> target
 	for (const [aid, meta] of Object.entries(artifactMeta)) {
-		const target = meta.revises;
-		if (target === undefined) continue;
+		const target = meta.revises as unknown;
+		if (target === undefined || target === null) continue;
+		if (typeof target !== "string") {
+			diagnostics.push({
+				severity: "error",
+				code: "V016",
+				message: `'revises' on artifact '${aid}' must be a string, got ${typeof target}`,
+				range: zeroRange(),
+			});
+			continue;
+		}
 		if (target === aid) {
 			diagnostics.push({
 				severity: "error",
@@ -387,22 +397,18 @@ export function validate(
 	{
 		const color = new Map<string, "white" | "gray" | "black">();
 		for (const id of Object.keys(artifactMeta)) color.set(id, "white");
-		let cycleReported = false;
 		function dfsRevises(id: string): boolean {
 			if (color.get(id) === "gray") return true;
 			if (color.get(id) === "black") return false;
 			color.set(id, "gray");
 			const target = revisesTargets.get(id);
 			if (target !== undefined && dfsRevises(target)) {
-				if (!cycleReported) {
-					cycleReported = true;
-					diagnostics.push({
-						severity: "error",
-						code: "V019",
-						message: `Cycle detected in 'revises' chain involving '${id}'`,
-						range: zeroRange(),
-					});
-				}
+				diagnostics.push({
+					severity: "error",
+					code: "V019",
+					message: `Cycle detected in 'revises' chain involving '${id}'`,
+					range: zeroRange(),
+				});
 				color.set(id, "black");
 				return false;
 			}
