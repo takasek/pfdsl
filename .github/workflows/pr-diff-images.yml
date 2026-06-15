@@ -34,7 +34,7 @@ jobs:
 
       - name: Install @pfdsl/cli
         if: steps.changed.outputs.files != ''
-        run: npm install -g @pfdsl/cli@0.0.4
+        run: npm install -g @pfdsl/cli
 
       - name: Generate before/after SVGs
         id: generate
