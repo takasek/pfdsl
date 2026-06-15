@@ -21,6 +21,14 @@
 	"dependencies": {
 		"@hpcc-js/wasm": "^2.18.0"
 	},
+	"peerDependencies": {
+		"puppeteer": ">=20.0.0"
+	},
+	"peerDependenciesMeta": {
+		"puppeteer": {
+			"optional": true
+		}
+	},
 	"files": [
 		"dist"
 	],

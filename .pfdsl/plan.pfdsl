@@ -68,6 +68,11 @@ artifact:
     description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
       要件経路、dogfood #16 由来）"
     updated_at: 2026-06-14T14:00:45Z
+  i72_pdf_png_export:
+    label: "PDF/PNG エクスポート (#72)"
+    status: wip
+    description: "pfdsl graph --format pdf|png。Puppeteer optional peer dep 経由で SVG → PDF/PNG 変換"
+    updated_at: 2026-06-15T00:00:00Z
   i3_obsidian_plugin:
     label: "Obsidian プラグイン (#3)"
     status: todo
@@ -137,6 +142,8 @@ process:
     label: 孤児検出lint実装
   layer_audit_assets:
     label: L3資産階層化
+  implement_pdf_png_export:
+    label: PDF/PNGエクスポート実装
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -188,5 +195,7 @@ cli_tool >> implement_graph_nav -> i17_graph_nav
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 cli_tool >> implement_orphan_lint -> i37_orphan_lint
+
+cli_tool >> implement_pdf_png_export -> i72_pdf_png_export
 
 
