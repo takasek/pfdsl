@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Generates the pfdsl Claude skill to a target directory.
 // Run: node scripts/gen-skill.mjs --out .claude/skills/pfdsl
-// The --out path must contain '.claude/' (safety check).
+// The --out path must contain '.claude/' or 'skills/' (safety check).
 
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -21,8 +21,9 @@ if (outIdx === -1 || !process.argv[outIdx + 1] || process.argv[outIdx + 1].start
 
 const outDir = resolve(process.cwd(), process.argv[outIdx + 1]);
 
-if (!outDir.split(/[\\/]/).includes(".claude")) {
-  console.error(`Error: output path must contain a '.claude' directory component — got: ${outDir}`);
+const parts = outDir.split(/[\\/]/);
+if (!parts.includes(".claude") && !parts.includes("skills")) {
+  console.error(`Error: output path must contain a '.claude' or 'skills' directory component — got: ${outDir}`);
   console.error("This check prevents accidentally writing to the wrong location.");
   process.exit(1);
 }

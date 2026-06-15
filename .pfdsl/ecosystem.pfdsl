@@ -40,17 +40,17 @@ artifact:
     label: スキルテンプレート
     status: done
     group: generation
-    description: "scripts/gen-skill.mjs 内（#10 で Markdown 分離予定）。品質ガイドの正本。知見・ADR の反映先"
+    description: "scripts/skill-template/SKILL.md。品質ガイドの正本。知見・ADR の反映先。gen-skill.mjs がこれを読み込んで skill と gh_skill_dist を生成する"
   feature_samples:
     label: 機能カタログ
     status: done
     group: generation
     description: "docs/samples/。1機能1ファイルの最小例。skill の references/samples.md の生成元"
   skill:
-    label: AI agent スキル
+    label: AI agent スキル（リポ内）
     status: done
     group: generation
-    description: ".claude/skills/pfdsl/。make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点"
+    description: ".claude/skills/pfdsl/。make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点（このリポ内の Claude Code が消費）"
   user_intent:
     label: ユーザーの関心・意図
     group: dialogue
@@ -117,6 +117,11 @@ artifact:
     status: done
     group: release
     description: "@pfdsl/cli（npm）。外部利用者向け配布物。toolchain の CLI 部分が変更されたら公開が必要 — v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC、公開作業は自動化済み）"
+  gh_skill_dist:
+    label: gh skill 配布スキル
+    status: done
+    group: release
+    description: "skills/pfdsl/（リポ内追跡ファイル）。gh skill install takasek/pfdsl/pfdsl --agent claude-code で外部ユーザーが ~/.claude/skills/pfdsl/ に展開する。make gen-skill で再生成（.claude/skills/pfdsl/ と常に同一内容 — diff -rq で保証）"
   pull_request:
     label: Pull Request
     group: planning
@@ -268,7 +273,7 @@ spec >> maintain_samples -> feature_samples
 
 [findings, adrs] >>? maintain_template
 
-[spec, skill_template, feature_samples, review_prompts] >> gen_skill -> skill
+[spec, skill_template, feature_samples, review_prompts] >> gen_skill -> [skill, gh_skill_dist]
 
 topics >> write_examples -> examples
 
@@ -304,4 +309,4 @@ toolchain >> publish_cli -> published_cli
 
 [feature_samples, impl_flow, toolchain] >> render_previews -> sample_previews
 
-[toolchain, published_cli] >> update_readme -> readme
+[toolchain, published_cli, gh_skill_dist] >> update_readme -> readme

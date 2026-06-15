@@ -31,6 +31,7 @@ build-deps:
 	pnpm --filter @pfdsl/graphviz-exporter build
 	pnpm --filter @pfdsl/metadata-exporter build
 	pnpm --filter @pfdsl/preview-engine build
+	pnpm --filter @pfdsl/cli build
 
 .PHONY: vscode-build
 vscode-build: build-deps
@@ -69,17 +70,28 @@ check-docs:
 .PHONY: gen-skill
 gen-skill: check-docs
 	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
+	node scripts/gen-skill.mjs --out skills/pfdsl
+	@diff -rq .claude/skills/pfdsl skills/pfdsl > /dev/null || (echo "ERROR: .claude/skills/pfdsl and skills/pfdsl differ after gen-skill" && exit 1)
+
+.PHONY: install-skill
+install-skill: check-docs
+	node scripts/gen-skill.mjs --out "$(HOME)/.claude/skills/pfdsl"
 
 .PHONY: push
 push: check-docs
-	@if ! git diff --quiet HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills; then \
-		echo "docs/samples, docs/examples, docs/pfdsl_implementation_flow.pfdsl, または .claude/skills に差分があります。コミットしてから push してください。"; \
-		git diff --stat HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills; \
+	@if ! git diff --quiet HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills skills; then \
+		echo "docs/samples, docs/examples, docs/pfdsl_implementation_flow.pfdsl, .claude/skills, または skills に差分があります。コミットしてから push してください。"; \
+		git diff --stat HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills skills; \
 		exit 1; \
 	fi
 	$(MAKE) gen-samples
 	@if ! git diff --quiet HEAD -- docs/samples; then \
 		echo "gen-samples で docs/samples が更新されました。自動コミットします。"; \
 		git add docs/samples docs/pfdsl_implementation_flow.* && git commit -m "chore: regenerate docs/samples"; \
+	fi
+	$(MAKE) gen-skill
+	@if ! git diff --quiet HEAD -- .claude/skills skills; then \
+		echo "gen-skill でスキルが更新されました。自動コミットします。"; \
+		git add .claude/skills skills && git commit -m "chore: regenerate skills"; \
 	fi
 	git push
