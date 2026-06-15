@@ -16,6 +16,7 @@ export interface CommandResult {
 	stdout: string;
 	stderr: string;
 	exitCode: number;
+	binaryOutput?: Buffer;
 }
 
 function ok(stdout = "", stderr = ""): CommandResult {
@@ -118,8 +119,66 @@ export function runNormalize(file: string): CommandResult {
 	return ok(formatEdges(sortEdges(edges, graph)));
 }
 
+type BinaryFormat = "pdf" | "png";
+export type CliRenderFormat = RenderFormat | BinaryFormat;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyPuppeteer = any;
+
+async function svgToBinary(svg: string, format: BinaryFormat): Promise<Buffer> {
+	let puppeteer: AnyPuppeteer;
+	try {
+		// @ts-expect-error - optional peer dependency, may not be installed
+		puppeteer = await import("puppeteer");
+	} catch {
+		throw new Error(
+			`PDF/PNG export requires puppeteer. Install it with:\n  npm install puppeteer`,
+		);
+	}
+	const viewBoxMatch = svg.match(/viewBox="([^"]+)"/);
+	let width = 1200;
+	let height = 800;
+	if (viewBoxMatch) {
+		const parts = viewBoxMatch[1]!.split(/\s+/).map(Number);
+		width = parts[2] ?? width;
+		height = parts[3] ?? height;
+	}
+	const browser = await puppeteer.default.launch({
+		headless: true,
+		args: ["--no-sandbox", "--disable-setuid-sandbox"],
+	});
+	try {
+		const page = await browser.newPage();
+		await page.setViewport({
+			width: Math.ceil(width),
+			height: Math.ceil(height),
+			deviceScaleFactor: 1,
+		});
+		await page.setContent(
+			`<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${width}px;height:${height}px;overflow:hidden}svg{display:block;width:${width}px;height:${height}px}</style></head><body>${svg}</body></html>`,
+			{ waitUntil: "networkidle0" },
+		);
+		if (format === "pdf") {
+			return Buffer.from(
+				await page.pdf({
+					width: `${width}px`,
+					height: `${height}px`,
+					printBackground: true,
+					margin: { top: 0, right: 0, bottom: 0, left: 0 },
+					pageRanges: "1",
+				}),
+			);
+		}
+		return Buffer.from(
+			await page.screenshot({ type: "png", omitBackground: false }),
+		);
+	} finally {
+		await browser.close();
+	}
+}
+
 export interface GraphOptions {
-	format?: RenderFormat;
+	format?: CliRenderFormat;
 }
 export async function runGraph(
 	file: string,
@@ -129,6 +188,15 @@ export async function runGraph(
 	const { graph, frontmatter, diagnostics } = analyze(readSource(file));
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
+	if (fmt === "pdf" || fmt === "png") {
+		const svg = await renderGraph(graph, frontmatter, { format: "svg" });
+		try {
+			const buf = await svgToBinary(svg, fmt);
+			return { stdout: "", stderr: "", exitCode: 0, binaryOutput: buf };
+		} catch (e) {
+			return fail(e instanceof Error ? `${e.message}\n` : String(e));
+		}
+	}
 	const out = await renderGraph(graph, frontmatter, { format: fmt });
 	return ok(out.endsWith("\n") ? out : `${out}\n`);
 }
@@ -172,8 +240,9 @@ Commands:
   fmt <file> [--write] [--mode flat|flows]
                            Format a .pfdsl file; flows groups per-process (A >> P -> B)
   normalize <file>         Print canonical edge list
-  graph <file> [--format dot|svg]
-                           Print Graphviz DOT (default) or SVG
+  graph <file> [--format dot|svg|pdf|png]
+                           Print Graphviz DOT (default), SVG, PDF, or PNG
+                           PDF/PNG requires: npm install puppeteer
   diff <a> <b>             Print structural diff between two files
   help                     Show this help
 `;
@@ -245,12 +314,22 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 		}
 		case "graph": {
 			const f = positional[0];
-			if (!f) return fail("usage: pfdsl graph <file> [--format dot|svg]\n", 2);
+			if (!f)
+				return fail(
+					"usage: pfdsl graph <file> [--format dot|svg|pdf|png]\n",
+					2,
+				);
 			const fmt = flags.format;
-			if (fmt !== undefined && fmt !== "dot" && fmt !== "svg") {
+			if (
+				fmt !== undefined &&
+				fmt !== "dot" &&
+				fmt !== "svg" &&
+				fmt !== "pdf" &&
+				fmt !== "png"
+			) {
 				return fail(`unknown format: ${String(fmt)}\n`, 2);
 			}
-			return runGraph(f, fmt ? { format: fmt } : {});
+			return runGraph(f, fmt ? { format: fmt as CliRenderFormat } : {});
 		}
 		case "diff": {
 			const [a, b] = positional;
