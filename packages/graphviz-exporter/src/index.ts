@@ -220,6 +220,24 @@ function calcMinWidth(label: string): number | undefined {
 	return Math.max(0.75, maxUnits * 0.1 + 0.3);
 }
 
+function darkenHex(color: string, factor = 0.7): string | undefined {
+	const m6 = /^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/.exec(color);
+	if (m6) {
+		const r = Math.round(parseInt(m6[1]!, 16) * factor);
+		const g = Math.round(parseInt(m6[2]!, 16) * factor);
+		const b = Math.round(parseInt(m6[3]!, 16) * factor);
+		return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+	}
+	const m3 = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/.exec(color);
+	if (m3) {
+		const r = Math.round(parseInt(m3[1]! + m3[1]!, 16) * factor);
+		const g = Math.round(parseInt(m3[2]! + m3[2]!, 16) * factor);
+		const b = Math.round(parseInt(m3[3]! + m3[3]!, 16) * factor);
+		return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+	}
+	return undefined;
+}
+
 export function exportDot(
 	graph: Graph,
 	frontmatter: Frontmatter | null = null,
@@ -280,8 +298,13 @@ export function exportDot(
 		lines.push(`  subgraph cluster_${gid} {`);
 		if (gm.label !== undefined)
 			lines.push(`    label=${quote(String(gm.label))};`);
-		if (gm.color !== undefined)
-			lines.push(`    color=${quote(String(gm.color))};`);
+		if (gm.color !== undefined) {
+			const fillColor = String(gm.color);
+			const strokeColor = darkenHex(fillColor) ?? fillColor;
+			lines.push(`    color=${quote(strokeColor)};`);
+			lines.push(`    style="filled";`);
+			lines.push(`    fillcolor=${quote(fillColor)};`);
+		}
 		for (const id of groupedNodes.get(gid)!) {
 			lines.push(
 				`    ${quote(id)} ${nodeAttrs(id, graph.nodes.get(id)!, frontmatter, boundaryArtifacts)};`,

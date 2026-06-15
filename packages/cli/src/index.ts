@@ -128,8 +128,8 @@ type AnyPuppeteer = any;
 async function svgToBinary(svg: string, format: BinaryFormat): Promise<Buffer> {
 	let puppeteer: AnyPuppeteer;
 	try {
-		// @ts-expect-error - optional peer dependency, may not be installed
-		puppeteer = await import("puppeteer");
+		const dep = "puppeteer";
+		puppeteer = await import(dep);
 	} catch {
 		throw new Error(
 			`PDF/PNG export requires puppeteer. Install it with:\n  npm install puppeteer`,

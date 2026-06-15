@@ -377,6 +377,8 @@ raw_data >> ingest -> processed
 			  subgraph cluster_g1 {
 			    label="Data Ingestion";
 			    color="lightblue";
+			    style="filled";
+			    fillcolor="lightblue";
 			    "ingest" [shape=ellipse, label="ingest"];
 			    "processed" [shape=box, label="processed", penwidth="2"];
 			    "raw_data" [shape=box, label="raw_data", penwidth="2"];
@@ -452,6 +454,98 @@ a >> P -> b
 		const { graph, frontmatter } = buildFromSource(src);
 		const dot = exportDot(graph, frontmatter);
 		expect(dot).toContain('color="#ff0000";');
+	});
+
+	it("emits style=filled and fillcolor matching color when group has color", () => {
+		const src = `---
+group:
+  g1:
+    color: lightblue
+artifact:
+  a:
+    group: g1
+process:
+  P: {}
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		const clusterBlock = dot.slice(
+			dot.indexOf("subgraph cluster_g1 {"),
+			dot.indexOf("  }") + 3,
+		);
+		expect(clusterBlock).toContain('style="filled";');
+		expect(clusterBlock).toContain('fillcolor="lightblue";');
+	});
+
+	it("darkens hex stroke color while keeping original as fillcolor", () => {
+		const src = `---
+group:
+  g1:
+    color: "#ff0000"
+artifact:
+  a:
+    group: g1
+process:
+  P: {}
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		const clusterBlock = dot.slice(
+			dot.indexOf("subgraph cluster_g1 {"),
+			dot.indexOf("  }") + 3,
+		);
+		// stroke: #ff0000 * 0.7 → #b30000
+		expect(clusterBlock).toContain('color="#b30000";');
+		expect(clusterBlock).toContain('fillcolor="#ff0000";');
+	});
+
+	it("keeps same named color for stroke and fill when hex parsing is not applicable", () => {
+		const src = `---
+group:
+  g1:
+    color: lightblue
+artifact:
+  a:
+    group: g1
+process:
+  P: {}
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		const clusterBlock = dot.slice(
+			dot.indexOf("subgraph cluster_g1 {"),
+			dot.indexOf("  }") + 3,
+		);
+		expect(clusterBlock).toContain('color="lightblue";');
+		expect(clusterBlock).toContain('fillcolor="lightblue";');
+	});
+
+	it("does not emit style or fillcolor when group has no color", () => {
+		const src = `---
+group:
+  g1: {}
+artifact:
+  a:
+    group: g1
+process:
+  P: {}
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		const clusterBlock = dot.slice(
+			dot.indexOf("subgraph cluster_g1 {"),
+			dot.indexOf("  }") + 3,
+		);
+		expect(clusterBlock).not.toMatch(/^\s+style=/m);
+		expect(clusterBlock).not.toMatch(/^\s+fillcolor=/m);
 	});
 
 	it("node with group referencing undeclared group id is rendered flat without error", () => {
