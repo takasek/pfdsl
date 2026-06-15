@@ -1,9 +1,9 @@
-// Pure logic for auditing sync between GitHub issues and .pfdsl/plan.pfdsl.
+// Pure logic for auditing sync between GitHub issues and .pfdsl/roadmap.pfdsl.
 // Zero I/O. No imports.
 
 export const FLOW_LABELS = [
-	{ name: "flow:managed", description: "tracked in .pfdsl/plan.pfdsl" },
-	{ name: "flow:exempt", description: "intentionally out of .pfdsl/plan.pfdsl scope" },
+	{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" },
+	{ name: "flow:exempt", description: "intentionally out of .pfdsl/roadmap.pfdsl scope" },
 ];
 
 /**

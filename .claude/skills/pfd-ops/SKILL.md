@@ -17,7 +17,7 @@ description: |
 このスキルは固有名詞を持たない。運用対象と手段は次の規約で解決する:
 
 - 各運用 `.pfdsl` ファイルには、同名 sibling の Markdown companion が任意で対になる。`<file>.pfdsl` を扱うときは sibling `<file>.md` も読んで従う
-- **作業項目の一次情報と同期手段**: `plan.pfdsl` とその sibling `plan.md` に従う
+- **作業項目の一次情報と同期手段**: `roadmap.pfdsl` とその sibling `plan.md` に従う
 - **知見の振り分け先・運用手続き**: `ecosystem.pfdsl` の知識系成果物と、その sibling `ecosystem.md`
 - **issue バックエンド規約**: companion が指す references（例: `references/github-issues-backend.md`）
 - **Claude 向け指示の置き場**: 配布スキルに同梱すべき規約（PR 本文規約等）は `references/` に置く。project CLAUDE.md は採用リポ固有の非配布設定のみ、global CLAUDE.md は全リポ横断設定のみ。「採用リポの Claude にも届けたい」指示は references/ へ
@@ -36,7 +36,7 @@ description: |
 
 コンテキストのないセッションでも1サイクル回せる自己完結手順。範囲規則: **1サイクル = 1プロセス**。大きすぎる場合は粒度ルールで分割を計画 PFD に反映してから着手する。
 
-1. **選択**: まず `git fetch origin` でリモートの最新状態を取得する（サイクル開始時の判断はすべて origin の現状を前提にする）。**CI やツールが自動生成した PR が open のままであれば、新規作業より先にマージを確認する** — open のまま作業を始めると選択判断が stale な状態に基づく（どのような PR が自動生成されるかはリポ固有 — companion の plan.md に記載する）。次に運用対象の計画 PFD（`plan.pfdsl` とその他のロードマップ PFD。所在は sibling `.md` companion が定義）から、入力 artifact が全て done のプロセスを列挙。ユーザー指定があればそれを、なければ合流点を解放するもの（後続プロセスの最後の未完入力になっているもの）を優先して1つ選ぶ
+1. **選択**: まず `git fetch origin` でリモートの最新状態を取得する（サイクル開始時の判断はすべて origin の現状を前提にする）。**CI やツールが自動生成した PR が open のままであれば、新規作業より先にマージを確認する** — open のまま作業を始めると選択判断が stale な状態に基づく（どのような PR が自動生成されるかはリポ固有 — companion の plan.md に記載する）。次に運用対象の計画 PFD（`roadmap.pfdsl` とその他のロードマップ PFD。所在は sibling `.md` companion が定義）から、入力 artifact が全て done のプロセスを列挙。ユーザー指定があればそれを、なければ合流点を解放するもの（後続プロセスの最後の未完入力になっているもの）を優先して1つ選ぶ
 2. **実行**: 作業項目の一次情報は plan.md が指すバックエンド。ブランチを切って作業する（main 直コミットしない）。PFD の読み書きは pfdsl スキルの品質ガイドに従う。まとまった執筆・実装は subagent に委譲し、本体は指示と評価に専念する
 3. **反映 — 終端ゲート（全項目を明示的に確認。「該当なし」も判断として記録）**:
    - [ ] companion（plan.md 等）が定義するリポ固有の追加ゲート項目を確認した（**タイミング規約があれば以降の項目より優先**）

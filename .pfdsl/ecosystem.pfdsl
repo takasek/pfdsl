@@ -30,7 +30,7 @@ artifact:
     label: 言語仕様書
     status: done
     group: generation
-    description: "docs/spec/spec.md。一次情報だが不変の外部入力ではない — 実装知見からの仕様提案（issue 経由）で改訂される。改版の詳細依存は .pfdsl/plan.pfdsl 参照"
+    description: "docs/spec/spec.md。一次情報だが不変の外部入力ではない — 実装知見からの仕様提案（issue 経由）で改訂される。改版の詳細依存は .pfdsl/roadmap.pfdsl 参照"
   spec_proposals:
     label: spec 提案文書群
     status: done
@@ -101,7 +101,7 @@ artifact:
     label: issue 依存グラフ
     status: done
     group: planning
-    description: ".pfdsl/plan.pfdsl。着手可能順序の導出。issue 追加時に更新"
+    description: ".pfdsl/roadmap.pfdsl。着手可能順序の導出。issue 追加時に更新"
   impl_flow:
     label: 実装ロードマップ
     status: done
@@ -169,7 +169,7 @@ artifact:
     label: 計画 companion
     status: done
     group: planning
-    description: ".pfdsl/plan.md。plan.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd-ops skill が読む L4 ホスト"
+    description: ".pfdsl/roadmap.md。roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd-ops skill が読む L4 ホスト"
 
 process:
   distill_ops:

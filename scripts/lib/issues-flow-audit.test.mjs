@@ -524,21 +524,21 @@ process:
 
 describe("computeLabelFindings", () => {
 	const expected = [
-		{ name: "flow:managed", description: "tracked in .pfdsl/plan.pfdsl" },
-		{ name: "flow:exempt", description: "intentionally out of .pfdsl/plan.pfdsl scope" },
+		{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" },
+		{ name: "flow:exempt", description: "intentionally out of .pfdsl/roadmap.pfdsl scope" },
 	];
 
 	it("returns empty when all labels match", () => {
 		const actual = [
-			{ name: "flow:managed", description: "tracked in .pfdsl/plan.pfdsl" },
-			{ name: "flow:exempt", description: "intentionally out of .pfdsl/plan.pfdsl scope" },
+			{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" },
+			{ name: "flow:exempt", description: "intentionally out of .pfdsl/roadmap.pfdsl scope" },
 		];
 		assert.deepEqual(computeLabelFindings(expected, actual), []);
 	});
 
 	it("label_missing when label does not exist", () => {
 		const actual = [
-			{ name: "flow:managed", description: "tracked in .pfdsl/plan.pfdsl" },
+			{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" },
 		];
 		const findings = computeLabelFindings(expected, actual);
 		assert.equal(findings.length, 1);
@@ -550,20 +550,20 @@ describe("computeLabelFindings", () => {
 	it("label_description_mismatch when description is wrong", () => {
 		const actual = [
 			{ name: "flow:managed", description: "old description" },
-			{ name: "flow:exempt", description: "intentionally out of .pfdsl/plan.pfdsl scope" },
+			{ name: "flow:exempt", description: "intentionally out of .pfdsl/roadmap.pfdsl scope" },
 		];
 		const findings = computeLabelFindings(expected, actual);
 		assert.equal(findings.length, 1);
 		assert.equal(findings[0].type, "label_description_mismatch");
 		assert.equal(findings[0].name, "flow:managed");
-		assert.equal(findings[0].description, "tracked in .pfdsl/plan.pfdsl");
+		assert.equal(findings[0].description, "tracked in .pfdsl/roadmap.pfdsl");
 		assert.equal(findings[0].fixVia, "github");
 	});
 
 	it("ignores extra labels not in expected", () => {
 		const actual = [
-			{ name: "flow:managed", description: "tracked in .pfdsl/plan.pfdsl" },
-			{ name: "flow:exempt", description: "intentionally out of .pfdsl/plan.pfdsl scope" },
+			{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" },
+			{ name: "flow:exempt", description: "intentionally out of .pfdsl/roadmap.pfdsl scope" },
 			{ name: "bug", description: "Something isn't working" },
 		];
 		assert.deepEqual(computeLabelFindings(expected, actual), []);

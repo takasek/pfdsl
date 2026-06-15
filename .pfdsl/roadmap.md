@@ -1,6 +1,6 @@
-# plan.md — issue 管理バインディング（plan.pfdsl の companion）
+# plan.md — issue 管理バインディング（roadmap.pfdsl の companion）
 
-`plan.pfdsl` は issue 依存構造のみ管理する。issue の一次情報と同期手段はここに書く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
+`roadmap.pfdsl` は issue 依存構造のみ管理する。issue の一次情報と同期手段はここに書く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
 
 ## バックエンド
 
@@ -10,13 +10,13 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 - 一次情報: github.com/takasek/pfdsl/issues
 - 同期監査スクリプト: `scripts/audit-issues-flow.mjs`（`--fix` で機械的修復）
-- 監査対象: `.pfdsl/plan.pfdsl`
+- 監査対象: `.pfdsl/roadmap.pfdsl`
 
 ## 運用対象の計画 PFD
 
 ワークサイクルの選択ステップが列挙する対象:
 
-- `.pfdsl/plan.pfdsl` — オープン issue の依存グラフ
+- `.pfdsl/roadmap.pfdsl` — オープン issue の依存グラフ
 - `docs/pfdsl_implementation_flow.pfdsl` — ツールチェーン実装ロードマップ
 
 ## 自動生成 PR（ワークサイクル選択前に確認）
