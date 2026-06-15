@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->
+
 # PFDSL仕様書 v0.0.7
 
 ## 1. 目的
@@ -204,6 +206,10 @@ artifact:
 ```
 
 * 列挙値: done | wip | todo | blocked
+  * `todo` — 未着手（artifact 未生成）
+  * `wip` — 生産中（ブランチ・PR がオープン、artifact が部分的に存在する）
+  * `done` — 完了（artifact が main にマージ済み）
+  * `blocked` — 外部要因で着手不能
 * 1 Artifact につき 0 個または 1 個
 * 列挙外の値は error
 

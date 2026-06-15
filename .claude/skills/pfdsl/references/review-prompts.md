@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/review-prompts.md -->
+
 # PFD レビュープロンプト（A/B カタログ）
 
 任意の PFD を問い詰めるための監査観点。品質ガイドが「書くときのルール」、本カタログは「レビュー時の問い」。各問いは実際に検出された誤りに由来する。一次情報は本ファイル — pfdsl スキル（references/ に同梱）と pfd-retro スキル（ポインタ参照）の両方から使われる。
