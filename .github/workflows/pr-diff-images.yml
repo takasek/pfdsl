@@ -12,49 +12,60 @@ jobs:
   attach-diff-images:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    concurrency:
+      group: pr-diff-images
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Find changed .pfdsl files
         id: changed
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.merge_commit_sha }}"
-          FILES=$(git diff --name-only "$BASE" "$HEAD" -- '*.pfdsl' | paste -sd, -)
-          echo "files=$FILES" >> $GITHUB_OUTPUT
+          {
+            echo 'files<<PFDSL_EOF'
+            git diff --name-only "$BASE" "$HEAD" -- '*.pfdsl'
+            echo 'PFDSL_EOF'
+          } >> $GITHUB_OUTPUT
 
       - name: Install @pfdsl/cli
         if: steps.changed.outputs.files != ''
-        run: npm install -g @pfdsl/cli
+        run: npm install -g @pfdsl/cli@0.0.4
 
       - name: Generate before/after SVGs
+        id: generate
         if: steps.changed.outputs.files != ''
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           CHANGED_FILES: ${{ steps.changed.outputs.files }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: node scripts/generate-pr-diff-images.mjs generate
 
       - name: Commit SVG artifacts
-        if: steps.changed.outputs.files != ''
+        if: success() && steps.changed.outputs.files != ''
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/diagrams/
           if ! git diff --cached --quiet; then
             git commit -m "docs(diagrams): add pfdsl diff images for PR #${{ github.event.pull_request.number }} [skip ci]"
-            git push
+            git pull --rebase origin ${{ github.event.pull_request.base.ref }}
+            git push origin HEAD:${{ github.event.pull_request.base.ref }}
           fi
 
       - name: Update PR description
-        if: steps.changed.outputs.files != ''
+        if: success() && steps.changed.outputs.files != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           CHANGED_FILES: ${{ steps.changed.outputs.files }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: node scripts/generate-pr-diff-images.mjs update-pr

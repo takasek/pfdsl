@@ -11,13 +11,13 @@
 // Required env vars (both phases):
 //   BASE_SHA           — PR base commit SHA
 //   PR_NUMBER          — PR number
-//   CHANGED_FILES      — comma-separated list of changed .pfdsl file paths
+//   CHANGED_FILES      — newline-separated list of changed .pfdsl file paths
 //   GITHUB_REPOSITORY  — "owner/repo"
 //   GH_TOKEN           — GitHub token (phase 2 only)
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
@@ -32,7 +32,7 @@ if (mode !== "generate" && mode !== "update-pr") {
 
 const baseSha = process.env.BASE_SHA;
 const prNumber = process.env.PR_NUMBER;
-const changedFiles = (process.env.CHANGED_FILES ?? "").split(",").filter(Boolean);
+const changedFiles = (process.env.CHANGED_FILES ?? "").split("\n").filter(Boolean);
 const repo = process.env.GITHUB_REPOSITORY;
 
 if (!baseSha || !prNumber || changedFiles.length === 0 || !repo) {
@@ -41,7 +41,7 @@ if (!baseSha || !prNumber || changedFiles.length === 0 || !repo) {
 }
 
 function sanitizePath(filePath) {
-	return filePath.replace(/[\\/]/g, "__").replace(/\.pfdsl$/, "");
+	return filePath.replace(/\.pfdsl$/, "");
 }
 
 function renderSvg(filePath) {
@@ -71,7 +71,10 @@ if (mode === "generate") {
 
 	for (const file of changedFiles) {
 		const sanitized = sanitizePath(file);
-		const tmpFile = join(tmpdir(), `pfdsl-before-${Date.now()}.pfdsl`);
+		const svgDir = join(outDir, dirname(sanitized));
+		mkdirSync(svgDir, { recursive: true });
+		const stem = basename(sanitized);
+		const tmpFile = join(tmpdir(), `pfdsl-before-${stem}-${process.pid}.pfdsl`);
 
 		// Before SVG (base version)
 		const baseContent = getBaseContent(file);
@@ -79,7 +82,7 @@ if (mode === "generate") {
 			writeFileSync(tmpFile, baseContent, "utf-8");
 			try {
 				const svg = renderSvg(tmpFile);
-				writeFileSync(join(outDir, `${sanitized}.before.svg`), svg, "utf-8");
+				writeFileSync(join(svgDir, `${stem}.before.svg`), svg, "utf-8");
 			} finally {
 				try { unlinkSync(tmpFile); } catch { /* ignore */ }
 			}
@@ -89,7 +92,7 @@ if (mode === "generate") {
 		const headPath = join(root, file);
 		if (existsSync(headPath)) {
 			const svg = renderSvg(headPath);
-			writeFileSync(join(outDir, `${sanitized}.after.svg`), svg, "utf-8");
+			writeFileSync(join(svgDir, `${stem}.after.svg`), svg, "utf-8");
 		}
 	}
 
@@ -99,17 +102,21 @@ if (mode === "generate") {
 
 // ── Phase 2: update PR description ────────────────────────────────────────
 
-const rawBase = `https://raw.githubusercontent.com/${repo}/main/docs/diagrams/pr-${prNumber}`;
+const defaultBranch = process.env.DEFAULT_BRANCH ?? "main";
+const rawBase = `https://raw.githubusercontent.com/${repo}/${defaultBranch}/docs/diagrams/pr-${prNumber}`;
 
 const sections = changedFiles.map((file) => {
 	const sanitized = sanitizePath(file);
+	const stem = basename(sanitized);
+	const relDir = dirname(sanitized);
+	const rawDir = relDir === "." ? rawBase : `${rawBase}/${relDir}`;
 	const lines = [`### \`${file}\``];
 
 	if (existsSync(join(outDir, `${sanitized}.before.svg`))) {
-		lines.push(`**Before**\n![before](${rawBase}/${sanitized}.before.svg)`);
+		lines.push(`**Before**\n![before](${rawDir}/${stem}.before.svg)`);
 	}
 	if (existsSync(join(outDir, `${sanitized}.after.svg`))) {
-		lines.push(`**After**\n![after](${rawBase}/${sanitized}.after.svg)`);
+		lines.push(`**After**\n![after](${rawDir}/${stem}.after.svg)`);
 	}
 	return lines.join("\n\n");
 });
