@@ -34,7 +34,8 @@ mkdirSync(refsDir, { recursive: true });
 
 const specSrc = readFileSync(resolve(root, "docs/spec/spec.md"), "utf-8");
 const specVersion = specSrc.match(/^# PFDSL仕様書 (v[\d.]+)/m)?.[1] ?? "unknown";
-writeFileSync(resolve(refsDir, "spec.md"), specSrc);
+const specHeader = `<!-- DO NOT EDIT — generated from docs/spec/spec.md by \`make gen-skill\` -->\n\n`;
+writeFileSync(resolve(refsDir, "spec.md"), specHeader + specSrc);
 console.log("references/spec.md ← docs/spec/spec.md");
 
 // --- 1b. Copy review prompts ---

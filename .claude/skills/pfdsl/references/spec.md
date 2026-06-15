@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT — generated from docs/spec/spec.md by `make gen-skill` -->
+
 # PFDSL仕様書 v0.0.7
 
 ## 1. 目的
