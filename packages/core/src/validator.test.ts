@@ -218,4 +218,161 @@ describe("validate", () => {
 			expect(codes("a >> p -> b\nb >>? p")).not.toContain("V010");
 		});
 	});
+
+	describe("W002: status:done artifact without criteria", () => {
+		it("warns when done artifact has no criteria field", () => {
+			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const diags = diagnose("A >> P -> B", fm);
+			expect(diags.map((d) => d.code)).toContain("W002");
+		});
+
+		it("W002 severity is warning in non-strict mode", () => {
+			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const diags = diagnose("A >> P -> B", fm);
+			const w002 = diags.find((d) => d.code === "W002");
+			expect(w002?.severity).toBe("warning");
+		});
+
+		it("W002 becomes error in strict mode", () => {
+			const { tokens } = lex("A >> P -> B");
+			const { document } = parseTokens(tokens);
+			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const { edges, nodeKinds } = normalize(document, fm);
+			const diags = validate(edges, nodeKinds, fm, { strict: true });
+			const w002 = diags.find((d) => d.code === "W002");
+			expect(w002?.severity).toBe("error");
+		});
+
+		it("no W002 when done artifact has criteria", () => {
+			const fm: Frontmatter = {
+				artifact: { A: { status: "done", criteria: "approved by TL" } },
+			};
+			expect(codes("A >> P -> B", fm)).not.toContain("W002");
+		});
+
+		it("no W002 when artifact is not done", () => {
+			const fm: Frontmatter = { artifact: { A: { status: "wip" } } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W002");
+		});
+
+		it("no W002 when artifact has no status", () => {
+			const fm: Frontmatter = { artifact: { A: {} } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W002");
+		});
+	});
+
+	describe("V012: criteria on process", () => {
+		it("errors when criteria is set on a process", () => {
+			const fm = {
+				process: { P: { criteria: "must pass all tests" } },
+			} as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).toContain("V012");
+		});
+	});
+
+	describe("V013: location on process", () => {
+		it("errors when location is set on a process", () => {
+			const fm = {
+				process: { P: { location: "src/process.ts" } },
+			} as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).toContain("V013");
+		});
+	});
+
+	describe("V014: command on artifact", () => {
+		it("errors when command is set on an artifact", () => {
+			const fm = {
+				artifact: { A: { command: "make build" } },
+			} as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).toContain("V014");
+		});
+	});
+
+	describe("V015: revises on process", () => {
+		it("errors when revises is set on a process", () => {
+			const fm = {
+				process: { P: { revises: "old_proc" } },
+			} as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).toContain("V015");
+		});
+	});
+
+	describe("V016: revises target not found", () => {
+		it("errors when revises references a non-existent artifact id", () => {
+			const fm: Frontmatter = {
+				artifact: { v2: { revises: "v1" } },
+			};
+			expect(codes("v2 >> P -> B", fm)).toContain("V016");
+		});
+
+		it("no V016 when revises target exists", () => {
+			const fm: Frontmatter = {
+				artifact: { v2: { revises: "v1" }, v1: {} },
+			};
+			expect(codes("v2 >> P -> B", fm)).not.toContain("V016");
+		});
+	});
+
+	describe("V017: revises self-reference", () => {
+		it("errors when artifact revises itself", () => {
+			const fm: Frontmatter = {
+				artifact: { v1: { revises: "v1" } },
+			};
+			expect(codes("v1 >> P -> B", fm)).toContain("V017");
+		});
+	});
+
+	describe("V018: revises branching (multiple artifacts revise same target)", () => {
+		it("errors when two artifacts revise the same artifact", () => {
+			const fm: Frontmatter = {
+				artifact: { v2a: { revises: "v1" }, v2b: { revises: "v1" }, v1: {} },
+			};
+			expect(codes("v2a >> P -> B", fm)).toContain("V018");
+		});
+
+		it("no V018 for linear chain", () => {
+			const fm: Frontmatter = {
+				artifact: { v3: { revises: "v2" }, v2: { revises: "v1" }, v1: {} },
+			};
+			expect(codes("v3 >> P -> B", fm)).not.toContain("V018");
+		});
+	});
+
+	describe("V019: revises cycle", () => {
+		it("errors when revises chain forms a cycle", () => {
+			const fm: Frontmatter = {
+				artifact: { a: { revises: "b" }, b: { revises: "a" } },
+			};
+			expect(codes("", fm)).toContain("V019");
+		});
+
+		it("reports all independent cycles, not just the first", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					a: { revises: "b" },
+					b: { revises: "a" },
+					c: { revises: "d" },
+					d: { revises: "c" },
+				},
+			};
+			const cs = codes("", fm);
+			expect(cs.filter((c) => c === "V019")).toHaveLength(2);
+		});
+
+		it("no V019 for acyclic revises chain", () => {
+			const fm: Frontmatter = {
+				artifact: { v3: { revises: "v2" }, v2: { revises: "v1" }, v1: {} },
+			};
+			expect(codes("", fm)).not.toContain("V019");
+		});
+	});
+
+	describe("V016: revises non-string value", () => {
+		it("errors when revises is a non-string type from YAML", () => {
+			const fm = {
+				artifact: { v2: { revises: 42 } },
+			} as unknown as Frontmatter;
+			expect(codes("v2 >> P -> B", fm)).toContain("V016");
+		});
+	});
 });

@@ -1,4 +1,11 @@
-import type { Frontmatter, Graph, NodeKind, NodeStyle } from "@pfdsl/core";
+import type {
+	ArtifactMeta,
+	Frontmatter,
+	Graph,
+	NodeKind,
+	NodeStyle,
+	ProcessMeta,
+} from "@pfdsl/core";
 import { STYLE_ATTRS } from "@pfdsl/core";
 
 const MIN_WRAP_RATIO = 0.3;
@@ -317,6 +324,12 @@ function nodeAttrs(
 	const meta = lookupMeta(id, kind, fm);
 	const nodeLabel = meta?.label;
 	const description = meta?.description;
+	const ameta =
+		kind === "artifact" ? (meta as ArtifactMeta | undefined) : undefined;
+	const criteria = ameta?.criteria;
+	const location =
+		typeof ameta?.location === "string" ? ameta.location : undefined;
+	const revises = ameta?.revises;
 
 	const maxWidth =
 		typeof fm?.layout?.maxWidth === "number" ? fm.layout.maxWidth : undefined;
@@ -326,18 +339,27 @@ function nodeAttrs(
 
 	const wrappingOccurred = wrappedNodeLabel !== nodeLabel;
 	const originalLabel = nodeLabel ?? id;
-	const tooltip = description
-		? `${originalLabel}\n\n${description}`
-		: wrappingOccurred
-			? originalLabel
-			: undefined;
+
+	const tooltipParts: string[] = [originalLabel];
+	if (description) tooltipParts.push(`\n\n${description}`);
+	if (criteria) tooltipParts.push(`\ncriteria: ${criteria}`);
+	if (location) tooltipParts.push(`\nlocation: ${location}`);
+	if (revises) tooltipParts.push(`\nrevises: ${revises}`);
+	const tooltip =
+		tooltipParts.length > 1
+			? tooltipParts.join("")
+			: wrappingOccurred
+				? originalLabel
+				: undefined;
 
 	const styleAttrs = resolveStyleAttrs(id, kind, fm);
 	const xlabel = buildXlabel(id, kind, fm);
+	const isUrl = location?.includes("://");
 
 	const minWidth = calcMinWidth(label);
 	const attrs: string[] = [`shape=${shape}`, `label=${quote(label)}`];
 	if (tooltip !== undefined) attrs.push(`tooltip=${quote(tooltip)}`);
+	if (isUrl && location) attrs.push(`href=${quote(location)}`);
 	if (minWidth !== undefined) attrs.push(`width=${minWidth.toFixed(2)}`);
 	if (xlabel !== undefined) attrs.push(`xlabel=${quote(xlabel)}`);
 	for (const key of STYLE_ATTRS) {
@@ -393,7 +415,7 @@ function lookupMeta(
 	id: string,
 	kind: NodeKind,
 	fm: Frontmatter | null,
-): { label?: string; description?: string } | undefined {
+): ArtifactMeta | ProcessMeta | undefined {
 	if (!fm) return undefined;
 	return kind === "process" ? fm.process?.[id] : fm.artifact?.[id];
 }

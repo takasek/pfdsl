@@ -21,6 +21,9 @@ export interface ArtifactMeta {
 	status?: Status;
 	tags?: string[];
 	group?: string;
+	criteria?: string;
+	location?: string;
+	revises?: string;
 	[key: string]: unknown;
 }
 
@@ -29,6 +32,7 @@ export interface ProcessMeta {
 	description?: string;
 	owner?: string;
 	group?: string;
+	command?: string;
 	[key: string]: unknown;
 }
 

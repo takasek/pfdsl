@@ -641,6 +641,119 @@ spec >> P -> X
 		const dot = exportDot(graph, frontmatter);
 		expect(dot).toContain('tooltip="処理\\n\\n詳細"');
 	});
+
+	describe("location field", () => {
+		it("adds href when location is a URL", () => {
+			const src = `---
+artifact:
+  spec: { label: "仕様書", location: "https://example.com/spec" }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).toContain('href="https://example.com/spec"');
+		});
+
+		it("does not add href when location is a file path", () => {
+			const src = `---
+artifact:
+  spec: { label: "仕様書", location: "docs/spec.md" }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).not.toContain("href=");
+		});
+
+		it("does not crash when location is a non-string YAML value", () => {
+			const fm = {
+				artifact: { spec: { label: "仕様書", location: 42 } },
+			} as unknown as Parameters<typeof exportDot>[1];
+			const { graph } = buildFromSource("spec >> P -> X");
+			expect(() => exportDot(graph, fm)).not.toThrow();
+		});
+
+		it("includes location in tooltip after description", () => {
+			const src = `---
+artifact:
+  spec: { label: "仕様書", description: "詳細", location: "docs/spec.md" }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).toContain("docs/spec.md");
+			expect(dot).toContain("詳細");
+		});
+
+		it("includes location in tooltip when no description", () => {
+			const src = `---
+artifact:
+  spec: { label: "仕様書", location: "docs/spec.md" }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).toContain("docs/spec.md");
+		});
+	});
+
+	describe("criteria field", () => {
+		it("includes criteria in tooltip", () => {
+			const src = `---
+artifact:
+  spec: { label: "仕様書", status: "done", criteria: "TL承認済み" }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).toContain("TL承認済み");
+		});
+
+		it("includes criteria and description both in tooltip", () => {
+			const src = `---
+artifact:
+  spec: { label: "仕様書", description: "詳細", criteria: "TL承認済み" }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).toContain("詳細");
+			expect(dot).toContain("TL承認済み");
+		});
+	});
+
+	describe("revises field", () => {
+		it("includes revises target in tooltip", () => {
+			const src = `---
+artifact:
+  v2: { label: "仕様書v2", revises: "v1" }
+  v1: { label: "仕様書v1" }
+---
+v1 >> P -> v2
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).toContain("revises: v1");
+		});
+
+		it("no revises annotation when revises is absent", () => {
+			const src = `---
+artifact:
+  v2: { label: "仕様書v2" }
+---
+v2 >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).not.toContain("revises:");
+		});
+	});
 });
 
 describe("fixture files", () => {
