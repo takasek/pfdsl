@@ -5,6 +5,8 @@ digraph PFDSL {
   subgraph cluster_backend {
     label="Backend";
     color="lightyellow";
+    style="filled";
+    fillcolor="lightyellow";
     "api_spec" [shape=box, label="api_spec", penwidth="2"];
     "build_api" [shape=ellipse, label="build_api"];
     "endpoint" [shape=box, label="endpoint", penwidth="2"];
@@ -12,6 +14,8 @@ digraph PFDSL {
   subgraph cluster_frontend {
     label="Frontend";
     color="lightblue";
+    style="filled";
+    fillcolor="lightblue";
     "build_ui" [shape=ellipse, label="build_ui"];
     "component" [shape=box, label="component", penwidth="2"];
     "ui_mockup" [shape=box, label="ui_mockup", penwidth="2"];

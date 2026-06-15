@@ -280,8 +280,11 @@ export function exportDot(
 		lines.push(`  subgraph cluster_${gid} {`);
 		if (gm.label !== undefined)
 			lines.push(`    label=${quote(String(gm.label))};`);
-		if (gm.color !== undefined)
+		if (gm.color !== undefined) {
 			lines.push(`    color=${quote(String(gm.color))};`);
+			lines.push(`    style="filled";`);
+			lines.push(`    fillcolor=${quote(String(gm.color))};`);
+		}
 		for (const id of groupedNodes.get(gid)!) {
 			lines.push(
 				`    ${quote(id)} ${nodeAttrs(id, graph.nodes.get(id)!, frontmatter, boundaryArtifacts)};`,
