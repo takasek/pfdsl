@@ -68,7 +68,7 @@ function buildExamplesIndexMd(dir) {
 
 const specSrc = readFileSync(resolve(root, "docs/spec/spec.md"), "utf-8");
 const specVersion = specSrc.match(/^# PFDSL仕様書 (v[\d.]+)/m)?.[1] ?? "unknown";
-const specHeader = `<!-- DO NOT EDIT — generated from docs/spec/spec.md by \`make gen-skill\` -->\n\n`;
+const specHeader = `<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->\n\n`;
 writeFileSync(resolve(refsDir, "spec.md"), specHeader + specSrc);
 console.log("references/spec.md ← docs/spec/spec.md");
 
