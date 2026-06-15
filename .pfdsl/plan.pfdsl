@@ -102,6 +102,10 @@ artifact:
     description: "audit コア + flow-sync action を skill
       同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは
       #11"
+  i63_adr_0015:
+    label: "ADR-0015 install/パラダイム (#63)"
+    status: todo
+    updated_at: 2026-06-15T00:00:00Z
   criteria_spec:
     label: "合否基準仕様案 (#7)"
     status: done
@@ -160,6 +164,8 @@ process:
     label: 孤児検出lint実装
   layer_audit_assets:
     label: L3資産階層化
+  write_adr_0015:
+    label: ADR-0015 執筆
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -214,4 +220,6 @@ published_cli >> automate_pr_diff -> i19_pr_diff_images
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 cli_tool >> implement_orphan_lint -> i37_orphan_lint
+
+audit_distribution >> write_adr_0015 -> i63_adr_0015
 
