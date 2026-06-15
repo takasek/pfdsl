@@ -150,6 +150,11 @@ artifact:
     status: done
     group: release
     description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samples で再生成。サンプル・ロードマップ変更時に更新（make push がドリフト検知）。GitHub 上の閲覧用終端成果物（README からリンクされるが README 執筆の入力ではない）"
+  pr_diagrams:
+    label: PR差分ダイアグラム
+    status: done
+    group: release
+    description: "docs/diagrams/pr-<N>/。merged PR が .pfdsl を変更した際に CI（pr-diff-images.yml）が before/after SVG を自動生成・コミット。PR description に埋め込まれ考古的レビューに使われる終端成果物。ライフサイクル: PR ごとに蓄積（削除規約なし）"
   readme:
     label: README
     status: done
@@ -297,7 +302,7 @@ gh_issues >> map_deps -> [issues_flow, plan_md]
 
 [gh_issues, issues_flow, spec] >> develop -> pull_request
 
-pull_request >> merge_pr -> [toolchain, impl_flow, issue_updates]
+pull_request >> merge_pr -> [toolchain, impl_flow, issue_updates, pr_diagrams]
 
 [ops_skill, ecosystem_md, plan_md] >>? develop
 
