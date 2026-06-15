@@ -45,11 +45,6 @@ artifact:
     status: done
     description: "@pfdsl/cli 0.0.3 公開済み（roadmap の cli_published に対応）。npm install -g
       @pfdsl/cli で利用可"
-  i11_portable_skill:
-    label: "配布可能スキル (#11)"
-    status: todo
-    tags: [ "priority:high" ]
-    updated_at: 2026-06-12T08:18:55Z
   multifile_policy:
     label: マルチファイル意味論方針
     status: todo
@@ -144,8 +139,6 @@ process:
     label: 生成系再構成
   publish_cli:
     label: CLI公開
-  package_skill:
-    label: スキルパッケージング
   migrate_convention:
     label: 規約移行
   fill_group_clusters:
@@ -195,7 +188,6 @@ skill_gen >> restructure_skillgen -> restructured_gen
 
 cli_tool >> publish_cli -> published_cli
 
-[restructured_gen, published_cli, i14_dir_convention, audit_distribution] >> package_skill -> i11_portable_skill
 
 cli_tool >> layer_audit_assets -> audit_distribution
 
