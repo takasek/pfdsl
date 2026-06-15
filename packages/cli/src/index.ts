@@ -143,37 +143,41 @@ async function svgToBinary(svg: string, format: BinaryFormat): Promise<Buffer> {
 		width = parts[2] ?? width;
 		height = parts[3] ?? height;
 	}
+	const sandboxArgs =
+		process.platform === "linux"
+			? ["--no-sandbox", "--disable-setuid-sandbox"]
+			: [];
 	const browser = await puppeteer.default.launch({
 		headless: true,
-		args: ["--no-sandbox", "--disable-setuid-sandbox"],
+		args: sandboxArgs,
 	});
 	try {
 		const page = await browser.newPage();
+		await page.setContent(
+			`<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${width}px;height:${height}px;overflow:hidden}svg{display:block;width:${width}px;height:${height}px}</style></head><body>${svg}</body></html>`,
+			{ waitUntil: "load" },
+		);
+		if (format === "pdf") {
+			return await page.pdf({
+				width: `${width}px`,
+				height: `${height}px`,
+				printBackground: true,
+				margin: { top: 0, right: 0, bottom: 0, left: 0 },
+				pageRanges: "1",
+			});
+		}
 		await page.setViewport({
 			width: Math.ceil(width),
 			height: Math.ceil(height),
 			deviceScaleFactor: 1,
 		});
-		await page.setContent(
-			`<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:${width}px;height:${height}px;overflow:hidden}svg{display:block;width:${width}px;height:${height}px}</style></head><body>${svg}</body></html>`,
-			{ waitUntil: "networkidle0" },
-		);
-		if (format === "pdf") {
-			return Buffer.from(
-				await page.pdf({
-					width: `${width}px`,
-					height: `${height}px`,
-					printBackground: true,
-					margin: { top: 0, right: 0, bottom: 0, left: 0 },
-					pageRanges: "1",
-				}),
-			);
-		}
-		return Buffer.from(
-			await page.screenshot({ type: "png", omitBackground: false }),
-		);
+		return await page.screenshot({ type: "png", omitBackground: false });
 	} finally {
-		await browser.close();
+		try {
+			await browser.close();
+		} catch {
+			// suppress close errors so the original error is not masked
+		}
 	}
 }
 
