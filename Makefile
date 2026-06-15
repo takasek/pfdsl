@@ -70,6 +70,10 @@ check-docs:
 gen-skill: check-docs
 	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
 
+.PHONY: install-skill
+install-skill: check-docs
+	node scripts/gen-skill.mjs --out "$(HOME)/.claude/skills/pfdsl"
+
 .PHONY: push
 push: check-docs
 	@if ! git diff --quiet HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills; then \

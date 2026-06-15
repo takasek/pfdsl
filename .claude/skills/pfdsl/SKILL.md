@@ -4,8 +4,7 @@ description: |
   Use when working with .pfdsl (Process Flow DSL) files — reading, writing,
   editing, or validating them. Always invoke before touching any .pfdsl file,
   running pfdsl CLI tools, updating artifact status (done/wip/todo/blocked),
-  adding artifacts or processes, or interpreting flow diagrams. Especially
-  use for docs/pfdsl_implementation_flow.pfdsl status updates.
+  adding artifacts or processes, or interpreting flow diagrams.
 ---
 
 ## Syntax
@@ -63,14 +62,12 @@ statusStyles:
 
 ## CLI
 
-Build first if needed: `make build-deps`
-
 ```bash
-node packages/cli/dist/cli.js check <file>
-node packages/cli/dist/cli.js fmt <file> [--write] [--mode flat|flows]
-node packages/cli/dist/cli.js normalize <file>
-node packages/cli/dist/cli.js graph <file> [--format dot|svg]
-node packages/cli/dist/cli.js diff <file-a> <file-b>
+npx @pfdsl/cli check <file>
+npx @pfdsl/cli fmt <file> [--write] [--mode flat|flows]
+npx @pfdsl/cli normalize <file>
+npx @pfdsl/cli graph <file> [--format dot|svg]
+npx @pfdsl/cli diff <file-a> <file-b>
 ```
 
 ## Key constraints
@@ -103,11 +100,11 @@ PFD はタスクリストではなく成果物の変換グラフ。
 - **組織学習パターン**: 観点表をレビュー入力に、指摘から `>>?` で観点表整備へ還流（samples 11-practical-web-dev）
 - **点検**: `check` と `graph --format dot` を実行。終端成果物が全て意図した納品物か、各プロセスが「この入力だけで出力を作れるか」を確認
 
-## Typical task: update status in implementation_flow.pfdsl
+## Typical task: update artifact status
 
-1. Find the artifact ID in `docs/pfdsl_implementation_flow.pfdsl` frontmatter `artifact:` section
+1. Find the artifact ID in the target `.pfdsl` file's frontmatter `artifact:` section
 2. Change `status: todo` → `status: done` (or `wip`, `blocked`)
-3. Validate: `node packages/cli/dist/cli.js check docs/pfdsl_implementation_flow.pfdsl`
+3. Validate: `npx @pfdsl/cli check <file>`
 
 ## References
 
