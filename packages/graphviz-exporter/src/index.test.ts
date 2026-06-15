@@ -667,6 +667,14 @@ spec >> P -> X
 			expect(dot).not.toContain("href=");
 		});
 
+		it("does not crash when location is a non-string YAML value", () => {
+			const fm = {
+				artifact: { spec: { label: "仕様書", location: 42 } },
+			} as unknown as Parameters<typeof exportDot>[1];
+			const { graph } = buildFromSource("spec >> P -> X");
+			expect(() => exportDot(graph, fm)).not.toThrow();
+		});
+
 		it("includes location in tooltip after description", () => {
 			const src = `---
 artifact:
@@ -715,9 +723,8 @@ spec >> P -> X
 `;
 			const { graph, frontmatter } = buildFromSource(src);
 			const dot = exportDot(graph, frontmatter);
-			const dot2 = dot;
-			expect(dot2).toContain("詳細");
-			expect(dot2).toContain("TL承認済み");
+			expect(dot).toContain("詳細");
+			expect(dot).toContain("TL承認済み");
 		});
 	});
 

@@ -1,4 +1,11 @@
-import type { Frontmatter, Graph, NodeKind, NodeStyle } from "@pfdsl/core";
+import type {
+	ArtifactMeta,
+	Frontmatter,
+	Graph,
+	NodeKind,
+	NodeStyle,
+	ProcessMeta,
+} from "@pfdsl/core";
 import { STYLE_ATTRS } from "@pfdsl/core";
 
 const MIN_WRAP_RATIO = 0.3;
@@ -317,10 +324,12 @@ function nodeAttrs(
 	const meta = lookupMeta(id, kind, fm);
 	const nodeLabel = meta?.label;
 	const description = meta?.description;
-	const artifactMeta = kind === "artifact" ? fm?.artifact?.[id] : undefined;
-	const criteria = artifactMeta?.criteria;
-	const location = artifactMeta?.location;
-	const revises = artifactMeta?.revises;
+	const ameta =
+		kind === "artifact" ? (meta as ArtifactMeta | undefined) : undefined;
+	const criteria = ameta?.criteria;
+	const location =
+		typeof ameta?.location === "string" ? ameta.location : undefined;
+	const revises = ameta?.revises;
 
 	const maxWidth =
 		typeof fm?.layout?.maxWidth === "number" ? fm.layout.maxWidth : undefined;
@@ -336,12 +345,12 @@ function nodeAttrs(
 	if (criteria) tooltipParts.push(`\ncriteria: ${criteria}`);
 	if (location) tooltipParts.push(`\nlocation: ${location}`);
 	if (revises) tooltipParts.push(`\nrevises: ${revises}`);
-	const hasExtra = description || criteria || location || revises;
-	const tooltip = hasExtra
-		? tooltipParts.join("")
-		: wrappingOccurred
-			? originalLabel
-			: undefined;
+	const tooltip =
+		tooltipParts.length > 1
+			? tooltipParts.join("")
+			: wrappingOccurred
+				? originalLabel
+				: undefined;
 
 	const styleAttrs = resolveStyleAttrs(id, kind, fm);
 	const xlabel = buildXlabel(id, kind, fm);
@@ -406,7 +415,7 @@ function lookupMeta(
 	id: string,
 	kind: NodeKind,
 	fm: Frontmatter | null,
-): { label?: string; description?: string } | undefined {
+): ArtifactMeta | ProcessMeta | undefined {
 	if (!fm) return undefined;
 	return kind === "process" ? fm.process?.[id] : fm.artifact?.[id];
 }
