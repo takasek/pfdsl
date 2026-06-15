@@ -19,6 +19,10 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 - `.pfdsl/plan.pfdsl` — オープン issue の依存グラフ
 - `docs/pfdsl_implementation_flow.pfdsl` — ツールチェーン実装ロードマップ
 
+## 自動生成 PR（ワークサイクル選択前に確認）
+
+このリポでは issue close 時に `flow-on-issue-close.yml` が `flow-sync/*` ブランチで flow-sync PR を自動起票する。サイクル開始時に open のものがあればマージ先行。
+
 ## 終端ゲート追加項目（issue 固有）
 
 **タイミング規約**: issue クローズと flow 確定は **PR マージ時**に行う（生態系図 merge_pr: 成果物・進捗・issue 更新はマージで正本になる）。PR 作成時点では行わない — PR がレビューで変わる/却下される可能性があるため。サイクルが PR 作成で終わる場合、下記2項目は「マージ時に実施」と記録して未了のまま閉じてよい。
