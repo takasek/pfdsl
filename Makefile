@@ -69,6 +69,7 @@ check-docs:
 .PHONY: gen-skill
 gen-skill: check-docs
 	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
+	node scripts/gen-skill.mjs --out skills/pfdsl
 
 .PHONY: install-skill
 install-skill: check-docs
@@ -76,9 +77,9 @@ install-skill: check-docs
 
 .PHONY: push
 push: check-docs
-	@if ! git diff --quiet HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills; then \
-		echo "docs/samples, docs/examples, docs/pfdsl_implementation_flow.pfdsl, または .claude/skills に差分があります。コミットしてから push してください。"; \
-		git diff --stat HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills; \
+	@if ! git diff --quiet HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills skills; then \
+		echo "docs/samples, docs/examples, docs/pfdsl_implementation_flow.pfdsl, .claude/skills, または skills に差分があります。コミットしてから push してください。"; \
+		git diff --stat HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills skills; \
 		exit 1; \
 	fi
 	$(MAKE) gen-samples
