@@ -317,6 +317,10 @@ function nodeAttrs(
 	const meta = lookupMeta(id, kind, fm);
 	const nodeLabel = meta?.label;
 	const description = meta?.description;
+	const artifactMeta = kind === "artifact" ? fm?.artifact?.[id] : undefined;
+	const criteria = artifactMeta?.criteria;
+	const location = artifactMeta?.location;
+	const revises = artifactMeta?.revises;
 
 	const maxWidth =
 		typeof fm?.layout?.maxWidth === "number" ? fm.layout.maxWidth : undefined;
@@ -326,18 +330,27 @@ function nodeAttrs(
 
 	const wrappingOccurred = wrappedNodeLabel !== nodeLabel;
 	const originalLabel = nodeLabel ?? id;
-	const tooltip = description
-		? `${originalLabel}\n\n${description}`
+
+	const tooltipParts: string[] = [originalLabel];
+	if (description) tooltipParts.push(`\n\n${description}`);
+	if (criteria) tooltipParts.push(`\ncriteria: ${criteria}`);
+	if (location) tooltipParts.push(`\nlocation: ${location}`);
+	if (revises) tooltipParts.push(`\nrevises: ${revises}`);
+	const hasExtra = description || criteria || location || revises;
+	const tooltip = hasExtra
+		? tooltipParts.join("")
 		: wrappingOccurred
 			? originalLabel
 			: undefined;
 
 	const styleAttrs = resolveStyleAttrs(id, kind, fm);
 	const xlabel = buildXlabel(id, kind, fm);
+	const isUrl = location?.includes("://");
 
 	const minWidth = calcMinWidth(label);
 	const attrs: string[] = [`shape=${shape}`, `label=${quote(label)}`];
 	if (tooltip !== undefined) attrs.push(`tooltip=${quote(tooltip)}`);
+	if (isUrl && location) attrs.push(`href=${quote(location)}`);
 	if (minWidth !== undefined) attrs.push(`width=${minWidth.toFixed(2)}`);
 	if (xlabel !== undefined) attrs.push(`xlabel=${quote(xlabel)}`);
 	for (const key of STYLE_ATTRS) {
