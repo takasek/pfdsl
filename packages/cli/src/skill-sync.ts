@@ -83,3 +83,36 @@ export function isL3Adopted(skillRoot: string, targetRoot: string): boolean {
 		existsSync(join(targetRoot, rel)),
 	);
 }
+
+export interface InstallCopyResult {
+	copied: boolean;
+	message: string;
+}
+
+/**
+ * Copies install/ (L3 mechanism: workflows, audit scripts) to target root,
+ * preserving relative paths, but only when L3 is already adopted there.
+ * When not adopted, copies nothing and returns guidance for first-time
+ * adoption (out of scope for sync itself).
+ */
+export function copyInstallLayer(
+	skillRoot: string,
+	targetRoot: string,
+): InstallCopyResult {
+	if (!isL3Adopted(skillRoot, targetRoot)) {
+		return {
+			copied: false,
+			message:
+				"GitHub Issues バックエンド (L3) は未採用です。採用する場合は次を実行してください:\n" +
+				"  cp -r .claude/skills/pfd-ops/install/. .\n",
+		};
+	}
+	const installDir = join(skillRoot, "install");
+	for (const rel of listInstallFiles(skillRoot)) {
+		const src = join(installDir, rel);
+		const dest = join(targetRoot, rel);
+		mkdirSync(dirname(dest), { recursive: true });
+		cpSync(src, dest);
+	}
+	return { copied: true, message: "" };
+}

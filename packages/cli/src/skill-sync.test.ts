@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	copyGeneralLayer,
+	copyInstallLayer,
 	isL3Adopted,
 	resolveSkillRoot,
 } from "./skill-sync.js";
@@ -82,5 +83,49 @@ describe("isL3Adopted", () => {
 			"// deployed copy\n",
 		);
 		expect(isL3Adopted(skillRoot, targetRoot)).toBe(true);
+	});
+});
+
+describe("copyInstallLayer", () => {
+	let targetRoot: string;
+
+	beforeEach(() => {
+		targetRoot = mkdtempSync(join(tmpdir(), "pfdsl-sync-test-"));
+	});
+
+	afterEach(() => {
+		rmSync(targetRoot, { recursive: true, force: true });
+	});
+
+	it("copies install/ tree to target root when adopted", () => {
+		const skillRoot = resolveSkillRoot();
+		// simulate prior adoption
+		mkdirSync(join(targetRoot, "scripts/lib"), { recursive: true });
+		writeFileSync(join(targetRoot, "scripts/lib/yaml-require.mjs"), "old\n");
+
+		const result = copyInstallLayer(skillRoot, targetRoot);
+
+		expect(result.copied).toBe(true);
+		const updated = readFileSync(
+			join(targetRoot, "scripts/lib/yaml-require.mjs"),
+			"utf-8",
+		);
+		expect(updated).not.toBe("old\n");
+		expect(
+			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
+		).toBe(true);
+	});
+
+	it("does not copy and returns guidance message when not adopted", () => {
+		const skillRoot = resolveSkillRoot();
+		const result = copyInstallLayer(skillRoot, targetRoot);
+
+		expect(result.copied).toBe(false);
+		expect(result.message).toContain(
+			"cp -r .claude/skills/pfd-ops/install/. .",
+		);
+		expect(
+			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
+		).toBe(false);
 	});
 });
