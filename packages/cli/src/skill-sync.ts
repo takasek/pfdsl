@@ -245,3 +245,56 @@ export async function ensureLabels(
 	}
 	return { created: [...missing], message: "" };
 }
+
+export interface RunSkillSyncOptions {
+	targetRoot: string;
+	yes: boolean;
+	execGh?: ExecGh;
+	confirm?: (question: string) => Promise<boolean>;
+}
+
+export interface SkillSyncResult {
+	stdout: string;
+	exitCode: number;
+}
+
+/**
+ * Orchestrates the full `pfdsl skill sync pfd-ops` flow:
+ * general layer overwrite -> conditional install/ overwrite (subordinate gh
+ * label confirmation when adopted) -> L4 scaffold -> ecosystem-setup prompt.
+ */
+export async function runSkillSync(
+	opts: RunSkillSyncOptions,
+): Promise<SkillSyncResult> {
+	const skillRoot = resolveSkillRoot();
+	const lines: string[] = [];
+
+	copyGeneralLayer(skillRoot, opts.targetRoot);
+	lines.push("pfd-ops general layer (SKILL.md, references/) synced.");
+
+	const installResult = copyInstallLayer(skillRoot, opts.targetRoot);
+	if (installResult.copied) {
+		lines.push("pfd-ops install/ layer synced (L3 adopted).");
+		const labelResult = await ensureLabels({
+			yes: opts.yes,
+			...(opts.execGh ? { execGh: opts.execGh } : {}),
+			...(opts.confirm ? { confirm: opts.confirm } : {}),
+		});
+		if (labelResult.message) lines.push(labelResult.message);
+		if (labelResult.created.length > 0) {
+			lines.push(`Created labels: ${labelResult.created.join(", ")}`);
+		}
+	} else {
+		lines.push(installResult.message);
+	}
+
+	const scaffoldResult = scaffoldL4Files(skillRoot, opts.targetRoot);
+	if (scaffoldResult.scaffolded.length > 0) {
+		lines.push(`Scaffolded: ${scaffoldResult.scaffolded.join(", ")}`);
+	}
+
+	const prompt = ecosystemSetupPrompt(skillRoot, scaffoldResult.scaffolded);
+	if (prompt) lines.push(prompt);
+
+	return { stdout: `${lines.join("\n")}\n`, exitCode: 0 };
+}

@@ -16,6 +16,7 @@ import {
 	ensureLabels,
 	isL3Adopted,
 	resolveSkillRoot,
+	runSkillSync,
 	scaffoldL4Files,
 } from "./skill-sync.js";
 
@@ -271,5 +272,61 @@ describe("ensureLabels", () => {
 		const confirm = async () => true;
 		const result = await ensureLabels({ execGh, yes: false, confirm });
 		expect(result.created.sort()).toEqual(["flow:exempt", "flow:managed"]);
+	});
+});
+
+describe("runSkillSync", () => {
+	let targetRoot: string;
+
+	beforeEach(() => {
+		targetRoot = mkdtempSync(join(tmpdir(), "pfdsl-sync-test-"));
+	});
+
+	afterEach(() => {
+		rmSync(targetRoot, { recursive: true, force: true });
+	});
+
+	it("syncs general layer, skips install/, scaffolds L4, shows prompt (unadopted repo)", async () => {
+		const result = await runSkillSync({ targetRoot, yes: true });
+
+		expect(
+			existsSync(join(targetRoot, ".claude/skills/pfd-ops/SKILL.md")),
+		).toBe(true);
+		expect(
+			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
+		).toBe(false);
+		expect(existsSync(join(targetRoot, ".pfdsl/roadmap.pfdsl"))).toBe(true);
+		expect(result.stdout).toContain("cp -r .claude/skills/pfd-ops/install/. .");
+		expect(result.stdout).toContain("ecosystem.pfdsl 構築プロンプト");
+		expect(result.exitCode).toBe(0);
+	});
+
+	it("copies install/ when already adopted, and does not print ecosystem prompt when L4 already exists", async () => {
+		mkdirSync(join(targetRoot, "scripts/lib"), { recursive: true });
+		writeFileSync(join(targetRoot, "scripts/lib/yaml-require.mjs"), "old\n");
+		mkdirSync(join(targetRoot, ".pfdsl"), { recursive: true });
+		for (const f of [
+			"roadmap.pfdsl",
+			"roadmap.md",
+			"ecosystem.pfdsl",
+			"ecosystem.md",
+		]) {
+			writeFileSync(join(targetRoot, ".pfdsl", f), "existing\n");
+		}
+
+		const result = await runSkillSync({
+			targetRoot,
+			yes: true,
+			execGh: (args: string[]) =>
+				args[0] === "label" && args[1] === "list"
+					? "flow:managed\nflow:exempt\n"
+					: "",
+		});
+
+		expect(
+			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
+		).toBe(true);
+		expect(result.stdout).not.toContain("ecosystem.pfdsl 構築プロンプト");
+		expect(result.exitCode).toBe(0);
 	});
 });
