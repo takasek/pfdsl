@@ -131,6 +131,18 @@ artifact:
   agent_skill:
     label: AI agentスキル (pfdsl読み書き)
     status: done
+  pdf_png_export:
+    label: PDF/PNGエクスポート
+    status: done
+    description: "cli_tool の graph --format pdf|png。Puppeteer (headless Chromium) 経由でSVG→PDF/PNG変換、optional peer dependencyとして実装（#72/#74、拡張連携は#83）"
+  group_fill_export:
+    label: groupクラスタ塗り
+    status: done
+    description: "graphviz_exporter のsubgraph clusterにstyle=filledを付与し宣言色をfillcolorとして適用（#15/#77）"
+  preview_minimap:
+    label: プレビューminimap
+    status: done
+    description: "vscode拡張プレビューパネルへのminimapオーバーレイ、ドラッグでメインビュー追従（#17/#81）"
 
 process:
   define_architecture:
@@ -203,6 +215,12 @@ process:
     label: CLI npm公開
   write_agent_skill:
     label: AI agentスキル作成
+  implement_pdf_png_export:
+    label: PDF/PNGエクスポート実装
+  implement_group_fill_export:
+    label: groupクラスタ塗り実装
+  implement_preview_minimap:
+    label: minimap実装
 ---
 
 # Phase 0: アーキテクチャ定義
@@ -289,3 +307,6 @@ core_library >> implement_metadata_exporter -> metadata_exporter
 cli_tool >> implement_diff_analysis -> diff_analyzer
 cli_tool >> publish_cli -> cli_published
 cli_tool >> write_agent_skill -> agent_skill
+cli_tool >> implement_pdf_png_export -> pdf_png_export
+graphviz_exporter >> implement_group_fill_export -> group_fill_export
+preview_panel >> implement_preview_minimap -> preview_minimap
