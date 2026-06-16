@@ -118,10 +118,71 @@ root.addEventListener("mouseleave", () => {
 	tooltip.style.display = "none";
 });
 
+const MINIMAP_W = 160;
+const MINIMAP_H = 120;
+const minimap = document.getElementById("minimap") as HTMLDivElement;
+const minimapSvg = document.getElementById("minimap-svg") as HTMLDivElement;
+const minimapVp = document.getElementById("minimap-vp") as HTMLDivElement;
+let mmScale = 1;
+let svgNatW = 0;
+let svgNatH = 0;
+
+function updateMinimapVp() {
+	if (!svgNatW || !svgNatH) return;
+	const vx = (-panX / scale) * mmScale;
+	const vy = (-panY / scale) * mmScale;
+	const vw = (root.clientWidth / scale) * mmScale;
+	const vh = (root.clientHeight / scale) * mmScale;
+	minimapVp.style.left = `${vx}px`;
+	minimapVp.style.top = `${vy}px`;
+	minimapVp.style.width = `${vw}px`;
+	minimapVp.style.height = `${vh}px`;
+}
+
+function refreshMinimap() {
+	const svgEl = inner.querySelector("svg");
+	if (!svgEl) {
+		minimap.style.display = "none";
+		return;
+	}
+	svgNatW = inner.offsetWidth;
+	svgNatH = inner.offsetHeight;
+	if (!svgNatW || !svgNatH) {
+		minimap.style.display = "none";
+		return;
+	}
+	mmScale = Math.min(MINIMAP_W / svgNatW, MINIMAP_H / svgNatH);
+	const scaledW = svgNatW * mmScale;
+	const scaledH = svgNatH * mmScale;
+	minimap.style.width = `${scaledW}px`;
+	minimap.style.height = `${scaledH}px`;
+	const clone = svgEl.cloneNode(true) as SVGSVGElement;
+	clone.setAttribute("width", String(scaledW));
+	clone.setAttribute("height", String(scaledH));
+	clone.style.width = `${scaledW}px`;
+	clone.style.height = `${scaledH}px`;
+	minimapSvg.replaceChildren(clone);
+	minimap.style.display = "block";
+	updateMinimapVp();
+}
+
+let minimapDragRect: DOMRect | null = null;
+
+function panToMinimapPoint(clientX: number, clientY: number) {
+	if (!svgNatW || !svgNatH) return;
+	const rect = minimapDragRect ?? minimap.getBoundingClientRect();
+	const gx = (clientX - rect.left) / mmScale;
+	const gy = (clientY - rect.top) / mmScale;
+	panX = root.clientWidth / 2 - gx * scale;
+	panY = root.clientHeight / 2 - gy * scale;
+	applyTransform();
+}
+
 let scale = 1;
 let panX = 0;
 let panY = 0;
 let dragging = false;
+let minimapDragging = false;
 let startX = 0;
 let startY = 0;
 let hasPositioned = false;
@@ -129,6 +190,7 @@ let hasPositioned = false;
 function applyTransform() {
 	inner.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
 	inner.style.transformOrigin = "0 0";
+	updateMinimapVp();
 }
 
 function centerGraph() {
@@ -201,6 +263,10 @@ root.addEventListener("mousedown", (e) => {
 });
 
 window.addEventListener("mousemove", (e) => {
+	if (minimapDragging) {
+		panToMinimapPoint(e.clientX, e.clientY);
+		return;
+	}
 	if (!dragging) return;
 	panX = e.clientX - startX;
 	panY = e.clientY - startY;
@@ -209,6 +275,8 @@ window.addEventListener("mousemove", (e) => {
 
 window.addEventListener("mouseup", () => {
 	dragging = false;
+	minimapDragging = false;
+	minimapDragRect = null;
 	root.style.cursor = "grab";
 });
 
@@ -225,6 +293,12 @@ root.addEventListener("dblclick", (e) => {
 	panX = 0;
 	panY = 0;
 	requestAnimationFrame(() => centerGraph());
+});
+
+minimap.addEventListener("mousedown", (e) => {
+	minimapDragging = true;
+	minimapDragRect = minimap.getBoundingClientRect();
+	panToMinimapPoint(e.clientX, e.clientY);
 });
 
 const HTML_ESCAPES: Record<string, string> = {
@@ -278,20 +352,19 @@ window.addEventListener("message", async (event) => {
 				svgEl.getAttribute("height"),
 			);
 		}
-		if (!hasPositioned) {
-			hasPositioned = true;
-			const focusNodeId = msg.focusNodeId;
-			log("scheduling center, focusNodeId:", focusNodeId);
-			requestAnimationFrame(() => {
+		const focusNodeId = msg.focusNodeId;
+		const shouldCenter = !hasPositioned;
+		hasPositioned = true;
+		requestAnimationFrame(() => {
+			if (shouldCenter) {
 				log("rAF fired, inner.offsetWidth:", inner.offsetWidth);
 				centerGraph();
 				if (focusNodeId) focusNode(focusNodeId);
-			});
-		} else if (lastFocusedNodeId) {
-			requestAnimationFrame(() => {
-				if (lastFocusedNodeId) focusNode(lastFocusedNodeId);
-			});
-		}
+			} else if (lastFocusedNodeId) {
+				focusNode(lastFocusedNodeId);
+			}
+			refreshMinimap();
+		});
 		if (currentDiff) renderDiffPanel(currentDiff);
 	} catch (e) {
 		log("render error:", (e as Error).message);
