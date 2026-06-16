@@ -61,6 +61,20 @@ describe("copyGeneralLayer", () => {
 			false,
 		);
 	});
+
+	it("mirrors the general layer, removing stale files, while preserving install/", () => {
+		const skillRoot = resolveSkillRoot();
+		const dest = join(targetRoot, ".claude/skills/pfd-ops");
+		mkdirSync(join(dest, "references"), { recursive: true });
+		writeFileSync(join(dest, "references/STALE.md"), "stale content\n");
+		mkdirSync(join(dest, "install"), { recursive: true });
+		writeFileSync(join(dest, "install/keep.txt"), "keep me\n");
+
+		copyGeneralLayer(skillRoot, targetRoot);
+
+		expect(existsSync(join(dest, "references/STALE.md"))).toBe(false);
+		expect(existsSync(join(dest, "install/keep.txt"))).toBe(true);
+	});
 });
 
 describe("isL3Adopted", () => {
