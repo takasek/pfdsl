@@ -13,6 +13,7 @@ import {
 	copyGeneralLayer,
 	copyInstallLayer,
 	ecosystemSetupPrompt,
+	ensureLabels,
 	isL3Adopted,
 	resolveSkillRoot,
 	scaffoldL4Files,
@@ -206,5 +207,69 @@ describe("ecosystemSetupPrompt", () => {
 		const skillRoot = resolveSkillRoot();
 		const prompt = ecosystemSetupPrompt(skillRoot, []);
 		expect(prompt).toBe("");
+	});
+});
+
+describe("ensureLabels", () => {
+	it("returns guidance and does nothing when gh is not found", async () => {
+		const execGh = () => {
+			throw Object.assign(new Error("not found"), { code: "ENOENT" });
+		};
+		const result = await ensureLabels({ execGh, yes: false });
+		expect(result.message).toContain("flow:managed");
+		expect(result.message).toContain("flow:exempt");
+		expect(result.message).toContain("手動");
+		expect(result.created).toEqual([]);
+	});
+
+	it("skips when no labels are missing", async () => {
+		const execGh = (args: string[]) => {
+			if (args[0] === "label" && args[1] === "list") {
+				return "flow:managed\tcolor\tdesc\nflow:exempt\tcolor\tdesc\n";
+			}
+			throw new Error(`unexpected gh call: ${args.join(" ")}`);
+		};
+		const result = await ensureLabels({ execGh, yes: false });
+		expect(result.created).toEqual([]);
+	});
+
+	it("creates missing labels with --yes (no prompt)", async () => {
+		const created: string[] = [];
+		const execGh = (args: string[]) => {
+			if (args[0] === "label" && args[1] === "list") return "";
+			if (args[0] === "label" && args[1] === "create") {
+				created.push(args[2]!);
+				return "";
+			}
+			throw new Error(`unexpected gh call: ${args.join(" ")}`);
+		};
+		const result = await ensureLabels({ execGh, yes: true });
+		expect(result.created.sort()).toEqual(["flow:exempt", "flow:managed"]);
+		expect(created.sort()).toEqual(["flow:exempt", "flow:managed"]);
+	});
+
+	it("prompts and skips creation when answer is not y", async () => {
+		const execGh = (args: string[]) => {
+			if (args[0] === "label" && args[1] === "list") return "";
+			throw new Error(`unexpected gh call: ${args.join(" ")}`);
+		};
+		const confirm = async () => false;
+		const result = await ensureLabels({ execGh, yes: false, confirm });
+		expect(result.created).toEqual([]);
+	});
+
+	it("prompts and creates when answer is y", async () => {
+		const created: string[] = [];
+		const execGh = (args: string[]) => {
+			if (args[0] === "label" && args[1] === "list") return "";
+			if (args[0] === "label" && args[1] === "create") {
+				created.push(args[2]!);
+				return "";
+			}
+			throw new Error(`unexpected gh call: ${args.join(" ")}`);
+		};
+		const confirm = async () => true;
+		const result = await ensureLabels({ execGh, yes: false, confirm });
+		expect(result.created.sort()).toEqual(["flow:exempt", "flow:managed"]);
 	});
 });

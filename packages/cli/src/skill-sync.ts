@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
 	cpSync,
 	existsSync,
@@ -7,6 +8,7 @@ import {
 	statSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -172,4 +174,74 @@ export function ecosystemSetupPrompt(
 		join(skillRoot, "references/ecosystem-setup-prompt.md"),
 		"utf-8",
 	);
+}
+
+const REQUIRED_LABELS = ["flow:managed", "flow:exempt"] as const;
+
+export type ExecGh = (args: string[]) => string;
+
+function defaultExecGh(args: string[]): string {
+	return execFileSync("gh", args, { encoding: "utf-8" });
+}
+
+async function defaultConfirm(question: string): Promise<boolean> {
+	const rl = createInterface({ input: process.stdin, output: process.stdout });
+	try {
+		const answer = await rl.question(question);
+		return answer.trim().toLowerCase() === "y";
+	} finally {
+		rl.close();
+	}
+}
+
+export interface EnsureLabelsOptions {
+	yes: boolean;
+	execGh?: ExecGh;
+	confirm?: (question: string) => Promise<boolean>;
+}
+
+export interface EnsureLabelsResult {
+	created: string[];
+	message: string;
+}
+
+/**
+ * Ensures flow:managed / flow:exempt labels exist via gh. Subordinate to L3
+ * adoption — callers should only invoke this when isL3Adopted() is true.
+ * gh missing -> guidance message, not an error. gh present -> list missing
+ * labels and confirm [y/N] (auto-yes with --yes).
+ */
+export async function ensureLabels(
+	opts: EnsureLabelsOptions,
+): Promise<EnsureLabelsResult> {
+	const execGh = opts.execGh ?? defaultExecGh;
+	const confirm = opts.confirm ?? defaultConfirm;
+
+	let existing: string;
+	try {
+		existing = execGh(["label", "list"]);
+	} catch {
+		return {
+			created: [],
+			message:
+				"gh コマンドが見つかりません。flow:managed / flow:exempt ラベルは手動作成してください。\n",
+		};
+	}
+
+	const missing = REQUIRED_LABELS.filter((label) => !existing.includes(label));
+	if (missing.length === 0) {
+		return { created: [], message: "" };
+	}
+
+	if (!opts.yes) {
+		const proceed = await confirm(
+			`不足しているラベルを作成しますか: ${missing.join(", ")} [y/N] `,
+		);
+		if (!proceed) return { created: [], message: "" };
+	}
+
+	for (const label of missing) {
+		execGh(["label", "create", label]);
+	}
+	return { created: [...missing], message: "" };
 }
