@@ -93,11 +93,6 @@ artifact:
   featured_toolchain:
     label: "spec v0.0.7 実装済みツールチェーン (#52)"
     status: done
-  i84_parser_typecheck_fix:
-    label: "parser.test.ts tsc型エラー修正 (#84)"
-    status: wip
-    description: "tsc --noEmit が TS2531 で失敗（output: ArtifactExpr | null への null guard 漏れ）。PR #83 検証中に発見"
-    updated_at: 2026-06-16T01:13:41Z
 process:
   write_article:
     label: 記事執筆
@@ -130,8 +125,6 @@ process:
     label: 孤児検出lint実装
   layer_audit_assets:
     label: L3資産階層化
-  fix_parser_typecheck:
-    label: parser.test.ts null guard修正
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -182,7 +175,6 @@ cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 cli_tool >> implement_orphan_lint -> i37_orphan_lint
 
-cli_tool >> fix_parser_typecheck -> i84_parser_typecheck_fix
 
 
 
