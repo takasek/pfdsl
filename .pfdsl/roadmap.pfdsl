@@ -39,8 +39,8 @@ artifact:
   published_cli:
     label: npm公開済みCLI
     status: done
-    description: "@pfdsl/cli 0.0.3 公開済み（roadmap の cli_published に対応）。npm install -g
-      @pfdsl/cli で利用可"
+    description: "npm install -g @pfdsl/cli で利用可。現行公開バージョンは npm 一次情報（ここに書かない —
+      ドリフトするため）。詳細は docs/pfdsl_implementation_flow.pfdsl の cli_published 参照"
   multifile_policy:
     label: マルチファイル意味論方針
     status: todo

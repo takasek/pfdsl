@@ -1,4 +1,4 @@
-# ADR-0014: samples は TSV 管理、examples は frontmatter 管理
+# ADR-0015: samples は TSV 管理、examples は frontmatter 管理
 
 - Status: Accepted
 - Date: 2026-06-15
