@@ -296,21 +296,10 @@ root.addEventListener("dblclick", (e) => {
 });
 
 minimap.addEventListener("mousedown", (e) => {
-	e.stopPropagation();
 	minimapDragging = true;
 	minimapDragRect = minimap.getBoundingClientRect();
 	panToMinimapPoint(e.clientX, e.clientY);
 });
-minimap.addEventListener("dblclick", (e) => {
-	e.stopPropagation();
-});
-minimap.addEventListener(
-	"wheel",
-	(e) => {
-		e.stopPropagation();
-	},
-	{ passive: true },
-);
 
 const HTML_ESCAPES: Record<string, string> = {
 	"&": "&amp;",

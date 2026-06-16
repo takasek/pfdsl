@@ -119,7 +119,8 @@ function buildHtml(
 <style>
 html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--vscode-editor-background); color: var(--vscode-editor-foreground); }
 body { display: flex; flex-direction: column; }
-#root { flex: 1; min-height: 0; overflow: hidden; cursor: grab; position: relative; }
+#root-wrap { flex: 1; min-height: 0; position: relative; }
+#root { width: 100%; height: 100%; overflow: hidden; cursor: grab; position: relative; }
 #inner { position: absolute; top: 0; left: 0; }
 .err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
 #tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 320px; pointer-events: none; display: none; z-index: 100; white-space: pre-wrap; word-break: break-word; }
@@ -135,7 +136,7 @@ g.node.pfdsl-focused ellipse, g.node.pfdsl-focused polygon, g.node.pfdsl-focused
 <script>window.__PFDSL_DEBUG__ = ${isDebug};</script>
 </head>
 <body>
-<div id="root"><div id="inner"></div><div id="minimap"><div id="minimap-svg"></div><div id="minimap-vp"></div></div></div>
+<div id="root-wrap"><div id="root"><div id="inner"></div></div><div id="minimap"><div id="minimap-svg"></div><div id="minimap-vp"></div></div></div>
 <div id="tooltip"></div>
 <div id="diff-panel"></div>
 <script type="module" src="${scriptUri}"></script>
