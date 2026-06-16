@@ -10,8 +10,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-	copyGeneralLayer,
 	copyInstallLayer,
+	copySkillTree,
 	ecosystemSetupPrompt,
 	ensureLabels,
 	isL3Adopted,
@@ -27,7 +27,7 @@ describe("resolveSkillRoot", () => {
 	});
 });
 
-describe("copyGeneralLayer", () => {
+describe("copySkillTree", () => {
 	let targetRoot: string;
 
 	beforeEach(() => {
@@ -38,9 +38,9 @@ describe("copyGeneralLayer", () => {
 		rmSync(targetRoot, { recursive: true, force: true });
 	});
 
-	it("copies SKILL.md and references/ unconditionally, excluding install/", () => {
+	it("copies SKILL.md, references/ and install/ templates into the skill dir", () => {
 		const skillRoot = resolveSkillRoot();
-		copyGeneralLayer(skillRoot, targetRoot);
+		copySkillTree(skillRoot, targetRoot);
 
 		const skillMd = readFileSync(
 			join(targetRoot, ".claude/skills/pfd-ops/SKILL.md"),
@@ -57,23 +57,34 @@ describe("copyGeneralLayer", () => {
 		);
 		expect(ref).toContain("GitHub Issues バックエンド");
 
-		expect(existsSync(join(targetRoot, ".claude/skills/pfd-ops/install"))).toBe(
-			false,
-		);
+		// install/ templates must land in the skill dir so a fresh adopter can run
+		// `cp -r .claude/skills/pfd-ops/install/. .` to adopt L3.
+		expect(
+			existsSync(
+				join(
+					targetRoot,
+					".claude/skills/pfd-ops/install/.github/workflows/check-pfd-ops-sync.yml",
+				),
+			),
+		).toBe(true);
 	});
 
-	it("mirrors the general layer, removing stale files, while preserving install/", () => {
+	it("mirrors the whole skill tree, removing stale files (install/ included)", () => {
 		const skillRoot = resolveSkillRoot();
 		const dest = join(targetRoot, ".claude/skills/pfd-ops");
 		mkdirSync(join(dest, "references"), { recursive: true });
 		writeFileSync(join(dest, "references/STALE.md"), "stale content\n");
 		mkdirSync(join(dest, "install"), { recursive: true });
-		writeFileSync(join(dest, "install/keep.txt"), "keep me\n");
+		writeFileSync(join(dest, "install/STALE.txt"), "stale\n");
 
-		copyGeneralLayer(skillRoot, targetRoot);
+		copySkillTree(skillRoot, targetRoot);
 
 		expect(existsSync(join(dest, "references/STALE.md"))).toBe(false);
-		expect(existsSync(join(dest, "install/keep.txt"))).toBe(true);
+		// install/ is mirrored too: stale local file gone, canonical templates present.
+		expect(existsSync(join(dest, "install/STALE.txt"))).toBe(false);
+		expect(existsSync(join(dest, "install/scripts/lib/yaml-require.mjs"))).toBe(
+			true,
+		);
 	});
 });
 
