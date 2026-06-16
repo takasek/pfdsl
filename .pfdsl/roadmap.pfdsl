@@ -1,8 +1,8 @@
 ---
 title: Issue 依存フロー（2026-06）
 description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue
-  管理規約・同期手段は sibling roadmap.md と pfd-ops スキルの references/github-issues-backend.md
-  参照
+  管理規約・同期手段は sibling roadmap.md と pfd-ops スキルの
+  references/github-issues-backend.md 参照
 layout:
   direction: LR
   maxWidth: 130
@@ -54,26 +54,12 @@ artifact:
     status: todo
     description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
     updated_at: 2026-06-12T08:18:56Z
-  i15_group_fill:
-    label: "group クラスタ塗りつぶし描画 (#15)"
-    status: todo
-    updated_at: 2026-06-12T08:19:02Z
-  i17_graph_nav:
-    label: "大規模図の閲覧支援 (#17)"
-    status: wip
-    description: "設計未確定（issue 本文参照）。implement_graph_nav 着手前にどの機能（minimap / neighborhood focus / filter）を作るかをユーザーと合意すること。"
-    updated_at: 2026-06-12T08:19:05Z
   i37_orphan_lint:
     label: "孤児process検出lint (#37)"
     status: todo
     description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
       要件経路、dogfood #16 由来）"
     updated_at: 2026-06-14T14:00:45Z
-  i72_pdf_png_export:
-    label: "PDF/PNG エクスポート (#72)"
-    status: wip
-    description: "pfdsl graph --format pdf|png。Puppeteer optional peer dep 経由で SVG → PDF/PNG 変換"
-    updated_at: 2026-06-15T00:00:00Z
   i3_obsidian_plugin:
     label: "Obsidian プラグイン (#3)"
     status: todo
@@ -133,18 +119,12 @@ process:
     label: 生成系再構成
   publish_cli:
     label: CLI公開
-  fill_group_clusters:
-    label: クラスタ塗り実装
-  implement_graph_nav:
-    label: 閲覧支援実装
   build_obsidian_plugin:
     label: Obsidianプラグイン実装
   implement_orphan_lint:
     label: 孤児検出lint実装
   layer_audit_assets:
     label: L3資産階層化
-  implement_pdf_png_export:
-    label: PDF/PNGエクスポート実装
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -186,9 +166,7 @@ cli_tool >> layer_audit_assets -> audit_distribution
 
 adr_corpus >> write_article -> i12_article
 
-cli_tool >> fill_group_clusters -> i15_group_fill
 
-cli_tool >> implement_graph_nav -> i17_graph_nav
 
 
 
@@ -197,6 +175,5 @@ cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 cli_tool >> implement_orphan_lint -> i37_orphan_lint
 
-cli_tool >> implement_pdf_png_export -> i72_pdf_png_export
 
 
