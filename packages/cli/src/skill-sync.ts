@@ -224,11 +224,18 @@ export async function ensureLabels(
 	let existing: string;
 	try {
 		existing = execGh(["label", "list"]);
-	} catch {
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException)?.code === "ENOENT") {
+			return {
+				created: [],
+				message:
+					"gh コマンドが見つかりません。flow:managed / flow:exempt ラベルは手動作成してください。\n",
+			};
+		}
+		const reason = err instanceof Error ? err.message : String(err);
 		return {
 			created: [],
-			message:
-				"gh コマンドが見つかりません。flow:managed / flow:exempt ラベルは手動作成してください。\n",
+			message: `gh ラベル確認に失敗しました（${reason}）。flow:managed / flow:exempt ラベルは手動で確認してください。\n`,
 		};
 	}
 

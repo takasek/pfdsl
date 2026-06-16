@@ -237,6 +237,17 @@ describe("ensureLabels", () => {
 		expect(result.created).toEqual([]);
 	});
 
+	it("returns a distinct non-fatal message when gh fails for a reason other than missing", async () => {
+		const execGh = () => {
+			throw new Error("auth required");
+		};
+		const result = await ensureLabels({ execGh, yes: false });
+		expect(result.created).toEqual([]);
+		expect(result.message).toContain("失敗");
+		expect(result.message).toContain("auth required");
+		expect(result.message).not.toContain("見つかりません");
+	});
+
 	it("skips when no labels are missing", async () => {
 		const execGh = (args: string[]) => {
 			if (args[0] === "label" && args[1] === "list") {
