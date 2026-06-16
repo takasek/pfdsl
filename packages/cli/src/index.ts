@@ -358,11 +358,15 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			// targets the directory the CLI is invoked from).
 			const targetRoot =
 				typeof flags.target === "string" ? flags.target : process.cwd();
-			const result = await runSkillSync({
-				targetRoot,
-				yes: flags.yes === true,
-			});
-			return ok(result.stdout);
+			try {
+				const result = await runSkillSync({
+					targetRoot,
+					yes: flags.yes === true,
+				});
+				return ok(result.stdout);
+			} catch (e) {
+				return fail(e instanceof Error ? `${e.message}\n` : String(e));
+			}
 		}
 		default:
 			return fail(`unknown command: ${command}\n${HELP}`, 2);
