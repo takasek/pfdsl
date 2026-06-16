@@ -1,3 +1,4 @@
+import { svgToBinary } from "@pfdsl/cli";
 import { formatEdges, sortEdges } from "@pfdsl/core";
 import { exportDot } from "@pfdsl/graphviz-exporter";
 import { extractMetadata, toTsv } from "@pfdsl/metadata-exporter";
@@ -19,6 +20,8 @@ export function registerExport(context: vscode.ExtensionContext): void {
 			const FORMATS = [
 				{ label: "DOT", description: ".dot" },
 				{ label: "SVG", description: ".svg" },
+				{ label: "PDF", description: ".pdf" },
+				{ label: "PNG", description: ".png" },
 				{ label: "TSV", description: ".tsv" },
 				{ label: "All (DOT + SVG + TSV)", description: "all" },
 			] as const;
@@ -78,6 +81,16 @@ export function registerExport(context: vscode.ExtensionContext): void {
 				content = Buffer.from(dot, "utf8");
 			} else if (ext === ".svg") {
 				content = Buffer.from(await renderDotToSvg(dot), "utf8");
+			} else if (ext === ".pdf" || ext === ".png") {
+				const svg = await renderDotToSvg(dot);
+				try {
+					content = await svgToBinary(svg, ext.slice(1) as "pdf" | "png");
+				} catch (e) {
+					vscode.window.showErrorMessage(
+						e instanceof Error ? e.message : String(e),
+					);
+					return;
+				}
 			} else {
 				content = Buffer.from(tsvContent, "utf8");
 			}

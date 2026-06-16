@@ -2,7 +2,7 @@
 	"name": "pfdsl",
 	"displayName": "PFDSL",
 	"description": "A DSL to define and visualize PFD (Process Flow Diagram) as code",
-	"version": "0.0.8",
+	"version": "0.0.10",
 	"publisher": "takasek",
 	"repository": {
 		"type": "git",
@@ -103,10 +103,19 @@
 	},
 	"dependencies": {
 		"@hpcc-js/wasm": "^2.18.0",
+		"@pfdsl/cli": "workspace:*",
 		"@pfdsl/core": "workspace:*",
 		"@pfdsl/graphviz-exporter": "workspace:*",
 		"@pfdsl/metadata-exporter": "workspace:*",
 		"@pfdsl/preview-engine": "workspace:*"
+	},
+	"peerDependencies": {
+		"puppeteer": ">=20.0.0"
+	},
+	"peerDependenciesMeta": {
+		"puppeteer": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
 		"@types/node": "^20.0.0",

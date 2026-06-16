@@ -125,11 +125,13 @@ export type CliRenderFormat = RenderFormat | BinaryFormat;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPuppeteer = any;
 
-async function svgToBinary(svg: string, format: BinaryFormat): Promise<Buffer> {
+export async function svgToBinary(
+	svg: string,
+	format: BinaryFormat,
+): Promise<Buffer> {
 	let puppeteer: AnyPuppeteer;
 	try {
-		const dep = "puppeteer";
-		puppeteer = await import(dep);
+		puppeteer = await import("puppeteer");
 	} catch {
 		throw new Error(
 			`PDF/PNG export requires puppeteer. Install it with:\n  npm install puppeteer`,
