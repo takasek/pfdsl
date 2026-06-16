@@ -14,6 +14,7 @@ import {
 	copyInstallLayer,
 	isL3Adopted,
 	resolveSkillRoot,
+	scaffoldL4Files,
 } from "./skill-sync.js";
 
 describe("resolveSkillRoot", () => {
@@ -127,5 +128,68 @@ describe("copyInstallLayer", () => {
 		expect(
 			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
 		).toBe(false);
+	});
+});
+
+describe("scaffoldL4Files", () => {
+	let targetRoot: string;
+
+	beforeEach(() => {
+		targetRoot = mkdtempSync(join(tmpdir(), "pfdsl-sync-test-"));
+	});
+
+	afterEach(() => {
+		rmSync(targetRoot, { recursive: true, force: true });
+	});
+
+	it("creates all 4 files under .pfdsl/ when none exist", () => {
+		const skillRoot = resolveSkillRoot();
+		const result = scaffoldL4Files(skillRoot, targetRoot);
+
+		expect(result.scaffolded.sort()).toEqual(
+			["ecosystem.md", "ecosystem.pfdsl", "roadmap.md", "roadmap.pfdsl"].sort(),
+		);
+		const roadmap = readFileSync(
+			join(targetRoot, ".pfdsl/roadmap.pfdsl"),
+			"utf-8",
+		);
+		expect(roadmap).toContain("seed");
+	});
+
+	it("does not touch a file that already exists", () => {
+		const skillRoot = resolveSkillRoot();
+		mkdirSync(join(targetRoot, ".pfdsl"), { recursive: true });
+		writeFileSync(
+			join(targetRoot, ".pfdsl/roadmap.pfdsl"),
+			"# pre-existing custom content\n",
+		);
+
+		const result = scaffoldL4Files(skillRoot, targetRoot);
+
+		expect(result.scaffolded).not.toContain("roadmap.pfdsl");
+		expect(result.scaffolded.sort()).toEqual(
+			["ecosystem.md", "ecosystem.pfdsl", "roadmap.md"].sort(),
+		);
+		const untouched = readFileSync(
+			join(targetRoot, ".pfdsl/roadmap.pfdsl"),
+			"utf-8",
+		);
+		expect(untouched).toBe("# pre-existing custom content\n");
+	});
+
+	it("returns empty scaffolded list when all 4 files already exist", () => {
+		const skillRoot = resolveSkillRoot();
+		mkdirSync(join(targetRoot, ".pfdsl"), { recursive: true });
+		for (const f of [
+			"roadmap.pfdsl",
+			"roadmap.md",
+			"ecosystem.pfdsl",
+			"ecosystem.md",
+		]) {
+			writeFileSync(join(targetRoot, ".pfdsl", f), "existing\n");
+		}
+
+		const result = scaffoldL4Files(skillRoot, targetRoot);
+		expect(result.scaffolded).toEqual([]);
 	});
 });

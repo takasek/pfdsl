@@ -116,3 +116,36 @@ export function copyInstallLayer(
 	}
 	return { copied: true, message: "" };
 }
+
+const L4_FILES = [
+	"roadmap.pfdsl",
+	"roadmap.md",
+	"ecosystem.pfdsl",
+	"ecosystem.md",
+] as const;
+
+export interface ScaffoldResult {
+	scaffolded: string[];
+}
+
+/**
+ * Scaffolds the 4 L4 files (.pfdsl/{roadmap,ecosystem}.{pfdsl,md}) at target
+ * root, one at a time, only when each is individually missing. Existing
+ * files are never touched (idempotent, no overwrite).
+ */
+export function scaffoldL4Files(
+	skillRoot: string,
+	targetRoot: string,
+): ScaffoldResult {
+	const scaffolded: string[] = [];
+	const targetDir = join(targetRoot, ".pfdsl");
+	const templateDir = join(skillRoot, "references/scaffold");
+	mkdirSync(targetDir, { recursive: true });
+	for (const file of L4_FILES) {
+		const dest = join(targetDir, file);
+		if (existsSync(dest)) continue;
+		cpSync(join(templateDir, file), dest);
+		scaffolded.push(file);
+	}
+	return { scaffolded };
+}
