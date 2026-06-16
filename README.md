@@ -101,6 +101,7 @@ pfdsl fmt <file> [--write]            # format (stdout, or rewrite in place)
 pfdsl normalize <file>                # canonical edge list
 pfdsl graph <file> [--format dot|svg] # Graphviz DOT (default) or SVG
 pfdsl diff <a> <b>                    # structural diff (nodes / edges / feedback)
+pfdsl skill sync <name> [--yes]       # sync a bundled skill (currently: pfd-ops) into the cwd
 pfdsl help
 ```
 
@@ -136,6 +137,22 @@ node scripts/gen-skill.mjs --out ~/.claude/skills/pfdsl
 ```
 
 The `--out` path must contain `/.claude/` (safety check). The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alongside `SKILL.md`.
+
+## pfd-ops skill — `skill sync` (cross-project)
+
+`pfd-ops` is a separate skill for **PFD-driven project operations**: it drives a work cycle off a roadmap/ecosystem graph (see [.claude/skills/pfd-ops/SKILL.md](.claude/skills/pfd-ops/SKILL.md)). Any repo can adopt it and keep it up to date with one command:
+
+```bash
+npx @pfdsl/cli@latest skill sync pfd-ops
+```
+
+Run at a target repo's root, it is idempotent and:
+
+- mirrors the skill into `.claude/skills/pfd-ops/` (SKILL.md, references, and the `install/` templates)
+- scaffolds `.pfdsl/{roadmap,ecosystem}.{pfdsl,md}` **only when missing**, then prints a prompt for growing the ecosystem graph (existing files are never overwritten)
+- refreshes the GitHub-Issues backend (`install/`: workflows + audit scripts deployed at repo root) **only if already adopted**; otherwise prints how to adopt it (`cp -r .claude/skills/pfd-ops/install/. .`)
+
+`--yes` auto-confirms `gh` label creation (`flow:managed` / `flow:exempt`) for non-interactive use.
 
 ## Library
 
