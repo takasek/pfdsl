@@ -1,0 +1,24 @@
+---
+title: Issue 依存フロー
+description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。詳細は sibling roadmap.md 参照。
+
+statusStyles:
+  done: { fillcolor: "#d4edda", style: filled }
+  wip: { fillcolor: "#fff3cd", style: filled }
+  todo: { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
+
+artifact:
+  seed:
+    label: (このプロジェクトの最初の入力 artifact に置き換える)
+    status: done
+  first_milestone:
+    label: (最初のマイルストーンに置き換える)
+    status: todo
+
+process:
+  start_work:
+    label: (最初の作業プロセスに置き換える)
+---
+
+seed >> start_work -> first_milestone
