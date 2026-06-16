@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,4 +42,44 @@ export function copyGeneralLayer(skillRoot: string, targetRoot: string): void {
 		if (entry === "install") continue;
 		cpSync(join(skillRoot, entry), join(dest, entry), { recursive: true });
 	}
+}
+
+/**
+ * Recursively lists all file paths under `dir`, relative to `dir`,
+ * using forward-slash separators (matches install/ tree's repo-root-relative
+ * layout, e.g. ".github/workflows/check-pfd-ops-sync.yml").
+ */
+function listFilesRecursive(dir: string, prefix = ""): string[] {
+	const out: string[] = [];
+	for (const entry of readdirSync(dir)) {
+		const abs = join(dir, entry);
+		const rel = prefix ? `${prefix}/${entry}` : entry;
+		if (statSync(abs).isDirectory()) {
+			out.push(...listFilesRecursive(abs, rel));
+		} else {
+			out.push(rel);
+		}
+	}
+	return out;
+}
+
+/**
+ * Returns the list of relative paths that install/ deploys to repo root,
+ * derived dynamically from the bundled install/ tree (not hardcoded).
+ */
+export function listInstallFiles(skillRoot: string): string[] {
+	const installDir = join(skillRoot, "install");
+	if (!existsSync(installDir)) return [];
+	return listFilesRecursive(installDir);
+}
+
+/**
+ * L3 (GitHub Issues backend / install/ mechanism) is considered adopted if
+ * any install/-derived file already exists at the target repo root.
+ * Adoption is all-or-nothing (cp -r install/. .), so a single hit is enough.
+ */
+export function isL3Adopted(skillRoot: string, targetRoot: string): boolean {
+	return listInstallFiles(skillRoot).some((rel) =>
+		existsSync(join(targetRoot, rel)),
+	);
 }
