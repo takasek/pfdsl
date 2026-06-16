@@ -31,3 +31,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
 - [ ] close 時の降格規則を適用した（定義は L3 reference。専属 process も含めて削除する）
+- [ ] toolchain（packages/）に新規 artifact/process が増えた場合、`docs/pfdsl_implementation_flow.pfdsl` に追記した（CLAUDE.md の dogfooding 規約。該当なしも判断として記録）
+- [ ] `packages/cli` を変更した場合、npm 公開（`v*` tag push）が必要か確認した（pending なら次サイクルの先頭タスクとして明記する — 忘れると `published_cli` が無期限に stale になる）
+
+これら2項目は2026-06-16 の /pfd-retro で発見: #72/#74・#15/#77・#17/#81 の3PRが連続して impl_flow を更新せず、`@pfdsl/cli` の npm 公開も #74 以降止まっていた（main の package.json も npm 上も 0.0.4 のまま）。ルール（CLAUDE.md）はあったがゲートに写っていなかった。
