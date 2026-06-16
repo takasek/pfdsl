@@ -161,15 +161,16 @@ function refreshMinimap() {
 	clone.setAttribute("height", String(scaledH));
 	clone.style.width = `${scaledW}px`;
 	clone.style.height = `${scaledH}px`;
-	minimapSvg.innerHTML = "";
-	minimapSvg.appendChild(clone);
+	minimapSvg.replaceChildren(clone);
 	minimap.style.display = "block";
 	updateMinimapVp();
 }
 
+let minimapDragRect: DOMRect | null = null;
+
 function panToMinimapPoint(clientX: number, clientY: number) {
 	if (!svgNatW || !svgNatH) return;
-	const rect = minimap.getBoundingClientRect();
+	const rect = minimapDragRect ?? minimap.getBoundingClientRect();
 	const gx = (clientX - rect.left) / mmScale;
 	const gy = (clientY - rect.top) / mmScale;
 	panX = root.clientWidth / 2 - gx * scale;
@@ -275,6 +276,7 @@ window.addEventListener("mousemove", (e) => {
 window.addEventListener("mouseup", () => {
 	dragging = false;
 	minimapDragging = false;
+	minimapDragRect = null;
 	root.style.cursor = "grab";
 });
 
@@ -296,6 +298,7 @@ root.addEventListener("dblclick", (e) => {
 minimap.addEventListener("mousedown", (e) => {
 	e.stopPropagation();
 	minimapDragging = true;
+	minimapDragRect = minimap.getBoundingClientRect();
 	panToMinimapPoint(e.clientX, e.clientY);
 });
 minimap.addEventListener("dblclick", (e) => {
@@ -360,26 +363,19 @@ window.addEventListener("message", async (event) => {
 				svgEl.getAttribute("height"),
 			);
 		}
-		if (!hasPositioned) {
-			hasPositioned = true;
-			const focusNodeId = msg.focusNodeId;
-			log("scheduling center, focusNodeId:", focusNodeId);
-			requestAnimationFrame(() => {
+		const focusNodeId = msg.focusNodeId;
+		const shouldCenter = !hasPositioned;
+		hasPositioned = true;
+		requestAnimationFrame(() => {
+			if (shouldCenter) {
 				log("rAF fired, inner.offsetWidth:", inner.offsetWidth);
 				centerGraph();
 				if (focusNodeId) focusNode(focusNodeId);
-				refreshMinimap();
-			});
-		} else if (lastFocusedNodeId) {
-			requestAnimationFrame(() => {
-				if (lastFocusedNodeId) focusNode(lastFocusedNodeId);
-				refreshMinimap();
-			});
-		} else {
-			requestAnimationFrame(() => {
-				refreshMinimap();
-			});
-		}
+			} else if (lastFocusedNodeId) {
+				focusNode(lastFocusedNodeId);
+			}
+			refreshMinimap();
+		});
 		if (currentDiff) renderDiffPanel(currentDiff);
 	} catch (e) {
 		log("render error:", (e as Error).message);
