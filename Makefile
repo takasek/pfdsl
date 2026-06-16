@@ -95,3 +95,19 @@ push: check-docs
 		git add .claude/skills skills && git commit -m "chore: regenerate skills"; \
 	fi
 	git push
+
+# @pfdsl/cli を npm 公開する。packages/cli/package.json の version から
+# v<version> タグを打って push し、publish-cli.yml (OIDC) を起動する。
+# 事前に version を上げてコミット・マージしておくこと。
+.PHONY: release
+release:
+	@VERSION=$$(node -p "require('./packages/cli/package.json').version"); \
+	BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$BRANCH" != "main" ]; then echo "main ブランチで実行してください (現在: $$BRANCH)"; exit 1; fi; \
+	if [ -n "$$(git status --porcelain)" ]; then echo "作業ツリーに未コミットの変更があります"; exit 1; fi; \
+	if git rev-parse "v$$VERSION" >/dev/null 2>&1; then echo "タグ v$$VERSION は既に存在します (version を上げてください)"; exit 1; fi; \
+	git fetch origin main --quiet; \
+	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
+	echo "v$$VERSION を打って push します (publish-cli.yml が起動)"; \
+	git tag "v$$VERSION"; \
+	git push origin "v$$VERSION"

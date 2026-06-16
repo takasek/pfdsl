@@ -40,18 +40,20 @@ export function resolveSkillRoot(): string {
 }
 
 /**
- * Copies the general layer (SKILL.md + references/*) from the bundled skill
- * root into `<targetRoot>/.claude/skills/pfd-ops/`, unconditionally
- * mirroring: each copied entry's existing destination is removed first, so
- * files deleted/renamed upstream don't linger in the adopter. The install/
- * subtree is excluded from this mirror — and never removed — since its copy
- * is conditional on L3 adoption (handled separately).
+ * Mirrors the whole bundled skill tree (SKILL.md + references/ + install/
+ * templates) into `<targetRoot>/.claude/skills/pfd-ops/`, unconditionally:
+ * each entry's existing destination is removed first, so files deleted/renamed
+ * upstream don't linger in the adopter.
+ *
+ * install/ is included so a fresh adopter has the canonical templates on disk
+ * and can run `cp -r .claude/skills/pfd-ops/install/. .` to adopt L3.
+ * Deploying install/ to the repo root is a separate, adoption-gated step
+ * (see copyInstallLayer).
  */
-export function copyGeneralLayer(skillRoot: string, targetRoot: string): void {
+export function copySkillTree(skillRoot: string, targetRoot: string): void {
 	const dest = join(targetRoot, ".claude/skills/pfd-ops");
 	mkdirSync(dest, { recursive: true });
 	for (const entry of readdirSync(skillRoot)) {
-		if (entry === "install") continue;
 		rmSync(join(dest, entry), { recursive: true, force: true });
 		cpSync(join(skillRoot, entry), join(dest, entry), { recursive: true });
 	}
@@ -286,8 +288,8 @@ export async function runSkillSync(
 	const skillRoot = resolveSkillRoot();
 	const lines: string[] = [];
 
-	copyGeneralLayer(skillRoot, opts.targetRoot);
-	lines.push("pfd-ops general layer (SKILL.md, references/) synced.");
+	copySkillTree(skillRoot, opts.targetRoot);
+	lines.push("pfd-ops skill tree synced (.claude/skills/pfd-ops/).");
 
 	const installResult = copyInstallLayer(skillRoot, opts.targetRoot);
 	if (installResult.copied) {
