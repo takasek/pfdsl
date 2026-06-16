@@ -134,6 +134,22 @@ artifact:
   agent_skill:
     label: AI agentスキル (pfdsl読み書き)
     status: done
+  pdf_png_export:
+    label: PDF/PNGエクスポート
+    status: done
+    description: "cli_tool の graph --format pdf|png。Puppeteer (headless Chromium) 経由でSVG→PDF/PNG変換、optional peer dependencyとして実装（#72/#74、拡張連携は#83）"
+  group_fill_export:
+    label: groupクラスタ塗り
+    status: done
+    description: "graphviz_exporter のsubgraph clusterにstyle=filledを付与し宣言色をfillcolorとして適用（#15/#77）"
+  preview_minimap:
+    label: プレビューminimap
+    status: done
+    description: "vscode拡張プレビューパネルへのminimapオーバーレイ、ドラッグでメインビュー追従（#17/#81）"
+  skill_sync_command:
+    label: skill syncコマンド
+    status: done
+    description: "\`pfdsl skill sync pfd-ops\`。外部採用リポの pfd-ops を一発最新化。npm同梱（tsup onSuccessで dist/skills/pfd-ops へコピー）+ L3採用済み判定で install/ 条件付き上書き + L4 scaffold + gh ラベル確認。consumer = 外部プロジェクトでの pfd-ops 運用（#90、設計 docs/superpowers/specs/2026-06-16-pfd-ops-sync-command-design.md）。v0.0.5 で公開予定"
 
 process:
   define_architecture:
@@ -206,6 +222,14 @@ process:
     label: CLI npm公開
   write_agent_skill:
     label: AI agentスキル作成
+  implement_pdf_png_export:
+    label: PDF/PNGエクスポート実装
+  implement_group_fill_export:
+    label: groupクラスタ塗り実装
+  implement_preview_minimap:
+    label: minimap実装
+  implement_skill_sync:
+    label: skill sync実装
 ---
 
 # Phase 0: アーキテクチャ定義
@@ -237,6 +261,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -248,14 +273,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -267,7 +296,9 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -275,6 +306,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 syntax_highlight
 token_spec
 validator
@@ -311,6 +343,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -322,14 +355,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -341,12 +378,15 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
 rc_extension
 release_marketplace
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -383,6 +423,7 @@ format_command
 formatter
 frontmatter_loader
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -394,14 +435,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -413,7 +458,9 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -421,6 +468,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 validator
@@ -460,6 +508,7 @@ format_command
 formatter
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -470,14 +519,18 @@ implement_diff_analysis
 implement_format_command
 implement_formatter
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -489,13 +542,16 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
 rc_extension
 release_marketplace
 repo_scaffold
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -535,6 +591,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -546,13 +603,17 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -563,13 +624,16 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
 rc_extension
 release_marketplace
 repo_scaffold
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 validator
@@ -609,6 +673,7 @@ format_command
 formatter
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -620,13 +685,17 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -636,13 +705,16 @@ metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
 rc_extension
 release_marketplace
 repo_scaffold
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 validator
@@ -680,6 +752,7 @@ format_command
 formatter
 frontmatter_loader
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -691,13 +764,17 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -707,7 +784,9 @@ lexer
 metadata_exporter
 package_core_library
 package_release_candidate
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -715,6 +794,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -752,6 +832,7 @@ format_command
 formatter
 frontmatter_loader
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -762,14 +843,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -780,7 +865,9 @@ metadata_exporter
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -788,6 +875,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -826,6 +914,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -837,14 +926,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 integrate_core_modules
 integrate_vscode_extension
@@ -854,7 +947,9 @@ metadata_exporter
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -862,6 +957,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -898,6 +994,7 @@ format_command
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -908,14 +1005,18 @@ implement_diff_analysis
 implement_format_command
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -926,7 +1027,9 @@ metadata_exporter
 normalizer
 package_core_library
 package_release_candidate
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -934,6 +1037,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -974,6 +1078,7 @@ diff_analyzer
 format_command
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -985,14 +1090,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_vscode_extension
@@ -1000,7 +1109,9 @@ language_service
 metadata_exporter
 package_core_library
 package_release_candidate
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -1008,6 +1119,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1044,6 +1156,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -1055,14 +1168,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1073,13 +1190,16 @@ metadata_exporter
 normalizer
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
 rc_extension
 release_marketplace
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1118,6 +1238,7 @@ format_command
 formatter
 frontmatter_loader
 graph_schema
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -1128,14 +1249,18 @@ implement_diff_analysis
 implement_format_command
 implement_formatter
 implement_frontmatter_loader
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1147,7 +1272,9 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -1155,6 +1282,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1196,6 +1324,7 @@ format_command
 formatter
 frontmatter_loader
 graph_schema
+group_fill_export
 hover_support
 implement_canonical_sorter
 implement_cli_wrapper
@@ -1205,14 +1334,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1224,13 +1357,16 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
 rc_extension
 release_marketplace
 repo_scaffold
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1268,6 +1404,7 @@ format_command
 formatter
 frontmatter_loader
 graph_schema
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -1279,13 +1416,17 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1297,6 +1438,8 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -1304,6 +1447,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1340,6 +1484,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -1350,14 +1495,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1369,7 +1518,9 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -1377,6 +1528,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1416,6 +1568,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -1427,14 +1580,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1446,13 +1603,16 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
 rc_extension
 release_marketplace
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1502,6 +1662,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 implement_canonical_sorter
@@ -1510,11 +1671,15 @@ implement_diff_analysis
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
+implement_skill_sync
 implement_validator
 integrate_core_modules
 integrate_vscode_extension
@@ -1524,12 +1689,15 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
+preview_minimap
 publish_cli
 published_extension
 rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 token_spec
 validator
@@ -1569,6 +1737,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 implement_canonical_sorter
@@ -1579,14 +1748,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1596,13 +1769,16 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 publish_cli
 published_extension
 rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 token_spec
 validator
@@ -1641,6 +1817,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -1652,14 +1829,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1670,13 +1851,16 @@ metadata_exporter
 normalizer
 package_core_library
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1714,6 +1898,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -1725,14 +1910,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1744,11 +1933,14 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1788,6 +1980,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -1799,14 +1992,18 @@ implement_format_command
 implement_formatter
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
 implement_preview_engine
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1818,13 +2015,16 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1864,6 +2064,7 @@ formatter
 frontmatter_loader
 graph_schema
 graphviz_exporter
+group_fill_export
 group_subgraph_export
 group_types
 hover_support
@@ -1874,13 +2075,17 @@ implement_diff_analysis
 implement_format_command
 implement_frontmatter_loader
 implement_graphviz_exporter
+implement_group_fill_export
 implement_hover_support
 implement_language_service
 implement_lexer
 implement_metadata_exporter
 implement_normalizer
 implement_parser
+implement_pdf_png_export
+implement_preview_minimap
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 integrate_core_modules
 integrate_vscode_extension
@@ -1891,7 +2096,9 @@ normalizer
 package_core_library
 package_release_candidate
 parser
+pdf_png_export
 preview_engine
+preview_minimap
 preview_panel
 publish_cli
 published_extension
@@ -1899,6 +2106,7 @@ rc_extension
 release_marketplace
 repo_scaffold
 shared_types
+skill_sync_command
 spec_v0_0_2
 syntax_highlight
 token_spec
@@ -1910,13 +2118,19 @@ write_agent_skill
 # 周辺ツール
 
 cli_tool >> implement_diff_analysis
+cli_tool >> implement_pdf_png_export
 cli_tool >> publish_cli
 cli_tool >> write_agent_skill
 implement_diff_analysis -> diff_analyzer
+implement_pdf_png_export -> pdf_png_export
 publish_cli -> cli_published
 write_agent_skill -> agent_skill
 core_library >> implement_metadata_exporter
 implement_metadata_exporter -> metadata_exporter
+graphviz_exporter >> implement_group_fill_export
+implement_group_fill_export -> group_fill_export
+preview_panel >> implement_preview_minimap
+implement_preview_minimap -> preview_minimap
 adopt_daily_workflow
 ast_schema
 build_config
@@ -1938,7 +2152,6 @@ format_command
 formatter
 frontmatter_loader
 graph_schema
-graphviz_exporter
 group_subgraph_export
 group_types
 hover_support
@@ -1956,6 +2169,7 @@ implement_normalizer
 implement_parser
 implement_preview_engine
 implement_preview_panel
+implement_skill_sync
 implement_syntax_highlight
 implement_validator
 integrate_core_modules
@@ -1967,7 +2181,87 @@ package_core_library
 package_release_candidate
 parser
 preview_engine
+published_extension
+rc_extension
+release_marketplace
+repo_scaffold
+shared_types
+skill_sync_command
+spec_v0_0_2
+syntax_highlight
+token_spec
+validator
+vscode_extension
+vscode_shell
+workflow_usage
+
+cli_tool >> implement_skill_sync
+implement_skill_sync -> skill_sync_command
+adopt_daily_workflow
+agent_skill
+ast_schema
+build_config
+canonical_sorter
+cli_published
+core_architecture
+core_library
+core_modules
+create_vscode_extension_shell
+define_architecture
+define_ast_schema
+define_build_policy
+define_diagnostic_schema
+define_graph_schema
+define_repo_structure
+define_shared_types
+define_token_rules
+diagnostic_schema
+diagnostics_ui
+diff_analyzer
+format_command
+formatter
+frontmatter_loader
+graph_schema
+graphviz_exporter
+group_fill_export
+group_subgraph_export
+group_types
+hover_support
+implement_canonical_sorter
+implement_cli_wrapper
+implement_diagnostics_ui
+implement_diff_analysis
+implement_format_command
+implement_formatter
+implement_frontmatter_loader
+implement_graphviz_exporter
+implement_group_fill_export
+implement_hover_support
+implement_language_service
+implement_lexer
+implement_metadata_exporter
+implement_normalizer
+implement_parser
+implement_pdf_png_export
+implement_preview_engine
+implement_preview_minimap
+implement_preview_panel
+implement_syntax_highlight
+implement_validator
+integrate_core_modules
+integrate_vscode_extension
+language_service
+lexer
+metadata_exporter
+normalizer
+package_core_library
+package_release_candidate
+parser
+pdf_png_export
+preview_engine
+preview_minimap
 preview_panel
+publish_cli
 published_extension
 rc_extension
 release_marketplace
@@ -1980,5 +2274,6 @@ validator
 vscode_extension
 vscode_shell
 workflow_usage
+write_agent_skill
 "
 `;
