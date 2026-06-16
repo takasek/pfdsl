@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { cpSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -27,4 +27,19 @@ export function resolveSkillRoot(): string {
 	throw new Error(
 		`pfd-ops skill tree not found at ${distCandidate} or ${sourceCandidate}`,
 	);
+}
+
+/**
+ * Copies the general layer (SKILL.md + references/*) from the bundled skill
+ * root into `<targetRoot>/.claude/skills/pfd-ops/`, unconditionally
+ * overwriting. The install/ subtree is excluded — its copy is conditional
+ * on L3 adoption (handled in a later task).
+ */
+export function copyGeneralLayer(skillRoot: string, targetRoot: string): void {
+	const dest = join(targetRoot, ".claude/skills/pfd-ops");
+	mkdirSync(dest, { recursive: true });
+	for (const entry of readdirSync(skillRoot)) {
+		if (entry === "install") continue;
+		cpSync(join(skillRoot, entry), join(dest, entry), { recursive: true });
+	}
 }
