@@ -232,7 +232,13 @@ export async function ensureLabels(
 		};
 	}
 
-	const missing = REQUIRED_LABELS.filter((label) => !existing.includes(label));
+	const names = new Set(
+		existing
+			.split("\n")
+			.filter((line) => line.trim() !== "")
+			.map((line) => line.split("\t")[0]!.trim()),
+	);
+	const missing = REQUIRED_LABELS.filter((label) => !names.has(label));
 	if (missing.length === 0) {
 		return { created: [], message: "" };
 	}

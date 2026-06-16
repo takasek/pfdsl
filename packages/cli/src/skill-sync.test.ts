@@ -248,6 +248,22 @@ describe("ensureLabels", () => {
 		expect(result.created).toEqual([]);
 	});
 
+	it("does not treat a substring-overlapping label as present (exact match only)", async () => {
+		const created: string[] = [];
+		const execGh = (args: string[]) => {
+			if (args[0] === "label" && args[1] === "list") {
+				return "flow:managed-archive\tc\td\nlegacy-flow:exempt\tc\td\n";
+			}
+			if (args[0] === "label" && args[1] === "create") {
+				created.push(args[2]!);
+				return "";
+			}
+			throw new Error(`unexpected gh call: ${args.join(" ")}`);
+		};
+		const result = await ensureLabels({ execGh, yes: true });
+		expect(result.created.sort()).toEqual(["flow:exempt", "flow:managed"]);
+	});
+
 	it("creates missing labels with --yes (no prompt)", async () => {
 		const created: string[] = [];
 		const execGh = (args: string[]) => {
