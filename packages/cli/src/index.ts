@@ -11,6 +11,7 @@ import {
 	sortEdges,
 } from "@pfdsl/core";
 import { type RenderFormat, renderGraph } from "@pfdsl/preview-engine";
+import { runSkillSync } from "./skill-sync.js";
 
 export interface CommandResult {
 	stdout: string;
@@ -250,6 +251,9 @@ Commands:
                            Print Graphviz DOT (default), SVG, PDF, or PNG
                            PDF/PNG requires: npm install puppeteer
   diff <a> <b>             Print structural diff between two files
+  skill sync <name> [--yes]
+                           Sync a bundled skill (currently: pfd-ops) into the current directory
+                           --yes     auto-confirm gh label creation (non-interactive)
   help                     Show this help
 `;
 
@@ -341,6 +345,28 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			const [a, b] = positional;
 			if (!a || !b) return fail("usage: pfdsl diff <a> <b>\n", 2);
 			return runDiff(a, b);
+		}
+		case "skill": {
+			const [sub, name] = positional;
+			if (sub !== "sync" || !name) {
+				return fail("usage: pfdsl skill sync <name> [--yes]\n", 2);
+			}
+			if (name !== "pfd-ops") {
+				return fail(`unknown skill: ${name}\n`, 2);
+			}
+			// --target overrides cwd; intended for tests only (production always
+			// targets the directory the CLI is invoked from).
+			const targetRoot =
+				typeof flags.target === "string" ? flags.target : process.cwd();
+			try {
+				const result = await runSkillSync({
+					targetRoot,
+					yes: flags.yes === true,
+				});
+				return ok(result.stdout);
+			} catch (e) {
+				return fail(e instanceof Error ? `${e.message}\n` : String(e));
+			}
 		}
 		default:
 			return fail(`unknown command: ${command}\n${HELP}`, 2);

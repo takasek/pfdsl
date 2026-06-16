@@ -143,6 +143,10 @@ artifact:
     label: プレビューminimap
     status: done
     description: "vscode拡張プレビューパネルへのminimapオーバーレイ、ドラッグでメインビュー追従（#17/#81）"
+  skill_sync_command:
+    label: skill syncコマンド
+    status: done
+    description: "`pfdsl skill sync pfd-ops`。外部採用リポの pfd-ops を一発最新化。npm同梱（tsup onSuccessで dist/skills/pfd-ops へコピー）+ L3採用済み判定で install/ 条件付き上書き + L4 scaffold + gh ラベル確認。consumer = 外部プロジェクトでの pfd-ops 運用（#90、設計 docs/superpowers/specs/2026-06-16-pfd-ops-sync-command-design.md）。v0.0.5 で公開予定"
 
 process:
   define_architecture:
@@ -221,6 +225,8 @@ process:
     label: groupクラスタ塗り実装
   implement_preview_minimap:
     label: minimap実装
+  implement_skill_sync:
+    label: skill sync実装
 ---
 
 # Phase 0: アーキテクチャ定義
@@ -310,3 +316,5 @@ cli_tool >> write_agent_skill -> agent_skill
 cli_tool >> implement_pdf_png_export -> pdf_png_export
 graphviz_exporter >> implement_group_fill_export -> group_fill_export
 preview_panel >> implement_preview_minimap -> preview_minimap
+
+cli_tool >> implement_skill_sync -> skill_sync_command

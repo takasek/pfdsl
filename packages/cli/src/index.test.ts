@@ -1,4 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -178,6 +184,40 @@ describe("check --summary", () => {
 		const r = await run(["check", join(dir, "invalid.pfdsl"), "--summary"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).not.toMatch(/artifacts:/);
+	});
+});
+
+describe("skill sync", () => {
+	it("usage error for bare 'skill'", async () => {
+		const r = await run(["skill"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("usage: pfdsl skill sync <name>");
+	});
+
+	it("usage error for unknown skill sync target", async () => {
+		const r = await run(["skill", "sync", "nonexistent-skill"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("unknown skill: nonexistent-skill");
+	});
+
+	it("syncs pfd-ops into target directory with --yes", async () => {
+		const target = mkdtempSync(join(tmpdir(), "pfdsl-skill-sync-cli-"));
+		try {
+			const r = await run([
+				"skill",
+				"sync",
+				"pfd-ops",
+				"--target",
+				target,
+				"--yes",
+			]);
+			expect(r.exitCode).toBe(0);
+			expect(existsSync(join(target, ".claude/skills/pfd-ops/SKILL.md"))).toBe(
+				true,
+			);
+		} finally {
+			rmSync(target, { recursive: true, force: true });
+		}
 	});
 });
 
