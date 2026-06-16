@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	copyGeneralLayer,
 	copyInstallLayer,
+	ecosystemSetupPrompt,
 	isL3Adopted,
 	resolveSkillRoot,
 	scaffoldL4Files,
@@ -191,5 +192,19 @@ describe("scaffoldL4Files", () => {
 
 		const result = scaffoldL4Files(skillRoot, targetRoot);
 		expect(result.scaffolded).toEqual([]);
+	});
+});
+
+describe("ecosystemSetupPrompt", () => {
+	it("returns the prompt content when scaffolded list is non-empty", () => {
+		const skillRoot = resolveSkillRoot();
+		const prompt = ecosystemSetupPrompt(skillRoot, ["roadmap.pfdsl"]);
+		expect(prompt).toContain("ecosystem.pfdsl 構築プロンプト");
+	});
+
+	it("returns empty string when scaffolded list is empty", () => {
+		const skillRoot = resolveSkillRoot();
+		const prompt = ecosystemSetupPrompt(skillRoot, []);
+		expect(prompt).toBe("");
 	});
 });

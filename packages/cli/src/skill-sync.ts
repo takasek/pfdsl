@@ -1,4 +1,11 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	statSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -148,4 +155,21 @@ export function scaffoldL4Files(
 		scaffolded.push(file);
 	}
 	return { scaffolded };
+}
+
+/**
+ * Returns the ecosystem-setup prompt content (read from the bundled
+ * reference template) when at least one L4 file was scaffolded this run.
+ * Returns "" when nothing was scaffolded (all L4 files already grown —
+ * avoid noise).
+ */
+export function ecosystemSetupPrompt(
+	skillRoot: string,
+	scaffolded: string[],
+): string {
+	if (scaffolded.length === 0) return "";
+	return readFileSync(
+		join(skillRoot, "references/ecosystem-setup-prompt.md"),
+		"utf-8",
+	);
 }
