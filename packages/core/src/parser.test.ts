@@ -30,7 +30,7 @@ describe("parseTokens", () => {
 		expect(stmt.segments).toHaveLength(1);
 		expect(stmt.segments[0]?.op).toBe(">>");
 		expect(stmt.segments[0]?.process.value).toBe("P");
-		expect(stmt.segments[0]?.output.ids[0]?.value).toBe("B");
+		expect(stmt.segments[0]?.output?.ids[0]?.value).toBe("B");
 	});
 
 	it("extended chain A >> P -> B >> Q -> C", () => {
@@ -39,7 +39,7 @@ describe("parseTokens", () => {
 		expect(stmt.type).toBe("chain");
 		expect(stmt.segments).toHaveLength(2);
 		expect(stmt.segments[1]?.process.value).toBe("Q");
-		expect(stmt.segments[1]?.output.ids[0]?.value).toBe("C");
+		expect(stmt.segments[1]?.output?.ids[0]?.value).toBe("C");
 	});
 
 	it("input edge A >> P", () => {
@@ -70,7 +70,7 @@ describe("parseTokens", () => {
 		const { document } = parse("[a, b] >> P -> [x, y]");
 		const stmt = document.statements[0] as ChainStatement;
 		expect(stmt.head.ids.map((i) => i.value)).toEqual(["a", "b"]);
-		expect(stmt.segments[0]?.output.ids.map((i) => i.value)).toEqual([
+		expect(stmt.segments[0]?.output?.ids.map((i) => i.value)).toEqual([
 			"x",
 			"y",
 		]);
