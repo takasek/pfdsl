@@ -40,7 +40,24 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、
 
 Yes の種別のファイルだけを育てる。
 
-## ステップ 3: 種別ごとに対話しながら構築する
+## ステップ 3: 必要な種別のテンプレートをコピーする
+
+ステップ 2 で Yes になった種別のテンプレートを `.pfdsl/` にコピーする。
+テンプレートは `skill sync pfd-ops` 実行後に以下のパスに配置されている:
+
+```
+.claude/skills/pfd-ops/references/scaffold/roadmap.pfdsl
+.claude/skills/pfd-ops/references/scaffold/roadmap.md
+.claude/skills/pfd-ops/references/scaffold/workflow.pfdsl
+.claude/skills/pfd-ops/references/scaffold/workflow.md
+.claude/skills/pfd-ops/references/scaffold/runtime-pipeline.pfdsl
+.claude/skills/pfd-ops/references/scaffold/runtime-pipeline.md
+```
+
+必要な種別のファイルだけを `.pfdsl/` にコピーする（不要な種別はコピーしない）。
+既に `.pfdsl/` にファイルが存在する場合は上書きしない。
+
+## ステップ 4: 種別ごとに対話しながら構築する
 
 承認された種別について、1ファイルずつ:
 
@@ -51,7 +68,7 @@ Yes の種別のファイルだけを育てる。
 
 pfdsl スキルの品質ガイドに従って記法を確認する。雛形のプレースホルダは実際のノード名に置き換える（プレースホルダのまま残さない）。
 
-## ステップ 4: 検証とゲート
+## ステップ 5: 検証とゲート
 
 - 各 `.pfdsl` ファイルに対して `pfdsl check <file>` が通ること
 - 作成した `.pfdsl` が `roadmap.pfdsl` に artifact として登録されているか確認する（未登録なら pfd-ops スキルの「成果物の門番」に従って登録する）

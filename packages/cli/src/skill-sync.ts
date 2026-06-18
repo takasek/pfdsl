@@ -132,46 +132,25 @@ export function copyInstallLayer(
 	return { copied: true, message: "" };
 }
 
-const L4_FILES = [
-	"roadmap.pfdsl",
-	"roadmap.md",
-	"workflow.pfdsl",
-	"workflow.md",
-] as const;
-
-export interface ScaffoldResult {
-	scaffolded: string[];
-}
-
 /**
- * Scaffolds the 4 L4 files (.pfdsl/{roadmap,workflow}.{pfdsl,md}) at target
- * root, one at a time, only when each is individually missing. Existing
- * files are never touched (idempotent, no overwrite).
+ * Returns guidance to run /pfd-ecosystem when .pfdsl/ contains no .pfdsl
+ * files yet. Templates for all three kinds (roadmap / workflow /
+ * runtime-pipeline) are available in the synced skill tree under
+ * .claude/skills/pfd-ops/references/scaffold/ — the user copies only the
+ * kinds their project needs via /pfd-ecosystem.
+ * Returns "" when .pfdsl/ already has at least one .pfdsl file.
  */
-export function scaffoldL4Files(
-	skillRoot: string,
-	targetRoot: string,
-): ScaffoldResult {
-	const scaffolded: string[] = [];
-	const targetDir = join(targetRoot, ".pfdsl");
-	const templateDir = join(skillRoot, "references/scaffold");
-	mkdirSync(targetDir, { recursive: true });
-	for (const file of L4_FILES) {
-		const dest = join(targetDir, file);
-		if (existsSync(dest)) continue;
-		cpSync(join(templateDir, file), dest);
-		scaffolded.push(file);
-	}
-	return { scaffolded };
-}
-
-/**
- * Returns a prompt to run /pfd-ecosystem when at least one L4 file was
- * scaffolded this run. Returns "" when nothing was scaffolded.
- */
-export function ecosystemSetupPrompt(scaffolded: string[]): string {
-	if (scaffolded.length === 0) return "";
-	return ".pfdsl/ が雛形（scaffold）のままです。`/pfd-ecosystem` スキルを起動してください。\n";
+export function pfdslDirGuidance(targetRoot: string): string {
+	const pfdslDir = join(targetRoot, ".pfdsl");
+	const hasAnyPfdsl =
+		existsSync(pfdslDir) &&
+		readdirSync(pfdslDir).some((f) => f.endsWith(".pfdsl"));
+	if (hasAnyPfdsl) return "";
+	return (
+		".pfdsl/ にファイルがありません。`/pfd-ecosystem` スキルを起動して\n" +
+		"プロジェクトに必要な種別（roadmap / workflow / runtime-pipeline）の\n" +
+		"テンプレートを .claude/skills/pfd-ops/references/scaffold/ からコピーしてください。\n"
+	);
 }
 
 const REQUIRED_LABELS = ["flow:managed", "flow:exempt"] as const;
@@ -315,13 +294,8 @@ export async function runSkillSync(
 		lines.push(installResult.message);
 	}
 
-	const scaffoldResult = scaffoldL4Files(skillRoot, opts.targetRoot);
-	if (scaffoldResult.scaffolded.length > 0) {
-		lines.push(`Scaffolded: ${scaffoldResult.scaffolded.join(", ")}`);
-	}
-
-	const prompt = ecosystemSetupPrompt(scaffoldResult.scaffolded);
-	if (prompt) lines.push(prompt);
+	const dirGuidance = pfdslDirGuidance(opts.targetRoot);
+	if (dirGuidance) lines.push(dirGuidance);
 
 	const pfdslGuidance = pfdslSkillGuidance(opts.targetRoot);
 	if (pfdslGuidance) lines.push(pfdslGuidance);
