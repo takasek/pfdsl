@@ -61,7 +61,7 @@ cp -r .claude/skills/pfd-ops/install/. .
 
 ## L4: リポ固有（配布対象外）
 
-採用リポ固有の事項。各リポの `.md` companion（`roadmap.md` / `ecosystem.md` 等）に記述する。
+採用リポ固有の事項。各リポの `.md` companion（`roadmap.md` / `workflow.md` 等）に記述する。
 
 pfdsl 開発リポ固有の例:
 - payoff_log: PFD の効果を収集する目的
@@ -77,7 +77,7 @@ pfdsl 開発リポ固有の例:
   references/
     architecture.md            ← このファイル
     github-issues-backend.md   ← L3 プリセット規約
-    ecosystem-setup-prompt.md  ← ecosystem.pfdsl 構築プロンプト
+    ecosystem-setup-prompt.md  ← scaffold 直後にClaudeへ渡すプロンプト（/pfd-ecosystem スキルを案内）
     scaffold/                  ← L4 雛形テンプレート
   install/                     ← L3 採用用テンプレート（リポルートへ cp -r）
     .github/workflows/         ← flow-on-issue-close 等

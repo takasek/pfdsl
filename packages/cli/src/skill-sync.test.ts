@@ -176,7 +176,7 @@ describe("scaffoldL4Files", () => {
 		const result = scaffoldL4Files(skillRoot, targetRoot);
 
 		expect(result.scaffolded.sort()).toEqual(
-			["ecosystem.md", "ecosystem.pfdsl", "roadmap.md", "roadmap.pfdsl"].sort(),
+			["workflow.md", "workflow.pfdsl", "roadmap.md", "roadmap.pfdsl"].sort(),
 		);
 		const roadmap = readFileSync(
 			join(targetRoot, ".pfdsl/roadmap.pfdsl"),
@@ -197,7 +197,7 @@ describe("scaffoldL4Files", () => {
 
 		expect(result.scaffolded).not.toContain("roadmap.pfdsl");
 		expect(result.scaffolded.sort()).toEqual(
-			["ecosystem.md", "ecosystem.pfdsl", "roadmap.md"].sort(),
+			["workflow.md", "workflow.pfdsl", "roadmap.md"].sort(),
 		);
 		const untouched = readFileSync(
 			join(targetRoot, ".pfdsl/roadmap.pfdsl"),
@@ -212,8 +212,8 @@ describe("scaffoldL4Files", () => {
 		for (const f of [
 			"roadmap.pfdsl",
 			"roadmap.md",
-			"ecosystem.pfdsl",
-			"ecosystem.md",
+			"workflow.pfdsl",
+			"workflow.md",
 		]) {
 			writeFileSync(join(targetRoot, ".pfdsl", f), "existing\n");
 		}
@@ -252,7 +252,7 @@ describe("ecosystemSetupPrompt", () => {
 	it("returns the prompt content when scaffolded list is non-empty", () => {
 		const skillRoot = resolveSkillRoot();
 		const prompt = ecosystemSetupPrompt(skillRoot, ["roadmap.pfdsl"]);
-		expect(prompt).toContain("ecosystem.pfdsl 構築プロンプト");
+		expect(prompt).toContain("pfd-ecosystem");
 	});
 
 	it("returns empty string when scaffolded list is empty", () => {
@@ -375,7 +375,7 @@ describe("runSkillSync", () => {
 		).toBe(false);
 		expect(existsSync(join(targetRoot, ".pfdsl/roadmap.pfdsl"))).toBe(true);
 		expect(result.stdout).toContain("cp -r .claude/skills/pfd-ops/install/. .");
-		expect(result.stdout).toContain("ecosystem.pfdsl 構築プロンプト");
+		expect(result.stdout).toContain("pfd-ecosystem");
 		expect(result.stdout).toContain("skill sync pfdsl");
 		expect(result.exitCode).toBe(0);
 	});
@@ -387,8 +387,8 @@ describe("runSkillSync", () => {
 		for (const f of [
 			"roadmap.pfdsl",
 			"roadmap.md",
-			"ecosystem.pfdsl",
-			"ecosystem.md",
+			"workflow.pfdsl",
+			"workflow.md",
 		]) {
 			writeFileSync(join(targetRoot, ".pfdsl", f), "existing\n");
 		}
@@ -405,7 +405,7 @@ describe("runSkillSync", () => {
 		expect(
 			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
 		).toBe(true);
-		expect(result.stdout).not.toContain("ecosystem.pfdsl 構築プロンプト");
+		expect(result.stdout).not.toContain("pfd-ecosystem");
 		expect(result.exitCode).toBe(0);
 	});
 });

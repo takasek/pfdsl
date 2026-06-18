@@ -1,0 +1,17 @@
+---
+title: (プロジェクト名) 運用ワークフロー
+description: この作業はどう繰り返されるか。誰が何をトリガーに何を行うか。詳細は sibling workflow.md 参照。
+
+artifact:
+  seed_input:
+    label: (繰り返しのトリガーに置き換える)
+  first_output:
+    label: (ワークフローの出力成果物に置き換える)
+    status: done
+
+process:
+  first_process:
+    label: (最初のプロセスに置き換える)
+---
+
+seed_input >> first_process -> first_output

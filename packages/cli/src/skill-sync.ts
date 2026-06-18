@@ -136,8 +136,8 @@ export function copyInstallLayer(
 const L4_FILES = [
 	"roadmap.pfdsl",
 	"roadmap.md",
-	"ecosystem.pfdsl",
-	"ecosystem.md",
+	"workflow.pfdsl",
+	"workflow.md",
 ] as const;
 
 export interface ScaffoldResult {
@@ -145,7 +145,7 @@ export interface ScaffoldResult {
 }
 
 /**
- * Scaffolds the 4 L4 files (.pfdsl/{roadmap,ecosystem}.{pfdsl,md}) at target
+ * Scaffolds the 4 L4 files (.pfdsl/{roadmap,workflow}.{pfdsl,md}) at target
  * root, one at a time, only when each is individually missing. Existing
  * files are never touched (idempotent, no overwrite).
  */
@@ -167,7 +167,7 @@ export function scaffoldL4Files(
 }
 
 /**
- * Returns the ecosystem-setup prompt content (read from the bundled
+ * Returns the workflow-setup prompt content (read from the bundled
  * reference template) when at least one L4 file was scaffolded this run.
  * Returns "" when nothing was scaffolded (all L4 files already grown —
  * avoid noise).
