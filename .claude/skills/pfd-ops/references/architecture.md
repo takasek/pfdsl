@@ -77,7 +77,6 @@ pfdsl 開発リポ固有の例:
   references/
     architecture.md            ← このファイル
     github-issues-backend.md   ← L3 プリセット規約
-    ecosystem-setup-prompt.md  ← scaffold 直後にClaudeへ渡すプロンプト（/pfd-ecosystem スキルを案内）
     scaffold/                  ← L4 雛形テンプレート
   install/                     ← L3 採用用テンプレート（リポルートへ cp -r）
     .github/workflows/         ← flow-on-issue-close 等

@@ -4,7 +4,6 @@ import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
-	readFileSync,
 	rmSync,
 	statSync,
 } from "node:fs";
@@ -167,20 +166,15 @@ export function scaffoldL4Files(
 }
 
 /**
- * Returns the workflow-setup prompt content (read from the bundled
- * reference template) when at least one L4 file was scaffolded this run.
- * Returns "" when nothing was scaffolded (all L4 files already grown —
- * avoid noise).
+ * Returns a prompt to run /pfd-ecosystem when at least one L4 file was
+ * scaffolded this run. Returns "" when nothing was scaffolded.
  */
 export function ecosystemSetupPrompt(
-	skillRoot: string,
+	_skillRoot: string,
 	scaffolded: string[],
 ): string {
 	if (scaffolded.length === 0) return "";
-	return readFileSync(
-		join(skillRoot, "references/ecosystem-setup-prompt.md"),
-		"utf-8",
-	);
+	return ".pfdsl/ が雛形（scaffold）のままです。`/pfd-ecosystem` スキルを起動してください。\n";
 }
 
 const REQUIRED_LABELS = ["flow:managed", "flow:exempt"] as const;
