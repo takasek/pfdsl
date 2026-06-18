@@ -31,6 +31,7 @@ digraph PFDSL {
   "frontmatter_loader" [shape=box, label="frontmatter_loader\nFrontmatterローダ", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "graph_schema" [shape=box, label="graph_schema\nグラフスキーマ", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "graphviz_exporter" [shape=box, label="graphviz_exporter\nGraphvizエクスポータ", width=2.30, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
+  "group_fill_export" [shape=box, label="group_fill_export\ngroupクラスタ塗り", tooltip="groupクラスタ塗り\n\ngraphviz_exporter のsubgraph clusterにstyle=filledを付与し宣言色をfillcolorとして適用（#15/#77）", width=2.00, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "group_subgraph_export" [shape=box, label="group_subgraph_export\nsubgraph cluster エクスポート (v0.0.5)", width=4.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "group_types" [shape=box, label="group_types\nGroupMeta型定義 (v0.0.5)", width=2.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "hover_support" [shape=box, label="hover_support\nホバーサポート", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
@@ -42,6 +43,7 @@ digraph PFDSL {
   "implement_formatter" [shape=ellipse, label="implement_formatter\nFormatter実装", width=2.20];
   "implement_frontmatter_loader" [shape=ellipse, label="implement_frontmatter_loader\nFrontmatterローダ実装", width=3.10];
   "implement_graphviz_exporter" [shape=ellipse, label="implement_graphviz_exporter\nGraphvizエクスポータ実装", width=3.00];
+  "implement_group_fill_export" [shape=ellipse, label="implement_group_fill_export\ngroupクラスタ塗り実装", width=3.00];
   "implement_group_subgraph_export" [shape=ellipse, label="implement_group_subgraph_export"];
   "implement_group_types" [shape=ellipse, label="implement_group_types"];
   "implement_hover_support" [shape=ellipse, label="implement_hover_support\nホバーサポート実装", width=2.60];
@@ -50,8 +52,11 @@ digraph PFDSL {
   "implement_metadata_exporter" [shape=ellipse, label="implement_metadata_exporter\nメタデータエクスポータ実装", width=3.00];
   "implement_normalizer" [shape=ellipse, label="implement_normalizer\nNormalizer実装", width=2.30];
   "implement_parser" [shape=ellipse, label="implement_parser\nParser実装", width=1.90];
+  "implement_pdf_png_export" [shape=ellipse, label="implement_pdf_png_export\nPDF/PNGエクスポート実装", width=2.70];
   "implement_preview_engine" [shape=ellipse, label="implement_preview_engine\nプレビューエンジン実装", width=2.70];
+  "implement_preview_minimap" [shape=ellipse, label="implement_preview_minimap\nminimap実装", width=2.80];
   "implement_preview_panel" [shape=ellipse, label="implement_preview_panel\nプレビューパネル実装", width=2.60];
+  "implement_skill_sync" [shape=ellipse, label="implement_skill_sync\nskill sync実装", width=2.30];
   "implement_syntax_highlight" [shape=ellipse, label="implement_syntax_highlight\nシンタックスハイライト実装", width=2.90];
   "implement_validator" [shape=ellipse, label="implement_validator\nValidator実装", width=2.20];
   "integrate_core_modules" [shape=ellipse, label="integrate_core_modules\nコアモジュール統合", width=2.50];
@@ -63,7 +68,9 @@ digraph PFDSL {
   "package_core_library" [shape=ellipse, label="package_core_library\nコアライブラリパッケージング", width=3.10];
   "package_release_candidate" [shape=ellipse, label="package_release_candidate\nRCパッケージング", width=2.80];
   "parser" [shape=box, label="parser\nParser実装", width=1.30, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
+  "pdf_png_export" [shape=box, label="pdf_png_export\nPDF/PNGエクスポート", tooltip="PDF/PNGエクスポート\n\ncli_tool の graph --format pdf|png。Puppeteer (headless Chromium) 経由でSVG→PDF/PNG変換、optional peer dependencyとして実装（#72/#74、拡張連携は#83）", width=2.20, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "preview_engine" [shape=box, label="preview_engine\nプレビューエンジン", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
+  "preview_minimap" [shape=box, label="preview_minimap\nプレビューminimap", tooltip="プレビューminimap\n\nvscode拡張プレビューパネルへのminimapオーバーレイ、ドラッグでメインビュー追従（#17/#81）", width=2.00, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "preview_panel" [shape=box, label="preview_panel\nプレビューパネル", width=1.90, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "publish_cli" [shape=ellipse, label="publish_cli\nCLI npm公開", width=1.40];
   "published_extension" [shape=box, label="published_extension\n公開版拡張", width=2.20, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
@@ -71,6 +78,7 @@ digraph PFDSL {
   "release_marketplace" [shape=ellipse, label="release_marketplace\nMarketplace公開", width=2.20];
   "repo_scaffold" [shape=box, label="repo_scaffold\nリポジトリ骨格", width=1.70, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "shared_types" [shape=box, label="shared_types\n共有型定義", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
+  "skill_sync_command" [shape=box, label="skill_sync_command\nskill syncコマンド", tooltip="skill syncコマンド\n\n`pfdsl skill sync pfd-ops`。外部採用リポの pfd-ops を一発最新化。npm同梱（tsup onSuccessで dist/skills/pfd-ops へコピー）+ L3採用済み判定で install/ 条件付き上書き + L4 scaffold + gh ラベル確認。consumer = 外部プロジェクトでの pfd-ops 運用（#90、設計 docs/superpowers/specs/2026-06-16-pfd-ops-sync-command-design.md）。v0.0.5 で公開予定", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "spec_v0_0_2" [shape=box, label="spec_v0_0_2\nPFDSL仕様書 v0.0.2", width=2.10, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled", penwidth="2"];
   "syntax_highlight" [shape=box, label="syntax_highlight\nシンタックスハイライト", width=2.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
   "token_spec" [shape=box, label="token_spec\nトークン規則", width=1.50, xlabel="done", fillcolor="lightgray", fontcolor="dimgray", style="filled"];
@@ -183,6 +191,14 @@ digraph PFDSL {
   "publish_cli" -> "cli_published";
   "cli_tool" -> "write_agent_skill";
   "write_agent_skill" -> "agent_skill";
+  "cli_tool" -> "implement_pdf_png_export";
+  "implement_pdf_png_export" -> "pdf_png_export";
+  "graphviz_exporter" -> "implement_group_fill_export";
+  "implement_group_fill_export" -> "group_fill_export";
+  "preview_panel" -> "implement_preview_minimap";
+  "implement_preview_minimap" -> "preview_minimap";
+  "cli_tool" -> "implement_skill_sync";
+  "implement_skill_sync" -> "skill_sync_command";
   "workflow_usage" -> "implement_validator" [style=dashed, color="#888888", constraint=false];
   "workflow_usage" -> "implement_formatter" [style=dashed, color="#888888", constraint=false];
   "workflow_usage" -> "implement_preview_engine" [style=dashed, color="#888888", constraint=false];

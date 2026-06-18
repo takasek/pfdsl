@@ -263,6 +263,8 @@ digraph PFDSL {
   subgraph cluster_backend {
     label="Backend";
     color="lightyellow";
+    style="filled";
+    fillcolor="lightyellow";
     "api_spec" [shape=box, label="api_spec", penwidth="2"];
     "build_api" [shape=ellipse, label="build_api"];
     "endpoint" [shape=box, label="endpoint", penwidth="2"];
@@ -270,6 +272,8 @@ digraph PFDSL {
   subgraph cluster_frontend {
     label="Frontend";
     color="lightblue";
+    style="filled";
+    fillcolor="lightblue";
     "build_ui" [shape=ellipse, label="build_ui"];
     "component" [shape=box, label="component", penwidth="2"];
     "ui_mockup" [shape=box, label="ui_mockup", penwidth="2"];
@@ -372,10 +376,13 @@ digraph PFDSL {
 
 ---
 
-## Real-world example
+## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
-[pfdsl_implementation_flow.pfdsl](../pfdsl_implementation_flow.pfdsl) — the PFDSL toolchain roadmap, written in PFDSL itself.
+How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).
 
-<img src="../pfdsl_implementation_flow.svg">
+<img src="pfdsl_implementation_flow.svg">
 
-[Source](../pfdsl_implementation_flow.pfdsl) · [DOT](../pfdsl_implementation_flow.dot)
+[Source](pfdsl_implementation_flow.pfdsl) · [DOT](pfdsl_implementation_flow.dot)
+
+---
+
