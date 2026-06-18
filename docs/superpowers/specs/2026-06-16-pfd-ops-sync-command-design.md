@@ -60,18 +60,18 @@ npx @pfdsl/cli@latest skill sync pfd-ops
 - `gh` 検出 → 不足ラベルを提示し `[y/N]` で一括作成確認。`--yes` で非対話・自動 yes（CI/自動化向け）
 - ラベル作成は L3 採用済みリポでのみ意味を持つため、採用済み判定に従属させる
 
-### scaffold（L4 ファイル欠落時の雛形生成 + ecosystem 構築プロンプト）
+### scaffold（L4 ファイル欠落時の雛形生成 + PFD セットアップ案内）
 
 L2 がディスパッチ先として期待する L4 ファイルが欠落している採用プロジェクトのために、sync は雛形を置くところまで担う。これにより「pfd-ops を sync したが運用ファイルが何もない」状態を埋め、採用プロジェクトが空の型から運用を立ち上げられる。
 
-- **対象**: `ecosystem.pfdsl` / `ecosystem.md` / `roadmap.pfdsl` / `roadmap.md`
+- **対象**: `workflow.pfdsl` / `workflow.md` / `roadmap.pfdsl` / `roadmap.md`（ADR-0017 により ecosystem 種別は廃止、workflow に置換）
 - **発動条件**: 各ファイルが**欠落している時のみ**個別に生成する。既存ファイルは一切不触（上書き方針と整合）。一度生成された L4 ファイルは以後の sync でも不触
 - **雛形の中身**: `.pfdsl` グラフ本体は `pfdsl check` が通る最小構成。`.md` companion は L4 ホストの節見出しだけ持つスケルトン。雛形ソースは dist 同梱（後述）
 - **中身の整合性は検証しない**: 既存ファイルが SKILL.md の新 L2 規約とズレていても sync は検出も修正もしない。それには L4 固有知識が必要で、固有名詞ゼロの汎用スキル境界（L1/L2）を侵す。中身レベルのズレは pfd-retro の監査対象（人間判断）に委ねる
 
-scaffold 実行後（および既に存在していた場合でも欠落を埋めた直後）、sync は **ecosystem 構築プロンプトを stdout に表示**する。これは「プロジェクト全体を見て、producer/consumer・終端監査の観点で `ecosystem.pfdsl` を起こせ」という pfd-ops 流儀の指示文。採用プロジェクトはこれをコピーして自リポの Claude に食わせ、空の雛形を実際の生態系グラフへ育てる。
+scaffold 実行後（および既に存在していた場合でも欠落を埋めた直後）、sync は **`/pfd-ecosystem` スキルの起動を促すメッセージを stdout に表示**する。採用プロジェクトはこのスキルを使い、ADR-0017 の問診リスト（roadmap / workflow / runtime-pipeline）に基づいてプロジェクトに必要な PFD セットを対話的に育てる。
 
-- **プロンプトのソース**: dist 同梱の reference テンプレ（例 `references/ecosystem-setup-prompt.md`）から読む。配布物として一元管理し、CLI へのハードコードを避ける
+- **メッセージのソース**: `ecosystemSetupPrompt()` がハードコード文字列を返す（ファイル読み込みなし）
 - **表示タイミング**: scaffold で1ファイルでも新規生成した場合に表示。全 L4 ファイルが既存（育成済み）なら表示しない（ノイズ回避）
 
 ## スコープ外（YAGNI）

@@ -250,14 +250,12 @@ describe("pfdslSkillGuidance", () => {
 
 describe("ecosystemSetupPrompt", () => {
 	it("returns the prompt content when scaffolded list is non-empty", () => {
-		const skillRoot = resolveSkillRoot();
-		const prompt = ecosystemSetupPrompt(skillRoot, ["roadmap.pfdsl"]);
+		const prompt = ecosystemSetupPrompt(["roadmap.pfdsl"]);
 		expect(prompt).toContain("pfd-ecosystem");
 	});
 
 	it("returns empty string when scaffolded list is empty", () => {
-		const skillRoot = resolveSkillRoot();
-		const prompt = ecosystemSetupPrompt(skillRoot, []);
+		const prompt = ecosystemSetupPrompt([]);
 		expect(prompt).toBe("");
 	});
 });
@@ -406,6 +404,7 @@ describe("runSkillSync", () => {
 			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
 		).toBe(true);
 		expect(result.stdout).not.toContain("pfd-ecosystem");
+		expect(result.stdout).toContain("skill sync pfdsl");
 		expect(result.exitCode).toBe(0);
 	});
 });

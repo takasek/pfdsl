@@ -169,10 +169,7 @@ export function scaffoldL4Files(
  * Returns a prompt to run /pfd-ecosystem when at least one L4 file was
  * scaffolded this run. Returns "" when nothing was scaffolded.
  */
-export function ecosystemSetupPrompt(
-	_skillRoot: string,
-	scaffolded: string[],
-): string {
+export function ecosystemSetupPrompt(scaffolded: string[]): string {
 	if (scaffolded.length === 0) return "";
 	return ".pfdsl/ が雛形（scaffold）のままです。`/pfd-ecosystem` スキルを起動してください。\n";
 }
@@ -323,7 +320,7 @@ export async function runSkillSync(
 		lines.push(`Scaffolded: ${scaffoldResult.scaffolded.join(", ")}`);
 	}
 
-	const prompt = ecosystemSetupPrompt(skillRoot, scaffoldResult.scaffolded);
+	const prompt = ecosystemSetupPrompt(scaffoldResult.scaffolded);
 	if (prompt) lines.push(prompt);
 
 	const pfdslGuidance = pfdslSkillGuidance(opts.targetRoot);
