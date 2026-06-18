@@ -15,6 +15,7 @@ import {
 	ecosystemSetupPrompt,
 	ensureLabels,
 	isL3Adopted,
+	pfdslSkillGuidance,
 	resolveSkillRoot,
 	runSkillSync,
 	scaffoldL4Files,
@@ -222,6 +223,31 @@ describe("scaffoldL4Files", () => {
 	});
 });
 
+describe("pfdslSkillGuidance", () => {
+	let targetRoot: string;
+
+	beforeEach(() => {
+		targetRoot = mkdtempSync(join(tmpdir(), "pfdsl-sync-test-"));
+	});
+
+	afterEach(() => {
+		rmSync(targetRoot, { recursive: true, force: true });
+	});
+
+	it("returns guidance when pfdsl skill is absent", () => {
+		const msg = pfdslSkillGuidance(targetRoot);
+		expect(msg).toContain("pfdsl");
+		expect(msg).toContain("skill sync pfdsl");
+	});
+
+	it("returns empty string when pfdsl skill is already installed", () => {
+		mkdirSync(join(targetRoot, ".claude/skills/pfdsl"), { recursive: true });
+		writeFileSync(join(targetRoot, ".claude/skills/pfdsl/SKILL.md"), "# pfdsl\n");
+		const msg = pfdslSkillGuidance(targetRoot);
+		expect(msg).toBe("");
+	});
+});
+
 describe("ecosystemSetupPrompt", () => {
 	it("returns the prompt content when scaffolded list is non-empty", () => {
 		const skillRoot = resolveSkillRoot();
@@ -350,6 +376,7 @@ describe("runSkillSync", () => {
 		expect(existsSync(join(targetRoot, ".pfdsl/roadmap.pfdsl"))).toBe(true);
 		expect(result.stdout).toContain("cp -r .claude/skills/pfd-ops/install/. .");
 		expect(result.stdout).toContain("ecosystem.pfdsl 構築プロンプト");
+		expect(result.stdout).toContain("skill sync pfdsl");
 		expect(result.exitCode).toBe(0);
 	});
 
