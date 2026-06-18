@@ -35,12 +35,15 @@ layout:
 artifact:
   <id>:
     label: 人間向けラベル
-    status: done       # todo=未着手 | wip=PR open | done=main済み | blocked=外部要因
+    status: done           # todo=未着手 | wip=PR open | done=main済み | blocked=外部要因
     description: ...
     owner: ...
     tags: [tag1, tag2]
     group: <group-id>
     parts: [sub-artifact-id, ...]
+    location: path/to/file  # 実体ファイル・URL へのポインタ。可視化でリンクになる
+    criteria: ...           # status:done の判断基準（検証可能な条件を書く）
+    revises: <artifact-id>  # 同ファイル内の改版元 artifact ID
 
 process:
   <id>:
@@ -48,6 +51,8 @@ process:
     description: ...
     owner: ...
     group: <group-id>
+    command: npm run build  # 対応する実行コマンド
+    estimate: 2d            # 工数見積もり（形式自由）
 
 group:
   <id>:
@@ -99,6 +104,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 - **ドリフト耐性**: description に本数・他所のリストの複製を書かない。一次情報への参照にする — 数と列挙は同期漏れで腐る
 - **parts メンバーもエッジ参加**: `[ch1, ch2] >> merge -> book`（spec §17.4）。エッジ無しは図上で孤立ノード化
 - **組織学習パターン**: 観点表をレビュー入力に、指摘から `>>?` で観点表整備へ還流（samples 11-practical-web-dev）
+- **フィールドを埋める**: artifact には `location`（実体パス/URL）・`criteria`（done 条件）・`owner`（担当）を、process には `command`（実行コマンド）・`estimate`（工数）を、書けるなら書く。書かない選択も明示的に
 - **点検**: `check` と `graph --format dot` を実行。終端成果物が全て意図した納品物か、各プロセスが「この入力だけで出力を作れるか」を確認
 
 ## Typical task: update artifact status

@@ -1,6 +1,6 @@
-# ecosystem.md — 運用手続き（ecosystem.pfdsl の companion）
+# workflow.md — 運用手続き（workflow.pfdsl の companion）
 
-`ecosystem.pfdsl` のグラフが運べない、複数ノードをまたぐ運用手続きをここに置く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
+`workflow.pfdsl` のグラフが運べない、複数ノードをまたぐ運用手続きをここに置く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
 
 ## 知見の振り分け（3経路）
 
