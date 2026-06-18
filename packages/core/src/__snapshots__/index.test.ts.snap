@@ -2,2278 +2,863 @@
 
 exports[`public API > format: matches golden canonical output for sample file (locks spec §14 ordering) 1`] = `
 "---
-title: PFDSL 実装計画フロー
-version: 0.3
-dslVersion: 0.0.6
-description: PFDSL 仕様に基づくツールチェーン実装のプロセスフロー記述
-tags: [implementation, roadmap]
-
+title: Issue 依存フロー（2026-06）
+description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue
+  管理規約・同期手段は sibling roadmap.md と pfd-ops スキルの
+  references/github-issues-backend.md 参照
 layout:
-  direction: TB
-
-statusStyles:
-  done:    { fillcolor: lightgray, style: filled, fontcolor: dimgray }
-  wip:     { fillcolor: lightyellow, style: filled }
-  todo:    { fillcolor: yellow, style: filled }
-  blocked: { fillcolor: salmon, style: filled }
+  direction: LR
+  maxWidth: 130
 
 artifact:
-  spec_v0_0_2:
-    label: PFDSL仕様書 v0.0.2
+  spec_v006:
+    label: 仕様書 v0.0.6
     status: done
-  core_architecture:
-    label: コアアーキテクチャ文書
+  findings_r12:
+    label: 実践ラウンド1/2レビュー知見
     status: done
-  repo_scaffold:
-    label: リポジトリ骨格
-    status: done
-  build_config:
-    label: ビルド設定
-    status: done
-  shared_types:
-    label: 共有型定義
-    status: done
-  token_spec:
-    label: トークン規則
-    status: done
-  ast_schema:
-    label: ASTスキーマ
-    status: done
-  diagnostic_schema:
-    label: 診断スキーマ
-    status: done
-  graph_schema:
-    label: グラフスキーマ
-    status: done
-  lexer:
-    label: Lexer実装
-    status: done
-  frontmatter_loader:
-    label: Frontmatterローダ
-    status: done
-  parser:
-    label: Parser実装
-    status: done
-  normalizer:
-    label: Normalizer実装
-    status: done
-  validator:
-    label: Validator実装
-    status: done
-  canonical_sorter:
-    label: 正準順序ソータ
-    status: done
-  formatter:
-    label: Formatter実装
-    status: done
-  core_modules:
-    label: コアモジュール群
-    parts: [lexer, frontmatter_loader, parser, normalizer, validator, canonical_sorter, formatter]
-    status: done
-  core_library:
-    label: コアライブラリ (@pfdsl/core)
-    status: done
-  group_types:
-    label: GroupMeta型定義 (v0.0.5)
-    status: done
-  group_subgraph_export:
-    label: subgraph cluster エクスポート (v0.0.5)
-    status: done
-  graphviz_exporter:
-    label: Graphvizエクスポータ
-    status: done
-  preview_engine:
-    label: プレビューエンジン
-    status: done
-  vscode_shell:
-    label: VSCode拡張シェル
-    status: done
-  language_service:
-    label: 言語サービス (LSP)
-    status: done
-  preview_panel:
-    label: プレビューパネル
-    status: done
-  format_command:
-    label: フォーマットコマンド
-    status: done
-  hover_support:
-    label: ホバーサポート
-    status: done
-  diagnostics_ui:
-    label: 診断UI
-    status: done
-  syntax_highlight:
-    label: シンタックスハイライト
-    status: done
-  vscode_extension:
-    label: VSCode拡張統合
-    status: done
-  rc_extension:
-    label: リリース候補版
-    status: done
-  published_extension:
-    label: 公開版拡張
-    status: done
-  workflow_usage:
-    label: 日常運用知見
-    status: todo
+    description: docs/examples の執筆・レビューで得た品質知見
   cli_tool:
-    label: CLIツール
+    label: CLI 実装（現行）
     status: done
-  metadata_exporter:
-    label: メタデータエクスポータ
+  skill_gen:
+    label: スキル生成系（現行）
     status: done
-  diff_analyzer:
-    label: 差分解析ツール
+    description: scripts/gen-skill.mjs と docs/samples 構成
+  i5_hierarchy_spec:
+    label: "階層PFD仕様案 (#5)"
+    status: todo
+    updated_at: 2026-06-12T08:18:39Z
+  i6_presets_spec:
+    label: "共有プリセット仕様案 (#6)"
+    status: todo
+    updated_at: 2026-06-12T08:18:40Z
+  spec_v007:
+    label: 仕様書 v0.0.7（統合）
+    status: wip
+  spec_v008:
+    label: 仕様書 v0.0.8（マルチファイル統合）
+    status: todo
+  published_cli:
+    label: npm公開済みCLI
     status: done
-  cli_published:
-    label: CLI npm公開
-    description: "@pfdsl/cli 0.0.4 を npm 公開済み。tag push 起動の GitHub Actions + Trusted Publishing (OIDC)。tsup でワークスペース依存をバンドル（@hpcc-js/wasm のみ外部）。0.0.3 は起動時 \\"Dynamic require of process\\" エラーで broken → tsup.config.ts に createRequire banner 追加で修正（PR #24）"
+    description: "npm install -g @pfdsl/cli で利用可。現行公開バージョンは npm 一次情報（ここに書かない —
+      ドリフトするため）。詳細は docs/pfdsl_implementation_flow.pfdsl の cli_published 参照"
+  multifile_policy:
+    label: マルチファイル意味論方針
+    status: todo
+    description: 共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料
+  adr_corpus:
+    label: "ADR 群 (docs/adr)"
     status: done
-  agent_skill:
-    label: AI agentスキル (pfdsl読み書き)
+    description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
+  i12_article:
+    label: "公開記事 (#12)"
+    status: todo
+    description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
+    updated_at: 2026-06-12T08:18:56Z
+  i37_orphan_lint:
+    label: "孤児process検出lint (#37)"
+    status: todo
+    description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
+      要件経路、dogfood #16 由来）"
+    updated_at: 2026-06-14T14:00:45Z
+  i3_obsidian_plugin:
+    label: "Obsidian プラグイン (#3)"
+    status: todo
+    updated_at: 2026-06-12T08:18:35Z
+  lint_checker:
+    label: "lint拡張checker (#4)"
     status: done
-  pdf_png_export:
-    label: PDF/PNGエクスポート
+    description: "lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため"
+  audit_distribution:
+    label: "L3資産の階層化配布 (#43)"
     status: done
-    description: "cli_tool の graph --format pdf|png。Puppeteer (headless Chromium) 経由でSVG→PDF/PNG変換、optional peer dependencyとして実装（#72/#74、拡張連携は#83）"
-  group_fill_export:
-    label: groupクラスタ塗り
+    description: "audit コア + flow-sync action を skill
+      同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは
+      #11"
+  criteria_spec:
+    label: "合否基準仕様案 (#7)"
     status: done
-    description: "graphviz_exporter のsubgraph clusterにstyle=filledを付与し宣言色をfillcolorとして適用（#15/#77）"
-  preview_minimap:
-    label: プレビューminimap
+  revises_spec:
+    label: "改版チェーン仕様案 (#8)"
     status: done
-    description: "vscode拡張プレビューパネルへのminimapオーバーレイ、ドラッグでメインビュー追従（#17/#81）"
-  skill_sync_command:
-    label: skill syncコマンド
+  design_notes:
+    label: "設計判断ノート・分岐なし方針 (#9)"
     status: done
-    description: "\`pfdsl skill sync pfd-ops\`。外部採用リポの pfd-ops を一発最新化。npm同梱（tsup onSuccessで dist/skills/pfd-ops へコピー）+ L3採用済み判定で install/ 条件付き上書き + L4 scaffold + gh ラベル確認。consumer = 外部プロジェクトでの pfd-ops 運用（#90、設計 docs/superpowers/specs/2026-06-16-pfd-ops-sync-command-design.md）。v0.0.5 で公開予定"
-
+  location_spec:
+    label: "location/command 仕様案 (#13)"
+    status: done
+    description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
+  restructured_gen:
+    label: "再構成済みスキル生成系 (#10)"
+    status: done
+  featured_toolchain:
+    label: "spec v0.0.7 実装済みツールチェーン (#52)"
+    status: done
+  i97_external_stakeholders_spec:
+    label: "externalStakeholders フィールド仕様案 (#97)"
+    status: todo
+    description: "artifact / process に外部消費者を列挙するフィールド。owner と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段"
+    updated_at: 2026-06-18T00:00:00Z
 process:
-  define_architecture:
-    label: アーキテクチャ定義
-  define_repo_structure:
-    label: リポジトリ構造設計
-  define_build_policy:
-    label: ビルドポリシー策定
-  define_shared_types:
-    label: 共有型定義
-  define_token_rules:
-    label: トークン規則定義
-  define_ast_schema:
-    label: ASTスキーマ定義
-  define_diagnostic_schema:
-    label: 診断スキーマ定義
-  define_graph_schema:
-    label: グラフスキーマ定義
-  implement_lexer:
-    label: Lexer実装
-  implement_frontmatter_loader:
-    label: Frontmatterローダ実装
-  implement_parser:
-    label: Parser実装
-  implement_normalizer:
-    label: Normalizer実装
-  implement_validator:
-    label: Validator実装
-  implement_canonical_sorter:
-    label: 正準順序ソータ実装
-  implement_formatter:
-    label: Formatter実装
-  integrate_core_modules:
-    label: コアモジュール統合
-  package_core_library:
-    label: コアライブラリパッケージング
-  implement_graphviz_exporter:
-    label: Graphvizエクスポータ実装
-  implement_preview_engine:
-    label: プレビューエンジン実装
-  create_vscode_extension_shell:
-    label: VSCode拡張シェル作成
-  implement_language_service:
-    label: 言語サービス実装
-  implement_preview_panel:
-    label: プレビューパネル実装
-  implement_format_command:
-    label: フォーマットコマンド実装
-  implement_hover_support:
-    label: ホバーサポート実装
-  implement_diagnostics_ui:
-    label: 診断UI実装
-  implement_syntax_highlight:
-    label: シンタックスハイライト実装
-  integrate_vscode_extension:
-    label: VSCode拡張統合
-  package_release_candidate:
-    label: RCパッケージング
-  release_marketplace:
-    label: Marketplace公開
-  adopt_daily_workflow:
-    label: 日常ワークフロー導入
-  implement_cli_wrapper:
-    label: CLIラッパー実装
-  implement_metadata_exporter:
-    label: メタデータエクスポータ実装
-  implement_diff_analysis:
-    label: 差分解析実装
+  write_article:
+    label: 記事執筆
+  draft_multifile_specs:
+    label: 階層・プリセット共同起草
+    description: "#5 と #6 は決定が往復で形成される相互依存のため分割せず共同設計する。共有決定は方針記録として外化"
+  draft_criteria:
+    label: 合否基準仕様起草
+  draft_revises:
+    label: 改版チェーン仕様起草
+  draft_location:
+    label: location/command 起草
+  write_design_notes:
+    label: 設計ノート執筆
+  integrate_spec:
+    label: 仕様統合
+  implement_lints:
+    label: lint実装
+  implement_spec_features:
+    label: 新仕様実装
+  integrate_multifile:
+    label: マルチファイル仕様統合
+  restructure_skillgen:
+    label: 生成系再構成
   publish_cli:
-    label: CLI npm公開
-  write_agent_skill:
-    label: AI agentスキル作成
-  implement_pdf_png_export:
-    label: PDF/PNGエクスポート実装
-  implement_group_fill_export:
-    label: groupクラスタ塗り実装
-  implement_preview_minimap:
-    label: minimap実装
-  implement_skill_sync:
-    label: skill sync実装
+    label: CLI公開
+  build_obsidian_plugin:
+    label: Obsidianプラグイン実装
+  implement_orphan_lint:
+    label: 孤児検出lint実装
+  draft_external_stakeholders:
+    label: externalStakeholders仕様起草
+    description: "artifact / process の externalStakeholders フィールドを spec に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
+  layer_audit_assets:
+    label: L3資産階層化
+
+tagStyles:
+  "priority:high": { color: "#b60205", penwidth: "2" }
+
+statusStyles:
+  done: { fillcolor: "#d4edda", style: filled }
+  wip: { fillcolor: "#fff3cd", style: filled }
+  todo: { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
 ---
 
-# Phase 0: アーキテクチャ定義
-
-spec_v0_0_2 >> define_architecture
-define_architecture -> core_architecture
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
+spec_v006 >> draft_multifile_specs
+draft_multifile_specs -> i5_hierarchy_spec
+draft_multifile_specs -> i6_presets_spec
+draft_multifile_specs -> multifile_policy
+adr_corpus
+audit_distribution
+build_obsidian_plugin
 cli_tool
-core_library
-core_modules
-create_vscode_extension_shell
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v007
+spec_v008
+write_article
+write_design_notes
 
-core_architecture >> define_build_policy
-core_architecture >> define_repo_structure
-core_architecture >> define_shared_types
-define_build_policy -> build_config
-define_repo_structure -> repo_scaffold
-define_shared_types -> shared_types
-adopt_daily_workflow
-agent_skill
-ast_schema
-canonical_sorter
-cli_published
+spec_v006 >> draft_criteria
+draft_criteria -> criteria_spec
+adr_corpus
+audit_distribution
+build_obsidian_plugin
 cli_tool
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_diagnostic_schema
-define_graph_schema
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+design_notes
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v007
+spec_v008
+write_article
+write_design_notes
 
-core_architecture >> define_ast_schema
-core_architecture >> define_diagnostic_schema
-core_architecture >> define_graph_schema
-core_architecture >> define_token_rules
-define_ast_schema -> ast_schema
-define_diagnostic_schema -> diagnostic_schema
-define_graph_schema -> graph_schema
-define_token_rules -> token_spec
-adopt_daily_workflow
-agent_skill
-build_config
-canonical_sorter
-cli_published
+spec_v006 >> draft_revises
+draft_revises -> revises_spec
+adr_corpus
+audit_distribution
+build_obsidian_plugin
 cli_tool
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_build_policy
-define_repo_structure
-define_shared_types
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+restructure_skillgen
+restructured_gen
+skill_gen
+spec_v007
+spec_v008
+write_article
+write_design_notes
 
-# Phase 1: コア層実装
-
-# Frontmatter は Lexer より前に分離する
-shared_types >> implement_frontmatter_loader
-implement_frontmatter_loader -> frontmatter_loader
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
+spec_v006 >> draft_location
+draft_location -> location_spec
+adr_corpus
+audit_distribution
+build_obsidian_plugin
 cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+multifile_policy
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v007
+spec_v008
+write_article
+write_design_notes
 
-shared_types >> implement_lexer
-token_spec >> implement_lexer
-implement_lexer -> lexer
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
+spec_v006 >> write_design_notes
+write_design_notes -> design_notes
+adr_corpus
+audit_distribution
+build_obsidian_plugin
 cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+criteria_spec
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v007
+spec_v008
+write_article
 
-ast_schema >> implement_parser
-frontmatter_loader >> implement_parser
-lexer >> implement_parser
-shared_types >> implement_parser
-token_spec >> implement_parser
-implement_parser -> parser
-adopt_daily_workflow
-agent_skill
-build_config
-canonical_sorter
-cli_published
+criteria_spec >> integrate_spec
+design_notes >> integrate_spec
+location_spec >> integrate_spec
+revises_spec >> integrate_spec
+integrate_spec -> spec_v007
+adr_corpus
+audit_distribution
+build_obsidian_plugin
 cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+layer_audit_assets
+lint_checker
+multifile_policy
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+restructure_skillgen
+restructured_gen
+skill_gen
+spec_v006
+spec_v008
+write_article
+write_design_notes
 
-graph_schema >> implement_normalizer
-parser >> implement_normalizer
-implement_normalizer -> normalizer
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
+spec_v006 >>? integrate_spec
+adr_corpus
+audit_distribution
+build_obsidian_plugin
 cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-package_core_library
-package_release_candidate
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v007
+spec_v008
+write_article
+write_design_notes
 
-graph_schema >> implement_canonical_sorter
-normalizer >> implement_canonical_sorter
-implement_canonical_sorter -> canonical_sorter
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-cli_published
+cli_tool >> implement_lints
+findings_r12 >> implement_lints
+spec_v006 >> implement_lints
+implement_lints -> lint_checker
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+location_spec
+multifile_policy
+publish_cli
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+lint_checker >> implement_spec_features
+spec_v007 >> implement_spec_features
+implement_spec_features -> featured_toolchain
+adr_corpus
+audit_distribution
+build_obsidian_plugin
 cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+integrate_multifile
+integrate_spec
+layer_audit_assets
+location_spec
+multifile_policy
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v008
+write_article
+write_design_notes
 
-diagnostic_schema >> implement_validator
-normalizer >> implement_validator
-implement_validator -> validator
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
+featured_toolchain >> integrate_multifile
+i5_hierarchy_spec >> integrate_multifile
+i6_presets_spec >> integrate_multifile
+multifile_policy >> integrate_multifile
+integrate_multifile -> spec_v008
+adr_corpus
+audit_distribution
+build_obsidian_plugin
 cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+write_article
+write_design_notes
 
-canonical_sorter >> implement_formatter
-parser >> implement_formatter
-implement_formatter -> formatter
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-cli_published
+skill_gen >> restructure_skillgen
+restructure_skillgen -> restructured_gen
+adr_corpus
+audit_distribution
+build_obsidian_plugin
 cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+revises_spec
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
 
-canonical_sorter >> integrate_core_modules
-formatter >> integrate_core_modules
-frontmatter_loader >> integrate_core_modules
-lexer >> integrate_core_modules
-normalizer >> integrate_core_modules
-parser >> integrate_core_modules
-validator >> integrate_core_modules
-integrate_core_modules -> core_modules
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-cli_published
-cli_tool
-core_architecture
-core_library
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_vscode_extension
-language_service
-metadata_exporter
-package_core_library
-package_release_candidate
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
-publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
-
-build_config >> package_core_library
-core_modules >> package_core_library
-repo_scaffold >> package_core_library
-package_core_library -> core_library
-adopt_daily_workflow
-agent_skill
-ast_schema
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
-publish_cli
-published_extension
-rc_extension
-release_marketplace
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
-
-# Phase 2: 出力層
-
-core_library >> implement_graphviz_exporter
-implement_graphviz_exporter -> graphviz_exporter
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
-publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
-
-# v0.0.5: group 概念 (subgraph cluster)
-graphviz_exporter >> implement_group_subgraph_export
-shared_types >> implement_group_types
-implement_group_types -> group_types
-group_types >> implement_group_subgraph_export
-implement_group_subgraph_export -> group_subgraph_export
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-group_fill_export
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
-publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
-
-core_library >> implement_preview_engine
-graphviz_exporter >> implement_preview_engine
-implement_preview_engine -> preview_engine
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_minimap
-preview_panel
-publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
-
-core_library >> implement_cli_wrapper
-implement_cli_wrapper -> cli_tool
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-core_architecture
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
-publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
-
-# Phase 3: VSCode 拡張
-
-repo_scaffold >> create_vscode_extension_shell
-create_vscode_extension_shell -> vscode_shell
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-core_library
-core_modules
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
-publish_cli
-published_extension
-rc_extension
-release_marketplace
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-workflow_usage
-write_agent_skill
-
-core_library >> implement_diagnostics_ui
-core_library >> implement_format_command
-core_library >> implement_hover_support
-core_library >> implement_language_service
-preview_engine >> implement_preview_panel
-vscode_shell >> implement_diagnostics_ui
-vscode_shell >> implement_format_command
-vscode_shell >> implement_hover_support
-vscode_shell >> implement_language_service
-vscode_shell >> implement_preview_panel
-vscode_shell >> implement_syntax_highlight
-implement_diagnostics_ui -> diagnostics_ui
-implement_format_command -> format_command
-implement_hover_support -> hover_support
-implement_language_service -> language_service
-implement_preview_panel -> preview_panel
-implement_syntax_highlight -> syntax_highlight
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diff_analyzer
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diff_analysis
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_skill_sync
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_minimap
-publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-token_spec
-validator
-vscode_extension
-workflow_usage
-write_agent_skill
-
-diagnostics_ui >> integrate_vscode_extension
-format_command >> integrate_vscode_extension
-hover_support >> integrate_vscode_extension
-language_service >> integrate_vscode_extension
-preview_panel >> integrate_vscode_extension
-syntax_highlight >> integrate_vscode_extension
-integrate_vscode_extension -> vscode_extension
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diff_analyzer
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-token_spec
-validator
-vscode_shell
-workflow_usage
-write_agent_skill
-
-# Phase 4: リリース
-
-vscode_extension >> package_release_candidate
-package_release_candidate -> rc_extension
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
-publish_cli
-published_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_shell
-workflow_usage
-write_agent_skill
-
-rc_extension >> release_marketplace
-release_marketplace -> published_extension
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
-publish_cli
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
-
-# Phase 5: 日常運用・継続改善
-
-published_extension >> adopt_daily_workflow
-adopt_daily_workflow -> workflow_usage
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
-publish_cli
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-write_agent_skill
-
-# 運用知見を実装プロセスへフィードバック (生成元は変更しない)
-workflow_usage >>? implement_formatter
-workflow_usage >>? implement_preview_engine
-workflow_usage >>? implement_validator
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-cli_tool
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_minimap
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
-publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-write_agent_skill
-
-# 周辺ツール
-
-cli_tool >> implement_diff_analysis
-cli_tool >> implement_pdf_png_export
 cli_tool >> publish_cli
-cli_tool >> write_agent_skill
-implement_diff_analysis -> diff_analyzer
-implement_pdf_png_export -> pdf_png_export
-publish_cli -> cli_published
-write_agent_skill -> agent_skill
-core_library >> implement_metadata_exporter
-implement_metadata_exporter -> metadata_exporter
-graphviz_exporter >> implement_group_fill_export
-implement_group_fill_export -> group_fill_export
-preview_panel >> implement_preview_minimap
-implement_preview_minimap -> preview_minimap
-adopt_daily_workflow
-ast_schema
-build_config
-canonical_sorter
-core_architecture
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-format_command
-formatter
-frontmatter_loader
-graph_schema
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_normalizer
-implement_parser
-implement_preview_engine
-implement_preview_panel
-implement_skill_sync
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-normalizer
-package_core_library
-package_release_candidate
-parser
-preview_engine
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-skill_sync_command
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
+publish_cli -> published_cli
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
 
-cli_tool >> implement_skill_sync
-implement_skill_sync -> skill_sync_command
-adopt_daily_workflow
-agent_skill
-ast_schema
-build_config
-canonical_sorter
-cli_published
-core_architecture
-core_library
-core_modules
-create_vscode_extension_shell
-define_architecture
-define_ast_schema
-define_build_policy
-define_diagnostic_schema
-define_graph_schema
-define_repo_structure
-define_shared_types
-define_token_rules
-diagnostic_schema
-diagnostics_ui
-diff_analyzer
-format_command
-formatter
-frontmatter_loader
-graph_schema
-graphviz_exporter
-group_fill_export
-group_subgraph_export
-group_types
-hover_support
-implement_canonical_sorter
-implement_cli_wrapper
-implement_diagnostics_ui
-implement_diff_analysis
-implement_format_command
-implement_formatter
-implement_frontmatter_loader
-implement_graphviz_exporter
-implement_group_fill_export
-implement_hover_support
-implement_language_service
-implement_lexer
-implement_metadata_exporter
-implement_normalizer
-implement_parser
-implement_pdf_png_export
-implement_preview_engine
-implement_preview_minimap
-implement_preview_panel
-implement_syntax_highlight
-implement_validator
-integrate_core_modules
-integrate_vscode_extension
-language_service
-lexer
-metadata_exporter
-normalizer
-package_core_library
-package_release_candidate
-parser
-pdf_png_export
-preview_engine
-preview_minimap
-preview_panel
+
+cli_tool >> layer_audit_assets
+layer_audit_assets -> audit_distribution
+adr_corpus
+build_obsidian_plugin
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+lint_checker
+location_spec
+multifile_policy
 publish_cli
-published_extension
-rc_extension
-release_marketplace
-repo_scaffold
-shared_types
-spec_v0_0_2
-syntax_highlight
-token_spec
-validator
-vscode_extension
-vscode_shell
-workflow_usage
-write_agent_skill
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+
+adr_corpus >> write_article
+write_article -> i12_article
+audit_distribution
+build_obsidian_plugin
+cli_tool
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+publish_cli
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_design_notes
+
+
+
+
+
+
+cli_tool >> build_obsidian_plugin
+build_obsidian_plugin -> i3_obsidian_plugin
+adr_corpus
+audit_distribution
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+publish_cli
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+cli_tool >> implement_orphan_lint
+implement_orphan_lint -> i37_orphan_lint
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+publish_cli
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+spec_v007 >> draft_external_stakeholders
+draft_external_stakeholders -> i97_external_stakeholders_spec
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+cli_tool
+criteria_spec
+design_notes
+draft_criteria
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+publish_cli
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v008
+write_article
+write_design_notes
+
+i97_external_stakeholders_spec >> integrate_multifile
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+cli_tool
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+implement_lints
+implement_orphan_lint
+implement_spec_features
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+publish_cli
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+
+
+
+
 "
 `;

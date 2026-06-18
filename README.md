@@ -71,7 +71,6 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 - **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
 - **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`); installable cross-project via `gh skill install takasek/pfdsl/pfdsl --agent claude-code`
 
-Roadmap progress lives in [docs/pfdsl_implementation_flow.pfdsl](docs/pfdsl_implementation_flow.pfdsl) (written in PFDSL itself).
 
 ## Quick start
 

@@ -7,7 +7,7 @@ import { format, normalizeDocument, parse, validateGraph } from "./index.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const samplePath = resolve(
 	__dirname,
-	"../../../docs/pfdsl_implementation_flow.pfdsl",
+	"../../../.pfdsl/roadmap.pfdsl",
 );
 const sampleSource = readFileSync(samplePath, "utf-8");
 
