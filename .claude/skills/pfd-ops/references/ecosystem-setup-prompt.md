@@ -4,15 +4,55 @@
 
 ---
 
-このプロジェクトの `ecosystem.pfdsl` と `ecosystem.md` は雛形（scaffold）のままです。プロジェクト全体を読んで、実際の生態系グラフに育ててください。
+このプロジェクトの `ecosystem.pfdsl` と `ecosystem.md` は雛形（scaffold）のままです。対話的に実際の生態系グラフに育てていきます。
 
-1. リポジトリ内の成果物（spec・skill・examples・ADR・issue・roadmap 等、種類を問わない）を洗い出す
-2. 各成果物について、それを生成するプロセス（producer）と、それを使うプロセス（consumer）を特定する
-3. **消費者を書けない成果物は ecosystem.pfdsl に載せない**（終端監査 — pfd-ops スキルの運用プロトコル参照）
-4. artifact/process を `ecosystem.pfdsl` の frontmatter に追記し、`>>`/`->` のフローエッジで producer→artifact→consumer の関係を記述する
-5. グラフだけで表現しきれない運用手続き（知見の振り分け先・学習ループ・終端ゲートの根拠など）は `ecosystem.md` に文章で書く
-6. 完成したら `pfdsl check ecosystem.pfdsl` を通すこと
+## ステップ 0: スキルを起動する
 
-雛形の `seed_input` / `first_process` / `first_output` は実際のノード名・実際の成果物名に置き換えてください（プレースホルダのまま残さない）。
+まず `/pfdsl` スキルを起動してください（.pfdsl 記法の品質ガイドに従うため）。
+
+## ステップ 1: リポジトリ全体像を把握する
+
+次のものを読んでリポ全体の構造を掴んでください:
+
+- ルートの `README.md`
+- ディレクトリ構成（`ls` で主要ディレクトリを確認）
+- `.pfdsl/roadmap.pfdsl`（ロードマップが既にある場合）
+
+把握できたら、リポジトリの目的と主要な成果物の種類をひと言で要約してください。
+
+## ステップ 2: 主要成果物の候補を列挙し、ユーザーと確認する
+
+リポジトリ内の成果物候補を一覧にしてください（spec・skill・examples・ADR・issue・roadmap 等、種類を問わない）。
+
+**いきなり全部グラフ化しません。** 一覧を提示したうえで:
+
+- 「これは ecosystem に載せるべきですか？」とユーザーに確認する
+- ユーザーの判断で不要なものを除外する（剪定）
+- **消費者を書けない成果物は ecosystem.pfdsl に載せない**（終端監査 — pfd-ops スキルの運用プロトコル参照）
+
+承認された成果物だけで次のステップに進んでください。
+
+## ステップ 3: producer / consumer を特定する
+
+承認された各成果物について:
+
+- それを生成するプロセス（producer）は何か？
+- それを使うプロセス（consumer）は何か？
+
+不明なものはユーザーに確認してください。
+
+## ステップ 4: グラフを記述する
+
+`ecosystem.pfdsl` の frontmatter に artifact / process を追記し、`>>`/`->` のフローエッジで producer→artifact→consumer の関係を記述してください。
+
+雛形の `seed_input` / `first_process` / `first_output` は実際のノード名に置き換えてください（プレースホルダのまま残さない）。
+
+## ステップ 5: 散文を ecosystem.md に書く
+
+グラフだけで表現しきれない運用手続き（知見の振り分け先・学習ループ・終端ゲートの根拠など）は `ecosystem.md` に文章で書いてください。
+
+## ステップ 6: 検証
+
+完成したら `pfdsl check ecosystem.pfdsl` を通してください。
 
 ---
