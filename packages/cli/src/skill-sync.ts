@@ -119,7 +119,8 @@ export function copyInstallLayer(
 			copied: false,
 			message:
 				"GitHub Issues バックエンド (L3) は未採用です。採用する場合は次を実行してください:\n" +
-				"  cp -r .claude/skills/pfd-ops/install/. .\n",
+				"  cp -r .claude/skills/pfd-ops/install/. .\n" +
+				"L3 の意味は .claude/skills/pfd-ops/references/architecture.md を参照してください。\n",
 		};
 	}
 	const installDir = join(skillRoot, "install");
@@ -278,9 +279,25 @@ export interface SkillSyncResult {
 }
 
 /**
+ * Returns a guidance message when the pfdsl skill is absent from the target
+ * repo's Claude skills directory. pfd-ops depends on pfdsl for reading and
+ * writing .pfdsl files, so both skills should be present together.
+ * Returns "" when pfdsl is already installed (no noise).
+ */
+export function pfdslSkillGuidance(targetRoot: string): string {
+	if (existsSync(join(targetRoot, ".claude/skills/pfdsl/SKILL.md"))) return "";
+	return (
+		"pfd-ops は .pfdsl ファイルの読み書きに pfdsl スキルを必要とします。\n" +
+		"pfdsl スキルをインストールするには次を実行してください:\n" +
+		"  npx @pfdsl/cli@latest skill sync pfdsl\n"
+	);
+}
+
+/**
  * Orchestrates the full `pfdsl skill sync pfd-ops` flow:
  * general layer overwrite -> conditional install/ overwrite (subordinate gh
- * label confirmation when adopted) -> L4 scaffold -> ecosystem-setup prompt.
+ * label confirmation when adopted) -> L4 scaffold -> ecosystem-setup prompt
+ * -> pfdsl skill guidance when absent.
  */
 export async function runSkillSync(
 	opts: RunSkillSyncOptions,
@@ -314,6 +331,9 @@ export async function runSkillSync(
 
 	const prompt = ecosystemSetupPrompt(skillRoot, scaffoldResult.scaffolded);
 	if (prompt) lines.push(prompt);
+
+	const pfdslGuidance = pfdslSkillGuidance(opts.targetRoot);
+	if (pfdslGuidance) lines.push(pfdslGuidance);
 
 	return { stdout: `${lines.join("\n")}\n`, exitCode: 0 };
 }
