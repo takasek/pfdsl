@@ -93,6 +93,11 @@ artifact:
   featured_toolchain:
     label: "spec v0.0.7 実装済みツールチェーン (#52)"
     status: done
+  i97_external_stakeholders_spec:
+    label: "externalStakeholders フィールド仕様案 (#97)"
+    status: todo
+    description: "artifact / process に外部消費者を列挙するフィールド。owner と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段"
+    updated_at: 2026-06-18T00:00:00Z
 process:
   write_article:
     label: 記事執筆
@@ -123,6 +128,9 @@ process:
     label: Obsidianプラグイン実装
   implement_orphan_lint:
     label: 孤児検出lint実装
+  draft_external_stakeholders:
+    label: externalStakeholders仕様起草
+    description: "artifact / process の externalStakeholders フィールドを spec に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
 
@@ -174,6 +182,10 @@ adr_corpus >> write_article -> i12_article
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 cli_tool >> implement_orphan_lint -> i37_orphan_lint
+
+spec_v007 >> draft_external_stakeholders -> i97_external_stakeholders_spec
+
+i97_external_stakeholders_spec >> integrate_multifile
 
 
 
