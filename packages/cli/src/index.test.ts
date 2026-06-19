@@ -162,6 +162,23 @@ describe("check --audit", () => {
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).not.toMatch(/terminal artifacts/);
 	});
+
+	it("artifact with externalStakeholders is excluded from terminal artifacts", async () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  report:",
+			"    externalStakeholders: [規制当局]",
+			"---",
+			"req >> analyze -> report",
+		].join("\n");
+		const f = join(dir, "ext-stakeholders.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["check", f, "--audit"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toMatch(/terminal artifacts:.*report/);
+		expect(r.stdout).toMatch(/external inputs:.*req/);
+	});
 });
 
 describe("check --summary", () => {

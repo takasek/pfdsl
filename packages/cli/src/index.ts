@@ -54,7 +54,7 @@ export interface CheckOptions {
 }
 
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
-	const { diagnostics, edges, nodeKinds } = analyze(
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(
 		readSource(file),
 		opts.strict ? { strict: true } : undefined,
 	);
@@ -64,9 +64,14 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	}
 
 	const extraLines: string[] = [];
+	const artifactMeta = frontmatter?.artifact ?? undefined;
 
 	if (opts.audit) {
-		const { terminals, externalInputs } = auditGraph(edges, nodeKinds);
+		const { terminals, externalInputs } = auditGraph(
+			edges,
+			nodeKinds,
+			artifactMeta,
+		);
 		extraLines.push(`terminal artifacts: ${terminals.join(", ")}`);
 		extraLines.push(`external inputs: ${externalInputs.join(", ")}`);
 	}
@@ -81,7 +86,11 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		const primaryEdgeCount = edges.filter(
 			(e) => e.kind === "input" || e.kind === "output",
 		).length;
-		const { terminals, externalInputs } = auditGraph(edges, nodeKinds);
+		const { terminals, externalInputs } = auditGraph(
+			edges,
+			nodeKinds,
+			artifactMeta,
+		);
 		extraLines.push(
 			`artifacts: ${artifactCount}, processes: ${processCount}, edges: ${primaryEdgeCount}, external_inputs: ${externalInputs.length}, terminals: ${terminals.length}`,
 		);
