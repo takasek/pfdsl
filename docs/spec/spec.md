@@ -119,6 +119,24 @@ artifact / process に対して group を指定することで、ノードをグ
 
 可視化バックエンドは `criteria:` / `location:` を tooltip に `description:` と並べて表示してよい。`location:` を Graphviz の `href` 属性として出力してよい。
 
+#### artifact と process の共有フィールド（owner / externalStakeholders）
+
+**owner** — 成果物またはプロセスの内部責任者（任意文字列）。グラフ意味論に影響しない。1 ノードにつき 0 または 1 個。
+
+**externalStakeholders** — 変換グラフの参加者でない外部消費者の列挙（文字列配列、省略可能）。外部提出先・最終消費者・規制当局など「フロー外で成果物を受け取る主体」を明示する。`owner`（内部責任者）と対称のフィールド。
+
+`externalStakeholders` を持つ成果物は終端監査（`pfdsl check --audit`）において消費者あり扱いとなり、孤立終端として報告されない。
+
+```yaml
+artifact:
+  monthly_report:
+    label: 月次コンプライアンスレポート
+    externalStakeholders: [規制当局]
+  published_skill:
+    label: 配布済みスキル
+    externalStakeholders: [外部ユーザー, 他プロジェクト開発者]
+```
+
 #### process 専用フィールド
 
 **command** — プロセスに対応する実行可能なコマンド文字列（任意文字列）。グラフ意味論に影響しない。1 Process につき 0 または 1 個。
