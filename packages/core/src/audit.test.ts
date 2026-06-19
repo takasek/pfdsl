@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { auditGraph } from "./audit.js";
+import type { ArtifactMeta } from "./types/frontmatter.js";
 import type { NodeKind, NormalizedEdge } from "./types/index.js";
 
 function mkEdges(
@@ -93,5 +94,65 @@ describe("auditGraph", () => {
 		const result = auditGraph([], new Map());
 		expect(result.terminals).toEqual([]);
 		expect(result.externalInputs).toEqual([]);
+	});
+
+	describe("externalStakeholders", () => {
+		it("artifact with externalStakeholders is not flagged as orphan terminal", () => {
+			// req >> design -> report   (report has externalStakeholders)
+			const edges = mkEdges(
+				{ kind: "input", a: "req", p: "design" },
+				{ kind: "output", a: "report", p: "design" },
+			);
+			const nodeKinds = new Map<string, NodeKind>([
+				["req", "artifact"],
+				["design", "process"],
+				["report", "artifact"],
+			]);
+			const artifactMeta: Record<string, ArtifactMeta> = {
+				report: { externalStakeholders: ["規制当局"] },
+			};
+			const result = auditGraph(edges, nodeKinds, artifactMeta);
+			expect(result.terminals).not.toContain("report");
+		});
+
+		it("artifact with empty externalStakeholders is still flagged as orphan terminal", () => {
+			const edges = mkEdges(
+				{ kind: "input", a: "req", p: "design" },
+				{ kind: "output", a: "report", p: "design" },
+			);
+			const nodeKinds = new Map<string, NodeKind>([
+				["req", "artifact"],
+				["design", "process"],
+				["report", "artifact"],
+			]);
+			const artifactMeta: Record<string, ArtifactMeta> = {
+				report: { externalStakeholders: [] },
+			};
+			const result = auditGraph(edges, nodeKinds, artifactMeta);
+			expect(result.terminals).toContain("report");
+		});
+
+		it("artifact with externalStakeholders and a consuming edge is neither terminal nor flagged", () => {
+			// req >> design -> report >> publish -> published   (report has externalStakeholders but also consumed)
+			const edges = mkEdges(
+				{ kind: "input", a: "req", p: "design" },
+				{ kind: "output", a: "report", p: "design" },
+				{ kind: "input", a: "report", p: "publish" },
+				{ kind: "output", a: "published", p: "publish" },
+			);
+			const nodeKinds = new Map<string, NodeKind>([
+				["req", "artifact"],
+				["design", "process"],
+				["report", "artifact"],
+				["publish", "process"],
+				["published", "artifact"],
+			]);
+			const artifactMeta: Record<string, ArtifactMeta> = {
+				report: { externalStakeholders: ["外部ユーザー"] },
+			};
+			const result = auditGraph(edges, nodeKinds, artifactMeta);
+			expect(result.terminals).not.toContain("report");
+			expect(result.terminals).toContain("published");
+		});
 	});
 });

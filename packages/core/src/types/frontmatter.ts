@@ -17,6 +17,7 @@ export interface ArtifactMeta {
 	label?: string;
 	description?: string;
 	owner?: string;
+	externalStakeholders?: string[];
 	parts?: string[];
 	status?: Status;
 	tags?: string[];
@@ -31,6 +32,7 @@ export interface ProcessMeta {
 	label?: string;
 	description?: string;
 	owner?: string;
+	externalStakeholders?: string[];
 	group?: string;
 	command?: string;
 	[key: string]: unknown;

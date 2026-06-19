@@ -1,3 +1,4 @@
+import type { ArtifactMeta } from "./types/frontmatter.js";
 import type { NodeKind, NormalizedEdge } from "./types/index.js";
 
 export interface AuditResult {
@@ -12,10 +13,14 @@ export interface AuditResult {
  *
  * Feedback edges are ignored: only `input` and `output` edges count as
  * production/consumption in the primary graph.
+ *
+ * Artifacts with a non-empty `externalStakeholders` list are treated as
+ * having an external consumer and are excluded from terminals.
  */
 export function auditGraph(
 	edges: NormalizedEdge[],
 	nodeKinds: Map<string, NodeKind>,
+	artifactMeta?: Record<string, ArtifactMeta>,
 ): AuditResult {
 	const produced = new Set<string>();
 	const consumed = new Set<string>();
@@ -39,7 +44,10 @@ export function auditGraph(
 	}
 
 	const terminals = [...new Set(artifacts)].filter(
-		(a) => produced.has(a) && !consumed.has(a),
+		(a) =>
+			produced.has(a) &&
+			!consumed.has(a) &&
+			!artifactMeta?.[a]?.externalStakeholders?.length,
 	);
 	const externalInputs = [...new Set(artifacts)].filter(
 		(a) => consumed.has(a) && !produced.has(a),
