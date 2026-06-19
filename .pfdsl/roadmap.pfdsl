@@ -136,7 +136,7 @@ artifact:
     label: "リリース状態チェックツール (#89)"
     description: "scripts/release-status.mjs と make release-status。npm・VSCode
       Marketplace の公開バージョンとローカルを突き合わせ behind を一覧表示"
-    status: todo
+    status: wip
     criteria: make release-status が全対象パッケージの公開状態を一覧表示し、behind があれば exit 1
     location: https://github.com/takasek/pfdsl/issues/89
     updated_at: 2026-06-19T00:00:00Z
