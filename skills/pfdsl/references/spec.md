@@ -90,18 +90,18 @@ artifact:
     description: 要求仕様の詳細説明
     owner: po
     status: done
-    tags: [external, critical]
     criteria: Tech Lead 承認かつ未解決設計質問がすべて解消されていること
     location: docs/spec/spec.md
     revises: spec_v1
+    tags: [external, critical]
 
 process:
   impl:
     label: 実装
     description: バックエンド実装処理
     owner: dev-team
-    estimate: 5d
     command: make build
+    estimate: 5d
 ```
 
 label は表示名として利用してよい。
