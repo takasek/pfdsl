@@ -276,7 +276,7 @@ process:
     group: planning
   publish_cli:
     label: CLI 公開
-    description: "自動化済み: v* tag push → GitHub Actions → npm publish。手作業は tag push のみ"
+    description: "事前に make release-status で behind を確認してから実施。自動化済み: v* tag push → GitHub Actions → npm publish。手作業は tag push のみ"
     command: "git tag v<VERSION> && git push origin v<VERSION>"
     group: release
   render_previews:
