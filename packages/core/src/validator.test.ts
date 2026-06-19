@@ -219,11 +219,26 @@ describe("validate", () => {
 		});
 	});
 
-	describe("W002: status:done artifact without criteria", () => {
+	describe("W002: artifact without criteria", () => {
 		it("warns when done artifact has no criteria field", () => {
 			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
 			const diags = diagnose("A >> P -> B", fm);
 			expect(diags.map((d) => d.code)).toContain("W002");
+		});
+
+		it("warns when wip artifact has no criteria field", () => {
+			const fm: Frontmatter = { artifact: { A: { status: "wip" } } };
+			expect(codes("A >> P -> B", fm)).toContain("W002");
+		});
+
+		it("warns when todo artifact has no criteria field", () => {
+			const fm: Frontmatter = { artifact: { A: { status: "todo" } } };
+			expect(codes("A >> P -> B", fm)).toContain("W002");
+		});
+
+		it("warns when artifact has no status and no criteria", () => {
+			const fm: Frontmatter = { artifact: { A: {} } };
+			expect(codes("A >> P -> B", fm)).toContain("W002");
 		});
 
 		it("W002 severity is warning in non-strict mode", () => {
@@ -243,20 +258,17 @@ describe("validate", () => {
 			expect(w002?.severity).toBe("error");
 		});
 
-		it("no W002 when done artifact has criteria", () => {
+		it("no W002 when artifact has criteria", () => {
 			const fm: Frontmatter = {
 				artifact: { A: { status: "done", criteria: "approved by TL" } },
 			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W002");
 		});
 
-		it("no W002 when artifact is not done", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "wip" } } };
-			expect(codes("A >> P -> B", fm)).not.toContain("W002");
-		});
-
-		it("no W002 when artifact has no status", () => {
-			const fm: Frontmatter = { artifact: { A: {} } };
+		it("no W002 when non-done artifact has criteria", () => {
+			const fm: Frontmatter = {
+				artifact: { A: { status: "wip", criteria: "PR passes CI" } },
+			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W002");
 		});
 	});

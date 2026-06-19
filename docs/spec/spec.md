@@ -111,7 +111,7 @@ artifact / process に対して group を指定することで、ノードをグ
 
 `status` / `tags` も Artifact 専用フィールドである（§2.7 参照）。
 
-**criteria** — 成果物が完了（`status: done`）とみなされる条件（任意文字列）。モデル内で完了根拠を自己文書化する。1 Artifact につき 0 または 1 個。§15.7 参照。
+**criteria** — 成果物の完了条件（任意文字列）。`status` を問わず事前宣言として設定可。モデル内で完了根拠を自己文書化する。1 Artifact につき 0 または 1 個。§15.7 参照。
 
 **location** — 成果物の実体ファイル・リソースへのポインタ（パス、glob、または URL）。相対パスの基準は含む `.pfdsl` ファイルの位置。グラフ意味論に影響しない。1 Artifact につき 0 または 1 個。§15.8 参照。
 
@@ -697,10 +697,10 @@ artifact.C.parts = [Ca, Cb]
 
 ### 15.7 criteria 制約
 
-* `status: done` かつ `criteria:` 未設定の Artifact: warning
+* `criteria:` 未設定の Artifact: warning
 * strict mode では error に昇格してよい
 * `criteria:` を Process に指定した場合は error
-* `status` が `done` 以外の Artifact に `criteria:` を設定することは有効（事前宣言として許容）。warning / error は発しない
+* `status` が `done` 以外の Artifact に `criteria:` を設定することは有効（事前宣言として許容）
 
 ### 15.8 location / command 制約
 
@@ -740,7 +740,7 @@ URL に分類されない `?` を含む文字列（例: `docs/file?v=1`）は gl
 * 不正 status / statusStyles / tagStyles: error
 * `location:` / `revises:` / `criteria:` を Process に指定: error
 * `command:` を Artifact に指定: error
-* `status: done` かつ `criteria:` 未設定: warning（strict mode では error）
+* `criteria:` 未設定の Artifact: warning（strict mode では error）
 * `location:` ファイルパスが存在しない: warning（任意実装）
 * `revises:` 参照先不在 / 自己参照 / 分岐 / 循環: error
 * 重複edge: warning可
@@ -871,6 +871,7 @@ v0.0.6 からの主な変更点（v0.0.7）：
 * §2.3 Artifact に `revises:` フィールドを追加（バージョン系列の明示）
 * §2.3 Process に `command:` フィールドを追加（実行手順の記述）
 * §15.7 criteria 制約を追加（`status: done` + `criteria:` 欠如 → warning）
+* §15.7 criteria 制約を拡張（全 status の `criteria:` 欠如 → warning）
 * §15.8 location 妥当性制約を追加（ファイルパス存在検証、任意実装）
 * §15.9 revises 制約を追加（参照先存在・自己参照禁止・線形性・循環禁止）
 * §17.5 / §17.6 例を追加
