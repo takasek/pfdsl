@@ -42,6 +42,7 @@ artifact:
   spec_v007:
     label: 仕様書 v0.0.7（統合）
     status: wip
+    criteria: check/fmt/graph が全サンプルにエラーなし、v0.0.7 全フィールドが spec 本文に統合済み
     location: docs/spec/spec.md
   spec_v008:
     label: 仕様書 v0.0.8（マルチファイル統合）
