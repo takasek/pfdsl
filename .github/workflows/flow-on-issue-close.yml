@@ -33,10 +33,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/audit-issues-flow.mjs --fix || true
 
+      - name: Regenerate golden snapshot (roadmap.pfdsl drives core format golden)
+        run: pnpm --filter @pfdsl/core exec vitest run -u || true
+
       - name: Open PR if roadmap.pfdsl changed
         uses: peter-evans/create-pull-request@v8
         with:
-          add-paths: .pfdsl/roadmap.pfdsl
+          add-paths: |
+            .pfdsl/roadmap.pfdsl
+            packages/core/src/__snapshots__/index.test.ts.snap
           branch: flow-sync/pending
           commit-message: "chore(plan): sync flow after #${{ github.event.issue.number }} closed"
           title: "chore(plan): sync flow (pending closed issues)"

@@ -31,8 +31,10 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
 - [ ] close 時の降格規則を適用した（定義は L3 reference。専属 process も含めて削除する）
 - [ ] `packages/cli` または `packages/vscode-extension` を変更した場合、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending なら次サイクルの先頭タスクとして明記する — 忘れると `published_cli` / `published_extension` が無期限に stale になる）
-- [ ] `.pfdsl/roadmap.pfdsl` を変更した場合（issue クローズ・追加による flow-sync 含む）、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新しコミットした
+- [ ] `.pfdsl/roadmap.pfdsl` を**人手で**変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新しコミットした（flow-sync bot PR は `flow-on-issue-close.yml` が `--fix` 後に自動再生成。どちらの経路も `test.yml` の PR test gate がマージ前に stale snapshot を検出する）
 
 「roadmap.pfdsl 変更 → snapshot 陳腐化」は 2026-06-19 の /pfd-retro で発見: PR #110 の flow-sync が roadmap.pfdsl を変更した際にスナップショットが更新されず、#108 として顕在化した。正しい更新コマンドは `-u` フラグ（`--update-snapshots` は vitest 1.x で無効）。
+
+2026-06-20 の /pfd-retro: 上記ゲートは**人間ゲートのため bot PR では発火し得ない**という構造欠落（#120）を発見。`flow-on-issue-close.yml` の bot PR は人間を経由せず、#89 クローズ同期（#116）で snapshot を stale 化させた。恒久解消として A: flow-sync に snapshot 自動再生成（`add-paths` に snapshot 追加）、B: PR test gate `test.yml`（`pnpm -r build && test`）を追加。本ゲート項目は人手編集のローカル事前チェックに退き、bot 経路と取りこぼしは CI が backstop する。
 
 これら（npm 公開・snapshot 更新の各項目）は2026-06-16 の /pfd-retro で発見: #72/#74・#15/#77・#17/#81 の3PRが連続して impl_flow を更新せず、`@pfdsl/cli` の npm 公開も #74 以降止まっていた（main の package.json も npm 上も 0.0.4 のまま）。ルール（CLAUDE.md）はあったがゲートに写っていなかった。
