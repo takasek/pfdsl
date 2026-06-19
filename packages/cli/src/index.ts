@@ -11,7 +11,11 @@ import {
 	sortEdges,
 } from "@pfdsl/core";
 import { type BinaryFormat, svgToBinary } from "@pfdsl/graphviz-exporter";
-import { type RenderFormat, renderGraph } from "@pfdsl/preview-engine";
+import {
+	type RenderFormat,
+	renderDiff,
+	renderGraph,
+} from "@pfdsl/preview-engine";
 import { runSkillSync } from "./skill-sync.js";
 
 export interface CommandResult {
@@ -160,24 +164,55 @@ export async function runGraph(
 
 export type { DiffReport };
 
-function loadGraph(file: string) {
-	return analyze(readSource(file)).graph;
-}
-
 export function diffGraphs(fileA: string, fileB: string): DiffReport {
-	const a = loadGraph(fileA);
-	const b = loadGraph(fileB);
+	const { graph: a } = analyze(readSource(fileA));
+	const { graph: b } = analyze(readSource(fileB));
 	return coreDiffGraphs(a, b);
 }
 
-export function runDiff(fileA: string, fileB: string): CommandResult {
-	const r = diffGraphs(fileA, fileB);
+export interface DiffOptions {
+	format?: "text" | "dot" | "svg";
+}
+
+export async function runDiff(
+	fileA: string,
+	fileB: string,
+	opts: DiffOptions = {},
+): Promise<CommandResult> {
+	const fmt = opts.format ?? "text";
+	const {
+		graph: graphA,
+		frontmatter: fmA,
+		diagnostics: diagsA,
+	} = analyze(readSource(fileA));
+	const failedA = failIfErrors(diagsA, fileA);
+	if (failedA) return failedA;
+	const {
+		graph: graphB,
+		frontmatter: fmB,
+		diagnostics: diagsB,
+	} = analyze(readSource(fileB));
+	const failedB = failIfErrors(diagsB, fileB);
+	if (failedB) return failedB;
+
+	if (fmt === "dot") {
+		const dot = await renderDiff(graphA, fmA, graphB, fmB, { format: "dot" });
+		return ok(dot.endsWith("\n") ? dot : `${dot}\n`);
+	}
+	if (fmt === "svg") {
+		const svg = await renderDiff(graphA, fmA, graphB, fmB, { format: "svg" });
+		return ok(svg.endsWith("\n") ? svg : `${svg}\n`);
+	}
+
+	// text format
+	const r = coreDiffGraphs(graphA, graphB, fmA, fmB);
 	const out: string[] = [];
 	const section = (label: string, items: string[]) => {
 		for (const i of items) out.push(`${label} ${i}`);
 	};
 	section("+ node", r.addedNodes);
 	section("- node", r.removedNodes);
+	section("~ node", r.changedNodes);
 	section("+ edge", r.addedEdges);
 	section("- edge", r.removedEdges);
 	section("+ feedback", r.addedFeedback);
@@ -200,7 +235,8 @@ Commands:
   graph <file> [--format dot|svg|pdf|png]
                            Print Graphviz DOT (default), SVG, PDF, or PNG
                            PDF/PNG requires: npm install puppeteer
-  diff <a> <b>             Print structural diff between two files
+  diff <a> <b> [--format text|dot|svg]
+                           Structural diff (text), or visual diff DOT/SVG
   skill sync <name> [--yes]
                            Sync a bundled skill (currently: pfd-ops) into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
@@ -294,7 +330,16 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 		case "diff": {
 			const [a, b] = positional;
 			if (!a || !b) return fail("usage: pfdsl diff <a> <b>\n", 2);
-			return runDiff(a, b);
+			const fmt = flags.format;
+			if (
+				fmt !== undefined &&
+				fmt !== "text" &&
+				fmt !== "dot" &&
+				fmt !== "svg"
+			) {
+				return fail(`unknown format: ${String(fmt)}\n`, 2);
+			}
+			return await runDiff(a, b, fmt ? { format: fmt } : {});
 		}
 		case "skill": {
 			const [sub, name] = positional;
