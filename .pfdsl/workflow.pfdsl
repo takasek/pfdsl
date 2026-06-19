@@ -145,6 +145,13 @@ artifact:
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
     group: release
+  published_extension:
+    label: Marketplace 公開 Extension
+    description: "外部利用者向け配布物。toolchain の vscode-extension 部分が変更されたら公開が必要 — ext-v* tag push で GitHub Actions が自動 publish（VSCE_PAT secret、公開作業は自動化済み）"
+    status: done
+    criteria: make release-status で takasek.pfdsl が期待バージョンを返す
+    location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
+    group: release
   pull_request:
     label: Pull Request
     description: "ブランチ上の変更束のレビュー・統合単位。レビュー指摘はブランチ上の修正で解消してからマージする"
@@ -279,6 +286,11 @@ process:
     description: "事前に make release-status で behind を確認してから実施。自動化済み: v* tag push → GitHub Actions → npm publish。手作業は tag push のみ"
     command: "git tag v<VERSION> && git push origin v<VERSION>"
     group: release
+  publish_extension:
+    label: Extension 公開
+    description: "事前に make release-status で behind を確認してから実施。自動化済み: ext-v* tag push → GitHub Actions → vsce publish（VSCE_PAT secret）。手作業は tag push のみ"
+    command: "make release-extension"
+    group: release
   render_previews:
     label: サンプル描画
     description: 機能カタログとロードマップを dot/svg に描画する
@@ -355,6 +367,8 @@ pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
 issue_updates >>? file_issues
 
 toolchain >> publish_cli -> published_cli
+
+toolchain >> publish_extension -> published_extension
 
 [feature_samples, roadmap_pfdsl, toolchain] >> render_previews -> sample_previews
 

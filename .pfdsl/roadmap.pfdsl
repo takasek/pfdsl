@@ -132,6 +132,13 @@ artifact:
     status: done
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
+  i119_published_extension:
+    label: "Marketplace 公開自動化 (#119)"
+    description: "vscode-extension を ext-v* tag push で GitHub Actions が自動 publish する仕組み。VSCE_PAT secret + publish-extension.yml + workflow.pfdsl 更新"
+    status: wip
+    criteria: ext-v* tag push で marketplace publish が自動実行される
+    location: https://github.com/takasek/pfdsl/issues/119
+    updated_at: 2026-06-20T00:00:00Z
 process:
   write_article:
     label: 記事執筆
@@ -166,6 +173,9 @@ process:
       に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
+  setup_ext_publish:
+    label: Extension公開自動化セットアップ
+    description: "VSCode Marketplace 公開を CI 自動化する。publish-extension.yml 追加・Makefile release-extension target 追加・workflow.pfdsl 更新"
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -217,6 +227,9 @@ cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 
 spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
+
+cli_tool >> setup_ext_publish -> i119_published_extension
+published_cli >>? setup_ext_publish
 
 
 
