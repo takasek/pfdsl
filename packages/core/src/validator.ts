@@ -80,6 +80,18 @@ export function validate(
 			});
 	}
 
+	// V020: frontmatter-declared process with no edges at all (orphaned process)
+	for (const pid of Object.keys(fm?.process ?? {})) {
+		if (!processInputCount.has(pid)) {
+			diagnostics.push({
+				severity: "error",
+				code: "V020",
+				message: `Process '${pid}' is declared but has no edges (orphaned process)`,
+				range: zeroRange(),
+			});
+		}
+	}
+
 	// V004 / V005 / V006: parts constraints
 	// V007: artifact.status enum check
 	// W001: parts member without edges
