@@ -28,143 +28,188 @@ group:
 artifact:
   spec:
     label: 言語仕様書
+    description: "一次情報だが不変の外部入力ではない — 実装知見からの仕様提案（issue 経由）で改訂される。改版の詳細依存は .pfdsl/roadmap.pfdsl 参照"
     status: done
+    criteria: check/fmt/graph が全サンプルに対してエラーなし
+    location: docs/spec/spec.md
     group: generation
-    description: "docs/spec/spec.md。一次情報だが不変の外部入力ではない — 実装知見からの仕様提案（issue 経由）で改訂される。改版の詳細依存は .pfdsl/roadmap.pfdsl 参照"
   spec_proposals:
     label: spec 提案文書群
+    description: "各 spec 改版候補の起草文書（概要・仕様変更・設計判断・影響範囲）。draft_proposals が生成し maintain_spec が消費して spec 改版に統合する。マージ後も歴史的記録として保持（workflow.md でライフサイクル規約を管理）"
     status: done
+    criteria: 対象改版の全提案が spec に統合済み（proposals/ に未統合ファイルなし）
+    location: docs/spec/proposals/
     group: generation
-    description: "docs/spec/proposals/。各 spec 改版候補の起草文書（概要・仕様変更・設計判断・影響範囲）。draft_proposals が生成し maintain_spec が消費して spec 改版に統合する。マージ後も歴史的記録として保持（workflow.md でライフサイクル規約を管理）"
   skill_template:
     label: スキルテンプレート
+    description: "品質ガイドの正本。知見・ADR の反映先。gen-skill.mjs がこれを読み込んで skill と gh_skill_dist を生成する"
     status: done
+    criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が最新テンプレートと一致
+    location: scripts/skill-template/SKILL.md
     group: generation
-    description: "scripts/skill-template/SKILL.md。品質ガイドの正本。知見・ADR の反映先。gen-skill.mjs がこれを読み込んで skill と gh_skill_dist を生成する"
   feature_samples:
     label: 機能カタログ
+    description: "1機能1ファイルの最小例。skill の references/samples.md の生成元"
     status: done
+    criteria: spec の全機能に対応する最小サンプルが存在し、check がエラーなしで通過
+    location: docs/samples/
     group: generation
-    description: "docs/samples/。1機能1ファイルの最小例。skill の references/samples.md の生成元"
   skill:
     label: AI agent スキル（リポ内）
+    description: "make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点（このリポ内の Claude Code が消費）"
     status: done
+    criteria: make gen-skill が差分なし、diff -rq で gh_skill_dist と一致
+    location: .claude/skills/pfdsl/
     group: generation
-    description: ".claude/skills/pfdsl/。make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点（このリポ内の Claude Code が消費）"
   gh_skill_dist:
     label: gh skill 配布スキル
+    description: "gh skill install takasek/pfdsl/pfdsl --agent claude-code で外部ユーザーが ~/.claude/skills/pfdsl/ に展開する。make gen-skill で再生成（.claude/skills/pfdsl/ と常に同一内容 — diff -rq で保証）"
     status: done
+    criteria: .claude/skills/pfdsl/ と diff -rq で差分なし
+    location: skills/pfdsl/
     group: release
-    description: "skills/pfdsl/（リポ内追跡ファイル）。gh skill install takasek/pfdsl/pfdsl --agent claude-code で外部ユーザーが ~/.claude/skills/pfdsl/ に展開する。make gen-skill で再生成（.claude/skills/pfdsl/ と常に同一内容 — diff -rq で保証）"
   user_intent:
     label: ユーザーの関心・意図
-    group: dialogue
     description: "何を作るか・何を問うかの源泉。不定形のフロー外リソース（ADR-0001 の実証例）"
+    group: dialogue
   topics:
     label: 実践お題
-    group: dialogue
     description: "対話で設定された実践 PFD の題材・シナリオ。write_examples の入力"
+    group: dialogue
   proposals:
     label: 作業・仕様提案
-    group: dialogue
     description: "対話で生まれた作業項目・仕様変更案。正式化は必ず file_issues を通る — 仕様変更が issue を経由する唯一の入口"
+    group: dialogue
   decisions:
     label: 方法論判断
-    group: dialogue
     description: "対話で確定した方法論・運用の判断。品質ガイド即時反映（maintain_template）とADR 起草（draft_adrs）の2経路で消費 — スキル改善は issue を通さない。実体はセッションログと反映先コミットで検証可能"
+    group: dialogue
   examples:
     label: 実践例
+    description: "品質ガイドの実証とレビュー素材。スキル参照への採録候補"
     status: done
+    criteria: check がエラーなし、品質ガイドのレビューで知見として記録済み
+    location: docs/examples/
     group: practice
-    description: "docs/examples/。品質ガイドの実証とレビュー素材。スキル参照への採録候補"
   findings:
     label: レビュー知見
-    status: done
-    group: practice
     description: "実践例レビューで得た品質知見。次世代の対話・整備への還流入力（消費先の一次情報は本図のエッジ）"
+    status: done
+    criteria: skill_template または adrs への反映経路が確定している（未処理の知見がない）
+    group: practice
   adrs:
     label: ADR
+    description: "方法論の設計決定記録。記事の原稿素材、ガイド改訂の根拠"
     status: done
+    criteria: 対象判断が文書化され docs/adr/README.md の一覧に追記済み
+    location: docs/adr/
     group: decision
-    description: "docs/adr/。方法論の設計決定記録。記事の原稿素材、ガイド改訂の根拠"
   payoff_log:
     label: 効果局面ログ
+    description: "PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材（write_article）と運用スキル蒸留の入力（distill_ops）。追記条件は ADR-0014 反実仮想テスト（冒頭規約参照）"
     status: done
+    criteria: ADR-0014 反実仮想テストを通過した事例が追記済み
+    location: docs/pfd_payoff_log.md
     group: decision
-    description: "docs/pfd_payoff_log.md。PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材（write_article）と運用スキル蒸留の入力（distill_ops）。追記条件は ADR-0014 反実仮想テスト（冒頭規約参照）"
   article:
     label: 公開記事
-    status: todo
-    group: decision
     description: "ADR 群を素材とした外部公開記事。本生態系の最終納品物のひとつ"
+    status: todo
+    criteria: 外部メディアに公開済みで URL が存在する
+    group: decision
   gh_issues:
     label: GitHub issues
+    description: "作業項目の一次情報"
     status: done
+    criteria: 起票・クローズ・ラベル付けが完了し roadmap_pfdsl と同期済み
+    location: https://github.com/takasek/pfdsl/issues
     group: planning
-    description: "github.com/takasek/pfdsl/issues。作業項目の一次情報"
   roadmap_pfdsl:
     label: issue 依存グラフ
+    description: "着手可能順序の導出。issue 追加時に更新"
     status: done
+    criteria: check がエラーなし、audit-issues-flow.mjs が差分なし
+    location: .pfdsl/roadmap.pfdsl
     group: planning
-    description: ".pfdsl/roadmap.pfdsl。着手可能順序の導出。issue 追加時に更新"
   toolchain:
     label: ツールチェーン
-    status: done
-    group: planning
     description: "packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）。実装の本質成果物。CLI に限らず develop の対象すべて"
+    status: done
+    criteria: 対象 issue の実装が完了し、PR がレビュー通過済み
+    location: packages/
+    group: planning
   published_cli:
     label: npm 公開 CLI
+    description: "外部利用者向け配布物。toolchain の CLI 部分が変更されたら公開が必要 — v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC、公開作業は自動化済み）"
     status: done
+    criteria: npm show @pfdsl/cli version が期待バージョンを返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
     group: release
-    description: "@pfdsl/cli（npm）。外部利用者向け配布物。toolchain の CLI 部分が変更されたら公開が必要 — v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC、公開作業は自動化済み）"
   pull_request:
     label: Pull Request
+    description: "ブランチ上の変更束のレビュー・統合単位。レビュー指摘はブランチ上の修正で解消してからマージする"
+    location: https://github.com/takasek/pfdsl/pulls
     group: planning
-    description: "ブランチ上の変更束のレビュー・統合単位（github.com/takasek/pfdsl/pulls）。レビュー指摘はブランチ上の修正で解消してからマージする"
   issue_updates:
     label: issue 更新内容
-    group: planning
     description: "マージ時に確定する issue への反映事項（クローズ・進捗・新発見の起票種）。フロー内で生まれる不定形情報（ADR-0001 と緊張するが、実体は merge コミットと flow 更新で検証可能）。issue 管理への還流シグナル"
+    group: planning
   ops_skill:
     label: PFD運用スキル
+    description: "/pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別（roadmap / workflow / runtime-pipeline）の定義と問診リストを含む（ADR-0017）。汎用層（L1+L2）= SKILL.md 本文、GitHub Issues プリセット（L3）= references/、デプロイ可能ファイル群（L3.5）= install/（CI で identity 強制）、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
     status: done
+    criteria: /pfd-cycle が期待通り動作する
+    location: .claude/skills/pfd-ops/
     group: generation
-    description: ".claude/skills/pfd-ops/ と /pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別（roadmap / workflow / runtime-pipeline）の定義と問診リストを含む（ADR-0017）。汎用層（L1+L2）= SKILL.md 本文、GitHub Issues プリセット（L3）= references/、デプロイ可能ファイル群（L3.5）= install/（CI で identity 強制）、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
   retro_skill:
     label: ふりかえり監査スキル
+    description: "/pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う"
     status: done
+    criteria: /pfd-retro が期待通り動作する
+    location: .claude/skills/pfd-retro/
     group: generation
-    description: ".claude/skills/pfd-retro/ と /pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う"
   review_prompts:
     label: レビュープロンプト集
+    description: "PFD を問い詰める A/B 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd-retro はポインタ参照"
     status: done
+    criteria: 監査観点が網羅されており、gen-skill で skill の references/review-prompts.md に同梱済み
+    location: docs/review-prompts.md
     group: generation
-    description: "docs/review-prompts.md。PFD を問い詰める A/B 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd-retro はポインタ参照"
   sample_previews:
     label: サンプル描画物
-    status: done
-    group: release
     description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samples で再生成。サンプル・ロードマップ変更時に更新（make push がドリフト検知）。GitHub 上の閲覧用終端成果物（README からリンクされるが README 執筆の入力ではない）"
+    status: done
+    criteria: make gen-samples が差分なしで完了し、README からのリンクが正常
+    location: docs/samples/
+    group: release
   pr_diagrams:
     label: PR差分ダイアグラム
+    description: "merged PR が .pfdsl を変更した際に CI（pr-diff-images.yml）が before/after SVG を自動生成・コミット。PR description に埋め込まれ考古的レビューに使われる終端成果物。ライフサイクル: PR ごとに蓄積（削除規約なし）"
     status: done
+    criteria: PR マージ後に CI が before/after SVG を自動生成・コミット済み
+    location: docs/diagrams/
     group: release
-    description: "docs/diagrams/pr-<N>/。merged PR が .pfdsl を変更した際に CI（pr-diff-images.yml）が before/after SVG を自動生成・コミット。PR description に埋め込まれ考古的レビューに使われる終端成果物。ライフサイクル: PR ごとに蓄積（削除規約なし）"
   readme:
     label: README
+    description: "外部利用者向けの導入文書。CLI のインストール手順・サンプル描画物への参照を含むため、CLI 公開形態やサンプル変更時に追従更新が必要"
     status: done
+    criteria: CLI インストール手順・サンプル描画物リンクが現行バージョンと整合している
+    location: README.md
     group: release
-    description: "README.md。外部利用者向けの導入文書。CLI のインストール手順・サンプル描画物への参照を含むため、CLI 公開形態やサンプル変更時に追従更新が必要"
   workflow_md:
     label: 生態系 companion
+    description: "workflow.pfdsl のグラフが運べない運用手続き散文（知見振り分け・学習ループ・payoff_log 追記条件・終端ゲート根拠）。pfd-ops skill が読む L4 ホスト"
     status: done
+    criteria: workflow.pfdsl の運用手続きと散文が一致している
+    location: .pfdsl/workflow.md
     group: generation
-    description: ".pfdsl/workflow.md。workflow.pfdsl のグラフが運べない運用手続き散文（知見振り分け・学習ループ・payoff_log 追記条件・終端ゲート根拠）。pfd-ops skill が読む L4 ホスト"
   roadmap_md:
     label: 計画 companion
+    description: "roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd-ops skill が読む L4 ホスト"
     status: done
+    criteria: roadmap.pfdsl の issue 管理バインディングと散文が一致し、audit-issues-flow.mjs が差分なしで通過
+    location: .pfdsl/roadmap.md
     group: planning
-    description: ".pfdsl/roadmap.md。roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd-ops skill が読む L4 ホスト"
 
 process:
   distill_ops:
@@ -193,8 +238,9 @@ process:
     group: generation
   gen_skill:
     label: スキル生成
-    description: make gen-skill
+    command: make gen-skill
     group: generation
+
   write_examples:
     label: 実践例執筆
     description: お題に対しスキルの品質ガイドに従って PFD を書く
@@ -218,6 +264,7 @@ process:
   map_deps:
     label: 依存整理
     description: "issue 間の依存を PFD 化し着手順を導出する。issue との同期は scripts/audit-issues-flow.mjs で機械監査（flow:managed ラベル・updated_at・priority 突合）。issue close 時は GitHub Action（flow-on-issue-close）が closed_in_flow を --fix した flow-sync PR を自動起票し、人がレビューして merge する"
+    command: node scripts/audit-issues-flow.mjs
     group: planning
   develop:
     label: ツールチェーン開発
@@ -230,10 +277,12 @@ process:
   publish_cli:
     label: CLI 公開
     description: "自動化済み: v* tag push → GitHub Actions → npm publish。手作業は tag push のみ"
+    command: "git tag v<VERSION> && git push origin v<VERSION>"
     group: release
   render_previews:
     label: サンプル描画
-    description: "make gen-samples。機能カタログとロードマップを dot/svg に描画する"
+    description: 機能カタログとロードマップを dot/svg に描画する
+    command: make gen-samples
     group: release
   update_readme:
     label: README 更新
