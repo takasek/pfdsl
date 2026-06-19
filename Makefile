@@ -60,7 +60,7 @@ gen-samples: build-deps
 
 .PHONY: check-docs
 check-docs:
-	@find docs -name "*.pfdsl" | sort | while read f; do \
+	@find docs -name "*.pfdsl" -type f | sort | while read f; do \
 		echo "check $$f"; \
 		node packages/cli/dist/cli.js check "$$f" || exit 1; \
 		node packages/cli/dist/cli.js graph "$$f" --format dot > /dev/null || exit 1; \
