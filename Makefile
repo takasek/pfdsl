@@ -96,6 +96,10 @@ push: check-docs
 	fi
 	git push
 
+.PHONY: release-status
+release-status:
+	node scripts/release-status.mjs
+
 # @pfdsl/cli を npm 公開する。packages/cli/package.json の version から
 # v<version> タグを打って push し、publish-cli.yml (OIDC) を起動する。
 # 事前に version を上げてコミット・マージしておくこと。
