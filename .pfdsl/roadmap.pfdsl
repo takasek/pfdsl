@@ -50,8 +50,8 @@ artifact:
     location: docs/spec/spec.md
   published_cli:
     label: npm公開済みCLI
-    description: "現行公開バージョンは npm 一次情報（ここに書かない —
-      ドリフトするため）。詳細は docs/pfdsl_implementation_flow.pfdsl の cli_published 参照"
+    description: "現行公開バージョンは npm 一次情報（ここに書かない — ドリフトするため）。詳細は
+      docs/pfdsl_implementation_flow.pfdsl の cli_published 参照"
     status: done
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
@@ -134,18 +134,20 @@ artifact:
     criteria: spec v0.0.7 の全機能が実装され、check/fmt/graph がエラーなしで動作
   i97_external_stakeholders_spec:
     label: "externalStakeholders フィールド仕様案 (#97)"
-    description: "artifact / process に外部消費者を列挙するフィールド。owner と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段"
+    description: "artifact / process に外部消費者を列挙するフィールド。owner
+      と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段"
     status: todo
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
-    updated_at: 2026-06-18T00:00:00Z
+    updated_at: 2026-06-18T05:21:41Z
   i103_criteria_warn_nondone:
     label: "全statusでcriteria未設定を警告 (#103)"
-    description: "status: done 以外でも criteria 未設定の artifact に warning を出す。spec §15.7 の severity 定義も合わせて更新"
+    description: "status: done 以外でも criteria 未設定の artifact に warning を出す。spec §15.7
+      の severity 定義も合わせて更新"
     status: todo
     criteria: check が criteria 未設定の全 artifact に warning を出し、spec §15.7 が更新済み
     location: https://github.com/takasek/pfdsl/issues/103
-    updated_at: 2026-06-19T00:00:00Z
+    updated_at: 2026-06-19T08:35:22Z
 process:
   write_article:
     label: 記事執筆
@@ -178,12 +180,14 @@ process:
     label: 孤児検出lint実装
   draft_external_stakeholders:
     label: externalStakeholders仕様起草
-    description: "artifact / process の externalStakeholders フィールドを spec に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
+    description: "artifact / process の externalStakeholders フィールドを spec
+      に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
   implement_criteria_warn:
     label: criteria警告拡張実装
-    description: "status を問わず criteria 未設定の artifact に warning を出す。spec §15.7 の severity 定義も更新"
+    description: "status を問わず criteria 未設定の artifact に warning を出す。spec §15.7 の
+      severity 定義も更新"
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
