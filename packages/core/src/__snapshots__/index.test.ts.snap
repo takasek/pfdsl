@@ -128,14 +128,21 @@ artifact:
     status: done
     location: https://github.com/takasek/pfdsl/issues/52
     criteria: spec v0.0.7 の全機能が実装され、check/fmt/graph がエラーなしで動作
-  i97_external_stakeholders_spec:
+  external_stakeholders_spec:
     label: "externalStakeholders フィールド仕様案 (#97)"
     description: "artifact / process に外部消費者を列挙するフィールド。owner
-      と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段"
-    status: todo
+      と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段。v0.0.7 スコープ"
+    status: done
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
-    updated_at: 2026-06-18T05:21:41Z
+  i89_release_status_tool:
+    label: "リリース状態チェックツール (#89)"
+    description: "scripts/release-status.mjs と make release-status。npm・VSCode
+      Marketplace の公開バージョンとローカルを突き合わせ behind を一覧表示"
+    status: todo
+    criteria: make release-status が全対象パッケージの公開状態を一覧表示し、behind があれば exit 1
+    location: https://github.com/takasek/pfdsl/issues/89
+    updated_at: 2026-06-19T00:00:00Z
 process:
   write_article:
     label: 記事執筆
@@ -170,6 +177,10 @@ process:
       に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
+  implement_release_status:
+    label: リリース状態チェック実装
+    description: "scripts/release-status.mjs スクリプトと Makefile release-status
+      ターゲットを追加。npm registry / VSCode Marketplace から公開バージョンを取得して比較"
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -195,12 +206,14 @@ draft_criteria
 draft_external_stakeholders
 draft_location
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
 i3_obsidian_plugin
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -229,14 +242,16 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -267,14 +282,16 @@ draft_criteria
 draft_external_stakeholders
 draft_location
 draft_multifile_specs
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -304,14 +321,16 @@ draft_criteria
 draft_external_stakeholders
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -341,14 +360,16 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -368,6 +389,7 @@ write_article
 
 criteria_spec >> integrate_spec
 design_notes >> integrate_spec
+external_stakeholders_spec >> integrate_spec
 location_spec >> integrate_spec
 revises_spec >> integrate_spec
 integrate_spec -> spec_v007
@@ -386,8 +408,9 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 layer_audit_assets
@@ -415,14 +438,16 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 layer_audit_assets
@@ -454,12 +479,14 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -491,13 +518,15 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 findings_r12
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -530,11 +559,13 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 findings_r12
 i12_article
 i3_obsidian_plugin
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_spec
 layer_audit_assets
@@ -564,14 +595,16 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -600,14 +633,16 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -637,14 +672,16 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -676,13 +713,15 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -717,13 +756,15 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
 i5_hierarchy_spec
 i6_presets_spec
-i97_external_stakeholders_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -745,8 +786,8 @@ write_design_notes
 
 
 
-spec_v007 >> draft_external_stakeholders
-draft_external_stakeholders -> i97_external_stakeholders_spec
+spec_v006 >> draft_external_stakeholders
+draft_external_stakeholders -> external_stakeholders_spec
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -763,7 +804,9 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
+i89_release_status_tool
 implement_lints
+implement_release_status
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -777,16 +820,16 @@ restructure_skillgen
 restructured_gen
 revises_spec
 skill_gen
-spec_v006
+spec_v007
 spec_v008
 write_article
 write_design_notes
 
-i97_external_stakeholders_spec >> integrate_multifile
+cli_tool >> implement_release_status
+implement_release_status -> i89_release_status_tool
 adr_corpus
 audit_distribution
 build_obsidian_plugin
-cli_tool
 criteria_spec
 design_notes
 draft_criteria
@@ -794,6 +837,7 @@ draft_external_stakeholders
 draft_location
 draft_multifile_specs
 draft_revises
+external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
@@ -802,6 +846,7 @@ i5_hierarchy_spec
 i6_presets_spec
 implement_lints
 implement_spec_features
+integrate_multifile
 integrate_spec
 layer_audit_assets
 lint_checker
