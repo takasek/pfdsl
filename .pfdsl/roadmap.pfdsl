@@ -132,6 +132,13 @@ artifact:
     status: done
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
+  i99_pr_diff_image:
+    label: "PR diff画像 (#99)"
+    description: "マージPRの変更.pfdslにbefore/after/diffの3画像を生成。diff画像は変更箇所のみ色分け（追加緑/削除赤/変更黄）。詳細設計は
+      docs/superpowers/specs/2026-06-20-pr-diff-image-design.md"
+    status: todo
+    criteria: マージPRにbefore/after/diff3画像が添付され、diff画像が追加緑・削除赤・変更黄で差分のみ表示する
+    location: https://github.com/takasek/pfdsl/issues/99
 process:
   write_article:
     label: 記事執筆
@@ -166,6 +173,8 @@ process:
       に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
+  implement_pr_diff_image:
+    label: PR diff画像実装
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -213,6 +222,8 @@ adr_corpus >> write_article -> i12_article
 
 
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
+
+cli_tool >> implement_pr_diff_image -> i99_pr_diff_image
 
 
 
