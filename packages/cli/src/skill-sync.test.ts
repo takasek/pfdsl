@@ -210,12 +210,14 @@ describe("pfdslSkillGuidance", () => {
 
 	it("returns empty string when pfdsl skill is already installed", () => {
 		mkdirSync(join(targetRoot, ".claude/skills/pfdsl"), { recursive: true });
-		writeFileSync(join(targetRoot, ".claude/skills/pfdsl/SKILL.md"), "# pfdsl\n");
+		writeFileSync(
+			join(targetRoot, ".claude/skills/pfdsl/SKILL.md"),
+			"# pfdsl\n",
+		);
 		const msg = pfdslSkillGuidance(targetRoot);
 		expect(msg).toBe("");
 	});
 });
-
 
 describe("ensureLabels", () => {
 	it("returns guidance and does nothing when gh is not found", async () => {
