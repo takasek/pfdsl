@@ -139,7 +139,7 @@ artifact:
     label: "PR diff画像 (#99)"
     description: "マージPRの変更.pfdslにbefore/after/diffの3画像を生成。diff画像は変更箇所のみ色分け（追加緑/削除赤/変更黄）。詳細設計は
       docs/superpowers/specs/2026-06-20-pr-diff-image-design.md"
-    status: todo
+    status: wip
     criteria: マージPRにbefore/after/diff3画像が添付され、diff画像が追加緑・削除赤・変更黄で差分のみ表示する
     location: https://github.com/takasek/pfdsl/issues/99
 process:
