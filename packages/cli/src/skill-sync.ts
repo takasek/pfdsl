@@ -4,7 +4,6 @@ import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
-	readFileSync,
 	rmSync,
 	statSync,
 } from "node:fs";
@@ -119,7 +118,8 @@ export function copyInstallLayer(
 			copied: false,
 			message:
 				"GitHub Issues バックエンド (L3) は未採用です。採用する場合は次を実行してください:\n" +
-				"  cp -r .claude/skills/pfd-ops/install/. .\n",
+				"  cp -r .claude/skills/pfd-ops/install/. .\n" +
+				"L3 の意味は .claude/skills/pfd-ops/references/architecture.md を参照してください。\n",
 		};
 	}
 	const installDir = join(skillRoot, "install");
@@ -132,53 +132,24 @@ export function copyInstallLayer(
 	return { copied: true, message: "" };
 }
 
-const L4_FILES = [
-	"roadmap.pfdsl",
-	"roadmap.md",
-	"ecosystem.pfdsl",
-	"ecosystem.md",
-] as const;
-
-export interface ScaffoldResult {
-	scaffolded: string[];
-}
-
 /**
- * Scaffolds the 4 L4 files (.pfdsl/{roadmap,ecosystem}.{pfdsl,md}) at target
- * root, one at a time, only when each is individually missing. Existing
- * files are never touched (idempotent, no overwrite).
+ * Returns guidance to run /pfd-ecosystem when .pfdsl/ contains no .pfdsl
+ * files yet. Templates for all three kinds (roadmap / workflow /
+ * runtime-pipeline) are available in the synced skill tree under
+ * .claude/skills/pfd-ops/references/scaffold/ — the user copies only the
+ * kinds their project needs via /pfd-ecosystem.
+ * Returns "" when .pfdsl/ already has at least one .pfdsl file.
  */
-export function scaffoldL4Files(
-	skillRoot: string,
-	targetRoot: string,
-): ScaffoldResult {
-	const scaffolded: string[] = [];
-	const targetDir = join(targetRoot, ".pfdsl");
-	const templateDir = join(skillRoot, "references/scaffold");
-	mkdirSync(targetDir, { recursive: true });
-	for (const file of L4_FILES) {
-		const dest = join(targetDir, file);
-		if (existsSync(dest)) continue;
-		cpSync(join(templateDir, file), dest);
-		scaffolded.push(file);
-	}
-	return { scaffolded };
-}
-
-/**
- * Returns the ecosystem-setup prompt content (read from the bundled
- * reference template) when at least one L4 file was scaffolded this run.
- * Returns "" when nothing was scaffolded (all L4 files already grown —
- * avoid noise).
- */
-export function ecosystemSetupPrompt(
-	skillRoot: string,
-	scaffolded: string[],
-): string {
-	if (scaffolded.length === 0) return "";
-	return readFileSync(
-		join(skillRoot, "references/ecosystem-setup-prompt.md"),
-		"utf-8",
+export function pfdslDirGuidance(targetRoot: string): string {
+	const pfdslDir = join(targetRoot, ".pfdsl");
+	const hasAnyPfdsl =
+		existsSync(pfdslDir) &&
+		readdirSync(pfdslDir).some((f) => f.endsWith(".pfdsl"));
+	if (hasAnyPfdsl) return "";
+	return (
+		".pfdsl/ にファイルがありません。`/pfd-ecosystem` スキルを起動して\n" +
+		"プロジェクトに必要な種別（roadmap / workflow / runtime-pipeline）の\n" +
+		"テンプレートを .claude/skills/pfd-ops/references/scaffold/ からコピーしてください。\n"
 	);
 }
 
@@ -278,9 +249,25 @@ export interface SkillSyncResult {
 }
 
 /**
+ * Returns a guidance message when the pfdsl skill is absent from the target
+ * repo's Claude skills directory. pfd-ops depends on pfdsl for reading and
+ * writing .pfdsl files, so both skills should be present together.
+ * Returns "" when pfdsl is already installed (no noise).
+ */
+export function pfdslSkillGuidance(targetRoot: string): string {
+	if (existsSync(join(targetRoot, ".claude/skills/pfdsl/SKILL.md"))) return "";
+	return (
+		"pfd-ops は .pfdsl ファイルの読み書きに pfdsl スキルを必要とします。\n" +
+		"pfdsl スキルをインストールするには次を実行してください:\n" +
+		"  npx @pfdsl/cli@latest skill sync pfdsl\n"
+	);
+}
+
+/**
  * Orchestrates the full `pfdsl skill sync pfd-ops` flow:
  * general layer overwrite -> conditional install/ overwrite (subordinate gh
- * label confirmation when adopted) -> L4 scaffold -> ecosystem-setup prompt.
+ * label confirmation when adopted) -> L4 scaffold -> ecosystem-setup prompt
+ * -> pfdsl skill guidance when absent.
  */
 export async function runSkillSync(
 	opts: RunSkillSyncOptions,
@@ -307,13 +294,11 @@ export async function runSkillSync(
 		lines.push(installResult.message);
 	}
 
-	const scaffoldResult = scaffoldL4Files(skillRoot, opts.targetRoot);
-	if (scaffoldResult.scaffolded.length > 0) {
-		lines.push(`Scaffolded: ${scaffoldResult.scaffolded.join(", ")}`);
-	}
+	const dirGuidance = pfdslDirGuidance(opts.targetRoot);
+	if (dirGuidance) lines.push(dirGuidance);
 
-	const prompt = ecosystemSetupPrompt(skillRoot, scaffoldResult.scaffolded);
-	if (prompt) lines.push(prompt);
+	const pfdslGuidance = pfdslSkillGuidance(opts.targetRoot);
+	if (pfdslGuidance) lines.push(pfdslGuidance);
 
 	return { stdout: `${lines.join("\n")}\n`, exitCode: 0 };
 }

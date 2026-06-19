@@ -77,4 +77,5 @@ workflow か runtime-pipeline か迷ったら: 人・チームの判断やトリ
 ## References
 
 - 各運用 `.pfdsl` の sibling `.md` companion — リポ固有のバインディングと手続き
+- `references/architecture.md` — スキルの層構成（L1〜L4・install/ の役割・採用とは何か）の説明
 - `references/github-issues-backend.md` — GitHub Issues バックエンドのプリセット規約（採用リポのみ）

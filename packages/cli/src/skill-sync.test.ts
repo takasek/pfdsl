@@ -12,12 +12,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	copyInstallLayer,
 	copySkillTree,
-	ecosystemSetupPrompt,
 	ensureLabels,
 	isL3Adopted,
+	pfdslDirGuidance,
+	pfdslSkillGuidance,
 	resolveSkillRoot,
 	runSkillSync,
-	scaffoldL4Files,
 } from "./skill-sync.js";
 
 describe("resolveSkillRoot", () => {
@@ -159,7 +159,7 @@ describe("copyInstallLayer", () => {
 	});
 });
 
-describe("scaffoldL4Files", () => {
+describe("pfdslDirGuidance", () => {
 	let targetRoot: string;
 
 	beforeEach(() => {
@@ -170,71 +170,52 @@ describe("scaffoldL4Files", () => {
 		rmSync(targetRoot, { recursive: true, force: true });
 	});
 
-	it("creates all 4 files under .pfdsl/ when none exist", () => {
-		const skillRoot = resolveSkillRoot();
-		const result = scaffoldL4Files(skillRoot, targetRoot);
-
-		expect(result.scaffolded.sort()).toEqual(
-			["ecosystem.md", "ecosystem.pfdsl", "roadmap.md", "roadmap.pfdsl"].sort(),
-		);
-		const roadmap = readFileSync(
-			join(targetRoot, ".pfdsl/roadmap.pfdsl"),
-			"utf-8",
-		);
-		expect(roadmap).toContain("seed");
+	it("returns guidance when .pfdsl/ does not exist", () => {
+		const msg = pfdslDirGuidance(targetRoot);
+		expect(msg).toContain("pfd-ecosystem");
+		expect(msg).toContain("scaffold");
 	});
 
-	it("does not touch a file that already exists", () => {
-		const skillRoot = resolveSkillRoot();
+	it("returns guidance when .pfdsl/ exists but has no .pfdsl files", () => {
 		mkdirSync(join(targetRoot, ".pfdsl"), { recursive: true });
-		writeFileSync(
-			join(targetRoot, ".pfdsl/roadmap.pfdsl"),
-			"# pre-existing custom content\n",
-		);
-
-		const result = scaffoldL4Files(skillRoot, targetRoot);
-
-		expect(result.scaffolded).not.toContain("roadmap.pfdsl");
-		expect(result.scaffolded.sort()).toEqual(
-			["ecosystem.md", "ecosystem.pfdsl", "roadmap.md"].sort(),
-		);
-		const untouched = readFileSync(
-			join(targetRoot, ".pfdsl/roadmap.pfdsl"),
-			"utf-8",
-		);
-		expect(untouched).toBe("# pre-existing custom content\n");
+		writeFileSync(join(targetRoot, ".pfdsl/notes.md"), "notes\n");
+		const msg = pfdslDirGuidance(targetRoot);
+		expect(msg).toContain("pfd-ecosystem");
 	});
 
-	it("returns empty scaffolded list when all 4 files already exist", () => {
-		const skillRoot = resolveSkillRoot();
+	it("returns empty string when .pfdsl/ has at least one .pfdsl file", () => {
 		mkdirSync(join(targetRoot, ".pfdsl"), { recursive: true });
-		for (const f of [
-			"roadmap.pfdsl",
-			"roadmap.md",
-			"ecosystem.pfdsl",
-			"ecosystem.md",
-		]) {
-			writeFileSync(join(targetRoot, ".pfdsl", f), "existing\n");
-		}
-
-		const result = scaffoldL4Files(skillRoot, targetRoot);
-		expect(result.scaffolded).toEqual([]);
+		writeFileSync(join(targetRoot, ".pfdsl/roadmap.pfdsl"), "existing\n");
+		const msg = pfdslDirGuidance(targetRoot);
+		expect(msg).toBe("");
 	});
 });
 
-describe("ecosystemSetupPrompt", () => {
-	it("returns the prompt content when scaffolded list is non-empty", () => {
-		const skillRoot = resolveSkillRoot();
-		const prompt = ecosystemSetupPrompt(skillRoot, ["roadmap.pfdsl"]);
-		expect(prompt).toContain("ecosystem.pfdsl 構築プロンプト");
+describe("pfdslSkillGuidance", () => {
+	let targetRoot: string;
+
+	beforeEach(() => {
+		targetRoot = mkdtempSync(join(tmpdir(), "pfdsl-sync-test-"));
 	});
 
-	it("returns empty string when scaffolded list is empty", () => {
-		const skillRoot = resolveSkillRoot();
-		const prompt = ecosystemSetupPrompt(skillRoot, []);
-		expect(prompt).toBe("");
+	afterEach(() => {
+		rmSync(targetRoot, { recursive: true, force: true });
+	});
+
+	it("returns guidance when pfdsl skill is absent", () => {
+		const msg = pfdslSkillGuidance(targetRoot);
+		expect(msg).toContain("pfdsl");
+		expect(msg).toContain("skill sync pfdsl");
+	});
+
+	it("returns empty string when pfdsl skill is already installed", () => {
+		mkdirSync(join(targetRoot, ".claude/skills/pfdsl"), { recursive: true });
+		writeFileSync(join(targetRoot, ".claude/skills/pfdsl/SKILL.md"), "# pfdsl\n");
+		const msg = pfdslSkillGuidance(targetRoot);
+		expect(msg).toBe("");
 	});
 });
+
 
 describe("ensureLabels", () => {
 	it("returns guidance and does nothing when gh is not found", async () => {
@@ -338,7 +319,7 @@ describe("runSkillSync", () => {
 		rmSync(targetRoot, { recursive: true, force: true });
 	});
 
-	it("syncs general layer, skips install/, scaffolds L4, shows prompt (unadopted repo)", async () => {
+	it("syncs general layer, skips install/, shows pfd-ecosystem guidance (unadopted repo)", async () => {
 		const result = await runSkillSync({ targetRoot, yes: true });
 
 		expect(
@@ -347,24 +328,18 @@ describe("runSkillSync", () => {
 		expect(
 			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
 		).toBe(false);
-		expect(existsSync(join(targetRoot, ".pfdsl/roadmap.pfdsl"))).toBe(true);
+		expect(existsSync(join(targetRoot, ".pfdsl/roadmap.pfdsl"))).toBe(false);
 		expect(result.stdout).toContain("cp -r .claude/skills/pfd-ops/install/. .");
-		expect(result.stdout).toContain("ecosystem.pfdsl 構築プロンプト");
+		expect(result.stdout).toContain("pfd-ecosystem");
+		expect(result.stdout).toContain("skill sync pfdsl");
 		expect(result.exitCode).toBe(0);
 	});
 
-	it("copies install/ when already adopted, and does not print ecosystem prompt when L4 already exists", async () => {
+	it("copies install/ when already adopted, and does not print ecosystem guidance when .pfdsl has files", async () => {
 		mkdirSync(join(targetRoot, "scripts/lib"), { recursive: true });
 		writeFileSync(join(targetRoot, "scripts/lib/yaml-require.mjs"), "old\n");
 		mkdirSync(join(targetRoot, ".pfdsl"), { recursive: true });
-		for (const f of [
-			"roadmap.pfdsl",
-			"roadmap.md",
-			"ecosystem.pfdsl",
-			"ecosystem.md",
-		]) {
-			writeFileSync(join(targetRoot, ".pfdsl", f), "existing\n");
-		}
+		writeFileSync(join(targetRoot, ".pfdsl/roadmap.pfdsl"), "existing\n");
 
 		const result = await runSkillSync({
 			targetRoot,
@@ -378,7 +353,8 @@ describe("runSkillSync", () => {
 		expect(
 			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
 		).toBe(true);
-		expect(result.stdout).not.toContain("ecosystem.pfdsl 構築プロンプト");
+		expect(result.stdout).not.toContain("pfd-ecosystem");
+		expect(result.stdout).toContain("skill sync pfdsl");
 		expect(result.exitCode).toBe(0);
 	});
 });
