@@ -5,10 +5,7 @@ import { describe, expect, it } from "vitest";
 import { format, normalizeDocument, parse, validateGraph } from "./index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const samplePath = resolve(
-	__dirname,
-	"../../../.pfdsl/roadmap.pfdsl",
-);
+const samplePath = resolve(__dirname, "../../../.pfdsl/roadmap.pfdsl");
 const sampleSource = readFileSync(samplePath, "utf-8");
 
 describe("public API", () => {
