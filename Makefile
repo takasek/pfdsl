@@ -79,15 +79,15 @@ install-skill: check-docs
 
 .PHONY: push
 push: check-docs
-	@if ! git diff --quiet HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills skills; then \
-		echo "docs/samples, docs/examples, docs/pfdsl_implementation_flow.pfdsl, .claude/skills, または skills に差分があります。コミットしてから push してください。"; \
-		git diff --stat HEAD -- docs/samples docs/examples docs/pfdsl_implementation_flow.pfdsl .claude/skills skills; \
+	@if ! git diff --quiet HEAD -- docs/samples docs/examples .claude/skills skills; then \
+		echo "docs/samples, docs/examples, .claude/skills, または skills に差分があります。コミットしてから push してください。"; \
+		git diff --stat HEAD -- docs/samples docs/examples .claude/skills skills; \
 		exit 1; \
 	fi
 	$(MAKE) gen-samples
 	@if ! git diff --quiet HEAD -- docs/samples; then \
 		echo "gen-samples で docs/samples が更新されました。自動コミットします。"; \
-		git add docs/samples docs/pfdsl_implementation_flow.* && git commit -m "chore: regenerate docs/samples"; \
+		git add docs/samples && git commit -m "chore: regenerate docs/samples"; \
 	fi
 	$(MAKE) gen-skill
 	@if ! git diff --quiet HEAD -- .claude/skills skills; then \
