@@ -1,0 +1,13 @@
+---
+artifact:
+  raw_data:
+    label: 生データ
+  report:
+    label: 月次レポート
+    externalStakeholders: [規制当局, 監査法人]
+  summary:
+    label: 経営サマリー
+    externalStakeholders: [経営層]
+---
+raw_data >> analyze -> report
+report >> summarize -> summary
