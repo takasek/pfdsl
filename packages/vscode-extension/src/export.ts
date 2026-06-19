@@ -1,6 +1,5 @@
-import { svgToBinary } from "@pfdsl/cli";
 import { formatEdges, sortEdges } from "@pfdsl/core";
-import { exportDot } from "@pfdsl/graphviz-exporter";
+import { exportDot, svgToBinary } from "@pfdsl/graphviz-exporter";
 import { extractMetadata, toTsv } from "@pfdsl/metadata-exporter";
 import { renderDotToSvg } from "@pfdsl/preview-engine";
 import * as vscode from "vscode";

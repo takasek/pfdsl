@@ -18,6 +18,14 @@
 	"dependencies": {
 		"@pfdsl/core": "workspace:*"
 	},
+	"peerDependencies": {
+		"puppeteer": ">=20.0.0"
+	},
+	"peerDependenciesMeta": {
+		"puppeteer": {
+			"optional": true
+		}
+	},
 	"files": [
 		"dist"
 	],

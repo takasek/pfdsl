@@ -30,6 +30,9 @@ importers:
       '@pfdsl/core':
         specifier: workspace:*
         version: link:../core
+      '@pfdsl/graphviz-exporter':
+        specifier: workspace:*
+        version: link:../graphviz-exporter
       '@pfdsl/preview-engine':
         specifier: workspace:*
         version: link:../preview-engine
@@ -64,6 +67,9 @@ importers:
       '@pfdsl/core':
         specifier: workspace:*
         version: link:../core
+      puppeteer:
+        specifier: '>=20.0.0'
+        version: 25.1.0
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -118,9 +124,6 @@ importers:
       '@hpcc-js/wasm':
         specifier: ^2.18.0
         version: 2.33.5
-      '@pfdsl/cli':
-        specifier: workspace:*
-        version: link:../cli
       '@pfdsl/core':
         specifier: workspace:*
         version: link:../core
