@@ -150,6 +150,28 @@ spec >> implement -> code
 
 ---
 
+## 11-external-stakeholders — External stakeholders
+
+`externalStakeholders:` on artifacts marks external consumers outside the flow graph. Excluded from orphan-terminal audit (`check --audit`).
+
+```pfdsl
+---
+artifact:
+  raw_data:
+    label: 生データ
+  report:
+    label: 月次レポート
+    externalStakeholders: [規制当局, 監査法人]
+  summary:
+    label: 経営サマリー
+    externalStakeholders: [経営層]
+---
+raw_data >> analyze -> report
+report >> summarize -> summary
+```
+
+---
+
 ## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
 How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).
