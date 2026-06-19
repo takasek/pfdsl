@@ -81,6 +81,7 @@ npx @pfdsl/cli diff <file-a> <file-b>
 - **V001 single-producer**: each artifact has at most one producing process (`->`)
 - **V002 process needs inputs**: every non-isolated process needs ≥1 input (`>>`)
 - **V003 process needs outputs**: every non-isolated process needs ≥1 output (`->`)
+- **V020 declared process needs edges**: any process declared in frontmatter `process:` must participate in at least one edge
 
 ## Writing quality PFDs
 

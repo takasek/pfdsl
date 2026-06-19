@@ -387,4 +387,37 @@ describe("validate", () => {
 			expect(codes("v2 >> P -> B", fm)).toContain("V016");
 		});
 	});
+
+	describe("V020: orphaned process (frontmatter-declared, no edges)", () => {
+		it("errors when a frontmatter process has no edges", () => {
+			const fm: Frontmatter = { process: { orphan: {} } };
+			expect(codes("", fm)).toContain("V020");
+		});
+
+		it("V020 severity is error", () => {
+			const fm: Frontmatter = { process: { orphan: {} } };
+			const diags = diagnose("", fm);
+			const v020 = diags.find((d) => d.code === "V020");
+			expect(v020?.severity).toBe("error");
+		});
+
+		it("no V020 when process participates in edges", () => {
+			const fm: Frontmatter = { process: { P: {} } };
+			expect(codes("A >> P -> B", fm)).not.toContain("V020");
+		});
+
+		it("no V020 for valid graph with no frontmatter process declarations", () => {
+			expect(codes("A >> P -> B")).not.toContain("V020");
+		});
+
+		it("no V020 when process has only input edges (V003 fires instead)", () => {
+			const fm: Frontmatter = { process: { P: {} } };
+			expect(codes("A >> P", fm)).not.toContain("V020");
+		});
+
+		it("no V020 when process has only output edges (V002 fires instead)", () => {
+			const fm: Frontmatter = { process: { P: {} } };
+			expect(codes("P -> B", fm)).not.toContain("V020");
+		});
+	});
 });
