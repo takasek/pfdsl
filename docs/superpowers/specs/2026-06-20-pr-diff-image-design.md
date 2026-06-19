@@ -181,21 +181,21 @@ pfdsl diff a b --format svg
   → renderDotToSvg(dot)               → SVG
 ```
 
-## Scope split (follow-up implementation cycles)
+## Implementation (landed in #117)
 
-This document is the **detailed design** (issue #99, design phase). Implementation
-splits into independently reviewable processes, dependency-ordered:
+Implemented in this PR as four dependency-ordered commits:
 
-1. **core `changedNodes`** — extend `DiffReport` + `diffGraphs`; unit tests
-   (kind change, metadata change, with/without frontmatter). No downstream
-   consumer breaks.
-2. **exporter `exportDiffDot` + preview `renderDiff`** — depends on (1); golden
-   DOT tests for added/removed/changed/context/empty.
-3. **CLI `diff --format`** — depends on (2); `text` `~ node` line + `dot`/`svg`.
-4. **workflow third image** — depends on (3) being in the published CLI
-   (`npm install -g @pfdsl/cli`), so it ships only after a CLI release.
+1. **core `changedNodes`** — `DiffReport.changedNodes` + `diffGraphs(a, b, fmA?, fmB?)`.
+2. **exporter `exportDiffDot` + preview `renderDiff`** — visual diff DOT/SVG.
+3. **CLI `diff --format text|dot|svg`** — `~ node` line + dot/svg render.
+4. **workflow third image** — `generate-pr-diff-images.mjs` writes `*.diff.svg`
+   and embeds a Diff section.
 
-(1)→(2)→(3) are one PR-able chain; (4) gates on a CLI publish.
+**Operational note**: step 4 invokes `pfdsl diff --format svg`, which only exists
+once the CLI carrying steps 1–3 is published to npm (`npm install -g @pfdsl/cli`
+in `pr-diff-images.yml`). After this PR merges, a CLI release must ship before
+the diff image will render on subsequent PRs — until then the workflow's
+`pfdsl diff` call fails for the new flag. Track via `make release-status`.
 
 ## Testing
 
