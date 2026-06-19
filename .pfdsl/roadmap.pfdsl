@@ -128,8 +128,9 @@ artifact:
   i97_external_stakeholders_spec:
     label: "externalStakeholders フィールド仕様案 (#97)"
     description: "artifact / process に外部消費者を列挙するフィールド。owner
-      と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段"
-    status: todo
+      と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段。v0.0.7
+      スコープ"
+    status: wip
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
     updated_at: 2026-06-18T05:21:41Z
@@ -188,7 +189,7 @@ spec_v006 >> draft_location -> location_spec
 
 spec_v006 >> write_design_notes -> design_notes
 
-[criteria_spec, revises_spec, location_spec, design_notes] >> integrate_spec -> spec_v007
+[criteria_spec, revises_spec, location_spec, design_notes, i97_external_stakeholders_spec] >> integrate_spec -> spec_v007
 
 spec_v006 >>? integrate_spec
 
@@ -217,9 +218,7 @@ cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 
 
-spec_v007 >> draft_external_stakeholders -> i97_external_stakeholders_spec
-
-i97_external_stakeholders_spec >> integrate_multifile
+spec_v006 >> draft_external_stakeholders -> i97_external_stakeholders_spec
 
 
 
