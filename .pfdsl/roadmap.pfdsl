@@ -75,7 +75,7 @@ artifact:
     updated_at: 2026-06-12T08:18:56Z
   i37_orphan_lint:
     label: "孤児process検出lint (#37)"
-    description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
+    description: "フロントマター宣言 process が edge に参加しない孤立を V020 error で検出する（§15.10）。終端監査の機械化（学習ループの lint
       要件経路、dogfood #16 由来）"
     status: wip
     criteria: check コマンドで孤立 process・ノードが検出される
