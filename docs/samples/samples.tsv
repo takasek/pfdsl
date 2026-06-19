@@ -8,4 +8,5 @@ id	summary	description
 08-groups	Groups	`group:` on nodes + `group:` declarations produce `subgraph cluster_<id>` blocks.
 09-parts	Parts	`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names.
 10-layout-tb	Layout direction	`layout.direction: TB` sets `rankdir=TB`. Default is `LR`.
+11-external-stakeholders	External stakeholders	`externalStakeholders:` on artifacts marks external consumers outside the flow graph. Excluded from orphan-terminal audit (`check --audit`).
 pfdsl_implementation_flow	PFDSL toolchain roadmap	How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).

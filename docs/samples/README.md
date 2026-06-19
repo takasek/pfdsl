@@ -376,6 +376,53 @@ digraph PFDSL {
 
 ---
 
+## 11-external-stakeholders — External stakeholders
+
+`externalStakeholders:` on artifacts marks external consumers outside the flow graph. Excluded from orphan-terminal audit (`check --audit`).
+
+```pfdsl
+---
+artifact:
+  raw_data:
+    label: 生データ
+  report:
+    label: 月次レポート
+    externalStakeholders: [規制当局, 監査法人]
+  summary:
+    label: 経営サマリー
+    externalStakeholders: [経営層]
+---
+raw_data >> analyze -> report
+report >> summarize -> summary
+```
+
+<img src="11-external-stakeholders.svg">
+
+<details>
+<summary>DOT</summary>
+
+```dot
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "analyze" [shape=ellipse, label="analyze"];
+  "raw_data" [shape=box, label="raw_data\n生データ", width=1.10, penwidth="2"];
+  "report" [shape=box, label="report\n月次レポート", width=1.50];
+  "summarize" [shape=ellipse, label="summarize"];
+  "summary" [shape=box, label="summary\n経営サマリー", width=1.50, penwidth="2"];
+
+  "raw_data" -> "analyze";
+  "analyze" -> "report";
+  "report" -> "summarize";
+  "summarize" -> "summary";
+}
+```
+
+</details>
+
+---
+
 ## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
 How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).
