@@ -103,7 +103,6 @@
 	},
 	"dependencies": {
 		"@hpcc-js/wasm": "^2.18.0",
-		"@pfdsl/cli": "workspace:*",
 		"@pfdsl/core": "workspace:*",
 		"@pfdsl/graphviz-exporter": "workspace:*",
 		"@pfdsl/metadata-exporter": "workspace:*",

@@ -53,6 +53,16 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 
 上記は個別 proposal 段階では見えず、統合時に他フィールドとの対称性比較で発覚する。`integrate_spec` では外部レビューを推奨する。
 
+## hotfix 運用（issue 省略）
+
+バグ修正で以下をすべて満たす場合、issue 起票・roadmap_pfdsl 更新を省略してよい:
+
+- spec・仕様変更を伴わない（既存動作の回復のみ）
+- PR 単体で完結し、依存解放を要しない
+- PR description に "hotfix" と明記する
+
+`[gh_issues, roadmap_pfdsl, spec] >> develop` の通常経路の例外ケース。issue なし develop は hotfix のみに限る。
+
 ## 終端ゲートの根拠
 
 汎用ゲート項目（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、このリポでは issue 固有項目を合成する。issue 固有項目は `roadmap.md` を参照。
