@@ -297,7 +297,7 @@ export function validate(
 		}
 	}
 
-	// W002: status:done artifact without criteria
+	// W002: artifact without criteria
 	// V012: criteria on process
 	// V013: location on process
 	// V014: command on artifact
@@ -331,11 +331,11 @@ export function validate(
 		}
 	}
 	for (const [aid, meta] of Object.entries(artifactMeta)) {
-		if (meta.status === "done" && meta.criteria === undefined) {
+		if (meta.criteria === undefined) {
 			diagnostics.push({
 				severity: options?.strict ? "error" : "warning",
 				code: "W002",
-				message: `Artifact '${aid}' has status:done but no 'criteria' field`,
+				message: `Artifact '${aid}' has no 'criteria' field`,
 				range: zeroRange(),
 			});
 		}

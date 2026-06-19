@@ -14,93 +14,143 @@ artifact:
   spec_v006:
     label: 仕様書 v0.0.6
     status: done
+    criteria: check/fmt/graph が全サンプルにエラーなし
+    location: docs/spec/spec.md
   findings_r12:
     label: 実践ラウンド1/2レビュー知見
-    status: done
     description: docs/examples の執筆・レビューで得た品質知見
+    status: done
+    criteria: skill_template または adr_corpus への反映が確認済み
   cli_tool:
     label: CLI 実装（現行）
     status: done
+    criteria: check/fmt/graph が全サンプルに対してエラーなし、npm 公開済み
   skill_gen:
     label: スキル生成系（現行）
-    status: done
     description: scripts/gen-skill.mjs と docs/samples 構成
+    status: done
+    criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
   i5_hierarchy_spec:
     label: "階層PFD仕様案 (#5)"
     status: todo
+    criteria: 仕様案として起草完了
+    location: https://github.com/takasek/pfdsl/issues/5
     updated_at: 2026-06-12T08:18:39Z
   i6_presets_spec:
     label: "共有プリセット仕様案 (#6)"
     status: todo
+    criteria: 仕様案として起草完了
+    location: https://github.com/takasek/pfdsl/issues/6
     updated_at: 2026-06-12T08:18:40Z
   spec_v007:
     label: 仕様書 v0.0.7（統合）
     status: wip
+    location: docs/spec/spec.md
   spec_v008:
     label: 仕様書 v0.0.8（マルチファイル統合）
     status: todo
+    criteria: check/fmt/graph が全サンプルにエラーなし
+    location: docs/spec/spec.md
   published_cli:
     label: npm公開済みCLI
+    description: "現行公開バージョンは npm 一次情報（ここに書かない — ドリフトするため）。詳細は
+      docs/pfdsl_implementation_flow.pfdsl の cli_published 参照"
     status: done
-    description: "npm install -g @pfdsl/cli で利用可。現行公開バージョンは npm 一次情報（ここに書かない —
-      ドリフトするため）。詳細は docs/pfdsl_implementation_flow.pfdsl の cli_published 参照"
+    criteria: npm show @pfdsl/cli version が期待バージョンを返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
   multifile_policy:
     label: マルチファイル意味論方針
+    description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
     status: todo
-    description: 共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料
+    criteria: ID スコープ・継承解決順・ファイル間参照の決定が文書化済み
   adr_corpus:
     label: "ADR 群 (docs/adr)"
-    status: done
     description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
+    status: done
+    criteria: 対象判断が文書化され docs/adr/README.md の一覧に追記済み
+    location: docs/adr/
   i12_article:
     label: "公開記事 (#12)"
-    status: todo
     description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
+    status: todo
+    criteria: 外部メディアに公開済みで URL が存在する
+    location: https://github.com/takasek/pfdsl/issues/12
     updated_at: 2026-06-12T08:18:56Z
   i37_orphan_lint:
     label: "孤児process検出lint (#37)"
-    status: todo
     description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
       要件経路、dogfood #16 由来）"
+    status: todo
+    criteria: check コマンドで孤立 process・ノードが検出される
+    location: https://github.com/takasek/pfdsl/issues/37
     updated_at: 2026-06-14T14:00:45Z
   i3_obsidian_plugin:
     label: "Obsidian プラグイン (#3)"
     status: todo
+    criteria: Obsidian 上で .pfdsl のプレビュー・編集が動作確認済み
+    location: https://github.com/takasek/pfdsl/issues/3
     updated_at: 2026-06-12T08:18:35Z
   lint_checker:
     label: "lint拡張checker (#4)"
-    status: done
     description: "lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため"
+    status: done
+    criteria: "issue #4 の対象 lint がすべて実装され、check コマンドで動作確認済み"
+    location: https://github.com/takasek/pfdsl/issues/4
   audit_distribution:
     label: "L3資産の階層化配布 (#43)"
-    status: done
     description: "audit コア + flow-sync action を skill
       同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは
       #11"
+    status: done
+    criteria: install/ に配布可能ファイルが揃い、CI で identity が強制されている
+    location: https://github.com/takasek/pfdsl/issues/43
   criteria_spec:
     label: "合否基準仕様案 (#7)"
     status: done
+    location: https://github.com/takasek/pfdsl/issues/7
+    criteria: 仕様案として起草完了
   revises_spec:
     label: "改版チェーン仕様案 (#8)"
     status: done
+    location: https://github.com/takasek/pfdsl/issues/8
+    criteria: 仕様案として起草完了
   design_notes:
     label: "設計判断ノート・分岐なし方針 (#9)"
     status: done
+    location: https://github.com/takasek/pfdsl/issues/9
+    criteria: 仕様案として起草完了
   location_spec:
     label: "location/command 仕様案 (#13)"
-    status: done
     description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
+    status: done
+    criteria: 仕様案として起草完了
+    location: https://github.com/takasek/pfdsl/issues/13
   restructured_gen:
     label: "再構成済みスキル生成系 (#10)"
     status: done
+    location: https://github.com/takasek/pfdsl/issues/10
+    criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
   featured_toolchain:
     label: "spec v0.0.7 実装済みツールチェーン (#52)"
     status: done
+    location: https://github.com/takasek/pfdsl/issues/52
+    criteria: spec v0.0.7 の全機能が実装され、check/fmt/graph がエラーなしで動作
   i97_external_stakeholders_spec:
     label: "externalStakeholders フィールド仕様案 (#97)"
+    description: "artifact / process に外部消費者を列挙するフィールド。owner
+      と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段"
     status: todo
-    description: "artifact / process に外部消費者を列挙するフィールド。owner と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段"
-    updated_at: 2026-06-18T00:00:00Z
+    criteria: 仕様案として起草完了
+    location: https://github.com/takasek/pfdsl/issues/97
+    updated_at: 2026-06-18T05:21:41Z
+  i103_criteria_warn_nondone:
+    label: "全statusでcriteria未設定を警告 (#103)"
+    description: "status: done 以外でも criteria 未設定の artifact に warning を出す。spec §15.7
+      の severity 定義も合わせて更新"
+    status: todo
+    criteria: check が criteria 未設定の全 artifact に warning を出し、spec §15.7 が更新済み
+    location: https://github.com/takasek/pfdsl/issues/103
+    updated_at: 2026-06-19T08:35:22Z
 process:
   write_article:
     label: 記事執筆
@@ -133,9 +183,14 @@ process:
     label: 孤児検出lint実装
   draft_external_stakeholders:
     label: externalStakeholders仕様起草
-    description: "artifact / process の externalStakeholders フィールドを spec に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
+    description: "artifact / process の externalStakeholders フィールドを spec
+      に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
+  implement_criteria_warn:
+    label: criteria警告拡張実装
+    description: "status を問わず criteria 未設定の artifact に warning を出す。spec §15.7 の
+      severity 定義も更新"
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -163,10 +218,12 @@ draft_location
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -199,12 +256,14 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -239,12 +298,14 @@ draft_location
 draft_multifile_specs
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -278,12 +339,14 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -317,12 +380,14 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -358,12 +423,14 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -395,12 +462,14 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -435,12 +504,14 @@ draft_location
 draft_multifile_specs
 draft_revises
 featured_toolchain
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_orphan_lint
 implement_spec_features
 integrate_multifile
@@ -474,12 +545,14 @@ draft_location
 draft_multifile_specs
 draft_revises
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 integrate_multifile
@@ -515,10 +588,12 @@ draft_location
 draft_multifile_specs
 draft_revises
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -552,12 +627,14 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -590,12 +667,14 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -629,12 +708,14 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -670,11 +751,13 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -713,11 +796,13 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -753,12 +838,55 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
 i97_external_stakeholders_spec
+implement_criteria_warn
 implement_lints
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+publish_cli
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+cli_tool >> implement_criteria_warn
+implement_criteria_warn -> i103_criteria_warn_nondone
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+featured_toolchain
+findings_r12
+i12_article
+i37_orphan_lint
+i3_obsidian_plugin
+i5_hierarchy_spec
+i6_presets_spec
+i97_external_stakeholders_spec
+implement_lints
+implement_orphan_lint
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -792,11 +920,13 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features
@@ -831,11 +961,13 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+i103_criteria_warn_nondone
 i12_article
 i37_orphan_lint
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
+implement_criteria_warn
 implement_lints
 implement_orphan_lint
 implement_spec_features

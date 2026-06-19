@@ -42,6 +42,7 @@ artifact:
   spec_v007:
     label: 仕様書 v0.0.7（統合）
     status: wip
+    criteria: check/fmt/graph が全サンプルにエラーなし、v0.0.7 全フィールドが spec 本文に統合済み
     location: docs/spec/spec.md
   spec_v008:
     label: 仕様書 v0.0.8（マルチファイル統合）
@@ -144,7 +145,7 @@ artifact:
     label: "全statusでcriteria未設定を警告 (#103)"
     description: "status: done 以外でも criteria 未設定の artifact に warning を出す。spec §15.7
       の severity 定義も合わせて更新"
-    status: todo
+    status: wip
     criteria: check が criteria 未設定の全 artifact に warning を出し、spec §15.7 が更新済み
     location: https://github.com/takasek/pfdsl/issues/103
     updated_at: 2026-06-19T08:35:22Z
