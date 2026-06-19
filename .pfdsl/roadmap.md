@@ -31,5 +31,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
 - [ ] close 時の降格規則を適用した（定義は L3 reference。専属 process も含めて削除する）
 - [ ] `packages/cli` を変更した場合、npm 公開（`v*` tag push）が必要か確認した（pending なら次サイクルの先頭タスクとして明記する — 忘れると `published_cli` が無期限に stale になる）
+- [ ] `.pfdsl/roadmap.pfdsl` を変更した場合（issue クローズ・追加による flow-sync 含む）、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新しコミットした
 
-これら2項目は2026-06-16 の /pfd-retro で発見: #72/#74・#15/#77・#17/#81 の3PRが連続して impl_flow を更新せず、`@pfdsl/cli` の npm 公開も #74 以降止まっていた（main の package.json も npm 上も 0.0.4 のまま）。ルール（CLAUDE.md）はあったがゲートに写っていなかった。
+「roadmap.pfdsl 変更 → snapshot 陳腐化」は 2026-06-19 の /pfd-retro で発見: PR #110 の flow-sync が roadmap.pfdsl を変更した際にスナップショットが更新されず、#108 として顕在化した。正しい更新コマンドは `-u` フラグ（`--update-snapshots` は vitest 1.x で無効）。
+
+これら（npm 公開・snapshot 更新の各項目）は2026-06-16 の /pfd-retro で発見: #72/#74・#15/#77・#17/#81 の3PRが連続して impl_flow を更新せず、`@pfdsl/cli` の npm 公開も #74 以降止まっていた（main の package.json も npm 上も 0.0.4 のまま）。ルール（CLAUDE.md）はあったがゲートに写っていなかった。
