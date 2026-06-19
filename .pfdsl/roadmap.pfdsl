@@ -144,7 +144,7 @@ artifact:
     label: "全statusでcriteria未設定を警告 (#103)"
     description: "status: done 以外でも criteria 未設定の artifact に warning を出す。spec §15.7
       の severity 定義も合わせて更新"
-    status: todo
+    status: wip
     criteria: check が criteria 未設定の全 artifact に warning を出し、spec §15.7 が更新済み
     location: https://github.com/takasek/pfdsl/issues/103
     updated_at: 2026-06-19T08:35:22Z
