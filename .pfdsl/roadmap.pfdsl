@@ -74,14 +74,6 @@ artifact:
     criteria: 外部メディアに公開済みで URL が存在する
     location: https://github.com/takasek/pfdsl/issues/12
     updated_at: 2026-06-12T08:18:56Z
-  i37_orphan_lint:
-    label: "孤児process検出lint (#37)"
-    description: "フロントマター宣言 process が edge に参加しない孤立を V020 error で検出する（§15.10）。終端監査の機械化（学習ループの lint
-      要件経路、dogfood #16 由来）"
-    status: wip
-    criteria: check コマンドで孤立 process・ノードが検出される
-    location: https://github.com/takasek/pfdsl/issues/37
-    updated_at: 2026-06-19T11:10:00Z
   i3_obsidian_plugin:
     label: "Obsidian プラグイン (#3)"
     status: todo
@@ -141,14 +133,6 @@ artifact:
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
     updated_at: 2026-06-18T05:21:41Z
-  i103_criteria_warn_nondone:
-    label: "全statusでcriteria未設定を警告 (#103)"
-    description: "status: done 以外でも criteria 未設定の artifact に warning を出す。spec §15.7
-      の severity 定義も合わせて更新"
-    status: wip
-    criteria: check が criteria 未設定の全 artifact に warning を出し、spec §15.7 が更新済み
-    location: https://github.com/takasek/pfdsl/issues/103
-    updated_at: 2026-06-19T08:35:22Z
 process:
   write_article:
     label: 記事執筆
@@ -177,18 +161,12 @@ process:
     label: CLI公開
   build_obsidian_plugin:
     label: Obsidianプラグイン実装
-  implement_orphan_lint:
-    label: 孤児検出lint実装
   draft_external_stakeholders:
     label: externalStakeholders仕様起草
     description: "artifact / process の externalStakeholders フィールドを spec
       に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
-  implement_criteria_warn:
-    label: criteria警告拡張実装
-    description: "status を問わず criteria 未設定の artifact に warning を出す。spec §15.7 の
-      severity 定義も更新"
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -237,9 +215,7 @@ adr_corpus >> write_article -> i12_article
 
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
-cli_tool >> implement_orphan_lint -> i37_orphan_lint
 
-cli_tool >> implement_criteria_warn -> i103_criteria_warn_nondone
 
 spec_v007 >> draft_external_stakeholders -> i97_external_stakeholders_spec
 
