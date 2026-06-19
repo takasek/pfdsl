@@ -36,7 +36,7 @@ jobs:
         if: steps.changed.outputs.files != ''
         run: npm install -g @pfdsl/cli
 
-      - name: Generate before/after SVGs
+      - name: Generate before/after/diff SVGs
         id: generate
         if: steps.changed.outputs.files != ''
         env:
