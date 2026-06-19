@@ -77,10 +77,10 @@ artifact:
     label: "孤児process検出lint (#37)"
     description: "check/audit が出力なき process・孤立ノードを検出する。終端監査の機械化（学習ループの lint
       要件経路、dogfood #16 由来）"
-    status: todo
+    status: wip
     criteria: check コマンドで孤立 process・ノードが検出される
     location: https://github.com/takasek/pfdsl/issues/37
-    updated_at: 2026-06-14T14:00:45Z
+    updated_at: 2026-06-19T11:10:00Z
   i3_obsidian_plugin:
     label: "Obsidian プラグイン (#3)"
     status: todo
