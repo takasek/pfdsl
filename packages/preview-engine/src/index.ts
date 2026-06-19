@@ -1,8 +1,13 @@
 import { Graphviz } from "@hpcc-js/wasm";
 import type { Frontmatter, Graph } from "@pfdsl/core";
-import { type ExportOptions, exportDot } from "@pfdsl/graphviz-exporter";
+import {
+	type ExportOptions,
+	exportDiffDot,
+	exportDot,
+} from "@pfdsl/graphviz-exporter";
 
 export type { ExportOptions } from "@pfdsl/graphviz-exporter";
+export { exportDiffDot } from "@pfdsl/graphviz-exporter";
 
 export type RenderFormat = "svg" | "dot";
 
@@ -32,6 +37,18 @@ export async function renderGraph(
 	options: RenderOptions = {},
 ): Promise<string> {
 	const dot = exportDot(graph, frontmatter, options);
+	if (options.format === "dot") return dot;
+	return renderDotToSvg(dot);
+}
+
+export async function renderDiff(
+	a: Graph,
+	fmA: Frontmatter | null,
+	b: Graph,
+	fmB: Frontmatter | null,
+	options: RenderOptions = {},
+): Promise<string> {
+	const dot = exportDiffDot(a, fmA, b, fmB, options);
 	if (options.format === "dot") return dot;
 	return renderDotToSvg(dot);
 }

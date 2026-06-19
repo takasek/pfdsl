@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildGraph, normalizeDocument, parse } from "@pfdsl/core";
+import { analyze, buildGraph, normalizeDocument, parse } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
-import { exportDot } from "./index.js";
+import { exportDiffDot, exportDot } from "./index.js";
 
 const samplesDir = resolve(
 	dirname(fileURLToPath(import.meta.url)),
@@ -865,4 +865,75 @@ describe("fixture files", () => {
 			expect(exportDot(graph, frontmatter)).toBe(expected);
 		});
 	}
+});
+
+describe("exportDiffDot", () => {
+	it("added node is styled with green fillcolor", () => {
+		const a = analyze("req >> design -> spec\n");
+		const b = analyze("req >> design -> spec\nnewnode >> design\n");
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).toContain('"newnode"');
+		expect(dot).toContain('fillcolor="#c3e6cb"');
+	});
+
+	it("removed node is styled with red fillcolor", () => {
+		const a = analyze("req >> design -> spec\n");
+		const b = analyze("design -> spec\n");
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).toContain('"req"');
+		expect(dot).toContain('fillcolor="#f5c6cb"');
+	});
+
+	it("changed node via status flip is styled with yellow fillcolor", () => {
+		const srcA = `---
+artifact:
+  spec: { status: todo }
+---
+spec >> P -> X
+`;
+		const srcB = `---
+artifact:
+  spec: { status: done }
+---
+spec >> P -> X
+`;
+		const a = analyze(srcA);
+		const b = analyze(srcB);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).toContain('"spec"');
+		expect(dot).toContain('fillcolor="#ffeeba"');
+	});
+
+	it("context node anchored by added edge appears with context color; isolated unchanged node is absent", () => {
+		// a: spec -> design (primary). Also isolated node "isolated".
+		const srcA = "spec >> design -> out\nisolated >> P2 -> sink\n";
+		// b: same plus added edge spec >> newproc, "isolated" remains
+		const srcB =
+			"spec >> design -> out\nspec >> newproc -> out2\nisolated >> P2 -> sink\n";
+		const a = analyze(srcA);
+		const b = analyze(srcB);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		// "spec" is an endpoint of the added edge "spec >> newproc" → context node
+		expect(dot).toContain('"spec"');
+		expect(dot).toContain("#777777");
+		// "isolated" is unchanged and NOT an endpoint of any added/removed edge → absent
+		expect(dot).not.toContain('"isolated"');
+	});
+
+	it("empty diff (identical inputs) emits _nodiff node", () => {
+		const src = "req >> design -> spec\n";
+		const a = analyze(src);
+		const b = analyze(src);
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot).toContain("_nodiff");
+		expect(dot).toContain("No structural or metadata changes");
+	});
+
+	it("output starts with digraph PFDSL { and ends with }\\n", () => {
+		const a = analyze("req >> design -> spec\n");
+		const b = analyze("req >> design -> spec\nnewnode >> design\n");
+		const dot = exportDiffDot(a.graph, a.frontmatter, b.graph, b.frontmatter);
+		expect(dot.startsWith("digraph PFDSL {")).toBe(true);
+		expect(dot.endsWith("}\n")).toBe(true);
+	});
 });
