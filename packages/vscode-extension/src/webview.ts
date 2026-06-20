@@ -1,4 +1,5 @@
 import { Graphviz } from "@hpcc-js/wasm";
+import { DragGuard } from "./dragGuard";
 
 type MessageToWebview =
 	| {
@@ -255,10 +256,13 @@ root.addEventListener(
 	{ passive: false },
 );
 
+const dragGuard = new DragGuard();
+
 root.addEventListener("mousedown", (e) => {
 	dragging = true;
 	startX = e.clientX - panX;
 	startY = e.clientY - panY;
+	dragGuard.onMouseDown(e.clientX, e.clientY, e.detail);
 	root.style.cursor = "grabbing";
 });
 
@@ -268,6 +272,7 @@ window.addEventListener("mousemove", (e) => {
 		return;
 	}
 	if (!dragging) return;
+	dragGuard.onMouseMove(e.clientX, e.clientY);
 	panX = e.clientX - startX;
 	panY = e.clientY - startY;
 	applyTransform();
@@ -281,6 +286,9 @@ window.addEventListener("mouseup", () => {
 });
 
 root.addEventListener("dblclick", (e) => {
+	// A double-click whose clicks involved panning is a drag, not a deliberate
+	// click — don't trigger the location link or reset the view.
+	if (dragGuard.dragged) return;
 	const node = (e.target as Element).closest("g.node");
 	if (node) {
 		const title = node.querySelector("title");
