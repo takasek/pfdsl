@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+  # Manual fallback: tag pushes occasionally fail to trigger this workflow.
+  # Dispatch from the branch/ref whose packages/cli/package.json version
+  # should be published (e.g. main).
+  workflow_dispatch:
 
 jobs:
   publish:
