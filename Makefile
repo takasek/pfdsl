@@ -50,8 +50,14 @@ vscode-dev: vscode-build
 vscode-watch: build-deps
 	pnpm --filter pfdsl watch
 
+# VERSION=x.y.z を渡すと packages/vscode-extension/package.json のバージョンを更新してからパッケージする
+# 例: make vscode-package VERSION=0.0.11
 .PHONY: vscode-package
 vscode-package: vscode-build
+	@if [ -n "$(VERSION)" ]; then \
+		node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('packages/vscode-extension/package.json','utf8'));p.version='$(VERSION)';fs.writeFileSync('packages/vscode-extension/package.json',JSON.stringify(p,null,'\t')+'\n')"; \
+		echo "version → $(VERSION)"; \
+	fi
 	cd packages/vscode-extension && vsce package --no-dependencies
 
 .PHONY: gen-samples
