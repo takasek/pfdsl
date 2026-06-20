@@ -44,18 +44,18 @@ artifact:
 statusStyles:
   done: { fillcolor: lightgray, style: filled }
   wip:  { fillcolor: lightyellow, style: filled }
-tagStyles:
-  external: { color: blue }
-  critical: { penwidth: "3" }
+tag:
+  external: { label: External, style: { color: blue } }
+  critical: { style: { penwidth: "3" } }
 ---
 spec >> P -> impl
 ```
 
-- `status` ∈ `done | wip | todo | blocked` (one per artifact)
-- `tags` — arbitrary string array; undefined entries in `tagStyles` are silently ignored
+- `status` ∈ `done | wip | todo | blocked` (one per artifact, artifact-only)
+- `tags` — arbitrary string array on **artifacts and processes**; undeclared tags are silently ignored
+- `tag:` block declares per-tag `label` / `description` / `style` (parallel to `group:`)
 - Allowed style attrs: `fillcolor | color | fontcolor | style | penwidth`
-- Apply order: `tags` reverse-merge (first tag wins) → `statusStyles` overrides last
-- Applies to artifact nodes only
+- Apply order: `tags` reverse-merge (first tag wins) → `statusStyles` overrides last (`status` artifact-only)
 
 See [docs/spec/spec.md §2.7](docs/spec/spec.md) for full rules.
 

@@ -177,7 +177,7 @@ digraph PFDSL {
 
 ## 06-status-styles — Status & tag styles
 
-`status:` + `tags:` on artifacts; `statusStyles:` and `tagStyles:` apply DOT attributes. Multiple tags merge; `status` wins conflicts.
+`status:` + `tags:` on artifacts/processes; `statusStyles:` and the `tag:` block (label / description / style) apply DOT attributes. Multiple tags merge; `status` wins conflicts.
 
 ```pfdsl
 ---
@@ -190,9 +190,13 @@ statusStyles:
   done: { fillcolor: "#d4edda", style: filled }
   wip:  { fillcolor: "#fff3cd", style: filled }
   todo: { fillcolor: "#f8f9fa", style: filled }
-tagStyles:
-  external:  { color: "#0066cc", penwidth: "2" }
-  sensitive: { style: dashed }
+tag:
+  external:
+    label: 外部公開
+    description: 外部に公開・提供される成果物
+    style: { color: "#0066cc", penwidth: "2" }
+  sensitive:
+    style: { style: dashed }
 ---
 raw_data >> ingest -> processed
 spec >> analyze -> report

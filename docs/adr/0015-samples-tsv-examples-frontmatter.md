@@ -20,7 +20,7 @@ issue #10 の P2 実装として当初「両ディレクトリとも frontmatter
 
 `docs/samples/` の存在意義は「特定の構文機能を最小の形で見せる」こと。01-simple-chain のように本体が2〜3行のファイルに frontmatter を加えると本体よりメタデータが大きくなる。また、summary/description の自然文は TSV で書く方が編集しやすく、YAML エスケープ問題も生じない。
 
-`docs/examples/` の存在意義は「現実的なドメイン事例として PFD を見せる」こと。これらは既に複数フィールドを持つ frontmatter を自然に必要とし（`statusStyles:`, `tagStyles:` 等）、`title:` の追加はその延長に過ぎない。
+`docs/examples/` の存在意義は「現実的なドメイン事例として PFD を見せる」こと。これらは既に複数フィールドを持つ frontmatter を自然に必要とし（`statusStyles:`, `tag:` 等）、`title:` の追加はその延長に過ぎない。
 
 ## Consequences
 

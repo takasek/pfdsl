@@ -6,7 +6,7 @@ v0.0.7 → v0.0.8
 
 ## 概要
 
-複数の `.pfdsl` ファイルを持つプロジェクトでは、`statusStyles` / `tagStyles` / `group` の定義がファイルごとに重複し、変更時の一貫性維持が困難になる。トップレベル frontmatter キー `extends:` を導入し、共有プリセットファイルから presentation 系スタイル定義を継承できるようにする。継承解決規則は `docs/spec/proposals/multifile-policy.md` 決定 3 に確定済みであり、本提案はそれを参照する。
+複数の `.pfdsl` ファイルを持つプロジェクトでは、`statusStyles` / `tag` / `group` の定義がファイルごとに重複し、変更時の一貫性維持が困難になる。トップレベル frontmatter キー `extends:` を導入し、共有プリセットファイルから presentation 系スタイル定義を継承できるようにする。継承解決規則は `docs/spec/proposals/multifile-policy.md` 決定 3 に確定済みであり、本提案はそれを参照する。
 
 ## 仕様変更
 
@@ -49,9 +49,9 @@ statusStyles:
     style: filled
     fillcolor: "#FFC107"
 
-tagStyles:
+tag:
   urgent:
-    color: red
+    style: { color: red }
 
 group:
   frontend:
@@ -59,7 +59,7 @@ group:
     style: dashed
 ```
 
-- 許容トップレベルキー: `extends` / `statusStyles` / `tagStyles` / `group`
+- 許容トップレベルキー: `extends` / `statusStyles` / `tag` / `group`
 - `artifact` / `process` キーを含む場合は **error**（生成物定義の共有は禁止、決定 1 参照）
 - エッジ本文（`>>` 構文）はプリセットファイルには記述できない。記述されている場合は error
 - プリセットファイル自身も `extends:` を持てる（多段継承、決定 3 参照）
@@ -106,9 +106,9 @@ spec >> implement >> test
 
 `pfdsl.config.yaml` をリポジトリルートに自動探索する代替案を検討したが不採用とした。理由: どのファイルがどのプリセットを継承しているかが各ファイルを開かなければわからない（暗黙的）。`extends:` を frontmatter に明示することで、ファイル単体を読んだだけで継承関係が可視になる。`docs/spec/proposals/multifile-policy.md` 決定 2a「ファイル間参照は常に相対パスで記述する」の精神とも一致する。
 
-### なぜ共有対象を presentation 系（statusStyles / tagStyles / group）に限るか
+### なぜ共有対象を presentation 系（statusStyles / tag / group）に限るか
 
-`artifact` / `process` 定義の共有は `docs/spec/proposals/multifile-policy.md` 決定 1（ID スコープ = ファイルローカル）および決定 3 対象スコープの規定により禁止される。生成物定義をファイルをまたいで共有すると、単一生成元制約（V001）のファイル単位保全が崩れる。statusStyles / tagStyles / group は純粋な presentation であり、生成論理に影響しない。
+`artifact` / `process` 定義の共有は `docs/spec/proposals/multifile-policy.md` 決定 1（ID スコープ = ファイルローカル）および決定 3 対象スコープの規定により禁止される。生成物定義をファイルをまたいで共有すると、単一生成元制約（V001）のファイル単位保全が崩れる。statusStyles / tag / group は純粋な presentation（および見た目に紐づくタグ定義）であり、生成論理に影響しない。
 
 ### なぜキー単位マージを採用するか（ブロック置換でなく）
 

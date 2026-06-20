@@ -184,8 +184,8 @@ process:
   implement_multifile:
     label: マルチファイル機能実装
 
-tagStyles:
-  "priority:high": { color: "#b60205", penwidth: "2" }
+tag:
+  "priority:high": { style: { color: "#b60205", penwidth: "2" } }
 
 statusStyles:
   done: { fillcolor: "#d4edda", style: filled }

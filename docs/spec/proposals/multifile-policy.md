@@ -75,14 +75,14 @@ extends: ./presets.yaml
 
 `extends:` の継承は以下の規則で解決する。
 
-1. **対象スコープ**: `extends:` で共有できるのは presentation 系トップレベル frontmatter キー（`statusStyles` / `tagStyles` / `group`）のみ。`artifact` / `process` 定義およびボディのエッジ文は共有しない。
+1. **対象スコープ**: `extends:` で共有できるのは presentation 系トップレベル frontmatter キー（`statusStyles` / `tag` / `group`）のみ。`artifact` / `process` 定義およびボディのエッジ文は共有しない。
 2. **キー単位マージ**: ファイルローカル定義が prevail。同一キーはローカルが上書き、衝突しないキーは union される（ブロック丸ごと置換ではない）。
 3. **多段 extends**: preset が別の preset を `extends:` することを許可する。解決は深さ優先・最近傍勝ち（nearest-wins）。`A extends B extends C` の場合、同一キーでは A > B > C の優先順。
 4. **循環参照禁止**: `A extends B, B extends A` は error。checker が検証する。
 
 ### 根拠
 
-- **artifact/process 非共有**: ファイル単位の単一生成元原則（決定 1）を保つため、生成物の定義はファイルをまたいで共有しない。statusStyles / tagStyles / group のみが純粋な見た目の設定であり共有コストゼロ。
+- **artifact/process 非共有**: ファイル単位の単一生成元原則（決定 1）を保つため、生成物の定義はファイルをまたいで共有しない。statusStyles / tag / group のみが純粋な見た目（およびタグ定義）の設定であり共有コストゼロ。
 - **キー単位マージ**: ブロック丸ごと置換にするとプリセットの一部キーだけ上書きしたい場合に全量再定義が必要になる。キー単位マージはローカル変更を最小にする。
 - **nearest-wins**: 直感的で予測可能。ローカル定義（最近傍）が常に勝つため、プリセット変更がローカルの意図を意図せず上書きしない。
 
