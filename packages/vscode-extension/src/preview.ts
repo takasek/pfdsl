@@ -83,12 +83,17 @@ function buildDescriptions(fm: Frontmatter | null): Record<string, string> {
 	const result: Record<string, string> = {};
 	if (!fm) return result;
 	for (const id of Object.keys(fm.artifact ?? {})) {
-		const desc = fm.artifact?.[id]?.description;
-		if (typeof desc === "string" && desc) result[id] = desc;
+		const meta = fm.artifact?.[id];
+		const parts: string[] = [];
+		if (meta?.description) parts.push(meta.description);
+		if (meta?.criteria) parts.push(`criteria: ${meta.criteria}`);
+		if (typeof meta?.location === "string" && meta.location)
+			parts.push(`location: ${meta.location}`);
+		if (parts.length > 0) result[id] = parts.join("\n");
 	}
 	for (const id of Object.keys(fm.process ?? {})) {
-		const desc = fm.process?.[id]?.description;
-		if (typeof desc === "string" && desc) result[id] = desc;
+		const meta = fm.process?.[id];
+		if (meta?.description) result[id] = meta.description;
 	}
 	return result;
 }

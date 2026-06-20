@@ -118,7 +118,7 @@ root.addEventListener("mousemove", (e) => {
 		tooltip.style.display = "none";
 		return;
 	}
-	const nodeId = node.querySelector("title")?.textContent;
+	const nodeId = (node as HTMLElement).dataset.nodeId;
 	const desc = nodeId ? descriptions[nodeId] : undefined;
 	const urlHref = nodeUrlHref(node);
 	const tooltipText = [desc, urlHref ? `${modKey}+Click to open URL` : null]
@@ -240,8 +240,7 @@ function clearFocusHighlight() {
 function focusNode(nodeId: string) {
 	const nodes = inner.querySelectorAll("g.node");
 	for (const node of nodes) {
-		const title = node.querySelector("title");
-		if (title?.textContent === nodeId) {
+		if ((node as HTMLElement).dataset.nodeId === nodeId) {
 			for (const n of nodes) n.classList.remove("pfdsl-focused");
 			lastFocusedNodeId = nodeId;
 			node.classList.add("pfdsl-focused");
@@ -314,9 +313,9 @@ root.addEventListener("click", (e) => {
 root.addEventListener("dblclick", (e) => {
 	const node = (e.target as Element).closest("g.node");
 	if (node) {
-		const title = node.querySelector("title");
-		if (title?.textContent) {
-			vscode.postMessage({ type: "nodeClick", nodeId: title.textContent });
+		const nodeId = (node as HTMLElement).dataset.nodeId;
+		if (nodeId) {
+			vscode.postMessage({ type: "nodeClick", nodeId });
 			return;
 		}
 	}
@@ -375,6 +374,21 @@ window.addEventListener("message", async (event) => {
 		const svg = g.dot(msg.dot, "svg");
 		log("svg length:", svg.length);
 		inner.innerHTML = svg;
+		// Move node IDs from <title> into data-node-id, then strip all
+		// <title> elements and xlink:title attributes so the browser does not
+		// show the Graphviz-generated native SVG tooltip alongside our custom one.
+		for (const node of inner.querySelectorAll("g.node")) {
+			const titleEl = node.querySelector(":scope > title");
+			if (titleEl?.textContent) {
+				(node as HTMLElement).dataset.nodeId = titleEl.textContent;
+			}
+		}
+		for (const el of inner.querySelectorAll("[*|title]")) {
+			el.removeAttributeNS("http://www.w3.org/1999/xlink", "title");
+		}
+		for (const el of inner.querySelectorAll("title")) {
+			el.remove();
+		}
 		const svgEl = inner.querySelector("svg");
 		if (svgEl) {
 			log(
