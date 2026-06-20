@@ -133,6 +133,13 @@ artifact:
     status: done
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
+  i127_process_tags:
+    label: "process tags 明示許可 (#127)"
+    description: "似た process 群を tag で束ね共有知識を companion md に外化する規約（subroutine 廃案の代替）の前提。§2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定。直接 spec 編集経路（proposal スキップ可）"
+    status: todo
+    criteria: §2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定
+    location: https://github.com/takasek/pfdsl/issues/127
+    updated_at: 2026-06-20T00:00:00Z
 process:
   write_article:
     label: 記事執筆
@@ -167,6 +174,8 @@ process:
       に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
+  clarify_process_tags:
+    label: process tags 明示化
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -219,6 +228,8 @@ cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 
 spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
+
+spec_v006 >> clarify_process_tags -> i127_process_tags
 
 
 
