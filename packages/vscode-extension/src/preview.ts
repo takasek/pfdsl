@@ -9,6 +9,7 @@ import { exportDot } from "@pfdsl/graphviz-exporter";
 import * as vscode from "vscode";
 import { analyzeDocument } from "./analyze.js";
 import { findFrontmatterDefinition } from "./jump.js";
+import { resolveLocationFsPath } from "./location-path.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
@@ -299,15 +300,14 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
-				const folder = vscode.workspace.getWorkspaceFolder(state.doc.uri);
-				if (folder) {
-					const fileUri = vscode.Uri.joinPath(folder.uri, msg.path);
-					vscode.workspace
-						.openTextDocument(fileUri)
-						.then((doc) =>
-							vscode.window.showTextDocument(doc, { preview: false }),
-						);
-				}
+				const fileUri = vscode.Uri.file(
+					resolveLocationFsPath(state.doc.uri.fsPath, msg.path),
+				);
+				vscode.workspace
+					.openTextDocument(fileUri)
+					.then((doc) =>
+						vscode.window.showTextDocument(doc, { preview: false }),
+					);
 			}
 		});
 

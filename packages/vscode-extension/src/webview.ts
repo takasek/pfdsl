@@ -1,4 +1,5 @@
 import { Graphviz } from "@hpcc-js/wasm";
+import { unwrapAnchors } from "./svg-anchors.js";
 
 type MessageToWebview =
 	| {
@@ -379,11 +380,11 @@ window.addEventListener("message", async (event) => {
 				if (loc) (node as HTMLElement).dataset.location = loc;
 				titleEl.remove();
 			}
-			for (const a of node.querySelectorAll("a")) {
-				a.removeAttribute("href");
-				a.removeAttributeNS("http://www.w3.org/1999/xlink", "href");
-			}
 		}
+		// Unwrap graphviz URL anchors: VSCode's handleInnerClick crashes
+		// (DataCloneError) on SVGAElement.href, so the <a> must be removed
+		// entirely. Cmd+Click is handled via dataset.location instead.
+		unwrapAnchors(inner);
 		for (const el of inner.querySelectorAll("[*|title], title")) {
 			if (el.tagName === "title") el.remove();
 			else el.removeAttributeNS("http://www.w3.org/1999/xlink", "title");
