@@ -53,6 +53,10 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 
 上記は個別 proposal 段階では見えず、統合時に他フィールドとの対称性比較で発覚する。`integrate_spec` では外部レビューを推奨する。
 
+### 委譲時の入力（構造捏造の予防）
+
+proposal 起草を subagent に委譲する場合、対象 spec の**現行 frontmatter キー構造・制約節番号**を委譲入力に明示する（`spec.md` の該当節を読ませる/grep させる）。渡さないと存在しない構造を捏造する（2026-06-20: spec に無い `presentation` ブロックを捏造 — review-prompts A「入力充足」の委譲版。戻り後レビューで検出したが、入力を渡せば捏造自体を予防できる）。
+
 ## hotfix 運用（issue 省略）
 
 バグ修正で以下をすべて満たす場合、issue 起票・roadmap_pfdsl 更新を省略してよい:
