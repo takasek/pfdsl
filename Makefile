@@ -116,18 +116,16 @@ release:
 	git tag "v$$VERSION"; \
 	git push origin "v$$VERSION"
 
-# vscode-extension を Marketplace 公開する。packages/vscode-extension/package.json の version から
-# ext-v<version> タグを打って push し、publish-extension.yml (VSCE_PAT secret) を起動する。
-# 事前に version を上げてコミット・マージしておくこと。GitHub Secrets に VSCE_PAT が必要。
+# vscode-extension を Marketplace に直接公開する。ローカルの VSCE_PAT 環境変数が必要。
+# 事前に version を上げてコミット・マージしておくこと。
 .PHONY: release-extension
-release-extension:
-	@VERSION=$$(node -p "require('./packages/vscode-extension/package.json').version"); \
+release-extension: vscode-build
+	@if [ -z "$$VSCE_PAT" ]; then echo "VSCE_PAT 未設定 (marketplace.visualstudio.com で発行した PAT を環境変数に設定してください)"; exit 1; fi; \
 	BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
 	if [ "$$BRANCH" != "main" ]; then echo "main ブランチで実行してください (現在: $$BRANCH)"; exit 1; fi; \
 	if [ -n "$$(git status --porcelain)" ]; then echo "作業ツリーに未コミットの変更があります"; exit 1; fi; \
-	if git rev-parse "ext-v$$VERSION" >/dev/null 2>&1; then echo "タグ ext-v$$VERSION は既に存在します (version を上げてください)"; exit 1; fi; \
 	git fetch origin main --quiet; \
 	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
-	echo "ext-v$$VERSION を打って push します (publish-extension.yml が起動)"; \
-	git tag "ext-v$$VERSION"; \
-	git push origin "ext-v$$VERSION"
+	VERSION=$$(node -p "require('./packages/vscode-extension/package.json').version"); \
+	echo "pfdsl v$$VERSION を Marketplace に公開します"; \
+	cd packages/vscode-extension && npx @vscode/vsce publish --no-dependencies

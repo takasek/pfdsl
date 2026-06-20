@@ -147,7 +147,7 @@ artifact:
     group: release
   published_extension:
     label: Marketplace 公開 Extension
-    description: "外部利用者向け配布物。toolchain の vscode-extension 部分が変更されたら公開が必要 — ext-v* tag push で GitHub Actions が自動 publish（VSCE_PAT secret、公開作業は自動化済み）"
+    description: "外部利用者向け配布物。toolchain の vscode-extension 部分が変更されたら公開が必要 — make release-extension でローカル publish（要 VSCE_PAT 環境変数）"
     status: done
     criteria: make release-status で takasek.pfdsl が期待バージョンを返す
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
@@ -288,7 +288,7 @@ process:
     group: release
   publish_extension:
     label: Extension 公開
-    description: "事前に make release-status で behind を確認してから実施。自動化済み: ext-v* tag push → GitHub Actions → vsce publish（VSCE_PAT secret）。手作業は tag push のみ"
+    description: "事前に make release-status で behind を確認してから実施。VSCE_PAT 環境変数（marketplace.visualstudio.com で発行）を設定してから実行"
     command: "make release-extension"
     group: release
   render_previews:

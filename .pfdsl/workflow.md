@@ -63,14 +63,14 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 
 `[gh_issues, roadmap_pfdsl, spec] >> develop` の通常経路の例外ケース。issue なし develop は hotfix のみに限る。
 
-## リリースタグ規則
+## リリース規則
 
-- CLI (`@pfdsl/cli`): `v*` タグ → `publish-cli.yml` → npm publish（OIDC、secret不要）
-- Extension (`pfdsl`): `ext-v*` タグ → `publish-extension.yml` → vsce publish（要 `VSCE_PAT` secret）
+- CLI (`@pfdsl/cli`): `make release` → `v*` タグ push → `publish-cli.yml`（OIDC、secret不要）
+- Extension (`pfdsl`): `make release-extension` → ローカルで `vsce publish`（要 `VSCE_PAT` 環境変数）
 
-タグプレフィックスを分けている理由: CLI と extension のバージョンは独立して進む（例: CLI v0.0.7、extension v0.0.10）。同じ `v*` トリガーにすると一方のリリースで他方の CI も起動してしまう。
+Extension は CI 経由でなくローカル実行。理由: npm の OIDC/Trusted Publishing は Marketplace に適用されないため PAT が必要になり、CI の利点（secret不要）が消える。
 
-**VSCE_PAT 前提条件**: `publish_extension` は GitHub Secrets に `VSCE_PAT`（marketplace.visualstudio.com で発行した PAT）が必要。未設定の場合 CI は `vsce publish` で失敗する。
+**VSCE_PAT 取得**: marketplace.visualstudio.com → publisher "takasek" → Personal Access Tokens。Scopes: Marketplace (Manage)。ローカル環境変数として設定すること（`.env.local` 等）。
 
 **roadmap.pfdsl での `cli_tool` の用法**: `cli_tool` は "CLI 実装（現行）" という定義だが、roadmap の依存グラフでは "toolchain が存在する" 状態のシグナルとして使う慣習がある（`build_obsidian_plugin`・`setup_ext_publish` 等）。toolchain 全体を指す場合は `workflow.pfdsl` の `toolchain` artifact を参照すること。
 
