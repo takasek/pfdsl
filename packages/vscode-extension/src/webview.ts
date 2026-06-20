@@ -100,11 +100,7 @@ function clearDiffPanel(): void {
 const modKey = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
 
 function nodeUrlHref(node: Element): string | null {
-	// Graphviz wraps the node content in <a> when href is set.
-	const a =
-		node.querySelector("a") ??
-		node.closest("a") ??
-		(node.parentElement?.tagName === "A" ? node.parentElement : null);
+	const a = node.querySelector("a") ?? node.closest("a");
 	if (!a) return null;
 	const href =
 		a.getAttribute("href") ??
@@ -120,7 +116,7 @@ root.addEventListener("mousemove", (e) => {
 	}
 	const nodeId = (node as HTMLElement).dataset.nodeId;
 	const desc = nodeId ? descriptions[nodeId] : undefined;
-	const urlHref = nodeUrlHref(node);
+	const urlHref = (node as HTMLElement).dataset.urlHref;
 	const tooltipText = [desc, urlHref ? `${modKey}+Click to open URL` : null]
 		.filter(Boolean)
 		.join("\n");
@@ -300,9 +296,8 @@ window.addEventListener("mouseup", () => {
 });
 
 root.addEventListener("click", (e) => {
-	const a = (e.target as Element).closest("a");
-	if (!a) return;
-	const href = nodeUrlHref(a.closest("g.node") ?? a);
+	const node = (e.target as Element).closest("g.node");
+	const href = node ? (node as HTMLElement).dataset.urlHref : null;
 	if (!href) return;
 	e.preventDefault();
 	if (e.metaKey || e.ctrlKey) {
@@ -374,20 +369,20 @@ window.addEventListener("message", async (event) => {
 		const svg = g.dot(msg.dot, "svg");
 		log("svg length:", svg.length);
 		inner.innerHTML = svg;
-		// Move node IDs from <title> into data-node-id, then strip all
-		// <title> elements and xlink:title attributes so the browser does not
-		// show the Graphviz-generated native SVG tooltip alongside our custom one.
+		// Move node IDs / URLs into data attributes; strip all <title> elements
+		// and xlink:title attributes so the browser native SVG tooltip is suppressed.
 		for (const node of inner.querySelectorAll("g.node")) {
 			const titleEl = node.querySelector(":scope > title");
 			if (titleEl?.textContent) {
 				(node as HTMLElement).dataset.nodeId = titleEl.textContent;
+				titleEl.remove();
 			}
+			const urlHref = nodeUrlHref(node);
+			if (urlHref) (node as HTMLElement).dataset.urlHref = urlHref;
 		}
-		for (const el of inner.querySelectorAll("[*|title]")) {
-			el.removeAttributeNS("http://www.w3.org/1999/xlink", "title");
-		}
-		for (const el of inner.querySelectorAll("title")) {
-			el.remove();
+		for (const el of inner.querySelectorAll("[*|title], title")) {
+			if (el.tagName === "title") el.remove();
+			else el.removeAttributeNS("http://www.w3.org/1999/xlink", "title");
 		}
 		const svgEl = inner.querySelector("svg");
 		if (svgEl) {
