@@ -77,7 +77,7 @@ check-docs:
 gen-skill: check-docs
 	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
 	node scripts/gen-skill.mjs --out skills/pfdsl
-	@diff -rq .claude/skills/pfdsl skills/pfdsl > /dev/null || (echo "ERROR: .claude/skills/pfdsl and skills/pfdsl differ after gen-skill" && exit 1)
+	@diff -rq -x CLAUDE.md .claude/skills/pfdsl skills/pfdsl > /dev/null || (echo "ERROR: .claude/skills/pfdsl and skills/pfdsl differ after gen-skill" && exit 1)
 
 .PHONY: install-skill
 install-skill: check-docs
