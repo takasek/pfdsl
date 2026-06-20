@@ -6,6 +6,7 @@ type MessageToWebview =
 			dot: string;
 			focusNodeId?: string;
 			descriptions?: Record<string, string>;
+			locations?: Record<string, string>;
 	  }
 	| { type: "error"; message: string }
 	| { type: "focus"; nodeId: string }
@@ -26,7 +27,8 @@ type MessageToWebview =
 type MessageFromWebview =
 	| { type: "ready" }
 	| { type: "nodeClick"; nodeId: string }
-	| { type: "openUrl"; url: string };
+	| { type: "openUrl"; url: string }
+	| { type: "openFile"; path: string };
 
 declare const acquireVsCodeApi: () => {
 	postMessage: (msg: MessageFromWebview) => void;
@@ -57,6 +59,7 @@ const inner = document.getElementById("inner") as HTMLDivElement;
 const tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
 let descriptions: Record<string, string> = {};
+let locations: Record<string, string> = {};
 let lastFocusedNodeId: string | undefined;
 
 const diffPanel = document.getElementById("diff-panel") as HTMLDivElement;
@@ -99,15 +102,6 @@ function clearDiffPanel(): void {
 
 const modKey = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
 
-function nodeUrlHref(node: Element): string | null {
-	const a = node.querySelector("a") ?? node.closest("a");
-	if (!a) return null;
-	const href =
-		a.getAttribute("href") ??
-		a.getAttributeNS("http://www.w3.org/1999/xlink", "href");
-	return href?.includes("://") ? href : null;
-}
-
 root.addEventListener("mousemove", (e) => {
 	const node = (e.target as Element).closest?.("g.node");
 	if (!node) {
@@ -116,10 +110,13 @@ root.addEventListener("mousemove", (e) => {
 	}
 	const nodeId = (node as HTMLElement).dataset.nodeId;
 	const desc = nodeId ? descriptions[nodeId] : undefined;
-	const urlHref = (node as HTMLElement).dataset.urlHref;
-	const tooltipText = [desc, urlHref ? `${modKey}+Click to open URL` : null]
-		.filter(Boolean)
-		.join("\n");
+	const loc = (node as HTMLElement).dataset.location;
+	const hint = loc
+		? loc.includes("://")
+			? `${modKey}+Click to open URL`
+			: `${modKey}+Click to open file`
+		: null;
+	const tooltipText = [desc, hint].filter(Boolean).join("\n");
 	if (!tooltipText) {
 		tooltip.style.display = "none";
 		return;
@@ -297,11 +294,15 @@ window.addEventListener("mouseup", () => {
 
 root.addEventListener("click", (e) => {
 	const node = (e.target as Element).closest("g.node");
-	const href = node ? (node as HTMLElement).dataset.urlHref : null;
-	if (!href) return;
+	const loc = node ? (node as HTMLElement).dataset.location : null;
+	if (!loc) return;
 	e.preventDefault();
 	if (e.metaKey || e.ctrlKey) {
-		vscode.postMessage({ type: "openUrl", url: href });
+		if (loc.includes("://")) {
+			vscode.postMessage({ type: "openUrl", url: loc });
+		} else {
+			vscode.postMessage({ type: "openFile", path: loc });
+		}
 	}
 });
 
@@ -363,22 +364,25 @@ window.addEventListener("message", async (event) => {
 	}
 	if (msg.type !== "render") return;
 	descriptions = msg.descriptions ?? {};
+	locations = msg.locations ?? {};
 	try {
 		const g = await getGraphviz();
 		log("calling g.dot()");
 		const svg = g.dot(msg.dot, "svg");
 		log("svg length:", svg.length);
 		inner.innerHTML = svg;
-		// Move node IDs / URLs into data attributes; strip all <title> elements
-		// and xlink:title attributes so the browser native SVG tooltip is suppressed.
 		for (const node of inner.querySelectorAll("g.node")) {
 			const titleEl = node.querySelector(":scope > title");
 			if (titleEl?.textContent) {
 				(node as HTMLElement).dataset.nodeId = titleEl.textContent;
+				const loc = locations[titleEl.textContent];
+				if (loc) (node as HTMLElement).dataset.location = loc;
 				titleEl.remove();
 			}
-			const urlHref = nodeUrlHref(node);
-			if (urlHref) (node as HTMLElement).dataset.urlHref = urlHref;
+			for (const a of node.querySelectorAll("a")) {
+				a.removeAttribute("href");
+				a.removeAttributeNS("http://www.w3.org/1999/xlink", "href");
+			}
 		}
 		for (const el of inner.querySelectorAll("[*|title], title")) {
 			if (el.tagName === "title") el.remove();
