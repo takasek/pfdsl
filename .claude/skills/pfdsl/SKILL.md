@@ -51,6 +51,7 @@ process:
     description: ...
     owner: ...
     group: <group-id>
+    tags: [tag1, tag2]      # Artifact / Process 両方に指定可（group と対称）
     command: npm run build  # 対応する実行コマンド
     estimate: 2d            # 工数見積もり（形式自由）
 
@@ -58,6 +59,12 @@ group:
   <id>:
     label: ...
     color: "#f0f0f0"
+
+tag:                         # タグ定義（artifact/process/group と同階層）
+  <tag-id>:
+    label: ...
+    description: ...
+    style: { color: blue, penwidth: "2" }  # 許可属性は statusStyles と同じ
 
 statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
@@ -94,6 +101,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 - **命名**: プロセスは変換が見える動詞句（「設計」「査読」。「対応」「作業」不可）、成果物は保管できるモノの名詞（「応急処置」は作業名 — 「暫定対応記録」に）。ID は短い英語スネーク、表示名は label
 - **抽象度を統一**: 「システム開発」と「変数リネーム」を並べない。肥大したら別ファイルへ
 - **グループは存在様式で切る**: 住処・寿命・消費局面の軸で分け、生成元では分けない — 生成関係はエッジが表現済み（ADR-0008）
+- **横断的な性質は tag で束ねる（subroutine でなく）**: 同じ性質を持つノード群（成果物でも工程でもよい）は共通 tag を付ける。tag は Artifact / Process 両方に付与でき、`tag:` 定義ブロックで `label` / `description` / `style` を一元管理する。とくに構造が似た複数 Process は1ノードに畳まず（清水DFD の 1:1 leveling 維持）tag で束ねる。深い共有知識のみ companion `.md` に外化（ADR-0019）
 - **出力は検証可能な「モノ」**: 「理解」「合意」は理解資料・議事録・承認記録に外化。副次物（リリースノート）だけでなく主産物も出力する
 - **入力は全て明示**: 暗黙依存禁止（例: 差分実装に base_code）。「レビュアー知識」等の不定形もフロー外リソースなら入力可。フロー内で生成するなら文書化
 - **可変リソースはスナップショット化**: DB・本番環境は「日次ダンプ」「リリース版」等の時点固定 artifact に（単一生成元・DAG と衝突するため）

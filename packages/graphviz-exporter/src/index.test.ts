@@ -185,12 +185,12 @@ spec >> P -> X
 		);
 	});
 
-	it("applies tagStyles to artifact with tags", () => {
+	it("applies tag style to artifact with tags", () => {
 		const src = `---
 artifact:
   spec: { tags: [external] }
-tagStyles:
-  external: { color: blue }
+tag:
+  external: { style: { color: blue } }
 ---
 spec >> P -> X
 `;
@@ -205,9 +205,9 @@ spec >> P -> X
 		const src = `---
 artifact:
   spec: { tags: [external, sensitive] }
-tagStyles:
-  external: { color: blue }
-  sensitive: { style: dashed }
+tag:
+  external: { style: { color: blue } }
+  sensitive: { style: { style: dashed } }
 ---
 spec >> P -> X
 `;
@@ -224,8 +224,8 @@ artifact:
   spec: { status: done, tags: [external] }
 statusStyles:
   done: { fillcolor: lightgray, style: filled }
-tagStyles:
-  external: { color: blue }
+tag:
+  external: { style: { color: blue } }
 ---
 spec >> P -> X
 `;
@@ -240,9 +240,9 @@ spec >> P -> X
 		const src = `---
 artifact:
   spec: { tags: [a, b] }
-tagStyles:
-  a: { color: red }
-  b: { color: blue }
+tag:
+  a: { style: { color: red } }
+  b: { style: { color: blue } }
 ---
 spec >> P -> X
 `;
@@ -258,8 +258,8 @@ artifact:
   spec: { status: done, tags: [external] }
 statusStyles:
   done: { color: gray }
-tagStyles:
-  external: { color: blue }
+tag:
+  external: { style: { color: blue } }
 ---
 spec >> P -> X
 `;
@@ -275,8 +275,8 @@ artifact:
   spec: { status: done, tags: [external] }
 statusStyles:
   done: { fillcolor: lightgray, style: filled }
-tagStyles:
-  external: { color: blue, penwidth: "3" }
+tag:
+  external: { style: { color: blue, penwidth: "3" } }
 ---
 spec >> P -> X
 `;
@@ -288,12 +288,12 @@ spec >> P -> X
 		expect(dot).toContain('penwidth="3"');
 	});
 
-	it("undefined tagStyles entries are ignored without error", () => {
+	it("undefined tag entries are ignored without error", () => {
 		const src = `---
 artifact:
   spec: { tags: [missing] }
-tagStyles:
-  other: { color: blue }
+tag:
+  other: { style: { color: blue } }
 ---
 spec >> P -> X
 `;
@@ -304,7 +304,7 @@ spec >> P -> X
 		);
 	});
 
-	it("does not apply status/tags to process nodes", () => {
+	it("does not inherit artifact status onto process nodes", () => {
 		const src = `---
 process:
   P: {}
@@ -318,6 +318,43 @@ spec >> P -> X
 		const { graph, frontmatter } = buildFromSource(src);
 		const dot = exportDot(graph, frontmatter);
 		expect(dot).toMatch(/"P" \[shape=ellipse, label="P"\]/);
+	});
+
+	it("applies tag style to process with tags", () => {
+		const src = `---
+process:
+  P: { tags: [shared] }
+artifact:
+  spec: {}
+tag:
+  shared: { style: { color: green } }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toMatch(
+			/"P" \[shape=ellipse, label="P", xlabel="shared", color="green"\]/,
+		);
+	});
+
+	it("xlabel joins multiple process tags with comma separator", () => {
+		const src = `---
+process:
+  P: { tags: [reusable, audited] }
+artifact:
+  spec: {}
+tag:
+  reusable: { style: { color: green } }
+  audited: { style: { penwidth: "3" } }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toMatch(
+			/"P" \[shape=ellipse, label="P", xlabel="reusable, audited"/,
+		);
 	});
 });
 
@@ -616,12 +653,12 @@ describe("boundary artifact penwidth", () => {
 		expect(dot).not.toMatch(/"design" \[.*penwidth/);
 	});
 
-	it("user-specified penwidth in tagStyles is not overridden", () => {
+	it("user-specified penwidth in tag style is not overridden", () => {
 		const src = `---
 artifact:
   req: { tags: [critical] }
-tagStyles:
-  critical: { penwidth: "5" }
+tag:
+  critical: { style: { penwidth: "5" } }
 ---
 req >> design -> spec
 `;

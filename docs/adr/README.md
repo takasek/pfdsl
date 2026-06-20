@@ -30,3 +30,4 @@
 - **ADR-0016** [pfd-ops install/ 集約](0016-install-paradigm.md) — 配布可能ファイルを install/ に集約し CI で canonical と deployed の identity を強制する
 - **ADR-0017** [PFDファイル種別の3分類](0017-pfd-kind-taxonomy.md) — roadmap / workflow / runtime-pipeline を「答える問い」で区別し ecosystem 種別を廃止する
 - **ADR-0018** [成果物の門番は双方向](0018-successor-gatekeeper.md) — 手段成果物（仕様・設計・計画・提案）は終端たりえず、出力時点で消費する後続をプレースホルダ登録する
+- **ADR-0019** [tags はノード横断ラベル + `tag:` 定義ブロック](0019-process-tags.md) — subroutine 却下の代替。tags を Artifact / Process 両種別の横断ラベルとし、`label` / `description` / `style` を持つ `tag:` 定義ブロックを新設（`tagStyles` 廃止・統合、status は Artifact 専用据え置き）

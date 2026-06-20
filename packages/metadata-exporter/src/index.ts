@@ -46,7 +46,7 @@ export function extractMetadata(
 					label: str(meta?.label),
 					description: str(meta?.description),
 					status: undefined,
-					tags: undefined,
+					tags: strArr(meta?.tags),
 					owner: str(meta?.owner),
 				};
 			}

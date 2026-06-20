@@ -93,9 +93,9 @@ describe("validate", () => {
 		expect(codes("A >> P -> B", fm)).toContain("V009");
 	});
 
-	it("V009: invalid attribute in tagStyles", () => {
+	it("V009: invalid attribute in tag style", () => {
 		const fm = {
-			tagStyles: { external: { invalidAttr: "x" } },
+			tag: { external: { style: { invalidAttr: "x" } } },
 		} as unknown as Frontmatter;
 		expect(codes("A >> P -> B", fm)).toContain("V009");
 	});
@@ -110,10 +110,10 @@ describe("validate", () => {
 		expect(cs).not.toContain("V009");
 	});
 
-	it("tagStyles: undefined tag used by artifact emits no error", () => {
+	it("tag: undefined tag used by artifact emits no error", () => {
 		const fm: Frontmatter = {
 			artifact: { A: { tags: ["undefined-tag"] } },
-			tagStyles: { other: { color: "blue" } },
+			tag: { other: { style: { color: "blue" } } },
 		};
 		const cs = codes("A >> P -> B", fm);
 		expect(cs).not.toContain("V009");

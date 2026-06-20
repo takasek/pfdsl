@@ -34,6 +34,7 @@ export interface ProcessMeta {
 	owner?: string;
 	externalStakeholders?: string[];
 	group?: string;
+	tags?: string[];
 	command?: string;
 	[key: string]: unknown;
 }
@@ -41,6 +42,13 @@ export interface ProcessMeta {
 export interface GroupMeta {
 	label?: string;
 	color?: string;
+	[key: string]: unknown;
+}
+
+export interface TagMeta {
+	label?: string;
+	description?: string;
+	style?: NodeStyle;
 	[key: string]: unknown;
 }
 
@@ -58,8 +66,8 @@ export interface Frontmatter {
 	artifact?: Record<string, ArtifactMeta>;
 	process?: Record<string, ProcessMeta>;
 	group?: Record<string, GroupMeta>;
+	tag?: Record<string, TagMeta>;
 	statusStyles?: Partial<Record<Status, NodeStyle>>;
-	tagStyles?: Record<string, NodeStyle>;
 	[key: string]: unknown;
 }
 

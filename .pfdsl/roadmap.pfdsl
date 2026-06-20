@@ -131,7 +131,7 @@ artifact:
     description: "似た process 群を tag で束ね共有知識を companion md に外化する規約（subroutine
       廃案の代替）の前提。§2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定。直接
       spec 編集経路（proposal スキップ可）"
-    status: todo
+    status: wip
     criteria: §2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定
     location: https://github.com/takasek/pfdsl/issues/127
     updated_at: 2026-06-20T01:24:11Z
@@ -184,8 +184,8 @@ process:
   implement_multifile:
     label: マルチファイル機能実装
 
-tagStyles:
-  "priority:high": { color: "#b60205", penwidth: "2" }
+tag:
+  "priority:high": { style: { color: "#b60205", penwidth: "2" } }
 
 statusStyles:
   done: { fillcolor: "#d4edda", style: filled }

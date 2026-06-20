@@ -30,12 +30,14 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
 - [ ] close 時の降格規則を適用した（定義は L3 reference。専属 process も含めて削除する）
-- [ ] `packages/cli` または `packages/vscode-extension` を変更した場合、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending なら次サイクルの先頭タスクとして明記する — 忘れると `published_cli` / `published_extension` が無期限に stale になる）
+- [ ] `packages/cli` / `packages/vscode-extension` **または CLI が束ねる依存パッケージ**（`@pfdsl/core` / `@pfdsl/graphviz-exporter` / `@pfdsl/metadata-exporter` 等 — `packages/cli/tsup.config.ts` の `noExternal: [/^@pfdsl\//]` が全 `@pfdsl/*` を dist へ同梱する）を変更した場合、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending なら次サイクルの先頭タスクとして明記する — 忘れると `published_cli` / `published_extension` が無期限に stale になる）。**判定はパッケージのパスでなく「公開物の挙動が変わるか」で行う**: lib 変更が CLI の出力（`check`/`graph` 等）を変える場合は cli 直接変更と同じ扱い
 - [ ] `.pfdsl/roadmap.pfdsl` を**人手で**変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新しコミットした（flow-sync bot PR は `flow-on-issue-close.yml` が `--fix` 後に自動再生成。どちらの経路も `test.yml` の PR test gate がマージ前に stale snapshot を検出する）
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる（2026-06-20 の /pfd-retro で発見: worktree サイクルで未ビルドのまま check が `Missing script` / `MODULE_NOT_FOUND` で失敗）。
 
 「roadmap.pfdsl 変更 → snapshot 陳腐化」は 2026-06-19 の /pfd-retro で発見: PR #110 の flow-sync が roadmap.pfdsl を変更した際にスナップショットが更新されず、#108 として顕在化した。正しい更新コマンドは `-u` フラグ（`--update-snapshots` は vitest 1.x で無効）。
+
+2026-06-20 の /pfd-retro（#127 サイクル）: 公開ゲートの**トリガー条件が狭すぎる**構造欠落を発見。`@pfdsl/core` / `@pfdsl/graphviz-exporter` は CLI に `noExternal` で同梱されるため、これら lib のみを変更した PR（#131）でも CLI の `graph` 出力（process tags 描画）が変わるが、旧ゲートは `packages/cli` パス直変更のみを契機としていた。判定軸を「パッケージのパス」から「公開物の挙動が変わるか」へ修正（#72/#15/#17 の impl_flow 取りこぼしと同型の死角）。
 
 2026-06-20 の /pfd-retro: 上記ゲートは**人間ゲートのため bot PR では発火し得ない**という構造欠落（#120）を発見。`flow-on-issue-close.yml` の bot PR は人間を経由せず、#89 クローズ同期（#116）で snapshot を stale 化させた。恒久解消として A: flow-sync に snapshot 自動再生成（`add-paths` に snapshot 追加）、B: PR test gate `test.yml`（`pnpm -r build && test`）を追加。本ゲート項目は人手編集のローカル事前チェックに退き、bot 経路と取りこぼしは CI が backstop する。
 
