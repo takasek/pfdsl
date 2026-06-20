@@ -47,7 +47,7 @@ artifact:
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
-    status: wip
+    status: done
     criteria: ID スコープ・継承解決順・ファイル間参照の決定が文書化済み
     location: docs/spec/proposals/multifile-policy.md
   adr_corpus:
