@@ -628,7 +628,8 @@ function resolveStyleAttrs(
 	const tags = meta?.tags ?? [];
 	for (let i = tags.length - 1; i >= 0; i--) {
 		const tag = tags[i];
-		if (tag !== undefined) Object.assign(styleAttrs, fm.tagStyles?.[tag] ?? {});
+		if (tag !== undefined)
+			Object.assign(styleAttrs, fm.tag?.[tag]?.style ?? {});
 	}
 	// status is artifact-only and applied last to win over tags
 	if (kind === "artifact") {

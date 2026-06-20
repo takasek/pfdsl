@@ -45,6 +45,13 @@ export interface GroupMeta {
 	[key: string]: unknown;
 }
 
+export interface TagMeta {
+	label?: string;
+	description?: string;
+	style?: NodeStyle;
+	[key: string]: unknown;
+}
+
 export interface Frontmatter {
 	title?: string;
 	version?: string | number;
@@ -59,8 +66,8 @@ export interface Frontmatter {
 	artifact?: Record<string, ArtifactMeta>;
 	process?: Record<string, ProcessMeta>;
 	group?: Record<string, GroupMeta>;
+	tag?: Record<string, TagMeta>;
 	statusStyles?: Partial<Record<Status, NodeStyle>>;
-	tagStyles?: Record<string, NodeStyle>;
 	[key: string]: unknown;
 }
 

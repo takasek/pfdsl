@@ -51,7 +51,7 @@ describe("loadFrontmatter", () => {
 		expect(result.bodyStartLine).toBe(5);
 	});
 
-	it("parses status, tags, statusStyles, tagStyles", () => {
+	it("parses status, tags, statusStyles, tag", () => {
 		const src = [
 			"---",
 			"artifact:",
@@ -60,9 +60,9 @@ describe("loadFrontmatter", () => {
 			"    tags: [external, critical]",
 			"statusStyles:",
 			"  done: { fillcolor: lightgray, style: filled }",
-			"tagStyles:",
-			"  external: { color: blue }",
-			'  critical: { penwidth: "3" }',
+			"tag:",
+			"  external: { label: 外部公開, style: { color: blue } }",
+			'  critical: { style: { penwidth: "3" } }',
 			"---",
 			"spec >> P -> X",
 			"",
@@ -73,7 +73,8 @@ describe("loadFrontmatter", () => {
 		expect(fm.artifact?.spec?.status).toBe("done");
 		expect(fm.artifact?.spec?.tags).toEqual(["external", "critical"]);
 		expect(fm.statusStyles?.done?.fillcolor).toBe("lightgray");
-		expect(fm.tagStyles?.external?.color).toBe("blue");
-		expect(fm.tagStyles?.critical?.penwidth).toBe("3");
+		expect(fm.tag?.external?.label).toBe("外部公開");
+		expect(fm.tag?.external?.style?.color).toBe("blue");
+		expect(fm.tag?.critical?.style?.penwidth).toBe("3");
 	});
 });

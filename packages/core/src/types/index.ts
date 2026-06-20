@@ -21,6 +21,7 @@ export type {
 	ProcessMeta,
 	Status,
 	StyleAttr,
+	TagMeta,
 } from "./frontmatter.js";
 export { STATUS_VALUES, STYLE_ATTRS } from "./frontmatter.js";
 export type { FeedbackEdge, Graph, NodeKind, PrimaryEdge } from "./graph.js";

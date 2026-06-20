@@ -148,7 +148,7 @@ export function validate(
 	}
 
 	// V008: statusStyles keys must be valid Status enum
-	// V009: statusStyles/tagStyles attribute keys must be in STYLE_ATTRS
+	// V009: statusStyles / tag.<id>.style attribute keys must be in STYLE_ATTRS
 	for (const [key, style] of Object.entries(fm?.statusStyles ?? {})) {
 		if (!STATUS_SET.has(key)) {
 			diagnostics.push({
@@ -169,13 +169,13 @@ export function validate(
 			}
 		}
 	}
-	for (const [key, style] of Object.entries(fm?.tagStyles ?? {})) {
-		for (const attr of Object.keys(style ?? {})) {
+	for (const [key, meta] of Object.entries(fm?.tag ?? {})) {
+		for (const attr of Object.keys(meta?.style ?? {})) {
 			if (!STYLE_ATTR_SET.has(attr)) {
 				diagnostics.push({
 					severity: "error",
 					code: "V009",
-					message: `Invalid style attribute '${attr}' in tagStyles.${key}. Allowed: ${STYLE_ATTRS.join(", ")}`,
+					message: `Invalid style attribute '${attr}' in tag.${key}.style. Allowed: ${STYLE_ATTRS.join(", ")}`,
 					range: zeroRange(),
 				});
 			}
