@@ -34,6 +34,7 @@ export interface ProcessMeta {
 	owner?: string;
 	externalStakeholders?: string[];
 	group?: string;
+	tags?: string[];
 	command?: string;
 	[key: string]: unknown;
 }

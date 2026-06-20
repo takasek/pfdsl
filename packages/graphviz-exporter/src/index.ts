@@ -608,6 +608,10 @@ function buildXlabel(
 		const meta = fm.artifact?.[id];
 		if (meta?.status) parts.push(meta.status);
 		for (const tag of meta?.tags ?? []) parts.push(tag);
+	} else {
+		// status is artifact-only; processes carry tags only
+		const meta = fm.process?.[id];
+		for (const tag of meta?.tags ?? []) parts.push(tag);
 	}
 	return parts.length > 0 ? parts.join(", ") : undefined;
 }
@@ -617,8 +621,8 @@ function resolveStyleAttrs(
 	kind: NodeKind,
 	fm: Frontmatter | null,
 ): NodeStyle {
-	if (kind !== "artifact" || !fm) return {};
-	const meta = fm.artifact?.[id];
+	if (!fm) return {};
+	const meta = kind === "artifact" ? fm.artifact?.[id] : fm.process?.[id];
 	const styleAttrs: NodeStyle = {};
 	// tags reverse iter: later Object.assign wins → first tag in array prevails
 	const tags = meta?.tags ?? [];
@@ -626,9 +630,11 @@ function resolveStyleAttrs(
 		const tag = tags[i];
 		if (tag !== undefined) Object.assign(styleAttrs, fm.tagStyles?.[tag] ?? {});
 	}
-	// status applied last to win over tags
-	if (meta?.status)
-		Object.assign(styleAttrs, fm.statusStyles?.[meta.status] ?? {});
+	// status is artifact-only and applied last to win over tags
+	if (kind === "artifact") {
+		const status = (meta as ArtifactMeta | undefined)?.status;
+		if (status) Object.assign(styleAttrs, fm.statusStyles?.[status] ?? {});
+	}
 	return styleAttrs;
 }
 

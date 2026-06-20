@@ -304,7 +304,7 @@ spec >> P -> X
 		);
 	});
 
-	it("does not apply status/tags to process nodes", () => {
+	it("does not inherit artifact status onto process nodes", () => {
 		const src = `---
 process:
   P: {}
@@ -318,6 +318,43 @@ spec >> P -> X
 		const { graph, frontmatter } = buildFromSource(src);
 		const dot = exportDot(graph, frontmatter);
 		expect(dot).toMatch(/"P" \[shape=ellipse, label="P"\]/);
+	});
+
+	it("applies tagStyles to process with tags", () => {
+		const src = `---
+process:
+  P: { tags: [shared] }
+artifact:
+  spec: {}
+tagStyles:
+  shared: { color: green }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toMatch(
+			/"P" \[shape=ellipse, label="P", xlabel="shared", color="green"\]/,
+		);
+	});
+
+	it("xlabel joins multiple process tags with comma separator", () => {
+		const src = `---
+process:
+  P: { tags: [reusable, audited] }
+artifact:
+  spec: {}
+tagStyles:
+  reusable: { color: green }
+  audited: { penwidth: "3" }
+---
+spec >> P -> X
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toMatch(
+			/"P" \[shape=ellipse, label="P", xlabel="reusable, audited"/,
+		);
 	});
 });
 

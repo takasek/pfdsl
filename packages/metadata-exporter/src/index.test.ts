@@ -113,6 +113,23 @@ req >> build
 		expect(rec.tags).toBeUndefined();
 	});
 
+	it("fills process tags from frontmatter (status stays undefined)", () => {
+		const src = `---
+process:
+  build:
+    label: ビルド
+    tags: [reusable, audited]
+---
+req >> build
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const rec = extractMetadata(graph, frontmatter).find(
+			(r) => r.id === "build",
+		)!;
+		expect(rec.tags).toEqual(["reusable", "audited"]);
+		expect(rec.status).toBeUndefined();
+	});
+
 	it("returns undefined for missing frontmatter fields", () => {
 		const { graph, frontmatter } = buildFromSource("req >> build\n");
 		const records = extractMetadata(graph, frontmatter);
