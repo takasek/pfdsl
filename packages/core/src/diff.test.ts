@@ -51,4 +51,122 @@ describe("diffGraphs", () => {
 		expect(r.removedFeedback).toEqual(["code -> impl"]);
 		expect(r.addedFeedback).toEqual([]);
 	});
+
+	describe("changedNodes", () => {
+		it("detects status flip via frontmatter (artifact todo→done)", () => {
+			const srcA = `---
+artifact:
+  spec:
+    status: todo
+---
+req >> design -> spec
+`;
+			const srcB = `---
+artifact:
+  spec:
+    status: done
+---
+req >> design -> spec
+`;
+			const a = analyze(srcA);
+			const b = analyze(srcB);
+			const r = diffGraphs(a.graph, b.graph, a.frontmatter, b.frontmatter);
+			expect(r.changedNodes).toEqual(["spec"]);
+		});
+
+		it("detects label change on a process", () => {
+			const srcA = `---
+process:
+  design:
+    label: Design
+---
+req >> design -> spec
+`;
+			const srcB = `---
+process:
+  design:
+    label: Detailed Design
+---
+req >> design -> spec
+`;
+			const a = analyze(srcA);
+			const b = analyze(srcB);
+			const r = diffGraphs(a.graph, b.graph, a.frontmatter, b.frontmatter);
+			expect(r.changedNodes).toEqual(["design"]);
+		});
+
+		it("reports changedNodes empty when metadata is identical", () => {
+			const src = `---
+artifact:
+  spec:
+    status: done
+---
+req >> design -> spec
+`;
+			const a = analyze(src);
+			const b = analyze(src);
+			const r = diffGraphs(a.graph, b.graph, a.frontmatter, b.frontmatter);
+			expect(r.changedNodes).toEqual([]);
+		});
+
+		it("reports changedNodes empty when frontmatters are omitted (2-arg call)", () => {
+			const srcA = `---
+artifact:
+  spec:
+    status: todo
+---
+req >> design -> spec
+`;
+			const srcB = `---
+artifact:
+  spec:
+    status: done
+---
+req >> design -> spec
+`;
+			const a = analyze(srcA);
+			const b = analyze(srcB);
+			// 2-arg call — no frontmatter passed, so changedNodes must be empty
+			const r = diffGraphs(a.graph, b.graph);
+			expect(r.changedNodes).toEqual([]);
+		});
+
+		it("detects kind change (same id is artifact in one graph and process in the other)", () => {
+			// In "req >> shared -> spec", "shared" is a process.
+			// In "req >> design -> shared", "shared" is an artifact.
+			const a = analyze("req >> shared -> spec\n");
+			const b = analyze("req >> design -> shared\n");
+			// "shared" appears in both graphs but with different kinds
+			const r = diffGraphs(a.graph, b.graph);
+			expect(r.changedNodes).toContain("shared");
+		});
+
+		it("does not include added or removed nodes in changedNodes", () => {
+			const srcA = `---
+artifact:
+  spec:
+    status: todo
+---
+req >> design -> spec
+`;
+			const srcB = `---
+artifact:
+  spec:
+    status: done
+  code:
+    status: wip
+---
+req >> design -> spec
+spec >> impl -> code
+`;
+			const a = analyze(srcA);
+			const b = analyze(srcB);
+			const r = diffGraphs(a.graph, b.graph, a.frontmatter, b.frontmatter);
+			// "code" and "impl" are added — must not appear in changedNodes
+			expect(r.changedNodes).not.toContain("code");
+			expect(r.changedNodes).not.toContain("impl");
+			// "spec" is in both and its status changed
+			expect(r.changedNodes).toEqual(["spec"]);
+		});
+	});
 });

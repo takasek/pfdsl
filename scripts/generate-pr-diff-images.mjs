@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// Generates before/after SVG diagrams for .pfdsl files changed in a merged PR,
-// and updates the PR description with image links.
+// Generates before/after/diff SVG diagrams for .pfdsl files changed in a merged
+// PR, and updates the PR description with image links. The diff SVG overlays the
+// two versions: added green, removed red, metadata-changed yellow, unchanged
+// hidden (see `pfdsl diff --format svg`).
 //
 // Two-phase usage (called by pr-diff-images.yml):
 //   Phase 1 — generate SVGs:
@@ -51,6 +53,13 @@ function renderSvg(filePath) {
 	});
 }
 
+function renderDiffSvg(aPath, bPath) {
+	return execFileSync("pfdsl", ["diff", aPath, bPath, "--format", "svg"], {
+		encoding: "utf-8",
+		cwd: root,
+	});
+}
+
 function getBaseContent(filePath) {
 	try {
 		return execFileSync("git", ["show", `${baseSha}:${filePath}`], {
@@ -75,24 +84,36 @@ if (mode === "generate") {
 		mkdirSync(svgDir, { recursive: true });
 		const stem = basename(sanitized);
 		const tmpFile = join(tmpdir(), `pfdsl-before-${stem}-${process.pid}.pfdsl`);
+		const emptyTmp = join(tmpdir(), `pfdsl-empty-${process.pid}.pfdsl`);
 
-		// Before SVG (base version)
 		const baseContent = getBaseContent(file);
-		if (baseContent) {
-			writeFileSync(tmpFile, baseContent, "utf-8");
-			try {
+		const headPath = join(root, file);
+		const headExists = existsSync(headPath);
+
+		try {
+			// Before SVG (base version)
+			if (baseContent) {
+				writeFileSync(tmpFile, baseContent, "utf-8");
 				const svg = renderSvg(tmpFile);
 				writeFileSync(join(svgDir, `${stem}.before.svg`), svg, "utf-8");
-			} finally {
-				try { unlinkSync(tmpFile); } catch { /* ignore */ }
 			}
-		}
 
-		// After SVG (head version)
-		const headPath = join(root, file);
-		if (existsSync(headPath)) {
-			const svg = renderSvg(headPath);
-			writeFileSync(join(svgDir, `${stem}.after.svg`), svg, "utf-8");
+			// After SVG (head version)
+			if (headExists) {
+				const svg = renderSvg(headPath);
+				writeFileSync(join(svgDir, `${stem}.after.svg`), svg, "utf-8");
+			}
+
+			// Diff SVG (overlay). Missing side → empty graph: an added file
+			// renders all-green, a deleted file all-red.
+			writeFileSync(emptyTmp, "", "utf-8");
+			const aPath = baseContent ? tmpFile : emptyTmp;
+			const bPath = headExists ? headPath : emptyTmp;
+			const diffSvg = renderDiffSvg(aPath, bPath);
+			writeFileSync(join(svgDir, `${stem}.diff.svg`), diffSvg, "utf-8");
+		} finally {
+			try { unlinkSync(tmpFile); } catch { /* ignore */ }
+			try { unlinkSync(emptyTmp); } catch { /* ignore */ }
 		}
 	}
 
@@ -117,6 +138,9 @@ const sections = changedFiles.map((file) => {
 	}
 	if (existsSync(join(outDir, `${sanitized}.after.svg`))) {
 		lines.push(`**After**\n![after](${rawDir}/${stem}.after.svg)`);
+	}
+	if (existsSync(join(outDir, `${sanitized}.diff.svg`))) {
+		lines.push(`**Diff**\n![diff](${rawDir}/${stem}.diff.svg)`);
 	}
 	return lines.join("\n\n");
 });

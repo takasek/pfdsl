@@ -145,6 +145,70 @@ describe("diff", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("no structural differences");
 	});
+
+	it("--format dot renders visual diff as DOT", async () => {
+		const a = join(dir, "diff-dot-a.pfdsl");
+		const b = join(dir, "diff-dot-b.pfdsl");
+		writeFileSync(a, "req >> design -> spec\n");
+		writeFileSync(b, "req >> design -> spec\nspec >> impl -> code\n");
+		const r = await run(["diff", a, b, "--format", "dot"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout.startsWith("digraph PFDSL {")).toBe(true);
+		expect(r.stdout).toMatch(/#28a745|#c3e6cb/);
+	});
+
+	it("--format svg renders visual diff as SVG", async () => {
+		const a = join(dir, "diff-svg-a.pfdsl");
+		const b = join(dir, "diff-svg-b.pfdsl");
+		writeFileSync(a, "req >> design -> spec\n");
+		writeFileSync(b, "req >> design -> spec\nspec >> impl -> code\n");
+		const r = await run(["diff", a, b, "--format", "svg"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("<svg");
+	});
+
+	it("text format shows ~ node for changed frontmatter status", async () => {
+		const a = join(dir, "diff-changed-a.pfdsl");
+		const b = join(dir, "diff-changed-b.pfdsl");
+		writeFileSync(
+			a,
+			[
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: todo",
+				"---",
+				"req >> design -> spec\n",
+			].join("\n"),
+		);
+		writeFileSync(
+			b,
+			[
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: done",
+				"---",
+				"req >> design -> spec\n",
+			].join("\n"),
+		);
+		const r = await run(["diff", a, b]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("~ node spec");
+	});
+
+	it("--format bogus returns exit code 2", async () => {
+		const a = join(dir, "valid.pfdsl");
+		const r = await run(["diff", a, a, "--format", "bogus"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("identical files with default text format still returns no structural differences", async () => {
+		const a = join(dir, "valid.pfdsl");
+		const r = await run(["diff", a, a, "--format", "text"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("no structural differences");
+	});
 });
 
 describe("check --audit", () => {
