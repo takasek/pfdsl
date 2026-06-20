@@ -109,7 +109,7 @@ function nodeUrlHref(node: Element): string | null {
 	const href =
 		a.getAttribute("href") ??
 		a.getAttributeNS("http://www.w3.org/1999/xlink", "href");
-	return href && href.includes("://") ? href : null;
+	return href?.includes("://") ? href : null;
 }
 
 root.addEventListener("mousemove", (e) => {
