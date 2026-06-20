@@ -67,6 +67,7 @@ type MessageToWebview =
 			dot: string;
 			focusNodeId?: string;
 			descriptions?: Record<string, string>;
+			locations?: Record<string, string>;
 	  }
 	| { type: "error"; message: string }
 	| { type: "focus"; nodeId: string }
@@ -76,18 +77,35 @@ type MessageToWebview =
 
 type MessageFromWebview =
 	| { type: "ready" }
-	| { type: "nodeClick"; nodeId: string };
+	| { type: "nodeClick"; nodeId: string }
+	| { type: "openUrl"; url: string }
+	| { type: "openFile"; path: string };
 
 function buildDescriptions(fm: Frontmatter | null): Record<string, string> {
 	const result: Record<string, string> = {};
 	if (!fm) return result;
 	for (const id of Object.keys(fm.artifact ?? {})) {
-		const desc = fm.artifact?.[id]?.description;
-		if (typeof desc === "string" && desc) result[id] = desc;
+		const meta = fm.artifact?.[id];
+		const parts: string[] = [];
+		if (meta?.description) parts.push(meta.description);
+		if (meta?.criteria) parts.push(`criteria: ${meta.criteria}`);
+		if (typeof meta?.location === "string" && meta.location)
+			parts.push(`location: ${meta.location}`);
+		if (parts.length > 0) result[id] = parts.join("\n");
 	}
 	for (const id of Object.keys(fm.process ?? {})) {
-		const desc = fm.process?.[id]?.description;
-		if (typeof desc === "string" && desc) result[id] = desc;
+		const meta = fm.process?.[id];
+		if (meta?.description) result[id] = meta.description;
+	}
+	return result;
+}
+
+function buildLocations(fm: Frontmatter | null): Record<string, string> {
+	const result: Record<string, string> = {};
+	if (!fm) return result;
+	for (const id of Object.keys(fm.artifact ?? {})) {
+		const loc = fm.artifact?.[id]?.location;
+		if (typeof loc === "string" && loc) result[id] = loc;
 	}
 	return result;
 }
@@ -212,11 +230,13 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		} else {
 			const { frontmatter } = analyzeDocument(state.doc);
 			const descriptions = buildDescriptions(frontmatter);
+			const locations = buildLocations(frontmatter);
 			state.panel.webview.postMessage({
 				type: "render",
 				dot,
 				focusNodeId,
 				descriptions,
+				locations,
 			});
 		}
 		if ("pendingDiff" in state) {
@@ -276,6 +296,18 @@ export function registerPreview(context: vscode.ExtensionContext): {
 					? nodeIdAtCursor(analyzeDocument(state.doc), editor.selection.active)
 					: undefined;
 				jumpToNode(state.doc, msg.nodeId, cursorId === msg.nodeId);
+			} else if (msg.type === "openUrl") {
+				vscode.env.openExternal(vscode.Uri.parse(msg.url));
+			} else if (msg.type === "openFile") {
+				const folder = vscode.workspace.getWorkspaceFolder(state.doc.uri);
+				if (folder) {
+					const fileUri = vscode.Uri.joinPath(folder.uri, msg.path);
+					vscode.workspace
+						.openTextDocument(fileUri)
+						.then((doc) =>
+							vscode.window.showTextDocument(doc, { preview: false }),
+						);
+				}
 			}
 		});
 
