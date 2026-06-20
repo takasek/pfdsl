@@ -135,13 +135,6 @@ artifact:
     status: done
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
-  i99_pr_diff_image:
-    label: "PR diff画像 (#99)"
-    description: "マージPRの変更.pfdslにbefore/after/diffの3画像を生成。diff画像は変更箇所のみ色分け（追加緑/削除赤/変更黄）。詳細設計は
-      docs/superpowers/specs/2026-06-20-pr-diff-image-design.md"
-    status: wip
-    criteria: マージPRにbefore/after/diff3画像が添付され、diff画像が追加緑・削除赤・変更黄で差分のみ表示する
-    location: https://github.com/takasek/pfdsl/issues/99
 process:
   write_article:
     label: 記事執筆
@@ -176,8 +169,6 @@ process:
       に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
-  implement_pr_diff_image:
-    label: PR diff画像実装
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -208,9 +199,7 @@ featured_toolchain
 findings_r12
 i12_article
 i3_obsidian_plugin
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -246,9 +235,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -286,9 +273,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -325,9 +310,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -364,9 +347,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -405,9 +386,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 layer_audit_assets
@@ -442,9 +421,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 layer_audit_assets
@@ -482,8 +459,6 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -521,9 +496,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -560,9 +533,7 @@ external_stakeholders_spec
 findings_r12
 i12_article
 i3_obsidian_plugin
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_spec
 layer_audit_assets
@@ -599,9 +570,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -637,9 +606,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -676,9 +643,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -716,9 +681,7 @@ findings_r12
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -759,9 +722,7 @@ findings_r12
 i12_article
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -781,44 +742,6 @@ spec_v008
 write_article
 write_design_notes
 
-cli_tool >> implement_pr_diff_image
-implement_pr_diff_image -> i99_pr_diff_image
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-i12_article
-i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
-implement_lints
-implement_spec_features
-integrate_multifile
-integrate_spec
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-publish_cli
-published_cli
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-write_article
-write_design_notes
 
 
 
@@ -840,9 +763,7 @@ i12_article
 i3_obsidian_plugin
 i5_hierarchy_spec
 i6_presets_spec
-i99_pr_diff_image
 implement_lints
-implement_pr_diff_image
 implement_spec_features
 integrate_multifile
 integrate_spec
