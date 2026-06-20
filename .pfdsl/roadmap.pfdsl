@@ -37,6 +37,11 @@ artifact:
     status: todo
     criteria: check/fmt/graph が全サンプルにエラーなし
     location: docs/spec/spec.md
+  multifile_toolchain:
+    label: spec v0.0.8 実装済みツールチェーン
+    description: "subflow:/extends: の parser・checker・renderer 実装。実装 issue は spec_v008 確定後に起票（手段の盲点が統合で露出するため詳細を先書きしない — ADR-0013 対称）。後続門番のプレースホルダ（ADR-0018）"
+    status: todo
+    criteria: subflow/extends が parser・checker・renderer に実装され check/fmt/graph がエラーなし
   published_cli:
     label: npm公開済みCLI
     description: "現行公開バージョンは npm 一次情報（ここに書かない — ドリフトするため）。詳細は
@@ -176,6 +181,8 @@ process:
     label: L3資産階層化
   clarify_process_tags:
     label: process tags 明示化
+  implement_multifile:
+    label: マルチファイル機能実装
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -206,6 +213,8 @@ spec_v006 >>? integrate_spec
 [spec_v007, lint_checker] >> implement_spec_features -> featured_toolchain
 
 [hierarchy_spec, presets_spec, multifile_policy, featured_toolchain] >> integrate_multifile -> spec_v008
+
+[spec_v008, featured_toolchain] >> implement_multifile -> multifile_toolchain
 
 skill_gen >> restructure_skillgen -> restructured_gen
 

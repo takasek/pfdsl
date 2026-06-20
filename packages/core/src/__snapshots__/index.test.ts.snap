@@ -40,6 +40,11 @@ artifact:
     status: todo
     criteria: check/fmt/graph が全サンプルにエラーなし
     location: docs/spec/spec.md
+  multifile_toolchain:
+    label: spec v0.0.8 実装済みツールチェーン
+    description: "subflow:/extends: の parser・checker・renderer 実装。実装 issue は spec_v008 確定後に起票（手段の盲点が統合で露出するため詳細を先書きしない — ADR-0013 対称）。後続門番のプレースホルダ（ADR-0018）"
+    status: todo
+    criteria: subflow/extends が parser・checker・renderer に実装され check/fmt/graph がエラーなし
   published_cli:
     label: npm公開済みCLI
     description: "現行公開バージョンは npm 一次情報（ここに書かない — ドリフトするため）。詳細は
@@ -179,6 +184,8 @@ process:
     label: L3資産階層化
   clarify_process_tags:
     label: process tags 明示化
+  implement_multifile:
+    label: マルチファイル機能実装
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -212,12 +219,14 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
 layer_audit_assets
 lint_checker
 location_spec
+multifile_toolchain
 publish_cli
 published_cli
 restructure_skillgen
@@ -249,6 +258,7 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -256,6 +266,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -289,6 +300,7 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -296,6 +308,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -328,12 +341,14 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
 layer_audit_assets
 lint_checker
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -367,6 +382,7 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -374,6 +390,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -408,11 +425,13 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 layer_audit_assets
 lint_checker
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -445,12 +464,14 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -484,12 +505,14 @@ hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
 layer_audit_assets
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -524,11 +547,13 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 integrate_multifile
 integrate_spec
 layer_audit_assets
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -564,11 +589,54 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_spec
 layer_audit_assets
 lint_checker
 location_spec
+multifile_toolchain
+publish_cli
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+write_article
+write_design_notes
+
+featured_toolchain >> implement_multifile
+spec_v008 >> implement_multifile
+implement_multifile -> multifile_toolchain
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+clarify_process_tags
+cli_tool
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+external_stakeholders_spec
+findings_r12
+hierarchy_spec
+i127_process_tags
+i12_article
+i3_obsidian_plugin
+implement_lints
+implement_spec_features
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -602,6 +670,7 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -609,6 +678,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -640,6 +710,7 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -647,6 +718,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 restructure_skillgen
 restructured_gen
@@ -679,12 +751,14 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -719,6 +793,7 @@ hierarchy_spec
 i127_process_tags
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -726,6 +801,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -762,6 +838,7 @@ hierarchy_spec
 i127_process_tags
 i12_article
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -769,6 +846,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -805,6 +883,7 @@ i127_process_tags
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -812,6 +891,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
@@ -844,6 +924,7 @@ hierarchy_spec
 i12_article
 i3_obsidian_plugin
 implement_lints
+implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -851,6 +932,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 published_cli
