@@ -30,18 +30,6 @@ artifact:
     description: scripts/gen-skill.mjs と docs/samples 構成
     status: done
     criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
-  i5_hierarchy_spec:
-    label: "階層PFD仕様案 (#5)"
-    status: wip
-    criteria: 仕様案として起草完了
-    location: https://github.com/takasek/pfdsl/issues/5
-    updated_at: 2026-06-20T00:00:00Z
-  i6_presets_spec:
-    label: "共有プリセット仕様案 (#6)"
-    status: wip
-    criteria: 仕様案として起草完了
-    location: https://github.com/takasek/pfdsl/issues/6
-    updated_at: 2026-06-20T00:00:00Z
   spec_v007:
     label: 仕様書 v0.0.7（統合）
     status: wip
@@ -138,11 +126,23 @@ artifact:
     location: https://github.com/takasek/pfdsl/issues/97
   i127_process_tags:
     label: "process tags 明示許可 (#127)"
-    description: "似た process 群を tag で束ね共有知識を companion md に外化する規約（subroutine 廃案の代替）の前提。§2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定。直接 spec 編集経路（proposal スキップ可）"
+    description: "似た process 群を tag で束ね共有知識を companion md に外化する規約（subroutine
+      廃案の代替）の前提。§2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定。直接
+      spec 編集経路（proposal スキップ可）"
     status: todo
     criteria: §2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定
     location: https://github.com/takasek/pfdsl/issues/127
-    updated_at: 2026-06-20T00:00:00Z
+    updated_at: 2026-06-20T01:24:11Z
+  hierarchy_spec:
+    label: "階層PFD仕様案 (#5)"
+    status: done
+    criteria: 仕様案として起草完了
+    location: https://github.com/takasek/pfdsl/issues/5
+  presets_spec:
+    label: "共有プリセット仕様案 (#6)"
+    status: done
+    criteria: 仕様案として起草完了
+    location: https://github.com/takasek/pfdsl/issues/6
 process:
   write_article:
     label: 記事執筆
@@ -191,9 +191,9 @@ statusStyles:
 ---
 
 spec_v006 >> draft_multifile_specs
-draft_multifile_specs -> i5_hierarchy_spec
-draft_multifile_specs -> i6_presets_spec
+draft_multifile_specs -> hierarchy_spec
 draft_multifile_specs -> multifile_policy
+draft_multifile_specs -> presets_spec
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -244,11 +244,10 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -257,6 +256,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -284,11 +284,10 @@ draft_multifile_specs
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -297,6 +296,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -323,11 +323,10 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -335,6 +334,7 @@ integrate_spec
 layer_audit_assets
 lint_checker
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -362,11 +362,10 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -375,6 +374,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -403,17 +403,17 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
 layer_audit_assets
 lint_checker
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -440,11 +440,10 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -452,6 +451,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -480,17 +480,17 @@ draft_multifile_specs
 draft_revises
 external_stakeholders_spec
 featured_toolchain
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_spec_features
 integrate_multifile
 integrate_spec
 layer_audit_assets
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -519,17 +519,17 @@ draft_multifile_specs
 draft_revises
 external_stakeholders_spec
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 integrate_multifile
 integrate_spec
 layer_audit_assets
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -542,9 +542,9 @@ write_article
 write_design_notes
 
 featured_toolchain >> integrate_multifile
-i5_hierarchy_spec >> integrate_multifile
-i6_presets_spec >> integrate_multifile
+hierarchy_spec >> integrate_multifile
 multifile_policy >> integrate_multifile
+presets_spec >> integrate_multifile
 integrate_multifile -> spec_v008
 adr_corpus
 audit_distribution
@@ -597,11 +597,10 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -610,6 +609,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 revises_spec
@@ -635,11 +635,10 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -648,6 +647,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -674,11 +674,10 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -686,6 +685,7 @@ integrate_spec
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -715,10 +715,9 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -727,6 +726,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -758,10 +758,9 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -770,6 +769,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -800,11 +800,10 @@ draft_multifile_specs
 draft_revises
 featured_toolchain
 findings_r12
+hierarchy_spec
 i127_process_tags
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -813,6 +812,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
@@ -840,10 +840,9 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+hierarchy_spec
 i12_article
 i3_obsidian_plugin
-i5_hierarchy_spec
-i6_presets_spec
 implement_lints
 implement_spec_features
 integrate_multifile
@@ -852,6 +851,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+presets_spec
 publish_cli
 published_cli
 restructure_skillgen
