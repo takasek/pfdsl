@@ -29,16 +29,16 @@ artifact:
     criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
   i5_hierarchy_spec:
     label: "階層PFD仕様案 (#5)"
-    status: todo
+    status: wip
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/5
-    updated_at: 2026-06-12T08:18:39Z
+    updated_at: 2026-06-20T00:00:00Z
   i6_presets_spec:
     label: "共有プリセット仕様案 (#6)"
-    status: todo
+    status: wip
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/6
-    updated_at: 2026-06-12T08:18:40Z
+    updated_at: 2026-06-20T00:00:00Z
   spec_v007:
     label: 仕様書 v0.0.7（統合）
     status: wip
@@ -59,8 +59,9 @@ artifact:
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
-    status: todo
+    status: wip
     criteria: ID スコープ・継承解決順・ファイル間参照の決定が文書化済み
+    location: docs/spec/proposals/multifile-policy.md
   adr_corpus:
     label: "ADR 群 (docs/adr)"
     description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
@@ -132,6 +133,13 @@ artifact:
     status: done
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
+  i127_process_tags:
+    label: "process tags 明示許可 (#127)"
+    description: "似た process 群を tag で束ね共有知識を companion md に外化する規約（subroutine 廃案の代替）の前提。§2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定。直接 spec 編集経路（proposal スキップ可）"
+    status: todo
+    criteria: §2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定
+    location: https://github.com/takasek/pfdsl/issues/127
+    updated_at: 2026-06-20T00:00:00Z
 process:
   write_article:
     label: 記事執筆
@@ -166,6 +174,8 @@ process:
       に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
+  clarify_process_tags:
+    label: process tags 明示化
 
 tagStyles:
   "priority:high": { color: "#b60205", penwidth: "2" }
@@ -218,6 +228,8 @@ cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 
 spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
+
+spec_v006 >> clarify_process_tags -> i127_process_tags
 
 
 
