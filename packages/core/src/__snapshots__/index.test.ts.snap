@@ -15,7 +15,7 @@ artifact:
     label: 仕様書 v0.0.6
     status: done
     criteria: check/fmt/graph が全サンプルにエラーなし
-    location: docs/spec/spec.md
+    location: ../docs/spec/spec.md
   findings_r12:
     label: 実践ラウンド1/2レビュー知見
     description: docs/examples の執筆・レビューで得た品質知見
@@ -34,12 +34,12 @@ artifact:
     label: 仕様書 v0.0.7（統合）
     status: wip
     criteria: check/fmt/graph が全サンプルにエラーなし、v0.0.7 全フィールドが spec 本文に統合済み
-    location: docs/spec/spec.md
+    location: ../docs/spec/spec.md
   spec_v008:
     label: 仕様書 v0.0.8（マルチファイル統合）
     status: todo
     criteria: check/fmt/graph が全サンプルにエラーなし
-    location: docs/spec/spec.md
+    location: ../docs/spec/spec.md
   multifile_toolchain:
     label: spec v0.0.8 実装済みツールチェーン
     description: "subflow:/extends: の parser・checker・renderer 実装。実装 issue は
@@ -59,13 +59,13 @@ artifact:
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
     status: done
     criteria: ID スコープ・継承解決順・ファイル間参照の決定が文書化済み
-    location: docs/spec/proposals/multifile-policy.md
+    location: ../docs/spec/proposals/multifile-policy.md
   adr_corpus:
     label: "ADR 群 (docs/adr)"
     description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
     status: done
     criteria: 対象判断が文書化され docs/adr/README.md の一覧に追記済み
-    location: docs/adr/
+    location: ../docs/adr/
   i12_article:
     label: "公開記事 (#12)"
     description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
