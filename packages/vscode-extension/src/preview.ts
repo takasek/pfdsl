@@ -76,7 +76,8 @@ type MessageToWebview =
 
 type MessageFromWebview =
 	| { type: "ready" }
-	| { type: "nodeClick"; nodeId: string };
+	| { type: "nodeClick"; nodeId: string }
+	| { type: "openUrl"; url: string };
 
 function buildDescriptions(fm: Frontmatter | null): Record<string, string> {
 	const result: Record<string, string> = {};
@@ -276,6 +277,8 @@ export function registerPreview(context: vscode.ExtensionContext): {
 					? nodeIdAtCursor(analyzeDocument(state.doc), editor.selection.active)
 					: undefined;
 				jumpToNode(state.doc, msg.nodeId, cursorId === msg.nodeId);
+			} else if (msg.type === "openUrl") {
+				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			}
 		});
 

@@ -25,7 +25,8 @@ type MessageToWebview =
 
 type MessageFromWebview =
 	| { type: "ready" }
-	| { type: "nodeClick"; nodeId: string };
+	| { type: "nodeClick"; nodeId: string }
+	| { type: "openUrl"; url: string };
 
 declare const acquireVsCodeApi: () => {
 	postMessage: (msg: MessageFromWebview) => void;
@@ -96,6 +97,21 @@ function clearDiffPanel(): void {
 	diffPanel.style.display = "none";
 }
 
+const modKey = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
+
+function nodeUrlHref(node: Element): string | null {
+	// Graphviz wraps the node content in <a> when href is set.
+	const a =
+		node.querySelector("a") ??
+		node.closest("a") ??
+		(node.parentElement?.tagName === "A" ? node.parentElement : null);
+	if (!a) return null;
+	const href =
+		a.getAttribute("href") ??
+		a.getAttributeNS("http://www.w3.org/1999/xlink", "href");
+	return href && href.includes("://") ? href : null;
+}
+
 root.addEventListener("mousemove", (e) => {
 	const node = (e.target as Element).closest?.("g.node");
 	if (!node) {
@@ -104,11 +120,15 @@ root.addEventListener("mousemove", (e) => {
 	}
 	const nodeId = node.querySelector("title")?.textContent;
 	const desc = nodeId ? descriptions[nodeId] : undefined;
-	if (!desc) {
+	const urlHref = nodeUrlHref(node);
+	const tooltipText = [desc, urlHref ? `${modKey}+Click to open URL` : null]
+		.filter(Boolean)
+		.join("\n");
+	if (!tooltipText) {
 		tooltip.style.display = "none";
 		return;
 	}
-	tooltip.textContent = desc;
+	tooltip.textContent = tooltipText;
 	tooltip.style.left = `${e.clientX + 14}px`;
 	tooltip.style.top = `${e.clientY + 14}px`;
 	tooltip.style.display = "block";
@@ -278,6 +298,17 @@ window.addEventListener("mouseup", () => {
 	minimapDragging = false;
 	minimapDragRect = null;
 	root.style.cursor = "grab";
+});
+
+root.addEventListener("click", (e) => {
+	const a = (e.target as Element).closest("a");
+	if (!a) return;
+	const href = nodeUrlHref(a.closest("g.node") ?? a);
+	if (!href) return;
+	e.preventDefault();
+	if (e.metaKey || e.ctrlKey) {
+		vscode.postMessage({ type: "openUrl", url: href });
+	}
 });
 
 root.addEventListener("dblclick", (e) => {
