@@ -77,7 +77,10 @@ check-docs:
 gen-skill: check-docs
 	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
 	node scripts/gen-skill.mjs --out skills/pfdsl
-	@diff -rq .claude/skills/pfdsl skills/pfdsl > /dev/null || (echo "ERROR: .claude/skills/pfdsl and skills/pfdsl differ after gen-skill" && exit 1)
+	# CLAUDE.md is a local-only "do not edit" guard for the in-repo working copy
+	# (.claude/skills/pfdsl); it is intentionally absent from the distribution copy
+	# (skills/pfdsl) and not emitted by gen-skill, so exclude it from the identity check.
+	@diff -rq -x CLAUDE.md .claude/skills/pfdsl skills/pfdsl > /dev/null || (echo "ERROR: .claude/skills/pfdsl and skills/pfdsl differ after gen-skill" && exit 1)
 
 .PHONY: install-skill
 install-skill: check-docs
