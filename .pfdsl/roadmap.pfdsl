@@ -39,7 +39,9 @@ artifact:
     location: docs/spec/spec.md
   multifile_toolchain:
     label: spec v0.0.8 実装済みツールチェーン
-    description: "subflow:/extends: の parser・checker・renderer 実装。実装 issue は spec_v008 確定後に起票（手段の盲点が統合で露出するため詳細を先書きしない — ADR-0013 対称）。後続門番のプレースホルダ（ADR-0018）"
+    description: "subflow:/extends: の parser・checker・renderer 実装。実装 issue は
+      spec_v008 確定後に起票（手段の盲点が統合で露出するため詳細を先書きしない — ADR-0013
+      対称）。後続門番のプレースホルダ（ADR-0018）"
     status: todo
     criteria: subflow/extends が parser・checker・renderer に実装され check/fmt/graph がエラーなし
   published_cli:
@@ -126,15 +128,6 @@ artifact:
     status: done
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
-  i127_process_tags:
-    label: "process tags 明示許可 (#127)"
-    description: "似た process 群を tag で束ね共有知識を companion md に外化する規約（subroutine
-      廃案の代替）の前提。§2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定。直接
-      spec 編集経路（proposal スキップ可）"
-    status: wip
-    criteria: §2.7.2 が process への tags 指定を明示し、renderer の process ノード適用も確定
-    location: https://github.com/takasek/pfdsl/issues/127
-    updated_at: 2026-06-20T01:24:11Z
   hierarchy_spec:
     label: "階層PFD仕様案 (#5)"
     status: done
@@ -179,8 +172,6 @@ process:
       に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
-  clarify_process_tags:
-    label: process tags 明示化
   implement_multifile:
     label: マルチファイル機能実装
 
@@ -238,7 +229,6 @@ cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
 
-spec_v006 >> clarify_process_tags -> i127_process_tags
 
 
 
