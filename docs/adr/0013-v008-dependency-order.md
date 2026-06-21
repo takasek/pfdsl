@@ -24,23 +24,18 @@ spec v0.0.7 の策定中に、v0.0.8 候補（マルチファイル意味論: #5
 
 ## Rationale
 
-1. **実装が仕様の盲点を露出する**: v0.0.7 で追加した 4フィールド
-   （criteria/location/command/revises）をツールチェーンに実装する過程で、 cross-file 文脈でのフィールド解釈（例: `location:` のパス解決、 `revises:` のクロスファイル参照）の設計課題が浮かぶ可能性が高い。
+1. **実装が仕様の盲点を露出する**: v0.0.7 で追加した 4フィールド（criteria/location/command/revises）をツールチェーンに実装する過程で、 cross-file 文脈でのフィールド解釈（例: `location:` のパス解決、 `revises:` のクロスファイル参照）の設計課題が浮かぶ可能性が高い。
    この実装経験なしにマルチファイル仕様を統合すると、v0.0.7 フィールドとの 相互作用に設計漏れが残る。
 
-2. **マルチファイルは全フィールドとの整合が必要**: 階層 PFD（#5）や共有プリセット（#6）は
-   ID スコープ・継承解決順・ファイル間参照を定義する。これらが v0.0.7 の `location:` パス解決規則（`://` / glob / ファイルパス分類）や `revises:` の同一ファイル限定制約と整合するかは、実装後にしか検証できない。
+2. **マルチファイルは全フィールドとの整合が必要**: 階層 PFD（#5）や共有プリセット（#6）は ID スコープ・継承解決順・ファイル間参照を定義する。これらが v0.0.7 の `location:` パス解決規則（`://` / glob / ファイルパス分類）や `revises:` の同一ファイル限定制約と整合するかは、実装後にしか検証できない。
 
-3. **起草は先行できる**: `i5_hierarchy_spec` / `i6_presets_spec` / `multifile_policy` の
-   起草自体は `spec_v006` だけで開始できる。実装待ちは「統合（integrate_multifile）」
-   だけであり、起草の並列進行を妨げない。
+3. **起草は先行できる**: `i5_hierarchy_spec` / `i6_presets_spec` / `multifile_policy` の起草自体は `spec_v006` だけで開始できる。実装待ちは「統合（integrate_multifile）」だけであり、起草の並列進行を妨げない。
 
 ## Consequences
 
 - `draft_multifile_specs` は今すぐ着手可能（入力 `spec_v006` done）。
 - `integrate_multifile` は `i52_featured_toolchain` 完了まで着手不可。
-- 将来 v0.0.7 実装中に `location:` / `revises:` のマルチファイル意味論に関する
-  設計判断が出た場合は、ADR 化して `multifile_policy` へ反映する経路が存在する。
+- 将来 v0.0.7 実装中に `location:` / `revises:` のマルチファイル意味論に関する設計判断が出た場合は、ADR 化して `multifile_policy` へ反映する経路が存在する。
 
 ## References
 
