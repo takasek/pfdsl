@@ -388,6 +388,68 @@ describe("validate", () => {
 		});
 	});
 
+	describe("V023: subflow on artifact", () => {
+		it("errors when subflow key is set on an artifact", () => {
+			const fm = {
+				artifact: { A: { subflow: "./child.pfdsl" } },
+			} as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).toContain("V023");
+		});
+
+		it("V023 severity is error", () => {
+			const fm = {
+				artifact: { A: { subflow: "./child.pfdsl" } },
+			} as unknown as Frontmatter;
+			const diags = diagnose("A >> P -> B", fm);
+			const v023 = diags.find((d) => d.code === "V023");
+			expect(v023?.severity).toBe("error");
+		});
+
+		it("no V023 when subflow is on a process (not artifact)", () => {
+			const fm = {
+				process: { P: { subflow: "./child.pfdsl" } },
+			} as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).not.toContain("V023");
+		});
+	});
+
+	describe("V024: boundary without subflow", () => {
+		it("errors when boundary is set on a process without subflow", () => {
+			const fm = {
+				process: { P: { boundary: { order: "incoming_order" } } },
+			} as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).toContain("V024");
+		});
+
+		it("V024 severity is error", () => {
+			const fm = {
+				process: { P: { boundary: { order: "incoming_order" } } },
+			} as unknown as Frontmatter;
+			const diags = diagnose("A >> P -> B", fm);
+			const v024 = diags.find((d) => d.code === "V024");
+			expect(v024?.severity).toBe("error");
+		});
+
+		it("no V024 when process has both boundary and subflow", () => {
+			const fm = {
+				process: {
+					P: {
+						subflow: "./child.pfdsl",
+						boundary: { order: "incoming_order" },
+					},
+				},
+			} as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).not.toContain("V024");
+		});
+
+		it("no V024 when process has subflow but no boundary", () => {
+			const fm = {
+				process: { P: { subflow: "./child.pfdsl" } },
+			} as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).not.toContain("V024");
+		});
+	});
+
 	describe("V020: orphaned process (frontmatter-declared, no edges)", () => {
 		it("errors when a frontmatter process has no edges", () => {
 			const fm: Frontmatter = { process: { orphan: {} } };

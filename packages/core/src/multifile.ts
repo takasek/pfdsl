@@ -2,6 +2,7 @@ import { dirname, resolve } from "node:path";
 import { zeroRange } from "./position.js";
 import type { Diagnostic } from "./types/diagnostic.js";
 import type { Frontmatter } from "./types/frontmatter.js";
+import type { NormalizedEdge } from "./types/index.js";
 
 /**
  * Result of resolving a cross-file reference (`subflow:` / `extends:`).
@@ -113,4 +114,178 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 
 	visit(entryPath);
 	return { docs, diagnostics };
+}
+
+/**
+ * Compute the set of "open input" artifacts in a flow:
+ * artifacts that appear in the flow but have NO output edge producing them (§15.11).
+ */
+export function computeOpenInputs(edges: NormalizedEdge[]): Set<string> {
+	const all = new Set<string>();
+	const produced = new Set<string>();
+	for (const e of edges) {
+		all.add(e.artifact);
+		if (e.kind === "output") produced.add(e.artifact);
+	}
+	return new Set([...all].filter((a) => !produced.has(a)));
+}
+
+/**
+ * Compute the set of "terminal" artifacts in a flow:
+ * artifacts that appear in the flow but are consumed by NEITHER `>>` (input) NOR `>>?` (feedback) (§15.11).
+ */
+export function computeTerminals(edges: NormalizedEdge[]): Set<string> {
+	const all = new Set<string>();
+	const consumed = new Set<string>();
+	for (const e of edges) {
+		all.add(e.artifact);
+		if (e.kind === "input" || e.kind === "feedback") consumed.add(e.artifact);
+	}
+	return new Set([...all].filter((a) => !consumed.has(a)));
+}
+
+/** Context for validating a single subflow boundary (§15.11). */
+export interface SubflowBoundaryContext {
+	processId: string;
+	/** Artifact IDs from parent's `>>` (normal input, NOT feedback) edges into this process. */
+	parentNormalInputs: Set<string>;
+	/** Artifact IDs from parent's `->` (output) edges from this process. */
+	parentOutputs: Set<string>;
+	/** boundary: map from frontmatter (parent_id → child_id). Empty object if no boundary. */
+	boundaryMap: Record<string, string>;
+	childOpenInputs: Set<string>;
+	childTerminals: Set<string>;
+}
+
+/**
+ * Validate the boundary between a parent process and its subflow child (§15.11).
+ * Returns V025 diagnostics for any violations.
+ */
+export function validateSubflowBoundary(
+	ctx: SubflowBoundaryContext,
+): Diagnostic[] {
+	const {
+		processId,
+		parentNormalInputs,
+		parentOutputs,
+		boundaryMap,
+		childOpenInputs,
+		childTerminals,
+	} = ctx;
+	const diagnostics: Diagnostic[] = [];
+
+	const parentBoundary = new Set([...parentNormalInputs, ...parentOutputs]);
+	const childBoundary = new Set([...childOpenInputs, ...childTerminals]);
+
+	// C1 — map keys must be parent boundary IDs
+	let hasC1orC2Error = false;
+	for (const key of Object.keys(boundaryMap)) {
+		if (!parentBoundary.has(key)) {
+			hasC1orC2Error = true;
+			diagnostics.push({
+				severity: "error",
+				code: "V025",
+				message: `boundary key '${key}' on process '${processId}' is not a parent boundary artifact`,
+				range: zeroRange(),
+			});
+		}
+	}
+
+	// C2 — map values must be child boundary IDs
+	for (const val of Object.values(boundaryMap)) {
+		if (!childBoundary.has(val)) {
+			hasC1orC2Error = true;
+			diagnostics.push({
+				severity: "error",
+				code: "V025",
+				message: `boundary value '${val}' on process '${processId}' is not a child boundary artifact`,
+				range: zeroRange(),
+			});
+		}
+	}
+
+	// Skip main bijection checks if C1/C2 failed
+	if (hasC1orC2Error) return diagnostics;
+
+	// Build effective map: parent ID -> child ID (using boundaryMap or identity)
+	const effective = new Map<string, string>();
+	for (const p of parentBoundary) {
+		effective.set(p, boundaryMap[p] ?? p);
+	}
+
+	// C3 — effective map must be injective
+	const childToParent = new Map<string, string>();
+	for (const [p, c] of effective) {
+		if (childToParent.has(c)) {
+			diagnostics.push({
+				severity: "error",
+				code: "V025",
+				message: `boundary map for process '${processId}' is not injective: multiple parent IDs map to child '${c}'`,
+				range: zeroRange(),
+			});
+		} else {
+			childToParent.set(c, p);
+		}
+	}
+
+	// C4 — side alignment
+	for (const p of parentNormalInputs) {
+		const c = effective.get(p)!;
+		if (childTerminals.has(c) && !childOpenInputs.has(c)) {
+			diagnostics.push({
+				severity: "error",
+				code: "V025",
+				message: `boundary maps input '${p}' to terminal '${c}' (side mismatch) on process '${processId}'`,
+				range: zeroRange(),
+			});
+		}
+	}
+	for (const p of parentOutputs) {
+		const c = effective.get(p)!;
+		if (childOpenInputs.has(c) && !childTerminals.has(c)) {
+			diagnostics.push({
+				severity: "error",
+				code: "V025",
+				message: `boundary maps output '${p}' to open input '${c}' (side mismatch) on process '${processId}'`,
+				range: zeroRange(),
+			});
+		}
+	}
+
+	// If C3/C4 errors, skip main bijection to avoid cascading noise
+	if (diagnostics.length > 0) return diagnostics;
+
+	// Main bijection check — input side
+	const mappedInputs = new Set(
+		[...parentNormalInputs].map((p) => effective.get(p)!),
+	);
+	if (!setsEqual(mappedInputs, childOpenInputs)) {
+		diagnostics.push({
+			severity: "error",
+			code: "V025",
+			message: `subflow boundary mismatch on process '${processId}': parent inputs ${JSON.stringify([...mappedInputs].sort())} ≠ child open inputs ${JSON.stringify([...childOpenInputs].sort())}`,
+			range: zeroRange(),
+		});
+	}
+
+	// Main bijection check — output side
+	const mappedOutputs = new Set(
+		[...parentOutputs].map((p) => effective.get(p)!),
+	);
+	if (!setsEqual(mappedOutputs, childTerminals)) {
+		diagnostics.push({
+			severity: "error",
+			code: "V025",
+			message: `subflow boundary mismatch on process '${processId}': parent outputs ${JSON.stringify([...mappedOutputs].sort())} ≠ child terminals ${JSON.stringify([...childTerminals].sort())}`,
+			range: zeroRange(),
+		});
+	}
+
+	return diagnostics;
+}
+
+function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+	if (a.size !== b.size) return false;
+	for (const x of a) if (!b.has(x)) return false;
+	return true;
 }
