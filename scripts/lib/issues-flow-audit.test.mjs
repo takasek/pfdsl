@@ -7,6 +7,7 @@ import {
 	applyFixes,
 	applyClosedInFlowFixes,
 	computeLabelFindings,
+	normalizeBody,
 } from "./issues-flow-audit.mjs";
 import { parseDocument } from "./yaml-require.mjs";
 
@@ -515,6 +516,36 @@ process:
 		// body refs updated
 		assert.ok(!newBody.includes("i16_def_jump"), "old id should not appear in body");
 		assert.ok(newBody.includes("def_jump"), "new id should appear in body");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// normalizeBody
+// ---------------------------------------------------------------------------
+
+describe("normalizeBody", () => {
+	it("collapses 3+ consecutive newlines to 2", () => {
+		const body = "a >> P -> b\n\n\nc >> Q -> d\n";
+		assert.equal(normalizeBody(body), "a >> P -> b\n\nc >> Q -> d\n");
+	});
+
+	it("collapses 4+ newlines", () => {
+		const body = "a >> P -> b\n\n\n\n\nc >> Q -> d\n";
+		assert.equal(normalizeBody(body), "a >> P -> b\n\nc >> Q -> d\n");
+	});
+
+	it("normalizes multiple trailing blank lines to single newline", () => {
+		const body = "a >> P -> b\n\n\n\n";
+		assert.equal(normalizeBody(body), "a >> P -> b\n");
+	});
+
+	it("leaves already-normalized body unchanged", () => {
+		const body = "a >> P -> b\n\nc >> Q -> d\n";
+		assert.equal(normalizeBody(body), body);
+	});
+
+	it("handles empty body", () => {
+		assert.equal(normalizeBody(""), "\n");
 	});
 });
 
