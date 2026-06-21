@@ -18,6 +18,10 @@ coverage/
 
 # editor
 .vscode/
+# but keep the extension's debug launch config (deterministic F5 in any worktree)
+!packages/vscode-extension/.vscode/
+!packages/vscode-extension/.vscode/launch.json
+!packages/vscode-extension/.vscode/tasks.json
 .idea/
 
 # pnpm

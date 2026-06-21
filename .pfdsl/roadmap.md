@@ -46,6 +46,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **Cycle 完了後 pfd-retro 実施**: 各 Cycle の PR 作成後、次 Cycle に移行する前に pfd-retro を完了させる。「続けて」で次 Cycle に即移行する場合も、前 Cycle の retro を先に実施してから進む。未実施の場合は延期理由を明示して記録する。（2026-06-21 の Cycle 2/3 で発見: retro なしで2 Cycle 連続進行し、ユーザー指摘まで気付かなかった。retro が終端に無ければ委譲結果の差分検証も省略される）
 
+**worktree での拡張デバッグ**: VSCode 拡張は `make vscode-dev` を **worktree ルートから**実行して開く（拡張フォルダを workspace root として開く窓が立ち、コミット済み `.vscode/launch.json` で F5 が確定動作。`preLaunchTask` が deps+ext を再ビルドして fresh dist を保証）。main repo を開くと worktree の変更でなく stale code をデバッグする。検証は `.pfdsl` を開き **PFDSL: Open Preview to the Side**（Markdown preview と別物）、webview console は `takasek.pfdsl` で絞る（2026-06-22 の /pfd-retro で発見: launch 設定がリポに無く F5 無反応、main repo の拡張/カタログをロードして "cannot open" 混乱、Markdown preview を開いて確認にならず、console 全文ペースト往復が多発。`pnpm install && pnpm -r build` 前提・worktree git cwd 前提と同じ「worktree 前提が暗黙」族）。
+
 「roadmap.pfdsl 変更 → snapshot 陳腐化」は 2026-06-19 の /pfd-retro で発見: PR #110 の flow-sync が roadmap.pfdsl を変更した際にスナップショットが更新されず、#108 として顕在化した。正しい更新コマンドは `-u` フラグ（`--update-snapshots` は vitest 1.x で無効）。
 
 2026-06-20 の /pfd-retro（#127 サイクル）: 公開ゲートの**トリガー条件が狭すぎる**構造欠落を発見。`@pfdsl/core` / `@pfdsl/graphviz-exporter` は CLI に `noExternal` で同梱されるため、これら lib のみを変更した PR（#131）でも CLI の `graph` 出力（process tags 描画）が変わるが、旧ゲートは `packages/cli` パス直変更のみを契機としていた。判定軸を「パッケージのパス」から「公開物の挙動が変わるか」へ修正（#72/#15/#17 の impl_flow 取りこぼしと同型の死角）。
