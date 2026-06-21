@@ -432,6 +432,42 @@ export function validate(
 		}
 	}
 
+	// W003: status non-monotonicity
+	// For each process: if any output artifact has status 'done',
+	// all normal input artifacts with explicit status must also be 'done'
+	{
+		const processInputs = new Map<string, string[]>();
+		const processOutputs = new Map<string, string[]>();
+		for (const e of edges) {
+			if (e.kind === "input") {
+				const arr = processInputs.get(e.process) ?? [];
+				arr.push(e.artifact);
+				processInputs.set(e.process, arr);
+			} else if (e.kind === "output") {
+				const arr = processOutputs.get(e.process) ?? [];
+				arr.push(e.artifact);
+				processOutputs.set(e.process, arr);
+			}
+		}
+		for (const [pid, outputs] of processOutputs) {
+			const hasDoneOutput = outputs.some(
+				(aid) => artifactMeta[aid]?.status === "done",
+			);
+			if (!hasDoneOutput) continue;
+			for (const aid of processInputs.get(pid) ?? []) {
+				const status = artifactMeta[aid]?.status;
+				if (status !== undefined && status !== "done") {
+					diagnostics.push({
+						severity: "warning",
+						code: "W003",
+						message: `Process '${pid}' outputs a 'done' artifact but input '${aid}' has status '${status}'`,
+						range: zeroRange(),
+					});
+				}
+			}
+		}
+	}
+
 	// V023: subflow on artifact
 	for (const [id, meta] of Object.entries(fm?.artifact ?? {})) {
 		if ((meta as Record<string, unknown>).subflow !== undefined) {

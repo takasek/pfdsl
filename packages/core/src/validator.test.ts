@@ -450,6 +450,122 @@ describe("validate", () => {
 		});
 	});
 
+	describe("W003: status non-monotonicity (output done while input not done)", () => {
+		it("warns when output artifact is done but input artifact is not done", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					inp: { status: "wip", criteria: "x" },
+					out: { status: "done", criteria: "y" },
+				},
+			};
+			expect(codes("inp >> P -> out", fm)).toContain("W003");
+		});
+
+		it("warns when output artifact is done but input artifact is todo", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					inp: { status: "todo", criteria: "x" },
+					out: { status: "done", criteria: "y" },
+				},
+			};
+			expect(codes("inp >> P -> out", fm)).toContain("W003");
+		});
+
+		it("warns when output artifact is done but input artifact is blocked", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					inp: { status: "blocked", criteria: "x" },
+					out: { status: "done", criteria: "y" },
+				},
+			};
+			expect(codes("inp >> P -> out", fm)).toContain("W003");
+		});
+
+		it("does not warn when all inputs and output are done", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					inp: { status: "done", criteria: "x" },
+					out: { status: "done", criteria: "y" },
+				},
+			};
+			expect(codes("inp >> P -> out", fm)).not.toContain("W003");
+		});
+
+		it("does not warn when output is not done", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					inp: { status: "todo", criteria: "x" },
+					out: { status: "wip", criteria: "y" },
+				},
+			};
+			expect(codes("inp >> P -> out", fm)).not.toContain("W003");
+		});
+
+		it("does not warn for feedback edges even if artifact is not done", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					inp: { status: "done", criteria: "a" },
+					out: { status: "done", criteria: "b" },
+					fb: { status: "wip", criteria: "c" },
+				},
+			};
+			// fb >>? P is feedback, should not trigger W003
+			expect(codes("inp >> P -> out\nfb >>? P", fm)).not.toContain("W003");
+		});
+
+		it("warns only for processes with done outputs, not all processes", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					a: { status: "done", criteria: "a" },
+					b: { status: "done", criteria: "b" },
+					c: { status: "wip", criteria: "c" },
+					d: { status: "todo", criteria: "d" },
+				},
+			};
+			// P1: a(done) >> P1 -> b(done) — no W003
+			// P2: c(wip) >> P2 -> d(todo) — no W003 (output not done)
+			const cs = codes("a >> P1 -> b\nc >> P2 -> d", fm);
+			expect(cs).not.toContain("W003");
+		});
+
+		it("W003 severity is warning", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					inp: { status: "wip", criteria: "x" },
+					out: { status: "done", criteria: "y" },
+				},
+			};
+			const diags = diagnose("inp >> P -> out", fm);
+			const w003 = diags.find((d) => d.code === "W003");
+			expect(w003?.severity).toBe("warning");
+		});
+
+		it("warns when one of multiple inputs is not done while output is done", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					a: { status: "done", criteria: "a" },
+					b: { status: "todo", criteria: "b" },
+					out: { status: "done", criteria: "out" },
+				},
+			};
+			expect(codes("[a, b] >> P -> out", fm)).toContain("W003");
+		});
+
+		it("does not warn when artifact has no status declared", () => {
+			// Undeclared status means status is undefined — not 'done', so input check skips
+			// Also output without declared 'done' status won't trigger
+			const fm: Frontmatter = {
+				artifact: {
+					inp: { criteria: "x" },
+					out: { status: "done", criteria: "y" },
+				},
+			};
+			// inp has no status (undefined) — should not count as non-done for this warning
+			// because we can't know the intended status
+			expect(codes("inp >> P -> out", fm)).not.toContain("W003");
+		});
+	});
+
 	describe("V020: orphaned process (frontmatter-declared, no edges)", () => {
 		it("errors when a frontmatter process has no edges", () => {
 			const fm: Frontmatter = { process: { orphan: {} } };
