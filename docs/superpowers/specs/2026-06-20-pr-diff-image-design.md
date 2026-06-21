@@ -12,11 +12,9 @@ Final output: **before / after / diff** (3 images per changed file).
 
 ## Existing `pfdsl diff` (investigation result)
 
-- `@pfdsl/core` `diffGraphs(a: Graph, b: Graph): DiffReport` — structural diff
-  over graph topology only: `addedNodes`, `removedNodes`, `addedEdges`, `removedEdges`, `addedFeedback`, `removedFeedback`. **No "changed" concept** — a node whose `status` flips `todo→done` but keeps its id is invisible to the current diff, because status/label live in `Frontmatter`, not `Graph`.
+- `@pfdsl/core` `diffGraphs(a: Graph, b: Graph): DiffReport` — structural diff over graph topology only: `addedNodes`, `removedNodes`, `addedEdges`, `removedEdges`, `addedFeedback`, `removedFeedback`. **No "changed" concept** — a node whose `status` flips `todo→done` but keeps its id is invisible to the current diff, because status/label live in `Frontmatter`, not `Graph`.
 - CLI `pfdsl diff <a> <b>` (`runDiff`) — text only, prints the six sections.
-- VSCode `pfdsl.diff` — same `diffGraphs`, rendered as a text panel under the
-  preview (`webview.ts` `renderDiffPanel`).
+- VSCode `pfdsl.diff` — same `diffGraphs`, rendered as a text panel under the preview (`webview.ts` `renderDiffPanel`).
 
 **Decision: integrate, don't replace.** Extend `DiffReport` with a `changedNodes`
 field (back-compatible — existing consumers ignore it) and add a new render path.
@@ -50,8 +48,7 @@ export function diffGraphs(
 **`changedNodes` rule** — id present in both `a.nodes` and `b.nodes`, and:
 
 - kind changed (artifact↔process), **or**
-- `fmA` and `fmB` both supplied and the node's metadata entry differs by deep
-  structural equality. Metadata entry = `fm.artifact[id]` for an artifact, `fm.process[id]` for a process. Compare via stable-key JSON serialization (sort object keys; arrays compared in order — `tags`/`externalStakeholders`
+- `fmA` and `fmB` both supplied and the node's metadata entry differs by deep structural equality. Metadata entry = `fm.artifact[id]` for an artifact, `fm.process[id]` for a process. Compare via stable-key JSON serialization (sort object keys; arrays compared in order — `tags`/`externalStakeholders`
   order is meaningful per the exporter's tag precedence).
 
 If `fmA`/`fmB` are omitted, only the kind-change branch can fire (topology-only).
@@ -79,10 +76,8 @@ Builds one DOT digraph representing the union, classified by diff status. Reuses
    - else → **unchanged**
 2. Classify every edge in `(A ∪ B).primaryEdges` and `.feedbackEdges`:
    added (in B not A) / removed (in A not B) / unchanged.
-3. **Visible nodes** = added ∪ removed ∪ changed ∪ {endpoints of any added or
-   removed edge}. An unchanged node that is visible *only* as an edge endpoint is a **context** node.
-4. **Visible edges** = added ∪ removed edges only. Unchanged edges are hidden
-   (even between two visible nodes) to keep the delta legible.
+3. **Visible nodes** = added ∪ removed ∪ changed ∪ {endpoints of any added or removed edge}. An unchanged node that is visible *only* as an edge endpoint is a **context** node.
+4. **Visible edges** = added ∪ removed edges only. Unchanged edges are hidden (even between two visible nodes) to keep the delta legible.
 5. Unchanged nodes that are not edge endpoints → **omitted** entirely.
 
 **Node content**: render B's metadata for added / changed / context nodes; A's for removed nodes (B has none). Label wrapping / min-width identical to `exportDot`.
@@ -130,10 +125,8 @@ pfdsl diff <a> <b> [--format text|dot|svg]   (default: text)
 
 ### Workflow — `.github/workflows/pr-diff-images.yml` + `scripts/generate-pr-diff-images.mjs`
 
-- **Trigger unchanged**: `pull_request: [closed]`, `if merged == true`. (Per
-  design dialogue — keep merge-time generation.)
-- `generate` phase: for each changed file, in addition to `*.before.svg` and
-  `*.after.svg`, write `*.diff.svg` via `pfdsl diff <tmpBefore> <headFile> --format svg`. The script already materializes the base version to a temp file for the before image — reuse it as the diff's `<a>`. Newly-added file → no before → diff renders as all-green (a=empty graph); deleted file → all-red.
+- **Trigger unchanged**: `pull_request: [closed]`, `if merged == true`. (Per design dialogue — keep merge-time generation.)
+- `generate` phase: for each changed file, in addition to `*.before.svg` and `*.after.svg`, write `*.diff.svg` via `pfdsl diff <tmpBefore> <headFile> --format svg`. The script already materializes the base version to a temp file for the before image — reuse it as the diff's `<a>`. Newly-added file → no before → diff renders as all-green (a=empty graph); deleted file → all-red.
 - `update-pr` phase: append a **Diff** subsection (raw URL to `*.diff.svg`)
   after Before/After in each file's block.
 
@@ -163,10 +156,7 @@ in `pr-diff-images.yml`). After this PR merges, a CLI release must ship before t
 
 ## Testing
 
-- core: `diffGraphs` — `changedNodes` for status flip, label change, kind change;
-  empty when frontmatters omitted; existing added/removed cases regress-green.
-- exporter: golden DOT for each class, context-node anchoring, hidden-unchanged,
-  empty-diff note node.
+- core: `diffGraphs` — `changedNodes` for status flip, label change, kind change; empty when frontmatters omitted; existing added/removed cases regress-green.
+- exporter: golden DOT for each class, context-node anchoring, hidden-unchanged, empty-diff note node.
 - cli: `diff --format dot|svg|text`; unknown format → exit 2; `~ node` line.
-- workflow / `generate-pr-diff-images.mjs`: added-file (all green) and
-  deleted-file (all red) edge cases; manual verification of the rendered PR.
+- workflow / `generate-pr-diff-images.mjs`: added-file (all green) and deleted-file (all red) edge cases; manual verification of the rendered PR.
