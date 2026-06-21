@@ -1,8 +1,6 @@
 ---
 title: Issue 依存フロー（2026-06）
-description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue
-  管理規約・同期手段は sibling roadmap.md と pfd-ops スキルの
-  references/github-issues-backend.md 参照
+description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue 管理規約・同期手段は sibling roadmap.md と pfd-ops スキルの references/github-issues-backend.md 参照
 layout:
   direction: LR
   maxWidth: 130
@@ -139,8 +137,7 @@ artifact:
     criteria: spec v0.0.7 の全機能が実装され、check/fmt/graph がエラーなしで動作
   external_stakeholders_spec:
     label: "externalStakeholders フィールド仕様案 (#97)"
-    description: "artifact / process に外部消費者を列挙するフィールド。owner
-      と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段。v0.0.7 スコープ"
+    description: "artifact / process に外部消費者を列挙するフィールド。owner と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段。v0.0.7 スコープ"
     status: done
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/97
@@ -184,8 +181,7 @@ process:
     label: Obsidianプラグイン実装
   draft_external_stakeholders:
     label: externalStakeholders仕様起草
-    description: "artifact / process の externalStakeholders フィールドを spec
-      に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
+    description: "artifact / process の externalStakeholders フィールドを spec に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
   layer_audit_assets:
     label: L3資産階層化
   implement_multifile:
