@@ -349,6 +349,38 @@ describe("applyFixes", () => {
 		applyFixes(doc, findings, new Map());
 		assert.equal(doc.toString(), before);
 	});
+
+	it("no mid-sentence line breaks: long description/criteria survive emit with lineWidth:0", () => {
+		const longDesc = "これはとても長い説明文で、句読点のない位置で折り返されてはいけません。文の途中で改行が入ると意味が変わってしまうため、lineWidth:0 で出力することが必要です。";
+		const longCrit = "長い完了条件の文章もまた途中で折り返されてはいけません。句読点（。、）の後でのみ改行が許可されます。";
+		const yamlStr = `artifact:
+  i5_foo:
+    label: Foo
+    description: ${longDesc}
+    criteria: ${longCrit}
+    status: todo
+`;
+		const doc = parseDocument(yamlStr);
+		const findings = [
+			{
+				type: "stale_updated_at",
+				issueNumber: 5,
+				artifactId: "i5_foo",
+				detail: "artifact: (none), issue: 2026-06-01T00:00:00Z",
+				fixVia: "file",
+			},
+		];
+		const issuesByNumber = new Map([
+			[5, { number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }],
+		]);
+		applyFixes(doc, findings, issuesByNumber);
+		const out = doc.toString({ lineWidth: 0 });
+		const lines = out.split("\n");
+		const descLine = lines.find((l) => l.includes("description:"));
+		const critLine = lines.find((l) => l.includes("criteria:"));
+		assert.ok(descLine && descLine.includes(longDesc), `description should be on one line, got: ${descLine}`);
+		assert.ok(critLine && critLine.includes(longCrit), `criteria should be on one line, got: ${critLine}`);
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -434,6 +466,39 @@ process:
 		assert.ok(newBody.includes("draft_multifile_specs"), "process should remain in body");
 	});
 
+
+	it("B: no mid-sentence line breaks: long description survives demote with lineWidth:0", () => {
+		const longDesc = "これはとても長い説明文で、句読点のない位置で折り返されてはいけません。文の途中で改行が入ると意味が変わってしまうため注意が必要です。";
+		const yamlStr = `artifact:
+  cli_tool:
+    label: CLI
+    status: done
+  i4_foo:
+    label: Foo
+    description: ${longDesc}
+    status: todo
+process:
+  use_foo:
+    label: Use foo
+`;
+		const body = `\ncli_tool >> make_foo -> i4_foo\ni4_foo >> use_foo -> cli_tool\n`;
+		const doc = parseDocument(yamlStr);
+		const findings = [
+			{
+				type: "closed_in_flow",
+				issueNumber: 4,
+				artifactId: "i4_foo",
+				detail: "issue is closed",
+				fixVia: "flow",
+				hasDownstream: true,
+			},
+		];
+		applyClosedInFlowFixes(doc, body, findings);
+		const out = doc.toString({ lineWidth: 0 });
+		const lines = out.split("\n");
+		const descLine = lines.find((l) => l.includes("description:"));
+		assert.ok(descLine && descLine.includes(longDesc), `description should be on one line after demote, got: ${descLine}`);
+	});
 
 		it("B: description containing ' #' survives write→re-parse round-trip without truncation", () => {
 			const yaml = `artifact:
