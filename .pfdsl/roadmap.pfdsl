@@ -40,7 +40,7 @@ artifact:
   multifile_toolchain:
     label: "spec v0.0.8 実装済みツールチェーン (#148)"
     description: "subflow:/extends: の checker 実装（V021-V028）。renderer は spec v0.0.8 の対象外（§2.9.3 はビューリンクのみ定義）。VS Code subflow ナビゲーションは #147。後続門番のプレースホルダ（ADR-0018）"
-    status: wip
+    status: done
     criteria: subflow/extends の checker が @pfdsl/core に実装され check コマンドで V021-V028 が動作確認済み（renderer は対象外）
     location: https://github.com/takasek/pfdsl/issues/148
   i147_subflow_nav:
