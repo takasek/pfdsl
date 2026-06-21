@@ -27,17 +27,18 @@ artifact:
     criteria: check/fmt/graph が全サンプルに対してエラーなし、npm 公開済み
   skill_gen:
     label: スキル生成系（現行）
-    description: scripts/gen-skill.mjs と docs/samples 構成。identity は check-gen-skill.yml が CI 強制
+    description: scripts/gen-skill.mjs と docs/samples 構成。identity は
+      check-gen-skill.yml が CI 強制
     status: done
     criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
   spec_v007:
     label: 仕様書 v0.0.7（統合）
-    status: wip
+    status: done
     criteria: check/fmt/graph が全サンプルにエラーなし、v0.0.7 全フィールドが spec 本文に統合済み
     location: ../docs/spec/spec.md
   spec_v008:
     label: 仕様書 v0.0.8（マルチファイル統合）
-    status: todo
+    status: done
     criteria: check/fmt/graph が全サンプルにエラーなし
     location: ../docs/spec/spec.md
   multifile_toolchain:
@@ -47,6 +48,22 @@ artifact:
       対称）。後続門番のプレースホルダ（ADR-0018）"
     status: todo
     criteria: subflow/extends が parser・checker・renderer に実装され check/fmt/graph がエラーなし
+  i137_status_lint:
+    label: "status 非単調 lint (#137)"
+    description: "出力 artifact が done かつ入力 artifact が done 未満を warning 検出。spec_v008
+      サイクルの retro で発見した status drift 死角"
+    status: todo
+    criteria: status 非単調を検出する lint が実装され check で動作確認済み
+    location: https://github.com/takasek/pfdsl/issues/137
+    updated_at: 2026-06-20T17:56:24Z
+  i138_example_check:
+    label: "doc 埋込例の check 検証 (#138)"
+    description: "spec.md / proposals 内の fenced pfdsl ブロックを抽出し check にかける。CI
+      強制。spec_v008 サイクルの retro で発見した inline 例の無検証死角"
+    status: todo
+    criteria: 埋込 pfdsl 例が check 検証経路に乗り CI 強制されている
+    location: https://github.com/takasek/pfdsl/issues/138
+    updated_at: 2026-06-20T17:56:25Z
   published_cli:
     label: npm公開済みCLI
     description: "現行公開バージョンは npm 一次情報（ここに書かない — ドリフトするため）。詳細は
@@ -177,6 +194,10 @@ process:
     label: L3資産階層化
   implement_multifile:
     label: マルチファイル機能実装
+  implement_status_lint:
+    label: status非単調lint実装
+  implement_example_check:
+    label: 埋込例check実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -206,10 +227,14 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -243,10 +268,14 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -283,10 +312,14 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -322,10 +355,14 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -361,10 +398,14 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -402,10 +443,14 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 layer_audit_assets
 lint_checker
@@ -439,10 +484,14 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 layer_audit_assets
 lint_checker
@@ -479,9 +528,13 @@ external_stakeholders_spec
 featured_toolchain
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -518,9 +571,13 @@ external_stakeholders_spec
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -558,10 +615,14 @@ draft_revises
 external_stakeholders_spec
 findings_r12
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_spec
 layer_audit_assets
 lint_checker
@@ -596,9 +657,13 @@ external_stakeholders_spec
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -635,10 +700,14 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -673,10 +742,14 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -712,12 +785,102 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
+implement_lints
+implement_multifile
+implement_spec_features
+implement_status_lint
+integrate_multifile
+integrate_spec
+lint_checker
+location_spec
+multifile_policy
+multifile_toolchain
+presets_spec
+publish_cli
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+lint_checker >> implement_status_lint
+implement_status_lint -> i137_status_lint
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+cli_tool
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+external_stakeholders_spec
+featured_toolchain
+findings_r12
+hierarchy_spec
+i12_article
+i138_example_check
+i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
 integrate_multifile
 integrate_spec
+layer_audit_assets
+location_spec
+multifile_policy
+multifile_toolchain
+presets_spec
+publish_cli
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+cli_tool >> implement_example_check
+implement_example_check -> i138_example_check
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+external_stakeholders_spec
+featured_toolchain
+findings_r12
+hierarchy_spec
+i12_article
+i137_status_lint
+i3_obsidian_plugin
+implement_lints
+implement_multifile
+implement_spec_features
+implement_status_lint
+integrate_multifile
+integrate_spec
+layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
@@ -752,10 +915,14 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -796,9 +963,13 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -838,10 +1009,14 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
+i137_status_lint
+i138_example_check
 i3_obsidian_plugin
+implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
+implement_status_lint
 integrate_multifile
 integrate_spec
 layer_audit_assets

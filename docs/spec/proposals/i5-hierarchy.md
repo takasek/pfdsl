@@ -4,6 +4,8 @@
 
 v0.0.7 → v0.0.8
 
+> **統合済み**: 本提案の決定は spec v0.0.8（§2.3 subflow / §2.9 マルチファイル意味論 / §15.11）に統合された（PR #136）。normative な仕様は spec 本文が一次情報。本ファイルは設計経緯の記録。
+
 ## 概要
 
 Shimizu PFD 法の核心は階層分解にある。親プロセスをサブフローへ展開し、外部入出力の整合が検証された状態で大規模フローを複数ファイルに分割できるようにする。現行仕様は単一ファイル前提でありリンク機構も境界整合チェックも存在しない。
@@ -38,7 +40,7 @@ process:
     label: 受注処理
     subflow: ./order_fulfill_sub.pfdsl
 ---
-order >> order_fulfill >> fulfilled_order
+order >> order_fulfill -> fulfilled_order
 ```
 
 子フロー（`order_fulfill_sub.pfdsl`）では `order` が open input artifact、`fulfilled_order` が terminal artifact となる。
