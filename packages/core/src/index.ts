@@ -161,6 +161,26 @@ export interface FormatOptions {
 	skipValidation?: boolean;
 }
 
+export type {
+	DocWithFrontmatter,
+	LoadedGraph,
+	ResolvedPresentation,
+	SubflowBoundaryContext,
+	SubflowRef,
+} from "./multifile.js";
+export {
+	collectExtendsRefs,
+	collectSubflowRefs,
+	computeOpenInputs,
+	computeTerminals,
+	loadExtendsChain,
+	loadSubflowGraph,
+	resolvePresentation,
+	resolveRefPath,
+	validatePresetKeys,
+	validateSubflowBoundary,
+} from "./multifile.js";
+
 export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	const {
 		frontmatter,
