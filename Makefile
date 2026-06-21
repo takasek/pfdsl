@@ -41,10 +41,14 @@ vscode-build: build-deps
 vscode-dev: vscode-build
 	code packages/vscode-extension
 	@echo ""
+	@echo "Opened $(CURDIR)/packages/vscode-extension"
+	@echo "  (run this from your worktree root, not the main repo, or you debug stale code)"
+	@echo ""
 	@echo "Next steps:"
-	@echo "  1. Run 'make vscode-watch' in another terminal"
-	@echo "  2. Press F5 in the opened VSCode window"
-	@echo "  3. After editing deps (core/graphviz-exporter), run 'make build-deps' then restart watch"
+	@echo "  1. Press F5 in the opened VSCode window (preLaunchTask rebuilds dist)"
+	@echo "  2. In the Dev Host: open a .pfdsl file, then run 'PFDSL: Open Preview to the Side'"
+	@echo "  3. (optional) 'make vscode-watch' in another terminal for live rebuilds"
+	@echo "  4. Debugging the webview console? Filter by 'takasek.pfdsl'"
 
 .PHONY: vscode-watch
 vscode-watch: build-deps
