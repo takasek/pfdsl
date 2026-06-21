@@ -36,6 +36,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる（2026-06-20 の /pfd-retro で発見: worktree サイクルで未ビルドのまま check が `Missing script` / `MODULE_NOT_FOUND` で失敗）。
 
+**Cycle 計画のパッケージ層明記**: 実装 Cycle の計画（PR body 等）には「対象パッケージ層（core / cli / graphviz-exporter 等）」を明記する。層を特定しないと、実装着手時に「renderer は core 外（CLI 層）なので今 Cycle のスコープ外」という判断が遅れて延期コストが発生する（2026-06-21 の Cycle 1 で発見: "renderer 任意展開" が core 実装 Cycle に含まれていたが、着手時に CLI/graphviz-exporter 層と判明して延期）。
+
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる（2026-06-21 の #135 サイクルで発見: `cd /Users/m5/works/pfdsl && git commit` が main を汚染し、ブランチ付け替えと reset --hard が必要になった）。
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる（2026-06-21 の #135 サイクルで発見: PR に性質が明示されておらず、通常機能追加との区別が見えなかった）。
