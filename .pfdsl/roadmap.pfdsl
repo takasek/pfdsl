@@ -24,8 +24,7 @@ artifact:
     criteria: check/fmt/graph が全サンプルに対してエラーなし、npm 公開済み
   skill_gen:
     label: スキル生成系（現行）
-    description: scripts/gen-skill.mjs と docs/samples 構成。identity は
-      check-gen-skill.yml が CI 強制
+    description: scripts/gen-skill.mjs と docs/samples 構成。identity は check-gen-skill.yml が CI 強制
     status: done
     criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
   spec_v007:
@@ -40,11 +39,9 @@ artifact:
     location: ../docs/spec/spec.md
   multifile_toolchain:
     label: "spec v0.0.8 実装済みツールチェーン (#148)"
-    description: "subflow:/extends: の checker 実装（V021-V028）。renderer は spec
-      v0.0.8 の対象外（§2.9.3 はビューリンクのみ定義）。VS Code subflow ナビゲーションは #147。後続門番のプレースホルダ（ADR-0018）"
+    description: "subflow:/extends: の checker 実装（V021-V028）。renderer は spec v0.0.8 の対象外（§2.9.3 はビューリンクのみ定義）。VS Code subflow ナビゲーションは #147。後続門番のプレースホルダ（ADR-0018）"
     status: wip
-    criteria: "subflow/extends の checker が @pfdsl/core に実装され check コマンドで
-      V021-V028 が動作確認済み（renderer は対象外）"
+    criteria: subflow/extends の checker が @pfdsl/core に実装され check コマンドで V021-V028 が動作確認済み（renderer は対象外）
     location: https://github.com/takasek/pfdsl/issues/148
   i147_subflow_nav:
     label: "VS Code subflow ナビゲーション (#147)"
@@ -54,24 +51,21 @@ artifact:
     location: https://github.com/takasek/pfdsl/issues/147
   i137_status_lint:
     label: "status 非単調 lint (#137)"
-    description: "出力 artifact が done かつ入力 artifact が done 未満を warning 検出。spec_v008
-      サイクルの retro で発見した status drift 死角"
+    description: "出力 artifact が done かつ入力 artifact が done 未満を warning 検出。spec_v008 サイクルの retro で発見した status drift 死角"
     status: todo
     criteria: status 非単調を検出する lint が実装され check で動作確認済み
     location: https://github.com/takasek/pfdsl/issues/137
     updated_at: 2026-06-20T17:56:24Z
   i138_example_check:
     label: "doc 埋込例の check 検証 (#138)"
-    description: "spec.md / proposals 内の fenced pfdsl ブロックを抽出し check にかける。CI
-      強制。spec_v008 サイクルの retro で発見した inline 例の無検証死角"
+    description: "spec.md / proposals 内の fenced pfdsl ブロックを抽出し check にかける。CI 強制。spec_v008 サイクルの retro で発見した inline 例の無検証死角"
     status: todo
     criteria: 埋込 pfdsl 例が check 検証経路に乗り CI 強制されている
     location: https://github.com/takasek/pfdsl/issues/138
     updated_at: 2026-06-20T17:56:25Z
   published_cli:
     label: npm公開済みCLI
-    description: "現行公開バージョンは npm 一次情報（ここに書かない — ドリフトするため）。詳細は
-      docs/pfdsl_implementation_flow.pfdsl の cli_published 参照"
+    description: "現行公開バージョンは npm 一次情報（ここに書かない — ドリフトするため）。詳細は docs/pfdsl_implementation_flow.pfdsl の cli_published 参照"
     status: done
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
@@ -108,9 +102,7 @@ artifact:
     location: https://github.com/takasek/pfdsl/issues/4
   audit_distribution:
     label: "L3資産の階層化配布 (#43)"
-    description: "audit コア + flow-sync action を skill
-      同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは
-      #11"
+    description: "audit コア + flow-sync action を skill 同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは #11"
     status: done
     criteria: install/ に配布可能ファイルが揃い、CI で identity が強制されている
     location: https://github.com/takasek/pfdsl/issues/43
