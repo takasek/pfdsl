@@ -43,7 +43,8 @@ function fail(stderr: string, exitCode = 1, stdout = ""): CommandResult {
 function formatDiagnostic(d: Diagnostic, file: string): string {
 	const r = d.range;
 	const loc = r ? `${file}:${r.start.line}:${r.start.column}` : file;
-	return `${loc}: ${d.severity}: ${d.message}`;
+	const code = d.code ? ` [${d.code}]` : "";
+	return `${loc}: ${d.severity}${code}: ${d.message}`;
 }
 
 function readSource(file: string): string {
@@ -52,13 +53,6 @@ function readSource(file: string): string {
 
 function diagText(diags: Diagnostic[], file: string): string {
 	return `${diags.map((d) => formatDiagnostic(d, file)).join("\n")}\n`;
-}
-
-function formatMultifileDiagnostic(d: Diagnostic, file: string): string {
-	const r = d.range;
-	const loc = r ? `${file}:${r.start.line}:${r.start.column}` : file;
-	const code = d.code ? ` [${d.code}]` : "";
-	return `${loc}: ${d.severity}${code}: ${d.message}`;
 }
 
 function failIfErrors(diags: Diagnostic[], file: string): CommandResult | null {
@@ -150,9 +144,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 
 	if (hasErrors(multiDiags)) {
 		const errs = multiDiags.filter((d) => d.severity === "error");
-		return fail(
-			`${errs.map((d) => formatMultifileDiagnostic(d, file)).join("\n")}\n`,
-		);
+		return fail(`${errs.map((d) => formatDiagnostic(d, file)).join("\n")}\n`);
 	}
 
 	const extraLines: string[] = [];
@@ -190,7 +182,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 
 	const allLines = [
 		...lines,
-		...multiDiags.map((d) => formatMultifileDiagnostic(d, file)),
+		...multiDiags.map((d) => formatDiagnostic(d, file)),
 		...extraLines,
 	];
 	return {
