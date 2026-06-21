@@ -1,7 +1,6 @@
 # @pfdsl/core
 
-Core pipeline for the PFDSL process-flow DSL: lex → parse → normalize →
-build graph → validate → sort → format.
+Core pipeline for the PFDSL process-flow DSL: lex → parse → normalize → build graph → validate → sort → format.
 
 ## Install
 
@@ -106,8 +105,7 @@ A >> P
   >> P -> X
 ```
 
-Full grammar and validation rules: see
-[docs/spec/spec.md](../../docs/spec/spec.md).
+Full grammar and validation rules: see [docs/spec/spec.md](../../docs/spec/spec.md).
 
 ## Diagnostics
 
@@ -123,8 +121,7 @@ interface Diagnostic {
 }
 ```
 
-Code prefixes: `FM` frontmatter, `L` lexer, `P` parser, `N` normalizer,
-`V` validator.
+Code prefixes: `FM` frontmatter, `L` lexer, `P` parser, `N` normalizer, `V` validator.
 
 ## Validation rules
 

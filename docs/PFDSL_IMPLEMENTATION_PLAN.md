@@ -253,8 +253,7 @@ pfdsl/
 
 ## Phase 5: 継続改善 (フィードバックループ)
 
-実運用で得た知見 (`workflow_usage`) を、既存の実装プロセス
-(`implement_validator` / `implement_formatter` / `implement_preview_engine`)
+実運用で得た知見 (`workflow_usage`) を、既存の実装プロセス (`implement_validator` / `implement_formatter` / `implement_preview_engine`)
 にフィードバック入力として再投入する。
 
 ```
@@ -263,8 +262,7 @@ workflow_usage >>? implement_formatter
 workflow_usage >>? implement_preview_engine
 ```
 
-これにより validator / formatter / preview_engine の生成元は
-`implement_*` プロセス単一のまま保たれ、単一生成元制約 (15.1) を満たす。
+これにより validator / formatter / preview_engine の生成元は `implement_*` プロセス単一のまま保たれ、単一生成元制約 (15.1) を満たす。
 
 ### Task 5.1: CI Actions
 
