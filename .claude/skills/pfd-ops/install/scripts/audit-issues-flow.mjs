@@ -157,10 +157,10 @@ findings = computeFindings(artifacts, issues);
 
 // 3. Apply document and body fixes
 const issuesByNumber = new Map(issues.map((i) => [i.number, i]));
-const docBefore = doc.toString();
+const docBefore = doc.toString({ lineWidth: 0 });
 applyFixes(doc, findings, issuesByNumber);
 const newBody = applyClosedInFlowFixes(doc, body, findings);
-const docAfter = doc.toString();
+const docAfter = doc.toString({ lineWidth: 0 });
 
 if (docAfter !== docBefore || newBody !== body) {
 	const newRaw = "---\n" + docAfter + "---\n" + newBody;
