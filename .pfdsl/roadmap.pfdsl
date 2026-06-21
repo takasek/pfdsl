@@ -40,11 +40,12 @@ artifact:
     location: ../docs/spec/spec.md
   multifile_toolchain:
     label: spec v0.0.8 実装済みツールチェーン
-    description: "subflow:/extends: の parser・checker・renderer 実装。実装 issue は
-      spec_v008 確定後に起票（手段の盲点が統合で露出するため詳細を先書きしない — ADR-0013
-      対称）。後続門番のプレースホルダ（ADR-0018）"
-    status: todo
-    criteria: subflow/extends が parser・checker・renderer に実装され check/fmt/graph がエラーなし
+    description: "subflow:/extends: の checker 実装（V021-V028）。renderer は spec
+      v0.0.8 の対象外（§2.9.3 はビューリンクのみ定義）。VS Code subflow ナビゲーションは #147。後続門番のプレースホルダ（ADR-0018）"
+    status: wip
+    criteria: "subflow/extends の checker が @pfdsl/core に実装され check コマンドで
+      V021-V028 が動作確認済み（renderer は対象外）"
+    location: https://github.com/takasek/pfdsl/issues/148
   i137_status_lint:
     label: "status 非単調 lint (#137)"
     description: "出力 artifact が done かつ入力 artifact が done 未満を warning 検出。spec_v008
@@ -191,6 +192,7 @@ process:
     label: L3資産階層化
   implement_multifile:
     label: マルチファイル機能実装
+    description: "spec v0.0.8 subflow/extends checker 実装（V021-V028）。renderer・VS Code extension は対象外。issue: https://github.com/takasek/pfdsl/issues/148"
   implement_status_lint:
     label: status非単調lint実装
   implement_example_check:
