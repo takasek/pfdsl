@@ -4,8 +4,11 @@ import {
 	collectSubflowRefs,
 	computeOpenInputs,
 	computeTerminals,
+	loadExtendsChain,
 	loadSubflowGraph,
+	resolvePresentation,
 	resolveRefPath,
+	validatePresetKeys,
 	validateSubflowBoundary,
 } from "./multifile.js";
 import type { Frontmatter } from "./types/frontmatter.js";
@@ -396,5 +399,251 @@ describe("validateSubflowBoundary", () => {
 		for (const d of diags) {
 			if (d.code === "V025") expect(d.severity).toBe("error");
 		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// loadExtendsChain
+// ---------------------------------------------------------------------------
+
+describe("loadExtendsChain", () => {
+	it("loads entry and a single preset", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: "./p.yaml" } },
+			"/p/p.yaml": { frontmatter: {} },
+		});
+		const result = loadExtendsChain("/p/main.pfdsl", docs);
+		expect([...result.docs.keys()].sort()).toEqual([
+			"/p/main.pfdsl",
+			"/p/p.yaml",
+		]);
+		expect(result.diagnostics).toEqual([]);
+	});
+
+	it("reports missing preset as V026 error", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: "./missing.yaml" } },
+		});
+		const result = loadExtendsChain("/p/main.pfdsl", docs);
+		expect(result.diagnostics).toHaveLength(1);
+		expect(result.diagnostics[0]!.code).toBe("V026");
+	});
+
+	it("reports self-referential extends as V027 cycle error", () => {
+		const docs = makeLoad({
+			"/p/self.pfdsl": { frontmatter: { extends: "./self.pfdsl" } },
+		});
+		const result = loadExtendsChain("/p/self.pfdsl", docs);
+		expect(result.diagnostics.some((d) => d.code === "V027")).toBe(true);
+	});
+
+	it("reports multi-hop extends cycle (a→b→c→a) as V027", () => {
+		const docs = makeLoad({
+			"/p/a.pfdsl": { frontmatter: { extends: "./b.pfdsl" } },
+			"/p/b.pfdsl": { frontmatter: { extends: "./c.pfdsl" } },
+			"/p/c.pfdsl": { frontmatter: { extends: "./a.pfdsl" } },
+		});
+		const result = loadExtendsChain("/p/a.pfdsl", docs);
+		expect(result.diagnostics.some((d) => d.code === "V027")).toBe(true);
+	});
+
+	it("diamond: shared preset loaded once, no diagnostics", () => {
+		const docs = makeLoad({
+			"/p/a.pfdsl": { frontmatter: { extends: ["./b.pfdsl", "./c.pfdsl"] } },
+			"/p/b.pfdsl": { frontmatter: { extends: "./d.pfdsl" } },
+			"/p/c.pfdsl": { frontmatter: { extends: "./d.pfdsl" } },
+			"/p/d.pfdsl": { frontmatter: {} },
+		});
+		const result = loadExtendsChain("/p/a.pfdsl", docs);
+		expect(result.docs.size).toBe(4);
+		expect(result.diagnostics).toEqual([]);
+	});
+
+	it("reports absolute path in extends as V026 (invalid extends path)", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: "/abs/path.yaml" } },
+		});
+		const result = loadExtendsChain("/p/main.pfdsl", docs);
+		expect(result.diagnostics).toHaveLength(1);
+		expect(result.diagnostics[0]!.code).toBe("V026");
+		expect(result.diagnostics[0]!.message).toContain("absolute");
+	});
+
+	it("reports URL in extends as V026", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: "https://x/y.yaml" } },
+		});
+		const result = loadExtendsChain("/p/main.pfdsl", docs);
+		expect(result.diagnostics).toHaveLength(1);
+		expect(result.diagnostics[0]!.code).toBe("V026");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// validatePresetKeys
+// ---------------------------------------------------------------------------
+
+describe("validatePresetKeys", () => {
+	it("returns [] when fm is null", () => {
+		expect(validatePresetKeys("/p/p.yaml", null)).toEqual([]);
+	});
+
+	it("returns [] when only allowed keys present", () => {
+		const fm: Frontmatter = {
+			extends: "./base.yaml",
+			statusStyles: {},
+			tag: {},
+			group: {},
+		};
+		expect(validatePresetKeys("/p/p.yaml", fm)).toEqual([]);
+	});
+
+	it("reports forbidden key 'artifact' as V028", () => {
+		const fm: Frontmatter = { artifact: {} };
+		const diags = validatePresetKeys("/p/p.yaml", fm);
+		expect(diags).toHaveLength(1);
+		expect(diags[0]!.code).toBe("V028");
+		expect(diags[0]!.message).toContain("artifact");
+	});
+
+	it("reports forbidden key 'process' as V028", () => {
+		const fm: Frontmatter = { process: {} };
+		const diags = validatePresetKeys("/p/p.yaml", fm);
+		expect(diags).toHaveLength(1);
+		expect(diags[0]!.code).toBe("V028");
+	});
+
+	it("reports forbidden key 'title' as V028", () => {
+		const fm: Frontmatter = { title: "My Flow" };
+		const diags = validatePresetKeys("/p/p.yaml", fm);
+		expect(diags).toHaveLength(1);
+		expect(diags[0]!.code).toBe("V028");
+	});
+
+	it("reports multiple forbidden keys as multiple V028 errors", () => {
+		const fm: Frontmatter = { title: "x", artifact: {}, process: {} };
+		const diags = validatePresetKeys("/p/p.yaml", fm);
+		expect(diags.length).toBeGreaterThanOrEqual(3);
+		expect(diags.every((d) => d.code === "V028")).toBe(true);
+	});
+
+	it("'extends' itself is allowed — no error", () => {
+		const fm: Frontmatter = { extends: "./base.yaml" };
+		expect(validatePresetKeys("/p/p.yaml", fm)).toEqual([]);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// resolvePresentation
+// ---------------------------------------------------------------------------
+
+describe("resolvePresentation", () => {
+	it("empty chain → all fields undefined", () => {
+		const result = resolvePresentation([]);
+		expect(result).toEqual({
+			statusStyles: undefined,
+			tag: undefined,
+			group: undefined,
+		});
+	});
+
+	it("single preset with statusStyles.done.fillcolor sets value", () => {
+		const result = resolvePresentation([
+			{
+				path: "/p/p.yaml",
+				fm: { statusStyles: { done: { fillcolor: "green" } } },
+			},
+		]);
+		expect(result.statusStyles?.done?.fillcolor).toBe("green");
+	});
+
+	it("local overrides preset: last writer wins on fillcolor", () => {
+		const result = resolvePresentation([
+			{
+				path: "/p/p.yaml",
+				fm: { statusStyles: { done: { fillcolor: "green" } } },
+			},
+			{
+				path: "/p/main.pfdsl",
+				fm: { statusStyles: { done: { fillcolor: "blue" } } },
+			},
+		]);
+		expect(result.statusStyles?.done?.fillcolor).toBe("blue");
+	});
+
+	it("deep merge: sibling attribute preserved when only one attr overridden (E1)", () => {
+		const result = resolvePresentation([
+			{
+				path: "/p/p.yaml",
+				fm: {
+					statusStyles: { done: { fillcolor: "green", fontcolor: "white" } },
+				},
+			},
+			{
+				path: "/p/main.pfdsl",
+				fm: { statusStyles: { done: { fillcolor: "blue" } } },
+			},
+		]);
+		expect(result.statusStyles?.done?.fillcolor).toBe("blue");
+		expect(result.statusStyles?.done?.fontcolor).toBe("white");
+	});
+
+	it("multi-preset: last element wins", () => {
+		const result = resolvePresentation([
+			{
+				path: "/p/base.yaml",
+				fm: { statusStyles: { done: { fillcolor: "green" } } },
+			},
+			{
+				path: "/p/mid.yaml",
+				fm: { statusStyles: { done: { fillcolor: "yellow" } } },
+			},
+			{
+				path: "/p/main.pfdsl",
+				fm: { statusStyles: { done: { fillcolor: "blue" } } },
+			},
+		]);
+		expect(result.statusStyles?.done?.fillcolor).toBe("blue");
+	});
+
+	it("wip preserved when only done overridden", () => {
+		const result = resolvePresentation([
+			{
+				path: "/p/p.yaml",
+				fm: {
+					statusStyles: {
+						done: { fillcolor: "green" },
+						wip: { fillcolor: "yellow" },
+					},
+				},
+			},
+			{
+				path: "/p/main.pfdsl",
+				fm: { statusStyles: { done: { fillcolor: "blue" } } },
+			},
+		]);
+		expect(result.statusStyles?.done?.fillcolor).toBe("blue");
+		expect(result.statusStyles?.wip?.fillcolor).toBe("yellow");
+	});
+
+	it("tag deep merge: style attribute preserved, label overridden", () => {
+		const result = resolvePresentation([
+			{
+				path: "/p/p.yaml",
+				fm: { tag: { urgent: { label: "!", style: { color: "red" } } } },
+			},
+			{ path: "/p/main.pfdsl", fm: { tag: { urgent: { label: "URGENT" } } } },
+		]);
+		expect(result.tag?.urgent?.style?.color).toBe("red");
+		expect(result.tag?.urgent?.label).toBe("URGENT");
+	});
+
+	it("group merge: fields from both preset and local combined", () => {
+		const result = resolvePresentation([
+			{ path: "/p/p.yaml", fm: { group: { team: { label: "Team A" } } } },
+			{ path: "/p/main.pfdsl", fm: { group: { team: { color: "blue" } } } },
+		]);
+		expect(result.group?.team?.label).toBe("Team A");
+		expect(result.group?.team?.color).toBe("blue");
 	});
 });

@@ -289,3 +289,168 @@ function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
 	for (const x of a) if (!b.has(x)) return false;
 	return true;
 }
+
+/**
+ * Recursively load an entry file and its `extends:` preset chain (§2.9.4 / §15.12).
+ * `load` reads + analyzes a file by absolute path, returning null when absent.
+ * Detects self-referential and multi-hop extends cycles (V027) and missing
+ * paths / invalid paths (V026). Diamond-shaped presets (same file reachable via
+ * multiple paths) are loaded only once — not treated as a cycle.
+ */
+export function loadExtendsChain<T extends DocWithFrontmatter>(
+	entryPath: string,
+	load: (path: string) => T | null,
+): LoadedGraph<T> {
+	const docs = new Map<string, T>();
+	const diagnostics: Diagnostic[] = [];
+	const stack = new Set<string>(); // current DFS path
+
+	function visit(path: string): void {
+		if (stack.has(path)) {
+			diagnostics.push({
+				severity: "error",
+				code: "V027",
+				message: `circular extends reference: ${path}`,
+				range: zeroRange(),
+			});
+			return;
+		}
+		if (docs.has(path)) return; // diamond — already loaded, not a cycle
+		const doc = load(path);
+		if (doc === null) {
+			diagnostics.push({
+				severity: "error",
+				code: "V026",
+				message: `extends file not found: ${path}`,
+				range: zeroRange(),
+			});
+			return;
+		}
+		docs.set(path, doc);
+		stack.add(path);
+		for (const ref of collectExtendsRefs(doc.frontmatter ?? {})) {
+			const resolved = resolveRefPath(path, ref);
+			if (!resolved.ok) {
+				diagnostics.push({
+					severity: "error",
+					code: "V026",
+					message: `invalid extends path (${resolved.reason}): ${ref}`,
+					range: zeroRange(),
+				});
+				continue;
+			}
+			visit(resolved.path);
+		}
+		stack.delete(path);
+	}
+
+	visit(entryPath);
+	return { docs, diagnostics };
+}
+
+/** Allowed top-level keys in a preset file (§2.9.5). */
+const PRESET_ALLOWED_KEYS = new Set([
+	"extends",
+	"statusStyles",
+	"tag",
+	"group",
+]);
+
+/**
+ * Validate that a preset file only contains presentation-layer keys (§2.9.5).
+ * Returns V028 diagnostics for every forbidden key found.
+ */
+export function validatePresetKeys(
+	path: string,
+	fm: Frontmatter | null,
+): Diagnostic[] {
+	if (fm === null) return [];
+	const diagnostics: Diagnostic[] = [];
+	for (const key of Object.keys(fm)) {
+		if (!PRESET_ALLOWED_KEYS.has(key)) {
+			diagnostics.push({
+				severity: "error",
+				code: "V028",
+				message: `preset '${path}' contains non-presentation key '${key}'`,
+				range: zeroRange(),
+			});
+		}
+	}
+	return diagnostics;
+}
+
+/** The merged presentation values resolved from an extends chain. */
+export interface ResolvedPresentation {
+	statusStyles: Frontmatter["statusStyles"];
+	tag: Frontmatter["tag"];
+	group: Frontmatter["group"];
+}
+
+/**
+ * Merge statusStyles / tag / group from a sequence of frontmatters in order
+ * (lowest priority first, local last). Each element's values override the
+ * previous at attribute level (§2.9.4 "属性レベル深マージ").
+ */
+export function resolvePresentation(
+	chain: { path: string; fm: Frontmatter | null }[],
+): ResolvedPresentation {
+	let statusStyles: Frontmatter["statusStyles"];
+	let tag: Frontmatter["tag"];
+	let group: Frontmatter["group"];
+
+	for (const { fm } of chain) {
+		if (fm === null) continue;
+
+		// Merge statusStyles: Record<Status, NodeStyle> — attribute-level merge
+		if (fm.statusStyles !== undefined) {
+			if (statusStyles === undefined) {
+				statusStyles = {};
+			}
+			for (const [status, nodeStyle] of Object.entries(fm.statusStyles)) {
+				if (nodeStyle === undefined) continue;
+				const existing =
+					(statusStyles as Record<string, Record<string, string>>)[status] ??
+					{};
+				(statusStyles as Record<string, Record<string, string>>)[status] = {
+					...existing,
+					...nodeStyle,
+				};
+			}
+		}
+
+		// Merge tag: Record<string, TagMeta> — field-level merge, style attribute-level
+		if (fm.tag !== undefined) {
+			if (tag === undefined) {
+				tag = {};
+			}
+			for (const [id, tagMeta] of Object.entries(fm.tag)) {
+				if (tagMeta === undefined) continue;
+				const existing = tag[id] ?? {};
+				const { style: newStyle, ...otherFields } = tagMeta;
+				const { style: existingStyle, ...existingOther } = existing;
+				const mergedStyle =
+					newStyle !== undefined || existingStyle !== undefined
+						? { ...existingStyle, ...newStyle }
+						: undefined;
+				tag[id] = {
+					...existingOther,
+					...otherFields,
+					...(mergedStyle !== undefined ? { style: mergedStyle } : {}),
+				};
+			}
+		}
+
+		// Merge group: Record<string, GroupMeta> — field-level merge
+		if (fm.group !== undefined) {
+			if (group === undefined) {
+				group = {};
+			}
+			for (const [id, groupMeta] of Object.entries(fm.group)) {
+				if (groupMeta === undefined) continue;
+				group[id] = { ...(group[id] ?? {}), ...groupMeta };
+			}
+		}
+	}
+
+	return { statusStyles, tag, group };
+}
