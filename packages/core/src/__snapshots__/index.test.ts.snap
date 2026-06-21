@@ -792,7 +792,6 @@ spec_v008
 write_article
 write_design_notes
 
-
 cli_tool >> layer_audit_assets
 layer_audit_assets -> audit_distribution
 adr_corpus
@@ -1018,11 +1017,6 @@ spec_v007
 spec_v008
 write_design_notes
 
-
-
-
-
-
 cli_tool >> build_obsidian_plugin
 build_obsidian_plugin -> i3_obsidian_plugin
 adr_corpus
@@ -1068,9 +1062,6 @@ spec_v008
 write_article
 write_design_notes
 
-
-
-
 spec_v006 >> draft_external_stakeholders
 draft_external_stakeholders -> external_stakeholders_spec
 adr_corpus
@@ -1115,12 +1106,5 @@ spec_v007
 spec_v008
 write_article
 write_design_notes
-
-
-
-
-
-
-
 "
 `;

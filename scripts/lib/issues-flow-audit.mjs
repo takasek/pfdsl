@@ -262,6 +262,15 @@ function parseEdgeLine(line) {
  * @param {{ type: string, artifactId: string, hasDownstream?: boolean }[]} findings
  * @returns {string} new body string
  */
+/**
+ * Collapses 3+ consecutive newlines to 2 and trims trailing blank lines to a single newline.
+ * @param {string} body
+ * @returns {string}
+ */
+export function normalizeBody(body) {
+	return body.replace(/\n{3,}/g, "\n\n").replace(/\n*$/, "\n");
+}
+
 export function applyClosedInFlowFixes(doc, body, findings) {
 	const closedFindings = findings.filter((f) => f.type === "closed_in_flow" && f.fixVia === "flow");
 	if (closedFindings.length === 0) return body;
@@ -339,5 +348,5 @@ export function applyClosedInFlowFixes(doc, body, findings) {
 		}
 	}
 
-	return lines.join("\n");
+	return normalizeBody(lines.join("\n"));
 }

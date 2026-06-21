@@ -33,6 +33,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/audit-issues-flow.mjs --fix || true
 
+      - name: Normalize blank lines in roadmap.pfdsl
+        run: node scripts/normalize-pfdsl.mjs || true
+
       - name: Regenerate golden snapshot (roadmap.pfdsl drives core format golden)
         run: pnpm --filter @pfdsl/core exec vitest run -u || true
 

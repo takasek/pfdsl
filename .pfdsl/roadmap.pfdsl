@@ -230,7 +230,6 @@ skill_gen >> restructure_skillgen -> restructured_gen
 
 cli_tool >> publish_cli -> published_cli
 
-
 cli_tool >> layer_audit_assets -> audit_distribution
 
 lint_checker >> implement_status_lint -> i137_status_lint
@@ -241,21 +240,6 @@ cli_tool >> implement_example_check -> i138_example_check
 
 adr_corpus >> write_article -> i12_article
 
-
-
-
-
-
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
-
-
-
 spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
-
-
-
-
-
-
-
