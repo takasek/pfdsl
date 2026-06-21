@@ -24,7 +24,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 ## 終端ゲート追加項目（issue 固有）
 
-**タイミング規約**: issue クローズと flow 確定は **PR マージ時**に行う（生態系図 merge_pr: 成果物・進捗・issue 更新はマージで正本になる）。PR 作成時点では行わない — PR がレビューで変わる/却下される可能性があるため。サイクルが PR 作成で終わる場合、下記2項目は「マージ時に実施」と記録して未了のまま閉じてよい。
+**タイミング規約**: issue クローズと flow 確定は **main への PR マージ時**に行う（生態系図 merge_pr: 成果物・進捗・issue 更新はマージで正本になる）。PR 作成時点では行わない — PR がレビューで変わる/却下される可能性があるため。サイクルが PR 作成で終わる場合、下記2項目は「マージ時に実施」と記録して未了のまま閉じてよい。**feature branch への中間 PR では `closes #xxx` を使わない** — feature branch マージ時に issue が閉じられるが、main 未到達のため誤 close になる（2026-06-22 発見: PR #145 が multifile-v008 へマージされ #148 が早期 close された）。
 
 汎用ゲート（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、**マージ時に**:
 
@@ -36,9 +36,15 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる（2026-06-20 の /pfd-retro で発見: worktree サイクルで未ビルドのまま check が `Missing script` / `MODULE_NOT_FOUND` で失敗）。
 
+**Cycle 計画のパッケージ層明記**: 実装 Cycle の計画（PR body 等）には「対象パッケージ層（core / cli / graphviz-exporter 等）」を明記する。層を特定しないと、実装着手時に「renderer は core 外（CLI 層）なので今 Cycle のスコープ外」という判断が遅れて延期コストが発生する（2026-06-21 の Cycle 1 で発見: "renderer 任意展開" が core 実装 Cycle に含まれていたが、着手時に CLI/graphviz-exporter 層と判明して延期）。
+
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる（2026-06-21 の #135 サイクルで発見: `cd /Users/m5/works/pfdsl && git commit` が main を汚染し、ブランチ付け替えと reset --hard が必要になった）。
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる（2026-06-21 の #135 サイクルで発見: PR に性質が明示されておらず、通常機能追加との区別が見えなかった）。
+
+**issue 起票と roadmap 追加は同時に行う**: issue を起票したら、その場で `roadmap.pfdsl` に artifact / process / edge を追加してコミットする。後回しにすると依存グラフが stale になり、「言われるまで気付かない」気付き依存に戻る。pfd-ops プロトコル2「起票 → 依存グラフに1チェーン追加」の実施タイミングは起票直後（2026-06-22 の retro で発見: #147/#148 起票後にユーザー指摘まで roadmap 未追加のまま進行）。
+
+**Cycle 完了後 pfd-retro 実施**: 各 Cycle の PR 作成後、次 Cycle に移行する前に pfd-retro を完了させる。「続けて」で次 Cycle に即移行する場合も、前 Cycle の retro を先に実施してから進む。未実施の場合は延期理由を明示して記録する。（2026-06-21 の Cycle 2/3 で発見: retro なしで2 Cycle 連続進行し、ユーザー指摘まで気付かなかった。retro が終端に無ければ委譲結果の差分検証も省略される）
 
 **worktree での拡張デバッグ**: VSCode 拡張は `make vscode-dev` を **worktree ルートから**実行して開く（拡張フォルダを workspace root として開く窓が立ち、コミット済み `.vscode/launch.json` で F5 が確定動作。`preLaunchTask` が deps+ext を再ビルドして fresh dist を保証）。main repo を開くと worktree の変更でなく stale code をデバッグする。検証は `.pfdsl` を開き **PFDSL: Open Preview to the Side**（Markdown preview と別物）、webview console は `takasek.pfdsl` で絞る（2026-06-22 の /pfd-retro で発見: launch 設定がリポに無く F5 無反応、main repo の拡張/カタログをロードして "cannot open" 混乱、Markdown preview を開いて確認にならず、console 全文ペースト往復が多発。`pnpm install && pnpm -r build` 前提・worktree git cwd 前提と同じ「worktree 前提が暗黙」族）。
 

@@ -432,5 +432,32 @@ export function validate(
 		}
 	}
 
+	// V023: subflow on artifact
+	for (const [id, meta] of Object.entries(fm?.artifact ?? {})) {
+		if ((meta as Record<string, unknown>).subflow !== undefined) {
+			diagnostics.push({
+				severity: "error",
+				code: "V023",
+				message: `'subflow' is not allowed on artifact '${id}'`,
+				range: zeroRange(),
+			});
+		}
+	}
+
+	// V024: boundary without subflow
+	for (const [pid, meta] of Object.entries(fm?.process ?? {})) {
+		if (
+			(meta as Record<string, unknown>).boundary !== undefined &&
+			meta.subflow === undefined
+		) {
+			diagnostics.push({
+				severity: "error",
+				code: "V024",
+				message: `'boundary' on process '${pid}' requires 'subflow'`,
+				range: zeroRange(),
+			});
+		}
+	}
+
 	return diagnostics;
 }

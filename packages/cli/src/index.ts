@@ -1,14 +1,22 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
 	analyze,
 	auditGraph,
+	computeOpenInputs,
+	computeTerminals,
 	diffGraphs as coreDiffGraphs,
 	type Diagnostic,
 	type DiffReport,
 	format,
 	formatEdges,
 	hasErrors,
+	loadExtendsChain,
+	loadSubflowGraph,
+	resolveRefPath,
 	sortEdges,
+	validatePresetKeys,
+	validateSubflowBoundary,
 } from "@pfdsl/core";
 import { type BinaryFormat, svgToBinary } from "@pfdsl/graphviz-exporter";
 import {
@@ -35,7 +43,8 @@ function fail(stderr: string, exitCode = 1, stdout = ""): CommandResult {
 function formatDiagnostic(d: Diagnostic, file: string): string {
 	const r = d.range;
 	const loc = r ? `${file}:${r.start.line}:${r.start.column}` : file;
-	return `${loc}: ${d.severity}: ${d.message}`;
+	const code = d.code ? ` [${d.code}]` : "";
+	return `${loc}: ${d.severity}${code}: ${d.message}`;
 }
 
 function readSource(file: string): string {
@@ -66,6 +75,76 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const lines = diagnostics.map((d) => formatDiagnostic(d, file));
 	if (hasErrors(diagnostics)) {
 		return { stdout: "", stderr: `${lines.join("\n")}\n`, exitCode: 1 };
+	}
+
+	// Multi-file checks (subflow + extends) — only run when single-file is clean
+	const absFile = resolve(file);
+	const loader = (path: string) => {
+		try {
+			let src = readFileSync(path, "utf-8");
+			// Plain YAML preset files (e.g. .yaml) have no --- delimiters;
+			// wrap them so loadFrontmatter picks up their content as frontmatter.
+			if (
+				!src.startsWith("---") &&
+				(path.endsWith(".yaml") || path.endsWith(".yml"))
+			) {
+				src = `---\n${src}\n---\n`;
+			}
+			return analyze(src);
+		} catch {
+			return null;
+		}
+	};
+
+	const multiDiags: Diagnostic[] = [];
+
+	// --- Subflow checks ---
+	const subflowGraph = loadSubflowGraph(absFile, loader);
+	multiDiags.push(...subflowGraph.diagnostics);
+
+	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
+		if (typeof pmeta.subflow !== "string") continue;
+		const resolved = resolveRefPath(absFile, pmeta.subflow);
+		if (!resolved.ok) continue; // already in subflowGraph.diagnostics
+		const childDoc = subflowGraph.docs.get(resolved.path);
+		if (!childDoc) continue; // missing file — already in diagnostics
+		const childEdges = childDoc.edges;
+		const childOpenInputs = computeOpenInputs(childEdges);
+		const childTerminals = computeTerminals(childEdges);
+		const parentNormalInputs = new Set(
+			edges
+				.filter((e) => e.kind === "input" && e.process === pid)
+				.map((e) => e.artifact),
+		);
+		const parentOutputs = new Set(
+			edges
+				.filter((e) => e.kind === "output" && e.process === pid)
+				.map((e) => e.artifact),
+		);
+		multiDiags.push(
+			...validateSubflowBoundary({
+				processId: pid,
+				parentNormalInputs,
+				parentOutputs,
+				boundaryMap: (pmeta.boundary as Record<string, string>) ?? {},
+				childOpenInputs,
+				childTerminals,
+			}),
+		);
+	}
+
+	// --- Extends checks ---
+	const extendsChain = loadExtendsChain(absFile, loader);
+	multiDiags.push(...extendsChain.diagnostics);
+
+	for (const [path, doc] of extendsChain.docs) {
+		if (path === absFile) continue; // skip entry file itself
+		multiDiags.push(...validatePresetKeys(path, doc.frontmatter));
+	}
+
+	if (hasErrors(multiDiags)) {
+		const errs = multiDiags.filter((d) => d.severity === "error");
+		return fail(`${errs.map((d) => formatDiagnostic(d, file)).join("\n")}\n`);
 	}
 
 	const extraLines: string[] = [];
@@ -101,7 +180,11 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		);
 	}
 
-	const allLines = [...lines, ...extraLines];
+	const allLines = [
+		...lines,
+		...multiDiags.map((d) => formatDiagnostic(d, file)),
+		...extraLines,
+	];
 	return {
 		stdout: allLines.length ? `${allLines.join("\n")}\n` : "OK\n",
 		stderr: "",

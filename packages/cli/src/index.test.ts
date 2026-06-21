@@ -313,3 +313,123 @@ describe("help / unknown", () => {
 		expect(r.exitCode).toBe(2);
 	});
 });
+
+describe("multifile check — subflow", () => {
+	const parentValid = [
+		"---",
+		"process:",
+		"  P:",
+		"    subflow: ./child.pfdsl",
+		"---",
+		"order >> P -> shipment",
+	].join("\n");
+	// child: open inputs = {order}, terminals = {shipment} → matches parent
+	const childValid = "order >> pack -> shipment\n";
+	// child: open inputs = {incoming_order}, terminals = {outgoing_parcel} → mismatch
+	const childMismatch = "incoming_order >> pack -> outgoing_parcel\n";
+	const parentMissing = [
+		"---",
+		"process:",
+		"  P:",
+		"    subflow: ./nonexistent.pfdsl",
+		"---",
+		"order >> P -> shipment",
+	].join("\n");
+
+	it("valid subflow boundary → exit 0", async () => {
+		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-subflow-"));
+		try {
+			writeFileSync(join(d, "parent.pfdsl"), parentValid);
+			writeFileSync(join(d, "child.pfdsl"), childValid);
+			const r = await run(["check", join(d, "parent.pfdsl")]);
+			expect(r.exitCode).toBe(0);
+		} finally {
+			rmSync(d, { recursive: true, force: true });
+		}
+	});
+
+	it("boundary mismatch → exit 1 with V025", async () => {
+		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-subflow-"));
+		try {
+			writeFileSync(join(d, "parent.pfdsl"), parentValid);
+			writeFileSync(join(d, "child.pfdsl"), childMismatch);
+			const r = await run(["check", join(d, "parent.pfdsl")]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toMatch(/V025/);
+		} finally {
+			rmSync(d, { recursive: true, force: true });
+		}
+	});
+
+	it("missing subflow file → exit 1 with V021", async () => {
+		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-subflow-"));
+		try {
+			writeFileSync(join(d, "parent.pfdsl"), parentMissing);
+			const r = await run(["check", join(d, "parent.pfdsl")]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toMatch(/V021/);
+		} finally {
+			rmSync(d, { recursive: true, force: true });
+		}
+	});
+});
+
+describe("multifile check — extends", () => {
+	const presetValid = [
+		"statusStyles:",
+		"  done:",
+		'    fillcolor: "#4CAF50"',
+	].join("\n");
+	const presetContaminated = [
+		'title: "should not be here"',
+		"statusStyles:",
+		"  done:",
+		'    fillcolor: "#4CAF50"',
+	].join("\n");
+	const mainFile = ["---", "extends: ./preset.yaml", "---", "a >> P -> b"].join(
+		"\n",
+	);
+	const mainMissingPreset = [
+		"---",
+		"extends: ./nonexistent.yaml",
+		"---",
+		"a >> P -> b",
+	].join("\n");
+
+	it("valid preset → exit 0", async () => {
+		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-extends-"));
+		try {
+			writeFileSync(join(d, "main.pfdsl"), mainFile);
+			writeFileSync(join(d, "preset.yaml"), presetValid);
+			const r = await run(["check", join(d, "main.pfdsl")]);
+			expect(r.exitCode).toBe(0);
+		} finally {
+			rmSync(d, { recursive: true, force: true });
+		}
+	});
+
+	it("preset with forbidden key → exit 1 with V028", async () => {
+		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-extends-"));
+		try {
+			writeFileSync(join(d, "main.pfdsl"), mainFile);
+			writeFileSync(join(d, "preset.yaml"), presetContaminated);
+			const r = await run(["check", join(d, "main.pfdsl")]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toMatch(/V028/);
+		} finally {
+			rmSync(d, { recursive: true, force: true });
+		}
+	});
+
+	it("missing preset file → exit 1 with V026", async () => {
+		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-extends-"));
+		try {
+			writeFileSync(join(d, "main.pfdsl"), mainMissingPreset);
+			const r = await run(["check", join(d, "main.pfdsl")]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toMatch(/V026/);
+		} finally {
+			rmSync(d, { recursive: true, force: true });
+		}
+	});
+});

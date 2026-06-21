@@ -36,6 +36,10 @@ export interface ProcessMeta {
 	group?: string;
 	tags?: string[];
 	command?: string;
+	/** Relative path to a child .pfdsl expanded as a subflow view-link (§2.9.3). */
+	subflow?: string;
+	/** Optional 1:1 boundary rename map (parent id → child id) for a subflow (§2.9.3). */
+	boundary?: Record<string, string>;
 	[key: string]: unknown;
 }
 
@@ -68,6 +72,8 @@ export interface Frontmatter {
 	group?: Record<string, GroupMeta>;
 	tag?: Record<string, TagMeta>;
 	statusStyles?: Partial<Record<Status, NodeStyle>>;
+	/** Relative path(s) to preset file(s) inherited for presentation keys (§2.9.4). */
+	extends?: string | string[];
 	[key: string]: unknown;
 }
 

@@ -126,7 +126,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 
 Read these when deeper detail is needed:
 
-- `references/spec.md` — full PFDSL spec v0.0.7 (syntax rules, grammar, all frontmatter fields)
+- `references/spec.md` — full PFDSL spec v0.0.8 (syntax rules, grammar, all frontmatter fields)
 - `references/samples.md` — annotated .pfdsl examples showing each language feature
 - `references/examples.md` — realistic domain examples demonstrating the quality guide
 - `references/review-prompts.md` — A/B 監査カタログ（レビュー時に PFD を問い詰めるプロンプト）
