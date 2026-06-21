@@ -42,6 +42,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる（2026-06-21 の #135 サイクルで発見: PR に性質が明示されておらず、通常機能追加との区別が見えなかった）。
 
+**issue 起票と roadmap 追加は同時に行う**: issue を起票したら、その場で `roadmap.pfdsl` に artifact / process / edge を追加してコミットする。後回しにすると依存グラフが stale になり、「言われるまで気付かない」気付き依存に戻る。pfd-ops プロトコル2「起票 → 依存グラフに1チェーン追加」の実施タイミングは起票直後（2026-06-22 の retro で発見: #147/#148 起票後にユーザー指摘まで roadmap 未追加のまま進行）。
+
 **Cycle 完了後 pfd-retro 実施**: 各 Cycle の PR 作成後、次 Cycle に移行する前に pfd-retro を完了させる。「続けて」で次 Cycle に即移行する場合も、前 Cycle の retro を先に実施してから進む。未実施の場合は延期理由を明示して記録する。（2026-06-21 の Cycle 2/3 で発見: retro なしで2 Cycle 連続進行し、ユーザー指摘まで気付かなかった。retro が終端に無ければ委譲結果の差分検証も省略される）
 
 「roadmap.pfdsl 変更 → snapshot 陳腐化」は 2026-06-19 の /pfd-retro で発見: PR #110 の flow-sync が roadmap.pfdsl を変更した際にスナップショットが更新されず、#108 として顕在化した。正しい更新コマンドは `-u` フラグ（`--update-snapshots` は vitest 1.x で無効）。

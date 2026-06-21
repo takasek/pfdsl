@@ -249,7 +249,7 @@ lint_checker >> implement_status_lint -> i137_status_lint
 
 cli_tool >> implement_example_check -> i138_example_check
 
-multifile_toolchain >> implement_subflow_nav -> i147_subflow_nav
+[multifile_toolchain, featured_toolchain] >> implement_subflow_nav -> i147_subflow_nav
 
 adr_corpus >> write_article -> i12_article
 

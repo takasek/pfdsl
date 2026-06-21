@@ -940,6 +940,7 @@ spec_v008
 write_article
 write_design_notes
 
+featured_toolchain >> implement_subflow_nav
 multifile_toolchain >> implement_subflow_nav
 implement_subflow_nav -> i147_subflow_nav
 adr_corpus
@@ -954,7 +955,6 @@ draft_location
 draft_multifile_specs
 draft_revises
 external_stakeholders_spec
-featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
