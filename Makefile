@@ -37,6 +37,8 @@ build-deps:
 vscode-build: build-deps
 	pnpm --filter pfdsl build
 
+# One command to start a dev session: build, open the extension window, then
+# watch for changes in the foreground (Ctrl+C to stop).
 .PHONY: vscode-dev
 vscode-dev: vscode-build
 	code packages/vscode-extension
@@ -45,13 +47,12 @@ vscode-dev: vscode-build
 	@echo "  (run this from your worktree root, not the main repo, or you debug stale code)"
 	@echo ""
 	@echo "Next steps:"
-	@echo "  1. Press F5 in the opened VSCode window (preLaunchTask rebuilds dist)"
-	@echo "  2. In the Dev Host: open a .pfdsl file, then run 'PFDSL: Open Preview to the Side'"
-	@echo "  3. (optional) 'make vscode-watch' in another terminal for live rebuilds"
+	@echo "  1. Press F5 in the opened VSCode window to launch the Extension Development Host"
+	@echo "  2. Open a .pfdsl file, then run 'PFDSL: Open Preview to the Side'"
+	@echo "  3. Edit code -> reload the Dev Host (Cmd+R); the watch below keeps dist fresh"
 	@echo "  4. Debugging the webview console? Filter by 'takasek.pfdsl'"
-
-.PHONY: vscode-watch
-vscode-watch: build-deps
+	@echo ""
+	@echo "Watching for changes (Ctrl+C to stop)..."
 	pnpm --filter pfdsl watch
 
 # VERSION=x.y.z を渡すと packages/vscode-extension/package.json のバージョンを更新してからパッケージする
