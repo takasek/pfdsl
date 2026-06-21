@@ -33,6 +33,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 - [ ] `packages/cli` / `packages/vscode-extension` **または CLI が束ねる依存パッケージ**（`@pfdsl/core` / `@pfdsl/graphviz-exporter` / `@pfdsl/metadata-exporter` 等 — `packages/cli/tsup.config.ts` の `noExternal: [/^@pfdsl\//]` が全 `@pfdsl/*` を dist へ同梱する）を変更した場合、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending なら次サイクルの先頭タスクとして明記する — 忘れると `published_cli` / `published_extension` が無期限に stale になる）。**判定はパッケージのパスでなく「公開物の挙動が変わるか」で行う**: lib 変更が CLI の出力（`check`/`graph` 等）を変える場合は cli 直接変更と同じ扱い
 - [ ] `.pfdsl/roadmap.pfdsl` を**人手で**変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新しコミットした（flow-sync bot PR は `flow-on-issue-close.yml` が `--fix` 後に自動再生成。どちらの経路も `test.yml` の PR test gate がマージ前に stale snapshot を検出する）
 - [ ] スキル生成ソース（`scripts/gen-skill.mjs`・spec・samples・examples・review-prompts・skill dirs 等）を変更した場合、`make gen-skill` を実行し再生成物をコミットした（`check-gen-skill.yml` が**全 PR**で identity を強制。人手・bot 両経路の取りこぼしを CI が backstop するため、本項目はローカル事前チェックに退く）
+- [ ] `.claude/skills/pfd-ops/install/` に配布している `scripts/lib/issues-flow-audit.mjs`・`scripts/normalize-pfdsl.mjs`・`.github/workflows/flow-on-issue-close.yml` を変更した場合、`install/` の対応ファイルを同期した（`check-pfd-ops-install-sync.yml` が全 PR で identity を強制。取りこぼしは CI が backstop するため、本項目はローカル事前チェックに退く）
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる（2026-06-20 の /pfd-retro で発見: worktree サイクルで未ビルドのまま check が `Missing script` / `MODULE_NOT_FOUND` で失敗）。
 
@@ -57,3 +58,5 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 2026-06-20 の /pfd-retro（#130 サイクル）: `skill_gen`（roadmap.pfdsl, done, criteria「make gen-skill 差分なし」）の invariant が #83(06-15) 以降 main で**偽**だった構造欠落を発見。`make gen-skill` の identity check はローカルのみで CI 強制が無く、#83 が gen-skill 未実行で `.claude/skills/pfdsl/CLAUDE.md` を追加したため素通りした（skill dirs 非対称で `diff -rq` が恒久失敗）。snapshot 陳腐化サーガ（#108/#116→`test.yml`）と同型の死角。#130 で `diff -rq -x CLAUDE.md`（非対称は意図的: ローカル稼働コピー vs `gh skill install` 配布コピー）に修正、#134 で `check-gen-skill.yml`（全 PR・path filter なし — #131 の狭すぎトリガーの轍を踏まない）を追加し恒久 backstop 化。
 
 これら（npm 公開・snapshot 更新の各項目）は2026-06-16 の /pfd-retro で発見: #72/#74・#15/#77・#17/#81 の3PRが連続して impl_flow を更新せず、`@pfdsl/cli` の npm 公開も #74 以降止まっていた（main の package.json も npm 上も 0.0.4 のまま）。ルール（CLAUDE.md）はあったがゲートに写っていなかった。
+
+2026-06-22 の /pfd-retro（PR #153）: `install/` 同期漏れを発見。`issues-flow-audit.mjs` / `flow-on-issue-close.yml` 変更・`normalize-pfdsl.mjs` 新規追加後、`check-pfd-ops-install-sync.yml` が弾くまで `install/` へのコピーを忘れた（2コミット追加でリカバリ）。`snapshot 更新` と同型の「companion にゲートが無い → CI が backstop → PR 後発覚」パターン。`check-gen-skill.yml` 追加（#134）と同じ解消方針で、ゲート項目を追記し backstop に退いた。
