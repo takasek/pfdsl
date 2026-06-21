@@ -44,8 +44,7 @@
 ## Consequences
 
 - スキル品質ガイドに4ルールとして収録
-- `docs/issues_flow.pfdsl` の「階層×プリセット仕様起草」が
-  「並列→上流方針→共同起草」と3段階で収束した経緯が実例 （git log の `fix(docs)` 2コミット参照）
+- `docs/issues_flow.pfdsl` の「階層×プリセット仕様起草」が「並列→上流方針→共同起草」と3段階で収束した経緯が実例 （git log の `fix(docs)` 2コミット参照）
 
 ## References
 
