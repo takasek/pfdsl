@@ -128,7 +128,7 @@ artifact:
     label: issue 依存グラフ
     description: "着手可能順序の導出。issue 追加時に更新"
     status: done
-    criteria: check がエラーなし、audit-issues-flow.mjs が差分なし。人手変更の場合は pnpm --filter @pfdsl/core exec vitest run -u でスナップショット更新済み。
+    criteria: check がエラーなし、audit-issues-flow.mjs が差分なし。人手変更後のスナップショット更新手順は workflow.md 参照。
     location: roadmap.pfdsl
     group: planning
   toolchain:
