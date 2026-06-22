@@ -44,13 +44,6 @@ artifact:
     status: done
     criteria: subflow/extends の checker が @pfdsl/core に実装され check コマンドで V021-V028 が動作確認済み（renderer は対象外）
     location: https://github.com/takasek/pfdsl/issues/148
-  i147_subflow_nav:
-    label: "VS Code subflow ナビゲーション (#147)"
-    description: "subflow: プロセスから子 .pfdsl を Cmd+Click で開く。location: との優先順位・tooltip hint 含む"
-    status: todo
-    criteria: subflow プロセスの Cmd+Click で子 .pfdsl が VS Code editor で開き tooltip に hint が表示される
-    location: https://github.com/takasek/pfdsl/issues/147
-    updated_at: 2026-06-21T17:48:38Z
   i138_example_check:
     label: "doc 埋込例の check 検証 (#138)"
     description: "spec.md / proposals 内の fenced pfdsl ブロックを抽出し check にかける。CI 強制。spec_v008 サイクルの retro で発見した inline 例の無検証死角"
@@ -70,7 +63,7 @@ artifact:
     status: wip
     criteria: v* tag push で VS Code Marketplace への自動 publish が動作確認済み
     location: https://github.com/takasek/pfdsl/issues/119
-    updated_at: 2026-06-19T23:58:39Z
+    updated_at: 2026-06-22T05:40:24Z
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -191,8 +184,6 @@ process:
   implement_multifile:
     label: マルチファイル機能実装
     description: "spec v0.0.8 subflow/extends checker 実装（V021-V028）。renderer・VS Code extension は対象外。issue: https://github.com/takasek/pfdsl/issues/148"
-  implement_subflow_nav:
-    label: subflowナビゲーション実装
   implement_example_check:
     label: 埋込例check実装
   publish_extension:
@@ -228,13 +219,11 @@ findings_r12
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -271,13 +260,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -317,13 +304,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -362,13 +347,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -407,13 +390,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -454,13 +435,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 layer_audit_assets
 lint_checker
@@ -497,13 +476,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 layer_audit_assets
 lint_checker
@@ -543,12 +520,10 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -588,12 +563,10 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -634,13 +607,11 @@ findings_r12
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_spec
 layer_audit_assets
 lint_checker
@@ -678,12 +649,10 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -723,13 +692,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -767,13 +734,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -811,13 +776,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 lint_checker
@@ -856,55 +819,7 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i147_subflow_nav
 i3_obsidian_plugin
-implement_lints
-implement_multifile
-implement_spec_features
-implement_subflow_nav
-integrate_multifile
-integrate_spec
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-presets_spec
-publish_cli
-publish_extension
-published_cli
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-write_article
-write_design_notes
-
-featured_toolchain >> implement_subflow_nav
-multifile_toolchain >> implement_subflow_nav
-implement_subflow_nav -> i147_subflow_nav
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-external_stakeholders_spec
-findings_r12
-hierarchy_spec
-i119_published_extension
-i12_article
-i138_example_check
-i3_obsidian_plugin
-implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
@@ -914,6 +829,7 @@ layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+multifile_toolchain
 presets_spec
 publish_cli
 publish_extension
@@ -946,13 +862,11 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -991,12 +905,10 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -1036,13 +948,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
@@ -1081,13 +991,11 @@ findings_r12
 hierarchy_spec
 i12_article
 i138_example_check
-i147_subflow_nav
 i3_obsidian_plugin
 implement_example_check
 implement_lints
 implement_multifile
 implement_spec_features
-implement_subflow_nav
 integrate_multifile
 integrate_spec
 layer_audit_assets
