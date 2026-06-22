@@ -50,10 +50,11 @@ artifact:
     status: todo
     criteria: subflow プロセスの Cmd+Click で子 .pfdsl が VS Code editor で開き tooltip に hint が表示される
     location: https://github.com/takasek/pfdsl/issues/147
+    updated_at: 2026-06-21T17:48:38Z
   i137_status_lint:
     label: "status 非単調 lint (#137)"
     description: "出力 artifact が done かつ入力 artifact が done 未満を warning 検出。spec_v008 サイクルの retro で発見した status drift 死角"
-    status: todo
+    status: wip
     criteria: status 非単調を検出する lint が実装され check で動作確認済み
     location: https://github.com/takasek/pfdsl/issues/137
     updated_at: 2026-06-20T17:56:24Z
@@ -70,6 +71,12 @@ artifact:
     status: done
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
+  i119_published_extension:
+    label: "Marketplace 公開済み extension (#119)"
+    description: "v* tag push で GitHub Actions が自動 publish する extension 公開フロー。CLI の Trusted Publishing / OIDC パターンを踏襲"
+    status: wip
+    criteria: v* tag push で VS Code Marketplace への自動 publish が動作確認済み
+    location: https://github.com/takasek/pfdsl/issues/119
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -196,6 +203,8 @@ process:
     label: status非単調lint実装
   implement_example_check:
     label: 埋込例check実装
+  publish_extension:
+    label: extension自動公開実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -224,6 +233,7 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 findings_r12
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -242,6 +252,7 @@ lint_checker
 location_spec
 multifile_toolchain
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -267,6 +278,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -287,6 +299,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -313,6 +326,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -333,6 +347,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -358,6 +373,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -377,6 +393,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -403,6 +420,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -423,6 +441,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -450,6 +469,7 @@ draft_revises
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -468,6 +488,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -493,6 +514,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -512,6 +534,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -539,6 +562,7 @@ draft_revises
 external_stakeholders_spec
 featured_toolchain
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -557,6 +581,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -584,6 +609,7 @@ draft_revises
 external_stakeholders_spec
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -602,6 +628,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -630,6 +657,7 @@ draft_multifile_specs
 draft_revises
 external_stakeholders_spec
 findings_r12
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -647,6 +675,7 @@ lint_checker
 location_spec
 multifile_toolchain
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -674,6 +703,7 @@ draft_revises
 external_stakeholders_spec
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -692,6 +722,7 @@ location_spec
 multifile_policy
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -719,6 +750,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -739,6 +771,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 revises_spec
 spec_v006
@@ -763,6 +796,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -782,6 +816,7 @@ location_spec
 multifile_policy
 multifile_toolchain
 presets_spec
+publish_extension
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -807,6 +842,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -826,6 +862,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -854,6 +891,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i138_example_check
 i147_subflow_nav
@@ -871,6 +909,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -898,6 +937,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i147_subflow_nav
@@ -916,6 +956,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -944,6 +985,7 @@ draft_revises
 external_stakeholders_spec
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -961,6 +1003,7 @@ location_spec
 multifile_policy
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -988,6 +1031,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i137_status_lint
 i138_example_check
 i147_subflow_nav
@@ -1007,6 +1051,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -1032,6 +1077,7 @@ external_stakeholders_spec
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
 i12_article
 i137_status_lint
 i138_example_check
@@ -1051,6 +1097,7 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_extension
 published_cli
 restructure_skillgen
 restructured_gen
@@ -1077,6 +1124,54 @@ draft_revises
 featured_toolchain
 findings_r12
 hierarchy_spec
+i119_published_extension
+i12_article
+i137_status_lint
+i138_example_check
+i147_subflow_nav
+i3_obsidian_plugin
+implement_example_check
+implement_lints
+implement_multifile
+implement_spec_features
+implement_status_lint
+implement_subflow_nav
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+multifile_toolchain
+presets_spec
+publish_cli
+publish_extension
+published_cli
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+cli_tool >> publish_extension
+publish_extension -> i119_published_extension
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+external_stakeholders_spec
+featured_toolchain
+findings_r12
+hierarchy_spec
 i12_article
 i137_status_lint
 i138_example_check
@@ -1102,6 +1197,7 @@ restructure_skillgen
 restructured_gen
 revises_spec
 skill_gen
+spec_v006
 spec_v007
 spec_v008
 write_article
