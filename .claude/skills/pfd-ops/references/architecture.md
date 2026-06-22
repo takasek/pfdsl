@@ -32,9 +32,23 @@ PFD の概念だけで導ける手順。固有名詞なし。
 | `<file>.pfdsl` の sibling `<file>.md` companion | リポ固有バインディング・手続き知 |
 | `roadmap.pfdsl` + `roadmap.md` | 作業項目の一次情報と同期手段 |
 | `workflow.pfdsl` + companion | 知見の振り分け先・手続き |
+| `runtime-pipeline.pfdsl` + companion | 変換境界の定義と変更手続き |
 | `references/github-issues-backend.md` 等 | バックエンド規約（採用リポのみ参照） |
 
 `.md` companion の機構（「sibling を読め」という規約）は L2 に属し SKILL.md に記載する。companion の中身は L4（リポ固有）に属す。
+
+### companion への書き分けルール（一次情報）
+
+findings やゲート項目を companion に書くとき、**どの companion か**の判断基準:
+
+| 書く内容の種類 | 宛先 companion |
+|---|---|
+| issue 固有ゲート・issue 管理バインディング・自動生成 PR 規約・issue バックエンド手続き | `roadmap.md` |
+| 繰り返し手続き・知見振り分けルール・`develop` プロセスの運用規約・retro 宛先バインディング | `workflow.md` |
+| 変換コンポーネントの追加・削除・境界変更に関する手続き | `runtime-pipeline.md` |
+| 配布スキルに同梱すべき規約（PR 本文規約等）| `references/` |
+
+この表が一次情報。`pfd-ops SKILL.md` の L2 ディスパッチ・`pfd-retro` の出力振り分け・`workflow.md` の retro バインディングはすべてここを参照する。
 
 ## L3: GitHub Issues バックエンド（`references/github-issues-backend.md`）
 
