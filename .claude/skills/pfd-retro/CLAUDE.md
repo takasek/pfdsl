@@ -4,6 +4,11 @@
 
 `docs/review-prompts.md` が一次情報。
 
+## PFD ファイル名（このリポ固有）
+
+- workflow PFD: `.pfdsl/workflow.pfdsl`
+- roadmap companion: `.pfdsl/roadmap.md`
+
 ## 出力宛先（このリポ固有）
 
 | finding の種類 | 宛先 |
