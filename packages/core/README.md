@@ -125,11 +125,9 @@ Code prefixes: `FM` frontmatter, `L` lexer, `P` parser, `N` normalizer, `V` vali
 
 ## Validation rules
 
-- **V001** Each artifact must have at most one producing process (single
-  source).
+- **V001** Each artifact must have at most one producing process (single source).
 - **V002 / V003** Every process must have ≥1 input and ≥1 output.
-- **V004 – V006** `parts:` declarations must reference processes, must not
-  self-reference, and must not form cycles.
+- **V004 – V006** `parts:` declarations must reference processes, must not self-reference, and must not form cycles.
 
 ## Canonical ordering
 
