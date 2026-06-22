@@ -29,6 +29,7 @@ coverage/
 
 # claude
 .claude/settings.local.json
+.claude/worktrees/
 .superpowers/
 
 # worktrees
