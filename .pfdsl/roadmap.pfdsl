@@ -48,13 +48,6 @@ artifact:
     criteria: subflow プロセスの Cmd+Click で子 .pfdsl が VS Code editor で開き tooltip に hint が表示される
     location: https://github.com/takasek/pfdsl/issues/147
     updated_at: 2026-06-21T17:48:38Z
-  i137_status_lint:
-    label: "status 非単調 lint (#137)"
-    description: "出力 artifact が done かつ入力 artifact が done 未満を warning 検出。spec_v008 サイクルの retro で発見した status drift 死角"
-    status: wip
-    criteria: status 非単調を検出する lint が実装され check で動作確認済み
-    location: https://github.com/takasek/pfdsl/issues/137
-    updated_at: 2026-06-20T17:56:24Z
   i138_example_check:
     label: "doc 埋込例の check 検証 (#138)"
     description: "spec.md / proposals 内の fenced pfdsl ブロックを抽出し check にかける。CI 強制。spec_v008 サイクルの retro で発見した inline 例の無検証死角"
@@ -74,6 +67,7 @@ artifact:
     status: wip
     criteria: v* tag push で VS Code Marketplace への自動 publish が動作確認済み
     location: https://github.com/takasek/pfdsl/issues/119
+    updated_at: 2026-06-19T23:58:39Z
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -196,8 +190,6 @@ process:
     description: "spec v0.0.8 subflow/extends checker 実装（V021-V028）。renderer・VS Code extension は対象外。issue: https://github.com/takasek/pfdsl/issues/148"
   implement_subflow_nav:
     label: subflowナビゲーション実装
-  implement_status_lint:
-    label: status非単調lint実装
   implement_example_check:
     label: 埋込例check実装
   publish_extension:
@@ -240,8 +232,6 @@ skill_gen >> restructure_skillgen -> restructured_gen
 cli_tool >> publish_cli -> published_cli
 
 cli_tool >> layer_audit_assets -> audit_distribution
-
-lint_checker >> implement_status_lint -> i137_status_lint
 
 cli_tool >> implement_example_check -> i138_example_check
 
