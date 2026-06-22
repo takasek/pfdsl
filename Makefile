@@ -115,14 +115,20 @@ push: check-docs
 release-status:
 	node scripts/release-status.mjs
 
-# @pfdsl/cli を npm 公開する。packages/cli/package.json の version から
+# @pfdsl/cli を npm 公開する。VERSION= を指定するか packages/cli/package.json の version を使い
 # v<version> タグを打って push し、publish-cli.yml (OIDC) を起動する。
-# 事前に version を上げてコミット・マージしておくこと。
+# VERSION= を指定した場合は package.json を更新してコミットしてからタグを打つ。
+# 例: make release VERSION=0.0.8
 .PHONY: release
 release:
-	@VERSION=$$(node -p "require('./packages/cli/package.json').version"); \
-	BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
 	if [ "$$BRANCH" != "main" ]; then echo "main ブランチで実行してください (現在: $$BRANCH)"; exit 1; fi; \
+	if [ -n "$(VERSION)" ]; then \
+		node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('packages/cli/package.json','utf8'));p.version='$(VERSION)';fs.writeFileSync('packages/cli/package.json',JSON.stringify(p,null,'\t')+'\n')"; \
+		git add packages/cli/package.json; \
+		git commit -m "chore(package): bump version to $(VERSION)"; \
+	fi; \
+	VERSION=$$(node -p "require('./packages/cli/package.json').version"); \
 	if [ -n "$$(git status --porcelain)" ]; then echo "作業ツリーに未コミットの変更があります"; exit 1; fi; \
 	if git rev-parse "v$$VERSION" >/dev/null 2>&1; then echo "タグ v$$VERSION は既に存在します (version を上げてください)"; exit 1; fi; \
 	git fetch origin main --quiet; \
