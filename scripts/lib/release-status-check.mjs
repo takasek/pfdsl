@@ -15,20 +15,24 @@ export function compareVersions(local, published) {
 }
 
 /**
- * @param {Array<{name: string, registry: string, localVersion: string, publishedVersion: string, status: string}>} results
+ * @param {Array<{name: string, registry: string, localVersion: string, publishedVersion: string, status: string, commitsAhead?: number}>} results
  * @returns {string}
  */
 export function formatResults(results) {
 	return results
-		.map(({ name, registry, localVersion, publishedVersion, status }) => {
-			const label =
-				status === "local-ahead"
-					? "! behind (needs publish)"
-					: status === "published-ahead"
-						? "! published-ahead (unexpected)"
-						: status === "error"
-							? "! error"
-							: "✓ up-to-date";
+		.map(({ name, registry, localVersion, publishedVersion, status, commitsAhead }) => {
+			let label;
+			if (status === "local-ahead") {
+				label = "! behind (needs publish)";
+			} else if (status === "published-ahead") {
+				label = "! published-ahead (unexpected)";
+			} else if (status === "error") {
+				label = "! error";
+			} else if (commitsAhead > 0) {
+				label = `! commits-ahead (${commitsAhead} commit(s), needs version bump)`;
+			} else {
+				label = "✓ up-to-date";
+			}
 			return `  ${name.padEnd(24)} local=${localVersion}  ${registry}=${publishedVersion}  ${label}`;
 		})
 		.join("\n");
