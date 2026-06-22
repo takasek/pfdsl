@@ -4,10 +4,13 @@
 
 `docs/review-prompts.md` が一次情報。
 
-## PFD ファイル名（このリポ固有）
+## PFD 種別とファイル（このリポ固有）
 
-- workflow PFD: `.pfdsl/workflow.pfdsl`
-- roadmap companion: `.pfdsl/roadmap.md`
+| 種別 | ファイル | sibling companion |
+|---|---|---|
+| roadmap | `.pfdsl/roadmap.pfdsl` | `.pfdsl/roadmap.md` |
+| workflow | `.pfdsl/workflow.pfdsl` | — |
+| runtime-pipeline | なし（採用していない） | — |
 
 ## 出力宛先（このリポ固有）
 
