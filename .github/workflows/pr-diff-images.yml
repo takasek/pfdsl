@@ -5,7 +5,6 @@ on:
     types: [closed]
 
 permissions:
-  contents: write
   pull-requests: write
 
 jobs:
@@ -47,20 +46,26 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: node scripts/generate-pr-diff-images.mjs generate
 
-      - name: Commit SVG artifacts
-        if: success() && steps.changed.outputs.files != ''
+      - name: Push SVG artifacts to ci-image-store
+        if: success() && steps.generate.outputs.has_svgs == 'true'
+        env:
+          DIAGRAMS_REPO_TOKEN: ${{ secrets.DIAGRAMS_REPO_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          git clone --depth=1 "https://x-access-token:${DIAGRAMS_REPO_TOKEN}@github.com/takasek/ci-image-store.git" /tmp/ci-image-store
+          mkdir -p "/tmp/ci-image-store/pfdsl/pr-${PR_NUMBER}"
+          cp -r "docs/diagrams/pr-${PR_NUMBER}/." "/tmp/ci-image-store/pfdsl/pr-${PR_NUMBER}/"
+          cd /tmp/ci-image-store
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/diagrams/
+          git add "pfdsl/pr-${PR_NUMBER}"
           if ! git diff --cached --quiet; then
-            git commit -m "docs(diagrams): add pfdsl diff images for PR #${{ github.event.pull_request.number }} [skip ci]"
-            git pull --rebase origin ${{ github.event.pull_request.base.ref }}
-            git push origin HEAD:${{ github.event.pull_request.base.ref }}
+            git commit -m "pfdsl: add diff images for pfdsl PR #${PR_NUMBER}"
+            git push origin HEAD
           fi
 
       - name: Update PR description
-        if: success() && steps.changed.outputs.files != ''
+        if: success() && steps.generate.outputs.has_svgs == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

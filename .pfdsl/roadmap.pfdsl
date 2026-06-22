@@ -49,8 +49,8 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   i76_external_diagrams:
     label: "PR差分画像外部リポ運用 (#76)"
-    description: "pr-diff-images.yml の push 先を takasek/pfdsl-diagrams に移し、メインリポの履歴膨張を止める"
-    status: todo
+    description: "pr-diff-images.yml の push 先を takasek/ci-image-store に移し、メインリポの履歴膨張を止める"
+    status: wip
     criteria: PR diff 画像が外部リポへ push され、メインリポ側 docs/diagrams/ はコミットされなくなった
     location: https://github.com/takasek/pfdsl/issues/76
     updated_at: 2026-06-22T06:11:16Z

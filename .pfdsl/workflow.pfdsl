@@ -191,10 +191,10 @@ artifact:
     group: release
   pr_diagrams:
     label: PR差分ダイアグラム
-    description: "merged PR が .pfdsl を変更した際に CI（pr-diff-images.yml）が before/after SVG を自動生成・コミット。PR description に埋め込まれ考古的レビューに使われる終端成果物。ライフサイクル: PR ごとに蓄積（削除規約なし）"
+    description: "merged PR が .pfdsl を変更した際に CI（pr-diff-images.yml）が before/after SVG を自動生成し takasek/ci-image-store へ push。PR description に埋め込まれ考古的レビューに使われる終端成果物。ライフサイクル: PR ごとに蓄積（削除規約なし）"
     status: done
-    criteria: PR マージ後に CI が before/after SVG を自動生成・コミット済み
-    location: ../docs/diagrams/
+    criteria: PR マージ後に CI が before/after SVG を自動生成し ci-image-store へ push 済み
+    location: https://github.com/takasek/ci-image-store
     group: release
   readme:
     label: README

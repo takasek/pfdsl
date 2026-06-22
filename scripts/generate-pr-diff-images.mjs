@@ -18,7 +18,7 @@
 //   GH_TOKEN           — GitHub token (phase 2 only)
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -118,13 +118,17 @@ if (mode === "generate") {
 	}
 
 	console.log(`Generated SVGs in docs/diagrams/pr-${prNumber}/`);
+
+	const githubOutput = process.env.GITHUB_OUTPUT;
+	if (githubOutput) {
+		appendFileSync(githubOutput, "has_svgs=true\n", "utf-8");
+	}
 	process.exit(0);
 }
 
 // ── Phase 2: update PR description ────────────────────────────────────────
 
-const defaultBranch = process.env.DEFAULT_BRANCH ?? "main";
-const rawBase = `https://raw.githubusercontent.com/${repo}/${defaultBranch}/docs/diagrams/pr-${prNumber}`;
+const rawBase = `https://raw.githubusercontent.com/takasek/ci-image-store/main/pfdsl/pr-${prNumber}`;
 
 const sections = changedFiles.map((file) => {
 	const sanitized = sanitizePath(file);
