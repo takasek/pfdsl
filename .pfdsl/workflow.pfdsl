@@ -158,7 +158,7 @@ artifact:
     label: PFD運用スキル
     description: "/pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別（roadmap / workflow / runtime-pipeline）の定義と問診リストを含む（ADR-0017）。汎用層（L1+L2）= SKILL.md 本文、GitHub Issues プリセット（L3）= references/、デプロイ可能ファイル群（L3.5）= install/（CI で identity 強制）、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
     status: done
-    criteria: /pfd-cycle が期待通り動作する
+    criteria: /pfd-cycle が期待通り動作する。check-pfd-ops-sync.yml が全 PR で通過する（install/ 配布ファイルを変更したら install/ も同期する）
     location: ../.claude/skills/pfd-ops/
     group: generation
   retro_skill:
