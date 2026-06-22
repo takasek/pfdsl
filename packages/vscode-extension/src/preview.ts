@@ -69,6 +69,7 @@ type MessageToWebview =
 			focusNodeId?: string;
 			descriptions?: Record<string, string>;
 			locations?: Record<string, string>;
+			subflows?: Record<string, string>;
 	  }
 	| { type: "error"; message: string }
 	| { type: "focus"; nodeId: string }
@@ -107,6 +108,22 @@ function buildLocations(fm: Frontmatter | null): Record<string, string> {
 	for (const id of Object.keys(fm.artifact ?? {})) {
 		const loc = fm.artifact?.[id]?.location;
 		if (typeof loc === "string" && loc) result[id] = loc;
+	}
+	for (const id of Object.keys(fm.process ?? {})) {
+		const meta = fm.process?.[id];
+		const loc = meta?.location ?? meta?.subflow;
+		if (typeof loc === "string" && loc && !loc.includes("://")) result[id] = loc;
+	}
+	return result;
+}
+
+function buildSubflows(fm: Frontmatter | null): Record<string, string> {
+	const result: Record<string, string> = {};
+	if (!fm) return result;
+	for (const id of Object.keys(fm.process ?? {})) {
+		const meta = fm.process?.[id];
+		if (!meta?.location && typeof meta?.subflow === "string" && meta.subflow)
+			result[id] = meta.subflow;
 	}
 	return result;
 }
@@ -232,12 +249,14 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			const { frontmatter } = analyzeDocument(state.doc);
 			const descriptions = buildDescriptions(frontmatter);
 			const locations = buildLocations(frontmatter);
+			const subflows = buildSubflows(frontmatter);
 			state.panel.webview.postMessage({
 				type: "render",
 				dot,
 				focusNodeId,
 				descriptions,
 				locations,
+				subflows,
 			});
 		}
 		if ("pendingDiff" in state) {
