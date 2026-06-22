@@ -75,6 +75,10 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 `[gh_issues, roadmap_pfdsl, spec] >> develop` の通常経路の例外ケース。issue なし develop は hotfix のみに限る。
 
+## CI成果物の格納先変更時の workflow.pfdsl 更新
+
+CI が生成・push する成果物（`pr_diagrams` 等）の格納先・push 方式を変える PR では、対応する `workflow.pfdsl` artifact の `description` / `criteria` / `location` を同一 PR で更新する。格納先の変更は artifact の定義を変えるため、workflow 図と実装が乖離する。
+
 ## pfd-retro バインディング
 
 A・B 層カタログ（図の監査プロンプト一覧）: `docs/review-prompts.md`
