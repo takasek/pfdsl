@@ -47,13 +47,6 @@ artifact:
     status: done
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
-  i76_external_diagrams:
-    label: "PR差分画像外部リポ運用 (#76)"
-    description: "pr-diff-images.yml の push 先を takasek/pfdsl-diagrams に移し、メインリポの履歴膨張を止める"
-    status: todo
-    criteria: PR diff 画像が外部リポへ push され、メインリポ側 docs/diagrams/ はコミットされなくなった
-    location: https://github.com/takasek/pfdsl/issues/76
-    updated_at: 2026-06-22T06:11:16Z
   i119_published_extension:
     label: "Marketplace 公開済み extension (#119)"
     description: "v* tag push で GitHub Actions が自動 publish する extension 公開フロー。CLI の Trusted Publishing / OIDC パターンを踏襲"
@@ -183,8 +176,6 @@ process:
     description: "spec v0.0.8 subflow/extends checker 実装（V021-V028）。renderer・VS Code extension は対象外。issue: https://github.com/takasek/pfdsl/issues/148"
   publish_extension:
     label: extension自動公開実装
-  move_diagrams_external:
-    label: PR差分画像を外部リポへ移動
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -231,5 +222,3 @@ cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
 
 cli_tool >> publish_extension -> i119_published_extension
-
-cli_tool >> move_diagrams_external -> i76_external_diagrams

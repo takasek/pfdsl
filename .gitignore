@@ -33,3 +33,6 @@ coverage/
 
 # worktrees
 .worktrees/
+
+# PR diff images (pushed to ci-image-store instead)
+docs/diagrams/
