@@ -8,6 +8,7 @@ type MessageToWebview =
 			focusNodeId?: string;
 			descriptions?: Record<string, string>;
 			locations?: Record<string, string>;
+			subflows?: Record<string, string>;
 	  }
 	| { type: "error"; message: string }
 	| { type: "focus"; nodeId: string }
@@ -61,6 +62,7 @@ const tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
 let descriptions: Record<string, string> = {};
 let locations: Record<string, string> = {};
+let subflows: Record<string, string> = {};
 let lastFocusedNodeId: string | undefined;
 
 const diffPanel = document.getElementById("diff-panel") as HTMLDivElement;
@@ -112,11 +114,14 @@ root.addEventListener("mousemove", (e) => {
 	const nodeId = (node as HTMLElement).dataset.nodeId;
 	const desc = nodeId ? descriptions[nodeId] : undefined;
 	const loc = (node as HTMLElement).dataset.location;
-	const hint = loc
-		? loc.includes("://")
-			? `${modKey}+Click to open URL`
-			: `${modKey}+Click to open file`
-		: null;
+	const subflow = (node as HTMLElement).dataset.subflow;
+	const hint = subflow
+		? `${modKey}+Click to open subflow`
+		: loc
+			? loc.includes("://")
+				? `${modKey}+Click to open URL`
+				: `${modKey}+Click to open file`
+			: null;
 	const tooltipText = [desc, hint].filter(Boolean).join("\n");
 	if (!tooltipText) {
 		tooltip.style.display = "none";
@@ -295,14 +300,21 @@ window.addEventListener("mouseup", () => {
 
 root.addEventListener("click", (e) => {
 	const node = (e.target as Element).closest("g.node");
-	const loc = node ? (node as HTMLElement).dataset.location : null;
-	if (!loc) return;
+	if (!node) return;
+	const el = node as HTMLElement;
+	const subflow = el.dataset.subflow;
+	const loc = el.dataset.location;
+	if (!subflow && !loc) return;
 	e.preventDefault();
 	if (e.metaKey || e.ctrlKey) {
-		if (loc.includes("://")) {
-			vscode.postMessage({ type: "openUrl", url: loc });
-		} else {
-			vscode.postMessage({ type: "openFile", path: loc });
+		if (subflow) {
+			vscode.postMessage({ type: "openFile", path: subflow });
+		} else if (loc) {
+			if (loc.includes("://")) {
+				vscode.postMessage({ type: "openUrl", url: loc });
+			} else {
+				vscode.postMessage({ type: "openFile", path: loc });
+			}
 		}
 	}
 });
@@ -366,6 +378,7 @@ window.addEventListener("message", async (event) => {
 	if (msg.type !== "render") return;
 	descriptions = msg.descriptions ?? {};
 	locations = msg.locations ?? {};
+	subflows = msg.subflows ?? {};
 	try {
 		const g = await getGraphviz();
 		log("calling g.dot()");
@@ -375,9 +388,12 @@ window.addEventListener("message", async (event) => {
 		for (const node of inner.querySelectorAll("g.node")) {
 			const titleEl = node.querySelector(":scope > title");
 			if (titleEl?.textContent) {
-				(node as HTMLElement).dataset.nodeId = titleEl.textContent;
-				const loc = locations[titleEl.textContent];
+				const id = titleEl.textContent;
+				(node as HTMLElement).dataset.nodeId = id;
+				const loc = locations[id];
 				if (loc) (node as HTMLElement).dataset.location = loc;
+				const sf = subflows[id];
+				if (sf) (node as HTMLElement).dataset.subflow = sf;
 				titleEl.remove();
 			}
 		}
