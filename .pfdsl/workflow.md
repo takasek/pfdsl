@@ -75,6 +75,8 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 `[gh_issues, roadmap_pfdsl, spec] >> develop` の通常経路の例外ケース。issue なし develop は hotfix のみに限る。
 
+**develop 開始前に hotfix 判定を行う。** 上記3条件を確認してから issue 起票・roadmap 追加の要否を決める。条件確認前に issue 起票・roadmap 追加を開始しない。
+
 ## pfd-retro バインディング
 
 A・B 層カタログ（図の監査プロンプト一覧）: `docs/review-prompts.md`
