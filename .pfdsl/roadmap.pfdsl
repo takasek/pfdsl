@@ -44,10 +44,10 @@ artifact:
   i147_subflow_nav:
     label: "VS Code subflow ナビゲーション (#147)"
     description: "subflow: プロセスから子 .pfdsl を Cmd+Click で開く。location: との優先順位・tooltip hint 含む"
-    status: todo
+    status: wip
     criteria: subflow プロセスの Cmd+Click で子 .pfdsl が VS Code editor で開き tooltip に hint が表示される
     location: https://github.com/takasek/pfdsl/issues/147
-    updated_at: 2026-06-21T17:48:38Z
+    updated_at: 2026-06-22T14:33:00Z
   i138_example_check:
     label: "doc 埋込例の check 検証 (#138)"
     description: "spec.md / proposals 内の fenced pfdsl ブロックを抽出し check にかける。CI 強制。spec_v008 サイクルの retro で発見した inline 例の無検証死角"
