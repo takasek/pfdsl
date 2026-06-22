@@ -128,7 +128,7 @@ artifact:
     label: issue 依存グラフ
     description: "着手可能順序の導出。issue 追加時に更新"
     status: done
-    criteria: check がエラーなし、audit-issues-flow.mjs が差分なし
+    criteria: check がエラーなし、audit-issues-flow.mjs が差分なし。人手変更の場合は pnpm --filter @pfdsl/core exec vitest run -u でスナップショット更新済み。
     location: roadmap.pfdsl
     group: planning
   toolchain:
@@ -158,7 +158,7 @@ artifact:
     label: PFD運用スキル
     description: "/pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別（roadmap / workflow / runtime-pipeline）の定義と問診リストを含む（ADR-0017）。汎用層（L1+L2）= SKILL.md 本文、GitHub Issues プリセット（L3）= references/、デプロイ可能ファイル群（L3.5）= install/（CI で identity 強制）、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
     status: done
-    criteria: /pfd-cycle が期待通り動作する
+    criteria: /pfd-cycle が期待通り動作する。install/ 配布ファイルを変更した PR で check-pfd-ops-sync.yml が通過する。
     location: ../.claude/skills/pfd-ops/
     group: generation
   retro_skill:
@@ -167,6 +167,13 @@ artifact:
     status: done
     criteria: /pfd-retro が期待通り動作する
     location: ../.claude/skills/pfd-retro/
+    group: generation
+  vscode_ext_debug_skill:
+    label: VSCode拡張デバッグスキル
+    description: "/vscode-ext-debug コマンド。worktree での VS Code 拡張デバッグ手順（make vscode-dev・F5 起動・PFDSL Preview 検証・webview console フィルタ）。手書き、生成対象外"
+    status: done
+    criteria: /vscode-ext-debug が期待通り動作する
+    location: ../.claude/skills/vscode-ext-debug/
     group: generation
   review_prompts:
     label: レビュープロンプト集
@@ -238,6 +245,7 @@ process:
     group: generation
   gen_skill:
     label: スキル生成
+    description: "スキル生成ソース（skill-template/spec/samples/examples/review-prompts/skill dirs 等）を変更した場合に実行する。check-gen-skill.yml が全 PR で identity を強制（CI backstop）"
     command: make gen-skill
     group: generation
 
@@ -259,7 +267,7 @@ process:
     group: decision
   file_issues:
     label: issue 管理
-    description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、roadmap_pfdsl と同期する"
+    description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、roadmap_pfdsl と同期する。起票と同時に roadmap_pfdsl への artifact/process/edge 追加を行う（後回し禁止 — 依存グラフが stale になり気付き依存に戻る）"
     group: planning
   map_deps:
     label: 依存整理
@@ -268,7 +276,7 @@ process:
     group: planning
   develop:
     label: ツールチェーン開発
-    description: 着手可能 issue をブランチ上で実装し PR にまとめる
+    description: "着手可能 issue をブランチ上で実装し PR にまとめる。PR body に対象パッケージ層（core / cli / graphviz-exporter 等）を明記する（層未明記だと着手後に層違いで延期コストが発生する）"
     group: planning
   merge_pr:
     label: レビュー・マージ
@@ -334,7 +342,7 @@ examples >> review_examples -> findings
 
 [skill, toolchain, retro_skill] >>? review_examples
 
-[adrs, payoff_log] >> distill_ops -> [ops_skill, retro_skill, review_prompts, workflow_md]
+[adrs, payoff_log] >> distill_ops -> [ops_skill, retro_skill, review_prompts, workflow_md, vscode_ext_debug_skill]
 
 retro_skill >>? discuss
 
@@ -350,7 +358,7 @@ gh_issues >> map_deps -> [roadmap_pfdsl, roadmap_md]
 
 pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
 
-[ops_skill, workflow_md, roadmap_md] >>? develop
+[ops_skill, workflow_md, roadmap_md, vscode_ext_debug_skill] >>? develop
 
 issue_updates >>? file_issues
 

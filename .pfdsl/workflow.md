@@ -67,6 +67,14 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 `[gh_issues, roadmap_pfdsl, spec] >> develop` の通常経路の例外ケース。issue なし develop は hotfix のみに限る。
 
+## pfd-retro バインディング
+
+A・B 層カタログ（図の監査プロンプト一覧）: `docs/review-prompts.md`
+
+PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workflow.pfdsl`）を採用。runtime-pipeline 未採用。
+
+出力宛先は「知見の振り分け（3経路）」セクションに従う。
+
 ## 終端ゲートの根拠
 
 汎用ゲート項目（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、このリポでは issue 固有項目を合成する。issue 固有項目は `roadmap.md` を参照。
