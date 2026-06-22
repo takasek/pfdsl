@@ -10,8 +10,7 @@ description: |
 
 # pfd-ecosystem: プロジェクト PFD セット対話的構築
 
-roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、
-プロジェクトの `.pfdsl/` セットを scaffold から実際のグラフに育てる。
+roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 プロジェクトの `.pfdsl/` セットを scaffold から実際のグラフに育てる。
 **いきなり全部書かない** — 問診で必要な種別を絞り、ユーザーと対話しながら剪定する。
 
 ## ステップ 0: pfdsl スキルを起動する

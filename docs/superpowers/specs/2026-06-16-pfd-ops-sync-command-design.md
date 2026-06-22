@@ -62,9 +62,7 @@ npx @pfdsl/cli@latest skill sync pfd-ops
 
 ### scaffold（テンプレート配置 + PFD セットアップ案内）
 
-sync は雛形ファイルを `.pfdsl/` に自動コピーしない。テンプレートは
-`.claude/skills/pfd-ops/references/scaffold/` に配置されており、ユーザーが
-必要な種別のみを `/pfd-ecosystem` スキル経由でオンデマンドにコピーする。
+sync は雛形ファイルを `.pfdsl/` に自動コピーしない。テンプレートは `.claude/skills/pfd-ops/references/scaffold/` に配置されており、ユーザーが 必要な種別のみを `/pfd-ecosystem` スキル経由でオンデマンドにコピーする。
 
 - **テンプレート対象**: `roadmap.pfdsl` / `roadmap.md` / `workflow.pfdsl` / `workflow.md` / `runtime-pipeline.pfdsl` / `runtime-pipeline.md`（ADR-0017 の3種別すべて）
 - **自動コピーなし**: 3種別全てがどのプロジェクトでも必要とは限らないため、sync は自動コピーを行わない

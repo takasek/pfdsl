@@ -1,9 +1,6 @@
 # PFDSL — Process Flow DSL
 
-A small DSL for describing process flows as artifacts and processes, and
-the input/output edges between them. Sources
-parse to a canonical edge list that can be re-emitted, validated, diffed,
-and rendered to Graphviz (DOT or SVG).
+A small DSL for describing process flows as artifacts and processes, and the input/output edges between them. Sources parse to a canonical edge list that can be re-emitted, validated, diffed, and rendered to Graphviz (DOT or SVG).
 
 ```pfdsl
 [requirement, constraint] >> design -> spec
@@ -25,13 +22,11 @@ Key syntax:
 - `A >> P -> B >> Q -> C` — chain (multi-segment statement)
 - `# ...` — comment to end of line
 - Trailing tokens (`<id>` or `]`) may be followed by a single newline (and
-  optional comment lines) before a continuation operator (`>>`, `>>?`,
-  `->`); blank lines force statement termination.
+  optional comment lines) before a continuation operator (`>>`, `>>?`, `->`); blank lines force statement termination.
 
 ## Artifact status & tags (DOT styling)
 
-Annotate artifacts with progress `status` (enum) and free-form `tags`,
-then map them to DOT node attributes via frontmatter.
+Annotate artifacts with progress `status` (enum) and free-form `tags`, then map them to DOT node attributes via frontmatter.
 
 ```pfdsl
 ---
@@ -114,8 +109,7 @@ See [packages/vscode-extension/README.md](packages/vscode-extension/README.md) f
 pnpm --filter @pfdsl/vscode-extension build
 ```
 
-Open the repo in VS Code and press `F5` to launch an Extension Development
-Host with `@pfdsl/vscode-extension` loaded. In the host, `.pfdsl` files get:
+Open the repo in VS Code and press `F5` to launch an Extension Development Host with `@pfdsl/vscode-extension` loaded. In the host, `.pfdsl` files get:
 
 - syntax highlighting (TextMate grammar; YAML embedded in frontmatter)
 - inline diagnostics (parse / normalize / validate)

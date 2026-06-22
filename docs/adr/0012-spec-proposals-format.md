@@ -6,13 +6,10 @@
 ## Context
 
 spec 改版（例: v0.0.6 → v0.0.7）では複数の issue がそれぞれ独立した仕様変更を提案する。
-これらを直接 spec.md に統合しようとすると、個別提案の設計判断・影響範囲・
-cross-field constraints が統合フェーズに持ち込まれ、外部レビューなしでは見落としが生じる。
+これらを直接 spec.md に統合しようとすると、個別提案の設計判断・影響範囲・ cross-field constraints が統合フェーズに持ち込まれ、外部レビューなしでは見落としが生じる。
 
 v0.0.7 の統合（`integrate_spec`）では Opus 外部レビュー 3ラウンドで 15件の指摘が出た。
-うち最重要は「individual proposals では見えない cross-proposal constraints」——
-例えば `command:` フィールドの Artifact 指定禁止は、`command:` proposal 単独では
-書かれず、統合時に他フィールドの対称性から発見された。
+うち最重要は「individual proposals では見えない cross-proposal constraints」—— 例えば `command:` フィールドの Artifact 指定禁止は、`command:` proposal 単独では 書かれず、統合時に他フィールドの対称性から発見された。
 
 提案文書の形式とその役割を規約として定めることで、統合フェーズの品質を安定させる。
 
@@ -66,13 +63,9 @@ spec §20（変更点リスト）と対になる証跡。
 
 ## Rationale
 
-1. **統合時の cross-validation が主仕事**: `integrate_spec` は "貼り合わせ" ではなく
-   複数提案の相互参照フェーズ。個別提案が完全であっても、型の対称性・例示の整合・
-   strict mode 定義の一貫性は統合後にしか検査できない。外部レビューを推奨する。
+1. **統合時の cross-validation が主仕事**: `integrate_spec` は "貼り合わせ" ではなく複数提案の相互参照フェーズ。個別提案が完全であっても、型の対称性・例示の整合・ strict mode 定義の一貫性は統合後にしか検査できない。外部レビューを推奨する。
 
-2. **4セクション構成の根拠**: 概要（what）→ 仕様変更（spec text）→ 設計判断（why）→
-   影響範囲（where to implement）の順が、起草・レビュー・実装の3者それぞれにとって
-   必要な情報を過不足なく提供する。
+2. **4セクション構成の根拠**: 概要（what）→ 仕様変更（spec text）→ 設計判断（why）→ 影響範囲（where to implement）の順が、起草・レビュー・実装の3者それぞれにとって 必要な情報を過不足なく提供する。
 
 3. **マージ後に残す根拠**: 統合後の spec は "何が変わったか" のみを示す。
    "なぜその設計判断か" は proposal の設計判断セクションにしか残らない。
