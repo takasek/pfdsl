@@ -77,6 +77,7 @@ check-docs:
 		node packages/cli/dist/cli.js graph "$$f" --format dot > /dev/null || exit 1; \
 	done
 	@echo "check-docs: all passed"
+	node scripts/check-doc-examples.mjs
 
 .PHONY: gen-skill
 gen-skill: check-docs

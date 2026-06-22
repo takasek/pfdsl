@@ -33,6 +33,7 @@ process:
 
 親プロセスの入出力エッジとの self-consistent 例：
 
+<!-- pfdsl-nocheck -->
 ```pfdsl
 ---
 process:
