@@ -95,4 +95,36 @@ describe("formatResults", () => {
 		assert.match(out, /up-to-date/);
 		assert.match(out, /behind/);
 	});
+
+	it("shows commits-ahead warning when version is equal but commits exist", () => {
+		const results = [
+			{
+				name: "@pfdsl/cli",
+				registry: "npm",
+				localVersion: "0.0.7",
+				publishedVersion: "0.0.7",
+				status: "equal",
+				commitsAhead: 2,
+			},
+		];
+		const out = formatResults(results);
+		assert.match(out, /commits-ahead/);
+		assert.match(out, /2 commit/);
+		assert.match(out, /needs version bump/);
+	});
+
+	it("shows up-to-date when version is equal and no commits ahead", () => {
+		const results = [
+			{
+				name: "@pfdsl/cli",
+				registry: "npm",
+				localVersion: "0.0.7",
+				publishedVersion: "0.0.7",
+				status: "equal",
+				commitsAhead: 0,
+			},
+		];
+		const out = formatResults(results);
+		assert.match(out, /up-to-date/);
+	});
 });
