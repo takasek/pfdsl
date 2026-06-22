@@ -38,6 +38,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **Cycle 計画のパッケージ層明記**: PR body に対象パッケージ層を明記する（→ workflow.pfdsl `develop` プロセスの description 参照）。
 
+**VS Code 拡張の UI 動作確認**: 拡張機能の挙動変更（webview インタラクション・クリック動作等）は PR 作成前に `/vscode-ext-debug` スキルを用いてビルド後の実動作を確認し、確認結果を受け取るまでサイクル完了とみなさない（pfd-ops 手順2）。
+
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる。
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる。
