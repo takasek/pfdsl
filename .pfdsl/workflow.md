@@ -77,7 +77,7 @@ A・B 層カタログ（図の監査プロンプト一覧）: `docs/review-promp
 
 PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workflow.pfdsl`）を採用。runtime-pipeline 未採用。
 
-出力宛先は「知見の振り分け（3経路）」セクションに従う。
+出力宛先は「知見の振り分け（3経路）」セクションに従う。companion への書き分け（どの companion に書くか）は `.claude/skills/pfd-ops/references/architecture.md` の「companion への書き分けルール」表が一次情報。
 
 ## 終端ゲートの根拠
 
