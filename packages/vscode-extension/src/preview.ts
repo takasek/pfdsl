@@ -112,7 +112,8 @@ function buildLocations(fm: Frontmatter | null): Record<string, string> {
 	for (const id of Object.keys(fm.process ?? {})) {
 		const meta = fm.process?.[id];
 		const loc = meta?.location ?? meta?.subflow;
-		if (typeof loc === "string" && loc && !loc.includes("://")) result[id] = loc;
+		if (typeof loc === "string" && loc && !loc.includes("://"))
+			result[id] = loc;
 	}
 	return result;
 }
