@@ -57,6 +57,10 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 
 proposal 起草を subagent に委譲する場合、対象 spec の**現行 frontmatter キー構造・制約節番号**を委譲入力に明示する（`spec.md` の該当節を読ませる/grep させる）。渡さないと存在しない構造を捏造する（2026-06-20: spec に無い `presentation` ブロックを捏造 — review-prompts A「入力充足」の委譲版。戻り後レビューで検出したが、入力を渡せば捏造自体を予防できる）。
 
+## VS Code 拡張の UI 動作確認
+
+`vscode-extension` の挙動変更（webview インタラクション・クリック動作等）を含む develop は、PR 作成前に `/vscode-ext-debug` スキルを用いてビルド後の実動作を確認する。確認結果をユーザーから受け取るまでサイクル完了とみなさない（pfd-ops 手順2）。
+
 ## hotfix 運用（issue 省略）
 
 バグ修正で以下をすべて満たす場合、issue 起票・roadmap_pfdsl 更新を省略してよい:
