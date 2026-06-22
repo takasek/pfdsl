@@ -21,8 +21,7 @@ Key syntax:
 - `R >>? P` — feedback edge (does not affect rank/topology)
 - `A >> P -> B >> Q -> C` — chain (multi-segment statement)
 - `# ...` — comment to end of line
-- Trailing tokens (`<id>` or `]`) may be followed by a single newline (and
-  optional comment lines) before a continuation operator (`>>`, `>>?`, `->`); blank lines force statement termination.
+- Trailing tokens (`<id>` or `]`) may be followed by a single newline (and optional comment lines) before a continuation operator (`>>`, `>>?`, `->`); blank lines force statement termination.
 
 ## Artifact status & tags (DOT styling)
 
