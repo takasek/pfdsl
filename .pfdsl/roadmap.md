@@ -1,5 +1,7 @@
 # roadmap.md — issue 管理バインディング（roadmap.pfdsl の companion）
 
+この companion を読んだ後、pfd-ops スキルをロードして運用プロトコル（サイクル手順・終端ゲート・知見振り分け手続き等）を確認すること。
+
 `roadmap.pfdsl` は issue 依存構造のみ管理する。issue の一次情報と同期手段はここに書く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
 
 ## バックエンド
@@ -31,18 +33,16 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
 - [ ] close 時の降格規則を適用した（定義は L3 reference。専属 process も含めて削除する）
 - [ ] `packages/cli` / `packages/vscode-extension` **または CLI が束ねる依存パッケージ**（`@pfdsl/core` / `@pfdsl/graphviz-exporter` / `@pfdsl/metadata-exporter` 等 — `packages/cli/tsup.config.ts` の `noExternal: [/^@pfdsl\//]` が全 `@pfdsl/*` を dist へ同梱する）を変更した場合、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending なら次サイクルの先頭タスクとして明記する — 忘れると `published_cli` / `published_extension` が無期限に stale になる）。**判定はパッケージのパスでなく「公開物の挙動が変わるか」で行う**: lib 変更が CLI の出力（`check`/`graph` 等）を変える場合は cli 直接変更と同じ扱い
-- [ ] `.pfdsl/roadmap.pfdsl` を**人手で**変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新しコミットした（flow-sync bot PR は `flow-on-issue-close.yml` が `--fix` 後に自動再生成。どちらの経路も `test.yml` の PR test gate がマージ前に stale snapshot を検出する）
-- [ ] スキル生成ソース（`scripts/gen-skill.mjs`・spec・samples・examples・review-prompts・skill dirs 等）を変更した場合、`make gen-skill` を実行し再生成物をコミットした（`check-gen-skill.yml` が**全 PR**で identity を強制。人手・bot 両経路の取りこぼしを CI が backstop するため、本項目はローカル事前チェックに退く）
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる（2026-06-20 の /pfd-retro で発見: worktree サイクルで未ビルドのまま check が `Missing script` / `MODULE_NOT_FOUND` で失敗）。
 
-**Cycle 計画のパッケージ層明記**: 実装 Cycle の計画（PR body 等）には「対象パッケージ層（core / cli / graphviz-exporter 等）」を明記する。層を特定しないと、実装着手時に「renderer は core 外（CLI 層）なので今 Cycle のスコープ外」という判断が遅れて延期コストが発生する（2026-06-21 の Cycle 1 で発見: "renderer 任意展開" が core 実装 Cycle に含まれていたが、着手時に CLI/graphviz-exporter 層と判明して延期）。
+**Cycle 計画のパッケージ層明記**: PR body に対象パッケージ層を明記する（→ workflow.pfdsl の develop 参照）。
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる（2026-06-21 の #135 サイクルで発見: `cd /Users/m5/works/pfdsl && git commit` が main を汚染し、ブランチ付け替えと reset --hard が必要になった）。
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる（2026-06-21 の #135 サイクルで発見: PR に性質が明示されておらず、通常機能追加との区別が見えなかった）。
 
-**issue 起票と roadmap 追加は同時に行う**: issue を起票したら、その場で `roadmap.pfdsl` に artifact / process / edge を追加してコミットする。後回しにすると依存グラフが stale になり、「言われるまで気付かない」気付き依存に戻る。pfd-ops プロトコル2「起票 → 依存グラフに1チェーン追加」の実施タイミングは起票直後（2026-06-22 の retro で発見: #147/#148 起票後にユーザー指摘まで roadmap 未追加のまま進行）。
+**issue 起票と roadmap 追加は同時に行う**（→ workflow.pfdsl の file_issues 参照）。
 
 **Cycle 完了後 pfd-retro 実施**: 各 Cycle の PR 作成後、次 Cycle に移行する前に pfd-retro を完了させる。「続けて」で次 Cycle に即移行する場合も、前 Cycle の retro を先に実施してから進む。未実施の場合は延期理由を明示して記録する。（2026-06-21 の Cycle 2/3 で発見: retro なしで2 Cycle 連続進行し、ユーザー指摘まで気付かなかった。retro が終端に無ければ委譲結果の差分検証も省略される）
 

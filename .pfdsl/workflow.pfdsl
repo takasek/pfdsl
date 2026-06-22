@@ -128,7 +128,7 @@ artifact:
     label: issue 依存グラフ
     description: "着手可能順序の導出。issue 追加時に更新"
     status: done
-    criteria: check がエラーなし、audit-issues-flow.mjs が差分なし
+    criteria: check がエラーなし、audit-issues-flow.mjs が差分なし。人手変更の場合は pnpm --filter @pfdsl/core exec vitest run -u でスナップショット更新済み（bot 経路は flow-on-issue-close.yml が自動再生成。どちらも test.yml が backstop）
     location: roadmap.pfdsl
     group: planning
   toolchain:
@@ -238,6 +238,7 @@ process:
     group: generation
   gen_skill:
     label: スキル生成
+    description: "スキル生成ソース（skill-template/spec/samples/examples/review-prompts/skill dirs 等）を変更した場合に実行する。check-gen-skill.yml が全 PR で identity を強制（CI backstop）"
     command: make gen-skill
     group: generation
 
@@ -259,7 +260,7 @@ process:
     group: decision
   file_issues:
     label: issue 管理
-    description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、roadmap_pfdsl と同期する"
+    description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、roadmap_pfdsl と同期する。起票と同時に roadmap_pfdsl への artifact/process/edge 追加を行う（後回し禁止 — 依存グラフが stale になり気付き依存に戻る）"
     group: planning
   map_deps:
     label: 依存整理
@@ -268,7 +269,7 @@ process:
     group: planning
   develop:
     label: ツールチェーン開発
-    description: 着手可能 issue をブランチ上で実装し PR にまとめる
+    description: "着手可能 issue をブランチ上で実装し PR にまとめる。PR body に対象パッケージ層（core / cli / graphviz-exporter 等）を明記する（層未明記だと着手後に層違いで延期コストが発生する）"
     group: planning
   merge_pr:
     label: レビュー・マージ
