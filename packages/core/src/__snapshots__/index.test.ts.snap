@@ -69,20 +69,6 @@ artifact:
     criteria: v* tag push で VS Code Marketplace への自動 publish が動作確認済み
     location: https://github.com/takasek/pfdsl/issues/119
     updated_at: 2026-06-22T05:40:24Z
-  i180_no_color:
-    label: "CLI --no-color / NO_COLOR 対応 (#180)"
-    description: "--no-color フラグまたは NO_COLOR 環境変数で ANSI カラー出力を無効化する。no-color.org 準拠"
-    status: todo
-    criteria: "NO_COLOR=1 pfdsl check <file> および --no-color で ANSI コードを含まない出力、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/180
-    updated_at: 2026-06-23T02:53:54Z
-  i181_json_output:
-    label: "CLI --json 出力対応 (#181)"
-    description: "check / normalize で --json フラグを渡すと診断結果またはエッジ一覧を JSON で返す。CI・外部ツール連携向け"
-    status: todo
-    criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/181
-    updated_at: 2026-06-23T02:54:03Z
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -185,6 +171,18 @@ artifact:
     status: done
     criteria: "echo 'a >> P -> b' | pfdsl check - が exit 0、fmt --write - が exit 2、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/178
+  no_color:
+    label: "CLI --no-color / NO_COLOR 対応 (#180)"
+    description: "--no-color フラグまたは NO_COLOR 環境変数で ANSI カラー出力を無効化する。no-color.org 準拠"
+    status: done
+    criteria: "NO_COLOR=1 pfdsl check <file> および --no-color で ANSI コードを含まない出力、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/180
+  json_output:
+    label: "CLI --json 出力対応 (#181)"
+    description: "check / normalize で --json フラグを渡すと診断結果またはエッジ一覧を JSON で返す。CI・外部ツール連携向け"
+    status: done
+    criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/181
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -269,8 +267,6 @@ featured_toolchain
 findings_r12
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -282,10 +278,12 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_toolchain
+no_color
 publish_cli_further
 publish_cli_v0010
 publish_cli_v009
@@ -322,8 +320,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -335,11 +331,13 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -378,8 +376,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -391,11 +387,13 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -433,8 +431,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -446,10 +442,12 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -488,8 +486,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -501,11 +497,13 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -545,8 +543,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -557,10 +553,12 @@ implement_stdin
 implement_subcommand_help
 implement_version_cmd
 integrate_multifile
+json_output
 layer_audit_assets
 lint_checker
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -598,8 +596,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -610,11 +606,13 @@ implement_stdin
 implement_subcommand_help
 implement_version_cmd
 integrate_multifile
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -654,8 +652,6 @@ featured_toolchain
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_multifile
@@ -666,10 +662,12 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -709,8 +707,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -721,10 +717,12 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -765,8 +763,6 @@ external_stakeholders_spec
 findings_r12
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -777,10 +773,12 @@ implement_stdin
 implement_subcommand_help
 implement_version_cmd
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_toolchain
+no_color
 publish_cli_further
 publish_cli_v0010
 publish_cli_v009
@@ -819,8 +817,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -831,10 +827,12 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -874,8 +872,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -887,11 +883,13 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -927,8 +925,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -940,11 +936,13 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -982,8 +980,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -995,10 +991,12 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -1037,8 +1035,6 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i119_published_extension
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1050,11 +1046,13 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -1092,8 +1090,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 implement_json_output
 implement_lints
 implement_multifile
@@ -1104,11 +1100,13 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -1147,8 +1145,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1160,11 +1156,13 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -1202,8 +1200,6 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1215,11 +1211,13 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v0010
@@ -1240,8 +1238,8 @@ write_design_notes
 
 cli_tool_v0010 >> implement_json_output
 cli_tool_v0010 >> implement_no_color
-implement_json_output -> i181_json_output
-implement_no_color -> i180_no_color
+implement_json_output -> json_output
+implement_no_color -> no_color
 cli_tool_v009 >> implement_stdin
 cli_tool_v009 >> implement_subcommand_help
 cli_tool_v009 >> implement_version_cmd
@@ -1314,8 +1312,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1327,11 +1323,13 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
+json_output
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
+no_color
 presets_spec
 publish_cli_further
 publish_cli_v009
@@ -1348,8 +1346,8 @@ write_article
 write_design_notes
 
 cli_tool_v0010 >> publish_cli_further
-i180_no_color >> publish_cli_further
-i181_json_output >> publish_cli_further
+json_output >> publish_cli_further
+no_color >> publish_cli_further
 publish_cli_further -> published_cli_further
 adr_corpus
 audit_distribution
