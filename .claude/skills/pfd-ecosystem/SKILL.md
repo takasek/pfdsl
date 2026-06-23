@@ -42,7 +42,7 @@ Yes の種別のファイルだけを育てる。
 ## ステップ 3: 必要な種別のテンプレートをコピーする
 
 ステップ 2 で Yes になった種別のテンプレートを `.pfdsl/` にコピーする。
-テンプレートは `skill sync pfd-ops` 実行後に以下のパスに配置されている:
+テンプレートは `skill sync` 実行後に以下のパスに配置されている:
 
 ```
 .claude/skills/pfd-ops/references/scaffold/roadmap.pfdsl
