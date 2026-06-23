@@ -133,8 +133,12 @@ root.addEventListener("mousemove", (e) => {
 	tooltip.style.display = "block";
 });
 
-root.addEventListener("mouseleave", () => {
+root.addEventListener("mouseleave", (e) => {
 	tooltip.style.display = "none";
+	if (e.buttons === 0) {
+		dragging = false;
+		root.style.cursor = "grab";
+	}
 });
 
 const MINIMAP_W = 160;
