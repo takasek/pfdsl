@@ -830,6 +830,42 @@ spec >> P -> X
 			const dot = exportDot(graph, frontmatter);
 			expect(dot).toContain("docs/spec.md");
 		});
+
+		it("shows comma-joined locations in tooltip when location is an array", () => {
+			const src = `---
+artifact:
+  spec: { label: "仕様書", location: ["a.ts", "b.ts"] }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).toContain("a.ts, b.ts");
+		});
+
+		it("does not add href when location is an array with a URL", () => {
+			const src = `---
+artifact:
+  spec: { label: "仕様書", location: ["https://example.com/a", "https://example.com/b"] }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).not.toContain("href=");
+		});
+
+		it("adds href when location is a single-element URL array", () => {
+			const src = `---
+artifact:
+  spec: { label: "仕様書", location: ["https://example.com/spec"] }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).toContain('href="https://example.com/spec"');
+		});
 	});
 
 	describe("criteria field", () => {

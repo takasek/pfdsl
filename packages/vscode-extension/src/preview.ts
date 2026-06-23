@@ -10,6 +10,7 @@ import * as vscode from "vscode";
 import { analyzeDocument } from "./analyze.js";
 import { findFrontmatterDefinition } from "./jump.js";
 import { resolveLocationFsPath } from "./location-path.js";
+import { buildDescriptions, buildLocations, buildSubflows } from "./location-utils.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
@@ -68,7 +69,7 @@ type MessageToWebview =
 			dot: string;
 			focusNodeId?: string;
 			descriptions?: Record<string, string>;
-			locations?: Record<string, string>;
+			locations?: Record<string, string[]>;
 			subflows?: Record<string, string>;
 	  }
 	| { type: "error"; message: string }
@@ -81,52 +82,94 @@ type MessageFromWebview =
 	| { type: "ready" }
 	| { type: "nodeClick"; nodeId: string }
 	| { type: "openUrl"; url: string }
-	| { type: "openFile"; path: string };
+	| { type: "openFile"; path: string }
+	| { type: "openLocation"; nodeId: string };
 
-function buildDescriptions(fm: Frontmatter | null): Record<string, string> {
-	const result: Record<string, string> = {};
-	if (!fm) return result;
-	for (const id of Object.keys(fm.artifact ?? {})) {
-		const meta = fm.artifact?.[id];
-		const parts: string[] = [];
-		if (meta?.description) parts.push(meta.description);
-		if (meta?.criteria) parts.push(`criteria: ${meta.criteria}`);
-		if (typeof meta?.location === "string" && meta.location)
-			parts.push(`location: ${meta.location}`);
-		if (parts.length > 0) result[id] = parts.join("\n");
+async function expandDirectory(dirUri: vscode.Uri): Promise<string[]> {
+	let entries: [string, vscode.FileType][];
+	try {
+		entries = await vscode.workspace.fs.readDirectory(dirUri);
+	} catch {
+		return [];
 	}
-	for (const id of Object.keys(fm.process ?? {})) {
-		const meta = fm.process?.[id];
-		if (meta?.description) result[id] = meta.description;
+	const files: string[] = [];
+	for (const [name, type] of entries) {
+		if (type === vscode.FileType.File) {
+			files.push(vscode.Uri.joinPath(dirUri, name).fsPath);
+		}
 	}
-	return result;
+	if (files.length === 0) {
+		for (const [name, type] of entries) {
+			if (type === vscode.FileType.Directory) {
+				const sub = await expandDirectory(vscode.Uri.joinPath(dirUri, name));
+				files.push(...sub);
+			}
+		}
+	}
+	return files;
 }
 
-function buildLocations(fm: Frontmatter | null): Record<string, string> {
-	const result: Record<string, string> = {};
-	if (!fm) return result;
-	for (const id of Object.keys(fm.artifact ?? {})) {
-		const loc = fm.artifact?.[id]?.location;
-		if (typeof loc === "string" && loc) result[id] = loc;
-	}
-	for (const id of Object.keys(fm.process ?? {})) {
-		const meta = fm.process?.[id];
-		const loc = meta?.location ?? meta?.subflow;
-		if (typeof loc === "string" && loc && !loc.includes("://"))
-			result[id] = loc;
-	}
-	return result;
-}
+type QuickPickLocationItem = vscode.QuickPickItem & { fsPath?: string; url?: string };
 
-function buildSubflows(fm: Frontmatter | null): Record<string, string> {
-	const result: Record<string, string> = {};
-	if (!fm) return result;
-	for (const id of Object.keys(fm.process ?? {})) {
-		const meta = fm.process?.[id];
-		if (!meta?.location && typeof meta?.subflow === "string" && meta.subflow)
-			result[id] = meta.subflow;
+async function handleOpenLocation(docFsPath: string, locs: string[]): Promise<void> {
+	if (locs.length === 0) return;
+
+	const items: QuickPickLocationItem[] = [];
+	for (const loc of locs) {
+		if (loc.includes("://")) {
+			const url = new URL(loc);
+			items.push({ label: url.hostname, description: loc, url: loc });
+		} else {
+			const resolvedPath = resolveLocationFsPath(docFsPath, loc);
+			const resolvedUri = vscode.Uri.file(resolvedPath);
+			let stat: vscode.FileStat | undefined;
+			try {
+				stat = await vscode.workspace.fs.stat(resolvedUri);
+			} catch {
+				// treat as file if stat fails
+			}
+			if (stat?.type === vscode.FileType.Directory) {
+				const children = await expandDirectory(resolvedUri);
+				if (children.length === 0) {
+					vscode.window.showWarningMessage(`No files found in ${loc}`);
+					return;
+				}
+				for (const child of children) {
+					items.push({
+						label: child.split("/").pop() ?? child,
+						description: child,
+						fsPath: child,
+					});
+				}
+			} else {
+				items.push({
+					label: resolvedPath.split("/").pop() ?? resolvedPath,
+					description: resolvedPath,
+					fsPath: resolvedPath,
+				});
+			}
+		}
 	}
-	return result;
+
+	if (items.length === 1) {
+		const item = items[0];
+		if (item.url) {
+			await vscode.env.openExternal(vscode.Uri.parse(item.url));
+		} else if (item.fsPath) {
+			const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(item.fsPath));
+			await vscode.window.showTextDocument(doc, { preview: false });
+		}
+		return;
+	}
+
+	const selected = await vscode.window.showQuickPick(items, { placeHolder: "Open location…" });
+	if (!selected) return;
+	if (selected.url) {
+		await vscode.env.openExternal(vscode.Uri.parse(selected.url));
+	} else if (selected.fsPath) {
+		const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(selected.fsPath));
+		await vscode.window.showTextDocument(doc, { preview: false });
+	}
 }
 
 function dotForDocument(doc: vscode.TextDocument): {
@@ -328,6 +371,10 @@ export function registerPreview(context: vscode.ExtensionContext): {
 					.then((doc) =>
 						vscode.window.showTextDocument(doc, { preview: false }),
 					);
+			} else if (msg.type === "openLocation") {
+				const { frontmatter } = analyzeDocument(state.doc);
+				const locs = buildLocations(frontmatter)[msg.nodeId] ?? [];
+				handleOpenLocation(state.doc.uri.fsPath, locs);
 			}
 		});
 

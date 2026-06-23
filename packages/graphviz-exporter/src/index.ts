@@ -548,8 +548,14 @@ function nodeAttrs(
 	const ameta =
 		kind === "artifact" ? (meta as ArtifactMeta | undefined) : undefined;
 	const criteria = ameta?.criteria;
-	const location =
-		typeof ameta?.location === "string" ? ameta.location : undefined;
+	const locationRaw = ameta?.location;
+	const locationArray: string[] | undefined =
+		typeof locationRaw === "string"
+			? [locationRaw]
+			: Array.isArray(locationRaw) && locationRaw.length > 0
+				? (locationRaw as string[])
+				: undefined;
+	const location = locationArray?.join(", ");
 	const revises = ameta?.revises;
 
 	const maxWidth =
@@ -611,12 +617,16 @@ function nodeAttrs(
 
 	const styleAttrs = resolveStyleAttrs(id, kind, fm);
 	const xlabel = buildXlabel(id, kind, fm);
-	const isUrl = location?.includes("://");
+	const firstLoc = locationArray?.[0];
+	const singleUrl =
+		locationArray?.length === 1 && firstLoc?.includes("://")
+			? firstLoc
+			: undefined;
 
 	const minWidth = calcMinWidth(label);
 	const attrs: string[] = [`shape=${shape}`, `label=${quote(label)}`];
 	if (tooltip !== undefined) attrs.push(`tooltip=${quote(tooltip)}`);
-	if (isUrl && location) attrs.push(`href=${quote(location)}`);
+	if (singleUrl) attrs.push(`href=${quote(singleUrl)}`);
 	if (minWidth !== undefined) attrs.push(`width=${minWidth.toFixed(2)}`);
 	if (xlabel !== undefined) attrs.push(`xlabel=${quote(xlabel)}`);
 	for (const key of STYLE_ATTRS) {

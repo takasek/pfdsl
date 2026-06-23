@@ -61,6 +61,10 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 `.pfdsl` ファイルを人手変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。変更後にテストを再実行せず PR を作成すると CI で失敗する。
 
+## spec.md 変更後の gen-skill 実行
+
+`docs/spec/spec.md` を変更した場合、`make gen-skill` を実行してからコミットする。スキルの `references/spec.md` が spec 本文と一致していないと CI（check-gen-skill.yml）で失敗する。
+
 ## VS Code 拡張の UI 動作確認
 
 `vscode-extension` の挙動変更（webview インタラクション・クリック動作等）を含む develop は、PR 作成前に `/vscode-ext-debug` スキルを用いてビルド後の実動作を確認する。確認結果をユーザーから受け取るまでサイクル完了とみなさない（pfd-ops 手順2）。
