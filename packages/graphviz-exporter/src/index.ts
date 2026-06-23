@@ -563,9 +563,45 @@ function nodeAttrs(
 
 	const tooltipParts: string[] = [originalLabel];
 	if (description) tooltipParts.push(`\n\n${description}`);
-	if (criteria) tooltipParts.push(`\ncriteria: ${criteria}`);
+
+	const KNOWN_TOOLTIP_SKIP = new Set([
+		"label",       // shown as node label
+		"description", // rendered first with double newline
+		"status",      // shown as node color and xlabel
+		"tags",        // shown as xlabel
+		"group",       // shown as cluster border
+		"parts",       // structural — child nodes are visible in graph
+		"location",    // appended last with dedicated formatting
+		"boundary",    // subflow id remapping — not human-readable as-is
+	]);
+	const knownFields: [string, string][] = [];
+	if (criteria) knownFields.push(["criteria", criteria]);
+	if (revises) knownFields.push(["revises", revises]);
+	if (typeof meta?.owner === "string") knownFields.push(["owner", meta.owner]);
+	if (typeof (meta as ProcessMeta | undefined)?.command === "string")
+		knownFields.push(["command", (meta as ProcessMeta).command!]);
+	if (typeof (meta as ProcessMeta | undefined)?.subflow === "string")
+		knownFields.push(["subflow", (meta as ProcessMeta).subflow!]);
+	const extraFields: [string, string][] = meta
+		? Object.entries(meta)
+				.filter(([k, v]) => {
+					if (KNOWN_TOOLTIP_SKIP.has(k)) return false;
+					if (knownFields.some(([kf]) => kf === k)) return false;
+					if (typeof v === "string") return true;
+					if (Array.isArray(v) && v.length > 0 && v.every((i) => typeof i === "string")) return true;
+					return false;
+				})
+				.map(([k, v]) => [k, Array.isArray(v) ? (v as string[]).join(", ") : v as string])
+		: [];
+
+	for (const [key, val] of [...knownFields, ...extraFields]) {
+		const formatted = val.includes("\n")
+			? `\n${key}:\n${val.split("\n").map((l) => `  ${l}`).join("\n")}`
+			: `\n${key}: ${val}`;
+		tooltipParts.push(formatted);
+	}
+
 	if (location) tooltipParts.push(`\nlocation: ${location}`);
-	if (revises) tooltipParts.push(`\nrevises: ${revises}`);
 	const tooltip =
 		tooltipParts.length > 1
 			? tooltipParts.join("")
