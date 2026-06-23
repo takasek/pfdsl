@@ -73,6 +73,19 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 `vscode-extension` の挙動変更（webview インタラクション・クリック動作等）を含む develop は、PR 作成前に `/vscode-ext-debug` スキルを用いてビルド後の実動作を確認する。確認結果をユーザーから受け取るまでサイクル完了とみなさない（pfd-ops 手順2）。
 
+## flow:exempt issue の roadmap 追加除外
+
+`flow:exempt` ラベルの issue は roadmap_pfdsl への artifact 追加対象外。`file_issues` の「起票と同時に roadmap 追加」ルールの例外。起票時に `flow:exempt` / `flow:managed` を判定してから roadmap 追加要否を決める。
+
+## 複数 issue を一括実装する場合のバージョン戦略
+
+複数の実装 issue を1つの PR に束ねる場合、中間バージョンの publish を省略してよい。ただし **選択判断は着手前に明示する**:
+
+- roadmap の中間バージョン artifact（例: `cli_tool_v0010`）の扱い（スキップ / 統合 / 後日 publish）を PR body に記述する
+- スキップする場合は「#NNN と #MMM を同一バージョンに統合し中間 publish を省略」と明記する
+
+省略判断を暗黙にすると roadmap の依存構造と実態が乖離する。
+
 ## hotfix 運用（issue 省略）
 
 バグ修正で以下をすべて満たす場合、issue 起票・roadmap_pfdsl 更新を省略してよい:
