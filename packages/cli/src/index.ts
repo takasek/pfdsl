@@ -305,8 +305,6 @@ export async function runDiff(
 }
 
 declare const __PFDSL_VERSION__: string;
-const VERSION: string =
-	typeof __PFDSL_VERSION__ !== "undefined" ? __PFDSL_VERSION__ : "0.0.0-dev";
 
 export const HELP = `pfdsl <command> [options]
 
@@ -365,7 +363,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 		case "version":
 		case "--version":
 		case "-V":
-			return ok(`${VERSION}\n`);
+			return ok(`${__PFDSL_VERSION__}\n`);
 		case "help":
 		case "--help":
 		case "-h":
