@@ -50,6 +50,18 @@ artifact:
     status: done
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
+  published_cli_next:
+    label: npm公開済みCLI（次期版）
+    description: "#172 --version / #177 per-command --help / #178 stdin 対応を含む次期リリース"
+    status: todo
+    criteria: npm show @pfdsl/cli version が次期バージョンを返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
+  published_cli_further:
+    label: npm公開済みCLI（次次期版）
+    description: "#180 --no-color / #181 --json 対応を含むリリース"
+    status: todo
+    criteria: npm show @pfdsl/cli version が次次期バージョンを返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
   i119_published_extension:
     label: "Marketplace 公開済み extension (#119)"
     description: "v* tag push で GitHub Actions が自動 publish する extension 公開フロー。CLI の Trusted Publishing / OIDC パターンを踏襲"
@@ -223,6 +235,10 @@ process:
     label: --no-color / NO_COLOR実装
   implement_json_output:
     label: --json出力実装
+  publish_cli_next:
+    label: CLI次期版リリース
+  publish_cli_further:
+    label: CLIさらに次期版リリース
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -274,8 +290,12 @@ lint_checker
 location_spec
 multifile_toolchain
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -325,8 +345,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -377,8 +401,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 skill_gen
@@ -427,8 +455,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -479,8 +511,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -530,8 +566,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 skill_gen
@@ -580,8 +620,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -631,8 +675,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -682,8 +730,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -733,8 +785,12 @@ lint_checker
 location_spec
 multifile_toolchain
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -784,8 +840,12 @@ location_spec
 multifile_policy
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -837,8 +897,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 revises_spec
 spec_v006
 spec_v007
@@ -886,7 +950,11 @@ location_spec
 multifile_policy
 multifile_toolchain
 presets_spec
+publish_cli_further
+publish_cli_next
 publish_extension
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -936,8 +1004,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -988,8 +1060,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1038,8 +1114,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1090,8 +1170,12 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 publish_extension
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1141,7 +1225,11 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
 published_cli
+published_cli_further
+published_cli_next
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1191,6 +1279,120 @@ multifile_policy
 multifile_toolchain
 presets_spec
 publish_cli
+publish_cli_further
+publish_cli_next
+publish_extension
+published_cli
+published_cli_further
+published_cli_next
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+i172_version_cmd >> publish_cli_next
+i177_subcommand_help >> publish_cli_next
+i178_stdin >> publish_cli_next
+publish_cli_next -> published_cli_next
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+cli_tool
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+external_stakeholders_spec
+featured_toolchain
+findings_r12
+hierarchy_spec
+i119_published_extension
+i12_article
+i180_no_color
+i181_json_output
+i3_obsidian_plugin
+implement_json_output
+implement_lints
+implement_multifile
+implement_no_color
+implement_spec_features
+implement_stdin
+implement_subcommand_help
+implement_version_cmd
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+multifile_toolchain
+presets_spec
+publish_cli
+publish_cli_further
+publish_extension
+published_cli
+published_cli_further
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+write_article
+write_design_notes
+
+i180_no_color >> publish_cli_further
+i181_json_output >> publish_cli_further
+published_cli_next >> publish_cli_further
+publish_cli_further -> published_cli_further
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+cli_tool
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+external_stakeholders_spec
+featured_toolchain
+findings_r12
+hierarchy_spec
+i119_published_extension
+i12_article
+i172_version_cmd
+i177_subcommand_help
+i178_stdin
+i3_obsidian_plugin
+implement_json_output
+implement_lints
+implement_multifile
+implement_no_color
+implement_spec_features
+implement_stdin
+implement_subcommand_help
+implement_version_cmd
+integrate_multifile
+integrate_spec
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+multifile_toolchain
+presets_spec
+publish_cli
+publish_cli_next
 publish_extension
 published_cli
 restructure_skillgen

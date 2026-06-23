@@ -47,6 +47,18 @@ artifact:
     status: done
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
+  published_cli_next:
+    label: npm公開済みCLI（次期版）
+    description: "#172 --version / #177 per-command --help / #178 stdin 対応を含む次期リリース"
+    status: todo
+    criteria: npm show @pfdsl/cli version が次期バージョンを返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
+  published_cli_further:
+    label: npm公開済みCLI（次次期版）
+    description: "#180 --no-color / #181 --json 対応を含むリリース"
+    status: todo
+    criteria: npm show @pfdsl/cli version が次次期バージョンを返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
   i119_published_extension:
     label: "Marketplace 公開済み extension (#119)"
     description: "v* tag push で GitHub Actions が自動 publish する extension 公開フロー。CLI の Trusted Publishing / OIDC パターンを踏襲"
@@ -220,6 +232,10 @@ process:
     label: --no-color / NO_COLOR実装
   implement_json_output:
     label: --json出力実装
+  publish_cli_next:
+    label: CLI次期版リリース
+  publish_cli_further:
+    label: CLIさらに次期版リリース
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -272,3 +288,7 @@ cli_tool >> implement_subcommand_help -> i177_subcommand_help
 cli_tool >> implement_stdin -> i178_stdin
 cli_tool >> implement_no_color -> i180_no_color
 cli_tool >> implement_json_output -> i181_json_output
+
+[i172_version_cmd, i177_subcommand_help, i178_stdin] >> publish_cli_next -> published_cli_next
+
+[published_cli_next, i180_no_color, i181_json_output] >> publish_cli_further -> published_cli_further
