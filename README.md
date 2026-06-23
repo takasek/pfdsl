@@ -130,9 +130,11 @@ node scripts/gen-skill.mjs --out ~/.claude/skills/pfdsl
 
 The `--out` path must contain `/.claude/` (safety check). The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alongside `SKILL.md`.
 
-## pfd-ops skill — `skill sync` (cross-project)
+## PFD-ops skill suite — `skill sync` (cross-project)
 
-`pfd-ops` is a separate skill for **PFD-driven project operations**: it drives a work cycle off a roadmap/ecosystem graph (see [.claude/skills/pfd-ops/SKILL.md](.claude/skills/pfd-ops/SKILL.md)). The skill is structured in four layers (L1 generic protocol / L2 dispatch / L3 GitHub Issues backend / L4 repo-specific); see [architecture reference](.claude/skills/pfd-ops/references/architecture.md) for details. Any repo can adopt it and keep it up to date with one command:
+`pfd-ops` is a skill for **PFD-driven project operations**: it drives a work cycle off a roadmap/ecosystem graph (see [.claude/skills/pfd-ops/SKILL.md](.claude/skills/pfd-ops/SKILL.md)). The skill is structured in four layers (L1 generic protocol / L2 dispatch / L3 GitHub Issues backend / L4 repo-specific); see [architecture reference](.claude/skills/pfd-ops/references/architecture.md) for details.
+
+`skill sync` installs the full PFD-ops suite into any repo with one command:
 
 ```bash
 npx @pfdsl/cli@latest skill sync
