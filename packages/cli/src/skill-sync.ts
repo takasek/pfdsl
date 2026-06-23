@@ -7,7 +7,7 @@ import {
 	rmSync,
 	statSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
@@ -15,27 +15,54 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
- * Resolves the directory containing the bundled pfd-ops skill tree
- * (SKILL.md, references/, install/).
+ * Resolves the directory containing a bundled skill tree (SKILL.md, etc.).
  *
- * Production: this file runs from `dist/skill-sync.js`, and the skill tree
- * is bundled as a sibling at `dist/skills/pfd-ops` (see tsup.config.ts
+ * Production: this file runs from `dist/skill-sync.js`, and skill trees
+ * are bundled as siblings at `dist/skills/<name>` (see tsup.config.ts
  * onSuccess hook).
  *
  * Source/test execution: this file runs from `packages/cli/src/`, where
- * `dist/skills/pfd-ops` may not exist yet (pre-build). Fall back to the
- * repo's canonical `.claude/skills/pfd-ops`, three levels up from `src/`.
+ * `dist/skills/<name>` may not exist yet (pre-build). Fall back to the
+ * repo's canonical `.claude/skills/<name>`, three levels up from `src/`.
  */
-export function resolveSkillRoot(): string {
-	const distCandidate = resolve(__dirname, "skills/pfd-ops");
+export function resolveSkillRoot(name: string): string {
+	const distCandidate = resolve(__dirname, `skills/${name}`);
 	if (existsSync(distCandidate)) return distCandidate;
 
-	const sourceCandidate = resolve(__dirname, "../../../.claude/skills/pfd-ops");
+	const sourceCandidate = resolve(__dirname, `../../../.claude/skills/${name}`);
 	if (existsSync(sourceCandidate)) return sourceCandidate;
 
 	throw new Error(
-		`pfd-ops skill tree not found at ${distCandidate} or ${sourceCandidate}`,
+		`${name} skill tree not found at ${distCandidate} or ${sourceCandidate}`,
 	);
+}
+
+/**
+ * Resolves the directory containing the bundled commands (pfd-cycle.md, etc.).
+ * Production: `dist/commands/`. Source/test: `.claude/commands/` three levels up.
+ */
+export function resolveCommandsDir(): string {
+	const distCandidate = resolve(__dirname, "commands");
+	if (existsSync(distCandidate)) return distCandidate;
+
+	const sourceCandidate = resolve(__dirname, "../../../.claude/commands");
+	if (existsSync(sourceCandidate)) return sourceCandidate;
+
+	throw new Error(
+		`commands dir not found at ${distCandidate} or ${sourceCandidate}`,
+	);
+}
+
+/**
+ * Copies all bundled command files into `<targetRoot>/.claude/commands/`,
+ * overwriting existing files so stale entries don't linger.
+ */
+export function copyCommands(commandsDir: string, targetRoot: string): void {
+	const dest = join(targetRoot, ".claude/commands");
+	mkdirSync(dest, { recursive: true });
+	for (const entry of readdirSync(commandsDir)) {
+		cpSync(join(commandsDir, entry), join(dest, entry));
+	}
 }
 
 /**
@@ -50,7 +77,7 @@ export function resolveSkillRoot(): string {
  * (see copyInstallLayer).
  */
 export function copySkillTree(skillRoot: string, targetRoot: string): void {
-	const dest = join(targetRoot, ".claude/skills/pfd-ops");
+	const dest = join(targetRoot, ".claude/skills", basename(skillRoot));
 	mkdirSync(dest, { recursive: true });
 	for (const entry of readdirSync(skillRoot)) {
 		rmSync(join(dest, entry), { recursive: true, force: true });
@@ -249,21 +276,6 @@ export interface SkillSyncResult {
 }
 
 /**
- * Returns a guidance message when the pfdsl skill is absent from the target
- * repo's Claude skills directory. pfd-ops depends on pfdsl for reading and
- * writing .pfdsl files, so both skills should be present together.
- * Returns "" when pfdsl is already installed (no noise).
- */
-export function pfdslSkillGuidance(targetRoot: string): string {
-	if (existsSync(join(targetRoot, ".claude/skills/pfdsl/SKILL.md"))) return "";
-	return (
-		"pfd-ops は .pfdsl ファイルの読み書きに pfdsl スキルを必要とします。\n" +
-		"pfdsl スキルをインストールするには次を実行してください:\n" +
-		"  npx @pfdsl/cli@latest skill sync pfdsl\n"
-	);
-}
-
-/**
  * Orchestrates the full `pfdsl skill sync pfd-ops` flow:
  * general layer overwrite -> conditional install/ overwrite (subordinate gh
  * label confirmation when adopted) -> L4 scaffold -> ecosystem-setup prompt
@@ -272,11 +284,20 @@ export function pfdslSkillGuidance(targetRoot: string): string {
 export async function runSkillSync(
 	opts: RunSkillSyncOptions,
 ): Promise<SkillSyncResult> {
-	const skillRoot = resolveSkillRoot();
+	const skillRoot = resolveSkillRoot("pfd-ops");
 	const lines: string[] = [];
 
 	copySkillTree(skillRoot, opts.targetRoot);
 	lines.push("pfd-ops skill tree synced (.claude/skills/pfd-ops/).");
+
+	copySkillTree(resolveSkillRoot("pfd-retro"), opts.targetRoot);
+	lines.push("pfd-retro skill tree synced (.claude/skills/pfd-retro/).");
+
+	copySkillTree(resolveSkillRoot("pfdsl"), opts.targetRoot);
+	lines.push("pfdsl skill tree synced (.claude/skills/pfdsl/).");
+
+	copyCommands(resolveCommandsDir(), opts.targetRoot);
+	lines.push("commands synced (.claude/commands/).");
 
 	const installResult = copyInstallLayer(skillRoot, opts.targetRoot);
 	if (installResult.copied) {
@@ -296,9 +317,6 @@ export async function runSkillSync(
 
 	const dirGuidance = pfdslDirGuidance(opts.targetRoot);
 	if (dirGuidance) lines.push(dirGuidance);
-
-	const pfdslGuidance = pfdslSkillGuidance(opts.targetRoot);
-	if (pfdslGuidance) lines.push(pfdslGuidance);
 
 	return { stdout: `${lines.join("\n")}\n`, exitCode: 0 };
 }
