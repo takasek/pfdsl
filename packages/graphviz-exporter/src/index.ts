@@ -563,7 +563,12 @@ function nodeAttrs(
 
 	const tooltipParts: string[] = [originalLabel];
 	if (description) tooltipParts.push(`\n\n${description}`);
-	if (criteria) tooltipParts.push(`\ncriteria: ${criteria}`);
+	if (criteria) {
+		const formattedCriteria = criteria.includes("\n")
+			? `\ncriteria:\n${criteria.split("\n").map((l) => `  ${l}`).join("\n")}`
+			: `\ncriteria: ${criteria}`;
+		tooltipParts.push(formattedCriteria);
+	}
 	if (location) tooltipParts.push(`\nlocation: ${location}`);
 	if (revises) tooltipParts.push(`\nrevises: ${revises}`);
 	const tooltip =
