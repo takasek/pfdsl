@@ -3,11 +3,15 @@ import type { Frontmatter } from "@pfdsl/core";
 export function normalizeLocation(loc: unknown): string[] {
 	if (typeof loc === "string" && loc) return [loc];
 	if (Array.isArray(loc))
-		return loc.filter((v): v is string => typeof v === "string" && v.length > 0);
+		return loc.filter(
+			(v): v is string => typeof v === "string" && v.length > 0,
+		);
 	return [];
 }
 
-export function buildDescriptions(fm: Frontmatter | null): Record<string, string> {
+export function buildDescriptions(
+	fm: Frontmatter | null,
+): Record<string, string> {
 	const result: Record<string, string> = {};
 	if (!fm) return result;
 	for (const id of Object.keys(fm.artifact ?? {})) {
@@ -26,7 +30,9 @@ export function buildDescriptions(fm: Frontmatter | null): Record<string, string
 	return result;
 }
 
-export function buildLocations(fm: Frontmatter | null): Record<string, string[]> {
+export function buildLocations(
+	fm: Frontmatter | null,
+): Record<string, string[]> {
 	const result: Record<string, string[]> = {};
 	if (!fm) return result;
 	for (const id of Object.keys(fm.artifact ?? {})) {

@@ -10,7 +10,11 @@ import * as vscode from "vscode";
 import { analyzeDocument } from "./analyze.js";
 import { findFrontmatterDefinition } from "./jump.js";
 import { resolveLocationFsPath } from "./location-path.js";
-import { buildDescriptions, buildLocations, buildSubflows } from "./location-utils.js";
+import {
+	buildDescriptions,
+	buildLocations,
+	buildSubflows,
+} from "./location-utils.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
@@ -109,9 +113,15 @@ async function expandDirectory(dirUri: vscode.Uri): Promise<string[]> {
 	return files;
 }
 
-type QuickPickLocationItem = vscode.QuickPickItem & { fsPath?: string; url?: string };
+type QuickPickLocationItem = vscode.QuickPickItem & {
+	fsPath?: string;
+	url?: string;
+};
 
-async function handleOpenLocation(docFsPath: string, locs: string[]): Promise<void> {
+async function handleOpenLocation(
+	docFsPath: string,
+	locs: string[],
+): Promise<void> {
 	if (locs.length === 0) return;
 
 	const items: QuickPickLocationItem[] = [];
@@ -156,18 +166,24 @@ async function handleOpenLocation(docFsPath: string, locs: string[]): Promise<vo
 		if (item.url) {
 			await vscode.env.openExternal(vscode.Uri.parse(item.url));
 		} else if (item.fsPath) {
-			const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(item.fsPath));
+			const doc = await vscode.workspace.openTextDocument(
+				vscode.Uri.file(item.fsPath),
+			);
 			await vscode.window.showTextDocument(doc, { preview: false });
 		}
 		return;
 	}
 
-	const selected = await vscode.window.showQuickPick(items, { placeHolder: "Open location…" });
+	const selected = await vscode.window.showQuickPick(items, {
+		placeHolder: "Open location…",
+	});
 	if (!selected) return;
 	if (selected.url) {
 		await vscode.env.openExternal(vscode.Uri.parse(selected.url));
 	} else if (selected.fsPath) {
-		const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(selected.fsPath));
+		const doc = await vscode.workspace.openTextDocument(
+			vscode.Uri.file(selected.fsPath),
+		);
 		await vscode.window.showTextDocument(doc, { preview: false });
 	}
 }
