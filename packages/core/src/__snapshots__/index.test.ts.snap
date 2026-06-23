@@ -965,12 +965,12 @@ spec_v008
 write_article
 write_design_notes
 
-cli_tool >> layer_audit_assets
+cli_tool_v009 >> layer_audit_assets
 layer_audit_assets -> audit_distribution
 adr_corpus
 build_obsidian_plugin
+cli_tool
 cli_tool_v0010
-cli_tool_v009
 criteria_spec
 design_notes
 draft_criteria
@@ -1075,12 +1075,12 @@ spec_v007
 spec_v008
 write_design_notes
 
-cli_tool >> build_obsidian_plugin
+cli_tool_v009 >> build_obsidian_plugin
 build_obsidian_plugin -> i3_obsidian_plugin
 adr_corpus
 audit_distribution
+cli_tool
 cli_tool_v0010
-cli_tool_v009
 criteria_spec
 design_notes
 draft_criteria
@@ -1185,13 +1185,13 @@ spec_v008
 write_article
 write_design_notes
 
-cli_tool >> publish_extension
+cli_tool_v009 >> publish_extension
 publish_extension -> i119_published_extension
 adr_corpus
 audit_distribution
 build_obsidian_plugin
+cli_tool
 cli_tool_v0010
-cli_tool_v009
 criteria_spec
 design_notes
 draft_criteria

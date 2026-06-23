@@ -46,3 +46,5 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる。
 
 **issue 起票と roadmap 追加は同時に行う**（→ workflow.pfdsl `file_issues` プロセスの description 参照）。
+
+- [ ] このサイクルで起票した全 issue が roadmap.pfdsl の artifact として登録済みか確認した
