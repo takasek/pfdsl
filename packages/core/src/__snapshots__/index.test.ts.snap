@@ -52,15 +52,9 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_tool_v0010:
     label: "CLI v0.0.10（次期リリース）"
-    description: "#172 --version / #177 per-command --help / #178 stdin 対応を含む"
+    description: "#172 --version / #177 per-command --help / #178 stdin / #180 --no-color / #181 --json 対応を含む"
     status: todo
     criteria: npm show @pfdsl/cli version が 0.0.10 を返す
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  published_cli_further:
-    label: npm公開済みCLI（次次期版）
-    description: "#180 --no-color / #181 --json 対応を含むリリース"
-    status: todo
-    criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
   i119_published_extension:
     label: "Marketplace 公開済み extension (#119)"
@@ -233,8 +227,6 @@ process:
     label: --json出力実装
   publish_cli_v0010:
     label: CLI v0.0.10リリース
-  publish_cli_further:
-    label: CLIさらに次期版リリース
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -284,11 +276,9 @@ lint_checker
 location_spec
 multifile_toolchain
 no_color
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -339,11 +329,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -395,11 +383,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 skill_gen
@@ -449,11 +435,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -505,11 +489,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -560,11 +542,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 skill_gen
@@ -614,11 +594,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -669,11 +647,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -724,11 +700,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -779,11 +753,9 @@ lint_checker
 location_spec
 multifile_toolchain
 no_color
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -834,11 +806,9 @@ location_spec
 multifile_policy
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -891,11 +861,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 revises_spec
 spec_v006
 spec_v007
@@ -944,10 +912,8 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -998,11 +964,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1054,11 +1018,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1108,11 +1070,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1164,11 +1124,9 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1219,10 +1177,8 @@ multifile_policy
 multifile_toolchain
 no_color
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1236,13 +1192,13 @@ version_cmd
 write_article
 write_design_notes
 
-cli_tool_v0010 >> implement_json_output
-cli_tool_v0010 >> implement_no_color
-implement_json_output -> json_output
-implement_no_color -> no_color
+cli_tool_v009 >> implement_json_output
+cli_tool_v009 >> implement_no_color
 cli_tool_v009 >> implement_stdin
 cli_tool_v009 >> implement_subcommand_help
 cli_tool_v009 >> implement_version_cmd
+implement_json_output -> json_output
+implement_no_color -> no_color
 implement_stdin -> stdin
 implement_subcommand_help -> subcommand_help
 implement_version_cmd -> version_cmd
@@ -1250,6 +1206,7 @@ adr_corpus
 audit_distribution
 build_obsidian_plugin
 cli_tool
+cli_tool_v0010
 criteria_spec
 design_notes
 draft_criteria
@@ -1275,11 +1232,9 @@ location_spec
 multifile_policy
 multifile_toolchain
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1290,6 +1245,8 @@ spec_v008
 write_article
 write_design_notes
 
+json_output >> publish_cli_v0010
+no_color >> publish_cli_v0010
 stdin >> publish_cli_v0010
 subcommand_help >> publish_cli_v0010
 version_cmd >> publish_cli_v0010
@@ -1323,68 +1280,12 @@ implement_subcommand_help
 implement_version_cmd
 integrate_multifile
 integrate_spec
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_further
-publish_cli_v009
-publish_extension
-published_cli_further
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-write_article
-write_design_notes
-
-cli_tool_v0010 >> publish_cli_further
-json_output >> publish_cli_further
-no_color >> publish_cli_further
-publish_cli_further -> published_cli_further
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-hierarchy_spec
-i119_published_extension
-i12_article
-i3_obsidian_plugin
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-integrate_multifile
-integrate_spec
 layer_audit_assets
 lint_checker
 location_spec
 multifile_policy
 multifile_toolchain
 presets_spec
-publish_cli_v0010
 publish_cli_v009
 publish_extension
 restructure_skillgen
@@ -1394,9 +1295,6 @@ skill_gen
 spec_v006
 spec_v007
 spec_v008
-stdin
-subcommand_help
-version_cmd
 write_article
 write_design_notes
 "
