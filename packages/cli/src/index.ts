@@ -325,7 +325,6 @@ Commands:
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
-  version                  Print version
   help                     Show this help
 `;
 
@@ -360,7 +359,6 @@ export function parseArgs(argv: readonly string[]): CliArgs {
 export async function run(argv: readonly string[]): Promise<CommandResult> {
 	const { command, positional, flags } = parseArgs(argv);
 	switch (command) {
-		case "version":
 		case "--version":
 		case "-V":
 			return ok(`${__PFDSL_VERSION__}\n`);

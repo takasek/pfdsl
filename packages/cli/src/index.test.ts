@@ -289,11 +289,6 @@ describe("skill sync", () => {
 });
 
 describe("version", () => {
-	it("version prints a semver string", async () => {
-		const r = await run(["version"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
-	});
 	it("--version prints a semver string", async () => {
 		const r = await run(["--version"]);
 		expect(r.exitCode).toBe(0);
@@ -303,6 +298,10 @@ describe("version", () => {
 		const r = await run(["-V"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+	});
+	it("version (bare subcommand) is unknown command", async () => {
+		const r = await run(["version"]);
+		expect(r.exitCode).toBe(2);
 	});
 });
 
