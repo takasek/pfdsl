@@ -90,14 +90,14 @@ node packages/cli/dist/cli.js help
 ```
 
 ```bash
-pfdsl check <file|->                  # validate (- = stdin)
-pfdsl fmt <file|-> [--write]          # format (- = stdin; --write not allowed with -)
-pfdsl normalize <file|->              # canonical edge list (- = stdin)
-pfdsl graph <file|-> [--format dot|svg] # Graphviz DOT (default) or SVG (- = stdin)
-pfdsl diff <a> <b>                    # structural diff (nodes / edges / feedback)
-pfdsl skill sync [--yes]              # sync pfd-ops skills and commands into the cwd
+pfdsl check <file|-> [--json] [--no-color]  # validate (- = stdin; --json outputs { ok, diagnostics })
+pfdsl fmt <file|-> [--write]                # format (- = stdin; --write not allowed with -)
+pfdsl normalize <file|-> [--json]           # canonical edge list (- = stdin; --json outputs array)
+pfdsl graph <file|-> [--format dot|svg]     # Graphviz DOT (default) or SVG (- = stdin)
+pfdsl diff <a> <b>                          # structural diff (nodes / edges / feedback)
+pfdsl skill sync [--yes]                    # sync pfd-ops skills and commands into the cwd
 pfdsl help
-pfdsl <command> --help                # per-command usage
+pfdsl <command> --help                      # per-command usage
 ```
 
 Exit codes: `0` ok, `1` validation/IO error, `2` usage error.
