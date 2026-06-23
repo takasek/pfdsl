@@ -74,6 +74,19 @@ artifact:
     status: wip
     criteria: "echo 'a >> P -> b' | pfdsl check - が exit 0、fmt --write - が exit 2、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/178
+  i180_no_color:
+    label: "CLI --no-color / NO_COLOR 対応 (#180)"
+    description: "--no-color フラグまたは NO_COLOR 環境変数で ANSI カラー出力を無効化する。no-color.org 準拠"
+    status: todo
+    criteria: "NO_COLOR=1 pfdsl check <file> および --no-color で ANSI コードを含まない出力、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/180
+    updated_at: 2026-06-23T00:00:00Z
+  i181_json_output:
+    label: "CLI --json 出力対応 (#181)"
+    description: "check / normalize で --json フラグを渡すと診断結果またはエッジ一覧を JSON で返す。CI・外部ツール連携向け"
+    status: todo
+    criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/181
     updated_at: 2026-06-23T00:00:00Z
   multifile_policy:
     label: マルチファイル意味論方針
@@ -203,6 +216,10 @@ process:
     label: per-command --help実装
   implement_stdin:
     label: stdin対応実装
+  implement_no_color:
+    label: --no-color / NO_COLOR実装
+  implement_json_output:
+    label: --json出力実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -253,3 +270,5 @@ cli_tool >> publish_extension -> i119_published_extension
 cli_tool >> implement_version_cmd -> i172_version_cmd
 cli_tool >> implement_subcommand_help -> i177_subcommand_help
 cli_tool >> implement_stdin -> i178_stdin
+cli_tool >> implement_no_color -> i180_no_color
+cli_tool >> implement_json_output -> i181_json_output
