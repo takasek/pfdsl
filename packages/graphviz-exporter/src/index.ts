@@ -563,14 +563,32 @@ function nodeAttrs(
 
 	const tooltipParts: string[] = [originalLabel];
 	if (description) tooltipParts.push(`\n\n${description}`);
-	if (criteria) {
-		const formattedCriteria = criteria.includes("\n")
-			? `\ncriteria:\n${criteria.split("\n").map((l) => `  ${l}`).join("\n")}`
-			: `\ncriteria: ${criteria}`;
-		tooltipParts.push(formattedCriteria);
+
+	const KNOWN_TOOLTIP_SKIP = new Set([
+		"label", "description", "status", "tags", "group", "parts",
+		"externalStakeholders", "location", "subflow", "boundary",
+	]);
+	const knownFields: [string, string][] = [];
+	if (criteria) knownFields.push(["criteria", criteria]);
+	if (revises) knownFields.push(["revises", revises]);
+	if (typeof meta?.owner === "string") knownFields.push(["owner", meta.owner]);
+	if (typeof (meta as ProcessMeta | undefined)?.command === "string")
+		knownFields.push(["command", (meta as ProcessMeta).command!]);
+	const extraFields: [string, string][] = meta
+		? Object.entries(meta)
+				.filter(([k, v]) => !KNOWN_TOOLTIP_SKIP.has(k) && typeof v === "string"
+					&& !knownFields.some(([kf]) => kf === k))
+				.map(([k, v]) => [k, v as string])
+		: [];
+
+	for (const [key, val] of [...knownFields, ...extraFields]) {
+		const formatted = val.includes("\n")
+			? `\n${key}:\n${val.split("\n").map((l) => `  ${l}`).join("\n")}`
+			: `\n${key}: ${val}`;
+		tooltipParts.push(formatted);
 	}
+
 	if (location) tooltipParts.push(`\nlocation: ${location}`);
-	if (revises) tooltipParts.push(`\nrevises: ${revises}`);
 	const tooltip =
 		tooltipParts.length > 1
 			? tooltipParts.join("")
