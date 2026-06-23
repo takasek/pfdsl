@@ -288,6 +288,24 @@ describe("skill sync", () => {
 	});
 });
 
+describe("version", () => {
+	it("version prints a semver string", async () => {
+		const r = await run(["version"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+	});
+	it("--version prints a semver string", async () => {
+		const r = await run(["--version"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+	});
+	it("-V prints a semver string", async () => {
+		const r = await run(["-V"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+	});
+});
+
 describe("help / unknown", () => {
 	it("help prints usage", async () => {
 		const r = await run(["help"]);

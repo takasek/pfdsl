@@ -304,6 +304,10 @@ export async function runDiff(
 	return ok(`${out.join("\n")}\n`);
 }
 
+declare const __PFDSL_VERSION__: string;
+const VERSION: string =
+	typeof __PFDSL_VERSION__ !== "undefined" ? __PFDSL_VERSION__ : "0.0.0-dev";
+
 export const HELP = `pfdsl <command> [options]
 
 Commands:
@@ -323,6 +327,7 @@ Commands:
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
+  version                  Print version
   help                     Show this help
 `;
 
@@ -357,6 +362,10 @@ export function parseArgs(argv: readonly string[]): CliArgs {
 export async function run(argv: readonly string[]): Promise<CommandResult> {
 	const { command, positional, flags } = parseArgs(argv);
 	switch (command) {
+		case "version":
+		case "--version":
+		case "-V":
+			return ok(`${VERSION}\n`);
 		case "help":
 		case "--help":
 		case "-h":
