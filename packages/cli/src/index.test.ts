@@ -280,8 +280,12 @@ describe("skill sync", () => {
 		try {
 			const r = await run(["skill", "sync", "--target", target, "--yes"]);
 			expect(r.exitCode).toBe(0);
-			expect(existsSync(join(target, ".claude/skills/pfd-ops/SKILL.md"))).toBe(true);
-			expect(existsSync(join(target, ".claude/commands/pfd-cycle.md"))).toBe(true);
+			expect(existsSync(join(target, ".claude/skills/pfd-ops/SKILL.md"))).toBe(
+				true,
+			);
+			expect(existsSync(join(target, ".claude/commands/pfd-cycle.md"))).toBe(
+				true,
+			);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}

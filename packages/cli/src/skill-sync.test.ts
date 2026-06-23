@@ -42,8 +42,12 @@ describe("copyCommands", () => {
 	it("copies pfd-cycle.md and pfd-retro.md into .claude/commands/", () => {
 		const commandsDir = resolveCommandsDir();
 		copyCommands(commandsDir, targetRoot);
-		expect(existsSync(join(targetRoot, ".claude/commands/pfd-cycle.md"))).toBe(true);
-		expect(existsSync(join(targetRoot, ".claude/commands/pfd-retro.md"))).toBe(true);
+		expect(existsSync(join(targetRoot, ".claude/commands/pfd-cycle.md"))).toBe(
+			true,
+		);
+		expect(existsSync(join(targetRoot, ".claude/commands/pfd-retro.md"))).toBe(
+			true,
+		);
 	});
 
 	it("overwrites stale command files", () => {
@@ -51,7 +55,10 @@ describe("copyCommands", () => {
 		mkdirSync(join(targetRoot, ".claude/commands"), { recursive: true });
 		writeFileSync(join(targetRoot, ".claude/commands/pfd-cycle.md"), "old\n");
 		copyCommands(commandsDir, targetRoot);
-		const content = readFileSync(join(targetRoot, ".claude/commands/pfd-cycle.md"), "utf-8");
+		const content = readFileSync(
+			join(targetRoot, ".claude/commands/pfd-cycle.md"),
+			"utf-8",
+		);
 		expect(content).not.toBe("old\n");
 	});
 });
@@ -343,15 +350,19 @@ describe("runSkillSync", () => {
 		expect(
 			existsSync(join(targetRoot, ".claude/skills/pfd-retro/SKILL.md")),
 		).toBe(true);
-		expect(
-			existsSync(join(targetRoot, ".claude/skills/pfdsl/SKILL.md")),
-		).toBe(true);
+		expect(existsSync(join(targetRoot, ".claude/skills/pfdsl/SKILL.md"))).toBe(
+			true,
+		);
 		expect(
 			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
 		).toBe(false);
 		expect(existsSync(join(targetRoot, ".pfdsl/roadmap.pfdsl"))).toBe(false);
-		expect(existsSync(join(targetRoot, ".claude/commands/pfd-cycle.md"))).toBe(true);
-		expect(existsSync(join(targetRoot, ".claude/commands/pfd-retro.md"))).toBe(true);
+		expect(existsSync(join(targetRoot, ".claude/commands/pfd-cycle.md"))).toBe(
+			true,
+		);
+		expect(existsSync(join(targetRoot, ".claude/commands/pfd-retro.md"))).toBe(
+			true,
+		);
 		expect(result.stdout).toContain("cp -r .claude/skills/pfd-ops/install/. .");
 		expect(result.stdout).toContain("pfd-ecosystem");
 		expect(result.stdout).not.toContain("skill sync pfdsl");

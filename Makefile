@@ -1,8 +1,8 @@
 .PHONY: setup
 setup:
 	pnpm install
-	cp scripts/pre-commit .git/hooks/pre-commit
-	chmod +x .git/hooks/pre-commit
+	cp scripts/pre-commit $$(git rev-parse --git-common-dir)/hooks/pre-commit
+	chmod +x $$(git rev-parse --git-common-dir)/hooks/pre-commit
 
 .PHONY: build
 build:

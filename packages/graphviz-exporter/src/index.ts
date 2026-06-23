@@ -322,7 +322,7 @@ export function exportDot(
 		for (const childGid of (groupChildren.get(gid) ?? []).sort()) {
 			emitGroupBlock(childGid, inner);
 		}
-		for (const id of (groupedNodes.get(gid) ?? [])) {
+		for (const id of groupedNodes.get(gid) ?? []) {
 			lines.push(
 				`${inner}${quote(id)} ${nodeAttrs(id, graph.nodes.get(id)!, frontmatter, boundaryArtifacts)};`,
 			);
@@ -594,14 +594,14 @@ function nodeAttrs(
 	if (description) tooltipParts.push(`\n\n${description}`);
 
 	const KNOWN_TOOLTIP_SKIP = new Set([
-		"label",       // shown as node label
+		"label", // shown as node label
 		"description", // rendered first with double newline
-		"status",      // shown as node color and xlabel
-		"tags",        // shown as xlabel
-		"group",       // shown as cluster border
-		"parts",       // structural — child nodes are visible in graph
-		"location",    // appended last with dedicated formatting
-		"boundary",    // subflow id remapping — not human-readable as-is
+		"status", // shown as node color and xlabel
+		"tags", // shown as xlabel
+		"group", // shown as cluster border
+		"parts", // structural — child nodes are visible in graph
+		"location", // appended last with dedicated formatting
+		"boundary", // subflow id remapping — not human-readable as-is
 	]);
 	const knownFields: [string, string][] = [];
 	if (criteria) knownFields.push(["criteria", criteria]);
@@ -617,15 +617,26 @@ function nodeAttrs(
 					if (KNOWN_TOOLTIP_SKIP.has(k)) return false;
 					if (knownFields.some(([kf]) => kf === k)) return false;
 					if (typeof v === "string") return true;
-					if (Array.isArray(v) && v.length > 0 && v.every((i) => typeof i === "string")) return true;
+					if (
+						Array.isArray(v) &&
+						v.length > 0 &&
+						v.every((i) => typeof i === "string")
+					)
+						return true;
 					return false;
 				})
-				.map(([k, v]) => [k, Array.isArray(v) ? (v as string[]).join(", ") : v as string])
+				.map(([k, v]) => [
+					k,
+					Array.isArray(v) ? (v as string[]).join(", ") : (v as string),
+				])
 		: [];
 
 	for (const [key, val] of [...knownFields, ...extraFields]) {
 		const formatted = val.includes("\n")
-			? `\n${key}:\n${val.split("\n").map((l) => `  ${l}`).join("\n")}`
+			? `\n${key}:\n${val
+					.split("\n")
+					.map((l) => `  ${l}`)
+					.join("\n")}`
 			: `\n${key}: ${val}`;
 		tooltipParts.push(formatted);
 	}
