@@ -4,9 +4,9 @@ digraph PFDSL {
 
   "analyze" [shape=ellipse, label="analyze"];
   "raw_data" [shape=box, label="raw_data\n生データ", width=1.10, penwidth="2"];
-  "report" [shape=box, label="report\n月次レポート", width=1.50];
+  "report" [shape=box, label="report\n月次レポート", tooltip="月次レポート\nexternalStakeholders: 規制当局, 監査法人", width=1.50];
   "summarize" [shape=ellipse, label="summarize"];
-  "summary" [shape=box, label="summary\n経営サマリー", width=1.50, penwidth="2"];
+  "summary" [shape=box, label="summary\n経営サマリー", tooltip="経営サマリー\nexternalStakeholders: 経営層", width=1.50, penwidth="2"];
 
   "raw_data" -> "analyze";
   "analyze" -> "report";

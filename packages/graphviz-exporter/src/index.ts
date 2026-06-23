@@ -566,7 +566,7 @@ function nodeAttrs(
 
 	const KNOWN_TOOLTIP_SKIP = new Set([
 		"label", "description", "status", "tags", "group", "parts",
-		"externalStakeholders", "location", "subflow", "boundary",
+		"location", "boundary",
 	]);
 	const knownFields: [string, string][] = [];
 	if (criteria) knownFields.push(["criteria", criteria]);
@@ -574,6 +574,11 @@ function nodeAttrs(
 	if (typeof meta?.owner === "string") knownFields.push(["owner", meta.owner]);
 	if (typeof (meta as ProcessMeta | undefined)?.command === "string")
 		knownFields.push(["command", (meta as ProcessMeta).command!]);
+	if (typeof (meta as ProcessMeta | undefined)?.subflow === "string")
+		knownFields.push(["subflow", (meta as ProcessMeta).subflow!]);
+	const es = meta?.externalStakeholders;
+	if (Array.isArray(es) && es.length > 0)
+		knownFields.push(["externalStakeholders", es.join(", ")]);
 	const extraFields: [string, string][] = meta
 		? Object.entries(meta)
 				.filter(([k, v]) => !KNOWN_TOOLTIP_SKIP.has(k) && typeof v === "string"
