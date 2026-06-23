@@ -71,6 +71,7 @@ vscode-package: vscode-build
 	if [ -n "$$(git status --porcelain)" ]; then echo "作業ツリーに未コミットの変更があります"; exit 1; fi; \
 	if git rev-parse "vscode-v$$VSVERSION" >/dev/null 2>&1; then echo "タグ vscode-v$$VSVERSION は既に存在します (version を上げてください)"; exit 1; fi; \
 	git fetch origin main --quiet; \
+	git push origin main --quiet; \
 	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
 	(cd packages/vscode-extension && vsce package --no-dependencies); \
 	git tag "vscode-v$$VSVERSION"; \
@@ -144,6 +145,7 @@ release:
 	if [ -n "$$(git status --porcelain)" ]; then echo "作業ツリーに未コミットの変更があります"; exit 1; fi; \
 	if git rev-parse "v$$VERSION" >/dev/null 2>&1; then echo "タグ v$$VERSION は既に存在します (version を上げてください)"; exit 1; fi; \
 	git fetch origin main --quiet; \
+	git push origin main --quiet; \
 	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
 	echo "v$$VERSION を打って push します (publish-cli.yml が起動)"; \
 	git tag "v$$VERSION"; \
