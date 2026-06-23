@@ -162,7 +162,7 @@ async function handleOpenLocation(
 	}
 
 	if (items.length === 1) {
-		const item = items[0];
+		const item = items[0]!;
 		if (item.url) {
 			await vscode.env.openExternal(vscode.Uri.parse(item.url));
 		} else if (item.fsPath) {

@@ -65,7 +65,7 @@ describe("buildLocations", () => {
 
 	it("omits process entry when subflow is absent and location is URL", () => {
 		const fm = {
-			process: { P: { subflow: undefined, location: "https://x.com/" } },
+			process: { P: { location: "https://x.com/" } },
 		};
 		expect(buildLocations(fm)).toEqual({});
 	});

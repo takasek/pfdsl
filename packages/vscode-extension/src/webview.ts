@@ -121,7 +121,7 @@ root.addEventListener("mousemove", (e) => {
 		: nodeLocs.length > 1
 			? `${modKey}+Click to open location…`
 			: nodeLocs.length === 1
-				? nodeLocs[0].includes("://")
+				? nodeLocs[0]!.includes("://")
 					? `${modKey}+Click to open URL`
 					: `${modKey}+Click to open file`
 				: null;

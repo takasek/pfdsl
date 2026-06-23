@@ -22,6 +22,8 @@ jobs:
 
       - run: pnpm -r build
 
+      - run: pnpm -r typecheck
+
       - run: pnpm -r test
 
       - name: Verify snapshots are up-to-date with .pfdsl files
