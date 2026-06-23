@@ -7,7 +7,15 @@ digraph PFDSL {
     color="lightyellow";
     style="filled";
     fillcolor="lightyellow";
-    "api_spec" [shape=box, label="api_spec", penwidth="2"];
+    subgraph cluster_db {
+      label="DB Layer";
+      color="#b3987d";
+      style="filled";
+      fillcolor="#ffd9b3";
+      "migrate" [shape=ellipse, label="migrate"];
+      "migrated" [shape=box, label="migrated"];
+      "schema" [shape=box, label="schema", penwidth="2"];
+    }
     "build_api" [shape=ellipse, label="build_api"];
     "endpoint" [shape=box, label="endpoint", penwidth="2"];
   }
@@ -21,7 +29,9 @@ digraph PFDSL {
     "ui_mockup" [shape=box, label="ui_mockup", penwidth="2"];
   }
 
-  "api_spec" -> "build_api";
+  "schema" -> "migrate";
+  "migrate" -> "migrated";
+  "migrated" -> "build_api";
   "build_api" -> "endpoint";
   "ui_mockup" -> "build_ui";
   "build_ui" -> "component";
