@@ -38,7 +38,7 @@ artifact:
     description: ...
     status: done           # todo=未着手 | wip=PR open | done=main済み | blocked=外部要因
     criteria: ...           # 完了条件（todo/wip でも前宣言として書く）
-    location: path/to/file  # 実体ファイル・URL へのポインタ。可視化でリンクになる
+    location: path/to/file  # 実体ファイル・URL へのポインタ。可視化でリンクになる。相対パスは「この .pfdsl ファイルからの相対」で書く
     owner: ...
     group: <group-id>
     tags: [tag1, tag2]
