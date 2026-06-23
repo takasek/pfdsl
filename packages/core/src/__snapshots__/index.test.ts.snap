@@ -83,13 +83,6 @@ artifact:
     criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/181
     updated_at: 2026-06-23T02:54:03Z
-  i183_nested_groups:
-    label: "group 内 group ネスト表現 (#183)"
-    description: "GroupMeta に parent フィールドを追加し、group 内 group を Graphviz subgraph cluster ネストで描画する。循環 parent は check でエラー検出"
-    status: todo
-    criteria: "parent フィールドを持つグループが Graphviz で正しくネスト描画される、循環 parent を check がエラー検出、テスト通過・check 通過"
-    location: https://github.com/takasek/pfdsl/issues/183
-    updated_at: 2026-06-23T07:37:44Z
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -244,9 +237,6 @@ process:
     label: CLI v0.0.10リリース
   publish_cli_further:
     label: CLIさらに次期版リリース
-  implement_nested_groups:
-    label: group 内 group ネスト実装
-    description: "GroupMeta に parent フィールドを追加し、graphviz-exporter でネスト subgraph cluster を出力する。循環検出 checker も含む"
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -281,12 +271,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -336,12 +324,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -394,12 +380,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -451,12 +435,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -508,12 +490,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -567,12 +547,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -622,12 +600,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -680,11 +656,9 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -737,12 +711,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_stdin
 implement_subcommand_help
@@ -795,12 +767,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -851,11 +821,9 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -908,12 +876,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -963,12 +929,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -1020,12 +984,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -1077,12 +1039,10 @@ hierarchy_spec
 i119_published_extension
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -1134,11 +1094,9 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -1191,12 +1149,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -1248,12 +1204,10 @@ hierarchy_spec
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -1311,11 +1265,9 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i183_nested_groups
 i3_obsidian_plugin
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -1364,12 +1316,10 @@ i119_published_extension
 i12_article
 i180_no_color
 i181_json_output
-i183_nested_groups
 i3_obsidian_plugin
 implement_json_output
 implement_lints
 implement_multifile
-implement_nested_groups
 implement_no_color
 implement_spec_features
 implement_stdin
@@ -1419,63 +1369,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i183_nested_groups
-i3_obsidian_plugin
-implement_json_output
-implement_lints
-implement_multifile
-implement_nested_groups
-implement_no_color
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-integrate_multifile
-integrate_spec
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-presets_spec
-publish_cli_v0010
-publish_cli_v009
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-stdin
-subcommand_help
-version_cmd
-write_article
-write_design_notes
-
-cli_tool_v009 >> implement_nested_groups
-implement_nested_groups -> i183_nested_groups
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-hierarchy_spec
-i119_published_extension
-i12_article
-i180_no_color
-i181_json_output
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1493,11 +1386,9 @@ location_spec
 multifile_policy
 multifile_toolchain
 presets_spec
-publish_cli_further
 publish_cli_v0010
 publish_cli_v009
 publish_extension
-published_cli_further
 restructure_skillgen
 restructured_gen
 revises_spec
