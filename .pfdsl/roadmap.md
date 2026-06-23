@@ -37,6 +37,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
 
+**vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。
+
 **spec.md を変更した場合**: `make gen-skill` を実行してスキルの `references/spec.md` を更新してからコミットする。
 
 **Cycle 計画のパッケージ層明記**: PR body に対象パッケージ層を明記する（→ workflow.pfdsl `develop` プロセスの description 参照）。
