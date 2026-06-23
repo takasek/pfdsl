@@ -288,6 +288,64 @@ describe("skill sync", () => {
 	});
 });
 
+describe("version", () => {
+	it("--version prints a semver string", async () => {
+		const r = await run(["--version"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+	});
+	it("-V prints a semver string", async () => {
+		const r = await run(["-V"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+	});
+	it("version (bare subcommand) is unknown command", async () => {
+		const r = await run(["version"]);
+		expect(r.exitCode).toBe(2);
+	});
+});
+
+describe("subcommand --help", () => {
+	it("check --help prints usage", async () => {
+		const r = await run(["check", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl check");
+	});
+	it("fmt --help prints usage", async () => {
+		const r = await run(["fmt", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl fmt");
+	});
+	it("normalize --help prints usage", async () => {
+		const r = await run(["normalize", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl normalize");
+	});
+	it("graph --help prints usage", async () => {
+		const r = await run(["graph", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl graph");
+	});
+	it("diff --help prints usage", async () => {
+		const r = await run(["diff", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl diff");
+	});
+	it("skill --help prints usage", async () => {
+		const r = await run(["skill", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl skill");
+	});
+});
+
+describe("stdin (-)", () => {
+	it("fmt --write with - returns error", async () => {
+		const r = await run(["fmt", "-", "--write"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("--write");
+	});
+});
+
 describe("help / unknown", () => {
 	it("help prints usage", async () => {
 		const r = await run(["help"]);

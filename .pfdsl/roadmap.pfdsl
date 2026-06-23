@@ -41,10 +41,22 @@ artifact:
     status: done
     criteria: subflow/extends の checker が @pfdsl/core に実装され check コマンドで V021-V028 が動作確認済み（renderer は対象外）
     location: https://github.com/takasek/pfdsl/issues/148
-  published_cli:
-    label: npm公開済みCLI
-    description: "現行公開バージョンは npm 一次情報（ここに書かない — ドリフトするため）。詳細は docs/pfdsl_implementation_flow.pfdsl の cli_published 参照"
+  cli_tool_v009:
+    label: "CLI v0.0.9（公開済み）"
+    description: "現行公開バージョン v0.0.9。後続実装の入力ベース"
     status: done
+    criteria: npm show @pfdsl/cli version が 0.0.9 を返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
+  cli_tool_v0010:
+    label: "CLI v0.0.10（次期リリース）"
+    description: "#172 --version / #177 per-command --help / #178 stdin 対応を含む"
+    status: todo
+    criteria: npm show @pfdsl/cli version が 0.0.10 を返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
+  published_cli_further:
+    label: npm公開済みCLI（次次期版）
+    description: "#180 --no-color / #181 --json 対応を含むリリース"
+    status: todo
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
   i119_published_extension:
@@ -54,6 +66,40 @@ artifact:
     criteria: v* tag push で VS Code Marketplace への自動 publish が動作確認済み
     location: https://github.com/takasek/pfdsl/issues/119
     updated_at: 2026-06-22T05:40:24Z
+  i172_version_cmd:
+    label: "CLI --version コマンド (#172)"
+    description: "pfdsl --version / -V でバージョン番号を出力する。ビルド時に package.json から tsup define で埋め込む"
+    status: wip
+    criteria: "pfdsl --version が semver 文字列を stdout に出力して exit 0、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/172
+    updated_at: 2026-06-23T00:00:00Z
+  i177_subcommand_help:
+    label: "CLI per-command --help (#177)"
+    description: "pfdsl check --help など各サブコマンドでコマンド固有の usage を表示する"
+    status: wip
+    criteria: "全サブコマンドで --help が exit 0、引数なし呼び出しで同内容を exit 2、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/177
+    updated_at: 2026-06-23T00:00:00Z
+  i178_stdin:
+    label: "CLI stdin 対応 (#178)"
+    description: "check/fmt/normalize/graph でファイル引数に - を渡すと stdin から読む。fmt --write - は禁止"
+    status: wip
+    criteria: "echo 'a >> P -> b' | pfdsl check - が exit 0、fmt --write - が exit 2、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/178
+  i180_no_color:
+    label: "CLI --no-color / NO_COLOR 対応 (#180)"
+    description: "--no-color フラグまたは NO_COLOR 環境変数で ANSI カラー出力を無効化する。no-color.org 準拠"
+    status: todo
+    criteria: "NO_COLOR=1 pfdsl check <file> および --no-color で ANSI コードを含まない出力、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/180
+    updated_at: 2026-06-23T00:00:00Z
+  i181_json_output:
+    label: "CLI --json 出力対応 (#181)"
+    description: "check / normalize で --json フラグを渡すと診断結果またはエッジ一覧を JSON で返す。CI・外部ツール連携向け"
+    status: todo
+    criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/181
+    updated_at: 2026-06-23T00:00:00Z
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -139,6 +185,8 @@ artifact:
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/6
 process:
+  implement_version_cmd:
+    label: --version コマンド実装
   write_article:
     label: 記事執筆
   draft_multifile_specs:
@@ -162,8 +210,8 @@ process:
     label: マルチファイル仕様統合
   restructure_skillgen:
     label: 生成系再構成
-  publish_cli:
-    label: CLI公開
+  publish_cli_v009:
+    label: CLI v0.0.9公開
   build_obsidian_plugin:
     label: Obsidianプラグイン実装
   draft_external_stakeholders:
@@ -176,6 +224,18 @@ process:
     description: "spec v0.0.8 subflow/extends checker 実装（V021-V028）。renderer・VS Code extension は対象外。issue: https://github.com/takasek/pfdsl/issues/148"
   publish_extension:
     label: extension自動公開実装
+  implement_subcommand_help:
+    label: per-command --help実装
+  implement_stdin:
+    label: stdin対応実装
+  implement_no_color:
+    label: --no-color / NO_COLOR実装
+  implement_json_output:
+    label: --json出力実装
+  publish_cli_v0010:
+    label: CLI v0.0.10リリース
+  publish_cli_further:
+    label: CLIさらに次期版リリース
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -211,7 +271,7 @@ spec_v006 >>? integrate_spec
 
 skill_gen >> restructure_skillgen -> restructured_gen
 
-cli_tool >> publish_cli -> published_cli
+cli_tool >> publish_cli_v009 -> cli_tool_v009
 
 cli_tool >> layer_audit_assets -> audit_distribution
 
@@ -222,3 +282,13 @@ cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
 
 cli_tool >> publish_extension -> i119_published_extension
+
+cli_tool_v009 >> implement_version_cmd -> i172_version_cmd
+cli_tool_v009 >> implement_subcommand_help -> i177_subcommand_help
+cli_tool_v009 >> implement_stdin -> i178_stdin
+cli_tool_v0010 >> implement_no_color -> i180_no_color
+cli_tool_v0010 >> implement_json_output -> i181_json_output
+
+[i172_version_cmd, i177_subcommand_help, i178_stdin] >> publish_cli_v0010 -> cli_tool_v0010
+
+[cli_tool_v0010, i180_no_color, i181_json_output] >> publish_cli_further -> published_cli_further

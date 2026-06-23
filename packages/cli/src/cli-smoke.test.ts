@@ -15,4 +15,11 @@ describe("dist/cli.js smoke", () => {
 		});
 		expect(stdout).toContain("pfdsl");
 	});
+
+	it.skipIf(!existsSync(distCli))("--version prints semver", () => {
+		const stdout = execFileSync(process.execPath, [distCli, "--version"], {
+			encoding: "utf8",
+		});
+		expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
+	});
 });
