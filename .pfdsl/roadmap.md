@@ -49,4 +49,6 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **issue 起票と roadmap 追加は同時に行う**（→ workflow.pfdsl `file_issues` プロセスの description 参照）。
 
+**新 frontmatter フィールドを追加した場合**: 対応する feature sample（`docs/samples/`）を同一 PR で更新し、`make gen-samples` と `make gen-skill` を実行してからコミットする。
+
 - [ ] このサイクルで起票した全 issue が roadmap.pfdsl の artifact として登録済みか確認した

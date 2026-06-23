@@ -241,16 +241,20 @@ digraph PFDSL {
 group:
   frontend: { label: Frontend, color: lightblue }
   backend:  { label: Backend,  color: lightyellow }
+  db:       { label: DB Layer, color: "#ffd9b3", parent: backend }
 artifact:
-  api_spec:  { group: backend }
+  schema:    { group: db }
+  migrated:  { group: db }
   endpoint:  { group: backend }
   ui_mockup: { group: frontend }
   component: { group: frontend }
 process:
+  migrate:   { group: db }
   build_api: { group: backend }
   build_ui:  { group: frontend }
 ---
-api_spec >> build_api -> endpoint
+schema >> migrate -> migrated
+migrated >> build_api -> endpoint
 ui_mockup >> build_ui -> component
 ```
 
@@ -269,7 +273,15 @@ digraph PFDSL {
     color="lightyellow";
     style="filled";
     fillcolor="lightyellow";
-    "api_spec" [shape=box, label="api_spec", penwidth="2"];
+    subgraph cluster_db {
+      label="DB Layer";
+      color="#b3987d";
+      style="filled";
+      fillcolor="#ffd9b3";
+      "migrate" [shape=ellipse, label="migrate"];
+      "migrated" [shape=box, label="migrated"];
+      "schema" [shape=box, label="schema", penwidth="2"];
+    }
     "build_api" [shape=ellipse, label="build_api"];
     "endpoint" [shape=box, label="endpoint", penwidth="2"];
   }
@@ -283,7 +295,9 @@ digraph PFDSL {
     "ui_mockup" [shape=box, label="ui_mockup", penwidth="2"];
   }
 
-  "api_spec" -> "build_api";
+  "schema" -> "migrate";
+  "migrate" -> "migrated";
+  "migrated" -> "build_api";
   "build_api" -> "endpoint";
   "ui_mockup" -> "build_ui";
   "build_ui" -> "component";
@@ -412,9 +426,9 @@ digraph PFDSL {
 
   "analyze" [shape=ellipse, label="analyze"];
   "raw_data" [shape=box, label="raw_data\n生データ", width=1.10, penwidth="2"];
-  "report" [shape=box, label="report\n月次レポート", width=1.50];
+  "report" [shape=box, label="report\n月次レポート", tooltip="月次レポート\nexternalStakeholders: 規制当局, 監査法人", width=1.50];
   "summarize" [shape=ellipse, label="summarize"];
-  "summary" [shape=box, label="summary\n経営サマリー", width=1.50, penwidth="2"];
+  "summary" [shape=box, label="summary\n経営サマリー", tooltip="経営サマリー\nexternalStakeholders: 経営層", width=1.50, penwidth="2"];
 
   "raw_data" -> "analyze";
   "analyze" -> "report";

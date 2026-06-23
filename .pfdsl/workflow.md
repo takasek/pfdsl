@@ -65,6 +65,10 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 `docs/spec/spec.md` を変更した場合、`make gen-skill` を実行してからコミットする。スキルの `references/spec.md` が spec 本文と一致していないと CI（check-gen-skill.yml）で失敗する。
 
+## 新 frontmatter フィールド追加時の sample 更新
+
+frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で更新し、`make gen-samples` を実行してからコミットする。feature sample の更新漏れは「フィールドが仕様にあるがサンプルに示されていない」状態になる。詳細は roadmap.md ゲート参照。
+
 ## VS Code 拡張の UI 動作確認
 
 `vscode-extension` の挙動変更（webview インタラクション・クリック動作等）を含む develop は、PR 作成前に `/vscode-ext-debug` スキルを用いてビルド後の実動作を確認する。確認結果をユーザーから受け取るまでサイクル完了とみなさない（pfd-ops 手順2）。

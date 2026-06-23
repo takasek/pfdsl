@@ -293,24 +293,47 @@ export function exportDot(
 		}
 	}
 
-	for (const gid of [...groupedNodes.keys()].sort()) {
-		const gm = frontmatter!.group![gid]!;
-		lines.push(`  subgraph cluster_${gid} {`);
+	const groupDefs = frontmatter?.group ?? {};
+	const groupChildren = new Map<string, string[]>();
+	const rootGroups: string[] = [];
+	for (const gid of Object.keys(groupDefs).sort()) {
+		const parentId = groupDefs[gid]?.parent;
+		if (parentId !== undefined && groupDefs[parentId] !== undefined) {
+			if (!groupChildren.has(parentId)) groupChildren.set(parentId, []);
+			groupChildren.get(parentId)!.push(gid);
+		} else {
+			rootGroups.push(gid);
+		}
+	}
+
+	function emitGroupBlock(gid: string, indent: string): void {
+		const gm = groupDefs[gid]!;
+		const inner = `${indent}  `;
+		lines.push(`${indent}subgraph cluster_${gid} {`);
 		if (gm.label !== undefined)
-			lines.push(`    label=${quote(String(gm.label))};`);
+			lines.push(`${inner}label=${quote(String(gm.label))};`);
 		if (gm.color !== undefined) {
 			const fillColor = String(gm.color);
 			const strokeColor = darkenHex(fillColor) ?? fillColor;
-			lines.push(`    color=${quote(strokeColor)};`);
-			lines.push(`    style="filled";`);
-			lines.push(`    fillcolor=${quote(fillColor)};`);
+			lines.push(`${inner}color=${quote(strokeColor)};`);
+			lines.push(`${inner}style="filled";`);
+			lines.push(`${inner}fillcolor=${quote(fillColor)};`);
 		}
-		for (const id of groupedNodes.get(gid)!) {
+		for (const childGid of (groupChildren.get(gid) ?? []).sort()) {
+			emitGroupBlock(childGid, inner);
+		}
+		for (const id of (groupedNodes.get(gid) ?? [])) {
 			lines.push(
-				`    ${quote(id)} ${nodeAttrs(id, graph.nodes.get(id)!, frontmatter, boundaryArtifacts)};`,
+				`${inner}${quote(id)} ${nodeAttrs(id, graph.nodes.get(id)!, frontmatter, boundaryArtifacts)};`,
 			);
 		}
-		lines.push("  }");
+		lines.push(`${indent}}`);
+	}
+
+	for (const gid of rootGroups) {
+		if (groupedNodes.has(gid) || (groupChildren.get(gid)?.length ?? 0) > 0) {
+			emitGroupBlock(gid, "  ");
+		}
 	}
 
 	for (const id of ungroupedIds) {

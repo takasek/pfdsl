@@ -102,16 +102,20 @@ processed >> analyze
 group:
   frontend: { label: Frontend, color: lightblue }
   backend:  { label: Backend,  color: lightyellow }
+  db:       { label: DB Layer, color: "#ffd9b3", parent: backend }
 artifact:
-  api_spec:  { group: backend }
+  schema:    { group: db }
+  migrated:  { group: db }
   endpoint:  { group: backend }
   ui_mockup: { group: frontend }
   component: { group: frontend }
 process:
+  migrate:   { group: db }
   build_api: { group: backend }
   build_ui:  { group: frontend }
 ---
-api_spec >> build_api -> endpoint
+schema >> migrate -> migrated
+migrated >> build_api -> endpoint
 ui_mockup >> build_ui -> component
 ```
 

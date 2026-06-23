@@ -624,6 +624,110 @@ a >> P -> b
 		const posG2 = dot.indexOf("cluster_g2");
 		expect(posG1).toBeLessThan(posG2);
 	});
+
+	it("child group is nested inside parent subgraph cluster", () => {
+		const src = `---
+group:
+  parent_g:
+    label: "Parent"
+    color: "#e0e0e0"
+  child_g:
+    label: "Child"
+    color: "#f5f5f5"
+    parent: parent_g
+artifact:
+  a:
+    group: parent_g
+  b:
+    group: child_g
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		const posParent = dot.indexOf("cluster_parent_g");
+		const posChild = dot.indexOf("cluster_child_g");
+		expect(posParent).toBeGreaterThanOrEqual(0);
+		expect(posChild).toBeGreaterThanOrEqual(0);
+		// child cluster appears after parent cluster opens
+		expect(posChild).toBeGreaterThan(posParent);
+		// child cluster is before parent cluster closes (nested)
+		const posParentClose = dot.indexOf("}", posParent);
+		expect(posChild).toBeLessThan(posParentClose);
+	});
+
+	it("full-DOT snapshot with nested groups", () => {
+		const src = `---
+group:
+  outer:
+    label: "Outer"
+    color: "#cccccc"
+  inner:
+    label: "Inner"
+    color: "#eeeeee"
+    parent: outer
+artifact:
+  a:
+    group: outer
+  b:
+    group: inner
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		expect(exportDot(graph, frontmatter)).toMatchInlineSnapshot(`
+			"digraph PFDSL {
+			  rankdir=LR;
+			  newrank=true;
+
+			  subgraph cluster_outer {
+			    label="Outer";
+			    color="#8f8f8f";
+			    style="filled";
+			    fillcolor="#cccccc";
+			    subgraph cluster_inner {
+			      label="Inner";
+			      color="#a7a7a7";
+			      style="filled";
+			      fillcolor="#eeeeee";
+			      "b" [shape=box, label="b", penwidth="2"];
+			    }
+			    "a" [shape=box, label="a", penwidth="2"];
+			  }
+			  "P" [shape=ellipse, label="P"];
+
+			  "a" -> "P";
+			  "P" -> "b";
+			}
+			"
+		`);
+	});
+
+	it("three-level nesting emits correctly ordered subgraph clusters", () => {
+		const src = `---
+group:
+  l1:
+    label: "Level 1"
+  l2:
+    label: "Level 2"
+    parent: l1
+  l3:
+    label: "Level 3"
+    parent: l2
+artifact:
+  a:
+    group: l3
+---
+a >> P -> b
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const dot = exportDot(graph, frontmatter);
+		const posL1 = dot.indexOf("cluster_l1");
+		const posL2 = dot.indexOf("cluster_l2");
+		const posL3 = dot.indexOf("cluster_l3");
+		expect(posL1).toBeLessThan(posL2);
+		expect(posL2).toBeLessThan(posL3);
+	});
 });
 
 describe("boundary artifact penwidth", () => {
