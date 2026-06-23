@@ -10,19 +10,60 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+	copyCommands,
 	copyInstallLayer,
 	copySkillTree,
 	ensureLabels,
 	isL3Adopted,
 	pfdslDirGuidance,
-	pfdslSkillGuidance,
+	resolveCommandsDir,
 	resolveSkillRoot,
 	runSkillSync,
 } from "./skill-sync.js";
 
+describe("resolveCommandsDir", () => {
+	it("resolves to a directory containing pfd-cycle.md", () => {
+		const dir = resolveCommandsDir();
+		expect(existsSync(join(dir, "pfd-cycle.md"))).toBe(true);
+	});
+});
+
+describe("copyCommands", () => {
+	let targetRoot: string;
+
+	beforeEach(() => {
+		targetRoot = mkdtempSync(join(tmpdir(), "pfdsl-sync-test-"));
+	});
+
+	afterEach(() => {
+		rmSync(targetRoot, { recursive: true, force: true });
+	});
+
+	it("copies pfd-cycle.md and pfd-retro.md into .claude/commands/", () => {
+		const commandsDir = resolveCommandsDir();
+		copyCommands(commandsDir, targetRoot);
+		expect(existsSync(join(targetRoot, ".claude/commands/pfd-cycle.md"))).toBe(true);
+		expect(existsSync(join(targetRoot, ".claude/commands/pfd-retro.md"))).toBe(true);
+	});
+
+	it("overwrites stale command files", () => {
+		const commandsDir = resolveCommandsDir();
+		mkdirSync(join(targetRoot, ".claude/commands"), { recursive: true });
+		writeFileSync(join(targetRoot, ".claude/commands/pfd-cycle.md"), "old\n");
+		copyCommands(commandsDir, targetRoot);
+		const content = readFileSync(join(targetRoot, ".claude/commands/pfd-cycle.md"), "utf-8");
+		expect(content).not.toBe("old\n");
+	});
+});
+
 describe("resolveSkillRoot", () => {
-	it("resolves to a directory containing SKILL.md", () => {
-		const root = resolveSkillRoot();
+	it("resolves pfd-ops to a directory containing SKILL.md", () => {
+		const root = resolveSkillRoot("pfd-ops");
+		expect(existsSync(`${root}/SKILL.md`)).toBe(true);
+	});
+
+	it("resolves pfd-retro to a directory containing SKILL.md", () => {
+		const root = resolveSkillRoot("pfd-retro");
 		expect(existsSync(`${root}/SKILL.md`)).toBe(true);
 	});
 });
@@ -39,7 +80,7 @@ describe("copySkillTree", () => {
 	});
 
 	it("copies SKILL.md, references/ and install/ templates into the skill dir", () => {
-		const skillRoot = resolveSkillRoot();
+		const skillRoot = resolveSkillRoot("pfd-ops");
 		copySkillTree(skillRoot, targetRoot);
 
 		const skillMd = readFileSync(
@@ -70,7 +111,7 @@ describe("copySkillTree", () => {
 	});
 
 	it("mirrors the whole skill tree, removing stale files (install/ included)", () => {
-		const skillRoot = resolveSkillRoot();
+		const skillRoot = resolveSkillRoot("pfd-ops");
 		const dest = join(targetRoot, ".claude/skills/pfd-ops");
 		mkdirSync(join(dest, "references"), { recursive: true });
 		writeFileSync(join(dest, "references/STALE.md"), "stale content\n");
@@ -100,12 +141,12 @@ describe("isL3Adopted", () => {
 	});
 
 	it("returns false when no install/-derived file exists at target root", () => {
-		const skillRoot = resolveSkillRoot();
+		const skillRoot = resolveSkillRoot("pfd-ops");
 		expect(isL3Adopted(skillRoot, targetRoot)).toBe(false);
 	});
 
 	it("returns true when at least one install/-derived file exists", () => {
-		const skillRoot = resolveSkillRoot();
+		const skillRoot = resolveSkillRoot("pfd-ops");
 		mkdirSync(join(targetRoot, "scripts/lib"), { recursive: true });
 		writeFileSync(
 			join(targetRoot, "scripts/lib/yaml-require.mjs"),
@@ -127,7 +168,7 @@ describe("copyInstallLayer", () => {
 	});
 
 	it("copies install/ tree to target root when adopted", () => {
-		const skillRoot = resolveSkillRoot();
+		const skillRoot = resolveSkillRoot("pfd-ops");
 		// simulate prior adoption
 		mkdirSync(join(targetRoot, "scripts/lib"), { recursive: true });
 		writeFileSync(join(targetRoot, "scripts/lib/yaml-require.mjs"), "old\n");
@@ -146,7 +187,7 @@ describe("copyInstallLayer", () => {
 	});
 
 	it("does not copy and returns guidance message when not adopted", () => {
-		const skillRoot = resolveSkillRoot();
+		const skillRoot = resolveSkillRoot("pfd-ops");
 		const result = copyInstallLayer(skillRoot, targetRoot);
 
 		expect(result.copied).toBe(false);
@@ -187,34 +228,6 @@ describe("pfdslDirGuidance", () => {
 		mkdirSync(join(targetRoot, ".pfdsl"), { recursive: true });
 		writeFileSync(join(targetRoot, ".pfdsl/roadmap.pfdsl"), "existing\n");
 		const msg = pfdslDirGuidance(targetRoot);
-		expect(msg).toBe("");
-	});
-});
-
-describe("pfdslSkillGuidance", () => {
-	let targetRoot: string;
-
-	beforeEach(() => {
-		targetRoot = mkdtempSync(join(tmpdir(), "pfdsl-sync-test-"));
-	});
-
-	afterEach(() => {
-		rmSync(targetRoot, { recursive: true, force: true });
-	});
-
-	it("returns guidance when pfdsl skill is absent", () => {
-		const msg = pfdslSkillGuidance(targetRoot);
-		expect(msg).toContain("pfdsl");
-		expect(msg).toContain("skill sync pfdsl");
-	});
-
-	it("returns empty string when pfdsl skill is already installed", () => {
-		mkdirSync(join(targetRoot, ".claude/skills/pfdsl"), { recursive: true });
-		writeFileSync(
-			join(targetRoot, ".claude/skills/pfdsl/SKILL.md"),
-			"# pfdsl\n",
-		);
-		const msg = pfdslSkillGuidance(targetRoot);
 		expect(msg).toBe("");
 	});
 });
@@ -328,12 +341,20 @@ describe("runSkillSync", () => {
 			existsSync(join(targetRoot, ".claude/skills/pfd-ops/SKILL.md")),
 		).toBe(true);
 		expect(
+			existsSync(join(targetRoot, ".claude/skills/pfd-retro/SKILL.md")),
+		).toBe(true);
+		expect(
+			existsSync(join(targetRoot, ".claude/skills/pfdsl/SKILL.md")),
+		).toBe(true);
+		expect(
 			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
 		).toBe(false);
 		expect(existsSync(join(targetRoot, ".pfdsl/roadmap.pfdsl"))).toBe(false);
+		expect(existsSync(join(targetRoot, ".claude/commands/pfd-cycle.md"))).toBe(true);
+		expect(existsSync(join(targetRoot, ".claude/commands/pfd-retro.md"))).toBe(true);
 		expect(result.stdout).toContain("cp -r .claude/skills/pfd-ops/install/. .");
 		expect(result.stdout).toContain("pfd-ecosystem");
-		expect(result.stdout).toContain("skill sync pfdsl");
+		expect(result.stdout).not.toContain("skill sync pfdsl");
 		expect(result.exitCode).toBe(0);
 	});
 
@@ -356,7 +377,7 @@ describe("runSkillSync", () => {
 			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
 		).toBe(true);
 		expect(result.stdout).not.toContain("pfd-ecosystem");
-		expect(result.stdout).toContain("skill sync pfdsl");
+		expect(result.stdout).not.toContain("skill sync pfdsl");
 		expect(result.exitCode).toBe(0);
 	});
 });

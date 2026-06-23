@@ -15,12 +15,21 @@ export default defineConfig({
 	},
 	onSuccess: async () => {
 		const repoRoot = resolve(__dirname, "../..");
-		const src = resolve(repoRoot, ".claude/skills/pfd-ops");
-		const dest = resolve(__dirname, "dist/skills/pfd-ops");
-		if (!existsSync(src)) {
-			throw new Error(`pfd-ops skill source not found at ${src}`);
+		for (const name of ["pfd-ops", "pfd-retro", "pfdsl"]) {
+			const src = resolve(repoRoot, `.claude/skills/${name}`);
+			const dest = resolve(__dirname, `dist/skills/${name}`);
+			if (!existsSync(src)) {
+				throw new Error(`${name} skill source not found at ${src}`);
+			}
+			mkdirSync(dest, { recursive: true });
+			cpSync(src, dest, { recursive: true });
 		}
-		mkdirSync(dest, { recursive: true });
-		cpSync(src, dest, { recursive: true });
+		const commandsSrc = resolve(repoRoot, ".claude/commands");
+		const commandsDest = resolve(__dirname, "dist/commands");
+		if (!existsSync(commandsSrc)) {
+			throw new Error(`commands dir not found at ${commandsSrc}`);
+		}
+		mkdirSync(commandsDest, { recursive: true });
+		cpSync(commandsSrc, commandsDest, { recursive: true });
 	},
 });

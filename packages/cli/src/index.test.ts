@@ -272,30 +272,16 @@ describe("skill sync", () => {
 	it("usage error for bare 'skill'", async () => {
 		const r = await run(["skill"]);
 		expect(r.exitCode).toBe(2);
-		expect(r.stderr).toContain("usage: pfdsl skill sync <name>");
+		expect(r.stderr).toContain("usage: pfdsl skill sync");
 	});
 
-	it("usage error for unknown skill sync target", async () => {
-		const r = await run(["skill", "sync", "nonexistent-skill"]);
-		expect(r.exitCode).toBe(2);
-		expect(r.stderr).toContain("unknown skill: nonexistent-skill");
-	});
-
-	it("syncs pfd-ops into target directory with --yes", async () => {
+	it("syncs skills and commands into target directory with --yes", async () => {
 		const target = mkdtempSync(join(tmpdir(), "pfdsl-skill-sync-cli-"));
 		try {
-			const r = await run([
-				"skill",
-				"sync",
-				"pfd-ops",
-				"--target",
-				target,
-				"--yes",
-			]);
+			const r = await run(["skill", "sync", "--target", target, "--yes"]);
 			expect(r.exitCode).toBe(0);
-			expect(existsSync(join(target, ".claude/skills/pfd-ops/SKILL.md"))).toBe(
-				true,
-			);
+			expect(existsSync(join(target, ".claude/skills/pfd-ops/SKILL.md"))).toBe(true);
+			expect(existsSync(join(target, ".claude/commands/pfd-cycle.md"))).toBe(true);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}
