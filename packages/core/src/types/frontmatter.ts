@@ -23,7 +23,7 @@ export interface ArtifactMeta {
 	tags?: string[];
 	group?: string;
 	criteria?: string;
-	location?: string;
+	location?: string | string[];
 	revises?: string;
 	[key: string]: unknown;
 }
