@@ -565,8 +565,14 @@ function nodeAttrs(
 	if (description) tooltipParts.push(`\n\n${description}`);
 
 	const KNOWN_TOOLTIP_SKIP = new Set([
-		"label", "description", "status", "tags", "group", "parts",
-		"location", "boundary",
+		"label",       // shown as node label
+		"description", // rendered first with double newline
+		"status",      // shown as node color and xlabel
+		"tags",        // shown as xlabel
+		"group",       // shown as cluster border
+		"parts",       // structural — child nodes are visible in graph
+		"location",    // appended last with dedicated formatting
+		"boundary",    // subflow id remapping — not human-readable as-is
 	]);
 	const knownFields: [string, string][] = [];
 	if (criteria) knownFields.push(["criteria", criteria]);
