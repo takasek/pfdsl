@@ -80,13 +80,6 @@ artifact:
     criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/181
     updated_at: 2026-06-23T02:54:03Z
-  i183_nested_groups:
-    label: "group 内 group ネスト表現 (#183)"
-    description: "GroupMeta に parent フィールドを追加し、group 内 group を Graphviz subgraph cluster ネストで描画する。循環 parent は check でエラー検出"
-    status: todo
-    criteria: "parent フィールドを持つグループが Graphviz で正しくネスト描画される、循環 parent を check がエラー検出、テスト通過・check 通過"
-    location: https://github.com/takasek/pfdsl/issues/183
-    updated_at: 2026-06-23T07:37:44Z
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -241,9 +234,6 @@ process:
     label: CLI v0.0.10リリース
   publish_cli_further:
     label: CLIさらに次期版リリース
-  implement_nested_groups:
-    label: group 内 group ネスト実装
-    description: "GroupMeta に parent フィールドを追加し、graphviz-exporter でネスト subgraph cluster を出力する。循環検出 checker も含む"
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -300,5 +290,3 @@ cli_tool_v0010 >> implement_json_output -> i181_json_output
 [version_cmd, subcommand_help, stdin] >> publish_cli_v0010 -> cli_tool_v0010
 
 [cli_tool_v0010, i180_no_color, i181_json_output] >> publish_cli_further -> published_cli_further
-
-cli_tool_v009 >> implement_nested_groups -> i183_nested_groups
