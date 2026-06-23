@@ -25,10 +25,44 @@ async function fetchNpmVersion(packageName) {
 	return data.version;
 }
 
-function fetchCommitsAhead(version, packageDir) {
+function findBumpCommit(version, packageDir) {
 	try {
-		const tag = `v${version}`;
-		const out = execSync(`git log ${tag}..HEAD --oneline -- ${packageDir}`, {
+		const pkgPath = `${packageDir}/package.json`;
+		const hashes = execSync(`git log --format="%H" -- ${pkgPath}`, {
+			encoding: "utf-8",
+			stdio: ["pipe", "pipe", "pipe"],
+		})
+			.trim()
+			.split("\n")
+			.filter(Boolean);
+		for (const hash of hashes) {
+			const content = execSync(`git show ${hash}:${pkgPath}`, {
+				encoding: "utf-8",
+				stdio: ["pipe", "pipe", "pipe"],
+			});
+			if (JSON.parse(content).version === version) return hash;
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+function fetchCommitsAhead(version, packageDir, tagPrefix = "v") {
+	const tag = `${tagPrefix}${version}`;
+	let baseRef;
+	try {
+		execSync(`git rev-parse ${tag}`, {
+			encoding: "utf-8",
+			stdio: ["pipe", "pipe", "pipe"],
+		});
+		baseRef = tag;
+	} catch {
+		baseRef = findBumpCommit(version, packageDir);
+		if (!baseRef) return 0;
+	}
+	try {
+		const out = execSync(`git log ${baseRef}..HEAD --oneline -- ${packageDir}`, {
 			encoding: "utf-8",
 			stdio: ["pipe", "pipe", "pipe"],
 		});
@@ -78,6 +112,7 @@ const PACKAGES = [
 		registry: "npm",
 		localVersionPath: "packages/cli/package.json",
 		packageDir: "packages/cli",
+		tagPrefix: "v",
 		fetchPublishedVersion: () => fetchNpmVersion("@pfdsl/cli"),
 	},
 	{
@@ -85,6 +120,7 @@ const PACKAGES = [
 		registry: "vscode-marketplace",
 		localVersionPath: "packages/vscode-extension/package.json",
 		packageDir: "packages/vscode-extension",
+		tagPrefix: "vscode-v",
 		fetchPublishedVersion: () =>
 			fetchVscodeMarketplaceVersion("takasek", "pfdsl"),
 	},
@@ -100,7 +136,7 @@ const results = await Promise.all(
 			publishedVersion = await pkg.fetchPublishedVersion();
 			status = compareVersions(localVersion, publishedVersion);
 			if (status === "equal") {
-				commitsAhead = fetchCommitsAhead(localVersion, pkg.packageDir);
+				commitsAhead = fetchCommitsAhead(localVersion, pkg.packageDir, pkg.tagPrefix);
 			}
 		} catch (e) {
 			publishedVersion = `error: ${e.message}`;

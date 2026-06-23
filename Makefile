@@ -55,15 +55,27 @@ vscode-dev: vscode-build
 	@echo "Watching for changes (Ctrl+C to stop)..."
 	pnpm --filter pfdsl watch
 
-# VERSION=x.y.z を渡すと packages/vscode-extension/package.json のバージョンを更新してからパッケージする
-# 例: make vscode-package VERSION=0.0.11
+# vscode-extension を .vsix にパッケージし vscode-v<version> タグを打って push する。
+# VERSION=x.y.z を渡すと package.json を更新してコミットしてからパッケージする。
+# 例: make vscode-package VERSION=0.0.13
 .PHONY: vscode-package
 vscode-package: vscode-build
-	@if [ -n "$(VERSION)" ]; then \
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$BRANCH" != "main" ]; then echo "main ブランチで実行してください (現在: $$BRANCH)"; exit 1; fi; \
+	if [ -n "$(VERSION)" ]; then \
 		node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('packages/vscode-extension/package.json','utf8'));p.version='$(VERSION)';fs.writeFileSync('packages/vscode-extension/package.json',JSON.stringify(p,null,'\t')+'\n')"; \
-		echo "version → $(VERSION)"; \
-	fi
-	cd packages/vscode-extension && vsce package --no-dependencies
+		git add packages/vscode-extension/package.json; \
+		git commit -m "chore(package): bump vscode-extension version to $(VERSION)"; \
+	fi; \
+	VSVERSION=$$(node -p "require('./packages/vscode-extension/package.json').version"); \
+	if [ -n "$$(git status --porcelain)" ]; then echo "作業ツリーに未コミットの変更があります"; exit 1; fi; \
+	if git rev-parse "vscode-v$$VSVERSION" >/dev/null 2>&1; then echo "タグ vscode-v$$VSVERSION は既に存在します (version を上げてください)"; exit 1; fi; \
+	git fetch origin main --quiet; \
+	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
+	(cd packages/vscode-extension && vsce package --no-dependencies); \
+	git tag "vscode-v$$VSVERSION"; \
+	git push origin "vscode-v$$VSVERSION"; \
+	echo "vscode-v$$VSVERSION タグ → push 完了"
 
 .PHONY: gen-samples
 gen-samples: build-deps
