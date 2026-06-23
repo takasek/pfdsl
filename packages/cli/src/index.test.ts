@@ -7,7 +7,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { diffGraphs, parseArgs, run } from "./index.js";
 
 let dir: string;
@@ -280,8 +280,12 @@ describe("skill sync", () => {
 		try {
 			const r = await run(["skill", "sync", "--target", target, "--yes"]);
 			expect(r.exitCode).toBe(0);
-			expect(existsSync(join(target, ".claude/skills/pfd-ops/SKILL.md"))).toBe(true);
-			expect(existsSync(join(target, ".claude/commands/pfd-cycle.md"))).toBe(true);
+			expect(existsSync(join(target, ".claude/skills/pfd-ops/SKILL.md"))).toBe(
+				true,
+			);
+			expect(existsSync(join(target, ".claude/commands/pfd-cycle.md"))).toBe(
+				true,
+			);
 		} finally {
 			rmSync(target, { recursive: true, force: true });
 		}
@@ -355,6 +359,92 @@ describe("help / unknown", () => {
 	it("unknown command returns 2", async () => {
 		const r = await run(["nonsense"]);
 		expect(r.exitCode).toBe(2);
+	});
+});
+
+describe("--no-color / NO_COLOR (#180)", () => {
+	afterEach(() => {
+		delete process.env.NO_COLOR;
+	});
+
+	it("check output without no-color contains OK (no ANSI codes present in plain output)", async () => {
+		const r = await run(["check", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("OK");
+	});
+
+	it("--no-color flag is accepted and does not break check", async () => {
+		const r = await run(["check", join(dir, "valid.pfdsl"), "--no-color"]);
+		expect(r.exitCode).toBe(0);
+		// No ANSI escape sequences in output
+		expect(r.stdout).not.toContain("\x1b[");
+		expect(r.stderr).not.toContain("\x1b[");
+	});
+
+	it("NO_COLOR env var suppresses ANSI codes", async () => {
+		process.env.NO_COLOR = "1";
+		const r = await run(["check", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toContain("\x1b[");
+		expect(r.stderr).not.toContain("\x1b[");
+	});
+
+	it("--no-color is accepted by all subcommands (fmt, normalize, graph)", async () => {
+		const fmt = await run(["fmt", join(dir, "valid.pfdsl"), "--no-color"]);
+		expect(fmt.exitCode).toBe(0);
+
+		const norm = await run([
+			"normalize",
+			join(dir, "valid.pfdsl"),
+			"--no-color",
+		]);
+		expect(norm.exitCode).toBe(0);
+
+		const graph = await run(["graph", join(dir, "valid.pfdsl"), "--no-color"]);
+		expect(graph.exitCode).toBe(0);
+	});
+});
+
+describe("--json output (#181)", () => {
+	it("check --json returns { ok: true, diagnostics: [] } for valid file", async () => {
+		const r = await run(["check", join(dir, "valid.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.diagnostics).toEqual([]);
+	});
+
+	it("check --json returns { ok: false, diagnostics: [...] } for invalid file", async () => {
+		const r = await run(["check", join(dir, "invalid.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+		const diag = parsed.diagnostics[0];
+		expect(diag).toHaveProperty("code");
+		expect(diag).toHaveProperty("severity");
+		expect(diag).toHaveProperty("message");
+	});
+
+	it("check --json exit code is same as without --json (0 for valid, 1 for invalid)", async () => {
+		const valid = await run(["check", join(dir, "valid.pfdsl"), "--json"]);
+		expect(valid.exitCode).toBe(0);
+		const invalid = await run(["check", join(dir, "invalid.pfdsl"), "--json"]);
+		expect(invalid.exitCode).toBe(1);
+	});
+
+	it("normalize --json returns edge list as JSON array", async () => {
+		const r = await run(["normalize", join(dir, "valid.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(Array.isArray(parsed)).toBe(true);
+		expect(parsed.length).toBeGreaterThan(0);
+		// each entry is an edge string
+		expect(typeof parsed[0]).toBe("string");
 	});
 });
 

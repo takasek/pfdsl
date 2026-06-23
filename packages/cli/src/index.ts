@@ -68,6 +68,7 @@ export interface CheckOptions {
 	audit?: boolean;
 	summary?: boolean;
 	strict?: boolean;
+	json?: boolean;
 }
 
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
@@ -77,12 +78,27 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	);
 	const lines = diagnostics.map((d) => formatDiagnostic(d, file));
 	if (hasErrors(diagnostics)) {
+		if (opts.json) {
+			const errs = diagnostics.filter((d) => d.severity === "error");
+			return {
+				stdout: `${JSON.stringify({ ok: false, diagnostics: errs })}\n`,
+				stderr: "",
+				exitCode: 1,
+			};
+		}
 		return { stdout: "", stderr: `${lines.join("\n")}\n`, exitCode: 1 };
 	}
 
 	// Multi-file checks (subflow + extends) — only run when single-file is clean.
 	// Skipped for stdin (-): relative paths cannot be resolved without a base file.
 	if (file === "-") {
+		if (opts.json) {
+			return {
+				stdout: `${JSON.stringify({ ok: true, diagnostics: [] })}\n`,
+				stderr: "",
+				exitCode: 0,
+			};
+		}
 		return {
 			stdout: lines.length ? `${lines.join("\n")}\n` : "OK\n",
 			stderr: "",
@@ -155,6 +171,13 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 
 	if (hasErrors(multiDiags)) {
 		const errs = multiDiags.filter((d) => d.severity === "error");
+		if (opts.json) {
+			return {
+				stdout: `${JSON.stringify({ ok: false, diagnostics: errs })}\n`,
+				stderr: "",
+				exitCode: 1,
+			};
+		}
 		return fail(`${errs.map((d) => formatDiagnostic(d, file)).join("\n")}\n`);
 	}
 
@@ -191,6 +214,15 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		);
 	}
 
+	if (opts.json) {
+		const allDiags = [...diagnostics, ...multiDiags];
+		return {
+			stdout: `${JSON.stringify({ ok: true, diagnostics: allDiags })}\n`,
+			stderr: "",
+			exitCode: 0,
+		};
+	}
+
 	const allLines = [
 		...lines,
 		...multiDiags.map((d) => formatDiagnostic(d, file)),
@@ -224,11 +256,23 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	return ok(output);
 }
 
-export function runNormalize(file: string): CommandResult {
+export interface NormalizeOptions {
+	json?: boolean;
+}
+
+export function runNormalize(
+	file: string,
+	opts: NormalizeOptions = {},
+): CommandResult {
 	const { edges, graph, diagnostics } = analyze(readSource(file));
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
-	return ok(formatEdges(sortEdges(edges, graph)));
+	const sorted = sortEdges(edges, graph);
+	if (opts.json) {
+		const edgeList = formatEdges(sorted).split("\n").filter(Boolean);
+		return ok(`${JSON.stringify(edgeList)}\n`);
+	}
+	return ok(formatEdges(sorted));
 }
 
 export type { BinaryFormat };
@@ -320,14 +364,16 @@ export async function runDiff(
 
 declare const __PFDSL_VERSION__: string;
 
-const HELP_CHECK = `usage: pfdsl check <file|-> [--audit] [--summary] [--strict]
+const HELP_CHECK = `usage: pfdsl check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
 
 Validate a .pfdsl file. Use - to read from stdin.
 
 Options:
-  --audit   list terminal artifacts and external inputs
-  --summary print artifact/process/edge counts
-  --strict  error if feedback source not reachable from target process
+  --audit    list terminal artifacts and external inputs
+  --summary  print artifact/process/edge counts
+  --strict   error if feedback source not reachable from target process
+  --json     output diagnostics as JSON ({ ok, diagnostics })
+  --no-color disable ANSI color codes (also: NO_COLOR env var)
 `;
 
 const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--mode flat|flows]
@@ -340,9 +386,12 @@ Options:
   --mode flows  group each process with its inputs and outputs (default)
 `;
 
-const HELP_NORMALIZE = `usage: pfdsl normalize <file|->
+const HELP_NORMALIZE = `usage: pfdsl normalize <file|-> [--json]
 
 Print canonical edge list. Use - to read from stdin.
+
+Options:
+  --json  output edge list as JSON array
 `;
 
 const HELP_GRAPH = `usage: pfdsl graph <file|-> [--format dot|svg|pdf|png]
@@ -377,14 +426,18 @@ Options:
 export const HELP = `pfdsl <command> [options]
 
 Commands:
-  check <file|-> [--audit] [--summary] [--strict]
+  check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
-                           --audit   list terminal artifacts and external inputs
-                           --summary print artifact/process/edge counts
-                           --strict  error if feedback source not reachable from target process
+                           --audit    list terminal artifacts and external inputs
+                           --summary  print artifact/process/edge counts
+                           --strict   error if feedback source not reachable from target process
+                           --json     output diagnostics as JSON
+                           --no-color disable ANSI color codes (also: NO_COLOR env var)
   fmt <file|-> [--write] [--mode flat|flows]
                            Format a .pfdsl file (- = stdin)
-  normalize <file|->       Print canonical edge list (- = stdin)
+  normalize <file|-> [--json]
+                           Print canonical edge list (- = stdin)
+                           --json     output edge list as JSON array
   graph <file|-> [--format dot|svg|pdf|png]
                            Print Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires: npm install puppeteer
@@ -442,6 +495,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				audit: flags.audit === true,
 				summary: flags.summary === true,
 				strict: flags.strict === true,
+				json: flags.json === true,
 			});
 		}
 		case "fmt": {
@@ -461,7 +515,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			if (flags.help) return ok(HELP_NORMALIZE);
 			const f = positional[0];
 			if (!f) return fail(HELP_NORMALIZE, 2);
-			return runNormalize(f);
+			return runNormalize(f, { json: flags.json === true });
 		}
 		case "graph": {
 			if (flags.help) return ok(HELP_GRAPH);
