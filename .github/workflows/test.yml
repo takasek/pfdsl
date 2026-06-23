@@ -23,3 +23,8 @@ jobs:
       - run: pnpm -r build
 
       - run: pnpm -r test
+
+      - name: Verify snapshots are up-to-date with .pfdsl files
+        run: |
+          pnpm --filter @pfdsl/core exec vitest run -u
+          git diff --exit-code packages/core/src/__snapshots__/

@@ -5,3 +5,13 @@ if ! git diff --quiet -- packages/; then
   echo "Biome formatted files. Review changes and re-stage."
   exit 1
 fi
+
+# When .pfdsl files are staged, verify snapshots are up-to-date.
+# Runs vitest -u to regenerate, then fails if any snapshot file changed.
+if git diff --cached --name-only | grep -q '\.pfdsl$'; then
+  pnpm --filter @pfdsl/core exec vitest run -u 2>/dev/null
+  if ! git diff --quiet -- packages/core/src/__snapshots__/; then
+    echo "Snapshots are stale. Run 'pnpm --filter @pfdsl/core exec vitest run -u' and re-stage the snapshot file."
+    exit 1
+  fi
+fi
