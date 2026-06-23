@@ -95,6 +95,7 @@ pfdsl normalize <file>                # canonical edge list
 pfdsl graph <file> [--format dot|svg] # Graphviz DOT (default) or SVG
 pfdsl diff <a> <b>                    # structural diff (nodes / edges / feedback)
 pfdsl skill sync [--yes]              # sync pfd-ops skills and commands into the cwd
+pfdsl version                         # print version (also --version, -V)
 pfdsl help
 ```
 
