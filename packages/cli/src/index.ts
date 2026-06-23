@@ -320,8 +320,8 @@ Commands:
                            PDF/PNG requires: npm install puppeteer
   diff <a> <b> [--format text|dot|svg]
                            Structural diff (text), or visual diff DOT/SVG
-  skill sync <name> [--yes]
-                           Sync a bundled skill (currently: pfd-ops) into the current directory
+  skill sync [--yes]
+                           Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
   help                     Show this help
 `;
@@ -425,12 +425,9 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			return await runDiff(a, b, fmt ? { format: fmt } : {});
 		}
 		case "skill": {
-			const [sub, name] = positional;
-			if (sub !== "sync" || !name) {
-				return fail("usage: pfdsl skill sync <name> [--yes]\n", 2);
-			}
-			if (name !== "pfd-ops") {
-				return fail(`unknown skill: ${name}\n`, 2);
+			const [sub] = positional;
+			if (sub !== "sync") {
+				return fail("usage: pfdsl skill sync [--yes]\n", 2);
 			}
 			// --target overrides cwd; intended for tests only (production always
 			// targets the directory the CLI is invoked from).
