@@ -286,8 +286,8 @@ cli_tool >> publish_extension -> i119_published_extension
 cli_tool_v009 >> implement_version_cmd -> i172_version_cmd
 cli_tool_v009 >> implement_subcommand_help -> i177_subcommand_help
 cli_tool_v009 >> implement_stdin -> i178_stdin
-cli_tool_v009 >> implement_no_color -> i180_no_color
-cli_tool_v009 >> implement_json_output -> i181_json_output
+cli_tool_v0010 >> implement_no_color -> i180_no_color
+cli_tool_v0010 >> implement_json_output -> i181_json_output
 
 [i172_version_cmd, i177_subcommand_help, i178_stdin] >> publish_cli_v0010 -> cli_tool_v0010
 

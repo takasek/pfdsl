@@ -1240,13 +1240,13 @@ spec_v008
 write_article
 write_design_notes
 
-cli_tool_v009 >> implement_json_output
-cli_tool_v009 >> implement_no_color
+cli_tool_v0010 >> implement_json_output
+cli_tool_v0010 >> implement_no_color
+implement_json_output -> i181_json_output
+implement_no_color -> i180_no_color
 cli_tool_v009 >> implement_stdin
 cli_tool_v009 >> implement_subcommand_help
 cli_tool_v009 >> implement_version_cmd
-implement_json_output -> i181_json_output
-implement_no_color -> i180_no_color
 implement_stdin -> i178_stdin
 implement_subcommand_help -> i177_subcommand_help
 implement_version_cmd -> i172_version_cmd
@@ -1254,7 +1254,6 @@ adr_corpus
 audit_distribution
 build_obsidian_plugin
 cli_tool
-cli_tool_v0010
 criteria_spec
 design_notes
 draft_criteria
