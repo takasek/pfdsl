@@ -48,6 +48,9 @@ function formatDiagnostic(d: Diagnostic, file: string): string {
 }
 
 function readSource(file: string): string {
+	if (file === "-") {
+		return readFileSync("/dev/stdin", "utf-8");
+	}
 	return readFileSync(file, "utf-8");
 }
 
@@ -77,7 +80,15 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		return { stdout: "", stderr: `${lines.join("\n")}\n`, exitCode: 1 };
 	}
 
-	// Multi-file checks (subflow + extends) — only run when single-file is clean
+	// Multi-file checks (subflow + extends) — only run when single-file is clean.
+	// Skipped for stdin (-): relative paths cannot be resolved without a base file.
+	if (file === "-") {
+		return {
+			stdout: lines.length ? `${lines.join("\n")}\n` : "OK\n",
+			stderr: "",
+			exitCode: 0,
+		};
+	}
 	const absFile = resolve(file);
 	const loader = (path: string) => {
 		try {
@@ -197,6 +208,9 @@ export interface FmtOptions {
 	mode?: "flat" | "flows";
 }
 export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
+	if (file === "-" && opts.write) {
+		return fail("--write cannot be used with stdin (-)\n", 2);
+	}
 	const source = readSource(file);
 	const { output, diagnostics } = format(source, {
 		style: opts.mode ?? "flows",
@@ -306,19 +320,73 @@ export async function runDiff(
 
 declare const __PFDSL_VERSION__: string;
 
+const HELP_CHECK = `usage: pfdsl check <file|-> [--audit] [--summary] [--strict]
+
+Validate a .pfdsl file. Use - to read from stdin.
+
+Options:
+  --audit   list terminal artifacts and external inputs
+  --summary print artifact/process/edge counts
+  --strict  error if feedback source not reachable from target process
+`;
+
+const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--mode flat|flows]
+
+Format a .pfdsl file. Use - to read from stdin (--write not allowed with stdin).
+
+Options:
+  --write       rewrite the file in place (cannot be used with -)
+  --mode flat   output one edge per line
+  --mode flows  group each process with its inputs and outputs (default)
+`;
+
+const HELP_NORMALIZE = `usage: pfdsl normalize <file|->
+
+Print canonical edge list. Use - to read from stdin.
+`;
+
+const HELP_GRAPH = `usage: pfdsl graph <file|-> [--format dot|svg|pdf|png]
+
+Print a Graphviz representation. Use - to read from stdin.
+
+Options:
+  --format dot  Graphviz DOT (default)
+  --format svg  SVG via Graphviz wasm
+  --format pdf  PDF (requires: npm install puppeteer)
+  --format png  PNG (requires: npm install puppeteer)
+`;
+
+const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg]
+
+Show structural differences between two .pfdsl files.
+
+Options:
+  --format text  human-readable summary (default)
+  --format dot   visual diff as Graphviz DOT
+  --format svg   visual diff as SVG
+`;
+
+const HELP_SKILL = `usage: pfdsl skill sync [--yes]
+
+Sync pfd-ops skills and commands into the current directory.
+
+Options:
+  --yes  auto-confirm gh label creation (non-interactive)
+`;
+
 export const HELP = `pfdsl <command> [options]
 
 Commands:
-  check <file> [--audit] [--summary] [--strict]
-                           Validate a .pfdsl file
+  check <file|-> [--audit] [--summary] [--strict]
+                           Validate a .pfdsl file (- = stdin)
                            --audit   list terminal artifacts and external inputs
                            --summary print artifact/process/edge counts
                            --strict  error if feedback source not reachable from target process
-  fmt <file> [--write] [--mode flat|flows]
-                           Format a .pfdsl file; flows groups per-process (A >> P -> B)
-  normalize <file>         Print canonical edge list
-  graph <file> [--format dot|svg|pdf|png]
-                           Print Graphviz DOT (default), SVG, PDF, or PNG
+  fmt <file|-> [--write] [--mode flat|flows]
+                           Format a .pfdsl file (- = stdin)
+  normalize <file|->       Print canonical edge list (- = stdin)
+  graph <file|-> [--format dot|svg|pdf|png]
+                           Print Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires: npm install puppeteer
   diff <a> <b> [--format text|dot|svg]
                            Structural diff (text), or visual diff DOT/SVG
@@ -367,8 +435,9 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 		case "-h":
 			return ok(HELP);
 		case "check": {
+			if (flags.help) return ok(HELP_CHECK);
 			const f = positional[0];
-			if (!f) return fail("usage: pfdsl check <file>\n", 2);
+			if (!f) return fail(HELP_CHECK, 2);
 			return runCheck(f, {
 				audit: flags.audit === true,
 				summary: flags.summary === true,
@@ -376,12 +445,9 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			});
 		}
 		case "fmt": {
+			if (flags.help) return ok(HELP_FMT);
 			const f = positional[0];
-			if (!f)
-				return fail(
-					"usage: pfdsl fmt <file> [--write] [--mode flat|flows]\n",
-					2,
-				);
+			if (!f) return fail(HELP_FMT, 2);
 			const mode = flags.mode;
 			if (mode !== undefined && mode !== "flat" && mode !== "flows") {
 				return fail(`unknown mode: ${String(mode)}\n`, 2);
@@ -392,17 +458,15 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			});
 		}
 		case "normalize": {
+			if (flags.help) return ok(HELP_NORMALIZE);
 			const f = positional[0];
-			if (!f) return fail("usage: pfdsl normalize <file>\n", 2);
+			if (!f) return fail(HELP_NORMALIZE, 2);
 			return runNormalize(f);
 		}
 		case "graph": {
+			if (flags.help) return ok(HELP_GRAPH);
 			const f = positional[0];
-			if (!f)
-				return fail(
-					"usage: pfdsl graph <file> [--format dot|svg|pdf|png]\n",
-					2,
-				);
+			if (!f) return fail(HELP_GRAPH, 2);
 			const fmt = flags.format;
 			if (
 				fmt !== undefined &&
@@ -416,8 +480,9 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			return runGraph(f, fmt ? { format: fmt as CliRenderFormat } : {});
 		}
 		case "diff": {
+			if (flags.help) return ok(HELP_DIFF);
 			const [a, b] = positional;
-			if (!a || !b) return fail("usage: pfdsl diff <a> <b>\n", 2);
+			if (!a || !b) return fail(HELP_DIFF, 2);
 			const fmt = flags.format;
 			if (
 				fmt !== undefined &&
@@ -430,9 +495,10 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			return await runDiff(a, b, fmt ? { format: fmt } : {});
 		}
 		case "skill": {
+			if (flags.help) return ok(HELP_SKILL);
 			const [sub] = positional;
 			if (sub !== "sync") {
-				return fail("usage: pfdsl skill sync [--yes]\n", 2);
+				return fail(HELP_SKILL, 2);
 			}
 			// --target overrides cwd; intended for tests only (production always
 			// targets the directory the CLI is invoked from).
