@@ -56,10 +56,24 @@ artifact:
     updated_at: 2026-06-22T05:40:24Z
   i172_version_cmd:
     label: "CLI --version コマンド (#172)"
-    description: "pfdsl --version / -V / version でバージョン番号を出力する。ビルド時に package.json から tsup define で埋め込む"
+    description: "pfdsl --version / -V でバージョン番号を出力する。ビルド時に package.json から tsup define で埋め込む"
     status: wip
     criteria: "pfdsl --version が semver 文字列を stdout に出力して exit 0、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/172
+    updated_at: 2026-06-23T00:00:00Z
+  i177_subcommand_help:
+    label: "CLI per-command --help (#177)"
+    description: "pfdsl check --help など各サブコマンドでコマンド固有の usage を表示する"
+    status: wip
+    criteria: "全サブコマンドで --help が exit 0、引数なし呼び出しで同内容を exit 2、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/177
+    updated_at: 2026-06-23T00:00:00Z
+  i178_stdin:
+    label: "CLI stdin 対応 (#178)"
+    description: "check/fmt/normalize/graph でファイル引数に - を渡すと stdin から読む。fmt --write - は禁止"
+    status: wip
+    criteria: "echo 'a >> P -> b' | pfdsl check - が exit 0、fmt --write - が exit 2、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/178
     updated_at: 2026-06-23T00:00:00Z
   multifile_policy:
     label: マルチファイル意味論方針
@@ -185,6 +199,10 @@ process:
     description: "spec v0.0.8 subflow/extends checker 実装（V021-V028）。renderer・VS Code extension は対象外。issue: https://github.com/takasek/pfdsl/issues/148"
   publish_extension:
     label: extension自動公開実装
+  implement_subcommand_help:
+    label: per-command --help実装
+  implement_stdin:
+    label: stdin対応実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -233,3 +251,5 @@ spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
 cli_tool >> publish_extension -> i119_published_extension
 
 cli_tool >> implement_version_cmd -> i172_version_cmd
+cli_tool >> implement_subcommand_help -> i177_subcommand_help
+cli_tool >> implement_stdin -> i178_stdin
