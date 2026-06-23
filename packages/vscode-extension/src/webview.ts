@@ -7,7 +7,7 @@ type MessageToWebview =
 			dot: string;
 			focusNodeId?: string;
 			descriptions?: Record<string, string>;
-			locations?: Record<string, string>;
+			locations?: Record<string, string[]>;
 			subflows?: Record<string, string>;
 	  }
 	| { type: "error"; message: string }
@@ -30,7 +30,8 @@ type MessageFromWebview =
 	| { type: "ready" }
 	| { type: "nodeClick"; nodeId: string }
 	| { type: "openUrl"; url: string }
-	| { type: "openFile"; path: string };
+	| { type: "openFile"; path: string }
+	| { type: "openLocation"; nodeId: string };
 
 declare const acquireVsCodeApi: () => {
 	postMessage: (msg: MessageFromWebview) => void;
@@ -61,7 +62,7 @@ const inner = document.getElementById("inner") as HTMLDivElement;
 const tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
 let descriptions: Record<string, string> = {};
-let locations: Record<string, string> = {};
+let locations: Record<string, string[]> = {};
 let subflows: Record<string, string> = {};
 let lastFocusedNodeId: string | undefined;
 
@@ -113,15 +114,17 @@ root.addEventListener("mousemove", (e) => {
 	}
 	const nodeId = (node as HTMLElement).dataset.nodeId;
 	const desc = nodeId ? descriptions[nodeId] : undefined;
-	const loc = (node as HTMLElement).dataset.location;
+	const nodeLocs = nodeId ? (locations[nodeId] ?? []) : [];
 	const subflow = (node as HTMLElement).dataset.subflow;
 	const hint = subflow
 		? `${modKey}+Click to open subflow`
-		: loc
-			? loc.includes("://")
-				? `${modKey}+Click to open URL`
-				: `${modKey}+Click to open file`
-			: null;
+		: nodeLocs.length > 1
+			? `${modKey}+Click to open location…`
+			: nodeLocs.length === 1
+				? nodeLocs[0].includes("://")
+					? `${modKey}+Click to open URL`
+					: `${modKey}+Click to open file`
+				: null;
 	const tooltipText = [desc, hint].filter(Boolean).join("\n");
 	if (!tooltipText) {
 		tooltip.style.display = "none";
@@ -307,18 +310,22 @@ root.addEventListener("click", (e) => {
 	if (!node) return;
 	const el = node as HTMLElement;
 	const subflow = el.dataset.subflow;
-	const loc = el.dataset.location;
-	if (!subflow && !loc) return;
+	const nodeId = el.dataset.nodeId;
+	const nodeLocs = nodeId ? (locations[nodeId] ?? []) : [];
+	if (!subflow && nodeLocs.length === 0) return;
 	e.preventDefault();
 	if (e.metaKey || e.ctrlKey) {
 		if (subflow) {
 			vscode.postMessage({ type: "openFile", path: subflow });
-		} else if (loc) {
+		} else if (nodeLocs.length === 1) {
+			const loc = nodeLocs[0];
 			if (loc.includes("://")) {
 				vscode.postMessage({ type: "openUrl", url: loc });
 			} else {
 				vscode.postMessage({ type: "openFile", path: loc });
 			}
+		} else if (nodeLocs.length > 1 && nodeId) {
+			vscode.postMessage({ type: "openLocation", nodeId });
 		}
 	}
 });
@@ -394,8 +401,6 @@ window.addEventListener("message", async (event) => {
 			if (titleEl?.textContent) {
 				const id = titleEl.textContent;
 				(node as HTMLElement).dataset.nodeId = id;
-				const loc = locations[id];
-				if (loc) (node as HTMLElement).dataset.location = loc;
 				const sf = subflows[id];
 				if (sf) (node as HTMLElement).dataset.subflow = sf;
 				titleEl.remove();
