@@ -46,6 +46,7 @@ export interface ProcessMeta {
 export interface GroupMeta {
 	label?: string;
 	color?: string;
+	parent?: string;
 	[key: string]: unknown;
 }
 

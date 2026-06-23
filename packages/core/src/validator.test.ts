@@ -450,6 +450,69 @@ describe("validate", () => {
 		});
 	});
 
+	describe("V025: cycle in group parent chain", () => {
+		it("errors when group parent forms a direct cycle (A → B → A)", () => {
+			const fm: Frontmatter = {
+				group: {
+					g1: { parent: "g2" },
+					g2: { parent: "g1" },
+				},
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V025");
+		});
+
+		it("V025 severity is error", () => {
+			const fm: Frontmatter = {
+				group: {
+					g1: { parent: "g2" },
+					g2: { parent: "g1" },
+				},
+			};
+			const diags = diagnose("A >> P -> B", fm);
+			const v025 = diags.find((d) => d.code === "V025");
+			expect(v025?.severity).toBe("error");
+		});
+
+		it("errors when group parent forms a longer cycle (A → B → C → A)", () => {
+			const fm: Frontmatter = {
+				group: {
+					g1: { parent: "g3" },
+					g2: { parent: "g1" },
+					g3: { parent: "g2" },
+				},
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V025");
+		});
+
+		it("no V025 when parent chain is acyclic", () => {
+			const fm: Frontmatter = {
+				group: {
+					parent_g: {},
+					child_g: { parent: "parent_g" },
+				},
+			};
+			expect(codes("A >> P -> B", fm)).not.toContain("V025");
+		});
+
+		it("no V025 when group has no parent", () => {
+			const fm: Frontmatter = {
+				group: {
+					g1: { label: "Flat group" },
+				},
+			};
+			expect(codes("A >> P -> B", fm)).not.toContain("V025");
+		});
+
+		it("no V025 when parent references unknown group id", () => {
+			const fm: Frontmatter = {
+				group: {
+					g1: { parent: "nonexistent" },
+				},
+			};
+			expect(codes("A >> P -> B", fm)).not.toContain("V025");
+		});
+	});
+
 	describe("W003: status non-monotonicity (output done while input not done)", () => {
 		it("warns when output artifact is done but input artifact is not done", () => {
 			const fm: Frontmatter = {

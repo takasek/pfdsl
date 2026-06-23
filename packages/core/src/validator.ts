@@ -495,5 +495,40 @@ export function validate(
 		}
 	}
 
+	// V025: cycle in group parent chain
+	{
+		const groupMeta = fm?.group ?? {};
+		const color = new Map<string, "white" | "gray" | "black">();
+		for (const id of Object.keys(groupMeta)) color.set(id, "white");
+
+		function dfsGroup(id: string): boolean {
+			color.set(id, "gray");
+			const parent = groupMeta[id]?.parent;
+			if (parent !== undefined) {
+				if (color.get(parent) === "gray") {
+					diagnostics.push({
+						severity: "error",
+						code: "V025",
+						message: `Cycle detected in 'parent' chain involving group '${id}' → '${parent}'`,
+						range: zeroRange(),
+					});
+					color.set(id, "black");
+					return true;
+				}
+				if (color.get(parent) === "white") {
+					if (dfsGroup(parent)) {
+						color.set(id, "black");
+						return true;
+					}
+				}
+			}
+			color.set(id, "black");
+			return false;
+		}
+		for (const id of Object.keys(groupMeta)) {
+			if (color.get(id) === "white") dfsGroup(id);
+		}
+	}
+
 	return diagnostics;
 }
