@@ -37,6 +37,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
 
+**spec.md を変更した場合**: `make gen-skill` を実行してスキルの `references/spec.md` を更新してからコミットする。
+
 **Cycle 計画のパッケージ層明記**: PR body に対象パッケージ層を明記する（→ workflow.pfdsl `develop` プロセスの description 参照）。
 
 **PR 本文の `Closes` キーワード確認**: issue に対応する PR（main 直接マージ）では本文に `Closes #<issue番号>` を含める（L3 規約）。feature branch への中間 PR では使わない（上記タイミング規約）。
