@@ -69,40 +69,20 @@ artifact:
     criteria: v* tag push で VS Code Marketplace への自動 publish が動作確認済み
     location: https://github.com/takasek/pfdsl/issues/119
     updated_at: 2026-06-22T05:40:24Z
-  i172_version_cmd:
-    label: "CLI --version コマンド (#172)"
-    description: "pfdsl --version / -V でバージョン番号を出力する。ビルド時に package.json から tsup define で埋め込む"
-    status: wip
-    criteria: "pfdsl --version が semver 文字列を stdout に出力して exit 0、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/172
-    updated_at: 2026-06-23T00:00:00Z
-  i177_subcommand_help:
-    label: "CLI per-command --help (#177)"
-    description: "pfdsl check --help など各サブコマンドでコマンド固有の usage を表示する"
-    status: wip
-    criteria: "全サブコマンドで --help が exit 0、引数なし呼び出しで同内容を exit 2、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/177
-    updated_at: 2026-06-23T00:00:00Z
-  i178_stdin:
-    label: "CLI stdin 対応 (#178)"
-    description: "check/fmt/normalize/graph でファイル引数に - を渡すと stdin から読む。fmt --write - は禁止"
-    status: wip
-    criteria: "echo 'a >> P -> b' | pfdsl check - が exit 0、fmt --write - が exit 2、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/178
   i180_no_color:
     label: "CLI --no-color / NO_COLOR 対応 (#180)"
     description: "--no-color フラグまたは NO_COLOR 環境変数で ANSI カラー出力を無効化する。no-color.org 準拠"
     status: todo
     criteria: "NO_COLOR=1 pfdsl check <file> および --no-color で ANSI コードを含まない出力、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/180
-    updated_at: 2026-06-23T00:00:00Z
+    updated_at: 2026-06-23T02:53:54Z
   i181_json_output:
     label: "CLI --json 出力対応 (#181)"
     description: "check / normalize で --json フラグを渡すと診断結果またはエッジ一覧を JSON で返す。CI・外部ツール連携向け"
     status: todo
     criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/181
-    updated_at: 2026-06-23T00:00:00Z
+    updated_at: 2026-06-23T02:54:03Z
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -187,6 +167,24 @@ artifact:
     status: done
     criteria: 仕様案として起草完了
     location: https://github.com/takasek/pfdsl/issues/6
+  version_cmd:
+    label: "CLI --version コマンド (#172)"
+    description: "pfdsl --version / -V でバージョン番号を出力する。ビルド時に package.json から tsup define で埋め込む"
+    status: done
+    criteria: "pfdsl --version が semver 文字列を stdout に出力して exit 0、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/172
+  subcommand_help:
+    label: "CLI per-command --help (#177)"
+    description: "pfdsl check --help など各サブコマンドでコマンド固有の usage を表示する"
+    status: done
+    criteria: "全サブコマンドで --help が exit 0、引数なし呼び出しで同内容を exit 2、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/177
+  stdin:
+    label: "CLI stdin 対応 (#178)"
+    description: "check/fmt/normalize/graph でファイル引数に - を渡すと stdin から読む。fmt --write - は禁止"
+    status: done
+    criteria: "echo 'a >> P -> b' | pfdsl check - が exit 0、fmt --write - が exit 2、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/178
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -271,9 +269,6 @@ featured_toolchain
 findings_r12
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -302,6 +297,9 @@ revises_spec
 skill_gen
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -324,9 +322,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -357,6 +352,9 @@ revises_spec
 skill_gen
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -380,9 +378,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -412,6 +407,9 @@ restructured_gen
 skill_gen
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -435,9 +433,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -467,6 +462,9 @@ revises_spec
 skill_gen
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -490,9 +488,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -523,6 +518,9 @@ revises_spec
 skill_gen
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 
 criteria_spec >> integrate_spec
@@ -547,9 +545,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -577,6 +572,9 @@ restructured_gen
 skill_gen
 spec_v006
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -600,9 +598,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -632,6 +627,9 @@ revises_spec
 skill_gen
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -656,9 +654,6 @@ featured_toolchain
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -687,6 +682,9 @@ revises_spec
 skill_gen
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -711,9 +709,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -742,6 +737,9 @@ revises_spec
 skill_gen
 spec_v006
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -767,9 +765,6 @@ external_stakeholders_spec
 findings_r12
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -797,6 +792,9 @@ revises_spec
 skill_gen
 spec_v006
 spec_v007
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -821,9 +819,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -852,6 +847,9 @@ revises_spec
 skill_gen
 spec_v006
 spec_v007
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -876,9 +874,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -907,6 +902,9 @@ revises_spec
 spec_v006
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -929,9 +927,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -962,6 +957,9 @@ skill_gen
 spec_v006
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -984,9 +982,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -1017,6 +1012,9 @@ skill_gen
 spec_v006
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -1039,9 +1037,6 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i119_published_extension
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -1073,6 +1068,9 @@ skill_gen
 spec_v006
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_design_notes
 
 cli_tool >> build_obsidian_plugin
@@ -1094,9 +1092,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 implement_json_output
@@ -1127,6 +1122,9 @@ skill_gen
 spec_v006
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -1149,9 +1147,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -1182,6 +1177,9 @@ revises_spec
 skill_gen
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -1204,9 +1202,6 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i180_no_color
 i181_json_output
 i3_obsidian_plugin
@@ -1237,6 +1232,9 @@ skill_gen
 spec_v006
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 
@@ -1247,9 +1245,9 @@ implement_no_color -> i180_no_color
 cli_tool_v009 >> implement_stdin
 cli_tool_v009 >> implement_subcommand_help
 cli_tool_v009 >> implement_version_cmd
-implement_stdin -> i178_stdin
-implement_subcommand_help -> i177_subcommand_help
-implement_version_cmd -> i172_version_cmd
+implement_stdin -> stdin
+implement_subcommand_help -> subcommand_help
+implement_version_cmd -> version_cmd
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -1294,9 +1292,9 @@ spec_v008
 write_article
 write_design_notes
 
-i172_version_cmd >> publish_cli_v0010
-i177_subcommand_help >> publish_cli_v0010
-i178_stdin >> publish_cli_v0010
+stdin >> publish_cli_v0010
+subcommand_help >> publish_cli_v0010
+version_cmd >> publish_cli_v0010
 publish_cli_v0010 -> cli_tool_v0010
 adr_corpus
 audit_distribution
@@ -1371,9 +1369,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i172_version_cmd
-i177_subcommand_help
-i178_stdin
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1401,6 +1396,9 @@ skill_gen
 spec_v006
 spec_v007
 spec_v008
+stdin
+subcommand_help
+version_cmd
 write_article
 write_design_notes
 "
