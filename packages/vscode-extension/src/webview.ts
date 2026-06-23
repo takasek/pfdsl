@@ -317,14 +317,7 @@ root.addEventListener("click", (e) => {
 	if (e.metaKey || e.ctrlKey) {
 		if (subflow) {
 			vscode.postMessage({ type: "openFile", path: subflow });
-		} else if (nodeLocs.length === 1) {
-			const loc = nodeLocs[0];
-			if (loc.includes("://")) {
-				vscode.postMessage({ type: "openUrl", url: loc });
-			} else {
-				vscode.postMessage({ type: "openFile", path: loc });
-			}
-		} else if (nodeLocs.length > 1 && nodeId) {
+		} else if (nodeLocs.length > 0 && nodeId) {
 			vscode.postMessage({ type: "openLocation", nodeId });
 		}
 	}
