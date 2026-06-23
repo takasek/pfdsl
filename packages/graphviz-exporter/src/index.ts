@@ -576,14 +576,16 @@ function nodeAttrs(
 		knownFields.push(["command", (meta as ProcessMeta).command!]);
 	if (typeof (meta as ProcessMeta | undefined)?.subflow === "string")
 		knownFields.push(["subflow", (meta as ProcessMeta).subflow!]);
-	const es = meta?.externalStakeholders;
-	if (Array.isArray(es) && es.length > 0)
-		knownFields.push(["externalStakeholders", es.join(", ")]);
 	const extraFields: [string, string][] = meta
 		? Object.entries(meta)
-				.filter(([k, v]) => !KNOWN_TOOLTIP_SKIP.has(k) && typeof v === "string"
-					&& !knownFields.some(([kf]) => kf === k))
-				.map(([k, v]) => [k, v as string])
+				.filter(([k, v]) => {
+					if (KNOWN_TOOLTIP_SKIP.has(k)) return false;
+					if (knownFields.some(([kf]) => kf === k)) return false;
+					if (typeof v === "string") return true;
+					if (Array.isArray(v) && v.length > 0 && v.every((i) => typeof i === "string")) return true;
+					return false;
+				})
+				.map(([k, v]) => [k, Array.isArray(v) ? (v as string[]).join(", ") : v as string])
 		: [];
 
 	for (const [key, val] of [...knownFields, ...extraFields]) {
