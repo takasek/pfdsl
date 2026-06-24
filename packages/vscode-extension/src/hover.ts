@@ -1,6 +1,9 @@
 import { ID_PATTERN } from "@pfdsl/core";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
+import { buildHoverLines } from "./hover-logic.js";
+
+export { buildHoverLines } from "./hover-logic.js";
 
 export function registerHover(context: vscode.ExtensionContext): void {
 	const provider: vscode.HoverProvider = {
@@ -13,24 +16,7 @@ export function registerHover(context: vscode.ExtensionContext): void {
 			const kind = nodeKinds.get(id);
 			if (!kind) return null;
 
-			const lines: string[] = [`**${id}** _(${kind})_`];
-			if (kind === "artifact") {
-				const meta = frontmatter?.artifact?.[id];
-				if (meta) {
-					if (meta.label) lines.push(`label: ${meta.label}`);
-					if (meta.owner) lines.push(`owner: ${meta.owner}`);
-					if (meta.status) lines.push(`status: ${meta.status}`);
-					if (meta.tags?.length) lines.push(`tags: ${meta.tags.join(", ")}`);
-					if (meta.parts?.length) lines.push(`parts: ${meta.parts.join(", ")}`);
-				}
-			} else {
-				const meta = frontmatter?.process?.[id];
-				if (meta) {
-					if (meta.label) lines.push(`label: ${meta.label}`);
-					if (meta.owner) lines.push(`owner: ${meta.owner}`);
-				}
-			}
-
+			const lines = buildHoverLines(id, kind, frontmatter);
 			const md = new vscode.MarkdownString(lines.join("  \n"));
 			md.isTrusted = false;
 			return new vscode.Hover(md, range);

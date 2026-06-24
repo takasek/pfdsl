@@ -1,12 +1,13 @@
 import type {
 	Diagnostic as CoreDiagnostic,
 	Range as CoreRange,
+	DiagnosticSeverity,
 } from "@pfdsl/core";
 import * as vscode from "vscode";
 import { analyzeDocument, dropAnalyzeCache, LANGUAGE_ID } from "./analyze.js";
 
-const SEVERITY_MAP: Record<
-	CoreDiagnostic["severity"],
+export const SEVERITY_MAP: Record<
+	DiagnosticSeverity,
 	vscode.DiagnosticSeverity
 > = {
 	error: vscode.DiagnosticSeverity.Error,
@@ -14,13 +15,25 @@ const SEVERITY_MAP: Record<
 	info: vscode.DiagnosticSeverity.Information,
 };
 
+export interface VscodeRangeLike {
+	startLine: number;
+	startColumn: number;
+	endLine: number;
+	endColumn: number;
+}
+
+export function coreRangeToVscode(r: CoreRange): VscodeRangeLike {
+	return {
+		startLine: r.start.line - 1,
+		startColumn: r.start.column - 1,
+		endLine: r.end.line - 1,
+		endColumn: r.end.column - 1,
+	};
+}
+
 function toVscodeRange(r: CoreRange): vscode.Range {
-	return new vscode.Range(
-		r.start.line - 1,
-		r.start.column - 1,
-		r.end.line - 1,
-		r.end.column - 1,
-	);
+	const { startLine, startColumn, endLine, endColumn } = coreRangeToVscode(r);
+	return new vscode.Range(startLine, startColumn, endLine, endColumn);
 }
 
 function toVscodeDiagnostic(d: CoreDiagnostic): vscode.Diagnostic {
