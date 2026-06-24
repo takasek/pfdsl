@@ -35,10 +35,13 @@ export function registerHover(context: vscode.ExtensionContext): void {
 							pos.translate(0, nodeId.length),
 						);
 						existing.revealRange(defRange);
-						vscode.window.showTextDocument(doc, {
-							viewColumn: existing.viewColumn,
-							preserveFocus: false,
-						});
+						const vc = existing.viewColumn;
+						if (vc !== undefined) {
+							vscode.window.showTextDocument(doc, {
+								viewColumn: vc,
+								preserveFocus: false,
+							});
+						}
 					} else {
 						vscode.window.showTextDocument(doc, { selection: defRange });
 					}
