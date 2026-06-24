@@ -18,6 +18,9 @@
 	"dependencies": {
 		"yaml": "^2.4.0"
 	},
+	"engines": {
+		"node": ">=18"
+	},
 	"files": [
 		"dist"
 	],

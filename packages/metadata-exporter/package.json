@@ -18,6 +18,9 @@
 	"dependencies": {
 		"@pfdsl/core": "workspace:*"
 	},
+	"engines": {
+		"node": ">=18"
+	},
 	"files": [
 		"dist"
 	],
