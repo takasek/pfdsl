@@ -177,13 +177,6 @@ artifact:
     status: done
     criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/181
-  i198_audit_improvements:
-    label: "監査改善の反映 (#198)"
-    description: "2026-06 コードベース監査で洗い出した品質・堅牢性・DX 改善の集約。内部の work item 依存と進捗は subflow audit-improvements.pfdsl で管理"
-    status: done
-    criteria: 全 work item が done で main 反映済み
-    location: https://github.com/takasek/pfdsl/issues/198
-    updated_at: 2026-06-24T05:58:33Z
   i201_published_libs:
     label: "公開ライブラリ群 (#201)"
     description: "@pfdsl/core / preview-engine / graphviz-exporter を npm 公開ライブラリ化し、README の Library 節と実態を整合させる。監査 #198 から派生（engines.node は #198 で対応）"
@@ -241,9 +234,6 @@ process:
     label: --json出力実装
   publish_cli_v0010:
     label: CLI v0.0.10リリース
-  address_audit_findings:
-    label: 監査改善の反映
-    description: "2026-06 監査 findings への対応。12 work item を Phase 1–4 で実施し main 反映済み（PR #202–#212）"
   publish_libraries:
     label: ライブラリ公開
 
@@ -261,7 +251,6 @@ spec_v006 >> draft_multifile_specs
 draft_multifile_specs -> hierarchy_spec
 draft_multifile_specs -> multifile_policy
 draft_multifile_specs -> presets_spec
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -279,7 +268,6 @@ featured_toolchain
 findings_r12
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -316,7 +304,6 @@ write_design_notes
 
 spec_v006 >> draft_criteria
 draft_criteria -> criteria_spec
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -334,7 +321,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -373,7 +359,6 @@ write_design_notes
 
 spec_v006 >> draft_revises
 draft_revises -> revises_spec
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -392,7 +377,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -430,7 +414,6 @@ write_design_notes
 
 spec_v006 >> draft_location
 draft_location -> location_spec
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -449,7 +432,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -487,7 +469,6 @@ write_design_notes
 
 spec_v006 >> write_design_notes
 write_design_notes -> design_notes
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -506,7 +487,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -548,7 +528,6 @@ external_stakeholders_spec >> integrate_spec
 location_spec >> integrate_spec
 revises_spec >> integrate_spec
 integrate_spec -> spec_v007
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -565,7 +544,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -600,7 +578,6 @@ write_article
 write_design_notes
 
 spec_v006 >>? integrate_spec
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -620,7 +597,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -660,7 +636,6 @@ cli_tool >> implement_lints
 findings_r12 >> implement_lints
 spec_v006 >> implement_lints
 implement_lints -> lint_checker
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -678,7 +653,6 @@ featured_toolchain
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -716,7 +690,6 @@ write_design_notes
 lint_checker >> implement_spec_features
 spec_v007 >> implement_spec_features
 implement_spec_features -> featured_toolchain
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -735,7 +708,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -775,7 +747,6 @@ hierarchy_spec >> integrate_multifile
 multifile_policy >> integrate_multifile
 presets_spec >> integrate_multifile
 integrate_multifile -> spec_v008
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -793,7 +764,6 @@ external_stakeholders_spec
 findings_r12
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -830,7 +800,6 @@ write_design_notes
 featured_toolchain >> implement_multifile
 spec_v008 >> implement_multifile
 implement_multifile -> multifile_toolchain
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -849,7 +818,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -886,7 +854,6 @@ write_design_notes
 
 skill_gen >> restructure_skillgen
 restructure_skillgen -> restructured_gen
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -906,7 +873,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -943,7 +909,6 @@ write_design_notes
 
 cli_tool >> publish_cli_v009
 publish_cli_v009 -> cli_tool_v009
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -961,7 +926,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -1000,7 +964,6 @@ write_design_notes
 
 cli_tool >> layer_audit_assets
 layer_audit_assets -> audit_distribution
-address_audit_findings
 adr_corpus
 build_obsidian_plugin
 cli_tool_v0010
@@ -1018,7 +981,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -1057,7 +1019,6 @@ write_design_notes
 
 adr_corpus >> write_article
 write_article -> i12_article
-address_audit_findings
 audit_distribution
 build_obsidian_plugin
 cli_tool
@@ -1075,7 +1036,6 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i119_published_extension
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -1114,7 +1074,6 @@ write_design_notes
 
 cli_tool >> build_obsidian_plugin
 build_obsidian_plugin -> i3_obsidian_plugin
-address_audit_findings
 adr_corpus
 audit_distribution
 cli_tool_v0010
@@ -1132,7 +1091,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 implement_json_output
 implement_lints
@@ -1171,7 +1129,6 @@ write_design_notes
 
 spec_v006 >> draft_external_stakeholders
 draft_external_stakeholders -> external_stakeholders_spec
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -1189,7 +1146,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -1228,7 +1184,6 @@ write_design_notes
 
 cli_tool >> publish_extension
 publish_extension -> i119_published_extension
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -1246,7 +1201,6 @@ featured_toolchain
 findings_r12
 hierarchy_spec
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -1293,7 +1247,6 @@ implement_no_color -> no_color
 implement_stdin -> stdin
 implement_subcommand_help -> subcommand_help
 implement_version_cmd -> version_cmd
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -1312,7 +1265,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_lints
@@ -1346,7 +1298,6 @@ stdin >> publish_cli_v0010
 subcommand_help >> publish_cli_v0010
 version_cmd >> publish_cli_v0010
 publish_cli_v0010 -> cli_tool_v0010
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -1365,7 +1316,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i201_published_libs
 i3_obsidian_plugin
 implement_json_output
@@ -1394,69 +1344,11 @@ skill_gen
 spec_v006
 spec_v007
 spec_v008
-write_article
-write_design_notes
-
-cli_tool >> address_audit_findings
-address_audit_findings -> i198_audit_improvements
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool_v0010
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-hierarchy_spec
-i119_published_extension
-i12_article
-i201_published_libs
-i3_obsidian_plugin
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-integrate_multifile
-integrate_spec
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v009
-publish_extension
-publish_libraries
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-stdin
-subcommand_help
-version_cmd
 write_article
 write_design_notes
 
 cli_tool >> publish_libraries
 publish_libraries -> i201_published_libs
-address_audit_findings
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -1475,7 +1367,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i198_audit_improvements
 i3_obsidian_plugin
 implement_json_output
 implement_lints
