@@ -180,6 +180,69 @@ report >> summarize -> summary
 
 ---
 
+## 12-subflow — Subflow
+
+`subflow:` on a process links to a child `.pfdsl` file. The child's open inputs and terminals must bijectively match the parent process's normal inputs and outputs (V025).
+
+```pfdsl
+---
+artifact:
+  requirement:
+    label: Requirements
+  shipped_order:
+    label: Shipped Order
+process:
+  fulfill_order:
+    label: Order Fulfillment
+    subflow: ./12-subflow-detail.pfdsl
+---
+requirement >> fulfill_order -> shipped_order
+```
+
+---
+
+## 13-preset — Preset (extends)
+
+`extends:` inherits `statusStyles` / `tag` / `group` from a preset file. Attribute-level deep merge: local values override inherited ones.
+
+```pfdsl
+---
+extends: ./13-preset-base.pfdsl
+artifact:
+  backlog: { status: done }
+  prototype: { status: wip }
+  release: { status: todo }
+---
+backlog >> develop -> prototype
+prototype >> review -> release
+```
+
+---
+
+## 14-boundary — Boundary map
+
+`boundary:` on a subflow process remaps parent artifact IDs to different child artifact IDs. Useful when reusing an independently-named child flow.
+
+```pfdsl
+---
+artifact:
+  order:
+    label: Customer Order
+  parcel:
+    label: Parcel
+process:
+  fulfill:
+    label: Fulfillment
+    subflow: ./14-boundary-detail.pfdsl
+    boundary:
+      order: incoming_order
+      parcel: outgoing_parcel
+---
+order >> fulfill -> parcel
+```
+
+---
+
 ## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
 How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).

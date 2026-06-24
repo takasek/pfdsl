@@ -1,0 +1,11 @@
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "fulfill" [shape=ellipse, label="fulfill\nFulfillment", tooltip="Fulfillment\nsubflow: ./14-boundary-detail.pfdsl"];
+  "order" [shape=box, label="order\nCustomer Order", penwidth="2"];
+  "parcel" [shape=box, label="parcel\nParcel", penwidth="2"];
+
+  "order" -> "fulfill";
+  "fulfill" -> "parcel";
+}

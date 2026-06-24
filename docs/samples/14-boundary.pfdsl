@@ -1,0 +1,15 @@
+---
+artifact:
+  order:
+    label: Customer Order
+  parcel:
+    label: Parcel
+process:
+  fulfill:
+    label: Fulfillment
+    subflow: ./14-boundary-detail.pfdsl
+    boundary:
+      order: incoming_order
+      parcel: outgoing_parcel
+---
+order >> fulfill -> parcel

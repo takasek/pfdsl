@@ -9,4 +9,7 @@ id	summary	description
 09-parts	Parts	`parts:` declares sub-artifacts of a composite artifact. Short IDs + `label:` show how opaque keys pair with human-readable names.
 10-layout-tb	Layout direction	`layout.direction: TB` sets `rankdir=TB`. Default is `LR`.
 11-external-stakeholders	External stakeholders	`externalStakeholders:` on artifacts marks external consumers outside the flow graph. Excluded from orphan-terminal audit (`check --audit`).
+12-subflow	Subflow	`subflow:` on a process links to a child `.pfdsl` file. The child's open inputs and terminals must bijectively match the parent process's normal inputs and outputs (V025).
+13-preset	Preset (extends)	`extends:` inherits `statusStyles` / `tag` / `group` from a preset file. Attribute-level deep merge: local values override inherited ones.
+14-boundary	Boundary map	`boundary:` on a subflow process remaps parent artifact IDs to different child artifact IDs. Useful when reusing an independently-named child flow.
 pfdsl_implementation_flow	PFDSL toolchain roadmap	How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).

@@ -1,0 +1,15 @@
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "backlog" [shape=box, label="backlog", xlabel="done", penwidth="2"];
+  "develop" [shape=ellipse, label="develop"];
+  "prototype" [shape=box, label="prototype", xlabel="wip"];
+  "release" [shape=box, label="release", xlabel="todo", penwidth="2"];
+  "review" [shape=ellipse, label="review"];
+
+  "backlog" -> "develop";
+  "develop" -> "prototype";
+  "prototype" -> "review";
+  "review" -> "release";
+}

@@ -1,0 +1,11 @@
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "fulfill_order" [shape=ellipse, label="fulfill_order\nOrder Fulfillment", tooltip="Order Fulfillment\nsubflow: ./12-subflow-detail.pfdsl"];
+  "requirement" [shape=box, label="requirement\nRequirements", penwidth="2"];
+  "shipped_order" [shape=box, label="shipped_order\nShipped Order", penwidth="2"];
+
+  "requirement" -> "fulfill_order";
+  "fulfill_order" -> "shipped_order";
+}
