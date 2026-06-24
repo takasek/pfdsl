@@ -174,6 +174,20 @@ artifact:
     status: done
     criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/181
+  i198_audit_improvements:
+    label: "監査改善の反映 (#198)"
+    description: "2026-06 コードベース監査で洗い出した品質・堅牢性・DX 改善の集約。内部の work item 依存と進捗は subflow audit-improvements.pfdsl で管理"
+    status: todo
+    criteria: 全 work item が done で main 反映済み
+    location: https://github.com/takasek/pfdsl/issues/198
+    updated_at: 2026-06-24T05:58:33Z
+  i201_published_libs:
+    label: "公開ライブラリ群 (#201)"
+    description: "@pfdsl/core / preview-engine / graphviz-exporter を npm 公開ライブラリ化し、README の Library 節と実態を整合させる。監査 #198 から派生（engines.node は #198 で対応）"
+    status: todo
+    criteria: 対象パッケージが npm 公開済みで README の install/import 例と一致
+    location: https://github.com/takasek/pfdsl/issues/201
+    updated_at: 2026-06-24T06:53:50Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -224,6 +238,12 @@ process:
     label: --json出力実装
   publish_cli_v0010:
     label: CLI v0.0.10リリース
+  address_audit_findings:
+    label: 監査改善の反映
+    description: "2026-06 監査 findings への対応。内部 work item と依存は子フローへ展開（subflow ビューリンク、生成の複製ではない）"
+    subflow: ./audit-improvements.pfdsl
+  publish_libraries:
+    label: ライブラリ公開
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -278,3 +298,7 @@ cli_tool_v009 >> implement_no_color -> no_color
 cli_tool_v009 >> implement_json_output -> json_output
 
 [version_cmd, subcommand_help, stdin, no_color, json_output] >> publish_cli_v0010 -> cli_tool_v0010
+
+cli_tool >> address_audit_findings -> i198_audit_improvements
+
+cli_tool >> publish_libraries -> i201_published_libs
