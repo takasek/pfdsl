@@ -184,6 +184,13 @@ artifact:
     criteria: 全 work item が done で main 反映済み
     location: https://github.com/takasek/pfdsl/issues/198
     updated_at: 2026-06-24T05:58:33Z
+  i201_published_libs:
+    label: "公開ライブラリ群 (#201)"
+    description: "@pfdsl/core / preview-engine / graphviz-exporter を npm 公開ライブラリ化し、README の Library 節と実態を整合させる。監査 #198 から派生（engines.node は #198 で対応）"
+    status: todo
+    criteria: 対象パッケージが npm 公開済みで README の install/import 例と一致
+    location: https://github.com/takasek/pfdsl/issues/201
+    updated_at: 2026-06-24T06:53:50Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -238,6 +245,8 @@ process:
     label: 監査改善の反映
     description: "2026-06 監査 findings への対応。内部 work item と依存は子フローへ展開（subflow ビューリンク、生成の複製ではない）"
     subflow: ./audit-improvements.pfdsl
+  publish_libraries:
+    label: ライブラリ公開
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -272,6 +281,7 @@ findings_r12
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -292,6 +302,7 @@ no_color
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -325,6 +336,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -347,6 +359,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -381,6 +394,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -403,6 +417,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 skill_gen
@@ -436,6 +451,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -457,6 +473,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -491,6 +508,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -513,6 +531,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -548,6 +567,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -568,6 +588,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 skill_gen
@@ -601,6 +622,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -622,6 +644,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -657,6 +680,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_multifile
@@ -677,6 +701,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -712,6 +737,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -732,6 +758,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -768,6 +795,7 @@ findings_r12
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -787,6 +815,7 @@ no_color
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -822,6 +851,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -842,6 +872,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -877,6 +908,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -899,6 +931,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 revises_spec
 spec_v006
 spec_v007
@@ -930,6 +963,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -951,6 +985,7 @@ no_color
 presets_spec
 publish_cli_v0010
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -985,6 +1020,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1006,6 +1042,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1040,6 +1077,7 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1062,6 +1100,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1095,6 +1134,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 implement_json_output
 implement_lints
 implement_multifile
@@ -1116,6 +1156,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1150,6 +1191,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1172,6 +1214,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1205,6 +1248,7 @@ findings_r12
 hierarchy_spec
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1226,6 +1270,7 @@ no_color
 presets_spec
 publish_cli_v0010
 publish_cli_v009
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1269,6 +1314,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_lints
 implement_multifile
@@ -1284,6 +1330,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1320,6 +1367,7 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i198_audit_improvements
+i201_published_libs
 i3_obsidian_plugin
 implement_json_output
 implement_lints
@@ -1339,6 +1387,7 @@ multifile_toolchain
 presets_spec
 publish_cli_v009
 publish_extension
+publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1369,6 +1418,65 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
+i201_published_libs
+i3_obsidian_plugin
+implement_json_output
+implement_lints
+implement_multifile
+implement_no_color
+implement_spec_features
+implement_stdin
+implement_subcommand_help
+implement_version_cmd
+integrate_multifile
+integrate_spec
+json_output
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+multifile_toolchain
+no_color
+presets_spec
+publish_cli_v0010
+publish_cli_v009
+publish_extension
+publish_libraries
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+stdin
+subcommand_help
+version_cmd
+write_article
+write_design_notes
+
+cli_tool >> publish_libraries
+publish_libraries -> i201_published_libs
+address_audit_findings
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+cli_tool_v0010
+cli_tool_v009
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+external_stakeholders_spec
+featured_toolchain
+findings_r12
+hierarchy_spec
+i119_published_extension
+i12_article
+i198_audit_improvements
 i3_obsidian_plugin
 implement_json_output
 implement_lints

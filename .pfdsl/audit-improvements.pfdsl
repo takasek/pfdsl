@@ -37,7 +37,7 @@ artifact:
   pkg_metadata:
     label: パッケージメタデータ整備
     status: todo
-    criteria: 全 package.json に engines.node、内部4パッケージに private、README の Node 要件が一致
+    criteria: 全 package.json に engines.node が宣言され README の Node 要件と一致。ライブラリ公開（private/publishConfig）は #201 へ分離
   pkg_docs:
     label: パッケージ README/CONTRIBUTING
     status: todo
