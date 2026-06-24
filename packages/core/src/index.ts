@@ -91,14 +91,16 @@ export function parse(source: string): ParseDocResult {
 		diagnostics: fmDiags,
 		bodyStartLine,
 	} = loadFrontmatter(source);
-	const { tokens, diagnostics: lexDiags } = lex(body);
+	const { tokens: rawTokens, diagnostics: lexDiags } = lex(body);
 	const lineOffset = bodyStartLine - 1;
-	if (lineOffset > 0) {
-		for (const t of tokens) {
-			t.start.line += lineOffset;
-			t.end.line += lineOffset;
-		}
-	}
+	const tokens =
+		lineOffset > 0
+			? rawTokens.map((t) => ({
+					...t,
+					start: { ...t.start, line: t.start.line + lineOffset },
+					end: { ...t.end, line: t.end.line + lineOffset },
+				}))
+			: rawTokens;
 	const { document, diagnostics: parseDiags } = parseTokens(tokens);
 	return {
 		document,
@@ -190,14 +192,16 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	} = loadFrontmatter(source);
 
 	// Parse full body for diagnostics and nodeKinds (needed for per-segment sort)
-	const { tokens, diagnostics: lexDiags } = lex(body);
+	const { tokens: rawTokens2, diagnostics: lexDiags } = lex(body);
 	const lineOffset = bodyStartLine - 1;
-	if (lineOffset > 0) {
-		for (const t of tokens) {
-			t.start.line += lineOffset;
-			t.end.line += lineOffset;
-		}
-	}
+	const tokens =
+		lineOffset > 0
+			? rawTokens2.map((t) => ({
+					...t,
+					start: { ...t.start, line: t.start.line + lineOffset },
+					end: { ...t.end, line: t.end.line + lineOffset },
+				}))
+			: rawTokens2;
 	const { document, diagnostics: parseDiags } = parseTokens(tokens);
 	const {
 		edges,

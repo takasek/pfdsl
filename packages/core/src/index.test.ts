@@ -3,6 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { format, normalizeDocument, parse, validateGraph } from "./index.js";
+import { lex } from "./lexer.js";
+import { parseTokens } from "./parser.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const samplePath = resolve(__dirname, "../../../.pfdsl/roadmap.pfdsl");
@@ -68,5 +70,24 @@ describe("public API", () => {
 		const src = "# just a comment\n";
 		const { output } = format(src);
 		expect(output).toBe("# just a comment\n");
+	});
+
+	describe("parse() immutability", () => {
+		it("does not mutate token positions: re-parse returns identical line numbers", () => {
+			const src = "---\nartifact:\n  a: {}\n---\na >> P -> b\n";
+			const r1 = parse(src);
+			const r2 = parse(src);
+			expect(r1.document.statements[0]?.start.line).toBe(
+				r2.document.statements[0]?.start.line,
+			);
+		});
+
+		it("does not mutate the token array passed from lex: token.start.line is unchanged after parse", () => {
+			const body = "a >> P -> b\n";
+			const { tokens } = lex(body);
+			const lineBeforeParse = tokens[0]?.start.line ?? -1;
+			parseTokens(tokens);
+			expect(tokens[0]?.start.line).toBe(lineBeforeParse);
+		});
 	});
 });
