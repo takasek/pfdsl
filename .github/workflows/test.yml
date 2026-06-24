@@ -20,11 +20,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: make lint
+
       - run: pnpm -r build
 
       - run: pnpm -r typecheck
 
       - run: pnpm -r test
+
+      - run: make check-docs
 
       - name: Verify snapshots are up-to-date with .pfdsl files
         run: |
