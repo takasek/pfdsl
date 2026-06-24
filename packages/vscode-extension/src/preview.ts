@@ -213,7 +213,9 @@ body { display: flex; flex-direction: column; }
 #root { width: 100%; height: 100%; overflow: hidden; cursor: grab; position: relative; }
 #inner { position: absolute; top: 0; left: 0; }
 .err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
-#tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 320px; pointer-events: none; display: none; z-index: 100; white-space: pre-wrap; word-break: break-word; }
+#tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 320px; pointer-events: none; display: none; z-index: 100; word-break: break-word; }
+#tooltip .tt-desc { white-space: pre-wrap; }
+#tooltip .tt-hint { color: var(--vscode-descriptionForeground, #888); font-style: italic; font-size: 0.9em; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--vscode-editorHoverWidget-border, #454545); }
 #diff-panel { display: none; flex-shrink: 0; max-height: 200px; overflow-y: auto; padding: 6px 12px; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size, 12px); border-top: 1px solid var(--vscode-panel-border, #333); background: var(--vscode-editor-background); }
 .diff-add { color: var(--vscode-gitDecoration-addedResourceForeground, #4caf50); white-space: pre; }
 .diff-remove { color: var(--vscode-gitDecoration-deletedResourceForeground, #f44336); white-space: pre; }
@@ -288,8 +290,10 @@ function jumpToNode(
 
 export function registerPreview(context: vscode.ExtensionContext): {
 	postDiff(report: DiffReport | null): void;
+	getActivePreviewDoc(): vscode.TextDocument | undefined;
 } {
-	let current: PreviewState | null = null;
+	const panels = new Map<string, PreviewState>();
+	let activePreviewDocUri: string | null = null;
 
 	function sendUpdate(state: PreviewState): void {
 		if (!state.webviewReady) return;
@@ -328,6 +332,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		doc: vscode.TextDocument,
 		focusNodeId?: string,
 	): PreviewState {
+		const docUri = doc.uri.toString();
 		const scriptUri = vscode.Uri.joinPath(
 			context.extensionUri,
 			"dist",
@@ -388,24 +393,42 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			}
 		});
 
+		panel.onDidChangeViewState((e) => {
+			if (e.webviewPanel.active) {
+				activePreviewDocUri = docUri;
+			}
+		});
+
 		panel.onDidDispose(() => {
-			current = null;
+			panels.delete(docUri);
+			if (activePreviewDocUri === docUri) activePreviewDocUri = null;
 		});
 		context.subscriptions.push(panel);
+		panels.set(docUri, state);
+		activePreviewDocUri = docUri;
 		return state;
 	}
 
 	function postDiff(report: DiffReport | null): void {
-		if (!current) return;
-		if (current.webviewReady) {
-			current.panel.webview.postMessage(
+		const state = activePreviewDocUri
+			? panels.get(activePreviewDocUri)
+			: undefined;
+		if (!state) return;
+		if (state.webviewReady) {
+			state.panel.webview.postMessage(
 				report == null
 					? ({ type: "clearDiff" } satisfies MessageToWebview)
 					: ({ type: "diff", report } satisfies MessageToWebview),
 			);
 		} else {
-			current.pendingDiff = report;
+			state.pendingDiff = report;
 		}
+	}
+
+	function getActivePreviewDoc(): vscode.TextDocument | undefined {
+		return activePreviewDocUri
+			? panels.get(activePreviewDocUri)?.doc
+			: undefined;
 	}
 
 	context.subscriptions.push(
@@ -413,52 +436,53 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			const editor = requireActivePfdslEditor();
 			if (!editor) return;
 			const doc = editor.document;
+			const docUri = doc.uri.toString();
 
-			if (current) {
-				current.doc = doc;
-				current.panel.reveal(vscode.ViewColumn.Beside, true);
-				sendUpdate(current);
+			const existing = panels.get(docUri);
+			if (existing) {
+				existing.panel.reveal(vscode.ViewColumn.Beside, true);
+				sendUpdate(existing);
 				return;
 			}
 
 			const result = analyzeDocument(doc);
 			const focusNodeId = nodeIdAtCursor(result, editor.selection.active);
-			current = createPanel(doc, focusNodeId);
+			createPanel(doc, focusNodeId);
 		}),
 
 		vscode.workspace.onDidChangeTextDocument((e) => {
-			if (current && e.document === current.doc) {
-				sendUpdate(current);
-			}
+			const state = panels.get(e.document.uri.toString());
+			if (state) sendUpdate(state);
 		}),
 
 		vscode.window.onDidChangeTextEditorSelection((e) => {
-			if (!current || e.textEditor.document !== current.doc) return;
+			const state = panels.get(e.textEditor.document.uri.toString());
+			if (!state) return;
 			const sel = e.selections[0];
 			if (!sel || sel.isEmpty) {
-				current.panel.webview.postMessage({
+				state.panel.webview.postMessage({
 					type: "clearFocus",
 				} satisfies MessageToWebview);
 				return;
 			}
 			const selectedText = e.textEditor.document.getText(sel);
-			const result = analyzeDocument(current.doc);
+			const result = analyzeDocument(state.doc);
 			const allIds = new Set(
 				result.document.statements
 					.flatMap(idsOfStatement)
 					.map((id) => id.value),
 			);
 			if (allIds.has(selectedText)) {
-				current.panel.webview.postMessage({
+				state.panel.webview.postMessage({
 					type: "focus",
 					nodeId: selectedText,
 				} satisfies MessageToWebview);
 			} else {
-				current.panel.webview.postMessage({
+				state.panel.webview.postMessage({
 					type: "clearFocus",
 				} satisfies MessageToWebview);
 			}
 		}),
 	);
-	return { postDiff };
+	return { postDiff, getActivePreviewDoc };
 }

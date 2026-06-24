@@ -12,8 +12,8 @@ export function activate(context: vscode.ExtensionContext): void {
 	registerDiagnostics(context);
 	registerFormatter(context);
 	registerHover(context);
-	const { postDiff } = registerPreview(context);
-	registerExport(context);
+	const { postDiff, getActivePreviewDoc } = registerPreview(context);
+	registerExport(context, getActivePreviewDoc);
 	registerDiff(context, postDiff);
 	registerDefinitionJump(context);
 }

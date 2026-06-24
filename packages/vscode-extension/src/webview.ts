@@ -125,12 +125,22 @@ root.addEventListener("mousemove", (e) => {
 					? `${modKey}+Click to open URL`
 					: `${modKey}+Click to open file`
 				: null;
-	const tooltipText = [desc, hint].filter(Boolean).join("\n");
-	if (!tooltipText) {
+	if (!desc && !hint) {
 		tooltip.style.display = "none";
 		return;
 	}
-	tooltip.textContent = tooltipText;
+	const parts: string[] = [];
+	if (desc) {
+		const descHtml = escapeHtml(desc).replace(
+			/^(criteria|location):/gm,
+			"<strong>$1:</strong>",
+		);
+		parts.push(`<div class="tt-desc">${descHtml.replace(/\n/g, "<br>")}</div>`);
+	}
+	if (hint) {
+		parts.push(`<div class="tt-hint">${escapeHtml(hint)}</div>`);
+	}
+	tooltip.innerHTML = parts.join("");
 	tooltip.style.left = `${e.clientX + 14}px`;
 	tooltip.style.top = `${e.clientY + 14}px`;
 	tooltip.style.display = "block";
