@@ -20,6 +20,9 @@
 		"@pfdsl/graphviz-exporter": "workspace:*",
 		"@hpcc-js/wasm": "^2.18.0"
 	},
+	"engines": {
+		"node": ">=18"
+	},
 	"files": [
 		"dist"
 	],

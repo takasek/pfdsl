@@ -29,6 +29,9 @@
 			"optional": true
 		}
 	},
+	"engines": {
+		"node": ">=18"
+	},
 	"files": [
 		"dist"
 	],
