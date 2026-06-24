@@ -122,6 +122,13 @@ describe("lex", () => {
 		expect(err?.range.end).toEqual({ line: 1, column: 2, offset: 1 });
 	});
 
+	it("L001: unclosed quoted identifier produces error and recovers rest of tokens", () => {
+		const result = lex('"unclosed A >> B');
+		const err = result.diagnostics.find((d) => d.code === "L001");
+		expect(err).toBeDefined();
+		expect(err?.severity).toBe("error");
+	});
+
 	describe("bare-id forbidden characters split tokens (spec §4.1)", () => {
 		it("semicolon splits IDs", () => {
 			expect(types("a;b")).toEqual(["ID", "SEMICOLON", "ID", "EOF"]);

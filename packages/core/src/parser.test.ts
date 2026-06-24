@@ -98,6 +98,51 @@ describe("parseTokens", () => {
 		expect(stmt.process.value).toBe("P");
 	});
 
+	describe("negative tests — error codes", () => {
+		function errorCodes(src: string): string[] {
+			const { diagnostics } = parse(src);
+			return diagnostics
+				.filter((d) => d.severity === "error")
+				.map((d) => d.code ?? "");
+		}
+
+		it("P002: empty artifact set [ ]", () => {
+			expect(errorCodes("[] >> P -> B")).toContain("P002");
+		});
+
+		it("P003: missing identifier after comma in set [A,]", () => {
+			expect(errorCodes("[A,] >> P -> B")).toContain("P003");
+		});
+
+		it("P004: missing artifact after ->  in output-edge start", () => {
+			expect(errorCodes("P ->")).toContain("P004");
+		});
+
+		it("P005: missing >> after artifact (A B)", () => {
+			expect(errorCodes("A B")).toContain("P005");
+		});
+
+		it("P006: missing process identifier after >> (A >> >>)", () => {
+			expect(errorCodes("A >> >> B")).toContain("P006");
+		});
+
+		it("P007: missing artifact after -> in chain (A >> P ->)", () => {
+			expect(errorCodes("A >> P ->")).toContain("P007");
+		});
+
+		it("P008: missing process identifier in chain continuation (A >> P -> B >> ->)", () => {
+			expect(errorCodes("A >> P -> B >> ->")).toContain("P008");
+		});
+
+		it("P010: missing artifact in chain continuation output (A >> P -> B >> Q ->)", () => {
+			expect(errorCodes("A >> P -> B >> Q ->")).toContain("P010");
+		});
+
+		it("P011: unclosed artifact set [A B", () => {
+			expect(errorCodes("[A B >> P -> C")).toContain("P011");
+		});
+	});
+
 	it("chain ending with bare >> process: A >> P -> B >> Q", () => {
 		const { document, diagnostics } = parse("A >> P -> B >> Q");
 		expect(diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
