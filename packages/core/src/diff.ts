@@ -1,3 +1,4 @@
+import { resolveMeta } from "./meta.js";
 import type { Frontmatter, Graph } from "./types/index.js";
 
 export interface DiffReport {
@@ -72,11 +73,9 @@ export function diffGraphs(
 		}
 
 		// Metadata comparison — only when both frontmatters are provided
-		if (fmA != null && fmB != null) {
-			const metaA =
-				kindB === "artifact" ? fmA.artifact?.[id] : fmA.process?.[id];
-			const metaB =
-				kindB === "artifact" ? fmB.artifact?.[id] : fmB.process?.[id];
+		if (fmA != null && fmB != null && kindB != null) {
+			const metaA = resolveMeta(fmA, kindB, id);
+			const metaB = resolveMeta(fmB, kindB, id);
 
 			if (stableStringify(metaA) !== stableStringify(metaB)) {
 				changedNodes.push(id);

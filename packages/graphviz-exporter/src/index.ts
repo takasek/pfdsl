@@ -6,7 +6,7 @@ import type {
 	NodeStyle,
 	ProcessMeta,
 } from "@pfdsl/core";
-import { diffGraphs, STYLE_ATTRS } from "@pfdsl/core";
+import { diffGraphs, resolveMeta, STYLE_ATTRS } from "@pfdsl/core";
 
 const MIN_WRAP_RATIO = 0.3;
 const LINE_HEAD_FORBIDDEN = /[、。，．）}\]」』】！？!?]/;
@@ -491,7 +491,7 @@ export function exportDiffDot(
 		if (kind === undefined) continue;
 
 		const fm = removed.has(id) ? fmA : fmB;
-		const meta = kind === "process" ? fm?.process?.[id] : fm?.artifact?.[id];
+		const meta = resolveMeta(fm, kind, id);
 		const nodeLabel = meta?.label;
 		const wrappedLabel =
 			nodeLabel !== undefined && maxWidth !== undefined
@@ -565,7 +565,7 @@ function nodeAttrs(
 	boundaryArtifacts: Set<string> = new Set(),
 ): string {
 	const shape = kind === "process" ? "ellipse" : "box";
-	const meta = lookupMeta(id, kind, fm);
+	const meta = resolveMeta(fm, kind, id);
 	const nodeLabel = meta?.label;
 	const description = meta?.description;
 	const ameta =
@@ -702,7 +702,7 @@ function resolveStyleAttrs(
 	fm: Frontmatter | null,
 ): NodeStyle {
 	if (!fm) return {};
-	const meta = kind === "artifact" ? fm.artifact?.[id] : fm.process?.[id];
+	const meta = resolveMeta(fm, kind, id);
 	const styleAttrs: NodeStyle = {};
 	// tags reverse iter: later Object.assign wins → first tag in array prevails
 	const tags = meta?.tags ?? [];
@@ -717,15 +717,6 @@ function resolveStyleAttrs(
 		if (status) Object.assign(styleAttrs, fm.statusStyles?.[status] ?? {});
 	}
 	return styleAttrs;
-}
-
-function lookupMeta(
-	id: string,
-	kind: NodeKind,
-	fm: Frontmatter | null,
-): ArtifactMeta | ProcessMeta | undefined {
-	if (!fm) return undefined;
-	return kind === "process" ? fm.process?.[id] : fm.artifact?.[id];
 }
 
 function quote(s: string): string {
