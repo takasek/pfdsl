@@ -1,0 +1,19 @@
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "pack" [shape=ellipse, label="pack"];
+  "packed_box" [shape=box, label="packed_box\nPacked Box"];
+  "pick_items" [shape=ellipse, label="pick_items"];
+  "picked_items" [shape=box, label="picked_items\nPicked Items"];
+  "requirement" [shape=box, label="requirement\nRequirements", tooltip="Requirements\n\nBoundary artifact — matches parent normal input.", penwidth="2"];
+  "ship" [shape=ellipse, label="ship"];
+  "shipped_order" [shape=box, label="shipped_order\nShipped Order", tooltip="Shipped Order\n\nBoundary artifact — matches parent output.", penwidth="2"];
+
+  "requirement" -> "pick_items";
+  "pick_items" -> "picked_items";
+  "picked_items" -> "pack";
+  "pack" -> "packed_box";
+  "packed_box" -> "ship";
+  "ship" -> "shipped_order";
+}

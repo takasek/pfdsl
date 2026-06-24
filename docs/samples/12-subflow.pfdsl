@@ -1,0 +1,12 @@
+---
+artifact:
+  requirement:
+    label: Requirements
+  shipped_order:
+    label: Shipped Order
+process:
+  fulfill_order:
+    label: Order Fulfillment
+    subflow: ./12-subflow-detail.pfdsl
+---
+requirement >> fulfill_order -> shipped_order

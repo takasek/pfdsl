@@ -1,0 +1,9 @@
+---
+extends: ./13-preset-base.pfdsl
+artifact:
+  backlog: { status: done }
+  prototype: { status: wip }
+  release: { status: todo }
+---
+backlog >> develop -> prototype
+prototype >> review -> release

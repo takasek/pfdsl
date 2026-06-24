@@ -1,0 +1,13 @@
+---
+artifact:
+  incoming_order:
+    label: Incoming Order
+    description: Boundary artifact — mapped from parent 'order' via boundary:.
+  picked:
+    label: Picked Items
+  outgoing_parcel:
+    label: Outgoing Parcel
+    description: Boundary artifact — mapped from parent 'parcel' via boundary:.
+---
+incoming_order >> pick -> picked
+picked >> pack -> outgoing_parcel

@@ -1,0 +1,16 @@
+---
+artifact:
+  requirement:
+    label: Requirements
+    description: Boundary artifact — matches parent normal input.
+  picked_items:
+    label: Picked Items
+  packed_box:
+    label: Packed Box
+  shipped_order:
+    label: Shipped Order
+    description: Boundary artifact — matches parent output.
+---
+requirement >> pick_items -> picked_items
+picked_items >> pack -> packed_box
+packed_box >> ship -> shipped_order

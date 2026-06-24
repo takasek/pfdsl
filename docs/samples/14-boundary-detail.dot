@@ -1,0 +1,15 @@
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "incoming_order" [shape=box, label="incoming_order\nIncoming Order", tooltip="Incoming Order\n\nBoundary artifact — mapped from parent 'order' via boundary:.", penwidth="2"];
+  "outgoing_parcel" [shape=box, label="outgoing_parcel\nOutgoing Parcel", tooltip="Outgoing Parcel\n\nBoundary artifact — mapped from parent 'parcel' via boundary:.", penwidth="2"];
+  "pack" [shape=ellipse, label="pack"];
+  "pick" [shape=ellipse, label="pick"];
+  "picked" [shape=box, label="picked\nPicked Items"];
+
+  "incoming_order" -> "pick";
+  "pick" -> "picked";
+  "picked" -> "pack";
+  "pack" -> "outgoing_parcel";
+}
