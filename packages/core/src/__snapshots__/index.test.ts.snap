@@ -180,7 +180,7 @@ artifact:
   i198_audit_improvements:
     label: "監査改善の反映 (#198)"
     description: "2026-06 コードベース監査で洗い出した品質・堅牢性・DX 改善の集約。内部の work item 依存と進捗は subflow audit-improvements.pfdsl で管理"
-    status: todo
+    status: done
     criteria: 全 work item が done で main 反映済み
     location: https://github.com/takasek/pfdsl/issues/198
     updated_at: 2026-06-24T05:58:33Z
@@ -243,8 +243,7 @@ process:
     label: CLI v0.0.10リリース
   address_audit_findings:
     label: 監査改善の反映
-    description: "2026-06 監査 findings への対応。内部 work item と依存は子フローへ展開（subflow ビューリンク、生成の複製ではない）"
-    subflow: ./audit-improvements.pfdsl
+    description: "2026-06 監査 findings への対応。12 work item を Phase 1–4 で実施し main 反映済み（PR #202–#212）"
   publish_libraries:
     label: ライブラリ公開
 
