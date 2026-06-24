@@ -57,6 +57,19 @@ describe("check", () => {
 		const r = await run(["check", join(dir, "conflict.pfdsl")]);
 		expect(r.exitCode).toBe(1);
 	});
+	it("returns 1 with readable message for missing file, no stack trace", async () => {
+		const r = await run(["check", join(dir, "nonexistent.pfdsl")]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toMatch(/nonexistent\.pfdsl/);
+		expect(r.stderr).not.toMatch(/Error:/);
+		expect(r.stderr).not.toMatch(/at /);
+	});
+	it("returns 1 with readable message for directory input", async () => {
+		const r = await run(["check", dir]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).not.toMatch(/Error:/);
+		expect(r.stderr).not.toMatch(/at /);
+	});
 });
 
 describe("fmt", () => {

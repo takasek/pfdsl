@@ -47,11 +47,26 @@ function formatDiagnostic(d: Diagnostic, file: string): string {
 	return `${loc}: ${d.severity}${code}: ${d.message}`;
 }
 
-function readSource(file: string): string {
+function isCommandResult(v: string | CommandResult): v is CommandResult {
+	return typeof v === "object";
+}
+
+function readSource(file: string): string | CommandResult {
 	if (file === "-") {
 		return readFileSync("/dev/stdin", "utf-8");
 	}
-	return readFileSync(file, "utf-8");
+	try {
+		return readFileSync(file, "utf-8");
+	} catch (e) {
+		const err = e as NodeJS.ErrnoException;
+		if (err.code === "ENOENT") {
+			return fail(`${file}: No such file or directory`);
+		}
+		if (err.code === "EISDIR") {
+			return fail(`${file}: Is a directory`);
+		}
+		return fail(`${file}: Cannot read file (${err.code ?? "unknown error"})`);
+	}
 }
 
 function diagText(diags: Diagnostic[], file: string): string {
@@ -72,8 +87,10 @@ export interface CheckOptions {
 }
 
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(
-		readSource(file),
+		src,
 		opts.strict ? { strict: true } : undefined,
 	);
 	const lines = diagnostics.map((d) => formatDiagnostic(d, file));
@@ -244,6 +261,7 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 		return fail("--write cannot be used with stdin (-)\n", 2);
 	}
 	const source = readSource(file);
+	if (isCommandResult(source)) return source;
 	const { output, diagnostics } = format(source, {
 		style: opts.mode ?? "flows",
 	});
@@ -264,7 +282,9 @@ export function runNormalize(
 	file: string,
 	opts: NormalizeOptions = {},
 ): CommandResult {
-	const { edges, graph, diagnostics } = analyze(readSource(file));
+	const normSrc = readSource(file);
+	if (isCommandResult(normSrc)) return normSrc;
+	const { edges, graph, diagnostics } = analyze(normSrc);
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
 	const sorted = sortEdges(edges, graph);
@@ -287,7 +307,9 @@ export async function runGraph(
 	opts: GraphOptions = {},
 ): Promise<CommandResult> {
 	const fmt = opts.format ?? "dot";
-	const { graph, frontmatter, diagnostics } = analyze(readSource(file));
+	const graphSrc = readSource(file);
+	if (isCommandResult(graphSrc)) return graphSrc;
+	const { graph, frontmatter, diagnostics } = analyze(graphSrc);
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
 	if (fmt === "pdf" || fmt === "png") {
@@ -306,8 +328,10 @@ export async function runGraph(
 export type { DiffReport };
 
 export function diffGraphs(fileA: string, fileB: string): DiffReport {
-	const { graph: a } = analyze(readSource(fileA));
-	const { graph: b } = analyze(readSource(fileB));
+	const srcA = readSource(fileA);
+	const srcB = readSource(fileB);
+	const { graph: a } = analyze(isCommandResult(srcA) ? "" : srcA);
+	const { graph: b } = analyze(isCommandResult(srcB) ? "" : srcB);
 	return coreDiffGraphs(a, b);
 }
 
@@ -321,18 +345,22 @@ export async function runDiff(
 	opts: DiffOptions = {},
 ): Promise<CommandResult> {
 	const fmt = opts.format ?? "text";
+	const diffSrcA = readSource(fileA);
+	if (isCommandResult(diffSrcA)) return diffSrcA;
 	const {
 		graph: graphA,
 		frontmatter: fmA,
 		diagnostics: diagsA,
-	} = analyze(readSource(fileA));
+	} = analyze(diffSrcA);
 	const failedA = failIfErrors(diagsA, fileA);
 	if (failedA) return failedA;
+	const diffSrcB = readSource(fileB);
+	if (isCommandResult(diffSrcB)) return diffSrcB;
 	const {
 		graph: graphB,
 		frontmatter: fmB,
 		diagnostics: diagsB,
-	} = analyze(readSource(fileB));
+	} = analyze(diffSrcB);
 	const failedB = failIfErrors(diagsB, fileB);
 	if (failedB) return failedB;
 
