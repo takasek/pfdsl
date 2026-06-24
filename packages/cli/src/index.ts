@@ -402,11 +402,6 @@ Options:
   --strict   error if feedback source not reachable from target process
   --json     output diagnostics as JSON ({ ok, diagnostics })
   --no-color disable ANSI color codes (also: NO_COLOR env var)
-
-Exit codes:
-  0  valid (warnings are non-fatal)
-  1  validation errors found, or file cannot be read
-  2  invalid usage (unknown flag, missing argument)
 `;
 
 const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--mode flat|flows]
@@ -417,11 +412,6 @@ Options:
   --write       rewrite the file in place (cannot be used with -)
   --mode flat   output one edge per line
   --mode flows  group each process with its inputs and outputs (default)
-
-Exit codes:
-  0  success
-  1  parse errors found, or file cannot be read
-  2  invalid usage (--write with -, unknown mode, missing argument)
 `;
 
 const HELP_NORMALIZE = `usage: pfdsl normalize <file|-> [--json]
@@ -430,11 +420,6 @@ Print canonical edge list. Use - to read from stdin.
 
 Options:
   --json  output edge list as JSON array
-
-Exit codes:
-  0  success
-  1  parse/validation errors found, or file cannot be read
-  2  invalid usage (missing argument)
 `;
 
 const HELP_GRAPH = `usage: pfdsl graph <file|-> [--format dot|svg|pdf|png]
@@ -446,11 +431,6 @@ Options:
   --format svg  SVG via Graphviz wasm
   --format pdf  PDF (requires: npm install puppeteer)
   --format png  PNG (requires: npm install puppeteer)
-
-Exit codes:
-  0  success
-  1  parse/validation errors found, or file cannot be read
-  2  invalid usage (unknown format, missing argument)
 `;
 
 const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg]
@@ -461,11 +441,6 @@ Options:
   --format text  human-readable summary (default)
   --format dot   visual diff as Graphviz DOT
   --format svg   visual diff as SVG
-
-Exit codes:
-  0  success (including when files are identical)
-  1  parse/validation errors found, or file cannot be read
-  2  invalid usage (unknown format, missing arguments)
 `;
 
 const HELP_SKILL = `usage: pfdsl skill sync [--yes]
@@ -474,11 +449,6 @@ Sync pfd-ops skills and commands into the current directory.
 
 Options:
   --yes  auto-confirm gh label creation (non-interactive)
-
-Exit codes:
-  0  success
-  1  sync failed
-  2  invalid usage (unknown subcommand)
 `;
 
 export const HELP = `pfdsl <command> [options]
@@ -505,6 +475,11 @@ Commands:
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
   help                     Show this help
+
+Exit codes:
+  0  success (warnings are non-fatal)
+  1  error (parse/validation error, or file cannot be read)
+  2  invalid usage (missing argument, unknown flag or subcommand)
 `;
 
 export interface CliArgs {
