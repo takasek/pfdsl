@@ -475,6 +475,11 @@ Commands:
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
   help                     Show this help
+
+Exit codes:
+  0  success (warnings are non-fatal)
+  1  error (parse/validation error, or file cannot be read)
+  2  invalid usage (missing argument, unknown flag or subcommand)
 `;
 
 export interface CliArgs {
