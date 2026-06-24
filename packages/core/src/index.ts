@@ -125,6 +125,8 @@ export function hasErrors(diags: readonly Diagnostic[]): boolean {
 	return diags.some((d) => d.severity === "error");
 }
 
+export { resolveMeta } from "./meta.js";
+
 export interface AnalyzeOptions {
 	strict?: boolean;
 }

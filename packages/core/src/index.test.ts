@@ -2,7 +2,13 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { format, normalizeDocument, parse, validateGraph } from "./index.js";
+import {
+	format,
+	normalizeDocument,
+	parse,
+	resolveMeta,
+	validateGraph,
+} from "./index.js";
 import { lex } from "./lexer.js";
 import { parseTokens } from "./parser.js";
 
@@ -88,6 +94,33 @@ describe("public API", () => {
 			const lineBeforeParse = tokens[0]?.start.line ?? -1;
 			parseTokens(tokens);
 			expect(tokens[0]?.start.line).toBe(lineBeforeParse);
+		});
+	});
+
+	describe("resolveMeta", () => {
+		const fm = {
+			artifact: { art1: { label: "Artifact 1" } },
+			process: { proc1: { label: "Process 1" } },
+		};
+
+		it("returns artifact meta when kind is 'artifact'", () => {
+			expect(resolveMeta(fm, "artifact", "art1")).toEqual({
+				label: "Artifact 1",
+			});
+		});
+
+		it("returns process meta when kind is 'process'", () => {
+			expect(resolveMeta(fm, "process", "proc1")).toEqual({
+				label: "Process 1",
+			});
+		});
+
+		it("returns undefined for unknown id", () => {
+			expect(resolveMeta(fm, "artifact", "unknown")).toBeUndefined();
+		});
+
+		it("returns undefined when fm is null", () => {
+			expect(resolveMeta(null, "artifact", "art1")).toBeUndefined();
 		});
 	});
 });
