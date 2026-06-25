@@ -32,24 +32,25 @@ describe("buildHoverLines", () => {
 			},
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("**label:** Spec Doc");
-		expect(lines).toContain("**description:** A spec document");
-		expect(lines).toContain("**owner:** alice");
-		expect(lines).toContain("**externalStakeholders:** corp-a, corp-b");
-		expect(lines).toContain("**status:** done");
-		expect(lines).toContain("**tags:** core, released");
-		expect(lines).toContain("**parts:** a, b");
-		expect(lines).toContain("**group:** g1");
-		expect(lines).toContain("**criteria:** no duplicates");
-		expect(lines).toContain("**location:** src/orders/");
-		expect(lines).toContain("**revises:** art0");
+		expect(lines).toContain("| label | Spec Doc |");
+		expect(lines).toContain("| description | A spec document |");
+		expect(lines).toContain("| owner | alice |");
+		expect(lines).toContain("| externalStakeholders | corp-a, corp-b |");
+		expect(lines).toContain("| status | done |");
+		expect(lines).toContain("| tags | core, released |");
+		expect(lines).toContain("| parts | a, b |");
+		expect(lines).toContain("| group | g1 |");
+		expect(lines).toContain("| criteria | no duplicates |");
+		expect(lines).toContain("| location | src/orders/ |");
+		expect(lines).toContain("| revises | art0 |");
 	});
 
 	it("omits artifact meta fields that are absent", () => {
 		const fm = { artifact: { art1: { label: "Only Label" } } };
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toHaveLength(3); // header + "---" + label
-		expect(lines[2]).toBe("**label:** Only Label");
+		// header + "---" + table-header + alignment-row + data-row
+		expect(lines).toHaveLength(5);
+		expect(lines).toContain("| label | Only Label |");
 	});
 
 	it("includes all process meta fields", () => {
@@ -68,14 +69,14 @@ describe("buildHoverLines", () => {
 			},
 		};
 		const lines = buildHoverLines("P1", "process", fm);
-		expect(lines).toContain("**label:** Build");
-		expect(lines).toContain("**description:** Builds the app");
-		expect(lines).toContain("**owner:** bob");
-		expect(lines).toContain("**externalStakeholders:** vendor");
-		expect(lines).toContain("**group:** ops");
-		expect(lines).toContain("**tags:** ci");
-		expect(lines).toContain("**command:** make build");
-		expect(lines).toContain("**subflow:** sub.pfdsl");
+		expect(lines).toContain("| label | Build |");
+		expect(lines).toContain("| description | Builds the app |");
+		expect(lines).toContain("| owner | bob |");
+		expect(lines).toContain("| externalStakeholders | vendor |");
+		expect(lines).toContain("| group | ops |");
+		expect(lines).toContain("| tags | ci |");
+		expect(lines).toContain("| command | make build |");
+		expect(lines).toContain("| subflow | sub.pfdsl |");
 	});
 
 	it("returns only header and separator when id not in frontmatter", () => {
@@ -94,10 +95,10 @@ describe("buildHoverLines", () => {
 			artifact: { art1: { location: ["src/a/", "src/b/"] } },
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("**location:** src/a/, src/b/");
+		expect(lines).toContain("| location | src/a/, src/b/ |");
 	});
 
-	it("formats multiline criteria with indented block", () => {
+	it("formats multiline criteria with br tags", () => {
 		const fm = {
 			artifact: {
 				art1: {
@@ -106,9 +107,11 @@ describe("buildHoverLines", () => {
 			},
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		const criteriaLine = lines.find((l) => l.startsWith("**criteria:**"));
+		const criteriaLine = lines.find((l) => l.startsWith("| criteria |"));
 		expect(criteriaLine).toBeDefined();
-		expect(criteriaLine).toContain("- no duplicates");
+		expect(criteriaLine).toContain(
+			"- no duplicates<br>- required fields filled",
+		);
 	});
 
 	it("expands group label when group definition exists", () => {
@@ -117,7 +120,7 @@ describe("buildHoverLines", () => {
 			group: { g1: { label: "Input Docs" } },
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("**group:** g1 (Input Docs)");
+		expect(lines).toContain("| group | g1 (Input Docs) |");
 	});
 
 	it("shows group id only when no label defined", () => {
@@ -125,6 +128,6 @@ describe("buildHoverLines", () => {
 			artifact: { art1: { group: "g1" } },
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("**group:** g1");
+		expect(lines).toContain("| group | g1 |");
 	});
 });

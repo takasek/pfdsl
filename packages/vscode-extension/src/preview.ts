@@ -66,7 +66,7 @@ type MessageToWebview =
 			type: "render";
 			dot: string;
 			focusNodeId?: string;
-			descriptions?: Record<string, string>;
+			descriptions?: Record<string, Array<[string, string]>>;
 			locations?: Record<string, string[]>;
 			subflows?: Record<string, string>;
 	  }
@@ -213,8 +213,11 @@ body { display: flex; flex-direction: column; }
 #root { width: 100%; height: 100%; overflow: hidden; cursor: grab; position: relative; }
 #inner { position: absolute; top: 0; left: 0; }
 .err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
-#tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 320px; pointer-events: none; display: none; z-index: 100; word-break: break-word; }
-#tooltip .tt-desc { white-space: pre-wrap; }
+#tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 360px; pointer-events: none; display: none; z-index: 100; word-break: break-word; }
+#tooltip .tt-table { border-collapse: collapse; width: 100%; }
+#tooltip .tt-key { text-align: right; color: var(--vscode-descriptionForeground, #888); white-space: nowrap; padding-right: 6px; vertical-align: top; }
+#tooltip .tt-val { text-align: left; vertical-align: top; }
+#tooltip .tt-body { padding-bottom: 4px; }
 #tooltip .tt-hint { color: var(--vscode-descriptionForeground, #888); font-style: italic; font-size: 0.9em; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--vscode-editorHoverWidget-border, #454545); }
 #diff-panel { display: none; flex-shrink: 0; max-height: 200px; overflow-y: auto; padding: 6px 12px; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size, 12px); border-top: 1px solid var(--vscode-panel-border, #333); background: var(--vscode-editor-background); }
 .diff-add { color: var(--vscode-gitDecoration-addedResourceForeground, #4caf50); white-space: pre; }

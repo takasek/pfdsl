@@ -1,16 +1,11 @@
 import type { Frontmatter, NodeKind } from "@pfdsl/core";
 import { normalizeLocation } from "./location-utils.js";
 
-function field(key: string, value: string): string {
-	const trimmed = value.trimEnd();
-	if (trimmed.includes("\n")) {
-		const indented = trimmed
-			.split("\n")
-			.map((l) => `  ${l}`)
-			.join("  \n");
-		return `**${key}:**  \n${indented}`;
-	}
-	return `**${key}:** ${trimmed}`;
+function tableRow(key: string, value: string): string {
+	// Escape pipe chars so they don't break the GFM table
+	const k = key.replace(/\|/g, "\\|");
+	const v = value.trimEnd().replace(/\|/g, "\\|").replace(/\n/g, "<br>");
+	return `| ${k} | ${v} |`;
 }
 
 export function buildHoverLines(
@@ -19,56 +14,71 @@ export function buildHoverLines(
 	frontmatter: Frontmatter | null,
 ): string[] {
 	const lines: string[] = [`**${id}** _(${kind})_`, "---"];
+	const rows: string[] = [];
+
 	if (kind === "artifact") {
 		const meta = frontmatter?.artifact?.[id];
 		if (meta) {
-			if (meta.label) lines.push(field("label", meta.label));
-			if (meta.description) lines.push(field("description", meta.description));
-			if (meta.owner) lines.push(field("owner", meta.owner));
+			if (meta.label) rows.push(tableRow("label", meta.label));
+			if (meta.description)
+				rows.push(tableRow("description", meta.description));
+			if (meta.owner) rows.push(tableRow("owner", meta.owner));
 			if (meta.externalStakeholders?.length)
-				lines.push(
-					field("externalStakeholders", meta.externalStakeholders.join(", ")),
+				rows.push(
+					tableRow(
+						"externalStakeholders",
+						meta.externalStakeholders.join(", "),
+					),
 				);
-			if (meta.status) lines.push(field("status", meta.status));
-			if (meta.tags?.length) lines.push(field("tags", meta.tags.join(", ")));
-			if (meta.parts?.length) lines.push(field("parts", meta.parts.join(", ")));
+			if (meta.status) rows.push(tableRow("status", meta.status));
+			if (meta.tags?.length) rows.push(tableRow("tags", meta.tags.join(", ")));
+			if (meta.parts?.length)
+				rows.push(tableRow("parts", meta.parts.join(", ")));
 			if (meta.group) {
 				const groupLabel = frontmatter?.group?.[meta.group]?.label;
-				lines.push(
-					field(
+				rows.push(
+					tableRow(
 						"group",
 						groupLabel ? `${meta.group} (${groupLabel})` : meta.group,
 					),
 				);
 			}
-			if (meta.criteria) lines.push(field("criteria", meta.criteria));
+			if (meta.criteria) rows.push(tableRow("criteria", meta.criteria));
 			const locs = normalizeLocation(meta.location);
-			if (locs.length) lines.push(field("location", locs.join(", ")));
-			if (meta.revises) lines.push(field("revises", meta.revises));
+			if (locs.length) rows.push(tableRow("location", locs.join(", ")));
+			if (meta.revises) rows.push(tableRow("revises", meta.revises));
 		}
 	} else {
 		const meta = frontmatter?.process?.[id];
 		if (meta) {
-			if (meta.label) lines.push(field("label", meta.label));
-			if (meta.description) lines.push(field("description", meta.description));
-			if (meta.owner) lines.push(field("owner", meta.owner));
+			if (meta.label) rows.push(tableRow("label", meta.label));
+			if (meta.description)
+				rows.push(tableRow("description", meta.description));
+			if (meta.owner) rows.push(tableRow("owner", meta.owner));
 			if (meta.externalStakeholders?.length)
-				lines.push(
-					field("externalStakeholders", meta.externalStakeholders.join(", ")),
+				rows.push(
+					tableRow(
+						"externalStakeholders",
+						meta.externalStakeholders.join(", "),
+					),
 				);
 			if (meta.group) {
 				const groupLabel = frontmatter?.group?.[meta.group]?.label;
-				lines.push(
-					field(
+				rows.push(
+					tableRow(
 						"group",
 						groupLabel ? `${meta.group} (${groupLabel})` : meta.group,
 					),
 				);
 			}
-			if (meta.tags?.length) lines.push(field("tags", meta.tags.join(", ")));
-			if (meta.command) lines.push(field("command", meta.command));
-			if (meta.subflow) lines.push(field("subflow", meta.subflow));
+			if (meta.tags?.length) rows.push(tableRow("tags", meta.tags.join(", ")));
+			if (meta.command) rows.push(tableRow("command", meta.command));
+			if (meta.subflow) rows.push(tableRow("subflow", meta.subflow));
 		}
+	}
+
+	if (rows.length > 0) {
+		lines.push("| | |", "|--:|:--|", ...rows);
 	}
 	return lines;
 }

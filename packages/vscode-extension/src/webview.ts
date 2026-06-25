@@ -6,7 +6,7 @@ type MessageToWebview =
 			type: "render";
 			dot: string;
 			focusNodeId?: string;
-			descriptions?: Record<string, string>;
+			descriptions?: Record<string, Array<[string, string]>>;
 			locations?: Record<string, string[]>;
 			subflows?: Record<string, string>;
 	  }
@@ -61,7 +61,7 @@ const root = document.getElementById("root") as HTMLDivElement;
 const inner = document.getElementById("inner") as HTMLDivElement;
 const tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
-let descriptions: Record<string, string> = {};
+let descriptions: Record<string, Array<[string, string]>> = {};
 let locations: Record<string, string[]> = {};
 let subflows: Record<string, string> = {};
 let lastFocusedNodeId: string | undefined;
@@ -131,11 +131,14 @@ root.addEventListener("mousemove", (e) => {
 	}
 	const parts: string[] = [];
 	if (desc) {
-		const descHtml = escapeHtml(desc).replace(
-			/^(\w[\w.]*:)/gm,
-			"<strong>$1</strong>",
-		);
-		parts.push(`<div class="tt-desc">${descHtml.replace(/\n/g, "<br>")}</div>`);
+		const rows = desc
+			.map(([k, v]) => {
+				const vHtml = escapeHtml(v).replace(/\n/g, "<br>");
+				if (!k) return `<tr><td colspan="2" class="tt-body">${vHtml}</td></tr>`;
+				return `<tr><td class="tt-key">${escapeHtml(k)}</td><td class="tt-val">${vHtml}</td></tr>`;
+			})
+			.join("");
+		parts.push(`<table class="tt-table">${rows}</table>`);
 	}
 	if (hint) {
 		parts.push(`<div class="tt-hint">${escapeHtml(hint)}</div>`);
