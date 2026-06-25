@@ -66,7 +66,7 @@ type MessageToWebview =
 			type: "render";
 			dot: string;
 			focusNodeId?: string;
-			descriptions?: Record<string, string>;
+			descriptions?: Record<string, Array<[string, string]>>;
 			locations?: Record<string, string[]>;
 			subflows?: Record<string, string>;
 	  }
@@ -115,6 +115,7 @@ type QuickPickLocationItem = vscode.QuickPickItem & {
 async function handleOpenLocation(
 	docFsPath: string,
 	locs: string[],
+	fallbackViewColumn?: vscode.ViewColumn,
 ): Promise<void> {
 	if (locs.length === 0) return;
 
@@ -160,10 +161,7 @@ async function handleOpenLocation(
 		if (item.url) {
 			await vscode.env.openExternal(vscode.Uri.parse(item.url));
 		} else if (item.fsPath) {
-			const doc = await vscode.workspace.openTextDocument(
-				vscode.Uri.file(item.fsPath),
-			);
-			await vscode.window.showTextDocument(doc, { preview: false });
+			await openFileActivatingExisting(item.fsPath, fallbackViewColumn);
 		}
 		return;
 	}
@@ -175,9 +173,22 @@ async function handleOpenLocation(
 	if (selected.url) {
 		await vscode.env.openExternal(vscode.Uri.parse(selected.url));
 	} else if (selected.fsPath) {
-		const doc = await vscode.workspace.openTextDocument(
-			vscode.Uri.file(selected.fsPath),
-		);
+		await openFileActivatingExisting(selected.fsPath, fallbackViewColumn);
+	}
+}
+
+async function openFileActivatingExisting(
+	fsPath: string,
+	fallbackViewColumn?: vscode.ViewColumn,
+): Promise<void> {
+	const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fsPath));
+	const existing = vscode.window.visibleTextEditors.find(
+		(e) => e.document.uri.toString() === doc.uri.toString(),
+	);
+	const vc = existing?.viewColumn ?? fallbackViewColumn;
+	if (vc !== undefined) {
+		await vscode.window.showTextDocument(doc, { viewColumn: vc });
+	} else {
 		await vscode.window.showTextDocument(doc, { preview: false });
 	}
 }
@@ -213,12 +224,16 @@ body { display: flex; flex-direction: column; }
 #root { width: 100%; height: 100%; overflow: hidden; cursor: grab; position: relative; }
 #inner { position: absolute; top: 0; left: 0; }
 .err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
-#tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 320px; pointer-events: none; display: none; z-index: 100; white-space: pre-wrap; word-break: break-word; }
+#tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 360px; pointer-events: none; display: none; z-index: 100; word-break: break-word; }
+#tooltip .tt-table { border-collapse: collapse; }
+#tooltip .tt-key { text-align: right; color: var(--vscode-descriptionForeground, #888); font-style: italic; font-size: 0.9em; white-space: nowrap; width: 1%; padding-right: 6px; vertical-align: top; }
+#tooltip .tt-val { text-align: left; vertical-align: top; }
+#tooltip .tt-body { padding-bottom: 4px; }
+#tooltip .tt-hint { color: var(--vscode-descriptionForeground, #888); font-style: italic; font-size: 0.9em; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--vscode-editorHoverWidget-border, #454545); }
 #diff-panel { display: none; flex-shrink: 0; max-height: 200px; overflow-y: auto; padding: 6px 12px; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size, 12px); border-top: 1px solid var(--vscode-panel-border, #333); background: var(--vscode-editor-background); }
 .diff-add { color: var(--vscode-gitDecoration-addedResourceForeground, #4caf50); white-space: pre; }
 .diff-remove { color: var(--vscode-gitDecoration-deletedResourceForeground, #f44336); white-space: pre; }
 .diff-none { color: var(--vscode-descriptionForeground, #888); font-style: italic; }
-g.node.pfdsl-focused ellipse, g.node.pfdsl-focused polygon, g.node.pfdsl-focused path { filter: drop-shadow(0 0 5px currentColor); stroke-width: 2.5; }
 #minimap { position: absolute; bottom: 12px; right: 12px; max-width: 160px; max-height: 120px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border, #555); border-radius: 4px; overflow: hidden; z-index: 50; opacity: 0.85; display: none; cursor: crosshair; }
 #minimap-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
 #minimap-vp { position: absolute; border: 1.5px solid var(--vscode-focusBorder, #007fd4); background: rgba(0,127,212,0.12); pointer-events: none; }
@@ -288,8 +303,10 @@ function jumpToNode(
 
 export function registerPreview(context: vscode.ExtensionContext): {
 	postDiff(report: DiffReport | null): void;
+	getActivePreviewDoc(): vscode.TextDocument | undefined;
 } {
-	let current: PreviewState | null = null;
+	const panels = new Map<string, PreviewState>();
+	let activePreviewDocUri: string | null = null;
 
 	function sendUpdate(state: PreviewState): void {
 		if (!state.webviewReady) return;
@@ -328,6 +345,7 @@ export function registerPreview(context: vscode.ExtensionContext): {
 		doc: vscode.TextDocument,
 		focusNodeId?: string,
 	): PreviewState {
+		const docUri = doc.uri.toString();
 		const scriptUri = vscode.Uri.joinPath(
 			context.extensionUri,
 			"dist",
@@ -373,39 +391,57 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
-				const fileUri = vscode.Uri.file(
-					resolveLocationFsPath(state.doc.uri.fsPath, msg.path),
-				);
-				vscode.workspace
-					.openTextDocument(fileUri)
-					.then((doc) =>
-						vscode.window.showTextDocument(doc, { preview: false }),
-					);
+				const fsPath = resolveLocationFsPath(state.doc.uri.fsPath, msg.path);
+				const srcVc = vscode.window.visibleTextEditors.find(
+					(e) => e.document === state.doc,
+				)?.viewColumn;
+				openFileActivatingExisting(fsPath, srcVc);
 			} else if (msg.type === "openLocation") {
 				const { frontmatter } = analyzeDocument(state.doc);
 				const locs = buildLocations(frontmatter)[msg.nodeId] ?? [];
-				handleOpenLocation(state.doc.uri.fsPath, locs);
+				const srcVc = vscode.window.visibleTextEditors.find(
+					(e) => e.document === state.doc,
+				)?.viewColumn;
+				handleOpenLocation(state.doc.uri.fsPath, locs, srcVc);
+			}
+		});
+
+		panel.onDidChangeViewState((e) => {
+			if (e.webviewPanel.active) {
+				activePreviewDocUri = docUri;
 			}
 		});
 
 		panel.onDidDispose(() => {
-			current = null;
+			panels.delete(docUri);
+			if (activePreviewDocUri === docUri) activePreviewDocUri = null;
 		});
 		context.subscriptions.push(panel);
+		panels.set(docUri, state);
+		activePreviewDocUri = docUri;
 		return state;
 	}
 
 	function postDiff(report: DiffReport | null): void {
-		if (!current) return;
-		if (current.webviewReady) {
-			current.panel.webview.postMessage(
+		const state = activePreviewDocUri
+			? panels.get(activePreviewDocUri)
+			: undefined;
+		if (!state) return;
+		if (state.webviewReady) {
+			state.panel.webview.postMessage(
 				report == null
 					? ({ type: "clearDiff" } satisfies MessageToWebview)
 					: ({ type: "diff", report } satisfies MessageToWebview),
 			);
 		} else {
-			current.pendingDiff = report;
+			state.pendingDiff = report;
 		}
+	}
+
+	function getActivePreviewDoc(): vscode.TextDocument | undefined {
+		return activePreviewDocUri
+			? panels.get(activePreviewDocUri)?.doc
+			: undefined;
 	}
 
 	context.subscriptions.push(
@@ -413,52 +449,53 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			const editor = requireActivePfdslEditor();
 			if (!editor) return;
 			const doc = editor.document;
+			const docUri = doc.uri.toString();
 
-			if (current) {
-				current.doc = doc;
-				current.panel.reveal(vscode.ViewColumn.Beside, true);
-				sendUpdate(current);
+			const existing = panels.get(docUri);
+			if (existing) {
+				existing.panel.reveal(vscode.ViewColumn.Beside, true);
+				sendUpdate(existing);
 				return;
 			}
 
 			const result = analyzeDocument(doc);
 			const focusNodeId = nodeIdAtCursor(result, editor.selection.active);
-			current = createPanel(doc, focusNodeId);
+			createPanel(doc, focusNodeId);
 		}),
 
 		vscode.workspace.onDidChangeTextDocument((e) => {
-			if (current && e.document === current.doc) {
-				sendUpdate(current);
-			}
+			const state = panels.get(e.document.uri.toString());
+			if (state) sendUpdate(state);
 		}),
 
 		vscode.window.onDidChangeTextEditorSelection((e) => {
-			if (!current || e.textEditor.document !== current.doc) return;
+			const state = panels.get(e.textEditor.document.uri.toString());
+			if (!state) return;
 			const sel = e.selections[0];
 			if (!sel || sel.isEmpty) {
-				current.panel.webview.postMessage({
+				state.panel.webview.postMessage({
 					type: "clearFocus",
 				} satisfies MessageToWebview);
 				return;
 			}
 			const selectedText = e.textEditor.document.getText(sel);
-			const result = analyzeDocument(current.doc);
+			const result = analyzeDocument(state.doc);
 			const allIds = new Set(
 				result.document.statements
 					.flatMap(idsOfStatement)
 					.map((id) => id.value),
 			);
 			if (allIds.has(selectedText)) {
-				current.panel.webview.postMessage({
+				state.panel.webview.postMessage({
 					type: "focus",
 					nodeId: selectedText,
 				} satisfies MessageToWebview);
 			} else {
-				current.panel.webview.postMessage({
+				state.panel.webview.postMessage({
 					type: "clearFocus",
 				} satisfies MessageToWebview);
 			}
 		}),
 	);
-	return { postDiff };
+	return { postDiff, getActivePreviewDoc };
 }

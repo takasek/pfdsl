@@ -2,7 +2,7 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "fulfill_order" [shape=ellipse, label="fulfill_order\nOrder Fulfillment", tooltip="Order Fulfillment\nsubflow: ./12-subflow-detail.pfdsl"];
+  "fulfill_order" [shape=ellipse, label="fulfill_order\nOrder Fulfillment", tooltip="Order Fulfillment\nsubflow: ./12-subflow-detail.pfdsl", peripheries="2"];
   "requirement" [shape=box, label="requirement\nRequirements", penwidth="2"];
   "shipped_order" [shape=box, label="shipped_order\nShipped Order", penwidth="2"];
 

@@ -6,7 +6,7 @@ type MessageToWebview =
 			type: "render";
 			dot: string;
 			focusNodeId?: string;
-			descriptions?: Record<string, string>;
+			descriptions?: Record<string, Array<[string, string]>>;
 			locations?: Record<string, string[]>;
 			subflows?: Record<string, string>;
 	  }
@@ -61,7 +61,7 @@ const root = document.getElementById("root") as HTMLDivElement;
 const inner = document.getElementById("inner") as HTMLDivElement;
 const tooltip = document.getElementById("tooltip") as HTMLDivElement;
 
-let descriptions: Record<string, string> = {};
+let descriptions: Record<string, Array<[string, string]>> = {};
 let locations: Record<string, string[]> = {};
 let subflows: Record<string, string> = {};
 let lastFocusedNodeId: string | undefined;
@@ -125,12 +125,41 @@ root.addEventListener("mousemove", (e) => {
 					? `${modKey}+Click to open URL`
 					: `${modKey}+Click to open file`
 				: null;
-	const tooltipText = [desc, hint].filter(Boolean).join("\n");
-	if (!tooltipText) {
+	if (!desc && !hint) {
 		tooltip.style.display = "none";
 		return;
 	}
-	tooltip.textContent = tooltipText;
+	const parts: string[] = [];
+	if (desc) {
+		let hintInjected = false;
+		const rows = desc
+			.map(([k, v]) => {
+				const vHtml = escapeHtml(v).replace(/\n/g, "<br>");
+				let cellExtra = "";
+				if (hint && !hintInjected) {
+					if (
+						(subflow && k === "subflow") ||
+						(!subflow && nodeLocs.length > 0 && k === "location")
+					) {
+						cellExtra = `<div class="tt-hint">${escapeHtml(hint)}</div>`;
+						hintInjected = true;
+					}
+				}
+				if (k === "**")
+					return `<tr><td colspan="2" class="tt-body"><strong>${vHtml}</strong>${cellExtra}</td></tr>`;
+				if (!k)
+					return `<tr><td colspan="2" class="tt-body">${vHtml}${cellExtra}</td></tr>`;
+				return `<tr><td class="tt-key">${escapeHtml(k)}</td><td class="tt-val">${vHtml}${cellExtra}</td></tr>`;
+			})
+			.join("");
+		parts.push(`<table class="tt-table">${rows}</table>`);
+		if (hint && !hintInjected) {
+			parts.push(`<div class="tt-hint">${escapeHtml(hint)}</div>`);
+		}
+	} else if (hint) {
+		parts.push(`<div class="tt-hint">${escapeHtml(hint)}</div>`);
+	}
+	tooltip.innerHTML = parts.join("");
 	tooltip.style.left = `${e.clientX + 14}px`;
 	tooltip.style.top = `${e.clientY + 14}px`;
 	tooltip.style.display = "block";
@@ -237,9 +266,6 @@ function centerGraph() {
 }
 
 function clearFocusHighlight() {
-	for (const node of inner.querySelectorAll("g.node.pfdsl-focused")) {
-		node.classList.remove("pfdsl-focused");
-	}
 	lastFocusedNodeId = undefined;
 }
 
@@ -247,9 +273,7 @@ function focusNode(nodeId: string) {
 	const nodes = inner.querySelectorAll("g.node");
 	for (const node of nodes) {
 		if ((node as HTMLElement).dataset.nodeId === nodeId) {
-			for (const n of nodes) n.classList.remove("pfdsl-focused");
 			lastFocusedNodeId = nodeId;
-			node.classList.add("pfdsl-focused");
 			const nodeRect = node.getBoundingClientRect();
 			const rootRect = root.getBoundingClientRect();
 			panX +=
@@ -288,6 +312,13 @@ root.addEventListener("mousedown", (e) => {
 });
 
 window.addEventListener("mousemove", (e) => {
+	if (e.buttons === 0 && (dragging || minimapDragging)) {
+		dragging = false;
+		minimapDragging = false;
+		minimapDragRect = null;
+		root.style.cursor = "grab";
+		return;
+	}
 	if (minimapDragging) {
 		panToMinimapPoint(e.clientX, e.clientY);
 		return;

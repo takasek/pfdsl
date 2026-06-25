@@ -11,21 +11,42 @@ export function normalizeLocation(loc: unknown): string[] {
 
 export function buildDescriptions(
 	fm: Frontmatter | null,
-): Record<string, string> {
-	const result: Record<string, string> = {};
+): Record<string, Array<[string, string]>> {
+	const result: Record<string, Array<[string, string]>> = {};
 	if (!fm) return result;
 	for (const id of Object.keys(fm.artifact ?? {})) {
 		const meta = fm.artifact?.[id];
-		const parts: string[] = [];
-		if (meta?.description) parts.push(meta.description);
-		if (meta?.criteria) parts.push(`criteria: ${meta.criteria}`);
-		const locs = normalizeLocation(meta?.location);
-		if (locs.length > 0) parts.push(`location: ${locs.join(", ")}`);
-		if (parts.length > 0) result[id] = parts.join("\n");
+		if (!meta) continue;
+		const rows: Array<[string, string]> = [];
+		if (meta.label) rows.push(["**", meta.label]);
+		if (meta.description) rows.push(["", meta.description.trimEnd()]);
+		if (meta.owner) rows.push(["owner", meta.owner]);
+		if (meta.externalStakeholders?.length)
+			rows.push(["externalStakeholders", meta.externalStakeholders.join(", ")]);
+		if (meta.status) rows.push(["status", meta.status]);
+		if (meta.tags?.length) rows.push(["tags", meta.tags.join(", ")]);
+		if (meta.parts?.length) rows.push(["parts", meta.parts.join(", ")]);
+		if (meta.group) rows.push(["group", meta.group]);
+		if (meta.criteria) rows.push(["criteria", meta.criteria]);
+		const locs = normalizeLocation(meta.location);
+		if (locs.length > 0) rows.push(["location", locs.join(", ")]);
+		if (meta.revises) rows.push(["revises", meta.revises]);
+		if (rows.length > 0) result[id] = rows;
 	}
 	for (const id of Object.keys(fm.process ?? {})) {
 		const meta = fm.process?.[id];
-		if (meta?.description) result[id] = meta.description;
+		if (!meta) continue;
+		const rows: Array<[string, string]> = [];
+		if (meta.label) rows.push(["**", meta.label]);
+		if (meta.description) rows.push(["", meta.description.trimEnd()]);
+		if (meta.owner) rows.push(["owner", meta.owner]);
+		if (meta.externalStakeholders?.length)
+			rows.push(["externalStakeholders", meta.externalStakeholders.join(", ")]);
+		if (meta.group) rows.push(["group", meta.group]);
+		if (meta.tags?.length) rows.push(["tags", meta.tags.join(", ")]);
+		if (meta.command) rows.push(["command", meta.command]);
+		if (meta.subflow) rows.push(["subflow", meta.subflow]);
+		if (rows.length > 0) result[id] = rows;
 	}
 	return result;
 }

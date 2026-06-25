@@ -76,23 +76,47 @@ describe("buildDescriptions", () => {
 		expect(buildDescriptions(null)).toEqual({});
 	});
 
-	it("includes description and criteria", () => {
+	it("includes description and criteria as separate rows", () => {
 		const fm = {
 			artifact: { a: { description: "詳細", criteria: "承認済み" } },
 		};
-		expect(buildDescriptions(fm)).toEqual({ a: "詳細\ncriteria: 承認済み" });
+		expect(buildDescriptions(fm)).toEqual({
+			a: [
+				["", "詳細"],
+				["criteria", "承認済み"],
+			],
+		});
+	});
+
+	it("puts label as bold row before description", () => {
+		const fm = {
+			artifact: { a: { label: "Spec", description: "詳細" } },
+		};
+		expect(buildDescriptions(fm)).toEqual({
+			a: [
+				["**", "Spec"],
+				["", "詳細"],
+			],
+		});
 	});
 
 	it("appends comma-joined locations for array location", () => {
 		const fm = {
 			artifact: { a: { location: ["x.ts", "y.ts"] } },
 		};
-		expect(buildDescriptions(fm)).toEqual({ a: "location: x.ts, y.ts" });
+		expect(buildDescriptions(fm)).toEqual({ a: [["location", "x.ts, y.ts"]] });
 	});
 
-	it("uses process description only", () => {
-		const fm = { process: { P: { description: "proc desc" } } };
-		expect(buildDescriptions(fm)).toEqual({ P: "proc desc" });
+	it("includes process description and other fields as rows", () => {
+		const fm = {
+			process: { P: { description: "proc desc", command: "make run" } },
+		};
+		expect(buildDescriptions(fm)).toEqual({
+			P: [
+				["", "proc desc"],
+				["command", "make run"],
+			],
+		});
 	});
 });
 
