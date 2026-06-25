@@ -3,7 +3,7 @@ import { normalizeLocation } from "./location-utils.js";
 
 function tableRow(key: string, value: string): string {
 	// Escape pipe chars so they don't break the GFM table
-	const k = key.replace(/\|/g, "\\|");
+	const k = `<em>${key.replace(/\|/g, "\\|")}</em>`;
 	const v = value.trimEnd().replace(/\|/g, "\\|").replace(/\n/g, "<br>");
 	return `| ${k} | ${v} |`;
 }

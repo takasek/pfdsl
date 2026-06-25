@@ -74,6 +74,7 @@ export function registerHover(context: vscode.ExtensionContext): void {
 			lines.splice(2, 0, linkLine);
 
 			const md = new vscode.MarkdownString(lines.join("  \n"));
+			md.supportHtml = true;
 			md.isTrusted = { enabledCommands: [GOTO_COMMAND, FIND_COMMAND] };
 			return new vscode.Hover(md, range);
 		},

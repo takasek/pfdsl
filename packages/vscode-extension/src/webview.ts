@@ -131,16 +131,30 @@ root.addEventListener("mousemove", (e) => {
 	}
 	const parts: string[] = [];
 	if (desc) {
+		let hintInjected = false;
 		const rows = desc
 			.map(([k, v]) => {
 				const vHtml = escapeHtml(v).replace(/\n/g, "<br>");
-				if (!k) return `<tr><td colspan="2" class="tt-body">${vHtml}</td></tr>`;
-				return `<tr><td class="tt-key">${escapeHtml(k)}</td><td class="tt-val">${vHtml}</td></tr>`;
+				let cellExtra = "";
+				if (hint && !hintInjected) {
+					if (
+						(subflow && k === "subflow") ||
+						(!subflow && nodeLocs.length > 0 && k === "location")
+					) {
+						cellExtra = `<div class="tt-hint">${escapeHtml(hint)}</div>`;
+						hintInjected = true;
+					}
+				}
+				if (!k)
+					return `<tr><td colspan="2" class="tt-body">${vHtml}${cellExtra}</td></tr>`;
+				return `<tr><td class="tt-key">${escapeHtml(k)}</td><td class="tt-val">${vHtml}${cellExtra}</td></tr>`;
 			})
 			.join("");
 		parts.push(`<table class="tt-table">${rows}</table>`);
-	}
-	if (hint) {
+		if (hint && !hintInjected) {
+			parts.push(`<div class="tt-hint">${escapeHtml(hint)}</div>`);
+		}
+	} else if (hint) {
 		parts.push(`<div class="tt-hint">${escapeHtml(hint)}</div>`);
 	}
 	tooltip.innerHTML = parts.join("");
