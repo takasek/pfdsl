@@ -225,8 +225,8 @@ body { display: flex; flex-direction: column; }
 #inner { position: absolute; top: 0; left: 0; }
 .err { padding: 12px; color: var(--vscode-errorForeground); white-space: pre-wrap; font-family: var(--vscode-editor-font-family); }
 #tooltip { position: fixed; background: var(--vscode-editorHoverWidget-background, #2d2d2d); color: var(--vscode-editorHoverWidget-foreground, #ccc); border: 1px solid var(--vscode-editorHoverWidget-border, #454545); padding: 4px 8px; border-radius: 3px; font-size: 12px; max-width: 360px; pointer-events: none; display: none; z-index: 100; word-break: break-word; }
-#tooltip .tt-table { border-collapse: collapse; width: 100%; }
-#tooltip .tt-key { text-align: right; color: var(--vscode-descriptionForeground, #888); white-space: nowrap; padding-right: 6px; vertical-align: top; }
+#tooltip .tt-table { border-collapse: collapse; }
+#tooltip .tt-key { text-align: right; color: var(--vscode-descriptionForeground, #888); font-style: italic; font-size: 0.9em; white-space: nowrap; width: 1%; padding-right: 6px; vertical-align: top; }
 #tooltip .tt-val { text-align: left; vertical-align: top; }
 #tooltip .tt-body { padding-bottom: 4px; }
 #tooltip .tt-hint { color: var(--vscode-descriptionForeground, #888); font-style: italic; font-size: 0.9em; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--vscode-editorHoverWidget-border, #454545); }

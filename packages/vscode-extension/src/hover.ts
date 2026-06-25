@@ -69,9 +69,9 @@ export function registerHover(context: vscode.ExtensionContext): void {
 			const findArgs = encodeURIComponent(
 				JSON.stringify({ searchString: id, isRegex: false }),
 			);
-			lines.push(
-				`[→ Go to definition](command:${GOTO_COMMAND}?${gotoArgs})  [⌕ Find all](command:${FIND_COMMAND}?${findArgs})`,
-			);
+			const linkLine = `[→ Go to definition](command:${GOTO_COMMAND}?${gotoArgs})  [⌕ Find all](command:${FIND_COMMAND}?${findArgs})`;
+			// Insert links after header+separator (index 2), before table rows
+			lines.splice(2, 0, linkLine);
 
 			const md = new vscode.MarkdownString(lines.join("  \n"));
 			md.isTrusted = { enabledCommands: [GOTO_COMMAND, FIND_COMMAND] };
