@@ -145,6 +145,8 @@ root.addEventListener("mousemove", (e) => {
 						hintInjected = true;
 					}
 				}
+				if (k === "**")
+					return `<tr><td colspan="2" class="tt-body"><strong>${vHtml}</strong>${cellExtra}</td></tr>`;
 				if (!k)
 					return `<tr><td colspan="2" class="tt-body">${vHtml}${cellExtra}</td></tr>`;
 				return `<tr><td class="tt-key">${escapeHtml(k)}</td><td class="tt-val">${vHtml}${cellExtra}</td></tr>`;

@@ -1,6 +1,11 @@
 import type { Frontmatter, NodeKind } from "@pfdsl/core";
 import { normalizeLocation } from "./location-utils.js";
 
+const KIND_ICON: Record<NodeKind, string> = {
+	artifact: "📄",
+	process: "▶️",
+};
+
 const KEY_STYLE =
 	'style="text-align:right;vertical-align:top;white-space:nowrap;padding-right:6px;color:var(--vscode-descriptionForeground);font-style:italic;font-size:0.9em;"';
 const VAL_STYLE = 'style="vertical-align:top;"';
@@ -19,15 +24,15 @@ export function buildHoverLines(
 	kind: NodeKind,
 	frontmatter: Frontmatter | null,
 ): string[] {
-	const lines: string[] = [`**${id}** _(${kind})_`, "---"];
+	const icon = KIND_ICON[kind];
+	const lines: string[] = [`**${id}** ${icon}`, "---"];
 	const rows: string[] = [];
 
 	if (kind === "artifact") {
 		const meta = frontmatter?.artifact?.[id];
 		if (meta) {
-			if (meta.label) rows.push(tableRow("label", meta.label));
-			if (meta.description)
-				rows.push(tableRow("description", meta.description));
+			if (meta.label) lines.push(`**${meta.label}**`);
+			if (meta.description) lines.push(meta.description.trimEnd());
 			if (meta.owner) rows.push(tableRow("owner", meta.owner));
 			if (meta.externalStakeholders?.length)
 				rows.push(
@@ -57,9 +62,8 @@ export function buildHoverLines(
 	} else {
 		const meta = frontmatter?.process?.[id];
 		if (meta) {
-			if (meta.label) rows.push(tableRow("label", meta.label));
-			if (meta.description)
-				rows.push(tableRow("description", meta.description));
+			if (meta.label) lines.push(`**${meta.label}**`);
+			if (meta.description) lines.push(meta.description.trimEnd());
 			if (meta.owner) rows.push(tableRow("owner", meta.owner));
 			if (meta.externalStakeholders?.length)
 				rows.push(

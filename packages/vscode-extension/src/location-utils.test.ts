@@ -88,6 +88,18 @@ describe("buildDescriptions", () => {
 		});
 	});
 
+	it("puts label as bold row before description", () => {
+		const fm = {
+			artifact: { a: { label: "Spec", description: "詳細" } },
+		};
+		expect(buildDescriptions(fm)).toEqual({
+			a: [
+				["**", "Spec"],
+				["", "詳細"],
+			],
+		});
+	});
+
 	it("appends comma-joined locations for array location", () => {
 		const fm = {
 			artifact: { a: { location: ["x.ts", "y.ts"] } },

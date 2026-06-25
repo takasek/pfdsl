@@ -4,13 +4,13 @@ import { buildHoverLines } from "./hover-logic.js";
 describe("buildHoverLines", () => {
 	it("returns header line and separator for id and kind", () => {
 		const lines = buildHoverLines("art1", "artifact", null);
-		expect(lines[0]).toBe("**art1** _(artifact)_");
+		expect(lines[0]).toBe("**art1** 📄");
 		expect(lines[1]).toBe("---");
 	});
 
 	it("returns header line for process kind", () => {
 		const lines = buildHoverLines("P1", "process", null);
-		expect(lines[0]).toBe("**P1** _(process)_");
+		expect(lines[0]).toBe("**P1** ▶️");
 	});
 
 	it("includes all artifact meta fields when present", () => {
@@ -32,11 +32,12 @@ describe("buildHoverLines", () => {
 			},
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
+		// label and description appear as plain lines, not in the table
+		expect(lines).toContain("**Spec Doc**");
+		expect(lines).toContain("A spec document");
 		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
-		expect(table).toContain(">label</td>");
-		expect(table).toContain(">Spec Doc</td>");
-		expect(table).toContain(">description</td>");
-		expect(table).toContain(">A spec document</td>");
+		expect(table).not.toContain(">label</td>");
+		expect(table).not.toContain(">description</td>");
 		expect(table).toContain(">owner</td>");
 		expect(table).toContain(">alice</td>");
 		expect(table).toContain(">externalStakeholders</td>");
@@ -60,11 +61,9 @@ describe("buildHoverLines", () => {
 	it("omits artifact meta fields that are absent", () => {
 		const fm = { artifact: { art1: { label: "Only Label" } } };
 		const lines = buildHoverLines("art1", "artifact", fm);
-		// header + "---" + table
+		// header + "---" + label line (no table since no other fields)
 		expect(lines).toHaveLength(3);
-		const table = lines[2] ?? "";
-		expect(table).toContain(">label</td>");
-		expect(table).toContain(">Only Label</td>");
+		expect(lines).toContain("**Only Label**");
 	});
 
 	it("includes all process meta fields", () => {
@@ -83,11 +82,11 @@ describe("buildHoverLines", () => {
 			},
 		};
 		const lines = buildHoverLines("P1", "process", fm);
+		expect(lines).toContain("**Build**");
+		expect(lines).toContain("Builds the app");
 		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
-		expect(table).toContain(">label</td>");
-		expect(table).toContain(">Build</td>");
-		expect(table).toContain(">description</td>");
-		expect(table).toContain(">Builds the app</td>");
+		expect(table).not.toContain(">label</td>");
+		expect(table).not.toContain(">description</td>");
 		expect(table).toContain(">owner</td>");
 		expect(table).toContain(">bob</td>");
 		expect(table).toContain(">externalStakeholders</td>");
