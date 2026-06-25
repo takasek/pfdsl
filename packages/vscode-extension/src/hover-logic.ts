@@ -6,17 +6,20 @@ const KIND_ICON: Record<NodeKind, string> = {
 	process: "▶️",
 };
 
-const KEY_STYLE =
-	'style="text-align:right;vertical-align:top;white-space:nowrap;padding-right:6px;color:var(--vscode-descriptionForeground);font-style:italic;font-size:0.9em;"';
-const VAL_STYLE = 'style="vertical-align:top;"';
-
 function escapeHtml(s: string): string {
 	return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function tableRow(key: string, value: string): string {
-	const v = escapeHtml(value.trimEnd()).replace(/\n/g, "<br>");
-	return `<tr><td ${KEY_STYLE}>${escapeHtml(key)}</td><td ${VAL_STYLE}>${v}</td></tr>`;
+	// GFM table: _key_ for italic; <br> for multiline values (supportHtml = true)
+	const v = escapeHtml(value.trimEnd())
+		.replace(/\|/g, "\\|")
+		.replace(/\n/g, "<br>");
+	return `| _${key}_ | ${v} |`;
+}
+
+function descLine(text: string): string {
+	return `<em>${escapeHtml(text.trimEnd()).replace(/\n/g, "<br>")}</em>`;
 }
 
 export function buildHoverLines(
@@ -25,14 +28,14 @@ export function buildHoverLines(
 	frontmatter: Frontmatter | null,
 ): string[] {
 	const icon = KIND_ICON[kind];
-	const lines: string[] = [`**${id}** ${icon}`, "---"];
+	const lines: string[] = [`${icon} **${id}**`, "---"];
 	const rows: string[] = [];
 
 	if (kind === "artifact") {
 		const meta = frontmatter?.artifact?.[id];
 		if (meta) {
 			if (meta.label) lines.push(`**${meta.label}**`);
-			if (meta.description) lines.push(meta.description.trimEnd());
+			if (meta.description) lines.push(descLine(meta.description));
 			if (meta.owner) rows.push(tableRow("owner", meta.owner));
 			if (meta.externalStakeholders?.length)
 				rows.push(
@@ -63,7 +66,7 @@ export function buildHoverLines(
 		const meta = frontmatter?.process?.[id];
 		if (meta) {
 			if (meta.label) lines.push(`**${meta.label}**`);
-			if (meta.description) lines.push(meta.description.trimEnd());
+			if (meta.description) lines.push(descLine(meta.description));
 			if (meta.owner) rows.push(tableRow("owner", meta.owner));
 			if (meta.externalStakeholders?.length)
 				rows.push(
@@ -88,7 +91,7 @@ export function buildHoverLines(
 	}
 
 	if (rows.length > 0) {
-		lines.push(`<table>${rows.join("")}</table>`);
+		lines.push("| | |", "|--:|:--|", ...rows);
 	}
 	return lines;
 }
