@@ -160,10 +160,7 @@ async function handleOpenLocation(
 		if (item.url) {
 			await vscode.env.openExternal(vscode.Uri.parse(item.url));
 		} else if (item.fsPath) {
-			const doc = await vscode.workspace.openTextDocument(
-				vscode.Uri.file(item.fsPath),
-			);
-			await vscode.window.showTextDocument(doc, { preview: false });
+			await openFileActivatingExisting(item.fsPath);
 		}
 		return;
 	}
@@ -175,9 +172,20 @@ async function handleOpenLocation(
 	if (selected.url) {
 		await vscode.env.openExternal(vscode.Uri.parse(selected.url));
 	} else if (selected.fsPath) {
-		const doc = await vscode.workspace.openTextDocument(
-			vscode.Uri.file(selected.fsPath),
-		);
+		await openFileActivatingExisting(selected.fsPath);
+	}
+}
+
+async function openFileActivatingExisting(fsPath: string): Promise<void> {
+	const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fsPath));
+	const existing = vscode.window.visibleTextEditors.find(
+		(e) => e.document.uri.toString() === doc.uri.toString(),
+	);
+	if (existing?.viewColumn !== undefined) {
+		await vscode.window.showTextDocument(doc, {
+			viewColumn: existing.viewColumn,
+		});
+	} else {
 		await vscode.window.showTextDocument(doc, { preview: false });
 	}
 }
@@ -380,14 +388,8 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
-				const fileUri = vscode.Uri.file(
-					resolveLocationFsPath(state.doc.uri.fsPath, msg.path),
-				);
-				vscode.workspace
-					.openTextDocument(fileUri)
-					.then((doc) =>
-						vscode.window.showTextDocument(doc, { preview: false }),
-					);
+				const fsPath = resolveLocationFsPath(state.doc.uri.fsPath, msg.path);
+				openFileActivatingExisting(fsPath);
 			} else if (msg.type === "openLocation") {
 				const { frontmatter } = analyzeDocument(state.doc);
 				const locs = buildLocations(frontmatter)[msg.nodeId] ?? [];
