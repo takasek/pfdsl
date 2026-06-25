@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildHoverLines } from "./hover-logic.js";
 
-function row(key: string, value: string) {
-	return `<tr><td ` + expect.stringContaining(`>${key}</td><td `);
-}
-
 describe("buildHoverLines", () => {
 	it("returns header line and separator for id and kind", () => {
 		const lines = buildHoverLines("art1", "artifact", null);
