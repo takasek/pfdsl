@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildHoverLines } from "./hover-logic.js";
 
+function row(key: string, value: string) {
+	return `<tr><td ` + expect.stringContaining(`>${key}</td><td `);
+}
+
 describe("buildHoverLines", () => {
 	it("returns header line and separator for id and kind", () => {
 		const lines = buildHoverLines("art1", "artifact", null);
@@ -32,27 +36,39 @@ describe("buildHoverLines", () => {
 			},
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("| <em>label</em> | Spec Doc |");
-		expect(lines).toContain("| <em>description</em> | A spec document |");
-		expect(lines).toContain("| <em>owner</em> | alice |");
-		expect(lines).toContain(
-			"| <em>externalStakeholders</em> | corp-a, corp-b |",
-		);
-		expect(lines).toContain("| <em>status</em> | done |");
-		expect(lines).toContain("| <em>tags</em> | core, released |");
-		expect(lines).toContain("| <em>parts</em> | a, b |");
-		expect(lines).toContain("| <em>group</em> | g1 |");
-		expect(lines).toContain("| <em>criteria</em> | no duplicates |");
-		expect(lines).toContain("| <em>location</em> | src/orders/ |");
-		expect(lines).toContain("| <em>revises</em> | art0 |");
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">label</td>");
+		expect(table).toContain(">Spec Doc</td>");
+		expect(table).toContain(">description</td>");
+		expect(table).toContain(">A spec document</td>");
+		expect(table).toContain(">owner</td>");
+		expect(table).toContain(">alice</td>");
+		expect(table).toContain(">externalStakeholders</td>");
+		expect(table).toContain(">corp-a, corp-b</td>");
+		expect(table).toContain(">status</td>");
+		expect(table).toContain(">done</td>");
+		expect(table).toContain(">tags</td>");
+		expect(table).toContain(">core, released</td>");
+		expect(table).toContain(">parts</td>");
+		expect(table).toContain(">a, b</td>");
+		expect(table).toContain(">group</td>");
+		expect(table).toContain(">g1</td>");
+		expect(table).toContain(">criteria</td>");
+		expect(table).toContain(">no duplicates</td>");
+		expect(table).toContain(">location</td>");
+		expect(table).toContain(">src/orders/</td>");
+		expect(table).toContain(">revises</td>");
+		expect(table).toContain(">art0</td>");
 	});
 
 	it("omits artifact meta fields that are absent", () => {
 		const fm = { artifact: { art1: { label: "Only Label" } } };
 		const lines = buildHoverLines("art1", "artifact", fm);
-		// header + "---" + table-header + alignment-row + data-row
-		expect(lines).toHaveLength(5);
-		expect(lines).toContain("| <em>label</em> | Only Label |");
+		// header + "---" + table
+		expect(lines).toHaveLength(3);
+		const table = lines[2] ?? "";
+		expect(table).toContain(">label</td>");
+		expect(table).toContain(">Only Label</td>");
 	});
 
 	it("includes all process meta fields", () => {
@@ -71,14 +87,23 @@ describe("buildHoverLines", () => {
 			},
 		};
 		const lines = buildHoverLines("P1", "process", fm);
-		expect(lines).toContain("| <em>label</em> | Build |");
-		expect(lines).toContain("| <em>description</em> | Builds the app |");
-		expect(lines).toContain("| <em>owner</em> | bob |");
-		expect(lines).toContain("| <em>externalStakeholders</em> | vendor |");
-		expect(lines).toContain("| <em>group</em> | ops |");
-		expect(lines).toContain("| <em>tags</em> | ci |");
-		expect(lines).toContain("| <em>command</em> | make build |");
-		expect(lines).toContain("| <em>subflow</em> | sub.pfdsl |");
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">label</td>");
+		expect(table).toContain(">Build</td>");
+		expect(table).toContain(">description</td>");
+		expect(table).toContain(">Builds the app</td>");
+		expect(table).toContain(">owner</td>");
+		expect(table).toContain(">bob</td>");
+		expect(table).toContain(">externalStakeholders</td>");
+		expect(table).toContain(">vendor</td>");
+		expect(table).toContain(">group</td>");
+		expect(table).toContain(">ops</td>");
+		expect(table).toContain(">tags</td>");
+		expect(table).toContain(">ci</td>");
+		expect(table).toContain(">command</td>");
+		expect(table).toContain(">make build</td>");
+		expect(table).toContain(">subflow</td>");
+		expect(table).toContain(">sub.pfdsl</td>");
 	});
 
 	it("returns only header and separator when id not in frontmatter", () => {
@@ -97,7 +122,9 @@ describe("buildHoverLines", () => {
 			artifact: { art1: { location: ["src/a/", "src/b/"] } },
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("| <em>location</em> | src/a/, src/b/ |");
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">location</td>");
+		expect(table).toContain(">src/a/, src/b/</td>");
 	});
 
 	it("formats multiline criteria with br tags", () => {
@@ -109,13 +136,9 @@ describe("buildHoverLines", () => {
 			},
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		const criteriaLine = lines.find((l) =>
-			l.startsWith("| <em>criteria</em> |"),
-		);
-		expect(criteriaLine).toBeDefined();
-		expect(criteriaLine).toContain(
-			"- no duplicates<br>- required fields filled",
-		);
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">criteria</td>");
+		expect(table).toContain("- no duplicates<br>- required fields filled");
 	});
 
 	it("expands group label when group definition exists", () => {
@@ -124,7 +147,8 @@ describe("buildHoverLines", () => {
 			group: { g1: { label: "Input Docs" } },
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("| <em>group</em> | g1 (Input Docs) |");
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">g1 (Input Docs)</td>");
 	});
 
 	it("shows group id only when no label defined", () => {
@@ -132,6 +156,7 @@ describe("buildHoverLines", () => {
 			artifact: { art1: { group: "g1" } },
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("| <em>group</em> | g1 |");
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">g1</td>");
 	});
 });

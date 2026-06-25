@@ -1,11 +1,17 @@
 import type { Frontmatter, NodeKind } from "@pfdsl/core";
 import { normalizeLocation } from "./location-utils.js";
 
+const KEY_STYLE =
+	'style="text-align:right;vertical-align:top;white-space:nowrap;padding-right:6px;color:var(--vscode-descriptionForeground);font-style:italic;font-size:0.9em;"';
+const VAL_STYLE = 'style="vertical-align:top;"';
+
+function escapeHtml(s: string): string {
+	return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 function tableRow(key: string, value: string): string {
-	// Escape pipe chars so they don't break the GFM table
-	const k = `<em>${key.replace(/\|/g, "\\|")}</em>`;
-	const v = value.trimEnd().replace(/\|/g, "\\|").replace(/\n/g, "<br>");
-	return `| ${k} | ${v} |`;
+	const v = escapeHtml(value.trimEnd()).replace(/\n/g, "<br>");
+	return `<tr><td ${KEY_STYLE}>${escapeHtml(key)}</td><td ${VAL_STYLE}>${v}</td></tr>`;
 }
 
 export function buildHoverLines(
@@ -78,7 +84,7 @@ export function buildHoverLines(
 	}
 
 	if (rows.length > 0) {
-		lines.push("| | |", "|--:|:--|", ...rows);
+		lines.push(`<table>${rows.join("")}</table>`);
 	}
 	return lines;
 }
