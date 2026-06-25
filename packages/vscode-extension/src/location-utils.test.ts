@@ -87,12 +87,16 @@ describe("buildDescriptions", () => {
 		const fm = {
 			artifact: { a: { location: ["x.ts", "y.ts"] } },
 		};
-		expect(buildDescriptions(fm)).toEqual({ a: "location: x.ts, y.ts" });
+		expect(buildDescriptions(fm)).toEqual({ a: "\nlocation: x.ts, y.ts" });
 	});
 
-	it("uses process description only", () => {
-		const fm = { process: { P: { description: "proc desc" } } };
-		expect(buildDescriptions(fm)).toEqual({ P: "proc desc" });
+	it("includes process description and other fields", () => {
+		const fm = {
+			process: { P: { description: "proc desc", command: "make run" } },
+		};
+		expect(buildDescriptions(fm)).toEqual({
+			P: "proc desc\ncommand: make run",
+		});
 	});
 });
 

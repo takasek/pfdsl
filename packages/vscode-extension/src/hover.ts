@@ -7,6 +7,7 @@ import { findFrontmatterDefinition } from "./jump.js";
 export { buildHoverLines } from "./hover-logic.js";
 
 const GOTO_COMMAND = "pfdsl._gotoNodeDefinition";
+const FIND_COMMAND = "editor.actions.findWithArgs";
 
 export function registerHover(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
@@ -62,11 +63,18 @@ export function registerHover(context: vscode.ExtensionContext): void {
 
 			const lines = buildHoverLines(id, kind, frontmatter);
 
-			const args = encodeURIComponent(JSON.stringify([doc.uri.toString(), id]));
-			lines.push(`[→ Go to definition](command:${GOTO_COMMAND}?${args})`);
+			const gotoArgs = encodeURIComponent(
+				JSON.stringify([doc.uri.toString(), id]),
+			);
+			const findArgs = encodeURIComponent(
+				JSON.stringify({ searchString: id, isRegex: false }),
+			);
+			lines.push(
+				`[→ Go to definition](command:${GOTO_COMMAND}?${gotoArgs})  [⌕ Find all](command:${FIND_COMMAND}?${findArgs})`,
+			);
 
 			const md = new vscode.MarkdownString(lines.join("  \n"));
-			md.isTrusted = { enabledCommands: [GOTO_COMMAND] };
+			md.isTrusted = { enabledCommands: [GOTO_COMMAND, FIND_COMMAND] };
 			return new vscode.Hover(md, range);
 		},
 	};

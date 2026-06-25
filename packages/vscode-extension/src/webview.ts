@@ -132,8 +132,8 @@ root.addEventListener("mousemove", (e) => {
 	const parts: string[] = [];
 	if (desc) {
 		const descHtml = escapeHtml(desc).replace(
-			/^(criteria|location):/gm,
-			"<strong>$1:</strong>",
+			/^(\w[\w.]*:)/gm,
+			"<strong>$1</strong>",
 		);
 		parts.push(`<div class="tt-desc">${descHtml.replace(/\n/g, "<br>")}</div>`);
 	}
@@ -298,6 +298,13 @@ root.addEventListener("mousedown", (e) => {
 });
 
 window.addEventListener("mousemove", (e) => {
+	if (e.buttons === 0 && (dragging || minimapDragging)) {
+		dragging = false;
+		minimapDragging = false;
+		minimapDragRect = null;
+		root.style.cursor = "grab";
+		return;
+	}
 	if (minimapDragging) {
 		panToMinimapPoint(e.clientX, e.clientY);
 		return;

@@ -96,4 +96,35 @@ describe("buildHoverLines", () => {
 		const lines = buildHoverLines("art1", "artifact", fm);
 		expect(lines).toContain("**location:** src/a/, src/b/");
 	});
+
+	it("formats multiline criteria with indented block", () => {
+		const fm = {
+			artifact: {
+				art1: {
+					criteria: "- no duplicates\n- required fields filled",
+				},
+			},
+		};
+		const lines = buildHoverLines("art1", "artifact", fm);
+		const criteriaLine = lines.find((l) => l.startsWith("**criteria:**"));
+		expect(criteriaLine).toBeDefined();
+		expect(criteriaLine).toContain("- no duplicates");
+	});
+
+	it("expands group label when group definition exists", () => {
+		const fm = {
+			artifact: { art1: { group: "g1" } },
+			group: { g1: { label: "Input Docs" } },
+		};
+		const lines = buildHoverLines("art1", "artifact", fm);
+		expect(lines).toContain("**group:** g1 (Input Docs)");
+	});
+
+	it("shows group id only when no label defined", () => {
+		const fm = {
+			artifact: { art1: { group: "g1" } },
+		};
+		const lines = buildHoverLines("art1", "artifact", fm);
+		expect(lines).toContain("**group:** g1");
+	});
 });

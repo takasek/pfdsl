@@ -223,5 +223,11 @@ export function nodeAttrs(
 	) {
 		attrs.push(`penwidth="2"`);
 	}
+	if (
+		kind === "process" &&
+		typeof (meta as ProcessMeta | undefined)?.subflow === "string"
+	) {
+		attrs.push(`peripheries="2"`);
+	}
 	return `[${attrs.join(", ")}]`;
 }
