@@ -34,16 +34,26 @@ describe("buildHoverLines", () => {
 		const lines = buildHoverLines("art1", "artifact", fm);
 		// label and description appear as plain lines, not in the table
 		expect(lines).toContain("**Spec Doc**");
-		expect(lines).toContain("<em>A spec document</em>");
-		expect(lines).toContain("| _owner_ | alice |");
-		expect(lines).toContain("| _externalStakeholders_ | corp-a, corp-b |");
-		expect(lines).toContain("| _status_ | done |");
-		expect(lines).toContain("| _tags_ | core, released |");
-		expect(lines).toContain("| _parts_ | a, b |");
-		expect(lines).toContain("| _group_ | g1 |");
-		expect(lines).toContain("| _criteria_ | no duplicates |");
-		expect(lines).toContain("| _location_ | src/orders/ |");
-		expect(lines).toContain("| _revises_ | art0 |");
+		expect(lines.some((l) => l.includes("A spec document"))).toBe(true);
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">owner<");
+		expect(table).toContain(">alice<");
+		expect(table).toContain(">externalStakeholders<");
+		expect(table).toContain(">corp-a, corp-b<");
+		expect(table).toContain(">status<");
+		expect(table).toContain(">done<");
+		expect(table).toContain(">tags<");
+		expect(table).toContain(">core, released<");
+		expect(table).toContain(">parts<");
+		expect(table).toContain(">a, b<");
+		expect(table).toContain(">group<");
+		expect(table).toContain(">g1<");
+		expect(table).toContain(">criteria<");
+		expect(table).toContain(">no duplicates<");
+		expect(table).toContain(">location<");
+		expect(table).toContain(">src/orders/<");
+		expect(table).toContain(">revises<");
+		expect(table).toContain(">art0<");
 	});
 
 	it("omits artifact meta fields that are absent", () => {
@@ -71,13 +81,20 @@ describe("buildHoverLines", () => {
 		};
 		const lines = buildHoverLines("P1", "process", fm);
 		expect(lines).toContain("**Build**");
-		expect(lines).toContain("<em>Builds the app</em>");
-		expect(lines).toContain("| _owner_ | bob |");
-		expect(lines).toContain("| _externalStakeholders_ | vendor |");
-		expect(lines).toContain("| _group_ | ops |");
-		expect(lines).toContain("| _tags_ | ci |");
-		expect(lines).toContain("| _command_ | make build |");
-		expect(lines).toContain("| _subflow_ | sub.pfdsl |");
+		expect(lines.some((l) => l.includes("Builds the app"))).toBe(true);
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">owner<");
+		expect(table).toContain(">bob<");
+		expect(table).toContain(">externalStakeholders<");
+		expect(table).toContain(">vendor<");
+		expect(table).toContain(">group<");
+		expect(table).toContain(">ops<");
+		expect(table).toContain(">tags<");
+		expect(table).toContain(">ci<");
+		expect(table).toContain(">command<");
+		expect(table).toContain(">make build<");
+		expect(table).toContain(">subflow<");
+		expect(table).toContain(">sub.pfdsl<");
 	});
 
 	it("returns only header and separator when id not in frontmatter", () => {
@@ -96,7 +113,9 @@ describe("buildHoverLines", () => {
 			artifact: { art1: { location: ["src/a/", "src/b/"] } },
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("| _location_ | src/a/, src/b/ |");
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">location<");
+		expect(table).toContain(">src/a/, src/b/<");
 	});
 
 	it("formats multiline criteria with br tags", () => {
@@ -108,11 +127,9 @@ describe("buildHoverLines", () => {
 			},
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		const criteriaLine = lines.find((l) => l.startsWith("| _criteria_ |"));
-		expect(criteriaLine).toBeDefined();
-		expect(criteriaLine).toContain(
-			"- no duplicates<br>- required fields filled",
-		);
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">criteria<");
+		expect(table).toContain("- no duplicates<br>- required fields filled");
 	});
 
 	it("expands group label when group definition exists", () => {
@@ -121,7 +138,8 @@ describe("buildHoverLines", () => {
 			group: { g1: { label: "Input Docs" } },
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("| _group_ | g1 (Input Docs) |");
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">g1 (Input Docs)<");
 	});
 
 	it("shows group id only when no label defined", () => {
@@ -129,6 +147,7 @@ describe("buildHoverLines", () => {
 			artifact: { art1: { group: "g1" } },
 		};
 		const lines = buildHoverLines("art1", "artifact", fm);
-		expect(lines).toContain("| _group_ | g1 |");
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">g1<");
 	});
 });
