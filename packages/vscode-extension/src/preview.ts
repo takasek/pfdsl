@@ -220,7 +220,6 @@ body { display: flex; flex-direction: column; }
 .diff-add { color: var(--vscode-gitDecoration-addedResourceForeground, #4caf50); white-space: pre; }
 .diff-remove { color: var(--vscode-gitDecoration-deletedResourceForeground, #f44336); white-space: pre; }
 .diff-none { color: var(--vscode-descriptionForeground, #888); font-style: italic; }
-g.node.pfdsl-focused ellipse, g.node.pfdsl-focused polygon, g.node.pfdsl-focused path { filter: drop-shadow(0 0 5px currentColor); }
 #minimap { position: absolute; bottom: 12px; right: 12px; max-width: 160px; max-height: 120px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border, #555); border-radius: 4px; overflow: hidden; z-index: 50; opacity: 0.85; display: none; cursor: crosshair; }
 #minimap-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
 #minimap-vp { position: absolute; border: 1.5px solid var(--vscode-focusBorder, #007fd4); background: rgba(0,127,212,0.12); pointer-events: none; }

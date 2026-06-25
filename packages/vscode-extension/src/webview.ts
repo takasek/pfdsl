@@ -247,9 +247,6 @@ function centerGraph() {
 }
 
 function clearFocusHighlight() {
-	for (const node of inner.querySelectorAll("g.node.pfdsl-focused")) {
-		node.classList.remove("pfdsl-focused");
-	}
 	lastFocusedNodeId = undefined;
 }
 
@@ -257,9 +254,7 @@ function focusNode(nodeId: string) {
 	const nodes = inner.querySelectorAll("g.node");
 	for (const node of nodes) {
 		if ((node as HTMLElement).dataset.nodeId === nodeId) {
-			for (const n of nodes) n.classList.remove("pfdsl-focused");
 			lastFocusedNodeId = nodeId;
-			node.classList.add("pfdsl-focused");
 			const nodeRect = node.getBoundingClientRect();
 			const rootRect = root.getBoundingClientRect();
 			panX +=
