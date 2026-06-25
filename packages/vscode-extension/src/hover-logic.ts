@@ -16,9 +16,11 @@ function tableRow(key: string, value: string): string {
 	return `<tr><td align="right" valign="top"><em>${escapeHtml(key)}</em></td><td valign="top">${v}</td></tr>`;
 }
 
-function descText(text: string): string {
-	// &nbsp; indent for left margin; <br> for newlines
-	return `&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(text.trimEnd()).replace(/\n/g, "<br>")}`;
+function descLines(text: string): string[] {
+	return text
+		.trimEnd()
+		.split("\n")
+		.map((l) => `> ${escapeHtml(l)}`);
 }
 
 export function buildHoverLines(
@@ -34,7 +36,7 @@ export function buildHoverLines(
 		const meta = frontmatter?.artifact?.[id];
 		if (meta) {
 			if (meta.label) lines.push(`**${meta.label}**`);
-			if (meta.description) lines.push(descText(meta.description));
+			if (meta.description) lines.push(...descLines(meta.description));
 			if (meta.owner) rows.push(tableRow("owner", meta.owner));
 			if (meta.externalStakeholders?.length)
 				rows.push(
@@ -65,7 +67,7 @@ export function buildHoverLines(
 		const meta = frontmatter?.process?.[id];
 		if (meta) {
 			if (meta.label) lines.push(`**${meta.label}**`);
-			if (meta.description) lines.push(descText(meta.description));
+			if (meta.description) lines.push(...descLines(meta.description));
 			if (meta.owner) rows.push(tableRow("owner", meta.owner));
 			if (meta.externalStakeholders?.length)
 				rows.push(

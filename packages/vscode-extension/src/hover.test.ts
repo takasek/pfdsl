@@ -34,7 +34,7 @@ describe("buildHoverLines", () => {
 		const lines = buildHoverLines("art1", "artifact", fm);
 		// label and description appear as plain lines, not in the table
 		expect(lines).toContain("**Spec Doc**");
-		expect(lines.some((l) => l.includes("A spec document"))).toBe(true);
+		expect(lines).toContain("> A spec document");
 		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
 		expect(table).toContain(">owner<");
 		expect(table).toContain(">alice<");
@@ -81,7 +81,7 @@ describe("buildHoverLines", () => {
 		};
 		const lines = buildHoverLines("P1", "process", fm);
 		expect(lines).toContain("**Build**");
-		expect(lines.some((l) => l.includes("Builds the app"))).toBe(true);
+		expect(lines).toContain("> Builds the app");
 		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
 		expect(table).toContain(">owner<");
 		expect(table).toContain(">bob<");
@@ -116,6 +116,15 @@ describe("buildHoverLines", () => {
 		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
 		expect(table).toContain(">location<");
 		expect(table).toContain(">src/a/, src/b/<");
+	});
+
+	it("renders multiline description as blockquote lines", () => {
+		const fm = {
+			artifact: { art1: { description: "line one\nline two" } },
+		};
+		const lines = buildHoverLines("art1", "artifact", fm);
+		expect(lines).toContain("> line one");
+		expect(lines).toContain("> line two");
 	});
 
 	it("formats multiline criteria with br tags", () => {
