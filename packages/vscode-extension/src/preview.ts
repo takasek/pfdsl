@@ -115,6 +115,7 @@ type QuickPickLocationItem = vscode.QuickPickItem & {
 async function handleOpenLocation(
 	docFsPath: string,
 	locs: string[],
+	fallbackViewColumn?: vscode.ViewColumn,
 ): Promise<void> {
 	if (locs.length === 0) return;
 
@@ -160,7 +161,7 @@ async function handleOpenLocation(
 		if (item.url) {
 			await vscode.env.openExternal(vscode.Uri.parse(item.url));
 		} else if (item.fsPath) {
-			await openFileActivatingExisting(item.fsPath);
+			await openFileActivatingExisting(item.fsPath, fallbackViewColumn);
 		}
 		return;
 	}
@@ -172,19 +173,21 @@ async function handleOpenLocation(
 	if (selected.url) {
 		await vscode.env.openExternal(vscode.Uri.parse(selected.url));
 	} else if (selected.fsPath) {
-		await openFileActivatingExisting(selected.fsPath);
+		await openFileActivatingExisting(selected.fsPath, fallbackViewColumn);
 	}
 }
 
-async function openFileActivatingExisting(fsPath: string): Promise<void> {
+async function openFileActivatingExisting(
+	fsPath: string,
+	fallbackViewColumn?: vscode.ViewColumn,
+): Promise<void> {
 	const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fsPath));
 	const existing = vscode.window.visibleTextEditors.find(
 		(e) => e.document.uri.toString() === doc.uri.toString(),
 	);
-	if (existing?.viewColumn !== undefined) {
-		await vscode.window.showTextDocument(doc, {
-			viewColumn: existing.viewColumn,
-		});
+	const vc = existing?.viewColumn ?? fallbackViewColumn;
+	if (vc !== undefined) {
+		await vscode.window.showTextDocument(doc, { viewColumn: vc });
 	} else {
 		await vscode.window.showTextDocument(doc, { preview: false });
 	}
@@ -389,11 +392,17 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
 				const fsPath = resolveLocationFsPath(state.doc.uri.fsPath, msg.path);
-				openFileActivatingExisting(fsPath);
+				const srcVc = vscode.window.visibleTextEditors.find(
+					(e) => e.document === state.doc,
+				)?.viewColumn;
+				openFileActivatingExisting(fsPath, srcVc);
 			} else if (msg.type === "openLocation") {
 				const { frontmatter } = analyzeDocument(state.doc);
 				const locs = buildLocations(frontmatter)[msg.nodeId] ?? [];
-				handleOpenLocation(state.doc.uri.fsPath, locs);
+				const srcVc = vscode.window.visibleTextEditors.find(
+					(e) => e.document === state.doc,
+				)?.viewColumn;
+				handleOpenLocation(state.doc.uri.fsPath, locs, srcVc);
 			}
 		});
 
