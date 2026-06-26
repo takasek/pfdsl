@@ -204,42 +204,42 @@ artifact:
     status: todo
     criteria: location/subflow/command フィールドのジャンプが動作確認済み
     location: https://github.com/takasek/pfdsl/issues/216
+    updated_at: 2026-06-26T05:00:40Z
   i217_run_command:
     label: "process command 実行 (#217)"
     description: "vscode-extension でプロセスの command フィールドを統合ターミナルで実行"
     status: todo
     criteria: command フィールドのターミナル実行が動作確認済み
     location: https://github.com/takasek/pfdsl/issues/217
+    updated_at: 2026-06-26T05:00:41Z
   i218_group_hover:
     label: "group hover メンバー一覧 (#218)"
     description: "vscode-extension でグループノードの hover にメンバー一覧を表示"
     status: todo
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
+    updated_at: 2026-06-26T05:00:41Z
   i219_w002_line:
     label: "W002 診断行番号修正 (#219)"
     description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
     status: todo
     criteria: W002 の診断が artifact 定義行を指す
     location: https://github.com/takasek/pfdsl/issues/219
+    updated_at: 2026-06-26T05:00:42Z
   i220_schedule_field:
     label: "schedule: フィールド仕様・実装 (#220)"
     description: "process/artifact に schedule: ブロックを追加。pfd-tools 連携可能の条件となる"
     status: todo
     criteria: "spec に schedule: が定義済み、サンプル・checker・formatter 対応済み"
     location: https://github.com/takasek/pfdsl/issues/220
+    updated_at: 2026-06-26T04:50:26Z
   i221_index_renum:
     label: "index フィールド + renum コマンド (#221)"
     description: "オプショナル整数フィールド index: と pfdsl renum コマンドを追加。pfd-tools の P#/D# 採番に対応"
     status: todo
     criteria: "spec に index: が定義済み、pfdsl renum コマンドが動作確認済み"
     location: https://github.com/takasek/pfdsl/issues/221
-  i222_pfd_tools_consultation:
-    label: "pfd-tools 打診 (#222)"
-    description: "pfd-tools に pfdsl 入力フォーマット対応を打診する Issue 起票タスク。実装を伴わない管理タスク"
-    status: todo
-    criteria: pfd-tools リポジトリに Issue を起票した
-    location: https://github.com/takasek/pfdsl/issues/222
+    updated_at: 2026-06-26T04:50:27Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -296,8 +296,6 @@ process:
     label: schedule:フィールド実装
   implement_index_renum:
     label: index フィールド + renum 実装
-  consult_pfd_tools:
-    label: pfd-tools 打診
   implement_hover_jump:
     label: hover/quickpick ジャンプ実装
   implement_run_command:
@@ -378,8 +376,6 @@ cli_tool_v009 >> implement_schedule_field -> i220_schedule_field
 cli_tool_v009 >> implement_index_renum -> i221_index_renum
 
 [cli_tool_v0010, i219_w002_line, i220_schedule_field, i221_index_renum] >> publish_cli_v0011 -> cli_tool_v0011
-
-cli_tool_v0011 >> consult_pfd_tools -> i222_pfd_tools_consultation
 
 [i220_schedule_field, i221_index_renum] >> integrate_spec_v009 -> spec_v009
 
