@@ -242,6 +242,13 @@ artifact:
     status: done
     criteria: W002 の診断が artifact 定義行を指す
     location: https://github.com/takasek/pfdsl/issues/219
+  i230_gen_samples_ci:
+    label: "gen-samples ドリフト検査 CI (#230)"
+    description: "docs/samples の .dot / README を CI で再生成しドリフト検査する。svg はバージョン依存のため対象外"
+    status: todo
+    criteria: CI が docs/samples の .dot と README のドリフトを検出し、svg の扱いが文書化済み
+    location: https://github.com/takasek/pfdsl/issues/230
+    updated_at: 2026-06-26T00:00:00Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -312,6 +319,8 @@ process:
     label: extension v0.0.14リリース
   integrate_spec_v009:
     label: 仕様書 v0.0.9統合
+  implement_gen_samples_ci:
+    label: gen-samplesドリフト検査CI実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -353,7 +362,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -424,7 +435,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -498,7 +511,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -571,7 +586,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -644,7 +661,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -719,7 +738,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -790,7 +811,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -864,7 +887,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -937,7 +962,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1011,7 +1038,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1083,7 +1112,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1156,7 +1187,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1227,7 +1260,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1300,7 +1335,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1373,7 +1410,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1446,6 +1485,8 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1519,7 +1560,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1592,7 +1635,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1674,7 +1719,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1743,7 +1790,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1811,7 +1860,9 @@ i217_run_command
 i218_group_hover
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1887,7 +1938,9 @@ i12_article
 i201_published_libs
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_index_renum
 implement_json_output
 implement_lints
@@ -1958,7 +2011,9 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_json_output
@@ -2031,7 +2086,9 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -2104,7 +2161,9 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -2176,6 +2235,82 @@ i12_article
 i201_published_libs
 i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
+i3_obsidian_plugin
+implement_gen_samples_ci
+implement_group_hover
+implement_hover_jump
+implement_index_renum
+implement_json_output
+implement_lints
+implement_multifile
+implement_no_color
+implement_run_command
+implement_schedule_field
+implement_spec_features
+implement_stdin
+implement_subcommand_help
+implement_version_cmd
+integrate_multifile
+integrate_spec
+integrate_spec_v009
+json_output
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+multifile_toolchain
+no_color
+presets_spec
+publish_cli_v0010
+publish_cli_v0011
+publish_cli_v009
+publish_extension
+publish_libraries
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+spec_v009
+stdin
+subcommand_help
+version_cmd
+w002_line
+write_article
+write_design_notes
+
+cli_tool >> implement_gen_samples_ci
+implement_gen_samples_ci -> i230_gen_samples_ci
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+cli_tool_v0010
+cli_tool_v0011
+cli_tool_v009
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+ext_v0014
+external_stakeholders_spec
+featured_toolchain
+findings_r12
+fix_w002_line
+hierarchy_spec
+i119_published_extension
+i12_article
+i201_published_libs
+i216_hover_jump
+i217_run_command
+i218_group_hover
+i220_schedule_field
+i221_index_renum
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -2204,6 +2339,7 @@ presets_spec
 publish_cli_v0010
 publish_cli_v0011
 publish_cli_v009
+publish_ext_v0014
 publish_extension
 publish_libraries
 restructure_skillgen

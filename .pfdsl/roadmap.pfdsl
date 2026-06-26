@@ -239,6 +239,13 @@ artifact:
     status: done
     criteria: W002 の診断が artifact 定義行を指す
     location: https://github.com/takasek/pfdsl/issues/219
+  i230_gen_samples_ci:
+    label: "gen-samples ドリフト検査 CI (#230)"
+    description: "docs/samples の .dot / README を CI で再生成しドリフト検査する。svg はバージョン依存のため対象外"
+    status: todo
+    criteria: CI が docs/samples の .dot と README のドリフトを検出し、svg の扱いが文書化済み
+    location: https://github.com/takasek/pfdsl/issues/230
+    updated_at: 2026-06-26T00:00:00Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -309,6 +316,8 @@ process:
     label: extension v0.0.14リリース
   integrate_spec_v009:
     label: 仕様書 v0.0.9統合
+  implement_gen_samples_ci:
+    label: gen-samplesドリフト検査CI実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -379,3 +388,5 @@ cli_tool_v009 >> implement_index_renum -> i221_index_renum
 [i220_schedule_field, i221_index_renum] >> integrate_spec_v009 -> spec_v009
 
 [i216_hover_jump, i217_run_command, i218_group_hover] >> publish_ext_v0014 -> ext_v0014
+
+cli_tool >> implement_gen_samples_ci -> i230_gen_samples_ci
