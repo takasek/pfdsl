@@ -198,6 +198,12 @@ artifact:
     criteria: 対象パッケージが npm 公開済みで README の install/import 例と一致
     location: https://github.com/takasek/pfdsl/issues/201
     updated_at: 2026-06-24T06:53:50Z
+  i231_workflow_libs:
+    label: "workflow に publish_libraries 登録 (#231)"
+    description: "published_libraries artifact と publish_libraries process を workflow.pfdsl に追加し、toolchain → publish_libraries → published_libraries エッジを接続する。#201 マージ後に着手可能"
+    status: todo
+    criteria: workflow.pfdsl に published_libraries と publish_libraries が登録され check がエラーなし
+    location: https://github.com/takasek/pfdsl/issues/231
   i216_hover_jump:
     label: "hover/quickpick jump (#216)"
     description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
@@ -306,6 +312,8 @@ process:
     label: group hover メンバー一覧実装
   fix_w002_line:
     label: W002 診断行番号修正
+  update_workflow_libs:
+    label: workflow にライブラリ公開ノード追加
   publish_cli_v0011:
     label: CLI v0.0.11リリース
   publish_ext_v0014:
@@ -368,6 +376,8 @@ cli_tool_v009 >> implement_json_output -> json_output
 [version_cmd, subcommand_help, stdin, no_color, json_output] >> publish_cli_v0010 -> cli_tool_v0010
 
 cli_tool >> publish_libraries -> i201_published_libs
+
+i201_published_libs >> update_workflow_libs -> i231_workflow_libs
 
 cli_tool_v009 >> implement_hover_jump -> i216_hover_jump
 cli_tool_v009 >> implement_run_command -> i217_run_command
