@@ -1,9 +1,11 @@
+import { findFrontmatterArtifactRanges } from "./frontmatter.js";
 import { zeroRange } from "./position.js";
 import type {
 	Diagnostic,
 	Frontmatter,
 	NodeKind,
 	NormalizedEdge,
+	Range,
 } from "./types/index.js";
 import { STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
 
@@ -12,6 +14,7 @@ const STYLE_ATTR_SET: ReadonlySet<string> = new Set(STYLE_ATTRS);
 
 export interface ValidateOptions {
 	strict?: boolean;
+	source?: string;
 }
 
 export function validate(
@@ -21,6 +24,9 @@ export function validate(
 	options?: ValidateOptions,
 ): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
+	const artifactRanges: Map<string, Range> = options?.source
+		? findFrontmatterArtifactRanges(options.source)
+		: new Map();
 
 	// V001: single-source constraint (Primary Graph)
 	const artifactGenerators = new Map<string, string[]>();
@@ -336,7 +342,7 @@ export function validate(
 				severity: options?.strict ? "error" : "warning",
 				code: "W002",
 				message: `Artifact '${aid}' has no 'criteria' field`,
-				range: zeroRange(),
+				range: artifactRanges.get(aid) ?? zeroRange(),
 			});
 		}
 		if ((meta as Record<string, unknown>).command !== undefined) {
