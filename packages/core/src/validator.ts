@@ -7,10 +7,54 @@ import type {
 	NormalizedEdge,
 	Range,
 } from "./types/index.js";
-import { STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
+import {
+	ARTIFACT_SCHEDULE_KEYS,
+	PROCESS_SCHEDULE_KEYS,
+	STATUS_VALUES,
+	STYLE_ATTRS,
+} from "./types/index.js";
 
 const STATUS_SET: ReadonlySet<string> = new Set(STATUS_VALUES);
 const STYLE_ATTR_SET: ReadonlySet<string> = new Set(STYLE_ATTRS);
+
+const PROCESS_SCHEDULE_SET: ReadonlySet<string> = new Set(
+	PROCESS_SCHEDULE_KEYS,
+);
+const ARTIFACT_SCHEDULE_SET: ReadonlySet<string> = new Set(
+	ARTIFACT_SCHEDULE_KEYS,
+);
+
+type ScheduleFieldKind = "nonNegNumber" | "ratio" | "nonNegInt" | "string";
+
+const SCHEDULE_FIELD_KINDS: Record<string, ScheduleFieldKind> = {
+	workVolume: "nonNegNumber",
+	reworkRatio: "ratio",
+	resources: "string",
+	startCondition: "string",
+	milestone: "string",
+	availableTime: "nonNegNumber",
+	maxRevision: "nonNegInt",
+};
+
+function isValidScheduleValue(field: string, value: unknown): boolean {
+	switch (SCHEDULE_FIELD_KINDS[field]) {
+		case "nonNegNumber":
+			return typeof value === "number" && Number.isFinite(value) && value >= 0;
+		case "ratio":
+			return (
+				typeof value === "number" &&
+				Number.isFinite(value) &&
+				value >= 0 &&
+				value <= 1
+			);
+		case "nonNegInt":
+			return typeof value === "number" && Number.isInteger(value) && value >= 0;
+		case "string":
+			return typeof value === "string";
+		default:
+			return false;
+	}
+}
 
 export interface ValidateOptions {
 	strict?: boolean;
@@ -499,6 +543,58 @@ export function validate(
 				range: zeroRange(),
 			});
 		}
+	}
+
+	// V029: schedule must be a mapping
+	// V030: unknown schedule field for the node type
+	// V031: invalid value for a known schedule field
+	function validateSchedule(
+		nodeId: string,
+		nodeType: "artifact" | "process",
+		schedule: unknown,
+	): void {
+		if (
+			schedule === null ||
+			typeof schedule !== "object" ||
+			Array.isArray(schedule)
+		) {
+			diagnostics.push({
+				severity: "error",
+				code: "V029",
+				message: `'schedule' on ${nodeType} '${nodeId}' must be a mapping`,
+				range: zeroRange(),
+			});
+			return;
+		}
+		const allowed =
+			nodeType === "process" ? PROCESS_SCHEDULE_SET : ARTIFACT_SCHEDULE_SET;
+		for (const [key, value] of Object.entries(schedule)) {
+			if (!allowed.has(key)) {
+				diagnostics.push({
+					severity: "error",
+					code: "V030",
+					message: `Unknown schedule field '${key}' on ${nodeType} '${nodeId}'. Allowed: ${[...allowed].join(", ")}`,
+					range: zeroRange(),
+				});
+				continue;
+			}
+			if (!isValidScheduleValue(key, value)) {
+				diagnostics.push({
+					severity: "error",
+					code: "V031",
+					message: `Invalid value for schedule field '${key}' on ${nodeType} '${nodeId}'`,
+					range: zeroRange(),
+				});
+			}
+		}
+	}
+	for (const [aid, meta] of Object.entries(artifactMeta)) {
+		const sched = (meta as Record<string, unknown>).schedule;
+		if (sched !== undefined) validateSchedule(aid, "artifact", sched);
+	}
+	for (const [pid, meta] of Object.entries(processMeta)) {
+		const sched = (meta as Record<string, unknown>).schedule;
+		if (sched !== undefined) validateSchedule(pid, "process", sched);
 	}
 
 	// V025: cycle in group parent chain

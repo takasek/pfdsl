@@ -13,6 +13,39 @@ export const STYLE_ATTRS = [
 export type StyleAttr = (typeof STYLE_ATTRS)[number];
 export type NodeStyle = Partial<Record<StyleAttr, string>>;
 
+/** Estimation parameters for pfd-tools interop (§2.3, #220). Process variant. */
+export interface ProcessSchedule {
+	/** Est. Work Volume（抽象作業量、非負数）. */
+	workVolume?: number;
+	/** Est. Rework Volume Ratio（0.0–1.0）. */
+	reworkRatio?: number;
+	/** Needed Resources（pfd-tools と同形式の文字列）. */
+	resources?: string;
+	/** Start Condition（pfd-tools と同 DSL の文字列）. */
+	startCondition?: string;
+	/** Milestone ID. */
+	milestone?: string;
+	[key: string]: unknown;
+}
+
+/** Estimation parameters for pfd-tools interop (§2.3, #220). Artifact variant. */
+export interface ArtifactSchedule {
+	/** 外部入力成果物の利用可能開始時刻（非負数）. */
+	availableTime?: number;
+	/** feedback ループの終了条件（非負整数）. */
+	maxRevision?: number;
+	[key: string]: unknown;
+}
+
+export const PROCESS_SCHEDULE_KEYS = [
+	"workVolume",
+	"reworkRatio",
+	"resources",
+	"startCondition",
+	"milestone",
+] as const;
+export const ARTIFACT_SCHEDULE_KEYS = ["availableTime", "maxRevision"] as const;
+
 export interface ArtifactMeta {
 	label?: string;
 	description?: string;
@@ -25,6 +58,8 @@ export interface ArtifactMeta {
 	criteria?: string;
 	location?: string | string[];
 	revises?: string;
+	/** Estimation parameters for pfd-tools interop (§2.3, #220). */
+	schedule?: ArtifactSchedule;
 	[key: string]: unknown;
 }
 
@@ -40,6 +75,8 @@ export interface ProcessMeta {
 	subflow?: string;
 	/** Optional 1:1 boundary rename map (parent id → child id) for a subflow (§2.9.3). */
 	boundary?: Record<string, string>;
+	/** Estimation parameters for pfd-tools interop (§2.3, #220). */
+	schedule?: ProcessSchedule;
 	[key: string]: unknown;
 }
 
