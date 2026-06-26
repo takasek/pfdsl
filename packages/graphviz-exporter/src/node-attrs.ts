@@ -76,11 +76,12 @@ export function buildXlabel(
 		const meta = fm.artifact?.[id];
 		if (meta?.status) parts.push(meta.status);
 		for (const tag of meta?.tags ?? []) parts.push(tag);
-	} else {
+	} else if (kind === "process") {
 		// status is artifact-only; processes carry tags only
 		const meta = fm.process?.[id];
 		for (const tag of meta?.tags ?? []) parts.push(tag);
 	}
+	// group: no status or tags to display
 	return parts.length > 0 ? parts.join(", ") : undefined;
 }
 
@@ -90,7 +91,11 @@ export function resolveStyleAttrs(
 	fm: Frontmatter | null,
 ): NodeStyle {
 	if (!fm) return {};
-	const meta = resolveMeta(fm, kind, id);
+	if (kind === "group") return {};
+	const meta = resolveMeta(fm, kind, id) as
+		| ArtifactMeta
+		| ProcessMeta
+		| undefined;
 	const styleAttrs: NodeStyle = {};
 	// tags reverse iter: later Object.assign wins → first tag in array prevails
 	const tags = meta?.tags ?? [];

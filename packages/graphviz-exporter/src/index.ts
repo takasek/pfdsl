@@ -64,6 +64,7 @@ export function exportDot(
 	const groupedNodes = new Map<string, string[]>();
 	const ungroupedIds: string[] = [];
 	for (const id of nodeIds) {
+		if (graph.nodes.get(id) === "group") continue; // group IDs are subgraph containers, not nodes
 		const gid = nodeGroup.get(id);
 		if (gid !== undefined && frontmatter?.group?.[gid] !== undefined) {
 			if (!groupedNodes.has(gid)) groupedNodes.set(gid, []);
