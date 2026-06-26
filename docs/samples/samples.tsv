@@ -13,3 +13,4 @@ id	summary	description
 13-preset	Preset (extends)	`extends:` inherits `statusStyles` / `tag` / `group` from a preset file. Attribute-level deep merge: local values override inherited ones.
 14-boundary	Boundary map	`boundary:` on a subflow process remaps parent artifact IDs to different child artifact IDs. Useful when reusing an independently-named child flow.
 pfdsl_implementation_flow	PFDSL toolchain roadmap	How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).
+15-schedule	Schedule (pfd-tools)	`schedule:` blocks attach estimation parameters for pfd-tools interop. Process: workVolume / reworkRatio / resources / startCondition / milestone. Artifact: availableTime / maxRevision. Metadata only — does not affect the graph.
