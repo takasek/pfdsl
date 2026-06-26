@@ -1,10 +1,10 @@
 import { ID_PATTERN } from "@pfdsl/core";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
-import { buildGroupHoverLines, buildHoverLines } from "./hover-logic.js";
+import { buildHoverLines } from "./hover-logic.js";
 import { findFrontmatterDefinition } from "./jump.js";
 
-export { buildGroupHoverLines, buildHoverLines } from "./hover-logic.js";
+export { buildHoverLines } from "./hover-logic.js";
 
 const GOTO_COMMAND = "pfdsl._gotoNodeDefinition";
 const FIND_COMMAND = "editor.actions.findWithArgs";
@@ -59,15 +59,9 @@ export function registerHover(context: vscode.ExtensionContext): void {
 
 			const { frontmatter, nodeKinds } = analyzeDocument(doc);
 			const kind = nodeKinds.get(id);
+			if (!kind) return null;
 
-			let lines: string[];
-			if (!kind) {
-				const groupLines = buildGroupHoverLines(id, frontmatter);
-				if (!groupLines) return null;
-				lines = groupLines;
-			} else {
-				lines = buildHoverLines(id, kind, frontmatter);
-			}
+			const lines = buildHoverLines(id, kind, frontmatter);
 
 			const gotoArgs = encodeURIComponent(
 				JSON.stringify([doc.uri.toString(), id]),

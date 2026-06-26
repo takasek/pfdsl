@@ -1,4 +1,4 @@
-export type NodeKind = "artifact" | "process";
+export type NodeKind = "artifact" | "process" | "group";
 
 export interface PrimaryEdge {
 	from: string;

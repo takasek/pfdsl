@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildGroupHoverLines, buildHoverLines } from "./hover-logic.js";
+import { buildHoverLines } from "./hover-logic.js";
 
 describe("buildHoverLines", () => {
 	it("returns header line and separator for id and kind", () => {
@@ -161,22 +161,12 @@ describe("buildHoverLines", () => {
 	});
 });
 
-describe("buildGroupHoverLines", () => {
-	it("returns null when id is not a group", () => {
-		const fm = { group: { g1: { label: "Inputs" } } };
-		expect(buildGroupHoverLines("unknown", fm)).toBeNull();
-	});
-
-	it("returns null when frontmatter is null", () => {
-		expect(buildGroupHoverLines("g1", null)).toBeNull();
-	});
-
+describe("buildHoverLines (group kind)", () => {
 	it("returns header with group icon and label", () => {
 		const fm = { group: { g1: { label: "Inputs" } } };
-		const lines = buildGroupHoverLines("g1", fm);
-		expect(lines).not.toBeNull();
-		expect(lines![0]).toBe("🗂 **g1**");
-		expect(lines![2]).toBe("**Inputs**");
+		const lines = buildHoverLines("g1", "group", fm);
+		expect(lines[0]).toBe("🗂 **g1**");
+		expect(lines[2]).toBe("**Inputs**");
 	});
 
 	it("lists artifact and process members in the table", () => {
@@ -190,7 +180,7 @@ describe("buildGroupHoverLines", () => {
 				P1: { group: "g1" },
 			},
 		};
-		const lines = buildGroupHoverLines("g1", fm)!;
+		const lines = buildHoverLines("g1", "group", fm);
 		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
 		expect(table).toContain(">📄 art1<");
 		expect(table).not.toContain("art2");
@@ -203,14 +193,19 @@ describe("buildGroupHoverLines", () => {
 			artifact: {},
 			process: {},
 		};
-		const lines = buildGroupHoverLines("empty", fm)!;
+		const lines = buildHoverLines("empty", "group", fm);
 		expect(lines.some((l) => l.startsWith("<table>"))).toBe(false);
 	});
 
 	it("handles group with no label", () => {
 		const fm = { group: { g2: {} } };
-		const lines = buildGroupHoverLines("g2", fm)!;
+		const lines = buildHoverLines("g2", "group", fm);
 		expect(lines[0]).toBe("🗂 **g2**");
 		expect(lines).toHaveLength(2); // header + "---"
+	});
+
+	it("returns only header and separator when id not in frontmatter group", () => {
+		const lines = buildHoverLines("unknown", "group", null);
+		expect(lines).toHaveLength(2);
 	});
 });
