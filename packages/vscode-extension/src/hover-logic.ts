@@ -96,3 +96,28 @@ export function buildHoverLines(
 	}
 	return lines;
 }
+
+export function buildGroupHoverLines(
+	id: string,
+	frontmatter: Frontmatter | null,
+): string[] | null {
+	const meta = frontmatter?.group?.[id];
+	if (!meta) return null;
+
+	const lines: string[] = [`🗂 **${id}**`, "---"];
+	if (meta.label) lines.push(`**${meta.label}**`);
+
+	const members: string[] = [];
+	for (const [aid, ameta] of Object.entries(frontmatter?.artifact ?? {})) {
+		if (ameta?.group === id) members.push(`📄 ${aid}`);
+	}
+	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
+		if (pmeta?.group === id) members.push(`▶️ ${pid}`);
+	}
+
+	if (members.length > 0) {
+		const rows = members.map((m) => tableRow("member", m));
+		lines.push(`<table>${rows.join("")}</table>`);
+	}
+	return lines;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildHoverLines } from "./hover-logic.js";
+import { buildGroupHoverLines, buildHoverLines } from "./hover-logic.js";
 
 describe("buildHoverLines", () => {
 	it("returns header line and separator for id and kind", () => {
@@ -158,5 +158,59 @@ describe("buildHoverLines", () => {
 		const lines = buildHoverLines("art1", "artifact", fm);
 		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
 		expect(table).toContain(">g1<");
+	});
+});
+
+describe("buildGroupHoverLines", () => {
+	it("returns null when id is not a group", () => {
+		const fm = { group: { g1: { label: "Inputs" } } };
+		expect(buildGroupHoverLines("unknown", fm)).toBeNull();
+	});
+
+	it("returns null when frontmatter is null", () => {
+		expect(buildGroupHoverLines("g1", null)).toBeNull();
+	});
+
+	it("returns header with group icon and label", () => {
+		const fm = { group: { g1: { label: "Inputs" } } };
+		const lines = buildGroupHoverLines("g1", fm);
+		expect(lines).not.toBeNull();
+		expect(lines![0]).toBe("🗂 **g1**");
+		expect(lines![2]).toBe("**Inputs**");
+	});
+
+	it("lists artifact and process members in the table", () => {
+		const fm = {
+			group: { g1: { label: "Inputs" } },
+			artifact: {
+				art1: { group: "g1" },
+				art2: { group: "other" },
+			},
+			process: {
+				P1: { group: "g1" },
+			},
+		};
+		const lines = buildGroupHoverLines("g1", fm)!;
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">📄 art1<");
+		expect(table).not.toContain("art2");
+		expect(table).toContain(">▶️ P1<");
+	});
+
+	it("omits member table when group has no members", () => {
+		const fm = {
+			group: { empty: { label: "Empty" } },
+			artifact: {},
+			process: {},
+		};
+		const lines = buildGroupHoverLines("empty", fm)!;
+		expect(lines.some((l) => l.startsWith("<table>"))).toBe(false);
+	});
+
+	it("handles group with no label", () => {
+		const fm = { group: { g2: {} } };
+		const lines = buildGroupHoverLines("g2", fm)!;
+		expect(lines[0]).toBe("🗂 **g2**");
+		expect(lines).toHaveLength(2); // header + "---"
 	});
 });
