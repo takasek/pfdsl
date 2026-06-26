@@ -197,7 +197,7 @@ artifact:
   i201_published_libs:
     label: "公開ライブラリ群 (#201)"
     description: "@pfdsl/core / preview-engine / graphviz-exporter を npm 公開ライブラリ化し、README の Library 節と実態を整合させる。監査 #198 から派生（engines.node は #198 で対応）"
-    status: todo
+    status: wip
     criteria: 対象パッケージが npm 公開済みで README の install/import 例と一致
     location: https://github.com/takasek/pfdsl/issues/201
     updated_at: 2026-06-24T06:53:50Z
