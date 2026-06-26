@@ -21,6 +21,8 @@ export type {
 	NodeStyle,
 	ProcessMeta,
 	ProcessSchedule,
+	ScheduleField,
+	ScheduleFieldKind,
 	Status,
 	StyleAttr,
 	TagMeta,
@@ -28,6 +30,7 @@ export type {
 export {
 	ARTIFACT_SCHEDULE_KEYS,
 	PROCESS_SCHEDULE_KEYS,
+	SCHEDULE_FIELDS,
 	STATUS_VALUES,
 	STYLE_ATTRS,
 } from "./frontmatter.js";

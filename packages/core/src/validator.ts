@@ -10,6 +10,8 @@ import type {
 import {
 	ARTIFACT_SCHEDULE_KEYS,
 	PROCESS_SCHEDULE_KEYS,
+	SCHEDULE_FIELDS,
+	type ScheduleFieldKind,
 	STATUS_VALUES,
 	STYLE_ATTRS,
 } from "./types/index.js";
@@ -24,20 +26,11 @@ const ARTIFACT_SCHEDULE_SET: ReadonlySet<string> = new Set(
 	ARTIFACT_SCHEDULE_KEYS,
 );
 
-type ScheduleFieldKind = "nonNegNumber" | "ratio" | "nonNegInt" | "string";
-
-const SCHEDULE_FIELD_KINDS: Record<string, ScheduleFieldKind> = {
-	workVolume: "nonNegNumber",
-	reworkRatio: "ratio",
-	resources: "string",
-	startCondition: "string",
-	milestone: "string",
-	availableTime: "nonNegNumber",
-	maxRevision: "nonNegInt",
-};
-
-function isValidScheduleValue(field: string, value: unknown): boolean {
-	switch (SCHEDULE_FIELD_KINDS[field]) {
+function isValidScheduleValue(
+	kind: ScheduleFieldKind,
+	value: unknown,
+): boolean {
+	switch (kind) {
 		case "nonNegNumber":
 			return typeof value === "number" && Number.isFinite(value) && value >= 0;
 		case "ratio":
@@ -51,8 +44,6 @@ function isValidScheduleValue(field: string, value: unknown): boolean {
 			return typeof value === "number" && Number.isInteger(value) && value >= 0;
 		case "string":
 			return typeof value === "string";
-		default:
-			return false;
 	}
 }
 
@@ -578,7 +569,8 @@ export function validate(
 				});
 				continue;
 			}
-			if (!isValidScheduleValue(key, value)) {
+			const kind = SCHEDULE_FIELDS[key as keyof typeof SCHEDULE_FIELDS].kind;
+			if (!isValidScheduleValue(kind, value)) {
 				diagnostics.push({
 					severity: "error",
 					code: "V031",

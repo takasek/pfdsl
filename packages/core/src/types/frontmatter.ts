@@ -37,14 +37,43 @@ export interface ArtifactSchedule {
 	[key: string]: unknown;
 }
 
-export const PROCESS_SCHEDULE_KEYS = [
-	"workVolume",
-	"reworkRatio",
-	"resources",
-	"startCondition",
-	"milestone",
-] as const;
-export const ARTIFACT_SCHEDULE_KEYS = ["availableTime", "maxRevision"] as const;
+/** Validation kind for a schedule field value. */
+export type ScheduleFieldKind =
+	| "nonNegNumber"
+	| "ratio"
+	| "nonNegInt"
+	| "string";
+
+interface ScheduleFieldSpec {
+	node: "process" | "artifact";
+	kind: ScheduleFieldKind;
+}
+
+/**
+ * Single source of truth for schedule fields: which node type owns each field
+ * and how its value is validated. The allowed-key sets and the per-field kind
+ * lookup are both derived from this table, so the two cannot drift (a drift
+ * would let a key be "allowed but kind-less", which would false-positive on
+ * every value).
+ */
+export const SCHEDULE_FIELDS = {
+	workVolume: { node: "process", kind: "nonNegNumber" },
+	reworkRatio: { node: "process", kind: "ratio" },
+	resources: { node: "process", kind: "string" },
+	startCondition: { node: "process", kind: "string" },
+	milestone: { node: "process", kind: "string" },
+	availableTime: { node: "artifact", kind: "nonNegNumber" },
+	maxRevision: { node: "artifact", kind: "nonNegInt" },
+} as const satisfies Record<string, ScheduleFieldSpec>;
+
+export type ScheduleField = keyof typeof SCHEDULE_FIELDS;
+
+export const PROCESS_SCHEDULE_KEYS = (
+	Object.keys(SCHEDULE_FIELDS) as ScheduleField[]
+).filter((k) => SCHEDULE_FIELDS[k].node === "process");
+export const ARTIFACT_SCHEDULE_KEYS = (
+	Object.keys(SCHEDULE_FIELDS) as ScheduleField[]
+).filter((k) => SCHEDULE_FIELDS[k].node === "artifact");
 
 export interface ArtifactMeta {
 	label?: string;
