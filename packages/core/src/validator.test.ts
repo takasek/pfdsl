@@ -123,6 +123,23 @@ describe("validate", () => {
 		expect(codes("A >> P -> B", fm)).not.toContain("W004");
 	});
 
+	it("V029: process index diagnostic points at the process line, not line 1", () => {
+		const src = `---
+process:
+  design:
+    index: 0
+---
+a >> design -> b
+`;
+		const { tokens } = lex(src);
+		const { document } = parseTokens(tokens);
+		const fm: Frontmatter = { process: { design: { index: 0 } } };
+		const { edges, nodeKinds } = normalize(document, fm);
+		const diags = validate(edges, nodeKinds, fm, { source: src });
+		const v029 = diags.find((d) => d.code === "V029");
+		expect(v029?.range?.start.line).toBe(3); // the `  design:` line
+	});
+
 	it("V008: invalid statusStyles key", () => {
 		const fm = {
 			statusStyles: { finished: { fillcolor: "gray" } },

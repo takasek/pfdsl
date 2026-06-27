@@ -215,14 +215,25 @@ function setIndex(yaml: string[], w: Write): void {
 		}
 	}
 
+	// Node keys sit at the section's child-indent level, detected from the
+	// first content line (supports 2-space, 4-space, etc. — not hardcoded).
+	let sectionIndent = 2;
+	for (let i = sectionStart + 1; i < sectionEnd; i++) {
+		const line = yaml[i]!;
+		if (line.trim() !== "" && !line.trimStart().startsWith("#")) {
+			sectionIndent = indentOf(line);
+			break;
+		}
+	}
+
 	// Find the node key line within the section (block or inline mapping).
 	const keyRe = new RegExp(`^(\\s+)${escapeRe(w.id)}:(.*)$`);
 	let nodeLine = -1;
-	let nodeIndent = 2;
+	let nodeIndent = sectionIndent;
 	let nodeRest = "";
 	for (let i = sectionStart + 1; i < sectionEnd; i++) {
 		const m = keyRe.exec(yaml[i]!);
-		if (m && m[1]!.length <= 2) {
+		if (m && m[1]!.length === sectionIndent) {
 			nodeLine = i;
 			nodeIndent = m[1]!.length;
 			nodeRest = m[2]!;
@@ -230,20 +241,28 @@ function setIndex(yaml: string[], w: Write): void {
 		}
 	}
 
+	const pad = (n: number) => " ".repeat(n);
+
 	if (nodeLine === -1) {
-		// Node not declared: insert a fresh block at the end of the section.
-		const block = [`  ${w.id}:`, `    index: ${w.value}`];
+		// Node not declared: insert a fresh block at the end of the section,
+		// matching the section's existing indentation.
+		const block = [
+			`${pad(sectionIndent)}${w.id}:`,
+			`${pad(sectionIndent * 2)}index: ${w.value}`,
+		];
 		yaml.splice(sectionEnd, 0, ...block);
 		return;
 	}
 
-	// Inline flow mapping: `id: { ... }` — edit inside the braces.
-	const inline = /^\s*\{(.*)\}\s*$/.exec(nodeRest);
+	// Inline flow mapping: `id: { ... }` — edit inside the braces. A trailing
+	// comment after the closing brace is allowed and preserved.
+	const inline = /^\s*\{(.*)\}\s*(?:#.*)?$/.exec(nodeRest);
 	if (inline) {
 		const inner = inline[1]!.trim();
-		if (/(^|[,{]\s*)index:\s*/.test(inner) || /\bindex:\s*/.test(inner)) {
+		if (/\bindex:\s*\d/.test(inner)) {
+			// Replace only the integer value, leaving surrounding spacing intact.
 			yaml[nodeLine] = yaml[nodeLine]!.replace(
-				/(\bindex:\s*)[^,}]*/,
+				/(\bindex:\s*)\d+/,
 				`$1${w.value}`,
 			);
 		} else {
@@ -255,17 +274,18 @@ function setIndex(yaml: string[], w: Write): void {
 	}
 
 	// Within the block mapping, update an existing index: or insert a new one.
-	const childIndent = nodeIndent + 2;
+	const childIndent = nodeIndent + sectionIndent;
 	for (let i = nodeLine + 1; i < sectionEnd; i++) {
 		const line = yaml[i]!;
 		if (line.trim() === "") continue;
 		if (indentOf(line) <= nodeIndent) break; // left the node block
 		if (/^\s*index:\s*/.test(line)) {
-			yaml[i] = line.replace(/^(\s*index:\s*).*$/, `$1${w.value}`);
+			// Replace the integer value; keep any trailing comment.
+			yaml[i] = line.replace(/^(\s*index:\s*)\d+/, `$1${w.value}`);
 			return;
 		}
 	}
-	yaml.splice(nodeLine + 1, 0, `${" ".repeat(childIndent)}index: ${w.value}`);
+	yaml.splice(nodeLine + 1, 0, `${pad(childIndent)}index: ${w.value}`);
 }
 
 function escapeRe(s: string): string {

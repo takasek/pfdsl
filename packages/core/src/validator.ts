@@ -1,4 +1,4 @@
-import { findFrontmatterArtifactRanges } from "./frontmatter.js";
+import { findFrontmatterNodeRanges } from "./frontmatter.js";
 import { zeroRange } from "./position.js";
 import type {
 	Diagnostic,
@@ -24,8 +24,8 @@ export function validate(
 	options?: ValidateOptions,
 ): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
-	const artifactRanges: Map<string, Range> = options?.source
-		? findFrontmatterArtifactRanges(options.source)
+	const nodeRanges: Map<string, Range> = options?.source
+		? findFrontmatterNodeRanges(options.source)
 		: new Map();
 
 	// V001: single-source constraint (Primary Graph)
@@ -168,7 +168,7 @@ export function validate(
 					severity: "error",
 					code: "V029",
 					message: `Invalid index '${String(idx)}' on ${kind} '${id}'. Must be a positive integer`,
-					range: artifactRanges.get(id) ?? zeroRange(),
+					range: nodeRanges.get(id) ?? zeroRange(),
 				});
 				continue;
 			}
@@ -178,7 +178,7 @@ export function validate(
 					severity: "warning",
 					code: "W004",
 					message: `Duplicate index ${idx} on ${kind} '${id}' (also on '${prev}')`,
-					range: artifactRanges.get(id) ?? zeroRange(),
+					range: nodeRanges.get(id) ?? zeroRange(),
 				});
 			} else {
 				seen.set(idx, id);
@@ -377,7 +377,7 @@ export function validate(
 				severity: options?.strict ? "error" : "warning",
 				code: "W002",
 				message: `Artifact '${aid}' has no 'criteria' field`,
-				range: artifactRanges.get(aid) ?? zeroRange(),
+				range: nodeRanges.get(aid) ?? zeroRange(),
 			});
 		}
 		if ((meta as Record<string, unknown>).command !== undefined) {

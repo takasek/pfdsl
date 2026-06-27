@@ -134,6 +134,61 @@ a >> p -> b
 		expect(output).toContain("a >> p -> b");
 	});
 
+	it("handles 4-space indented front matter without corrupting it", () => {
+		const src = `---
+artifact:
+    req:
+        label: Req
+    spec:
+        label: Spec
+process:
+    design:
+        label: Design
+---
+req >> design -> spec
+`;
+		const { output } = reindex(src, { renumber: true });
+		// output must still parse (no duplicate keys / mixed indent)
+		const { diagnostics } = analyze(output);
+		expect(diagnostics.some((d) => d.severity === "error")).toBe(false);
+		const idx = indices(output);
+		expect(idx.artifact.req).toBe(1);
+		expect(idx.process.design).toBe(1);
+	});
+
+	it("updates an inline mapping that has a trailing comment", () => {
+		const src = `---
+artifact:
+  req: { index: 9 } # important
+  spec: {}
+process:
+  design: {}
+---
+req >> design -> spec
+`;
+		const { output } = reindex(src, { renumber: true });
+		const { diagnostics } = analyze(output);
+		expect(diagnostics.some((d) => d.severity === "error")).toBe(false);
+		const idx = indices(output);
+		expect(idx.artifact.req).toBe(1);
+		// trailing comment is preserved
+		expect(output).toContain("# important");
+	});
+
+	it("preserves spacing when updating the last key of an inline mapping", () => {
+		const src = `---
+artifact:
+  spec: {}
+process:
+  design: { index: 5 }
+---
+spec >> design -> out
+`;
+		const { output } = reindex(src, { renumber: true });
+		expect(output).toContain("{ index: 1 }");
+		expect(output).not.toContain("{ index: 1}");
+	});
+
 	it("returns diagnostics and leaves source unchanged on parse error", () => {
 		const src = `a >> >> b\n`;
 		const { output, changes, diagnostics } = reindex(src);

@@ -6,24 +6,28 @@ import type {
 	Range,
 } from "./types/index.js";
 
-export function findFrontmatterArtifactRanges(
-	source: string,
-): Map<string, Range> {
+/**
+ * Locate the front matter key line of each artifact and process node, keyed by
+ * id. Used to point diagnostics at the offending node. Node id keys are matched
+ * at exactly 2-space indent (the canonical front matter style).
+ */
+export function findFrontmatterNodeRanges(source: string): Map<string, Range> {
 	const result = new Map<string, Range>();
 	const { bodyStartLine } = loadFrontmatter(source);
 	const fmEndLine = bodyStartLine - 1;
 	const lines = source.split("\n");
-	let inArtifactSection = false;
+	let inNodeSection = false;
 	for (let i = 0; i < fmEndLine && i < lines.length; i++) {
 		const line = lines[i];
 		if (line === undefined) continue;
 		// Top-level section key (no leading spaces)
 		if (/^\S/.test(line)) {
-			inArtifactSection = line.startsWith("artifact:");
+			inNodeSection =
+				line.startsWith("artifact:") || line.startsWith("process:");
 			continue;
 		}
-		if (!inArtifactSection) continue;
-		// Artifact ID keys are at exactly 2-space indent
+		if (!inNodeSection) continue;
+		// Node ID keys are at exactly 2-space indent
 		const m = /^( {2})(\S[^:]*)\s*:/.exec(line);
 		if (!m) continue;
 		const id = m[2] ?? "";
@@ -37,6 +41,9 @@ export function findFrontmatterArtifactRanges(
 	}
 	return result;
 }
+
+/** @deprecated use findFrontmatterNodeRanges (now covers process nodes too) */
+export const findFrontmatterArtifactRanges = findFrontmatterNodeRanges;
 
 export function loadFrontmatter(source: string): LoadResult {
 	if (!source.startsWith("---")) {
