@@ -145,6 +145,13 @@ artifact:
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
     group: release
+  published_libraries:
+    label: npm 公開ライブラリ群
+    description: "@pfdsl/core / graphviz-exporter / preview-engine の npm 公開物。toolchain のライブラリ部分が変更されたら公開が必要 — lib-v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC）"
+    status: todo
+    criteria: npm show @pfdsl/core version が期待バージョンを返す
+    location: https://www.npmjs.com/package/@pfdsl/core
+    group: release
   pull_request:
     label: Pull Request
     description: "ブランチ上の変更束のレビュー・統合単位。レビュー指摘はブランチ上の修正で解消してからマージする"
@@ -287,6 +294,11 @@ process:
     description: "事前に make release-status で behind を確認してから実施。自動化済み: v* tag push → GitHub Actions → npm publish。手作業は tag push のみ"
     command: "git tag v<VERSION> && git push origin v<VERSION>"
     group: release
+  publish_libraries:
+    label: ライブラリ公開
+    description: "事前に make release-status で behind を確認してから実施。自動化済み: lib-v* tag push → GitHub Actions → npm publish（core → graphviz-exporter → preview-engine 順）。手作業は tag push のみ"
+    command: "make release-libs VERSION=<VERSION>"
+    group: release
   render_previews:
     label: サンプル描画
     description: 機能カタログとロードマップを dot/svg に描画する
@@ -363,6 +375,8 @@ pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
 issue_updates >>? file_issues
 
 toolchain >> publish_cli -> published_cli
+
+toolchain >> publish_libraries -> published_libraries
 
 [feature_samples, roadmap_pfdsl, toolchain] >> render_previews -> sample_previews
 
