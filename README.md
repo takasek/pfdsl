@@ -153,6 +153,12 @@ Run at a target repo's root, it is idempotent and:
 
 ## Library
 
+```sh
+pnpm add @pfdsl/core
+# SVG rendering (optional):
+pnpm add @pfdsl/graphviz-exporter @pfdsl/preview-engine
+```
+
 ```ts
 import { format } from '@pfdsl/core';
 
