@@ -61,7 +61,7 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 
 - **Pipeline** — lexer → parser → normalizer → validator → canonical sorter → formatter (`@pfdsl/core`)
 - **DOT / SVG** — Graphviz export and Wasm-based rendering (`@pfdsl/graphviz-exporter`, `@pfdsl/preview-engine`)
-- **CLI** — `pfdsl check / fmt / reindex / normalize / graph / diff` (`@pfdsl/cli`)
+- **CLI** — `pfdsl check / fmt / reindex / sort / normalize / graph / diff` (`@pfdsl/cli`)
 - **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
 - **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`); installable cross-project via `gh skill install takasek/pfdsl/pfdsl --agent claude-code`
 
@@ -93,6 +93,7 @@ node packages/cli/dist/cli.js help
 pfdsl check <file|-> [--json] [--no-color]  # validate (- = stdin; --json outputs { ok, diagnostics })
 pfdsl fmt <file|-> [--write]                # format (- = stdin; --write not allowed with -)
 pfdsl reindex <file|-> [--write] [--check] [--renumber] [--json]  # assign topological index: values
+pfdsl sort <file|-> --by <keys> [--write] [--check]              # sort node definitions (keys: index, topological, group, id)
 pfdsl normalize <file|-> [--json]           # canonical edge list (- = stdin; --json outputs array)
 pfdsl graph <file|-> [--format dot|svg]     # Graphviz DOT (default) or SVG (- = stdin)
 pfdsl diff <a> <b>                          # structural diff (nodes / edges / feedback)
