@@ -470,7 +470,7 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "fulfill_order" [shape=ellipse, label="fulfill_order\nOrder Fulfillment", tooltip="Order Fulfillment\nsubflow: ./12-subflow-detail.pfdsl", peripheries="2"];
+  "fulfill_order" [shape=ellipse, label="fulfill_order\nOrder Fulfillment", tooltip="Order Fulfillment\nsubflow: ./12-subflow-detail.pfdsl"];
   "requirement" [shape=box, label="requirement\nRequirements", penwidth="2"];
   "shipped_order" [shape=box, label="shipped_order\nShipped Order", penwidth="2"];
 
@@ -558,7 +558,7 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "fulfill" [shape=ellipse, label="fulfill\nFulfillment", tooltip="Fulfillment\nsubflow: ./14-boundary-detail.pfdsl", peripheries="2"];
+  "fulfill" [shape=ellipse, label="fulfill\nFulfillment", tooltip="Fulfillment\nsubflow: ./14-boundary-detail.pfdsl"];
   "order" [shape=box, label="order\nCustomer Order", penwidth="2"];
   "parcel" [shape=box, label="parcel\nParcel", penwidth="2"];
 
@@ -578,76 +578,6 @@ How PFDSL itself was built — a snapshot of the toolchain implementation flow, 
 <img src="pfdsl_implementation_flow.svg">
 
 [Source](pfdsl_implementation_flow.pfdsl) · [DOT](pfdsl_implementation_flow.dot)
-
----
-
-## 15-schedule — Schedule (pfd-tools)
-
-`schedule:` blocks attach estimation parameters for pfd-tools interop. Process: workVolume / reworkRatio / resources / startCondition / milestone. Artifact: availableTime / maxRevision. Metadata only — does not affect the graph.
-
-```pfdsl
----
-title: スケジュール見積もり
-artifact:
-  req:
-    label: 要求仕様書
-    criteria: ステークホルダー承認済み
-    schedule:
-      availableTime: 0.0
-      maxRevision: 3
-  spec:
-    label: 設計書
-    criteria: 設計レビュー完了
-  code:
-    label: 実装コード
-    criteria: 全テスト通過
-process:
-  design:
-    label: 設計
-    schedule:
-      workVolume: 2.0
-      reworkRatio: 0.2
-      resources: "Dev:1"
-      startCondition: "\\complete(req)"
-      milestone: M1
-  impl:
-    label: 実装
-    schedule:
-      workVolume: 5.0
-      reworkRatio: 0.3
-      resources: "Dev:2;QA:0.5"
-      milestone: M2
----
-req >> design -> spec
-spec >> impl -> code
-```
-
-<img src="15-schedule.svg">
-
-<details>
-<summary>DOT</summary>
-
-```dot
-digraph PFDSL {
-  rankdir=LR;
-  newrank=true;
-  label="スケジュール見積もり";
-  labelloc="t";
-
-  "code" [shape=box, label="code\n実装コード", tooltip="実装コード\ncriteria: 全テスト通過", width=1.30, penwidth="2"];
-  "design" [shape=ellipse, label="design\n設計", width=0.90];
-  "impl" [shape=ellipse, label="impl\n実装", width=0.75];
-  "req" [shape=box, label="req\n要求仕様書", tooltip="要求仕様書\ncriteria: ステークホルダー承認済み", width=1.30, penwidth="2"];
-  "spec" [shape=box, label="spec\n設計書", tooltip="設計書\ncriteria: 設計レビュー完了", width=0.90];
-
-  "req" -> "design";
-  "design" -> "spec";
-  "spec" -> "impl";
-  "impl" -> "code";
-}
-```
-
-</details>
 
 ---
 

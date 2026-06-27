@@ -78,24 +78,6 @@ describe("public API", () => {
 		expect(output).toBe("# just a comment\n");
 	});
 
-	it("format: preserves schedule: front matter block verbatim (#220)", () => {
-		const src = [
-			"---",
-			"process:",
-			"  impl:",
-			"    schedule:",
-			"      workVolume: 3",
-			"      reworkRatio: 0.3",
-			"---",
-			"spec >> impl -> code",
-			"",
-		].join("\n");
-		const { output, diagnostics } = format(src, { style: "flows" });
-		expect(diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
-		expect(output).toContain("    schedule:\n      workVolume: 3");
-		expect(output).toBe(src);
-	});
-
 	describe("parse() immutability", () => {
 		it("does not mutate token positions: re-parse returns identical line numbers", () => {
 			const src = "---\nartifact:\n  a: {}\n---\na >> P -> b\n";
