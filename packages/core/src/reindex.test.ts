@@ -175,6 +175,25 @@ req >> design -> spec
 		expect(output).toContain("# important");
 	});
 
+	it("does not corrupt an inline mapping whose trailing comment contains braces", () => {
+		const src = `---
+artifact:
+  a: { label: A } # see {x} and more
+  b: {}
+process:
+  p: {}
+---
+a >> p -> b
+`;
+		const { output } = reindex(src, { renumber: true });
+		const { diagnostics } = analyze(output);
+		expect(diagnostics.some((d) => d.severity === "error")).toBe(false);
+		const idx = indices(output);
+		expect(idx.artifact.a).toBe(1);
+		// the comment (and its braces) survive intact
+		expect(output).toContain("# see {x} and more");
+	});
+
 	it("preserves spacing when updating the last key of an inline mapping", () => {
 		const src = `---
 artifact:

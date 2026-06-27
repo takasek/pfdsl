@@ -44,13 +44,9 @@ export function reindex(
 		return { output: source, changes: [], diagnostics };
 	}
 
-	const kindOf = (id: string): NodeKind => {
-		const k = nodeKinds.get(id);
-		if (k) return k;
-		return frontmatter?.process && id in frontmatter.process
-			? "process"
-			: "artifact";
-	};
+	// nodeKinds is total over every candidate id (the normalizer registers all
+	// frontmatter artifact:/process: keys); the default is a safety net only.
+	const kindOf = (id: string): NodeKind => nodeKinds.get(id) ?? "artifact";
 	const existingIndex = (id: string): number | undefined => {
 		const meta =
 			kindOf(id) === "process"
@@ -132,11 +128,6 @@ export function reindex(
 
 // --- front matter text editing ---------------------------------------------
 
-const SECTION_OF: Record<NodeKind, string> = {
-	artifact: "artifact",
-	process: "process",
-};
-
 function applyWrites(source: string, writes: Write[]): string {
 	const lines = source.split("\n");
 	const trailingNewline = source.endsWith("\n");
@@ -188,7 +179,7 @@ const indentOf = (line: string): number =>
 	line.length - line.trimStart().length;
 
 function setIndex(yaml: string[], w: Write): void {
-	const section = SECTION_OF[w.kind];
+	const section = w.kind; // NodeKind values are exactly the YAML section names
 	// Locate the top-level section line (indent 0).
 	let sectionStart = -1;
 	for (let i = 0; i < yaml.length; i++) {
@@ -254,23 +245,29 @@ function setIndex(yaml: string[], w: Write): void {
 		return;
 	}
 
-	// Inline flow mapping: `id: { ... }` — edit inside the braces. A trailing
-	// comment after the closing brace is allowed and preserved.
-	const inline = /^\s*\{(.*)\}\s*(?:#.*)?$/.exec(nodeRest);
-	if (inline) {
-		const inner = inline[1]!.trim();
-		if (/\bindex:\s*\d/.test(inner)) {
-			// Replace only the integer value, leaving surrounding spacing intact.
-			yaml[nodeLine] = yaml[nodeLine]!.replace(
-				/(\bindex:\s*)\d+/,
-				`$1${w.value}`,
+	// Inline flow mapping: `id: { ... }` — edit inside the braces only. The brace
+	// span is located by balance scanning (not a greedy regex) so nested braces
+	// and a trailing comment containing braces are left untouched.
+	if (nodeRest.trimStart().startsWith("{")) {
+		const span = innerBraceSpan(nodeRest);
+		if (span) {
+			const prefix = yaml[nodeLine]!.slice(
+				0,
+				yaml[nodeLine]!.length - nodeRest.length,
 			);
-		} else {
-			const merged =
-				inner === "" ? `index: ${w.value}` : `index: ${w.value}, ${inner}`;
-			yaml[nodeLine] = yaml[nodeLine]!.replace(/\{.*\}/, `{ ${merged} }`);
+			const before = nodeRest.slice(0, span.open); // whitespace after the colon
+			const after = nodeRest.slice(span.close + 1); // trailing comment, if any
+			const inner = nodeRest.slice(span.open + 1, span.close).trim();
+			let merged: string;
+			if (/\bindex:\s*\d/.test(inner)) {
+				merged = inner.replace(/(\bindex:\s*)\d+/, `$1${w.value}`);
+			} else {
+				merged =
+					inner === "" ? `index: ${w.value}` : `index: ${w.value}, ${inner}`;
+			}
+			yaml[nodeLine] = `${prefix}${before}{ ${merged} }${after}`;
+			return;
 		}
-		return;
 	}
 
 	// Within the block mapping, update an existing index: or insert a new one.
@@ -290,4 +287,16 @@ function setIndex(yaml: string[], w: Write): void {
 
 function escapeRe(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Locate the first balanced `{ ... }` group in s, or null if unbalanced. */
+function innerBraceSpan(s: string): { open: number; close: number } | null {
+	const open = s.indexOf("{");
+	if (open === -1) return null;
+	let depth = 0;
+	for (let i = open; i < s.length; i++) {
+		if (s[i] === "{") depth++;
+		else if (s[i] === "}" && --depth === 0) return { open, close: i };
+	}
+	return null;
 }
