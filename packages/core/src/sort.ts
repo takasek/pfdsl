@@ -115,9 +115,9 @@ export function sort(source: string, opts: SortOptions): SortResult {
 		return { output: source, changed: false, diagnostics };
 	}
 
-	// Compute topological order: first appearance across sorted edges, then remaining by id.
+	// Compute topological order only when needed.
 	const topoOrder = new Map<string, number>();
-	{
+	if (opts.by.includes("topological")) {
 		const order: string[] = [];
 		const seen = new Set<string>();
 		const push = (id: string) => {
@@ -155,7 +155,10 @@ export function sort(source: string, opts: SortOptions): SortResult {
 		return typeof meta?.group === "string" ? meta.group : null;
 	};
 
-	const getSortValue = (id: string, key: SortKey): string | number => {
+	const getSortValue = (
+		id: string,
+		key: Exclude<SortKey, "group">,
+	): string | number => {
 		const kind = kindOf(id);
 		const meta =
 			kind === "artifact"
@@ -169,9 +172,6 @@ export function sort(source: string, opts: SortOptions): SortResult {
 					: Number.MAX_SAFE_INTEGER;
 			case "topological":
 				return topoOrder.get(id) ?? Number.MAX_SAFE_INTEGER;
-			case "group":
-				// handled specially in comparator; return placeholder
-				return 0;
 			case "id":
 				return id;
 		}

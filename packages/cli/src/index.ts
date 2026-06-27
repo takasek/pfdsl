@@ -364,12 +364,6 @@ export function runSort(file: string, opts: SortOptions): CommandResult {
 
 	const keys = parseSortKeys(opts.by);
 	if (!Array.isArray(keys)) return keys;
-	if (keys.length === 0) {
-		return fail(
-			`invalid --by value: ${JSON.stringify(opts.by)} (valid: index, topological, group, id)\n`,
-			2,
-		);
-	}
 
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
@@ -659,7 +653,9 @@ export function parseArgs(argv: readonly string[]): CliArgs {
 			const key = a.slice(2);
 			const next = rest[i + 1];
 			if (next !== undefined && !next.startsWith("--")) {
-				flags[key] = next;
+				const prev = flags[key];
+				// Repeated string flag: join with comma so --by a --by b ≡ --by a,b
+				flags[key] = typeof prev === "string" ? `${prev},${next}` : next;
 				i++;
 			} else {
 				flags[key] = true;
