@@ -116,6 +116,13 @@ export type {
 } from "./reindex.js";
 export { reindex } from "./reindex.js";
 
+export type {
+	SortKey,
+	SortOptions,
+	SortResult,
+} from "./sort.js";
+export { sort } from "./sort.js";
+
 export type { ValidateOptions } from "./validator.js";
 export {
 	buildGraph,
