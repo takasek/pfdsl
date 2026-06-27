@@ -194,19 +194,13 @@ artifact:
     status: done
     criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/181
-  i201_published_libs:
-    label: "公開ライブラリ群 (#201)"
-    description: "@pfdsl/core / preview-engine / graphviz-exporter を npm 公開ライブラリ化し、README の Library 節と実態を整合させる。監査 #198 から派生（engines.node は #198 で対応）"
-    status: wip
-    criteria: 対象パッケージが npm 公開済みで README の install/import 例と一致
-    location: https://github.com/takasek/pfdsl/issues/201
-    updated_at: 2026-06-24T06:53:50Z
   i231_workflow_libs:
     label: "workflow に publish_libraries 登録 (#231)"
     description: "published_libraries artifact と publish_libraries process を workflow.pfdsl に追加し、toolchain → publish_libraries → published_libraries エッジを接続する。#201 マージ後に着手可能"
     status: todo
     criteria: workflow.pfdsl に published_libraries と publish_libraries が登録され check がエラーなし
     location: https://github.com/takasek/pfdsl/issues/231
+    updated_at: 2026-06-27T08:01:22Z
   i216_hover_jump:
     label: "hover/quickpick jump (#216)"
     description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
@@ -228,13 +222,6 @@ artifact:
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
     updated_at: 2026-06-26T05:00:41Z
-  i221_index_reindex:
-    label: "index フィールド + reindex コマンド (#221)"
-    description: "オプショナル整数フィールド index: と pfdsl reindex コマンドを追加。pfd-tools の P#/D# 採番に対応"
-    status: todo
-    criteria: "spec に index: が定義済み、pfdsl reindex コマンドが動作確認済み"
-    location: https://github.com/takasek/pfdsl/issues/221
-    updated_at: 2026-06-26T04:50:27Z
   w002_line:
     label: "W002 診断行番号修正 (#219)"
     description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
@@ -247,7 +234,19 @@ artifact:
     status: todo
     criteria: CI が docs/samples の .dot と README のドリフトを検出し、svg の扱いが文書化済み
     location: https://github.com/takasek/pfdsl/issues/230
-    updated_at: 2026-06-26T00:00:00Z
+    updated_at: 2026-06-27T08:01:20Z
+  published_libs:
+    label: "公開ライブラリ群 (#201)"
+    description: "@pfdsl/core / preview-engine / graphviz-exporter を npm 公開ライブラリ化し、README の Library 節と実態を整合させる。監査 #198 から派生（engines.node は #198 で対応）"
+    status: done
+    criteria: 対象パッケージが npm 公開済みで README の install/import 例と一致
+    location: https://github.com/takasek/pfdsl/issues/201
+  index_reindex:
+    label: "index フィールド + reindex コマンド (#221)"
+    description: "オプショナル整数フィールド index: と pfdsl reindex コマンドを追加。pfd-tools の P#/D# 採番に対応"
+    status: done
+    criteria: "spec に index: が定義済み、pfdsl reindex コマンドが動作確認済み"
+    location: https://github.com/takasek/pfdsl/issues/221
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -355,11 +354,9 @@ findings_r12
 fix_w002_line
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -376,6 +373,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -391,6 +389,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -428,11 +427,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -449,6 +446,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -466,6 +464,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -504,11 +503,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -525,6 +522,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -542,6 +540,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 skill_gen
@@ -579,11 +578,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -600,6 +597,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -616,6 +614,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -654,11 +653,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -675,6 +672,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -692,6 +690,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -731,11 +730,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -752,6 +749,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec_v009
 json_output
@@ -767,6 +765,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 skill_gen
@@ -804,11 +803,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -825,6 +822,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec_v009
 json_output
@@ -841,6 +839,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -880,11 +879,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -900,6 +897,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -916,6 +914,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -955,11 +954,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -975,6 +972,7 @@ implement_run_command
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -991,6 +989,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1031,11 +1030,9 @@ findings_r12
 fix_w002_line
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1052,6 +1049,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_spec
 integrate_spec_v009
 json_output
@@ -1066,6 +1064,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1105,11 +1104,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1125,6 +1122,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1141,6 +1139,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1180,11 +1179,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1201,6 +1198,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1218,6 +1216,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 revises_spec
 spec_v006
 spec_v007
@@ -1253,11 +1252,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1274,6 +1271,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1290,6 +1288,7 @@ publish_cli_v0011
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1328,11 +1327,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1349,6 +1346,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1365,6 +1363,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1403,11 +1402,9 @@ findings_r12
 fix_w002_line
 hierarchy_spec
 i119_published_extension
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1424,6 +1421,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1441,6 +1439,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1478,11 +1477,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 implement_gen_samples_ci
@@ -1498,6 +1495,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1515,6 +1513,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1553,11 +1552,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1574,6 +1571,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1591,6 +1589,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1628,11 +1627,9 @@ findings_r12
 fix_w002_line
 hierarchy_spec
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1649,6 +1646,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1665,6 +1663,7 @@ publish_cli_v0011
 publish_cli_v009
 publish_ext_v0014
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1712,11 +1711,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1728,6 +1725,7 @@ implement_lints
 implement_multifile
 implement_run_command
 implement_spec_features
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1743,6 +1741,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1783,11 +1782,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1804,6 +1801,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1818,6 +1816,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -1832,7 +1831,7 @@ write_article
 write_design_notes
 
 cli_tool >> publish_libraries
-publish_libraries -> i201_published_libs
+publish_libraries -> published_libs
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -1857,7 +1856,6 @@ i12_article
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -1874,6 +1872,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -1906,7 +1905,7 @@ w002_line
 write_article
 write_design_notes
 
-i201_published_libs >> update_workflow_libs
+published_libs >> update_workflow_libs
 update_workflow_libs -> i231_workflow_libs
 adr_corpus
 audit_distribution
@@ -1933,7 +1932,6 @@ i12_article
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
@@ -1949,6 +1947,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -2009,8 +2008,6 @@ findings_r12
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -2024,6 +2021,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -2041,6 +2039,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -2057,7 +2056,7 @@ write_article
 write_design_notes
 
 cli_tool_v009 >> implement_index_reindex
-implement_index_reindex -> i221_index_reindex
+implement_index_reindex -> index_reindex
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -2079,7 +2078,6 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
@@ -2115,6 +2113,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -2132,7 +2131,7 @@ write_article
 write_design_notes
 
 cli_tool_v0010 >> publish_cli_v0011
-i221_index_reindex >> publish_cli_v0011
+index_reindex >> publish_cli_v0011
 w002_line >> publish_cli_v0011
 publish_cli_v0011 -> cli_tool_v0011
 adr_corpus
@@ -2155,7 +2154,6 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
@@ -2191,6 +2189,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -2206,7 +2205,7 @@ version_cmd
 write_article
 write_design_notes
 
-i221_index_reindex >> integrate_spec_v009
+index_reindex >> integrate_spec_v009
 integrate_spec_v009 -> spec_v009
 adr_corpus
 audit_distribution
@@ -2230,7 +2229,6 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
@@ -2266,6 +2264,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -2306,8 +2305,6 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
-i221_index_reindex
 i230_gen_samples_ci
 i231_workflow_libs
 i3_obsidian_plugin
@@ -2324,6 +2321,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -2340,6 +2338,7 @@ publish_cli_v0011
 publish_cli_v009
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -2379,11 +2378,9 @@ fix_w002_line
 hierarchy_spec
 i119_published_extension
 i12_article
-i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_reindex
 i231_workflow_libs
 i3_obsidian_plugin
 implement_group_hover
@@ -2398,6 +2395,7 @@ implement_spec_features
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
+index_reindex
 integrate_multifile
 integrate_spec
 integrate_spec_v009
@@ -2415,6 +2413,7 @@ publish_cli_v009
 publish_ext_v0014
 publish_extension
 publish_libraries
+published_libs
 restructure_skillgen
 restructured_gen
 revises_spec
