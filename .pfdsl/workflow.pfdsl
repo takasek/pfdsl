@@ -380,4 +380,4 @@ toolchain >> publish_libraries -> published_libraries
 
 [feature_samples, roadmap_pfdsl, toolchain] >> render_previews -> sample_previews
 
-[toolchain, published_cli, gh_skill_dist] >> update_readme -> readme
+[toolchain, published_cli, published_libraries, gh_skill_dist] >> update_readme -> readme
