@@ -119,6 +119,14 @@ describe("computeFindings", () => {
 		assert.equal(f.fixVia, undefined);
 	});
 
+	it("exempt_conflict without managed: no missing_label (bot must not add flow:managed to exempt issues)", () => {
+		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const issues = [{ number: 5, state: "OPEN", labels: ["flow:exempt"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		assert.ok(findings.find((f) => f.type === "exempt_conflict"), "should still report exempt_conflict");
+		assert.ok(!findings.find((f) => f.type === "missing_label"), "must not report missing_label for exempt issues");
+	});
+
 	it("missing_artifact: open issue with flow:managed but no artifact", () => {
 		const issues = [{ number: 99, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
 		const findings = computeFindings([], issues);
@@ -173,6 +181,35 @@ describe("computeFindings", () => {
 		assert.equal(matching[0].type, "closed_in_flow");
 		assert.equal(matching[0].fixVia, "flow");
 		assert.ok(matching[0].detail.includes("delete the chain"), "detail should guide cleanup");
+	});
+
+	it("closed_not_planned: NOT_PLANNED close without downstream → fixVia:flow (auto-removable)", () => {
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: false }];
+		const issues = [{ number: 5, state: "CLOSED", stateReason: "NOT_PLANNED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		const f = findings.find((f) => f.type === "closed_not_planned");
+		assert.ok(f, "should emit closed_not_planned");
+		assert.ok(!findings.find((f) => f.type === "closed_in_flow"), "must not emit closed_in_flow");
+		assert.equal(f.fixVia, "flow");
+		assert.equal(f.hasDownstream, false);
+	});
+
+	it("closed_not_planned: NOT_PLANNED close with downstream → manual (no fixVia)", () => {
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: true }];
+		const issues = [{ number: 5, state: "CLOSED", stateReason: "NOT_PLANNED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		const f = findings.find((f) => f.type === "closed_not_planned");
+		assert.ok(f, "should emit closed_not_planned");
+		assert.equal(f.fixVia, undefined, "has downstream: must not auto-fix");
+	});
+
+	it("closed_in_flow: COMPLETED stateReason still uses closed_in_flow type", () => {
+		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const issues = [{ number: 5, state: "CLOSED", stateReason: "COMPLETED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(artifacts, issues);
+		const f = findings.find((f) => f.type === "closed_in_flow");
+		assert.ok(f, "COMPLETED close should use closed_in_flow");
+		assert.ok(!findings.find((f) => f.type === "closed_not_planned"));
 	});
 
 	it("stale_updated_at: open issue with mismatched updatedAt", () => {
@@ -537,6 +574,37 @@ process:
 				`description was truncated at ' #': got "${desc}"`,
 			);
 		});
+
+	it("closed_not_planned terminal: Case A removal (same as closed_in_flow terminal)", () => {
+		const yaml = `artifact:
+  cli_tool:
+    label: CLI
+    status: done
+  i16_def_jump:
+    label: def-jump feature
+    status: todo
+process:
+  implement_def_jump:
+    label: Implement def-jump
+`;
+		const body = `\ncli_tool >> implement_def_jump -> i16_def_jump\n`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "closed_not_planned",
+				issueNumber: 16,
+				artifactId: "i16_def_jump",
+				detail: "issue closed as not planned",
+				fixVia: "flow",
+				hasDownstream: false,
+			},
+		];
+		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const fm = doc.toJS();
+		assert.equal(fm.artifact.i16_def_jump, undefined, "artifact should be removed");
+		assert.equal(fm.process?.implement_def_jump, undefined, "sole-output process should be removed");
+		assert.ok(!newBody.includes("implement_def_jump"), "edge should be removed from body");
+	});
 
 	// Case B: non-terminal, not done → demote: strip iN_ prefix, set status done, update body refs
 	it("B: non-terminal not-done — strips prefix, sets done, updates body refs", () => {
