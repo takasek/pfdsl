@@ -7,6 +7,7 @@ import { registerFormatter } from "./format.js";
 import { registerHover } from "./hover.js";
 import { registerDefinitionJump } from "./jump.js";
 import { registerPreview } from "./preview.js";
+import { registerSortMeta } from "./sort-meta.js";
 
 export function activate(context: vscode.ExtensionContext): void {
 	registerDiagnostics(context);
@@ -16,6 +17,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	registerExport(context, getActivePreviewDoc);
 	registerDiff(context, postDiff);
 	registerDefinitionJump(context);
+	registerSortMeta(context);
 }
 
 export function deactivate(): void {

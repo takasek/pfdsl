@@ -16,6 +16,8 @@ import {
 	loadSubflowGraph,
 	reindex,
 	resolveRefPath,
+	type SortKey,
+	sort,
 	sortEdges,
 	validatePresetKeys,
 	validateSubflowBoundary,
@@ -333,6 +335,59 @@ export function runReindex(
 	return ok(output);
 }
 
+export interface SortOptions {
+	by: string; // comma-separated SortKey list, e.g. "group,index"
+	write?: boolean;
+	check?: boolean;
+}
+
+function parseSortKeys(raw: string): SortKey[] | CommandResult {
+	const valid: SortKey[] = ["index", "topological", "group", "id"];
+	const parts = raw.split(",").map((k) => k.trim());
+	const invalid = parts.filter((k) => !(valid as string[]).includes(k));
+	if (invalid.length > 0) {
+		return fail(
+			`invalid --by key(s): ${invalid.map((k) => JSON.stringify(k)).join(", ")} (valid: index, topological, group, id)\n`,
+			2,
+		);
+	}
+	return parts as SortKey[];
+}
+
+export function runSort(file: string, opts: SortOptions): CommandResult {
+	if (opts.check && opts.write) {
+		return fail("--check cannot be combined with --write\n", 2);
+	}
+	if (file === "-" && opts.write) {
+		return fail("--write cannot be used with stdin (-)\n", 2);
+	}
+
+	const keys = parseSortKeys(opts.by);
+	if (!Array.isArray(keys)) return keys;
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { output, changed, diagnostics } = sort(src, { by: keys });
+	const failed = failIfErrors(diagnostics, file);
+	if (failed) return failed;
+
+	if (opts.check) {
+		return {
+			stdout: changed ? "not sorted\n" : "",
+			stderr: "",
+			exitCode: changed ? 1 : 0,
+		};
+	}
+
+	if (opts.write) {
+		if (changed) writeFileSync(file, output, "utf-8");
+		return ok();
+	}
+
+	return ok(output);
+}
+
 export interface NormalizeOptions {
 	json?: boolean;
 }
@@ -491,6 +546,18 @@ Options:
   --json      emit the change report as JSON ({ changes: [...] })
 `;
 
+const HELP_SORT = `usage: pfdsl sort-meta <file|-> --by <keys> [--write] [--check]
+
+Sort artifact and process node definitions within each frontmatter section.
+Each section is sorted independently. Use - to read from stdin.
+
+Options:
+  --by <keys>   comma-separated sort keys: index, topological, group, id
+                e.g. --by group,index  (primary=group, secondary=index)
+  --write       rewrite the file in place (cannot be used with -)
+  --check       exit 1 if the file is not already sorted (CI mode)
+`;
+
 const HELP_NORMALIZE = `usage: pfdsl normalize <file|-> [--json]
 
 Print canonical edge list. Use - to read from stdin.
@@ -546,6 +613,11 @@ Commands:
                            --check     exit 1 if reindexing would change anything
                            --renumber  reassign every node from 1
                            --json      emit change report as JSON
+  sort-meta <file|-> --by <keys> [--write] [--check]
+                           Sort node definitions by keys (- = stdin)
+                           --by        comma-separated: index, topological, group, id
+                           --write     rewrite in place
+                           --check     exit 1 if not already sorted
   normalize <file|-> [--json]
                            Print canonical edge list (- = stdin)
                            --json     output edge list as JSON array
@@ -581,7 +653,9 @@ export function parseArgs(argv: readonly string[]): CliArgs {
 			const key = a.slice(2);
 			const next = rest[i + 1];
 			if (next !== undefined && !next.startsWith("--")) {
-				flags[key] = next;
+				const prev = flags[key];
+				// Repeated string flag: join with comma so --by a --by b ≡ --by a,b
+				flags[key] = typeof prev === "string" ? `${prev},${next}` : next;
 				i++;
 			} else {
 				flags[key] = true;
@@ -636,6 +710,18 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				check: flags.check === true,
 				renumber: flags.renumber === true,
 				json: flags.json === true,
+			});
+		}
+		case "sort-meta": {
+			if (flags.help) return ok(HELP_SORT);
+			const f = positional[0];
+			if (!f) return fail(HELP_SORT, 2);
+			const byVal = flags.by;
+			if (!byVal || byVal === true) return fail(HELP_SORT, 2);
+			return runSort(f, {
+				by: String(byVal),
+				write: flags.write === true,
+				check: flags.check === true,
 			});
 		}
 		case "normalize": {
