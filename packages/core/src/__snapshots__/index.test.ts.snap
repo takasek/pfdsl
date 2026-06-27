@@ -58,7 +58,7 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_tool_v0011:
     label: "CLI v0.0.11（次期リリース）"
-    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+reindex 等を含む予定"
+    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+reindex / #236 node sort 等を含む予定"
     status: todo
     criteria: npm show @pfdsl/cli version が 0.0.11 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
@@ -229,6 +229,13 @@ artifact:
     criteria: "spec に index: が定義済み、pfdsl reindex コマンドが動作確認済み"
     location: https://github.com/takasek/pfdsl/issues/221
     updated_at: 2026-06-26T04:50:27Z
+  i236_node_sort:
+    label: "node 定義の並べ替え (#236)"
+    description: "frontmatter の artifact/process node 定義を index/topological/group 等のキーで並べ替える pfdsl sort コマンド。index 採番(#221)と frontmatter 編集基盤の上に乗る"
+    status: todo
+    criteria: "pfdsl sort が --by index|topological|group で node 定義を並べ替え、--check で検証できる"
+    location: https://github.com/takasek/pfdsl/issues/236
+    updated_at: 2026-06-27T03:30:00Z
   w002_line:
     label: "W002 診断行番号修正 (#219)"
     description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
@@ -299,6 +306,8 @@ process:
     label: W002 診断行番号修正
   publish_cli_v0011:
     label: CLI v0.0.11リリース
+  implement_node_sort:
+    label: node 並べ替え実装
   publish_ext_v0014:
     label: extension v0.0.14リリース
   integrate_spec_v009:
@@ -343,6 +352,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -351,6 +361,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -412,6 +423,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -420,6 +432,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -484,6 +497,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -492,6 +506,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -555,6 +570,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -563,6 +579,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -626,6 +643,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -634,6 +652,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -699,6 +718,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -707,6 +727,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -768,6 +789,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -776,6 +798,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -840,6 +863,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -847,6 +871,7 @@ implement_index_reindex
 implement_json_output
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -911,6 +936,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -919,6 +945,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_stdin
 implement_subcommand_help
@@ -983,6 +1010,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -991,6 +1019,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1053,6 +1082,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -1060,6 +1090,7 @@ implement_index_reindex
 implement_json_output
 implement_lints
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1124,6 +1155,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -1132,6 +1164,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1193,6 +1226,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -1201,6 +1235,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1264,6 +1299,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -1272,6 +1308,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1335,6 +1372,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -1343,6 +1381,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1406,6 +1445,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1413,6 +1453,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1477,6 +1518,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -1485,6 +1527,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1548,6 +1591,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -1556,6 +1600,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1628,12 +1673,14 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
 implement_lints
 implement_multifile
+implement_node_sort
 implement_run_command
 implement_spec_features
 integrate_multifile
@@ -1695,6 +1742,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -1703,6 +1751,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1761,6 +1810,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -1769,6 +1819,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -1835,12 +1886,14 @@ i119_published_extension
 i12_article
 i201_published_libs
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1903,9 +1956,84 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
+implement_json_output
+implement_lints
+implement_multifile
+implement_no_color
+implement_node_sort
+implement_run_command
+implement_spec_features
+implement_stdin
+implement_subcommand_help
+implement_version_cmd
+integrate_multifile
+integrate_spec
+integrate_spec_v009
+json_output
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+multifile_toolchain
+no_color
+presets_spec
+publish_cli_v0010
+publish_cli_v0011
+publish_cli_v009
+publish_ext_v0014
+publish_extension
+publish_libraries
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+spec_v009
+stdin
+subcommand_help
+version_cmd
+w002_line
+write_article
+write_design_notes
+
+cli_tool_v009 >> implement_node_sort
+implement_node_sort -> i236_node_sort
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+cli_tool
+cli_tool_v0010
+cli_tool_v0011
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+ext_v0014
+external_stakeholders_spec
+featured_toolchain
+findings_r12
+fix_w002_line
+hierarchy_spec
+i119_published_extension
+i12_article
+i201_published_libs
+i216_hover_jump
+i217_run_command
+i218_group_hover
+i221_index_reindex
+i3_obsidian_plugin
+implement_group_hover
+implement_hover_jump
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1949,6 +2077,7 @@ write_design_notes
 
 cli_tool_v0010 >> publish_cli_v0011
 i221_index_reindex >> publish_cli_v0011
+i236_node_sort >> publish_cli_v0011
 w002_line >> publish_cli_v0011
 publish_cli_v0011 -> cli_tool_v0011
 adr_corpus
@@ -1983,6 +2112,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -2046,6 +2176,7 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -2054,6 +2185,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
@@ -2116,6 +2248,7 @@ i119_published_extension
 i12_article
 i201_published_libs
 i221_index_reindex
+i236_node_sort
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
@@ -2124,6 +2257,7 @@ implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
+implement_node_sort
 implement_run_command
 implement_spec_features
 implement_stdin
