@@ -219,7 +219,7 @@ artifact:
     label: "node 定義の並べ替え (#236)"
     description: "frontmatter の artifact/process node 定義を index/topological/group 等のキーで並べ替える pfdsl sort コマンド。index 採番(#221)と frontmatter 編集基盤の上に乗る"
     status: todo
-    criteria: "pfdsl sort が --by index|topological|group で node 定義を並べ替え、--check で検証できる"
+    criteria: "pfdsl sort が --by index|topological|group|id で node 定義を並べ替え、--check で検証できる"
     location: https://github.com/takasek/pfdsl/issues/236
     updated_at: 2026-06-27T03:04:39Z
   w002_line:
