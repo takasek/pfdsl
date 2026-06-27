@@ -2,306 +2,123 @@
 
 exports[`public API > format: matches golden canonical output for sample file (locks spec §14 ordering) 1`] = `
 "---
-title: Issue 依存フロー（2026-06）
-description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。issue 管理規約・同期手段は sibling roadmap.md と pfd-ops スキルの references/github-issues-backend.md 参照
+title: Pipeline Scale Test Fixture
+description: Fixed fixture for snapshot testing pipeline throughput. Represents structural patterns of a real roadmap without coupling to production planning data.
 layout:
   direction: LR
   maxWidth: 130
 
 artifact:
-  spec_v006:
-    label: 仕様書 v0.0.6
+  spec_alpha:
+    label: Alpha Spec
     status: done
-    criteria: check/fmt/graph が全サンプルにエラーなし
-    location: ../docs/spec/spec.md
-  findings_r12:
-    label: 実践ラウンド1/2レビュー知見
-    description: docs/examples の執筆・レビューで得た品質知見
+    criteria: drafted and reviewed
+    location: docs/spec/alpha.md
+  spec_beta:
+    label: Beta Spec
     status: done
-    criteria: skill_template または adr_corpus への反映が確認済み
-  cli_tool:
-    label: CLI 実装（現行）
+    criteria: drafted and reviewed
+    location: docs/spec/beta.md
+  policy_doc:
+    label: Policy Document
+    description: Design decisions for the multi-module architecture.
     status: done
-    criteria: check/fmt/graph が全サンプルに対してエラーなし、npm 公開済み
-  skill_gen:
-    label: スキル生成系（現行）
-    description: scripts/gen-skill.mjs と docs/samples 構成。identity は check-gen-skill.yml が CI 強制
+    criteria: documented and approved
+    location: docs/policy.md
+  adr_set:
+    label: ADR Set
+    description: Architectural decision records.
     status: done
-    criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
-  spec_v007:
-    label: 仕様書 v0.0.7（統合）
+    criteria: decisions documented in docs/adr/
+    location: docs/adr/
+  impl_core:
+    label: Core Implementation
     status: done
-    criteria: check/fmt/graph が全サンプルにエラーなし、v0.0.7 全フィールドが spec 本文に統合済み
-    location: ../docs/spec/spec.md
-  spec_v008:
-    label: 仕様書 v0.0.8（マルチファイル統合）
+    criteria: tests pass, published
+  impl_ext:
+    label: Extension Implementation
     status: done
-    criteria: check/fmt/graph が全サンプルにエラーなし
-    location: ../docs/spec/spec.md
-  multifile_toolchain:
-    label: "spec v0.0.8 実装済みツールチェーン (#148)"
-    description: "subflow:/extends: の checker 実装（V021-V028）。renderer は spec v0.0.8 の対象外（§2.9.3 はビューリンクのみ定義）。VS Code subflow ナビゲーションは #147。後続門番のプレースホルダ（ADR-0018）"
+    criteria: tests pass
+  impl_cli:
+    label: "CLI Implementation (#5)"
+    description: "command-line interface wrapping core"
     status: done
-    criteria: subflow/extends の checker が @pfdsl/core に実装され check コマンドで V021-V028 が動作確認済み（renderer は対象外）
-    location: https://github.com/takasek/pfdsl/issues/148
-  cli_tool_v009:
-    label: "CLI v0.0.9（公開済み）"
-    description: "現行公開バージョン v0.0.9。後続実装の入力ベース"
-    status: done
-    criteria: npm show @pfdsl/cli version が 0.0.9 を返す
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_tool_v0010:
-    label: "CLI v0.0.10（公開済み）"
-    description: "#172 --version / #177 per-command --help / #178 stdin / #180 --no-color / #181 --json 対応を含む"
-    status: done
-    criteria: npm show @pfdsl/cli version が 0.0.10 を返す
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_tool_v0011:
-    label: "CLI v0.0.11（次期リリース）"
-    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+reindex / #236 node sort 等を含む予定"
-    status: todo
-    criteria: npm show @pfdsl/cli version が 0.0.11 を返す
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  spec_v009:
-    label: 仕様書 v0.0.9（index:統合）
-    status: todo
-    criteria: "index: が spec 本文に統合済み"
-    location: ../docs/spec/spec.md
-  ext_v0014:
-    label: "extension v0.0.14（次期リリース）"
-    description: "現在コミット先行中の vscode-extension 変更を含む次期 Marketplace リリース"
-    status: todo
-    criteria: Marketplace の takasek.pfdsl version が 0.0.14 を返す
-    location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
-  i119_published_extension:
-    label: "Marketplace 公開済み extension (#119)"
-    description: "v* tag push で GitHub Actions が自動 publish する extension 公開フロー。CLI の Trusted Publishing / OIDC パターンを踏襲"
+    criteria: "pfdsl --version exits 0"
+    location: https://example.com/issues/5
+  feature_x:
+    label: "Feature X (#20)"
     status: wip
-    criteria: v* tag push で VS Code Marketplace への自動 publish が動作確認済み
-    location: https://github.com/takasek/pfdsl/issues/119
-    updated_at: 2026-06-22T05:40:24Z
-  multifile_policy:
-    label: マルチファイル意味論方針
-    description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
-    status: done
-    criteria: ID スコープ・継承解決順・ファイル間参照の決定が文書化済み
-    location: ../docs/spec/proposals/multifile-policy.md
-  adr_corpus:
-    label: "ADR 群 (docs/adr)"
-    description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
-    status: done
-    criteria: 対象判断が文書化され docs/adr/README.md の一覧に追記済み
-    location: ../docs/adr/
-  i12_article:
-    label: "公開記事 (#12)"
-    description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
+    criteria: feature works end-to-end
+    location: https://example.com/issues/20
+    updated_at: 2026-01-15T00:00:00Z
+  feature_y:
+    label: "Feature Y (#21)"
     status: todo
-    criteria: 外部メディアに公開済みで URL が存在する
-    location: https://github.com/takasek/pfdsl/issues/12
-    updated_at: 2026-06-12T08:18:56Z
-  i3_obsidian_plugin:
-    label: "Obsidian プラグイン (#3)"
+    criteria: feature works end-to-end
+    location: https://example.com/issues/21
+    updated_at: 2026-01-16T00:00:00Z
+  feature_z:
+    label: "Feature Z (#22)"
+    description: "depends on feature_x and feature_y for shared state"
     status: todo
-    criteria: Obsidian 上で .pfdsl のプレビュー・編集が動作確認済み
-    location: https://github.com/takasek/pfdsl/issues/3
-    updated_at: 2026-06-12T08:18:35Z
-  lint_checker:
-    label: "lint拡張checker (#4)"
-    description: "lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため"
-    status: done
-    criteria: "issue #4 の対象 lint がすべて実装され、check コマンドで動作確認済み"
-    location: https://github.com/takasek/pfdsl/issues/4
-  audit_distribution:
-    label: "L3資産の階層化配布 (#43)"
-    description: "audit コア + flow-sync action を skill 同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは #11"
-    status: done
-    criteria: install/ に配布可能ファイルが揃い、CI で identity が強制されている
-    location: https://github.com/takasek/pfdsl/issues/43
-  criteria_spec:
-    label: "合否基準仕様案 (#7)"
-    status: done
-    location: https://github.com/takasek/pfdsl/issues/7
-    criteria: 仕様案として起草完了
-  revises_spec:
-    label: "改版チェーン仕様案 (#8)"
-    status: done
-    location: https://github.com/takasek/pfdsl/issues/8
-    criteria: 仕様案として起草完了
-  design_notes:
-    label: "設計判断ノート・分岐なし方針 (#9)"
-    status: done
-    location: https://github.com/takasek/pfdsl/issues/9
-    criteria: 仕様案として起草完了
-  location_spec:
-    label: "location/command 仕様案 (#13)"
-    description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
-    status: done
-    criteria: 仕様案として起草完了
-    location: https://github.com/takasek/pfdsl/issues/13
-  restructured_gen:
-    label: "再構成済みスキル生成系 (#10)"
-    status: done
-    location: https://github.com/takasek/pfdsl/issues/10
-    criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
-  featured_toolchain:
-    label: "spec v0.0.7 実装済みツールチェーン (#52)"
-    status: done
-    location: https://github.com/takasek/pfdsl/issues/52
-    criteria: spec v0.0.7 の全機能が実装され、check/fmt/graph がエラーなしで動作
-  external_stakeholders_spec:
-    label: "externalStakeholders フィールド仕様案 (#97)"
-    description: "artifact / process に外部消費者を列挙するフィールド。owner と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段。v0.0.7 スコープ"
-    status: done
-    criteria: 仕様案として起草完了
-    location: https://github.com/takasek/pfdsl/issues/97
-  hierarchy_spec:
-    label: "階層PFD仕様案 (#5)"
-    status: done
-    criteria: 仕様案として起草完了
-    location: https://github.com/takasek/pfdsl/issues/5
-  presets_spec:
-    label: "共有プリセット仕様案 (#6)"
-    status: done
-    criteria: 仕様案として起草完了
-    location: https://github.com/takasek/pfdsl/issues/6
-  version_cmd:
-    label: "CLI --version コマンド (#172)"
-    description: "pfdsl --version / -V でバージョン番号を出力する。ビルド時に package.json から tsup define で埋め込む"
-    status: done
-    criteria: "pfdsl --version が semver 文字列を stdout に出力して exit 0、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/172
-  subcommand_help:
-    label: "CLI per-command --help (#177)"
-    description: "pfdsl check --help など各サブコマンドでコマンド固有の usage を表示する"
-    status: done
-    criteria: "全サブコマンドで --help が exit 0、引数なし呼び出しで同内容を exit 2、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/177
-  stdin:
-    label: "CLI stdin 対応 (#178)"
-    description: "check/fmt/normalize/graph でファイル引数に - を渡すと stdin から読む。fmt --write - は禁止"
-    status: done
-    criteria: "echo 'a >> P -> b' | pfdsl check - が exit 0、fmt --write - が exit 2、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/178
-  no_color:
-    label: "CLI --no-color / NO_COLOR 対応 (#180)"
-    description: "--no-color フラグまたは NO_COLOR 環境変数で ANSI カラー出力を無効化する。no-color.org 準拠"
-    status: done
-    criteria: "NO_COLOR=1 pfdsl check <file> および --no-color で ANSI コードを含まない出力、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/180
-  json_output:
-    label: "CLI --json 出力対応 (#181)"
-    description: "check / normalize で --json フラグを渡すと診断結果またはエッジ一覧を JSON で返す。CI・外部ツール連携向け"
-    status: done
-    criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/181
-  i216_hover_jump:
-    label: "hover/quickpick jump (#216)"
-    description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
-    status: wip
-    criteria: location/subflow/command フィールドのジャンプが動作確認済み
-    location: https://github.com/takasek/pfdsl/issues/216
-    updated_at: 2026-06-26T05:00:40Z
-  i217_run_command:
-    label: "process command 実行 (#217)"
-    description: "vscode-extension でプロセスの command フィールドを統合ターミナルで実行"
-    status: wip
-    criteria: command フィールドのターミナル実行が動作確認済み
-    location: https://github.com/takasek/pfdsl/issues/217
-    updated_at: 2026-06-26T05:00:41Z
-  i218_group_hover:
-    label: "group hover メンバー一覧 (#218)"
-    description: "vscode-extension でグループノードの hover にメンバー一覧を表示"
-    status: wip
-    criteria: group ノードの hover にメンバー一覧が表示される
-    location: https://github.com/takasek/pfdsl/issues/218
-    updated_at: 2026-06-26T05:00:41Z
-  i236_node_sort:
-    label: "node 定義の並べ替え (#236)"
-    description: "frontmatter の artifact/process node 定義を index/topological/group 等のキーで並べ替える pfdsl sort コマンド。index 採番(#221)と frontmatter 編集基盤の上に乗る"
+    criteria: feature works end-to-end
+    location: https://example.com/issues/22
+  impl_plugin_a:
+    label: "Plugin A (#10)"
     status: todo
-    criteria: "pfdsl sort が --by index|topological|group で node 定義を並べ替え、--check で検証できる"
-    location: https://github.com/takasek/pfdsl/issues/236
-    updated_at: 2026-06-27T03:04:39Z
-  w002_line:
-    label: "W002 診断行番号修正 (#219)"
-    description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
-    status: done
-    criteria: W002 の診断が artifact 定義行を指す
-    location: https://github.com/takasek/pfdsl/issues/219
-  index_reindex:
-    label: "index フィールド + reindex コマンド (#221)"
-    description: "オプショナル整数フィールド index: と pfdsl reindex コマンドを追加。pfd-tools の P#/D# 採番に対応"
-    status: done
-    criteria: "spec に index: が定義済み、pfdsl reindex コマンドが動作確認済み"
-    location: https://github.com/takasek/pfdsl/issues/221
+    criteria: plugin loads without errors
+    location: https://example.com/issues/10
+    updated_at: 2026-02-01T00:00:00Z
+  impl_plugin_b:
+    label: "Plugin B (#11)"
+    description: "depends on plugin_a for shared types"
+    status: todo
+    criteria: plugin loads without errors
+    location: https://example.com/issues/11
+  release_v1:
+    label: v1.0 Release
+    status: todo
+    criteria: all core features shipped and tested
+  release_v2:
+    label: v2.0 Release
+    status: todo
+    criteria: plugins available and marketplace published
+  article:
+    label: "Public Article (#30)"
+    status: todo
+    criteria: published at external URL
+    location: https://example.com/issues/30
+    updated_at: 2026-03-01T00:00:00Z
+
 process:
-  implement_version_cmd:
-    label: --version コマンド実装
+  draft_alpha:
+    label: Draft Alpha Spec
+  draft_beta:
+    label: Draft Beta Spec
+  write_policy:
+    label: Write Policy Doc
+  implement_core:
+    label: Implement Core
+  implement_ext:
+    label: Implement Extension
+  implement_cli:
+    label: Implement CLI
+  implement_feature_x:
+    label: Implement Feature X
+  implement_feature_y:
+    label: Implement Feature Y
+  implement_feature_z:
+    label: Implement Feature Z
+  build_plugin_a:
+    label: Build Plugin A
+  build_plugin_b:
+    label: Build Plugin B
+  do_release_v1:
+    label: Release v1.0
+  do_release_v2:
+    label: Release v2.0
   write_article:
-    label: 記事執筆
-  draft_multifile_specs:
-    label: 階層・プリセット共同起草
-    description: "#5 と #6 は決定が往復で形成される相互依存のため分割せず共同設計する。共有決定は方針記録として外化"
-  draft_criteria:
-    label: 合否基準仕様起草
-  draft_revises:
-    label: 改版チェーン仕様起草
-  draft_location:
-    label: location/command 起草
-  write_design_notes:
-    label: 設計ノート執筆
-  integrate_spec:
-    label: 仕様統合
-  implement_lints:
-    label: lint実装
-  implement_spec_features:
-    label: 新仕様実装
-  integrate_multifile:
-    label: マルチファイル仕様統合
-  restructure_skillgen:
-    label: 生成系再構成
-  publish_cli_v009:
-    label: CLI v0.0.9公開
-  build_obsidian_plugin:
-    label: Obsidianプラグイン実装
-  draft_external_stakeholders:
-    label: externalStakeholders仕様起草
-    description: "artifact / process の externalStakeholders フィールドを spec に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
-  layer_audit_assets:
-    label: L3資産階層化
-  implement_multifile:
-    label: マルチファイル機能実装
-    description: "spec v0.0.8 subflow/extends checker 実装（V021-V028）。renderer・VS Code extension は対象外。issue: https://github.com/takasek/pfdsl/issues/148"
-  publish_extension:
-    label: extension自動公開実装
-  implement_subcommand_help:
-    label: per-command --help実装
-  implement_stdin:
-    label: stdin対応実装
-  implement_no_color:
-    label: --no-color / NO_COLOR実装
-  implement_json_output:
-    label: --json出力実装
-  publish_cli_v0010:
-    label: CLI v0.0.10リリース
-  implement_index_reindex:
-    label: index フィールド + reindex 実装
-  implement_hover_jump:
-    label: hover/quickpick ジャンプ実装
-  implement_run_command:
-    label: process command 実行実装
-  implement_group_hover:
-    label: group hover メンバー一覧実装
-  fix_w002_line:
-    label: W002 診断行番号修正
-  publish_cli_v0011:
-    label: CLI v0.0.11リリース
-  implement_node_sort:
-    label: node 並べ替え実装
-  publish_ext_v0014:
-    label: extension v0.0.14リリース
-  integrate_spec_v009:
-    label: 仕様書 v0.0.9統合
+    label: Write Article
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -313,1850 +130,439 @@ statusStyles:
   blocked: { fillcolor: "#f8d7da", style: filled }
 ---
 
-spec_v006 >> draft_multifile_specs
-draft_multifile_specs -> hierarchy_spec
-draft_multifile_specs -> multifile_policy
-draft_multifile_specs -> presets_spec
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_toolchain
-no_color
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+adr_set >> draft_alpha
+draft_alpha -> spec_alpha
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_beta
+feature_x
+feature_y
+feature_z
+impl_cli
+impl_core
+impl_ext
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+policy_doc
+release_v1
+release_v2
+spec_beta
 write_article
-write_design_notes
+write_policy
 
-spec_v006 >> draft_criteria
-draft_criteria -> criteria_spec
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-design_notes
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+adr_set >> draft_beta
+draft_beta -> spec_beta
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+feature_x
+feature_y
+feature_z
+impl_cli
+impl_core
+impl_ext
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+policy_doc
+release_v1
+release_v2
+spec_alpha
 write_article
-write_design_notes
+write_policy
 
-spec_v006 >> draft_revises
-draft_revises -> revises_spec
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-skill_gen
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
-write_article
-write_design_notes
-
-spec_v006 >> draft_location
-draft_location -> location_spec
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
-write_article
-write_design_notes
-
-spec_v006 >> write_design_notes
-write_design_notes -> design_notes
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+adr_set >> write_policy
+write_policy -> policy_doc
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+feature_x
+feature_y
+feature_z
+impl_cli
+impl_core
+impl_ext
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+release_v1
+release_v2
+spec_alpha
+spec_beta
 write_article
 
-criteria_spec >> integrate_spec
-design_notes >> integrate_spec
-external_stakeholders_spec >> integrate_spec
-location_spec >> integrate_spec
-revises_spec >> integrate_spec
-integrate_spec -> spec_v007
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-skill_gen
-spec_v006
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+policy_doc >> implement_core
+spec_alpha >> implement_core
+implement_core -> impl_core
+adr_set
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+feature_x
+feature_y
+feature_z
+impl_cli
+impl_ext
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+release_v1
+release_v2
+spec_beta
 write_article
-write_design_notes
+write_policy
 
-spec_v006 >>? integrate_spec
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+policy_doc >> implement_ext
+spec_beta >> implement_ext
+implement_ext -> impl_ext
+adr_set
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+feature_x
+feature_y
+feature_z
+impl_cli
+impl_core
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_core
+implement_feature_x
+implement_feature_y
+implement_feature_z
+release_v1
+release_v2
+spec_alpha
 write_article
-write_design_notes
+write_policy
 
-cli_tool >> implement_lints
-findings_r12 >> implement_lints
-spec_v006 >> implement_lints
-implement_lints -> lint_checker
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+impl_core >> implement_cli
+impl_ext >> implement_cli
+implement_cli -> impl_cli
+adr_set
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+feature_x
+feature_y
+feature_z
+impl_plugin_a
+impl_plugin_b
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+policy_doc
+release_v1
+release_v2
+spec_alpha
+spec_beta
 write_article
-write_design_notes
+write_policy
 
-lint_checker >> implement_spec_features
-spec_v007 >> implement_spec_features
-implement_spec_features -> featured_toolchain
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+impl_core >> implement_feature_x
+implement_feature_x -> feature_x
+adr_set
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+feature_y
+feature_z
+impl_cli
+impl_ext
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_core
+implement_ext
+implement_feature_y
+implement_feature_z
+policy_doc
+release_v1
+release_v2
+spec_alpha
+spec_beta
 write_article
-write_design_notes
+write_policy
 
-featured_toolchain >> integrate_multifile
-hierarchy_spec >> integrate_multifile
-multifile_policy >> integrate_multifile
-presets_spec >> integrate_multifile
-integrate_multifile -> spec_v008
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-findings_r12
-fix_w002_line
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_toolchain
-no_color
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+impl_core >> implement_feature_y
+implement_feature_y -> feature_y
+adr_set
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+feature_x
+feature_z
+impl_cli
+impl_ext
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_z
+policy_doc
+release_v1
+release_v2
+spec_alpha
+spec_beta
 write_article
-write_design_notes
+write_policy
 
-featured_toolchain >> implement_multifile
-spec_v008 >> implement_multifile
-implement_multifile -> multifile_toolchain
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+feature_x >> implement_feature_z
+feature_y >> implement_feature_z
+implement_feature_z -> feature_z
+adr_set
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+impl_cli
+impl_core
+impl_ext
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_y
+policy_doc
+release_v1
+release_v2
+spec_alpha
+spec_beta
 write_article
-write_design_notes
+write_policy
 
-skill_gen >> restructure_skillgen
-restructure_skillgen -> restructured_gen
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-revises_spec
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+impl_core >> build_plugin_a
+build_plugin_a -> impl_plugin_a
+adr_set
+article
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+feature_x
+feature_y
+feature_z
+impl_cli
+impl_ext
+impl_plugin_b
+implement_cli
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+policy_doc
+release_v1
+release_v2
+spec_alpha
+spec_beta
 write_article
-write_design_notes
+write_policy
 
-cli_tool >> publish_cli_v009
-publish_cli_v009 -> cli_tool_v009
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool_v0010
-cli_tool_v0011
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+impl_ext >> build_plugin_b
+impl_plugin_a >> build_plugin_b
+build_plugin_b -> impl_plugin_b
+adr_set
+article
+build_plugin_a
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+feature_x
+feature_y
+feature_z
+impl_cli
+impl_core
+implement_cli
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+policy_doc
+release_v1
+release_v2
+spec_alpha
+spec_beta
 write_article
-write_design_notes
+write_policy
 
-cli_tool >> layer_audit_assets
-layer_audit_assets -> audit_distribution
-adr_corpus
-build_obsidian_plugin
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+feature_x >> do_release_v1
+feature_y >> do_release_v1
+feature_z >> do_release_v1
+impl_cli >> do_release_v1
+do_release_v1 -> release_v1
+adr_set
+article
+build_plugin_a
+build_plugin_b
+do_release_v2
+draft_alpha
+draft_beta
+impl_core
+impl_ext
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+policy_doc
+release_v2
+spec_alpha
+spec_beta
 write_article
-write_design_notes
+write_policy
 
-adr_corpus >> write_article
-write_article -> i12_article
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
-write_design_notes
-
-cli_tool >> build_obsidian_plugin
-build_obsidian_plugin -> i3_obsidian_plugin
-adr_corpus
-audit_distribution
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+impl_plugin_a >> do_release_v2
+impl_plugin_b >> do_release_v2
+release_v1 >> do_release_v2
+do_release_v2 -> release_v2
+adr_set
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+draft_alpha
+draft_beta
+feature_x
+feature_y
+feature_z
+impl_cli
+impl_core
+impl_ext
+implement_cli
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+policy_doc
+spec_alpha
+spec_beta
 write_article
-write_design_notes
+write_policy
 
-spec_v006 >> draft_external_stakeholders
-draft_external_stakeholders -> external_stakeholders_spec
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
-write_article
-write_design_notes
+adr_set >> write_article
+write_article -> article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+feature_x
+feature_y
+feature_z
+impl_cli
+impl_core
+impl_ext
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_core
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+policy_doc
+release_v1
+release_v2
+spec_alpha
+spec_beta
+write_policy
 
-cli_tool >> publish_extension
-publish_extension -> i119_published_extension
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
+spec_alpha >>? implement_core
+adr_set
+article
+build_plugin_a
+build_plugin_b
+do_release_v1
+do_release_v2
+draft_alpha
+draft_beta
+feature_x
+feature_y
+feature_z
+impl_cli
+impl_core
+impl_ext
+impl_plugin_a
+impl_plugin_b
+implement_cli
+implement_ext
+implement_feature_x
+implement_feature_y
+implement_feature_z
+policy_doc
+release_v1
+release_v2
+spec_beta
 write_article
-write_design_notes
-
-cli_tool_v009 >> implement_json_output
-cli_tool_v009 >> implement_no_color
-cli_tool_v009 >> implement_stdin
-cli_tool_v009 >> implement_subcommand_help
-cli_tool_v009 >> implement_version_cmd
-implement_json_output -> json_output
-implement_no_color -> no_color
-implement_stdin -> stdin
-implement_subcommand_help -> subcommand_help
-implement_version_cmd -> version_cmd
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_lints
-implement_multifile
-implement_node_sort
-implement_run_command
-implement_spec_features
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-w002_line
-write_article
-write_design_notes
-
-json_output >> publish_cli_v0010
-no_color >> publish_cli_v0010
-stdin >> publish_cli_v0010
-subcommand_help >> publish_cli_v0010
-version_cmd >> publish_cli_v0010
-publish_cli_v0010 -> cli_tool_v0010
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-presets_spec
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-w002_line
-write_article
-write_design_notes
-
-cli_tool_v009 >> fix_w002_line
-cli_tool_v009 >> implement_group_hover
-cli_tool_v009 >> implement_hover_jump
-cli_tool_v009 >> implement_run_command
-fix_w002_line -> w002_line
-implement_group_hover -> i218_group_hover
-implement_hover_jump -> i216_hover_jump
-implement_run_command -> i217_run_command
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-hierarchy_spec
-i119_published_extension
-i12_article
-i236_node_sort
-i3_obsidian_plugin
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-write_article
-write_design_notes
-
-cli_tool_v009 >> implement_index_reindex
-implement_index_reindex -> index_reindex
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
-write_article
-write_design_notes
-
-cli_tool_v009 >> implement_node_sort
-implement_node_sort -> i236_node_sort
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
-write_article
-write_design_notes
-
-cli_tool_v0010 >> publish_cli_v0011
-i236_node_sort >> publish_cli_v0011
-index_reindex >> publish_cli_v0011
-w002_line >> publish_cli_v0011
-publish_cli_v0011 -> cli_tool_v0011
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-write_article
-write_design_notes
-
-index_reindex >> integrate_spec_v009
-integrate_spec_v009 -> spec_v009
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-integrate_multifile
-integrate_spec
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-stdin
-subcommand_help
-version_cmd
-w002_line
-write_article
-write_design_notes
-
-i216_hover_jump >> publish_ext_v0014
-i217_run_command >> publish_ext_v0014
-i218_group_hover >> publish_ext_v0014
-publish_ext_v0014 -> ext_v0014
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i236_node_sort
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_node_sort
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-index_reindex
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-version_cmd
-w002_line
-write_article
-write_design_notes
+write_policy
 "
 `;
