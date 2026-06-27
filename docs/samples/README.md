@@ -578,12 +578,12 @@ digraph PFDSL {
 ```pfdsl
 ---
 artifact:
-  requirement: { index: 1, label: 要求 }
-  spec:        { index: 2, label: 仕様書 }
-  code:        { index: 3, label: コード }
+  requirement: { index: 1 }
+  spec:        { index: 2 }
+  code:        { index: 3 }
 process:
-  design:      { index: 1, label: 設計 }
-  implement:   { index: 2, label: 実装 }
+  design:      { index: 1 }
+  implement:   { index: 2 }
 ---
 requirement >> design -> spec
 spec >> implement -> code
@@ -599,11 +599,11 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "code" [shape=box, label="code\nコード", width=0.90, penwidth="2"];
-  "design" [shape=ellipse, label="design\n設計", width=0.90];
-  "implement" [shape=ellipse, label="implement\n実装", width=1.20];
-  "requirement" [shape=box, label="requirement\n要求", width=1.40, penwidth="2"];
-  "spec" [shape=box, label="spec\n仕様書", width=0.90];
+  "code" [shape=box, label="code", penwidth="2"];
+  "design" [shape=ellipse, label="design"];
+  "implement" [shape=ellipse, label="implement"];
+  "requirement" [shape=box, label="requirement", penwidth="2"];
+  "spec" [shape=box, label="spec"];
 
   "requirement" -> "design";
   "design" -> "spec";
