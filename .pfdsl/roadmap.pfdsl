@@ -55,14 +55,14 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_tool_v0011:
     label: "CLI v0.0.11（次期リリース）"
-    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #220 schedule: / #221 index+renum 等を含む予定"
+    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+renum 等を含む予定"
     status: todo
     criteria: npm show @pfdsl/cli version が 0.0.11 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
   spec_v009:
-    label: 仕様書 v0.0.9（schedule:/index:統合）
+    label: 仕様書 v0.0.9（index:統合）
     status: todo
-    criteria: "schedule:/index: が spec 本文に統合済み"
+    criteria: "index: が spec 本文に統合済み"
     location: ../docs/spec/spec.md
   ext_v0014:
     label: "extension v0.0.14（次期リリース）"
@@ -210,42 +210,41 @@ artifact:
     status: todo
     criteria: location/subflow/command フィールドのジャンプが動作確認済み
     location: https://github.com/takasek/pfdsl/issues/216
+    updated_at: 2026-06-26T05:00:40Z
   i217_run_command:
     label: "process command 実行 (#217)"
     description: "vscode-extension でプロセスの command フィールドを統合ターミナルで実行"
     status: todo
     criteria: command フィールドのターミナル実行が動作確認済み
     location: https://github.com/takasek/pfdsl/issues/217
+    updated_at: 2026-06-26T05:00:41Z
   i218_group_hover:
     label: "group hover メンバー一覧 (#218)"
     description: "vscode-extension でグループノードの hover にメンバー一覧を表示"
     status: todo
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
-  i219_w002_line:
-    label: "W002 診断行番号修正 (#219)"
-    description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
-    status: todo
-    criteria: W002 の診断が artifact 定義行を指す
-    location: https://github.com/takasek/pfdsl/issues/219
-  i220_schedule_field:
-    label: "schedule: フィールド仕様・実装 (#220)"
-    description: "process/artifact に schedule: ブロックを追加。pfd-tools 連携可能の条件となる"
-    status: todo
-    criteria: "spec に schedule: が定義済み、サンプル・checker・formatter 対応済み"
-    location: https://github.com/takasek/pfdsl/issues/220
+    updated_at: 2026-06-26T05:00:41Z
   i221_index_renum:
     label: "index フィールド + renum コマンド (#221)"
     description: "オプショナル整数フィールド index: と pfdsl renum コマンドを追加。pfd-tools の P#/D# 採番に対応"
     status: todo
     criteria: "spec に index: が定義済み、pfdsl renum コマンドが動作確認済み"
     location: https://github.com/takasek/pfdsl/issues/221
-  i222_pfd_tools_consultation:
-    label: "pfd-tools 打診 (#222)"
-    description: "pfd-tools に pfdsl 入力フォーマット対応を打診する Issue 起票タスク。実装を伴わない管理タスク"
+    updated_at: 2026-06-26T04:50:27Z
+  w002_line:
+    label: "W002 診断行番号修正 (#219)"
+    description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
+    status: done
+    criteria: W002 の診断が artifact 定義行を指す
+    location: https://github.com/takasek/pfdsl/issues/219
+  i230_gen_samples_ci:
+    label: "gen-samples ドリフト検査 CI (#230)"
+    description: "docs/samples の .dot / README を CI で再生成しドリフト検査する。svg はバージョン依存のため対象外"
     status: todo
-    criteria: pfd-tools リポジトリに Issue を起票した
-    location: https://github.com/takasek/pfdsl/issues/222
+    criteria: CI が docs/samples の .dot と README のドリフトを検出し、svg の扱いが文書化済み
+    location: https://github.com/takasek/pfdsl/issues/230
+    updated_at: 2026-06-26T00:00:00Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -298,12 +297,8 @@ process:
     label: CLI v0.0.10リリース
   publish_libraries:
     label: ライブラリ公開
-  implement_schedule_field:
-    label: schedule:フィールド実装
   implement_index_renum:
     label: index フィールド + renum 実装
-  consult_pfd_tools:
-    label: pfd-tools 打診
   implement_hover_jump:
     label: hover/quickpick ジャンプ実装
   implement_run_command:
@@ -320,6 +315,8 @@ process:
     label: extension v0.0.14リリース
   integrate_spec_v009:
     label: 仕様書 v0.0.9統合
+  implement_gen_samples_ci:
+    label: gen-samplesドリフト検査CI実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -382,15 +379,14 @@ i201_published_libs >> update_workflow_libs -> i231_workflow_libs
 cli_tool_v009 >> implement_hover_jump -> i216_hover_jump
 cli_tool_v009 >> implement_run_command -> i217_run_command
 cli_tool_v009 >> implement_group_hover -> i218_group_hover
-cli_tool_v009 >> fix_w002_line -> i219_w002_line
+cli_tool_v009 >> fix_w002_line -> w002_line
 
-cli_tool_v009 >> implement_schedule_field -> i220_schedule_field
 cli_tool_v009 >> implement_index_renum -> i221_index_renum
 
-[cli_tool_v0010, i219_w002_line, i220_schedule_field, i221_index_renum] >> publish_cli_v0011 -> cli_tool_v0011
+[cli_tool_v0010, w002_line, i221_index_renum] >> publish_cli_v0011 -> cli_tool_v0011
 
-cli_tool_v0011 >> consult_pfd_tools -> i222_pfd_tools_consultation
-
-[i220_schedule_field, i221_index_renum] >> integrate_spec_v009 -> spec_v009
+i221_index_renum >> integrate_spec_v009 -> spec_v009
 
 [i216_hover_jump, i217_run_command, i218_group_hover] >> publish_ext_v0014 -> ext_v0014
+
+cli_tool >> implement_gen_samples_ci -> i230_gen_samples_ci

@@ -271,6 +271,35 @@ describe("validate", () => {
 			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W002");
 		});
+
+		it("W002 range points to artifact definition line when source is provided", () => {
+			const source = [
+				"---",
+				"artifact:",
+				"  myArt:",
+				"    status: done",
+				"---",
+				"myArt >> P -> B",
+			].join("\n");
+			const fm: Frontmatter = { artifact: { myArt: { status: "done" } } };
+			const { tokens } = lex("myArt >> P -> B");
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, fm);
+			const diags = validate(edges, nodeKinds, fm, { source });
+			const w002 = diags.find((d) => d.code === "W002");
+			expect(w002).toBeDefined();
+			expect(w002?.range.start.line).toBe(3); // line 3 (1-based): "  myArt:"
+		});
+
+		it("W002 range falls back to zeroRange when source is not provided", () => {
+			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const { tokens } = lex("A >> P -> B");
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, fm);
+			const diags = validate(edges, nodeKinds, fm);
+			const w002 = diags.find((d) => d.code === "W002");
+			expect(w002?.range.start.line).toBe(1); // zeroRange: line 1
+		});
 	});
 
 	describe("V012: criteria on process", () => {

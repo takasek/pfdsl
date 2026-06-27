@@ -53,5 +53,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **新 frontmatter フィールドを追加した場合**: 対応する feature sample（`docs/samples/`）を同一 PR で更新し、`make gen-samples` と `make gen-skill` を実行してからコミットする。
 
+**`make gen-samples` 実行後**: 全 `.svg` が再生成されるが、`.svg` は graphviz のバージョンに依存して描画差分が出る。今回追加・変更したサンプルの `.pfdsl` / `.dot` / `.svg` のみをステージし、無関係なサンプルの `.svg` 差分（バージョン差由来）は `git checkout` で戻してからコミットする。`.dot` と README は決定論的（純 JS）のため差分はそのまま採用してよい。
+
 - [ ] このサイクルで起票した全 issue が roadmap.pfdsl の artifact として登録済みか確認した
 - [ ] 起票した issue に `flow:managed` または `flow:exempt` ラベルを付与した
