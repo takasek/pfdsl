@@ -61,13 +61,13 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 `.pfdsl` ファイルを人手変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。pre-commit hook（`.pfdsl` staged 時）と CI の両方で更新漏れを自動検出する。
 
-## spec.md 変更後の gen-skill 実行
+## 生成物の再生成と自動ドリフト検査（gen-skill / gen-samples）
 
-`docs/spec/spec.md` を変更した場合、`make gen-skill` を実行してからコミットする。スキルの `references/spec.md` が spec 本文と一致していないと CI（check-gen-skill.yml）で失敗する。
+`docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。再生成漏れは機械的に検出されるため手動チェックは不要 — gen-skill identity は pre-commit（gen-skill 入力 staged 時）と CI（check-gen-skill.yml）、`.dot` / README のドリフトは graphviz-exporter の vitest テスト（pre-commit の `docs/samples/` staged 時と CI test）が検査する。`.svg` は graphviz バージョン依存のため検査対象外（roadmap.md ゲート参照）。
 
-## 新 frontmatter フィールド追加時の sample 更新
+## 新 frontmatter フィールド追加時の sample 追加
 
-frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で更新し、`make gen-samples` を実行してからコミットする。feature sample の更新漏れは「フィールドが仕様にあるがサンプルに示されていない」状態になる。詳細は roadmap.md ゲート参照。
+frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で追加する（「フィールドが仕様にあるがサンプルに示されていない」状態を防ぐ設計ルール）。生成物の再生成・ドリフト検査は上記のとおり機械的に強制される。
 
 ## VS Code 拡張の UI 動作確認
 
