@@ -191,13 +191,6 @@ artifact:
     status: done
     criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/181
-  i201_published_libs:
-    label: "公開ライブラリ群 (#201)"
-    description: "@pfdsl/core / preview-engine / graphviz-exporter を npm 公開ライブラリ化し、README の Library 節と実態を整合させる。監査 #198 から派生（engines.node は #198 で対応）"
-    status: wip
-    criteria: 対象パッケージが npm 公開済みで README の install/import 例と一致
-    location: https://github.com/takasek/pfdsl/issues/201
-    updated_at: 2026-06-24T06:53:50Z
   i216_hover_jump:
     label: "hover/quickpick jump (#216)"
     description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
@@ -219,26 +212,25 @@ artifact:
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
     updated_at: 2026-06-26T05:00:41Z
-  i221_index_reindex:
-    label: "index フィールド + reindex コマンド (#221)"
-    description: "オプショナル整数フィールド index: と pfdsl reindex コマンドを追加。pfd-tools の P#/D# 採番に対応"
-    status: todo
-    criteria: "spec に index: が定義済み、pfdsl reindex コマンドが動作確認済み"
-    location: https://github.com/takasek/pfdsl/issues/221
-    updated_at: 2026-06-26T04:50:27Z
   i236_node_sort:
     label: "node 定義の並べ替え (#236)"
     description: "frontmatter の artifact/process node 定義を index/topological/group 等のキーで並べ替える pfdsl sort コマンド。index 採番(#221)と frontmatter 編集基盤の上に乗る"
     status: todo
     criteria: "pfdsl sort が --by index|topological|group で node 定義を並べ替え、--check で検証できる"
     location: https://github.com/takasek/pfdsl/issues/236
-    updated_at: 2026-06-27T03:30:00Z
+    updated_at: 2026-06-27T03:04:39Z
   w002_line:
     label: "W002 診断行番号修正 (#219)"
     description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
     status: done
     criteria: W002 の診断が artifact 定義行を指す
     location: https://github.com/takasek/pfdsl/issues/219
+  index_reindex:
+    label: "index フィールド + reindex コマンド (#221)"
+    description: "オプショナル整数フィールド index: と pfdsl reindex コマンドを追加。pfd-tools の P#/D# 採番に対応"
+    status: done
+    criteria: "spec に index: が定義済み、pfdsl reindex コマンドが動作確認済み"
+    location: https://github.com/takasek/pfdsl/issues/221
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -289,8 +281,6 @@ process:
     label: --json出力実装
   publish_cli_v0010:
     label: CLI v0.0.10リリース
-  publish_libraries:
-    label: ライブラリ公開
   implement_index_reindex:
     label: index フィールド + reindex 実装
   implement_hover_jump:
@@ -364,19 +354,17 @@ cli_tool_v009 >> implement_json_output -> json_output
 
 [version_cmd, subcommand_help, stdin, no_color, json_output] >> publish_cli_v0010 -> cli_tool_v0010
 
-cli_tool >> publish_libraries -> i201_published_libs
-
 cli_tool_v009 >> implement_hover_jump -> i216_hover_jump
 cli_tool_v009 >> implement_run_command -> i217_run_command
 cli_tool_v009 >> implement_group_hover -> i218_group_hover
 cli_tool_v009 >> fix_w002_line -> w002_line
 
-cli_tool_v009 >> implement_index_reindex -> i221_index_reindex
+cli_tool_v009 >> implement_index_reindex -> index_reindex
 
 cli_tool_v009 >> implement_node_sort -> i236_node_sort
 
-[cli_tool_v0010, w002_line, i221_index_reindex, i236_node_sort] >> publish_cli_v0011 -> cli_tool_v0011
+[cli_tool_v0010, w002_line, index_reindex, i236_node_sort] >> publish_cli_v0011 -> cli_tool_v0011
 
-i221_index_reindex >> integrate_spec_v009 -> spec_v009
+index_reindex >> integrate_spec_v009 -> spec_v009
 
 [i216_hover_jump, i217_run_command, i218_group_hover] >> publish_ext_v0014 -> ext_v0014
