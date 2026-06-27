@@ -11,6 +11,7 @@
 - **入力充足**: 各プロセス「この入力だけで出力を作れるか」（例: 修正開発に base_code・PoC が無い。ADR 起草に参照先の図が無い → ID 捏造が発生）
 
 - **status 単調性**: 出力 artifact が `done` なのに入力 artifact が `done` 未満の対はないか（`check` の W003 が機械検出するが、status 未宣言の artifact は検出対象外 — 人手 backstop）
+- **同種対称性**: 既存の同種 artifact（同グループ・同接頭辞等）と同じ下流消費者（エッジ先プロセス）を新 artifact も備えているか。欠落は「追加者が全消費者を列挙しなかった」形で発生する（例: `published_cli` の消費者が持つ全エッジを `published_libraries` も持つか）
 
 ## B. 粒度・型
 
