@@ -11,8 +11,10 @@ import {
 	format,
 	formatEdges,
 	hasErrors,
+	type IndexChange,
 	loadExtendsChain,
 	loadSubflowGraph,
+	reindex,
 	resolveRefPath,
 	sortEdges,
 	validatePresetKeys,
@@ -274,6 +276,63 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	return ok(output);
 }
 
+export interface ReindexOptions {
+	write?: boolean;
+	check?: boolean;
+	renumber?: boolean;
+	json?: boolean;
+}
+
+function reindexReport(changes: IndexChange[], json: boolean): string {
+	if (json) return `${JSON.stringify({ changes })}\n`;
+	if (changes.length === 0) return "";
+	const prefix = (k: IndexChange["kind"]) => (k === "process" ? "P" : "D");
+	const lines = changes.map((c) =>
+		c.from === null
+			? `+ ${prefix(c.kind)} ${c.id} ${c.to}`
+			: `~ ${prefix(c.kind)} ${c.id} ${c.from} → ${c.to}`,
+	);
+	return `${lines.join("\n")}\n`;
+}
+
+export function runReindex(
+	file: string,
+	opts: ReindexOptions = {},
+): CommandResult {
+	if (opts.check && opts.write) {
+		return fail("--check cannot be combined with --write\n", 2);
+	}
+	if (file === "-" && opts.write) {
+		return fail("--write cannot be used with stdin (-)\n", 2);
+	}
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { output, changes, diagnostics } = reindex(
+		src,
+		opts.renumber ? { renumber: true } : {},
+	);
+	const failed = failIfErrors(diagnostics, file);
+	if (failed) return failed;
+
+	// --check: report drift, non-zero exit when reindexing would change anything.
+	if (opts.check) {
+		const report = reindexReport(changes, opts.json === true);
+		return { stdout: report, stderr: "", exitCode: changes.length > 0 ? 1 : 0 };
+	}
+
+	// --write: body goes to the file; stdout carries the change report.
+	if (opts.write) {
+		if (changes.length > 0) writeFileSync(file, output, "utf-8");
+		return ok(reindexReport(changes, opts.json === true));
+	}
+
+	// --json (no write): emit the machine-readable change report.
+	if (opts.json) return ok(reindexReport(changes, true));
+
+	// default: rewritten body to stdout (preview), like fmt.
+	return ok(output);
+}
+
 export interface NormalizeOptions {
 	json?: boolean;
 }
@@ -414,6 +473,24 @@ Options:
   --mode flows  group each process with its inputs and outputs (default)
 `;
 
+const HELP_REINDEX = `usage: pfdsl reindex <file|-> [--write] [--check] [--renumber] [--json]
+
+Assign integer index: values to nodes in topological order. Processes and
+artifacts are numbered with independent counters. Use - to read from stdin.
+
+By default existing index: values are kept and only nodes lacking one are
+filled. Output follows the gofmt model: the rewritten file goes to stdout
+(preview); with --write it is written in place and stdout carries the change
+report instead. Diagnostics go to stderr.
+
+Options:
+  --write     rewrite the file in place; print the change report to stdout
+              (cannot be used with -)
+  --check     do not write; exit 1 if reindexing would change anything (CI)
+  --renumber  reassign every node from 1 (default keeps existing indices)
+  --json      emit the change report as JSON ({ changes: [...] })
+`;
+
 const HELP_NORMALIZE = `usage: pfdsl normalize <file|-> [--json]
 
 Print canonical edge list. Use - to read from stdin.
@@ -463,6 +540,12 @@ Commands:
                            --no-color disable ANSI color codes (also: NO_COLOR env var)
   fmt <file|-> [--write] [--mode flat|flows]
                            Format a .pfdsl file (- = stdin)
+  reindex <file|-> [--write] [--check] [--renumber] [--json]
+                           Assign topological index: values (- = stdin)
+                           --write     rewrite in place; report to stdout
+                           --check     exit 1 if reindexing would change anything
+                           --renumber  reassign every node from 1
+                           --json      emit change report as JSON
   normalize <file|-> [--json]
                            Print canonical edge list (- = stdin)
                            --json     output edge list as JSON array
@@ -542,6 +625,17 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			return runFmt(f, {
 				write: flags.write === true,
 				...(mode ? { mode } : {}),
+			});
+		}
+		case "reindex": {
+			if (flags.help) return ok(HELP_REINDEX);
+			const f = positional[0];
+			if (!f) return fail(HELP_REINDEX, 2);
+			return runReindex(f, {
+				write: flags.write === true,
+				check: flags.check === true,
+				renumber: flags.renumber === true,
+				json: flags.json === true,
 			});
 		}
 		case "normalize": {

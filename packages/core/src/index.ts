@@ -109,6 +109,13 @@ export function parse(source: string): ParseDocResult {
 	};
 }
 
+export type {
+	IndexChange,
+	ReindexOptions,
+	ReindexResult,
+} from "./reindex.js";
+export { reindex } from "./reindex.js";
+
 export type { ValidateOptions } from "./validator.js";
 export {
 	buildGraph,

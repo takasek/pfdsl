@@ -1,0 +1,11 @@
+---
+artifact:
+  requirement: { index: 1 }
+  spec:        { index: 2 }
+  code:        { index: 3 }
+process:
+  design:      { index: 1 }
+  implement:   { index: 2 }
+---
+requirement >> design -> spec
+spec >> implement -> code

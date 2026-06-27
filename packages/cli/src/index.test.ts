@@ -104,6 +104,87 @@ describe("fmt", () => {
 	});
 });
 
+describe("reindex", () => {
+	const declared = `---
+artifact:
+  req:
+    label: Req
+  spec:
+    label: Spec
+process:
+  design:
+    label: Design
+---
+req >> design -> spec
+`;
+
+	it("default prints the rewritten body to stdout (preview), no write", async () => {
+		const f = join(dir, "reindex-preview.pfdsl");
+		writeFileSync(f, declared);
+		const r = await run(["reindex", f, "--renumber"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("index: 1");
+		// file is untouched in preview mode
+		expect(readFileSync(f, "utf-8")).toBe(declared);
+	});
+
+	it("--write rewrites the file and prints the change report to stdout", async () => {
+		const f = join(dir, "reindex-write.pfdsl");
+		writeFileSync(f, declared);
+		const r = await run(["reindex", f, "--write", "--renumber"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("+ D req 1");
+		expect(r.stdout).toContain("+ P design 1");
+		expect(readFileSync(f, "utf-8")).toContain("index:");
+	});
+
+	it("--check exits 1 when reindexing would change anything", async () => {
+		const f = join(dir, "reindex-check.pfdsl");
+		writeFileSync(f, declared);
+		const r = await run(["reindex", f, "--check", "--renumber"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toContain("design");
+	});
+
+	it("--check exits 0 when already indexed", async () => {
+		const f = join(dir, "reindex-check-clean.pfdsl");
+		writeFileSync(f, declared);
+		await run(["reindex", f, "--write", "--renumber"]);
+		const r = await run(["reindex", f, "--check", "--renumber"]);
+		expect(r.exitCode).toBe(0);
+	});
+
+	it("--json emits a machine-readable change report", async () => {
+		const f = join(dir, "reindex-json.pfdsl");
+		writeFileSync(f, declared);
+		const r = await run(["reindex", f, "--json", "--renumber"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(Array.isArray(parsed.changes)).toBe(true);
+		expect(parsed.changes.length).toBe(3);
+	});
+
+	it("--write with stdin is rejected (exit 2)", async () => {
+		const r = await run(["reindex", "-", "--write"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("--check combined with --write is rejected (exit 2)", async () => {
+		const f = join(dir, "reindex-conflict.pfdsl");
+		writeFileSync(f, declared);
+		const r = await run(["reindex", f, "--check", "--write"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("parse error surfaces diagnostics and exits 1", async () => {
+		const f = join(dir, "reindex-bad.pfdsl");
+		writeFileSync(f, "req >> design\n"); // V003: no output
+		const r = await run(["reindex", f, "--write"]);
+		expect(r.exitCode).toBe(1);
+		expect(readFileSync(f, "utf-8")).toBe("req >> design\n");
+	});
+});
+
 describe("normalize", () => {
 	it("prints canonical edges", async () => {
 		const r = await run(["normalize", join(dir, "valid.pfdsl")]);

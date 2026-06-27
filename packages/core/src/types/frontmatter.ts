@@ -19,6 +19,8 @@ export interface ArtifactMeta {
 	owner?: string;
 	externalStakeholders?: string[];
 	parts?: string[];
+	/** Optional positive-integer node index (pfd-tools D{index}). Namespace independent from processes. */
+	index?: number;
 	status?: Status;
 	tags?: string[];
 	group?: string;
@@ -33,6 +35,8 @@ export interface ProcessMeta {
 	description?: string;
 	owner?: string;
 	externalStakeholders?: string[];
+	/** Optional positive-integer node index (pfd-tools P{index}). Namespace independent from artifacts. */
+	index?: number;
 	group?: string;
 	tags?: string[];
 	command?: string;
