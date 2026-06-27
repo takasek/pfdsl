@@ -39,7 +39,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。
 
-**spec.md を変更した場合**: `make gen-skill` を実行してスキルの `references/spec.md` を更新してからコミットする。
+**`docs/spec/spec.md` / `docs/samples/` を変更した場合**: スキルの `references/` とサンプルの `.dot` / README を `make gen-skill` / `make gen-samples` で再生成する。再生成漏れは pre-commit（gen-skill 入力・`docs/samples/` staged 時）と CI が自動検査するため、手動でのドリフト確認は不要。
 
 **Cycle 計画のパッケージ層明記**: PR body に対象パッケージ層を明記する（→ workflow.pfdsl `develop` プロセスの description 参照）。
 
@@ -51,7 +51,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **`flow:managed` issue の起票と roadmap 追加は同時に行う**（→ workflow.pfdsl `file_issues` プロセスの description 参照）。`flow:exempt`（保守・基盤・修正など roadmap 非管理。判定は L3 reference の「ラベル判定基準」）は roadmap に登録しない。
 
-**新 frontmatter フィールドを追加した場合**: 対応する feature sample（`docs/samples/`）を同一 PR で更新し、`make gen-samples` と `make gen-skill` を実行してからコミットする。
+**新 frontmatter フィールドを追加した場合**: 対応する feature sample（`docs/samples/`）を同一 PR で追加する（生成物 `.dot` / README / `references/` の再生成・ドリフト検査は pre-commit と CI が強制する）。
 
 **`make gen-samples` 実行後**: 全 `.svg` が再生成されるが、`.svg` は graphviz のバージョンに依存して描画差分が出る。今回追加・変更したサンプルの `.pfdsl` / `.dot` / `.svg` のみをステージし、無関係なサンプルの `.svg` 差分（バージョン差由来）は `git checkout` で戻してからコミットする。`.dot` と README は決定論的（純 JS）のため差分はそのまま採用してよい。
 

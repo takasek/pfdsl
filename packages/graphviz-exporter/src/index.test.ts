@@ -1114,3 +1114,45 @@ spec >> P -> X
 		expect(dot.endsWith("}\n")).toBe(true);
 	});
 });
+
+// Deterministic drift guard for docs/samples (.dot + README). The .svg is
+// graphviz-version-dependent and excluded. Mechanically enforces what
+// `make gen-samples` produces so a stale exporter / un-regenerated sample is
+// caught in pre-commit (vitest) and CI rather than by a human gate.
+describe("docs/samples drift", () => {
+	const pfdslFiles = readdirSync(samplesDir)
+		.filter((f) => f.endsWith(".pfdsl"))
+		.sort();
+	const tsvIds = new Set(
+		readFileSync(resolve(samplesDir, "samples.tsv"), "utf-8")
+			.trim()
+			.split("\n")
+			.slice(1)
+			.map((line) => line.split("\t")[0]),
+	);
+	const readme = readFileSync(resolve(samplesDir, "README.md"), "utf-8");
+
+	for (const f of pfdslFiles) {
+		const base = f.replace(/\.pfdsl$/, "");
+		it(`${base}.dot equals exportDot(source)`, () => {
+			const src = readFileSync(resolve(samplesDir, f), "utf-8");
+			const { graph, frontmatter } = buildFromSource(src);
+			const committed = readFileSync(
+				resolve(samplesDir, `${base}.dot`),
+				"utf-8",
+			);
+			expect(committed).toBe(exportDot(graph, frontmatter));
+		});
+	}
+
+	// README embeds each listed sample's .dot in a fenced block; the dogfooding
+	// implementation_flow sample is linked, not embedded (gen-samples special case).
+	for (const f of pfdslFiles) {
+		const base = f.replace(/\.pfdsl$/, "");
+		if (!tsvIds.has(base) || base === "pfdsl_implementation_flow") continue;
+		it(`README embeds the current ${base}.dot`, () => {
+			const dot = readFileSync(resolve(samplesDir, `${base}.dot`), "utf-8");
+			expect(readme).toContain(dot);
+		});
+	}
+});
