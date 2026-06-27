@@ -243,6 +243,26 @@ order >> fulfill -> parcel
 
 ---
 
+## 15-index — Index field
+
+`index:` assigns an optional positive integer to artifacts and processes (independent namespaces). No graph-semantic effect; `pfdsl reindex` numbers nodes in topological order.
+
+```pfdsl
+---
+artifact:
+  requirement: { index: 1 }
+  spec:        { index: 2 }
+  code:        { index: 3 }
+process:
+  design:      { index: 1 }
+  implement:   { index: 2 }
+---
+requirement >> design -> spec
+spec >> implement -> code
+```
+
+---
+
 ## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
 How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).
