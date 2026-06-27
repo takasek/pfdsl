@@ -55,7 +55,7 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_tool_v0011:
     label: "CLI v0.0.11（次期リリース）"
-    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+reindex 等を含む予定"
+    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+reindex / #236 node sort 等を含む予定"
     status: todo
     criteria: npm show @pfdsl/cli version が 0.0.11 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
@@ -226,6 +226,13 @@ artifact:
     criteria: "spec に index: が定義済み、pfdsl reindex コマンドが動作確認済み"
     location: https://github.com/takasek/pfdsl/issues/221
     updated_at: 2026-06-26T04:50:27Z
+  i236_node_sort:
+    label: "node 定義の並べ替え (#236)"
+    description: "frontmatter の artifact/process node 定義を index/topological/group 等のキーで並べ替える pfdsl sort コマンド。index 採番(#221)と frontmatter 編集基盤の上に乗る"
+    status: todo
+    criteria: "pfdsl sort が --by index|topological|group で node 定義を並べ替え、--check で検証できる"
+    location: https://github.com/takasek/pfdsl/issues/236
+    updated_at: 2026-06-27T03:30:00Z
   w002_line:
     label: "W002 診断行番号修正 (#219)"
     description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
@@ -296,6 +303,8 @@ process:
     label: W002 診断行番号修正
   publish_cli_v0011:
     label: CLI v0.0.11リリース
+  implement_node_sort:
+    label: node 並べ替え実装
   publish_ext_v0014:
     label: extension v0.0.14リリース
   integrate_spec_v009:
@@ -364,7 +373,9 @@ cli_tool_v009 >> fix_w002_line -> w002_line
 
 cli_tool_v009 >> implement_index_reindex -> i221_index_reindex
 
-[cli_tool_v0010, w002_line, i221_index_reindex] >> publish_cli_v0011 -> cli_tool_v0011
+cli_tool_v009 >> implement_node_sort -> i236_node_sort
+
+[cli_tool_v0010, w002_line, i221_index_reindex, i236_node_sort] >> publish_cli_v0011 -> cli_tool_v0011
 
 i221_index_reindex >> integrate_spec_v009 -> spec_v009
 
