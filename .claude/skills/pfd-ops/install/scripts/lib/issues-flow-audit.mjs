@@ -63,7 +63,7 @@ export function parseIssueArtifacts(frontmatter) {
 
 /**
  * @param {{ id: string, issueNumber: number, status: string|undefined, updatedAt: string|undefined, priorities: string[], hasDownstream?: boolean }[]} artifacts - priorities must be pre-sorted (parseIssueArtifacts guarantees this)
- * @param {{ number: number, state: "OPEN"|"CLOSED", labels: string[], updatedAt: string }[]} issues
+ * @param {{ number: number, state: "OPEN"|"CLOSED", stateReason?: string|null, labels: string[], updatedAt: string }[]} issues
  * @returns {{ type: string, issueNumber: number, artifactId: string|undefined, detail: string, fixVia?: "file"|"github" }[]}
  */
 export function computeFindings(artifacts, issues) {
@@ -93,13 +93,18 @@ export function computeFindings(artifacts, issues) {
 			if (art.status === "done" && art.hasDownstream) {
 				continue;
 			}
+			const isNotPlanned = iss.stateReason === "NOT_PLANNED";
 			findings.push({
-				type: "closed_in_flow",
+				type: isNotPlanned ? "closed_not_planned" : "closed_in_flow",
 				issueNumber: art.issueNumber,
 				artifactId: art.id,
 				hasDownstream: art.hasDownstream,
-				detail: `issue is closed — delete the chain if terminal, or strip the iN_ prefix to demote it to a plain done artifact if downstream processes consume it`,
-				fixVia: "flow",
+				detail: isNotPlanned
+					? art.hasDownstream
+						? `issue closed as not planned but has downstream consumers — remove manually`
+						: `issue closed as not planned — terminal chain will be removed`
+					: `issue is closed — delete the chain if terminal, or strip the iN_ prefix to demote it to a plain done artifact if downstream processes consume it`,
+				fixVia: isNotPlanned && art.hasDownstream ? undefined : "flow",
 			});
 			// skip all freshness checks for closed issues
 			continue;
@@ -116,9 +121,7 @@ export function computeFindings(artifacts, issues) {
 				artifactId: art.id,
 				detail: `issue has flow:exempt label but has an artifact in the flow`,
 			});
-		}
-
-		if (!hasManaged) {
+		} else if (!hasManaged) {
 			findings.push({
 				type: "missing_label",
 				issueNumber: art.issueNumber,
@@ -272,7 +275,9 @@ export function normalizeBody(body) {
 }
 
 export function applyClosedInFlowFixes(doc, body, findings) {
-	const closedFindings = findings.filter((f) => f.type === "closed_in_flow" && f.fixVia === "flow");
+	const closedFindings = findings.filter(
+		(f) => (f.type === "closed_in_flow" || f.type === "closed_not_planned") && f.fixVia === "flow",
+	);
 	if (closedFindings.length === 0) return body;
 
 	let lines = body.split("\n");
