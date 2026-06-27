@@ -58,7 +58,7 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_tool_v0011:
     label: "CLI v0.0.11（次期リリース）"
-    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+renum 等を含む予定"
+    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+reindex 等を含む予定"
     status: todo
     criteria: npm show @pfdsl/cli version が 0.0.11 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
@@ -222,11 +222,11 @@ artifact:
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
     updated_at: 2026-06-26T05:00:41Z
-  i221_index_renum:
-    label: "index フィールド + renum コマンド (#221)"
-    description: "オプショナル整数フィールド index: と pfdsl renum コマンドを追加。pfd-tools の P#/D# 採番に対応"
+  i221_index_reindex:
+    label: "index フィールド + reindex コマンド (#221)"
+    description: "オプショナル整数フィールド index: と pfdsl reindex コマンドを追加。pfd-tools の P#/D# 採番に対応"
     status: todo
-    criteria: "spec に index: が定義済み、pfdsl renum コマンドが動作確認済み"
+    criteria: "spec に index: が定義済み、pfdsl reindex コマンドが動作確認済み"
     location: https://github.com/takasek/pfdsl/issues/221
     updated_at: 2026-06-26T04:50:27Z
   w002_line:
@@ -294,8 +294,8 @@ process:
     label: CLI v0.0.10リリース
   publish_libraries:
     label: ライブラリ公開
-  implement_index_renum:
-    label: index フィールド + renum 実装
+  implement_index_reindex:
+    label: index フィールド + reindex 実装
   implement_hover_jump:
     label: hover/quickpick ジャンプ実装
   implement_run_command:
@@ -351,13 +351,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -422,13 +422,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -496,13 +496,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -569,13 +569,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -642,13 +642,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -717,13 +717,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -788,13 +788,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -862,13 +862,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_multifile
 implement_no_color
@@ -935,13 +935,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1009,13 +1009,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1081,13 +1081,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_no_color
@@ -1154,13 +1154,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1225,13 +1225,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1298,13 +1298,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1371,13 +1371,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1444,12 +1444,12 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1517,13 +1517,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1590,13 +1590,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1672,13 +1672,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_lints
 implement_multifile
 implement_run_command
@@ -1741,13 +1741,13 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1809,13 +1809,13 @@ i12_article
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1885,11 +1885,11 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i201_published_libs
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -1929,8 +1929,8 @@ version_cmd
 write_article
 write_design_notes
 
-cli_tool_v009 >> implement_index_renum
-implement_index_renum -> i221_index_renum
+cli_tool_v009 >> implement_index_reindex
+implement_index_reindex -> i221_index_reindex
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -2003,7 +2003,7 @@ write_article
 write_design_notes
 
 cli_tool_v0010 >> publish_cli_v0011
-i221_index_renum >> publish_cli_v0011
+i221_index_reindex >> publish_cli_v0011
 w002_line >> publish_cli_v0011
 publish_cli_v0011 -> cli_tool_v0011
 adr_corpus
@@ -2035,7 +2035,7 @@ i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -2075,7 +2075,7 @@ version_cmd
 write_article
 write_design_notes
 
-i221_index_renum >> integrate_spec_v009
+i221_index_reindex >> integrate_spec_v009
 integrate_spec_v009 -> spec_v009
 adr_corpus
 audit_distribution
@@ -2108,7 +2108,7 @@ i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -2174,13 +2174,13 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i201_published_libs
-i221_index_renum
+i221_index_reindex
 i230_gen_samples_ci
 i3_obsidian_plugin
 implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
@@ -2248,11 +2248,11 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i221_index_renum
+i221_index_reindex
 i3_obsidian_plugin
 implement_group_hover
 implement_hover_jump
-implement_index_renum
+implement_index_reindex
 implement_json_output
 implement_lints
 implement_multifile
