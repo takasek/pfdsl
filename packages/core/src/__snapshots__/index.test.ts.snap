@@ -58,14 +58,14 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_tool_v0011:
     label: "CLI v0.0.11（次期リリース）"
-    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #220 schedule: / #221 index+renum 等を含む予定"
+    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+renum 等を含む予定"
     status: todo
     criteria: npm show @pfdsl/cli version が 0.0.11 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
   spec_v009:
-    label: 仕様書 v0.0.9（schedule:/index:統合）
+    label: 仕様書 v0.0.9（index:統合）
     status: todo
-    criteria: "schedule:/index: が spec 本文に統合済み"
+    criteria: "index: が spec 本文に統合済み"
     location: ../docs/spec/spec.md
   ext_v0014:
     label: "extension v0.0.14（次期リリース）"
@@ -222,13 +222,6 @@ artifact:
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
     updated_at: 2026-06-26T05:00:41Z
-  i220_schedule_field:
-    label: "schedule: フィールド仕様・実装 (#220)"
-    description: "process/artifact に schedule: ブロックを追加。pfd-tools 連携可能の条件となる"
-    status: todo
-    criteria: "spec に schedule: が定義済み、サンプル・checker・formatter 対応済み"
-    location: https://github.com/takasek/pfdsl/issues/220
-    updated_at: 2026-06-26T04:50:26Z
   i221_index_renum:
     label: "index フィールド + renum コマンド (#221)"
     description: "オプショナル整数フィールド index: と pfdsl renum コマンドを追加。pfd-tools の P#/D# 採番に対応"
@@ -242,6 +235,13 @@ artifact:
     status: done
     criteria: W002 の診断が artifact 定義行を指す
     location: https://github.com/takasek/pfdsl/issues/219
+  i230_gen_samples_ci:
+    label: "gen-samples ドリフト検査 CI (#230)"
+    description: "docs/samples の .dot / README を CI で再生成しドリフト検査する。svg はバージョン依存のため対象外"
+    status: todo
+    criteria: CI が docs/samples の .dot と README のドリフトを検出し、svg の扱いが文書化済み
+    location: https://github.com/takasek/pfdsl/issues/230
+    updated_at: 2026-06-26T00:00:00Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -294,8 +294,6 @@ process:
     label: CLI v0.0.10リリース
   publish_libraries:
     label: ライブラリ公開
-  implement_schedule_field:
-    label: schedule:フィールド実装
   implement_index_renum:
     label: index フィールド + renum 実装
   implement_hover_jump:
@@ -312,6 +310,8 @@ process:
     label: extension v0.0.14リリース
   integrate_spec_v009:
     label: 仕様書 v0.0.9統合
+  implement_gen_samples_ci:
+    label: gen-samplesドリフト検査CI実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -351,9 +351,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -362,7 +363,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -422,9 +422,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -433,7 +434,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -496,9 +496,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -507,7 +508,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -569,9 +569,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -580,7 +581,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -642,9 +642,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -653,7 +654,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -717,9 +717,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -728,7 +729,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -788,9 +788,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -799,7 +800,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -862,9 +862,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -872,7 +873,6 @@ implement_json_output
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -935,9 +935,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -946,7 +947,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_stdin
 implement_subcommand_help
 implement_version_cmd
@@ -1009,9 +1009,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1020,7 +1021,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1081,9 +1081,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1091,7 +1092,6 @@ implement_json_output
 implement_lints
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1154,9 +1154,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1165,7 +1166,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1225,9 +1225,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1236,7 +1237,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1298,9 +1298,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1309,7 +1310,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1371,9 +1371,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1382,7 +1383,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1444,8 +1444,9 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1454,7 +1455,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1517,9 +1517,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1528,7 +1529,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1590,9 +1590,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1601,7 +1602,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1672,16 +1672,16 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
 implement_lints
 implement_multifile
 implement_run_command
-implement_schedule_field
 implement_spec_features
 integrate_multifile
 integrate_spec
@@ -1741,9 +1741,10 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1752,7 +1753,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1809,9 +1809,10 @@ i12_article
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -1820,7 +1821,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1885,15 +1885,15 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i201_published_libs
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_index_renum
 implement_json_output
 implement_lints
 implement_multifile
 implement_no_color
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -1930,9 +1930,7 @@ write_article
 write_design_notes
 
 cli_tool_v009 >> implement_index_renum
-cli_tool_v009 >> implement_schedule_field
 implement_index_renum -> i221_index_renum
-implement_schedule_field -> i220_schedule_field
 adr_corpus
 audit_distribution
 build_obsidian_plugin
@@ -1958,7 +1956,9 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_json_output
@@ -2003,7 +2003,6 @@ write_article
 write_design_notes
 
 cli_tool_v0010 >> publish_cli_v0011
-i220_schedule_field >> publish_cli_v0011
 i221_index_renum >> publish_cli_v0011
 w002_line >> publish_cli_v0011
 publish_cli_v0011 -> cli_tool_v0011
@@ -2031,7 +2030,9 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -2040,7 +2041,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -2075,7 +2075,6 @@ version_cmd
 write_article
 write_design_notes
 
-i220_schedule_field >> integrate_spec_v009
 i221_index_renum >> integrate_spec_v009
 integrate_spec_v009 -> spec_v009
 adr_corpus
@@ -2104,7 +2103,9 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -2113,7 +2114,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -2174,9 +2174,10 @@ hierarchy_spec
 i119_published_extension
 i12_article
 i201_published_libs
-i220_schedule_field
 i221_index_renum
+i230_gen_samples_ci
 i3_obsidian_plugin
+implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_renum
@@ -2185,7 +2186,6 @@ implement_lints
 implement_multifile
 implement_no_color
 implement_run_command
-implement_schedule_field
 implement_spec_features
 implement_stdin
 implement_subcommand_help
@@ -2204,6 +2204,79 @@ presets_spec
 publish_cli_v0010
 publish_cli_v0011
 publish_cli_v009
+publish_extension
+publish_libraries
+restructure_skillgen
+restructured_gen
+revises_spec
+skill_gen
+spec_v006
+spec_v007
+spec_v008
+spec_v009
+stdin
+subcommand_help
+version_cmd
+w002_line
+write_article
+write_design_notes
+
+cli_tool >> implement_gen_samples_ci
+implement_gen_samples_ci -> i230_gen_samples_ci
+adr_corpus
+audit_distribution
+build_obsidian_plugin
+cli_tool_v0010
+cli_tool_v0011
+cli_tool_v009
+criteria_spec
+design_notes
+draft_criteria
+draft_external_stakeholders
+draft_location
+draft_multifile_specs
+draft_revises
+ext_v0014
+external_stakeholders_spec
+featured_toolchain
+findings_r12
+fix_w002_line
+hierarchy_spec
+i119_published_extension
+i12_article
+i201_published_libs
+i216_hover_jump
+i217_run_command
+i218_group_hover
+i221_index_renum
+i3_obsidian_plugin
+implement_group_hover
+implement_hover_jump
+implement_index_renum
+implement_json_output
+implement_lints
+implement_multifile
+implement_no_color
+implement_run_command
+implement_spec_features
+implement_stdin
+implement_subcommand_help
+implement_version_cmd
+integrate_multifile
+integrate_spec
+integrate_spec_v009
+json_output
+layer_audit_assets
+lint_checker
+location_spec
+multifile_policy
+multifile_toolchain
+no_color
+presets_spec
+publish_cli_v0010
+publish_cli_v0011
+publish_cli_v009
+publish_ext_v0014
 publish_extension
 publish_libraries
 restructure_skillgen

@@ -55,14 +55,14 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_tool_v0011:
     label: "CLI v0.0.11（次期リリース）"
-    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #220 schedule: / #221 index+renum 等を含む予定"
+    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+renum 等を含む予定"
     status: todo
     criteria: npm show @pfdsl/cli version が 0.0.11 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
   spec_v009:
-    label: 仕様書 v0.0.9（schedule:/index:統合）
+    label: 仕様書 v0.0.9（index:統合）
     status: todo
-    criteria: "schedule:/index: が spec 本文に統合済み"
+    criteria: "index: が spec 本文に統合済み"
     location: ../docs/spec/spec.md
   ext_v0014:
     label: "extension v0.0.14（次期リリース）"
@@ -219,13 +219,6 @@ artifact:
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
     updated_at: 2026-06-26T05:00:41Z
-  i220_schedule_field:
-    label: "schedule: フィールド仕様・実装 (#220)"
-    description: "process/artifact に schedule: ブロックを追加。pfd-tools 連携可能の条件となる"
-    status: todo
-    criteria: "spec に schedule: が定義済み、サンプル・checker・formatter 対応済み"
-    location: https://github.com/takasek/pfdsl/issues/220
-    updated_at: 2026-06-26T04:50:26Z
   i221_index_renum:
     label: "index フィールド + renum コマンド (#221)"
     description: "オプショナル整数フィールド index: と pfdsl renum コマンドを追加。pfd-tools の P#/D# 採番に対応"
@@ -239,6 +232,13 @@ artifact:
     status: done
     criteria: W002 の診断が artifact 定義行を指す
     location: https://github.com/takasek/pfdsl/issues/219
+  i230_gen_samples_ci:
+    label: "gen-samples ドリフト検査 CI (#230)"
+    description: "docs/samples の .dot / README を CI で再生成しドリフト検査する。svg はバージョン依存のため対象外"
+    status: todo
+    criteria: CI が docs/samples の .dot と README のドリフトを検出し、svg の扱いが文書化済み
+    location: https://github.com/takasek/pfdsl/issues/230
+    updated_at: 2026-06-26T00:00:00Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -291,8 +291,6 @@ process:
     label: CLI v0.0.10リリース
   publish_libraries:
     label: ライブラリ公開
-  implement_schedule_field:
-    label: schedule:フィールド実装
   implement_index_renum:
     label: index フィールド + renum 実装
   implement_hover_jump:
@@ -309,6 +307,8 @@ process:
     label: extension v0.0.14リリース
   integrate_spec_v009:
     label: 仕様書 v0.0.9統合
+  implement_gen_samples_ci:
+    label: gen-samplesドリフト検査CI実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -371,11 +371,12 @@ cli_tool_v009 >> implement_run_command -> i217_run_command
 cli_tool_v009 >> implement_group_hover -> i218_group_hover
 cli_tool_v009 >> fix_w002_line -> w002_line
 
-cli_tool_v009 >> implement_schedule_field -> i220_schedule_field
 cli_tool_v009 >> implement_index_renum -> i221_index_renum
 
-[cli_tool_v0010, w002_line, i220_schedule_field, i221_index_renum] >> publish_cli_v0011 -> cli_tool_v0011
+[cli_tool_v0010, w002_line, i221_index_renum] >> publish_cli_v0011 -> cli_tool_v0011
 
-[i220_schedule_field, i221_index_renum] >> integrate_spec_v009 -> spec_v009
+i221_index_renum >> integrate_spec_v009 -> spec_v009
 
 [i216_hover_jump, i217_run_command, i218_group_hover] >> publish_ext_v0014 -> ext_v0014
+
+cli_tool >> implement_gen_samples_ci -> i230_gen_samples_ci
