@@ -77,6 +77,10 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 `flow:exempt` ラベルの issue は roadmap_pfdsl への artifact 追加対象外。`file_issues` の「起票と同時に roadmap 追加」ルールの例外。起票時に `flow:exempt` / `flow:managed` を判定してから roadmap 追加要否を決める。
 
+## develop 着手時の artifact status 更新
+
+`develop` を開始する時点で、実装対象の出力 artifact を `todo` から `wip` に更新する。flow-sync は merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
+
 ## 複数 issue を一括実装する場合のバージョン戦略
 
 複数の実装 issue を1つの PR に束ねる場合、中間バージョンの publish を省略してよい。ただし **選択判断は着手前に明示する**:

@@ -192,8 +192,8 @@ statusStyles:
   todo: { fillcolor: "#f8f9fa", style: filled }
 tag:
   external:
-    label: 外部公開
-    description: 外部に公開・提供される成果物
+    label: Publicly Released
+    description: Artifacts published or delivered externally
     style: { color: "#0066cc", penwidth: "2" }
   sensitive:
     style: { style: dashed }
@@ -402,13 +402,13 @@ digraph PFDSL {
 ---
 artifact:
   raw_data:
-    label: 生データ
+    label: Raw Data
   report:
-    label: 月次レポート
-    externalStakeholders: [規制当局, 監査法人]
+    label: Monthly Report
+    externalStakeholders: [Regulatory Authority, Audit Firm]
   summary:
-    label: 経営サマリー
-    externalStakeholders: [経営層]
+    label: Executive Summary
+    externalStakeholders: [Management]
 ---
 raw_data >> analyze -> report
 report >> summarize -> summary
@@ -425,10 +425,10 @@ digraph PFDSL {
   newrank=true;
 
   "analyze" [shape=ellipse, label="analyze"];
-  "raw_data" [shape=box, label="raw_data\n生データ", width=1.10, penwidth="2"];
-  "report" [shape=box, label="report\n月次レポート", tooltip="月次レポート\nexternalStakeholders: 規制当局, 監査法人", width=1.50];
+  "raw_data" [shape=box, label="raw_data\nRaw Data", penwidth="2"];
+  "report" [shape=box, label="report\nMonthly Report", tooltip="Monthly Report\nexternalStakeholders: Regulatory Authority, Audit Firm"];
   "summarize" [shape=ellipse, label="summarize"];
-  "summary" [shape=box, label="summary\n経営サマリー", tooltip="経営サマリー\nexternalStakeholders: 経営層", width=1.50, penwidth="2"];
+  "summary" [shape=box, label="summary\nExecutive Summary", tooltip="Executive Summary\nexternalStakeholders: Management", penwidth="2"];
 
   "raw_data" -> "analyze";
   "analyze" -> "report";
