@@ -546,7 +546,7 @@ Options:
   --json      emit the change report as JSON ({ changes: [...] })
 `;
 
-const HELP_SORT = `usage: pfdsl sort <file|-> --by <keys> [--write] [--check]
+const HELP_SORT = `usage: pfdsl sort-meta <file|-> --by <keys> [--write] [--check]
 
 Sort artifact and process node definitions within each frontmatter section.
 Each section is sorted independently. Use - to read from stdin.
@@ -613,7 +613,7 @@ Commands:
                            --check     exit 1 if reindexing would change anything
                            --renumber  reassign every node from 1
                            --json      emit change report as JSON
-  sort <file|-> --by <keys> [--write] [--check]
+  sort-meta <file|-> --by <keys> [--write] [--check]
                            Sort node definitions by keys (- = stdin)
                            --by        comma-separated: index, topological, group, id
                            --write     rewrite in place
@@ -712,7 +712,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				json: flags.json === true,
 			});
 		}
-		case "sort": {
+		case "sort-meta": {
 			if (flags.help) return ok(HELP_SORT);
 			const f = positional[0];
 			if (!f) return fail(HELP_SORT, 2);

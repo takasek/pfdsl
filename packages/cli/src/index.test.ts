@@ -185,7 +185,7 @@ req >> design -> spec
 	});
 });
 
-describe("sort", () => {
+describe("sort-meta", () => {
 	const unsorted = `---
 artifact:
   z:
@@ -199,7 +199,7 @@ z >> p -> a
 	it("default prints sorted body to stdout (preview), no write", async () => {
 		const f = join(dir, "sort-preview.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort", f, "--by", "id"]);
+		const r = await run(["sort-meta", f, "--by", "id"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toMatch(/^\s*a:/m);
 		// file is untouched in preview mode
@@ -209,7 +209,7 @@ z >> p -> a
 	it("--write rewrites the file in place", async () => {
 		const f = join(dir, "sort-write.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort", f, "--by", "id", "--write"]);
+		const r = await run(["sort-meta", f, "--by", "id", "--write"]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
 		// a should appear before z after sorting by id
@@ -221,7 +221,7 @@ z >> p -> a
 	it("--check exits 1 when not sorted", async () => {
 		const f = join(dir, "sort-check-unsorted.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort", f, "--by", "id", "--check"]);
+		const r = await run(["sort-meta", f, "--by", "id", "--check"]);
 		expect(r.exitCode).toBe(1);
 	});
 
@@ -237,26 +237,26 @@ z >> p -> a
 `;
 		const f = join(dir, "sort-check-sorted.pfdsl");
 		writeFileSync(f, sorted);
-		const r = await run(["sort", f, "--by", "id", "--check"]);
+		const r = await run(["sort-meta", f, "--by", "id", "--check"]);
 		expect(r.exitCode).toBe(0);
 	});
 
 	it("--by without value is rejected (exit 2)", async () => {
 		const f = join(dir, "sort-noby.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort", f]);
+		const r = await run(["sort-meta", f]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("--write with stdin is rejected (exit 2)", async () => {
-		const r = await run(["sort", "-", "--by", "id", "--write"]);
+		const r = await run(["sort-meta", "-", "--by", "id", "--write"]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("--check combined with --write is rejected (exit 2)", async () => {
 		const f = join(dir, "sort-conflict.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort", f, "--by", "id", "--check", "--write"]);
+		const r = await run(["sort-meta", f, "--by", "id", "--check", "--write"]);
 		expect(r.exitCode).toBe(2);
 	});
 
@@ -270,7 +270,7 @@ a1 >> p -> b1
 `;
 		const f = join(dir, "sort-multikey.pfdsl");
 		writeFileSync(f, src);
-		const r = await run(["sort", f, "--by", "group,index"]);
+		const r = await run(["sort-meta", f, "--by", "group,index"]);
 		expect(r.exitCode).toBe(0);
 		// a1 (alpha) before b1 (beta)
 		expect(r.stdout.indexOf("  a1:")).toBeLessThan(r.stdout.indexOf("  b1:"));
@@ -279,14 +279,14 @@ a1 >> p -> b1
 	it("invalid --by key is rejected (exit 2)", async () => {
 		const f = join(dir, "sort-badkey.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort", f, "--by", "invalid"]);
+		const r = await run(["sort-meta", f, "--by", "invalid"]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("partially invalid --by key is rejected (exit 2)", async () => {
 		const f = join(dir, "sort-partialkey.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort", f, "--by", "index,typo"]);
+		const r = await run(["sort-meta", f, "--by", "index,typo"]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toMatch(/typo/);
 	});
