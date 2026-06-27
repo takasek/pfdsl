@@ -79,6 +79,50 @@ describe("validate", () => {
 		expect(codes("A >> P -> B", fm)).toContain("V007");
 	});
 
+	it("V029: index must be a positive integer (zero rejected)", () => {
+		const fm = {
+			artifact: { B: { index: 0 } },
+		} as unknown as Frontmatter;
+		expect(codes("A >> P -> B", fm)).toContain("V029");
+	});
+
+	it("V029: index must be a positive integer (non-integer rejected)", () => {
+		const fm = {
+			process: { P: { index: 1.5 } },
+		} as unknown as Frontmatter;
+		expect(codes("A >> P -> B", fm)).toContain("V029");
+	});
+
+	it("V029: index must be a positive integer (negative rejected)", () => {
+		const fm = {
+			artifact: { B: { index: -3 } },
+		} as unknown as Frontmatter;
+		expect(codes("A >> P -> B", fm)).toContain("V029");
+	});
+
+	it("V029: valid positive-integer index produces no error", () => {
+		const fm: Frontmatter = {
+			artifact: { B: { index: 2 } },
+			process: { P: { index: 1 } },
+		};
+		expect(codes("A >> P -> B", fm)).not.toContain("V029");
+	});
+
+	it("W004: duplicate index within the same namespace warns", () => {
+		const fm: Frontmatter = {
+			artifact: { A: { index: 1 }, B: { index: 1 } },
+		};
+		expect(codes("A >> P -> B", fm)).toContain("W004");
+	});
+
+	it("W004: same index across artifact/process namespaces is allowed", () => {
+		const fm: Frontmatter = {
+			artifact: { B: { index: 1 } },
+			process: { P: { index: 1 } },
+		};
+		expect(codes("A >> P -> B", fm)).not.toContain("W004");
+	});
+
 	it("V008: invalid statusStyles key", () => {
 		const fm = {
 			statusStyles: { finished: { fillcolor: "gray" } },

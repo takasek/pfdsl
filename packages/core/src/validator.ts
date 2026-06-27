@@ -153,6 +153,41 @@ export function validate(
 		}
 	}
 
+	// V029: index must be a positive integer (artifact / process)
+	// W004: duplicate index within a namespace (independent per kind)
+	const checkIndices = (
+		entries: Record<string, { index?: unknown }>,
+		kind: "artifact" | "process",
+	): void => {
+		const seen = new Map<number, string>();
+		for (const [id, meta] of Object.entries(entries)) {
+			const idx = meta.index;
+			if (idx === undefined) continue;
+			if (typeof idx !== "number" || !Number.isInteger(idx) || idx < 1) {
+				diagnostics.push({
+					severity: "error",
+					code: "V029",
+					message: `Invalid index '${String(idx)}' on ${kind} '${id}'. Must be a positive integer`,
+					range: artifactRanges.get(id) ?? zeroRange(),
+				});
+				continue;
+			}
+			const prev = seen.get(idx);
+			if (prev !== undefined) {
+				diagnostics.push({
+					severity: "warning",
+					code: "W004",
+					message: `Duplicate index ${idx} on ${kind} '${id}' (also on '${prev}')`,
+					range: artifactRanges.get(id) ?? zeroRange(),
+				});
+			} else {
+				seen.set(idx, id);
+			}
+		}
+	};
+	checkIndices(fm?.artifact ?? {}, "artifact");
+	checkIndices(fm?.process ?? {}, "process");
+
 	// V008: statusStyles keys must be valid Status enum
 	// V009: statusStyles / tag.<id>.style attribute keys must be in STYLE_ATTRS
 	for (const [key, style] of Object.entries(fm?.statusStyles ?? {})) {
