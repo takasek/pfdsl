@@ -15,3 +15,28 @@ if git diff --cached --name-only | grep -q '\.pfdsl$'; then
     exit 1
   fi
 fi
+
+# When gen-skill inputs are staged, verify the generated skill dirs are fresh.
+# gen-skill.mjs is dist-free (pure file generation), so this runs without a build.
+if git diff --cached --name-only | grep -qE '^(docs/|scripts/skill-template/|scripts/gen-skill\.mjs)'; then
+  node scripts/gen-skill.mjs --out .claude/skills/pfdsl >/dev/null
+  node scripts/gen-skill.mjs --out skills/pfdsl >/dev/null
+  if ! git diff --quiet -- .claude/skills/pfdsl skills/pfdsl; then
+    echo "Skill dirs are stale. Run 'make gen-skill' and re-stage the skill files."
+    exit 1
+  fi
+fi
+
+# When samples change, verify the deterministic .dot / README drift guard.
+# It is a vitest test that imports @pfdsl/core (→ dist), so it needs a build;
+# skip with a notice when dist is absent (CI always runs it after building).
+if git diff --cached --name-only | grep -qE '^docs/samples/'; then
+  if [ -f packages/core/dist/index.js ] && [ -f packages/graphviz-exporter/dist/index.js ]; then
+    if ! pnpm --filter @pfdsl/graphviz-exporter exec vitest run index.test >/dev/null 2>&1; then
+      echo "docs/samples drift: run 'make gen-samples' and re-stage .dot / README.md."
+      exit 1
+    fi
+  else
+    echo "note: skipping samples drift check (run 'pnpm -r build' to enable locally; CI verifies it)."
+  fi
+fi
