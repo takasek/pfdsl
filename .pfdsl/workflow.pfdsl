@@ -128,7 +128,7 @@ artifact:
     label: issue 依存グラフ
     description: "着手可能順序の導出。issue 追加時に更新"
     status: done
-    criteria: check がエラーなし、audit-issues-flow.mjs が差分なし。人手変更後のスナップショット更新手順は workflow.md 参照。
+    criteria: check がエラーなし、audit-issues-flow.mjs が差分なし。
     location: roadmap.pfdsl
     group: planning
   toolchain:
@@ -380,4 +380,4 @@ toolchain >> publish_libraries -> published_libraries
 
 [feature_samples, roadmap_pfdsl, toolchain] >> render_previews -> sample_previews
 
-[toolchain, published_cli, gh_skill_dist] >> update_readme -> readme
+[toolchain, published_cli, published_libraries, gh_skill_dist] >> update_readme -> readme

@@ -59,7 +59,7 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 ## .pfdsl 変更後のスナップショット更新
 
-`.pfdsl` ファイルを人手変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。pre-commit hook（`.pfdsl` staged 時）と CI の両方で更新漏れを自動検出する。
+`packages/core/src/__fixtures__/` 内のフィクスチャ `.pfdsl` を変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。pre-commit hook（`.pfdsl` staged 時）と CI の両方で更新漏れを自動検出する。`.pfdsl/roadmap.pfdsl` / `.pfdsl/workflow.pfdsl` 等の運用 PFD を変更してもスナップショットは変化しない（fixture ベースのため）。
 
 ## 生成物の再生成と自動ドリフト検査（gen-skill / gen-samples）
 
@@ -76,6 +76,10 @@ frontmatter に新フィールドを追加する develop では、対応する `
 ## flow:exempt issue の roadmap 追加除外
 
 `flow:exempt` ラベルの issue は roadmap_pfdsl への artifact 追加対象外。`file_issues` の「起票と同時に roadmap 追加」ルールの例外。起票時に `flow:exempt` / `flow:managed` を判定してから roadmap 追加要否を決める。
+
+## develop 着手時の artifact status 更新
+
+`develop` を開始する時点で、実装対象の出力 artifact を `todo` から `wip` に更新する。flow-sync は merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
 
 ## 複数 issue を一括実装する場合のバージョン戦略
 

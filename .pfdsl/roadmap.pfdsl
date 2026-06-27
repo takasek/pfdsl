@@ -194,21 +194,21 @@ artifact:
   i216_hover_jump:
     label: "hover/quickpick jump (#216)"
     description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
-    status: todo
+    status: wip
     criteria: location/subflow/command フィールドのジャンプが動作確認済み
     location: https://github.com/takasek/pfdsl/issues/216
     updated_at: 2026-06-26T05:00:40Z
   i217_run_command:
     label: "process command 実行 (#217)"
     description: "vscode-extension でプロセスの command フィールドを統合ターミナルで実行"
-    status: todo
+    status: wip
     criteria: command フィールドのターミナル実行が動作確認済み
     location: https://github.com/takasek/pfdsl/issues/217
     updated_at: 2026-06-26T05:00:41Z
   i218_group_hover:
     label: "group hover メンバー一覧 (#218)"
     description: "vscode-extension でグループノードの hover にメンバー一覧を表示"
-    status: todo
+    status: wip
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
     updated_at: 2026-06-26T05:00:41Z

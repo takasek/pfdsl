@@ -13,7 +13,7 @@ import { lex } from "./lexer.js";
 import { parseTokens } from "./parser.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const samplePath = resolve(__dirname, "../../../.pfdsl/roadmap.pfdsl");
+const samplePath = resolve(__dirname, "__fixtures__/pipeline-scale.pfdsl");
 const sampleSource = readFileSync(samplePath, "utf-8");
 
 describe("public API", () => {
