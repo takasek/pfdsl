@@ -1,0 +1,11 @@
+---
+artifact:
+  requirement: { index: 1, label: 要求 }
+  spec:        { index: 2, label: 仕様書 }
+  code:        { index: 3, label: コード }
+process:
+  design:      { index: 1, label: 設計 }
+  implement:   { index: 2, label: 実装 }
+---
+requirement >> design -> spec
+spec >> implement -> code

@@ -470,7 +470,7 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "fulfill_order" [shape=ellipse, label="fulfill_order\nOrder Fulfillment", tooltip="Order Fulfillment\nsubflow: ./12-subflow-detail.pfdsl"];
+  "fulfill_order" [shape=ellipse, label="fulfill_order\nOrder Fulfillment", tooltip="Order Fulfillment\nsubflow: ./12-subflow-detail.pfdsl", peripheries="2"];
   "requirement" [shape=box, label="requirement\nRequirements", penwidth="2"];
   "shipped_order" [shape=box, label="shipped_order\nShipped Order", penwidth="2"];
 
@@ -558,12 +558,57 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "fulfill" [shape=ellipse, label="fulfill\nFulfillment", tooltip="Fulfillment\nsubflow: ./14-boundary-detail.pfdsl"];
+  "fulfill" [shape=ellipse, label="fulfill\nFulfillment", tooltip="Fulfillment\nsubflow: ./14-boundary-detail.pfdsl", peripheries="2"];
   "order" [shape=box, label="order\nCustomer Order", penwidth="2"];
   "parcel" [shape=box, label="parcel\nParcel", penwidth="2"];
 
   "order" -> "fulfill";
   "fulfill" -> "parcel";
+}
+```
+
+</details>
+
+---
+
+## 15-index — Index field
+
+`index:` assigns an optional positive integer to artifacts and processes (independent namespaces). No graph-semantic effect; `pfdsl reindex` numbers nodes in topological order.
+
+```pfdsl
+---
+artifact:
+  requirement: { index: 1, label: 要求 }
+  spec:        { index: 2, label: 仕様書 }
+  code:        { index: 3, label: コード }
+process:
+  design:      { index: 1, label: 設計 }
+  implement:   { index: 2, label: 実装 }
+---
+requirement >> design -> spec
+spec >> implement -> code
+```
+
+<img src="15-index.svg">
+
+<details>
+<summary>DOT</summary>
+
+```dot
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "code" [shape=box, label="code\nコード", width=0.90, penwidth="2"];
+  "design" [shape=ellipse, label="design\n設計", width=0.90];
+  "implement" [shape=ellipse, label="implement\n実装", width=1.20];
+  "requirement" [shape=box, label="requirement\n要求", width=1.40, penwidth="2"];
+  "spec" [shape=box, label="spec\n仕様書", width=0.90];
+
+  "requirement" -> "design";
+  "design" -> "spec";
+  "spec" -> "implement";
+  "implement" -> "code";
 }
 ```
 
