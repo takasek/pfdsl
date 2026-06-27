@@ -274,7 +274,7 @@ process:
     group: decision
   file_issues:
     label: issue 管理
-    description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、roadmap_pfdsl と同期する。起票と同時に roadmap_pfdsl への artifact/process/edge 追加を行う（後回し禁止 — 依存グラフが stale になり気付き依存に戻る）"
+    description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、roadmap_pfdsl と同期する。`flow:managed` の issue は起票と同時に roadmap_pfdsl への artifact/process/edge 追加を行う（後回し禁止 — 依存グラフが stale になり気付き依存に戻る）。保守・基盤・修正（バグ/hotfix・CI/hook/tooling・PFD bookkeeping）は `flow:exempt` とし roadmap に載せない（判定は references/github-issues-backend.md）"
     group: planning
   map_deps:
     label: 依存整理

@@ -198,12 +198,6 @@ artifact:
     criteria: 対象パッケージが npm 公開済みで README の install/import 例と一致
     location: https://github.com/takasek/pfdsl/issues/201
     updated_at: 2026-06-24T06:53:50Z
-  i231_workflow_libs:
-    label: "workflow に publish_libraries 登録 (#231)"
-    description: "published_libraries artifact と publish_libraries process を workflow.pfdsl に追加し、toolchain → publish_libraries → published_libraries エッジを接続する。#201 マージ後に着手可能"
-    status: todo
-    criteria: workflow.pfdsl に published_libraries と publish_libraries が登録され check がエラーなし
-    location: https://github.com/takasek/pfdsl/issues/231
   i216_hover_jump:
     label: "hover/quickpick jump (#216)"
     description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
@@ -238,13 +232,6 @@ artifact:
     status: done
     criteria: W002 の診断が artifact 定義行を指す
     location: https://github.com/takasek/pfdsl/issues/219
-  i230_gen_samples_ci:
-    label: "gen-samples ドリフト検査 CI (#230)"
-    description: "docs/samples の .dot / README を CI で再生成しドリフト検査する。svg はバージョン依存のため対象外"
-    status: todo
-    criteria: CI が docs/samples の .dot と README のドリフトを検出し、svg の扱いが文書化済み
-    location: https://github.com/takasek/pfdsl/issues/230
-    updated_at: 2026-06-26T00:00:00Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -307,16 +294,12 @@ process:
     label: group hover メンバー一覧実装
   fix_w002_line:
     label: W002 診断行番号修正
-  update_workflow_libs:
-    label: workflow にライブラリ公開ノード追加
   publish_cli_v0011:
     label: CLI v0.0.11リリース
   publish_ext_v0014:
     label: extension v0.0.14リリース
   integrate_spec_v009:
     label: 仕様書 v0.0.9統合
-  implement_gen_samples_ci:
-    label: gen-samplesドリフト検査CI実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -374,8 +357,6 @@ cli_tool_v009 >> implement_json_output -> json_output
 
 cli_tool >> publish_libraries -> i201_published_libs
 
-i201_published_libs >> update_workflow_libs -> i231_workflow_libs
-
 cli_tool_v009 >> implement_hover_jump -> i216_hover_jump
 cli_tool_v009 >> implement_run_command -> i217_run_command
 cli_tool_v009 >> implement_group_hover -> i218_group_hover
@@ -388,5 +369,3 @@ cli_tool_v009 >> implement_index_reindex -> i221_index_reindex
 i221_index_reindex >> integrate_spec_v009 -> spec_v009
 
 [i216_hover_jump, i217_run_command, i218_group_hover] >> publish_ext_v0014 -> ext_v0014
-
-cli_tool >> implement_gen_samples_ci -> i230_gen_samples_ci

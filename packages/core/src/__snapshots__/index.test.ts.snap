@@ -201,12 +201,6 @@ artifact:
     criteria: 対象パッケージが npm 公開済みで README の install/import 例と一致
     location: https://github.com/takasek/pfdsl/issues/201
     updated_at: 2026-06-24T06:53:50Z
-  i231_workflow_libs:
-    label: "workflow に publish_libraries 登録 (#231)"
-    description: "published_libraries artifact と publish_libraries process を workflow.pfdsl に追加し、toolchain → publish_libraries → published_libraries エッジを接続する。#201 マージ後に着手可能"
-    status: todo
-    criteria: workflow.pfdsl に published_libraries と publish_libraries が登録され check がエラーなし
-    location: https://github.com/takasek/pfdsl/issues/231
   i216_hover_jump:
     label: "hover/quickpick jump (#216)"
     description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
@@ -241,13 +235,6 @@ artifact:
     status: done
     criteria: W002 の診断が artifact 定義行を指す
     location: https://github.com/takasek/pfdsl/issues/219
-  i230_gen_samples_ci:
-    label: "gen-samples ドリフト検査 CI (#230)"
-    description: "docs/samples の .dot / README を CI で再生成しドリフト検査する。svg はバージョン依存のため対象外"
-    status: todo
-    criteria: CI が docs/samples の .dot と README のドリフトを検出し、svg の扱いが文書化済み
-    location: https://github.com/takasek/pfdsl/issues/230
-    updated_at: 2026-06-26T00:00:00Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -310,16 +297,12 @@ process:
     label: group hover メンバー一覧実装
   fix_w002_line:
     label: W002 診断行番号修正
-  update_workflow_libs:
-    label: workflow にライブラリ公開ノード追加
   publish_cli_v0011:
     label: CLI v0.0.11リリース
   publish_ext_v0014:
     label: extension v0.0.14リリース
   integrate_spec_v009:
     label: 仕様書 v0.0.9統合
-  implement_gen_samples_ci:
-    label: gen-samplesドリフト検査CI実装
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -360,10 +343,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -400,7 +380,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -433,10 +412,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -475,7 +451,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -509,10 +484,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -550,7 +522,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -584,10 +555,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -625,7 +593,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -659,10 +626,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -701,7 +665,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -736,10 +699,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -775,7 +735,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -809,10 +768,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -850,7 +806,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -885,10 +840,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -925,7 +877,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -960,10 +911,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1000,7 +948,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -1036,10 +983,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1075,7 +1019,6 @@ spec_v007
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -1110,10 +1053,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1150,7 +1090,6 @@ spec_v007
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -1185,10 +1124,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1225,7 +1161,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -1258,10 +1193,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1300,7 +1232,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -1333,10 +1264,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1375,7 +1303,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -1408,10 +1335,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1451,7 +1375,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_design_notes
@@ -1483,9 +1406,6 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1525,7 +1445,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -1558,10 +1477,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1600,7 +1516,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -1633,10 +1548,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1675,7 +1587,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -1717,10 +1628,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1751,7 +1659,6 @@ spec_v006
 spec_v007
 spec_v008
 spec_v009
-update_workflow_libs
 w002_line
 write_article
 write_design_notes
@@ -1788,10 +1695,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1826,7 +1730,6 @@ spec_v006
 spec_v007
 spec_v008
 spec_v009
-update_workflow_libs
 w002_line
 write_article
 write_design_notes
@@ -1858,10 +1761,7 @@ i216_hover_jump
 i217_run_command
 i218_group_hover
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -1890,82 +1790,6 @@ publish_cli_v0011
 publish_cli_v009
 publish_ext_v0014
 publish_extension
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-update_workflow_libs
-version_cmd
-w002_line
-write_article
-write_design_notes
-
-i201_published_libs >> update_workflow_libs
-update_workflow_libs -> i231_workflow_libs
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i221_index_reindex
-i230_gen_samples_ci
-i3_obsidian_plugin
-implement_gen_samples_ci
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-publish_libraries
 restructure_skillgen
 restructured_gen
 revises_spec
@@ -2011,10 +1835,7 @@ i119_published_extension
 i12_article
 i201_published_libs
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_index_reindex
 implement_json_output
 implement_lints
@@ -2051,7 +1872,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 write_article
 write_design_notes
@@ -2083,10 +1903,7 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_json_output
@@ -2125,7 +1942,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -2159,10 +1975,7 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -2201,7 +2014,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 write_article
 write_design_notes
@@ -2234,10 +2046,7 @@ i201_published_libs
 i216_hover_jump
 i217_run_command
 i218_group_hover
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -2275,7 +2084,6 @@ spec_v007
 spec_v008
 stdin
 subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
@@ -2308,10 +2116,7 @@ i119_published_extension
 i12_article
 i201_published_libs
 i221_index_reindex
-i230_gen_samples_ci
-i231_workflow_libs
 i3_obsidian_plugin
-implement_gen_samples_ci
 implement_group_hover
 implement_hover_jump
 implement_index_reindex
@@ -2350,82 +2155,6 @@ spec_v008
 spec_v009
 stdin
 subcommand_help
-update_workflow_libs
-version_cmd
-w002_line
-write_article
-write_design_notes
-
-cli_tool >> implement_gen_samples_ci
-implement_gen_samples_ci -> i230_gen_samples_ci
-adr_corpus
-audit_distribution
-build_obsidian_plugin
-cli_tool_v0010
-cli_tool_v0011
-cli_tool_v009
-criteria_spec
-design_notes
-draft_criteria
-draft_external_stakeholders
-draft_location
-draft_multifile_specs
-draft_revises
-ext_v0014
-external_stakeholders_spec
-featured_toolchain
-findings_r12
-fix_w002_line
-hierarchy_spec
-i119_published_extension
-i12_article
-i201_published_libs
-i216_hover_jump
-i217_run_command
-i218_group_hover
-i221_index_reindex
-i231_workflow_libs
-i3_obsidian_plugin
-implement_group_hover
-implement_hover_jump
-implement_index_reindex
-implement_json_output
-implement_lints
-implement_multifile
-implement_no_color
-implement_run_command
-implement_spec_features
-implement_stdin
-implement_subcommand_help
-implement_version_cmd
-integrate_multifile
-integrate_spec
-integrate_spec_v009
-json_output
-layer_audit_assets
-lint_checker
-location_spec
-multifile_policy
-multifile_toolchain
-no_color
-presets_spec
-publish_cli_v0010
-publish_cli_v0011
-publish_cli_v009
-publish_ext_v0014
-publish_extension
-publish_libraries
-restructure_skillgen
-restructured_gen
-revises_spec
-skill_gen
-spec_v006
-spec_v007
-spec_v008
-spec_v009
-stdin
-subcommand_help
-update_workflow_libs
 version_cmd
 w002_line
 write_article
