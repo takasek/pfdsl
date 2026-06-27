@@ -150,3 +150,29 @@ release:
 	echo "v$$VERSION を打って push します (publish-cli.yml が起動)"; \
 	git tag "v$$VERSION"; \
 	git push origin "v$$VERSION"
+
+# ライブラリ群（core/graphviz-exporter/preview-engine）を npm 公開する。
+# VERSION= を指定するか packages/core/package.json の version を使い
+# lib-v<version> タグを打って push し、publish-libraries.yml (OIDC) を起動する。
+# VERSION= を指定した場合は3パッケージの package.json を同時に更新してコミットしてからタグを打つ。
+# 例: make release-libs VERSION=0.0.2
+.PHONY: release-libs
+release-libs:
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$BRANCH" != "main" ]; then echo "main ブランチで実行してください (現在: $$BRANCH)"; exit 1; fi; \
+	if [ -n "$(VERSION)" ]; then \
+		for pkg in core graphviz-exporter preview-engine; do \
+			node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('packages/$$pkg/package.json','utf8'));p.version='$(VERSION)';fs.writeFileSync('packages/$$pkg/package.json',JSON.stringify(p,null,'\t')+'\n')"; \
+		done; \
+		git add packages/core/package.json packages/graphviz-exporter/package.json packages/preview-engine/package.json; \
+		git commit -m "chore(libs): bump library versions to $(VERSION)"; \
+	fi; \
+	VERSION=$$(node -p "require('./packages/core/package.json').version"); \
+	if [ -n "$$(git status --porcelain)" ]; then echo "作業ツリーに未コミットの変更があります"; exit 1; fi; \
+	if git rev-parse "lib-v$$VERSION" >/dev/null 2>&1; then echo "タグ lib-v$$VERSION は既に存在します (version を上げてください)"; exit 1; fi; \
+	git fetch origin main --quiet; \
+	git push origin main --quiet; \
+	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
+	echo "lib-v$$VERSION を打って push します (publish-libraries.yml が起動)"; \
+	git tag "lib-v$$VERSION"; \
+	git push origin "lib-v$$VERSION"
