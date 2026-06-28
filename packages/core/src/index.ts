@@ -112,6 +112,20 @@ export function parse(source: string): ParseDocResult {
 	};
 }
 
+export type {
+	IndexChange,
+	ReindexOptions,
+	ReindexResult,
+} from "./reindex.js";
+export { reindex } from "./reindex.js";
+
+export type {
+	SortKey,
+	SortOptions,
+	SortResult,
+} from "./sort.js";
+export { sort } from "./sort.js";
+
 export type { ValidateOptions } from "./validator.js";
 export {
 	buildGraph,
@@ -150,12 +164,9 @@ export function analyze(
 		isolatedNodes,
 		diagnostics: normDiags,
 	} = normalize(document, frontmatter);
-	const valDiags = validate(
-		edges,
-		nodeKinds,
-		frontmatter,
-		opts.strict ? { strict: true } : undefined,
-	);
+	const valOpts: import("./validator.js").ValidateOptions = { source };
+	if (opts.strict) valOpts.strict = true;
+	const valDiags = validate(edges, nodeKinds, frontmatter, valOpts);
 	const graph = buildGraph(edges, nodeKinds);
 	return {
 		document,
@@ -221,7 +232,7 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	} = normalize(document, frontmatter);
 	const valDiags = opts.skipValidation
 		? []
-		: validate(edges, nodeKinds, frontmatter);
+		: validate(edges, nodeKinds, frontmatter, { source });
 
 	const frontmatterSection = source.slice(0, source.length - body.length);
 

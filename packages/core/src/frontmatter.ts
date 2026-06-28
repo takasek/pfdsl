@@ -1,5 +1,49 @@
 import { parse as parseYaml } from "yaml";
-import type { Diagnostic, Frontmatter, LoadResult } from "./types/index.js";
+import type {
+	Diagnostic,
+	Frontmatter,
+	LoadResult,
+	Range,
+} from "./types/index.js";
+
+/**
+ * Locate the front matter key line of each artifact and process node, keyed by
+ * id. Used to point diagnostics at the offending node. Node id keys are matched
+ * at exactly 2-space indent (the canonical front matter style).
+ */
+export function findFrontmatterNodeRanges(source: string): Map<string, Range> {
+	const result = new Map<string, Range>();
+	const { bodyStartLine } = loadFrontmatter(source);
+	const fmEndLine = bodyStartLine - 1;
+	const lines = source.split("\n");
+	let inNodeSection = false;
+	for (let i = 0; i < fmEndLine && i < lines.length; i++) {
+		const line = lines[i];
+		if (line === undefined) continue;
+		// Top-level section key (no leading spaces)
+		if (/^\S/.test(line)) {
+			inNodeSection =
+				line.startsWith("artifact:") || line.startsWith("process:");
+			continue;
+		}
+		if (!inNodeSection) continue;
+		// Node ID keys are at exactly 2-space indent
+		const m = /^( {2})(\S[^:]*)\s*:/.exec(line);
+		if (!m) continue;
+		const id = m[2] ?? "";
+		if (!id) continue;
+		const lineNum = i + 1; // 1-based
+		const col = 3; // 2 spaces + 1-based = column 3
+		result.set(id, {
+			start: { line: lineNum, column: col, offset: 0 },
+			end: { line: lineNum, column: col + id.length, offset: 0 },
+		});
+	}
+	return result;
+}
+
+/** @deprecated use findFrontmatterNodeRanges (now covers process nodes too) */
+export const findFrontmatterArtifactRanges = findFrontmatterNodeRanges;
 
 export function loadFrontmatter(source: string): LoadResult {
 	if (!source.startsWith("---")) {

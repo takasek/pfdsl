@@ -47,12 +47,13 @@ function fetchIssues() {
 	const out = execFileSync("gh", [
 		"issue", "list",
 		"--state", "all",
-		"--json", "number,state,labels,updatedAt",
+		"--json", "number,state,stateReason,labels,updatedAt",
 		"--limit", "500",
 	]);
 	return JSON.parse(out).map((i) => ({
 		number: i.number,
 		state: i.state,
+		stateReason: i.stateReason ?? null,
 		labels: i.labels.map((l) => l.name),
 		updatedAt: i.updatedAt,
 	}));

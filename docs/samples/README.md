@@ -192,8 +192,8 @@ statusStyles:
   todo: { fillcolor: "#f8f9fa", style: filled }
 tag:
   external:
-    label: 外部公開
-    description: 外部に公開・提供される成果物
+    label: Publicly Released
+    description: Artifacts published or delivered externally
     style: { color: "#0066cc", penwidth: "2" }
   sensitive:
     style: { style: dashed }
@@ -402,13 +402,13 @@ digraph PFDSL {
 ---
 artifact:
   raw_data:
-    label: 生データ
+    label: Raw Data
   report:
-    label: 月次レポート
-    externalStakeholders: [規制当局, 監査法人]
+    label: Monthly Report
+    externalStakeholders: [Regulatory Authority, Audit Firm]
   summary:
-    label: 経営サマリー
-    externalStakeholders: [経営層]
+    label: Executive Summary
+    externalStakeholders: [Management]
 ---
 raw_data >> analyze -> report
 report >> summarize -> summary
@@ -425,10 +425,10 @@ digraph PFDSL {
   newrank=true;
 
   "analyze" [shape=ellipse, label="analyze"];
-  "raw_data" [shape=box, label="raw_data\n生データ", width=1.10, penwidth="2"];
-  "report" [shape=box, label="report\n月次レポート", tooltip="月次レポート\nexternalStakeholders: 規制当局, 監査法人", width=1.50];
+  "raw_data" [shape=box, label="raw_data\nRaw Data", penwidth="2"];
+  "report" [shape=box, label="report\nMonthly Report", tooltip="Monthly Report\nexternalStakeholders: Regulatory Authority, Audit Firm"];
   "summarize" [shape=ellipse, label="summarize"];
-  "summary" [shape=box, label="summary\n経営サマリー", tooltip="経営サマリー\nexternalStakeholders: 経営層", width=1.50, penwidth="2"];
+  "summary" [shape=box, label="summary\nExecutive Summary", tooltip="Executive Summary\nexternalStakeholders: Management", penwidth="2"];
 
   "raw_data" -> "analyze";
   "analyze" -> "report";
@@ -470,7 +470,7 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "fulfill_order" [shape=ellipse, label="fulfill_order\nOrder Fulfillment", tooltip="Order Fulfillment\nsubflow: ./12-subflow-detail.pfdsl"];
+  "fulfill_order" [shape=ellipse, label="fulfill_order\nOrder Fulfillment", tooltip="Order Fulfillment\nsubflow: ./12-subflow-detail.pfdsl", peripheries="2"];
   "requirement" [shape=box, label="requirement\nRequirements", penwidth="2"];
   "shipped_order" [shape=box, label="shipped_order\nShipped Order", penwidth="2"];
 
@@ -558,12 +558,57 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "fulfill" [shape=ellipse, label="fulfill\nFulfillment", tooltip="Fulfillment\nsubflow: ./14-boundary-detail.pfdsl"];
+  "fulfill" [shape=ellipse, label="fulfill\nFulfillment", tooltip="Fulfillment\nsubflow: ./14-boundary-detail.pfdsl", peripheries="2"];
   "order" [shape=box, label="order\nCustomer Order", penwidth="2"];
   "parcel" [shape=box, label="parcel\nParcel", penwidth="2"];
 
   "order" -> "fulfill";
   "fulfill" -> "parcel";
+}
+```
+
+</details>
+
+---
+
+## 15-index — Index field
+
+`index:` assigns an optional positive integer to artifacts and processes (independent namespaces). No graph-semantic effect; `pfdsl reindex` numbers nodes in topological order.
+
+```pfdsl
+---
+artifact:
+  requirement: { index: 1 }
+  spec:        { index: 2 }
+  code:        { index: 3 }
+process:
+  design:      { index: 1 }
+  implement:   { index: 2 }
+---
+requirement >> design -> spec
+spec >> implement -> code
+```
+
+<img src="15-index.svg">
+
+<details>
+<summary>DOT</summary>
+
+```dot
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "code" [shape=box, label="code", penwidth="2"];
+  "design" [shape=ellipse, label="design"];
+  "implement" [shape=ellipse, label="implement"];
+  "requirement" [shape=box, label="requirement", penwidth="2"];
+  "spec" [shape=box, label="spec"];
+
+  "requirement" -> "design";
+  "design" -> "spec";
+  "spec" -> "implement";
+  "implement" -> "code";
 }
 ```
 

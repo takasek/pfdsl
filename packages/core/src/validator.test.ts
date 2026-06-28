@@ -79,6 +79,67 @@ describe("validate", () => {
 		expect(codes("A >> P -> B", fm)).toContain("V007");
 	});
 
+	it("V029: index must be a positive integer (zero rejected)", () => {
+		const fm = {
+			artifact: { B: { index: 0 } },
+		} as unknown as Frontmatter;
+		expect(codes("A >> P -> B", fm)).toContain("V029");
+	});
+
+	it("V029: index must be a positive integer (non-integer rejected)", () => {
+		const fm = {
+			process: { P: { index: 1.5 } },
+		} as unknown as Frontmatter;
+		expect(codes("A >> P -> B", fm)).toContain("V029");
+	});
+
+	it("V029: index must be a positive integer (negative rejected)", () => {
+		const fm = {
+			artifact: { B: { index: -3 } },
+		} as unknown as Frontmatter;
+		expect(codes("A >> P -> B", fm)).toContain("V029");
+	});
+
+	it("V029: valid positive-integer index produces no error", () => {
+		const fm: Frontmatter = {
+			artifact: { B: { index: 2 } },
+			process: { P: { index: 1 } },
+		};
+		expect(codes("A >> P -> B", fm)).not.toContain("V029");
+	});
+
+	it("W004: duplicate index within the same namespace warns", () => {
+		const fm: Frontmatter = {
+			artifact: { A: { index: 1 }, B: { index: 1 } },
+		};
+		expect(codes("A >> P -> B", fm)).toContain("W004");
+	});
+
+	it("W004: same index across artifact/process namespaces is allowed", () => {
+		const fm: Frontmatter = {
+			artifact: { B: { index: 1 } },
+			process: { P: { index: 1 } },
+		};
+		expect(codes("A >> P -> B", fm)).not.toContain("W004");
+	});
+
+	it("V029: process index diagnostic points at the process line, not line 1", () => {
+		const src = `---
+process:
+  design:
+    index: 0
+---
+a >> design -> b
+`;
+		const { tokens } = lex(src);
+		const { document } = parseTokens(tokens);
+		const fm: Frontmatter = { process: { design: { index: 0 } } };
+		const { edges, nodeKinds } = normalize(document, fm);
+		const diags = validate(edges, nodeKinds, fm, { source: src });
+		const v029 = diags.find((d) => d.code === "V029");
+		expect(v029?.range?.start.line).toBe(3); // the `  design:` line
+	});
+
 	it("V008: invalid statusStyles key", () => {
 		const fm = {
 			statusStyles: { finished: { fillcolor: "gray" } },
@@ -270,6 +331,35 @@ describe("validate", () => {
 				artifact: { A: { status: "wip", criteria: "PR passes CI" } },
 			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W002");
+		});
+
+		it("W002 range points to artifact definition line when source is provided", () => {
+			const source = [
+				"---",
+				"artifact:",
+				"  myArt:",
+				"    status: done",
+				"---",
+				"myArt >> P -> B",
+			].join("\n");
+			const fm: Frontmatter = { artifact: { myArt: { status: "done" } } };
+			const { tokens } = lex("myArt >> P -> B");
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, fm);
+			const diags = validate(edges, nodeKinds, fm, { source });
+			const w002 = diags.find((d) => d.code === "W002");
+			expect(w002).toBeDefined();
+			expect(w002?.range.start.line).toBe(3); // line 3 (1-based): "  myArt:"
+		});
+
+		it("W002 range falls back to zeroRange when source is not provided", () => {
+			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const { tokens } = lex("A >> P -> B");
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, fm);
+			const diags = validate(edges, nodeKinds, fm);
+			const w002 = diags.find((d) => d.code === "W002");
+			expect(w002?.range.start.line).toBe(1); // zeroRange: line 1
 		});
 	});
 

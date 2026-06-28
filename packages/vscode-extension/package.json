@@ -70,6 +70,10 @@
 			{
 				"command": "pfdsl.jumpToDefinition",
 				"title": "PFDSL: Go to Frontmatter Definition"
+			},
+			{
+				"command": "pfdsl.sortMeta",
+				"title": "PFDSL: Sort Node Definitions…"
 			}
 		],
 		"keybindings": [

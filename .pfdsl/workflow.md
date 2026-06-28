@@ -59,15 +59,15 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 ## .pfdsl 変更後のスナップショット更新
 
-`.pfdsl` ファイルを人手変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。pre-commit hook（`.pfdsl` staged 時）と CI の両方で更新漏れを自動検出する。
+`packages/core/src/__fixtures__/` 内のフィクスチャ `.pfdsl` を変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。pre-commit hook（`.pfdsl` staged 時）と CI の両方で更新漏れを自動検出する。`.pfdsl/roadmap.pfdsl` / `.pfdsl/workflow.pfdsl` 等の運用 PFD を変更してもスナップショットは変化しない（fixture ベースのため）。
 
-## spec.md 変更後の gen-skill 実行
+## 生成物の再生成と自動ドリフト検査（gen-skill / gen-samples）
 
-`docs/spec/spec.md` を変更した場合、`make gen-skill` を実行してからコミットする。スキルの `references/spec.md` が spec 本文と一致していないと CI（check-gen-skill.yml）で失敗する。
+`docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。再生成漏れは機械的に検出されるため手動チェックは不要 — gen-skill identity は pre-commit（gen-skill 入力 staged 時）と CI（check-gen-skill.yml）、`.dot` / README のドリフトは graphviz-exporter の vitest テスト（pre-commit の `docs/samples/` staged 時と CI test）が検査する。`.svg` は graphviz バージョン依存のため検査対象外（roadmap.md ゲート参照）。
 
-## 新 frontmatter フィールド追加時の sample 更新
+## 新 frontmatter フィールド追加時の sample 追加
 
-frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で更新し、`make gen-samples` を実行してからコミットする。feature sample の更新漏れは「フィールドが仕様にあるがサンプルに示されていない」状態になる。詳細は roadmap.md ゲート参照。
+frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で追加する（「フィールドが仕様にあるがサンプルに示されていない」状態を防ぐ設計ルール）。生成物の再生成・ドリフト検査は上記のとおり機械的に強制される。
 
 ## VS Code 拡張の UI 動作確認
 
@@ -76,6 +76,10 @@ frontmatter に新フィールドを追加する develop では、対応する `
 ## flow:exempt issue の roadmap 追加除外
 
 `flow:exempt` ラベルの issue は roadmap_pfdsl への artifact 追加対象外。`file_issues` の「起票と同時に roadmap 追加」ルールの例外。起票時に `flow:exempt` / `flow:managed` を判定してから roadmap 追加要否を決める。
+
+## develop 着手時の artifact status 更新
+
+`develop` を開始する時点で、実装対象の出力 artifact を `todo` から `wip` に更新する。flow-sync は merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
 
 ## 複数 issue を一括実装する場合のバージョン戦略
 

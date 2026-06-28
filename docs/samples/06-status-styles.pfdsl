@@ -10,8 +10,8 @@ statusStyles:
   todo: { fillcolor: "#f8f9fa", style: filled }
 tag:
   external:
-    label: 外部公開
-    description: 外部に公開・提供される成果物
+    label: Publicly Released
+    description: Artifacts published or delivered externally
     style: { color: "#0066cc", penwidth: "2" }
   sensitive:
     style: { style: dashed }

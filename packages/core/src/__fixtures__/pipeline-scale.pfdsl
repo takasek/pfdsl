@@ -1,0 +1,158 @@
+---
+title: Pipeline Scale Test Fixture
+description: Fixed fixture for snapshot testing pipeline throughput. Represents structural patterns of a real roadmap without coupling to production planning data.
+layout:
+  direction: LR
+  maxWidth: 130
+
+artifact:
+  spec_alpha:
+    label: Alpha Spec
+    status: done
+    criteria: drafted and reviewed
+    location: docs/spec/alpha.md
+  spec_beta:
+    label: Beta Spec
+    status: done
+    criteria: drafted and reviewed
+    location: docs/spec/beta.md
+  policy_doc:
+    label: Policy Document
+    description: Design decisions for the multi-module architecture.
+    status: done
+    criteria: documented and approved
+    location: docs/policy.md
+  adr_set:
+    label: ADR Set
+    description: Architectural decision records.
+    status: done
+    criteria: decisions documented in docs/adr/
+    location: docs/adr/
+  impl_core:
+    label: Core Implementation
+    status: done
+    criteria: tests pass, published
+  impl_ext:
+    label: Extension Implementation
+    status: done
+    criteria: tests pass
+  impl_cli:
+    label: "CLI Implementation (#5)"
+    description: "command-line interface wrapping core"
+    status: done
+    criteria: "pfdsl --version exits 0"
+    location: https://example.com/issues/5
+  feature_x:
+    label: "Feature X (#20)"
+    status: wip
+    criteria: feature works end-to-end
+    location: https://example.com/issues/20
+    updated_at: 2026-01-15T00:00:00Z
+  feature_y:
+    label: "Feature Y (#21)"
+    status: todo
+    criteria: feature works end-to-end
+    location: https://example.com/issues/21
+    updated_at: 2026-01-16T00:00:00Z
+  feature_z:
+    label: "Feature Z (#22)"
+    description: "depends on feature_x and feature_y for shared state"
+    status: todo
+    criteria: feature works end-to-end
+    location: https://example.com/issues/22
+  impl_plugin_a:
+    label: "Plugin A (#10)"
+    status: todo
+    criteria: plugin loads without errors
+    location: https://example.com/issues/10
+    updated_at: 2026-02-01T00:00:00Z
+  impl_plugin_b:
+    label: "Plugin B (#11)"
+    description: "depends on plugin_a for shared types"
+    status: todo
+    criteria: plugin loads without errors
+    location: https://example.com/issues/11
+  release_v1:
+    label: v1.0 Release
+    status: todo
+    criteria: all core features shipped and tested
+  release_v2:
+    label: v2.0 Release
+    status: todo
+    criteria: plugins available and marketplace published
+  article:
+    label: "Public Article (#30)"
+    status: todo
+    criteria: published at external URL
+    location: https://example.com/issues/30
+    updated_at: 2026-03-01T00:00:00Z
+
+process:
+  draft_alpha:
+    label: Draft Alpha Spec
+  draft_beta:
+    label: Draft Beta Spec
+  write_policy:
+    label: Write Policy Doc
+  implement_core:
+    label: Implement Core
+  implement_ext:
+    label: Implement Extension
+  implement_cli:
+    label: Implement CLI
+  implement_feature_x:
+    label: Implement Feature X
+  implement_feature_y:
+    label: Implement Feature Y
+  implement_feature_z:
+    label: Implement Feature Z
+  build_plugin_a:
+    label: Build Plugin A
+  build_plugin_b:
+    label: Build Plugin B
+  do_release_v1:
+    label: Release v1.0
+  do_release_v2:
+    label: Release v2.0
+  write_article:
+    label: Write Article
+
+tag:
+  "priority:high": { style: { color: "#b60205", penwidth: "2" } }
+
+statusStyles:
+  done: { fillcolor: "#d4edda", style: filled }
+  wip: { fillcolor: "#fff3cd", style: filled }
+  todo: { fillcolor: "#f8f9fa", style: filled }
+  blocked: { fillcolor: "#f8d7da", style: filled }
+---
+
+adr_set >> draft_alpha -> spec_alpha
+
+adr_set >> draft_beta -> spec_beta
+
+adr_set >> write_policy -> policy_doc
+
+[spec_alpha, policy_doc] >> implement_core -> impl_core
+
+[spec_beta, policy_doc] >> implement_ext -> impl_ext
+
+[impl_core, impl_ext] >> implement_cli -> impl_cli
+
+impl_core >> implement_feature_x -> feature_x
+
+impl_core >> implement_feature_y -> feature_y
+
+[feature_x, feature_y] >> implement_feature_z -> feature_z
+
+impl_core >> build_plugin_a -> impl_plugin_a
+
+[impl_plugin_a, impl_ext] >> build_plugin_b -> impl_plugin_b
+
+[impl_cli, feature_x, feature_y, feature_z] >> do_release_v1 -> release_v1
+
+[release_v1, impl_plugin_a, impl_plugin_b] >> do_release_v2 -> release_v2
+
+adr_set >> write_article -> article
+
+spec_alpha >>? implement_core

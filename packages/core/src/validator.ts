@@ -1,9 +1,11 @@
+import { findFrontmatterNodeRanges } from "./frontmatter.js";
 import { zeroRange } from "./position.js";
 import type {
 	Diagnostic,
 	Frontmatter,
 	NodeKind,
 	NormalizedEdge,
+	Range,
 } from "./types/index.js";
 import { STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
 
@@ -12,6 +14,7 @@ const STYLE_ATTR_SET: ReadonlySet<string> = new Set(STYLE_ATTRS);
 
 export interface ValidateOptions {
 	strict?: boolean;
+	source?: string;
 }
 
 export function validate(
@@ -21,6 +24,9 @@ export function validate(
 	options?: ValidateOptions,
 ): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
+	const nodeRanges: Map<string, Range> = options?.source
+		? findFrontmatterNodeRanges(options.source)
+		: new Map();
 
 	// V001: single-source constraint (Primary Graph)
 	const artifactGenerators = new Map<string, string[]>();
@@ -146,6 +152,41 @@ export function validate(
 			});
 		}
 	}
+
+	// V029: index must be a positive integer (artifact / process)
+	// W004: duplicate index within a namespace (independent per kind)
+	const checkIndices = (
+		entries: Record<string, { index?: unknown }>,
+		kind: "artifact" | "process",
+	): void => {
+		const seen = new Map<number, string>();
+		for (const [id, meta] of Object.entries(entries)) {
+			const idx = meta.index;
+			if (idx === undefined) continue;
+			if (typeof idx !== "number" || !Number.isInteger(idx) || idx < 1) {
+				diagnostics.push({
+					severity: "error",
+					code: "V029",
+					message: `Invalid index '${String(idx)}' on ${kind} '${id}'. Must be a positive integer`,
+					range: nodeRanges.get(id) ?? zeroRange(),
+				});
+				continue;
+			}
+			const prev = seen.get(idx);
+			if (prev !== undefined) {
+				diagnostics.push({
+					severity: "warning",
+					code: "W004",
+					message: `Duplicate index ${idx} on ${kind} '${id}' (also on '${prev}')`,
+					range: nodeRanges.get(id) ?? zeroRange(),
+				});
+			} else {
+				seen.set(idx, id);
+			}
+		}
+	};
+	checkIndices(fm?.artifact ?? {}, "artifact");
+	checkIndices(fm?.process ?? {}, "process");
 
 	// V008: statusStyles keys must be valid Status enum
 	// V009: statusStyles / tag.<id>.style attribute keys must be in STYLE_ATTRS
@@ -336,7 +377,7 @@ export function validate(
 				severity: options?.strict ? "error" : "warning",
 				code: "W002",
 				message: `Artifact '${aid}' has no 'criteria' field`,
-				range: zeroRange(),
+				range: nodeRanges.get(aid) ?? zeroRange(),
 			});
 		}
 		if ((meta as Record<string, unknown>).command !== undefined) {

@@ -80,8 +80,8 @@ statusStyles:
   todo: { fillcolor: "#f8f9fa", style: filled }
 tag:
   external:
-    label: 外部公開
-    description: 外部に公開・提供される成果物
+    label: Publicly Released
+    description: Artifacts published or delivered externally
     style: { color: "#0066cc", penwidth: "2" }
   sensitive:
     style: { style: dashed }
@@ -166,13 +166,13 @@ spec >> implement -> code
 ---
 artifact:
   raw_data:
-    label: 生データ
+    label: Raw Data
   report:
-    label: 月次レポート
-    externalStakeholders: [規制当局, 監査法人]
+    label: Monthly Report
+    externalStakeholders: [Regulatory Authority, Audit Firm]
   summary:
-    label: 経営サマリー
-    externalStakeholders: [経営層]
+    label: Executive Summary
+    externalStakeholders: [Management]
 ---
 raw_data >> analyze -> report
 report >> summarize -> summary
@@ -239,6 +239,26 @@ process:
       parcel: outgoing_parcel
 ---
 order >> fulfill -> parcel
+```
+
+---
+
+## 15-index — Index field
+
+`index:` assigns an optional positive integer to artifacts and processes (independent namespaces). No graph-semantic effect; `pfdsl reindex` numbers nodes in topological order.
+
+```pfdsl
+---
+artifact:
+  requirement: { index: 1 }
+  spec:        { index: 2 }
+  code:        { index: 3 }
+process:
+  design:      { index: 1 }
+  implement:   { index: 2 }
+---
+requirement >> design -> spec
+spec >> implement -> code
 ```
 
 ---

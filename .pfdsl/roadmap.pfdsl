@@ -55,14 +55,14 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_tool_v0011:
     label: "CLI v0.0.11（次期リリース）"
-    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #220 schedule: / #221 index+renum 等を含む予定"
+    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+reindex / #236 node sort 等を含む予定"
     status: todo
     criteria: npm show @pfdsl/cli version が 0.0.11 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
   spec_v009:
-    label: 仕様書 v0.0.9（schedule:/index:統合）
+    label: 仕様書 v0.0.9（index:統合）
     status: todo
-    criteria: "schedule:/index: が spec 本文に統合済み"
+    criteria: "index: が spec 本文に統合済み"
     location: ../docs/spec/spec.md
   ext_v0014:
     label: "extension v0.0.14（次期リリース）"
@@ -191,55 +191,45 @@ artifact:
     status: done
     criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/181
-  i201_published_libs:
-    label: "公開ライブラリ群 (#201)"
-    description: "@pfdsl/core / preview-engine / graphviz-exporter を npm 公開ライブラリ化し、README の Library 節と実態を整合させる。監査 #198 から派生（engines.node は #198 で対応）"
-    status: todo
-    criteria: 対象パッケージが npm 公開済みで README の install/import 例と一致
-    location: https://github.com/takasek/pfdsl/issues/201
-    updated_at: 2026-06-24T06:53:50Z
   i216_hover_jump:
     label: "hover/quickpick jump (#216)"
     description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
-    status: todo
+    status: wip
     criteria: location/subflow/command フィールドのジャンプが動作確認済み
     location: https://github.com/takasek/pfdsl/issues/216
     updated_at: 2026-06-26T05:00:40Z
   i217_run_command:
     label: "process command 実行 (#217)"
     description: "vscode-extension でプロセスの command フィールドを統合ターミナルで実行"
-    status: todo
+    status: wip
     criteria: command フィールドのターミナル実行が動作確認済み
     location: https://github.com/takasek/pfdsl/issues/217
     updated_at: 2026-06-26T05:00:41Z
   i218_group_hover:
     label: "group hover メンバー一覧 (#218)"
     description: "vscode-extension でグループノードの hover にメンバー一覧を表示"
-    status: todo
+    status: wip
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
     updated_at: 2026-06-26T05:00:41Z
-  i219_w002_line:
+  w002_line:
     label: "W002 診断行番号修正 (#219)"
     description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
-    status: todo
+    status: done
     criteria: W002 の診断が artifact 定義行を指す
     location: https://github.com/takasek/pfdsl/issues/219
-    updated_at: 2026-06-26T05:00:42Z
-  i220_schedule_field:
-    label: "schedule: フィールド仕様・実装 (#220)"
-    description: "process/artifact に schedule: ブロックを追加。pfd-tools 連携可能の条件となる"
-    status: todo
-    criteria: "spec に schedule: が定義済み、サンプル・checker・formatter 対応済み"
-    location: https://github.com/takasek/pfdsl/issues/220
-    updated_at: 2026-06-26T04:50:26Z
-  i221_index_renum:
-    label: "index フィールド + renum コマンド (#221)"
-    description: "オプショナル整数フィールド index: と pfdsl renum コマンドを追加。pfd-tools の P#/D# 採番に対応"
-    status: todo
-    criteria: "spec に index: が定義済み、pfdsl renum コマンドが動作確認済み"
+  index_reindex:
+    label: "index フィールド + reindex コマンド (#221)"
+    description: "オプショナル整数フィールド index: と pfdsl reindex コマンドを追加。pfd-tools の P#/D# 採番に対応"
+    status: done
+    criteria: "spec に index: が定義済み、pfdsl reindex コマンドが動作確認済み"
     location: https://github.com/takasek/pfdsl/issues/221
-    updated_at: 2026-06-26T04:50:27Z
+  node_sort:
+    label: "node 定義の並べ替え (#236)"
+    description: "frontmatter の artifact/process node 定義を index/topological/group 等のキーで並べ替える pfdsl sort コマンド。index 採番(#221)と frontmatter 編集基盤の上に乗る"
+    status: done
+    criteria: "pfdsl sort が --by index|topological|group|id で node 定義を並べ替え、--check で検証できる"
+    location: https://github.com/takasek/pfdsl/issues/236
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -290,12 +280,8 @@ process:
     label: --json出力実装
   publish_cli_v0010:
     label: CLI v0.0.10リリース
-  publish_libraries:
-    label: ライブラリ公開
-  implement_schedule_field:
-    label: schedule:フィールド実装
-  implement_index_renum:
-    label: index フィールド + renum 実装
+  implement_index_reindex:
+    label: index フィールド + reindex 実装
   implement_hover_jump:
     label: hover/quickpick ジャンプ実装
   implement_run_command:
@@ -306,6 +292,8 @@ process:
     label: W002 診断行番号修正
   publish_cli_v0011:
     label: CLI v0.0.11リリース
+  implement_node_sort:
+    label: node 並べ替え実装
   publish_ext_v0014:
     label: extension v0.0.14リリース
   integrate_spec_v009:
@@ -365,18 +353,17 @@ cli_tool_v009 >> implement_json_output -> json_output
 
 [version_cmd, subcommand_help, stdin, no_color, json_output] >> publish_cli_v0010 -> cli_tool_v0010
 
-cli_tool >> publish_libraries -> i201_published_libs
-
 cli_tool_v009 >> implement_hover_jump -> i216_hover_jump
 cli_tool_v009 >> implement_run_command -> i217_run_command
 cli_tool_v009 >> implement_group_hover -> i218_group_hover
-cli_tool_v009 >> fix_w002_line -> i219_w002_line
+cli_tool_v009 >> fix_w002_line -> w002_line
 
-cli_tool_v009 >> implement_schedule_field -> i220_schedule_field
-cli_tool_v009 >> implement_index_renum -> i221_index_renum
+cli_tool_v009 >> implement_index_reindex -> index_reindex
 
-[cli_tool_v0010, i219_w002_line, i220_schedule_field, i221_index_renum] >> publish_cli_v0011 -> cli_tool_v0011
+cli_tool_v009 >> implement_node_sort -> node_sort
 
-[i220_schedule_field, i221_index_renum] >> integrate_spec_v009 -> spec_v009
+[cli_tool_v0010, w002_line, index_reindex, node_sort] >> publish_cli_v0011 -> cli_tool_v0011
+
+index_reindex >> integrate_spec_v009 -> spec_v009
 
 [i216_hover_jump, i217_run_command, i218_group_hover] >> publish_ext_v0014 -> ext_v0014

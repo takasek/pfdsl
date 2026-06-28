@@ -1,0 +1,15 @@
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "code" [shape=box, label="code", penwidth="2"];
+  "design" [shape=ellipse, label="design"];
+  "implement" [shape=ellipse, label="implement"];
+  "requirement" [shape=box, label="requirement", penwidth="2"];
+  "spec" [shape=box, label="spec"];
+
+  "requirement" -> "design";
+  "design" -> "spec";
+  "spec" -> "implement";
+  "implement" -> "code";
+}

@@ -104,6 +104,194 @@ describe("fmt", () => {
 	});
 });
 
+describe("reindex", () => {
+	const declared = `---
+artifact:
+  req:
+    label: Req
+  spec:
+    label: Spec
+process:
+  design:
+    label: Design
+---
+req >> design -> spec
+`;
+
+	it("default prints the rewritten body to stdout (preview), no write", async () => {
+		const f = join(dir, "reindex-preview.pfdsl");
+		writeFileSync(f, declared);
+		const r = await run(["reindex", f, "--renumber"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("index: 1");
+		// file is untouched in preview mode
+		expect(readFileSync(f, "utf-8")).toBe(declared);
+	});
+
+	it("--write rewrites the file and prints the change report to stdout", async () => {
+		const f = join(dir, "reindex-write.pfdsl");
+		writeFileSync(f, declared);
+		const r = await run(["reindex", f, "--write", "--renumber"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("+ D req 1");
+		expect(r.stdout).toContain("+ P design 1");
+		expect(readFileSync(f, "utf-8")).toContain("index:");
+	});
+
+	it("--check exits 1 when reindexing would change anything", async () => {
+		const f = join(dir, "reindex-check.pfdsl");
+		writeFileSync(f, declared);
+		const r = await run(["reindex", f, "--check", "--renumber"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toContain("design");
+	});
+
+	it("--check exits 0 when already indexed", async () => {
+		const f = join(dir, "reindex-check-clean.pfdsl");
+		writeFileSync(f, declared);
+		await run(["reindex", f, "--write", "--renumber"]);
+		const r = await run(["reindex", f, "--check", "--renumber"]);
+		expect(r.exitCode).toBe(0);
+	});
+
+	it("--json emits a machine-readable change report", async () => {
+		const f = join(dir, "reindex-json.pfdsl");
+		writeFileSync(f, declared);
+		const r = await run(["reindex", f, "--json", "--renumber"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(Array.isArray(parsed.changes)).toBe(true);
+		expect(parsed.changes.length).toBe(3);
+	});
+
+	it("--write with stdin is rejected (exit 2)", async () => {
+		const r = await run(["reindex", "-", "--write"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("--check combined with --write is rejected (exit 2)", async () => {
+		const f = join(dir, "reindex-conflict.pfdsl");
+		writeFileSync(f, declared);
+		const r = await run(["reindex", f, "--check", "--write"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("parse error surfaces diagnostics and exits 1", async () => {
+		const f = join(dir, "reindex-bad.pfdsl");
+		writeFileSync(f, "req >> design\n"); // V003: no output
+		const r = await run(["reindex", f, "--write"]);
+		expect(r.exitCode).toBe(1);
+		expect(readFileSync(f, "utf-8")).toBe("req >> design\n");
+	});
+});
+
+describe("sort-meta", () => {
+	const unsorted = `---
+artifact:
+  z:
+    label: Z
+  a:
+    label: A
+---
+z >> p -> a
+`;
+
+	it("default prints sorted body to stdout (preview), no write", async () => {
+		const f = join(dir, "sort-preview.pfdsl");
+		writeFileSync(f, unsorted);
+		const r = await run(["sort-meta", f, "--by", "id"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toMatch(/^\s*a:/m);
+		// file is untouched in preview mode
+		expect(readFileSync(f, "utf-8")).toBe(unsorted);
+	});
+
+	it("--write rewrites the file in place", async () => {
+		const f = join(dir, "sort-write.pfdsl");
+		writeFileSync(f, unsorted);
+		const r = await run(["sort-meta", f, "--by", "id", "--write"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		// a should appear before z after sorting by id
+		const aIdx = after.indexOf("  a:");
+		const zIdx = after.indexOf("  z:");
+		expect(aIdx).toBeLessThan(zIdx);
+	});
+
+	it("--check exits 1 when not sorted", async () => {
+		const f = join(dir, "sort-check-unsorted.pfdsl");
+		writeFileSync(f, unsorted);
+		const r = await run(["sort-meta", f, "--by", "id", "--check"]);
+		expect(r.exitCode).toBe(1);
+	});
+
+	it("--check exits 0 when already sorted", async () => {
+		const sorted = `---
+artifact:
+  a:
+    label: A
+  z:
+    label: Z
+---
+z >> p -> a
+`;
+		const f = join(dir, "sort-check-sorted.pfdsl");
+		writeFileSync(f, sorted);
+		const r = await run(["sort-meta", f, "--by", "id", "--check"]);
+		expect(r.exitCode).toBe(0);
+	});
+
+	it("--by without value is rejected (exit 2)", async () => {
+		const f = join(dir, "sort-noby.pfdsl");
+		writeFileSync(f, unsorted);
+		const r = await run(["sort-meta", f]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("--write with stdin is rejected (exit 2)", async () => {
+		const r = await run(["sort-meta", "-", "--by", "id", "--write"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("--check combined with --write is rejected (exit 2)", async () => {
+		const f = join(dir, "sort-conflict.pfdsl");
+		writeFileSync(f, unsorted);
+		const r = await run(["sort-meta", f, "--by", "id", "--check", "--write"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("accepts multi-key --by group,index", async () => {
+		const src = `---
+artifact:
+  b1: { label: B1, group: beta, index: 1 }
+  a1: { label: A1, group: alpha, index: 1 }
+---
+a1 >> p -> b1
+`;
+		const f = join(dir, "sort-multikey.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["sort-meta", f, "--by", "group,index"]);
+		expect(r.exitCode).toBe(0);
+		// a1 (alpha) before b1 (beta)
+		expect(r.stdout.indexOf("  a1:")).toBeLessThan(r.stdout.indexOf("  b1:"));
+	});
+
+	it("invalid --by key is rejected (exit 2)", async () => {
+		const f = join(dir, "sort-badkey.pfdsl");
+		writeFileSync(f, unsorted);
+		const r = await run(["sort-meta", f, "--by", "invalid"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("partially invalid --by key is rejected (exit 2)", async () => {
+		const f = join(dir, "sort-partialkey.pfdsl");
+		writeFileSync(f, unsorted);
+		const r = await run(["sort-meta", f, "--by", "index,typo"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toMatch(/typo/);
+	});
+});
+
 describe("normalize", () => {
 	it("prints canonical edges", async () => {
 		const r = await run(["normalize", join(dir, "valid.pfdsl")]);
