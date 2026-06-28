@@ -11,10 +11,12 @@ function escapeHtml(s: string): string {
 	return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// valign/align are legacy HTML attributes preserved by VSCode's sanitizer (not CSS)
+// GFM table: inline markdown (links, italic) is processed in cells; <br> for multiline (supportHtml=true)
 function tableRow(key: string, value: string): string {
-	const v = escapeHtml(value.trimEnd()).replace(/\n/g, "<br>");
-	return `<tr><td align="right" valign="top"><em>${escapeHtml(key)}</em></td><td valign="top">${v}</td></tr>`;
+	const v = escapeHtml(value.trimEnd())
+		.replace(/\|/g, "\\|")
+		.replace(/\n/g, "<br>");
+	return `| _${escapeHtml(key)}_ | ${v} |`;
 }
 
 function descLines(text: string): string[] {
@@ -131,7 +133,7 @@ export function buildHoverLines(
 	}
 
 	if (rows.length > 0) {
-		lines.push(`<table>${rows.join("")}</table>`);
+		lines.push(["| | |", "|--:|:--|", ...rows].join("\n"));
 	}
 	return lines;
 }

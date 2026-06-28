@@ -77,10 +77,12 @@ export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 						}
 						if (stat?.type === vscode.FileType.Directory) {
 							const args = encodeURIComponent(JSON.stringify([fsPath]));
-							return new vscode.DocumentLink(
+							const link = new vscode.DocumentLink(
 								range,
 								vscode.Uri.parse(`command:${OPEN_DIR_COMMAND}?${args}`),
 							);
+							link.tooltip = "Open file in folder…";
+							return link;
 						}
 						return new vscode.DocumentLink(range, uri);
 					}
