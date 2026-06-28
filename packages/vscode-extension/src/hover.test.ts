@@ -98,6 +98,19 @@ describe("buildHoverLines", () => {
 		expect(table).toContain("make build");
 		expect(table).toContain("_subflow_");
 		expect(table).toContain("sub.pfdsl");
+		expect(lines.some((l) => l.includes("▶ Run command"))).toBe(false); // no docUri
+	});
+
+	it("shows run command link in command table cell when docUri provided", () => {
+		const fm = {
+			process: { P1: { command: "make build" } },
+		};
+		const lines = buildHoverLines("P1", "process", fm, "file:///repo/a.pfdsl");
+		const table = tableContent(lines);
+		expect(table).toContain("_command_");
+		expect(table).toContain("make build");
+		expect(table).toContain("[▶ run](command:pfdsl._runProcessCommand?");
+		expect(table).toContain("make%20build");
 	});
 
 	it("returns only header and separator when id not in frontmatter", () => {
@@ -161,6 +174,57 @@ describe("buildHoverLines", () => {
 		const lines = buildHoverLines("art1", "artifact", fm);
 		const table = tableContent(lines);
 		expect(table).toContain("g1");
+	});
+
+	it("makes artifact group clickable when docUri provided", () => {
+		const fm = {
+			artifact: { art1: { group: "g1" } },
+			group: { g1: { label: "Input Docs" } },
+		};
+		const lines = buildHoverLines(
+			"art1",
+			"artifact",
+			fm,
+			"file:///repo/a.pfdsl",
+		);
+		const table = tableContent(lines);
+		expect(table).toContain("command:pfdsl._gotoNodeDefinition");
+		expect(table).toContain("g1");
+		expect(table).toContain("Input Docs");
+	});
+
+	it("makes location clickable as directory command when docUri provided", () => {
+		const fm = { artifact: { art1: { location: "src/orders/" } } };
+		const lines = buildHoverLines(
+			"art1",
+			"artifact",
+			fm,
+			"file:///repo/a.pfdsl",
+		);
+		const table = tableContent(lines);
+		expect(table).toContain("command:pfdsl._openDirLocation");
+		expect(table).toContain("src/orders/");
+	});
+
+	it("makes location clickable as file:// link when docUri provided", () => {
+		const fm = { artifact: { art1: { location: "src/orders/order.ts" } } };
+		const lines = buildHoverLines(
+			"art1",
+			"artifact",
+			fm,
+			"file:///repo/a.pfdsl",
+		);
+		const table = tableContent(lines);
+		expect(table).toContain("file:///repo/src/orders/order.ts");
+		expect(table).toContain("src/orders/order.ts");
+	});
+
+	it("makes process group clickable when docUri provided", () => {
+		const fm = { process: { P1: { group: "ops" } } };
+		const lines = buildHoverLines("P1", "process", fm, "file:///repo/a.pfdsl");
+		const table = tableContent(lines);
+		expect(table).toContain("command:pfdsl._gotoNodeDefinition");
+		expect(table).toContain("ops");
 	});
 });
 

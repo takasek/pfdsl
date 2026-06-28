@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import type { Frontmatter, NodeKind } from "@pfdsl/core";
 import { normalizeLocation } from "./location-utils.js";
 
@@ -26,11 +27,36 @@ function descLines(text: string): string[] {
 		.map((l) => `> ${escapeHtml(l)}`);
 }
 
+export const RUN_COMMAND = "pfdsl._runProcessCommand";
 const GOTO_COMMAND = "pfdsl._gotoNodeDefinition";
+const OPEN_DIR_COMMAND = "pfdsl._openDirLocation";
 
 function nodeLink(docUri: string, nodeId: string, icon: string): string {
 	const args = encodeURIComponent(JSON.stringify([docUri, nodeId]));
 	return `[${icon} ${nodeId}](command:${GOTO_COMMAND}?${args})`;
+}
+
+function locationLink(docUri: string, loc: string): string {
+	const fsPath = decodeURIComponent(docUri.replace(/^file:\/\//, ""));
+	const absPath = path.resolve(path.dirname(fsPath), loc.replace(/\/$/, ""));
+	if (loc.endsWith("/")) {
+		const args = encodeURIComponent(JSON.stringify([absPath]));
+		return `[${loc}](command:${OPEN_DIR_COMMAND}?${args})`;
+	}
+	return `[${loc}](file://${absPath})`;
+}
+
+function groupDisplay(
+	groupId: string,
+	frontmatter: Frontmatter | null,
+	docUri?: string,
+): string {
+	const label = frontmatter?.group?.[groupId]?.label;
+	if (docUri) {
+		const link = nodeLink(docUri, groupId, KIND_ICON.group);
+		return label ? `${link} (${label})` : link;
+	}
+	return label ? `${groupId} (${label})` : groupId;
 }
 
 export function buildHoverLines(
@@ -60,18 +86,18 @@ export function buildHoverLines(
 			if (meta.tags?.length) rows.push(tableRow("tags", meta.tags.join(", ")));
 			if (meta.parts?.length)
 				rows.push(tableRow("parts", meta.parts.join(", ")));
-			if (meta.group) {
-				const groupLabel = frontmatter?.group?.[meta.group]?.label;
+			if (meta.group)
 				rows.push(
-					tableRow(
-						"group",
-						groupLabel ? `${meta.group} (${groupLabel})` : meta.group,
-					),
+					tableRow("group", groupDisplay(meta.group, frontmatter, docUri)),
 				);
-			}
 			if (meta.criteria) rows.push(tableRow("criteria", meta.criteria));
 			const locs = normalizeLocation(meta.location);
-			if (locs.length) rows.push(tableRow("location", locs.join(", ")));
+			if (locs.length) {
+				const locDisplay = docUri
+					? locs.map((l) => locationLink(docUri, l)).join(", ")
+					: locs.join(", ");
+				rows.push(tableRow("location", locDisplay));
+			}
 			if (meta.revises) rows.push(tableRow("revises", meta.revises));
 		}
 	} else if (kind === "process") {
@@ -87,17 +113,17 @@ export function buildHoverLines(
 						meta.externalStakeholders.join(", "),
 					),
 				);
-			if (meta.group) {
-				const groupLabel = frontmatter?.group?.[meta.group]?.label;
+			if (meta.group)
 				rows.push(
-					tableRow(
-						"group",
-						groupLabel ? `${meta.group} (${groupLabel})` : meta.group,
-					),
+					tableRow("group", groupDisplay(meta.group, frontmatter, docUri)),
 				);
-			}
 			if (meta.tags?.length) rows.push(tableRow("tags", meta.tags.join(", ")));
-			if (meta.command) rows.push(tableRow("command", meta.command));
+			if (meta.command) {
+				const commandDisplay = docUri
+					? `${meta.command}  [▶ run](command:${RUN_COMMAND}?${encodeURIComponent(JSON.stringify([meta.command, docUri]))})`
+					: meta.command;
+				rows.push(tableRow("command", commandDisplay));
+			}
 			if (meta.subflow) rows.push(tableRow("subflow", meta.subflow));
 		}
 	} else {
