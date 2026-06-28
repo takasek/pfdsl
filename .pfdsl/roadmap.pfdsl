@@ -212,13 +212,6 @@ artifact:
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
     updated_at: 2026-06-26T05:00:41Z
-  i236_node_sort:
-    label: "node 定義の並べ替え (#236)"
-    description: "frontmatter の artifact/process node 定義を index/topological/group 等のキーで並べ替える pfdsl sort コマンド。index 採番(#221)と frontmatter 編集基盤の上に乗る"
-    status: todo
-    criteria: "pfdsl sort が --by index|topological|group|id で node 定義を並べ替え、--check で検証できる"
-    location: https://github.com/takasek/pfdsl/issues/236
-    updated_at: 2026-06-27T03:04:39Z
   w002_line:
     label: "W002 診断行番号修正 (#219)"
     description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
@@ -231,6 +224,12 @@ artifact:
     status: done
     criteria: "spec に index: が定義済み、pfdsl reindex コマンドが動作確認済み"
     location: https://github.com/takasek/pfdsl/issues/221
+  node_sort:
+    label: "node 定義の並べ替え (#236)"
+    description: "frontmatter の artifact/process node 定義を index/topological/group 等のキーで並べ替える pfdsl sort コマンド。index 採番(#221)と frontmatter 編集基盤の上に乗る"
+    status: done
+    criteria: "pfdsl sort が --by index|topological|group|id で node 定義を並べ替え、--check で検証できる"
+    location: https://github.com/takasek/pfdsl/issues/236
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -361,9 +360,9 @@ cli_tool_v009 >> fix_w002_line -> w002_line
 
 cli_tool_v009 >> implement_index_reindex -> index_reindex
 
-cli_tool_v009 >> implement_node_sort -> i236_node_sort
+cli_tool_v009 >> implement_node_sort -> node_sort
 
-[cli_tool_v0010, w002_line, index_reindex, i236_node_sort] >> publish_cli_v0011 -> cli_tool_v0011
+[cli_tool_v0010, w002_line, index_reindex, node_sort] >> publish_cli_v0011 -> cli_tool_v0011
 
 index_reindex >> integrate_spec_v009 -> spec_v009
 
