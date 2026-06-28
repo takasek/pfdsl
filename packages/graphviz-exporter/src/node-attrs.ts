@@ -92,10 +92,7 @@ export function resolveStyleAttrs(
 ): NodeStyle {
 	if (!fm) return {};
 	if (kind === "group") return {};
-	const meta = resolveMeta(fm, kind, id) as
-		| ArtifactMeta
-		| ProcessMeta
-		| undefined;
+	const meta = resolveMeta(fm, kind, id);
 	const styleAttrs: NodeStyle = {};
 	// tags reverse iter: later Object.assign wins → first tag in array prevails
 	const tags = meta?.tags ?? [];

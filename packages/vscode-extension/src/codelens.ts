@@ -7,7 +7,7 @@ const COMMAND_LINE_RE = /^\s+command:\s+(.+)$/;
 export function registerCodeLens(context: vscode.ExtensionContext): void {
 	const provider: vscode.InlayHintsProvider = {
 		provideInlayHints(doc) {
-			const { frontmatter } = analyzeDocument(doc);
+			const { frontmatter, bodyStartLine } = analyzeDocument(doc);
 			if (!frontmatter?.process) return [];
 
 			const processCommands = new Set<string>();
@@ -19,15 +19,7 @@ export function registerCodeLens(context: vscode.ExtensionContext): void {
 			const hints: vscode.InlayHint[] = [];
 			const docUri = doc.uri.toString();
 
-			let frontmatterEnd = doc.lineCount;
-			for (let i = 1; i < doc.lineCount; i++) {
-				if (doc.lineAt(i).text.trim() === "---") {
-					frontmatterEnd = i;
-					break;
-				}
-			}
-
-			for (let i = 0; i < frontmatterEnd; i++) {
+			for (let i = 0; i < bodyStartLine - 1; i++) {
 				const lineText = doc.lineAt(i).text;
 				const match = lineText.match(COMMAND_LINE_RE);
 				if (!match) continue;
