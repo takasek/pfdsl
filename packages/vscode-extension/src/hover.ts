@@ -2,18 +2,17 @@ import * as path from "node:path";
 import { ID_PATTERN } from "@pfdsl/core";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
-import { buildHoverLines } from "./hover-logic.js";
+import { buildHoverLines, RUN_COMMAND } from "./hover-logic.js";
 import { findFrontmatterDefinition } from "./jump.js";
 
 export { buildHoverLines } from "./hover-logic.js";
 
 const GOTO_COMMAND = "pfdsl._gotoNodeDefinition";
 const FIND_COMMAND = "editor.actions.findWithArgs";
-const RUN_COMMAND = "pfdsl._runProcessCommand";
-
-const outputChannel = vscode.window.createOutputChannel("pfdsl hover");
 
 export function registerHover(context: vscode.ExtensionContext): void {
+	const outputChannel = vscode.window.createOutputChannel("pfdsl hover");
+	context.subscriptions.push(outputChannel);
 	context.subscriptions.push(
 		vscode.commands.registerCommand(
 			RUN_COMMAND,

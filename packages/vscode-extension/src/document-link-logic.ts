@@ -46,8 +46,7 @@ export function extractDocumentLinks(
 
 			const values = normalizeLocation(rawValue);
 			if (values.length === 0) continue;
-			const value = values[0];
-			if (!value) continue;
+			const value = values[0]!;
 
 			const startChar = prefix.length + quote.length;
 			const endChar = startChar + rawValue.length;

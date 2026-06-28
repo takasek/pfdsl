@@ -1,5 +1,5 @@
-import * as path from "node:path";
 import type { Frontmatter, NodeKind } from "@pfdsl/core";
+import { resolveLocationFsPath } from "./location-path.js";
 import { normalizeLocation } from "./location-utils.js";
 
 const KIND_ICON: Record<NodeKind, string> = {
@@ -37,9 +37,13 @@ function nodeLink(docUri: string, nodeId: string, icon: string): string {
 }
 
 function locationLink(docUri: string, loc: string): string {
-	const fsPath = decodeURIComponent(docUri.replace(/^file:\/\//, ""));
-	const absPath = path.resolve(path.dirname(fsPath), loc.replace(/\/$/, ""));
-	if (loc.endsWith("/")) {
+	const docFsPath = decodeURIComponent(docUri.replace(/^file:\/\//, ""));
+	const isDir = loc.endsWith("/");
+	const absPath = resolveLocationFsPath(
+		docFsPath,
+		isDir ? loc.slice(0, -1) : loc,
+	);
+	if (isDir) {
 		const args = encodeURIComponent(JSON.stringify([absPath]));
 		return `[${loc}](command:${OPEN_DIR_COMMAND}?${args})`;
 	}
@@ -131,30 +135,17 @@ export function buildHoverLines(
 		const meta = frontmatter?.group?.[id];
 		if (meta) {
 			if (meta.label) lines.push(`**${meta.label}**`);
-			const artifactMembers: string[] = [];
-			const processMembers: string[] = [];
-			for (const [aid, ameta] of Object.entries(frontmatter?.artifact ?? {})) {
-				if (ameta?.group === id) {
-					artifactMembers.push(
-						docUri
-							? nodeLink(docUri, aid, KIND_ICON.artifact)
-							: `${KIND_ICON.artifact} ${aid}`,
+			for (const [mapKey, icon] of [
+				["artifact", KIND_ICON.artifact],
+				["process", KIND_ICON.process],
+			] as const) {
+				const members = Object.entries(frontmatter?.[mapKey] ?? {})
+					.filter(([, m]) => m?.group === id)
+					.map(([nid]) =>
+						docUri ? nodeLink(docUri, nid, icon) : `${icon} ${nid}`,
 					);
-				}
+				if (members.length > 0) rows.push(tableRow(mapKey, members.join(", ")));
 			}
-			for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
-				if (pmeta?.group === id) {
-					processMembers.push(
-						docUri
-							? nodeLink(docUri, pid, KIND_ICON.process)
-							: `${KIND_ICON.process} ${pid}`,
-					);
-				}
-			}
-			if (artifactMembers.length > 0)
-				rows.push(tableRow("artifact", artifactMembers.join(", ")));
-			if (processMembers.length > 0)
-				rows.push(tableRow("process", processMembers.join(", ")));
 		}
 	}
 
