@@ -24,10 +24,18 @@ function descLines(text: string): string[] {
 		.map((l) => `> ${escapeHtml(l)}`);
 }
 
+const GOTO_COMMAND = "pfdsl._gotoNodeDefinition";
+
+function nodeLink(docUri: string, nodeId: string, icon: string): string {
+	const args = encodeURIComponent(JSON.stringify([docUri, nodeId]));
+	return `[${icon} ${nodeId}](command:${GOTO_COMMAND}?${args})`;
+}
+
 export function buildHoverLines(
 	id: string,
 	kind: NodeKind,
 	frontmatter: Frontmatter | null,
+	docUri?: string,
 ): string[] {
 	const icon = KIND_ICON[kind];
 	const lines: string[] = [`${icon} **${id}**`, "---"];
@@ -95,14 +103,30 @@ export function buildHoverLines(
 		const meta = frontmatter?.group?.[id];
 		if (meta) {
 			if (meta.label) lines.push(`**${meta.label}**`);
-			const members: string[] = [];
+			const artifactMembers: string[] = [];
+			const processMembers: string[] = [];
 			for (const [aid, ameta] of Object.entries(frontmatter?.artifact ?? {})) {
-				if (ameta?.group === id) members.push(`${KIND_ICON.artifact} ${aid}`);
+				if (ameta?.group === id) {
+					artifactMembers.push(
+						docUri
+							? nodeLink(docUri, aid, KIND_ICON.artifact)
+							: `${KIND_ICON.artifact} ${aid}`,
+					);
+				}
 			}
 			for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
-				if (pmeta?.group === id) members.push(`${KIND_ICON.process} ${pid}`);
+				if (pmeta?.group === id) {
+					processMembers.push(
+						docUri
+							? nodeLink(docUri, pid, KIND_ICON.process)
+							: `${KIND_ICON.process} ${pid}`,
+					);
+				}
 			}
-			for (const m of members) rows.push(tableRow("member", m));
+			if (artifactMembers.length > 0)
+				rows.push(tableRow("artifact", artifactMembers.join(", ")));
+			if (processMembers.length > 0)
+				rows.push(tableRow("process", processMembers.join(", ")));
 		}
 	}
 

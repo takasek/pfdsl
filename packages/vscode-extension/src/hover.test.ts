@@ -169,7 +169,7 @@ describe("buildHoverLines (group kind)", () => {
 		expect(lines[2]).toBe("**Inputs**");
 	});
 
-	it("lists artifact and process members in the table", () => {
+	it("lists artifact and process members grouped by kind", () => {
 		const fm = {
 			group: { g1: { label: "Inputs" } },
 			artifact: {
@@ -182,9 +182,24 @@ describe("buildHoverLines (group kind)", () => {
 		};
 		const lines = buildHoverLines("g1", "group", fm);
 		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain(">artifact<");
 		expect(table).toContain(">📄 art1<");
 		expect(table).not.toContain("art2");
+		expect(table).toContain(">process<");
 		expect(table).toContain(">▶️ P1<");
+	});
+
+	it("makes members clickable when docUri is provided", () => {
+		const fm = {
+			group: { g1: { label: "Inputs" } },
+			artifact: { art1: { group: "g1" } },
+			process: { P1: { group: "g1" } },
+		};
+		const lines = buildHoverLines("g1", "group", fm, "file:///repo/a.pfdsl");
+		const table = lines.find((l) => l.startsWith("<table>")) ?? "";
+		expect(table).toContain("command:pfdsl._gotoNodeDefinition");
+		expect(table).toContain("art1");
+		expect(table).toContain("P1");
 	});
 
 	it("omits member table when group has no members", () => {
