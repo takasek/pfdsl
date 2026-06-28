@@ -1,5 +1,6 @@
 import type * as vscode from "vscode";
 import { clearAnalyzeCache } from "./analyze.js";
+import { registerCodeLens } from "./codelens.js";
 import { registerDiagnostics } from "./diagnostics.js";
 import { registerDiff } from "./diff.js";
 import { registerDocumentLinks } from "./document-link.js";
@@ -13,6 +14,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	registerDiagnostics(context);
 	registerFormatter(context);
 	registerHover(context);
+	registerCodeLens(context);
 	registerDocumentLinks(context);
 	const { postDiff, getActivePreviewDoc } = registerPreview(context);
 	registerExport(context, getActivePreviewDoc);

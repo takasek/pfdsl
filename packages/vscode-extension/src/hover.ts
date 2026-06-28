@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import { ID_PATTERN } from "@pfdsl/core";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
@@ -10,16 +11,23 @@ const GOTO_COMMAND = "pfdsl._gotoNodeDefinition";
 const FIND_COMMAND = "editor.actions.findWithArgs";
 const RUN_COMMAND = "pfdsl._runProcessCommand";
 
+const outputChannel = vscode.window.createOutputChannel("pfdsl hover");
+
 export function registerHover(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
-		vscode.commands.registerCommand(RUN_COMMAND, (command: string) => {
-			const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-			const options: vscode.TerminalOptions = { name: "pfdsl" };
-			if (workspaceRoot) options.cwd = workspaceRoot;
-			const terminal = vscode.window.createTerminal(options);
-			terminal.show();
-			terminal.sendText(command);
-		}),
+		vscode.commands.registerCommand(
+			RUN_COMMAND,
+			(command: string, docUriStr?: string) => {
+				const cwd = docUriStr
+					? path.dirname(vscode.Uri.parse(docUriStr).fsPath)
+					: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				const options: vscode.TerminalOptions = { name: "pfdsl" };
+				if (cwd) options.cwd = cwd;
+				const terminal = vscode.window.createTerminal(options);
+				terminal.show();
+				terminal.sendText(command);
+			},
+		),
 	);
 
 	context.subscriptions.push(
@@ -85,11 +93,9 @@ export function registerHover(context: vscode.ExtensionContext): void {
 				`[→ Go to definition](command:${GOTO_COMMAND}?${gotoArgs})`,
 				`[⌕ Find all](command:${FIND_COMMAND}?${findArgs})`,
 			];
-			const processCommand = frontmatter?.process?.[id]?.command;
-			if (processCommand) {
-				const runArgs = encodeURIComponent(JSON.stringify([processCommand]));
-				linkParts.push(`[▶ Run command](command:${RUN_COMMAND}?${runArgs})`);
-			}
+			outputChannel.appendLine(
+				`[hover] id=${id} kind=${kind} command=${JSON.stringify(frontmatter?.process?.[id]?.command)}`,
+			);
 			const linkLine = linkParts.join("  ");
 			// Insert links after header+separator (index 2), before table rows
 			lines.splice(2, 0, linkLine);
