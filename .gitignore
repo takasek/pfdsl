@@ -37,3 +37,6 @@ coverage/
 
 # PR diff images (pushed to ci-image-store instead)
 docs/diagrams/
+
+# vscode extension package artifacts
+*.vsix
