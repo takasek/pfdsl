@@ -293,6 +293,11 @@ export async function runSkillSync(
 	copySkillTree(resolveSkillRoot("pfd-retro"), opts.targetRoot);
 	lines.push("pfd-retro skill tree synced (.claude/skills/pfd-retro/).");
 
+	copySkillTree(resolveSkillRoot("pfd-ecosystem"), opts.targetRoot);
+	lines.push(
+		"pfd-ecosystem skill tree synced (.claude/skills/pfd-ecosystem/).",
+	);
+
 	copySkillTree(resolveSkillRoot("pfdsl"), opts.targetRoot);
 	lines.push("pfdsl skill tree synced (.claude/skills/pfdsl/).");
 

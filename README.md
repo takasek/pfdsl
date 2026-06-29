@@ -152,7 +152,7 @@ The `--out` path must contain `/.claude/` (safety check). The script copies `doc
 
 ## pfd-cycle suite — `skill sync` (cross-project)
 
-A suite of Claude Code skills and commands for **PFD-driven project operations**: issue prioritization, progress tracking, artifact management, and session-learning routing across `roadmap` / `workflow` / `runtime-pipeline` PFDs. Use `/pfd-cycle` to run a work cycle and `/pfd-retro` to audit and improve the process.
+A suite of Claude Code skills and commands for **PFD-driven project operations**: issue prioritization, progress tracking, artifact management, and session-learning routing across `roadmap` / `workflow` / `runtime-pipeline` PFDs. Use `/pfd-init` to bootstrap a new project's `.pfdsl/`, `/pfd-cycle` to run a work cycle, and `/pfd-retro` to audit and improve the process.
 
 Install into any repo with one command:
 
@@ -162,8 +162,8 @@ npx @pfdsl/cli@latest skill sync
 
 Run at a target repo's root, it is idempotent and:
 
-- mirrors skills into `.claude/skills/` (`pfd-ops`, `pfd-retro`, `pfdsl`)
-- copies commands into `.claude/commands/` (`pfd-cycle`, `pfd-retro`)
+- mirrors skills into `.claude/skills/` (`pfd-ops`, `pfd-retro`, `pfd-ecosystem`, `pfdsl`)
+- copies commands into `.claude/commands/` (`pfd-init`, `pfd-cycle`, `pfd-retro`)
 - refreshes the GitHub-Issues backend (`install/`: workflows + audit scripts deployed at repo root) **only if already adopted**; otherwise prints how to adopt it (`cp -r .claude/skills/pfd-ops/install/. .`)
 
 `--yes` auto-confirms `gh` label creation (`flow:managed` / `flow:exempt`) for non-interactive use.
