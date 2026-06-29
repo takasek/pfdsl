@@ -22,7 +22,7 @@ export default defineConfig({
 	},
 	onSuccess: async () => {
 		const repoRoot = resolve(__dirname, "../..");
-		for (const name of ["pfd-ops", "pfd-retro", "pfdsl"]) {
+		for (const name of ["pfd-ops", "pfd-retro", "pfd-ecosystem", "pfdsl"]) {
 			const src = resolve(repoRoot, `.claude/skills/${name}`);
 			const dest = resolve(__dirname, `dist/skills/${name}`);
 			if (!existsSync(src)) {
