@@ -64,13 +64,6 @@ artifact:
     status: done
     criteria: "index: が spec 本文に統合済み"
     location: ../docs/spec/spec.md
-  i252_published_libraries:
-    label: "npm ライブラリ公開 (#252)"
-    description: "@pfdsl/core / graphviz-exporter / preview-engine を lib-v* tag push で npm 公開する。PR #228 で publish 基盤整備済み。"
-    status: done
-    criteria: "npm show @pfdsl/core version が期待バージョンを返す"
-    location: https://github.com/takasek/pfdsl/issues/252
-    updated_at: 2026-06-29T02:30:00Z
   ext_v0014:
     label: "extension v0.0.14（公開済み）"
     description: "現在コミット先行中の vscode-extension 変更を含む次期 Marketplace リリース"
@@ -83,7 +76,7 @@ artifact:
     status: wip
     criteria: "`VSCE_PAT` を設定した `make release-extension` で VS Code Marketplace への publish が動作確認済み"
     location: https://github.com/takasek/pfdsl/issues/119
-    updated_at: 2026-06-22T05:40:24Z
+    updated_at: 2026-06-29T01:43:14Z
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -302,8 +295,6 @@ process:
     label: extension v0.0.14リリース
   integrate_spec_v009:
     label: 仕様書 v0.0.9統合
-  publish_libraries:
-    label: npmライブラリ公開
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -373,5 +364,3 @@ cli_tool_v009 >> implement_node_sort -> node_sort
 index_reindex >> integrate_spec_v009 -> spec_v009
 
 [hover_jump, run_command, group_hover] >> publish_ext_v0014 -> ext_v0014
-
-cli_tool_v0010 >> publish_libraries -> i252_published_libraries
