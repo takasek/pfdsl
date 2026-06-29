@@ -54,9 +54,9 @@ artifact:
     criteria: npm show @pfdsl/cli version が 0.0.10 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_tool_v0011:
-    label: "CLI v0.0.11（次期リリース）"
-    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+reindex / #236 node sort 等を含む予定"
-    status: todo
+    label: "CLI v0.0.11（公開済み）"
+    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+reindex / #236 node sort 等を含む"
+    status: done
     criteria: npm show @pfdsl/cli version が 0.0.11 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
   spec_v009:
@@ -66,15 +66,15 @@ artifact:
     location: ../docs/spec/spec.md
   i252_published_libraries:
     label: "npm ライブラリ公開 (#252)"
-    description: "@pfdsl/core / graphviz-exporter / preview-engine を lib-v* tag push で npm 公開する。PR #228 で publish 基盤整備済み、実際の publish は未実施（404）"
-    status: todo
+    description: "@pfdsl/core / graphviz-exporter / preview-engine を lib-v* tag push で npm 公開する。PR #228 で publish 基盤整備済み。"
+    status: done
     criteria: "npm show @pfdsl/core version が期待バージョンを返す"
     location: https://github.com/takasek/pfdsl/issues/252
-    updated_at: 2026-06-29T01:05:00Z
+    updated_at: 2026-06-29T02:30:00Z
   ext_v0014:
-    label: "extension v0.0.14（次期リリース）"
+    label: "extension v0.0.14（公開済み）"
     description: "現在コミット先行中の vscode-extension 変更を含む次期 Marketplace リリース"
-    status: todo
+    status: done
     criteria: Marketplace の takasek.pfdsl version が 0.0.14 を返す
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
   i119_published_extension:
