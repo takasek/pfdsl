@@ -72,9 +72,9 @@ artifact:
     location: https://github.com/takasek/pfdsl/issues/252
     updated_at: 2026-06-29T02:30:00Z
   ext_v0014:
-    label: "extension v0.0.14（次期リリース）"
+    label: "extension v0.0.14（公開済み）"
     description: "現在コミット先行中の vscode-extension 変更を含む次期 Marketplace リリース"
-    status: todo
+    status: done
     criteria: Marketplace の takasek.pfdsl version が 0.0.14 を返す
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
   i119_published_extension:
