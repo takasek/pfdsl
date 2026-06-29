@@ -70,6 +70,13 @@ artifact:
     status: todo
     criteria: Marketplace の takasek.pfdsl version が 0.0.14 を返す
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
+  i119_published_extension:
+    label: "Marketplace 公開済み extension (#119)"
+    description: "v* tag push で GitHub Actions が自動 publish する extension 公開フロー。CLI の Trusted Publishing / OIDC パターンを踏襲"
+    status: wip
+    criteria: v* tag push で VS Code Marketplace への自動 publish が動作確認済み
+    location: https://github.com/takasek/pfdsl/issues/119
+    updated_at: 2026-06-22T05:40:24Z
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -258,6 +265,8 @@ process:
   implement_multifile:
     label: マルチファイル機能実装
     description: "spec v0.0.8 subflow/extends checker 実装（V021-V028）。renderer・VS Code extension は対象外。issue: https://github.com/takasek/pfdsl/issues/148"
+  publish_extension:
+    label: extension自動公開実装
   implement_subcommand_help:
     label: per-command --help実装
   implement_stdin:
@@ -330,6 +339,8 @@ adr_corpus >> write_article -> i12_article
 cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
 
 spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
+
+cli_tool >> publish_extension -> i119_published_extension
 
 cli_tool_v009 >> implement_version_cmd -> version_cmd
 cli_tool_v009 >> implement_subcommand_help -> subcommand_help
