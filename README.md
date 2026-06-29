@@ -53,6 +53,10 @@ spec >> P -> impl
 
 See [docs/spec/spec.md §2.7](docs/spec/spec.md) for full rules.
 
+## `index:` field (external tool numbering)
+
+Artifacts and processes accept an optional `index:` integer. `pfdsl reindex` auto-assigns values in topological order; external tools (e.g. pfd-tools) read them as `D{index}` / `P{index}`. See [docs/spec/spec.md §2.3](docs/spec/spec.md) for constraints.
+
 ## Samples
 
 Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/samples/](docs/samples/README.md).
@@ -71,7 +75,7 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 ```bash
 pnpm install
 pnpm -r build
-pnpm -r test       # 128 tests across 4 packages
+pnpm -r test
 pnpm -r typecheck
 ```
 
@@ -90,14 +94,25 @@ node packages/cli/dist/cli.js help
 ```
 
 ```bash
-pfdsl check <file|-> [--json] [--no-color]  # validate (- = stdin; --json outputs { ok, diagnostics })
-pfdsl fmt <file|-> [--write]                # format (- = stdin; --write not allowed with -)
-pfdsl reindex <file|-> [--write] [--check] [--renumber] [--json]  # assign topological index: values
-pfdsl sort-meta <file|-> --by <keys> [--write] [--check]         # sort node definitions (keys: index, topological, group, id)
-                                                                  # --check: exit 1 if not sorted (for CI)
+pfdsl check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
+                                            # validate (- = stdin)
+                                            # --audit: list terminal artifacts and external inputs
+                                            # --summary: print artifact/process/edge counts
+                                            # --strict: error if feedback source not reachable from target
+                                            # --json: output { ok, diagnostics }
+pfdsl fmt <file|-> [--write] [--mode flat|flows]
+                                            # format (- = stdin; --write not allowed with -)
+pfdsl reindex <file|-> [--write] [--check] [--renumber] [--json]
+                                            # assign topological index: values (- = stdin)
+                                            # --check: exit 1 if reindexing would change anything
+pfdsl sort-meta <file|-> --by <keys> [--write] [--check]
+                                            # sort node definitions (keys: index, topological, group, id)
+                                            # --check: exit 1 if not sorted (for CI)
 pfdsl normalize <file|-> [--json]           # canonical edge list (- = stdin; --json outputs array)
-pfdsl graph <file|-> [--format dot|svg]     # Graphviz DOT (default) or SVG (- = stdin)
-pfdsl diff <a> <b>                          # structural diff (nodes / edges / feedback)
+pfdsl graph <file|-> [--format dot|svg|pdf|png]
+                                            # Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
+                                            # PDF/PNG requires: npm install puppeteer
+pfdsl diff <a> <b> [--format text|dot|svg]  # structural diff (text), or visual diff DOT/SVG
 pfdsl skill sync [--yes]                    # sync pfd-ops skills and commands into the cwd
 pfdsl help
 pfdsl <command> --help                      # per-command usage
