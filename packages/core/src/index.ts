@@ -66,6 +66,7 @@ export { STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
 export interface ParseDocResult {
 	document: Document;
 	frontmatter: Frontmatter | null;
+	bodyStartLine: number;
 	diagnostics: Diagnostic[];
 }
 
@@ -77,6 +78,7 @@ export interface FormatResult {
 export interface AnalyzeResult {
 	document: Document;
 	frontmatter: Frontmatter | null;
+	bodyStartLine: number;
 	edges: NormalizedEdge[];
 	nodeKinds: Map<string, NodeKind>;
 	isolatedNodes: Set<string>;
@@ -105,6 +107,7 @@ export function parse(source: string): ParseDocResult {
 	return {
 		document,
 		frontmatter,
+		bodyStartLine,
 		diagnostics: [...fmDiags, ...lexDiags, ...parseDiags],
 	};
 }
@@ -149,7 +152,12 @@ export function analyze(
 	source: string,
 	opts: AnalyzeOptions = {},
 ): AnalyzeResult {
-	const { document, frontmatter, diagnostics: parseDiags } = parse(source);
+	const {
+		document,
+		frontmatter,
+		bodyStartLine,
+		diagnostics: parseDiags,
+	} = parse(source);
 	const {
 		edges,
 		nodeKinds,
@@ -163,6 +171,7 @@ export function analyze(
 	return {
 		document,
 		frontmatter,
+		bodyStartLine,
 		edges,
 		nodeKinds,
 		isolatedNodes,

@@ -10,7 +10,7 @@ import type {
 
 export interface NormalizeResult {
 	edges: NormalizedEdge[];
-	nodeKinds: Map<string, "artifact" | "process">;
+	nodeKinds: Map<string, "artifact" | "process" | "group">;
 	isolatedNodes: Set<string>;
 	diagnostics: Diagnostic[];
 }
@@ -28,13 +28,16 @@ export function normalize(
 	const diagnostics: Diagnostic[] = [];
 	const rawEdges: NormalizedEdge[] = [];
 	const seenEdges = new Set<string>();
-	const nodeKinds = new Map<string, "artifact" | "process">();
+	const nodeKinds = new Map<string, "artifact" | "process" | "group">();
 	const declaredNodes = new Set<string>(); // node-decl で宣言されたID（孤立候補）
 	const edgeNodes = new Set<string>(); // edge に参加したID
 
 	// Pre-populate from front matter (takes priority)
 	for (const id of Object.keys(fm?.artifact ?? {})) {
 		nodeKinds.set(id, "artifact");
+	}
+	for (const id of Object.keys(fm?.group ?? {})) {
+		if (!nodeKinds.has(id)) nodeKinds.set(id, "group");
 	}
 	for (const id of Object.keys(fm?.process ?? {})) {
 		if (nodeKinds.has(id)) {
@@ -152,9 +155,10 @@ export function normalize(
 	for (const id of declaredNodes) {
 		if (!edgeNodes.has(id)) isolatedNodes.add(id);
 	}
-	// front matter宣言のみのnodeも孤立扱い
-	for (const id of nodeKinds.keys()) {
-		if (!edgeNodes.has(id) && !isolatedNodes.has(id)) isolatedNodes.add(id);
+	// front matter宣言のみのnodeも孤立扱い（groupは除外 — エッジ参加しない設計）
+	for (const [id, kind] of nodeKinds) {
+		if (kind !== "group" && !edgeNodes.has(id) && !isolatedNodes.has(id))
+			isolatedNodes.add(id);
 	}
 
 	return { edges: rawEdges, nodeKinds, isolatedNodes, diagnostics };

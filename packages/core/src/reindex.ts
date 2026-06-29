@@ -85,7 +85,11 @@ export function reindex(
 	// Assign indices per kind.
 	const assigned = new Map<string, number>();
 	if (opts.renumber) {
-		const counter: Record<NodeKind, number> = { artifact: 0, process: 0 };
+		const counter: Record<NodeKind, number> = {
+			artifact: 0,
+			process: 0,
+			group: 0,
+		};
 		for (const id of order) {
 			const kind = kindOf(id);
 			counter[kind] += 1;
@@ -93,7 +97,11 @@ export function reindex(
 		}
 	} else {
 		// fill: keep existing, hand out numbers above the current max per kind.
-		const next: Record<NodeKind, number> = { artifact: 0, process: 0 };
+		const next: Record<NodeKind, number> = {
+			artifact: 0,
+			process: 0,
+			group: 0,
+		};
 		for (const id of order) {
 			const cur = existingIndex(id);
 			if (cur !== undefined) next[kindOf(id)] = Math.max(next[kindOf(id)], cur);

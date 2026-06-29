@@ -102,6 +102,10 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 **develop 開始前に hotfix 判定を行う。** 上記3条件を確認してから issue 起票・roadmap 追加の要否を決める。条件確認前に issue 起票・roadmap 追加を開始しない。
 
+## コアライブラリ型を拡張する場合の設計判断
+
+vscode-extension 等で新しいノード種別をホバー対応する場合、「`NodeKind`（コア公開型）に追加する」vs「provider 内で独自チェックする」の選択が生じる。判断基準: `analyze()` の `nodeKinds` マップに新種別が自然に乗る（frontmatter でスコープが確定する）なら型に追加する。provider ローカルの一時的な判定なら独自チェックにとどめる。コアへの変更は全パッケージの再ビルドと `Record<NodeKind, ...>` の exhaustive check 修正が必要になるため、影響範囲を確認してから選択する。
+
 ## CI成果物の格納先変更時の workflow.pfdsl 更新
 
 CI が生成・push する成果物（`pr_diagrams` 等）の格納先・push 方式を変える PR では、対応する `workflow.pfdsl` artifact の `description` / `criteria` / `location` を同一 PR で更新する。格納先の変更は artifact の定義を変えるため、workflow 図と実装が乖離する。
