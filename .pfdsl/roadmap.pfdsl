@@ -61,7 +61,7 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   spec_v009:
     label: 仕様書 v0.0.9（index:統合）
-    status: todo
+    status: done
     criteria: "index: が spec 本文に統合済み"
     location: ../docs/spec/spec.md
   ext_v0014:
