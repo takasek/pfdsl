@@ -57,3 +57,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 - [ ] このサイクルで起票した issue を `flow:managed` / `flow:exempt` に分類した（判定は L3 reference の「ラベル判定基準」。保守・基盤・修正は exempt）
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
+
+**spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact（spec_v007 / spec_v008 / spec_v009 等）は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
+
+**spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際は、前バージョンの spec artifact を `>>?` フィードバック入力として追加する（例: `spec_v008 >>? integrate_spec_v009`）。`integrate_spec` が `spec_v006 >>?` を持つのと同じパターン。

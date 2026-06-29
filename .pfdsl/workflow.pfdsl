@@ -152,6 +152,13 @@ artifact:
     criteria: npm show @pfdsl/core version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/core
     group: release
+  published_ext:
+    label: Marketplace 公開 extension
+    description: "外部利用者向け VS Code 拡張配布物。vscode-extension を変更したら公開が必要 — make vscode-package で .vsix 生成 + vscode-v* tag push、marketplace.visualstudio.com で手動アップロード"
+    status: done
+    criteria: Marketplace の takasek.pfdsl version が期待バージョンを返す
+    location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
+    group: release
   pull_request:
     label: Pull Request
     description: "ブランチ上の変更束のレビュー・統合単位。レビュー指摘はブランチ上の修正で解消してからマージする"
@@ -205,7 +212,7 @@ artifact:
     group: release
   readme:
     label: README
-    description: "外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照を含むため、CLI 公開形態・ライブラリ公開形態やサンプル変更時に追従更新が必要"
+    description: "外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照を含むため、CLI 公開形態・ライブラリ公開形態やサンプル変更時に追従更新が必要。extension 公開（published_ext）は update_readme をトリガーしない — README は marketplace リンクのみで版数を記載しないため"
     status: done
     criteria: CLI インストール手順・Library 節インストール例（pnpm add）・サンプル描画物リンクが現行バージョンと整合している
     location: ../README.md
@@ -291,13 +298,18 @@ process:
     group: planning
   publish_cli:
     label: CLI 公開
-    description: "事前に make release-status で behind を確認してから実施。自動化済み: v* tag push → GitHub Actions → npm publish。手作業は tag push のみ"
-    command: "git tag v<VERSION> && git push origin v<VERSION>"
+    description: "事前に make release-status で behind を確認してから実施。自動化済み: v* tag push → GitHub Actions → npm publish。手作業は make release のみ"
+    command: "make release VERSION=<VERSION>"
     group: release
   publish_libraries:
     label: ライブラリ公開
-    description: "事前に make release-status で behind を確認してから実施。自動化済み: lib-v* tag push → GitHub Actions → npm publish（core → graphviz-exporter → preview-engine 順）。手作業は tag push のみ"
+    description: "事前に make release-status で behind を確認してから実施。自動化済み: lib-v* tag push → GitHub Actions → npm publish（core → graphviz-exporter → preview-engine 順）。手作業は make release-libs のみ"
     command: "make release-libs VERSION=<VERSION>"
+    group: release
+  publish_ext:
+    label: extension 公開
+    description: "事前に make release-status で behind を確認してから実施。make vscode-package で .vsix 生成 + vscode-v* tag push。marketplace.visualstudio.com で .vsix を手動アップロード"
+    command: "make vscode-package VERSION=<VERSION>"
     group: release
   render_previews:
     label: サンプル描画
@@ -377,6 +389,8 @@ issue_updates >>? file_issues
 toolchain >> publish_cli -> published_cli
 
 toolchain >> publish_libraries -> published_libraries
+
+toolchain >> publish_ext -> published_ext
 
 [feature_samples, roadmap_pfdsl, toolchain] >> render_previews -> sample_previews
 
