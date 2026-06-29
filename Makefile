@@ -149,7 +149,11 @@ release:
 	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
 	echo "v$$VERSION を打って push します (publish-cli.yml が起動)"; \
 	git tag "v$$VERSION"; \
-	git push origin "v$$VERSION"
+	git push origin "v$$VERSION"; \
+	echo "GHA 起動待ち..."; \
+	sleep 8; \
+	RUN_ID=$$(gh run list --workflow publish-cli.yml --json databaseId,headBranch --jq ".[] | select(.headBranch==\"v$$VERSION\") | .databaseId" | head -1); \
+	if [ -n "$$RUN_ID" ]; then gh run watch $$RUN_ID --exit-status; else echo "⚠ GHA run が見つかりません: gh run list --workflow publish-cli.yml"; exit 1; fi
 
 # ライブラリ群（core/graphviz-exporter/preview-engine）を npm 公開する。
 # VERSION= を指定するか packages/core/package.json の version を使い
@@ -175,4 +179,8 @@ release-libs:
 	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
 	echo "lib-v$$VERSION を打って push します (publish-libraries.yml が起動)"; \
 	git tag "lib-v$$VERSION"; \
-	git push origin "lib-v$$VERSION"
+	git push origin "lib-v$$VERSION"; \
+	echo "GHA 起動待ち..."; \
+	sleep 8; \
+	RUN_ID=$$(gh run list --workflow publish-libraries.yml --json databaseId,headBranch --jq ".[] | select(.headBranch==\"lib-v$$VERSION\") | .databaseId" | head -1); \
+	if [ -n "$$RUN_ID" ]; then gh run watch $$RUN_ID --exit-status; else echo "⚠ GHA run が見つかりません: gh run list --workflow publish-libraries.yml"; exit 1; fi
