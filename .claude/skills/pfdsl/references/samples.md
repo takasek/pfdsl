@@ -263,6 +263,29 @@ spec >> implement -> code
 
 ---
 
+## 16-basepath — basePath field
+
+`basePath:` sets the base directory for resolving `location:` file paths and `command:` working directory. Defaults to the `.pfdsl` file's directory when omitted.
+
+```pfdsl
+---
+basePath: ../
+process:
+  build:
+    command: npm run build
+    label: Build
+artifact:
+  source:
+    label: Source Code
+  output:
+    label: Build Output
+    location: dist/index.js
+---
+source >> build -> output
+```
+
+---
+
 ## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
 How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).
