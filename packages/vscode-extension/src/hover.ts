@@ -20,7 +20,10 @@ export function registerHover(context: vscode.ExtensionContext): void {
 				let cwd: string | undefined;
 				if (docUriStr) {
 					const docDir = path.dirname(vscode.Uri.parse(docUriStr).fsPath);
-					cwd = basePath ? path.resolve(docDir, basePath) : docDir;
+					cwd =
+						basePath && !path.isAbsolute(basePath)
+							? path.resolve(docDir, basePath)
+							: docDir;
 				} else {
 					cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 				}

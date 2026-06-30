@@ -48,4 +48,10 @@ describe("resolveLocationFsPath", () => {
 			),
 		).toBe("/repo/docs/spec/spec.md");
 	});
+
+	it("ignores an absolute basePath and falls back to the .pfdsl file's directory", () => {
+		expect(
+			resolveLocationFsPath("/repo/.pfdsl/roadmap.pfdsl", "roadmap.md", "/etc"),
+		).toBe("/repo/.pfdsl/roadmap.md");
+	});
 });
