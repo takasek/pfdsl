@@ -116,6 +116,7 @@ async function handleOpenLocation(
 	docFsPath: string,
 	locs: string[],
 	fallbackViewColumn?: vscode.ViewColumn,
+	basePath?: string,
 ): Promise<void> {
 	if (locs.length === 0) return;
 
@@ -125,7 +126,7 @@ async function handleOpenLocation(
 			const url = new URL(loc);
 			items.push({ label: url.hostname, description: loc, url: loc });
 		} else {
-			const resolvedPath = resolveLocationFsPath(docFsPath, loc);
+			const resolvedPath = resolveLocationFsPath(docFsPath, loc, basePath);
 			const resolvedUri = vscode.Uri.file(resolvedPath);
 			let stat: vscode.FileStat | undefined;
 			try {
@@ -391,7 +392,12 @@ export function registerPreview(context: vscode.ExtensionContext): {
 			} else if (msg.type === "openUrl") {
 				vscode.env.openExternal(vscode.Uri.parse(msg.url));
 			} else if (msg.type === "openFile") {
-				const fsPath = resolveLocationFsPath(state.doc.uri.fsPath, msg.path);
+				const { frontmatter } = analyzeDocument(state.doc);
+				const fsPath = resolveLocationFsPath(
+					state.doc.uri.fsPath,
+					msg.path,
+					frontmatter?.basePath,
+				);
 				const srcVc = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
 				)?.viewColumn;
@@ -402,7 +408,12 @@ export function registerPreview(context: vscode.ExtensionContext): {
 				const srcVc = vscode.window.visibleTextEditors.find(
 					(e) => e.document === state.doc,
 				)?.viewColumn;
-				handleOpenLocation(state.doc.uri.fsPath, locs, srcVc);
+				handleOpenLocation(
+					state.doc.uri.fsPath,
+					locs,
+					srcVc,
+					frontmatter?.basePath,
+				);
 			}
 		});
 
