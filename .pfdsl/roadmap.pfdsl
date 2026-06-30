@@ -215,7 +215,7 @@ artifact:
     status: wip
     criteria: "basePath: フィールドが CLI/core/vscode-extension で動作確認済み、feature sample あり"
     location: https://github.com/takasek/pfdsl/issues/261
-    updated_at: 2026-07-01T00:00:00Z
+    updated_at: 2026-06-30T17:57:05Z
   spec_v0010:
     label: 仕様書 v0.0.10（basePath統合）
     status: todo
