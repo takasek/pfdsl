@@ -79,6 +79,8 @@ export interface Frontmatter {
 	statusStyles?: Partial<Record<Status, NodeStyle>>;
 	/** Relative path(s) to preset file(s) inherited for presentation keys (§2.9.4). */
 	extends?: string | string[];
+	/** Relative path from the .pfdsl file used as base for location: and command: resolution. Default: .pfdsl file's directory. */
+	basePath?: string;
 	[key: string]: unknown;
 }
 

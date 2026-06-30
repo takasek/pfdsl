@@ -76,4 +76,12 @@ describe("extractDocumentLinks", () => {
 		expect(link.startChar).toBe(15);
 		expect(link.endChar).toBe(15 + "docs/foo.md".length);
 	});
+
+	it("resolves location relative to basePath when basePath is specified", () => {
+		const src = `---\nbasePath: ../\nartifact:\n  a:\n    location: config.json\n---\n`;
+		const links = extractDocumentLinks(src, DOC_PATH);
+		expect(links).toHaveLength(1);
+		// DOC_PATH is /repo/.pfdsl/roadmap.pfdsl; basePath ../ → /repo/; config.json → /repo/config.json
+		expect(links[0]?.target).toBe("file:///repo/config.json");
+	});
 });

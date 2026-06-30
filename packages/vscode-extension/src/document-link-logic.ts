@@ -29,7 +29,8 @@ export function extractDocumentLinks(
 	source: string,
 	docFsPath: string,
 ): LinkRange[] {
-	const { bodyStartLine } = loadFrontmatter(source);
+	const { bodyStartLine, frontmatter } = loadFrontmatter(source);
+	const basePath = frontmatter?.basePath;
 	const lines = source.split("\n");
 	const results: LinkRange[] = [];
 
@@ -53,7 +54,7 @@ export function extractDocumentLinks(
 
 			const target = isUrl(value)
 				? value
-				: `file://${resolveLocationFsPath(docFsPath, value)}`;
+				: `file://${resolveLocationFsPath(docFsPath, value, basePath)}`;
 
 			results.push({ line: i, startChar, endChar, target });
 			break;

@@ -1,6 +1,7 @@
 ---
 title: Pipeline Scale Test Fixture
 description: Fixed fixture for snapshot testing pipeline throughput. Represents structural patterns of a real roadmap without coupling to production planning data.
+basePath: ./
 layout:
   direction: LR
   maxWidth: 130
