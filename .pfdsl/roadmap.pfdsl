@@ -212,7 +212,7 @@ artifact:
   i261_basepath:
     label: "basePath フィールド実装 (#261)"
     description: "frontmatter トップレベルに basePath: フィールドを追加。command:/location: の相対パス解決基準を変更できる。未指定時は .pfdsl ファイルのディレクトリをデフォルトとして後方互換を保つ"
-    status: todo
+    status: wip
     criteria: "basePath: フィールドが CLI/core/vscode-extension で動作確認済み、feature sample あり"
     location: https://github.com/takasek/pfdsl/issues/261
     updated_at: 2026-07-01T00:00:00Z
