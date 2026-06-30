@@ -209,13 +209,6 @@ artifact:
     status: done
     criteria: "pfdsl sort が --by index|topological|group|id で node 定義を並べ替え、--check で検証できる"
     location: https://github.com/takasek/pfdsl/issues/236
-  i261_basepath:
-    label: "basePath フィールド実装 (#261)"
-    description: "frontmatter トップレベルに basePath: フィールドを追加。command:/location: の相対パス解決基準を変更できる。未指定時は .pfdsl ファイルのディレクトリをデフォルトとして後方互換を保つ"
-    status: wip
-    criteria: "basePath: フィールドが CLI/core/vscode-extension で動作確認済み、feature sample あり"
-    location: https://github.com/takasek/pfdsl/issues/261
-    updated_at: 2026-06-30T17:57:05Z
   spec_v0010:
     label: 仕様書 v0.0.10（basePath統合）
     status: todo
@@ -249,6 +242,12 @@ artifact:
     status: done
     criteria: group ノードの hover にメンバー一覧が表示される
     location: https://github.com/takasek/pfdsl/issues/218
+  basepath:
+    label: "basePath フィールド実装 (#261)"
+    description: "frontmatter トップレベルに basePath: フィールドを追加。command:/location: の相対パス解決基準を変更できる。未指定時は .pfdsl ファイルのディレクトリをデフォルトとして後方互換を保つ"
+    status: done
+    criteria: "basePath: フィールドが CLI/core/vscode-extension で動作確認済み、feature sample あり"
+    location: https://github.com/takasek/pfdsl/issues/261
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -396,8 +395,8 @@ index_reindex >> integrate_spec_v009 -> spec_v009
 
 [hover_jump, run_command, group_hover] >> publish_ext_v0014 -> ext_v0014
 
-[spec_v009, cli_tool_v0011] >> implement_basepath -> i261_basepath
-i261_basepath >> integrate_spec_v0010 -> spec_v0010
+[spec_v009, cli_tool_v0011] >> implement_basepath -> basepath
+basepath >> integrate_spec_v0010 -> spec_v0010
 spec_v009 >>? integrate_spec_v0010
-i261_basepath >> publish_cli_v0012 -> cli_tool_v0012
-i261_basepath >> publish_ext_v0015 -> ext_v0015
+basepath >> publish_cli_v0012 -> cli_tool_v0012
+basepath >> publish_ext_v0015 -> ext_v0015
