@@ -1,0 +1,11 @@
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "build" [shape=ellipse, label="build\nBuild", tooltip="Build\ncommand: npm run build"];
+  "output" [shape=box, label="output\nBuild Output", tooltip="Build Output\nlocation: dist/index.js", penwidth="2"];
+  "source" [shape=box, label="source\nSource Code", penwidth="2"];
+
+  "source" -> "build";
+  "build" -> "output";
+}

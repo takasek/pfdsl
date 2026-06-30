@@ -226,6 +226,40 @@ describe("buildHoverLines", () => {
 		expect(table).toContain("command:pfdsl._gotoNodeDefinition");
 		expect(table).toContain("ops");
 	});
+
+	it("resolves location relative to basePath when basePath is set", () => {
+		const fm = {
+			basePath: "../",
+			artifact: { art1: { location: "config.json" } },
+		};
+		// docUri: file:///repo/sub/a.pfdsl; basePath ../ → /repo/; config.json → /repo/config.json
+		const lines = buildHoverLines(
+			"art1",
+			"artifact",
+			fm,
+			"file:///repo/sub/a.pfdsl",
+		);
+		const table = tableContent(lines);
+		expect(table).toContain("file:///repo/config.json");
+	});
+
+	it("passes basePath as third arg in run command link when basePath is set", () => {
+		const fm = {
+			basePath: "../",
+			process: { P1: { command: "make build" } },
+		};
+		const lines = buildHoverLines(
+			"P1",
+			"process",
+			fm,
+			"file:///repo/sub/a.pfdsl",
+		);
+		const table = tableContent(lines);
+		expect(table).toContain("_command_");
+		expect(table).toContain("make build");
+		// The JSON args should include basePath as third element
+		expect(table).toContain("..%2F"); // "../" URL-encoded
+	});
 });
 
 describe("buildHoverLines (group kind)", () => {

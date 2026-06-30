@@ -16,10 +16,17 @@ export function registerHover(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
 		vscode.commands.registerCommand(
 			RUN_COMMAND,
-			(command: string, docUriStr?: string) => {
-				const cwd = docUriStr
-					? path.dirname(vscode.Uri.parse(docUriStr).fsPath)
-					: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+			(command: string, docUriStr?: string, basePath?: string) => {
+				let cwd: string | undefined;
+				if (docUriStr) {
+					const docDir = path.dirname(vscode.Uri.parse(docUriStr).fsPath);
+					cwd =
+						basePath && !path.isAbsolute(basePath)
+							? path.resolve(docDir, basePath)
+							: docDir;
+				} else {
+					cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+				}
 				const options: vscode.TerminalOptions = { name: "pfdsl" };
 				if (cwd) options.cwd = cwd;
 				const terminal = vscode.window.createTerminal(options);

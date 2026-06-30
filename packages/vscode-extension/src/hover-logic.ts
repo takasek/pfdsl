@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import type { Frontmatter, NodeKind } from "@pfdsl/core";
 import { resolveLocationFsPath } from "./location-path.js";
 import { normalizeLocation } from "./location-utils.js";
@@ -36,12 +37,13 @@ function nodeLink(docUri: string, nodeId: string, icon: string): string {
 	return `[${icon} ${nodeId}](command:${GOTO_COMMAND}?${args})`;
 }
 
-function locationLink(docUri: string, loc: string): string {
-	const docFsPath = decodeURIComponent(docUri.replace(/^file:\/\//, ""));
+function locationLink(docUri: string, loc: string, basePath?: string): string {
+	const docFsPath = fileURLToPath(docUri);
 	const isDir = loc.endsWith("/");
 	const absPath = resolveLocationFsPath(
 		docFsPath,
 		isDir ? loc.slice(0, -1) : loc,
+		basePath,
 	);
 	if (isDir) {
 		const args = encodeURIComponent(JSON.stringify([absPath]));
@@ -73,6 +75,8 @@ export function buildHoverLines(
 	const lines: string[] = [`${icon} **${id}**`, "---"];
 	const rows: string[] = [];
 
+	const basePath = frontmatter?.basePath;
+
 	if (kind === "artifact") {
 		const meta = frontmatter?.artifact?.[id];
 		if (meta) {
@@ -98,7 +102,7 @@ export function buildHoverLines(
 			const locs = normalizeLocation(meta.location);
 			if (locs.length) {
 				const locDisplay = docUri
-					? locs.map((l) => locationLink(docUri, l)).join(", ")
+					? locs.map((l) => locationLink(docUri, l, basePath)).join(", ")
 					: locs.join(", ");
 				rows.push(tableRow("location", locDisplay));
 			}
@@ -124,7 +128,7 @@ export function buildHoverLines(
 			if (meta.tags?.length) rows.push(tableRow("tags", meta.tags.join(", ")));
 			if (meta.command) {
 				const commandDisplay = docUri
-					? `${meta.command}  [▶ run](command:${RUN_COMMAND}?${encodeURIComponent(JSON.stringify([meta.command, docUri]))})`
+					? `${meta.command}  [▶ run](command:${RUN_COMMAND}?${encodeURIComponent(JSON.stringify([meta.command, docUri, frontmatter?.basePath]))})`
 					: meta.command;
 				rows.push(tableRow("command", commandDisplay));
 			}

@@ -1,0 +1,14 @@
+---
+basePath: ../
+process:
+  build:
+    command: npm run build
+    label: Build
+artifact:
+  source:
+    label: Source Code
+  output:
+    label: Build Output
+    location: dist/index.js
+---
+source >> build -> output

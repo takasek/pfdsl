@@ -30,7 +30,7 @@ export function registerCodeLens(context: vscode.ExtensionContext): void {
 				const part = new vscode.InlayHintLabelPart("▶ run");
 				part.command = {
 					command: RUN_COMMAND,
-					arguments: [rawValue, docUri],
+					arguments: [rawValue, docUri, frontmatter.basePath],
 					title: "Run command",
 				};
 

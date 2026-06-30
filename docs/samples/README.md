@@ -616,6 +616,50 @@ digraph PFDSL {
 
 ---
 
+## 16-basepath — basePath field
+
+`basePath:` sets the base directory for resolving `location:` file paths and `command:` working directory. Defaults to the `.pfdsl` file's directory when omitted.
+
+```pfdsl
+---
+basePath: ../
+process:
+  build:
+    command: npm run build
+    label: Build
+artifact:
+  source:
+    label: Source Code
+  output:
+    label: Build Output
+    location: dist/index.js
+---
+source >> build -> output
+```
+
+<img src="16-basepath.svg">
+
+<details>
+<summary>DOT</summary>
+
+```dot
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "build" [shape=ellipse, label="build\nBuild", tooltip="Build\ncommand: npm run build"];
+  "output" [shape=box, label="output\nBuild Output", tooltip="Build Output\nlocation: dist/index.js", penwidth="2"];
+  "source" [shape=box, label="source\nSource Code", penwidth="2"];
+
+  "source" -> "build";
+  "build" -> "output";
+}
+```
+
+</details>
+
+---
+
 ## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
 How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).

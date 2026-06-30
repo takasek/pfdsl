@@ -29,7 +29,8 @@ export function extractDocumentLinks(
 	source: string,
 	docFsPath: string,
 ): LinkRange[] {
-	const { bodyStartLine } = loadFrontmatter(source);
+	const { bodyStartLine, frontmatter } = loadFrontmatter(source);
+	const basePath = frontmatter?.basePath;
 	const lines = source.split("\n");
 	const results: LinkRange[] = [];
 
@@ -51,9 +52,13 @@ export function extractDocumentLinks(
 			const startChar = prefix.length + quote.length;
 			const endChar = startChar + rawValue.length;
 
+			// basePath applies to location: only (spec §2.3/§15.8); subflow:
+			// always resolves against the containing .pfdsl file's directory (§15.8).
+			const effectiveBasePath =
+				pattern === LOCATION_LINE ? basePath : undefined;
 			const target = isUrl(value)
 				? value
-				: `file://${resolveLocationFsPath(docFsPath, value)}`;
+				: `file://${resolveLocationFsPath(docFsPath, value, effectiveBasePath)}`;
 
 			results.push({ line: i, startChar, endChar, target });
 			break;

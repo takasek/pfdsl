@@ -209,6 +209,28 @@ artifact:
     status: done
     criteria: "pfdsl sort が --by index|topological|group|id で node 定義を並べ替え、--check で検証できる"
     location: https://github.com/takasek/pfdsl/issues/236
+  i261_basepath:
+    label: "basePath フィールド実装 (#261)"
+    description: "frontmatter トップレベルに basePath: フィールドを追加。command:/location: の相対パス解決基準を変更できる。未指定時は .pfdsl ファイルのディレクトリをデフォルトとして後方互換を保つ"
+    status: wip
+    criteria: "basePath: フィールドが CLI/core/vscode-extension で動作確認済み、feature sample あり"
+    location: https://github.com/takasek/pfdsl/issues/261
+    updated_at: 2026-06-30T17:57:05Z
+  spec_v0010:
+    label: 仕様書 v0.0.10（basePath統合）
+    status: todo
+    criteria: "basePath: フィールドが spec 本文に統合済み"
+    location: ../docs/spec/spec.md
+  cli_tool_v0012:
+    label: "CLI v0.0.12（次期）"
+    status: todo
+    criteria: npm show @pfdsl/cli version が 0.0.12 を返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
+  ext_v0015:
+    label: "extension v0.0.15（次期）"
+    status: todo
+    criteria: Marketplace の takasek.pfdsl version が 0.0.15 を返す
+    location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
   hover_jump:
     label: "hover/quickpick jump (#216)"
     description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
@@ -295,6 +317,15 @@ process:
     label: extension v0.0.14リリース
   integrate_spec_v009:
     label: 仕様書 v0.0.9統合
+  implement_basepath:
+    label: basePath フィールド実装
+    description: "spec, CLI/core, vscode-extension に basePath: フィールド対応を実装する。新フロントマターフィールド追加・location/command パス解決変更・拡張コマンド実行 cwd 変更・feature sample 追加を含む"
+  integrate_spec_v0010:
+    label: 仕様書 v0.0.10統合
+  publish_cli_v0012:
+    label: CLI v0.0.12リリース
+  publish_ext_v0015:
+    label: extension v0.0.15リリース
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -364,3 +395,9 @@ cli_tool_v009 >> implement_node_sort -> node_sort
 index_reindex >> integrate_spec_v009 -> spec_v009
 
 [hover_jump, run_command, group_hover] >> publish_ext_v0014 -> ext_v0014
+
+[spec_v009, cli_tool_v0011] >> implement_basepath -> i261_basepath
+i261_basepath >> integrate_spec_v0010 -> spec_v0010
+spec_v009 >>? integrate_spec_v0010
+i261_basepath >> publish_cli_v0012 -> cli_tool_v0012
+i261_basepath >> publish_ext_v0015 -> ext_v0015
