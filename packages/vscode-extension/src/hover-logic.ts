@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import type { Frontmatter, NodeKind } from "@pfdsl/core";
 import { resolveLocationFsPath } from "./location-path.js";
 import { normalizeLocation } from "./location-utils.js";
@@ -37,7 +38,7 @@ function nodeLink(docUri: string, nodeId: string, icon: string): string {
 }
 
 function locationLink(docUri: string, loc: string, basePath?: string): string {
-	const docFsPath = decodeURIComponent(docUri.replace(/^file:\/\//, ""));
+	const docFsPath = fileURLToPath(docUri);
 	const isDir = loc.endsWith("/");
 	const absPath = resolveLocationFsPath(
 		docFsPath,
