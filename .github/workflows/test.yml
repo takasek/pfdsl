@@ -30,6 +30,8 @@ jobs:
 
       - run: make check-docs
 
+      - run: make check-readme-cli
+
       - name: Verify snapshots are up-to-date with .pfdsl files
         run: |
           pnpm --filter @pfdsl/core exec vitest run -u

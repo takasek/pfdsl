@@ -40,3 +40,18 @@ if git diff --cached --name-only | grep -qE '^docs/samples/'; then
     echo "note: skipping samples drift check (run 'pnpm -r build' to enable locally; CI verifies it)."
   fi
 fi
+
+# When the CLI source or README changes, verify the README `## CLI` generated
+# block matches `pfdsl help` output. It reads packages/cli/dist/cli.js directly,
+# so it needs a build; skip with a notice when dist is absent (CI verifies it).
+if git diff --cached --name-only | grep -qE '^(packages/cli/src/|README\.md)'; then
+  if [ -f packages/cli/dist/cli.js ]; then
+    node scripts/gen-readme-cli.mjs >/dev/null
+    if ! git diff --quiet -- README.md; then
+      echo "README.md CLI section is stale. Run 'make gen-readme-cli' and re-stage README.md."
+      exit 1
+    fi
+  else
+    echo "note: skipping README CLI drift check (run 'pnpm -r build' to enable locally; CI verifies it)."
+  fi
+fi

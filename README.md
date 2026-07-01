@@ -93,32 +93,52 @@ For development (from this repo after `pnpm -r build`):
 node packages/cli/dist/cli.js help
 ```
 
+<!-- gen-readme-cli:start -->
+
 ```bash
-pfdsl check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
-                                            # validate (- = stdin)
-                                            # --audit: list terminal artifacts and external inputs
-                                            # --summary: print artifact/process/edge counts
-                                            # --strict: error if feedback source not reachable from target
-                                            # --json: output { ok, diagnostics }
-pfdsl fmt <file|-> [--write] [--mode flat|flows]
-                                            # format (- = stdin; --write not allowed with -)
-pfdsl reindex <file|-> [--write] [--check] [--renumber] [--json]
-                                            # assign topological index: values (- = stdin)
-                                            # --check: exit 1 if reindexing would change anything
-pfdsl sort-meta <file|-> --by <keys> [--write] [--check]
-                                            # sort node definitions (keys: index, topological, group, id)
-                                            # --check: exit 1 if not sorted (for CI)
-pfdsl normalize <file|-> [--json]           # canonical edge list (- = stdin; --json outputs array)
-pfdsl graph <file|-> [--format dot|svg|pdf|png]
-                                            # Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-                                            # PDF/PNG requires: npm install puppeteer
-pfdsl diff <a> <b> [--format text|dot|svg]  # structural diff (text), or visual diff DOT/SVG
-pfdsl skill sync [--yes]                    # sync pfd-ops skills and commands into the cwd
-pfdsl help
-pfdsl <command> --help                      # per-command usage
+pfdsl <command> [options]
+
+Commands:
+  check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
+                           Validate a .pfdsl file (- = stdin)
+                           --audit    list terminal artifacts and external inputs
+                           --summary  print artifact/process/edge counts
+                           --strict   error if feedback source not reachable from target process
+                           --json     output diagnostics as JSON
+                           --no-color disable ANSI color codes (also: NO_COLOR env var)
+  fmt <file|-> [--write] [--mode flat|flows]
+                           Format a .pfdsl file (- = stdin)
+  reindex <file|-> [--write] [--check] [--renumber] [--json]
+                           Assign topological index: values (- = stdin)
+                           --write     rewrite in place; report to stdout
+                           --check     exit 1 if reindexing would change anything
+                           --renumber  reassign every node from 1
+                           --json      emit change report as JSON
+  sort-meta <file|-> --by <keys> [--write] [--check]
+                           Sort node definitions by keys (- = stdin)
+                           --by        comma-separated: index, topological, group, id
+                           --write     rewrite in place
+                           --check     exit 1 if not already sorted
+  normalize <file|-> [--json]
+                           Print canonical edge list (- = stdin)
+                           --json     output edge list as JSON array
+  graph <file|-> [--format dot|svg|pdf|png]
+                           Print Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
+                           PDF/PNG requires: npm install puppeteer
+  diff <a> <b> [--format text|dot|svg]
+                           Structural diff (text), or visual diff DOT/SVG
+  skill sync [--yes]
+                           Sync pfd-ops skills and commands into the current directory
+                           --yes     auto-confirm gh label creation (non-interactive)
+  help                     Show this help
+
+Exit codes:
+  0  success (warnings are non-fatal)
+  1  error (parse/validation error, or file cannot be read)
+  2  invalid usage (missing argument, unknown flag or subcommand)
 ```
 
-Exit codes: `0` ok, `1` validation/IO error, `2` usage error.
+<!-- gen-readme-cli:end -->
 
 ## VSCode extension
 
