@@ -37,9 +37,5 @@ const block = `\n\n\`\`\`bash\n${helpOutput}\n\`\`\`\n\n`;
 
 const updated = before + block + after;
 
-if (updated === readme) {
-  console.log("README.md CLI section already up to date with `pfdsl help`");
-} else {
-  writeFileSync(readmePath, updated);
-  console.log("README.md CLI section ← `pfdsl help`");
-}
+writeFileSync(readmePath, updated);
+console.log("README.md CLI section ← `pfdsl help`");
