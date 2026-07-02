@@ -768,3 +768,132 @@ describe("multifile check — extends", () => {
 		}
 	});
 });
+
+describe("ready", () => {
+	// Fixtures written in beforeAll(dir):
+	//   valid.pfdsl: "req >> design -> spec\nspec >> impl -> code\n"  (no status)
+	//   invalid.pfdsl: process with no output (parse error path)
+
+	const withStatus = (content: string) => {
+		const f = join(dir, "ready-status.pfdsl");
+		writeFileSync(f, content);
+		return f;
+	};
+
+	it("lists ready processes when all inputs are done", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("design");
+		expect(r.stdout).not.toContain("impl");
+	});
+
+	it("excludes process whose input is not done", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: todo\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No ready processes. Check artifact statuses.\n");
+	});
+
+	it("treats undefined status as done (no frontmatter)", async () => {
+		// valid.pfdsl has no artifact status — both processes should be ready
+		const r = await run(["ready", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("design");
+		expect(r.stdout).toContain("impl");
+	});
+
+	it("--json returns structured output", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.ready).toBeInstanceOf(Array);
+		expect(parsed.ready[0].id).toBe("design");
+		expect(parsed.ready[0].inputs).toContain("req");
+		expect(parsed.best).toBeUndefined();
+	});
+
+	it("--json --best includes best field", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f, "--json", "--best"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.best).toBeDefined();
+		expect(parsed.best.id).toBe("design");
+	});
+
+	it("--best marks recommended process with *", async () => {
+		const r = await run(["ready", join(dir, "valid.pfdsl"), "--best"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toMatch(/\*/);
+		expect(r.stdout).toContain("recommended next");
+	});
+
+	it("missing file returns exit 1", async () => {
+		const r = await run(["ready", join(dir, "nonexistent.pfdsl")]);
+		expect(r.exitCode).toBe(1);
+	});
+
+	it("missing argument returns exit 2", async () => {
+		const r = await run(["ready"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("--help returns help text", async () => {
+		const r = await run(["ready", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl ready");
+	});
+
+	it("--best prefers process that removes last blocker, not just any consumer", async () => {
+		// A -> x; B -> y; [x(done?), y] >> C; [x] >> D
+		// After A completes: C still needs y (todo), D immediately ready.
+		// --best should prefer A (unblocks D) over B (doesn't unblock anyone yet).
+		// But here we test the opposite: B is NOT preferred because completing A
+		// truly unblocks D while completing B only satisfies one of C's two inputs.
+		const src = [
+			"---",
+			"artifact:",
+			"  req_a:",
+			"    status: done",
+			"  req_b:",
+			"    status: done",
+			"  y:",
+			"    status: todo",
+			"---",
+			"req_a >> make_x -> x",
+			"req_b >> make_y -> y",
+			"[x, y] >> merge -> result",
+			"x >> side -> side_out",
+		].join("\n");
+		const f = join(dir, "ready-heuristic.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["ready", f, "--json", "--best"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		// make_x unblocks `side` (last missing input) — 1 newly-ready process
+		// make_y unblocks nothing (merge still needs x which is todo)
+		// make_x should be chosen as best
+		expect(parsed.best.id).toBe("make_x");
+	});
+
+	it("--best not passed: no computation overhead, best absent from JSON", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.best).toBeUndefined();
+	});
+});

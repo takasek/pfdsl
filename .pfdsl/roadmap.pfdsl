@@ -214,6 +214,16 @@ artifact:
     status: todo
     criteria: "basePath: フィールドが spec 本文に統合済み"
     location: ../docs/spec/spec.md
+  ready_cmd:
+    label: "pfdsl ready コマンド (PR #267)"
+    description: "着手可能プロセスを機械的に列挙する ready コマンド。--best で合流点優先の推薦、--json で機械可読出力。pfd-ops スキルの step 1 計算を代替する"
+    status: wip
+    criteria: "pfdsl ready <file> が ready プロセス一覧を出力し、--best/--json が動作確認済み、テスト通過"
+  pfd_ops_skill_ready:
+    label: "pfd-ops スキル ready コマンド対応"
+    description: "pfd-ops SKILL.md のワークサイクル step 1 を pfdsl ready CLI 呼び出しに書き換える。スキル利用者が手動計算しなくて済むようになる"
+    status: todo
+    criteria: "pfd-ops SKILL.md の着手判断ステップが pfdsl ready CLI を参照し、~/.claude/skills/pfd-ops/ に反映済み"
   cli_tool_v0012:
     label: "CLI v0.0.12（次期）"
     status: todo
@@ -321,6 +331,12 @@ process:
     description: "spec, CLI/core, vscode-extension に basePath: フィールド対応を実装する。新フロントマターフィールド追加・location/command パス解決変更・拡張コマンド実行 cwd 変更・feature sample 追加を含む"
   integrate_spec_v0010:
     label: 仕様書 v0.0.10統合
+  implement_ready_cmd:
+    label: ready コマンド実装
+    description: "pfd-ops スキルのステップ1計算を CLI に移す。--best/--json を含む"
+  update_pfd_ops_skill:
+    label: pfd-ops スキル更新
+    description: "SKILL.md ワークサイクル step 1 を pfdsl ready CLI 参照に書き換え、~/.claude/skills/pfd-ops/ に反映する"
   publish_cli_v0012:
     label: CLI v0.0.12リリース
   publish_ext_v0015:
@@ -398,5 +414,8 @@ index_reindex >> integrate_spec_v009 -> spec_v009
 [spec_v009, cli_tool_v0011] >> implement_basepath -> basepath
 basepath >> integrate_spec_v0010 -> spec_v0010
 spec_v009 >>? integrate_spec_v0010
-basepath >> publish_cli_v0012 -> cli_tool_v0012
+cli_tool_v0011 >> implement_ready_cmd -> ready_cmd
+[basepath, ready_cmd] >> publish_cli_v0012 -> cli_tool_v0012
 basepath >> publish_ext_v0015 -> ext_v0015
+
+cli_tool_v0012 >> update_pfd_ops_skill -> pfd_ops_skill_ready

@@ -127,6 +127,10 @@ Commands:
                            PDF/PNG requires: npm install puppeteer
   diff <a> <b> [--format text|dot|svg]
                            Structural diff (text), or visual diff DOT/SVG
+  ready <file|-> [--best] [--json]
+                           List ready-to-start processes (- = stdin)
+                           --best    recommend the best next process
+                           --json    output as JSON
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
