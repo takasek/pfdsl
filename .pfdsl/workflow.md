@@ -65,6 +65,8 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 `docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。`packages/cli/src/` の CLI コマンド定義を変更したら `make gen-readme-cli`（README `## CLI` セクション）で再生成する。再生成漏れは機械的に検出されるため手動チェックは不要 — gen-skill identity は pre-commit（gen-skill 入力 staged 時）と CI（check-gen-skill.yml）、`.dot` / README のドリフトは graphviz-exporter の vitest テスト（pre-commit の `docs/samples/` staged 時と CI test）、README `## CLI` セクションのドリフトは `make check-readme-cli`（pre-commit の `packages/cli/src/` / `README.md` staged 時と CI test.yml）が検査する。`.svg` は graphviz バージョン依存のため検査対象外（roadmap.md ゲート参照）。
 
+**`make gen-readme-cli` 前のビルド**: pre-commit の README drift 検査は `packages/cli/dist/cli.js` を実行して `pfdsl help` 出力を取得する。`packages/cli/src/` を変更した後、コミット前に `pnpm --filter @pfdsl/cli build`（または `pnpm -r build`）を済ませておかないと、dist が古いまま生成・検査され、新コマンドの追加が README に反映されずに通過する。
+
 ## 新 frontmatter フィールド追加時の sample 追加
 
 frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で追加する（「フィールドが仕様にあるがサンプルに示されていない」状態を防ぐ設計ルール）。生成物の再生成・ドリフト検査は上記のとおり機械的に強制される。
