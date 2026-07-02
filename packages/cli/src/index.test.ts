@@ -768,3 +768,90 @@ describe("multifile check — extends", () => {
 		}
 	});
 });
+
+describe("ready", () => {
+	// Fixtures written in beforeAll(dir):
+	//   valid.pfdsl: "req >> design -> spec\nspec >> impl -> code\n"  (no status)
+	//   invalid.pfdsl: process with no output (parse error path)
+
+	const withStatus = (content: string) => {
+		const f = join(dir, "ready-status.pfdsl");
+		writeFileSync(f, content);
+		return f;
+	};
+
+	it("lists ready processes when all inputs are done", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("design");
+		expect(r.stdout).not.toContain("impl");
+	});
+
+	it("excludes process whose input is not done", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: todo\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No ready processes. Check artifact statuses.\n");
+	});
+
+	it("treats undefined status as done (no frontmatter)", async () => {
+		// valid.pfdsl has no artifact status — both processes should be ready
+		const r = await run(["ready", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("design");
+		expect(r.stdout).toContain("impl");
+	});
+
+	it("--json returns structured output", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.ready).toBeInstanceOf(Array);
+		expect(parsed.ready[0].id).toBe("design");
+		expect(parsed.ready[0].inputs).toContain("req");
+		expect(parsed.best).toBeUndefined();
+	});
+
+	it("--json --best includes best field", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f, "--json", "--best"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.best).toBeDefined();
+		expect(parsed.best.id).toBe("design");
+	});
+
+	it("--best marks recommended process with *", async () => {
+		const r = await run(["ready", join(dir, "valid.pfdsl"), "--best"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toMatch(/\*/);
+		expect(r.stdout).toContain("recommended next");
+	});
+
+	it("missing file returns exit 1", async () => {
+		const r = await run(["ready", join(dir, "nonexistent.pfdsl")]);
+		expect(r.exitCode).toBe(1);
+	});
+
+	it("missing argument returns exit 2", async () => {
+		const r = await run(["ready"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("--help returns help text", async () => {
+		const r = await run(["ready", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl ready");
+	});
+});

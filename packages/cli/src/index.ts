@@ -409,6 +409,104 @@ export function runNormalize(
 	return ok(formatEdges(sorted));
 }
 
+export interface ReadyOptions {
+	best?: boolean;
+	json?: boolean;
+}
+
+export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
+	const earlyFail = failIfErrors(diagnostics, file);
+	if (earlyFail) return earlyFail;
+
+	const artifactMeta = frontmatter?.artifact ?? {};
+
+	// Collect normal (non-feedback) input edges per process
+	const processInputs = new Map<string, string[]>();
+	for (const e of edges) {
+		if (e.kind === "input") {
+			const arr = processInputs.get(e.process) ?? [];
+			arr.push(e.artifact);
+			processInputs.set(e.process, arr);
+		}
+	}
+
+	// A process is ready when all its input artifacts are done (undefined = done)
+	const readyIds: string[] = [];
+	for (const [pid, inputs] of processInputs) {
+		if (nodeKinds.get(pid) !== "process") continue;
+		const allDone = inputs.every((aid) => {
+			const s = artifactMeta[aid]?.status;
+			return s === "done" || s === undefined;
+		});
+		if (allDone) readyIds.push(pid);
+	}
+
+	// best-next: prefer the process whose outputs unlock the most downstream processes
+	let bestId: string | undefined;
+	if (readyIds.length > 0) {
+		const processOutputs = new Map<string, string[]>();
+		for (const e of edges) {
+			if (e.kind === "output") {
+				const arr = processOutputs.get(e.process) ?? [];
+				arr.push(e.artifact);
+				processOutputs.set(e.process, arr);
+			}
+		}
+		const downstreamCount = (pid: string): number => {
+			const outputs = processOutputs.get(pid) ?? [];
+			const consumers = new Set<string>();
+			for (const e of edges) {
+				if (e.kind === "input" && outputs.includes(e.artifact)) {
+					consumers.add(e.process);
+				}
+			}
+			return consumers.size;
+		};
+		bestId = [...readyIds].sort((a, b) => {
+			const diff = downstreamCount(b) - downstreamCount(a);
+			return diff !== 0 ? diff : a.localeCompare(b);
+		})[0];
+	}
+
+	type ReadyItem = { id: string; label: string; inputs: string[] };
+	const toItem = (pid: string): ReadyItem => ({
+		id: pid,
+		label: frontmatter?.process?.[pid]?.label ?? pid,
+		inputs: processInputs.get(pid) ?? [],
+	});
+
+	const readyItems = readyIds.map(toItem);
+	const bestItem = bestId ? toItem(bestId) : undefined;
+
+	if (opts.json) {
+		const payload: Record<string, unknown> = { ok: true, ready: readyItems };
+		if (opts.best && bestItem) payload.best = bestItem;
+		return ok(`${JSON.stringify(payload)}\n`);
+	}
+
+	if (readyItems.length === 0) {
+		return ok("No ready processes. Check artifact statuses.\n");
+	}
+
+	const lines: string[] = [`Ready processes (${readyItems.length}):`];
+	for (const item of readyItems) {
+		const marker = opts.best && item.id === bestId ? "*" : " ";
+		const inputs = item.inputs.join(", ");
+		lines.push(
+			`  ${marker} ${item.id.padEnd(20)} "${item.label}"   inputs: [${inputs}]`,
+		);
+	}
+	if (opts.best && bestItem) {
+		lines.push("");
+		lines.push("* = recommended next (unblocks the most downstream work)");
+	}
+	return ok(`${lines.join("\n")}\n`);
+}
+
 export type { BinaryFormat };
 export { svgToBinary };
 export type CliRenderFormat = RenderFormat | BinaryFormat;
@@ -595,6 +693,16 @@ Options:
   --yes  auto-confirm gh label creation (non-interactive)
 `;
 
+const HELP_READY = `usage: pfdsl ready <file|-> [--best] [--json]
+
+List processes whose every input artifact has status: done (or no status set).
+Use - to read from stdin.
+
+Options:
+  --best  highlight the process that unblocks the most downstream work
+  --json  output as JSON ({ ok, ready: [{id, label, inputs}], best? })
+`;
+
 export const HELP = `pfdsl <command> [options]
 
 Commands:
@@ -626,6 +734,10 @@ Commands:
                            PDF/PNG requires: npm install puppeteer
   diff <a> <b> [--format text|dot|svg]
                            Structural diff (text), or visual diff DOT/SVG
+  ready <file|-> [--best] [--json]
+                           List ready-to-start processes (- = stdin)
+                           --best    recommend the best next process
+                           --json    output as JSON
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
@@ -760,6 +872,15 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				return fail(`unknown format: ${String(fmt)}\n`, 2);
 			}
 			return await runDiff(a, b, fmt ? { format: fmt } : {});
+		}
+		case "ready": {
+			if (flags.help) return ok(HELP_READY);
+			const f = positional[0];
+			if (!f) return fail(HELP_READY, 2);
+			return runReady(f, {
+				best: flags.best === true,
+				json: flags.json === true,
+			});
 		}
 		case "skill": {
 			if (flags.help) return ok(HELP_SKILL);
