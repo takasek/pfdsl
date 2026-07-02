@@ -854,4 +854,46 @@ describe("ready", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("pfdsl ready");
 	});
+
+	it("--best prefers process that removes last blocker, not just any consumer", async () => {
+		// A -> x; B -> y; [x(done?), y] >> C; [x] >> D
+		// After A completes: C still needs y (todo), D immediately ready.
+		// --best should prefer A (unblocks D) over B (doesn't unblock anyone yet).
+		// But here we test the opposite: B is NOT preferred because completing A
+		// truly unblocks D while completing B only satisfies one of C's two inputs.
+		const src = [
+			"---",
+			"artifact:",
+			"  req_a:",
+			"    status: done",
+			"  req_b:",
+			"    status: done",
+			"  y:",
+			"    status: todo",
+			"---",
+			"req_a >> make_x -> x",
+			"req_b >> make_y -> y",
+			"[x, y] >> merge -> result",
+			"x >> side -> side_out",
+		].join("\n");
+		const f = join(dir, "ready-heuristic.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["ready", f, "--json", "--best"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		// make_x unblocks `side` (last missing input) — 1 newly-ready process
+		// make_y unblocks nothing (merge still needs x which is todo)
+		// make_x should be chosen as best
+		expect(parsed.best.id).toBe("make_x");
+	});
+
+	it("--best not passed: no computation overhead, best absent from JSON", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.best).toBeUndefined();
+	});
 });

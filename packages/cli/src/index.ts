@@ -445,31 +445,58 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 		if (allDone) readyIds.push(pid);
 	}
 
-	// best-next: prefer the process whose outputs unlock the most downstream processes
+	// best-next: prefer the process that would actually make the most downstream processes ready.
+	// A consumer counts only if completing pid removes its LAST remaining blocker
+	// (i.e. all other inputs of that consumer are already done/undefined).
 	let bestId: string | undefined;
-	if (readyIds.length > 0) {
-		const processOutputs = new Map<string, string[]>();
+	if (opts.best && readyIds.length > 0) {
+		// Precompute artifact → consuming processes (O(m) once)
+		const artifactConsumers = new Map<string, string[]>();
 		for (const e of edges) {
-			if (e.kind === "output") {
-				const arr = processOutputs.get(e.process) ?? [];
-				arr.push(e.artifact);
-				processOutputs.set(e.process, arr);
+			if (e.kind === "input") {
+				const arr = artifactConsumers.get(e.artifact) ?? [];
+				arr.push(e.process);
+				artifactConsumers.set(e.artifact, arr);
 			}
 		}
-		const downstreamCount = (pid: string): number => {
-			const outputs = processOutputs.get(pid) ?? [];
-			const consumers = new Set<string>();
-			for (const e of edges) {
-				if (e.kind === "input" && outputs.includes(e.artifact)) {
-					consumers.add(e.process);
+		// Precompute process output artifact sets (O(m) once)
+		const processOutputSets = new Map<string, Set<string>>();
+		for (const e of edges) {
+			if (e.kind === "output") {
+				const s = processOutputSets.get(e.process) ?? new Set();
+				s.add(e.artifact);
+				processOutputSets.set(e.process, s);
+			}
+		}
+		// Count consumers that would become ready after pid completes (O(m) per pid, but
+		// pid iterates only its own outputs × their consumers, total O(m) across all pids)
+		const countUnlocked = (pid: string): number => {
+			const outputs = processOutputSets.get(pid) ?? new Set();
+			const unlocked = new Set<string>();
+			for (const aid of outputs) {
+				for (const consumer of artifactConsumers.get(aid) ?? []) {
+					if (unlocked.has(consumer)) continue;
+					// Consumer becomes ready if all its inputs (other than ones pid outputs) are done
+					const otherInputsAllDone =
+						processInputs.get(consumer)?.every((inp) => {
+							if (outputs.has(inp)) return true; // pid will satisfy this
+							const s = artifactMeta[inp]?.status;
+							return s === "done" || s === undefined;
+						}) ?? true;
+					if (otherInputsAllDone) unlocked.add(consumer);
 				}
 			}
-			return consumers.size;
+			return unlocked.size;
 		};
-		bestId = [...readyIds].sort((a, b) => {
-			const diff = downstreamCount(b) - downstreamCount(a);
-			return diff !== 0 ? diff : a.localeCompare(b);
-		})[0];
+		// Precompute counts then find max in O(n) — avoid O(n log n) sort + allocation
+		const counts = new Map<string, number>(
+			readyIds.map((pid) => [pid, countUnlocked(pid)]),
+		);
+		bestId = readyIds.reduce((best, pid) => {
+			const bc = counts.get(best) ?? 0;
+			const pc = counts.get(pid) ?? 0;
+			return pc > bc || (pc === bc && pid < best) ? pid : best;
+		});
 	}
 
 	type ReadyItem = { id: string; label: string; inputs: string[] };
@@ -502,7 +529,9 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	}
 	if (opts.best && bestItem) {
 		lines.push("");
-		lines.push("* = recommended next (unblocks the most downstream work)");
+		lines.push(
+			"* = recommended next (removes the last blocker for the most downstream processes)",
+		);
 	}
 	return ok(`${lines.join("\n")}\n`);
 }
