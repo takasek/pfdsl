@@ -190,8 +190,8 @@ artifact:
     group: release
   readme:
     label: README
-    description: "外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照を含むため、CLI 公開形態・ライブラリ公開形態やサンプル変更時に追従更新が必要。extension 公開（published_ext）は update_readme をトリガーしない — README は marketplace リンクのみで版数を記載しないため"
-    criteria: CLI インストール手順・Library 節インストール例（pnpm add）・サンプル描画物リンクが現行バージョンと整合している
+    description: "外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照を含むため、CLI 公開形態・ライブラリ公開形態やサンプル変更時に追従更新が必要。extension 公開（published_ext）は update_readme をトリガーしない — README は marketplace リンクのみで版数を記載しないため。CLI コマンドリファレンス（## CLI 節）は `make gen-readme-cli` が `pfdsl help` 出力から自動生成し、`make check-readme-cli` が pre-commit と CI（test.yml）でドリフトを機械検査するため update_readme の手動対象外"
+    criteria: CLI インストール手順・Library 節インストール例（pnpm add）・サンプル描画物リンクが現行バージョンと整合している。CLI コマンドリファレンスは make check-readme-cli が差分なしで通過する
     location: ../README.md
     group: release
   workflow_md:
@@ -293,7 +293,7 @@ process:
     group: release
   update_readme:
     label: README 更新
-    description: CLI の提供形態・サンプル構成の変更を導入文書に反映する
+    description: CLI の提供形態・サンプル構成の変更を導入文書に反映する。CLI コマンドリファレンスは gen-readme-cli が自動化済みのため対象外
     group: release
 
 statusStyles:

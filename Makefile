@@ -82,6 +82,15 @@ vscode-package: vscode-build
 gen-samples: build-deps
 	node scripts/gen-samples.mjs
 
+.PHONY: gen-readme-cli
+gen-readme-cli:
+	node scripts/gen-readme-cli.mjs
+
+.PHONY: check-readme-cli
+check-readme-cli:
+	node scripts/gen-readme-cli.mjs
+	@git diff --exit-code README.md || (echo "README.md CLI section is stale. Run 'make gen-readme-cli' and commit the result." && exit 1)
+
 .PHONY: check-docs
 check-docs:
 	@find docs -name "*.pfdsl" -type f | sort | while read f; do \

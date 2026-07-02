@@ -61,9 +61,9 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 `packages/core/src/__fixtures__/` 内のフィクスチャ `.pfdsl` を変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。pre-commit hook（`.pfdsl` staged 時）と CI の両方で更新漏れを自動検出する。`.pfdsl/roadmap.pfdsl` / `.pfdsl/workflow.pfdsl` 等の運用 PFD を変更してもスナップショットは変化しない（fixture ベースのため）。
 
-## 生成物の再生成と自動ドリフト検査（gen-skill / gen-samples）
+## 生成物の再生成と自動ドリフト検査（gen-skill / gen-samples / gen-readme-cli）
 
-`docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。再生成漏れは機械的に検出されるため手動チェックは不要 — gen-skill identity は pre-commit（gen-skill 入力 staged 時）と CI（check-gen-skill.yml）、`.dot` / README のドリフトは graphviz-exporter の vitest テスト（pre-commit の `docs/samples/` staged 時と CI test）が検査する。`.svg` は graphviz バージョン依存のため検査対象外（roadmap.md ゲート参照）。
+`docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。`packages/cli/src/` の CLI コマンド定義を変更したら `make gen-readme-cli`（README `## CLI` セクション）で再生成する。再生成漏れは機械的に検出されるため手動チェックは不要 — gen-skill identity は pre-commit（gen-skill 入力 staged 時）と CI（check-gen-skill.yml）、`.dot` / README のドリフトは graphviz-exporter の vitest テスト（pre-commit の `docs/samples/` staged 時と CI test）、README `## CLI` セクションのドリフトは `make check-readme-cli`（pre-commit の `packages/cli/src/` / `README.md` staged 時と CI test.yml）が検査する。`.svg` は graphviz バージョン依存のため検査対象外（roadmap.md ゲート参照）。
 
 ## 新 frontmatter フィールド追加時の sample 追加
 
