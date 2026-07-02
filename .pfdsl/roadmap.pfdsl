@@ -215,11 +215,10 @@ artifact:
     criteria: "basePath: フィールドが spec 本文に統合済み"
     location: ../docs/spec/spec.md
   ready_cmd:
-    label: "pfdsl ready コマンド (#267)"
+    label: "pfdsl ready コマンド (PR #267)"
     description: "着手可能プロセスを機械的に列挙する ready コマンド。--best で合流点優先の推薦、--json で機械可読出力。pfd-ops スキルの step 1 計算を代替する"
     status: wip
     criteria: "pfdsl ready <file> が ready プロセス一覧を出力し、--best/--json が動作確認済み、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/267
   pfd_ops_skill_ready:
     label: "pfd-ops スキル ready コマンド対応"
     description: "pfd-ops SKILL.md のワークサイクル step 1 を pfdsl ready CLI 呼び出しに書き換える。スキル利用者が手動計算しなくて済むようになる"
