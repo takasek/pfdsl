@@ -7,6 +7,8 @@ import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { findMissingFields } from "./lib/skill-field-drift.mjs";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
@@ -133,6 +135,16 @@ console.log(`references/examples.md ← docs/examples/*.pfdsl (${exampleCount} e
 // --- 3. Write SKILL.md from template ---
 
 const templateSrc = readFileSync(resolve(__dirname, "skill-template/SKILL.md"), "utf-8");
+
+const frontmatterTs = readFileSync(resolve(root, "packages/core/src/types/frontmatter.ts"), "utf-8");
+const missingFields = findMissingFields(frontmatterTs, templateSrc);
+if (missingFields.length > 0) {
+  console.error("Error: typed frontmatter fields missing from skill-template 'Frontmatter structure' section:");
+  for (const f of missingFields) console.error(`  - ${f}`);
+  console.error("Add them to the yaml block (or the pointer line below it) in scripts/skill-template/SKILL.md.");
+  process.exit(1);
+}
+
 const skillMd = templateSrc
 	.replace(/\{\{specVersion\}\}/g, specVersion)
 	.replace(/\{\{cliVersion\}\}/g, cliVersion);

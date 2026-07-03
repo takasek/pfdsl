@@ -28,6 +28,9 @@ description: |
 
 ```yaml
 title: ...
+type: roadmap     # roadmap | workflow | runtime-pipeline（§2.10）。`ready` は roadmap のみ対象。省略可
+extends: presets.yaml   # 表示系キー（statusStyles 等）のプリセット継承（§2.9.4）
+basePath: ../     # location:/command: の解決基準ディレクトリ。省略時はこの .pfdsl のディレクトリ
 layout:
   direction: LR   # LR | RL | TB | BT (default LR)
   maxWidth: 120   # label wrap width in px (optional)
@@ -44,6 +47,8 @@ artifact:
     tags: [tag1, tag2]
     parts: [sub-artifact-id, ...]
     revises: <artifact-id>  # 同ファイル内の改版元 artifact ID
+    externalStakeholders: [...]  # 変換グラフ外の読み手（外部提出先等。owner と対称。process にも指定可）
+    index: 1                # 外部ツール向け採番（D{index}/P{index}。任意。process にも指定可）
 
 process:
   <id>:
@@ -54,11 +59,14 @@ process:
     tags: [tag1, tag2]      # Artifact / Process 両方に指定可（group と対称）
     command: npm run build  # 対応する実行コマンド
     estimate: 2d            # 工数見積もり（形式自由）
+    subflow: child.pfdsl    # 子 PFD への展開リンク（§2.9.3）
+    boundary: { parent_id: child_id }  # subflow の親→子 artifact ID 対応表（1:1）
 
 group:
   <id>:
     label: ...
     color: "#f0f0f0"
+    parent: <group-id>      # 入れ子グループ
 
 tag:                         # タグ定義（artifact/process/group と同階層）
   <tag-id>:
@@ -73,6 +81,8 @@ statusStyles:
   waiting:   { fillcolor: "#f8d7da", style: filled }
   suspended: { fillcolor: "#e2e3e5", style: filled }
 ```
+
+その他のトップレベルフィールド（`version` / `dslVersion` 等）と各フィールドの正確な仕様は `references/spec.md` §2、機能別の最小例は `references/samples.md` を参照。
 
 ## CLI
 
