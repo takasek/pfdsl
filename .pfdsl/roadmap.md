@@ -68,3 +68,5 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 **`integrate_spec_vXXX` の入力列挙**: `integrate_spec_vXXX` の通常入力には、そのバージョンで spec に統合される全ての変更を引き起こした artifact を列挙する。「実装が完了した artifact のうち、未統合のもの」を漏らさず書く（例: basepath と ready_cmd の両方が v0.0.10 の変更点なら `[basepath, ready_cmd] >> integrate_spec_v0010`）。
 
 **publish 系 artifact を新規追加するとき**: 追加前に `make release-status` を実行し、現行リリース済みバージョンを確認してから次バージョンの artifact を起こす。確認せずに追加すると、已リリースのバージョンを「次期」として登録する drift が発生する。
+
+**publish_cli_vXXXX の入力列挙**: そのバージョンに含まれる全実装 artifact を入力として列挙する。実装 artifact の追加と同一サイクルで publish の入力集合も更新する（後回しにすると artifact が publish チェーンから切れる）。

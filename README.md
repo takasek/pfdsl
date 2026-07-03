@@ -133,6 +133,9 @@ Commands:
                            --json    output as JSON
   status-set <file> <artifact-id> <status>
                            Set artifact status (todo|wip|done|waiting|suspended) in place
+  audit-sync <roadmap> <flow> [<flow>...] [--json]
+                           Cross-check todo artifacts in flow files against the roadmap
+                           --json    output as JSON
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)

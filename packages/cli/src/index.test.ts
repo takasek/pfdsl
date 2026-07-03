@@ -992,3 +992,130 @@ req >> design -> spec
 		expect(r.stdout).toContain("status-set");
 	});
 });
+
+describe("audit-sync", () => {
+	const roadmapWith = (artifacts: string) => {
+		const f = join(dir, "as-roadmap.pfdsl");
+		writeFileSync(
+			f,
+			`---\ntype: roadmap\nartifact:\n${artifacts}---\nreq >> build -> output\n`,
+		);
+		return f;
+	};
+	const flowWith = (artifacts: string) => {
+		const f = join(dir, "as-flow.pfdsl");
+		writeFileSync(f, `---\ntype: workflow\nartifact:\n${artifacts}---\n`);
+		return f;
+	};
+
+	it("exits 0 when all todo flow artifacts are in the roadmap", async () => {
+		const rm = roadmapWith("  output:\n    status: todo\n");
+		const fl = flowWith("  output:\n    status: todo\n");
+		const r = await run(["audit-sync", rm, fl]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("tracked");
+	});
+
+	it("exits 1 and reports gap when todo flow artifact is not in the roadmap", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith(
+			"  missing_artifact:\n    status: todo\n    label: Missing\n",
+		);
+		const r = await run(["audit-sync", rm, fl]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toContain("missing_artifact");
+		expect(r.stdout).toContain("Missing");
+	});
+
+	it("ignores non-todo artifacts in flow files", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith(
+			"  done_art:\n    status: done\n  wip_art:\n    status: wip\n",
+		);
+		const r = await run(["audit-sync", rm, fl]);
+		expect(r.exitCode).toBe(0);
+	});
+
+	it("--json returns structured output with ok=true when no gaps", async () => {
+		const rm = roadmapWith("  tracked:\n    status: todo\n");
+		const fl = flowWith("  tracked:\n    status: todo\n");
+		const r = await run(["audit-sync", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.gaps).toHaveLength(0);
+	});
+
+	it("--json returns structured output with gaps when untracked", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  gap_art:\n    status: todo\n    label: Gap\n");
+		const r = await run(["audit-sync", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(1);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(parsed.gaps).toHaveLength(1);
+		expect(parsed.gaps[0].artifactId).toBe("gap_art");
+		expect(parsed.gaps[0].label).toBe("Gap");
+		expect(parsed.gaps[0].status).toBe("todo");
+	});
+
+	it("rejects when roadmap file is not type: roadmap", async () => {
+		const nonRoadmap = join(dir, "as-non-roadmap.pfdsl");
+		writeFileSync(
+			nonRoadmap,
+			"---\ntype: workflow\nartifact:\n  x:\n    status: done\n---\n",
+		);
+		const fl = flowWith("  y:\n    status: todo\n");
+		const r = await run(["audit-sync", nonRoadmap, fl]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("roadmap");
+	});
+
+	it("rejects when flow file is type: roadmap", async () => {
+		const rm = roadmapWith("  x:\n    status: done\n");
+		const anotherRoadmap = join(dir, "as-roadmap2.pfdsl");
+		writeFileSync(
+			anotherRoadmap,
+			"---\ntype: roadmap\nartifact:\n  y:\n    status: todo\n---\nreq >> build -> y\n",
+		);
+		const r = await run(["audit-sync", rm, anotherRoadmap]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("workflow");
+	});
+
+	it("missing argument returns exit 2", async () => {
+		const r = await run(["audit-sync"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("only roadmap arg (no flow) returns exit 2", async () => {
+		const rm = roadmapWith("  x:\n    status: done\n");
+		const r = await run(["audit-sync", rm]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("--help returns help text", async () => {
+		const r = await run(["audit-sync", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("audit-sync");
+	});
+
+	it("accepts multiple flow files", async () => {
+		const rm = roadmapWith("  tracked:\n    status: todo\n");
+		const fl1 = join(dir, "as-flow1.pfdsl");
+		const fl2 = join(dir, "as-flow2.pfdsl");
+		writeFileSync(
+			fl1,
+			"---\ntype: workflow\nartifact:\n  tracked:\n    status: todo\n---\n",
+		);
+		writeFileSync(
+			fl2,
+			"---\ntype: runtime-pipeline\nartifact:\n  gap_only:\n    status: todo\n---\n",
+		);
+		const r = await run(["audit-sync", rm, fl1, fl2, "--json"]);
+		expect(r.exitCode).toBe(1);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.gaps).toHaveLength(1);
+		expect(parsed.gaps[0].artifactId).toBe("gap_only");
+	});
+});
