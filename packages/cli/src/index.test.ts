@@ -12,12 +12,15 @@ import { diffGraphs, parseArgs, run } from "./index.js";
 
 let dir: string;
 const valid = "req >> design -> spec\nspec >> impl -> code\n";
+const validWithStatus =
+	"---\nartifact:\n  spec:\n    status: wip\n    criteria: spec criteria\n  code:\n    status: todo\n    criteria: code criteria\n---\nreq >> design -> spec\nspec >> impl -> code\n";
 const invalid = "req >> design\n"; // process design has no output
 const conflict = "req >> design -> spec\nother -> spec\n"; // dual generators
 
 beforeAll(() => {
 	dir = mkdtempSync(join(tmpdir(), "pfdsl-cli-"));
 	writeFileSync(join(dir, "valid.pfdsl"), valid);
+	writeFileSync(join(dir, "valid-with-status.pfdsl"), validWithStatus);
 	writeFileSync(join(dir, "invalid.pfdsl"), invalid);
 	writeFileSync(join(dir, "conflict.pfdsl"), conflict);
 });
@@ -569,7 +572,7 @@ describe("--no-color / NO_COLOR (#180)", () => {
 	});
 
 	it("check output without no-color contains OK (no ANSI codes present in plain output)", async () => {
-		const r = await run(["check", join(dir, "valid.pfdsl")]);
+		const r = await run(["check", join(dir, "valid-with-status.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("OK");
 	});
@@ -608,7 +611,11 @@ describe("--no-color / NO_COLOR (#180)", () => {
 
 describe("--json output (#181)", () => {
 	it("check --json returns { ok: true, diagnostics: [] } for valid file", async () => {
-		const r = await run(["check", join(dir, "valid.pfdsl"), "--json"]);
+		const r = await run([
+			"check",
+			join(dir, "valid-with-status.pfdsl"),
+			"--json",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toBe("");
 		const parsed = JSON.parse(r.stdout);

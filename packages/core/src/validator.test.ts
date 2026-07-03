@@ -17,8 +17,10 @@ function codes(src: string, fm: Frontmatter | null = null): string[] {
 }
 
 describe("validate", () => {
-	it("valid graph: no diagnostics", () => {
-		expect(diagnose("A >> P -> B")).toHaveLength(0);
+	it("valid graph: no errors", () => {
+		expect(
+			diagnose("A >> P -> B").filter((d) => d.severity === "error"),
+		).toHaveLength(0);
 	});
 
 	it("V001: single-source violation (two processes generate same artifact)", () => {
@@ -68,7 +70,9 @@ describe("validate", () => {
 
 	it("valid chain: no errors", () => {
 		expect(
-			diagnose("req >> design -> spec\nspec >> impl -> code"),
+			diagnose("req >> design -> spec\nspec >> impl -> code").filter(
+				(d) => d.severity === "error",
+			),
 		).toHaveLength(0);
 	});
 
@@ -817,6 +821,73 @@ a >> design -> b
 		it("no V031 when type is absent", () => {
 			const fm: Frontmatter = {};
 			expect(codes("A >> P -> B", fm)).not.toContain("V031");
+		});
+	});
+
+	describe("W005: produced artifact with no status", () => {
+		// W005 fires when an artifact is produced (output of a process) but has no status field.
+		// Source artifacts (input-only) are exempt.
+
+		it("warns when produced artifact has no status (frontmatter declared)", () => {
+			const fm: Frontmatter = { artifact: { B: {} } };
+			expect(codes("A >> P -> B", fm)).toContain("W005");
+		});
+
+		it("warns when produced artifact has no status (not declared in frontmatter)", () => {
+			// B is produced by P but has no frontmatter entry at all.
+			expect(codes("A >> P -> B")).toContain("W005");
+		});
+
+		it("no W005 when produced artifact has status: done", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W005");
+		});
+
+		it("no W005 when produced artifact has status: wip", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "wip" } } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W005");
+		});
+
+		it("no W005 when produced artifact has status: todo", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "todo" } } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W005");
+		});
+
+		it("no W005 when produced artifact has status: waiting", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "waiting" } } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W005");
+		});
+
+		it("no W005 when produced artifact has status: suspended", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "suspended" } } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W005");
+		});
+
+		it("no W005 for source artifact (input-only)", () => {
+			// A is source — no process outputs it, so W005 does not apply to A.
+			// B (produced) has status to avoid W005 on B; we verify A alone does not trigger it.
+			const fm: Frontmatter = {
+				artifact: { A: {}, B: { status: "todo" } },
+			};
+			const diags = diagnose("A >> P -> B", fm);
+			expect(
+				diags.filter((d) => d.code === "W005" && d.message.includes("'A'")),
+			).toHaveLength(0);
+		});
+
+		it("W005 severity is warning in non-strict mode", () => {
+			const diags = diagnose("A >> P -> B");
+			const w005 = diags.find((d) => d.code === "W005");
+			expect(w005?.severity).toBe("warning");
+		});
+
+		it("W005 becomes error in strict mode", () => {
+			const { tokens } = lex("A >> P -> B");
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, null);
+			const diags = validate(edges, nodeKinds, null, { strict: true });
+			const w005 = diags.find((d) => d.code === "W005");
+			expect(w005?.severity).toBe("error");
 		});
 	});
 });
