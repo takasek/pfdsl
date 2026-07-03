@@ -326,6 +326,13 @@ a >> design -> b
 			expect(codes("A >> P -> B", fm)).not.toContain("W002");
 		});
 
+		it("no W002 for produced artifact with no frontmatter declaration (undeclared = out of scope)", () => {
+			// W002 only checks artifacts declared in frontmatter.
+			// A produced artifact with no frontmatter entry is exempt by design —
+			// there is no metadata block to attach a criteria check to.
+			expect(codes("A >> P -> B")).not.toContain("W002");
+		});
+
 		it("W002 severity is warning in non-strict mode", () => {
 			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
 			const diags = diagnose("A >> P -> B", fm);
