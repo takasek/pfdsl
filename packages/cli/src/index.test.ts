@@ -991,6 +991,77 @@ req >> design -> spec
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("status-set");
 	});
+
+	// newly-ready reporting (roadmap files only)
+	const roadmapBase = `---
+type: roadmap
+artifact:
+  req:
+    status: todo
+  spec:
+    status: todo
+  code:
+    status: todo
+---
+req >> design -> spec
+spec >> impl -> code
+`;
+
+	it("prints newly-ready line when a done-transition unlocks at least one process", async () => {
+		const f = join(dir, "status-set-newly-ready.pfdsl");
+		writeFileSync(f, roadmapBase);
+		const r = await run(["status-set", f, "req", "done"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("newly ready:");
+		expect(r.stdout).toContain("design");
+	});
+
+	it("prints no newly-ready line when no process becomes unblocked", async () => {
+		const f = join(dir, "status-set-no-newly-ready.pfdsl");
+		writeFileSync(f, roadmapBase);
+		// setting code to done doesn't unlock anything (impl already needs spec which is undefined=done, code just output)
+		const r = await run(["status-set", f, "code", "wip"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toContain("newly ready:");
+	});
+
+	it("non-roadmap file (type: workflow): no newly-ready line in output", async () => {
+		const nonRoadmap = `---
+type: workflow
+artifact:
+  req:
+    status: todo
+---
+req >> design -> spec
+`;
+		const f = join(dir, "status-set-non-roadmap.pfdsl");
+		writeFileSync(f, nonRoadmap);
+		const r = await run(["status-set", f, "req", "done"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toContain("newly ready:");
+	});
+
+	it("--json includes newlyReady array with newly unblocked ids", async () => {
+		const f = join(dir, "status-set-json-newly-ready.pfdsl");
+		writeFileSync(f, roadmapBase);
+		const r = await run(["status-set", f, "req", "done", "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.newlyReady).toBeInstanceOf(Array);
+		expect(parsed.newlyReady).toContain("design");
+	});
+
+	it("--json with nothing unlocked gives empty newlyReady array", async () => {
+		const f = join(dir, "status-set-json-empty-newly-ready.pfdsl");
+		writeFileSync(f, roadmapBase);
+		const r = await run(["status-set", f, "code", "wip", "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.newlyReady).toBeInstanceOf(Array);
+		expect(parsed.newlyReady).toHaveLength(0);
+	});
 });
 
 describe("audit-sync", () => {

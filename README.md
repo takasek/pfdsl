@@ -131,8 +131,10 @@ Commands:
                            List ready-to-start processes (- = stdin)
                            --best    recommend the best next process
                            --json    output as JSON
-  status-set <file> <artifact-id> <status>
+  status-set <file> <artifact-id> <status> [--json]
                            Set artifact status (todo|wip|done|waiting|suspended) in place
+                           Roadmap files: prints newly-ready processes after the change
+                           --json    output as JSON ({ ok, newlyReady: string[] })
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON
