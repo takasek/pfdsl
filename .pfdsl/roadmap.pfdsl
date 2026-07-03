@@ -211,8 +211,14 @@ artifact:
     location: https://github.com/takasek/pfdsl/issues/236
   spec_v0010:
     label: 仕様書 v0.0.10（basePath統合）
-    status: todo
+    status: done
     criteria: "basePath: フィールドが spec 本文に統合済み"
+    location: ../docs/spec/spec.md
+    updated_at: 2026-07-03T03:51:00Z
+  spec_v0011:
+    label: 仕様書 v0.0.11（waiting/suspended/type統合）
+    status: done
+    criteria: "waiting/suspended status 分割・type フィールド・W002 source artifact 免除が spec 本文に統合済み"
     location: ../docs/spec/spec.md
   ready_cmd:
     label: "pfdsl ready コマンド (PR #267)"
@@ -250,7 +256,7 @@ artifact:
   i268_type_field:
     label: "type フィールド追加 (#268)"
     description: "frontmatter に type: roadmap|workflow|runtime-pipeline を追加し、ready を roadmap 型にゲート。draft_proposals 経由"
-    status: todo
+    status: done
     criteria: "type: フィールドが spec に統合済み、ready が roadmap 型以外で error を出力する"
     location: https://github.com/takasek/pfdsl/issues/268
     updated_at: 2026-07-02T18:46:25Z
@@ -264,15 +270,15 @@ artifact:
   i272_w002_hierarchy:
     label: "W002 criteria 階層化 (#272)"
     description: "producer を持たない source artifact は W002 対象外にするか低階層 warning に落とす"
-    status: todo
+    status: done
     criteria: "source artifact（producer なし）への W002 が抑制または低severity 化され、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/272
     updated_at: 2026-07-02T18:56:10Z
   i273_blocked_by:
-    label: "blockedBy フィールド (#273)"
-    description: "blocked 理由の機械可読化。blockedBy: human 等で人間待ち/依存待ちを区別。draft_proposals 経由"
-    status: todo
-    criteria: "blockedBy: フィールドが spec に統合済み、対応サンプルあり"
+    label: "blocked 分割: waiting/suspended (#273)"
+    description: "status: blocked を waiting（外部待ち）と suspended（自主停止）に分割。破壊的変更として即 V007/V008 エラー化"
+    status: done
+    criteria: "waiting/suspended が STATUS_VALUES に追加され、blocked が V007/V008 でエラーになり、spec v0.0.11 に統合済み"
     location: https://github.com/takasek/pfdsl/issues/273
     updated_at: 2026-07-02T18:56:12Z
   i278_release_automation:
@@ -414,6 +420,9 @@ process:
     label: status-set コマンド実装
   implement_release_automation:
     label: make release roadmap 自動更新実装
+  integrate_spec_v0011:
+    label: 仕様書 v0.0.11統合
+    description: "waiting/suspended status 分割・type フィールド・W002 source artifact 免除を spec 本文に統合する"
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -422,7 +431,8 @@ statusStyles:
   done: { fillcolor: "#d4edda", style: filled }
   wip: { fillcolor: "#fff3cd", style: filled }
   todo: { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 spec_v006 >> draft_multifile_specs -> [hierarchy_spec, presets_spec, multifile_policy]
@@ -485,12 +495,12 @@ index_reindex >> integrate_spec_v009 -> spec_v009
 [hover_jump, run_command, group_hover] >> publish_ext_v0014 -> ext_v0014
 
 [spec_v009, cli_tool_v0011] >> implement_basepath -> basepath
-basepath >> integrate_spec_v0010 -> spec_v0010
+[basepath, ready_cmd] >> integrate_spec_v0010 -> spec_v0010
 spec_v009 >>? integrate_spec_v0010
 cli_tool_v0011 >> implement_ready_cmd -> ready_cmd
 basepath >> publish_cli_v0012 -> cli_tool_v0012
 [cli_tool_v0012, ready_cmd] >> publish_cli_v0013 -> cli_tool_v0013
-basepath >> publish_ext_v0015 -> ext_v0015
+[ext_v0014, basepath] >> publish_ext_v0015 -> ext_v0015
 
 cli_tool_v0013 >> update_pfd_ops_skill -> pfd_ops_skill_ready
 
@@ -502,3 +512,6 @@ cli_tool_v0013 >> implement_status_set -> status_set
 status_set >> implement_release_automation -> i278_release_automation
 
 [cli_tool_v0013, i268_type_field, i272_w002_hierarchy, i273_blocked_by, status_set] >> publish_cli_v0014 -> cli_tool_v0014
+
+[i268_type_field, i272_w002_hierarchy, i273_blocked_by] >> integrate_spec_v0011 -> spec_v0011
+spec_v0010 >>? integrate_spec_v0011

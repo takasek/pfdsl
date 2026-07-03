@@ -286,6 +286,29 @@ source >> build -> output
 
 ---
 
+## 17-type — type field
+
+`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). `pfdsl ready` requires `type: roadmap`; other values or omission cause an error (V031 for invalid values).
+
+```pfdsl
+---
+type: roadmap
+artifact:
+  requirements:
+    label: Requirements
+    status: done
+  implementation:
+    label: Implementation
+    status: wip
+process:
+  build:
+    label: Build
+---
+requirements >> build -> implementation
+```
+
+---
+
 ## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
 How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).
@@ -305,7 +328,8 @@ statusStyles:
   done:    { fillcolor: lightgray, style: filled, fontcolor: dimgray }
   wip:     { fillcolor: lightyellow, style: filled }
   todo:    { fillcolor: yellow, style: filled }
-  blocked: { fillcolor: salmon, style: filled }
+  waiting: { fillcolor: salmon, style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 
 artifact:
   spec_v0_0_2:

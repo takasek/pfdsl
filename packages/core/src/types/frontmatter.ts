@@ -1,7 +1,20 @@
 import type { Diagnostic } from "./diagnostic.js";
 
-export const STATUS_VALUES = ["done", "wip", "todo", "blocked"] as const;
+export const STATUS_VALUES = [
+	"done",
+	"wip",
+	"todo",
+	"waiting",
+	"suspended",
+] as const;
 export type Status = (typeof STATUS_VALUES)[number];
+
+export const PFD_TYPE_VALUES = [
+	"roadmap",
+	"workflow",
+	"runtime-pipeline",
+] as const;
+export type PfdType = (typeof PFD_TYPE_VALUES)[number];
 
 export const STYLE_ATTRS = [
 	"fillcolor",
@@ -81,6 +94,8 @@ export interface Frontmatter {
 	extends?: string | string[];
 	/** Relative path from the .pfdsl file used as base for location: and command: resolution. Default: .pfdsl file's directory. */
 	basePath?: string;
+	/** PFD kind: roadmap | workflow | runtime-pipeline. Controls which commands apply. */
+	type?: PfdType;
 	[key: string]: unknown;
 }
 

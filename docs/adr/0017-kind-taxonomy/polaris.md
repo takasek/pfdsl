@@ -245,10 +245,11 @@ process:
     group: platform
 
 statusStyles:
-  done:    { fillcolor: "#d4edda", style: filled }
-  wip:     { fillcolor: "#fff3cd", style: filled }
-  todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  done:      { fillcolor: "#d4edda", style: filled }
+  wip:       { fillcolor: "#fff3cd", style: filled }
+  todo:      { fillcolor: "#f8f9fa", style: filled }
+  waiting:   { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 # Aチーム（決済）の採用フロー

@@ -64,7 +64,7 @@ Process は純粋関数であり「完了」という状態を持たない（`st
 
 ### checker の警告タイミング
 
-`status: done` + `criteria:` 未設定 の組み合わせのみ検査する。`status: wip` / `todo` / `blocked` では警告しない。
+`status: done` + `criteria:` 未設定 の組み合わせのみ検査する。`status: wip` / `todo` / `waiting` / `suspended` では警告しない。
 
 ## 影響範囲
 

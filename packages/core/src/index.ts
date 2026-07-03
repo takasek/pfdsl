@@ -51,6 +51,7 @@ export type {
 	NodeStyle,
 	NormalizedEdge,
 	OutputEdgeStatement,
+	PfdType,
 	Position,
 	PrimaryEdge,
 	ProcessMeta,
@@ -61,7 +62,7 @@ export type {
 	Token,
 	TokenType,
 } from "./types/index.js";
-export { STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
+export { PFD_TYPE_VALUES, STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
 
 export interface ParseDocResult {
 	document: Document;

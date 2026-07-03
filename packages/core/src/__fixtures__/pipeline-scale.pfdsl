@@ -1,6 +1,7 @@
 ---
 title: Pipeline Scale Test Fixture
 description: Fixed fixture for snapshot testing pipeline throughput. Represents structural patterns of a real roadmap without coupling to production planning data.
+type: roadmap
 basePath: ./
 layout:
   direction: LR
@@ -125,7 +126,8 @@ statusStyles:
   done: { fillcolor: "#d4edda", style: filled }
   wip: { fillcolor: "#fff3cd", style: filled }
   todo: { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 adr_set >> draft_alpha -> spec_alpha

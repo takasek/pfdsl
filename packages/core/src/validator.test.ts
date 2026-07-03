@@ -79,6 +79,13 @@ describe("validate", () => {
 		expect(codes("A >> P -> B", fm)).toContain("V007");
 	});
 
+	it("V007: blocked is no longer valid — use waiting or suspended", () => {
+		const fm = {
+			artifact: { A: { status: "blocked" } },
+		} as unknown as Frontmatter;
+		expect(codes("A >> P -> B", fm)).toContain("V007");
+	});
+
 	it("V029: index must be a positive integer (zero rejected)", () => {
 		const fm = {
 			artifact: { B: { index: 0 } },
@@ -143,6 +150,13 @@ a >> design -> b
 	it("V008: invalid statusStyles key", () => {
 		const fm = {
 			statusStyles: { finished: { fillcolor: "gray" } },
+		} as unknown as Frontmatter;
+		expect(codes("A >> P -> B", fm)).toContain("V008");
+	});
+
+	it("V008: blocked is no longer a valid statusStyles key", () => {
+		const fm = {
+			statusStyles: { blocked: { fillcolor: "#f8d7da" } },
 		} as unknown as Frontmatter;
 		expect(codes("A >> P -> B", fm)).toContain("V008");
 	});
@@ -281,29 +295,46 @@ a >> design -> b
 	});
 
 	describe("W002: artifact without criteria", () => {
-		it("warns when done artifact has no criteria field", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+		// W002 applies only to produced artifacts (has a producer process).
+		// Source artifacts (input-only, no producer) are exempt.
+		// In "A >> P -> B": A is source, B is produced.
+
+		it("warns when produced artifact has no criteria field", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
 			const diags = diagnose("A >> P -> B", fm);
 			expect(diags.map((d) => d.code)).toContain("W002");
 		});
 
-		it("warns when wip artifact has no criteria field", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "wip" } } };
+		it("warns when produced wip artifact has no criteria field", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "wip" } } };
 			expect(codes("A >> P -> B", fm)).toContain("W002");
 		});
 
-		it("warns when todo artifact has no criteria field", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "todo" } } };
+		it("warns when produced todo artifact has no criteria field", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "todo" } } };
 			expect(codes("A >> P -> B", fm)).toContain("W002");
 		});
 
-		it("warns when artifact has no status and no criteria", () => {
-			const fm: Frontmatter = { artifact: { A: {} } };
+		it("warns when produced artifact has no status and no criteria", () => {
+			const fm: Frontmatter = { artifact: { B: {} } };
 			expect(codes("A >> P -> B", fm)).toContain("W002");
+		});
+
+		it("no W002 for source artifact (input-only, no producer)", () => {
+			// A is a source artifact — no process outputs it, so W002 is suppressed.
+			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W002");
+		});
+
+		it("no W002 for produced artifact with no frontmatter declaration (undeclared = out of scope)", () => {
+			// W002 only checks artifacts declared in frontmatter.
+			// A produced artifact with no frontmatter entry is exempt by design —
+			// there is no metadata block to attach a criteria check to.
+			expect(codes("A >> P -> B")).not.toContain("W002");
 		});
 
 		it("W002 severity is warning in non-strict mode", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
 			const diags = diagnose("A >> P -> B", fm);
 			const w002 = diags.find((d) => d.code === "W002");
 			expect(w002?.severity).toBe("warning");
@@ -312,23 +343,23 @@ a >> design -> b
 		it("W002 becomes error in strict mode", () => {
 			const { tokens } = lex("A >> P -> B");
 			const { document } = parseTokens(tokens);
-			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
 			const { edges, nodeKinds } = normalize(document, fm);
 			const diags = validate(edges, nodeKinds, fm, { strict: true });
 			const w002 = diags.find((d) => d.code === "W002");
 			expect(w002?.severity).toBe("error");
 		});
 
-		it("no W002 when artifact has criteria", () => {
+		it("no W002 when produced artifact has criteria", () => {
 			const fm: Frontmatter = {
-				artifact: { A: { status: "done", criteria: "approved by TL" } },
+				artifact: { B: { status: "done", criteria: "approved by TL" } },
 			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W002");
 		});
 
-		it("no W002 when non-done artifact has criteria", () => {
+		it("no W002 when non-done produced artifact has criteria", () => {
 			const fm: Frontmatter = {
-				artifact: { A: { status: "wip", criteria: "PR passes CI" } },
+				artifact: { B: { status: "wip", criteria: "PR passes CI" } },
 			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W002");
 		});
@@ -340,10 +371,10 @@ a >> design -> b
 				"  myArt:",
 				"    status: done",
 				"---",
-				"myArt >> P -> B",
+				"A >> P -> myArt",
 			].join("\n");
 			const fm: Frontmatter = { artifact: { myArt: { status: "done" } } };
-			const { tokens } = lex("myArt >> P -> B");
+			const { tokens } = lex("A >> P -> myArt");
 			const { document } = parseTokens(tokens);
 			const { edges, nodeKinds } = normalize(document, fm);
 			const diags = validate(edges, nodeKinds, fm, { source });
@@ -353,7 +384,7 @@ a >> design -> b
 		});
 
 		it("W002 range falls back to zeroRange when source is not provided", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
 			const { tokens } = lex("A >> P -> B");
 			const { document } = parseTokens(tokens);
 			const { edges, nodeKinds } = normalize(document, fm);
@@ -624,10 +655,20 @@ a >> design -> b
 			expect(codes("inp >> P -> out", fm)).toContain("W003");
 		});
 
-		it("warns when output artifact is done but input artifact is blocked", () => {
+		it("warns when output artifact is done but input artifact is waiting", () => {
 			const fm: Frontmatter = {
 				artifact: {
-					inp: { status: "blocked", criteria: "x" },
+					inp: { status: "waiting", criteria: "x" },
+					out: { status: "done", criteria: "y" },
+				},
+			};
+			expect(codes("inp >> P -> out", fm)).toContain("W003");
+		});
+
+		it("warns when output artifact is done but input artifact is suspended", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					inp: { status: "suspended", criteria: "x" },
 					out: { status: "done", criteria: "y" },
 				},
 			};
@@ -749,6 +790,33 @@ a >> design -> b
 		it("no V020 when process has only output edges (V002 fires instead)", () => {
 			const fm: Frontmatter = { process: { P: {} } };
 			expect(codes("P -> B", fm)).not.toContain("V020");
+		});
+	});
+
+	describe("V031: invalid type field value", () => {
+		it("errors when type is an unknown value", () => {
+			const fm = { type: "kanban" } as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).toContain("V031");
+		});
+
+		it("no V031 for type: roadmap", () => {
+			const fm: Frontmatter = { type: "roadmap" };
+			expect(codes("A >> P -> B", fm)).not.toContain("V031");
+		});
+
+		it("no V031 for type: workflow", () => {
+			const fm: Frontmatter = { type: "workflow" };
+			expect(codes("A >> P -> B", fm)).not.toContain("V031");
+		});
+
+		it("no V031 for type: runtime-pipeline", () => {
+			const fm: Frontmatter = { type: "runtime-pipeline" };
+			expect(codes("A >> P -> B", fm)).not.toContain("V031");
+		});
+
+		it("no V031 when type is absent", () => {
+			const fm: Frontmatter = {};
+			expect(codes("A >> P -> B", fm)).not.toContain("V031");
 		});
 	});
 });

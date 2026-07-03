@@ -660,6 +660,50 @@ digraph PFDSL {
 
 ---
 
+## 17-type — type field
+
+`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). `pfdsl ready` requires `type: roadmap`; other values or omission cause an error (V031 for invalid values).
+
+```pfdsl
+---
+type: roadmap
+artifact:
+  requirements:
+    label: Requirements
+    status: done
+  implementation:
+    label: Implementation
+    status: wip
+process:
+  build:
+    label: Build
+---
+requirements >> build -> implementation
+```
+
+<img src="17-type.svg">
+
+<details>
+<summary>DOT</summary>
+
+```dot
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "build" [shape=ellipse, label="build\nBuild"];
+  "implementation" [shape=box, label="implementation\nImplementation", xlabel="wip", penwidth="2"];
+  "requirements" [shape=box, label="requirements\nRequirements", xlabel="done", penwidth="2"];
+
+  "requirements" -> "build";
+  "build" -> "implementation";
+}
+```
+
+</details>
+
+---
+
 ## pfdsl_implementation_flow — PFDSL toolchain roadmap
 
 How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).
