@@ -36,7 +36,7 @@ artifact:
   <id>:
     label: 人間向けラベル
     description: ...
-    status: done           # todo=未着手 | wip=PR open | done=main済み | waiting=外部要因待ち | suspended=自主保留
+    status: done           # todo=未着手 | wip=生産中（ブランチ/PR open）| done=main済み | waiting=外部要因待ち | suspended=自主保留
     criteria: ...           # 完了条件（todo/wip でも前宣言として書く）
     location: path/to/file  # 実体ファイル・URL へのポインタ。可視化でリンクになる。相対パスは「この .pfdsl ファイルからの相対」で書く
     owner: ...
