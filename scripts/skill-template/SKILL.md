@@ -90,7 +90,7 @@ npx @pfdsl/cli audit-sync <roadmap> <flow>... [--json]
 npx @pfdsl/cli skill sync [--yes]
 ```
 
-Full flag reference: `npx @pfdsl/cli help`.
+Full flag reference: `npx @pfdsl/cli help`. This section documents CLI v{{cliVersion}}. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.
 
 ## Key constraints
 
