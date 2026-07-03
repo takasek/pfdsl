@@ -36,8 +36,7 @@ type: roadmap   # または workflow / runtime-pipeline
 
 ## 理由
 
-* workflow に将来着手予定の `todo` ノードを置きたいという要求と、
-  `ready` が workflow 型で誤動作することは独立した問いである
+* workflow に将来着手予定の `todo` ノードを置きたいという要求と、`ready` が workflow 型で誤動作することは独立した問いである
 * 種別をツールが自己判断するより、ファイルが自己宣言するほうが明確
 
 ## 関連
