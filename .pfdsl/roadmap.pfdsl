@@ -275,13 +275,6 @@ artifact:
     criteria: "blockedBy: フィールドが spec に統合済み、対応サンプルあり"
     location: https://github.com/takasek/pfdsl/issues/273
     updated_at: 2026-07-02T18:56:12Z
-  i277_status_set:
-    label: "status-set コマンド (#277)"
-    description: "pfdsl status-set <file> <artifact-id> <status> で artifact status を CLI から更新する"
-    status: wip
-    criteria: "pfdsl status-set が対象 artifact の status フィールドを書き換え、不正 status は exit 2"
-    location: https://github.com/takasek/pfdsl/issues/277
-    updated_at: 2026-07-03T01:28:34Z
   i278_release_automation:
     label: "make release roadmap 自動更新 (#278)"
     description: "make release 後に roadmap の publish artifact を自動 done にする連携。#277 status-set が前提"
@@ -313,6 +306,12 @@ artifact:
     status: done
     criteria: "basePath: フィールドが CLI/core/vscode-extension で動作確認済み、feature sample あり"
     location: https://github.com/takasek/pfdsl/issues/261
+  status_set:
+    label: "status-set コマンド (#277)"
+    description: "pfdsl status-set <file> <artifact-id> <status> で artifact status を CLI から更新する"
+    status: done
+    criteria: "pfdsl status-set が対象 artifact の status フィールドを書き換え、不正 status は exit 2"
+    location: https://github.com/takasek/pfdsl/issues/277
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -499,7 +498,7 @@ cli_tool_v0013 >> implement_type_field -> i268_type_field
 i268_type_field >> implement_audit_sync -> i269_audit_sync
 cli_tool_v0013 >> implement_w002_hierarchy -> i272_w002_hierarchy
 cli_tool_v0013 >> implement_blocked_by -> i273_blocked_by
-cli_tool_v0013 >> implement_status_set -> i277_status_set
-i277_status_set >> implement_release_automation -> i278_release_automation
+cli_tool_v0013 >> implement_status_set -> status_set
+status_set >> implement_release_automation -> i278_release_automation
 
-[cli_tool_v0013, i268_type_field, i272_w002_hierarchy, i273_blocked_by, i277_status_set] >> publish_cli_v0014 -> cli_tool_v0014
+[cli_tool_v0013, i268_type_field, i272_w002_hierarchy, i273_blocked_by, status_set] >> publish_cli_v0014 -> cli_tool_v0014
