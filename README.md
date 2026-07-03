@@ -186,6 +186,12 @@ Install into any repo with one command:
 npx @pfdsl/cli@latest skill sync
 ```
 
+> **Tip:** `npx` re-installs on every invocation. For faster `check` / `ready` runs in daily use, install once:
+> ```bash
+> npm install -g @pfdsl/cli          # global
+> npm install --save-dev @pfdsl/cli  # or as a devDependency
+> ```
+
 Run at a target repo's root, it is idempotent and:
 
 - mirrors skills into `.claude/skills/` (`pfd-ops`, `pfd-retro`, `pfd-ecosystem`, `pfdsl`)
