@@ -4,7 +4,7 @@ name: pfdsl
 description: |
   Use when working with .pfdsl (Process Flow DSL) files — reading, writing,
   editing, or validating them. Always invoke before touching any .pfdsl file,
-  running pfdsl CLI tools, updating artifact status (done/wip/todo/blocked),
+  running pfdsl CLI tools, updating artifact status (done/wip/todo/waiting/suspended),
   adding artifacts or processes, or interpreting flow diagrams.
 ---
 
@@ -36,7 +36,7 @@ artifact:
   <id>:
     label: 人間向けラベル
     description: ...
-    status: done           # todo=未着手 | wip=PR open | done=main済み | blocked=外部要因
+    status: done           # todo=未着手 | wip=PR open | done=main済み | waiting=外部要因待ち | suspended=自主保留
     criteria: ...           # 完了条件（todo/wip でも前宣言として書く）
     location: path/to/file  # 実体ファイル・URL へのポインタ。可視化でリンクになる。相対パスは「この .pfdsl ファイルからの相対」で書く
     owner: ...
@@ -70,7 +70,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting:   { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ```
 
 ## CLI
@@ -119,7 +120,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 ## Typical task: update artifact status
 
 1. Find the artifact ID in the target `.pfdsl` file's frontmatter `artifact:` section
-2. Change `status: todo` → `status: done` (or `wip`, `blocked`)
+2. Change `status: todo` → `status: done` (or `wip`, `waiting`, `suspended`)
 3. Validate: `npx @pfdsl/cli check <file>`
 
 ## References

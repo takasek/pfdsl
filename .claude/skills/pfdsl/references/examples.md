@@ -101,7 +101,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 proposal >> plan -> outline
@@ -242,7 +243,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 cfp_announcement >> recruit_cfp -> session_proposals
@@ -343,7 +345,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 sow >> draft_contract -> contract_draft
@@ -451,7 +454,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 crm_raw >> clean_crm -> crm_clean
@@ -549,7 +553,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 [job_description, resume] >> screen_resume -> screening_result
@@ -642,7 +647,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 alert >> triage -> triage_record
@@ -740,7 +746,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 [raw_dataset, feature_spec] >> prepare_data -> prepared_dataset
@@ -863,7 +870,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 vulnerability_report >> triage_vuln -> triage_result
@@ -971,7 +979,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 requirement >> design -> design_doc
@@ -1077,7 +1086,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 change_request >> write_usdm -> usdm

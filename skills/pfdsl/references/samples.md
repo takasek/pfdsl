@@ -305,7 +305,8 @@ statusStyles:
   done:    { fillcolor: lightgray, style: filled, fontcolor: dimgray }
   wip:     { fillcolor: lightyellow, style: filled }
   todo:    { fillcolor: yellow, style: filled }
-  blocked: { fillcolor: salmon, style: filled }
+  waiting: { fillcolor: salmon, style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 
 artifact:
   spec_v0_0_2:
