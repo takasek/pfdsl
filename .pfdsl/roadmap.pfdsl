@@ -264,7 +264,7 @@ artifact:
   i292_symmetry_hint:
     label: "check --audit 同種対称性ヒント (#292)"
     description: "同 group 内 artifact の下流消費者集合の非対称を情報表示。retro プロンプト A の機械化（spec 変更なし）"
-    status: todo
+    status: wip
     criteria: "check --audit が同 group 消費者非対称の hint 行を出力し、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/292
     updated_at: 2026-07-03T16:22:34Z
