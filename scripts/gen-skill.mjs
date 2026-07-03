@@ -7,8 +7,11 @@ import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { execFileSync } from "node:child_process";
+
 import { findMissingFields } from "./lib/skill-field-drift.mjs";
 import { resolveCompanions } from "./lib/sample-companions.mjs";
+import { renderCliSection } from "./lib/skill-cli-section.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -153,9 +156,17 @@ if (missingFields.length > 0) {
   process.exit(1);
 }
 
+const cliPath = resolve(root, "packages/cli/dist/cli.js");
+if (!existsSync(cliPath)) {
+  console.error("Error: packages/cli/dist/cli.js not found. Run 'pnpm -r build' first.");
+  process.exit(1);
+}
+const helpOutput = execFileSync(process.execPath, [cliPath, "help"], { encoding: "utf-8" });
+
 const skillMd = templateSrc
 	.replace(/\{\{specVersion\}\}/g, specVersion)
-	.replace(/\{\{cliVersion\}\}/g, cliVersion);
+	.replace(/\{\{cliVersion\}\}/g, cliVersion)
+	.replace("{{cliCommands}}", renderCliSection(helpOutput));
 
 writeFileSync(resolve(outDir, "SKILL.md"), skillMd);
 console.log("SKILL.md → generated from skill-template/SKILL.md");

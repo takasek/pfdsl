@@ -87,17 +87,7 @@ statusStyles:
 ## CLI
 
 ```bash
-npx @pfdsl/cli check <file> [--audit] [--summary] [--strict] [--json]
-npx @pfdsl/cli fmt <file> [--write] [--mode flat|flows]
-npx @pfdsl/cli reindex <file> [--write] [--check] [--renumber] [--json]
-npx @pfdsl/cli sort-meta <file> --by <keys> [--write] [--check]
-npx @pfdsl/cli normalize <file>
-npx @pfdsl/cli graph <file> [--format dot|svg|pdf|png]
-npx @pfdsl/cli diff <file-a> <file-b> [--format text|dot|svg]
-npx @pfdsl/cli ready <file> [--best] [--json]      # roadmap: list ready-to-start processes
-npx @pfdsl/cli status-set <file> <artifact-id> <status>
-npx @pfdsl/cli audit-sync <roadmap> <flow>... [--json]
-npx @pfdsl/cli skill sync [--yes]
+{{cliCommands}}
 ```
 
 Full flag reference: `npx @pfdsl/cli help`. This section documents CLI v{{cliVersion}}. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.

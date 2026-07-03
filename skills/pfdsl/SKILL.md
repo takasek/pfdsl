@@ -87,17 +87,18 @@ statusStyles:
 ## CLI
 
 ```bash
-npx @pfdsl/cli check <file> [--audit] [--summary] [--strict] [--json]
-npx @pfdsl/cli fmt <file> [--write] [--mode flat|flows]
-npx @pfdsl/cli reindex <file> [--write] [--check] [--renumber] [--json]
-npx @pfdsl/cli sort-meta <file> --by <keys> [--write] [--check]
-npx @pfdsl/cli normalize <file>
-npx @pfdsl/cli graph <file> [--format dot|svg|pdf|png]
-npx @pfdsl/cli diff <file-a> <file-b> [--format text|dot|svg]
-npx @pfdsl/cli ready <file> [--best] [--json]      # roadmap: list ready-to-start processes
-npx @pfdsl/cli status-set <file> <artifact-id> <status>
-npx @pfdsl/cli audit-sync <roadmap> <flow>... [--json]
-npx @pfdsl/cli skill sync [--yes]
+npx @pfdsl/cli check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
+npx @pfdsl/cli fmt <file|-> [--write] [--mode flat|flows]   # Format a .pfdsl file (- = stdin)
+npx @pfdsl/cli reindex <file|-> [--write] [--check] [--renumber] [--json]   # Assign topological index: values (- = stdin)
+npx @pfdsl/cli sort-meta <file|-> --by <keys> [--write] [--check]   # Sort node definitions by keys (- = stdin)
+npx @pfdsl/cli normalize <file|-> [--json]   # Print canonical edge list (- = stdin)
+npx @pfdsl/cli graph <file|-> [--format dot|svg|pdf|png]   # Print Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
+npx @pfdsl/cli diff <a> <b> [--format text|dot|svg]   # Structural diff (text), or visual diff DOT/SVG
+npx @pfdsl/cli ready <file|-> [--best] [--json]   # List ready-to-start processes (- = stdin)
+npx @pfdsl/cli status-set <file> <artifact-id> <status> [--json]   # Set artifact status (todo|wip|done|waiting|suspended) in place
+npx @pfdsl/cli audit-sync <roadmap> <flow> [<flow>...] [--json]   # Cross-check todo artifacts in flow files against the roadmap
+npx @pfdsl/cli skill sync [--yes]   # Sync pfd-ops skills and commands into the current directory
+npx @pfdsl/cli help   # Show this help
 ```
 
 Full flag reference: `npx @pfdsl/cli help`. This section documents CLI v0.0.15. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.
