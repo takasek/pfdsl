@@ -1,0 +1,14 @@
+---
+type: roadmap
+artifact:
+  requirements:
+    label: Requirements
+    status: done
+  implementation:
+    label: Implementation
+    status: wip
+process:
+  build:
+    label: Build
+---
+requirements >> build -> implementation
