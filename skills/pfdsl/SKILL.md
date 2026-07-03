@@ -77,12 +77,20 @@ statusStyles:
 ## CLI
 
 ```bash
-npx @pfdsl/cli check <file>
+npx @pfdsl/cli check <file> [--audit] [--summary] [--strict] [--json]
 npx @pfdsl/cli fmt <file> [--write] [--mode flat|flows]
+npx @pfdsl/cli reindex <file> [--write] [--check] [--renumber] [--json]
+npx @pfdsl/cli sort-meta <file> --by <keys> [--write] [--check]
 npx @pfdsl/cli normalize <file>
-npx @pfdsl/cli graph <file> [--format dot|svg]
-npx @pfdsl/cli diff <file-a> <file-b>
+npx @pfdsl/cli graph <file> [--format dot|svg|pdf|png]
+npx @pfdsl/cli diff <file-a> <file-b> [--format text|dot|svg]
+npx @pfdsl/cli ready <file> [--best] [--json]      # roadmap: list ready-to-start processes
+npx @pfdsl/cli status-set <file> <artifact-id> <status>
+npx @pfdsl/cli audit-sync <roadmap> <flow>... [--json]
+npx @pfdsl/cli skill sync [--yes]
 ```
+
+Full flag reference: `npx @pfdsl/cli help`. This section documents CLI v0.0.13. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.
 
 ## Key constraints
 
@@ -119,15 +127,21 @@ PFD はタスクリストではなく成果物の変換グラフ。
 
 ## Typical task: update artifact status
 
-1. Find the artifact ID in the target `.pfdsl` file's frontmatter `artifact:` section
-2. Change `status: todo` → `status: done` (or `wip`, `waiting`, `suspended`)
-3. Validate: `npx @pfdsl/cli check <file>`
+```bash
+npx @pfdsl/cli status-set <file> <artifact-id> <status>   # todo|wip|done|waiting|suspended
+```
 
-## References
+Sets the status in place and validates. Manual fallback: edit `status:` in the frontmatter `artifact:` section, then run `check`.
 
-Read these when deeper detail is needed:
+## References — which to read when
 
-- `references/spec.md` — full PFDSL spec v0.0.11 (syntax rules, grammar, all frontmatter fields)
-- `references/samples.md` — annotated .pfdsl examples showing each language feature
-- `references/examples.md` — realistic domain examples demonstrating the quality guide
-- `references/review-prompts.md` — A/B 監査カタログ（レビュー時に PFD を問い詰めるプロンプト）
+| 局面 | 読む場所 |
+|---|---|
+| status 更新・読解・小編集 | 本文で完結（references 不要） |
+| 特定の構文・フィールドの書き方 | `references/samples.md`（機能別の最小例） |
+| 新規 PFD の執筆・設計判断 | 本文の quality guide + `references/examples.md`（実戦ドメインの設計パターン） |
+| check エラーの対処 | エラーコード（V/W）で `references/spec.md` を grep（ヒット先は §15 制約・§16 エラー方針・§20 変更履歴のいずれか） |
+| フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
+| PFD のレビュー・監査 | `references/review-prompts.md`（A/B カタログ。書くルールは本文、問い詰めはこちら） |
+
+`references/spec.md` は full spec v0.0.11（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。

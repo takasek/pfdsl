@@ -1,6 +1,6 @@
 # roadmap.md — issue 管理バインディング（roadmap.pfdsl の companion）
 
-この companion を読んだ後、pfd-ops スキルをロードして運用プロトコル（サイクル手順・終端ゲート・知見振り分け手続き等）を確認すること。
+この companion を読んだ後、pfd-ops スキルが未ロードならロードして運用プロトコル（サイクル手順・終端ゲート・知見振り分け手続き等）を確認すること（ロード済みなら再ロード不要）。
 
 `roadmap.pfdsl` は issue 依存構造のみ管理する。issue の一次情報と同期手段はここに書く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
 
@@ -26,7 +26,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 ## 終端ゲート追加項目（issue 固有）
 
-**タイミング規約**: issue クローズと flow 確定は **main への PR マージ時**に行う（生態系図 merge_pr: 成果物・進捗・issue 更新はマージで正本になる）。PR 作成時点では行わない — PR がレビューで変わる/却下される可能性があるため。サイクルが PR 作成で終わる場合、下記2項目は「マージ時に実施」と記録して未了のまま閉じてよい。**feature branch への中間 PR では `closes #xxx` を使わない** — feature branch マージ時に issue が閉じられるが、main 未到達のため誤 close になる。
+**タイミング規約**: issue クローズと flow 確定は **main への PR マージ時**に行う（生態系図 merge_pr: 成果物・進捗・issue 更新はマージで正本になる）。PR 作成時点では行わない — PR がレビューで変わる/却下される可能性があるため。サイクルが PR 作成で終わる場合、下記2項目は「マージ時に実施」と記録して未了のまま閉じてよい。**feature branch への中間 PR では `closes #xxx` を使わない**（理由と規約は L3 reference「PR 本文規約」が一次情報）。
 
 **着手時**: develop ブランチを切った時点で、実装対象の出力 artifact を `todo → wip` に更新する（workflow.md「develop 着手時の artifact status 更新」）。PR 作成・マージを待たない。
 
@@ -34,18 +34,18 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
 - [ ] close 時の降格規則を適用した（定義は L3 reference。専属 process も含めて削除する）
-- [ ] 変更が公開物の挙動を変える場合（CLI 出力・拡張機能の動作変化を含む — パスでなく挙動で判定）、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending なら次サイクルの先頭タスクとして明記する）
+- [ ] 変更が公開物の挙動・同梱内容を変える場合（CLI 出力・拡張機能の動作変化に加え、skill sync 同梱物 = `.claude/skills/` の配布4スキル・pfd-* コマンドの変更を含む — パスでなく挙動と同梱内容で判定）、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending なら次サイクルの先頭タスクとして明記する）
 - [ ] CLIコマンドを追加・変更した場合、HELP テキスト（`packages/cli/src/index.ts`）と README のコマンド一覧の両方を更新した
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。`make gen-samples` は graphviz の `dot` バイナリを要求する。web/worktree 環境には未インストールのことがあるため、未導入なら `apt-get install graphviz` 等で先に用意する。ビルド後は `npx @pfdsl/cli@latest` でなく `node packages/cli/dist/cli.js` を使う（`npx` は npm の公開バージョンを使うため、未リリースの status 値等が V008 エラーになる）。
 
 **vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。クリック・ホバー等の UI 挙動変更（DocumentLinkProvider・HoverProvider 等）を含む場合は `/vscode-ext-debug` スキルで PR 作成前に実動作確認し、ユーザーの確認結果を受け取るまで完了とみなさない。
 
-**`docs/spec/spec.md` / `docs/samples/` を変更した場合**: スキルの `references/` とサンプルの `.dot` / README を `make gen-skill` / `make gen-samples` で再生成する。再生成漏れは pre-commit（gen-skill 入力・`docs/samples/` staged 時）と CI が自動検査するため、手動でのドリフト確認は不要。
+**`docs/spec/spec.md` / `docs/samples/` を変更した場合**: workflow.md「生成物の再生成と自動ドリフト検査」に従う（再生成手続きの一次情報はそちら。ここには複製しない）。
 
 **Cycle 計画のパッケージ層明記**: PR body に対象パッケージ層を明記する（→ workflow.pfdsl `develop` プロセスの description 参照）。
 
-**PR 本文の `Closes` キーワード確認**: issue に対応する PR（main 直接マージ）では本文に `Closes #<issue番号>` を含める（L3 規約）。feature branch への中間 PR では使わない（上記タイミング規約）。
+**PR 本文の `Closes` キーワード確認**: L3 reference「PR 本文規約」に従う（main 直接マージのみ使用・中間 PR では使わない）。
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる。
 

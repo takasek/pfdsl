@@ -127,7 +127,7 @@ artifact:
     group: planning
   published_cli:
     label: npm 公開 CLI
-    description: "外部利用者向け配布物。toolchain の CLI 部分が変更されたら公開が必要 — v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC、公開作業は自動化済み）"
+    description: "外部利用者向け配布物。toolchain の CLI 部分または skill sync 同梱物（pfdsl / pfd-ops / pfd-retro / pfd-ecosystem スキルと pfd-* コマンド）が変更されたら公開が必要 — v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC、公開作業は自動化済み）"
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
     group: release
@@ -154,7 +154,7 @@ artifact:
     group: planning
   ops_skill:
     label: PFD運用スキル
-    description: "/pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別（roadmap / workflow / runtime-pipeline）の定義と問診リストを含む（ADR-0017）。汎用層（L1+L2）= SKILL.md 本文、GitHub Issues プリセット（L3）= references/、デプロイ可能ファイル群（L3.5）= install/（CI で identity 強制）、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
+    description: "/pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR-0017）は ecosystem_skill が一次情報。汎用層（L1+L2）= SKILL.md 本文、GitHub Issues プリセット（L3）= references/、デプロイ可能ファイル群（L3.5）= install/（CI で identity 強制）、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
     criteria: /pfd-cycle が期待通り動作する。install/ 配布ファイルを変更した PR で check-pfd-ops-sync.yml が通過する。
     location: ../.claude/skills/pfd-ops/
     group: generation
@@ -163,6 +163,12 @@ artifact:
     description: "/pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う"
     criteria: /pfd-retro が期待通り動作する
     location: ../.claude/skills/pfd-retro/
+    group: generation
+  ecosystem_skill:
+    label: PFDセット構築スキル
+    description: "/pfd-init コマンド。PFD セット（roadmap / workflow / runtime-pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
+    criteria: /pfd-init が期待通り動作する
+    location: ../.claude/skills/pfd-ecosystem/
     group: generation
   vscode_ext_debug_skill:
     label: VSCode拡張デバッグスキル
@@ -196,7 +202,7 @@ artifact:
     group: release
   workflow_md:
     label: 生態系 companion
-    description: "workflow.pfdsl のグラフが運べない運用手続き散文（知見振り分け・学習ループ・payoff_log 追記条件・終端ゲート根拠）。pfd-ops skill が読む L4 ホスト"
+    description: "workflow.pfdsl のグラフが運べない運用手続き散文。セクション構成は実ファイルが一次情報（ここに列挙しない）。pfd-ops skill が読む L4 ホスト"
     criteria: workflow.pfdsl の運用手続きと散文が一致している
     location: workflow.md
     group: generation
@@ -210,7 +216,7 @@ artifact:
 process:
   distill_ops:
     label: 運用プロトコル蒸留
-    description: ADR と効果局面ログから運用手順・監査カタログを抽出しスキル化する
+    description: "対話の判断・ADR・効果局面ログから運用手順・監査カタログを抽出しスキル化する。スキル改善は issue を通さず対話から直接行う（知見振り分け経路1）"
     group: generation
   maintain_template:
     label: テンプレート整備
@@ -256,7 +262,7 @@ process:
     group: decision
   file_issues:
     label: issue 管理
-    description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、roadmap_pfdsl と同期する。`flow:managed` の issue は起票と同時に roadmap_pfdsl への artifact/process/edge 追加を行う（後回し禁止 — 依存グラフが stale になり気付き依存に戻る）。保守・基盤・修正（バグ/hotfix・CI/hook/tooling・PFD bookkeeping）は `flow:exempt` とし roadmap に載せない（判定は references/github-issues-backend.md）"
+    description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、roadmap_pfdsl と同期する。`flow:managed` の issue は起票と同時に roadmap_pfdsl への artifact/process/edge 追加を行う（後回し禁止 — 依存グラフが stale になり気付き依存に戻る）。`flow:exempt`（保守・基盤・修正）は roadmap に載せない — カテゴリ列挙と判定基準は references/github-issues-backend.md が一次情報"
     group: planning
   map_deps:
     label: 依存整理
@@ -332,7 +338,7 @@ examples >> review_examples -> findings
 
 [skill, toolchain, retro_skill] >>? review_examples
 
-[adrs, payoff_log] >> distill_ops -> [ops_skill, retro_skill, review_prompts, workflow_md, vscode_ext_debug_skill]
+[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill, retro_skill, ecosystem_skill, review_prompts, workflow_md, vscode_ext_debug_skill]
 
 retro_skill >>? discuss
 
@@ -352,7 +358,7 @@ pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
 
 issue_updates >>? file_issues
 
-toolchain >> publish_cli -> published_cli
+[toolchain, skill, ops_skill, retro_skill, ecosystem_skill] >> publish_cli -> published_cli
 
 toolchain >> publish_libraries -> published_libraries
 

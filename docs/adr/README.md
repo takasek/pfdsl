@@ -34,3 +34,5 @@
 - **ADR-0020** [仕様制約は具体例トレースで実装前に検証する](0020-spec-constraint-stress-testing.md) — 散文は未定義動作を隠す。境界カテゴリ（粒度・名前・N:M・循環・diamond・部分マップ）の具体例を normative 制約にトレースして判定まで詰め、未定義を spec 決定で潰す。worked example は [サブディレクトリ](0020-spec-stress-testing/boundary-validation-log.md)に保存
 - **ADR-0021** [外部ツール専用フィールドは spec に入れない](0021-no-external-only-spec-fields.md) — 値の意味づけが完全に外部ツール依存で pfdsl 単体（グラフ意味論 / 可視化 / `check`）に寄与しないフィールドは不採用。`schedule:`（#220）を not planned とし `index:`（#221）は単体価値ありとして維持
 - **ADR-0022** [ファイル書き換え CLI は gofmt 出力モデル](0022-cli-mutation-output-model.md) — ファイルを変える CLI は既定で本体を stdout、`--write` でインプレース＋レポートを stdout、`--check` で CI ドリフト検出、stderr は診断専用。副作用と stdout の中身を分離する
+- **ADR-0023** [L4 companion から配布層への昇格経路](0023-l4-promotion-route.md) — companion は配布されないため汎用知見が滞留する。固有名詞を含まないルールを昇格候補として検出する「L4 滞留監査」を retro D 層に追加する
+- **ADR-0024** [retro 実行記録と差分計測可能な起動条件](0024-retro-execution-record.md) — 「たまったら」は基準点なしで判定不能。retro 実行記録を workflow companion に残し、起動条件を前回以降の差分計測形に書き換える

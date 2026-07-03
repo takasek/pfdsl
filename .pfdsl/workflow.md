@@ -6,7 +6,7 @@
 
 実践・レビューで得た知見は3経路に振り分ける:
 
-1. **即時ルール化** — pfdsl スキルの品質ガイド改訂（`skill_template` artifact = scripts/gen-skill.mjs 内）。スキル改善は issue を通さず対話から直接行う（`maintain_template` プロセス）
+1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `skill_template` artifact（= scripts/gen-skill.mjs 内テンプレート）を、pfd-ops / pfd-retro / pfd-ecosystem は `.claude/skills/` 配下の SKILL.md・references を直接改訂する。スキル改善は issue を通さず対話から直接行う（`maintain_template` プロセス）
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
@@ -81,11 +81,11 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 ## flow:exempt issue の roadmap 追加除外
 
-`flow:exempt` ラベルの issue は roadmap_pfdsl への artifact 追加対象外。`file_issues` の「起票と同時に roadmap 追加」ルールの例外。起票時に `flow:exempt` / `flow:managed` を判定してから roadmap 追加要否を決める。
+判定基準・タイミングは L3 reference（`github-issues-backend.md`「ラベル判定基準」）が一次情報。`file_issues` の「起票と同時に roadmap 追加」ルールの例外。
 
 ## develop 着手時の artifact status 更新
 
-`develop` を開始する時点で、実装対象の出力 artifact を `todo` から `wip` に更新する。flow-sync は merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
+汎用ルール（着手時 todo→wip、PR を待たない）は pfd-ops プロトコル「進捗更新」が一次情報。このリポでは flow-sync が merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
 
 ## 複数 issue を一括実装する場合のバージョン戦略
 
@@ -98,15 +98,7 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 ## hotfix 運用（issue 省略）
 
-バグ修正で以下をすべて満たす場合、issue 起票・roadmap_pfdsl 更新を省略してよい:
-
-- spec・仕様変更を伴わない（既存動作の回復のみ）
-- PR 単体で完結し、依存解放を要しない
-- PR description に "hotfix" と明記する
-
-`[gh_issues, roadmap_pfdsl, spec] >> develop` の通常経路の例外ケース。issue なし develop は hotfix のみに限る。
-
-**develop 開始前に hotfix 判定を行う。** 上記3条件を確認してから issue 起票・roadmap 追加の要否を決める。条件確認前に issue 起票・roadmap 追加を開始しない。
+判定3条件と省略規則は L3 reference（`github-issues-backend.md`「hotfix 運用」）が一次情報。このリポでは `[gh_issues, roadmap_pfdsl, spec] >> develop` 通常経路の例外ケースに当たる。
 
 ## コアライブラリ型を拡張する場合の設計判断
 
@@ -123,6 +115,13 @@ A・B 層カタログ（図の監査プロンプト一覧）: `docs/review-promp
 PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workflow.pfdsl`）を採用。runtime-pipeline 未採用。
 
 出力宛先は「知見の振り分け（3経路）」セクションに従う。companion への書き分け（どの companion に書くか）は `.claude/skills/pfd-ops/references/architecture.md` の「companion への書き分けルール」表が一次情報。
+
+### retro 実行記録
+
+pfd-retro 実行ごとに1行追記する（形式: 日付 — 対象範囲 — findings 件数）。pfd-ops プロトコル「定期監査」の起動条件はこの記録を基準点に差分計測する。
+
+- 2026-07-03 — pfd-cycle スキル群（pfd-ops / pfd-retro / pfd-ecosystem / commands / architecture.md）設計レビュー — findings 15件 + meta 1件
+- 2026-07-03 — 第2ラウンド監査（片肺更新スキャン・L4 滞留昇格・列挙ドリフト。対象: 第1ラウンド反映後の全体） — findings 8件
 
 ## 終端ゲートの根拠
 
