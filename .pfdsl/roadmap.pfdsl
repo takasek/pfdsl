@@ -217,17 +217,30 @@ artifact:
   ready_cmd:
     label: "pfdsl ready コマンド (PR #267)"
     description: "着手可能プロセスを機械的に列挙する ready コマンド。--best で合流点優先の推薦、--json で機械可読出力。pfd-ops スキルの step 1 計算を代替する"
-    status: wip
+    status: done
     criteria: "pfdsl ready <file> が ready プロセス一覧を出力し、--best/--json が動作確認済み、テスト通過"
+    location: https://github.com/takasek/pfdsl/pull/267
   pfd_ops_skill_ready:
     label: "pfd-ops スキル ready コマンド対応"
     description: "pfd-ops SKILL.md のワークサイクル step 1 を pfdsl ready CLI 呼び出しに書き換える。スキル利用者が手動計算しなくて済むようになる"
-    status: todo
+    status: done
     criteria: "pfd-ops SKILL.md の着手判断ステップが pfdsl ready CLI を参照し、~/.claude/skills/pfd-ops/ に反映済み"
   cli_tool_v0012:
-    label: "CLI v0.0.12（次期）"
-    status: todo
+    label: "CLI v0.0.12（公開済み）"
+    description: "#252 pfd-init コマンド追加・pfd-ecosystem スキル配布等を含む"
+    status: done
     criteria: npm show @pfdsl/cli version が 0.0.12 を返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
+  cli_tool_v0013:
+    label: "CLI v0.0.13（公開済み）"
+    description: "ready コマンド (#267) 等を含む"
+    status: done
+    criteria: npm show @pfdsl/cli version が 0.0.13 を返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
+  cli_tool_v0014:
+    label: "CLI v0.0.14（次期）"
+    status: todo
+    criteria: npm show @pfdsl/cli version が 0.0.14 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
   ext_v0015:
     label: "extension v0.0.15（次期）"
@@ -339,6 +352,10 @@ process:
     description: "SKILL.md ワークサイクル step 1 を pfdsl ready CLI 参照に書き換え、~/.claude/skills/pfd-ops/ に反映する"
   publish_cli_v0012:
     label: CLI v0.0.12リリース
+  publish_cli_v0013:
+    label: CLI v0.0.13リリース
+  publish_cli_v0014:
+    label: CLI v0.0.14リリース
   publish_ext_v0015:
     label: extension v0.0.15リリース
 
@@ -415,7 +432,9 @@ index_reindex >> integrate_spec_v009 -> spec_v009
 basepath >> integrate_spec_v0010 -> spec_v0010
 spec_v009 >>? integrate_spec_v0010
 cli_tool_v0011 >> implement_ready_cmd -> ready_cmd
-[basepath, ready_cmd] >> publish_cli_v0012 -> cli_tool_v0012
+basepath >> publish_cli_v0012 -> cli_tool_v0012
+[cli_tool_v0012, ready_cmd] >> publish_cli_v0013 -> cli_tool_v0013
 basepath >> publish_ext_v0015 -> ext_v0015
 
-cli_tool_v0012 >> update_pfd_ops_skill -> pfd_ops_skill_ready
+cli_tool_v0013 >> update_pfd_ops_skill -> pfd_ops_skill_ready
+cli_tool_v0013 >> publish_cli_v0014 -> cli_tool_v0014
