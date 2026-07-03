@@ -257,7 +257,7 @@ artifact:
   i291_statusset_impact:
     label: "status-set 解放プロセス報告 (#291)"
     description: "status 変更後に newly-ready プロセスの差分を出力へ追加。/pfd-cycle 報告ステップの機械化"
-    status: todo
+    status: wip
     criteria: "status-set が変更後の newly-ready プロセスを text/JSON 出力に含め、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/291
     updated_at: 2026-07-03T16:22:33Z
