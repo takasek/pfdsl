@@ -1,5 +1,6 @@
 ---
 title: (プロジェクト名) 運用ワークフロー
+type: workflow
 description: この作業はどう繰り返されるか。誰が何をトリガーに何を行うか。詳細は sibling workflow.md 参照。
 
 artifact:
