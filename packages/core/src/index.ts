@@ -1,6 +1,6 @@
 import { auditGraph } from "./audit.js";
 
-export type { AuditResult } from "./audit.js";
+export type { AuditResult, ConsumerAsymmetryHint } from "./audit.js";
 export { auditGraph };
 
 import {

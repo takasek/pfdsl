@@ -123,7 +123,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 - **parts メンバーもエッジ参加**: `[ch1, ch2] >> merge -> book`（spec §17.4）。エッジ無しは図上で孤立ノード化
 - **組織学習パターン**: 観点表をレビュー入力に、指摘から `>>?` で観点表整備へ還流（samples 11-practical-web-dev）
 - **フィールドを埋める**: artifact には `location`（実体パス/URL）・`criteria`（完了条件。todo/wip でも前宣言として書く）・`owner`（担当）を、process には `command`（実行コマンド）・`estimate`（工数）を、書けるなら書く。書かない選択も明示的に
-- **点検**: `check` と `graph --format dot` を実行。終端成果物が全て意図した納品物か、各プロセスが「この入力だけで出力を作れるか」を確認
+- **点検**: `check --audit` を実行 — 終端 artifact と外部入力の一覧が2行で得られる。終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないか、各プロセスが「この入力だけで出力を作れるか」を確認。図の視覚確認が必要なときだけ `graph --format dot` を使う（大きい図では dot 全読より --audit が安い）
 
 ## Typical task: update artifact status
 

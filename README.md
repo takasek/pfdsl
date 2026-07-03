@@ -101,7 +101,7 @@ pfdsl <command> [options]
 Commands:
   check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
-                           --audit    list terminal artifacts and external inputs
+                           --audit    list terminal artifacts, external inputs, and consumer asymmetry hints
                            --summary  print artifact/process/edge counts
                            --strict   error if feedback source not reachable from target process
                            --json     output diagnostics as JSON
@@ -131,8 +131,10 @@ Commands:
                            List ready-to-start processes (- = stdin)
                            --best    recommend the best next process
                            --json    output as JSON
-  status-set <file> <artifact-id> <status>
+  status-set <file> <artifact-id> <status> [--json]
                            Set artifact status (todo|wip|done|waiting|suspended) in place
+                           Roadmap files: prints newly-ready processes after the change
+                           --json    output as JSON ({ ok, newlyReady: string[] })
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON

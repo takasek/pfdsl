@@ -45,7 +45,7 @@ description: |
    - 新しい種類の成果物は `.pfdsl/workflow.pfdsl` に producer・consumer を登録してから作る（外部消費者は `externalStakeholders` フィールドで明示）
    - 変換コンポーネントを追加・変更・削除する場合は、その変換を実際にモデル化している採用済み PFD の description・criteria・edge を更新する。「runtime-pipeline.pfdsl が存在しない = 該当なし」と即断しない — 別の PFD（多くの場合 `.pfdsl/workflow.pfdsl` の該当ノード・エッジ）が同じ変換を表現していないか確認してから N/A と記録する
 6. **知見の振り分け**: 実践・レビューで得た知見を記録先成果物へ振り分ける。**構造的事実**（新しいエッジ・成果物の生成方式が変わった等、図に描ける変化）は対応する `.pfdsl` 本体のノード・エッジ・description・criteria を更新する。**手続き散文**（グラフで運べない運用ルール・振り分け手続き自体）は sibling companion `.md` に書く。両方に該当する変更（新成果物の追加等）は両方を更新する
-7. **定期監査**: `/pfd-cycle` コマンド経由では毎サイクル終了後に pfd-retro が自動実行される。直接 pfd-ops を呼んだ場合は、**前回 retro の実行記録**（workflow companion の retro バインディングに記録される。記録が無ければ「未実行」とみなす。workflow companion 自体が無いリポでは /pfd-cycle 経由の自動実行を基準点とする）を基準点に、次のいずれかで手動起動する — 前回以降に新規 ADR が2本以上 / 前回以降に同一 PFD へ修正コミットが3回以上 / 設計対話が長く続いた後 / セッションの締め際。ユーザーの気付きを待たない。findings はプロトコル6の経路で振り分ける
+7. **定期監査**: `/pfd-cycle` コマンド経由では毎サイクル終了後に pfd-retro が自動実行される。直接 pfd-ops を呼んだ場合は、**前回 retro の実行記録**（workflow companion の retro バインディングに記録される。記録が無ければ「未実行」とみなす。workflow companion 自体が無いリポでは /pfd-cycle 経由の自動実行を基準点とする）を基準点に、次のいずれかで手動起動する — 前回以降に新規 ADR が2本以上 / 前回以降に同一 PFD へ修正コミットが3回以上 / 設計対話が長く続いた後 / セッションの締め際。閾値は `git log --oneline --since=<前回記録の日付> -- <ADR 置き場 / 当該 .pfdsl>` で機械的に数える。ユーザーの気付きを待たない。findings はプロトコル6の経路で振り分ける
 
 ## ワークサイクル（/pfd-cycle の手順）
 
@@ -63,7 +63,7 @@ description: |
    - [ ] 出力 artifact の status を更新した（タイミングは companion の規約に従う。companion に規約がない場合は references/ 等の L3相当層で定義する）
    - [ ] 知見を `.pfdsl/workflow.pfdsl` の sibling companion の振り分け手続きに従って振り分けた
    - [ ] 実行中に発見した新プロセス・成果物を `.pfdsl/roadmap.pfdsl` に追記した（消費者を明示できないものは作らない）
-   - [ ] 今サイクルの出力 artifact が手段（仕様・設計・計画・提案）なら、それを消費する後続プロセスがグラフに在るか確認した。無ければ todo プレースホルダで登録した（後続門番、プロトコル5(b)。真の納品物のみ終端を許す）
+   - [ ] `check --audit` で終端 artifact 一覧を取得し、今サイクルの出力 artifact が手段（仕様・設計・計画・提案）なら、それを消費する後続プロセスがグラフに在るか確認した。無ければ todo プレースホルダで登録した（後続門番、プロトコル5(b)。真の納品物のみ終端を許す。グラフの手動走査より --audit の2行出力が安い）
    - [ ] 変換コンポーネントを追加・変更・削除した場合、それをモデル化している採用済み PFD（`.pfdsl/runtime-pipeline.pfdsl` または `.pfdsl/workflow.pfdsl` の該当箇所）に反映した（該当なしも明示。runtime-pipeline.pfdsl 未採用は自動的に N/A にならない — workflow.pfdsl 側を確認）
    - [ ] 作業中に偶発的に見つけたスコープ外の既存問題（バグ等）を起票した（ユーザーの指摘を待たない）
    - [ ] 変更した全 .pfdsl が `check` を通過する

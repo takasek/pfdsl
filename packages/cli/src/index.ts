@@ -208,13 +208,22 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const artifactMeta = frontmatter?.artifact ?? undefined;
 
 	if (opts.audit) {
-		const { terminals, externalInputs } = auditGraph(
-			edges,
-			nodeKinds,
-			artifactMeta,
-		);
+		const {
+			terminals,
+			externalInputs,
+			consumerAsymmetry,
+			consumerAsymmetryRemainder,
+		} = auditGraph(edges, nodeKinds, artifactMeta);
 		extraLines.push(`terminal artifacts: ${terminals.join(", ")}`);
 		extraLines.push(`external inputs: ${externalInputs.join(", ")}`);
+		for (const hint of consumerAsymmetry) {
+			extraLines.push(
+				`consumer asymmetry (hint): ${hint.artifact} lacks [${hint.missingProcesses.join(", ")}] present on same-group ${hint.sibling}`,
+			);
+		}
+		if (consumerAsymmetryRemainder > 0) {
+			extraLines.push(`... (${consumerAsymmetryRemainder} more)`);
+		}
 	}
 
 	if (opts.summary) {
@@ -416,6 +425,81 @@ export interface ReadyOptions {
 	json?: boolean;
 }
 
+/**
+ * Core ready-process algorithm operating on pre-analyzed data.
+ * "Ready" = all input artifacts done/undefined AND at least one output not done.
+ * Returns processInputs and processOutputs maps in addition to readyIds so
+ * callers (e.g. runReady --best) can reuse the already-built maps.
+ */
+function computeReadyIdsCore(
+	edges: ReturnType<typeof analyze>["edges"],
+	nodeKinds: ReturnType<typeof analyze>["nodeKinds"],
+	artifactMeta: NonNullable<
+		ReturnType<typeof analyze>["frontmatter"]
+	>["artifact"] &
+		object,
+): {
+	readyIds: string[];
+	processInputs: Map<string, string[]>;
+	processOutputs: Map<string, string[]>;
+} {
+	const processInputs = new Map<string, string[]>();
+	for (const e of edges) {
+		if (e.kind === "input") {
+			const arr = processInputs.get(e.process) ?? [];
+			arr.push(e.artifact);
+			processInputs.set(e.process, arr);
+		}
+	}
+	const processOutputs = new Map<string, string[]>();
+	for (const e of edges) {
+		if (e.kind === "output") {
+			const arr = processOutputs.get(e.process) ?? [];
+			arr.push(e.artifact);
+			processOutputs.set(e.process, arr);
+		}
+	}
+
+	const readyIds: string[] = [];
+	for (const [pid, inputs] of processInputs) {
+		if (nodeKinds.get(pid) !== "process") continue;
+		const allInputsDone = inputs.every((aid) => {
+			const s = artifactMeta[aid]?.status;
+			return s === "done" || s === undefined;
+		});
+		if (!allInputsDone) continue;
+		const outputs = processOutputs.get(pid) ?? [];
+		const alreadyDone =
+			outputs.length > 0 &&
+			outputs.every((aid) => {
+				const s = artifactMeta[aid]?.status;
+				return s === "done";
+			});
+		if (!alreadyDone) readyIds.push(pid);
+	}
+	return { readyIds, processInputs, processOutputs };
+}
+
+/**
+ * Compute the set of ready process IDs from raw source (parses and type-gates).
+ * Returns {readyIds: [], isRoadmap: false} on parse errors or non-roadmap type.
+ */
+function computeReadyIds(src: string): {
+	readyIds: string[];
+	isRoadmap: boolean;
+} {
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
+	if (hasErrors(diagnostics)) return { readyIds: [], isRoadmap: false };
+
+	const pfdType = frontmatter?.type;
+	const isRoadmap = pfdType === undefined || pfdType === "roadmap";
+	if (!isRoadmap) return { readyIds: [], isRoadmap: false };
+
+	const artifactMeta = frontmatter?.artifact ?? {};
+	const { readyIds } = computeReadyIdsCore(edges, nodeKinds, artifactMeta);
+	return { readyIds, isRoadmap: true };
+}
+
 export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
@@ -435,45 +519,11 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 
-	// Collect normal (non-feedback) input edges per process
-	const processInputs = new Map<string, string[]>();
-	for (const e of edges) {
-		if (e.kind === "input") {
-			const arr = processInputs.get(e.process) ?? [];
-			arr.push(e.artifact);
-			processInputs.set(e.process, arr);
-		}
-	}
-
-	// Collect output artifact sets per process
-	const processOutputs = new Map<string, string[]>();
-	for (const e of edges) {
-		if (e.kind === "output") {
-			const arr = processOutputs.get(e.process) ?? [];
-			arr.push(e.artifact);
-			processOutputs.set(e.process, arr);
-		}
-	}
-
-	// A process is ready when all its input artifacts are done (undefined = done)
-	// and at least one output artifact is not yet done (i.e., the process is not already complete)
-	const readyIds: string[] = [];
-	for (const [pid, inputs] of processInputs) {
-		if (nodeKinds.get(pid) !== "process") continue;
-		const allInputsDone = inputs.every((aid) => {
-			const s = artifactMeta[aid]?.status;
-			return s === "done" || s === undefined;
-		});
-		if (!allInputsDone) continue;
-		const outputs = processOutputs.get(pid) ?? [];
-		const alreadyDone =
-			outputs.length > 0 &&
-			outputs.every((aid) => {
-				const s = artifactMeta[aid]?.status;
-				return s === "done";
-			});
-		if (!alreadyDone) readyIds.push(pid);
-	}
+	const { readyIds, processInputs } = computeReadyIdsCore(
+		edges,
+		nodeKinds,
+		artifactMeta,
+	);
 
 	// best-next: prefer the process that would actually make the most downstream processes ready.
 	// A consumer counts only if completing pid removes its LAST remaining blocker
@@ -566,10 +616,15 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	return ok(`${lines.join("\n")}\n`);
 }
 
+export interface StatusSetOptions {
+	json?: boolean;
+}
+
 export function runStatusSet(
 	file: string,
 	artifactId: string,
 	status: string,
+	opts: StatusSetOptions = {},
 ): CommandResult {
 	if (!STATUS_VALUES.includes(status as (typeof STATUS_VALUES)[number])) {
 		return fail(HELP_STATUS_SET, 2);
@@ -590,6 +645,10 @@ export function runStatusSet(
 		return fail(`error: artifact '${artifactId}' not found in ${file}\n`);
 	}
 
+	// Snapshot ready set before mutation (roadmap only)
+	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
+	const beforeSet = new Set(beforeIds);
+
 	// Replace "    status: <old>" under this artifact, or insert it after its header
 	const statusLineRe = new RegExp(
 		`(  ${artifactId}:[ \\t]*\\n(?:    [^\\n]*\\n)*?)    status: [^\\n]+`,
@@ -607,6 +666,18 @@ export function runStatusSet(
 	const newSrc =
 		src.slice(0, fmBodyStart) + newFm + src.slice(fmBodyStart + fmBlock.length);
 	writeFileSync(file, newSrc, "utf-8");
+
+	// Compute newly-ready processes (roadmap only)
+	const newlyReady: string[] = isRoadmap
+		? computeReadyIds(newSrc).readyIds.filter((id) => !beforeSet.has(id))
+		: [];
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, newlyReady })}\n`);
+	}
+	if (newlyReady.length > 0) {
+		return ok(`newly ready: ${newlyReady.join(", ")}\n`);
+	}
 	return ok("");
 }
 
@@ -817,7 +888,7 @@ const HELP_CHECK = `usage: pfdsl check <file|-> [--audit] [--summary] [--strict]
 Validate a .pfdsl file. Use - to read from stdin.
 
 Options:
-  --audit    list terminal artifacts and external inputs
+  --audit    list terminal artifacts and external inputs; also emits consumer asymmetry hints for same-group artifacts
   --summary  print artifact/process/edge counts
   --strict   error if feedback source not reachable from target process
   --json     output diagnostics as JSON ({ ok, diagnostics })
@@ -911,11 +982,13 @@ Options:
   --json  output as JSON ({ ok, ready: [{id, label, inputs}], best? })
 `;
 
-const HELP_STATUS_SET = `usage: pfdsl status-set <file> <artifact-id> <status>
+const HELP_STATUS_SET = `usage: pfdsl status-set <file> <artifact-id> <status> [--json]
 
 Set the status of an artifact in a .pfdsl file, rewriting it in place.
+For roadmap files, reports which processes became newly ready after the change.
 
   <status>  one of: todo | wip | done | waiting | suspended
+  --json    emit JSON ({ ok, newlyReady: string[] }) instead of text
 
 Exit codes:
   0  success
@@ -946,7 +1019,7 @@ export const HELP = `pfdsl <command> [options]
 Commands:
   check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
-                           --audit    list terminal artifacts and external inputs
+                           --audit    list terminal artifacts, external inputs, and consumer asymmetry hints
                            --summary  print artifact/process/edge counts
                            --strict   error if feedback source not reachable from target process
                            --json     output diagnostics as JSON
@@ -976,8 +1049,10 @@ Commands:
                            List ready-to-start processes (- = stdin)
                            --best    recommend the best next process
                            --json    output as JSON
-  status-set <file> <artifact-id> <status>
+  status-set <file> <artifact-id> <status> [--json]
                            Set artifact status (todo|wip|done|waiting|suspended) in place
+                           Roadmap files: prints newly-ready processes after the change
+                           --json    output as JSON ({ ok, newlyReady: string[] })
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON
@@ -1129,7 +1204,9 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			if (flags.help) return ok(HELP_STATUS_SET);
 			const [f, artifactId, status] = positional;
 			if (!f || !artifactId || !status) return fail(HELP_STATUS_SET, 2);
-			return runStatusSet(f, artifactId, status);
+			return runStatusSet(f, artifactId, status, {
+				json: flags.json === true,
+			});
 		}
 		case "audit-sync": {
 			if (flags.help) return ok(HELP_AUDIT_SYNC);
