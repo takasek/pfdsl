@@ -278,7 +278,7 @@ artifact:
   i277_status_set:
     label: "status-set コマンド (#277)"
     description: "pfdsl status-set <file> <artifact-id> <status> で artifact status を CLI から更新する"
-    status: todo
+    status: wip
     criteria: "pfdsl status-set が対象 artifact の status フィールドを書き換え、不正 status は exit 2"
     location: https://github.com/takasek/pfdsl/issues/277
     updated_at: 2026-07-03T01:28:34Z

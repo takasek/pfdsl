@@ -17,6 +17,7 @@ import {
 	reindex,
 	resolveRefPath,
 	type SortKey,
+	STATUS_VALUES,
 	sort,
 	sortEdges,
 	validatePresetKeys,
@@ -555,6 +556,50 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	return ok(`${lines.join("\n")}\n`);
 }
 
+export function runStatusSet(
+	file: string,
+	artifactId: string,
+	status: string,
+): CommandResult {
+	if (!STATUS_VALUES.includes(status as (typeof STATUS_VALUES)[number])) {
+		return fail(HELP_STATUS_SET, 2);
+	}
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const frontmatterMatch = /^---\n([\s\S]*?\n)---\n/.exec(src);
+	const fmBlock = frontmatterMatch?.[1];
+	if (!frontmatterMatch || !fmBlock) {
+		return fail(`error: artifact '${artifactId}' not found in ${file}\n`);
+	}
+	const fmBodyStart = frontmatterMatch[0].length - fmBlock.length - 4; // after "---\n"
+
+	// Find the artifact block: look for "  <id>:" in frontmatter
+	const artifactHeaderRe = new RegExp(`^(  ${artifactId}:\\s*\\n)`, "m");
+	if (!artifactHeaderRe.test(fmBlock)) {
+		return fail(`error: artifact '${artifactId}' not found in ${file}\n`);
+	}
+
+	// Replace "    status: <old>" under this artifact, or insert it after its header
+	const statusLineRe = new RegExp(
+		`(  ${artifactId}:[ \\t]*\\n(?:    [^\\n]*\\n)*?)    status: [^\\n]+`,
+	);
+	let newFm: string;
+	if (statusLineRe.test(fmBlock)) {
+		newFm = fmBlock.replace(statusLineRe, `$1    status: ${status}`);
+	} else {
+		newFm = fmBlock.replace(
+			new RegExp(`(  ${artifactId}:[ \\t]*\\n)`),
+			`$1    status: ${status}\n`,
+		);
+	}
+
+	const newSrc =
+		src.slice(0, fmBodyStart) + newFm + src.slice(fmBodyStart + fmBlock.length);
+	writeFileSync(file, newSrc, "utf-8");
+	return ok("");
+}
+
 export type { BinaryFormat };
 export { svgToBinary };
 export type CliRenderFormat = RenderFormat | BinaryFormat;
@@ -751,6 +796,18 @@ Options:
   --json  output as JSON ({ ok, ready: [{id, label, inputs}], best? })
 `;
 
+const HELP_STATUS_SET = `usage: pfdsl status-set <file> <artifact-id> <status>
+
+Set the status of an artifact in a .pfdsl file, rewriting it in place.
+
+  <status>  one of: todo | wip | done | blocked
+
+Exit codes:
+  0  success
+  1  artifact not found in the file
+  2  invalid usage (missing argument, invalid status value)
+`;
+
 export const HELP = `pfdsl <command> [options]
 
 Commands:
@@ -786,6 +843,8 @@ Commands:
                            List ready-to-start processes (- = stdin)
                            --best    recommend the best next process
                            --json    output as JSON
+  status-set <file> <artifact-id> <status>
+                           Set artifact status (todo|wip|done|blocked) in place
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
@@ -929,6 +988,12 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				best: flags.best === true,
 				json: flags.json === true,
 			});
+		}
+		case "status-set": {
+			if (flags.help) return ok(HELP_STATUS_SET);
+			const [f, artifactId, status] = positional;
+			if (!f || !artifactId || !status) return fail(HELP_STATUS_SET, 2);
+			return runStatusSet(f, artifactId, status);
 		}
 		case "skill": {
 			if (flags.help) return ok(HELP_SKILL);

@@ -911,3 +911,55 @@ describe("ready", () => {
 		expect(ids).toContain("impl");
 	});
 });
+
+describe("status-set", () => {
+	const base = `---
+artifact:
+  req:
+    status: todo
+  spec:
+    status: done
+---
+req >> design -> spec
+`;
+
+	it("rewrites artifact status in place and exits 0", async () => {
+		const f = join(dir, "status-set-write.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["status-set", f, "req", "done"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("status: done");
+		expect(after).not.toContain("status: todo");
+	});
+
+	it("exits 1 when artifact id not found", async () => {
+		const f = join(dir, "status-set-notfound.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["status-set", f, "nonexistent", "done"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("nonexistent");
+	});
+
+	it("exits 2 for invalid status value", async () => {
+		const f = join(dir, "status-set-badstatus.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["status-set", f, "req", "invalid"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("exits 2 when artifact-id or status argument is missing", async () => {
+		const f = join(dir, "status-set-missing.pfdsl");
+		writeFileSync(f, base);
+		const r1 = await run(["status-set", f]);
+		expect(r1.exitCode).toBe(2);
+		const r2 = await run(["status-set", f, "req"]);
+		expect(r2.exitCode).toBe(2);
+	});
+
+	it("--help returns help text", async () => {
+		const r = await run(["status-set", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("status-set");
+	});
+});
