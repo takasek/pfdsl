@@ -199,6 +199,27 @@ process:
 requirement >> fulfill_order -> shipped_order
 ```
 
+Companion file `12-subflow-detail.pfdsl` referenced above:
+
+```pfdsl
+---
+artifact:
+  requirement:
+    label: Requirements
+    description: Boundary artifact — matches parent normal input.
+  picked_items:
+    label: Picked Items
+  packed_box:
+    label: Packed Box
+  shipped_order:
+    label: Shipped Order
+    description: Boundary artifact — matches parent output.
+---
+requirement >> pick_items -> picked_items
+picked_items >> pack -> packed_box
+packed_box >> ship -> shipped_order
+```
+
 ---
 
 ## 13-preset — Preset (extends)
@@ -215,6 +236,17 @@ artifact:
 ---
 backlog >> develop -> prototype
 prototype >> review -> release
+```
+
+Companion file `13-preset-base.pfdsl` referenced above:
+
+```pfdsl
+---
+statusStyles:
+  done: { fillcolor: "#d4edda", style: filled }
+  wip:  { fillcolor: "#fff3cd", style: filled }
+  todo: { fillcolor: "#f8f9fa", style: filled }
+---
 ```
 
 ---
@@ -239,6 +271,24 @@ process:
       parcel: outgoing_parcel
 ---
 order >> fulfill -> parcel
+```
+
+Companion file `14-boundary-detail.pfdsl` referenced above:
+
+```pfdsl
+---
+artifact:
+  incoming_order:
+    label: Incoming Order
+    description: Boundary artifact — mapped from parent 'order' via boundary:.
+  picked:
+    label: Picked Items
+  outgoing_parcel:
+    label: Outgoing Parcel
+    description: Boundary artifact — mapped from parent 'parcel' via boundary:.
+---
+incoming_order >> pick -> picked
+picked >> pack -> outgoing_parcel
 ```
 
 ---
