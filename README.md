@@ -131,6 +131,8 @@ Commands:
                            List ready-to-start processes (- = stdin)
                            --best    recommend the best next process
                            --json    output as JSON
+  status-set <file> <artifact-id> <status>
+                           Set artifact status (todo|wip|done|blocked) in place
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
