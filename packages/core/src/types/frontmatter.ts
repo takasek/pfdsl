@@ -1,6 +1,12 @@
 import type { Diagnostic } from "./diagnostic.js";
 
-export const STATUS_VALUES = ["done", "wip", "todo", "blocked"] as const;
+export const STATUS_VALUES = [
+	"done",
+	"wip",
+	"todo",
+	"waiting",
+	"suspended",
+] as const;
 export type Status = (typeof STATUS_VALUES)[number];
 
 export const STYLE_ATTRS = [

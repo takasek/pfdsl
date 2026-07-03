@@ -800,7 +800,7 @@ const HELP_STATUS_SET = `usage: pfdsl status-set <file> <artifact-id> <status>
 
 Set the status of an artifact in a .pfdsl file, rewriting it in place.
 
-  <status>  one of: todo | wip | done | blocked
+  <status>  one of: todo | wip | done | waiting | suspended
 
 Exit codes:
   0  success
@@ -844,7 +844,7 @@ Commands:
                            --best    recommend the best next process
                            --json    output as JSON
   status-set <file> <artifact-id> <status>
-                           Set artifact status (todo|wip|done|blocked) in place
+                           Set artifact status (todo|wip|done|waiting|suspended) in place
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)

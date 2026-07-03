@@ -79,6 +79,13 @@ describe("validate", () => {
 		expect(codes("A >> P -> B", fm)).toContain("V007");
 	});
 
+	it("V007: blocked is no longer valid — use waiting or suspended", () => {
+		const fm = {
+			artifact: { A: { status: "blocked" } },
+		} as unknown as Frontmatter;
+		expect(codes("A >> P -> B", fm)).toContain("V007");
+	});
+
 	it("V029: index must be a positive integer (zero rejected)", () => {
 		const fm = {
 			artifact: { B: { index: 0 } },
@@ -143,6 +150,13 @@ a >> design -> b
 	it("V008: invalid statusStyles key", () => {
 		const fm = {
 			statusStyles: { finished: { fillcolor: "gray" } },
+		} as unknown as Frontmatter;
+		expect(codes("A >> P -> B", fm)).toContain("V008");
+	});
+
+	it("V008: blocked is no longer a valid statusStyles key", () => {
+		const fm = {
+			statusStyles: { blocked: { fillcolor: "#f8d7da" } },
 		} as unknown as Frontmatter;
 		expect(codes("A >> P -> B", fm)).toContain("V008");
 	});
@@ -624,10 +638,20 @@ a >> design -> b
 			expect(codes("inp >> P -> out", fm)).toContain("W003");
 		});
 
-		it("warns when output artifact is done but input artifact is blocked", () => {
+		it("warns when output artifact is done but input artifact is waiting", () => {
 			const fm: Frontmatter = {
 				artifact: {
-					inp: { status: "blocked", criteria: "x" },
+					inp: { status: "waiting", criteria: "x" },
+					out: { status: "done", criteria: "y" },
+				},
+			};
+			expect(codes("inp >> P -> out", fm)).toContain("W003");
+		});
+
+		it("warns when output artifact is done but input artifact is suspended", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					inp: { status: "suspended", criteria: "x" },
 					out: { status: "done", criteria: "y" },
 				},
 			};
