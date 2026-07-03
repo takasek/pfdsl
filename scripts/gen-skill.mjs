@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import { findMissingFields } from "./lib/skill-field-drift.mjs";
 import { resolveCompanions } from "./lib/sample-companions.mjs";
 import { renderCliSection } from "./lib/skill-cli-section.mjs";
+import { buildExamplesMd } from "./lib/examples-index.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -39,36 +40,17 @@ mkdirSync(refsDir, { recursive: true });
 
 // --- Helpers ---
 
-function parseFrontmatterTitle(src) {
-  const m = src.match(/^---\n([\s\S]*?)\n---/);
-  if (!m) return null;
-  const line = m[1].split("\n").find((l) => l.startsWith("title:"));
-  if (!line) return null;
-  const raw = line.replace(/^title:\s*/, "").trim();
-  return raw.replace(/^(["'])(.*)\1$/, "$2");
-}
-
 function buildExamplesIndexMd(dir) {
-  const files = readdirSync(dir)
+  const entries = readdirSync(dir)
     .filter((f) => f.endsWith(".pfdsl"))
-    .sort();
+    .sort()
+    .map((f) => ({ id: f.replace(".pfdsl", ""), source: readFileSync(resolve(dir, f), "utf-8") }));
 
-  let md = `<!-- DO NOT EDIT — generated from docs/examples/ in https://github.com/takasek/pfdsl -->\n\n# PFDSL Examples Reference\n\nRealistic domain examples demonstrating the quality guide.\n\n`;
-  let count = 0;
-
-  for (const f of files) {
-    const src = readFileSync(resolve(dir, f), "utf-8");
-    const id = f.replace(".pfdsl", "");
-    const title = parseFrontmatterTitle(src) ?? id;
-    const fence = src.includes("```") ? "````" : "```";
-    md += `## ${id} — ${title}\n\n${fence}pfdsl\n${src}${fence}\n\n---\n\n`;
-    count++;
-  }
-
-  if (count === 0) {
+  if (entries.length === 0) {
     console.warn(`warn: no .pfdsl files found in ${dir}`);
   }
-  return { md, count };
+  const header = `<!-- DO NOT EDIT — generated from docs/examples/ in https://github.com/takasek/pfdsl -->\n\n# PFDSL Examples Reference\n\nRealistic domain examples demonstrating the quality guide. Use the index to Read only the relevant line range.\n\n`;
+  return { md: buildExamplesMd(entries, header), count: entries.length };
 }
 
 // --- 1. Copy spec ---
