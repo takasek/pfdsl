@@ -217,7 +217,7 @@ artifact:
     updated_at: 2026-07-03T03:51:00Z
   spec_v0011:
     label: 仕様書 v0.0.11（waiting/suspended/type統合）
-    status: wip
+    status: done
     criteria: "waiting/suspended status 分割・type フィールド・W002 source artifact 免除が spec 本文に統合済み"
     location: ../docs/spec/spec.md
   ready_cmd:
@@ -256,7 +256,7 @@ artifact:
   i268_type_field:
     label: "type フィールド追加 (#268)"
     description: "frontmatter に type: roadmap|workflow|runtime-pipeline を追加し、ready を roadmap 型にゲート。draft_proposals 経由"
-    status: todo
+    status: done
     criteria: "type: フィールドが spec に統合済み、ready が roadmap 型以外で error を出力する"
     location: https://github.com/takasek/pfdsl/issues/268
     updated_at: 2026-07-02T18:46:25Z
@@ -270,14 +270,14 @@ artifact:
   i272_w002_hierarchy:
     label: "W002 criteria 階層化 (#272)"
     description: "producer を持たない source artifact は W002 対象外にするか低階層 warning に落とす"
-    status: todo
+    status: done
     criteria: "source artifact（producer なし）への W002 が抑制または低severity 化され、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/272
     updated_at: 2026-07-02T18:56:10Z
   i273_blocked_by:
     label: "blockedBy フィールド (#273)"
     description: "blocked 理由の機械可読化。blockedBy: human 等で人間待ち/依存待ちを区別。draft_proposals 経由"
-    status: todo
+    status: done
     criteria: "blockedBy: フィールドが spec に統合済み、対応サンプルあり"
     location: https://github.com/takasek/pfdsl/issues/273
     updated_at: 2026-07-02T18:56:12Z
