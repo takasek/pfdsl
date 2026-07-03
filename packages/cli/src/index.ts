@@ -434,15 +434,34 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 		}
 	}
 
+	// Collect output artifact sets per process
+	const processOutputs = new Map<string, string[]>();
+	for (const e of edges) {
+		if (e.kind === "output") {
+			const arr = processOutputs.get(e.process) ?? [];
+			arr.push(e.artifact);
+			processOutputs.set(e.process, arr);
+		}
+	}
+
 	// A process is ready when all its input artifacts are done (undefined = done)
+	// and at least one output artifact is not yet done (i.e., the process is not already complete)
 	const readyIds: string[] = [];
 	for (const [pid, inputs] of processInputs) {
 		if (nodeKinds.get(pid) !== "process") continue;
-		const allDone = inputs.every((aid) => {
+		const allInputsDone = inputs.every((aid) => {
 			const s = artifactMeta[aid]?.status;
 			return s === "done" || s === undefined;
 		});
-		if (allDone) readyIds.push(pid);
+		if (!allInputsDone) continue;
+		const outputs = processOutputs.get(pid) ?? [];
+		const alreadyDone =
+			outputs.length > 0 &&
+			outputs.every((aid) => {
+				const s = artifactMeta[aid]?.status;
+				return s === "done";
+			});
+		if (!alreadyDone) readyIds.push(pid);
 	}
 
 	// best-next: prefer the process that would actually make the most downstream processes ready.

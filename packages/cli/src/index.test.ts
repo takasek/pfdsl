@@ -896,4 +896,18 @@ describe("ready", () => {
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.best).toBeUndefined();
 	});
+
+	it("excludes process whose output artifacts are all done", async () => {
+		// design is ready-to-start (inputs done) but its output spec is already done
+		// → design should NOT appear in the ready list
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: done\n---\nreq >> design -> spec\nspec >> impl -> code\n",
+		);
+		const r = await run(["ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		const ids = parsed.ready.map((x: { id: string }) => x.id);
+		expect(ids).not.toContain("design");
+		expect(ids).toContain("impl");
+	});
 });
