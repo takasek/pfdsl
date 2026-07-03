@@ -839,6 +839,28 @@ describe("ready", () => {
 		expect(r.stdout).toContain("recommended next");
 	});
 
+	it("rejects file with type: workflow (exit 2)", async () => {
+		const f = withStatus("---\ntype: workflow\n---\nA >> P -> B\n");
+		const r = await run(["ready", f]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("type: roadmap");
+	});
+
+	it("rejects file with type: runtime-pipeline (exit 2)", async () => {
+		const f = withStatus("---\ntype: runtime-pipeline\n---\nA >> P -> B\n");
+		const r = await run(["ready", f]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("type: roadmap");
+	});
+
+	it("accepts file with type: roadmap", async () => {
+		const f = withStatus(
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f]);
+		expect(r.exitCode).toBe(0);
+	});
+
 	it("missing file returns exit 1", async () => {
 		const r = await run(["ready", join(dir, "nonexistent.pfdsl")]);
 		expect(r.exitCode).toBe(1);
