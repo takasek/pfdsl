@@ -28,6 +28,7 @@ description: |
 - 各運用 `.pfdsl` ファイルには、同名 sibling の Markdown companion が任意で対になる。`<file>.pfdsl` を扱うときは sibling `<file>.md` も読んで従う
 - **作業項目の一次情報と同期手段**: `.pfdsl/roadmap.pfdsl` とその sibling `.pfdsl/roadmap.md` に従う
 - **知見の振り分け先・運用手続き**: `.pfdsl/workflow.pfdsl` の知識系成果物と、その sibling companion `.md`
+- **変換境界の定義と変更手続き**: `.pfdsl/runtime-pipeline.pfdsl`（採用時）とその sibling companion `.md`
 - **issue バックエンド規約**: companion が指す references（例: `references/github-issues-backend.md`）
 - **Claude 向け指示の置き場**: 配布スキルに同梱すべき規約（PR 本文規約等）は `references/` に置く。project CLAUDE.md は採用リポ固有の非配布設定のみ、global CLAUDE.md は全リポ横断設定のみ。「採用リポの Claude にも届けたい」指示は references/ へ
 - **companion への書き分けルール**（どの companion に何を書くか）: `references/architecture.md` の「companion への書き分けルール」表が一次情報
@@ -35,7 +36,7 @@ description: |
 ## 運用プロトコル
 
 1. **着手判断**: 入力 artifact が全て done のプロセス = 着手可能。並列着手集合は status から機械的に導出する（優先順位の議論より先にまず列挙）
-2. **新規作業の受け入れ**: 作業項目を起票（手段は roadmap.md）。その作業が**成果物を生み他作業の着手をゲートするものだけ**依存グラフに1チェーン追加する（他作業をゲートしない保守・基盤・修正は roadmap に載せない — カテゴリ列挙と判定基準はバックエンド規約の L3 reference が一次情報）→ 並列性・接点・合流点を確定させてから着手する
+2. **新規作業の受け入れ**: 作業項目を起票（手段は roadmap.md）。その作業が**成果物を生み他作業の着手をゲートするものだけ**依存グラフに1チェーン追加する（他作業をゲートしない保守・基盤・修正 — バグ修正・CI/ビルド/tooling・図や doc の bookkeeping 等 — は roadmap に載せない。ラベル運用などバックエンド固有の判定手続きは採用バックエンドの L3 reference に従う）→ 並列性・接点・合流点を確定させてから着手する
 3. **依存レビュー**: 「並列でいける」という直感は図に書いて初めてレビュー可能になる。決定が往復で形成される相互依存が見つかったら分割せず統合する。判定テスト: 上流方針の合否基準を下流作業なしで書けるか（書けなければ上流方針は入力でなく出力 = 相互依存の証拠）
 4. **進捗更新**: 着手時に出力 artifact を todo→wip に更新する（着手と同時。PR 作成・マージを待たない）。作業完了 = 出力 artifact の status 更新。コミットと同時に行う。done の根拠が言えない場合は出力成果物の定義を疑う
 5. **成果物の門番（双方向、ADR-0018）**: 終端監査は両向きに行う
@@ -44,7 +45,7 @@ description: |
    - 新しい種類の成果物は `.pfdsl/workflow.pfdsl` に producer・consumer を登録してから作る（外部消費者は `externalStakeholders` フィールドで明示）
    - 変換コンポーネントを追加・変更・削除する場合は、その変換を実際にモデル化している採用済み PFD の description・criteria・edge を更新する。「runtime-pipeline.pfdsl が存在しない = 該当なし」と即断しない — 別の PFD（多くの場合 `.pfdsl/workflow.pfdsl` の該当ノード・エッジ）が同じ変換を表現していないか確認してから N/A と記録する
 6. **知見の振り分け**: 実践・レビューで得た知見を記録先成果物へ振り分ける。**構造的事実**（新しいエッジ・成果物の生成方式が変わった等、図に描ける変化）は対応する `.pfdsl` 本体のノード・エッジ・description・criteria を更新する。**手続き散文**（グラフで運べない運用ルール・振り分け手続き自体）は sibling companion `.md` に書く。両方に該当する変更（新成果物の追加等）は両方を更新する
-7. **定期監査**: `/pfd-cycle` コマンド経由では毎サイクル終了後に pfd-retro が自動実行される。直接 pfd-ops を呼んだ場合は、**前回 retro の実行記録**（workflow companion の retro バインディングに記録される。記録が無ければ「未実行」とみなす）を基準点に、次のいずれかで手動起動する — 前回以降に新規 ADR が2本以上 / 前回以降に同一 PFD へ修正コミットが3回以上 / 設計対話が長く続いた後 / セッションの締め際。ユーザーの気付きを待たない。findings はプロトコル6の経路で振り分ける
+7. **定期監査**: `/pfd-cycle` コマンド経由では毎サイクル終了後に pfd-retro が自動実行される。直接 pfd-ops を呼んだ場合は、**前回 retro の実行記録**（workflow companion の retro バインディングに記録される。記録が無ければ「未実行」とみなす。workflow companion 自体が無いリポでは /pfd-cycle 経由の自動実行を基準点とする）を基準点に、次のいずれかで手動起動する — 前回以降に新規 ADR が2本以上 / 前回以降に同一 PFD へ修正コミットが3回以上 / 設計対話が長く続いた後 / セッションの締め際。ユーザーの気付きを待たない。findings はプロトコル6の経路で振り分ける
 
 ## ワークサイクル（/pfd-cycle の手順）
 
