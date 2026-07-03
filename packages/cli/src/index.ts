@@ -208,13 +208,22 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const artifactMeta = frontmatter?.artifact ?? undefined;
 
 	if (opts.audit) {
-		const { terminals, externalInputs } = auditGraph(
-			edges,
-			nodeKinds,
-			artifactMeta,
-		);
+		const {
+			terminals,
+			externalInputs,
+			consumerAsymmetry,
+			consumerAsymmetryRemainder,
+		} = auditGraph(edges, nodeKinds, artifactMeta);
 		extraLines.push(`terminal artifacts: ${terminals.join(", ")}`);
 		extraLines.push(`external inputs: ${externalInputs.join(", ")}`);
+		for (const hint of consumerAsymmetry) {
+			extraLines.push(
+				`consumer asymmetry (hint): ${hint.artifact} lacks [${hint.missingProcesses.join(", ")}] present on same-group ${hint.sibling}`,
+			);
+		}
+		if (consumerAsymmetryRemainder > 0) {
+			extraLines.push(`... (${consumerAsymmetryRemainder} more)`);
+		}
 	}
 
 	if (opts.summary) {
@@ -879,7 +888,7 @@ const HELP_CHECK = `usage: pfdsl check <file|-> [--audit] [--summary] [--strict]
 Validate a .pfdsl file. Use - to read from stdin.
 
 Options:
-  --audit    list terminal artifacts and external inputs
+  --audit    list terminal artifacts and external inputs; also emits consumer asymmetry hints for same-group artifacts
   --summary  print artifact/process/edge counts
   --strict   error if feedback source not reachable from target process
   --json     output diagnostics as JSON ({ ok, diagnostics })
@@ -1010,7 +1019,7 @@ export const HELP = `pfdsl <command> [options]
 Commands:
   check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
-                           --audit    list terminal artifacts and external inputs
+                           --audit    list terminal artifacts, external inputs, and consumer asymmetry hints
                            --summary  print artifact/process/edge counts
                            --strict   error if feedback source not reachable from target process
                            --json     output diagnostics as JSON

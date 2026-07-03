@@ -101,7 +101,7 @@ pfdsl <command> [options]
 Commands:
   check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
-                           --audit    list terminal artifacts and external inputs
+                           --audit    list terminal artifacts, external inputs, and consumer asymmetry hints
                            --summary  print artifact/process/edge counts
                            --strict   error if feedback source not reachable from target process
                            --json     output diagnostics as JSON

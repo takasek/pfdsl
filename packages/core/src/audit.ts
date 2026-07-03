@@ -1,11 +1,24 @@
 import type { ArtifactMeta } from "./types/frontmatter.js";
 import type { NodeKind, NormalizedEdge } from "./types/index.js";
 
+export interface ConsumerAsymmetryHint {
+	/** The artifact whose consumer set is a proper subset of `sibling`'s */
+	artifact: string;
+	/** Processes present on `sibling` but missing on `artifact` */
+	missingProcesses: string[];
+	/** The same-group artifact that has the superset of consumers */
+	sibling: string;
+}
+
 export interface AuditResult {
 	/** Artifacts produced by a process but not consumed by any process */
 	terminals: string[];
 	/** Artifacts consumed by a process but not produced by any process */
 	externalInputs: string[];
+	/** Same-kind symmetry hints: artifact whose normal consumer set is a proper subset of a same-group sibling's */
+	consumerAsymmetry: ConsumerAsymmetryHint[];
+	/** Number of additional hints beyond the 10-hint cap */
+	consumerAsymmetryRemainder: number;
 }
 
 /**
@@ -53,5 +66,71 @@ export function auditGraph(
 		(a) => consumed.has(a) && !produced.has(a),
 	);
 
-	return { terminals, externalInputs };
+	// Consumer asymmetry: group artifacts by their frontmatter group, then
+	// compare normal (non-feedback) consumer sets pairwise within each group.
+	const consumerAsymmetry: ConsumerAsymmetryHint[] = [];
+	let consumerAsymmetryRemainder = 0;
+
+	if (artifactMeta) {
+		// Build map: artifact id → set of consuming processes (input edges only)
+		const normalConsumers = new Map<string, Set<string>>();
+		for (const e of edges) {
+			if (e.kind !== "input") continue;
+			let set = normalConsumers.get(e.artifact);
+			if (!set) {
+				set = new Set();
+				normalConsumers.set(e.artifact, set);
+			}
+			set.add(e.process);
+		}
+
+		// Group artifacts by their group, ignoring ungrouped artifacts
+		const byGroup = new Map<string, string[]>();
+		for (const [id, meta] of Object.entries(artifactMeta)) {
+			const grp = meta.group;
+			if (!grp) continue;
+			// Only consider artifacts that have at least one outgoing normal edge
+			if (!normalConsumers.has(id)) continue;
+			let list = byGroup.get(grp);
+			if (!list) {
+				list = [];
+				byGroup.set(grp, list);
+			}
+			list.push(id);
+		}
+
+		const allHints: ConsumerAsymmetryHint[] = [];
+		for (const members of byGroup.values()) {
+			if (members.length < 2) continue;
+			// Pairwise: check if consumers(A) ⊂ consumers(B) strictly
+			for (const a of members) {
+				for (const b of members) {
+					if (a === b) continue;
+					const consA = normalConsumers.get(a) ?? new Set<string>();
+					const consB = normalConsumers.get(b) ?? new Set<string>();
+					// Check A ⊂ B strictly: every element of A is in B, and B has more
+					if (consA.size >= consB.size) continue;
+					const isSubset = [...consA].every((p) => consB.has(p));
+					if (!isSubset) continue;
+					const missing = [...consB].filter((p) => !consA.has(p)).sort();
+					allHints.push({ artifact: a, missingProcesses: missing, sibling: b });
+				}
+			}
+		}
+
+		const CAP = 10;
+		if (allHints.length > CAP) {
+			consumerAsymmetryRemainder = allHints.length - CAP;
+			consumerAsymmetry.push(...allHints.slice(0, CAP));
+		} else {
+			consumerAsymmetry.push(...allHints);
+		}
+	}
+
+	return {
+		terminals,
+		externalInputs,
+		consumerAsymmetry,
+		consumerAsymmetryRemainder,
+	};
 }
