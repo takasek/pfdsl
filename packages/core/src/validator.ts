@@ -372,7 +372,7 @@ export function validate(
 		}
 	}
 	for (const [aid, meta] of Object.entries(artifactMeta)) {
-		if (meta.criteria === undefined) {
+		if (meta.criteria === undefined && artifactGenerators.has(aid)) {
 			diagnostics.push({
 				severity: options?.strict ? "error" : "warning",
 				code: "W002",

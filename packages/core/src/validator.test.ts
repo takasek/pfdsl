@@ -295,29 +295,39 @@ a >> design -> b
 	});
 
 	describe("W002: artifact without criteria", () => {
-		it("warns when done artifact has no criteria field", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+		// W002 applies only to produced artifacts (has a producer process).
+		// Source artifacts (input-only, no producer) are exempt.
+		// In "A >> P -> B": A is source, B is produced.
+
+		it("warns when produced artifact has no criteria field", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
 			const diags = diagnose("A >> P -> B", fm);
 			expect(diags.map((d) => d.code)).toContain("W002");
 		});
 
-		it("warns when wip artifact has no criteria field", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "wip" } } };
+		it("warns when produced wip artifact has no criteria field", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "wip" } } };
 			expect(codes("A >> P -> B", fm)).toContain("W002");
 		});
 
-		it("warns when todo artifact has no criteria field", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "todo" } } };
+		it("warns when produced todo artifact has no criteria field", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "todo" } } };
 			expect(codes("A >> P -> B", fm)).toContain("W002");
 		});
 
-		it("warns when artifact has no status and no criteria", () => {
-			const fm: Frontmatter = { artifact: { A: {} } };
+		it("warns when produced artifact has no status and no criteria", () => {
+			const fm: Frontmatter = { artifact: { B: {} } };
 			expect(codes("A >> P -> B", fm)).toContain("W002");
+		});
+
+		it("no W002 for source artifact (input-only, no producer)", () => {
+			// A is a source artifact — no process outputs it, so W002 is suppressed.
+			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W002");
 		});
 
 		it("W002 severity is warning in non-strict mode", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
 			const diags = diagnose("A >> P -> B", fm);
 			const w002 = diags.find((d) => d.code === "W002");
 			expect(w002?.severity).toBe("warning");
@@ -326,23 +336,23 @@ a >> design -> b
 		it("W002 becomes error in strict mode", () => {
 			const { tokens } = lex("A >> P -> B");
 			const { document } = parseTokens(tokens);
-			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
 			const { edges, nodeKinds } = normalize(document, fm);
 			const diags = validate(edges, nodeKinds, fm, { strict: true });
 			const w002 = diags.find((d) => d.code === "W002");
 			expect(w002?.severity).toBe("error");
 		});
 
-		it("no W002 when artifact has criteria", () => {
+		it("no W002 when produced artifact has criteria", () => {
 			const fm: Frontmatter = {
-				artifact: { A: { status: "done", criteria: "approved by TL" } },
+				artifact: { B: { status: "done", criteria: "approved by TL" } },
 			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W002");
 		});
 
-		it("no W002 when non-done artifact has criteria", () => {
+		it("no W002 when non-done produced artifact has criteria", () => {
 			const fm: Frontmatter = {
-				artifact: { A: { status: "wip", criteria: "PR passes CI" } },
+				artifact: { B: { status: "wip", criteria: "PR passes CI" } },
 			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W002");
 		});
@@ -354,10 +364,10 @@ a >> design -> b
 				"  myArt:",
 				"    status: done",
 				"---",
-				"myArt >> P -> B",
+				"A >> P -> myArt",
 			].join("\n");
 			const fm: Frontmatter = { artifact: { myArt: { status: "done" } } };
-			const { tokens } = lex("myArt >> P -> B");
+			const { tokens } = lex("A >> P -> myArt");
 			const { document } = parseTokens(tokens);
 			const { edges, nodeKinds } = normalize(document, fm);
 			const diags = validate(edges, nodeKinds, fm, { source });
@@ -367,7 +377,7 @@ a >> design -> b
 		});
 
 		it("W002 range falls back to zeroRange when source is not provided", () => {
-			const fm: Frontmatter = { artifact: { A: { status: "done" } } };
+			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
 			const { tokens } = lex("A >> P -> B");
 			const { document } = parseTokens(tokens);
 			const { edges, nodeKinds } = normalize(document, fm);
