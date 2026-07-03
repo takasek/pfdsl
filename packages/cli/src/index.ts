@@ -510,7 +510,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 
-	const { readyIds, processInputs, processOutputs } = computeReadyIdsCore(
+	const { readyIds, processInputs } = computeReadyIdsCore(
 		edges,
 		nodeKinds,
 		artifactMeta,
