@@ -257,10 +257,11 @@ process:
     description: gh skill install で配布できる形式に出力する
 
 statusStyles:
-  done:    { fillcolor: "#d4edda", style: filled }
-  wip:     { fillcolor: "#fff3cd", style: filled }
-  todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  done:      { fillcolor: "#d4edda", style: filled }
+  wip:       { fillcolor: "#fff3cd", style: filled }
+  todo:      { fillcolor: "#f8f9fa", style: filled }
+  waiting:   { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 session_log >> extract_patterns -> learning_patterns
@@ -344,10 +345,11 @@ actors:
   - id: report_generator
     label: 月次レポート生成システム
 statusStyles:
-  done:    { border: solid,   color: "#4caf50" }
-  wip:     { border: dashed,  color: "#ff9800" }
-  todo:    { border: dotted,  color: "#9e9e9e" }
-  blocked: { border: double,  color: "#f44336" }
+  done:      { border: solid,   color: "#4caf50" }
+  wip:       { border: dashed,  color: "#ff9800" }
+  todo:      { border: dotted,  color: "#9e9e9e" }
+  waiting:   { border: double,  color: "#f44336" }
+  suspended: { border: dotted,  color: "#9e9e9e" }
 ---
 
 // ── GPS受信層 ──────────────────────────────
@@ -543,7 +545,7 @@ layout:
 artifact:
   <id>:
     label: 人間向けラベル
-    status: done       # todo=未着手 | wip=PR open | done=main済み | blocked=外部要因
+    status: done       # todo=未着手 | wip=PR open | done=main済み | waiting=外部要因待ち | suspended=自主保留
     description: ...
     owner: ...
     tags: [tag1, tag2]
@@ -563,10 +565,11 @@ group:
     color: "#f0f0f0"
 
 statusStyles:
-  done:    { fillcolor: "#d4edda", style: filled }
-  wip:     { fillcolor: "#fff3cd", style: filled }
-  todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  done:      { fillcolor: "#d4edda", style: filled }
+  wip:       { fillcolor: "#fff3cd", style: filled }
+  todo:      { fillcolor: "#f8f9fa", style: filled }
+  waiting:   { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ```
 
 ## CLI
@@ -612,7 +615,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 ## Typical task: update artifact status
 
 1. Find the artifact ID in the target `.pfdsl` file's frontmatter `artifact:` section
-2. Change `status: todo` → `status: done` (or `wip`, `blocked`)
+2. Change `status: todo` → `status: done` (or `wip`, `waiting`, `suspended`)
 3. Validate: `npx @pfdsl/cli check <file>`
 
 ## References

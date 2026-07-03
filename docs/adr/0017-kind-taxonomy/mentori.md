@@ -89,7 +89,7 @@ layout:
 artifact:
   <id>:
     label: 人間向けラベル
-    status: done       # todo=未着手 | wip=PR open | done=main済み | blocked=外部要因
+    status: done       # todo=未着手 | wip=PR open | done=main済み | waiting=外部要因待ち | suspended=自主保留
     description: ...
     owner: ...
     tags: [tag1, tag2]
@@ -112,7 +112,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting:   { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ```
 
 ## CLI
@@ -158,7 +159,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 ## Typical task: update artifact status
 
 1. Find the artifact ID in the target `.pfdsl` file's frontmatter `artifact:` section
-2. Change `status: todo` → `status: done` (or `wip`, `blocked`)
+2. Change `status: todo` → `status: done` (or `wip`, `waiting`, `suspended`)
 3. Validate: `npx @pfdsl/cli check <file>`
 
 ## References
@@ -338,7 +339,8 @@ statusStyles:
   done:    { fillcolor: "#d4edda", style: filled }
   wip:     { fillcolor: "#fff3cd", style: filled }
   todo:    { fillcolor: "#f8f9fa", style: filled }
-  blocked: { fillcolor: "#f8d7da", style: filled }
+  waiting:   { fillcolor: "#f8d7da", style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
 session_log >> extract_patterns -> learning_patterns

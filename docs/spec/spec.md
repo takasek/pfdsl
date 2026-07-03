@@ -281,11 +281,12 @@ artifact:
     status: done
 ```
 
-* 列挙値: done | wip | todo | blocked
+* 列挙値: done | wip | todo | waiting | suspended
   * `todo` — 未着手（artifact 未生成）
   * `wip` — 生産中（ブランチ・PR がオープン、artifact が部分的に存在する）
   * `done` — 完了（artifact が main にマージ済み）
-  * `blocked` — 外部要因で着手不能
+  * `waiting` — 外部要因で着手不能（locus of control: 他者。レビュー待ち・外部ベンダー回答待ち等）
+  * `suspended` — 自主的な一時中断・再開予定あり（locus of control: 自分たち）
 * 1 Artifact につき 0 個または 1 個
 * 列挙外の値は error
 
@@ -313,7 +314,8 @@ process:
 statusStyles:
   done:    { fillcolor: lightgray, style: filled, fontcolor: dimgray }
   wip:     { fillcolor: lightyellow, style: filled }
-  blocked: { fillcolor: salmon, style: filled }
+  waiting:   { fillcolor: salmon, style: filled }
+  suspended: { fillcolor: "#e2e3e5", style: filled }
 ```
 
 * status 値 → DOT 属性マップ（プロジェクト共通スタイル）

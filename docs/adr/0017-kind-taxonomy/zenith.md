@@ -105,10 +105,11 @@ actors:
   - id: report_generator
     label: 月次レポート生成システム
 statusStyles:
-  done:    { border: solid,   color: "#4caf50" }
-  wip:     { border: dashed,  color: "#ff9800" }
-  todo:    { border: dotted,  color: "#9e9e9e" }
-  blocked: { border: double,  color: "#f44336" }
+  done:      { border: solid,   color: "#4caf50" }
+  wip:       { border: dashed,  color: "#ff9800" }
+  todo:      { border: dotted,  color: "#9e9e9e" }
+  waiting:   { border: double,  color: "#f44336" }
+  suspended: { border: dotted,  color: "#9e9e9e" }
 ---
 
 // ── GPS受信層 ──────────────────────────────

@@ -45,7 +45,7 @@ tag:
 spec >> P -> impl
 ```
 
-- `status` ∈ `done | wip | todo | blocked` (one per artifact, artifact-only)
+- `status` ∈ `done | wip | todo | waiting | suspended` (one per artifact, artifact-only)
 - `tags` — arbitrary string array on **artifacts and processes**; undeclared tags are silently ignored
 - `tag:` block declares per-tag `label` / `description` / `style` (parallel to `group:`)
 - Allowed style attrs: `fillcolor | color | fontcolor | style | penwidth`
@@ -132,7 +132,7 @@ Commands:
                            --best    recommend the best next process
                            --json    output as JSON
   status-set <file> <artifact-id> <status>
-                           Set artifact status (todo|wip|done|blocked) in place
+                           Set artifact status (todo|wip|done|waiting|suspended) in place
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
