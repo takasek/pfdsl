@@ -16,42 +16,50 @@ if git diff --cached --name-only | grep -q '\.pfdsl$'; then
   fi
 fi
 
-# When gen-skill inputs are staged, verify the generated skill dirs are fresh.
-# gen-skill.mjs is dist-free (pure file generation), so this runs without a build.
-if git diff --cached --name-only | grep -qE '^(docs/|scripts/skill-template/|scripts/gen-skill\.mjs)'; then
-  node scripts/gen-skill.mjs --out .claude/skills/pfdsl >/dev/null
-  node scripts/gen-skill.mjs --out skills/pfdsl >/dev/null
-  if ! git diff --quiet -- .claude/skills/pfdsl skills/pfdsl; then
-    echo "Skill dirs are stale. Run 'make gen-skill' and re-stage the skill files."
+# Shared shape for "regenerate/verify derived output, fail if stale" checks.
+# require_dist: space-separated dist files that must exist first, or "-" if
+# none needed (gen-skill is dist-free). check_cmd: a command that itself
+# returns non-zero when the derived output is stale (regenerate-then-diff,
+# or a drift-asserting test).
+check_drift() {
+  trigger=$1; require_dist=$2; check_cmd=$3; hint=$4
+  if ! git diff --cached --name-only | grep -qE "$trigger"; then
+    return 0
+  fi
+  if [ "$require_dist" != "-" ]; then
+    for f in $require_dist; do
+      if [ ! -f "$f" ]; then
+        echo "note: skipping drift check (dist absent) — run 'pnpm -r build' to enable locally; CI verifies it."
+        return 0
+      fi
+    done
+  fi
+  if ! eval "$check_cmd" >/dev/null 2>&1; then
+    echo "$hint"
     exit 1
   fi
-fi
+}
 
-# When samples change, verify the deterministic .dot / README drift guard.
-# It is a vitest test that imports @pfdsl/core (→ dist), so it needs a build;
-# skip with a notice when dist is absent (CI always runs it after building).
-if git diff --cached --name-only | grep -qE '^docs/samples/'; then
-  if [ -f packages/core/dist/index.js ] && [ -f packages/graphviz-exporter/dist/index.js ]; then
-    if ! pnpm --filter @pfdsl/graphviz-exporter exec vitest run index.test >/dev/null 2>&1; then
-      echo "docs/samples drift: run 'make gen-samples' and re-stage .dot / README.md."
-      exit 1
-    fi
-  else
-    echo "note: skipping samples drift check (run 'pnpm -r build' to enable locally; CI verifies it)."
-  fi
-fi
+# CI runs these three checks via different mechanisms (dedicated workflow
+# for gen-skill since it also needs its own checkout for cross-repo
+# install-skill consumption; inline `make check-readme-cli` step in
+# test.yml; a vitest test for gen-samples since dogfooding the exporter
+# is itself the check). Left as-is — no functional difference, and
+# converging them isn't worth the churn (see #265).
 
-# When the CLI source or README changes, verify the README `## CLI` generated
-# block matches `pfdsl help` output. It reads packages/cli/dist/cli.js directly,
-# so it needs a build; skip with a notice when dist is absent (CI verifies it).
-if git diff --cached --name-only | grep -qE '^(packages/cli/src/|README\.md)'; then
-  if [ -f packages/cli/dist/cli.js ]; then
-    node scripts/gen-readme-cli.mjs >/dev/null
-    if ! git diff --quiet -- README.md; then
-      echo "README.md CLI section is stale. Run 'make gen-readme-cli' and re-stage README.md."
-      exit 1
-    fi
-  else
-    echo "note: skipping README CLI drift check (run 'pnpm -r build' to enable locally; CI verifies it)."
-  fi
-fi
+# gen-skill.mjs is dist-free (pure file generation), so this runs without a build.
+check_drift '^(docs/|scripts/skill-template/|scripts/gen-skill\.mjs)' - \
+  "node scripts/gen-skill.mjs --out .claude/skills/pfdsl && node scripts/gen-skill.mjs --out skills/pfdsl && git diff --quiet -- .claude/skills/pfdsl skills/pfdsl" \
+  "Skill dirs are stale. Run 'make gen-skill' and re-stage the skill files."
+
+# The .dot/README drift guard is a vitest test that imports @pfdsl/core (→ dist).
+check_drift '^docs/samples/' \
+  "packages/core/dist/index.js packages/graphviz-exporter/dist/index.js" \
+  "pnpm --filter @pfdsl/graphviz-exporter exec vitest run index.test" \
+  "docs/samples drift: run 'make gen-samples' and re-stage .dot / README.md."
+
+# Verifies the README `## CLI` generated block matches `pfdsl help` output;
+# reads packages/cli/dist/cli.js directly.
+check_drift '^(packages/cli/src/|README\.md)' "packages/cli/dist/cli.js" \
+  "node scripts/gen-readme-cli.mjs && git diff --quiet -- README.md" \
+  "README.md CLI section is stale. Run 'make gen-readme-cli' and re-stage README.md."
