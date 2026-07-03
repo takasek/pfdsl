@@ -6,7 +6,7 @@
 
 実践・レビューで得た知見は3経路に振り分ける:
 
-1. **即時ルール化** — pfdsl スキルの品質ガイド改訂（`skill_template` artifact = scripts/gen-skill.mjs 内）。スキル改善は issue を通さず対話から直接行う（`maintain_template` プロセス）
+1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `skill_template` artifact（= scripts/gen-skill.mjs 内テンプレート）を、pfd-ops / pfd-retro / pfd-ecosystem は `.claude/skills/` 配下の SKILL.md・references を直接改訂する。スキル改善は issue を通さず対話から直接行う（`maintain_template` プロセス）
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
@@ -123,6 +123,12 @@ A・B 層カタログ（図の監査プロンプト一覧）: `docs/review-promp
 PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workflow.pfdsl`）を採用。runtime-pipeline 未採用。
 
 出力宛先は「知見の振り分け（3経路）」セクションに従う。companion への書き分け（どの companion に書くか）は `.claude/skills/pfd-ops/references/architecture.md` の「companion への書き分けルール」表が一次情報。
+
+### retro 実行記録
+
+pfd-retro 実行ごとに1行追記する（形式: 日付 — 対象範囲 — findings 件数）。pfd-ops プロトコル「定期監査」の起動条件はこの記録を基準点に差分計測する。
+
+- 2026-07-03 — pfd-cycle スキル群（pfd-ops / pfd-retro / pfd-ecosystem / commands / architecture.md）設計レビュー — findings 15件 + meta 1件
 
 ## 終端ゲートの根拠
 
