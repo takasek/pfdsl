@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->
 
-# PFDSL仕様書 v0.0.9
+# PFDSL仕様書 v0.0.11
 
 ## 1. 目的
 
