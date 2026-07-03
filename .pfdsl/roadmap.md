@@ -62,3 +62,5 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 **spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact（spec_v007 / spec_v008 / spec_v009 等）は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
 
 **spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際は、前バージョンの spec artifact を `>>?` フィードバック入力として追加する（例: `spec_v008 >>? integrate_spec_v009`）。`integrate_spec` が `spec_v006 >>?` を持つのと同じパターン。
+
+**publish 系 artifact を新規追加するとき**: 追加前に `make release-status` を実行し、現行リリース済みバージョンを確認してから次バージョンの artifact を起こす。確認せずに追加すると、已リリースのバージョンを「次期」として登録する drift が発生する。
