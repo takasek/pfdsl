@@ -323,5 +323,12 @@ export async function runSkillSync(
 	const dirGuidance = pfdslDirGuidance(opts.targetRoot);
 	if (dirGuidance) lines.push(dirGuidance);
 
+	lines.push(
+		"Tip: `npx @pfdsl/cli@latest` re-installs on every run. " +
+			"For faster checks, install once:\n" +
+			"  npm install -g @pfdsl/cli          # global\n" +
+			"  npm install --save-dev @pfdsl/cli  # or as a devDependency",
+	);
+
 	return { stdout: `${lines.join("\n")}\n`, exitCode: 0 };
 }
