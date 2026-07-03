@@ -824,49 +824,79 @@ a >> design -> b
 		});
 	});
 
-	describe("W005: produced artifact with no status", () => {
-		// W005 fires when an artifact is produced (output of a process) but has no status field.
-		// Source artifacts (input-only) are exempt.
+	describe("W005: produced artifact with no status (roadmap files only)", () => {
+		// W005 fires only when type: roadmap and a produced artifact has no status field.
+		// Source artifacts (input-only) and non-roadmap files are exempt.
 
 		it("warns when produced artifact has no status (frontmatter declared)", () => {
-			const fm: Frontmatter = { artifact: { B: {} } };
+			const fm: Frontmatter = { type: "roadmap", artifact: { B: {} } };
 			expect(codes("A >> P -> B", fm)).toContain("W005");
 		});
 
 		it("warns when produced artifact has no status (not declared in frontmatter)", () => {
-			// B is produced by P but has no frontmatter entry at all.
-			expect(codes("A >> P -> B")).toContain("W005");
+			// B is produced by P but has no frontmatter entry; type: roadmap triggers W005.
+			const fm: Frontmatter = { type: "roadmap" };
+			expect(codes("A >> P -> B", fm)).toContain("W005");
+		});
+
+		it("no W005 when type is absent (non-roadmap intent)", () => {
+			expect(codes("A >> P -> B")).not.toContain("W005");
+		});
+
+		it("no W005 when type is workflow", () => {
+			const fm: Frontmatter = { type: "workflow" };
+			expect(codes("A >> P -> B", fm)).not.toContain("W005");
+		});
+
+		it("no W005 when type is runtime-pipeline", () => {
+			const fm: Frontmatter = { type: "runtime-pipeline" };
+			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});
 
 		it("no W005 when produced artifact has status: done", () => {
-			const fm: Frontmatter = { artifact: { B: { status: "done" } } };
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { B: { status: "done" } },
+			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});
 
 		it("no W005 when produced artifact has status: wip", () => {
-			const fm: Frontmatter = { artifact: { B: { status: "wip" } } };
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { B: { status: "wip" } },
+			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});
 
 		it("no W005 when produced artifact has status: todo", () => {
-			const fm: Frontmatter = { artifact: { B: { status: "todo" } } };
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { B: { status: "todo" } },
+			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});
 
 		it("no W005 when produced artifact has status: waiting", () => {
-			const fm: Frontmatter = { artifact: { B: { status: "waiting" } } };
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { B: { status: "waiting" } },
+			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});
 
 		it("no W005 when produced artifact has status: suspended", () => {
-			const fm: Frontmatter = { artifact: { B: { status: "suspended" } } };
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { B: { status: "suspended" } },
+			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});
 
 		it("no W005 for source artifact (input-only)", () => {
 			// A is source — no process outputs it, so W005 does not apply to A.
-			// B (produced) has status to avoid W005 on B; we verify A alone does not trigger it.
 			const fm: Frontmatter = {
+				type: "roadmap",
 				artifact: { A: {}, B: { status: "todo" } },
 			};
 			const diags = diagnose("A >> P -> B", fm);
@@ -876,16 +906,18 @@ a >> design -> b
 		});
 
 		it("W005 severity is warning in non-strict mode", () => {
-			const diags = diagnose("A >> P -> B");
+			const fm: Frontmatter = { type: "roadmap" };
+			const diags = diagnose("A >> P -> B", fm);
 			const w005 = diags.find((d) => d.code === "W005");
 			expect(w005?.severity).toBe("warning");
 		});
 
 		it("W005 becomes error in strict mode", () => {
+			const fm: Frontmatter = { type: "roadmap" };
 			const { tokens } = lex("A >> P -> B");
 			const { document } = parseTokens(tokens);
-			const { edges, nodeKinds } = normalize(document, null);
-			const diags = validate(edges, nodeKinds, null, { strict: true });
+			const { edges, nodeKinds } = normalize(document, fm);
+			const diags = validate(edges, nodeKinds, fm, { strict: true });
 			const w005 = diags.find((d) => d.code === "W005");
 			expect(w005?.severity).toBe("error");
 		});

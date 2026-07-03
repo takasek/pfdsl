@@ -572,17 +572,19 @@ export function validate(
 		}
 	}
 
-	// W005: produced artifact with no status field
-	for (const [aid] of artifactGenerators) {
-		const status = (artifactMeta[aid] as { status?: unknown } | undefined)
-			?.status;
-		if (status === undefined) {
-			diagnostics.push({
-				severity: options?.strict ? "error" : "warning",
-				code: "W005",
-				message: `Produced artifact '${aid}' has no 'status' field`,
-				range: nodeRanges.get(aid) ?? zeroRange(),
-			});
+	// W005: produced artifact with no status field (roadmap files only)
+	if (fm?.type === "roadmap") {
+		for (const [aid] of artifactGenerators) {
+			const status = (artifactMeta[aid] as { status?: unknown } | undefined)
+				?.status;
+			if (status === undefined) {
+				diagnostics.push({
+					severity: options?.strict ? "error" : "warning",
+					code: "W005",
+					message: `Produced artifact '${aid}' has no 'status' field`,
+					range: nodeRanges.get(aid) ?? zeroRange(),
+				});
+			}
 		}
 	}
 
