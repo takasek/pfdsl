@@ -288,7 +288,7 @@ source >> build -> output
 
 ## 17-type — type field
 
-`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). `pfdsl ready` requires `type: roadmap`; other values or omission cause an error (V031 for invalid values).
+`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). Values outside the enum cause an error (V031). `pfdsl ready` rejects `type: workflow` / `type: runtime-pipeline`; omitting `type:` is allowed and skips the kind check.
 
 ```pfdsl
 ---
