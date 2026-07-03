@@ -263,7 +263,7 @@ artifact:
   i269_audit_sync:
     label: "workflow/roadmap 同期監査コマンド (#269)"
     description: "workflow/pipeline の todo ノードと roadmap の構築チェーンを突合する audit-sync コマンド。#268 type フィールドが前提"
-    status: todo
+    status: wip
     criteria: "pfdsl audit-sync が workflow/pipeline の todo ノードと roadmap の対応チェーンを突合し差分を報告する"
     location: https://github.com/takasek/pfdsl/issues/269
     updated_at: 2026-07-02T18:46:44Z

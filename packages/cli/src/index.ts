@@ -610,6 +610,111 @@ export function runStatusSet(
 	return ok("");
 }
 
+export interface AuditSyncOptions {
+	json?: boolean;
+}
+
+export interface AuditSyncGap {
+	file: string;
+	artifactId: string;
+	label: string;
+	status: string;
+}
+
+export interface AuditSyncResult {
+	ok: boolean;
+	gaps: AuditSyncGap[];
+}
+
+export function runAuditSync(
+	roadmapFile: string,
+	flowFiles: string[],
+	opts: AuditSyncOptions = {},
+): CommandResult {
+	const roadmapSrc = readSource(roadmapFile);
+	if (isCommandResult(roadmapSrc)) return roadmapSrc;
+
+	const {
+		diagnostics: roadmapDiags,
+		frontmatter: roadmapFm,
+		edges: roadmapEdges,
+	} = analyze(roadmapSrc);
+	const roadmapFail = failIfErrors(roadmapDiags, roadmapFile);
+	if (roadmapFail) return roadmapFail;
+
+	const ROADMAP_REQUIRED_TYPE = "roadmap" satisfies PfdType;
+	if (
+		roadmapFm?.type !== undefined &&
+		roadmapFm.type !== ROADMAP_REQUIRED_TYPE
+	) {
+		return fail(
+			`audit-sync: roadmap file must have type: roadmap. Got type: ${roadmapFm.type}\n`,
+			2,
+		);
+	}
+
+	// Collect all artifact IDs that appear in the roadmap (declared or in edges)
+	const roadmapArtifactIds = new Set<string>(
+		Object.keys(roadmapFm?.artifact ?? {}),
+	);
+	for (const e of roadmapEdges) {
+		roadmapArtifactIds.add(e.artifact);
+	}
+
+	const gaps: AuditSyncGap[] = [];
+
+	for (const flowFile of flowFiles) {
+		const flowSrc = readSource(flowFile);
+		if (isCommandResult(flowSrc)) return flowSrc;
+
+		const { diagnostics: flowDiags, frontmatter: flowFm } = analyze(flowSrc);
+		const flowFail = failIfErrors(flowDiags, flowFile);
+		if (flowFail) return flowFail;
+
+		const flowType = flowFm?.type;
+		if (flowType === ROADMAP_REQUIRED_TYPE) {
+			return fail(
+				`audit-sync: flow file must be workflow or runtime-pipeline, not roadmap: ${flowFile}\n`,
+				2,
+			);
+		}
+
+		for (const [aid, meta] of Object.entries(flowFm?.artifact ?? {})) {
+			if (meta.status === "todo") {
+				if (!roadmapArtifactIds.has(aid)) {
+					gaps.push({
+						file: flowFile,
+						artifactId: aid,
+						label: meta.label ?? aid,
+						status: "todo",
+					});
+				}
+			}
+		}
+	}
+
+	const result: AuditSyncResult = { ok: gaps.length === 0, gaps };
+
+	if (opts.json) {
+		const exitCode = gaps.length > 0 ? 1 : 0;
+		return { stdout: `${JSON.stringify(result)}\n`, stderr: "", exitCode };
+	}
+
+	if (gaps.length === 0) {
+		return ok("All todo artifacts in flow files are tracked in the roadmap.\n");
+	}
+
+	const lines: string[] = [`Untracked todo artifacts (${gaps.length}):`];
+	for (const g of gaps) {
+		lines.push(`  ${g.artifactId.padEnd(20)} "${g.label}"   in: ${g.file}`);
+	}
+	lines.push(
+		"",
+		"Add a build chain in the roadmap for each untracked artifact.",
+	);
+	return { stdout: `${lines.join("\n")}\n`, stderr: "", exitCode: 1 };
+}
+
 export type { BinaryFormat };
 export { svgToBinary };
 export type CliRenderFormat = RenderFormat | BinaryFormat;
@@ -818,6 +923,24 @@ Exit codes:
   2  invalid usage (missing argument, invalid status value)
 `;
 
+const HELP_AUDIT_SYNC = `usage: pfdsl audit-sync <roadmap> <flow> [<flow>...] [--json]
+
+Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
+Reports artifacts with status: todo in flow files that have no corresponding entry
+in the roadmap, indicating a build chain is missing.
+
+  <roadmap>  path to a .pfdsl file with type: roadmap
+  <flow>     one or more .pfdsl files with type: workflow or runtime-pipeline
+
+Options:
+  --json  output as JSON ({ ok, gaps: [{file, artifactId, label, status}] })
+
+Exit codes:
+  0  all todo artifacts are tracked in the roadmap
+  1  one or more todo artifacts have no roadmap entry
+  2  invalid usage
+`;
+
 export const HELP = `pfdsl <command> [options]
 
 Commands:
@@ -855,6 +978,9 @@ Commands:
                            --json    output as JSON
   status-set <file> <artifact-id> <status>
                            Set artifact status (todo|wip|done|waiting|suspended) in place
+  audit-sync <roadmap> <flow> [<flow>...] [--json]
+                           Cross-check todo artifacts in flow files against the roadmap
+                           --json    output as JSON
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
@@ -1004,6 +1130,15 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			const [f, artifactId, status] = positional;
 			if (!f || !artifactId || !status) return fail(HELP_STATUS_SET, 2);
 			return runStatusSet(f, artifactId, status);
+		}
+		case "audit-sync": {
+			if (flags.help) return ok(HELP_AUDIT_SYNC);
+			const [roadmapFile, ...flowFiles] = positional;
+			if (!roadmapFile || flowFiles.length === 0)
+				return fail(HELP_AUDIT_SYNC, 2);
+			return runAuditSync(roadmapFile, flowFiles, {
+				json: flags.json === true,
+			});
 		}
 		case "skill": {
 			if (flags.help) return ok(HELP_SKILL);
