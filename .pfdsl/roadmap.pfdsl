@@ -275,10 +275,10 @@ artifact:
     location: https://github.com/takasek/pfdsl/issues/272
     updated_at: 2026-07-02T18:56:10Z
   i273_blocked_by:
-    label: "blockedBy フィールド (#273)"
-    description: "blocked 理由の機械可読化。blockedBy: human 等で人間待ち/依存待ちを区別。draft_proposals 経由"
+    label: "blocked 分割: waiting/suspended (#273)"
+    description: "status: blocked を waiting（外部待ち）と suspended（自主停止）に分割。破壊的変更として即 V007/V008 エラー化"
     status: done
-    criteria: "blockedBy: フィールドが spec に統合済み、対応サンプルあり"
+    criteria: "waiting/suspended が STATUS_VALUES に追加され、blocked が V007/V008 でエラーになり、spec v0.0.11 に統合済み"
     location: https://github.com/takasek/pfdsl/issues/273
     updated_at: 2026-07-02T18:56:12Z
   i278_release_automation:
@@ -495,12 +495,12 @@ index_reindex >> integrate_spec_v009 -> spec_v009
 [hover_jump, run_command, group_hover] >> publish_ext_v0014 -> ext_v0014
 
 [spec_v009, cli_tool_v0011] >> implement_basepath -> basepath
-basepath >> integrate_spec_v0010 -> spec_v0010
+[basepath, ready_cmd] >> integrate_spec_v0010 -> spec_v0010
 spec_v009 >>? integrate_spec_v0010
 cli_tool_v0011 >> implement_ready_cmd -> ready_cmd
 basepath >> publish_cli_v0012 -> cli_tool_v0012
 [cli_tool_v0012, ready_cmd] >> publish_cli_v0013 -> cli_tool_v0013
-basepath >> publish_ext_v0015 -> ext_v0015
+[ext_v0014, basepath] >> publish_ext_v0015 -> ext_v0015
 
 cli_tool_v0013 >> update_pfd_ops_skill -> pfd_ops_skill_ready
 
