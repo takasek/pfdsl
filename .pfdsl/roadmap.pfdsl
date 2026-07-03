@@ -260,13 +260,6 @@ artifact:
     criteria: "type: フィールドが spec に統合済み、ready が roadmap 型以外で error を出力する"
     location: https://github.com/takasek/pfdsl/issues/268
     updated_at: 2026-07-02T18:46:25Z
-  i269_audit_sync:
-    label: "workflow/roadmap 同期監査コマンド (#269)"
-    description: "workflow/pipeline の todo ノードと roadmap の構築チェーンを突合する audit-sync コマンド。#268 type フィールドが前提"
-    status: wip
-    criteria: "pfdsl audit-sync が workflow/pipeline の todo ノードと roadmap の対応チェーンを突合し差分を報告する"
-    location: https://github.com/takasek/pfdsl/issues/269
-    updated_at: 2026-07-02T18:46:44Z
   i272_w002_hierarchy:
     label: "W002 criteria 階層化 (#272)"
     description: "producer を持たない source artifact は W002 対象外にするか低階層 warning に落とす"
@@ -318,6 +311,12 @@ artifact:
     status: done
     criteria: "pfdsl status-set が対象 artifact の status フィールドを書き換え、不正 status は exit 2"
     location: https://github.com/takasek/pfdsl/issues/277
+  audit_sync:
+    label: "workflow/roadmap 同期監査コマンド (#269)"
+    description: "workflow/pipeline の todo ノードと roadmap の構築チェーンを突合する audit-sync コマンド。#268 type フィールドが前提"
+    status: done
+    criteria: "pfdsl audit-sync が workflow/pipeline の todo ノードと roadmap の対応チェーンを突合し差分を報告する"
+    location: https://github.com/takasek/pfdsl/issues/269
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -505,13 +504,13 @@ basepath >> publish_cli_v0012 -> cli_tool_v0012
 cli_tool_v0013 >> update_pfd_ops_skill -> pfd_ops_skill_ready
 
 cli_tool_v0013 >> implement_type_field -> i268_type_field
-i268_type_field >> implement_audit_sync -> i269_audit_sync
+i268_type_field >> implement_audit_sync -> audit_sync
 cli_tool_v0013 >> implement_w002_hierarchy -> i272_w002_hierarchy
 cli_tool_v0013 >> implement_blocked_by -> i273_blocked_by
 cli_tool_v0013 >> implement_status_set -> status_set
 status_set >> implement_release_automation -> i278_release_automation
 
-[cli_tool_v0013, i268_type_field, i269_audit_sync, i272_w002_hierarchy, i273_blocked_by, status_set] >> publish_cli_v0014 -> cli_tool_v0014
+[cli_tool_v0013, i268_type_field, audit_sync, i272_w002_hierarchy, i273_blocked_by, status_set] >> publish_cli_v0014 -> cli_tool_v0014
 
 [i268_type_field, i272_w002_hierarchy, i273_blocked_by] >> integrate_spec_v0011 -> spec_v0011
 spec_v0010 >>? integrate_spec_v0011
