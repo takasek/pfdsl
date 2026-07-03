@@ -1,5 +1,6 @@
 ---
 title: データ分析ETLパイプライン
+description: 可変リソース（本番 DB）のスナップショット化と、単一生成の mart を複数消費者が使う扇形。
 layout:
   direction: LR
   maxWidth: 120

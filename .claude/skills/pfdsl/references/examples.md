@@ -2,13 +2,27 @@
 
 # PFDSL Examples Reference
 
-Realistic domain examples demonstrating the quality guide.
+Realistic domain examples demonstrating the quality guide. Use the index to Read only the relevant line range.
+
+## Index
+
+- book-writing（技術書執筆・出版フロー）L20–L137 — parts による章 artifact の分割と合流（compile）、レビュー後の改版をフェーズ境界の別 artifact で表すパターン。
+- conference-ops（技術カンファレンス開催フロー）L139–L282 — 時間的凝集で束ねない並列手配（会場・スポンサー・プログラム）の依存分割と、運営マニュアルへの合流点。
+- contract-negotiation（業務委託契約締結フロー）L284–L385 — 往復で収束する交渉の >>? 還流（修正稿 >>? 交渉）と、双方リーガルレビューの並列分割。
+- etl-pipeline（データ分析ETLパイプライン）L387–L491 — 可変リソース（本番 DB）のスナップショット化と、単一生成の mart を複数消費者が使う扇形。
+- hiring-process（採用プロセス）L493–L591 — 生成者の整合 — 応募者の提出物はフロー外入力、各プロセスは自分が作る評価記録だけを出力する。
+- incident-response（本番障害対応フロー）L593–L686 — 応急処置・調査の「作業」を記録 artifact に外化し、runbook 整備を >>? で次回対応へ還流する組織学習。
+- ml-model-dev（機械学習モデル開発・運用フロー）L688–L788 — 版を列挙できない定常再学習サイクルを >>?（retrain_dataset >>? train_model）で表す改版パターン。
+- security-advisory（OSS 脆弱性 Coordinated Disclosure フロー）L790–L911 — 暗黙依存の明示（修正開発に base_code）と、公開物・アドバイザリを終端とする外部調整フロー。
+- web-feature-dev（Webアプリ機能開発フロー）L913–L1027 — 観点表をレビュー入力にし指摘を >>? で観点表整備へ還流する組織学習パターンと、QA からの修正還流。
+- xddp-derived-dev（XDDP風派生開発フロー）L1029–L1129 — 派生開発の暗黙依存（base_code・理解資料）を入力として明示し、欠陥報告を >>? で実装へ還流する。
 
 ## book-writing — 技術書執筆・出版フロー
 
 ```pfdsl
 ---
 title: 技術書執筆・出版フロー
+description: parts による章 artifact の分割と合流（compile）、レビュー後の改版をフェーズ境界の別 artifact で表すパターン。
 layout:
   direction: LR
   maxWidth: 130
@@ -127,6 +141,7 @@ copyedited_manuscript >> typeset -> print_ready_pdf
 ```pfdsl
 ---
 title: 技術カンファレンス開催フロー
+description: 時間的凝集で束ねない並列手配（会場・スポンサー・プログラム）の依存分割と、運営マニュアルへの合流点。
 layout:
   direction: LR
   maxWidth: 130
@@ -271,6 +286,7 @@ satisfaction_survey >> compile_report
 ```pfdsl
 ---
 title: 業務委託契約締結フロー
+description: 往復で収束する交渉の >>? 還流（修正稿 >>? 交渉）と、双方リーガルレビューの並列分割。
 layout:
   direction: LR
   maxWidth: 130
@@ -373,6 +389,7 @@ final_contract >> execute_contract -> signed_contract
 ```pfdsl
 ---
 title: データ分析ETLパイプライン
+description: 可変リソース（本番 DB）のスナップショット化と、単一生成の mart を複数消費者が使う扇形。
 layout:
   direction: LR
   maxWidth: 120
@@ -478,6 +495,7 @@ mart >> generate_report -> weekly_report
 ```pfdsl
 ---
 title: 採用プロセス
+description: 生成者の整合 — 応募者の提出物はフロー外入力、各プロセスは自分が作る評価記録だけを出力する。
 layout:
   direction: LR
   maxWidth: 120
@@ -577,6 +595,7 @@ final_evaluation >> extend_offer -> offer_letter
 ```pfdsl
 ---
 title: 本番障害対応フロー
+description: 応急処置・調査の「作業」を記録 artifact に外化し、runbook 整備を >>? で次回対応へ還流する組織学習。
 layout:
   direction: LR
   maxWidth: 130
@@ -671,6 +690,7 @@ runbook >>? triage
 ```pfdsl
 ---
 title: 機械学習モデル開発・運用フロー
+description: 版を列挙できない定常再学習サイクルを >>?（retrain_dataset >>? train_model）で表す改版パターン。
 layout:
   direction: LR
   maxWidth: 130
@@ -772,6 +792,7 @@ retrain_dataset >>? train_model
 ```pfdsl
 ---
 title: OSS 脆弱性 Coordinated Disclosure フロー
+description: 暗黙依存の明示（修正開発に base_code）と、公開物・アドバイザリを終端とする外部調整フロー。
 layout:
   direction: LR
   maxWidth: 130
@@ -894,6 +915,7 @@ fix_patch >> review_patch -> patch_review_record
 ```pfdsl
 ---
 title: Webアプリ機能開発フロー
+description: 観点表をレビュー入力にし指摘を >>? で観点表整備へ還流する組織学習パターンと、QA からの修正還流。
 layout:
   direction: LR
   maxWidth: 120
@@ -1009,6 +1031,7 @@ bug_ticket >>? implement
 ```pfdsl
 ---
 title: XDDP風派生開発フロー
+description: 派生開発の暗黙依存（base_code・理解資料）を入力として明示し、欠陥報告を >>? で実装へ還流する。
 layout:
   direction: LR
   maxWidth: 130

@@ -1,5 +1,6 @@
 ---
 title: OSS 脆弱性 Coordinated Disclosure フロー
+description: 暗黙依存の明示（修正開発に base_code）と、公開物・アドバイザリを終端とする外部調整フロー。
 layout:
   direction: LR
   maxWidth: 130

@@ -1,5 +1,6 @@
 ---
 title: 機械学習モデル開発・運用フロー
+description: 版を列挙できない定常再学習サイクルを >>?（retrain_dataset >>? train_model）で表す改版パターン。
 layout:
   direction: LR
   maxWidth: 130

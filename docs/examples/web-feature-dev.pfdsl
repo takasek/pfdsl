@@ -1,5 +1,6 @@
 ---
 title: Webアプリ機能開発フロー
+description: 観点表をレビュー入力にし指摘を >>? で観点表整備へ還流する組織学習パターンと、QA からの修正還流。
 layout:
   direction: LR
   maxWidth: 120

@@ -1,5 +1,6 @@
 ---
 title: XDDP風派生開発フロー
+description: 派生開発の暗黙依存（base_code・理解資料）を入力として明示し、欠陥報告を >>? で実装へ還流する。
 layout:
   direction: LR
   maxWidth: 130

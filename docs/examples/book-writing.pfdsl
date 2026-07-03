@@ -1,5 +1,6 @@
 ---
 title: 技術書執筆・出版フロー
+description: parts による章 artifact の分割と合流（compile）、レビュー後の改版をフェーズ境界の別 artifact で表すパターン。
 layout:
   direction: LR
   maxWidth: 130

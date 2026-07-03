@@ -1,5 +1,6 @@
 ---
 title: 採用プロセス
+description: 生成者の整合 — 応募者の提出物はフロー外入力、各プロセスは自分が作る評価記録だけを出力する。
 layout:
   direction: LR
   maxWidth: 120

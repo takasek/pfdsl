@@ -87,17 +87,7 @@ statusStyles:
 ## CLI
 
 ```bash
-npx @pfdsl/cli check <file> [--audit] [--summary] [--strict] [--json]
-npx @pfdsl/cli fmt <file> [--write] [--mode flat|flows]
-npx @pfdsl/cli reindex <file> [--write] [--check] [--renumber] [--json]
-npx @pfdsl/cli sort-meta <file> --by <keys> [--write] [--check]
-npx @pfdsl/cli normalize <file>
-npx @pfdsl/cli graph <file> [--format dot|svg|pdf|png]
-npx @pfdsl/cli diff <file-a> <file-b> [--format text|dot|svg]
-npx @pfdsl/cli ready <file> [--best] [--json]      # roadmap: list ready-to-start processes
-npx @pfdsl/cli status-set <file> <artifact-id> <status>
-npx @pfdsl/cli audit-sync <roadmap> <flow>... [--json]
-npx @pfdsl/cli skill sync [--yes]
+{{cliCommands}}
 ```
 
 Full flag reference: `npx @pfdsl/cli help`. This section documents CLI v{{cliVersion}}. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.
@@ -149,7 +139,7 @@ Sets the status in place and validates. Manual fallback: edit `status:` in the f
 |---|---|
 | status 更新・読解・小編集 | 本文で完結（references 不要） |
 | 特定の構文・フィールドの書き方 | `references/samples.md`（機能別の最小例） |
-| 新規 PFD の執筆・設計判断 | 本文の quality guide + `references/examples.md`（実戦ドメインの設計パターン） |
+| 新規 PFD の執筆・設計判断 | 本文の quality guide + `references/examples.md`（実戦ドメインの設計パターン。先頭の Index で該当例の行範囲を特定し、そこだけ Read する） |
 | check エラーの対処 | エラーコード（V/W）で `references/spec.md` を grep（ヒット先は §15 制約・§16 エラー方針・§20 変更履歴のいずれか） |
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
 | PFD のレビュー・監査 | `references/review-prompts.md`（A/B カタログ。書くルールは本文、問い詰めはこちら） |

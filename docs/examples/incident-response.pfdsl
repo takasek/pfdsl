@@ -1,5 +1,6 @@
 ---
 title: 本番障害対応フロー
+description: 応急処置・調査の「作業」を記録 artifact に外化し、runbook 整備を >>? で次回対応へ還流する組織学習。
 layout:
   direction: LR
   maxWidth: 130
