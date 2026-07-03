@@ -14,7 +14,6 @@ import {
 	type IndexChange,
 	loadExtendsChain,
 	loadSubflowGraph,
-	PFD_TYPE_VALUES,
 	reindex,
 	resolveRefPath,
 	type SortKey,
@@ -426,9 +425,8 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 
 	const pfdType = frontmatter?.type;
 	if (pfdType !== undefined && pfdType !== "roadmap") {
-		const allowed = PFD_TYPE_VALUES.join(", ");
 		return fail(
-			`ready requires a roadmap file (type: roadmap). This file has type: ${pfdType}\nAllowed types: ${allowed}\n`,
+			`ready requires a roadmap file (type: roadmap). This file has type: ${pfdType}\n`,
 			2,
 		);
 	}

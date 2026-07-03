@@ -573,11 +573,11 @@ export function validate(
 	}
 
 	// V031: invalid type field value
-	if (fm?.type !== undefined && !PFD_TYPE_SET.has(fm.type as string)) {
+	if (fm?.type !== undefined && !PFD_TYPE_SET.has(String(fm.type))) {
 		diagnostics.push({
 			severity: "error",
 			code: "V031",
-			message: `Invalid type '${fm.type}'. Allowed: ${PFD_TYPE_VALUES.join(", ")}`,
+			message: `Invalid type '${String(fm.type)}'. Allowed: ${PFD_TYPE_VALUES.join(", ")}`,
 			range: zeroRange(),
 		});
 	}
