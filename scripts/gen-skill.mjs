@@ -7,6 +7,9 @@ import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { findMissingFields } from "./lib/skill-field-drift.mjs";
+import { resolveCompanions } from "./lib/sample-companions.mjs";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
@@ -96,11 +99,12 @@ const rows = tsv
     return { id: id.trim(), summary: summary?.trim() ?? "", description: description?.trim() ?? "" };
   });
 
-const tsvIds = new Set(rows.map((r) => r.id));
-for (const f of readdirSync(samplesDir).filter((f) => f.endsWith(".pfdsl"))) {
-  if (!tsvIds.has(f.replace(".pfdsl", ""))) {
-    console.warn(`  warn: ${f} exists but has no entry in samples.tsv — will not appear in references/samples.md`);
-  }
+const sampleFileIds = readdirSync(samplesDir)
+  .filter((f) => f.endsWith(".pfdsl"))
+  .map((f) => f.replace(".pfdsl", ""));
+const { companionsById, orphans } = resolveCompanions(rows.map((r) => r.id), sampleFileIds);
+for (const id of orphans) {
+  console.warn(`  warn: ${id}.pfdsl exists but has no entry in samples.tsv — will not appear in references/samples.md`);
 }
 
 let samplesMd = `<!-- DO NOT EDIT — generated from docs/samples/ in https://github.com/takasek/pfdsl -->\n\n# PFDSL Samples Reference\n\nAnnotated .pfdsl files illustrating each language feature.\n\n`;
@@ -114,7 +118,13 @@ for (const { id, summary, description } of rows) {
   }
   const src = readFileSync(pfdslPath, "utf-8");
   const fence = src.includes("```") ? "````" : "```";
-  samplesMd += `## ${id} — ${summary}\n\n${description}\n\n${fence}pfdsl\n${src}${fence}\n\n---\n\n`;
+  samplesMd += `## ${id} — ${summary}\n\n${description}\n\n${fence}pfdsl\n${src}${fence}\n\n`;
+  for (const cid of companionsById.get(id) ?? []) {
+    const csrc = readFileSync(resolve(samplesDir, `${cid}.pfdsl`), "utf-8");
+    const cfence = csrc.includes("```") ? "````" : "```";
+    samplesMd += `Companion file \`${cid}.pfdsl\` referenced above:\n\n${cfence}pfdsl\n${csrc}${cfence}\n\n`;
+  }
+  samplesMd += `---\n\n`;
   sampleCount++;
 }
 
@@ -133,6 +143,16 @@ console.log(`references/examples.md ← docs/examples/*.pfdsl (${exampleCount} e
 // --- 3. Write SKILL.md from template ---
 
 const templateSrc = readFileSync(resolve(__dirname, "skill-template/SKILL.md"), "utf-8");
+
+const frontmatterTs = readFileSync(resolve(root, "packages/core/src/types/frontmatter.ts"), "utf-8");
+const missingFields = findMissingFields(frontmatterTs, templateSrc);
+if (missingFields.length > 0) {
+  console.error("Error: typed frontmatter fields missing from skill-template 'Frontmatter structure' section:");
+  for (const f of missingFields) console.error(`  - ${f}`);
+  console.error("Add them to the yaml block (or the pointer line below it) in scripts/skill-template/SKILL.md.");
+  process.exit(1);
+}
+
 const skillMd = templateSrc
 	.replace(/\{\{specVersion\}\}/g, specVersion)
 	.replace(/\{\{cliVersion\}\}/g, cliVersion);

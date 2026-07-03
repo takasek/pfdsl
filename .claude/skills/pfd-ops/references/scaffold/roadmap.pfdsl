@@ -1,5 +1,6 @@
 ---
 title: Issue 依存フロー
+type: roadmap
 description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。詳細は sibling roadmap.md 参照。
 
 statusStyles:
