@@ -785,4 +785,31 @@ a >> design -> b
 			expect(codes("P -> B", fm)).not.toContain("V020");
 		});
 	});
+
+	describe("V031: invalid type field value", () => {
+		it("errors when type is an unknown value", () => {
+			const fm = { type: "kanban" } as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).toContain("V031");
+		});
+
+		it("no V031 for type: roadmap", () => {
+			const fm: Frontmatter = { type: "roadmap" };
+			expect(codes("A >> P -> B", fm)).not.toContain("V031");
+		});
+
+		it("no V031 for type: workflow", () => {
+			const fm: Frontmatter = { type: "workflow" };
+			expect(codes("A >> P -> B", fm)).not.toContain("V031");
+		});
+
+		it("no V031 for type: runtime-pipeline", () => {
+			const fm: Frontmatter = { type: "runtime-pipeline" };
+			expect(codes("A >> P -> B", fm)).not.toContain("V031");
+		});
+
+		it("no V031 when type is absent", () => {
+			const fm: Frontmatter = {};
+			expect(codes("A >> P -> B", fm)).not.toContain("V031");
+		});
+	});
 });

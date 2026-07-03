@@ -14,6 +14,7 @@ import {
 	type IndexChange,
 	loadExtendsChain,
 	loadSubflowGraph,
+	PFD_TYPE_VALUES,
 	reindex,
 	resolveRefPath,
 	type SortKey,
@@ -423,6 +424,15 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const earlyFail = failIfErrors(diagnostics, file);
 	if (earlyFail) return earlyFail;
 
+	const pfdType = frontmatter?.type;
+	if (pfdType !== undefined && pfdType !== "roadmap") {
+		const allowed = PFD_TYPE_VALUES.join(", ");
+		return fail(
+			`ready requires a roadmap file (type: roadmap). This file has type: ${pfdType}\nAllowed types: ${allowed}\n`,
+			2,
+		);
+	}
+
 	const artifactMeta = frontmatter?.artifact ?? {};
 
 	// Collect normal (non-feedback) input edges per process
@@ -789,7 +799,7 @@ Options:
 const HELP_READY = `usage: pfdsl ready <file|-> [--best] [--json]
 
 List processes whose every input artifact has status: done (or no status set).
-Use - to read from stdin.
+Only applies to roadmap files (type: roadmap). Use - to read from stdin.
 
 Options:
   --best  highlight the process that unblocks the most downstream work

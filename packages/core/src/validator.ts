@@ -7,10 +7,11 @@ import type {
 	NormalizedEdge,
 	Range,
 } from "./types/index.js";
-import { STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
+import { PFD_TYPE_VALUES, STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
 
 const STATUS_SET: ReadonlySet<string> = new Set(STATUS_VALUES);
 const STYLE_ATTR_SET: ReadonlySet<string> = new Set(STYLE_ATTRS);
+const PFD_TYPE_SET: ReadonlySet<string> = new Set(PFD_TYPE_VALUES);
 
 export interface ValidateOptions {
 	strict?: boolean;
@@ -569,6 +570,16 @@ export function validate(
 		for (const id of Object.keys(groupMeta)) {
 			if (color.get(id) === "white") dfsGroup(id);
 		}
+	}
+
+	// V031: invalid type field value
+	if (fm?.type !== undefined && !PFD_TYPE_SET.has(fm.type as string)) {
+		diagnostics.push({
+			severity: "error",
+			code: "V031",
+			message: `Invalid type '${fm.type}'. Allowed: ${PFD_TYPE_VALUES.join(", ")}`,
+			range: zeroRange(),
+		});
 	}
 
 	return diagnostics;
