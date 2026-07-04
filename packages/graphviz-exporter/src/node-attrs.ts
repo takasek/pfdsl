@@ -122,7 +122,8 @@ export function nodeAttrs(
 	const ameta =
 		kind === "artifact" ? (meta as ArtifactMeta | undefined) : undefined;
 	const criteria = ameta?.criteria;
-	const locationRaw = ameta?.location;
+	const locationRaw = (meta as { location?: string | string[] } | undefined)
+		?.location;
 	const locationArray: string[] | undefined =
 		typeof locationRaw === "string"
 			? [locationRaw]
