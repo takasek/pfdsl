@@ -412,7 +412,9 @@ a >> design -> b
 			const fm = {
 				process: { P: { location: "src/process.ts" } },
 			} as unknown as Frontmatter;
-			expect(codes("A >> P -> B", fm)).not.toContain("V013");
+			expect(
+				diagnose("A >> P -> B", fm).filter((d) => d.severity === "error"),
+			).toHaveLength(0);
 		});
 
 		it("does not error when location is a URL array on a process", () => {
@@ -421,7 +423,9 @@ a >> design -> b
 					P: { location: ["https://github.com/example/repo/issues/1"] },
 				},
 			} as unknown as Frontmatter;
-			expect(codes("A >> P -> B", fm)).not.toContain("V013");
+			expect(
+				diagnose("A >> P -> B", fm).filter((d) => d.severity === "error"),
+			).toHaveLength(0);
 		});
 	});
 
