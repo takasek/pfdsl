@@ -46,6 +46,8 @@ export function buildDescriptions(
 		if (meta.tags?.length) rows.push(["tags", meta.tags.join(", ")]);
 		if (meta.command) rows.push(["command", meta.command]);
 		if (meta.subflow) rows.push(["subflow", meta.subflow]);
+		const procLocs = normalizeLocation(meta.location);
+		if (procLocs.length > 0) rows.push(["location", procLocs.join(", ")]);
 		if (rows.length > 0) result[id] = rows;
 	}
 	return result;
