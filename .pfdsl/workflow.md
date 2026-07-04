@@ -20,7 +20,7 @@
 
 ## code-review / simplify の実施粒度
 
-pfd-ops 終端ゲート「`/simplify` または `/code-review` を実施した（実装規模・品質基準は companion で定義）」の定義はここ。diff の規模に review の重さを合わせる。scoped な小〜中規模修正（数十行、1-2ファイル中心）に高効度設定（8角度 finder × 候補ごと検証 agent、計10体以上の subagent 起動）をかけると diff サイズに対して過剰 — 軽い level（角度を絞る）を選ぶか、subagent を使わず自分で Read/Grep して直接レビューする。8角度並列 + 全候補検証の重量級構成は大規模 PR・複数ファイルにまたがる変更向け（2026-07-05: #308 対応で数十行規模の diff に高効度設定を使い token 消費が過大化。global CLAUDE.md にも同旨の cross-project ルールを追加済みだが、このゲート項目自体が「companion で定義」前提のため、ここにも明記する）。
+pfd-ops 終端ゲート「実装規模・品質基準は companion で定義」の実体はここ。diff 規模に review の重さを合わせる（詳細・理由は global CLAUDE.md「code-review の実行粒度」参照）。
 
 ## payoff_log 追記条件
 
