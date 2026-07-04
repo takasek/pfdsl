@@ -995,6 +995,7 @@ const HELP_READY = `usage: pfdsl ready <file|-> [--best] [--json]
 
 List processes whose every input artifact has status: done (or no status set).
 Only applies to roadmap files (type: roadmap). Use - to read from stdin.
+Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
 Options:
   --best  highlight the process that unblocks the most downstream work
