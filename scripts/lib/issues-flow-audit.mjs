@@ -197,21 +197,21 @@ export function computeFindings(entries, issues) {
 /**
  * Applies file-fixable findings to the yaml Document in place.
  * @param {import("yaml").Document} doc
- * @param {{ type: string, issueNumber: number, artifactId: string|undefined, fixVia?: "file"|"github"|"flow" }[]} findings
+ * @param {{ type: string, issueNumber: number, processId: string|undefined, fixVia?: "file"|"github"|"flow" }[]} findings
  * @param {Map<number, { number: number, state: string, labels: string[], updatedAt: string }>} issuesByNumber
  */
 export function applyFixes(doc, findings, issuesByNumber) {
 	for (const finding of findings) {
 		if (finding.fixVia !== "file") continue;
-		const { type, artifactId, issueNumber } = finding;
+		const { type, processId, issueNumber } = finding;
 		const issue = issuesByNumber.get(issueNumber);
 		if (!issue) continue;
 
 		if (type === "stale_updated_at") {
-			doc.setIn(["artifact", artifactId, "updated_at"], issue.updatedAt);
+			doc.setIn(["process", processId, "updated_at"], issue.updatedAt);
 		} else if (type === "priority_drift") {
 			// Get existing tags preserving order, remove priority: ones
-			const existingTags = doc.getIn(["artifact", artifactId, "tags"]);
+			const existingTags = doc.getIn(["process", processId, "tags"]);
 			let nonPriorityTags = [];
 			if (existingTags) {
 				// existingTags may be a yaml Seq node or plain array
@@ -221,9 +221,9 @@ export function applyFixes(doc, findings, issuesByNumber) {
 			const issuePriorities = issue.labels.filter((l) => l.startsWith("priority:")).sort();
 			const newTags = [...nonPriorityTags, ...issuePriorities];
 			if (newTags.length === 0) {
-				doc.deleteIn(["artifact", artifactId, "tags"]);
+				doc.deleteIn(["process", processId, "tags"]);
 			} else {
-				doc.setIn(["artifact", artifactId, "tags"], newTags);
+				doc.setIn(["process", processId, "tags"], newTags);
 			}
 		}
 		// other types: ignore

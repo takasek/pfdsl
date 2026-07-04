@@ -341,21 +341,20 @@ describe("computeFindings", () => {
 
 describe("applyFixes", () => {
 	it("round-trip: preserves double-quoted label and adds updated_at", () => {
-		const yaml = `artifact:
-  i5_hierarchy_spec:
+		const yaml = `process:
+  i5_draft_hierarchy_spec:
     label: "階層PFD仕様案 (#5)"
-    status: todo
-  i6_presets_spec:
+  i6_draft_presets_spec:
     label: "共有プリセット仕様案 (#6)"
-    status: todo
 `;
 		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "stale_updated_at",
 				issueNumber: 6,
-				artifactId: "i6_presets_spec",
-				detail: "artifact: (none), issue: 2026-06-01T00:00:00Z",
+				processId: "i6_draft_presets_spec",
+				artifactId: "presets_spec",
+				detail: "process: (none), issue: 2026-06-01T00:00:00Z",
 				fixVia: "file",
 			},
 		];
@@ -364,17 +363,14 @@ describe("applyFixes", () => {
 		]);
 		applyFixes(doc, findings, issuesByNumber);
 		const out = doc.toString();
-		// quoted label preserved verbatim
 		assert.ok(out.includes('"階層PFD仕様案 (#5)"'), "quoted label should be preserved");
-		// updated_at added
 		assert.ok(out.includes("updated_at: 2026-06-01T00:00:00Z"), "updated_at should be added");
 	});
 
 	it("priority_drift: replaces priority tags, preserves non-priority tags", () => {
-		const yaml = `artifact:
-  i5_foo:
+		const yaml = `process:
+  i5_do_foo:
     label: Foo
-    status: todo
     tags:
       - priority:high
       - foo
@@ -384,8 +380,9 @@ describe("applyFixes", () => {
 			{
 				type: "priority_drift",
 				issueNumber: 5,
-				artifactId: "i5_foo",
-				detail: "artifact: [priority:high], issue: [priority:low]",
+				processId: "i5_do_foo",
+				artifactId: "foo",
+				detail: "process: [priority:high], issue: [priority:low]",
 				fixVia: "file",
 			},
 		];
@@ -394,14 +391,13 @@ describe("applyFixes", () => {
 		]);
 		applyFixes(doc, findings, issuesByNumber);
 		const obj = doc.toJS();
-		assert.deepEqual(obj.artifact.i5_foo.tags, ["foo", "priority:low"]);
+		assert.deepEqual(obj.process.i5_do_foo.tags, ["foo", "priority:low"]);
 	});
 
 	it("priority_drift: removing last tag deletes the key", () => {
-		const yaml = `artifact:
-  i5_foo:
+		const yaml = `process:
+  i5_do_foo:
     label: Foo
-    status: todo
     tags:
       - priority:high
 `;
@@ -410,53 +406,50 @@ describe("applyFixes", () => {
 			{
 				type: "priority_drift",
 				issueNumber: 5,
-				artifactId: "i5_foo",
-				detail: "artifact: [priority:high], issue: []",
+				processId: "i5_do_foo",
+				artifactId: "foo",
+				detail: "process: [priority:high], issue: []",
 				fixVia: "file",
 			},
 		];
-		// issue has no priority labels
 		const issuesByNumber = new Map([
 			[5, { number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }],
 		]);
 		applyFixes(doc, findings, issuesByNumber);
 		const obj = doc.toJS();
-		assert.equal(obj.artifact.i5_foo.tags, undefined);
+		assert.equal(obj.process.i5_do_foo.tags, undefined);
 	});
 
 	it("ignores findings without fixVia: 'file'", () => {
-		const yaml = `artifact:
-  i5_foo:
+		const yaml = `process:
+  i5_do_foo:
     label: Foo
-    status: todo
 `;
 		const doc = parseDocument(yaml);
 		const before = doc.toString();
 		const findings = [
-			{ type: "unknown_issue", issueNumber: 5, artifactId: "i5_foo", detail: "" },
-			{ type: "closed_in_flow", issueNumber: 5, artifactId: "i5_foo", detail: "", fixVia: "flow" },
+			{ type: "unknown_issue", issueNumber: 5, processId: "i5_do_foo", artifactId: "foo", detail: "" },
+			{ type: "closed_in_flow", issueNumber: 5, processId: "i5_do_foo", artifactId: "foo", detail: "", fixVia: "flow" },
 		];
 		applyFixes(doc, findings, new Map());
 		assert.equal(doc.toString(), before);
 	});
 
-	it("no mid-sentence line breaks: long description/criteria survive emit with lineWidth:0", () => {
+	it("no mid-sentence line breaks: long description/criteria on the process survive emit with lineWidth:0", () => {
 		const longDesc = "これはとても長い説明文で、句読点のない位置で折り返されてはいけません。文の途中で改行が入ると意味が変わってしまうため、lineWidth:0 で出力することが必要です。";
-		const longCrit = "長い完了条件の文章もまた途中で折り返されてはいけません。句読点（。、）の後でのみ改行が許可されます。";
-		const yamlStr = `artifact:
-  i5_foo:
+		const yamlStr = `process:
+  i5_do_foo:
     label: Foo
     description: ${longDesc}
-    criteria: ${longCrit}
-    status: todo
 `;
 		const doc = parseDocument(yamlStr);
 		const findings = [
 			{
 				type: "stale_updated_at",
 				issueNumber: 5,
-				artifactId: "i5_foo",
-				detail: "artifact: (none), issue: 2026-06-01T00:00:00Z",
+				processId: "i5_do_foo",
+				artifactId: "foo",
+				detail: "process: (none), issue: 2026-06-01T00:00:00Z",
 				fixVia: "file",
 			},
 		];
@@ -467,9 +460,7 @@ describe("applyFixes", () => {
 		const out = doc.toString({ lineWidth: 0 });
 		const lines = out.split("\n");
 		const descLine = lines.find((l) => l.includes("description:"));
-		const critLine = lines.find((l) => l.includes("criteria:"));
 		assert.ok(descLine && descLine.includes(longDesc), `description should be on one line, got: ${descLine}`);
-		assert.ok(critLine && critLine.includes(longCrit), `criteria should be on one line, got: ${critLine}`);
 	});
 });
 
