@@ -51,11 +51,11 @@ describe("buildLocations", () => {
 		expect(buildLocations(fm)).toEqual({ spec: ["https://example.com/spec"] });
 	});
 
-	it("excludes URL-only process locations", () => {
+	it("includes URL-only process locations", () => {
 		const fm = {
 			process: { P: { location: "https://example.com/doc" } },
 		};
-		expect(buildLocations(fm)).toEqual({});
+		expect(buildLocations(fm)).toEqual({ P: ["https://example.com/doc"] });
 	});
 
 	it("includes file-path process locations", () => {
@@ -63,11 +63,11 @@ describe("buildLocations", () => {
 		expect(buildLocations(fm)).toEqual({ P: ["child.pfdsl"] });
 	});
 
-	it("omits process entry when subflow is absent and location is URL", () => {
+	it("prefers location over subflow when both are present", () => {
 		const fm = {
-			process: { P: { location: "https://x.com/" } },
+			process: { P: { location: "https://x.com/", subflow: "child.pfdsl" } },
 		};
-		expect(buildLocations(fm)).toEqual({});
+		expect(buildLocations(fm)).toEqual({ P: ["https://x.com/"] });
 	});
 });
 
