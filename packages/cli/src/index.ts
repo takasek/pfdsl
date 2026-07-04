@@ -495,7 +495,7 @@ function computeReadyIds(src: string): {
 	if (hasErrors(diagnostics))
 		return { readyIds: [], isRoadmap: false, warnings: [] };
 
-	const warnings = diagnostics.filter((d) => d.severity === "warning");
+	const warnings = diagnostics.filter((d) => d.code === "W006");
 	const pfdType = frontmatter?.type;
 	const isRoadmap = pfdType === undefined || pfdType === "roadmap";
 	if (!isRoadmap) return { readyIds: [], isRoadmap: false, warnings };
@@ -524,10 +524,8 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 		);
 	}
 
-	const warnings = diagnostics.filter((d) => d.severity === "warning");
-	const warnText = warnings.length
-		? `${warnings.map((d) => formatDiagnostic(d, file)).join("\n")}\n`
-		: "";
+	const warnings = diagnostics.filter((d) => d.code === "W006");
+	const warnText = warnings.length ? diagText(warnings, file) : "";
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 
@@ -659,7 +657,7 @@ export function runStatusSet(
 	}
 
 	// Snapshot ready set before mutation (roadmap only)
-	const { readyIds: beforeIds, isRoadmap, warnings } = computeReadyIds(src);
+	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
 	const beforeSet = new Set(beforeIds);
 
 	// Replace "    status: <old>" under this artifact, or insert it after its header
@@ -680,14 +678,15 @@ export function runStatusSet(
 		src.slice(0, fmBodyStart) + newFm + src.slice(fmBodyStart + fmBlock.length);
 	writeFileSync(file, newSrc, "utf-8");
 
-	// Compute newly-ready processes (roadmap only)
-	const newlyReady: string[] = isRoadmap
-		? computeReadyIds(newSrc).readyIds.filter((id) => !beforeSet.has(id))
+	// Recompute against the written file (roadmap only) so newly-ready processes
+	// and warnings (e.g. W006) reflect post-mutation state, not the pre-write snapshot.
+	const after = isRoadmap ? computeReadyIds(newSrc) : undefined;
+	const newlyReady: string[] = after
+		? after.readyIds.filter((id) => !beforeSet.has(id))
 		: [];
+	const warnings = after?.warnings ?? [];
 
-	const warnText = warnings.length
-		? `${warnings.map((d) => formatDiagnostic(d, file)).join("\n")}\n`
-		: "";
+	const warnText = warnings.length ? diagText(warnings, file) : "";
 
 	if (opts.json) {
 		const payload: Record<string, unknown> = { ok: true, newlyReady };
@@ -999,16 +998,17 @@ Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
 Options:
   --best  highlight the process that unblocks the most downstream work
-  --json  output as JSON ({ ok, ready: [{id, label, inputs}], best? })
+  --json  output as JSON ({ ok, ready: [{id, label, inputs}], best?, warnings? })
 `;
 
 const HELP_STATUS_SET = `usage: pfdsl status-set <file> <artifact-id> <status> [--json]
 
 Set the status of an artifact in a .pfdsl file, rewriting it in place.
 For roadmap files, reports which processes became newly ready after the change.
+Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
   <status>  one of: todo | wip | done | waiting | suspended
-  --json    emit JSON ({ ok, newlyReady: string[] }) instead of text
+  --json    emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
 
 Exit codes:
   0  success
@@ -1072,7 +1072,7 @@ Commands:
   status-set <file> <artifact-id> <status> [--json]
                            Set artifact status (todo|wip|done|waiting|suspended) in place
                            Roadmap files: prints newly-ready processes after the change
-                           --json    output as JSON ({ ok, newlyReady: string[] })
+                           --json    output as JSON ({ ok, newlyReady: string[], warnings? })
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON

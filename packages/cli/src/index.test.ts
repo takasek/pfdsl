@@ -888,6 +888,16 @@ describe("ready", () => {
 		expect(parsed.warnings?.[0]?.code).toBe("W006");
 	});
 
+	it("does not surface non-W006 warnings (e.g. W005) as ready warnings (#308)", async () => {
+		const f = withStatus(
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n  spec: {}\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f, "--json"]);
+		const parsed = JSON.parse(r.stdout);
+		expect(r.stderr).not.toContain("W005");
+		expect(parsed.warnings).toBeUndefined();
+	});
+
 	it("missing file returns exit 1", async () => {
 		const r = await run(["ready", join(dir, "nonexistent.pfdsl")]);
 		expect(r.exitCode).toBe(1);
@@ -1018,6 +1028,18 @@ req >> design -> spec
 		const r = await run(["status-set", f, "req", "done"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toContain("W006");
+	});
+
+	it("does not surface non-W006 warnings (e.g. W005) as status-set warnings (#308)", async () => {
+		const f = join(dir, "status-set-w005.pfdsl");
+		writeFileSync(
+			f,
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  spec: {}\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status-set", f, "req", "done", "--json"]);
+		const parsed = JSON.parse(r.stdout);
+		expect(r.stderr).not.toContain("W005");
+		expect(parsed.warnings).toBeUndefined();
 	});
 
 	// newly-ready reporting (roadmap files only)
