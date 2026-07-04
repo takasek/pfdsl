@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
 	parseIssueProcesses,
+	buildProcessOutputs,
 	computeFindings,
 	applyFixes,
 	applyClosedInFlowFixes,
@@ -92,6 +93,35 @@ describe("parseIssueProcesses", () => {
 		assert.equal(result.length, 1);
 		assert.equal(result[0].id, "i40_i41_do_work");
 		assert.deepEqual(result[0].issueNumbers, [40, 41]);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// buildProcessOutputs
+// ---------------------------------------------------------------------------
+
+describe("buildProcessOutputs", () => {
+	it("maps process id to single output", () => {
+		const body = "a >> P -> b\n";
+		const result = buildProcessOutputs(body);
+		assert.deepEqual(result.get("P"), ["b"]);
+	});
+
+	it("maps process id to multiple outputs from a list edge", () => {
+		const body = "a >> P -> [b, c]\n";
+		const result = buildProcessOutputs(body);
+		assert.deepEqual(result.get("P"), ["b", "c"]);
+	});
+
+	it("merges outputs across multiple edge lines for the same process", () => {
+		const body = "a >> P -> b\nx >> P -> c\n";
+		const result = buildProcessOutputs(body);
+		assert.deepEqual(result.get("P"), ["b", "c"]);
+	});
+
+	it("returns an empty map for a body with no edges", () => {
+		const result = buildProcessOutputs("not an edge line\n");
+		assert.equal(result.size, 0);
 	});
 });
 

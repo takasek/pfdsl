@@ -223,6 +223,23 @@ export function applyFixes(doc, findings, issuesByNumber) {
 }
 
 /**
+ * Maps each process id appearing in a flow edge to the list of artifact ids
+ * it produces (RHS of `>>`), merged across all edge lines mentioning it.
+ * @param {string} body
+ * @returns {Map<string, string[]>}
+ */
+export function buildProcessOutputs(body) {
+	const result = new Map();
+	for (const line of body.split("\n")) {
+		const parsed = parseEdgeLine(line);
+		if (!parsed) continue;
+		const existing = result.get(parsed.process) ?? [];
+		result.set(parsed.process, [...existing, ...parsed.outputs]);
+	}
+	return result;
+}
+
+/**
  * Parses a flow edge line and returns its parts, or null if not an edge.
  * Edge forms:
  *   inputs >> PROCESS -> output
