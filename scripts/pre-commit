@@ -16,6 +16,14 @@ if git diff --cached --name-only | grep -q '\.pfdsl$'; then
   fi
 fi
 
+# When .md files are staged, reject mid-sentence line breaks (see #302).
+staged_md=$(git diff --cached --name-only --diff-filter=d -- '*.md')
+if [ -n "$staged_md" ]; then
+  if ! node scripts/check-md-linebreaks.mjs $staged_md; then
+    exit 1
+  fi
+fi
+
 # Shared shape for "regenerate/verify derived output, fail if stale" checks.
 # require_dist: space-separated dist files that must exist first, or "-" if
 # none needed (gen-skill is dist-free). check_cmd: a command that itself
