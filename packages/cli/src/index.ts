@@ -487,24 +487,31 @@ function computeReadyIdsCore(
 function computeReadyIds(src: string): {
 	readyIds: string[];
 	isRoadmap: boolean;
+	warnings: Diagnostic[];
 } {
-	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
-	if (hasErrors(diagnostics)) return { readyIds: [], isRoadmap: false };
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
+		readyGate: true,
+	});
+	if (hasErrors(diagnostics))
+		return { readyIds: [], isRoadmap: false, warnings: [] };
 
+	const warnings = diagnostics.filter((d) => d.severity === "warning");
 	const pfdType = frontmatter?.type;
 	const isRoadmap = pfdType === undefined || pfdType === "roadmap";
-	if (!isRoadmap) return { readyIds: [], isRoadmap: false };
+	if (!isRoadmap) return { readyIds: [], isRoadmap: false, warnings };
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 	const { readyIds } = computeReadyIdsCore(edges, nodeKinds, artifactMeta);
-	return { readyIds, isRoadmap: true };
+	return { readyIds, isRoadmap: true, warnings };
 }
 
 export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 
-	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
+		readyGate: true,
+	});
 	const earlyFail = failIfErrors(diagnostics, file);
 	if (earlyFail) return earlyFail;
 
@@ -516,6 +523,11 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 			2,
 		);
 	}
+
+	const warnings = diagnostics.filter((d) => d.severity === "warning");
+	const warnText = warnings.length
+		? `${warnings.map((d) => formatDiagnostic(d, file)).join("\n")}\n`
+		: "";
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 
@@ -592,11 +604,12 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	if (opts.json) {
 		const payload: Record<string, unknown> = { ok: true, ready: readyItems };
 		if (opts.best && bestItem) payload.best = bestItem;
-		return ok(`${JSON.stringify(payload)}\n`);
+		if (warnings.length) payload.warnings = warnings;
+		return ok(`${JSON.stringify(payload)}\n`, warnText);
 	}
 
 	if (readyItems.length === 0) {
-		return ok("No ready processes. Check artifact statuses.\n");
+		return ok("No ready processes. Check artifact statuses.\n", warnText);
 	}
 
 	const lines: string[] = [`Ready processes (${readyItems.length}):`];
@@ -613,7 +626,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 			"* = recommended next (removes the last blocker for the most downstream processes)",
 		);
 	}
-	return ok(`${lines.join("\n")}\n`);
+	return ok(`${lines.join("\n")}\n`, warnText);
 }
 
 export interface StatusSetOptions {
@@ -646,7 +659,7 @@ export function runStatusSet(
 	}
 
 	// Snapshot ready set before mutation (roadmap only)
-	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
+	const { readyIds: beforeIds, isRoadmap, warnings } = computeReadyIds(src);
 	const beforeSet = new Set(beforeIds);
 
 	// Replace "    status: <old>" under this artifact, or insert it after its header
@@ -672,13 +685,19 @@ export function runStatusSet(
 		? computeReadyIds(newSrc).readyIds.filter((id) => !beforeSet.has(id))
 		: [];
 
+	const warnText = warnings.length
+		? `${warnings.map((d) => formatDiagnostic(d, file)).join("\n")}\n`
+		: "";
+
 	if (opts.json) {
-		return ok(`${JSON.stringify({ ok: true, newlyReady })}\n`);
+		const payload: Record<string, unknown> = { ok: true, newlyReady };
+		if (warnings.length) payload.warnings = warnings;
+		return ok(`${JSON.stringify(payload)}\n`, warnText);
 	}
 	if (newlyReady.length > 0) {
-		return ok(`newly ready: ${newlyReady.join(", ")}\n`);
+		return ok(`newly ready: ${newlyReady.join(", ")}\n`, warnText);
 	}
-	return ok("");
+	return ok("", warnText);
 }
 
 export interface AuditSyncOptions {

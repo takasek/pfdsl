@@ -868,6 +868,26 @@ describe("ready", () => {
 		expect(r.exitCode).toBe(0);
 	});
 
+	it("warns (W006) on stderr when type: is omitted, but still succeeds (#308)", async () => {
+		const r = await run(["ready", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("W006");
+	});
+
+	it("no W006 warning when type: roadmap is explicit", async () => {
+		const f = withStatus(
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["ready", f]);
+		expect(r.stderr).not.toContain("W006");
+	});
+
+	it("--json includes W006 in warnings when type: is omitted", async () => {
+		const r = await run(["ready", join(dir, "valid.pfdsl"), "--json"]);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.warnings?.[0]?.code).toBe("W006");
+	});
+
 	it("missing file returns exit 1", async () => {
 		const r = await run(["ready", join(dir, "nonexistent.pfdsl")]);
 		expect(r.exitCode).toBe(1);
@@ -990,6 +1010,14 @@ req >> design -> spec
 		const r = await run(["status-set", "--help"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("status-set");
+	});
+
+	it("warns (W006) on stderr when type: is omitted (#308)", async () => {
+		const f = join(dir, "status-set-no-type.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["status-set", f, "req", "done"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("W006");
 	});
 
 	// newly-ready reporting (roadmap files only)
