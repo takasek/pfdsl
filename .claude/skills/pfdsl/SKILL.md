@@ -155,4 +155,4 @@ Sets the status in place and validates. Manual fallback: edit `status:` in the f
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
 | PFD のレビュー・監査 | `references/review-prompts.md`（A/B カタログ。書くルールは本文、問い詰めはこちら） |
 
-`references/spec.md` は full spec v0.0.11（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
+`references/spec.md` は full spec v0.0.12（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
