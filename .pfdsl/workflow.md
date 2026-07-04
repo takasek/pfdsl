@@ -126,6 +126,7 @@ pfd-retro 実行ごとに1行追記する（形式: 日付 — 対象範囲 — 
 
 - 2026-07-03 — pfd-cycle スキル群（pfd-ops / pfd-retro / pfd-ecosystem / commands / architecture.md）設計レビュー — findings 15件 + meta 1件
 - 2026-07-03 — 第2ラウンド監査（片肺更新スキャン・L4 滞留昇格・列挙ドリフト。対象: 第1ラウンド反映後の全体） — findings 8件
+- 2026-07-04 — #297 V025 二重割当修正サイクル — findings 2件（i300 除外リスト欠落・除外リスト列挙ドリフト対策ルール追加）
 
 ## 終端ゲートの根拠
 
