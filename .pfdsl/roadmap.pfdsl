@@ -335,6 +335,34 @@ artifact:
     status: done
     criteria: "check --audit が同 group 消費者非対称の hint 行を出力し、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/292
+  i297_recode:
+    label: "V025 二重割当解消 (#297)"
+    description: "subflow 境界違反系に専用コードを再採番し group 循環 V025 との衝突を解消する。#299 レジストリ固定の前提"
+    status: todo
+    criteria: "subflow 境界違反と group 循環が異なる診断コードを発行し、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/297
+    updated_at: 2026-07-04T05:44:06Z
+  i298_boundary_feedback:
+    label: "open input の feedback 除外 (#298)"
+    description: "spec v0.0.11 レビュー F1。open input 定義を terminal と対称にし、feedback ループを跨ぐ subflow 化を可能にする。spec v0.0.12 統合を含む"
+    status: wip
+    criteria: "生成元なし・feedback のみ消費の子 artifact が境界照合から除外され、spec v0.0.12 に定義変更が統合済み、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/298
+    updated_at: 2026-07-04T05:43:00Z
+  i299_diag_registry:
+    label: "診断コードレジストリ + CI 突合 (#299)"
+    description: "spec §16 を全診断コード（P/V/W）の表に改め、check --json の発行コード集合との一致を CI で検査する。F2/F8/F15/F17/F20"
+    status: todo
+    criteria: "spec §16 が全コード表を持ち、実装コード集合との差分を CI が検出する"
+    location: https://github.com/takasek/pfdsl/issues/299
+    updated_at: 2026-07-04T05:43:15Z
+  i300_spec_editorial:
+    label: "spec 編集整備パス (#300)"
+    description: "v0.0.11 レビューの残余 findings（F3-F22。F1 は #298、§16 表化は #299）を spec に反映する"
+    status: todo
+    criteria: "対象 findings が spec に反映され check-docs / gen-skill が差分なしで通過"
+    location: https://github.com/takasek/pfdsl/issues/300
+    updated_at: 2026-07-04T05:43:40Z
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -446,6 +474,15 @@ process:
   integrate_spec_v0011:
     label: 仕様書 v0.0.11統合
     description: "waiting/suspended status 分割・type フィールド・W002 source artifact 免除を spec 本文に統合する"
+  recode_boundary_diags:
+    label: 境界診断コード再採番
+  implement_boundary_feedback:
+    label: open input feedback 除外実装
+    description: "computeOpenInputs の修正と spec v0.0.12 統合（proposal 経由）。発見経緯は docs/adr/0020-spec-stress-testing/"
+  implement_diag_registry:
+    label: 診断コードレジストリ整備
+  revise_spec_editorial:
+    label: spec 編集整備
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -544,3 +581,11 @@ cli_tool_v0014 >> implement_symmetry_hint -> symmetry_hint
 
 [i268_type_field, i272_w002_hierarchy, i273_blocked_by] >> integrate_spec_v0011 -> spec_v0011
 spec_v0010 >>? integrate_spec_v0011
+
+multifile_toolchain >> recode_boundary_diags -> i297_recode
+
+[spec_v0011, multifile_toolchain] >> implement_boundary_feedback -> i298_boundary_feedback
+
+[i297_recode, spec_v0011] >> implement_diag_registry -> i299_diag_registry
+
+i298_boundary_feedback >> revise_spec_editorial -> i300_spec_editorial
