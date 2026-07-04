@@ -162,7 +162,8 @@ export interface SubflowBoundaryContext {
 
 /**
  * Validate the boundary between a parent process and its subflow child (§15.11).
- * Returns V025 diagnostics for any violations.
+ * Returns V030 (dangling key/value), V032 (non-injective), V033 (side mismatch),
+ * or V034 (set mismatch) diagnostics for any violations.
  */
 export function validateSubflowBoundary(
 	ctx: SubflowBoundaryContext,
@@ -187,7 +188,7 @@ export function validateSubflowBoundary(
 			hasC1orC2Error = true;
 			diagnostics.push({
 				severity: "error",
-				code: "V025",
+				code: "V030",
 				message: `boundary key '${key}' on process '${processId}' is not a parent boundary artifact`,
 				range: zeroRange(),
 			});
@@ -200,7 +201,7 @@ export function validateSubflowBoundary(
 			hasC1orC2Error = true;
 			diagnostics.push({
 				severity: "error",
-				code: "V025",
+				code: "V030",
 				message: `boundary value '${val}' on process '${processId}' is not a child boundary artifact`,
 				range: zeroRange(),
 			});
@@ -222,7 +223,7 @@ export function validateSubflowBoundary(
 		if (childToParent.has(c)) {
 			diagnostics.push({
 				severity: "error",
-				code: "V025",
+				code: "V032",
 				message: `boundary map for process '${processId}' is not injective: multiple parent IDs map to child '${c}'`,
 				range: zeroRange(),
 			});
@@ -237,7 +238,7 @@ export function validateSubflowBoundary(
 		if (childTerminals.has(c) && !childOpenInputs.has(c)) {
 			diagnostics.push({
 				severity: "error",
-				code: "V025",
+				code: "V033",
 				message: `boundary maps input '${p}' to terminal '${c}' (side mismatch) on process '${processId}'`,
 				range: zeroRange(),
 			});
@@ -248,7 +249,7 @@ export function validateSubflowBoundary(
 		if (childOpenInputs.has(c) && !childTerminals.has(c)) {
 			diagnostics.push({
 				severity: "error",
-				code: "V025",
+				code: "V033",
 				message: `boundary maps output '${p}' to open input '${c}' (side mismatch) on process '${processId}'`,
 				range: zeroRange(),
 			});
@@ -265,7 +266,7 @@ export function validateSubflowBoundary(
 	if (!setsEqual(mappedInputs, childOpenInputs)) {
 		diagnostics.push({
 			severity: "error",
-			code: "V025",
+			code: "V034",
 			message: `subflow boundary mismatch on process '${processId}': parent inputs ${JSON.stringify([...mappedInputs].sort())} ≠ child open inputs ${JSON.stringify([...childOpenInputs].sort())}`,
 			range: zeroRange(),
 		});
@@ -278,7 +279,7 @@ export function validateSubflowBoundary(
 	if (!setsEqual(mappedOutputs, childTerminals)) {
 		diagnostics.push({
 			severity: "error",
-			code: "V025",
+			code: "V034",
 			message: `subflow boundary mismatch on process '${processId}': parent outputs ${JSON.stringify([...mappedOutputs].sort())} ≠ child terminals ${JSON.stringify([...childTerminals].sort())}`,
 			range: zeroRange(),
 		});

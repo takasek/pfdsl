@@ -338,7 +338,7 @@ artifact:
   i297_recode:
     label: "V025 二重割当解消 (#297)"
     description: "subflow 境界違反系に専用コードを再採番し group 循環 V025 との衝突を解消する。#299 レジストリ固定の前提"
-    status: todo
+    status: wip
     criteria: "subflow 境界違反と group 循環が異なる診断コードを発行し、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/297
     updated_at: 2026-07-04T05:44:06Z
@@ -352,7 +352,7 @@ artifact:
     tags: [ "priority:high" ]
   i300_spec_editorial:
     label: "spec 編集整備パス (#300)"
-    description: "v0.0.11 レビューの残余 findings（F3-F22。F1 は #298、§16 表化は #299）と extends プローブ（#304）の findings を spec に反映する"
+    description: "v0.0.11 レビューの残余 findings（F3-F22。F1 は #298、F2 は #297、§16 表化は #299）と extends プローブ（#304）の findings を spec に反映する"
     status: todo
     criteria: "対象 findings が spec に反映され check-docs / gen-skill が差分なしで通過"
     location: https://github.com/takasek/pfdsl/issues/300

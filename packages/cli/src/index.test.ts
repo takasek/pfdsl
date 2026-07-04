@@ -690,14 +690,14 @@ describe("multifile check — subflow", () => {
 		}
 	});
 
-	it("boundary mismatch → exit 1 with V025", async () => {
+	it("boundary mismatch → exit 1 with V034", async () => {
 		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-subflow-"));
 		try {
 			writeFileSync(join(d, "parent.pfdsl"), parentValid);
 			writeFileSync(join(d, "child.pfdsl"), childMismatch);
 			const r = await run(["check", join(d, "parent.pfdsl")]);
 			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toMatch(/V025/);
+			expect(r.stderr).toMatch(/V034/);
 		} finally {
 			rmSync(d, { recursive: true, force: true });
 		}
