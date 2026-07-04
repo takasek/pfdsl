@@ -369,6 +369,11 @@ artifact:
     status: done
     criteria: "subflow 境界違反と group 循環が異なる診断コードを発行し、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/297
+  i310_location_on_process:
+    label: "location: を Process にも許可 (#310)"
+    description: "roadmap.pfdsl の issue/PR 追跡URLが Artifact.location にしか置けない制約を緩和する。spec §2.3/§15.8/§16/§17.5 の V013 相当規則を撤廃し checker/型/テスト/graphviz-exporter/vscode-extension/サンプルを更新する"
+    status: wip
+    criteria: "location が process に指定できチェッカーがエラーを出さない。spec §2.3/§15.8/§16/§17.5 に反映済み。graphviz-exporter/vscode-extension が process.location を artifact 同様に扱う。check-docs/gen-skill/gen-samples が差分なしで通過"
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -492,6 +497,10 @@ process:
   probe_extends_spec:
     label: extends 意味論プローブ
 
+  relax_location_on_process:
+    label: location on process 実装
+    location: https://github.com/takasek/pfdsl/issues/310
+
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
 
@@ -599,3 +608,5 @@ multifile_toolchain >> recode_boundary_diags -> recode
 [spec_v0011, multifile_toolchain] >> probe_extends_spec -> i304_extends_probe
 
 [boundary_feedback, i304_extends_probe] >> revise_spec_editorial -> i300_spec_editorial
+
+spec_v0011 >> relax_location_on_process -> i310_location_on_process
