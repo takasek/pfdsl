@@ -475,20 +475,21 @@ describe("applyClosedInFlowFixes", () => {
   cli_tool:
     label: CLI
     status: done
-  i16_def_jump:
+  def_jump:
     label: def-jump feature
     status: todo
 process:
-  implement_def_jump:
+  i16_implement_def_jump:
     label: Implement def-jump
 `;
-		const body = `\ncli_tool >> implement_def_jump -> i16_def_jump\n`;
+		const body = `\ncli_tool >> i16_implement_def_jump -> def_jump\n`;
 		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "closed_in_flow",
 				issueNumber: 16,
-				artifactId: "i16_def_jump",
+				processId: "i16_implement_def_jump",
+				artifactId: "def_jump",
 				detail: "issue is closed",
 				fixVia: "flow",
 				hasDownstream: false,
@@ -496,13 +497,10 @@ process:
 		];
 		const newBody = applyClosedInFlowFixes(doc, body, findings);
 		const fm = doc.toJS();
-		// artifact removed from frontmatter
-		assert.equal(fm.artifact.i16_def_jump, undefined, "artifact should be removed");
-		// sole-output process removed from frontmatter
-		assert.equal(fm.process?.implement_def_jump, undefined, "sole-output process should be removed");
-		// edge line removed from body
-		assert.ok(!newBody.includes("implement_def_jump"), "edge should be removed from body");
-		assert.ok(!newBody.includes("i16_def_jump"), "artifact should not appear in body");
+		assert.equal(fm.artifact.def_jump, undefined, "artifact should be removed");
+		assert.equal(fm.process?.i16_implement_def_jump, undefined, "sole-output process should be removed");
+		assert.ok(!newBody.includes("i16_implement_def_jump"), "edge should be removed from body");
+		assert.ok(!newBody.includes("def_jump"), "artifact should not appear in body");
 	});
 
 	// Case A2: terminal artifact, multi-output process → remove artifact from list, keep process and edge
@@ -511,23 +509,24 @@ process:
   spec_v006:
     label: Spec v0.0.6
     status: done
-  i5_hierarchy_spec:
+  hierarchy_spec:
     label: Hierarchy spec
     status: todo
   multifile_policy:
     label: Policy
     status: todo
 process:
-  draft_multifile_specs:
+  i5_draft_multifile_specs:
     label: Draft multi-file specs
 `;
-		const body = `\nspec_v006 >> draft_multifile_specs -> [i5_hierarchy_spec, multifile_policy]\n`;
+		const body = `\nspec_v006 >> i5_draft_multifile_specs -> [hierarchy_spec, multifile_policy]\n`;
 		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "closed_in_flow",
 				issueNumber: 5,
-				artifactId: "i5_hierarchy_spec",
+				processId: "i5_draft_multifile_specs",
+				artifactId: "hierarchy_spec",
 				detail: "issue is closed",
 				fixVia: "flow",
 				hasDownstream: false,
@@ -535,108 +534,34 @@ process:
 		];
 		const newBody = applyClosedInFlowFixes(doc, body, findings);
 		const fm = doc.toJS();
-		// closed artifact removed from frontmatter
-		assert.equal(fm.artifact.i5_hierarchy_spec, undefined, "closed artifact should be removed");
-		// multi-output process kept
-		assert.ok(fm.process?.draft_multifile_specs, "multi-output process should be kept");
-		// other artifact kept
+		assert.equal(fm.artifact.hierarchy_spec, undefined, "closed artifact should be removed");
+		assert.ok(fm.process?.i5_draft_multifile_specs, "multi-output process should be kept");
 		assert.ok(fm.artifact.multifile_policy, "other output should remain in frontmatter");
-		// body still has the edge but without the closed artifact
-		assert.ok(!newBody.includes("i5_hierarchy_spec"), "closed artifact should not appear in body");
+		assert.ok(!newBody.includes("hierarchy_spec"), "closed artifact should not appear in body");
 		assert.ok(newBody.includes("multifile_policy"), "other output should remain in body");
-		assert.ok(newBody.includes("draft_multifile_specs"), "process should remain in body");
+		assert.ok(newBody.includes("i5_draft_multifile_specs"), "process should remain in body");
 	});
-
-
-	it("B: no mid-sentence line breaks: long description survives demote with lineWidth:0", () => {
-		const longDesc = "これはとても長い説明文で、句読点のない位置で折り返されてはいけません。文の途中で改行が入ると意味が変わってしまうため注意が必要です。";
-		const yamlStr = `artifact:
-  cli_tool:
-    label: CLI
-    status: done
-  i4_foo:
-    label: Foo
-    description: ${longDesc}
-    status: todo
-process:
-  use_foo:
-    label: Use foo
-`;
-		const body = `\ncli_tool >> make_foo -> i4_foo\ni4_foo >> use_foo -> cli_tool\n`;
-		const doc = parseDocument(yamlStr);
-		const findings = [
-			{
-				type: "closed_in_flow",
-				issueNumber: 4,
-				artifactId: "i4_foo",
-				detail: "issue is closed",
-				fixVia: "flow",
-				hasDownstream: true,
-			},
-		];
-		applyClosedInFlowFixes(doc, body, findings);
-		const out = doc.toString({ lineWidth: 0 });
-		const lines = out.split("\n");
-		const descLine = lines.find((l) => l.includes("description:"));
-		assert.ok(descLine && descLine.includes(longDesc), `description should be on one line after demote, got: ${descLine}`);
-	});
-
-		it("B: description containing ' #' survives write→re-parse round-trip without truncation", () => {
-			const yaml = `artifact:
-  cli_tool:
-    label: CLI
-    status: done
-  i4_lint_checker:
-    label: Lint checker
-    description: lint 候補の完全リストは issue #4 が一次情報
-    status: todo
-process:
-  use_lint:
-    label: Use lint
-`;
-			const body = `\ncli_tool >> run_lint -> i4_lint_checker\ni4_lint_checker >> use_lint -> cli_tool\n`;
-			const doc = parseDocument(yaml);
-			const findings = [
-				{
-					type: "closed_in_flow",
-					issueNumber: 4,
-					artifactId: "i4_lint_checker",
-					detail: "issue is closed",
-					fixVia: "flow",
-					hasDownstream: true,
-				},
-			];
-			applyClosedInFlowFixes(doc, body, findings);
-			// Re-parse the emitted YAML to simulate the next file read
-			const emitted = doc.toString();
-			const reparsed = parseDocument(emitted).toJS();
-			const desc = reparsed.artifact?.lint_checker?.description;
-			assert.equal(
-				desc,
-				"lint 候補の完全リストは issue #4 が一次情報",
-				`description was truncated at ' #': got "${desc}"`,
-			);
-		});
 
 	it("closed_not_planned terminal: Case A removal (same as closed_in_flow terminal)", () => {
 		const yaml = `artifact:
   cli_tool:
     label: CLI
     status: done
-  i16_def_jump:
+  def_jump:
     label: def-jump feature
     status: todo
 process:
-  implement_def_jump:
+  i16_implement_def_jump:
     label: Implement def-jump
 `;
-		const body = `\ncli_tool >> implement_def_jump -> i16_def_jump\n`;
+		const body = `\ncli_tool >> i16_implement_def_jump -> def_jump\n`;
 		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "closed_not_planned",
 				issueNumber: 16,
-				artifactId: "i16_def_jump",
+				processId: "i16_implement_def_jump",
+				artifactId: "def_jump",
 				detail: "issue closed as not planned",
 				fixVia: "flow",
 				hasDownstream: false,
@@ -644,36 +569,37 @@ process:
 		];
 		const newBody = applyClosedInFlowFixes(doc, body, findings);
 		const fm = doc.toJS();
-		assert.equal(fm.artifact.i16_def_jump, undefined, "artifact should be removed");
-		assert.equal(fm.process?.implement_def_jump, undefined, "sole-output process should be removed");
-		assert.ok(!newBody.includes("implement_def_jump"), "edge should be removed from body");
+		assert.equal(fm.artifact.def_jump, undefined, "artifact should be removed");
+		assert.equal(fm.process?.i16_implement_def_jump, undefined, "sole-output process should be removed");
+		assert.ok(!newBody.includes("i16_implement_def_jump"), "edge should be removed from body");
 	});
 
-	// Case B: non-terminal, not done → demote: strip iN_ prefix, set status done, update body refs
-	it("B: non-terminal not-done — strips prefix, sets done, updates body refs", () => {
+	// Case B: non-terminal — only clears tags/updated_at. No rename, no status forcing.
+	it("B: non-terminal — clears tags/updated_at on the process, leaves ids and status untouched", () => {
 		const yaml = `artifact:
   cli_tool:
     label: CLI
     status: done
-  i16_def_jump:
+  def_jump:
     label: def-jump feature
     status: todo
+process:
+  i16_implement_def_jump:
+    label: Implement def-jump
     updated_at: "2026-01-01T00:00:00Z"
     tags:
       - priority:high
-process:
-  implement_def_jump:
-    label: Implement def-jump
   use_def_jump:
     label: Use def-jump
 `;
-		const body = `\ncli_tool >> implement_def_jump -> i16_def_jump\ni16_def_jump >> use_def_jump -> cli_tool\n`;
+		const body = `\ncli_tool >> i16_implement_def_jump -> def_jump\ndef_jump >> use_def_jump -> cli_tool\n`;
 		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "closed_in_flow",
 				issueNumber: 16,
-				artifactId: "i16_def_jump",
+				processId: "i16_implement_def_jump",
+				artifactId: "def_jump",
 				detail: "issue is closed",
 				fixVia: "flow",
 				hasDownstream: true,
@@ -681,17 +607,51 @@ process:
 		];
 		const newBody = applyClosedInFlowFixes(doc, body, findings);
 		const fm = doc.toJS();
-		// old id gone
-		assert.equal(fm.artifact.i16_def_jump, undefined, "old prefixed id should be removed");
-		// new id present with status done
-		assert.ok(fm.artifact.def_jump, "demoted artifact should exist");
-		assert.equal(fm.artifact.def_jump.status, "done");
-		// priority drift fields removed
-		assert.equal(fm.artifact.def_jump.updated_at, undefined, "updated_at should be removed");
-		assert.equal(fm.artifact.def_jump.tags, undefined, "tags should be removed");
-		// body refs updated
-		assert.ok(!newBody.includes("i16_def_jump"), "old id should not appear in body");
-		assert.ok(newBody.includes("def_jump"), "new id should appear in body");
+		// process id unchanged (permanent prefix)
+		assert.ok(fm.process.i16_implement_def_jump, "process id must not be renamed");
+		// issue-tracking fields cleared
+		assert.equal(fm.process.i16_implement_def_jump.updated_at, undefined, "updated_at should be removed");
+		assert.equal(fm.process.i16_implement_def_jump.tags, undefined, "tags should be removed");
+		// artifact untouched: id unchanged, status NOT forced
+		assert.ok(fm.artifact.def_jump, "artifact id must not be renamed");
+		assert.equal(fm.artifact.def_jump.status, "todo", "status must not be force-set — it's already correct from the completion commit");
+		// body unchanged (no id renamed anywhere)
+		assert.equal(newBody.trim(), body.trim());
+	});
+
+	it("B: description containing ' #' is untouched (no node-reuse rewrite needed since ids don't change)", () => {
+		const yaml = `artifact:
+  cli_tool:
+    label: CLI
+    status: done
+  lint_checker:
+    label: Lint checker
+    description: "lint 候補の完全リストは issue #4 が一次情報"
+    status: todo
+process:
+  i4_run_lint:
+    label: Run lint
+  use_lint:
+    label: Use lint
+`;
+		const body = `\ncli_tool >> i4_run_lint -> lint_checker\nlint_checker >> use_lint -> cli_tool\n`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "closed_in_flow",
+				issueNumber: 4,
+				processId: "i4_run_lint",
+				artifactId: "lint_checker",
+				detail: "issue is closed",
+				fixVia: "flow",
+				hasDownstream: true,
+			},
+		];
+		applyClosedInFlowFixes(doc, body, findings);
+		const emitted = doc.toString();
+		const reparsed = parseDocument(emitted).toJS();
+		const desc = reparsed.artifact?.lint_checker?.description;
+		assert.equal(desc, "lint 候補の完全リストは issue #4 が一次情報");
 	});
 });
 

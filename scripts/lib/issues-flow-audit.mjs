@@ -270,22 +270,6 @@ function parseEdgeLine(line) {
 }
 
 /**
- * Applies closed_in_flow fixes to both the yaml Document (in place) and the flow body string.
- * Returns the (possibly modified) body string.
- *
- * Two cases per finding:
- *   A. hasDownstream === false (terminal): remove artifact from frontmatter. If the producing
- *      process has no other outputs, remove the process too and drop the edge line. If the
- *      process has other outputs, remove only this artifact from the output list in the edge.
- *   B. hasDownstream === true and status !== done (demote): strip iN_ prefix → new plain id,
- *      set status: done, remove updated_at and tags. Update all body references.
- *
- * @param {import("yaml").Document} doc
- * @param {string} body
- * @param {{ type: string, artifactId: string, hasDownstream?: boolean }[]} findings
- * @returns {string} new body string
- */
-/**
  * Collapses 3+ consecutive newlines to 2 and trims trailing blank lines to a single newline.
  * @param {string} body
  * @returns {string}
@@ -294,6 +278,23 @@ export function normalizeBody(body) {
 	return body.replace(/\n{3,}/g, "\n\n").replace(/\n*$/, "\n");
 }
 
+/**
+ * Applies closed_in_flow fixes to both the yaml Document (in place) and the flow body string.
+ * Returns the (possibly modified) body string.
+ *
+ * Two cases per finding:
+ *   A. hasDownstream === false (terminal): remove artifact from frontmatter. If the producing
+ *      process has no other outputs, remove the process too and drop the edge line. If the
+ *      process has other outputs, remove only this artifact from the output list in the edge.
+ *   B. hasDownstream === true and status !== done (non-terminal): the iN_ prefix on the process
+ *      is permanent, so there is nothing to rename. Just clear the process's issue-tracking
+ *      fields (tags, updated_at) — status is already correct from the completion commit.
+ *
+ * @param {import("yaml").Document} doc
+ * @param {string} body
+ * @param {{ type: string, processId: string, artifactId: string, hasDownstream?: boolean }[]} findings
+ * @returns {string} new body string
+ */
 export function applyClosedInFlowFixes(doc, body, findings) {
 	const closedFindings = findings.filter(
 		(f) => (f.type === "closed_in_flow" || f.type === "closed_not_planned") && f.fixVia === "flow",
@@ -303,16 +304,16 @@ export function applyClosedInFlowFixes(doc, body, findings) {
 	let lines = body.split("\n");
 
 	for (const finding of closedFindings) {
-		const { artifactId, hasDownstream } = finding;
+		const { processId, artifactId, hasDownstream } = finding;
 
 		if (!hasDownstream) {
 			// Case A: terminal — remove artifact from frontmatter
 			doc.deleteIn(["artifact", artifactId]);
 
-			// Find the producing edge line (artifact appears on RHS)
+			// Find the producing edge line for this process
 			const edgeIdx = lines.findIndex((line) => {
 				const parsed = parseEdgeLine(line);
-				return parsed && parsed.outputs.includes(artifactId);
+				return parsed && parsed.process === processId && parsed.outputs.includes(artifactId);
 			});
 
 			if (edgeIdx >= 0) {
@@ -321,7 +322,7 @@ export function applyClosedInFlowFixes(doc, body, findings) {
 
 				if (remainingOutputs.length === 0) {
 					// A1: sole-output process — remove process from frontmatter and drop the edge line
-					doc.deleteIn(["process", parsed.process]);
+					doc.deleteIn(["process", processId]);
 					lines.splice(edgeIdx, 1);
 				} else if (remainingOutputs.length === 1) {
 					// A2: multi-output, now single — rewrite as non-list
@@ -332,44 +333,10 @@ export function applyClosedInFlowFixes(doc, body, findings) {
 				}
 			}
 		} else {
-			// Case B: non-terminal not-done — demote by stripping iN_ prefix
-			const newId = artifactId.replace(/^i\d+_/, "");
-
-			// Reuse the existing YAML Map node to preserve scalar quoting/styling.
-			// Do NOT call toJSON(): it flattens nodes into plain strings, which causes
-			// setIn to re-emit them as PLAIN scalars. A value like
-			//   description: some text #4 more text
-			// is parsed as value="some text" comment="4 more text", and toJSON()
-			// silently discards the comment — the data is lost permanently.
-			const mapNode = doc.getIn(["artifact", artifactId]);
-
-			doc.deleteIn(["artifact", artifactId]);
-			doc.setIn(["artifact", newId], mapNode);
-
-			// After reuse, fix up PLAIN scalars whose original text contained ' #':
-			// the YAML parser stored the ' #...' portion as an inline comment on the
-			// node. Reconstruct the full value and force-quote so the next parse
-			// doesn't truncate it again.
-			if (mapNode && mapNode.items) {
-				for (const pair of mapNode.items) {
-					const val = pair.value;
-					if (val && val.type === "PLAIN" && typeof val.comment === "string" && val.comment.length > 0) {
-						val.value = val.value + " #" + val.comment;
-						val.comment = undefined;
-						val.type = "QUOTE_DOUBLE";
-					}
-				}
-			}
-
-			// Set status to done and remove issue-tracking fields.
-			doc.setIn(["artifact", newId, "status"], "done");
-			doc.deleteIn(["artifact", newId, "tags"]);
-			doc.deleteIn(["artifact", newId, "updated_at"]);
-
-			// Update all references in body
-			// Use word-boundary regex: match artifactId as a whole word token
-			const re = new RegExp(`\\b${artifactId}\\b`, "g");
-			lines = lines.map((line) => line.replace(re, newId));
+			// Case B: non-terminal — iN_ is permanent on the process, nothing to rename.
+			// Only clear the fields that stop being meaningful once the issue is closed.
+			doc.deleteIn(["process", processId, "tags"]);
+			doc.deleteIn(["process", processId, "updated_at"]);
 		}
 	}
 
