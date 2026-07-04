@@ -64,9 +64,12 @@ export function buildLocations(
 	}
 	for (const id of Object.keys(fm.process ?? {})) {
 		const meta = fm.process?.[id];
-		const rawLoc = meta?.location ?? meta?.subflow;
-		const locs = normalizeLocation(rawLoc).filter((l) => !l.includes("://"));
-		if (locs.length > 0) result[id] = locs;
+		if (meta?.location !== undefined) {
+			const locs = normalizeLocation(meta.location);
+			if (locs.length > 0) result[id] = locs;
+		} else if (typeof meta?.subflow === "string" && meta.subflow) {
+			result[id] = [meta.subflow];
+		}
 	}
 	return result;
 }
