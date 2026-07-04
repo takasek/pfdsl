@@ -262,7 +262,7 @@ describe("validateSubflowBoundary", () => {
 		expect(diags).toHaveLength(0);
 	});
 
-	it("G2 — name mismatch without boundary map → V025 error", () => {
+	it("G2 — name mismatch without boundary map → V034 error", () => {
 		const diags = validateSubflowBoundary({
 			processId: "fulfill",
 			parentNormalInputs: new Set(["order"]),
@@ -271,7 +271,7 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["incoming_order"]),
 			childTerminals: new Set(["outgoing_parcel"]),
 		});
-		expect(diags.some((d) => d.code === "V025")).toBe(true);
+		expect(diags.some((d) => d.code === "V034")).toBe(true);
 	});
 
 	it("M0 — happy path with boundary map → no errors", () => {
@@ -286,7 +286,7 @@ describe("validateSubflowBoundary", () => {
 		expect(diags).toHaveLength(0);
 	});
 
-	it("M4 — non-injective boundary map (two parent IDs map to same child ID) → V025", () => {
+	it("M4 — non-injective boundary map (two parent IDs map to same child ID) → V032", () => {
 		// parent inputs {a, b}, parent outputs {}: both a->b and b->b (identity) collide on child 'b'
 		const diags = validateSubflowBoundary({
 			processId: "P",
@@ -296,10 +296,10 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["b", "c"]),
 			childTerminals: new Set([]),
 		});
-		expect(diags.some((d) => d.code === "V025")).toBe(true);
+		expect(diags.some((d) => d.code === "V032")).toBe(true);
 	});
 
-	it("M5 — dangling key in boundary map → V025", () => {
+	it("M5 — dangling key in boundary map → V030", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",
 			parentNormalInputs: new Set(["order"]),
@@ -308,10 +308,10 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["order"]),
 			childTerminals: new Set([]),
 		});
-		expect(diags.some((d) => d.code === "V025")).toBe(true);
+		expect(diags.some((d) => d.code === "V030")).toBe(true);
 	});
 
-	it("M5 — dangling value in boundary map → V025", () => {
+	it("M5 — dangling value in boundary map → V030", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",
 			parentNormalInputs: new Set(["order"]),
@@ -320,10 +320,10 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["incoming_order"]),
 			childTerminals: new Set([]),
 		});
-		expect(diags.some((d) => d.code === "V025")).toBe(true);
+		expect(diags.some((d) => d.code === "V030")).toBe(true);
 	});
 
-	it("X1 — side crossing: input mapped to terminal → V025", () => {
+	it("X1 — side crossing: input mapped to terminal → V033", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",
 			parentNormalInputs: new Set(["order"]),
@@ -332,10 +332,10 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["incoming_order"]),
 			childTerminals: new Set(["outgoing_parcel"]),
 		});
-		expect(diags.some((d) => d.code === "V025")).toBe(true);
+		expect(diags.some((d) => d.code === "V033")).toBe(true);
 	});
 
-	it("X4 — swap map (input→child terminal side, output→child open input side) → V025", () => {
+	it("X4 — swap map (input→child terminal side, output→child open input side) → no errors", () => {
 		// parent input 'a' maps to child terminal 'a' (wrong side)
 		// parent output 'b' maps to child open input 'b' (wrong side)
 		// boundary: { a: 'b', b: 'a' }
@@ -386,7 +386,7 @@ describe("validateSubflowBoundary", () => {
 		expect(diags).toHaveLength(0);
 	});
 
-	it("feedback-aware: parent has output but child has no terminals → V025", () => {
+	it("feedback-aware: parent has output but child has no terminals → V034", () => {
 		// child: a >> P -> b; b >>? P → childTerminals = {} (b consumed by feedback)
 		// parent outputs {shipment} but child terminals {} → mismatch
 		const diags = validateSubflowBoundary({
@@ -397,10 +397,10 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["a"]),
 			childTerminals: new Set([]),
 		});
-		expect(diags.some((d) => d.code === "V025")).toBe(true);
+		expect(diags.some((d) => d.code === "V034")).toBe(true);
 	});
 
-	it("all V025 diagnostics have severity error", () => {
+	it("all subflow boundary diagnostics have severity error", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",
 			parentNormalInputs: new Set(["order"]),
@@ -409,8 +409,9 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["incoming_order"]),
 			childTerminals: new Set([]),
 		});
+		expect(diags.length).toBeGreaterThan(0);
 		for (const d of diags) {
-			if (d.code === "V025") expect(d.severity).toBe("error");
+			expect(d.severity).toBe("error");
 		}
 	});
 });
