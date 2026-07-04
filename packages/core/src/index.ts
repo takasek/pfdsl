@@ -147,6 +147,7 @@ export { resolveMeta } from "./meta.js";
 
 export interface AnalyzeOptions {
 	strict?: boolean;
+	readyGate?: boolean;
 }
 
 export function analyze(
@@ -167,6 +168,7 @@ export function analyze(
 	} = normalize(document, frontmatter);
 	const valOpts: import("./validator.js").ValidateOptions = { source };
 	if (opts.strict) valOpts.strict = true;
+	if (opts.readyGate) valOpts.readyGate = true;
 	const valDiags = validate(edges, nodeKinds, frontmatter, valOpts);
 	const graph = buildGraph(edges, nodeKinds);
 	return {

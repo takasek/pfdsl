@@ -16,6 +16,7 @@ const PFD_TYPE_SET: ReadonlySet<string> = new Set(PFD_TYPE_VALUES);
 export interface ValidateOptions {
 	strict?: boolean;
 	source?: string;
+	readyGate?: boolean;
 }
 
 export function validate(
@@ -585,6 +586,17 @@ export function validate(
 			severity: "error",
 			code: "V031",
 			message: `Invalid type '${String(fm.type)}'. Allowed: ${PFD_TYPE_VALUES.join(", ")}`,
+			range: zeroRange(),
+		});
+	}
+
+	// W006: type omitted under a ready-type-gate context (ready/status-set treat as roadmap)
+	if (options?.readyGate && fm?.type === undefined) {
+		diagnostics.push({
+			severity: "warning",
+			code: "W006",
+			message:
+				"type: omitted; treating this file as 'roadmap' for ready gating. Add 'type: roadmap' to make this explicit.",
 			range: zeroRange(),
 		});
 	}
