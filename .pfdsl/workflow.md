@@ -71,6 +71,8 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 **`make gen-readme-cli` 前のビルド**: pre-commit の README drift 検査は `packages/cli/dist/cli.js` を実行して `pfdsl help` 出力を取得する。`packages/cli/src/` を変更した後、コミット前に `pnpm --filter @pfdsl/cli build`（または `pnpm -r build`）を済ませておかないと、dist が古いまま生成・検査され、新コマンドの追加が README に反映されずに通過する。
 
+**出力抑制**: `make gen-samples` / `make gen-skill` は pnpm 全パッケージビルド + 全サンプル check の warning を毎回出力するため数百行に及ぶ。実行後は `git status --short docs/samples/ .claude/skills/pfdsl/ skills/pfdsl/` で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
+
 ## 新 frontmatter フィールド追加時の sample 追加
 
 frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で追加する（「フィールドが仕様にあるがサンプルに示されていない」状態を防ぐ設計ルール）。生成物の再生成・ドリフト検査は上記のとおり機械的に強制される。
