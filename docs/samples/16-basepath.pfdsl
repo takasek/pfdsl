@@ -4,6 +4,7 @@ process:
   build:
     command: npm run build
     label: Build
+    location: https://github.com/example/repo/issues/1
 artifact:
   source:
     label: Source Code

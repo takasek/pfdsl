@@ -13,6 +13,6 @@ id	summary	description
 13-preset	Preset (extends)	`extends:` inherits `statusStyles` / `tag` / `group` from a preset file. Attribute-level deep merge: local values override inherited ones.
 14-boundary	Boundary map	`boundary:` on a subflow process remaps parent artifact IDs to different child artifact IDs. Useful when reusing an independently-named child flow.
 15-index	Index field	`index:` assigns an optional positive integer to artifacts and processes (independent namespaces). No graph-semantic effect; `pfdsl reindex` numbers nodes in topological order.
-16-basepath	basePath field	`basePath:` sets the base directory for resolving `location:` file paths and `command:` working directory. Defaults to the `.pfdsl` file's directory when omitted.
+16-basepath	basePath field	`basePath:` sets the base directory for resolving `location:` file paths and `command:` working directory. Defaults to the `.pfdsl` file's directory when omitted. `location:` may also be set on processes.
 17-type	type field	`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). Values outside the enum cause an error (V031). `pfdsl ready` rejects any explicit non-`roadmap` type; omitting `type:` is treated as `roadmap` and allowed.
 pfdsl_implementation_flow	PFDSL toolchain roadmap	How PFDSL itself was built — a snapshot of the toolchain implementation flow, written in PFDSL (dogfooding).

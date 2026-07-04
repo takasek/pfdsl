@@ -53,6 +53,7 @@ export interface ProcessMeta {
 	group?: string;
 	tags?: string[];
 	command?: string;
+	location?: string | string[];
 	/** Relative path to a child .pfdsl expanded as a subflow view-link (§2.9.3). */
 	subflow?: string;
 	/** Optional 1:1 boundary rename map (parent id → child id) for a subflow (§2.9.3). */

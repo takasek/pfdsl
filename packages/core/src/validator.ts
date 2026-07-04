@@ -341,7 +341,6 @@ export function validate(
 
 	// W002: artifact without criteria
 	// V012: criteria on process
-	// V013: location on process
 	// V014: command on artifact
 	// V015: revises on process
 	const processMeta = fm?.process ?? {};
@@ -352,14 +351,6 @@ export function validate(
 				severity: "error",
 				code: "V012",
 				message: `'criteria' is not allowed on process '${pid}'`,
-				range: zeroRange(),
-			});
-		}
-		if (m.location !== undefined) {
-			diagnostics.push({
-				severity: "error",
-				code: "V013",
-				message: `'location' is not allowed on process '${pid}'`,
 				range: zeroRange(),
 			});
 		}

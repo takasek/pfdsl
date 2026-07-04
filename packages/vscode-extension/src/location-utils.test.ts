@@ -118,6 +118,15 @@ describe("buildDescriptions", () => {
 			],
 		});
 	});
+
+	it("includes process location as a row", () => {
+		const fm = {
+			process: { P: { location: "https://github.com/example/repo/issues/1" } },
+		};
+		expect(buildDescriptions(fm)).toEqual({
+			P: [["location", "https://github.com/example/repo/issues/1"]],
+		});
+	});
 });
 
 describe("buildSubflows", () => {

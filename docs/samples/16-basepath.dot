@@ -2,7 +2,7 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "build" [shape=ellipse, label="build\nBuild", tooltip="Build\ncommand: npm run build"];
+  "build" [shape=ellipse, label="build\nBuild", tooltip="Build\ncommand: npm run build\nlocation: https://github.com/example/repo/issues/1", href="https://github.com/example/repo/issues/1"];
   "output" [shape=box, label="output\nBuild Output", tooltip="Build Output\nlocation: dist/index.js", penwidth="2"];
   "source" [shape=box, label="source\nSource Code", penwidth="2"];
 

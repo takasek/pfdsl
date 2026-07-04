@@ -970,6 +970,31 @@ spec >> P -> X
 			const dot = exportDot(graph, frontmatter);
 			expect(dot).toContain('href="https://example.com/spec"');
 		});
+
+		it("adds href when location is a URL on a process", () => {
+			const src = `---
+process:
+  P: { label: "処理", location: "https://example.com/proc" }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).toContain('href="https://example.com/proc"');
+		});
+
+		it("includes location in tooltip for a process without adding href for a file path", () => {
+			const src = `---
+process:
+  P: { label: "処理", location: "docs/proc.md" }
+---
+spec >> P -> X
+`;
+			const { graph, frontmatter } = buildFromSource(src);
+			const dot = exportDot(graph, frontmatter);
+			expect(dot).toContain("docs/proc.md");
+			expect(dot).not.toContain("href=");
+		});
 	});
 
 	describe("criteria field", () => {
