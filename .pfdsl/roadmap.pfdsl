@@ -338,7 +338,7 @@ artifact:
   i297_recode:
     label: "V025 二重割当解消 (#297)"
     description: "subflow 境界違反系に専用コードを再採番し group 循環 V025 との衝突を解消する。#299 レジストリ固定の前提"
-    status: todo
+    status: wip
     criteria: "subflow 境界違反と group 循環が異なる診断コードを発行し、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/297
     updated_at: 2026-07-04T05:44:06Z
