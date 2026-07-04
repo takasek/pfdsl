@@ -12,7 +12,7 @@
 <!-- build -->
 <g id="node1" class="node">
 <title>build</title>
-<g id="a_node1"><a xlink:title="Build&#10;command: npm run build">
+<g id="a_node1"><a xlink:href="https://github.com/example/repo/issues/1" xlink:title="Build&#10;command: npm run build&#10;location: https://github.com/example/repo/issues/1">
 <ellipse fill="none" stroke="black" cx="154.28" cy="-28.99" rx="32.53" ry="28.99"/>
 <text xml:space="preserve" text-anchor="middle" x="154.28" y="-32.19" font-family="Times,serif" font-size="14.00">build</text>
 <text xml:space="preserve" text-anchor="middle" x="154.28" y="-15.69" font-family="Times,serif" font-size="14.00">Build</text>

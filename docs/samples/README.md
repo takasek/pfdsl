@@ -618,7 +618,7 @@ digraph PFDSL {
 
 ## 16-basepath — basePath field
 
-`basePath:` sets the base directory for resolving `location:` file paths and `command:` working directory. Defaults to the `.pfdsl` file's directory when omitted.
+`basePath:` sets the base directory for resolving `location:` file paths and `command:` working directory. Defaults to the `.pfdsl` file's directory when omitted. `location:` may also be set on processes.
 
 ```pfdsl
 ---
@@ -627,6 +627,7 @@ process:
   build:
     command: npm run build
     label: Build
+    location: https://github.com/example/repo/issues/1
 artifact:
   source:
     label: Source Code
@@ -647,7 +648,7 @@ digraph PFDSL {
   rankdir=LR;
   newrank=true;
 
-  "build" [shape=ellipse, label="build\nBuild", tooltip="Build\ncommand: npm run build"];
+  "build" [shape=ellipse, label="build\nBuild", tooltip="Build\ncommand: npm run build\nlocation: https://github.com/example/repo/issues/1", href="https://github.com/example/repo/issues/1"];
   "output" [shape=box, label="output\nBuild Output", tooltip="Build Output\nlocation: dist/index.js", penwidth="2"];
   "source" [shape=box, label="source\nSource Code", penwidth="2"];
 

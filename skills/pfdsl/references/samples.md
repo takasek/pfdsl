@@ -315,7 +315,7 @@ spec >> implement -> code
 
 ## 16-basepath — basePath field
 
-`basePath:` sets the base directory for resolving `location:` file paths and `command:` working directory. Defaults to the `.pfdsl` file's directory when omitted.
+`basePath:` sets the base directory for resolving `location:` file paths and `command:` working directory. Defaults to the `.pfdsl` file's directory when omitted. `location:` may also be set on processes.
 
 ```pfdsl
 ---
@@ -324,6 +324,7 @@ process:
   build:
     command: npm run build
     label: Build
+    location: https://github.com/example/repo/issues/1
 artifact:
   source:
     label: Source Code
