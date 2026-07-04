@@ -443,7 +443,7 @@ digraph PFDSL {
 
 ## 12-subflow — Subflow
 
-`subflow:` on a process links to a child `.pfdsl` file. The child's open inputs and terminals must bijectively match the parent process's normal inputs and outputs (V025).
+`subflow:` on a process links to a child `.pfdsl` file. The child's open inputs and terminals must bijectively match the parent process's normal inputs and outputs (V034).
 
 ```pfdsl
 ---
@@ -662,7 +662,7 @@ digraph PFDSL {
 
 ## 17-type — type field
 
-`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). `pfdsl ready` requires `type: roadmap`; other values or omission cause an error (V031 for invalid values).
+`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). Values outside the enum cause an error (V031). `pfdsl ready` rejects `type: workflow` / `type: runtime-pipeline`; omitting `type:` is allowed and skips the kind check.
 
 ```pfdsl
 ---

@@ -182,7 +182,7 @@ report >> summarize -> summary
 
 ## 12-subflow — Subflow
 
-`subflow:` on a process links to a child `.pfdsl` file. The child's open inputs and terminals must bijectively match the parent process's normal inputs and outputs (V025).
+`subflow:` on a process links to a child `.pfdsl` file. The child's open inputs and terminals must bijectively match the parent process's normal inputs and outputs (V034).
 
 ```pfdsl
 ---
