@@ -57,12 +57,12 @@ export function parseIssueProcesses(frontmatter) {
 }
 
 /**
- * @param {{ id: string, issueNumber: number, status: string|undefined, updatedAt: string|undefined, priorities: string[], hasDownstream?: boolean }[]} artifacts - priorities must be pre-sorted (parseIssueArtifacts guarantees this)
+ * @param {{ processId: string, issueNumber: number, artifactId: string, status: string|undefined, hasDownstream: boolean, updatedAt: string|undefined, priorities: string[] }[]} entries - priorities must be pre-sorted
  * @param {{ number: number, state: "OPEN"|"CLOSED", stateReason?: string|null, labels: string[], updatedAt: string }[]} issues
- * @returns {{ type: string, issueNumber: number, artifactId: string|undefined, detail: string, fixVia?: "file"|"github" }[]}
+ * @returns {{ type: string, issueNumber: number, processId: string|undefined, artifactId: string|undefined, detail: string, fixVia?: "file"|"github"|"flow", hasDownstream?: boolean }[]}
  */
-export function computeFindings(artifacts, issues) {
-	const artifactIssueNumbers = new Set(artifacts.map((a) => a.issueNumber));
+export function computeFindings(entries, issues) {
+	const trackedIssueNumbers = new Set(entries.map((e) => e.issueNumber));
 	const issuesByNumber = new Map();
 	for (const iss of issues) {
 		issuesByNumber.set(iss.number, iss);
@@ -70,112 +70,120 @@ export function computeFindings(artifacts, issues) {
 
 	const findings = [];
 
-	// Check each artifact against its issue
-	for (const art of artifacts) {
-		const iss = issuesByNumber.get(art.issueNumber);
+	// Check each tracked entry against its issue
+	for (const entry of entries) {
+		const iss = issuesByNumber.get(entry.issueNumber);
 		if (!iss) {
 			findings.push({
 				type: "unknown_issue",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				detail: `issue #${art.issueNumber} not found in issues list`,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				detail: `issue #${entry.issueNumber} not found in issues list`,
 			});
 			continue;
 		}
 
 		if (iss.state === "CLOSED") {
 			// closed + done + has downstream = expected state, no action needed
-			if (art.status === "done" && art.hasDownstream) {
+			if (entry.status === "done" && entry.hasDownstream) {
 				continue;
 			}
 			const isNotPlanned = iss.stateReason === "NOT_PLANNED";
 			findings.push({
 				type: isNotPlanned ? "closed_not_planned" : "closed_in_flow",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				hasDownstream: art.hasDownstream,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				hasDownstream: entry.hasDownstream,
 				detail: isNotPlanned
-					? art.hasDownstream
+					? entry.hasDownstream
 						? `issue closed as not planned but has downstream consumers — remove manually`
 						: `issue closed as not planned — terminal chain will be removed`
-					: `issue is closed — delete the chain if terminal, or strip the iN_ prefix to demote it to a plain done artifact if downstream processes consume it`,
-				fixVia: isNotPlanned && art.hasDownstream ? undefined : "flow",
+					: `issue is closed — delete the chain if terminal, or clear iN_ issue-tracking fields on the process if downstream processes consume the output`,
+				fixVia: isNotPlanned && entry.hasDownstream ? undefined : "flow",
 			});
 			// skip all freshness checks for closed issues
 			continue;
 		}
 
-		// OPEN issue with artifact
+		// OPEN issue with a tracked process
 		const hasManaged = iss.labels.includes("flow:managed");
 		const hasExempt = iss.labels.includes("flow:exempt");
 
 		if (hasExempt) {
 			findings.push({
 				type: "exempt_conflict",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				detail: `issue has flow:exempt label but has an artifact in the flow`,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				detail: `issue has flow:exempt label but has a tracked process in the flow`,
 			});
 		} else if (!hasManaged) {
 			findings.push({
 				type: "missing_label",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				detail: `open issue with artifact is missing "flow:managed" label`,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				detail: `open issue with tracked process is missing "flow:managed" label`,
 				fixVia: "github",
 			});
 		}
 
 		// Freshness checks for open issues
-		if (art.updatedAt !== iss.updatedAt) {
-			const artVal = art.updatedAt ?? "(none)";
+		if (entry.updatedAt !== iss.updatedAt) {
+			const val = entry.updatedAt ?? "(none)";
 			findings.push({
 				type: "stale_updated_at",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				detail: `artifact: ${artVal}, issue: ${iss.updatedAt}`,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				detail: `process: ${val}, issue: ${iss.updatedAt}`,
 				fixVia: "file",
 			});
 		}
 
 		// Priority drift
 		const issuePriorities = iss.labels.filter((l) => l.startsWith("priority:")).sort();
-		if (JSON.stringify(issuePriorities) !== JSON.stringify(art.priorities)) {
+		if (JSON.stringify(issuePriorities) !== JSON.stringify(entry.priorities)) {
 			findings.push({
 				type: "priority_drift",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				detail: `artifact: [${art.priorities.join(", ")}], issue: [${issuePriorities.join(", ")}]`,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				detail: `process: [${entry.priorities.join(", ")}], issue: [${issuePriorities.join(", ")}]`,
 				fixVia: "file",
 			});
 		}
 	}
 
-	// Check each issue for missing artifact
+	// Check each issue for a missing tracked process
 	for (const iss of issues) {
 		if (iss.state !== "OPEN") continue;
-		if (artifactIssueNumbers.has(iss.number)) continue;
+		if (trackedIssueNumbers.has(iss.number)) continue;
 
 		const hasManaged = iss.labels.includes("flow:managed");
 		const hasExempt = iss.labels.includes("flow:exempt");
 
 		if (hasExempt) {
-			// flow:exempt and no artifact: no finding
+			// flow:exempt and no tracked process: no finding
 			continue;
 		}
 		if (hasManaged) {
 			findings.push({
-				type: "missing_artifact",
+				type: "missing_process",
 				issueNumber: iss.number,
+				processId: undefined,
 				artifactId: undefined,
-				detail: `issue has flow:managed label but no artifact in the flow`,
+				detail: `issue has flow:managed label but no tracked process in the flow`,
 			});
 		} else {
 			findings.push({
 				type: "untriaged",
 				issueNumber: iss.number,
+				processId: undefined,
 				artifactId: undefined,
-				detail: `open issue has no artifact and no flow label`,
+				detail: `open issue has no tracked process and no flow label`,
 			});
 		}
 	}

@@ -130,53 +130,54 @@ describe("buildProcessOutputs", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeFindings", () => {
-	// Helper: open issue with matching artifact but no flow:managed label
-	it("missing_label: open issue with artifact but no flow:managed", () => {
-		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+	it("missing_label: open issue with tracked process but no flow:managed", () => {
+		const entries = [{ processId: "i5_draft_hierarchy_spec", issueNumber: 5, artifactId: "hierarchy_spec", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: [], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "missing_label");
 		assert.ok(f);
 		assert.equal(f.issueNumber, 5);
-		assert.equal(f.artifactId, "i5_hierarchy_spec");
+		assert.equal(f.processId, "i5_draft_hierarchy_spec");
+		assert.equal(f.artifactId, "hierarchy_spec");
 		assert.equal(f.fixVia, "github");
 	});
 
 	it("no missing_label when flow:managed is present", () => {
-		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_draft_hierarchy_spec", issueNumber: 5, artifactId: "hierarchy_spec", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		assert.ok(!findings.find((f) => f.type === "missing_label"));
 	});
 
-	it("exempt_conflict: open issue with artifact AND flow:exempt label", () => {
-		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+	it("exempt_conflict: open issue with tracked process AND flow:exempt label", () => {
+		const entries = [{ processId: "i5_draft_hierarchy_spec", issueNumber: 5, artifactId: "hierarchy_spec", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed", "flow:exempt"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "exempt_conflict");
 		assert.ok(f);
 		assert.equal(f.fixVia, undefined);
 	});
 
 	it("exempt_conflict without managed: no missing_label (bot must not add flow:managed to exempt issues)", () => {
-		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_draft_hierarchy_spec", issueNumber: 5, artifactId: "hierarchy_spec", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:exempt"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		assert.ok(findings.find((f) => f.type === "exempt_conflict"), "should still report exempt_conflict");
 		assert.ok(!findings.find((f) => f.type === "missing_label"), "must not report missing_label for exempt issues");
 	});
 
-	it("missing_artifact: open issue with flow:managed but no artifact", () => {
+	it("missing_process: open issue with flow:managed but no tracked process", () => {
 		const issues = [{ number: 99, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
 		const findings = computeFindings([], issues);
-		const f = findings.find((f) => f.type === "missing_artifact");
+		const f = findings.find((f) => f.type === "missing_process");
 		assert.ok(f);
 		assert.equal(f.issueNumber, 99);
+		assert.equal(f.processId, undefined);
 		assert.equal(f.artifactId, undefined);
 		assert.equal(f.fixVia, undefined);
 	});
 
-	it("untriaged: open issue with no artifact and no flow labels", () => {
+	it("untriaged: open issue with no tracked process and no flow labels", () => {
 		const issues = [{ number: 99, state: "OPEN", labels: [], updatedAt: "2026-01-01T00:00:00Z" }];
 		const findings = computeFindings([], issues);
 		const f = findings.find((f) => f.type === "untriaged");
@@ -185,36 +186,37 @@ describe("computeFindings", () => {
 		assert.equal(f.fixVia, undefined);
 	});
 
-	it("no finding: open issue with flow:exempt and no artifact", () => {
+	it("no finding: open issue with flow:exempt and no tracked process", () => {
 		const issues = [{ number: 99, state: "OPEN", labels: ["flow:exempt"], updatedAt: "2026-01-01T00:00:00Z" }];
 		const findings = computeFindings([], issues);
 		assert.equal(findings.length, 0);
 	});
 
-	it("unknown_issue: artifact whose issueNumber is not in issues list", () => {
-		const artifacts = [{ id: "i99_foo", issueNumber: 99, status: "todo", updatedAt: undefined, priorities: [] }];
-		const findings = computeFindings(artifacts, []);
+	it("unknown_issue: entry whose issueNumber is not in issues list", () => {
+		const entries = [{ processId: "i99_do_foo", issueNumber: 99, artifactId: "foo", status: "todo", updatedAt: undefined, priorities: [] }];
+		const findings = computeFindings(entries, []);
 		const f = findings.find((f) => f.type === "unknown_issue");
 		assert.ok(f);
 		assert.equal(f.issueNumber, 99);
-		assert.equal(f.artifactId, "i99_foo");
+		assert.equal(f.processId, "i99_do_foo");
+		assert.equal(f.artifactId, "foo");
 		assert.equal(f.fixVia, undefined);
 	});
 
-	it("closed_in_flow: artifact for closed issue with status !== done", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+	it("closed_in_flow: entry for closed issue with status !== done", () => {
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "closed_in_flow");
 		assert.ok(f);
 		assert.equal(f.fixVia, "flow");
 		assert.ok(f.detail.includes("delete the chain"), "detail should guide cleanup");
 	});
 
-	it("closed_in_flow: artifact for closed issue with status done also emits finding", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "done", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+	it("closed_in_flow: entry for closed issue with status done also emits finding", () => {
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "done", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-02-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const matching = findings.filter((f) => f.issueNumber === 5);
 		assert.equal(matching.length, 1);
 		assert.equal(matching[0].type, "closed_in_flow");
@@ -223,9 +225,9 @@ describe("computeFindings", () => {
 	});
 
 	it("closed_not_planned: NOT_PLANNED close without downstream → fixVia:flow (auto-removable)", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: false }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: false }];
 		const issues = [{ number: 5, state: "CLOSED", stateReason: "NOT_PLANNED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "closed_not_planned");
 		assert.ok(f, "should emit closed_not_planned");
 		assert.ok(!findings.find((f) => f.type === "closed_in_flow"), "must not emit closed_in_flow");
@@ -234,27 +236,27 @@ describe("computeFindings", () => {
 	});
 
 	it("closed_not_planned: NOT_PLANNED close with downstream → manual (no fixVia)", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: true }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: true }];
 		const issues = [{ number: 5, state: "CLOSED", stateReason: "NOT_PLANNED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "closed_not_planned");
 		assert.ok(f, "should emit closed_not_planned");
 		assert.equal(f.fixVia, undefined, "has downstream: must not auto-fix");
 	});
 
 	it("closed_in_flow: COMPLETED stateReason still uses closed_in_flow type", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "CLOSED", stateReason: "COMPLETED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "closed_in_flow");
 		assert.ok(f, "COMPLETED close should use closed_in_flow");
 		assert.ok(!findings.find((f) => f.type === "closed_not_planned"));
 	});
 
 	it("stale_updated_at: open issue with mismatched updatedAt", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "stale_updated_at");
 		assert.ok(f);
 		assert.equal(f.fixVia, "file");
@@ -262,63 +264,74 @@ describe("computeFindings", () => {
 		assert.ok(f.detail.includes("2026-06-01T00:00:00Z"));
 	});
 
-	it("stale_updated_at: artifact missing updatedAt shows (none)", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: undefined, priorities: [] }];
+	it("stale_updated_at: entry missing updatedAt shows (none)", () => {
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: undefined, priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "stale_updated_at");
 		assert.ok(f);
 		assert.ok(f.detail.includes("(none)"));
 	});
 
 	it("no stale_updated_at when updatedAt matches", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		assert.ok(!findings.find((f) => f.type === "stale_updated_at"));
 	});
 
-	it("priority_drift: issue priority labels differ from artifact priorities", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: ["priority:high"] }];
+	it("priority_drift: issue priority labels differ from process priorities", () => {
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: ["priority:high"] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed", "priority:low"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "priority_drift");
 		assert.ok(f);
 		assert.equal(f.fixVia, "file");
 	});
 
 	it("no priority_drift when both have no priority labels", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		assert.ok(!findings.find((f) => f.type === "priority_drift"));
 	});
 
 	it("one pair can yield multiple findings", () => {
-		// stale_updated_at + priority_drift + missing_label all at once
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: ["priority:high"] }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: ["priority:high"] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["priority:low"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		assert.ok(findings.find((f) => f.type === "missing_label"));
 		assert.ok(findings.find((f) => f.type === "stale_updated_at"));
 		assert.ok(findings.find((f) => f.type === "priority_drift"));
 	});
 
 	it("findings are ordered by issueNumber ascending", () => {
-		const artifacts = [
-			{ id: "i10_foo", issueNumber: 10, status: "todo", updatedAt: undefined, priorities: [] },
-			{ id: "i3_bar", issueNumber: 3, status: "todo", updatedAt: undefined, priorities: [] },
+		const entries = [
+			{ processId: "i10_do_foo", issueNumber: 10, artifactId: "foo", status: "todo", updatedAt: undefined, priorities: [] },
+			{ processId: "i3_do_bar", issueNumber: 3, artifactId: "bar", status: "todo", updatedAt: undefined, priorities: [] },
 		];
 		const issues = [
 			{ number: 10, state: "OPEN", labels: [], updatedAt: "2026-06-01T00:00:00Z" },
 			{ number: 3, state: "OPEN", labels: [], updatedAt: "2026-06-01T00:00:00Z" },
 		];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const nums = findings.map((f) => f.issueNumber);
-		// all 3s should come before 10s
 		const first10 = nums.indexOf(10);
 		const last3 = nums.lastIndexOf(3);
 		assert.ok(last3 < first10 || first10 === -1);
+	});
+
+	it("multi-output process: independent findings per output artifact (no aggregation)", () => {
+		const entries = [
+			{ processId: "i7_draft_specs", issueNumber: 7, artifactId: "spec_a", status: "done", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: true },
+			{ processId: "i7_draft_specs", issueNumber: 7, artifactId: "spec_b", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: false },
+		];
+		const issues = [{ number: 7, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(entries, issues);
+		const matching = findings.filter((f) => f.issueNumber === 7);
+		assert.equal(matching.length, 1, "spec_a (done+hasDownstream) should not produce a finding");
+		assert.equal(matching[0].artifactId, "spec_b");
+		assert.equal(matching[0].type, "closed_in_flow");
 	});
 });
 
