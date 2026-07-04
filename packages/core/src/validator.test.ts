@@ -407,12 +407,21 @@ a >> design -> b
 		});
 	});
 
-	describe("V013: location on process", () => {
-		it("errors when location is set on a process", () => {
+	describe("location on process (legal)", () => {
+		it("does not error when location is set on a process", () => {
 			const fm = {
 				process: { P: { location: "src/process.ts" } },
 			} as unknown as Frontmatter;
-			expect(codes("A >> P -> B", fm)).toContain("V013");
+			expect(codes("A >> P -> B", fm)).not.toContain("V013");
+		});
+
+		it("does not error when location is a URL array on a process", () => {
+			const fm = {
+				process: {
+					P: { location: ["https://github.com/example/repo/issues/1"] },
+				},
+			} as unknown as Frontmatter;
+			expect(codes("A >> P -> B", fm)).not.toContain("V013");
 		});
 	});
 
