@@ -176,6 +176,12 @@ artifact:
     criteria: /vscode-ext-debug が期待通り動作する
     location: ../.claude/skills/vscode-ext-debug/
     group: generation
+  spec_stress_skill:
+    label: 仕様stress-testスキル
+    description: "/spec-stress-test コマンド。仕様制約の具体例 stress-test（ADR-0020）と agent 実書きプローブ（spec のみ読ませた subagent を CLI で採点）の実行手順。仕様改訂の検証能力として maintain_spec に還流。リポローカル・手書き（生成対象外・配布対象外）"
+    criteria: /spec-stress-test が期待通り動作する
+    location: ../.claude/skills/spec-stress-test/
+    group: generation
   review_prompts:
     label: レビュープロンプト集
     description: "PFD を問い詰める A/B 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd-retro はポインタ参照"
@@ -338,7 +344,9 @@ examples >> review_examples -> findings
 
 [skill, toolchain, retro_skill] >>? review_examples
 
-[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill, retro_skill, ecosystem_skill, review_prompts, workflow_md, vscode_ext_debug_skill]
+[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill, retro_skill, ecosystem_skill, review_prompts, workflow_md, vscode_ext_debug_skill, spec_stress_skill]
+
+spec_stress_skill >>? maintain_spec
 
 retro_skill >>? discuss
 

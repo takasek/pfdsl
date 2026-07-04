@@ -153,6 +153,6 @@ Sets the status in place and validates. Manual fallback: edit `status:` in the f
 | 新規 PFD の執筆・設計判断 | 本文の quality guide + `references/examples.md`（実戦ドメインの設計パターン。先頭の Index で該当例の行範囲を特定し、そこだけ Read する） |
 | check エラーの対処 | エラーコード（V/W）で `references/spec.md` を grep（ヒット先は §15 制約・§16 エラー方針・§20 変更履歴のいずれか） |
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
-| PFD のレビュー・監査 | `references/review-prompts.md`（A/B カタログ。書くルールは本文、問い詰めはこちら） |
+| PFD のレビュー・監査 | `references/review-prompts.md`（A/B/C カタログ。A/B は図、C は DSL 仕様の監査。書くルールは本文、問い詰めはこちら） |
 
-`references/spec.md` は full spec v0.0.11（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
+`references/spec.md` は full spec v0.0.12（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。

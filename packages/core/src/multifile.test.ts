@@ -171,14 +171,27 @@ describe("computeOpenInputs", () => {
 		expect(computeOpenInputs(edges)).toEqual(new Set(["a"]));
 	});
 
-	it("artifact with no producer is open input even if only feedback-consumed", () => {
-		// x >>? P  (x has no output edge producing it)
+	it("artifact with no producer consumed ONLY by feedback is NOT an open input (§2.9.3 symmetric feedback exclusion)", () => {
+		// x >>? P  (x has no producer and only a feedback consumer)
+		// x is a cross-cutting loop element, not part of the boundary contract
 		const edges: NormalizedEdge[] = [
 			{ kind: "input", artifact: "a", process: "P" },
 			{ kind: "output", process: "P", artifact: "b" },
 			{ kind: "feedback", artifact: "x", process: "P" },
 		];
-		expect(computeOpenInputs(edges)).toEqual(new Set(["a", "x"]));
+		expect(computeOpenInputs(edges)).toEqual(new Set(["a"]));
+	});
+
+	it("artifact with no producer consumed by both >> and >>? IS an open input", () => {
+		// a >> P; a >>? Q  (a has a normal consumer, so it stays in the boundary)
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "a", process: "P" },
+			{ kind: "output", process: "P", artifact: "b" },
+			{ kind: "feedback", artifact: "a", process: "Q" },
+			{ kind: "input", artifact: "b", process: "Q" },
+			{ kind: "output", process: "Q", artifact: "c" },
+		];
+		expect(computeOpenInputs(edges)).toEqual(new Set(["a"]));
 	});
 
 	it("empty edges produce empty open inputs", () => {

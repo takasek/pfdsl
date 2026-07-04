@@ -45,7 +45,7 @@ description: |
    - 新しい種類の成果物は `.pfdsl/workflow.pfdsl` に producer・consumer を登録してから作る（外部消費者は `externalStakeholders` フィールドで明示）
    - 変換コンポーネントを追加・変更・削除する場合は、その変換を実際にモデル化している採用済み PFD の description・criteria・edge を更新する。「runtime-pipeline.pfdsl が存在しない = 該当なし」と即断しない — 別の PFD（多くの場合 `.pfdsl/workflow.pfdsl` の該当ノード・エッジ）が同じ変換を表現していないか確認してから N/A と記録する
 6. **知見の振り分け**: 実践・レビューで得た知見を記録先成果物へ振り分ける。**構造的事実**（新しいエッジ・成果物の生成方式が変わった等、図に描ける変化）は対応する `.pfdsl` 本体のノード・エッジ・description・criteria を更新する。**手続き散文**（グラフで運べない運用ルール・振り分け手続き自体）は sibling companion `.md` に書く。両方に該当する変更（新成果物の追加等）は両方を更新する
-7. **定期監査**: `/pfd-cycle` コマンド経由では毎サイクル終了後に pfd-retro が自動実行される。直接 pfd-ops を呼んだ場合は、**前回 retro の実行記録**（workflow companion の retro バインディングに記録される。記録が無ければ「未実行」とみなす。workflow companion 自体が無いリポでは /pfd-cycle 経由の自動実行を基準点とする）を基準点に、次のいずれかで手動起動する — 前回以降に新規 ADR が2本以上 / 前回以降に同一 PFD へ修正コミットが3回以上 / 設計対話が長く続いた後 / セッションの締め際。閾値は `git log --oneline --since=<前回記録の日付> -- <ADR 置き場 / 当該 .pfdsl>` で機械的に数える。ユーザーの気付きを待たない。findings はプロトコル6の経路で振り分ける
+7. **定期監査**: `/pfd-cycle` コマンド経由では毎サイクル終了後に pfd-retro が自動実行される。直接 pfd-ops を呼んだ場合は、**前回 retro の実行記録**（workflow companion の retro バインディングに記録される。記録が無ければ「未実行」とみなす。workflow companion 自体が無いリポでは /pfd-cycle 経由の自動実行を基準点とする）を基準点に、次のいずれかで手動起動する — 前回以降に新規の設計決定記録（ADR 等。所在は workflow companion の retro バインディングが指す。設計決定記録を運用しないリポでは本条件は対象外）が2本以上 / 前回以降に同一 PFD へ修正コミットが3回以上 / 設計対話が長く続いた後 / セッションの締め際。閾値は `git log --oneline --since=<前回記録の日付> -- <設計決定記録の置き場 / 当該 .pfdsl>` で機械的に数える。ユーザーの気付きを待たない。findings はプロトコル6の経路で振り分ける
 
 ## ワークサイクル（/pfd-cycle の手順）
 
