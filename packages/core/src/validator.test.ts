@@ -3,17 +3,25 @@ import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
 import type { Frontmatter } from "./types/index.js";
-import { validate } from "./validator.js";
+import { type ValidateOptions, validate } from "./validator.js";
 
-function diagnose(src: string, fm: Frontmatter | null = null) {
+function diagnose(
+	src: string,
+	fm: Frontmatter | null = null,
+	options?: ValidateOptions,
+) {
 	const { tokens } = lex(src);
 	const { document } = parseTokens(tokens);
 	const { edges, nodeKinds } = normalize(document, fm);
-	return validate(edges, nodeKinds, fm);
+	return validate(edges, nodeKinds, fm, options);
 }
 
-function codes(src: string, fm: Frontmatter | null = null): string[] {
-	return diagnose(src, fm).map((d) => d.code);
+function codes(
+	src: string,
+	fm: Frontmatter | null = null,
+	options?: ValidateOptions,
+): string[] {
+	return diagnose(src, fm, options).map((d) => d.code);
 }
 
 describe("validate", () => {
@@ -834,6 +842,33 @@ a >> design -> b
 		it("no V031 when type is absent", () => {
 			const fm: Frontmatter = {};
 			expect(codes("A >> P -> B", fm)).not.toContain("V031");
+		});
+	});
+
+	describe("W006: type omitted under ready gate (#308)", () => {
+		it("warns when readyGate is set and type is absent", () => {
+			const fm: Frontmatter = {};
+			expect(codes("A >> P -> B", fm, { readyGate: true })).toContain("W006");
+		});
+
+		it("no W006 when type: roadmap is explicit, even under readyGate", () => {
+			const fm: Frontmatter = { type: "roadmap" };
+			expect(codes("A >> P -> B", fm, { readyGate: true })).not.toContain(
+				"W006",
+			);
+		});
+
+		it("no W006 when readyGate is not set, even if type is absent", () => {
+			const fm: Frontmatter = {};
+			expect(codes("A >> P -> B", fm)).not.toContain("W006");
+		});
+
+		it("W006 severity is warning", () => {
+			const fm: Frontmatter = {};
+			const w006 = diagnose("A >> P -> B", fm, { readyGate: true }).find(
+				(d) => d.code === "W006",
+			);
+			expect(w006?.severity).toBe("warning");
 		});
 	});
 

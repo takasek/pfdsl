@@ -18,6 +18,11 @@
 
 ラウンド比較・lint 要件送りはツールチェーン開発を持つリポ固有の運用。
 
+## code-review / simplify の実施粒度
+
+pfd-ops 終端ゲート「実装規模・品質基準は companion で定義」の実体はここ。
+diff の規模に review の重さを合わせる。scoped な小〜中規模修正（数十行、1-2ファイル中心）に `/code-review` の高効度設定（8角度 finder × 候補ごと検証 agent、計10体以上の subagent 起動）をかけると diff サイズに対して過剰 — 軽い level（角度を絞る）を選ぶか、そもそも subagent を使わず自分で Read/Grep して直接レビューする。8角度並列 + 全候補検証の重量級構成は大規模 PR 向け。
+
 ## payoff_log 追記条件
 
 PFD の効果を体感した局面は `docs/pfd_payoff_log.md`（`payoff_log` artifact）に **日付・局面・効果・参照** の形式で追記する。pfdsl の効果実証が目的（このリポ固有の動機）。

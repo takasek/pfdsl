@@ -487,24 +487,31 @@ function computeReadyIdsCore(
 function computeReadyIds(src: string): {
 	readyIds: string[];
 	isRoadmap: boolean;
+	warnings: Diagnostic[];
 } {
-	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
-	if (hasErrors(diagnostics)) return { readyIds: [], isRoadmap: false };
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
+		readyGate: true,
+	});
+	if (hasErrors(diagnostics))
+		return { readyIds: [], isRoadmap: false, warnings: [] };
 
+	const warnings = diagnostics.filter((d) => d.code === "W006");
 	const pfdType = frontmatter?.type;
 	const isRoadmap = pfdType === undefined || pfdType === "roadmap";
-	if (!isRoadmap) return { readyIds: [], isRoadmap: false };
+	if (!isRoadmap) return { readyIds: [], isRoadmap: false, warnings };
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 	const { readyIds } = computeReadyIdsCore(edges, nodeKinds, artifactMeta);
-	return { readyIds, isRoadmap: true };
+	return { readyIds, isRoadmap: true, warnings };
 }
 
 export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 
-	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
+		readyGate: true,
+	});
 	const earlyFail = failIfErrors(diagnostics, file);
 	if (earlyFail) return earlyFail;
 
@@ -516,6 +523,9 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 			2,
 		);
 	}
+
+	const warnings = diagnostics.filter((d) => d.code === "W006");
+	const warnText = warnings.length ? diagText(warnings, file) : "";
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 
@@ -592,11 +602,12 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	if (opts.json) {
 		const payload: Record<string, unknown> = { ok: true, ready: readyItems };
 		if (opts.best && bestItem) payload.best = bestItem;
-		return ok(`${JSON.stringify(payload)}\n`);
+		if (warnings.length) payload.warnings = warnings;
+		return ok(`${JSON.stringify(payload)}\n`, warnText);
 	}
 
 	if (readyItems.length === 0) {
-		return ok("No ready processes. Check artifact statuses.\n");
+		return ok("No ready processes. Check artifact statuses.\n", warnText);
 	}
 
 	const lines: string[] = [`Ready processes (${readyItems.length}):`];
@@ -613,7 +624,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 			"* = recommended next (removes the last blocker for the most downstream processes)",
 		);
 	}
-	return ok(`${lines.join("\n")}\n`);
+	return ok(`${lines.join("\n")}\n`, warnText);
 }
 
 export interface StatusSetOptions {
@@ -667,18 +678,25 @@ export function runStatusSet(
 		src.slice(0, fmBodyStart) + newFm + src.slice(fmBodyStart + fmBlock.length);
 	writeFileSync(file, newSrc, "utf-8");
 
-	// Compute newly-ready processes (roadmap only)
-	const newlyReady: string[] = isRoadmap
-		? computeReadyIds(newSrc).readyIds.filter((id) => !beforeSet.has(id))
+	// Recompute against the written file (roadmap only) so newly-ready processes
+	// and warnings (e.g. W006) reflect post-mutation state, not the pre-write snapshot.
+	const after = isRoadmap ? computeReadyIds(newSrc) : undefined;
+	const newlyReady: string[] = after
+		? after.readyIds.filter((id) => !beforeSet.has(id))
 		: [];
+	const warnings = after?.warnings ?? [];
+
+	const warnText = warnings.length ? diagText(warnings, file) : "";
 
 	if (opts.json) {
-		return ok(`${JSON.stringify({ ok: true, newlyReady })}\n`);
+		const payload: Record<string, unknown> = { ok: true, newlyReady };
+		if (warnings.length) payload.warnings = warnings;
+		return ok(`${JSON.stringify(payload)}\n`, warnText);
 	}
 	if (newlyReady.length > 0) {
-		return ok(`newly ready: ${newlyReady.join(", ")}\n`);
+		return ok(`newly ready: ${newlyReady.join(", ")}\n`, warnText);
 	}
-	return ok("");
+	return ok("", warnText);
 }
 
 export interface AuditSyncOptions {
@@ -976,19 +994,21 @@ const HELP_READY = `usage: pfdsl ready <file|-> [--best] [--json]
 
 List processes whose every input artifact has status: done (or no status set).
 Only applies to roadmap files (type: roadmap). Use - to read from stdin.
+Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
 Options:
   --best  highlight the process that unblocks the most downstream work
-  --json  output as JSON ({ ok, ready: [{id, label, inputs}], best? })
+  --json  output as JSON ({ ok, ready: [{id, label, inputs}], best?, warnings? })
 `;
 
 const HELP_STATUS_SET = `usage: pfdsl status-set <file> <artifact-id> <status> [--json]
 
 Set the status of an artifact in a .pfdsl file, rewriting it in place.
 For roadmap files, reports which processes became newly ready after the change.
+Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
   <status>  one of: todo | wip | done | waiting | suspended
-  --json    emit JSON ({ ok, newlyReady: string[] }) instead of text
+  --json    emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
 
 Exit codes:
   0  success
@@ -1052,7 +1072,7 @@ Commands:
   status-set <file> <artifact-id> <status> [--json]
                            Set artifact status (todo|wip|done|waiting|suspended) in place
                            Roadmap files: prints newly-ready processes after the change
-                           --json    output as JSON ({ ok, newlyReady: string[] })
+                           --json    output as JSON ({ ok, newlyReady: string[], warnings? })
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON
