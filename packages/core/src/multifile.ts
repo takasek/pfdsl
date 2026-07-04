@@ -118,16 +118,19 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 
 /**
  * Compute the set of "open input" artifacts in a flow:
- * artifacts that appear in the flow but have NO output edge producing them (§15.11).
+ * artifacts that have NO output edge producing them AND are consumed by at
+ * least one normal `>>` input edge (§15.11). Unproduced artifacts consumed
+ * only via `>>?` are cross-cutting loop elements, excluded symmetrically to
+ * feedback-consumed terminals (§2.9.3).
  */
 export function computeOpenInputs(edges: NormalizedEdge[]): Set<string> {
-	const all = new Set<string>();
+	const consumedByInput = new Set<string>();
 	const produced = new Set<string>();
 	for (const e of edges) {
-		all.add(e.artifact);
+		if (e.kind === "input") consumedByInput.add(e.artifact);
 		if (e.kind === "output") produced.add(e.artifact);
 	}
-	return new Set([...all].filter((a) => !produced.has(a)));
+	return new Set([...consumedByInput].filter((a) => !produced.has(a)));
 }
 
 /**
