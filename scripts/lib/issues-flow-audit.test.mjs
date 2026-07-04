@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-	parseIssueArtifacts,
+	parseIssueProcesses,
 	computeFindings,
 	applyFixes,
 	applyClosedInFlowFixes,
@@ -12,77 +12,86 @@ import {
 import { parseDocument } from "./yaml-require.mjs";
 
 // ---------------------------------------------------------------------------
-// parseIssueArtifacts
+// parseIssueProcesses
 // ---------------------------------------------------------------------------
 
-describe("parseIssueArtifacts", () => {
-	it("returns empty array when no artifact key", () => {
-		const result = parseIssueArtifacts({});
+describe("parseIssueProcesses", () => {
+	it("returns empty array when no process key", () => {
+		const result = parseIssueProcesses({});
 		assert.deepEqual(result, []);
 	});
 
-	it("ignores non-iN_ artifacts", () => {
+	it("ignores non-iN_ processes", () => {
 		const fm = {
-			artifact: {
-				spec_v006: { label: "Spec", status: "done" },
-				cli_tool: { label: "CLI", status: "done" },
-				findings_r12: { label: "Findings", status: "done" },
+			process: {
+				build_cli: { label: "CLI" },
+				write_docs: { label: "Docs" },
 			},
 		};
-		const result = parseIssueArtifacts(fm);
+		const result = parseIssueProcesses(fm);
 		assert.deepEqual(result, []);
 	});
 
-	it("parses iN_ artifacts and extracts issueNumber", () => {
+	it("parses iN_ processes and extracts issueNumbers", () => {
 		const fm = {
-			artifact: {
-				i4_lint_checker: { label: "Lint", status: "todo", tags: ["priority:high"] },
-				i11_portable_skill: { label: "Skill", status: "todo", tags: ["priority:high"] },
+			process: {
+				i4_build_lint_checker: { label: "Lint", tags: ["priority:high"] },
+				i11_port_skill: { label: "Skill", tags: ["priority:high"] },
 			},
 		};
-		const result = parseIssueArtifacts(fm);
+		const result = parseIssueProcesses(fm);
 		assert.equal(result.length, 2);
-		assert.equal(result[0].id, "i4_lint_checker");
-		assert.equal(result[0].issueNumber, 4);
-		assert.equal(result[0].status, "todo");
+		assert.equal(result[0].id, "i4_build_lint_checker");
+		assert.deepEqual(result[0].issueNumbers, [4]);
 		assert.deepEqual(result[0].priorities, ["priority:high"]);
-		assert.equal(result[1].issueNumber, 11);
+		assert.deepEqual(result[1].issueNumbers, [11]);
 	});
 
 	it("updatedAt and priorities default correctly when fields absent; updatedAt extracted when present", () => {
-		const absent = parseIssueArtifacts({ artifact: { i5_hierarchy_spec: { label: "H", status: "todo" } } });
+		const absent = parseIssueProcesses({ process: { i5_draft_hierarchy_spec: { label: "H" } } });
 		assert.equal(absent[0].updatedAt, undefined);
 		assert.deepEqual(absent[0].priorities, []);
 
-		const present = parseIssueArtifacts({ artifact: { i5_hierarchy_spec: { label: "H", status: "todo", updated_at: "2026-06-01T00:00:00Z" } } });
+		const present = parseIssueProcesses({ process: { i5_draft_hierarchy_spec: { label: "H", updated_at: "2026-06-01T00:00:00Z" } } });
 		assert.equal(present[0].updatedAt, "2026-06-01T00:00:00Z");
 	});
 
 	it("priorities filters only priority: tags and sorts them", () => {
 		const fm = {
-			artifact: {
-				i5_hierarchy_spec: {
+			process: {
+				i5_draft_hierarchy_spec: {
 					label: "H",
-					status: "todo",
 					tags: ["foo", "priority:high", "priority:low", "bar"],
 				},
 			},
 		};
-		const result = parseIssueArtifacts(fm);
+		const result = parseIssueProcesses(fm);
 		assert.deepEqual(result[0].priorities, ["priority:high", "priority:low"]);
 	});
 
-	it("mixes iN_ and non-iN_ artifacts correctly", () => {
+	it("mixes iN_ and non-iN_ processes correctly", () => {
 		const fm = {
-			artifact: {
-				spec_v006: { label: "Spec", status: "done" },
-				i18_issue_sync: { label: "Sync", status: "todo", tags: ["priority:high"] },
-				cli_tool: { label: "CLI", status: "done" },
+			process: {
+				build_cli: { label: "CLI" },
+				i18_sync_issues: { label: "Sync", tags: ["priority:high"] },
+				write_docs: { label: "Docs" },
 			},
 		};
-		const result = parseIssueArtifacts(fm);
+		const result = parseIssueProcesses(fm);
 		assert.equal(result.length, 1);
-		assert.equal(result[0].issueNumber, 18);
+		assert.deepEqual(result[0].issueNumbers, [18]);
+	});
+
+	it("parses concatenated iN_ prefixes when one process is tracked by multiple issues", () => {
+		const fm = {
+			process: {
+				i40_i41_do_work: { label: "Do work" },
+			},
+		};
+		const result = parseIssueProcesses(fm);
+		assert.equal(result.length, 1);
+		assert.equal(result[0].id, "i40_i41_do_work");
+		assert.deepEqual(result[0].issueNumbers, [40, 41]);
 	});
 });
 

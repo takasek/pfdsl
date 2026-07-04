@@ -39,24 +39,19 @@ export function computeLabelFindings(expectedLabels, actualLabels) {
 
 /**
  * @param {object} frontmatter - parsed YAML object
- * @returns {{ id: string, issueNumber: number, status: string|undefined, updatedAt: string|undefined, priorities: string[] }[]}
+ * @returns {{ id: string, issueNumbers: number[], updatedAt: string|undefined, priorities: string[] }[]}
  */
-export function parseIssueArtifacts(frontmatter) {
-	const artifact = frontmatter.artifact;
-	if (!artifact) return [];
+export function parseIssueProcesses(frontmatter) {
+	const process = frontmatter.process;
+	if (!process) return [];
 	const result = [];
-	for (const [id, val] of Object.entries(artifact)) {
-		const m = id.match(/^i(\d+)_/);
-		if (!m) continue;
+	for (const [id, val] of Object.entries(process)) {
+		const prefixMatch = id.match(/^(?:i\d+_)+/);
+		if (!prefixMatch) continue;
+		const issueNumbers = [...prefixMatch[0].matchAll(/i(\d+)_/g)].map((m) => Number(m[1]));
 		const tags = val.tags ?? [];
 		const priorities = tags.filter((t) => t.startsWith("priority:")).sort();
-		result.push({
-			id,
-			issueNumber: Number(m[1]),
-			status: val.status,
-			updatedAt: val.updated_at,
-			priorities,
-		});
+		result.push({ id, issueNumbers, updatedAt: val.updated_at, priorities });
 	}
 	return result;
 }
