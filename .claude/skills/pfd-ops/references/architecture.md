@@ -57,9 +57,9 @@ cp -r .claude/skills/pfd-ops/install/. .
 
 主な規約:
 - issue が一次情報。`roadmap.pfdsl` は依存構造のみ管理
-- artifact id は `iN_` prefix（N = issue 番号）。オープン issue のみ参照
+- process id は `iN_` prefix（N = issue 番号）。恒久 — issue close 後も剥がさない。出力 artifact id は最初から plain
 - `flow:managed` / `flow:exempt` ラベルで管理対象を分類
-- issue close 時: 終端はチェーンごと削除、下流入力が残るものは prefix を外し一般 done artifact へ降格
+- issue close 時: 終端はチェーンごと削除、下流入力が残るものは process 側の `tags`/`updated_at` のみ削除
 - `audit-issues-flow.mjs` で同期監査・機械修復
 
 詳細: [`github-issues-backend.md`](github-issues-backend.md)
