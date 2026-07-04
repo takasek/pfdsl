@@ -335,13 +335,6 @@ artifact:
     status: done
     criteria: "check --audit が同 group 消費者非対称の hint 行を出力し、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/292
-  i297_recode:
-    label: "V025 二重割当解消 (#297)"
-    description: "subflow 境界違反系に専用コードを再採番し group 循環 V025 との衝突を解消する。#299 レジストリ固定の前提"
-    status: wip
-    criteria: "subflow 境界違反と group 循環が異なる診断コードを発行し、テスト通過"
-    location: https://github.com/takasek/pfdsl/issues/297
-    updated_at: 2026-07-04T05:44:06Z
   i299_diag_registry:
     label: "診断コードレジストリ + CI 突合 (#299)"
     description: "spec §16 を全診断コード（P/V/W）の表に改め、check --json の発行コード集合との一致を CI で検査する。F2/F8/F15/F17/F20。C 系の機械化（stale 前方参照 grep）を同居"
@@ -370,6 +363,12 @@ artifact:
     status: done
     criteria: "生成元なし・feedback のみ消費の子 artifact が境界照合から除外され、spec v0.0.12 に定義変更が統合済み、テスト通過"
     location: https://github.com/takasek/pfdsl/issues/298
+  recode:
+    label: "V025 二重割当解消 (#297)"
+    description: "subflow 境界違反系に専用コードを再採番し group 循環 V025 との衝突を解消する。#299 レジストリ固定の前提"
+    status: done
+    criteria: "subflow 境界違反と group 循環が異なる診断コードを発行し、テスト通過"
+    location: https://github.com/takasek/pfdsl/issues/297
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -591,11 +590,11 @@ cli_tool_v0014 >> implement_symmetry_hint -> symmetry_hint
 [i268_type_field, i272_w002_hierarchy, i273_blocked_by] >> integrate_spec_v0011 -> spec_v0011
 spec_v0010 >>? integrate_spec_v0011
 
-multifile_toolchain >> recode_boundary_diags -> i297_recode
+multifile_toolchain >> recode_boundary_diags -> recode
 
 [spec_v0011, multifile_toolchain] >> implement_boundary_feedback -> boundary_feedback
 
-[i297_recode, spec_v0011] >> implement_diag_registry -> i299_diag_registry
+[recode, spec_v0011] >> implement_diag_registry -> i299_diag_registry
 
 [spec_v0011, multifile_toolchain] >> probe_extends_spec -> i304_extends_probe
 
