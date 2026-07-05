@@ -713,6 +713,7 @@ export interface AuditSyncGap {
 export interface AuditSyncResult {
 	ok: boolean;
 	gaps: AuditSyncGap[];
+	warnings?: Diagnostic[];
 }
 
 export function runAuditSync(
@@ -727,9 +728,12 @@ export function runAuditSync(
 		diagnostics: roadmapDiags,
 		frontmatter: roadmapFm,
 		edges: roadmapEdges,
-	} = analyze(roadmapSrc);
+	} = analyze(roadmapSrc, { readyGate: true });
 	const roadmapFail = failIfErrors(roadmapDiags, roadmapFile);
 	if (roadmapFail) return roadmapFail;
+
+	const warnings = roadmapDiags.filter((d) => d.code === "W006");
+	const warnText = warnings.length ? diagText(warnings, roadmapFile) : "";
 
 	const ROADMAP_REQUIRED_TYPE = "roadmap" satisfies PfdType;
 	if (
@@ -783,14 +787,22 @@ export function runAuditSync(
 	}
 
 	const result: AuditSyncResult = { ok: gaps.length === 0, gaps };
+	if (warnings.length) result.warnings = warnings;
 
 	if (opts.json) {
 		const exitCode = gaps.length > 0 ? 1 : 0;
-		return { stdout: `${JSON.stringify(result)}\n`, stderr: "", exitCode };
+		return {
+			stdout: `${JSON.stringify(result)}\n`,
+			stderr: warnText,
+			exitCode,
+		};
 	}
 
 	if (gaps.length === 0) {
-		return ok("All todo artifacts in flow files are tracked in the roadmap.\n");
+		return ok(
+			"All todo artifacts in flow files are tracked in the roadmap.\n",
+			warnText,
+		);
 	}
 
 	const lines: string[] = [`Untracked todo artifacts (${gaps.length}):`];
@@ -801,7 +813,7 @@ export function runAuditSync(
 		"",
 		"Add a build chain in the roadmap for each untracked artifact.",
 	);
-	return { stdout: `${lines.join("\n")}\n`, stderr: "", exitCode: 1 };
+	return { stdout: `${lines.join("\n")}\n`, stderr: warnText, exitCode: 1 };
 }
 
 export type { BinaryFormat };
@@ -1021,12 +1033,13 @@ const HELP_AUDIT_SYNC = `usage: pfdsl audit-sync <roadmap> <flow> [<flow>...] [-
 Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
 Reports artifacts with status: todo in flow files that have no corresponding entry
 in the roadmap, indicating a build chain is missing.
+Omitting type: on the roadmap file is treated as roadmap and allowed, with a warning (W006).
 
   <roadmap>  path to a .pfdsl file with type: roadmap
   <flow>     one or more .pfdsl files with type: workflow or runtime-pipeline
 
 Options:
-  --json  output as JSON ({ ok, gaps: [{file, artifactId, label, status}] })
+  --json  output as JSON ({ ok, gaps: [{file, artifactId, label, status}], warnings? })
 
 Exit codes:
   0  all todo artifacts are tracked in the roadmap
