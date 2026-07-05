@@ -495,7 +495,8 @@ process:
 				hasDownstream: false,
 			},
 		];
-		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const issuesByNumber = new Map([[16, { number: 16, state: "CLOSED" }]]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 		const fm = doc.toJS();
 		assert.equal(fm.artifact.def_jump, undefined, "artifact should be removed");
 		assert.equal(fm.process?.i16_implement_def_jump, undefined, "sole-output process should be removed");
@@ -532,7 +533,8 @@ process:
 				hasDownstream: false,
 			},
 		];
-		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const issuesByNumber = new Map([[5, { number: 5, state: "CLOSED" }]]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 		const fm = doc.toJS();
 		assert.equal(fm.artifact.hierarchy_spec, undefined, "closed artifact should be removed");
 		assert.ok(fm.process?.i5_draft_multifile_specs, "multi-output process should be kept");
@@ -540,6 +542,78 @@ process:
 		assert.ok(!newBody.includes("hierarchy_spec"), "closed artifact should not appear in body");
 		assert.ok(newBody.includes("multifile_policy"), "other output should remain in body");
 		assert.ok(newBody.includes("i5_draft_multifile_specs"), "process should remain in body");
+	});
+
+	it("A1 guard: sole-output process shared by 2 issues — sibling still open, does NOT delete", () => {
+		const yaml = `artifact:
+  cli_tool:
+    label: CLI
+    status: done
+  multifile_specs:
+    label: Multi-file specs
+    status: todo
+process:
+  i5_i6_draft_multifile_specs:
+    label: Draft multi-file specs
+`;
+		const body = `\ncli_tool >> i5_i6_draft_multifile_specs -> multifile_specs\n`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "closed_in_flow",
+				issueNumber: 5,
+				processId: "i5_i6_draft_multifile_specs",
+				artifactId: "multifile_specs",
+				detail: "issue is closed",
+				fixVia: "flow",
+				hasDownstream: false,
+			},
+		];
+		const issuesByNumber = new Map([
+			[5, { number: 5, state: "CLOSED" }],
+			[6, { number: 6, state: "OPEN" }],
+		]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
+		const fm = doc.toJS();
+		assert.ok(fm.artifact.multifile_specs, "artifact must NOT be removed while a sibling issue is still open");
+		assert.ok(fm.process?.i5_i6_draft_multifile_specs, "process must NOT be removed while a sibling issue is still open");
+		assert.equal(newBody, body, "body must be unchanged while a sibling issue is still open");
+	});
+
+	it("A1 guard: sole-output process shared by 2 issues — both closed, deletes as normal", () => {
+		const yaml = `artifact:
+  cli_tool:
+    label: CLI
+    status: done
+  multifile_specs:
+    label: Multi-file specs
+    status: todo
+process:
+  i5_i6_draft_multifile_specs:
+    label: Draft multi-file specs
+`;
+		const body = `\ncli_tool >> i5_i6_draft_multifile_specs -> multifile_specs\n`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "closed_in_flow",
+				issueNumber: 5,
+				processId: "i5_i6_draft_multifile_specs",
+				artifactId: "multifile_specs",
+				detail: "issue is closed",
+				fixVia: "flow",
+				hasDownstream: false,
+			},
+		];
+		const issuesByNumber = new Map([
+			[5, { number: 5, state: "CLOSED" }],
+			[6, { number: 6, state: "CLOSED" }],
+		]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
+		const fm = doc.toJS();
+		assert.equal(fm.artifact.multifile_specs, undefined, "artifact should be removed once every tracking issue is closed");
+		assert.equal(fm.process?.i5_i6_draft_multifile_specs, undefined, "process should be removed once every tracking issue is closed");
+		assert.ok(!newBody.includes("i5_i6_draft_multifile_specs"), "edge should be removed from body");
 	});
 
 	it("closed_not_planned terminal: Case A removal (same as closed_in_flow terminal)", () => {
@@ -567,7 +641,8 @@ process:
 				hasDownstream: false,
 			},
 		];
-		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const issuesByNumber = new Map([[16, { number: 16, state: "CLOSED" }]]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 		const fm = doc.toJS();
 		assert.equal(fm.artifact.def_jump, undefined, "artifact should be removed");
 		assert.equal(fm.process?.i16_implement_def_jump, undefined, "sole-output process should be removed");
@@ -605,7 +680,8 @@ process:
 				hasDownstream: true,
 			},
 		];
-		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const issuesByNumber = new Map([[16, { number: 16, state: "CLOSED" }]]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 		const fm = doc.toJS();
 		// process id unchanged (permanent prefix)
 		assert.ok(fm.process.i16_implement_def_jump, "process id must not be renamed");
@@ -647,7 +723,8 @@ process:
 				hasDownstream: true,
 			},
 		];
-		applyClosedInFlowFixes(doc, body, findings);
+		const issuesByNumber = new Map([[4, { number: 4, state: "CLOSED" }]]);
+		applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 		const emitted = doc.toString();
 		const reparsed = parseDocument(emitted).toJS();
 		const desc = reparsed.artifact?.lint_checker?.description;

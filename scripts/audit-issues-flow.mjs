@@ -88,6 +88,9 @@ const consumedIds = getConsumedArtifactIds(body);
 // issue #5 closing could act on an output really tracked by issue #6). This is a known,
 // accepted limitation — see docs/superpowers/specs/2026-07-04-issue-tracking-id-on-process-design.md
 // ("1 processが複数出力artifactを持つ場合"). Not present in current roadmap.pfdsl data.
+// Separately, applyClosedInFlowFixes guards against fully deleting a shared sole-output
+// process until every one of its tracking issues is closed, so a still-open sibling issue
+// never loses its tracked process out from under it.
 const entries = [];
 for (const proc of processes) {
 	const outputs = outputsByProcess.get(proc.id) ?? [];
@@ -182,7 +185,7 @@ findings = computeFindings(entries, issues);
 const issuesByNumber = new Map(issues.map((i) => [i.number, i]));
 const docBefore = doc.toString({ lineWidth: 0 });
 applyFixes(doc, findings, issuesByNumber);
-const newBody = applyClosedInFlowFixes(doc, body, findings);
+const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 const docAfter = doc.toString({ lineWidth: 0 });
 
 if (docAfter !== docBefore || newBody !== body) {

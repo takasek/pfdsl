@@ -284,8 +284,13 @@ export function normalizeBody(body) {
  *
  * Two cases per finding:
  *   A. hasDownstream === false (terminal): remove artifact from frontmatter. If the producing
- *      process has no other outputs, remove the process too and drop the edge line. If the
- *      process has other outputs, remove only this artifact from the output list in the edge.
+ *      process has no other outputs, this would fully retire the process — but only do so once
+ *      every issue number embedded in the process id's `iN_iM_..._` prefix is CLOSED (a process
+ *      can be tracked by more than one issue; deleting it while a sibling issue is still open
+ *      would orphan that issue's tracking). If any tracking issue is still open, skip this
+ *      finding entirely and retry on a future run. If the process has other outputs, remove
+ *      only this artifact from the output list in the edge (no cross-issue check needed, since
+ *      the process itself survives).
  *   B. hasDownstream === true and status !== done (non-terminal): the iN_ prefix on the process
  *      is permanent, so there is nothing to rename. Just clear the process's issue-tracking
  *      fields (tags, updated_at) — status is already correct from the completion commit.
@@ -293,9 +298,10 @@ export function normalizeBody(body) {
  * @param {import("yaml").Document} doc
  * @param {string} body
  * @param {{ type: string, processId: string, artifactId: string, hasDownstream?: boolean }[]} findings
+ * @param {Map<number, { number: number, state: string }>} issuesByNumber
  * @returns {string} new body string
  */
-export function applyClosedInFlowFixes(doc, body, findings) {
+export function applyClosedInFlowFixes(doc, body, findings, issuesByNumber) {
 	const closedFindings = findings.filter(
 		(f) => (f.type === "closed_in_flow" || f.type === "closed_not_planned") && f.fixVia === "flow",
 	);
@@ -307,29 +313,40 @@ export function applyClosedInFlowFixes(doc, body, findings) {
 		const { processId, artifactId, hasDownstream } = finding;
 
 		if (!hasDownstream) {
-			// Case A: terminal — remove artifact from frontmatter
-			doc.deleteIn(["artifact", artifactId]);
-
-			// Find the producing edge line for this process
+			// Case A: terminal. Find the producing edge line for this process first, so we
+			// know whether removing this artifact would fully retire the process.
 			const edgeIdx = lines.findIndex((line) => {
 				const parsed = parseEdgeLine(line);
 				return parsed && parsed.process === processId && parsed.outputs.includes(artifactId);
 			});
 
-			if (edgeIdx >= 0) {
-				const parsed = parseEdgeLine(lines[edgeIdx]);
-				const remainingOutputs = parsed.outputs.filter((o) => o !== artifactId);
+			const remainingOutputs = edgeIdx >= 0
+				? parseEdgeLine(lines[edgeIdx]).outputs.filter((o) => o !== artifactId)
+				: null;
 
-				if (remainingOutputs.length === 0) {
-					// A1: sole-output process — remove process from frontmatter and drop the edge line
-					doc.deleteIn(["process", processId]);
-					lines.splice(edgeIdx, 1);
-				} else if (remainingOutputs.length === 1) {
-					// A2: multi-output, now single — rewrite as non-list
-					lines[edgeIdx] = `${parsed.prefix}${remainingOutputs[0]}`;
-				} else {
-					// A2: multi-output — rewrite list without removed artifact
-					lines[edgeIdx] = `${parsed.prefix}[${remainingOutputs.join(", ")}]`;
+			if (remainingOutputs !== null && remainingOutputs.length === 0) {
+				// A1: this would be the process's last output. Only retire the whole process
+				// if every issue tracking it is closed.
+				const prefixMatch = processId.match(/^(?:i\d+_)+/);
+				const issueNumbers = prefixMatch
+					? [...prefixMatch[0].matchAll(/i(\d+)_/g)].map((m) => Number(m[1]))
+					: [];
+				const allClosed = issueNumbers.every((n) => issuesByNumber.get(n)?.state === "CLOSED");
+				if (!allClosed) continue;
+
+				doc.deleteIn(["artifact", artifactId]);
+				doc.deleteIn(["process", processId]);
+				lines.splice(edgeIdx, 1);
+			} else {
+				// A2: multi-output (or no edge found) — remove only this artifact.
+				doc.deleteIn(["artifact", artifactId]);
+				if (edgeIdx >= 0) {
+					const parsed = parseEdgeLine(lines[edgeIdx]);
+					if (remainingOutputs.length === 1) {
+						lines[edgeIdx] = `${parsed.prefix}${remainingOutputs[0]}`;
+					} else {
+						lines[edgeIdx] = `${parsed.prefix}[${remainingOutputs.join(", ")}]`;
+					}
 				}
 			}
 		} else {
