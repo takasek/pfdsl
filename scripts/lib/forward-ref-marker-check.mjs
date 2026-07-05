@@ -1,31 +1,35 @@
 /**
  * Pure functions for marker-based forward-reference resolution: matches
- * `<!-- forward-ref: <id> -->` markers against `<!-- implements: <id> -->`
- * markers by id. This only does the mechanical cross-referencing — whether a
- * match means the forward-ref is actually stale is left to human judgment.
- * See #326 (complements the phrase-grep in stale-forward-ref-check.mjs).
+ * `[[SPEC_<slug>?]]` forward-ref markers (anywhere in prose) against
+ * `(SPEC_<slug>)` id definitions (trailing on a heading line) by id. This
+ * only does the mechanical cross-referencing — whether a match means the
+ * forward-ref is actually stale is left to human judgment. See #326.
+ *
+ * Note: strict references `[[SPEC_<slug>]]` (no trailing `?`) are a separate,
+ * not-yet-implemented construct reserved for #328 and are ignored here.
  */
 
-const FORWARD_REF_RE = /<!--\s*forward-ref:\s*(\S+?)\s*-->/g;
-const IMPLEMENTS_RE = /<!--\s*implements:\s*(\S+?)\s*-->/g;
+const FORWARD_REF_RE = /\[\[SPEC_([A-Za-z0-9_]+)\?\]\]/g;
+const HEADING_RE = /^#{1,6}\s/;
+const IMPLEMENTS_TRAILING_RE = /\(SPEC_([A-Za-z0-9_]+)\)\s*$/;
+const FENCE_RE = /^(```|~~~)/;
 
 /**
  * @param {string} text
- * @param {RegExp} re
- * @returns {Array<{line: number, id: string}>}
+ * @param {(line: string, lineNumber: number, hits: Array<{line: number, id: string}>) => void} visit
  */
-function findMarkers(text, re) {
-	const hits = [];
+function forEachNonFencedLine(text, visit) {
 	const lines = text.split("\n");
+	let inFence = false;
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
-		re.lastIndex = 0;
-		let match;
-		while ((match = re.exec(line)) !== null) {
-			hits.push({ line: i + 1, id: match[1] });
+		if (FENCE_RE.test(line)) {
+			inFence = !inFence;
+			continue;
 		}
+		if (inFence) continue;
+		visit(line, i + 1);
 	}
-	return hits;
 }
 
 /**
@@ -33,7 +37,15 @@ function findMarkers(text, re) {
  * @returns {Array<{line: number, id: string}>}
  */
 export function findForwardRefMarkers(text) {
-	return findMarkers(text, FORWARD_REF_RE);
+	const hits = [];
+	forEachNonFencedLine(text, (line, lineNumber) => {
+		FORWARD_REF_RE.lastIndex = 0;
+		let match;
+		while ((match = FORWARD_REF_RE.exec(line)) !== null) {
+			hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
+		}
+	});
+	return hits;
 }
 
 /**
@@ -41,7 +53,14 @@ export function findForwardRefMarkers(text) {
  * @returns {Array<{line: number, id: string}>}
  */
 export function findImplementsMarkers(text) {
-	return findMarkers(text, IMPLEMENTS_RE);
+	const hits = [];
+	forEachNonFencedLine(text, (line, lineNumber) => {
+		if (!HEADING_RE.test(line)) return;
+		const match = IMPLEMENTS_TRAILING_RE.exec(line);
+		if (!match) return;
+		hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
+	});
+	return hits;
 }
 
 /**
