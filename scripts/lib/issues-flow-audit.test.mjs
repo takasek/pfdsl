@@ -2,7 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-	parseIssueArtifacts,
+	parseIssueProcesses,
+	buildProcessOutputs,
 	computeFindings,
 	applyFixes,
 	applyClosedInFlowFixes,
@@ -12,77 +13,115 @@ import {
 import { parseDocument } from "./yaml-require.mjs";
 
 // ---------------------------------------------------------------------------
-// parseIssueArtifacts
+// parseIssueProcesses
 // ---------------------------------------------------------------------------
 
-describe("parseIssueArtifacts", () => {
-	it("returns empty array when no artifact key", () => {
-		const result = parseIssueArtifacts({});
+describe("parseIssueProcesses", () => {
+	it("returns empty array when no process key", () => {
+		const result = parseIssueProcesses({});
 		assert.deepEqual(result, []);
 	});
 
-	it("ignores non-iN_ artifacts", () => {
+	it("ignores non-iN_ processes", () => {
 		const fm = {
-			artifact: {
-				spec_v006: { label: "Spec", status: "done" },
-				cli_tool: { label: "CLI", status: "done" },
-				findings_r12: { label: "Findings", status: "done" },
+			process: {
+				build_cli: { label: "CLI" },
+				write_docs: { label: "Docs" },
 			},
 		};
-		const result = parseIssueArtifacts(fm);
+		const result = parseIssueProcesses(fm);
 		assert.deepEqual(result, []);
 	});
 
-	it("parses iN_ artifacts and extracts issueNumber", () => {
+	it("parses iN_ processes and extracts issueNumbers", () => {
 		const fm = {
-			artifact: {
-				i4_lint_checker: { label: "Lint", status: "todo", tags: ["priority:high"] },
-				i11_portable_skill: { label: "Skill", status: "todo", tags: ["priority:high"] },
+			process: {
+				i4_build_lint_checker: { label: "Lint", tags: ["priority:high"] },
+				i11_port_skill: { label: "Skill", tags: ["priority:high"] },
 			},
 		};
-		const result = parseIssueArtifacts(fm);
+		const result = parseIssueProcesses(fm);
 		assert.equal(result.length, 2);
-		assert.equal(result[0].id, "i4_lint_checker");
-		assert.equal(result[0].issueNumber, 4);
-		assert.equal(result[0].status, "todo");
+		assert.equal(result[0].id, "i4_build_lint_checker");
+		assert.deepEqual(result[0].issueNumbers, [4]);
 		assert.deepEqual(result[0].priorities, ["priority:high"]);
-		assert.equal(result[1].issueNumber, 11);
+		assert.deepEqual(result[1].issueNumbers, [11]);
 	});
 
 	it("updatedAt and priorities default correctly when fields absent; updatedAt extracted when present", () => {
-		const absent = parseIssueArtifacts({ artifact: { i5_hierarchy_spec: { label: "H", status: "todo" } } });
+		const absent = parseIssueProcesses({ process: { i5_draft_hierarchy_spec: { label: "H" } } });
 		assert.equal(absent[0].updatedAt, undefined);
 		assert.deepEqual(absent[0].priorities, []);
 
-		const present = parseIssueArtifacts({ artifact: { i5_hierarchy_spec: { label: "H", status: "todo", updated_at: "2026-06-01T00:00:00Z" } } });
+		const present = parseIssueProcesses({ process: { i5_draft_hierarchy_spec: { label: "H", updated_at: "2026-06-01T00:00:00Z" } } });
 		assert.equal(present[0].updatedAt, "2026-06-01T00:00:00Z");
 	});
 
 	it("priorities filters only priority: tags and sorts them", () => {
 		const fm = {
-			artifact: {
-				i5_hierarchy_spec: {
+			process: {
+				i5_draft_hierarchy_spec: {
 					label: "H",
-					status: "todo",
 					tags: ["foo", "priority:high", "priority:low", "bar"],
 				},
 			},
 		};
-		const result = parseIssueArtifacts(fm);
+		const result = parseIssueProcesses(fm);
 		assert.deepEqual(result[0].priorities, ["priority:high", "priority:low"]);
 	});
 
-	it("mixes iN_ and non-iN_ artifacts correctly", () => {
+	it("mixes iN_ and non-iN_ processes correctly", () => {
 		const fm = {
-			artifact: {
-				spec_v006: { label: "Spec", status: "done" },
-				i18_issue_sync: { label: "Sync", status: "todo", tags: ["priority:high"] },
-				cli_tool: { label: "CLI", status: "done" },
+			process: {
+				build_cli: { label: "CLI" },
+				i18_sync_issues: { label: "Sync", tags: ["priority:high"] },
+				write_docs: { label: "Docs" },
 			},
 		};
-		const result = parseIssueArtifacts(fm);
+		const result = parseIssueProcesses(fm);
 		assert.equal(result.length, 1);
-		assert.equal(result[0].issueNumber, 18);
+		assert.deepEqual(result[0].issueNumbers, [18]);
+	});
+
+	it("parses concatenated iN_ prefixes when one process is tracked by multiple issues", () => {
+		const fm = {
+			process: {
+				i40_i41_do_work: { label: "Do work" },
+			},
+		};
+		const result = parseIssueProcesses(fm);
+		assert.equal(result.length, 1);
+		assert.equal(result[0].id, "i40_i41_do_work");
+		assert.deepEqual(result[0].issueNumbers, [40, 41]);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// buildProcessOutputs
+// ---------------------------------------------------------------------------
+
+describe("buildProcessOutputs", () => {
+	it("maps process id to single output", () => {
+		const body = "a >> P -> b\n";
+		const result = buildProcessOutputs(body);
+		assert.deepEqual(result.get("P"), ["b"]);
+	});
+
+	it("maps process id to multiple outputs from a list edge", () => {
+		const body = "a >> P -> [b, c]\n";
+		const result = buildProcessOutputs(body);
+		assert.deepEqual(result.get("P"), ["b", "c"]);
+	});
+
+	it("merges outputs across multiple edge lines for the same process", () => {
+		const body = "a >> P -> b\nx >> P -> c\n";
+		const result = buildProcessOutputs(body);
+		assert.deepEqual(result.get("P"), ["b", "c"]);
+	});
+
+	it("returns an empty map for a body with no edges", () => {
+		const result = buildProcessOutputs("not an edge line\n");
+		assert.equal(result.size, 0);
 	});
 });
 
@@ -91,53 +130,54 @@ describe("parseIssueArtifacts", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeFindings", () => {
-	// Helper: open issue with matching artifact but no flow:managed label
-	it("missing_label: open issue with artifact but no flow:managed", () => {
-		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+	it("missing_label: open issue with tracked process but no flow:managed", () => {
+		const entries = [{ processId: "i5_draft_hierarchy_spec", issueNumber: 5, artifactId: "hierarchy_spec", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: [], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "missing_label");
 		assert.ok(f);
 		assert.equal(f.issueNumber, 5);
-		assert.equal(f.artifactId, "i5_hierarchy_spec");
+		assert.equal(f.processId, "i5_draft_hierarchy_spec");
+		assert.equal(f.artifactId, "hierarchy_spec");
 		assert.equal(f.fixVia, "github");
 	});
 
 	it("no missing_label when flow:managed is present", () => {
-		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_draft_hierarchy_spec", issueNumber: 5, artifactId: "hierarchy_spec", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		assert.ok(!findings.find((f) => f.type === "missing_label"));
 	});
 
-	it("exempt_conflict: open issue with artifact AND flow:exempt label", () => {
-		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+	it("exempt_conflict: open issue with tracked process AND flow:exempt label", () => {
+		const entries = [{ processId: "i5_draft_hierarchy_spec", issueNumber: 5, artifactId: "hierarchy_spec", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed", "flow:exempt"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "exempt_conflict");
 		assert.ok(f);
 		assert.equal(f.fixVia, undefined);
 	});
 
 	it("exempt_conflict without managed: no missing_label (bot must not add flow:managed to exempt issues)", () => {
-		const artifacts = [{ id: "i5_hierarchy_spec", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_draft_hierarchy_spec", issueNumber: 5, artifactId: "hierarchy_spec", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:exempt"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		assert.ok(findings.find((f) => f.type === "exempt_conflict"), "should still report exempt_conflict");
 		assert.ok(!findings.find((f) => f.type === "missing_label"), "must not report missing_label for exempt issues");
 	});
 
-	it("missing_artifact: open issue with flow:managed but no artifact", () => {
+	it("missing_process: open issue with flow:managed but no tracked process", () => {
 		const issues = [{ number: 99, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
 		const findings = computeFindings([], issues);
-		const f = findings.find((f) => f.type === "missing_artifact");
+		const f = findings.find((f) => f.type === "missing_process");
 		assert.ok(f);
 		assert.equal(f.issueNumber, 99);
+		assert.equal(f.processId, undefined);
 		assert.equal(f.artifactId, undefined);
 		assert.equal(f.fixVia, undefined);
 	});
 
-	it("untriaged: open issue with no artifact and no flow labels", () => {
+	it("untriaged: open issue with no tracked process and no flow labels", () => {
 		const issues = [{ number: 99, state: "OPEN", labels: [], updatedAt: "2026-01-01T00:00:00Z" }];
 		const findings = computeFindings([], issues);
 		const f = findings.find((f) => f.type === "untriaged");
@@ -146,36 +186,37 @@ describe("computeFindings", () => {
 		assert.equal(f.fixVia, undefined);
 	});
 
-	it("no finding: open issue with flow:exempt and no artifact", () => {
+	it("no finding: open issue with flow:exempt and no tracked process", () => {
 		const issues = [{ number: 99, state: "OPEN", labels: ["flow:exempt"], updatedAt: "2026-01-01T00:00:00Z" }];
 		const findings = computeFindings([], issues);
 		assert.equal(findings.length, 0);
 	});
 
-	it("unknown_issue: artifact whose issueNumber is not in issues list", () => {
-		const artifacts = [{ id: "i99_foo", issueNumber: 99, status: "todo", updatedAt: undefined, priorities: [] }];
-		const findings = computeFindings(artifacts, []);
+	it("unknown_issue: entry whose issueNumber is not in issues list", () => {
+		const entries = [{ processId: "i99_do_foo", issueNumber: 99, artifactId: "foo", status: "todo", updatedAt: undefined, priorities: [] }];
+		const findings = computeFindings(entries, []);
 		const f = findings.find((f) => f.type === "unknown_issue");
 		assert.ok(f);
 		assert.equal(f.issueNumber, 99);
-		assert.equal(f.artifactId, "i99_foo");
+		assert.equal(f.processId, "i99_do_foo");
+		assert.equal(f.artifactId, "foo");
 		assert.equal(f.fixVia, undefined);
 	});
 
-	it("closed_in_flow: artifact for closed issue with status !== done", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+	it("closed_in_flow: entry for closed issue with status !== done", () => {
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "closed_in_flow");
 		assert.ok(f);
 		assert.equal(f.fixVia, "flow");
 		assert.ok(f.detail.includes("delete the chain"), "detail should guide cleanup");
 	});
 
-	it("closed_in_flow: artifact for closed issue with status done also emits finding", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "done", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+	it("closed_in_flow: entry for closed issue with status done also emits finding", () => {
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "done", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-02-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const matching = findings.filter((f) => f.issueNumber === 5);
 		assert.equal(matching.length, 1);
 		assert.equal(matching[0].type, "closed_in_flow");
@@ -184,9 +225,9 @@ describe("computeFindings", () => {
 	});
 
 	it("closed_not_planned: NOT_PLANNED close without downstream → fixVia:flow (auto-removable)", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: false }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: false }];
 		const issues = [{ number: 5, state: "CLOSED", stateReason: "NOT_PLANNED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "closed_not_planned");
 		assert.ok(f, "should emit closed_not_planned");
 		assert.ok(!findings.find((f) => f.type === "closed_in_flow"), "must not emit closed_in_flow");
@@ -195,27 +236,27 @@ describe("computeFindings", () => {
 	});
 
 	it("closed_not_planned: NOT_PLANNED close with downstream → manual (no fixVia)", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: true }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: true }];
 		const issues = [{ number: 5, state: "CLOSED", stateReason: "NOT_PLANNED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "closed_not_planned");
 		assert.ok(f, "should emit closed_not_planned");
 		assert.equal(f.fixVia, undefined, "has downstream: must not auto-fix");
 	});
 
 	it("closed_in_flow: COMPLETED stateReason still uses closed_in_flow type", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "CLOSED", stateReason: "COMPLETED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "closed_in_flow");
 		assert.ok(f, "COMPLETED close should use closed_in_flow");
 		assert.ok(!findings.find((f) => f.type === "closed_not_planned"));
 	});
 
 	it("stale_updated_at: open issue with mismatched updatedAt", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "stale_updated_at");
 		assert.ok(f);
 		assert.equal(f.fixVia, "file");
@@ -223,63 +264,74 @@ describe("computeFindings", () => {
 		assert.ok(f.detail.includes("2026-06-01T00:00:00Z"));
 	});
 
-	it("stale_updated_at: artifact missing updatedAt shows (none)", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: undefined, priorities: [] }];
+	it("stale_updated_at: entry missing updatedAt shows (none)", () => {
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: undefined, priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "stale_updated_at");
 		assert.ok(f);
 		assert.ok(f.detail.includes("(none)"));
 	});
 
 	it("no stale_updated_at when updatedAt matches", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		assert.ok(!findings.find((f) => f.type === "stale_updated_at"));
 	});
 
-	it("priority_drift: issue priority labels differ from artifact priorities", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: ["priority:high"] }];
+	it("priority_drift: issue priority labels differ from process priorities", () => {
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: ["priority:high"] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed", "priority:low"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const f = findings.find((f) => f.type === "priority_drift");
 		assert.ok(f);
 		assert.equal(f.fixVia, "file");
 	});
 
 	it("no priority_drift when both have no priority labels", () => {
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: [] }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-06-01T00:00:00Z", priorities: [] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		assert.ok(!findings.find((f) => f.type === "priority_drift"));
 	});
 
 	it("one pair can yield multiple findings", () => {
-		// stale_updated_at + priority_drift + missing_label all at once
-		const artifacts = [{ id: "i5_foo", issueNumber: 5, status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: ["priority:high"] }];
+		const entries = [{ processId: "i5_do_foo", issueNumber: 5, artifactId: "foo", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: ["priority:high"] }];
 		const issues = [{ number: 5, state: "OPEN", labels: ["priority:low"], updatedAt: "2026-06-01T00:00:00Z" }];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		assert.ok(findings.find((f) => f.type === "missing_label"));
 		assert.ok(findings.find((f) => f.type === "stale_updated_at"));
 		assert.ok(findings.find((f) => f.type === "priority_drift"));
 	});
 
 	it("findings are ordered by issueNumber ascending", () => {
-		const artifacts = [
-			{ id: "i10_foo", issueNumber: 10, status: "todo", updatedAt: undefined, priorities: [] },
-			{ id: "i3_bar", issueNumber: 3, status: "todo", updatedAt: undefined, priorities: [] },
+		const entries = [
+			{ processId: "i10_do_foo", issueNumber: 10, artifactId: "foo", status: "todo", updatedAt: undefined, priorities: [] },
+			{ processId: "i3_do_bar", issueNumber: 3, artifactId: "bar", status: "todo", updatedAt: undefined, priorities: [] },
 		];
 		const issues = [
 			{ number: 10, state: "OPEN", labels: [], updatedAt: "2026-06-01T00:00:00Z" },
 			{ number: 3, state: "OPEN", labels: [], updatedAt: "2026-06-01T00:00:00Z" },
 		];
-		const findings = computeFindings(artifacts, issues);
+		const findings = computeFindings(entries, issues);
 		const nums = findings.map((f) => f.issueNumber);
-		// all 3s should come before 10s
 		const first10 = nums.indexOf(10);
 		const last3 = nums.lastIndexOf(3);
 		assert.ok(last3 < first10 || first10 === -1);
+	});
+
+	it("multi-output process: independent findings per output artifact (no aggregation)", () => {
+		const entries = [
+			{ processId: "i7_draft_specs", issueNumber: 7, artifactId: "spec_a", status: "done", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: true },
+			{ processId: "i7_draft_specs", issueNumber: 7, artifactId: "spec_b", status: "todo", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: false },
+		];
+		const issues = [{ number: 7, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(entries, issues);
+		const matching = findings.filter((f) => f.issueNumber === 7);
+		assert.equal(matching.length, 1, "spec_a (done+hasDownstream) should not produce a finding");
+		assert.equal(matching[0].artifactId, "spec_b");
+		assert.equal(matching[0].type, "closed_in_flow");
 	});
 });
 
@@ -289,21 +341,20 @@ describe("computeFindings", () => {
 
 describe("applyFixes", () => {
 	it("round-trip: preserves double-quoted label and adds updated_at", () => {
-		const yaml = `artifact:
-  i5_hierarchy_spec:
+		const yaml = `process:
+  i5_draft_hierarchy_spec:
     label: "階層PFD仕様案 (#5)"
-    status: todo
-  i6_presets_spec:
+  i6_draft_presets_spec:
     label: "共有プリセット仕様案 (#6)"
-    status: todo
 `;
 		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "stale_updated_at",
 				issueNumber: 6,
-				artifactId: "i6_presets_spec",
-				detail: "artifact: (none), issue: 2026-06-01T00:00:00Z",
+				processId: "i6_draft_presets_spec",
+				artifactId: "presets_spec",
+				detail: "process: (none), issue: 2026-06-01T00:00:00Z",
 				fixVia: "file",
 			},
 		];
@@ -312,17 +363,14 @@ describe("applyFixes", () => {
 		]);
 		applyFixes(doc, findings, issuesByNumber);
 		const out = doc.toString();
-		// quoted label preserved verbatim
 		assert.ok(out.includes('"階層PFD仕様案 (#5)"'), "quoted label should be preserved");
-		// updated_at added
 		assert.ok(out.includes("updated_at: 2026-06-01T00:00:00Z"), "updated_at should be added");
 	});
 
 	it("priority_drift: replaces priority tags, preserves non-priority tags", () => {
-		const yaml = `artifact:
-  i5_foo:
+		const yaml = `process:
+  i5_do_foo:
     label: Foo
-    status: todo
     tags:
       - priority:high
       - foo
@@ -332,8 +380,9 @@ describe("applyFixes", () => {
 			{
 				type: "priority_drift",
 				issueNumber: 5,
-				artifactId: "i5_foo",
-				detail: "artifact: [priority:high], issue: [priority:low]",
+				processId: "i5_do_foo",
+				artifactId: "foo",
+				detail: "process: [priority:high], issue: [priority:low]",
 				fixVia: "file",
 			},
 		];
@@ -342,14 +391,13 @@ describe("applyFixes", () => {
 		]);
 		applyFixes(doc, findings, issuesByNumber);
 		const obj = doc.toJS();
-		assert.deepEqual(obj.artifact.i5_foo.tags, ["foo", "priority:low"]);
+		assert.deepEqual(obj.process.i5_do_foo.tags, ["foo", "priority:low"]);
 	});
 
 	it("priority_drift: removing last tag deletes the key", () => {
-		const yaml = `artifact:
-  i5_foo:
+		const yaml = `process:
+  i5_do_foo:
     label: Foo
-    status: todo
     tags:
       - priority:high
 `;
@@ -358,53 +406,50 @@ describe("applyFixes", () => {
 			{
 				type: "priority_drift",
 				issueNumber: 5,
-				artifactId: "i5_foo",
-				detail: "artifact: [priority:high], issue: []",
+				processId: "i5_do_foo",
+				artifactId: "foo",
+				detail: "process: [priority:high], issue: []",
 				fixVia: "file",
 			},
 		];
-		// issue has no priority labels
 		const issuesByNumber = new Map([
 			[5, { number: 5, state: "OPEN", labels: ["flow:managed"], updatedAt: "2026-06-01T00:00:00Z" }],
 		]);
 		applyFixes(doc, findings, issuesByNumber);
 		const obj = doc.toJS();
-		assert.equal(obj.artifact.i5_foo.tags, undefined);
+		assert.equal(obj.process.i5_do_foo.tags, undefined);
 	});
 
 	it("ignores findings without fixVia: 'file'", () => {
-		const yaml = `artifact:
-  i5_foo:
+		const yaml = `process:
+  i5_do_foo:
     label: Foo
-    status: todo
 `;
 		const doc = parseDocument(yaml);
 		const before = doc.toString();
 		const findings = [
-			{ type: "unknown_issue", issueNumber: 5, artifactId: "i5_foo", detail: "" },
-			{ type: "closed_in_flow", issueNumber: 5, artifactId: "i5_foo", detail: "", fixVia: "flow" },
+			{ type: "unknown_issue", issueNumber: 5, processId: "i5_do_foo", artifactId: "foo", detail: "" },
+			{ type: "closed_in_flow", issueNumber: 5, processId: "i5_do_foo", artifactId: "foo", detail: "", fixVia: "flow" },
 		];
 		applyFixes(doc, findings, new Map());
 		assert.equal(doc.toString(), before);
 	});
 
-	it("no mid-sentence line breaks: long description/criteria survive emit with lineWidth:0", () => {
+	it("no mid-sentence line breaks: long description/criteria on the process survive emit with lineWidth:0", () => {
 		const longDesc = "これはとても長い説明文で、句読点のない位置で折り返されてはいけません。文の途中で改行が入ると意味が変わってしまうため、lineWidth:0 で出力することが必要です。";
-		const longCrit = "長い完了条件の文章もまた途中で折り返されてはいけません。句読点（。、）の後でのみ改行が許可されます。";
-		const yamlStr = `artifact:
-  i5_foo:
+		const yamlStr = `process:
+  i5_do_foo:
     label: Foo
     description: ${longDesc}
-    criteria: ${longCrit}
-    status: todo
 `;
 		const doc = parseDocument(yamlStr);
 		const findings = [
 			{
 				type: "stale_updated_at",
 				issueNumber: 5,
-				artifactId: "i5_foo",
-				detail: "artifact: (none), issue: 2026-06-01T00:00:00Z",
+				processId: "i5_do_foo",
+				artifactId: "foo",
+				detail: "process: (none), issue: 2026-06-01T00:00:00Z",
 				fixVia: "file",
 			},
 		];
@@ -415,9 +460,7 @@ describe("applyFixes", () => {
 		const out = doc.toString({ lineWidth: 0 });
 		const lines = out.split("\n");
 		const descLine = lines.find((l) => l.includes("description:"));
-		const critLine = lines.find((l) => l.includes("criteria:"));
 		assert.ok(descLine && descLine.includes(longDesc), `description should be on one line, got: ${descLine}`);
-		assert.ok(critLine && critLine.includes(longCrit), `criteria should be on one line, got: ${critLine}`);
 	});
 });
 
@@ -432,34 +475,33 @@ describe("applyClosedInFlowFixes", () => {
   cli_tool:
     label: CLI
     status: done
-  i16_def_jump:
+  def_jump:
     label: def-jump feature
     status: todo
 process:
-  implement_def_jump:
+  i16_implement_def_jump:
     label: Implement def-jump
 `;
-		const body = `\ncli_tool >> implement_def_jump -> i16_def_jump\n`;
+		const body = `\ncli_tool >> i16_implement_def_jump -> def_jump\n`;
 		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "closed_in_flow",
 				issueNumber: 16,
-				artifactId: "i16_def_jump",
+				processId: "i16_implement_def_jump",
+				artifactId: "def_jump",
 				detail: "issue is closed",
 				fixVia: "flow",
 				hasDownstream: false,
 			},
 		];
-		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const issuesByNumber = new Map([[16, { number: 16, state: "CLOSED" }]]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 		const fm = doc.toJS();
-		// artifact removed from frontmatter
-		assert.equal(fm.artifact.i16_def_jump, undefined, "artifact should be removed");
-		// sole-output process removed from frontmatter
-		assert.equal(fm.process?.implement_def_jump, undefined, "sole-output process should be removed");
-		// edge line removed from body
-		assert.ok(!newBody.includes("implement_def_jump"), "edge should be removed from body");
-		assert.ok(!newBody.includes("i16_def_jump"), "artifact should not appear in body");
+		assert.equal(fm.artifact.def_jump, undefined, "artifact should be removed");
+		assert.equal(fm.process?.i16_implement_def_jump, undefined, "sole-output process should be removed");
+		assert.ok(!newBody.includes("i16_implement_def_jump"), "edge should be removed from body");
+		assert.ok(!newBody.includes("def_jump"), "artifact should not appear in body");
 	});
 
 	// Case A2: terminal artifact, multi-output process → remove artifact from list, keep process and edge
@@ -468,187 +510,225 @@ process:
   spec_v006:
     label: Spec v0.0.6
     status: done
-  i5_hierarchy_spec:
+  hierarchy_spec:
     label: Hierarchy spec
     status: todo
   multifile_policy:
     label: Policy
     status: todo
 process:
-  draft_multifile_specs:
+  i5_draft_multifile_specs:
     label: Draft multi-file specs
 `;
-		const body = `\nspec_v006 >> draft_multifile_specs -> [i5_hierarchy_spec, multifile_policy]\n`;
+		const body = `\nspec_v006 >> i5_draft_multifile_specs -> [hierarchy_spec, multifile_policy]\n`;
 		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "closed_in_flow",
 				issueNumber: 5,
-				artifactId: "i5_hierarchy_spec",
+				processId: "i5_draft_multifile_specs",
+				artifactId: "hierarchy_spec",
 				detail: "issue is closed",
 				fixVia: "flow",
 				hasDownstream: false,
 			},
 		];
-		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const issuesByNumber = new Map([[5, { number: 5, state: "CLOSED" }]]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 		const fm = doc.toJS();
-		// closed artifact removed from frontmatter
-		assert.equal(fm.artifact.i5_hierarchy_spec, undefined, "closed artifact should be removed");
-		// multi-output process kept
-		assert.ok(fm.process?.draft_multifile_specs, "multi-output process should be kept");
-		// other artifact kept
+		assert.equal(fm.artifact.hierarchy_spec, undefined, "closed artifact should be removed");
+		assert.ok(fm.process?.i5_draft_multifile_specs, "multi-output process should be kept");
 		assert.ok(fm.artifact.multifile_policy, "other output should remain in frontmatter");
-		// body still has the edge but without the closed artifact
-		assert.ok(!newBody.includes("i5_hierarchy_spec"), "closed artifact should not appear in body");
+		assert.ok(!newBody.includes("hierarchy_spec"), "closed artifact should not appear in body");
 		assert.ok(newBody.includes("multifile_policy"), "other output should remain in body");
-		assert.ok(newBody.includes("draft_multifile_specs"), "process should remain in body");
+		assert.ok(newBody.includes("i5_draft_multifile_specs"), "process should remain in body");
 	});
 
-
-	it("B: no mid-sentence line breaks: long description survives demote with lineWidth:0", () => {
-		const longDesc = "これはとても長い説明文で、句読点のない位置で折り返されてはいけません。文の途中で改行が入ると意味が変わってしまうため注意が必要です。";
-		const yamlStr = `artifact:
+	it("A1 guard: sole-output process shared by 2 issues — sibling still open, does NOT delete", () => {
+		const yaml = `artifact:
   cli_tool:
     label: CLI
     status: done
-  i4_foo:
-    label: Foo
-    description: ${longDesc}
+  multifile_specs:
+    label: Multi-file specs
     status: todo
 process:
-  use_foo:
-    label: Use foo
+  i5_i6_draft_multifile_specs:
+    label: Draft multi-file specs
 `;
-		const body = `\ncli_tool >> make_foo -> i4_foo\ni4_foo >> use_foo -> cli_tool\n`;
-		const doc = parseDocument(yamlStr);
+		const body = `\ncli_tool >> i5_i6_draft_multifile_specs -> multifile_specs\n`;
+		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "closed_in_flow",
-				issueNumber: 4,
-				artifactId: "i4_foo",
+				issueNumber: 5,
+				processId: "i5_i6_draft_multifile_specs",
+				artifactId: "multifile_specs",
 				detail: "issue is closed",
 				fixVia: "flow",
-				hasDownstream: true,
+				hasDownstream: false,
 			},
 		];
-		applyClosedInFlowFixes(doc, body, findings);
-		const out = doc.toString({ lineWidth: 0 });
-		const lines = out.split("\n");
-		const descLine = lines.find((l) => l.includes("description:"));
-		assert.ok(descLine && descLine.includes(longDesc), `description should be on one line after demote, got: ${descLine}`);
+		const issuesByNumber = new Map([
+			[5, { number: 5, state: "CLOSED" }],
+			[6, { number: 6, state: "OPEN" }],
+		]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
+		const fm = doc.toJS();
+		assert.ok(fm.artifact.multifile_specs, "artifact must NOT be removed while a sibling issue is still open");
+		assert.ok(fm.process?.i5_i6_draft_multifile_specs, "process must NOT be removed while a sibling issue is still open");
+		assert.equal(newBody, body, "body must be unchanged while a sibling issue is still open");
 	});
 
-		it("B: description containing ' #' survives write→re-parse round-trip without truncation", () => {
-			const yaml = `artifact:
+	it("A1 guard: sole-output process shared by 2 issues — both closed, deletes as normal", () => {
+		const yaml = `artifact:
   cli_tool:
     label: CLI
     status: done
-  i4_lint_checker:
-    label: Lint checker
-    description: lint 候補の完全リストは issue #4 が一次情報
+  multifile_specs:
+    label: Multi-file specs
     status: todo
 process:
-  use_lint:
-    label: Use lint
+  i5_i6_draft_multifile_specs:
+    label: Draft multi-file specs
 `;
-			const body = `\ncli_tool >> run_lint -> i4_lint_checker\ni4_lint_checker >> use_lint -> cli_tool\n`;
-			const doc = parseDocument(yaml);
-			const findings = [
-				{
-					type: "closed_in_flow",
-					issueNumber: 4,
-					artifactId: "i4_lint_checker",
-					detail: "issue is closed",
-					fixVia: "flow",
-					hasDownstream: true,
-				},
-			];
-			applyClosedInFlowFixes(doc, body, findings);
-			// Re-parse the emitted YAML to simulate the next file read
-			const emitted = doc.toString();
-			const reparsed = parseDocument(emitted).toJS();
-			const desc = reparsed.artifact?.lint_checker?.description;
-			assert.equal(
-				desc,
-				"lint 候補の完全リストは issue #4 が一次情報",
-				`description was truncated at ' #': got "${desc}"`,
-			);
-		});
+		const body = `\ncli_tool >> i5_i6_draft_multifile_specs -> multifile_specs\n`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "closed_in_flow",
+				issueNumber: 5,
+				processId: "i5_i6_draft_multifile_specs",
+				artifactId: "multifile_specs",
+				detail: "issue is closed",
+				fixVia: "flow",
+				hasDownstream: false,
+			},
+		];
+		const issuesByNumber = new Map([
+			[5, { number: 5, state: "CLOSED" }],
+			[6, { number: 6, state: "CLOSED" }],
+		]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
+		const fm = doc.toJS();
+		assert.equal(fm.artifact.multifile_specs, undefined, "artifact should be removed once every tracking issue is closed");
+		assert.equal(fm.process?.i5_i6_draft_multifile_specs, undefined, "process should be removed once every tracking issue is closed");
+		assert.ok(!newBody.includes("i5_i6_draft_multifile_specs"), "edge should be removed from body");
+	});
 
 	it("closed_not_planned terminal: Case A removal (same as closed_in_flow terminal)", () => {
 		const yaml = `artifact:
   cli_tool:
     label: CLI
     status: done
-  i16_def_jump:
+  def_jump:
     label: def-jump feature
     status: todo
 process:
-  implement_def_jump:
+  i16_implement_def_jump:
     label: Implement def-jump
 `;
-		const body = `\ncli_tool >> implement_def_jump -> i16_def_jump\n`;
+		const body = `\ncli_tool >> i16_implement_def_jump -> def_jump\n`;
 		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "closed_not_planned",
 				issueNumber: 16,
-				artifactId: "i16_def_jump",
+				processId: "i16_implement_def_jump",
+				artifactId: "def_jump",
 				detail: "issue closed as not planned",
 				fixVia: "flow",
 				hasDownstream: false,
 			},
 		];
-		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const issuesByNumber = new Map([[16, { number: 16, state: "CLOSED" }]]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 		const fm = doc.toJS();
-		assert.equal(fm.artifact.i16_def_jump, undefined, "artifact should be removed");
-		assert.equal(fm.process?.implement_def_jump, undefined, "sole-output process should be removed");
-		assert.ok(!newBody.includes("implement_def_jump"), "edge should be removed from body");
+		assert.equal(fm.artifact.def_jump, undefined, "artifact should be removed");
+		assert.equal(fm.process?.i16_implement_def_jump, undefined, "sole-output process should be removed");
+		assert.ok(!newBody.includes("i16_implement_def_jump"), "edge should be removed from body");
 	});
 
-	// Case B: non-terminal, not done → demote: strip iN_ prefix, set status done, update body refs
-	it("B: non-terminal not-done — strips prefix, sets done, updates body refs", () => {
+	// Case B: non-terminal — only clears tags/updated_at. No rename, no status forcing.
+	it("B: non-terminal — clears tags/updated_at on the process, leaves ids and status untouched", () => {
 		const yaml = `artifact:
   cli_tool:
     label: CLI
     status: done
-  i16_def_jump:
+  def_jump:
     label: def-jump feature
     status: todo
+process:
+  i16_implement_def_jump:
+    label: Implement def-jump
     updated_at: "2026-01-01T00:00:00Z"
     tags:
       - priority:high
-process:
-  implement_def_jump:
-    label: Implement def-jump
   use_def_jump:
     label: Use def-jump
 `;
-		const body = `\ncli_tool >> implement_def_jump -> i16_def_jump\ni16_def_jump >> use_def_jump -> cli_tool\n`;
+		const body = `\ncli_tool >> i16_implement_def_jump -> def_jump\ndef_jump >> use_def_jump -> cli_tool\n`;
 		const doc = parseDocument(yaml);
 		const findings = [
 			{
 				type: "closed_in_flow",
 				issueNumber: 16,
-				artifactId: "i16_def_jump",
+				processId: "i16_implement_def_jump",
+				artifactId: "def_jump",
 				detail: "issue is closed",
 				fixVia: "flow",
 				hasDownstream: true,
 			},
 		];
-		const newBody = applyClosedInFlowFixes(doc, body, findings);
+		const issuesByNumber = new Map([[16, { number: 16, state: "CLOSED" }]]);
+		const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 		const fm = doc.toJS();
-		// old id gone
-		assert.equal(fm.artifact.i16_def_jump, undefined, "old prefixed id should be removed");
-		// new id present with status done
-		assert.ok(fm.artifact.def_jump, "demoted artifact should exist");
-		assert.equal(fm.artifact.def_jump.status, "done");
-		// priority drift fields removed
-		assert.equal(fm.artifact.def_jump.updated_at, undefined, "updated_at should be removed");
-		assert.equal(fm.artifact.def_jump.tags, undefined, "tags should be removed");
-		// body refs updated
-		assert.ok(!newBody.includes("i16_def_jump"), "old id should not appear in body");
-		assert.ok(newBody.includes("def_jump"), "new id should appear in body");
+		// process id unchanged (permanent prefix)
+		assert.ok(fm.process.i16_implement_def_jump, "process id must not be renamed");
+		// issue-tracking fields cleared
+		assert.equal(fm.process.i16_implement_def_jump.updated_at, undefined, "updated_at should be removed");
+		assert.equal(fm.process.i16_implement_def_jump.tags, undefined, "tags should be removed");
+		// artifact untouched: id unchanged, status NOT forced
+		assert.ok(fm.artifact.def_jump, "artifact id must not be renamed");
+		assert.equal(fm.artifact.def_jump.status, "todo", "status must not be force-set — it's already correct from the completion commit");
+		// body unchanged (no id renamed anywhere)
+		assert.equal(newBody.trim(), body.trim());
+	});
+
+	it("B: description containing ' #' is untouched (no node-reuse rewrite needed since ids don't change)", () => {
+		const yaml = `artifact:
+  cli_tool:
+    label: CLI
+    status: done
+  lint_checker:
+    label: Lint checker
+    description: "lint 候補の完全リストは issue #4 が一次情報"
+    status: todo
+process:
+  i4_run_lint:
+    label: Run lint
+  use_lint:
+    label: Use lint
+`;
+		const body = `\ncli_tool >> i4_run_lint -> lint_checker\nlint_checker >> use_lint -> cli_tool\n`;
+		const doc = parseDocument(yaml);
+		const findings = [
+			{
+				type: "closed_in_flow",
+				issueNumber: 4,
+				processId: "i4_run_lint",
+				artifactId: "lint_checker",
+				detail: "issue is closed",
+				fixVia: "flow",
+				hasDownstream: true,
+			},
+		];
+		const issuesByNumber = new Map([[4, { number: 4, state: "CLOSED" }]]);
+		applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
+		const emitted = doc.toString();
+		const reparsed = parseDocument(emitted).toJS();
+		const desc = reparsed.artifact?.lint_checker?.description;
+		assert.equal(desc, "lint 候補の完全リストは issue #4 が一次情報");
 	});
 });
 

@@ -39,35 +39,30 @@ export function computeLabelFindings(expectedLabels, actualLabels) {
 
 /**
  * @param {object} frontmatter - parsed YAML object
- * @returns {{ id: string, issueNumber: number, status: string|undefined, updatedAt: string|undefined, priorities: string[] }[]}
+ * @returns {{ id: string, issueNumbers: number[], updatedAt: string|undefined, priorities: string[] }[]}
  */
-export function parseIssueArtifacts(frontmatter) {
-	const artifact = frontmatter.artifact;
-	if (!artifact) return [];
+export function parseIssueProcesses(frontmatter) {
+	const process = frontmatter.process;
+	if (!process) return [];
 	const result = [];
-	for (const [id, val] of Object.entries(artifact)) {
-		const m = id.match(/^i(\d+)_/);
-		if (!m) continue;
+	for (const [id, val] of Object.entries(process)) {
+		const prefixMatch = id.match(/^(?:i\d+_)+/);
+		if (!prefixMatch) continue;
+		const issueNumbers = [...prefixMatch[0].matchAll(/i(\d+)_/g)].map((m) => Number(m[1]));
 		const tags = val.tags ?? [];
 		const priorities = tags.filter((t) => t.startsWith("priority:")).sort();
-		result.push({
-			id,
-			issueNumber: Number(m[1]),
-			status: val.status,
-			updatedAt: val.updated_at,
-			priorities,
-		});
+		result.push({ id, issueNumbers, updatedAt: val.updated_at, priorities });
 	}
 	return result;
 }
 
 /**
- * @param {{ id: string, issueNumber: number, status: string|undefined, updatedAt: string|undefined, priorities: string[], hasDownstream?: boolean }[]} artifacts - priorities must be pre-sorted (parseIssueArtifacts guarantees this)
+ * @param {{ processId: string, issueNumber: number, artifactId: string, status: string|undefined, hasDownstream: boolean, updatedAt: string|undefined, priorities: string[] }[]} entries - priorities must be pre-sorted
  * @param {{ number: number, state: "OPEN"|"CLOSED", stateReason?: string|null, labels: string[], updatedAt: string }[]} issues
- * @returns {{ type: string, issueNumber: number, artifactId: string|undefined, detail: string, fixVia?: "file"|"github" }[]}
+ * @returns {{ type: string, issueNumber: number, processId: string|undefined, artifactId: string|undefined, detail: string, fixVia?: "file"|"github"|"flow", hasDownstream?: boolean }[]}
  */
-export function computeFindings(artifacts, issues) {
-	const artifactIssueNumbers = new Set(artifacts.map((a) => a.issueNumber));
+export function computeFindings(entries, issues) {
+	const trackedIssueNumbers = new Set(entries.map((e) => e.issueNumber));
 	const issuesByNumber = new Map();
 	for (const iss of issues) {
 		issuesByNumber.set(iss.number, iss);
@@ -75,112 +70,120 @@ export function computeFindings(artifacts, issues) {
 
 	const findings = [];
 
-	// Check each artifact against its issue
-	for (const art of artifacts) {
-		const iss = issuesByNumber.get(art.issueNumber);
+	// Check each tracked entry against its issue
+	for (const entry of entries) {
+		const iss = issuesByNumber.get(entry.issueNumber);
 		if (!iss) {
 			findings.push({
 				type: "unknown_issue",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				detail: `issue #${art.issueNumber} not found in issues list`,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				detail: `issue #${entry.issueNumber} not found in issues list`,
 			});
 			continue;
 		}
 
 		if (iss.state === "CLOSED") {
 			// closed + done + has downstream = expected state, no action needed
-			if (art.status === "done" && art.hasDownstream) {
+			if (entry.status === "done" && entry.hasDownstream) {
 				continue;
 			}
 			const isNotPlanned = iss.stateReason === "NOT_PLANNED";
 			findings.push({
 				type: isNotPlanned ? "closed_not_planned" : "closed_in_flow",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				hasDownstream: art.hasDownstream,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				hasDownstream: entry.hasDownstream,
 				detail: isNotPlanned
-					? art.hasDownstream
+					? entry.hasDownstream
 						? `issue closed as not planned but has downstream consumers — remove manually`
 						: `issue closed as not planned — terminal chain will be removed`
-					: `issue is closed — delete the chain if terminal, or strip the iN_ prefix to demote it to a plain done artifact if downstream processes consume it`,
-				fixVia: isNotPlanned && art.hasDownstream ? undefined : "flow",
+					: `issue is closed — delete the chain if terminal, or clear iN_ issue-tracking fields on the process if downstream processes consume the output`,
+				fixVia: isNotPlanned && entry.hasDownstream ? undefined : "flow",
 			});
 			// skip all freshness checks for closed issues
 			continue;
 		}
 
-		// OPEN issue with artifact
+		// OPEN issue with a tracked process
 		const hasManaged = iss.labels.includes("flow:managed");
 		const hasExempt = iss.labels.includes("flow:exempt");
 
 		if (hasExempt) {
 			findings.push({
 				type: "exempt_conflict",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				detail: `issue has flow:exempt label but has an artifact in the flow`,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				detail: `issue has flow:exempt label but has a tracked process in the flow`,
 			});
 		} else if (!hasManaged) {
 			findings.push({
 				type: "missing_label",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				detail: `open issue with artifact is missing "flow:managed" label`,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				detail: `open issue with tracked process is missing "flow:managed" label`,
 				fixVia: "github",
 			});
 		}
 
 		// Freshness checks for open issues
-		if (art.updatedAt !== iss.updatedAt) {
-			const artVal = art.updatedAt ?? "(none)";
+		if (entry.updatedAt !== iss.updatedAt) {
+			const val = entry.updatedAt ?? "(none)";
 			findings.push({
 				type: "stale_updated_at",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				detail: `artifact: ${artVal}, issue: ${iss.updatedAt}`,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				detail: `process: ${val}, issue: ${iss.updatedAt}`,
 				fixVia: "file",
 			});
 		}
 
 		// Priority drift
 		const issuePriorities = iss.labels.filter((l) => l.startsWith("priority:")).sort();
-		if (JSON.stringify(issuePriorities) !== JSON.stringify(art.priorities)) {
+		if (JSON.stringify(issuePriorities) !== JSON.stringify(entry.priorities)) {
 			findings.push({
 				type: "priority_drift",
-				issueNumber: art.issueNumber,
-				artifactId: art.id,
-				detail: `artifact: [${art.priorities.join(", ")}], issue: [${issuePriorities.join(", ")}]`,
+				issueNumber: entry.issueNumber,
+				processId: entry.processId,
+				artifactId: entry.artifactId,
+				detail: `process: [${entry.priorities.join(", ")}], issue: [${issuePriorities.join(", ")}]`,
 				fixVia: "file",
 			});
 		}
 	}
 
-	// Check each issue for missing artifact
+	// Check each issue for a missing tracked process
 	for (const iss of issues) {
 		if (iss.state !== "OPEN") continue;
-		if (artifactIssueNumbers.has(iss.number)) continue;
+		if (trackedIssueNumbers.has(iss.number)) continue;
 
 		const hasManaged = iss.labels.includes("flow:managed");
 		const hasExempt = iss.labels.includes("flow:exempt");
 
 		if (hasExempt) {
-			// flow:exempt and no artifact: no finding
+			// flow:exempt and no tracked process: no finding
 			continue;
 		}
 		if (hasManaged) {
 			findings.push({
-				type: "missing_artifact",
+				type: "missing_process",
 				issueNumber: iss.number,
+				processId: undefined,
 				artifactId: undefined,
-				detail: `issue has flow:managed label but no artifact in the flow`,
+				detail: `issue has flow:managed label but no tracked process in the flow`,
 			});
 		} else {
 			findings.push({
 				type: "untriaged",
 				issueNumber: iss.number,
+				processId: undefined,
 				artifactId: undefined,
-				detail: `open issue has no artifact and no flow label`,
+				detail: `open issue has no tracked process and no flow label`,
 			});
 		}
 	}
@@ -194,21 +197,21 @@ export function computeFindings(artifacts, issues) {
 /**
  * Applies file-fixable findings to the yaml Document in place.
  * @param {import("yaml").Document} doc
- * @param {{ type: string, issueNumber: number, artifactId: string|undefined, fixVia?: "file"|"github"|"flow" }[]} findings
+ * @param {{ type: string, issueNumber: number, processId: string|undefined, fixVia?: "file"|"github"|"flow" }[]} findings
  * @param {Map<number, { number: number, state: string, labels: string[], updatedAt: string }>} issuesByNumber
  */
 export function applyFixes(doc, findings, issuesByNumber) {
 	for (const finding of findings) {
 		if (finding.fixVia !== "file") continue;
-		const { type, artifactId, issueNumber } = finding;
+		const { type, processId, issueNumber } = finding;
 		const issue = issuesByNumber.get(issueNumber);
 		if (!issue) continue;
 
 		if (type === "stale_updated_at") {
-			doc.setIn(["artifact", artifactId, "updated_at"], issue.updatedAt);
+			doc.setIn(["process", processId, "updated_at"], issue.updatedAt);
 		} else if (type === "priority_drift") {
 			// Get existing tags preserving order, remove priority: ones
-			const existingTags = doc.getIn(["artifact", artifactId, "tags"]);
+			const existingTags = doc.getIn(["process", processId, "tags"]);
 			let nonPriorityTags = [];
 			if (existingTags) {
 				// existingTags may be a yaml Seq node or plain array
@@ -218,13 +221,30 @@ export function applyFixes(doc, findings, issuesByNumber) {
 			const issuePriorities = issue.labels.filter((l) => l.startsWith("priority:")).sort();
 			const newTags = [...nonPriorityTags, ...issuePriorities];
 			if (newTags.length === 0) {
-				doc.deleteIn(["artifact", artifactId, "tags"]);
+				doc.deleteIn(["process", processId, "tags"]);
 			} else {
-				doc.setIn(["artifact", artifactId, "tags"], newTags);
+				doc.setIn(["process", processId, "tags"], newTags);
 			}
 		}
 		// other types: ignore
 	}
+}
+
+/**
+ * Maps each process id appearing in a flow edge to the list of artifact ids
+ * it produces (RHS of `>>`), merged across all edge lines mentioning it.
+ * @param {string} body
+ * @returns {Map<string, string[]>}
+ */
+export function buildProcessOutputs(body) {
+	const result = new Map();
+	for (const line of body.split("\n")) {
+		const parsed = parseEdgeLine(line);
+		if (!parsed) continue;
+		const existing = result.get(parsed.process) ?? [];
+		result.set(parsed.process, [...existing, ...parsed.outputs]);
+	}
+	return result;
 }
 
 /**
@@ -250,22 +270,6 @@ function parseEdgeLine(line) {
 }
 
 /**
- * Applies closed_in_flow fixes to both the yaml Document (in place) and the flow body string.
- * Returns the (possibly modified) body string.
- *
- * Two cases per finding:
- *   A. hasDownstream === false (terminal): remove artifact from frontmatter. If the producing
- *      process has no other outputs, remove the process too and drop the edge line. If the
- *      process has other outputs, remove only this artifact from the output list in the edge.
- *   B. hasDownstream === true and status !== done (demote): strip iN_ prefix → new plain id,
- *      set status: done, remove updated_at and tags. Update all body references.
- *
- * @param {import("yaml").Document} doc
- * @param {string} body
- * @param {{ type: string, artifactId: string, hasDownstream?: boolean }[]} findings
- * @returns {string} new body string
- */
-/**
  * Collapses 3+ consecutive newlines to 2 and trims trailing blank lines to a single newline.
  * @param {string} body
  * @returns {string}
@@ -274,7 +278,30 @@ export function normalizeBody(body) {
 	return body.replace(/\n{3,}/g, "\n\n").replace(/\n*$/, "\n");
 }
 
-export function applyClosedInFlowFixes(doc, body, findings) {
+/**
+ * Applies closed_in_flow fixes to both the yaml Document (in place) and the flow body string.
+ * Returns the (possibly modified) body string.
+ *
+ * Two cases per finding:
+ *   A. hasDownstream === false (terminal): remove artifact from frontmatter. If the producing
+ *      process has no other outputs, this would fully retire the process — but only do so once
+ *      every issue number embedded in the process id's `iN_iM_..._` prefix is CLOSED (a process
+ *      can be tracked by more than one issue; deleting it while a sibling issue is still open
+ *      would orphan that issue's tracking). If any tracking issue is still open, skip this
+ *      finding entirely and retry on a future run. If the process has other outputs, remove
+ *      only this artifact from the output list in the edge (no cross-issue check needed, since
+ *      the process itself survives).
+ *   B. hasDownstream === true and status !== done (non-terminal): the iN_ prefix on the process
+ *      is permanent, so there is nothing to rename. Just clear the process's issue-tracking
+ *      fields (tags, updated_at) — status is already correct from the completion commit.
+ *
+ * @param {import("yaml").Document} doc
+ * @param {string} body
+ * @param {{ type: string, processId: string, artifactId: string, hasDownstream?: boolean }[]} findings
+ * @param {Map<number, { number: number, state: string }>} issuesByNumber
+ * @returns {string} new body string
+ */
+export function applyClosedInFlowFixes(doc, body, findings, issuesByNumber) {
 	const closedFindings = findings.filter(
 		(f) => (f.type === "closed_in_flow" || f.type === "closed_not_planned") && f.fixVia === "flow",
 	);
@@ -283,73 +310,50 @@ export function applyClosedInFlowFixes(doc, body, findings) {
 	let lines = body.split("\n");
 
 	for (const finding of closedFindings) {
-		const { artifactId, hasDownstream } = finding;
+		const { processId, artifactId, hasDownstream } = finding;
 
 		if (!hasDownstream) {
-			// Case A: terminal — remove artifact from frontmatter
-			doc.deleteIn(["artifact", artifactId]);
-
-			// Find the producing edge line (artifact appears on RHS)
+			// Case A: terminal. Find the producing edge line for this process first, so we
+			// know whether removing this artifact would fully retire the process.
 			const edgeIdx = lines.findIndex((line) => {
 				const parsed = parseEdgeLine(line);
-				return parsed && parsed.outputs.includes(artifactId);
+				return parsed && parsed.process === processId && parsed.outputs.includes(artifactId);
 			});
 
-			if (edgeIdx >= 0) {
-				const parsed = parseEdgeLine(lines[edgeIdx]);
-				const remainingOutputs = parsed.outputs.filter((o) => o !== artifactId);
+			const remainingOutputs = edgeIdx >= 0
+				? parseEdgeLine(lines[edgeIdx]).outputs.filter((o) => o !== artifactId)
+				: null;
 
-				if (remainingOutputs.length === 0) {
-					// A1: sole-output process — remove process from frontmatter and drop the edge line
-					doc.deleteIn(["process", parsed.process]);
-					lines.splice(edgeIdx, 1);
-				} else if (remainingOutputs.length === 1) {
-					// A2: multi-output, now single — rewrite as non-list
-					lines[edgeIdx] = `${parsed.prefix}${remainingOutputs[0]}`;
-				} else {
-					// A2: multi-output — rewrite list without removed artifact
-					lines[edgeIdx] = `${parsed.prefix}[${remainingOutputs.join(", ")}]`;
-				}
-			}
-		} else {
-			// Case B: non-terminal not-done — demote by stripping iN_ prefix
-			const newId = artifactId.replace(/^i\d+_/, "");
+			if (remainingOutputs !== null && remainingOutputs.length === 0) {
+				// A1: this would be the process's last output. Only retire the whole process
+				// if every issue tracking it is closed.
+				const prefixMatch = processId.match(/^(?:i\d+_)+/);
+				const issueNumbers = prefixMatch
+					? [...prefixMatch[0].matchAll(/i(\d+)_/g)].map((m) => Number(m[1]))
+					: [];
+				const allClosed = issueNumbers.every((n) => issuesByNumber.get(n)?.state === "CLOSED");
+				if (!allClosed) continue;
 
-			// Reuse the existing YAML Map node to preserve scalar quoting/styling.
-			// Do NOT call toJSON(): it flattens nodes into plain strings, which causes
-			// setIn to re-emit them as PLAIN scalars. A value like
-			//   description: some text #4 more text
-			// is parsed as value="some text" comment="4 more text", and toJSON()
-			// silently discards the comment — the data is lost permanently.
-			const mapNode = doc.getIn(["artifact", artifactId]);
-
-			doc.deleteIn(["artifact", artifactId]);
-			doc.setIn(["artifact", newId], mapNode);
-
-			// After reuse, fix up PLAIN scalars whose original text contained ' #':
-			// the YAML parser stored the ' #...' portion as an inline comment on the
-			// node. Reconstruct the full value and force-quote so the next parse
-			// doesn't truncate it again.
-			if (mapNode && mapNode.items) {
-				for (const pair of mapNode.items) {
-					const val = pair.value;
-					if (val && val.type === "PLAIN" && typeof val.comment === "string" && val.comment.length > 0) {
-						val.value = val.value + " #" + val.comment;
-						val.comment = undefined;
-						val.type = "QUOTE_DOUBLE";
+				doc.deleteIn(["artifact", artifactId]);
+				doc.deleteIn(["process", processId]);
+				lines.splice(edgeIdx, 1);
+			} else {
+				// A2: multi-output (or no edge found) — remove only this artifact.
+				doc.deleteIn(["artifact", artifactId]);
+				if (edgeIdx >= 0) {
+					const parsed = parseEdgeLine(lines[edgeIdx]);
+					if (remainingOutputs.length === 1) {
+						lines[edgeIdx] = `${parsed.prefix}${remainingOutputs[0]}`;
+					} else {
+						lines[edgeIdx] = `${parsed.prefix}[${remainingOutputs.join(", ")}]`;
 					}
 				}
 			}
-
-			// Set status to done and remove issue-tracking fields.
-			doc.setIn(["artifact", newId, "status"], "done");
-			doc.deleteIn(["artifact", newId, "tags"]);
-			doc.deleteIn(["artifact", newId, "updated_at"]);
-
-			// Update all references in body
-			// Use word-boundary regex: match artifactId as a whole word token
-			const re = new RegExp(`\\b${artifactId}\\b`, "g");
-			lines = lines.map((line) => line.replace(re, newId));
+		} else {
+			// Case B: non-terminal — iN_ is permanent on the process, nothing to rename.
+			// Only clear the fields that stop being meaningful once the issue is closed.
+			doc.deleteIn(["process", processId, "tags"]);
+			doc.deleteIn(["process", processId, "updated_at"]);
 		}
 	}
 

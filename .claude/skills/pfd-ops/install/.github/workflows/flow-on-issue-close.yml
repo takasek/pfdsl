@@ -51,4 +51,4 @@ jobs:
           body: |
             Mechanical `.pfdsl/roadmap.pfdsl` sync (`audit-issues-flow.mjs --fix`). Triggered by close of issue #${{ github.event.issue.number }}.
 
-            Terminal chains are removed (artifact + sole producing process + edge); artifacts with remaining downstream are demoted by stripping the `iN_` prefix. Review and merge if correct.
+            Terminal chains are removed (artifact + sole producing process + edge); processes with remaining downstream outputs only have their `tags`/`updated_at` issue-tracking fields cleared (the `iN_` prefix on the process is permanent). Review and merge if correct.

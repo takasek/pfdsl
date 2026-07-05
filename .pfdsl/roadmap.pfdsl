@@ -69,12 +69,6 @@ artifact:
     status: done
     criteria: Marketplace の takasek.pfdsl version が 0.0.14 を返す
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
-  i119_published_extension:
-    label: "Marketplace 公開済み extension (#119)"
-    description: "VS Marketplace は OIDC/Trusted Publishing 非対応のため PAT が必要。VSCE_PAT 環境変数を設定して `make release-extension` でローカル実行する"
-    status: wip
-    criteria: "`VSCE_PAT` を設定した `make release-extension` で VS Code Marketplace への publish が動作確認済み"
-    updated_at: 2026-06-29T01:43:14Z
   multifile_policy:
     label: マルチファイル意味論方針
     description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
@@ -87,17 +81,6 @@ artifact:
     status: done
     criteria: 対象判断が文書化され docs/adr/README.md の一覧に追記済み
     location: ../docs/adr/
-  i12_article:
-    label: "公開記事 (#12)"
-    description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
-    status: todo
-    criteria: 外部メディアに公開済みで URL が存在する
-    updated_at: 2026-06-12T08:18:56Z
-  i3_obsidian_plugin:
-    label: "Obsidian プラグイン (#3)"
-    status: todo
-    criteria: Obsidian 上で .pfdsl のプレビュー・編集が動作確認済み
-    updated_at: 2026-06-12T08:18:35Z
   lint_checker:
     label: "lint拡張checker (#4)"
     description: "lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため"
@@ -235,30 +218,6 @@ artifact:
     status: todo
     criteria: Marketplace の takasek.pfdsl version が 0.0.15 を返す
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
-  i268_type_field:
-    label: "type フィールド追加 (#268)"
-    description: "frontmatter に type: roadmap|workflow|runtime-pipeline を追加し、ready を roadmap 型にゲート。draft_proposals 経由"
-    status: done
-    criteria: "type: フィールドが spec に統合済み、ready が roadmap 型以外で error を出力する"
-    updated_at: 2026-07-02T18:46:25Z
-  i272_w002_hierarchy:
-    label: "W002 criteria 階層化 (#272)"
-    description: "producer を持たない source artifact は W002 対象外にするか低階層 warning に落とす"
-    status: done
-    criteria: "source artifact（producer なし）への W002 が抑制または低severity 化され、テスト通過"
-    updated_at: 2026-07-02T18:56:10Z
-  i273_blocked_by:
-    label: "blocked 分割: waiting/suspended (#273)"
-    description: "status: blocked を waiting（外部待ち）と suspended（自主停止）に分割。破壊的変更として即 V007/V008 エラー化"
-    status: done
-    criteria: "waiting/suspended が STATUS_VALUES に追加され、blocked が V007/V008 でエラーになり、spec v0.0.11 に統合済み"
-    updated_at: 2026-07-02T18:56:12Z
-  i278_release_automation:
-    label: "make release roadmap 自動更新 (#278)"
-    description: "make release 後に roadmap の publish artifact を自動 done にする連携。#277 status-set が前提"
-    status: todo
-    criteria: "make release 実行後に roadmap の対応 artifact が自動 done に更新される"
-    updated_at: 2026-07-03T01:28:44Z
   hover_jump:
     label: "hover/quickpick jump (#216)"
     description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
@@ -299,25 +258,6 @@ artifact:
     description: "同 group 内 artifact の下流消費者集合の非対称を情報表示。retro プロンプト A の機械化（spec 変更なし）"
     status: done
     criteria: "check --audit が同 group 消費者非対称の hint 行を出力し、テスト通過"
-  i299_diag_registry:
-    label: "診断コードレジストリ + CI 突合 (#299)"
-    description: "spec §16 を全診断コード（P/V/W）の表に改め、check --json の発行コード集合との一致を CI で検査する。F2/F8/F15/F17/F20。C 系の機械化（stale 前方参照 grep）を同居"
-    status: todo
-    criteria: "spec §16 が全コード表を持ち、実装コード集合との差分と stale 前方参照を CI が検出する"
-    updated_at: 2026-07-04T07:58:26Z
-    tags: [ "priority:high" ]
-  i300_spec_editorial:
-    label: "spec 編集整備パス (#300)"
-    description: "v0.0.11 レビューの残余 findings（F3-F22。F1 は #298、F2 は #297、§16 表化は #299）と extends プローブ（#304）の findings を spec に反映する"
-    status: todo
-    criteria: "対象 findings が spec に反映され check-docs / gen-skill が差分なしで通過"
-    updated_at: 2026-07-04T05:43:40Z
-  i304_extends_probe:
-    label: "extends 意味論の agent プローブ (#304)"
-    description: "spec-stress-test スキルのオラクル型で extends の深マージ・diamond・優先順位・プリセット汚染を検証する。モデル勾配（haiku）同時測定を含む。スキル初回実運用"
-    status: todo
-    criteria: "オラクル実行・CLI 突合・0020 dir への記録が完了し、確信度中/低の箇所が findings として振り分け済み"
-    updated_at: 2026-07-04T07:58:06Z
   boundary_feedback:
     label: "open input の feedback 除外 (#298)"
     description: "spec v0.0.11 レビュー F1。open input 定義を terminal と対称にし、feedback ループを跨ぐ subflow 化を可能にする。spec v0.0.12 統合を含む"
@@ -328,13 +268,59 @@ artifact:
     description: "subflow 境界違反系に専用コードを再採番し group 循環 V025 との衝突を解消する。#299 レジストリ固定の前提"
     status: done
     criteria: "subflow 境界違反と group 循環が異なる診断コードを発行し、テスト通過"
+  published_extension:
+    label: "Marketplace 公開済み extension (#119)"
+    description: "VS Marketplace は OIDC/Trusted Publishing 非対応のため PAT が必要。VSCE_PAT 環境変数を設定して `make release-extension` でローカル実行する"
+    status: wip
+    criteria: "`VSCE_PAT` を設定した `make release-extension` で VS Code Marketplace への publish が動作確認済み"
+  article:
+    label: "公開記事 (#12)"
+    description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
+    status: todo
+    criteria: 外部メディアに公開済みで URL が存在する
+  obsidian_plugin:
+    label: "Obsidian プラグイン (#3)"
+    status: todo
+    criteria: Obsidian 上で .pfdsl のプレビュー・編集が動作確認済み
+  type_field:
+    label: "type フィールド追加 (#268)"
+    description: "frontmatter に type: roadmap|workflow|runtime-pipeline を追加し、ready を roadmap 型にゲート。draft_proposals 経由"
+    status: done
+    criteria: "type: フィールドが spec に統合済み、ready が roadmap 型以外で error を出力する"
+  w002_hierarchy:
+    label: "W002 criteria 階層化 (#272)"
+    description: "producer を持たない source artifact は W002 対象外にするか低階層 warning に落とす"
+    status: done
+    criteria: "source artifact（producer なし）への W002 が抑制または低severity 化され、テスト通過"
+  blocked_by:
+    label: "blocked 分割: waiting/suspended (#273)"
+    description: "status: blocked を waiting（外部待ち）と suspended（自主停止）に分割。破壊的変更として即 V007/V008 エラー化"
+    status: done
+    criteria: "waiting/suspended が STATUS_VALUES に追加され、blocked が V007/V008 でエラーになり、spec v0.0.11 に統合済み"
+  release_automation:
+    label: "make release roadmap 自動更新 (#278)"
+    description: "make release 後に roadmap の publish artifact を自動 done にする連携。#277 status-set が前提"
+    status: todo
+    criteria: "make release 実行後に roadmap の対応 artifact が自動 done に更新される"
+  diag_registry:
+    label: "診断コードレジストリ + CI 突合 (#299)"
+    description: "spec §16 を全診断コード（P/V/W）の表に改め、check --json の発行コード集合との一致を CI で検査する。F2/F8/F15/F17/F20。C 系の機械化（stale 前方参照 grep）を同居"
+    status: todo
+    criteria: "spec §16 が全コード表を持ち、実装コード集合との差分と stale 前方参照を CI が検出する"
+  spec_editorial:
+    label: "spec 編集整備パス (#300)"
+    description: "v0.0.11 レビューの残余 findings（F3-F22。F1 は #298、F2 は #297、§16 表化は #299）と extends プローブ（#304）の findings を spec に反映する"
+    status: todo
+    criteria: "対象 findings が spec に反映され check-docs / gen-skill が差分なしで通過"
+  extends_probe:
+    label: "extends 意味論の agent プローブ (#304)"
+    description: "spec-stress-test スキルのオラクル型で extends の深マージ・diamond・優先順位・プリセット汚染を検証する。モデル勾配（haiku）同時測定を含む。スキル初回実運用"
+    status: todo
+    criteria: "オラクル実行・CLI 突合・0020 dir への記録が完了し、確信度中/低の箇所が findings として振り分け済み"
 process:
   implement_version_cmd:
     label: --version コマンド実装
     location: https://github.com/takasek/pfdsl/issues/172
-  write_article:
-    label: 記事執筆
-    location: https://github.com/takasek/pfdsl/issues/12
   draft_multifile_specs:
     label: 階層・プリセット共同起草
     description: "#5 と #6 は決定が往復で形成される相互依存のため分割せず共同設計する。共有決定は方針記録として外化"
@@ -366,9 +352,6 @@ process:
     location: https://github.com/takasek/pfdsl/issues/10
   publish_cli_v009:
     label: CLI v0.0.9公開
-  build_obsidian_plugin:
-    label: Obsidianプラグイン実装
-    location: https://github.com/takasek/pfdsl/issues/3
   draft_external_stakeholders:
     label: externalStakeholders仕様起草
     description: "artifact / process の externalStakeholders フィールドを spec に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
@@ -380,9 +363,6 @@ process:
     label: マルチファイル機能実装
     description: "spec v0.0.8 subflow/extends checker 実装（V021-V028）。renderer・VS Code extension は対象外。issue: https://github.com/takasek/pfdsl/issues/148"
     location: https://github.com/takasek/pfdsl/issues/148
-  publish_extension:
-    label: extension自動公開実装
-    location: https://github.com/takasek/pfdsl/issues/119
   implement_subcommand_help:
     label: per-command --help実装
     location: https://github.com/takasek/pfdsl/issues/177
@@ -442,21 +422,10 @@ process:
     label: CLI v0.0.14リリース
   publish_ext_v0015:
     label: extension v0.0.15リリース
-  implement_type_field:
-    label: type フィールド実装
-    description: "frontmatter type: フィールドと ready コマンドのロードマップ型ゲートを実装する。draft_proposals 経由"
-    location: https://github.com/takasek/pfdsl/issues/268
   implement_audit_sync:
     label: audit-sync コマンド実装
     description: "workflow/pipeline の todo ノードと roadmap 構築チェーンを突合するコマンド"
     location: https://github.com/takasek/pfdsl/issues/269
-  implement_w002_hierarchy:
-    label: W002 criteria 階層化実装
-    location: https://github.com/takasek/pfdsl/issues/272
-  implement_blocked_by:
-    label: blockedBy フィールド実装
-    description: "blockedBy: フィールドの spec 統合と CLI 対応。draft_proposals 経由"
-    location: https://github.com/takasek/pfdsl/issues/273
   implement_status_set:
     label: status-set コマンド実装
     location: https://github.com/takasek/pfdsl/issues/277
@@ -468,9 +437,6 @@ process:
     location: https://github.com/takasek/pfdsl/issues/292
   publish_cli_v0015:
     label: CLI v0.0.15リリース
-  implement_release_automation:
-    label: make release roadmap 自動更新実装
-    location: https://github.com/takasek/pfdsl/issues/278
   integrate_spec_v0011:
     label: 仕様書 v0.0.11統合
     description: "waiting/suspended status 分割・type フィールド・W002 source artifact 免除を spec 本文に統合する"
@@ -481,15 +447,49 @@ process:
     label: open input feedback 除外実装
     description: "computeOpenInputs の修正と spec v0.0.12 統合（proposal 経由）。発見経緯は docs/adr/0020-spec-stress-testing/"
     location: https://github.com/takasek/pfdsl/issues/298
-  implement_diag_registry:
+  i119_publish_extension:
+    label: extension自動公開実装
+    location: https://github.com/takasek/pfdsl/issues/119
+    updated_at: 2026-06-29T01:43:14Z
+  i12_write_article:
+    label: 記事執筆
+    location: https://github.com/takasek/pfdsl/issues/12
+    updated_at: 2026-06-12T08:18:56Z
+  i3_build_obsidian_plugin:
+    label: Obsidianプラグイン実装
+    location: https://github.com/takasek/pfdsl/issues/3
+    updated_at: 2026-06-12T08:18:35Z
+  i268_implement_type_field:
+    label: type フィールド実装
+    description: "frontmatter type: フィールドと ready コマンドのロードマップ型ゲートを実装する。draft_proposals 経由"
+    location: https://github.com/takasek/pfdsl/issues/268
+    updated_at: 2026-07-02T18:46:25Z
+  i272_implement_w002_hierarchy:
+    label: W002 criteria 階層化実装
+    location: https://github.com/takasek/pfdsl/issues/272
+    updated_at: 2026-07-02T18:56:10Z
+  i273_implement_blocked_by:
+    label: blockedBy フィールド実装
+    description: "blockedBy: フィールドの spec 統合と CLI 対応。draft_proposals 経由"
+    location: https://github.com/takasek/pfdsl/issues/273
+    updated_at: 2026-07-02T18:56:12Z
+  i278_implement_release_automation:
+    label: make release roadmap 自動更新実装
+    location: https://github.com/takasek/pfdsl/issues/278
+    updated_at: 2026-07-03T01:28:44Z
+  i299_implement_diag_registry:
     label: 診断コードレジストリ整備
     location: https://github.com/takasek/pfdsl/issues/299
-  revise_spec_editorial:
+    updated_at: 2026-07-04T07:58:26Z
+    tags: [ "priority:high" ]
+  i300_revise_spec_editorial:
     label: spec 編集整備
     location: https://github.com/takasek/pfdsl/issues/300
-  probe_extends_spec:
+    updated_at: 2026-07-04T05:43:40Z
+  i304_probe_extends_spec:
     label: extends 意味論プローブ
     location: https://github.com/takasek/pfdsl/issues/304
+    updated_at: 2026-07-04T07:58:06Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -530,13 +530,13 @@ cli_tool >> publish_cli_v009 -> cli_tool_v009
 
 cli_tool >> layer_audit_assets -> audit_distribution
 
-adr_corpus >> write_article -> i12_article
+adr_corpus >> i12_write_article -> article
 
-cli_tool >> build_obsidian_plugin -> i3_obsidian_plugin
+cli_tool >> i3_build_obsidian_plugin -> obsidian_plugin
 
 spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
 
-cli_tool >> publish_extension -> i119_published_extension
+cli_tool >> i119_publish_extension -> published_extension
 
 cli_tool_v009 >> implement_version_cmd -> version_cmd
 cli_tool_v009 >> implement_subcommand_help -> subcommand_help
@@ -571,14 +571,14 @@ basepath >> publish_cli_v0012 -> cli_tool_v0012
 
 cli_tool_v0013 >> update_pfd_ops_skill -> pfd_ops_skill_ready
 
-cli_tool_v0013 >> implement_type_field -> i268_type_field
-i268_type_field >> implement_audit_sync -> audit_sync
-cli_tool_v0013 >> implement_w002_hierarchy -> i272_w002_hierarchy
-cli_tool_v0013 >> implement_blocked_by -> i273_blocked_by
+cli_tool_v0013 >> i268_implement_type_field -> type_field
+type_field >> implement_audit_sync -> audit_sync
+cli_tool_v0013 >> i272_implement_w002_hierarchy -> w002_hierarchy
+cli_tool_v0013 >> i273_implement_blocked_by -> blocked_by
 cli_tool_v0013 >> implement_status_set -> status_set
-status_set >> implement_release_automation -> i278_release_automation
+status_set >> i278_implement_release_automation -> release_automation
 
-[cli_tool_v0013, i268_type_field, audit_sync, i272_w002_hierarchy, i273_blocked_by, status_set] >> publish_cli_v0014 -> cli_tool_v0014
+[cli_tool_v0013, type_field, audit_sync, w002_hierarchy, blocked_by, status_set] >> publish_cli_v0014 -> cli_tool_v0014
 
 cli_tool_v0014 >> implement_statusset_impact -> statusset_impact
 
@@ -586,15 +586,15 @@ cli_tool_v0014 >> implement_symmetry_hint -> symmetry_hint
 
 [cli_tool_v0014, statusset_impact, symmetry_hint] >> publish_cli_v0015 -> cli_tool_v0015
 
-[i268_type_field, i272_w002_hierarchy, i273_blocked_by] >> integrate_spec_v0011 -> spec_v0011
+[type_field, w002_hierarchy, blocked_by] >> integrate_spec_v0011 -> spec_v0011
 spec_v0010 >>? integrate_spec_v0011
 
 multifile_toolchain >> recode_boundary_diags -> recode
 
 [spec_v0011, multifile_toolchain] >> implement_boundary_feedback -> boundary_feedback
 
-[recode, spec_v0011] >> implement_diag_registry -> i299_diag_registry
+[recode, spec_v0011] >> i299_implement_diag_registry -> diag_registry
 
-[spec_v0011, multifile_toolchain] >> probe_extends_spec -> i304_extends_probe
+[spec_v0011, multifile_toolchain] >> i304_probe_extends_spec -> extends_probe
 
-[boundary_feedback, i304_extends_probe] >> revise_spec_editorial -> i300_spec_editorial
+[boundary_feedback, extends_probe] >> i300_revise_spec_editorial -> spec_editorial
