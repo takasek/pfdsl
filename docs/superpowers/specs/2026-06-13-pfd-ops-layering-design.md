@@ -50,7 +50,7 @@ PFD という概念だけから導ける手順。固有名詞ゼロ。
 
 - payoff_log: PFD の効果を収集する動機ごと固有（pfdsl の効果実証が目的）
 - pfdsl 品質ガイド改訂経路: このリポが pfdsl スキルの上流だから成立
-- ADR 改訂規約 / review-prompts.md
+- ADR 改訂規約 / review-perspectives.md
 - 学習ループのラウンド比較・残存ミスの lint 要件送り（ツールチェーン開発固有）
 - implementation_flow ロードマップ
 - L3 のインスタンス化（採用バックエンド = GitHub、監査スクリプトの実パス、リポ URL）— `roadmap.md` がこの L4 ホスト

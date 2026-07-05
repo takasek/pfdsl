@@ -182,11 +182,11 @@ artifact:
     criteria: /spec-stress-test が期待通り動作する
     location: ../.claude/skills/spec-stress-test/
     group: generation
-  review_prompts:
-    label: レビュープロンプト集
+  review_perspectives:
+    label: レビュー観点集
     description: "PFD を問い詰める A/B 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd-retro はポインタ参照"
-    criteria: 監査観点が網羅されており、gen-skill で skill の references/review-prompts.md に同梱済み
-    location: ../docs/review-prompts.md
+    criteria: 監査観点が網羅されており、gen-skill で skill の references/review-perspectives.md に同梱済み
+    location: ../docs/review-perspectives.md
     group: generation
   sample_previews:
     label: サンプル描画物
@@ -246,7 +246,7 @@ process:
     group: generation
   gen_skill:
     label: スキル生成
-    description: "スキル生成ソース（skill-template/spec/samples/examples/review-prompts/skill dirs 等）を変更した場合に実行する。check-gen-skill.yml が全 PR で identity を強制（CI backstop）"
+    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）を変更した場合に実行する。check-gen-skill.yml が全 PR で identity を強制（CI backstop）"
     command: make gen-skill
     group: generation
 
@@ -332,7 +332,7 @@ spec >> maintain_samples -> feature_samples
 
 [findings, adrs] >>? maintain_template
 
-[spec, skill_template, feature_samples, review_prompts] >> gen_skill -> [skill, gh_skill_dist]
+[spec, skill_template, feature_samples, review_perspectives] >> gen_skill -> [skill, gh_skill_dist]
 
 skill >>? gen_skill
 
@@ -344,7 +344,7 @@ examples >> review_examples -> findings
 
 [skill, toolchain, retro_skill] >>? review_examples
 
-[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill, retro_skill, ecosystem_skill, review_prompts, workflow_md, vscode_ext_debug_skill, spec_stress_skill]
+[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill, retro_skill, ecosystem_skill, review_perspectives, workflow_md, vscode_ext_debug_skill, spec_stress_skill]
 
 spec_stress_skill >>? maintain_spec
 

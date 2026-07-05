@@ -55,7 +55,7 @@ spec だけを読ませた subagent を被験者にし、実 CLI を正解器と
 ## 成果物の配置と還流
 
 - 例・トレース・実験記録は `docs/adr/0020-spec-stress-testing/` に恒久保存し、ADR-0020 本文の References に1行追記する（先例: `boundary-validation-log.md`・`spec-v0011-review.md`・`subflow-agent-probe.md` — プロンプト全文と記録形式はこれらを踏襲）
-- findings の振り分け（pfd-ops 経路）: 仕様欠陥・機械化可能な検査は issue 起票（`flow:managed` / `flow:exempt` の判定は L3 reference）。レビュー観点として一般化できるものは `docs/review-prompts.md` の C 系に追記（追記後 `make gen-skill`）
+- findings の振り分け（pfd-ops 経路）: 仕様欠陥・機械化可能な検査は issue 起票（`flow:managed` / `flow:exempt` の判定は L3 reference）。一般化できる観点は `docs/review-perspectives.md` の C レンズに追記（配布ソースなので追記後 `make gen-skill`）、pfdsl 仕様固有の例・機構は `.pfdsl/review-perspectives.md`（instance）の C 節に追記（gen-skill 不要）
 - 意図的に invalid な例を fenced ```pfdsl ブロックで残す場合、`docs/spec/` 配下では直前行に `<!-- pfdsl-nocheck -->` が必要（check-doc-examples の対象。docs/adr は対象外）
 
 ## 被験者プロンプトのテンプレート
