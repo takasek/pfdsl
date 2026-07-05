@@ -274,6 +274,51 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.some((d) => d.code === "V034")).toBe(true);
 	});
 
+	it("V034 input-side message shows only the diff, not full sets", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["order"]),
+			parentOutputs: new Set(["shipment"]),
+			boundaryMap: {},
+			childOpenInputs: new Set(["issues", "order"]),
+			childTerminals: new Set(["shipment"]),
+		});
+		const d = diags.find((d) => d.code === "V034");
+		expect(d?.message).toBe(
+			"subflow boundary mismatch on process 'P': missing in parent inputs: [\"issues\"]",
+		);
+	});
+
+	it("V034 output-side message shows only the diff, not full sets", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["order"]),
+			parentOutputs: new Set(["shipment", "invoice"]),
+			boundaryMap: {},
+			childOpenInputs: new Set(["order"]),
+			childTerminals: new Set(["shipment"]),
+		});
+		const d = diags.find((d) => d.code === "V034");
+		expect(d?.message).toBe(
+			"subflow boundary mismatch on process 'P': extra in parent outputs: [\"invoice\"]",
+		);
+	});
+
+	it("V034 message shows both missing and extra when both sides differ", () => {
+		const diags = validateSubflowBoundary({
+			processId: "P",
+			parentNormalInputs: new Set(["order", "invoice"]),
+			parentOutputs: new Set(["shipment"]),
+			boundaryMap: {},
+			childOpenInputs: new Set(["order", "issues"]),
+			childTerminals: new Set(["shipment"]),
+		});
+		const d = diags.find((d) => d.code === "V034");
+		expect(d?.message).toBe(
+			'subflow boundary mismatch on process \'P\': missing in parent inputs: ["issues"]; extra in parent inputs: ["invoice"]',
+		);
+	});
+
 	it("M0 — happy path with boundary map → no errors", () => {
 		const diags = validateSubflowBoundary({
 			processId: "fulfill",

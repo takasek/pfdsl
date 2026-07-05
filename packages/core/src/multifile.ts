@@ -267,7 +267,7 @@ export function validateSubflowBoundary(
 		diagnostics.push({
 			severity: "error",
 			code: "V034",
-			message: `subflow boundary mismatch on process '${processId}': parent inputs ${JSON.stringify([...mappedInputs].sort())} ≠ child open inputs ${JSON.stringify([...childOpenInputs].sort())}`,
+			message: `subflow boundary mismatch on process '${processId}': ${formatSetDiff("inputs", mappedInputs, childOpenInputs)}`,
 			range: zeroRange(),
 		});
 	}
@@ -280,7 +280,7 @@ export function validateSubflowBoundary(
 		diagnostics.push({
 			severity: "error",
 			code: "V034",
-			message: `subflow boundary mismatch on process '${processId}': parent outputs ${JSON.stringify([...mappedOutputs].sort())} ≠ child terminals ${JSON.stringify([...childTerminals].sort())}`,
+			message: `subflow boundary mismatch on process '${processId}': ${formatSetDiff("outputs", mappedOutputs, childTerminals)}`,
 			range: zeroRange(),
 		});
 	}
@@ -292,6 +292,29 @@ function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
 	if (a.size !== b.size) return false;
 	for (const x of a) if (!b.has(x)) return false;
 	return true;
+}
+
+/**
+ * Render the diff between the parent-mapped set and the child set for a
+ * V034 message: what the child has that the parent side lacks ("missing"),
+ * and what the parent side has that the child lacks ("extra"). Omits a
+ * clause when that side has no difference, per issue #301.
+ */
+function formatSetDiff(
+	label: string,
+	parentSide: Set<string>,
+	childSide: Set<string>,
+): string {
+	const missing = [...childSide].filter((x) => !parentSide.has(x)).sort();
+	const extra = [...parentSide].filter((x) => !childSide.has(x)).sort();
+	const clauses: string[] = [];
+	if (missing.length > 0) {
+		clauses.push(`missing in parent ${label}: ${JSON.stringify(missing)}`);
+	}
+	if (extra.length > 0) {
+		clauses.push(`extra in parent ${label}: ${JSON.stringify(extra)}`);
+	}
+	return clauses.join("; ");
 }
 
 /**
