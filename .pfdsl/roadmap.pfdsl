@@ -271,7 +271,7 @@ artifact:
   published_extension:
     label: "Marketplace 公開済み extension (#119)"
     description: "VS Marketplace は OIDC/Trusted Publishing 非対応のため PAT が必要。VSCE_PAT 環境変数を設定して `make release-extension` でローカル実行する"
-    status: wip
+    status: suspended
     criteria: "`VSCE_PAT` を設定した `make release-extension` で VS Code Marketplace への publish が動作確認済み"
   article:
     label: "公開記事 (#12)"
