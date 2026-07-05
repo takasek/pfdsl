@@ -304,8 +304,8 @@ artifact:
     criteria: "make release 実行後に roadmap の対応 artifact が自動 done に更新される"
   diag_registry:
     label: "診断コードレジストリ + CI 突合 (#299)"
-    description: "spec §16 を全診断コード（P/V/W）の表に改め、check --json の発行コード集合との一致を CI で検査する。F2/F8/F15/F17/F20。C 系の機械化（stale 前方参照 grep）を同居"
-    status: todo
+    description: "spec §16 を全診断コード（P/V/W）の表に改め、core がソースから静的抽出したコードレジストリとの一致を CI で検査する。F2/F8/F15/F17/F20。C 系の機械化（stale 前方参照 grep）を同居"
+    status: done
     criteria: "spec §16 が全コード表を持ち、実装コード集合との差分と stale 前方参照を CI が検出する"
   spec_editorial:
     label: "spec 編集整備パス (#300)"
