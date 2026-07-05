@@ -198,6 +198,7 @@ export type {
 	SubflowRef,
 } from "./multifile.js";
 export {
+	buildPresentationChain,
 	collectExtendsRefs,
 	collectSubflowRefs,
 	computeOpenInputs,

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
 	analyze,
 	auditGraph,
+	buildPresentationChain,
 	computeOpenInputs,
 	computeTerminals,
 	diffGraphs as coreDiffGraphs,
@@ -16,6 +17,7 @@ import {
 	loadSubflowGraph,
 	type PfdType,
 	reindex,
+	resolvePresentation,
 	resolveRefPath,
 	type SortKey,
 	STATUS_VALUES,
@@ -75,6 +77,24 @@ function readSource(file: string): string | CommandResult {
 	}
 }
 
+/** Loader for `loadExtendsChain`: reads + analyzes a file by absolute path. */
+function extendsLoader(path: string): ReturnType<typeof analyze> | null {
+	try {
+		let src = readFileSync(path, "utf-8");
+		// Plain YAML preset files (e.g. .yaml) have no --- delimiters;
+		// wrap them so loadFrontmatter picks up their content as frontmatter.
+		if (
+			!src.startsWith("---") &&
+			(path.endsWith(".yaml") || path.endsWith(".yml"))
+		) {
+			src = `---\n${src}\n---\n`;
+		}
+		return analyze(src);
+	} catch {
+		return null;
+	}
+}
+
 function diagText(diags: Diagnostic[], file: string): string {
 	return `${diags.map((d) => formatDiagnostic(d, file)).join("\n")}\n`;
 }
@@ -129,27 +149,10 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		};
 	}
 	const absFile = resolve(file);
-	const loader = (path: string) => {
-		try {
-			let src = readFileSync(path, "utf-8");
-			// Plain YAML preset files (e.g. .yaml) have no --- delimiters;
-			// wrap them so loadFrontmatter picks up their content as frontmatter.
-			if (
-				!src.startsWith("---") &&
-				(path.endsWith(".yaml") || path.endsWith(".yml"))
-			) {
-				src = `---\n${src}\n---\n`;
-			}
-			return analyze(src);
-		} catch {
-			return null;
-		}
-	};
-
 	const multiDiags: Diagnostic[] = [];
 
 	// --- Subflow checks ---
-	const subflowGraph = loadSubflowGraph(absFile, loader);
+	const subflowGraph = loadSubflowGraph(absFile, extendsLoader);
 	multiDiags.push(...subflowGraph.diagnostics);
 
 	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
@@ -184,7 +187,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	}
 
 	// --- Extends checks ---
-	const extendsChain = loadExtendsChain(absFile, loader);
+	const extendsChain = loadExtendsChain(absFile, extendsLoader);
 	multiDiags.push(...extendsChain.diagnostics);
 
 	for (const [path, doc] of extendsChain.docs) {
@@ -833,8 +836,32 @@ export async function runGraph(
 	const { graph, frontmatter, diagnostics } = analyze(graphSrc);
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
+
+	// Resolve extends-inherited statusStyles/tag/group (§2.9.4) so presets
+	// shared across files actually affect rendering, not just `check`.
+	// Skipped for stdin (-): relative extends paths need a base file.
+	let effectiveFrontmatter = frontmatter;
+	if (file !== "-") {
+		const absFile = resolve(file);
+		const extendsChain = loadExtendsChain(absFile, extendsLoader);
+		const chain = buildPresentationChain(absFile, extendsChain.docs);
+		const resolved = resolvePresentation(chain);
+		effectiveFrontmatter = { ...frontmatter };
+		if (resolved.statusStyles !== undefined) {
+			effectiveFrontmatter.statusStyles = resolved.statusStyles;
+		}
+		if (resolved.tag !== undefined) {
+			effectiveFrontmatter.tag = resolved.tag;
+		}
+		if (resolved.group !== undefined) {
+			effectiveFrontmatter.group = resolved.group;
+		}
+	}
+
 	if (fmt === "pdf" || fmt === "png") {
-		const svg = await renderGraph(graph, frontmatter, { format: "svg" });
+		const svg = await renderGraph(graph, effectiveFrontmatter, {
+			format: "svg",
+		});
 		try {
 			const buf = await svgToBinary(svg, fmt);
 			return { stdout: "", stderr: "", exitCode: 0, binaryOutput: buf };
@@ -842,7 +869,7 @@ export async function runGraph(
 			return fail(e instanceof Error ? `${e.message}\n` : String(e));
 		}
 	}
-	const out = await renderGraph(graph, frontmatter, { format: fmt });
+	const out = await renderGraph(graph, effectiveFrontmatter, { format: fmt });
 	return ok(out.endsWith("\n") ? out : `${out}\n`);
 }
 

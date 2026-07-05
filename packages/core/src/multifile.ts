@@ -375,6 +375,39 @@ export function loadExtendsChain<T extends DocWithFrontmatter>(
 	return { docs, diagnostics };
 }
 
+/**
+ * Build the ordered chain for `resolvePresentation` from an already-loaded
+ * extends graph (§2.9.4 決定的解決アルゴリズム). `resolve(F)` merges
+ * `resolve(P1) → … → resolve(Pn) → F のローカル定義`, so each preset's own
+ * extends must resolve before the preset's own locals, and the entry file's
+ * locals must land last — a post-order DFS over the `extends:` refs, visited
+ * in list order, with the current node appended after its refs.
+ */
+export function buildPresentationChain<T extends DocWithFrontmatter>(
+	entryPath: string,
+	docs: Map<string, T>,
+): { path: string; fm: Frontmatter | null }[] {
+	const chain: { path: string; fm: Frontmatter | null }[] = [];
+	const stack = new Set<string>(); // current DFS path — guards cycles (V027 already reported)
+
+	function visit(path: string): void {
+		if (stack.has(path)) return;
+		const doc = docs.get(path);
+		if (doc === undefined) return; // missing file — V026 already reported
+		stack.add(path);
+		for (const ref of collectExtendsRefs(doc.frontmatter ?? {})) {
+			const resolved = resolveRefPath(path, ref);
+			if (!resolved.ok) continue;
+			visit(resolved.path);
+		}
+		stack.delete(path);
+		chain.push({ path, fm: doc.frontmatter ?? null });
+	}
+
+	visit(entryPath);
+	return chain;
+}
+
 /** Allowed top-level keys in a preset file (§2.9.5). */
 const PRESET_ALLOWED_KEYS = new Set([
 	"extends",
