@@ -327,6 +327,64 @@ describe("graph", () => {
 		const r = await run(["graph", join(dir, "valid.pfdsl"), "--format", "xyz"]);
 		expect(r.exitCode).toBe(2);
 	});
+
+	it("applies extends-inherited statusStyles (#330)", async () => {
+		const d = mkdtempSync(join(tmpdir(), "pfdsl-graph-extends-"));
+		try {
+			const preset = [
+				"statusStyles:",
+				"  done:",
+				'    fillcolor: "#4CAF50"',
+			].join("\n");
+			const main = [
+				"---",
+				"extends: ./preset.yaml",
+				"artifact:",
+				"  spec:",
+				"    status: done",
+				"---",
+				"req >> design -> spec",
+			].join("\n");
+			writeFileSync(join(d, "preset.yaml"), preset);
+			writeFileSync(join(d, "main.pfdsl"), main);
+			const r = await run(["graph", join(d, "main.pfdsl")]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toContain('fillcolor="#4CAF50"');
+		} finally {
+			rmSync(d, { recursive: true, force: true });
+		}
+	});
+
+	it("local statusStyles override the inherited preset value (#330)", async () => {
+		const d = mkdtempSync(join(tmpdir(), "pfdsl-graph-extends-"));
+		try {
+			const preset = [
+				"statusStyles:",
+				"  done:",
+				'    fillcolor: "#4CAF50"',
+			].join("\n");
+			const main = [
+				"---",
+				"extends: ./preset.yaml",
+				"statusStyles:",
+				"  done:",
+				'    fillcolor: "#2196F3"',
+				"artifact:",
+				"  spec:",
+				"    status: done",
+				"---",
+				"req >> design -> spec",
+			].join("\n");
+			writeFileSync(join(d, "preset.yaml"), preset);
+			writeFileSync(join(d, "main.pfdsl"), main);
+			const r = await run(["graph", join(d, "main.pfdsl")]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toContain('fillcolor="#2196F3"');
+			expect(r.stdout).not.toContain('fillcolor="#4CAF50"');
+		} finally {
+			rmSync(d, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("diff", () => {
