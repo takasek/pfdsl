@@ -16,5 +16,19 @@
       "Bash(git commit *)",
       "Bash(gh issue edit *)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ ! -d node_modules ]; then echo '[pfdsl] node_modules not found in this worktree - running make setup'; make setup; fi",
+            "timeout": 300,
+            "statusMessage": "pfdsl: checking setup (make setup if this worktree is new)"
+          }
+        ]
+      }
+    ]
   }
 }
