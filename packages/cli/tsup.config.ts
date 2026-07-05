@@ -1,6 +1,13 @@
-import { cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+} from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig } from "tsup";
+import { isDistributableCommand } from "./src/skill-sync.js";
 
 const { version } = JSON.parse(
 	readFileSync(resolve(__dirname, "package.json"), "utf-8"),
@@ -37,6 +44,9 @@ export default defineConfig({
 			throw new Error(`commands dir not found at ${commandsSrc}`);
 		}
 		mkdirSync(commandsDest, { recursive: true });
-		cpSync(commandsSrc, commandsDest, { recursive: true });
+		for (const entry of readdirSync(commandsSrc)) {
+			if (!isDistributableCommand(entry)) continue;
+			cpSync(resolve(commandsSrc, entry), resolve(commandsDest, entry));
+		}
 	},
 });
