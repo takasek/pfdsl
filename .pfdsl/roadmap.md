@@ -60,6 +60,8 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 **`make gen-samples` 実行後**: 全 `.svg` が再生成されるが、`.svg` は graphviz のバージョンに依存して描画差分が出る。今回追加・変更したサンプルの `.pfdsl` / `.dot` / `.svg` のみをステージし、無関係なサンプルの `.svg` 差分（バージョン差由来）は `git checkout` で戻してからコミットする。`.dot` と README は決定論的（純 JS）のため差分はそのまま採用してよい。
 
+**新規 `.md` を Write で作成した場合**: commit 前に `node scripts/check-md-linebreaks.mjs <対象ファイル>` で自己検査する（pre-commit 任せで一発コミットすると、読点位置の改行違反が複数箇所まとめて出て全文書き直しになりやすい）。
+
 - [ ] このサイクルで起票した issue を `flow:managed` / `flow:exempt` に分類した（判定は L3 reference の「ラベル判定基準」。保守・基盤・修正は exempt）
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
 - [ ] `node scripts/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する）
