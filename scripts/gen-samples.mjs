@@ -3,10 +3,11 @@
 // Run from repo root: node scripts/gen-samples.mjs
 // Requires graphviz `dot` CLI to be installed.
 
-import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildReadme } from "./gen-samples-readme.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -43,74 +44,5 @@ for (const f of files) {
 
 // --- Generate README.md from samples.tsv ---
 
-const tsv = readFileSync(resolve(samplesDir, "samples.tsv"), "utf-8");
-const rows = tsv
-  .trim()
-  .split("\n")
-  .slice(1) // skip header
-  .map((line) => {
-    const [id, summary, description] = line.split("\t");
-    return { id, summary, description };
-  });
-
-let readme = `# PFDSL Samples
-
-Re-generate: \`node scripts/gen-samples.mjs\`
-
-`;
-
-const tsvIds = new Set(rows.map((r) => r.id));
-for (const f of readdirSync(samplesDir).filter((f) => f.endsWith(".pfdsl"))) {
-  if (!tsvIds.has(f.replace(".pfdsl", ""))) {
-    console.warn(`  warn: ${f} exists but has no entry in samples.tsv — will not appear in README`);
-  }
-}
-
-for (const { id, summary, description } of rows) {
-  const pfdslPath = resolve(samplesDir, `${id}.pfdsl`);
-  if (!existsSync(pfdslPath)) {
-    console.warn(`  warn: ${id}.pfdsl not found, skipping`);
-    continue;
-  }
-  const src = readFileSync(pfdslPath, "utf-8");
-
-  if (id === "pfdsl_implementation_flow") {
-    readme += `## ${id} — ${summary}
-
-${description}
-
-<img src="${id}.svg">
-
-[Source](${id}.pfdsl) · [DOT](${id}.dot)
-
----
-
-`;
-    continue;
-  }
-
-  const dot = readFileSync(resolve(samplesDir, `${id}.dot`), "utf-8");
-  readme += `## ${id} — ${summary}
-
-${description}
-
-\`\`\`pfdsl
-${src}\`\`\`
-
-<img src="${id}.svg">
-
-<details>
-<summary>DOT</summary>
-
-\`\`\`dot
-${dot}\`\`\`
-
-</details>
-
----
-
-`;
-}
-
-writeFileSync(resolve(samplesDir, "README.md"), readme);
+writeFileSync(resolve(samplesDir, "README.md"), buildReadme(samplesDir));
 console.log("README.md generated");
