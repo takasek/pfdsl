@@ -302,11 +302,6 @@ artifact:
     description: "make release 後に roadmap の publish artifact を自動 done にする連携。#277 status-set が前提"
     status: todo
     criteria: "make release 実行後に roadmap の対応 artifact が自動 done に更新される"
-  spec_editorial:
-    label: "spec 編集整備パス (#300)"
-    description: "v0.0.11 レビューの残余 findings（F3-F22。F1 は #298、F2 は #297、§16 表化は #299）と extends プローブ（#304）の findings を spec に反映する"
-    status: done
-    criteria: "対象 findings が spec に反映され check-docs / gen-skill が差分なしで通過"
   extends_probe:
     label: "extends 意味論の agent プローブ (#304)"
     description: "spec-stress-test スキルのオラクル型で extends の深マージ・diamond・優先順位・プリセット汚染を検証する。モデル勾配（haiku）同時測定を含む。スキル初回実運用"
@@ -472,10 +467,6 @@ process:
     label: make release roadmap 自動更新実装
     location: https://github.com/takasek/pfdsl/issues/278
     updated_at: 2026-07-03T01:28:44Z
-  i300_revise_spec_editorial:
-    label: spec 編集整備
-    location: https://github.com/takasek/pfdsl/issues/300
-    updated_at: 2026-07-05T11:55:08Z
   i304_probe_extends_spec:
     label: extends 意味論プローブ
     location: https://github.com/takasek/pfdsl/issues/304
@@ -584,5 +575,3 @@ multifile_toolchain >> recode_boundary_diags -> recode
 [spec_v0011, multifile_toolchain] >> implement_boundary_feedback -> boundary_feedback
 
 [spec_v0011, multifile_toolchain] >> i304_probe_extends_spec -> extends_probe
-
-[boundary_feedback, extends_probe] >> i300_revise_spec_editorial -> spec_editorial
