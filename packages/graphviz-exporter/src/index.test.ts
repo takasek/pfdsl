@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyze, buildGraph, normalizeDocument, parse } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
+import { buildReadme } from "../../../scripts/gen-samples-readme.mjs";
 import { exportDiffDot, exportDot } from "./index.js";
 
 const samplesDir = resolve(
@@ -1180,4 +1181,11 @@ describe("docs/samples drift", () => {
 			expect(readme).toContain(dot);
 		});
 	}
+
+	// Full-content guard: catches drift the per-.dot checks above miss, e.g. a
+	// samples.tsv description/summary edit that wasn't followed by `make
+	// gen-samples` (#306).
+	it("README.md matches full regeneration from samples.tsv", () => {
+		expect(readme).toBe(buildReadme(samplesDir));
+	});
 });
