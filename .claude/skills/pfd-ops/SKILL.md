@@ -53,6 +53,7 @@ description: |
 
 1. **選択**:
    - まず `git fetch origin` でリモートの最新状態を取得する（サイクル開始時の判断はすべて origin の現状を前提にする）。新規ブランチは `origin/<base>` を起点に作成する — fetch は remote-tracking ref のみ更新し local ブランチは更新しないため、local 経由で切ると stale なまま気づかず作業してしまう
+   - **既存ブランチ（前セッションから継続する worktree 等）で作業を再開する場合**、`git log --oneline HEAD..origin/<base>` で base が先行していないか確認し、先行していれば rebase してから続行する。stale なまま進めると無関係な PR diff（他 PR で先行 merge された変更の revert に見える差分）が混入する
    - **CI やツールが自動生成した PR が open のままであれば、新規作業より先にマージを確認する** — open のまま作業を始めると選択判断が stale な状態に基づく（どのような PR が自動生成されるかはリポ固有 — companion の roadmap.md に記載する）
    - `.pfdsl/roadmap.pfdsl` の着手可能プロセスを列挙する。`npx @pfdsl/cli ready <roadmap.pfdsl> --best --json` で、入力 artifact が全て done のプロセス一覧と `--best` 推薦（合流点を解放するもの＝後続プロセスの最後の未完入力になっているもの）が JSON で得られる
    - ユーザー指定があればそれを、なければ `best` の推薦を優先して1つ選ぶ。**ユーザー指定で入力 artifact が done でないプロセスを選んだ場合、「前提条件未達で着手する」とその理由を記録してから実行する**
