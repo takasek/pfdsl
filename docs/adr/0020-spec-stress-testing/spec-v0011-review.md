@@ -285,7 +285,7 @@ agent 実験 B（`subflow-agent-probe.md`）では被験者がこの罠を正し
 1. **spec ↔ checker のコード整合を CI で検査**: `check --json` が発行しうる全コードの一覧をcore からエクスポートし、spec §16 の表（F8）との差分を `check-docs` 系で検出する。
    V025 衝突（F2）はこの検査があれば混入時点で落ちていた。
 2. **agent 実書きプローブの定常化**: 「spec だけを読ませた sonnet に書かせ、CLI を正解器にして採点する」
-   手法（`subflow-agent-probe.md`）は、ADR-0020 の手トレースが取りこぼす「読者がどこで誤読するか」を検出する。仕様の大きな追加時のレビュー観点として`docs/review-prompts.md` に C 系（仕様ユーザビリティ）として追記する余地がある。
+   手法（`subflow-agent-probe.md`）は、ADR-0020 の手トレースが取りこぼす「読者がどこで誤読するか」を検出する。仕様の大きな追加時のレビュー観点として`docs/review-perspectives.md` に C 系（仕様ユーザビリティ）として追記する余地がある。
 3. **`check` の境界不一致メッセージに差分ヒント**: 現状は両集合の全列挙。
    `missing in parent: [...] / extra in parent: [...]` 形式にすると、agent 実験で観測した自己修正ループ（何が原因かの特定）が速くなる。
 4. **`fmt --mode flows` と subflow の関係の文書化**: 正規形が subflow を保持しない（§13）以上、構造 diff は subflow 版とインライン版を別物と判定する。この帰結（リファクタリングでフローを子に切り出すと diff が全張り替えになる）を §13 に注記しておくと驚きが減る。

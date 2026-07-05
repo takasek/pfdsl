@@ -40,7 +40,7 @@ pfd-ops の終端ゲートに確認項目を追加する:
 - pfd-ops プロトコル5を双方向門番に書き換え、終端ゲートに後続確認項目を追加した。
 - 現状修復として `.pfdsl/roadmap.pfdsl` に `implement_multifile -> multifile_toolchain`（todo, 入力 `[spec_v008, featured_toolchain]`）を登録し、`spec_v008` の終端違反を解消した。
   実装 issue の起票は v0.0.8 統合後（spec_v008 確定後）に行う。
-- review-prompts A「偽の不変性」（生成元なし外部入力の点検）と対称の点検観点。
+- review-perspectives A「偽の不変性」（生成元なし外部入力の点検）と対称の点検観点。
   終端ノードについても「これは真の納品物か、後続ノード未登録か」を問う。
 
 ## References

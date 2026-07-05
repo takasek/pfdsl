@@ -65,11 +65,11 @@ const baseHeader = (src) =>
 writeFileSync(resolve(refsDir, "spec.md"), baseHeader("docs/spec/spec.md") + specSrc);
 console.log("references/spec.md ← docs/spec/spec.md");
 
-// --- 1b. Copy review prompts ---
+// --- 1b. Copy review perspectives ---
 
-const promptsSrc = readFileSync(resolve(root, "docs/review-prompts.md"), "utf-8");
-writeFileSync(resolve(refsDir, "review-prompts.md"), baseHeader("docs/review-prompts.md") + promptsSrc);
-console.log("references/review-prompts.md ← docs/review-prompts.md");
+const promptsSrc = readFileSync(resolve(root, "docs/review-perspectives.md"), "utf-8");
+writeFileSync(resolve(refsDir, "review-perspectives.md"), baseHeader("docs/review-perspectives.md") + promptsSrc);
+console.log("references/review-perspectives.md ← docs/review-perspectives.md");
 
 // --- 2. Generate samples.md from TSV ---
 

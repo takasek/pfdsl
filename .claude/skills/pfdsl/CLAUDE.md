@@ -6,7 +6,7 @@
 |---|---|
 | スキル本文（構文・品質ガイド・CLI等） | `scripts/gen-skill.mjs` のテンプレート |
 | 仕様書（spec） | `docs/spec/spec.md` |
-| レビュープロンプト | `docs/review-prompts.md` |
+| レビュー観点 | `docs/review-perspectives.md` |
 | サンプル | `docs/samples/*.pfdsl` |
 
 編集後は `make gen-skill` を実行し、生成物ごと commit する。
