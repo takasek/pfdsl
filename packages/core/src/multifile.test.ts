@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	buildPresentationChain,
 	collectExtendsRefs,
 	collectSubflowRefs,
 	computeOpenInputs,
@@ -535,6 +536,85 @@ describe("loadExtendsChain", () => {
 		const result = loadExtendsChain("/p/main.pfdsl", docs);
 		expect(result.diagnostics).toHaveLength(1);
 		expect(result.diagnostics[0]!.code).toBe("V026");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// buildPresentationChain
+// ---------------------------------------------------------------------------
+
+describe("buildPresentationChain", () => {
+	it("single file, no extends → chain of just the entry", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { statusStyles: {} } },
+		});
+		const { docs: loaded } = loadExtendsChain("/p/main.pfdsl", docs);
+		const chain = buildPresentationChain("/p/main.pfdsl", loaded);
+		expect(chain.map((c) => c.path)).toEqual(["/p/main.pfdsl"]);
+	});
+
+	it("single preset → preset before entry (lowest priority first)", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: "./p.yaml" } },
+			"/p/p.yaml": { frontmatter: { statusStyles: {} } },
+		});
+		const { docs: loaded } = loadExtendsChain("/p/main.pfdsl", docs);
+		const chain = buildPresentationChain("/p/main.pfdsl", loaded);
+		expect(chain.map((c) => c.path)).toEqual(["/p/p.yaml", "/p/main.pfdsl"]);
+	});
+
+	it("multi-hop: grandparent preset resolves before parent, before entry", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: "./mid.yaml" } },
+			"/p/mid.yaml": { frontmatter: { extends: "./base.yaml" } },
+			"/p/base.yaml": { frontmatter: { statusStyles: {} } },
+		});
+		const { docs: loaded } = loadExtendsChain("/p/main.pfdsl", docs);
+		const chain = buildPresentationChain("/p/main.pfdsl", loaded);
+		expect(chain.map((c) => c.path)).toEqual([
+			"/p/base.yaml",
+			"/p/mid.yaml",
+			"/p/main.pfdsl",
+		]);
+	});
+
+	it("multiple extends: earlier array entries resolve before later ones", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: { extends: ["./base.yaml", "./team.yaml"] },
+			},
+			"/p/base.yaml": { frontmatter: { statusStyles: {} } },
+			"/p/team.yaml": { frontmatter: { statusStyles: {} } },
+		});
+		const { docs: loaded } = loadExtendsChain("/p/main.pfdsl", docs);
+		const chain = buildPresentationChain("/p/main.pfdsl", loaded);
+		expect(chain.map((c) => c.path)).toEqual([
+			"/p/base.yaml",
+			"/p/team.yaml",
+			"/p/main.pfdsl",
+		]);
+	});
+
+	it("feeding chain into resolvePresentation applies inherited statusStyles", () => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: "./p.yaml" } },
+			"/p/p.yaml": {
+				frontmatter: { statusStyles: { done: { fillcolor: "green" } } },
+			},
+		});
+		const { docs: loaded } = loadExtendsChain("/p/main.pfdsl", docs);
+		const chain = buildPresentationChain("/p/main.pfdsl", loaded);
+		const result = resolvePresentation(chain);
+		expect(result.statusStyles?.done?.fillcolor).toBe("green");
+	});
+
+	it("cycle: does not infinite-loop, still yields a chain", () => {
+		const docs = makeLoad({
+			"/p/self.pfdsl": { frontmatter: { extends: "./self.pfdsl" } },
+		});
+		const { docs: loaded } = loadExtendsChain("/p/self.pfdsl", docs);
+		const chain = buildPresentationChain("/p/self.pfdsl", loaded);
+		expect(chain.map((c) => c.path)).toEqual(["/p/self.pfdsl"]);
 	});
 });
 
