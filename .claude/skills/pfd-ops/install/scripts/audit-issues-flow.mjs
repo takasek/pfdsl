@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseIssueArtifacts, computeFindings, applyFixes, applyClosedInFlowFixes, computeLabelFindings, FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
+import { parseIssueProcesses, buildProcessOutputs, computeFindings, applyFixes, applyClosedInFlowFixes, computeLabelFindings, FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
 import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -63,7 +63,8 @@ function fetchIssues() {
 
 const doc = parseDocument(fmText);
 const fm = doc.toJS();
-const artifacts = parseIssueArtifacts(fm);
+const processes = parseIssueProcesses(fm);
+const outputsByProcess = buildProcessOutputs(body);
 
 // Mark artifacts that are consumed (have downstream) in the flow body
 function getConsumedArtifactIds(body) {
@@ -80,8 +81,29 @@ function getConsumedArtifactIds(body) {
 }
 
 const consumedIds = getConsumedArtifactIds(body);
-for (const art of artifacts) {
-	art.hasDownstream = consumedIds.has(art.id);
+
+// Expand each tracked process into one entry per (issueNumber, output artifact) pair.
+// NOTE: if a single process ever has both multiple issueNumbers AND multiple outputs,
+// this cross-product can pair an issue with an output it doesn't actually track (e.g.
+// issue #5 closing could act on an output really tracked by issue #6). This is a known,
+// accepted limitation — see docs/superpowers/specs/2026-07-04-issue-tracking-id-on-process-design.md
+// ("1 processが複数出力artifactを持つ場合"). Not present in current roadmap.pfdsl data.
+const entries = [];
+for (const proc of processes) {
+	const outputs = outputsByProcess.get(proc.id) ?? [];
+	for (const issueNumber of proc.issueNumbers) {
+		for (const artifactId of outputs) {
+			entries.push({
+				processId: proc.id,
+				issueNumber,
+				artifactId,
+				status: fm.artifact?.[artifactId]?.status,
+				hasDownstream: consumedIds.has(artifactId),
+				updatedAt: proc.updatedAt,
+				priorities: proc.priorities,
+			});
+		}
+	}
 }
 
 // --- Check labels ---
@@ -111,25 +133,25 @@ if (labelFindings.length > 0) {
 // --- First pass: compute and print findings ---
 
 let issues = fetchIssues();
-let findings = computeFindings(artifacts, issues);
+let findings = computeFindings(entries, issues);
 
 function printFindings(findings) {
 	const fixable = findings.filter((f) => f.fixVia);
 	const manual = findings.filter((f) => !f.fixVia);
 
+	function fmtFinding(f) {
+		const pid = f.processId ? ` [${f.processId}]` : "";
+		const aid = f.artifactId ? ` -> ${f.artifactId}` : "";
+		return `  #${f.issueNumber} ${f.type}${pid}${aid} ${f.detail}`;
+	}
+
 	if (fixable.length > 0) {
 		console.log("fixable:");
-		for (const f of fixable) {
-			const aid = f.artifactId ? ` [${f.artifactId}]` : "";
-			console.log(`  #${f.issueNumber} ${f.type}${aid} ${f.detail}`);
-		}
+		for (const f of fixable) console.log(fmtFinding(f));
 	}
 	if (manual.length > 0) {
 		console.log("manual:");
-		for (const f of manual) {
-			const aid = f.artifactId ? ` [${f.artifactId}]` : "";
-			console.log(`  #${f.issueNumber} ${f.type}${aid} ${f.detail}`);
-		}
+		for (const f of manual) console.log(fmtFinding(f));
 	}
 }
 
@@ -154,7 +176,7 @@ for (const f of missingLabel) {
 
 // 2. Re-fetch issues (labeling changes updatedAt), recompute
 issues = fetchIssues();
-findings = computeFindings(artifacts, issues);
+findings = computeFindings(entries, issues);
 
 // 3. Apply document and body fixes
 const issuesByNumber = new Map(issues.map((i) => [i.number, i]));
