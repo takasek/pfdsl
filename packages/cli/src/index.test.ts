@@ -1239,4 +1239,28 @@ describe("audit-sync", () => {
 		expect(parsed.gaps).toHaveLength(1);
 		expect(parsed.gaps[0].artifactId).toBe("gap_only");
 	});
+
+	it("warns (W006) on stderr when roadmap type: is omitted, but still succeeds (#317)", async () => {
+		const rm = join(dir, "as-roadmap-no-type.pfdsl");
+		writeFileSync(
+			rm,
+			"---\nartifact:\n  output:\n    status: todo\n---\nreq >> build -> output\n",
+		);
+		const fl = flowWith("  output:\n    status: todo\n");
+		const r = await run(["audit-sync", rm, fl]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("W006");
+	});
+
+	it("--json includes W006 in warnings when roadmap type: is omitted (#317)", async () => {
+		const rm = join(dir, "as-roadmap-no-type-json.pfdsl");
+		writeFileSync(
+			rm,
+			"---\nartifact:\n  output:\n    status: todo\n---\nreq >> build -> output\n",
+		);
+		const fl = flowWith("  output:\n    status: todo\n");
+		const r = await run(["audit-sync", rm, fl, "--json"]);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.warnings?.[0]?.code).toBe("W006");
+	});
 });
