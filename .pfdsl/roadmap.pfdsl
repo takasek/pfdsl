@@ -310,7 +310,7 @@ artifact:
   extends_probe:
     label: "extends 意味論の agent プローブ (#304)"
     description: "spec-stress-test スキルのオラクル型で extends の深マージ・diamond・優先順位・プリセット汚染を検証する。モデル勾配（haiku）同時測定を含む。スキル初回実運用"
-    status: todo
+    status: done
     criteria: "オラクル実行・CLI 突合・0020 dir への記録が完了し、確信度中/低の箇所が findings として振り分け済み"
 process:
   implement_version_cmd:
@@ -475,7 +475,7 @@ process:
   i300_revise_spec_editorial:
     label: spec 編集整備
     location: https://github.com/takasek/pfdsl/issues/300
-    updated_at: 2026-07-04T05:43:40Z
+    updated_at: 2026-07-05T11:55:08Z
   i304_probe_extends_spec:
     label: extends 意味論プローブ
     location: https://github.com/takasek/pfdsl/issues/304
