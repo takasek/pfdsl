@@ -64,6 +64,23 @@ describe("copyCommands", () => {
 		);
 		expect(content).not.toBe("old\n");
 	});
+
+	it("does not copy non pfd-* files, even when present in the source dir", () => {
+		const commandsDir = mkdtempSync(join(tmpdir(), "pfdsl-sync-src-"));
+		try {
+			writeFileSync(join(commandsDir, "pfd-cycle.md"), "cycle\n");
+			writeFileSync(join(commandsDir, "internal-debug.md"), "secret\n");
+			copyCommands(commandsDir, targetRoot);
+			expect(
+				existsSync(join(targetRoot, ".claude/commands/pfd-cycle.md")),
+			).toBe(true);
+			expect(
+				existsSync(join(targetRoot, ".claude/commands/internal-debug.md")),
+			).toBe(false);
+		} finally {
+			rmSync(commandsDir, { recursive: true, force: true });
+		}
+	});
 });
 
 describe("resolveSkillRoot", () => {

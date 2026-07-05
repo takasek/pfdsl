@@ -54,13 +54,25 @@ export function resolveCommandsDir(): string {
 }
 
 /**
- * Copies all bundled command files into `<targetRoot>/.claude/commands/`,
+ * Commands are opt-in for distribution: only files matching this pattern
+ * leak into the npm package and adopting repos. Repo-local commands
+ * (debugging helpers, maintainer-only workflows) stay out by default.
+ */
+const DISTRIBUTABLE_COMMAND_PATTERN = /^pfd-.*\.md$/;
+
+export function isDistributableCommand(filename: string): boolean {
+	return DISTRIBUTABLE_COMMAND_PATTERN.test(filename);
+}
+
+/**
+ * Copies allowlisted command files into `<targetRoot>/.claude/commands/`,
  * overwriting existing files so stale entries don't linger.
  */
 export function copyCommands(commandsDir: string, targetRoot: string): void {
 	const dest = join(targetRoot, ".claude/commands");
 	mkdirSync(dest, { recursive: true });
 	for (const entry of readdirSync(commandsDir)) {
+		if (!isDistributableCommand(entry)) continue;
 		cpSync(join(commandsDir, entry), join(dest, entry));
 	}
 }
