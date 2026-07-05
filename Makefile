@@ -100,6 +100,8 @@ check-docs:
 	done
 	@echo "check-docs: all passed"
 	node scripts/check-doc-examples.mjs
+	node scripts/check-diag-registry.mjs
+	node scripts/check-stale-forward-refs.mjs
 
 .PHONY: gen-skill
 gen-skill: check-docs
