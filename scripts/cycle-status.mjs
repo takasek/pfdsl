@@ -27,7 +27,13 @@ try {
 	fetched = false;
 }
 
-const behindBase = countBehind(sh(`git log --oneline HEAD..origin/${base}`));
+let behindBase = null;
+let behindBaseError = null;
+try {
+	behindBase = countBehind(sh(`git log --oneline HEAD..origin/${base}`));
+} catch (e) {
+	behindBaseError = e.message;
+}
 
 let openFlowSyncPRs = [];
 let otherOpenPRs = [];
@@ -55,6 +61,7 @@ if (existsSync(cliPath)) {
 }
 
 const result = { fetched, behindBase, openFlowSyncPRs, otherOpenPRs, ready, best };
+if (behindBaseError) result.behindBaseError = behindBaseError;
 if (prError) result.prError = prError;
 if (readyError) result.readyError = readyError;
 

@@ -48,6 +48,11 @@ describe("hasStatusChange", () => {
 	it("returns false for an empty diff", () => {
 		assert.equal(hasStatusChange(""), false);
 	});
+
+	it("still detects a status: line whose content itself starts with a dash", () => {
+		const diff = "@@ -1,2 +1,2 @@\n--status: dash-prefixed-value\n+status: wip\n";
+		assert.equal(hasStatusChange(diff), true);
+	});
 });
 
 describe("MANUAL_ITEMS", () => {

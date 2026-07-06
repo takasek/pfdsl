@@ -25,11 +25,13 @@ function trySh(cmd) {
 	try {
 		return { ok: true, out: sh(cmd) };
 	} catch (e) {
-		return { ok: false, out: e.stdout ?? e.message };
+		return { ok: false, out: e.stdout || e.message };
 	}
 }
 
-const changedFiles = sh(`git diff --name-only ${base}...HEAD`)
+// --diff-filter=d excludes deleted paths — a deleted .pfdsl/.md would
+// otherwise fail the check/linebreaks gates against a file that no longer exists.
+const changedFiles = sh(`git diff --diff-filter=d --name-only ${base}...HEAD`)
 	.trim()
 	.split("\n")
 	.filter(Boolean);

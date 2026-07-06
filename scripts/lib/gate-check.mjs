@@ -43,7 +43,8 @@ export function formatGateTable(results) {
  * @returns {boolean}
  */
 export function hasStatusChange(diffText) {
-	return diffText
-		.split("\n")
-		.some((line) => /^[+-](?!\+\+|--)/.test(line) && /status:/.test(line));
+	return diffText.split("\n").some((line) => {
+		if (line.startsWith("--- ") || line.startsWith("+++ ")) return false;
+		return /^[+-]/.test(line) && /status:/.test(line);
+	});
 }
