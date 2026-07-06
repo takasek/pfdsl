@@ -154,13 +154,13 @@ artifact:
     group: planning
   ops_skill_general:
     label: PFD運用スキル（汎用層）
-    description: "/pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR-0017）は ecosystem_skill が一次情報。汎用層（L1）= SKILL.md 本文、ディスパッチ（L2）= SKILL.md 本文のディスパッチ規約、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
+    description: "/pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR-0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文。L4（リポ固有、配布対象外）は pd-ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る"
     criteria: /pfd-cycle が期待通り動作する
     location: ../.claude/skills/pfd-ops/
     group: generation
   ops_skill_l3:
     label: PFD運用スキル（GitHub Issuesバックエンド層）
-    description: "GitHub Issues で作業項目管理する採用リポ向けプリセット（L3）= references/github-issues-backend.md、デプロイ可能ファイル群（L3.5）= install/（CI で identity 強制）。retro_skill の監査結果がこの層の規約改訂に還流する。手書き（生成対象外）"
+    description: "GitHub Issues で作業項目管理する採用リポ向けプリセット（L3）= references/github-issues-backend.md + install/（採用用テンプレート、CI で identity 強制）。retro_skill の監査結果がこの層の規約改訂に還流する。手書き（生成対象外）"
     criteria: install/ 配布ファイルを変更した PR で check-pfd-ops-sync.yml が通過する
     location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
     group: generation

@@ -104,7 +104,7 @@ artifact:
     group: skill
   ops_skill_general:
     label: "PFD運用フレームワーク 汎用層（f1）"
-    description: "pfd-opsのL1（汎用手順）+L2（ディスパッチ）+L4（companion機構）。内容の一次情報はworkflow.pfdslのops_skill_general — ここでは配布対象の1コンポーネントとしてのみ扱う"
+    description: "pfd-opsのL1（汎用手順）+L2（ディスパッチ）。ともにSKILL.md本文で配布。L4（リポ固有）は配布対象外でpd-ops自体に含まれない。内容の一次情報はworkflow.pfdslのops_skill_general — ここでは配布対象の1コンポーネントとしてのみ扱う"
     group: skill
   ops_skill_l3:
     label: "PFD運用フレームワーク GitHub Issuesバックエンド層（f2）"
