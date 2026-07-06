@@ -310,7 +310,7 @@ artifact:
   ops_checkers:
     label: "cycle-status / gate-check スクリプト (#354)"
     description: "ワークサイクル手順1の機械操作束ねと終端ゲート機械6項目の集約チェッカー。pfd-ops SKILL.md の散文手順を companion 経由のスクリプト参照に置換する"
-    status: todo
+    status: done
     criteria: "両スクリプトがテスト付きで動作し、pfd-ops 手順1・3がスクリプト参照に縮んでいる"
   retro_due_hook:
     label: "retro-due 起動判定 + Stop hook (#355)"
