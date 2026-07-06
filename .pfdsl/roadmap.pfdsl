@@ -210,12 +210,12 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_tool_v0015:
     label: "CLI v0.0.15（次期）"
-    status: todo
+    status: done
     criteria: npm show @pfdsl/cli version が 0.0.15 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
   ext_v0015:
     label: "extension v0.0.15（次期）"
-    status: todo
+    status: done
     criteria: Marketplace の takasek.pfdsl version が 0.0.15 を返す
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
   hover_jump:
