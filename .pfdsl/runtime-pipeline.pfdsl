@@ -1,7 +1,7 @@
 ---
 title: pfdsl CLI 変換パイプライン
 type: runtime-pipeline
-description: "pfdslソースが実行時に何に変換されるか、変換の境界はどこか。a(仕様)+b(処理系)を基盤にc(pfdsl skill)/d(VSCode拡張)が独立にbを呼び、g(skill sync)がf(pd-opsフレームワーク)を配布する。層識別はtagで表現する。詳細はsibling runtime-pipeline.md参照"
+description: "pfdslソースが実行時に何に変換されるか、変換の境界はどこか。a(仕様)+b(処理系)を基盤にc(pfdsl skill)/d(VSCode拡張)が独立にbを呼ぶ。呼び出し元はinvoked_by_c/invoked_by_dタグで表現する（>>入力にすると依存の向きが逆転し、a-gのレイヤーidentityタグと混在させるとis-a/is-called-byが紛れるため別名前空間に分離）。g(skill sync)がf(pd-opsフレームワーク)を配布する。詳細はsibling runtime-pipeline.md参照"
 layout:
   direction: LR
   maxWidth: 140
@@ -42,6 +42,14 @@ tag:
   g:
     label: "g: fの配布"
     style: { color: "#16a085" }
+  invoked_by_c:
+    label: "cから呼ばれる"
+    description: "呼び出し元がcである関係を表す。bレイヤーidentityを表すtag:cとは別名前空間（is-a/is-called-byの混在を避けるため分離）"
+    style: { color: "#f8d7a3" }
+  invoked_by_d:
+    label: "dから呼ばれる"
+    description: "呼び出し元がdである関係を表す。bレイヤーidentityを表すtag:dとは別名前空間（is-a/is-called-byの混在を避けるため分離）"
+    style: { color: "#dcc6f5" }
 
 artifact:
   pfdsl_source:
@@ -54,13 +62,13 @@ artifact:
     tags: [a]
   pfdsl_skill:
     label: PFD読み書き分析skill
-    description: "AIエージェントに.pfdsl操作を指示するスキル。CLIコマンド経由でbを呼ぶ（check/fmt/graph/diff/sort-meta等）。配布時はskill_source_bundleにも同梱される（gの一部）"
+    description: "AIエージェントに.pfdsl操作を指示するスキル。CLIコマンド経由でbを呼ぶ（check/fmt/graph/diff/sort-meta等）。呼び出し元であってbの入力データではないため、bの各processへは>>で繋がず、該当processのtagsにinvoked_by_cを付与して表現する（自身のidentityタグcとは別名前空間）。配布時はskill_source_bundleにも同梱される（gの一部、こちらは実ファイルコピーなので>>で正しく表現する）"
     location: ../.claude/skills/pfdsl/
     group: agent_skill
     tags: [c]
   vscode_extension:
     label: VSCode拡張
-    description: "PFDの視覚的読み書き分析を提供する拡張。CLIを介さずbを直接呼ぶ。cli（c経由の呼び出し）とは互いに依存せず、双方が独立にbへ依存する。preview/hover/codelens/jump/document-link等のUI専用機能は検証可能な成果物を持たないためこのグラフの対象外"
+    description: "PFDの視覚的読み書き分析を提供する拡張。CLIを介さずbを直接呼ぶ。呼び出し元であってbの入力データではないため、bの各processへは>>で繋がず、該当processのtagsにinvoked_by_dを付与して表現する（自身のidentityタグdとは別名前空間。>>で繋ぐと「bがdに依存する」向きに逆転するため）。@pfdsl/cli（c経由の呼び出し）とは互いに依存せず、双方が独立にbへ依存する。preview/hover/codelens/jump/document-link等のUI専用機能は検証可能な成果物を持たないためこのグラフの対象外"
     location: ../packages/vscode-extension/
     group: vscode_ext
     tags: [d]
@@ -176,54 +184,54 @@ artifact:
 process:
   parse:
     label: 構文解析
-    description: frontmatter読込・lex・parseでdocument+frontmatterを得る
+    description: frontmatter読込・lex・parseでdocument+frontmatterを得る。CLI（c）・VSCode拡張（d）双方の全コマンドが内部で通る
     group: core
-    tags: [b]
+    tags: [b, invoked_by_c, invoked_by_d]
   normalize:
     label: 正規化
-    description: エッジリストとノード種別を正規化しGraphを構築する
+    description: エッジリストとノード種別を正規化しGraphを構築する。CLI（c）・VSCode拡張（d）双方が呼ぶ
     group: core
-    tags: [b]
+    tags: [b, invoked_by_c, invoked_by_d]
   validate:
     label: 検証
     description: V/Wルールに基づき診断を生成する
     command: npx @pfdsl/cli check
     group: core
-    tags: [b]
+    tags: [b, invoked_by_c, invoked_by_d]
   format:
     label: 整形
     description: ソースを独立に再lex/parseし正準整形済みテキストを生成する
     command: npx @pfdsl/cli fmt --write
     group: core
-    tags: [b]
+    tags: [b, invoked_by_c, invoked_by_d]
   render_graph:
     label: DOT変換
     description: 正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する
     group: core
-    tags: [b]
+    tags: [b, invoked_by_c, invoked_by_d]
   export_image:
     label: 画像化
     description: DOTをSVG（wasm、依存なし）またはPDF/PNG（puppeteer必須）へ変換する
     command: npx @pfdsl/cli graph --format svg
     group: core
-    tags: [b]
+    tags: [b, invoked_by_c, invoked_by_d]
   export_metadata:
     label: メタデータ抽出
-    description: 正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する（VSCode拡張のみ）
+    description: 正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する。CLIサブコマンドはなくVSCode拡張のみが呼ぶ
     group: core
-    tags: [b]
+    tags: [b, invoked_by_d]
   diff_graphs:
     label: 差分算出
     description: 2つのグラフ間の構造差分を計算する
     command: npx @pfdsl/cli diff
     group: core
-    tags: [b]
+    tags: [b, invoked_by_c, invoked_by_d]
   sort_meta:
     label: ノード定義ソート
     description: 指定キーでfrontmatterのノード定義を並べ替える
     command: npx @pfdsl/cli sort-meta
     group: core
-    tags: [b]
+    tags: [b, invoked_by_c, invoked_by_d]
   bundle_skills:
     label: スキルバンドル生成
     description: "ビルド時（tsup onSuccess）に.claude/skills/{pfd-ops,pfd-retro,pfd-ecosystem,pfdsl}をdist/へコピーする（fの内容authoring自体はworkflow.pfdsl側、ここは機械的コピーのみ）"
@@ -253,23 +261,23 @@ process:
     tags: [g]
 ---
 
-[pfdsl_source, pfdsl_skill, vscode_extension] >> parse -> parsed_doc
+pfdsl_source >> parse -> parsed_doc
 
-[parsed_doc, pfdsl_skill, vscode_extension] >> normalize -> normalized_graph
+parsed_doc >> normalize -> normalized_graph
 
-[normalized_graph, pfdsl_spec, pfdsl_skill, vscode_extension] >> validate -> diagnostics_report
+[normalized_graph, pfdsl_spec] >> validate -> diagnostics_report
 
-[pfdsl_source, pfdsl_skill, vscode_extension] >> format -> formatted_source
+pfdsl_source >> format -> formatted_source
 
-[normalized_graph, parsed_doc, pfdsl_skill, vscode_extension] >> render_graph -> dot_graph
+[normalized_graph, parsed_doc] >> render_graph -> dot_graph
 
-[dot_graph, pfdsl_skill, vscode_extension] >> export_image -> rendered_image
+dot_graph >> export_image -> rendered_image
 
-[normalized_graph, parsed_doc, vscode_extension] >> export_metadata -> metadata_tsv
+[normalized_graph, parsed_doc] >> export_metadata -> metadata_tsv
 
-[normalized_graph, pfdsl_skill, vscode_extension] >> diff_graphs -> diff_report
+normalized_graph >> diff_graphs -> diff_report
 
-[parsed_doc, pfdsl_skill, vscode_extension] >> sort_meta -> sorted_source
+parsed_doc >> sort_meta -> sorted_source
 
 [pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> bundle_skills -> skill_source_bundle
 
