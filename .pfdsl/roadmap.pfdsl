@@ -332,6 +332,17 @@ artifact:
     status: todo
     criteria: npm show @pfdsl/cli version が 0.0.18 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
+  spec_id_syntax:
+    label: "仕様ID構文 ADR + 最小lint (#328)"
+    description: "spec.md 相互参照の仕様ID方式。構文・レンジ規則の詳細と移行方針は issue #328 が一次情報。汎用ツール化の検討記録は issue コメント参照"
+    status: todo
+    criteria: 構文・レンジ規則が ADR 化され、ID 一意性チェックと dangling 参照チェックの lint が CI で動作確認済み
+  spec_id_refs:
+    label: 仕様ID相互参照化済み spec.md
+    description: "節番号直書きの相互参照を仕様ID参照へ段階移行した spec.md。ADR 確定後に別 issue として起票する（#328 移行方針）。後続門番のプレースホルダ（ADR-0018）"
+    status: todo
+    criteria: spec.md の節番号相互参照が仕様ID参照に置換され、lint が dangling なしで通過
+    location: ../docs/spec/spec.md
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -515,6 +526,13 @@ process:
     updated_at: 2026-07-06T04:34:30Z
   publish_cli_v0018:
     label: CLI v0.0.18リリース
+  i328_design_spec_ids:
+    label: 仕様ID構文設計・最小lint実装
+    location: https://github.com/takasek/pfdsl/issues/328
+    updated_at: 2026-07-06T05:34:43Z
+  migrate_spec_id_refs:
+    label: spec.md 仕様ID参照移行
+    description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。ADR 確定後に issue 起票して iN prefix を付与する"
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -626,3 +644,6 @@ cli_tool_v0015 >> i356_implement_explain_cmd -> explain_cmd
 cli_tool_v0015 >> i357_define_pfd_lens_agent -> pfd_lens_agent
 
 [explain_cmd, pfd_lens_agent] >> publish_cli_v0018 -> cli_tool_v0018
+spec_v0011 >> i328_design_spec_ids -> spec_id_syntax
+
+spec_id_syntax >> migrate_spec_id_refs -> spec_id_refs
