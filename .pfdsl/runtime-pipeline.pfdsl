@@ -1,0 +1,163 @@
+---
+title: pfdsl CLI 変換パイプライン
+type: runtime-pipeline
+description: pfdslソースが実行時に何に変換されるか、変換の境界はどこか。詳細はsibling runtime-pipeline.md参照
+layout:
+  direction: LR
+  maxWidth: 140
+
+group:
+  core:
+    label: "@pfdsl/core"
+    color: "#e8f4fd"
+  cli:
+    label: "@pfdsl/cli（graph/export系）"
+    color: "#fef9e7"
+  vscode_ext:
+    label: vscode-extension
+    color: "#f3e8fd"
+  skill:
+    label: "@pfdsl/cli（skill sync）"
+    color: "#eafaf1"
+
+artifact:
+  pfdsl_source:
+    label: .pfdslソースファイル
+    description: ユーザーが記述するfrontmatter+bodyのテキスト
+  parsed_doc:
+    label: 構文木・frontmatter
+    description: frontmatter読込・lex・parseの出力（document構造とfrontmatter）
+    location: ../packages/core/src/index.ts
+    group: core
+  normalized_graph:
+    label: 正準化グラフ
+    description: 正規化済みエッジ・ノード種別・isolatedノード集合とGraph構造。check以外の後続処理の共通入力
+    location: ../packages/core/src/normalizer.ts
+    group: core
+  diagnostics_report:
+    label: 診断結果
+    description: V/Wルールに基づくエラー・警告一覧（checkコマンドの出力）
+    location: ../packages/core/src/validator.ts
+    externalStakeholders: [CLIユーザー, CI]
+    group: core
+  formatted_source:
+    label: 整形済みソース
+    description: 独立した再parseから生成する正準整形済み.pfdslテキスト（fmtコマンドの出力）
+    location: ../packages/core/src/formatter.ts
+    externalStakeholders: [CLIユーザー]
+    group: core
+  dot_graph:
+    label: DOTグラフ
+    description: Graphviz DOT形式テキスト（graphコマンドのデフォルト出力）。graphviz-exporterパッケージが構築しCLI/VSCode拡張の双方から呼ばれる
+    location: ../packages/graphviz-exporter/src/index.ts
+    externalStakeholders: [CLIユーザー]
+    group: cli
+  rendered_image:
+    label: レンダリング画像
+    description: DOTから変換したSVG（wasm）またはPDF/PNG（puppeteer経由）
+    location: ../packages/preview-engine/src/index.ts
+    externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
+    group: cli
+  metadata_tsv:
+    label: メタデータTSV
+    description: ノードのkind/label/description/status/tags/ownerを抽出したタブ区切りテキスト。CLIサブコマンドはなくVSCode拡張のエクスポート機能（pfdsl.export）でのみ生成
+    location: ../packages/metadata-exporter/src/index.ts
+    externalStakeholders: [VSCode拡張ユーザー]
+    group: vscode_ext
+  skill_source_bundle:
+    label: 配布対象スキル束
+    description: "pfd-ops/pfd-retro/pfd-ecosystem/pfdsl の4スキルツリーとcommands/pfd-*.md。ビルド時（tsup onSuccess）に.claude/skills/*・.claude/commands/*からdist/へバンドルされ、公開npmパッケージに同梱される。開発/テスト実行時はresolveSkillRootがdist不在ならリポの.claude/skills/<name>へフォールバックする"
+    location: ../packages/cli/src/skill-sync.ts
+    group: skill
+  installed_skills:
+    label: 導入済みスキル
+    description: 採用リポ<target>/.claude/skills/{pfd-ops,pfd-retro,pfd-ecosystem,pfdsl}/へのミラーコピー結果。既存エントリは同期前に削除し削除・改名を反映する
+    group: skill
+  installed_commands:
+    label: 導入済みコマンド
+    description: 採用リポ<target>/.claude/commands/pfd-*.mdへのコピー結果（配布許可パターンのみ）
+    externalStakeholders: [採用リポのAIエージェント]
+    group: skill
+  installed_l3_layer:
+    label: 導入済みL3レイヤー
+    description: GitHub Issuesバックエンド（ワークフロー・監査スクリプト）の採用リポルートへのコピー結果。L3が既に採用済み（install/由来ファイルが1つでも存在）の場合のみコピーし、未採用時は案内メッセージのみでファイルは生成しない
+    group: skill
+  gh_labels:
+    label: GitHubラベル整備結果
+    description: "flow:managed / flow:exempt ラベルの存在保証（gh CLI経由、L3採用時のみ実行）"
+    externalStakeholders: [採用リポのGitHubリポジトリ]
+    group: skill
+
+process:
+  parse:
+    label: 構文解析
+    description: frontmatter読込・lex・parseでdocument+frontmatterを得る
+    group: core
+  normalize:
+    label: 正規化
+    description: エッジリストとノード種別を正規化しGraphを構築する
+    group: core
+  validate:
+    label: 検証
+    description: V/Wルールに基づき診断を生成する
+    command: npx @pfdsl/cli check
+    group: core
+  format:
+    label: 整形
+    description: ソースを独立に再lex/parseし正準整形済みテキストを生成する
+    command: npx @pfdsl/cli fmt --write
+    group: core
+  render_graph:
+    label: DOT変換
+    description: 正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する
+    group: cli
+  export_image:
+    label: 画像化
+    description: DOTをSVG（wasm、依存なし）またはPDF/PNG（puppeteer必須）へ変換する
+    command: npx @pfdsl/cli graph --format svg
+    group: cli
+  export_metadata:
+    label: メタデータ抽出
+    description: 正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する（VSCode拡張のみ）
+    group: vscode_ext
+  sync_skill_tree:
+    label: スキルツリー同期
+    description: skill_source_bundleの各スキルツリーを採用リポの.claude/skills/へミラーコピーする
+    command: npx @pfdsl/cli skill sync
+    group: skill
+  sync_commands:
+    label: コマンド同期
+    description: skill_source_bundleのcommands/pfd-*.mdを採用リポの.claude/commands/へコピーする
+    command: npx @pfdsl/cli skill sync
+    group: skill
+  sync_install_layer:
+    label: L3レイヤー同期
+    description: L3採用判定後、採用済みなら install/ 由来ファイルを採用リポルートへコピーする
+    group: skill
+  ensure_labels:
+    label: ラベル保証
+    description: L3同期が行われた場合のみ、必要ラベルの存在をgh CLIで確認・作成する
+    group: skill
+---
+
+pfdsl_source >> parse -> parsed_doc
+
+parsed_doc >> normalize -> normalized_graph
+
+normalized_graph >> validate -> diagnostics_report
+
+pfdsl_source >> format -> formatted_source
+
+[normalized_graph, parsed_doc] >> render_graph -> dot_graph
+
+dot_graph >> export_image -> rendered_image
+
+[normalized_graph, parsed_doc] >> export_metadata -> metadata_tsv
+
+skill_source_bundle >> sync_skill_tree -> installed_skills
+
+skill_source_bundle >> sync_commands -> installed_commands
+
+installed_skills >> sync_install_layer -> installed_l3_layer
+
+installed_l3_layer >> ensure_labels -> gh_labels
