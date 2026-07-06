@@ -57,7 +57,7 @@ if (pfdslFiles.length === 0) {
 	results.push({
 		name: "audit-issues-flow",
 		status: r.ok ? "PASS" : "FAIL",
-		detail: r.ok ? undefined : "manual findings remain (see: node scripts/audit-issues-flow.mjs)",
+		detail: r.ok ? undefined : "re-run: node scripts/audit-issues-flow.mjs (findings or gh/network error)",
 	});
 }
 
@@ -93,6 +93,8 @@ if (pfdslFiles.length === 0) {
 }
 
 // 6. output artifact status update in .pfdsl/roadmap.pfdsl
+// Presence check only (some status: line changed) — it does not verify
+// that the changed line belongs to *this* cycle's output artifact.
 {
 	const diffText = sh(`git diff ${base}...HEAD -- .pfdsl/roadmap.pfdsl`);
 	const changed = hasStatusChange(diffText);
