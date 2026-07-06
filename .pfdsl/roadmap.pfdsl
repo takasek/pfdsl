@@ -307,6 +307,17 @@ artifact:
     description: "使い捨て環境への skill sync で採用初日を再現し、同梱物妥当性・ガイダンス実行可能性・agent 到達性・冪等性を検証する。spec-stress-test 手法の配布層への移植"
     status: todo
     criteria: "プローブ実行記録と findings 振り分けが完了し、手順が再実行可能な形で文書化済み"
+  spec_id_syntax:
+    label: "仕様ID構文 ADR + 最小lint (#328)"
+    description: "spec.md 相互参照の仕様ID方式。構文・レンジ規則の詳細と移行方針は issue #328 が一次情報。汎用ツール化の検討記録は issue コメント参照"
+    status: todo
+    criteria: 構文・レンジ規則が ADR 化され、ID 一意性チェックと dangling 参照チェックの lint が CI で動作確認済み
+  spec_id_refs:
+    label: 仕様ID相互参照化済み spec.md
+    description: "節番号直書きの相互参照を仕様ID参照へ段階移行した spec.md。ADR 確定後に別 issue として起票する（#328 移行方針）。後続門番のプレースホルダ（ADR-0018）"
+    status: todo
+    criteria: spec.md の節番号相互参照が仕様ID参照に置換され、lint が dangling なしで通過
+    location: ../docs/spec/spec.md
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -471,6 +482,13 @@ process:
     label: 採用初日プローブ実施
     location: https://github.com/takasek/pfdsl/issues/352
     updated_at: 2026-07-06T03:43:14Z
+  i328_design_spec_ids:
+    label: 仕様ID構文設計・最小lint実装
+    location: https://github.com/takasek/pfdsl/issues/328
+    updated_at: 2026-07-06T05:34:43Z
+  migrate_spec_id_refs:
+    label: spec.md 仕様ID参照移行
+    description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。ADR 確定後に issue 起票して iN prefix を付与する"
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -575,3 +593,7 @@ multifile_toolchain >> recode_boundary_diags -> recode
 [spec_v0011, multifile_toolchain] >> implement_boundary_feedback -> boundary_feedback
 
 cli_tool_v0015 >> i352_probe_adoption_day -> adoption_probe
+
+spec_v0011 >> i328_design_spec_ids -> spec_id_syntax
+
+spec_id_syntax >> migrate_spec_id_refs -> spec_id_refs
