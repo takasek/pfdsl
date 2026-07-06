@@ -1,29 +1,44 @@
 ---
 title: pfdsl CLI 変換パイプライン
 type: runtime-pipeline
-description: pfdslソースが実行時に何に変換されるか、変換の境界はどこか。詳細はsibling runtime-pipeline.md参照
+description: "pfdslソースが実行時に何に変換されるか、変換の境界はどこか。a(仕様)+b(処理系)を基盤にc(skill)/d(拡張)が操作し、g(skill sync)がf(pd-opsフレームワーク)を配布する。詳細はsibling runtime-pipeline.md参照"
 layout:
   direction: LR
   maxWidth: 140
 
 group:
   core:
-    label: "@pfdsl/core"
+    label: "@pfdsl/core（b: 処理系）"
     color: "#e8f4fd"
   cli:
-    label: "@pfdsl/cli（graph/export系）"
+    label: "@pfdsl/cli（graph/export系。c: pfdsl skillが指示）"
     color: "#fef9e7"
   vscode_ext:
-    label: vscode-extension
+    label: "vscode-extension（d）"
     color: "#f3e8fd"
   skill:
-    label: "@pfdsl/cli（skill sync）"
+    label: "@pfdsl/cli（skill sync = g: fの配布）"
     color: "#eafaf1"
 
 artifact:
   pfdsl_source:
     label: .pfdslソースファイル
     description: ユーザーが記述するfrontmatter+bodyのテキスト
+  pfdsl_spec:
+    label: 言語仕様書（a）
+    description: ".pfdslの構文・フィールド・検証規則を定める一次情報。validateが適用するV/Wルールの根拠"
+    location: ../docs/spec/spec.md
+    group: core
+  pfdsl_skill:
+    label: "PFD読み書き分析skill（c）"
+    description: "AIエージェントに.pfdsl操作を指示するスキル。エージェントはこれに従いengine（b）を呼び出す。配布時はskill_source_bundleにも同梱される（gの一部）"
+    location: ../.claude/skills/pfdsl/
+    group: cli
+  vscode_extension:
+    label: "VSCode拡張（d）"
+    description: "PFDの視覚的読み書き分析を提供する拡張。graphviz-exporter/preview-engine/metadata-exporterをCLIを介さず直接呼ぶ"
+    location: ../packages/vscode-extension/
+    group: vscode_ext
   parsed_doc:
     label: 構文木・frontmatter
     description: frontmatter読込・lex・parseの出力（document構造とfrontmatter）
@@ -87,6 +102,22 @@ artifact:
     description: "flow:managed / flow:exempt ラベルの存在保証（gh CLI経由、L3採用時のみ実行）"
     externalStakeholders: [採用リポのGitHubリポジトリ]
     group: skill
+  ops_skill_general:
+    label: "PFD運用フレームワーク 汎用層（f1）"
+    description: "pfd-opsのL1（汎用手順）+L2（ディスパッチ）+L4（companion機構）。内容の一次情報はworkflow.pfdslのops_skill_general — ここでは配布対象の1コンポーネントとしてのみ扱う"
+    group: skill
+  ops_skill_l3:
+    label: "PFD運用フレームワーク GitHub Issuesバックエンド層（f2）"
+    description: "pfd-opsのL3プリセット。内容・retroフィードバックの一次情報はworkflow.pfdslのops_skill_l3 — ここでは配布対象の1コンポーネントとしてのみ扱う"
+    group: skill
+  retro_skill:
+    label: ふりかえり監査スキル
+    description: "内容の一次情報はworkflow.pfdsl。ここではskill_source_bundleへの同梱対象としてのみ扱う"
+    group: skill
+  ecosystem_skill:
+    label: PFDセット構築スキル
+    description: "内容の一次情報はworkflow.pfdsl。ここではskill_source_bundleへの同梱対象としてのみ扱う"
+    group: skill
 
 process:
   parse:
@@ -120,6 +151,10 @@ process:
     label: メタデータ抽出
     description: 正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する（VSCode拡張のみ）
     group: vscode_ext
+  bundle_skills:
+    label: スキルバンドル生成
+    description: "ビルド時（tsup onSuccess）に.claude/skills/{pfd-ops,pfd-retro,pfd-ecosystem,pfdsl}をdist/へコピーする（fの内容authoring自体はworkflow.pfdsl側、ここは機械的コピーのみ）"
+    group: skill
   sync_skill_tree:
     label: スキルツリー同期
     description: skill_source_bundleの各スキルツリーを採用リポの.claude/skills/へミラーコピーする
@@ -140,19 +175,21 @@ process:
     group: skill
 ---
 
-pfdsl_source >> parse -> parsed_doc
+[pfdsl_source, pfdsl_skill] >> parse -> parsed_doc
 
 parsed_doc >> normalize -> normalized_graph
 
-normalized_graph >> validate -> diagnostics_report
+[normalized_graph, pfdsl_spec] >> validate -> diagnostics_report
 
 pfdsl_source >> format -> formatted_source
 
 [normalized_graph, parsed_doc] >> render_graph -> dot_graph
 
-dot_graph >> export_image -> rendered_image
+[dot_graph, pfdsl_skill, vscode_extension] >> export_image -> rendered_image
 
-[normalized_graph, parsed_doc] >> export_metadata -> metadata_tsv
+[normalized_graph, parsed_doc, vscode_extension] >> export_metadata -> metadata_tsv
+
+[pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> bundle_skills -> skill_source_bundle
 
 skill_source_bundle >> sync_skill_tree -> installed_skills
 

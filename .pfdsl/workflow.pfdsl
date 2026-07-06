@@ -152,11 +152,17 @@ artifact:
     label: issue 更新内容
     description: "マージ時に確定する issue への反映事項（クローズ・進捗・新発見の起票種）。フロー内で生まれる不定形情報（ADR-0001 と緊張するが、実体は merge コミットと flow 更新で検証可能）。issue 管理への還流シグナル"
     group: planning
-  ops_skill:
-    label: PFD運用スキル
-    description: "/pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR-0017）は ecosystem_skill が一次情報。汎用層（L1+L2）= SKILL.md 本文、GitHub Issues プリセット（L3）= references/、デプロイ可能ファイル群（L3.5）= install/（CI で identity 強制）、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
-    criteria: /pfd-cycle が期待通り動作する。install/ 配布ファイルを変更した PR で check-pfd-ops-sync.yml が通過する。
+  ops_skill_general:
+    label: PFD運用スキル（汎用層）
+    description: "/pfd-cycle コマンド。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR-0017）は ecosystem_skill が一次情報。汎用層（L1）= SKILL.md 本文、ディスパッチ（L2）= SKILL.md 本文のディスパッチ規約、リポ固有（L4）= 各 .pfdsl の sibling .md companion。手書き（生成対象外）"
+    criteria: /pfd-cycle が期待通り動作する
     location: ../.claude/skills/pfd-ops/
+    group: generation
+  ops_skill_l3:
+    label: PFD運用スキル（GitHub Issuesバックエンド層）
+    description: "GitHub Issues で作業項目管理する採用リポ向けプリセット（L3）= references/github-issues-backend.md、デプロイ可能ファイル群（L3.5）= install/（CI で identity 強制）。retro_skill の監査結果がこの層の規約改訂に還流する。手書き（生成対象外）"
+    criteria: install/ 配布ファイルを変更した PR で check-pfd-ops-sync.yml が通過する
+    location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
     group: generation
   retro_skill:
     label: ふりかえり監査スキル
@@ -359,11 +365,13 @@ examples >> review_examples -> findings
 
 [skill, toolchain, retro_skill] >>? review_examples
 
-[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill, retro_skill, ecosystem_skill, review_perspectives, workflow_md, vscode_ext_debug_skill, spec_stress_skill]
+[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, review_perspectives, workflow_md, vscode_ext_debug_skill, spec_stress_skill]
 
 spec_stress_skill >>? maintain_spec
 
 retro_skill >>? discuss
+
+retro_skill >>? distill_ops
 
 [adrs, payoff_log] >> write_article -> article
 
@@ -379,11 +387,11 @@ toolchain >> map_transform_boundaries -> [runtime_pipeline_pfdsl, runtime_pipeli
 
 pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
 
-[ops_skill, workflow_md, roadmap_md, runtime_pipeline_pfdsl, vscode_ext_debug_skill] >>? develop
+[ops_skill_general, ops_skill_l3, workflow_md, roadmap_md, runtime_pipeline_pfdsl, vscode_ext_debug_skill] >>? develop
 
 issue_updates >>? file_issues
 
-[toolchain, skill, ops_skill, retro_skill, ecosystem_skill] >> publish_cli -> published_cli
+[toolchain, skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> publish_cli -> published_cli
 
 toolchain >> publish_libraries -> published_libraries
 

@@ -2,6 +2,20 @@
 
 `runtime-pipeline.pfdsl` のグラフが運べない、変換境界に関する補足をここに置く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
 
+## 全体構成（a-g）
+
+このパイプラインは以下の層で構成される。a/bが基盤、c/dはそれを使う操作手段、e/gは配布の仕組み、fは別レイヤーの運用フレームワーク（詳細はworkflow.pfdsl側）。
+
+- **a（言語仕様）**: `pfdsl_spec`。`docs/spec/spec.md`。`validate`が適用するV/Wルールの根拠
+- **b（処理系）**: `core`グループの一連のprocess（parse/normalize/validate/format/render_graph/export_image）。`@pfdsl/core`実体
+- **c（PFD読み書き分析skill）**: `pfdsl_skill`。AIエージェントはこれに従いbを呼ぶ（`parse`の入力・`export_image`の入力として明示）
+- **d（VSCode拡張）**: `vscode_extension`。CLIを介さずgraphviz-exporter/preview-engine/metadata-exporterを直接呼ぶ（`export_image`/`export_metadata`の入力として明示）
+- **e（a,bの配布）**: このファイルの対象外。npm公開（`published_cli`/`published_libraries`）はworkflow.pfdsl側で表現する
+- **f（PFD運用フレームワーク）**: このファイルの対象外。内容（L1/L2/L4=一般層・L3=GitHub Issuesバックエンド層・retroフィードバック）の一次情報はworkflow.pfdslの`ops_skill_general`/`ops_skill_l3`。ここでは`bundle_skills`の入力（配布対象コンポーネント）としてのみ扱う
+- **g（fの配布）**: `skill`グループの一連のprocess（bundle_skills以降）。`pfdsl skill sync`が実装
+
+fの内容そのもの（pd-opsのL1〜L4構成・pd-retroからのフィードバック経路）はworkflow.pfdslが一次情報。このファイルはfを「配布される既製コンポーネント」としてのみ扱い、authoring（誰がどう書くか）は範囲外とする。
+
 ## 変換境界の定義
 
 - **parse（`@pfdsl/core` の `parse()`）**: frontmatter読込 → lex → parseの3段を1トランザクションとして扱う。出力は`document`（構文木）と`frontmatter`。個別サブコマンドとしては露出しない内部境界
@@ -16,7 +30,7 @@
 
 `pfdsl skill sync`は上記の.pfdsl変換パイプラインとは独立した、ファイル配布のためのサブパイプライン。
 
-- **skill_source_bundle の出所**: ビルド時（`packages/cli/tsup.config.ts`の`onSuccess`）に`.claude/skills/{pfd-ops,pfd-retro,pfd-ecosystem,pfdsl}`と`.claude/commands/`（`pfd-*.md`のみ）を`packages/cli/dist/skills/`・`dist/commands/`へコピーし、npmパッケージに同梱する。この4スキル名の並びはtsup.config.tsとskill-sync.tsの`runSkillSync`両方にハードコードされており、スキル追加時は両方の更新が必要
+- **skill_source_bundle の出所（`bundle_skills`）**: ビルド時（`packages/cli/tsup.config.ts`の`onSuccess`）に`.claude/skills/{pfd-ops,pfd-retro,pfd-ecosystem,pfdsl}`と`.claude/commands/`（`pfd-*.md`のみ）を`packages/cli/dist/skills/`・`dist/commands/`へコピーし、npmパッケージに同梱する。この4スキル名の並びはtsup.config.tsとskill-sync.tsの`runSkillSync`両方にハードコードされており、スキル追加時は両方の更新が必要。コピー元の`pfd-ops`は内部でL1/L2/L4（ops_skill_general）とL3（ops_skill_l3）に分かれるが、コピー処理自体は両者を区別しない機械的な丸ごとコピー
 - **`resolveSkillRoot`のフォールバック**: 公開後の実行は`dist/skills/<name>`を、ソース/テスト実行時（pre-build）は3階層上の`.claude/skills/<name>`を参照する。どちらにも無ければ例外
 - **`sync_skill_tree`は破壊的コピー**: 各エントリを`rmSync`で削除してから`cpSync`する。アップストリームで削除・改名されたファイルが採用リポに残留しない設計
 - **`sync_install_layer`はゲート付き**: L3（GitHub Issuesバックエンド）が採用リポで既に採用済み（`install/`由来ファイルが1つでも存在）の場合のみ`install/`をリポルートへコピーする。未採用時はファイルを一切生成せず、`cp -r .claude/skills/pfd-ops/install/. .`を促す案内メッセージのみ返す（自動アップグレードしない）
