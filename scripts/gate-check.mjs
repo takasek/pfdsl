@@ -1,22 +1,34 @@
 #!/usr/bin/env node
-// Terminal-gate aggregate checker: runs the 6 mechanically-verifiable items
+// Terminal-gate aggregate checker: runs the mechanically-verifiable items
 // from pfd-ops step 3 (check / audit-issues-flow / check-md-linebreaks /
 // gen-skill identity / snapshot freshness / output-artifact status update)
-// against the diff from <base> to HEAD, then prints the remaining
-// judgment-only items as MANUAL: lines.
-// Usage: node scripts/gate-check.mjs [--base main]
+// against the diff from origin/<base> to HEAD, then prints the remaining
+// checklist items (extracted from SKILL.md itself) as MANUAL: lines.
+// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key>]
 
 import { execSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MANUAL_ITEMS, matchesTrigger, formatGateTable, hasStatusChange } from "./lib/gate-check.mjs";
+import {
+	extractGateChecklist,
+	deriveManualItems,
+	matchesTrigger,
+	formatGateTable,
+	hasStatusChange,
+	statusChangedForArtifact,
+} from "./lib/gate-check.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
 const args = process.argv.slice(2);
-const baseFlagIdx = args.indexOf("--base");
-const base = baseFlagIdx >= 0 ? args[baseFlagIdx + 1] : "main";
+const flag = (name) => {
+	const idx = args.indexOf(name);
+	return idx >= 0 ? args[idx + 1] : undefined;
+};
+const base = flag("--base") ?? "main";
+const artifactKey = flag("--artifact");
 
 function sh(cmd) {
 	return execSync(cmd, { cwd: root, encoding: "utf-8" });
@@ -29,12 +41,17 @@ function trySh(cmd) {
 	}
 }
 
+// Best-effort — a stale/missing origin ref surfaces as a clear diff failure below.
+trySh("git fetch origin");
+
 // --diff-filter=d excludes deleted paths — a deleted .pfdsl/.md would
 // otherwise fail the check/linebreaks gates against a file that no longer exists.
-const changedFiles = sh(`git diff --diff-filter=d --name-only ${base}...HEAD`)
-	.trim()
-	.split("\n")
-	.filter(Boolean);
+const diffFiles = trySh(`git diff --diff-filter=d --name-only origin/${base}...HEAD`);
+if (!diffFiles.ok) {
+	console.error(`gate-check: failed to diff against origin/${base}: ${diffFiles.out.trim()}`);
+	process.exit(1);
+}
+const changedFiles = diffFiles.out.trim().split("\n").filter(Boolean);
 const pfdslFiles = changedFiles.filter((f) => f.endsWith(".pfdsl"));
 const mdFiles = changedFiles.filter((f) => f.endsWith(".md"));
 
@@ -45,12 +62,20 @@ if (pfdslFiles.length === 0) {
 	results.push({ name: "pfdsl check", status: "SKIP", detail: "no .pfdsl changes" });
 } else {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
-	const failed = pfdslFiles.filter((f) => !trySh(`node "${cliPath}" check "${f}"`).ok);
-	results.push({
-		name: "pfdsl check",
-		status: failed.length === 0 ? "PASS" : "FAIL",
-		detail: failed.length === 0 ? `${pfdslFiles.length} file(s)` : `failed: ${failed.join(", ")}`,
-	});
+	if (!existsSync(cliPath)) {
+		results.push({
+			name: "pfdsl check",
+			status: "FAIL",
+			detail: "packages/cli/dist/cli.js not built; run 'pnpm -r build' first",
+		});
+	} else {
+		const failed = pfdslFiles.filter((f) => !trySh(`node "${cliPath}" check "${f}"`).ok);
+		results.push({
+			name: "pfdsl check",
+			status: failed.length === 0 ? "PASS" : "FAIL",
+			detail: failed.length === 0 ? `${pfdslFiles.length} file(s)` : `failed: ${failed.join(", ")}`,
+		});
+	}
 }
 
 // 2. audit-issues-flow (no --fix: fails if manual findings remain)
@@ -85,32 +110,66 @@ if (!matchesTrigger(changedFiles, /^(docs\/|scripts\/skill-template\/|scripts\/g
 if (pfdslFiles.length === 0) {
 	results.push({ name: "snapshot freshness", status: "SKIP", detail: "no .pfdsl changes" });
 } else {
-	trySh("pnpm --filter @pfdsl/core exec vitest run -u");
-	const r = trySh("git diff --quiet -- packages/core/src/__snapshots__/");
-	results.push({
-		name: "snapshot freshness",
-		status: r.ok ? "PASS" : "FAIL",
-		detail: r.ok ? undefined : "snapshots stale; re-stage packages/core/src/__snapshots__/",
-	});
+	const vitestRun = trySh("pnpm --filter @pfdsl/core exec vitest run -u");
+	if (!vitestRun.ok) {
+		results.push({
+			name: "snapshot freshness",
+			status: "FAIL",
+			detail: `vitest run failed: ${vitestRun.out.trim().slice(-200)}`,
+		});
+	} else {
+		const r = trySh("git diff --quiet -- packages/core/src/__snapshots__/");
+		results.push({
+			name: "snapshot freshness",
+			status: r.ok ? "PASS" : "FAIL",
+			detail: r.ok ? undefined : "snapshots stale; re-stage packages/core/src/__snapshots__/",
+		});
+	}
 }
 
 // 6. output artifact status update in .pfdsl/roadmap.pfdsl
-// Presence check only (some status: line changed) — it does not verify
-// that the changed line belongs to *this* cycle's output artifact.
 {
-	const diffText = sh(`git diff ${base}...HEAD -- .pfdsl/roadmap.pfdsl`);
-	const changed = hasStatusChange(diffText);
-	results.push({
-		name: "output artifact status update",
-		status: changed ? "PASS" : "FAIL",
-		detail: changed ? undefined : "no status: line changed in .pfdsl/roadmap.pfdsl",
-	});
+	if (artifactKey) {
+		const before = trySh(`git show origin/${base}:.pfdsl/roadmap.pfdsl`);
+		const after = trySh("git show HEAD:.pfdsl/roadmap.pfdsl");
+		if (!before.ok || !after.ok) {
+			results.push({
+				name: "output artifact status update",
+				status: "FAIL",
+				detail: `could not read .pfdsl/roadmap.pfdsl at origin/${base} or HEAD`,
+			});
+		} else {
+			const changed = statusChangedForArtifact(before.out, after.out, artifactKey);
+			results.push({
+				name: "output artifact status update",
+				status: changed ? "PASS" : "FAIL",
+				detail: changed ? undefined : `no status: change detected for artifact '${artifactKey}'`,
+			});
+		}
+	} else {
+		const diffResult = trySh(`git diff origin/${base}...HEAD -- .pfdsl/roadmap.pfdsl`);
+		if (!diffResult.ok) {
+			results.push({ name: "output artifact status update", status: "FAIL", detail: diffResult.out.trim() });
+		} else {
+			const changed = hasStatusChange(diffResult.out);
+			results.push({
+				name: "output artifact status update",
+				status: changed ? "PASS" : "FAIL",
+				detail: changed
+					? "presence-only check; pass --artifact <key> to verify the specific output artifact"
+					: "no status: line changed in .pfdsl/roadmap.pfdsl",
+			});
+		}
+	}
 }
+
+const skillMdPath = resolve(root, ".claude/skills/pfd-ops/SKILL.md");
+const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdPath, "utf-8")));
 
 console.log("gate-check:");
 console.log(formatGateTable(results));
 console.log("\nMANUAL (judge and confirm each):");
-for (const item of MANUAL_ITEMS) console.log(`  MANUAL: ${item}`);
+for (const item of manualItems) console.log(`  MANUAL: ${item}`);
 
 const hasFail = results.some((r) => r.status === "FAIL");
 if (hasFail) process.exit(1);

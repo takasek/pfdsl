@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { matchesTrigger, formatGateTable, hasStatusChange, MANUAL_ITEMS } from "./gate-check.mjs";
+import {
+	matchesTrigger,
+	formatGateTable,
+	hasStatusChange,
+	statusChangedForArtifact,
+	extractGateChecklist,
+	deriveManualItems,
+} from "./gate-check.mjs";
 
 describe("matchesTrigger", () => {
 	it("matches when any file hits the pattern", () => {
@@ -55,9 +62,72 @@ describe("hasStatusChange", () => {
 	});
 });
 
-describe("MANUAL_ITEMS", () => {
-	it("is a non-empty list of strings", () => {
-		assert.ok(MANUAL_ITEMS.length > 0);
-		for (const item of MANUAL_ITEMS) assert.equal(typeof item, "string");
+describe("statusChangedForArtifact", () => {
+	const before = [
+		"artifact:",
+		'  ops_checkers:',
+		'    label: "scripts"',
+		"    status: todo",
+		"  retro_due_hook:",
+		'    label: "hook"',
+		"    status: todo",
+		"",
+	].join("\n");
+
+	it("detects a status change scoped to the named artifact", () => {
+		const after = before.replace(
+			'  ops_checkers:\n    label: "scripts"\n    status: todo',
+			'  ops_checkers:\n    label: "scripts"\n    status: done',
+		);
+		assert.equal(statusChangedForArtifact(before, after, "ops_checkers"), true);
+	});
+
+	it("ignores a status change on a different artifact", () => {
+		const after = before.replace(
+			'  retro_due_hook:\n    label: "hook"\n    status: todo',
+			'  retro_due_hook:\n    label: "hook"\n    status: wip',
+		);
+		assert.equal(statusChangedForArtifact(before, after, "ops_checkers"), false);
+	});
+
+	it("returns false when the artifact block is missing from both snapshots", () => {
+		assert.equal(statusChangedForArtifact(before, before, "nonexistent_artifact"), false);
+	});
+});
+
+describe("extractGateChecklist", () => {
+	const sampleSkillMd = [
+		"1. foo",
+		"2. bar",
+		"3. **反映 — 終端ゲート**:",
+		"   - **companion がゲート集約チェッカーを指す場合**、まずそれを実行する",
+		"   - [ ] 出力 artifact の status を更新した",
+		"   - [ ] 知見を振り分けた",
+		"   - [ ] 変更した全 .pfdsl が `check` を通過する",
+		"4. **報告**: 完了したプロセス",
+	].join("\n");
+
+	it("extracts only the checkbox items between step 3 and step 4", () => {
+		assert.deepEqual(extractGateChecklist(sampleSkillMd), [
+			"出力 artifact の status を更新した",
+			"知見を振り分けた",
+			"変更した全 .pfdsl が `check` を通過する",
+		]);
+	});
+
+	it("returns an empty array when no checklist section is present", () => {
+		assert.deepEqual(extractGateChecklist("1. foo\n2. bar\n"), []);
+	});
+});
+
+describe("deriveManualItems", () => {
+	it("drops items already covered by gate-check's mechanized checks", () => {
+		const items = ["出力 artifact の status を更新した", "知見を振り分けた", "変更した全 .pfdsl が `check` を通過する"];
+		assert.deepEqual(deriveManualItems(items), ["知見を振り分けた"]);
+	});
+
+	it("keeps everything when nothing matches the covered keywords", () => {
+		const items = ["知見を振り分けた", "PR にまとめた"];
+		assert.deepEqual(deriveManualItems(items), items);
 	});
 });
