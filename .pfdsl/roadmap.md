@@ -20,9 +20,15 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 - `.pfdsl/roadmap.pfdsl` — オープン issue の依存グラフ
 
+## プリフライト・ゲート集約スクリプト（#354）
+
+- **選択フェーズ（pfd-ops 手順1）**: `node scripts/cycle-status.mjs` — fetch 実行・base への遅れコミット数・flow-sync PR / その他 open PR の一覧・`ready --best` の結果を1回の JSON 出力に集約する。`--base <branch>` で対象ブランチを変更可能（デフォルト `main`）
+- **終端ゲート機械6項目（pfd-ops 手順3）**: `node scripts/gate-check.mjs` — 変更 `.pfdsl` の `check` 通過・`audit-issues-flow` 差分なし・変更 `.md` の `check-md-linebreaks`・gen-skill identity（該当変更時のみ）・snapshot 鮮度（`.pfdsl` 変更時のみ）・`roadmap.pfdsl` の `status:` 更新有無を PASS/FAIL/SKIP 表で返す（`--base <branch>` 対応、デフォルト `main`）。判定不能な残り項目は `MANUAL:` prefix で列挙される — その項目のみ個別に確認する
+- どちらも `packages/cli/dist/cli.js` の存在を前提にする箇所がある（worktree では先に `pnpm install && pnpm -r build` を済ませる）
+
 ## 自動生成 PR（ワークサイクル選択前に確認）
 
-このリポでは issue close 時に `flow-on-issue-close.yml` が `flow-sync/*` ブランチで flow-sync PR を自動起票する。サイクル開始時に `flow-sync/*` ブランチの PR が open のものがあれば CI が green であることを確認してマージ先行（コンフリクトがある場合は手動解消してからマージ）。それ以外の open PR（機能追加・バグ修正等）は「今回の着手作業に競合するか」を判断軸としてケースバイケースで確認する。
+このリポでは issue close 時に `flow-on-issue-close.yml` が `flow-sync/*` ブランチで flow-sync PR を自動起票する。サイクル開始時に `flow-sync/*` ブランチの PR が open のものがあれば CI が green であることを確認してマージ先行（コンフリクトがある場合は手動解消してからマージ）。それ以外の open PR（機能追加・バグ修正等）は「今回の着手作業に競合するか」を判断軸としてケースバイケースで確認する。`node scripts/cycle-status.mjs` の `openFlowSyncPRs` / `otherOpenPRs` フィールドが手動 `gh pr list` の代替になる。
 
 ## 終端ゲート追加項目（issue 固有）
 
@@ -64,7 +70,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 - [ ] このサイクルで起票した issue を `flow:managed` / `flow:exempt` に分類した（判定は L3 reference の「ラベル判定基準」。保守・基盤・修正は exempt）
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
-- [ ] `node scripts/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する）
+- [ ] `node scripts/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する。`gate-check.mjs` 実行時はその一部として自動実行される）
 
 **spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact（spec_v007 / spec_v008 / spec_v009 等）は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
 
