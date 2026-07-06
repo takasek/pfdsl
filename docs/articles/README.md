@@ -139,6 +139,12 @@ PFD の前提知識は仮定しない。第1部の入口だけ「依存関係は
 各部の本文 — `docs/articles/NN-slug.md`（序は作らない）。
 slug 案: `01-what-can-we-start-now` / `02-diagrams-rot` / `03-machine-checked-structure` / `04-zero-context-participants`。
 
+## 公開先
+
+Zenn で確定（2026-07-03）。
+本文執筆完了後、zenn-cli のリポジトリ管理（`articles/` 配下・Zenn slug 命名・frontmatter 付与）へ移行する。
+移行までは `docs/articles/NN-slug.md` で執筆・レビューを回す。
+
 ## 素材
 
 - `docs/pfd_payoff_log.md`（実話の一次情報。上のエピソード配分表で引く。成功例のみ＝生存者バイアスに注意。負例は git 履歴・ADR から採る）
