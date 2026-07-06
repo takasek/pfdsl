@@ -302,11 +302,11 @@ artifact:
     description: "make release 後に roadmap の publish artifact を自動 done にする連携。#277 status-set が前提"
     status: todo
     criteria: "make release 実行後に roadmap の対応 artifact が自動 done に更新される"
-  extends_probe:
-    label: "extends 意味論の agent プローブ (#304)"
-    description: "spec-stress-test スキルのオラクル型で extends の深マージ・diamond・優先順位・プリセット汚染を検証する。モデル勾配（haiku）同時測定を含む。スキル初回実運用"
-    status: done
-    criteria: "オラクル実行・CLI 突合・0020 dir への記録が完了し、確信度中/低の箇所が findings として振り分け済み"
+  adoption_probe:
+    label: "skill sync 採用初日プローブ (#352)"
+    description: "使い捨て環境への skill sync で採用初日を再現し、同梱物妥当性・ガイダンス実行可能性・agent 到達性・冪等性を検証する。spec-stress-test 手法の配布層への移植"
+    status: todo
+    criteria: "プローブ実行記録と findings 振り分けが完了し、手順が再実行可能な形で文書化済み"
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -467,10 +467,10 @@ process:
     label: make release roadmap 自動更新実装
     location: https://github.com/takasek/pfdsl/issues/278
     updated_at: 2026-07-03T01:28:44Z
-  i304_probe_extends_spec:
-    label: extends 意味論プローブ
-    location: https://github.com/takasek/pfdsl/issues/304
-    updated_at: 2026-07-04T07:58:06Z
+  i352_probe_adoption_day:
+    label: 採用初日プローブ実施
+    location: https://github.com/takasek/pfdsl/issues/352
+    updated_at: 2026-07-06T03:43:14Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -574,4 +574,4 @@ multifile_toolchain >> recode_boundary_diags -> recode
 
 [spec_v0011, multifile_toolchain] >> implement_boundary_feedback -> boundary_feedback
 
-[spec_v0011, multifile_toolchain] >> i304_probe_extends_spec -> extends_probe
+cli_tool_v0015 >> i352_probe_adoption_day -> adoption_probe
