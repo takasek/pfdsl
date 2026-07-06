@@ -307,6 +307,31 @@ artifact:
     description: "使い捨て環境への skill sync で採用初日を再現し、同梱物妥当性・ガイダンス実行可能性・agent 到達性・冪等性を検証する。spec-stress-test 手法の配布層への移植"
     status: todo
     criteria: "プローブ実行記録と findings 振り分けが完了し、手順が再実行可能な形で文書化済み"
+  ops_checkers:
+    label: "cycle-status / gate-check スクリプト (#354)"
+    description: "ワークサイクル手順1の機械操作束ねと終端ゲート機械6項目の集約チェッカー。pfd-ops SKILL.md の散文手順を companion 経由のスクリプト参照に置換する"
+    status: todo
+    criteria: "両スクリプトがテスト付きで動作し、pfd-ops 手順1・3がスクリプト参照に縮んでいる"
+  retro_due_hook:
+    label: "retro-due 起動判定 + Stop hook (#355)"
+    description: "workflow.md の retro 実行記録を基準に ADR・PFD 修正コミットを計数し、閾値超過時に /pfd-retro 推奨を hook で注入する"
+    status: todo
+    criteria: "retro-due がテスト付きで due 判定を返し、hook 発火を実測確認済み"
+  explain_cmd:
+    label: "pfdsl explain コマンド (#356)"
+    description: "診断コード → 定義節・summary の一発引き。#299 のレジストリを消費する。check エラー対処の spec grep 手順を代替"
+    status: todo
+    criteria: "全診断コード族で explain が動作し、レジストリ整合が CI 検査でカバーされている"
+  pfd_lens_agent:
+    label: "pfd-lens agent + agents 配布 (#357)"
+    description: "A/B 図監査を隔離 subagent 化し、skill sync の配布対象に .claude/agents/pfd-*.md を追加する。pfd-retro の description 二重人格を解消"
+    status: todo
+    criteria: "agent 単体の監査実測1回・pfd-retro の A/B 節が委譲形・agents 配布のテストあり"
+  cli_tool_v0018:
+    label: "CLI v0.0.18（次期）"
+    status: todo
+    criteria: npm show @pfdsl/cli version が 0.0.18 を返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
   spec_id_syntax:
     label: "仕様ID構文 ADR + 最小lint (#328)"
     description: "spec.md 相互参照の仕様ID方式。構文・レンジ規則の詳細と移行方針は issue #328 が一次情報。汎用ツール化の検討記録は issue コメント参照"
@@ -482,6 +507,25 @@ process:
     label: 採用初日プローブ実施
     location: https://github.com/takasek/pfdsl/issues/352
     updated_at: 2026-07-06T03:43:14Z
+  i354_implement_ops_checkers:
+    label: サイクル機械化スクリプト実装
+    location: https://github.com/takasek/pfdsl/issues/354
+    tags: ["priority:high"]
+    updated_at: 2026-07-06T04:46:18Z
+  i355_implement_retro_due:
+    label: retro-due 判定 + hook 実装
+    location: https://github.com/takasek/pfdsl/issues/355
+    updated_at: 2026-07-06T04:34:27Z
+  i356_implement_explain_cmd:
+    label: explain コマンド実装
+    location: https://github.com/takasek/pfdsl/issues/356
+    updated_at: 2026-07-06T04:34:29Z
+  i357_define_pfd_lens_agent:
+    label: pfd-lens agent 定義 + 配布実装
+    location: https://github.com/takasek/pfdsl/issues/357
+    updated_at: 2026-07-06T04:34:30Z
+  publish_cli_v0018:
+    label: CLI v0.0.18リリース
   i328_design_spec_ids:
     label: 仕様ID構文設計・最小lint実装
     location: https://github.com/takasek/pfdsl/issues/328
@@ -594,6 +638,12 @@ multifile_toolchain >> recode_boundary_diags -> recode
 
 cli_tool_v0015 >> i352_probe_adoption_day -> adoption_probe
 
+cli_tool_v0015 >> i354_implement_ops_checkers -> ops_checkers
+cli_tool_v0015 >> i355_implement_retro_due -> retro_due_hook
+cli_tool_v0015 >> i356_implement_explain_cmd -> explain_cmd
+cli_tool_v0015 >> i357_define_pfd_lens_agent -> pfd_lens_agent
+
+[explain_cmd, pfd_lens_agent] >> publish_cli_v0018 -> cli_tool_v0018
 spec_v0011 >> i328_design_spec_ids -> spec_id_syntax
 
 spec_id_syntax >> migrate_spec_id_refs -> spec_id_refs
