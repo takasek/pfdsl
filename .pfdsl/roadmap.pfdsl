@@ -499,7 +499,8 @@ process:
   i354_implement_ops_checkers:
     label: サイクル機械化スクリプト実装
     location: https://github.com/takasek/pfdsl/issues/354
-    updated_at: 2026-07-06T04:34:26Z
+    tags: ["priority:high"]
+    updated_at: 2026-07-06T04:46:18Z
   i355_implement_retro_due:
     label: retro-due 判定 + hook 実装
     location: https://github.com/takasek/pfdsl/issues/355
