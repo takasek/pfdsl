@@ -138,6 +138,7 @@ pfd-retro 実行ごとに1行追記する（形式: 日付 — 対象範囲 — 
 - 2026-07-05 — #304 extends オラクルプローブサイクル — findings 2件（spec-stress-test スキルに CLI 非露出時の正解確定手法を蒸留・新規 md 作成時の check-md-linebreaks 自己検査ゲート追加）
 - 2026-07-06 — #300 spec 編集整備サイクル — findings 1件（§20 の版番号複製を除去しタイトル行を唯一の権威に統一。workflow.md 権威節に再記載禁止を明記）
 - 2026-07-06 — d〜g 構造レビュー（配布4スキル・skill sync・release フロー・生成パイプライン） — findings 14件（exempt 13件 → トラッカー #351、managed 1件 → #352 採用初日プローブ）
+- 2026-07-06 — #354 cycle-status/gate-check 実装サイクル — findings 1件（gen-skill トリガー正規表現の pre-commit/gate-check.mjs 間重複 → #364）
 
 ## 終端ゲートの根拠
 
