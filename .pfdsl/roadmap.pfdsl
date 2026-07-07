@@ -112,6 +112,11 @@ artifact:
     label: "再構成済みスキル生成系 (#10)"
     status: done
     criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
+  marketplace_dist:
+    label: "marketplace 配布 pfdsl skill 群 (#366)"
+    description: "pfdsl + pfd-ecosystem/retro/cycle を1プラグインに束ね Claude plugin marketplace 配布。gen-skill の出力先を plugin ディレクトリへ向ける。生成層は温存し配布層のみ /plugin 化。pfd-ops はリポジトリ成果物を運べないため cp -r 維持"
+    status: todo
+    criteria: "plugin が marketplace 経由で install でき skill 発火・references 生成物が届くことを検証済み、spec/CLI version と plugin.json version の連動 gate が CI で動作"
   featured_toolchain:
     label: "spec v0.0.7 実装済みツールチェーン (#52)"
     status: done
@@ -523,6 +528,10 @@ process:
   migrate_spec_id_refs:
     label: spec.md 仕様ID参照移行
     description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。ADR 確定後に issue 起票して iN prefix を付与する"
+  i366_distribute_marketplace:
+    label: marketplace 配布移行
+    location: https://github.com/takasek/pfdsl/issues/366
+    updated_at: 2026-07-07T00:59:55Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -636,3 +645,5 @@ cli_tool_v0015 >> i357_define_pfd_lens_agent -> pfd_lens_agent
 spec_v0011 >> i328_design_spec_ids -> spec_id_syntax
 
 spec_id_syntax >> migrate_spec_id_refs -> spec_id_refs
+
+skill_gen >> i366_distribute_marketplace -> marketplace_dist
