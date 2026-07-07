@@ -97,7 +97,10 @@ Full flag reference: `npx @pfdsl/cli help`. This section documents CLI v{{cliVer
 - **V001 single-producer**: each artifact has at most one producing process (`->`)
 - **V002 process needs inputs**: every non-isolated process needs ≥1 input (`>>`)
 - **V003 process needs outputs**: every non-isolated process needs ≥1 output (`->`)
+- **V010 primary graph is a DAG**: no cycle via `>>` / `->` (feedback `>>?` is exempt)
 - **V020 declared process needs edges**: any process declared in frontmatter `process:` must participate in at least one edge
+
+Full V/W list: `references/spec.md` §15–16.
 
 ## Writing quality PFDs
 
@@ -127,7 +130,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 
 ### フィードバックと改版
 
-- **Primary graph は DAG に**: 循環は `>>` で書かず `>>?` か改版 artifact で（`check` は循環を検出しない）
+- **Primary graph は DAG に**: 循環は `>>` で書かず `>>?` か改版 artifact で（`>>` の循環は V010 error）
 - **改版は1パターン**: フェーズ境界（承認・配布されるベースライン）なら別 artifact、同一フェーズ内の収束や定常運用サイクル（再学習等、版を列挙できない繰り返し）なら `>>?`。併用は二重表現
 - **`>>?` は後ろ向きに**: 下流の成果物を上流プロセスへ戻す（`修正稿 >>? 交渉`）。既に `>>` で繋いだ対に重ねるのは冗長
 - **能力成果物は世代還流**: フロー内で生産される skill・ツール等が自分の生産チェーン上流のプロセスに入るときは、位相に関係なく前世代スナップショットとして `>>?`（ADR-0011）
