@@ -71,6 +71,12 @@ const promptsSrc = readFileSync(resolve(root, "docs/review-perspectives.md"), "u
 writeFileSync(resolve(refsDir, "review-perspectives.md"), baseHeader("docs/review-perspectives.md") + promptsSrc);
 console.log("references/review-perspectives.md ← docs/review-perspectives.md");
 
+// --- 1c. Copy quality guide ---
+
+const qualityGuideSrc = readFileSync(resolve(root, "docs/quality-guide.md"), "utf-8");
+writeFileSync(resolve(refsDir, "quality-guide.md"), baseHeader("docs/quality-guide.md") + qualityGuideSrc);
+console.log("references/quality-guide.md ← docs/quality-guide.md");
+
 // --- 2. Generate samples.md from TSV ---
 
 const samplesDir = resolve(root, "docs/samples");

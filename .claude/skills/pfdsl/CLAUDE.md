@@ -4,7 +4,8 @@
 
 | 編集したい内容 | 一次ソース |
 |---|---|
-| スキル本文（構文・品質ガイド・CLI等） | `scripts/gen-skill.mjs` のテンプレート |
+| スキル本文（構文・CLI・点検等） | `scripts/skill-template/SKILL.md` |
+| 品質ガイド | `docs/quality-guide.md` |
 | 仕様書（spec） | `docs/spec/spec.md` |
 | レビュー観点 | `docs/review-perspectives.md` |
 | サンプル | `docs/samples/*.pfdsl` |
