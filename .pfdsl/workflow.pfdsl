@@ -93,7 +93,7 @@ artifact:
   findings:
     label: レビュー知見
     description: "実践例レビューで得た品質知見。次世代の対話・整備への還流入力（消費先の一次情報は本図のエッジ）"
-    criteria: skill_template または adrs への反映経路が確定している（未処理の知見がない）
+    criteria: quality_guide・skill_template または adrs への反映経路が確定している（未処理の知見がない）
     group: practice
   adrs:
     label: ADR
