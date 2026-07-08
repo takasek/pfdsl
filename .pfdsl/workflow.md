@@ -12,14 +12,6 @@
 
 このリポが pfdsl スキルの上流であるため経路1（品質ガイド改訂）が成立する。配布先リポでは経路1は存在しない場合がある。
 
-## Claude への恒常指示
-
-pfd-ops 運用に紐づく、Claude へ恒常的に届けたい指示（PR 本文規約等）はこのセクションに置く。読まれる契機は companion 規約（`.pfdsl` を扱うとき sibling `.md` を読む）とワークサイクルの受け入れゲートが保証する。サイクル外でも常時届けたい指示は root `CLAUDE.md` からこのセクションへポインタを張る。
-
-新しい指示が生まれたら、配布先リポでも一般に有効かを評価する。有効なら `.claude/skills/pfd-ops/references/` に追記し配布に載せる（知見の振り分け経路1と同じ）。このリポ固有の事情に依るなら、このセクションに追記する（採用リポ側でも既定の置き場になる。pfd-ops SKILL.md「Claude 向け指示の置き場」参照）。
-
-現時点でこのリポ固有の恒常指示は無い。
-
 ## 学習ループ
 
 実践 → レビュー → ガイド改訂 → 再実践。ラウンド比較で「ルールで消えたミス / 残ったミス」を分離計測し、残ったものは lint 要件（ツール側）へ送る。根拠は ADR-0006「品質担保の二層構造 — ルールで防げるミスと防げないミス」。
@@ -128,31 +120,6 @@ vscode-extension 等で新しいノード種別をホバー対応する場合、
 ## CI成果物の格納先変更時の workflow.pfdsl 更新
 
 CI が生成・push する成果物（`pr_diagrams` 等）の格納先・push 方式を変える PR では、対応する `workflow.pfdsl` artifact の `description` / `criteria` / `location` を同一 PR で更新する。格納先の変更は artifact の定義を変えるため、workflow 図と実装が乖離する。
-
-## pfd-retro バインディング
-
-A・B・C カタログ（監査観点の枠組み）: `docs/review-perspectives.md`（配布レンズ）。当リポの具体例・機構は `.pfdsl/review-perspectives.md`（instance）に蓄積する。
-
-C 系の対象仕様: `docs/spec/spec.md`。実行手順: `/spec-stress-test`（リポローカル）。
-
-設計決定記録: `docs/adr/`（ADR。一覧・改訂規約は `docs/adr/README.md`）。pfd-ops 定期監査トリガーの「設計決定記録」はこれを指す。
-
-PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workflow.pfdsl`）・runtime-pipeline（`.pfdsl/runtime-pipeline.pfdsl`）を採用。
-
-出力宛先は「知見の振り分け（3経路）」セクションに従う。companion への書き分け（どの companion に書くか）は `.claude/skills/pfd-ops/references/architecture.md` の「companion への書き分けルール」表が一次情報。
-
-### retro 実行記録
-
-pfd-retro 実行ごとに1行追記する（形式: 日付 — 対象範囲 — findings 件数）。pfd-ops プロトコル「定期監査」の起動条件はこの記録を基準点に差分計測する。
-
-- 2026-07-03 — pfd-cycle スキル群（pfd-ops / pfd-retro / pfd-ecosystem / commands / architecture.md）設計レビュー — findings 15件 + meta 1件
-- 2026-07-03 — 第2ラウンド監査（片肺更新スキャン・L4 滞留昇格・列挙ドリフト。対象: 第1ラウンド反映後の全体） — findings 8件
-- 2026-07-04 — #297 V025 二重割当修正サイクル — findings 2件（i300 除外リスト欠落・除外リスト列挙ドリフト対策ルール追加）
-- 2026-07-05 — #299 診断コードレジストリサイクル — findings 2件（既存ブランチ再開時の rebase チェック漏れを pfd-ops 選択手順に追加・diag_registry description の実装乖離修正）
-- 2026-07-05 — #304 extends オラクルプローブサイクル — findings 2件（spec-stress-test スキルに CLI 非露出時の正解確定手法を蒸留・新規 md 作成時の check-md-linebreaks 自己検査ゲート追加）
-- 2026-07-06 — #300 spec 編集整備サイクル — findings 1件（§20 の版番号複製を除去しタイトル行を唯一の権威に統一。workflow.md 権威節に再記載禁止を明記）
-- 2026-07-06 — d〜g 構造レビュー（配布4スキル・skill sync・release フロー・生成パイプライン） — findings 14件（exempt 13件 → トラッカー #351、managed 1件 → #352 採用初日プローブ）
-- 2026-07-06 — #354 cycle-status/gate-check 実装サイクル — findings 1件（gen-skill トリガー正規表現の pre-commit/gate-check.mjs 間重複 → #364）
 
 ## 終端ゲートの根拠
 
