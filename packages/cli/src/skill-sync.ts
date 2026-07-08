@@ -4,6 +4,7 @@ import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
+	readFileSync,
 	rmSync,
 	statSync,
 } from "node:fs";
@@ -88,8 +89,9 @@ export function copyCommands(commandsDir: string, targetRoot: string): void {
  * Deploying install/ to the repo root is a separate, adoption-gated step
  * (see copyInstallLayer).
  */
-export function copySkillTree(skillRoot: string, targetRoot: string): void {
+export function copySkillTree(skillRoot: string, targetRoot: string): string[] {
 	const dest = join(targetRoot, ".claude/skills", basename(skillRoot));
+	const overwritten = detectLocalEdits(skillRoot, dest);
 	mkdirSync(dest, { recursive: true });
 	for (const entry of readdirSync(skillRoot)) {
 		// CLAUDE.md at skill root is a dev-repo-only guard (e.g. "run make
@@ -103,6 +105,27 @@ export function copySkillTree(skillRoot: string, targetRoot: string): void {
 		rmSync(join(dest, entry), { recursive: true, force: true });
 		cpSync(join(skillRoot, entry), join(dest, entry), { recursive: true });
 	}
+	return overwritten;
+}
+
+/**
+ * Detects dest files that exist and differ in content from their source
+ * counterpart, before copySkillTree's unconditional rm+cp overwrites them —
+ * i.e. adopter-local edits that are about to be silently destroyed. Files
+ * that exist only in dest (stale leftovers) or only in source (new files)
+ * are not "overwritten local edits" and are excluded.
+ */
+function detectLocalEdits(skillRoot: string, dest: string): string[] {
+	if (!existsSync(dest)) return [];
+	const overwritten: string[] = [];
+	for (const rel of listFilesRecursive(skillRoot)) {
+		const destPath = join(dest, rel);
+		if (!existsSync(destPath) || !statSync(destPath).isFile()) continue;
+		if (!readFileSync(join(skillRoot, rel)).equals(readFileSync(destPath))) {
+			overwritten.push(rel);
+		}
+	}
+	return overwritten;
 }
 
 /**
@@ -307,18 +330,35 @@ export async function runSkillSync(
 	const skillRoot = resolveSkillRoot("pfd-ops");
 	const lines: string[] = [];
 
-	copySkillTree(skillRoot, opts.targetRoot);
+	const warnOverwritten = (name: string, overwritten: string[]) => {
+		if (overwritten.length > 0) {
+			lines.push(
+				`warning: local edits overwritten in .claude/skills/${name}/: ${overwritten.join(", ")}`,
+			);
+		}
+	};
+
+	warnOverwritten("pfd-ops", copySkillTree(skillRoot, opts.targetRoot));
 	lines.push("pfd-ops skill tree synced (.claude/skills/pfd-ops/).");
 
-	copySkillTree(resolveSkillRoot("pfd-retro"), opts.targetRoot);
+	warnOverwritten(
+		"pfd-retro",
+		copySkillTree(resolveSkillRoot("pfd-retro"), opts.targetRoot),
+	);
 	lines.push("pfd-retro skill tree synced (.claude/skills/pfd-retro/).");
 
-	copySkillTree(resolveSkillRoot("pfd-ecosystem"), opts.targetRoot);
+	warnOverwritten(
+		"pfd-ecosystem",
+		copySkillTree(resolveSkillRoot("pfd-ecosystem"), opts.targetRoot),
+	);
 	lines.push(
 		"pfd-ecosystem skill tree synced (.claude/skills/pfd-ecosystem/).",
 	);
 
-	copySkillTree(resolveSkillRoot("pfdsl"), opts.targetRoot);
+	warnOverwritten(
+		"pfdsl",
+		copySkillTree(resolveSkillRoot("pfdsl"), opts.targetRoot),
+	);
 	lines.push("pfdsl skill tree synced (.claude/skills/pfdsl/).");
 
 	copyCommands(resolveCommandsDir(), opts.targetRoot);

@@ -179,6 +179,40 @@ describe("copySkillTree", () => {
 			true,
 		);
 	});
+
+	it("returns the relative paths of dest files whose content differs from source before overwriting", () => {
+		const skillRoot = resolveSkillRoot("pfd-ops");
+		const dest = join(targetRoot, ".claude/skills/pfd-ops");
+		mkdirSync(dest, { recursive: true });
+		writeFileSync(join(dest, "SKILL.md"), "locally edited content\n");
+
+		const overwritten = copySkillTree(skillRoot, targetRoot);
+
+		expect(overwritten).toContain("SKILL.md");
+	});
+
+	it("does not crash when a source file's dest counterpart is a directory (stale layout)", () => {
+		const skillRoot = resolveSkillRoot("pfd-ops");
+		const dest = join(targetRoot, ".claude/skills/pfd-ops");
+		// SKILL.md is a file in source; simulate a dest where it's a stale directory.
+		mkdirSync(join(dest, "SKILL.md"), { recursive: true });
+		writeFileSync(join(dest, "SKILL.md/nested.txt"), "leftover\n");
+
+		expect(() => copySkillTree(skillRoot, targetRoot)).not.toThrow();
+		// the stale directory is gone and SKILL.md is now the real file, post-sync.
+		expect(readFileSync(join(dest, "SKILL.md"), "utf-8")).toContain(
+			"name: pfd-ops",
+		);
+	});
+
+	it("returns an empty array when no dest file differs from source", () => {
+		const skillRoot = resolveSkillRoot("pfd-ops");
+		copySkillTree(skillRoot, targetRoot); // first sync: nothing to diff against yet
+
+		const overwritten = copySkillTree(skillRoot, targetRoot); // second sync: dest now matches source
+
+		expect(overwritten).toEqual([]);
+	});
 });
 
 describe("isL3Adopted", () => {
@@ -417,6 +451,29 @@ describe("runSkillSync", () => {
 		expect(result.stdout).toContain("cp -r .claude/skills/pfd-ops/install/. .");
 		expect(result.stdout).toContain("pfd-ecosystem");
 		expect(result.stdout).not.toContain("skill sync pfdsl");
+		expect(result.stdout).not.toContain("warning: local edits overwritten");
+		expect(result.exitCode).toBe(0);
+	});
+
+	it("warns with the file path when sync overwrites an adopter-local edit", async () => {
+		mkdirSync(join(targetRoot, ".claude/skills/pfd-ops"), { recursive: true });
+		writeFileSync(
+			join(targetRoot, ".claude/skills/pfd-ops/SKILL.md"),
+			"locally edited content\n",
+		);
+
+		const result = await runSkillSync({ targetRoot, yes: true });
+
+		expect(result.stdout).toContain(
+			"warning: local edits overwritten in .claude/skills/pfd-ops/: SKILL.md",
+		);
+		// sync still completes despite the warning (no --force gate).
+		expect(
+			readFileSync(
+				join(targetRoot, ".claude/skills/pfd-ops/SKILL.md"),
+				"utf-8",
+			),
+		).not.toContain("locally edited content");
 		expect(result.exitCode).toBe(0);
 	});
 
