@@ -57,9 +57,6 @@ function buildExamplesIndexMd(dir) {
 
 const specSrc = readFileSync(resolve(root, "docs/spec/spec.md"), "utf-8");
 const specVersion = specSrc.match(/^# PFDSL仕様書 (v[\d.]+)/m)?.[1] ?? "unknown";
-const cliVersion = JSON.parse(
-	readFileSync(resolve(root, "packages/cli/package.json"), "utf-8"),
-).version;
 const baseHeader = (src) =>
   `<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/${src} -->\n\n`;
 writeFileSync(resolve(refsDir, "spec.md"), baseHeader("docs/spec/spec.md") + specSrc);
@@ -153,7 +150,6 @@ const helpOutput = execFileSync(process.execPath, [cliPath, "help"], { encoding:
 
 const skillMd = templateSrc
 	.replace(/\{\{specVersion\}\}/g, specVersion)
-	.replace(/\{\{cliVersion\}\}/g, cliVersion)
 	.replace("{{cliCommands}}", renderCliSection(helpOutput));
 
 writeFileSync(resolve(outDir, "SKILL.md"), skillMd);
