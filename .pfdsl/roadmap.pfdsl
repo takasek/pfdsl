@@ -531,7 +531,7 @@ process:
   i366_distribute_marketplace:
     label: marketplace 配布移行
     location: https://github.com/takasek/pfdsl/issues/366
-    updated_at: 2026-07-07T00:59:55Z
+    updated_at: 2026-07-07T03:28:01Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
