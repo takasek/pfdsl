@@ -66,10 +66,11 @@ Yes の種別のファイルだけを育てる。
 .claude/skills/pfd-ops/references/scaffold/runtime-pipeline.pfdsl
 .claude/skills/pfd-ops/references/scaffold/runtime-pipeline.md
 .claude/skills/pfd-ops/references/scaffold/bindings/pfd-retro.md
+.claude/skills/pfd-ops/references/scaffold/bindings/pfd-ops.md
 ```
 
 必要な種別のファイルだけを `.pfdsl/` にコピーする（不要な種別はコピーしない）。
-`bindings/pfd-retro.md` は種別と無関係（pfd-retro スキルは全リポ共通で同梱される）— `.pfdsl/bindings/pfd-retro.md` として常にコピーする。
+`bindings/pfd-retro.md`・`bindings/pfd-ops.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-ops.md` として常にコピーする。
 既に `.pfdsl/` にファイルが存在する場合は上書きしない。
 
 ## ステップ 4: 種別ごとに対話しながら構築する
