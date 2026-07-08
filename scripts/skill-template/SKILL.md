@@ -107,12 +107,12 @@ Full V/W list: `references/spec.md` §15–16.
 PFD はタスクリストではなく成果物の変換グラフ。
 新規執筆・ノード追加・構造変更の前に `references/quality-guide.md`（設計判断ルール）を必ず読む。
 
-## 点検
+## 読解と点検
 
-`check --audit` を実行 — 終端 artifact と外部入力の一覧が2行で得られる。
-終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないか、各プロセスが「この入力だけで出力を作れるか」を確認。
-図の視覚確認が必要なときだけ `graph --format dot` を使う（大きい図では dot 全読より --audit が安い）。
-roadmap と flow ファイルが併存する構成では `audit-sync <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する。
+- **読解**: 大きい PFD は全読しない。`check --audit` の2行（終端 artifact と外部入力）で輪郭を掴み、対象ノードの frontmatter だけ読む。roadmap では `ready --best` が着手可能プロセスを返す
+- **書いた後の点検**: 同じ --audit の2行で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る
+- roadmap と flow ファイルが併存する構成では `audit-sync <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する
+- 図の視覚確認が必要なときだけ `graph --format dot` を使う（大きい図では dot 全読より --audit が安い）
 
 ## Typical task: update artifact status
 
