@@ -92,6 +92,14 @@ export function copySkillTree(skillRoot: string, targetRoot: string): void {
 	const dest = join(targetRoot, ".claude/skills", basename(skillRoot));
 	mkdirSync(dest, { recursive: true });
 	for (const entry of readdirSync(skillRoot)) {
+		// CLAUDE.md at skill root is a dev-repo-only guard (e.g. "run make
+		// gen-skill" instructions that only make sense in this repo) — never
+		// ship it to adopting repos, and clear any stale copy a prior sync
+		// of an older CLI version may have left behind.
+		if (entry === "CLAUDE.md") {
+			rmSync(join(dest, entry), { recursive: true, force: true });
+			continue;
+		}
 		rmSync(join(dest, entry), { recursive: true, force: true });
 		cpSync(join(skillRoot, entry), join(dest, entry), { recursive: true });
 	}
