@@ -142,6 +142,15 @@ describe("copySkillTree", () => {
 		).toBe(true);
 	});
 
+	it("excludes CLAUDE.md (dev-repo-only guard) from the synced skill dir", () => {
+		const skillRoot = resolveSkillRoot("pfdsl");
+		copySkillTree(skillRoot, targetRoot);
+
+		expect(existsSync(join(targetRoot, ".claude/skills/pfdsl/CLAUDE.md"))).toBe(
+			false,
+		);
+	});
+
 	it("mirrors the whole skill tree, removing stale files (install/ included)", () => {
 		const skillRoot = resolveSkillRoot("pfd-ops");
 		const dest = join(targetRoot, ".claude/skills/pfd-ops");

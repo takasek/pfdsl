@@ -5,7 +5,7 @@ import {
 	readdirSync,
 	readFileSync,
 } from "node:fs";
-import { resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { defineConfig } from "tsup";
 import { isDistributableCommand } from "./src/skill-sync.js";
 
@@ -36,7 +36,13 @@ export default defineConfig({
 				throw new Error(`${name} skill source not found at ${src}`);
 			}
 			mkdirSync(dest, { recursive: true });
-			cpSync(src, dest, { recursive: true });
+			cpSync(src, dest, {
+				recursive: true,
+				// CLAUDE.md at skill root is a dev-repo-only guard — never ship it
+				// (mirrors the exclusion in copySkillTree, skill-sync.ts).
+				filter: (source) =>
+					basename(source) !== "CLAUDE.md" || dirname(source) !== src,
+			});
 		}
 		const commandsSrc = resolve(repoRoot, ".claude/commands");
 		const commandsDest = resolve(__dirname, "dist/commands");
