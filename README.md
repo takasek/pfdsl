@@ -246,6 +246,7 @@ API reference: [packages/core/README.md](packages/core/README.md).
 ```
 packages/core/               @pfdsl/core              — DSL pipeline (parse / validate / format)
 packages/graphviz-exporter/  @pfdsl/graphviz-exporter — Graph → DOT
+packages/metadata-exporter/  @pfdsl/metadata-exporter — Graph → structured metadata (private, bundled into VSCode extension)
 packages/preview-engine/     @pfdsl/preview-engine    — DOT → SVG (Graphviz wasm)
 packages/cli/                @pfdsl/cli               — `pfdsl` CLI
 packages/vscode-extension/   @pfdsl/vscode-extension  — VSCode language extension ([README](packages/vscode-extension/README.md))
