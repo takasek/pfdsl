@@ -1,8 +1,15 @@
 # PFD 効果局面ログ
 
-PFD が効果を発揮した局面の事例ログ。体感した時点で追記する。公開記事（issue #12）の具体エピソード素材であり、消費者は .pfdsl/ecosystem.pfdsl の write_article プロセス。
+PFD が効果を発揮した局面の事例ログ。体感した時点で追記する。公開記事（issue #12）の具体エピソード素材。消費者の一次情報は .pfdsl/workflow.pfdsl の payoff_log から出るエッジ。
 
 追記の判定（ADR-0014）: 反実仮想テスト「依存グラフ／プロセス分解がなければこの判断・作業は違っていたか」を満たし、違いを1行で引用できる時のみ書く。引用できなければ書かない（後付けの捏造を排除する）。
+
+## 2026-07-08 図に描いた一次ソース主張が抽出リファクタの同期を強制する
+- 局面: pfdsl skill の品質ガイドを docs/quality-guide.md へ切り出すリファクタ（PR #369）
+- 効果: workflow.pfdsl の skill_template.description が「品質ガイドの正本」と主張していたため、quality_guide artifact の新設と maintain_template / gen_skill エッジの更新が必須作業として浮上した。
+  対照: 図に描かれず散文だけだった workflow.md 経路1の一次ソースパスは「scripts/gen-skill.mjs 内テンプレート」のまま stale（テンプレート分離を反映し損ね）で、同リファクタ中に発見・修正した
+- 学習: 「正本はどこか」の主張は図の artifact（location・description）に載せると構造変更時に同期が強制される。散文への複製は腐る — 同日に追加した「能力の否定記述」観点（review-perspectives C）と同根
+- 参照: PR #369、commit 897b2d5・417052c
 
 ## 2026-06-21 ADR の具体例がそのまま TDD fixture になる
 - 局面: Cycle 1（subflow 境界整合 §15.11）の実装で ADR-0020 の boundary-validation-log.md を参照
