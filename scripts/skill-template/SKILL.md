@@ -139,7 +139,8 @@ PFD はタスクリストではなく成果物の変換グラフ。
 ### グループとタグ
 
 - **グループは存在様式で切る**: 住処・寿命・消費局面の軸で分け、生成元では分けない — 生成関係はエッジが表現済み（ADR-0008）
-- **横断的な性質は tag で束ねる（subroutine でなく）**: 同じ性質を持つノード群（成果物でも工程でもよい）には共通 tag を付ける（定義・スタイルは Frontmatter structure の `tag:` 参照）。とくに構造が似た複数 Process は1ノードに畳まず（清水DFD の 1:1 leveling 維持）tag で束ね、深い共有知識のみ companion `.md` に外化（ADR-0019）。tag が表せるのは is-a（そのノード自身の性質・所属）のみ — 他ノードとの関係（「cから呼ばれる」等）を tag 化すると is-a と is-called-by が紛れて誤読を生む。関係は description へ
+- **横断的な性質は tag で束ねる（subroutine でなく）**: 同じ性質を持つノード群（成果物でも工程でもよい）には共通 tag を付ける（定義・スタイルは Frontmatter structure の `tag:` 参照）。とくに構造が似た複数 Process は1ノードに畳まず（清水DFD の 1:1 leveling 維持）tag で束ね、深い共有知識のみ companion `.md` に外化（ADR-0019）
+- **tag は is-a のみ**: tag が表せるのはそのノード自身の性質・所属だけ。他ノードとの関係（「cから呼ばれる」等）を tag 化すると is-a と is-called-by が紛れて誤読を生む — 関係は description へ
 
 ### 命名と注釈
 
