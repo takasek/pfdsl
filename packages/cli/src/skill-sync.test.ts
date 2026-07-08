@@ -151,6 +151,17 @@ describe("copySkillTree", () => {
 		);
 	});
 
+	it("removes a stale CLAUDE.md left by a prior sync of an older version", () => {
+		const skillRoot = resolveSkillRoot("pfdsl");
+		const dest = join(targetRoot, ".claude/skills/pfdsl");
+		mkdirSync(dest, { recursive: true });
+		writeFileSync(join(dest, "CLAUDE.md"), "stale dev-repo-only guard\n");
+
+		copySkillTree(skillRoot, targetRoot);
+
+		expect(existsSync(join(dest, "CLAUDE.md"))).toBe(false);
+	});
+
 	it("mirrors the whole skill tree, removing stale files (install/ included)", () => {
 		const skillRoot = resolveSkillRoot("pfd-ops");
 		const dest = join(targetRoot, ".claude/skills/pfd-ops");
