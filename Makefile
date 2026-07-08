@@ -57,26 +57,11 @@ vscode-dev: vscode-build
 
 # vscode-extension を .vsix にパッケージし vscode-v<version> タグを打って push する。
 # VERSION=x.y.z を渡すと package.json を更新してコミットしてからパッケージする。
+# tag を打つ前に build/test/check-docs/gen-skill identity を検査する (scripts/release.mjs)。
 # 例: make vscode-package VERSION=0.0.13
 .PHONY: vscode-package
 vscode-package: vscode-build
-	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	if [ "$$BRANCH" != "main" ]; then echo "main ブランチで実行してください (現在: $$BRANCH)"; exit 1; fi; \
-	if [ -n "$(VERSION)" ]; then \
-		node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('packages/vscode-extension/package.json','utf8'));p.version='$(VERSION)';fs.writeFileSync('packages/vscode-extension/package.json',JSON.stringify(p,null,'\t')+'\n')"; \
-		git add packages/vscode-extension/package.json; \
-		git commit -m "chore(package): bump vscode-extension version to $(VERSION)"; \
-	fi; \
-	VSVERSION=$$(node -p "require('./packages/vscode-extension/package.json').version"); \
-	if [ -n "$$(git status --porcelain)" ]; then echo "作業ツリーに未コミットの変更があります"; exit 1; fi; \
-	if git rev-parse "vscode-v$$VSVERSION" >/dev/null 2>&1; then echo "タグ vscode-v$$VSVERSION は既に存在します (version を上げてください)"; exit 1; fi; \
-	git fetch origin main --quiet; \
-	git push origin main --quiet; \
-	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
-	(cd packages/vscode-extension && vsce package --no-dependencies); \
-	git tag "vscode-v$$VSVERSION"; \
-	git push origin "vscode-v$$VSVERSION"; \
-	echo "vscode-v$$VSVERSION タグ → push 完了"
+	node scripts/release.mjs vscode $(if $(VERSION),--version $(VERSION))
 
 .PHONY: gen-samples
 gen-samples: build-deps
@@ -142,56 +127,18 @@ release-status:
 # @pfdsl/cli を npm 公開する。VERSION= を指定するか packages/cli/package.json の version を使い
 # v<version> タグを打って push し、publish-cli.yml (OIDC) を起動する。
 # VERSION= を指定した場合は package.json を更新してコミットしてからタグを打つ。
+# tag を打つ前に build/test/check-docs/gen-skill identity を検査する (scripts/release.mjs)。
 # 例: make release VERSION=0.0.8
 .PHONY: release
 release:
-	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	if [ "$$BRANCH" != "main" ]; then echo "main ブランチで実行してください (現在: $$BRANCH)"; exit 1; fi; \
-	if [ -n "$(VERSION)" ]; then \
-		node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('packages/cli/package.json','utf8'));p.version='$(VERSION)';fs.writeFileSync('packages/cli/package.json',JSON.stringify(p,null,'\t')+'\n')"; \
-		git add packages/cli/package.json; \
-		git commit -m "chore(package): bump version to $(VERSION)"; \
-	fi; \
-	VERSION=$$(node -p "require('./packages/cli/package.json').version"); \
-	if [ -n "$$(git status --porcelain)" ]; then echo "作業ツリーに未コミットの変更があります"; exit 1; fi; \
-	if git rev-parse "v$$VERSION" >/dev/null 2>&1; then echo "タグ v$$VERSION は既に存在します (version を上げてください)"; exit 1; fi; \
-	git fetch origin main --quiet; \
-	git push origin main --quiet; \
-	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
-	echo "v$$VERSION を打って push します (publish-cli.yml が起動)"; \
-	git tag "v$$VERSION"; \
-	git push origin "v$$VERSION"; \
-	echo "GHA 起動待ち..."; \
-	sleep 8; \
-	RUN_ID=$$(gh run list --workflow publish-cli.yml --json databaseId,headBranch --jq ".[] | select(.headBranch==\"v$$VERSION\") | .databaseId" | head -1); \
-	if [ -n "$$RUN_ID" ]; then gh run watch $$RUN_ID --exit-status; else echo "⚠ GHA run が見つかりません: gh run list --workflow publish-cli.yml"; exit 1; fi
+	node scripts/release.mjs cli $(if $(VERSION),--version $(VERSION))
 
 # ライブラリ群（core/graphviz-exporter/preview-engine）を npm 公開する。
 # VERSION= を指定するか packages/core/package.json の version を使い
 # lib-v<version> タグを打って push し、publish-libraries.yml (OIDC) を起動する。
 # VERSION= を指定した場合は3パッケージの package.json を同時に更新してコミットしてからタグを打つ。
+# tag を打つ前に build/test/check-docs/gen-skill identity を検査する (scripts/release.mjs)。
 # 例: make release-libs VERSION=0.0.2
 .PHONY: release-libs
 release-libs:
-	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	if [ "$$BRANCH" != "main" ]; then echo "main ブランチで実行してください (現在: $$BRANCH)"; exit 1; fi; \
-	if [ -n "$(VERSION)" ]; then \
-		for pkg in core graphviz-exporter preview-engine; do \
-			node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('packages/$$pkg/package.json','utf8'));p.version='$(VERSION)';fs.writeFileSync('packages/$$pkg/package.json',JSON.stringify(p,null,'\t')+'\n')"; \
-		done; \
-		git add packages/core/package.json packages/graphviz-exporter/package.json packages/preview-engine/package.json; \
-		git commit -m "chore(libs): bump library versions to $(VERSION)"; \
-	fi; \
-	VERSION=$$(node -p "require('./packages/core/package.json').version"); \
-	if [ -n "$$(git status --porcelain)" ]; then echo "作業ツリーに未コミットの変更があります"; exit 1; fi; \
-	if git rev-parse "lib-v$$VERSION" >/dev/null 2>&1; then echo "タグ lib-v$$VERSION は既に存在します (version を上げてください)"; exit 1; fi; \
-	git fetch origin main --quiet; \
-	git push origin main --quiet; \
-	if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then echo "ローカル main が origin/main と一致しません。pull してください"; exit 1; fi; \
-	echo "lib-v$$VERSION を打って push します (publish-libraries.yml が起動)"; \
-	git tag "lib-v$$VERSION"; \
-	git push origin "lib-v$$VERSION"; \
-	echo "GHA 起動待ち..."; \
-	sleep 8; \
-	RUN_ID=$$(gh run list --workflow publish-libraries.yml --json databaseId,headBranch --jq ".[] | select(.headBranch==\"lib-v$$VERSION\") | .databaseId" | head -1); \
-	if [ -n "$$RUN_ID" ]; then gh run watch $$RUN_ID --exit-status; else echo "⚠ GHA run が見つかりません: gh run list --workflow publish-libraries.yml"; exit 1; fi
+	node scripts/release.mjs libs $(if $(VERSION),--version $(VERSION))
