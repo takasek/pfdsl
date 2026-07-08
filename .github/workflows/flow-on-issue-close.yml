@@ -19,32 +19,68 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v6
-
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install audit dependency (yaml)
+        run: npm install --no-save yaml
 
       - name: Apply flow sync (audit --fix)
+        id: audit
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/audit-issues-flow.mjs --fix || true
+        run: node scripts/audit-issues-flow.mjs --fix
 
       - name: Normalize blank lines in roadmap.pfdsl
-        run: node scripts/normalize-pfdsl.mjs || true
+        id: normalize
+        continue-on-error: true
+        run: node scripts/normalize-pfdsl.mjs
 
-      - name: Regenerate golden snapshot (roadmap.pfdsl drives core format golden)
-        run: pnpm --filter @pfdsl/core exec vitest run -u || true
+      - name: Run repo-local flow-sync hook (optional; no-op if absent)
+        id: local_hook
+        continue-on-error: true
+        run: |
+          if [ -f scripts/flow-sync-local-hook.mjs ]; then
+            node scripts/flow-sync-local-hook.mjs
+          else
+            echo "no scripts/flow-sync-local-hook.mjs — skipping repo-local step"
+          fi
+          # Collect hook-modified paths so add-paths below never references a
+          # path the hook didn't touch (create-pull-request's add-paths runs a
+          # single `git add -- <paths>`, which fails hard — and stages nothing
+          # at all, not even the paths that do exist — if any path is absent).
+          echo "paths<<FLOW_SYNC_HOOK_PATHS_EOF" >> "$GITHUB_OUTPUT"
+          { git diff --name-only -- . ':!.pfdsl/roadmap.pfdsl'
+            git ls-files --others --exclude-standard -- . ':!.pfdsl/roadmap.pfdsl'
+          } >> "$GITHUB_OUTPUT"
+          echo "FLOW_SYNC_HOOK_PATHS_EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Summarize step results
+        id: summary
+        if: always()
+        run: |
+          any_failed=false
+          for pair in "audit:${{ steps.audit.outcome }}" "normalize:${{ steps.normalize.outcome }}" "local_hook:${{ steps.local_hook.outcome }}"; do
+            name="${pair%%:*}"
+            outcome="${pair##*:}"
+            if [ "$outcome" = "failure" ]; then
+              echo "- ❌ $name failed" >> "$GITHUB_STEP_SUMMARY"
+              any_failed=true
+            else
+              echo "- ✅ $name ($outcome)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          echo "any_failed=$any_failed" >> "$GITHUB_OUTPUT"
 
       - name: Open PR if roadmap.pfdsl changed
+        id: create_pr
         uses: peter-evans/create-pull-request@v8
         with:
           add-paths: |
             .pfdsl/roadmap.pfdsl
-            packages/core/src/__snapshots__/index.test.ts.snap
+            ${{ steps.local_hook.outputs.paths }}
           branch: flow-sync/pending
           commit-message: "chore(plan): sync flow after #${{ github.event.issue.number }} closed"
           title: "chore(plan): sync flow (pending closed issues)"
@@ -52,3 +88,10 @@ jobs:
             Mechanical `.pfdsl/roadmap.pfdsl` sync (`audit-issues-flow.mjs --fix`). Triggered by close of issue #${{ github.event.issue.number }}.
 
             Terminal chains are removed (artifact + sole producing process + edge); processes with remaining downstream outputs only have their `tags`/`updated_at` issue-tracking fields cleared (the `iN_` prefix on the process is permanent). Review and merge if correct.
+            ${{ steps.summary.outputs.any_failed == 'true' && '
+
+            ⚠️ Some sync steps failed — see workflow run summary for details.' || '' }}
+
+      - name: Fail workflow if a step failed and no PR was created or updated
+        if: steps.summary.outputs.any_failed == 'true' && steps.create_pr.outputs.pull-request-operation != 'created' && steps.create_pr.outputs.pull-request-operation != 'updated'
+        run: exit 1
