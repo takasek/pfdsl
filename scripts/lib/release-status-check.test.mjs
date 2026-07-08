@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { compareVersions, formatResults } from "./release-status-check.mjs";
+import {
+	compareVersions,
+	formatResults,
+	formatSkillBundleStatus,
+} from "./release-status-check.mjs";
 
 describe("compareVersions", () => {
 	it("equal when versions match", () => {
@@ -125,6 +129,28 @@ describe("formatResults", () => {
 			},
 		];
 		const out = formatResults(results);
+		assert.match(out, /up-to-date/);
+	});
+});
+
+describe("formatSkillBundleStatus", () => {
+	it("shows commits-ahead warning with count and tag when commitCount > 0", () => {
+		const out = formatSkillBundleStatus(3, "v0.0.17");
+		assert.match(out, /commits-ahead/);
+		assert.match(out, /3 commit/);
+		assert.match(out, /v0\.0\.17/);
+		assert.match(out, /needs CLI release/);
+	});
+
+	it("shows up-to-date when commitCount is 0", () => {
+		const out = formatSkillBundleStatus(0, "v0.0.17");
+		assert.match(out, /up-to-date/);
+		assert.match(out, /v0\.0\.17/);
+		assert.doesNotMatch(out, /commits-ahead/);
+	});
+
+	it("shows up-to-date when there is no prior CLI tag yet", () => {
+		const out = formatSkillBundleStatus(0, null);
 		assert.match(out, /up-to-date/);
 	});
 });

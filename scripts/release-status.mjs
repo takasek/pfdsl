@@ -7,7 +7,11 @@ import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
-import { compareVersions, formatResults } from "./lib/release-status-check.mjs";
+import {
+	compareVersions,
+	formatResults,
+	formatSkillBundleStatus,
+} from "./lib/release-status-check.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -170,10 +174,55 @@ const results = await Promise.all(
 	}),
 );
 
+// .claude/skills and .claude/commands are bundled into @pfdsl/cli's dist at
+// build time (tsup.config.ts onSuccess) and only reach adopting repos via a
+// CLI release — editing them doesn't touch packages/cli/package.json, so the
+// per-package commitsAhead check above misses this drift entirely.
+function findLatestCliTag() {
+	try {
+		// 'v[0-9]*' (not 'v*') so this matches CLI tags like v0.0.17 without
+		// also matching lib-v* / vscode-v* (both start with 'v' after the
+		// prefix, and glob 'v*' would match "vscode-v0.0.17" too).
+		return execSync("git describe --tags --match 'v[0-9]*' --abbrev=0", {
+			encoding: "utf-8",
+			stdio: ["pipe", "pipe", "pipe"],
+		}).trim();
+	} catch {
+		return null;
+	}
+}
+
+// Keep in sync with tsup.config.ts's onSuccess allowlist — .claude/skills/
+// also holds skills that aren't bundled into the CLI (spec-stress-test,
+// vscode-ext-debug), which would be false positives here.
+const BUNDLED_SKILL_DIRS = ["pfd-ops", "pfd-retro", "pfd-ecosystem", "pfdsl"].map(
+	(name) => `.claude/skills/${name}`,
+);
+
+function countSkillBundleCommits(sinceTag) {
+	if (!sinceTag) return 0;
+	try {
+		const paths = [...BUNDLED_SKILL_DIRS, ".claude/commands"].join(" ");
+		const out = execSync(`git log ${sinceTag}..HEAD --oneline -- ${paths}`, {
+			encoding: "utf-8",
+			stdio: ["pipe", "pipe", "pipe"],
+		});
+		return out.trim().split("\n").filter(Boolean).length;
+	} catch (e) {
+		console.warn(`warn: could not count skill bundle commits since ${sinceTag}: ${e.message}`);
+		return 0;
+	}
+}
+
+const skillBundleTag = findLatestCliTag();
+const skillBundleCommits = countSkillBundleCommits(skillBundleTag);
+
 console.log("release-status:");
 console.log(formatResults(results));
+console.log(formatSkillBundleStatus(skillBundleCommits, skillBundleTag));
 
-const needsAction = results.some(
-	(r) => r.status === "local-ahead" || r.status === "error" || r.commitsAhead > 0,
-);
+const needsAction =
+	results.some(
+		(r) => r.status === "local-ahead" || r.status === "error" || r.commitsAhead > 0,
+	) || skillBundleCommits > 0;
 if (needsAction) process.exit(1);

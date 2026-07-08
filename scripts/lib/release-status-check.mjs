@@ -37,3 +37,22 @@ export function formatResults(results) {
 		})
 		.join("\n");
 }
+
+/**
+ * .claude/skills and .claude/commands are bundled into @pfdsl/cli's dist at
+ * build time and only reach adopting repos via a CLI release — editing them
+ * doesn't show up as a packages/cli/package.json change, so the ordinary
+ * commits-ahead check misses this drift. sinceTag is null when no CLI tag
+ * exists yet (nothing to compare against, so nothing to report).
+ * @param {number} commitCount
+ * @param {string | null} sinceTag
+ * @returns {string}
+ */
+export function formatSkillBundleStatus(commitCount, sinceTag) {
+	const name = "@pfdsl/cli bundle (.claude/skills, .claude/commands)";
+	if (commitCount > 0) {
+		return `  ${name} ! commits-ahead (${commitCount} commit(s) since ${sinceTag}, needs CLI release)`;
+	}
+	const suffix = sinceTag ? ` (no changes since ${sinceTag})` : "";
+	return `  ${name} ✓ up-to-date${suffix}`;
+}
