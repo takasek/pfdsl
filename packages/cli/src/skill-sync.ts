@@ -156,9 +156,9 @@ export function copyInstallLayer(
 		return {
 			copied: false,
 			message:
-				"GitHub Issues バックエンド (L3) は未採用です。採用する場合は次を実行してください:\n" +
+				"GitHub Issues backend (L3) is not adopted. To adopt, run:\n" +
 				"  cp -r .claude/skills/pfd-ops/install/. .\n" +
-				"L3 の意味は .claude/skills/pfd-ops/references/architecture.md を参照してください。\n",
+				"See .claude/skills/pfd-ops/references/architecture.md for what L3 means.\n",
 		};
 	}
 	const installDir = join(skillRoot, "install");
@@ -186,9 +186,9 @@ export function pfdslDirGuidance(targetRoot: string): string {
 		readdirSync(pfdslDir).some((f) => f.endsWith(".pfdsl"));
 	if (hasAnyPfdsl) return "";
 	return (
-		".pfdsl/ にファイルがありません。`/pfd-ecosystem` スキルを起動して\n" +
-		"プロジェクトに必要な種別（roadmap / workflow / runtime-pipeline）の\n" +
-		"テンプレートを .claude/skills/pfd-ops/references/scaffold/ からコピーしてください。\n"
+		".pfdsl/ has no files yet. Run the `/pfd-ecosystem` skill to copy\n" +
+		"templates for the kinds your project needs (roadmap / workflow /\n" +
+		"runtime-pipeline) from .claude/skills/pfd-ops/references/scaffold/.\n"
 	);
 }
 
@@ -241,13 +241,13 @@ export async function ensureLabels(
 			return {
 				created: [],
 				message:
-					"gh コマンドが見つかりません。flow:managed / flow:exempt ラベルは手動作成してください。\n",
+					"gh command not found. Create the flow:managed / flow:exempt labels manually.\n",
 			};
 		}
 		const reason = err instanceof Error ? err.message : String(err);
 		return {
 			created: [],
-			message: `gh ラベル確認に失敗しました（${reason}）。flow:managed / flow:exempt ラベルは手動で確認してください。\n`,
+			message: `Failed to check gh labels (${reason}). Verify flow:managed / flow:exempt labels manually.\n`,
 		};
 	}
 
@@ -264,7 +264,7 @@ export async function ensureLabels(
 
 	if (!opts.yes) {
 		const proceed = await confirm(
-			`不足しているラベルを作成しますか: ${missing.join(", ")} [y/N] `,
+			`Create missing labels: ${missing.join(", ")} [y/N] `,
 		);
 		if (!proceed) return { created: [], message: "" };
 	}

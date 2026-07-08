@@ -272,7 +272,7 @@ describe("ensureLabels", () => {
 		const result = await ensureLabels({ execGh, yes: false });
 		expect(result.message).toContain("flow:managed");
 		expect(result.message).toContain("flow:exempt");
-		expect(result.message).toContain("手動");
+		expect(result.message).toContain("manually");
 		expect(result.created).toEqual([]);
 	});
 
@@ -282,9 +282,9 @@ describe("ensureLabels", () => {
 		};
 		const result = await ensureLabels({ execGh, yes: false });
 		expect(result.created).toEqual([]);
-		expect(result.message).toContain("失敗");
+		expect(result.message).toContain("Failed");
 		expect(result.message).toContain("auth required");
-		expect(result.message).not.toContain("見つかりません");
+		expect(result.message).not.toContain("not found");
 	});
 
 	it("skips when no labels are missing", async () => {
@@ -418,7 +418,7 @@ describe("runSkillSync", () => {
 		expect(
 			existsSync(join(targetRoot, ".github/workflows/check-pfd-ops-sync.yml")),
 		).toBe(true);
-		expect(result.stdout).not.toContain("にファイルがありません");
+		expect(result.stdout).not.toContain("has no files yet");
 		expect(result.stdout).not.toContain("skill sync pfdsl");
 		expect(result.exitCode).toBe(0);
 	});
