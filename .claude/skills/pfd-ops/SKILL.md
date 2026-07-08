@@ -30,7 +30,7 @@ description: |
 - **知見の振り分け先・運用手続き**: `.pfdsl/workflow.pfdsl` の知識系成果物と、その sibling companion `.md`
 - **変換境界の定義と変更手続き**: `.pfdsl/runtime-pipeline.pfdsl`（採用時）とその sibling companion `.md`
 - **issue バックエンド規約**: companion が指す references（例: `references/github-issues-backend.md`）
-- **Claude 向け指示の置き場**: 配布スキル本体（本 SKILL.md・`references/` 配下）は skill sync が採用リポの `.claude/skills/` を無条件で上書きするため、開発リポ（このスキルの source of truth）でのみ改訂できる。「採用リポの Claude にも届けたい」指示が生まれたら、workflow companion の該当節に判断を委ねる（未記載なら sync で消えない場所に置くのが安全側のデフォルト）。project CLAUDE.md は採用リポ固有の非配布設定のみ、global CLAUDE.md は全リポ横断設定のみ
+- **Claude 向け指示の置き場**: このリポの Claude に恒常的に届けたい指示の既定の置き場は repo root の `.pfdsl/` 配下。workflow companion が別の置き場を定めていればそれに従う。project CLAUDE.md は当該リポ固有の非配布設定のみ、global CLAUDE.md は全リポ横断設定のみ
 - **companion への書き分けルール**（どの companion に何を書くか）: `references/architecture.md` の「companion への書き分けルール」表が一次情報
 
 ## 運用プロトコル

@@ -11,7 +11,7 @@
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
 このリポが pfdsl スキルの上流であるため経路1（品質ガイド改訂）が成立する。配布先リポでは経路1は存在しない場合がある。
-「採用リポの Claude にも届けたい指示」（PR 本文規約等）が生まれた場合、このリポでは `.claude/skills/pfd-ops/references/` に直接追記する（経路1と同じ、開発リポならではの判断）。配布先リポでは `references/` は skill sync で上書きされるため、このリポの workflow.md 相当（各リポ固有の companion）に置く。
+「採用リポの Claude にも届けたい指示」（PR 本文規約等）が生まれた場合、その指示が配布先リポでも一般に有効かを評価する。有効なら `.claude/skills/pfd-ops/references/` に追記し配布に載せる（経路1と同じ）。このリポ固有の事情に依るなら `.pfdsl/` 配下に置く（採用リポ側でも既定の置き場になる。SKILL.md「Claude 向け指示の置き場」参照）。
 
 ## 学習ループ
 
