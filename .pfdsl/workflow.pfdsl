@@ -224,6 +224,18 @@ artifact:
     criteria: workflow.pfdsl の運用手続きと散文が一致している
     location: workflow.md
     group: generation
+  bindings_pfd_ops:
+    label: pfd-ops バインディング
+    description: "pfd-ops 運用に紐づく Claude への恒常指示（PR 本文規約等）。sibling companion でなく独立ファイル（読み込み契機がスキル発火であり PFD グラフ操作と一致しないため）。pfd-ops skill が存在すれば読む"
+    criteria: 記載内容が現行の pfd-ops 運用と矛盾しない
+    location: bindings/pfd-ops.md
+    group: generation
+  bindings_pfd_retro:
+    label: pfd-retro バインディング
+    description: "pfd-retro が読むカタログ参照・配布物への finding 反映手続き・retro 実行記録ログ。sibling companion でなく独立ファイル（理由は bindings_pfd_ops と同じ）。pfd-retro skill が読む"
+    criteria: retro 実行記録が最新実行を反映し、カタログ参照先が実在する
+    location: bindings/pfd-retro.md
+    group: generation
   roadmap_md:
     label: 計画 companion
     description: "roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd-ops skill が読む L4 ホスト"
@@ -371,7 +383,7 @@ examples >> review_examples -> findings
 
 [skill, toolchain, retro_skill] >>? review_examples
 
-[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, review_perspectives, workflow_md, vscode_ext_debug_skill, spec_stress_skill]
+[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, review_perspectives, workflow_md, bindings_pfd_ops, bindings_pfd_retro, vscode_ext_debug_skill, spec_stress_skill]
 
 spec_stress_skill >>? maintain_spec
 
@@ -393,7 +405,7 @@ toolchain >> map_transform_boundaries -> [runtime_pipeline_pfdsl, runtime_pipeli
 
 pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
 
-[ops_skill_general, ops_skill_l3, workflow_md, roadmap_md, runtime_pipeline_pfdsl, vscode_ext_debug_skill] >>? develop
+[ops_skill_general, ops_skill_l3, workflow_md, bindings_pfd_ops, bindings_pfd_retro, roadmap_md, runtime_pipeline_pfdsl, vscode_ext_debug_skill] >>? develop
 
 issue_updates >>? file_issues
 

@@ -10,7 +10,7 @@ description: |
 
 # PFD-driven project operations
 
-記法・品質ガイドは pfdsl スキル。本スキルは汎用運用プロトコル。リポ固有のバインディングは各 `.pfdsl` の sibling `.md` companion と references に置く。
+記法・品質ガイドは pfdsl スキル。本スキルは汎用運用プロトコル。リポ固有のバインディングは各 `.pfdsl` の sibling `.md` companion・`.pfdsl/bindings/<スキル名>.md`・references に置く。
 
 ## PFDファイルの種別（ADR-0017）
 
@@ -30,7 +30,7 @@ description: |
 - **知見の振り分け先・運用手続き**: `.pfdsl/workflow.pfdsl` の知識系成果物と、その sibling companion `.md`
 - **変換境界の定義と変更手続き**: `.pfdsl/runtime-pipeline.pfdsl`（採用時）とその sibling companion `.md`
 - **issue バックエンド規約**: companion が指す references（例: `references/github-issues-backend.md`）
-- **Claude 向け指示の置き場**: 配布スキルに同梱すべき規約（PR 本文規約等）は `references/` に置く。project CLAUDE.md は採用リポ固有の非配布設定のみ、global CLAUDE.md は全リポ横断設定のみ。「採用リポの Claude にも届けたい」指示は references/ へ
+- **Claude 向け指示の置き場**: pfd-ops 運用に紐づく恒常指示（PR 本文規約等）は `.pfdsl/bindings/pfd-ops.md` が存在すれば読んで従う（命名規則は `references/architecture.md` 参照）。ファイルが無ければ該当なしとみなす。サイクル外でも常時届けたい指示は、root `CLAUDE.md` から当該ファイルへポインタを張ることを推奨する。project CLAUDE.md は当該リポ固有の非配布設定のみ、global CLAUDE.md は全リポ横断設定のみ
 - **companion への書き分けルール**（どの companion に何を書くか）: `references/architecture.md` の「companion への書き分けルール」表が一次情報
 
 ## 運用プロトコル
@@ -45,7 +45,7 @@ description: |
    - 新しい種類の成果物は `.pfdsl/workflow.pfdsl` に producer・consumer を登録してから作る（外部消費者は `externalStakeholders` フィールドで明示）
    - 変換コンポーネントを追加・変更・削除する場合は、その変換を実際にモデル化している採用済み PFD の description・criteria・edge を更新する。「runtime-pipeline.pfdsl が存在しない = 該当なし」と即断しない — 別の PFD（多くの場合 `.pfdsl/workflow.pfdsl` の該当ノード・エッジ）が同じ変換を表現していないか確認してから N/A と記録する
 6. **知見の振り分け**: 実践・レビューで得た知見を記録先成果物へ振り分ける。**構造的事実**（新しいエッジ・成果物の生成方式が変わった等、図に描ける変化）は対応する `.pfdsl` 本体のノード・エッジ・description・criteria を更新する。**手続き散文**（グラフで運べない運用ルール・振り分け手続き自体）は sibling companion `.md` に書く。両方に該当する変更（新成果物の追加等）は両方を更新する
-7. **定期監査**: `/pfd-cycle` コマンド経由では毎サイクル終了後に pfd-retro が自動実行される。直接 pfd-ops を呼んだ場合は、**前回 retro の実行記録**（workflow companion の retro バインディングに記録される。記録が無ければ「未実行」とみなす。workflow companion 自体が無いリポでは /pfd-cycle 経由の自動実行を基準点とする）を基準点に、次のいずれかで手動起動する — 前回以降に新規の設計決定記録（ADR 等。所在は workflow companion の retro バインディングが指す。設計決定記録を運用しないリポでは本条件は対象外）が2本以上 / 前回以降に同一 PFD へ修正コミットが3回以上 / 設計対話が長く続いた後 / セッションの締め際。閾値は `git log --oneline --since=<前回記録の日付> -- <設計決定記録の置き場 / 当該 .pfdsl>` で機械的に数える。ユーザーの気付きを待たない。findings はプロトコル6の経路で振り分ける
+7. **定期監査**: `/pfd-cycle` コマンド経由では毎サイクル終了後に pfd-retro が自動実行される。直接 pfd-ops を呼んだ場合は、**前回 retro の実行記録**（`.pfdsl/bindings/pfd-retro.md` の「retro 実行記録」ログ末尾の最新1行。記録が無ければ「未実行」とみなす。当該ファイル自体が無いリポでは /pfd-cycle 経由の自動実行を基準点とする）を基準点に、次のいずれかで手動起動する — 前回以降に新規の設計決定記録（ADR 等。所在は `.pfdsl/bindings/pfd-retro.md` が指す。設計決定記録を運用しないリポでは本条件は対象外）が2本以上 / 前回以降に同一 PFD へ修正コミットが3回以上 / 設計対話が長く続いた後 / セッションの締め際。閾値は `git log --oneline --since=<前回記録の日付> -- <設計決定記録の置き場 / 当該 .pfdsl>` で機械的に数える。ユーザーの気付きを待たない。findings はプロトコル6の経路で振り分ける
 
 ## ワークサイクル（/pfd-cycle の手順）
 
