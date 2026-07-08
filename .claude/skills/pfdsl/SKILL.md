@@ -101,7 +101,7 @@ npx @pfdsl/cli skill sync [--yes]   # Sync pfd-ops skills and commands into the 
 npx @pfdsl/cli help   # Show this help
 ```
 
-Full flag reference: `npx @pfdsl/cli help`. This section documents CLI v0.0.17. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.
+Full flag reference: `npx @pfdsl/cli help`. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.
 
 ## Key constraints
 
