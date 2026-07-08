@@ -40,7 +40,7 @@ artifact:
     group: generation
   skill_template:
     label: スキルテンプレート
-    description: "スキル本文（構文・CLI・点検・references ルーティング）の正本。gen-skill.mjs がこれを読み込んで skill と gh_skill_dist を生成する"
+    description: "スキル本文の正本（品質ガイドは quality_guide が別持ち）。gen-skill.mjs がこれを読み込んで skill と gh_skill_dist を生成する"
     criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が最新テンプレートと一致
     location: ../scripts/skill-template/SKILL.md
     group: generation
