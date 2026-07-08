@@ -112,7 +112,7 @@ function detectLocalEdits(skillRoot: string, dest: string): string[] {
 	const overwritten: string[] = [];
 	for (const rel of listFilesRecursive(skillRoot)) {
 		const destPath = join(dest, rel);
-		if (!existsSync(destPath)) continue;
+		if (!existsSync(destPath) || !statSync(destPath).isFile()) continue;
 		if (!readFileSync(join(skillRoot, rel)).equals(readFileSync(destPath))) {
 			overwritten.push(rel);
 		}

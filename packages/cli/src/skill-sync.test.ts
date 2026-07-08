@@ -171,6 +171,20 @@ describe("copySkillTree", () => {
 		expect(overwritten).toContain("SKILL.md");
 	});
 
+	it("does not crash when a source file's dest counterpart is a directory (stale layout)", () => {
+		const skillRoot = resolveSkillRoot("pfd-ops");
+		const dest = join(targetRoot, ".claude/skills/pfd-ops");
+		// SKILL.md is a file in source; simulate a dest where it's a stale directory.
+		mkdirSync(join(dest, "SKILL.md"), { recursive: true });
+		writeFileSync(join(dest, "SKILL.md/nested.txt"), "leftover\n");
+
+		expect(() => copySkillTree(skillRoot, targetRoot)).not.toThrow();
+		// the stale directory is gone and SKILL.md is now the real file, post-sync.
+		expect(readFileSync(join(dest, "SKILL.md"), "utf-8")).toContain(
+			"name: pfd-ops",
+		);
+	});
+
 	it("returns an empty array when no dest file differs from source", () => {
 		const skillRoot = resolveSkillRoot("pfd-ops");
 		copySkillTree(skillRoot, targetRoot); // first sync: nothing to diff against yet
