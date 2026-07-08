@@ -164,6 +164,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 `check --audit` を実行 — 終端 artifact と外部入力の一覧が2行で得られる。
 終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないか、各プロセスが「この入力だけで出力を作れるか」を確認。
 図の視覚確認が必要なときだけ `graph --format dot` を使う（大きい図では dot 全読より --audit が安い）。
+roadmap と flow ファイルが併存する構成では `audit-sync <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する。
 
 ## Typical task: update artifact status
 
