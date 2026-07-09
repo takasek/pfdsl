@@ -12,6 +12,10 @@ description: |
 
 記法・品質ガイドは pfdsl スキル。本スキルは汎用運用プロトコル。リポ固有のバインディングは各 `.pfdsl` の sibling `.md` companion・`.pfdsl/bindings/<スキル名>.md`・references に置く。
 
+## 前提条件
+
+本スキルの運用プロトコルは `.pfdsl/roadmap.pfdsl` の存在を前提にする。カレントプロジェクトに `.pfdsl/` が無ければ、運用プロトコルを実行せず pfd-ecosystem スキル（`/pfd-init`）で PFD セットを初期構築するようユーザーに案内してセッションを終了する。
+
 ## PFDファイルの種別（ADR-0017）
 
 種別は「このPFDが答える問い」で区別する。
