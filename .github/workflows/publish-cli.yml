@@ -27,6 +27,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # .claude/skills/pfdsl is generated + gitignored (#348) and absent on a
+      # fresh checkout — bootstrap it before building for publish (a plain
+      # 'pnpm --filter cli... build' would otherwise fail at the CLI's
+      # onSuccess bundling step).
+      - run: make bootstrap-pfdsl-skill
+
       - run: pnpm --filter "@pfdsl/cli..." build
 
       - run: pnpm --filter "@pfdsl/cli..." test

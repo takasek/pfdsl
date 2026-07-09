@@ -3,6 +3,24 @@ setup:
 	pnpm install
 	cp scripts/pre-commit $$(git rev-parse --git-common-dir)/hooks/pre-commit
 	chmod +x $$(git rev-parse --git-common-dir)/hooks/pre-commit
+	@if [ ! -d .claude/skills/pfdsl ]; then $(MAKE) bootstrap-pfdsl-skill; fi
+
+# .claude/skills/pfdsl is generated + gitignored (#348), not tracked in git.
+# Bootstrapping it has a build-order cycle: the CLI build's onSuccess hook bundles
+# .claude/skills/pfdsl into dist/skills (fails if the dir is absent), but
+# gen-skill.mjs needs a built CLI (packages/cli/dist/cli.js) to render the CLI
+# help section. Break the cycle: build once tolerating the onSuccess failure
+# (dist/cli.js is already written to disk before onSuccess runs), generate the
+# skill, then rebuild the CLI cleanly so dist/skills/pfdsl is bundled too.
+.PHONY: bootstrap-pfdsl-skill
+bootstrap-pfdsl-skill:
+	pnpm --filter @pfdsl/core build
+	pnpm --filter @pfdsl/graphviz-exporter build
+	pnpm --filter @pfdsl/metadata-exporter build
+	pnpm --filter @pfdsl/preview-engine build
+	-pnpm --filter @pfdsl/cli build
+	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
+	pnpm --filter @pfdsl/cli build
 
 .PHONY: build
 build:
@@ -104,9 +122,9 @@ install-skill: check-docs
 
 .PHONY: push
 push: check-docs
-	@if ! git diff --quiet HEAD -- docs/samples docs/examples .claude/skills skills; then \
-		echo "docs/samples, docs/examples, .claude/skills, または skills に差分があります。コミットしてから push してください。"; \
-		git diff --stat HEAD -- docs/samples docs/examples .claude/skills skills; \
+	@if ! git diff --quiet HEAD -- docs/samples docs/examples skills; then \
+		echo "docs/samples, docs/examples, または skills に差分があります。コミットしてから push してください。"; \
+		git diff --stat HEAD -- docs/samples docs/examples skills; \
 		exit 1; \
 	fi
 	$(MAKE) gen-samples
@@ -115,9 +133,9 @@ push: check-docs
 		git add docs/samples && git commit -m "chore: regenerate docs/samples"; \
 	fi
 	$(MAKE) gen-skill
-	@if ! git diff --quiet HEAD -- .claude/skills skills; then \
+	@if ! git diff --quiet HEAD -- skills; then \
 		echo "gen-skill でスキルが更新されました。自動コミットします。"; \
-		git add .claude/skills skills && git commit -m "chore: regenerate skills"; \
+		git add skills && git commit -m "chore: regenerate skills"; \
 	fi
 	git push
 

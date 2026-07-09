@@ -36,7 +36,9 @@ export default defineConfig({
 			const src = resolve(repoRoot, `.claude/skills/${name}`);
 			const dest = resolve(__dirname, `dist/skills/${name}`);
 			if (!existsSync(src)) {
-				throw new Error(`${name} skill source not found at ${src}`);
+				throw new Error(
+					`${name} skill source not found at ${src}. Run 'make gen-skill' first (or 'make setup' for a fresh clone).`,
+				);
 			}
 			mkdirSync(dest, { recursive: true });
 			cpSync(src, dest, {

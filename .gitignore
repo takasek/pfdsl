@@ -31,6 +31,9 @@ coverage/
 .claude/settings.local.json
 .claude/worktrees/
 .superpowers/
+# generated snapshot of docs/spec/spec.md etc. (see 'make gen-skill'); the
+# tracked distribution copy lives in skills/pfdsl (#348)
+.claude/skills/pfdsl/
 
 # worktrees
 .worktrees/

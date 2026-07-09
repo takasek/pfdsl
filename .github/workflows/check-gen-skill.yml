@@ -20,14 +20,17 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm -r build
+      # .claude/skills/pfdsl is generated + gitignored (#348), so it doesn't exist
+      # on a fresh checkout yet — bootstrap-pfdsl-skill builds once, generates it,
+      # then rebuilds so the CLI bundle picks it up (see Makefile comment).
+      - run: make bootstrap-pfdsl-skill
 
       - name: Regenerate skill dirs and assert no drift
         run: |
           make gen-skill
-          if ! git diff --exit-code .claude/skills/pfdsl skills/pfdsl; then
+          if ! git diff --exit-code skills/pfdsl; then
             echo ""
-            echo "ERROR: skill dirs are stale. Run 'make gen-skill' and commit the result."
+            echo "ERROR: skills/pfdsl is stale. Run 'make gen-skill' and commit the result."
             exit 1
           fi
           echo "gen-skill identity in sync."
