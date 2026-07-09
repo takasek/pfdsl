@@ -18,7 +18,7 @@ const FENCE_RE = /^(```|~~~)/;
  * @param {string} text
  * @param {(line: string, lineNumber: number, hits: Array<{line: number, id: string}>) => void} visit
  */
-function forEachNonFencedLine(text, visit) {
+export function forEachNonFencedLine(text, visit) {
 	const lines = text.split("\n");
 	let inFence = false;
 	for (let i = 0; i < lines.length; i++) {
