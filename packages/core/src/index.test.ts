@@ -78,6 +78,19 @@ describe("public API", () => {
 		expect(output).toBe("# just a comment\n");
 	});
 
+	it("format: isolated frontmatter node appears exactly once across multiple flow segments (regression #368)", () => {
+		const src =
+			"---\nartifact:\n  isolated_x: {}\n---\nA >> P -> B\nC >> Q -> D\n";
+		const { output } = format(src, { style: "flows" });
+		// Count bare-id lines only (the rendered isolated-node form), not the
+		// frontmatter declaration line, which also contains the substring.
+		const bareLineOccurrences = output
+			.split("\n")
+			.filter((line) => line === "isolated_x").length;
+		expect(bareLineOccurrences).toBe(1);
+		expect(output.trimEnd().endsWith("isolated_x")).toBe(true);
+	});
+
 	describe("parse() immutability", () => {
 		it("does not mutate token positions: re-parse returns identical line numbers", () => {
 			const src = "---\nartifact:\n  a: {}\n---\na >> P -> b\n";

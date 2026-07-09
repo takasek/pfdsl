@@ -234,6 +234,7 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	const {
 		edges,
 		nodeKinds,
+		isolatedNodes,
 		diagnostics: normDiags,
 	} = normalize(document, frontmatter);
 	const valDiags = opts.skipValidation
@@ -242,28 +243,39 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 
 	const frontmatterSection = source.slice(0, source.length - body.length);
 
-	// Format segment by segment to preserve comment lines
+	// Format segment by segment to preserve comment lines. Isolated-node
+	// detection is done once above for the whole document (edgeNodes there
+	// reflects every statement in the file), so per-segment normalize() calls
+	// only need segEdges — recomputing isolated per segment against the full
+	// file's frontmatter would flag nearly every other node as isolated
+	// relative to that single segment (issue #368).
 	const segments = splitBodyIntoSegments(body);
 	const formattedBody = segments
 		.map((seg) => {
 			if (seg.kind === "comment") return seg.text;
 			const { tokens: segToks } = lex(seg.text);
 			const { document: segDoc } = parseTokens(segToks);
-			const { edges: segEdges, isolatedNodes: segIsolated } = normalize(
-				segDoc,
-				frontmatter,
-			);
+			const { edges: segEdges } = normalize(segDoc, frontmatter);
 			const segGraph = buildGraph(segEdges, nodeKinds);
 			const segSorted = sortEdges(segEdges, segGraph);
-			const segIso = sortIsolated(segIsolated);
 			return opts.style === "flows"
-				? formatAsFlows(segSorted, segIso)
-				: formatEdges(segSorted, segIso);
+				? formatAsFlows(segSorted)
+				: formatEdges(segSorted);
 		})
 		.join("");
 
+	// Isolated nodes are rendered exactly once, as a trailing block at the
+	// very end of the file (after all segments), instead of once per segment.
+	const isolatedIds = sortIsolated(isolatedNodes);
+	const isolatedBlock =
+		isolatedIds.length === 0
+			? ""
+			: opts.style === "flows"
+				? formatAsFlows([], isolatedIds)
+				: formatEdges([], isolatedIds);
+
 	return {
-		output: frontmatterSection + formattedBody,
+		output: frontmatterSection + formattedBody + isolatedBlock,
 		diagnostics: [
 			...fmDiags,
 			...lexDiags,
