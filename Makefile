@@ -127,9 +127,9 @@ gen-plugin: gen-skill
 
 .PHONY: push
 push: check-docs
-	@if ! git diff --quiet HEAD -- docs/samples docs/examples skills commands .claude-plugin; then \
-		echo "docs/samples, docs/examples, skills, commands, または .claude-plugin に差分があります。コミットしてから push してください。"; \
-		git diff --stat HEAD -- docs/samples docs/examples skills commands .claude-plugin; \
+	@if ! git diff --quiet HEAD -- docs/samples docs/examples skills plugin .claude-plugin; then \
+		echo "docs/samples, docs/examples, skills, plugin, または .claude-plugin に差分があります。コミットしてから push してください。"; \
+		git diff --stat HEAD -- docs/samples docs/examples skills plugin .claude-plugin; \
 		exit 1; \
 	fi
 	$(MAKE) gen-samples
@@ -138,9 +138,9 @@ push: check-docs
 		git add docs/samples && git commit -m "chore: regenerate docs/samples"; \
 	fi
 	$(MAKE) gen-plugin
-	@if ! git diff --quiet HEAD -- skills commands .claude-plugin; then \
+	@if ! git diff --quiet HEAD -- skills plugin .claude-plugin; then \
 		echo "gen-plugin でスキル/プラグインが更新されました。自動コミットします。"; \
-		git add skills commands .claude-plugin && git commit -m "chore: regenerate skills and plugin"; \
+		git add skills plugin .claude-plugin && git commit -m "chore: regenerate skills and plugin"; \
 	fi
 	git push
 
