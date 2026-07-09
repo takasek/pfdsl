@@ -107,12 +107,29 @@ function computeParagraphRange(lines, lineIndex) {
 }
 
 /**
+ * Splits `text` on "\n" the same way `findSpecIdDefinitions` numbers lines,
+ * but drops the single trailing "" that `split` produces when `text` ends
+ * with a newline (the common case for files) — without this, an "EOF"
+ * range would overshoot by one phantom blank line that isn't actually a
+ * line in the file.
+ * @param {string} text
+ * @returns {string[]}
+ */
+function splitLines(text) {
+	const rawLines = text.split("\n");
+	if (rawLines.length > 0 && rawLines[rawLines.length - 1] === "") {
+		return rawLines.slice(0, -1);
+	}
+	return rawLines;
+}
+
+/**
  * @param {string} text
  * @param {number} lineNumber 1-indexed line where a definition marker sits
  * @returns {{startLine: number, endLine: number}} 1-indexed closed range
  */
 export function computeRange(text, lineNumber) {
-	const lines = text.split("\n");
+	const lines = splitLines(text);
 	const lineIndex = lineNumber - 1;
 	const type = classifyBlock(lines, lineIndex);
 	const range =

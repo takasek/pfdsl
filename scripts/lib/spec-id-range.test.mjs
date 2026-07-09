@@ -39,6 +39,12 @@ describe("computeRange — heading", () => {
 		assert.deepEqual(range, { startLine: 1, endLine: 3 });
 	});
 
+	it("does not count the phantom line from a trailing newline as part of EOF", () => {
+		const text = `${["## A (SPEC_a)", "body a", "more body"].join("\n")}\n`;
+		const range = computeRange(text, 1);
+		assert.deepEqual(range, { startLine: 1, endLine: 3 });
+	});
+
 	it("does not treat a fake heading inside a fenced code block as a boundary", () => {
 		const text = [
 			"## A (SPEC_a)",
@@ -100,6 +106,12 @@ describe("computeRange — list item", () => {
 
 	it("runs to EOF when there is no following sibling or dedent", () => {
 		const text = ["- item one (SPEC_i1)", "  body a", "  body b"].join("\n");
+		const range = computeRange(text, 1);
+		assert.deepEqual(range, { startLine: 1, endLine: 3 });
+	});
+
+	it("does not count the phantom line from a trailing newline as part of EOF", () => {
+		const text = `${["- item one (SPEC_i1)", "  body a", "  body b"].join("\n")}\n`;
 		const range = computeRange(text, 1);
 		assert.deepEqual(range, { startLine: 1, endLine: 3 });
 	});
