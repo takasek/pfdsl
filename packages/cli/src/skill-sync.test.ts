@@ -10,12 +10,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+	copyAgents,
 	copyCommands,
 	copyInstallLayer,
 	copySkillTree,
 	ensureLabels,
 	isL3Adopted,
 	pfdslDirGuidance,
+	resolveAgentsDir,
 	resolveCommandsDir,
 	resolveSkillRoot,
 	runSkillSync,
@@ -25,6 +27,62 @@ describe("resolveCommandsDir", () => {
 	it("resolves to a directory containing pfd-cycle.md", () => {
 		const dir = resolveCommandsDir();
 		expect(existsSync(join(dir, "pfd-cycle.md"))).toBe(true);
+	});
+});
+
+describe("resolveAgentsDir", () => {
+	it("resolves to a directory containing pfd-lens.md", () => {
+		const dir = resolveAgentsDir();
+		expect(existsSync(join(dir, "pfd-lens.md"))).toBe(true);
+	});
+});
+
+describe("copyAgents", () => {
+	let targetRoot: string;
+
+	beforeEach(() => {
+		targetRoot = mkdtempSync(join(tmpdir(), "pfdsl-sync-test-"));
+	});
+
+	afterEach(() => {
+		rmSync(targetRoot, { recursive: true, force: true });
+	});
+
+	it("copies pfd-lens.md into .claude/agents/", () => {
+		const agentsDir = resolveAgentsDir();
+		copyAgents(agentsDir, targetRoot);
+		expect(existsSync(join(targetRoot, ".claude/agents/pfd-lens.md"))).toBe(
+			true,
+		);
+	});
+
+	it("overwrites stale agent files", () => {
+		const agentsDir = resolveAgentsDir();
+		mkdirSync(join(targetRoot, ".claude/agents"), { recursive: true });
+		writeFileSync(join(targetRoot, ".claude/agents/pfd-lens.md"), "old\n");
+		copyAgents(agentsDir, targetRoot);
+		const content = readFileSync(
+			join(targetRoot, ".claude/agents/pfd-lens.md"),
+			"utf-8",
+		);
+		expect(content).not.toBe("old\n");
+	});
+
+	it("does not copy non pfd-* files, even when present in the source dir", () => {
+		const agentsDir = mkdtempSync(join(tmpdir(), "pfdsl-sync-agents-src-"));
+		try {
+			writeFileSync(join(agentsDir, "pfd-lens.md"), "lens\n");
+			writeFileSync(join(agentsDir, "internal-debug.md"), "secret\n");
+			copyAgents(agentsDir, targetRoot);
+			expect(existsSync(join(targetRoot, ".claude/agents/pfd-lens.md"))).toBe(
+				true,
+			);
+			expect(
+				existsSync(join(targetRoot, ".claude/agents/internal-debug.md")),
+			).toBe(false);
+		} finally {
+			rmSync(agentsDir, { recursive: true, force: true });
+		}
 	});
 });
 
@@ -446,6 +504,9 @@ describe("runSkillSync", () => {
 			true,
 		);
 		expect(existsSync(join(targetRoot, ".claude/commands/pfd-retro.md"))).toBe(
+			true,
+		);
+		expect(existsSync(join(targetRoot, ".claude/agents/pfd-lens.md"))).toBe(
 			true,
 		);
 		expect(result.stdout).toContain("cp -r .claude/skills/pfd-ops/install/. .");
