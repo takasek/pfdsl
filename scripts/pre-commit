@@ -26,9 +26,8 @@ fi
 
 # Shared shape for "regenerate/verify derived output, fail if stale" checks.
 # require_dist: space-separated dist files that must exist first, or "-" if
-# none needed (gen-skill is dist-free). check_cmd: a command that itself
-# returns non-zero when the derived output is stale (regenerate-then-diff,
-# or a drift-asserting test).
+# none needed. check_cmd: a command that itself returns non-zero when the
+# derived output is stale (regenerate-then-diff, or a drift-asserting test).
 check_drift() {
   trigger=$1; require_dist=$2; check_cmd=$3; hint=$4
   if ! git diff --cached --name-only | grep -qE "$trigger"; then
@@ -55,11 +54,11 @@ check_drift() {
 # is itself the check). Left as-is — no functional difference, and
 # converging them isn't worth the churn (see #265).
 
-# gen-skill.mjs is dist-free (pure file generation), so this runs without a build.
+# gen-skill.mjs embeds `pfdsl help` output, so it needs the CLI dist.
 # Trigger pattern is sourced from scripts/lib/gen-skill-trigger.mjs (single
 # source of truth shared with gate-check.mjs) since this sh script can't import JS.
 gen_skill_trigger=$(node scripts/lib/gen-skill-trigger.mjs)
-check_drift "$gen_skill_trigger" - \
+check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
   "node scripts/gen-skill.mjs --out .claude/skills/pfdsl && node scripts/gen-skill.mjs --out skills/pfdsl && git diff --quiet -- .claude/skills/pfdsl skills/pfdsl" \
   "Skill dirs are stale. Run 'make gen-skill' and re-stage the skill files."
 
