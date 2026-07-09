@@ -119,7 +119,7 @@ artifact:
     group: skill_sources
   skill_source_bundle:
     label: 配布対象スキル束
-    description: "4スキルツリーとcommands/pfd-*.mdをdist/へバンドルし公開npmパッケージへ同梱したもの。開発/テスト実行時はresolveSkillRootがdist不在ならリポの.claude/skills/<name>へフォールバックする"
+    description: "4スキルツリーとcommands/pfd-*.md・agents/pfd-*.mdをdist/へバンドルし公開npmパッケージへ同梱したもの。開発/テスト実行時はresolveSkillRoot・resolveAgentsDirがdist不在ならリポの.claude/skills/<name>・.claude/agents/へフォールバックする"
   installed_skills:
     label: 導入済みスキル
     description: "採用リポ<target>/.claude/skills/{pfd-ops,pfd-retro,pfd-ecosystem,pfdsl}/へのミラーコピー結果"
@@ -128,6 +128,11 @@ artifact:
   installed_commands:
     label: 導入済みコマンド
     description: 採用リポ<target>/.claude/commands/pfd-*.mdへのコピー結果
+    externalStakeholders: [採用リポのAIエージェント]
+    group: adopter_repo
+  installed_agents:
+    label: 導入済みagent定義
+    description: 採用リポ<target>/.claude/agents/pfd-*.mdへのコピー結果（#357）
     externalStakeholders: [採用リポのAIエージェント]
     group: adopter_repo
   installed_l3_layer:
@@ -196,7 +201,7 @@ process:
     tags: [b]
   bundle_skills:
     label: スキルバンドル生成
-    description: "ビルド時（tsup onSuccess）に4スキルツリーとcommands/pfd-*.mdをdist/へコピーする。対象4スキル名はtsup.config.tsとskill-sync.tsの両方にハードコードされ、スキル追加時は両方の更新が必要。fの内容authoringはworkflow.pfdsl側、ここは機械的コピーのみ"
+    description: "ビルド時（tsup onSuccess）に4スキルツリーとcommands/pfd-*.md・agents/pfd-*.mdをdist/へコピーする。対象4スキル名・agentsパターンはtsup.config.tsとskill-sync.tsの両方にハードコードされ、スキル・agent追加時は両方の更新が必要。fの内容authoringはworkflow.pfdsl側、ここは機械的コピーのみ"
     location: ../packages/cli/tsup.config.ts
     tags: [g]
   sync_skill_tree:
@@ -208,6 +213,12 @@ process:
   sync_commands:
     label: コマンド同期
     description: skill_source_bundleのcommands/のうちpfd-*.mdパターンに一致するものだけを採用リポの.claude/commands/へコピーする
+    command: npx @pfdsl/cli skill sync
+    location: ../packages/cli/src/skill-sync.ts
+    tags: [g]
+  sync_agents:
+    label: agent定義同期
+    description: skill_source_bundleのagents/のうちpfd-*.mdパターンに一致するものだけを採用リポの.claude/agents/へコピーする（#357。sync_commandsと同型）
     command: npx @pfdsl/cli skill sync
     location: ../packages/cli/src/skill-sync.ts
     tags: [g]
@@ -247,6 +258,8 @@ dot_graph >> export_image -> rendered_image
 skill_source_bundle >> sync_skill_tree -> installed_skills
 
 skill_source_bundle >> sync_commands -> installed_commands
+
+skill_source_bundle >> sync_agents -> installed_agents
 
 skill_source_bundle >> sync_install_layer -> installed_l3_layer
 
