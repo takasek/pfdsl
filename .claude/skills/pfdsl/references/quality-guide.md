@@ -6,6 +6,8 @@
 一次情報は本ファイル — pfdsl スキルの references/ に同梱される。
 本ガイドが「書くときのルール」、レビュー時の問いは review-perspectives.md。
 
+本ガイド中の `ADR-\d+` は github.com/takasek/pfdsl の docs/adr/ にある設計記録を指す。配布リポには同梱されない — 設計根拠を確認したいときは上流リポを参照する。
+
 PFD はタスクリストではなく成果物の変換グラフ。
 
 ## 構造の立て方
