@@ -31,6 +31,14 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/commands/pfd-init.md"), true);
 	});
 
+	it("matches .claude/commands/pfd-retro.md", () => {
+		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/commands/pfd-retro.md"), true);
+	});
+
+	it("matches .claude/agents/pfd-lens.md", () => {
+		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/agents/pfd-lens.md"), true);
+	});
+
 	it("matches packages/cli/package.json", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test("packages/cli/package.json"), true);
 	});

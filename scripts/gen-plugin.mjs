@@ -40,11 +40,11 @@ for (const name of ["pfd-ecosystem", "pfd-retro"]) {
 	console.log(`plugin/pfdsl/skills/${name} ← .claude/skills/${name}`);
 }
 
-// --- 3. Copy the commands (pfd-cycle, pfd-init) into commands/ ---
+// --- 3. Copy the commands (pfd-cycle, pfd-init, pfd-retro) into commands/ ---
 
 const commandsDest = resolve(pluginRoot, "commands");
 mkdirSync(commandsDest, { recursive: true });
-for (const file of ["pfd-cycle.md", "pfd-init.md"]) {
+for (const file of ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"]) {
 	const src = resolve(root, `.claude/commands/${file}`);
 	if (!existsSync(src)) {
 		console.error(`Error: ${src} not found.`);
@@ -54,7 +54,24 @@ for (const file of ["pfd-cycle.md", "pfd-init.md"]) {
 	console.log(`plugin/pfdsl/commands/${file} ← .claude/commands/${file}`);
 }
 
-// --- 4. Write plugin/pfdsl/.claude-plugin/plugin.json ---
+// --- 4. Copy the agents (pfd-lens) into agents/ ---
+// pfd-retro's SKILL.md delegates large-diagram audits to the pfd-lens agent
+// (.claude/agents/pfd-lens.md); without it bundled, that delegation path is
+// unreachable for plugin-only installs.
+
+const agentsDest = resolve(pluginRoot, "agents");
+mkdirSync(agentsDest, { recursive: true });
+for (const file of ["pfd-lens.md"]) {
+	const src = resolve(root, `.claude/agents/${file}`);
+	if (!existsSync(src)) {
+		console.error(`Error: ${src} not found.`);
+		process.exit(1);
+	}
+	cpSync(src, resolve(agentsDest, file));
+	console.log(`plugin/pfdsl/agents/${file} ← .claude/agents/${file}`);
+}
+
+// --- 5. Write plugin/pfdsl/.claude-plugin/plugin.json ---
 
 const cliVersion = JSON.parse(readFileSync(resolve(root, "packages/cli/package.json"), "utf-8")).version;
 const manifest = buildPluginManifest({ cliVersion });
