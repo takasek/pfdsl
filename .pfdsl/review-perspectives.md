@@ -27,4 +27,5 @@
 - **同名異義**: 「terminal artifact」が §3.3 / subflow 境界 / --audit で三様
 - **三点登記〔機構〕**: §15.X・§16・実装コードの3点対称登記。二重割当（V025 が group 循環と subflow 境界の両方に発行）を検出
 - **stale 前方参照〔機構〕**: `[[SPEC_xxx?]]` と `(SPEC_xxx)` の id 一致を `check-forward-ref-markers.mjs` が検出（#326）
+- **仕様ID相互参照〔機構〕**: `(SPEC_xxx)` 定義の一意性と `[[SPEC_xxx]]` の dangling を `check-spec-ids.mjs` が検査（ADR-0027、#328）
 - **由来**: ADR-0020・`docs/adr/0020-spec-stress-testing/`。実行手順は `/spec-stress-test`
