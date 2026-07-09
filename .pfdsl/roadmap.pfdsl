@@ -330,7 +330,7 @@ artifact:
   spec_id_syntax:
     label: "仕様ID構文 ADR + 最小lint (#328)"
     description: "spec.md 相互参照の仕様ID方式。構文・レンジ規則の詳細と移行方針は issue #328 が一次情報。汎用ツール化の検討記録は issue コメント参照"
-    status: todo
+    status: wip
     criteria: 構文・レンジ規則が ADR 化され、ID 一意性チェックと dangling 参照チェックの lint が CI で動作確認済み
   spec_id_refs:
     label: 仕様ID相互参照化済み spec.md
