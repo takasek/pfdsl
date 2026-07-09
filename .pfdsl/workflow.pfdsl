@@ -232,8 +232,8 @@ artifact:
     group: generation
   bindings_pfd_retro:
     label: pfd-retro バインディング
-    description: "pfd-retro が読むカタログ参照・配布物への finding 反映手続き・retro 実行記録ログ。sibling companion でなく独立ファイル（理由は bindings_pfd_ops と同じ）。pfd-retro skill が読む"
-    criteria: retro 実行記録が最新実行を反映し、カタログ参照先が実在する
+    description: "pfd-retro が読むカタログ参照・配布物への finding 反映手続き。sibling companion でなく独立ファイル（理由は bindings_pfd_ops と同じ）。pfd-retro skill が読む"
+    criteria: 記載内容が現行の pfd-retro 運用と矛盾せず、カタログ参照先が実在する
     location: bindings/pfd-retro.md
     group: generation
   roadmap_md:
