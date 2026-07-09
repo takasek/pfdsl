@@ -61,3 +61,56 @@ export function findStrictRefs(text) {
 	});
 	return hits;
 }
+
+/**
+ * @param {Array<{file: string, line: number, id: string}>} definitionHits
+ * @returns {Array<{id: string, definitions: Array<{file: string, line: number, id: string}>}>}
+ */
+export function findDuplicateDefinitions(definitionHits) {
+	const byId = new Map();
+	for (const hit of definitionHits) {
+		if (!byId.has(hit.id)) byId.set(hit.id, []);
+		byId.get(hit.id).push(hit);
+	}
+	const duplicates = [];
+	for (const [id, definitions] of byId) {
+		if (definitions.length > 1) duplicates.push({ id, definitions });
+	}
+	return duplicates;
+}
+
+/**
+ * @param {Array<{file: string, line: number, id: string}>} strictRefHits
+ * @param {Array<{file: string, line: number, id: string}>} definitionHits
+ * @returns {Array<{id: string, refs: Array<{file: string, line: number, id: string}>}>}
+ */
+export function findDanglingStrictRefs(strictRefHits, definitionHits) {
+	const definedIds = new Set(definitionHits.map((hit) => hit.id));
+	const byId = new Map();
+	for (const hit of strictRefHits) {
+		if (definedIds.has(hit.id)) continue;
+		if (!byId.has(hit.id)) byId.set(hit.id, []);
+		byId.get(hit.id).push(hit);
+	}
+	return [...byId.entries()].map(([id, refs]) => ({ id, refs }));
+}
+
+/**
+ * @param {Array<{id: string, definitions: Array<{file: string, line: number, id: string}>}>} duplicates
+ * @param {Array<{id: string, refs: Array<{file: string, line: number, id: string}>}>} dangling
+ * @returns {string}
+ */
+export function formatSpecIdViolations(duplicates, dangling) {
+	const lines = [];
+	for (const dup of duplicates) {
+		const locations = dup.definitions.map((h) => `${h.file}:${h.line}`).join(", ");
+		lines.push(`duplicate definition of id "${dup.id}" at ${locations}`);
+	}
+	for (const dang of dangling) {
+		const locations = dang.refs.map((h) => `${h.file}:${h.line}`).join(", ");
+		lines.push(
+			`dangling strict reference "${dang.id}" at ${locations} — no matching (${dang.id}) definition`,
+		);
+	}
+	return lines.join("\n");
+}

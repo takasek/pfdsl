@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import {
 	findSpecIdDefinitions,
 	findStrictRefs,
+	findDuplicateDefinitions,
+	findDanglingStrictRefs,
+	formatSpecIdViolations,
 } from "./spec-id-check.mjs";
 
 describe("findSpecIdDefinitions", () => {
@@ -114,5 +117,99 @@ describe("findStrictRefs", () => {
 	it("ignores strict references inside an inline code span", () => {
 		const text = "See `[[SPEC_inline_example]]` for the syntax.";
 		assert.deepEqual(findStrictRefs(text), []);
+	});
+});
+
+describe("findDuplicateDefinitions", () => {
+	it("returns an empty array when every id is defined once", () => {
+		const definitionHits = [
+			{ file: "a.md", line: 1, id: "SPEC_foo" },
+			{ file: "a.md", line: 2, id: "SPEC_bar" },
+		];
+		assert.deepEqual(findDuplicateDefinitions(definitionHits), []);
+	});
+
+	it("flags an id defined twice in the same file", () => {
+		const definitionHits = [
+			{ file: "a.md", line: 1, id: "SPEC_foo" },
+			{ file: "a.md", line: 5, id: "SPEC_foo" },
+		];
+		const dupes = findDuplicateDefinitions(definitionHits);
+		assert.equal(dupes.length, 1);
+		assert.equal(dupes[0].id, "SPEC_foo");
+		assert.equal(dupes[0].definitions.length, 2);
+	});
+
+	it("flags an id defined twice across different files", () => {
+		const definitionHits = [
+			{ file: "a.md", line: 1, id: "SPEC_foo" },
+			{ file: "b.md", line: 1, id: "SPEC_foo" },
+		];
+		const dupes = findDuplicateDefinitions(definitionHits);
+		assert.equal(dupes.length, 1);
+		assert.deepEqual(
+			dupes[0].definitions.map((h) => h.file),
+			["a.md", "b.md"],
+		);
+	});
+});
+
+describe("findDanglingStrictRefs", () => {
+	it("returns an empty array when every strict ref has a matching definition", () => {
+		const strictRefHits = [{ file: "a.md", line: 1, id: "SPEC_foo" }];
+		const definitionHits = [{ file: "b.md", line: 1, id: "SPEC_foo" }];
+		assert.deepEqual(
+			findDanglingStrictRefs(strictRefHits, definitionHits),
+			[],
+		);
+	});
+
+	it("flags a strict ref with no matching definition anywhere", () => {
+		const strictRefHits = [{ file: "a.md", line: 1, id: "SPEC_missing" }];
+		const definitionHits = [];
+		const dangling = findDanglingStrictRefs(strictRefHits, definitionHits);
+		assert.equal(dangling.length, 1);
+		assert.equal(dangling[0].id, "SPEC_missing");
+		assert.equal(dangling[0].refs.length, 1);
+	});
+
+	it("groups multiple dangling refs to the same id together", () => {
+		const strictRefHits = [
+			{ file: "a.md", line: 1, id: "SPEC_missing" },
+			{ file: "a.md", line: 9, id: "SPEC_missing" },
+		];
+		const dangling = findDanglingStrictRefs(strictRefHits, []);
+		assert.equal(dangling.length, 1);
+		assert.equal(dangling[0].refs.length, 2);
+	});
+});
+
+describe("formatSpecIdViolations", () => {
+	it("formats duplicate and dangling violations with file:line", () => {
+		const duplicates = [
+			{
+				id: "SPEC_foo",
+				definitions: [
+					{ file: "a.md", line: 1, id: "SPEC_foo" },
+					{ file: "b.md", line: 2, id: "SPEC_foo" },
+				],
+			},
+		];
+		const dangling = [
+			{
+				id: "SPEC_missing",
+				refs: [{ file: "c.md", line: 3, id: "SPEC_missing" }],
+			},
+		];
+		const out = formatSpecIdViolations(duplicates, dangling);
+		assert.match(out, /SPEC_foo/);
+		assert.match(out, /a\.md:1/);
+		assert.match(out, /b\.md:2/);
+		assert.match(out, /SPEC_missing/);
+		assert.match(out, /c\.md:3/);
+	});
+
+	it("returns an empty string when there are no violations", () => {
+		assert.equal(formatSpecIdViolations([], []), "");
 	});
 });
