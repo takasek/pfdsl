@@ -320,7 +320,7 @@ artifact:
   explain_cmd:
     label: "pfdsl explain コマンド (#356)"
     description: "診断コード → 定義節・summary の一発引き。#299 のレジストリを消費する。check エラー対処の spec grep 手順を代替"
-    status: todo
+    status: done
     criteria: "全診断コード族で explain が動作し、レジストリ整合が CI 検査でカバーされている"
   pfd_lens_agent:
     label: "pfd-lens agent + agents 配布 (#357)"
