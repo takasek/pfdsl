@@ -304,7 +304,7 @@ process:
 
   gen_plugin:
     label: プラグイン生成
-    description: "gen_skill と同じ一次ソース（spec/skill_template/quality_guide/feature_samples/review_perspectives）から pfdsl スキルを独立再生成し、ecosystem_skill・retro_skill と /pfd-cycle・/pfd-init コマンドを plugin/pfdsl/ に束ね plugin.json を書く。skill（.claude/skills/pfdsl/）を直接コピーするわけではない。version は toolchain の CLI package.json 由来。check-gen-skill.yml が全 PR で drift を強制（CI backstop、CLI リリース後の version 反映漏れも検出）"
+    description: "gen_skill と同じ一次ソース（spec/skill_template/quality_guide/feature_samples/review_perspectives）から pfdsl スキルを独立再生成し、ecosystem_skill・retro_skill と /pfd-cycle・/pfd-init コマンドを plugin/pfdsl/ に束ね plugin.json を書く。pfdsl_skill（.claude/skills/pfdsl/）を直接コピーするわけではない。version は toolchain の CLI package.json 由来。check-gen-skill.yml が全 PR で drift を強制（CI backstop、CLI リリース後の version 反映漏れも検出）"
     command: make gen-plugin
     group: release
 

@@ -63,8 +63,9 @@ check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
   "Skill dirs are stale. Run 'make gen-skill' and re-stage the skill files."
 
 # gen-plugin.mjs bundles pfd-ecosystem/pfd-retro/commands plus the pfdsl skill
-# (via gen-skill.mjs) into plugin/pfdsl/; also dist-free.
-check_drift '^(docs/|scripts/skill-template/|scripts/gen-skill\.mjs|scripts/gen-plugin\.mjs|scripts/lib/gen-plugin\.mjs|\.claude/skills/pfd-ecosystem/|\.claude/skills/pfd-retro/|\.claude/commands/pfd-cycle\.md|\.claude/commands/pfd-init\.md|packages/cli/package\.json)' - \
+# (via gen-skill.mjs) into plugin/pfdsl/; needs the CLI dist for the same
+# reason as the gen-skill check above (see #400/#401).
+check_drift '^(docs/|scripts/skill-template/|scripts/gen-skill\.mjs|scripts/gen-plugin\.mjs|scripts/lib/gen-plugin\.mjs|\.claude/skills/pfd-ecosystem/|\.claude/skills/pfd-retro/|\.claude/commands/pfd-cycle\.md|\.claude/commands/pfd-init\.md|packages/cli/package\.json)' "packages/cli/dist/cli.js" \
   "node scripts/gen-plugin.mjs && git diff --quiet -- plugin" \
   "plugin/pfdsl is stale. Run 'make gen-plugin' and re-stage the plugin files."
 
