@@ -7,7 +7,10 @@ import {
 } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { defineConfig } from "tsup";
-import { isDistributableCommand } from "./src/skill-sync.js";
+import {
+	isDistributableAgent,
+	isDistributableCommand,
+} from "./src/skill-sync.js";
 
 const { version } = JSON.parse(
 	readFileSync(resolve(__dirname, "package.json"), "utf-8"),
@@ -53,6 +56,16 @@ export default defineConfig({
 		for (const entry of readdirSync(commandsSrc)) {
 			if (!isDistributableCommand(entry)) continue;
 			cpSync(resolve(commandsSrc, entry), resolve(commandsDest, entry));
+		}
+		const agentsSrc = resolve(repoRoot, ".claude/agents");
+		const agentsDest = resolve(__dirname, "dist/agents");
+		if (!existsSync(agentsSrc)) {
+			throw new Error(`agents dir not found at ${agentsSrc}`);
+		}
+		mkdirSync(agentsDest, { recursive: true });
+		for (const entry of readdirSync(agentsSrc)) {
+			if (!isDistributableAgent(entry)) continue;
+			cpSync(resolve(agentsSrc, entry), resolve(agentsDest, entry));
 		}
 	},
 });
