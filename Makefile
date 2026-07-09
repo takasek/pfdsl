@@ -105,6 +105,7 @@ check-docs:
 	node scripts/check-doc-examples.mjs
 	node scripts/check-diag-registry.mjs
 	node scripts/check-forward-ref-markers.mjs
+	node scripts/check-spec-ids.mjs
 	node scripts/check-companion-bindings.mjs
 
 .PHONY: gen-skill
