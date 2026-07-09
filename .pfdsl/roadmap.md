@@ -56,7 +56,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 **PR 本文の `Closes` キーワード確認**: L3 reference「PR 本文規約」に従う（main 直接マージのみ使用・中間 PR では使わない）。
 
-**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる。
+**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる。Read/Edit/Write 等のファイル操作ツールも同様 — worktree セッション中でも絶対パスを worktree ディレクトリ配下で明示せず main repo パスを渡すと、意図せず main チェックアウトのファイルを直接書き換える（#357 実装セッションで実際に発生。git 履歴でなく作業ツリーが対象のため git 側の防止策では検知できない）。パスに疑いがあれば `pwd` でなく渡すパス文字列自体を確認する。
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる。
 
