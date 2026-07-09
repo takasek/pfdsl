@@ -56,7 +56,10 @@ check_drift() {
 # converging them isn't worth the churn (see #265).
 
 # gen-skill.mjs is dist-free (pure file generation), so this runs without a build.
-check_drift '^(docs/|scripts/skill-template/|scripts/gen-skill\.mjs)' - \
+# Trigger pattern is sourced from scripts/lib/gen-skill-trigger.mjs (single
+# source of truth shared with gate-check.mjs) since this sh script can't import JS.
+gen_skill_trigger=$(node scripts/lib/gen-skill-trigger.mjs)
+check_drift "$gen_skill_trigger" - \
   "node scripts/gen-skill.mjs --out .claude/skills/pfdsl && node scripts/gen-skill.mjs --out skills/pfdsl && git diff --quiet -- .claude/skills/pfdsl skills/pfdsl" \
   "Skill dirs are stale. Run 'make gen-skill' and re-stage the skill files."
 

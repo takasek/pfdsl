@@ -18,6 +18,7 @@ import {
 	hasStatusChange,
 	statusChangedForArtifact,
 } from "./lib/gate-check.mjs";
+import { GEN_SKILL_TRIGGER } from "./lib/gen-skill-trigger.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -97,7 +98,7 @@ if (mdFiles.length === 0) {
 }
 
 // 4. gen-skill identity (only when skill-source paths changed)
-if (!matchesTrigger(changedFiles, /^(docs\/|scripts\/skill-template\/|scripts\/gen-skill\.mjs)/)) {
+if (!matchesTrigger(changedFiles, GEN_SKILL_TRIGGER)) {
 	results.push({ name: "gen-skill identity", status: "SKIP", detail: "no skill-source changes" });
 } else {
 	const r = trySh(
