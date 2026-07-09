@@ -325,7 +325,7 @@ artifact:
   pfd_lens_agent:
     label: "pfd-lens agent + agents 配布 (#357)"
     description: "A/B 図監査を隔離 subagent 化し、skill sync の配布対象に .claude/agents/pfd-*.md を追加する。pfd-retro の description 二重人格を解消"
-    status: todo
+    status: done
     criteria: "agent 単体の監査実測1回・pfd-retro の A/B 節が委譲形・agents 配布のテストあり"
   cli_tool_v0018:
     label: "CLI v0.0.18（次期）"
