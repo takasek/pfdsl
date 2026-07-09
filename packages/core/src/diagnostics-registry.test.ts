@@ -61,6 +61,18 @@ describe("extractDiagnosticCodesFromSource", () => {
 	});
 });
 
+describe("DIAGNOSTIC_REGISTRY section/summary metadata", () => {
+	it("every entry has a section number and a non-empty one-line summary", () => {
+		for (const [code, entry] of Object.entries(DIAGNOSTIC_REGISTRY)) {
+			expect(entry.section, `${code} section`).toMatch(/^\d+(\.\d+){0,2}$/);
+			expect(entry.summary, `${code} summary`).not.toBe("");
+			expect(entry.summary, `${code} summary must be one line`).not.toMatch(
+				/\n/,
+			);
+		}
+	});
+});
+
 describe("DIAGNOSTIC_REGISTRY vs. real source", () => {
 	const coreSrcDir = __dirname;
 	const sourceFiles = [
