@@ -518,7 +518,6 @@ process:
   i357_define_pfd_lens_agent:
     label: pfd-lens agent 定義 + 配布実装
     location: https://github.com/takasek/pfdsl/issues/357
-    updated_at: 2026-07-06T04:34:30Z
   publish_cli_v0018:
     label: CLI v0.0.18リリース
   i328_design_spec_ids:
