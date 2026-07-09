@@ -135,437 +135,56 @@ statusStyles:
 
 adr_set >> draft_alpha
 draft_alpha -> spec_alpha
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_beta
-feature_x
-feature_y
-feature_z
-impl_cli
-impl_core
-impl_ext
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-policy_doc
-release_v1
-release_v2
-spec_beta
-write_article
-write_policy
 
 adr_set >> draft_beta
 draft_beta -> spec_beta
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-feature_x
-feature_y
-feature_z
-impl_cli
-impl_core
-impl_ext
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-policy_doc
-release_v1
-release_v2
-spec_alpha
-write_article
-write_policy
 
 adr_set >> write_policy
 write_policy -> policy_doc
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-feature_x
-feature_y
-feature_z
-impl_cli
-impl_core
-impl_ext
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-release_v1
-release_v2
-spec_alpha
-spec_beta
-write_article
 
 policy_doc >> implement_core
 spec_alpha >> implement_core
 implement_core -> impl_core
-adr_set
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-feature_x
-feature_y
-feature_z
-impl_cli
-impl_ext
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-release_v1
-release_v2
-spec_beta
-write_article
-write_policy
 
 policy_doc >> implement_ext
 spec_beta >> implement_ext
 implement_ext -> impl_ext
-adr_set
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-feature_x
-feature_y
-feature_z
-impl_cli
-impl_core
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_core
-implement_feature_x
-implement_feature_y
-implement_feature_z
-release_v1
-release_v2
-spec_alpha
-write_article
-write_policy
 
 impl_core >> implement_cli
 impl_ext >> implement_cli
 implement_cli -> impl_cli
-adr_set
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-feature_x
-feature_y
-feature_z
-impl_plugin_a
-impl_plugin_b
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-policy_doc
-release_v1
-release_v2
-spec_alpha
-spec_beta
-write_article
-write_policy
 
 impl_core >> implement_feature_x
 implement_feature_x -> feature_x
-adr_set
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-feature_y
-feature_z
-impl_cli
-impl_ext
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_core
-implement_ext
-implement_feature_y
-implement_feature_z
-policy_doc
-release_v1
-release_v2
-spec_alpha
-spec_beta
-write_article
-write_policy
 
 impl_core >> implement_feature_y
 implement_feature_y -> feature_y
-adr_set
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-feature_x
-feature_z
-impl_cli
-impl_ext
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_z
-policy_doc
-release_v1
-release_v2
-spec_alpha
-spec_beta
-write_article
-write_policy
 
 feature_x >> implement_feature_z
 feature_y >> implement_feature_z
 implement_feature_z -> feature_z
-adr_set
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-impl_cli
-impl_core
-impl_ext
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_y
-policy_doc
-release_v1
-release_v2
-spec_alpha
-spec_beta
-write_article
-write_policy
 
 impl_core >> build_plugin_a
 build_plugin_a -> impl_plugin_a
-adr_set
-article
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-feature_x
-feature_y
-feature_z
-impl_cli
-impl_ext
-impl_plugin_b
-implement_cli
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-policy_doc
-release_v1
-release_v2
-spec_alpha
-spec_beta
-write_article
-write_policy
 
 impl_ext >> build_plugin_b
 impl_plugin_a >> build_plugin_b
 build_plugin_b -> impl_plugin_b
-adr_set
-article
-build_plugin_a
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-feature_x
-feature_y
-feature_z
-impl_cli
-impl_core
-implement_cli
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-policy_doc
-release_v1
-release_v2
-spec_alpha
-spec_beta
-write_article
-write_policy
 
 feature_x >> do_release_v1
 feature_y >> do_release_v1
 feature_z >> do_release_v1
 impl_cli >> do_release_v1
 do_release_v1 -> release_v1
-adr_set
-article
-build_plugin_a
-build_plugin_b
-do_release_v2
-draft_alpha
-draft_beta
-impl_core
-impl_ext
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-policy_doc
-release_v2
-spec_alpha
-spec_beta
-write_article
-write_policy
 
 impl_plugin_a >> do_release_v2
 impl_plugin_b >> do_release_v2
 release_v1 >> do_release_v2
 do_release_v2 -> release_v2
-adr_set
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-draft_alpha
-draft_beta
-feature_x
-feature_y
-feature_z
-impl_cli
-impl_core
-impl_ext
-implement_cli
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-policy_doc
-spec_alpha
-spec_beta
-write_article
-write_policy
 
 adr_set >> write_article
 write_article -> article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-feature_x
-feature_y
-feature_z
-impl_cli
-impl_core
-impl_ext
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_core
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-policy_doc
-release_v1
-release_v2
-spec_alpha
-spec_beta
-write_policy
 
 spec_alpha >>? implement_core
-adr_set
-article
-build_plugin_a
-build_plugin_b
-do_release_v1
-do_release_v2
-draft_alpha
-draft_beta
-feature_x
-feature_y
-feature_z
-impl_cli
-impl_core
-impl_ext
-impl_plugin_a
-impl_plugin_b
-implement_cli
-implement_ext
-implement_feature_x
-implement_feature_y
-implement_feature_z
-policy_doc
-release_v1
-release_v2
-spec_beta
-write_article
-write_policy
 "
 `;
