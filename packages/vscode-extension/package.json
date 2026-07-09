@@ -103,7 +103,7 @@
 	"scripts": {
 		"build": "node esbuild.config.mjs",
 		"watch": "node esbuild.config.mjs --watch",
-		"typecheck": "tsc --noEmit",
+		"typecheck": "tsgo --noEmit",
 		"test": "vitest run --passWithNoTests"
 	},
 	"dependencies": {
