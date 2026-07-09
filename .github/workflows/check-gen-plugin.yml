@@ -1,4 +1,4 @@
-name: check gen-skill / gen-plugin identity
+name: check gen-plugin identity
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  gen-skill:
+  gen-plugin:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -24,16 +24,6 @@ jobs:
       # on a fresh checkout yet — bootstrap-pfdsl-skill builds once, generates it,
       # then rebuilds so the CLI bundle picks it up (see Makefile comment).
       - run: make bootstrap-pfdsl-skill
-
-      - name: Regenerate skill dirs and assert no drift
-        run: |
-          make gen-skill
-          if ! git diff --exit-code skills/pfdsl; then
-            echo ""
-            echo "ERROR: skills/pfdsl is stale. Run 'make gen-skill' and commit the result."
-            exit 1
-          fi
-          echo "gen-skill identity in sync."
 
       - name: Regenerate plugin dir and assert no drift
         run: |

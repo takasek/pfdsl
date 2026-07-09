@@ -10,4 +10,4 @@
 | レビュー観点 | `docs/review-perspectives.md` |
 | サンプル | `docs/samples/*.pfdsl` |
 
-編集後は `make gen-skill` を実行する。このディレクトリ（`.claude/skills/pfdsl`）は gitignore 対象のローカル作業コピーのため commit 不要。配布用コピー `skills/pfdsl` のみ commit する。
+編集後は `make gen-skill` を実行する。このディレクトリ（`.claude/skills/pfdsl`）は gitignore 対象のローカル作業コピーのため commit 不要。marketplace 配布用コピー `plugin/pfdsl/skills/pfdsl` は `make gen-plugin` で再生成し、そちらは commit する。

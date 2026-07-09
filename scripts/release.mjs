@@ -95,26 +95,23 @@ try {
 
 // --- 6. pre-tag checks ---
 
-console.log("Running pre-tag checks (build, test, check-docs, gen-skill identity)...");
+console.log("Running pre-tag checks (build, test, check-docs, gen-plugin identity)...");
 run("make", ["build"]);
 run("make", ["test"]);
 run("make", ["check-docs"]);
-run("make", ["gen-skill"]);
-// make gen-skill only checks .claude/skills/pfdsl and skills/pfdsl match each
-// other (both freshly regenerated, so they almost always do) — it does not
-// check that the regeneration matches what's committed. Mirror what CI's
-// check-gen-skill.yml does: regenerate, then diff against the committed tree.
+run("make", ["gen-plugin"]);
+// make gen-plugin regenerates plugin/pfdsl/ (the marketplace distribution
+// copy) fresh — it does not check that the regeneration matches what's
+// committed. Mirror what CI's check-gen-plugin.yml does: regenerate, then
+// diff against the committed tree.
 try {
-	execFileSync("git", ["diff", "--exit-code", ".claude/skills/pfdsl", "skills/pfdsl"], {
+	execFileSync("git", ["diff", "--exit-code", "plugin"], {
 		cwd: root,
 		stdio: "ignore",
 	});
 } catch (err) {
 	if (err.status === undefined) throw err; // execFileSync itself failed to spawn
-	fail(
-		"generated skill dirs (.claude/skills/pfdsl, skills/pfdsl) are stale — " +
-			"run 'make gen-skill' and commit the result before releasing.",
-	);
+	fail("generated plugin dir (plugin/pfdsl) is stale — run 'make gen-plugin' and commit the result before releasing.");
 }
 
 // --- 7. bump + commit (only if --version was given) ---
