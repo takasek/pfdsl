@@ -1,3 +1,4 @@
 # Generated skill files — excluded from language stats and collapsed in PR diffs
 skills/pfdsl/** linguist-generated=true
 .claude/skills/pfdsl/** linguist-generated=true
+plugin/pfdsl/** linguist-generated=true
