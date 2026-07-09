@@ -38,3 +38,4 @@
 - **ADR-0024** [retro 実行記録と差分計測可能な起動条件](0024-retro-execution-record.md)（Superseded by ADR-0026） — 「たまったら」は基準点なしで判定不能。retro 実行記録を workflow companion に残し、起動条件を前回以降の差分計測形に書き換える
 - **ADR-0025** [レビューカタログは抽象レンズを配布、具体例は repo-local instance](0025-review-catalog-lens-example-split.md) — 「各問いは実際に検出された誤りに由来する」具体例は本質的に repo-local。配布層は A/B/C の観点の枠組みのみ、pfdsl 固有の例示・機構は専用 instance ファイルへ降格する ADR-0023 の鏡像
 - **ADR-0026** [retro トリガーを done イベント駆動に一本化し実行記録を廃止](0026-retro-trigger-done-event.md) — 実行記録は並列 worktree でコンフリクトする上、閾値条件は導入以来一度も単独発火していない。基準点は既存の done イベント（プロトコル4）に一本化し、記録機構ごと廃止する
+- **ADR-0027** [仕様相互参照を安定 ID アンカーに移行する](0027-spec-id-cross-references.md) — 節番号直書きは挿入・並べ替えで崩れる。`[[SPEC_xxx]]` / `[[SPEC_xxx?]]` / `(SPEC_xxx)` の bracket 構文を正式採用し、不透明・永続・欠番許容の ID として renumber 機能なしで運用する

@@ -10,6 +10,14 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
 
 出力宛先は `.pfdsl/workflow.md`「知見の振り分け（3経路）」セクションに従う。companion への書き分け（どの companion に書くか）は `.claude/skills/pfd-ops/references/architecture.md` の「companion への書き分けルール」表が一次情報。
 
+## 監査の追加パターン（このリポで検出）
+
+- **並行委譲の接合部**: 複数 subagent へ並行委譲した成果物同士の整合は、各委譲の受け入れ基準では検証されない。
+  検収では成果物ペアの接合部（一方が定める規約 × 他方が生成する内容）を突合する。
+  問いの形: 「委譲 A の出力は、委譲 B が実装した検査・規約の除外条件に収まっているか」。
+  具体例: ADR の構文例引用（double-backtick span）と lint の inline-code 除外（当時 single-backtick のみ対応）の組で、構文例が実マーカーとして検出され、定義例と参照例が相互解決して lint が偶然 PASS した（#328。除外は #398 で backtick run 対応に修正済み）。
+  検査 PASS は接合部の健全性を保証しない — 例示が実データ化していないかを実マッチ列挙（検出関数の直接実行）で確認する。
+
 ## 配布物への finding 反映
 
 配布 bundle（`.claude/skills/pfd-*` 配下のスキル本文・reference）は `pfdsl skill sync` が採用リポへ無条件上書きコピーする配布物であり、採用リポで直接編集しても次回 sync で消える。
