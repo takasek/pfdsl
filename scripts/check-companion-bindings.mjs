@@ -14,8 +14,8 @@
  *    exists) — this runs as part of `make check-docs`, which already
  *    assumes that for other checks.
  * 2. If .pfdsl/bindings/pfd-retro.md exists, verifies it has the "pfd-retro
- *    バインディング" and "retro 実行記録" headings pfd-retro's audit
- *    protocol depends on being able to find.
+ *    バインディング" heading pfd-retro's audit protocol depends on being
+ *    able to find.
  *
  * Usage: node scripts/check-companion-bindings.mjs
  */
@@ -33,7 +33,7 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-const REQUIRED_PFD_RETRO_BINDING_HEADINGS = ["pfd-retro バインディング", "retro 実行記録"];
+const REQUIRED_PFD_RETRO_BINDING_HEADINGS = ["pfd-retro バインディング"];
 
 const files = execSync('git ls-files ".pfdsl/*.md"', {
 	encoding: "utf8",

@@ -1,6 +1,6 @@
 # ADR-0024: retro 実行記録と差分計測可能な起動条件
 
-- Status: Accepted
+- Status: Superseded by ADR-0026
 - Date: 2026-07-03
 
 ## Context
