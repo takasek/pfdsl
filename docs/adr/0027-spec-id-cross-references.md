@@ -1,4 +1,4 @@
-# ADR-0027: 仕様相互参照を安定 ID アンカーに移行する
+# ADR-0027: 仕様相互参照を安定 ID アンカーに移行する (SPEC_id_syntax)
 
 - Status: Accepted
 - Date: 2026-07-09
