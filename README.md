@@ -67,7 +67,7 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 - **DOT / SVG** — Graphviz export and Wasm-based rendering (`@pfdsl/graphviz-exporter`, `@pfdsl/preview-engine`)
 - **CLI** — `pfdsl check / fmt / reindex / sort-meta / normalize / graph / diff` (`@pfdsl/cli`)
 - **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
-- **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`); installable cross-project via `gh skill install takasek/pfdsl pfdsl --agent claude-code`
+- **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`); installable via `/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`, or `gh skill install takasek/pfdsl pfdsl --agent claude-code`
 
 
 ## Quick start
@@ -171,6 +171,21 @@ Open the repo in VS Code and press `F5` to launch an Extension Development Host 
 ## Claude Code skill
 
 A skill for Claude Code is bundled at `.claude/skills/pfdsl/`. It provides PFDSL syntax reference, CLI command guidance, and workflow steps for editing `.pfdsl` files. Claude Code picks it up automatically when working in this repo.
+
+### Install via Claude Code plugin marketplace (recommended)
+
+The `pfdsl`, `pfd-ecosystem`, and `pfd-retro` skills, plus the `/pfd-cycle` and `/pfd-init` commands, are distributed as a Claude Code plugin (`plugin/pfdsl/`) through this repo's self-hosted marketplace:
+
+```
+/plugin marketplace add takasek/pfdsl
+/plugin install pfdsl@pfdsl
+```
+
+Skills and commands are namespaced under the plugin: `pfdsl:pfdsl`, `pfdsl:pfd-ecosystem`, `pfdsl:pfd-retro`, `/pfdsl:pfd-cycle`, `/pfdsl:pfd-init`. Updates ship by bumping the CLI version (`plugin.json`'s `version` field is derived from `packages/cli/package.json`); `/plugin marketplace update` picks up new releases.
+
+`pfd-ops` is not part of the plugin — it ships repo-side automation (GitHub Actions workflows, audit scripts) that a plugin can't deliver into your project, so it keeps the `skill sync` / `cp -r` adopt flow below.
+
+### Manual install
 
 To regenerate after spec or sample changes:
 
