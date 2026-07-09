@@ -68,6 +68,12 @@ artifact:
     criteria: .claude/skills/pfdsl/ と diff -rq で差分なし
     location: ../skills/pfdsl/
     group: release
+  plugin_dist:
+    label: marketplace 配布プラグイン
+    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl で外部ユーザーが導入する Claude Code プラグイン（pfdsl / ecosystem_skill / retro_skill スキルと /pfd-cycle・/pfd-init コマンドを束ねる）。pfd-ops は含まない（repo 側自動化を運べないため skill sync / cp -r を維持）。make gen-plugin で再生成、plugin.json の version は toolchain の CLI package.json 由来"
+    criteria: make gen-plugin が差分なし（check-gen-skill.yml が CI で強制、CLI リリース後の version 反映漏れもこれで検出）
+    location: ../plugin/pfdsl/
+    group: release
   user_intent:
     label: ユーザーの関心・意図
     description: "何を作るか・何を問うかの源泉。不定形のフロー外リソース（ADR-0001 の実証例）"
@@ -296,6 +302,12 @@ process:
     command: make gen-skill
     group: generation
 
+  gen_plugin:
+    label: プラグイン生成
+    description: "gen_skill 後、ecosystem_skill・retro_skill と /pfd-cycle・/pfd-init コマンドを plugin/pfdsl/ に束ね plugin.json を書く。version は toolchain の CLI package.json 由来。check-gen-skill.yml が全 PR で drift を強制（CI backstop、CLI リリース後の version 反映漏れも検出）"
+    command: make gen-plugin
+    group: release
+
   write_examples:
     label: 実践例執筆
     description: お題に対しスキルの品質ガイドに従って PFD を書く
@@ -394,6 +406,8 @@ spec >> maintain_samples -> feature_samples
 [spec, skill_template, quality_guide, feature_samples, review_perspectives] >> gen_skill -> [pfdsl_skill, gh_skill_dist]
 
 pfdsl_skill >>? gen_skill
+
+[toolchain, skill, ecosystem_skill, retro_skill] >> gen_plugin -> plugin_dist
 
 topics >> write_examples -> examples
 

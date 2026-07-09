@@ -115,7 +115,7 @@ artifact:
   marketplace_dist:
     label: "marketplace 配布 pfdsl skill 群 (#366)"
     description: "pfdsl + pfd-ecosystem/retro/cycle を1プラグインに束ね Claude plugin marketplace 配布。gen-skill の出力先を plugin ディレクトリへ向ける。生成層は温存し配布層のみ /plugin 化。pfd-ops はリポジトリ成果物を運べないため cp -r 維持"
-    status: todo
+    status: done
     criteria: "plugin が marketplace 経由で install でき skill 発火・references 生成物が届くことを検証済み、spec/CLI version と plugin.json version の連動 gate が CI で動作"
   featured_toolchain:
     label: "spec v0.0.7 実装済みツールチェーン (#52)"
