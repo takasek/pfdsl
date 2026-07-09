@@ -1,4 +1,4 @@
-name: check gen-skill identity
+name: check gen-skill / gen-plugin identity
 
 on:
   push:
@@ -34,3 +34,15 @@ jobs:
             exit 1
           fi
           echo "gen-skill identity in sync."
+
+      - name: Regenerate plugin dir and assert no drift
+        run: |
+          make gen-plugin
+          if ! git diff --exit-code skills/pfd-ecosystem skills/pfd-retro commands .claude-plugin; then
+            echo ""
+            echo "ERROR: plugin dirs are stale (this also catches a plugin.json version left behind"
+            echo "after a CLI release — its version is derived from packages/cli/package.json)."
+            echo "Run 'make gen-plugin' and commit the result."
+            exit 1
+          fi
+          echo "gen-plugin identity in sync."
