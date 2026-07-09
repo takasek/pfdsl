@@ -15,12 +15,16 @@ import { forEachNonFencedLine } from "./forward-ref-marker-check.mjs";
 
 const DEFINITION_RE = /\(SPEC_([A-Za-z0-9_]+)\)/g;
 const STRICT_REF_RE = /\[\[SPEC_([A-Za-z0-9_]+)\]\]/g;
-const INLINE_CODE_RE = /`[^`]*`/g;
+const INLINE_CODE_RE = /(`+)[\s\S]*?\1(?!`)/g;
 
 /**
- * Blanks out inline code spans (single backtick pairs) on a line so markers
- * quoted inside them aren't matched. Doesn't handle multi-backtick fences
- * (`` `` ``); a single backtick pair is the required minimum (#328).
+ * Blanks out inline code spans on a line so markers quoted inside them
+ * aren't matched. Follows the CommonMark code span rule: a span opens with
+ * a run of one or more backticks and closes at the next run of exactly the
+ * same length (the trailing `(?!`)` rejects a shorter run that's actually
+ * a prefix of a longer one, e.g. `` ` `` closing a `` `` `` open), so
+ * multi-backtick fences (`` `` ``) are handled the same as single pairs
+ * (#328, #398).
  * @param {string} line
  * @returns {string}
  */

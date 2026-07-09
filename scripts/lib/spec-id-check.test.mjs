@@ -80,6 +80,25 @@ describe("findSpecIdDefinitions", () => {
 		assert.equal(hits.length, 1);
 		assert.equal(hits[0].id, "SPEC_outside_span");
 	});
+
+	it("ignores markers inside a double-backtick inline code span", () => {
+		const text = "See ``(SPEC_double_backtick)`` for the syntax.";
+		assert.deepEqual(findSpecIdDefinitions(text), []);
+	});
+
+	it("handles single and double backtick spans mixed on the same line", () => {
+		const text = "`(SPEC_single)` then ``(SPEC_double)`` then (SPEC_real) is defined.";
+		const hits = findSpecIdDefinitions(text);
+		assert.equal(hits.length, 1);
+		assert.equal(hits[0].id, "SPEC_real");
+	});
+
+	it("treats an embedded single backtick inside a double-backtick span as content", () => {
+		const text = "See ``(SPEC_embedded)`extra`` then (SPEC_after) is real.";
+		const hits = findSpecIdDefinitions(text);
+		assert.equal(hits.length, 1);
+		assert.equal(hits[0].id, "SPEC_after");
+	});
 });
 
 describe("findStrictRefs", () => {
@@ -117,6 +136,18 @@ describe("findStrictRefs", () => {
 	it("ignores strict references inside an inline code span", () => {
 		const text = "See `[[SPEC_inline_example]]` for the syntax.";
 		assert.deepEqual(findStrictRefs(text), []);
+	});
+
+	it("ignores strict references inside a double-backtick inline code span", () => {
+		const text = "See ``[[SPEC_double_backtick]]`` for the syntax.";
+		assert.deepEqual(findStrictRefs(text), []);
+	});
+
+	it("handles single and double backtick spans mixed on the same line", () => {
+		const text = "`[[SPEC_single]]` then ``[[SPEC_double]]`` then [[SPEC_real]] is a ref.";
+		const hits = findStrictRefs(text);
+		assert.equal(hits.length, 1);
+		assert.equal(hits[0].id, "SPEC_real");
 	});
 });
 
