@@ -1322,3 +1322,52 @@ describe("audit-sync", () => {
 		expect(parsed.warnings?.[0]?.code).toBe("W006");
 	});
 });
+
+describe("explain", () => {
+	it("prints the code, severity, summary, and spec section for a plain-severity error code", async () => {
+		const r = await run(["explain", "V021"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("V021 (error):");
+		expect(r.stdout.toLowerCase()).toContain("subflow");
+		expect(r.stdout).toContain("§15.11");
+	});
+
+	it("prints a strict-mode severity label for a two-severity code", async () => {
+		const r = await run(["explain", "W002"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("W002 (warning");
+		expect(r.stdout).toContain("--strict");
+		expect(r.stdout).toContain("§15.7");
+	});
+
+	it("works for a P-family (parser) code", async () => {
+		const r = await run(["explain", "P004"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("P004 (error):");
+		expect(r.stdout).toContain("§9");
+	});
+
+	it("works for an FM-family (front matter) code", async () => {
+		const r = await run(["explain", "FM001"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("FM001 (error):");
+	});
+
+	it("points to the spec.md full text as a fallback", async () => {
+		const r = await run(["explain", "V021"]);
+		expect(r.stdout).toContain("docs/spec/spec.md");
+	});
+
+	it("exits 2 and lists known codes for an unknown code", async () => {
+		const r = await run(["explain", "X999"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("X999");
+		expect(r.stderr).toContain("V021");
+		expect(r.stderr).toContain("FM001");
+	});
+
+	it("exits 2 with usage help when no code is given", async () => {
+		const r = await run(["explain"]);
+		expect(r.exitCode).toBe(2);
+	});
+});
