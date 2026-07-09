@@ -79,6 +79,44 @@ export function copyCommands(commandsDir: string, targetRoot: string): void {
 }
 
 /**
+ * Resolves the directory containing the bundled agents (pfd-lens.md, etc.).
+ * Production: `dist/agents/`. Source/test: `.claude/agents/` three levels up.
+ */
+export function resolveAgentsDir(): string {
+	const distCandidate = resolve(__dirname, "agents");
+	if (existsSync(distCandidate)) return distCandidate;
+
+	const sourceCandidate = resolve(__dirname, "../../../.claude/agents");
+	if (existsSync(sourceCandidate)) return sourceCandidate;
+
+	throw new Error(
+		`agents dir not found at ${distCandidate} or ${sourceCandidate}`,
+	);
+}
+
+/**
+ * Agents are opt-in for distribution, same allowlist pattern as commands:
+ * only `pfd-*.md` leaks into the npm package and adopting repos. Repo-local
+ * agents (debugging helpers, maintainer-only workflows) stay out by default.
+ */
+export function isDistributableAgent(filename: string): boolean {
+	return DISTRIBUTABLE_COMMAND_PATTERN.test(filename);
+}
+
+/**
+ * Copies allowlisted agent files into `<targetRoot>/.claude/agents/`,
+ * overwriting existing files so stale entries don't linger.
+ */
+export function copyAgents(agentsDir: string, targetRoot: string): void {
+	const dest = join(targetRoot, ".claude/agents");
+	mkdirSync(dest, { recursive: true });
+	for (const entry of readdirSync(agentsDir)) {
+		if (!isDistributableAgent(entry)) continue;
+		cpSync(join(agentsDir, entry), join(dest, entry));
+	}
+}
+
+/**
  * Mirrors the whole bundled skill tree (SKILL.md + references/ + install/
  * templates) into `<targetRoot>/.claude/skills/pfd-ops/`, unconditionally:
  * each entry's existing destination is removed first, so files deleted/renamed
@@ -363,6 +401,9 @@ export async function runSkillSync(
 
 	copyCommands(resolveCommandsDir(), opts.targetRoot);
 	lines.push("commands synced (.claude/commands/).");
+
+	copyAgents(resolveAgentsDir(), opts.targetRoot);
+	lines.push("agents synced (.claude/agents/).");
 
 	const installResult = copyInstallLayer(skillRoot, opts.targetRoot);
 	if (installResult.copied) {

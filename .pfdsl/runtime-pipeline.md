@@ -43,7 +43,8 @@
 
 ## skill sync（配布チェーン）の依存
 
-- **skill_source_bundle の出所（`bundle_skills`）**: ビルド時（`packages/cli/tsup.config.ts` の `onSuccess`）に4スキルツリーと `commands/pfd-*.md` を `dist/` へコピーし npm パッケージに同梱する。4スキル名は tsup.config.ts と skill-sync.ts の `runSkillSync` の両方にハードコードされており、スキル追加時は両方の更新が必要。pfd-ops 内部の f1/f2 の区別をコピー処理は関知しない（丸ごとコピー）
+- **skill_source_bundle の出所（`bundle_skills`）**: ビルド時（`packages/cli/tsup.config.ts` の `onSuccess`）に4スキルツリーと `commands/pfd-*.md`・`agents/pfd-*.md`（#357）を `dist/` へコピーし npm パッケージに同梱する。4スキル名・agents パターンは tsup.config.ts と skill-sync.ts の `runSkillSync` の両方にハードコードされており、スキル・agent 追加時は両方の更新が必要。pfd-ops 内部の f1/f2 の区別をコピー処理は関知しない（丸ごとコピー）
+- **`sync_agents` は `sync_commands` と同型**: `DISTRIBUTABLE_COMMAND_PATTERN`（`/^pfd-.*\.md$/`）を再利用し、`.claude/agents/` のうち `pfd-*.md` に一致するものだけを採用リポの `.claude/agents/` へコピーする（非破壊的な `cpSync` 上書き）
 - **`resolveSkillRoot` のフォールバック**: 公開後の実行は `dist/skills/<name>` を、ソース/テスト実行時（pre-build）は3階層上の `.claude/skills/<name>` を参照する。どちらにも無ければ例外
 - **`sync_skill_tree` は破壊的コピー**: 各エントリを `rmSync` で削除してから `cpSync` する。アップストリームで削除・改名されたファイルが採用リポに残留しない設計
 - **`sync_install_layer` のコピー元はバンドル**: `copyInstallLayer(skillRoot, targetRoot)` はバンドル内 `pfd-ops/install/` から採用リポルートへコピーする（採用リポの `.claude/skills/pfd-ops/install/` からではない）。L3 採用済み（`install/` 由来ファイルが1つでも存在）の場合のみ実行し、未採用時は `cp -r .claude/skills/pfd-ops/install/. .` を促す案内のみ返す（自動アップグレードしない）
