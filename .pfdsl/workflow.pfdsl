@@ -56,7 +56,7 @@ artifact:
     criteria: spec の全機能に対応する最小サンプルが存在し、check がエラーなしで通過
     location: ../docs/samples/
     group: generation
-  skill:
+  pfdsl_skill:
     label: AI agent スキル（リポ内）
     description: "make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点（このリポ内の Claude Code が消費）"
     criteria: make gen-skill が差分なし、diff -rq で gh_skill_dist と一致
@@ -164,42 +164,49 @@ artifact:
     criteria: /pfd-cycle が期待通り動作する
     location: ../.claude/skills/pfd-ops/
     group: generation
+    tags: [distilled_skill]
   ops_skill_l3:
     label: PFD運用スキル（GitHub Issuesバックエンド層）
     description: "GitHub Issues で作業項目管理する採用リポ向けプリセット（L3）= references/github-issues-backend.md + install/（採用用テンプレート、CI で identity 強制）。retro_skill の監査結果がこの層の規約改訂に還流する。手書き（生成対象外）"
     criteria: install/ 配布ファイルを変更した PR で check-pfd-ops-sync.yml が通過する
     location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
     group: generation
+    tags: [distilled_skill]
   retro_skill:
     label: ふりかえり監査スキル
     description: "/pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う"
     criteria: /pfd-retro が期待通り動作する
     location: ../.claude/skills/pfd-retro/
     group: generation
+    tags: [distilled_skill]
   ecosystem_skill:
     label: PFDセット構築スキル
     description: "/pfd-init コマンド。PFD セット（roadmap / workflow / runtime-pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
     criteria: /pfd-init が期待通り動作する
     location: ../.claude/skills/pfd-ecosystem/
     group: generation
+    tags: [distilled_skill]
   vscode_ext_debug_skill:
     label: VSCode拡張デバッグスキル
     description: "/vscode-ext-debug コマンド。worktree での VS Code 拡張デバッグ手順（make vscode-dev・F5 起動・PFDSL Preview 検証・webview console フィルタ）。手書き、生成対象外"
     criteria: /vscode-ext-debug が期待通り動作する
     location: ../.claude/skills/vscode-ext-debug/
     group: generation
+    tags: [distilled_skill]
   spec_stress_skill:
     label: 仕様stress-testスキル
     description: "/spec-stress-test コマンド。仕様制約の具体例 stress-test（ADR-0020）と agent 実書きプローブ（spec のみ読ませた subagent を CLI で採点）の実行手順。仕様改訂の検証能力として maintain_spec に還流。リポローカル・手書き（生成対象外・配布対象外）"
     criteria: /spec-stress-test が期待通り動作する
     location: ../.claude/skills/spec-stress-test/
     group: generation
+    tags: [distilled_skill]
   review_perspectives:
     label: レビュー観点集
     description: "PFD を問い詰める A/B 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd-retro はポインタ参照"
     criteria: 監査観点が網羅されており、gen-skill で skill の references/review-perspectives.md に同梱済み
     location: ../docs/review-perspectives.md
     group: generation
+    tags: [distilled_doc]
   sample_previews:
     label: サンプル描画物
     description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samples で再生成。サンプル・ロードマップ変更時に更新（make push がドリフト検知）。GitHub 上の閲覧用終端成果物（README からリンクされるが README 執筆の入力ではない）"
@@ -214,8 +221,8 @@ artifact:
     group: release
   readme:
     label: README
-    description: "外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照を含むため、CLI 公開形態・ライブラリ公開形態やサンプル変更時に追従更新が必要。extension 公開（published_ext）は update_readme をトリガーしない — README は marketplace リンクのみで版数を記載しないため。CLI コマンドリファレンス（## CLI 節）は `make gen-readme-cli` が `pfdsl help` 出力から自動生成し、`make check-readme-cli` が pre-commit と CI（test.yml）でドリフトを機械検査するため update_readme の手動対象外"
-    criteria: CLI インストール手順・Library 節インストール例（pnpm add）・サンプル描画物リンクが現行バージョンと整合している。CLI コマンドリファレンスは make check-readme-cli が差分なしで通過する
+    description: "外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照リンクを含むが、リンク先パスは安定しており sample_previews の内容更新では変化しない — 追従更新が要るのは CLI 公開形態・ライブラリ公開形態の変更時のみ。extension 公開（published_ext）は update_readme をトリガーしない — README は marketplace リンクのみで版数を記載しないため。CLI コマンドリファレンス（## CLI 節）は `make gen-readme-cli` が `pfdsl help` 出力から自動生成し、`make check-readme-cli` が pre-commit と CI（test.yml）でドリフトを機械検査するため update_readme の手動対象外"
+    criteria: CLI インストール手順・Library 節インストール例（pnpm add）が現行バージョンと整合している。CLI コマンドリファレンスは make check-readme-cli が差分なしで通過する
     location: ../README.md
     group: release
   workflow_md:
@@ -224,18 +231,21 @@ artifact:
     criteria: workflow.pfdsl の運用手続きと散文が一致している
     location: workflow.md
     group: generation
+    tags: [distilled_doc]
   bindings_pfd_ops:
     label: pfd-ops バインディング
     description: "pfd-ops 運用に紐づく Claude への恒常指示（PR 本文規約等）。sibling companion でなく独立ファイル（読み込み契機がスキル発火であり PFD グラフ操作と一致しないため）。pfd-ops skill が存在すれば読む"
     criteria: 記載内容が現行の pfd-ops 運用と矛盾しない
     location: bindings/pfd-ops.md
     group: generation
+    tags: [distilled_doc]
   bindings_pfd_retro:
     label: pfd-retro バインディング
     description: "pfd-retro が読むカタログ参照・配布物への finding 反映手続き。sibling companion でなく独立ファイル（理由は bindings_pfd_ops と同じ）。pfd-retro skill が読む"
     criteria: 記載内容が現行の pfd-retro 運用と矛盾せず、カタログ参照先が実在する
     location: bindings/pfd-retro.md
     group: generation
+    tags: [distilled_doc]
   roadmap_md:
     label: 計画 companion
     description: "roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd-ops skill が読む L4 ホスト"
@@ -339,13 +349,21 @@ process:
     group: release
   render_previews:
     label: サンプル描画
-    description: 機能カタログとロードマップを dot/svg に描画する
+    description: "機能カタログとロードマップを dot/svg に描画する。toolchain のビルド（make build-deps）が実行前提だがコンテンツ依存ではない — 呼び出し元ソフトウェアと同様、入力エッジに含めない"
     command: make gen-samples
     group: release
   update_readme:
     label: README 更新
     description: CLI の提供形態・サンプル構成の変更を導入文書に反映する。CLI コマンドリファレンスは gen-readme-cli が自動化済みのため対象外
     group: release
+
+tag:
+  distilled_skill:
+    label: 蒸留スキル系成果物
+    description: distill_ops が対話判断・ADR・効果局面ログから生成する skill 形態の成果物
+  distilled_doc:
+    label: 蒸留ドキュメント系成果物
+    description: distill_ops が生成する散文・カタログ形態の成果物
 
 statusStyles:
   todo:
@@ -356,6 +374,8 @@ statusStyles:
 user_intent >> discuss -> [topics, proposals, decisions, payoff_log]
 
 decisions >> draft_adrs -> adrs
+
+toolchain >>? draft_adrs
 
 findings >>? discuss
 
@@ -371,17 +391,17 @@ spec >> maintain_samples -> feature_samples
 
 [findings, adrs] >>? maintain_template
 
-[spec, skill_template, quality_guide, feature_samples, review_perspectives] >> gen_skill -> [skill, gh_skill_dist]
+[spec, skill_template, quality_guide, feature_samples, review_perspectives] >> gen_skill -> [pfdsl_skill, gh_skill_dist]
 
-skill >>? gen_skill
+pfdsl_skill >>? gen_skill
 
 topics >> write_examples -> examples
 
-skill >>? write_examples
+pfdsl_skill >>? write_examples
 
 examples >> review_examples -> findings
 
-[skill, toolchain, retro_skill] >>? review_examples
+[pfdsl_skill, toolchain, retro_skill] >>? review_examples
 
 [adrs, payoff_log, decisions] >> distill_ops -> [ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, review_perspectives, workflow_md, bindings_pfd_ops, bindings_pfd_retro, vscode_ext_debug_skill, spec_stress_skill]
 
@@ -405,16 +425,16 @@ toolchain >> map_transform_boundaries -> [runtime_pipeline_pfdsl, runtime_pipeli
 
 pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
 
-[ops_skill_general, ops_skill_l3, workflow_md, bindings_pfd_ops, bindings_pfd_retro, roadmap_md, runtime_pipeline_pfdsl, vscode_ext_debug_skill] >>? develop
+[ops_skill_general, ops_skill_l3, workflow_md, bindings_pfd_ops, bindings_pfd_retro, roadmap_md, runtime_pipeline_pfdsl, vscode_ext_debug_skill, toolchain] >>? develop
 
 issue_updates >>? file_issues
 
-[toolchain, skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> publish_cli -> published_cli
+[toolchain, pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> publish_cli -> published_cli
 
 toolchain >> publish_libraries -> published_libraries
 
 toolchain >> publish_ext -> published_ext
 
-[feature_samples, roadmap_pfdsl, toolchain] >> render_previews -> sample_previews
+[feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
 
 [toolchain, published_cli, published_libraries, gh_skill_dist] >> update_readme -> readme
