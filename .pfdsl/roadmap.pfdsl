@@ -518,7 +518,7 @@ process:
     updated_at: 2026-07-06T05:34:43Z
   migrate_spec_id_refs:
     label: spec.md 仕様ID参照移行
-    description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。ADR 確定後に issue 起票して iN prefix を付与する"
+    description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。ADR 確定後に issue 起票して iN prefix を付与する。issue 化時に移行対象の現行 spec artifact を入力エッジとして列挙する"
   i366_distribute_marketplace:
     label: marketplace 配布移行
     location: https://github.com/takasek/pfdsl/issues/366
