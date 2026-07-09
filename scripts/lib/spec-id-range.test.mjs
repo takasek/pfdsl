@@ -52,6 +52,65 @@ describe("computeRange — heading", () => {
 	});
 });
 
+describe("computeRange — table row", () => {
+	it("spans exactly one line, regardless of marker position within it", () => {
+		const text = ["| a | b (SPEC_t) |", "| c | d |"].join("\n");
+		const range = computeRange(text, 1);
+		assert.deepEqual(range, { startLine: 1, endLine: 1 });
+	});
+});
+
+describe("computeRange — list item", () => {
+	it("ends at the next sibling item at the same indent", () => {
+		const text = ["- item one (SPEC_i1)", "  continuation", "- item two"].join("\n");
+		const range = computeRange(text, 1);
+		assert.deepEqual(range, { startLine: 1, endLine: 2 });
+	});
+
+	it("includes a nested child list", () => {
+		const text = [
+			"- item one (SPEC_i1)",
+			"  - child a",
+			"  - child b",
+			"- item two",
+		].join("\n");
+		const range = computeRange(text, 1);
+		assert.deepEqual(range, { startLine: 1, endLine: 3 });
+	});
+
+	it("includes multiple continuation paragraphs inside the item", () => {
+		const text = [
+			"- item one (SPEC_i1)",
+			"  first paragraph",
+			"",
+			"  second paragraph",
+			"- item two",
+		].join("\n");
+		const range = computeRange(text, 1);
+		assert.deepEqual(range, { startLine: 1, endLine: 4 });
+	});
+
+	it("ends at list termination — a shallower non-blank line", () => {
+		const text = ["  - item one (SPEC_i1)", "    body", "next paragraph, not a list item"].join(
+			"\n",
+		);
+		const range = computeRange(text, 1);
+		assert.deepEqual(range, { startLine: 1, endLine: 2 });
+	});
+
+	it("runs to EOF when there is no following sibling or dedent", () => {
+		const text = ["- item one (SPEC_i1)", "  body a", "  body b"].join("\n");
+		const range = computeRange(text, 1);
+		assert.deepEqual(range, { startLine: 1, endLine: 3 });
+	});
+
+	it("finds the marker mid-line inside a list item", () => {
+		const text = ["- item with (SPEC_mid) marker mid-line", "- item two"].join("\n");
+		const range = computeRange(text, 1);
+		assert.deepEqual(range, { startLine: 1, endLine: 1 });
+	});
+});
+
 describe("computeRange — paragraph", () => {
 	it("is bounded by blank lines on both sides", () => {
 		const text = ["intro", "", "line one", "line two (SPEC_p)", "line three", "", "outro"].join(

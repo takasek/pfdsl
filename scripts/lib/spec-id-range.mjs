@@ -84,6 +84,20 @@ function computeHeadingRange(lines, lineIndex) {
 	return { startIndex: lineIndex, endIndex: endIndex - 1 };
 }
 
+function computeListItemRange(lines, lineIndex) {
+	const indent = listItemIndent(lines[lineIndex]);
+	const endIndex = findBoundary(lines, lineIndex + 1, (line) => {
+		if (isBlank(line)) return false;
+		if (listItemIndent(line) === indent) return true; // next sibling item
+		return leadingWhitespaceLength(line) < indent; // dedent past the item
+	});
+	return { startIndex: lineIndex, endIndex: endIndex - 1 };
+}
+
+function computeTableRowRange(lineIndex) {
+	return { startIndex: lineIndex, endIndex: lineIndex };
+}
+
 function computeParagraphRange(lines, lineIndex) {
 	let start = lineIndex;
 	while (start > 0 && !isBlank(lines[start - 1])) start--;
@@ -104,6 +118,10 @@ export function computeRange(text, lineNumber) {
 	const range =
 		type === "heading"
 			? computeHeadingRange(lines, lineIndex)
-			: computeParagraphRange(lines, lineIndex);
+			: type === "list-item"
+				? computeListItemRange(lines, lineIndex)
+				: type === "table-row"
+					? computeTableRowRange(lineIndex)
+					: computeParagraphRange(lines, lineIndex);
 	return { startLine: range.startIndex + 1, endLine: range.endIndex + 1 };
 }
