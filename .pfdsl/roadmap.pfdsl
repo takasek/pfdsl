@@ -333,6 +333,11 @@ artifact:
     status: done
     location: ../docs/adr/0027-spec-id-cross-references.md
     criteria: 構文・レンジ規則が ADR 化され、ID 一意性チェックと dangling 参照チェックの lint が CI で動作確認済み
+  get_by_id_tool:
+    label: "get-by-ID ツール (#402)"
+    description: "仕様IDのレンジ規則（ADR-0027）に従い該当ブロックを取得する scripts ツール。LLM の spec 参照 token 削減と、移行作業での範囲機械確認が用途"
+    status: todo
+    criteria: ADR-0027 の全 block 種別（見出し・list item・table 行・paragraph）の範囲取得がテストで検証され、docs/ 実データで動作確認済み
   spec_id_refs:
     label: 仕様ID相互参照化済み spec.md
     description: "節番号直書きの相互参照を仕様ID参照へ段階移行した spec.md。ADR 確定後に別 issue として起票する（#328 移行方針）。後続門番のプレースホルダ（ADR-0018）"
@@ -516,6 +521,10 @@ process:
     label: 仕様ID構文設計・最小lint実装
     location: https://github.com/takasek/pfdsl/issues/328
     updated_at: 2026-07-06T05:34:43Z
+  i402_implement_get_by_id:
+    label: get-by-ID ツール実装
+    location: https://github.com/takasek/pfdsl/issues/402
+    updated_at: 2026-07-09T18:37:46Z
   migrate_spec_id_refs:
     label: spec.md 仕様ID参照移行
     description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。ADR 確定後に issue 起票して iN prefix を付与する。issue 化時に移行対象の現行 spec artifact を入力エッジとして列挙する"
@@ -634,6 +643,8 @@ cli_tool_v0015 >> i357_define_pfd_lens_agent -> pfd_lens_agent
 [explain_cmd, pfd_lens_agent] >> publish_cli_v0018 -> cli_tool_v0018
 spec_v0011 >> i328_design_spec_ids -> spec_id_syntax
 
-spec_id_syntax >> migrate_spec_id_refs -> spec_id_refs
+spec_id_syntax >> i402_implement_get_by_id -> get_by_id_tool
+
+[spec_id_syntax, get_by_id_tool] >> migrate_spec_id_refs -> spec_id_refs
 
 skill_gen >> i366_distribute_marketplace -> marketplace_dist
