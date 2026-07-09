@@ -7,7 +7,9 @@ import {
 	computeOpenInputs,
 	computeTerminals,
 	diffGraphs as coreDiffGraphs,
+	DIAGNOSTIC_REGISTRY,
 	type Diagnostic,
+	type DiagnosticRegistryEntry,
 	type DiffReport,
 	format,
 	formatEdges,
@@ -1074,6 +1076,43 @@ Exit codes:
   2  invalid usage
 `;
 
+const HELP_EXPLAIN = `usage: pfdsl explain <code>
+
+Print the one-line summary and spec section for a diagnostic code (e.g. V021).
+Codes come from the FM/P/V/W families reported by \`pfdsl check\`.
+
+  <code>  a diagnostic code, e.g. V021, P004, W002, FM001
+
+Exit codes:
+  0  known code
+  2  unknown code, or invalid usage
+`;
+
+function severityLabel(
+	severities: DiagnosticRegistryEntry["severities"],
+): string {
+	if (severities.length > 1) return "warning; --strict: error";
+	return severities[0] ?? "error";
+}
+
+function runExplain(code: string): CommandResult {
+	const entry = DIAGNOSTIC_REGISTRY[code];
+	if (!entry) {
+		const known = Object.keys(DIAGNOSTIC_REGISTRY).sort();
+		return fail(
+			`Unknown diagnostic code: ${code}\nKnown codes: ${known.join(", ")}\n`,
+			2,
+		);
+	}
+	const lines = [
+		`${code} (${severityLabel(entry.severities)}): ${entry.summary}`,
+		`Defined in: spec §${entry.section}`,
+		"",
+		`Full text: docs/spec/spec.md §${entry.section} (references/spec.md when using the pfdsl skill)`,
+	];
+	return ok(`${lines.join("\n")}\n`);
+}
+
 export const HELP = `pfdsl <command> [options]
 
 Commands:
@@ -1119,6 +1158,7 @@ Commands:
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
+  explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
   help                     Show this help
 
 Exit codes:
@@ -1296,6 +1336,12 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			} catch (e) {
 				return fail(e instanceof Error ? `${e.message}\n` : String(e));
 			}
+		}
+		case "explain": {
+			if (flags.help) return ok(HELP_EXPLAIN);
+			const code = positional[0];
+			if (!code) return fail(HELP_EXPLAIN, 2);
+			return runExplain(code);
 		}
 		default:
 			return fail(`unknown command: ${command}\n${HELP}`, 2);

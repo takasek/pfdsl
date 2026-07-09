@@ -141,6 +141,7 @@ Commands:
   skill sync [--yes]
                            Sync pfd-ops skills and commands into the current directory
                            --yes     auto-confirm gh label creation (non-interactive)
+  explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
   help                     Show this help
 
 Exit codes:
