@@ -201,6 +201,7 @@ Run at a target repo's root, it is idempotent and:
 
 - mirrors skills into `.claude/skills/` (`pfd-ops`, `pfd-retro`, `pfd-ecosystem`, `pfdsl`)
 - copies commands into `.claude/commands/` (`pfd-init`, `pfd-cycle`, `pfd-retro`)
+- copies agents into `.claude/agents/` (`pfd-lens`)
 - refreshes the GitHub-Issues backend (`install/`: workflows + audit scripts deployed at repo root) **only if already adopted**; otherwise prints how to adopt it (`cp -r .claude/skills/pfd-ops/install/. .`)
 
 `--yes` auto-confirms `gh` label creation (`flow:managed` / `flow:exempt`) for non-interactive use.
