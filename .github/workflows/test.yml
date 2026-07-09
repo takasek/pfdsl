@@ -22,6 +22,11 @@ jobs:
 
       - run: make lint
 
+      # .claude/skills/pfdsl is generated + gitignored (#348) and absent on a
+      # fresh checkout — bootstrap it before the plain 'pnpm -r build' below
+      # (which would otherwise fail at the CLI's onSuccess bundling step).
+      - run: make bootstrap-pfdsl-skill
+
       - run: pnpm -r build
 
       - run: pnpm -r typecheck

@@ -4,7 +4,7 @@
 // The --out path must contain '.claude/' or 'skills/' (safety check).
 
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { execFileSync } from "node:child_process";
@@ -154,5 +154,20 @@ const skillMd = templateSrc
 
 writeFileSync(resolve(outDir, "SKILL.md"), skillMd);
 console.log("SKILL.md → generated from skill-template/SKILL.md");
+
+// --- 4. Write CLAUDE.md guard (in-repo working copy only, .claude/ outputs) ---
+// .claude/skills/pfdsl is a generated + gitignored working copy (#348); the
+// distribution copy (skills/pfdsl) intentionally omits this dev-only guard
+// (mirrors the CLAUDE.md exclusion in the gen-skill identity check, Makefile).
+// Must check the path *relative to the repo root*, not raw absolute path
+// components — the repo itself may be checked out under a directory that
+// contains a literal ".claude" segment (e.g. a worktree at .claude/worktrees/*),
+// which would otherwise false-positive for every --out target.
+const relOutParts = relative(root, outDir).split(sep);
+if (relOutParts[0] === ".claude") {
+  const claudeMd = readFileSync(resolve(__dirname, "skill-template/CLAUDE.md"), "utf-8");
+  writeFileSync(resolve(outDir, "CLAUDE.md"), claudeMd);
+  console.log("CLAUDE.md → generated from skill-template/CLAUDE.md (in-repo working copy guard)");
+}
 
 console.log(`\nSkill written to: ${outDir}`);
