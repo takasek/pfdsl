@@ -22,7 +22,7 @@ artifact:
     criteria: check/fmt/graph が全サンプルに対してエラーなし、npm 公開済み
   skill_gen:
     label: スキル生成系（現行）
-    description: scripts/gen-skill.mjs と docs/samples 構成。identity は check-gen-skill.yml が CI 強制
+    description: scripts/gen-skill.mjs と docs/samples 構成。identity は check-gen-plugin.yml が CI 強制
     status: done
     criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
   spec_v007:

@@ -67,7 +67,7 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 - **DOT / SVG** — Graphviz export and Wasm-based rendering (`@pfdsl/graphviz-exporter`, `@pfdsl/preview-engine`)
 - **CLI** — `pfdsl check / fmt / reindex / sort-meta / normalize / graph / diff` (`@pfdsl/cli`)
 - **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
-- **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`); installable via `/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`, or `gh skill install takasek/pfdsl pfdsl --agent claude-code`
+- **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`); installable via `/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`
 
 
 ## Quick start
@@ -185,17 +185,15 @@ Skills and commands are namespaced under the plugin: `pfdsl:pfdsl`, `pfdsl:pfd-e
 
 `pfd-ops` is not part of the plugin — it ships repo-side automation (GitHub Actions workflows, audit scripts) that a plugin can't deliver into your project, so it keeps the `skill sync` / `cp -r` adopt flow below.
 
-### Manual install
+### Regenerating the skill (contributors)
 
-To regenerate after spec or sample changes:
+After changing `docs/spec/spec.md`, `docs/samples/`, or the skill template, regenerate the in-repo dev copy:
 
 ```bash
 make gen-skill
-# or install elsewhere:
-node scripts/gen-skill.mjs --out ~/.claude/skills/pfdsl
 ```
 
-The `--out` path must contain `/.claude/` (safety check). The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alongside `SKILL.md`.
+The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alongside `SKILL.md`. `make gen-plugin` (which depends on `gen-skill`) regenerates the marketplace plugin's copy too.
 
 ## pfd-cycle suite — `skill sync` (cross-project)
 
