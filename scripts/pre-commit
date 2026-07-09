@@ -62,6 +62,12 @@ check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
   "node scripts/gen-skill.mjs --out .claude/skills/pfdsl && node scripts/gen-skill.mjs --out skills/pfdsl && git diff --quiet -- .claude/skills/pfdsl skills/pfdsl" \
   "Skill dirs are stale. Run 'make gen-skill' and re-stage the skill files."
 
+# gen-plugin.mjs bundles pfd-ecosystem/pfd-retro/commands plus the pfdsl skill
+# (via gen-skill.mjs) into plugin/pfdsl/; also dist-free.
+check_drift '^(docs/|scripts/skill-template/|scripts/gen-skill\.mjs|scripts/gen-plugin\.mjs|scripts/lib/gen-plugin\.mjs|\.claude/skills/pfd-ecosystem/|\.claude/skills/pfd-retro/|\.claude/commands/pfd-cycle\.md|\.claude/commands/pfd-init\.md|packages/cli/package\.json)' - \
+  "node scripts/gen-plugin.mjs && git diff --quiet -- plugin" \
+  "plugin/pfdsl is stale. Run 'make gen-plugin' and re-stage the plugin files."
+
 # The .dot/README drift guard is a vitest test that imports @pfdsl/core (→ dist).
 check_drift '^docs/samples/' \
   "packages/core/dist/index.js packages/graphviz-exporter/dist/index.js" \
