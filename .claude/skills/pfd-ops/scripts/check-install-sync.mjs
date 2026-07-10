@@ -128,3 +128,75 @@ export async function checkUpstreamVersion(skillRoot, fetchImpl = fetch) {
 		return null;
 	}
 }
+
+// --- CLI ---
+
+function parseArgs(argv) {
+	const args = { target: process.cwd(), deploy: false, force: false, upstream: false };
+	for (let i = 0; i < argv.length; i++) {
+		const arg = argv[i];
+		if (arg === "--target") {
+			args.target = argv[++i];
+		} else if (arg === "--deploy") {
+			args.deploy = true;
+		} else if (arg === "--force") {
+			args.force = true;
+		} else if (arg === "--upstream") {
+			args.upstream = true;
+		}
+	}
+	return args;
+}
+
+async function main() {
+	const args = parseArgs(process.argv.slice(2));
+	const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+	const targetRoot = resolve(args.target);
+
+	let exitCode = 0;
+
+	if (args.deploy) {
+		const { copied, skipped } = deployInstall(skillRoot, targetRoot, { force: args.force });
+		if (copied.length > 0) {
+			console.log("Copied:");
+			for (const f of copied) console.log(`  ${f}`);
+		}
+		if (skipped.length > 0) {
+			console.log("Skipped (locally modified; re-run with --force to overwrite):");
+			for (const f of skipped) console.log(`  ${f}`);
+			exitCode = 1;
+		}
+		if (copied.length === 0 && skipped.length === 0) {
+			console.log("Nothing to deploy: install/ is empty.");
+		}
+	} else {
+		const { results, adopted } = checkInstallSync(skillRoot, targetRoot);
+		if (!adopted) {
+			console.log(
+				"The GitHub Issues backend (L3) is not adopted in this repo — no pfd-ops install/ files are deployed.\n" +
+					"To adopt it, run: node check-install-sync.mjs --deploy",
+			);
+		} else {
+			const issues = results.filter((r) => r.status !== "ok");
+			if (issues.length === 0) {
+				console.log("pfd-ops install/ files are in sync with the deployed copies.");
+			} else {
+				console.log("pfd-ops install/ files are out of sync:");
+				for (const r of issues) console.log(`  ${r.status}: ${r.path}`);
+				console.log("Run with --deploy to refresh (add --force to overwrite locally edited files).");
+				exitCode = 1;
+			}
+		}
+	}
+
+	if (args.upstream) {
+		const warning = await checkUpstreamVersion(skillRoot);
+		if (warning) console.log(warning);
+	}
+
+	process.exit(exitCode);
+}
+
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+	main();
+}
