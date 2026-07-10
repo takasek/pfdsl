@@ -61,6 +61,21 @@ export function tagName(kind, version) {
 	return `${kind.tagPrefix}${version}`;
 }
 
+/**
+ * Paths to `git add` when committing a version bump. gen-plugin.mjs derives
+ * plugin/pfdsl/.claude-plugin/plugin.json's version from packages/cli/package.json,
+ * so a cli release must re-stage the regenerated plugin dir alongside the
+ * bumped package.json — otherwise the pre-commit hook's staleness check
+ * (which re-derives plugin/pfdsl and diffs it against the index) rejects
+ * the commit.
+ * @param {string} kindArg
+ * @param {ReleaseKind} kind
+ * @returns {string[]}
+ */
+export function filesToCommitForBump(kindArg, kind) {
+	return kindArg === "cli" ? [...kind.packages, "plugin"] : [...kind.packages];
+}
+
 const MARKETPLACE_PLUGIN_REPO_URL = "https://github.com/takasek/pfdsl.git";
 const MARKETPLACE_PLUGIN_PATH = "plugin/pfdsl";
 

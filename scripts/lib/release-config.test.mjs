@@ -1,7 +1,13 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 
-import { RELEASE_KINDS, bumpVersionInPackageJson, tagName, pinMarketplaceSourceToTag } from "./release-config.mjs";
+import {
+	RELEASE_KINDS,
+	bumpVersionInPackageJson,
+	tagName,
+	pinMarketplaceSourceToTag,
+	filesToCommitForBump,
+} from "./release-config.mjs";
 
 test("RELEASE_KINDS has the three known kinds with distinct tag prefixes", () => {
 	assert.deepEqual(Object.keys(RELEASE_KINDS).sort(), ["cli", "libs", "vscode"]);
@@ -91,4 +97,13 @@ test("pinMarketplaceSourceToTag preserves tab indentation and trailing newline",
 	const after = pinMarketplaceSourceToTag(before, "v0.0.19");
 	assert.match(after, /\n$/);
 	assert.match(after, /\t"plugins"/);
+});
+
+test("filesToCommitForBump includes plugin/pfdsl for cli releases, since gen-plugin mirrors packages/cli/package.json's version", () => {
+	assert.deepEqual(filesToCommitForBump("cli", RELEASE_KINDS.cli), ["packages/cli/package.json", "plugin"]);
+});
+
+test("filesToCommitForBump excludes plugin/pfdsl for libs and vscode releases, which don't touch the cli version", () => {
+	assert.deepEqual(filesToCommitForBump("libs", RELEASE_KINDS.libs), RELEASE_KINDS.libs.packages);
+	assert.deepEqual(filesToCommitForBump("vscode", RELEASE_KINDS.vscode), RELEASE_KINDS.vscode.packages);
 });

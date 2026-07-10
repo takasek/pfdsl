@@ -24,7 +24,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { RELEASE_KINDS, bumpVersionInPackageJson, tagName, pinMarketplaceSourceToTag } from "./lib/release-config.mjs";
+import {
+	RELEASE_KINDS,
+	bumpVersionInPackageJson,
+	tagName,
+	pinMarketplaceSourceToTag,
+	filesToCommitForBump,
+} from "./lib/release-config.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -122,7 +128,15 @@ if (explicitVersion) {
 		const abs = resolve(root, pkgPath);
 		writeFileSync(abs, bumpVersionInPackageJson(readFileSync(abs, "utf-8"), explicitVersion));
 	}
-	run("git", ["add", ...kind.packages]);
+	if (kindArg === "cli") {
+		// The bump above just changed packages/cli/package.json's version, which
+		// gen-plugin.mjs mirrors into plugin/pfdsl/.claude-plugin/plugin.json.
+		// Regenerate now so plugin/pfdsl is committed alongside the bump —
+		// otherwise the pre-commit hook's own regenerate-and-diff check sees the
+		// new cli version and rejects this commit as stale.
+		run("make", ["gen-plugin"]);
+	}
+	run("git", ["add", ...filesToCommitForBump(kindArg, kind)]);
 	run("git", ["commit", "-m", kind.commitMessage(explicitVersion)]);
 }
 
