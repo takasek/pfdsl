@@ -1,0 +1,9 @@
+#!/bin/sh
+# Thin shim installed at .git/hooks/pre-commit by `make setup`.
+# Always execs the checked-out scripts/pre-commit so the check logic stays in
+# sync with the branch's tree instead of a stale copy from setup time (#411).
+if [ -x ./scripts/pre-commit ]; then
+  exec ./scripts/pre-commit
+fi
+echo "warning: scripts/pre-commit not found in this checkout; skipping pre-commit checks" >&2
+exit 0
