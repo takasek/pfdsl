@@ -549,7 +549,7 @@ process:
     label: pfd-ops plugin 統合・skill sync 廃止検討
     description: "設計 TBD（issue 参照）— ADR-0016 の identity ゲート帰趨と CLAUDE_PLUGIN_ROOT の slash command 適用可否を確定させてから実装"
     location: https://github.com/takasek/pfdsl/issues/404
-    updated_at: 2026-07-09T19:28:18Z
+    updated_at: 2026-07-10T02:04:21Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
