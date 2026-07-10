@@ -501,16 +501,13 @@ process:
     label: type フィールド実装
     description: "frontmatter type: フィールドと ready コマンドのロードマップ型ゲートを実装する。draft_proposals 経由"
     location: https://github.com/takasek/pfdsl/issues/268
-    updated_at: 2026-07-02T18:46:25Z
   i272_implement_w002_hierarchy:
     label: W002 criteria 階層化実装
     location: https://github.com/takasek/pfdsl/issues/272
-    updated_at: 2026-07-02T18:56:10Z
   i273_implement_blocked_by:
     label: blockedBy フィールド実装
     description: "blockedBy: フィールドの spec 統合と CLI 対応。draft_proposals 経由"
     location: https://github.com/takasek/pfdsl/issues/273
-    updated_at: 2026-07-02T18:56:12Z
   i278_implement_release_automation:
     label: make release roadmap 自動更新実装
     location: https://github.com/takasek/pfdsl/issues/278
@@ -522,7 +519,6 @@ process:
   i356_implement_explain_cmd:
     label: explain コマンド実装
     location: https://github.com/takasek/pfdsl/issues/356
-    updated_at: 2026-07-06T04:34:29Z
   i357_define_pfd_lens_agent:
     label: pfd-lens agent 定義 + 配布実装
     location: https://github.com/takasek/pfdsl/issues/357
@@ -549,7 +545,7 @@ process:
     label: pfd-ops plugin 統合・skill sync 廃止検討
     description: "設計 TBD（issue 参照）— ADR-0016 の identity ゲート帰趨と CLAUDE_PLUGIN_ROOT の slash command 適用可否を確定させてから実装"
     location: https://github.com/takasek/pfdsl/issues/404
-    updated_at: 2026-07-09T19:28:18Z
+    updated_at: 2026-07-10T02:04:21Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
