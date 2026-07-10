@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +9,7 @@ import {
 	checkInstallSync,
 	deployInstall,
 	checkUpstreamVersion,
+	parseArgs,
 } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
 
 let tmp;
@@ -88,6 +89,34 @@ describe("checkInstallSync", () => {
 		assert.equal(byPath["a.txt"], "ok");
 		assert.equal(byPath["sub/b.txt"], "missing");
 	});
+
+	it("reports a file removed from canonical install/ as orphaned, using the deploy manifest", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-orphan");
+		mkdirSync(targetRoot, { recursive: true });
+
+		// Simulate a prior deploy when sub/b.txt was still canonical.
+		deployInstall(skillRoot, targetRoot);
+
+		// Simulate a future pfdsl release dropping sub/b.txt from canonical install/.
+		rmSync(join(skillRoot, "install", "sub", "b.txt"));
+
+		const { results } = checkInstallSync(skillRoot, targetRoot);
+		const byPath = Object.fromEntries(results.map((r) => [r.path, r.status]));
+		assert.equal(byPath["a.txt"], "ok");
+		assert.equal(byPath["sub/b.txt"], "orphaned");
+	});
+
+	it("does not report a file as orphaned when no manifest exists (never deployed via this tool)", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-no-manifest");
+		// A file that merely happens to match a canonical filename, placed by
+		// some other means (no prior --deploy, no manifest) is not "orphaned".
+		writeFile(targetRoot, "unrelated.txt", "whatever");
+
+		const { results } = checkInstallSync(skillRoot, targetRoot);
+		assert.ok(!results.some((r) => r.path === "unrelated.txt"));
+	});
 });
 
 describe("deployInstall", () => {
@@ -130,6 +159,54 @@ describe("deployInstall", () => {
 		assert.deepEqual(copied.sort(), ["a.txt", "sub/b.txt"]);
 		assert.deepEqual(skipped, []);
 		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "canonical-a");
+	});
+
+	it("removes an unmodified file that a later canonical release dropped from install/", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-orphan-cleanup");
+		deployInstall(skillRoot, targetRoot);
+
+		rmSync(join(skillRoot, "install", "sub", "b.txt"));
+		const { removed, orphanSkipped } = deployInstall(skillRoot, targetRoot);
+
+		assert.deepEqual(removed, ["sub/b.txt"]);
+		assert.deepEqual(orphanSkipped, []);
+		assert.equal(existsSync(join(targetRoot, "sub", "b.txt")), false);
+	});
+
+	it("skips removing an orphaned file that was locally modified, unless forced", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-orphan-edited");
+		deployInstall(skillRoot, targetRoot);
+		writeFile(targetRoot, "sub/b.txt", "locally-edited-before-drop");
+
+		rmSync(join(skillRoot, "install", "sub", "b.txt"));
+		const first = deployInstall(skillRoot, targetRoot);
+		assert.deepEqual(first.removed, []);
+		assert.deepEqual(first.orphanSkipped, ["sub/b.txt"]);
+		assert.equal(existsSync(join(targetRoot, "sub", "b.txt")), true);
+
+		const forced = deployInstall(skillRoot, targetRoot, { force: true });
+		assert.deepEqual(forced.removed, ["sub/b.txt"]);
+		assert.equal(existsSync(join(targetRoot, "sub", "b.txt")), false);
+	});
+});
+
+describe("parseArgs", () => {
+	it("parses --deploy, --force, --upstream, and --target with a value", () => {
+		const args = parseArgs(["--target", "/tmp/foo", "--deploy", "--force", "--upstream"]);
+		assert.equal(args.target, "/tmp/foo");
+		assert.equal(args.deploy, true);
+		assert.equal(args.force, true);
+		assert.equal(args.upstream, true);
+	});
+
+	it("throws when --target is immediately followed by another flag", () => {
+		assert.throws(() => parseArgs(["--target", "--deploy"]), /--target requires a path argument/);
+	});
+
+	it("throws when --target is the last argument", () => {
+		assert.throws(() => parseArgs(["--target"]), /--target requires a path argument/);
 	});
 });
 

@@ -7,7 +7,16 @@
 //
 // Usage: node check-install-sync.mjs [--target <dir>] [--deploy] [--force] [--upstream]
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,13 +54,42 @@ function relPathParts(rel) {
 	return rel.split("/");
 }
 
+// Records which install/ files this tool last deployed to a target, plus
+// each file's canonical hash at that time, so a later run can tell "canonical
+// dropped this file" (check: report orphaned; deploy: safe to remove) apart
+// from "a file that merely happens to live at this path but was never
+// deployed by this tool" (nothing to report or touch).
+const MANIFEST_RELATIVE_PATH = ".claude/pfd-ops-install-manifest.json";
+
+function readManifest(targetRoot) {
+	const manifestPath = join(targetRoot, ...MANIFEST_RELATIVE_PATH.split("/"));
+	if (!existsSync(manifestPath)) return [];
+	try {
+		const data = JSON.parse(readFileSync(manifestPath, "utf-8"));
+		return Array.isArray(data.files) ? data.files : [];
+	} catch {
+		return [];
+	}
+}
+
+function writeManifest(targetRoot, entries) {
+	const manifestPath = join(targetRoot, ...MANIFEST_RELATIVE_PATH.split("/"));
+	mkdirSync(dirname(manifestPath), { recursive: true });
+	const sorted = [...entries].sort((a, b) => a.path.localeCompare(b.path));
+	writeFileSync(manifestPath, `${JSON.stringify({ files: sorted }, null, "\t")}\n`);
+}
+
 /**
  * Compare canonical install/ files against their deployed copies at
- * targetRoot. Returns per-file status ("ok" | "modified" | "missing") plus
- * an overall `adopted` flag (true iff at least one file is deployed).
+ * targetRoot. Returns per-file status ("ok" | "modified" | "missing" |
+ * "orphaned") plus an overall `adopted` flag (true iff at least one file is
+ * deployed). "orphaned" covers a file this tool previously deployed (per the
+ * deploy manifest) whose canonical source no longer exists — otherwise such
+ * files would be invisible to every check, since they aren't part of the
+ * current install/ listing at all.
  * @param {string} skillRoot
  * @param {string} targetRoot
- * @returns {{ results: Array<{path: string, status: "ok"|"modified"|"missing"}>, adopted: boolean }}
+ * @returns {{ results: Array<{path: string, status: "ok"|"modified"|"missing"|"orphaned"}>, adopted: boolean }}
  */
 export function checkInstallSync(skillRoot, targetRoot) {
 	const installDir = resolve(skillRoot, "install");
@@ -65,19 +103,32 @@ export function checkInstallSync(skillRoot, targetRoot) {
 		const status = sha256(canonicalPath) === sha256(targetPath) ? "ok" : "modified";
 		return { path: rel, status };
 	});
-	const adopted = results.some((r) => r.status !== "missing");
-	return { results, adopted };
+
+	const currentSet = new Set(files);
+	const orphaned = readManifest(targetRoot)
+		.filter((entry) => !currentSet.has(entry.path))
+		.filter((entry) => existsSync(join(targetRoot, ...relPathParts(entry.path))))
+		.map((entry) => ({ path: entry.path, status: "orphaned" }));
+
+	const allResults = [...results, ...orphaned];
+	const adopted = allResults.some((r) => r.status !== "missing");
+	return { results: allResults, adopted };
 }
 
 /**
  * Copy canonical install/ files to targetRoot, creating directories as
  * needed. A target file whose hash differs from canonical is treated as a
  * local edit and skipped unless force is true (a local edit would otherwise
- * be silently destroyed).
+ * be silently destroyed). Also removes files this tool previously deployed
+ * (per the deploy manifest) whose canonical source has since been dropped
+ * from install/ — unless the on-disk copy was locally modified, in which
+ * case it's left alone (reported in `orphanSkipped`) unless force is given.
+ * Writes/updates the deploy manifest afterward so future runs can detect
+ * orphans and locally-edited files consistently.
  * @param {string} skillRoot
  * @param {string} targetRoot
  * @param {{ force?: boolean }} [options]
- * @returns {{ copied: string[], skipped: string[] }}
+ * @returns {{ copied: string[], skipped: string[], removed: string[], orphanSkipped: string[] }}
  */
 export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 	const installDir = resolve(skillRoot, "install");
@@ -98,7 +149,33 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 		copyFileSync(canonicalPath, targetPath);
 		copied.push(rel);
 	}
-	return { copied, skipped };
+
+	const currentSet = new Set(files);
+	const removed = [];
+	const orphanSkipped = [];
+	const retainedOrphanEntries = [];
+	for (const entry of readManifest(targetRoot)) {
+		if (currentSet.has(entry.path)) continue;
+		const targetPath = join(targetRoot, ...relPathParts(entry.path));
+		if (!existsSync(targetPath)) continue;
+		if (!force && sha256(targetPath) !== entry.hash) {
+			orphanSkipped.push(entry.path);
+			// Keep this entry in the manifest — it's still on disk, still
+			// orphaned, and still needs a future --force deploy (or check) to
+			// find it. Dropping it here would make it invisible from now on.
+			retainedOrphanEntries.push(entry);
+			continue;
+		}
+		rmSync(targetPath, { force: true });
+		removed.push(entry.path);
+	}
+
+	writeManifest(targetRoot, [
+		...files.map((rel) => ({ path: rel, hash: sha256(join(installDir, ...relPathParts(rel))) })),
+		...retainedOrphanEntries,
+	]);
+
+	return { copied, skipped, removed, orphanSkipped };
 }
 
 const UPSTREAM_PLUGIN_JSON_URL = "https://raw.githubusercontent.com/takasek/pfdsl/main/plugin/pfdsl/.claude-plugin/plugin.json";
@@ -131,12 +208,17 @@ export async function checkUpstreamVersion(skillRoot, fetchImpl = fetch) {
 
 // --- CLI ---
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
 	const args = { target: process.cwd(), deploy: false, force: false, upstream: false };
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
 		if (arg === "--target") {
-			args.target = argv[++i];
+			const value = argv[i + 1];
+			if (value === undefined || value.startsWith("--")) {
+				throw new Error("--target requires a path argument");
+			}
+			args.target = value;
+			i++;
 		} else if (arg === "--deploy") {
 			args.deploy = true;
 		} else if (arg === "--force") {
@@ -149,14 +231,20 @@ function parseArgs(argv) {
 }
 
 async function main() {
-	const args = parseArgs(process.argv.slice(2));
+	let args;
+	try {
+		args = parseArgs(process.argv.slice(2));
+	} catch (e) {
+		console.error(e instanceof Error ? e.message : String(e));
+		process.exit(2);
+	}
 	const skillRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 	const targetRoot = resolve(args.target);
 
 	let exitCode = 0;
 
 	if (args.deploy) {
-		const { copied, skipped } = deployInstall(skillRoot, targetRoot, { force: args.force });
+		const { copied, skipped, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, { force: args.force });
 		if (copied.length > 0) {
 			console.log("Copied:");
 			for (const f of copied) console.log(`  ${f}`);
@@ -166,7 +254,16 @@ async function main() {
 			for (const f of skipped) console.log(`  ${f}`);
 			exitCode = 1;
 		}
-		if (copied.length === 0 && skipped.length === 0) {
+		if (removed.length > 0) {
+			console.log("Removed (no longer part of canonical install/):");
+			for (const f of removed) console.log(`  ${f}`);
+		}
+		if (orphanSkipped.length > 0) {
+			console.log("Orphaned but locally modified; re-run with --force to remove:");
+			for (const f of orphanSkipped) console.log(`  ${f}`);
+			exitCode = 1;
+		}
+		if (copied.length === 0 && skipped.length === 0 && removed.length === 0 && orphanSkipped.length === 0) {
 			console.log("Nothing to deploy: install/ is empty.");
 		}
 	} else {
@@ -197,6 +294,10 @@ async function main() {
 	process.exit(exitCode);
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+// realpathSync (not resolve) matters here: on macOS, import.meta.url reflects
+// the ESM loader's realpath-resolved location (e.g. /tmp -> /private/tmp), so
+// a plain resolve() of argv[1] still mismatches when the invocation path
+// crosses a symlink.
+if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
 	main();
 }
