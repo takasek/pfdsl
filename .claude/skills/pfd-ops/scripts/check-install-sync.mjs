@@ -10,6 +10,7 @@
 // Usage: node check-install-sync.mjs [--target <dir>] [--deploy] [--force] [--upstream]
 
 import {
+	chmodSync,
 	copyFileSync,
 	existsSync,
 	mkdirSync,
@@ -17,6 +18,7 @@ import {
 	readFileSync,
 	realpathSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
@@ -169,6 +171,11 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 		}
 		mkdirSync(dirname(targetPath), { recursive: true });
 		copyFileSync(canonicalPath, targetPath);
+		// copyFileSync's mode handling is platform-dependent (observed: preserved
+		// on macOS/APFS via clonefile, dropped to the umask default on Linux) —
+		// chmod explicitly so canonical and deployed stay bit-for-bit identical
+		// regardless of OS (#421).
+		chmodSync(targetPath, statSync(canonicalPath).mode);
 		copied.push(rel);
 	}
 

@@ -1,6 +1,16 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, symlinkSync } from "node:fs";
+import {
+	mkdtempSync,
+	mkdirSync,
+	writeFileSync,
+	readFileSync,
+	rmSync,
+	existsSync,
+	symlinkSync,
+	chmodSync,
+	statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -218,6 +228,27 @@ describe("deployInstall", () => {
 
 		const { copied } = deployInstall(skillRoot, targetRoot);
 		assert.deepEqual(copied.sort(), ["a.txt", "sub/b.txt"]);
+	});
+
+	it("copies the canonical file's mode onto a freshly created target file", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-mode-fresh");
+		mkdirSync(targetRoot, { recursive: true });
+		chmodSync(join(skillRoot, "install", "a.txt"), 0o755);
+
+		deployInstall(skillRoot, targetRoot);
+		assert.equal(statSync(join(targetRoot, "a.txt")).mode & 0o777, 0o755);
+	});
+
+	it("re-applies the canonical mode onto a target file that already exists with a different mode", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-mode-existing");
+		writeFile(targetRoot, "a.txt", "canonical-a");
+		chmodSync(join(targetRoot, "a.txt"), 0o644);
+		chmodSync(join(skillRoot, "install", "a.txt"), 0o755);
+
+		deployInstall(skillRoot, targetRoot);
+		assert.equal(statSync(join(targetRoot, "a.txt")).mode & 0o777, 0o755);
 	});
 });
 
