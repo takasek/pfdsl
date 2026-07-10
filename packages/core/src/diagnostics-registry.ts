@@ -16,7 +16,8 @@ export interface DiagnosticRegistryEntry {
 
 /**
  * Registry of every diagnostic code emittable by
- * frontmatter.ts / parser.ts / validator.ts / multifile.ts.
+ * frontmatter.ts / parser.ts / validator.ts / multifile.ts / lexer.ts /
+ * normalizer.ts.
  *
  * Kept honest by diagnostics-registry.test.ts, which extracts every
  * `code: "..."` / `severity: ...` pair actually present in those source
@@ -296,6 +297,33 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		section: "15.14",
 		summary:
 			"a file with no `type:` is treated as roadmap in a ready-gate context (ready / status-set / audit-sync)",
+	},
+
+	L001: {
+		severities: ["error"],
+		section: "4.2",
+		summary: 'a quoted identifier is missing its closing `"`',
+	},
+	L002: {
+		severities: ["error"],
+		section: "8",
+		summary: "a character does not start any valid token",
+	},
+
+	N001: {
+		severities: ["error"],
+		section: "5.1",
+		summary: "an ID is declared as both artifact and process in front matter",
+	},
+	N002: {
+		severities: ["error"],
+		section: "5.1",
+		summary: "an ID is used as both artifact and process in the graph body",
+	},
+	N003: {
+		severities: ["warning"],
+		section: "15.4",
+		summary: "the same edge is stated more than once",
 	},
 };
 

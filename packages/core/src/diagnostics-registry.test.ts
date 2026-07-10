@@ -80,6 +80,8 @@ describe("DIAGNOSTIC_REGISTRY vs. real source", () => {
 		"parser.ts",
 		"validator.ts",
 		"multifile.ts",
+		"lexer.ts",
+		"normalizer.ts",
 	];
 
 	const foundByFile = sourceFiles.map((f) =>
