@@ -310,7 +310,7 @@ artifact:
   adoption_probe:
     label: "plugin 採用初日プローブ (#352)"
     description: "使い捨て環境への plugin インストール + /pfd-init で採用初日を再現し、同梱物妥当性・ガイダンス実行可能性・agent 到達性・冪等性を検証する。spec-stress-test 手法の配布層への移植（配布経路は ADR-0028 で skill sync から plugin へ移行済み）"
-    status: todo
+    status: done
     criteria: "プローブ実行記録と findings 振り分けが完了し、手順が再実行可能な形で文書化済み"
   explain_cmd:
     label: "pfdsl explain コマンド (#356)"
