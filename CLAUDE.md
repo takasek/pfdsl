@@ -4,7 +4,7 @@
 
 ## セットアップ
 
-クローン直後・新規 worktree では最初に `make setup` を実行する。依存インストールに加え pre-commit hook（`scripts/pre-commit`）を `.git/hooks/` に導入し、コミット時に biome 整形と `.pfdsl` スナップショット鮮度を自動検査する。これを飛ばすとローカルコミットが検査をすり抜け、CI で初めて失敗に気付くことになる。
+クローン直後・新規 worktree では最初に `make setup` を実行する。依存インストールに加え pre-commit hook のシム（`scripts/hooks/pre-commit-shim`）を `.git/hooks/` に導入する。シムはコミット実行 worktree の `scripts/pre-commit` を都度 exec するため、hook の版とブランチのツリー内容が常に一致する（#411）。実体（`scripts/pre-commit`）はコミット時に biome 整形と `.pfdsl` スナップショット鮮度を自動検査する。これを飛ばすとローカルコミットが検査をすり抜け、CI で初めて失敗に気付くことになる。
 
 ## 文字列の言語
 
