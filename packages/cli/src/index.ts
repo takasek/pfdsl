@@ -1070,7 +1070,7 @@ Exit codes:
 const HELP_EXPLAIN = `usage: pfdsl explain <code>
 
 Print the one-line summary and spec section for a diagnostic code (e.g. V021).
-Codes come from the FM/P/V/W families reported by \`pfdsl check\`.
+Codes come from the FM/L/N/P/V/W families reported by \`pfdsl check\`.
 
   <code>  a diagnostic code, e.g. V021, P004, W002, FM001
 
