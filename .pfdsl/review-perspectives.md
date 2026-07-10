@@ -8,7 +8,7 @@
 - **駆動源**: issue 起票の駆動源は対話で、レビュー知見は `>>?`
 - **名前の一般化水準**: `cli_tool` → 実際は `packages/` 全体 = toolchain
 - **偽の不変性**: 仕様書は実装知見の issue 経由で改訂される → maintain プロセスが要る
-- **入力充足**: 修正開発に `base_code`・PoC が欠落、ADR 起草に参照図が欠落 → ID 捏造が発生
+- **入力充足**: 修正開発に `base_code`・PoC が欠落、ADR 起草に参照図が欠落 → ID 捏造が発生。`assemble_plugin`（旧 `bundle_skills`）は `.claude/commands/pfd-*.md`・`.claude/agents/pfd-lens.md` も実際には消費するが artifact 化されておらず入力エッジに現れない（2026-07-10、pfd-lens 監査で検出。修正は新規 artifact 設計を要するため未着手）
 - **status 単調性**: `check` の W003 が機械検出する
 - **同種対称性**: `published_cli` が持つ全消費エッジを `published_libraries` も持つか。`quality_guide` 新設時に `findings.criteria` の反映先列挙への追随が漏れた（読み直しで検出、2026-07-08）
 

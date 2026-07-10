@@ -14,7 +14,7 @@
 - **d（VSCode拡張）**: `packages/vscode-extension/`。図に現れない — bのホストであり、データを供給も保管もしないため（次節）
 - **e（a,bの配布）**: このファイルの対象外。npm 公開は workflow.pfdsl 側で表現する
 - **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 GitHub Issues バックエンド層）。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`。L4 はリポ固有で配布対象外・pfd-ops 自体に含まれない。ここでは配布素材としてのみ扱う
-- **g（fの配布）**: `tags: [g]` の process 群。`pfdsl skill sync` とビルド時バンドルが実装
+- **g（fの配布）**: `tags: [g]` の process 群。make gen-plugin（組み立て）・Claude Code plugin marketplace（インストール）・check-install-sync.mjs（実配置とランタイム照合）が実装
 
 ## ホスト（c/d）とbの関係
 
@@ -41,14 +41,11 @@
 - **export_metadata（`metadata-exporter` の `extractMetadata(graph, frontmatter)`）**: VSCode 拡張の `pfdsl.export`（`export.ts`）のみが呼ぶ
 - **diff_graphs（`diff.ts` の `diffGraphs(a, b, fmA, fmB)`）**: 入力は2組の（グラフ, frontmatter）。この図は単一ドキュメントの変換を軸にモデル化しているため、比較対象の2つ目は図上に現れない
 
-## skill sync（配布チェーン）の依存
+## plugin 配布チェーンの依存
 
-- **skill_source_bundle の出所（`bundle_skills`）**: ビルド時（`packages/cli/tsup.config.ts` の `onSuccess`）に4スキルツリーと `commands/pfd-*.md`・`agents/pfd-*.md`（#357）を `dist/` へコピーし npm パッケージに同梱する。4スキル名・agents パターンは tsup.config.ts と skill-sync.ts の `runSkillSync` の両方にハードコードされており、スキル・agent 追加時は両方の更新が必要。pfd-ops 内部の f1/f2 の区別をコピー処理は関知しない（丸ごとコピー）
-- **`sync_agents` は `sync_commands` と同型**: `DISTRIBUTABLE_COMMAND_PATTERN`（`/^pfd-.*\.md$/`）を再利用し、`.claude/agents/` のうち `pfd-*.md` に一致するものだけを採用リポの `.claude/agents/` へコピーする（非破壊的な `cpSync` 上書き）
-- **`resolveSkillRoot` のフォールバック**: 公開後の実行は `dist/skills/<name>` を、ソース/テスト実行時（pre-build）は3階層上の `.claude/skills/<name>` を参照する。どちらにも無ければ例外
-- **`sync_skill_tree` は破壊的コピー**: 各エントリを `rmSync` で削除してから `cpSync` する。アップストリームで削除・改名されたファイルが採用リポに残留しない設計
-- **`sync_install_layer` のコピー元はバンドル**: `copyInstallLayer(skillRoot, targetRoot)` はバンドル内 `pfd-ops/install/` から採用リポルートへコピーする（採用リポの `.claude/skills/pfd-ops/install/` からではない）。L3 採用済み（`install/` 由来ファイルが1つでも存在）の場合のみ実行し、未採用時は `cp -r .claude/skills/pfd-ops/install/. .` を促す案内のみ返す（自動アップグレードしない）
-- **`ensure_labels` は GitHub 側の副作用**: `sync_install_layer` が実行された場合のみ、`gh` CLI で `flow:managed` / `flow:exempt` ラベルの存在を確認・作成する。`--yes` 未指定時は対話確認を挟む。gh 不在時は手動作成の案内を返す（エラーにしない）
+- **同梱対象リストの一元化（`assemble_plugin`）**: 同梱スキル・コマンド・agent の列挙は `scripts/gen-plugin.mjs` のみが持つ（旧 skill sync 時代の tsup.config.ts との二重ハードコードは解消済み）。スキル・agent を追加するときは gen-plugin.mjs を更新する。
+- **`deploy_install_layer` のコピー元は plugin 同梱 canonical**: `check-install-sync.mjs --deploy` は `<skill root>/install/` から採用リポルートへコピーする。ローカル編集された配置済みファイルは hash 不一致として skip・警告され、`--force` でのみ上書きされる（ADR-0028）。
+- **採用リポの drift 検知はランタイムのみ**: `check-pfd-ops-sync.yml` は採用リポへ配布されない。pfd-ops 発火時の `check_install_sync` が唯一の安全網で、警告への対応は pfd-ops SKILL.md「配置ファイルの鮮度セルフチェック」が定める。
 
 ## エラー・例外処理
 

@@ -47,7 +47,11 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test("README.md"), false);
 	});
 
-	it("does not match an unrelated .claude/skills/pfd-ops/ path", () => {
-		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/skills/pfd-ops/SKILL.md"), false);
+	it("matches a .claude/skills/pfd-ops/ path", () => {
+		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/skills/pfd-ops/SKILL.md"), true);
+	});
+
+	it("does not match an unrelated root-level file", () => {
+		assert.equal(GEN_PLUGIN_TRIGGER.test("packages/core/src/index.ts"), false);
 	});
 });

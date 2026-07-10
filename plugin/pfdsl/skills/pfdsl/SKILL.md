@@ -97,7 +97,6 @@ npx @pfdsl/cli diff <a> <b> [--format text|dot|svg]   # Structural diff (text), 
 npx @pfdsl/cli ready <file|-> [--best] [--json]   # List ready-to-start processes (- = stdin)
 npx @pfdsl/cli status-set <file> <artifact-id> <status> [--json]   # Set artifact status (todo|wip|done|waiting|suspended) in place
 npx @pfdsl/cli audit-sync <roadmap> <flow> [<flow>...] [--json]   # Cross-check todo artifacts in flow files against the roadmap
-npx @pfdsl/cli skill sync [--yes]   # Sync pfd-ops skills and commands into the current directory
 npx @pfdsl/cli explain <code>   # Print the summary and spec section for a diagnostic code (e.g. V021)
 npx @pfdsl/cli help   # Show this help
 ```
