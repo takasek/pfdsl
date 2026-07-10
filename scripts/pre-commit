@@ -60,7 +60,7 @@ check_drift() {
 # favor of the plugin marketplace (#366).
 # Trigger pattern is sourced from scripts/lib/gen-skill-trigger.mjs (single
 # source of truth shared with gate-check.mjs) since this sh script can't import JS.
-gen_skill_trigger=$(node scripts/lib/gen-skill-trigger.mjs)
+gen_skill_trigger=$(node scripts/lib/gen-skill-trigger.mjs) || { echo "gen-skill trigger derivation failed"; exit 1; }
 check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
   "node scripts/gen-skill.mjs --out .claude/skills/pfdsl" \
   "The .claude/skills/pfdsl dev copy failed to regenerate. Run 'make gen-skill' and investigate."
@@ -70,7 +70,7 @@ check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
 # reason as the gen-skill check above (see #400/#401).
 # Trigger pattern is sourced from scripts/lib/gen-plugin-trigger.mjs (single
 # source of truth shared with gate-check.mjs).
-gen_plugin_trigger=$(node scripts/lib/gen-plugin-trigger.mjs)
+gen_plugin_trigger=$(node scripts/lib/gen-plugin-trigger.mjs) || { echo "gen-plugin trigger derivation failed"; exit 1; }
 check_drift "$gen_plugin_trigger" "packages/cli/dist/cli.js" \
   "node scripts/gen-plugin.mjs && git diff --quiet -- plugin" \
   "plugin/pfdsl is stale. Run 'make gen-plugin' and re-stage the plugin files."
