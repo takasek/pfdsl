@@ -342,7 +342,7 @@ artifact:
   pfd_ops_plugin_dist:
     label: "pfd-ops 統合済み plugin 配布 (#404)"
     description: "pfd-ops の L1/L2/L3（SKILL.md 本文・references/github-issues-backend.md）を plugin/pfdsl/ に統合し、install/ の実配置（採用リポへの GitHub Actions workflow・scripts 書き込み）を /pfd-init の scaffold コピー機能へ移す。成立すれば pfdsl skill sync（CLI コマンド）が不要になる。設計 TBD — 未解決論点は issue #404 参照（ADR-0016 の check-pfd-ops-sync.yml drift ゲートが依存する canonical-in-repo モデルとの整合、${CLAUDE_PLUGIN_ROOT} の slash command 本文での実地検証、adopt/refresh コマンド設計、チーム/CI 前提の trade-off、既導入リポの移行手順）"
-    status: todo
+    status: wip
     criteria: "issue #404 の未解決論点が ADR または PFD companion に決定として記録されており、pfd-ops が plugin 経由で発火し install/ 相当の配置が /pfd-init 経由で機能することを検証済み"
   mint_check_tool:
     label: "mint-check ツール (#405)"
