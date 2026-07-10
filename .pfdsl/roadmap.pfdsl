@@ -351,6 +351,16 @@ artifact:
     status: todo
     criteria: spec.md の節番号相互参照が仕様ID参照に置換され、lint が dangling なしで通過
     location: ../docs/spec/spec.md
+  ansi_color:
+    label: "CLI 診断 ANSI カラー出力 (#435)"
+    description: "check 診断の severity 色付け。#180 で予約済みの --no-color / NO_COLOR の口を実装で活かす。TTY かつ NO_COLOR 未設定かつ --no-color なしのときのみ色付け"
+    status: todo
+    criteria: "TTY で severity 別に色付き、--no-color / NO_COLOR / 非 TTY で ANSI 不含、既存 no-color テストが実効化されテスト通過"
+  cli_tool_v0020:
+    label: "CLI v0.0.20（次期）"
+    status: todo
+    criteria: npm show @pfdsl/cli version が 0.0.20 を返す
+    location: https://www.npmjs.com/package/@pfdsl/cli
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -526,6 +536,12 @@ process:
     label: mint-check ツール実装
     location: https://github.com/takasek/pfdsl/issues/405
     updated_at: 2026-07-10T01:50:30Z
+  i435_implement_ansi_color:
+    label: 診断 ANSI カラー実装
+    location: https://github.com/takasek/pfdsl/issues/435
+    updated_at: 2026-07-10T16:04:28Z
+  publish_cli_v0020:
+    label: CLI v0.0.20リリース
   migrate_spec_id_refs:
     label: spec.md 仕様ID参照移行
     description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。ADR 確定後に issue 起票して iN prefix を付与する。issue 化時に移行対象の現行 spec artifact を入力エッジとして列挙する"
@@ -654,3 +670,6 @@ spec_id_syntax >> i405_implement_mint_check -> mint_check_tool
 skill_gen >> i366_distribute_marketplace -> marketplace_dist
 
 marketplace_dist >> i404_integrate_pfd_ops_plugin -> pfd_ops_plugin_dist
+
+cli_tool_v0018 >> i435_implement_ansi_color -> ansi_color
+ansi_color >> publish_cli_v0020 -> cli_tool_v0020
