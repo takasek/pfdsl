@@ -63,6 +63,11 @@ GFM の table セル内はインライン要素のみのため、「table 行内
   リポジトリ内の参照は書き換えられても、外部の参照は書き換えられない。
 - `[[...]]` は wikilink 互換の記法とする。
   Obsidian 等の既存エコシステムでジャンプ・backlink・dangling 検出といった機能がそのまま付いてくる。
+- ID は削除後も再利用しない（renumber 不採用と同じ理由 — 外部参照は書き換えられない）。
+  ブロックを削除する際は、その ID を tombstone（予約済み ID のリスト）として記録し、tombstone の再定義は lint エラーとする。
+  tombstone リストの実体と lint 強制は初の ID 削除が発生する時点で導入する（#405）。
+- 新規採番前に slug の既出（定義・strict 参照・forward-ref・tombstone）を確認する。
+  特に既存 forward-ref と同じ slug を別概念で採番すると、エラーにならず「解消済み候補」warning のまま参照が別ブロックへ silent に解決するため、mint-check ツール（#405）で機械列挙する。
 
 ## 検討したが不採用の案
 
