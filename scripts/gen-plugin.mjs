@@ -27,9 +27,9 @@ execFileSync(process.execPath, [resolve(__dirname, "gen-skill.mjs"), "--out", re
 	stdio: "inherit",
 });
 
-// --- 2. Copy the static skills (pfd-ecosystem, pfd-retro) into skills/ ---
+// --- 2. Copy the static skills (pfd-ecosystem, pfd-ops, pfd-retro) into skills/ ---
 
-for (const name of ["pfd-ecosystem", "pfd-retro"]) {
+for (const name of ["pfd-ecosystem", "pfd-ops", "pfd-retro"]) {
 	const src = resolve(root, `.claude/skills/${name}`);
 	const dest = resolve(pluginRoot, `skills/${name}`);
 	if (!existsSync(src)) {
