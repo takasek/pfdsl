@@ -18,4 +18,9 @@ describe("buildPluginManifest", () => {
 		const manifest = buildPluginManifest({ cliVersion: "0.0.18" });
 		assert.equal(manifest.license, "MIT");
 	});
+
+	it("mentions the pfd-ops skill in the description", () => {
+		const manifest = buildPluginManifest({ cliVersion: "0.0.18" });
+		assert.match(manifest.description, /pfd-ops/);
+	});
 });
