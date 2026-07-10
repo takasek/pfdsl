@@ -647,7 +647,7 @@ multifile_toolchain >> recode_boundary_diags -> recode
 
 [spec_v0011, multifile_toolchain] >> implement_boundary_feedback -> boundary_feedback
 
-cli_tool_v0015 >> i352_probe_adoption_day -> adoption_probe
+pfd_ops_plugin_dist >> i352_probe_adoption_day -> adoption_probe
 
 cli_tool_v0015 >> i356_implement_explain_cmd -> explain_cmd
 cli_tool_v0015 >> i357_define_pfd_lens_agent -> pfd_lens_agent
