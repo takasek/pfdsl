@@ -47,6 +47,10 @@
 - **`deploy_install_layer` のコピー元は plugin 同梱 canonical**: `check-install-sync.mjs --deploy` は `<skill root>/install/` から採用リポルートへコピーする。ローカル編集された配置済みファイルは hash 不一致として skip・警告され、`--force` でのみ上書きされる（ADR-0028）。
 - **採用リポの drift 検知はランタイムのみ**: `check-pfd-ops-sync.yml` は採用リポへ配布されない。pfd-ops 発火時の `check_install_sync` が唯一の安全網で、警告への対応は pfd-ops SKILL.md「配置ファイルの鮮度セルフチェック」が定める。
 
+## モデル化対象外のツール
+
+`scripts/gate-check.mjs`・`scripts/audit-issues-flow.mjs`・`scripts/check-scaffold-sync.mjs` 等、PR ゲート・監査目的の開発者向けツールはこの図の対象外とする。pfdsl の実行時変換でも配布物でもなく、このリポ自身の開発フローを検証するメタツールのため。pfd-ops 終端ゲート「変換コンポーネントを追加・変更・削除した場合...」の判定で、この種のツールの新規追加・変更は該当なしと扱ってよい。
+
 ## エラー・例外処理
 
 - 診断は `severity: "error" | "warning"` を持つ。`check --strict` は一部の警告（例: V011 フィードバック検証）をエラー昇格させる
