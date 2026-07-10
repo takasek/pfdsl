@@ -60,3 +60,27 @@ export function bumpVersionInPackageJson(src, version) {
 export function tagName(kind, version) {
 	return `${kind.tagPrefix}${version}`;
 }
+
+const MARKETPLACE_PLUGIN_REPO_URL = "https://github.com/takasek/pfdsl.git";
+const MARKETPLACE_PLUGIN_PATH = "plugin/pfdsl";
+
+/**
+ * Points the pfdsl plugin's marketplace.json entry at a specific CLI release
+ * tag, so `/plugin install` and `/plugin marketplace update` fetch a pinned,
+ * previously-verified snapshot instead of main's current (possibly broken)
+ * HEAD. First run replaces the bare relative-path shorthand source with the
+ * explicit git-subdir form; later runs just rewrite its `ref`.
+ * @param {string} src
+ * @param {string} tag
+ * @returns {string}
+ */
+export function pinMarketplaceSourceToTag(src, tag) {
+	const marketplace = JSON.parse(src);
+	marketplace.plugins[0].source = {
+		source: "git-subdir",
+		url: MARKETPLACE_PLUGIN_REPO_URL,
+		path: MARKETPLACE_PLUGIN_PATH,
+		ref: tag,
+	};
+	return `${JSON.stringify(marketplace, null, "\t")}\n`;
+}

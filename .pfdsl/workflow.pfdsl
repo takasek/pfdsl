@@ -340,7 +340,7 @@ process:
     group: planning
   publish_cli:
     label: CLI 公開
-    description: "事前に make release-status で behind を確認してから実施。自動化済み: v* tag push → GitHub Actions → npm publish。手作業は make release のみ"
+    description: "事前に make release-status で behind を確認してから実施。自動化済み: v* tag push → GitHub Actions → npm publish。plugin_dist の marketplace.json も同じ v* タグへ pin される（plugin/pfdsl 新設時点のタグには含まれないファイルを参照しないよう、main の現在 HEAD でなくこの検証済みタグを指す）。手作業は make release のみ"
     command: "make release VERSION=<VERSION>"
     group: release
   publish_libraries:
