@@ -90,7 +90,7 @@ artifact:
     group: run_outputs
   pfdsl_skill:
     label: PFD読み書き分析skill
-    description: "AIエージェントに.pfdsl操作（check/fmt/graph/diff/sort-meta等のCLIコマンド）を指示するスキル。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため、図にはbundle_skillsへの素材提供のみが現れる"
+    description: "AIエージェントに.pfdsl操作（check/fmt/graph/diff/sort-meta等のCLIコマンド）を指示するスキル。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため、図にはassemble_pluginへの素材提供のみが現れる"
     location: ../.claude/skills/pfdsl/
     group: skill_sources
     tags: [c]
@@ -112,12 +112,12 @@ artifact:
     tags: [f2]
   retro_skill:
     label: ふりかえり監査スキル
-    description: "内容の一次情報はworkflow.pfdsl。ここではskill_source_bundleへの同梱対象としてのみ扱う"
+    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_dirへの同梱対象としてのみ扱う"
     location: ../.claude/skills/pfd-retro/
     group: skill_sources
   ecosystem_skill:
     label: PFDセット構築スキル
-    description: "内容の一次情報はworkflow.pfdsl。ここではskill_source_bundleへの同梱対象としてのみ扱う"
+    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_dirへの同梱対象としてのみ扱う"
     location: ../.claude/skills/pfd-ecosystem/
     group: skill_sources
   installed_l3_layer:
