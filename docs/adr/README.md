@@ -39,3 +39,4 @@
 - **ADR-0025** [レビューカタログは抽象レンズを配布、具体例は repo-local instance](0025-review-catalog-lens-example-split.md) — 「各問いは実際に検出された誤りに由来する」具体例は本質的に repo-local。配布層は A/B/C の観点の枠組みのみ、pfdsl 固有の例示・機構は専用 instance ファイルへ降格する ADR-0023 の鏡像
 - **ADR-0026** [retro トリガーを done イベント駆動に一本化し実行記録を廃止](0026-retro-trigger-done-event.md) — 実行記録は並列 worktree でコンフリクトする上、閾値条件は導入以来一度も単独発火していない。基準点は既存の done イベント（プロトコル4）に一本化し、記録機構ごと廃止する
 - **ADR-0027** [仕様相互参照を安定 ID アンカーに移行する](0027-spec-id-cross-references.md) — 節番号直書きは挿入・並べ替えで崩れる。`[[SPEC_xxx]]` / `[[SPEC_xxx?]]` / `(SPEC_xxx)` の bracket 構文を正式採用し、不透明・永続・欠番許容の ID として renumber 機能なしで運用する
+- **ADR-0028** [pfd-ops の plugin 配布移行と skill sync の廃止](0028-plugin-first-pfd-ops-distribution.md) — pfd-ops を plugin に同梱し `install/` 実配置を `/pfd-init` に統合、`pfdsl skill sync` を削除。採用リポの drift 検知は CI 強制からランタイム hash 照合（pfd-ops 発火時）へ移行、ADR-0016 はリポ内運用として存続
