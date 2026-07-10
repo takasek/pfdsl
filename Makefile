@@ -1,7 +1,7 @@
 .PHONY: setup
 setup:
 	pnpm install
-	cp scripts/hooks/pre-commit $$(git rev-parse --git-common-dir)/hooks/pre-commit
+	cp scripts/hooks/pre-commit-shim $$(git rev-parse --git-common-dir)/hooks/pre-commit
 	chmod +x $$(git rev-parse --git-common-dir)/hooks/pre-commit
 	@if [ ! -d .claude/skills/pfdsl ]; then $(MAKE) bootstrap-pfdsl-skill; fi
 
