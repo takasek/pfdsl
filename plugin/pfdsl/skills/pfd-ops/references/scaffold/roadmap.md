@@ -4,7 +4,7 @@
 
 ## バックエンド
 
-(採用するバックエンドを記載する。GitHub Issues を使う場合は `<pfd-ops skill root>/references/github-issues-backend.md` を参照。`<pfd-ops skill root>` は plugin 経由なら `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops`、`${CLAUDE_PLUGIN_ROOT}` が変数名のまま置換されず見える場合は repo-local `.claude/skills/pfd-ops` を使う。)
+(採用するバックエンドを記載する。GitHub Issues を使う場合は `<pfd-ops skill root>/references/github-issues-backend.md` を参照。`<pfd-ops skill root>` は plugin 経由なら `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops`。上のパスが置換されず変数名のまま見えている場合は repo-local `.claude/skills/pfd-ops` を使う。)
 
 ## このリポのインスタンス値
 
