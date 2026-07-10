@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Runtime self-check for the pfd-ops "install/" tree (ADR-0028).
 //
-// This file ships inside the pfd-ops skill and is copied verbatim into the
+// This file ships inside the pfd-ops skill and is copied verbatim (along
+// with the rest of the skill tree, including its sibling scripts) into the
 // pfdsl plugin (plugin/pfdsl/skills/pfd-ops/scripts/check-install-sync.mjs),
-// so it must not import anything outside itself — Node stdlib only.
+// so it must not import anything outside its own skill tree — Node stdlib
+// and sibling files under this directory only.
 //
 // Usage: node check-install-sync.mjs [--target <dir>] [--deploy] [--force] [--upstream]
 
@@ -20,6 +22,7 @@ import {
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkUpstreamVersion } from "./plugin-version-check.mjs";
 
 /**
  * Recursively enumerate files under installDir, returning repo-root-relative
@@ -46,12 +49,18 @@ export function listInstallFiles(installDir) {
 	return results.sort();
 }
 
+// Used only for values that must persist across runs (the deploy manifest) —
+// a plain byte comparison can't be used there since the canonical file it
+// would compare against may no longer exist by the time of a later check.
 function sha256(filePath) {
 	return createHash("sha256").update(readFileSync(filePath)).digest("hex");
 }
 
-function relPathParts(rel) {
-	return rel.split("/");
+// Live A/B comparison (both files exist right now): a direct byte compare
+// short-circuits on the first differing byte and needs no crypto overhead,
+// unlike hashing both sides just to compare the resulting digests.
+function filesEqual(pathA, pathB) {
+	return readFileSync(pathA).equals(readFileSync(pathB));
 }
 
 // Records which install/ files this tool last deployed to a target, plus
@@ -62,7 +71,7 @@ function relPathParts(rel) {
 const MANIFEST_RELATIVE_PATH = ".claude/pfd-ops-install-manifest.json";
 
 function readManifest(targetRoot) {
-	const manifestPath = join(targetRoot, ...MANIFEST_RELATIVE_PATH.split("/"));
+	const manifestPath = join(targetRoot, MANIFEST_RELATIVE_PATH);
 	if (!existsSync(manifestPath)) return [];
 	try {
 		const data = JSON.parse(readFileSync(manifestPath, "utf-8"));
@@ -73,7 +82,7 @@ function readManifest(targetRoot) {
 }
 
 function writeManifest(targetRoot, entries) {
-	const manifestPath = join(targetRoot, ...MANIFEST_RELATIVE_PATH.split("/"));
+	const manifestPath = join(targetRoot, MANIFEST_RELATIVE_PATH);
 	mkdirSync(dirname(manifestPath), { recursive: true });
 	const sorted = [...entries].sort((a, b) => a.path.localeCompare(b.path));
 	writeFileSync(manifestPath, `${JSON.stringify({ files: sorted }, null, "\t")}\n`);
@@ -95,19 +104,18 @@ export function checkInstallSync(skillRoot, targetRoot) {
 	const installDir = resolve(skillRoot, "install");
 	const files = listInstallFiles(installDir);
 	const results = files.map((rel) => {
-		const canonicalPath = join(installDir, ...relPathParts(rel));
-		const targetPath = join(targetRoot, ...relPathParts(rel));
+		const targetPath = join(targetRoot, rel);
 		if (!existsSync(targetPath)) {
 			return { path: rel, status: "missing" };
 		}
-		const status = sha256(canonicalPath) === sha256(targetPath) ? "ok" : "modified";
+		const status = filesEqual(join(installDir, rel), targetPath) ? "ok" : "modified";
 		return { path: rel, status };
 	});
 
 	const currentSet = new Set(files);
 	const orphaned = readManifest(targetRoot)
 		.filter((entry) => !currentSet.has(entry.path))
-		.filter((entry) => existsSync(join(targetRoot, ...relPathParts(entry.path))))
+		.filter((entry) => existsSync(join(targetRoot, entry.path)))
 		.map((entry) => ({ path: entry.path, status: "orphaned" }));
 
 	const allResults = [...results, ...orphaned];
@@ -136,14 +144,11 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 	const copied = [];
 	const skipped = [];
 	for (const rel of files) {
-		const canonicalPath = join(installDir, ...relPathParts(rel));
-		const targetPath = join(targetRoot, ...relPathParts(rel));
-		if (existsSync(targetPath) && !force) {
-			const same = sha256(canonicalPath) === sha256(targetPath);
-			if (!same) {
-				skipped.push(rel);
-				continue;
-			}
+		const canonicalPath = join(installDir, rel);
+		const targetPath = join(targetRoot, rel);
+		if (existsSync(targetPath) && !force && !filesEqual(canonicalPath, targetPath)) {
+			skipped.push(rel);
+			continue;
 		}
 		mkdirSync(dirname(targetPath), { recursive: true });
 		copyFileSync(canonicalPath, targetPath);
@@ -156,7 +161,7 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 	const retainedOrphanEntries = [];
 	for (const entry of readManifest(targetRoot)) {
 		if (currentSet.has(entry.path)) continue;
-		const targetPath = join(targetRoot, ...relPathParts(entry.path));
+		const targetPath = join(targetRoot, entry.path);
 		if (!existsSync(targetPath)) continue;
 		if (!force && sha256(targetPath) !== entry.hash) {
 			orphanSkipped.push(entry.path);
@@ -171,39 +176,11 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 	}
 
 	writeManifest(targetRoot, [
-		...files.map((rel) => ({ path: rel, hash: sha256(join(installDir, ...relPathParts(rel))) })),
+		...files.map((rel) => ({ path: rel, hash: sha256(join(installDir, rel)) })),
 		...retainedOrphanEntries,
 	]);
 
 	return { copied, skipped, removed, orphanSkipped };
-}
-
-const UPSTREAM_PLUGIN_JSON_URL = "https://raw.githubusercontent.com/takasek/pfdsl/main/plugin/pfdsl/.claude-plugin/plugin.json";
-
-/**
- * Best-effort version-skew warning: compares the locally installed plugin
- * version (read from `<skillRoot>/../../.claude-plugin/plugin.json`, which
- * only exists when running from an installed plugin) against upstream's
- * plugin.json on GitHub main. Silent (returns null) whenever the local
- * manifest is absent (repo-local run) or the fetch/parse fails for any
- * reason — this check must never break the caller.
- * @param {string} skillRoot
- * @param {typeof fetch} [fetchImpl]
- * @returns {Promise<string|null>}
- */
-export async function checkUpstreamVersion(skillRoot, fetchImpl = fetch) {
-	const localManifestPath = resolve(skillRoot, "../../.claude-plugin/plugin.json");
-	if (!existsSync(localManifestPath)) return null;
-	try {
-		const localVersion = JSON.parse(readFileSync(localManifestPath, "utf-8")).version;
-		const res = await fetchImpl(UPSTREAM_PLUGIN_JSON_URL, { signal: AbortSignal.timeout(3000) });
-		if (!res.ok) return null;
-		const remote = await res.json();
-		if (!remote.version || remote.version === localVersion) return null;
-		return `Warning: installed pfdsl plugin version (${localVersion}) differs from upstream (${remote.version}). Consider updating the plugin.`;
-	} catch {
-		return null;
-	}
 }
 
 // --- CLI ---
@@ -230,6 +207,12 @@ export function parseArgs(argv) {
 	return args;
 }
 
+function printGroup(title, items) {
+	if (items.length === 0) return;
+	console.log(title);
+	for (const item of items) console.log(`  ${item}`);
+}
+
 async function main() {
 	let args;
 	try {
@@ -245,24 +228,11 @@ async function main() {
 
 	if (args.deploy) {
 		const { copied, skipped, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, { force: args.force });
-		if (copied.length > 0) {
-			console.log("Copied:");
-			for (const f of copied) console.log(`  ${f}`);
-		}
-		if (skipped.length > 0) {
-			console.log("Skipped (locally modified; re-run with --force to overwrite):");
-			for (const f of skipped) console.log(`  ${f}`);
-			exitCode = 1;
-		}
-		if (removed.length > 0) {
-			console.log("Removed (no longer part of canonical install/):");
-			for (const f of removed) console.log(`  ${f}`);
-		}
-		if (orphanSkipped.length > 0) {
-			console.log("Orphaned but locally modified; re-run with --force to remove:");
-			for (const f of orphanSkipped) console.log(`  ${f}`);
-			exitCode = 1;
-		}
+		printGroup("Copied:", copied);
+		printGroup("Skipped (locally modified; re-run with --force to overwrite):", skipped);
+		printGroup("Removed (no longer part of canonical install/):", removed);
+		printGroup("Orphaned but locally modified; re-run with --force to remove:", orphanSkipped);
+		if (skipped.length > 0 || orphanSkipped.length > 0) exitCode = 1;
 		if (copied.length === 0 && skipped.length === 0 && removed.length === 0 && orphanSkipped.length === 0) {
 			console.log("Nothing to deploy: install/ is empty.");
 		}

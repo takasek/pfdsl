@@ -8,7 +8,6 @@ import {
 	listInstallFiles,
 	checkInstallSync,
 	deployInstall,
-	checkUpstreamVersion,
 	parseArgs,
 } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
 
@@ -26,6 +25,15 @@ function writeFile(root, relPath, content) {
 	const full = join(root, ...relPath.split("/"));
 	mkdirSync(join(full, ".."), { recursive: true });
 	writeFileSync(full, content);
+}
+
+// Shared fixture for checkInstallSync/deployInstall tests: a skill root with
+// a two-file install/ tree (one top-level file, one nested).
+function makeSkillRoot() {
+	const skillRoot = join(tmp, "skill");
+	writeFile(join(skillRoot, "install"), "a.txt", "canonical-a");
+	writeFile(join(skillRoot, "install"), "sub/b.txt", "canonical-b");
+	return skillRoot;
 }
 
 describe("listInstallFiles", () => {
@@ -48,13 +56,6 @@ describe("listInstallFiles", () => {
 });
 
 describe("checkInstallSync", () => {
-	function makeSkillRoot() {
-		const skillRoot = join(tmp, "skill");
-		writeFile(join(skillRoot, "install"), "a.txt", "canonical-a");
-		writeFile(join(skillRoot, "install"), "sub/b.txt", "canonical-b");
-		return skillRoot;
-	}
-
 	it("reports not-adopted when zero deployed files exist at target", () => {
 		const skillRoot = makeSkillRoot();
 		const targetRoot = join(tmp, "target-empty");
@@ -120,13 +121,6 @@ describe("checkInstallSync", () => {
 });
 
 describe("deployInstall", () => {
-	function makeSkillRoot() {
-		const skillRoot = join(tmp, "skill");
-		writeFile(join(skillRoot, "install"), "a.txt", "canonical-a");
-		writeFile(join(skillRoot, "install"), "sub/b.txt", "canonical-b");
-		return skillRoot;
-	}
-
 	it("copies every canonical file into an empty target, creating directories as needed", () => {
 		const skillRoot = makeSkillRoot();
 		const targetRoot = join(tmp, "target-fresh");
@@ -210,48 +204,5 @@ describe("parseArgs", () => {
 	});
 });
 
-describe("checkUpstreamVersion", () => {
-	function makePluginSkillRoot(localVersion) {
-		const pluginRoot = join(tmp, "plugin-root");
-		const skillRoot = join(pluginRoot, "skills", "pfd-ops");
-		mkdirSync(skillRoot, { recursive: true });
-		writeFile(pluginRoot, ".claude-plugin/plugin.json", JSON.stringify({ version: localVersion }));
-		return skillRoot;
-	}
-
-	function fakeFetch(remoteVersion) {
-		return async () => ({
-			ok: true,
-			json: async () => ({ version: remoteVersion }),
-		});
-	}
-
-	it("returns a warning string when the upstream version differs", async () => {
-		const skillRoot = makePluginSkillRoot("1.0.0");
-		const warning = await checkUpstreamVersion(skillRoot, fakeFetch("2.0.0"));
-		assert.match(warning, /1\.0\.0/);
-		assert.match(warning, /2\.0\.0/);
-	});
-
-	it("returns null when the upstream version matches", async () => {
-		const skillRoot = makePluginSkillRoot("1.0.0");
-		const warning = await checkUpstreamVersion(skillRoot, fakeFetch("1.0.0"));
-		assert.equal(warning, null);
-	});
-
-	it("returns null silently when the injected fetch rejects", async () => {
-		const skillRoot = makePluginSkillRoot("1.0.0");
-		const rejectingFetch = async () => {
-			throw new Error("network down");
-		};
-		const warning = await checkUpstreamVersion(skillRoot, rejectingFetch);
-		assert.equal(warning, null);
-	});
-
-	it("returns null silently when the local plugin.json is absent (repo-local run)", async () => {
-		const skillRoot = join(tmp, "repo-local-skill");
-		mkdirSync(skillRoot, { recursive: true });
-		const warning = await checkUpstreamVersion(skillRoot, fakeFetch("2.0.0"));
-		assert.equal(warning, null);
-	});
-});
+// checkUpstreamVersion moved to plugin-version-check.mjs/.test.mjs (ADR-0028
+// review: decoupled from install/ sync semantics for reuse by other skills).
