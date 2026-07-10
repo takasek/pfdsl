@@ -1,5 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	matchesTrigger,
 	formatGateTable,
@@ -7,7 +10,10 @@ import {
 	statusChangedForArtifact,
 	extractGateChecklist,
 	deriveManualItems,
+	GATE_CHECKLIST_SOURCE_PATH,
 } from "./gate-check.mjs";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("matchesTrigger", () => {
 	it("matches when any file hits the pattern", () => {
@@ -129,5 +135,13 @@ describe("deriveManualItems", () => {
 	it("keeps everything when nothing matches the covered keywords", () => {
 		const items = ["知見を振り分けた", "PR にまとめた"];
 		assert.deepEqual(deriveManualItems(items), items);
+	});
+});
+
+describe("GATE_CHECKLIST_SOURCE_PATH", () => {
+	it("points at a file whose checklist section yields MANUAL items", () => {
+		const text = readFileSync(resolve(root, GATE_CHECKLIST_SOURCE_PATH), "utf-8");
+		const items = deriveManualItems(extractGateChecklist(text));
+		assert.ok(items.length > 0, "expected at least one MANUAL checklist item from the deployed source file");
 	});
 });
