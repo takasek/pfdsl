@@ -515,7 +515,7 @@ process:
   i352_probe_adoption_day:
     label: 採用初日プローブ実施
     location: https://github.com/takasek/pfdsl/issues/352
-    updated_at: 2026-07-06T03:43:14Z
+    updated_at: 2026-07-10T10:46:26Z
   i356_implement_explain_cmd:
     label: explain コマンド実装
     location: https://github.com/takasek/pfdsl/issues/356
@@ -544,7 +544,6 @@ process:
     label: pfd-ops plugin 統合・skill sync 廃止検討
     description: "設計は ADR-0028 で確定・実装済み（plugin 同梱・/pfd-init 実配置・skill sync 削除）"
     location: https://github.com/takasek/pfdsl/issues/404
-    updated_at: 2026-07-10T02:04:21Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
