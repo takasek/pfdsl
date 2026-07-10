@@ -53,12 +53,9 @@ PR マージ時に issue が自動 close されるには、PR 本文に `Closes 
 
 ## 採用手順
 
-1. `pfd-ops` スキルをリポの `.claude/skills/pfd-ops/` に設置する
-2. `pfd-ops/install/` 以下のファイルをリポルートに一括コピーする（相対パス保持）:
-   ```sh
-   cp -r .claude/skills/pfd-ops/install/. .
-   ```
-   install/ 内ファイルと deployed コピーの identity は `check-pfd-ops-sync.yml` CI が自動検証する（設計根拠: ADR-0016）。
+1. pfdsl plugin を導入する（`/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`）— pfd-ops スキル本体はリポでなく plugin から供給される
+2. `install/` 以下のファイルをリポルートに実配置する（`/pfd-init` ステップ3.5、または直接 `node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy`）。
+   配置ファイルと plugin 同梱 canonical の drift は pfd-ops 発火時のランタイム hash 照合が警告する（設計根拠: ADR-0028）
 3. GitHub に `flow:managed` / `flow:exempt` ラベルを作成する（`audit-issues-flow.mjs --fix` が未作成ラベルを自動生成する）
 4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、issue に対応する process に `iN_` prefix を付ける
 5. リポの `roadmap.md` で本プリセットを指し、リポ URL を記載する

@@ -1,7 +1,7 @@
 ---
 title: pfdsl CLI 変換パイプライン
 type: runtime-pipeline
-description: "pfdslソースが実行時に何へ変換されるか、変換の境界はどこか。独立した2本のチェーンを持つ: .pfdslドキュメント変換（b: 処理系）とスキル配布（g: skill sync）。処理系の呼び出し元（c: pfdsl skill / d: VSCode拡張）はパイプラインを実行するホストでありデータではないため、図には現れない（pfdsl_skillのみ配布素材として登場）。a-g層との対応と設計判断はsibling runtime-pipeline.md参照"
+description: "pfdslソースが実行時に何へ変換されるか、変換の境界はどこか。独立した2本のチェーンを持つ: .pfdslドキュメント変換（b: 処理系）とスキル配布（g: plugin）。処理系の呼び出し元（c: pfdsl skill / d: VSCode拡張）はパイプラインを実行するホストでありデータではないため、図には現れない（pfdsl_skillのみ配布素材として登場）。a-g層との対応と設計判断はsibling runtime-pipeline.md参照"
 layout:
   direction: LR
   maxWidth: 140
@@ -19,6 +19,9 @@ group:
   adopter_repo:
     label: 採用リポ
     color: "#eafaf1"
+  adopter_env:
+    label: 採用ユーザー環境（ユーザー単位・リポ外）
+    color: "#fdebd0"
 
 tag:
   b:
@@ -117,27 +120,9 @@ artifact:
     description: "内容の一次情報はworkflow.pfdsl。ここではskill_source_bundleへの同梱対象としてのみ扱う"
     location: ../.claude/skills/pfd-ecosystem/
     group: skill_sources
-  skill_source_bundle:
-    label: 配布対象スキル束
-    description: "4スキルツリーとcommands/pfd-*.md・agents/pfd-*.mdをdist/へバンドルし公開npmパッケージへ同梱したもの。開発/テスト実行時はresolveSkillRoot・resolveAgentsDirがdist不在ならリポの.claude/skills/<name>・.claude/agents/へフォールバックする"
-  installed_skills:
-    label: 導入済みスキル
-    description: "採用リポ<target>/.claude/skills/{pfd-ops,pfd-retro,pfd-ecosystem,pfdsl}/へのミラーコピー結果"
-    externalStakeholders: [採用リポのAIエージェント]
-    group: adopter_repo
-  installed_commands:
-    label: 導入済みコマンド
-    description: 採用リポ<target>/.claude/commands/pfd-*.mdへのコピー結果
-    externalStakeholders: [採用リポのAIエージェント]
-    group: adopter_repo
-  installed_agents:
-    label: 導入済みagent定義
-    description: 採用リポ<target>/.claude/agents/pfd-*.mdへのコピー結果（#357）
-    externalStakeholders: [採用リポのAIエージェント]
-    group: adopter_repo
   installed_l3_layer:
     label: 導入済みL3レイヤー
-    description: install/由来ファイル（GitHub Actionsワークフロー・監査スクリプト）の採用リポルートへのコピー結果
+    description: "plugin同梱install/由来ファイル（GitHub Actionsワークフロー・監査スクリプト）の採用リポルートへの実配置結果"
     externalStakeholders: [採用リポのGitHub Actions]
     group: adopter_repo
   gh_labels:
@@ -145,6 +130,20 @@ artifact:
     description: "flow:managed / flow:exempt ラベルの存在保証（gh CLI経由）"
     externalStakeholders: [採用リポのGitHubリポジトリ]
     group: adopter_repo
+  plugin_dir:
+    label: 配布プラグインディレクトリ
+    description: "make gen-plugin が組み立てる plugin/pfdsl/（コミット対象、git-subdir marketplace source としてそのまま配布される）。canonical スキル群との identity は check-gen-plugin.yml が CI 強制する"
+    location: ../plugin/pfdsl/
+  installed_plugin:
+    label: 導入済みプラグイン
+    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。4スキル・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）"
+    externalStakeholders: [採用リポのAIエージェント]
+    group: adopter_env
+  drift_report:
+    label: 配置鮮度警告
+    description: "配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、および上流plugin versionとのskew警告（stdout）。警告が出たら--deployでrefreshする"
+    externalStakeholders: [採用リポのAIエージェント]
+    group: run_outputs
 
 process:
   parse:
@@ -199,39 +198,33 @@ process:
     command: npx @pfdsl/cli sort-meta
     location: ../packages/core/src/sort.ts
     tags: [b]
-  bundle_skills:
-    label: スキルバンドル生成
-    description: "ビルド時（tsup onSuccess）に4スキルツリーとcommands/pfd-*.md・agents/pfd-*.mdをdist/へコピーする。対象4スキル名・agentsパターンはtsup.config.tsとskill-sync.tsの両方にハードコードされ、スキル・agent追加時は両方の更新が必要。fの内容authoringはworkflow.pfdsl側、ここは機械的コピーのみ"
-    location: ../packages/cli/tsup.config.ts
+  assemble_plugin:
+    label: プラグイン組み立て
+    description: "4スキルツリー（pfdslはgen-skillで生成、他3つは.claude/skills/からコピー）とcommands/pfd-*.md・agents/pfd-lens.mdをplugin/pfdsl/へ集約しplugin.jsonをCLI versionから生成する。同梱対象リストはgen-plugin.mjsに一元化"
+    command: make gen-plugin
+    location: ../scripts/gen-plugin.mjs
     tags: [g]
-  sync_skill_tree:
-    label: スキルツリー同期
-    description: skill_source_bundleの各スキルツリーを採用リポの.claude/skills/へミラーコピーする（エントリ単位でrm→cpの破壊的コピー。削除・改名を反映する）
-    command: npx @pfdsl/cli skill sync
-    location: ../packages/cli/src/skill-sync.ts
+  install_plugin:
+    label: プラグインインストール
+    description: "外部ユーザーがClaude Codeのmarketplace機構で導入・更新する（/plugin install、更新は/plugin marketplace update）。リポ内コミットを伴わない"
     tags: [g]
-  sync_commands:
-    label: コマンド同期
-    description: skill_source_bundleのcommands/のうちpfd-*.mdパターンに一致するものだけを採用リポの.claude/commands/へコピーする
-    command: npx @pfdsl/cli skill sync
-    location: ../packages/cli/src/skill-sync.ts
+  deploy_install_layer:
+    label: L3レイヤー実配置
+    description: "/pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。既配置ファイルがcanonicalとhash不一致（ローカル編集）なら上書きせず警告し、--force指定時のみ上書きする"
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --deploy
+    location: ../.claude/skills/pfd-ops/scripts/check-install-sync.mjs
     tags: [g]
-  sync_agents:
-    label: agent定義同期
-    description: skill_source_bundleのagents/のうちpfd-*.mdパターンに一致するものだけを採用リポの.claude/agents/へコピーする（#357。sync_commandsと同型）
-    command: npx @pfdsl/cli skill sync
-    location: ../packages/cli/src/skill-sync.ts
-    tags: [g]
-  sync_install_layer:
-    label: L3レイヤー同期
-    description: "バンドル内pfd-ops/install/を採用リポルートへコピーする。採用リポでL3採用済み（install/由来ファイルが1つ以上存在）の場合のみ実行し、未採用時は案内メッセージのみでファイルを生成しない"
-    command: npx @pfdsl/cli skill sync
-    location: ../packages/cli/src/skill-sync.ts
+  check_install_sync:
+    label: 配置鮮度セルフチェック
+    description: "pfd-ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。--upstreamで上流plugin.json versionとのskewもベストエフォートで警告する。check-pfd-ops-sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR-0028）"
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
+    location: ../.claude/skills/pfd-ops/scripts/check-install-sync.mjs
     tags: [g]
   ensure_labels:
     label: ラベル保証
-    description: "L3同期が行われた場合のみ、flow:managed / flow:exemptラベルの存在をgh CLIで確認・作成する（--yes未指定時は対話確認）"
-    location: ../packages/cli/src/skill-sync.ts
+    description: "L3採用手順の一部として flow:managed / flow:exempt ラベルの存在を確認・作成する（deployed の audit-issues-flow.mjs --fix が未作成ラベルを自動生成する。旧skill syncのensure機能の移管先）"
+    command: node scripts/audit-issues-flow.mjs --fix
+    location: ../scripts/audit-issues-flow.mjs
     tags: [g]
 ---
 
@@ -253,14 +246,12 @@ dot_graph >> export_image -> rendered_image
 
 [normalized_graph, parsed_doc] >> diff_graphs -> diff_report
 
-[pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> bundle_skills -> skill_source_bundle
+[pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> assemble_plugin -> plugin_dir
 
-skill_source_bundle >> sync_skill_tree -> installed_skills
+plugin_dir >> install_plugin -> installed_plugin
 
-skill_source_bundle >> sync_commands -> installed_commands
+installed_plugin >> deploy_install_layer -> installed_l3_layer
 
-skill_source_bundle >> sync_agents -> installed_agents
-
-skill_source_bundle >> sync_install_layer -> installed_l3_layer
+[installed_plugin, installed_l3_layer] >> check_install_sync -> drift_report
 
 installed_l3_layer >> ensure_labels -> gh_labels
