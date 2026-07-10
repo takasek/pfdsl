@@ -1,0 +1,17 @@
+---
+title: (プロジェクト名) データパイプライン
+type: runtime-pipeline
+description: システムが動くとき、データは何に変換されるか。変換の境界はどこか。詳細は sibling runtime-pipeline.md 参照。
+
+artifact:
+  raw_input:
+    label: (入力データに置き換える)
+  processed_output:
+    label: (変換後の出力に置き換える)
+
+process:
+  transform:
+    label: (変換プロセスに置き換える)
+---
+
+raw_input >> transform -> processed_output

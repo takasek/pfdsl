@@ -20,7 +20,7 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
 
 ## 配布物への finding 反映
 
-配布 bundle（`.claude/skills/pfd-*` 配下のスキル本文・reference）は `pfdsl skill sync` が採用リポへ無条件上書きコピーする配布物であり、採用リポで直接編集しても次回 sync で消える。
+配布 bundle（plugin 同梱の pfd-* スキル本文・reference）は上流リポ（takasek/pfdsl）の生成・同梱物であり、採用リポ側のコピーは編集対象にならない（ADR-0028。plugin cache 内のファイルはインストール更新で消える）。
 finding を配布物に反映したい場合は、出力表の宛先（companion 等）に記録した上で、上流リポへの変更提案として起票する。
 本スキル本文（SKILL.md）に取り込めるのは L1（固有名詞ゼロの汎用プロトコル — 層定義は `pfd-ops/references/architecture.md`）に一般化できる記述のみ: リポ固有の固有名詞・issue 番号・ファイルパス・ADR 番号は禁止、配布 bundle 内のスキル・reference への相互参照は可。
 一般化できない具体例は companion に残す。
