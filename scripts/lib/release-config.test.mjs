@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 
-import { RELEASE_KINDS, bumpVersionInPackageJson, tagName } from "./release-config.mjs";
+import { RELEASE_KINDS, bumpVersionInPackageJson, tagName, pinMarketplaceSourceToTag } from "./release-config.mjs";
 
 test("RELEASE_KINDS has the three known kinds with distinct tag prefixes", () => {
 	assert.deepEqual(Object.keys(RELEASE_KINDS).sort(), ["cli", "libs", "vscode"]);
@@ -44,4 +44,51 @@ test("tagName concatenates prefix and version", () => {
 	assert.equal(tagName(RELEASE_KINDS.cli, "0.0.18"), "v0.0.18");
 	assert.equal(tagName(RELEASE_KINDS.libs, "0.0.3"), "lib-v0.0.3");
 	assert.equal(tagName(RELEASE_KINDS.vscode, "0.0.14"), "vscode-v0.0.14");
+});
+
+test("pinMarketplaceSourceToTag replaces a bare relative-path source with a tag-pinned git-subdir source", () => {
+	const before = `{
+	"name": "pfdsl",
+	"plugins": [
+		{
+			"name": "pfdsl",
+			"description": "desc",
+			"source": "./plugin/pfdsl"
+		}
+	]
+}
+`;
+	const after = pinMarketplaceSourceToTag(before, "v0.0.19");
+	assert.deepEqual(JSON.parse(after).plugins[0].source, {
+		source: "git-subdir",
+		url: "https://github.com/takasek/pfdsl.git",
+		path: "plugin/pfdsl",
+		ref: "v0.0.19",
+	});
+});
+
+test("pinMarketplaceSourceToTag updates ref on an already-pinned source", () => {
+	const before = `{
+	"plugins": [
+		{
+			"name": "pfdsl",
+			"source": {
+				"source": "git-subdir",
+				"url": "https://github.com/takasek/pfdsl.git",
+				"path": "plugin/pfdsl",
+				"ref": "v0.0.18"
+			}
+		}
+	]
+}
+`;
+	const after = pinMarketplaceSourceToTag(before, "v0.0.19");
+	assert.equal(JSON.parse(after).plugins[0].source.ref, "v0.0.19");
+});
+
+test("pinMarketplaceSourceToTag preserves tab indentation and trailing newline", () => {
+	const before = '{\n\t"plugins": [\n\t\t{ "name": "pfdsl", "source": "./plugin/pfdsl" }\n\t]\n}\n';
+	const after = pinMarketplaceSourceToTag(before, "v0.0.19");
+	assert.match(after, /\n$/);
+	assert.match(after, /\t"plugins"/);
 });

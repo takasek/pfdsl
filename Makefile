@@ -111,21 +111,16 @@ check-docs:
 .PHONY: gen-skill
 gen-skill: check-docs
 	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
-	node scripts/gen-skill.mjs --out skills/pfdsl
-	# CLAUDE.md is a local-only "do not edit" guard for the in-repo working copy
-	# (.claude/skills/pfdsl); it is intentionally absent from the distribution copy
-	# (skills/pfdsl) and not emitted by gen-skill, so exclude it from the identity check.
-	@diff -rq -x CLAUDE.md .claude/skills/pfdsl skills/pfdsl > /dev/null || (echo "ERROR: .claude/skills/pfdsl and skills/pfdsl differ after gen-skill" && exit 1)
 
-.PHONY: install-skill
-install-skill: check-docs
-	node scripts/gen-skill.mjs --out "$(HOME)/.claude/skills/pfdsl"
+.PHONY: gen-plugin
+gen-plugin: gen-skill
+	node scripts/gen-plugin.mjs
 
 .PHONY: push
 push: check-docs
-	@if ! git diff --quiet HEAD -- docs/samples docs/examples skills; then \
-		echo "docs/samples, docs/examples, または skills に差分があります。コミットしてから push してください。"; \
-		git diff --stat HEAD -- docs/samples docs/examples skills; \
+	@if ! git diff --quiet HEAD -- docs/samples docs/examples plugin .claude-plugin; then \
+		echo "docs/samples, docs/examples, plugin, または .claude-plugin に差分があります。コミットしてから push してください。"; \
+		git diff --stat HEAD -- docs/samples docs/examples plugin .claude-plugin; \
 		exit 1; \
 	fi
 	$(MAKE) gen-samples
@@ -133,10 +128,10 @@ push: check-docs
 		echo "gen-samples で docs/samples が更新されました。自動コミットします。"; \
 		git add docs/samples && git commit -m "chore: regenerate docs/samples"; \
 	fi
-	$(MAKE) gen-skill
-	@if ! git diff --quiet HEAD -- skills; then \
-		echo "gen-skill でスキルが更新されました。自動コミットします。"; \
-		git add skills && git commit -m "chore: regenerate skills"; \
+	$(MAKE) gen-plugin
+	@if ! git diff --quiet HEAD -- plugin .claude-plugin; then \
+		echo "gen-plugin でプラグインが更新されました。自動コミットします。"; \
+		git add plugin .claude-plugin && git commit -m "chore: regenerate plugin"; \
 	fi
 	git push
 

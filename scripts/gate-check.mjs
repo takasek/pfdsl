@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Terminal-gate aggregate checker: runs the mechanically-verifiable items
 // from pfd-ops step 3 (check / audit-issues-flow / check-md-linebreaks /
-// gen-skill identity / snapshot freshness / output-artifact status update)
+// gen-plugin identity / snapshot freshness / output-artifact status update)
 // against the diff from origin/<base> to HEAD, then prints the remaining
 // checklist items (extracted from SKILL.md itself) as MANUAL: lines.
 // Usage: node scripts/gate-check.mjs [--base main] [--artifact <key>]
@@ -18,7 +18,7 @@ import {
 	hasStatusChange,
 	statusChangedForArtifact,
 } from "./lib/gate-check.mjs";
-import { GEN_SKILL_TRIGGER } from "./lib/gen-skill-trigger.mjs";
+import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -97,14 +97,12 @@ if (mdFiles.length === 0) {
 	results.push({ name: "check-md-linebreaks", status: r.ok ? "PASS" : "FAIL" });
 }
 
-// 4. gen-skill identity (only when skill-source paths changed)
-if (!matchesTrigger(changedFiles, GEN_SKILL_TRIGGER)) {
-	results.push({ name: "gen-skill identity", status: "SKIP", detail: "no skill-source changes" });
+// 4. gen-plugin identity (only when skill/plugin-source paths changed)
+if (!matchesTrigger(changedFiles, GEN_PLUGIN_TRIGGER)) {
+	results.push({ name: "gen-plugin identity", status: "SKIP", detail: "no skill/plugin-source changes" });
 } else {
-	const r = trySh(
-		'node scripts/gen-skill.mjs --out .claude/skills/pfdsl && node scripts/gen-skill.mjs --out skills/pfdsl && diff -rq -x CLAUDE.md .claude/skills/pfdsl skills/pfdsl',
-	);
-	results.push({ name: "gen-skill identity", status: r.ok ? "PASS" : "FAIL" });
+	const r = trySh("node scripts/gen-plugin.mjs && git diff --exit-code -- plugin");
+	results.push({ name: "gen-plugin identity", status: r.ok ? "PASS" : "FAIL" });
 }
 
 // 5. snapshot freshness (only when .pfdsl files changed)

@@ -1,0 +1,15 @@
+{
+	"$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+	"name": "pfdsl",
+	"description": "PFD-DSL authoring toolkit for Claude Code — process-flow-diagram DSL for planning/workflow modeling.",
+	"owner": {
+		"name": "takasek"
+	},
+	"plugins": [
+		{
+			"name": "pfdsl",
+			"description": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), ecosystem bootstrap (pfd-ecosystem skill), retrospective audit (pfd-retro skill), and /pfd-cycle, /pfd-init commands.",
+			"source": "./plugin/pfdsl"
+		}
+	]
+}

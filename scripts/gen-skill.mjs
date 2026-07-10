@@ -157,8 +157,8 @@ console.log("SKILL.md → generated from skill-template/SKILL.md");
 
 // --- 4. Write CLAUDE.md guard (in-repo working copy only, .claude/ outputs) ---
 // .claude/skills/pfdsl is a generated + gitignored working copy (#348); the
-// distribution copy (skills/pfdsl) intentionally omits this dev-only guard
-// (mirrors the CLAUDE.md exclusion in the gen-skill identity check, Makefile).
+// marketplace plugin copy (plugin/pfdsl/skills/pfdsl, #366) intentionally
+// omits this dev-only guard.
 // Must check the path *relative to the repo root*, not raw absolute path
 // components — the repo itself may be checked out under a directory that
 // contains a literal ".claude" segment (e.g. a worktree at .claude/worktrees/*),

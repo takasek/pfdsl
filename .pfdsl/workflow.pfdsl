@@ -40,8 +40,8 @@ artifact:
     group: generation
   skill_template:
     label: スキルテンプレート
-    description: "スキル本文の正本（品質ガイドは quality_guide が別持ち）。gen-skill.mjs がこれを読み込んで skill と gh_skill_dist を生成する"
-    criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が最新テンプレートと一致
+    description: "スキル本文の正本（品質ガイドは quality_guide が別持ち）。gen-skill.mjs がこれを読み込んで pfdsl_skill を生成する"
+    criteria: make gen-skill が差分なしで完了し、pfdsl_skill が最新テンプレートと一致
     location: ../scripts/skill-template/SKILL.md
     group: generation
   quality_guide:
@@ -58,15 +58,15 @@ artifact:
     group: generation
   pfdsl_skill:
     label: AI agent スキル（リポ内）
-    description: "make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点（このリポ内の Claude Code が消費）"
-    criteria: make gen-skill が差分なし、diff -rq で gh_skill_dist と一致
+    description: "make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点（このリポ内の Claude Code が消費）。marketplace 配布は plugin_dist（gen_plugin が同じ一次ソースから独立再生成）"
+    criteria: make gen-skill が差分なし
     location: ../.claude/skills/pfdsl/
     group: generation
-  gh_skill_dist:
-    label: gh skill 配布スキル
-    description: "gh skill install takasek/pfdsl/pfdsl --agent claude-code で外部ユーザーが ~/.claude/skills/pfdsl/ に展開する。make gen-skill で再生成（.claude/skills/pfdsl/ と常に同一内容 — diff -rq で保証）"
-    criteria: .claude/skills/pfdsl/ と diff -rq で差分なし
-    location: ../skills/pfdsl/
+  plugin_dist:
+    label: marketplace 配布プラグイン
+    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl で外部ユーザーが導入する Claude Code プラグイン（pfdsl / ecosystem_skill / retro_skill スキル、/pfd-cycle・/pfd-init・/pfd-retro コマンド、pfd-lens agent を束ねる）。pfd-ops は含まない（repo 側自動化を運べないため skill sync / cp -r を維持）。make gen-plugin で再生成、plugin.json の version は toolchain の CLI package.json 由来"
+    criteria: make gen-plugin が差分なし（check-gen-plugin.yml が CI で強制、CLI リリース後の version 反映漏れもこれで検出）
+    location: ../plugin/pfdsl/
     group: release
   user_intent:
     label: ユーザーの関心・意図
@@ -179,6 +179,12 @@ artifact:
     location: ../.claude/skills/pfd-retro/
     group: generation
     tags: [distilled_skill]
+  pfd_lens_agent:
+    label: pfd-lens agent
+    description: "retro_skill の A・B 層委譲先。大きい図・複数図の監査を read-only agent へオフロードする（#357）。手書き、生成対象外"
+    criteria: /pfd-lens が期待通り動作する
+    location: ../.claude/agents/pfd-lens.md
+    group: generation
   ecosystem_skill:
     label: PFDセット構築スキル
     description: "/pfd-init コマンド。PFD セット（roadmap / workflow / runtime-pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
@@ -292,9 +298,15 @@ process:
     group: generation
   gen_skill:
     label: スキル生成
-    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）を変更した場合に実行する。check-gen-skill.yml が全 PR で identity を強制（CI backstop）"
+    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）を変更した場合に実行する。gh skill install 向け配布コピーは廃止済み（#366、marketplace に一本化）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制（CI backstop）"
     command: make gen-skill
     group: generation
+
+  gen_plugin:
+    label: プラグイン生成
+    description: "gen_skill と同じ一次ソース（spec/skill_template/quality_guide/feature_samples/review_perspectives）から pfdsl スキルを独立再生成し、ecosystem_skill・retro_skill、/pfd-cycle・/pfd-init・/pfd-retro コマンド、pfd-lens agent を plugin/pfdsl/ に束ね plugin.json を書く。pfdsl_skill（.claude/skills/pfdsl/）を直接コピーするわけではない。version は toolchain の CLI package.json 由来。check-gen-plugin.yml が全 PR で drift を強制（CI backstop、CLI リリース後の version 反映漏れも検出）"
+    command: make gen-plugin
+    group: release
 
   write_examples:
     label: 実践例執筆
@@ -334,7 +346,7 @@ process:
     group: planning
   publish_cli:
     label: CLI 公開
-    description: "事前に make release-status で behind を確認してから実施。自動化済み: v* tag push → GitHub Actions → npm publish。手作業は make release のみ"
+    description: "事前に make release-status で behind を確認してから実施。自動化済み: v* tag push → GitHub Actions → npm publish。plugin_dist の marketplace.json も同じ v* タグへ pin される（plugin/pfdsl 新設時点のタグには含まれないファイルを参照しないよう、main の現在 HEAD でなくこの検証済みタグを指す）。手作業は make release のみ"
     command: "make release VERSION=<VERSION>"
     group: release
   publish_libraries:
@@ -391,9 +403,11 @@ spec >> maintain_samples -> feature_samples
 
 [findings, adrs] >>? maintain_template
 
-[spec, skill_template, quality_guide, feature_samples, review_perspectives] >> gen_skill -> [pfdsl_skill, gh_skill_dist]
+[spec, skill_template, quality_guide, feature_samples, review_perspectives] >> gen_skill -> pfdsl_skill
 
 pfdsl_skill >>? gen_skill
+
+[spec, skill_template, quality_guide, feature_samples, review_perspectives, toolchain, ecosystem_skill, retro_skill, pfd_lens_agent] >> gen_plugin -> plugin_dist
 
 topics >> write_examples -> examples
 
@@ -429,7 +443,7 @@ pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
 
 issue_updates >>? file_issues
 
-[toolchain, pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> publish_cli -> published_cli
+[toolchain, pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, pfd_lens_agent] >> publish_cli -> published_cli
 
 toolchain >> publish_libraries -> published_libraries
 
@@ -437,4 +451,4 @@ toolchain >> publish_ext -> published_ext
 
 [feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
 
-[toolchain, published_cli, published_libraries, gh_skill_dist] >> update_readme -> readme
+[toolchain, published_cli, published_libraries, plugin_dist] >> update_readme -> readme

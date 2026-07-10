@@ -8,8 +8,9 @@
 //   3. clean working tree check
 //   4. resolve target version (from --version, or the current package.json)
 //   5. tag-duplicate check (cheap, version is already known)
-//   6. pre-tag checks: build, test, check-docs, gen-skill identity
+//   6. pre-tag checks: build, test, check-docs, gen-plugin identity
 //   7. bump package.json(s) + commit (only if --version was given)
+//   7b. cli only: pin marketplace.json's plugin source to this release's tag
 //   8. push origin main
 //   9. kind-specific pre-tag step (vscode: vsce package)
 //   10. git tag + push tag
@@ -23,7 +24,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { RELEASE_KINDS, bumpVersionInPackageJson, tagName } from "./lib/release-config.mjs";
+import { RELEASE_KINDS, bumpVersionInPackageJson, tagName, pinMarketplaceSourceToTag } from "./lib/release-config.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -95,26 +96,23 @@ try {
 
 // --- 6. pre-tag checks ---
 
-console.log("Running pre-tag checks (build, test, check-docs, gen-skill identity)...");
+console.log("Running pre-tag checks (build, test, check-docs, gen-plugin identity)...");
 run("make", ["build"]);
 run("make", ["test"]);
 run("make", ["check-docs"]);
-run("make", ["gen-skill"]);
-// make gen-skill only checks .claude/skills/pfdsl and skills/pfdsl match each
-// other (both freshly regenerated, so they almost always do) — it does not
-// check that the regeneration matches what's committed. Mirror what CI's
-// check-gen-skill.yml does: regenerate, then diff against the committed tree.
+run("make", ["gen-plugin"]);
+// make gen-plugin regenerates plugin/pfdsl/ (the marketplace distribution
+// copy) fresh — it does not check that the regeneration matches what's
+// committed. Mirror what CI's check-gen-plugin.yml does: regenerate, then
+// diff against the committed tree.
 try {
-	execFileSync("git", ["diff", "--exit-code", ".claude/skills/pfdsl", "skills/pfdsl"], {
+	execFileSync("git", ["diff", "--exit-code", "plugin"], {
 		cwd: root,
 		stdio: "ignore",
 	});
 } catch (err) {
 	if (err.status === undefined) throw err; // execFileSync itself failed to spawn
-	fail(
-		"generated skill dirs (.claude/skills/pfdsl, skills/pfdsl) are stale — " +
-			"run 'make gen-skill' and commit the result before releasing.",
-	);
+	fail("generated plugin dir (plugin/pfdsl) is stale — run 'make gen-plugin' and commit the result before releasing.");
 }
 
 // --- 7. bump + commit (only if --version was given) ---
@@ -126,6 +124,21 @@ if (explicitVersion) {
 	}
 	run("git", ["add", ...kind.packages]);
 	run("git", ["commit", "-m", kind.commitMessage(explicitVersion)]);
+}
+
+// --- 7b. cli release: pin the marketplace plugin source to this tag, so
+// /plugin install and /plugin marketplace update fetch this verified
+// snapshot instead of main's current (possibly since-changed) HEAD ---
+
+if (kindArg === "cli") {
+	const marketplacePath = resolve(root, ".claude-plugin/marketplace.json");
+	const before = readFileSync(marketplacePath, "utf-8");
+	const after = pinMarketplaceSourceToTag(before, tag);
+	if (after !== before) {
+		writeFileSync(marketplacePath, after);
+		run("git", ["add", ".claude-plugin/marketplace.json"]);
+		run("git", ["commit", "-m", `chore(plugin): pin marketplace source to ${tag}`]);
+	}
 }
 
 // --- 8. push origin main ---

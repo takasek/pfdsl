@@ -54,13 +54,26 @@ check_drift() {
 # is itself the check). Left as-is — no functional difference, and
 # converging them isn't worth the churn (see #265).
 
-# gen-skill.mjs embeds `pfdsl help` output, so it needs the CLI dist.
+# gen-skill.mjs embeds `pfdsl help` output, so it needs the CLI dist. Only
+# regenerates the .claude/skills/pfdsl dev working copy — the tracked
+# distribution copy (skills/pfdsl, for `gh skill install`) was removed in
+# favor of the plugin marketplace (#366).
 # Trigger pattern is sourced from scripts/lib/gen-skill-trigger.mjs (single
 # source of truth shared with gate-check.mjs) since this sh script can't import JS.
 gen_skill_trigger=$(node scripts/lib/gen-skill-trigger.mjs)
 check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
-  "node scripts/gen-skill.mjs --out .claude/skills/pfdsl && node scripts/gen-skill.mjs --out skills/pfdsl && git diff --quiet -- .claude/skills/pfdsl skills/pfdsl" \
-  "Skill dirs are stale. Run 'make gen-skill' and re-stage the skill files."
+  "node scripts/gen-skill.mjs --out .claude/skills/pfdsl" \
+  "The .claude/skills/pfdsl dev copy failed to regenerate. Run 'make gen-skill' and investigate."
+
+# gen-plugin.mjs bundles pfd-ecosystem/pfd-retro/commands plus the pfdsl skill
+# (via gen-skill.mjs) into plugin/pfdsl/; needs the CLI dist for the same
+# reason as the gen-skill check above (see #400/#401).
+# Trigger pattern is sourced from scripts/lib/gen-plugin-trigger.mjs (single
+# source of truth shared with gate-check.mjs).
+gen_plugin_trigger=$(node scripts/lib/gen-plugin-trigger.mjs)
+check_drift "$gen_plugin_trigger" "packages/cli/dist/cli.js" \
+  "node scripts/gen-plugin.mjs && git diff --quiet -- plugin" \
+  "plugin/pfdsl is stale. Run 'make gen-plugin' and re-stage the plugin files."
 
 # The .dot/README drift guard is a vitest test that imports @pfdsl/core (→ dist).
 check_drift '^docs/samples/' \

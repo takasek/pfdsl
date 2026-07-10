@@ -27,11 +27,11 @@ describe("formatGateTable", () => {
 	it("renders PASS/FAIL/SKIP rows with symbols", () => {
 		const out = formatGateTable([
 			{ name: "pfdsl check", status: "PASS" },
-			{ name: "gen-skill identity", status: "SKIP", detail: "no skill-source changes" },
+			{ name: "gen-plugin identity", status: "SKIP", detail: "no skill/plugin-source changes" },
 			{ name: "audit-issues-flow", status: "FAIL", detail: "diff detected" },
 		]);
 		assert.match(out, /✓ PASS\s+pfdsl check/);
-		assert.match(out, /- SKIP\s+gen-skill identity — no skill-source changes/);
+		assert.match(out, /- SKIP\s+gen-plugin identity — no skill\/plugin-source changes/);
 		assert.match(out, /✗ FAIL\s+audit-issues-flow — diff detected/);
 	});
 });

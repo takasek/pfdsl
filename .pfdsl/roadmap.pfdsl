@@ -22,7 +22,7 @@ artifact:
     criteria: check/fmt/graph が全サンプルに対してエラーなし、npm 公開済み
   skill_gen:
     label: スキル生成系（現行）
-    description: scripts/gen-skill.mjs と docs/samples 構成。identity は check-gen-skill.yml が CI 強制
+    description: scripts/gen-skill.mjs と docs/samples 構成。identity は check-gen-plugin.yml が CI 強制
     status: done
     criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
   spec_v007:
@@ -115,7 +115,7 @@ artifact:
   marketplace_dist:
     label: "marketplace 配布 pfdsl skill 群 (#366)"
     description: "pfdsl + pfd-ecosystem/retro/cycle を1プラグインに束ね Claude plugin marketplace 配布。gen-skill の出力先を plugin ディレクトリへ向ける。生成層は温存し配布層のみ /plugin 化。pfd-ops はリポジトリ成果物を運べないため cp -r 維持"
-    status: todo
+    status: done
     criteria: "plugin が marketplace 経由で install でき skill 発火・references 生成物が届くことを検証済み、spec/CLI version と plugin.json version の連動 gate が CI で動作"
   featured_toolchain:
     label: "spec v0.0.7 実装済みツールチェーン (#52)"
@@ -341,9 +341,9 @@ artifact:
     criteria: ADR-0027 の全 block 種別（見出し・list item・table 行・paragraph）の範囲取得がテストで検証され、docs/ 実データで動作確認済み
   pfd_ops_plugin_dist:
     label: "pfd-ops 統合済み plugin 配布 (#404)"
-    description: "pfd-ops の L1〜L3 を marketplace plugin に統合した配布形態。skill sync 廃止の可否は ADR-0016 の identity ゲート帰趨に依存（設計 TBD、issue #404 が一次情報）"
+    description: "pfd-ops の L1/L2/L3（SKILL.md 本文・references/github-issues-backend.md）を plugin/pfdsl/ に統合し、install/ の実配置（採用リポへの GitHub Actions workflow・scripts 書き込み）を /pfd-init の scaffold コピー機能へ移す。成立すれば pfdsl skill sync（CLI コマンド）が不要になる。設計 TBD — 未解決論点は issue #404 参照（ADR-0016 の check-pfd-ops-sync.yml drift ゲートが依存する canonical-in-repo モデルとの整合、${CLAUDE_PLUGIN_ROOT} の slash command 本文での実地検証、adopt/refresh コマンド設計、チーム/CI 前提の trade-off、既導入リポの移行手順）"
     status: todo
-    criteria: 設計論点2件（CLAUDE_PLUGIN_ROOT の slash command 適用・canonical install コピーの帰趨）が確定し、採用された配布形態で pfd-ops の L1〜L3 が採用リポに届くことを検証済み
+    criteria: "issue #404 の未解決論点が ADR または PFD companion に決定として記録されており、pfd-ops が plugin 経由で発火し install/ 相当の配置が /pfd-init 経由で機能することを検証済み"
   mint_check_tool:
     label: "mint-check ツール (#405)"
     description: "採番前に slug の既出（定義・strict 参照・forward-ref・tombstone）を列挙する scripts ツール。既存 forward-ref の slug を別概念で採番する silent 衝突の防止が主目的"
