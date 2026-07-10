@@ -3,7 +3,8 @@
 // from pfd-ops step 3 (check / audit-issues-flow / check-md-linebreaks /
 // gen-plugin identity / snapshot freshness / output-artifact status update)
 // against the diff from origin/<base> to HEAD, then prints the remaining
-// checklist items (extracted from SKILL.md itself) as MANUAL: lines.
+// checklist items (extracted from the work-cycle checklist itself) as
+// MANUAL: lines.
 // Usage: node scripts/gate-check.mjs [--base main] [--artifact <key>]
 
 import { execSync } from "node:child_process";
@@ -17,6 +18,7 @@ import {
 	formatGateTable,
 	hasStatusChange,
 	statusChangedForArtifact,
+	GATE_CHECKLIST_SOURCE_PATH,
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 
@@ -162,7 +164,7 @@ if (pfdslFiles.length === 0) {
 	}
 }
 
-const skillMdPath = resolve(root, ".claude/skills/pfd-ops/SKILL.md");
+const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
 const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdPath, "utf-8")));
 
 console.log("gate-check:");

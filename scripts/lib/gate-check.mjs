@@ -56,9 +56,14 @@ export function statusChangedForArtifact(beforeText, afterText, artifactKey) {
 }
 
 /**
- * Parse the pfd-ops SKILL.md terminal-gate checklist (workcycle step 3) into
- * raw item strings. SKILL.md is the single source of truth for wording —
- * gate-check derives its MANUAL: list from it instead of duplicating the text.
+ * Repo-relative path to the terminal-gate checklist (workcycle step 3). This
+ * file is the single source of truth for wording — gate-check derives its
+ * MANUAL: list from it instead of duplicating the text.
+ */
+export const GATE_CHECKLIST_SOURCE_PATH = ".claude/skills/pfd-ops/references/work-cycle.md";
+
+/**
+ * Parse the terminal-gate checklist (workcycle step 3) into raw item strings.
  * @param {string} skillMdText
  * @returns {string[]}
  */
@@ -80,7 +85,8 @@ export function extractGateChecklist(skillMdText) {
 }
 
 // Checklist items already covered by gate-check's own mechanized checks,
-// matched by substring since SKILL.md wording is the source of truth.
+// matched by substring since the checklist source file's wording is the
+// source of truth.
 const COVERED_BY_GATE_CHECK = ["出力 artifact の status を更新した", "変更した全 .pfdsl が"];
 
 /**
