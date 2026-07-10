@@ -1,5 +1,16 @@
 import { Graphviz } from "@hpcc-js/wasm";
+import { buildDiffPanelHtml } from "./diff-panel.js";
 import { unwrapAnchors } from "./svg-anchors.js";
+
+type DiffReport = {
+	addedNodes: string[];
+	removedNodes: string[];
+	changedNodes: string[];
+	addedEdges: string[];
+	removedEdges: string[];
+	addedFeedback: string[];
+	removedFeedback: string[];
+};
 
 type MessageToWebview =
 	| {
@@ -13,17 +24,7 @@ type MessageToWebview =
 	| { type: "error"; message: string }
 	| { type: "focus"; nodeId: string }
 	| { type: "clearFocus" }
-	| {
-			type: "diff";
-			report: {
-				addedNodes: string[];
-				removedNodes: string[];
-				addedEdges: string[];
-				removedEdges: string[];
-				addedFeedback: string[];
-				removedFeedback: string[];
-			};
-	  }
+	| { type: "diff"; report: DiffReport }
 	| { type: "clearDiff" };
 
 type MessageFromWebview =
@@ -67,34 +68,10 @@ let subflows: Record<string, string> = {};
 let lastFocusedNodeId: string | undefined;
 
 const diffPanel = document.getElementById("diff-panel") as HTMLDivElement;
-type StoredDiff = {
-	addedNodes: string[];
-	removedNodes: string[];
-	addedEdges: string[];
-	removedEdges: string[];
-	addedFeedback: string[];
-	removedFeedback: string[];
-};
-let currentDiff: StoredDiff | null = null;
+let currentDiff: DiffReport | null = null;
 
-function renderDiffPanel(report: StoredDiff): void {
-	const lines: string[] = [];
-	for (const n of report.addedNodes) lines.push(`+ node  ${n}`);
-	for (const n of report.removedNodes) lines.push(`- node  ${n}`);
-	for (const e of report.addedEdges) lines.push(`+ edge  ${e}`);
-	for (const e of report.removedEdges) lines.push(`- edge  ${e}`);
-	for (const f of report.addedFeedback) lines.push(`+ feedback  ${f}`);
-	for (const f of report.removedFeedback) lines.push(`- feedback  ${f}`);
-	if (lines.length === 0) {
-		diffPanel.innerHTML = `<span class="diff-none">No structural differences</span>`;
-	} else {
-		diffPanel.innerHTML = lines
-			.map(
-				(l) =>
-					`<div class="${l.startsWith("+") ? "diff-add" : "diff-remove"}">${escapeHtml(l)}</div>`,
-			)
-			.join("");
-	}
+function renderDiffPanel(report: DiffReport): void {
+	diffPanel.innerHTML = buildDiffPanelHtml(report);
 	diffPanel.style.display = "block";
 }
 
