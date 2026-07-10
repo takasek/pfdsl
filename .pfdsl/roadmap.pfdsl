@@ -339,6 +339,16 @@ artifact:
     status: done
     location: ../scripts/get-spec-id.mjs
     criteria: ADR-0027 の全 block 種別（見出し・list item・table 行・paragraph）の範囲取得がテストで検証され、docs/ 実データで動作確認済み
+  pfd_ops_plugin_dist:
+    label: "pfd-ops 統合済み plugin 配布 (#404)"
+    description: "pfd-ops の L1〜L3 を marketplace plugin に統合した配布形態。skill sync 廃止の可否は ADR-0016 の identity ゲート帰趨に依存（設計 TBD、issue #404 が一次情報）"
+    status: todo
+    criteria: 設計論点2件（CLAUDE_PLUGIN_ROOT の slash command 適用・canonical install コピーの帰趨）が確定し、採用された配布形態で pfd-ops の L1〜L3 が採用リポに届くことを検証済み
+  mint_check_tool:
+    label: "mint-check ツール (#405)"
+    description: "採番前に slug の既出（定義・strict 参照・forward-ref・tombstone）を列挙する scripts ツール。既存 forward-ref の slug を別概念で採番する silent 衝突の防止が主目的"
+    status: todo
+    criteria: 定義・strict 参照・forward-ref の全出現種別が file:line で列挙され、既出ゼロ/ありで exit code が分かれることがテストで検証済み
   spec_id_refs:
     label: 仕様ID相互参照化済み spec.md
     description: "節番号直書きの相互参照を仕様ID参照へ段階移行した spec.md。ADR 確定後に別 issue として起票する（#328 移行方針）。後続門番のプレースホルダ（ADR-0018）"
@@ -524,7 +534,10 @@ process:
   i402_implement_get_by_id:
     label: get-by-ID ツール実装
     location: https://github.com/takasek/pfdsl/issues/402
-    updated_at: 2026-07-09T18:37:46Z
+  i405_implement_mint_check:
+    label: mint-check ツール実装
+    location: https://github.com/takasek/pfdsl/issues/405
+    updated_at: 2026-07-10T01:50:30Z
   migrate_spec_id_refs:
     label: spec.md 仕様ID参照移行
     description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。ADR 確定後に issue 起票して iN prefix を付与する。issue 化時に移行対象の現行 spec artifact を入力エッジとして列挙する"
@@ -532,6 +545,11 @@ process:
     label: marketplace 配布移行
     location: https://github.com/takasek/pfdsl/issues/366
     updated_at: 2026-07-07T03:28:01Z
+  i404_integrate_pfd_ops_plugin:
+    label: pfd-ops plugin 統合・skill sync 廃止検討
+    description: "設計 TBD（issue 参照）— ADR-0016 の identity ゲート帰趨と CLAUDE_PLUGIN_ROOT の slash command 適用可否を確定させてから実装"
+    location: https://github.com/takasek/pfdsl/issues/404
+    updated_at: 2026-07-09T19:28:18Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -645,6 +663,10 @@ spec_v0011 >> i328_design_spec_ids -> spec_id_syntax
 
 spec_id_syntax >> i402_implement_get_by_id -> get_by_id_tool
 
-[spec_id_syntax, get_by_id_tool] >> migrate_spec_id_refs -> spec_id_refs
+spec_id_syntax >> i405_implement_mint_check -> mint_check_tool
+
+[spec_id_syntax, get_by_id_tool, mint_check_tool] >> migrate_spec_id_refs -> spec_id_refs
 
 skill_gen >> i366_distribute_marketplace -> marketplace_dist
+
+marketplace_dist >> i404_integrate_pfd_ops_plugin -> pfd_ops_plugin_dist
