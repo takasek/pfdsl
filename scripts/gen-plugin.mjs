@@ -19,56 +19,56 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const pluginRoot = resolve(root, "plugin/pfdsl");
 
-function mirrorOrExit(fn, ...args) {
-	try {
-		fn(...args);
-	} catch (e) {
-		console.error(e instanceof Error ? e.message : String(e));
-		process.exit(1);
+function assemble() {
+	// --- 1. Generate the pfdsl skill directly into plugin/pfdsl/skills/pfdsl ---
+	// (reuses gen-skill.mjs rather than copying skills/pfdsl, so this stays in
+	// sync even if the two ever diverge in generation logic)
+
+	execFileSync(process.execPath, [resolve(__dirname, "gen-skill.mjs"), "--out", resolve(pluginRoot, "skills/pfdsl")], {
+		stdio: "inherit",
+	});
+
+	// --- 2. Copy the static skills (pfd-ecosystem, pfd-ops, pfd-retro) into skills/ ---
+
+	for (const name of ["pfd-ecosystem", "pfd-ops", "pfd-retro"]) {
+		mirrorDir(name, resolve(root, ".claude/skills"), resolve(pluginRoot, "skills"));
+		console.log(`plugin/pfdsl/skills/${name} ← .claude/skills/${name}`);
 	}
+
+	// --- 3. Copy the commands (pfd-cycle, pfd-init, pfd-retro) into commands/ ---
+
+	const commandFiles = ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"];
+	mirrorFiles(commandFiles, resolve(root, ".claude/commands"), resolve(pluginRoot, "commands"));
+	for (const file of commandFiles) {
+		console.log(`plugin/pfdsl/commands/${file} ← .claude/commands/${file}`);
+	}
+
+	// --- 4. Copy the agents (pfd-lens) into agents/ ---
+	// pfd-retro's SKILL.md delegates large-diagram audits to the pfd-lens agent
+	// (.claude/agents/pfd-lens.md); without it bundled, that delegation path is
+	// unreachable for plugin-only installs.
+
+	const agentFiles = ["pfd-lens.md"];
+	mirrorFiles(agentFiles, resolve(root, ".claude/agents"), resolve(pluginRoot, "agents"));
+	for (const file of agentFiles) {
+		console.log(`plugin/pfdsl/agents/${file} ← .claude/agents/${file}`);
+	}
+
+	// --- 5. Write plugin/pfdsl/.claude-plugin/plugin.json ---
+
+	const cliVersion = JSON.parse(readFileSync(resolve(root, "packages/cli/package.json"), "utf-8")).version;
+	const manifest = buildPluginManifest({ cliVersion });
+	const pluginManifestDir = resolve(pluginRoot, ".claude-plugin");
+	mkdirSync(pluginManifestDir, { recursive: true });
+	writeFileSync(resolve(pluginManifestDir, "plugin.json"), `${JSON.stringify(manifest, null, "\t")}\n`);
+	console.log("plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version");
+
+	console.log("\nPlugin assembled at plugin/pfdsl/. Verify locally with: claude --plugin-dir plugin/pfdsl");
 }
 
-// --- 1. Generate the pfdsl skill directly into plugin/pfdsl/skills/pfdsl ---
-// (reuses gen-skill.mjs rather than copying skills/pfdsl, so this stays in
-// sync even if the two ever diverge in generation logic)
-
-execFileSync(process.execPath, [resolve(__dirname, "gen-skill.mjs"), "--out", resolve(pluginRoot, "skills/pfdsl")], {
-	stdio: "inherit",
-});
-
-// --- 2. Copy the static skills (pfd-ecosystem, pfd-ops, pfd-retro) into skills/ ---
-
-for (const name of ["pfd-ecosystem", "pfd-ops", "pfd-retro"]) {
-	mirrorOrExit(mirrorDir, name, resolve(root, ".claude/skills"), resolve(pluginRoot, "skills"));
-	console.log(`plugin/pfdsl/skills/${name} ← .claude/skills/${name}`);
+try {
+	assemble();
+} catch (e) {
+	console.error(e instanceof Error ? e.message : String(e));
+	process.exit(1);
 }
-
-// --- 3. Copy the commands (pfd-cycle, pfd-init, pfd-retro) into commands/ ---
-
-const commandFiles = ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"];
-mirrorOrExit(mirrorFiles, commandFiles, resolve(root, ".claude/commands"), resolve(pluginRoot, "commands"));
-for (const file of commandFiles) {
-	console.log(`plugin/pfdsl/commands/${file} ← .claude/commands/${file}`);
-}
-
-// --- 4. Copy the agents (pfd-lens) into agents/ ---
-// pfd-retro's SKILL.md delegates large-diagram audits to the pfd-lens agent
-// (.claude/agents/pfd-lens.md); without it bundled, that delegation path is
-// unreachable for plugin-only installs.
-
-const agentFiles = ["pfd-lens.md"];
-mirrorOrExit(mirrorFiles, agentFiles, resolve(root, ".claude/agents"), resolve(pluginRoot, "agents"));
-for (const file of agentFiles) {
-	console.log(`plugin/pfdsl/agents/${file} ← .claude/agents/${file}`);
-}
-
-// --- 5. Write plugin/pfdsl/.claude-plugin/plugin.json ---
-
-const cliVersion = JSON.parse(readFileSync(resolve(root, "packages/cli/package.json"), "utf-8")).version;
-const manifest = buildPluginManifest({ cliVersion });
-const pluginManifestDir = resolve(pluginRoot, ".claude-plugin");
-mkdirSync(pluginManifestDir, { recursive: true });
-writeFileSync(resolve(pluginManifestDir, "plugin.json"), `${JSON.stringify(manifest, null, "\t")}\n`);
-console.log("plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version");
-
-console.log("\nPlugin assembled at plugin/pfdsl/. Verify locally with: claude --plugin-dir plugin/pfdsl");

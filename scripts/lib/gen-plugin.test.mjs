@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -68,6 +68,42 @@ describe("mirrorDir", () => {
 
 	it("exits with an error when the source directory is missing", () => {
 		assert.throws(() => mirrorDir("missing", join(tmp, "src"), join(tmp, "dest")), /not found/);
+	});
+
+	it("excludes a top-level CLAUDE.md dev-only guard from the mirrored copy", () => {
+		const src = join(tmp, "src", "foo");
+		mkdirSync(src, { recursive: true });
+		writeFileSync(join(src, "SKILL.md"), "skill body");
+		writeFileSync(join(src, "CLAUDE.md"), "dev-only guard, never ship this");
+		const destRoot = join(tmp, "dest");
+
+		mirrorDir("foo", join(tmp, "src"), destRoot);
+
+		assert.equal(existsSync(join(destRoot, "foo", "CLAUDE.md")), false);
+		assert.equal(readFileSync(join(destRoot, "foo", "SKILL.md"), "utf-8"), "skill body");
+	});
+
+	it("keeps the prior destination content when the source copy fails partway", () => {
+		// A source directory containing an unreadable nested file makes cpSync
+		// throw partway through a recursive copy — a portable stand-in for any
+		// mid-copy failure (disk full, permission change, concurrent deletion).
+		const src = join(tmp, "src", "foo");
+		mkdirSync(src, { recursive: true });
+		writeFileSync(join(src, "a.txt"), "new-a");
+		writeFileSync(join(src, "unreadable.txt"), "x");
+		chmodSync(join(src, "unreadable.txt"), 0o000);
+
+		const destRoot = join(tmp, "dest");
+		mkdirSync(join(destRoot, "foo"), { recursive: true });
+		writeFileSync(join(destRoot, "foo", "a.txt"), "prior-good-a");
+
+		try {
+			assert.throws(() => mirrorDir("foo", join(tmp, "src"), destRoot));
+		} finally {
+			chmodSync(join(src, "unreadable.txt"), 0o644);
+		}
+
+		assert.equal(readFileSync(join(destRoot, "foo", "a.txt"), "utf-8"), "prior-good-a");
 	});
 });
 
