@@ -179,6 +179,12 @@ artifact:
     location: ../.claude/skills/pfd-retro/
     group: generation
     tags: [distilled_skill]
+  pfd_lens_agent:
+    label: pfd-lens agent
+    description: "retro_skill の A・B 層委譲先。大きい図・複数図の監査を read-only agent へオフロードする（#357）。手書き、生成対象外"
+    criteria: /pfd-lens が期待通り動作する
+    location: ../.claude/agents/pfd-lens.md
+    group: generation
   ecosystem_skill:
     label: PFDセット構築スキル
     description: "/pfd-init コマンド。PFD セット（roadmap / workflow / runtime-pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
@@ -401,7 +407,7 @@ spec >> maintain_samples -> feature_samples
 
 pfdsl_skill >>? gen_skill
 
-[spec, skill_template, quality_guide, feature_samples, review_perspectives, toolchain, ecosystem_skill, retro_skill] >> gen_plugin -> plugin_dist
+[spec, skill_template, quality_guide, feature_samples, review_perspectives, toolchain, ecosystem_skill, retro_skill, pfd_lens_agent] >> gen_plugin -> plugin_dist
 
 topics >> write_examples -> examples
 
@@ -437,7 +443,7 @@ pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
 
 issue_updates >>? file_issues
 
-[toolchain, pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> publish_cli -> published_cli
+[toolchain, pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, pfd_lens_agent] >> publish_cli -> published_cli
 
 toolchain >> publish_libraries -> published_libraries
 
