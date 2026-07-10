@@ -6,21 +6,16 @@ setup:
 	@if [ ! -d .claude/skills/pfdsl ]; then $(MAKE) bootstrap-pfdsl-skill; fi
 
 # .claude/skills/pfdsl is generated + gitignored (#348), not tracked in git.
-# Bootstrapping it has a build-order cycle: the CLI build's onSuccess hook bundles
-# .claude/skills/pfdsl into dist/skills (fails if the dir is absent), but
 # gen-skill.mjs needs a built CLI (packages/cli/dist/cli.js) to render the CLI
-# help section. Break the cycle: build once tolerating the onSuccess failure
-# (dist/cli.js is already written to disk before onSuccess runs), generate the
-# skill, then rebuild the CLI cleanly so dist/skills/pfdsl is bundled too.
+# help section, so build the packages first, then generate the skill once.
 .PHONY: bootstrap-pfdsl-skill
 bootstrap-pfdsl-skill:
 	pnpm --filter @pfdsl/core build
 	pnpm --filter @pfdsl/graphviz-exporter build
 	pnpm --filter @pfdsl/metadata-exporter build
 	pnpm --filter @pfdsl/preview-engine build
-	-pnpm --filter @pfdsl/cli build
-	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
 	pnpm --filter @pfdsl/cli build
+	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
 
 .PHONY: build
 build:

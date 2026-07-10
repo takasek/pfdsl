@@ -34,7 +34,6 @@ import {
 	renderDiff,
 	renderGraph,
 } from "@pfdsl/preview-engine";
-import { runSkillSync } from "./skill-sync.js";
 
 export interface CommandResult {
 	stdout: string;
@@ -1023,14 +1022,6 @@ Options:
   --format svg   visual diff as SVG
 `;
 
-const HELP_SKILL = `usage: pfdsl skill sync [--yes]
-
-Sync pfd-ops skills and commands into the current directory.
-
-Options:
-  --yes  auto-confirm gh label creation (non-interactive)
-`;
-
 const HELP_READY = `usage: pfdsl ready <file|-> [--best] [--json]
 
 List processes whose every input artifact has status: done (or no status set).
@@ -1155,9 +1146,6 @@ Commands:
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON
-  skill sync [--yes]
-                           Sync pfd-ops skills and commands into the current directory
-                           --yes     auto-confirm gh label creation (non-interactive)
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
   help                     Show this help
 
@@ -1316,26 +1304,6 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			return runAuditSync(roadmapFile, flowFiles, {
 				json: flags.json === true,
 			});
-		}
-		case "skill": {
-			if (flags.help) return ok(HELP_SKILL);
-			const [sub] = positional;
-			if (sub !== "sync") {
-				return fail(HELP_SKILL, 2);
-			}
-			// --target overrides cwd; intended for tests only (production always
-			// targets the directory the CLI is invoked from).
-			const targetRoot =
-				typeof flags.target === "string" ? flags.target : process.cwd();
-			try {
-				const result = await runSkillSync({
-					targetRoot,
-					yes: flags.yes === true,
-				});
-				return ok(result.stdout);
-			} catch (e) {
-				return fail(e instanceof Error ? `${e.message}\n` : String(e));
-			}
 		}
 		case "explain": {
 			if (flags.help) return ok(HELP_EXPLAIN);

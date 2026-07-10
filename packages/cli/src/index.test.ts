@@ -1,10 +1,4 @@
-import {
-	existsSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -530,30 +524,6 @@ describe("check --summary", () => {
 	});
 });
 
-describe("skill sync", () => {
-	it("usage error for bare 'skill'", async () => {
-		const r = await run(["skill"]);
-		expect(r.exitCode).toBe(2);
-		expect(r.stderr).toContain("usage: pfdsl skill sync");
-	});
-
-	it("syncs skills and commands into target directory with --yes", async () => {
-		const target = mkdtempSync(join(tmpdir(), "pfdsl-skill-sync-cli-"));
-		try {
-			const r = await run(["skill", "sync", "--target", target, "--yes"]);
-			expect(r.exitCode).toBe(0);
-			expect(existsSync(join(target, ".claude/skills/pfd-ops/SKILL.md"))).toBe(
-				true,
-			);
-			expect(existsSync(join(target, ".claude/commands/pfd-cycle.md"))).toBe(
-				true,
-			);
-		} finally {
-			rmSync(target, { recursive: true, force: true });
-		}
-	});
-});
-
 describe("version", () => {
 	it("--version prints a semver string", async () => {
 		const r = await run(["--version"]);
@@ -596,11 +566,6 @@ describe("subcommand --help", () => {
 		const r = await run(["diff", "--help"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("pfdsl diff");
-	});
-	it("skill --help prints usage", async () => {
-		const r = await run(["skill", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl skill");
 	});
 });
 

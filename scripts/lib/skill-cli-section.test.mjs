@@ -14,9 +14,6 @@ Commands:
                            Set artifact status (todo|wip|done|waiting|suspended) in place
                            Roadmap files: prints newly-ready processes after the change
                            --json    output as JSON
-  skill sync [--yes]
-                           Sync pfd-ops skills and commands into the current directory
-                           --yes     auto-confirm gh label creation (non-interactive)
   help                     Show this help
 
 Exit codes:
@@ -30,7 +27,6 @@ describe("renderCliSection", () => {
 		assert.deepEqual(lines, [
 			"npx @pfdsl/cli check <file|-> [--audit] [--json]   # Validate a .pfdsl file (- = stdin)",
 			"npx @pfdsl/cli status-set <file> <artifact-id> <status> [--json]   # Set artifact status (todo|wip|done|waiting|suspended) in place",
-			"npx @pfdsl/cli skill sync [--yes]   # Sync pfd-ops skills and commands into the current directory",
 			"npx @pfdsl/cli help   # Show this help",
 		]);
 	});

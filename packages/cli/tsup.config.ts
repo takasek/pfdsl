@@ -1,16 +1,6 @@
-import {
-	cpSync,
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-} from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineConfig } from "tsup";
-import {
-	isDistributableAgent,
-	isDistributableCommand,
-} from "./src/skill-sync.js";
 
 const { version } = JSON.parse(
 	readFileSync(resolve(__dirname, "package.json"), "utf-8"),
@@ -29,45 +19,5 @@ export default defineConfig({
 		// noExternal pulls in transitive CJS deps (e.g. yaml, which ships no
 		// node ESM build); esbuild's ESM output needs a real require for them.
 		js: 'import { createRequire as __pfdslCreateRequire } from "node:module"; const require = __pfdslCreateRequire(import.meta.url);',
-	},
-	onSuccess: async () => {
-		const repoRoot = resolve(__dirname, "../..");
-		for (const name of ["pfd-ops", "pfd-retro", "pfd-ecosystem", "pfdsl"]) {
-			const src = resolve(repoRoot, `.claude/skills/${name}`);
-			const dest = resolve(__dirname, `dist/skills/${name}`);
-			if (!existsSync(src)) {
-				throw new Error(
-					`${name} skill source not found at ${src}. Run 'make gen-skill' first (or 'make setup' for a fresh clone).`,
-				);
-			}
-			mkdirSync(dest, { recursive: true });
-			cpSync(src, dest, {
-				recursive: true,
-				// CLAUDE.md at skill root is a dev-repo-only guard — never ship it
-				// (mirrors the exclusion in copySkillTree, skill-sync.ts).
-				filter: (source) =>
-					basename(source) !== "CLAUDE.md" || dirname(source) !== src,
-			});
-		}
-		const commandsSrc = resolve(repoRoot, ".claude/commands");
-		const commandsDest = resolve(__dirname, "dist/commands");
-		if (!existsSync(commandsSrc)) {
-			throw new Error(`commands dir not found at ${commandsSrc}`);
-		}
-		mkdirSync(commandsDest, { recursive: true });
-		for (const entry of readdirSync(commandsSrc)) {
-			if (!isDistributableCommand(entry)) continue;
-			cpSync(resolve(commandsSrc, entry), resolve(commandsDest, entry));
-		}
-		const agentsSrc = resolve(repoRoot, ".claude/agents");
-		const agentsDest = resolve(__dirname, "dist/agents");
-		if (!existsSync(agentsSrc)) {
-			throw new Error(`agents dir not found at ${agentsSrc}`);
-		}
-		mkdirSync(agentsDest, { recursive: true });
-		for (const entry of readdirSync(agentsSrc)) {
-			if (!isDistributableAgent(entry)) continue;
-			cpSync(resolve(agentsSrc, entry), resolve(agentsDest, entry));
-		}
 	},
 });

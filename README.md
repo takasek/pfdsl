@@ -138,9 +138,6 @@ Commands:
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON
-  skill sync [--yes]
-                           Sync pfd-ops skills and commands into the current directory
-                           --yes     auto-confirm gh label creation (non-interactive)
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
   help                     Show this help
 
@@ -174,16 +171,16 @@ A skill for Claude Code is bundled at `.claude/skills/pfdsl/`. It provides PFDSL
 
 ### Install via Claude Code plugin marketplace (recommended)
 
-The `pfdsl`, `pfd-ecosystem`, and `pfd-retro` skills, plus the `/pfd-cycle` and `/pfd-init` commands, are distributed as a Claude Code plugin (`plugin/pfdsl/`) through this repo's self-hosted marketplace:
+The `pfdsl`, `pfd-ecosystem`, `pfd-retro`, and `pfd-ops` skills, plus the `/pfd-cycle` and `/pfd-init` commands, are distributed as a Claude Code plugin (`plugin/pfdsl/`) through this repo's self-hosted marketplace:
 
 ```
 /plugin marketplace add takasek/pfdsl
 /plugin install pfdsl@pfdsl
 ```
 
-Skills and commands are namespaced under the plugin: `pfdsl:pfdsl`, `pfdsl:pfd-ecosystem`, `pfdsl:pfd-retro`, `/pfdsl:pfd-cycle`, `/pfdsl:pfd-init`. Updates ship by bumping the CLI version (`plugin.json`'s `version` field is derived from `packages/cli/package.json`); `/plugin marketplace update` picks up new releases.
+Skills and commands are namespaced under the plugin: `pfdsl:pfdsl`, `pfdsl:pfd-ecosystem`, `pfdsl:pfd-retro`, `pfdsl:pfd-ops`, `/pfdsl:pfd-cycle`, `/pfdsl:pfd-init`. Updates ship by bumping the CLI version (`plugin.json`'s `version` field is derived from `packages/cli/package.json`); `/plugin marketplace update` picks up new releases.
 
-`pfd-ops` is not part of the plugin — it ships repo-side automation (GitHub Actions workflows, audit scripts) that a plugin can't deliver into your project, so it keeps the `skill sync` / `cp -r` adopt flow below.
+`pfd-ops` ships repo-side automation (GitHub Actions workflows, audit scripts) that the plugin mechanism can't write into your project directly, so adopting it is a separate step — see the section below.
 
 ### Regenerating the skill (contributors)
 
@@ -195,30 +192,21 @@ make gen-skill
 
 The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alongside `SKILL.md`. `make gen-plugin` (which depends on `gen-skill`) regenerates the marketplace plugin's copy too.
 
-## pfd-cycle suite — `skill sync` (cross-project)
+## pfd-cycle suite (cross-project)
 
-A suite of Claude Code skills and commands for **PFD-driven project operations**: issue prioritization, progress tracking, artifact management, and session-learning routing across `roadmap` / `workflow` / `runtime-pipeline` PFDs. Use `/pfd-init` to bootstrap a new project's `.pfdsl/`, `/pfd-cycle` to run a work cycle, and `/pfd-retro` to audit and improve the process.
+A suite of Claude Code skills and commands for **PFD-driven project operations**: issue prioritization, progress tracking, artifact management, and session-learning routing across `roadmap` / `workflow` / `runtime-pipeline` PFDs.
 
-Install into any repo with one command:
+Adopt it in any repo through the plugin:
 
-```bash
-npx @pfdsl/cli@latest skill sync
+```
+/plugin marketplace add takasek/pfdsl
+/plugin install pfdsl@pfdsl
+/pfd-init
 ```
 
-> **Tip:** `npx` re-installs on every invocation. For faster `check` / `ready` runs in daily use, install once:
-> ```bash
-> npm install -g @pfdsl/cli          # global
-> npm install --save-dev @pfdsl/cli  # or as a devDependency
-> ```
+`/pfd-init` copies the `.pfdsl/` scaffold for the PFD kinds your project needs, and (optionally, step 3.5) deploys the GitHub-Issues backend automation — workflows and audit scripts — to the repo root, via the `check-install-sync.mjs` script bundled with the `pfd-ops` skill. Running it again refreshes an already-adopted repo: locally edited files are warned about rather than overwritten, unless you pass `--force`.
 
-Run at a target repo's root, it is idempotent and:
-
-- mirrors skills into `.claude/skills/` (`pfd-ops`, `pfd-retro`, `pfd-ecosystem`, `pfdsl`)
-- copies commands into `.claude/commands/` (`pfd-init`, `pfd-cycle`, `pfd-retro`)
-- copies agents into `.claude/agents/` (`pfd-lens`)
-- refreshes the GitHub-Issues backend (`install/`: workflows + audit scripts deployed at repo root) **only if already adopted**; otherwise prints how to adopt it (`cp -r .claude/skills/pfd-ops/install/. .`)
-
-`--yes` auto-confirms `gh` label creation (`flow:managed` / `flow:exempt`) for non-interactive use.
+Once adopted, use `/pfd-cycle` to run a work cycle and `/pfd-retro` to audit and improve the process.
 
 ## Library
 
