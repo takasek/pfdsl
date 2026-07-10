@@ -8,16 +8,25 @@
 // CLAUDE.md, etc). `claude plugin validate` flags a plugin-root CLAUDE.md as
 // unshippable context, which is what surfaced this during local verification.
 
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
-import { buildPluginManifest } from "./lib/gen-plugin.mjs";
+import { buildPluginManifest, mirrorDir, mirrorFiles } from "./lib/gen-plugin.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const pluginRoot = resolve(root, "plugin/pfdsl");
+
+function mirrorOrExit(fn, ...args) {
+	try {
+		fn(...args);
+	} catch (e) {
+		console.error(e instanceof Error ? e.message : String(e));
+		process.exit(1);
+	}
+}
 
 // --- 1. Generate the pfdsl skill directly into plugin/pfdsl/skills/pfdsl ---
 // (reuses gen-skill.mjs rather than copying skills/pfdsl, so this stays in
@@ -30,32 +39,15 @@ execFileSync(process.execPath, [resolve(__dirname, "gen-skill.mjs"), "--out", re
 // --- 2. Copy the static skills (pfd-ecosystem, pfd-ops, pfd-retro) into skills/ ---
 
 for (const name of ["pfd-ecosystem", "pfd-ops", "pfd-retro"]) {
-	const src = resolve(root, `.claude/skills/${name}`);
-	const dest = resolve(pluginRoot, `skills/${name}`);
-	if (!existsSync(src)) {
-		console.error(`Error: ${src} not found.`);
-		process.exit(1);
-	}
-	// rm before cp: a plain cpSync only adds/overwrites, so a file deleted
-	// upstream (e.g. .claude/skills/pfd-ops/install/...) would otherwise
-	// linger here forever with no diff to catch it.
-	rmSync(dest, { recursive: true, force: true });
-	cpSync(src, dest, { recursive: true });
+	mirrorOrExit(mirrorDir, name, resolve(root, ".claude/skills"), resolve(pluginRoot, "skills"));
 	console.log(`plugin/pfdsl/skills/${name} ← .claude/skills/${name}`);
 }
 
 // --- 3. Copy the commands (pfd-cycle, pfd-init, pfd-retro) into commands/ ---
 
-const commandsDest = resolve(pluginRoot, "commands");
-rmSync(commandsDest, { recursive: true, force: true });
-mkdirSync(commandsDest, { recursive: true });
-for (const file of ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"]) {
-	const src = resolve(root, `.claude/commands/${file}`);
-	if (!existsSync(src)) {
-		console.error(`Error: ${src} not found.`);
-		process.exit(1);
-	}
-	cpSync(src, resolve(commandsDest, file));
+const commandFiles = ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"];
+mirrorOrExit(mirrorFiles, commandFiles, resolve(root, ".claude/commands"), resolve(pluginRoot, "commands"));
+for (const file of commandFiles) {
 	console.log(`plugin/pfdsl/commands/${file} ← .claude/commands/${file}`);
 }
 
@@ -64,16 +56,9 @@ for (const file of ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"]) {
 // (.claude/agents/pfd-lens.md); without it bundled, that delegation path is
 // unreachable for plugin-only installs.
 
-const agentsDest = resolve(pluginRoot, "agents");
-rmSync(agentsDest, { recursive: true, force: true });
-mkdirSync(agentsDest, { recursive: true });
-for (const file of ["pfd-lens.md"]) {
-	const src = resolve(root, `.claude/agents/${file}`);
-	if (!existsSync(src)) {
-		console.error(`Error: ${src} not found.`);
-		process.exit(1);
-	}
-	cpSync(src, resolve(agentsDest, file));
+const agentFiles = ["pfd-lens.md"];
+mirrorOrExit(mirrorFiles, agentFiles, resolve(root, ".claude/agents"), resolve(pluginRoot, "agents"));
+for (const file of agentFiles) {
 	console.log(`plugin/pfdsl/agents/${file} ← .claude/agents/${file}`);
 }
 
