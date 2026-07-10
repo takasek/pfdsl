@@ -24,7 +24,7 @@ description: |
 node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
 ```
 
-`${CLAUDE_PLUGIN_ROOT}` は plugin ロード時に実パスへ置換される。リテラルのまま見えている場合は plugin 外（repo-local）ロード — `node .claude/skills/pfd-ops/scripts/check-install-sync.mjs --upstream` を使う。
+CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${CLAUDE_PLUGIN_ROOT}` の形でのみ置換対象 — この説明文中の表記のように波括弧を外せば置換されない）。上のコマンド行がパス置換されず変数名のまま見えている場合は plugin 外（repo-local）ロード — `node .claude/skills/pfd-ops/scripts/check-install-sync.mjs --upstream` を使う。
 GitHub Issues バックエンド未採用のリポでは何も出ない。
 **警告が出たら対応する**: drift 警告は `--deploy` で refresh する（ローカル編集を意図的に上書きする場合のみ `--force`）。plugin バージョンの上流差分警告は plugin の更新をユーザーに案内する。CI 強制ではなくこのランタイムチェックだけが採用リポの安全網なので、警告を黙殺しない。
 
