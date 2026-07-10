@@ -9,6 +9,7 @@ import {
 	buildLocations,
 	buildSubflows,
 } from "./location-utils.js";
+import type { MessageFromWebview, MessageToWebview } from "./messages.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
@@ -60,28 +61,6 @@ function nodeIdAtCursor(
 	}
 	return undefined;
 }
-
-type MessageToWebview =
-	| {
-			type: "render";
-			dot: string;
-			focusNodeId?: string;
-			descriptions?: Record<string, Array<[string, string]>>;
-			locations?: Record<string, string[]>;
-			subflows?: Record<string, string>;
-	  }
-	| { type: "error"; message: string }
-	| { type: "focus"; nodeId: string }
-	| { type: "clearFocus" }
-	| { type: "diff"; report: DiffReport }
-	| { type: "clearDiff" };
-
-type MessageFromWebview =
-	| { type: "ready" }
-	| { type: "nodeClick"; nodeId: string }
-	| { type: "openUrl"; url: string }
-	| { type: "openFile"; path: string }
-	| { type: "openLocation"; nodeId: string };
 
 async function expandDirectory(dirUri: vscode.Uri): Promise<string[]> {
 	let entries: [string, vscode.FileType][];

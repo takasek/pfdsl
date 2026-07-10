@@ -1,38 +1,8 @@
 import { Graphviz } from "@hpcc-js/wasm";
+import type { DiffReport } from "@pfdsl/core";
 import { buildDiffPanelHtml } from "./diff-panel.js";
+import type { MessageFromWebview, MessageToWebview } from "./messages.js";
 import { unwrapAnchors } from "./svg-anchors.js";
-
-type DiffReport = {
-	addedNodes: string[];
-	removedNodes: string[];
-	changedNodes: string[];
-	addedEdges: string[];
-	removedEdges: string[];
-	addedFeedback: string[];
-	removedFeedback: string[];
-};
-
-type MessageToWebview =
-	| {
-			type: "render";
-			dot: string;
-			focusNodeId?: string;
-			descriptions?: Record<string, Array<[string, string]>>;
-			locations?: Record<string, string[]>;
-			subflows?: Record<string, string>;
-	  }
-	| { type: "error"; message: string }
-	| { type: "focus"; nodeId: string }
-	| { type: "clearFocus" }
-	| { type: "diff"; report: DiffReport }
-	| { type: "clearDiff" };
-
-type MessageFromWebview =
-	| { type: "ready" }
-	| { type: "nodeClick"; nodeId: string }
-	| { type: "openUrl"; url: string }
-	| { type: "openFile"; path: string }
-	| { type: "openLocation"; nodeId: string };
 
 declare const acquireVsCodeApi: () => {
 	postMessage: (msg: MessageFromWebview) => void;
