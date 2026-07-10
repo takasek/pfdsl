@@ -40,7 +40,11 @@ export function listInstallFiles(installDir) {
 			const full = join(dir, entry.name);
 			if (entry.isDirectory()) {
 				walk(full, rel);
-			} else if (entry.isFile()) {
+			} else if (entry.isFile() || entry.isSymbolicLink()) {
+				// Dirent.isFile()/isDirectory() don't follow symlinks, so a
+				// symlinked file would otherwise be silently invisible here —
+				// treated as a leaf file (deployInstall's copyFileSync follows
+				// the link and copies its target's content, same as any file).
 				results.push(rel);
 			}
 		}
@@ -70,12 +74,25 @@ function filesEqual(pathA, pathB) {
 // deployed by this tool" (nothing to report or touch).
 const MANIFEST_RELATIVE_PATH = ".claude/pfd-ops-install-manifest.json";
 
+function isValidManifestEntry(entry) {
+	return (
+		entry !== null &&
+		typeof entry === "object" &&
+		typeof entry.path === "string" &&
+		typeof entry.hash === "string"
+	);
+}
+
+// Malformed entries (hand-edited file, merge conflict, a future schema
+// change reading an old manifest) are dropped rather than crashing every
+// caller downstream — an entry this tool can't make sense of is exactly
+// equivalent to it never having been recorded.
 function readManifest(targetRoot) {
 	const manifestPath = join(targetRoot, MANIFEST_RELATIVE_PATH);
 	if (!existsSync(manifestPath)) return [];
 	try {
 		const data = JSON.parse(readFileSync(manifestPath, "utf-8"));
-		return Array.isArray(data.files) ? data.files : [];
+		return Array.isArray(data.files) ? data.files.filter(isValidManifestEntry) : [];
 	} catch {
 		return [];
 	}

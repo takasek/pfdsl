@@ -94,6 +94,7 @@ pfdsl 開発リポ固有の例:
     scaffold/                  ← L4 雛形テンプレート
   scripts/
     check-install-sync.mjs     ← install/ の実配置・鮮度セルフチェック（ADR-0028）
+    plugin-version-check.mjs   ← plugin version skew チェック（install/ 同期と無関係、check-install-sync.mjs から呼ばれる）
   install/                     ← L3 採用用テンプレート（リポルートへ実配置）
     .github/workflows/         ← flow-on-issue-close 等
     scripts/                   ← audit-issues-flow.mjs 等

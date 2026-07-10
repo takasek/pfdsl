@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -52,6 +52,14 @@ describe("listInstallFiles", () => {
 
 	it("returns an empty array when install/ does not exist", () => {
 		assert.deepEqual(listInstallFiles(join(tmp, "nonexistent")), []);
+	});
+
+	it("includes a symlinked file rather than silently dropping it", () => {
+		const installDir = join(tmp, "install");
+		writeFile(installDir, "real.txt", "a");
+		symlinkSync(join(installDir, "real.txt"), join(installDir, "linked.txt"));
+
+		assert.deepEqual(listInstallFiles(installDir), ["linked.txt", "real.txt"]);
 	});
 });
 
@@ -118,6 +126,20 @@ describe("checkInstallSync", () => {
 		const { results } = checkInstallSync(skillRoot, targetRoot);
 		assert.ok(!results.some((r) => r.path === "unrelated.txt"));
 	});
+
+	it("ignores malformed manifest entries instead of crashing", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-malformed-manifest");
+		writeFile(targetRoot, "a.txt", "canonical-a");
+		writeFile(
+			targetRoot,
+			".claude/pfd-ops-install-manifest.json",
+			JSON.stringify({ files: [{}, "not-an-object", { path: 123, hash: "x" }, { path: "a.txt", hash: "irrelevant" }] }),
+		);
+
+		const { results } = checkInstallSync(skillRoot, targetRoot);
+		assert.ok(!results.some((r) => r.status === "orphaned"));
+	});
 });
 
 describe("deployInstall", () => {
@@ -183,6 +205,19 @@ describe("deployInstall", () => {
 		const forced = deployInstall(skillRoot, targetRoot, { force: true });
 		assert.deepEqual(forced.removed, ["sub/b.txt"]);
 		assert.equal(existsSync(join(targetRoot, "sub", "b.txt")), false);
+	});
+
+	it("ignores malformed manifest entries instead of crashing", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-malformed-manifest-deploy");
+		writeFile(
+			targetRoot,
+			".claude/pfd-ops-install-manifest.json",
+			JSON.stringify({ files: [{}, "not-an-object", { path: 123, hash: "x" }] }),
+		);
+
+		const { copied } = deployInstall(skillRoot, targetRoot);
+		assert.deepEqual(copied.sort(), ["a.txt", "sub/b.txt"]);
 	});
 });
 
