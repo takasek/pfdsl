@@ -55,15 +55,40 @@ PFDSLはこの図法をテキストで書くための最小限の記法を持つ
 
 - `A >> P -> B`：AはプロセスPの入力、BはPの出力。
 - `[a, b] >> P`：集合記法。
-- 図の冒頭に置くメタデータ欄（frontmatter）で、成果物にstatus（done / wip / todoなど）を付けられる。
+- 図の冒頭に置くメタデータ欄（frontmatter）で、ノードに表示名（label）を、成果物にstatus（done / wip / todoなど）を付けられる。
 
 要件と制約から設計を経て仕様書ができ、それをもとに実装してコードができ、コードをレビューしてレビュー結果ができる、という流れは次のように書ける。
 
 ```pfdsl
+---
+artifact:
+  requirement:
+    label: 要件
+  constraint:
+    label: 制約
+  spec:
+    label: 仕様書
+  codebase:
+    label: 既存コード
+  code:
+    label: コード
+  review_report:
+    label: レビュー結果
+process:
+  design:
+    label: 設計
+  implement:
+    label: 実装
+  review:
+    label: レビュー
+---
 [requirement, constraint] >> design -> spec
 [spec, codebase] >> implement -> code
 code >> review -> review_report
 ```
+
+このテキストは、CLIひとつでレイアウト済みの絵に変換できる。
+以降に載せる図の絵は、すべて本文中のテキストからこの変換で生成したものである。
 
 ![要件と制約から仕様書を作り、実装とレビューへ続く依存グラフ。四角が成果物、楕円がプロセス](images/01-basic-flow.svg)
 
@@ -83,15 +108,29 @@ code >> review -> review_report
 ---
 artifact:
   requirement:
+    label: 要件
     status: done
   constraint:
+    label: 制約
     status: done
   spec:
+    label: 仕様書
     status: todo
   codebase:
+    label: 既存コード
     status: done
   code:
+    label: コード
     status: todo
+  review_report:
+    label: レビュー結果
+process:
+  design:
+    label: 設計
+  implement:
+    label: 実装
+  review:
+    label: レビュー
 ---
 [requirement, constraint] >> design -> spec
 [spec, codebase] >> implement -> code
@@ -116,7 +155,7 @@ reviewの入力はcodeで、これもtodoのままなので同様にまだ着手
 ```
 $ pfdsl ready roadmap.pfdsl --best
 Ready processes (1):
-  * design               "design"   inputs: [requirement, constraint]
+  * design               "設計"   inputs: [requirement, constraint]
 
 * = recommended next (removes the last blocker for the most downstream processes)
 ```
