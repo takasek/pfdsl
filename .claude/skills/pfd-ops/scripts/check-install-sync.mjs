@@ -7,7 +7,7 @@
 //
 // Usage: node check-install-sync.mjs [--target <dir>] [--deploy] [--force] [--upstream]
 
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -67,4 +67,36 @@ export function checkInstallSync(skillRoot, targetRoot) {
 	});
 	const adopted = results.some((r) => r.status !== "missing");
 	return { results, adopted };
+}
+
+/**
+ * Copy canonical install/ files to targetRoot, creating directories as
+ * needed. A target file whose hash differs from canonical is treated as a
+ * local edit and skipped unless force is true (a local edit would otherwise
+ * be silently destroyed).
+ * @param {string} skillRoot
+ * @param {string} targetRoot
+ * @param {{ force?: boolean }} [options]
+ * @returns {{ copied: string[], skipped: string[] }}
+ */
+export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
+	const installDir = resolve(skillRoot, "install");
+	const files = listInstallFiles(installDir);
+	const copied = [];
+	const skipped = [];
+	for (const rel of files) {
+		const canonicalPath = join(installDir, ...relPathParts(rel));
+		const targetPath = join(targetRoot, ...relPathParts(rel));
+		if (existsSync(targetPath) && !force) {
+			const same = sha256(canonicalPath) === sha256(targetPath);
+			if (!same) {
+				skipped.push(rel);
+				continue;
+			}
+		}
+		mkdirSync(dirname(targetPath), { recursive: true });
+		copyFileSync(canonicalPath, targetPath);
+		copied.push(rel);
+	}
+	return { copied, skipped };
 }

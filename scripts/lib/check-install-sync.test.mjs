@@ -1,10 +1,10 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { listInstallFiles, checkInstallSync } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
+import { listInstallFiles, checkInstallSync, deployInstall } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
 
 let tmp;
 
@@ -82,5 +82,48 @@ describe("checkInstallSync", () => {
 		const byPath = Object.fromEntries(results.map((r) => [r.path, r.status]));
 		assert.equal(byPath["a.txt"], "ok");
 		assert.equal(byPath["sub/b.txt"], "missing");
+	});
+});
+
+describe("deployInstall", () => {
+	function makeSkillRoot() {
+		const skillRoot = join(tmp, "skill");
+		writeFile(join(skillRoot, "install"), "a.txt", "canonical-a");
+		writeFile(join(skillRoot, "install"), "sub/b.txt", "canonical-b");
+		return skillRoot;
+	}
+
+	it("copies every canonical file into an empty target, creating directories as needed", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-fresh");
+		mkdirSync(targetRoot, { recursive: true });
+
+		const { copied, skipped } = deployInstall(skillRoot, targetRoot);
+		assert.deepEqual(copied.sort(), ["a.txt", "sub/b.txt"]);
+		assert.deepEqual(skipped, []);
+		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "canonical-a");
+		assert.equal(readFileSync(join(targetRoot, "sub", "b.txt"), "utf-8"), "canonical-b");
+	});
+
+	it("skips a locally-edited file without --force and leaves it untouched", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-edited");
+		writeFile(targetRoot, "a.txt", "locally-edited");
+
+		const { copied, skipped } = deployInstall(skillRoot, targetRoot);
+		assert.deepEqual(copied.sort(), ["sub/b.txt"]);
+		assert.deepEqual(skipped, ["a.txt"]);
+		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "locally-edited");
+	});
+
+	it("overwrites a locally-edited file when force is given", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-force");
+		writeFile(targetRoot, "a.txt", "locally-edited");
+
+		const { copied, skipped } = deployInstall(skillRoot, targetRoot, { force: true });
+		assert.deepEqual(copied.sort(), ["a.txt", "sub/b.txt"]);
+		assert.deepEqual(skipped, []);
+		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "canonical-a");
 	});
 });
