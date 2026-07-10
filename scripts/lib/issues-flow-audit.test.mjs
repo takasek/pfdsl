@@ -329,9 +329,34 @@ describe("computeFindings", () => {
 		const issues = [{ number: 7, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
 		const findings = computeFindings(entries, issues);
 		const matching = findings.filter((f) => f.issueNumber === 7);
-		assert.equal(matching.length, 1, "spec_a (done+hasDownstream) should not produce a finding");
-		assert.equal(matching[0].artifactId, "spec_b");
-		assert.equal(matching[0].type, "closed_in_flow");
+		assert.equal(matching.length, 2, "both spec_a and spec_b still carry a residual updatedAt, so both should produce findings");
+		assert.deepEqual(matching.map((f) => f.artifactId).sort(), ["spec_a", "spec_b"]);
+		assert.ok(matching.every((f) => f.type === "closed_in_flow"));
+	});
+
+	it("closed + done + hasDownstream: no finding once issue-tracking fields are fully cleared (demotion already applied)", () => {
+		const entries = [{ processId: "i7_draft_specs", issueNumber: 7, artifactId: "spec_a", status: "done", updatedAt: undefined, priorities: [], hasDownstream: true }];
+		const issues = [{ number: 7, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(entries, issues);
+		assert.equal(findings.filter((f) => f.issueNumber === 7).length, 0, "no residual fields means demotion is already applied — idempotent no-op");
+	});
+
+	it("closed + hasDownstream: finding still emitted when only updatedAt is residual (tags/priorities already cleared)", () => {
+		const entries = [{ processId: "i7_draft_specs", issueNumber: 7, artifactId: "spec_a", status: "done", updatedAt: "2026-01-01T00:00:00Z", priorities: [], hasDownstream: true }];
+		const issues = [{ number: 7, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(entries, issues);
+		const f = findings.find((f) => f.issueNumber === 7);
+		assert.ok(f, "residual updatedAt alone must still trigger closed_in_flow");
+		assert.equal(f.type, "closed_in_flow");
+	});
+
+	it("closed + hasDownstream: finding still emitted when only priorities/tags are residual (updatedAt already cleared)", () => {
+		const entries = [{ processId: "i7_draft_specs", issueNumber: 7, artifactId: "spec_a", status: "done", updatedAt: undefined, priorities: ["priority:high"], hasDownstream: true }];
+		const issues = [{ number: 7, state: "CLOSED", labels: ["flow:managed"], updatedAt: "2026-01-01T00:00:00Z" }];
+		const findings = computeFindings(entries, issues);
+		const f = findings.find((f) => f.issueNumber === 7);
+		assert.ok(f, "residual priorities/tags alone must still trigger closed_in_flow");
+		assert.equal(f.type, "closed_in_flow");
 	});
 });
 

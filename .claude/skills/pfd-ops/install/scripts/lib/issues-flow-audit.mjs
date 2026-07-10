@@ -85,9 +85,16 @@ export function computeFindings(entries, issues) {
 		}
 
 		if (iss.state === "CLOSED") {
-			// closed + done + has downstream = expected state, no action needed
-			if (entry.status === "done" && entry.hasDownstream) {
-				continue;
+			// Non-terminal (has downstream consumers): demotion only clears the process's
+			// issue-tracking fields (tags/updated_at), it never deletes the entry — so once
+			// both fields are gone, the demotion has already happened and there's nothing
+			// left to fix. `status` is not observed here: "done" does not prove demotion ran,
+			// it's also the normal end-state of this repo's completion-then-close ordering.
+			if (entry.hasDownstream) {
+				const hasTrackingFields = entry.updatedAt !== undefined || entry.priorities.length > 0;
+				if (!hasTrackingFields) {
+					continue;
+				}
 			}
 			const isNotPlanned = iss.stateReason === "NOT_PLANNED";
 			findings.push({
