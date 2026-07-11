@@ -36,8 +36,8 @@ check_drift() {
   fi
   if [ "$require_dist" != "-" ]; then
     for f in $require_dist; do
-      if [ ! -f "$f" ]; then
-        echo "note: skipping drift check (dist absent) — run 'pnpm -r build' to enable locally; CI verifies it."
+      if ! node scripts/lib/dist-freshness.mjs "$f"; then
+        echo "note: skipping drift check ($f missing or stale vs its src/) — run 'pnpm -r build' to enable locally; CI verifies it."
         return 0
       fi
     done
