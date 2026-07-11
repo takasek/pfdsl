@@ -1,3 +1,4 @@
+import { groupEdges } from "./edge-groups.js";
 import { computeOpenInputs } from "./multifile.js";
 import type { ArtifactMeta } from "./types/frontmatter.js";
 import type { NodeKind, NormalizedEdge } from "./types/index.js";
@@ -83,15 +84,10 @@ export function auditGraph(
 
 	if (artifactMeta) {
 		// Build map: artifact id → set of consuming processes (input edges only)
+		const artifactConsumers = groupEdges(edges).artifactConsumers;
 		const normalConsumers = new Map<string, Set<string>>();
-		for (const e of edges) {
-			if (e.kind !== "input") continue;
-			let set = normalConsumers.get(e.artifact);
-			if (!set) {
-				set = new Set();
-				normalConsumers.set(e.artifact, set);
-			}
-			set.add(e.process);
+		for (const [artifact, processes] of artifactConsumers) {
+			normalConsumers.set(artifact, new Set(processes));
 		}
 
 		// Group artifacts by their group, ignoring ungrouped artifacts
