@@ -543,7 +543,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 
-	const { readyIds, processInputs } = computeReadyIdsCore(
+	const { readyIds, processInputs, processOutputs } = computeReadyIdsCore(
 		edges,
 		nodeKinds,
 		artifactMeta,
@@ -593,11 +593,17 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 		});
 	}
 
-	type ReadyItem = { id: string; label: string; inputs: string[] };
+	type ReadyItem = {
+		id: string;
+		label: string;
+		inputs: string[];
+		outputs: string[];
+	};
 	const toItem = (pid: string): ReadyItem => ({
 		id: pid,
 		label: frontmatter?.process?.[pid]?.label ?? pid,
 		inputs: processInputs.get(pid) ?? [],
+		outputs: processOutputs.get(pid) ?? [],
 	});
 
 	const readyItems = readyIds.map(toItem);
@@ -1035,7 +1041,7 @@ Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
 Options:
   --best  highlight the process that unblocks the most downstream work
-  --json  output as JSON ({ ok, ready: [{id, label, inputs}], best?, warnings? })
+  --json  output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, warnings? })
 `;
 
 const HELP_STATUS_SET = `usage: pfdsl status-set <file> <artifact-id> <status> [--json]

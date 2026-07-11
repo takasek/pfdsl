@@ -19,6 +19,8 @@ roadmap は「製品の成果物を生み、他作業の着手をゲートする
 
 **判定タイミング**: 起票時に `flow:managed` / `flow:exempt` を判定してから roadmap 追加要否を決める。`flow:managed` の起票と roadmap 追加は同時に行う（後回しにすると依存グラフが stale になり気付き依存に戻る）。
 
+**ラベル付与の許可要否**: `flow:managed`/`flow:exempt` の付与・変更は分類作業であり、issue の close・PR の merge・公開物の publish 等の確定操作ではない。ユーザーへの明示確認なしに実行してよい。
+
 ## PR 本文規約
 
 issue に対応する PR を作る際、本文に必ず閉じるキーワードを含める:
