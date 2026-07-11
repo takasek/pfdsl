@@ -75,25 +75,33 @@ let designUnsettledError = null;
 let gateCheckCommand = null;
 let gateCheckCommandError = null;
 if (best) {
-	const roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
-
+	let roadmapText = null;
 	try {
-		const issueNumber = findIssueNumberForProcess(roadmapText, best);
-		if (issueNumber) {
-			const body = sh(`gh issue view ${issueNumber} --json body --jq .body`);
-			({ designUnsettled, matchedLines: designUnsettledLines } = detectDesignUnsettled(body));
-		} else {
-			designUnsettledError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
-		}
+		roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
 	} catch (e) {
 		designUnsettledError = e.message;
+		gateCheckCommandError = e.message;
 	}
 
-	const artifactKey = findOutputArtifactForProcess(roadmapText, best);
-	if (artifactKey) {
-		gateCheckCommand = buildGateCheckCommand(artifactKey, base);
-	} else {
-		gateCheckCommandError = `no output artifact edge found for process '${best}' in .pfdsl/roadmap.pfdsl`;
+	if (roadmapText !== null) {
+		try {
+			const issueNumber = findIssueNumberForProcess(roadmapText, best);
+			if (issueNumber) {
+				const body = sh(`gh issue view ${issueNumber} --json body --jq .body`);
+				({ designUnsettled, matchedLines: designUnsettledLines } = detectDesignUnsettled(body));
+			} else {
+				designUnsettledError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
+			}
+		} catch (e) {
+			designUnsettledError = e.message;
+		}
+
+		const artifactKey = findOutputArtifactForProcess(roadmapText, best);
+		if (artifactKey) {
+			gateCheckCommand = buildGateCheckCommand(artifactKey, base);
+		} else {
+			gateCheckCommandError = `no output artifact edge found for process '${best}' in .pfdsl/roadmap.pfdsl`;
+		}
 	}
 }
 
