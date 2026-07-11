@@ -1041,7 +1041,7 @@ Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
 Options:
   --best  highlight the process that unblocks the most downstream work
-  --json  output as JSON ({ ok, ready: [{id, label, inputs}], best?, warnings? })
+  --json  output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, warnings? })
 `;
 
 const HELP_STATUS_SET = `usage: pfdsl status-set <file> <artifact-id> <status> [--json]
