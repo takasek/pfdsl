@@ -49,11 +49,20 @@ function fail(stderr: string, exitCode = 1, stdout = ""): CommandResult {
 	return { stdout, stderr, exitCode };
 }
 
-function formatDiagnostic(d: Diagnostic, file: string): string {
+const SEVERITY_ANSI_CODE: Record<Diagnostic["severity"], string> = {
+	error: "31", // red
+	warning: "33", // yellow
+	info: "36", // cyan
+};
+
+function formatDiagnostic(d: Diagnostic, file: string, color = false): string {
 	const r = d.range;
 	const loc = r ? `${file}:${r.start.line}:${r.start.column}` : file;
 	const code = d.code ? ` [${d.code}]` : "";
-	return `${loc}: ${d.severity}${code}: ${d.message}`;
+	const severity = color
+		? `\x1b[${SEVERITY_ANSI_CODE[d.severity]}m${d.severity}\x1b[0m`
+		: d.severity;
+	return `${loc}: ${severity}${code}: ${d.message}`;
 }
 
 function isCommandResult(v: string | CommandResult): v is CommandResult {
@@ -111,6 +120,7 @@ export interface CheckOptions {
 	summary?: boolean;
 	strict?: boolean;
 	json?: boolean;
+	color?: boolean;
 }
 
 export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
@@ -120,7 +130,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 		src,
 		opts.strict ? { strict: true } : undefined,
 	);
-	const lines = diagnostics.map((d) => formatDiagnostic(d, file));
+	const lines = diagnostics.map((d) => formatDiagnostic(d, file, opts.color));
 	if (hasErrors(diagnostics)) {
 		if (opts.json) {
 			const errs = diagnostics.filter((d) => d.severity === "error");
@@ -205,7 +215,9 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 				exitCode: 1,
 			};
 		}
-		return fail(`${errs.map((d) => formatDiagnostic(d, file)).join("\n")}\n`);
+		return fail(
+			`${errs.map((d) => formatDiagnostic(d, file, opts.color)).join("\n")}\n`,
+		);
 	}
 
 	const extraLines: string[] = [];
@@ -261,7 +273,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 
 	const allLines = [
 		...lines,
-		...multiDiags.map((d) => formatDiagnostic(d, file)),
+		...multiDiags.map((d) => formatDiagnostic(d, file, opts.color)),
 		...extraLines,
 	];
 	return {
