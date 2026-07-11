@@ -539,7 +539,6 @@ process:
   i435_implement_ansi_color:
     label: 診断 ANSI カラー実装
     location: https://github.com/takasek/pfdsl/issues/435
-    updated_at: 2026-07-10T16:04:28Z
   publish_cli_v0020:
     label: CLI v0.0.20リリース
   migrate_spec_id_refs:
