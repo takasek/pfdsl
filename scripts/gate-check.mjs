@@ -19,6 +19,12 @@ import {
 	hasStatusChange,
 	statusChangedForArtifact,
 	GATE_CHECKLIST_SOURCE_PATH,
+	VSCODE_EXT_TRIGGER,
+	lintCommitSubjects,
+	wipTransitionDetected,
+	parseAuditTerminals,
+	diffNewTerminals,
+	diffReadySets,
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 
@@ -33,12 +39,12 @@ const flag = (name) => {
 const base = flag("--base") ?? "main";
 const artifactKey = flag("--artifact");
 
-function sh(cmd) {
-	return execSync(cmd, { cwd: root, encoding: "utf-8" });
+function sh(cmd, input) {
+	return execSync(cmd, { cwd: root, encoding: "utf-8", input });
 }
-function trySh(cmd) {
+function trySh(cmd, input) {
 	try {
-		return { ok: true, out: sh(cmd) };
+		return { ok: true, out: sh(cmd, input) };
 	} catch (e) {
 		return { ok: false, out: e.stdout || e.message };
 	}
@@ -164,11 +170,125 @@ if (pfdslFiles.length === 0) {
 	}
 }
 
+// 7. vscode-extension typecheck (only when packages/vscode-extension/ changed)
+if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
+	results.push({ name: "vscode-extension typecheck", status: "SKIP", detail: "no vscode-extension changes" });
+} else {
+	const r = trySh("pnpm --filter @pfdsl/vscode-extension typecheck");
+	results.push({
+		name: "vscode-extension typecheck",
+		status: r.ok ? "PASS" : "FAIL",
+		detail: r.ok ? undefined : r.out.trim().slice(-200),
+	});
+}
+
+// 8. commit subject lint (Conventional Commits message format; granularity stays MANUAL)
+{
+	const subjectsOut = trySh(`git log origin/${base}..HEAD --format=%s`);
+	if (!subjectsOut.ok) {
+		results.push({ name: "commit subject lint", status: "FAIL", detail: subjectsOut.out.trim() });
+	} else {
+		const subjects = subjectsOut.out.trim().split("\n").filter(Boolean);
+		if (subjects.length === 0) {
+			results.push({ name: "commit subject lint", status: "SKIP", detail: "no commits in range" });
+		} else {
+			const linted = lintCommitSubjects(subjects);
+			const failed = linted.filter((r) => !r.ok);
+			results.push({
+				name: "commit subject lint",
+				status: failed.length === 0 ? "PASS" : "FAIL",
+				detail: failed.length === 0 ? `${subjects.length} commit(s)` : `not Conventional Commits: ${failed.map((r) => r.subject).join(", ")}`,
+			});
+		}
+	}
+}
+
+// 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
+if (!changedFiles.includes(".pfdsl/roadmap.pfdsl")) {
+	results.push({ name: "wip transition", status: "SKIP", detail: "no .pfdsl/roadmap.pfdsl changes" });
+} else {
+	const shasOut = trySh(`git log --format=%H origin/${base}..HEAD -- .pfdsl/roadmap.pfdsl`);
+	if (!shasOut.ok) {
+		results.push({ name: "wip transition", status: "FAIL", detail: shasOut.out.trim() });
+	} else {
+		const shas = shasOut.out.trim().split("\n").filter(Boolean);
+		const snapshots = shas
+			.map((sha) => trySh(`git show ${sha}:.pfdsl/roadmap.pfdsl`))
+			.filter((r) => r.ok)
+			.map((r) => r.out);
+		const detected = wipTransitionDetected(snapshots, artifactKey);
+		results.push({
+			name: "wip transition",
+			status: detected ? "PASS" : "FAIL",
+			detail: detected
+				? artifactKey
+					? `wip found for '${artifactKey}'`
+					: "presence-only check; pass --artifact <key> to verify the specific output artifact"
+				: artifactKey
+					? `no status: wip snapshot found for artifact '${artifactKey}'`
+					: "no status: wip found in any commit snapshot",
+		});
+	}
+}
+
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
 const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdPath, "utf-8")));
 
 console.log("gate-check:");
 console.log(formatGateTable(results));
+
+// Report material: new terminal artifacts per changed .pfdsl file (protocol5(b)
+// follow-up gatekeeper). Extraction+diff is mechanized; classifying each as
+// means vs. deliverable, and registering a todo consumer if missing, stays MANUAL.
+{
+	const cliPath = resolve(root, "packages/cli/dist/cli.js");
+	if (pfdslFiles.length > 0 && existsSync(cliPath)) {
+		const newTerminalsByFile = [];
+		for (const f of pfdslFiles) {
+			const before = trySh(`git show origin/${base}:${f}`);
+			const after = trySh(`git show HEAD:${f}`);
+			if (!after.ok) continue;
+			const beforeAudit = before.ok ? trySh(`node "${cliPath}" check - --audit`, before.out) : { ok: true, out: "" };
+			const afterAudit = trySh(`node "${cliPath}" check - --audit`, after.out);
+			if (!afterAudit.ok) continue;
+			const newTerminals = diffNewTerminals(
+				beforeAudit.ok ? parseAuditTerminals(beforeAudit.out) : [],
+				parseAuditTerminals(afterAudit.out),
+			);
+			if (newTerminals.length > 0) newTerminalsByFile.push({ file: f, newTerminals });
+		}
+		if (newTerminalsByFile.length > 0) {
+			console.log("\nNew terminal artifacts (classify means vs. deliverable; register todo consumer if missing):");
+			for (const { file, newTerminals } of newTerminalsByFile) {
+				console.log(`  ${file}: ${newTerminals.join(", ")}`);
+			}
+		}
+	}
+}
+
+// Report material: ready-set diff for .pfdsl/roadmap.pfdsl (workcycle step 4's
+// "released follow-up processes / updated ready set" report), derived from two
+// `ready --json` runs instead of AI graph traversal.
+{
+	const cliPath = resolve(root, "packages/cli/dist/cli.js");
+	if (changedFiles.includes(".pfdsl/roadmap.pfdsl") && existsSync(cliPath)) {
+		const before = trySh(`git show origin/${base}:.pfdsl/roadmap.pfdsl`);
+		const after = trySh("git show HEAD:.pfdsl/roadmap.pfdsl");
+		if (before.ok && after.ok) {
+			const beforeReady = trySh(`node "${cliPath}" ready - --json`, before.out);
+			const afterReady = trySh(`node "${cliPath}" ready - --json`, after.out);
+			if (beforeReady.ok && afterReady.ok) {
+				const beforeIds = JSON.parse(beforeReady.out).ready.map((p) => p.id);
+				const afterIds = JSON.parse(afterReady.out).ready.map((p) => p.id);
+				const { newlyReady, noLongerReady } = diffReadySets(beforeIds, afterIds);
+				console.log(`\nReady-set diff (origin/${base} → HEAD):`);
+				console.log(`  newly ready: ${newlyReady.length > 0 ? newlyReady.join(", ") : "(none)"}`);
+				console.log(`  no longer ready: ${noLongerReady.length > 0 ? noLongerReady.join(", ") : "(none)"}`);
+			}
+		}
+	}
+}
+
 console.log("\nMANUAL (judge and confirm each):");
 for (const item of manualItems) console.log(`  MANUAL: ${item}`);
 
