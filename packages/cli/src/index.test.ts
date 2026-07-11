@@ -957,6 +957,7 @@ describe("ready", () => {
 		expect(parsed.ready).toBeInstanceOf(Array);
 		expect(parsed.ready[0].id).toBe("design");
 		expect(parsed.ready[0].inputs).toContain("req");
+		expect(parsed.ready[0].outputs).toContain("spec");
 		expect(parsed.best).toBeUndefined();
 	});
 
@@ -969,6 +970,7 @@ describe("ready", () => {
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.best).toBeDefined();
 		expect(parsed.best.id).toBe("design");
+		expect(parsed.best.outputs).toContain("spec");
 	});
 
 	it("--best marks recommended process with *", async () => {
