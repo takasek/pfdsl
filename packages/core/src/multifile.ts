@@ -408,6 +408,38 @@ export function buildPresentationChain<T extends DocWithFrontmatter>(
 	return chain;
 }
 
+/**
+ * Resolve the `extends:` chain of `entryPath` and merge the resulting
+ * statusStyles / tag / group into a copy of `frontmatter` (§2.9.4), so
+ * renderers (CLI graph, VS Code preview/export) share one resolution path.
+ * Chain diagnostics are intentionally dropped — rendering is lenient; strict
+ * validation happens in `check`. Returns `frontmatter` as-is when the chain
+ * contributes nothing.
+ */
+export function resolveEffectiveFrontmatter<T extends DocWithFrontmatter>(
+	entryPath: string,
+	frontmatter: Frontmatter | null,
+	load: (path: string) => T | null,
+): Frontmatter | null {
+	const { docs } = loadExtendsChain(entryPath, load);
+	const chain = buildPresentationChain(entryPath, docs);
+	const resolved = resolvePresentation(chain);
+	if (
+		resolved.statusStyles === undefined &&
+		resolved.tag === undefined &&
+		resolved.group === undefined
+	) {
+		return frontmatter;
+	}
+	const effective: Frontmatter = { ...frontmatter };
+	if (resolved.statusStyles !== undefined) {
+		effective.statusStyles = resolved.statusStyles;
+	}
+	if (resolved.tag !== undefined) effective.tag = resolved.tag;
+	if (resolved.group !== undefined) effective.group = resolved.group;
+	return effective;
+}
+
 /** Allowed top-level keys in a preset file (§2.9.5). */
 const PRESET_ALLOWED_KEYS = new Set([
 	"extends",

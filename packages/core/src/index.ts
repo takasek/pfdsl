@@ -205,6 +205,7 @@ export {
 	computeTerminals,
 	loadExtendsChain,
 	loadSubflowGraph,
+	resolveEffectiveFrontmatter,
 	resolvePresentation,
 	resolveRefPath,
 	validatePresetKeys,

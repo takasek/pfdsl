@@ -7,6 +7,7 @@ import {
 	computeTerminals,
 	loadExtendsChain,
 	loadSubflowGraph,
+	resolveEffectiveFrontmatter,
 	resolvePresentation,
 	resolveRefPath,
 	validatePresetKeys,
@@ -784,5 +785,69 @@ describe("resolvePresentation", () => {
 		]);
 		expect(result.group?.team?.label).toBe("Team A");
 		expect(result.group?.team?.color).toBe("blue");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// resolveEffectiveFrontmatter
+// ---------------------------------------------------------------------------
+
+describe("resolveEffectiveFrontmatter", () => {
+	it("merges preset statusStyles/tag/group into the entry frontmatter", () => {
+		const load = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: "./p.yaml" } },
+			"/p/p.yaml": {
+				frontmatter: {
+					statusStyles: { done: { fillcolor: "green" } },
+					tag: { urgent: { label: "!" } },
+					group: { team: { label: "Team A" } },
+				},
+			},
+		});
+		const fm: Frontmatter = { extends: "./p.yaml", title: "t" };
+		const eff = resolveEffectiveFrontmatter("/p/main.pfdsl", fm, load);
+		expect(eff?.title).toBe("t");
+		expect(eff?.statusStyles?.done?.fillcolor).toBe("green");
+		expect(eff?.tag?.urgent?.label).toBe("!");
+		expect(eff?.group?.team?.label).toBe("Team A");
+	});
+
+	it("local values override preset values (local wins last)", () => {
+		const load = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					extends: "./p.yaml",
+					statusStyles: { done: { fillcolor: "blue" } },
+				},
+			},
+			"/p/p.yaml": {
+				frontmatter: { statusStyles: { done: { fillcolor: "green" } } },
+			},
+		});
+		const fm: Frontmatter = {
+			extends: "./p.yaml",
+			statusStyles: { done: { fillcolor: "blue" } },
+		};
+		const eff = resolveEffectiveFrontmatter("/p/main.pfdsl", fm, load);
+		expect(eff?.statusStyles?.done?.fillcolor).toBe("blue");
+	});
+
+	it("no extends chain contributions → returns the original frontmatter object", () => {
+		const load = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { title: "t" } },
+		});
+		const fm: Frontmatter = { title: "t" };
+		expect(resolveEffectiveFrontmatter("/p/main.pfdsl", fm, load)).toBe(fm);
+	});
+
+	it("null entry frontmatter with presets still yields merged presentation", () => {
+		const load = makeLoad({
+			"/p/main.pfdsl": { frontmatter: { extends: "./p.yaml" } },
+			"/p/p.yaml": {
+				frontmatter: { statusStyles: { done: { fillcolor: "green" } } },
+			},
+		});
+		const eff = resolveEffectiveFrontmatter("/p/main.pfdsl", null, load);
+		expect(eff?.statusStyles?.done?.fillcolor).toBe("green");
 	});
 });
