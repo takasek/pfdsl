@@ -41,6 +41,10 @@ Closes #<issue番号>
 
 **develop 開始前に hotfix 判定を行う** — 3条件の確認前に issue 起票・roadmap 追加を開始しない。issue なし develop は hotfix のみに限る。
 
+## develop 中に見つけたスコープ外バグの扱い
+
+作業中の issue とは無関係な既存問題を偶然見つけた場合は原則どおり別途起票する。ただし、**当該 PR のテストを green にするために不可避な既存バグ**（例: 新規追加したテストの実行方式が、テスト対象と無関係な既存コードの欠陥を顕在化させた場合）は、同一 PR 内で直接修正してよい — 別 issue に切り出すと当の PR が green にならず着地しない。判定テスト: 「このバグを直さずに今の PR のテストを green にできるか」。できない場合のみ同一 PR 内で直す。修正理由・原因は PR 本文に明記する（発見経緯でなく、何が壊れていて何を直したかの事実）。
+
 ## flow:exempt のバッチ管理（親トラッカー issue）
 
 複数の `flow:exempt` issue をまとめて記録・順序管理したい場合、GitHub issue 本文にタスクリスト形式で列挙した親トラッカー issue を1つ立ててよい（roadmap.pfdsl には載せず、親issue自体も exempt）。子issueを close した際は、親issueのタスクリスト該当行を手動で `[x]` に更新する — 本文中の手書き `- [ ] #123` 形式は GitHub のネイティブ task-list 連動（相手issueを convert-to-issue した場合のみ働く自動チェック機能）の対象にならず、close しても自動チェックされない。全件完了で親issue自体を close する。
