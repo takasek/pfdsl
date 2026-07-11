@@ -1241,6 +1241,43 @@ req >> design -> spec
 		expect(parsed.newlyReady).toBeInstanceOf(Array);
 		expect(parsed.newlyReady).toHaveLength(0);
 	});
+
+	it("rewrites status in place on 4-space-indented frontmatter (#430)", async () => {
+		const fourSpace = `---
+artifact:
+    req:
+        status: todo
+    spec:
+        status: done
+---
+req >> design -> spec
+`;
+		const f = join(dir, "status-set-4space.pfdsl");
+		writeFileSync(f, fourSpace);
+		const r = await run(["status-set", f, "req", "done"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("status: done");
+		expect(after).not.toContain("status: todo");
+	});
+
+	it("handles artifact ids containing regex metacharacters (#430)", async () => {
+		const withMetaId = `---
+artifact:
+  req(v2):
+    status: todo
+  spec:
+    status: done
+---
+other >> design -> spec
+`;
+		const f = join(dir, "status-set-regex-meta-id.pfdsl");
+		writeFileSync(f, withMetaId);
+		const r = await run(["status-set", f, "req(v2)", "done"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("req(v2):\n    status: done");
+	});
 });
 
 describe("audit-sync", () => {

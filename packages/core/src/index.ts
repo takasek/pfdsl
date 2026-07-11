@@ -11,6 +11,7 @@ import {
 	splitBodyIntoSegments,
 } from "./formatter.js";
 import { loadFrontmatter } from "./frontmatter.js";
+import { escapeRe } from "./frontmatter-text.js";
 import { buildGraph } from "./graph.js";
 import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
@@ -65,6 +66,7 @@ export type {
 	TokenType,
 } from "./types/index.js";
 export { PFD_TYPE_VALUES, STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
+export { escapeRe };
 
 export interface ParseDocResult {
 	document: Document;
