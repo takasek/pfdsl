@@ -483,6 +483,60 @@ digraph PFDSL {
 
 ---
 
+## 12-subflow-detail — Subflow child
+
+The child flow referenced by `12-subflow.pfdsl`'s `subflow:` — its open input and terminal artifacts (`requirement`, `shipped_order`) bijectively match the parent process's inputs and outputs.
+
+```pfdsl
+---
+artifact:
+  requirement:
+    label: Requirements
+    description: Boundary artifact — matches parent normal input.
+  picked_items:
+    label: Picked Items
+  packed_box:
+    label: Packed Box
+  shipped_order:
+    label: Shipped Order
+    description: Boundary artifact — matches parent output.
+---
+requirement >> pick_items -> picked_items
+picked_items >> pack -> packed_box
+packed_box >> ship -> shipped_order
+```
+
+<img src="12-subflow-detail.svg">
+
+<details>
+<summary>DOT</summary>
+
+```dot
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "pack" [shape=ellipse, label="pack"];
+  "packed_box" [shape=box, label="packed_box\nPacked Box"];
+  "pick_items" [shape=ellipse, label="pick_items"];
+  "picked_items" [shape=box, label="picked_items\nPicked Items"];
+  "requirement" [shape=box, label="requirement\nRequirements", tooltip="Requirements\n\nBoundary artifact — matches parent normal input.", penwidth="2"];
+  "ship" [shape=ellipse, label="ship"];
+  "shipped_order" [shape=box, label="shipped_order\nShipped Order", tooltip="Shipped Order\n\nBoundary artifact — matches parent output.", penwidth="2"];
+
+  "requirement" -> "pick_items";
+  "pick_items" -> "picked_items";
+  "picked_items" -> "pack";
+  "pack" -> "packed_box";
+  "packed_box" -> "ship";
+  "ship" -> "shipped_order";
+}
+```
+
+</details>
+
+---
+
 ## 13-preset — Preset (extends)
 
 `extends:` inherits `statusStyles` / `tag` / `group` from a preset file. Attribute-level deep merge: local values override inherited ones.
@@ -519,6 +573,36 @@ digraph PFDSL {
   "develop" -> "prototype";
   "prototype" -> "review";
   "review" -> "release";
+}
+```
+
+</details>
+
+---
+
+## 13-preset-base — Preset base
+
+The base file referenced by `13-preset.pfdsl`'s `extends:` — declares `statusStyles` inherited by the child.
+
+```pfdsl
+---
+statusStyles:
+  done: { fillcolor: "#d4edda", style: filled }
+  wip:  { fillcolor: "#fff3cd", style: filled }
+  todo: { fillcolor: "#f8f9fa", style: filled }
+---
+```
+
+<img src="13-preset-base.svg">
+
+<details>
+<summary>DOT</summary>
+
+```dot
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
 }
 ```
 
@@ -564,6 +648,53 @@ digraph PFDSL {
 
   "order" -> "fulfill";
   "fulfill" -> "parcel";
+}
+```
+
+</details>
+
+---
+
+## 14-boundary-detail — Boundary child
+
+The child flow referenced by `14-boundary.pfdsl`'s `subflow:` — its artifact IDs (`incoming_order`, `outgoing_parcel`) are remapped from the parent's `order` / `parcel` via `boundary:`.
+
+```pfdsl
+---
+artifact:
+  incoming_order:
+    label: Incoming Order
+    description: Boundary artifact — mapped from parent 'order' via boundary:.
+  picked:
+    label: Picked Items
+  outgoing_parcel:
+    label: Outgoing Parcel
+    description: Boundary artifact — mapped from parent 'parcel' via boundary:.
+---
+incoming_order >> pick -> picked
+picked >> pack -> outgoing_parcel
+```
+
+<img src="14-boundary-detail.svg">
+
+<details>
+<summary>DOT</summary>
+
+```dot
+digraph PFDSL {
+  rankdir=LR;
+  newrank=true;
+
+  "incoming_order" [shape=box, label="incoming_order\nIncoming Order", tooltip="Incoming Order\n\nBoundary artifact — mapped from parent 'order' via boundary:.", penwidth="2"];
+  "outgoing_parcel" [shape=box, label="outgoing_parcel\nOutgoing Parcel", tooltip="Outgoing Parcel\n\nBoundary artifact — mapped from parent 'parcel' via boundary:.", penwidth="2"];
+  "pack" [shape=ellipse, label="pack"];
+  "pick" [shape=ellipse, label="pick"];
+  "picked" [shape=box, label="picked\nPicked Items"];
+
+  "incoming_order" -> "pick";
+  "pick" -> "picked";
+  "picked" -> "pack";
+  "pack" -> "outgoing_parcel";
 }
 ```
 

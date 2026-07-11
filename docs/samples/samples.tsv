@@ -10,8 +10,11 @@ id	summary	description
 10-layout-tb	Layout direction	`layout.direction: TB` sets `rankdir=TB`. Default is `LR`.
 11-external-stakeholders	External stakeholders	`externalStakeholders:` on artifacts marks external consumers outside the flow graph. Excluded from orphan-terminal audit (`check --audit`).
 12-subflow	Subflow	`subflow:` on a process links to a child `.pfdsl` file. The child's open inputs and terminals must bijectively match the parent process's normal inputs and outputs (V034).
+12-subflow-detail	Subflow child	The child flow referenced by `12-subflow.pfdsl`'s `subflow:` — its open input and terminal artifacts (`requirement`, `shipped_order`) bijectively match the parent process's inputs and outputs.
 13-preset	Preset (extends)	`extends:` inherits `statusStyles` / `tag` / `group` from a preset file. Attribute-level deep merge: local values override inherited ones.
+13-preset-base	Preset base	The base file referenced by `13-preset.pfdsl`'s `extends:` — declares `statusStyles` inherited by the child.
 14-boundary	Boundary map	`boundary:` on a subflow process remaps parent artifact IDs to different child artifact IDs. Useful when reusing an independently-named child flow.
+14-boundary-detail	Boundary child	The child flow referenced by `14-boundary.pfdsl`'s `subflow:` — its artifact IDs (`incoming_order`, `outgoing_parcel`) are remapped from the parent's `order` / `parcel` via `boundary:`.
 15-index	Index field	`index:` assigns an optional positive integer to artifacts and processes (independent namespaces). No graph-semantic effect; `pfdsl reindex` numbers nodes in topological order.
 16-basepath	basePath field	`basePath:` sets the base directory for resolving `location:` file paths and `command:` working directory. Defaults to the `.pfdsl` file's directory when omitted. `location:` may also be set on processes.
 17-type	type field	`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). Values outside the enum cause an error (V031). `pfdsl ready` rejects any explicit non-`roadmap` type; omitting `type:` is treated as `roadmap` and allowed, with a warning (W006).
