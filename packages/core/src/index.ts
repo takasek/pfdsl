@@ -89,7 +89,17 @@ export interface AnalyzeResult {
 	diagnostics: Diagnostic[];
 }
 
-export function parse(source: string): ParseDocResult {
+interface ParsedBody extends ParseDocResult {
+	body: string;
+}
+
+/**
+ * Shared prefix of parse() and format(): load front matter, lex the body,
+ * shift token positions onto the full-source line numbers, then parse.
+ * format() continues on from here with normalize/validate/segment work that
+ * parse() doesn't need.
+ */
+function parseBody(source: string): ParsedBody {
 	const {
 		frontmatter,
 		body,
@@ -111,8 +121,15 @@ export function parse(source: string): ParseDocResult {
 		document,
 		frontmatter,
 		bodyStartLine,
+		body,
 		diagnostics: [...fmDiags, ...lexDiags, ...parseDiags],
 	};
+}
+
+export function parse(source: string): ParseDocResult {
+	const { document, frontmatter, bodyStartLine, diagnostics } =
+		parseBody(source);
+	return { document, frontmatter, bodyStartLine, diagnostics };
 }
 
 export type {
@@ -214,25 +231,13 @@ export {
 } from "./multifile.js";
 
 export function format(source: string, opts: FormatOptions = {}): FormatResult {
+	// Parse full body for diagnostics and nodeKinds (needed for per-segment sort)
 	const {
+		document,
 		frontmatter,
 		body,
-		diagnostics: fmDiags,
-		bodyStartLine,
-	} = loadFrontmatter(source);
-
-	// Parse full body for diagnostics and nodeKinds (needed for per-segment sort)
-	const { tokens: rawTokens2, diagnostics: lexDiags } = lex(body);
-	const lineOffset = bodyStartLine - 1;
-	const tokens =
-		lineOffset > 0
-			? rawTokens2.map((t) => ({
-					...t,
-					start: { ...t.start, line: t.start.line + lineOffset },
-					end: { ...t.end, line: t.end.line + lineOffset },
-				}))
-			: rawTokens2;
-	const { document, diagnostics: parseDiags } = parseTokens(tokens);
+		diagnostics: parseDiags,
+	} = parseBody(source);
 	const {
 		edges,
 		nodeKinds,
@@ -278,12 +283,6 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 
 	return {
 		output: frontmatterSection + formattedBody + isolatedBlock,
-		diagnostics: [
-			...fmDiags,
-			...lexDiags,
-			...parseDiags,
-			...normDiags,
-			...valDiags,
-		],
+		diagnostics: [...parseDiags, ...normDiags, ...valDiags],
 	};
 }
