@@ -1,4 +1,4 @@
-import { indentOf } from "./frontmatter-text.js";
+import { detectChildIndent, indentOf } from "./frontmatter-text.js";
 import { analyze } from "./index.js";
 import { computeTopoOrder } from "./sorter.js";
 import type { Diagnostic, NodeKind } from "./types/index.js";
@@ -205,13 +205,7 @@ export function sort(source: string, opts: SortOptions): SortResult {
 		const sectionContent = yaml.slice(sectionStart + 1, sectionEnd);
 
 		// Detect child indent from the first content line
-		let childIndent = 2;
-		for (const line of sectionContent) {
-			if (line.trim() !== "" && !line.trimStart().startsWith("#")) {
-				childIndent = indentOf(line);
-				break;
-			}
-		}
+		const childIndent = detectChildIndent(sectionContent);
 
 		const { blocks, gaps } = extractBlocksAndGaps(sectionContent, childIndent);
 		if (blocks.length === 0) continue;

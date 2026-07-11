@@ -1,4 +1,4 @@
-import { indentOf } from "./frontmatter-text.js";
+import { detectChildIndent, escapeRe, indentOf } from "./frontmatter-text.js";
 import { analyze } from "./index.js";
 import { computeTopoOrder } from "./sorter.js";
 import type { Diagnostic, NodeKind } from "./types/index.js";
@@ -189,14 +189,9 @@ function setIndex(yaml: string[], w: Write): void {
 
 	// Node keys sit at the section's child-indent level, detected from the
 	// first content line (supports 2-space, 4-space, etc. — not hardcoded).
-	let sectionIndent = 2;
-	for (let i = sectionStart + 1; i < sectionEnd; i++) {
-		const line = yaml[i]!;
-		if (line.trim() !== "" && !line.trimStart().startsWith("#")) {
-			sectionIndent = indentOf(line);
-			break;
-		}
-	}
+	const sectionIndent = detectChildIndent(
+		yaml.slice(sectionStart + 1, sectionEnd),
+	);
 
 	// Find the node key line within the section (block or inline mapping).
 	const keyRe = new RegExp(`^(\\s+)${escapeRe(w.id)}:(.*)$`);
@@ -264,10 +259,6 @@ function setIndex(yaml: string[], w: Write): void {
 		}
 	}
 	yaml.splice(nodeLine + 1, 0, `${pad(childIndent)}index: ${w.value}`);
-}
-
-function escapeRe(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** Locate the first balanced `{ ... }` group in s, or null if unbalanced. */
