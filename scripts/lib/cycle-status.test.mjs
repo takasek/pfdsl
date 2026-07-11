@@ -7,6 +7,8 @@ import {
 	summarizeCiStatus,
 	detectDesignUnsettled,
 	findIssueNumberForProcess,
+	findOutputArtifactForProcess,
+	buildGateCheckCommand,
 } from "./cycle-status.mjs";
 
 describe("summarizeCiStatus", () => {
@@ -148,6 +150,40 @@ processes:
 
 	it("returns null for an unknown process id", () => {
 		assert.equal(findIssueNumberForProcess(pfdsl, "i999_nonexistent"), null);
+	});
+});
+
+describe("findOutputArtifactForProcess", () => {
+	const pfdsl = `spec_id_syntax >> i402_implement_get_by_id -> get_by_id_tool
+
+spec_id_syntax >> i405_implement_mint_check -> mint_check_tool
+
+[spec_id_syntax, get_by_id_tool, mint_check_tool] >> migrate_spec_id_refs -> spec_id_refs
+`;
+
+	it("extracts the output artifact for a simple single-input edge", () => {
+		assert.equal(findOutputArtifactForProcess(pfdsl, "i405_implement_mint_check"), "mint_check_tool");
+	});
+
+	it("extracts the output artifact for a bracketed multi-input edge", () => {
+		assert.equal(findOutputArtifactForProcess(pfdsl, "migrate_spec_id_refs"), "spec_id_refs");
+	});
+
+	it("returns null when the process has no edge", () => {
+		assert.equal(findOutputArtifactForProcess(pfdsl, "i999_nonexistent"), null);
+	});
+});
+
+describe("buildGateCheckCommand", () => {
+	it("builds the completed gate-check command line", () => {
+		assert.equal(
+			buildGateCheckCommand("mint_check_tool", "main"),
+			"node scripts/gate-check.mjs --base main --artifact mint_check_tool",
+		);
+	});
+
+	it("returns null when artifactKey is missing", () => {
+		assert.equal(buildGateCheckCommand(null, "main"), null);
 	});
 });
 

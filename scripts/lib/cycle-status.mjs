@@ -71,6 +71,29 @@ export function findIssueNumberForProcess(pfdslText, processId) {
 	return match ? Number(match[1]) : null;
 }
 
+/**
+ * roadmap.pfdsl の edge 定義（`... >> <processId> -> <outputKey>`）から
+ * プロセスの出力 artifact キーを引く。
+ * @param {string} pfdslText
+ * @param {string} processId
+ * @returns {string | null}
+ */
+export function findOutputArtifactForProcess(pfdslText, processId) {
+	const re = new RegExp(`>>\\s*${processId}\\s*->\\s*([A-Za-z0-9_]+)`);
+	const match = pfdslText.match(re);
+	return match ? match[1] : null;
+}
+
+/**
+ * @param {string | null} artifactKey
+ * @param {string} base
+ * @returns {string | null}
+ */
+export function buildGateCheckCommand(artifactKey, base) {
+	if (!artifactKey) return null;
+	return `node scripts/gate-check.mjs --base ${base} --artifact ${artifactKey}`;
+}
+
 const DESIGN_UNSETTLED_PATTERNS = [/design TBD/i, /設計未確定/, /設計未合意/];
 
 /**

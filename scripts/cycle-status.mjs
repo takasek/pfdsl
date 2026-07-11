@@ -14,6 +14,8 @@ import {
 	countBehind,
 	findIssueNumberForProcess,
 	detectDesignUnsettled,
+	findOutputArtifactForProcess,
+	buildGateCheckCommand,
 } from "./lib/cycle-status.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -70,9 +72,12 @@ if (existsSync(cliPath)) {
 let designUnsettled = null;
 let designUnsettledLines = [];
 let designUnsettledError = null;
+let gateCheckCommand = null;
+let gateCheckCommandError = null;
 if (best) {
+	const roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
+
 	try {
-		const roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
 		const issueNumber = findIssueNumberForProcess(roadmapText, best);
 		if (issueNumber) {
 			const body = sh(`gh issue view ${issueNumber} --json body --jq .body`);
@@ -82,6 +87,13 @@ if (best) {
 		}
 	} catch (e) {
 		designUnsettledError = e.message;
+	}
+
+	const artifactKey = findOutputArtifactForProcess(roadmapText, best);
+	if (artifactKey) {
+		gateCheckCommand = buildGateCheckCommand(artifactKey, base);
+	} else {
+		gateCheckCommandError = `no output artifact edge found for process '${best}' in .pfdsl/roadmap.pfdsl`;
 	}
 }
 
@@ -94,10 +106,12 @@ const result = {
 	best,
 	designUnsettled,
 	designUnsettledLines,
+	gateCheckCommand,
 };
 if (behindBaseError) result.behindBaseError = behindBaseError;
 if (prError) result.prError = prError;
 if (readyError) result.readyError = readyError;
 if (designUnsettledError) result.designUnsettledError = designUnsettledError;
+if (gateCheckCommandError) result.gateCheckCommandError = gateCheckCommandError;
 
 console.log(JSON.stringify(result, null, 2));
