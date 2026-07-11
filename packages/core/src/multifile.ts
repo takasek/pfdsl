@@ -409,6 +409,21 @@ export function buildPresentationChain<T extends DocWithFrontmatter>(
 }
 
 /**
+ * Prepare a preset file's source for `analyze`. Plain YAML preset files
+ * (`.yaml` / `.yml`) have no `---` delimiters; wrap them so loadFrontmatter
+ * picks up their content as frontmatter. Other sources pass through as-is.
+ */
+export function wrapPresetSource(path: string, src: string): string {
+	if (
+		!src.startsWith("---") &&
+		(path.endsWith(".yaml") || path.endsWith(".yml"))
+	) {
+		return `---\n${src}\n---\n`;
+	}
+	return src;
+}
+
+/**
  * Resolve the `extends:` chain of `entryPath` and merge the resulting
  * statusStyles / tag / group into a copy of `frontmatter` (§2.9.4), so
  * renderers (CLI graph, VS Code preview/export) share one resolution path.

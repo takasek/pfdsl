@@ -12,6 +12,7 @@ import {
 	resolveRefPath,
 	validatePresetKeys,
 	validateSubflowBoundary,
+	wrapPresetSource,
 } from "./multifile.js";
 import type { Frontmatter } from "./types/frontmatter.js";
 import type { NormalizedEdge } from "./types/index.js";
@@ -849,5 +850,29 @@ describe("resolveEffectiveFrontmatter", () => {
 		});
 		const eff = resolveEffectiveFrontmatter("/p/main.pfdsl", null, load);
 		expect(eff?.statusStyles?.done?.fillcolor).toBe("green");
+	});
+});
+
+describe("wrapPresetSource", () => {
+	it("wraps a plain YAML preset (no --- delimiters) as frontmatter", () => {
+		expect(wrapPresetSource("/p/p.yaml", "tag: {}")).toBe(
+			"---\ntag: {}\n---\n",
+		);
+	});
+
+	it("leaves a .yaml file that already starts with --- untouched", () => {
+		expect(wrapPresetSource("/p/p.yaml", "---\ntag: {}\n---\n")).toBe(
+			"---\ntag: {}\n---\n",
+		);
+	});
+
+	it("leaves a .pfdsl source untouched", () => {
+		expect(wrapPresetSource("/p/m.pfdsl", "a >> P -> b\n")).toBe(
+			"a >> P -> b\n",
+		);
+	});
+
+	it("wraps .yml as well", () => {
+		expect(wrapPresetSource("/p/p.yml", "tag: {}")).toBe("---\ntag: {}\n---\n");
 	});
 });
