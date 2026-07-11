@@ -2,7 +2,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { diffGraphs, parseArgs, run } from "./index.js";
+import {
+	diffGraphs,
+	parseArgs,
+	run,
+	runCheck,
+	shouldColorize,
+} from "./index.js";
 
 let dir: string;
 const valid = "req >> design -> spec\nspec >> impl -> code\n";
@@ -10,6 +16,8 @@ const validWithStatus =
 	"---\nartifact:\n  spec:\n    status: wip\n    criteria: spec criteria\n  code:\n    status: todo\n    criteria: code criteria\n---\nreq >> design -> spec\nspec >> impl -> code\n";
 const invalid = "req >> design\n"; // process design has no output
 const conflict = "req >> design -> spec\nother -> spec\n"; // dual generators
+const warningOnly =
+	"---\nartifact:\n  bundle:\n    parts: [orphan]\n---\nreq >> design -> bundle\n"; // W001: orphan has no edges
 
 beforeAll(() => {
 	dir = mkdtempSync(join(tmpdir(), "pfdsl-cli-"));
@@ -17,6 +25,7 @@ beforeAll(() => {
 	writeFileSync(join(dir, "valid-with-status.pfdsl"), validWithStatus);
 	writeFileSync(join(dir, "invalid.pfdsl"), invalid);
 	writeFileSync(join(dir, "conflict.pfdsl"), conflict);
+	writeFileSync(join(dir, "warning-only.pfdsl"), warningOnly);
 });
 
 afterAll(() => {
@@ -629,6 +638,103 @@ describe("--no-color / NO_COLOR (#180)", () => {
 
 		const graph = await run(["graph", join(dir, "valid.pfdsl"), "--no-color"]);
 		expect(graph.exitCode).toBe(0);
+	});
+});
+
+describe("ANSI color for check diagnostics (#435)", () => {
+	it("runCheck with color:true wraps 'error' severity in red ANSI codes", () => {
+		const r = runCheck(join(dir, "invalid.pfdsl"), { color: true });
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("\x1b[31merror\x1b[0m");
+	});
+
+	it("runCheck with color:true wraps 'warning' severity in yellow ANSI codes", () => {
+		const r = runCheck(join(dir, "warning-only.pfdsl"), { color: true });
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("\x1b[33mwarning\x1b[0m");
+	});
+
+	it("runCheck without color option emits no ANSI codes", () => {
+		const r = runCheck(join(dir, "invalid.pfdsl"));
+		expect(r.stderr).not.toContain("\x1b[");
+	});
+});
+
+describe("run() wires color into the check command (#435)", () => {
+	const originalIsTTY = process.stdout.isTTY;
+
+	afterEach(() => {
+		Object.defineProperty(process.stdout, "isTTY", {
+			value: originalIsTTY,
+			configurable: true,
+		});
+		delete process.env.NO_COLOR;
+	});
+
+	it("emits ANSI codes on a TTY with no NO_COLOR and no --no-color flag", async () => {
+		Object.defineProperty(process.stdout, "isTTY", {
+			value: true,
+			configurable: true,
+		});
+		const r = await run(["check", join(dir, "invalid.pfdsl")]);
+		expect(r.stderr).toContain("\x1b[31merror\x1b[0m");
+	});
+
+	it("suppresses ANSI codes on a TTY when --no-color is passed", async () => {
+		Object.defineProperty(process.stdout, "isTTY", {
+			value: true,
+			configurable: true,
+		});
+		const r = await run(["check", join(dir, "invalid.pfdsl"), "--no-color"]);
+		expect(r.stderr).not.toContain("\x1b[");
+	});
+
+	it("suppresses ANSI codes on a TTY when NO_COLOR env is set", async () => {
+		Object.defineProperty(process.stdout, "isTTY", {
+			value: true,
+			configurable: true,
+		});
+		process.env.NO_COLOR = "1";
+		const r = await run(["check", join(dir, "invalid.pfdsl")]);
+		expect(r.stderr).not.toContain("\x1b[");
+	});
+});
+
+describe("shouldColorize (#435)", () => {
+	it("is false when --no-color flag is set, even on a TTY with no NO_COLOR", () => {
+		expect(
+			shouldColorize({ noColorFlag: true, stream: { isTTY: true }, env: {} }),
+		).toBe(false);
+	});
+
+	it("is false when NO_COLOR env is set, even on a TTY without --no-color", () => {
+		expect(
+			shouldColorize({
+				noColorFlag: false,
+				stream: { isTTY: true },
+				env: { NO_COLOR: "1" },
+			}),
+		).toBe(false);
+	});
+
+	it("is false when stdout is not a TTY", () => {
+		expect(
+			shouldColorize({
+				noColorFlag: false,
+				stream: { isTTY: false },
+				env: {},
+			}),
+		).toBe(false);
+	});
+
+	it("is true on a TTY with no NO_COLOR and no --no-color flag", () => {
+		expect(
+			shouldColorize({
+				noColorFlag: false,
+				stream: { isTTY: true },
+				env: {},
+			}),
+		).toBe(true);
 	});
 });
 
