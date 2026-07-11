@@ -117,6 +117,25 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
 }
 
 /**
+ * Build the produced/consumed artifact sets from `>>` (input) and `->`
+ * (output) edges, ignoring feedback (`>>?`) edges. Shared by `computeOpenInputs`
+ * (boundary-terminal analysis) and `auditGraph` in audit.ts (audit-terminal
+ * analysis), which both need this same base classification (#460).
+ */
+export function buildProducedConsumed(edges: NormalizedEdge[]): {
+	produced: Set<string>;
+	consumed: Set<string>;
+} {
+	const produced = new Set<string>();
+	const consumed = new Set<string>();
+	for (const e of edges) {
+		if (e.kind === "output") produced.add(e.artifact);
+		else if (e.kind === "input") consumed.add(e.artifact);
+	}
+	return { produced, consumed };
+}
+
+/**
  * Compute the set of "open input" artifacts in a flow:
  * artifacts that have NO output edge producing them AND are consumed by at
  * least one normal `>>` input edge (§15.11). Unproduced artifacts consumed
@@ -124,13 +143,8 @@ export function loadSubflowGraph<T extends DocWithFrontmatter>(
  * feedback-consumed terminals (§2.9.3).
  */
 export function computeOpenInputs(edges: NormalizedEdge[]): Set<string> {
-	const consumedByInput = new Set<string>();
-	const produced = new Set<string>();
-	for (const e of edges) {
-		if (e.kind === "input") consumedByInput.add(e.artifact);
-		if (e.kind === "output") produced.add(e.artifact);
-	}
-	return new Set([...consumedByInput].filter((a) => !produced.has(a)));
+	const { produced, consumed } = buildProducedConsumed(edges);
+	return new Set([...consumed].filter((a) => !produced.has(a)));
 }
 
 /**
