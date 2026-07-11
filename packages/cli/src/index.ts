@@ -62,7 +62,7 @@ function isCommandResult(v: string | CommandResult): v is CommandResult {
 
 function readSource(file: string): string | CommandResult {
 	if (file === "-") {
-		return readFileSync("/dev/stdin", "utf-8");
+		return readFileSync(0, "utf-8");
 	}
 	try {
 		return readFileSync(file, "utf-8");
