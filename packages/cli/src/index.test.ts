@@ -660,6 +660,46 @@ describe("ANSI color for check diagnostics (#435)", () => {
 	});
 });
 
+describe("run() wires color into the check command (#435)", () => {
+	const originalIsTTY = process.stdout.isTTY;
+
+	afterEach(() => {
+		Object.defineProperty(process.stdout, "isTTY", {
+			value: originalIsTTY,
+			configurable: true,
+		});
+		delete process.env.NO_COLOR;
+	});
+
+	it("emits ANSI codes on a TTY with no NO_COLOR and no --no-color flag", async () => {
+		Object.defineProperty(process.stdout, "isTTY", {
+			value: true,
+			configurable: true,
+		});
+		const r = await run(["check", join(dir, "invalid.pfdsl")]);
+		expect(r.stderr).toContain("\x1b[31merror\x1b[0m");
+	});
+
+	it("suppresses ANSI codes on a TTY when --no-color is passed", async () => {
+		Object.defineProperty(process.stdout, "isTTY", {
+			value: true,
+			configurable: true,
+		});
+		const r = await run(["check", join(dir, "invalid.pfdsl"), "--no-color"]);
+		expect(r.stderr).not.toContain("\x1b[");
+	});
+
+	it("suppresses ANSI codes on a TTY when NO_COLOR env is set", async () => {
+		Object.defineProperty(process.stdout, "isTTY", {
+			value: true,
+			configurable: true,
+		});
+		process.env.NO_COLOR = "1";
+		const r = await run(["check", join(dir, "invalid.pfdsl")]);
+		expect(r.stderr).not.toContain("\x1b[");
+	});
+});
+
 describe("shouldColorize (#435)", () => {
 	it("is false when --no-color flag is set, even on a TTY with no NO_COLOR", () => {
 		expect(

@@ -1232,6 +1232,11 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				summary: flags.summary === true,
 				strict: flags.strict === true,
 				json: flags.json === true,
+				color: shouldColorize({
+					noColorFlag: flags["no-color"] === true,
+					stream: process.stdout,
+					env: process.env,
+				}),
 			});
 		}
 		case "fmt": {
