@@ -199,7 +199,11 @@ process:
 requirement >> fulfill_order -> shipped_order
 ```
 
-Companion file `12-subflow-detail.pfdsl` referenced above:
+---
+
+## 12-subflow-detail — Subflow child
+
+The child flow referenced by `12-subflow.pfdsl`'s `subflow:` — its open input and terminal artifacts (`requirement`, `shipped_order`) bijectively match the parent process's inputs and outputs.
 
 ```pfdsl
 ---
@@ -238,7 +242,11 @@ backlog >> develop -> prototype
 prototype >> review -> release
 ```
 
-Companion file `13-preset-base.pfdsl` referenced above:
+---
+
+## 13-preset-base — Preset base
+
+The base file referenced by `13-preset.pfdsl`'s `extends:` — declares `statusStyles` inherited by the child.
 
 ```pfdsl
 ---
@@ -273,7 +281,11 @@ process:
 order >> fulfill -> parcel
 ```
 
-Companion file `14-boundary-detail.pfdsl` referenced above:
+---
+
+## 14-boundary-detail — Boundary child
+
+The child flow referenced by `14-boundary.pfdsl`'s `subflow:` — its artifact IDs (`incoming_order`, `outgoing_parcel`) are remapped from the parent's `order` / `parcel` via `boundary:`.
 
 ```pfdsl
 ---
