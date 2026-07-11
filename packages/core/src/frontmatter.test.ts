@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadFrontmatter } from "./frontmatter.js";
+import { findFrontmatterNodeRanges, loadFrontmatter } from "./frontmatter.js";
 
 describe("loadFrontmatter", () => {
 	it("no frontmatter: returns body as-is, bodyStartLine=1", () => {
@@ -76,5 +76,65 @@ describe("loadFrontmatter", () => {
 		expect(fm.tag?.external?.label).toBe("外部公開");
 		expect(fm.tag?.external?.style?.color).toBe("blue");
 		expect(fm.tag?.critical?.style?.penwidth).toBe("3");
+	});
+});
+
+describe("findFrontmatterNodeRanges", () => {
+	it("locates node id ranges at 2-space indent (canonical style)", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  spec:",
+			"    status: done",
+			"---",
+			"spec >> P -> X",
+			"",
+		].join("\n");
+		const ranges = findFrontmatterNodeRanges(src);
+		expect(ranges.get("spec")).toEqual({
+			start: { line: 3, column: 3, offset: 0 },
+			end: { line: 3, column: 7, offset: 0 },
+		});
+	});
+
+	it("locates node id ranges at 4-space indent (#430)", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"    spec:",
+			"        status: done",
+			"---",
+			"spec >> P -> X",
+			"",
+		].join("\n");
+		const ranges = findFrontmatterNodeRanges(src);
+		expect(ranges.get("spec")).toEqual({
+			start: { line: 3, column: 5, offset: 0 },
+			end: { line: 3, column: 9, offset: 0 },
+		});
+	});
+
+	it("detects indent independently per section (#430)", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"    spec:",
+			"        status: done",
+			"process:",
+			"  build:",
+			"    status: wip",
+			"---",
+			"spec >> build -> out",
+			"",
+		].join("\n");
+		const ranges = findFrontmatterNodeRanges(src);
+		expect(ranges.get("spec")).toEqual({
+			start: { line: 3, column: 5, offset: 0 },
+			end: { line: 3, column: 9, offset: 0 },
+		});
+		expect(ranges.get("build")).toEqual({
+			start: { line: 6, column: 3, offset: 0 },
+			end: { line: 6, column: 8, offset: 0 },
+		});
 	});
 });
