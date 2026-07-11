@@ -13,6 +13,7 @@ import {
 	escapeRe,
 	format,
 	formatEdges,
+	groupEdges,
 	hasErrors,
 	type IndexChange,
 	loadExtendsChain,
@@ -468,22 +469,7 @@ function computeReadyIdsCore(
 	processInputs: Map<string, string[]>;
 	processOutputs: Map<string, string[]>;
 } {
-	const processInputs = new Map<string, string[]>();
-	for (const e of edges) {
-		if (e.kind === "input") {
-			const arr = processInputs.get(e.process) ?? [];
-			arr.push(e.artifact);
-			processInputs.set(e.process, arr);
-		}
-	}
-	const processOutputs = new Map<string, string[]>();
-	for (const e of edges) {
-		if (e.kind === "output") {
-			const arr = processOutputs.get(e.process) ?? [];
-			arr.push(e.artifact);
-			processOutputs.set(e.process, arr);
-		}
-	}
+	const { processInputs, processOutputs } = groupEdges(edges);
 
 	const readyIds: string[] = [];
 	for (const [pid, inputs] of processInputs) {
@@ -566,22 +552,12 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	let bestId: string | undefined;
 	if (opts.best && readyIds.length > 0) {
 		// Precompute artifact → consuming processes (O(m) once)
-		const artifactConsumers = new Map<string, string[]>();
-		for (const e of edges) {
-			if (e.kind === "input") {
-				const arr = artifactConsumers.get(e.artifact) ?? [];
-				arr.push(e.process);
-				artifactConsumers.set(e.artifact, arr);
-			}
-		}
+		const { artifactConsumers, processOutputs: processOutputLists } =
+			groupEdges(edges);
 		// Precompute process output artifact sets (O(m) once)
 		const processOutputSets = new Map<string, Set<string>>();
-		for (const e of edges) {
-			if (e.kind === "output") {
-				const s = processOutputSets.get(e.process) ?? new Set();
-				s.add(e.artifact);
-				processOutputSets.set(e.process, s);
-			}
+		for (const [pid, outputs] of processOutputLists) {
+			processOutputSets.set(pid, new Set(outputs));
 		}
 		// Count consumers that would become ready after pid completes (O(m) per pid, but
 		// pid iterates only its own outputs × their consumers, total O(m) across all pids)
