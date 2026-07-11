@@ -13,6 +13,7 @@ import {
 	GATE_CHECKLIST_SOURCE_PATH,
 	VSCODE_EXT_TRIGGER,
 	lintCommitSubjects,
+	wipTransitionDetected,
 } from "./gate-check.mjs";
 
 describe("VSCODE_EXT_TRIGGER", () => {
@@ -150,6 +151,33 @@ describe("lintCommitSubjects", () => {
 			results.map((r) => r.ok),
 			[true, false],
 		);
+	});
+});
+
+describe("wipTransitionDetected", () => {
+	const wipSnapshot = ["artifact:", "  ops_checkers:", '    label: "scripts"', "    status: wip", ""].join("\n");
+	const todoSnapshot = ["artifact:", "  ops_checkers:", '    label: "scripts"', "    status: todo", ""].join("\n");
+	const doneSnapshot = ["artifact:", "  ops_checkers:", '    label: "scripts"', "    status: done", ""].join("\n");
+	const otherWipSnapshot = ["artifact:", "  retro_due_hook:", '    label: "hook"', "    status: wip", ""].join("\n");
+
+	it("detects a wip snapshot for the named artifact", () => {
+		assert.equal(wipTransitionDetected([todoSnapshot, wipSnapshot, doneSnapshot], "ops_checkers"), true);
+	});
+
+	it("returns false when the named artifact was never wip", () => {
+		assert.equal(wipTransitionDetected([todoSnapshot, doneSnapshot], "ops_checkers"), false);
+	});
+
+	it("ignores a wip snapshot belonging to a different artifact", () => {
+		assert.equal(wipTransitionDetected([todoSnapshot, otherWipSnapshot, doneSnapshot], "ops_checkers"), false);
+	});
+
+	it("without an artifact key, detects wip anywhere in any snapshot", () => {
+		assert.equal(wipTransitionDetected([todoSnapshot, otherWipSnapshot]), true);
+	});
+
+	it("returns false for an empty snapshot list", () => {
+		assert.equal(wipTransitionDetected([], "ops_checkers"), false);
 	});
 });
 

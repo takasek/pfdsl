@@ -21,6 +21,7 @@ import {
 	GATE_CHECKLIST_SOURCE_PATH,
 	VSCODE_EXT_TRIGGER,
 	lintCommitSubjects,
+	wipTransitionDetected,
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 
@@ -196,6 +197,34 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 				detail: failed.length === 0 ? `${subjects.length} commit(s)` : `not Conventional Commits: ${failed.map((r) => r.subject).join(", ")}`,
 			});
 		}
+	}
+}
+
+// 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
+if (!changedFiles.includes(".pfdsl/roadmap.pfdsl")) {
+	results.push({ name: "wip transition", status: "SKIP", detail: "no .pfdsl/roadmap.pfdsl changes" });
+} else {
+	const shasOut = trySh(`git log --format=%H origin/${base}..HEAD -- .pfdsl/roadmap.pfdsl`);
+	if (!shasOut.ok) {
+		results.push({ name: "wip transition", status: "FAIL", detail: shasOut.out.trim() });
+	} else {
+		const shas = shasOut.out.trim().split("\n").filter(Boolean);
+		const snapshots = shas
+			.map((sha) => trySh(`git show ${sha}:.pfdsl/roadmap.pfdsl`))
+			.filter((r) => r.ok)
+			.map((r) => r.out);
+		const detected = wipTransitionDetected(snapshots, artifactKey);
+		results.push({
+			name: "wip transition",
+			status: detected ? "PASS" : "FAIL",
+			detail: detected
+				? artifactKey
+					? `wip found for '${artifactKey}'`
+					: "presence-only check; pass --artifact <key> to verify the specific output artifact"
+				: artifactKey
+					? `no status: wip snapshot found for artifact '${artifactKey}'`
+					: "no status: wip found in any commit snapshot",
+		});
 	}
 }
 

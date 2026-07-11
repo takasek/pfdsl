@@ -38,6 +38,20 @@ export function hasStatusChange(diffText) {
 }
 
 /**
+ * Extract a specific artifact's status: value from a full-file snapshot of
+ * .pfdsl/roadmap.pfdsl.
+ * @param {string} text
+ * @param {string} artifactKey
+ * @returns {string | undefined}
+ */
+export function extractArtifactStatus(text, artifactKey) {
+	const block = text.match(new RegExp(`\\n {2}${artifactKey}:\\n([\\s\\S]*?)(?=\\n {2}\\S+:\\n|$)`));
+	if (!block) return undefined;
+	const status = block[1].match(/status:\s*(\S+)/);
+	return status ? status[1] : undefined;
+}
+
+/**
  * Precise check: did a specific artifact's status: value change between two
  * full-file snapshots of .pfdsl/roadmap.pfdsl?
  * @param {string} beforeText
@@ -46,13 +60,23 @@ export function hasStatusChange(diffText) {
  * @returns {boolean}
  */
 export function statusChangedForArtifact(beforeText, afterText, artifactKey) {
-	const extractStatus = (text) => {
-		const block = text.match(new RegExp(`\\n {2}${artifactKey}:\\n([\\s\\S]*?)(?=\\n {2}\\S+:\\n|$)`));
-		if (!block) return undefined;
-		const status = block[1].match(/status:\s*(\S+)/);
-		return status ? status[1] : undefined;
-	};
-	return extractStatus(beforeText) !== extractStatus(afterText);
+	return extractArtifactStatus(beforeText, artifactKey) !== extractArtifactStatus(afterText, artifactKey);
+}
+
+/**
+ * Was the artifact (or, without a key, any artifact) ever in status: wip
+ * across a sequence of full-file snapshots of .pfdsl/roadmap.pfdsl — one
+ * per commit that touched the file? Verifies protocol4's "todo→wip at
+ * start" step was actually exercised, not just the final done transition.
+ * @param {string[]} fileSnapshots
+ * @param {string} [artifactKey]
+ * @returns {boolean}
+ */
+export function wipTransitionDetected(fileSnapshots, artifactKey) {
+	if (artifactKey) {
+		return fileSnapshots.some((text) => extractArtifactStatus(text, artifactKey) === "wip");
+	}
+	return fileSnapshots.some((text) => /status:\s*wip/.test(text));
 }
 
 /**
