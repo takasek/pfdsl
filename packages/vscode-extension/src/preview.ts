@@ -9,6 +9,7 @@ import {
 	buildLocations,
 	buildSubflows,
 } from "./location-utils.js";
+import type { MessageFromWebview, MessageToWebview } from "./messages.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 interface PreviewState {
@@ -60,28 +61,6 @@ function nodeIdAtCursor(
 	}
 	return undefined;
 }
-
-type MessageToWebview =
-	| {
-			type: "render";
-			dot: string;
-			focusNodeId?: string;
-			descriptions?: Record<string, Array<[string, string]>>;
-			locations?: Record<string, string[]>;
-			subflows?: Record<string, string>;
-	  }
-	| { type: "error"; message: string }
-	| { type: "focus"; nodeId: string }
-	| { type: "clearFocus" }
-	| { type: "diff"; report: DiffReport }
-	| { type: "clearDiff" };
-
-type MessageFromWebview =
-	| { type: "ready" }
-	| { type: "nodeClick"; nodeId: string }
-	| { type: "openUrl"; url: string }
-	| { type: "openFile"; path: string }
-	| { type: "openLocation"; nodeId: string };
 
 async function expandDirectory(dirUri: vscode.Uri): Promise<string[]> {
 	let entries: [string, vscode.FileType][];
@@ -234,6 +213,7 @@ body { display: flex; flex-direction: column; }
 #diff-panel { display: none; flex-shrink: 0; max-height: 200px; overflow-y: auto; padding: 6px 12px; font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size, 12px); border-top: 1px solid var(--vscode-panel-border, #333); background: var(--vscode-editor-background); }
 .diff-add { color: var(--vscode-gitDecoration-addedResourceForeground, #4caf50); white-space: pre; }
 .diff-remove { color: var(--vscode-gitDecoration-deletedResourceForeground, #f44336); white-space: pre; }
+.diff-change { color: var(--vscode-gitDecoration-modifiedResourceForeground, #e2c08d); white-space: pre; }
 .diff-none { color: var(--vscode-descriptionForeground, #888); font-style: italic; }
 #minimap { position: absolute; bottom: 12px; right: 12px; max-width: 160px; max-height: 120px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border, #555); border-radius: 4px; overflow: hidden; z-index: 50; opacity: 0.85; display: none; cursor: crosshair; }
 #minimap-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
