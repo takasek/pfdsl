@@ -1,3 +1,4 @@
+import { indentOf } from "./frontmatter-text.js";
 import { analyze } from "./index.js";
 import { sortEdges } from "./sorter.js";
 import type { Diagnostic, NodeKind } from "./types/index.js";
@@ -19,9 +20,6 @@ interface NodeBlock {
 	/** Lines that form the block: preceding comment lines + key line + child lines. */
 	lines: string[];
 }
-
-const indentOf = (line: string): number =>
-	line.length - line.trimStart().length;
 
 function extractNodeId(line: string): string {
 	const m = /^\s+(\S[^:]*?)\s*:/.exec(line);

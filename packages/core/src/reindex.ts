@@ -1,3 +1,4 @@
+import { indentOf } from "./frontmatter-text.js";
 import { analyze } from "./index.js";
 import { sortEdges } from "./sorter.js";
 import type { Diagnostic, NodeKind } from "./types/index.js";
@@ -182,9 +183,6 @@ function buildFrontmatter(writes: Write[]): string {
 	lines.push("---", "");
 	return lines.join("\n");
 }
-
-const indentOf = (line: string): number =>
-	line.length - line.trimStart().length;
 
 function setIndex(yaml: string[], w: Write): void {
 	const section = w.kind; // NodeKind values are exactly the YAML section names
