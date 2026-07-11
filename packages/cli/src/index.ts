@@ -105,8 +105,11 @@ function readSource(file: string): string | CommandResult {
 	}
 }
 
-/** Loader for `loadExtendsChain`: reads + analyzes a file by absolute path. */
-function extendsLoader(path: string): ReturnType<typeof analyze> | null {
+/**
+ * Shared file loader for `loadExtendsChain` and `loadSubflowGraph`: reads +
+ * analyzes a file by absolute path.
+ */
+function fileLoader(path: string): ReturnType<typeof analyze> | null {
 	try {
 		const src = readFileSync(path, "utf-8");
 		return analyze(wrapPresetSource(path, src));
@@ -173,7 +176,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const multiDiags: Diagnostic[] = [];
 
 	// --- Subflow checks ---
-	const subflowGraph = loadSubflowGraph(absFile, extendsLoader);
+	const subflowGraph = loadSubflowGraph(absFile, fileLoader);
 	multiDiags.push(...subflowGraph.diagnostics);
 
 	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
@@ -208,7 +211,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	}
 
 	// --- Extends checks ---
-	const extendsChain = loadExtendsChain(absFile, extendsLoader);
+	const extendsChain = loadExtendsChain(absFile, fileLoader);
 	multiDiags.push(...extendsChain.diagnostics);
 
 	for (const [path, doc] of extendsChain.docs) {
@@ -865,7 +868,7 @@ export async function runGraph(
 		effectiveFrontmatter = resolveEffectiveFrontmatter(
 			resolve(file),
 			frontmatter,
-			extendsLoader,
+			fileLoader,
 		);
 	}
 
