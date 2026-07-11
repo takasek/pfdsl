@@ -1,46 +1,60 @@
-import { format, hasErrors, loadFrontmatter } from "@pfdsl/core";
 import * as vscode from "vscode";
 import { LANGUAGE_ID } from "./analyze.js";
+import {
+	clampSelectionToBody,
+	computeFullDocumentFormatOutput,
+	computeRangeFormatOutput,
+	type FormatStyle,
+} from "./format-logic.js";
+
+function formatWholeDocument(
+	doc: vscode.TextDocument,
+	style: FormatStyle,
+): vscode.TextEdit | null {
+	const source = doc.getText();
+	const output = computeFullDocumentFormatOutput(source, style);
+	if (output === null) return null;
+	const fullRange = new vscode.Range(
+		doc.positionAt(0),
+		doc.positionAt(source.length),
+	);
+	return vscode.TextEdit.replace(fullRange, output);
+}
+
+function formatSelection(
+	doc: vscode.TextDocument,
+	range: vscode.Range,
+	style: FormatStyle,
+): vscode.TextEdit | null {
+	const source = doc.getText();
+	const clamped = clampSelectionToBody(
+		source,
+		range.start.line,
+		range.end.line,
+	);
+	if (!clamped) return null;
+	const selectedRange = new vscode.Range(
+		new vscode.Position(clamped.startLine, 0),
+		doc.lineAt(clamped.endLine).rangeIncludingLineBreak.end,
+	);
+	const selectedText = doc.getText(selectedRange);
+	const output = computeRangeFormatOutput(selectedText, style);
+	if (output === null) return null;
+	return vscode.TextEdit.replace(selectedRange, output);
+}
 
 export function registerFormatter(context: vscode.ExtensionContext): void {
 	const docProvider: vscode.DocumentFormattingEditProvider = {
 		provideDocumentFormattingEdits(doc) {
-			const source = doc.getText();
-			const { output, diagnostics } = format(source, { style: "flows" });
-			if (hasErrors(diagnostics)) return [];
-			if (output === source) return [];
-			const fullRange = new vscode.Range(
-				doc.positionAt(0),
-				doc.positionAt(source.length),
-			);
-			return [vscode.TextEdit.replace(fullRange, output)];
+			const edit = formatWholeDocument(doc, "flows");
+			return edit ? [edit] : [];
 		},
 	};
 
 	const rangeProvider: vscode.DocumentRangeFormattingEditProvider = {
 		provideDocumentRangeFormattingEdits(doc, range) {
-			const source = doc.getText();
-			const frontmatterLineCount = loadFrontmatter(source).bodyStartLine - 1;
-
-			// selection entirely in frontmatter → nothing to do
-			if (range.end.line < frontmatterLineCount) return [];
-
-			// Expand to full lines, clamped below the frontmatter
-			const startLine = Math.max(range.start.line, frontmatterLineCount);
-			const endLine = range.end.line;
-			const selectedRange = new vscode.Range(
-				new vscode.Position(startLine, 0),
-				doc.lineAt(endLine).rangeIncludingLineBreak.end,
-			);
-			const selectedText = doc.getText(selectedRange);
-
-			const { output, diagnostics } = format(selectedText, {
-				style: "flows",
-				skipValidation: true,
-			});
-			if (hasErrors(diagnostics)) return [];
-			if (output === selectedText) return [];
-			return [vscode.TextEdit.replace(selectedRange, output)];
+			const edit = formatSelection(doc, range, "flows");
+			return edit ? [edit] : [];
 		},
 	};
 
@@ -77,36 +91,11 @@ export function registerFormatter(context: vscode.ExtensionContext): void {
 			const doc = editor.document;
 			const sel = editor.selection;
 
-			if (!sel.isEmpty) {
-				// Format selection only
-				const source = doc.getText();
-				const frontmatterLineCount = loadFrontmatter(source).bodyStartLine - 1;
-				if (sel.end.line < frontmatterLineCount) return;
-				const startLine = Math.max(sel.start.line, frontmatterLineCount);
-				const selectedRange = new vscode.Range(
-					new vscode.Position(startLine, 0),
-					doc.lineAt(sel.end.line).rangeIncludingLineBreak.end,
-				);
-				const selectedText = doc.getText(selectedRange);
-				const { output, diagnostics } = format(selectedText, {
-					style: pick.mode,
-					skipValidation: true,
-				});
-				if (hasErrors(diagnostics) || output === selectedText) return;
-				await editor.edit((eb) => eb.replace(selectedRange, output));
-			} else {
-				// Format whole document
-				const source = doc.getText();
-				const { output, diagnostics } = format(source, {
-					style: pick.mode,
-				});
-				if (hasErrors(diagnostics) || output === source) return;
-				const fullRange = new vscode.Range(
-					doc.positionAt(0),
-					doc.positionAt(source.length),
-				);
-				await editor.edit((eb) => eb.replace(fullRange, output));
-			}
+			const edit = sel.isEmpty
+				? formatWholeDocument(doc, pick.mode)
+				: formatSelection(doc, sel, pick.mode);
+			if (!edit) return;
+			await editor.edit((eb) => eb.replace(edit.range, edit.newText));
 		}),
 	);
 }

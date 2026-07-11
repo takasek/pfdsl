@@ -10,8 +10,10 @@ import {
 	type Diagnostic,
 	type DiagnosticRegistryEntry,
 	type DiffReport,
+	escapeRe,
 	format,
 	formatEdges,
+	groupEdges,
 	hasErrors,
 	type IndexChange,
 	loadExtendsChain,
@@ -103,8 +105,11 @@ function readSource(file: string): string | CommandResult {
 	}
 }
 
-/** Loader for `loadExtendsChain`: reads + analyzes a file by absolute path. */
-function extendsLoader(path: string): ReturnType<typeof analyze> | null {
+/**
+ * Shared file loader for `loadExtendsChain` and `loadSubflowGraph`: reads +
+ * analyzes a file by absolute path.
+ */
+function fileLoader(path: string): ReturnType<typeof analyze> | null {
 	try {
 		const src = readFileSync(path, "utf-8");
 		return analyze(wrapPresetSource(path, src));
@@ -171,7 +176,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const multiDiags: Diagnostic[] = [];
 
 	// --- Subflow checks ---
-	const subflowGraph = loadSubflowGraph(absFile, extendsLoader);
+	const subflowGraph = loadSubflowGraph(absFile, fileLoader);
 	multiDiags.push(...subflowGraph.diagnostics);
 
 	for (const [pid, pmeta] of Object.entries(frontmatter?.process ?? {})) {
@@ -206,7 +211,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	}
 
 	// --- Extends checks ---
-	const extendsChain = loadExtendsChain(absFile, extendsLoader);
+	const extendsChain = loadExtendsChain(absFile, fileLoader);
 	multiDiags.push(...extendsChain.diagnostics);
 
 	for (const [path, doc] of extendsChain.docs) {
@@ -467,22 +472,7 @@ function computeReadyIdsCore(
 	processInputs: Map<string, string[]>;
 	processOutputs: Map<string, string[]>;
 } {
-	const processInputs = new Map<string, string[]>();
-	for (const e of edges) {
-		if (e.kind === "input") {
-			const arr = processInputs.get(e.process) ?? [];
-			arr.push(e.artifact);
-			processInputs.set(e.process, arr);
-		}
-	}
-	const processOutputs = new Map<string, string[]>();
-	for (const e of edges) {
-		if (e.kind === "output") {
-			const arr = processOutputs.get(e.process) ?? [];
-			arr.push(e.artifact);
-			processOutputs.set(e.process, arr);
-		}
-	}
+	const { processInputs, processOutputs } = groupEdges(edges);
 
 	const readyIds: string[] = [];
 	for (const [pid, inputs] of processInputs) {
@@ -565,22 +555,12 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	let bestId: string | undefined;
 	if (opts.best && readyIds.length > 0) {
 		// Precompute artifact → consuming processes (O(m) once)
-		const artifactConsumers = new Map<string, string[]>();
-		for (const e of edges) {
-			if (e.kind === "input") {
-				const arr = artifactConsumers.get(e.artifact) ?? [];
-				arr.push(e.process);
-				artifactConsumers.set(e.artifact, arr);
-			}
-		}
+		const { artifactConsumers, processOutputs: processOutputLists } =
+			groupEdges(edges);
 		// Precompute process output artifact sets (O(m) once)
 		const processOutputSets = new Map<string, Set<string>>();
-		for (const e of edges) {
-			if (e.kind === "output") {
-				const s = processOutputSets.get(e.process) ?? new Set();
-				s.add(e.artifact);
-				processOutputSets.set(e.process, s);
-			}
+		for (const [pid, outputs] of processOutputLists) {
+			processOutputSets.set(pid, new Set(outputs));
 		}
 		// Count consumers that would become ready after pid completes (O(m) per pid, but
 		// pid iterates only its own outputs × their consumers, total O(m) across all pids)
@@ -674,27 +654,49 @@ export function runStatusSet(
 	}
 	const fmBodyStart = frontmatterMatch[0].length - fmBlock.length - 4; // after "---\n"
 
-	// Find the artifact block: look for "  <id>:" in frontmatter
-	const artifactHeaderRe = new RegExp(`^(  ${artifactId}:\\s*\\n)`, "m");
-	if (!artifactHeaderRe.test(fmBlock)) {
+	// Find the artifact block: look for "<indent><id>:" in frontmatter. The id
+	// is escaped since quoted ids may contain regex metacharacters, and the
+	// indent width is detected from the header line itself rather than
+	// hardcoded to 2-space (supports 2-space, 4-space, etc. — #430).
+	const escapedId = escapeRe(artifactId);
+	const headerRe = new RegExp(`^(\\s+)${escapedId}:\\s*\\n`, "m");
+	const headerMatch = headerRe.exec(fmBlock);
+	if (!headerMatch) {
 		return fail(`error: artifact '${artifactId}' not found in ${file}\n`);
 	}
+	const nodeIndent = headerMatch[1]!.length;
+
+	// Detect this node's field indent from the line right after its header;
+	// falls back to one section-level deeper when the node has no existing
+	// fields to sniff from.
+	const afterHeader = fmBlock.slice(headerMatch.index + headerMatch[0].length);
+	const afterHeaderNl = afterHeader.indexOf("\n");
+	const firstLine =
+		afterHeaderNl === -1 ? afterHeader : afterHeader.slice(0, afterHeaderNl);
+	const firstLineIndent = firstLine.length - firstLine.trimStart().length;
+	const childIndent =
+		firstLine.trim() !== "" && firstLineIndent > nodeIndent
+			? firstLineIndent
+			: nodeIndent * 2;
+
+	const nodePad = " ".repeat(nodeIndent);
+	const childPad = " ".repeat(childIndent);
 
 	// Snapshot ready set before mutation (roadmap only)
 	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
 	const beforeSet = new Set(beforeIds);
 
-	// Replace "    status: <old>" under this artifact, or insert it after its header
+	// Replace "<childPad>status: <old>" under this artifact, or insert it after its header
 	const statusLineRe = new RegExp(
-		`(  ${artifactId}:[ \\t]*\\n(?:    [^\\n]*\\n)*?)    status: [^\\n]+`,
+		`(${nodePad}${escapedId}:[ \\t]*\\n(?:${childPad}[^\\n]*\\n)*?)${childPad}status: [^\\n]+`,
 	);
 	let newFm: string;
 	if (statusLineRe.test(fmBlock)) {
-		newFm = fmBlock.replace(statusLineRe, `$1    status: ${status}`);
+		newFm = fmBlock.replace(statusLineRe, `$1${childPad}status: ${status}`);
 	} else {
 		newFm = fmBlock.replace(
-			new RegExp(`(  ${artifactId}:[ \\t]*\\n)`),
-			`$1    status: ${status}\n`,
+			new RegExp(`(${nodePad}${escapedId}:[ \\t]*\\n)`),
+			`$1${childPad}status: ${status}\n`,
 		);
 	}
 
@@ -866,7 +868,7 @@ export async function runGraph(
 		effectiveFrontmatter = resolveEffectiveFrontmatter(
 			resolve(file),
 			frontmatter,
-			extendsLoader,
+			fileLoader,
 		);
 	}
 
@@ -886,14 +888,6 @@ export async function runGraph(
 }
 
 export type { DiffReport };
-
-export function diffGraphs(fileA: string, fileB: string): DiffReport {
-	const srcA = readSource(fileA);
-	const srcB = readSource(fileB);
-	const { graph: a } = analyze(isCommandResult(srcA) ? "" : srcA);
-	const { graph: b } = analyze(isCommandResult(srcB) ? "" : srcB);
-	return coreDiffGraphs(a, b);
-}
 
 export interface DiffOptions {
 	format?: "text" | "dot" | "svg";

@@ -1,5 +1,6 @@
+import { detectChildIndent, escapeRe, indentOf } from "./frontmatter-text.js";
 import { analyze } from "./index.js";
-import { sortEdges } from "./sorter.js";
+import { computeTopoOrder } from "./sorter.js";
 import type { Diagnostic, NodeKind } from "./types/index.js";
 
 export interface IndexChange {
@@ -55,32 +56,7 @@ export function reindex(
 		return typeof meta?.index === "number" ? meta.index : undefined;
 	};
 
-	// Deterministic topological node order: first appearance across the
-	// canonical edge sort (feedback edges are skipped — they carry no rank),
-	// then any remaining declared/isolated nodes by id.
-	const order: string[] = [];
-	const seen = new Set<string>();
-	const push = (id: string) => {
-		if (!seen.has(id)) {
-			seen.add(id);
-			order.push(id);
-		}
-	};
-	for (const e of sortEdges(edges, graph)) {
-		if (e.kind === "input") {
-			push(e.artifact);
-			push(e.process);
-		} else if (e.kind === "output") {
-			push(e.process);
-			push(e.artifact);
-		}
-	}
-	const remaining = new Set<string>([
-		...graph.nodes.keys(),
-		...Object.keys(frontmatter?.artifact ?? {}),
-		...Object.keys(frontmatter?.process ?? {}),
-	]);
-	for (const id of [...remaining].sort()) push(id);
+	const order = computeTopoOrder(edges, graph, frontmatter);
 
 	// Assign indices per kind.
 	const assigned = new Map<string, number>();
@@ -183,9 +159,6 @@ function buildFrontmatter(writes: Write[]): string {
 	return lines.join("\n");
 }
 
-const indentOf = (line: string): number =>
-	line.length - line.trimStart().length;
-
 function setIndex(yaml: string[], w: Write): void {
 	const section = w.kind; // NodeKind values are exactly the YAML section names
 	// Locate the top-level section line (indent 0).
@@ -216,14 +189,9 @@ function setIndex(yaml: string[], w: Write): void {
 
 	// Node keys sit at the section's child-indent level, detected from the
 	// first content line (supports 2-space, 4-space, etc. — not hardcoded).
-	let sectionIndent = 2;
-	for (let i = sectionStart + 1; i < sectionEnd; i++) {
-		const line = yaml[i]!;
-		if (line.trim() !== "" && !line.trimStart().startsWith("#")) {
-			sectionIndent = indentOf(line);
-			break;
-		}
-	}
+	const sectionIndent = detectChildIndent(
+		yaml.slice(sectionStart + 1, sectionEnd),
+	);
 
 	// Find the node key line within the section (block or inline mapping).
 	const keyRe = new RegExp(`^(\\s+)${escapeRe(w.id)}:(.*)$`);
@@ -291,10 +259,6 @@ function setIndex(yaml: string[], w: Write): void {
 		}
 	}
 	yaml.splice(nodeLine + 1, 0, `${pad(childIndent)}index: ${w.value}`);
-}
-
-function escapeRe(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** Locate the first balanced `{ ... }` group in s, or null if unbalanced. */

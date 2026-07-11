@@ -3,8 +3,8 @@ import { buildGraph } from "./graph.js";
 import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
-import { sortEdges } from "./sorter.js";
-import type { NormalizedEdge } from "./types/index.js";
+import { computeTopoOrder, sortEdges } from "./sorter.js";
+import type { Frontmatter, NormalizedEdge } from "./types/index.js";
 
 function sorted(src: string): NormalizedEdge[] {
 	const { tokens } = lex(src);
@@ -12,6 +12,17 @@ function sorted(src: string): NormalizedEdge[] {
 	const { edges, nodeKinds } = normalize(document, null);
 	const graph = buildGraph(edges, nodeKinds);
 	return sortEdges(edges, graph);
+}
+
+function topoOrder(
+	src: string,
+	frontmatter: Frontmatter | null = null,
+): string[] {
+	const { tokens } = lex(src);
+	const { document } = parseTokens(tokens);
+	const { edges, nodeKinds } = normalize(document, frontmatter);
+	const graph = buildGraph(edges, nodeKinds);
+	return computeTopoOrder(edges, graph, frontmatter);
 }
 
 describe("sortEdges", () => {
@@ -82,6 +93,36 @@ describe("sortEdges", () => {
 			{ kind: "input", artifact: "B", process: "P2" },
 			{ kind: "output", process: "P1", artifact: "B" },
 			{ kind: "output", process: "P2", artifact: "A" },
+		]);
+	});
+});
+
+describe("computeTopoOrder", () => {
+	it("orders a simple chain: artifact, process, artifact, ...", () => {
+		expect(topoOrder("A >> P -> B")).toEqual(["A", "P", "B"]);
+	});
+
+	it("dedupes ids shared across edges (each node appears once)", () => {
+		expect(topoOrder("A >> P -> B >> Q -> C")).toEqual([
+			"A",
+			"P",
+			"B",
+			"Q",
+			"C",
+		]);
+	});
+
+	it("appends frontmatter-declared nodes not reachable via any edge, sorted", () => {
+		const frontmatter: Frontmatter = {
+			artifact: { Z: {}, Y: {} },
+			process: {},
+		};
+		expect(topoOrder("A >> P -> B", frontmatter)).toEqual([
+			"A",
+			"P",
+			"B",
+			"Y",
+			"Z",
 		]);
 	});
 });

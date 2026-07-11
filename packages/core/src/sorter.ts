@@ -1,7 +1,43 @@
-import type { Graph, NormalizedEdge } from "./types/index.js";
+import type { Frontmatter, Graph, NormalizedEdge } from "./types/index.js";
 
 export function sortIsolated(isolatedNodes: Set<string>): string[] {
 	return [...isolatedNodes].sort();
+}
+
+/**
+ * Deterministic topological node order: first appearance across the
+ * canonical edge sort (feedback edges are skipped — they carry no rank),
+ * then any remaining declared/isolated nodes by id.
+ */
+export function computeTopoOrder(
+	edges: NormalizedEdge[],
+	graph: Graph,
+	frontmatter: Frontmatter | null | undefined,
+): string[] {
+	const order: string[] = [];
+	const seen = new Set<string>();
+	const push = (id: string) => {
+		if (!seen.has(id)) {
+			seen.add(id);
+			order.push(id);
+		}
+	};
+	for (const e of sortEdges(edges, graph)) {
+		if (e.kind === "input") {
+			push(e.artifact);
+			push(e.process);
+		} else if (e.kind === "output") {
+			push(e.process);
+			push(e.artifact);
+		}
+	}
+	const remaining = new Set([
+		...graph.nodes.keys(),
+		...Object.keys(frontmatter?.artifact ?? {}),
+		...Object.keys(frontmatter?.process ?? {}),
+	]);
+	for (const id of [...remaining].sort()) push(id);
+	return order;
 }
 
 export function sortEdges(

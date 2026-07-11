@@ -1,5 +1,6 @@
+import { detectChildIndent, indentOf } from "./frontmatter-text.js";
 import { analyze } from "./index.js";
-import { sortEdges } from "./sorter.js";
+import { computeTopoOrder } from "./sorter.js";
 import type { Diagnostic, NodeKind } from "./types/index.js";
 
 export type SortKey = "index" | "topological" | "group" | "id";
@@ -19,9 +20,6 @@ interface NodeBlock {
 	/** Lines that form the block: preceding comment lines + key line + child lines. */
 	lines: string[];
 }
-
-const indentOf = (line: string): number =>
-	line.length - line.trimStart().length;
 
 function extractNodeId(line: string): string {
 	const m = /^\s+(\S[^:]*?)\s*:/.exec(line);
@@ -118,29 +116,7 @@ export function sort(source: string, opts: SortOptions): SortResult {
 	// Compute topological order only when needed.
 	const topoOrder = new Map<string, number>();
 	if (opts.by.includes("topological")) {
-		const order: string[] = [];
-		const seen = new Set<string>();
-		const push = (id: string) => {
-			if (!seen.has(id)) {
-				seen.add(id);
-				order.push(id);
-			}
-		};
-		for (const e of sortEdges(edges, graph)) {
-			if (e.kind === "input") {
-				push(e.artifact);
-				push(e.process);
-			} else if (e.kind === "output") {
-				push(e.process);
-				push(e.artifact);
-			}
-		}
-		const remaining = new Set([
-			...graph.nodes.keys(),
-			...Object.keys(frontmatter?.artifact ?? {}),
-			...Object.keys(frontmatter?.process ?? {}),
-		]);
-		for (const id of [...remaining].sort()) push(id);
+		const order = computeTopoOrder(edges, graph, frontmatter);
 		for (const [rank, id] of order.entries()) topoOrder.set(id, rank);
 	}
 
@@ -229,13 +205,7 @@ export function sort(source: string, opts: SortOptions): SortResult {
 		const sectionContent = yaml.slice(sectionStart + 1, sectionEnd);
 
 		// Detect child indent from the first content line
-		let childIndent = 2;
-		for (const line of sectionContent) {
-			if (line.trim() !== "" && !line.trimStart().startsWith("#")) {
-				childIndent = indentOf(line);
-				break;
-			}
-		}
+		const childIndent = detectChildIndent(sectionContent);
 
 		const { blocks, gaps } = extractBlocksAndGaps(sectionContent, childIndent);
 		if (blocks.length === 0) continue;
