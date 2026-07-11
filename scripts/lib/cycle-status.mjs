@@ -48,6 +48,44 @@ export function parseReadyOutput(readyJson) {
 }
 
 /**
+ * roadmap.pfdsl 内の `<processId>:` ブロック（次の同インデントキーまで）を抜き出す。
+ * @param {string} pfdslText
+ * @param {string} processId
+ * @returns {string | null}
+ */
+function findProcessBlock(pfdslText, processId) {
+	const re = new RegExp(`^  ${processId}:\\n([\\s\\S]*?)(?=^  \\S|^\\S)`, "m");
+	const match = pfdslText.match(re);
+	return match ? match[1] : null;
+}
+
+/**
+ * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
+ * @param {string} processId
+ * @returns {number | null}
+ */
+export function findIssueNumberForProcess(pfdslText, processId) {
+	const block = findProcessBlock(pfdslText, processId);
+	if (!block) return null;
+	const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
+	return match ? Number(match[1]) : null;
+}
+
+const DESIGN_UNSETTLED_PATTERNS = [/design TBD/i, /設計未確定/, /設計未合意/];
+
+/**
+ * work-cycle.md 手順1が定義する「設計未合意フレーズ」を issue 本文から検出する。
+ * @param {string | undefined | null} body
+ * @param {RegExp[]} patterns
+ * @returns {{designUnsettled: boolean, matchedLines: string[]}}
+ */
+export function detectDesignUnsettled(body, patterns = DESIGN_UNSETTLED_PATTERNS) {
+	if (!body) return { designUnsettled: false, matchedLines: [] };
+	const matchedLines = body.split("\n").filter((line) => patterns.some((p) => p.test(line)));
+	return { designUnsettled: matchedLines.length > 0, matchedLines };
+}
+
+/**
  * @param {string} logOutput - output of `git log --oneline HEAD..origin/<base>`
  * @returns {number}
  */

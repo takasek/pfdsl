@@ -7,7 +7,14 @@ import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { classifyPRs, parseReadyOutput, countBehind } from "./lib/cycle-status.mjs";
+import { readFileSync } from "node:fs";
+import {
+	classifyPRs,
+	parseReadyOutput,
+	countBehind,
+	findIssueNumberForProcess,
+	detectDesignUnsettled,
+} from "./lib/cycle-status.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -60,9 +67,37 @@ if (existsSync(cliPath)) {
 	readyError = "packages/cli/dist/cli.js not built; run 'pnpm -r build' first";
 }
 
-const result = { fetched, behindBase, openFlowSyncPRs, otherOpenPRs, ready, best };
+let designUnsettled = null;
+let designUnsettledLines = [];
+let designUnsettledError = null;
+if (best) {
+	try {
+		const roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
+		const issueNumber = findIssueNumberForProcess(roadmapText, best);
+		if (issueNumber) {
+			const body = sh(`gh issue view ${issueNumber} --json body --jq .body`);
+			({ designUnsettled, matchedLines: designUnsettledLines } = detectDesignUnsettled(body));
+		} else {
+			designUnsettledError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
+		}
+	} catch (e) {
+		designUnsettledError = e.message;
+	}
+}
+
+const result = {
+	fetched,
+	behindBase,
+	openFlowSyncPRs,
+	otherOpenPRs,
+	ready,
+	best,
+	designUnsettled,
+	designUnsettledLines,
+};
 if (behindBaseError) result.behindBaseError = behindBaseError;
 if (prError) result.prError = prError;
 if (readyError) result.readyError = readyError;
+if (designUnsettledError) result.designUnsettledError = designUnsettledError;
 
 console.log(JSON.stringify(result, null, 2));

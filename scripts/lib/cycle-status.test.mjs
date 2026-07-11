@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { classifyPRs, parseReadyOutput, countBehind, summarizeCiStatus } from "./cycle-status.mjs";
+import {
+	classifyPRs,
+	parseReadyOutput,
+	countBehind,
+	summarizeCiStatus,
+	detectDesignUnsettled,
+	findIssueNumberForProcess,
+} from "./cycle-status.mjs";
 
 describe("summarizeCiStatus", () => {
 	it("returns NONE for empty/missing rollup", () => {
@@ -82,6 +89,65 @@ describe("parseReadyOutput", () => {
 	it("returns null best when absent", () => {
 		const json = { ok: true, ready: [] };
 		assert.deepEqual(parseReadyOutput(json), { ready: [], best: null });
+	});
+});
+
+describe("detectDesignUnsettled", () => {
+	it("returns false for a body with no unsettled-design phrases", () => {
+		assert.deepEqual(detectDesignUnsettled("実装方針は A に決定。"), {
+			designUnsettled: false,
+			matchedLines: [],
+		});
+	});
+
+	it("detects '設計未確定' and returns the matched line", () => {
+		const body = "## 概要\n設計未確定な点がある。\n続き";
+		assert.deepEqual(detectDesignUnsettled(body), {
+			designUnsettled: true,
+			matchedLines: ["設計未確定な点がある。"],
+		});
+	});
+
+	it("detects 'design TBD' case-insensitively", () => {
+		const body = "Approach: design TBD, need discussion";
+		const { designUnsettled, matchedLines } = detectDesignUnsettled(body);
+		assert.equal(designUnsettled, true);
+		assert.deepEqual(matchedLines, ["Approach: design TBD, need discussion"]);
+	});
+
+	it("returns false for empty/missing body", () => {
+		assert.deepEqual(detectDesignUnsettled(""), { designUnsettled: false, matchedLines: [] });
+		assert.deepEqual(detectDesignUnsettled(undefined), { designUnsettled: false, matchedLines: [] });
+	});
+});
+
+describe("findIssueNumberForProcess", () => {
+	const pfdsl = `artifacts:
+  spec_id_syntax:
+    label: 仕様ID構文
+processes:
+  i402_implement_get_by_id:
+    label: get-by-ID ツール実装
+    location: https://github.com/takasek/pfdsl/issues/402
+  i405_implement_mint_check:
+    label: mint-check ツール実装
+    location: https://github.com/takasek/pfdsl/issues/405
+    updated_at: 2026-07-10T01:50:30Z
+  i435_implement_ansi_color:
+    label: 診断 ANSI カラー実装
+    location: https://github.com/takasek/pfdsl/issues/435
+`;
+
+	it("extracts the issue number from the process block's location", () => {
+		assert.equal(findIssueNumberForProcess(pfdsl, "i405_implement_mint_check"), 405);
+	});
+
+	it("does not bleed into a neighboring process's location", () => {
+		assert.equal(findIssueNumberForProcess(pfdsl, "i402_implement_get_by_id"), 402);
+	});
+
+	it("returns null for an unknown process id", () => {
+		assert.equal(findIssueNumberForProcess(pfdsl, "i999_nonexistent"), null);
 	});
 });
 
