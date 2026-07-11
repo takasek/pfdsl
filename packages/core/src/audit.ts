@@ -1,3 +1,4 @@
+import { computeOpenInputs } from "./multifile.js";
 import type { ArtifactMeta } from "./types/frontmatter.js";
 import type { NodeKind, NormalizedEdge } from "./types/index.js";
 
@@ -24,8 +25,16 @@ export interface AuditResult {
 /**
  * Inspect the primary graph for terminal artifacts and external inputs.
  *
- * Feedback edges are ignored: only `input` and `output` edges count as
- * production/consumption in the primary graph.
+ * `terminals` here is the spec's **audit-terminal** (§15.11): produced and
+ * not consumed by a normal `>>` input, ignoring feedback (`>>?`) consumption.
+ * This intentionally differs from `computeTerminals` in multifile.ts, which
+ * computes the stricter **boundary-terminal** (also excludes artifacts
+ * consumed only via feedback) used for subflow boundary validation. The two
+ * terms are distinct by design — see spec §15.11 "audit-terminal と
+ * boundary-terminal" — not a bug to converge.
+ *
+ * `externalInputs` delegates to `computeOpenInputs` (multifile.ts), which
+ * implements the same "consumed by `>>`, not produced" check.
  *
  * Artifacts with a non-empty `externalStakeholders` list are treated as
  * having an external consumer and are excluded from terminals.
@@ -62,8 +71,9 @@ export function auditGraph(
 			!consumed.has(a) &&
 			!artifactMeta?.[a]?.externalStakeholders?.length,
 	);
-	const externalInputs = [...new Set(artifacts)].filter(
-		(a) => consumed.has(a) && !produced.has(a),
+	const openInputs = computeOpenInputs(edges);
+	const externalInputs = [...new Set(artifacts)].filter((a) =>
+		openInputs.has(a),
 	);
 
 	// Consumer asymmetry: group artifacts by their frontmatter group, then

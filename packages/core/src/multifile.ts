@@ -134,8 +134,13 @@ export function computeOpenInputs(edges: NormalizedEdge[]): Set<string> {
 }
 
 /**
- * Compute the set of "terminal" artifacts in a flow:
- * artifacts that appear in the flow but are consumed by NEITHER `>>` (input) NOR `>>?` (feedback) (§15.11).
+ * Compute the set of **boundary-terminal** artifacts in a flow (§15.11):
+ * artifacts that appear in the flow but are consumed by NEITHER `>>` (input)
+ * NOR `>>?` (feedback). Used for subflow boundary validation.
+ *
+ * This is stricter than `auditGraph`'s `terminals` (audit.ts), the spec's
+ * **audit-terminal**, which ignores feedback consumption. The two terms are
+ * distinct by design — see spec §15.11 "audit-terminal と boundary-terminal".
  */
 export function computeTerminals(edges: NormalizedEdge[]): Set<string> {
 	const all = new Set<string>();
