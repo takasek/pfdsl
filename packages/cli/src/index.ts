@@ -138,7 +138,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	if (file === "-") {
 		if (opts.json) {
 			return {
-				stdout: `${JSON.stringify({ ok: true, diagnostics: [] })}\n`,
+				stdout: `${JSON.stringify({ ok: true, diagnostics })}\n`,
 				stderr: "",
 				exitCode: 0,
 			};
