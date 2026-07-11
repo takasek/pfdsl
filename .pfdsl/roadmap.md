@@ -22,7 +22,10 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 ## プリフライト・ゲート集約スクリプト（#354）
 
-- **選択フェーズ（pfd-ops 手順1）**: `node scripts/cycle-status.mjs` — fetch 実行・base への遅れコミット数・flow-sync PR / その他 open PR の一覧・`ready --best` の結果を1回の JSON 出力に集約する。`--base <branch>` で対象ブランチを変更可能（デフォルト `main`）
+- **選択フェーズ（pfd-ops 手順1）**: `node scripts/cycle-status.mjs` — fetch 実行・base への遅れコミット数・flow-sync PR / その他 open PR の一覧・`ready --best` の結果を1回の JSON 出力に集約する。`--base <branch>` で対象ブランチを変更可能（デフォルト `main`）。加えて次の3点を出力する（#461）:
+  - `openFlowSyncPRs` の各要素に `ci`（`PASS`/`FAIL`/`PENDING`/`NONE`/`UNKNOWN`）を含む。`gh pr checks` の別往復は不要
+  - best 候補プロセスの issue 本文を fetch し、「design TBD」「設計未確定」等の設計未合意フレーズを検出した結果を `designUnsettled`（bool）・`designUnsettledLines`（ヒット行）で出力する。対称な複数案か事実上1案かの最終判断は引き続き AI が行う
+  - best 候補プロセスの出力 artifact キーを roadmap.pfdsl の edge から引き、実行すべき `gate-check.mjs --artifact <key>` の完成形コマンド行を `gateCheckCommand` で出力する（転記ミス・フォールバック判定への意図しない低下を防ぐ）
 - **終端ゲート機械6項目（pfd-ops 手順3）**: `node scripts/gate-check.mjs [--base main] [--artifact <key>]` — 内部で `git fetch origin` を試みたうえで `origin/<base>...HEAD` を基準に差分を取る（fetch 失敗時も既存 remote-tracking ref で続行し、ref 自体が無ければ明示エラーで終了する）。変更 `.pfdsl` の `check` 通過・`audit-issues-flow` 差分なし・変更 `.md` の `check-md-linebreaks`・gen-skill identity（該当変更時のみ）・snapshot 鮮度（`.pfdsl` 変更時のみ、`vitest` 自体の失敗も FAIL 扱い）・`roadmap.pfdsl` の `status:` 更新有無を PASS/FAIL/SKIP 表で返す。`--artifact <key>` を渡すとその artifact の `status:` 変化のみを厳密判定する（省略時は「どこかで status: が変わったか」の粗いフォールバック判定になる旨を detail に明示）。判定不能な残り項目は `MANUAL:` prefix で列挙される — SKILL.md の終端ゲートチェックリストから実行時に抽出するため手打ちコピーは持たない。その項目のみ個別に確認する
 - どちらも `packages/cli/dist/cli.js` の存在を前提にする箇所がある（worktree では先に `pnpm install && pnpm -r build` を済ませる）
 - `flow:exempt` issue（roadmap 非管理）の develop では `roadmap.pfdsl` 自体を変更しないため、`--artifact` 省略時の粗いフォールバック判定は常に FAIL になる。この場合は N/A と判断してよい（#439 で確認）。
