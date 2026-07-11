@@ -1,7 +1,8 @@
 #!/bin/sh
 pnpm biome check --write packages/ --no-errors-on-unmatched
 
-if ! git diff --quiet -- packages/; then
+staged_packages=$(git diff --cached --name-only --diff-filter=d -- packages/)
+if [ -n "$staged_packages" ] && ! git diff --quiet -- $staged_packages; then
   echo "Biome formatted files. Review changes and re-stage."
   exit 1
 fi
