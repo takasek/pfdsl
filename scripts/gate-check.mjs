@@ -20,6 +20,7 @@ import {
 	statusChangedForArtifact,
 	GATE_CHECKLIST_SOURCE_PATH,
 	VSCODE_EXT_TRIGGER,
+	lintCommitSubjects,
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 
@@ -175,6 +176,27 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 		status: r.ok ? "PASS" : "FAIL",
 		detail: r.ok ? undefined : r.out.trim().slice(-200),
 	});
+}
+
+// 8. commit subject lint (Conventional Commits message format; granularity stays MANUAL)
+{
+	const subjectsOut = trySh(`git log origin/${base}..HEAD --format=%s`);
+	if (!subjectsOut.ok) {
+		results.push({ name: "commit subject lint", status: "FAIL", detail: subjectsOut.out.trim() });
+	} else {
+		const subjects = subjectsOut.out.trim().split("\n").filter(Boolean);
+		if (subjects.length === 0) {
+			results.push({ name: "commit subject lint", status: "SKIP", detail: "no commits in range" });
+		} else {
+			const linted = lintCommitSubjects(subjects);
+			const failed = linted.filter((r) => !r.ok);
+			results.push({
+				name: "commit subject lint",
+				status: failed.length === 0 ? "PASS" : "FAIL",
+				detail: failed.length === 0 ? `${subjects.length} commit(s)` : `not Conventional Commits: ${failed.map((r) => r.subject).join(", ")}`,
+			});
+		}
+	}
 }
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);

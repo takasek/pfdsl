@@ -12,6 +12,7 @@ import {
 	deriveManualItems,
 	GATE_CHECKLIST_SOURCE_PATH,
 	VSCODE_EXT_TRIGGER,
+	lintCommitSubjects,
 } from "./gate-check.mjs";
 
 describe("VSCODE_EXT_TRIGGER", () => {
@@ -109,6 +110,46 @@ describe("statusChangedForArtifact", () => {
 
 	it("returns false when the artifact block is missing from both snapshots", () => {
 		assert.equal(statusChangedForArtifact(before, before, "nonexistent_artifact"), false);
+	});
+});
+
+describe("lintCommitSubjects", () => {
+	it("accepts a Conventional Commits subject", () => {
+		const results = lintCommitSubjects(["feat(gate-check): add commit lint"]);
+		assert.deepEqual(results, [{ subject: "feat(gate-check): add commit lint", ok: true }]);
+	});
+
+	it("accepts a breaking-change subject with !", () => {
+		const results = lintCommitSubjects(["feat!: drop legacy flag"]);
+		assert.equal(results[0].ok, true);
+	});
+
+	it("accepts a subject with no scope", () => {
+		const results = lintCommitSubjects(["docs: clarify companion rule"]);
+		assert.equal(results[0].ok, true);
+	});
+
+	it("rejects a subject with no type prefix", () => {
+		const results = lintCommitSubjects(["add commit lint"]);
+		assert.equal(results[0].ok, false);
+	});
+
+	it("rejects an unknown type", () => {
+		const results = lintCommitSubjects(["wip: something"]);
+		assert.equal(results[0].ok, false);
+	});
+
+	it("rejects a merge-style subject that lacks a colon", () => {
+		const results = lintCommitSubjects(["Merge pull request #466 from foo/bar"]);
+		assert.equal(results[0].ok, false);
+	});
+
+	it("returns one result per subject, preserving order", () => {
+		const results = lintCommitSubjects(["feat: a", "not conventional"]);
+		assert.deepEqual(
+			results.map((r) => r.ok),
+			[true, false],
+		);
 	});
 });
 
