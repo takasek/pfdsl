@@ -886,14 +886,6 @@ export async function runGraph(
 
 export type { DiffReport };
 
-export function diffGraphs(fileA: string, fileB: string): DiffReport {
-	const srcA = readSource(fileA);
-	const srcB = readSource(fileB);
-	const { graph: a } = analyze(isCommandResult(srcA) ? "" : srcA);
-	const { graph: b } = analyze(isCommandResult(srcB) ? "" : srcB);
-	return coreDiffGraphs(a, b);
-}
-
 export interface DiffOptions {
 	format?: "text" | "dot" | "svg";
 }

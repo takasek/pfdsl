@@ -2,13 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import {
-	diffGraphs,
-	parseArgs,
-	run,
-	runCheck,
-	shouldColorize,
-} from "./index.js";
+import { parseArgs, run, runCheck, runDiff, shouldColorize } from "./index.js";
 
 let dir: string;
 const valid = "req >> design -> spec\nspec >> impl -> code\n";
@@ -391,16 +385,25 @@ describe("graph", () => {
 });
 
 describe("diff", () => {
-	it("reports added and removed edges", () => {
+	it("reports added and removed edges", async () => {
 		const a = join(dir, "diff-a.pfdsl");
 		const b = join(dir, "diff-b.pfdsl");
 		writeFileSync(a, "req >> design -> spec\n");
 		writeFileSync(b, "req >> design -> spec\nspec >> impl -> code\n");
-		const report = diffGraphs(a, b);
-		expect(report.addedNodes).toEqual(["code", "impl"]);
-		expect(report.addedEdges).toContain("spec -> impl");
-		expect(report.addedEdges).toContain("impl -> code");
-		expect(report.removedEdges).toEqual([]);
+		const r = await runDiff(a, b);
+		expect(r.stdout).toContain("+ node code");
+		expect(r.stdout).toContain("+ node impl");
+		expect(r.stdout).toContain("+ edge spec -> impl");
+		expect(r.stdout).toContain("+ edge impl -> code");
+		expect(r.stdout).not.toContain("- edge");
+	});
+
+	it("fails with an error when a file cannot be read", async () => {
+		const a = join(dir, "diff-a.pfdsl");
+		writeFileSync(a, "req >> design -> spec\n");
+		const r = await runDiff(a, join(dir, "does-not-exist.pfdsl"));
+		expect(r.exitCode).not.toBe(0);
+		expect(r.stderr).toBeTruthy();
 	});
 
 	it("CLI diff output for identical files", async () => {
