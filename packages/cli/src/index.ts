@@ -543,7 +543,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 
-	const { readyIds, processInputs } = computeReadyIdsCore(
+	const { readyIds, processInputs, processOutputs } = computeReadyIdsCore(
 		edges,
 		nodeKinds,
 		artifactMeta,
@@ -593,11 +593,17 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 		});
 	}
 
-	type ReadyItem = { id: string; label: string; inputs: string[] };
+	type ReadyItem = {
+		id: string;
+		label: string;
+		inputs: string[];
+		outputs: string[];
+	};
 	const toItem = (pid: string): ReadyItem => ({
 		id: pid,
 		label: frontmatter?.process?.[pid]?.label ?? pid,
 		inputs: processInputs.get(pid) ?? [],
+		outputs: processOutputs.get(pid) ?? [],
 	});
 
 	const readyItems = readyIds.map(toItem);
