@@ -1,7 +1,10 @@
 import type { AnalyzeResult, DiffReport, IdNode, Statement } from "@pfdsl/core";
 import { exportDot } from "@pfdsl/graphviz-exporter";
 import * as vscode from "vscode";
-import { analyzeDocument } from "./analyze.js";
+import {
+	analyzeDocument,
+	resolveEffectiveFrontmatterForUri,
+} from "./analyze.js";
 import { findFrontmatterDefinition } from "./jump.js";
 import { resolveLocationFsPath } from "./location-path.js";
 import {
@@ -181,7 +184,11 @@ function dotForDocument(doc: vscode.TextDocument): {
 	const fatal = diagnostics.find((d) => d.severity === "error");
 	if (fatal) return { error: `${fatal.code}: ${fatal.message}` };
 	try {
-		return { dot: exportDot(graph, frontmatter) };
+		const effectiveFrontmatter = resolveEffectiveFrontmatterForUri(
+			doc.uri,
+			frontmatter,
+		);
+		return { dot: exportDot(graph, effectiveFrontmatter) };
 	} catch (e) {
 		return { error: `Export failed: ${(e as Error).message}` };
 	}

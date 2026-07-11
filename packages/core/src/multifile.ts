@@ -134,8 +134,13 @@ export function computeOpenInputs(edges: NormalizedEdge[]): Set<string> {
 }
 
 /**
- * Compute the set of "terminal" artifacts in a flow:
- * artifacts that appear in the flow but are consumed by NEITHER `>>` (input) NOR `>>?` (feedback) (§15.11).
+ * Compute the set of **boundary-terminal** artifacts in a flow (§15.11):
+ * artifacts that appear in the flow but are consumed by NEITHER `>>` (input)
+ * NOR `>>?` (feedback). Used for subflow boundary validation.
+ *
+ * This is stricter than `auditGraph`'s `terminals` (audit.ts), the spec's
+ * **audit-terminal**, which ignores feedback consumption. The two terms are
+ * distinct by design — see spec §15.11 "audit-terminal と boundary-terminal".
  */
 export function computeTerminals(edges: NormalizedEdge[]): Set<string> {
 	const all = new Set<string>();
@@ -406,6 +411,53 @@ export function buildPresentationChain<T extends DocWithFrontmatter>(
 
 	visit(entryPath);
 	return chain;
+}
+
+/**
+ * Prepare a preset file's source for `analyze`. Plain YAML preset files
+ * (`.yaml` / `.yml`) have no `---` delimiters; wrap them so loadFrontmatter
+ * picks up their content as frontmatter. Other sources pass through as-is.
+ */
+export function wrapPresetSource(path: string, src: string): string {
+	if (
+		!src.startsWith("---") &&
+		(path.endsWith(".yaml") || path.endsWith(".yml"))
+	) {
+		return `---\n${src}\n---\n`;
+	}
+	return src;
+}
+
+/**
+ * Resolve the `extends:` chain of `entryPath` and merge the resulting
+ * statusStyles / tag / group into a copy of `frontmatter` (§2.9.4), so
+ * renderers (CLI graph, VS Code preview/export) share one resolution path.
+ * Chain diagnostics are intentionally dropped — rendering is lenient; strict
+ * validation happens in `check`. Returns `frontmatter` as-is when the chain
+ * contributes nothing.
+ */
+export function resolveEffectiveFrontmatter<T extends DocWithFrontmatter>(
+	entryPath: string,
+	frontmatter: Frontmatter | null,
+	load: (path: string) => T | null,
+): Frontmatter | null {
+	const { docs } = loadExtendsChain(entryPath, load);
+	const chain = buildPresentationChain(entryPath, docs);
+	const resolved = resolvePresentation(chain);
+	if (
+		resolved.statusStyles === undefined &&
+		resolved.tag === undefined &&
+		resolved.group === undefined
+	) {
+		return frontmatter;
+	}
+	const effective: Frontmatter = { ...frontmatter };
+	if (resolved.statusStyles !== undefined) {
+		effective.statusStyles = resolved.statusStyles;
+	}
+	if (resolved.tag !== undefined) effective.tag = resolved.tag;
+	if (resolved.group !== undefined) effective.group = resolved.group;
+	return effective;
 }
 
 /** Allowed top-level keys in a preset file (§2.9.5). */

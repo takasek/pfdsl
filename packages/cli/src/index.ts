@@ -3,7 +3,6 @@ import { resolve } from "node:path";
 import {
 	analyze,
 	auditGraph,
-	buildPresentationChain,
 	computeOpenInputs,
 	computeTerminals,
 	diffGraphs as coreDiffGraphs,
@@ -19,7 +18,7 @@ import {
 	loadSubflowGraph,
 	type PfdType,
 	reindex,
-	resolvePresentation,
+	resolveEffectiveFrontmatter,
 	resolveRefPath,
 	type SortKey,
 	STATUS_VALUES,
@@ -27,6 +26,7 @@ import {
 	sortEdges,
 	validatePresetKeys,
 	validateSubflowBoundary,
+	wrapPresetSource,
 } from "@pfdsl/core";
 import { type BinaryFormat, svgToBinary } from "@pfdsl/graphviz-exporter";
 import {
@@ -106,16 +106,8 @@ function readSource(file: string): string | CommandResult {
 /** Loader for `loadExtendsChain`: reads + analyzes a file by absolute path. */
 function extendsLoader(path: string): ReturnType<typeof analyze> | null {
 	try {
-		let src = readFileSync(path, "utf-8");
-		// Plain YAML preset files (e.g. .yaml) have no --- delimiters;
-		// wrap them so loadFrontmatter picks up their content as frontmatter.
-		if (
-			!src.startsWith("---") &&
-			(path.endsWith(".yaml") || path.endsWith(".yml"))
-		) {
-			src = `---\n${src}\n---\n`;
-		}
-		return analyze(src);
+		const src = readFileSync(path, "utf-8");
+		return analyze(wrapPresetSource(path, src));
 	} catch {
 		return null;
 	}
@@ -871,20 +863,11 @@ export async function runGraph(
 	// Skipped for stdin (-): relative extends paths need a base file.
 	let effectiveFrontmatter = frontmatter;
 	if (file !== "-") {
-		const absFile = resolve(file);
-		const extendsChain = loadExtendsChain(absFile, extendsLoader);
-		const chain = buildPresentationChain(absFile, extendsChain.docs);
-		const resolved = resolvePresentation(chain);
-		effectiveFrontmatter = { ...frontmatter };
-		if (resolved.statusStyles !== undefined) {
-			effectiveFrontmatter.statusStyles = resolved.statusStyles;
-		}
-		if (resolved.tag !== undefined) {
-			effectiveFrontmatter.tag = resolved.tag;
-		}
-		if (resolved.group !== undefined) {
-			effectiveFrontmatter.group = resolved.group;
-		}
+		effectiveFrontmatter = resolveEffectiveFrontmatter(
+			resolve(file),
+			frontmatter,
+			extendsLoader,
+		);
 	}
 
 	if (fmt === "pdf" || fmt === "png") {

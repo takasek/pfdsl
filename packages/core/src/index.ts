@@ -205,10 +205,12 @@ export {
 	computeTerminals,
 	loadExtendsChain,
 	loadSubflowGraph,
+	resolveEffectiveFrontmatter,
 	resolvePresentation,
 	resolveRefPath,
 	validatePresetKeys,
 	validateSubflowBoundary,
+	wrapPresetSource,
 } from "./multifile.js";
 
 export function format(source: string, opts: FormatOptions = {}): FormatResult {
