@@ -1,6 +1,6 @@
 import { indentOf } from "./frontmatter-text.js";
 import { analyze } from "./index.js";
-import { sortEdges } from "./sorter.js";
+import { computeTopoOrder } from "./sorter.js";
 import type { Diagnostic, NodeKind } from "./types/index.js";
 
 export interface IndexChange {
@@ -56,32 +56,7 @@ export function reindex(
 		return typeof meta?.index === "number" ? meta.index : undefined;
 	};
 
-	// Deterministic topological node order: first appearance across the
-	// canonical edge sort (feedback edges are skipped — they carry no rank),
-	// then any remaining declared/isolated nodes by id.
-	const order: string[] = [];
-	const seen = new Set<string>();
-	const push = (id: string) => {
-		if (!seen.has(id)) {
-			seen.add(id);
-			order.push(id);
-		}
-	};
-	for (const e of sortEdges(edges, graph)) {
-		if (e.kind === "input") {
-			push(e.artifact);
-			push(e.process);
-		} else if (e.kind === "output") {
-			push(e.process);
-			push(e.artifact);
-		}
-	}
-	const remaining = new Set<string>([
-		...graph.nodes.keys(),
-		...Object.keys(frontmatter?.artifact ?? {}),
-		...Object.keys(frontmatter?.process ?? {}),
-	]);
-	for (const id of [...remaining].sort()) push(id);
+	const order = computeTopoOrder(edges, graph, frontmatter);
 
 	// Assign indices per kind.
 	const assigned = new Map<string, number>();
