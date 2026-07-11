@@ -1,5 +1,5 @@
 import { groupEdges } from "./edge-groups.js";
-import { computeOpenInputs } from "./multifile.js";
+import { buildProducedConsumed, computeOpenInputs } from "./multifile.js";
 import type { ArtifactMeta } from "./types/frontmatter.js";
 import type { NodeKind, NormalizedEdge } from "./types/index.js";
 
@@ -45,17 +45,7 @@ export function auditGraph(
 	nodeKinds: Map<string, NodeKind>,
 	artifactMeta?: Record<string, ArtifactMeta>,
 ): AuditResult {
-	const produced = new Set<string>();
-	const consumed = new Set<string>();
-
-	for (const e of edges) {
-		if (e.kind === "output") {
-			produced.add(e.artifact);
-		} else if (e.kind === "input") {
-			consumed.add(e.artifact);
-		}
-		// feedback edges intentionally ignored
-	}
+	const { produced, consumed } = buildProducedConsumed(edges);
 
 	const artifacts: string[] = [];
 	for (const [id, kind] of nodeKinds) {
