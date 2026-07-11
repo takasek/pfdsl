@@ -65,6 +65,22 @@ function formatDiagnostic(d: Diagnostic, file: string, color = false): string {
 	return `${loc}: ${severity}${code}: ${d.message}`;
 }
 
+export interface ShouldColorizeInput {
+	/** True when the user passed --no-color. */
+	noColorFlag: boolean;
+	/** The output stream color would be written to (e.g. process.stdout). */
+	stream: { isTTY?: boolean };
+	/** The process environment (checked for NO_COLOR). */
+	env: { NO_COLOR?: string };
+}
+
+/** ADR/#180: color is enabled only when stdout is a TTY, NO_COLOR is unset, and --no-color was not passed. */
+export function shouldColorize(input: ShouldColorizeInput): boolean {
+	if (input.noColorFlag) return false;
+	if (input.env.NO_COLOR !== undefined) return false;
+	return Boolean(input.stream.isTTY);
+}
+
 function isCommandResult(v: string | CommandResult): v is CommandResult {
 	return typeof v === "object";
 }

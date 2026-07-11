@@ -2,7 +2,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { diffGraphs, parseArgs, run, runCheck } from "./index.js";
+import {
+	diffGraphs,
+	parseArgs,
+	run,
+	runCheck,
+	shouldColorize,
+} from "./index.js";
 
 let dir: string;
 const valid = "req >> design -> spec\nspec >> impl -> code\n";
@@ -651,6 +657,44 @@ describe("ANSI color for check diagnostics (#435)", () => {
 	it("runCheck without color option emits no ANSI codes", () => {
 		const r = runCheck(join(dir, "invalid.pfdsl"));
 		expect(r.stderr).not.toContain("\x1b[");
+	});
+});
+
+describe("shouldColorize (#435)", () => {
+	it("is false when --no-color flag is set, even on a TTY with no NO_COLOR", () => {
+		expect(
+			shouldColorize({ noColorFlag: true, stream: { isTTY: true }, env: {} }),
+		).toBe(false);
+	});
+
+	it("is false when NO_COLOR env is set, even on a TTY without --no-color", () => {
+		expect(
+			shouldColorize({
+				noColorFlag: false,
+				stream: { isTTY: true },
+				env: { NO_COLOR: "1" },
+			}),
+		).toBe(false);
+	});
+
+	it("is false when stdout is not a TTY", () => {
+		expect(
+			shouldColorize({
+				noColorFlag: false,
+				stream: { isTTY: false },
+				env: {},
+			}),
+		).toBe(false);
+	});
+
+	it("is true on a TTY with no NO_COLOR and no --no-color flag", () => {
+		expect(
+			shouldColorize({
+				noColorFlag: false,
+				stream: { isTTY: true },
+				env: {},
+			}),
+		).toBe(true);
 	});
 });
 
