@@ -1,3 +1,4 @@
+import { groupEdges } from "./edge-groups.js";
 import { findFrontmatterNodeRanges } from "./frontmatter.js";
 import { zeroRange } from "./position.js";
 import type {
@@ -51,23 +52,26 @@ export function validate(
 	}
 
 	// V002 / V003: process completeness — edge参加processのみ (§15.2)
+	// input and feedback edges both count toward "has inputs" (V002); only
+	// output edges count toward "has outputs" (V003).
+	const edgeGroups = groupEdges(edges);
+	const allEdgeProcesses = new Set<string>([
+		...edgeGroups.processInputs.keys(),
+		...edgeGroups.processOutputs.keys(),
+		...edgeGroups.processFeedback.keys(),
+	]);
 	const processInputCount = new Map<string, number>();
 	const processOutputCount = new Map<string, number>();
-	for (const e of edges) {
-		if (!processInputCount.has(e.process)) processInputCount.set(e.process, 0);
-		if (!processOutputCount.has(e.process))
-			processOutputCount.set(e.process, 0);
-		if (e.kind === "input" || e.kind === "feedback") {
-			processInputCount.set(
-				e.process,
-				(processInputCount.get(e.process) ?? 0) + 1,
-			);
-		} else {
-			processOutputCount.set(
-				e.process,
-				(processOutputCount.get(e.process) ?? 0) + 1,
-			);
-		}
+	for (const pid of allEdgeProcesses) {
+		processInputCount.set(
+			pid,
+			(edgeGroups.processInputs.get(pid)?.length ?? 0) +
+				(edgeGroups.processFeedback.get(pid)?.length ?? 0),
+		);
+		processOutputCount.set(
+			pid,
+			edgeGroups.processOutputs.get(pid)?.length ?? 0,
+		);
 	}
 	for (const [id, count] of processInputCount) {
 		if (count === 0)
@@ -470,19 +474,7 @@ export function validate(
 	// For each process: if any output artifact has status 'done',
 	// all normal input artifacts with explicit status must also be 'done'
 	{
-		const processInputs = new Map<string, string[]>();
-		const processOutputs = new Map<string, string[]>();
-		for (const e of edges) {
-			if (e.kind === "input") {
-				const arr = processInputs.get(e.process) ?? [];
-				arr.push(e.artifact);
-				processInputs.set(e.process, arr);
-			} else if (e.kind === "output") {
-				const arr = processOutputs.get(e.process) ?? [];
-				arr.push(e.artifact);
-				processOutputs.set(e.process, arr);
-			}
-		}
+		const { processInputs, processOutputs } = edgeGroups;
 		for (const [pid, outputs] of processOutputs) {
 			const hasDoneOutput = outputs.some(
 				(aid) => artifactMeta[aid]?.status === "done",
