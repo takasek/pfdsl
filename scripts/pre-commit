@@ -87,3 +87,7 @@ check_drift '^docs/samples/' \
 check_drift '^(packages/cli/src/|README\.md)' "packages/cli/dist/cli.js" \
   "node scripts/gen-readme-cli.mjs && git diff --quiet -- README.md" \
   "README.md CLI section is stale. Run 'make gen-readme-cli' and re-stage README.md."
+
+# Advisory-only (see #463): reminds to consider pfd-retro when a commit
+# marks a roadmap artifact done. Never blocks the commit.
+node scripts/lib/retro-reminder-check.mjs
