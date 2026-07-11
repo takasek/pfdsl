@@ -4,8 +4,11 @@ description: |
   Use when operating a project with PFDs — prioritizing or accepting issues,
   updating progress status after completing work, adding new artifacts or
   documents to the repo, or deciding where session learnings should be
-  recorded. Complements the pfdsl skill (notation and quality of .pfdsl
-  files); this skill covers how to run the project on top of them.
+  recorded. Also fires when the user asks to work on a bare issue or
+  work-item number (e.g. "#461") — route it through the work cycle even if
+  the item is not managed in the roadmap. Complements the pfdsl skill
+  (notation and quality of .pfdsl files); this skill covers how to run the
+  project on top of them.
 ---
 
 # PFD-driven project operations
