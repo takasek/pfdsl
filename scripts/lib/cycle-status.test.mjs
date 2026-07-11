@@ -1,6 +1,29 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { classifyPRs, parseReadyOutput, countBehind } from "./cycle-status.mjs";
+import { classifyPRs, parseReadyOutput, countBehind, summarizeCiStatus } from "./cycle-status.mjs";
+
+describe("summarizeCiStatus", () => {
+	it("returns NONE for empty/missing rollup", () => {
+		assert.equal(summarizeCiStatus([]), "NONE");
+		assert.equal(summarizeCiStatus(undefined), "NONE");
+	});
+
+	it("returns PASS when all checks succeeded", () => {
+		assert.equal(summarizeCiStatus([{ conclusion: "SUCCESS" }, { conclusion: "SUCCESS" }]), "PASS");
+	});
+
+	it("returns FAIL when any check failed", () => {
+		assert.equal(summarizeCiStatus([{ conclusion: "SUCCESS" }, { conclusion: "FAILURE" }]), "FAIL");
+	});
+
+	it("returns PENDING when any check is still running", () => {
+		assert.equal(summarizeCiStatus([{ conclusion: null, status: "IN_PROGRESS" }]), "PENDING");
+	});
+
+	it("FAIL takes precedence over PENDING", () => {
+		assert.equal(summarizeCiStatus([{ conclusion: "FAILURE" }, { conclusion: null }]), "FAIL");
+	});
+});
 
 describe("classifyPRs", () => {
 	it("splits flow-sync PRs from other open PRs", () => {
@@ -9,8 +32,21 @@ describe("classifyPRs", () => {
 			{ number: 2, title: "feature work", headRefName: "feat/foo" },
 		];
 		const { openFlowSyncPRs, otherOpenPRs } = classifyPRs(prs);
-		assert.deepEqual(openFlowSyncPRs, [{ number: 1, title: "flow sync" }]);
+		assert.deepEqual(openFlowSyncPRs, [{ number: 1, title: "flow sync", ci: "NONE" }]);
 		assert.deepEqual(otherOpenPRs, [{ number: 2, title: "feature work" }]);
+	});
+
+	it("includes CI status on flow-sync PRs from statusCheckRollup", () => {
+		const prs = [
+			{
+				number: 1,
+				title: "flow sync",
+				headRefName: "flow-sync/2026-07-06",
+				statusCheckRollup: [{ conclusion: "SUCCESS" }],
+			},
+		];
+		const { openFlowSyncPRs } = classifyPRs(prs);
+		assert.deepEqual(openFlowSyncPRs, [{ number: 1, title: "flow sync", ci: "PASS" }]);
 	});
 
 	it("returns empty lists for no PRs", () => {

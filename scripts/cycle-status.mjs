@@ -39,7 +39,7 @@ let openFlowSyncPRs = [];
 let otherOpenPRs = [];
 let prError = null;
 try {
-	const prJson = JSON.parse(sh("gh pr list --state open --json number,title,headRefName"));
+	const prJson = JSON.parse(sh("gh pr list --state open --json number,title,headRefName,statusCheckRollup"));
 	({ openFlowSyncPRs, otherOpenPRs } = classifyPRs(prJson));
 } catch (e) {
 	prError = e.message;
