@@ -3,7 +3,10 @@ import { exportDot, svgToBinary } from "@pfdsl/graphviz-exporter";
 import { extractMetadata, toTsv } from "@pfdsl/metadata-exporter";
 import { renderDotToSvg } from "@pfdsl/preview-engine";
 import * as vscode from "vscode";
-import { analyzeDocument } from "./analyze.js";
+import {
+	analyzeDocument,
+	resolveEffectiveFrontmatterForUri,
+} from "./analyze.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 const outputChannel = vscode.window.createOutputChannel("PFDSL");
@@ -41,8 +44,12 @@ export function registerExport(
 				return;
 			}
 
-			const dot = exportDot(graph, frontmatter);
-			const tsvContent = toTsv(extractMetadata(graph, frontmatter));
+			const effectiveFrontmatter = resolveEffectiveFrontmatterForUri(
+				doc.uri,
+				frontmatter,
+			);
+			const dot = exportDot(graph, effectiveFrontmatter);
+			const tsvContent = toTsv(extractMetadata(graph, effectiveFrontmatter));
 			const base = doc.uri.path.replace(/\.pfdsl$/, "");
 
 			async function writeFile(
