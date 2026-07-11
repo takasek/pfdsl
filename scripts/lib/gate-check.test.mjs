@@ -269,6 +269,11 @@ describe("deriveManualItems", () => {
 		const items = ["知見を振り分けた", "PR にまとめた"];
 		assert.deepEqual(deriveManualItems(items), items);
 	});
+
+	it("drops the Conventional Commits subject-format item, keeps the granularity item", () => {
+		const items = ["コミット粒度が規約に従っている", "コミット subject が Conventional Commits 形式に従う"];
+		assert.deepEqual(deriveManualItems(items), ["コミット粒度が規約に従っている"]);
+	});
 });
 
 describe("GATE_CHECKLIST_SOURCE_PATH", () => {

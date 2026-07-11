@@ -21,7 +21,8 @@
    - [ ] 変換コンポーネントを追加・変更・削除した場合、それをモデル化している採用済み PFD（`.pfdsl/runtime-pipeline.pfdsl` または `.pfdsl/workflow.pfdsl` の該当箇所）に反映した（該当なしも明示。runtime-pipeline.pfdsl 未採用は自動的に N/A にならない — workflow.pfdsl 側を確認）
    - [ ] 作業中に偶発的に見つけたスコープ外の既存問題（バグ等）を起票した（ユーザーの指摘を待たない）
    - [ ] 変更した全 .pfdsl が `check` を通過する
-   - [ ] コミット粒度（論理単位ごとの分割）が規約（CLAUDE.md または companion で定義）に従っている（メッセージ形式は gate-check の commit subject lint が機械判定する）
+   - [ ] コミット粒度（論理単位ごとの分割）が規約（CLAUDE.md または companion で定義）に従っている
+   - [ ] コミット subject が Conventional Commits 形式に従う
    - [ ] `/simplify` または `/code-review` を実施した（実装規模・品質基準は companion で定義。省略する場合はその理由を明示）
    - [ ] 変更束を PR にまとめた
 4. **報告**: 完了したプロセス、それにより解放された後続プロセス、更新後の着手可能集合

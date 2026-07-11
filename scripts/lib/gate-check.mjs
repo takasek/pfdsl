@@ -179,7 +179,11 @@ export function extractGateChecklist(skillMdText) {
 // Checklist items already covered by gate-check's own mechanized checks,
 // matched by substring since the checklist source file's wording is the
 // source of truth.
-const COVERED_BY_GATE_CHECK = ["出力 artifact の status を更新した", "変更した全 .pfdsl が"];
+const COVERED_BY_GATE_CHECK = [
+	"出力 artifact の status を更新した",
+	"変更した全 .pfdsl が",
+	"Conventional Commits 形式に従う",
+];
 
 /**
  * @param {string[]} checklistItems
