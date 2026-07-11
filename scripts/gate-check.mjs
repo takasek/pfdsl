@@ -24,6 +24,7 @@ import {
 	wipTransitionDetected,
 	parseAuditTerminals,
 	diffNewTerminals,
+	diffReadySets,
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 
@@ -267,6 +268,29 @@ console.log(formatGateTable(results));
 			console.log("\nNew terminal artifacts (classify means vs. deliverable; register todo consumer if missing):");
 			for (const { file, newTerminals } of newTerminalsByFile) {
 				console.log(`  ${file}: ${newTerminals.join(", ")}`);
+			}
+		}
+	}
+}
+
+// Report material: ready-set diff for .pfdsl/roadmap.pfdsl (workcycle step 4's
+// "released follow-up processes / updated ready set" report), derived from two
+// `ready --json` runs instead of AI graph traversal.
+{
+	const cliPath = resolve(root, "packages/cli/dist/cli.js");
+	if (changedFiles.includes(".pfdsl/roadmap.pfdsl") && existsSync(cliPath)) {
+		const before = trySh(`git show origin/${base}:.pfdsl/roadmap.pfdsl`);
+		const after = trySh("git show HEAD:.pfdsl/roadmap.pfdsl");
+		if (before.ok && after.ok) {
+			const beforeReady = tryShInput(`node "${cliPath}" ready - --json`, before.out);
+			const afterReady = tryShInput(`node "${cliPath}" ready - --json`, after.out);
+			if (beforeReady.ok && afterReady.ok) {
+				const beforeIds = JSON.parse(beforeReady.out).ready.map((p) => p.id);
+				const afterIds = JSON.parse(afterReady.out).ready.map((p) => p.id);
+				const { newlyReady, noLongerReady } = diffReadySets(beforeIds, afterIds);
+				console.log(`\nReady-set diff (origin/${base} → HEAD):`);
+				console.log(`  newly ready: ${newlyReady.length > 0 ? newlyReady.join(", ") : "(none)"}`);
+				console.log(`  no longer ready: ${noLongerReady.length > 0 ? noLongerReady.join(", ") : "(none)"}`);
 			}
 		}
 	}

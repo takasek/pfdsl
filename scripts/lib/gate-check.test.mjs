@@ -16,6 +16,7 @@ import {
 	wipTransitionDetected,
 	parseAuditTerminals,
 	diffNewTerminals,
+	diffReadySets,
 } from "./gate-check.mjs";
 
 describe("VSCODE_EXT_TRIGGER", () => {
@@ -209,6 +210,27 @@ describe("diffNewTerminals", () => {
 
 	it("returns an empty array for identical sets", () => {
 		assert.deepEqual(diffNewTerminals(["a", "b"], ["a", "b"]), []);
+	});
+});
+
+describe("diffReadySets", () => {
+	it("finds processes that became newly ready", () => {
+		const result = diffReadySets(["p1", "p2"], ["p1", "p2", "p3"]);
+		assert.deepEqual(result, { newlyReady: ["p3"], noLongerReady: [] });
+	});
+
+	it("finds processes that are no longer ready", () => {
+		const result = diffReadySets(["p1", "p2"], ["p1"]);
+		assert.deepEqual(result, { newlyReady: [], noLongerReady: ["p2"] });
+	});
+
+	it("handles both directions changing at once", () => {
+		const result = diffReadySets(["p1", "p2"], ["p1", "p3"]);
+		assert.deepEqual(result, { newlyReady: ["p3"], noLongerReady: ["p2"] });
+	});
+
+	it("returns empty arrays for identical sets", () => {
+		assert.deepEqual(diffReadySets(["p1"], ["p1"]), { newlyReady: [], noLongerReady: [] });
 	});
 });
 

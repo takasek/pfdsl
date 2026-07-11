@@ -131,6 +131,23 @@ export function diffNewTerminals(beforeTerminals, afterTerminals) {
 }
 
 /**
+ * Diff two `ready --json` process-id sets (workcycle step 4's "released
+ * follow-up processes / updated ready set" report), derived mechanically
+ * instead of via AI graph traversal.
+ * @param {string[]} beforeIds
+ * @param {string[]} afterIds
+ * @returns {{newlyReady: string[], noLongerReady: string[]}}
+ */
+export function diffReadySets(beforeIds, afterIds) {
+	const before = new Set(beforeIds);
+	const after = new Set(afterIds);
+	return {
+		newlyReady: afterIds.filter((id) => !before.has(id)),
+		noLongerReady: beforeIds.filter((id) => !after.has(id)),
+	};
+}
+
+/**
  * Repo-relative path to the terminal-gate checklist (workcycle step 3). This
  * file is the single source of truth for wording — gate-check derives its
  * MANUAL: list from it instead of duplicating the text.
