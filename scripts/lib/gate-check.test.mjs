@@ -14,6 +14,8 @@ import {
 	VSCODE_EXT_TRIGGER,
 	lintCommitSubjects,
 	wipTransitionDetected,
+	parseAuditTerminals,
+	diffNewTerminals,
 } from "./gate-check.mjs";
 
 describe("VSCODE_EXT_TRIGGER", () => {
@@ -178,6 +180,35 @@ describe("wipTransitionDetected", () => {
 
 	it("returns false for an empty snapshot list", () => {
 		assert.equal(wipTransitionDetected([], "ops_checkers"), false);
+	});
+});
+
+describe("parseAuditTerminals", () => {
+	it("parses the comma-separated terminal artifacts line", () => {
+		const text = "terminal artifacts: spec_v0010, article, obsidian_plugin\nexternal inputs: adr_corpus\n";
+		assert.deepEqual(parseAuditTerminals(text), ["spec_v0010", "article", "obsidian_plugin"]);
+	});
+
+	it("returns an empty array when there is no terminal artifacts line", () => {
+		assert.deepEqual(parseAuditTerminals("external inputs: adr_corpus\n"), []);
+	});
+
+	it("returns an empty array when the terminal artifacts line is empty", () => {
+		assert.deepEqual(parseAuditTerminals("terminal artifacts: \nexternal inputs:\n"), []);
+	});
+});
+
+describe("diffNewTerminals", () => {
+	it("returns terminals present after but not before", () => {
+		assert.deepEqual(diffNewTerminals(["a", "b"], ["a", "b", "c"]), ["c"]);
+	});
+
+	it("returns an empty array when nothing new was added", () => {
+		assert.deepEqual(diffNewTerminals(["a", "b"], ["a"]), []);
+	});
+
+	it("returns an empty array for identical sets", () => {
+		assert.deepEqual(diffNewTerminals(["a", "b"], ["a", "b"]), []);
 	});
 });
 

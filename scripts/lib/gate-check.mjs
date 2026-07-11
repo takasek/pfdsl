@@ -102,6 +102,35 @@ export function lintCommitSubjects(subjects) {
 }
 
 /**
+ * Parse the `terminal artifacts: a, b, c` line out of `pfdsl check --audit`
+ * text output.
+ * @param {string} auditText
+ * @returns {string[]}
+ */
+export function parseAuditTerminals(auditText) {
+	const line = auditText.split("\n").find((l) => l.startsWith("terminal artifacts:"));
+	if (!line) return [];
+	return line
+		.slice("terminal artifacts:".length)
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+}
+
+/**
+ * Terminal artifacts present after a change but not before — candidates for
+ * the follow-up gatekeeper (protocol5(b)): classify each as means or
+ * deliverable, and register a todo consumer if a means artifact lacks one.
+ * @param {string[]} beforeTerminals
+ * @param {string[]} afterTerminals
+ * @returns {string[]}
+ */
+export function diffNewTerminals(beforeTerminals, afterTerminals) {
+	const before = new Set(beforeTerminals);
+	return afterTerminals.filter((t) => !before.has(t));
+}
+
+/**
  * Repo-relative path to the terminal-gate checklist (workcycle step 3). This
  * file is the single source of truth for wording — gate-check derives its
  * MANUAL: list from it instead of duplicating the text.

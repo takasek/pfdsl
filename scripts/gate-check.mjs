@@ -22,6 +22,8 @@ import {
 	VSCODE_EXT_TRIGGER,
 	lintCommitSubjects,
 	wipTransitionDetected,
+	parseAuditTerminals,
+	diffNewTerminals,
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 
@@ -42,6 +44,13 @@ function sh(cmd) {
 function trySh(cmd) {
 	try {
 		return { ok: true, out: sh(cmd) };
+	} catch (e) {
+		return { ok: false, out: e.stdout || e.message };
+	}
+}
+function tryShInput(cmd, input) {
+	try {
+		return { ok: true, out: execSync(cmd, { cwd: root, encoding: "utf-8", input }) };
 	} catch (e) {
 		return { ok: false, out: e.stdout || e.message };
 	}
@@ -233,6 +242,36 @@ const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdP
 
 console.log("gate-check:");
 console.log(formatGateTable(results));
+
+// Report material: new terminal artifacts per changed .pfdsl file (protocol5(b)
+// follow-up gatekeeper). Extraction+diff is mechanized; classifying each as
+// means vs. deliverable, and registering a todo consumer if missing, stays MANUAL.
+{
+	const cliPath = resolve(root, "packages/cli/dist/cli.js");
+	if (pfdslFiles.length > 0 && existsSync(cliPath)) {
+		const newTerminalsByFile = [];
+		for (const f of pfdslFiles) {
+			const before = trySh(`git show origin/${base}:${f}`);
+			const after = trySh(`git show HEAD:${f}`);
+			if (!after.ok) continue;
+			const beforeAudit = before.ok ? tryShInput(`node "${cliPath}" check - --audit`, before.out) : { ok: true, out: "" };
+			const afterAudit = tryShInput(`node "${cliPath}" check - --audit`, after.out);
+			if (!afterAudit.ok) continue;
+			const newTerminals = diffNewTerminals(
+				beforeAudit.ok ? parseAuditTerminals(beforeAudit.out) : [],
+				parseAuditTerminals(afterAudit.out),
+			);
+			if (newTerminals.length > 0) newTerminalsByFile.push({ file: f, newTerminals });
+		}
+		if (newTerminalsByFile.length > 0) {
+			console.log("\nNew terminal artifacts (classify means vs. deliverable; register todo consumer if missing):");
+			for (const { file, newTerminals } of newTerminalsByFile) {
+				console.log(`  ${file}: ${newTerminals.join(", ")}`);
+			}
+		}
+	}
+}
+
 console.log("\nMANUAL (judge and confirm each):");
 for (const item of manualItems) console.log(`  MANUAL: ${item}`);
 
