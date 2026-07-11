@@ -25,6 +25,7 @@ export function extractMetadata(
 	frontmatter: Frontmatter | null,
 ): MetadataRecord[] {
 	return [...graph.nodes.entries()]
+		.filter(([, kind]) => kind !== "group") // group IDs are subgraph containers, not nodes
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([id, kind]) => {
 			if (kind === "artifact") {

@@ -144,4 +144,24 @@ req >> build
 		const records = extractMetadata(graph, null);
 		expect(records).toHaveLength(2);
 	});
+
+	it("skips group nodes (containers, not rows)", () => {
+		const src = `---
+group:
+  g1:
+    label: "Data Ingestion"
+artifact:
+  raw_data:
+    group: g1
+process:
+  ingest:
+    group: g1
+---
+raw_data >> ingest
+`;
+		const { graph, frontmatter } = buildFromSource(src);
+		const records = extractMetadata(graph, frontmatter);
+		expect(records.map((r) => r.id)).toEqual(["ingest", "raw_data"]);
+		expect(records.some((r) => r.kind === "group")).toBe(false);
+	});
 });
