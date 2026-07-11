@@ -39,19 +39,12 @@ const flag = (name) => {
 const base = flag("--base") ?? "main";
 const artifactKey = flag("--artifact");
 
-function sh(cmd) {
-	return execSync(cmd, { cwd: root, encoding: "utf-8" });
+function sh(cmd, input) {
+	return execSync(cmd, { cwd: root, encoding: "utf-8", input });
 }
-function trySh(cmd) {
+function trySh(cmd, input) {
 	try {
-		return { ok: true, out: sh(cmd) };
-	} catch (e) {
-		return { ok: false, out: e.stdout || e.message };
-	}
-}
-function tryShInput(cmd, input) {
-	try {
-		return { ok: true, out: execSync(cmd, { cwd: root, encoding: "utf-8", input }) };
+		return { ok: true, out: sh(cmd, input) };
 	} catch (e) {
 		return { ok: false, out: e.stdout || e.message };
 	}
@@ -255,8 +248,8 @@ console.log(formatGateTable(results));
 			const before = trySh(`git show origin/${base}:${f}`);
 			const after = trySh(`git show HEAD:${f}`);
 			if (!after.ok) continue;
-			const beforeAudit = before.ok ? tryShInput(`node "${cliPath}" check - --audit`, before.out) : { ok: true, out: "" };
-			const afterAudit = tryShInput(`node "${cliPath}" check - --audit`, after.out);
+			const beforeAudit = before.ok ? trySh(`node "${cliPath}" check - --audit`, before.out) : { ok: true, out: "" };
+			const afterAudit = trySh(`node "${cliPath}" check - --audit`, after.out);
 			if (!afterAudit.ok) continue;
 			const newTerminals = diffNewTerminals(
 				beforeAudit.ok ? parseAuditTerminals(beforeAudit.out) : [],
@@ -282,8 +275,8 @@ console.log(formatGateTable(results));
 		const before = trySh(`git show origin/${base}:.pfdsl/roadmap.pfdsl`);
 		const after = trySh("git show HEAD:.pfdsl/roadmap.pfdsl");
 		if (before.ok && after.ok) {
-			const beforeReady = tryShInput(`node "${cliPath}" ready - --json`, before.out);
-			const afterReady = tryShInput(`node "${cliPath}" ready - --json`, after.out);
+			const beforeReady = trySh(`node "${cliPath}" ready - --json`, before.out);
+			const afterReady = trySh(`node "${cliPath}" ready - --json`, after.out);
 			if (beforeReady.ok && afterReady.ok) {
 				const beforeIds = JSON.parse(beforeReady.out).ready.map((p) => p.id);
 				const afterIds = JSON.parse(afterReady.out).ready.map((p) => p.id);
