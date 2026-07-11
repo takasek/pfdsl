@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildPresentationChain,
+	buildProducedConsumed,
 	collectExtendsRefs,
 	collectSubflowRefs,
 	computeOpenInputs,
@@ -145,6 +146,40 @@ describe("loadSubflowGraph", () => {
 		});
 		const result = loadSubflowGraph("/p/a.pfdsl", docs);
 		expect(result.diagnostics.some((d) => d.code === "V022")).toBe(true);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// buildProducedConsumed
+// ---------------------------------------------------------------------------
+
+describe("buildProducedConsumed", () => {
+	it("output edges populate produced, input edges populate consumed", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "input", artifact: "a", process: "P" },
+			{ kind: "output", process: "P", artifact: "b" },
+		];
+		expect(buildProducedConsumed(edges)).toEqual({
+			produced: new Set(["b"]),
+			consumed: new Set(["a"]),
+		});
+	});
+
+	it("feedback edges are ignored on both sides", () => {
+		const edges: NormalizedEdge[] = [
+			{ kind: "feedback", artifact: "x", process: "P" },
+		];
+		expect(buildProducedConsumed(edges)).toEqual({
+			produced: new Set(),
+			consumed: new Set(),
+		});
+	});
+
+	it("empty edges produce empty sets", () => {
+		expect(buildProducedConsumed([])).toEqual({
+			produced: new Set(),
+			consumed: new Set(),
+		});
 	});
 });
 
