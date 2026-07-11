@@ -48,9 +48,6 @@ export function findFrontmatterNodeRanges(source: string): Map<string, Range> {
 	return result;
 }
 
-/** @deprecated use findFrontmatterNodeRanges (now covers process nodes too) */
-export const findFrontmatterArtifactRanges = findFrontmatterNodeRanges;
-
 export function loadFrontmatter(source: string): LoadResult {
 	if (!source.startsWith("---")) {
 		return {
