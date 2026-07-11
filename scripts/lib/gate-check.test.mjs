@@ -11,7 +11,18 @@ import {
 	extractGateChecklist,
 	deriveManualItems,
 	GATE_CHECKLIST_SOURCE_PATH,
+	VSCODE_EXT_TRIGGER,
 } from "./gate-check.mjs";
+
+describe("VSCODE_EXT_TRIGGER", () => {
+	it("matches files under packages/vscode-extension", () => {
+		assert.equal(matchesTrigger(["packages/vscode-extension/src/extension.ts"], VSCODE_EXT_TRIGGER), true);
+	});
+
+	it("does not match files outside packages/vscode-extension", () => {
+		assert.equal(matchesTrigger(["packages/cli/src/index.ts"], VSCODE_EXT_TRIGGER), false);
+	});
+});
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 

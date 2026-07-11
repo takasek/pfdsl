@@ -19,6 +19,7 @@ import {
 	hasStatusChange,
 	statusChangedForArtifact,
 	GATE_CHECKLIST_SOURCE_PATH,
+	VSCODE_EXT_TRIGGER,
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 
@@ -162,6 +163,18 @@ if (pfdslFiles.length === 0) {
 			});
 		}
 	}
+}
+
+// 7. vscode-extension typecheck (only when packages/vscode-extension/ changed)
+if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
+	results.push({ name: "vscode-extension typecheck", status: "SKIP", detail: "no vscode-extension changes" });
+} else {
+	const r = trySh("pnpm --filter @pfdsl/vscode-extension typecheck");
+	results.push({
+		name: "vscode-extension typecheck",
+		status: r.ok ? "PASS" : "FAIL",
+		detail: r.ok ? undefined : r.out.trim().slice(-200),
+	});
 }
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);

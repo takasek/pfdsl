@@ -56,6 +56,13 @@ export function statusChangedForArtifact(beforeText, afterText, artifactKey) {
 }
 
 /**
+ * Path trigger for the vscode-extension typecheck gate (roadmap.md
+ * "vscode-extension を変更した場合" note). Mirrors GEN_PLUGIN_TRIGGER's
+ * trigger-then-run shape.
+ */
+export const VSCODE_EXT_TRIGGER = /^packages\/vscode-extension\//;
+
+/**
  * Repo-relative path to the terminal-gate checklist (workcycle step 3). This
  * file is the single source of truth for wording — gate-check derives its
  * MANUAL: list from it instead of duplicating the text.
