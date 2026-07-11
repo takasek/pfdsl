@@ -22,4 +22,26 @@ describe("dist/cli.js smoke", () => {
 		});
 		expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
 	});
+
+	// #428: stdin + --json success path hardcoded `diagnostics: []`, dropping
+	// warnings (e.g. W002) that both the file-path --json path and the stdin
+	// non-json path do report.
+	it.skipIf(!existsSync(distCli))(
+		"check - --json includes warnings from stdin input (#428)",
+		() => {
+			const src = "---\nartifact:\n  B:\n    status: done\n---\nA >> P -> B\n";
+			const stdout = execFileSync(
+				process.execPath,
+				[distCli, "check", "-", "--json"],
+				{ encoding: "utf8", input: src },
+			);
+			const parsed = JSON.parse(stdout);
+			expect(parsed.ok).toBe(true);
+			expect(
+				(parsed.diagnostics as Array<{ code: string }>).some(
+					(d) => d.code === "W002",
+				),
+			).toBe(true);
+		},
+	);
 });
