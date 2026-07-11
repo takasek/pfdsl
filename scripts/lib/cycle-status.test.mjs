@@ -7,7 +7,6 @@ import {
 	summarizeCiStatus,
 	detectDesignUnsettled,
 	findIssueNumberForProcess,
-	findOutputArtifactForProcess,
 	buildGateCheckCommand,
 } from "./cycle-status.mjs";
 
@@ -70,27 +69,27 @@ describe("classifyPRs", () => {
 });
 
 describe("parseReadyOutput", () => {
-	it("extracts ready ids and best id", () => {
+	it("extracts ready ids, best id, and best outputs", () => {
 		const json = {
 			ok: true,
 			ready: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
-			best: { id: "a", label: "A" },
+			best: { id: "a", label: "A", outputs: ["a_out"] },
 		};
-		assert.deepEqual(parseReadyOutput(json), { ready: ["a", "b"], best: "a" });
+		assert.deepEqual(parseReadyOutput(json), { ready: ["a", "b"], best: "a", bestOutputs: ["a_out"] });
 	});
 
 	it("returns empty when ok is false", () => {
-		assert.deepEqual(parseReadyOutput({ ok: false }), { ready: [], best: null });
+		assert.deepEqual(parseReadyOutput({ ok: false }), { ready: [], best: null, bestOutputs: [] });
 	});
 
 	it("returns empty for missing/invalid input", () => {
-		assert.deepEqual(parseReadyOutput(null), { ready: [], best: null });
-		assert.deepEqual(parseReadyOutput(undefined), { ready: [], best: null });
+		assert.deepEqual(parseReadyOutput(null), { ready: [], best: null, bestOutputs: [] });
+		assert.deepEqual(parseReadyOutput(undefined), { ready: [], best: null, bestOutputs: [] });
 	});
 
-	it("returns null best when absent", () => {
+	it("returns null best and empty bestOutputs when absent", () => {
 		const json = { ok: true, ready: [] };
-		assert.deepEqual(parseReadyOutput(json), { ready: [], best: null });
+		assert.deepEqual(parseReadyOutput(json), { ready: [], best: null, bestOutputs: [] });
 	});
 });
 
@@ -150,27 +149,6 @@ processes:
 
 	it("returns null for an unknown process id", () => {
 		assert.equal(findIssueNumberForProcess(pfdsl, "i999_nonexistent"), null);
-	});
-});
-
-describe("findOutputArtifactForProcess", () => {
-	const pfdsl = `spec_id_syntax >> i402_implement_get_by_id -> get_by_id_tool
-
-spec_id_syntax >> i405_implement_mint_check -> mint_check_tool
-
-[spec_id_syntax, get_by_id_tool, mint_check_tool] >> migrate_spec_id_refs -> spec_id_refs
-`;
-
-	it("extracts the output artifact for a simple single-input edge", () => {
-		assert.equal(findOutputArtifactForProcess(pfdsl, "i405_implement_mint_check"), "mint_check_tool");
-	});
-
-	it("extracts the output artifact for a bracketed multi-input edge", () => {
-		assert.equal(findOutputArtifactForProcess(pfdsl, "migrate_spec_id_refs"), "spec_id_refs");
-	});
-
-	it("returns null when the process has no edge", () => {
-		assert.equal(findOutputArtifactForProcess(pfdsl, "i999_nonexistent"), null);
 	});
 });
 

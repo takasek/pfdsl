@@ -14,7 +14,6 @@ import {
 	countBehind,
 	findIssueNumberForProcess,
 	detectDesignUnsettled,
-	findOutputArtifactForProcess,
 	buildGateCheckCommand,
 } from "./lib/cycle-status.mjs";
 
@@ -57,11 +56,12 @@ try {
 const cliPath = resolve(root, "packages/cli/dist/cli.js");
 let ready = [];
 let best = null;
+let bestOutputs = [];
 let readyError = null;
 if (existsSync(cliPath)) {
 	try {
 		const readyJson = JSON.parse(sh(`node "${cliPath}" ready .pfdsl/roadmap.pfdsl --best --json`));
-		({ ready, best } = parseReadyOutput(readyJson));
+		({ ready, best, bestOutputs } = parseReadyOutput(readyJson));
 	} catch (e) {
 		readyError = e.message;
 	}
@@ -72,38 +72,24 @@ if (existsSync(cliPath)) {
 let designUnsettled = null;
 let designUnsettledLines = [];
 let designUnsettledError = null;
-let gateCheckCommand = null;
-let gateCheckCommandError = null;
 if (best) {
-	let roadmapText = null;
 	try {
-		roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
+		const roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
+		const issueNumber = findIssueNumberForProcess(roadmapText, best);
+		if (issueNumber) {
+			const body = sh(`gh issue view ${issueNumber} --json body --jq .body`);
+			({ designUnsettled, matchedLines: designUnsettledLines } = detectDesignUnsettled(body));
+		} else {
+			designUnsettledError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
+		}
 	} catch (e) {
 		designUnsettledError = e.message;
-		gateCheckCommandError = e.message;
-	}
-
-	if (roadmapText !== null) {
-		try {
-			const issueNumber = findIssueNumberForProcess(roadmapText, best);
-			if (issueNumber) {
-				const body = sh(`gh issue view ${issueNumber} --json body --jq .body`);
-				({ designUnsettled, matchedLines: designUnsettledLines } = detectDesignUnsettled(body));
-			} else {
-				designUnsettledError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
-			}
-		} catch (e) {
-			designUnsettledError = e.message;
-		}
-
-		const artifactKey = findOutputArtifactForProcess(roadmapText, best);
-		if (artifactKey) {
-			gateCheckCommand = buildGateCheckCommand(artifactKey, base);
-		} else {
-			gateCheckCommandError = `no output artifact edge found for process '${best}' in .pfdsl/roadmap.pfdsl`;
-		}
 	}
 }
+
+// bestOutputs[0] のみ使う。複数出力プロセス（例: 1プロセスが複数 artifact を生成する edge）は
+// 最初の出力のみを gate-check の対象にする単純化。
+const gateCheckCommand = buildGateCheckCommand(bestOutputs[0] ?? null, base);
 
 const result = {
 	fetched,
@@ -120,6 +106,5 @@ if (behindBaseError) result.behindBaseError = behindBaseError;
 if (prError) result.prError = prError;
 if (readyError) result.readyError = readyError;
 if (designUnsettledError) result.designUnsettledError = designUnsettledError;
-if (gateCheckCommandError) result.gateCheckCommandError = gateCheckCommandError;
 
 console.log(JSON.stringify(result, null, 2));

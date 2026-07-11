@@ -36,15 +36,16 @@ export function classifyPRs(prs, flowSyncPattern = /^flow-sync\//) {
 
 /**
  * @param {unknown} readyJson - output of `pfdsl ready --best --json`
- * @returns {{ready: string[], best: string | null}}
+ * @returns {{ready: string[], best: string | null, bestOutputs: string[]}}
  */
 export function parseReadyOutput(readyJson) {
 	if (!readyJson || typeof readyJson !== "object" || readyJson.ok !== true) {
-		return { ready: [], best: null };
+		return { ready: [], best: null, bestOutputs: [] };
 	}
 	const ready = (readyJson.ready ?? []).map((p) => p.id);
 	const best = readyJson.best?.id ?? null;
-	return { ready, best };
+	const bestOutputs = readyJson.best?.outputs ?? [];
+	return { ready, best, bestOutputs };
 }
 
 /**
@@ -69,19 +70,6 @@ export function findIssueNumberForProcess(pfdslText, processId) {
 	if (!block) return null;
 	const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
 	return match ? Number(match[1]) : null;
-}
-
-/**
- * roadmap.pfdsl の edge 定義（`... >> <processId> -> <outputKey>`）から
- * プロセスの出力 artifact キーを引く。
- * @param {string} pfdslText
- * @param {string} processId
- * @returns {string | null}
- */
-export function findOutputArtifactForProcess(pfdslText, processId) {
-	const re = new RegExp(`>>\\s*${processId}\\s*->\\s*([A-Za-z0-9_]+)`);
-	const match = pfdslText.match(re);
-	return match ? match[1] : null;
 }
 
 /**
