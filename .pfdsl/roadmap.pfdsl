@@ -541,7 +541,6 @@ process:
   i405_implement_mint_check:
     label: mint-check ツール実装
     location: https://github.com/takasek/pfdsl/issues/405
-    updated_at: 2026-07-10T01:50:30Z
   i435_implement_ansi_color:
     label: 診断 ANSI カラー実装
     location: https://github.com/takasek/pfdsl/issues/435
