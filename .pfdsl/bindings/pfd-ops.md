@@ -21,6 +21,6 @@ node scripts/check-scaffold-sync.mjs
 
 ## 仕様 ID の採番手続き
 
-新規 ID を採番する前に slug の既出を確認する（ADR-0027「ID の性質」。機械列挙は mint-check ツール #405 — 実装までは `grep -rn 'SPEC_<slug>' docs/` で代用）。
+新規 ID を採番する前に slug の既出を確認する（ADR-0027「ID の性質」）。機械列挙は `node scripts/mint-check.mjs <slug>` を使う（定義・strict 参照・forward-ref の全出現を file:line で列挙し、既出ありなら exit 1。tombstone 次元は初 ID 削除まで据え置き #405）。
 採番しようとした slug が既存 forward-ref（`[[SPEC_xxx?]]`）と一致した場合、その forward-ref が予約した概念と同一かを確認し、別概念なら slug を変える。
 削除された ID は再利用しない。
