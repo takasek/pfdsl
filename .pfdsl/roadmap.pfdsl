@@ -343,7 +343,7 @@ artifact:
   mint_check_tool:
     label: "mint-check ツール (#405)"
     description: "採番前に slug の既出（定義・strict 参照・forward-ref・tombstone）を列挙する scripts ツール。既存 forward-ref の slug を別概念で採番する silent 衝突の防止が主目的"
-    status: todo
+    status: wip
     criteria: 定義・strict 参照・forward-ref の全出現種別が file:line で列挙され、既出ゼロ/ありで exit code が分かれることがテストで検証済み
   spec_id_refs:
     label: 仕様ID相互参照化済み spec.md
