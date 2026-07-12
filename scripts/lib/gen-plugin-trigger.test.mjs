@@ -43,6 +43,10 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test("packages/cli/package.json"), true);
 	});
 
+	it("matches a hooks/ path", () => {
+		assert.equal(GEN_PLUGIN_TRIGGER.test("hooks/retro-reminder-post-tool-use.mjs"), true);
+	});
+
 	it("does not match an unrelated root-level README.md", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test("README.md"), false);
 	});
