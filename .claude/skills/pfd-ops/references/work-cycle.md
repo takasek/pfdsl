@@ -26,4 +26,6 @@
    - [ ] `/simplify` または `/code-review` を実施した（実装規模・品質基準は companion で定義。省略する場合はその理由を明示）
    - [ ] 変更束を PR にまとめた
 4. **報告**: 完了したプロセス、それにより解放された後続プロセス、更新後の着手可能集合
-5. **retro**: `/pfd-cycle` コマンド経由の場合、手順3で出力 artifact に done を付与した直後 — 報告と同一ターン内で pfd-retro スキルを起動する。プロトコル7の規約はセッション記憶に依存しては機械強制にならない。このサイクル手順自体に最終ステップとして組み込み、報告を出して終わりにしない。**バックストップ**（このリポでは）: `roadmap.pfdsl` に `status: done` を追加するコミットで pre-commit が stderr に advisory warning を出す（`scripts/lib/retro-reminder-check.mjs`、非ブロッキング）。セッション記憶が抜けても done 付与コミットの Bash tool result 経由で気付ける。
+5. **retro**: `/pfd-cycle` コマンド経由の場合、次の2条件を独立に確認する（プロトコル7。一方の非該当がもう一方の免除にならない）。プロトコル7の規約はセッション記憶に依存しては機械強制にならない。このサイクル手順自体に最終ステップとして組み込み、報告を出して終わりにしない。
+   - (a) 手順3で出力 artifact に done を付与した直後 — 報告と同一ターン内で pfd-retro スキルを起動する。**バックストップ**（このリポでは）: `roadmap.pfdsl` に `status: done` を追加するコミットで pre-commit が stderr に advisory warning を出す（`scripts/lib/retro-reminder-check.mjs`、非ブロッキング）。セッション記憶が抜けても done 付与コミットの Bash tool result 経由で気付ける
+   - (b) done 付与の有無に関わらず、サイクルの結論がまとまったタイミングでユーザーに「そろそろサイクルを締めるか」を能動的に確認する（exempt issue 等で done 付与が発生しないサイクルでも必須。バックストップなし — セッション記憶のみに依存する既知の弱点）
