@@ -54,7 +54,12 @@ function assemble() {
 		console.log(`plugin/pfdsl/agents/${file} ← .claude/agents/${file}`);
 	}
 
-	// --- 5. Write plugin/pfdsl/.claude-plugin/plugin.json ---
+	// --- 5. Copy the plugin hooks (retro reminder, #465) into hooks/ ---
+
+	mirrorDir("hooks", root, pluginRoot);
+	console.log("plugin/pfdsl/hooks ← hooks");
+
+	// --- 6. Write plugin/pfdsl/.claude-plugin/plugin.json ---
 
 	const cliVersion = JSON.parse(readFileSync(resolve(root, "packages/cli/package.json"), "utf-8")).version;
 	const manifest = buildPluginManifest({ cliVersion });
