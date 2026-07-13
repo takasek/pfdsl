@@ -307,7 +307,7 @@ artifact:
   release_automation:
     label: "make release roadmap 自動更新 (#278)"
     description: "make release 後に roadmap の publish artifact を自動 done にする連携。#277 status-set が前提"
-    status: todo
+    status: wip
     criteria: "make release 実行後に roadmap の対応 artifact が自動 done に更新される"
   explain_cmd:
     label: "pfdsl explain コマンド (#356)"
