@@ -662,50 +662,77 @@ export function runStatusSet(
 	}
 	const fmBodyStart = frontmatterMatch[0].length - fmBlock.length - 4; // after "---\n"
 
-	// Find the artifact block: look for "<indent><id>:" in frontmatter. The id
-	// is escaped since quoted ids may contain regex metacharacters, and the
-	// indent width is detected from the header line itself rather than
-	// hardcoded to 2-space (supports 2-space, 4-space, etc. — #430).
+	// Find the artifact block. The id is escaped since quoted ids may contain
+	// regex metacharacters (#430). Two styles are supported:
+	//   block-style: "<indent><id>:\n  <fields>..."
+	//   flow-style:  "<indent><id>: { key: val, ... }"  (#415)
 	const escapedId = escapeRe(artifactId);
 	const headerRe = new RegExp(`^(\\s+)${escapedId}:\\s*\\n`, "m");
 	const headerMatch = headerRe.exec(fmBlock);
-	if (!headerMatch) {
+
+	const flowHeaderRe = new RegExp(
+		`^(\\s+)${escapedId}:\\s*(\\{[^}]*\\})[ \\t]*$`,
+		"m",
+	);
+	const flowMatch = headerMatch ? null : flowHeaderRe.exec(fmBlock);
+
+	if (!headerMatch && !flowMatch) {
 		return fail(`error: artifact '${artifactId}' not found in ${file}\n`);
 	}
-	const nodeIndent = headerMatch[1]!.length;
-
-	// Detect this node's field indent from the line right after its header;
-	// falls back to one section-level deeper when the node has no existing
-	// fields to sniff from.
-	const afterHeader = fmBlock.slice(headerMatch.index + headerMatch[0].length);
-	const afterHeaderNl = afterHeader.indexOf("\n");
-	const firstLine =
-		afterHeaderNl === -1 ? afterHeader : afterHeader.slice(0, afterHeaderNl);
-	const firstLineIndent = firstLine.length - firstLine.trimStart().length;
-	const childIndent =
-		firstLine.trim() !== "" && firstLineIndent > nodeIndent
-			? firstLineIndent
-			: nodeIndent * 2;
-
-	const nodePad = " ".repeat(nodeIndent);
-	const childPad = " ".repeat(childIndent);
 
 	// Snapshot ready set before mutation (roadmap only)
 	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
 	const beforeSet = new Set(beforeIds);
 
-	// Replace "<childPad>status: <old>" under this artifact, or insert it after its header
-	const statusLineRe = new RegExp(
-		`(${nodePad}${escapedId}:[ \\t]*\\n(?:${childPad}[^\\n]*\\n)*?)${childPad}status: [^\\n]+`,
-	);
 	let newFm: string;
-	if (statusLineRe.test(fmBlock)) {
-		newFm = fmBlock.replace(statusLineRe, `$1${childPad}status: ${status}`);
+	if (flowMatch) {
+		// Flow-style: update or insert status within "{ ... }" on the same line
+		const flowBody = flowMatch[2]!;
+		let newFlowBody: string;
+		if (/\bstatus:\s*\S+/.test(flowBody)) {
+			newFlowBody = flowBody.replace(/\bstatus:\s*\S+/, `status: ${status}`);
+		} else {
+			const inner = flowBody.slice(1, -1).trim();
+			newFlowBody = inner
+				? `{ ${inner}, status: ${status} }`
+				: `{ status: ${status} }`;
+		}
+		const matchedLine = flowMatch[0]!;
+		const newLine = matchedLine.replace(flowBody, newFlowBody);
+		newFm =
+			fmBlock.slice(0, flowMatch.index) +
+			newLine +
+			fmBlock.slice(flowMatch.index + matchedLine.length);
 	} else {
-		newFm = fmBlock.replace(
-			new RegExp(`(${nodePad}${escapedId}:[ \\t]*\\n)`),
-			`$1${childPad}status: ${status}\n`,
+		// Block-style. Detect indent width from the header line (#430).
+		const nodeIndent = headerMatch![1]!.length;
+		const afterHeader = fmBlock.slice(
+			headerMatch!.index + headerMatch![0].length,
 		);
+		const afterHeaderNl = afterHeader.indexOf("\n");
+		const firstLine =
+			afterHeaderNl === -1 ? afterHeader : afterHeader.slice(0, afterHeaderNl);
+		const firstLineIndent = firstLine.length - firstLine.trimStart().length;
+		const childIndent =
+			firstLine.trim() !== "" && firstLineIndent > nodeIndent
+				? firstLineIndent
+				: nodeIndent * 2;
+
+		const nodePad = " ".repeat(nodeIndent);
+		const childPad = " ".repeat(childIndent);
+
+		// Replace "<childPad>status: <old>" under this artifact, or insert it after its header
+		const statusLineRe = new RegExp(
+			`(${nodePad}${escapedId}:[ \\t]*\\n(?:${childPad}[^\\n]*\\n)*?)${childPad}status: [^\\n]+`,
+		);
+		if (statusLineRe.test(fmBlock)) {
+			newFm = fmBlock.replace(statusLineRe, `$1${childPad}status: ${status}`);
+		} else {
+			newFm = fmBlock.replace(
+				new RegExp(`(${nodePad}${escapedId}:[ \\t]*\\n)`),
+				`$1${childPad}status: ${status}\n`,
+			);
+		}
 	}
 
 	const newSrc =
