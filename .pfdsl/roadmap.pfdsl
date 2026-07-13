@@ -41,21 +41,21 @@ artifact:
     description: "subflow:/extends: の checker 実装（V021-V028）。renderer は spec v0.0.8 の対象外（§2.9.3 はビューリンクのみ定義）。VS Code subflow ナビゲーションは #147。後続門番のプレースホルダ（ADR-0018）"
     status: done
     criteria: subflow/extends の checker が @pfdsl/core に実装され check コマンドで V021-V028 が動作確認済み（renderer は対象外）
-  cli_tool_v009:
-    label: "CLI v0.0.9（公開済み）"
-    description: "現行公開バージョン v0.0.9。後続実装の入力ベース"
+  cli_release_bootstrap:
+    label: "CLIリリース: 初回公開ベースライン（npm v0.0.9）"
+    description: "後続実装群の入力ベースとなる最初の公開版"
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.9 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_tool_v0010:
-    label: "CLI v0.0.10（公開済み）"
+  cli_release_ux_flags:
+    label: "CLIリリース: DXフラグ群（npm v0.0.10）"
     description: "#172 --version / #177 per-command --help / #178 stdin / #180 --no-color / #181 --json 対応を含む"
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.10 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_tool_v0011:
-    label: "CLI v0.0.11（公開済み）"
-    description: "#216 hover jump / #217 run command / #218 group hover / #219 W002 / #221 index+reindex / #236 node sort 等を含む"
+  cli_release_index_sort:
+    label: "CLIリリース: index/reindex + node sort（npm v0.0.11）"
+    description: "#219 W002 診断行番号修正 / #221 index+reindex / #236 node sort を含む（#216-218 hover jump 等は extension 側 ext_v0014 への出力）"
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.11 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
@@ -196,26 +196,27 @@ artifact:
     description: "pfd-ops SKILL.md のワークサイクル step 1 を pfdsl ready CLI 呼び出しに書き換える。スキル利用者が手動計算しなくて済むようになる"
     status: done
     criteria: "pfd-ops SKILL.md の着手判断ステップが pfdsl ready CLI を参照し、~/.claude/skills/pfd-ops/ に反映済み"
-  cli_tool_v0012:
-    label: "CLI v0.0.12（公開済み）"
-    description: "#252 pfd-init コマンド追加・pfd-ecosystem スキル配布等を含む"
+  cli_release_basepath:
+    label: "CLIリリース: basePath対応（npm v0.0.12）"
+    description: "#261 basePath フィールド対応を含む"
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.12 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_tool_v0013:
-    label: "CLI v0.0.13（公開済み）"
-    description: "ready コマンド (#267) 等を含む"
+  cli_release_ready_cmd:
+    label: "CLIリリース: readyコマンド（npm v0.0.13）"
+    description: "ready コマンド (#267) を含む"
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.13 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_tool_v0014:
-    label: "CLI v0.0.14（公開済み）"
-    description: "status-set / audit-sync / waiting・suspended status 等を含む"
+  cli_release_status_lifecycle:
+    label: "CLIリリース: statusライフサイクル機能群（npm v0.0.14）"
+    description: "#268 type フィールド / #269 audit-sync / #272 W002 階層化 / #273 waiting・suspended 分割 / #277 status-set を含む"
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.14 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_tool_v0015:
-    label: "CLI v0.0.15（次期）"
+  cli_release_statusset_impact:
+    label: "CLIリリース: status-set影響レポート（npm v0.0.15）"
+    description: "#291 status-set 解放プロセス報告 / #292 audit 同種対称性ヒントを含む"
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.15 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
@@ -318,8 +319,9 @@ artifact:
     description: "A/B 図監査を隔離 subagent 化し、skill sync の配布対象に .claude/agents/pfd-*.md を追加する。pfd-retro の description 二重人格を解消"
     status: done
     criteria: "エージェント定義の妥当性確認（frontmatter構文・tools制限・description）+ pfd-retro の A/B 節が委譲形・agents 配布のテストあり + ライブ subagent 呼び出しでの実監査1回（#386で実施・完了）"
-  cli_tool_v0018:
-    label: "CLI v0.0.18（次期）"
+  cli_release_explain_lens:
+    label: "CLIリリース: explain + pfd-lens agent（npm v0.0.18）"
+    description: "#356 explain コマンド / #357 pfd-lens agent 配布 / #404 pfd-ops plugin 統合を含む"
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.18 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
@@ -362,8 +364,9 @@ artifact:
     description: "check 診断の severity 色付け。#180 で予約済みの --no-color / NO_COLOR の口を実装で活かす。TTY かつ NO_COLOR 未設定かつ --no-color なしのときのみ色付け"
     status: done
     criteria: "TTY で severity 別に色付き、--no-color / NO_COLOR / 非 TTY で ANSI 不含、既存 no-color テストが実効化されテスト通過"
-  cli_tool_v0020:
-    label: "CLI v0.0.20（公開済み）"
+  cli_release_ansi_color:
+    label: "CLIリリース: 診断ANSIカラー出力（npm v0.0.20）"
+    description: "#435 診断 ANSI カラー出力を含む"
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.20 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
@@ -400,8 +403,8 @@ process:
   restructure_skillgen:
     label: 生成系再構成
     location: https://github.com/takasek/pfdsl/issues/10
-  publish_cli_v009:
-    label: CLI v0.0.9公開
+  publish_cli_bootstrap:
+    label: CLI初回公開
   draft_external_stakeholders:
     label: externalStakeholders仕様起草
     description: "artifact / process の externalStakeholders フィールドを spec に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
@@ -425,8 +428,8 @@ process:
   implement_json_output:
     label: --json出力実装
     location: https://github.com/takasek/pfdsl/issues/181
-  publish_cli_v0010:
-    label: CLI v0.0.10リリース
+  publish_cli_ux_flags:
+    label: CLI DXフラグ群公開
   implement_index_reindex:
     label: index フィールド + reindex 実装
     location: https://github.com/takasek/pfdsl/issues/221
@@ -442,8 +445,8 @@ process:
   fix_w002_line:
     label: W002 診断行番号修正
     location: https://github.com/takasek/pfdsl/issues/219
-  publish_cli_v0011:
-    label: CLI v0.0.11リリース
+  publish_cli_index_sort:
+    label: CLI index/reindex + node sort公開
   implement_node_sort:
     label: node 並べ替え実装
     location: https://github.com/takasek/pfdsl/issues/236
@@ -464,12 +467,12 @@ process:
   update_pfd_ops_skill:
     label: pfd-ops スキル更新
     description: "SKILL.md ワークサイクル step 1 を pfdsl ready CLI 参照に書き換え、~/.claude/skills/pfd-ops/ に反映する"
-  publish_cli_v0012:
-    label: CLI v0.0.12リリース
-  publish_cli_v0013:
-    label: CLI v0.0.13リリース
-  publish_cli_v0014:
-    label: CLI v0.0.14リリース
+  publish_cli_basepath:
+    label: CLI basePath対応公開
+  publish_cli_ready_cmd:
+    label: CLI readyコマンド公開
+  publish_cli_status_lifecycle:
+    label: CLI statusライフサイクル機能群公開
   publish_ext_v0015:
     label: extension v0.0.15リリース
   implement_audit_sync:
@@ -485,8 +488,8 @@ process:
   implement_symmetry_hint:
     label: audit 同種対称性ヒント実装
     location: https://github.com/takasek/pfdsl/issues/292
-  publish_cli_v0015:
-    label: CLI v0.0.15リリース
+  publish_cli_statusset_impact:
+    label: CLI status-set影響レポート公開
   integrate_spec_v0011:
     label: 仕様書 v0.0.11統合
     description: "waiting/suspended status 分割・type フィールド・W002 source artifact 免除を spec 本文に統合する"
@@ -530,8 +533,8 @@ process:
   i357_define_pfd_lens_agent:
     label: pfd-lens agent 定義 + 配布実装
     location: https://github.com/takasek/pfdsl/issues/357
-  publish_cli_v0018:
-    label: CLI v0.0.18リリース
+  publish_cli_explain_lens:
+    label: CLI explain + pfd-lens agent公開
   i328_design_spec_ids:
     label: 仕様ID構文設計・最小lint実装
     location: https://github.com/takasek/pfdsl/issues/328
@@ -544,8 +547,8 @@ process:
   i435_implement_ansi_color:
     label: 診断 ANSI カラー実装
     location: https://github.com/takasek/pfdsl/issues/435
-  publish_cli_v0020:
-    label: CLI v0.0.20リリース
+  publish_cli_ansi_color:
+    label: CLI ANSIカラー公開
   migrate_spec_id_refs:
     label: spec.md 仕様ID参照移行
     description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。ADR 確定後に issue 起票して iN prefix を付与する。issue 化時に移行対象の現行 spec artifact を入力エッジとして列挙する"
@@ -595,7 +598,7 @@ spec_v006 >>? integrate_spec
 
 skill_gen >> restructure_skillgen -> restructured_gen
 
-cli_tool >> publish_cli_v009 -> cli_tool_v009
+cli_tool >> publish_cli_bootstrap -> cli_release_bootstrap
 
 cli_tool >> layer_audit_assets -> audit_distribution
 
@@ -607,53 +610,53 @@ spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
 
 cli_tool >> i119_publish_extension -> published_extension
 
-cli_tool_v009 >> implement_version_cmd -> version_cmd
-cli_tool_v009 >> implement_subcommand_help -> subcommand_help
-cli_tool_v009 >> implement_stdin -> stdin
-cli_tool_v009 >> implement_no_color -> no_color
-cli_tool_v009 >> implement_json_output -> json_output
+cli_release_bootstrap >> implement_version_cmd -> version_cmd
+cli_release_bootstrap >> implement_subcommand_help -> subcommand_help
+cli_release_bootstrap >> implement_stdin -> stdin
+cli_release_bootstrap >> implement_no_color -> no_color
+cli_release_bootstrap >> implement_json_output -> json_output
 
-[version_cmd, subcommand_help, stdin, no_color, json_output] >> publish_cli_v0010 -> cli_tool_v0010
+[version_cmd, subcommand_help, stdin, no_color, json_output] >> publish_cli_ux_flags -> cli_release_ux_flags
 
-cli_tool_v009 >> implement_hover_jump -> hover_jump
-cli_tool_v009 >> implement_run_command -> run_command
-cli_tool_v009 >> implement_group_hover -> group_hover
-cli_tool_v009 >> fix_w002_line -> w002_line
+cli_release_bootstrap >> implement_hover_jump -> hover_jump
+cli_release_bootstrap >> implement_run_command -> run_command
+cli_release_bootstrap >> implement_group_hover -> group_hover
+cli_release_bootstrap >> fix_w002_line -> w002_line
 
-cli_tool_v009 >> implement_index_reindex -> index_reindex
+cli_release_bootstrap >> implement_index_reindex -> index_reindex
 
-cli_tool_v009 >> implement_node_sort -> node_sort
+cli_release_bootstrap >> implement_node_sort -> node_sort
 
-[cli_tool_v0010, w002_line, index_reindex, node_sort] >> publish_cli_v0011 -> cli_tool_v0011
+[cli_release_ux_flags, w002_line, index_reindex, node_sort] >> publish_cli_index_sort -> cli_release_index_sort
 
 index_reindex >> integrate_spec_v009 -> spec_v009
 
 [hover_jump, run_command, group_hover] >> publish_ext_v0014 -> ext_v0014
 
-[spec_v009, cli_tool_v0011] >> implement_basepath -> basepath
+[spec_v009, cli_release_index_sort] >> implement_basepath -> basepath
 [basepath, ready_cmd] >> integrate_spec_v0010 -> spec_v0010
 spec_v009 >>? integrate_spec_v0010
-cli_tool_v0011 >> implement_ready_cmd -> ready_cmd
-basepath >> publish_cli_v0012 -> cli_tool_v0012
-[cli_tool_v0012, ready_cmd] >> publish_cli_v0013 -> cli_tool_v0013
+cli_release_index_sort >> implement_ready_cmd -> ready_cmd
+basepath >> publish_cli_basepath -> cli_release_basepath
+[cli_release_basepath, ready_cmd] >> publish_cli_ready_cmd -> cli_release_ready_cmd
 [ext_v0014, basepath] >> publish_ext_v0015 -> ext_v0015
 
-cli_tool_v0013 >> update_pfd_ops_skill -> pfd_ops_skill_ready
+cli_release_ready_cmd >> update_pfd_ops_skill -> pfd_ops_skill_ready
 
-cli_tool_v0013 >> i268_implement_type_field -> type_field
+cli_release_ready_cmd >> i268_implement_type_field -> type_field
 type_field >> implement_audit_sync -> audit_sync
-cli_tool_v0013 >> i272_implement_w002_hierarchy -> w002_hierarchy
-cli_tool_v0013 >> i273_implement_blocked_by -> blocked_by
-cli_tool_v0013 >> implement_status_set -> status_set
+cli_release_ready_cmd >> i272_implement_w002_hierarchy -> w002_hierarchy
+cli_release_ready_cmd >> i273_implement_blocked_by -> blocked_by
+cli_release_ready_cmd >> implement_status_set -> status_set
 status_set >> i278_implement_release_automation -> release_automation
 
-[cli_tool_v0013, type_field, audit_sync, w002_hierarchy, blocked_by, status_set] >> publish_cli_v0014 -> cli_tool_v0014
+[cli_release_ready_cmd, type_field, audit_sync, w002_hierarchy, blocked_by, status_set] >> publish_cli_status_lifecycle -> cli_release_status_lifecycle
 
-cli_tool_v0014 >> implement_statusset_impact -> statusset_impact
+cli_release_status_lifecycle >> implement_statusset_impact -> statusset_impact
 
-cli_tool_v0014 >> implement_symmetry_hint -> symmetry_hint
+cli_release_status_lifecycle >> implement_symmetry_hint -> symmetry_hint
 
-[cli_tool_v0014, statusset_impact, symmetry_hint] >> publish_cli_v0015 -> cli_tool_v0015
+[cli_release_status_lifecycle, statusset_impact, symmetry_hint] >> publish_cli_statusset_impact -> cli_release_statusset_impact
 
 [type_field, w002_hierarchy, blocked_by] >> integrate_spec_v0011 -> spec_v0011
 spec_v0010 >>? integrate_spec_v0011
@@ -662,10 +665,10 @@ multifile_toolchain >> recode_boundary_diags -> recode
 
 [spec_v0011, multifile_toolchain] >> implement_boundary_feedback -> boundary_feedback
 
-cli_tool_v0015 >> i356_implement_explain_cmd -> explain_cmd
-cli_tool_v0015 >> i357_define_pfd_lens_agent -> pfd_lens_agent
+cli_release_statusset_impact >> i356_implement_explain_cmd -> explain_cmd
+cli_release_statusset_impact >> i357_define_pfd_lens_agent -> pfd_lens_agent
 
-[explain_cmd, pfd_lens_agent, pfd_ops_plugin_dist] >> publish_cli_v0018 -> cli_tool_v0018
+[explain_cmd, pfd_lens_agent, pfd_ops_plugin_dist] >> publish_cli_explain_lens -> cli_release_explain_lens
 spec_v0011 >> i328_design_spec_ids -> spec_id_syntax
 
 spec_id_syntax >> i402_implement_get_by_id -> get_by_id_tool
@@ -680,5 +683,5 @@ skill_gen >> i366_distribute_marketplace -> marketplace_dist
 
 marketplace_dist >> i404_integrate_pfd_ops_plugin -> pfd_ops_plugin_dist
 
-cli_tool_v0018 >> i435_implement_ansi_color -> ansi_color
-ansi_color >> publish_cli_v0020 -> cli_tool_v0020
+cli_release_explain_lens >> i435_implement_ansi_color -> ansi_color
+ansi_color >> publish_cli_ansi_color -> cli_release_ansi_color
