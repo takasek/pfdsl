@@ -456,7 +456,7 @@ export interface ReadyOptions {
 
 /**
  * Core ready-process algorithm operating on pre-analyzed data.
- * "Ready" = all input artifacts done/undefined AND at least one output not done.
+ * "Ready" = all input artifacts done/undefined AND at least one output still actionable (not done/wip/suspended/waiting).
  * Returns processInputs and processOutputs maps in addition to readyIds so
  * callers (e.g. runReady --best) can reuse the already-built maps.
  */
@@ -483,13 +483,15 @@ function computeReadyIdsCore(
 		});
 		if (!allInputsDone) continue;
 		const outputs = processOutputs.get(pid) ?? [];
-		const alreadyDone =
+		const outputsInert =
 			outputs.length > 0 &&
 			outputs.every((aid) => {
 				const s = artifactMeta[aid]?.status;
-				return s === "done";
+				return (
+					s === "done" || s === "suspended" || s === "waiting" || s === "wip"
+				);
 			});
-		if (!alreadyDone) readyIds.push(pid);
+		if (!outputsInert) readyIds.push(pid);
 	}
 	return { readyIds, processInputs, processOutputs };
 }
