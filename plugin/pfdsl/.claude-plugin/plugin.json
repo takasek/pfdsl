@@ -1,7 +1,7 @@
 {
 	"name": "pfdsl",
 	"description": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), ecosystem bootstrap (pfd-ecosystem skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), and /pfd-cycle, /pfd-init commands.",
-	"version": "0.0.19",
+	"version": "0.0.20",
 	"author": {
 		"name": "takasek"
 	},
