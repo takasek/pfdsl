@@ -1283,6 +1283,64 @@ other >> design -> spec
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("req(v2):\n    status: done");
 	});
+
+	// flow-style YAML frontmatter (#415)
+	it("rewrites status in flow-style artifact that already has status (#415)", async () => {
+		const flowStyle = `---
+type: roadmap
+artifact:
+  requirement: { label: Requirement, status: done }
+  spec: { label: Spec, status: todo }
+process:
+  design: { label: Design }
+---
+requirement >> design -> spec
+`;
+		const f = join(dir, "status-set-flow-has-status.pfdsl");
+		writeFileSync(f, flowStyle);
+		const r = await run(["status-set", f, "spec", "wip"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("status: wip");
+		expect(after).not.toContain("status: todo");
+	});
+
+	it("inserts status into flow-style artifact with no status field (#415)", async () => {
+		const flowStyle = `---
+type: roadmap
+artifact:
+  requirement: { label: Requirement, status: done }
+  spec: { label: Spec }
+process:
+  design: { label: Design }
+---
+requirement >> design -> spec
+`;
+		const f = join(dir, "status-set-flow-no-status.pfdsl");
+		writeFileSync(f, flowStyle);
+		const r = await run(["status-set", f, "spec", "wip"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("status: wip");
+	});
+
+	it("gives a clear error message for flow-style when artifact is not found (#415)", async () => {
+		const flowStyle = `---
+type: roadmap
+artifact:
+  requirement: { label: Requirement, status: done }
+  spec: { label: Spec, status: todo }
+process:
+  design: { label: Design }
+---
+requirement >> design -> spec
+`;
+		const f = join(dir, "status-set-flow-notfound.pfdsl");
+		writeFileSync(f, flowStyle);
+		const r = await run(["status-set", f, "nonexistent", "done"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("nonexistent");
+	});
 });
 
 describe("audit-sync", () => {
