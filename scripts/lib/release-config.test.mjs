@@ -7,6 +7,7 @@ import {
 	tagName,
 	pinMarketplaceSourceToTag,
 	filesToCommitForBump,
+	releaseMilestoneArtifactIds,
 } from "./release-config.mjs";
 
 test("RELEASE_KINDS has the three known kinds with distinct tag prefixes", () => {
@@ -106,4 +107,30 @@ test("filesToCommitForBump includes plugin/pfdsl for cli releases, since gen-plu
 test("filesToCommitForBump excludes plugin/pfdsl for libs and vscode releases, which don't touch the cli version", () => {
 	assert.deepEqual(filesToCommitForBump("libs", RELEASE_KINDS.libs), RELEASE_KINDS.libs.packages);
 	assert.deepEqual(filesToCommitForBump("vscode", RELEASE_KINDS.vscode), RELEASE_KINDS.vscode.packages);
+});
+
+test("releaseMilestoneArtifactIds collects outputs of ready processes whose id starts with the given prefix", () => {
+	const ready = [
+		{ id: "publish_cli_ansi_color", label: "x", inputs: [], outputs: ["cli_release_ansi_color"] },
+		{ id: "implement_something", label: "x", inputs: [], outputs: ["something"] },
+	];
+	assert.deepEqual(releaseMilestoneArtifactIds(ready), ["cli_release_ansi_color"]);
+});
+
+test("releaseMilestoneArtifactIds returns an empty array when no ready process matches the prefix", () => {
+	const ready = [{ id: "implement_something", label: "x", inputs: [], outputs: ["something"] }];
+	assert.deepEqual(releaseMilestoneArtifactIds(ready), []);
+});
+
+test("releaseMilestoneArtifactIds flattens outputs across multiple matching processes", () => {
+	const ready = [
+		{ id: "publish_cli_a", label: "x", inputs: [], outputs: ["cli_release_a"] },
+		{ id: "publish_cli_b", label: "x", inputs: [], outputs: ["cli_release_b1", "cli_release_b2"] },
+	];
+	assert.deepEqual(releaseMilestoneArtifactIds(ready), ["cli_release_a", "cli_release_b1", "cli_release_b2"]);
+});
+
+test("releaseMilestoneArtifactIds respects a custom prefix", () => {
+	const ready = [{ id: "publish_ext_foo", label: "x", inputs: [], outputs: ["ext_foo"] }];
+	assert.deepEqual(releaseMilestoneArtifactIds(ready, "publish_ext_"), ["ext_foo"]);
 });
