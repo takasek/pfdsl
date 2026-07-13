@@ -282,7 +282,7 @@ artifact:
   article:
     label: "公開記事 (#12)"
     description: ADR 群を素材とした外部公開記事。依存なしで着手可能、spec v0.0.7 確定後はより充実
-    status: todo
+    status: wip
     criteria: 外部メディアに公開済みで URL が存在する
   obsidian_plugin:
     label: "Obsidian プラグイン (#3)"
@@ -360,11 +360,11 @@ artifact:
   ansi_color:
     label: "CLI 診断 ANSI カラー出力 (#435)"
     description: "check 診断の severity 色付け。#180 で予約済みの --no-color / NO_COLOR の口を実装で活かす。TTY かつ NO_COLOR 未設定かつ --no-color なしのときのみ色付け"
-    status: todo
+    status: done
     criteria: "TTY で severity 別に色付き、--no-color / NO_COLOR / 非 TTY で ANSI 不含、既存 no-color テストが実効化されテスト通過"
   cli_tool_v0020:
-    label: "CLI v0.0.20（次期）"
-    status: todo
+    label: "CLI v0.0.20（公開済み）"
+    status: done
     criteria: npm show @pfdsl/cli version が 0.0.20 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
 process:
