@@ -15,6 +15,7 @@
 //   9. kind-specific pre-tag step (vscode: vsce package)
 //   10. git tag + push tag
 //   11. watch the publish workflow (skipped for vscode, which has none)
+//   12. cli only: mark ready roadmap release milestones done + commit + push
 //
 // Checks run *before* the version bump commit, so a check failure never
 // leaves a dangling local commit to clean up.
@@ -30,6 +31,7 @@ import {
 	tagName,
 	pinMarketplaceSourceToTag,
 	filesToCommitForBump,
+	releaseMilestoneArtifactIds,
 } from "./lib/release-config.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -192,4 +194,29 @@ if (kind.workflow) {
 	run("gh", ["run", "watch", runId, "--exit-status"]);
 } else {
 	console.log(`${tag} tagged and pushed (no publish workflow for this kind).`);
+}
+
+// --- 12. cli release: mark ready roadmap release milestones done ---
+// No version-number → artifact-ID derivation: whichever publish_cli_*
+// milestones are ready (all inputs satisfied) get marked done, regardless
+// of how this release lines up against roadmap-planned version numbers.
+
+if (kindArg === "cli") {
+	const cliPath = resolve(root, "packages/cli/dist/cli.js");
+	const roadmapPath = resolve(root, ".pfdsl/roadmap.pfdsl");
+	const readyOutput = capture("node", [cliPath, "ready", roadmapPath, "--json"]);
+	const { ready } = JSON.parse(readyOutput);
+	const artifactIds = releaseMilestoneArtifactIds(ready);
+
+	if (artifactIds.length === 0) {
+		console.log("No roadmap release milestone is ready to mark done (this release ships no planned milestone).");
+	} else {
+		for (const artifactId of artifactIds) {
+			console.log(`Marking roadmap artifact ${artifactId} as done...`);
+			run("node", [cliPath, "status-set", roadmapPath, artifactId, "done"]);
+		}
+		run("git", ["add", roadmapPath]);
+		run("git", ["commit", "-m", `chore(roadmap): mark ${artifactIds.join(", ")} as done`]);
+		run("git", ["push", "origin", "main", "--quiet"]);
+	}
 }

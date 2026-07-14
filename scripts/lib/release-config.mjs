@@ -76,6 +76,22 @@ export function filesToCommitForBump(kindArg, kind) {
 	return kindArg === "cli" ? [...kind.packages, "plugin"] : [...kind.packages];
 }
 
+/**
+ * Picks out the roadmap release-milestone artifact IDs that a `pfdsl ready
+ * --json` run says are actionable right now, restricted to processes whose
+ * ID starts with `prefix`. No version-number derivation: whichever release
+ * milestones happen to be ready get marked done, regardless of how many
+ * versions actually shipped between them.
+ * @param {{id: string, outputs: string[]}[]} readyItems - the `ready` array from `pfdsl ready --json`
+ * @param {string} [prefix]
+ * @returns {string[]}
+ */
+export function releaseMilestoneArtifactIds(readyItems, prefix = "publish_cli_") {
+	return readyItems
+		.filter((item) => item.id.startsWith(prefix))
+		.flatMap((item) => item.outputs);
+}
+
 const MARKETPLACE_PLUGIN_REPO_URL = "https://github.com/takasek/pfdsl.git";
 const MARKETPLACE_PLUGIN_PATH = "plugin/pfdsl";
 

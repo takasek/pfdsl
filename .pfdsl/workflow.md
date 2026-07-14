@@ -104,14 +104,13 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 汎用ルール（着手時 todo→wip、PR を待たない）は pfd-ops プロトコル「進捗更新」が一次情報。このリポでは flow-sync が merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
 
-## 複数 issue を一括実装する場合のバージョン戦略
+## release milestone artifact の作成規約
 
-複数の実装 issue を1つの PR に束ねる場合、中間バージョンの publish を省略してよい。ただし **選択判断は着手前に明示する**:
+roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョン番号の事前予約ではない。**下流作業がそれを入力として要求する時点**でのみ作成する（pfd-ops プロトコル2・5の適用）。バージョン番号は roadmap 本体に書かず、done 後の label/criteria に事実として付記するのみ — 番号を先に書いて後から実態と合わせる運用（#278 導入前の運用）は廃止した。
 
-- roadmap の中間バージョン artifact（例: `cli_tool_v0010`）の扱い（スキップ / 統合 / 後日 publish）を PR body に記述する
-- スキップする場合は「#NNN と #MMM を同一バージョンに統合し中間 publish を省略」と明記する
+複数の実装 issue を1つの PR/リリースに束ねる場合も、milestone ノードは束ねた内容を表す1つの slug で作成すればよい。「中間バージョンをスキップ/統合するか」という判断自体が発生しない — バージョン番号を roadmap に書かないため、スキップ対象になるバージョン番号付きノードが最初から存在しない。
 
-省略判断を暗黙にすると roadmap の依存構造と実態が乖離する。
+`make release cli` は roadmap 上 ready になった `publish_cli_*` プロセスの出力を機械的に done 化する（バージョン番号からの artifact ID 逆算はしない）。計画外リリースで ready な milestone が無ければ何もしない。
 
 ## hotfix 運用（issue 省略）
 
