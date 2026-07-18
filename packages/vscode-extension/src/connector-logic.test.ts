@@ -2,39 +2,49 @@ import type { NormalizedEdge } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
 import {
 	buildConnectorEdgeLine,
-	directionForKind,
 	edgeAlreadyExists,
 	insertConnectorEdge,
 } from "./connector-logic.js";
 
-describe("directionForKind", () => {
-	it("treats input and feedback as 'before'", () => {
-		expect(directionForKind(">>")).toBe("before");
-		expect(directionForKind(">>?")).toBe("before");
-	});
-
-	it("treats output as 'after'", () => {
-		expect(directionForKind("->")).toBe("after");
-	});
-});
-
 describe("buildConnectorEdgeLine", () => {
-	it("places the other node before the current node for '>>'", () => {
-		expect(buildConnectorEdgeLine("build", "before", ">>", "spec_doc")).toBe(
-			"spec_doc >> build",
-		);
+	describe("when the current node is a process", () => {
+		it("places the other node before it for '>>'", () => {
+			expect(buildConnectorEdgeLine("build", "process", ">>", "spec_doc")).toBe(
+				"spec_doc >> build",
+			);
+		});
+
+		it("uses the feedback connector for '>>?'", () => {
+			expect(buildConnectorEdgeLine("build", "process", ">>?", "review")).toBe(
+				"review >>? build",
+			);
+		});
+
+		it("places the other node after it for '->'", () => {
+			expect(buildConnectorEdgeLine("build", "process", "->", "result")).toBe(
+				"build -> result",
+			);
+		});
 	});
 
-	it("uses the feedback connector for '>>?'", () => {
-		expect(buildConnectorEdgeLine("build", "before", ">>?", "review")).toBe(
-			"review >>? build",
-		);
-	});
+	describe("when the current node is an artifact", () => {
+		it("places it before the other node for '>>' (as normal input)", () => {
+			expect(
+				buildConnectorEdgeLine("spec_doc", "artifact", ">>", "build"),
+			).toBe("spec_doc >> build");
+		});
 
-	it("places the other node after the current node for '->'", () => {
-		expect(buildConnectorEdgeLine("build", "after", "->", "result")).toBe(
-			"build -> result",
-		);
+		it("places it before the other node for '>>?' (as feedback input)", () => {
+			expect(buildConnectorEdgeLine("review", "artifact", ">>?", "build")).toBe(
+				"review >>? build",
+			);
+		});
+
+		it("places it after the other node for '->' (as output)", () => {
+			expect(buildConnectorEdgeLine("result", "artifact", "->", "build")).toBe(
+				"build -> result",
+			);
+		});
 	});
 });
 
@@ -66,7 +76,7 @@ describe("insertConnectorEdge", () => {
 		expect(insertedLine).toBe(5);
 	});
 
-	it("anchors after the last body line mentioning nodeId instead of the document end", () => {
+	it("anchors after the last body line mentioning nodeId when no cursor line is given", () => {
 		const source = [
 			"---",
 			"artifact:",
@@ -129,6 +139,37 @@ describe("insertConnectorEdge", () => {
 		expect(text).toBe("spec_doc >> build_extended\nx >> build\n");
 		expect(insertedLine).toBe(1);
 	});
+
+	it("matches nodeId directly followed by '->' with no space", () => {
+		const source = "spec_doc >> build->result\n";
+		const { text, insertedLine } = insertConnectorEdge(
+			source,
+			"x >> build",
+			"build",
+		);
+		const lines = text.split("\n");
+		expect(lines[insertedLine]).toBe("x >> build");
+		expect(lines[insertedLine - 1]).toBe("spec_doc >> build->result");
+	});
+
+	it("anchors at the occurrence nearest the cursor line, not always the last one", () => {
+		const source = [
+			"build >> early_step",
+			"unrelated >> other",
+			"unrelated2 >> other2",
+			"late_step >> build",
+			"",
+		].join("\n");
+		const { text, insertedLine } = insertConnectorEdge(
+			source,
+			"build -> extra",
+			"build",
+			0,
+		);
+		const lines = text.split("\n");
+		expect(lines[insertedLine]).toBe("build -> extra");
+		expect(lines[insertedLine - 1]).toBe("build >> early_step");
+	});
 });
 
 describe("edgeAlreadyExists", () => {
@@ -138,23 +179,42 @@ describe("edgeAlreadyExists", () => {
 		{ kind: "output", process: "build", artifact: "result" },
 	];
 
-	it("detects an existing input edge", () => {
-		expect(edgeAlreadyExists(edges, "build", ">>", "spec_doc")).toBe(true);
+	it("detects an existing input edge from the process side", () => {
+		expect(edgeAlreadyExists(edges, "build", "process", ">>", "spec_doc")).toBe(
+			true,
+		);
+	});
+
+	it("detects the same input edge from the artifact side", () => {
+		expect(
+			edgeAlreadyExists(edges, "spec_doc", "artifact", ">>", "build"),
+		).toBe(true);
 	});
 
 	it("detects an existing feedback edge", () => {
-		expect(edgeAlreadyExists(edges, "build", ">>?", "review")).toBe(true);
+		expect(edgeAlreadyExists(edges, "build", "process", ">>?", "review")).toBe(
+			true,
+		);
 	});
 
-	it("detects an existing output edge", () => {
-		expect(edgeAlreadyExists(edges, "build", "->", "result")).toBe(true);
+	it("detects an existing output edge from either side", () => {
+		expect(edgeAlreadyExists(edges, "build", "process", "->", "result")).toBe(
+			true,
+		);
+		expect(edgeAlreadyExists(edges, "result", "artifact", "->", "build")).toBe(
+			true,
+		);
 	});
 
 	it("returns false for an edge that doesn't exist", () => {
-		expect(edgeAlreadyExists(edges, "build", ">>", "other")).toBe(false);
+		expect(edgeAlreadyExists(edges, "build", "process", ">>", "other")).toBe(
+			false,
+		);
 	});
 
 	it("does not confuse input and feedback edges of the same pair", () => {
-		expect(edgeAlreadyExists(edges, "build", ">>", "review")).toBe(false);
+		expect(edgeAlreadyExists(edges, "build", "process", ">>", "review")).toBe(
+			false,
+		);
 	});
 });

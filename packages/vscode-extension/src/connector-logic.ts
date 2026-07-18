@@ -1,22 +1,30 @@
 import { loadFrontmatter, type NormalizedEdge } from "@pfdsl/core";
 
-export type ConnectorDirection = "before" | "after";
+/** The DSL role the current node plays in the edge being built. */
+export type ConnectorRole = "artifact" | "process";
 export type ConnectorKind = ">>" | ">>?" | "->";
 
-/** >>/>>? attach before the current node (as its input); -> attaches after (as its output). */
-export function directionForKind(connector: ConnectorKind): ConnectorDirection {
-	return connector === "->" ? "after" : "before";
-}
-
+/**
+ * Builds the edge line text. `>>`/`>>?` always read artifact-then-process
+ * left-to-right; `->` always reads process-then-artifact. nodeRole says
+ * which slot the current node occupies, so a connector invoked on an
+ * artifact and one invoked on a process produce differently-shaped lines
+ * for the same connector kind.
+ */
 export function buildConnectorEdgeLine(
 	nodeId: string,
-	direction: ConnectorDirection,
+	nodeRole: ConnectorRole,
 	connector: ConnectorKind,
 	otherId: string,
 ): string {
-	return direction === "before"
-		? `${otherId} ${connector} ${nodeId}`
-		: `${nodeId} ${connector} ${otherId}`;
+	if (connector === "->") {
+		return nodeRole === "process"
+			? `${nodeId} -> ${otherId}`
+			: `${otherId} -> ${nodeId}`;
+	}
+	return nodeRole === "artifact"
+		? `${nodeId} ${connector} ${otherId}`
+		: `${otherId} ${connector} ${nodeId}`;
 }
 
 export interface ConnectorInsertion {
@@ -31,32 +39,50 @@ function escapeRegex(s: string): string {
 const CONTINUATION_PREFIXES = [">>?", ">>", "->"];
 
 /**
- * Last body line index (0-indexed) mentioning nodeId as a whole ID, extended
+ * Whole-ID match for nodeId, boundary-aware against the DSL's `-` arrow
+ * character: a trailing `-` only breaks the match if it is NOT the start of
+ * `->` (an ID's own hyphen still breaks it, e.g. nodeId "build" must not
+ * match inside "build-foo", but must match in "build->x" with no space
+ * before the arrow).
+ */
+function wholeIdPattern(nodeId: string): RegExp {
+	return new RegExp(
+		`(?<![\\p{L}\\p{N}_-])${escapeRegex(nodeId)}(?![\\p{L}\\p{N}_]|-(?!>))`,
+		"u",
+	);
+}
+
+/**
+ * Body line index (0-indexed) of the nodeId occurrence nearest cursorLine
+ * (nearest by line distance; ties favor the later occurrence), extended
  * through any continuation lines that follow it (operator-first next line),
- * so the new edge lands next to the statement it's related to instead of
- * always at the end of the document. Returns undefined if nodeId doesn't
- * appear in any body line (nothing to anchor to).
+ * so the new edge lands next to the statement the user is actually looking
+ * at. Without cursorLine, falls back to the last occurrence in the
+ * document. Returns undefined if nodeId doesn't appear in any body line.
  */
 function findRelatedLineIndex(
 	source: string,
 	nodeId: string,
+	cursorLine?: number,
 ): number | undefined {
 	const { bodyStartLine } = loadFrontmatter(source);
 	const lines = source.split("\n");
 	const bodyStart = Math.max(bodyStartLine - 1, 0);
-	const pattern = new RegExp(
-		`(?<![\\p{L}\\p{N}_-])${escapeRegex(nodeId)}(?![\\p{L}\\p{N}_-])`,
-		"u",
-	);
+	const pattern = wholeIdPattern(nodeId);
 
-	let lastMatch: number | undefined;
+	const matches: number[] = [];
 	for (let i = bodyStart; i < lines.length; i++) {
 		const line = lines[i];
-		if (line !== undefined && pattern.test(line)) lastMatch = i;
+		if (line !== undefined && pattern.test(line)) matches.push(i);
 	}
-	if (lastMatch === undefined) return undefined;
+	if (matches.length === 0) return undefined;
 
-	let idx = lastMatch;
+	const reference = cursorLine ?? Number.POSITIVE_INFINITY;
+	const best = matches.reduce((closest, i) =>
+		Math.abs(i - reference) <= Math.abs(closest - reference) ? i : closest,
+	);
+
+	let idx = best;
 	while (idx + 1 < lines.length) {
 		const next = lines[idx + 1]?.trimStart() ?? "";
 		if (!CONTINUATION_PREFIXES.some((op) => next.startsWith(op))) break;
@@ -66,17 +92,19 @@ function findRelatedLineIndex(
 }
 
 /**
- * Inserts edgeLine right after the last body line related to nodeId (its
- * statement, including continuation lines), or — if nodeId doesn't appear in
- * any body edge yet — after the last non-blank line of the document.
+ * Inserts edgeLine right after the body statement (including continuation
+ * lines) for the nodeId occurrence nearest cursorLine, or — if nodeId
+ * doesn't appear in any body edge yet — after the last non-blank line of
+ * the document.
  */
 export function insertConnectorEdge(
 	source: string,
 	edgeLine: string,
 	nodeId?: string,
+	cursorLine?: number,
 ): ConnectorInsertion {
 	if (nodeId) {
-		const anchor = findRelatedLineIndex(source, nodeId);
+		const anchor = findRelatedLineIndex(source, nodeId, cursorLine);
 		if (anchor !== undefined) {
 			const lines = source.split("\n");
 			const insertedLine = anchor + 1;
@@ -95,17 +123,22 @@ export function insertConnectorEdge(
 export function edgeAlreadyExists(
 	edges: readonly NormalizedEdge[],
 	nodeId: string,
+	nodeRole: ConnectorRole,
 	connector: ConnectorKind,
 	otherId: string,
 ): boolean {
 	if (connector === "->") {
+		const process = nodeRole === "process" ? nodeId : otherId;
+		const artifact = nodeRole === "process" ? otherId : nodeId;
 		return edges.some(
 			(e) =>
-				e.kind === "output" && e.process === nodeId && e.artifact === otherId,
+				e.kind === "output" && e.process === process && e.artifact === artifact,
 		);
 	}
 	const kind = connector === ">>" ? "input" : "feedback";
+	const artifact = nodeRole === "artifact" ? nodeId : otherId;
+	const process = nodeRole === "artifact" ? otherId : nodeId;
 	return edges.some(
-		(e) => e.kind === kind && e.process === nodeId && e.artifact === otherId,
+		(e) => e.kind === kind && e.artifact === artifact && e.process === process,
 	);
 }
