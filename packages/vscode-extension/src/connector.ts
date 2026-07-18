@@ -185,10 +185,14 @@ export function registerConnectorEditing(
 			if (anchored) {
 				// Single-line insert: less disruptive to fold state/undo than a
 				// full-document replace, and valid because anchored insertion never
-				// touches any other line's content.
-				await editor.edit((eb) =>
-					eb.insert(new vscode.Position(insertedLine, 0), `${edgeLine}\n`),
-				);
+				// touches any other line's content. Insert relative to the *end*
+				// of the preceding line (always a valid position) rather than the
+				// start of insertedLine, which doesn't exist yet — and, when the
+				// anchor is the document's last line with no trailing newline,
+				// would silently clamp and merge into it.
+				const anchorLineEnd = editor.document.lineAt(insertedLine - 1).range
+					.end;
+				await editor.edit((eb) => eb.insert(anchorLineEnd, `\n${edgeLine}`));
 			} else {
 				const fullRange = new vscode.Range(
 					editor.document.positionAt(0),
