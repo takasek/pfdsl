@@ -34,6 +34,10 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 このリポでは issue close 時に `flow-on-issue-close.yml` が `flow-sync/*` ブランチで flow-sync PR を自動起票する。サイクル開始時に `flow-sync/*` ブランチの PR が open のものがあれば CI が green であることを確認してマージ先行（コンフリクトがある場合は手動解消してからマージ）。それ以外の open PR（機能追加・バグ修正等）は「今回の着手作業に競合するか」を判断軸としてケースバイケースで確認する。`node scripts/cycle-status.mjs` の `openFlowSyncPRs` / `otherOpenPRs` フィールドが手動 `gh pr list` の代替になる。
 
+**flow-sync PR の CI が `pending`/`action_required` のまま動かない場合**: `github-actions[bot]` が起票した PR は workflow run が承認待ち（`action_required`）で止まり、放置すると CI が green にならないまま preflight が詰まる。GitHub MCP の `actions_list`（`list_workflow_runs`, branch でフィルタ）で該当 run の `conclusion` を確認し、`action_required` なら `actions_run_trigger`（`method: rerun_workflow_run`）で明示的に再実行する。
+
+**`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` に依存し、`gh` 不在の環境では PR 一覧取得・design-unsettled 判定・audit-issues-flow ステップがエラーで止まる（#489）。この場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、issue 本文の design-unsettled 判定は `issue_read`（`get`）で本文を読んで手動判定、`audit-issues-flow` 相当は対象 issue の `location:`・`updated_at:` を roadmap.pfdsl の記載と手動突合する。
+
 ## 終端ゲート追加項目（issue 固有）
 
 **タイミング規約**: issue クローズと flow 確定（下記「マージ時のみ」の2項目）は **main への PR マージ時**に行う（生態系図 merge_pr: 進捗・issue 更新はマージで正本になる）。PR 作成時点では行わない — PR がレビューで変わる/却下される可能性があるため。サイクルが PR 作成で終わる場合、この2項目は「マージ時に実施」と記録して未了のまま閉じてよい。**feature branch への中間 PR では `closes #xxx` を使わない**（理由と規約は L3 reference「PR 本文規約」が一次情報）。**出力 artifact の status done 更新はこれに含まれない** — develop 完了時点（PR 作成前）で criteria 達成が言えるなら done にしてよい（プロトコル4のデフォルト通り）。
