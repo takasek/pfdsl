@@ -112,13 +112,23 @@ export function reindex(
 		writes.push({ kind, id, value: to });
 	}
 
-	const output = writes.length ? applyWrites(source, writes) : source;
-	return { output, changes, diagnostics };
+	if (!writes.length) return { output: source, changes, diagnostics };
+	const { output, skipped } = applyWrites(source, writes);
+	// A write skipped as unsafe (e.g. an inline flow-style section one-liner)
+	// never happened — drop its entry so callers don't report a change that
+	// isn't reflected in the output.
+	const reportedChanges = skipped.size
+		? changes.filter((c) => !skipped.has(`${c.kind}:${c.id}`))
+		: changes;
+	return { output, changes: reportedChanges, diagnostics };
 }
 
 // --- front matter text editing ---------------------------------------------
 
-function applyWrites(source: string, writes: Write[]): string {
+function applyWrites(
+	source: string,
+	writes: Write[],
+): { output: string; skipped: Set<string> } {
 	const lines = source.split("\n");
 	const trailingNewline = source.endsWith("\n");
 
@@ -127,18 +137,21 @@ function applyWrites(source: string, writes: Write[]): string {
 	// No front matter: synthesize one from the writes.
 	if (!fences) {
 		const fm = buildFrontmatter(writes);
-		return `${fm}${source}`;
+		return { output: `${fm}${source}`, skipped: new Set() };
 	}
 
 	const { open, close } = fences;
 	// Mutable view of the YAML region (exclusive of the --- fences).
 	const yaml = lines.slice(open + 1, close);
-	for (const w of writes) setIndex(yaml, w);
+	const skipped = new Set<string>();
+	for (const w of writes) {
+		if (!setIndex(yaml, w)) skipped.add(`${w.kind}:${w.id}`);
+	}
 
 	const rebuilt = [...lines.slice(0, open + 1), ...yaml, ...lines.slice(close)];
 	let result = rebuilt.join("\n");
 	if (trailingNewline && !result.endsWith("\n")) result += "\n";
-	return result;
+	return { output: result, skipped };
 }
 
 function buildFrontmatter(writes: Write[]): string {
@@ -156,14 +169,22 @@ function buildFrontmatter(writes: Write[]): string {
 	return lines.join("\n");
 }
 
-function setIndex(yaml: string[], w: Write): void {
+/** @returns false when the write was skipped as unsafe (caller reports no change). */
+function setIndex(yaml: string[], w: Write): boolean {
 	const section = w.kind; // NodeKind values are exactly the YAML section names
 	const located = locateSection(yaml, section);
 
 	if (!located) {
 		// Append a fresh section at the end of the YAML region.
 		yaml.push(`${section}:`, `  ${w.id}:`, `    index: ${w.value}`);
-		return;
+		return true;
+	}
+
+	if (located.flowStyle) {
+		// Inline flow-style section (`kind: { ... }`) — splicing a block-style
+		// index: line in isn't safe without a full YAML rewrite (mirrors
+		// insert-definition.ts's handling of the same case).
+		return false;
 	}
 
 	const { start: sectionStart, end: sectionEnd } = located;
@@ -199,7 +220,7 @@ function setIndex(yaml: string[], w: Write): void {
 			`${pad(sectionIndent * 2)}index: ${w.value}`,
 		];
 		yaml.splice(sectionEnd, 0, ...block);
-		return;
+		return true;
 	}
 
 	// Inline flow mapping: `id: { ... }` — edit inside the braces only. The brace
@@ -223,7 +244,7 @@ function setIndex(yaml: string[], w: Write): void {
 					inner === "" ? `index: ${w.value}` : `index: ${w.value}, ${inner}`;
 			}
 			yaml[nodeLine] = `${prefix}${before}{ ${merged} }${after}`;
-			return;
+			return true;
 		}
 	}
 
@@ -236,10 +257,11 @@ function setIndex(yaml: string[], w: Write): void {
 		if (/^\s*index:\s*/.test(line)) {
 			// Replace the integer value; keep any trailing comment.
 			yaml[i] = line.replace(/^(\s*index:\s*)\d+/, `$1${w.value}`);
-			return;
+			return true;
 		}
 	}
 	yaml.splice(nodeLine + 1, 0, `${pad(childIndent)}index: ${w.value}`);
+	return true;
 }
 
 /** Locate the first balanced `{ ... }` group in s, or null if unbalanced. */
