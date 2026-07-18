@@ -398,7 +398,7 @@ artifact:
   field_get_cmd:
     label: "ノード フィールド値取得コマンド (#476)"
     description: "id と field を指定してノードのフィールド値を取得する get コマンド。複数 id/field 指定可、location は basePath 解決後の値を返す。エージェントの grep/Read 代替"
-    status: wip
+    status: done
     criteria: "pfdsl get <file> --id <ids> --field <fields> が値を返し、location が basePath 解決済みで出力される、テスト通過"
   v011_semantics:
     label: "V011 strict 意味論の緩和 (#478)"
