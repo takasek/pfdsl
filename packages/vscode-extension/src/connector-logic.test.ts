@@ -65,6 +65,70 @@ describe("insertConnectorEdge", () => {
 		expect(text).toBe("---\nartifact:\n  A: {}\n---\nA >> P\nA -> B\n");
 		expect(insertedLine).toBe(5);
 	});
+
+	it("anchors after the last body line mentioning nodeId instead of the document end", () => {
+		const source = [
+			"---",
+			"artifact:",
+			"  spec_doc: {}",
+			"process:",
+			"  build: {}",
+			"---",
+			"spec_doc >> build",
+			"other >> unrelated",
+			"",
+		].join("\n");
+		const { text, insertedLine } = insertConnectorEdge(
+			source,
+			"build -> result",
+			"build",
+		);
+		const lines = text.split("\n");
+		expect(lines[insertedLine]).toBe("build -> result");
+		expect(lines[insertedLine - 1]).toBe("spec_doc >> build");
+		expect(lines[insertedLine + 1]).toBe("other >> unrelated");
+	});
+
+	it("anchors after a multi-line continuation block", () => {
+		const source = [
+			"spec_doc",
+			">> build",
+			"-> result",
+			"other >> unrelated",
+			"",
+		].join("\n");
+		const { text, insertedLine } = insertConnectorEdge(
+			source,
+			"build -> extra",
+			"build",
+		);
+		const lines = text.split("\n");
+		expect(lines[insertedLine]).toBe("build -> extra");
+		expect(lines[insertedLine - 1]).toBe("-> result");
+		expect(lines[insertedLine + 1]).toBe("other >> unrelated");
+	});
+
+	it("falls back to appending at the end when nodeId isn't in any body edge yet", () => {
+		const source = "spec_doc >> build\n";
+		const { text, insertedLine } = insertConnectorEdge(
+			source,
+			"review >>? build2",
+			"build2",
+		);
+		expect(text).toBe("spec_doc >> build\nreview >>? build2\n");
+		expect(insertedLine).toBe(1);
+	});
+
+	it("does not match a node ID that is only a substring of another ID", () => {
+		const source = "spec_doc >> build_extended\n";
+		const { text, insertedLine } = insertConnectorEdge(
+			source,
+			"x >> build",
+			"build",
+		);
+		expect(text).toBe("spec_doc >> build_extended\nx >> build\n");
+		expect(insertedLine).toBe(1);
+	});
 });
 
 describe("edgeAlreadyExists", () => {

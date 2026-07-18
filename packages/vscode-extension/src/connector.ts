@@ -119,7 +119,11 @@ export function registerConnectorEditing(
 				otherId,
 			);
 			const source = editor.document.getText();
-			const { text, insertedLine } = insertConnectorEdge(source, edgeLine);
+			const { text, insertedLine } = insertConnectorEdge(
+				source,
+				edgeLine,
+				nodeId,
+			);
 			const fullRange = new vscode.Range(
 				editor.document.positionAt(0),
 				editor.document.positionAt(source.length),
