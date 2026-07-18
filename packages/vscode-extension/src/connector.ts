@@ -1,46 +1,72 @@
-import { ID_PATTERN } from "@pfdsl/core";
+import { ID_PATTERN, type NodeKind } from "@pfdsl/core";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 import {
 	buildConnectorEdgeLine,
 	type ConnectorKind,
-	directionForKind,
+	type ConnectorRole,
 	edgeAlreadyExists,
 	insertConnectorEdge,
 } from "./connector-logic.js";
 
 const NEW_ID_ITEM = "$(add) New node ID…";
+const PLACEHOLDER = "…";
 
-/** Labels show the resulting edge syntax directly so direction never needs a separate pick. */
-const CONNECTOR_ITEMS: {
-	connector: ConnectorKind;
-	buildLabel: (nodeId: string) => string;
-	description: string;
-}[] = [
-	{
-		connector: ">>",
-		buildLabel: (id) => `? >> ${id}`,
-		description: "Add input (before this node)",
-	},
-	{
-		connector: ">>?",
-		buildLabel: (id) => `? >>? ${id}`,
-		description: "Add feedback input (before this node)",
-	},
-	{
-		connector: "->",
-		buildLabel: (id) => `${id} -> ?`,
-		description: "Add output (after this node)",
-	},
-];
+/** Labels show the resulting edge syntax directly, adapted to the current node's role. */
+function connectorItemsFor(
+	nodeId: string,
+	nodeRole: ConnectorRole,
+): { connector: ConnectorKind; label: string; description: string }[] {
+	if (nodeRole === "artifact") {
+		return [
+			{
+				connector: ">>",
+				label: `${nodeId} >> ${PLACEHOLDER}`,
+				description: "Add as normal input to a process",
+			},
+			{
+				connector: ">>?",
+				label: `${nodeId} >>? ${PLACEHOLDER}`,
+				description: "Add as feedback input to a process",
+			},
+			{
+				connector: "->",
+				label: `${PLACEHOLDER} -> ${nodeId}`,
+				description: "Add as the output of a process",
+			},
+		];
+	}
+	return [
+		{
+			connector: ">>",
+			label: `${PLACEHOLDER} >> ${nodeId}`,
+			description: "Add a normal input",
+		},
+		{
+			connector: ">>?",
+			label: `${PLACEHOLDER} >>? ${nodeId}`,
+			description: "Add a feedback input",
+		},
+		{
+			connector: "->",
+			label: `${nodeId} -> ${PLACEHOLDER}`,
+			description: "Add an output",
+		},
+	];
+}
+
+/** The kind an "other node" must have to be a valid endpoint for a given connector choice. */
+function compatibleOtherKind(nodeRole: ConnectorRole): NodeKind {
+	return nodeRole === "artifact" ? "process" : "artifact";
+}
 
 function nodeIdAtCursor(
 	editor: vscode.TextEditor,
-): { nodeId: string } | undefined {
+): { nodeId: string; line: number } | undefined {
 	const { document: doc, selection } = editor;
 	const range = doc.getWordRangeAtPosition(selection.active, ID_PATTERN);
 	if (!range) return undefined;
-	return { nodeId: doc.getText(range) };
+	return { nodeId: doc.getText(range), line: selection.active.line };
 }
 
 export function registerConnectorEditing(
@@ -58,33 +84,34 @@ export function registerConnectorEditing(
 				);
 				return;
 			}
-			const { nodeId } = cursor;
+			const { nodeId, line: cursorLine } = cursor;
+
+			const { nodeKinds, edges } = analyzeDocument(editor.document);
+			const nodeKind = nodeKinds.get(nodeId);
+			if (nodeKind === "group") {
+				vscode.window.showInformationMessage(
+					"Cannot add a connector to a group node.",
+				);
+				return;
+			}
+			const nodeRole: ConnectorRole =
+				nodeKind === "artifact" ? "artifact" : "process";
 
 			const connectorPick = await vscode.window.showQuickPick(
-				CONNECTOR_ITEMS.map((item) => ({
-					label: item.buildLabel(nodeId),
-					description: item.description,
-					connector: item.connector,
-				})),
+				connectorItemsFor(nodeId, nodeRole),
 				{ placeHolder: `Choose the connector for "${nodeId}"` },
 			);
 			if (!connectorPick) return;
 			const connector = connectorPick.connector;
-			const direction = directionForKind(connector);
 
-			const { nodeKinds, edges } = analyzeDocument(editor.document);
-			const existingIds = [...nodeKinds.keys()]
-				.filter((id) => id !== nodeId)
+			const wantedKind = compatibleOtherKind(nodeRole);
+			const existingIds = [...nodeKinds.entries()]
+				.filter(([id, kind]) => id !== nodeId && kind === wantedKind)
+				.map(([id]) => id)
 				.sort();
 			const idPick = await vscode.window.showQuickPick(
-				[
-					{ label: NEW_ID_ITEM },
-					...existingIds.map((id) => {
-						const kind = nodeKinds.get(id);
-						return kind ? { label: id, description: kind } : { label: id };
-					}),
-				],
-				{ placeHolder: "Select the other node" },
+				[{ label: NEW_ID_ITEM }, ...existingIds.map((id) => ({ label: id }))],
+				{ placeHolder: `Select the ${wantedKind} to connect` },
 			);
 			if (!idPick) return;
 
@@ -92,7 +119,7 @@ export function registerConnectorEditing(
 			if (idPick.label === NEW_ID_ITEM) {
 				const fullIdPattern = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
 				const input = await vscode.window.showInputBox({
-					prompt: "New node ID",
+					prompt: `New ${wantedKind} ID`,
 					validateInput: (value) => {
 						if (!fullIdPattern.test(value)) return "Invalid node ID";
 						if (value === nodeId) return "Cannot connect a node to itself";
@@ -103,9 +130,9 @@ export function registerConnectorEditing(
 				otherId = input;
 			}
 
-			if (edgeAlreadyExists(edges, nodeId, connector, otherId)) {
+			if (edgeAlreadyExists(edges, nodeId, nodeRole, connector, otherId)) {
 				const choice = await vscode.window.showWarningMessage(
-					`"${buildConnectorEdgeLine(nodeId, direction, connector, otherId)}" already exists.`,
+					`"${buildConnectorEdgeLine(nodeId, nodeRole, connector, otherId)}" already exists.`,
 					{ modal: true },
 					"Add anyway",
 				);
@@ -114,7 +141,7 @@ export function registerConnectorEditing(
 
 			const edgeLine = buildConnectorEdgeLine(
 				nodeId,
-				direction,
+				nodeRole,
 				connector,
 				otherId,
 			);
@@ -123,6 +150,7 @@ export function registerConnectorEditing(
 				source,
 				edgeLine,
 				nodeId,
+				cursorLine,
 			);
 			const fullRange = new vscode.Range(
 				editor.document.positionAt(0),
@@ -130,12 +158,9 @@ export function registerConnectorEditing(
 			);
 			await editor.edit((eb) => eb.replace(fullRange, text));
 
-			const newLineRange = editor.document.lineAt(insertedLine).range;
-			editor.selection = new vscode.Selection(
-				newLineRange.start,
-				newLineRange.end,
-			);
-			editor.revealRange(newLineRange);
+			const lineEnd = editor.document.lineAt(insertedLine).range.end;
+			editor.selection = new vscode.Selection(lineEnd, lineEnd);
+			editor.revealRange(editor.document.lineAt(insertedLine).range);
 		}),
 	);
 }
