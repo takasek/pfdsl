@@ -82,8 +82,8 @@ export function auditGraph(
 
 		// Group artifacts by their group, ignoring ungrouped artifacts
 		const byGroup = new Map<string, string[]>();
-		for (const [id, meta] of Object.entries(artifactMeta)) {
-			const grp = meta.group;
+		for (const [id, rawMeta] of Object.entries(artifactMeta)) {
+			const grp = rawMeta?.group;
 			if (!grp) continue;
 			// Only consider artifacts that have at least one outgoing normal edge
 			if (!normalConsumers.has(id)) continue;

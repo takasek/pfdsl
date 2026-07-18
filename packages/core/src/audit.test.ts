@@ -291,6 +291,23 @@ describe("auditGraph", () => {
 		});
 	});
 
+	it("does not crash when an artifact node is declared with no value (YAML null, #501)", () => {
+		// a >> p -> b, with artifactMeta.a: null (frontmatter `a:` with no value)
+		const edges = mkEdges(
+			{ kind: "input", a: "a", p: "p" },
+			{ kind: "output", a: "b", p: "p" },
+		);
+		const nodeKinds = new Map<string, NodeKind>([
+			["a", "artifact"],
+			["p", "process"],
+			["b", "artifact"],
+		]);
+		const artifactMeta = {
+			a: null,
+		} as unknown as Record<string, ArtifactMeta>;
+		expect(() => auditGraph(edges, nodeKinds, artifactMeta)).not.toThrow();
+	});
+
 	describe("externalStakeholders", () => {
 		it("artifact with externalStakeholders is not flagged as orphan terminal", () => {
 			// req >> design -> report   (report has externalStakeholders)
