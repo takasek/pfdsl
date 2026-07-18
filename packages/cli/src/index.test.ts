@@ -498,18 +498,18 @@ describe("diff", () => {
 	});
 });
 
-describe("check --audit", () => {
-	it("shows terminal artifacts and external inputs for a valid file", async () => {
+describe("graph io", () => {
+	it("shows external inputs and terminal artifacts for a valid file", async () => {
 		// valid.pfdsl: req >> design -> spec\nspec >> impl -> code
 		// external inputs: req; terminals: code
-		const r = await run(["check", join(dir, "valid.pfdsl"), "--audit"]);
+		const r = await run(["graph", "io", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toMatch(/terminal artifacts:.*code/);
 		expect(r.stdout).toMatch(/external inputs:.*req/);
+		expect(r.stdout).toMatch(/terminal artifacts:.*code/);
 	});
 
-	it("does not show audit output when file has errors", async () => {
-		const r = await run(["check", join(dir, "invalid.pfdsl"), "--audit"]);
+	it("exits 1 when the file has errors", async () => {
+		const r = await run(["graph", "io", join(dir, "invalid.pfdsl")]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).not.toMatch(/terminal artifacts/);
 	});
@@ -525,21 +525,30 @@ describe("check --audit", () => {
 		].join("\n");
 		const f = join(dir, "ext-stakeholders.pfdsl");
 		writeFileSync(f, src);
-		const r = await run(["check", f, "--audit"]);
+		const r = await run(["graph", "io", f]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).not.toMatch(/terminal artifacts:.*report/);
 		expect(r.stdout).toMatch(/external inputs:.*req/);
 	});
+
+	it("--json returns externalInputs and terminals arrays", async () => {
+		const r = await run(["graph", "io", join(dir, "valid.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			externalInputs: ["req"],
+			terminals: ["code"],
+		});
+	});
 });
 
-describe("check --summary", () => {
+describe("graph summary", () => {
 	it("shows counts of artifacts, processes, edges, external_inputs, terminals", async () => {
-		// valid.pfdsl: 4 artifacts (req, spec, impl, code... wait: req,spec,code=artifacts, design,impl=processes)
-		// Actually: req >> design -> spec\nspec >> impl -> code
+		// valid.pfdsl: req >> design -> spec\nspec >> impl -> code
 		// artifacts: req, spec, code (3), processes: design, impl (2)
 		// primary edges: req->design, design->spec, spec->impl, impl->code = 4
 		// external_inputs: req (1), terminals: code (1)
-		const r = await run(["check", join(dir, "valid.pfdsl"), "--summary"]);
+		const r = await run(["graph", "summary", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toMatch(/artifacts: 3/);
 		expect(r.stdout).toMatch(/processes: 2/);
@@ -548,10 +557,82 @@ describe("check --summary", () => {
 		expect(r.stdout).toMatch(/terminals: 1/);
 	});
 
-	it("does not show summary output when file has errors", async () => {
-		const r = await run(["check", join(dir, "invalid.pfdsl"), "--summary"]);
+	it("exits 1 when the file has errors", async () => {
+		const r = await run(["graph", "summary", join(dir, "invalid.pfdsl")]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).not.toMatch(/artifacts:/);
+	});
+
+	it("--json returns counts", async () => {
+		const r = await run([
+			"graph",
+			"summary",
+			join(dir, "valid.pfdsl"),
+			"--json",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			artifacts: 3,
+			processes: 2,
+			edges: 4,
+			externalInputs: 1,
+			terminals: 1,
+		});
+	});
+});
+
+describe("check --hints", () => {
+	// lib's consumers {use_a, use_b} are a strict subset of same-group cli's
+	// {use_a, use_b, use_c} → hint that lib lacks use_c.
+	const asymmetric = [
+		"---",
+		"group:",
+		"  g:",
+		"    label: G",
+		"artifact:",
+		"  lib:",
+		"    group: g",
+		"  cli:",
+		"    group: g",
+		"---",
+		"lib >> use_a -> out_a",
+		"lib >> use_b -> out_b",
+		"cli >> use_a",
+		"cli >> use_b",
+		"cli >> use_c -> out_c",
+	].join("\n");
+
+	it("prints consumer asymmetry hints", async () => {
+		const f = join(dir, "hints.pfdsl");
+		writeFileSync(f, asymmetric);
+		const r = await run(["check", f, "--hints"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toMatch(/consumer asymmetry \(hint\): lib/);
+	});
+
+	it("without --hints prints no hint lines", async () => {
+		const f = join(dir, "hints.pfdsl");
+		writeFileSync(f, asymmetric);
+		const r = await run(["check", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toMatch(/consumer asymmetry/);
+	});
+
+	it("--json includes a hints array", async () => {
+		const f = join(dir, "hints.pfdsl");
+		writeFileSync(f, asymmetric);
+		const r = await run(["check", f, "--hints", "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.hints).toEqual([
+			{
+				artifact: "lib",
+				missingProcesses: ["use_c"],
+				sibling: "cli",
+			},
+		]);
 	});
 });
 

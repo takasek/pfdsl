@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
 	analyze,
 	auditGraph,
+	type ConsumerAsymmetryHint,
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
@@ -135,8 +136,7 @@ function failIfErrors(diags: Diagnostic[], file: string): CommandResult | null {
 }
 
 export interface CheckOptions {
-	audit?: boolean;
-	summary?: boolean;
+	hints?: boolean;
 	strict?: boolean;
 	json?: boolean;
 	color?: boolean;
@@ -242,49 +242,38 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const extraLines: string[] = [];
 	const artifactMeta = frontmatter?.artifact ?? undefined;
 
-	if (opts.audit) {
-		const {
-			terminals,
-			externalInputs,
-			consumerAsymmetry,
-			consumerAsymmetryRemainder,
-		} = auditGraph(edges, nodeKinds, artifactMeta);
-		extraLines.push(`terminal artifacts: ${terminals.join(", ")}`);
-		extraLines.push(`external inputs: ${externalInputs.join(", ")}`);
-		for (const hint of consumerAsymmetry) {
-			extraLines.push(
-				`consumer asymmetry (hint): ${hint.artifact} lacks [${hint.missingProcesses.join(", ")}] present on same-group ${hint.sibling}`,
-			);
-		}
-		if (consumerAsymmetryRemainder > 0) {
-			extraLines.push(`... (${consumerAsymmetryRemainder} more)`);
-		}
-	}
-
-	if (opts.summary) {
-		const artifactCount = [...nodeKinds.values()].filter(
-			(k) => k === "artifact",
-		).length;
-		const processCount = [...nodeKinds.values()].filter(
-			(k) => k === "process",
-		).length;
-		const primaryEdgeCount = edges.filter(
-			(e) => e.kind === "input" || e.kind === "output",
-		).length;
-		const { terminals, externalInputs } = auditGraph(
+	let hints: ConsumerAsymmetryHint[] = [];
+	let hintsOmitted = 0;
+	if (opts.hints) {
+		const { consumerAsymmetry, consumerAsymmetryRemainder } = auditGraph(
 			edges,
 			nodeKinds,
 			artifactMeta,
 		);
-		extraLines.push(
-			`artifacts: ${artifactCount}, processes: ${processCount}, edges: ${primaryEdgeCount}, external_inputs: ${externalInputs.length}, terminals: ${terminals.length}`,
-		);
+		hints = consumerAsymmetry;
+		hintsOmitted = consumerAsymmetryRemainder;
+		for (const hint of hints) {
+			extraLines.push(
+				`consumer asymmetry (hint): ${hint.artifact} lacks [${hint.missingProcesses.join(", ")}] present on same-group ${hint.sibling}`,
+			);
+		}
+		if (hintsOmitted > 0) {
+			extraLines.push(`... (${hintsOmitted} more)`);
+		}
 	}
 
 	if (opts.json) {
 		const allDiags = [...diagnostics, ...multiDiags];
+		const payload: Record<string, unknown> = {
+			ok: true,
+			diagnostics: allDiags,
+		};
+		if (opts.hints) {
+			payload.hints = hints;
+			if (hintsOmitted > 0) payload.hintsOmitted = hintsOmitted;
+		}
 		return {
-			stdout: `${JSON.stringify({ ok: true, diagnostics: allDiags })}\n`,
+			stdout: `${JSON.stringify(payload)}\n`,
 			stderr: "",
 			exitCode: 0,
 		};
@@ -1032,6 +1021,89 @@ export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
 	return ok(`${lines.join("\n")}\n`, hint);
 }
 
+export interface GraphSummaryOptions {
+	json?: boolean;
+}
+
+/**
+ * Shared loader for graph summary/io: reads + analyzes a file, failing on
+ * errors, and returns the pieces auditGraph needs.
+ */
+function loadForAudit(file: string):
+	| {
+			edges: ReturnType<typeof analyze>["edges"];
+			nodeKinds: ReturnType<typeof analyze>["nodeKinds"];
+			artifactMeta: NonNullable<
+				ReturnType<typeof analyze>["frontmatter"]
+			>["artifact"];
+	  }
+	| CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
+	const failed = failIfErrors(diagnostics, file);
+	if (failed) return failed;
+	return { edges, nodeKinds, artifactMeta: frontmatter?.artifact ?? undefined };
+}
+
+export function runGraphSummary(
+	file: string,
+	opts: GraphSummaryOptions = {},
+): CommandResult {
+	const loaded = loadForAudit(file);
+	if ("exitCode" in loaded) return loaded;
+	const { edges, nodeKinds, artifactMeta } = loaded;
+	const artifactCount = [...nodeKinds.values()].filter(
+		(k) => k === "artifact",
+	).length;
+	const processCount = [...nodeKinds.values()].filter(
+		(k) => k === "process",
+	).length;
+	const primaryEdgeCount = edges.filter(
+		(e) => e.kind === "input" || e.kind === "output",
+	).length;
+	const { terminals, externalInputs } = auditGraph(
+		edges,
+		nodeKinds,
+		artifactMeta,
+	);
+	if (opts.json) {
+		return ok(
+			`${JSON.stringify({
+				ok: true,
+				artifacts: artifactCount,
+				processes: processCount,
+				edges: primaryEdgeCount,
+				externalInputs: externalInputs.length,
+				terminals: terminals.length,
+			})}\n`,
+		);
+	}
+	return ok(
+		`artifacts: ${artifactCount}, processes: ${processCount}, edges: ${primaryEdgeCount}, external_inputs: ${externalInputs.length}, terminals: ${terminals.length}\n`,
+	);
+}
+
+export function runGraphIo(
+	file: string,
+	opts: GraphSummaryOptions = {},
+): CommandResult {
+	const loaded = loadForAudit(file);
+	if ("exitCode" in loaded) return loaded;
+	const { edges, nodeKinds, artifactMeta } = loaded;
+	const { terminals, externalInputs } = auditGraph(
+		edges,
+		nodeKinds,
+		artifactMeta,
+	);
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, externalInputs, terminals })}\n`);
+	}
+	return ok(
+		`external inputs: ${externalInputs.join(", ")}\nterminal artifacts: ${terminals.join(", ")}\n`,
+	);
+}
+
 export interface AuditSyncOptions {
 	json?: boolean;
 }
@@ -1253,16 +1325,47 @@ export async function runDiff(
 
 declare const __PFDSL_VERSION__: string;
 
-const HELP_CHECK = `usage: pfdsl check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
+const HELP_CHECK = `usage: pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]
 
 Validate a .pfdsl file. Use - to read from stdin.
 
 Options:
-  --audit    list terminal artifacts and external inputs; also emits consumer asymmetry hints for same-group artifacts
-  --summary  print artifact/process/edge counts
   --strict   error if feedback source not reachable from target process
-  --json     output diagnostics as JSON ({ ok, diagnostics })
+  --hints    also emit consumer asymmetry hints for same-group artifacts
+  --json     output diagnostics as JSON ({ ok, diagnostics, hints? })
   --no-color disable ANSI color codes (also: NO_COLOR env var)
+
+For topology queries (terminal artifacts, external inputs, counts) see
+\`pfdsl graph io\` and \`pfdsl graph summary\`.
+`;
+
+const HELP_GRAPH_SUMMARY = `usage: pfdsl graph summary <file|-> [--json]
+
+Print aggregate counts for the graph: artifacts, processes, primary edges,
+external inputs, and terminal artifacts. Use - to read from stdin.
+
+  --json  output as JSON ({ ok, artifacts, processes, edges, externalInputs, terminals })
+
+Exit codes:
+  0  success
+  1  parse/validation error
+  2  invalid usage
+`;
+
+const HELP_GRAPH_IO = `usage: pfdsl graph io <file|-> [--json]
+
+Print the graph's boundary: external inputs (artifacts consumed but never
+produced — where the flow starts) and terminal artifacts (produced but never
+consumed — where it ends). Artifacts with externalStakeholders are treated
+as having an external consumer and excluded from terminals. Use - to read
+from stdin.
+
+  --json  output as JSON ({ ok, externalInputs: string[], terminals: string[] })
+
+Exit codes:
+  0  success
+  1  parse/validation error
+  2  invalid usage
 `;
 
 const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--mode flat|flows]
@@ -1558,7 +1661,7 @@ Subcommands:
 export const HELP = `pfdsl <command> [options]
 
 Commands:
-  check <file|-> [--strict] [--json] [--no-color] [--audit] [--summary]
+  check <file|-> [--strict] [--hints] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
   fmt <file|-> [--write] [--mode flat|flows]
@@ -1622,6 +1725,18 @@ function runGraphGroup(
 	if (!sub)
 		return flags.help ? ok(HELP_GRAPH_GROUP) : fail(HELP_GRAPH_GROUP, 2);
 	switch (sub) {
+		case "summary": {
+			if (flags.help) return ok(HELP_GRAPH_SUMMARY);
+			const f = rest[0];
+			if (!f) return fail(HELP_GRAPH_SUMMARY, 2);
+			return runGraphSummary(f, { json: flags.json === true });
+		}
+		case "io": {
+			if (flags.help) return ok(HELP_GRAPH_IO);
+			const f = rest[0];
+			if (!f) return fail(HELP_GRAPH_IO, 2);
+			return runGraphIo(f, { json: flags.json === true });
+		}
 		case "edges": {
 			if (flags.help) return ok(HELP_GRAPH_EDGES);
 			const f = rest[0];
@@ -1782,8 +1897,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			const f = positional[0];
 			if (!f) return fail(HELP_CHECK, 2);
 			return runCheck(f, {
-				audit: flags.audit === true,
-				summary: flags.summary === true,
+				hints: flags.hints === true,
 				strict: flags.strict === true,
 				json: flags.json === true,
 				color: shouldColorize({
