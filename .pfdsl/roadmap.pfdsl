@@ -37,6 +37,7 @@ artifact:
     status: done
     criteria: check/fmt/graph が全サンプルにエラーなし
     location: ../docs/spec/spec.md
+    revises: spec_v007
   multifile_toolchain:
     label: "spec v0.0.8 実装済みツールチェーン (#148)"
     description: "subflow:/extends: の checker 実装（V021-V028）。renderer は spec v0.0.8 の対象外（§2.9.3 はビューリンクのみ定義）。VS Code subflow ナビゲーションは #147。後続門番のプレースホルダ（ADR-0018）"
@@ -65,6 +66,7 @@ artifact:
     status: done
     criteria: "index: が spec 本文に統合済み"
     location: ../docs/spec/spec.md
+    revises: spec_v008
   ext_v0014:
     label: "extension v0.0.14（公開済み）"
     description: "現在コミット先行中の vscode-extension 変更を含む次期 Marketplace リリース"
