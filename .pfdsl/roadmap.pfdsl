@@ -304,11 +304,6 @@ artifact:
     description: "status: blocked を waiting（外部待ち）と suspended（自主停止）に分割。破壊的変更として即 V007/V008 エラー化"
     status: done
     criteria: "waiting/suspended が STATUS_VALUES に追加され、blocked が V007/V008 でエラーになり、spec v0.0.11 に統合済み"
-  release_automation:
-    label: "make release roadmap 自動更新 (#278)"
-    description: "make release 後に roadmap の publish artifact を自動 done にする連携。#277 status-set が前提"
-    status: done
-    criteria: "make release 実行後に roadmap の対応 artifact が自動 done に更新される"
   explain_cmd:
     label: "pfdsl explain コマンド (#356)"
     description: "診断コード → 定義節・summary の一発引き。#299 のレジストリを消費する。check エラー対処の spec grep 手順を代替"
@@ -558,10 +553,6 @@ process:
     label: blockedBy フィールド実装
     description: "blockedBy: フィールドの spec 統合と CLI 対応。draft_proposals 経由"
     location: https://github.com/takasek/pfdsl/issues/273
-  i278_implement_release_automation:
-    label: make release roadmap 自動更新実装
-    location: https://github.com/takasek/pfdsl/issues/278
-    updated_at: 2026-07-03T01:28:44Z
   i356_implement_explain_cmd:
     label: explain コマンド実装
     location: https://github.com/takasek/pfdsl/issues/356
@@ -707,7 +698,6 @@ type_field >> implement_audit_sync -> audit_sync
 cli_release_ready_cmd >> i272_implement_w002_hierarchy -> w002_hierarchy
 cli_release_ready_cmd >> i273_implement_blocked_by -> blocked_by
 cli_release_ready_cmd >> implement_status_set -> status_set
-status_set >> i278_implement_release_automation -> release_automation
 
 [cli_release_ready_cmd, type_field, audit_sync, w002_hierarchy, blocked_by, status_set] >> publish_cli_status_lifecycle -> cli_release_status_lifecycle
 
