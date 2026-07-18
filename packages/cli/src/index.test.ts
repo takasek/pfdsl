@@ -35,8 +35,8 @@ describe("parseArgs", () => {
 		});
 	});
 	it("parses --format with value", () => {
-		expect(parseArgs(["graph", "a.pfdsl", "--format", "svg"])).toEqual({
-			command: "graph",
+		expect(parseArgs(["render", "a.pfdsl", "--format", "svg"])).toEqual({
+			command: "render",
 			positional: ["a.pfdsl"],
 			flags: { format: "svg" },
 		});
@@ -121,7 +121,7 @@ req >> design -> spec
 	it("default prints the rewritten body to stdout (preview), no write", async () => {
 		const f = join(dir, "reindex-preview.pfdsl");
 		writeFileSync(f, declared);
-		const r = await run(["reindex", f, "--renumber"]);
+		const r = await run(["meta", "reindex", f, "--renumber"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("index: 1");
 		// file is untouched in preview mode
@@ -131,7 +131,7 @@ req >> design -> spec
 	it("--write rewrites the file and prints the change report to stdout", async () => {
 		const f = join(dir, "reindex-write.pfdsl");
 		writeFileSync(f, declared);
-		const r = await run(["reindex", f, "--write", "--renumber"]);
+		const r = await run(["meta", "reindex", f, "--write", "--renumber"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("+ D req 1");
 		expect(r.stdout).toContain("+ P design 1");
@@ -141,7 +141,7 @@ req >> design -> spec
 	it("--check exits 1 when reindexing would change anything", async () => {
 		const f = join(dir, "reindex-check.pfdsl");
 		writeFileSync(f, declared);
-		const r = await run(["reindex", f, "--check", "--renumber"]);
+		const r = await run(["meta", "reindex", f, "--check", "--renumber"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).toContain("design");
 	});
@@ -149,15 +149,15 @@ req >> design -> spec
 	it("--check exits 0 when already indexed", async () => {
 		const f = join(dir, "reindex-check-clean.pfdsl");
 		writeFileSync(f, declared);
-		await run(["reindex", f, "--write", "--renumber"]);
-		const r = await run(["reindex", f, "--check", "--renumber"]);
+		await run(["meta", "reindex", f, "--write", "--renumber"]);
+		const r = await run(["meta", "reindex", f, "--check", "--renumber"]);
 		expect(r.exitCode).toBe(0);
 	});
 
 	it("--json emits a machine-readable change report", async () => {
 		const f = join(dir, "reindex-json.pfdsl");
 		writeFileSync(f, declared);
-		const r = await run(["reindex", f, "--json", "--renumber"]);
+		const r = await run(["meta", "reindex", f, "--json", "--renumber"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
 		expect(Array.isArray(parsed.changes)).toBe(true);
@@ -165,14 +165,14 @@ req >> design -> spec
 	});
 
 	it("--write with stdin is rejected (exit 2)", async () => {
-		const r = await run(["reindex", "-", "--write"]);
+		const r = await run(["meta", "reindex", "-", "--write"]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("--check combined with --write is rejected (exit 2)", async () => {
 		const f = join(dir, "reindex-conflict.pfdsl");
 		writeFileSync(f, declared);
-		const r = await run(["reindex", f, "--check", "--write"]);
+		const r = await run(["meta", "reindex", f, "--check", "--write"]);
 		expect(r.exitCode).toBe(2);
 	});
 
@@ -180,13 +180,13 @@ req >> design -> spec
 		const f = join(dir, "reindex-bad.pfdsl");
 		const src = "req >> design -> spec\nother -> spec\n"; // V001: dual generators (always error)
 		writeFileSync(f, src);
-		const r = await run(["reindex", f, "--write"]);
+		const r = await run(["meta", "reindex", f, "--write"]);
 		expect(r.exitCode).toBe(1);
 		expect(readFileSync(f, "utf-8")).toBe(src);
 	});
 });
 
-describe("sort-meta", () => {
+describe("meta sort", () => {
 	const unsorted = `---
 artifact:
   z:
@@ -200,7 +200,7 @@ z >> p -> a
 	it("default prints sorted body to stdout (preview), no write", async () => {
 		const f = join(dir, "sort-preview.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort-meta", f, "--by", "id"]);
+		const r = await run(["meta", "sort", f, "--by", "id"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toMatch(/^\s*a:/m);
 		// file is untouched in preview mode
@@ -210,7 +210,7 @@ z >> p -> a
 	it("--write rewrites the file in place", async () => {
 		const f = join(dir, "sort-write.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort-meta", f, "--by", "id", "--write"]);
+		const r = await run(["meta", "sort", f, "--by", "id", "--write"]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
 		// a should appear before z after sorting by id
@@ -222,7 +222,7 @@ z >> p -> a
 	it("--check exits 1 when not sorted", async () => {
 		const f = join(dir, "sort-check-unsorted.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort-meta", f, "--by", "id", "--check"]);
+		const r = await run(["meta", "sort", f, "--by", "id", "--check"]);
 		expect(r.exitCode).toBe(1);
 	});
 
@@ -238,26 +238,34 @@ z >> p -> a
 `;
 		const f = join(dir, "sort-check-sorted.pfdsl");
 		writeFileSync(f, sorted);
-		const r = await run(["sort-meta", f, "--by", "id", "--check"]);
+		const r = await run(["meta", "sort", f, "--by", "id", "--check"]);
 		expect(r.exitCode).toBe(0);
 	});
 
 	it("--by without value is rejected (exit 2)", async () => {
 		const f = join(dir, "sort-noby.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort-meta", f]);
+		const r = await run(["meta", "sort", f]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("--write with stdin is rejected (exit 2)", async () => {
-		const r = await run(["sort-meta", "-", "--by", "id", "--write"]);
+		const r = await run(["meta", "sort", "-", "--by", "id", "--write"]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("--check combined with --write is rejected (exit 2)", async () => {
 		const f = join(dir, "sort-conflict.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort-meta", f, "--by", "id", "--check", "--write"]);
+		const r = await run([
+			"meta",
+			"sort",
+			f,
+			"--by",
+			"id",
+			"--check",
+			"--write",
+		]);
 		expect(r.exitCode).toBe(2);
 	});
 
@@ -271,7 +279,7 @@ a1 >> p -> b1
 `;
 		const f = join(dir, "sort-multikey.pfdsl");
 		writeFileSync(f, src);
-		const r = await run(["sort-meta", f, "--by", "group,index"]);
+		const r = await run(["meta", "sort", f, "--by", "group,index"]);
 		expect(r.exitCode).toBe(0);
 		// a1 (alpha) before b1 (beta)
 		expect(r.stdout.indexOf("  a1:")).toBeLessThan(r.stdout.indexOf("  b1:"));
@@ -280,33 +288,33 @@ a1 >> p -> b1
 	it("invalid --by key is rejected (exit 2)", async () => {
 		const f = join(dir, "sort-badkey.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort-meta", f, "--by", "invalid"]);
+		const r = await run(["meta", "sort", f, "--by", "invalid"]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("partially invalid --by key is rejected (exit 2)", async () => {
 		const f = join(dir, "sort-partialkey.pfdsl");
 		writeFileSync(f, unsorted);
-		const r = await run(["sort-meta", f, "--by", "index,typo"]);
+		const r = await run(["meta", "sort", f, "--by", "index,typo"]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toMatch(/typo/);
 	});
 });
 
-describe("normalize", () => {
+describe("graph edges", () => {
 	it("prints canonical edges", async () => {
-		const r = await run(["normalize", join(dir, "valid.pfdsl")]);
+		const r = await run(["graph", "edges", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("req >> design");
 		expect(r.stdout).toContain("design -> spec");
 	});
 });
 
-describe("graph", () => {
+describe("render", () => {
 	it("format=dot (default and explicit produce identical output)", async () => {
-		const implicit = await run(["graph", join(dir, "valid.pfdsl")]);
+		const implicit = await run(["render", join(dir, "valid.pfdsl")]);
 		const explicit = await run([
-			"graph",
+			"render",
 			join(dir, "valid.pfdsl"),
 			"--format",
 			"dot",
@@ -317,12 +325,22 @@ describe("graph", () => {
 		expect(implicit.stdout).toBe(explicit.stdout);
 	});
 	it("format=svg renders SVG", async () => {
-		const r = await run(["graph", join(dir, "valid.pfdsl"), "--format", "svg"]);
+		const r = await run([
+			"render",
+			join(dir, "valid.pfdsl"),
+			"--format",
+			"svg",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("<svg");
 	});
 	it("rejects unknown format", async () => {
-		const r = await run(["graph", join(dir, "valid.pfdsl"), "--format", "xyz"]);
+		const r = await run([
+			"render",
+			join(dir, "valid.pfdsl"),
+			"--format",
+			"xyz",
+		]);
 		expect(r.exitCode).toBe(2);
 	});
 
@@ -345,7 +363,7 @@ describe("graph", () => {
 			].join("\n");
 			writeFileSync(join(d, "preset.yaml"), preset);
 			writeFileSync(join(d, "main.pfdsl"), main);
-			const r = await run(["graph", join(d, "main.pfdsl")]);
+			const r = await run(["render", join(d, "main.pfdsl")]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toContain('fillcolor="#4CAF50"');
 		} finally {
@@ -375,7 +393,7 @@ describe("graph", () => {
 			].join("\n");
 			writeFileSync(join(d, "preset.yaml"), preset);
 			writeFileSync(join(d, "main.pfdsl"), main);
-			const r = await run(["graph", join(d, "main.pfdsl")]);
+			const r = await run(["render", join(d, "main.pfdsl")]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toContain('fillcolor="#2196F3"');
 			expect(r.stdout).not.toContain('fillcolor="#4CAF50"');
@@ -565,15 +583,15 @@ describe("subcommand --help", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("pfdsl fmt");
 	});
-	it("normalize --help prints usage", async () => {
-		const r = await run(["normalize", "--help"]);
+	it("graph edges --help prints usage", async () => {
+		const r = await run(["graph", "edges", "--help"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl normalize");
+		expect(r.stdout).toContain("pfdsl graph edges");
 	});
-	it("graph --help prints usage", async () => {
-		const r = await run(["graph", "--help"]);
+	it("render --help prints usage", async () => {
+		const r = await run(["render", "--help"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl graph");
+		expect(r.stdout).toContain("pfdsl render");
 	});
 	it("diff --help prints usage", async () => {
 		const r = await run(["diff", "--help"]);
@@ -629,18 +647,19 @@ describe("--no-color / NO_COLOR (#180)", () => {
 		expect(r.stderr).not.toContain("\x1b[");
 	});
 
-	it("--no-color is accepted by all subcommands (fmt, normalize, graph)", async () => {
+	it("--no-color is accepted by all subcommands (fmt, graph edges, render)", async () => {
 		const fmt = await run(["fmt", join(dir, "valid.pfdsl"), "--no-color"]);
 		expect(fmt.exitCode).toBe(0);
 
 		const norm = await run([
-			"normalize",
+			"graph",
+			"edges",
 			join(dir, "valid.pfdsl"),
 			"--no-color",
 		]);
 		expect(norm.exitCode).toBe(0);
 
-		const graph = await run(["graph", join(dir, "valid.pfdsl"), "--no-color"]);
+		const graph = await run(["render", join(dir, "valid.pfdsl"), "--no-color"]);
 		expect(graph.exitCode).toBe(0);
 	});
 });
@@ -777,8 +796,8 @@ describe("--json output (#181)", () => {
 		expect(invalid.exitCode).toBe(1);
 	});
 
-	it("normalize --json returns edge list as JSON array", async () => {
-		const r = await run(["normalize", join(dir, "valid.pfdsl"), "--json"]);
+	it("graph edges --json returns edge list as JSON array", async () => {
+		const r = await run(["graph", "edges", join(dir, "valid.pfdsl"), "--json"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toBe("");
 		const parsed = JSON.parse(r.stdout);
@@ -909,7 +928,7 @@ describe("multifile check — extends", () => {
 	});
 });
 
-describe("ready", () => {
+describe("status ready", () => {
 	// Fixtures written in beforeAll(dir):
 	//   valid.pfdsl: "req >> design -> spec\nspec >> impl -> code\n"  (no status)
 	//   invalid.pfdsl: dual generators (V001, always error)
@@ -924,7 +943,7 @@ describe("ready", () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["ready", f]);
+		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("design");
 		expect(r.stdout).not.toContain("impl");
@@ -934,14 +953,14 @@ describe("ready", () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: todo\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["ready", f]);
+		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("No ready processes. Check artifact statuses.\n");
 	});
 
 	it("treats undefined status as done (no frontmatter)", async () => {
 		// valid.pfdsl has no artifact status — both processes should be ready
-		const r = await run(["ready", join(dir, "valid.pfdsl")]);
+		const r = await run(["status", "ready", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("design");
 		expect(r.stdout).toContain("impl");
@@ -951,7 +970,7 @@ describe("ready", () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["ready", f, "--json"]);
+		const r = await run(["status", "ready", f, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.ok).toBe(true);
@@ -966,7 +985,7 @@ describe("ready", () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["ready", f, "--json", "--best"]);
+		const r = await run(["status", "ready", f, "--json", "--best"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.best).toBeDefined();
@@ -975,7 +994,12 @@ describe("ready", () => {
 	});
 
 	it("--best marks recommended process with *", async () => {
-		const r = await run(["ready", join(dir, "valid.pfdsl"), "--best"]);
+		const r = await run([
+			"status",
+			"ready",
+			join(dir, "valid.pfdsl"),
+			"--best",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toMatch(/\*/);
 		expect(r.stdout).toContain("recommended next");
@@ -983,14 +1007,14 @@ describe("ready", () => {
 
 	it("rejects file with type: workflow (exit 2)", async () => {
 		const f = withStatus("---\ntype: workflow\n---\nA >> P -> B\n");
-		const r = await run(["ready", f]);
+		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("type: roadmap");
 	});
 
 	it("rejects file with type: runtime-pipeline (exit 2)", async () => {
 		const f = withStatus("---\ntype: runtime-pipeline\n---\nA >> P -> B\n");
-		const r = await run(["ready", f]);
+		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("type: roadmap");
 	});
@@ -999,12 +1023,12 @@ describe("ready", () => {
 		const f = withStatus(
 			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["ready", f]);
+		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(0);
 	});
 
 	it("warns (W006) on stderr when type: is omitted, but still succeeds (#308)", async () => {
-		const r = await run(["ready", join(dir, "valid.pfdsl")]);
+		const r = await run(["status", "ready", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toContain("W006");
 	});
@@ -1013,12 +1037,17 @@ describe("ready", () => {
 		const f = withStatus(
 			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["ready", f]);
+		const r = await run(["status", "ready", f]);
 		expect(r.stderr).not.toContain("W006");
 	});
 
 	it("--json includes W006 in warnings when type: is omitted", async () => {
-		const r = await run(["ready", join(dir, "valid.pfdsl"), "--json"]);
+		const r = await run([
+			"status",
+			"ready",
+			join(dir, "valid.pfdsl"),
+			"--json",
+		]);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.warnings?.[0]?.code).toBe("W006");
 	});
@@ -1027,26 +1056,26 @@ describe("ready", () => {
 		const f = withStatus(
 			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n  spec: {}\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["ready", f, "--json"]);
+		const r = await run(["status", "ready", f, "--json"]);
 		const parsed = JSON.parse(r.stdout);
 		expect(r.stderr).not.toContain("W005");
 		expect(parsed.warnings).toBeUndefined();
 	});
 
 	it("missing file returns exit 1", async () => {
-		const r = await run(["ready", join(dir, "nonexistent.pfdsl")]);
+		const r = await run(["status", "ready", join(dir, "nonexistent.pfdsl")]);
 		expect(r.exitCode).toBe(1);
 	});
 
 	it("missing argument returns exit 2", async () => {
-		const r = await run(["ready"]);
+		const r = await run(["status", "ready"]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("--help returns help text", async () => {
-		const r = await run(["ready", "--help"]);
+		const r = await run(["status", "ready", "--help"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl ready");
+		expect(r.stdout).toContain("pfdsl status ready");
 	});
 
 	it("--best prefers process that removes last blocker, not just any consumer", async () => {
@@ -1072,7 +1101,7 @@ describe("ready", () => {
 		].join("\n");
 		const f = join(dir, "ready-heuristic.pfdsl");
 		writeFileSync(f, src);
-		const r = await run(["ready", f, "--json", "--best"]);
+		const r = await run(["status", "ready", f, "--json", "--best"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
 		// make_x unblocks `side` (last missing input) — 1 newly-ready process
@@ -1085,7 +1114,7 @@ describe("ready", () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["ready", f, "--json"]);
+		const r = await run(["status", "ready", f, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.best).toBeUndefined();
@@ -1097,7 +1126,7 @@ describe("ready", () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: done\n---\nreq >> design -> spec\nspec >> impl -> code\n",
 		);
-		const r = await run(["ready", f, "--json"]);
+		const r = await run(["status", "ready", f, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
 		const ids = parsed.ready.map((x: { id: string }) => x.id);
@@ -1106,7 +1135,7 @@ describe("ready", () => {
 	});
 });
 
-describe("status-set", () => {
+describe("meta set", () => {
 	const base = `---
 artifact:
   req:
@@ -1120,7 +1149,7 @@ req >> design -> spec
 	it("rewrites artifact status in place and exits 0", async () => {
 		const f = join(dir, "status-set-write.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["status-set", f, "req", "done"]);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("status: done");
@@ -1130,7 +1159,7 @@ req >> design -> spec
 	it("exits 1 when artifact id not found", async () => {
 		const f = join(dir, "status-set-notfound.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["status-set", f, "nonexistent", "done"]);
+		const r = await run(["meta", "set", f, "nonexistent", "status", "done"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toContain("nonexistent");
 	});
@@ -1138,40 +1167,40 @@ req >> design -> spec
 	it("exits 2 for invalid status value", async () => {
 		const f = join(dir, "status-set-badstatus.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["status-set", f, "req", "invalid"]);
+		const r = await run(["meta", "set", f, "req", "status", "invalid"]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("exits 2 when artifact-id or status argument is missing", async () => {
 		const f = join(dir, "status-set-missing.pfdsl");
 		writeFileSync(f, base);
-		const r1 = await run(["status-set", f]);
+		const r1 = await run(["meta", "set", f]);
 		expect(r1.exitCode).toBe(2);
-		const r2 = await run(["status-set", f, "req"]);
+		const r2 = await run(["meta", "set", f, "req"]);
 		expect(r2.exitCode).toBe(2);
 	});
 
 	it("--help returns help text", async () => {
-		const r = await run(["status-set", "--help"]);
+		const r = await run(["meta", "set", "--help"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("status-set");
+		expect(r.stdout).toContain("meta set");
 	});
 
 	it("warns (W006) on stderr when type: is omitted (#308)", async () => {
 		const f = join(dir, "status-set-no-type.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["status-set", f, "req", "done"]);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toContain("W006");
 	});
 
-	it("does not surface non-W006 warnings (e.g. W005) as status-set warnings (#308)", async () => {
+	it("does not surface non-W006 warnings (e.g. W005) as meta set warnings (#308)", async () => {
 		const f = join(dir, "status-set-w005.pfdsl");
 		writeFileSync(
 			f,
 			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  spec: {}\n---\nreq >> design -> spec\n",
 		);
-		const r = await run(["status-set", f, "req", "done", "--json"]);
+		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
 		const parsed = JSON.parse(r.stdout);
 		expect(r.stderr).not.toContain("W005");
 		expect(parsed.warnings).toBeUndefined();
@@ -1195,7 +1224,7 @@ spec >> impl -> code
 	it("prints newly-ready line when a done-transition unlocks at least one process", async () => {
 		const f = join(dir, "status-set-newly-ready.pfdsl");
 		writeFileSync(f, roadmapBase);
-		const r = await run(["status-set", f, "req", "done"]);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("newly ready:");
 		expect(r.stdout).toContain("design");
@@ -1205,7 +1234,7 @@ spec >> impl -> code
 		const f = join(dir, "status-set-no-newly-ready.pfdsl");
 		writeFileSync(f, roadmapBase);
 		// setting code to done doesn't unlock anything (impl already needs spec which is undefined=done, code just output)
-		const r = await run(["status-set", f, "code", "wip"]);
+		const r = await run(["meta", "set", f, "code", "status", "wip"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).not.toContain("newly ready:");
 	});
@@ -1221,7 +1250,7 @@ req >> design -> spec
 `;
 		const f = join(dir, "status-set-non-roadmap.pfdsl");
 		writeFileSync(f, nonRoadmap);
-		const r = await run(["status-set", f, "req", "done"]);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).not.toContain("newly ready:");
 	});
@@ -1229,7 +1258,7 @@ req >> design -> spec
 	it("--json includes newlyReady array with newly unblocked ids", async () => {
 		const f = join(dir, "status-set-json-newly-ready.pfdsl");
 		writeFileSync(f, roadmapBase);
-		const r = await run(["status-set", f, "req", "done", "--json"]);
+		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.ok).toBe(true);
@@ -1240,7 +1269,7 @@ req >> design -> spec
 	it("--json with nothing unlocked gives empty newlyReady array", async () => {
 		const f = join(dir, "status-set-json-empty-newly-ready.pfdsl");
 		writeFileSync(f, roadmapBase);
-		const r = await run(["status-set", f, "code", "wip", "--json"]);
+		const r = await run(["meta", "set", f, "code", "status", "wip", "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.ok).toBe(true);
@@ -1260,7 +1289,7 @@ req >> design -> spec
 `;
 		const f = join(dir, "status-set-4space.pfdsl");
 		writeFileSync(f, fourSpace);
-		const r = await run(["status-set", f, "req", "done"]);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("status: done");
@@ -1279,7 +1308,7 @@ other >> design -> spec
 `;
 		const f = join(dir, "status-set-regex-meta-id.pfdsl");
 		writeFileSync(f, withMetaId);
-		const r = await run(["status-set", f, "req(v2)", "done"]);
+		const r = await run(["meta", "set", f, "req(v2)", "status", "done"]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("req(v2):\n    status: done");
@@ -1299,7 +1328,7 @@ requirement >> design -> spec
 `;
 		const f = join(dir, "status-set-flow-has-status.pfdsl");
 		writeFileSync(f, flowStyle);
-		const r = await run(["status-set", f, "spec", "wip"]);
+		const r = await run(["meta", "set", f, "spec", "status", "wip"]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("status: wip");
@@ -1319,7 +1348,7 @@ requirement >> design -> spec
 `;
 		const f = join(dir, "status-set-flow-no-status.pfdsl");
 		writeFileSync(f, flowStyle);
-		const r = await run(["status-set", f, "spec", "wip"]);
+		const r = await run(["meta", "set", f, "spec", "status", "wip"]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("status: wip");
@@ -1338,13 +1367,13 @@ requirement >> design -> spec
 `;
 		const f = join(dir, "status-set-flow-notfound.pfdsl");
 		writeFileSync(f, flowStyle);
-		const r = await run(["status-set", f, "nonexistent", "done"]);
+		const r = await run(["meta", "set", f, "nonexistent", "status", "done"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toContain("nonexistent");
 	});
 });
 
-describe("audit-sync", () => {
+describe("status gaps", () => {
 	const roadmapWith = (artifacts: string) => {
 		const f = join(dir, "as-roadmap.pfdsl");
 		writeFileSync(
@@ -1362,7 +1391,7 @@ describe("audit-sync", () => {
 	it("exits 0 when all todo flow artifacts are in the roadmap", async () => {
 		const rm = roadmapWith("  output:\n    status: todo\n");
 		const fl = flowWith("  output:\n    status: todo\n");
-		const r = await run(["audit-sync", rm, fl]);
+		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("tracked");
 	});
@@ -1372,7 +1401,7 @@ describe("audit-sync", () => {
 		const fl = flowWith(
 			"  missing_artifact:\n    status: todo\n    label: Missing\n",
 		);
-		const r = await run(["audit-sync", rm, fl]);
+		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).toContain("missing_artifact");
 		expect(r.stdout).toContain("Missing");
@@ -1383,14 +1412,14 @@ describe("audit-sync", () => {
 		const fl = flowWith(
 			"  done_art:\n    status: done\n  wip_art:\n    status: wip\n",
 		);
-		const r = await run(["audit-sync", rm, fl]);
+		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(0);
 	});
 
 	it("--json returns structured output with ok=true when no gaps", async () => {
 		const rm = roadmapWith("  tracked:\n    status: todo\n");
 		const fl = flowWith("  tracked:\n    status: todo\n");
-		const r = await run(["audit-sync", rm, fl, "--json"]);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.ok).toBe(true);
@@ -1400,7 +1429,7 @@ describe("audit-sync", () => {
 	it("--json returns structured output with gaps when untracked", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
 		const fl = flowWith("  gap_art:\n    status: todo\n    label: Gap\n");
-		const r = await run(["audit-sync", rm, fl, "--json"]);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		expect(r.exitCode).toBe(1);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.ok).toBe(false);
@@ -1417,7 +1446,7 @@ describe("audit-sync", () => {
 			"---\ntype: workflow\nartifact:\n  x:\n    status: done\n---\n",
 		);
 		const fl = flowWith("  y:\n    status: todo\n");
-		const r = await run(["audit-sync", nonRoadmap, fl]);
+		const r = await run(["status", "gaps", nonRoadmap, fl]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("roadmap");
 	});
@@ -1429,26 +1458,26 @@ describe("audit-sync", () => {
 			anotherRoadmap,
 			"---\ntype: roadmap\nartifact:\n  y:\n    status: todo\n---\nreq >> build -> y\n",
 		);
-		const r = await run(["audit-sync", rm, anotherRoadmap]);
+		const r = await run(["status", "gaps", rm, anotherRoadmap]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("workflow");
 	});
 
 	it("missing argument returns exit 2", async () => {
-		const r = await run(["audit-sync"]);
+		const r = await run(["status", "gaps"]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("only roadmap arg (no flow) returns exit 2", async () => {
 		const rm = roadmapWith("  x:\n    status: done\n");
-		const r = await run(["audit-sync", rm]);
+		const r = await run(["status", "gaps", rm]);
 		expect(r.exitCode).toBe(2);
 	});
 
 	it("--help returns help text", async () => {
-		const r = await run(["audit-sync", "--help"]);
+		const r = await run(["status", "gaps", "--help"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("audit-sync");
+		expect(r.stdout).toContain("status gaps");
 	});
 
 	it("accepts multiple flow files", async () => {
@@ -1463,7 +1492,7 @@ describe("audit-sync", () => {
 			fl2,
 			"---\ntype: runtime-pipeline\nartifact:\n  gap_only:\n    status: todo\n---\n",
 		);
-		const r = await run(["audit-sync", rm, fl1, fl2, "--json"]);
+		const r = await run(["status", "gaps", rm, fl1, fl2, "--json"]);
 		expect(r.exitCode).toBe(1);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.gaps).toHaveLength(1);
@@ -1477,7 +1506,7 @@ describe("audit-sync", () => {
 			"---\nartifact:\n  output:\n    status: todo\n---\nreq >> build -> output\n",
 		);
 		const fl = flowWith("  output:\n    status: todo\n");
-		const r = await run(["audit-sync", rm, fl]);
+		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toContain("W006");
 	});
@@ -1489,7 +1518,7 @@ describe("audit-sync", () => {
 			"---\nartifact:\n  output:\n    status: todo\n---\nreq >> build -> output\n",
 		);
 		const fl = flowWith("  output:\n    status: todo\n");
-		const r = await run(["audit-sync", rm, fl, "--json"]);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.warnings?.[0]?.code).toBe("W006");
 	});
@@ -1544,7 +1573,7 @@ describe("explain", () => {
 	});
 });
 
-describe("get", () => {
+describe("meta get", () => {
 	const base = `---
 basePath: ../
 artifact:
@@ -1564,7 +1593,15 @@ spec >> build -> code
 	it("returns a single id/field value as text", async () => {
 		const f = join(dir, "get-single.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--id", "spec", "--field", "status"]);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"spec",
+			"--field",
+			"status",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("spec.status: done\n");
 	});
@@ -1572,7 +1609,15 @@ spec >> build -> code
 	it("resolves location through basePath so callers don't recompute it (#476)", async () => {
 		const f = join(dir, "get-location.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--id", "spec", "--field", "location"]);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"spec",
+			"--field",
+			"location",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe(
 			`spec.location: ${resolve(dir, "..", "docs/spec.md")}\n`,
@@ -1582,7 +1627,15 @@ spec >> build -> code
 	it("resolves location for a process the same way as for an artifact", async () => {
 		const f = join(dir, "get-process-location.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--id", "build", "--field", "location"]);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"build",
+			"--field",
+			"location",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe(
 			`build.location: ${resolve(dir, "..", "src/build.ts")}\n`,
@@ -1592,7 +1645,15 @@ spec >> build -> code
 	it("accepts multiple ids and fields (comma-separated or repeated flags)", async () => {
 		const f = join(dir, "get-multi.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--id", "spec,code", "--field", "status"]);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"spec,code",
+			"--field",
+			"status",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("spec.status: done\ncode.status: todo\n");
 	});
@@ -1600,7 +1661,15 @@ spec >> build -> code
 	it("returns an empty value for a field the node doesn't have", async () => {
 		const f = join(dir, "get-empty-field.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--id", "code", "--field", "location"]);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"code",
+			"--field",
+			"location",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("code.location: \n");
 	});
@@ -1609,6 +1678,7 @@ spec >> build -> code
 		const f = join(dir, "get-json.pfdsl");
 		writeFileSync(f, base);
 		const r = await run([
+			"meta",
 			"get",
 			f,
 			"--id",
@@ -1632,7 +1702,15 @@ spec >> build -> code
 	it("exits 1 when an id is not found in the file", async () => {
 		const f = join(dir, "get-notfound.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--id", "nonexistent", "--field", "status"]);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"nonexistent",
+			"--field",
+			"status",
+		]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toContain("nonexistent");
 	});
@@ -1641,6 +1719,7 @@ spec >> build -> code
 		const f = join(dir, "get-partial-notfound.pfdsl");
 		writeFileSync(f, base);
 		const r = await run([
+			"meta",
 			"get",
 			f,
 			"--id",
@@ -1657,6 +1736,7 @@ spec >> build -> code
 		const f = join(dir, "get-partial-notfound-json.pfdsl");
 		writeFileSync(f, base);
 		const r = await run([
+			"meta",
 			"get",
 			f,
 			"--id",
@@ -1676,7 +1756,7 @@ spec >> build -> code
 	it("warns on stderr for an unrecognized field name but still succeeds", async () => {
 		const f = join(dir, "get-unknown-field.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--id", "spec", "--field", "lable"]);
+		const r = await run(["meta", "get", f, "--id", "spec", "--field", "lable"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("spec.lable: \n");
 		expect(r.stderr).toContain("warning");
@@ -1686,7 +1766,15 @@ spec >> build -> code
 	it("collapses the unknown-field warning into one line for multiple ids of the same kind (#479 re-check)", async () => {
 		const f = join(dir, "get-unknown-field-multi.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--id", "spec,code", "--field", "lable"]);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"spec,code",
+			"--field",
+			"lable",
+		]);
 		expect(r.exitCode).toBe(0);
 		const warningLines = r.stderr
 			.trim()
@@ -1700,7 +1788,15 @@ spec >> build -> code
 	it("does not warn for a recognized field with no value set", async () => {
 		const f = join(dir, "get-known-empty-field.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--id", "code", "--field", "location"]);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"code",
+			"--field",
+			"location",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toBe("");
 	});
@@ -1708,7 +1804,7 @@ spec >> build -> code
 	it("exits 2 with a specific message when --field is missing", async () => {
 		const f = join(dir, "get-missing-field.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--id", "spec"]);
+		const r = await run(["meta", "get", f, "--id", "spec"]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("--field is required");
 	});
@@ -1716,7 +1812,7 @@ spec >> build -> code
 	it("exits 2 with a specific message when --id is missing", async () => {
 		const f = join(dir, "get-missing-id.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f, "--field", "status"]);
+		const r = await run(["meta", "get", f, "--field", "status"]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("--id is required");
 	});
@@ -1724,15 +1820,15 @@ spec >> build -> code
 	it("exits 2 when both --id and --field are missing", async () => {
 		const f = join(dir, "get-missing-both.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["get", f]);
+		const r = await run(["meta", "get", f]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("--id and --field are required");
 	});
 
 	it("--help returns help text", async () => {
-		const r = await run(["get", "--help"]);
+		const r = await run(["meta", "get", "--help"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl get");
+		expect(r.stdout).toContain("pfdsl meta get");
 	});
 });
 
@@ -1748,7 +1844,7 @@ spec >> review -> report
 		it("prints predecessors and successors as text", async () => {
 			const f = join(dir, "neighbors.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["neighbors", f, "spec"]);
+			const r = await run(["graph", "neighbors", f, "spec"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe(
 				"predecessors: design\nsuccessors: build, review\n",
@@ -1758,7 +1854,7 @@ spec >> review -> report
 		it("emits JSON", async () => {
 			const f = join(dir, "neighbors-json.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["neighbors", f, "spec", "--json"]);
+			const r = await run(["graph", "neighbors", f, "spec", "--json"]);
 			expect(r.exitCode).toBe(0);
 			expect(JSON.parse(r.stdout)).toEqual({
 				ok: true,
@@ -1770,7 +1866,7 @@ spec >> review -> report
 		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
 			const f = join(dir, "neighbors-notfound.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["neighbors", f, "nonexistent"]);
+			const r = await run(["graph", "neighbors", f, "nonexistent"]);
 			expect(r.exitCode).toBe(1);
 			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
 		});
@@ -1778,7 +1874,7 @@ spec >> review -> report
 		it("exits 2 when the id argument is missing", async () => {
 			const f = join(dir, "neighbors-missing.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["neighbors", f]);
+			const r = await run(["graph", "neighbors", f]);
 			expect(r.exitCode).toBe(2);
 		});
 	});
@@ -1787,7 +1883,7 @@ spec >> review -> report
 		it("prints the downstream closure one id per line, for piping (#479 usability review)", async () => {
 			const f = join(dir, "impact.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["impact", f, "spec"]);
+			const r = await run(["graph", "impact", f, "spec"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe("build\ncode\nreport\nreview\n");
 		});
@@ -1795,7 +1891,7 @@ spec >> review -> report
 		it("prints (none) for a terminal node", async () => {
 			const f = join(dir, "impact-terminal.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["impact", f, "code"]);
+			const r = await run(["graph", "impact", f, "code"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe("(none)\n");
 		});
@@ -1803,7 +1899,7 @@ spec >> review -> report
 		it("emits JSON", async () => {
 			const f = join(dir, "impact-json.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["impact", f, "spec", "--json"]);
+			const r = await run(["graph", "impact", f, "spec", "--json"]);
 			expect(r.exitCode).toBe(0);
 			const parsed = JSON.parse(r.stdout);
 			expect(parsed.ok).toBe(true);
@@ -1815,7 +1911,7 @@ spec >> review -> report
 		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
 			const f = join(dir, "impact-notfound.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["impact", f, "nonexistent"]);
+			const r = await run(["graph", "impact", f, "nonexistent"]);
 			expect(r.exitCode).toBe(1);
 			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
 		});
@@ -1825,7 +1921,7 @@ spec >> review -> report
 		it("prints the upstream closure one id per line, for piping (#479 usability review)", async () => {
 			const f = join(dir, "depends-on.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["depends-on", f, "code"]);
+			const r = await run(["graph", "depends-on", f, "code"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe("build\ndesign\nreq\nspec\n");
 		});
@@ -1833,7 +1929,7 @@ spec >> review -> report
 		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
 			const f = join(dir, "depends-on-notfound.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["depends-on", f, "nonexistent"]);
+			const r = await run(["graph", "depends-on", f, "nonexistent"]);
 			expect(r.exitCode).toBe(1);
 			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
 		});
@@ -1843,7 +1939,7 @@ spec >> review -> report
 		it("prints all simple paths as text", async () => {
 			const f = join(dir, "path.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["path", f, "spec", "code"]);
+			const r = await run(["graph", "path", f, "spec", "code"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe("spec -> build -> code\n");
 		});
@@ -1851,7 +1947,7 @@ spec >> review -> report
 		it("prints a message when no path exists", async () => {
 			const f = join(dir, "path-none.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["path", f, "code", "report"]);
+			const r = await run(["graph", "path", f, "code", "report"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe("no path found\n");
 		});
@@ -1859,7 +1955,7 @@ spec >> review -> report
 		it("emits JSON", async () => {
 			const f = join(dir, "path-json.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["path", f, "spec", "code", "--json"]);
+			const r = await run(["graph", "path", f, "spec", "code", "--json"]);
 			expect(r.exitCode).toBe(0);
 			expect(JSON.parse(r.stdout)).toEqual({
 				ok: true,
@@ -1870,14 +1966,14 @@ spec >> review -> report
 		it("exits 1 when either id is not found", async () => {
 			const f = join(dir, "path-notfound.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["path", f, "nonexistent", "code"]);
+			const r = await run(["graph", "path", f, "nonexistent", "code"]);
 			expect(r.exitCode).toBe(1);
 		});
 
 		it("exits 2 when the to argument is missing", async () => {
 			const f = join(dir, "path-missing.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["path", f, "spec"]);
+			const r = await run(["graph", "path", f, "spec"]);
 			expect(r.exitCode).toBe(2);
 		});
 	});
@@ -1886,7 +1982,7 @@ spec >> review -> report
 		it("ranks nodes by total degree as text", async () => {
 			const f = join(dir, "stats.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["stats", f]);
+			const r = await run(["graph", "stats", f]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout.split("\n")[0]).toBe(
 				"spec (artifact)   fan-in=1  fan-out=2  total=3",
@@ -1896,7 +1992,7 @@ spec >> review -> report
 		it("--limit caps the number of rows", async () => {
 			const f = join(dir, "stats-limit.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["stats", f, "--limit", "1"]);
+			const r = await run(["graph", "stats", f, "--limit", "1"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout.trim().split("\n")).toHaveLength(1);
 		});
@@ -1904,7 +2000,7 @@ spec >> review -> report
 		it("emits JSON", async () => {
 			const f = join(dir, "stats-json.pfdsl");
 			writeFileSync(f, base);
-			const r = await run(["stats", f, "--json"]);
+			const r = await run(["graph", "stats", f, "--json"]);
 			expect(r.exitCode).toBe(0);
 			const parsed = JSON.parse(r.stdout);
 			expect(parsed.ok).toBe(true);
@@ -1923,7 +2019,7 @@ spec >> review -> report
 				(_, i) => `a${i} >> p${i} -> b${i}`,
 			).join("\n");
 			writeFileSync(f, `${manyNodes}\n`);
-			const r = await run(["stats", f]);
+			const r = await run(["graph", "stats", f]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).not.toContain("nodes total");
 			expect(r.stderr).toContain("nodes total");
@@ -1937,7 +2033,7 @@ spec >> review -> report
 				(_, i) => `a${i} >> p${i} -> b${i}`,
 			).join("\n");
 			writeFileSync(f, `${manyNodes}\n`);
-			const r = await run(["stats", f, "--limit", "5"]);
+			const r = await run(["graph", "stats", f, "--limit", "5"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stderr).toBe("");
 		});
@@ -1949,7 +2045,7 @@ spec >> review -> report
 				(_, i) => `a${i} >> p${i} -> b${i}`,
 			).join("\n");
 			writeFileSync(f, `${manyNodes}\n`);
-			const r = await run(["stats", f, "--json"]);
+			const r = await run(["graph", "stats", f, "--json"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stderr).toBe("");
 			expect(() => JSON.parse(r.stdout)).not.toThrow();

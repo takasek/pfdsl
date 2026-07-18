@@ -656,7 +656,7 @@ export function runStatusSet(
 	opts: StatusSetOptions = {},
 ): CommandResult {
 	if (!STATUS_VALUES.includes(status as (typeof STATUS_VALUES)[number])) {
-		return fail(HELP_STATUS_SET, 2);
+		return fail(HELP_META_SET, 2);
 	}
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
@@ -1049,7 +1049,7 @@ export interface AuditSyncResult {
 	warnings?: Diagnostic[];
 }
 
-export function runAuditSync(
+export function runStatusGaps(
 	roadmapFile: string,
 	flowFiles: string[],
 	opts: AuditSyncOptions = {},
@@ -1074,7 +1074,7 @@ export function runAuditSync(
 		roadmapFm.type !== ROADMAP_REQUIRED_TYPE
 	) {
 		return fail(
-			`audit-sync: roadmap file must have type: roadmap. Got type: ${roadmapFm.type}\n`,
+			`status gaps: roadmap file must have type: roadmap. Got type: ${roadmapFm.type}\n`,
 			2,
 		);
 	}
@@ -1100,7 +1100,7 @@ export function runAuditSync(
 		const flowType = flowFm?.type;
 		if (flowType === ROADMAP_REQUIRED_TYPE) {
 			return fail(
-				`audit-sync: flow file must be workflow or runtime-pipeline, not roadmap: ${flowFile}\n`,
+				`status gaps: flow file must be workflow or runtime-pipeline, not roadmap: ${flowFile}\n`,
 				2,
 			);
 		}
@@ -1153,12 +1153,12 @@ export type { BinaryFormat };
 export { svgToBinary };
 export type CliRenderFormat = RenderFormat | BinaryFormat;
 
-export interface GraphOptions {
+export interface RenderOptions {
 	format?: CliRenderFormat;
 }
-export async function runGraph(
+export async function runRender(
 	file: string,
-	opts: GraphOptions = {},
+	opts: RenderOptions = {},
 ): Promise<CommandResult> {
 	const fmt = opts.format ?? "dot";
 	const graphSrc = readSource(file);
@@ -1275,7 +1275,7 @@ Options:
   --mode flows  group each process with its inputs and outputs (default)
 `;
 
-const HELP_REINDEX = `usage: pfdsl reindex <file|-> [--write] [--check] [--renumber] [--json]
+const HELP_REINDEX = `usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json]
 
 Assign integer index: values to nodes in topological order. Processes and
 artifacts are numbered with independent counters. Use - to read from stdin.
@@ -1293,7 +1293,7 @@ Options:
   --json      emit the change report as JSON ({ changes: [...] })
 `;
 
-const HELP_SORT = `usage: pfdsl sort-meta <file|-> --by <keys> [--write] [--check]
+const HELP_SORT = `usage: pfdsl meta sort <file|-> --by <keys> [--write] [--check]
 
 Sort artifact and process node definitions within each frontmatter section.
 Each section is sorted independently. Use - to read from stdin.
@@ -1305,7 +1305,7 @@ Options:
   --check       exit 1 if the file is not already sorted (CI mode)
 `;
 
-const HELP_NORMALIZE = `usage: pfdsl normalize <file|-> [--json]
+const HELP_GRAPH_EDGES = `usage: pfdsl graph edges <file|-> [--json]
 
 Print canonical edge list. Use - to read from stdin.
 
@@ -1313,7 +1313,7 @@ Options:
   --json  output edge list as JSON array
 `;
 
-const HELP_GRAPH = `usage: pfdsl graph <file|-> [--format dot|svg|pdf|png]
+const HELP_RENDER = `usage: pfdsl render <file|-> [--format dot|svg|pdf|png]
 
 Print a Graphviz representation. Use - to read from stdin.
 
@@ -1334,7 +1334,7 @@ Options:
   --format svg   visual diff as SVG
 `;
 
-const HELP_READY = `usage: pfdsl ready <file|-> [--best] [--json]
+const HELP_READY = `usage: pfdsl status ready <file|-> [--best] [--json]
 
 List processes whose every input artifact has status: done (or no status set).
 Only applies to roadmap files (type: roadmap). Use - to read from stdin.
@@ -1345,22 +1345,25 @@ Options:
   --json  output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, warnings? })
 `;
 
-const HELP_STATUS_SET = `usage: pfdsl status-set <file> <artifact-id> <status> [--json]
+const HELP_META_SET = `usage: pfdsl meta set <file> <id> <field> <value> [--json]
 
-Set the status of an artifact in a .pfdsl file, rewriting it in place.
-For roadmap files, reports which processes became newly ready after the change.
+Set a frontmatter field of a node in a .pfdsl file, rewriting it in place.
+Currently only the \`status\` field is supported.
+When setting status on a roadmap file, reports which processes became newly
+ready after the change.
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
-  <status>  one of: todo | wip | done | waiting | suspended
+  <field>   currently: status
+  <value>   for status: one of todo | wip | done | waiting | suspended
   --json    emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
 
 Exit codes:
   0  success
-  1  artifact not found in the file
-  2  invalid usage (missing argument, invalid status value)
+  1  id not found in the file
+  2  invalid usage (missing argument, unsupported field, invalid value)
 `;
 
-const HELP_GET = `usage: pfdsl get <file|-> --id <ids> --field <fields> [--json]
+const HELP_GET = `usage: pfdsl meta get <file|-> --id <ids> --field <fields> [--json]
 
 Print field values for one or more artifact/process/group ids. Use - to read
 from stdin (location fields are returned unresolved when reading from stdin,
@@ -1387,7 +1390,7 @@ Exit codes:
   2  invalid usage (missing --id/--field)
 `;
 
-const HELP_NEIGHBORS = `usage: pfdsl neighbors <file|-> <id> [--json]
+const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json]
 
 Print the direct predecessors (in-edges) and successors (out-edges) of a
 node — its immediate producer(s)/consumer(s) only, not the full closure.
@@ -1400,7 +1403,7 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_IMPACT = `usage: pfdsl impact <file|-> <id> [--json]
+const HELP_IMPACT = `usage: pfdsl graph impact <file|-> <id> [--json]
 
 Print the full downstream closure reachable from <id> via primary edges
 (everything <id> unblocks, transitively), excluding <id> itself. Text mode
@@ -1414,7 +1417,7 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_DEPENDS_ON = `usage: pfdsl depends-on <file|-> <id> [--json]
+const HELP_DEPENDS_ON = `usage: pfdsl graph depends-on <file|-> <id> [--json]
 
 Print the full upstream closure <id> depends on via primary edges
 (everything that must exist for <id> to exist), excluding <id> itself. Text
@@ -1428,7 +1431,7 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_PATH = `usage: pfdsl path <file|-> <from> <to> [--json]
+const HELP_PATH = `usage: pfdsl graph path <file|-> <from> <to> [--json]
 
 Print all simple paths from <from> to <to> via primary edges (empty if
 none exist). Answers "is <from> a prerequisite of <to>, and how".
@@ -1441,7 +1444,7 @@ Exit codes:
   2  invalid usage (missing from/to)
 `;
 
-const HELP_STATS = `usage: pfdsl stats <file|-> [--limit <n>] [--json]
+const HELP_STATS = `usage: pfdsl graph stats <file|-> [--limit <n>] [--json]
 
 Print fan-in/fan-out per node, ranked by total degree descending (hubs
 first) then id ascending. Text mode prints a hint to stderr suggesting
@@ -1456,7 +1459,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_AUDIT_SYNC = `usage: pfdsl audit-sync <roadmap> <flow> [<flow>...] [--json]
+const HELP_STATUS_GAPS = `usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json]
 
 Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
 Reports artifacts with status: todo in flow files that have no corresponding entry
@@ -1512,65 +1515,67 @@ function runExplain(code: string): CommandResult {
 	return ok(`${lines.join("\n")}\n`);
 }
 
+const HELP_GRAPH_GROUP = `usage: pfdsl graph <subcommand> ...
+
+Read-only queries on the graph topology. Run
+\`pfdsl graph <subcommand> --help\` for details on each.
+
+Subcommands:
+  summary <file|->            Print artifact/process/edge counts
+  io <file|->                 Print external inputs and terminal artifacts
+  stats <file|-> [--limit]    Rank nodes by fan-in/fan-out degree
+  neighbors <file|-> <id>     Direct predecessors/successors of a node
+  impact <file|-> <id>        Full downstream closure of a node
+  depends-on <file|-> <id>    Full upstream closure of a node
+  path <file|-> <from> <to>   All simple paths between two nodes
+  edges <file|->              Canonical edge list
+
+All subcommands accept --json.
+`;
+
+const HELP_META_GROUP = `usage: pfdsl meta <subcommand> ...
+
+Read and write frontmatter metadata. Run
+\`pfdsl meta <subcommand> --help\` for details on each.
+
+Subcommands:
+  get <file|-> --id <ids> --field <fields>   Print field values
+  set <file> <id> <field> <value>            Set a field value in place
+  sort <file|-> --by <keys>                  Sort node definitions
+  reindex <file|->                           Assign topological index: values
+`;
+
+const HELP_STATUS_GROUP = `usage: pfdsl status <subcommand> ...
+
+Planning queries derived from artifact status. Run
+\`pfdsl status <subcommand> --help\` for details on each.
+
+Subcommands:
+  ready <file|-> [--best]           List ready-to-start processes
+  gaps <roadmap> <flow> [<flow>...] Find todo artifacts missing from the roadmap
+`;
+
 export const HELP = `pfdsl <command> [options]
 
 Commands:
-  check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
+  check <file|-> [--strict] [--json] [--no-color] [--audit] [--summary]
                            Validate a .pfdsl file (- = stdin)
-                           --audit    list terminal artifacts, external inputs, and consumer asymmetry hints
-                           --summary  print artifact/process/edge counts
-                           --strict   error if feedback source not reachable from target process
-                           --json     output diagnostics as JSON
-                           --no-color disable ANSI color codes (also: NO_COLOR env var)
+  explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
   fmt <file|-> [--write] [--mode flat|flows]
                            Format a .pfdsl file (- = stdin)
-  reindex <file|-> [--write] [--check] [--renumber] [--json]
-                           Assign topological index: values (- = stdin)
-                           --write     rewrite in place; report to stdout
-                           --check     exit 1 if reindexing would change anything
-                           --renumber  reassign every node from 1
-                           --json      emit change report as JSON
-  sort-meta <file|-> --by <keys> [--write] [--check]
-                           Sort node definitions by keys (- = stdin)
-                           --by        comma-separated: index, topological, group, id
-                           --write     rewrite in place
-                           --check     exit 1 if not already sorted
-  normalize <file|-> [--json]
-                           Print canonical edge list (- = stdin)
-                           --json     output edge list as JSON array
-  graph <file|-> [--format dot|svg|pdf|png]
-                           Print Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
+  render <file|-> [--format dot|svg|pdf|png]
+                           Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires: npm install puppeteer
   diff <a> <b> [--format text|dot|svg]
                            Structural diff (text), or visual diff DOT/SVG
-  ready <file|-> [--best] [--json]
-                           List ready-to-start processes (- = stdin)
-                           --best    recommend the best next process
-                           --json    output as JSON
-  status-set <file> <artifact-id> <status> [--json]
-                           Set artifact status (todo|wip|done|waiting|suspended) in place
-                           Roadmap files: prints newly-ready processes after the change
-                           --json    output as JSON ({ ok, newlyReady: string[], warnings? })
-  get <file|-> --id <ids> --field <fields> [--json]
-                           Print field values for one or more ids (- = stdin)
-                           --id      comma-separated ids, or repeat --id
-                           --field   comma-separated field names, or repeat --field
-                           A "location" field is resolved against basePath
-                           --json    output as JSON
-  neighbors <file|-> <id> [--json]
-                           Print direct predecessors/successors of a node (- = stdin)
-  impact <file|-> <id> [--json]
-                           Print the full downstream closure of a node (- = stdin)
-  depends-on <file|-> <id> [--json]
-                           Print the full upstream closure of a node (- = stdin)
-  path <file|-> <from> <to> [--json]
-                           Print all simple paths from <from> to <to> (- = stdin)
-  stats <file|-> [--limit <n>] [--json]
-                           Rank nodes by fan-in/fan-out degree (- = stdin)
-  audit-sync <roadmap> <flow> [<flow>...] [--json]
-                           Cross-check todo artifacts in flow files against the roadmap
-                           --json    output as JSON
-  explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
+
+Command groups (run \`pfdsl <group>\` for their subcommands):
+  graph summary|io|stats|neighbors|impact|depends-on|path|edges
+                           Read-only queries on the graph topology
+  meta get|set|sort|reindex
+                           Read and write frontmatter metadata
+  status ready|gaps        Planning queries derived from artifact status
+
   help                     Show this help
 
 Exit codes:
@@ -1609,6 +1614,153 @@ export function parseArgs(argv: readonly string[]): CliArgs {
 	return { command, positional, flags };
 }
 
+function runGraphGroup(
+	positional: string[],
+	flags: Record<string, string | boolean>,
+): CommandResult {
+	const [sub, ...rest] = positional;
+	if (!sub)
+		return flags.help ? ok(HELP_GRAPH_GROUP) : fail(HELP_GRAPH_GROUP, 2);
+	switch (sub) {
+		case "edges": {
+			if (flags.help) return ok(HELP_GRAPH_EDGES);
+			const f = rest[0];
+			if (!f) return fail(HELP_GRAPH_EDGES, 2);
+			return runNormalize(f, { json: flags.json === true });
+		}
+		case "neighbors": {
+			if (flags.help) return ok(HELP_NEIGHBORS);
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
+			return runNeighbors(f, id, { json: flags.json === true });
+		}
+		case "impact": {
+			if (flags.help) return ok(HELP_IMPACT);
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_IMPACT, 2);
+			return runImpact(f, id, { json: flags.json === true });
+		}
+		case "depends-on": {
+			if (flags.help) return ok(HELP_DEPENDS_ON);
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
+			return runDependsOn(f, id, { json: flags.json === true });
+		}
+		case "path": {
+			if (flags.help) return ok(HELP_PATH);
+			const [f, from, to] = rest;
+			if (!f || !from || !to) return fail(HELP_PATH, 2);
+			return runPath(f, from, to, { json: flags.json === true });
+		}
+		case "stats": {
+			if (flags.help) return ok(HELP_STATS);
+			const f = rest[0];
+			if (!f) return fail(HELP_STATS, 2);
+			const limitFlag = flags.limit;
+			let limit: number | undefined;
+			if (typeof limitFlag === "string") {
+				const n = Number(limitFlag);
+				if (!Number.isInteger(n) || n < 0) return fail(HELP_STATS, 2);
+				limit = n;
+			}
+			return runStats(f, {
+				...(limit !== undefined ? { limit } : {}),
+				json: flags.json === true,
+			});
+		}
+		default:
+			return fail(`unknown graph subcommand: ${sub}\n${HELP_GRAPH_GROUP}`, 2);
+	}
+}
+
+function runMetaGroup(
+	positional: string[],
+	flags: Record<string, string | boolean>,
+): CommandResult {
+	const [sub, ...rest] = positional;
+	if (!sub) return flags.help ? ok(HELP_META_GROUP) : fail(HELP_META_GROUP, 2);
+	switch (sub) {
+		case "get": {
+			if (flags.help) return ok(HELP_GET);
+			const f = rest[0];
+			if (!f) return fail(HELP_GET, 2);
+			return runGet(f, {
+				...(typeof flags.id === "string" ? { id: flags.id } : {}),
+				...(typeof flags.field === "string" ? { field: flags.field } : {}),
+				json: flags.json === true,
+			});
+		}
+		case "set": {
+			if (flags.help) return ok(HELP_META_SET);
+			const [f, id, field, value] = rest;
+			if (!f || !id || !field || !value) return fail(HELP_META_SET, 2);
+			if (field !== "status") {
+				return fail(
+					`meta set: unsupported field '${field}' (currently only: status)\n`,
+					2,
+				);
+			}
+			return runStatusSet(f, id, value, { json: flags.json === true });
+		}
+		case "sort": {
+			if (flags.help) return ok(HELP_SORT);
+			const f = rest[0];
+			if (!f) return fail(HELP_SORT, 2);
+			const byVal = flags.by;
+			if (!byVal || byVal === true) return fail(HELP_SORT, 2);
+			return runSort(f, {
+				by: String(byVal),
+				write: flags.write === true,
+				check: flags.check === true,
+			});
+		}
+		case "reindex": {
+			if (flags.help) return ok(HELP_REINDEX);
+			const f = rest[0];
+			if (!f) return fail(HELP_REINDEX, 2);
+			return runReindex(f, {
+				write: flags.write === true,
+				check: flags.check === true,
+				renumber: flags.renumber === true,
+				json: flags.json === true,
+			});
+		}
+		default:
+			return fail(`unknown meta subcommand: ${sub}\n${HELP_META_GROUP}`, 2);
+	}
+}
+
+function runStatusGroup(
+	positional: string[],
+	flags: Record<string, string | boolean>,
+): CommandResult {
+	const [sub, ...rest] = positional;
+	if (!sub)
+		return flags.help ? ok(HELP_STATUS_GROUP) : fail(HELP_STATUS_GROUP, 2);
+	switch (sub) {
+		case "ready": {
+			if (flags.help) return ok(HELP_READY);
+			const f = rest[0];
+			if (!f) return fail(HELP_READY, 2);
+			return runReady(f, {
+				best: flags.best === true,
+				json: flags.json === true,
+			});
+		}
+		case "gaps": {
+			if (flags.help) return ok(HELP_STATUS_GAPS);
+			const [roadmapFile, ...flowFiles] = rest;
+			if (!roadmapFile || flowFiles.length === 0)
+				return fail(HELP_STATUS_GAPS, 2);
+			return runStatusGaps(roadmapFile, flowFiles, {
+				json: flags.json === true,
+			});
+		}
+		default:
+			return fail(`unknown status subcommand: ${sub}\n${HELP_STATUS_GROUP}`, 2);
+	}
+}
+
 export async function run(argv: readonly string[]): Promise<CommandResult> {
 	const { command, positional, flags } = parseArgs(argv);
 	switch (command) {
@@ -1619,6 +1771,12 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 		case "--help":
 		case "-h":
 			return ok(HELP);
+		case "graph":
+			return runGraphGroup(positional, flags);
+		case "meta":
+			return runMetaGroup(positional, flags);
+		case "status":
+			return runStatusGroup(positional, flags);
 		case "check": {
 			if (flags.help) return ok(HELP_CHECK);
 			const f = positional[0];
@@ -1648,39 +1806,10 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				...(mode ? { mode } : {}),
 			});
 		}
-		case "reindex": {
-			if (flags.help) return ok(HELP_REINDEX);
+		case "render": {
+			if (flags.help) return ok(HELP_RENDER);
 			const f = positional[0];
-			if (!f) return fail(HELP_REINDEX, 2);
-			return runReindex(f, {
-				write: flags.write === true,
-				check: flags.check === true,
-				renumber: flags.renumber === true,
-				json: flags.json === true,
-			});
-		}
-		case "sort-meta": {
-			if (flags.help) return ok(HELP_SORT);
-			const f = positional[0];
-			if (!f) return fail(HELP_SORT, 2);
-			const byVal = flags.by;
-			if (!byVal || byVal === true) return fail(HELP_SORT, 2);
-			return runSort(f, {
-				by: String(byVal),
-				write: flags.write === true,
-				check: flags.check === true,
-			});
-		}
-		case "normalize": {
-			if (flags.help) return ok(HELP_NORMALIZE);
-			const f = positional[0];
-			if (!f) return fail(HELP_NORMALIZE, 2);
-			return runNormalize(f, { json: flags.json === true });
-		}
-		case "graph": {
-			if (flags.help) return ok(HELP_GRAPH);
-			const f = positional[0];
-			if (!f) return fail(HELP_GRAPH, 2);
+			if (!f) return fail(HELP_RENDER, 2);
 			const fmt = flags.format;
 			if (
 				fmt !== undefined &&
@@ -1691,7 +1820,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			) {
 				return fail(`unknown format: ${String(fmt)}\n`, 2);
 			}
-			return runGraph(f, fmt ? { format: fmt as CliRenderFormat } : {});
+			return runRender(f, fmt ? { format: fmt as CliRenderFormat } : {});
 		}
 		case "diff": {
 			if (flags.help) return ok(HELP_DIFF);
@@ -1707,82 +1836,6 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				return fail(`unknown format: ${String(fmt)}\n`, 2);
 			}
 			return await runDiff(a, b, fmt ? { format: fmt } : {});
-		}
-		case "ready": {
-			if (flags.help) return ok(HELP_READY);
-			const f = positional[0];
-			if (!f) return fail(HELP_READY, 2);
-			return runReady(f, {
-				best: flags.best === true,
-				json: flags.json === true,
-			});
-		}
-		case "status-set": {
-			if (flags.help) return ok(HELP_STATUS_SET);
-			const [f, artifactId, status] = positional;
-			if (!f || !artifactId || !status) return fail(HELP_STATUS_SET, 2);
-			return runStatusSet(f, artifactId, status, {
-				json: flags.json === true,
-			});
-		}
-		case "get": {
-			if (flags.help) return ok(HELP_GET);
-			const f = positional[0];
-			if (!f) return fail(HELP_GET, 2);
-			return runGet(f, {
-				...(typeof flags.id === "string" ? { id: flags.id } : {}),
-				...(typeof flags.field === "string" ? { field: flags.field } : {}),
-				json: flags.json === true,
-			});
-		}
-		case "neighbors": {
-			if (flags.help) return ok(HELP_NEIGHBORS);
-			const [f, id] = positional;
-			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
-			return runNeighbors(f, id, { json: flags.json === true });
-		}
-		case "impact": {
-			if (flags.help) return ok(HELP_IMPACT);
-			const [f, id] = positional;
-			if (!f || !id) return fail(HELP_IMPACT, 2);
-			return runImpact(f, id, { json: flags.json === true });
-		}
-		case "depends-on": {
-			if (flags.help) return ok(HELP_DEPENDS_ON);
-			const [f, id] = positional;
-			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
-			return runDependsOn(f, id, { json: flags.json === true });
-		}
-		case "path": {
-			if (flags.help) return ok(HELP_PATH);
-			const [f, from, to] = positional;
-			if (!f || !from || !to) return fail(HELP_PATH, 2);
-			return runPath(f, from, to, { json: flags.json === true });
-		}
-		case "stats": {
-			if (flags.help) return ok(HELP_STATS);
-			const f = positional[0];
-			if (!f) return fail(HELP_STATS, 2);
-			const limitFlag = flags.limit;
-			let limit: number | undefined;
-			if (typeof limitFlag === "string") {
-				const n = Number(limitFlag);
-				if (!Number.isInteger(n) || n < 0) return fail(HELP_STATS, 2);
-				limit = n;
-			}
-			return runStats(f, {
-				...(limit !== undefined ? { limit } : {}),
-				json: flags.json === true,
-			});
-		}
-		case "audit-sync": {
-			if (flags.help) return ok(HELP_AUDIT_SYNC);
-			const [roadmapFile, ...flowFiles] = positional;
-			if (!roadmapFile || flowFiles.length === 0)
-				return fail(HELP_AUDIT_SYNC, 2);
-			return runAuditSync(roadmapFile, flowFiles, {
-				json: flags.json === true,
-			});
 		}
 		case "explain": {
 			if (flags.help) return ok(HELP_EXPLAIN);

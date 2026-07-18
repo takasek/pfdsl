@@ -36,7 +36,12 @@ afterAll(() => {
 
 describe("graph with puppeteer", () => {
 	it("format=pdf returns binary output", async () => {
-		const r = await run(["graph", join(dir, "valid.pfdsl"), "--format", "pdf"]);
+		const r = await run([
+			"render",
+			join(dir, "valid.pfdsl"),
+			"--format",
+			"pdf",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.binaryOutput).toBeInstanceOf(Buffer);
 		expect(r.binaryOutput!.toString()).toContain("%PDF");
@@ -44,7 +49,12 @@ describe("graph with puppeteer", () => {
 	});
 
 	it("format=png returns binary output", async () => {
-		const r = await run(["graph", join(dir, "valid.pfdsl"), "--format", "png"]);
+		const r = await run([
+			"render",
+			join(dir, "valid.pfdsl"),
+			"--format",
+			"png",
+		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.binaryOutput).toBeInstanceOf(Buffer);
 		expect(r.stdout).toBe("");
