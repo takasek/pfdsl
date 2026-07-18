@@ -370,6 +370,41 @@ artifact:
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.20 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
+  incomplete_tolerance:
+    label: "書き途中グラフ非strict許容 (#480)"
+    description: "V020/V002/V003 を非 strict で warning に降格し --strict で error 維持。spec 次版統合を含む。逐次書き込みする grill スキル (#481) の前提"
+    status: todo
+    criteria: "非 strict の check で V020/V002/V003 が warning、--strict で error になり、spec 本文・診断表が更新済み、テスト通過"
+  grill_skill:
+    label: "pfd-grill スキル (#481)"
+    description: "最終成果物からの後ろ向き対話構築スキル。名前確定→criteria→プロセス導出→入力導出の再帰。plugin 同梱で配布"
+    status: todo
+    criteria: "pfd-grill が plugin 経由で発火し、サンプル図を後ろ向き対話でフルスクラッチ構築するライブ実行1回を検証済み"
+  editor_connector:
+    label: "エディタ コネクタ編集支援 (#482)"
+    description: "ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用"
+    status: todo
+    criteria: "カーソル下ノードへの前後追加・接続がコネクタ種選択付きで動作確認済み、テスト通過"
+  preview_connector:
+    label: "Preview コネクタ生成 UI (#483)"
+    description: "webview の nodeClick 基盤を拡張し、ノードクリックから前後追加・接続をテキストへ反映する。#482 の編集機構を共用"
+    status: todo
+    criteria: "Preview のノードクリックからコネクタ選択・生成でテキストへ反映され再描画されることが動作確認済み"
+  def_insertion:
+    label: "frontmatter 定義挿入 code action (#484)"
+    description: "edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する"
+    status: todo
+    criteria: "未定義ノードへの定義挿入 code action が artifact/process 判別付きで動作確認済み、テスト通過"
+  cli_release_grill_tolerance:
+    label: "CLIリリース: 書き途中許容 + pfd-grill"
+    description: "#480 warning 降格 / #481 pfd-grill スキル同梱を含む次期 npm リリース"
+    status: todo
+    criteria: "npm 公開版の check で V020/V002/V003 が非 strict warning であり、plugin に pfd-grill が同梱されている"
+  ext_editing_release:
+    label: "extension 編集支援リリース"
+    description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
+    status: todo
+    criteria: "コネクタ編集・Preview 生成 UI・定義挿入を含む extension が Marketplace 公開済み"
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -562,6 +597,30 @@ process:
     label: pfd-ops plugin 統合・skill sync 廃止検討
     description: "設計は ADR-0028 で確定・実装済み（plugin 同梱・/pfd-init 実配置・skill sync 削除）"
     location: https://github.com/takasek/pfdsl/issues/404
+  i480_relax_incomplete_graph:
+    label: 書き途中許容実装
+    location: https://github.com/takasek/pfdsl/issues/480
+    updated_at: 2026-07-18T00:32:56Z
+  i481_create_grill_skill:
+    label: pfd-grill スキル作成
+    location: https://github.com/takasek/pfdsl/issues/481
+    updated_at: 2026-07-18T00:33:10Z
+  i482_implement_editor_connector:
+    label: エディタ コネクタ編集実装
+    location: https://github.com/takasek/pfdsl/issues/482
+    updated_at: 2026-07-18T00:33:31Z
+  i483_implement_preview_connector:
+    label: Preview コネクタ UI 実装
+    location: https://github.com/takasek/pfdsl/issues/483
+    updated_at: 2026-07-18T00:33:46Z
+  i484_implement_def_insertion:
+    label: 定義挿入 code action 実装
+    location: https://github.com/takasek/pfdsl/issues/484
+    updated_at: 2026-07-18T00:34:01Z
+  publish_cli_grill_tolerance:
+    label: CLI 書き途中許容 + grill 公開
+  publish_ext_editing:
+    label: extension 編集支援リリース
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -685,3 +744,12 @@ marketplace_dist >> i404_integrate_pfd_ops_plugin -> pfd_ops_plugin_dist
 
 cli_release_explain_lens >> i435_implement_ansi_color -> ansi_color
 ansi_color >> publish_cli_ansi_color -> cli_release_ansi_color
+
+cli_release_ansi_color >> i480_relax_incomplete_graph -> incomplete_tolerance
+incomplete_tolerance >> i481_create_grill_skill -> grill_skill
+[incomplete_tolerance, grill_skill] >> publish_cli_grill_tolerance -> cli_release_grill_tolerance
+
+ext_v0015 >> i482_implement_editor_connector -> editor_connector
+editor_connector >> i483_implement_preview_connector -> preview_connector
+ext_v0015 >> i484_implement_def_insertion -> def_insertion
+[editor_connector, preview_connector, def_insertion] >> publish_ext_editing -> ext_editing_release
