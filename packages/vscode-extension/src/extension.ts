@@ -2,6 +2,7 @@ import type * as vscode from "vscode";
 import { clearAnalyzeCache } from "./analyze.js";
 import { registerCodeLens } from "./codelens.js";
 import { registerConnectorEditing } from "./connector.js";
+import { registerDefInsertion } from "./def-insertion.js";
 import { registerDiagnostics } from "./diagnostics.js";
 import { registerDiff } from "./diff.js";
 import { registerDocumentLinks } from "./document-link.js";
@@ -24,6 +25,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	registerDefinitionJump(context);
 	registerSortMeta(context);
 	registerConnectorEditing(context);
+	registerDefInsertion(context);
 }
 
 export function deactivate(): void {
