@@ -43,6 +43,11 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
   具体例: PR #497（#476）作成時に `.pfdsl/roadmap.md` の「PR 本文の `Closes` キーワード確認」項目を実行し忘れ、`Closes #476` を欠いたまま PR を作成した（pfd-retro の C 層監査で気付き、PR 本文を更新して修正）。
   対策: PR 作成・issue クローズ等、companion のサブ項目が集中するタイミングでは、メタ項目にチェックする前に companion の該当セクションを Read し直し、列挙された個別項目を上から順に照合する。
 
+- **issue クローズ漏れ trap（別 PR 経由の偶発解決）**: あるレビュー対応 PR が別 issue のスコープを偶発的に解決すると、その別 issue 自体は誰も見ていないため open のまま残り続ける。着手前に issue 本文の再現手順を現行コードに当てて「まだ再現するか」を確認しないと、既に解決済みの issue に無駄な実装差分を積みかねない。
+  問いの形: 「この issue が指す症状は、現行コードでまだ再現するか（既存の別 PR が偶発的に解決していないか）」。
+  具体例: #494（def-insertion.ts のフルドキュメント置換問題）は、#491 のレビュー対応コミット 31b16c1（fix(core,vscode-extension): use a minimal insert edit ...）で既に解決済みだったが、issue 自体は open のまま1日残った。#490/#493/#498 のバッチ処理着手前に現行コードを確認したことで発覚し、実装差分なしでクローズできた。
+  対策: 着手前の issue 本文再読（work-cycle 手順1）に「本文の再現手順・コード引用を現行の該当ファイルと突合する」を含める。
+
 ## 配布物への finding 反映
 
 配布 bundle（plugin 同梱の pfd-* スキル本文・reference）は上流リポ（takasek/pfdsl）の生成・同梱物であり、採用リポ側のコピーは編集対象にならない（ADR-0028。plugin cache 内のファイルはインストール更新で消える）。
