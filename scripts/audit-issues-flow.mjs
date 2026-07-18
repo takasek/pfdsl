@@ -3,11 +3,12 @@
 // Usage: node scripts/audit-issues-flow.mjs [--fix]
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseIssueProcesses, buildProcessOutputs, computeFindings, applyFixes, applyClosedInFlowFixes, computeLabelFindings, FLOW_LABELS, isGhUnavailableError, GH_UNAVAILABLE_EXIT_CODE } from "./lib/issues-flow-audit.mjs";
+import { parseIssueProcesses, buildProcessOutputs, computeFindings, applyFixes, applyClosedInFlowFixes, computeLabelFindings, FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
+import { isGhUnavailableError, GH_UNAVAILABLE_EXIT_CODE } from "./lib/gh-compat.mjs";
+import { execGh } from "./lib/gh-exec.mjs";
 import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -36,15 +37,15 @@ const body = lines.slice(fmEnd + 1).join("\n");
 
 // --- Fetch labels from GitHub ---
 
-function fetchLabels() {
-	const out = execFileSync("gh", ["label", "list", "--json", "name,description", "--limit", "100"]);
+async function fetchLabels() {
+	const out = await execGh(["label", "list", "--json", "name,description", "--limit", "100"]);
 	return JSON.parse(out).map((l) => ({ name: l.name, description: l.description ?? "" }));
 }
 
 // --- Fetch issues from GitHub ---
 
-function fetchIssues() {
-	const out = execFileSync("gh", [
+async function fetchIssues() {
+	const out = await execGh([
 		"issue", "list",
 		"--state", "all",
 		"--json", "number,state,stateReason,labels,updatedAt",
@@ -118,7 +119,7 @@ function exitGhUnavailable() {
 
 let labels;
 try {
-	labels = fetchLabels();
+	labels = await fetchLabels();
 } catch (e) {
 	if (isGhUnavailableError(e)) exitGhUnavailable();
 	throw e;
@@ -133,9 +134,9 @@ if (labelFindings.length > 0) {
 	if (fix) {
 		for (const f of labelFindings) {
 			if (f.type === "label_missing") {
-				execFileSync("gh", ["label", "create", f.name, "--description", f.description, "--color", "ededed"]);
+				await execGh(["label", "create", f.name, "--description", f.description, "--color", "ededed"]);
 			} else if (f.type === "label_description_mismatch") {
-				execFileSync("gh", ["label", "edit", f.name, "--description", f.description]);
+				await execGh(["label", "edit", f.name, "--description", f.description]);
 			}
 		}
 		console.log("fixed label findings");
@@ -148,7 +149,7 @@ if (labelFindings.length > 0) {
 
 let issues;
 try {
-	issues = fetchIssues();
+	issues = await fetchIssues();
 } catch (e) {
 	if (isGhUnavailableError(e)) exitGhUnavailable();
 	throw e;
@@ -191,11 +192,11 @@ if (!fix) {
 // 1. Add flow:managed label to issues missing it
 const missingLabel = findings.filter((f) => f.fixVia === "github");
 for (const f of missingLabel) {
-	execFileSync("gh", ["issue", "edit", String(f.issueNumber), "--add-label", "flow:managed"]);
+	await execGh(["issue", "edit", String(f.issueNumber), "--add-label", "flow:managed"]);
 }
 
 // 2. Re-fetch issues (labeling changes updatedAt), recompute
-issues = fetchIssues();
+issues = await fetchIssues();
 findings = computeFindings(entries, issues);
 
 // 3. Apply document and body fixes

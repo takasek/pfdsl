@@ -16,6 +16,7 @@ import {
 	detectDesignUnsettled,
 	buildGateCheckCommand,
 } from "./lib/cycle-status.mjs";
+import { execGh } from "./lib/gh-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -47,7 +48,9 @@ let openFlowSyncPRs = [];
 let otherOpenPRs = [];
 let prError = null;
 try {
-	const prJson = JSON.parse(sh("gh pr list --state open --json number,title,headRefName,statusCheckRollup"));
+	const prJson = JSON.parse(
+		await execGh(["pr", "list", "--state", "open", "--json", "number,title,headRefName,statusCheckRollup"], { cwd: root }),
+	);
 	({ openFlowSyncPRs, otherOpenPRs } = classifyPRs(prJson));
 } catch (e) {
 	prError = e.message;
@@ -77,7 +80,7 @@ if (best) {
 		const roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
 		const issueNumber = findIssueNumberForProcess(roadmapText, best);
 		if (issueNumber) {
-			const body = sh(`gh issue view ${issueNumber} --json body --jq .body`);
+			const body = await execGh(["issue", "view", String(issueNumber), "--json", "body", "--jq", ".body"], { cwd: root });
 			({ designUnsettled, matchedLines: designUnsettledLines } = detectDesignUnsettled(body));
 		} else {
 			designUnsettledError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
