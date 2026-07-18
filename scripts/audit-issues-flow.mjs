@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseIssueProcesses, buildProcessOutputs, computeFindings, applyFixes, applyClosedInFlowFixes, computeLabelFindings, FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
+import { parseIssueProcesses, buildProcessOutputs, computeFindings, applyFixes, applyClosedInFlowFixes, computeLabelFindings, FLOW_LABELS, isGhUnavailableError, GH_UNAVAILABLE_EXIT_CODE } from "./lib/issues-flow-audit.mjs";
 import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -111,7 +111,18 @@ for (const proc of processes) {
 
 // --- Check labels ---
 
-const labels = fetchLabels();
+function exitGhUnavailable() {
+	console.log("gh unavailable: skipping GitHub-dependent checks (label sync, issue sync)");
+	process.exit(GH_UNAVAILABLE_EXIT_CODE);
+}
+
+let labels;
+try {
+	labels = fetchLabels();
+} catch (e) {
+	if (isGhUnavailableError(e)) exitGhUnavailable();
+	throw e;
+}
 const labelFindings = computeLabelFindings(FLOW_LABELS, labels);
 
 if (labelFindings.length > 0) {
@@ -135,7 +146,13 @@ if (labelFindings.length > 0) {
 
 // --- First pass: compute and print findings ---
 
-let issues = fetchIssues();
+let issues;
+try {
+	issues = fetchIssues();
+} catch (e) {
+	if (isGhUnavailableError(e)) exitGhUnavailable();
+	throw e;
+}
 let findings = computeFindings(entries, issues);
 
 function printFindings(findings) {

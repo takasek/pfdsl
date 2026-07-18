@@ -6,6 +6,22 @@ export const FLOW_LABELS = [
 	{ name: "flow:exempt", description: "intentionally out of .pfdsl/roadmap.pfdsl scope" },
 ];
 
+// Exit code signaling "gh CLI unavailable" (ENOENT), distinct from exit code 1
+// (real findings/errors) — lets callers like gate-check.mjs tell "tool missing"
+// apart from "roadmap actually drifted" (#489, #492).
+export const GH_UNAVAILABLE_EXIT_CODE = 2;
+
+/**
+ * True if an execFileSync("gh", ...) failure means the gh CLI binary itself
+ * is missing (ENOENT), as opposed to gh running and reporting a real error
+ * (auth failure, network error, bad args).
+ * @param {{ code?: string }} error
+ * @returns {boolean}
+ */
+export function isGhUnavailableError(error) {
+	return error?.code === "ENOENT";
+}
+
 /**
  * @param {{ name: string, description: string }[]} expectedLabels
  * @param {{ name: string, description: string }[]} actualLabels
