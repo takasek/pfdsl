@@ -89,7 +89,7 @@ export const VSCODE_EXT_TRIGGER = /^packages\/vscode-extension\//;
 // Conventional Commits subject line: type(scope)!: description.
 // Scope and ! are optional; type must be one of the conventional set.
 const CONVENTIONAL_COMMIT_PATTERN =
-	/^(feat|fix|refactor|docs|chore|test|style|perf|build|ci|revert)(\([\w./-]+\))?!?: .+/;
+	/^(feat|fix|refactor|docs|chore|test|style|perf|build|ci|revert)(\([\w.,/-]+\))?!?: .+/;
 
 /**
  * Lint commit subjects against the Conventional Commits format (message

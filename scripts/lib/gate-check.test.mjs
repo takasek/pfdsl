@@ -148,6 +148,13 @@ describe("lintCommitSubjects", () => {
 		assert.equal(results[0].ok, false);
 	});
 
+	it("accepts a comma-separated multi-package scope (#498)", () => {
+		const results = lintCommitSubjects([
+			"fix(core,vscode-extension): use a minimal insert edit instead of full-document replace",
+		]);
+		assert.equal(results[0].ok, true);
+	});
+
 	it("returns one result per subject, preserving order", () => {
 		const results = lintCommitSubjects(["feat: a", "not conventional"]);
 		assert.deepEqual(
