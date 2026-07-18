@@ -104,7 +104,7 @@
 				{
 					"when": "editorLangId == pfdsl",
 					"command": "pfdsl.addConnector",
-					"group": "navigation"
+					"group": "2_pfdsl_edit"
 				}
 			]
 		}

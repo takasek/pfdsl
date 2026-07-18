@@ -3,32 +3,36 @@ import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 import {
 	buildConnectorEdgeLine,
-	type ConnectorDirection,
 	type ConnectorKind,
-	connectorKindsFor,
+	directionForKind,
+	edgeAlreadyExists,
 	insertConnectorEdge,
 } from "./connector-logic.js";
 
 const NEW_ID_ITEM = "$(add) New node ID…";
 
-const DIRECTION_ITEMS: {
-	label: string;
+/** Labels show the resulting edge syntax directly so direction never needs a separate pick. */
+const CONNECTOR_ITEMS: {
+	connector: ConnectorKind;
+	buildLabel: (nodeId: string) => string;
 	description: string;
-	value: ConnectorDirection;
 }[] = [
 	{
-		label: "Before",
-		description: "add an input source (>>/>>?)",
-		value: "before",
+		connector: ">>",
+		buildLabel: (id) => `? >> ${id}`,
+		description: "Add input (before this node)",
 	},
-	{ label: "After", description: "add an output target (->)", value: "after" },
+	{
+		connector: ">>?",
+		buildLabel: (id) => `? >>? ${id}`,
+		description: "Add feedback input (before this node)",
+	},
+	{
+		connector: "->",
+		buildLabel: (id) => `${id} -> ?`,
+		description: "Add output (after this node)",
+	},
 ];
-
-const CONNECTOR_LABELS: Record<ConnectorKind, string> = {
-	">>": "Input (>>)",
-	">>?": "Feedback (>>?)",
-	"->": "Output (->)",
-};
 
 function nodeIdAtCursor(
 	editor: vscode.TextEditor,
@@ -56,48 +60,56 @@ export function registerConnectorEditing(
 			}
 			const { nodeId } = cursor;
 
-			const directionPick = await vscode.window.showQuickPick(DIRECTION_ITEMS, {
-				placeHolder: `Add a connector ${nodeId === "" ? "" : `for "${nodeId}"`}`,
-			});
-			if (!directionPick) return;
-			const direction = directionPick.value;
-
-			const kinds = connectorKindsFor(direction);
-			const connectorPick =
-				kinds.length === 1
-					? kinds[0]
-					: await vscode.window
-							.showQuickPick(
-								kinds.map((k) => ({
-									label: CONNECTOR_LABELS[k],
-									connectorKind: k,
-								})),
-								{ placeHolder: "Select connector type" },
-							)
-							.then((pick) => pick?.connectorKind);
+			const connectorPick = await vscode.window.showQuickPick(
+				CONNECTOR_ITEMS.map((item) => ({
+					label: item.buildLabel(nodeId),
+					description: item.description,
+					connector: item.connector,
+				})),
+				{ placeHolder: `Choose the connector for "${nodeId}"` },
+			);
 			if (!connectorPick) return;
-			const connector = connectorPick;
+			const connector = connectorPick.connector;
+			const direction = directionForKind(connector);
 
-			const { nodeKinds } = analyzeDocument(editor.document);
+			const { nodeKinds, edges } = analyzeDocument(editor.document);
 			const existingIds = [...nodeKinds.keys()]
 				.filter((id) => id !== nodeId)
 				.sort();
 			const idPick = await vscode.window.showQuickPick(
-				[NEW_ID_ITEM, ...existingIds],
+				[
+					{ label: NEW_ID_ITEM },
+					...existingIds.map((id) => {
+						const kind = nodeKinds.get(id);
+						return kind ? { label: id, description: kind } : { label: id };
+					}),
+				],
 				{ placeHolder: "Select the other node" },
 			);
 			if (!idPick) return;
 
-			let otherId = idPick;
-			if (idPick === NEW_ID_ITEM) {
+			let otherId = idPick.label;
+			if (idPick.label === NEW_ID_ITEM) {
 				const fullIdPattern = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
 				const input = await vscode.window.showInputBox({
 					prompt: "New node ID",
-					validateInput: (value) =>
-						fullIdPattern.test(value) ? undefined : "Invalid node ID",
+					validateInput: (value) => {
+						if (!fullIdPattern.test(value)) return "Invalid node ID";
+						if (value === nodeId) return "Cannot connect a node to itself";
+						return undefined;
+					},
 				});
 				if (!input) return;
 				otherId = input;
+			}
+
+			if (edgeAlreadyExists(edges, nodeId, connector, otherId)) {
+				const choice = await vscode.window.showWarningMessage(
+					`"${buildConnectorEdgeLine(nodeId, direction, connector, otherId)}" already exists.`,
+					{ modal: true },
+					"Add anyway",
+				);
+				if (choice !== "Add anyway") return;
 			}
 
 			const edgeLine = buildConnectorEdgeLine(
@@ -107,12 +119,19 @@ export function registerConnectorEditing(
 				otherId,
 			);
 			const source = editor.document.getText();
-			const { text } = insertConnectorEdge(source, edgeLine);
+			const { text, insertedLine } = insertConnectorEdge(source, edgeLine);
 			const fullRange = new vscode.Range(
 				editor.document.positionAt(0),
 				editor.document.positionAt(source.length),
 			);
 			await editor.edit((eb) => eb.replace(fullRange, text));
+
+			const newLineRange = editor.document.lineAt(insertedLine).range;
+			editor.selection = new vscode.Selection(
+				newLineRange.start,
+				newLineRange.end,
+			);
+			editor.revealRange(newLineRange);
 		}),
 	);
 }
