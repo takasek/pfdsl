@@ -3,7 +3,12 @@ import { resolve } from "node:path";
 import {
 	analyze,
 	auditGraph,
+	computeDependsOn,
+	computeImpact,
+	computeNeighbors,
 	computeOpenInputs,
+	computePaths,
+	computeStats,
 	computeTerminals,
 	diffGraphs as coreDiffGraphs,
 	DIAGNOSTIC_REGISTRY,
@@ -918,6 +923,115 @@ function formatGetLine(
 	return `${id}.${field}: ${display}`;
 }
 
+export interface GraphAnalysisOptions {
+	json?: boolean;
+}
+
+type GraphLoadResult =
+	| { graph: ReturnType<typeof analyze>["graph"] }
+	| CommandResult;
+
+function isGraphLoadFailure(v: GraphLoadResult): v is CommandResult {
+	return "exitCode" in v;
+}
+
+function loadGraph(file: string): GraphLoadResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, graph } = analyze(src);
+	const failed = failIfErrors(diagnostics, file);
+	if (failed) return failed;
+	return { graph };
+}
+
+/** Shared not-found error shape across all graph-analysis subcommands (#479 usability review). */
+function idsNotFoundError(file: string, ids: string[]): CommandResult {
+	return fail(`error: id(s) not found in ${file}: ${ids.join(", ")}\n`, 1);
+}
+
+export function runNeighbors(
+	file: string,
+	id: string,
+	opts: GraphAnalysisOptions = {},
+): CommandResult {
+	const loaded = loadGraph(file);
+	if (isGraphLoadFailure(loaded)) return loaded;
+	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
+	const { predecessors, successors } = computeNeighbors(loaded.graph, id);
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, predecessors, successors })}\n`);
+	}
+	return ok(
+		`predecessors: ${predecessors.join(", ") || "(none)"}\nsuccessors: ${successors.join(", ") || "(none)"}\n`,
+	);
+}
+
+export function runImpact(
+	file: string,
+	id: string,
+	opts: GraphAnalysisOptions = {},
+): CommandResult {
+	const loaded = loadGraph(file);
+	if (isGraphLoadFailure(loaded)) return loaded;
+	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
+	const impact = computeImpact(loaded.graph, id).sort();
+	if (opts.json) return ok(`${JSON.stringify({ ok: true, impact })}\n`);
+	return ok(impact.length ? `${impact.join("\n")}\n` : "(none)\n");
+}
+
+export function runDependsOn(
+	file: string,
+	id: string,
+	opts: GraphAnalysisOptions = {},
+): CommandResult {
+	const loaded = loadGraph(file);
+	if (isGraphLoadFailure(loaded)) return loaded;
+	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
+	const dependsOn = computeDependsOn(loaded.graph, id).sort();
+	if (opts.json) return ok(`${JSON.stringify({ ok: true, dependsOn })}\n`);
+	return ok(dependsOn.length ? `${dependsOn.join("\n")}\n` : "(none)\n");
+}
+
+export function runPath(
+	file: string,
+	from: string,
+	to: string,
+	opts: GraphAnalysisOptions = {},
+): CommandResult {
+	const loaded = loadGraph(file);
+	if (isGraphLoadFailure(loaded)) return loaded;
+	const missing = [from, to].filter((id) => !loaded.graph.nodes.has(id));
+	if (missing.length > 0) return idsNotFoundError(file, missing);
+	const paths = computePaths(loaded.graph, from, to);
+	if (opts.json) return ok(`${JSON.stringify({ ok: true, paths })}\n`);
+	if (paths.length === 0) return ok("no path found\n");
+	return ok(`${paths.map((p) => p.join(" -> ")).join("\n")}\n`);
+}
+
+export interface StatsOptions extends GraphAnalysisOptions {
+	limit?: number;
+}
+
+/** Above this row count, text mode (not --json) hints that --limit exists (#479 usability review). */
+const STATS_HINT_THRESHOLD = 20;
+
+export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
+	const loaded = loadGraph(file);
+	if (isGraphLoadFailure(loaded)) return loaded;
+	const all = computeStats(loaded.graph);
+	const stats = opts.limit !== undefined ? all.slice(0, opts.limit) : all;
+	if (opts.json) return ok(`${JSON.stringify({ ok: true, stats })}\n`);
+	const lines = stats.map(
+		(s) =>
+			`${s.id} (${s.kind})   fan-in=${s.fanIn}  fan-out=${s.fanOut}  total=${s.fanIn + s.fanOut}`,
+	);
+	const hint =
+		opts.limit === undefined && all.length > STATS_HINT_THRESHOLD
+			? `(${all.length} nodes total — pass --limit <n> to narrow)\n`
+			: "";
+	return ok(`${lines.join("\n")}\n`, hint);
+}
+
 export interface AuditSyncOptions {
 	json?: boolean;
 }
@@ -1273,6 +1387,75 @@ Exit codes:
   2  invalid usage (missing --id/--field)
 `;
 
+const HELP_NEIGHBORS = `usage: pfdsl neighbors <file|-> <id> [--json]
+
+Print the direct predecessors (in-edges) and successors (out-edges) of a
+node — its immediate producer(s)/consumer(s) only, not the full closure.
+
+  --json  output as JSON ({ ok, predecessors: string[], successors: string[] })
+
+Exit codes:
+  0  success
+  1  id not found in the file
+  2  invalid usage (missing id)
+`;
+
+const HELP_IMPACT = `usage: pfdsl impact <file|-> <id> [--json]
+
+Print the full downstream closure reachable from <id> via primary edges
+(everything <id> unblocks, transitively), excluding <id> itself. Text mode
+prints one id per line (empty: "(none)"), for easy piping into other tools.
+
+  --json  output as JSON ({ ok, impact: string[] })
+
+Exit codes:
+  0  success
+  1  id not found in the file
+  2  invalid usage (missing id)
+`;
+
+const HELP_DEPENDS_ON = `usage: pfdsl depends-on <file|-> <id> [--json]
+
+Print the full upstream closure <id> depends on via primary edges
+(everything that must exist for <id> to exist), excluding <id> itself. Text
+mode prints one id per line (empty: "(none)"), for easy piping into other tools.
+
+  --json  output as JSON ({ ok, dependsOn: string[] })
+
+Exit codes:
+  0  success
+  1  id not found in the file
+  2  invalid usage (missing id)
+`;
+
+const HELP_PATH = `usage: pfdsl path <file|-> <from> <to> [--json]
+
+Print all simple paths from <from> to <to> via primary edges (empty if
+none exist). Answers "is <from> a prerequisite of <to>, and how".
+
+  --json  output as JSON ({ ok, paths: string[][] })
+
+Exit codes:
+  0  success (including when no path exists)
+  1  <from> or <to> not found in the file
+  2  invalid usage (missing from/to)
+`;
+
+const HELP_STATS = `usage: pfdsl stats <file|-> [--limit <n>] [--json]
+
+Print fan-in/fan-out per node, ranked by total degree descending (hubs
+first) then id ascending. Text mode prints a hint to stderr suggesting
+--limit when the file has more than ${STATS_HINT_THRESHOLD} nodes and --limit wasn't given
+(kept off stdout so \`stats <file> | ...\` pipelines aren't affected).
+
+  --limit <n>  only print the top n rows
+  --json       output as JSON ({ ok, stats: {id, kind, fanIn, fanOut}[] })
+
+Exit codes:
+  0  success
+  2  invalid usage
+`;
+
 const HELP_AUDIT_SYNC = `usage: pfdsl audit-sync <roadmap> <flow> [<flow>...] [--json]
 
 Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
@@ -1374,6 +1557,16 @@ Commands:
                            --field   comma-separated field names, or repeat --field
                            A "location" field is resolved against basePath
                            --json    output as JSON
+  neighbors <file|-> <id> [--json]
+                           Print direct predecessors/successors of a node (- = stdin)
+  impact <file|-> <id> [--json]
+                           Print the full downstream closure of a node (- = stdin)
+  depends-on <file|-> <id> [--json]
+                           Print the full upstream closure of a node (- = stdin)
+  path <file|-> <from> <to> [--json]
+                           Print all simple paths from <from> to <to> (- = stdin)
+  stats <file|-> [--limit <n>] [--json]
+                           Rank nodes by fan-in/fan-out degree (- = stdin)
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON
@@ -1539,6 +1732,46 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			return runGet(f, {
 				...(typeof flags.id === "string" ? { id: flags.id } : {}),
 				...(typeof flags.field === "string" ? { field: flags.field } : {}),
+				json: flags.json === true,
+			});
+		}
+		case "neighbors": {
+			if (flags.help) return ok(HELP_NEIGHBORS);
+			const [f, id] = positional;
+			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
+			return runNeighbors(f, id, { json: flags.json === true });
+		}
+		case "impact": {
+			if (flags.help) return ok(HELP_IMPACT);
+			const [f, id] = positional;
+			if (!f || !id) return fail(HELP_IMPACT, 2);
+			return runImpact(f, id, { json: flags.json === true });
+		}
+		case "depends-on": {
+			if (flags.help) return ok(HELP_DEPENDS_ON);
+			const [f, id] = positional;
+			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
+			return runDependsOn(f, id, { json: flags.json === true });
+		}
+		case "path": {
+			if (flags.help) return ok(HELP_PATH);
+			const [f, from, to] = positional;
+			if (!f || !from || !to) return fail(HELP_PATH, 2);
+			return runPath(f, from, to, { json: flags.json === true });
+		}
+		case "stats": {
+			if (flags.help) return ok(HELP_STATS);
+			const f = positional[0];
+			if (!f) return fail(HELP_STATS, 2);
+			const limitFlag = flags.limit;
+			let limit: number | undefined;
+			if (typeof limitFlag === "string") {
+				const n = Number(limitFlag);
+				if (!Number.isInteger(n) || n < 0) return fail(HELP_STATS, 2);
+				limit = n;
+			}
+			return runStats(f, {
+				...(limit !== undefined ? { limit } : {}),
 				json: flags.json === true,
 			});
 		}

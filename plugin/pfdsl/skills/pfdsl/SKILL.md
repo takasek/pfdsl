@@ -97,6 +97,11 @@ npx @pfdsl/cli diff <a> <b> [--format text|dot|svg]   # Structural diff (text), 
 npx @pfdsl/cli ready <file|-> [--best] [--json]   # List ready-to-start processes (- = stdin)
 npx @pfdsl/cli status-set <file> <artifact-id> <status> [--json]   # Set artifact status (todo|wip|done|waiting|suspended) in place
 npx @pfdsl/cli get <file|-> --id <ids> --field <fields> [--json]   # Print field values for one or more ids (- = stdin)
+npx @pfdsl/cli neighbors <file|-> <id> [--json]   # Print direct predecessors/successors of a node (- = stdin)
+npx @pfdsl/cli impact <file|-> <id> [--json]   # Print the full downstream closure of a node (- = stdin)
+npx @pfdsl/cli depends-on <file|-> <id> [--json]   # Print the full upstream closure of a node (- = stdin)
+npx @pfdsl/cli path <file|-> <from> <to> [--json]   # Print all simple paths from <from> to <to> (- = stdin)
+npx @pfdsl/cli stats <file|-> [--limit <n>] [--json]   # Rank nodes by fan-in/fan-out degree (- = stdin)
 npx @pfdsl/cli audit-sync <roadmap> <flow> [<flow>...] [--json]   # Cross-check todo artifacts in flow files against the roadmap
 npx @pfdsl/cli explain <code>   # Print the summary and spec section for a diagnostic code (e.g. V021)
 npx @pfdsl/cli help   # Show this help

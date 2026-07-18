@@ -141,6 +141,16 @@ Commands:
                            --field   comma-separated field names, or repeat --field
                            A "location" field is resolved against basePath
                            --json    output as JSON
+  neighbors <file|-> <id> [--json]
+                           Print direct predecessors/successors of a node (- = stdin)
+  impact <file|-> <id> [--json]
+                           Print the full downstream closure of a node (- = stdin)
+  depends-on <file|-> <id> [--json]
+                           Print the full upstream closure of a node (- = stdin)
+  path <file|-> <from> <to> [--json]
+                           Print all simple paths from <from> to <to> (- = stdin)
+  stats <file|-> [--limit <n>] [--json]
+                           Rank nodes by fan-in/fan-out degree (- = stdin)
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON
