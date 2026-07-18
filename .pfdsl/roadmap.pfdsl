@@ -31,6 +31,7 @@ artifact:
     status: done
     criteria: check/fmt/graph が全サンプルにエラーなし、v0.0.7 全フィールドが spec 本文に統合済み
     location: ../docs/spec/spec.md
+    revises: spec_v006
   spec_v008:
     label: 仕様書 v0.0.8（マルチファイル統合）
     status: done
@@ -181,11 +182,13 @@ artifact:
     criteria: "basePath: フィールドが spec 本文に統合済み"
     location: ../docs/spec/spec.md
     updated_at: 2026-07-03T03:51:00Z
+    revises: spec_v009
   spec_v0011:
     label: 仕様書 v0.0.11（waiting/suspended/type統合）
     status: done
     criteria: "waiting/suspended status 分割・type フィールド・W002 source artifact 免除が spec 本文に統合済み"
     location: ../docs/spec/spec.md
+    revises: spec_v0010
   ready_cmd:
     label: "pfdsl ready コマンド (PR #267)"
     description: "着手可能プロセスを機械的に列挙する ready コマンド。--best で合流点優先の推薦、--json で機械可読出力。pfd-ops スキルの step 1 計算を代替する"
@@ -670,8 +673,6 @@ spec_v006 >> write_design_notes -> design_notes
 
 [criteria_spec, revises_spec, location_spec, design_notes, external_stakeholders_spec] >> integrate_spec -> spec_v007
 
-spec_v006 >>? integrate_spec
-
 [spec_v006, findings_r12, cli_tool] >> implement_lints -> lint_checker
 
 [spec_v007, lint_checker] >> implement_spec_features -> featured_toolchain
@@ -719,7 +720,6 @@ index_reindex >> integrate_spec_v009 -> spec_v009
 
 [spec_v009, cli_release_index_sort] >> implement_basepath -> basepath
 [basepath, ready_cmd] >> integrate_spec_v0010 -> spec_v0010
-spec_v009 >>? integrate_spec_v0010
 cli_release_index_sort >> implement_ready_cmd -> ready_cmd
 basepath >> publish_cli_basepath -> cli_release_basepath
 [cli_release_basepath, ready_cmd] >> publish_cli_ready_cmd -> cli_release_ready_cmd
@@ -742,7 +742,6 @@ cli_release_status_lifecycle >> implement_symmetry_hint -> symmetry_hint
 [cli_release_status_lifecycle, statusset_impact, symmetry_hint] >> publish_cli_statusset_impact -> cli_release_statusset_impact
 
 [type_field, w002_hierarchy, blocked_by] >> integrate_spec_v0011 -> spec_v0011
-spec_v0010 >>? integrate_spec_v0011
 
 multifile_toolchain >> recode_boundary_diags -> recode
 
