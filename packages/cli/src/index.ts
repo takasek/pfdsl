@@ -21,6 +21,7 @@ import {
 	type PfdType,
 	reindex,
 	resolveEffectiveFrontmatter,
+	resolveLocationFsPath,
 	resolveRefPath,
 	type SortKey,
 	STATUS_VALUES,
@@ -760,6 +761,99 @@ export function runStatusSet(
 	return ok("", warnText);
 }
 
+export interface GetOptions {
+	id?: string;
+	field?: string;
+	json?: boolean;
+}
+
+function splitCommaList(raw: string): string[] {
+	return raw
+		.split(",")
+		.map((s) => s.trim())
+		.filter((s) => s.length > 0);
+}
+
+export function runGet(file: string, opts: GetOptions = {}): CommandResult {
+	if (!opts.id || !opts.field) return fail(HELP_GET, 2);
+	const ids = splitCommaList(opts.id);
+	const fields = splitCommaList(opts.field);
+	if (ids.length === 0 || fields.length === 0) return fail(HELP_GET, 2);
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
+	const failed = failIfErrors(diagnostics, file);
+	if (failed) return failed;
+
+	const basePath = frontmatter?.basePath;
+	const docFsPath = file === "-" ? null : resolve(file);
+
+	const metaFor = (id: string): Record<string, unknown> | undefined => {
+		switch (nodeKinds.get(id)) {
+			case "artifact":
+				return frontmatter?.artifact?.[id];
+			case "process":
+				return frontmatter?.process?.[id];
+			case "group":
+				return frontmatter?.group?.[id];
+			default:
+				return undefined;
+		}
+	};
+
+	const resolveValue = (field: string, value: unknown): unknown => {
+		if (field !== "location" || value === undefined || docFsPath === null)
+			return value;
+		const resolveOne = (loc: string) =>
+			resolveLocationFsPath(docFsPath, loc, basePath);
+		return Array.isArray(value)
+			? value.map(resolveOne)
+			: resolveOne(String(value));
+	};
+
+	const missing: string[] = [];
+	const values: Record<string, Record<string, unknown>> = {};
+	for (const id of ids) {
+		if (!nodeKinds.has(id)) {
+			missing.push(id);
+			continue;
+		}
+		const meta = metaFor(id);
+		const row: Record<string, unknown> = {};
+		for (const field of fields) {
+			row[field] = resolveValue(field, meta?.[field]) ?? null;
+		}
+		values[id] = row;
+	}
+
+	if (missing.length > 0) {
+		return fail(
+			`error: id(s) not found in ${file}: ${missing.join(", ")}\n`,
+			1,
+		);
+	}
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, values })}\n`);
+	}
+
+	const lines: string[] = [];
+	for (const id of ids) {
+		for (const field of fields) {
+			const v = values[id]?.[field];
+			const display = Array.isArray(v)
+				? v.join(", ")
+				: v === null
+					? ""
+					: String(v);
+			lines.push(`${id}.${field}: ${display}`);
+		}
+	}
+	return ok(`${lines.join("\n")}\n`);
+}
+
 export interface AuditSyncOptions {
 	json?: boolean;
 }
@@ -1088,6 +1182,26 @@ Exit codes:
   2  invalid usage (missing argument, invalid status value)
 `;
 
+const HELP_GET = `usage: pfdsl get <file|-> --id <ids> --field <fields> [--json]
+
+Print field values for one or more artifact/process/group ids. Use - to read
+from stdin (location fields are returned unresolved when reading from stdin,
+since there is no file path to resolve basePath against).
+
+  --id <ids>      comma-separated ids, or repeat --id for each one
+  --field <fields> comma-separated field names, or repeat --field for each one
+  --json          emit JSON ({ ok, values: { [id]: { [field]: value } } })
+
+A \`location\` field is resolved against the file's basePath (spec §15.8) so
+callers don't need to recompute it themselves. A field the node doesn't have
+prints as an empty value (JSON: null); this is not an error.
+
+Exit codes:
+  0  success
+  1  one or more requested ids do not exist in the file
+  2  invalid usage (missing --id/--field)
+`;
+
 const HELP_AUDIT_SYNC = `usage: pfdsl audit-sync <roadmap> <flow> [<flow>...] [--json]
 
 Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
@@ -1183,6 +1297,12 @@ Commands:
                            Set artifact status (todo|wip|done|waiting|suspended) in place
                            Roadmap files: prints newly-ready processes after the change
                            --json    output as JSON ({ ok, newlyReady: string[], warnings? })
+  get <file|-> --id <ids> --field <fields> [--json]
+                           Print field values for one or more ids (- = stdin)
+                           --id      comma-separated ids, or repeat --id
+                           --field   comma-separated field names, or repeat --field
+                           A "location" field is resolved against basePath
+                           --json    output as JSON
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON
@@ -1338,6 +1458,16 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			const [f, artifactId, status] = positional;
 			if (!f || !artifactId || !status) return fail(HELP_STATUS_SET, 2);
 			return runStatusSet(f, artifactId, status, {
+				json: flags.json === true,
+			});
+		}
+		case "get": {
+			if (flags.help) return ok(HELP_GET);
+			const f = positional[0];
+			if (!f) return fail(HELP_GET, 2);
+			return runGet(f, {
+				...(typeof flags.id === "string" ? { id: flags.id } : {}),
+				...(typeof flags.field === "string" ? { field: flags.field } : {}),
 				json: flags.json === true,
 			});
 		}

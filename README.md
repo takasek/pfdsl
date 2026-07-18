@@ -135,6 +135,12 @@ Commands:
                            Set artifact status (todo|wip|done|waiting|suspended) in place
                            Roadmap files: prints newly-ready processes after the change
                            --json    output as JSON ({ ok, newlyReady: string[], warnings? })
+  get <file|-> --id <ids> --field <fields> [--json]
+                           Print field values for one or more ids (- = stdin)
+                           --id      comma-separated ids, or repeat --id
+                           --field   comma-separated field names, or repeat --field
+                           A "location" field is resolved against basePath
+                           --json    output as JSON
   audit-sync <roadmap> <flow> [<flow>...] [--json]
                            Cross-check todo artifacts in flow files against the roadmap
                            --json    output as JSON
