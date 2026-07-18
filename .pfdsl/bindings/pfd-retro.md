@@ -28,6 +28,16 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
   具体例: `--strict` は V011（feedback 到達性）のみを制御すると読める名前だが、実装は W002/W005 の warning→error 昇格も同時に束ねていた（#480 派生作業）。既存リポ資産（`docs/*.pfdsl`・`.pfdsl/*.pfdsl`）に対して素の `--strict` を先に検証せず CI 設定へ組み込もうとし、無関係な既存 W002/V011 所見 170 件超が一斉 FAIL するところだった。
   対策: 新しいフラグを既存ゲートに組み込む前に、そのフラグを対象コーパス全体に対して単体実行し、意図した検査以外の所見件数を数えてから採否を判断する。
 
+- **実行環境の暗黙前提 trap**: リポの運用スクリプトが特定の CLI ツール（`gh` 等）の存在を暗黙の前提にしていると、そのツールを持たない実行環境（Claude Code Remote 等、GitHub 操作が MCP server 経由に限定されるセッション）では preflight/gate-check の一部〜全部がエラーで止まる。
+  問いの形: 「このスクリプトが前提にしている外部 CLI は、全ての起動元セッション種別で利用可能か」。
+  具体例: `scripts/cycle-status.mjs` / `scripts/gate-check.mjs`（内部の `audit-issues-flow.mjs`）が `gh` に `execSync`/`execFileSync` で依存しており、`gh` 不在の Claude Code Remote セッションで `audit-issues-flow.mjs` が `spawnSync gh ENOENT` でクラッシュし、gate-check の残り項目の出力ごと失われた（#482 セッション、#489 で追跡）。
+  対策: 該当ステップは GitHub MCP のツール呼び出しで個別に代替できる（`.pfdsl/roadmap.md`「自動生成 PR」節に代替手順を記録）。恒久対策（`gh` 依存の解消・try/catch 化）は #489。
+
+- **companion 追記手順の見落とし**: SKILL.md 本文の自己点検セクションが1つのスクリプトしか名指ししていないと、同じ契機で実行すべき binding 側の追加ステップ（companion にのみ書かれている）を読み飛ばしたまま作業を始めてしまう。
+  問いの形: 「このセルフチェック手順は、binding に追記された継続ステップの存在を保証しているか、それとも読み手が binding 全文を読む前提に依存しているか」。
+  具体例: `.pfdsl/bindings/pfd-ops.md` に「配置ファイルの鮮度セルフチェックに続けて `check-scaffold-sync.mjs` も実行する」という追加ステップがあったが、SKILL.md 側の該当セクションはそれへの参照を持たず、セッション開始時に見落とした（retro で気付き実行、drift は無し）。
+  対策: SKILL.md のセルフチェックセクションに「同じタイミングで binding の追加ステップも確認する」という一般化した誘導文を追記した（本コミット）。
+
 ## 配布物への finding 反映
 
 配布 bundle（plugin 同梱の pfd-* スキル本文・reference）は上流リポ（takasek/pfdsl）の生成・同梱物であり、採用リポ側のコピーは編集対象にならない（ADR-0028。plugin cache 内のファイルはインストール更新で消える）。

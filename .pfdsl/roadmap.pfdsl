@@ -383,7 +383,7 @@ artifact:
   editor_connector:
     label: "エディタ コネクタ編集支援 (#482)"
     description: "ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用"
-    status: todo
+    status: wip
     criteria: "カーソル下ノードへの前後追加・接続がコネクタ種選択付きで動作確認済み、テスト通過"
   preview_connector:
     label: "Preview コネクタ生成 UI (#483)"
