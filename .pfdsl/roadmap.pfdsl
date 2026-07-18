@@ -408,7 +408,7 @@ artifact:
   graph_analysis:
     label: "graph-analysis サブコマンド群 (#479)"
     description: "neighbors / impact / depends-on / path / hubs / group-graph / rollup 等の分析サブコマンド。完全リストと優先度は issue #479 が一次情報。着手時に段階を切り分ける"
-    status: wip
+    status: done
     criteria: "issue #479 の分析サブコマンドが実装され、到達性・近傍・集計が動作確認済み、テスト通過"
   cli_release_grill_tolerance:
     label: "CLIリリース: 診断緩和 + pfd-grill"
