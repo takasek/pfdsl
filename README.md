@@ -65,7 +65,7 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 
 - **Pipeline** — lexer → parser → normalizer → validator → canonical sorter → formatter (`@pfdsl/core`)
 - **DOT / SVG** — Graphviz export and Wasm-based rendering (`@pfdsl/graphviz-exporter`, `@pfdsl/preview-engine`)
-- **CLI** — `pfdsl check / fmt / reindex / sort-meta / normalize / graph / diff` (`@pfdsl/cli`)
+- **CLI** — `pfdsl check / fmt / render / diff` plus `graph` / `meta` / `status` command groups (`@pfdsl/cli`)
 - **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
 - **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`); installable via `/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`
 
