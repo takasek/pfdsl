@@ -102,7 +102,7 @@ export function lintCommitSubjects(subjects) {
 }
 
 /**
- * Parse the `terminal artifacts: a, b, c` line out of `pfdsl check --audit`
+ * Parse the `terminal artifacts: a, b, c` line out of `pfdsl graph io`
  * text output.
  * @param {string} auditText
  * @returns {string[]}

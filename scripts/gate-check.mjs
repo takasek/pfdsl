@@ -248,8 +248,8 @@ console.log(formatGateTable(results));
 			const before = trySh(`git show origin/${base}:${f}`);
 			const after = trySh(`git show HEAD:${f}`);
 			if (!after.ok) continue;
-			const beforeAudit = before.ok ? trySh(`node "${cliPath}" check - --audit`, before.out) : { ok: true, out: "" };
-			const afterAudit = trySh(`node "${cliPath}" check - --audit`, after.out);
+			const beforeAudit = before.ok ? trySh(`node "${cliPath}" graph io -`, before.out) : { ok: true, out: "" };
+			const afterAudit = trySh(`node "${cliPath}" graph io -`, after.out);
 			if (!afterAudit.ok) continue;
 			const newTerminals = diffNewTerminals(
 				beforeAudit.ok ? parseAuditTerminals(beforeAudit.out) : [],
@@ -268,15 +268,15 @@ console.log(formatGateTable(results));
 
 // Report material: ready-set diff for .pfdsl/roadmap.pfdsl (workcycle step 4's
 // "released follow-up processes / updated ready set" report), derived from two
-// `ready --json` runs instead of AI graph traversal.
+// `status ready --json` runs instead of AI graph traversal.
 {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	if (changedFiles.includes(".pfdsl/roadmap.pfdsl") && existsSync(cliPath)) {
 		const before = trySh(`git show origin/${base}:.pfdsl/roadmap.pfdsl`);
 		const after = trySh("git show HEAD:.pfdsl/roadmap.pfdsl");
 		if (before.ok && after.ok) {
-			const beforeReady = trySh(`node "${cliPath}" ready - --json`, before.out);
-			const afterReady = trySh(`node "${cliPath}" ready - --json`, after.out);
+			const beforeReady = trySh(`node "${cliPath}" status ready - --json`, before.out);
+			const afterReady = trySh(`node "${cliPath}" status ready - --json`, after.out);
 			if (beforeReady.ok && afterReady.ok) {
 				const beforeIds = JSON.parse(beforeReady.out).ready.map((p) => p.id);
 				const afterIds = JSON.parse(afterReady.out).ready.map((p) => p.id);

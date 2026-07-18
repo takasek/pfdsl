@@ -51,8 +51,8 @@ artifact:
     group: in_memory
   normalized_graph:
     label: 正準化グラフ
-    description: "正規化済みエッジ・ノード種別・isolatedノード集合とGraph構造。validate/render_graph/export_metadata/diff_graphsの共通入力。CLI normalizeコマンドはこれをJSONで直接出力する"
-    criteria: npx @pfdsl/cli normalize が実装され動作確認済み（validate/render_graph/export_metadata/diff_graphsの共通入力として機能）
+    description: "正規化済みエッジ・ノード種別・isolatedノード集合とGraph構造。validate/render_graph/export_metadata/diff_graphsの共通入力。CLI graph edgesコマンドはこれをJSONで直接出力する"
+    criteria: npx @pfdsl/cli graph edges が実装され動作確認済み（validate/render_graph/export_metadata/diff_graphsの共通入力として機能）
     externalStakeholders: [CLIユーザー]
     group: in_memory
   diagnostics_report:
@@ -69,14 +69,14 @@ artifact:
     group: run_outputs
   dot_graph:
     label: DOTグラフ
-    description: Graphviz DOT形式テキスト（graphコマンドのデフォルト出力）
-    criteria: npx @pfdsl/cli graph が実装され動作確認済み
+    description: Graphviz DOT形式テキスト（renderコマンドのデフォルト出力）
+    criteria: npx @pfdsl/cli render が実装され動作確認済み
     externalStakeholders: [CLIユーザー]
     group: run_outputs
   rendered_image:
     label: レンダリング画像
     description: DOTから変換したSVG（wasm）またはPDF/PNG（puppeteer経由）
-    criteria: npx @pfdsl/cli graph --format svg/pdf/png が実装され動作確認済み
+    criteria: npx @pfdsl/cli render --format svg/pdf/png が実装され動作確認済み
     externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
     group: run_outputs
   metadata_tsv:
@@ -94,12 +94,12 @@ artifact:
   sorted_source:
     label: ソート済みソース
     description: 指定キーでノード定義を並べ替えた.pfdslテキスト
-    criteria: sort-metaコマンドが実装され動作確認済み
+    criteria: meta sortコマンドが実装され動作確認済み
     externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
     group: run_outputs
   pfdsl_skill:
     label: PFD読み書き分析skill
-    description: "AIエージェントに.pfdsl操作（check/fmt/graph/diff/sort-meta等のCLIコマンド）を指示するスキル。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため、図にはassemble_pluginへの素材提供のみが現れる"
+    description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため、図にはassemble_pluginへの素材提供のみが現れる"
     location: ../.claude/skills/pfdsl/
     group: skill_sources
     tags: [c]
@@ -168,7 +168,7 @@ process:
   normalize:
     label: 正規化
     description: エッジリストとノード種別を正規化しGraphを構築する
-    command: npx @pfdsl/cli normalize
+    command: npx @pfdsl/cli graph edges
     location: ../packages/core/src/normalizer.ts
     tags: [b]
   validate:
@@ -186,13 +186,13 @@ process:
   render_graph:
     label: DOT変換
     description: 正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する
-    command: npx @pfdsl/cli graph
+    command: npx @pfdsl/cli render
     location: ../packages/graphviz-exporter/src/index.ts
     tags: [b]
   export_image:
     label: 画像化
     description: DOTをSVG（wasm、外部依存なし）またはPDF/PNG（puppeteer必須）へ変換する
-    command: npx @pfdsl/cli graph --format svg
+    command: npx @pfdsl/cli render --format svg
     location: ../packages/preview-engine/src/index.ts
     tags: [b]
   export_metadata:
@@ -209,7 +209,7 @@ process:
   sort_meta:
     label: ノード定義ソート
     description: ソースを再parseし、指定キーでfrontmatterのノード定義を並べ替えたテキストを生成する
-    command: npx @pfdsl/cli sort-meta
+    command: npx @pfdsl/cli meta sort
     location: ../packages/core/src/sort.ts
     tags: [b]
   assemble_plugin:
