@@ -59,6 +59,10 @@ function compatibleOtherKind(nodeRole: ConnectorRole): NodeKind {
 	return nodeRole === "artifact" ? "process" : "artifact";
 }
 
+function articleFor(word: string): string {
+	return /^[aeiou]/i.test(word) ? "an" : "a";
+}
+
 function nodeIdAtCursor(
 	editor: vscode.TextEditor,
 ): { nodeId: string; line: number } | undefined {
@@ -127,7 +131,10 @@ export function registerConnectorEditing(
 				.map(([id]) => id)
 				.sort();
 			const idPick = await vscode.window.showQuickPick(
-				[{ label: newIdItem }, ...existingIds.map((id) => ({ label: id }))],
+				[
+					{ label: newIdItem, alwaysShow: true },
+					...existingIds.map((id) => ({ label: id, alwaysShow: false })),
+				],
 				{ placeHolder: `Select the ${wantedKind} to connect` },
 			);
 			if (!idPick) return;
@@ -138,11 +145,13 @@ export function registerConnectorEditing(
 				const input = await vscode.window.showInputBox({
 					prompt: `New ${wantedKind} ID`,
 					validateInput: (value) => {
-						if (!fullIdPattern.test(value)) return "Invalid node ID";
+						if (!fullIdPattern.test(value)) {
+							return "Invalid ID — use letters, numbers, _ or - (must start with a letter, number, or _)";
+						}
 						if (value === nodeId) return "Cannot connect a node to itself";
 						const existingKind = nodeKinds.get(value);
 						if (existingKind && existingKind !== wantedKind) {
-							return `"${value}" is already a ${existingKind}, not a ${wantedKind}`;
+							return `"${value}" is already ${articleFor(existingKind)} ${existingKind}, not ${articleFor(wantedKind)} ${wantedKind}`;
 						}
 						return undefined;
 					},
@@ -167,17 +176,26 @@ export function registerConnectorEditing(
 				otherId,
 			);
 			const source = editor.document.getText();
-			const { text, insertedLine } = insertConnectorEdge(
+			const { text, insertedLine, anchored } = insertConnectorEdge(
 				source,
 				edgeLine,
 				nodeId,
 				cursorLine,
 			);
-			const fullRange = new vscode.Range(
-				editor.document.positionAt(0),
-				editor.document.positionAt(source.length),
-			);
-			await editor.edit((eb) => eb.replace(fullRange, text));
+			if (anchored) {
+				// Single-line insert: less disruptive to fold state/undo than a
+				// full-document replace, and valid because anchored insertion never
+				// touches any other line's content.
+				await editor.edit((eb) =>
+					eb.insert(new vscode.Position(insertedLine, 0), `${edgeLine}\n`),
+				);
+			} else {
+				const fullRange = new vscode.Range(
+					editor.document.positionAt(0),
+					editor.document.positionAt(source.length),
+				);
+				await editor.edit((eb) => eb.replace(fullRange, text));
+			}
 
 			const lineEnd = editor.document.lineAt(insertedLine).range.end;
 			editor.selection = new vscode.Selection(lineEnd, lineEnd);
