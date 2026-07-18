@@ -774,11 +774,50 @@ function splitCommaList(raw: string): string[] {
 		.filter((s) => s.length > 0);
 }
 
+const KNOWN_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
+	artifact: new Set([
+		"label",
+		"description",
+		"owner",
+		"externalStakeholders",
+		"parts",
+		"index",
+		"status",
+		"tags",
+		"group",
+		"criteria",
+		"location",
+		"revises",
+	]),
+	process: new Set([
+		"label",
+		"description",
+		"owner",
+		"externalStakeholders",
+		"index",
+		"group",
+		"tags",
+		"command",
+		"location",
+		"subflow",
+		"boundary",
+	]),
+	group: new Set(["label", "color", "parent"]),
+};
+
 export function runGet(file: string, opts: GetOptions = {}): CommandResult {
-	if (!opts.id || !opts.field) return fail(HELP_GET, 2);
+	if (!opts.id && !opts.field) {
+		return fail(`error: --id and --field are required\n\n${HELP_GET}`, 2);
+	}
+	if (!opts.id) return fail(`error: --id is required\n\n${HELP_GET}`, 2);
+	if (!opts.field) return fail(`error: --field is required\n\n${HELP_GET}`, 2);
 	const ids = splitCommaList(opts.id);
 	const fields = splitCommaList(opts.field);
-	if (ids.length === 0 || fields.length === 0) return fail(HELP_GET, 2);
+	if (ids.length === 0)
+		return fail(`error: --id is required\n\n${HELP_GET}`, 2);
+	if (fields.length === 0) {
+		return fail(`error: --field is required\n\n${HELP_GET}`, 2);
+	}
 
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
@@ -814,44 +853,62 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	};
 
 	const missing: string[] = [];
+	const warnings: string[] = [];
 	const values: Record<string, Record<string, unknown>> = {};
 	for (const id of ids) {
-		if (!nodeKinds.has(id)) {
+		const kind = nodeKinds.get(id);
+		if (kind === undefined) {
 			missing.push(id);
 			continue;
 		}
 		const meta = metaFor(id);
 		const row: Record<string, unknown> = {};
 		for (const field of fields) {
+			if (!KNOWN_FIELDS[kind].has(field)) {
+				warnings.push(
+					`warning: '${field}' is not a recognized field for '${id}' (possible typo?)`,
+				);
+			}
 			row[field] = resolveValue(field, meta?.[field]) ?? null;
 		}
 		values[id] = row;
 	}
+	const warnText = warnings.length ? `${warnings.join("\n")}\n` : "";
 
 	if (missing.length > 0) {
-		return fail(
-			`error: id(s) not found in ${file}: ${missing.join(", ")}\n`,
-			1,
-		);
+		const errorText = `error: id(s) not found in ${file}: ${missing.join(", ")}\n`;
+		if (opts.json) {
+			return fail(
+				`${warnText}${errorText}`,
+				1,
+				`${JSON.stringify({ ok: false, values, missing })}\n`,
+			);
+		}
+		const lines = ids
+			.filter((id) => values[id])
+			.flatMap((id) => fields.map((field) => formatGetLine(id, field, values)));
+		const stdout = lines.length ? `${lines.join("\n")}\n` : "";
+		return fail(`${warnText}${errorText}`, 1, stdout);
 	}
 
 	if (opts.json) {
-		return ok(`${JSON.stringify({ ok: true, values })}\n`);
+		return ok(`${JSON.stringify({ ok: true, values })}\n`, warnText);
 	}
 
-	const lines: string[] = [];
-	for (const id of ids) {
-		for (const field of fields) {
-			const v = values[id]?.[field];
-			const display = Array.isArray(v)
-				? v.join(", ")
-				: v === null
-					? ""
-					: String(v);
-			lines.push(`${id}.${field}: ${display}`);
-		}
-	}
-	return ok(`${lines.join("\n")}\n`);
+	const lines = ids.flatMap((id) =>
+		fields.map((field) => formatGetLine(id, field, values)),
+	);
+	return ok(`${lines.join("\n")}\n`, warnText);
+}
+
+function formatGetLine(
+	id: string,
+	field: string,
+	values: Record<string, Record<string, unknown>>,
+): string {
+	const v = values[id]?.[field];
+	const display = Array.isArray(v) ? v.join(", ") : v === null ? "" : String(v);
+	return `${id}.${field}: ${display}`;
 }
 
 export interface AuditSyncOptions {
@@ -1194,7 +1251,14 @@ since there is no file path to resolve basePath against).
 
 A \`location\` field is resolved against the file's basePath (spec §15.8) so
 callers don't need to recompute it themselves. A field the node doesn't have
-prints as an empty value (JSON: null); this is not an error.
+prints as an empty value (JSON: null); this is not an error. Requesting a
+field name that isn't a recognized frontmatter key prints a warning to
+stderr (possible typo) but still returns the value (empty, since it's
+genuinely unset) — this does not fail the command.
+
+If some requested ids exist and others don't, values for the found ids are
+still printed (to stdout, or under "values" in --json) alongside the error
+for the missing ones.
 
 Exit codes:
   0  success

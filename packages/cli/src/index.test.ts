@@ -1637,13 +1637,82 @@ spec >> build -> code
 		expect(r.stderr).toContain("nonexistent");
 	});
 
-	it("exits 2 when --id or --field is missing", async () => {
-		const f = join(dir, "get-missing.pfdsl");
+	it("still prints values for found ids when some ids are missing", async () => {
+		const f = join(dir, "get-partial-notfound.pfdsl");
 		writeFileSync(f, base);
-		const r1 = await run(["get", f]);
-		expect(r1.exitCode).toBe(2);
-		const r2 = await run(["get", f, "--id", "spec"]);
-		expect(r2.exitCode).toBe(2);
+		const r = await run([
+			"get",
+			f,
+			"--id",
+			"spec,nonexistent",
+			"--field",
+			"status",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toBe("spec.status: done\n");
+		expect(r.stderr).toContain("nonexistent");
+	});
+
+	it("--json reports found values and missing ids together on a partial miss", async () => {
+		const f = join(dir, "get-partial-notfound-json.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"get",
+			f,
+			"--id",
+			"spec,nonexistent",
+			"--field",
+			"status",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: false,
+			values: { spec: { status: "done" } },
+			missing: ["nonexistent"],
+		});
+	});
+
+	it("warns on stderr for an unrecognized field name but still succeeds", async () => {
+		const f = join(dir, "get-unknown-field.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["get", f, "--id", "spec", "--field", "lable"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("spec.lable: \n");
+		expect(r.stderr).toContain("warning");
+		expect(r.stderr).toContain("lable");
+	});
+
+	it("does not warn for a recognized field with no value set", async () => {
+		const f = join(dir, "get-known-empty-field.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["get", f, "--id", "code", "--field", "location"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+	});
+
+	it("exits 2 with a specific message when --field is missing", async () => {
+		const f = join(dir, "get-missing-field.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["get", f, "--id", "spec"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("--field is required");
+	});
+
+	it("exits 2 with a specific message when --id is missing", async () => {
+		const f = join(dir, "get-missing-id.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["get", f, "--field", "status"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("--id is required");
+	});
+
+	it("exits 2 when both --id and --field are missing", async () => {
+		const f = join(dir, "get-missing-both.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["get", f]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("--id and --field are required");
 	});
 
 	it("--help returns help text", async () => {
