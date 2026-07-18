@@ -74,6 +74,10 @@
 			{
 				"command": "pfdsl.sortMeta",
 				"title": "PFDSL: Sort Node Definitions…"
+			},
+			{
+				"command": "pfdsl.addConnector",
+				"title": "PFDSL: Add Connector…"
 			}
 		],
 		"keybindings": [
@@ -95,6 +99,11 @@
 				{
 					"when": "editorLangId == pfdsl",
 					"command": "pfdsl.jumpToDefinition",
+					"group": "navigation"
+				},
+				{
+					"when": "editorLangId == pfdsl",
+					"command": "pfdsl.addConnector",
 					"group": "navigation"
 				}
 			]
