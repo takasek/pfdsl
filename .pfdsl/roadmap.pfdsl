@@ -616,7 +616,6 @@ process:
   i480_relax_incomplete_graph:
     label: 書き途中許容実装
     location: https://github.com/takasek/pfdsl/issues/480
-    updated_at: 2026-07-18T00:32:56Z
   i481_create_grill_skill:
     label: pfd-grill スキル作成
     location: https://github.com/takasek/pfdsl/issues/481
