@@ -1735,3 +1735,183 @@ spec >> build -> code
 		expect(r.stdout).toContain("pfdsl get");
 	});
 });
+
+describe("graph analysis", () => {
+	// req >> design -> spec >> build -> code
+	//                spec >> review -> report
+	const base = `req >> design -> spec
+spec >> build -> code
+spec >> review -> report
+`;
+
+	describe("neighbors", () => {
+		it("prints predecessors and successors as text", async () => {
+			const f = join(dir, "neighbors.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["neighbors", f, "spec"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				"predecessors: design\nsuccessors: build, review\n",
+			);
+		});
+
+		it("emits JSON", async () => {
+			const f = join(dir, "neighbors-json.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["neighbors", f, "spec", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				predecessors: ["design"],
+				successors: ["build", "review"],
+			});
+		});
+
+		it("exits 1 when the id is not found", async () => {
+			const f = join(dir, "neighbors-notfound.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["neighbors", f, "nonexistent"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toContain("nonexistent");
+		});
+
+		it("exits 2 when the id argument is missing", async () => {
+			const f = join(dir, "neighbors-missing.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["neighbors", f]);
+			expect(r.exitCode).toBe(2);
+		});
+	});
+
+	describe("impact", () => {
+		it("prints the downstream closure as text", async () => {
+			const f = join(dir, "impact.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["impact", f, "spec"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("impact: build, code, report, review\n");
+		});
+
+		it("prints an empty impact for a terminal node", async () => {
+			const f = join(dir, "impact-terminal.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["impact", f, "code"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("impact: (none)\n");
+		});
+
+		it("emits JSON", async () => {
+			const f = join(dir, "impact-json.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["impact", f, "spec", "--json"]);
+			expect(r.exitCode).toBe(0);
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(true);
+			expect(parsed.impact.sort()).toEqual(
+				["build", "code", "report", "review"].sort(),
+			);
+		});
+
+		it("exits 1 when the id is not found", async () => {
+			const f = join(dir, "impact-notfound.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["impact", f, "nonexistent"]);
+			expect(r.exitCode).toBe(1);
+		});
+	});
+
+	describe("depends-on", () => {
+		it("prints the upstream closure as text", async () => {
+			const f = join(dir, "depends-on.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["depends-on", f, "code"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("depends-on: build, design, req, spec\n");
+		});
+
+		it("exits 1 when the id is not found", async () => {
+			const f = join(dir, "depends-on-notfound.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["depends-on", f, "nonexistent"]);
+			expect(r.exitCode).toBe(1);
+		});
+	});
+
+	describe("path", () => {
+		it("prints all simple paths as text", async () => {
+			const f = join(dir, "path.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["path", f, "spec", "code"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("spec -> build -> code\n");
+		});
+
+		it("prints a message when no path exists", async () => {
+			const f = join(dir, "path-none.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["path", f, "code", "report"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("no path found\n");
+		});
+
+		it("emits JSON", async () => {
+			const f = join(dir, "path-json.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["path", f, "spec", "code", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				paths: [["spec", "build", "code"]],
+			});
+		});
+
+		it("exits 1 when either id is not found", async () => {
+			const f = join(dir, "path-notfound.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["path", f, "nonexistent", "code"]);
+			expect(r.exitCode).toBe(1);
+		});
+
+		it("exits 2 when the to argument is missing", async () => {
+			const f = join(dir, "path-missing.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["path", f, "spec"]);
+			expect(r.exitCode).toBe(2);
+		});
+	});
+
+	describe("stats", () => {
+		it("ranks nodes by total degree as text", async () => {
+			const f = join(dir, "stats.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["stats", f]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout.split("\n")[0]).toBe(
+				"spec (artifact)   fan-in=1  fan-out=2  total=3",
+			);
+		});
+
+		it("--limit caps the number of rows", async () => {
+			const f = join(dir, "stats-limit.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["stats", f, "--limit", "1"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout.trim().split("\n")).toHaveLength(1);
+		});
+
+		it("emits JSON", async () => {
+			const f = join(dir, "stats-json.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["stats", f, "--json"]);
+			expect(r.exitCode).toBe(0);
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(true);
+			expect(parsed.stats[0]).toEqual({
+				id: "spec",
+				kind: "artifact",
+				fanIn: 1,
+				fanOut: 2,
+			});
+		});
+	});
+});
