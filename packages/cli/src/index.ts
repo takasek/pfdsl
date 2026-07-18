@@ -905,17 +905,56 @@ const KNOWN_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
 	group: new Set(["label", "color", "parent"]),
 };
 
+/**
+ * Read-only fields computed from a base field rather than stored in
+ * frontmatter. `location.resolved` auto-accompanies `location` (artifact and
+ * process); `command.cwd` auto-accompanies `command` (process only). Both
+ * can also be requested explicitly via --field, in which case only the
+ * derived value is returned (the base field is not auto-added).
+ */
+const DERIVED_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
+	artifact: new Set(["location.resolved"]),
+	process: new Set(["location.resolved", "command.cwd"]),
+	group: new Set(),
+};
+
+/** Classify a single `location:` element per spec §15.8 and resolve it if it's not a URL. */
+function resolveLocationElement(
+	docFsPath: string,
+	element: string,
+	basePath?: string,
+): string {
+	return element.includes("://")
+		? element
+		: resolveLocationFsPath(docFsPath, element, basePath);
+}
+
+function resolveLocationDerived(
+	docFsPath: string,
+	value: unknown,
+	basePath?: string,
+): unknown {
+	return Array.isArray(value)
+		? value.map((v) => resolveLocationElement(docFsPath, String(v), basePath))
+		: resolveLocationElement(docFsPath, String(value), basePath);
+}
+
+/** The directory commands run in: basePath resolved against the file's dir (§15.8), independent of the command string itself. */
+function commandCwdDerived(docFsPath: string, basePath?: string): string {
+	return resolveLocationFsPath(docFsPath, ".", basePath);
+}
+
 export function runGet(file: string, opts: GetOptions = {}): CommandResult {
-	if (!opts.id && !opts.field) {
-		return fail(`error: --id and --field are required\n\n${HELP_GET}`, 2);
-	}
 	if (!opts.id) return fail(`error: --id is required\n\n${HELP_GET}`, 2);
-	if (!opts.field) return fail(`error: --field is required\n\n${HELP_GET}`, 2);
 	const ids = splitCommaList(opts.id);
-	const fields = splitCommaList(opts.field);
 	if (ids.length === 0)
 		return fail(`error: --id is required\n\n${HELP_GET}`, 2);
-	if (fields.length === 0) {
+
+	// Omitted --field means "all set fields"; present-but-empty (e.g. "--field ,")
+	// is still a usage error.
+	const explicitFields =
+		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
+	if (explicitFields !== undefined && explicitFields.length === 0) {
 		return fail(`error: --field is required\n\n${HELP_GET}`, 2);
 	}
 
@@ -942,21 +981,32 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 		}
 	};
 
-	const resolveValue = (field: string, value: unknown): unknown => {
-		if (field !== "location" || value === undefined || docFsPath === null)
-			return value;
-		const resolveOne = (loc: string) =>
-			resolveLocationFsPath(docFsPath, loc, basePath);
-		return Array.isArray(value)
-			? value.map(resolveOne)
-			: resolveOne(String(value));
-	};
-
 	const missing: string[] = [];
 	// Keyed by "kind::field" so one warning covers every id sharing that
 	// (kind, field) pair instead of repeating per id (#479 usability re-check).
 	const unknownFieldIds = new Map<string, string[]>();
+	// Keyed by field name so one warning covers every id that hit the same
+	// can't-resolve-from-stdin case.
+	const stdinFieldIds = new Map<string, string[]>();
+	const flagUnknown = (
+		kind: "artifact" | "process" | "group",
+		field: string,
+		id: string,
+	) => {
+		const key = `${kind}::${field}`;
+		const affected = unknownFieldIds.get(key);
+		if (affected) affected.push(id);
+		else unknownFieldIds.set(key, [id]);
+	};
+	const flagStdin = (field: string, id: string) => {
+		const affected = stdinFieldIds.get(field);
+		if (affected) affected.push(id);
+		else stdinFieldIds.set(field, [id]);
+	};
+
 	const values: Record<string, Record<string, unknown>> = {};
+	const displayFieldsById: Record<string, string[]> = {};
+
 	for (const id of ids) {
 		const kind = nodeKinds.get(id);
 		if (kind === undefined) {
@@ -965,22 +1015,89 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 		}
 		const meta = metaFor(id);
 		const row: Record<string, unknown> = {};
-		for (const field of fields) {
-			if (!KNOWN_FIELDS[kind].has(field)) {
-				const key = `${kind}::${field}`;
-				const affected = unknownFieldIds.get(key);
-				if (affected) affected.push(id);
-				else unknownFieldIds.set(key, [id]);
+		const displayFields: string[] = [];
+		const addField = (field: string) => {
+			if (!displayFields.includes(field)) displayFields.push(field);
+		};
+
+		// Derived fields auto-accompany their base field right after it, but
+		// only when the node actually has the base field and we have a real
+		// file path to resolve against (not stdin).
+		const addLocationResolvedIfApplicable = () => {
+			if (meta?.location === undefined || docFsPath === null) return;
+			row["location.resolved"] = resolveLocationDerived(
+				docFsPath,
+				meta.location,
+				basePath,
+			);
+			addField("location.resolved");
+		};
+		const addCommandCwdIfApplicable = () => {
+			if (meta?.command === undefined || docFsPath === null) return;
+			row["command.cwd"] = commandCwdDerived(docFsPath, basePath);
+			addField("command.cwd");
+		};
+
+		if (explicitFields === undefined) {
+			// --field omitted: every field present on this node, raw, in
+			// frontmatter order, plus applicable derived fields.
+			for (const field of meta ? Object.keys(meta) : []) {
+				row[field] = meta![field];
+				addField(field);
+				if (field === "location") addLocationResolvedIfApplicable();
+				if (field === "command") addCommandCwdIfApplicable();
 			}
-			row[field] = resolveValue(field, meta?.[field]) ?? null;
+		} else {
+			for (const field of explicitFields) {
+				if (field === "location.resolved" || field === "command.cwd") {
+					addField(field);
+					if (!DERIVED_FIELDS[kind].has(field)) flagUnknown(kind, field, id);
+					if (docFsPath === null) {
+						row[field] = null;
+						flagStdin(field, id);
+						continue;
+					}
+					if (field === "location.resolved") {
+						row[field] =
+							meta?.location === undefined
+								? null
+								: resolveLocationDerived(docFsPath, meta.location, basePath);
+					} else {
+						row[field] = commandCwdDerived(docFsPath, basePath);
+					}
+					continue;
+				}
+				addField(field);
+				if (!KNOWN_FIELDS[kind].has(field)) flagUnknown(kind, field, id);
+				row[field] = meta?.[field] ?? null;
+				if (field === "location") addLocationResolvedIfApplicable();
+				if (field === "command") addCommandCwdIfApplicable();
+			}
 		}
+
 		values[id] = row;
+		displayFieldsById[id] = displayFields;
 	}
-	const warnings = [...unknownFieldIds.entries()].map(([key, affectedIds]) => {
-		const field = key.split("::")[1];
-		return `warning: '${field}' is not a recognized field for ${affectedIds.length === 1 ? `'${affectedIds[0]}'` : `id(s) ${affectedIds.join(", ")}`} (possible typo?)`;
-	});
+
+	const unknownWarnings = [...unknownFieldIds.entries()].map(
+		([key, affectedIds]) => {
+			const field = key.split("::")[1];
+			return `warning: '${field}' is not a recognized field for ${affectedIds.length === 1 ? `'${affectedIds[0]}'` : `id(s) ${affectedIds.join(", ")}`} (possible typo?)`;
+		},
+	);
+	const stdinWarnings = [...stdinFieldIds.entries()].map(
+		([field, affectedIds]) =>
+			`warning: cannot resolve '${field}' for ${affectedIds.length === 1 ? `'${affectedIds[0]}'` : `id(s) ${affectedIds.join(", ")}`}: no file path when reading from stdin`,
+	);
+	const warnings = [...unknownWarnings, ...stdinWarnings];
 	const warnText = warnings.length ? `${warnings.join("\n")}\n` : "";
+
+	const linesFor = (idsToPrint: string[]) =>
+		idsToPrint.flatMap((id) =>
+			(displayFieldsById[id] ?? []).map((field) =>
+				formatGetLine(id, field, values),
+			),
+		);
 
 	if (missing.length > 0) {
 		const errorText = `error: id(s) not found in ${file}: ${missing.join(", ")}\n`;
@@ -991,9 +1108,7 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 				`${JSON.stringify({ ok: false, values, missing })}\n`,
 			);
 		}
-		const lines = ids
-			.filter((id) => values[id])
-			.flatMap((id) => fields.map((field) => formatGetLine(id, field, values)));
+		const lines = linesFor(ids.filter((id) => values[id]));
 		const stdout = lines.length ? `${lines.join("\n")}\n` : "";
 		return fail(`${warnText}${errorText}`, 1, stdout);
 	}
@@ -1002,10 +1117,8 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 		return ok(`${JSON.stringify({ ok: true, values })}\n`, warnText);
 	}
 
-	const lines = ids.flatMap((id) =>
-		fields.map((field) => formatGetLine(id, field, values)),
-	);
-	return ok(`${lines.join("\n")}\n`, warnText);
+	const lines = linesFor(ids);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
 }
 
 function formatGetLine(
@@ -1578,22 +1691,45 @@ Exit codes:
   2  invalid usage (missing argument, invalid field or value)
 `;
 
-const HELP_GET = `usage: pfdsl meta get <file|-> --id <ids> --field <fields> [--json]
+const HELP_GET = `usage: pfdsl meta get <file|-> --id <ids> [--field <fields>] [--json]
 
-Print field values for one or more artifact/process/group ids. Use - to read
-from stdin (location fields are returned unresolved when reading from stdin,
-since there is no file path to resolve basePath against).
+Print field values for one or more artifact/process/group ids.
 
   --id <ids>      comma-separated ids, or repeat --id for each one
-  --field <fields> comma-separated field names, or repeat --field for each one
+  --field <fields> comma-separated field names, or repeat --field for each one.
+                  Omit entirely to print every field set in each node's
+                  frontmatter entry (raw, in frontmatter order), plus
+                  applicable derived fields.
   --json          emit JSON ({ ok, values: { [id]: { [field]: value } } })
 
-A \`location\` field is resolved against the file's basePath (spec §15.8) so
-callers don't need to recompute it themselves. A field the node doesn't have
-prints as an empty value (JSON: null); this is not an error. Requesting a
-field name that isn't a recognized frontmatter key prints a warning to
-stderr (possible typo) but still returns the value (empty, since it's
-genuinely unset) — this does not fail the command.
+\`location\` is returned as the raw value exactly as written (so \`meta get\`
+and \`meta set\` round-trip). The resolved filesystem path is a separate
+read-only derived field, \`location.resolved\`, which is added to the output
+automatically right after \`location\` whenever \`location\` is in the output
+(explicitly requested or via omitted --field) and the node has a location.
+Each location element is classified per spec §15.8: an element containing
+"://" is a URL and is passed through unchanged; everything else (paths and
+globs) is resolved against the file's basePath. A scalar location yields a
+scalar location.resolved; an array yields an array.
+
+\`command.cwd\` works the same way for process nodes: whenever \`command\` is
+in the output and the node has a command, \`command.cwd\` (the basePath-
+resolved directory commands run in) is added right after it. command.cwd
+does not depend on the command string itself.
+
+Either derived field may also be requested explicitly via --field (e.g.
+--field location.resolved), in which case only the derived value is
+returned — the base field is not auto-added. Use - to read from stdin: since
+there is no file path to resolve against, derived fields are silently
+omitted from auto-accompaniment, and an explicit request for one returns
+null with a warning on stderr instead of failing the command.
+
+A field the node doesn't have prints as an empty value (JSON: null); this is
+not an error. A node that exists but has no frontmatter entry at all yields
+an empty row (JSON: {}, no text lines). Requesting a field name that isn't a
+recognized frontmatter or derived key prints a warning to stderr (possible
+typo) but still returns the value (empty, since it's genuinely unset) — this
+does not fail the command.
 
 If some requested ids exist and others don't, values for the found ids are
 still printed (to stdout, or under "values" in --json) alongside the error
@@ -1602,7 +1738,7 @@ for the missing ones.
 Exit codes:
   0  success
   1  one or more requested ids do not exist in the file
-  2  invalid usage (missing --id/--field)
+  2  invalid usage (missing --id)
 `;
 
 const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json]

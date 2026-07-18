@@ -1,8 +1,31 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import { parseArgs, run, runCheck, runDiff, shouldColorize } from "./index.js";
+
+// Lets "meta get -" tests inject stdin content without touching the real fd 0
+// (which would otherwise hang/behave unpredictably under the test runner).
+// All other fs calls pass through to the real implementation unchanged.
+let stdinOverride: string | null = null;
+vi.mock("node:fs", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("node:fs")>();
+	return {
+		...actual,
+		readFileSync: (path: unknown, opts?: unknown) => {
+			if (path === 0 && stdinOverride !== null) return stdinOverride;
+			return (actual.readFileSync as (...a: unknown[]) => unknown)(path, opts);
+		},
+	};
+});
 
 let dir: string;
 const valid = "req >> design -> spec\nspec >> impl -> code\n";
@@ -1822,6 +1845,7 @@ artifact:
 process:
   build:
     location: src/build.ts
+    command: npm run build
 ---
 req >> design -> spec
 spec >> build -> code
@@ -1843,7 +1867,7 @@ spec >> build -> code
 		expect(r.stdout).toBe("spec.status: done\n");
 	});
 
-	it("resolves location through basePath so callers don't recompute it (#476)", async () => {
+	it("returns location as the raw value, with location.resolved auto-added alongside it (#476)", async () => {
 		const f = join(dir, "get-location.pfdsl");
 		writeFileSync(f, base);
 		const r = await run([
@@ -1857,7 +1881,7 @@ spec >> build -> code
 		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe(
-			`spec.location: ${resolve(dir, "..", "docs/spec.md")}\n`,
+			`spec.location: docs/spec.md\nspec.location.resolved: ${resolve(dir, "..", "docs/spec.md")}\n`,
 		);
 	});
 
@@ -1875,8 +1899,120 @@ spec >> build -> code
 		]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe(
-			`build.location: ${resolve(dir, "..", "src/build.ts")}\n`,
+			`build.location: src/build.ts\nbuild.location.resolved: ${resolve(dir, "..", "src/build.ts")}\n`,
 		);
+	});
+
+	it("passes URL location elements through unresolved while resolving path elements (§15.8)", async () => {
+		const f = join(dir, "get-location-url-mix.pfdsl");
+		writeFileSync(
+			f,
+			`---
+basePath: ../
+artifact:
+  spec:
+    location:
+      - docs/spec.md
+      - https://example.com/spec
+---
+req -> spec
+`,
+		);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"spec",
+			"--field",
+			"location.resolved",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: {
+				spec: {
+					"location.resolved": [
+						resolve(dir, "..", "docs/spec.md"),
+						"https://example.com/spec",
+					],
+				},
+			},
+		});
+	});
+
+	it("adds command.cwd honoring basePath whenever command is in the output", async () => {
+		const f = join(dir, "get-command-cwd.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"build",
+			"--field",
+			"command",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: {
+				build: {
+					command: "npm run build",
+					"command.cwd": resolve(dir, ".."),
+				},
+			},
+		});
+	});
+
+	it("returns only the derived value when it is requested explicitly (base not auto-added)", async () => {
+		const f = join(dir, "get-explicit-derived.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"spec",
+			"--field",
+			"location.resolved",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: {
+				spec: { "location.resolved": resolve(dir, "..", "docs/spec.md") },
+			},
+		});
+	});
+
+	it("returns all set fields plus applicable derived fields when --field is omitted", async () => {
+		const f = join(dir, "get-all-fields.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "get", f, "--id", "build", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: {
+				build: {
+					location: "src/build.ts",
+					"location.resolved": resolve(dir, "..", "src/build.ts"),
+					command: "npm run build",
+					"command.cwd": resolve(dir, ".."),
+				},
+			},
+		});
+	});
+
+	it("returns an empty row for a node that exists but has no frontmatter entry", async () => {
+		const f = join(dir, "get-all-fields-empty.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "get", f, "--id", "req", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({ ok: true, values: { req: {} } });
 	});
 
 	it("accepts multiple ids and fields (comma-separated or repeated flags)", async () => {
@@ -1911,7 +2047,7 @@ spec >> build -> code
 		expect(r.stdout).toBe("code.location: \n");
 	});
 
-	it("emits JSON with resolved location when --json is passed", async () => {
+	it("emits JSON with raw location plus derived location.resolved when --json is passed", async () => {
 		const f = join(dir, "get-json.pfdsl");
 		writeFileSync(f, base);
 		const r = await run([
@@ -1929,7 +2065,8 @@ spec >> build -> code
 			ok: true,
 			values: {
 				spec: {
-					location: resolve(dir, "..", "docs/spec.md"),
+					location: "docs/spec.md",
+					"location.resolved": resolve(dir, "..", "docs/spec.md"),
 					status: "done",
 				},
 			},
@@ -2038,12 +2175,11 @@ spec >> build -> code
 		expect(r.stderr).toBe("");
 	});
 
-	it("exits 2 with a specific message when --field is missing", async () => {
+	it("--field is optional: omitting it no longer errors", async () => {
 		const f = join(dir, "get-missing-field.pfdsl");
 		writeFileSync(f, base);
 		const r = await run(["meta", "get", f, "--id", "spec"]);
-		expect(r.exitCode).toBe(2);
-		expect(r.stderr).toContain("--field is required");
+		expect(r.exitCode).toBe(0);
 	});
 
 	it("exits 2 with a specific message when --id is missing", async () => {
@@ -2054,12 +2190,83 @@ spec >> build -> code
 		expect(r.stderr).toContain("--id is required");
 	});
 
-	it("exits 2 when both --id and --field are missing", async () => {
+	it("exits 2 with --id is required when both --id and --field are omitted", async () => {
 		const f = join(dir, "get-missing-both.pfdsl");
 		writeFileSync(f, base);
 		const r = await run(["meta", "get", f]);
 		expect(r.exitCode).toBe(2);
-		expect(r.stderr).toContain("--id and --field are required");
+		expect(r.stderr).toContain("--id is required");
+	});
+
+	it("returns null with a warning when an explicit derived field is requested from stdin", async () => {
+		stdinOverride = `---
+process:
+  build:
+    location: src/build.ts
+    command: npm run build
+---
+req >> build -> out
+`;
+		try {
+			const r = await run([
+				"meta",
+				"get",
+				"-",
+				"--id",
+				"build",
+				"--field",
+				"location.resolved,command.cwd",
+				"--json",
+			]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				values: {
+					build: { "location.resolved": null, "command.cwd": null },
+				},
+			});
+			expect(r.stderr).toContain("stdin");
+			expect(r.stderr).toContain("location.resolved");
+			expect(r.stderr).toContain("command.cwd");
+		} finally {
+			stdinOverride = null;
+		}
+	});
+
+	it("round-trips a relative location unchanged through meta set then meta get", async () => {
+		const f = join(dir, "get-set-roundtrip.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec: {}
+---
+req -> spec
+`,
+		);
+		const setResult = await run([
+			"meta",
+			"set",
+			f,
+			"spec",
+			"location",
+			"../docs/spec.md",
+		]);
+		expect(setResult.exitCode).toBe(0);
+
+		const r = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"spec",
+			"--field",
+			"location",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			`spec.location: ../docs/spec.md\nspec.location.resolved: ${resolve(dir, "../docs/spec.md")}\n`,
+		);
 	});
 
 	it("--help returns help text", async () => {
