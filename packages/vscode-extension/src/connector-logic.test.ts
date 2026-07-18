@@ -51,9 +51,23 @@ describe("buildConnectorEdgeLine", () => {
 describe("insertConnectorEdge", () => {
 	it("appends the edge line after the last non-blank line", () => {
 		const source = "A >> P -> B\n";
-		const { text, insertedLine } = insertConnectorEdge(source, "C >> P");
+		const { text, insertedLine, anchored } = insertConnectorEdge(
+			source,
+			"C >> P",
+		);
 		expect(text).toBe("A >> P -> B\nC >> P\n");
 		expect(insertedLine).toBe(1);
+		expect(anchored).toBe(false);
+	});
+
+	it("reports anchored: true when inserted next to a related statement", () => {
+		const source = "spec_doc >> build\n";
+		const { anchored } = insertConnectorEdge(
+			source,
+			"build -> result",
+			"build",
+		);
+		expect(anchored).toBe(true);
 	});
 
 	it("trims trailing blank lines before appending", () => {

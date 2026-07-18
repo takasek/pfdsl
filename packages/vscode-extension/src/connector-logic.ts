@@ -30,6 +30,8 @@ export function buildConnectorEdgeLine(
 export interface ConnectorInsertion {
 	text: string;
 	insertedLine: number;
+	/** True when anchored next to an existing statement (safe to insert as a single line); false for the end-of-document fallback, which also trims trailing blank lines and so needs a full-text replace. */
+	anchored: boolean;
 }
 
 function escapeRegex(s: string): string {
@@ -109,14 +111,14 @@ export function insertConnectorEdge(
 			const lines = source.split("\n");
 			const insertedLine = anchor + 1;
 			lines.splice(insertedLine, 0, edgeLine);
-			return { text: lines.join("\n"), insertedLine };
+			return { text: lines.join("\n"), insertedLine, anchored: true };
 		}
 	}
 	const trimmed = source.replace(/\s+$/, "");
 	const insertedLine = trimmed.length > 0 ? trimmed.split("\n").length : 0;
 	const text =
 		trimmed.length > 0 ? `${trimmed}\n${edgeLine}\n` : `${edgeLine}\n`;
-	return { text, insertedLine };
+	return { text, insertedLine, anchored: false };
 }
 
 /** Whether the edge a connector choice would create is already present among the document's normalized edges. */
