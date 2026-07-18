@@ -304,11 +304,6 @@ artifact:
     description: "status: blocked を waiting（外部待ち）と suspended（自主停止）に分割。破壊的変更として即 V007/V008 エラー化"
     status: done
     criteria: "waiting/suspended が STATUS_VALUES に追加され、blocked が V007/V008 でエラーになり、spec v0.0.11 に統合済み"
-  release_automation:
-    label: "make release roadmap 自動更新 (#278)"
-    description: "make release 後に roadmap の publish artifact を自動 done にする連携。#277 status-set が前提"
-    status: done
-    criteria: "make release 実行後に roadmap の対応 artifact が自動 done に更新される"
   explain_cmd:
     label: "pfdsl explain コマンド (#356)"
     description: "診断コード → 定義節・summary の一発引き。#299 のレジストリを消費する。check エラー対処の spec grep 手順を代替"
@@ -370,6 +365,61 @@ artifact:
     status: done
     criteria: npm show @pfdsl/cli version が 0.0.20 を返す
     location: https://www.npmjs.com/package/@pfdsl/cli
+  incomplete_tolerance:
+    label: "書き途中グラフ非strict許容 (#480)"
+    description: "V020/V002/V003 を非 strict で warning に降格し --strict で error 維持。spec 次版統合を含む。逐次書き込みする grill スキル (#481) の前提"
+    status: todo
+    criteria: "非 strict の check で V020/V002/V003 が warning、--strict で error になり、spec 本文・診断表が更新済み、テスト通過"
+  grill_skill:
+    label: "pfd-grill スキル (#481)"
+    description: "最終成果物からの後ろ向き対話構築スキル。名前確定→criteria→プロセス導出→入力導出の再帰。plugin 同梱で配布"
+    status: todo
+    criteria: "pfd-grill が plugin 経由で発火し、サンプル図を後ろ向き対話でフルスクラッチ構築するライブ実行1回を検証済み"
+  editor_connector:
+    label: "エディタ コネクタ編集支援 (#482)"
+    description: "ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用"
+    status: todo
+    criteria: "カーソル下ノードへの前後追加・接続がコネクタ種選択付きで動作確認済み、テスト通過"
+  preview_connector:
+    label: "Preview コネクタ生成 UI (#483)"
+    description: "webview の nodeClick 基盤を拡張し、ノードクリックから前後追加・接続をテキストへ反映する。#482 の編集機構を共用"
+    status: todo
+    criteria: "Preview のノードクリックからコネクタ選択・生成でテキストへ反映され再描画されることが動作確認済み"
+  def_insertion:
+    label: "frontmatter 定義挿入 code action (#484)"
+    description: "edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する"
+    status: todo
+    criteria: "未定義ノードへの定義挿入 code action が artifact/process 判別付きで動作確認済み、テスト通過"
+  field_get_cmd:
+    label: "ノード フィールド値取得コマンド (#476)"
+    description: "id と field を指定してノードのフィールド値を取得する get コマンド。複数 id/field 指定可、location は basePath 解決後の値を返す。エージェントの grep/Read 代替"
+    status: todo
+    criteria: "pfdsl get <file> --id <ids> --field <fields> が値を返し、location が basePath 解決済みで出力される、テスト通過"
+  v011_semantics:
+    label: "V011 strict 意味論の緩和 (#478)"
+    description: "strict mode の feedback 到達性検査（V011）が非連結な別系統からの正当な補助入力を誤検出する欠陥を緩和する。真の逆循環のみ検出へ絞るか warning 降格。方針は issue #478 の (a)/(b)/(c) から着手前に選択。spec 次版統合を含む"
+    status: todo
+    criteria: "非連結な別系統からの >>? 補助入力が V011 error にならず、真の逆循環は検出され、spec §15.3 の変更が統合済み、テスト通過"
+  graph_analysis:
+    label: "graph-analysis サブコマンド群 (#479)"
+    description: "neighbors / impact / depends-on / path / hubs / group-graph / rollup 等の分析サブコマンド。完全リストと優先度は issue #479 が一次情報。着手時に段階を切り分ける"
+    status: todo
+    criteria: "issue #479 の分析サブコマンドが実装され、到達性・近傍・集計が動作確認済み、テスト通過"
+  cli_release_grill_tolerance:
+    label: "CLIリリース: 診断緩和 + pfd-grill"
+    description: "#480 warning 降格 / #478 V011 緩和 / #481 pfd-grill スキル同梱を含む次期 npm リリース"
+    status: todo
+    criteria: "npm 公開版の check で V020/V002/V003 が非 strict warning かつ V011 が正当な補助入力を許容し、plugin に pfd-grill が同梱されている"
+  cli_release_query_tools:
+    label: "CLIリリース: フィールド取得 + graph 分析"
+    description: "#476 get コマンド / #479 graph-analysis サブコマンド群を含む次期 npm リリース"
+    status: todo
+    criteria: "npm 公開版で get と graph-analysis サブコマンドが動作する"
+  ext_editing_release:
+    label: "extension 編集支援リリース"
+    description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
+    status: todo
+    criteria: "コネクタ編集・Preview 生成 UI・定義挿入を含む extension が Marketplace 公開済み"
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -523,10 +573,6 @@ process:
     label: blockedBy フィールド実装
     description: "blockedBy: フィールドの spec 統合と CLI 対応。draft_proposals 経由"
     location: https://github.com/takasek/pfdsl/issues/273
-  i278_implement_release_automation:
-    label: make release roadmap 自動更新実装
-    location: https://github.com/takasek/pfdsl/issues/278
-    updated_at: 2026-07-03T01:28:44Z
   i356_implement_explain_cmd:
     label: explain コマンド実装
     location: https://github.com/takasek/pfdsl/issues/356
@@ -562,6 +608,44 @@ process:
     label: pfd-ops plugin 統合・skill sync 廃止検討
     description: "設計は ADR-0028 で確定・実装済み（plugin 同梱・/pfd-init 実配置・skill sync 削除）"
     location: https://github.com/takasek/pfdsl/issues/404
+  i480_relax_incomplete_graph:
+    label: 書き途中許容実装
+    location: https://github.com/takasek/pfdsl/issues/480
+    updated_at: 2026-07-18T00:32:56Z
+  i481_create_grill_skill:
+    label: pfd-grill スキル作成
+    location: https://github.com/takasek/pfdsl/issues/481
+    updated_at: 2026-07-18T00:33:10Z
+  i482_implement_editor_connector:
+    label: エディタ コネクタ編集実装
+    location: https://github.com/takasek/pfdsl/issues/482
+    updated_at: 2026-07-18T00:33:31Z
+  i483_implement_preview_connector:
+    label: Preview コネクタ UI 実装
+    location: https://github.com/takasek/pfdsl/issues/483
+    updated_at: 2026-07-18T00:33:46Z
+  i484_implement_def_insertion:
+    label: 定義挿入 code action 実装
+    location: https://github.com/takasek/pfdsl/issues/484
+    updated_at: 2026-07-18T00:34:01Z
+  publish_cli_grill_tolerance:
+    label: CLI 診断緩和 + grill 公開
+  publish_ext_editing:
+    label: extension 編集支援リリース
+  i476_implement_field_get:
+    label: フィールド値取得コマンド実装
+    location: https://github.com/takasek/pfdsl/issues/476
+    updated_at: 2026-07-18T00:41:35Z
+  i478_relax_v011:
+    label: V011 意味論緩和実装
+    location: https://github.com/takasek/pfdsl/issues/478
+    updated_at: 2026-07-18T00:41:37Z
+  i479_implement_graph_analysis:
+    label: graph-analysis サブコマンド実装
+    location: https://github.com/takasek/pfdsl/issues/479
+    updated_at: 2026-07-18T00:41:38Z
+  publish_cli_query_tools:
+    label: CLI フィールド取得 + graph 分析公開
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -648,7 +732,6 @@ type_field >> implement_audit_sync -> audit_sync
 cli_release_ready_cmd >> i272_implement_w002_hierarchy -> w002_hierarchy
 cli_release_ready_cmd >> i273_implement_blocked_by -> blocked_by
 cli_release_ready_cmd >> implement_status_set -> status_set
-status_set >> i278_implement_release_automation -> release_automation
 
 [cli_release_ready_cmd, type_field, audit_sync, w002_hierarchy, blocked_by, status_set] >> publish_cli_status_lifecycle -> cli_release_status_lifecycle
 
@@ -685,3 +768,17 @@ marketplace_dist >> i404_integrate_pfd_ops_plugin -> pfd_ops_plugin_dist
 
 cli_release_explain_lens >> i435_implement_ansi_color -> ansi_color
 ansi_color >> publish_cli_ansi_color -> cli_release_ansi_color
+
+cli_release_ansi_color >> i480_relax_incomplete_graph -> incomplete_tolerance
+incomplete_tolerance >> i481_create_grill_skill -> grill_skill
+cli_release_ansi_color >> i478_relax_v011 -> v011_semantics
+[incomplete_tolerance, v011_semantics, grill_skill] >> publish_cli_grill_tolerance -> cli_release_grill_tolerance
+
+cli_release_ansi_color >> i476_implement_field_get -> field_get_cmd
+cli_release_ansi_color >> i479_implement_graph_analysis -> graph_analysis
+[field_get_cmd, graph_analysis] >> publish_cli_query_tools -> cli_release_query_tools
+
+ext_v0015 >> i482_implement_editor_connector -> editor_connector
+editor_connector >> i483_implement_preview_connector -> preview_connector
+ext_v0015 >> i484_implement_def_insertion -> def_insertion
+[editor_connector, preview_connector, def_insertion] >> publish_ext_editing -> ext_editing_release
