@@ -393,7 +393,7 @@ artifact:
   def_insertion:
     label: "frontmatter 定義挿入 code action (#484)"
     description: "edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する"
-    status: todo
+    status: wip
     criteria: "未定義ノードへの定義挿入 code action が artifact/process 判別付きで動作確認済み、テスト通過"
   field_get_cmd:
     label: "ノード フィールド値取得コマンド (#476)"

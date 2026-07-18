@@ -1,4 +1,10 @@
-import { detectChildIndent, escapeRe, indentOf } from "./frontmatter-text.js";
+import {
+	detectChildIndent,
+	escapeRe,
+	findFrontmatterFences,
+	indentOf,
+	locateSection,
+} from "./frontmatter-text.js";
 import { analyze } from "./index.js";
 import { computeTopoOrder } from "./sorter.js";
 import type { Diagnostic, NodeKind } from "./types/index.js";
@@ -116,24 +122,15 @@ function applyWrites(source: string, writes: Write[]): string {
 	const lines = source.split("\n");
 	const trailingNewline = source.endsWith("\n");
 
-	let open = -1;
-	let close = -1;
-	if (lines[0]?.trim() === "---") {
-		open = 0;
-		for (let i = 1; i < lines.length; i++) {
-			if (lines[i]?.trim() === "---") {
-				close = i;
-				break;
-			}
-		}
-	}
+	const fences = findFrontmatterFences(lines);
 
 	// No front matter: synthesize one from the writes.
-	if (open === -1 || close === -1) {
+	if (!fences) {
 		const fm = buildFrontmatter(writes);
 		return `${fm}${source}`;
 	}
 
+	const { open, close } = fences;
 	// Mutable view of the YAML region (exclusive of the --- fences).
 	const yaml = lines.slice(open + 1, close);
 	for (const w of writes) setIndex(yaml, w);
@@ -161,31 +158,15 @@ function buildFrontmatter(writes: Write[]): string {
 
 function setIndex(yaml: string[], w: Write): void {
 	const section = w.kind; // NodeKind values are exactly the YAML section names
-	// Locate the top-level section line (indent 0).
-	let sectionStart = -1;
-	for (let i = 0; i < yaml.length; i++) {
-		const line = yaml[i]!;
-		if (/^[^\s#]/.test(line) && line.replace(/:\s*$/, "") === section) {
-			sectionStart = i;
-			break;
-		}
-	}
+	const located = locateSection(yaml, section);
 
-	if (sectionStart === -1) {
+	if (!located) {
 		// Append a fresh section at the end of the YAML region.
 		yaml.push(`${section}:`, `  ${w.id}:`, `    index: ${w.value}`);
 		return;
 	}
 
-	// Section spans until the next top-level (indent-0, non-comment) line.
-	let sectionEnd = yaml.length;
-	for (let i = sectionStart + 1; i < yaml.length; i++) {
-		const line = yaml[i]!;
-		if (line.trim() !== "" && /^[^\s#]/.test(line)) {
-			sectionEnd = i;
-			break;
-		}
-	}
+	const { start: sectionStart, end: sectionEnd } = located;
 
 	// Node keys sit at the section's child-indent level, detected from the
 	// first content line (supports 2-space, 4-space, etc. — not hardcoded).
