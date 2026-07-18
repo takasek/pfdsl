@@ -390,11 +390,31 @@ artifact:
     description: "edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する"
     status: todo
     criteria: "未定義ノードへの定義挿入 code action が artifact/process 判別付きで動作確認済み、テスト通過"
-  cli_release_grill_tolerance:
-    label: "CLIリリース: 書き途中許容 + pfd-grill"
-    description: "#480 warning 降格 / #481 pfd-grill スキル同梱を含む次期 npm リリース"
+  field_get_cmd:
+    label: "ノード フィールド値取得コマンド (#476)"
+    description: "id と field を指定してノードのフィールド値を取得する get コマンド。複数 id/field 指定可、location は basePath 解決後の値を返す。エージェントの grep/Read 代替"
     status: todo
-    criteria: "npm 公開版の check で V020/V002/V003 が非 strict warning であり、plugin に pfd-grill が同梱されている"
+    criteria: "pfdsl get <file> --id <ids> --field <fields> が値を返し、location が basePath 解決済みで出力される、テスト通過"
+  v011_semantics:
+    label: "V011 strict 意味論の緩和 (#478)"
+    description: "strict mode の feedback 到達性検査（V011）が非連結な別系統からの正当な補助入力を誤検出する欠陥を緩和する。真の逆循環のみ検出へ絞るか warning 降格。方針は issue #478 の (a)/(b)/(c) から着手前に選択。spec 次版統合を含む"
+    status: todo
+    criteria: "非連結な別系統からの >>? 補助入力が V011 error にならず、真の逆循環は検出され、spec §15.3 の変更が統合済み、テスト通過"
+  graph_analysis:
+    label: "graph-analysis サブコマンド群 (#479)"
+    description: "neighbors / impact / depends-on / path / hubs / group-graph / rollup 等の分析サブコマンド。完全リストと優先度は issue #479 が一次情報。着手時に段階を切り分ける"
+    status: todo
+    criteria: "issue #479 の分析サブコマンドが実装され、到達性・近傍・集計が動作確認済み、テスト通過"
+  cli_release_grill_tolerance:
+    label: "CLIリリース: 診断緩和 + pfd-grill"
+    description: "#480 warning 降格 / #478 V011 緩和 / #481 pfd-grill スキル同梱を含む次期 npm リリース"
+    status: todo
+    criteria: "npm 公開版の check で V020/V002/V003 が非 strict warning かつ V011 が正当な補助入力を許容し、plugin に pfd-grill が同梱されている"
+  cli_release_query_tools:
+    label: "CLIリリース: フィールド取得 + graph 分析"
+    description: "#476 get コマンド / #479 graph-analysis サブコマンド群を含む次期 npm リリース"
+    status: todo
+    criteria: "npm 公開版で get と graph-analysis サブコマンドが動作する"
   ext_editing_release:
     label: "extension 編集支援リリース"
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
@@ -609,9 +629,23 @@ process:
     location: https://github.com/takasek/pfdsl/issues/484
     updated_at: 2026-07-18T00:34:01Z
   publish_cli_grill_tolerance:
-    label: CLI 書き途中許容 + grill 公開
+    label: CLI 診断緩和 + grill 公開
   publish_ext_editing:
     label: extension 編集支援リリース
+  i476_implement_field_get:
+    label: フィールド値取得コマンド実装
+    location: https://github.com/takasek/pfdsl/issues/476
+    updated_at: 2026-07-18T00:41:35Z
+  i478_relax_v011:
+    label: V011 意味論緩和実装
+    location: https://github.com/takasek/pfdsl/issues/478
+    updated_at: 2026-07-18T00:41:37Z
+  i479_implement_graph_analysis:
+    label: graph-analysis サブコマンド実装
+    location: https://github.com/takasek/pfdsl/issues/479
+    updated_at: 2026-07-18T00:41:38Z
+  publish_cli_query_tools:
+    label: CLI フィールド取得 + graph 分析公開
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -737,7 +771,12 @@ ansi_color >> publish_cli_ansi_color -> cli_release_ansi_color
 
 cli_release_ansi_color >> i480_relax_incomplete_graph -> incomplete_tolerance
 incomplete_tolerance >> i481_create_grill_skill -> grill_skill
-[incomplete_tolerance, grill_skill] >> publish_cli_grill_tolerance -> cli_release_grill_tolerance
+cli_release_ansi_color >> i478_relax_v011 -> v011_semantics
+[incomplete_tolerance, v011_semantics, grill_skill] >> publish_cli_grill_tolerance -> cli_release_grill_tolerance
+
+cli_release_ansi_color >> i476_implement_field_get -> field_get_cmd
+cli_release_ansi_color >> i479_implement_graph_analysis -> graph_analysis
+[field_get_cmd, graph_analysis] >> publish_cli_query_tools -> cli_release_query_tools
 
 ext_v0015 >> i482_implement_editor_connector -> editor_connector
 editor_connector >> i483_implement_preview_connector -> preview_connector
