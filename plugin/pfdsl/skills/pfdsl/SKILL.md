@@ -87,24 +87,11 @@ statusStyles:
 ## CLI
 
 ```bash
-npx @pfdsl/cli check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
-npx @pfdsl/cli fmt <file|-> [--write] [--mode flat|flows]   # Format a .pfdsl file (- = stdin)
-npx @pfdsl/cli reindex <file|-> [--write] [--check] [--renumber] [--json]   # Assign topological index: values (- = stdin)
-npx @pfdsl/cli sort-meta <file|-> --by <keys> [--write] [--check]   # Sort node definitions by keys (- = stdin)
-npx @pfdsl/cli normalize <file|-> [--json]   # Print canonical edge list (- = stdin)
-npx @pfdsl/cli graph <file|-> [--format dot|svg|pdf|png]   # Print Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-npx @pfdsl/cli diff <a> <b> [--format text|dot|svg]   # Structural diff (text), or visual diff DOT/SVG
-npx @pfdsl/cli ready <file|-> [--best] [--json]   # List ready-to-start processes (- = stdin)
-npx @pfdsl/cli status-set <file> <artifact-id> <status> [--json]   # Set artifact status (todo|wip|done|waiting|suspended) in place
-npx @pfdsl/cli get <file|-> --id <ids> --field <fields> [--json]   # Print field values for one or more ids (- = stdin)
-npx @pfdsl/cli neighbors <file|-> <id> [--json]   # Print direct predecessors/successors of a node (- = stdin)
-npx @pfdsl/cli impact <file|-> <id> [--json]   # Print the full downstream closure of a node (- = stdin)
-npx @pfdsl/cli depends-on <file|-> <id> [--json]   # Print the full upstream closure of a node (- = stdin)
-npx @pfdsl/cli path <file|-> <from> <to> [--json]   # Print all simple paths from <from> to <to> (- = stdin)
-npx @pfdsl/cli stats <file|-> [--limit <n>] [--json]   # Rank nodes by fan-in/fan-out degree (- = stdin)
-npx @pfdsl/cli audit-sync <roadmap> <flow> [<flow>...] [--json]   # Cross-check todo artifacts in flow files against the roadmap
+npx @pfdsl/cli check <file|-> [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
 npx @pfdsl/cli explain <code>   # Print the summary and spec section for a diagnostic code (e.g. V021)
-npx @pfdsl/cli help   # Show this help
+npx @pfdsl/cli fmt <file|-> [--write]   # Format a .pfdsl file (- = stdin)
+npx @pfdsl/cli render <file|-> [--format dot|svg|pdf|png]   # Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
+npx @pfdsl/cli diff <a> <b> [--format text|dot|svg]   # Structural diff (text), or visual diff DOT/SVG
 ```
 
 Full flag reference: `npx @pfdsl/cli help`. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.
@@ -126,15 +113,15 @@ PFD はタスクリストではなく成果物の変換グラフ。
 
 ## 読解と点検
 
-- **読解**: 大きい PFD は全読しない。`check --audit` の2行（終端 artifact と外部入力）で輪郭を掴み、対象ノードの frontmatter だけ読む。roadmap では `ready --best` が着手可能プロセスを返す
-- **書いた後の点検**: 同じ --audit の2行で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る
-- roadmap と flow ファイルが併存する構成では `audit-sync <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する
-- 図の視覚確認が必要なときだけ `graph --format dot` を使う（大きい図では dot 全読より --audit が安い）
+- **読解**: 大きい PFD は全読しない。`graph io` の2行（終端 artifact と外部入力）で輪郭を掴み、対象ノードの frontmatter だけ読む。roadmap では `status ready --best` が着手可能プロセスを返す
+- **書いた後の点検**: 同じ `graph io` の2行で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る
+- roadmap と flow ファイルが併存する構成では `status gaps <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する
+- 図の視覚確認が必要なときだけ `render --format dot` を使う（大きい図では dot 全読より graph io が安い）
 
 ## Typical task: update artifact status
 
 ```bash
-npx @pfdsl/cli status-set <file> <artifact-id> <status>   # todo|wip|done|waiting|suspended
+npx @pfdsl/cli meta set <file> <artifact-id> status <status>   # todo|wip|done|waiting|suspended
 ```
 
 Sets the status in place and validates. Manual fallback: edit `status:` in the frontmatter `artifact:` section, then run `check`.
@@ -150,4 +137,4 @@ Sets the status in place and validates. Manual fallback: edit `status:` in the f
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
 | PFD のレビュー・監査 | `references/review-perspectives.md`（A/B/C カタログ。A/B は図、C は normative 仕様文書（自リポ保守の仕様がある場合）の監査。書くルールは `references/quality-guide.md`、問い詰めはこちら） |
 
-`references/spec.md` は full spec v0.0.16（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
+`references/spec.md` は full spec v0.0.17（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。

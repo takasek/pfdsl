@@ -396,7 +396,7 @@ digraph PFDSL {
 
 ## 11-external-stakeholders — External stakeholders
 
-`externalStakeholders:` on artifacts marks external consumers outside the flow graph. Excluded from orphan-terminal audit (`check --audit`).
+`externalStakeholders:` on artifacts marks external consumers outside the flow graph. Excluded from orphan-terminal audit (`graph io`).
 
 ```pfdsl
 ---
@@ -704,7 +704,7 @@ digraph PFDSL {
 
 ## 15-index — Index field
 
-`index:` assigns an optional positive integer to artifacts and processes (independent namespaces). No graph-semantic effect; `pfdsl reindex` numbers nodes in topological order.
+`index:` assigns an optional positive integer to artifacts and processes (independent namespaces). No graph-semantic effect; `pfdsl meta reindex` numbers nodes in topological order.
 
 ```pfdsl
 ---
@@ -794,7 +794,7 @@ digraph PFDSL {
 
 ## 17-type — type field
 
-`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). Values outside the enum cause an error (V031). `pfdsl ready` rejects any explicit non-`roadmap` type; omitting `type:` is treated as `roadmap` and allowed, with a warning (W006).
+`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). Values outside the enum cause an error (V031). `pfdsl status ready` rejects any explicit non-`roadmap` type; omitting `type:` is treated as `roadmap` and allowed, with a warning (W006).
 
 ```pfdsl
 ---
