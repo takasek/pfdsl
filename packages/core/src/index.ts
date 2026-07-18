@@ -136,6 +136,8 @@ export function parse(source: string): ParseDocResult {
 	return { document, frontmatter, bodyStartLine, diagnostics };
 }
 
+export type { InsertDefinitionResult } from "./insert-definition.js";
+export { insertDefinition } from "./insert-definition.js";
 export type {
 	IndexChange,
 	ReindexOptions,
