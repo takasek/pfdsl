@@ -420,13 +420,13 @@ export function runSort(file: string, opts: SortOptions): CommandResult {
 	return ok(output);
 }
 
-export interface NormalizeOptions {
+export interface GraphEdgesOptions {
 	json?: boolean;
 }
 
-export function runNormalize(
+export function runGraphEdges(
 	file: string,
-	opts: NormalizeOptions = {},
+	opts: GraphEdgesOptions = {},
 ): CommandResult {
 	const normSrc = readSource(file);
 	if (isCommandResult(normSrc)) return normSrc;
@@ -435,8 +435,7 @@ export function runNormalize(
 	if (failed) return failed;
 	const sorted = sortEdges(edges, graph);
 	if (opts.json) {
-		const edgeList = formatEdges(sorted).split("\n").filter(Boolean);
-		return ok(`${JSON.stringify(edgeList)}\n`);
+		return ok(`${JSON.stringify({ ok: true, edges: sorted })}\n`);
 	}
 	return ok(formatEdges(sorted));
 }
@@ -1409,7 +1408,7 @@ const HELP_GRAPH_EDGES = `usage: pfdsl graph edges <file|-> [--json]
 Print canonical edge list. Use - to read from stdin.
 
 Options:
-  --json  output edge list as JSON array
+  --json  output as JSON ({ ok, edges: {kind, artifact, process}[] })
 `;
 
 const HELP_RENDER = `usage: pfdsl render <file|-> [--format dot|svg|pdf|png]
@@ -1736,7 +1735,7 @@ function runGraphGroup(
 			if (flags.help) return ok(HELP_GRAPH_EDGES);
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_EDGES, 2);
-			return runNormalize(f, { json: flags.json === true });
+			return runGraphEdges(f, { json: flags.json === true });
 		}
 		case "neighbors": {
 			if (flags.help) return ok(HELP_NEIGHBORS);

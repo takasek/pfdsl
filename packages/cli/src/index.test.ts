@@ -861,15 +861,20 @@ describe("--json output (#181)", () => {
 		expect(invalid.exitCode).toBe(1);
 	});
 
-	it("graph edges --json returns edge list as JSON array", async () => {
+	it("graph edges --json returns structured edge objects", async () => {
 		const r = await run(["graph", "edges", join(dir, "valid.pfdsl"), "--json"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(Array.isArray(parsed)).toBe(true);
-		expect(parsed.length).toBeGreaterThan(0);
-		// each entry is an edge string
-		expect(typeof parsed[0]).toBe("string");
+		// valid.pfdsl: req >> design -> spec\nspec >> impl -> code
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			edges: [
+				{ kind: "input", artifact: "req", process: "design" },
+				{ kind: "output", artifact: "spec", process: "design" },
+				{ kind: "input", artifact: "spec", process: "impl" },
+				{ kind: "output", artifact: "code", process: "impl" },
+			],
+		});
 	});
 });
 
