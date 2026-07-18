@@ -41,3 +41,4 @@
 - **ADR-0027** [仕様相互参照を安定 ID アンカーに移行する](0027-spec-id-cross-references.md) — 節番号直書きは挿入・並べ替えで崩れる。`[[SPEC_xxx]]` / `[[SPEC_xxx?]]` / `(SPEC_xxx)` の bracket 構文を正式採用し、不透明・永続・欠番許容の ID として renumber 機能なしで運用する
 - **ADR-0028** [pfd-ops の plugin 配布移行と skill sync の廃止](0028-plugin-first-pfd-ops-distribution.md) — pfd-ops を plugin に同梱し `install/` 実配置を `/pfd-init` に統合、`pfdsl skill sync` を削除。採用リポの drift 検知は CI 強制からランタイム hash 照合（pfd-ops 発火時）へ移行、ADR-0016 はリポ内運用として存続
 - **ADR-0029** [配布層の欠陥は使い捨て環境での採用初日再現で検出する](0029-adoption-day-probe.md) — ADR-0020（DSL 仕様 stress-test）の配布層版。使い捨て環境で plugin install → `/pfd-init` を実際に辿り、同梱物妥当性・ガイダンス実行可能性・agent 到達性・冪等性の4観点を検証する。初回実施で配布バグ1件（#417）を検出
+- **ADR-0030** [CLIコマンド体系を操作対象の種類で分類する](0030-cli-command-taxonomy.md) — フラットな17コマンドを `graph`（位相への読み取り専用問い合わせ）/ `meta`（field-aware な frontmatter 読み書き）/ `status`（status 由来の計画クエリ）の3グループとトップレベル動詞に再編。エイリアスなし一括切替、旧名は exit 2
