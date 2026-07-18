@@ -1683,6 +1683,20 @@ spec >> build -> code
 		expect(r.stderr).toContain("lable");
 	});
 
+	it("collapses the unknown-field warning into one line for multiple ids of the same kind (#479 re-check)", async () => {
+		const f = join(dir, "get-unknown-field-multi.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["get", f, "--id", "spec,code", "--field", "lable"]);
+		expect(r.exitCode).toBe(0);
+		const warningLines = r.stderr
+			.trim()
+			.split("\n")
+			.filter((l) => l.includes("lable"));
+		expect(warningLines).toHaveLength(1);
+		expect(warningLines[0]).toContain("spec");
+		expect(warningLines[0]).toContain("code");
+	});
+
 	it("does not warn for a recognized field with no value set", async () => {
 		const f = join(dir, "get-known-empty-field.pfdsl");
 		writeFileSync(f, base);

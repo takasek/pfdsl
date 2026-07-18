@@ -853,7 +853,9 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	};
 
 	const missing: string[] = [];
-	const warnings: string[] = [];
+	// Keyed by "kind::field" so one warning covers every id sharing that
+	// (kind, field) pair instead of repeating per id (#479 usability re-check).
+	const unknownFieldIds = new Map<string, string[]>();
 	const values: Record<string, Record<string, unknown>> = {};
 	for (const id of ids) {
 		const kind = nodeKinds.get(id);
@@ -865,14 +867,19 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 		const row: Record<string, unknown> = {};
 		for (const field of fields) {
 			if (!KNOWN_FIELDS[kind].has(field)) {
-				warnings.push(
-					`warning: '${field}' is not a recognized field for '${id}' (possible typo?)`,
-				);
+				const key = `${kind}::${field}`;
+				const affected = unknownFieldIds.get(key);
+				if (affected) affected.push(id);
+				else unknownFieldIds.set(key, [id]);
 			}
 			row[field] = resolveValue(field, meta?.[field]) ?? null;
 		}
 		values[id] = row;
 	}
+	const warnings = [...unknownFieldIds.entries()].map(([key, affectedIds]) => {
+		const field = key.split("::")[1];
+		return `warning: '${field}' is not a recognized field for ${affectedIds.length === 1 ? `'${affectedIds[0]}'` : `id(s) ${affectedIds.join(", ")}`} (possible typo?)`;
+	});
 	const warnText = warnings.length ? `${warnings.join("\n")}\n` : "";
 
 	if (missing.length > 0) {
