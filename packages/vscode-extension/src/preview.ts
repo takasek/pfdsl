@@ -1,4 +1,10 @@
-import type { AnalyzeResult, DiffReport, IdNode, Statement } from "@pfdsl/core";
+import {
+	type AnalyzeResult,
+	type DiffReport,
+	type IdNode,
+	resolveLocationFsPath,
+	type Statement,
+} from "@pfdsl/core";
 import { exportDot } from "@pfdsl/graphviz-exporter";
 import * as vscode from "vscode";
 import {
@@ -6,7 +12,6 @@ import {
 	resolveEffectiveFrontmatterForUri,
 } from "./analyze.js";
 import { findFrontmatterDefinition } from "./jump.js";
-import { resolveLocationFsPath } from "./location-path.js";
 import {
 	buildDescriptions,
 	buildLocations,

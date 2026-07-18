@@ -1,6 +1,9 @@
 import { fileURLToPath } from "node:url";
-import type { Frontmatter, NodeKind } from "@pfdsl/core";
-import { resolveLocationFsPath } from "./location-path.js";
+import {
+	type Frontmatter,
+	type NodeKind,
+	resolveLocationFsPath,
+} from "@pfdsl/core";
 import { normalizeLocation } from "./location-utils.js";
 
 const KIND_ICON: Record<NodeKind, string> = {
