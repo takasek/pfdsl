@@ -1441,6 +1441,173 @@ requirement >> design -> spec
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toContain("nonexistent");
 	});
+
+	// generalized fields (beyond status)
+	const generic = `---
+artifact:
+  spec:
+    label: Old Label
+    status: done
+process:
+  design:
+    label: Design
+---
+req >> design -> spec
+`;
+
+	it("replaces an existing non-status field (label)", async () => {
+		const f = join(dir, "meta-set-label.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run(["meta", "set", f, "spec", "label", "New Label"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("label: New Label");
+		expect(after).not.toContain("Old Label");
+	});
+
+	it("inserts a field that is not yet present (owner)", async () => {
+		const f = join(dir, "meta-set-insert.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run(["meta", "set", f, "spec", "owner", "alice"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toMatch(/spec:\n {4}owner: alice\n/);
+		// existing fields survive
+		expect(after).toContain("label: Old Label");
+	});
+
+	it("sets a field on a process node (command)", async () => {
+		const f = join(dir, "meta-set-process.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run(["meta", "set", f, "design", "command", "make spec"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("command: make spec");
+		// the written file still parses cleanly
+		const check = await run(["check", f]);
+		expect(check.exitCode).toBe(0);
+	});
+
+	it("quotes values that would break YAML (colon)", async () => {
+		const f = join(dir, "meta-set-quote.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run(["meta", "set", f, "spec", "label", "spec: v2"]);
+		expect(r.exitCode).toBe(0);
+		const check = await run(["check", f]);
+		expect(check.exitCode).toBe(0);
+		const get = await run([
+			"meta",
+			"get",
+			f,
+			"--id",
+			"spec",
+			"--field",
+			"label",
+			"--json",
+		]);
+		expect(JSON.parse(get.stdout).values.spec.label).toBe("spec: v2");
+	});
+
+	it("accepts multiple comma-separated ids and reports newly-ready once", async () => {
+		const multiRoadmap = `---
+type: roadmap
+artifact:
+  a:
+    status: todo
+  b:
+    status: todo
+  c:
+    status: todo
+---
+a >> p1
+b >> p1 -> c
+`;
+		const f = join(dir, "meta-set-multi.pfdsl");
+		writeFileSync(f, multiRoadmap);
+		const r = await run(["meta", "set", f, "a,b", "status", "done"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after.match(/status: done/g)).toHaveLength(2);
+		// p1 becomes ready only after BOTH inputs are done → reported once
+		expect(r.stdout).toContain("newly ready: p1");
+	});
+
+	it("exits 1 and writes nothing when any id is missing (atomic)", async () => {
+		const f = join(dir, "meta-set-atomic.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run(["meta", "set", f, "spec,ghost", "status", "wip"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("ghost");
+		expect(readFileSync(f, "utf-8")).toBe(generic);
+	});
+
+	it("rejects a field invalid for the node kind (exit 2)", async () => {
+		const f = join(dir, "meta-set-badkind.pfdsl");
+		writeFileSync(f, generic);
+		// command is a process field, spec is an artifact
+		const r = await run(["meta", "set", f, "spec", "command", "make"]);
+		expect(r.exitCode).toBe(2);
+		expect(readFileSync(f, "utf-8")).toBe(generic);
+	});
+
+	it("rejects non-scalar fields (tags) (exit 2)", async () => {
+		const f = join(dir, "meta-set-nonscalar.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run(["meta", "set", f, "spec", "tags", "x"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("rejects derived fields (location.resolved) (exit 2)", async () => {
+		const f = join(dir, "meta-set-derived.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run([
+			"meta",
+			"set",
+			f,
+			"spec",
+			"location.resolved",
+			"/tmp/x",
+		]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("rejects a non-integer index value (exit 2)", async () => {
+		const f = join(dir, "meta-set-badindex.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run(["meta", "set", f, "spec", "index", "abc"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("rejects unquoted multi-word values (exit 2, quoting hint)", async () => {
+		const f = join(dir, "meta-set-unquoted.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run(["meta", "set", f, "spec", "label", "New", "Label"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("quote");
+	});
+
+	it("replaces a multi-line block-scalar value without leaving orphan lines", async () => {
+		const blockScalar = `---
+artifact:
+  spec:
+    description: |
+      line one.
+      line two.
+    status: done
+---
+req >> design -> spec
+`;
+		const f = join(dir, "meta-set-block-scalar.pfdsl");
+		writeFileSync(f, blockScalar);
+		const r = await run(["meta", "set", f, "spec", "description", "short."]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("description: short.");
+		expect(after).not.toContain("line one.");
+		expect(after).toContain("status: done");
+		const check = await run(["check", f]);
+		expect(check.exitCode).toBe(0);
+	});
 });
 
 describe("status gaps", () => {

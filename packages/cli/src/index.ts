@@ -630,34 +630,57 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	return ok(`${lines.join("\n")}\n`, warnText);
 }
 
-export interface StatusSetOptions {
+export interface MetaSetOptions {
 	json?: boolean;
 }
 
-export function runStatusSet(
-	file: string,
-	artifactId: string,
-	status: string,
-	opts: StatusSetOptions = {},
-): CommandResult {
-	if (!STATUS_VALUES.includes(status as (typeof STATUS_VALUES)[number])) {
-		return fail(HELP_META_SET, 2);
-	}
-	const src = readSource(file);
-	if (isCommandResult(src)) return src;
+/** Fields whose values are arrays/maps — meta set only writes scalars. */
+const NON_SCALAR_FIELDS = new Set([
+	"tags",
+	"parts",
+	"externalStakeholders",
+	"boundary",
+]);
 
+/**
+ * Render a value as a single-line YAML scalar, double-quoting when a bare
+ * scalar would misparse (YAML indicators, colon, quotes, leading/trailing
+ * whitespace, ...). Inner spaces are fine bare ("make spec").
+ */
+function yamlScalar(value: string): string {
+	const needsQuoting =
+		value === "" ||
+		/[:#"'\\\n]/.test(value) ||
+		/^[\s[\]{}&*!|>%@`,?-]/.test(value) ||
+		/^\s|\s$/.test(value);
+	if (!needsQuoting) return value;
+	return `"${value
+		.replace(/\\/g, "\\\\")
+		.replace(/"/g, '\\"')
+		.replace(/\n/g, "\\n")}"`;
+}
+
+/**
+ * Rewrite one node's field in the raw source, preserving all other
+ * formatting. The id is escaped since quoted ids may contain regex
+ * metacharacters (#430). Two styles are supported:
+ *   block-style: "<indent><id>:\n  <fields>..."
+ *   flow-style:  "<indent><id>: { key: val, ... }"  (#415)
+ * Returns null when the id has no frontmatter entry.
+ */
+function setFieldInSource(
+	src: string,
+	id: string,
+	field: string,
+	scalar: string,
+): string | null {
 	const frontmatterMatch = /^---\n([\s\S]*?\n)---\n/.exec(src);
 	const fmBlock = frontmatterMatch?.[1];
-	if (!frontmatterMatch || !fmBlock) {
-		return fail(`error: artifact '${artifactId}' not found in ${file}\n`);
-	}
+	if (!frontmatterMatch || !fmBlock) return null;
 	const fmBodyStart = frontmatterMatch[0].length - fmBlock.length - 4; // after "---\n"
 
-	// Find the artifact block. The id is escaped since quoted ids may contain
-	// regex metacharacters (#430). Two styles are supported:
-	//   block-style: "<indent><id>:\n  <fields>..."
-	//   flow-style:  "<indent><id>: { key: val, ... }"  (#415)
-	const escapedId = escapeRe(artifactId);
+	const escapedId = escapeRe(id);
+	const escapedField = escapeRe(field);
 	const headerRe = new RegExp(`^(\\s+)${escapedId}:\\s*\\n`, "m");
 	const headerMatch = headerRe.exec(fmBlock);
 
@@ -667,26 +690,23 @@ export function runStatusSet(
 	);
 	const flowMatch = headerMatch ? null : flowHeaderRe.exec(fmBlock);
 
-	if (!headerMatch && !flowMatch) {
-		return fail(`error: artifact '${artifactId}' not found in ${file}\n`);
-	}
-
-	// Snapshot ready set before mutation (roadmap only)
-	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
-	const beforeSet = new Set(beforeIds);
+	if (!headerMatch && !flowMatch) return null;
 
 	let newFm: string;
 	if (flowMatch) {
-		// Flow-style: update or insert status within "{ ... }" on the same line
+		// Flow-style: update or insert the field within "{ ... }" on the same line
 		const flowBody = flowMatch[2]!;
+		const kvRe = new RegExp(
+			`\\b${escapedField}:\\s*("(?:[^"\\\\]|\\\\.)*"|[^,}]*)`,
+		);
 		let newFlowBody: string;
-		if (/\bstatus:\s*\S+/.test(flowBody)) {
-			newFlowBody = flowBody.replace(/\bstatus:\s*\S+/, `status: ${status}`);
+		if (kvRe.test(flowBody)) {
+			newFlowBody = flowBody.replace(kvRe, `${field}: ${scalar}`);
 		} else {
 			const inner = flowBody.slice(1, -1).trim();
 			newFlowBody = inner
-				? `{ ${inner}, status: ${status} }`
-				: `{ status: ${status} }`;
+				? `{ ${inner}, ${field}: ${scalar} }`
+				: `{ ${field}: ${scalar} }`;
 		}
 		const matchedLine = flowMatch[0]!;
 		const newLine = matchedLine.replace(flowBody, newFlowBody);
@@ -712,22 +732,112 @@ export function runStatusSet(
 		const nodePad = " ".repeat(nodeIndent);
 		const childPad = " ".repeat(childIndent);
 
-		// Replace "<childPad>status: <old>" under this artifact, or insert it after its header
-		const statusLineRe = new RegExp(
-			`(${nodePad}${escapedId}:[ \\t]*\\n(?:${childPad}[^\\n]*\\n)*?)${childPad}status: [^\\n]+`,
+		// Replace "<childPad><field>: <old>" under this node — including any
+		// deeper-indented continuation lines (multi-line block scalars), so
+		// replacing them never leaves orphan lines — or insert after the header.
+		const fieldLineRe = new RegExp(
+			`(${nodePad}${escapedId}:[ \\t]*\\n(?:${childPad}[^\\n]*\\n)*?)${childPad}${escapedField}:[^\\n]*\\n(?:${childPad} +[^\\n]*\\n)*`,
 		);
-		if (statusLineRe.test(fmBlock)) {
-			newFm = fmBlock.replace(statusLineRe, `$1${childPad}status: ${status}`);
+		if (fieldLineRe.test(fmBlock)) {
+			newFm = fmBlock.replace(
+				fieldLineRe,
+				`$1${childPad}${field}: ${scalar}\n`,
+			);
 		} else {
 			newFm = fmBlock.replace(
 				new RegExp(`(${nodePad}${escapedId}:[ \\t]*\\n)`),
-				`$1${childPad}status: ${status}\n`,
+				`$1${childPad}${field}: ${scalar}\n`,
 			);
 		}
 	}
 
-	const newSrc =
-		src.slice(0, fmBodyStart) + newFm + src.slice(fmBodyStart + fmBlock.length);
+	return (
+		src.slice(0, fmBodyStart) + newFm + src.slice(fmBodyStart + fmBlock.length)
+	);
+}
+
+export function runMetaSet(
+	file: string,
+	idList: string,
+	field: string,
+	value: string,
+	opts: MetaSetOptions = {},
+): CommandResult {
+	if (file === "-") {
+		return fail("meta set cannot be used with stdin (-)\n", 2);
+	}
+	if (field.includes(".")) {
+		return fail(
+			`meta set: '${field}' is a derived read-only field and cannot be set\n`,
+			2,
+		);
+	}
+	if (NON_SCALAR_FIELDS.has(field)) {
+		return fail(`meta set: '${field}' is not a scalar field\n`, 2);
+	}
+	if (
+		field === "status" &&
+		!STATUS_VALUES.includes(value as (typeof STATUS_VALUES)[number])
+	) {
+		return fail(
+			`meta set: invalid status '${value}' (valid: ${STATUS_VALUES.join(" | ")})\n`,
+			2,
+		);
+	}
+	if (field === "index" && !/^\d+$/.test(value)) {
+		return fail(
+			`meta set: index must be a non-negative integer, got '${value}'\n`,
+			2,
+		);
+	}
+	const ids = splitCommaList(idList);
+	if (ids.length === 0) return fail(HELP_META_SET, 2);
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, nodeKinds } = analyze(src);
+	const failed = failIfErrors(diagnostics, file);
+	if (failed) return failed;
+
+	// Validate every id and field/kind pairing before touching anything, so a
+	// multi-id call is atomic: either all writes land or none do.
+	const missing = ids.filter((id) => !nodeKinds.has(id));
+	if (missing.length > 0) {
+		return fail(`error: id(s) not found in ${file}: ${missing.join(", ")}\n`);
+	}
+	for (const id of ids) {
+		const kind = nodeKinds.get(id);
+		if (kind !== "artifact" && kind !== "process" && kind !== "group") continue;
+		if (!KNOWN_FIELDS[kind].has(field)) {
+			return fail(
+				`meta set: '${field}' is not a valid ${kind} field (id: ${id})\n`,
+				2,
+			);
+		}
+	}
+
+	// Snapshot ready set before mutation (roadmap only)
+	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
+	const beforeSet = new Set(beforeIds);
+
+	const scalar = yamlScalar(value);
+	let newSrc = src;
+	for (const id of ids) {
+		const applied = setFieldInSource(newSrc, id, field, scalar);
+		if (applied === null) {
+			return fail(`error: '${id}' not found in ${file}\n`);
+		}
+		newSrc = applied;
+	}
+
+	// Safety net: never write a rewrite that introduces errors the original
+	// didn't have (rewriter bug or unsupported YAML style).
+	if (hasErrors(analyze(newSrc).diagnostics)) {
+		return fail(
+			`meta set: refusing to write ${file}: the rewrite would introduce parse errors\n`,
+		);
+	}
 	writeFileSync(file, newSrc, "utf-8");
 
 	// Recompute against the written file (roadmap only) so newly-ready processes
@@ -1443,22 +1553,29 @@ Options:
   --json  output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, warnings? })
 `;
 
-const HELP_META_SET = `usage: pfdsl meta set <file> <id> <field> <value> [--json]
+const HELP_META_SET = `usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json]
 
-Set a frontmatter field of a node in a .pfdsl file, rewriting it in place.
-Currently only the \`status\` field is supported.
+Set a scalar frontmatter field on one or more nodes, rewriting the file in
+place while preserving its formatting. Multiple comma-separated ids get the
+same value; the call is atomic (all writes land or none do). Quote values
+containing spaces.
+
+Field-aware validation: status must be one of todo | wip | done | waiting |
+suspended; index must be a non-negative integer; the field must be valid for
+each node's kind. Array/map fields (tags, parts, externalStakeholders,
+boundary) and derived read-only fields (location.resolved, command.cwd)
+cannot be set.
+
 When setting status on a roadmap file, reports which processes became newly
-ready after the change.
+ready after the change (once, after all writes).
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
-  <field>   currently: status
-  <value>   for status: one of todo | wip | done | waiting | suspended
   --json    emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
 
 Exit codes:
   0  success
-  1  id not found in the file
-  2  invalid usage (missing argument, unsupported field, invalid value)
+  1  id not found in the file, or the rewrite was refused
+  2  invalid usage (missing argument, invalid field or value)
 `;
 
 const HELP_GET = `usage: pfdsl meta get <file|-> --id <ids> --field <fields> [--json]
@@ -1801,15 +1918,16 @@ function runMetaGroup(
 		}
 		case "set": {
 			if (flags.help) return ok(HELP_META_SET);
-			const [f, id, field, value] = rest;
-			if (!f || !id || !field || !value) return fail(HELP_META_SET, 2);
-			if (field !== "status") {
+			const [f, id, field, value, ...extra] = rest;
+			if (!f || !id || !field || value === undefined)
+				return fail(HELP_META_SET, 2);
+			if (extra.length > 0) {
 				return fail(
-					`meta set: unsupported field '${field}' (currently only: status)\n`,
+					`meta set: too many arguments — quote values containing spaces (got: ${[value, ...extra].join(" ")})\n`,
 					2,
 				);
 			}
-			return runStatusSet(f, id, value, { json: flags.json === true });
+			return runMetaSet(f, id, field, value, { json: flags.json === true });
 		}
 		case "sort": {
 			if (flags.help) return ok(HELP_SORT);
