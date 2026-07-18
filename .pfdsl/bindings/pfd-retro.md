@@ -23,6 +23,11 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
   具体例: pre-commit の `check_drift`（regenerate-then-diff 方式）が dist ファイルの**存在**のみを前提条件にしており鮮度を見ていなかったため、worktree に残った stale な CLI dist から `gen-plugin` を再生成すると、stale dist 由来の誤った内容同士が一致して PASS した。CI は fresh checkout から都度ビルドするため唯一そこでだけ drift が検出された（#450）。`scripts/lib/dist-freshness.mjs` で dist の mtime を sibling `src/` の最新 mtime と比較し、存在しないときと同様に古いときも検査を skip する形に修正（#452）。
   対策: 「存在すれば検査可能」でなく「入力より新しければ検査可能」を前提条件にする。
 
+- **フラグの意味範囲 trap**: フラグ名が示唆する狭い意味範囲（「今触っている検査の厳格版」）を信じて未検証のまま既存ゲートに組み込むと、そのフラグが実際に束ねる無関係な検査群が一斉に error 化し、意図しない大量破壊を CI で初めて知ることになる。
+  問いの形: 「このフラグは名前が示す範囲だけを制御しているか、他の無関係な検査も同時に束ねていないか」。
+  具体例: `--strict` は V011（feedback 到達性）のみを制御すると読める名前だが、実装は W002/W005 の warning→error 昇格も同時に束ねていた（#480 派生作業）。既存リポ資産（`docs/*.pfdsl`・`.pfdsl/*.pfdsl`）に対して素の `--strict` を先に検証せず CI 設定へ組み込もうとし、無関係な既存 W002/V011 所見 170 件超が一斉 FAIL するところだった。
+  対策: 新しいフラグを既存ゲートに組み込む前に、そのフラグを対象コーパス全体に対して単体実行し、意図した検査以外の所見件数を数えてから採否を判断する。
+
 ## 配布物への finding 反映
 
 配布 bundle（plugin 同梱の pfd-* スキル本文・reference）は上流リポ（takasek/pfdsl）の生成・同梱物であり、採用リポ側のコピーは編集対象にならない（ADR-0028。plugin cache 内のファイルはインストール更新で消える）。
