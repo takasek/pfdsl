@@ -1916,7 +1916,7 @@ spec >> review -> report
 			});
 		});
 
-		it("hints at --limit in text mode when the file has many nodes and no --limit was given (#479 usability review)", async () => {
+		it("hints at --limit on stderr (not stdout) when the file has many nodes and no --limit was given (#479 re-check)", async () => {
 			const f = join(dir, "stats-many-nodes.pfdsl");
 			const manyNodes = Array.from(
 				{ length: 25 },
@@ -1925,8 +1925,9 @@ spec >> review -> report
 			writeFileSync(f, `${manyNodes}\n`);
 			const r = await run(["stats", f]);
 			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toContain("nodes total");
-			expect(r.stdout).toContain("--limit");
+			expect(r.stdout).not.toContain("nodes total");
+			expect(r.stderr).toContain("nodes total");
+			expect(r.stderr).toContain("--limit");
 		});
 
 		it("does not print a hint when --limit was explicitly given", async () => {
@@ -1938,7 +1939,7 @@ spec >> review -> report
 			writeFileSync(f, `${manyNodes}\n`);
 			const r = await run(["stats", f, "--limit", "5"]);
 			expect(r.exitCode).toBe(0);
-			expect(r.stdout).not.toContain("nodes total");
+			expect(r.stderr).toBe("");
 		});
 
 		it("does not print a hint when --json is passed", async () => {
@@ -1950,6 +1951,7 @@ spec >> review -> report
 			writeFileSync(f, `${manyNodes}\n`);
 			const r = await run(["stats", f, "--json"]);
 			expect(r.exitCode).toBe(0);
+			expect(r.stderr).toBe("");
 			expect(() => JSON.parse(r.stdout)).not.toThrow();
 		});
 	});

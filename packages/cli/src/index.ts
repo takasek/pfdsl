@@ -1027,9 +1027,9 @@ export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
 	);
 	const hint =
 		opts.limit === undefined && all.length > STATS_HINT_THRESHOLD
-			? `\n(${all.length} nodes total — pass --limit <n> to narrow)\n`
+			? `(${all.length} nodes total — pass --limit <n> to narrow)\n`
 			: "";
-	return ok(`${lines.join("\n")}\n${hint}`);
+	return ok(`${lines.join("\n")}\n`, hint);
 }
 
 export interface AuditSyncOptions {
@@ -1444,8 +1444,9 @@ Exit codes:
 const HELP_STATS = `usage: pfdsl stats <file|-> [--limit <n>] [--json]
 
 Print fan-in/fan-out per node, ranked by total degree descending (hubs
-first) then id ascending. Text mode prints a trailing hint suggesting
---limit when the file has more than ${STATS_HINT_THRESHOLD} nodes and --limit wasn't given.
+first) then id ascending. Text mode prints a hint to stderr suggesting
+--limit when the file has more than ${STATS_HINT_THRESHOLD} nodes and --limit wasn't given
+(kept off stdout so \`stats <file> | ...\` pipelines aren't affected).
 
   --limit <n>  only print the top n rows
   --json       output as JSON ({ ok, stats: {id, kind, fanIn, fanOut}[] })
