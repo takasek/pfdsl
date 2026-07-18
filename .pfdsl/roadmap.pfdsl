@@ -623,7 +623,6 @@ process:
   i482_implement_editor_connector:
     label: エディタ コネクタ編集実装
     location: https://github.com/takasek/pfdsl/issues/482
-    updated_at: 2026-07-18T00:33:31Z
   i483_implement_preview_connector:
     label: Preview コネクタ UI 実装
     location: https://github.com/takasek/pfdsl/issues/483
@@ -631,7 +630,6 @@ process:
   i484_implement_def_insertion:
     label: 定義挿入 code action 実装
     location: https://github.com/takasek/pfdsl/issues/484
-    updated_at: 2026-07-18T00:34:01Z
   publish_cli_grill_tolerance:
     label: CLI 診断緩和 + grill 公開
   publish_ext_editing:
