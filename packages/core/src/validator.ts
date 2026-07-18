@@ -76,7 +76,7 @@ export function validate(
 	for (const [id, count] of processInputCount) {
 		if (count === 0)
 			diagnostics.push({
-				severity: "error",
+				severity: options?.strict ? "error" : "warning",
 				code: "V002",
 				message: `Process '${id}' has no inputs`,
 				range: zeroRange(),
@@ -85,7 +85,7 @@ export function validate(
 	for (const [id, count] of processOutputCount) {
 		if (count === 0)
 			diagnostics.push({
-				severity: "error",
+				severity: options?.strict ? "error" : "warning",
 				code: "V003",
 				message: `Process '${id}' has no outputs`,
 				range: zeroRange(),
@@ -96,7 +96,7 @@ export function validate(
 	for (const pid of Object.keys(fm?.process ?? {})) {
 		if (!processInputCount.has(pid)) {
 			diagnostics.push({
-				severity: "error",
+				severity: options?.strict ? "error" : "warning",
 				code: "V020",
 				message: `Process '${pid}' is declared but has no edges (orphaned process)`,
 				range: zeroRange(),

@@ -8,7 +8,7 @@ let dir: string;
 const valid = "req >> design -> spec\nspec >> impl -> code\n";
 const validWithStatus =
 	"---\nartifact:\n  spec:\n    status: wip\n    criteria: spec criteria\n  code:\n    status: todo\n    criteria: code criteria\n---\nreq >> design -> spec\nspec >> impl -> code\n";
-const invalid = "req >> design\n"; // process design has no output
+const invalid = "req >> design -> spec\nother -> spec\n"; // V001: dual generators (always error)
 const conflict = "req >> design -> spec\nother -> spec\n"; // dual generators
 const warningOnly =
 	"---\nartifact:\n  bundle:\n    parts: [orphan]\n---\nreq >> design -> bundle\n"; // W001: orphan has no edges
@@ -178,10 +178,11 @@ req >> design -> spec
 
 	it("parse error surfaces diagnostics and exits 1", async () => {
 		const f = join(dir, "reindex-bad.pfdsl");
-		writeFileSync(f, "req >> design\n"); // V003: no output
+		const src = "req >> design -> spec\nother -> spec\n"; // V001: dual generators (always error)
+		writeFileSync(f, src);
 		const r = await run(["reindex", f, "--write"]);
 		expect(r.exitCode).toBe(1);
-		expect(readFileSync(f, "utf-8")).toBe("req >> design\n");
+		expect(readFileSync(f, "utf-8")).toBe(src);
 	});
 });
 
@@ -911,7 +912,7 @@ describe("multifile check — extends", () => {
 describe("ready", () => {
 	// Fixtures written in beforeAll(dir):
 	//   valid.pfdsl: "req >> design -> spec\nspec >> impl -> code\n"  (no status)
-	//   invalid.pfdsl: process with no output (parse error path)
+	//   invalid.pfdsl: dual generators (V001, always error)
 
 	const withStatus = (content: string) => {
 		const f = join(dir, "ready-status.pfdsl");

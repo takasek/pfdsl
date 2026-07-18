@@ -44,8 +44,22 @@ describe("validate", () => {
 		expect(codes("P -> B")).toContain("V002");
 	});
 
+	it("V002 severity is warning by default, error with --strict", () => {
+		const diags = diagnose("P -> B");
+		expect(diags.find((d) => d.code === "V002")?.severity).toBe("warning");
+		const strictDiags = diagnose("P -> B", null, { strict: true });
+		expect(strictDiags.find((d) => d.code === "V002")?.severity).toBe("error");
+	});
+
 	it("V003: process with no outputs", () => {
 		expect(codes("A >> P")).toContain("V003");
+	});
+
+	it("V003 severity is warning by default, error with --strict", () => {
+		const diags = diagnose("A >> P");
+		expect(diags.find((d) => d.code === "V003")?.severity).toBe("warning");
+		const strictDiags = diagnose("A >> P", null, { strict: true });
+		expect(strictDiags.find((d) => d.code === "V003")?.severity).toBe("error");
 	});
 
 	it("V004: parts member is a process", () => {
@@ -791,11 +805,14 @@ a >> design -> b
 			expect(codes("", fm)).toContain("V020");
 		});
 
-		it("V020 severity is error", () => {
+		it("V020 severity is warning by default, error with --strict", () => {
 			const fm: Frontmatter = { process: { orphan: {} } };
 			const diags = diagnose("", fm);
-			const v020 = diags.find((d) => d.code === "V020");
-			expect(v020?.severity).toBe("error");
+			expect(diags.find((d) => d.code === "V020")?.severity).toBe("warning");
+			const strictDiags = diagnose("", fm, { strict: true });
+			expect(strictDiags.find((d) => d.code === "V020")?.severity).toBe(
+				"error",
+			);
 		});
 
 		it("no V020 when process participates in edges", () => {
