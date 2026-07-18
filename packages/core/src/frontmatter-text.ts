@@ -51,17 +51,28 @@ export interface Section {
 	start: number;
 	/** Line index just past the section's content (exclusive). */
 	end: number;
+	/**
+	 * True when the section header itself carries an inline flow-style value
+	 * (`name: { ... }`) rather than child lines below it — the section exists
+	 * but isn't safe to splice a block-style entry into.
+	 */
+	flowStyle: boolean;
 }
 
 /** Locate a top-level (unindented) `<name>:` section within `yaml` lines. */
 export function locateSection(yaml: string[], name: string): Section | null {
 	let start = -1;
+	let flowStyle = false;
 	for (let i = 0; i < yaml.length; i++) {
 		const line = yaml[i]!;
-		if (/^[^\s#]/.test(line) && line.replace(/:\s*$/, "") === name) {
-			start = i;
-			break;
-		}
+		if (!/^[^\s#]/.test(line) || !line.startsWith(`${name}:`)) continue;
+		const rest = line.slice(name.length + 1).trim();
+		// A bare header (optionally followed by a trailing comment) has no
+		// non-comment content after the colon; anything else that isn't a
+		// comment is an inline flow-style value.
+		flowStyle = rest !== "" && !rest.startsWith("#");
+		start = i;
+		break;
 	}
 	if (start === -1) return null;
 
@@ -73,5 +84,5 @@ export function locateSection(yaml: string[], name: string): Section | null {
 			break;
 		}
 	}
-	return { start, end };
+	return { start, end, flowStyle };
 }

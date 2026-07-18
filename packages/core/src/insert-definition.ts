@@ -47,6 +47,11 @@ export function insertDefinition(
 
 	if (!section) {
 		yaml.push(`${kind}:`, `  ${id}:`, `    label: ${id}`);
+	} else if (section.flowStyle) {
+		// Inline flow-style section (`kind: { ... }`) — splicing a block-style
+		// entry in isn't safe without a full YAML rewrite, and re-appending a
+		// second top-level `kind:` header would produce a duplicate-key error.
+		return { output: source, inserted: false };
 	} else {
 		const { start: sectionStart, end: sectionEnd } = section;
 		const sectionIndent = detectChildIndent(

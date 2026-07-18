@@ -89,8 +89,16 @@ describe("locateSection", () => {
 			"process:",
 			"  p: { label: P }",
 		];
-		expect(locateSection(yaml, "artifact")).toEqual({ start: 0, end: 2 });
-		expect(locateSection(yaml, "process")).toEqual({ start: 2, end: 4 });
+		expect(locateSection(yaml, "artifact")).toEqual({
+			start: 0,
+			end: 2,
+			flowStyle: false,
+		});
+		expect(locateSection(yaml, "process")).toEqual({
+			start: 2,
+			end: 4,
+			flowStyle: false,
+		});
 	});
 
 	it("returns null when the section doesn't exist", () => {
@@ -105,5 +113,23 @@ describe("locateSection", () => {
 			"    label: not a top-level section",
 		];
 		expect(locateSection(yaml, "artifact")).toBeNull();
+	});
+
+	it("locates a header with a trailing comment", () => {
+		const yaml = ["artifact: # user artifacts", "  a: { label: A }"];
+		expect(locateSection(yaml, "artifact")).toEqual({
+			start: 0,
+			end: 2,
+			flowStyle: false,
+		});
+	});
+
+	it("flags an inline flow-style section (whole section on one line)", () => {
+		const yaml = ["artifact: { a: { label: A } }", "process:", "  p: {}"];
+		expect(locateSection(yaml, "artifact")).toEqual({
+			start: 0,
+			end: 1,
+			flowStyle: true,
+		});
 	});
 });

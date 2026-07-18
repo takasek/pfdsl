@@ -71,6 +71,33 @@ a >> p -> b
 		expect(second.output).toBe(first.output);
 	});
 
+	it("locates the section header even with a trailing comment", () => {
+		const src = `---
+artifact: # user artifacts
+  a:
+    label: A
+---
+a >> p -> b
+`;
+		const { output, inserted } = insertDefinition(src, "artifact", "b");
+		expect(inserted).toBe(true);
+		const { frontmatter, diagnostics } = analyze(output);
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(frontmatter?.artifact?.b?.label).toBe("b");
+		expect(frontmatter?.artifact?.a?.label).toBe("A");
+	});
+
+	it("is a safe no-op when the section is an inline flow-style one-liner", () => {
+		const src = `---
+artifact: { a: { label: A } }
+---
+a >> p -> b
+`;
+		const { output, inserted } = insertDefinition(src, "artifact", "b");
+		expect(inserted).toBe(false);
+		expect(output).toBe(src);
+	});
+
 	it("matches the section's existing indent width", () => {
 		const src = `---
 artifact:
