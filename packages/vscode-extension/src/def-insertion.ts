@@ -19,19 +19,22 @@ export function registerDefInsertion(context: vscode.ExtensionContext): void {
 			if (!kind) return;
 
 			const source = document.getText();
-			const { output, inserted } = insertDefinition(source, kind, id);
-			if (!inserted) return;
+			const { inserted, insertion } = insertDefinition(source, kind, id);
+			if (!inserted || !insertion) return;
 
 			const action = new vscode.CodeAction(
 				`Insert ${kind} definition for "${id}"`,
 				vscode.CodeActionKind.QuickFix,
 			);
-			const fullRange = new vscode.Range(
-				document.positionAt(0),
-				document.positionAt(source.length),
-			);
+			// Minimal edit (insert only) instead of a full-document replace, so a
+			// concurrent edit elsewhere in the document between code-action
+			// computation and application isn't silently discarded (#494).
 			action.edit = new vscode.WorkspaceEdit();
-			action.edit.replace(document.uri, fullRange, output);
+			action.edit.insert(
+				document.uri,
+				new vscode.Position(insertion.line, 0),
+				insertion.text,
+			);
 			return [action];
 		},
 	};
