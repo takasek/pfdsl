@@ -944,6 +944,11 @@ function loadGraph(file: string): GraphLoadResult {
 	return { graph };
 }
 
+/** Shared not-found error shape across all graph-analysis subcommands (#479 usability review). */
+function idsNotFoundError(file: string, ids: string[]): CommandResult {
+	return fail(`error: id(s) not found in ${file}: ${ids.join(", ")}\n`, 1);
+}
+
 export function runNeighbors(
 	file: string,
 	id: string,
@@ -951,9 +956,7 @@ export function runNeighbors(
 ): CommandResult {
 	const loaded = loadGraph(file);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	if (!loaded.graph.nodes.has(id)) {
-		return fail(`error: id '${id}' not found in ${file}\n`, 1);
-	}
+	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
 	const { predecessors, successors } = computeNeighbors(loaded.graph, id);
 	if (opts.json) {
 		return ok(`${JSON.stringify({ ok: true, predecessors, successors })}\n`);
@@ -970,12 +973,10 @@ export function runImpact(
 ): CommandResult {
 	const loaded = loadGraph(file);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	if (!loaded.graph.nodes.has(id)) {
-		return fail(`error: id '${id}' not found in ${file}\n`, 1);
-	}
+	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
 	const impact = computeImpact(loaded.graph, id).sort();
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, impact })}\n`);
-	return ok(`impact: ${impact.join(", ") || "(none)"}\n`);
+	return ok(impact.length ? `${impact.join("\n")}\n` : "(none)\n");
 }
 
 export function runDependsOn(
@@ -985,12 +986,10 @@ export function runDependsOn(
 ): CommandResult {
 	const loaded = loadGraph(file);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	if (!loaded.graph.nodes.has(id)) {
-		return fail(`error: id '${id}' not found in ${file}\n`, 1);
-	}
+	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
 	const dependsOn = computeDependsOn(loaded.graph, id).sort();
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, dependsOn })}\n`);
-	return ok(`depends-on: ${dependsOn.join(", ") || "(none)"}\n`);
+	return ok(dependsOn.length ? `${dependsOn.join("\n")}\n` : "(none)\n");
 }
 
 export function runPath(
@@ -1002,12 +1001,7 @@ export function runPath(
 	const loaded = loadGraph(file);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	const missing = [from, to].filter((id) => !loaded.graph.nodes.has(id));
-	if (missing.length > 0) {
-		return fail(
-			`error: id(s) not found in ${file}: ${missing.join(", ")}\n`,
-			1,
-		);
-	}
+	if (missing.length > 0) return idsNotFoundError(file, missing);
 	const paths = computePaths(loaded.graph, from, to);
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, paths })}\n`);
 	if (paths.length === 0) return ok("no path found\n");
@@ -1017,6 +1011,9 @@ export function runPath(
 export interface StatsOptions extends GraphAnalysisOptions {
 	limit?: number;
 }
+
+/** Above this row count, text mode (not --json) hints that --limit exists (#479 usability review). */
+const STATS_HINT_THRESHOLD = 20;
 
 export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
 	const loaded = loadGraph(file);
@@ -1028,7 +1025,11 @@ export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
 		(s) =>
 			`${s.id} (${s.kind})   fan-in=${s.fanIn}  fan-out=${s.fanOut}  total=${s.fanIn + s.fanOut}`,
 	);
-	return ok(`${lines.join("\n")}\n`);
+	const hint =
+		opts.limit === undefined && all.length > STATS_HINT_THRESHOLD
+			? `\n(${all.length} nodes total — pass --limit <n> to narrow)\n`
+			: "";
+	return ok(`${lines.join("\n")}\n${hint}`);
 }
 
 export interface AuditSyncOptions {
@@ -1402,7 +1403,8 @@ Exit codes:
 const HELP_IMPACT = `usage: pfdsl impact <file|-> <id> [--json]
 
 Print the full downstream closure reachable from <id> via primary edges
-(everything <id> unblocks, transitively), excluding <id> itself.
+(everything <id> unblocks, transitively), excluding <id> itself. Text mode
+prints one id per line (empty: "(none)"), for easy piping into other tools.
 
   --json  output as JSON ({ ok, impact: string[] })
 
@@ -1415,7 +1417,8 @@ Exit codes:
 const HELP_DEPENDS_ON = `usage: pfdsl depends-on <file|-> <id> [--json]
 
 Print the full upstream closure <id> depends on via primary edges
-(everything that must exist for <id> to exist), excluding <id> itself.
+(everything that must exist for <id> to exist), excluding <id> itself. Text
+mode prints one id per line (empty: "(none)"), for easy piping into other tools.
 
   --json  output as JSON ({ ok, dependsOn: string[] })
 
@@ -1441,7 +1444,8 @@ Exit codes:
 const HELP_STATS = `usage: pfdsl stats <file|-> [--limit <n>] [--json]
 
 Print fan-in/fan-out per node, ranked by total degree descending (hubs
-first) then id ascending.
+first) then id ascending. Text mode prints a trailing hint suggesting
+--limit when the file has more than ${STATS_HINT_THRESHOLD} nodes and --limit wasn't given.
 
   --limit <n>  only print the top n rows
   --json       output as JSON ({ ok, stats: {id, kind, fanIn, fanOut}[] })

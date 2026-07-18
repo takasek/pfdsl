@@ -1767,12 +1767,12 @@ spec >> review -> report
 			});
 		});
 
-		it("exits 1 when the id is not found", async () => {
+		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
 			const f = join(dir, "neighbors-notfound.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["neighbors", f, "nonexistent"]);
 			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toContain("nonexistent");
+			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
 		});
 
 		it("exits 2 when the id argument is missing", async () => {
@@ -1784,20 +1784,20 @@ spec >> review -> report
 	});
 
 	describe("impact", () => {
-		it("prints the downstream closure as text", async () => {
+		it("prints the downstream closure one id per line, for piping (#479 usability review)", async () => {
 			const f = join(dir, "impact.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["impact", f, "spec"]);
 			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toBe("impact: build, code, report, review\n");
+			expect(r.stdout).toBe("build\ncode\nreport\nreview\n");
 		});
 
-		it("prints an empty impact for a terminal node", async () => {
+		it("prints (none) for a terminal node", async () => {
 			const f = join(dir, "impact-terminal.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["impact", f, "code"]);
 			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toBe("impact: (none)\n");
+			expect(r.stdout).toBe("(none)\n");
 		});
 
 		it("emits JSON", async () => {
@@ -1812,28 +1812,30 @@ spec >> review -> report
 			);
 		});
 
-		it("exits 1 when the id is not found", async () => {
+		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
 			const f = join(dir, "impact-notfound.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["impact", f, "nonexistent"]);
 			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
 		});
 	});
 
 	describe("depends-on", () => {
-		it("prints the upstream closure as text", async () => {
+		it("prints the upstream closure one id per line, for piping (#479 usability review)", async () => {
 			const f = join(dir, "depends-on.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["depends-on", f, "code"]);
 			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toBe("depends-on: build, design, req, spec\n");
+			expect(r.stdout).toBe("build\ndesign\nreq\nspec\n");
 		});
 
-		it("exits 1 when the id is not found", async () => {
+		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
 			const f = join(dir, "depends-on-notfound.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["depends-on", f, "nonexistent"]);
 			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
 		});
 	});
 
@@ -1912,6 +1914,43 @@ spec >> review -> report
 				fanIn: 1,
 				fanOut: 2,
 			});
+		});
+
+		it("hints at --limit in text mode when the file has many nodes and no --limit was given (#479 usability review)", async () => {
+			const f = join(dir, "stats-many-nodes.pfdsl");
+			const manyNodes = Array.from(
+				{ length: 25 },
+				(_, i) => `a${i} >> p${i} -> b${i}`,
+			).join("\n");
+			writeFileSync(f, `${manyNodes}\n`);
+			const r = await run(["stats", f]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toContain("nodes total");
+			expect(r.stdout).toContain("--limit");
+		});
+
+		it("does not print a hint when --limit was explicitly given", async () => {
+			const f = join(dir, "stats-many-nodes-limited.pfdsl");
+			const manyNodes = Array.from(
+				{ length: 25 },
+				(_, i) => `a${i} >> p${i} -> b${i}`,
+			).join("\n");
+			writeFileSync(f, `${manyNodes}\n`);
+			const r = await run(["stats", f, "--limit", "5"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).not.toContain("nodes total");
+		});
+
+		it("does not print a hint when --json is passed", async () => {
+			const f = join(dir, "stats-many-nodes-json.pfdsl");
+			const manyNodes = Array.from(
+				{ length: 25 },
+				(_, i) => `a${i} >> p${i} -> b${i}`,
+			).join("\n");
+			writeFileSync(f, `${manyNodes}\n`);
+			const r = await run(["stats", f, "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(() => JSON.parse(r.stdout)).not.toThrow();
 		});
 	});
 });
