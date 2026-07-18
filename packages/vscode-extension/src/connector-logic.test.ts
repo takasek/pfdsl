@@ -1,34 +1,37 @@
+import type { NormalizedEdge } from "@pfdsl/core";
 import { describe, expect, it } from "vitest";
 import {
 	buildConnectorEdgeLine,
-	connectorKindsFor,
+	directionForKind,
+	edgeAlreadyExists,
 	insertConnectorEdge,
 } from "./connector-logic.js";
 
-describe("connectorKindsFor", () => {
-	it("offers input and feedback connectors for 'before'", () => {
-		expect(connectorKindsFor("before")).toEqual([">>", ">>?"]);
+describe("directionForKind", () => {
+	it("treats input and feedback as 'before'", () => {
+		expect(directionForKind(">>")).toBe("before");
+		expect(directionForKind(">>?")).toBe("before");
 	});
 
-	it("offers only the output connector for 'after'", () => {
-		expect(connectorKindsFor("after")).toEqual(["->"]);
+	it("treats output as 'after'", () => {
+		expect(directionForKind("->")).toBe("after");
 	});
 });
 
 describe("buildConnectorEdgeLine", () => {
-	it("places the other node before the current node for 'before' + '>>'", () => {
+	it("places the other node before the current node for '>>'", () => {
 		expect(buildConnectorEdgeLine("build", "before", ">>", "spec_doc")).toBe(
 			"spec_doc >> build",
 		);
 	});
 
-	it("uses the feedback connector for 'before' + '>>?'", () => {
+	it("uses the feedback connector for '>>?'", () => {
 		expect(buildConnectorEdgeLine("build", "before", ">>?", "review")).toBe(
 			"review >>? build",
 		);
 	});
 
-	it("places the other node after the current node for 'after' + '->'", () => {
+	it("places the other node after the current node for '->'", () => {
 		expect(buildConnectorEdgeLine("build", "after", "->", "result")).toBe(
 			"build -> result",
 		);
@@ -61,5 +64,33 @@ describe("insertConnectorEdge", () => {
 		const { text, insertedLine } = insertConnectorEdge(source, "A -> B");
 		expect(text).toBe("---\nartifact:\n  A: {}\n---\nA >> P\nA -> B\n");
 		expect(insertedLine).toBe(5);
+	});
+});
+
+describe("edgeAlreadyExists", () => {
+	const edges: NormalizedEdge[] = [
+		{ kind: "input", artifact: "spec_doc", process: "build" },
+		{ kind: "feedback", artifact: "review", process: "build" },
+		{ kind: "output", process: "build", artifact: "result" },
+	];
+
+	it("detects an existing input edge", () => {
+		expect(edgeAlreadyExists(edges, "build", ">>", "spec_doc")).toBe(true);
+	});
+
+	it("detects an existing feedback edge", () => {
+		expect(edgeAlreadyExists(edges, "build", ">>?", "review")).toBe(true);
+	});
+
+	it("detects an existing output edge", () => {
+		expect(edgeAlreadyExists(edges, "build", "->", "result")).toBe(true);
+	});
+
+	it("returns false for an edge that doesn't exist", () => {
+		expect(edgeAlreadyExists(edges, "build", ">>", "other")).toBe(false);
+	});
+
+	it("does not confuse input and feedback edges of the same pair", () => {
+		expect(edgeAlreadyExists(edges, "build", ">>", "review")).toBe(false);
 	});
 });

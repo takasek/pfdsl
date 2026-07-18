@@ -1,11 +1,11 @@
+import type { NormalizedEdge } from "@pfdsl/core";
+
 export type ConnectorDirection = "before" | "after";
 export type ConnectorKind = ">>" | ">>?" | "->";
 
-/** Connector kinds valid for a given direction (§lexer ARROW_INPUT/ARROW_FEEDBACK/ARROW_OUTPUT). */
-export function connectorKindsFor(
-	direction: ConnectorDirection,
-): ConnectorKind[] {
-	return direction === "before" ? [">>", ">>?"] : ["->"];
+/** >>/>>? attach before the current node (as its input); -> attaches after (as its output). */
+export function directionForKind(connector: ConnectorKind): ConnectorDirection {
+	return connector === "->" ? "after" : "before";
 }
 
 export function buildConnectorEdgeLine(
@@ -34,4 +34,23 @@ export function insertConnectorEdge(
 	const text =
 		trimmed.length > 0 ? `${trimmed}\n${edgeLine}\n` : `${edgeLine}\n`;
 	return { text, insertedLine };
+}
+
+/** Whether the edge a connector choice would create is already present among the document's normalized edges. */
+export function edgeAlreadyExists(
+	edges: readonly NormalizedEdge[],
+	nodeId: string,
+	connector: ConnectorKind,
+	otherId: string,
+): boolean {
+	if (connector === "->") {
+		return edges.some(
+			(e) =>
+				e.kind === "output" && e.process === nodeId && e.artifact === otherId,
+		);
+	}
+	const kind = connector === ">>" ? "input" : "feedback";
+	return edges.some(
+		(e) => e.kind === kind && e.process === nodeId && e.artifact === otherId,
+	);
 }
