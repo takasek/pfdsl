@@ -293,7 +293,6 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 
 export interface FmtOptions {
 	write?: boolean;
-	mode?: "flat" | "flows";
 }
 export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	if (file === "-" && opts.write) {
@@ -301,9 +300,7 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	}
 	const source = readSource(file);
 	if (isCommandResult(source)) return source;
-	const { output, diagnostics } = format(source, {
-		style: opts.mode ?? "flows",
-	});
+	const { output, diagnostics } = format(source, { style: "flows" });
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
 	if (opts.write) {
@@ -1368,14 +1365,13 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--mode flat|flows]
+const HELP_FMT = `usage: pfdsl fmt <file|-> [--write]
 
-Format a .pfdsl file. Use - to read from stdin (--write not allowed with stdin).
+Format a .pfdsl file, grouping each process with its inputs and outputs.
+Use - to read from stdin (--write not allowed with stdin).
 
 Options:
-  --write       rewrite the file in place (cannot be used with -)
-  --mode flat   output one edge per line
-  --mode flows  group each process with its inputs and outputs (default)
+  --write  rewrite the file in place (cannot be used with -)
 `;
 
 const HELP_REINDEX = `usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json]
@@ -1664,8 +1660,7 @@ Commands:
   check <file|-> [--strict] [--hints] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
-  fmt <file|-> [--write] [--mode flat|flows]
-                           Format a .pfdsl file (- = stdin)
+  fmt <file|-> [--write]   Format a .pfdsl file (- = stdin)
   render <file|-> [--format dot|svg|pdf|png]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires: npm install puppeteer
@@ -1911,14 +1906,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			if (flags.help) return ok(HELP_FMT);
 			const f = positional[0];
 			if (!f) return fail(HELP_FMT, 2);
-			const mode = flags.mode;
-			if (mode !== undefined && mode !== "flat" && mode !== "flows") {
-				return fail(`unknown mode: ${String(mode)}\n`, 2);
-			}
-			return runFmt(f, {
-				write: flags.write === true,
-				...(mode ? { mode } : {}),
-			});
+			return runFmt(f, { write: flags.write === true });
 		}
 		case "render": {
 			if (flags.help) return ok(HELP_RENDER);
