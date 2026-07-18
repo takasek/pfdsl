@@ -17,7 +17,27 @@ import {
 	parseAuditTerminals,
 	diffNewTerminals,
 	diffReadySets,
+	classifyAuditIssuesFlowResult,
+	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
 } from "./gate-check.mjs";
+
+describe("classifyAuditIssuesFlowResult", () => {
+	it("PASS when ok", () => {
+		assert.deepEqual(classifyAuditIssuesFlowResult(true, 0), { status: "PASS" });
+	});
+
+	it("SKIP with gh-unavailable detail when exit code is the gh-unavailable code", () => {
+		const result = classifyAuditIssuesFlowResult(false, AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE);
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /gh CLI unavailable/);
+	});
+
+	it("FAIL for a real findings/error exit code", () => {
+		const result = classifyAuditIssuesFlowResult(false, 1);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /findings/);
+	});
+});
 
 describe("VSCODE_EXT_TRIGGER", () => {
 	it("matches files under packages/vscode-extension", () => {

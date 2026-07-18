@@ -12,6 +12,27 @@ export function matchesTrigger(files, pattern) {
 	return files.some((f) => pattern.test(f));
 }
 
+// audit-issues-flow.mjs exits with this code when the gh CLI is unavailable
+// (ENOENT), distinct from exit code 1 (real findings) — see #489, #492.
+export const AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE = 2;
+
+/**
+ * Map an `node scripts/audit-issues-flow.mjs` subprocess result to a
+ * gate-check row. Exit code 2 (gh CLI unavailable) degrades to SKIP instead
+ * of FAIL, so a missing gh binary doesn't get conflated with an actual
+ * roadmap/issue sync drift.
+ * @param {boolean} ok
+ * @param {number|undefined} exitStatus
+ * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
+ */
+export function classifyAuditIssuesFlowResult(ok, exitStatus) {
+	if (ok) return { status: "PASS" };
+	if (exitStatus === AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE) {
+		return { status: "SKIP", detail: "gh CLI unavailable; GitHub-dependent checks skipped (see #492)" };
+	}
+	return { status: "FAIL", detail: "re-run: node scripts/audit-issues-flow.mjs (findings)" };
+}
+
 /**
  * @param {Array<{name: string, status: 'PASS'|'FAIL'|'SKIP', detail?: string}>} results
  * @returns {string}

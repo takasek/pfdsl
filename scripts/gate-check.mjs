@@ -25,6 +25,7 @@ import {
 	parseAuditTerminals,
 	diffNewTerminals,
 	diffReadySets,
+	classifyAuditIssuesFlowResult,
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 
@@ -46,7 +47,7 @@ function trySh(cmd, input) {
 	try {
 		return { ok: true, out: sh(cmd, input) };
 	} catch (e) {
-		return { ok: false, out: e.stdout || e.message };
+		return { ok: false, out: e.stdout || e.message, status: e.status };
 	}
 }
 
@@ -90,11 +91,7 @@ if (pfdslFiles.length === 0) {
 // 2. audit-issues-flow (no --fix: fails if manual findings remain)
 {
 	const r = trySh("node scripts/audit-issues-flow.mjs");
-	results.push({
-		name: "audit-issues-flow",
-		status: r.ok ? "PASS" : "FAIL",
-		detail: r.ok ? undefined : "re-run: node scripts/audit-issues-flow.mjs (findings or gh/network error)",
-	});
+	results.push({ name: "audit-issues-flow", ...classifyAuditIssuesFlowResult(r.ok, r.status) });
 }
 
 // 3. check-md-linebreaks on changed .md files
