@@ -2,7 +2,8 @@ import type { DiagnosticSeverity } from "./types/index.js";
 
 export interface DiagnosticRegistryEntry {
 	/** Severities this code can be emitted with. Usually one entry; two for
-	 * codes whose severity depends on `options?.strict` (W002, W005). */
+	 * codes whose severity depends on `options?.strict` (V002, V003, V020,
+	 * W002, W005). */
 	severities: readonly DiagnosticSeverity[];
 	/** Spec section number (without the `§` prefix) that normatively defines
 	 * the condition this code checks, e.g. "15.11". Matches spec.md §16's
@@ -98,12 +99,12 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		summary: "the same artifact is produced by multiple processes",
 	},
 	V002: {
-		severities: ["error"],
+		severities: ["warning", "error"],
 		section: "15.2",
 		summary: "a process has no inputs",
 	},
 	V003: {
-		severities: ["error"],
+		severities: ["warning", "error"],
 		section: "15.2",
 		summary: "a process has no outputs",
 	},
@@ -185,7 +186,7 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		summary: "`revises:` references form a cycle",
 	},
 	V020: {
-		severities: ["error"],
+		severities: ["warning", "error"],
 		section: "15.10",
 		summary:
 			"a process declared in front matter does not participate in any edge (orphaned declared process)",

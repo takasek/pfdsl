@@ -47,45 +47,54 @@ artifact:
   parsed_doc:
     label: 構文木・frontmatter
     description: frontmatter読込・lex・parseの出力（document構造とfrontmatter）
+    criteria: frontmatter読込・lex・parseの3段が実装され、CLI全コマンド・VSCode拡張の双方で動作確認済み
     group: in_memory
   normalized_graph:
     label: 正準化グラフ
     description: "正規化済みエッジ・ノード種別・isolatedノード集合とGraph構造。validate/render_graph/export_metadata/diff_graphsの共通入力。CLI normalizeコマンドはこれをJSONで直接出力する"
+    criteria: npx @pfdsl/cli normalize が実装され動作確認済み（validate/render_graph/export_metadata/diff_graphsの共通入力として機能）
     externalStakeholders: [CLIユーザー]
     group: in_memory
   diagnostics_report:
     label: 診断結果
     description: "V/Wルールに基づくエラー・警告一覧。CLI checkコマンドの出力で、VSCode拡張は同じvalidateをエディタ内リアルタイム診断に使う"
+    criteria: npx @pfdsl/cli check が実装され動作確認済み（VSCode拡張のリアルタイム診断でも共有）
     externalStakeholders: [CLIユーザー, CI, VSCode拡張ユーザー]
     group: run_outputs
   formatted_source:
     label: 整形済みソース
     description: ソースからの独立した再parseで生成する正準整形済み.pfdslテキスト
+    criteria: npx @pfdsl/cli fmt --write が実装され動作確認済み
     externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
     group: run_outputs
   dot_graph:
     label: DOTグラフ
     description: Graphviz DOT形式テキスト（graphコマンドのデフォルト出力）
+    criteria: npx @pfdsl/cli graph が実装され動作確認済み
     externalStakeholders: [CLIユーザー]
     group: run_outputs
   rendered_image:
     label: レンダリング画像
     description: DOTから変換したSVG（wasm）またはPDF/PNG（puppeteer経由）
+    criteria: npx @pfdsl/cli graph --format svg/pdf/png が実装され動作確認済み
     externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
     group: run_outputs
   metadata_tsv:
     label: メタデータTSV
     description: ノードのkind/label/description/status/tags/ownerを抽出したタブ区切りテキスト
+    criteria: メタデータ抽出処理が実装され、VSCode拡張のエクスポート機能から動作確認済み
     externalStakeholders: [VSCode拡張ユーザー]
     group: run_outputs
   diff_report:
     label: 差分レポート
     description: "2つのグラフ間の構造差分（追加・削除・改名ノード等）。この図は単一ドキュメントの変換を軸にモデル化しているため、比較対象の2つ目のグラフは図上に現れない"
+    criteria: npx @pfdsl/cli diff が実装され動作確認済み
     externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
     group: run_outputs
   sorted_source:
     label: ソート済みソース
     description: 指定キーでノード定義を並べ替えた.pfdslテキスト
+    criteria: sort-metaコマンドが実装され動作確認済み
     externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
     group: run_outputs
   pfdsl_skill:
@@ -123,25 +132,30 @@ artifact:
   installed_l3_layer:
     label: 導入済みL3レイヤー
     description: "plugin同梱install/由来ファイル（GitHub Actionsワークフロー・監査スクリプト）の採用リポルートへの実配置結果"
+    criteria: check-install-sync.mjs --deploy が実装され、採用リポへの実配置が動作確認済み
     externalStakeholders: [採用リポのGitHub Actions]
     group: adopter_repo
   gh_labels:
     label: GitHubラベル整備結果
     description: "flow:managed / flow:exempt ラベルの存在保証（gh CLI経由）"
+    criteria: audit-issues-flow.mjs --fix によるラベル自動生成が実装され動作確認済み
     externalStakeholders: [採用リポのGitHubリポジトリ]
     group: adopter_repo
   plugin_dir:
     label: 配布プラグインディレクトリ
     description: "make gen-plugin が組み立てる plugin/pfdsl/（コミット対象、git-subdir marketplace source としてそのまま配布される）。canonical スキル群との identity は check-gen-plugin.yml が CI 強制する"
+    criteria: make gen-plugin が実装され、check-gen-plugin.yml のCI強制込みで動作確認済み
     location: ../plugin/pfdsl/
   installed_plugin:
     label: 導入済みプラグイン
     description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。4スキル・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）"
+    criteria: marketplace経由の導入が動作確認済み（4スキル・pfd-*コマンド・pfd-lens agentが一括で届く）
     externalStakeholders: [採用リポのAIエージェント]
     group: adopter_env
   drift_report:
     label: 配置鮮度警告
     description: "配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、および上流plugin versionとのskew警告（stdout）。警告が出たら--deployでrefreshする"
+    criteria: check-install-sync.mjs --upstream によるhash照合・skew警告が実装され動作確認済み
     externalStakeholders: [採用リポのAIエージェント]
     group: run_outputs
 
