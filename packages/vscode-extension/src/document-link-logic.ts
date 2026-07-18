@@ -1,5 +1,4 @@
-import { loadFrontmatter } from "@pfdsl/core";
-import { resolveLocationFsPath } from "./location-path.js";
+import { loadFrontmatter, resolveLocationFsPath } from "@pfdsl/core";
 import { normalizeLocation } from "./location-utils.js";
 
 export interface LinkRange {
