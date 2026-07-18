@@ -98,6 +98,20 @@ describe("validate", () => {
 		).toHaveLength(0);
 	});
 
+	it("does not crash when an artifact node is declared with no value (YAML null, #490)", () => {
+		const fm = {
+			artifact: { A: null },
+		} as unknown as Frontmatter;
+		expect(() => diagnose("A >> P -> B", fm)).not.toThrow();
+	});
+
+	it("does not crash when a process node is declared with no value (YAML null, #490)", () => {
+		const fm = {
+			process: { P: null },
+		} as unknown as Frontmatter;
+		expect(() => diagnose("A >> P -> B", fm)).not.toThrow();
+	});
+
 	it("V007: invalid status enum value", () => {
 		const fm = {
 			artifact: { A: { status: "finished" } },

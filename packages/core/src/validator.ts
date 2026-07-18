@@ -121,7 +121,8 @@ export function validate(
 		}
 	}
 
-	for (const [artifactId, meta] of Object.entries(artifactMeta)) {
+	for (const [artifactId, rawMeta] of Object.entries(artifactMeta)) {
+		const meta = rawMeta ?? {};
 		for (const partId of meta.parts ?? []) {
 			if (nodeKinds.get(partId) === "process") {
 				diagnostics.push({
@@ -162,12 +163,12 @@ export function validate(
 	// V029: index must be a positive integer (artifact / process)
 	// W004: duplicate index within a namespace (independent per kind)
 	const checkIndices = (
-		entries: Record<string, { index?: unknown }>,
+		entries: Record<string, { index?: unknown } | null>,
 		kind: "artifact" | "process",
 	): void => {
 		const seen = new Map<number, string>();
-		for (const [id, meta] of Object.entries(entries)) {
-			const idx = meta.index;
+		for (const [id, rawMeta] of Object.entries(entries)) {
+			const idx = rawMeta?.index;
 			if (idx === undefined) continue;
 			if (typeof idx !== "number" || !Number.isInteger(idx) || idx < 1) {
 				diagnostics.push({
@@ -349,8 +350,8 @@ export function validate(
 	// V014: command on artifact
 	// V015: revises on process
 	const processMeta = fm?.process ?? {};
-	for (const [pid, meta] of Object.entries(processMeta)) {
-		const m = meta as Record<string, unknown>;
+	for (const [pid, rawMeta] of Object.entries(processMeta)) {
+		const m = (rawMeta ?? {}) as Record<string, unknown>;
 		if (m.criteria !== undefined) {
 			diagnostics.push({
 				severity: "error",
@@ -368,7 +369,8 @@ export function validate(
 			});
 		}
 	}
-	for (const [aid, meta] of Object.entries(artifactMeta)) {
+	for (const [aid, rawMeta] of Object.entries(artifactMeta)) {
+		const meta = rawMeta ?? {};
 		if (meta.criteria === undefined && artifactGenerators.has(aid)) {
 			diagnostics.push({
 				severity: options?.strict ? "error" : "warning",
@@ -392,8 +394,8 @@ export function validate(
 	// V018: revises branching (multiple artifacts revise same target)
 	// V019: revises cycle
 	const revisesTargets = new Map<string, string>(); // aid -> target
-	for (const [aid, meta] of Object.entries(artifactMeta)) {
-		const target = meta.revises as unknown;
+	for (const [aid, rawMeta] of Object.entries(artifactMeta)) {
+		const target = rawMeta?.revises as unknown;
 		if (target === undefined || target === null) continue;
 		if (typeof target !== "string") {
 			diagnostics.push({
@@ -495,8 +497,9 @@ export function validate(
 	}
 
 	// V023: subflow on artifact
-	for (const [id, meta] of Object.entries(fm?.artifact ?? {})) {
-		if ((meta as Record<string, unknown>).subflow !== undefined) {
+	for (const [id, rawMeta] of Object.entries(fm?.artifact ?? {})) {
+		const meta = (rawMeta ?? {}) as Record<string, unknown>;
+		if (meta.subflow !== undefined) {
 			diagnostics.push({
 				severity: "error",
 				code: "V023",
@@ -507,11 +510,9 @@ export function validate(
 	}
 
 	// V024: boundary without subflow
-	for (const [pid, meta] of Object.entries(fm?.process ?? {})) {
-		if (
-			(meta as Record<string, unknown>).boundary !== undefined &&
-			meta.subflow === undefined
-		) {
+	for (const [pid, rawMeta] of Object.entries(fm?.process ?? {})) {
+		const meta = (rawMeta ?? {}) as Record<string, unknown>;
+		if (meta.boundary !== undefined && meta.subflow === undefined) {
 			diagnostics.push({
 				severity: "error",
 				code: "V024",
