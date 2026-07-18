@@ -9,7 +9,6 @@ import {
 	insertConnectorEdge,
 } from "./connector-logic.js";
 
-const NEW_ID_ITEM = "$(add) New node ID…";
 const PLACEHOLDER = "…";
 
 /** Labels show the resulting edge syntax directly, adapted to the current node's role. */
@@ -94,8 +93,25 @@ export function registerConnectorEditing(
 				);
 				return;
 			}
-			const nodeRole: ConnectorRole =
-				nodeKind === "artifact" ? "artifact" : "process";
+
+			let nodeRole: ConnectorRole;
+			if (nodeKind === "artifact" || nodeKind === "process") {
+				nodeRole = nodeKind;
+			} else {
+				// Not yet declared or used anywhere — ask rather than silently
+				// assuming a role, since every offered connector shape depends on it.
+				const rolePick = await vscode.window.showQuickPick(
+					[
+						{ label: "Artifact", role: "artifact" as const },
+						{ label: "Process", role: "process" as const },
+					],
+					{
+						placeHolder: `"${nodeId}" isn't declared yet — is it an artifact or a process?`,
+					},
+				);
+				if (!rolePick) return;
+				nodeRole = rolePick.role;
+			}
 
 			const connectorPick = await vscode.window.showQuickPick(
 				connectorItemsFor(nodeId, nodeRole),
@@ -105,24 +121,29 @@ export function registerConnectorEditing(
 			const connector = connectorPick.connector;
 
 			const wantedKind = compatibleOtherKind(nodeRole);
+			const newIdItem = `$(add) New ${wantedKind} ID…`;
 			const existingIds = [...nodeKinds.entries()]
 				.filter(([id, kind]) => id !== nodeId && kind === wantedKind)
 				.map(([id]) => id)
 				.sort();
 			const idPick = await vscode.window.showQuickPick(
-				[{ label: NEW_ID_ITEM }, ...existingIds.map((id) => ({ label: id }))],
+				[{ label: newIdItem }, ...existingIds.map((id) => ({ label: id }))],
 				{ placeHolder: `Select the ${wantedKind} to connect` },
 			);
 			if (!idPick) return;
 
 			let otherId = idPick.label;
-			if (idPick.label === NEW_ID_ITEM) {
+			if (idPick.label === newIdItem) {
 				const fullIdPattern = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
 				const input = await vscode.window.showInputBox({
 					prompt: `New ${wantedKind} ID`,
 					validateInput: (value) => {
 						if (!fullIdPattern.test(value)) return "Invalid node ID";
 						if (value === nodeId) return "Cannot connect a node to itself";
+						const existingKind = nodeKinds.get(value);
+						if (existingKind && existingKind !== wantedKind) {
+							return `"${value}" is already a ${existingKind}, not a ${wantedKind}`;
+						}
 						return undefined;
 					},
 				});
