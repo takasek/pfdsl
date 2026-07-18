@@ -27,3 +27,51 @@ export function detectChildIndent(lines: string[], fallback = 2): number {
 	}
 	return fallback;
 }
+
+export interface FrontmatterFences {
+	/** Line index of the opening `---`. */
+	open: number;
+	/** Line index of the closing `---`. */
+	close: number;
+}
+
+/** Locate the opening/closing `---` fence lines, or null if absent/unclosed. */
+export function findFrontmatterFences(
+	lines: string[],
+): FrontmatterFences | null {
+	if (lines[0]?.trim() !== "---") return null;
+	for (let i = 1; i < lines.length; i++) {
+		if (lines[i]?.trim() === "---") return { open: 0, close: i };
+	}
+	return null;
+}
+
+export interface Section {
+	/** Line index of the `<name>:` header within the YAML region. */
+	start: number;
+	/** Line index just past the section's content (exclusive). */
+	end: number;
+}
+
+/** Locate a top-level (unindented) `<name>:` section within `yaml` lines. */
+export function locateSection(yaml: string[], name: string): Section | null {
+	let start = -1;
+	for (let i = 0; i < yaml.length; i++) {
+		const line = yaml[i]!;
+		if (/^[^\s#]/.test(line) && line.replace(/:\s*$/, "") === name) {
+			start = i;
+			break;
+		}
+	}
+	if (start === -1) return null;
+
+	let end = yaml.length;
+	for (let i = start + 1; i < yaml.length; i++) {
+		const line = yaml[i]!;
+		if (line.trim() !== "" && /^[^\s#]/.test(line)) {
+			end = i;
+			break;
+		}
+	}
+	return { start, end };
+}

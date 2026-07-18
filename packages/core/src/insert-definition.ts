@@ -1,4 +1,9 @@
-import { detectChildIndent, escapeRe } from "./frontmatter-text.js";
+import {
+	detectChildIndent,
+	escapeRe,
+	findFrontmatterFences,
+	locateSection,
+} from "./frontmatter-text.js";
 
 export interface InsertDefinitionResult {
 	/** Source with a definition block inserted (unchanged when already defined). */
@@ -20,20 +25,10 @@ export function insertDefinition(
 	const lines = source.split("\n");
 	const trailingNewline = source.endsWith("\n");
 
-	let open = -1;
-	let close = -1;
-	if (lines[0]?.trim() === "---") {
-		open = 0;
-		for (let i = 1; i < lines.length; i++) {
-			if (lines[i]?.trim() === "---") {
-				close = i;
-				break;
-			}
-		}
-	}
+	const fences = findFrontmatterFences(lines);
 
 	// No front matter: synthesize one around the source.
-	if (open === -1 || close === -1) {
+	if (!fences) {
 		const fm = [
 			"---",
 			`${kind}:`,
@@ -45,31 +40,15 @@ export function insertDefinition(
 		return { output: `${fm}${source}`, inserted: true };
 	}
 
+	const { open, close } = fences;
 	const yaml = lines.slice(open + 1, close);
-
-	let sectionStart = -1;
-	for (let i = 0; i < yaml.length; i++) {
-		const line = yaml[i]!;
-		if (/^[^\s#]/.test(line) && line.replace(/:\s*$/, "") === kind) {
-			sectionStart = i;
-			break;
-		}
-	}
-
+	const section = locateSection(yaml, kind);
 	const pad = (n: number) => " ".repeat(n);
 
-	if (sectionStart === -1) {
+	if (!section) {
 		yaml.push(`${kind}:`, `  ${id}:`, `    label: ${id}`);
 	} else {
-		let sectionEnd = yaml.length;
-		for (let i = sectionStart + 1; i < yaml.length; i++) {
-			const line = yaml[i]!;
-			if (line.trim() !== "" && /^[^\s#]/.test(line)) {
-				sectionEnd = i;
-				break;
-			}
-		}
-
+		const { start: sectionStart, end: sectionEnd } = section;
 		const sectionIndent = detectChildIndent(
 			yaml.slice(sectionStart + 1, sectionEnd),
 		);
