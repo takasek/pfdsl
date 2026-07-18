@@ -637,7 +637,6 @@ process:
   i476_implement_field_get:
     label: フィールド値取得コマンド実装
     location: https://github.com/takasek/pfdsl/issues/476
-    updated_at: 2026-07-18T00:41:35Z
   i478_relax_v011:
     label: V011 意味論緩和実装
     location: https://github.com/takasek/pfdsl/issues/478
@@ -645,7 +644,6 @@ process:
   i479_implement_graph_analysis:
     label: graph-analysis サブコマンド実装
     location: https://github.com/takasek/pfdsl/issues/479
-    updated_at: 2026-07-18T00:41:38Z
   publish_cli_query_tools:
     label: CLI フィールド取得 + graph 分析公開
 
