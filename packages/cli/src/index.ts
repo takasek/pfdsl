@@ -293,8 +293,12 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 
 export interface FmtOptions {
 	write?: boolean;
+	check?: boolean;
 }
 export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
+	if (opts.check && opts.write) {
+		return fail("--check cannot be combined with --write\n", 2);
+	}
 	if (file === "-" && opts.write) {
 		return fail("--write cannot be used with stdin (-)\n", 2);
 	}
@@ -303,6 +307,14 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	const { output, diagnostics } = format(source, { style: "flows" });
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
+	if (opts.check) {
+		const changed = output !== source;
+		return {
+			stdout: changed ? "not formatted\n" : "",
+			stderr: "",
+			exitCode: changed ? 1 : 0,
+		};
+	}
 	if (opts.write) {
 		writeFileSync(file, output, "utf-8");
 		return ok();
@@ -1587,13 +1599,15 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_FMT = `usage: pfdsl fmt <file|-> [--write]
+const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--check]
 
 Format a .pfdsl file, grouping each process with its inputs and outputs.
-Use - to read from stdin (--write not allowed with stdin).
+Use - to read from stdin (--write not allowed with stdin; --check is allowed).
 
 Options:
   --write  rewrite the file in place (cannot be used with -)
+  --check  do not write; exit 1 if formatting would change anything (CI)
+           (cannot be combined with --write)
 `;
 
 const HELP_REINDEX = `usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json]
@@ -1912,7 +1926,8 @@ Commands:
   check <file|-> [--strict] [--hints] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
-  fmt <file|-> [--write]   Format a .pfdsl file (- = stdin)
+  fmt <file|-> [--write] [--check]
+                           Format a .pfdsl file (- = stdin)
   render <file|-> [--format dot|svg|pdf|png]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires: npm install puppeteer
@@ -2159,7 +2174,10 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			if (flags.help) return ok(HELP_FMT);
 			const f = positional[0];
 			if (!f) return fail(HELP_FMT, 2);
-			return runFmt(f, { write: flags.write === true });
+			return runFmt(f, {
+				write: flags.write === true,
+				check: flags.check === true,
+			});
 		}
 		case "render": {
 			if (flags.help) return ok(HELP_RENDER);

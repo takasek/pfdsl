@@ -109,6 +109,43 @@ describe("fmt", () => {
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("req >> design");
 	});
+
+	it("--check exits 1 and prints 'not formatted' when the file is not formatted, without writing", async () => {
+		const f = join(dir, "fmt-check-unformatted.pfdsl");
+		const src = "   req>>design->spec\n";
+		writeFileSync(f, src);
+		const r = await run(["fmt", f, "--check"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toBe("not formatted\n");
+		expect(readFileSync(f, "utf-8")).toBe(src);
+	});
+
+	it("--check exits 0 and prints nothing when the file is already formatted", async () => {
+		const f = join(dir, "fmt-check-clean.pfdsl");
+		writeFileSync(f, valid);
+		const r = await run(["fmt", f, "--check"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("");
+	});
+
+	it("--check is allowed with stdin (-)", async () => {
+		stdinOverride = "   req>>design->spec\n";
+		try {
+			const r = await run(["fmt", "-", "--check"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stdout).toBe("not formatted\n");
+		} finally {
+			stdinOverride = null;
+		}
+	});
+
+	it("--check combined with --write is rejected (exit 2)", async () => {
+		const f = join(dir, "fmt-check-conflict.pfdsl");
+		writeFileSync(f, valid);
+		const r = await run(["fmt", f, "--check", "--write"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe("--check cannot be combined with --write\n");
+	});
 });
 
 describe("reindex", () => {
