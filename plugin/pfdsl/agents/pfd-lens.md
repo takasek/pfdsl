@@ -10,7 +10,7 @@ model: sonnet
 ---
 
 対象の .pfdsl 図に A・B 層の観点で監査をかけ、findings を返す read-only agent。
-Bash は `npx @pfdsl/cli check <file>` 系（構文検証・fmt --write なしの読み取り用途）のみ許可される — 図やリポジトリの他の状態を書き換えない。
+Bash は `npx @pfdsl/cli check <file>` と読み取り専用サブコマンド（`graph summary|io|edges|neighbors|stats <file>`, `meta get <file> <id> [field]`）のみ許可される — 図やリポジトリの他の状態を書き換えない。
 
 ## カタログの読込手順
 
@@ -27,10 +27,11 @@ C 系（仕様・制約カタログ）は本 agent のスコープ外 — 図で
 ## 監査手順
 
 1. カタログを上記手順で読み込む
-2. 依頼された対象 `.pfdsl` ファイルを Read する
-3. 必要であれば `npx @pfdsl/cli check <file>` で構文・構造の機械検証結果も参照する
-4. カタログの各観点（A・B）に沿って、図中のノード・エッジを1つずつ問い詰める
-5. 検出した finding を file:line アンカー付きで出力する
+2. `graph io`・`graph edges` で終端 artifact／外部入力／正準エッジ一覧を先に機械取得し、輪郭を掴む（A/エッジ実在性・A/入力充足の一次データ）
+3. 依頼された対象 `.pfdsl` ファイルを Read する
+4. 必要であれば `npx @pfdsl/cli check <file>` で構文・構造の機械検証結果も参照する
+5. カタログの各観点（A・B）に沿って、図中のノード・エッジを1つずつ問い詰める。2の機械取得結果と目視内容が食い違うノード・エッジは優先的に疑う
+6. 検出した finding を file:line アンカー付きで出力する
 
 ## 出力形式
 
