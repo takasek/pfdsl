@@ -110,8 +110,9 @@ PFD はタスクリストではなく成果物の変換グラフ。
 ## 読解と点検
 
 - **読解**: 大きい PFD は全読しない。`graph io` の2行（終端 artifact と外部入力）で輪郭を掴み、対象ノードの frontmatter だけ読む。roadmap では `status ready --best` が着手可能プロセスを返す
-- **書いた後の点検**: 同じ `graph io` の2行で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る
-- roadmap と flow ファイルが併存する構成では `status gaps <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する
+- **書いた後の点検**: 同じ `graph io` の2行で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る。`graph orphans` は predecessor・successor どちらも持たないノード（配線忘れ）を検出する — graph io の外部入力・終端はそれぞれ片側のみの欠落なので、両方欠落した本当に浮いたノードは別途これで見る
+- roadmap と flow ファイルが併存する構成では `status gaps <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する。roadmap 内の artifact を status で絞り込む場合は `status list <file> --status <s[,s...]>`、着手不可なプロセスがなぜ止まっているか見るなら `status blocked <file>`
+- `location:` を書いたら `meta check-links <file>` で参照先ファイルの実在を確認できる（URL・glob は自動的にスキップされる）
 - 図の視覚確認が必要なときだけ `render --format dot` を使う（大きい図では dot 全読より graph io が安い）
 
 ## Typical task: update artifact status
