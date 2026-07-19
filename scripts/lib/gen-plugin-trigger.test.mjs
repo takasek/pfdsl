@@ -23,6 +23,10 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/skills/pfd-retro/SKILL.md"), true);
 	});
 
+	it("matches a .claude/skills/pfd-grill/ path", () => {
+		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/skills/pfd-grill/SKILL.md"), true);
+	});
+
 	it("matches .claude/commands/pfd-cycle.md", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/commands/pfd-cycle.md"), true);
 	});

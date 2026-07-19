@@ -6,14 +6,14 @@
 //
 // Superset of GEN_SKILL_TRIGGER: gen-plugin.mjs re-runs gen-skill.mjs
 // internally (see scripts/gen-plugin.mjs), plus bundles pfd-ecosystem/
-// pfd-ops/pfd-retro/pfd-cycle/pfd-init/pfd-lens and derives plugin.json's
-// version from the CLI package.json.
+// pfd-ops/pfd-retro/pfd-grill/pfd-cycle/pfd-init/pfd-lens and derives
+// plugin.json's version from the CLI package.json.
 
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { GEN_SKILL_TRIGGER_PATTERN } from "./gen-skill-trigger.mjs";
 
-export const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|\\.claude/skills/pfd-ecosystem/|\\.claude/skills/pfd-ops/|\\.claude/skills/pfd-retro/|\\.claude/commands/pfd-cycle\\.md|\\.claude/commands/pfd-init\\.md|\\.claude/commands/pfd-retro\\.md|\\.claude/agents/pfd-lens\\.md|^hooks/|packages/cli/package\\.json`;
+export const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|\\.claude/skills/pfd-ecosystem/|\\.claude/skills/pfd-ops/|\\.claude/skills/pfd-retro/|\\.claude/skills/pfd-grill/|\\.claude/commands/pfd-cycle\\.md|\\.claude/commands/pfd-init\\.md|\\.claude/commands/pfd-retro\\.md|\\.claude/agents/pfd-lens\\.md|^hooks/|packages/cli/package\\.json`;
 
 export const GEN_PLUGIN_TRIGGER = new RegExp(GEN_PLUGIN_TRIGGER_PATTERN);
 
