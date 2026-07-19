@@ -540,6 +540,62 @@ describe("diff", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("no structural differences");
 	});
+
+	it("--json emits the structural DiffReport as JSON", async () => {
+		const a = join(dir, "diff-json-a.pfdsl");
+		const b = join(dir, "diff-json-b.pfdsl");
+		writeFileSync(a, "req >> design -> spec\n");
+		writeFileSync(b, "req >> design -> spec\nspec >> impl -> code\n");
+		const r = await run(["diff", a, b, "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			diff: {
+				addedNodes: ["code", "impl"],
+				removedNodes: [],
+				changedNodes: [],
+				addedEdges: ["impl -> code", "spec -> impl"],
+				removedEdges: [],
+				addedFeedback: [],
+				removedFeedback: [],
+			},
+		});
+	});
+
+	it("--json with --format text is fine", async () => {
+		const a = join(dir, "valid.pfdsl");
+		const r = await run(["diff", a, a, "--format", "text", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout).ok).toBe(true);
+	});
+
+	it("--json combined with --format dot is rejected (exit 2)", async () => {
+		const a = join(dir, "valid.pfdsl");
+		const r = await run(["diff", a, a, "--format", "dot", "--json"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe("--json cannot be combined with --format dot|svg\n");
+	});
+
+	it("--json combined with --format svg is rejected (exit 2)", async () => {
+		const a = join(dir, "valid.pfdsl");
+		const r = await run(["diff", a, a, "--format", "svg", "--json"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe("--json cannot be combined with --format dot|svg\n");
+	});
+
+	it("one side may be stdin (-)", async () => {
+		const b = join(dir, "diff-stdin-b.pfdsl");
+		writeFileSync(b, "req >> design -> spec\n");
+		stdinOverride = "req >> design -> spec\nspec >> impl -> code\n";
+		try {
+			const r = await run(["diff", "-", b]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toContain("- node code");
+			expect(r.stdout).toContain("- node impl");
+		} finally {
+			stdinOverride = null;
+		}
+	});
 });
 
 describe("graph io", () => {

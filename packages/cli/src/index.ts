@@ -1501,6 +1501,7 @@ export type { DiffReport };
 
 export interface DiffOptions {
 	format?: "text" | "dot" | "svg";
+	json?: boolean;
 }
 
 export async function runDiff(
@@ -1509,6 +1510,9 @@ export async function runDiff(
 	opts: DiffOptions = {},
 ): Promise<CommandResult> {
 	const fmt = opts.format ?? "text";
+	if (opts.json && (fmt === "dot" || fmt === "svg")) {
+		return fail("--json cannot be combined with --format dot|svg\n", 2);
+	}
 	const diffSrcA = readSource(fileA);
 	if (isCommandResult(diffSrcA)) return diffSrcA;
 	const {
@@ -1539,6 +1543,9 @@ export async function runDiff(
 
 	// text format
 	const r = coreDiffGraphs(graphA, graphB, fmA, fmB);
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, diff: r })}\n`);
+	}
 	const out: string[] = [];
 	const section = (label: string, items: string[]) => {
 		for (const i of items) out.push(`${label} ${i}`);
@@ -1659,14 +1666,19 @@ Options:
   --format png  PNG (requires: npm install puppeteer)
 `;
 
-const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg]
+const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json]
 
-Show structural differences between two .pfdsl files.
+Show structural differences between two .pfdsl files. Either side may be -
+to read from stdin, e.g. \`git show HEAD:f.pfdsl | pfdsl diff - f.pfdsl\`.
 
 Options:
   --format text  human-readable summary (default)
   --format dot   visual diff as Graphviz DOT
   --format svg   visual diff as SVG
+  --json         emit the structural report as JSON
+                 ({ ok, diff: { addedNodes, removedNodes, changedNodes,
+                 addedEdges, removedEdges, addedFeedback, removedFeedback } })
+                 (cannot be combined with --format dot|svg)
 `;
 
 const HELP_READY = `usage: pfdsl status ready <file|-> [--best] [--json]
@@ -2208,7 +2220,10 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			) {
 				return fail(`unknown format: ${String(fmt)}\n`, 2);
 			}
-			return await runDiff(a, b, fmt ? { format: fmt } : {});
+			return await runDiff(a, b, {
+				...(fmt ? { format: fmt } : {}),
+				json: flags.json === true,
+			});
 		}
 		case "explain": {
 			if (flags.help) return ok(HELP_EXPLAIN);
