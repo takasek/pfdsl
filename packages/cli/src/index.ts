@@ -1211,20 +1211,29 @@ export function runDependsOn(
 	return ok(dependsOn.length ? `${dependsOn.join("\n")}\n` : "(none)\n");
 }
 
+export interface PathOptions extends GraphAnalysisOptions {
+	limit?: number;
+}
+
 export function runPath(
 	file: string,
 	from: string,
 	to: string,
-	opts: GraphAnalysisOptions = {},
+	opts: PathOptions = {},
 ): CommandResult {
 	const loaded = loadGraph(file);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	const missing = [from, to].filter((id) => !loaded.graph.nodes.has(id));
 	if (missing.length > 0) return idsNotFoundError(file, missing);
-	const paths = computePaths(loaded.graph, from, to);
+	const all = computePaths(loaded.graph, from, to);
+	const paths = opts.limit !== undefined ? all.slice(0, opts.limit) : all;
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, paths })}\n`);
-	if (paths.length === 0) return ok("no path found\n");
-	return ok(`${paths.map((p) => p.join(" -> ")).join("\n")}\n`);
+	const truncated = opts.limit !== undefined && all.length > opts.limit;
+	const hint = truncated
+		? `(${all.length} paths total — showing first ${opts.limit})\n`
+		: "";
+	if (paths.length === 0) return ok("no path found\n", hint);
+	return ok(`${paths.map((p) => p.join(" -> ")).join("\n")}\n`, hint);
 }
 
 export interface StatsOptions extends GraphAnalysisOptions {
@@ -1807,17 +1816,20 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_PATH = `usage: pfdsl graph path <file|-> <from> <to> [--json]
+const HELP_PATH = `usage: pfdsl graph path <file|-> <from> <to> [--limit <n>] [--json]
 
 Print all simple paths from <from> to <to> via primary edges (empty if
-none exist). Answers "is <from> a prerequisite of <to>, and how".
+none exist). Answers "is <from> a prerequisite of <to>, and how". Text mode
+prints a hint to stderr when --limit actually truncates the result (kept
+off stdout so \`path ... | ...\` pipelines aren't affected).
 
-  --json  output as JSON ({ ok, paths: string[][] })
+  --limit <n>  only print the first n paths
+  --json       output as JSON ({ ok, paths: string[][] })
 
 Exit codes:
   0  success (including when no path exists)
   1  <from> or <to> not found in the file
-  2  invalid usage (missing from/to)
+  2  invalid usage (missing from/to, or invalid --limit)
 `;
 
 const HELP_STATS = `usage: pfdsl graph stats <file|-> [--limit <n>] [--json]
@@ -1903,7 +1915,8 @@ Subcommands:
   neighbors <file|-> <id>     Direct predecessors/successors of a node
   impact <file|-> <id>        Full downstream closure of a node
   depends-on <file|-> <id>    Full upstream closure of a node
-  path <file|-> <from> <to>   All simple paths between two nodes
+  path <file|-> <from> <to> [--limit]
+                              All simple paths between two nodes
   edges <file|->              Canonical edge list
 
 All subcommands accept --json.
@@ -2038,7 +2051,17 @@ function runGraphGroup(
 			if (flags.help) return ok(HELP_PATH);
 			const [f, from, to] = rest;
 			if (!f || !from || !to) return fail(HELP_PATH, 2);
-			return runPath(f, from, to, { json: flags.json === true });
+			const limitFlag = flags.limit;
+			let limit: number | undefined;
+			if (typeof limitFlag === "string") {
+				const n = Number(limitFlag);
+				if (!Number.isInteger(n) || n < 0) return fail(HELP_PATH, 2);
+				limit = n;
+			}
+			return runPath(f, from, to, {
+				...(limit !== undefined ? { limit } : {}),
+				json: flags.json === true,
+			});
 		}
 		case "stats": {
 			if (flags.help) return ok(HELP_STATS);

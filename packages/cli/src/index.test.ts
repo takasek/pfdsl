@@ -2405,6 +2405,82 @@ spec >> review -> report
 			const r = await run(["graph", "path", f, "spec"]);
 			expect(r.exitCode).toBe(2);
 		});
+
+		describe("--limit", () => {
+			// diamond: two distinct simple paths from a to d
+			const diamond = `a >> p1 -> b
+a >> p2 -> c
+b >> p3
+c >> p3
+p3 -> d
+`;
+
+			it("caps the number of printed paths as text", async () => {
+				const f = join(dir, "path-limit.pfdsl");
+				writeFileSync(f, diamond);
+				const r = await run(["graph", "path", f, "a", "d", "--limit", "1"]);
+				expect(r.exitCode).toBe(0);
+				expect(r.stdout.trim().split("\n")).toHaveLength(1);
+			});
+
+			it("caps the number of paths in --json", async () => {
+				const f = join(dir, "path-limit-json.pfdsl");
+				writeFileSync(f, diamond);
+				const r = await run([
+					"graph",
+					"path",
+					f,
+					"a",
+					"d",
+					"--limit",
+					"1",
+					"--json",
+				]);
+				expect(r.exitCode).toBe(0);
+				const parsed = JSON.parse(r.stdout);
+				expect(parsed.ok).toBe(true);
+				expect(parsed.paths).toHaveLength(1);
+			});
+
+			it("prints a truncation hint on stderr (not stdout) when --limit actually truncates", async () => {
+				const f = join(dir, "path-limit-hint.pfdsl");
+				writeFileSync(f, diamond);
+				const r = await run(["graph", "path", f, "a", "d", "--limit", "1"]);
+				expect(r.exitCode).toBe(0);
+				expect(r.stdout).not.toContain("paths total");
+				expect(r.stderr).toBe("(2 paths total — showing first 1)\n");
+			});
+
+			it("does not print a truncation hint when --limit is not smaller than the total", async () => {
+				const f = join(dir, "path-limit-no-hint.pfdsl");
+				writeFileSync(f, diamond);
+				const r = await run(["graph", "path", f, "a", "d", "--limit", "5"]);
+				expect(r.exitCode).toBe(0);
+				expect(r.stderr).toBe("");
+			});
+
+			it("does not print a truncation hint when --limit is omitted", async () => {
+				const f = join(dir, "path-no-limit.pfdsl");
+				writeFileSync(f, diamond);
+				const r = await run(["graph", "path", f, "a", "d"]);
+				expect(r.exitCode).toBe(0);
+				expect(r.stderr).toBe("");
+			});
+
+			it("rejects a non-integer --limit (exit 2)", async () => {
+				const f = join(dir, "path-limit-bad.pfdsl");
+				writeFileSync(f, diamond);
+				const r = await run(["graph", "path", f, "a", "d", "--limit", "abc"]);
+				expect(r.exitCode).toBe(2);
+			});
+
+			it("rejects a negative --limit (exit 2)", async () => {
+				const f = join(dir, "path-limit-negative.pfdsl");
+				writeFileSync(f, diamond);
+				const r = await run(["graph", "path", f, "a", "d", "--limit", "-1"]);
+				expect(r.exitCode).toBe(2);
+			});
+		});
 	});
 
 	describe("stats", () => {
