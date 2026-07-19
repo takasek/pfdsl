@@ -6,7 +6,7 @@
 
 実践・レビューで得た知見は3経路に振り分ける:
 
-1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を、pfd-ops / pfd-retro / pfd-ecosystem は `.claude/skills/` 配下の SKILL.md・references を直接改訂する。スキル改善は issue を通さず対話から直接行う（`maintain_template` プロセス）
+1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を、pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem は `.claude/skills/` 配下の SKILL.md・references を直接改訂する。スキル改善は issue を通さず対話から直接行う（`maintain_template` プロセス）
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
@@ -78,11 +78,13 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 ## 生成物の再生成と自動ドリフト検査（gen-skill / gen-plugin / gen-samples / gen-readme-cli）
 
-`docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。`packages/cli/src/` の CLI コマンド定義を変更したら `make gen-readme-cli`（README `## CLI` セクション）で再生成する。`.claude/skills/pfd-ops` / `.claude/skills/pfd-ecosystem` / `.claude/skills/pfd-retro` / `.claude/agents/pfd-lens.md` / `.claude/commands/pfd-cycle.md` / `.claude/commands/pfd-init.md` / `.claude/commands/pfd-retro.md` または gen-skill の入力を変更したら `make gen-plugin`（`plugin/pfdsl/`、marketplace 配布プラグイン。gen-skill 分は内部で自動実行）で再生成する（ADR-0028 で pfd-ops も同梱対象に追加）。再生成漏れは機械的に検出されるため手動チェックは不要 — gen-skill / gen-plugin の identity は pre-commit（各々の入力 staged 時）と CI（check-gen-plugin.yml）、`.dot` / README のドリフトは graphviz-exporter の vitest テスト（pre-commit の `docs/samples/` staged 時と CI test）、README `## CLI` セクションのドリフトは `make check-readme-cli`（pre-commit の `packages/cli/src/` / `README.md` staged 時と CI test.yml）が検査する。`.svg` は graphviz バージョン依存のため検査対象外（roadmap.md ゲート参照）。
+`docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。`packages/cli/src/` の CLI コマンド定義を変更したら `make gen-readme-cli`（README `## CLI` セクション）で再生成する。`.claude/skills/pfd-grill` / `.claude/skills/pfd-ops` / `.claude/skills/pfd-retro` / `.claude/skills/pfd-ecosystem` / `.claude/agents/pfd-lens.md` / `.claude/commands/pfd-cycle.md` / `.claude/commands/pfd-init.md` / `.claude/commands/pfd-retro.md` または gen-skill の入力を変更したら `make gen-plugin`（`plugin/pfdsl/`、marketplace 配布プラグイン。gen-skill 分は内部で自動実行）で再生成する（ADR-0028 で pfd-ops も同梱対象に追加）。再生成漏れは機械的に検出されるため手動チェックは不要 — gen-skill / gen-plugin の identity は pre-commit（各々の入力 staged 時）と CI（check-gen-plugin.yml）、`.dot` / README のドリフトは graphviz-exporter の vitest テスト（pre-commit の `docs/samples/` staged 時と CI test）、README `## CLI` セクションのドリフトは `make check-readme-cli`（pre-commit の `packages/cli/src/` / `README.md` staged 時と CI test.yml）が検査する。`.svg` は graphviz バージョン依存のため検査対象外（roadmap.md ゲート参照）。
 
 **dist 鮮度の機械検査**: pre-commit の drift 検査（README `## CLI` セクション・gen-skill・gen-plugin）は対象 dist（`packages/cli/dist/cli.js` 等）を実行または import して出力を取得する。`scripts/lib/dist-freshness.mjs` が dist の mtime を sibling `src/` の最新 mtime と比較し、dist が存在しない場合と同様に古い場合も検査を skip して「run 'pnpm -r build'」を促す（#450/#452）。skip は「検査対象が信頼できないので判定を CI に委ねる」意味であり、ローカルで検査 PASS しなかったからといって drift が無いとは限らない — コミット前に `pnpm -r build` を済ませて skip を解消してから判断する。
 
 **出力抑制**: `make gen-samples` / `make gen-skill` は pnpm 全パッケージビルド + 全サンプル check の warning を毎回出力するため数百行に及ぶ。実行後は `git status --short docs/samples/ .claude/skills/pfdsl/ plugin/pfdsl/` で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
+
+**配布スキルの新規追加時の横断照合**: 新しい配布スキル（`.claude/skills/pfd-*`）を追加したら、`grep -rn "<既存スキルID>\b" .pfdsl/ scripts/` で既存の兄弟スキル（例: `retro_skill`）の全参照箇所を洗い出し、新スキルにも同じ箇所（`workflow.pfdsl` の `distill_ops` 出力エッジ・`publish_cli` 入力エッジ・`gen_plugin` 入力エッジ、`runtime-pipeline.pfdsl` の `assemble_plugin` 入力エッジ）が揃っているか1つずつ照合する。`scripts/gen-plugin.mjs` の静的リストと `plugin.json` description は pre-commit の drift 検査が機械的に強制するが、PFD 側のこれらのエッジは check で強制されず目視追随に依存する（#481 で `grill_skill` 追加時に発見。当初 `distill_ops`・`publish_cli`・`assemble_plugin` の3箇所を見落とし、pfd-retro の A層「同種対称性」監査で気付いた）。
 
 ## 新 frontmatter フィールド追加時の sample 追加
 

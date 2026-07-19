@@ -26,6 +26,11 @@ describe("buildPluginManifest", () => {
 		const manifest = buildPluginManifest({ cliVersion: "0.0.18" });
 		assert.match(manifest.description, /pfd-ops/);
 	});
+
+	it("mentions the pfd-grill skill in the description", () => {
+		const manifest = buildPluginManifest({ cliVersion: "0.0.18" });
+		assert.match(manifest.description, /pfd-grill/);
+	});
 });
 
 let tmp;

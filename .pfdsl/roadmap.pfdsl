@@ -372,13 +372,13 @@ artifact:
     location: https://www.npmjs.com/package/@pfdsl/cli
   incomplete_tolerance:
     label: "書き途中グラフ非strict許容 (#480)"
-    description: "V020/V002/V003 を非 strict で warning に降格し --strict で error 維持。spec 次版統合を含む。逐次書き込みする grill スキル (#481) の前提"
+    description: "V020/V002/V003 を非 strict で warning に降格し --strict で error 維持。spec 次版統合を含む。grill スキル (#481) の書き途中の途中反映を可能にする前提"
     status: done
     criteria: "非 strict の check で V020/V002/V003 が warning、--strict で error になり、spec 本文・診断表が更新済み、テスト通過"
   grill_skill:
     label: "pfd-grill スキル (#481)"
     description: "最終成果物からの後ろ向き対話構築スキル。名前確定→criteria→プロセス導出→入力導出の再帰。plugin 同梱で配布"
-    status: todo
+    status: done
     criteria: "pfd-grill が plugin 経由で発火し、サンプル図を後ろ向き対話でフルスクラッチ構築するライブ実行1回を検証済み"
   editor_connector:
     label: "エディタ コネクタ編集支援 (#482)"

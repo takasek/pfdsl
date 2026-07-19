@@ -10,7 +10,7 @@
 - **偽の不変性**: 仕様書は実装知見の issue 経由で改訂される → maintain プロセスが要る。`pfd_lens_agent` は `workflow.pfdsl` で open input 扱いだが、他のスキル成果物（`retro_skill` 等）が `distill_ops` の出力として更新経路を持つのと非対称 — 保守プロセスへの接続が欠落している
 - **入力充足**: 修正開発に `base_code`・PoC が欠落、ADR 起草に参照図が欠落 → ID 捏造が発生。`assemble_plugin`（旧 `bundle_skills`）は `.claude/commands/pfd-*.md`・`.claude/agents/pfd-lens.md` も実際には消費するが artifact 化されておらず入力エッジに現れない（2026-07-10、pfd-lens 監査で検出。修正は新規 artifact 設計を要するため未着手）
 - **status 単調性**: `check` の W003 が機械検出する
-- **同種対称性**: `published_cli` が持つ全消費エッジを `published_libraries` も持つか。`quality_guide` 新設時に `findings.criteria` の反映先列挙への追随が漏れた（読み直しで検出、2026-07-08）
+- **同種対称性**: `published_cli` が持つ全消費エッジを `published_libraries` も持つか。`quality_guide` 新設時に `findings.criteria` の反映先列挙への追随が漏れた（読み直しで検出、2026-07-08）。`grill_skill`（#481）追加時も同型の見落としを検出（対策は `.pfdsl/workflow.md`「配布スキルの新規追加時の横断照合」参照、2026-07-19）
 
 ## B. 粒度・型
 
