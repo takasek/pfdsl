@@ -311,13 +311,16 @@ export function validate(
 	}
 
 	// V011: strict-mode feedback validation
-	// In strict mode, for each feedback edge A >>? P, verify that P can reach A
-	// in the primary graph (P directly or transitively produces A).
+	// In strict mode, for each feedback edge A >>? P, verify that A is not
+	// already a true upstream ancestor of P in the primary graph. A feedback
+	// edge is meant to loop a (possibly disconnected) artifact back into a
+	// process; it only contradicts the primary graph when A can already reach
+	// P through ordinary `>>`/`->` edges (a genuine reverse cycle), not merely
+	// because A and P belong to unrelated subgraphs.
 	if (options?.strict) {
-		// Build reverse adjacency for reachability: from a process, what artifacts can be reached?
-		function primaryReachable(startProcess: string): Set<string> {
+		function primaryReachable(start: string): Set<string> {
 			const reachable = new Set<string>();
-			const queue: string[] = [startProcess];
+			const queue: string[] = [start];
 			while (queue.length > 0) {
 				const node = queue.shift()!;
 				for (const neighbor of primaryAdj.get(node) ?? []) {
@@ -332,12 +335,12 @@ export function validate(
 
 		for (const e of edges) {
 			if (e.kind === "feedback") {
-				const reachable = primaryReachable(e.process);
-				if (!reachable.has(e.artifact)) {
+				const reachable = primaryReachable(e.artifact);
+				if (reachable.has(e.process)) {
 					diagnostics.push({
 						severity: "error",
 						code: "V011",
-						message: `Feedback artifact '${e.artifact}' is not reachable from process '${e.process}' in the primary graph`,
+						message: `Feedback artifact '${e.artifact}' is already an upstream ancestor of process '${e.process}' in the primary graph (reverse cycle)`,
 						range: zeroRange(),
 					});
 				}
