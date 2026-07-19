@@ -681,17 +681,17 @@ describe("graph io", () => {
 });
 
 describe("graph summary", () => {
-	it("shows counts of artifacts, processes, edges, external_inputs, terminals", async () => {
+	it("shows counts of artifacts, processes, edges, external inputs, terminals", async () => {
 		// valid.pfdsl: req >> design -> spec\nspec >> impl -> code
 		// artifacts: req, spec, code (3), processes: design, impl (2)
 		// primary edges: req->design, design->spec, spec->impl, impl->code = 4
-		// external_inputs: req (1), terminals: code (1)
+		// external inputs: req (1), terminals: code (1)
 		const r = await run(["graph", "summary", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toMatch(/artifacts: 3/);
 		expect(r.stdout).toMatch(/processes: 2/);
 		expect(r.stdout).toMatch(/edges: 4/);
-		expect(r.stdout).toMatch(/external_inputs: 1/);
+		expect(r.stdout).toMatch(/external inputs: 1/);
 		expect(r.stdout).toMatch(/terminals: 1/);
 	});
 

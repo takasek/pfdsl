@@ -1350,7 +1350,7 @@ export function runGraphSummary(
 		);
 	}
 	return ok(
-		`artifacts: ${artifactCount}, processes: ${processCount}, edges: ${primaryEdgeCount}, external_inputs: ${externalInputs.length}, terminals: ${terminals.length}\n`,
+		`artifacts: ${artifactCount}, processes: ${processCount}, edges: ${primaryEdgeCount}, external inputs: ${externalInputs.length}, terminals: ${terminals.length}\n`,
 	);
 }
 
