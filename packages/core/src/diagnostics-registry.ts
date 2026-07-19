@@ -147,7 +147,7 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		severities: ["error"],
 		section: "15.3",
 		summary:
-			"strict mode: a feedback artifact is unreachable from its target process",
+			"strict mode: a feedback artifact is already a true upstream ancestor of its target process (reverse cycle)",
 	},
 	V012: {
 		severities: ["error"],
