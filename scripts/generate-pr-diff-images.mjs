@@ -47,7 +47,7 @@ function sanitizePath(filePath) {
 }
 
 function renderSvg(filePath) {
-	return execFileSync("pfdsl", ["graph", filePath, "--format", "svg"], {
+	return execFileSync("pfdsl", ["render", filePath, "--format", "svg"], {
 		encoding: "utf-8",
 		cwd: root,
 	});

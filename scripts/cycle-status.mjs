@@ -63,7 +63,7 @@ let bestOutputs = [];
 let readyError = null;
 if (existsSync(cliPath)) {
 	try {
-		const readyJson = JSON.parse(sh(`node "${cliPath}" ready .pfdsl/roadmap.pfdsl --best --json`));
+		const readyJson = JSON.parse(sh(`node "${cliPath}" status ready .pfdsl/roadmap.pfdsl --best --json`));
 		({ ready, best, bestOutputs } = parseReadyOutput(readyJson));
 	} catch (e) {
 		readyError = e.message;

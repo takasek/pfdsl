@@ -65,7 +65,7 @@ Feature-by-feature syntax examples with rendered `.dot` and `.svg`: [docs/sample
 
 - **Pipeline** — lexer → parser → normalizer → validator → canonical sorter → formatter (`@pfdsl/core`)
 - **DOT / SVG** — Graphviz export and Wasm-based rendering (`@pfdsl/graphviz-exporter`, `@pfdsl/preview-engine`)
-- **CLI** — `pfdsl check / fmt / reindex / sort-meta / normalize / graph / diff` (`@pfdsl/cli`)
+- **CLI** — `pfdsl check / fmt / render / diff` plus `graph` / `meta` / `status` command groups (`@pfdsl/cli`)
 - **VSCode extension** — syntax highlighting, diagnostics, hover, document formatter, live SVG preview (`@pfdsl/vscode-extension`)
 - **Claude Code skill** — syntax reference, CLI guidance, workflow for editing `.pfdsl` files (`.claude/skills/pfdsl/`); installable via `/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`
 
@@ -99,62 +99,24 @@ node packages/cli/dist/cli.js help
 pfdsl <command> [options]
 
 Commands:
-  check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
+  check <file|-> [--strict] [--hints] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
-                           --audit    list terminal artifacts, external inputs, and consumer asymmetry hints
-                           --summary  print artifact/process/edge counts
-                           --strict   error if feedback source not reachable from target process
-                           --json     output diagnostics as JSON
-                           --no-color disable ANSI color codes (also: NO_COLOR env var)
-  fmt <file|-> [--write] [--mode flat|flows]
-                           Format a .pfdsl file (- = stdin)
-  reindex <file|-> [--write] [--check] [--renumber] [--json]
-                           Assign topological index: values (- = stdin)
-                           --write     rewrite in place; report to stdout
-                           --check     exit 1 if reindexing would change anything
-                           --renumber  reassign every node from 1
-                           --json      emit change report as JSON
-  sort-meta <file|-> --by <keys> [--write] [--check]
-                           Sort node definitions by keys (- = stdin)
-                           --by        comma-separated: index, topological, group, id
-                           --write     rewrite in place
-                           --check     exit 1 if not already sorted
-  normalize <file|-> [--json]
-                           Print canonical edge list (- = stdin)
-                           --json     output edge list as JSON array
-  graph <file|-> [--format dot|svg|pdf|png]
-                           Print Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-                           PDF/PNG requires: npm install puppeteer
-  diff <a> <b> [--format text|dot|svg]
-                           Structural diff (text), or visual diff DOT/SVG
-  ready <file|-> [--best] [--json]
-                           List ready-to-start processes (- = stdin)
-                           --best    recommend the best next process
-                           --json    output as JSON
-  status-set <file> <artifact-id> <status> [--json]
-                           Set artifact status (todo|wip|done|waiting|suspended) in place
-                           Roadmap files: prints newly-ready processes after the change
-                           --json    output as JSON ({ ok, newlyReady: string[], warnings? })
-  get <file|-> --id <ids> --field <fields> [--json]
-                           Print field values for one or more ids (- = stdin)
-                           --id      comma-separated ids, or repeat --id
-                           --field   comma-separated field names, or repeat --field
-                           A "location" field is resolved against basePath
-                           --json    output as JSON
-  neighbors <file|-> <id> [--json]
-                           Print direct predecessors/successors of a node (- = stdin)
-  impact <file|-> <id> [--json]
-                           Print the full downstream closure of a node (- = stdin)
-  depends-on <file|-> <id> [--json]
-                           Print the full upstream closure of a node (- = stdin)
-  path <file|-> <from> <to> [--json]
-                           Print all simple paths from <from> to <to> (- = stdin)
-  stats <file|-> [--limit <n>] [--json]
-                           Rank nodes by fan-in/fan-out degree (- = stdin)
-  audit-sync <roadmap> <flow> [<flow>...] [--json]
-                           Cross-check todo artifacts in flow files against the roadmap
-                           --json    output as JSON
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
+  fmt <file|-> [--write] [--check]
+                           Format a .pfdsl file (- = stdin)
+  render <file|-> [--format dot|svg|pdf|png]
+                           Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
+                           PDF/PNG requires: npm install puppeteer
+  diff <a> <b> [--format text|dot|svg] [--json]
+                           Structural diff (text), or visual diff DOT/SVG
+
+Command groups (run `pfdsl <group>` for their subcommands):
+  graph summary|io|stats|neighbors|impact|depends-on|path|edges
+                           Read-only queries on the graph topology
+  meta get|set|sort|reindex
+                           Read and write frontmatter metadata
+  status ready|gaps        Planning queries derived from artifact status
+
   help                     Show this help
 
 Exit codes:

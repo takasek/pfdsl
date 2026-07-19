@@ -204,7 +204,7 @@ if (kind.workflow) {
 if (kindArg === "cli") {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	const roadmapPath = resolve(root, ".pfdsl/roadmap.pfdsl");
-	const readyOutput = capture("node", [cliPath, "ready", roadmapPath, "--json"]);
+	const readyOutput = capture("node", [cliPath, "status", "ready", roadmapPath, "--json"]);
 	const { ready } = JSON.parse(readyOutput);
 	const artifactIds = releaseMilestoneArtifactIds(ready);
 
@@ -213,7 +213,7 @@ if (kindArg === "cli") {
 	} else {
 		for (const artifactId of artifactIds) {
 			console.log(`Marking roadmap artifact ${artifactId} as done...`);
-			run("node", [cliPath, "status-set", roadmapPath, artifactId, "done"]);
+			run("node", [cliPath, "meta", "set", roadmapPath, artifactId, "status", "done"]);
 		}
 		run("git", ["add", roadmapPath]);
 		run("git", ["commit", "-m", `chore(roadmap): mark ${artifactIds.join(", ")} as done`]);

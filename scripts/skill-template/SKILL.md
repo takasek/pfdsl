@@ -109,15 +109,15 @@ PFD はタスクリストではなく成果物の変換グラフ。
 
 ## 読解と点検
 
-- **読解**: 大きい PFD は全読しない。`check --audit` の2行（終端 artifact と外部入力）で輪郭を掴み、対象ノードの frontmatter だけ読む。roadmap では `ready --best` が着手可能プロセスを返す
-- **書いた後の点検**: 同じ --audit の2行で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る
-- roadmap と flow ファイルが併存する構成では `audit-sync <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する
-- 図の視覚確認が必要なときだけ `graph --format dot` を使う（大きい図では dot 全読より --audit が安い）
+- **読解**: 大きい PFD は全読しない。`graph io` の2行（終端 artifact と外部入力）で輪郭を掴み、対象ノードの frontmatter だけ読む。roadmap では `status ready --best` が着手可能プロセスを返す
+- **書いた後の点検**: 同じ `graph io` の2行で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る
+- roadmap と flow ファイルが併存する構成では `status gaps <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する
+- 図の視覚確認が必要なときだけ `render --format dot` を使う（大きい図では dot 全読より graph io が安い）
 
 ## Typical task: update artifact status
 
 ```bash
-npx @pfdsl/cli status-set <file> <artifact-id> <status>   # todo|wip|done|waiting|suspended
+npx @pfdsl/cli meta set <file> <artifact-id> status <status>   # todo|wip|done|waiting|suspended
 ```
 
 Sets the status in place and validates. Manual fallback: edit `status:` in the frontmatter `artifact:` section, then run `check`.

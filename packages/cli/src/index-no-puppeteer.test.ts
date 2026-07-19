@@ -24,13 +24,23 @@ afterAll(() => {
 
 describe("graph without puppeteer", () => {
 	it("format=pdf returns error with installation hint", async () => {
-		const r = await run(["graph", join(dir, "valid.pfdsl"), "--format", "pdf"]);
+		const r = await run([
+			"render",
+			join(dir, "valid.pfdsl"),
+			"--format",
+			"pdf",
+		]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toContain("puppeteer");
 	});
 
 	it("format=png returns error with installation hint", async () => {
-		const r = await run(["graph", join(dir, "valid.pfdsl"), "--format", "png"]);
+		const r = await run([
+			"render",
+			join(dir, "valid.pfdsl"),
+			"--format",
+			"png",
+		]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toContain("puppeteer");
 	});

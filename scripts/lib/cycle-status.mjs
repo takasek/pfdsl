@@ -35,7 +35,7 @@ export function classifyPRs(prs, flowSyncPattern = /^flow-sync\//) {
 }
 
 /**
- * @param {unknown} readyJson - output of `pfdsl ready --best --json`
+ * @param {unknown} readyJson - output of `pfdsl status ready --best --json`
  * @returns {{ready: string[], best: string | null, bestOutputs: string[]}}
  */
 export function parseReadyOutput(readyJson) {

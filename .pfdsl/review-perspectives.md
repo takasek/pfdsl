@@ -24,8 +24,22 @@
 - **対称性の欠け**: terminal は feedback 消費を除外、open input は除外なし → 階層跨ぎ feedback 表現不能。extends の絶対パス禁止は §16 にあり subflow 側に無い
 - **字義 vs 実装**: 孤立 node-decl は字義では境界不一致 error、実装は無視
 - **能力の否定記述**: 「`check` は循環を検出しない」が V010 実装後も skill 本文と runtime-pipeline companion の2箇所に残存（2026-07-08 検出・修正）
-- **同名異義**: 「terminal artifact」が §3.3 / subflow 境界 / --audit で三様
+- **同名異義**: 「terminal artifact」が §3.3 / subflow 境界 / `graph io` で三様
 - **三点登記〔機構〕**: §15.X・§16・実装コードの3点対称登記。二重割当（V025 が group 循環と subflow 境界の両方に発行）を検出
 - **stale 前方参照〔機構〕**: `[[SPEC_xxx?]]` と `(SPEC_xxx)` の id 一致を `check-forward-ref-markers.mjs` が検出（#326）
 - **仕様ID相互参照〔機構〕**: `(SPEC_xxx)` 定義の一意性と `[[SPEC_xxx]]` の dangling を `check-spec-ids.mjs` が検査（ADR-0027、#328）
 - **由来**: ADR-0020・`docs/adr/0020-spec-stress-testing/`。実行手順は `/spec-stress-test`
+
+## D. CLI 変更時の監査軸
+
+`packages/cli` に変更を加える際のチェックリスト。ADR-0030（コマンド体系）・ADR-0022（出力モデル）を踏まえる。
+
+- **コマンド分類（何に対する操作か）**: 変更対象がファイル全体／位相／フィールド／status 由来の計画のどれかを特定し、既存グループとの整合を確認する
+- **オプションの対称性**: `--write` / `--check` / `--json` / `--limit` 等が同系コマンド間で一貫して実装されているか、新設フラグの実装漏れがないかを確認する
+- **出力形式**: text 出力と JSON 出力が同じ情報を表しているか、キー名（camelCase 等）が既存コマンドと揃っているかを確認する
+- **エラーモードの出力規約**: `--json` 指定時の失敗（parse エラー・id 未検出・書き込み拒否等）が `{ ok: false, ... }` の形で stdout に出るか、stderr が空かを確認する
+- **exit code の意味**: 0=成功・1=検証/実行エラー・2=usage エラーという区分が新設コマンドでも保たれているかを確認する
+- **stdout・stderr の規律（ADR-0022）**: gofmt モデル（プレビュー/--write/--check）と、成果物・診断情報の出力先分離が守られているかを確認する
+- **ライブラリ公開 API 名の追従**: エクスポートされる型・関数名がコマンド名の改名に追随しているか、旧称（例: `AuditSync*`）が残存していないかを確認する
+- **生成物の再生成と冪等性**: `make gen-plugin` / `make gen-readme-cli` を再実行して diff が出ないかを確認する（ヘルプ文言変更時は特に）
+- **バージョンと変更記録**: 破壊的変更なら次回リリースの semver 扱い（0.x は minor bump）が ADR の Consequences に記録されているかを確認する

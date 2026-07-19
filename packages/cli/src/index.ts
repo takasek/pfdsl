@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import {
 	analyze,
 	auditGraph,
+	type ConsumerAsymmetryHint,
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
@@ -128,15 +129,34 @@ function diagText(diags: Diagnostic[], file: string): string {
 	return `${diags.map((d) => formatDiagnostic(d, file)).join("\n")}\n`;
 }
 
-function failIfErrors(diags: Diagnostic[], file: string): CommandResult | null {
+/**
+ * Shared shape for every --json exit-1 failure: `{ ok: false, ...payload }`
+ * on stdout, empty stderr (ADR: JSON failures never mix with human text).
+ */
+function failJson(
+	payload: Record<string, unknown>,
+	exitCode = 1,
+): CommandResult {
+	return {
+		stdout: `${JSON.stringify({ ok: false, ...payload })}\n`,
+		stderr: "",
+		exitCode,
+	};
+}
+
+function failIfErrors(
+	diags: Diagnostic[],
+	file: string,
+	json = false,
+): CommandResult | null {
 	if (!hasErrors(diags)) return null;
 	const errs = diags.filter((d) => d.severity === "error");
+	if (json) return failJson({ diagnostics: errs });
 	return fail(diagText(errs, file));
 }
 
 export interface CheckOptions {
-	audit?: boolean;
-	summary?: boolean;
+	hints?: boolean;
 	strict?: boolean;
 	json?: boolean;
 	color?: boolean;
@@ -242,49 +262,38 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 	const extraLines: string[] = [];
 	const artifactMeta = frontmatter?.artifact ?? undefined;
 
-	if (opts.audit) {
-		const {
-			terminals,
-			externalInputs,
-			consumerAsymmetry,
-			consumerAsymmetryRemainder,
-		} = auditGraph(edges, nodeKinds, artifactMeta);
-		extraLines.push(`terminal artifacts: ${terminals.join(", ")}`);
-		extraLines.push(`external inputs: ${externalInputs.join(", ")}`);
-		for (const hint of consumerAsymmetry) {
-			extraLines.push(
-				`consumer asymmetry (hint): ${hint.artifact} lacks [${hint.missingProcesses.join(", ")}] present on same-group ${hint.sibling}`,
-			);
-		}
-		if (consumerAsymmetryRemainder > 0) {
-			extraLines.push(`... (${consumerAsymmetryRemainder} more)`);
-		}
-	}
-
-	if (opts.summary) {
-		const artifactCount = [...nodeKinds.values()].filter(
-			(k) => k === "artifact",
-		).length;
-		const processCount = [...nodeKinds.values()].filter(
-			(k) => k === "process",
-		).length;
-		const primaryEdgeCount = edges.filter(
-			(e) => e.kind === "input" || e.kind === "output",
-		).length;
-		const { terminals, externalInputs } = auditGraph(
+	let hints: ConsumerAsymmetryHint[] = [];
+	let hintsOmitted = 0;
+	if (opts.hints) {
+		const { consumerAsymmetry, consumerAsymmetryRemainder } = auditGraph(
 			edges,
 			nodeKinds,
 			artifactMeta,
 		);
-		extraLines.push(
-			`artifacts: ${artifactCount}, processes: ${processCount}, edges: ${primaryEdgeCount}, external_inputs: ${externalInputs.length}, terminals: ${terminals.length}`,
-		);
+		hints = consumerAsymmetry;
+		hintsOmitted = consumerAsymmetryRemainder;
+		for (const hint of hints) {
+			extraLines.push(
+				`consumer asymmetry (hint): ${hint.artifact} lacks [${hint.missingProcesses.join(", ")}] present on same-group ${hint.sibling}`,
+			);
+		}
+		if (hintsOmitted > 0) {
+			extraLines.push(`... (${hintsOmitted} more)`);
+		}
 	}
 
 	if (opts.json) {
 		const allDiags = [...diagnostics, ...multiDiags];
+		const payload: Record<string, unknown> = {
+			ok: true,
+			diagnostics: allDiags,
+		};
+		if (opts.hints) {
+			payload.hints = hints;
+			if (hintsOmitted > 0) payload.hintsOmitted = hintsOmitted;
+		}
 		return {
-			stdout: `${JSON.stringify({ ok: true, diagnostics: allDiags })}\n`,
+			stdout: `${JSON.stringify(payload)}\n`,
 			stderr: "",
 			exitCode: 0,
 		};
@@ -304,19 +313,28 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 
 export interface FmtOptions {
 	write?: boolean;
-	mode?: "flat" | "flows";
+	check?: boolean;
 }
 export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
+	if (opts.check && opts.write) {
+		return fail("--check cannot be combined with --write\n", 2);
+	}
 	if (file === "-" && opts.write) {
 		return fail("--write cannot be used with stdin (-)\n", 2);
 	}
 	const source = readSource(file);
 	if (isCommandResult(source)) return source;
-	const { output, diagnostics } = format(source, {
-		style: opts.mode ?? "flows",
-	});
+	const { output, diagnostics } = format(source, { style: "flows" });
 	const failed = failIfErrors(diagnostics, file);
 	if (failed) return failed;
+	if (opts.check) {
+		const changed = output !== source;
+		return {
+			stdout: changed ? "not formatted\n" : "",
+			stderr: "",
+			exitCode: changed ? 1 : 0,
+		};
+	}
 	if (opts.write) {
 		writeFileSync(file, output, "utf-8");
 		return ok();
@@ -359,7 +377,7 @@ export function runReindex(
 		src,
 		opts.renumber ? { renumber: true } : {},
 	);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, opts.json);
 	if (failed) return failed;
 
 	// --check: report drift, non-zero exit when reindexing would change anything.
@@ -434,23 +452,22 @@ export function runSort(file: string, opts: SortOptions): CommandResult {
 	return ok(output);
 }
 
-export interface NormalizeOptions {
+export interface GraphEdgesOptions {
 	json?: boolean;
 }
 
-export function runNormalize(
+export function runGraphEdges(
 	file: string,
-	opts: NormalizeOptions = {},
+	opts: GraphEdgesOptions = {},
 ): CommandResult {
 	const normSrc = readSource(file);
 	if (isCommandResult(normSrc)) return normSrc;
 	const { edges, graph, diagnostics } = analyze(normSrc);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, opts.json);
 	if (failed) return failed;
 	const sorted = sortEdges(edges, graph);
 	if (opts.json) {
-		const edgeList = formatEdges(sorted).split("\n").filter(Boolean);
-		return ok(`${JSON.stringify(edgeList)}\n`);
+		return ok(`${JSON.stringify({ ok: true, edges: sorted })}\n`);
 	}
 	return ok(formatEdges(sorted));
 }
@@ -534,7 +551,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
 		readyGate: true,
 	});
-	const earlyFail = failIfErrors(diagnostics, file);
+	const earlyFail = failIfErrors(diagnostics, file, opts.json);
 	if (earlyFail) return earlyFail;
 
 	const READY_REQUIRED_TYPE = "roadmap" satisfies PfdType;
@@ -645,34 +662,57 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	return ok(`${lines.join("\n")}\n`, warnText);
 }
 
-export interface StatusSetOptions {
+export interface MetaSetOptions {
 	json?: boolean;
 }
 
-export function runStatusSet(
-	file: string,
-	artifactId: string,
-	status: string,
-	opts: StatusSetOptions = {},
-): CommandResult {
-	if (!STATUS_VALUES.includes(status as (typeof STATUS_VALUES)[number])) {
-		return fail(HELP_STATUS_SET, 2);
-	}
-	const src = readSource(file);
-	if (isCommandResult(src)) return src;
+/** Fields whose values are arrays/maps — meta set only writes scalars. */
+const NON_SCALAR_FIELDS = new Set([
+	"tags",
+	"parts",
+	"externalStakeholders",
+	"boundary",
+]);
 
+/**
+ * Render a value as a single-line YAML scalar, double-quoting when a bare
+ * scalar would misparse (YAML indicators, colon, quotes, leading/trailing
+ * whitespace, ...). Inner spaces are fine bare ("make spec").
+ */
+function yamlScalar(value: string): string {
+	const needsQuoting =
+		value === "" ||
+		/[:#"'\\\n,{}[\]]/.test(value) ||
+		/^[\s&*!|>%@`?-]/.test(value) ||
+		/^\s|\s$/.test(value);
+	if (!needsQuoting) return value;
+	return `"${value
+		.replace(/\\/g, "\\\\")
+		.replace(/"/g, '\\"')
+		.replace(/\n/g, "\\n")}"`;
+}
+
+/**
+ * Rewrite one node's field in the raw source, preserving all other
+ * formatting. The id is escaped since quoted ids may contain regex
+ * metacharacters (#430). Two styles are supported:
+ *   block-style: "<indent><id>:\n  <fields>..."
+ *   flow-style:  "<indent><id>: { key: val, ... }"  (#415)
+ * Returns null when the id has no frontmatter entry.
+ */
+function setFieldInSource(
+	src: string,
+	id: string,
+	field: string,
+	scalar: string,
+): string | null {
 	const frontmatterMatch = /^---\n([\s\S]*?\n)---\n/.exec(src);
 	const fmBlock = frontmatterMatch?.[1];
-	if (!frontmatterMatch || !fmBlock) {
-		return fail(`error: artifact '${artifactId}' not found in ${file}\n`);
-	}
+	if (!frontmatterMatch || !fmBlock) return null;
 	const fmBodyStart = frontmatterMatch[0].length - fmBlock.length - 4; // after "---\n"
 
-	// Find the artifact block. The id is escaped since quoted ids may contain
-	// regex metacharacters (#430). Two styles are supported:
-	//   block-style: "<indent><id>:\n  <fields>..."
-	//   flow-style:  "<indent><id>: { key: val, ... }"  (#415)
-	const escapedId = escapeRe(artifactId);
+	const escapedId = escapeRe(id);
+	const escapedField = escapeRe(field);
 	const headerRe = new RegExp(`^(\\s+)${escapedId}:\\s*\\n`, "m");
 	const headerMatch = headerRe.exec(fmBlock);
 
@@ -682,26 +722,23 @@ export function runStatusSet(
 	);
 	const flowMatch = headerMatch ? null : flowHeaderRe.exec(fmBlock);
 
-	if (!headerMatch && !flowMatch) {
-		return fail(`error: artifact '${artifactId}' not found in ${file}\n`);
-	}
-
-	// Snapshot ready set before mutation (roadmap only)
-	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
-	const beforeSet = new Set(beforeIds);
+	if (!headerMatch && !flowMatch) return null;
 
 	let newFm: string;
 	if (flowMatch) {
-		// Flow-style: update or insert status within "{ ... }" on the same line
+		// Flow-style: update or insert the field within "{ ... }" on the same line
 		const flowBody = flowMatch[2]!;
+		const kvRe = new RegExp(
+			`\\b${escapedField}:\\s*("(?:[^"\\\\]|\\\\.)*"|[^,}]*)`,
+		);
 		let newFlowBody: string;
-		if (/\bstatus:\s*\S+/.test(flowBody)) {
-			newFlowBody = flowBody.replace(/\bstatus:\s*\S+/, `status: ${status}`);
+		if (kvRe.test(flowBody)) {
+			newFlowBody = flowBody.replace(kvRe, `${field}: ${scalar}`);
 		} else {
 			const inner = flowBody.slice(1, -1).trim();
 			newFlowBody = inner
-				? `{ ${inner}, status: ${status} }`
-				: `{ status: ${status} }`;
+				? `{ ${inner}, ${field}: ${scalar} }`
+				: `{ ${field}: ${scalar} }`;
 		}
 		const matchedLine = flowMatch[0]!;
 		const newLine = matchedLine.replace(flowBody, newFlowBody);
@@ -727,22 +764,112 @@ export function runStatusSet(
 		const nodePad = " ".repeat(nodeIndent);
 		const childPad = " ".repeat(childIndent);
 
-		// Replace "<childPad>status: <old>" under this artifact, or insert it after its header
-		const statusLineRe = new RegExp(
-			`(${nodePad}${escapedId}:[ \\t]*\\n(?:${childPad}[^\\n]*\\n)*?)${childPad}status: [^\\n]+`,
+		// Replace "<childPad><field>: <old>" under this node — including any
+		// deeper-indented continuation lines (multi-line block scalars), so
+		// replacing them never leaves orphan lines — or insert after the header.
+		const fieldLineRe = new RegExp(
+			`(${nodePad}${escapedId}:[ \\t]*\\n(?:${childPad}[^\\n]*\\n)*?)${childPad}${escapedField}:[^\\n]*\\n(?:${childPad} +[^\\n]*\\n)*`,
 		);
-		if (statusLineRe.test(fmBlock)) {
-			newFm = fmBlock.replace(statusLineRe, `$1${childPad}status: ${status}`);
+		if (fieldLineRe.test(fmBlock)) {
+			newFm = fmBlock.replace(
+				fieldLineRe,
+				`$1${childPad}${field}: ${scalar}\n`,
+			);
 		} else {
 			newFm = fmBlock.replace(
 				new RegExp(`(${nodePad}${escapedId}:[ \\t]*\\n)`),
-				`$1${childPad}status: ${status}\n`,
+				`$1${childPad}${field}: ${scalar}\n`,
 			);
 		}
 	}
 
-	const newSrc =
-		src.slice(0, fmBodyStart) + newFm + src.slice(fmBodyStart + fmBlock.length);
+	return (
+		src.slice(0, fmBodyStart) + newFm + src.slice(fmBodyStart + fmBlock.length)
+	);
+}
+
+export function runMetaSet(
+	file: string,
+	idList: string,
+	field: string,
+	value: string,
+	opts: MetaSetOptions = {},
+): CommandResult {
+	if (file === "-") {
+		return fail("meta set cannot be used with stdin (-)\n", 2);
+	}
+	if (field.includes(".")) {
+		return fail(
+			`meta set: '${field}' is a derived read-only field and cannot be set\n`,
+			2,
+		);
+	}
+	if (NON_SCALAR_FIELDS.has(field)) {
+		return fail(`meta set: '${field}' is not a scalar field\n`, 2);
+	}
+	if (
+		field === "status" &&
+		!STATUS_VALUES.includes(value as (typeof STATUS_VALUES)[number])
+	) {
+		return fail(
+			`meta set: invalid status '${value}' (valid: ${STATUS_VALUES.join(" | ")})\n`,
+			2,
+		);
+	}
+	if (field === "index" && !/^\d+$/.test(value)) {
+		return fail(
+			`meta set: index must be a non-negative integer, got '${value}'\n`,
+			2,
+		);
+	}
+	const ids = splitCommaList(idList);
+	if (ids.length === 0) return fail(HELP_META_SET, 2);
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, nodeKinds } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json);
+	if (failed) return failed;
+
+	// Validate every id and field/kind pairing before touching anything, so a
+	// multi-id call is atomic: either all writes land or none do.
+	const missing = ids.filter((id) => !nodeKinds.has(id));
+	if (missing.length > 0) {
+		return idsNotFoundError(file, missing, opts.json);
+	}
+	for (const id of ids) {
+		const kind = nodeKinds.get(id);
+		if (kind !== "artifact" && kind !== "process" && kind !== "group") continue;
+		if (!KNOWN_FIELDS[kind].has(field)) {
+			return fail(
+				`meta set: '${field}' is not a valid ${kind} field (id: ${id})\n`,
+				2,
+			);
+		}
+	}
+
+	// Snapshot ready set before mutation (roadmap only)
+	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
+	const beforeSet = new Set(beforeIds);
+
+	const scalar = yamlScalar(value);
+	let newSrc = src;
+	for (const id of ids) {
+		const applied = setFieldInSource(newSrc, id, field, scalar);
+		if (applied === null) {
+			return fail(`error: '${id}' not found in ${file}\n`);
+		}
+		newSrc = applied;
+	}
+
+	// Safety net: never write a rewrite that introduces errors the original
+	// didn't have (rewriter bug or unsupported YAML style).
+	if (hasErrors(analyze(newSrc).diagnostics)) {
+		const message = `meta set: refusing to write ${file}: the rewrite would introduce errors`;
+		if (opts.json) return failJson({ error: message });
+		return fail(`${message}\n`);
+	}
 	writeFileSync(file, newSrc, "utf-8");
 
 	// Recompute against the written file (roadmap only) so newly-ready processes
@@ -810,25 +937,63 @@ const KNOWN_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
 	group: new Set(["label", "color", "parent"]),
 };
 
+/**
+ * Read-only fields computed from a base field rather than stored in
+ * frontmatter. `location.resolved` auto-accompanies `location` (artifact and
+ * process); `command.cwd` auto-accompanies `command` (process only). Both
+ * can also be requested explicitly via the field positional, in which case
+ * only the derived value is returned (the base field is not auto-added).
+ */
+const DERIVED_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
+	artifact: new Set(["location.resolved"]),
+	process: new Set(["location.resolved", "command.cwd"]),
+	group: new Set(),
+};
+
+/** Classify a single `location:` element per spec §15.8 and resolve it if it's not a URL. */
+function resolveLocationElement(
+	docFsPath: string,
+	element: string,
+	basePath?: string,
+): string {
+	return element.includes("://")
+		? element
+		: resolveLocationFsPath(docFsPath, element, basePath);
+}
+
+function resolveLocationDerived(
+	docFsPath: string,
+	value: unknown,
+	basePath?: string,
+): unknown {
+	return Array.isArray(value)
+		? value.map((v) => resolveLocationElement(docFsPath, String(v), basePath))
+		: resolveLocationElement(docFsPath, String(value), basePath);
+}
+
+/** The directory commands run in: basePath resolved against the file's dir (§15.8), independent of the command string itself. */
+function commandCwdDerived(docFsPath: string, basePath?: string): string {
+	return resolveLocationFsPath(docFsPath, ".", basePath);
+}
+
 export function runGet(file: string, opts: GetOptions = {}): CommandResult {
-	if (!opts.id && !opts.field) {
-		return fail(`error: --id and --field are required\n\n${HELP_GET}`, 2);
-	}
-	if (!opts.id) return fail(`error: --id is required\n\n${HELP_GET}`, 2);
-	if (!opts.field) return fail(`error: --field is required\n\n${HELP_GET}`, 2);
+	if (!opts.id) return fail(`error: id is required\n\n${HELP_GET}`, 2);
 	const ids = splitCommaList(opts.id);
-	const fields = splitCommaList(opts.field);
-	if (ids.length === 0)
-		return fail(`error: --id is required\n\n${HELP_GET}`, 2);
-	if (fields.length === 0) {
-		return fail(`error: --field is required\n\n${HELP_GET}`, 2);
+	if (ids.length === 0) return fail(`error: id is required\n\n${HELP_GET}`, 2);
+
+	// Omitted field positional means "all set fields"; present-but-empty
+	// (e.g. an empty/blank field positional) is still a usage error.
+	const explicitFields =
+		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
+	if (explicitFields !== undefined && explicitFields.length === 0) {
+		return fail(`error: field is required\n\n${HELP_GET}`, 2);
 	}
 
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 
 	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, opts.json);
 	if (failed) return failed;
 
 	const basePath = frontmatter?.basePath;
@@ -847,21 +1012,32 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 		}
 	};
 
-	const resolveValue = (field: string, value: unknown): unknown => {
-		if (field !== "location" || value === undefined || docFsPath === null)
-			return value;
-		const resolveOne = (loc: string) =>
-			resolveLocationFsPath(docFsPath, loc, basePath);
-		return Array.isArray(value)
-			? value.map(resolveOne)
-			: resolveOne(String(value));
-	};
-
 	const missing: string[] = [];
 	// Keyed by "kind::field" so one warning covers every id sharing that
 	// (kind, field) pair instead of repeating per id (#479 usability re-check).
 	const unknownFieldIds = new Map<string, string[]>();
+	// Keyed by field name so one warning covers every id that hit the same
+	// can't-resolve-from-stdin case.
+	const stdinFieldIds = new Map<string, string[]>();
+	const flagUnknown = (
+		kind: "artifact" | "process" | "group",
+		field: string,
+		id: string,
+	) => {
+		const key = `${kind}::${field}`;
+		const affected = unknownFieldIds.get(key);
+		if (affected) affected.push(id);
+		else unknownFieldIds.set(key, [id]);
+	};
+	const flagStdin = (field: string, id: string) => {
+		const affected = stdinFieldIds.get(field);
+		if (affected) affected.push(id);
+		else stdinFieldIds.set(field, [id]);
+	};
+
 	const values: Record<string, Record<string, unknown>> = {};
+	const displayFieldsById: Record<string, string[]> = {};
+
 	for (const id of ids) {
 		const kind = nodeKinds.get(id);
 		if (kind === undefined) {
@@ -870,22 +1046,89 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 		}
 		const meta = metaFor(id);
 		const row: Record<string, unknown> = {};
-		for (const field of fields) {
-			if (!KNOWN_FIELDS[kind].has(field)) {
-				const key = `${kind}::${field}`;
-				const affected = unknownFieldIds.get(key);
-				if (affected) affected.push(id);
-				else unknownFieldIds.set(key, [id]);
+		const displayFields: string[] = [];
+		const addField = (field: string) => {
+			if (!displayFields.includes(field)) displayFields.push(field);
+		};
+
+		// Derived fields auto-accompany their base field right after it, but
+		// only when the node actually has the base field and we have a real
+		// file path to resolve against (not stdin).
+		const addLocationResolvedIfApplicable = () => {
+			if (meta?.location === undefined || docFsPath === null) return;
+			row["location.resolved"] = resolveLocationDerived(
+				docFsPath,
+				meta.location,
+				basePath,
+			);
+			addField("location.resolved");
+		};
+		const addCommandCwdIfApplicable = () => {
+			if (meta?.command === undefined || docFsPath === null) return;
+			row["command.cwd"] = commandCwdDerived(docFsPath, basePath);
+			addField("command.cwd");
+		};
+
+		if (explicitFields === undefined) {
+			// field positional omitted: every field present on this node, raw, in
+			// frontmatter order, plus applicable derived fields.
+			for (const field of meta ? Object.keys(meta) : []) {
+				row[field] = meta![field];
+				addField(field);
+				if (field === "location") addLocationResolvedIfApplicable();
+				if (field === "command") addCommandCwdIfApplicable();
 			}
-			row[field] = resolveValue(field, meta?.[field]) ?? null;
+		} else {
+			for (const field of explicitFields) {
+				if (field === "location.resolved" || field === "command.cwd") {
+					addField(field);
+					if (!DERIVED_FIELDS[kind].has(field)) flagUnknown(kind, field, id);
+					if (docFsPath === null) {
+						row[field] = null;
+						flagStdin(field, id);
+						continue;
+					}
+					if (field === "location.resolved") {
+						row[field] =
+							meta?.location === undefined
+								? null
+								: resolveLocationDerived(docFsPath, meta.location, basePath);
+					} else {
+						row[field] = commandCwdDerived(docFsPath, basePath);
+					}
+					continue;
+				}
+				addField(field);
+				if (!KNOWN_FIELDS[kind].has(field)) flagUnknown(kind, field, id);
+				row[field] = meta?.[field] ?? null;
+				if (field === "location") addLocationResolvedIfApplicable();
+				if (field === "command") addCommandCwdIfApplicable();
+			}
 		}
+
 		values[id] = row;
+		displayFieldsById[id] = displayFields;
 	}
-	const warnings = [...unknownFieldIds.entries()].map(([key, affectedIds]) => {
-		const field = key.split("::")[1];
-		return `warning: '${field}' is not a recognized field for ${affectedIds.length === 1 ? `'${affectedIds[0]}'` : `id(s) ${affectedIds.join(", ")}`} (possible typo?)`;
-	});
+
+	const unknownWarnings = [...unknownFieldIds.entries()].map(
+		([key, affectedIds]) => {
+			const field = key.split("::")[1];
+			return `warning: '${field}' is not a recognized field for ${affectedIds.length === 1 ? `'${affectedIds[0]}'` : `id(s) ${affectedIds.join(", ")}`} (possible typo?)`;
+		},
+	);
+	const stdinWarnings = [...stdinFieldIds.entries()].map(
+		([field, affectedIds]) =>
+			`warning: cannot resolve '${field}' for ${affectedIds.length === 1 ? `'${affectedIds[0]}'` : `id(s) ${affectedIds.join(", ")}`}: no file path when reading from stdin`,
+	);
+	const warnings = [...unknownWarnings, ...stdinWarnings];
 	const warnText = warnings.length ? `${warnings.join("\n")}\n` : "";
+
+	const linesFor = (idsToPrint: string[]) =>
+		idsToPrint.flatMap((id) =>
+			(displayFieldsById[id] ?? []).map((field) =>
+				formatGetLine(id, field, values),
+			),
+		);
 
 	if (missing.length > 0) {
 		const errorText = `error: id(s) not found in ${file}: ${missing.join(", ")}\n`;
@@ -896,9 +1139,7 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 				`${JSON.stringify({ ok: false, values, missing })}\n`,
 			);
 		}
-		const lines = ids
-			.filter((id) => values[id])
-			.flatMap((id) => fields.map((field) => formatGetLine(id, field, values)));
+		const lines = linesFor(ids.filter((id) => values[id]));
 		const stdout = lines.length ? `${lines.join("\n")}\n` : "";
 		return fail(`${warnText}${errorText}`, 1, stdout);
 	}
@@ -907,10 +1148,8 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 		return ok(`${JSON.stringify({ ok: true, values })}\n`, warnText);
 	}
 
-	const lines = ids.flatMap((id) =>
-		fields.map((field) => formatGetLine(id, field, values)),
-	);
-	return ok(`${lines.join("\n")}\n`, warnText);
+	const lines = linesFor(ids);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
 }
 
 function formatGetLine(
@@ -935,17 +1174,22 @@ function isGraphLoadFailure(v: GraphLoadResult): v is CommandResult {
 	return "exitCode" in v;
 }
 
-function loadGraph(file: string): GraphLoadResult {
+function loadGraph(file: string, json = false): GraphLoadResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 	const { diagnostics, graph } = analyze(src);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, json);
 	if (failed) return failed;
 	return { graph };
 }
 
 /** Shared not-found error shape across all graph-analysis subcommands (#479 usability review). */
-function idsNotFoundError(file: string, ids: string[]): CommandResult {
+function idsNotFoundError(
+	file: string,
+	ids: string[],
+	json = false,
+): CommandResult {
+	if (json) return failJson({ missing: ids });
 	return fail(`error: id(s) not found in ${file}: ${ids.join(", ")}\n`, 1);
 }
 
@@ -954,9 +1198,10 @@ export function runNeighbors(
 	id: string,
 	opts: GraphAnalysisOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file);
+	const loaded = loadGraph(file, opts.json);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
+	if (!loaded.graph.nodes.has(id))
+		return idsNotFoundError(file, [id], opts.json);
 	const { predecessors, successors } = computeNeighbors(loaded.graph, id);
 	if (opts.json) {
 		return ok(`${JSON.stringify({ ok: true, predecessors, successors })}\n`);
@@ -971,9 +1216,10 @@ export function runImpact(
 	id: string,
 	opts: GraphAnalysisOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file);
+	const loaded = loadGraph(file, opts.json);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
+	if (!loaded.graph.nodes.has(id))
+		return idsNotFoundError(file, [id], opts.json);
 	const impact = computeImpact(loaded.graph, id).sort();
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, impact })}\n`);
 	return ok(impact.length ? `${impact.join("\n")}\n` : "(none)\n");
@@ -984,28 +1230,38 @@ export function runDependsOn(
 	id: string,
 	opts: GraphAnalysisOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file);
+	const loaded = loadGraph(file, opts.json);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
+	if (!loaded.graph.nodes.has(id))
+		return idsNotFoundError(file, [id], opts.json);
 	const dependsOn = computeDependsOn(loaded.graph, id).sort();
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, dependsOn })}\n`);
 	return ok(dependsOn.length ? `${dependsOn.join("\n")}\n` : "(none)\n");
+}
+
+export interface PathOptions extends GraphAnalysisOptions {
+	limit?: number;
 }
 
 export function runPath(
 	file: string,
 	from: string,
 	to: string,
-	opts: GraphAnalysisOptions = {},
+	opts: PathOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file);
+	const loaded = loadGraph(file, opts.json);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	const missing = [from, to].filter((id) => !loaded.graph.nodes.has(id));
-	if (missing.length > 0) return idsNotFoundError(file, missing);
-	const paths = computePaths(loaded.graph, from, to);
+	if (missing.length > 0) return idsNotFoundError(file, missing, opts.json);
+	const all = computePaths(loaded.graph, from, to);
+	const paths = opts.limit !== undefined ? all.slice(0, opts.limit) : all;
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, paths })}\n`);
-	if (paths.length === 0) return ok("no path found\n");
-	return ok(`${paths.map((p) => p.join(" -> ")).join("\n")}\n`);
+	const truncated = opts.limit !== undefined && all.length > opts.limit;
+	const hint = truncated
+		? `(${all.length} paths total — showing first ${opts.limit})\n`
+		: "";
+	if (paths.length === 0) return ok("no path found\n", hint);
+	return ok(`${paths.map((p) => p.join(" -> ")).join("\n")}\n`, hint);
 }
 
 export interface StatsOptions extends GraphAnalysisOptions {
@@ -1016,7 +1272,7 @@ export interface StatsOptions extends GraphAnalysisOptions {
 const STATS_HINT_THRESHOLD = 20;
 
 export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
-	const loaded = loadGraph(file);
+	const loaded = loadGraph(file, opts.json);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	const all = computeStats(loaded.graph);
 	const stats = opts.limit !== undefined ? all.slice(0, opts.limit) : all;
@@ -1032,27 +1288,117 @@ export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
 	return ok(`${lines.join("\n")}\n`, hint);
 }
 
-export interface AuditSyncOptions {
+export interface GraphSummaryOptions {
 	json?: boolean;
 }
 
-export interface AuditSyncGap {
+/**
+ * Shared loader for graph summary/io: reads + analyzes a file, failing on
+ * errors, and returns the pieces auditGraph needs.
+ */
+function loadForAudit(
+	file: string,
+	json = false,
+):
+	| {
+			edges: ReturnType<typeof analyze>["edges"];
+			nodeKinds: ReturnType<typeof analyze>["nodeKinds"];
+			artifactMeta: NonNullable<
+				ReturnType<typeof analyze>["frontmatter"]
+			>["artifact"];
+	  }
+	| CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, json);
+	if (failed) return failed;
+	return { edges, nodeKinds, artifactMeta: frontmatter?.artifact ?? undefined };
+}
+
+export function runGraphSummary(
+	file: string,
+	opts: GraphSummaryOptions = {},
+): CommandResult {
+	const loaded = loadForAudit(file, opts.json);
+	if ("exitCode" in loaded) return loaded;
+	const { edges, nodeKinds, artifactMeta } = loaded;
+	const artifactCount = [...nodeKinds.values()].filter(
+		(k) => k === "artifact",
+	).length;
+	const processCount = [...nodeKinds.values()].filter(
+		(k) => k === "process",
+	).length;
+	const primaryEdgeCount = edges.filter(
+		(e) => e.kind === "input" || e.kind === "output",
+	).length;
+	const { terminals, externalInputs } = auditGraph(
+		edges,
+		nodeKinds,
+		artifactMeta,
+	);
+	if (opts.json) {
+		return ok(
+			`${JSON.stringify({
+				ok: true,
+				artifacts: artifactCount,
+				processes: processCount,
+				edges: primaryEdgeCount,
+				externalInputs: externalInputs.length,
+				terminals: terminals.length,
+			})}\n`,
+		);
+	}
+	return ok(
+		`artifacts: ${artifactCount}, processes: ${processCount}, edges: ${primaryEdgeCount}, external inputs: ${externalInputs.length}, terminals: ${terminals.length}\n`,
+	);
+}
+
+export interface GraphIoOptions {
+	json?: boolean;
+}
+
+export function runGraphIo(
+	file: string,
+	opts: GraphIoOptions = {},
+): CommandResult {
+	const loaded = loadForAudit(file, opts.json);
+	if ("exitCode" in loaded) return loaded;
+	const { edges, nodeKinds, artifactMeta } = loaded;
+	const { terminals, externalInputs } = auditGraph(
+		edges,
+		nodeKinds,
+		artifactMeta,
+	);
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, externalInputs, terminals })}\n`);
+	}
+	return ok(
+		`external inputs: ${externalInputs.join(", ")}\nterminal artifacts: ${terminals.join(", ")}\n`,
+	);
+}
+
+export interface StatusGapsOptions {
+	json?: boolean;
+}
+
+export interface StatusGap {
 	file: string;
 	artifactId: string;
 	label: string;
 	status: string;
 }
 
-export interface AuditSyncResult {
+export interface StatusGapsResult {
 	ok: boolean;
-	gaps: AuditSyncGap[];
+	gaps: StatusGap[];
 	warnings?: Diagnostic[];
 }
 
-export function runAuditSync(
+export function runStatusGaps(
 	roadmapFile: string,
 	flowFiles: string[],
-	opts: AuditSyncOptions = {},
+	opts: StatusGapsOptions = {},
 ): CommandResult {
 	const roadmapSrc = readSource(roadmapFile);
 	if (isCommandResult(roadmapSrc)) return roadmapSrc;
@@ -1062,7 +1408,7 @@ export function runAuditSync(
 		frontmatter: roadmapFm,
 		edges: roadmapEdges,
 	} = analyze(roadmapSrc, { readyGate: true });
-	const roadmapFail = failIfErrors(roadmapDiags, roadmapFile);
+	const roadmapFail = failIfErrors(roadmapDiags, roadmapFile, opts.json);
 	if (roadmapFail) return roadmapFail;
 
 	const warnings = roadmapDiags.filter((d) => d.code === "W006");
@@ -1074,7 +1420,7 @@ export function runAuditSync(
 		roadmapFm.type !== ROADMAP_REQUIRED_TYPE
 	) {
 		return fail(
-			`audit-sync: roadmap file must have type: roadmap. Got type: ${roadmapFm.type}\n`,
+			`status gaps: roadmap file must have type: roadmap. Got type: ${roadmapFm.type}\n`,
 			2,
 		);
 	}
@@ -1087,20 +1433,20 @@ export function runAuditSync(
 		roadmapArtifactIds.add(e.artifact);
 	}
 
-	const gaps: AuditSyncGap[] = [];
+	const gaps: StatusGap[] = [];
 
 	for (const flowFile of flowFiles) {
 		const flowSrc = readSource(flowFile);
 		if (isCommandResult(flowSrc)) return flowSrc;
 
 		const { diagnostics: flowDiags, frontmatter: flowFm } = analyze(flowSrc);
-		const flowFail = failIfErrors(flowDiags, flowFile);
+		const flowFail = failIfErrors(flowDiags, flowFile, opts.json);
 		if (flowFail) return flowFail;
 
 		const flowType = flowFm?.type;
 		if (flowType === ROADMAP_REQUIRED_TYPE) {
 			return fail(
-				`audit-sync: flow file must be workflow or runtime-pipeline, not roadmap: ${flowFile}\n`,
+				`status gaps: flow file must be workflow or runtime-pipeline, not roadmap: ${flowFile}\n`,
 				2,
 			);
 		}
@@ -1119,7 +1465,7 @@ export function runAuditSync(
 		}
 	}
 
-	const result: AuditSyncResult = { ok: gaps.length === 0, gaps };
+	const result: StatusGapsResult = { ok: gaps.length === 0, gaps };
 	if (warnings.length) result.warnings = warnings;
 
 	if (opts.json) {
@@ -1153,12 +1499,12 @@ export type { BinaryFormat };
 export { svgToBinary };
 export type CliRenderFormat = RenderFormat | BinaryFormat;
 
-export interface GraphOptions {
+export interface RenderOptions {
 	format?: CliRenderFormat;
 }
-export async function runGraph(
+export async function runRender(
 	file: string,
-	opts: GraphOptions = {},
+	opts: RenderOptions = {},
 ): Promise<CommandResult> {
 	const fmt = opts.format ?? "dot";
 	const graphSrc = readSource(file);
@@ -1198,6 +1544,7 @@ export type { DiffReport };
 
 export interface DiffOptions {
 	format?: "text" | "dot" | "svg";
+	json?: boolean;
 }
 
 export async function runDiff(
@@ -1206,6 +1553,9 @@ export async function runDiff(
 	opts: DiffOptions = {},
 ): Promise<CommandResult> {
 	const fmt = opts.format ?? "text";
+	if (opts.json && (fmt === "dot" || fmt === "svg")) {
+		return fail("--json cannot be combined with --format dot|svg\n", 2);
+	}
 	const diffSrcA = readSource(fileA);
 	if (isCommandResult(diffSrcA)) return diffSrcA;
 	const {
@@ -1236,6 +1586,9 @@ export async function runDiff(
 
 	// text format
 	const r = coreDiffGraphs(graphA, graphB, fmA, fmB);
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, diff: r })}\n`);
+	}
 	const out: string[] = [];
 	const section = (label: string, items: string[]) => {
 		for (const i of items) out.push(`${label} ${i}`);
@@ -1253,29 +1606,63 @@ export async function runDiff(
 
 declare const __PFDSL_VERSION__: string;
 
-const HELP_CHECK = `usage: pfdsl check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
+const HELP_CHECK = `usage: pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]
 
 Validate a .pfdsl file. Use - to read from stdin.
 
 Options:
-  --audit    list terminal artifacts and external inputs; also emits consumer asymmetry hints for same-group artifacts
-  --summary  print artifact/process/edge counts
   --strict   error if feedback source not reachable from target process
-  --json     output diagnostics as JSON ({ ok, diagnostics })
+  --hints    also emit consumer asymmetry hints for same-group artifacts
+  --json     output diagnostics as JSON ({ ok, diagnostics, hints? })
   --no-color disable ANSI color codes (also: NO_COLOR env var)
+
+For topology queries (terminal artifacts, external inputs, counts) see
+\`pfdsl graph io\` and \`pfdsl graph summary\`.
 `;
 
-const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--mode flat|flows]
+const HELP_GRAPH_SUMMARY = `usage: pfdsl graph summary <file|-> [--json]
 
-Format a .pfdsl file. Use - to read from stdin (--write not allowed with stdin).
+Print aggregate counts for the graph: artifacts, processes, primary edges,
+external inputs, and terminal artifacts. Use - to read from stdin.
+
+  --json  output as JSON ({ ok, artifacts, processes, edges, externalInputs, terminals })
+          on failure: { ok: false, diagnostics }
+
+Exit codes:
+  0  success
+  1  parse/validation error
+  2  invalid usage
+`;
+
+const HELP_GRAPH_IO = `usage: pfdsl graph io <file|-> [--json]
+
+Print the graph's boundary: external inputs (artifacts consumed but never
+produced — where the flow starts) and terminal artifacts (produced but never
+consumed — where it ends). Artifacts with externalStakeholders are treated
+as having an external consumer and excluded from terminals. Use - to read
+from stdin.
+
+  --json  output as JSON ({ ok, externalInputs: string[], terminals: string[] })
+          on failure: { ok: false, diagnostics }
+
+Exit codes:
+  0  success
+  1  parse/validation error
+  2  invalid usage
+`;
+
+const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--check]
+
+Format a .pfdsl file, grouping each process with its inputs and outputs.
+Use - to read from stdin (--write not allowed with stdin; --check is allowed).
 
 Options:
-  --write       rewrite the file in place (cannot be used with -)
-  --mode flat   output one edge per line
-  --mode flows  group each process with its inputs and outputs (default)
+  --write  rewrite the file in place (cannot be used with -)
+  --check  do not write; exit 1 if formatting would change anything (CI)
+           (cannot be combined with --write)
 `;
 
-const HELP_REINDEX = `usage: pfdsl reindex <file|-> [--write] [--check] [--renumber] [--json]
+const HELP_REINDEX = `usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json]
 
 Assign integer index: values to nodes in topological order. Processes and
 artifacts are numbered with independent counters. Use - to read from stdin.
@@ -1291,9 +1678,10 @@ Options:
   --check     do not write; exit 1 if reindexing would change anything (CI)
   --renumber  reassign every node from 1 (default keeps existing indices)
   --json      emit the change report as JSON ({ changes: [...] })
+              on parse failure: { ok: false, diagnostics } (exit 1)
 `;
 
-const HELP_SORT = `usage: pfdsl sort-meta <file|-> --by <keys> [--write] [--check]
+const HELP_SORT = `usage: pfdsl meta sort <file|-> --by <keys> [--write] [--check]
 
 Sort artifact and process node definitions within each frontmatter section.
 Each section is sorted independently. Use - to read from stdin.
@@ -1305,15 +1693,16 @@ Options:
   --check       exit 1 if the file is not already sorted (CI mode)
 `;
 
-const HELP_NORMALIZE = `usage: pfdsl normalize <file|-> [--json]
+const HELP_GRAPH_EDGES = `usage: pfdsl graph edges <file|-> [--json]
 
 Print canonical edge list. Use - to read from stdin.
 
 Options:
-  --json  output edge list as JSON array
+  --json  output as JSON ({ ok, edges: {kind, artifact, process}[] })
+          on failure: { ok: false, diagnostics }
 `;
 
-const HELP_GRAPH = `usage: pfdsl graph <file|-> [--format dot|svg|pdf|png]
+const HELP_RENDER = `usage: pfdsl render <file|-> [--format dot|svg|pdf|png]
 
 Print a Graphviz representation. Use - to read from stdin.
 
@@ -1324,17 +1713,22 @@ Options:
   --format png  PNG (requires: npm install puppeteer)
 `;
 
-const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg]
+const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json]
 
-Show structural differences between two .pfdsl files.
+Show structural differences between two .pfdsl files. Either side may be -
+to read from stdin, e.g. \`git show HEAD:f.pfdsl | pfdsl diff - f.pfdsl\`.
 
 Options:
   --format text  human-readable summary (default)
   --format dot   visual diff as Graphviz DOT
   --format svg   visual diff as SVG
+  --json         emit the structural report as JSON
+                 ({ ok, diff: { addedNodes, removedNodes, changedNodes,
+                 addedEdges, removedEdges, addedFeedback, removedFeedback } })
+                 (cannot be combined with --format dot|svg)
 `;
 
-const HELP_READY = `usage: pfdsl ready <file|-> [--best] [--json]
+const HELP_READY = `usage: pfdsl status ready <file|-> [--best] [--json]
 
 List processes whose every input artifact has status: done (or no status set).
 Only applies to roadmap files (type: roadmap). Use - to read from stdin.
@@ -1343,39 +1737,77 @@ Omitting type: is treated as roadmap and allowed, with a warning (W006).
 Options:
   --best  highlight the process that unblocks the most downstream work
   --json  output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, warnings? })
+          on parse failure: { ok: false, diagnostics }
 `;
 
-const HELP_STATUS_SET = `usage: pfdsl status-set <file> <artifact-id> <status> [--json]
+const HELP_META_SET = `usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json]
 
-Set the status of an artifact in a .pfdsl file, rewriting it in place.
-For roadmap files, reports which processes became newly ready after the change.
+Set a scalar frontmatter field on one or more nodes, rewriting the file in
+place while preserving its formatting. Multiple comma-separated ids get the
+same value; the call is atomic (all writes land or none do). Quote values
+containing spaces.
+
+Field-aware validation: status must be one of todo | wip | done | waiting |
+suspended; index must be a non-negative integer; the field must be valid for
+each node's kind. Array/map fields (tags, parts, externalStakeholders,
+boundary) and derived read-only fields (location.resolved, command.cwd)
+cannot be set.
+
+When setting status on a roadmap file, reports which processes became newly
+ready after the change (once, after all writes).
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
-  <status>  one of: todo | wip | done | waiting | suspended
   --json    emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
+            on failure: { ok: false, diagnostics } / { ok: false, missing } /
+            { ok: false, error }
 
 Exit codes:
   0  success
-  1  artifact not found in the file
-  2  invalid usage (missing argument, invalid status value)
+  1  id not found in the file, or the rewrite was refused
+  2  invalid usage (missing argument, invalid field or value)
 `;
 
-const HELP_GET = `usage: pfdsl get <file|-> --id <ids> --field <fields> [--json]
+const HELP_GET = `usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--json]
 
-Print field values for one or more artifact/process/group ids. Use - to read
-from stdin (location fields are returned unresolved when reading from stdin,
-since there is no file path to resolve basePath against).
+Print field values for one or more artifact/process/group ids.
 
-  --id <ids>      comma-separated ids, or repeat --id for each one
-  --field <fields> comma-separated field names, or repeat --field for each one
-  --json          emit JSON ({ ok, values: { [id]: { [field]: value } } })
+  <id[,id...]>        comma-separated ids (required)
+  [field[,field...]]  comma-separated field names (optional). Omit entirely
+                      to print every field set in each node's frontmatter
+                      entry (raw, in frontmatter order), plus applicable
+                      derived fields.
+  --json              emit JSON ({ ok, values: { [id]: { [field]: value } } })
+                      on parse failure: { ok: false, diagnostics }
+                      on id miss: { ok: false, values, missing }
 
-A \`location\` field is resolved against the file's basePath (spec §15.8) so
-callers don't need to recompute it themselves. A field the node doesn't have
-prints as an empty value (JSON: null); this is not an error. Requesting a
-field name that isn't a recognized frontmatter key prints a warning to
-stderr (possible typo) but still returns the value (empty, since it's
-genuinely unset) — this does not fail the command.
+\`location\` is returned as the raw value exactly as written (so \`meta get\`
+and \`meta set\` round-trip). The resolved filesystem path is a separate
+read-only derived field, \`location.resolved\`, which is added to the output
+automatically right after \`location\` whenever \`location\` is in the output
+(explicitly requested or via an omitted field positional) and the node has
+a location. Each location element is classified per spec §15.8: an element
+containing "://" is a URL and is passed through unchanged; everything else
+(paths and globs) is resolved against the file's basePath. A scalar
+location yields a scalar location.resolved; an array yields an array.
+
+\`command.cwd\` works the same way for process nodes: whenever \`command\` is
+in the output and the node has a command, \`command.cwd\` (the basePath-
+resolved directory commands run in) is added right after it. command.cwd
+does not depend on the command string itself.
+
+Either derived field may also be requested explicitly in the field
+positional (e.g. location.resolved), in which case only the derived value
+is returned — the base field is not auto-added. Use - to read from stdin:
+since there is no file path to resolve against, derived fields are silently
+omitted from auto-accompaniment, and an explicit request for one returns
+null with a warning on stderr instead of failing the command.
+
+A field the node doesn't have prints as an empty value (JSON: null); this is
+not an error. A node that exists but has no frontmatter entry at all yields
+an empty row (JSON: {}, no text lines). Requesting a field name that isn't a
+recognized frontmatter or derived key prints a warning to stderr (possible
+typo) but still returns the value (empty, since it's genuinely unset) — this
+does not fail the command.
 
 If some requested ids exist and others don't, values for the found ids are
 still printed (to stdout, or under "values" in --json) alongside the error
@@ -1384,15 +1816,16 @@ for the missing ones.
 Exit codes:
   0  success
   1  one or more requested ids do not exist in the file
-  2  invalid usage (missing --id/--field)
+  2  invalid usage (missing id, or too many positional arguments)
 `;
 
-const HELP_NEIGHBORS = `usage: pfdsl neighbors <file|-> <id> [--json]
+const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json]
 
 Print the direct predecessors (in-edges) and successors (out-edges) of a
 node — its immediate producer(s)/consumer(s) only, not the full closure.
 
   --json  output as JSON ({ ok, predecessors: string[], successors: string[] })
+          on failure: { ok: false, diagnostics } / { ok: false, missing }
 
 Exit codes:
   0  success
@@ -1400,13 +1833,14 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_IMPACT = `usage: pfdsl impact <file|-> <id> [--json]
+const HELP_IMPACT = `usage: pfdsl graph impact <file|-> <id> [--json]
 
 Print the full downstream closure reachable from <id> via primary edges
 (everything <id> unblocks, transitively), excluding <id> itself. Text mode
 prints one id per line (empty: "(none)"), for easy piping into other tools.
 
   --json  output as JSON ({ ok, impact: string[] })
+          on failure: { ok: false, diagnostics } / { ok: false, missing }
 
 Exit codes:
   0  success
@@ -1414,13 +1848,14 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_DEPENDS_ON = `usage: pfdsl depends-on <file|-> <id> [--json]
+const HELP_DEPENDS_ON = `usage: pfdsl graph depends-on <file|-> <id> [--json]
 
 Print the full upstream closure <id> depends on via primary edges
 (everything that must exist for <id> to exist), excluding <id> itself. Text
 mode prints one id per line (empty: "(none)"), for easy piping into other tools.
 
   --json  output as JSON ({ ok, dependsOn: string[] })
+          on failure: { ok: false, diagnostics } / { ok: false, missing }
 
 Exit codes:
   0  success
@@ -1428,20 +1863,24 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_PATH = `usage: pfdsl path <file|-> <from> <to> [--json]
+const HELP_PATH = `usage: pfdsl graph path <file|-> <from> <to> [--limit <n>] [--json]
 
 Print all simple paths from <from> to <to> via primary edges (empty if
-none exist). Answers "is <from> a prerequisite of <to>, and how".
+none exist). Answers "is <from> a prerequisite of <to>, and how". Text mode
+prints a hint to stderr when --limit actually truncates the result (kept
+off stdout so \`path ... | ...\` pipelines aren't affected).
 
-  --json  output as JSON ({ ok, paths: string[][] })
+  --limit <n>  only print the first n paths
+  --json       output as JSON ({ ok, paths: string[][] })
+               on failure: { ok: false, diagnostics } / { ok: false, missing }
 
 Exit codes:
   0  success (including when no path exists)
   1  <from> or <to> not found in the file
-  2  invalid usage (missing from/to)
+  2  invalid usage (missing from/to, or invalid --limit)
 `;
 
-const HELP_STATS = `usage: pfdsl stats <file|-> [--limit <n>] [--json]
+const HELP_STATS = `usage: pfdsl graph stats <file|-> [--limit <n>] [--json]
 
 Print fan-in/fan-out per node, ranked by total degree descending (hubs
 first) then id ascending. Text mode prints a hint to stderr suggesting
@@ -1450,13 +1889,14 @@ first) then id ascending. Text mode prints a hint to stderr suggesting
 
   --limit <n>  only print the top n rows
   --json       output as JSON ({ ok, stats: {id, kind, fanIn, fanOut}[] })
+               on parse failure: { ok: false, diagnostics }
 
 Exit codes:
   0  success
   2  invalid usage
 `;
 
-const HELP_AUDIT_SYNC = `usage: pfdsl audit-sync <roadmap> <flow> [<flow>...] [--json]
+const HELP_STATUS_GAPS = `usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json]
 
 Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
 Reports artifacts with status: todo in flow files that have no corresponding entry
@@ -1468,6 +1908,7 @@ Omitting type: on the roadmap file is treated as roadmap and allowed, with a war
 
 Options:
   --json  output as JSON ({ ok, gaps: [{file, artifactId, label, status}], warnings? })
+          on parse failure: { ok: false, diagnostics }
 
 Exit codes:
   0  all todo artifacts are tracked in the roadmap
@@ -1512,65 +1953,68 @@ function runExplain(code: string): CommandResult {
 	return ok(`${lines.join("\n")}\n`);
 }
 
+const HELP_GRAPH_GROUP = `usage: pfdsl graph <subcommand> ...
+
+Read-only queries on the graph topology. Run
+\`pfdsl graph <subcommand> --help\` for details on each.
+
+Subcommands:
+  summary <file|->            Print artifact/process/edge counts
+  io <file|->                 Print external inputs and terminal artifacts
+  stats <file|-> [--limit]    Rank nodes by fan-in/fan-out degree
+  neighbors <file|-> <id>     Direct predecessors/successors of a node
+  impact <file|-> <id>        Full downstream closure of a node
+  depends-on <file|-> <id>    Full upstream closure of a node
+  path <file|-> <from> <to> [--limit]
+                              All simple paths between two nodes
+  edges <file|->              Canonical edge list
+
+All subcommands accept --json.
+`;
+
+const HELP_META_GROUP = `usage: pfdsl meta <subcommand> ...
+
+Read and write frontmatter metadata. Run
+\`pfdsl meta <subcommand> --help\` for details on each.
+
+Subcommands:
+  get <file|-> <id[,id...]> [field[,field...]]   Print field values
+  set <file> <id> <field> <value>                Set a field value in place
+  sort <file|-> --by <keys>                      Sort node definitions
+  reindex <file|->                               Assign topological index: values
+`;
+
+const HELP_STATUS_GROUP = `usage: pfdsl status <subcommand> ...
+
+Planning queries derived from artifact status. Run
+\`pfdsl status <subcommand> --help\` for details on each.
+
+Subcommands:
+  ready <file|-> [--best]           List ready-to-start processes
+  gaps <roadmap> <flow> [<flow>...] Find todo artifacts missing from the roadmap
+`;
+
 export const HELP = `pfdsl <command> [options]
 
 Commands:
-  check <file|-> [--audit] [--summary] [--strict] [--json] [--no-color]
+  check <file|-> [--strict] [--hints] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
-                           --audit    list terminal artifacts, external inputs, and consumer asymmetry hints
-                           --summary  print artifact/process/edge counts
-                           --strict   error if feedback source not reachable from target process
-                           --json     output diagnostics as JSON
-                           --no-color disable ANSI color codes (also: NO_COLOR env var)
-  fmt <file|-> [--write] [--mode flat|flows]
-                           Format a .pfdsl file (- = stdin)
-  reindex <file|-> [--write] [--check] [--renumber] [--json]
-                           Assign topological index: values (- = stdin)
-                           --write     rewrite in place; report to stdout
-                           --check     exit 1 if reindexing would change anything
-                           --renumber  reassign every node from 1
-                           --json      emit change report as JSON
-  sort-meta <file|-> --by <keys> [--write] [--check]
-                           Sort node definitions by keys (- = stdin)
-                           --by        comma-separated: index, topological, group, id
-                           --write     rewrite in place
-                           --check     exit 1 if not already sorted
-  normalize <file|-> [--json]
-                           Print canonical edge list (- = stdin)
-                           --json     output edge list as JSON array
-  graph <file|-> [--format dot|svg|pdf|png]
-                           Print Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-                           PDF/PNG requires: npm install puppeteer
-  diff <a> <b> [--format text|dot|svg]
-                           Structural diff (text), or visual diff DOT/SVG
-  ready <file|-> [--best] [--json]
-                           List ready-to-start processes (- = stdin)
-                           --best    recommend the best next process
-                           --json    output as JSON
-  status-set <file> <artifact-id> <status> [--json]
-                           Set artifact status (todo|wip|done|waiting|suspended) in place
-                           Roadmap files: prints newly-ready processes after the change
-                           --json    output as JSON ({ ok, newlyReady: string[], warnings? })
-  get <file|-> --id <ids> --field <fields> [--json]
-                           Print field values for one or more ids (- = stdin)
-                           --id      comma-separated ids, or repeat --id
-                           --field   comma-separated field names, or repeat --field
-                           A "location" field is resolved against basePath
-                           --json    output as JSON
-  neighbors <file|-> <id> [--json]
-                           Print direct predecessors/successors of a node (- = stdin)
-  impact <file|-> <id> [--json]
-                           Print the full downstream closure of a node (- = stdin)
-  depends-on <file|-> <id> [--json]
-                           Print the full upstream closure of a node (- = stdin)
-  path <file|-> <from> <to> [--json]
-                           Print all simple paths from <from> to <to> (- = stdin)
-  stats <file|-> [--limit <n>] [--json]
-                           Rank nodes by fan-in/fan-out degree (- = stdin)
-  audit-sync <roadmap> <flow> [<flow>...] [--json]
-                           Cross-check todo artifacts in flow files against the roadmap
-                           --json    output as JSON
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
+  fmt <file|-> [--write] [--check]
+                           Format a .pfdsl file (- = stdin)
+  render <file|-> [--format dot|svg|pdf|png]
+                           Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
+                           PDF/PNG requires: npm install puppeteer
+  diff <a> <b> [--format text|dot|svg] [--json]
+                           Structural diff (text), or visual diff DOT/SVG
+
+Command groups (run \`pfdsl <group>\` for their subcommands):
+  graph summary|io|stats|neighbors|impact|depends-on|path|edges
+                           Read-only queries on the graph topology
+  meta get|set|sort|reindex
+                           Read and write frontmatter metadata
+  status ready|gaps        Planning queries derived from artifact status
+
   help                     Show this help
 
 Exit codes:
@@ -1609,6 +2053,177 @@ export function parseArgs(argv: readonly string[]): CliArgs {
 	return { command, positional, flags };
 }
 
+function runGraphGroup(
+	positional: string[],
+	flags: Record<string, string | boolean>,
+): CommandResult {
+	const [sub, ...rest] = positional;
+	if (!sub)
+		return flags.help ? ok(HELP_GRAPH_GROUP) : fail(HELP_GRAPH_GROUP, 2);
+	switch (sub) {
+		case "summary": {
+			if (flags.help) return ok(HELP_GRAPH_SUMMARY);
+			const f = rest[0];
+			if (!f) return fail(HELP_GRAPH_SUMMARY, 2);
+			return runGraphSummary(f, { json: flags.json === true });
+		}
+		case "io": {
+			if (flags.help) return ok(HELP_GRAPH_IO);
+			const f = rest[0];
+			if (!f) return fail(HELP_GRAPH_IO, 2);
+			return runGraphIo(f, { json: flags.json === true });
+		}
+		case "edges": {
+			if (flags.help) return ok(HELP_GRAPH_EDGES);
+			const f = rest[0];
+			if (!f) return fail(HELP_GRAPH_EDGES, 2);
+			return runGraphEdges(f, { json: flags.json === true });
+		}
+		case "neighbors": {
+			if (flags.help) return ok(HELP_NEIGHBORS);
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
+			return runNeighbors(f, id, { json: flags.json === true });
+		}
+		case "impact": {
+			if (flags.help) return ok(HELP_IMPACT);
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_IMPACT, 2);
+			return runImpact(f, id, { json: flags.json === true });
+		}
+		case "depends-on": {
+			if (flags.help) return ok(HELP_DEPENDS_ON);
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
+			return runDependsOn(f, id, { json: flags.json === true });
+		}
+		case "path": {
+			if (flags.help) return ok(HELP_PATH);
+			const [f, from, to] = rest;
+			if (!f || !from || !to) return fail(HELP_PATH, 2);
+			const limitFlag = flags.limit;
+			let limit: number | undefined;
+			if (typeof limitFlag === "string") {
+				const n = Number(limitFlag);
+				if (!Number.isInteger(n) || n < 0) return fail(HELP_PATH, 2);
+				limit = n;
+			}
+			return runPath(f, from, to, {
+				...(limit !== undefined ? { limit } : {}),
+				json: flags.json === true,
+			});
+		}
+		case "stats": {
+			if (flags.help) return ok(HELP_STATS);
+			const f = rest[0];
+			if (!f) return fail(HELP_STATS, 2);
+			const limitFlag = flags.limit;
+			let limit: number | undefined;
+			if (typeof limitFlag === "string") {
+				const n = Number(limitFlag);
+				if (!Number.isInteger(n) || n < 0) return fail(HELP_STATS, 2);
+				limit = n;
+			}
+			return runStats(f, {
+				...(limit !== undefined ? { limit } : {}),
+				json: flags.json === true,
+			});
+		}
+		default:
+			return fail(`unknown graph subcommand: ${sub}\n${HELP_GRAPH_GROUP}`, 2);
+	}
+}
+
+function runMetaGroup(
+	positional: string[],
+	flags: Record<string, string | boolean>,
+): CommandResult {
+	const [sub, ...rest] = positional;
+	if (!sub) return flags.help ? ok(HELP_META_GROUP) : fail(HELP_META_GROUP, 2);
+	switch (sub) {
+		case "get": {
+			if (flags.help) return ok(HELP_GET);
+			const [f, id, field, ...extra] = rest;
+			if (!f || !id) return fail(HELP_GET, 2);
+			if (extra.length > 0) return fail(HELP_GET, 2);
+			return runGet(f, {
+				id,
+				...(field !== undefined ? { field } : {}),
+				json: flags.json === true,
+			});
+		}
+		case "set": {
+			if (flags.help) return ok(HELP_META_SET);
+			const [f, id, field, value, ...extra] = rest;
+			if (!f || !id || !field || value === undefined)
+				return fail(HELP_META_SET, 2);
+			if (extra.length > 0) {
+				return fail(
+					`meta set: too many arguments — quote values containing spaces (got: ${[value, ...extra].join(" ")})\n`,
+					2,
+				);
+			}
+			return runMetaSet(f, id, field, value, { json: flags.json === true });
+		}
+		case "sort": {
+			if (flags.help) return ok(HELP_SORT);
+			const f = rest[0];
+			if (!f) return fail(HELP_SORT, 2);
+			const byVal = flags.by;
+			if (!byVal || byVal === true) return fail(HELP_SORT, 2);
+			return runSort(f, {
+				by: String(byVal),
+				write: flags.write === true,
+				check: flags.check === true,
+			});
+		}
+		case "reindex": {
+			if (flags.help) return ok(HELP_REINDEX);
+			const f = rest[0];
+			if (!f) return fail(HELP_REINDEX, 2);
+			return runReindex(f, {
+				write: flags.write === true,
+				check: flags.check === true,
+				renumber: flags.renumber === true,
+				json: flags.json === true,
+			});
+		}
+		default:
+			return fail(`unknown meta subcommand: ${sub}\n${HELP_META_GROUP}`, 2);
+	}
+}
+
+function runStatusGroup(
+	positional: string[],
+	flags: Record<string, string | boolean>,
+): CommandResult {
+	const [sub, ...rest] = positional;
+	if (!sub)
+		return flags.help ? ok(HELP_STATUS_GROUP) : fail(HELP_STATUS_GROUP, 2);
+	switch (sub) {
+		case "ready": {
+			if (flags.help) return ok(HELP_READY);
+			const f = rest[0];
+			if (!f) return fail(HELP_READY, 2);
+			return runReady(f, {
+				best: flags.best === true,
+				json: flags.json === true,
+			});
+		}
+		case "gaps": {
+			if (flags.help) return ok(HELP_STATUS_GAPS);
+			const [roadmapFile, ...flowFiles] = rest;
+			if (!roadmapFile || flowFiles.length === 0)
+				return fail(HELP_STATUS_GAPS, 2);
+			return runStatusGaps(roadmapFile, flowFiles, {
+				json: flags.json === true,
+			});
+		}
+		default:
+			return fail(`unknown status subcommand: ${sub}\n${HELP_STATUS_GROUP}`, 2);
+	}
+}
+
 export async function run(argv: readonly string[]): Promise<CommandResult> {
 	const { command, positional, flags } = parseArgs(argv);
 	switch (command) {
@@ -1619,13 +2234,18 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 		case "--help":
 		case "-h":
 			return ok(HELP);
+		case "graph":
+			return runGraphGroup(positional, flags);
+		case "meta":
+			return runMetaGroup(positional, flags);
+		case "status":
+			return runStatusGroup(positional, flags);
 		case "check": {
 			if (flags.help) return ok(HELP_CHECK);
 			const f = positional[0];
 			if (!f) return fail(HELP_CHECK, 2);
 			return runCheck(f, {
-				audit: flags.audit === true,
-				summary: flags.summary === true,
+				hints: flags.hints === true,
 				strict: flags.strict === true,
 				json: flags.json === true,
 				color: shouldColorize({
@@ -1639,48 +2259,15 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			if (flags.help) return ok(HELP_FMT);
 			const f = positional[0];
 			if (!f) return fail(HELP_FMT, 2);
-			const mode = flags.mode;
-			if (mode !== undefined && mode !== "flat" && mode !== "flows") {
-				return fail(`unknown mode: ${String(mode)}\n`, 2);
-			}
 			return runFmt(f, {
 				write: flags.write === true,
-				...(mode ? { mode } : {}),
-			});
-		}
-		case "reindex": {
-			if (flags.help) return ok(HELP_REINDEX);
-			const f = positional[0];
-			if (!f) return fail(HELP_REINDEX, 2);
-			return runReindex(f, {
-				write: flags.write === true,
-				check: flags.check === true,
-				renumber: flags.renumber === true,
-				json: flags.json === true,
-			});
-		}
-		case "sort-meta": {
-			if (flags.help) return ok(HELP_SORT);
-			const f = positional[0];
-			if (!f) return fail(HELP_SORT, 2);
-			const byVal = flags.by;
-			if (!byVal || byVal === true) return fail(HELP_SORT, 2);
-			return runSort(f, {
-				by: String(byVal),
-				write: flags.write === true,
 				check: flags.check === true,
 			});
 		}
-		case "normalize": {
-			if (flags.help) return ok(HELP_NORMALIZE);
+		case "render": {
+			if (flags.help) return ok(HELP_RENDER);
 			const f = positional[0];
-			if (!f) return fail(HELP_NORMALIZE, 2);
-			return runNormalize(f, { json: flags.json === true });
-		}
-		case "graph": {
-			if (flags.help) return ok(HELP_GRAPH);
-			const f = positional[0];
-			if (!f) return fail(HELP_GRAPH, 2);
+			if (!f) return fail(HELP_RENDER, 2);
 			const fmt = flags.format;
 			if (
 				fmt !== undefined &&
@@ -1691,7 +2278,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			) {
 				return fail(`unknown format: ${String(fmt)}\n`, 2);
 			}
-			return runGraph(f, fmt ? { format: fmt as CliRenderFormat } : {});
+			return runRender(f, fmt ? { format: fmt as CliRenderFormat } : {});
 		}
 		case "diff": {
 			if (flags.help) return ok(HELP_DIFF);
@@ -1706,81 +2293,8 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			) {
 				return fail(`unknown format: ${String(fmt)}\n`, 2);
 			}
-			return await runDiff(a, b, fmt ? { format: fmt } : {});
-		}
-		case "ready": {
-			if (flags.help) return ok(HELP_READY);
-			const f = positional[0];
-			if (!f) return fail(HELP_READY, 2);
-			return runReady(f, {
-				best: flags.best === true,
-				json: flags.json === true,
-			});
-		}
-		case "status-set": {
-			if (flags.help) return ok(HELP_STATUS_SET);
-			const [f, artifactId, status] = positional;
-			if (!f || !artifactId || !status) return fail(HELP_STATUS_SET, 2);
-			return runStatusSet(f, artifactId, status, {
-				json: flags.json === true,
-			});
-		}
-		case "get": {
-			if (flags.help) return ok(HELP_GET);
-			const f = positional[0];
-			if (!f) return fail(HELP_GET, 2);
-			return runGet(f, {
-				...(typeof flags.id === "string" ? { id: flags.id } : {}),
-				...(typeof flags.field === "string" ? { field: flags.field } : {}),
-				json: flags.json === true,
-			});
-		}
-		case "neighbors": {
-			if (flags.help) return ok(HELP_NEIGHBORS);
-			const [f, id] = positional;
-			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
-			return runNeighbors(f, id, { json: flags.json === true });
-		}
-		case "impact": {
-			if (flags.help) return ok(HELP_IMPACT);
-			const [f, id] = positional;
-			if (!f || !id) return fail(HELP_IMPACT, 2);
-			return runImpact(f, id, { json: flags.json === true });
-		}
-		case "depends-on": {
-			if (flags.help) return ok(HELP_DEPENDS_ON);
-			const [f, id] = positional;
-			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
-			return runDependsOn(f, id, { json: flags.json === true });
-		}
-		case "path": {
-			if (flags.help) return ok(HELP_PATH);
-			const [f, from, to] = positional;
-			if (!f || !from || !to) return fail(HELP_PATH, 2);
-			return runPath(f, from, to, { json: flags.json === true });
-		}
-		case "stats": {
-			if (flags.help) return ok(HELP_STATS);
-			const f = positional[0];
-			if (!f) return fail(HELP_STATS, 2);
-			const limitFlag = flags.limit;
-			let limit: number | undefined;
-			if (typeof limitFlag === "string") {
-				const n = Number(limitFlag);
-				if (!Number.isInteger(n) || n < 0) return fail(HELP_STATS, 2);
-				limit = n;
-			}
-			return runStats(f, {
-				...(limit !== undefined ? { limit } : {}),
-				json: flags.json === true,
-			});
-		}
-		case "audit-sync": {
-			if (flags.help) return ok(HELP_AUDIT_SYNC);
-			const [roadmapFile, ...flowFiles] = positional;
-			if (!roadmapFile || flowFiles.length === 0)
-				return fail(HELP_AUDIT_SYNC, 2);
-			return runAuditSync(roadmapFile, flowFiles, {
+			return await runDiff(a, b, {
+				...(fmt ? { format: fmt } : {}),
 				json: flags.json === true,
 			});
 		}

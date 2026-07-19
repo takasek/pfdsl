@@ -94,7 +94,7 @@ check-docs:
 	@find docs -name "*.pfdsl" -type f | sort | while read f; do \
 		echo "check $$f"; \
 		node packages/cli/dist/cli.js check "$$f" || exit 1; \
-		node packages/cli/dist/cli.js graph "$$f" --format dot > /dev/null || exit 1; \
+		node packages/cli/dist/cli.js render "$$f" --format dot > /dev/null || exit 1; \
 	done
 	@echo "check-docs: all passed"
 	node scripts/check-doc-examples.mjs
