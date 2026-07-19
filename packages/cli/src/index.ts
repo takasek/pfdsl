@@ -662,6 +662,142 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	return ok(`${lines.join("\n")}\n`, warnText);
 }
 
+export interface StatusListOptions {
+	status: string;
+	json?: boolean;
+}
+
+export interface StatusListItem {
+	id: string;
+	label: string;
+	status: string;
+}
+
+export function runStatusList(
+	file: string,
+	opts: StatusListOptions,
+): CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json);
+	if (failed) return failed;
+
+	const statuses = splitCommaList(opts.status);
+	const invalid = statuses.find(
+		(s) => !STATUS_VALUES.includes(s as (typeof STATUS_VALUES)[number]),
+	);
+	if (invalid !== undefined) {
+		return fail(
+			`status list: invalid status '${invalid}' (valid: ${STATUS_VALUES.join(" | ")})\n`,
+			2,
+		);
+	}
+	const statusSet = new Set(statuses);
+
+	const artifactMeta = frontmatter?.artifact ?? {};
+	const items: StatusListItem[] = Object.entries(artifactMeta)
+		.filter(
+			([, meta]) => meta.status !== undefined && statusSet.has(meta.status),
+		)
+		.map(([id, meta]) => ({
+			id,
+			label: meta.label ?? id,
+			status: meta.status as string,
+		}))
+		.sort((a, b) => a.id.localeCompare(b.id));
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, items })}\n`);
+	}
+	if (items.length === 0) {
+		return ok(`No artifacts match status: ${statuses.join(", ")}.\n`);
+	}
+	const lines: string[] = [`Artifacts (${items.length}):`];
+	for (const item of items) {
+		lines.push(
+			`  ${item.id.padEnd(20)} "${item.label}"   status: ${item.status}`,
+		);
+	}
+	return ok(`${lines.join("\n")}\n`);
+}
+
+export interface StatusBlockedOptions {
+	json?: boolean;
+}
+
+export interface StatusBlockedItem {
+	id: string;
+	label: string;
+	blockedBy: string[];
+}
+
+export function runStatusBlocked(
+	file: string,
+	opts: StatusBlockedOptions = {},
+): CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
+		readyGate: true,
+	});
+	const earlyFail = failIfErrors(diagnostics, file, opts.json);
+	if (earlyFail) return earlyFail;
+
+	const BLOCKED_REQUIRED_TYPE = "roadmap" satisfies PfdType;
+	const pfdType = frontmatter?.type;
+	if (pfdType !== undefined && pfdType !== BLOCKED_REQUIRED_TYPE) {
+		return fail(
+			`blocked requires a roadmap file (type: roadmap). This file has type: ${pfdType}\n`,
+			2,
+		);
+	}
+
+	const warnings = diagnostics.filter((d) => d.code === "W006");
+	const warnText = warnings.length ? diagText(warnings, file) : "";
+
+	const artifactMeta = frontmatter?.artifact ?? {};
+	const { processInputs } = groupEdges(edges);
+
+	const blockedItems: StatusBlockedItem[] = [];
+	for (const [pid, inputs] of processInputs) {
+		if (nodeKinds.get(pid) !== "process") continue;
+		const blockedBy = inputs.filter((aid) => {
+			const s = artifactMeta[aid]?.status;
+			return s !== "done" && s !== undefined;
+		});
+		if (blockedBy.length === 0) continue;
+		blockedItems.push({
+			id: pid,
+			label: frontmatter?.process?.[pid]?.label ?? pid,
+			blockedBy,
+		});
+	}
+	blockedItems.sort((a, b) => a.id.localeCompare(b.id));
+
+	if (opts.json) {
+		const payload: Record<string, unknown> = {
+			ok: true,
+			blocked: blockedItems,
+		};
+		if (warnings.length) payload.warnings = warnings;
+		return ok(`${JSON.stringify(payload)}\n`, warnText);
+	}
+
+	if (blockedItems.length === 0) {
+		return ok("No blocked processes.\n", warnText);
+	}
+	const lines: string[] = [`Blocked processes (${blockedItems.length}):`];
+	for (const item of blockedItems) {
+		lines.push(
+			`  ${item.id.padEnd(20)} "${item.label}"   blocked by: [${item.blockedBy.join(", ")}]`,
+		);
+	}
+	return ok(`${lines.join("\n")}\n`, warnText);
+}
+
 export interface MetaSetOptions {
 	json?: boolean;
 }
@@ -1798,6 +1934,38 @@ Options:
           on parse failure: { ok: false, diagnostics }
 `;
 
+const HELP_STATUS_LIST = `usage: pfdsl status list <file|-> --status <status[,status...]> [--json]
+
+List artifacts whose status matches one of the given values. Use - to read
+from stdin.
+
+  --status <status[,status...]>  required, comma-separated: todo | wip | done |
+                                  waiting | suspended
+  --json  output as JSON ({ ok, items: [{id, label, status}] })
+          on parse failure: { ok: false, diagnostics }
+
+Exit codes:
+  0  success
+  1  parse/validation error
+  2  invalid usage (missing/unknown --status)
+`;
+
+const HELP_STATUS_BLOCKED = `usage: pfdsl status blocked <file|-> [--json]
+
+List processes that are not ready: for each, the input artifacts whose
+status is not done (or unset). Only applies to roadmap files (type:
+roadmap). Use - to read from stdin. Omitting type: is treated as roadmap
+and allowed, with a warning (W006).
+
+  --json  output as JSON ({ ok, blocked: [{id, label, blockedBy}], warnings? })
+          on parse failure: { ok: false, diagnostics }
+
+Exit codes:
+  0  success
+  1  parse/validation error
+  2  invalid usage
+`;
+
 const HELP_META_SET = `usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json]
 
 Set a scalar frontmatter field on one or more nodes, rewriting the file in
@@ -2049,6 +2217,8 @@ Planning queries derived from artifact status. Run
 
 Subcommands:
   ready <file|-> [--best]           List ready-to-start processes
+  blocked <file|->                  List not-ready processes and their blocking inputs
+  list <file|-> --status <s[,s...]> List artifacts by status
   gaps <roadmap> <flow> [<flow>...] Find todo artifacts missing from the roadmap
 `;
 
@@ -2071,7 +2241,8 @@ Command groups (run \`pfdsl <group>\` for their subcommands):
                            Read-only queries on the graph topology
   meta get|set|sort|reindex
                            Read and write frontmatter metadata
-  status ready|gaps        Planning queries derived from artifact status
+  status ready|blocked|list|gaps
+                           Planning queries derived from artifact status
 
   help                     Show this help
 
@@ -2281,6 +2452,23 @@ function runStatusGroup(
 			if (!roadmapFile || flowFiles.length === 0)
 				return fail(HELP_STATUS_GAPS, 2);
 			return runStatusGaps(roadmapFile, flowFiles, {
+				json: flags.json === true,
+			});
+		}
+		case "blocked": {
+			if (flags.help) return ok(HELP_STATUS_BLOCKED);
+			const f = rest[0];
+			if (!f) return fail(HELP_STATUS_BLOCKED, 2);
+			return runStatusBlocked(f, { json: flags.json === true });
+		}
+		case "list": {
+			if (flags.help) return ok(HELP_STATUS_LIST);
+			const f = rest[0];
+			if (!f) return fail(HELP_STATUS_LIST, 2);
+			const statusVal = flags.status;
+			if (!statusVal || statusVal === true) return fail(HELP_STATUS_LIST, 2);
+			return runStatusList(f, {
+				status: String(statusVal),
 				json: flags.json === true,
 			});
 		}

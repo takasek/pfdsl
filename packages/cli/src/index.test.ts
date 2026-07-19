@@ -2135,6 +2135,151 @@ describe("status gaps", () => {
 	});
 });
 
+describe("status list", () => {
+	const withStatus = (content: string) => {
+		const f = join(dir, "status-list.pfdsl");
+		writeFileSync(f, content);
+		return f;
+	};
+
+	it("lists artifacts matching a single status", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  a:\n    status: todo\n  b:\n    status: done\n---\nx >> p1 -> a\na >> p2 -> b\n",
+		);
+		const r = await run(["status", "list", f, "--status", "todo"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("a");
+		expect(r.stdout).not.toContain('"b"');
+	});
+
+	it("lists artifacts matching multiple comma-separated statuses", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  a:\n    status: todo\n  b:\n    status: wip\n  c:\n    status: done\n---\nx >> p1 -> a\na >> p2 -> b\nb >> p3 -> c\n",
+		);
+		const r = await run(["status", "list", f, "--status", "todo,wip"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("a");
+		expect(r.stdout).toContain("b");
+		expect(r.stdout).not.toContain('"c"');
+	});
+
+	it("excludes artifacts without a matching status", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  a:\n    status: done\n---\nx >> p -> a\n",
+		);
+		const r = await run(["status", "list", f, "--status", "todo"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No artifacts match status: todo.\n");
+	});
+
+	it("--json returns structured output", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  a:\n    status: todo\n    label: Alpha\n---\nx >> p -> a\n",
+		);
+		const r = await run(["status", "list", f, "--status", "todo", "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.items).toEqual([{ id: "a", label: "Alpha", status: "todo" }]);
+	});
+
+	it("missing --status flag is a usage error (exit 2)", async () => {
+		const r = await run(["status", "list", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("unknown status value is a usage error (exit 2)", async () => {
+		const r = await run([
+			"status",
+			"list",
+			join(dir, "valid.pfdsl"),
+			"--status",
+			"bogus",
+		]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("missing file returns exit 1", async () => {
+		const r = await run([
+			"status",
+			"list",
+			join(dir, "nonexistent.pfdsl"),
+			"--status",
+			"todo",
+		]);
+		expect(r.exitCode).toBe(1);
+	});
+
+	it("--help returns help text", async () => {
+		const r = await run(["status", "list", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl status list");
+	});
+});
+
+describe("status blocked", () => {
+	const withStatus = (content: string) => {
+		const f = join(dir, "status-blocked.pfdsl");
+		writeFileSync(f, content);
+		return f;
+	};
+
+	it("lists processes with an undone input and the blocking artifacts", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: todo\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "blocked", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("design");
+		expect(r.stdout).toContain("req");
+	});
+
+	it("excludes processes whose inputs are all done", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "blocked", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No blocked processes.\n");
+	});
+
+	it("--json returns structured output", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: waiting\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "blocked", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.blocked[0].id).toBe("design");
+		expect(parsed.blocked[0].blockedBy).toContain("req");
+	});
+
+	it("rejects file with type: workflow (exit 2)", async () => {
+		const f = withStatus("---\ntype: workflow\n---\nA >> P -> B\n");
+		const r = await run(["status", "blocked", f]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("type: roadmap");
+	});
+
+	it("warns (W006) on stderr when type: is omitted, but still succeeds", async () => {
+		const r = await run(["status", "blocked", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("W006");
+	});
+
+	it("missing file returns exit 1", async () => {
+		const r = await run(["status", "blocked", join(dir, "nonexistent.pfdsl")]);
+		expect(r.exitCode).toBe(1);
+	});
+
+	it("--help returns help text", async () => {
+		const r = await run(["status", "blocked", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl status blocked");
+	});
+});
+
 describe("explain", () => {
 	it("prints the code, severity, summary, and spec section for a plain-severity error code", async () => {
 		const r = await run(["explain", "V021"]);
