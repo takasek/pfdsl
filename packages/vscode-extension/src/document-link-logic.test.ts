@@ -92,4 +92,49 @@ describe("extractDocumentLinks", () => {
 		// DOC_PATH is /repo/.pfdsl/roadmap.pfdsl; subflow ignores basePath → /repo/.pfdsl/sub.pfdsl
 		expect(links[0]?.target).toBe("file:///repo/.pfdsl/sub.pfdsl");
 	});
+
+	it("returns a link for each item in a block (dash) array location", () => {
+		const src = `---\nartifact:\n  a:\n    location:\n      - src/foo.ts\n      - src/bar.ts\n---\n`;
+		const links = extractDocumentLinks(src, DOC_PATH);
+		expect(links.map((l) => l.target)).toEqual([
+			"file:///repo/.pfdsl/src/foo.ts",
+			"file:///repo/.pfdsl/src/bar.ts",
+		]);
+	});
+
+	it("sets column range for each block array item to the item text only", () => {
+		const src = `---\nartifact:\n  a:\n    location:\n      - src/foo.ts\n---\n`;
+		const links = extractDocumentLinks(src, DOC_PATH);
+		expect(links).toHaveLength(1);
+		const link = links[0]!;
+		expect(link.line).toBe(4);
+		// "      - " is 8 chars
+		expect(link.startChar).toBe(8);
+		expect(link.endChar).toBe(8 + "src/foo.ts".length);
+	});
+
+	it("returns a link for each item in a single-line flow array location", () => {
+		const src = `---\nartifact:\n  a:\n    location: [src/foo.ts, src/bar.ts]\n---\n`;
+		const links = extractDocumentLinks(src, DOC_PATH);
+		expect(links.map((l) => l.target)).toEqual([
+			"file:///repo/.pfdsl/src/foo.ts",
+			"file:///repo/.pfdsl/src/bar.ts",
+		]);
+	});
+
+	it("returns a link for each item in a multi-line flow array location", () => {
+		const src = `---\nartifact:\n  a:\n    location:\n      [\n        src/foo.ts,\n        src/bar.ts,\n      ]\n---\n`;
+		const links = extractDocumentLinks(src, DOC_PATH);
+		expect(links.map((l) => l.target)).toEqual([
+			"file:///repo/.pfdsl/src/foo.ts",
+			"file:///repo/.pfdsl/src/bar.ts",
+		]);
+	});
+
+	it("still links a scalar location field", () => {
+		const src = `---\nartifact:\n  a:\n    location: src/foo.ts\n---\n`;
+		const links = extractDocumentLinks(src, DOC_PATH);
+		expect(links).toHaveLength(1);
+		expect(links[0]?.target).toBe("file:///repo/.pfdsl/src/foo.ts");
+	});
 });
