@@ -378,7 +378,7 @@ artifact:
   grill_skill:
     label: "pfd-grill スキル (#481)"
     description: "最終成果物からの後ろ向き対話構築スキル。名前確定→criteria→プロセス導出→入力導出の再帰。plugin 同梱で配布"
-    status: todo
+    status: wip
     criteria: "pfd-grill が plugin 経由で発火し、サンプル図を後ろ向き対話でフルスクラッチ構築するライブ実行1回を検証済み"
   editor_connector:
     label: "エディタ コネクタ編集支援 (#482)"
