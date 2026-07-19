@@ -129,9 +129,29 @@ function diagText(diags: Diagnostic[], file: string): string {
 	return `${diags.map((d) => formatDiagnostic(d, file)).join("\n")}\n`;
 }
 
-function failIfErrors(diags: Diagnostic[], file: string): CommandResult | null {
+/**
+ * Shared shape for every --json exit-1 failure: `{ ok: false, ...payload }`
+ * on stdout, empty stderr (ADR: JSON failures never mix with human text).
+ */
+function failJson(
+	payload: Record<string, unknown>,
+	exitCode = 1,
+): CommandResult {
+	return {
+		stdout: `${JSON.stringify({ ok: false, ...payload })}\n`,
+		stderr: "",
+		exitCode,
+	};
+}
+
+function failIfErrors(
+	diags: Diagnostic[],
+	file: string,
+	json = false,
+): CommandResult | null {
 	if (!hasErrors(diags)) return null;
 	const errs = diags.filter((d) => d.severity === "error");
+	if (json) return failJson({ diagnostics: errs });
 	return fail(diagText(errs, file));
 }
 
@@ -357,7 +377,7 @@ export function runReindex(
 		src,
 		opts.renumber ? { renumber: true } : {},
 	);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, opts.json);
 	if (failed) return failed;
 
 	// --check: report drift, non-zero exit when reindexing would change anything.
@@ -443,7 +463,7 @@ export function runGraphEdges(
 	const normSrc = readSource(file);
 	if (isCommandResult(normSrc)) return normSrc;
 	const { edges, graph, diagnostics } = analyze(normSrc);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, opts.json);
 	if (failed) return failed;
 	const sorted = sortEdges(edges, graph);
 	if (opts.json) {
@@ -531,7 +551,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
 		readyGate: true,
 	});
-	const earlyFail = failIfErrors(diagnostics, file);
+	const earlyFail = failIfErrors(diagnostics, file, opts.json);
 	if (earlyFail) return earlyFail;
 
 	const READY_REQUIRED_TYPE = "roadmap" satisfies PfdType;
@@ -809,14 +829,14 @@ export function runMetaSet(
 	if (isCommandResult(src)) return src;
 
 	const { diagnostics, nodeKinds } = analyze(src);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, opts.json);
 	if (failed) return failed;
 
 	// Validate every id and field/kind pairing before touching anything, so a
 	// multi-id call is atomic: either all writes land or none do.
 	const missing = ids.filter((id) => !nodeKinds.has(id));
 	if (missing.length > 0) {
-		return fail(`error: id(s) not found in ${file}: ${missing.join(", ")}\n`);
+		return idsNotFoundError(file, missing, opts.json);
 	}
 	for (const id of ids) {
 		const kind = nodeKinds.get(id);
@@ -846,9 +866,9 @@ export function runMetaSet(
 	// Safety net: never write a rewrite that introduces errors the original
 	// didn't have (rewriter bug or unsupported YAML style).
 	if (hasErrors(analyze(newSrc).diagnostics)) {
-		return fail(
-			`meta set: refusing to write ${file}: the rewrite would introduce parse errors\n`,
-		);
+		const message = `meta set: refusing to write ${file}: the rewrite would introduce parse errors`;
+		if (opts.json) return failJson({ error: message });
+		return fail(`${message}\n`);
 	}
 	writeFileSync(file, newSrc, "utf-8");
 
@@ -973,7 +993,7 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	if (isCommandResult(src)) return src;
 
 	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, opts.json);
 	if (failed) return failed;
 
 	const basePath = frontmatter?.basePath;
@@ -1154,17 +1174,22 @@ function isGraphLoadFailure(v: GraphLoadResult): v is CommandResult {
 	return "exitCode" in v;
 }
 
-function loadGraph(file: string): GraphLoadResult {
+function loadGraph(file: string, json = false): GraphLoadResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 	const { diagnostics, graph } = analyze(src);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, json);
 	if (failed) return failed;
 	return { graph };
 }
 
 /** Shared not-found error shape across all graph-analysis subcommands (#479 usability review). */
-function idsNotFoundError(file: string, ids: string[]): CommandResult {
+function idsNotFoundError(
+	file: string,
+	ids: string[],
+	json = false,
+): CommandResult {
+	if (json) return failJson({ missing: ids });
 	return fail(`error: id(s) not found in ${file}: ${ids.join(", ")}\n`, 1);
 }
 
@@ -1173,9 +1198,10 @@ export function runNeighbors(
 	id: string,
 	opts: GraphAnalysisOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file);
+	const loaded = loadGraph(file, opts.json);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
+	if (!loaded.graph.nodes.has(id))
+		return idsNotFoundError(file, [id], opts.json);
 	const { predecessors, successors } = computeNeighbors(loaded.graph, id);
 	if (opts.json) {
 		return ok(`${JSON.stringify({ ok: true, predecessors, successors })}\n`);
@@ -1190,9 +1216,10 @@ export function runImpact(
 	id: string,
 	opts: GraphAnalysisOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file);
+	const loaded = loadGraph(file, opts.json);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
+	if (!loaded.graph.nodes.has(id))
+		return idsNotFoundError(file, [id], opts.json);
 	const impact = computeImpact(loaded.graph, id).sort();
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, impact })}\n`);
 	return ok(impact.length ? `${impact.join("\n")}\n` : "(none)\n");
@@ -1203,9 +1230,10 @@ export function runDependsOn(
 	id: string,
 	opts: GraphAnalysisOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file);
+	const loaded = loadGraph(file, opts.json);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	if (!loaded.graph.nodes.has(id)) return idsNotFoundError(file, [id]);
+	if (!loaded.graph.nodes.has(id))
+		return idsNotFoundError(file, [id], opts.json);
 	const dependsOn = computeDependsOn(loaded.graph, id).sort();
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, dependsOn })}\n`);
 	return ok(dependsOn.length ? `${dependsOn.join("\n")}\n` : "(none)\n");
@@ -1221,10 +1249,10 @@ export function runPath(
 	to: string,
 	opts: PathOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file);
+	const loaded = loadGraph(file, opts.json);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	const missing = [from, to].filter((id) => !loaded.graph.nodes.has(id));
-	if (missing.length > 0) return idsNotFoundError(file, missing);
+	if (missing.length > 0) return idsNotFoundError(file, missing, opts.json);
 	const all = computePaths(loaded.graph, from, to);
 	const paths = opts.limit !== undefined ? all.slice(0, opts.limit) : all;
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, paths })}\n`);
@@ -1244,7 +1272,7 @@ export interface StatsOptions extends GraphAnalysisOptions {
 const STATS_HINT_THRESHOLD = 20;
 
 export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
-	const loaded = loadGraph(file);
+	const loaded = loadGraph(file, opts.json);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	const all = computeStats(loaded.graph);
 	const stats = opts.limit !== undefined ? all.slice(0, opts.limit) : all;
@@ -1268,7 +1296,10 @@ export interface GraphSummaryOptions {
  * Shared loader for graph summary/io: reads + analyzes a file, failing on
  * errors, and returns the pieces auditGraph needs.
  */
-function loadForAudit(file: string):
+function loadForAudit(
+	file: string,
+	json = false,
+):
 	| {
 			edges: ReturnType<typeof analyze>["edges"];
 			nodeKinds: ReturnType<typeof analyze>["nodeKinds"];
@@ -1280,7 +1311,7 @@ function loadForAudit(file: string):
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, json);
 	if (failed) return failed;
 	return { edges, nodeKinds, artifactMeta: frontmatter?.artifact ?? undefined };
 }
@@ -1289,7 +1320,7 @@ export function runGraphSummary(
 	file: string,
 	opts: GraphSummaryOptions = {},
 ): CommandResult {
-	const loaded = loadForAudit(file);
+	const loaded = loadForAudit(file, opts.json);
 	if ("exitCode" in loaded) return loaded;
 	const { edges, nodeKinds, artifactMeta } = loaded;
 	const artifactCount = [...nodeKinds.values()].filter(
@@ -1327,7 +1358,7 @@ export function runGraphIo(
 	file: string,
 	opts: GraphSummaryOptions = {},
 ): CommandResult {
-	const loaded = loadForAudit(file);
+	const loaded = loadForAudit(file, opts.json);
 	if ("exitCode" in loaded) return loaded;
 	const { edges, nodeKinds, artifactMeta } = loaded;
 	const { terminals, externalInputs } = auditGraph(
@@ -1373,7 +1404,7 @@ export function runStatusGaps(
 		frontmatter: roadmapFm,
 		edges: roadmapEdges,
 	} = analyze(roadmapSrc, { readyGate: true });
-	const roadmapFail = failIfErrors(roadmapDiags, roadmapFile);
+	const roadmapFail = failIfErrors(roadmapDiags, roadmapFile, opts.json);
 	if (roadmapFail) return roadmapFail;
 
 	const warnings = roadmapDiags.filter((d) => d.code === "W006");
@@ -1405,7 +1436,7 @@ export function runStatusGaps(
 		if (isCommandResult(flowSrc)) return flowSrc;
 
 		const { diagnostics: flowDiags, frontmatter: flowFm } = analyze(flowSrc);
-		const flowFail = failIfErrors(flowDiags, flowFile);
+		const flowFail = failIfErrors(flowDiags, flowFile, opts.json);
 		if (flowFail) return flowFail;
 
 		const flowType = flowFm?.type;
@@ -1591,6 +1622,7 @@ Print aggregate counts for the graph: artifacts, processes, primary edges,
 external inputs, and terminal artifacts. Use - to read from stdin.
 
   --json  output as JSON ({ ok, artifacts, processes, edges, externalInputs, terminals })
+          on failure: { ok: false, diagnostics }
 
 Exit codes:
   0  success
@@ -1607,6 +1639,7 @@ as having an external consumer and excluded from terminals. Use - to read
 from stdin.
 
   --json  output as JSON ({ ok, externalInputs: string[], terminals: string[] })
+          on failure: { ok: false, diagnostics }
 
 Exit codes:
   0  success
@@ -1641,6 +1674,7 @@ Options:
   --check     do not write; exit 1 if reindexing would change anything (CI)
   --renumber  reassign every node from 1 (default keeps existing indices)
   --json      emit the change report as JSON ({ changes: [...] })
+              on parse failure: { ok: false, diagnostics } (exit 1)
 `;
 
 const HELP_SORT = `usage: pfdsl meta sort <file|-> --by <keys> [--write] [--check]
@@ -1661,6 +1695,7 @@ Print canonical edge list. Use - to read from stdin.
 
 Options:
   --json  output as JSON ({ ok, edges: {kind, artifact, process}[] })
+          on failure: { ok: false, diagnostics }
 `;
 
 const HELP_RENDER = `usage: pfdsl render <file|-> [--format dot|svg|pdf|png]
@@ -1698,6 +1733,7 @@ Omitting type: is treated as roadmap and allowed, with a warning (W006).
 Options:
   --best  highlight the process that unblocks the most downstream work
   --json  output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, warnings? })
+          on parse failure: { ok: false, diagnostics }
 `;
 
 const HELP_META_SET = `usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json]
@@ -1718,6 +1754,8 @@ ready after the change (once, after all writes).
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
   --json    emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
+            on failure: { ok: false, diagnostics } / { ok: false, missing } /
+            { ok: false, error }
 
 Exit codes:
   0  success
@@ -1735,6 +1773,8 @@ Print field values for one or more artifact/process/group ids.
                       entry (raw, in frontmatter order), plus applicable
                       derived fields.
   --json              emit JSON ({ ok, values: { [id]: { [field]: value } } })
+                      on parse failure: { ok: false, diagnostics }
+                      on id miss: { ok: false, values, missing }
 
 \`location\` is returned as the raw value exactly as written (so \`meta get\`
 and \`meta set\` round-trip). The resolved filesystem path is a separate
@@ -1781,6 +1821,7 @@ Print the direct predecessors (in-edges) and successors (out-edges) of a
 node — its immediate producer(s)/consumer(s) only, not the full closure.
 
   --json  output as JSON ({ ok, predecessors: string[], successors: string[] })
+          on failure: { ok: false, diagnostics } / { ok: false, missing }
 
 Exit codes:
   0  success
@@ -1795,6 +1836,7 @@ Print the full downstream closure reachable from <id> via primary edges
 prints one id per line (empty: "(none)"), for easy piping into other tools.
 
   --json  output as JSON ({ ok, impact: string[] })
+          on failure: { ok: false, diagnostics } / { ok: false, missing }
 
 Exit codes:
   0  success
@@ -1809,6 +1851,7 @@ Print the full upstream closure <id> depends on via primary edges
 mode prints one id per line (empty: "(none)"), for easy piping into other tools.
 
   --json  output as JSON ({ ok, dependsOn: string[] })
+          on failure: { ok: false, diagnostics } / { ok: false, missing }
 
 Exit codes:
   0  success
@@ -1825,6 +1868,7 @@ off stdout so \`path ... | ...\` pipelines aren't affected).
 
   --limit <n>  only print the first n paths
   --json       output as JSON ({ ok, paths: string[][] })
+               on failure: { ok: false, diagnostics } / { ok: false, missing }
 
 Exit codes:
   0  success (including when no path exists)
@@ -1841,6 +1885,7 @@ first) then id ascending. Text mode prints a hint to stderr suggesting
 
   --limit <n>  only print the top n rows
   --json       output as JSON ({ ok, stats: {id, kind, fanIn, fanOut}[] })
+               on parse failure: { ok: false, diagnostics }
 
 Exit codes:
   0  success
@@ -1859,6 +1904,7 @@ Omitting type: on the roadmap file is treated as roadmap and allowed, with a war
 
 Options:
   --json  output as JSON ({ ok, gaps: [{file, artifactId, label, status}], warnings? })
+          on parse failure: { ok: false, diagnostics }
 
 Exit codes:
   0  all todo artifacts are tracked in the roadmap

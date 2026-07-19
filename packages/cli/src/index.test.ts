@@ -228,6 +228,19 @@ req >> design -> spec
 		expect(r.exitCode).toBe(1);
 		expect(readFileSync(f, "utf-8")).toBe(src);
 	});
+
+	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+		const f = join(dir, "reindex-bad-json.pfdsl");
+		const src = "req >> design -> spec\nother -> spec\n"; // V001: dual generators (always error)
+		writeFileSync(f, src);
+		const r = await run(["meta", "reindex", f, "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	});
 });
 
 describe("meta sort", () => {
@@ -351,6 +364,21 @@ describe("graph edges", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("req >> design");
 		expect(r.stdout).toContain("design -> spec");
+	});
+
+	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+		const r = await run([
+			"graph",
+			"edges",
+			join(dir, "invalid.pfdsl"),
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 });
 
@@ -614,6 +642,16 @@ describe("graph io", () => {
 		expect(r.stdout).not.toMatch(/terminal artifacts/);
 	});
 
+	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+		const r = await run(["graph", "io", join(dir, "invalid.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	});
+
 	it("artifact with externalStakeholders is excluded from terminal artifacts", async () => {
 		const src = [
 			"---",
@@ -661,6 +699,21 @@ describe("graph summary", () => {
 		const r = await run(["graph", "summary", join(dir, "invalid.pfdsl")]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).not.toMatch(/artifacts:/);
+	});
+
+	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+		const r = await run([
+			"graph",
+			"summary",
+			join(dir, "invalid.pfdsl"),
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 
 	it("--json returns counts", async () => {
@@ -1198,6 +1251,13 @@ describe("status ready", () => {
 		expect(r.stderr).toContain("type: roadmap");
 	});
 
+	it("non-roadmap type stays exit 2 plain text even with --json (usage error, not a --json failure)", async () => {
+		const f = withStatus("---\ntype: workflow\n---\nA >> P -> B\n");
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stdout).toBe("");
+	});
+
 	it("rejects file with type: runtime-pipeline (exit 2)", async () => {
 		const f = withStatus("---\ntype: runtime-pipeline\n---\nA >> P -> B\n");
 		const r = await run(["status", "ready", f]);
@@ -1251,6 +1311,21 @@ describe("status ready", () => {
 	it("missing file returns exit 1", async () => {
 		const r = await run(["status", "ready", join(dir, "nonexistent.pfdsl")]);
 		expect(r.exitCode).toBe(1);
+	});
+
+	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+		const r = await run([
+			"status",
+			"ready",
+			join(dir, "invalid.pfdsl"),
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 
 	it("missing argument returns exit 2", async () => {
@@ -1648,6 +1723,81 @@ b >> p1 -> c
 		expect(readFileSync(f, "utf-8")).toBe(generic);
 	});
 
+	it("--json on missing id emits { ok: false, missing } on stdout, empty stderr, and writes nothing", async () => {
+		const f = join(dir, "meta-set-atomic-json.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run([
+			"meta",
+			"set",
+			f,
+			"spec,ghost",
+			"status",
+			"wip",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		expect(JSON.parse(r.stdout)).toEqual({ ok: false, missing: ["ghost"] });
+		expect(readFileSync(f, "utf-8")).toBe(generic);
+	});
+
+	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+		const f = join(dir, "meta-set-parse-error.pfdsl");
+		writeFileSync(f, "req >> design -> spec\nother -> spec\n"); // V001: dual generators
+		const r = await run(["meta", "set", f, "spec", "status", "done", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	});
+
+	it("refuses to write and reports the error on stderr when the rewrite would corrupt the file (text mode)", async () => {
+		const flowStyle = `---
+process:
+  design: { label: Design }
+---
+req >> design -> spec
+`;
+		const f = join(dir, "meta-set-refuse-text.pfdsl");
+		writeFileSync(f, flowStyle);
+		const r = await run(["meta", "set", f, "design", "owner", "a} b"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("refusing to write");
+		expect(readFileSync(f, "utf-8")).toBe(flowStyle);
+	});
+
+	it("--json on the refusing-to-write guard emits { ok: false, error } on stdout, empty stderr", async () => {
+		// A "}" in an unquoted flow-style value corrupts the enclosing "{ ... }"
+		// map (yamlScalar does not consider "}" unsafe on its own), which trips
+		// the post-write re-parse safety net.
+		const flowStyle = `---
+process:
+  design: { label: Design }
+---
+req >> design -> spec
+`;
+		const f = join(dir, "meta-set-refuse-json.pfdsl");
+		writeFileSync(f, flowStyle);
+		const r = await run([
+			"meta",
+			"set",
+			f,
+			"design",
+			"owner",
+			"a} b",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(typeof parsed.error).toBe("string");
+		expect(parsed.error).toContain("refusing to write");
+		expect(readFileSync(f, "utf-8")).toBe(flowStyle);
+	});
+
 	it("rejects a field invalid for the node kind (exit 2)", async () => {
 		const f = join(dir, "meta-set-badkind.pfdsl");
 		writeFileSync(f, generic);
@@ -1781,6 +1931,40 @@ describe("status gaps", () => {
 		expect(parsed.gaps[0].artifactId).toBe("gap_art");
 		expect(parsed.gaps[0].label).toBe("Gap");
 		expect(parsed.gaps[0].status).toBe("todo");
+	});
+
+	it("--json on roadmap parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+		const fl = flowWith("  output:\n    status: todo\n");
+		const r = await run([
+			"status",
+			"gaps",
+			join(dir, "invalid.pfdsl"),
+			fl,
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	});
+
+	it("--json on flow-file parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const r = await run([
+			"status",
+			"gaps",
+			rm,
+			join(dir, "invalid.pfdsl"),
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 
 	it("rejects when roadmap file is not type: roadmap", async () => {
@@ -2138,6 +2322,23 @@ req -> spec
 		});
 	});
 
+	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+		const r = await run([
+			"meta",
+			"get",
+			join(dir, "invalid.pfdsl"),
+			"spec",
+			"status",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	});
+
 	it("warns on stderr for an unrecognized field name but still succeeds", async () => {
 		const f = join(dir, "get-unknown-field.pfdsl");
 		writeFileSync(f, base);
@@ -2300,11 +2501,46 @@ spec >> review -> report
 			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
 		});
 
+		it("--json on id-not-found emits { ok: false, missing } on stdout, empty stderr", async () => {
+			const f = join(dir, "neighbors-notfound-json.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["graph", "neighbors", f, "nonexistent", "--json"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: false,
+				missing: ["nonexistent"],
+			});
+		});
+
+		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+			const r = await run([
+				"graph",
+				"neighbors",
+				join(dir, "invalid.pfdsl"),
+				"spec",
+				"--json",
+			]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(false);
+			expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		});
+
 		it("exits 2 when the id argument is missing", async () => {
 			const f = join(dir, "neighbors-missing.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "neighbors", f]);
 			expect(r.exitCode).toBe(2);
+		});
+
+		it("exit-2 usage error (missing id) produces no stdout JSON even with --json", async () => {
+			const f = join(dir, "neighbors-missing-json.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["graph", "neighbors", f, "--json"]);
+			expect(r.exitCode).toBe(2);
+			expect(r.stdout).toBe("");
 		});
 	});
 
@@ -2344,6 +2580,33 @@ spec >> review -> report
 			expect(r.exitCode).toBe(1);
 			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
 		});
+
+		it("--json on id-not-found emits { ok: false, missing } on stdout, empty stderr", async () => {
+			const f = join(dir, "impact-notfound-json.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["graph", "impact", f, "nonexistent", "--json"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: false,
+				missing: ["nonexistent"],
+			});
+		});
+
+		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+			const r = await run([
+				"graph",
+				"impact",
+				join(dir, "invalid.pfdsl"),
+				"spec",
+				"--json",
+			]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(false);
+			expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		});
 	});
 
 	describe("depends-on", () => {
@@ -2361,6 +2624,33 @@ spec >> review -> report
 			const r = await run(["graph", "depends-on", f, "nonexistent"]);
 			expect(r.exitCode).toBe(1);
 			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
+		});
+
+		it("--json on id-not-found emits { ok: false, missing } on stdout, empty stderr", async () => {
+			const f = join(dir, "depends-on-notfound-json.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["graph", "depends-on", f, "nonexistent", "--json"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: false,
+				missing: ["nonexistent"],
+			});
+		});
+
+		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+			const r = await run([
+				"graph",
+				"depends-on",
+				join(dir, "invalid.pfdsl"),
+				"spec",
+				"--json",
+			]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(false);
+			expect(Array.isArray(parsed.diagnostics)).toBe(true);
 		});
 	});
 
@@ -2397,6 +2687,41 @@ spec >> review -> report
 			writeFileSync(f, base);
 			const r = await run(["graph", "path", f, "nonexistent", "code"]);
 			expect(r.exitCode).toBe(1);
+		});
+
+		it("--json on id-not-found emits { ok: false, missing } on stdout, empty stderr", async () => {
+			const f = join(dir, "path-notfound-json.pfdsl");
+			writeFileSync(f, base);
+			const r = await run([
+				"graph",
+				"path",
+				f,
+				"nonexistent",
+				"code",
+				"--json",
+			]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: false,
+				missing: ["nonexistent"],
+			});
+		});
+
+		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+			const r = await run([
+				"graph",
+				"path",
+				join(dir, "invalid.pfdsl"),
+				"spec",
+				"code",
+				"--json",
+			]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(false);
+			expect(Array.isArray(parsed.diagnostics)).toBe(true);
 		});
 
 		it("exits 2 when the to argument is missing", async () => {
@@ -2554,6 +2879,20 @@ p3 -> d
 			expect(r.exitCode).toBe(0);
 			expect(r.stderr).toBe("");
 			expect(() => JSON.parse(r.stdout)).not.toThrow();
+		});
+
+		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+			const r = await run([
+				"graph",
+				"stats",
+				join(dir, "invalid.pfdsl"),
+				"--json",
+			]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(false);
+			expect(Array.isArray(parsed.diagnostics)).toBe(true);
 		});
 	});
 });
