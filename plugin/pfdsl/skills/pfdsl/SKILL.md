@@ -92,6 +92,10 @@ npx @pfdsl/cli explain <code>   # Print the summary and spec section for a diagn
 npx @pfdsl/cli fmt <file|-> [--write] [--check]   # Format a .pfdsl file (- = stdin)
 npx @pfdsl/cli render <file|-> [--format dot|svg|pdf|png]   # Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
 npx @pfdsl/cli diff <a> <b> [--format text|dot|svg] [--json]   # Structural diff (text), or visual diff DOT/SVG
+npx @pfdsl/cli graph summary|io|stats|neighbors|impact|depends-on|path|edges   # Read-only queries on the graph topology
+npx @pfdsl/cli meta get|set|sort|reindex   # Read and write frontmatter metadata
+npx @pfdsl/cli status ready|gaps   # Planning queries derived from artifact status
+npx @pfdsl/cli help   # Show this help
 ```
 
 Full flag reference: `npx @pfdsl/cli help`. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.
@@ -117,6 +121,9 @@ PFD はタスクリストではなく成果物の変換グラフ。
 - **書いた後の点検**: 同じ `graph io` の2行で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る
 - roadmap と flow ファイルが併存する構成では `status gaps <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する
 - 図の視覚確認が必要なときだけ `render --format dot` を使う（大きい図では dot 全読より graph io が安い）
+- ノードの変更・削除前の影響範囲調査は `graph impact <file> <id>`（下流の全消費者）・`graph depends-on <file> <id>`（上流の全生産者）・`graph neighbors <file> <id>`（直接の前後のみ）を使う。grep での手繰りより網羅的
+- 2ノード間の関係を確かめたいときは `graph path <file> <from> <to>` で全単純経路を得る
+- 複数 artifact のフィールドを横断的に読むときは `meta get <file> <id1,id2,...> [field1,field2,...]` を使う（フルファイル Read 不要）
 
 ## Typical task: update artifact status
 
