@@ -17,8 +17,8 @@
    - [ ] 出力 artifact の status を更新した（タイミングは companion の規約が最優先。無ければプロトコル4のデフォルト — 着手時に wip・完了コミットと同時に done）
    - [ ] 知見を `.pfdsl/workflow.pfdsl` の sibling companion の振り分け手続きに従って振り分けた
    - [ ] 実行中に発見した新プロセス・成果物を `.pfdsl/roadmap.pfdsl` に追記した（消費者を明示できないものは作らない）
-   - [ ] ゲート集約チェッカーが報告する新規終端 artifact リスト（変更 `.pfdsl` の `check --audit` 差分）を見て、今サイクルの出力 artifact が手段（仕様・設計・計画・提案）なら、それを消費する後続プロセスがグラフに在るか確認した。無ければ todo プレースホルダで登録した（後続門番、プロトコル5(b)。分類と登録のみ MANUAL — 抽出・差分は機械化済み。真の納品物のみ終端を許す）
-   - [ ] 変換コンポーネントを追加・変更・削除した場合、それをモデル化している採用済み PFD（`.pfdsl/runtime-pipeline.pfdsl` または `.pfdsl/workflow.pfdsl` の該当箇所）に反映した（該当なしも明示。runtime-pipeline.pfdsl 未採用は自動的に N/A にならない — workflow.pfdsl 側を確認）
+   - [ ] ゲート集約チェッカーが報告する新規終端 artifact リスト（変更 `.pfdsl` の `graph io` 差分）を見て、今サイクルの出力 artifact が手段（仕様・設計・計画・提案）なら、それを消費する後続プロセスがグラフに在るか確認した。無ければ todo プレースホルダで登録した（後続門番、プロトコル5(b)。分類と登録のみ MANUAL — 抽出・差分は機械化済み。真の納品物のみ終端を許す）
+   - [ ] 変換コンポーネントを追加・変更・削除した場合、それをモデル化している採用済み PFD（`.pfdsl/runtime-pipeline.pfdsl` または `.pfdsl/workflow.pfdsl` の該当箇所）に反映した（該当なしも明示。runtime-pipeline.pfdsl 未採用は自動的に N/A にならない — workflow.pfdsl 側を確認）。影響範囲の特定には `npx @pfdsl/cli graph impact <file> <id>`（下流の消費者全て）・`graph depends-on <file> <id>`（上流の生産者全て）が使える — 変更対象ノードを grep で手繰るより網羅的
    - [ ] 作業中に偶発的に見つけたスコープ外の既存問題（バグ等）を起票した（ユーザーの指摘を待たない）
    - [ ] 変更した全 .pfdsl が `check` を通過する
    - [ ] コミット粒度（論理単位ごとの分割）が規約（CLAUDE.md または companion で定義）に従っている

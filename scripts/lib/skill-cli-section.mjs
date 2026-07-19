@@ -17,7 +17,8 @@ export function renderCliSection(helpOutput) {
 
 	const entries = [];
 	for (const line of lines.slice(start + 1)) {
-		if (line.trim() !== "" && !line.startsWith("  ")) break; // next section (e.g. Exit codes:)
+		if (line.trim().startsWith("Exit codes:")) break;
+		if (line.trim() !== "" && !line.startsWith("  ")) continue; // section sub-header, e.g. "Command groups (...):"
 		const command = line.match(/^ {2}(\S.*)$/);
 		if (command) {
 			// Inline description separated by a run of spaces (e.g. the `help` entry).

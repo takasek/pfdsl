@@ -114,6 +114,9 @@ PFD はタスクリストではなく成果物の変換グラフ。
 - roadmap と flow ファイルが併存する構成では `status gaps <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する。roadmap 内の artifact を status で絞り込む場合は `status list <file> --status <s[,s...]>`、着手不可なプロセスがなぜ止まっているか見るなら `status blocked <file>`
 - `location:` を書いたら `meta check-links <file>` で参照先ファイルの実在を確認できる（URL・glob は自動的にスキップされる）
 - 図の視覚確認が必要なときだけ `render --format dot` を使う（大きい図では dot 全読より graph io が安い）
+- ノードの変更・削除前の影響範囲調査は `graph impact <file> <id>`（下流の全消費者）・`graph depends-on <file> <id>`（上流の全生産者）・`graph neighbors <file> <id>`（直接の前後のみ）を使う。grep での手繰りより網羅的
+- 2ノード間の関係を確かめたいときは `graph path <file> <from> <to>` で全単純経路を得る
+- 複数 artifact のフィールドを横断的に読むときは `meta get <file> <id1,id2,...> [field1,field2,...]` を使う（フルファイル Read 不要）
 
 ## Typical task: update artifact status
 
