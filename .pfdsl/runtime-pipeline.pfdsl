@@ -129,6 +129,11 @@ artifact:
     description: "内容の一次情報はworkflow.pfdsl。ここではplugin_dirへの同梱対象としてのみ扱う"
     location: ../.claude/skills/pfd-ecosystem/
     group: skill_sources
+  grill_skill:
+    label: 後ろ向き対話構築スキル
+    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_dirへの同梱対象としてのみ扱う"
+    location: ../.claude/skills/pfd-grill/
+    group: skill_sources
   installed_l3_layer:
     label: 導入済みL3レイヤー
     description: "plugin同梱install/由来ファイル（GitHub Actionsワークフロー・監査スクリプト）の採用リポルートへの実配置結果"
@@ -260,7 +265,7 @@ dot_graph >> export_image -> rendered_image
 
 [normalized_graph, parsed_doc] >> diff_graphs -> diff_report
 
-[pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> assemble_plugin -> plugin_dir
+[pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, grill_skill] >> assemble_plugin -> plugin_dir
 
 plugin_dir >> install_plugin -> installed_plugin
 

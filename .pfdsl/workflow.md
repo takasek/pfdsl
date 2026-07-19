@@ -84,6 +84,8 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 **出力抑制**: `make gen-samples` / `make gen-skill` は pnpm 全パッケージビルド + 全サンプル check の warning を毎回出力するため数百行に及ぶ。実行後は `git status --short docs/samples/ .claude/skills/pfdsl/ plugin/pfdsl/` で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
+**配布スキルの新規追加時の横断照合**: 新しい配布スキル（`.claude/skills/pfd-*`）を追加したら、`grep -rn "<既存スキルID>\b" .pfdsl/ scripts/` で既存の兄弟スキル（例: `retro_skill`）の全参照箇所を洗い出し、新スキルにも同じ箇所（`workflow.pfdsl` の `distill_ops` 出力エッジ・`publish_cli` 入力エッジ・`gen_plugin` 入力エッジ、`runtime-pipeline.pfdsl` の `assemble_plugin` 入力エッジ）が揃っているか1つずつ照合する。`scripts/gen-plugin.mjs` の静的リストと `plugin.json` description は pre-commit の drift 検査が機械的に強制するが、PFD 側のこれらのエッジは check で強制されず目視追随に依存する（#481 で `grill_skill` 追加時に発見。当初 `distill_ops`・`publish_cli`・`assemble_plugin` の3箇所を見落とし、pfd-retro の A層「同種対称性」監査で気付いた）。
+
 ## 新 frontmatter フィールド追加時の sample 追加
 
 frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で追加する（「フィールドが仕様にあるがサンプルに示されていない」状態を防ぐ設計ルール）。生成物の再生成・ドリフト検査は上記のとおり機械的に強制される。

@@ -429,7 +429,7 @@ examples >> review_examples -> findings
 
 [pfdsl_skill, toolchain, retro_skill] >>? review_examples
 
-[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, review_perspectives, workflow_md, bindings_pfd_ops, bindings_pfd_retro, vscode_ext_debug_skill, spec_stress_skill]
+[adrs, payoff_log, decisions] >> distill_ops -> [ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, grill_skill, review_perspectives, workflow_md, bindings_pfd_ops, bindings_pfd_retro, vscode_ext_debug_skill, spec_stress_skill]
 
 spec_stress_skill >>? maintain_spec
 
@@ -455,7 +455,7 @@ pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
 
 issue_updates >>? file_issues
 
-[toolchain, pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, pfd_lens_agent] >> publish_cli -> published_cli
+[toolchain, pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, grill_skill, pfd_lens_agent] >> publish_cli -> published_cli
 
 toolchain >> publish_libraries -> published_libraries
 
