@@ -265,7 +265,7 @@ dot_graph >> export_image -> rendered_image
 
 [normalized_graph, parsed_doc] >> diff_graphs -> diff_report
 
-[pfdsl_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, grill_skill] >> assemble_plugin -> plugin_dir
+[pfdsl_skill, grill_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> assemble_plugin -> plugin_dir
 
 plugin_dir >> install_plugin -> installed_plugin
 

@@ -28,9 +28,9 @@ function assemble() {
 		stdio: "inherit",
 	});
 
-	// --- 2. Copy the static skills (pfd-ecosystem, pfd-ops, pfd-retro, pfd-grill) into skills/ ---
+	// --- 2. Copy the static skills (pfd-grill, pfd-ops, pfd-retro, pfd-ecosystem) into skills/ ---
 
-	for (const name of ["pfd-ecosystem", "pfd-ops", "pfd-retro", "pfd-grill"]) {
+	for (const name of ["pfd-grill", "pfd-ops", "pfd-retro", "pfd-ecosystem"]) {
 		mirrorDir(name, resolve(root, ".claude/skills"), resolve(pluginRoot, "skills"));
 		console.log(`plugin/pfdsl/skills/${name} ← .claude/skills/${name}`);
 	}

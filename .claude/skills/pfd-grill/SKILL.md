@@ -9,18 +9,16 @@ description: |
   any PFD, operational or not. Trigger when the user wants to
   "grill"/interrogate their way to a graph, or a PFD's kind/scaffold is
   already chosen but its graph is still empty. pfd-ecosystem picks which
-  PFD kinds a project needs and recommends this technique for a graph's
-  first-time construction.
+  PFD kinds a project needs and recommends this technique both for a
+  blank graph's first-time construction and, applied locally, for any
+  node whose connections remain unclear in an otherwise forward-built
+  graph.
 ---
 
 # pfd-grill: 最終成果物からの後ろ向き対話構築
 
 最終成果物の名前から出発し、それを生む process → その入力成果物 → その入力を生む process ...と遡って PFD の中身を対話的に埋める。
-運用ハーネス（pfd-ops）の一部ではなく、運用 PFD・設計検討の図・単発の図を問わず任意の `.pfdsl` に適用できる汎用の作図アプローチ。
-
-pfd-ecosystem との棲み分け: pfd-ecosystem は「どの種別（roadmap/workflow/runtime-pipeline）の PFD を持つか」を選ぶ。
-pfd-grill は種別が決まった後、1枚の図の中身を後ろ向き再帰で導出する。
-種別選定後の初回構築（pfd-ecosystem ステップ4）では、白紙の図を埋める作業と非常に整合するためこのスキルの利用が推奨される。
+運用中の PFD・設計検討の図・単発の図を問わず、任意の `.pfdsl` に適用できる汎用の作図テクニック。
 
 ## ステップ 0: pfdsl スキルを起動する
 

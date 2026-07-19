@@ -5,8 +5,8 @@
 // since it cannot `import` JS). Keep this ERE-compatible for `grep -E`.
 //
 // Superset of GEN_SKILL_TRIGGER: gen-plugin.mjs re-runs gen-skill.mjs
-// internally (see scripts/gen-plugin.mjs), plus bundles pfd-ecosystem/
-// pfd-ops/pfd-retro/pfd-grill/pfd-cycle/pfd-init/pfd-lens and derives
+// internally (see scripts/gen-plugin.mjs), plus bundles pfd-grill/
+// pfd-ops/pfd-retro/pfd-ecosystem/pfd-cycle/pfd-init/pfd-lens and derives
 // plugin.json's version from the CLI package.json.
 
 import { realpathSync } from "node:fs";

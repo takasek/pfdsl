@@ -70,7 +70,7 @@ export function buildPluginManifest({ cliVersion }) {
 	return {
 		name: "pfdsl",
 		description:
-			"PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), ecosystem bootstrap (pfd-ecosystem skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), backward-dialogue diagram construction (pfd-grill skill), and /pfd-cycle, /pfd-init commands.",
+			"PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), and /pfd-cycle, /pfd-init commands.",
 		version: cliVersion,
 		author: { name: "takasek" },
 		homepage: "https://github.com/takasek/pfdsl",
