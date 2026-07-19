@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
 	analyze,
@@ -1343,6 +1343,80 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
 }
 
+export interface CheckLinksOptions {
+	json?: boolean;
+}
+
+export interface CheckLinksMissing {
+	id: string;
+	kind: "artifact" | "process";
+	location: string;
+	resolved: string;
+}
+
+/** URL (contains "://") or glob (contains *, ?, or {) elements are not checkable file paths (spec §15.8). */
+function isLocationCheckable(element: string): boolean {
+	return !element.includes("://") && !/[*?{]/.test(element);
+}
+
+export function runCheckLinks(
+	file: string,
+	opts: CheckLinksOptions = {},
+): CommandResult {
+	if (file === "-") {
+		return fail("meta check-links cannot be used with stdin (-)\n", 2);
+	}
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json);
+	if (failed) return failed;
+
+	const basePath = frontmatter?.basePath;
+	const docFsPath = resolve(file);
+
+	const missing: CheckLinksMissing[] = [];
+	const checkNode = (
+		id: string,
+		kind: "artifact" | "process",
+		location: unknown,
+	) => {
+		if (location === undefined) return;
+		const elements = Array.isArray(location) ? location : [location];
+		for (const element of elements) {
+			const value = String(element);
+			if (!isLocationCheckable(value)) continue;
+			const resolvedPath = resolveLocationFsPath(docFsPath, value, basePath);
+			if (!existsSync(resolvedPath)) {
+				missing.push({ id, kind, location: value, resolved: resolvedPath });
+			}
+		}
+	};
+
+	for (const [id, meta] of Object.entries(frontmatter?.artifact ?? {})) {
+		checkNode(id, "artifact", meta.location);
+	}
+	for (const [id, meta] of Object.entries(frontmatter?.process ?? {})) {
+		checkNode(id, "process", meta.location);
+	}
+	missing.sort((a, b) => a.id.localeCompare(b.id));
+
+	if (opts.json) {
+		const exitCode = missing.length > 0 ? 1 : 0;
+		return {
+			stdout: `${JSON.stringify({ ok: missing.length === 0, missing })}\n`,
+			stderr: "",
+			exitCode,
+		};
+	}
+	if (missing.length === 0) return ok("All location paths exist.\n");
+	const lines = missing.map(
+		(m) => `${m.id} (${m.kind})   ${m.location} -> ${m.resolved}`,
+	);
+	return { stdout: `${lines.join("\n")}\n`, stderr: "", exitCode: 1 };
+}
+
 function formatGetLine(
 	id: string,
 	field: string,
@@ -2018,6 +2092,25 @@ Exit codes:
   2  invalid usage (missing argument, invalid field or value)
 `;
 
+const HELP_CHECK_LINKS = `usage: pfdsl meta check-links <file> [--json]
+
+Verify that every artifact/process \`location:\` file path exists on disk
+(dead-link detection). Each location element is classified per spec §15.8:
+a "://" element is a URL and is skipped; a *, ?, or { element is a glob
+and is skipped; everything else is resolved (basePath-aware, same as
+\`meta get\`'s location.resolved) and checked with a filesystem existence
+check. Cannot be used with stdin (-): there is no file path to resolve
+relative paths against.
+
+  --json  output as JSON ({ ok, missing: {id, kind, location, resolved}[] })
+          on parse failure: { ok: false, diagnostics }
+
+Exit codes:
+  0  all checkable location paths exist
+  1  one or more location paths do not exist, or parse/validation error
+  2  invalid usage (stdin)
+`;
+
 const HELP_GET = `usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--json]
 
 Print field values for one or more artifact/process/group ids.
@@ -2250,6 +2343,7 @@ Subcommands:
   set <file> <id> <field> <value>                Set a field value in place
   sort <file|-> --by <keys>                      Sort node definitions
   reindex <file|->                               Assign topological index: values
+  check-links <file>                             Verify location: file paths exist
 `;
 
 const HELP_STATUS_GROUP = `usage: pfdsl status <subcommand> ...
@@ -2281,7 +2375,7 @@ Commands:
 Command groups (run \`pfdsl <group>\` for their subcommands):
   graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
-  meta get|set|sort|reindex
+  meta get|set|sort|reindex|check-links
                            Read and write frontmatter metadata
   status ready|blocked|list|gaps
                            Planning queries derived from artifact status
@@ -2471,6 +2565,12 @@ function runMetaGroup(
 				renumber: flags.renumber === true,
 				json: flags.json === true,
 			});
+		}
+		case "check-links": {
+			if (flags.help) return ok(HELP_CHECK_LINKS);
+			const f = rest[0];
+			if (!f) return fail(HELP_CHECK_LINKS, 2);
+			return runCheckLinks(f, { json: flags.json === true });
 		}
 		default:
 			return fail(`unknown meta subcommand: ${sub}\n${HELP_META_GROUP}`, 2);

@@ -2693,6 +2693,140 @@ req -> spec
 	});
 });
 
+describe("meta check-links", () => {
+	it("reports a missing location file path", async () => {
+		const f = join(dir, "check-links-missing.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec:
+    location: does-not-exist.md
+---
+req -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toContain("spec");
+		expect(r.stdout).toContain("does-not-exist.md");
+	});
+
+	it("succeeds when the location file exists", async () => {
+		const existing = join(dir, "existing-doc.md");
+		writeFileSync(existing, "hi\n");
+		const f = join(dir, "check-links-ok.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec:
+    location: existing-doc.md
+---
+req -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("All location paths exist.\n");
+	});
+
+	it("skips URL locations", async () => {
+		const f = join(dir, "check-links-url.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec:
+    location: https://example.com/spec.md
+---
+req -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(0);
+	});
+
+	it("skips glob locations", async () => {
+		const f = join(dir, "check-links-glob.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec:
+    location: docs/*.md
+---
+req -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(0);
+	});
+
+	it("checks process locations too", async () => {
+		const f = join(dir, "check-links-process.pfdsl");
+		writeFileSync(
+			f,
+			`---
+process:
+  design:
+    location: missing-process-doc.md
+---
+req >> design -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toContain("design");
+	});
+
+	it("--json returns structured output", async () => {
+		const f = join(dir, "check-links-json.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec:
+    location: does-not-exist.md
+---
+req -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f, "--json"]);
+		expect(r.exitCode).toBe(1);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(parsed.missing).toEqual([
+			{
+				id: "spec",
+				kind: "artifact",
+				location: "does-not-exist.md",
+				resolved: resolve(dir, "does-not-exist.md"),
+			},
+		]);
+	});
+
+	it("rejects stdin (exit 2)", async () => {
+		const r = await run(["meta", "check-links", "-"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("missing file returns exit 1", async () => {
+		const r = await run([
+			"meta",
+			"check-links",
+			join(dir, "nonexistent.pfdsl"),
+		]);
+		expect(r.exitCode).toBe(1);
+	});
+
+	it("--help returns help text", async () => {
+		const r = await run(["meta", "check-links", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl meta check-links");
+	});
+});
+
 describe("graph analysis", () => {
 	// req >> design -> spec >> build -> code
 	//                spec >> review -> report
