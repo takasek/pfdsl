@@ -682,8 +682,8 @@ const NON_SCALAR_FIELDS = new Set([
 function yamlScalar(value: string): string {
 	const needsQuoting =
 		value === "" ||
-		/[:#"'\\\n]/.test(value) ||
-		/^[\s[\]{}&*!|>%@`,?-]/.test(value) ||
+		/[:#"'\\\n,{}[\]]/.test(value) ||
+		/^[\s&*!|>%@`?-]/.test(value) ||
 		/^\s|\s$/.test(value);
 	if (!needsQuoting) return value;
 	return `"${value
@@ -866,7 +866,7 @@ export function runMetaSet(
 	// Safety net: never write a rewrite that introduces errors the original
 	// didn't have (rewriter bug or unsupported YAML style).
 	if (hasErrors(analyze(newSrc).diagnostics)) {
-		const message = `meta set: refusing to write ${file}: the rewrite would introduce parse errors`;
+		const message = `meta set: refusing to write ${file}: the rewrite would introduce errors`;
 		if (opts.json) return failJson({ error: message });
 		return fail(`${message}\n`);
 	}

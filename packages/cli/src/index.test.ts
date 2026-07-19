@@ -1753,40 +1753,52 @@ b >> p1 -> c
 		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 
-	it("refuses to write and reports the error on stderr when the rewrite would corrupt the file (text mode)", async () => {
+	it("writes flow-indicator values (}, comma) into a flow-style entry intact", async () => {
 		const flowStyle = `---
 process:
   design: { label: Design }
 ---
 req >> design -> spec
 `;
-		const f = join(dir, "meta-set-refuse-text.pfdsl");
+		const f = join(dir, "meta-set-flow-indicators.pfdsl");
 		writeFileSync(f, flowStyle);
-		const r = await run(["meta", "set", f, "design", "owner", "a} b"]);
+		const r = await run(["meta", "set", f, "design", "owner", "a} b, c"]);
+		expect(r.exitCode).toBe(0);
+		const check = await run(["check", f]);
+		expect(check.exitCode).toBe(0);
+		const get = await run(["meta", "get", f, "design", "owner", "--json"]);
+		expect(JSON.parse(get.stdout).values.design.owner).toBe("a} b, c");
+	});
+
+	// The guard also catches semantically invalid writes: revises pointing at
+	// the node itself is V017 (spec §15.9), introduced only by the rewrite.
+	const selfRevises = `---
+artifact:
+  spec:
+    label: Spec
+---
+req >> design -> spec
+`;
+
+	it("refuses to write and reports the error on stderr when the rewrite would introduce errors (text mode)", async () => {
+		const f = join(dir, "meta-set-refuse-text.pfdsl");
+		writeFileSync(f, selfRevises);
+		const r = await run(["meta", "set", f, "spec", "revises", "spec"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toContain("refusing to write");
-		expect(readFileSync(f, "utf-8")).toBe(flowStyle);
+		expect(readFileSync(f, "utf-8")).toBe(selfRevises);
 	});
 
 	it("--json on the refusing-to-write guard emits { ok: false, error } on stdout, empty stderr", async () => {
-		// A "}" in an unquoted flow-style value corrupts the enclosing "{ ... }"
-		// map (yamlScalar does not consider "}" unsafe on its own), which trips
-		// the post-write re-parse safety net.
-		const flowStyle = `---
-process:
-  design: { label: Design }
----
-req >> design -> spec
-`;
 		const f = join(dir, "meta-set-refuse-json.pfdsl");
-		writeFileSync(f, flowStyle);
+		writeFileSync(f, selfRevises);
 		const r = await run([
 			"meta",
 			"set",
 			f,
-			"design",
-			"owner",
-			"a} b",
+			"spec",
+			"revises",
+			"spec",
 			"--json",
 		]);
 		expect(r.exitCode).toBe(1);
@@ -1795,7 +1807,7 @@ req >> design -> spec
 		expect(parsed.ok).toBe(false);
 		expect(typeof parsed.error).toBe("string");
 		expect(parsed.error).toContain("refusing to write");
-		expect(readFileSync(f, "utf-8")).toBe(flowStyle);
+		expect(readFileSync(f, "utf-8")).toBe(selfRevises);
 	});
 
 	it("rejects a field invalid for the node kind (exit 2)", async () => {
