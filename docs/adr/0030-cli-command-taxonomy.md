@@ -64,6 +64,7 @@ pfdsl は外部ユーザーが不在の段階にある。
 - 本ブランチのコミット群で、スキル（`.claude/skills/pfdsl` 生成元・`scripts/skill-template/SKILL.md`）・スクリプト（`scripts/*.mjs`）・`docs/spec/spec.md`・生成物（plugin / README.md / docs/samples/README.md）を一括更新する。
 - `graph` グループは将来追加される位相への問い合わせコマンドの名前空間になる。
   新しい読み取り専用グラフクエリは、トップレベルに足すのではなく `graph` の下に追加する。
+- コマンド体系そのものが破壊的に変わるため、次回の npm リリースは 0.x の minor bump（0.1.0）にする。
 
 ## References
 
