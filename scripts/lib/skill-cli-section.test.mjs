@@ -43,3 +43,41 @@ describe("renderCliSection", () => {
 		assert.throws(() => renderCliSection("pfdsl <command>\n\nnothing\n"));
 	});
 });
+
+const GROUPS_FIXTURE = `pfdsl <command> [options]
+
+Commands:
+  check <file|-> [--strict] [--json]
+                           Validate a .pfdsl file (- = stdin)
+
+Command groups (run \`pfdsl <group>\` for their subcommands):
+  graph summary|io|stats|neighbors|impact|depends-on|path|edges
+                           Read-only queries on the graph topology
+  meta get|set|sort|reindex
+                           Read and write frontmatter metadata
+  status ready|gaps        Planning queries derived from artifact status
+
+  help                     Show this help
+
+Exit codes:
+  0  success (warnings are non-fatal)
+`;
+
+describe("renderCliSection with command groups", () => {
+	it("includes the Command groups entries, not just the top-level Commands", () => {
+		const lines = renderCliSection(GROUPS_FIXTURE).split("\n");
+		assert.deepEqual(lines, [
+			"npx @pfdsl/cli check <file|-> [--strict] [--json]   # Validate a .pfdsl file (- = stdin)",
+			"npx @pfdsl/cli graph summary|io|stats|neighbors|impact|depends-on|path|edges   # Read-only queries on the graph topology",
+			"npx @pfdsl/cli meta get|set|sort|reindex   # Read and write frontmatter metadata",
+			"npx @pfdsl/cli status ready|gaps   # Planning queries derived from artifact status",
+			"npx @pfdsl/cli help   # Show this help",
+		]);
+	});
+
+	it("stops at the Exit codes section", () => {
+		const out = renderCliSection(GROUPS_FIXTURE);
+		assert.ok(!out.includes("Exit codes"));
+		assert.ok(!out.includes("warnings are non-fatal"));
+	});
+});
