@@ -83,10 +83,16 @@ describe("mirrorDir", () => {
 		assert.equal(readFileSync(join(destRoot, "foo", "SKILL.md"), "utf-8"), "skill body");
 	});
 
-	it("keeps the prior destination content when the source copy fails partway", () => {
+	it("keeps the prior destination content when the source copy fails partway", (t) => {
 		// A source directory containing an unreadable nested file makes cpSync
 		// throw partway through a recursive copy — a portable stand-in for any
 		// mid-copy failure (disk full, permission change, concurrent deletion).
+		// root ignores permission bits, so this fault injection can't trigger
+		// there; skip rather than false-fail (#509).
+		if (process.getuid?.() === 0) {
+			t.skip("root ignores chmod 0o000, so this fault injection can't fail the copy");
+			return;
+		}
 		const src = join(tmp, "src", "foo");
 		mkdirSync(src, { recursive: true });
 		writeFileSync(join(src, "a.txt"), "new-a");
