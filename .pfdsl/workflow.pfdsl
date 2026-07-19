@@ -64,7 +64,7 @@ artifact:
     group: generation
   plugin_dist:
     label: marketplace 配布プラグイン
-    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl で外部ユーザーが導入する Claude Code プラグイン（pfdsl / ops_skill_general / ops_skill_l3 / ecosystem_skill / retro_skill スキル、/pfd-cycle・/pfd-init・/pfd-retro コマンド、pfd-lens agent を束ねる）。install/ の実配置は /pfd-init ステップ3.5（check-install-sync.mjs --deploy）が行う（ADR-0028、旧 pfdsl skill sync は廃止）。make gen-plugin で再生成、plugin.json の version は toolchain の CLI package.json 由来"
+    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl で外部ユーザーが導入する Claude Code プラグイン（pfdsl / ops_skill_general / ops_skill_l3 / ecosystem_skill / retro_skill / grill_skill スキル、/pfd-cycle・/pfd-init・/pfd-retro コマンド、pfd-lens agent を束ねる）。install/ の実配置は /pfd-init ステップ3.5（check-install-sync.mjs --deploy）が行う（ADR-0028、旧 pfdsl skill sync は廃止）。make gen-plugin で再生成、plugin.json の version は toolchain の CLI package.json 由来"
     criteria: make gen-plugin が差分なし（check-gen-plugin.yml が CI で強制、CLI リリース後の version 反映漏れもこれで検出）
     location: ../plugin/pfdsl/
     group: release
@@ -136,7 +136,7 @@ artifact:
     group: planning
   published_cli:
     label: npm 公開 CLI
-    description: "外部利用者向け配布物。toolchain の CLI 部分または plugin 同梱物（pfdsl / pfd-ops / pfd-retro / pfd-ecosystem スキルと pfd-* コマンド・agents）が変更されたら公開が必要 — v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC、公開作業は自動化済み）"
+    description: "外部利用者向け配布物。toolchain の CLI 部分または plugin 同梱物（pfdsl / pfd-ops / pfd-retro / pfd-ecosystem / pfd-grill スキルと pfd-* コマンド・agents）が変更されたら公開が必要 — v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC、公開作業は自動化済み）"
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
     group: release
@@ -195,6 +195,13 @@ artifact:
     description: "/pfd-init コマンド。PFD セット（roadmap / workflow / runtime-pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
     criteria: /pfd-init が期待通り動作する
     location: ../.claude/skills/pfd-ecosystem/
+    group: generation
+    tags: [distilled_skill]
+  grill_skill:
+    label: 後ろ向き対話構築スキル
+    description: "pfd-grill スキル。最終成果物からの後ろ向き対話で単一 PFD の中身を書く手順（#481）。手書き、生成対象外"
+    criteria: /pfd-grill が期待通り動作する
+    location: ../.claude/skills/pfd-grill/
     group: generation
     tags: [distilled_skill]
   vscode_ext_debug_skill:
@@ -309,7 +316,7 @@ process:
 
   gen_plugin:
     label: プラグイン生成
-    description: "gen_skill と同じ一次ソース（spec/skill_template/quality_guide/feature_samples/review_perspectives）から pfdsl スキルを独立再生成し、ecosystem_skill・retro_skill、/pfd-cycle・/pfd-init・/pfd-retro コマンド、pfd-lens agent を plugin/pfdsl/ に束ね plugin.json を書く。pfdsl_skill（.claude/skills/pfdsl/）を直接コピーするわけではない。version は toolchain の CLI package.json 由来。check-gen-plugin.yml が全 PR で drift を強制（CI backstop、CLI リリース後の version 反映漏れも検出）"
+    description: "gen_skill と同じ一次ソース（spec/skill_template/quality_guide/feature_samples/review_perspectives）から pfdsl スキルを独立再生成し、ecosystem_skill・retro_skill・grill_skill、/pfd-cycle・/pfd-init・/pfd-retro コマンド、pfd-lens agent を plugin/pfdsl/ に束ね plugin.json を書く。pfdsl_skill（.claude/skills/pfdsl/）を直接コピーするわけではない。version は toolchain の CLI package.json 由来。check-gen-plugin.yml が全 PR で drift を強制（CI backstop、CLI リリース後の version 反映漏れも検出）"
     command: make gen-plugin
     group: release
 
@@ -412,7 +419,7 @@ spec >> maintain_samples -> feature_samples
 
 pfdsl_skill >>? gen_skill
 
-[spec, skill_template, quality_guide, feature_samples, review_perspectives, toolchain, ecosystem_skill, retro_skill, pfd_lens_agent] >> gen_plugin -> plugin_dist
+[spec, skill_template, quality_guide, feature_samples, review_perspectives, toolchain, ecosystem_skill, retro_skill, grill_skill, pfd_lens_agent] >> gen_plugin -> plugin_dist
 
 topics >> write_examples -> examples
 
