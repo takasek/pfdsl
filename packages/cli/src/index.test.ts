@@ -1877,6 +1877,77 @@ req >> design -> spec
 		const check = await run(["check", f]);
 		expect(check.exitCode).toBe(0);
 	});
+
+	// Block scalars may contain blank lines (a legal YAML paragraph break);
+	// the surgery regexes must step over them both when replacing the scalar
+	// itself and when walking past it to reach a later field.
+	const blankLineScalar = `---
+artifact:
+  spec:
+    description: |
+      line one.
+
+      line three.
+    status: done
+---
+req >> design -> spec
+`;
+
+	it("replaces a block scalar containing a blank line without orphan lines", async () => {
+		const f = join(dir, "meta-set-blank-scalar-replace.pfdsl");
+		writeFileSync(f, blankLineScalar);
+		const r = await run(["meta", "set", f, "spec", "description", "short."]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("description: short.");
+		expect(after).not.toContain("line one.");
+		expect(after).not.toContain("line three.");
+		expect(after).toContain("status: done");
+		const check = await run(["check", f]);
+		expect(check.exitCode).toBe(0);
+	});
+
+	it("updates a field that follows a blank-line block scalar without duplicating it", async () => {
+		const f = join(dir, "meta-set-blank-scalar-walk.pfdsl");
+		writeFileSync(f, blankLineScalar);
+		const r = await run(["meta", "set", f, "spec", "status", "wip"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("status: wip");
+		expect(after).not.toContain("status: done");
+		expect(after.match(/status:/g)).toHaveLength(1);
+		expect(after).toContain("line one.");
+		expect(after).toContain("line three.");
+		const check = await run(["check", f]);
+		expect(check.exitCode).toBe(0);
+	});
+
+	// YAML core-schema resolution: reserved words and number-like strings must
+	// be quoted for string fields, or the parser re-types them (get/set
+	// round-trip breakage). index is integer-typed and must stay bare.
+	it("quotes YAML reserved words and number-like values for string fields", async () => {
+		const f = join(dir, "meta-set-reserved.pfdsl");
+		writeFileSync(f, generic);
+		const r1 = await run(["meta", "set", f, "spec", "label", "true"]);
+		expect(r1.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toContain('label: "true"');
+		const get1 = await run(["meta", "get", f, "spec", "label", "--json"]);
+		expect(JSON.parse(get1.stdout).values.spec.label).toBe("true");
+
+		const r2 = await run(["meta", "set", f, "spec", "label", "42"]);
+		expect(r2.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toContain('label: "42"');
+	});
+
+	it("keeps index values as bare integers", async () => {
+		const f = join(dir, "meta-set-bare-index.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run(["meta", "set", f, "spec", "index", "5"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("index: 5");
+		expect(after).not.toContain('index: "5"');
+	});
 });
 
 describe("status gaps", () => {
@@ -2332,6 +2403,9 @@ req -> spec
 			values: { spec: { status: "done" } },
 			missing: ["nonexistent"],
 		});
+		// JSON failure convention: the error lives in the payload, not stderr
+		// (stderr stays reserved for warnings).
+		expect(r.stderr).not.toContain("error:");
 	});
 
 	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {

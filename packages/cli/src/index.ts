@@ -679,12 +679,20 @@ const NON_SCALAR_FIELDS = new Set([
  * scalar would misparse (YAML indicators, colon, quotes, leading/trailing
  * whitespace, ...). Inner spaces are fine bare ("make spec").
  */
-function yamlScalar(value: string): string {
+function yamlScalar(value: string, quoteAmbiguous = true): string {
+	// Core-schema resolution: bare true/null/42/2026-07-19 etc. re-type to
+	// boolean/null/number/date on parse, so string fields must quote them
+	// (integer fields like index pass quoteAmbiguous=false to stay bare).
+	const resolvesToNonString =
+		/^(?:true|false|null|yes|no|on|off|~)$/i.test(value) ||
+		(value.trim() !== "" && !Number.isNaN(Number(value))) ||
+		/^\d{4}-\d{2}-\d{2}/.test(value);
 	const needsQuoting =
 		value === "" ||
 		/[:#"'\\\n,{}[\]]/.test(value) ||
 		/^[\s&*!|>%@`?-]/.test(value) ||
-		/^\s|\s$/.test(value);
+		/^\s|\s$/.test(value) ||
+		(quoteAmbiguous && resolvesToNonString);
 	if (!needsQuoting) return value;
 	return `"${value
 		.replace(/\\/g, "\\\\")
@@ -767,8 +775,13 @@ function setFieldInSource(
 		// Replace "<childPad><field>: <old>" under this node — including any
 		// deeper-indented continuation lines (multi-line block scalars), so
 		// replacing them never leaves orphan lines — or insert after the header.
+		// Both the walk to the field and the continuation consumption tolerate
+		// blank lines, which are legal inside block scalars: the walk accepts
+		// whitespace-only lines, and the consumption takes blank lines only
+		// when a deeper-indented line follows (a trailing blank belongs to the
+		// mapping, not the scalar).
 		const fieldLineRe = new RegExp(
-			`(${nodePad}${escapedId}:[ \\t]*\\n(?:${childPad}[^\\n]*\\n)*?)${childPad}${escapedField}:[^\\n]*\\n(?:${childPad} +[^\\n]*\\n)*`,
+			`(${nodePad}${escapedId}:[ \\t]*\\n(?:(?:${childPad}[^\\n]*|[ \\t]*)\\n)*?)${childPad}${escapedField}:[^\\n]*\\n(?:(?:[ \\t]*\\n)*${childPad} +[^\\n]*\\n)*`,
 		);
 		if (fieldLineRe.test(fmBlock)) {
 			newFm = fmBlock.replace(
@@ -853,7 +866,7 @@ export function runMetaSet(
 	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
 	const beforeSet = new Set(beforeIds);
 
-	const scalar = yamlScalar(value);
+	const scalar = yamlScalar(value, field !== "index");
 	let newSrc = src;
 	for (const id of ids) {
 		const applied = setFieldInSource(newSrc, id, field, scalar);
@@ -1133,11 +1146,13 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	if (missing.length > 0) {
 		const errorText = `error: id(s) not found in ${file}: ${missing.join(", ")}\n`;
 		if (opts.json) {
-			return fail(
-				`${warnText}${errorText}`,
-				1,
-				`${JSON.stringify({ ok: false, values, missing })}\n`,
-			);
+			// JSON failure convention: the error is carried in the payload;
+			// stderr keeps only warnings.
+			return {
+				stdout: `${JSON.stringify({ ok: false, values, missing })}\n`,
+				stderr: warnText,
+				exitCode: 1,
+			};
 		}
 		const lines = linesFor(ids.filter((id) => values[id]));
 		const stdout = lines.length ? `${lines.join("\n")}\n` : "";
