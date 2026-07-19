@@ -39,7 +39,7 @@ npm install -g @pfdsl/cli
 
 | Command | Description |
 |---|---|
-| `pfdsl meta get <file>` | Print frontmatter field values |
+| `pfdsl meta get <file> <id[,id...]> [field[,field...]]` | Print frontmatter field values |
 | `pfdsl meta set <file> <id[,id...]> <field> <value>` | Set a scalar frontmatter field in place |
 | `pfdsl meta sort <file>` | Sort frontmatter node definitions by key |
 | `pfdsl meta reindex <file>` | Number nodes' `index:` in topological order |

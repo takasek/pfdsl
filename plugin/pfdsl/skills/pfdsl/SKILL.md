@@ -89,9 +89,9 @@ statusStyles:
 ```bash
 npx @pfdsl/cli check <file|-> [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
 npx @pfdsl/cli explain <code>   # Print the summary and spec section for a diagnostic code (e.g. V021)
-npx @pfdsl/cli fmt <file|-> [--write]   # Format a .pfdsl file (- = stdin)
+npx @pfdsl/cli fmt <file|-> [--write] [--check]   # Format a .pfdsl file (- = stdin)
 npx @pfdsl/cli render <file|-> [--format dot|svg|pdf|png]   # Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-npx @pfdsl/cli diff <a> <b> [--format text|dot|svg]   # Structural diff (text), or visual diff DOT/SVG
+npx @pfdsl/cli diff <a> <b> [--format text|dot|svg] [--json]   # Structural diff (text), or visual diff DOT/SVG
 ```
 
 Full flag reference: `npx @pfdsl/cli help`. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.

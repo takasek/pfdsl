@@ -1955,7 +1955,7 @@ Commands:
   render <file|-> [--format dot|svg|pdf|png]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires: npm install puppeteer
-  diff <a> <b> [--format text|dot|svg]
+  diff <a> <b> [--format text|dot|svg] [--json]
                            Structural diff (text), or visual diff DOT/SVG
 
 Command groups (run \`pfdsl <group>\` for their subcommands):
