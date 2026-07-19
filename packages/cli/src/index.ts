@@ -1354,9 +1354,13 @@ export function runGraphSummary(
 	);
 }
 
+export interface GraphIoOptions {
+	json?: boolean;
+}
+
 export function runGraphIo(
 	file: string,
-	opts: GraphSummaryOptions = {},
+	opts: GraphIoOptions = {},
 ): CommandResult {
 	const loaded = loadForAudit(file, opts.json);
 	if ("exitCode" in loaded) return loaded;
@@ -1374,27 +1378,27 @@ export function runGraphIo(
 	);
 }
 
-export interface AuditSyncOptions {
+export interface StatusGapsOptions {
 	json?: boolean;
 }
 
-export interface AuditSyncGap {
+export interface StatusGap {
 	file: string;
 	artifactId: string;
 	label: string;
 	status: string;
 }
 
-export interface AuditSyncResult {
+export interface StatusGapsResult {
 	ok: boolean;
-	gaps: AuditSyncGap[];
+	gaps: StatusGap[];
 	warnings?: Diagnostic[];
 }
 
 export function runStatusGaps(
 	roadmapFile: string,
 	flowFiles: string[],
-	opts: AuditSyncOptions = {},
+	opts: StatusGapsOptions = {},
 ): CommandResult {
 	const roadmapSrc = readSource(roadmapFile);
 	if (isCommandResult(roadmapSrc)) return roadmapSrc;
@@ -1429,7 +1433,7 @@ export function runStatusGaps(
 		roadmapArtifactIds.add(e.artifact);
 	}
 
-	const gaps: AuditSyncGap[] = [];
+	const gaps: StatusGap[] = [];
 
 	for (const flowFile of flowFiles) {
 		const flowSrc = readSource(flowFile);
@@ -1461,7 +1465,7 @@ export function runStatusGaps(
 		}
 	}
 
-	const result: AuditSyncResult = { ok: gaps.length === 0, gaps };
+	const result: StatusGapsResult = { ok: gaps.length === 0, gaps };
 	if (warnings.length) result.warnings = warnings;
 
 	if (opts.json) {
