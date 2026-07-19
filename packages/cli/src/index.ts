@@ -24,6 +24,7 @@ import {
 	type IndexChange,
 	loadExtendsChain,
 	loadSubflowGraph,
+	type NodeKind,
 	type PfdType,
 	reindex,
 	resolveEffectiveFrontmatter,
@@ -1482,6 +1483,30 @@ export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
 	return ok(`${lines.join("\n")}\n`, hint);
 }
 
+export interface GraphOrphansOptions {
+	json?: boolean;
+}
+
+export interface GraphOrphan {
+	id: string;
+	kind: NodeKind;
+}
+
+/** Nodes with neither predecessor nor successor — fully disconnected from the graph (§518). */
+export function runGraphOrphans(
+	file: string,
+	opts: GraphOrphansOptions = {},
+): CommandResult {
+	const loaded = loadGraph(file, opts.json);
+	if (isGraphLoadFailure(loaded)) return loaded;
+	const orphans: GraphOrphan[] = computeStats(loaded.graph)
+		.filter((s) => s.fanIn === 0 && s.fanOut === 0)
+		.map((s) => ({ id: s.id, kind: s.kind }));
+	if (opts.json) return ok(`${JSON.stringify({ ok: true, orphans })}\n`);
+	if (orphans.length === 0) return ok("(none)\n");
+	return ok(`${orphans.map((o) => `${o.id} (${o.kind})`).join("\n")}\n`);
+}
+
 export interface GraphSummaryOptions {
 	json?: boolean;
 }
@@ -2122,6 +2147,22 @@ Exit codes:
   2  invalid usage
 `;
 
+const HELP_GRAPH_ORPHANS = `usage: pfdsl graph orphans <file|-> [--json]
+
+Print nodes with neither predecessor nor successor — fully disconnected
+from the graph. Distinct from \`graph io\`'s external inputs (no predecessor
+only) and terminals (no successor only): an orphan has neither. Use - to
+read from stdin.
+
+  --json  output as JSON ({ ok, orphans: {id, kind}[] })
+          on parse failure: { ok: false, diagnostics }
+
+Exit codes:
+  0  success
+  1  parse/validation error
+  2  invalid usage
+`;
+
 const HELP_STATUS_GAPS = `usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json]
 
 Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
@@ -2194,6 +2235,7 @@ Subcommands:
   path <file|-> <from> <to> [--limit]
                               All simple paths between two nodes
   edges <file|->              Canonical edge list
+  orphans <file|->            Nodes with neither predecessor nor successor
 
 All subcommands accept --json.
 `;
@@ -2237,7 +2279,7 @@ Commands:
                            Structural diff (text), or visual diff DOT/SVG
 
 Command groups (run \`pfdsl <group>\` for their subcommands):
-  graph summary|io|stats|neighbors|impact|depends-on|path|edges
+  graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
   meta get|set|sort|reindex
                            Read and write frontmatter metadata
@@ -2364,6 +2406,12 @@ function runGraphGroup(
 				...(limit !== undefined ? { limit } : {}),
 				json: flags.json === true,
 			});
+		}
+		case "orphans": {
+			if (flags.help) return ok(HELP_GRAPH_ORPHANS);
+			const f = rest[0];
+			if (!f) return fail(HELP_GRAPH_ORPHANS, 2);
+			return runGraphOrphans(f, { json: flags.json === true });
 		}
 		default:
 			return fail(`unknown graph subcommand: ${sub}\n${HELP_GRAPH_GROUP}`, 2);

@@ -3126,6 +3126,66 @@ p3 -> d
 			expect(Array.isArray(parsed.diagnostics)).toBe(true);
 		});
 	});
+
+	describe("orphans", () => {
+		it("lists nodes with no predecessor and no successor as text", async () => {
+			const f = join(dir, "orphans.pfdsl");
+			writeFileSync(
+				f,
+				`---\nartifact:\n  floater:\n    status: todo\n---\n${base}`,
+			);
+			const r = await run(["graph", "orphans", f]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toContain("floater");
+			expect(r.stdout).not.toContain("spec");
+		});
+
+		it("prints a no-orphans message when none exist", async () => {
+			const f = join(dir, "orphans-none.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["graph", "orphans", f]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("(none)\n");
+		});
+
+		it("emits JSON", async () => {
+			const f = join(dir, "orphans-json.pfdsl");
+			writeFileSync(
+				f,
+				`---\nartifact:\n  floater:\n    status: todo\n---\n${base}`,
+			);
+			const r = await run(["graph", "orphans", f, "--json"]);
+			expect(r.exitCode).toBe(0);
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(true);
+			expect(parsed.orphans).toEqual([{ id: "floater", kind: "artifact" }]);
+		});
+
+		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+			const r = await run([
+				"graph",
+				"orphans",
+				join(dir, "invalid.pfdsl"),
+				"--json",
+			]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(false);
+			expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		});
+
+		it("missing file returns exit 1", async () => {
+			const r = await run(["graph", "orphans", join(dir, "nonexistent.pfdsl")]);
+			expect(r.exitCode).toBe(1);
+		});
+
+		it("--help returns help text", async () => {
+			const r = await run(["graph", "orphans", "--help"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toContain("pfdsl graph orphans");
+		});
+	});
 });
 
 // Regression tests for the code-review findings on the restructure PR (#506).
