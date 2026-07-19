@@ -619,7 +619,6 @@ process:
   i481_create_grill_skill:
     label: pfd-grill スキル作成
     location: https://github.com/takasek/pfdsl/issues/481
-    updated_at: 2026-07-18T00:33:10Z
   i482_implement_editor_connector:
     label: エディタ コネクタ編集実装
     location: https://github.com/takasek/pfdsl/issues/482
