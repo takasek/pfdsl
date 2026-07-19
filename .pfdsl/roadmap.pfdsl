@@ -403,7 +403,7 @@ artifact:
   v011_semantics:
     label: "V011 strict 意味論の緩和 (#478)"
     description: "strict mode の feedback 到達性検査（V011）が非連結な別系統からの正当な補助入力を誤検出する欠陥を緩和する。真の逆循環のみ検出へ絞るか warning 降格。方針は issue #478 の (a)/(b)/(c) から着手前に選択。spec 次版統合を含む"
-    status: todo
+    status: done
     criteria: "非連結な別系統からの >>? 補助入力が V011 error にならず、真の逆循環は検出され、spec §15.3 の変更が統合済み、テスト通過"
   graph_analysis:
     label: "graph-analysis サブコマンド群 (#479)"
@@ -639,7 +639,7 @@ process:
   i478_relax_v011:
     label: V011 意味論緩和実装
     location: https://github.com/takasek/pfdsl/issues/478
-    updated_at: 2026-07-18T00:41:37Z
+    updated_at: 2026-07-19T21:38:28Z
   i479_implement_graph_analysis:
     label: graph-analysis サブコマンド実装
     location: https://github.com/takasek/pfdsl/issues/479

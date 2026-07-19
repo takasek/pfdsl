@@ -293,17 +293,26 @@ a >> design -> b
 		});
 
 		it("does not report V011 in strict mode when P can reach A in the primary graph", () => {
-			// a >> p -> b   b >>? q -> c   q produces b in primary, so feedback b>>?q is valid
+			// a >> p -> b   b >>? p   p produces b in primary, so feedback b>>?p is valid
 			expect(strictCodes("a >> p -> b\nb >>? p")).not.toContain("V011");
 		});
 
-		it("reports V011 in strict mode when feedback artifact is not reachable from its process", () => {
-			// x is never an output of p in the primary graph
-			expect(strictCodes("a >> p -> b\nx >>? p")).toContain("V011");
+		it("does not report V011 in strict mode for a disconnected feedback artifact", () => {
+			// x belongs to an unrelated subgraph and is never reachable from or to p;
+			// this is a legitimate auxiliary feedback input (issue #478)
+			expect(strictCodes("a >> p -> b\nx >>? p")).not.toContain("V011");
+		});
+
+		it("reports V011 in strict mode when the feedback artifact is already an upstream ancestor of the process (reverse cycle)", () => {
+			// a >> p -> b -> q -> c   a already reaches q via the primary graph,
+			// so declaring a >>? q is a genuine reverse cycle, not a legitimate feedback loop
+			expect(strictCodes("a >> p -> b\nb >> q -> c\na >>? q")).toContain(
+				"V011",
+			);
 		});
 
 		it("V011 severity is error", () => {
-			const { tokens } = lex("a >> p -> b\nx >>? p");
+			const { tokens } = lex("a >> p -> b\nb >> q -> c\na >>? q");
 			const { document } = parseTokens(tokens);
 			const { edges, nodeKinds } = normalize(document, null);
 			const diags = validate(edges, nodeKinds, null, { strict: true });
