@@ -921,8 +921,8 @@ const KNOWN_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
  * Read-only fields computed from a base field rather than stored in
  * frontmatter. `location.resolved` auto-accompanies `location` (artifact and
  * process); `command.cwd` auto-accompanies `command` (process only). Both
- * can also be requested explicitly via --field, in which case only the
- * derived value is returned (the base field is not auto-added).
+ * can also be requested explicitly via the field positional, in which case
+ * only the derived value is returned (the base field is not auto-added).
  */
 const DERIVED_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
 	artifact: new Set(["location.resolved"]),
@@ -957,17 +957,16 @@ function commandCwdDerived(docFsPath: string, basePath?: string): string {
 }
 
 export function runGet(file: string, opts: GetOptions = {}): CommandResult {
-	if (!opts.id) return fail(`error: --id is required\n\n${HELP_GET}`, 2);
+	if (!opts.id) return fail(`error: id is required\n\n${HELP_GET}`, 2);
 	const ids = splitCommaList(opts.id);
-	if (ids.length === 0)
-		return fail(`error: --id is required\n\n${HELP_GET}`, 2);
+	if (ids.length === 0) return fail(`error: id is required\n\n${HELP_GET}`, 2);
 
-	// Omitted --field means "all set fields"; present-but-empty (e.g. "--field ,")
-	// is still a usage error.
+	// Omitted field positional means "all set fields"; present-but-empty
+	// (e.g. an empty/blank field positional) is still a usage error.
 	const explicitFields =
 		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
 	if (explicitFields !== undefined && explicitFields.length === 0) {
-		return fail(`error: --field is required\n\n${HELP_GET}`, 2);
+		return fail(`error: field is required\n\n${HELP_GET}`, 2);
 	}
 
 	const src = readSource(file);
@@ -1051,7 +1050,7 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 		};
 
 		if (explicitFields === undefined) {
-			// --field omitted: every field present on this node, raw, in
+			// field positional omitted: every field present on this node, raw, in
 			// frontmatter order, plus applicable derived fields.
 			for (const field of meta ? Object.keys(meta) : []) {
 				row[field] = meta![field];
@@ -1717,36 +1716,36 @@ Exit codes:
   2  invalid usage (missing argument, invalid field or value)
 `;
 
-const HELP_GET = `usage: pfdsl meta get <file|-> --id <ids> [--field <fields>] [--json]
+const HELP_GET = `usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--json]
 
 Print field values for one or more artifact/process/group ids.
 
-  --id <ids>      comma-separated ids, or repeat --id for each one
-  --field <fields> comma-separated field names, or repeat --field for each one.
-                  Omit entirely to print every field set in each node's
-                  frontmatter entry (raw, in frontmatter order), plus
-                  applicable derived fields.
-  --json          emit JSON ({ ok, values: { [id]: { [field]: value } } })
+  <id[,id...]>        comma-separated ids (required)
+  [field[,field...]]  comma-separated field names (optional). Omit entirely
+                      to print every field set in each node's frontmatter
+                      entry (raw, in frontmatter order), plus applicable
+                      derived fields.
+  --json              emit JSON ({ ok, values: { [id]: { [field]: value } } })
 
 \`location\` is returned as the raw value exactly as written (so \`meta get\`
 and \`meta set\` round-trip). The resolved filesystem path is a separate
 read-only derived field, \`location.resolved\`, which is added to the output
 automatically right after \`location\` whenever \`location\` is in the output
-(explicitly requested or via omitted --field) and the node has a location.
-Each location element is classified per spec §15.8: an element containing
-"://" is a URL and is passed through unchanged; everything else (paths and
-globs) is resolved against the file's basePath. A scalar location yields a
-scalar location.resolved; an array yields an array.
+(explicitly requested or via an omitted field positional) and the node has
+a location. Each location element is classified per spec §15.8: an element
+containing "://" is a URL and is passed through unchanged; everything else
+(paths and globs) is resolved against the file's basePath. A scalar
+location yields a scalar location.resolved; an array yields an array.
 
 \`command.cwd\` works the same way for process nodes: whenever \`command\` is
 in the output and the node has a command, \`command.cwd\` (the basePath-
 resolved directory commands run in) is added right after it. command.cwd
 does not depend on the command string itself.
 
-Either derived field may also be requested explicitly via --field (e.g.
---field location.resolved), in which case only the derived value is
-returned — the base field is not auto-added. Use - to read from stdin: since
-there is no file path to resolve against, derived fields are silently
+Either derived field may also be requested explicitly in the field
+positional (e.g. location.resolved), in which case only the derived value
+is returned — the base field is not auto-added. Use - to read from stdin:
+since there is no file path to resolve against, derived fields are silently
 omitted from auto-accompaniment, and an explicit request for one returns
 null with a warning on stderr instead of failing the command.
 
@@ -1764,7 +1763,7 @@ for the missing ones.
 Exit codes:
   0  success
   1  one or more requested ids do not exist in the file
-  2  invalid usage (missing --id)
+  2  invalid usage (missing id, or too many positional arguments)
 `;
 
 const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json]
@@ -1916,10 +1915,10 @@ Read and write frontmatter metadata. Run
 \`pfdsl meta <subcommand> --help\` for details on each.
 
 Subcommands:
-  get <file|-> --id <ids> --field <fields>   Print field values
-  set <file> <id> <field> <value>            Set a field value in place
-  sort <file|-> --by <keys>                  Sort node definitions
-  reindex <file|->                           Assign topological index: values
+  get <file|-> <id[,id...]> [field[,field...]]   Print field values
+  set <file> <id> <field> <value>                Set a field value in place
+  sort <file|-> --by <keys>                      Sort node definitions
+  reindex <file|->                               Assign topological index: values
 `;
 
 const HELP_STATUS_GROUP = `usage: pfdsl status <subcommand> ...
@@ -2071,11 +2070,12 @@ function runMetaGroup(
 	switch (sub) {
 		case "get": {
 			if (flags.help) return ok(HELP_GET);
-			const f = rest[0];
-			if (!f) return fail(HELP_GET, 2);
+			const [f, id, field, ...extra] = rest;
+			if (!f || !id) return fail(HELP_GET, 2);
+			if (extra.length > 0) return fail(HELP_GET, 2);
 			return runGet(f, {
-				...(typeof flags.id === "string" ? { id: flags.id } : {}),
-				...(typeof flags.field === "string" ? { field: flags.field } : {}),
+				id,
+				...(field !== undefined ? { field } : {}),
 				json: flags.json === true,
 			});
 		}

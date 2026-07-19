@@ -1611,16 +1611,7 @@ req >> design -> spec
 		expect(r.exitCode).toBe(0);
 		const check = await run(["check", f]);
 		expect(check.exitCode).toBe(0);
-		const get = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"spec",
-			"--field",
-			"label",
-			"--json",
-		]);
+		const get = await run(["meta", "get", f, "spec", "label", "--json"]);
 		expect(JSON.parse(get.stdout).values.spec.label).toBe("spec: v2");
 	});
 
@@ -1947,15 +1938,7 @@ spec >> build -> code
 	it("returns a single id/field value as text", async () => {
 		const f = join(dir, "get-single.pfdsl");
 		writeFileSync(f, base);
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"spec",
-			"--field",
-			"status",
-		]);
+		const r = await run(["meta", "get", f, "spec", "status"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("spec.status: done\n");
 	});
@@ -1963,15 +1946,7 @@ spec >> build -> code
 	it("returns location as the raw value, with location.resolved auto-added alongside it (#476)", async () => {
 		const f = join(dir, "get-location.pfdsl");
 		writeFileSync(f, base);
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"spec",
-			"--field",
-			"location",
-		]);
+		const r = await run(["meta", "get", f, "spec", "location"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe(
 			`spec.location: docs/spec.md\nspec.location.resolved: ${resolve(dir, "..", "docs/spec.md")}\n`,
@@ -1981,15 +1956,7 @@ spec >> build -> code
 	it("resolves location for a process the same way as for an artifact", async () => {
 		const f = join(dir, "get-process-location.pfdsl");
 		writeFileSync(f, base);
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"build",
-			"--field",
-			"location",
-		]);
+		const r = await run(["meta", "get", f, "build", "location"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe(
 			`build.location: src/build.ts\nbuild.location.resolved: ${resolve(dir, "..", "src/build.ts")}\n`,
@@ -2015,9 +1982,7 @@ req -> spec
 			"meta",
 			"get",
 			f,
-			"--id",
 			"spec",
-			"--field",
 			"location.resolved",
 			"--json",
 		]);
@@ -2038,16 +2003,7 @@ req -> spec
 	it("adds command.cwd honoring basePath whenever command is in the output", async () => {
 		const f = join(dir, "get-command-cwd.pfdsl");
 		writeFileSync(f, base);
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"build",
-			"--field",
-			"command",
-			"--json",
-		]);
+		const r = await run(["meta", "get", f, "build", "command", "--json"]);
 		expect(r.exitCode).toBe(0);
 		expect(JSON.parse(r.stdout)).toEqual({
 			ok: true,
@@ -2067,9 +2023,7 @@ req -> spec
 			"meta",
 			"get",
 			f,
-			"--id",
 			"spec",
-			"--field",
 			"location.resolved",
 			"--json",
 		]);
@@ -2082,10 +2036,10 @@ req -> spec
 		});
 	});
 
-	it("returns all set fields plus applicable derived fields when --field is omitted", async () => {
+	it("returns all set fields plus applicable derived fields when the field positional is omitted", async () => {
 		const f = join(dir, "get-all-fields.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["meta", "get", f, "--id", "build", "--json"]);
+		const r = await run(["meta", "get", f, "build", "--json"]);
 		expect(r.exitCode).toBe(0);
 		expect(JSON.parse(r.stdout)).toEqual({
 			ok: true,
@@ -2103,23 +2057,15 @@ req -> spec
 	it("returns an empty row for a node that exists but has no frontmatter entry", async () => {
 		const f = join(dir, "get-all-fields-empty.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["meta", "get", f, "--id", "req", "--json"]);
+		const r = await run(["meta", "get", f, "req", "--json"]);
 		expect(r.exitCode).toBe(0);
 		expect(JSON.parse(r.stdout)).toEqual({ ok: true, values: { req: {} } });
 	});
 
-	it("accepts multiple ids and fields (comma-separated or repeated flags)", async () => {
+	it("accepts multiple comma-separated ids and fields", async () => {
 		const f = join(dir, "get-multi.pfdsl");
 		writeFileSync(f, base);
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"spec,code",
-			"--field",
-			"status",
-		]);
+		const r = await run(["meta", "get", f, "spec,code", "status"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("spec.status: done\ncode.status: todo\n");
 	});
@@ -2127,15 +2073,7 @@ req -> spec
 	it("returns an empty value for a field the node doesn't have", async () => {
 		const f = join(dir, "get-empty-field.pfdsl");
 		writeFileSync(f, base);
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"code",
-			"--field",
-			"location",
-		]);
+		const r = await run(["meta", "get", f, "code", "location"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("code.location: \n");
 	});
@@ -2147,9 +2085,7 @@ req -> spec
 			"meta",
 			"get",
 			f,
-			"--id",
 			"spec",
-			"--field",
 			"location,status",
 			"--json",
 		]);
@@ -2169,15 +2105,7 @@ req -> spec
 	it("exits 1 when an id is not found in the file", async () => {
 		const f = join(dir, "get-notfound.pfdsl");
 		writeFileSync(f, base);
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"nonexistent",
-			"--field",
-			"status",
-		]);
+		const r = await run(["meta", "get", f, "nonexistent", "status"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toContain("nonexistent");
 	});
@@ -2185,15 +2113,7 @@ req -> spec
 	it("still prints values for found ids when some ids are missing", async () => {
 		const f = join(dir, "get-partial-notfound.pfdsl");
 		writeFileSync(f, base);
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"spec,nonexistent",
-			"--field",
-			"status",
-		]);
+		const r = await run(["meta", "get", f, "spec,nonexistent", "status"]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).toBe("spec.status: done\n");
 		expect(r.stderr).toContain("nonexistent");
@@ -2206,9 +2126,7 @@ req -> spec
 			"meta",
 			"get",
 			f,
-			"--id",
 			"spec,nonexistent",
-			"--field",
 			"status",
 			"--json",
 		]);
@@ -2223,7 +2141,7 @@ req -> spec
 	it("warns on stderr for an unrecognized field name but still succeeds", async () => {
 		const f = join(dir, "get-unknown-field.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["meta", "get", f, "--id", "spec", "--field", "lable"]);
+		const r = await run(["meta", "get", f, "spec", "lable"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("spec.lable: \n");
 		expect(r.stderr).toContain("warning");
@@ -2233,15 +2151,7 @@ req -> spec
 	it("collapses the unknown-field warning into one line for multiple ids of the same kind (#479 re-check)", async () => {
 		const f = join(dir, "get-unknown-field-multi.pfdsl");
 		writeFileSync(f, base);
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"spec,code",
-			"--field",
-			"lable",
-		]);
+		const r = await run(["meta", "get", f, "spec,code", "lable"]);
 		expect(r.exitCode).toBe(0);
 		const warningLines = r.stderr
 			.trim()
@@ -2255,40 +2165,32 @@ req -> spec
 	it("does not warn for a recognized field with no value set", async () => {
 		const f = join(dir, "get-known-empty-field.pfdsl");
 		writeFileSync(f, base);
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"code",
-			"--field",
-			"location",
-		]);
+		const r = await run(["meta", "get", f, "code", "location"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toBe("");
 	});
 
-	it("--field is optional: omitting it no longer errors", async () => {
+	it("field positional is optional: omitting it no longer errors", async () => {
 		const f = join(dir, "get-missing-field.pfdsl");
 		writeFileSync(f, base);
-		const r = await run(["meta", "get", f, "--id", "spec"]);
+		const r = await run(["meta", "get", f, "spec"]);
 		expect(r.exitCode).toBe(0);
 	});
 
-	it("exits 2 with a specific message when --id is missing", async () => {
+	it("exits 2 with usage help when the id positional is missing", async () => {
 		const f = join(dir, "get-missing-id.pfdsl");
-		writeFileSync(f, base);
-		const r = await run(["meta", "get", f, "--field", "status"]);
-		expect(r.exitCode).toBe(2);
-		expect(r.stderr).toContain("--id is required");
-	});
-
-	it("exits 2 with --id is required when both --id and --field are omitted", async () => {
-		const f = join(dir, "get-missing-both.pfdsl");
 		writeFileSync(f, base);
 		const r = await run(["meta", "get", f]);
 		expect(r.exitCode).toBe(2);
-		expect(r.stderr).toContain("--id is required");
+		expect(r.stderr).toContain("pfdsl meta get");
+	});
+
+	it("exits 2 when there are extra positional arguments beyond file, ids, and fields", async () => {
+		const f = join(dir, "get-too-many-positionals.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "get", f, "spec", "status", "extra"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("pfdsl meta get");
 	});
 
 	it("returns null with a warning when an explicit derived field is requested from stdin", async () => {
@@ -2305,9 +2207,7 @@ req >> build -> out
 				"meta",
 				"get",
 				"-",
-				"--id",
 				"build",
-				"--field",
 				"location.resolved,command.cwd",
 				"--json",
 			]);
@@ -2347,15 +2247,7 @@ req -> spec
 		]);
 		expect(setResult.exitCode).toBe(0);
 
-		const r = await run([
-			"meta",
-			"get",
-			f,
-			"--id",
-			"spec",
-			"--field",
-			"location",
-		]);
+		const r = await run(["meta", "get", f, "spec", "location"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe(
 			`spec.location: ../docs/spec.md\nspec.location.resolved: ${resolve(dir, "../docs/spec.md")}\n`,
