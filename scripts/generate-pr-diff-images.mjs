@@ -46,18 +46,24 @@ function sanitizePath(filePath) {
 	return filePath.replace(/\.pfdsl$/, "");
 }
 
+// The in-repo CLI build, so the commands always match this script's revision
+// (the published @pfdsl/cli lags the repo between merge and release).
+const cliPath = join(root, "packages", "cli", "dist", "cli.js");
+
 function renderSvg(filePath) {
-	return execFileSync("pfdsl", ["render", filePath, "--format", "svg"], {
-		encoding: "utf-8",
-		cwd: root,
-	});
+	return execFileSync(
+		process.execPath,
+		[cliPath, "render", filePath, "--format", "svg"],
+		{ encoding: "utf-8", cwd: root },
+	);
 }
 
 function renderDiffSvg(aPath, bPath) {
-	return execFileSync("pfdsl", ["diff", aPath, bPath, "--format", "svg"], {
-		encoding: "utf-8",
-		cwd: root,
-	});
+	return execFileSync(
+		process.execPath,
+		[cliPath, "diff", aPath, bPath, "--format", "svg"],
+		{ encoding: "utf-8", cwd: root },
+	);
 }
 
 function getBaseContent(filePath) {

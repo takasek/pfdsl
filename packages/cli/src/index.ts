@@ -679,17 +679,61 @@ const NON_SCALAR_FIELDS = new Set([
  * scalar would misparse (YAML indicators, colon, quotes, leading/trailing
  * whitespace, ...). Inner spaces are fine bare ("make spec").
  */
-function yamlScalar(value: string): string {
+function yamlScalar(value: string, quoteAmbiguous = true): string {
+	// Core-schema resolution: bare true/null/42/2026-07-19 etc. re-type to
+	// boolean/null/number/date on parse, so string fields must quote them
+	// (integer fields like index pass quoteAmbiguous=false to stay bare).
+	const resolvesToNonString =
+		/^(?:true|false|null|yes|no|on|off|~)$/i.test(value) ||
+		(value.trim() !== "" && !Number.isNaN(Number(value))) ||
+		/^\d{4}-\d{2}-\d{2}/.test(value);
 	const needsQuoting =
 		value === "" ||
 		/[:#"'\\\n,{}[\]]/.test(value) ||
 		/^[\s&*!|>%@`?-]/.test(value) ||
-		/^\s|\s$/.test(value);
+		/^\s|\s$/.test(value) ||
+		(quoteAmbiguous && resolvesToNonString);
 	if (!needsQuoting) return value;
 	return `"${value
 		.replace(/\\/g, "\\\\")
 		.replace(/"/g, '\\"')
 		.replace(/\n/g, "\\n")}"`;
+}
+
+/**
+ * Split a flow-map inner text ("key: val, key2: val2") into its top-level
+ * entries, honoring double- and single-quoted strings so commas inside
+ * quoted values do not split.
+ */
+function splitFlowEntries(inner: string): string[] {
+	const parts: string[] = [];
+	let cur = "";
+	let quote: '"' | "'" | null = null;
+	for (let i = 0; i < inner.length; i++) {
+		const ch = inner[i]!;
+		if (quote === '"') {
+			cur += ch;
+			if (ch === "\\") cur += inner[++i] ?? "";
+			else if (ch === '"') quote = null;
+		} else if (quote === "'") {
+			cur += ch;
+			if (ch === "'") {
+				// YAML single-quote escape: '' stays inside the string
+				if (inner[i + 1] === "'") cur += inner[++i]!;
+				else quote = null;
+			}
+		} else if (ch === '"' || ch === "'") {
+			quote = ch;
+			cur += ch;
+		} else if (ch === ",") {
+			parts.push(cur);
+			cur = "";
+		} else {
+			cur += ch;
+		}
+	}
+	if (cur.trim() !== "") parts.push(cur);
+	return parts;
 }
 
 /**
@@ -716,8 +760,10 @@ function setFieldInSource(
 	const headerRe = new RegExp(`^(\\s+)${escapedId}:\\s*\\n`, "m");
 	const headerMatch = headerRe.exec(fmBlock);
 
+	// Flow-style body match is quote-aware: a "}" inside a quoted value must
+	// not terminate the map.
 	const flowHeaderRe = new RegExp(
-		`^(\\s+)${escapedId}:\\s*(\\{[^}]*\\})[ \\t]*$`,
+		`^(\\s+)${escapedId}:\\s*(\\{(?:"(?:[^"\\\\]|\\\\.)*"|'(?:[^']|'')*'|[^}"'])*\\})[ \\t]*$`,
 		"m",
 	);
 	const flowMatch = headerMatch ? null : flowHeaderRe.exec(fmBlock);
@@ -726,20 +772,17 @@ function setFieldInSource(
 
 	let newFm: string;
 	if (flowMatch) {
-		// Flow-style: update or insert the field within "{ ... }" on the same line
+		// Flow-style: split "{ ... }" into top-level entries (quote-aware, so a
+		// decoy "field:" inside another value's string is never matched), then
+		// replace the matching entry or append a new one.
 		const flowBody = flowMatch[2]!;
-		const kvRe = new RegExp(
-			`\\b${escapedField}:\\s*("(?:[^"\\\\]|\\\\.)*"|[^,}]*)`,
-		);
-		let newFlowBody: string;
-		if (kvRe.test(flowBody)) {
-			newFlowBody = flowBody.replace(kvRe, `${field}: ${scalar}`);
-		} else {
-			const inner = flowBody.slice(1, -1).trim();
-			newFlowBody = inner
-				? `{ ${inner}, ${field}: ${scalar} }`
-				: `{ ${field}: ${scalar} }`;
-		}
+		const entries = splitFlowEntries(flowBody.slice(1, -1));
+		const keyRe = new RegExp(`^\\s*${escapedField}:`);
+		const idx = entries.findIndex((e) => keyRe.test(e));
+		const newEntry = `${field}: ${scalar}`;
+		if (idx >= 0) entries[idx] = newEntry;
+		else entries.push(newEntry);
+		const newFlowBody = `{ ${entries.map((e) => e.trim()).join(", ")} }`;
 		const matchedLine = flowMatch[0]!;
 		const newLine = matchedLine.replace(flowBody, newFlowBody);
 		newFm =
@@ -767,8 +810,13 @@ function setFieldInSource(
 		// Replace "<childPad><field>: <old>" under this node — including any
 		// deeper-indented continuation lines (multi-line block scalars), so
 		// replacing them never leaves orphan lines — or insert after the header.
+		// Both the walk to the field and the continuation consumption tolerate
+		// blank lines, which are legal inside block scalars: the walk accepts
+		// whitespace-only lines, and the consumption takes blank lines only
+		// when a deeper-indented line follows (a trailing blank belongs to the
+		// mapping, not the scalar).
 		const fieldLineRe = new RegExp(
-			`(${nodePad}${escapedId}:[ \\t]*\\n(?:${childPad}[^\\n]*\\n)*?)${childPad}${escapedField}:[^\\n]*\\n(?:${childPad} +[^\\n]*\\n)*`,
+			`(${nodePad}${escapedId}:[ \\t]*\\n(?:(?:${childPad}[^\\n]*|[ \\t]*)\\n)*?)${childPad}${escapedField}:[^\\n]*\\n(?:(?:[ \\t]*\\n)*${childPad} +[^\\n]*\\n)*`,
 		);
 		if (fieldLineRe.test(fmBlock)) {
 			newFm = fmBlock.replace(
@@ -853,11 +901,12 @@ export function runMetaSet(
 	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
 	const beforeSet = new Set(beforeIds);
 
-	const scalar = yamlScalar(value);
+	const scalar = yamlScalar(value, field !== "index");
 	let newSrc = src;
 	for (const id of ids) {
 		const applied = setFieldInSource(newSrc, id, field, scalar);
 		if (applied === null) {
+			if (opts.json) return failJson({ missing: [id] });
 			return fail(`error: '${id}' not found in ${file}\n`);
 		}
 		newSrc = applied;
@@ -1094,7 +1143,10 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 								? null
 								: resolveLocationDerived(docFsPath, meta.location, basePath);
 					} else {
-						row[field] = commandCwdDerived(docFsPath, basePath);
+						row[field] =
+							meta?.command === undefined
+								? null
+								: commandCwdDerived(docFsPath, basePath);
 					}
 					continue;
 				}
@@ -1133,11 +1185,13 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	if (missing.length > 0) {
 		const errorText = `error: id(s) not found in ${file}: ${missing.join(", ")}\n`;
 		if (opts.json) {
-			return fail(
-				`${warnText}${errorText}`,
-				1,
-				`${JSON.stringify({ ok: false, values, missing })}\n`,
-			);
+			// JSON failure convention: the error is carried in the payload;
+			// stderr keeps only warnings.
+			return {
+				stdout: `${JSON.stringify({ ok: false, values, missing })}\n`,
+				stderr: warnText,
+				exitCode: 1,
+			};
 		}
 		const lines = linesFor(ids.filter((id) => values[id]));
 		const stdout = lines.length ? `${lines.join("\n")}\n` : "";
@@ -1256,12 +1310,16 @@ export function runPath(
 	const all = computePaths(loaded.graph, from, to);
 	const paths = opts.limit !== undefined ? all.slice(0, opts.limit) : all;
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, paths })}\n`);
+	// "no path found" means the graph has none — not that --limit hid them all.
+	if (all.length === 0) return ok("no path found\n");
 	const truncated = opts.limit !== undefined && all.length > opts.limit;
 	const hint = truncated
 		? `(${all.length} paths total — showing first ${opts.limit})\n`
 		: "";
-	if (paths.length === 0) return ok("no path found\n", hint);
-	return ok(`${paths.map((p) => p.join(" -> ")).join("\n")}\n`, hint);
+	const body = paths.length
+		? `${paths.map((p) => p.join(" -> ")).join("\n")}\n`
+		: "";
+	return ok(body, hint);
 }
 
 export interface StatsOptions extends GraphAnalysisOptions {
@@ -1563,7 +1621,7 @@ export async function runDiff(
 		frontmatter: fmA,
 		diagnostics: diagsA,
 	} = analyze(diffSrcA);
-	const failedA = failIfErrors(diagsA, fileA);
+	const failedA = failIfErrors(diagsA, fileA, opts.json);
 	if (failedA) return failedA;
 	const diffSrcB = readSource(fileB);
 	if (isCommandResult(diffSrcB)) return diffSrcB;
@@ -1572,7 +1630,7 @@ export async function runDiff(
 		frontmatter: fmB,
 		diagnostics: diagsB,
 	} = analyze(diffSrcB);
-	const failedB = failIfErrors(diagsB, fileB);
+	const failedB = failIfErrors(diagsB, fileB, opts.json);
 	if (failedB) return failedB;
 
 	if (fmt === "dot") {
@@ -2053,6 +2111,23 @@ export function parseArgs(argv: readonly string[]): CliArgs {
 	return { command, positional, flags };
 }
 
+/**
+ * Parse the optional --limit flag shared by graph path/stats: undefined when
+ * absent, the parsed non-negative integer, or a usage-error CommandResult
+ * (including a bare --limit with no value, which parseArgs yields as `true`).
+ */
+function parseLimitFlag(
+	flags: Record<string, string | boolean>,
+	help: string,
+): number | CommandResult | undefined {
+	const limitFlag = flags.limit;
+	if (limitFlag === undefined) return undefined;
+	if (limitFlag === true) return fail(help, 2);
+	const n = Number(limitFlag);
+	if (!Number.isInteger(n) || n < 0) return fail(help, 2);
+	return n;
+}
+
 function runGraphGroup(
 	positional: string[],
 	flags: Record<string, string | boolean>,
@@ -2101,13 +2176,8 @@ function runGraphGroup(
 			if (flags.help) return ok(HELP_PATH);
 			const [f, from, to] = rest;
 			if (!f || !from || !to) return fail(HELP_PATH, 2);
-			const limitFlag = flags.limit;
-			let limit: number | undefined;
-			if (typeof limitFlag === "string") {
-				const n = Number(limitFlag);
-				if (!Number.isInteger(n) || n < 0) return fail(HELP_PATH, 2);
-				limit = n;
-			}
+			const limit = parseLimitFlag(flags, HELP_PATH);
+			if (limit !== undefined && typeof limit !== "number") return limit;
 			return runPath(f, from, to, {
 				...(limit !== undefined ? { limit } : {}),
 				json: flags.json === true,
@@ -2117,13 +2187,8 @@ function runGraphGroup(
 			if (flags.help) return ok(HELP_STATS);
 			const f = rest[0];
 			if (!f) return fail(HELP_STATS, 2);
-			const limitFlag = flags.limit;
-			let limit: number | undefined;
-			if (typeof limitFlag === "string") {
-				const n = Number(limitFlag);
-				if (!Number.isInteger(n) || n < 0) return fail(HELP_STATS, 2);
-				limit = n;
-			}
+			const limit = parseLimitFlag(flags, HELP_STATS);
+			if (limit !== undefined && typeof limit !== "number") return limit;
 			return runStats(f, {
 				...(limit !== undefined ? { limit } : {}),
 				json: flags.json === true,
@@ -2259,6 +2324,12 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			if (flags.help) return ok(HELP_FMT);
 			const f = positional[0];
 			if (!f) return fail(HELP_FMT, 2);
+			if (flags.mode !== undefined) {
+				return fail(
+					"fmt: --mode was removed; fmt always formats in flows style\n",
+					2,
+				);
+			}
 			return runFmt(f, {
 				write: flags.write === true,
 				check: flags.check === true,

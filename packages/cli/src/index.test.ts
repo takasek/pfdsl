@@ -1877,6 +1877,77 @@ req >> design -> spec
 		const check = await run(["check", f]);
 		expect(check.exitCode).toBe(0);
 	});
+
+	// Block scalars may contain blank lines (a legal YAML paragraph break);
+	// the surgery regexes must step over them both when replacing the scalar
+	// itself and when walking past it to reach a later field.
+	const blankLineScalar = `---
+artifact:
+  spec:
+    description: |
+      line one.
+
+      line three.
+    status: done
+---
+req >> design -> spec
+`;
+
+	it("replaces a block scalar containing a blank line without orphan lines", async () => {
+		const f = join(dir, "meta-set-blank-scalar-replace.pfdsl");
+		writeFileSync(f, blankLineScalar);
+		const r = await run(["meta", "set", f, "spec", "description", "short."]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("description: short.");
+		expect(after).not.toContain("line one.");
+		expect(after).not.toContain("line three.");
+		expect(after).toContain("status: done");
+		const check = await run(["check", f]);
+		expect(check.exitCode).toBe(0);
+	});
+
+	it("updates a field that follows a blank-line block scalar without duplicating it", async () => {
+		const f = join(dir, "meta-set-blank-scalar-walk.pfdsl");
+		writeFileSync(f, blankLineScalar);
+		const r = await run(["meta", "set", f, "spec", "status", "wip"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("status: wip");
+		expect(after).not.toContain("status: done");
+		expect(after.match(/status:/g)).toHaveLength(1);
+		expect(after).toContain("line one.");
+		expect(after).toContain("line three.");
+		const check = await run(["check", f]);
+		expect(check.exitCode).toBe(0);
+	});
+
+	// YAML core-schema resolution: reserved words and number-like strings must
+	// be quoted for string fields, or the parser re-types them (get/set
+	// round-trip breakage). index is integer-typed and must stay bare.
+	it("quotes YAML reserved words and number-like values for string fields", async () => {
+		const f = join(dir, "meta-set-reserved.pfdsl");
+		writeFileSync(f, generic);
+		const r1 = await run(["meta", "set", f, "spec", "label", "true"]);
+		expect(r1.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toContain('label: "true"');
+		const get1 = await run(["meta", "get", f, "spec", "label", "--json"]);
+		expect(JSON.parse(get1.stdout).values.spec.label).toBe("true");
+
+		const r2 = await run(["meta", "set", f, "spec", "label", "42"]);
+		expect(r2.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toContain('label: "42"');
+	});
+
+	it("keeps index values as bare integers", async () => {
+		const f = join(dir, "meta-set-bare-index.pfdsl");
+		writeFileSync(f, generic);
+		const r = await run(["meta", "set", f, "spec", "index", "5"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("index: 5");
+		expect(after).not.toContain('index: "5"');
+	});
 });
 
 describe("status gaps", () => {
@@ -2332,6 +2403,9 @@ req -> spec
 			values: { spec: { status: "done" } },
 			missing: ["nonexistent"],
 		});
+		// JSON failure convention: the error lives in the payload, not stderr
+		// (stderr stays reserved for warnings).
+		expect(r.stderr).not.toContain("error:");
 	});
 
 	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
@@ -2906,5 +2980,112 @@ p3 -> d
 			expect(parsed.ok).toBe(false);
 			expect(Array.isArray(parsed.diagnostics)).toBe(true);
 		});
+	});
+});
+
+// Regression tests for the code-review findings on the restructure PR (#506).
+describe("review hardening", () => {
+	const invalidSrc = "req >> design -> spec\nother -> spec\n"; // V001
+
+	it("diff --json emits { ok: false, diagnostics } when an input fails to parse", async () => {
+		const bad = join(dir, "review-diff-bad.pfdsl");
+		const good = join(dir, "review-diff-good.pfdsl");
+		writeFileSync(bad, invalidSrc);
+		writeFileSync(good, "req >> design -> spec\n");
+		const r = await run(["diff", bad, good, "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+	});
+
+	it("meta set --json on an edge-only id (no frontmatter entry) emits { ok: false, missing }", async () => {
+		const f = join(dir, "review-set-edge-only.pfdsl");
+		writeFileSync(f, "req >> design -> spec\n");
+		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		expect(JSON.parse(r.stdout)).toEqual({ ok: false, missing: ["req"] });
+	});
+
+	it("graph path --limit 0 does not claim 'no path found' when paths exist", async () => {
+		const f = join(dir, "review-path-limit0.pfdsl");
+		writeFileSync(f, "a >> p -> b\nb >> q -> c\n");
+		const r = await run(["graph", "path", f, "a", "c", "--limit", "0"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toContain("no path found");
+		expect(r.stderr).toContain("1 paths total");
+	});
+
+	it("graph path still reports 'no path found' when none exist", async () => {
+		const f = join(dir, "review-path-none.pfdsl");
+		writeFileSync(f, "a >> p -> b\nc >> q -> d\n");
+		const r = await run(["graph", "path", f, "a", "d", "--limit", "0"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("no path found");
+		expect(r.stderr).toBe("");
+	});
+
+	it("bare --limit without a value is a usage error for graph path and graph stats", async () => {
+		const f = join(dir, "review-limit-bare.pfdsl");
+		writeFileSync(f, "a >> p -> b\n");
+		const p = await run(["graph", "path", f, "a", "b", "--limit"]);
+		expect(p.exitCode).toBe(2);
+		const s = await run(["graph", "stats", f, "--limit"]);
+		expect(s.exitCode).toBe(2);
+	});
+
+	it("meta set handles a flow-style entry whose other value contains a quoted brace", async () => {
+		const f = join(dir, "review-flow-brace.pfdsl");
+		writeFileSync(
+			f,
+			'---\nartifact:\n  spec: { label: "a } b", status: wip }\n---\nreq >> design -> spec\n',
+		);
+		const r = await run(["meta", "set", f, "spec", "status", "done"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain('"a } b"');
+		expect(after).toContain("status: done");
+		expect(after).not.toContain("status: wip");
+		const check = await run(["check", f]);
+		expect(check.exitCode).toBe(0);
+	});
+
+	it("meta set does not overwrite a decoy key inside another quoted value", async () => {
+		const f = join(dir, "review-flow-decoy.pfdsl");
+		writeFileSync(
+			f,
+			'---\nartifact:\n  spec: { description: "status: legacy", status: wip }\n---\nreq >> design -> spec\n',
+		);
+		const r = await run(["meta", "set", f, "spec", "status", "done"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain('"status: legacy"');
+		expect(after).toContain("status: done");
+		expect(after).not.toContain("status: wip");
+		const get = await run(["meta", "get", f, "spec", "description", "--json"]);
+		expect(JSON.parse(get.stdout).values.spec.description).toBe(
+			"status: legacy",
+		);
+	});
+
+	it("explicit command.cwd request returns null when the node has no command", async () => {
+		const f = join(dir, "review-cwd-null.pfdsl");
+		writeFileSync(
+			f,
+			"---\nprocess:\n  design:\n    label: Design\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["meta", "get", f, "design", "command.cwd", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout).values.design["command.cwd"]).toBe(null);
+	});
+
+	it("fmt rejects the removed --mode flag with exit 2", async () => {
+		const f = join(dir, "review-fmt-mode.pfdsl");
+		writeFileSync(f, "req >> design -> spec\n");
+		const r = await run(["fmt", f, "--mode", "flat"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("removed");
 	});
 });

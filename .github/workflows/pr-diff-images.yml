@@ -31,9 +31,24 @@ jobs:
             echo 'PFDSL_EOF'
           } >> $GITHUB_OUTPUT
 
-      - name: Install @pfdsl/cli
+      # Build the CLI from this checkout instead of installing the published
+      # @pfdsl/cli: the script must match the CLI it drives, and the npm
+      # release lags the repo (e.g. the graph→render rename would break every
+      # run between merge and the next publish).
+      - uses: pnpm/action-setup@v6
         if: steps.changed.outputs.files != ''
-        run: npm install -g @pfdsl/cli
+
+      - uses: actions/setup-node@v6
+        if: steps.changed.outputs.files != ''
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Build @pfdsl/cli from source
+        if: steps.changed.outputs.files != ''
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm -r build
 
       - name: Generate before/after/diff SVGs
         id: generate
