@@ -92,9 +92,9 @@ npx @pfdsl/cli explain <code>   # Print the summary and spec section for a diagn
 npx @pfdsl/cli fmt <file|-> [--write] [--check]   # Format a .pfdsl file (- = stdin)
 npx @pfdsl/cli render <file|-> [--format dot|svg|pdf|png]   # Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
 npx @pfdsl/cli diff <a> <b> [--format text|dot|svg] [--json]   # Structural diff (text), or visual diff DOT/SVG
-npx @pfdsl/cli graph summary|io|stats|neighbors|impact|depends-on|path|edges   # Read-only queries on the graph topology
-npx @pfdsl/cli meta get|set|sort|reindex   # Read and write frontmatter metadata
-npx @pfdsl/cli status ready|gaps   # Planning queries derived from artifact status
+npx @pfdsl/cli graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans   # Read-only queries on the graph topology
+npx @pfdsl/cli meta get|set|sort|reindex|check-links   # Read and write frontmatter metadata
+npx @pfdsl/cli status ready|blocked|list|gaps   # Planning queries derived from artifact status
 npx @pfdsl/cli help   # Show this help
 ```
 
