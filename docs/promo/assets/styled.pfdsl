@@ -1,0 +1,24 @@
+---
+type: roadmap
+statusStyles:
+  done: { fillcolor: "#d4edda", style: filled }
+  wip:  { fillcolor: "#fff3cd", style: filled }
+  todo: { fillcolor: "#f8f9fa", style: filled }
+artifact:
+  product_idea: { status: done }
+  user_interviews: { status: done }
+  requirements: { status: done }
+  design_doc: { status: wip }
+  implementation: { status: todo }
+  test_report: { status: todo }
+  landing_page: { status: todo }
+  release: { status: todo }
+---
+product_idea >> define_requirements -> requirements
+user_interviews >> define_requirements
+requirements >> write_design -> design_doc
+design_doc >> implement -> implementation
+implementation >> run_tests -> test_report
+requirements >> build_landing_page -> landing_page
+test_report >> ship -> release
+landing_page >> ship

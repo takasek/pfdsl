@@ -1,0 +1,8 @@
+product_idea >> define_requirements -> requirements
+user_interviews >> define_requirements
+requirements >> write_design -> design_doc
+design_doc >> implement -> implementation
+implementation >> run_tests -> test_report
+requirements >> build_landing_page -> landing_page
+test_report >> ship -> release
+landing_page >> ship
