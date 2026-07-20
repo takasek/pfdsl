@@ -413,12 +413,12 @@ artifact:
   cli_release_grill_tolerance:
     label: "CLIリリース: 診断緩和 + pfd-grill"
     description: "#480 warning 降格 / #478 V011 緩和 / #481 pfd-grill スキル同梱を含む次期 npm リリース"
-    status: todo
+    status: done
     criteria: "npm 公開版の check で V020/V002/V003 が非 strict warning かつ V011 が正当な補助入力を許容し、plugin に pfd-grill が同梱されている"
   cli_release_query_tools:
     label: "CLIリリース: フィールド取得 + graph 分析"
     description: "#476 get コマンド / #479 graph-analysis サブコマンド群を含む次期 npm リリース"
-    status: todo
+    status: done
     criteria: "npm 公開版で get と graph-analysis サブコマンドが動作する"
   ext_editing_release:
     label: "extension 編集支援リリース"
