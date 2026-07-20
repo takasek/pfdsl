@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
 	analyze,
@@ -24,6 +24,7 @@ import {
 	type IndexChange,
 	loadExtendsChain,
 	loadSubflowGraph,
+	type NodeKind,
 	type PfdType,
 	reindex,
 	resolveEffectiveFrontmatter,
@@ -662,6 +663,142 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	return ok(`${lines.join("\n")}\n`, warnText);
 }
 
+export interface StatusListOptions {
+	status: string;
+	json?: boolean;
+}
+
+export interface StatusListItem {
+	id: string;
+	label: string;
+	status: string;
+}
+
+export function runStatusList(
+	file: string,
+	opts: StatusListOptions,
+): CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json);
+	if (failed) return failed;
+
+	const statuses = splitCommaList(opts.status);
+	const invalid = statuses.find(
+		(s) => !STATUS_VALUES.includes(s as (typeof STATUS_VALUES)[number]),
+	);
+	if (invalid !== undefined) {
+		return fail(
+			`status list: invalid status '${invalid}' (valid: ${STATUS_VALUES.join(" | ")})\n`,
+			2,
+		);
+	}
+	const statusSet = new Set(statuses);
+
+	const artifactMeta = frontmatter?.artifact ?? {};
+	const items: StatusListItem[] = Object.entries(artifactMeta)
+		.filter(
+			([, meta]) => meta.status !== undefined && statusSet.has(meta.status),
+		)
+		.map(([id, meta]) => ({
+			id,
+			label: meta.label ?? id,
+			status: meta.status as string,
+		}))
+		.sort((a, b) => a.id.localeCompare(b.id));
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, items })}\n`);
+	}
+	if (items.length === 0) {
+		return ok(`No artifacts match status: ${statuses.join(", ")}.\n`);
+	}
+	const lines: string[] = [`Artifacts (${items.length}):`];
+	for (const item of items) {
+		lines.push(
+			`  ${item.id.padEnd(20)} "${item.label}"   status: ${item.status}`,
+		);
+	}
+	return ok(`${lines.join("\n")}\n`);
+}
+
+export interface StatusBlockedOptions {
+	json?: boolean;
+}
+
+export interface StatusBlockedItem {
+	id: string;
+	label: string;
+	blockedBy: string[];
+}
+
+export function runStatusBlocked(
+	file: string,
+	opts: StatusBlockedOptions = {},
+): CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
+		readyGate: true,
+	});
+	const earlyFail = failIfErrors(diagnostics, file, opts.json);
+	if (earlyFail) return earlyFail;
+
+	const BLOCKED_REQUIRED_TYPE = "roadmap" satisfies PfdType;
+	const pfdType = frontmatter?.type;
+	if (pfdType !== undefined && pfdType !== BLOCKED_REQUIRED_TYPE) {
+		return fail(
+			`blocked requires a roadmap file (type: roadmap). This file has type: ${pfdType}\n`,
+			2,
+		);
+	}
+
+	const warnings = diagnostics.filter((d) => d.code === "W006");
+	const warnText = warnings.length ? diagText(warnings, file) : "";
+
+	const artifactMeta = frontmatter?.artifact ?? {};
+	const { processInputs } = groupEdges(edges);
+
+	const blockedItems: StatusBlockedItem[] = [];
+	for (const [pid, inputs] of processInputs) {
+		if (nodeKinds.get(pid) !== "process") continue;
+		const blockedBy = inputs.filter((aid) => {
+			const s = artifactMeta[aid]?.status;
+			return s !== "done" && s !== undefined;
+		});
+		if (blockedBy.length === 0) continue;
+		blockedItems.push({
+			id: pid,
+			label: frontmatter?.process?.[pid]?.label ?? pid,
+			blockedBy,
+		});
+	}
+	blockedItems.sort((a, b) => a.id.localeCompare(b.id));
+
+	if (opts.json) {
+		const payload: Record<string, unknown> = {
+			ok: true,
+			blocked: blockedItems,
+		};
+		if (warnings.length) payload.warnings = warnings;
+		return ok(`${JSON.stringify(payload)}\n`, warnText);
+	}
+
+	if (blockedItems.length === 0) {
+		return ok("No blocked processes.\n", warnText);
+	}
+	const lines: string[] = [`Blocked processes (${blockedItems.length}):`];
+	for (const item of blockedItems) {
+		lines.push(
+			`  ${item.id.padEnd(20)} "${item.label}"   blocked by: [${item.blockedBy.join(", ")}]`,
+		);
+	}
+	return ok(`${lines.join("\n")}\n`, warnText);
+}
+
 export interface MetaSetOptions {
 	json?: boolean;
 }
@@ -1206,6 +1343,80 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
 }
 
+export interface CheckLinksOptions {
+	json?: boolean;
+}
+
+export interface CheckLinksMissing {
+	id: string;
+	kind: "artifact" | "process";
+	location: string;
+	resolved: string;
+}
+
+/** URL (contains "://") or glob (contains *, ?, or {) elements are not checkable file paths (spec §15.8). */
+function isLocationCheckable(element: string): boolean {
+	return !element.includes("://") && !/[*?{]/.test(element);
+}
+
+export function runCheckLinks(
+	file: string,
+	opts: CheckLinksOptions = {},
+): CommandResult {
+	if (file === "-") {
+		return fail("meta check-links cannot be used with stdin (-)\n", 2);
+	}
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json);
+	if (failed) return failed;
+
+	const basePath = frontmatter?.basePath;
+	const docFsPath = resolve(file);
+
+	const missing: CheckLinksMissing[] = [];
+	const checkNode = (
+		id: string,
+		kind: "artifact" | "process",
+		location: unknown,
+	) => {
+		if (location === undefined) return;
+		const elements = Array.isArray(location) ? location : [location];
+		for (const element of elements) {
+			const value = String(element);
+			if (!isLocationCheckable(value)) continue;
+			const resolvedPath = resolveLocationFsPath(docFsPath, value, basePath);
+			if (!existsSync(resolvedPath)) {
+				missing.push({ id, kind, location: value, resolved: resolvedPath });
+			}
+		}
+	};
+
+	for (const [id, meta] of Object.entries(frontmatter?.artifact ?? {})) {
+		checkNode(id, "artifact", meta.location);
+	}
+	for (const [id, meta] of Object.entries(frontmatter?.process ?? {})) {
+		checkNode(id, "process", meta.location);
+	}
+	missing.sort((a, b) => a.id.localeCompare(b.id));
+
+	if (opts.json) {
+		const exitCode = missing.length > 0 ? 1 : 0;
+		return {
+			stdout: `${JSON.stringify({ ok: missing.length === 0, missing })}\n`,
+			stderr: "",
+			exitCode,
+		};
+	}
+	if (missing.length === 0) return ok("All location paths exist.\n");
+	const lines = missing.map(
+		(m) => `${m.id} (${m.kind})   ${m.location} -> ${m.resolved}`,
+	);
+	return { stdout: `${lines.join("\n")}\n`, stderr: "", exitCode: 1 };
+}
+
 function formatGetLine(
 	id: string,
 	field: string,
@@ -1344,6 +1555,30 @@ export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
 			? `(${all.length} nodes total — pass --limit <n> to narrow)\n`
 			: "";
 	return ok(`${lines.join("\n")}\n`, hint);
+}
+
+export interface GraphOrphansOptions {
+	json?: boolean;
+}
+
+export interface GraphOrphan {
+	id: string;
+	kind: NodeKind;
+}
+
+/** Nodes with neither predecessor nor successor — fully disconnected from the graph (§518). */
+export function runGraphOrphans(
+	file: string,
+	opts: GraphOrphansOptions = {},
+): CommandResult {
+	const loaded = loadGraph(file, opts.json);
+	if (isGraphLoadFailure(loaded)) return loaded;
+	const orphans: GraphOrphan[] = computeStats(loaded.graph)
+		.filter((s) => s.fanIn === 0 && s.fanOut === 0)
+		.map((s) => ({ id: s.id, kind: s.kind }));
+	if (opts.json) return ok(`${JSON.stringify({ ok: true, orphans })}\n`);
+	if (orphans.length === 0) return ok("(none)\n");
+	return ok(`${orphans.map((o) => `${o.id} (${o.kind})`).join("\n")}\n`);
 }
 
 export interface GraphSummaryOptions {
@@ -1798,6 +2033,38 @@ Options:
           on parse failure: { ok: false, diagnostics }
 `;
 
+const HELP_STATUS_LIST = `usage: pfdsl status list <file|-> --status <status[,status...]> [--json]
+
+List artifacts whose status matches one of the given values. Use - to read
+from stdin.
+
+  --status <status[,status...]>  required, comma-separated: todo | wip | done |
+                                  waiting | suspended
+  --json  output as JSON ({ ok, items: [{id, label, status}] })
+          on parse failure: { ok: false, diagnostics }
+
+Exit codes:
+  0  success
+  1  parse/validation error
+  2  invalid usage (missing/unknown --status)
+`;
+
+const HELP_STATUS_BLOCKED = `usage: pfdsl status blocked <file|-> [--json]
+
+List processes that are not ready: for each, the input artifacts whose
+status is not done (or unset). Only applies to roadmap files (type:
+roadmap). Use - to read from stdin. Omitting type: is treated as roadmap
+and allowed, with a warning (W006).
+
+  --json  output as JSON ({ ok, blocked: [{id, label, blockedBy}], warnings? })
+          on parse failure: { ok: false, diagnostics }
+
+Exit codes:
+  0  success
+  1  parse/validation error
+  2  invalid usage
+`;
+
 const HELP_META_SET = `usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json]
 
 Set a scalar frontmatter field on one or more nodes, rewriting the file in
@@ -1823,6 +2090,25 @@ Exit codes:
   0  success
   1  id not found in the file, or the rewrite was refused
   2  invalid usage (missing argument, invalid field or value)
+`;
+
+const HELP_CHECK_LINKS = `usage: pfdsl meta check-links <file> [--json]
+
+Verify that every artifact/process \`location:\` file path exists on disk
+(dead-link detection). Each location element is classified per spec §15.8:
+a "://" element is a URL and is skipped; a *, ?, or { element is a glob
+and is skipped; everything else is resolved (basePath-aware, same as
+\`meta get\`'s location.resolved) and checked with a filesystem existence
+check. Cannot be used with stdin (-): there is no file path to resolve
+relative paths against.
+
+  --json  output as JSON ({ ok, missing: {id, kind, location, resolved}[] })
+          on parse failure: { ok: false, diagnostics }
+
+Exit codes:
+  0  all checkable location paths exist
+  1  one or more location paths do not exist, or parse/validation error
+  2  invalid usage (stdin)
 `;
 
 const HELP_GET = `usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--json]
@@ -1954,6 +2240,22 @@ Exit codes:
   2  invalid usage
 `;
 
+const HELP_GRAPH_ORPHANS = `usage: pfdsl graph orphans <file|-> [--json]
+
+Print nodes with neither predecessor nor successor — fully disconnected
+from the graph. Distinct from \`graph io\`'s external inputs (no predecessor
+only) and terminals (no successor only): an orphan has neither. Use - to
+read from stdin.
+
+  --json  output as JSON ({ ok, orphans: {id, kind}[] })
+          on parse failure: { ok: false, diagnostics }
+
+Exit codes:
+  0  success
+  1  parse/validation error
+  2  invalid usage
+`;
+
 const HELP_STATUS_GAPS = `usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json]
 
 Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
@@ -2026,6 +2328,7 @@ Subcommands:
   path <file|-> <from> <to> [--limit]
                               All simple paths between two nodes
   edges <file|->              Canonical edge list
+  orphans <file|->            Nodes with neither predecessor nor successor
 
 All subcommands accept --json.
 `;
@@ -2040,6 +2343,7 @@ Subcommands:
   set <file> <id> <field> <value>                Set a field value in place
   sort <file|-> --by <keys>                      Sort node definitions
   reindex <file|->                               Assign topological index: values
+  check-links <file>                             Verify location: file paths exist
 `;
 
 const HELP_STATUS_GROUP = `usage: pfdsl status <subcommand> ...
@@ -2049,6 +2353,8 @@ Planning queries derived from artifact status. Run
 
 Subcommands:
   ready <file|-> [--best]           List ready-to-start processes
+  blocked <file|->                  List not-ready processes and their blocking inputs
+  list <file|-> --status <s[,s...]> List artifacts by status
   gaps <roadmap> <flow> [<flow>...] Find todo artifacts missing from the roadmap
 `;
 
@@ -2067,11 +2373,12 @@ Commands:
                            Structural diff (text), or visual diff DOT/SVG
 
 Command groups (run \`pfdsl <group>\` for their subcommands):
-  graph summary|io|stats|neighbors|impact|depends-on|path|edges
+  graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
-  meta get|set|sort|reindex
+  meta get|set|sort|reindex|check-links
                            Read and write frontmatter metadata
-  status ready|gaps        Planning queries derived from artifact status
+  status ready|blocked|list|gaps
+                           Planning queries derived from artifact status
 
   help                     Show this help
 
@@ -2194,6 +2501,12 @@ function runGraphGroup(
 				json: flags.json === true,
 			});
 		}
+		case "orphans": {
+			if (flags.help) return ok(HELP_GRAPH_ORPHANS);
+			const f = rest[0];
+			if (!f) return fail(HELP_GRAPH_ORPHANS, 2);
+			return runGraphOrphans(f, { json: flags.json === true });
+		}
 		default:
 			return fail(`unknown graph subcommand: ${sub}\n${HELP_GRAPH_GROUP}`, 2);
 	}
@@ -2253,6 +2566,12 @@ function runMetaGroup(
 				json: flags.json === true,
 			});
 		}
+		case "check-links": {
+			if (flags.help) return ok(HELP_CHECK_LINKS);
+			const f = rest[0];
+			if (!f) return fail(HELP_CHECK_LINKS, 2);
+			return runCheckLinks(f, { json: flags.json === true });
+		}
 		default:
 			return fail(`unknown meta subcommand: ${sub}\n${HELP_META_GROUP}`, 2);
 	}
@@ -2281,6 +2600,23 @@ function runStatusGroup(
 			if (!roadmapFile || flowFiles.length === 0)
 				return fail(HELP_STATUS_GAPS, 2);
 			return runStatusGaps(roadmapFile, flowFiles, {
+				json: flags.json === true,
+			});
+		}
+		case "blocked": {
+			if (flags.help) return ok(HELP_STATUS_BLOCKED);
+			const f = rest[0];
+			if (!f) return fail(HELP_STATUS_BLOCKED, 2);
+			return runStatusBlocked(f, { json: flags.json === true });
+		}
+		case "list": {
+			if (flags.help) return ok(HELP_STATUS_LIST);
+			const f = rest[0];
+			if (!f) return fail(HELP_STATUS_LIST, 2);
+			const statusVal = flags.status;
+			if (!statusVal || statusVal === true) return fail(HELP_STATUS_LIST, 2);
+			return runStatusList(f, {
+				status: String(statusVal),
 				json: flags.json === true,
 			});
 		}

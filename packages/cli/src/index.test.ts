@@ -2135,6 +2135,151 @@ describe("status gaps", () => {
 	});
 });
 
+describe("status list", () => {
+	const withStatus = (content: string) => {
+		const f = join(dir, "status-list.pfdsl");
+		writeFileSync(f, content);
+		return f;
+	};
+
+	it("lists artifacts matching a single status", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  a:\n    status: todo\n  b:\n    status: done\n---\nx >> p1 -> a\na >> p2 -> b\n",
+		);
+		const r = await run(["status", "list", f, "--status", "todo"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("a");
+		expect(r.stdout).not.toContain('"b"');
+	});
+
+	it("lists artifacts matching multiple comma-separated statuses", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  a:\n    status: todo\n  b:\n    status: wip\n  c:\n    status: done\n---\nx >> p1 -> a\na >> p2 -> b\nb >> p3 -> c\n",
+		);
+		const r = await run(["status", "list", f, "--status", "todo,wip"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("a");
+		expect(r.stdout).toContain("b");
+		expect(r.stdout).not.toContain('"c"');
+	});
+
+	it("excludes artifacts without a matching status", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  a:\n    status: done\n---\nx >> p -> a\n",
+		);
+		const r = await run(["status", "list", f, "--status", "todo"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No artifacts match status: todo.\n");
+	});
+
+	it("--json returns structured output", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  a:\n    status: todo\n    label: Alpha\n---\nx >> p -> a\n",
+		);
+		const r = await run(["status", "list", f, "--status", "todo", "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.items).toEqual([{ id: "a", label: "Alpha", status: "todo" }]);
+	});
+
+	it("missing --status flag is a usage error (exit 2)", async () => {
+		const r = await run(["status", "list", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("unknown status value is a usage error (exit 2)", async () => {
+		const r = await run([
+			"status",
+			"list",
+			join(dir, "valid.pfdsl"),
+			"--status",
+			"bogus",
+		]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("missing file returns exit 1", async () => {
+		const r = await run([
+			"status",
+			"list",
+			join(dir, "nonexistent.pfdsl"),
+			"--status",
+			"todo",
+		]);
+		expect(r.exitCode).toBe(1);
+	});
+
+	it("--help returns help text", async () => {
+		const r = await run(["status", "list", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl status list");
+	});
+});
+
+describe("status blocked", () => {
+	const withStatus = (content: string) => {
+		const f = join(dir, "status-blocked.pfdsl");
+		writeFileSync(f, content);
+		return f;
+	};
+
+	it("lists processes with an undone input and the blocking artifacts", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: todo\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "blocked", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("design");
+		expect(r.stdout).toContain("req");
+	});
+
+	it("excludes processes whose inputs are all done", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "blocked", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No blocked processes.\n");
+	});
+
+	it("--json returns structured output", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: waiting\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "blocked", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.blocked[0].id).toBe("design");
+		expect(parsed.blocked[0].blockedBy).toContain("req");
+	});
+
+	it("rejects file with type: workflow (exit 2)", async () => {
+		const f = withStatus("---\ntype: workflow\n---\nA >> P -> B\n");
+		const r = await run(["status", "blocked", f]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("type: roadmap");
+	});
+
+	it("warns (W006) on stderr when type: is omitted, but still succeeds", async () => {
+		const r = await run(["status", "blocked", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("W006");
+	});
+
+	it("missing file returns exit 1", async () => {
+		const r = await run(["status", "blocked", join(dir, "nonexistent.pfdsl")]);
+		expect(r.exitCode).toBe(1);
+	});
+
+	it("--help returns help text", async () => {
+		const r = await run(["status", "blocked", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl status blocked");
+	});
+});
+
 describe("explain", () => {
 	it("prints the code, severity, summary, and spec section for a plain-severity error code", async () => {
 		const r = await run(["explain", "V021"]);
@@ -2545,6 +2690,140 @@ req -> spec
 		const r = await run(["meta", "get", "--help"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("pfdsl meta get");
+	});
+});
+
+describe("meta check-links", () => {
+	it("reports a missing location file path", async () => {
+		const f = join(dir, "check-links-missing.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec:
+    location: does-not-exist.md
+---
+req -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toContain("spec");
+		expect(r.stdout).toContain("does-not-exist.md");
+	});
+
+	it("succeeds when the location file exists", async () => {
+		const existing = join(dir, "existing-doc.md");
+		writeFileSync(existing, "hi\n");
+		const f = join(dir, "check-links-ok.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec:
+    location: existing-doc.md
+---
+req -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("All location paths exist.\n");
+	});
+
+	it("skips URL locations", async () => {
+		const f = join(dir, "check-links-url.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec:
+    location: https://example.com/spec.md
+---
+req -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(0);
+	});
+
+	it("skips glob locations", async () => {
+		const f = join(dir, "check-links-glob.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec:
+    location: docs/*.md
+---
+req -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(0);
+	});
+
+	it("checks process locations too", async () => {
+		const f = join(dir, "check-links-process.pfdsl");
+		writeFileSync(
+			f,
+			`---
+process:
+  design:
+    location: missing-process-doc.md
+---
+req >> design -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toContain("design");
+	});
+
+	it("--json returns structured output", async () => {
+		const f = join(dir, "check-links-json.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  spec:
+    location: does-not-exist.md
+---
+req -> spec
+`,
+		);
+		const r = await run(["meta", "check-links", f, "--json"]);
+		expect(r.exitCode).toBe(1);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(parsed.missing).toEqual([
+			{
+				id: "spec",
+				kind: "artifact",
+				location: "does-not-exist.md",
+				resolved: resolve(dir, "does-not-exist.md"),
+			},
+		]);
+	});
+
+	it("rejects stdin (exit 2)", async () => {
+		const r = await run(["meta", "check-links", "-"]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("missing file returns exit 1", async () => {
+		const r = await run([
+			"meta",
+			"check-links",
+			join(dir, "nonexistent.pfdsl"),
+		]);
+		expect(r.exitCode).toBe(1);
+	});
+
+	it("--help returns help text", async () => {
+		const r = await run(["meta", "check-links", "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("pfdsl meta check-links");
 	});
 });
 
@@ -2979,6 +3258,66 @@ p3 -> d
 			const parsed = JSON.parse(r.stdout);
 			expect(parsed.ok).toBe(false);
 			expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		});
+	});
+
+	describe("orphans", () => {
+		it("lists nodes with no predecessor and no successor as text", async () => {
+			const f = join(dir, "orphans.pfdsl");
+			writeFileSync(
+				f,
+				`---\nartifact:\n  floater:\n    status: todo\n---\n${base}`,
+			);
+			const r = await run(["graph", "orphans", f]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toContain("floater");
+			expect(r.stdout).not.toContain("spec");
+		});
+
+		it("prints a no-orphans message when none exist", async () => {
+			const f = join(dir, "orphans-none.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["graph", "orphans", f]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("(none)\n");
+		});
+
+		it("emits JSON", async () => {
+			const f = join(dir, "orphans-json.pfdsl");
+			writeFileSync(
+				f,
+				`---\nartifact:\n  floater:\n    status: todo\n---\n${base}`,
+			);
+			const r = await run(["graph", "orphans", f, "--json"]);
+			expect(r.exitCode).toBe(0);
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(true);
+			expect(parsed.orphans).toEqual([{ id: "floater", kind: "artifact" }]);
+		});
+
+		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
+			const r = await run([
+				"graph",
+				"orphans",
+				join(dir, "invalid.pfdsl"),
+				"--json",
+			]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(false);
+			expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		});
+
+		it("missing file returns exit 1", async () => {
+			const r = await run(["graph", "orphans", join(dir, "nonexistent.pfdsl")]);
+			expect(r.exitCode).toBe(1);
+		});
+
+		it("--help returns help text", async () => {
+			const r = await run(["graph", "orphans", "--help"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toContain("pfdsl graph orphans");
 		});
 	});
 });
