@@ -134,7 +134,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 npx @pfdsl/cli meta set <file> <artifact-id> status <status>   # todo|wip|done|waiting|suspended
 ```
 
-Sets the status in place and validates. Manual fallback: edit `status:` in the frontmatter `artifact:` section, then run `check`.
+Sets the status in place and validates in one step — always prefer it over hand-editing. Only if the CLI is genuinely unavailable, edit `status:` in the artifact's frontmatter and then run `check` to validate.
 
 ## References — which to read when
 
