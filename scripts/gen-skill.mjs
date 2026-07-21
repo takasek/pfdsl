@@ -154,11 +154,24 @@ const helpOutput = execFileSync(process.execPath, [cliPath, "help"], { encoding:
 const cliVersion = JSON.parse(
   readFileSync(resolve(root, "packages/cli/package.json"), "utf-8"),
 ).version;
+if (!cliVersion) {
+  console.error("Error: packages/cli/package.json has no 'version' field — cannot stamp the skill's required CLI version.");
+  process.exit(1);
+}
 
 const skillMd = templateSrc
 	.replace(/\{\{specVersion\}\}/g, specVersion)
 	.replace(/\{\{cliVersion\}\}/g, cliVersion)
 	.replace("{{cliCommands}}", renderCliSection(helpOutput));
+
+// Fail loudly if the template carries a placeholder nobody substituted — a
+// typo'd or newly-added {{name}} would otherwise ship as a literal to readers.
+const leftover = [...new Set(skillMd.match(/\{\{[^{}]*\}\}/g) ?? [])];
+if (leftover.length > 0) {
+  console.error(`Error: unreplaced template placeholder(s) in generated SKILL.md: ${leftover.join(", ")}`);
+  console.error("Every {{...}} in scripts/skill-template/SKILL.md needs a matching .replace() in scripts/gen-skill.mjs.");
+  process.exit(1);
+}
 
 writeFileSync(resolve(outDir, "SKILL.md"), skillMd);
 console.log("SKILL.md → generated from skill-template/SKILL.md");
