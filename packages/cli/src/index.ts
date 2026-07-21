@@ -126,8 +126,8 @@ function fileLoader(path: string): ReturnType<typeof analyze> | null {
 	}
 }
 
-function diagText(diags: Diagnostic[], file: string): string {
-	return `${diags.map((d) => formatDiagnostic(d, file)).join("\n")}\n`;
+function diagText(diags: Diagnostic[], file: string, color = false): string {
+	return `${diags.map((d) => formatDiagnostic(d, file, color)).join("\n")}\n`;
 }
 
 /**
@@ -149,11 +149,12 @@ function failIfErrors(
 	diags: Diagnostic[],
 	file: string,
 	json = false,
+	color = false,
 ): CommandResult | null {
 	if (!hasErrors(diags)) return null;
 	const errs = diags.filter((d) => d.severity === "error");
 	if (json) return failJson({ diagnostics: errs });
-	return fail(diagText(errs, file));
+	return fail(diagText(errs, file, color));
 }
 
 export interface CheckOptions {
@@ -315,6 +316,7 @@ export function runCheck(file: string, opts: CheckOptions = {}): CommandResult {
 export interface FmtOptions {
 	write?: boolean;
 	check?: boolean;
+	color?: boolean;
 }
 export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	if (opts.check && opts.write) {
@@ -326,7 +328,7 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	const source = readSource(file);
 	if (isCommandResult(source)) return source;
 	const { output, diagnostics } = format(source, { style: "flows" });
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, undefined, opts.color);
 	if (failed) return failed;
 	if (opts.check) {
 		const changed = output !== source;
@@ -348,6 +350,7 @@ export interface ReindexOptions {
 	check?: boolean;
 	renumber?: boolean;
 	json?: boolean;
+	color?: boolean;
 }
 
 function reindexReport(changes: IndexChange[], json: boolean): string {
@@ -378,7 +381,7 @@ export function runReindex(
 		src,
 		opts.renumber ? { renumber: true } : {},
 	);
-	const failed = failIfErrors(diagnostics, file, opts.json);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
 	// --check: report drift, non-zero exit when reindexing would change anything.
@@ -404,6 +407,7 @@ export interface SortOptions {
 	by: string; // comma-separated SortKey list, e.g. "group,index"
 	write?: boolean;
 	check?: boolean;
+	color?: boolean;
 }
 
 function parseSortKeys(raw: string): SortKey[] | CommandResult {
@@ -434,7 +438,7 @@ export function runSort(file: string, opts: SortOptions): CommandResult {
 	if (isCommandResult(src)) return src;
 
 	const { output, changed, diagnostics } = sort(src, { by: keys });
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, undefined, opts.color);
 	if (failed) return failed;
 
 	if (opts.check) {
@@ -455,6 +459,7 @@ export function runSort(file: string, opts: SortOptions): CommandResult {
 
 export interface GraphEdgesOptions {
 	json?: boolean;
+	color?: boolean;
 }
 
 export function runGraphEdges(
@@ -464,7 +469,7 @@ export function runGraphEdges(
 	const normSrc = readSource(file);
 	if (isCommandResult(normSrc)) return normSrc;
 	const { edges, graph, diagnostics } = analyze(normSrc);
-	const failed = failIfErrors(diagnostics, file, opts.json);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 	const sorted = sortEdges(edges, graph);
 	if (opts.json) {
@@ -476,6 +481,7 @@ export function runGraphEdges(
 export interface ReadyOptions {
 	best?: boolean;
 	json?: boolean;
+	color?: boolean;
 }
 
 /**
@@ -552,7 +558,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
 		readyGate: true,
 	});
-	const earlyFail = failIfErrors(diagnostics, file, opts.json);
+	const earlyFail = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (earlyFail) return earlyFail;
 
 	const READY_REQUIRED_TYPE = "roadmap" satisfies PfdType;
@@ -565,7 +571,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	}
 
 	const warnings = diagnostics.filter((d) => d.code === "W006");
-	const warnText = warnings.length ? diagText(warnings, file) : "";
+	const warnText = warnings.length ? diagText(warnings, file, opts.color) : "";
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 
@@ -666,6 +672,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 export interface StatusListOptions {
 	status: string;
 	json?: boolean;
+	color?: boolean;
 }
 
 export interface StatusListItem {
@@ -682,7 +689,7 @@ export function runStatusList(
 	if (isCommandResult(src)) return src;
 
 	const { diagnostics, frontmatter } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, opts.json);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
 	const statuses = splitCommaList(opts.status);
@@ -726,6 +733,7 @@ export function runStatusList(
 
 export interface StatusBlockedOptions {
 	json?: boolean;
+	color?: boolean;
 }
 
 export interface StatusBlockedItem {
@@ -744,7 +752,7 @@ export function runStatusBlocked(
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src, {
 		readyGate: true,
 	});
-	const earlyFail = failIfErrors(diagnostics, file, opts.json);
+	const earlyFail = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (earlyFail) return earlyFail;
 
 	const BLOCKED_REQUIRED_TYPE = "roadmap" satisfies PfdType;
@@ -757,7 +765,7 @@ export function runStatusBlocked(
 	}
 
 	const warnings = diagnostics.filter((d) => d.code === "W006");
-	const warnText = warnings.length ? diagText(warnings, file) : "";
+	const warnText = warnings.length ? diagText(warnings, file, opts.color) : "";
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 	const { processInputs } = groupEdges(edges);
@@ -801,6 +809,7 @@ export function runStatusBlocked(
 
 export interface MetaSetOptions {
 	json?: boolean;
+	color?: boolean;
 }
 
 /** Fields whose values are arrays/maps — meta set only writes scalars. */
@@ -1014,7 +1023,7 @@ export function runMetaSet(
 	if (isCommandResult(src)) return src;
 
 	const { diagnostics, nodeKinds } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, opts.json);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
 	// Validate every id and field/kind pairing before touching anything, so a
@@ -1066,7 +1075,7 @@ export function runMetaSet(
 		: [];
 	const warnings = after?.warnings ?? [];
 
-	const warnText = warnings.length ? diagText(warnings, file) : "";
+	const warnText = warnings.length ? diagText(warnings, file, opts.color) : "";
 
 	if (opts.json) {
 		const payload: Record<string, unknown> = { ok: true, newlyReady };
@@ -1083,6 +1092,7 @@ export interface GetOptions {
 	id?: string;
 	field?: string;
 	json?: boolean;
+	color?: boolean;
 }
 
 function splitCommaList(raw: string): string[] {
@@ -1179,7 +1189,7 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	if (isCommandResult(src)) return src;
 
 	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, opts.json);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
 	const basePath = frontmatter?.basePath;
@@ -1345,6 +1355,7 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 
 export interface CheckLinksOptions {
 	json?: boolean;
+	color?: boolean;
 }
 
 export interface CheckLinksMissing {
@@ -1370,7 +1381,7 @@ export function runCheckLinks(
 	if (isCommandResult(src)) return src;
 
 	const { diagnostics, frontmatter } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, opts.json);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
 	const basePath = frontmatter?.basePath;
@@ -1429,6 +1440,7 @@ function formatGetLine(
 
 export interface GraphAnalysisOptions {
 	json?: boolean;
+	color?: boolean;
 }
 
 type GraphLoadResult =
@@ -1439,11 +1451,11 @@ function isGraphLoadFailure(v: GraphLoadResult): v is CommandResult {
 	return "exitCode" in v;
 }
 
-function loadGraph(file: string, json = false): GraphLoadResult {
+function loadGraph(file: string, json = false, color = false): GraphLoadResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 	const { diagnostics, graph } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, json);
+	const failed = failIfErrors(diagnostics, file, json, color);
 	if (failed) return failed;
 	return { graph };
 }
@@ -1463,7 +1475,7 @@ export function runNeighbors(
 	id: string,
 	opts: GraphAnalysisOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file, opts.json);
+	const loaded = loadGraph(file, opts.json, opts.color);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	if (!loaded.graph.nodes.has(id))
 		return idsNotFoundError(file, [id], opts.json);
@@ -1481,7 +1493,7 @@ export function runImpact(
 	id: string,
 	opts: GraphAnalysisOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file, opts.json);
+	const loaded = loadGraph(file, opts.json, opts.color);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	if (!loaded.graph.nodes.has(id))
 		return idsNotFoundError(file, [id], opts.json);
@@ -1495,7 +1507,7 @@ export function runDependsOn(
 	id: string,
 	opts: GraphAnalysisOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file, opts.json);
+	const loaded = loadGraph(file, opts.json, opts.color);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	if (!loaded.graph.nodes.has(id))
 		return idsNotFoundError(file, [id], opts.json);
@@ -1514,7 +1526,7 @@ export function runPath(
 	to: string,
 	opts: PathOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file, opts.json);
+	const loaded = loadGraph(file, opts.json, opts.color);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	const missing = [from, to].filter((id) => !loaded.graph.nodes.has(id));
 	if (missing.length > 0) return idsNotFoundError(file, missing, opts.json);
@@ -1541,7 +1553,7 @@ export interface StatsOptions extends GraphAnalysisOptions {
 const STATS_HINT_THRESHOLD = 20;
 
 export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
-	const loaded = loadGraph(file, opts.json);
+	const loaded = loadGraph(file, opts.json, opts.color);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	const all = computeStats(loaded.graph);
 	const stats = opts.limit !== undefined ? all.slice(0, opts.limit) : all;
@@ -1559,6 +1571,7 @@ export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
 
 export interface GraphOrphansOptions {
 	json?: boolean;
+	color?: boolean;
 }
 
 export interface GraphOrphan {
@@ -1571,7 +1584,7 @@ export function runGraphOrphans(
 	file: string,
 	opts: GraphOrphansOptions = {},
 ): CommandResult {
-	const loaded = loadGraph(file, opts.json);
+	const loaded = loadGraph(file, opts.json, opts.color);
 	if (isGraphLoadFailure(loaded)) return loaded;
 	const orphans: GraphOrphan[] = computeStats(loaded.graph)
 		.filter((s) => s.fanIn === 0 && s.fanOut === 0)
@@ -1583,6 +1596,7 @@ export function runGraphOrphans(
 
 export interface GraphSummaryOptions {
 	json?: boolean;
+	color?: boolean;
 }
 
 /**
@@ -1592,6 +1606,7 @@ export interface GraphSummaryOptions {
 function loadForAudit(
 	file: string,
 	json = false,
+	color = false,
 ):
 	| {
 			edges: ReturnType<typeof analyze>["edges"];
@@ -1604,7 +1619,7 @@ function loadForAudit(
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, json);
+	const failed = failIfErrors(diagnostics, file, json, color);
 	if (failed) return failed;
 	return { edges, nodeKinds, artifactMeta: frontmatter?.artifact ?? undefined };
 }
@@ -1613,7 +1628,7 @@ export function runGraphSummary(
 	file: string,
 	opts: GraphSummaryOptions = {},
 ): CommandResult {
-	const loaded = loadForAudit(file, opts.json);
+	const loaded = loadForAudit(file, opts.json, opts.color);
 	if ("exitCode" in loaded) return loaded;
 	const { edges, nodeKinds, artifactMeta } = loaded;
 	const artifactCount = [...nodeKinds.values()].filter(
@@ -1649,13 +1664,14 @@ export function runGraphSummary(
 
 export interface GraphIoOptions {
 	json?: boolean;
+	color?: boolean;
 }
 
 export function runGraphIo(
 	file: string,
 	opts: GraphIoOptions = {},
 ): CommandResult {
-	const loaded = loadForAudit(file, opts.json);
+	const loaded = loadForAudit(file, opts.json, opts.color);
 	if ("exitCode" in loaded) return loaded;
 	const { edges, nodeKinds, artifactMeta } = loaded;
 	const { terminals, externalInputs } = auditGraph(
@@ -1673,6 +1689,7 @@ export function runGraphIo(
 
 export interface StatusGapsOptions {
 	json?: boolean;
+	color?: boolean;
 }
 
 export interface StatusGap {
@@ -1701,11 +1718,18 @@ export function runStatusGaps(
 		frontmatter: roadmapFm,
 		edges: roadmapEdges,
 	} = analyze(roadmapSrc, { readyGate: true });
-	const roadmapFail = failIfErrors(roadmapDiags, roadmapFile, opts.json);
+	const roadmapFail = failIfErrors(
+		roadmapDiags,
+		roadmapFile,
+		opts.json,
+		opts.color,
+	);
 	if (roadmapFail) return roadmapFail;
 
 	const warnings = roadmapDiags.filter((d) => d.code === "W006");
-	const warnText = warnings.length ? diagText(warnings, roadmapFile) : "";
+	const warnText = warnings.length
+		? diagText(warnings, roadmapFile, opts.color)
+		: "";
 
 	const ROADMAP_REQUIRED_TYPE = "roadmap" satisfies PfdType;
 	if (
@@ -1733,7 +1757,7 @@ export function runStatusGaps(
 		if (isCommandResult(flowSrc)) return flowSrc;
 
 		const { diagnostics: flowDiags, frontmatter: flowFm } = analyze(flowSrc);
-		const flowFail = failIfErrors(flowDiags, flowFile, opts.json);
+		const flowFail = failIfErrors(flowDiags, flowFile, opts.json, opts.color);
 		if (flowFail) return flowFail;
 
 		const flowType = flowFm?.type;
@@ -1794,6 +1818,7 @@ export type CliRenderFormat = RenderFormat | BinaryFormat;
 
 export interface RenderOptions {
 	format?: CliRenderFormat;
+	color?: boolean;
 }
 export async function runRender(
 	file: string,
@@ -1803,7 +1828,7 @@ export async function runRender(
 	const graphSrc = readSource(file);
 	if (isCommandResult(graphSrc)) return graphSrc;
 	const { graph, frontmatter, diagnostics } = analyze(graphSrc);
-	const failed = failIfErrors(diagnostics, file);
+	const failed = failIfErrors(diagnostics, file, undefined, opts.color);
 	if (failed) return failed;
 
 	// Resolve extends-inherited statusStyles/tag/group (§2.9.4) so presets
@@ -1838,6 +1863,7 @@ export type { DiffReport };
 export interface DiffOptions {
 	format?: "text" | "dot" | "svg";
 	json?: boolean;
+	color?: boolean;
 }
 
 export async function runDiff(
@@ -1856,7 +1882,7 @@ export async function runDiff(
 		frontmatter: fmA,
 		diagnostics: diagsA,
 	} = analyze(diffSrcA);
-	const failedA = failIfErrors(diagsA, fileA, opts.json);
+	const failedA = failIfErrors(diagsA, fileA, opts.json, opts.color);
 	if (failedA) return failedA;
 	const diffSrcB = readSource(fileB);
 	if (isCommandResult(diffSrcB)) return diffSrcB;
@@ -1865,7 +1891,7 @@ export async function runDiff(
 		frontmatter: fmB,
 		diagnostics: diagsB,
 	} = analyze(diffSrcB);
-	const failedB = failIfErrors(diagsB, fileB, opts.json);
+	const failedB = failIfErrors(diagsB, fileB, opts.json, opts.color);
 	if (failedB) return failedB;
 
 	if (fmt === "dot") {
@@ -1913,13 +1939,14 @@ For topology queries (terminal artifacts, external inputs, counts) see
 \`pfdsl graph io\` and \`pfdsl graph summary\`.
 `;
 
-const HELP_GRAPH_SUMMARY = `usage: pfdsl graph summary <file|-> [--json]
+const HELP_GRAPH_SUMMARY = `usage: pfdsl graph summary <file|-> [--json] [--no-color]
 
 Print aggregate counts for the graph: artifacts, processes, primary edges,
 external inputs, and terminal artifacts. Use - to read from stdin.
 
-  --json  output as JSON ({ ok, artifacts, processes, edges, externalInputs, terminals })
-          on failure: { ok: false, diagnostics }
+  --json      output as JSON ({ ok, artifacts, processes, edges, externalInputs, terminals })
+              on failure: { ok: false, diagnostics }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
@@ -1927,7 +1954,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_GRAPH_IO = `usage: pfdsl graph io <file|-> [--json]
+const HELP_GRAPH_IO = `usage: pfdsl graph io <file|-> [--json] [--no-color]
 
 Print the graph's boundary: external inputs (artifacts consumed but never
 produced — where the flow starts) and terminal artifacts (produced but never
@@ -1935,8 +1962,9 @@ consumed — where it ends). Artifacts with externalStakeholders are treated
 as having an external consumer and excluded from terminals. Use - to read
 from stdin.
 
-  --json  output as JSON ({ ok, externalInputs: string[], terminals: string[] })
-          on failure: { ok: false, diagnostics }
+  --json      output as JSON ({ ok, externalInputs: string[], terminals: string[] })
+              on failure: { ok: false, diagnostics }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
@@ -1944,18 +1972,19 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--check]
+const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--check] [--no-color]
 
 Format a .pfdsl file, grouping each process with its inputs and outputs.
 Use - to read from stdin (--write not allowed with stdin; --check is allowed).
 
 Options:
-  --write  rewrite the file in place (cannot be used with -)
-  --check  do not write; exit 1 if formatting would change anything (CI)
-           (cannot be combined with --write)
+  --write     rewrite the file in place (cannot be used with -)
+  --check     do not write; exit 1 if formatting would change anything (CI)
+              (cannot be combined with --write)
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_REINDEX = `usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json]
+const HELP_REINDEX = `usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json] [--no-color]
 
 Assign integer index: values to nodes in topological order. Processes and
 artifacts are numbered with independent counters. Use - to read from stdin.
@@ -1972,9 +2001,10 @@ Options:
   --renumber  reassign every node from 1 (default keeps existing indices)
   --json      emit the change report as JSON ({ changes: [...] })
               on parse failure: { ok: false, diagnostics } (exit 1)
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_SORT = `usage: pfdsl meta sort <file|-> --by <keys> [--write] [--check]
+const HELP_SORT = `usage: pfdsl meta sort <file|-> --by <keys> [--write] [--check] [--no-color]
 
 Sort artifact and process node definitions within each frontmatter section.
 Each section is sorted independently. Use - to read from stdin.
@@ -1984,18 +2014,20 @@ Options:
                 e.g. --by group,index  (primary=group, secondary=index)
   --write       rewrite the file in place (cannot be used with -)
   --check       exit 1 if the file is not already sorted (CI mode)
+  --no-color    disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_GRAPH_EDGES = `usage: pfdsl graph edges <file|-> [--json]
+const HELP_GRAPH_EDGES = `usage: pfdsl graph edges <file|-> [--json] [--no-color]
 
 Print canonical edge list. Use - to read from stdin.
 
 Options:
-  --json  output as JSON ({ ok, edges: {kind, artifact, process}[] })
-          on failure: { ok: false, diagnostics }
+  --json      output as JSON ({ ok, edges: {kind, artifact, process}[] })
+              on failure: { ok: false, diagnostics }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_RENDER = `usage: pfdsl render <file|-> [--format dot|svg|pdf|png]
+const HELP_RENDER = `usage: pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]
 
 Print a Graphviz representation. Use - to read from stdin.
 
@@ -2004,9 +2036,10 @@ Options:
   --format svg  SVG via Graphviz wasm
   --format pdf  PDF (requires: npm install puppeteer)
   --format png  PNG (requires: npm install puppeteer)
+  --no-color    disable ANSI color codes for diagnostics (also: NO_COLOR env var)
 `;
 
-const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json]
+const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
 
 Show structural differences between two .pfdsl files. Either side may be -
 to read from stdin, e.g. \`git show HEAD:f.pfdsl | pfdsl diff - f.pfdsl\`.
@@ -2019,29 +2052,32 @@ Options:
                  ({ ok, diff: { addedNodes, removedNodes, changedNodes,
                  addedEdges, removedEdges, addedFeedback, removedFeedback } })
                  (cannot be combined with --format dot|svg)
+  --no-color     disable ANSI color codes for diagnostics (also: NO_COLOR env var)
 `;
 
-const HELP_READY = `usage: pfdsl status ready <file|-> [--best] [--json]
+const HELP_READY = `usage: pfdsl status ready <file|-> [--best] [--json] [--no-color]
 
 List processes whose every input artifact has status: done (or no status set).
 Only applies to roadmap files (type: roadmap). Use - to read from stdin.
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
 Options:
-  --best  highlight the process that unblocks the most downstream work
-  --json  output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, warnings? })
-          on parse failure: { ok: false, diagnostics }
+  --best      highlight the process that unblocks the most downstream work
+  --json      output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, warnings? })
+              on parse failure: { ok: false, diagnostics }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_STATUS_LIST = `usage: pfdsl status list <file|-> --status <status[,status...]> [--json]
+const HELP_STATUS_LIST = `usage: pfdsl status list <file|-> --status <status[,status...]> [--json] [--no-color]
 
 List artifacts whose status matches one of the given values. Use - to read
 from stdin.
 
   --status <status[,status...]>  required, comma-separated: todo | wip | done |
                                   waiting | suspended
-  --json  output as JSON ({ ok, items: [{id, label, status}] })
-          on parse failure: { ok: false, diagnostics }
+  --json      output as JSON ({ ok, items: [{id, label, status}] })
+              on parse failure: { ok: false, diagnostics }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
@@ -2049,15 +2085,16 @@ Exit codes:
   2  invalid usage (missing/unknown --status)
 `;
 
-const HELP_STATUS_BLOCKED = `usage: pfdsl status blocked <file|-> [--json]
+const HELP_STATUS_BLOCKED = `usage: pfdsl status blocked <file|-> [--json] [--no-color]
 
 List processes that are not ready: for each, the input artifacts whose
 status is not done (or unset). Only applies to roadmap files (type:
 roadmap). Use - to read from stdin. Omitting type: is treated as roadmap
 and allowed, with a warning (W006).
 
-  --json  output as JSON ({ ok, blocked: [{id, label, blockedBy}], warnings? })
-          on parse failure: { ok: false, diagnostics }
+  --json      output as JSON ({ ok, blocked: [{id, label, blockedBy}], warnings? })
+              on parse failure: { ok: false, diagnostics }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
@@ -2065,7 +2102,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_META_SET = `usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json]
+const HELP_META_SET = `usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json] [--no-color]
 
 Set a scalar frontmatter field on one or more nodes, rewriting the file in
 place while preserving its formatting. Multiple comma-separated ids get the
@@ -2082,9 +2119,10 @@ When setting status on a roadmap file, reports which processes became newly
 ready after the change (once, after all writes).
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
-  --json    emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
-            on failure: { ok: false, diagnostics } / { ok: false, missing } /
-            { ok: false, error }
+  --json      emit JSON ({ ok, newlyReady: string[], warnings? }) instead of text
+              on failure: { ok: false, diagnostics } / { ok: false, missing } /
+              { ok: false, error }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
@@ -2092,7 +2130,7 @@ Exit codes:
   2  invalid usage (missing argument, invalid field or value)
 `;
 
-const HELP_CHECK_LINKS = `usage: pfdsl meta check-links <file> [--json]
+const HELP_CHECK_LINKS = `usage: pfdsl meta check-links <file> [--json] [--no-color]
 
 Verify that every artifact/process \`location:\` file path exists on disk
 (dead-link detection). Each location element is classified per spec §15.8:
@@ -2102,8 +2140,9 @@ and is skipped; everything else is resolved (basePath-aware, same as
 check. Cannot be used with stdin (-): there is no file path to resolve
 relative paths against.
 
-  --json  output as JSON ({ ok, missing: {id, kind, location, resolved}[] })
-          on parse failure: { ok: false, diagnostics }
+  --json      output as JSON ({ ok, missing: {id, kind, location, resolved}[] })
+              on parse failure: { ok: false, diagnostics }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  all checkable location paths exist
@@ -2111,7 +2150,7 @@ Exit codes:
   2  invalid usage (stdin)
 `;
 
-const HELP_GET = `usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--json]
+const HELP_GET = `usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--json] [--no-color]
 
 Print field values for one or more artifact/process/group ids.
 
@@ -2123,6 +2162,7 @@ Print field values for one or more artifact/process/group ids.
   --json              emit JSON ({ ok, values: { [id]: { [field]: value } } })
                       on parse failure: { ok: false, diagnostics }
                       on id miss: { ok: false, values, missing }
+  --no-color          disable ANSI color codes (also: NO_COLOR env var)
 
 \`location\` is returned as the raw value exactly as written (so \`meta get\`
 and \`meta set\` round-trip). The resolved filesystem path is a separate
@@ -2163,13 +2203,14 @@ Exit codes:
   2  invalid usage (missing id, or too many positional arguments)
 `;
 
-const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json]
+const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json] [--no-color]
 
 Print the direct predecessors (in-edges) and successors (out-edges) of a
 node — its immediate producer(s)/consumer(s) only, not the full closure.
 
-  --json  output as JSON ({ ok, predecessors: string[], successors: string[] })
-          on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --json      output as JSON ({ ok, predecessors: string[], successors: string[] })
+              on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
@@ -2177,14 +2218,15 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_IMPACT = `usage: pfdsl graph impact <file|-> <id> [--json]
+const HELP_IMPACT = `usage: pfdsl graph impact <file|-> <id> [--json] [--no-color]
 
 Print the full downstream closure reachable from <id> via primary edges
 (everything <id> unblocks, transitively), excluding <id> itself. Text mode
 prints one id per line (empty: "(none)"), for easy piping into other tools.
 
-  --json  output as JSON ({ ok, impact: string[] })
-          on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --json      output as JSON ({ ok, impact: string[] })
+              on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
@@ -2192,14 +2234,15 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_DEPENDS_ON = `usage: pfdsl graph depends-on <file|-> <id> [--json]
+const HELP_DEPENDS_ON = `usage: pfdsl graph depends-on <file|-> <id> [--json] [--no-color]
 
 Print the full upstream closure <id> depends on via primary edges
 (everything that must exist for <id> to exist), excluding <id> itself. Text
 mode prints one id per line (empty: "(none)"), for easy piping into other tools.
 
-  --json  output as JSON ({ ok, dependsOn: string[] })
-          on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --json      output as JSON ({ ok, dependsOn: string[] })
+              on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
@@ -2207,7 +2250,7 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_PATH = `usage: pfdsl graph path <file|-> <from> <to> [--limit <n>] [--json]
+const HELP_PATH = `usage: pfdsl graph path <file|-> <from> <to> [--limit <n>] [--json] [--no-color]
 
 Print all simple paths from <from> to <to> via primary edges (empty if
 none exist). Answers "is <from> a prerequisite of <to>, and how". Text mode
@@ -2217,6 +2260,7 @@ off stdout so \`path ... | ...\` pipelines aren't affected).
   --limit <n>  only print the first n paths
   --json       output as JSON ({ ok, paths: string[][] })
                on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --no-color   disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success (including when no path exists)
@@ -2224,7 +2268,7 @@ Exit codes:
   2  invalid usage (missing from/to, or invalid --limit)
 `;
 
-const HELP_STATS = `usage: pfdsl graph stats <file|-> [--limit <n>] [--json]
+const HELP_STATS = `usage: pfdsl graph stats <file|-> [--limit <n>] [--json] [--no-color]
 
 Print fan-in/fan-out per node, ranked by total degree descending (hubs
 first) then id ascending. Text mode prints a hint to stderr suggesting
@@ -2234,21 +2278,23 @@ first) then id ascending. Text mode prints a hint to stderr suggesting
   --limit <n>  only print the top n rows
   --json       output as JSON ({ ok, stats: {id, kind, fanIn, fanOut}[] })
                on parse failure: { ok: false, diagnostics }
+  --no-color   disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
   2  invalid usage
 `;
 
-const HELP_GRAPH_ORPHANS = `usage: pfdsl graph orphans <file|-> [--json]
+const HELP_GRAPH_ORPHANS = `usage: pfdsl graph orphans <file|-> [--json] [--no-color]
 
 Print nodes with neither predecessor nor successor — fully disconnected
 from the graph. Distinct from \`graph io\`'s external inputs (no predecessor
 only) and terminals (no successor only): an orphan has neither. Use - to
 read from stdin.
 
-  --json  output as JSON ({ ok, orphans: {id, kind}[] })
-          on parse failure: { ok: false, diagnostics }
+  --json      output as JSON ({ ok, orphans: {id, kind}[] })
+              on parse failure: { ok: false, diagnostics }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  success
@@ -2256,7 +2302,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_STATUS_GAPS = `usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json]
+const HELP_STATUS_GAPS = `usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json] [--no-color]
 
 Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
 Reports artifacts with status: todo in flow files that have no corresponding entry
@@ -2267,8 +2313,9 @@ Omitting type: on the roadmap file is treated as roadmap and allowed, with a war
   <flow>     one or more .pfdsl files with type: workflow or runtime-pipeline
 
 Options:
-  --json  output as JSON ({ ok, gaps: [{file, artifactId, label, status}], warnings? })
-          on parse failure: { ok: false, diagnostics }
+  --json      output as JSON ({ ok, gaps: [{file, artifactId, label, status}], warnings? })
+              on parse failure: { ok: false, diagnostics }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
   0  all todo artifacts are tracked in the roadmap
@@ -2330,7 +2377,7 @@ Subcommands:
   edges <file|->              Canonical edge list
   orphans <file|->            Nodes with neither predecessor nor successor
 
-All subcommands accept --json.
+All subcommands accept --json and --no-color.
 `;
 
 const HELP_META_GROUP = `usage: pfdsl meta <subcommand> ...
@@ -2344,6 +2391,8 @@ Subcommands:
   sort <file|-> --by <keys>                      Sort node definitions
   reindex <file|->                               Assign topological index: values
   check-links <file>                             Verify location: file paths exist
+
+All subcommands accept --json and --no-color.
 `;
 
 const HELP_STATUS_GROUP = `usage: pfdsl status <subcommand> ...
@@ -2356,6 +2405,8 @@ Subcommands:
   blocked <file|->                  List not-ready processes and their blocking inputs
   list <file|-> --status <s[,s...]> List artifacts by status
   gaps <roadmap> <flow> [<flow>...] Find todo artifacts missing from the roadmap
+
+All subcommands accept --json and --no-color.
 `;
 
 export const HELP = `pfdsl <command> [options]
@@ -2364,12 +2415,12 @@ Commands:
   check <file|-> [--strict] [--hints] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
-  fmt <file|-> [--write] [--check]
+  fmt <file|-> [--write] [--check] [--no-color]
                            Format a .pfdsl file (- = stdin)
-  render <file|-> [--format dot|svg|pdf|png]
+  render <file|-> [--format dot|svg|pdf|png] [--no-color]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires: npm install puppeteer
-  diff <a> <b> [--format text|dot|svg] [--json]
+  diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
                            Structural diff (text), or visual diff DOT/SVG
 
 Command groups (run \`pfdsl <group>\` for their subcommands):
@@ -2435,6 +2486,15 @@ function parseLimitFlag(
 	return n;
 }
 
+/** Resolves --no-color/NO_COLOR/TTY for a dispatched command (ADR/#180, #435, #508). */
+function resolveColor(flags: Record<string, string | boolean>): boolean {
+	return shouldColorize({
+		noColorFlag: flags["no-color"] === true,
+		stream: process.stdout,
+		env: process.env,
+	});
+}
+
 function runGraphGroup(
 	positional: string[],
 	flags: Record<string, string | boolean>,
@@ -2447,37 +2507,55 @@ function runGraphGroup(
 			if (flags.help) return ok(HELP_GRAPH_SUMMARY);
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_SUMMARY, 2);
-			return runGraphSummary(f, { json: flags.json === true });
+			return runGraphSummary(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
 		}
 		case "io": {
 			if (flags.help) return ok(HELP_GRAPH_IO);
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_IO, 2);
-			return runGraphIo(f, { json: flags.json === true });
+			return runGraphIo(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
 		}
 		case "edges": {
 			if (flags.help) return ok(HELP_GRAPH_EDGES);
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_EDGES, 2);
-			return runGraphEdges(f, { json: flags.json === true });
+			return runGraphEdges(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
 		}
 		case "neighbors": {
 			if (flags.help) return ok(HELP_NEIGHBORS);
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
-			return runNeighbors(f, id, { json: flags.json === true });
+			return runNeighbors(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
 		}
 		case "impact": {
 			if (flags.help) return ok(HELP_IMPACT);
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_IMPACT, 2);
-			return runImpact(f, id, { json: flags.json === true });
+			return runImpact(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
 		}
 		case "depends-on": {
 			if (flags.help) return ok(HELP_DEPENDS_ON);
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
-			return runDependsOn(f, id, { json: flags.json === true });
+			return runDependsOn(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
 		}
 		case "path": {
 			if (flags.help) return ok(HELP_PATH);
@@ -2488,6 +2566,7 @@ function runGraphGroup(
 			return runPath(f, from, to, {
 				...(limit !== undefined ? { limit } : {}),
 				json: flags.json === true,
+				color: resolveColor(flags),
 			});
 		}
 		case "stats": {
@@ -2499,13 +2578,17 @@ function runGraphGroup(
 			return runStats(f, {
 				...(limit !== undefined ? { limit } : {}),
 				json: flags.json === true,
+				color: resolveColor(flags),
 			});
 		}
 		case "orphans": {
 			if (flags.help) return ok(HELP_GRAPH_ORPHANS);
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_ORPHANS, 2);
-			return runGraphOrphans(f, { json: flags.json === true });
+			return runGraphOrphans(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
 		}
 		default:
 			return fail(`unknown graph subcommand: ${sub}\n${HELP_GRAPH_GROUP}`, 2);
@@ -2528,6 +2611,7 @@ function runMetaGroup(
 				id,
 				...(field !== undefined ? { field } : {}),
 				json: flags.json === true,
+				color: resolveColor(flags),
 			});
 		}
 		case "set": {
@@ -2541,7 +2625,10 @@ function runMetaGroup(
 					2,
 				);
 			}
-			return runMetaSet(f, id, field, value, { json: flags.json === true });
+			return runMetaSet(f, id, field, value, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
 		}
 		case "sort": {
 			if (flags.help) return ok(HELP_SORT);
@@ -2553,6 +2640,7 @@ function runMetaGroup(
 				by: String(byVal),
 				write: flags.write === true,
 				check: flags.check === true,
+				color: resolveColor(flags),
 			});
 		}
 		case "reindex": {
@@ -2564,13 +2652,17 @@ function runMetaGroup(
 				check: flags.check === true,
 				renumber: flags.renumber === true,
 				json: flags.json === true,
+				color: resolveColor(flags),
 			});
 		}
 		case "check-links": {
 			if (flags.help) return ok(HELP_CHECK_LINKS);
 			const f = rest[0];
 			if (!f) return fail(HELP_CHECK_LINKS, 2);
-			return runCheckLinks(f, { json: flags.json === true });
+			return runCheckLinks(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
 		}
 		default:
 			return fail(`unknown meta subcommand: ${sub}\n${HELP_META_GROUP}`, 2);
@@ -2592,6 +2684,7 @@ function runStatusGroup(
 			return runReady(f, {
 				best: flags.best === true,
 				json: flags.json === true,
+				color: resolveColor(flags),
 			});
 		}
 		case "gaps": {
@@ -2601,13 +2694,17 @@ function runStatusGroup(
 				return fail(HELP_STATUS_GAPS, 2);
 			return runStatusGaps(roadmapFile, flowFiles, {
 				json: flags.json === true,
+				color: resolveColor(flags),
 			});
 		}
 		case "blocked": {
 			if (flags.help) return ok(HELP_STATUS_BLOCKED);
 			const f = rest[0];
 			if (!f) return fail(HELP_STATUS_BLOCKED, 2);
-			return runStatusBlocked(f, { json: flags.json === true });
+			return runStatusBlocked(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
 		}
 		case "list": {
 			if (flags.help) return ok(HELP_STATUS_LIST);
@@ -2618,6 +2715,7 @@ function runStatusGroup(
 			return runStatusList(f, {
 				status: String(statusVal),
 				json: flags.json === true,
+				color: resolveColor(flags),
 			});
 		}
 		default:
@@ -2649,11 +2747,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 				hints: flags.hints === true,
 				strict: flags.strict === true,
 				json: flags.json === true,
-				color: shouldColorize({
-					noColorFlag: flags["no-color"] === true,
-					stream: process.stdout,
-					env: process.env,
-				}),
+				color: resolveColor(flags),
 			});
 		}
 		case "fmt": {
@@ -2669,6 +2763,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			return runFmt(f, {
 				write: flags.write === true,
 				check: flags.check === true,
+				color: resolveColor(flags),
 			});
 		}
 		case "render": {
@@ -2685,7 +2780,10 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			) {
 				return fail(`unknown format: ${String(fmt)}\n`, 2);
 			}
-			return runRender(f, fmt ? { format: fmt as CliRenderFormat } : {});
+			return runRender(f, {
+				...(fmt ? { format: fmt as CliRenderFormat } : {}),
+				color: resolveColor(flags),
+			});
 		}
 		case "diff": {
 			if (flags.help) return ok(HELP_DIFF);
@@ -2703,6 +2801,7 @@ export async function run(argv: readonly string[]): Promise<CommandResult> {
 			return await runDiff(a, b, {
 				...(fmt ? { format: fmt } : {}),
 				json: flags.json === true,
+				color: resolveColor(flags),
 			});
 		}
 		case "explain": {

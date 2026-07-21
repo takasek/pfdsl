@@ -5,6 +5,7 @@ import {
 	afterAll,
 	afterEach,
 	beforeAll,
+	beforeEach,
 	describe,
 	expect,
 	it,
@@ -954,6 +955,234 @@ describe("run() wires color into the check command (#435)", () => {
 		process.env.NO_COLOR = "1";
 		const r = await run(["check", join(dir, "invalid.pfdsl")]);
 		expect(r.stderr).not.toContain("\x1b[");
+	});
+});
+
+describe("--no-color wired into all diagnostic-emitting commands (#508)", () => {
+	const originalIsTTY = process.stdout.isTTY;
+
+	beforeEach(() => {
+		Object.defineProperty(process.stdout, "isTTY", {
+			value: true,
+			configurable: true,
+		});
+	});
+
+	afterEach(() => {
+		Object.defineProperty(process.stdout, "isTTY", {
+			value: originalIsTTY,
+			configurable: true,
+		});
+	});
+
+	const invalidFile = () => join(dir, "invalid.pfdsl");
+
+	const cases: Array<{ name: string; argv: (noColor: boolean) => string[] }> = [
+		{
+			name: "fmt",
+			argv: (nc) => ["fmt", invalidFile(), ...(nc ? ["--no-color"] : [])],
+		},
+		{
+			name: "meta reindex",
+			argv: (nc) => [
+				"meta",
+				"reindex",
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "meta sort",
+			argv: (nc) => [
+				"meta",
+				"sort",
+				invalidFile(),
+				"--by",
+				"id",
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "graph edges",
+			argv: (nc) => [
+				"graph",
+				"edges",
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "status ready",
+			argv: (nc) => [
+				"status",
+				"ready",
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "status list",
+			argv: (nc) => [
+				"status",
+				"list",
+				invalidFile(),
+				"--status",
+				"todo",
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "status blocked",
+			argv: (nc) => [
+				"status",
+				"blocked",
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "meta set",
+			argv: (nc) => [
+				"meta",
+				"set",
+				invalidFile(),
+				"x",
+				"label",
+				"y",
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "meta get",
+			argv: (nc) => [
+				"meta",
+				"get",
+				invalidFile(),
+				"x",
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "meta check-links",
+			argv: (nc) => [
+				"meta",
+				"check-links",
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "graph neighbors",
+			argv: (nc) => [
+				"graph",
+				"neighbors",
+				invalidFile(),
+				"x",
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "graph impact",
+			argv: (nc) => [
+				"graph",
+				"impact",
+				invalidFile(),
+				"x",
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "graph depends-on",
+			argv: (nc) => [
+				"graph",
+				"depends-on",
+				invalidFile(),
+				"x",
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "graph path",
+			argv: (nc) => [
+				"graph",
+				"path",
+				invalidFile(),
+				"a",
+				"b",
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "graph stats",
+			argv: (nc) => [
+				"graph",
+				"stats",
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "graph orphans",
+			argv: (nc) => [
+				"graph",
+				"orphans",
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "graph summary",
+			argv: (nc) => [
+				"graph",
+				"summary",
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "graph io",
+			argv: (nc) => [
+				"graph",
+				"io",
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "status gaps",
+			argv: (nc) => [
+				"status",
+				"gaps",
+				invalidFile(),
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
+			name: "render",
+			argv: (nc) => ["render", invalidFile(), ...(nc ? ["--no-color"] : [])],
+		},
+		{
+			name: "diff",
+			argv: (nc) => [
+				"diff",
+				invalidFile(),
+				invalidFile(),
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+	];
+
+	it.each(
+		cases,
+	)("$name emits ANSI red on TTY without --no-color, suppresses it with --no-color", async ({
+		argv,
+	}) => {
+		const withColor = await run(argv(false));
+		expect(withColor.stderr).toContain("\x1b[31merror\x1b[0m");
+
+		const noColor = await run(argv(true));
+		expect(noColor.stderr).not.toContain("\x1b[");
 	});
 });
 
