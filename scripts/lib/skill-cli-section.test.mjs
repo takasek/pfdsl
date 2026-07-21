@@ -22,12 +22,12 @@ Exit codes:
 `;
 
 describe("renderCliSection", () => {
-	it("renders one npx line per command with its first description line as a comment", () => {
+	it("renders one pfdsl line per command with its first description line as a comment", () => {
 		const lines = renderCliSection(HELP_FIXTURE).split("\n");
 		assert.deepEqual(lines, [
-			"npx @pfdsl/cli check <file|-> [--hints] [--json]   # Validate a .pfdsl file (- = stdin)",
-			"npx @pfdsl/cli meta set <file> <artifact-id> <field> <value> [--json]   # Set a scalar frontmatter field in place",
-			"npx @pfdsl/cli help   # Show this help",
+			"pfdsl check <file|-> [--hints] [--json]   # Validate a .pfdsl file (- = stdin)",
+			"pfdsl meta set <file> <artifact-id> <field> <value> [--json]   # Set a scalar frontmatter field in place",
+			"pfdsl help   # Show this help",
 		]);
 	});
 
@@ -67,11 +67,11 @@ describe("renderCliSection with command groups", () => {
 	it("includes the Command groups entries, not just the top-level Commands", () => {
 		const lines = renderCliSection(GROUPS_FIXTURE).split("\n");
 		assert.deepEqual(lines, [
-			"npx @pfdsl/cli check <file|-> [--strict] [--json]   # Validate a .pfdsl file (- = stdin)",
-			"npx @pfdsl/cli graph summary|io|stats|neighbors|impact|depends-on|path|edges   # Read-only queries on the graph topology",
-			"npx @pfdsl/cli meta get|set|sort|reindex   # Read and write frontmatter metadata",
-			"npx @pfdsl/cli status ready|gaps   # Planning queries derived from artifact status",
-			"npx @pfdsl/cli help   # Show this help",
+			"pfdsl check <file|-> [--strict] [--json]   # Validate a .pfdsl file (- = stdin)",
+			"pfdsl graph summary|io|stats|neighbors|impact|depends-on|path|edges   # Read-only queries on the graph topology",
+			"pfdsl meta get|set|sort|reindex   # Read and write frontmatter metadata",
+			"pfdsl status ready|gaps   # Planning queries derived from artifact status",
+			"pfdsl help   # Show this help",
 		]);
 	});
 
