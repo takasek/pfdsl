@@ -102,12 +102,12 @@ Commands:
   check <file|-> [--strict] [--hints] [--json] [--no-color]
                            Validate a .pfdsl file (- = stdin)
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
-  fmt <file|-> [--write] [--check]
+  fmt <file|-> [--write] [--check] [--no-color]
                            Format a .pfdsl file (- = stdin)
-  render <file|-> [--format dot|svg|pdf|png]
+  render <file|-> [--format dot|svg|pdf|png] [--no-color]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires: npm install puppeteer
-  diff <a> <b> [--format text|dot|svg] [--json]
+  diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
                            Structural diff (text), or visual diff DOT/SVG
 
 Command groups (run `pfdsl <group>` for their subcommands):
