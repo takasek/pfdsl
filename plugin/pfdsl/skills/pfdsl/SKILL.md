@@ -86,21 +86,21 @@ statusStyles:
 
 ## CLI
 
-**Preflight — check the CLI version before running any command below.** This skill targets `@pfdsl/cli` **>= 0.0.21**; the commands below use the grouped `graph`/`meta`/`status` surface that older releases lack, so an outdated CLI fails with `unknown command` rather than an obvious version error. Run `pfdsl --version` (or `npx @pfdsl/cli --version`) once at the start of the session. If it reports a version below `0.0.21`, or the check itself fails, do **not** run the commands below — ask the user to update with `npm install -g @pfdsl/cli@latest` and continue only after they confirm.
+**Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.0.21**; the commands below use the grouped `graph`/`meta`/`status` surface that older releases lack, so an outdated CLI fails with `unknown command` rather than an obvious version error. Run `pfdsl --version` once at the start of the session. If `pfdsl` is missing or reports a version below `0.0.21`, do **not** run the commands below — ask the user to install or update it with `npm install -g @pfdsl/cli@latest`, and continue only after they confirm. (An environment that genuinely cannot install globally may substitute a version-pinned `npx @pfdsl/cli@0.0.21 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic.)
 
 ```bash
-npx @pfdsl/cli check <file|-> [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
-npx @pfdsl/cli explain <code>   # Print the summary and spec section for a diagnostic code (e.g. V021)
-npx @pfdsl/cli fmt <file|-> [--write] [--check] [--no-color]   # Format a .pfdsl file (- = stdin)
-npx @pfdsl/cli render <file|-> [--format dot|svg|pdf|png] [--no-color]   # Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-npx @pfdsl/cli diff <a> <b> [--format text|dot|svg] [--json] [--no-color]   # Structural diff (text), or visual diff DOT/SVG
-npx @pfdsl/cli graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans   # Read-only queries on the graph topology
-npx @pfdsl/cli meta get|set|sort|reindex|check-links   # Read and write frontmatter metadata
-npx @pfdsl/cli status ready|blocked|list|gaps   # Planning queries derived from artifact status
-npx @pfdsl/cli help   # Show this help
+pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
+pfdsl explain <code>   # Print the summary and spec section for a diagnostic code (e.g. V021)
+pfdsl fmt <file|-> [--write] [--check] [--no-color]   # Format a .pfdsl file (- = stdin)
+pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]   # Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
+pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]   # Structural diff (text), or visual diff DOT/SVG
+pfdsl graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans   # Read-only queries on the graph topology
+pfdsl meta get|set|sort|reindex|check-links   # Read and write frontmatter metadata
+pfdsl status ready|blocked|list|gaps   # Planning queries derived from artifact status
+pfdsl help   # Show this help
 ```
 
-Full flag reference: `npx @pfdsl/cli help`. If a command above is still reported as `unknown command` after the preflight, the installed CLI is older than `0.0.21` — update via `npm install -g @pfdsl/cli@latest` (or run `npx @pfdsl/cli@latest help` to inspect the current surface).
+Full flag reference: `pfdsl help`. If a command above is still reported as `unknown command` after the preflight, the installed CLI is older than `0.0.21` — update via `npm install -g @pfdsl/cli@latest` (or run `npx @pfdsl/cli@latest help` to inspect the current published surface).
 
 ## Key constraints
 
@@ -131,7 +131,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 ## Typical task: update artifact status
 
 ```bash
-npx @pfdsl/cli meta set <file> <artifact-id> status <status>   # todo|wip|done|waiting|suspended
+pfdsl meta set <file> <artifact-id> status <status>   # todo|wip|done|waiting|suspended
 ```
 
 Sets the status in place and validates. Manual fallback: edit `status:` in the frontmatter `artifact:` section, then run `check`.
@@ -143,7 +143,7 @@ Sets the status in place and validates. Manual fallback: edit `status:` in the f
 | status 更新・読解・小編集 | 本文で完結（references 不要） |
 | 特定の構文・フィールドの書き方 | `references/samples.md`（機能別の最小例） |
 | 新規 PFD の執筆・設計判断 | `references/quality-guide.md`（必読）+ `references/examples.md`（実戦ドメインの設計パターン。先頭の Index で該当例の行範囲を特定し、そこだけ Read する） |
-| check エラーの対処 | `npx @pfdsl/cli explain <code>`（例: V021）でコード→節番号+一行要約を即時解決。節本文が要る場合のみフォールバックとして `references/spec.md` をエラーコードで grep（ヒット先は §15 制約・§16 エラー方針・§20 変更履歴のいずれか） |
+| check エラーの対処 | `pfdsl explain <code>`（例: V021）でコード→節番号+一行要約を即時解決。節本文が要る場合のみフォールバックとして `references/spec.md` をエラーコードで grep（ヒット先は §15 制約・§16 エラー方針・§20 変更履歴のいずれか） |
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
 | PFD のレビュー・監査 | `references/review-perspectives.md`（A/B/C カタログ。A/B は図、C は normative 仕様文書（自リポ保守の仕様がある場合）の監査。書くルールは `references/quality-guide.md`、問い詰めはこちら） |
 

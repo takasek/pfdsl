@@ -159,6 +159,8 @@ The `pfdsl`, `pfd-ecosystem`, `pfd-retro`, and `pfd-ops` skills, plus the `/pfd-
 
 Skills and commands are namespaced under the plugin: `pfdsl:pfdsl`, `pfdsl:pfd-ecosystem`, `pfdsl:pfd-retro`, `pfdsl:pfd-ops`, `/pfdsl:pfd-cycle`, `/pfdsl:pfd-init`. Updates ship by bumping the CLI version (`plugin.json`'s `version` field is derived from `packages/cli/package.json`); `/plugin marketplace update` picks up new releases.
 
+The skills invoke the CLI as `pfdsl`, so adopters need `@pfdsl/cli` installed and on `PATH` (`npm install -g @pfdsl/cli`). Each skill's preflight verifies this and asks you to install or update when the binary is missing or older than the version the skill was generated against.
+
 `pfd-ops` ships repo-side automation (GitHub Actions workflows, audit scripts) that the plugin mechanism can't write into your project directly, so adopting it is a separate step — see the section below.
 
 ### Regenerating the skill (contributors)

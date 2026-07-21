@@ -1,5 +1,5 @@
 // Renders the pfdsl skill's CLI section from `pfdsl help` output: one
-// `npx @pfdsl/cli <signature>` line per command, annotated with the
+// `pfdsl <signature>` line per command, annotated with the
 // command's first description line. Flag details stay in `pfdsl help`.
 // Used by scripts/gen-skill.mjs (README embeds the full help output via
 // scripts/gen-readme-cli.mjs instead).
@@ -35,6 +35,6 @@ export function renderCliSection(helpOutput) {
 	}
 
 	return entries
-		.map(({ signature, desc }) => `npx @pfdsl/cli ${signature}${desc ? `   # ${desc}` : ""}`)
+		.map(({ signature, desc }) => `pfdsl ${signature}${desc ? `   # ${desc}` : ""}`)
 		.join("\n");
 }

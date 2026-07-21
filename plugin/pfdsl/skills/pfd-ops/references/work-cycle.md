@@ -7,7 +7,7 @@
      - まず `git fetch origin` でリモートの最新状態を取得する。新規ブランチは `origin/<base>` を起点に作成する — fetch は remote-tracking ref のみ更新し local ブランチは更新しないため、local 経由で切ると stale なまま気づかず作業してしまう
      - **既存ブランチ（前セッションから継続する worktree 等）で作業を再開する場合**、`git log --oneline HEAD..origin/<base>` で base が先行していないか確認し、先行していれば rebase してから続行する。stale なまま進めると無関係な PR diff（他 PR で先行 merge された変更の revert に見える差分）が混入する
      - **CI やツールが自動生成した PR が open のままであれば、新規作業より先にマージを確認する** — open のまま作業を始めると選択判断が stale な状態に基づく（どのような PR が自動生成されるかはリポ固有 — companion の roadmap.md に記載する）
-     - `.pfdsl/roadmap.pfdsl` の着手可能プロセスを列挙する。`npx @pfdsl/cli status ready <roadmap.pfdsl> --best --json` で、入力 artifact が全て done のプロセス一覧と `--best` 推薦（合流点を解放するもの＝後続プロセスの最後の未完入力になっているもの）が JSON で得られる。着手可能集合が薄く「何が止めているか」を知りたい場合は `status blocked <roadmap.pfdsl>` で各未着手プロセスの未達入力 artifact を一覧できる（`graph stats` の fan-out と併せればボトルネックの優先度づけもできる）
+     - `.pfdsl/roadmap.pfdsl` の着手可能プロセスを列挙する。`pfdsl status ready <roadmap.pfdsl> --best --json` で、入力 artifact が全て done のプロセス一覧と `--best` 推薦（合流点を解放するもの＝後続プロセスの最後の未完入力になっているもの）が JSON で得られる。着手可能集合が薄く「何が止めているか」を知りたい場合は `status blocked <roadmap.pfdsl>` で各未着手プロセスの未達入力 artifact を一覧できる（`graph stats` の fan-out と併せればボトルネックの優先度づけもできる）
    - ユーザー指定があればそれを、なければ `best` の推薦を優先して1つ選ぶ。roadmap 非管理の作業項目（exempt 等）を番号指定された場合も本手順で処理する — ready 列挙に出ないことは cycle を通さない理由にならない（プリフライト・終端ゲート・retro は変更内容と独立に有効）。**ユーザー指定で入力 artifact が done でないプロセスを選んだ場合、「前提条件未達で着手する」とその理由を記録してから実行する**
    - 選択後、そのプロセスの issue 本文とコメント（一次情報。`gh issue view` はデフォルトで本文のみ返す — `--comments` 等でコメントも取得する）を読む。「design TBD」「設計未確定」等の設計未合意フレーズ、または複数の実装方針案が列挙されており選択が明記されていない場合は、実装に進まず設計対話を行って方針を確定させる。ただし列挙された案のうち一方が本文中で未解決の付随課題を自認している（対称な選択でなく事実上1案に絞られている）場合は、残る案を採用して対話を省略してよい。設計確定がコメントとして事後投稿されていることがある — 本文のみで判断し着手すると見落とす。逆に、設計を記した本文・コメントが起票後にマージされた依存や仕様・決定記録の更新で陳腐化していることもある — issue が関連作業より前に書かれている場合、設計メモを鵜呑みにせず現行のコード・仕様・決定記録と突き合わせてから実装する（メモは一次情報だが最新とは限らない）
 2. **実行**: 作業項目の一次情報は roadmap.md が指すバックエンド。ブランチを切って作業する（main 直コミットしない）。`.pfdsl/runtime-pipeline.pfdsl` が存在する場合は着手前に変換境界を確認し、実装スコープが境界を越えないか確かめる。PFD の読み書きは pfdsl スキルの品質ガイドに従う。ビルド・生成・全量 check 系のコマンドは出力が数百行に及ぶことがある — 結果確認は `git status --short <対象パス>` / `git diff --stat` で変更有無を先に見る（詳細ログが要る場合のみファイルにリダイレクトして絞る）。**GUI・エディタ拡張等の UI 変更は、ビルド後にユーザーと実際に操作して動作確認する。verify が BLOCKED になった場合も「確認手順をユーザーに渡す」で終わらず、ユーザーの確認結果を受け取るまで完了とみなさない。**
@@ -18,7 +18,7 @@
    - [ ] 知見を `.pfdsl/workflow.pfdsl` の sibling companion の振り分け手続きに従って振り分けた
    - [ ] 実行中に発見した新プロセス・成果物を `.pfdsl/roadmap.pfdsl` に追記した（消費者を明示できないものは作らない）
    - [ ] ゲート集約チェッカーが報告する新規終端 artifact リスト（変更 `.pfdsl` の `graph io` 差分）を見て、今サイクルの出力 artifact が手段（仕様・設計・計画・提案）なら、それを消費する後続プロセスがグラフに在るか確認した。無ければ todo プレースホルダで登録した（後続門番、プロトコル5(b)。分類と登録のみ MANUAL — 抽出・差分は機械化済み。真の納品物のみ終端を許す）
-   - [ ] 変換コンポーネントを追加・変更・削除した場合、それをモデル化している採用済み PFD（`.pfdsl/runtime-pipeline.pfdsl` または `.pfdsl/workflow.pfdsl` の該当箇所）に反映した（該当なしも明示。runtime-pipeline.pfdsl 未採用は自動的に N/A にならない — workflow.pfdsl 側を確認）。影響範囲の特定には `npx @pfdsl/cli graph impact <file> <id>`（下流の消費者全て）・`graph depends-on <file> <id>`（上流の生産者全て）が使える — 変更対象ノードを grep で手繰るより網羅的
+   - [ ] 変換コンポーネントを追加・変更・削除した場合、それをモデル化している採用済み PFD（`.pfdsl/runtime-pipeline.pfdsl` または `.pfdsl/workflow.pfdsl` の該当箇所）に反映した（該当なしも明示。runtime-pipeline.pfdsl 未採用は自動的に N/A にならない — workflow.pfdsl 側を確認）。影響範囲の特定には `pfdsl graph impact <file> <id>`（下流の消費者全て）・`graph depends-on <file> <id>`（上流の生産者全て）が使える — 変更対象ノードを grep で手繰るより網羅的
    - [ ] 作業中に偶発的に見つけたスコープ外の既存問題（バグ等）を起票した（ユーザーの指摘を待たない）
    - [ ] 変更した全 .pfdsl が `check` を通過する
    - [ ] コミット粒度（論理単位ごとの分割）が規約（CLAUDE.md または companion で定義）に従っている
