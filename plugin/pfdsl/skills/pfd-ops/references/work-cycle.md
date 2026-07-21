@@ -24,6 +24,6 @@
    - [ ] コミット粒度（論理単位ごとの分割）が規約（CLAUDE.md または companion で定義）に従っている
    - [ ] コミット subject が Conventional Commits 形式に従う
    - [ ] `/simplify` または `/code-review` を実施した（実装規模・品質基準は companion で定義。省略する場合はその理由を明示）
-   - [ ] 変更束を PR にまとめた
+   - [ ] 変更束を PR にまとめた（PR 作成後にローカルで追加コミットした場合、push し忘れていないか `git log origin/<branch>..<branch>` で確認する — CI は push 済みの内容にしか反応しない）
 4. **報告**: 完了したプロセス、それにより解放された後続プロセス、更新後の着手可能集合。特定 status の全体像（例: 残 wip 一覧）が要る場合は都度 `status list <roadmap.pfdsl> --status wip,waiting --json` 等で機械的に絞り込む — 全文 Read や個別 `meta get` の積み上げに頼らない
 5. **retro**: `/pfd-cycle` コマンド経由の場合、プロトコル7の (a)(b) 両条件を確認する（定義は SKILL.md 本文が一次情報 — ここには複製しない）。このサイクル手順自体に最終ステップとして組み込み、報告を出して終わりにしない。**バックストップ**（(a) について、このリポでは）: `roadmap.pfdsl` に `status: done` を追加するコミットで pre-commit が stderr に advisory warning を出す（`scripts/lib/retro-reminder-check.mjs`、非ブロッキング）。セッション記憶が抜けても done 付与コミットの Bash tool result 経由で気付ける。(b) にはバックストップがない — セッション記憶のみに依存する既知の弱点
