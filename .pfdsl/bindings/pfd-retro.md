@@ -18,6 +18,11 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
   具体例: ADR の構文例引用（double-backtick span）と lint の inline-code 除外（当時 single-backtick のみ対応）の組で、構文例が実マーカーとして検出され、定義例と参照例が相互解決して lint が偶然 PASS した（#328。除外は #398 で backtick run 対応に修正済み）。
   検査 PASS は接合部の健全性を保証しない — 例示が実データ化していないかを実マッチ列挙（検出関数の直接実行）で確認する。
 
+- **並行リファクタの死角**: 同じ主題（例: edge集合からのグルーピング）を扱う複数の並行 issue/PR が、互いのスコープ外に同型の重複コードを残すことがある。各 issue は自分のスコープ内でしか重複を見ないため、相手側のリファクタが通った後も気付かれない。
+  問いの形: 「このリファクタが対象にしなかった箇所に、同種のループ/パターンがもう一方の並行リファクタの後にも残っていないか」。
+  検出の機会: 2つの並行ブランチを rebase/merge で合流させるとき。コンフリクトした箇所だけでなく、双方の diff で「同じ処理を別名の変数で書いている箇所」を横断 grep する。
+  具体例: `computeOpenInputs`（multifile.ts）に externalInputs 計算を委譲するリファクタと、edges グルーピングを共有ヘルパーに統合するリファクタが並行して走り、audit.ts 内の produced/consumed Set 構築（前者の対象外）が後者のヘルパーからも漏れて残った（takasek/pfdsl #460）。
+
 - **検査の自己参照 trap**: 「生成器を再実行し出力を既存生成物と diff する」形の drift 検査は、生成器の入力（ビルド成果物・キャッシュ等）自体が古い場合、古い入力から再生成した出力を古い生成物と比較するため一致してしまい、検査が自己無矛盾のまま PASS する。
   問いの形: 「この検査の『再生成』は、検査対象と同じ古い入力を使っていないか」。
   具体例: pre-commit の `check_drift`（regenerate-then-diff 方式）が dist ファイルの**存在**のみを前提条件にしており鮮度を見ていなかったため、worktree に残った stale な CLI dist から `gen-plugin` を再生成すると、stale dist 由来の誤った内容同士が一致して PASS した。CI は fresh checkout から都度ビルドするため唯一そこでだけ drift が検出された（#450）。`scripts/lib/dist-freshness.mjs` で dist の mtime を sibling `src/` の最新 mtime と比較し、存在しないときと同様に古いときも検査を skip する形に修正（#452）。
