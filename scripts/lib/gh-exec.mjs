@@ -13,6 +13,7 @@ import { execFileSync } from "node:child_process";
 import { isGhUnavailableError, planGhRestCall } from "./gh-compat.mjs";
 import {
 	parseOwnerRepo,
+	parseHost,
 	fetchAllLabels,
 	fetchAllIssues,
 	createLabel,
@@ -31,6 +32,22 @@ function ownerRepoFromGitRemote(cwd) {
 	const ownerRepo = parseOwnerRepo(remoteUrl);
 	if (!ownerRepo) throw new Error(`could not determine owner/repo from git remote: ${remoteUrl}`);
 	return ownerRepo;
+}
+
+/**
+ * The host `gh` should target for this repo, derived from its origin remote.
+ * Returns null if it can't be determined (no git, no origin) — callers then
+ * leave the ambient environment untouched.
+ * @param {string} cwd
+ * @returns {string | null}
+ */
+function hostFromGitRemote(cwd) {
+	try {
+		const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], { cwd, encoding: "utf-8" }).trim();
+		return parseHost(remoteUrl);
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -72,7 +89,12 @@ async function runGhRestPlan(plan, cwd, token) {
 export async function execGh(args, opts = {}) {
 	const cwd = opts.cwd ?? process.cwd();
 	try {
-		return execFileSync("gh", args, { cwd, encoding: "utf-8" });
+		// Pin GH_HOST to this repo's own remote host so an ambient GH_HOST
+		// pointing at a different host (a multi-host `gh` login) doesn't make
+		// gh reject the repo. Falls back to the ambient env when undeterminable.
+		const host = hostFromGitRemote(cwd);
+		const env = host ? { ...process.env, GH_HOST: host } : process.env;
+		return execFileSync("gh", args, { cwd, encoding: "utf-8", env });
 	} catch (e) {
 		if (!isGhUnavailableError(e)) throw e;
 		// Rethrow the original ENOENT (rather than a new error) whenever REST

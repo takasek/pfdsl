@@ -23,8 +23,23 @@ import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
+import { parseHost } from "./lib/github-rest.mjs";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
+
+// Pin GH_HOST to this repo's own remote host so `gh` doesn't fail under an
+// ambient GH_HOST pointing at a different host (multi-host `gh` login).
+const ghEnv = (() => {
+	try {
+		const host = parseHost(
+			execFileSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf-8" }).trim(),
+		);
+		return host ? { ...process.env, GH_HOST: host } : process.env;
+	} catch {
+		return process.env;
+	}
+})();
 
 const mode = process.argv[2];
 if (mode !== "generate" && mode !== "update-pr") {
@@ -176,7 +191,7 @@ const newSection = [
 const currentBody = execFileSync(
 	"gh",
 	["pr", "view", prNumber, "--json", "body", "-q", ".body"],
-	{ encoding: "utf-8", cwd: root },
+	{ encoding: "utf-8", cwd: root, env: ghEnv },
 ).trim();
 
 const stripped = currentBody
@@ -188,6 +203,7 @@ const newBody = stripped ? `${stripped}\n\n${newSection}` : newSection;
 execFileSync("gh", ["pr", "edit", prNumber, "--body", newBody], {
 	encoding: "utf-8",
 	cwd: root,
+	env: ghEnv,
 });
 
 console.log(`Updated PR #${prNumber} description with diagram images.`);

@@ -33,6 +33,7 @@ import {
 	filesToCommitForBump,
 	releaseMilestoneArtifactIds,
 } from "./lib/release-config.mjs";
+import { parseHost } from "./lib/github-rest.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -41,8 +42,20 @@ function run(cmd, args, opts = {}) {
 	execFileSync(cmd, args, { cwd: root, stdio: "inherit", ...opts });
 }
 
-function capture(cmd, args) {
-	return execFileSync(cmd, args, { cwd: root, encoding: "utf-8" }).trim();
+function capture(cmd, args, opts = {}) {
+	return execFileSync(cmd, args, { cwd: root, encoding: "utf-8", ...opts }).trim();
+}
+
+// Pin GH_HOST to this repo's own remote host so `gh` doesn't fail under an
+// ambient GH_HOST pointing at a different host (multi-host `gh` login).
+function ghOpts() {
+	let host = null;
+	try {
+		host = parseHost(capture("git", ["remote", "get-url", "origin"]));
+	} catch {
+		host = null;
+	}
+	return host ? { env: { ...process.env, GH_HOST: host } } : {};
 }
 
 function fail(message) {
@@ -178,20 +191,25 @@ run("git", ["push", "origin", tag]);
 if (kind.workflow) {
 	console.log("Waiting for GHA run to appear...");
 	execFileSync("sleep", ["8"]);
-	const runId = capture("gh", [
-		"run",
-		"list",
-		"--workflow",
-		kind.workflow,
-		"--json",
-		"databaseId,headBranch",
-		"--jq",
-		`.[] | select(.headBranch=="${tag}") | .databaseId`,
-	]).split("\n")[0];
+	const gh = ghOpts();
+	const runId = capture(
+		"gh",
+		[
+			"run",
+			"list",
+			"--workflow",
+			kind.workflow,
+			"--json",
+			"databaseId,headBranch",
+			"--jq",
+			`.[] | select(.headBranch=="${tag}") | .databaseId`,
+		],
+		gh,
+	).split("\n")[0];
 	if (!runId) {
 		fail(`GHA run not found: gh run list --workflow ${kind.workflow}`);
 	}
-	run("gh", ["run", "watch", runId, "--exit-status"]);
+	run("gh", ["run", "watch", runId, "--exit-status"], gh);
 } else {
 	console.log(`${tag} tagged and pushed (no publish workflow for this kind).`);
 }
