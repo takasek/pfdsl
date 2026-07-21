@@ -235,6 +235,7 @@ export {
 	collectSubflowRefs,
 	computeOpenInputs,
 	computeTerminals,
+	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
 	resolveEffectiveFrontmatter,

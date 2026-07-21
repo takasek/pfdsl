@@ -6,6 +6,7 @@ import {
 	collectSubflowRefs,
 	computeOpenInputs,
 	computeTerminals,
+	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
 	resolveEffectiveFrontmatter,
@@ -89,6 +90,24 @@ describe("resolveRefPath", () => {
 			ok: false,
 			reason: "url",
 		});
+	});
+});
+
+describe("isUrlLike", () => {
+	it("is true for a value containing '://'", () => {
+		expect(isUrlLike("https://example.com/x")).toBe(true);
+	});
+
+	it("is true for a relative-looking value that still contains '://'", () => {
+		expect(isUrlLike("git+ssh://host/repo")).toBe(true);
+	});
+
+	it("is false for a plain relative path", () => {
+		expect(isUrlLike("./sub.pfdsl")).toBe(false);
+	});
+
+	it("is false for an absolute filesystem path", () => {
+		expect(isUrlLike("/abs/x.pfdsl")).toBe(false);
 	});
 });
 

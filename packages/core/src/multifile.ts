@@ -13,12 +13,17 @@ export type RefResult =
 	| { ok: true; path: string }
 	| { ok: false; reason: "absolute" | "url" };
 
+/** True when a value is a URL rather than a filesystem path (contains `://`), per spec §15.8. */
+export function isUrlLike(value: string): boolean {
+	return value.includes("://");
+}
+
 /**
  * Resolve a relative cross-file reference against the containing file (§2.9.2).
  * Absolute paths and URLs (`://`) are not permitted.
  */
 export function resolveRefPath(fromFile: string, ref: string): RefResult {
-	if (ref.includes("://")) return { ok: false, reason: "url" };
+	if (isUrlLike(ref)) return { ok: false, reason: "url" };
 	if (ref.startsWith("/")) return { ok: false, reason: "absolute" };
 	return { ok: true, path: resolve(dirname(fromFile), ref) };
 }
