@@ -22,6 +22,7 @@ import {
 	groupEdges,
 	hasErrors,
 	type IndexChange,
+	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
 	type NodeKind,
@@ -1142,7 +1143,7 @@ function resolveLocationElement(
 	element: string,
 	basePath?: string,
 ): string {
-	return element.includes("://")
+	return isUrlLike(element)
 		? element
 		: resolveLocationFsPath(docFsPath, element, basePath);
 }
@@ -1356,7 +1357,7 @@ export interface CheckLinksMissing {
 
 /** URL (contains "://") or glob (contains *, ?, or {) elements are not checkable file paths (spec §15.8). */
 function isLocationCheckable(element: string): boolean {
-	return !element.includes("://") && !/[*?{]/.test(element);
+	return !isUrlLike(element) && !/[*?{]/.test(element);
 }
 
 export function runCheckLinks(
