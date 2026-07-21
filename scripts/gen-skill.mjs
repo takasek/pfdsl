@@ -148,8 +148,16 @@ if (!existsSync(cliPath)) {
 }
 const helpOutput = execFileSync(process.execPath, [cliPath, "help"], { encoding: "utf-8" });
 
+// The skill documents the command surface of the CLI it was generated against,
+// so it declares that version as the minimum the reader's CLI must satisfy.
+// Auto-injected from package.json so the preflight can never drift from reality.
+const cliVersion = JSON.parse(
+  readFileSync(resolve(root, "packages/cli/package.json"), "utf-8"),
+).version;
+
 const skillMd = templateSrc
 	.replace(/\{\{specVersion\}\}/g, specVersion)
+	.replace(/\{\{cliVersion\}\}/g, cliVersion)
 	.replace("{{cliCommands}}", renderCliSection(helpOutput));
 
 writeFileSync(resolve(outDir, "SKILL.md"), skillMd);

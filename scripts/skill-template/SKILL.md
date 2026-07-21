@@ -86,11 +86,13 @@ statusStyles:
 
 ## CLI
 
+**Preflight — check the CLI version before running any command below.** This skill targets `@pfdsl/cli` **>= {{cliVersion}}**; the commands below use the grouped `graph`/`meta`/`status` surface that older releases lack, so an outdated CLI fails with `unknown command` rather than an obvious version error. Run `pfdsl --version` (or `npx @pfdsl/cli --version`) once at the start of the session. If it reports a version below `{{cliVersion}}`, or the check itself fails, do **not** run the commands below — ask the user to update with `npm install -g @pfdsl/cli@latest` and continue only after they confirm.
+
 ```bash
 {{cliCommands}}
 ```
 
-Full flag reference: `npx @pfdsl/cli help`. If a command above is reported as `unknown command`, the installed/published CLI is older than this skill — check `npx @pfdsl/cli@latest help`.
+Full flag reference: `npx @pfdsl/cli help`. If a command above is still reported as `unknown command` after the preflight, the installed CLI is older than `{{cliVersion}}` — update via `npm install -g @pfdsl/cli@latest` (or run `npx @pfdsl/cli@latest help` to inspect the current surface).
 
 ## Key constraints
 
