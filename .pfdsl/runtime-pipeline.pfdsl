@@ -52,31 +52,31 @@ artifact:
   normalized_graph:
     label: 正準化グラフ
     description: "正規化済みエッジ・ノード種別・isolatedノード集合とGraph構造。validate/render_graph/export_metadata/diff_graphsの共通入力。CLI graph edgesコマンドはこれをJSONで直接出力する"
-    criteria: npx @pfdsl/cli graph edges が実装され動作確認済み（validate/render_graph/export_metadata/diff_graphsの共通入力として機能）
+    criteria: node packages/cli/dist/cli.js graph edges が実装され動作確認済み（validate/render_graph/export_metadata/diff_graphsの共通入力として機能）
     externalStakeholders: [CLIユーザー]
     group: in_memory
   diagnostics_report:
     label: 診断結果
     description: "V/Wルールに基づくエラー・警告一覧。CLI checkコマンドの出力で、VSCode拡張は同じvalidateをエディタ内リアルタイム診断に使う"
-    criteria: npx @pfdsl/cli check が実装され動作確認済み（VSCode拡張のリアルタイム診断でも共有）
+    criteria: node packages/cli/dist/cli.js check が実装され動作確認済み（VSCode拡張のリアルタイム診断でも共有）
     externalStakeholders: [CLIユーザー, CI, VSCode拡張ユーザー]
     group: run_outputs
   formatted_source:
     label: 整形済みソース
     description: ソースからの独立した再parseで生成する正準整形済み.pfdslテキスト
-    criteria: npx @pfdsl/cli fmt --write が実装され動作確認済み
+    criteria: node packages/cli/dist/cli.js fmt --write が実装され動作確認済み
     externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
     group: run_outputs
   dot_graph:
     label: DOTグラフ
     description: Graphviz DOT形式テキスト（renderコマンドのデフォルト出力）
-    criteria: npx @pfdsl/cli render が実装され動作確認済み
+    criteria: node packages/cli/dist/cli.js render が実装され動作確認済み
     externalStakeholders: [CLIユーザー]
     group: run_outputs
   rendered_image:
     label: レンダリング画像
     description: DOTから変換したSVG（wasm）またはPDF/PNG（puppeteer経由）
-    criteria: npx @pfdsl/cli render --format svg/pdf/png が実装され動作確認済み
+    criteria: node packages/cli/dist/cli.js render --format svg/pdf/png が実装され動作確認済み
     externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
     group: run_outputs
   metadata_tsv:
@@ -88,7 +88,7 @@ artifact:
   diff_report:
     label: 差分レポート
     description: "2つのグラフ間の構造差分（追加・削除・改名ノード等）。この図は単一ドキュメントの変換を軸にモデル化しているため、比較対象の2つ目のグラフは図上に現れない"
-    criteria: npx @pfdsl/cli diff が実装され動作確認済み
+    criteria: node packages/cli/dist/cli.js diff が実装され動作確認済み
     externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
     group: run_outputs
   sorted_source:
@@ -173,31 +173,31 @@ process:
   normalize:
     label: 正規化
     description: エッジリストとノード種別を正規化しGraphを構築する
-    command: npx @pfdsl/cli graph edges
+    command: node packages/cli/dist/cli.js graph edges
     location: ../packages/core/src/normalizer.ts
     tags: [b]
   validate:
     label: 検証
     description: "正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する。ルールの一次情報docs/spec/spec.md（a層）は設計時にこの実装へ反映されるもので、実行時の入力ではない"
-    command: npx @pfdsl/cli check
+    command: node packages/cli/dist/cli.js check
     location: ../packages/core/src/validator.ts
     tags: [b]
   format:
     label: 整形
     description: ソースを独立に再lex/parseし正準整形済みテキストを生成する（parseの出力を再利用しない別経路）
-    command: npx @pfdsl/cli fmt --write
+    command: node packages/cli/dist/cli.js fmt --write
     location: ../packages/core/src/formatter.ts
     tags: [b]
   render_graph:
     label: DOT変換
     description: 正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する
-    command: npx @pfdsl/cli render
+    command: node packages/cli/dist/cli.js render
     location: ../packages/graphviz-exporter/src/index.ts
     tags: [b]
   export_image:
     label: 画像化
     description: DOTをSVG（wasm、外部依存なし）またはPDF/PNG（puppeteer必須）へ変換する
-    command: npx @pfdsl/cli render --format svg
+    command: node packages/cli/dist/cli.js render --format svg
     location: ../packages/preview-engine/src/index.ts
     tags: [b]
   export_metadata:
@@ -208,13 +208,13 @@ process:
   diff_graphs:
     label: 差分算出
     description: 2つの正準化グラフ（とそれぞれのfrontmatter）の構造差分を計算する
-    command: npx @pfdsl/cli diff
+    command: node packages/cli/dist/cli.js diff
     location: ../packages/core/src/diff.ts
     tags: [b]
   sort_meta:
     label: ノード定義ソート
     description: ソースを再parseし、指定キーでfrontmatterのノード定義を並べ替えたテキストを生成する
-    command: npx @pfdsl/cli meta sort
+    command: node packages/cli/dist/cli.js meta sort
     location: ../packages/core/src/sort.ts
     tags: [b]
   assemble_plugin:
