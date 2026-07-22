@@ -1,12 +1,25 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { execGh } from "./gh-exec.mjs";
 
-// Scoped to just /usr/bin so `git` still resolves (ownerRepoFromGitRemote
-// needs it) while `gh` — never installed there in this sandbox — stays
-// absent, exercising the ENOENT fallback path for real.
-const NO_GH_PATH = "/usr/bin";
+// A real `gh` binary may live anywhere on PATH depending on the environment
+// (absent on this maintainer's Mac, but preinstalled at /usr/bin/gh on
+// GitHub Actions' ubuntu runners — see #541) — hardcoding a directory that's
+// merely "usually gh-less" isn't portable. Build a PATH containing only a
+// symlink to the real `git` (ownerRepoFromGitRemote needs it) and nothing
+// else, so `gh` reliably resolves to ENOENT regardless of what the host has
+// installed.
+function ghlessPathWithGit() {
+	const dir = mkdtempSync(join(tmpdir(), "gh-exec-test-path-"));
+	const gitPath = execFileSync("which", ["git"], { encoding: "utf-8" }).trim();
+	symlinkSync(gitPath, join(dir, "git"));
+	return dir;
+}
 
 describe("execGh", () => {
 	let originalPath;
@@ -15,6 +28,7 @@ describe("execGh", () => {
 	let originalFetch;
 	let originalHttpsProxy;
 	let originalHttpsProxyLower;
+	let ghlessPath;
 
 	beforeEach(() => {
 		originalPath = process.env.PATH;
@@ -23,7 +37,8 @@ describe("execGh", () => {
 		originalFetch = globalThis.fetch;
 		originalHttpsProxy = process.env.HTTPS_PROXY;
 		originalHttpsProxyLower = process.env.https_proxy;
-		process.env.PATH = NO_GH_PATH;
+		ghlessPath = ghlessPathWithGit();
+		process.env.PATH = ghlessPath;
 		// proxyAwareFetch (github-rest.mjs's default fetchImpl) delegates to a
 		// child process when a proxy is configured, which would bypass the
 		// globalThis.fetch stub below — force the direct-fetch path for this
@@ -34,6 +49,7 @@ describe("execGh", () => {
 
 	afterEach(() => {
 		process.env.PATH = originalPath;
+		rmSync(ghlessPath, { recursive: true, force: true });
 		if (originalGhToken === undefined) delete process.env.GH_TOKEN;
 		else process.env.GH_TOKEN = originalGhToken;
 		if (originalGithubToken === undefined) delete process.env.GITHUB_TOKEN;
