@@ -70,7 +70,7 @@ PR マージ時に issue が自動 close されるには、PR 本文に `Closes 
 4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、issue に対応する process に `iN_` prefix を付ける
 5. リポの `roadmap.md` で本プリセットを指し、リポ URL を記載する
 
-## 依存（flow-on-issue-close.yml 実行環境）
+## 依存（pfdsl-flow-on-issue-close.yml 実行環境）
 
 - Node.js 24 以上
 - `gh` CLI（GitHub Actions ランナーにはプリインストール済み）

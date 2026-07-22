@@ -1,24 +1,48 @@
 {
 	"files": [
 		{
-			"path": ".github/workflows/flow-on-issue-close.yml",
-			"hash": "83b4d6114d78e784aecca2d36d5bf374ac143604720c7d5e033c7a41d99e64ba"
+			"path": ".github/workflows/pfdsl-flow-on-issue-close.yml",
+			"hash": "abf5b99eabea98dd73ed72044a42b96f0db9c87ae33d77d8287c50b9d4f24c14"
 		},
 		{
-			"path": "scripts/audit-issues-flow.mjs",
-			"hash": "64b82957048d24f94b81da6144f26606a1b51f528ae87402294e10d46d350ada"
+			"path": "scripts/pfdsl/actions/flow-sync/action.yml",
+			"hash": "f22c60cc1a055993cd93488869d82b71930dd3a536d9a99053cc4771803f460e"
 		},
 		{
-			"path": "scripts/lib/issues-flow-audit.mjs",
+			"path": "scripts/pfdsl/audit-issues-flow.mjs",
+			"hash": "ce292986c276311ecb44b4d8eed278fd5a7205e0015bea032d7d7ff468ff23b4"
+		},
+		{
+			"path": "scripts/pfdsl/lib/gh-compat.mjs",
+			"hash": "f595333eae7fdb0adbde03aaf9fe4e1d66f532fb9a7ebd46c2d9f9ebf72c7580"
+		},
+		{
+			"path": "scripts/pfdsl/lib/gh-exec.mjs",
+			"hash": "3a36a27151f92cf579627de09e7d6b348551e4ed3b508f22e58f5c743a8e47bf"
+		},
+		{
+			"path": "scripts/pfdsl/lib/github-rest.mjs",
+			"hash": "b7374e931f73958c3f6321030c5a44356c84469e7bbd4b703ded0360685363e9"
+		},
+		{
+			"path": "scripts/pfdsl/lib/issues-flow-audit.mjs",
 			"hash": "2da013be559292211c1e02775a3ed9ce5e38c6988f2b54e0ceb4ddd5aa15d17d"
 		},
 		{
-			"path": "scripts/lib/yaml-require.mjs",
+			"path": "scripts/pfdsl/lib/proxy-fetch-worker.mjs",
+			"hash": "e56fcab04e7664172b678f89c7f310e1e4225de558967c4490220df52cead16a"
+		},
+		{
+			"path": "scripts/pfdsl/lib/proxy-fetch.mjs",
+			"hash": "8f1ba695c933625a10ad98b3cc93c1273b34a7d56ab70d2dd1dfe0faf5f98afb"
+		},
+		{
+			"path": "scripts/pfdsl/lib/yaml-require.mjs",
 			"hash": "1e5a4bd4e622bfae32b3f86d9832eee5c4f18602618035ee6dc50ac021fd138c"
 		},
 		{
-			"path": "scripts/normalize-pfdsl.mjs",
-			"hash": "1d6129ad005a6ab7e7b7ec2b53f73966ce0fe3da210bc4c132f55ca65912f356"
+			"path": "scripts/pfdsl/normalize-pfdsl.mjs",
+			"hash": "4915314d0347da514c1b8d32bf63388e1b8e001755813340fedb30fb1bdc592b"
 		}
 	]
 }

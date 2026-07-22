@@ -33,7 +33,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 ## 自動生成 PR（ワークサイクル選択前に確認）
 
-このリポでは issue close 時に `flow-on-issue-close.yml` が `flow-sync/*` ブランチで flow-sync PR を自動起票する。サイクル開始時に `flow-sync/*` ブランチの PR が open のものがあれば CI が green であることを確認してマージ先行（コンフリクトがある場合は手動解消してからマージ）。それ以外の open PR（機能追加・バグ修正等）は「今回の着手作業に競合するか」を判断軸としてケースバイケースで確認する。`node scripts/cycle-status.mjs` の `openFlowSyncPRs` / `otherOpenPRs` フィールドが手動 `gh pr list` の代替になる。
+このリポでは issue close 時に `pfdsl-flow-on-issue-close.yml` が `flow-sync/*` ブランチで flow-sync PR を自動起票する。サイクル開始時に `flow-sync/*` ブランチの PR が open のものがあれば CI が green であることを確認してマージ先行（コンフリクトがある場合は手動解消してからマージ）。それ以外の open PR（機能追加・バグ修正等）は「今回の着手作業に競合するか」を判断軸としてケースバイケースで確認する。`node scripts/cycle-status.mjs` の `openFlowSyncPRs` / `otherOpenPRs` フィールドが手動 `gh pr list` の代替になる。
 
 **flow-sync PR の CI が `pending`/`action_required` のまま動かない場合**: `github-actions[bot]` が起票した PR は workflow run が承認待ち（`action_required`）で止まり、放置すると CI が green にならないまま preflight が詰まる。GitHub MCP の `actions_list`（`list_workflow_runs`, branch でフィルタ）で該当 run の `conclusion` を確認し、`action_required` なら `actions_run_trigger`（`method: rerun_workflow_run`）で明示的に再実行する。
 
