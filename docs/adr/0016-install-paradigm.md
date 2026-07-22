@@ -1,6 +1,6 @@
 # ADR-0016: pfd-ops 配布可能ファイルの install/ 集約
 
-- Status: Accepted（採用リポへの配布経路は ADR-0028 が改訂。リポ内運用は存続）
+- Status: Accepted（採用リポへの配布経路は ADR-0028 が改訂。配布物のディレクトリ構造は ADR-0032 がさらに改訂。リポ内運用は存続）
 - Date: 2026-06-15
 
 ## Context
