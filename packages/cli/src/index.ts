@@ -904,13 +904,17 @@ function setFieldInSource(
 
 	const escapedId = escapeRe(id);
 	const escapedField = escapeRe(field);
-	const headerRe = new RegExp(`^(\\s+)${escapedId}:\\s*\\n`, "m");
+	// Match only the line's own leading indent: "[ \t]+", not "\s+". "\s"
+	// includes "\n", so with the "m" anchor it would start on a preceding blank
+	// line and swallow the newline plus indent, inflating the detected node
+	// indent and making the block-style rewrite silently no-op (#530).
+	const headerRe = new RegExp(`^([ \\t]+)${escapedId}:\\s*\\n`, "m");
 	const headerMatch = headerRe.exec(fmBlock);
 
 	// Flow-style body match is quote-aware: a "}" inside a quoted value must
 	// not terminate the map.
 	const flowHeaderRe = new RegExp(
-		`^(\\s+)${escapedId}:\\s*(\\{(?:"(?:[^"\\\\]|\\\\.)*"|'(?:[^']|'')*'|[^}"'])*\\})[ \\t]*$`,
+		`^([ \\t]+)${escapedId}:\\s*(\\{(?:"(?:[^"\\\\]|\\\\.)*"|'(?:[^']|'')*'|[^}"'])*\\})[ \\t]*$`,
 		"m",
 	);
 	const flowMatch = headerMatch ? null : flowHeaderRe.exec(fmBlock);
