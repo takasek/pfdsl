@@ -2038,6 +2038,9 @@ Options:
   --format pdf  PDF (requires: npm install puppeteer)
   --format png  PNG (requires: npm install puppeteer)
   --no-color    disable ANSI color codes for diagnostics (also: NO_COLOR env var)
+
+puppeteer is only needed for --format pdf and png, and must live in the same Node/npm environment as the pfdsl CLI.
+Under a version manager (nvm/nodenv/volta), a mismatched Node version's global install is not resolved — e.g. \`nodenv exec npm install -g puppeteer\`.
 `;
 
 const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
@@ -2420,7 +2423,7 @@ Commands:
                            Format a .pfdsl file (- = stdin)
   render <file|-> [--format dot|svg|pdf|png] [--no-color]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-                           PDF/PNG requires: npm install puppeteer
+                           PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)
   diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
                            Structural diff (text), or visual diff DOT/SVG
 

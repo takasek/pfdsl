@@ -106,7 +106,7 @@ Commands:
                            Format a .pfdsl file (- = stdin)
   render <file|-> [--format dot|svg|pdf|png] [--no-color]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-                           PDF/PNG requires: npm install puppeteer
+                           PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)
   diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
                            Structural diff (text), or visual diff DOT/SVG
 
