@@ -242,8 +242,8 @@ process:
   ensure_labels:
     label: ラベル保証
     description: "L3採用手順の一部として flow:managed / flow:exempt ラベルの存在を確認・作成する（deployed の audit-issues-flow.mjs --fix が未作成ラベルを自動生成する。旧skill syncのensure機能の移管先）"
-    command: node scripts/audit-issues-flow.mjs --fix
-    location: ../scripts/audit-issues-flow.mjs
+    command: node scripts/pfdsl/audit-issues-flow.mjs --fix
+    location: ../scripts/pfdsl/audit-issues-flow.mjs
     tags: [g]
 ---
 

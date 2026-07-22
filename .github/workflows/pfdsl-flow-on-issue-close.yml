@@ -31,12 +31,12 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/audit-issues-flow.mjs --fix
+        run: node scripts/pfdsl/audit-issues-flow.mjs --fix
 
       - name: Normalize blank lines in roadmap.pfdsl
         id: normalize
         continue-on-error: true
-        run: node scripts/normalize-pfdsl.mjs
+        run: node scripts/pfdsl/normalize-pfdsl.mjs
 
       - name: Run repo-local flow-sync hook (optional; no-op if absent)
         id: local_hook

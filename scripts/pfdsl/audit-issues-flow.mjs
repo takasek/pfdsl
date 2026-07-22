@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Audits sync between GitHub issues and .pfdsl/roadmap.pfdsl.
-// Usage: node scripts/audit-issues-flow.mjs [--fix]
+// Usage: node scripts/pfdsl/audit-issues-flow.mjs [--fix]
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -12,7 +12,7 @@ import { execGh } from "./lib/gh-exec.mjs";
 import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "..");
+const root = resolve(__dirname, "../..");
 
 const fix = process.argv.includes("--fix");
 

@@ -9,7 +9,7 @@
 ## このリポのインスタンス値
 
 - 一次情報: (issue 管理先の URL)
-- 同期監査スクリプト: (採用する場合は `scripts/audit-issues-flow.mjs` のパス)
+- 同期監査スクリプト: (採用する場合は `scripts/pfdsl/audit-issues-flow.mjs` のパス)
 - 監査対象: (このファイルが対応する `.pfdsl` のパス)
 
 ## 運用対象の計画 PFD

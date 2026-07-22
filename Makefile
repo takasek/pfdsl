@@ -24,7 +24,7 @@ build:
 .PHONY: test
 test:
 	pnpm -r test
-	node --test "scripts/lib/*.test.mjs"
+	node --test "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs"
 
 .PHONY: typecheck
 typecheck:
