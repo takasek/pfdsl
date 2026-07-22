@@ -350,7 +350,7 @@ export async function svgToBinary(
 ): Promise<Buffer> {
 	const puppeteer: AnyPuppeteer = await import("puppeteer").catch(() => {
 		throw new Error(
-			`PDF/PNG export requires puppeteer. Install it with:\n  npm install puppeteer`,
+			`PDF/PNG export requires puppeteer, installed into the same Node/npm environment as the pfdsl CLI. Install it with:\n  npm install puppeteer\nIf pfdsl is a global install under a Node version manager (nvm/nodenv/volta), a different Node version's global will not be resolved — install into the CLI's own environment, e.g.:\n  nodenv exec npm install -g puppeteer`,
 		);
 	});
 	const viewBoxMatch = svg.match(/viewBox="([^"]+)"/);
