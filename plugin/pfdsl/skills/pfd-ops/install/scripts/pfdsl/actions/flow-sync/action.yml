@@ -1,0 +1,102 @@
+name: pfd-ops flow sync
+description: >-
+  Audits and mechanically syncs .pfdsl/roadmap.pfdsl against closed GitHub
+  issues, then opens or updates a PR with the result. Invoked by the
+  repo-local .github/workflows/pfdsl-flow-on-issue-close.yml wrapper.
+
+inputs:
+  gh-token:
+    description: Token passed as GH_TOKEN to audit-issues-flow.mjs
+    required: true
+  issue-number:
+    description: Number of the issue that triggered this run
+    required: true
+
+outputs:
+  pull-request-operation:
+    description: Mirrors peter-evans/create-pull-request's pull-request-operation output
+    value: ${{ steps.create_pr.outputs.pull-request-operation }}
+  any-failed:
+    description: "'true' if any sync step failed"
+    value: ${{ steps.summary.outputs.any_failed }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 24
+
+    - name: Install audit dependency (yaml)
+      shell: bash
+      run: npm install --no-save yaml
+
+    - name: Apply flow sync (audit --fix)
+      id: audit
+      shell: bash
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ inputs.gh-token }}
+      run: node scripts/pfdsl/audit-issues-flow.mjs --fix
+
+    - name: Normalize blank lines in roadmap.pfdsl
+      id: normalize
+      shell: bash
+      continue-on-error: true
+      run: node scripts/pfdsl/normalize-pfdsl.mjs
+
+    - name: Run repo-local flow-sync hook (optional; no-op if absent)
+      id: local_hook
+      shell: bash
+      continue-on-error: true
+      run: |
+        if [ -f scripts/flow-sync-local-hook.mjs ]; then
+          node scripts/flow-sync-local-hook.mjs
+        else
+          echo "no scripts/flow-sync-local-hook.mjs — skipping repo-local step"
+        fi
+        # Collect hook-modified paths so add-paths below never references a
+        # path the hook didn't touch (create-pull-request's add-paths runs a
+        # single `git add -- <paths>`, which fails hard — and stages nothing
+        # at all, not even the paths that do exist — if any path is absent).
+        echo "paths<<FLOW_SYNC_HOOK_PATHS_EOF" >> "$GITHUB_OUTPUT"
+        { git diff --name-only -- . ':!.pfdsl/roadmap.pfdsl'
+          git ls-files --others --exclude-standard -- . ':!.pfdsl/roadmap.pfdsl'
+        } >> "$GITHUB_OUTPUT"
+        echo "FLOW_SYNC_HOOK_PATHS_EOF" >> "$GITHUB_OUTPUT"
+
+    - name: Summarize step results
+      id: summary
+      shell: bash
+      if: always()
+      run: |
+        any_failed=false
+        for pair in "audit:${{ steps.audit.outcome }}" "normalize:${{ steps.normalize.outcome }}" "local_hook:${{ steps.local_hook.outcome }}"; do
+          name="${pair%%:*}"
+          outcome="${pair##*:}"
+          if [ "$outcome" = "failure" ]; then
+            echo "- ❌ $name failed" >> "$GITHUB_STEP_SUMMARY"
+            any_failed=true
+          else
+            echo "- ✅ $name ($outcome)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        done
+        echo "any_failed=$any_failed" >> "$GITHUB_OUTPUT"
+
+    - name: Open PR if roadmap.pfdsl changed
+      id: create_pr
+      uses: peter-evans/create-pull-request@v8
+      with:
+        add-paths: |
+          .pfdsl/roadmap.pfdsl
+          ${{ steps.local_hook.outputs.paths }}
+        branch: flow-sync/pending
+        commit-message: "chore(plan): sync flow after #${{ inputs.issue-number }} closed"
+        title: "chore(plan): sync flow (pending closed issues)"
+        body: |
+          Mechanical `.pfdsl/roadmap.pfdsl` sync (`audit-issues-flow.mjs --fix`). Triggered by close of issue #${{ inputs.issue-number }}.
+
+          Terminal chains are removed (artifact + sole producing process + edge); processes with remaining downstream outputs only have their `tags`/`updated_at` issue-tracking fields cleared (the `iN_` prefix on the process is permanent). Review and merge if correct.
+          ${{ steps.summary.outputs.any_failed == 'true' && '
+
+          ⚠️ Some sync steps failed — see workflow run summary for details.' || '' }}

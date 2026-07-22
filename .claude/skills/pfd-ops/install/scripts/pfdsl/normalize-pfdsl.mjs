@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Collapses consecutive blank lines in a .pfdsl file body.
-// Usage: node scripts/normalize-pfdsl.mjs [path] (default: .pfdsl/roadmap.pfdsl)
+// Usage: node scripts/pfdsl/normalize-pfdsl.mjs [path] (default: .pfdsl/roadmap.pfdsl)
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { normalizeBody } from "./lib/issues-flow-audit.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "..");
+const root = resolve(__dirname, "../..");
 
 const filePath = process.argv[2] ?? resolve(root, ".pfdsl/roadmap.pfdsl");
 const raw = readFileSync(filePath, "utf-8");

@@ -1,0 +1,31 @@
+name: flow on issue close
+
+on:
+  issues:
+    types: [closed]
+
+concurrency:
+  group: flow-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Sync flow
+        id: flow_sync
+        uses: ./scripts/pfdsl/actions/flow-sync
+        with:
+          gh-token: ${{ github.token }}
+          issue-number: ${{ github.event.issue.number }}
+
+      - name: Fail workflow if a step failed and no PR was created or updated
+        if: steps.flow_sync.outputs.any-failed == 'true' && steps.flow_sync.outputs.pull-request-operation != 'created' && steps.flow_sync.outputs.pull-request-operation != 'updated'
+        run: exit 1
