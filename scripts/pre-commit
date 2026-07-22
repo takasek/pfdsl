@@ -17,6 +17,23 @@ if git diff --cached --name-only | grep -q '\.pfdsl$'; then
   fi
 fi
 
+# When operational .pfdsl/ files are staged, verify they are canonically
+# formatted. Scoped to .pfdsl/ — hand-authored teaching material under docs/
+# is intentionally exempt, since fmt can materialize implied nodes there (#529).
+staged_ops_pfdsl=$(git diff --cached --name-only --diff-filter=d | grep -E '^\.pfdsl/.*\.pfdsl$' || true)
+if [ -n "$staged_ops_pfdsl" ]; then
+  if node scripts/lib/dist-freshness.mjs packages/cli/dist/cli.js; then
+    for f in $staged_ops_pfdsl; do
+      if ! node packages/cli/dist/cli.js fmt "$f" --check >/dev/null 2>&1; then
+        echo "$f is not canonically formatted. Run 'make fmt-pfdsl' and re-stage."
+        exit 1
+      fi
+    done
+  else
+    echo "note: skipping .pfdsl fmt check (packages/cli/dist/cli.js missing or stale) — run 'pnpm -r build' to enable locally; CI verifies it."
+  fi
+fi
+
 # When .md files are staged, reject mid-sentence line breaks (see #302).
 staged_md=$(git diff --cached --name-only --diff-filter=d -- '*.md')
 if [ -n "$staged_md" ]; then

@@ -656,7 +656,7 @@ statusStyles:
   suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
-spec_v006 >> draft_multifile_specs -> [hierarchy_spec, presets_spec, multifile_policy]
+spec_v006 >> draft_multifile_specs -> [hierarchy_spec, multifile_policy, presets_spec]
 
 spec_v006 >> draft_criteria -> criteria_spec
 
@@ -666,15 +666,15 @@ spec_v006 >> draft_location -> location_spec
 
 spec_v006 >> write_design_notes -> design_notes
 
-[criteria_spec, revises_spec, location_spec, design_notes, external_stakeholders_spec] >> integrate_spec -> spec_v007
+[criteria_spec, design_notes, external_stakeholders_spec, location_spec, revises_spec] >> integrate_spec -> spec_v007
 
-[spec_v006, findings_r12, cli_tool] >> implement_lints -> lint_checker
+[cli_tool, findings_r12, spec_v006] >> implement_lints -> lint_checker
 
-[spec_v007, lint_checker] >> implement_spec_features -> featured_toolchain
+[lint_checker, spec_v007] >> implement_spec_features -> featured_toolchain
 
-[hierarchy_spec, presets_spec, multifile_policy, featured_toolchain] >> integrate_multifile -> spec_v008
+[featured_toolchain, hierarchy_spec, multifile_policy, presets_spec] >> integrate_multifile -> spec_v008
 
-[spec_v008, featured_toolchain] >> implement_multifile -> multifile_toolchain
+[featured_toolchain, spec_v008] >> implement_multifile -> multifile_toolchain
 
 skill_gen >> restructure_skillgen -> restructured_gen
 
@@ -690,45 +690,45 @@ spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
 
 cli_tool >> i119_publish_extension -> published_extension
 
-cli_release_bootstrap >> implement_version_cmd -> version_cmd
-cli_release_bootstrap >> implement_subcommand_help -> subcommand_help
-cli_release_bootstrap >> implement_stdin -> stdin
-cli_release_bootstrap >> implement_no_color -> no_color
 cli_release_bootstrap >> implement_json_output -> json_output
+cli_release_bootstrap >> implement_no_color -> no_color
+cli_release_bootstrap >> implement_stdin -> stdin
+cli_release_bootstrap >> implement_subcommand_help -> subcommand_help
+cli_release_bootstrap >> implement_version_cmd -> version_cmd
 
-[version_cmd, subcommand_help, stdin, no_color, json_output] >> publish_cli_ux_flags -> cli_release_ux_flags
+[json_output, no_color, stdin, subcommand_help, version_cmd] >> publish_cli_ux_flags -> cli_release_ux_flags
 
+cli_release_bootstrap >> fix_w002_line -> w002_line
+cli_release_bootstrap >> implement_group_hover -> group_hover
 cli_release_bootstrap >> implement_hover_jump -> hover_jump
 cli_release_bootstrap >> implement_run_command -> run_command
-cli_release_bootstrap >> implement_group_hover -> group_hover
-cli_release_bootstrap >> fix_w002_line -> w002_line
 
 cli_release_bootstrap >> implement_index_reindex -> index_reindex
 
 cli_release_bootstrap >> implement_node_sort -> node_sort
 
-[cli_release_ux_flags, w002_line, index_reindex, node_sort] >> publish_cli_index_sort -> cli_release_index_sort
+[cli_release_ux_flags, index_reindex, node_sort, w002_line] >> publish_cli_index_sort -> cli_release_index_sort
 
 index_reindex >> integrate_spec_v009 -> spec_v009
 
-[hover_jump, run_command, group_hover] >> publish_ext_v0014 -> ext_v0014
+[group_hover, hover_jump, run_command] >> publish_ext_v0014 -> ext_v0014
 
-[spec_v009, cli_release_index_sort] >> implement_basepath -> basepath
-[basepath, ready_cmd] >> integrate_spec_v0010 -> spec_v0010
+[cli_release_index_sort, spec_v009] >> implement_basepath -> basepath
 cli_release_index_sort >> implement_ready_cmd -> ready_cmd
+[basepath, ready_cmd] >> integrate_spec_v0010 -> spec_v0010
 basepath >> publish_cli_basepath -> cli_release_basepath
-[cli_release_basepath, ready_cmd] >> publish_cli_ready_cmd -> cli_release_ready_cmd
 [ext_v0014, basepath] >> publish_ext_v0015 -> ext_v0015
+[ready_cmd, cli_release_basepath] >> publish_cli_ready_cmd -> cli_release_ready_cmd
 
 cli_release_ready_cmd >> update_pfd_ops_skill -> pfd_ops_skill_ready
 
 cli_release_ready_cmd >> i268_implement_type_field -> type_field
-type_field >> implement_audit_sync -> audit_sync
 cli_release_ready_cmd >> i272_implement_w002_hierarchy -> w002_hierarchy
 cli_release_ready_cmd >> i273_implement_blocked_by -> blocked_by
 cli_release_ready_cmd >> implement_status_set -> status_set
+type_field >> implement_audit_sync -> audit_sync
 
-[cli_release_ready_cmd, type_field, audit_sync, w002_hierarchy, blocked_by, status_set] >> publish_cli_status_lifecycle -> cli_release_status_lifecycle
+[audit_sync, blocked_by, cli_release_ready_cmd, status_set, type_field, w002_hierarchy] >> publish_cli_status_lifecycle -> cli_release_status_lifecycle
 
 cli_release_status_lifecycle >> implement_statusset_impact -> statusset_impact
 
@@ -736,11 +736,11 @@ cli_release_status_lifecycle >> implement_symmetry_hint -> symmetry_hint
 
 [cli_release_status_lifecycle, statusset_impact, symmetry_hint] >> publish_cli_statusset_impact -> cli_release_statusset_impact
 
-[type_field, w002_hierarchy, blocked_by] >> integrate_spec_v0011 -> spec_v0011
+[blocked_by, type_field, w002_hierarchy] >> integrate_spec_v0011 -> spec_v0011
 
 multifile_toolchain >> recode_boundary_diags -> recode
 
-[spec_v0011, multifile_toolchain] >> implement_boundary_feedback -> boundary_feedback
+[multifile_toolchain, spec_v0011] >> implement_boundary_feedback -> boundary_feedback
 
 cli_release_statusset_impact >> i356_implement_explain_cmd -> explain_cmd
 cli_release_statusset_impact >> i357_define_pfd_lens_agent -> pfd_lens_agent
@@ -752,9 +752,9 @@ spec_id_syntax >> i402_implement_get_by_id -> get_by_id_tool
 
 spec_id_syntax >> i405_implement_mint_check -> mint_check_tool
 
-[spec_id_syntax, get_by_id_tool, mint_check_tool] >> migrate_spec_id_refs -> spec_id_refs
+[get_by_id_tool, mint_check_tool, spec_id_syntax] >> migrate_spec_id_refs -> spec_id_refs
 
-[spec_id_syntax, mint_check_tool] >> introduce_tombstones -> spec_id_tombstones
+[mint_check_tool, spec_id_syntax] >> introduce_tombstones -> spec_id_tombstones
 
 skill_gen >> i366_distribute_marketplace -> marketplace_dist
 
@@ -763,9 +763,9 @@ marketplace_dist >> i404_integrate_pfd_ops_plugin -> pfd_ops_plugin_dist
 cli_release_explain_lens >> i435_implement_ansi_color -> ansi_color
 ansi_color >> publish_cli_ansi_color -> cli_release_ansi_color
 
+cli_release_ansi_color >> i478_relax_v011 -> v011_semantics
 cli_release_ansi_color >> i480_relax_incomplete_graph -> incomplete_tolerance
 incomplete_tolerance >> i481_create_grill_skill -> grill_skill
-cli_release_ansi_color >> i478_relax_v011 -> v011_semantics
 [incomplete_tolerance, v011_semantics, grill_skill] >> publish_cli_grill_tolerance -> cli_release_grill_tolerance
 
 cli_release_ansi_color >> i476_implement_field_get -> field_get_cmd
@@ -773,6 +773,6 @@ cli_release_ansi_color >> i479_implement_graph_analysis -> graph_analysis
 [field_get_cmd, graph_analysis] >> publish_cli_query_tools -> cli_release_query_tools
 
 ext_v0015 >> i482_implement_editor_connector -> editor_connector
-editor_connector >> i483_implement_preview_connector -> preview_connector
 ext_v0015 >> i484_implement_def_insertion -> def_insertion
-[editor_connector, preview_connector, def_insertion] >> publish_ext_editing -> ext_editing_release
+editor_connector >> i483_implement_preview_connector -> preview_connector
+[def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release

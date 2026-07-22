@@ -904,13 +904,17 @@ function setFieldInSource(
 
 	const escapedId = escapeRe(id);
 	const escapedField = escapeRe(field);
-	const headerRe = new RegExp(`^(\\s+)${escapedId}:\\s*\\n`, "m");
+	// Match only the line's own leading indent: "[ \t]+", not "\s+". "\s"
+	// includes "\n", so with the "m" anchor it would start on a preceding blank
+	// line and swallow the newline plus indent, inflating the detected node
+	// indent and making the block-style rewrite silently no-op (#530).
+	const headerRe = new RegExp(`^([ \\t]+)${escapedId}:\\s*\\n`, "m");
 	const headerMatch = headerRe.exec(fmBlock);
 
 	// Flow-style body match is quote-aware: a "}" inside a quoted value must
 	// not terminate the map.
 	const flowHeaderRe = new RegExp(
-		`^(\\s+)${escapedId}:\\s*(\\{(?:"(?:[^"\\\\]|\\\\.)*"|'(?:[^']|'')*'|[^}"'])*\\})[ \\t]*$`,
+		`^([ \\t]+)${escapedId}:\\s*(\\{(?:"(?:[^"\\\\]|\\\\.)*"|'(?:[^']|'')*'|[^}"'])*\\})[ \\t]*$`,
 		"m",
 	);
 	const flowMatch = headerMatch ? null : flowHeaderRe.exec(fmBlock);
@@ -2038,6 +2042,9 @@ Options:
   --format pdf  PDF (requires: npm install puppeteer)
   --format png  PNG (requires: npm install puppeteer)
   --no-color    disable ANSI color codes for diagnostics (also: NO_COLOR env var)
+
+puppeteer is only needed for --format pdf and png, and must live in the same Node/npm environment as the pfdsl CLI.
+Under a version manager (nvm/nodenv/volta), a mismatched Node version's global install is not resolved — e.g. \`nodenv exec npm install -g puppeteer\`.
 `;
 
 const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
@@ -2420,7 +2427,7 @@ Commands:
                            Format a .pfdsl file (- = stdin)
   render <file|-> [--format dot|svg|pdf|png] [--no-color]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-                           PDF/PNG requires: npm install puppeteer
+                           PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)
   diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
                            Structural diff (text), or visual diff DOT/SVG
 

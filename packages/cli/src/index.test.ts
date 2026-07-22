@@ -2151,6 +2151,33 @@ req >> design -> spec
 		expect(check.exitCode).toBe(0);
 	});
 
+	// A blank line before a node header must not be swallowed into the node's
+	// indent: /^(\s+)id:/ would let the "^" anchor on the blank line and let
+	// "\s+" consume the newline plus the indent, inflating the detected indent
+	// and making the block-style rewrite silently no-op (#530).
+	it("sets a field on a node preceded by a blank line (no silent no-op) (#530)", async () => {
+		const blankBeforeNode = `---
+type: roadmap
+artifact:
+  first:
+    status: done
+
+  target:
+    status: done
+---
+target >> p -> zz
+`;
+		const f = join(dir, "meta-set-blank-before-node.pfdsl");
+		writeFileSync(f, blankBeforeNode);
+		const r = await run(["meta", "set", f, "target", "status", "wip"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("status: wip");
+		expect(after.match(/status: wip/g)).toHaveLength(1);
+		// The first node's status must stay untouched.
+		expect(after.match(/status: done/g)).toHaveLength(1);
+	});
+
 	// YAML core-schema resolution: reserved words and number-like strings must
 	// be quoted for string fields, or the parser re-types them (get/set
 	// round-trip breakage). index is integer-typed and must stay bare.

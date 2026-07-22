@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
 	parseOwnerRepo,
+	parseHost,
 	mapLabelsResponse,
 	mapIssuesResponse,
 	mapCheckRunsToRollup,
@@ -34,6 +35,36 @@ describe("parseOwnerRepo", () => {
 
 	it("returns null when fewer than two path segments", () => {
 		assert.equal(parseOwnerRepo("https://github.com/takasek"), null);
+	});
+});
+
+describe("parseHost", () => {
+	it("https URL", () => {
+		assert.equal(parseHost("https://github.com/takasek/pfdsl.git"), "github.com");
+	});
+
+	it("https URL to a GitHub Enterprise host", () => {
+		assert.equal(parseHost("https://ghe.corp.example/takasek/pfdsl"), "ghe.corp.example");
+	});
+
+	it("scp-like git@ URL", () => {
+		assert.equal(parseHost("git@github.com:takasek/pfdsl.git"), "github.com");
+	});
+
+	it("ssh:// URL to an enterprise host", () => {
+		assert.equal(parseHost("ssh://git@ghe.corp.example/takasek/pfdsl.git"), "ghe.corp.example");
+	});
+
+	it("keeps an explicit port", () => {
+		assert.equal(parseHost("https://ghe.corp.example:8443/takasek/pfdsl"), "ghe.corp.example:8443");
+	});
+
+	it("strips userinfo from the authority", () => {
+		assert.equal(parseHost("http://local_proxy@127.0.0.1:41729/git/takasek/pfdsl"), "127.0.0.1:41729");
+	});
+
+	it("returns null when no host can be extracted", () => {
+		assert.equal(parseHost("not-a-url"), null);
 	});
 });
 
