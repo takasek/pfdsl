@@ -13,7 +13,7 @@
 				"source": "git-subdir",
 				"url": "https://github.com/takasek/pfdsl.git",
 				"path": "plugin/pfdsl",
-				"ref": "v0.0.22"
+				"ref": "v0.0.23"
 			}
 		}
 	]
