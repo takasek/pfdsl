@@ -90,7 +90,7 @@ if (pfdslFiles.length === 0) {
 
 // 2. audit-issues-flow (no --fix: fails if manual findings remain)
 {
-	const r = trySh("node scripts/audit-issues-flow.mjs");
+	const r = trySh("node scripts/pfdsl/audit-issues-flow.mjs");
 	results.push({ name: "audit-issues-flow", ...classifyAuditIssuesFlowResult(r.ok, r.status) });
 }
 

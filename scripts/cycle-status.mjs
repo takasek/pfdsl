@@ -16,7 +16,7 @@ import {
 	detectDesignUnsettled,
 	buildGateCheckCommand,
 } from "./lib/cycle-status.mjs";
-import { execGh } from "./lib/gh-exec.mjs";
+import { execGh } from "./pfdsl/lib/gh-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
