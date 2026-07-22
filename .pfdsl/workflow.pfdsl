@@ -395,7 +395,7 @@ statusStyles:
     style: filled
 ---
 
-user_intent >> discuss -> [topics, proposals, decisions, payoff_log]
+user_intent >> discuss -> [decisions, payoff_log, proposals, topics]
 
 decisions >> draft_adrs -> adrs
 
@@ -409,17 +409,18 @@ spec_proposals >> maintain_spec -> spec
 
 spec >>? maintain_spec
 
-[spec, decisions] >> maintain_template -> [skill_template, quality_guide]
+[decisions, spec] >> maintain_template -> [quality_guide, skill_template]
 
 spec >> maintain_samples -> feature_samples
 
-[findings, adrs] >>? maintain_template
+adrs >>? maintain_template
+findings >>? maintain_template
 
-[spec, skill_template, quality_guide, feature_samples, review_perspectives] >> gen_skill -> pfdsl_skill
+[feature_samples, quality_guide, review_perspectives, skill_template, spec] >> gen_skill -> pfdsl_skill
 
 pfdsl_skill >>? gen_skill
 
-[spec, skill_template, quality_guide, feature_samples, review_perspectives, toolchain, grill_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, pfd_lens_agent] >> gen_plugin -> plugin_dist
+[ecosystem_skill, feature_samples, grill_skill, ops_skill_general, ops_skill_l3, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
 
 topics >> write_examples -> examples
 
@@ -427,9 +428,11 @@ pfdsl_skill >>? write_examples
 
 examples >> review_examples -> findings
 
-[pfdsl_skill, toolchain, retro_skill] >>? review_examples
+pfdsl_skill >>? review_examples
+retro_skill >>? review_examples
+toolchain >>? review_examples
 
-[adrs, payoff_log, decisions] >> distill_ops -> [grill_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, review_perspectives, workflow_md, bindings_pfd_ops, bindings_pfd_retro, vscode_ext_debug_skill, spec_stress_skill]
+[adrs, decisions, payoff_log] >> distill_ops -> [bindings_pfd_ops, bindings_pfd_retro, ecosystem_skill, grill_skill, ops_skill_general, ops_skill_l3, retro_skill, review_perspectives, spec_stress_skill, vscode_ext_debug_skill, workflow_md]
 
 spec_stress_skill >>? maintain_spec
 
@@ -443,19 +446,27 @@ proposals >> file_issues -> gh_issues
 
 findings >>? file_issues
 
-gh_issues >> map_deps -> [roadmap_pfdsl, roadmap_md]
+gh_issues >> map_deps -> [roadmap_md, roadmap_pfdsl]
 
-toolchain >> map_transform_boundaries -> [runtime_pipeline_pfdsl, runtime_pipeline_md]
+toolchain >> map_transform_boundaries -> [runtime_pipeline_md, runtime_pipeline_pfdsl]
 
 [gh_issues, roadmap_pfdsl, spec] >> develop -> pull_request
 
-pull_request >> merge_pr -> [toolchain, issue_updates, pr_diagrams]
+pull_request >> merge_pr -> [issue_updates, pr_diagrams, toolchain]
 
-[ops_skill_general, ops_skill_l3, workflow_md, bindings_pfd_ops, bindings_pfd_retro, roadmap_md, runtime_pipeline_pfdsl, vscode_ext_debug_skill, toolchain] >>? develop
+bindings_pfd_ops >>? develop
+bindings_pfd_retro >>? develop
+ops_skill_general >>? develop
+ops_skill_l3 >>? develop
+roadmap_md >>? develop
+runtime_pipeline_pfdsl >>? develop
+toolchain >>? develop
+vscode_ext_debug_skill >>? develop
+workflow_md >>? develop
 
 issue_updates >>? file_issues
 
-[toolchain, pfdsl_skill, grill_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill, pfd_lens_agent] >> publish_cli -> published_cli
+[ecosystem_skill, grill_skill, ops_skill_general, ops_skill_l3, pfd_lens_agent, pfdsl_skill, retro_skill, toolchain] >> publish_cli -> published_cli
 
 toolchain >> publish_libraries -> published_libraries
 
@@ -463,4 +474,4 @@ toolchain >> publish_ext -> published_ext
 
 [feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
 
-[toolchain, published_cli, published_libraries, plugin_dist] >> update_readme -> readme
+[plugin_dist, published_cli, published_libraries, toolchain] >> update_readme -> readme
