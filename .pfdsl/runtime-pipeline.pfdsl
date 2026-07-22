@@ -265,12 +265,12 @@ dot_graph >> export_image -> rendered_image
 
 [normalized_graph, parsed_doc] >> diff_graphs -> diff_report
 
-[pfdsl_skill, grill_skill, ops_skill_general, ops_skill_l3, retro_skill, ecosystem_skill] >> assemble_plugin -> plugin_dir
+[ecosystem_skill, grill_skill, ops_skill_general, ops_skill_l3, pfdsl_skill, retro_skill] >> assemble_plugin -> plugin_dir
 
 plugin_dir >> install_plugin -> installed_plugin
 
 installed_plugin >> deploy_install_layer -> installed_l3_layer
 
-[installed_plugin, installed_l3_layer] >> check_install_sync -> drift_report
+[installed_l3_layer, installed_plugin] >> check_install_sync -> drift_report
 
 installed_l3_layer >> ensure_labels -> gh_labels

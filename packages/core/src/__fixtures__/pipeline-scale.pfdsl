@@ -136,9 +136,9 @@ adr_set >> draft_beta -> spec_beta
 
 adr_set >> write_policy -> policy_doc
 
-[spec_alpha, policy_doc] >> implement_core -> impl_core
+[policy_doc, spec_alpha] >> implement_core -> impl_core
 
-[spec_beta, policy_doc] >> implement_ext -> impl_ext
+[policy_doc, spec_beta] >> implement_ext -> impl_ext
 
 [impl_core, impl_ext] >> implement_cli -> impl_cli
 
@@ -150,11 +150,11 @@ impl_core >> implement_feature_y -> feature_y
 
 impl_core >> build_plugin_a -> impl_plugin_a
 
-[impl_plugin_a, impl_ext] >> build_plugin_b -> impl_plugin_b
+[impl_ext, impl_plugin_a] >> build_plugin_b -> impl_plugin_b
 
-[impl_cli, feature_x, feature_y, feature_z] >> do_release_v1 -> release_v1
+[feature_x, feature_y, feature_z, impl_cli] >> do_release_v1 -> release_v1
 
-[release_v1, impl_plugin_a, impl_plugin_b] >> do_release_v2 -> release_v2
+[impl_plugin_a, impl_plugin_b, release_v1] >> do_release_v2 -> release_v2
 
 adr_set >> write_article -> article
 

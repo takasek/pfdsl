@@ -89,6 +89,24 @@ check-readme-cli:
 	node scripts/gen-readme-cli.mjs
 	@git diff --exit-code README.md || (echo "README.md CLI section is stale. Run 'make gen-readme-cli' and commit the result." && exit 1)
 
+# Canonical-fmt guard for operational .pfdsl/ files only (#529). docs/ teaching
+# material is exempt, since fmt can materialize implied nodes there.
+.PHONY: check-fmt
+check-fmt:
+	@find .pfdsl -name "*.pfdsl" -type f | sort | while read f; do \
+		echo "fmt --check $$f"; \
+		node packages/cli/dist/cli.js fmt "$$f" --check || \
+			{ echo "$$f is not canonically formatted. Run 'make fmt-pfdsl' and commit the result."; exit 1; }; \
+	done
+	@echo "check-fmt: all passed"
+
+# Rewrite the operational .pfdsl/ files to canonical fmt (companion to check-fmt).
+.PHONY: fmt-pfdsl
+fmt-pfdsl:
+	@find .pfdsl -name "*.pfdsl" -type f | sort | while read f; do \
+		node packages/cli/dist/cli.js fmt "$$f" --write || exit 1; \
+	done
+
 .PHONY: check-docs
 check-docs:
 	@find docs -name "*.pfdsl" -type f | sort | while read f; do \
