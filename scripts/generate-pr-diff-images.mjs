@@ -23,7 +23,7 @@ import { dirname, join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
-import { parseHost } from "./lib/github-rest.mjs";
+import { parseHost } from "./pfdsl/lib/github-rest.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");

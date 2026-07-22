@@ -33,7 +33,7 @@ import {
 	filesToCommitForBump,
 	releaseMilestoneArtifactIds,
 } from "./lib/release-config.mjs";
-import { parseHost } from "./lib/github-rest.mjs";
+import { parseHost } from "./pfdsl/lib/github-rest.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
