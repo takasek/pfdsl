@@ -36,7 +36,12 @@ const files = execSync('git ls-files "scripts/*.mjs" "scripts/**/*.mjs"', {
 	.filter(Boolean)
 	.map((f) => resolve(root, f))
 	// dedupe: a file directly under scripts/ matches both patterns
-	.filter((f, i, arr) => arr.indexOf(f) === i);
+	.filter((f, i, arr) => arr.indexOf(f) === i)
+	// *.test.mjs files are exercised by `node --test` itself, which already
+	// fails loudly on a broken import — and their own import-statement
+	// fixtures (string literals used as test input, not real imports) would
+	// otherwise be misparsed as real specifiers by the regex below.
+	.filter((f) => !f.endsWith(".test.mjs"));
 
 const broken = findBrokenImports(files);
 
