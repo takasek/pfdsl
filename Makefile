@@ -25,6 +25,7 @@ build:
 test:
 	pnpm -r test
 	node --test "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs"
+	node scripts/check-script-imports.mjs
 
 .PHONY: typecheck
 typecheck:
