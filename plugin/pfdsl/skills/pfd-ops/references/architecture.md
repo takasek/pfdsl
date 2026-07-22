@@ -97,8 +97,8 @@ pfdsl 開発リポ固有の例:
     check-install-sync.mjs     ← install/ の実配置・鮮度セルフチェック（ADR-0028）
     plugin-version-check.mjs   ← plugin version skew チェック（install/ 同期と無関係、check-install-sync.mjs から呼ばれる）
   install/                     ← L3 採用用テンプレート（リポルートへ実配置）
-    .github/workflows/         ← flow-on-issue-close 等
-    scripts/                   ← audit-issues-flow.mjs 等
+    .github/workflows/         ← pfdsl-flow-on-issue-close.yml（薄い呼び出しのみ）
+    scripts/pfdsl/             ← audit-issues-flow.mjs・composite action 本体等（配布物の由来を示す専用ディレクトリ、ADR-0032）
 ```
 
 `install/` の canonical は plugin に同梱され、リポルートへの実配置・更新は `check-install-sync.mjs --deploy`（`/pfd-init` ステップ 3.5）が行う。

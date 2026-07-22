@@ -53,20 +53,20 @@ Closes #<issue番号>
 
 ## 自動同期（flow-on-issue-close）
 
-issue が close されると `.github/workflows/flow-on-issue-close.yml` が起動し、`audit-issues-flow.mjs --fix` で `roadmap.pfdsl` を機械修復して PR を作成する。
+issue が close されると `.github/workflows/pfdsl-flow-on-issue-close.yml` が起動し、`scripts/pfdsl/actions/flow-sync` composite action 経由で `audit-issues-flow.mjs --fix` を実行して `roadmap.pfdsl` を機械修復し PR を作成する。workflow 本体は checkout してこの action を呼ぶだけの薄い構成 — 実体スクリプトは `scripts/pfdsl/` 配下に集約し、由来を明示する（配布物の境界設計は ADR-0032 参照）。
 
 PR マージ時に issue が自動 close されるには、PR 本文に `Closes #<issue番号>` を含める必要がある（「PR 本文規約」参照）。
 
 ## 同期監査
 
-`scripts/audit-issues-flow.mjs` が GitHub issues と `roadmap.pfdsl` の同期を機械監査する（ラベル・updatedAt・priority 突合）。`--fix` で機械的修復。
+`scripts/pfdsl/audit-issues-flow.mjs` が GitHub issues と `roadmap.pfdsl` の同期を機械監査する（ラベル・updatedAt・priority 突合）。`--fix` で機械的修復。
 
 ## 採用手順
 
 1. pfdsl plugin を導入する（`/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`）— pfd-ops スキル本体はリポでなく plugin から供給される
 2. `install/` 以下のファイルをリポルートに実配置する（`/pfd-init` ステップ3.5、または直接 `node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy`）。
    配置ファイルと plugin 同梱 canonical の drift は pfd-ops 発火時のランタイム hash 照合が警告する（設計根拠: ADR-0028）
-3. GitHub に `flow:managed` / `flow:exempt` ラベルを作成する（`audit-issues-flow.mjs --fix` が未作成ラベルを自動生成する）
+3. GitHub に `flow:managed` / `flow:exempt` ラベルを作成する（`scripts/pfdsl/audit-issues-flow.mjs --fix` が未作成ラベルを自動生成する）
 4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、issue に対応する process に `iN_` prefix を付ける
 5. リポの `roadmap.md` で本プリセットを指し、リポ URL を記載する
 
@@ -74,6 +74,6 @@ PR マージ時に issue が自動 close されるには、PR 本文に `Closes 
 
 - Node.js 24 以上
 - `gh` CLI（GitHub Actions ランナーにはプリインストール済み）
-- npm パッケージ `yaml`（`audit-issues-flow.mjs` の唯一の外部依存。workflow が `npm install --no-save yaml` で都度導入するため事前インストール不要）
+- npm パッケージ `yaml`（`audit-issues-flow.mjs` の唯一の外部依存。composite action が `npm install --no-save yaml` で都度導入するため事前インストール不要）
 
 workflow は pnpm 等の特定パッケージマネージャを前提としない（`npm install --no-save yaml` のみで完結）。リポ固有の追加処理（スナップショット再生成等）が必要な場合は `scripts/flow-sync-local-hook.mjs` を置くと、存在すれば workflow が自動実行する。
