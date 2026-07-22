@@ -86,7 +86,7 @@ statusStyles:
 
 ## CLI
 
-**Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.0.22**; the commands below use the grouped `graph`/`meta`/`status` surface that older releases lack, so an outdated CLI fails with `unknown command` rather than an obvious version error. Run `pfdsl --version` once at the start of the session. If `pfdsl` is missing or reports a version below `0.0.22`, do **not** run the commands below — ask the user to install or update it with `npm install -g @pfdsl/cli@latest`, and continue only after they confirm. (An environment that genuinely cannot install globally may substitute a version-pinned `npx @pfdsl/cli@0.0.22 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic.)
+**Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.0.23**; the commands below use the grouped `graph`/`meta`/`status` surface that older releases lack, so an outdated CLI fails with `unknown command` rather than an obvious version error. Run `pfdsl --version` once at the start of the session. If `pfdsl` is missing or reports a version below `0.0.23`, do **not** run the commands below — ask the user to install or update it with `npm install -g @pfdsl/cli@latest`, and continue only after they confirm. (An environment that genuinely cannot install globally may substitute a version-pinned `npx @pfdsl/cli@0.0.23 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic.)
 
 ```bash
 pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
@@ -100,7 +100,7 @@ pfdsl status ready|blocked|list|gaps   # Planning queries derived from artifact 
 pfdsl help   # Show this help
 ```
 
-Full flag reference: `pfdsl help`. If a command above is still reported as `unknown command` after the preflight, the installed CLI is older than `0.0.22` — update via `npm install -g @pfdsl/cli@latest` (or run `npx @pfdsl/cli@latest help` to inspect the current published surface).
+Full flag reference: `pfdsl help`. If a command above is still reported as `unknown command` after the preflight, the installed CLI is older than `0.0.23` — update via `npm install -g @pfdsl/cli@latest` (or run `npx @pfdsl/cli@latest help` to inspect the current published surface).
 
 ## Key constraints
 
