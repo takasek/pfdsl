@@ -53,7 +53,7 @@ Closes #<issue番号>
 
 ## 自動同期（flow-on-issue-close）
 
-issue が close されると `.github/workflows/pfdsl-flow-on-issue-close.yml` が起動し、`scripts/pfdsl/actions/flow-sync` composite action 経由で `audit-issues-flow.mjs --fix` を実行して `roadmap.pfdsl` を機械修復し PR を作成する。workflow 本体は checkout してこの action を呼ぶだけの薄い構成 — 実体スクリプトは `scripts/pfdsl/` 配下に集約し、由来を明示する（配布物の境界設計は ADR-0032 参照）。
+issue が close されると `.github/workflows/pfdsl-flow-on-issue-close.yml` が起動し、`scripts/pfdsl/audit-issues-flow.mjs --fix` を実行して `roadmap.pfdsl` を機械修復し PR を作成する。実体スクリプトは `scripts/pfdsl/` 配下に集約し、由来を明示する（配布物の境界設計は ADR-0032 参照）。
 
 PR マージ時に issue が自動 close されるには、PR 本文に `Closes #<issue番号>` を含める必要がある（「PR 本文規約」参照）。
 
@@ -74,6 +74,6 @@ PR マージ時に issue が自動 close されるには、PR 本文に `Closes 
 
 - Node.js 24 以上
 - `gh` CLI（GitHub Actions ランナーにはプリインストール済み）
-- npm パッケージ `yaml`（`audit-issues-flow.mjs` の唯一の外部依存。composite action が `npm install --no-save yaml` で都度導入するため事前インストール不要）
+- npm パッケージ `yaml`（`audit-issues-flow.mjs` の唯一の外部依存。workflow が `npm install --no-save yaml` で都度導入するため事前インストール不要）
 
 workflow は pnpm 等の特定パッケージマネージャを前提としない（`npm install --no-save yaml` のみで完結）。リポ固有の追加処理（スナップショット再生成等）が必要な場合は `scripts/flow-sync-local-hook.mjs` を置くと、存在すれば workflow が自動実行する。
