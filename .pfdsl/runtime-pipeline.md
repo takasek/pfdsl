@@ -49,7 +49,7 @@
 
 ## モデル化対象外のツール
 
-`scripts/gate-check.mjs`・`scripts/audit-issues-flow.mjs`・`scripts/check-scaffold-sync.mjs` 等、PR ゲート・監査目的の開発者向けツールはこの図の対象外とする。pfdsl の実行時変換でも配布物でもなく、このリポ自身の開発フローを検証するメタツールのため。pfd-ops 終端ゲート「変換コンポーネントを追加・変更・削除した場合...」の判定で、この種のツールの新規追加・変更は該当なしと扱ってよい。
+`scripts/gate-check.mjs`・`scripts/pfdsl/audit-issues-flow.mjs`・`scripts/check-scaffold-sync.mjs` 等、PR ゲート・監査目的の開発者向けツールはこの図の対象外とする。pfdsl の実行時変換でも配布物でもなく、このリポ自身の開発フローを検証するメタツールのため。pfd-ops 終端ゲート「変換コンポーネントを追加・変更・削除した場合...」の判定で、この種のツールの新規追加・変更は該当なしと扱ってよい。
 
 ## エラー・例外処理
 

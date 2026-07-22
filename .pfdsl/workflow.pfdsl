@@ -342,8 +342,8 @@ process:
     group: planning
   map_deps:
     label: 依存整理
-    description: "issue 間の依存を PFD 化し着手順を導出する。issue との同期は scripts/audit-issues-flow.mjs で機械監査（flow:managed ラベル・updated_at・priority 突合）。issue close 時は GitHub Action（flow-on-issue-close）が --fix した flow-sync PR を自動起票し、人がレビューして merge する。COMPLETED close は closed_in_flow（終端削除 or done 降格）、NOT_PLANNED close は closed_not_planned（終端は自動削除、下流ありは手動対応 finding）として区別する"
-    command: node scripts/audit-issues-flow.mjs
+    description: "issue 間の依存を PFD 化し着手順を導出する。issue との同期は scripts/pfdsl/audit-issues-flow.mjs で機械監査（flow:managed ラベル・updated_at・priority 突合）。issue close 時は GitHub Action（pfdsl-flow-on-issue-close）が --fix した flow-sync PR を自動起票し、人がレビューして merge する。COMPLETED close は closed_in_flow（終端削除 or done 降格）、NOT_PLANNED close は closed_not_planned（終端は自動削除、下流ありは手動対応 finding）として区別する"
+    command: node scripts/pfdsl/audit-issues-flow.mjs
   map_transform_boundaries:
     label: 変換境界整理
     description: "toolchain の実装（parse/normalize/validate/format/render/export 等）から実行時データ変換の境界を PFD 化する。変換コンポーネントの追加・変更・削除時に手動更新（ADR-0018 門番、pfd-ops プロトコル5）"

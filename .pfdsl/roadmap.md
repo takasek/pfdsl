@@ -11,7 +11,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 ## このリポのインスタンス値
 
 - 一次情報: github.com/takasek/pfdsl/issues
-- 同期監査スクリプト: `scripts/audit-issues-flow.mjs`（`--fix` で機械的修復）
+- 同期監査スクリプト: `scripts/pfdsl/audit-issues-flow.mjs`（`--fix` で機械的修復）
 - 監査対象: `.pfdsl/roadmap.pfdsl`
 
 ## 運用対象の計画 PFD
@@ -81,7 +81,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 - [ ] このサイクルで起票した issue を `flow:managed` / `flow:exempt` に分類した（判定は L3 reference の「ラベル判定基準」。保守・基盤・修正は exempt）
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
-- [ ] `node scripts/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する。`gate-check.mjs` 実行時はその一部として自動実行される）
+- [ ] `node scripts/pfdsl/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する。`gate-check.mjs` 実行時はその一部として自動実行される）
 
 **spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact（spec_v007 / spec_v008 / spec_v009 等）は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
 
