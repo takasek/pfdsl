@@ -53,6 +53,12 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
   具体例: #494（def-insertion.ts のフルドキュメント置換問題）は、#491 のレビュー対応コミット 31b16c1（fix(core,vscode-extension): use a minimal insert edit ...）で既に解決済みだったが、issue 自体は open のまま1日残った。#490/#493/#498 のバッチ処理着手前に現行コードを確認したことで発覚し、実装差分なしでクローズできた。
   対策: 着手前の issue 本文再読（work-cycle 手順1）に「本文の再現手順・コード引用を現行の該当ファイルと突合する」を含める。
 
+- **部分実装 fallback trap**: 外部 CLI 不在に備えた互換 fallback（REST 直叩き等）が、エラーを出さず「成功したように見えて」本来の実装より劣化・切り詰められた結果を返すと、それを消費する検査は健全に PASS/実行したように見えて判定が信頼できない。
+  「実行環境の暗黙前提 trap」（crash on absence — fallback 不在でクラッシュし可視）とは逆に、fallback 在りゆえに沈黙で誤った結果が通る（不可視でより危険）。
+  問いの形: 「この fallback は本来の実装と同じ完全性を返すか、成功したように見えて結果が劣化・切り詰められていないか」。
+  具体例: `gh` 不在環境の `audit-issues-flow` REST fallback（`fetchAllIssues`）が、短いページで早期 break しページングし切れず新しい 175 件（最小 issue #43）しか返さなかったため、実在する古い open issue #3 / #12 に false な `unknown_issue` finding を出した（#543）。`gh` 実体のある CI では `--limit 500` が全件返し再現しないため、fallback がまさに使われる Remote/web 環境でのみ audit が不正確になる。
+  対策: fallback 経路の網羅性を実データで確認する（返却件数・最小/最大キーの範囲を本来値と突合）。fallback が返す集合を「完全」と仮定した下流判定は、集合の完全性が別途保証されない限り信用しない。
+
 ## 配布物への finding 反映
 
 配布 bundle（plugin 同梱の pfd-* スキル本文・reference）は上流リポ（takasek/pfdsl）の生成・同梱物であり、採用リポ側のコピーは編集対象にならない（ADR-0028。plugin cache 内のファイルはインストール更新で消える）。
