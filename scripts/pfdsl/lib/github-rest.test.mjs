@@ -133,16 +133,49 @@ function jsonResponse(body, ok = true, status = 200) {
 	return { ok, status, json: async () => body, text: async () => JSON.stringify(body) };
 }
 
+/** 1-based page number from a `?…&page=N` URL (defaults to 1). */
+function pageOf(url) {
+	const m = url.match(/[?&]page=(\d+)/);
+	return m ? Number(m[1]) : 1;
+}
+
+/** An open issue entry matching the REST `/issues` shape. */
+function issue(number) {
+	return { number, state: "open", labels: [], updated_at: "2026-01-01T00:00:00Z" };
+}
+
+/** A pull-request entry as it appears in the same `/issues` feed. */
+function prEntry(number) {
+	return { ...issue(number), pull_request: { url: "…" } };
+}
+
+/**
+ * A fake fetch that serves `pages[page-1]` (an array) for URLs matching
+ * `pathIncludes`, and an empty array once the pages run out — faithfully
+ * reproducing GitHub's page-number pagination, including the empty
+ * terminator page.
+ */
+function pagedFetchImpl(pathIncludes, pages, envelope = (arr) => arr) {
+	return async (url) => {
+		if (!url.includes(pathIncludes)) throw new Error(`unexpected url: ${url}`);
+		return jsonResponse(envelope(pages[pageOf(url) - 1] ?? []));
+	};
+}
+
 describe("fetchAllLabels", () => {
-	it("requests the labels endpoint and maps the response", async () => {
+	it("paginates across pages, terminating on the empty page", async () => {
 		const calls = [];
+		const base = pagedFetchImpl("/labels", [
+			[{ name: "bug", description: "b" }, { name: "flow:managed", description: "m" }],
+			[{ name: "flow:exempt", description: "e" }],
+		]);
 		const fetchImpl = async (url, init) => {
 			calls.push({ url, init });
-			return jsonResponse([{ name: "bug", description: "Something isn't working" }]);
+			return base(url, init);
 		};
 		const result = await fetchAllLabels("takasek", "pfdsl", "tok", fetchImpl);
-		assert.deepEqual(result, [{ name: "bug", description: "Something isn't working" }]);
-		assert.equal(calls.length, 1);
+		assert.deepEqual(result.map((l) => l.name), ["bug", "flow:managed", "flow:exempt"]);
+		assert.equal(calls.length, 3); // page 1, page 2, empty page 3
 		assert.match(calls[0].url, /\/repos\/takasek\/pfdsl\/labels/);
 		assert.equal(calls[0].init.headers.Authorization, "Bearer tok");
 	});
@@ -154,39 +187,57 @@ describe("fetchAllLabels", () => {
 });
 
 describe("fetchAllIssues", () => {
-	it("paginates until a short page is returned", async () => {
-		let page = 0;
-		const fetchImpl = async () => {
-			page++;
-			if (page === 1) {
-				return jsonResponse(
-					Array.from({ length: 100 }, (_, i) => ({
-						number: i + 1,
-						state: "open",
-						labels: [],
-						updated_at: "2026-01-01T00:00:00Z",
-					})),
-				);
-			}
-			return jsonResponse([{ number: 101, state: "open", labels: [], updated_at: "2026-01-01T00:00:00Z" }]);
-		};
-		const result = await fetchAllIssues("takasek", "pfdsl", "tok", fetchImpl);
-		assert.equal(result.length, 101);
-		assert.equal(page, 2);
+	it("concatenates issues across every page until the empty page", async () => {
+		const pages = [
+			Array.from({ length: 100 }, (_, i) => issue(200 - i)),
+			Array.from({ length: 45 }, (_, i) => issue(100 - i)),
+		];
+		const result = await fetchAllIssues("takasek", "pfdsl", "tok", pagedFetchImpl("/issues", pages));
+		assert.equal(result.length, 145);
+		// the oldest issue, on the last non-empty page, must be present
+		assert.ok(result.some((i) => i.number === 56));
 	});
 
-	it("stops at the given limit even if more pages would be available", async () => {
-		const fetchImpl = async () =>
-			jsonResponse(
-				Array.from({ length: 100 }, (_, i) => ({
-					number: i + 1,
-					state: "open",
-					labels: [],
-					updated_at: "2026-01-01T00:00:00Z",
-				})),
-			);
+	it("does not stop on a short, non-final page (#543)", async () => {
+		// page 2 comes back short (75 < per_page) but is NOT the last page —
+		// the proxy can truncate a mid-stream page. Only the empty page ends it.
+		let pagesFetched = 0;
+		const pages = [
+			Array.from({ length: 100 }, (_, i) => issue(1000 - i)),
+			Array.from({ length: 75 }, (_, i) => issue(900 - i)),
+			Array.from({ length: 30 }, (_, i) => issue(3 - i + 27)), // includes #3
+		];
+		const fetchImpl = async (url) => {
+			pagesFetched = Math.max(pagesFetched, pageOf(url));
+			return jsonResponse(pages[pageOf(url) - 1] ?? []);
+		};
+		const result = await fetchAllIssues("takasek", "pfdsl", "tok", fetchImpl);
+		assert.equal(result.length, 205);
+		assert.ok(pagesFetched >= 4, "should fetch past the short page to the empty terminator");
+		assert.ok(result.some((i) => i.number === 3), "the old issue behind the short page must be included");
+	});
+
+	it("counts the limit against issues, not raw issue+PR entries (#543)", async () => {
+		// Raw entries per page exceed the limit, but most are PRs. Counting raw
+		// entries would stop after page 1 and drop the older issues on page 2.
+		const pages = [
+			[prEntry(20), prEntry(19), prEntry(18), issue(17), issue(16)],
+			[issue(5), issue(4), issue(3)],
+		];
+		const result = await fetchAllIssues("takasek", "pfdsl", "tok", pagedFetchImpl("/issues", pages), 4);
+		assert.deepEqual(result.map((i) => i.number), [17, 16, 5, 4]);
+	});
+
+	it("stops fetching once the limit of issues is collected", async () => {
+		let pagesFetched = 0;
+		const pages = [Array.from({ length: 100 }, (_, i) => issue(100 - i))];
+		const fetchImpl = async (url) => {
+			pagesFetched = Math.max(pagesFetched, pageOf(url));
+			return jsonResponse(pages[pageOf(url) - 1] ?? []);
+		};
 		const result = await fetchAllIssues("takasek", "pfdsl", "tok", fetchImpl, 50);
 		assert.equal(result.length, 50);
+		assert.equal(pagesFetched, 1);
 	});
 });
 
@@ -206,10 +257,14 @@ describe("fetchOpenPrsWithCi", () => {
 	it("attaches a statusCheckRollup per PR from its head sha's check-runs", async () => {
 		const fetchImpl = async (url) => {
 			if (url.includes("/pulls?")) {
-				return jsonResponse([{ number: 10, title: "flow sync", head: { ref: "flow-sync/pending", sha: "abc123" } }]);
+				return jsonResponse(
+					pageOf(url) === 1
+						? [{ number: 10, title: "flow sync", head: { ref: "flow-sync/pending", sha: "abc123" } }]
+						: [],
+				);
 			}
 			if (url.includes("/check-runs")) {
-				return jsonResponse({ check_runs: [{ status: "completed", conclusion: "success" }] });
+				return jsonResponse({ check_runs: pageOf(url) === 1 ? [{ status: "completed", conclusion: "success" }] : [] });
 			}
 			throw new Error(`unexpected url: ${url}`);
 		};
@@ -217,5 +272,19 @@ describe("fetchOpenPrsWithCi", () => {
 		assert.deepEqual(result, [
 			{ number: 10, title: "flow sync", headRefName: "flow-sync/pending", statusCheckRollup: [{ conclusion: "SUCCESS" }] },
 		]);
+	});
+
+	it("paginates open PRs across pages until the empty page", async () => {
+		const prPages = [
+			[{ number: 30, title: "a", head: { ref: "a", sha: "s30" } }, { number: 29, title: "b", head: { ref: "b", sha: "s29" } }],
+			[{ number: 5, title: "c", head: { ref: "c", sha: "s5" } }],
+		];
+		const fetchImpl = async (url) => {
+			if (url.includes("/pulls?")) return jsonResponse(prPages[pageOf(url) - 1] ?? []);
+			if (url.includes("/check-runs")) return jsonResponse({ check_runs: [] });
+			throw new Error(`unexpected url: ${url}`);
+		};
+		const result = await fetchOpenPrsWithCi("takasek", "pfdsl", "tok", fetchImpl);
+		assert.deepEqual(result.map((p) => p.number), [30, 29, 5]);
 	});
 });
