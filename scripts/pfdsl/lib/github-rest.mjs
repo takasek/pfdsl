@@ -12,6 +12,7 @@
 import { proxyAwareFetch } from "./proxy-fetch.mjs";
 
 const API_ROOT = "https://api.github.com";
+const PER_PAGE = 100;
 
 /**
  * Extract {owner, repo} from a git remote URL. Handles https, git@ scp-like,
@@ -116,6 +117,41 @@ async function request(fetchImpl, url, init) {
 }
 
 /**
+ * Fetch every page of a paginated list endpoint and concatenate the results.
+ *
+ * Termination is on an **empty** page, never on a short one. GitHub's own
+ * contract lets a `< per_page` page signal the end, but this repo's fallback
+ * runs behind a proxy (proxy-fetch.mjs delegates each request to a child
+ * process) that can return a short — but non-final — page mid-stream; a
+ * `batch.length < perPage` break would then silently truncate the feed and
+ * drop the oldest items (#543). Only a zero-length page reliably means the
+ * end.
+ *
+ * `getPageItems` extracts the array to accumulate from each response body
+ * (identity for endpoints that return a bare array; a key selector for
+ * enveloped ones like check-runs). Termination is keyed on that same array,
+ * so callers must pass the endpoint's raw page array here and do any
+ * domain-specific filtering on the concatenated result — filtering inside
+ * the extractor could make a non-final page look empty and stop early.
+ *
+ * @param {typeof fetch} fetchImpl
+ * @param {(page: number) => string} buildUrl  builds the endpoint URL for a 1-based page
+ * @param {string} token
+ * @param {(body: any) => any[]} [getPageItems]
+ * @returns {Promise<any[]>}
+ */
+async function fetchAllPages(fetchImpl, buildUrl, token, getPageItems = (body) => body) {
+	const all = [];
+	for (let page = 1; ; page++) {
+		const res = await request(fetchImpl, buildUrl(page), { headers: authHeaders({ token }) });
+		const batch = getPageItems(await res.json());
+		if (batch.length === 0) break;
+		all.push(...batch);
+	}
+	return all;
+}
+
+/**
  * @param {string} owner
  * @param {string} repo
  * @param {string} token
@@ -123,10 +159,12 @@ async function request(fetchImpl, url, init) {
  * @returns {Promise<{name: string, description: string}[]>}
  */
 export async function fetchAllLabels(owner, repo, token, fetchImpl = proxyAwareFetch) {
-	const res = await request(fetchImpl, `${API_ROOT}/repos/${owner}/${repo}/labels?per_page=100`, {
-		headers: authHeaders({ token }),
-	});
-	return mapLabelsResponse(await res.json());
+	const raw = await fetchAllPages(
+		fetchImpl,
+		(page) => `${API_ROOT}/repos/${owner}/${repo}/labels?per_page=${PER_PAGE}&page=${page}`,
+		token,
+	);
+	return mapLabelsResponse(raw);
 }
 
 /**
@@ -138,19 +176,24 @@ export async function fetchAllLabels(owner, repo, token, fetchImpl = proxyAwareF
  * @returns {Promise<ReturnType<typeof mapIssuesResponse>>}
  */
 export async function fetchAllIssues(owner, repo, token, fetchImpl = proxyAwareFetch, limit = 500) {
-	const perPage = 100;
-	const all = [];
-	for (let page = 1; all.length < limit; page++) {
+	// The `limit` is on issues, matching `gh issue list --limit N`. It must be
+	// counted *after* filtering out pull requests (the REST `/issues` feed
+	// interleaves them): counting raw entries capped the feed at ~limit
+	// issues+PRs, dropping the oldest issues once the repo grew past `limit`
+	// combined entries (#543). Pagination terminates on an empty page, so a
+	// short non-final page can no longer end the loop early.
+	const issues = [];
+	for (let page = 1; issues.length < limit; page++) {
 		const res = await request(
 			fetchImpl,
-			`${API_ROOT}/repos/${owner}/${repo}/issues?state=all&per_page=${perPage}&page=${page}`,
+			`${API_ROOT}/repos/${owner}/${repo}/issues?state=all&per_page=${PER_PAGE}&page=${page}`,
 			{ headers: authHeaders({ token }) },
 		);
 		const batch = await res.json();
-		all.push(...batch);
-		if (batch.length < perPage) break;
+		if (batch.length === 0) break;
+		issues.push(...mapIssuesResponse(batch));
 	}
-	return mapIssuesResponse(all.slice(0, limit));
+	return issues.slice(0, limit);
 }
 
 /**
@@ -227,11 +270,13 @@ export async function getIssueBody(owner, repo, token, issueNumber, fetchImpl = 
  * @returns {Promise<{conclusion: string|null}[]>}
  */
 async function fetchCiRollupForSha(owner, repo, token, sha, fetchImpl = proxyAwareFetch) {
-	const res = await request(fetchImpl, `${API_ROOT}/repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`, {
-		headers: authHeaders({ token }),
-	});
-	const { check_runs } = await res.json();
-	return mapCheckRunsToRollup(check_runs ?? []);
+	const checkRuns = await fetchAllPages(
+		fetchImpl,
+		(page) => `${API_ROOT}/repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=${PER_PAGE}&page=${page}`,
+		token,
+		(body) => body.check_runs ?? [],
+	);
+	return mapCheckRunsToRollup(checkRuns);
 }
 
 /**
@@ -243,10 +288,11 @@ async function fetchCiRollupForSha(owner, repo, token, sha, fetchImpl = proxyAwa
  * @returns {Promise<Array<{number: number, title: string, headRefName: string, statusCheckRollup: {conclusion: string|null}[]}>>}
  */
 export async function fetchOpenPrsWithCi(owner, repo, token, fetchImpl = proxyAwareFetch) {
-	const res = await request(fetchImpl, `${API_ROOT}/repos/${owner}/${repo}/pulls?state=open&per_page=100`, {
-		headers: authHeaders({ token }),
-	});
-	const prs = await res.json();
+	const prs = await fetchAllPages(
+		fetchImpl,
+		(page) => `${API_ROOT}/repos/${owner}/${repo}/pulls?state=open&per_page=${PER_PAGE}&page=${page}`,
+		token,
+	);
 	return Promise.all(
 		prs.map(async (pr) => ({
 			number: pr.number,
