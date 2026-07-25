@@ -133,8 +133,41 @@ function jsonResponse(body, ok = true, status = 200) {
 	return { ok, status, json: async () => body, text: async () => JSON.stringify(body) };
 }
 
+/** 1-based page number from a `?…&page=N` URL (defaults to 1). */
+function pageOf(url) {
+	const m = url.match(/[?&]page=(\d+)/);
+	return m ? Number(m[1]) : 1;
+}
+
+/** An open issue entry matching the REST `/issues` shape. */
+function issue(number) {
+	return { number, state: "open", labels: [], updated_at: "2026-01-01T00:00:00Z" };
+}
+
+/** A pull-request entry as it appears in the same `/issues` feed. */
+function prEntry(number) {
+	return { ...issue(number), pull_request: { url: "…" } };
+}
+
+/**
+ * A fake fetch that serves `pages[page-1]` (an array) for URLs matching
+ * `pathIncludes`, and an empty array once the pages run out — reproducing
+ * GitHub's page-number pagination.
+ */
+function pagedFetchImpl(pathIncludes, pages, envelope = (arr) => arr) {
+	return async (url) => {
+		if (!url.includes(pathIncludes)) throw new Error(`unexpected url: ${url}`);
+		return jsonResponse(envelope(pages[pageOf(url) - 1] ?? []));
+	};
+}
+
+/** A full page (per_page=100) of issues numbered downwards from `from`. */
+function fullPage(from) {
+	return Array.from({ length: 100 }, (_, i) => issue(from - i));
+}
+
 describe("fetchAllLabels", () => {
-	it("requests the labels endpoint and maps the response", async () => {
+	it("stops after a single short page", async () => {
 		const calls = [];
 		const fetchImpl = async (url, init) => {
 			calls.push({ url, init });
@@ -142,9 +175,26 @@ describe("fetchAllLabels", () => {
 		};
 		const result = await fetchAllLabels("takasek", "pfdsl", "tok", fetchImpl);
 		assert.deepEqual(result, [{ name: "bug", description: "Something isn't working" }]);
-		assert.equal(calls.length, 1);
+		assert.equal(calls.length, 1, "a short first page is the last page — no terminator round-trip");
 		assert.match(calls[0].url, /\/repos\/takasek\/pfdsl\/labels/);
 		assert.equal(calls[0].init.headers.Authorization, "Bearer tok");
+	});
+
+	it("paginates past a full page, terminating on the short one", async () => {
+		const pages = [
+			Array.from({ length: 100 }, (_, i) => ({ name: `l${i}`, description: "" })),
+			[{ name: "flow:exempt", description: "e" }],
+		];
+		const result = await fetchAllLabels("takasek", "pfdsl", "tok", pagedFetchImpl("/labels", pages));
+		assert.equal(result.length, 101);
+		assert.equal(result.at(-1).name, "flow:exempt");
+	});
+
+	it("throws instead of truncating when the page parameter never advances", async () => {
+		// A layer that ignores `page` (over-eager stub or cache) would otherwise
+		// spin forever; returning a partial list silently is the #543 failure.
+		const fetchImpl = async () => jsonResponse(Array.from({ length: 100 }, (_, i) => ({ name: `l${i}`, description: "" })));
+		await assert.rejects(() => fetchAllLabels("takasek", "pfdsl", "tok", fetchImpl), /pagination exceeded/);
 	});
 
 	it("throws with status and body text on a non-ok response", async () => {
@@ -154,39 +204,61 @@ describe("fetchAllLabels", () => {
 });
 
 describe("fetchAllIssues", () => {
-	it("paginates until a short page is returned", async () => {
-		let page = 0;
-		const fetchImpl = async () => {
-			page++;
-			if (page === 1) {
-				return jsonResponse(
-					Array.from({ length: 100 }, (_, i) => ({
-						number: i + 1,
-						state: "open",
-						labels: [],
-						updated_at: "2026-01-01T00:00:00Z",
-					})),
-				);
-			}
-			return jsonResponse([{ number: 101, state: "open", labels: [], updated_at: "2026-01-01T00:00:00Z" }]);
-		};
-		const result = await fetchAllIssues("takasek", "pfdsl", "tok", fetchImpl);
-		assert.equal(result.length, 101);
-		assert.equal(page, 2);
+	it("concatenates issues across pages, terminating on the short page", async () => {
+		const pages = [fullPage(200), Array.from({ length: 45 }, (_, i) => issue(100 - i))];
+		const result = await fetchAllIssues("takasek", "pfdsl", "tok", pagedFetchImpl("/issues", pages));
+		assert.equal(result.length, 145);
+		assert.ok(result.some((i) => i.number === 56), "the oldest issue on the last page must be present");
 	});
 
-	it("stops at the given limit even if more pages would be available", async () => {
-		const fetchImpl = async () =>
-			jsonResponse(
-				Array.from({ length: 100 }, (_, i) => ({
-					number: i + 1,
-					state: "open",
-					labels: [],
-					updated_at: "2026-01-01T00:00:00Z",
-				})),
-			);
+	it("reaches issues beyond the first `limit` raw entries when PRs are interleaved (#543)", async () => {
+		// The real failure: the /issues feed interleaves PRs, and the limit used
+		// to count raw entries. Five full pages here carry only 175 issues (as
+		// the live repo did), so a raw-entry limit of 500 stopped before page 6
+		// and never fetched the oldest issues — #3 and #12 among them.
+		const perPageIssueCounts = [33, 45, 42, 32, 23];
+		let next = 545;
+		const pages = perPageIssueCounts.map((issueCount) => {
+			const page = [];
+			for (let i = 0; i < 100; i++) page.push(i < issueCount ? issue(next--) : prEntry(next--));
+			return page;
+		});
+		pages.push([issue(12), issue(3)]); // the short final page, holding the old issues
+
+		const result = await fetchAllIssues("takasek", "pfdsl", "tok", pagedFetchImpl("/issues", pages), 500);
+		assert.ok(result.some((i) => i.number === 3), "#3 must be reached");
+		assert.ok(result.some((i) => i.number === 12), "#12 must be reached");
+		assert.equal(result.length, 177);
+		assert.ok(result.every((i) => !("pull_request" in i)), "pull requests must be filtered out");
+	});
+
+	it("stops fetching once `limit` issues are collected", async () => {
+		let pagesFetched = 0;
+		const fetchImpl = async (url) => {
+			pagesFetched = Math.max(pagesFetched, pageOf(url));
+			return jsonResponse(fullPage(1000 - (pageOf(url) - 1) * 100));
+		};
 		const result = await fetchAllIssues("takasek", "pfdsl", "tok", fetchImpl, 50);
 		assert.equal(result.length, 50);
+		assert.equal(pagesFetched, 1, "must not keep paging once the limit is met");
+	});
+
+	it("keeps paging for a mostly-PR feed instead of treating limit/per_page as a page bound", async () => {
+		// 3 issues per full page: reaching a limit of 6 legitimately needs 2
+		// pages even though limit/per_page rounds to 1.
+		const fetchImpl = async (url) => {
+			const p = pageOf(url);
+			if (p > 3) return jsonResponse([]);
+			const base = 1000 - (p - 1) * 100;
+			return jsonResponse(Array.from({ length: 100 }, (_, i) => (i < 3 ? issue(base - i) : prEntry(base - i))));
+		};
+		const result = await fetchAllIssues("takasek", "pfdsl", "tok", fetchImpl, 6);
+		assert.equal(result.length, 6);
+	});
+
+	it("throws instead of truncating when the page parameter never advances", async () => {
+		const fetchImpl = async () => jsonResponse(fullPage(1000));
+		await assert.rejects(() => fetchAllIssues("takasek", "pfdsl", "tok", fetchImpl, 100000), /pagination exceeded/);
 	});
 });
 
@@ -204,7 +276,9 @@ describe("getIssueBody", () => {
 
 describe("fetchOpenPrsWithCi", () => {
 	it("attaches a statusCheckRollup per PR from its head sha's check-runs", async () => {
+		const calls = [];
 		const fetchImpl = async (url) => {
+			calls.push(url);
 			if (url.includes("/pulls?")) {
 				return jsonResponse([{ number: 10, title: "flow sync", head: { ref: "flow-sync/pending", sha: "abc123" } }]);
 			}
@@ -217,5 +291,36 @@ describe("fetchOpenPrsWithCi", () => {
 		assert.deepEqual(result, [
 			{ number: 10, title: "flow sync", headRefName: "flow-sync/pending", statusCheckRollup: [{ conclusion: "SUCCESS" }] },
 		]);
+		assert.equal(calls.length, 2, "one short page each — no terminator round-trips");
+	});
+
+	it("paginates open PRs past a full page, terminating on the short one", async () => {
+		const prPages = [
+			Array.from({ length: 100 }, (_, i) => ({ number: 200 - i, title: "a", head: { ref: "a", sha: `s${200 - i}` } })),
+			[{ number: 5, title: "c", head: { ref: "c", sha: "s5" } }],
+		];
+		const fetchImpl = async (url) => {
+			if (url.includes("/pulls?")) return jsonResponse(prPages[pageOf(url) - 1] ?? []);
+			if (url.includes("/check-runs")) return jsonResponse({ check_runs: [] });
+			throw new Error(`unexpected url: ${url}`);
+		};
+		const result = await fetchOpenPrsWithCi("takasek", "pfdsl", "tok", fetchImpl);
+		assert.equal(result.length, 101);
+		assert.equal(result.at(-1).number, 5);
+	});
+
+	it("paginates a head sha's check-runs past a full page", async () => {
+		const runPages = [
+			Array.from({ length: 100 }, () => ({ status: "completed", conclusion: "success" })),
+			[{ status: "completed", conclusion: "failure" }],
+		];
+		const fetchImpl = async (url) => {
+			if (url.includes("/pulls?")) return jsonResponse([{ number: 1, title: "t", head: { ref: "r", sha: "sha1" } }]);
+			if (url.includes("/check-runs")) return jsonResponse({ check_runs: runPages[pageOf(url) - 1] ?? [] });
+			throw new Error(`unexpected url: ${url}`);
+		};
+		const [pr] = await fetchOpenPrsWithCi("takasek", "pfdsl", "tok", fetchImpl);
+		assert.equal(pr.statusCheckRollup.length, 101);
+		assert.equal(pr.statusCheckRollup.at(-1).conclusion, "FAILURE");
 	});
 });
