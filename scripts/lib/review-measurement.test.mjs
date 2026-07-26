@@ -7,6 +7,7 @@ import {
 	extractMeasurements,
 	summarize,
 	TARGET_SAMPLE_COUNT,
+	IN_SAMPLE_PATH,
 } from "./review-measurement.mjs";
 
 const log = (...entries) => entries.map(([sha, body]) => `${sha}${FIELD_SEP}${body}`).join(RECORD_SEP);
@@ -85,6 +86,21 @@ describe("extractMeasurements", () => {
 				["bbb", "out"],
 			],
 		);
+	});
+});
+
+describe("IN_SAMPLE_PATH", () => {
+	it("matches the code paths that put a cycle in sample", () => {
+		assert.equal(IN_SAMPLE_PATH.test("scripts/lib/review-measurement.mjs\n"), true);
+		assert.equal(IN_SAMPLE_PATH.test("packages/core/src/parser.ts\n"), true);
+	});
+
+	it("does not match prose-only changes, which stay out of sample", () => {
+		assert.equal(IN_SAMPLE_PATH.test(".pfdsl/roadmap.md\ndocs/adr/README.md\n"), false);
+	});
+
+	it("matches when a code path appears on any line of a file list", () => {
+		assert.equal(IN_SAMPLE_PATH.test("docs/adr/README.md\nscripts/gate-check.mjs\n"), true);
 	});
 });
 

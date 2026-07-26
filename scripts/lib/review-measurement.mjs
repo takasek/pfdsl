@@ -23,15 +23,25 @@ export const RECORD_SEP = "";
 const TRAILER = /^Review-Measurement:\s*(.+)$/m;
 const PAIR = /(\w+)=(?:"([^"]*)"|(\S+))/g;
 
+/** Substring for `git log --grep`, so git filters instead of us reading all of history. */
+export const TRAILER_GREP = "Review-Measurement:";
+
 /**
- * Parse a single trailer line into a record.
+ * Paths whose change makes a cycle in-sample. Kept beside the parser so the
+ * predicate has one anchor in code; the prose statement of the same rule lives
+ * in the terminal-gate section of the roadmap companion.
+ */
+export const IN_SAMPLE_PATH = /^(packages|scripts)\//m;
+
+/**
+ * Parse a trailer out of a commit message (subject and body).
  * A malformed record carries `error` instead of throwing — the aggregate view
  * reports it separately so it cannot be mistaken for a zero-finding cycle.
- * @param {string} line
+ * @param {string} text - a commit message, or any text that may contain the trailer line
  * @returns {{sample?: string, new?: number, adopted?: number, angles?: string, error?: string}|null}
  */
-export function parseMeasurementTrailer(line) {
-	const match = TRAILER.exec(line);
+export function parseMeasurementTrailer(text) {
+	const match = TRAILER.exec(text);
 	if (!match) return null;
 
 	/** @type {Record<string, string>} */

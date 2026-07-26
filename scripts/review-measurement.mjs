@@ -21,6 +21,8 @@ import {
 	summarize,
 	parseMeasurementTrailer,
 	TARGET_SAMPLE_COUNT,
+	TRAILER_GREP,
+	IN_SAMPLE_PATH,
 } from "./lib/review-measurement.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -40,7 +42,8 @@ function trySh(cmd) {
 
 const range = since ? `${since}..HEAD` : "HEAD";
 const logFormat = `--format=%H${FIELD_SEP}%B${RECORD_SEP}`;
-const logResult = trySh(`git log ${logFormat} ${range}`);
+// --grep lets git skip non-record commits instead of us reading all of history.
+const logResult = trySh(`git log --grep="${TRAILER_GREP}" ${logFormat} ${range}`);
 if (!logResult.ok) {
 	console.error(`review-measurement: failed to read git log for ${range}: ${logResult.out.trim()}`);
 	process.exit(1);
@@ -89,7 +92,7 @@ const merges = mergesResult.ok ? mergesResult.out.trim().split("\n").filter(Bool
 const missing = [];
 for (const merge of merges) {
 	const files = trySh(`git diff --name-only ${merge}^1 ${merge}`);
-	if (!files.ok || !/^(packages|scripts)\//m.test(files.out)) continue;
+	if (!files.ok || !IN_SAMPLE_PATH.test(files.out)) continue;
 	const bodies = trySh(`git log --format=%B ${merge}^1..${merge}^2`);
 	if (bodies.ok && parseMeasurementTrailer(bodies.out)) continue;
 	const subject = trySh(`git log -1 --format=%s ${merge}`);
