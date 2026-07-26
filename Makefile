@@ -130,6 +130,16 @@ gen-skill: check-docs
 gen-plugin: gen-skill
 	node scripts/gen-plugin.mjs
 
+# Manual entry point for the pfd-ops install/ canonical<->deployed sync
+# (#547): lifts deployed -> canonical for every divergence, then
+# regenerates plugin/ so its mirror picks up the change too. `--staged`
+# mode (staged-side-wins, used by scripts/pre-commit) is invoked directly
+# via `node scripts/sync-install.mjs --staged`, not through this target.
+.PHONY: sync-install
+sync-install:
+	node scripts/sync-install.mjs
+	$(MAKE) gen-plugin
+
 .PHONY: push
 push: check-docs
 	@if ! git diff --quiet HEAD -- docs/samples docs/examples plugin .claude-plugin; then \
