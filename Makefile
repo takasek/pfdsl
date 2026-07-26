@@ -126,8 +126,12 @@ check-docs:
 gen-skill: check-docs
 	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
 
+.PHONY: gen-install
+gen-install:
+	node scripts/gen-install.mjs
+
 .PHONY: gen-plugin
-gen-plugin: gen-skill
+gen-plugin: gen-skill gen-install
 	node scripts/gen-plugin.mjs
 
 .PHONY: push

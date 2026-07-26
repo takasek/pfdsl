@@ -83,6 +83,19 @@ check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
   "node scripts/gen-skill.mjs --out .claude/skills/pfdsl" \
   "The .claude/skills/pfdsl dev copy failed to regenerate. Run 'make gen-skill' and investigate."
 
+# install/ is a generated mirror of its repo-root sources (#547) — one
+# direction only, repo-root source -> .claude/skills/pfd-ops/install/. Runs
+# even when packages/cli/dist/cli.js is missing/stale (require_dist "-"):
+# gen-install is pure file copying and needs no build output, unlike the
+# gen-skill/gen-plugin checks below.
+# Trigger pattern is sourced from scripts/lib/gen-install-trigger.mjs (single
+# source of truth; also covers a hand-edit to the generated install/ side,
+# which this regenerate-then-diff overwrites and flags).
+gen_install_trigger=$(node scripts/lib/gen-install-trigger.mjs) || { echo "gen-install trigger derivation failed"; exit 1; }
+check_drift "$gen_install_trigger" "-" \
+  "node scripts/gen-install.mjs && git diff --quiet -- .claude/skills/pfd-ops/install" \
+  ".claude/skills/pfd-ops/install is stale (or was hand-edited). Run 'make gen-install' and re-stage."
+
 # gen-plugin.mjs bundles pfd-ecosystem/pfd-retro/commands plus the pfdsl skill
 # (via gen-skill.mjs) into plugin/pfdsl/; needs the CLI dist for the same
 # reason as the gen-skill check above (see #400/#401).
