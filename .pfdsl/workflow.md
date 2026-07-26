@@ -82,6 +82,18 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 **dist 鮮度の機械検査**: pre-commit の drift 検査（README `## CLI` セクション・gen-skill・gen-plugin）は対象 dist（`packages/cli/dist/cli.js` 等）を実行または import して出力を取得する。`scripts/lib/dist-freshness.mjs` が dist の mtime を sibling `src/` の最新 mtime と比較し、dist が存在しない場合と同様に古い場合も検査を skip して「run 'pnpm -r build'」を促す（#450/#452）。skip は「検査対象が信頼できないので判定を CI に委ねる」意味であり、ローカルで検査 PASS しなかったからといって drift が無いとは限らない — コミット前に `pnpm -r build` を済ませて skip を解消してから判断する。
 
+**pfd-ops `install/` は生成物**: `.claude/skills/pfd-ops/install/**` は手編集しない。
+一次情報は repo ルート側のソース（`scripts/pfdsl/**` と `.github/workflows/pfdsl-flow-on-issue-close.yml`）で、そこを編集して `make gen-install` で `install/` を再生成する。
+生成の向きは `repo ルートのソース → install/ → plugin/pfdsl/` の一本のみで、逆向きの経路は無い。
+配布対象は `scripts/lib/install-templates.mjs` の明示リストが決める（`scripts/pfdsl/` には配布しない repo ローカルの `*.test.mjs` が同居するため、glob でなく明示リストにしている）。
+テンプレートを増減したらこのリストも更新する。
+`gen-plugin` は内部で `gen-install` を実行するため、`plugin/` が古い `install/` から組まれることはない。
+
+drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査と違い dist を要求しないので、ビルド未実施でもローカルで走る）と CI（`check-pfd-ops-sync.yml`）が行う。
+生成側を手編集した場合も、再生成が作業ツリーの手編集を上書きしたうえで検査が落ちる。
+テンプレートのソースを変更したコミットは再ステージが2往復必要になる（1回目で `install/`、2回目で `plugin/`）。
+2ホップの生成チェーンに「直して exit 1」の流儀を適用した結果であり、意図した挙動である。
+
 **出力抑制**: `make gen-samples` / `make gen-skill` は pnpm 全パッケージビルド + 全サンプル check の warning を毎回出力するため数百行に及ぶ。実行後は `git status --short docs/samples/ .claude/skills/pfdsl/ plugin/pfdsl/` で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
 **配布スキルの新規追加時の横断照合**: 新しい配布スキル（`.claude/skills/pfd-*`）を追加したら、`grep -rn "<既存スキルID>\b" .pfdsl/ scripts/` で既存の兄弟スキル（例: `retro_skill`）の全参照箇所を洗い出し、新スキルにも同じ箇所（`workflow.pfdsl` の `distill_ops` 出力エッジ・`publish_cli` 入力エッジ・`gen_plugin` 入力エッジ、`runtime-pipeline.pfdsl` の `assemble_plugin` 入力エッジ）が揃っているか1つずつ照合する。`scripts/gen-plugin.mjs` の静的リストと `plugin.json` description は pre-commit の drift 検査が機械的に強制するが、PFD 側のこれらのエッジは check で強制されず目視追随に依存する（#481 で `grill_skill` 追加時に発見。当初 `distill_ops`・`publish_cli`・`assemble_plugin` の3箇所を見落とし、pfd-retro の A層「同種対称性」監査で気付いた）。

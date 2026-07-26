@@ -28,6 +28,7 @@ import {
 	classifyAuditIssuesFlowResult,
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
+import { GEN_INSTALL_TRIGGER } from "./lib/gen-install-trigger.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -102,11 +103,17 @@ if (mdFiles.length === 0) {
 	results.push({ name: "check-md-linebreaks", status: r.ok ? "PASS" : "FAIL" });
 }
 
-// 4. gen-plugin identity (only when skill/plugin-source paths changed)
-if (!matchesTrigger(changedFiles, GEN_PLUGIN_TRIGGER)) {
-	results.push({ name: "gen-plugin identity", status: "SKIP", detail: "no skill/plugin-source changes" });
+// 4. gen-plugin identity (only when skill/plugin/install-source paths changed).
+// GEN_INSTALL_TRIGGER is consulted too: install/ is generated from repo-root
+// sources (#547) that GEN_PLUGIN_TRIGGER doesn't match, so a PR editing only a
+// template source (e.g. scripts/pfdsl/lib/*.mjs) would otherwise report SKIP
+// while in fact owing install/ and plugin/ churn. gen-plugin.mjs runs
+// gen-install internally, so one regeneration covers both hops — hence both
+// output trees are diffed.
+if (!matchesTrigger(changedFiles, GEN_PLUGIN_TRIGGER) && !matchesTrigger(changedFiles, GEN_INSTALL_TRIGGER)) {
+	results.push({ name: "gen-plugin identity", status: "SKIP", detail: "no skill/plugin/install-source changes" });
 } else {
-	const r = trySh("node scripts/gen-plugin.mjs && git diff --exit-code -- plugin");
+	const r = trySh("node scripts/gen-plugin.mjs && git diff --exit-code -- plugin .claude/skills/pfd-ops/install");
 	results.push({ name: "gen-plugin identity", status: r.ok ? "PASS" : "FAIL" });
 }
 
