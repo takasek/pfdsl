@@ -21,7 +21,11 @@ jobs:
         run: |
           fail=0
 
-          # Each file under install/ must match the file at the same relative path from repo root
+          # Each file under install/ must match the file at the same relative path from repo root.
+          # This identity is still a true invariant, but it's no longer the whole
+          # story: install/ is now a generated mirror (#547), so the step below
+          # additionally verifies it was actually generated from its repo-root
+          # sources, not hand-edited to merely match by coincidence.
           while IFS= read -r src; do
             rel="${src#.claude/skills/pfd-ops/install/}"
             dst="$rel"
@@ -37,7 +41,16 @@ jobs:
 
           if [ $fail -ne 0 ]; then
             echo ""
-            echo "Fix: edit the canonical under .claude/skills/pfd-ops/install/ and copy to the matching repo path (or vice-versa — keep both in sync)."
+            echo "Fix: .claude/skills/pfd-ops/install/ is generated. Edit the repo-root source and run 'make gen-install'."
             exit 1
           fi
           echo "All pfd-ops install files in sync."
+      - name: Check pfd-ops/install was generated from its repo-root sources
+        run: |
+          node scripts/gen-install.mjs
+          if ! git diff --exit-code -- .claude/skills/pfd-ops/install; then
+            echo ""
+            echo "Fix: .claude/skills/pfd-ops/install/ is generated. Edit the repo-root source and run 'make gen-install'."
+            exit 1
+          fi
+          echo "pfd-ops install/ matches 'node scripts/gen-install.mjs' output."
