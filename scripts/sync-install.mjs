@@ -25,6 +25,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const canonicalDir = resolve(root, ".claude/skills/pfd-ops/install");
 const targetRoot = root;
 const cliDist = resolve(root, "packages/cli/dist/cli.js");
+// The one part of the generated plugin tree that mirrors install/ (see the
+// gen-plugin call below for why the staging scope matters).
+const PLUGIN_INSTALL_MIRROR = "plugin/pfdsl/skills/pfd-ops/install";
 
 const staged = process.argv.includes("--staged");
 
@@ -104,7 +107,15 @@ function main() {
 				);
 			} else {
 				execFileSync(process.execPath, [resolve(root, "scripts/gen-plugin.mjs")], { cwd: root, stdio: "inherit" });
-				gitAdd(["plugin"]);
+				// Stage only the subtree a lift can actually affect. gen-plugin
+				// rebuilds all of plugin/pfdsl/ from the working tree, so a blanket
+				// `git add plugin` would also stage output derived from *unstaged*
+				// edits under .claude/skills/** — content the human never staged and
+				// would never see. Anything beyond this path is unrelated drift, and
+				// leaving it unstaged is what makes the gen-plugin check_drift step
+				// later in scripts/pre-commit fail loudly instead of silently
+				// committing it.
+				gitAdd([PLUGIN_INSTALL_MIRROR]);
 			}
 		}
 	}
