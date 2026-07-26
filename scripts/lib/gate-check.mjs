@@ -45,6 +45,42 @@ export function formatGateTable(results) {
 }
 
 /**
+ * Classify the output-artifact status-update gate (item 6). No new states:
+ * this reuses the existing reasoned-SKIP vocabulary the same way item 9
+ * (wip transition) already does for the no-roadmap-change case.
+ * @param {{artifactKey?: string, roadmapChanged?: boolean, changed?: boolean}} params
+ *   - artifactKey: the --artifact CLI flag value, if given.
+ *   - roadmapChanged: whether .pfdsl/roadmap.pfdsl appears in the changed-files list.
+ *     Only consulted when artifactKey is absent.
+ *   - changed: whether a status: change was detected (precise per-artifact
+ *     check when artifactKey is set, presence-only fallback otherwise).
+ *     Not evaluated (may be undefined) in the SKIP case.
+ * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
+ */
+export function classifyOutputArtifactStatus({ artifactKey, roadmapChanged, changed }) {
+	if (!artifactKey && !roadmapChanged) {
+		return {
+			status: "SKIP",
+			detail:
+				"work item has no roadmap output artifact (roadmap.pfdsl untouched); " +
+				"if this is roadmap-managed work, pass --artifact <key> for a strict check",
+		};
+	}
+	if (artifactKey) {
+		return {
+			status: changed ? "PASS" : "FAIL",
+			detail: changed ? undefined : `no status: change detected for artifact '${artifactKey}'`,
+		};
+	}
+	return {
+		status: changed ? "PASS" : "FAIL",
+		detail: changed
+			? "presence-only check; pass --artifact <key> to verify the specific output artifact"
+			: "no status: line changed in .pfdsl/roadmap.pfdsl",
+	};
+}
+
+/**
  * Coarse fallback: true if *any* status: line changed anywhere in the diff.
  * Does not verify the change belongs to a specific artifact — pass an
  * --artifact key to the CLI and use statusChangedForArtifact for that.

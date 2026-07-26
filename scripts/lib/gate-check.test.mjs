@@ -19,6 +19,7 @@ import {
 	diffReadySets,
 	classifyAuditIssuesFlowResult,
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
+	classifyOutputArtifactStatus,
 } from "./gate-check.mjs";
 
 describe("classifyAuditIssuesFlowResult", () => {
@@ -36,6 +37,36 @@ describe("classifyAuditIssuesFlowResult", () => {
 		const result = classifyAuditIssuesFlowResult(false, 1);
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /findings/);
+	});
+});
+
+describe("classifyOutputArtifactStatus", () => {
+	it("SKIPs when there is no --artifact key and roadmap.pfdsl itself was not touched", () => {
+		const result = classifyOutputArtifactStatus({ artifactKey: undefined, roadmapChanged: false });
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /--artifact/);
+	});
+
+	it("PASSes on the presence-only fallback when roadmap.pfdsl changed and a status: line moved", () => {
+		const result = classifyOutputArtifactStatus({ artifactKey: undefined, roadmapChanged: true, changed: true });
+		assert.equal(result.status, "PASS");
+	});
+
+	it("FAILs on the presence-only fallback when roadmap.pfdsl changed but no status: line moved", () => {
+		const result = classifyOutputArtifactStatus({ artifactKey: undefined, roadmapChanged: true, changed: false });
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /no status: line changed/);
+	});
+
+	it("PASSes the strict per-artifact check when a status: change was found for the key", () => {
+		const result = classifyOutputArtifactStatus({ artifactKey: "ops_checkers", changed: true });
+		assert.equal(result.status, "PASS");
+	});
+
+	it("FAILs the strict per-artifact check and names the artifact when no status: change was found", () => {
+		const result = classifyOutputArtifactStatus({ artifactKey: "ops_checkers", changed: false });
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /ops_checkers/);
 	});
 });
 
