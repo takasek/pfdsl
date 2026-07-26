@@ -50,6 +50,23 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
 - [ ] close 時の降格規則を適用した（定義は L3 reference。専属 process も含めて削除する）
 
+**`/code-review` の実測期間中（#561 が open の間）**: `packages/` または `scripts/` に変更があるサイクルでは、終端ゲートの `/simplify` または `/code-review` 項目を省略しない。
+散文・PFD のみのサイクルは**実測の対象外**として PR 本文にその旨を書く（「実施して指摘なし」として数えない — コード変更のないサイクルを分母に入れると出現率が下振れする）。
+自己レビュー（差分の読み直し）は実施済みとみなし、それに**加えて**軽い設定の `/code-review`（角度を絞る。8角度 × 検証 agent の高効度設定は使わない）を実施する。
+記録はサイクル内のいずれか1コミットの trailer に置く。
+
+```
+Review-Measurement: sample=in new=2 adopted=1 angles="branch coverage; error paths"
+Review-Measurement: sample=out
+```
+
+`new` は自己レビューで気付いていなかった指摘の件数、`adopted` はうち採用した件数。
+**`new=0` の回も必ず書く** — ヒットだけ記録すると分母が消えて出現率が出ない。
+記録先をファイルにも PR 本文にもしないのは、前者が並列 worktree で追記コンフリクトを起こし（ADR-0026 が同型の記録機構を廃止した理由）、後者は終端ゲート実行時点でまだ存在しないため。
+集計は `node scripts/review-measurement.mjs --since <ref>` で行う。
+このスクリプトは記録漏れ（`packages/` / `scripts/` を変えたのに trailer が無いマージ）も報告する。
+10サイクル分そろったら #561 で集計し、省略条件を決めて本項目を差し替える。
+
 develop 完了時点（PR 作成前、マージを待たない）で:
 
 - [ ] 変更が公開物の挙動・同梱内容を変える場合（CLI 出力・拡張機能の動作変化に加え、plugin 同梱物 = 配布スキル群・pfd-* コマンド・agents（`make gen-plugin` の対象）の変更を含む — パスでなく挙動と同梱内容で判定）、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending なら次サイクルの先頭タスクとして明記する）
