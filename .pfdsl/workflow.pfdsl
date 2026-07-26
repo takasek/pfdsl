@@ -172,8 +172,8 @@ artifact:
     tags: [distilled_skill]
   ops_skill_l3:
     label: PFD運用スキル（GitHub Issuesバックエンド層）
-    description: "GitHub Issues で作業項目管理する採用リポ向けプリセット（L3）= references/github-issues-backend.md + install/（採用用テンプレート。このリポ内の canonical/deployed identity は CI 強制、採用リポ側の drift はランタイム hash 照合 — ADR-0028）。retro_skill の監査結果がこの層の規約改訂に還流する。手書き（生成対象外）"
-    criteria: install/ 配布ファイルを変更した PR で check-pfd-ops-sync.yml が通過する
+    description: GitHub Issues で作業項目管理する採用リポ向けプリセット（L3）= references/github-issues-backend.md + install/（採用用テンプレート。このリポ内の canonical/deployed identity は pre-commit の双方向同期（staged 側優先、scripts/sync-install.mjs）が維持し CI が強制、採用リポ側の drift はランタイム hash 照合 — ADR-0028）。retro_skill の監査結果がこの層の規約改訂に還流する。手書き（生成対象外）
+    criteria: install/ 配布ファイルを変更した PR で check-pfd-ops-sync.yml が通過する。canonical/deployed の乖離は pre-commit が自動解消し、両側 staged の曖昧ケースのみコミットを止める
     location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
     group: generation
     tags: [distilled_skill]
