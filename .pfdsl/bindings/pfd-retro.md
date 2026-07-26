@@ -53,6 +53,17 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
   具体例: #494（def-insertion.ts のフルドキュメント置換問題）は、#491 のレビュー対応コミット 31b16c1（fix(core,vscode-extension): use a minimal insert edit ...）で既に解決済みだったが、issue 自体は open のまま1日残った。#490/#493/#498 のバッチ処理着手前に現行コードを確認したことで発覚し、実装差分なしでクローズできた。
   対策: 着手前の issue 本文再読（work-cycle 手順1）に「本文の再現手順・コード引用を現行の該当ファイルと突合する」を含める。
 
+- **自動ステージの巻き込み trap**: hook が生成物を再生成して `git add` するとき、生成器が「作業ツリー全体から」再生成する型だと、staged された変更に由来しない出力まで一緒にステージされる。
+  未 staged の編集が、人間のレビュー機会なしにコミットへ入る。
+  クリーンな作業ツリーで踏む end-to-end テストでは絶対に再現しない — 巻き込み元となる無関係な未 staged 編集が存在しないため、テストは PASS する。
+  問いの形: 「この `git add` の範囲は、今回の変更が影響しうる部分木に限定されているか。生成器の出力全体を無条件にステージしていないか」。
+  具体例: install/ の lift 後に `gen-plugin.mjs` を再実行して `git add plugin` と広くステージしていた（#547 初回実装）。
+  `gen-plugin.mjs` は `plugin/pfdsl/` 全体を作業ツリーから再生成するため、`.claude/skills/**` に未 staged の編集があるとその生成物まで staged された。
+  `plugin/pfdsl/skills/pfd-ops/install`（lift が影響しうる唯一の部分木）に絞って解消。
+  絞ると無関係な生成物は未 staged で残り、後続の drift 検査が明示的にコミットを止める。
+  対策: auto-stage を伴う hook のレビューでは、クリーンツリーの正常系に加えて「無関係な未 staged 編集がある状態」を必ず踏む。
+  委譲する場合はこの敵対的ケースを受け入れ基準に明記する（正常系の e2e だけを指示すると委譲先はそれしか踏まない）。
+
 ## 配布物への finding 反映
 
 配布 bundle（plugin 同梱の pfd-* スキル本文・reference）は上流リポ（takasek/pfdsl）の生成・同梱物であり、採用リポ側のコピーは編集対象にならない（ADR-0028。plugin cache 内のファイルはインストール更新で消える）。

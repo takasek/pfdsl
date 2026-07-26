@@ -14,20 +14,6 @@ node scripts/check-scaffold-sync.mjs
 
 `.claude/skills/pfd-ops/references/scaffold/`（`gen-plugin.mjs` のコピー元）と `plugin/pfdsl/skills/pfd-ops/references/scaffold/`（配布用ミラー）の drift を検知する。警告が出たら `node scripts/gen-plugin.mjs` で反映してからコミットする。`install/` と異なり `scaffold/` に `--deploy` 相当の機構はない（scaffold は `/pfd-init` がコピー後にユーザーが値を埋めるテンプレートのため、実配置先は用途的に別物になる）。
 
-## install/ の双方向 sync（staged-side-wins、#547）
-
-`.claude/skills/pfd-ops/install/`（canonical）と配置先（deployed、例: `scripts/pfdsl/lib/gh-compat.mjs`）は本来 byte-identical だが、実際に動くのは deployed 側であり編集も deployed 側から始まることが多い。乖離をコミット時に自動解決するため、`scripts/pre-commit` から `node scripts/sync-install.mjs --staged` を無条件に実行する。ファイルごとの解決規則は次の通り。deployed 側のみ staged なら lift（deployed → canonical）。canonical 側のみ staged なら deploy（canonical → deployed）。両方 staged かつ内容が異なるなら ambiguous として何もせずコミットを止め、どちらを採用するか人間に選ばせる。どちらも unstaged（working tree のみの乖離）なら何もせず skip として報告する。
-
-lift/deploy が確定した分は解決結果を自動で `git add` し、コミットが一発で通るようにする（他の biome/snapshot/gen-plugin drift チェックの「直して exit 1、人間が re-stage」とは異なる新しい流儀。このステップは既に staged な片側のバイトをもう片方へ複製するだけで人間のレビュー対象が増えないため、auto-stage で問題ない）。lift が canonical 側を書き換えた場合は `plugin/pfdsl/skills/pfd-ops/` ミラーも古くなるため、続けて `gen-plugin.mjs` を実行する（dist が stale なら skip し CI 側の検査に委ねる）。
-
-このとき `git add` する範囲は `plugin/pfdsl/skills/pfd-ops/install` だけに絞る。
-`gen-plugin.mjs` は `plugin/pfdsl/` 全体を作業ツリーから再生成するため、`git add plugin` と広く staged すると `.claude/skills/**` の**未 staged な編集**に由来する生成物まで巻き込む。
-人間が staged していない変更が、レビューの機会なくコミットに入ってしまう。
-絞っておけば、それらは未 staged のまま残り、後続の gen-plugin drift チェックが「plugin が stale」として明示的にコミットを止める。
-自動解決は曖昧でないものに限る、という本機構の原則がここにも当てはまる。
-
-手動で揃えたい場合は `make sync-install` を使う（manual mode: 全乖離を lift として解決し `gen-plugin` まで実行する）。既存の `.claude/skills/pfd-ops/scripts/check-install-sync.mjs --deploy`（canonical → deployed 一方向、orphan 削除つき）とは役割が異なり併存する。
-
 ## spec 参照の token 節約（get-by-ID）
 
 `docs/` 内の `(SPEC_xxx)` 定義済みブロックを参照する際は、ファイル全文を Read せず `node scripts/get-spec-id.mjs SPEC_xxx` で該当ブロックのみ取得する（レンジ規則は ADR-0027）。

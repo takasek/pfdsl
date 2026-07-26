@@ -82,6 +82,28 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 **dist 鮮度の機械検査**: pre-commit の drift 検査（README `## CLI` セクション・gen-skill・gen-plugin）は対象 dist（`packages/cli/dist/cli.js` 等）を実行または import して出力を取得する。`scripts/lib/dist-freshness.mjs` が dist の mtime を sibling `src/` の最新 mtime と比較し、dist が存在しない場合と同様に古い場合も検査を skip して「run 'pnpm -r build'」を促す（#450/#452）。skip は「検査対象が信頼できないので判定を CI に委ねる」意味であり、ローカルで検査 PASS しなかったからといって drift が無いとは限らない — コミット前に `pnpm -r build` を済ませて skip を解消してから判断する。
 
+## install/ の canonical↔deployed 双方向 sync（staged-side-wins）
+
+`.claude/skills/pfd-ops/install/`（canonical）と配置先（deployed、例: `scripts/pfdsl/lib/gh-compat.mjs`）は byte-identical に保つ（ADR-0015）。
+実際に走りテストが import するのは deployed 側であり編集も deployed 側から始まることが多いため、`scripts/pre-commit` から `node scripts/sync-install.mjs --staged` を無条件に実行して乖離をコミット時に自動解決する。
+ファイルごとの解決規則は次の通り。
+deployed 側のみ staged なら lift（deployed → canonical）。
+canonical 側のみ staged なら deploy（canonical → deployed）。
+両方 staged かつ内容が異なるなら ambiguous として何もせずコミットを止め、どちらを採用するか人間に選ばせる。
+どちらも unstaged（working tree のみの乖離）なら何もせず skip として報告する。
+
+lift/deploy が確定した分は解決結果を自動で `git add` する（上記の drift 検査群の「直して exit 1、人間が re-stage」とは異なる流儀。このステップは既に staged な片側のバイトをもう片方へ複製するだけで人間のレビュー対象が増えないため、auto-stage で問題ない）。
+lift が canonical 側を書き換えた場合は `plugin/pfdsl/skills/pfd-ops/` ミラーも古くなるため、続けて `gen-plugin.mjs` を実行する（dist が stale なら skip し CI 側の検査に委ねる）。
+
+このとき `git add` する範囲は `plugin/pfdsl/skills/pfd-ops/install` だけに絞る。
+`gen-plugin.mjs` は `plugin/pfdsl/` 全体を作業ツリーから再生成するため、`git add plugin` と広く staged すると `.claude/skills/**` の**未 staged な編集**に由来する生成物まで巻き込む。
+人間が staged していない変更が、レビューの機会なくコミットに入ってしまう。
+絞っておけば、それらは未 staged のまま残り、後続の gen-plugin drift 検査が「plugin が stale」として明示的にコミットを止める。
+自動解決は曖昧でないものに限る、という本機構の原則がここにも当てはまる。
+
+手動で揃えたい場合は `make sync-install` を使う（manual mode: 全乖離を lift として解決し `gen-plugin` まで実行する）。
+`.claude/skills/pfd-ops/scripts/check-install-sync.mjs --deploy`（canonical → deployed 一方向、orphan 削除つき、配布物）とは役割が異なり併存する。
+
 **出力抑制**: `make gen-samples` / `make gen-skill` は pnpm 全パッケージビルド + 全サンプル check の warning を毎回出力するため数百行に及ぶ。実行後は `git status --short docs/samples/ .claude/skills/pfdsl/ plugin/pfdsl/` で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
 **配布スキルの新規追加時の横断照合**: 新しい配布スキル（`.claude/skills/pfd-*`）を追加したら、`grep -rn "<既存スキルID>\b" .pfdsl/ scripts/` で既存の兄弟スキル（例: `retro_skill`）の全参照箇所を洗い出し、新スキルにも同じ箇所（`workflow.pfdsl` の `distill_ops` 出力エッジ・`publish_cli` 入力エッジ・`gen_plugin` 入力エッジ、`runtime-pipeline.pfdsl` の `assemble_plugin` 入力エッジ）が揃っているか1つずつ照合する。`scripts/gen-plugin.mjs` の静的リストと `plugin.json` description は pre-commit の drift 検査が機械的に強制するが、PFD 側のこれらのエッジは check で強制されず目視追随に依存する（#481 で `grill_skill` 追加時に発見。当初 `distill_ops`・`publish_cli`・`assemble_plugin` の3箇所を見落とし、pfd-retro の A層「同種対称性」監査で気付いた）。
