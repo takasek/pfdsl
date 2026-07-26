@@ -28,6 +28,12 @@ function assemble() {
 		stdio: "inherit",
 	});
 
+	// --- 1b. Regenerate .claude/skills/pfd-ops/install/ from its repo-root
+	// sources (#547) before mirroring the pfd-ops skill tree below, so
+	// plugin/ is never built from a stale install/ mirror.
+
+	execFileSync(process.execPath, [resolve(__dirname, "gen-install.mjs")], { stdio: "inherit" });
+
 	// --- 2. Copy the static skills (pfd-grill, pfd-ops, pfd-retro, pfd-ecosystem) into skills/ ---
 
 	for (const name of ["pfd-grill", "pfd-ops", "pfd-retro", "pfd-ecosystem"]) {
