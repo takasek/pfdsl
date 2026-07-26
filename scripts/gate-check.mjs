@@ -18,6 +18,7 @@ import {
 	formatGateTable,
 	hasStatusChange,
 	statusChangedForArtifact,
+	classifyOutputArtifactStatus,
 	GATE_CHECKLIST_SOURCE_PATH,
 	VSCODE_EXT_TRIGGER,
 	lintCommitSubjects,
@@ -140,7 +141,13 @@ if (pfdslFiles.length === 0) {
 
 // 6. output artifact status update in .pfdsl/roadmap.pfdsl
 {
-	if (artifactKey) {
+	const roadmapChanged = changedFiles.includes(".pfdsl/roadmap.pfdsl");
+	if (!artifactKey && !roadmapChanged) {
+		results.push({
+			name: "output artifact status update",
+			...classifyOutputArtifactStatus({ artifactKey, roadmapChanged }),
+		});
+	} else if (artifactKey) {
 		const before = trySh(`git show origin/${base}:.pfdsl/roadmap.pfdsl`);
 		const after = trySh("git show HEAD:.pfdsl/roadmap.pfdsl");
 		if (!before.ok || !after.ok) {
@@ -153,8 +160,7 @@ if (pfdslFiles.length === 0) {
 			const changed = statusChangedForArtifact(before.out, after.out, artifactKey);
 			results.push({
 				name: "output artifact status update",
-				status: changed ? "PASS" : "FAIL",
-				detail: changed ? undefined : `no status: change detected for artifact '${artifactKey}'`,
+				...classifyOutputArtifactStatus({ artifactKey, changed }),
 			});
 		}
 	} else {
@@ -165,10 +171,7 @@ if (pfdslFiles.length === 0) {
 			const changed = hasStatusChange(diffResult.out);
 			results.push({
 				name: "output artifact status update",
-				status: changed ? "PASS" : "FAIL",
-				detail: changed
-					? "presence-only check; pass --artifact <key> to verify the specific output artifact"
-					: "no status: line changed in .pfdsl/roadmap.pfdsl",
+				...classifyOutputArtifactStatus({ artifactKey, roadmapChanged, changed }),
 			});
 		}
 	}
