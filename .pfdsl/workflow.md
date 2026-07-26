@@ -110,6 +110,26 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 `.claude/agents/` の agent に worktree 作成を含むフローを委譲する場合、`superpowers:using-git-worktrees` skill の Step 0（既存 isolation 検出時は再利用）を素通しにしない。subagent は呼び出し元セッションが使用中の worktree 内で起動されることがあり、Step 0 はその共有 worktree を「既存の分離ワークスペース」と誤認識して乗っ取る（issue #439 の issue-worker 試走で発生。呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねない）。agent 定義側で「Step 0 をバイパスし常に新規 worktree を作成する」旨を明記する（例: `.claude/agents/issue-worker.md`）。
 
+## 委譲先の外向き操作の制御（3層）
+
+実装を subagent へ委譲するとき、push・PR 作成・issue 操作は呼び出し元が持つ。
+ブリーフに「push するな」と書くだけでは守られないことが実証されているため、機構で制御する。
+
+**1. agent の選択。** 実装だけを委譲するなら `pfd-implementer` を使う（`tools:` に `mcp__github__*` を含まないため、MCP 経由の PR 作成ができない）。
+`general-purpose` は `tools: *` で GitHub MCP を丸ごと持つので、実装委譲には使わない。
+worktree 作成から PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
+
+**2. PreToolUse hook。** `scripts/delegation-guard.mjs` が、allowlist 外の subagent による `git push` と `gh` の変更系サブコマンドを拒否する。
+subagent の hook payload には `agent_type` / `agent_id` が入り、呼び出し元の payload には入らない。
+この差が判別子になる（`session_id` / `transcript_path` / `prompt_id` は親子で共通のため使えない）。
+allowlist は `scripts/lib/delegation-guard.mjs` の `DEFAULT_ALLOWED_AGENTS`。
+デフォルト拒否なので、新しい agent を足しても黙って push 権を得ることはない。
+`settings.json` の `permissions.deny` を使わないのは、プロジェクト全体に効いて呼び出し元と `issue-worker` まで巻き込むため。
+
+**3. 戻り時の検出。** 委譲から戻ったら `git log origin/<branch>..HEAD` と PR 一覧を確認する。
+上2層をすり抜ける経路（生 `curl`・スクリプト経由の間接実行）は塞げないため、この層が最後の網になる。
+ツール面が将来増えても効くのはここだけである。
+
 ## flow:exempt issue の roadmap 追加除外
 
 判定基準・タイミングは L3 reference（`github-issues-backend.md`「ラベル判定基準」）が一次情報。`file_issues` の「起票と同時に roadmap 追加」ルールの例外。

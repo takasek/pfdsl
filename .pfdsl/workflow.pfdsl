@@ -190,6 +190,12 @@ artifact:
     criteria: /pfd-lens が期待通り動作する
     location: ../.claude/agents/pfd-lens.md
     group: generation
+  implementer_agent:
+    label: 実装委譲agentと外向き操作ガード
+    description: "pfd-implementer agent（実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す）と、それを機構で担保する PreToolUse ガード。委譲ブリーフの留保指定を、指示でなく権限として強制する。手書き、生成対象外"
+    criteria: allowlist 外の subagent からの外向きコマンドが拒否され、呼び出し元と allowlist 対象 agent は影響を受けない
+    location: ../.claude/agents/pfd-implementer.md
+    group: generation
   ecosystem_skill:
     label: PFDセット構築スキル
     description: "/pfd-init コマンド。PFD セット（roadmap / workflow / runtime-pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
@@ -432,7 +438,7 @@ pfdsl_skill >>? review_examples
 retro_skill >>? review_examples
 toolchain >>? review_examples
 
-[adrs, decisions, payoff_log] >> distill_ops -> [bindings_pfd_ops, bindings_pfd_retro, ecosystem_skill, grill_skill, ops_skill_general, ops_skill_l3, retro_skill, review_perspectives, spec_stress_skill, vscode_ext_debug_skill, workflow_md]
+[adrs, decisions, payoff_log] >> distill_ops -> [bindings_pfd_ops, bindings_pfd_retro, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, retro_skill, review_perspectives, spec_stress_skill, vscode_ext_debug_skill, workflow_md]
 
 spec_stress_skill >>? maintain_spec
 
@@ -462,6 +468,8 @@ roadmap_md >>? develop
 runtime_pipeline_pfdsl >>? develop
 toolchain >>? develop
 vscode_ext_debug_skill >>? develop
+
+implementer_agent >>? develop
 workflow_md >>? develop
 
 issue_updates >>? file_issues
