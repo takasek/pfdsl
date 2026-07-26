@@ -83,6 +83,23 @@ check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
   "node scripts/gen-skill.mjs --out .claude/skills/pfdsl" \
   "The .claude/skills/pfdsl dev copy failed to regenerate. Run 'make gen-skill' and investigate."
 
+# Reconcile the pfd-ops install/ canonical<->deployed pair by whichever side
+# is staged, auto-`git add`ing whatever it writes (#547). Runs
+# unconditionally (no hardcoded staged-path trigger like the check_drift
+# calls below) since the script itself is cheap and derives its file set
+# from install/ directly. Must run before the gen-plugin drift check below:
+# a lift here writes into .claude/skills/pfd-ops/install/, and
+# sync-install.mjs's own gen-plugin re-run already regenerates+stages
+# plugin/ for that, so the drift check finds nothing left to complain about.
+# Auto-staging (instead of fix-then-`exit 1` like every other check here) is
+# deliberate: this step never does anything but copy one already-staged
+# file's bytes onto its sibling, so there is nothing for a human to review
+# before it lands — the ambiguous case (both sides staged, differing
+# content) still stops the commit and asks instead of guessing.
+if ! node scripts/sync-install.mjs --staged; then
+  exit 1
+fi
+
 # gen-plugin.mjs bundles pfd-ecosystem/pfd-retro/commands plus the pfdsl skill
 # (via gen-skill.mjs) into plugin/pfdsl/; needs the CLI dist for the same
 # reason as the gen-skill check above (see #400/#401).
