@@ -425,6 +425,16 @@ artifact:
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
     status: todo
     criteria: "コネクタ編集・Preview 生成 UI・定義挿入を含む extension が Marketplace 公開済み"
+  frontmatter_cst_impl:
+    label: frontmatter CST 化実装済みコード
+    description: "ADR-0034 (#578/#592) の実装。fmt/meta set/sort/reindex/insert-definition が yaml Document ベースで frontmatter を読み書きする"
+    status: wip
+    criteria: "4コマンド + fmt が CST 経由で frontmatter を読み書きし、frontmatter-text.ts の手術用ヘルパーが削除され、既存テストが更新済みで green"
+  cli_release_frontmatter_cst:
+    label: "CLIリリース: frontmatter CST 化（破壊的変更）"
+    description: "#592 frontmatter の CST ベース読み書きを含む次期 npm リリース。既存 .pfdsl の再整形を伴う破壊的変更"
+    status: todo
+    criteria: "npm 公開版で fmt/meta set/sort/reindex/insert-definition が CST ベースの frontmatter 読み書きで動作する"
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -646,6 +656,12 @@ process:
     location: https://github.com/takasek/pfdsl/issues/479
   publish_cli_query_tools:
     label: CLI フィールド取得 + graph 分析公開
+  i592_cst_frontmatter:
+    label: frontmatter CST 化実装
+    description: "ADR-0034 の決定を実装する。fmt/meta set/sort/reindex/insert-definition の frontmatter 読み書きを yaml Document ベースに統一し、frontmatter-text.ts の手術用ヘルパーを削除する"
+    location: https://github.com/takasek/pfdsl/issues/592
+  publish_cli_frontmatter_cst:
+    label: CLI frontmatter CST 化公開
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -773,6 +789,9 @@ incomplete_tolerance >> i481_create_grill_skill -> grill_skill
 cli_release_ansi_color >> i476_implement_field_get -> field_get_cmd
 cli_release_ansi_color >> i479_implement_graph_analysis -> graph_analysis
 [field_get_cmd, graph_analysis] >> publish_cli_query_tools -> cli_release_query_tools
+
+cli_tool >> i592_cst_frontmatter -> frontmatter_cst_impl
+frontmatter_cst_impl >> publish_cli_frontmatter_cst -> cli_release_frontmatter_cst
 
 ext_v0015 >> i482_implement_editor_connector -> editor_connector
 ext_v0015 >> i484_implement_def_insertion -> def_insertion
