@@ -3,16 +3,16 @@
 // Run: node scripts/gen-skill.mjs --out .claude/skills/pfdsl
 // The --out path must contain '.claude/' or 'skills/' (safety check).
 
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { execFileSync } from "node:child_process";
 
 import { findMissingFields } from "./lib/skill-field-drift.mjs";
-import { resolveCompanions } from "./lib/sample-companions.mjs";
 import { renderCliSection } from "./lib/skill-cli-section.mjs";
-import { buildExamplesMd } from "./lib/examples-index.mjs";
+import { assertSafeSkillOutDir } from "./lib/skill-out-dir.mjs";
+import { writeSkillRefs } from "./lib/gen-skill-refs.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -27,106 +27,11 @@ if (outIdx === -1 || !process.argv[outIdx + 1] || process.argv[outIdx + 1].start
 }
 
 const outDir = resolve(process.cwd(), process.argv[outIdx + 1]);
+assertSafeSkillOutDir(outDir);
 
-const parts = outDir.split(/[\\/]/);
-if (!parts.includes(".claude") && !parts.includes("skills")) {
-  console.error(`Error: output path must contain a '.claude' or 'skills' directory component — got: ${outDir}`);
-  console.error("This check prevents accidentally writing to the wrong location.");
-  process.exit(1);
-}
+// --- 1/1b/1c/2/2b. Write references/*.md (dist非依存 — see scripts/lib/gen-skill-refs.mjs) ---
 
-const refsDir = resolve(outDir, "references");
-mkdirSync(refsDir, { recursive: true });
-
-// --- Helpers ---
-
-function buildExamplesIndexMd(dir) {
-  const entries = readdirSync(dir)
-    .filter((f) => f.endsWith(".pfdsl"))
-    .sort()
-    .map((f) => ({ id: f.replace(".pfdsl", ""), source: readFileSync(resolve(dir, f), "utf-8") }));
-
-  if (entries.length === 0) {
-    console.warn(`warn: no .pfdsl files found in ${dir}`);
-  }
-  const header = `<!-- DO NOT EDIT — generated from docs/examples/ in https://github.com/takasek/pfdsl -->\n\n# PFDSL Examples Reference\n\nRealistic domain examples demonstrating the quality guide. Use the index to Read only the relevant line range.\n\n`;
-  return { md: buildExamplesMd(entries, header), count: entries.length };
-}
-
-// --- 1. Copy spec ---
-
-const specSrc = readFileSync(resolve(root, "docs/spec/spec.md"), "utf-8");
-const specVersion = specSrc.match(/^# PFDSL仕様書 (v[\d.]+)/m)?.[1] ?? "unknown";
-const baseHeader = (src) =>
-  `<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/${src} -->\n\n`;
-writeFileSync(resolve(refsDir, "spec.md"), baseHeader("docs/spec/spec.md") + specSrc);
-console.log("references/spec.md ← docs/spec/spec.md");
-
-// --- 1b. Copy review perspectives ---
-
-const promptsSrc = readFileSync(resolve(root, "docs/review-perspectives.md"), "utf-8");
-writeFileSync(resolve(refsDir, "review-perspectives.md"), baseHeader("docs/review-perspectives.md") + promptsSrc);
-console.log("references/review-perspectives.md ← docs/review-perspectives.md");
-
-// --- 1c. Copy quality guide ---
-
-const qualityGuideSrc = readFileSync(resolve(root, "docs/quality-guide.md"), "utf-8");
-writeFileSync(resolve(refsDir, "quality-guide.md"), baseHeader("docs/quality-guide.md") + qualityGuideSrc);
-console.log("references/quality-guide.md ← docs/quality-guide.md");
-
-// --- 2. Generate samples.md from TSV ---
-
-const samplesDir = resolve(root, "docs/samples");
-const tsv = readFileSync(resolve(samplesDir, "samples.tsv"), "utf-8");
-const rows = tsv
-  .trim()
-  .split("\n")
-  .slice(1)
-  .map((line) => {
-    const [id, summary, description] = line.split("\t");
-    return { id: id.trim(), summary: summary?.trim() ?? "", description: description?.trim() ?? "" };
-  });
-
-const sampleFileIds = readdirSync(samplesDir)
-  .filter((f) => f.endsWith(".pfdsl"))
-  .map((f) => f.replace(".pfdsl", ""));
-const { companionsById, orphans } = resolveCompanions(rows.map((r) => r.id), sampleFileIds);
-for (const id of orphans) {
-  console.warn(`  warn: ${id}.pfdsl exists but has no entry in samples.tsv — will not appear in references/samples.md`);
-}
-
-let samplesMd = `<!-- DO NOT EDIT — generated from docs/samples/ in https://github.com/takasek/pfdsl -->\n\n# PFDSL Samples Reference\n\nAnnotated .pfdsl files illustrating each language feature.\n\n`;
-let sampleCount = 0;
-
-for (const { id, summary, description } of rows) {
-  const pfdslPath = resolve(samplesDir, `${id}.pfdsl`);
-  if (!existsSync(pfdslPath)) {
-    console.warn(`  warn: ${id}.pfdsl not found, skipping`);
-    continue;
-  }
-  const src = readFileSync(pfdslPath, "utf-8");
-  const fence = src.includes("```") ? "````" : "```";
-  samplesMd += `## ${id} — ${summary}\n\n${description}\n\n${fence}pfdsl\n${src}${fence}\n\n`;
-  for (const cid of companionsById.get(id) ?? []) {
-    const csrc = readFileSync(resolve(samplesDir, `${cid}.pfdsl`), "utf-8");
-    const cfence = csrc.includes("```") ? "````" : "```";
-    samplesMd += `Companion file \`${cid}.pfdsl\` referenced above:\n\n${cfence}pfdsl\n${csrc}${cfence}\n\n`;
-  }
-  samplesMd += `---\n\n`;
-  sampleCount++;
-}
-
-if (sampleCount === 0) {
-  console.warn("warn: no sample .pfdsl files found — references/samples.md will contain no examples");
-}
-writeFileSync(resolve(refsDir, "samples.md"), samplesMd);
-console.log(`references/samples.md ← docs/samples/*.pfdsl via samples.tsv (${sampleCount} samples)`);
-
-// --- 2b. Generate examples.md from frontmatter ---
-
-const { md: examplesMd, count: exampleCount } = buildExamplesIndexMd(resolve(root, "docs/examples"));
-writeFileSync(resolve(refsDir, "examples.md"), examplesMd);
-console.log(`references/examples.md ← docs/examples/*.pfdsl (${exampleCount} examples)`);
+const specVersion = writeSkillRefs(root, outDir);
 
 // --- 3. Write SKILL.md from template ---
 
