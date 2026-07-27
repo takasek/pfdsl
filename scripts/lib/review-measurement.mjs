@@ -106,3 +106,27 @@ export function summarize(records) {
 		remaining: Math.max(0, TARGET_SAMPLE_COUNT - sampled.length),
 	};
 }
+
+/**
+ * Read the --since ref from argv.
+ * Both accepted forms are checked explicitly, and a missing value is an error
+ * rather than a silent fall-through: without a ref the script skips the
+ * missing-record scan entirely and still exits 0, which reads as "nothing
+ * missing" to whoever asked for the scan.
+ * @param {string[]} argv
+ * @returns {{since?: string, error?: string}}
+ */
+export function parseSinceArg(argv) {
+	const inline = argv.find((a) => a.startsWith("--since="));
+	if (inline) {
+		const value = inline.slice("--since=".length);
+		return value ? { since: value } : { error: "--since= needs a ref" };
+	}
+
+	const idx = argv.indexOf("--since");
+	if (idx === -1) return { since: undefined };
+
+	const value = argv[idx + 1];
+	if (!value || value.startsWith("-")) return { error: "--since needs a ref" };
+	return { since: value };
+}

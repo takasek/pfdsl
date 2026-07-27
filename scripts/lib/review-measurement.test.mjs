@@ -8,6 +8,7 @@ import {
 	summarize,
 	TARGET_SAMPLE_COUNT,
 	IN_SAMPLE_PATH,
+	parseSinceArg,
 } from "./review-measurement.mjs";
 
 const log = (...entries) => entries.map(([sha, body]) => `${sha}${FIELD_SEP}${body}`).join(RECORD_SEP);
@@ -141,5 +142,31 @@ describe("summarize", () => {
 		]);
 		assert.equal(s.sampled, 1);
 		assert.equal(s.malformed, 1);
+	});
+});
+
+describe("parseSinceArg", () => {
+	it("returns no ref when the flag is absent", () => {
+		assert.deepEqual(parseSinceArg([]), { since: undefined });
+	});
+
+	it("reads the separate-argument form", () => {
+		assert.deepEqual(parseSinceArg(["--since", "v1.0"]), { since: "v1.0" });
+	});
+
+	it("reads the inline form, which otherwise looks like an unknown flag", () => {
+		assert.deepEqual(parseSinceArg(["--since=v1.0"]), { since: "v1.0" });
+	});
+
+	it("errors when the flag carries no ref rather than dropping the scan", () => {
+		assert.match(parseSinceArg(["--since"]).error, /--since/);
+	});
+
+	it("errors when the next argument is another flag, not a ref", () => {
+		assert.match(parseSinceArg(["--since", "--verbose"]).error, /--since/);
+	});
+
+	it("errors on an empty inline value", () => {
+		assert.match(parseSinceArg(["--since="]).error, /--since/);
 	});
 });

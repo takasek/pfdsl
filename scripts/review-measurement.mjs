@@ -23,11 +23,16 @@ import {
 	TARGET_SAMPLE_COUNT,
 	TRAILER_GREP,
 	IN_SAMPLE_PATH,
+	parseSinceArg,
 } from "./lib/review-measurement.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const args = process.argv.slice(2);
-const since = args.includes("--since") ? args[args.indexOf("--since") + 1] : undefined;
+const argv = parseSinceArg(process.argv.slice(2));
+if (argv.error) {
+	console.error(`review-measurement: ${argv.error}`);
+	process.exit(2);
+}
+const since = argv.since;
 
 // argv form, never a shell string: a ref is user input and reaches git verbatim.
 function tryGit(args) {
