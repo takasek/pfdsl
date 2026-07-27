@@ -37,6 +37,10 @@ export function extractTestGlobs(source) {
  * anything nested (#582). Agreement with what `node --test` actually collects
  * was checked against `fs.globSync` over the repo's tracked test files; the
  * `matchesGlob` cases below pin the semantics this check depends on.
+ * Metacharacters other than the star — `?`, character classes, brace
+ * alternation — are now interpreted as glob too, where the hand-rolled version
+ * escaped them into literals. No glob written in the Makefile or the workflow
+ * uses any of them today.
  * @param {string} path
  * @param {string} glob
  * @returns {boolean}
