@@ -30,10 +30,13 @@ export function extractTestGlobs(source) {
 
 /**
  * Match a repo-relative path against a single glob, with the same semantics
- * `node --test` itself uses to resolve its glob arguments. Delegates to
- * `node:path`'s `matchesGlob` — the same underlying engine `node --test`
- * resolves its arguments through — so this check cannot drift from the
- * behavior it is modeling the way a hand-rolled regex translation could.
+ * `node --test` uses to resolve its glob arguments. Delegates to `node:path`'s
+ * `matchesGlob` instead of translating the glob to a regex by hand — the
+ * hand-rolled version mapped every `*` to `[^/]*`, so it read a doubled `*` as
+ * a plain one and reported a recursive glob argument as unable to reach
+ * anything nested (#582). Agreement with what `node --test` actually collects
+ * was checked against `fs.globSync` over the repo's tracked test files; the
+ * `matchesGlob` cases below pin the semantics this check depends on.
  * @param {string} path
  * @param {string} glob
  * @returns {boolean}
