@@ -38,6 +38,14 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
   具体例: `scripts/cycle-status.mjs` / `scripts/gate-check.mjs`（内部の `audit-issues-flow.mjs`）が `gh` に `execSync`/`execFileSync` で依存しており、`gh` 不在の Claude Code Remote セッションで `audit-issues-flow.mjs` が `spawnSync gh ENOENT` でクラッシュし、gate-check の残り項目の出力ごと失われた（#482 セッション、#489 で追跡）。
   対策: 該当ステップは GitHub MCP のツール呼び出しで個別に代替できる（`.pfdsl/roadmap.md`「自動生成 PR」節に代替手順を記録）。恒久対策（`gh` 依存の解消・try/catch 化）は #489。
 
+- **検査対象を手列挙で指定する trap**: 検査・テストの対象集合をディレクトリやパスの手書きリストで指定すると、対象が増えたときに無言で漏れる。
+  漏れた対象は「検査を通っている」のでなく「検査が走っていない」が、出力はどちらも同じ（緑）になる。
+  列挙ドリフト（同じリストが2箇所にあって乖離する）と違い、こちらは**照合相手のリストが存在しない** — 比較対象がないので目視でも気付けない。
+  問いの形: 「この検査が実際に拾った対象の集合と、リポジトリに実在する対象の集合は一致するか」。列挙を読むのでなく**両方を数えて突き合わせる**。
+  具体例: `node --test` の対象が `scripts/lib/` と `scripts/pfdsl/lib/` をディレクトリ名で列挙していたため、`scripts/*.test.mjs` に置いたテスト4件（shell injection のガードを含む）が一度も実行されていなかった。
+  対策: 列挙をやめるか、**実在集合との突合を検査に組み込む**。このリポは後者を採り、`scripts/lib/test-glob-coverage.mjs` が Makefile と CI の `node --test` glob を読んで、tracked な `*.test.mjs` に到達しないものを列挙する。
+  前者（`"scripts/*.test.mjs" "scripts/**/*.test.mjs"` の2パターン化）も `node --test` 側は成立するが、突合検査があれば列挙のままで安全なので採らなかった。
+
 - **規約が名指しする手段を実行主体が起動できない trap**: 運用規約が特定のコマンド・スキルを名指しすると、実行主体（AI）の権限でそれを起動できない場合に、規約が構造的に満たせなくなる。
   外部ツールの不在（上の「実行環境の暗黙前提 trap」）と違い、**同じ harness の中にコマンドは存在する**ため、失敗が「使えない」でなく「呼べない」形で出る。
   黙って類似コマンドへ落ちるか項目ごと飛ばすかのどちらかになり、どちらも規約の遵守記録を汚す。計測を伴う規約では分母が歪む。
