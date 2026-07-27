@@ -26,8 +26,11 @@ waxa CLI（blank-slate, ツール呼び出し不可）では retrieval 有無を
 
 ## code-review / simplify の実施粒度
 
-pfd-ops 終端ゲート「実装規模・品質基準は companion で定義」の実体はここ。
-diff の規模に review の重さを合わせる。scoped な小〜中規模修正（数十行、1-2ファイル中心）に `/code-review` の高効度設定（8角度 finder × 候補ごと検証 agent、計10体以上の subagent 起動）をかけると diff サイズに対して過剰 — 軽い level（角度を絞る）を選ぶか、そもそも subagent を使わず自分で Read/Grep して直接レビューする。8角度並列 + 全候補検証の重量級構成は大規模 PR 向け。
+原則（diff の規模に review の重さを合わせる）は配布層（pfd-ops `references/work-cycle.md` 手順3）が一次情報。
+ここにはこのリポの基準値のみを書く。
+
+- 軽い側: 数十行・1〜2ファイル中心。角度を2〜4に絞るか、委譲せず自分で Read/Grep する
+- 重い側: `/code-review` の既定 fan-out（8角度 finder × 候補ごと検証 agent、計10体以上の subagent 起動）は大規模 PR 向け
 
 ## payoff_log 追記条件
 
@@ -92,7 +95,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 テンプレートのソースを変更したコミットは再ステージが2往復必要になる（1回目で `install/`、2回目で `plugin/`）。
 2ホップの生成チェーンに「直して exit 1」の流儀を適用した結果であり、意図した挙動である。
 
-**生成物 drift 検査はコミット分割を制約する**: `gen-plugin` の drift 検査は作業ツリー全体から再生成した結果を staged 分と突き合わせるため、生成元（`.claude/skills/pfd-*` 等）と生成物（`plugin/`）を別コミットに割ると、生成元だけを staged にした時点で不一致になり弾かれる。配布層を触るサイクルでは、生成元と生成物は同一コミットに入れる。論理単位が2つ以上あってもこの境界では割れない — 割れない理由を PR 本文に書く。
+**生成物 drift 検査はコミット分割を制約する**: 規則は配布層（pfd-ops `references/work-cycle.md` のコミット粒度ゲート）が一次情報。このリポで該当する検査は `gen-plugin`（生成元 `.claude/skills/pfd-*` 等 → 生成物 `plugin/`）と `gen-install`。
 
 **出力抑制**: `make gen-samples` / `make gen-skill` は pnpm 全パッケージビルド + 全サンプル check の warning を毎回出力するため数百行に及ぶ。実行後は `git status --short docs/samples/ .claude/skills/pfdsl/ plugin/pfdsl/` で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
