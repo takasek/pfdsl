@@ -28,6 +28,10 @@ test:
 	node scripts/check-script-imports.mjs
 	node scripts/check-no-shell-strings.mjs
 
+.PHONY: coverage
+coverage:
+	pnpm -r coverage
+
 .PHONY: typecheck
 typecheck:
 	pnpm -r typecheck
