@@ -106,11 +106,14 @@ check_drift "$gen_plugin_trigger" "packages/cli/dist/cli.js" \
   "node scripts/gen-plugin.mjs && git diff --quiet -- plugin" \
   "plugin/pfdsl is stale. Run 'make gen-plugin' and re-stage the plugin files."
 
-# The .dot/README drift guard is a vitest test that imports @pfdsl/core (→ dist).
+# The .dot/README drift guard and the .svg drift guard are separate vitest
+# suites (graphviz-exporter and preview-engine respectively — see the
+# "docs/samples svg drift" comment in preview-engine's index.test.ts for why
+# the .svg guard can't live next to the .dot guard).
 check_drift '^docs/samples/' \
-  "packages/core/dist/index.js packages/graphviz-exporter/dist/index.js" \
-  "pnpm --filter @pfdsl/graphviz-exporter exec vitest run index.test" \
-  "docs/samples drift: run 'make gen-samples' and re-stage .dot / README.md."
+  "packages/core/dist/index.js packages/graphviz-exporter/dist/index.js packages/preview-engine/dist/index.js" \
+  "pnpm --filter @pfdsl/graphviz-exporter exec vitest run index.test && pnpm --filter @pfdsl/preview-engine exec vitest run index.test" \
+  "docs/samples drift: run 'make gen-samples' and re-stage .dot / README.md / .svg."
 
 # Verifies the README `## CLI` generated block matches `pfdsl help` output;
 # reads packages/cli/dist/cli.js directly.
