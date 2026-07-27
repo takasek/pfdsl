@@ -17,14 +17,12 @@
 import {
 	RECORD_SEP,
 	FIELD_SEP,
-	extractMeasurements,
+	mergeCycleRecords,
 	summarize,
 	parseMeasurementTrailer,
 	TARGET_SAMPLE_COUNT,
-	TRAILER_GREP,
 	IN_SAMPLE_PATH,
 	parseSinceArg,
-	countMeasurementTrailers,
 	classifyCycle,
 } from "./lib/review-measurement.mjs";
 import { tryGit as sharedTryGit, tryRun } from "./lib/run-exec.mjs";
@@ -49,30 +47,53 @@ const since = argv.since;
 const tryGit = (args) => sharedTryGit(args, { cwd: root });
 
 const range = since ? `${since}..HEAD` : "HEAD";
-const logFormat = `--format=%H${FIELD_SEP}%B${RECORD_SEP}`;
-// --grep lets git skip non-record commits instead of us reading all of history.
-const logResult = tryGit(["log", `--grep=${TRAILER_GREP}`, logFormat, range]);
-if (!logResult.ok) {
-	console.error(`review-measurement: failed to read git log for ${range}: ${logResult.out.trim()}`);
+
+// One cycle = one first-parent step: a merge (whose branch side carries the
+// work) or a commit that landed directly. Reading records commit-wise counted
+// a cycle once per review pass it recorded, which inflated the denominator the
+// rate divides by — a cycle that reviewed twice is still one cycle (#561).
+const stepsResult = tryGit(["log", "--first-parent", `--format=%H${FIELD_SEP}%P${FIELD_SEP}%s`, range]);
+if (!stepsResult.ok) {
+	console.error(`review-measurement: failed to read git log for ${range}: ${stepsResult.out.trim()}`);
 	process.exit(1);
 }
 
-const records = extractMeasurements(logResult.out);
-const summary = summarize(records);
+/** @type {Array<{sha: string, subject: string, secondParent: string|undefined, records: object[]}>} */
+const cycles = [];
+for (const line of stepsResult.out.trim().split("\n").filter(Boolean)) {
+	const [sha, parents = "", subject = ""] = line.split(FIELD_SEP);
+	const secondParent = parents.trim().split(/\s+/)[1];
+	// A merge's records live on its branch side; a direct commit carries its own.
+	const bodies = secondParent
+		? tryGit(["log", "--format=%B", `${sha}^1..${sha}^2`])
+		: tryGit(["log", "-1", "--format=%B", sha]);
+	if (!bodies.ok) continue;
+	const records = [];
+	for (const body of bodies.out.split(/^(?=Review-Measurement:)/m)) {
+		const record = parseMeasurementTrailer(body);
+		if (record) records.push(record);
+	}
+	cycles.push({ sha, subject: subject.trim(), secondParent, records });
+}
+
+const recorded = cycles.filter((c) => c.records.length > 0);
+const summary = summarize(recorded);
 
 console.log("review-measurement:");
-if (records.length === 0) {
+if (recorded.length === 0) {
 	console.log("  no records yet");
 } else {
-	for (const r of records) {
-		const sha = r.sha.slice(0, 7);
-		if (r.error) {
-			console.log(`  ! ${sha} malformed — ${r.error}`);
-		} else if (r.sample === "out") {
-			console.log(`  - ${sha} out of sample${r.angles ? ` — ${r.angles}` : ""}`);
+	for (const c of recorded) {
+		const merged = mergeCycleRecords(c.records);
+		const sha = c.sha.slice(0, 7);
+		const passes = c.records.length > 1 ? ` (${c.records.length} passes)` : "";
+		if (merged.error) {
+			console.log(`  ! ${sha} malformed — ${merged.error}`);
+		} else if (merged.sample === "out") {
+			console.log(`  - ${sha} out of sample${passes}`);
 		} else {
-			const angles = r.angles ? ` — ${r.angles}` : "";
-			console.log(`  ${r.new > 0 ? "*" : "·"} ${sha} new=${r.new} adopted=${r.adopted}${angles}`);
+			const tools = merged.tools.length > 0 ? ` [${merged.tools.join(", ")}]` : "";
+			console.log(`  ${merged.new > 0 ? "*" : "·"} ${sha} new=${merged.new} adopted=${merged.adopted}${tools}${passes}`);
 		}
 	}
 }
@@ -87,15 +108,15 @@ if (summary.malformed > 0) {
 	console.log(`  malformed records     ${summary.malformed}  — fix these; they are not zero-finding cycles`);
 }
 
-// Per tool, because a pooled rate measures which tool ran rather than what
-// review is worth.
+// Per review pass, not per cycle: a pooled rate measures which tool ran rather
+// than what review is worth, and one cycle can run more than one tool.
 const tools = Object.entries(summary.byTool);
 if (tools.length > 0) {
 	console.log("");
-	console.log("  by tool:");
+	console.log("  by review pass:");
 	for (const [tool, b] of tools) {
-		const toolRate = b.sampled === 0 ? "n/a" : `${((b.withFindings / b.sampled) * 100).toFixed(0)}%`;
-		console.log(`    ${tool.padEnd(20)} ${b.sampled} cycle(s), ${b.withFindings} with findings (${toolRate}), new/adopted ${b.totalNew}/${b.totalAdopted}`);
+		const toolRate = b.passes === 0 ? "n/a" : `${((b.withFindings / b.passes) * 100).toFixed(0)}%`;
+		console.log(`    ${tool.padEnd(20)} ${b.passes} pass(es), ${b.withFindings} with findings (${toolRate}), new/adopted ${b.totalNew}/${b.totalAdopted}`);
 	}
 }
 
@@ -107,45 +128,28 @@ if (!since) {
 	process.exit(0);
 }
 
-// --first-parent keeps this to merges that landed on the base branch. Without
-// it a back-merge of main into a feature branch is scanned too, and there ^1 is
-// the branch tip and ^2 is main — the diff reads as main's changes and ^1..^2
-// as commits already merged, so it is reported as a cycle that never existed.
-const mergesResult = tryGit(["log", "--merges", "--first-parent", `--format=%H${FIELD_SEP}%s`, `${since}..HEAD`]);
-if (!mergesResult.ok) {
-	console.error(`review-measurement: failed to list merges since ${since}: ${mergesResult.out.trim()}`);
-	process.exit(1);
-}
-// Subject comes from the same listing rather than a git call per merge.
-const merges = mergesResult.out
-	.trim()
-	.split("\n")
-	.filter(Boolean)
-	.map((line) => {
-		const [sha, subject = ""] = line.split(FIELD_SEP);
-		return { sha, subject };
-	});
-
 const issues = [];
 // A cycle we could not read is not a clean cycle. Collected rather than skipped
 // so a shallow clone cannot produce an all-green report from zero evidence.
 const unreadable = [];
 
-for (const { sha, subject } of merges) {
-	const label = `${sha.slice(0, 7)} ${subject}`.trim();
+// The same first-parent walk the summary used, so the two views cannot disagree
+// about what a cycle is or which records belong to it. Only merges carry a diff
+// worth classifying; a commit that landed directly is its own trivial cycle.
+for (const cycle of cycles.filter((c) => c.secondParent)) {
+	const label = `${cycle.sha.slice(0, 7)} ${cycle.subject}`.trim();
 
-	const files = tryGit(["diff", "--name-only", `${sha}^1`, sha]);
-	const bodies = tryGit(["log", "--format=%B", `${sha}^1..${sha}^2`]);
-	if (!files.ok || !bodies.ok) {
-		unreadable.push(`${label} — ${(files.ok ? bodies.out : files.out).trim().split("\n")[0]}`);
+	const files = tryGit(["diff", "--name-only", `${cycle.sha}^1`, cycle.sha]);
+	if (!files.ok) {
+		unreadable.push(`${label} — ${files.out.trim().split("\n")[0]}`);
 		continue;
 	}
 
-	const record = parseMeasurementTrailer(bodies.out);
+	const merged = mergeCycleRecords(cycle.records);
 	const { issues: cycleIssues } = classifyCycle({
 		changedFiles: files.out,
-		trailerCount: countMeasurementTrailers(bodies.out),
-		sample: record?.sample,
+		trailerCount: cycle.records.length,
+		sample: merged?.sample,
 	});
 	for (const issue of cycleIssues) issues.push(`${label} — ${issue.detail}`);
 }

@@ -103,21 +103,63 @@ export function extractMeasurements(logText) {
 /**
  * @param {Array<{sample?: string, new?: number, adopted?: number, error?: string}>} records
  */
-export function summarize(records) {
-	const malformed = records.filter((r) => r.error);
-	const sampled = records.filter((r) => r.sample === "in" && !r.error);
-	const outOfSample = records.filter((r) => r.sample === "out" && !r.error).length;
+/**
+ * Collapse one cycle's review passes into a single record.
+ * A cycle commonly reviews more than once — the self review, the tool, then
+ * the fixes the tool prompted — and each pass writes its own trailer. Counting
+ * those as separate cycles inflated the denominator the rate divides by.
+ * @param {Array<{sample?: string, new?: number, adopted?: number, tool?: string, angles?: string, error?: string}>} records
+ * @returns {{sample: string, new: number, adopted: number, tools: string[], angles: string[], error?: string}|null}
+ */
+export function mergeCycleRecords(records) {
+	if (records.length === 0) return null;
+
+	const malformed = records.find((r) => r.error);
+	// Any pass claiming in-sample makes the cycle in-sample: a cycle that
+	// changed code stays in the denominator even if another pass said out.
+	const sample = records.some((r) => r.sample === "in") ? "in" : "out";
+	const merged = {
+		sample,
+		new: 0,
+		adopted: 0,
+		tools: [],
+		angles: [],
+		...(malformed ? { error: malformed.error } : {}),
+	};
+	for (const r of records) {
+		if (r.error || r.sample !== "in") continue;
+		merged.new += r.new;
+		merged.adopted += r.adopted;
+		if (r.tool && !merged.tools.includes(r.tool)) merged.tools.push(r.tool);
+		if (r.angles && !merged.angles.includes(r.angles)) merged.angles.push(r.angles);
+	}
+	return merged;
+}
+
+/**
+ * @param {Array<{records: Array<object>}>} cycles - one entry per cycle, in any order
+ */
+export function summarize(cycles) {
+	const merged = cycles.map((c) => mergeCycleRecords(c.records)).filter(Boolean);
+	const malformed = merged.filter((r) => r.error);
+	const sampled = merged.filter((r) => r.sample === "in" && !r.error);
+	const outOfSample = merged.filter((r) => r.sample === "out" && !r.error).length;
 	const cyclesWithFindings = sampled.filter((r) => r.new > 0).length;
 
-	/** @type {Record<string, {sampled: number, withFindings: number, totalNew: number, totalAdopted: number}>} */
+	// Per review pass, not per cycle: a cycle that ran two tools is one cycle
+	// but two data points about what each tool finds.
+	/** @type {Record<string, {passes: number, withFindings: number, totalNew: number, totalAdopted: number}>} */
 	const byTool = {};
-	for (const r of sampled) {
-		const key = r.tool ?? "unspecified";
-		const bucket = (byTool[key] ??= { sampled: 0, withFindings: 0, totalNew: 0, totalAdopted: 0 });
-		bucket.sampled += 1;
-		if (r.new > 0) bucket.withFindings += 1;
-		bucket.totalNew += r.new;
-		bucket.totalAdopted += r.adopted;
+	for (const c of cycles) {
+		for (const r of c.records) {
+			if (r.error || r.sample !== "in") continue;
+			const key = r.tool ?? "unspecified";
+			const bucket = (byTool[key] ??= { passes: 0, withFindings: 0, totalNew: 0, totalAdopted: 0 });
+			bucket.passes += 1;
+			if (r.new > 0) bucket.withFindings += 1;
+			bucket.totalNew += r.new;
+			bucket.totalAdopted += r.adopted;
+		}
 	}
 
 	return {
@@ -159,9 +201,9 @@ export function parseSinceArg(argv) {
 }
 
 /**
- * How many trailers a cycle's commits carry. The rule allows exactly one per
- * cycle; more than one is double-counted by the commit-wise summary while the
- * merge-wise scan sees a single cycle, so the two views disagree silently.
+ * How many trailers a cycle's commits carry. More than one is expected — a
+ * cycle reviews more than once — and mergeCycleRecords folds them into one
+ * record so the cycle is still counted once.
  * @param {string} text - the concatenated commit messages of one cycle
  */
 export function countMeasurementTrailers(text) {
@@ -172,7 +214,8 @@ export function countMeasurementTrailers(text) {
  * Judge one cycle against its own diff.
  * Trailer presence alone is not enough: `sample=` is written by hand and the
  * paths it claims are checkable, so a cycle that changed code and declared
- * itself out of sample silently leaves the denominator.
+ * itself out of sample silently leaves the denominator. A cycle that recorded
+ * several passes is not a problem — it reviewed several times.
  * @param {{changedFiles: string, trailerCount: number, sample?: string}} cycle
  * @returns {{inSampleByPath: boolean, issues: Array<{type: string, detail: string}>}}
  */
@@ -182,11 +225,6 @@ export function classifyCycle({ changedFiles, trailerCount, sample }) {
 
 	if (trailerCount === 0) {
 		if (inSampleByPath) issues.push({ type: "missing", detail: "changed code but carries no record" });
-		return { inSampleByPath, issues };
-	}
-
-	if (trailerCount > 1) {
-		issues.push({ type: "duplicate", detail: `${trailerCount} records in one cycle; the rule allows one` });
 		return { inSampleByPath, issues };
 	}
 
