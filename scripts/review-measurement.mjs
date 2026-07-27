@@ -14,7 +14,6 @@
 // be read is listed separately and sets a non-zero exit — an unread cycle is not
 // a clean one.
 
-import { execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -30,6 +29,7 @@ import {
 	countMeasurementTrailers,
 	classifyCycle,
 } from "./lib/review-measurement.mjs";
+import { tryGit as sharedTryGit } from "./lib/run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = parseSinceArg(process.argv.slice(2));
@@ -40,13 +40,7 @@ if (argv.error) {
 const since = argv.since;
 
 // argv form, never a shell string: a ref is user input and reaches git verbatim.
-function tryGit(args) {
-	try {
-		return { ok: true, out: execFileSync("git", args, { cwd: root, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024 }) };
-	} catch (e) {
-		return { ok: false, out: e.stdout || e.message };
-	}
-}
+const tryGit = (args) => sharedTryGit(args, { cwd: root });
 
 const range = since ? `${since}..HEAD` : "HEAD";
 const logFormat = `--format=%H${FIELD_SEP}%B${RECORD_SEP}`;

@@ -47,3 +47,11 @@ describe("run-exec", () => {
 		assert.throws(() => git(["rev-parse", "definitely-not-a-ref"], { cwd: root }));
 	});
 });
+
+describe("run-exec stderr handling", () => {
+	it("carries the failure reason from stderr, where git writes it", () => {
+		const result = tryRun("git", ["rev-parse", "definitely-not-a-ref"], { cwd: root });
+
+		assert.match(result.out, /definitely-not-a-ref|unknown revision|ambiguous/);
+	});
+});

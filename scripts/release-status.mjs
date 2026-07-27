@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execSync } from "node:child_process";
+import { git } from "./lib/run-exec.mjs";
 import {
 	compareVersions,
 	formatResults,
@@ -32,18 +32,12 @@ async function fetchNpmVersion(packageName) {
 function findBumpCommit(version, packageDir) {
 	try {
 		const pkgPath = `${packageDir}/package.json`;
-		const hashes = execSync(`git log --format="%H" -- ${pkgPath}`, {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		})
+		const hashes = git(["log", "--format=%H", "--", pkgPath])
 			.trim()
 			.split("\n")
 			.filter(Boolean);
 		for (const hash of hashes) {
-			const content = execSync(`git show ${hash}:${pkgPath}`, {
-				encoding: "utf-8",
-				stdio: ["pipe", "pipe", "pipe"],
-			});
+			const content = git(["show", `${hash}:${pkgPath}`]);
 			if (JSON.parse(content).version === version) return hash;
 		}
 		return null;
@@ -56,20 +50,14 @@ function fetchCommitsAhead(version, packageDir, tagPrefix = "v") {
 	const tag = `${tagPrefix}${version}`;
 	let baseRef;
 	try {
-		execSync(`git rev-parse ${tag}`, {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		});
+		git(["rev-parse", tag]);
 		baseRef = tag;
 	} catch {
 		baseRef = findBumpCommit(version, packageDir);
 		if (!baseRef) return 0;
 	}
 	try {
-		const out = execSync(`git log ${baseRef}..HEAD --oneline -- ${packageDir}`, {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		});
+		const out = git(["log", `${baseRef}..HEAD`, "--oneline", "--", packageDir]);
 		return out.trim().split("\n").filter(Boolean).length;
 	} catch {
 		return 0;
@@ -183,10 +171,7 @@ function findLatestCliTag() {
 		// 'v[0-9]*' (not 'v*') so this matches CLI tags like v0.0.17 without
 		// also matching lib-v* / vscode-v* (both start with 'v' after the
 		// prefix, and glob 'v*' would match "vscode-v0.0.17" too).
-		return execSync("git describe --tags --match 'v[0-9]*' --abbrev=0", {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		}).trim();
+		return git(["describe", "--tags", "--match", "v[0-9]*", "--abbrev=0"]).trim();
 	} catch {
 		return null;
 	}
@@ -202,11 +187,8 @@ const BUNDLED_SKILL_DIRS = ["pfd-ops", "pfd-retro", "pfd-ecosystem", "pfdsl"].ma
 function countSkillBundleCommits(sinceTag) {
 	if (!sinceTag) return 0;
 	try {
-		const paths = [...BUNDLED_SKILL_DIRS, ".claude/commands"].join(" ");
-		const out = execSync(`git log ${sinceTag}..HEAD --oneline -- ${paths}`, {
-			encoding: "utf-8",
-			stdio: ["pipe", "pipe", "pipe"],
-		});
+		const paths = [...BUNDLED_SKILL_DIRS, ".claude/commands"];
+		const out = git(["log", `${sinceTag}..HEAD`, "--oneline", "--", ...paths]);
 		return out.trim().split("\n").filter(Boolean).length;
 	} catch (e) {
 		console.warn(`warn: could not count skill bundle commits since ${sinceTag}: ${e.message}`);
