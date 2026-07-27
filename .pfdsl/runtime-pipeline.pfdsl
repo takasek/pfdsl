@@ -111,12 +111,14 @@ artifact:
     tags: [f1]
   ops_skill_l3:
     label: PFD運用フレームワーク GitHub Issuesバックエンド層
-    description: "pfd-opsのL3プリセット（references/github-issues-backend.md + install/テンプレート）。内容の一次情報はworkflow.pfdslのops_skill_l3"
-    location:
-      [
-        ../.claude/skills/pfd-ops/references/github-issues-backend.md,
-        ../.claude/skills/pfd-ops/install/,
-      ]
+    description: "pfd-opsのL3プリセットの規約本文。内容の一次情報はworkflow.pfdslのops_skill_l3。採用リポが配置するテンプレート本体はops_install_templates"
+    location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
+    group: skill_sources
+    tags: [f2]
+  ops_install_templates:
+    label: pfd-ops 採用テンプレート（install/）
+    description: "採用リポへ配置されるテンプレート一式。生成の経路（repoルートのソース → install/）はworkflow.pfdslのgen_installが持ち、この図では配布素材として現れる。内容の一次情報はworkflow.pfdslのops_install_templates"
+    location: ../.claude/skills/pfd-ops/install/
     group: skill_sources
     tags: [f2]
   retro_skill:
@@ -265,7 +267,7 @@ dot_graph >> export_image -> rendered_image
 
 [normalized_graph, parsed_doc] >> diff_graphs -> diff_report
 
-[ecosystem_skill, grill_skill, ops_skill_general, ops_skill_l3, pfdsl_skill, retro_skill] >> assemble_plugin -> plugin_dir
+[ecosystem_skill, grill_skill, ops_install_templates, ops_skill_general, ops_skill_l3, pfdsl_skill, retro_skill] >> assemble_plugin -> plugin_dir
 
 plugin_dir >> install_plugin -> installed_plugin
 

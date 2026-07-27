@@ -172,11 +172,23 @@ artifact:
     tags: [distilled_skill]
   ops_skill_l3:
     label: PFD運用スキル（GitHub Issuesバックエンド層）
-    description: GitHub Issues で作業項目管理する採用リポ向けプリセット（L3）= references/github-issues-backend.md + install/（採用用テンプレート。install/ は生成物で、一次情報は repo ルート側のソース。make gen-install が repo ルート → install/ → plugin/ の一方向で生成し、pre-commit と CI が drift を強制する。採用リポ側の drift はランタイム hash 照合 — ADR-0028）。retro_skill の監査結果がこの層の規約改訂に還流する。references は手書き（生成対象外）
-    criteria: install/ が repo ルートのソースから make gen-install で再生成でき、check-pfd-ops-sync.yml が生成物一致と identity の両方で通過する
+    description: GitHub Issues で作業項目管理する採用リポ向けプリセット（L3）の規約本文 = references/github-issues-backend.md。手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。採用リポが実際に配置するファイル群は ops_install_templates 側
+    criteria: 採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・close 時の降格規則・PR 本文規約）が記述済み
     location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
     group: generation
     tags: [distilled_skill]
+  ops_install_sources:
+    label: pfd-ops 配布ソース（repo ルート）
+    description: 採用リポへ配る監査スクリプトと GitHub Actions workflow の一次情報。実体は repo ルート側にあり、配布対象は scripts/lib/install-templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）。このリポ自身の運用にも同じ実体を使う
+    criteria: install-templates.mjs のリストに挙がる全パスが実在し、このリポの運用で実際に使われている
+    location: [../scripts/pfdsl/, ../.github/workflows/pfdsl-flow-on-issue-close.yml]
+    group: generation
+  ops_install_templates:
+    label: pfd-ops 採用テンプレート（install/）
+    description: 採用リポが自リポへ配置するテンプレート一式。生成物であり手編集しない。/pfd-init のステップ3.5（check-install-sync.mjs --deploy）が実配置し、採用リポ側の drift はランタイム hash 照合で検出する（ADR-0028）
+    criteria: repo ルートのソースから make gen-install で再生成でき、check-pfd-ops-sync.yml が生成物一致と identity の両方で通過する
+    location: ../.claude/skills/pfd-ops/install/
+    group: generation
   retro_skill:
     label: ふりかえり監査スキル
     description: "/pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う"
@@ -320,6 +332,12 @@ process:
     command: make gen-skill
     group: generation
 
+  gen_install:
+    label: install/ 生成
+    description: "repo ルートの配布ソースから pfd-ops スキルの install/ ミラーを一方向で再生成する（#547 で双方向 sync を廃止）。生成の向きは repo ルートのソース → install/ → plugin/ の一本のみ。gen_plugin が内部で実行するため plugin が古い install/ から組まれることはない。drift は pre-commit と check-pfd-ops-sync.yml が強制する"
+    command: make gen-install
+    group: release
+
   gen_plugin:
     label: プラグイン生成
     description: "gen_skill と同じ一次ソース（spec/skill_template/quality_guide/feature_samples/review_perspectives）から pfdsl スキルを独立再生成し、grill_skill・ops_skill_general・ops_skill_l3・retro_skill・ecosystem_skill、/pfd-cycle・/pfd-init・/pfd-retro コマンド、pfd-lens agent を plugin/pfdsl/ に束ね plugin.json を書く。pfdsl_skill（.claude/skills/pfdsl/）を直接コピーするわけではない。version は toolchain の CLI package.json 由来。check-gen-plugin.yml が全 PR で drift を強制（CI backstop、CLI リリース後の version 反映漏れも検出）"
@@ -426,7 +444,9 @@ findings >>? maintain_template
 
 pfdsl_skill >>? gen_skill
 
-[ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
+ops_install_sources >> gen_install -> ops_install_templates
+
+[ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
 
 topics >> write_examples -> examples
 
@@ -474,7 +494,7 @@ workflow_md >>? develop
 
 issue_updates >>? file_issues
 
-[ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, pfdsl_skill, retro_skill, toolchain] >> publish_cli -> published_cli
+[ecosystem_skill, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_lens_agent, pfdsl_skill, retro_skill, toolchain] >> publish_cli -> published_cli
 
 toolchain >> publish_libraries -> published_libraries
 

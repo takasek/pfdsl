@@ -13,7 +13,7 @@
 - **c（PFD読み書き分析skill）**: `pfdsl_skill`。bのホストとしては図外（次節）、配布素材としてのみ `bundle_skills` の入力に現れる
 - **d（VSCode拡張）**: `packages/vscode-extension/`。図に現れない — bのホストであり、データを供給も保管もしないため（次節）
 - **e（a,bの配布）**: このファイルの対象外。npm 公開は workflow.pfdsl 側で表現する
-- **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 GitHub Issues バックエンド層）。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`。L4 はリポ固有で配布対象外・pfd-ops 自体に含まれない。ここでは配布素材としてのみ扱う
+- **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 GitHub Issues バックエンド層）。f2 は規約本文（`ops_skill_l3`）と採用テンプレート（`ops_install_templates`）の2 artifact に分かれる — 前者は手書き、後者は `gen_install` の生成物であり、生成経路は workflow.pfdsl が持つ。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`。L4 はリポ固有で配布対象外・pfd-ops 自体に含まれない。ここでは配布素材としてのみ扱う
 - **g（fの配布）**: `tags: [g]` の process 群。make gen-plugin（組み立て）・Claude Code plugin marketplace（インストール）・check-install-sync.mjs（実配置とランタイム照合）が実装
 
 ## ホスト（c/d）とbの関係
