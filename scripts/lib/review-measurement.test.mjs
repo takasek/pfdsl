@@ -8,6 +8,9 @@ import {
 	summarize,
 	TARGET_SAMPLE_COUNT,
 	IN_SAMPLE_PATH,
+	parseSinceArg,
+	countMeasurementTrailers,
+	classifyCycle,
 } from "./review-measurement.mjs";
 
 const log = (...entries) => entries.map(([sha, body]) => `${sha}${FIELD_SEP}${body}`).join(RECORD_SEP);
@@ -141,5 +144,108 @@ describe("summarize", () => {
 		]);
 		assert.equal(s.sampled, 1);
 		assert.equal(s.malformed, 1);
+	});
+});
+
+describe("parseSinceArg", () => {
+	it("returns no ref when the flag is absent", () => {
+		assert.deepEqual(parseSinceArg([]), { since: undefined });
+	});
+
+	it("reads the separate-argument form", () => {
+		assert.deepEqual(parseSinceArg(["--since", "v1.0"]), { since: "v1.0" });
+	});
+
+	it("reads the inline form, which otherwise looks like an unknown flag", () => {
+		assert.deepEqual(parseSinceArg(["--since=v1.0"]), { since: "v1.0" });
+	});
+
+	it("errors when the flag carries no ref rather than dropping the scan", () => {
+		assert.match(parseSinceArg(["--since"]).error, /--since/);
+	});
+
+	it("errors when the next argument is another flag, not a ref", () => {
+		assert.match(parseSinceArg(["--since", "--verbose"]).error, /--since/);
+	});
+
+	it("errors on an empty inline value", () => {
+		assert.match(parseSinceArg(["--since="]).error, /--since/);
+	});
+});
+
+describe("countMeasurementTrailers", () => {
+	it("counts one trailer per cycle", () => {
+		assert.equal(countMeasurementTrailers("body\nReview-Measurement: sample=out\n"), 1);
+	});
+
+	it("counts every trailer, so a cycle that recorded twice is visible", () => {
+		const text = "a\nReview-Measurement: sample=in new=1 adopted=1\nb\nReview-Measurement: sample=out\n";
+		assert.equal(countMeasurementTrailers(text), 2);
+	});
+
+	it("counts none when the cycle recorded nothing", () => {
+		assert.equal(countMeasurementTrailers("just a commit body"), 0);
+	});
+});
+
+describe("classifyCycle", () => {
+	it("reports nothing when a code cycle recorded one in-sample trailer", () => {
+		const c = classifyCycle({ changedFiles: "scripts/a.mjs\n", trailerCount: 1, sample: "in" });
+		assert.deepEqual(c.issues, []);
+	});
+
+	it("reports a missing record when a code cycle recorded nothing", () => {
+		const c = classifyCycle({ changedFiles: "packages/core/src/a.ts\n", trailerCount: 0 });
+		assert.deepEqual(c.issues.map((i) => i.type), ["missing"]);
+	});
+
+	it("stays silent about a prose cycle that recorded nothing", () => {
+		const c = classifyCycle({ changedFiles: "docs/a.md\n", trailerCount: 0 });
+		assert.deepEqual(c.issues, []);
+	});
+
+	it("reports sample=out on a cycle that changed code, which removes it from the denominator", () => {
+		const c = classifyCycle({ changedFiles: "scripts/a.mjs\n", trailerCount: 1, sample: "out" });
+		assert.deepEqual(c.issues.map((i) => i.type), ["mismatch"]);
+	});
+
+	it("reports sample=in on a cycle that changed no code, which pads the denominator", () => {
+		const c = classifyCycle({ changedFiles: "docs/a.md\n", trailerCount: 1, sample: "in" });
+		assert.deepEqual(c.issues.map((i) => i.type), ["mismatch"]);
+	});
+
+	it("reports a cycle that recorded more than once, which double-counts it", () => {
+		const c = classifyCycle({ changedFiles: "scripts/a.mjs\n", trailerCount: 2, sample: "in" });
+		assert.deepEqual(c.issues.map((i) => i.type), ["duplicate"]);
+	});
+});
+
+describe("tool field", () => {
+	it("parses the tool that produced the findings", () => {
+		const r = parseMeasurementTrailer("Review-Measurement: sample=in new=1 adopted=1 tool=code-review");
+		assert.equal(r.tool, "code-review");
+	});
+
+	it("rejects a tool outside the three the rule names", () => {
+		const r = parseMeasurementTrailer("Review-Measurement: sample=in new=1 adopted=1 tool=eyeballs");
+		assert.match(r.error, /tool/);
+	});
+
+	it("leaves the tool unspecified on records written before the field existed", () => {
+		const r = parseMeasurementTrailer("Review-Measurement: sample=in new=1 adopted=1");
+		assert.equal(r.error, undefined);
+		assert.equal(r.tool, undefined);
+	});
+
+	it("breaks the rate down per tool, since the tools do not have equal yield", () => {
+		const s = summarize([
+			{ sample: "in", new: 3, adopted: 2, tool: "code-review" },
+			{ sample: "in", new: 0, adopted: 0, tool: "simplify" },
+			{ sample: "in", new: 1, adopted: 1, tool: "simplify" },
+			{ sample: "in", new: 2, adopted: 0 },
+		]);
+		assert.deepEqual(s.byTool["code-review"], { sampled: 1, withFindings: 1, totalNew: 3, totalAdopted: 2 });
+		assert.deepEqual(s.byTool.simplify, { sampled: 2, withFindings: 1, totalNew: 1, totalAdopted: 1 });
+		assert.deepEqual(s.byTool.unspecified, { sampled: 1, withFindings: 1, totalNew: 2, totalAdopted: 0 });
 	});
 });

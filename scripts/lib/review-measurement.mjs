@@ -34,6 +34,15 @@ export const TRAILER_GREP = "Review-Measurement:";
 export const IN_SAMPLE_PATH = /^(packages|scripts)\//m;
 
 /**
+ * The review tools the rule allows, in descending expected yield.
+ * The rate is meaningless pooled across them: `/code-review` fans out further
+ * than `/simplify`, so a pooled figure measures which tool ran that cycle
+ * rather than what review is worth. Records written before the field existed
+ * carry no tool and are summarised as `unspecified`.
+ */
+export const REVIEW_TOOLS = ["code-review", "code-reviewer-agent", "simplify"];
+
+/**
  * Parse a trailer out of a commit message (subject and body).
  * A malformed record carries `error` instead of throwing — the aggregate view
  * reports it separately so it cannot be mistaken for a zero-finding cycle.
@@ -51,6 +60,12 @@ export function parseMeasurementTrailer(text) {
 	}
 
 	const record = { sample: fields.sample, angles: fields.angles };
+	if (fields.tool !== undefined) {
+		if (!REVIEW_TOOLS.includes(fields.tool)) {
+			return { ...record, error: `tool must be one of ${REVIEW_TOOLS.join(", ")}, got ${JSON.stringify(fields.tool)}` };
+		}
+		record.tool = fields.tool;
+	}
 
 	if (record.sample !== "in" && record.sample !== "out") {
 		return { ...record, error: `sample must be "in" or "out", got ${JSON.stringify(fields.sample ?? null)}` };
@@ -94,7 +109,19 @@ export function summarize(records) {
 	const outOfSample = records.filter((r) => r.sample === "out" && !r.error).length;
 	const cyclesWithFindings = sampled.filter((r) => r.new > 0).length;
 
+	/** @type {Record<string, {sampled: number, withFindings: number, totalNew: number, totalAdopted: number}>} */
+	const byTool = {};
+	for (const r of sampled) {
+		const key = r.tool ?? "unspecified";
+		const bucket = (byTool[key] ??= { sampled: 0, withFindings: 0, totalNew: 0, totalAdopted: 0 });
+		bucket.sampled += 1;
+		if (r.new > 0) bucket.withFindings += 1;
+		bucket.totalNew += r.new;
+		bucket.totalAdopted += r.adopted;
+	}
+
 	return {
+		byTool,
 		sampled: sampled.length,
 		outOfSample,
 		malformed: malformed.length,
@@ -105,4 +132,68 @@ export function summarize(records) {
 		findingRate: sampled.length === 0 ? null : cyclesWithFindings / sampled.length,
 		remaining: Math.max(0, TARGET_SAMPLE_COUNT - sampled.length),
 	};
+}
+
+/**
+ * Read the --since ref from argv.
+ * Both accepted forms are checked explicitly, and a missing value is an error
+ * rather than a silent fall-through: without a ref the script skips the
+ * missing-record scan entirely and still exits 0, which reads as "nothing
+ * missing" to whoever asked for the scan.
+ * @param {string[]} argv
+ * @returns {{since?: string, error?: string}}
+ */
+export function parseSinceArg(argv) {
+	const inline = argv.find((a) => a.startsWith("--since="));
+	if (inline) {
+		const value = inline.slice("--since=".length);
+		return value ? { since: value } : { error: "--since= needs a ref" };
+	}
+
+	const idx = argv.indexOf("--since");
+	if (idx === -1) return { since: undefined };
+
+	const value = argv[idx + 1];
+	if (!value || value.startsWith("-")) return { error: "--since needs a ref" };
+	return { since: value };
+}
+
+/**
+ * How many trailers a cycle's commits carry. The rule allows exactly one per
+ * cycle; more than one is double-counted by the commit-wise summary while the
+ * merge-wise scan sees a single cycle, so the two views disagree silently.
+ * @param {string} text - the concatenated commit messages of one cycle
+ */
+export function countMeasurementTrailers(text) {
+	return (text.match(/^Review-Measurement:/gm) ?? []).length;
+}
+
+/**
+ * Judge one cycle against its own diff.
+ * Trailer presence alone is not enough: `sample=` is written by hand and the
+ * paths it claims are checkable, so a cycle that changed code and declared
+ * itself out of sample silently leaves the denominator.
+ * @param {{changedFiles: string, trailerCount: number, sample?: string}} cycle
+ * @returns {{inSampleByPath: boolean, issues: Array<{type: string, detail: string}>}}
+ */
+export function classifyCycle({ changedFiles, trailerCount, sample }) {
+	const inSampleByPath = IN_SAMPLE_PATH.test(changedFiles);
+	const issues = [];
+
+	if (trailerCount === 0) {
+		if (inSampleByPath) issues.push({ type: "missing", detail: "changed code but carries no record" });
+		return { inSampleByPath, issues };
+	}
+
+	if (trailerCount > 1) {
+		issues.push({ type: "duplicate", detail: `${trailerCount} records in one cycle; the rule allows one` });
+		return { inSampleByPath, issues };
+	}
+
+	if (inSampleByPath && sample === "out") {
+		issues.push({ type: "mismatch", detail: "changed code but recorded sample=out" });
+	} else if (!inSampleByPath && sample === "in") {
+		issues.push({ type: "mismatch", detail: "changed no code but recorded sample=in" });
+	}
+	return { inSampleByPath, issues };
 }
