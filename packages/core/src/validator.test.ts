@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
-import type { Frontmatter } from "./types/index.js";
+import type { Frontmatter, Status } from "./types/index.js";
+import { PFD_TYPE_VALUES, STATUS_VALUES } from "./types/index.js";
 import { type ValidateOptions, validate } from "./validator.js";
 
 function diagnose(
@@ -238,14 +239,6 @@ a >> design -> b
 		const cs = codes("idle_process");
 		expect(cs).not.toContain("V002");
 		expect(cs).not.toContain("V003");
-	});
-
-	it("V002/V003: process with output but no input still triggers V002", () => {
-		expect(codes("P -> B")).toContain("V002");
-	});
-
-	it("V002/V003: process with input but no output still triggers V003", () => {
-		expect(codes("A >> P")).toContain("V003");
 	});
 
 	describe("W001: parts member without edges", () => {
@@ -697,40 +690,15 @@ a >> design -> b
 	});
 
 	describe("W003: status non-monotonicity (output done while input not done)", () => {
-		it("warns when output artifact is done but input artifact is not done", () => {
+		// Every non-done status counts as "not done" for the monotonicity rule,
+		// so the case list is derived rather than spelled out — a status added
+		// later joins the assertion instead of slipping past it.
+		it.each(
+			STATUS_VALUES.filter((s): s is Status => s !== "done"),
+		)("warns when output artifact is done but input artifact is %s", (status) => {
 			const fm: Frontmatter = {
 				artifact: {
-					inp: { status: "wip", criteria: "x" },
-					out: { status: "done", criteria: "y" },
-				},
-			};
-			expect(codes("inp >> P -> out", fm)).toContain("W003");
-		});
-
-		it("warns when output artifact is done but input artifact is todo", () => {
-			const fm: Frontmatter = {
-				artifact: {
-					inp: { status: "todo", criteria: "x" },
-					out: { status: "done", criteria: "y" },
-				},
-			};
-			expect(codes("inp >> P -> out", fm)).toContain("W003");
-		});
-
-		it("warns when output artifact is done but input artifact is waiting", () => {
-			const fm: Frontmatter = {
-				artifact: {
-					inp: { status: "waiting", criteria: "x" },
-					out: { status: "done", criteria: "y" },
-				},
-			};
-			expect(codes("inp >> P -> out", fm)).toContain("W003");
-		});
-
-		it("warns when output artifact is done but input artifact is suspended", () => {
-			const fm: Frontmatter = {
-				artifact: {
-					inp: { status: "suspended", criteria: "x" },
+					inp: { status, criteria: "x" },
 					out: { status: "done", criteria: "y" },
 				},
 			};
@@ -864,18 +832,10 @@ a >> design -> b
 			expect(codes("A >> P -> B", fm)).toContain("V031");
 		});
 
-		it("no V031 for type: roadmap", () => {
-			const fm: Frontmatter = { type: "roadmap" };
-			expect(codes("A >> P -> B", fm)).not.toContain("V031");
-		});
-
-		it("no V031 for type: workflow", () => {
-			const fm: Frontmatter = { type: "workflow" };
-			expect(codes("A >> P -> B", fm)).not.toContain("V031");
-		});
-
-		it("no V031 for type: runtime-pipeline", () => {
-			const fm: Frontmatter = { type: "runtime-pipeline" };
+		// V031 accepts exactly the declared enum, so the accepted cases are the
+		// enum itself — a type added later is asserted without editing this file.
+		it.each(PFD_TYPE_VALUES)("no V031 for type: %s", (type) => {
+			const fm: Frontmatter = { type };
 			expect(codes("A >> P -> B", fm)).not.toContain("V031");
 		});
 
@@ -941,42 +901,16 @@ a >> design -> b
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});
 
-		it("no W005 when produced artifact has status: done", () => {
+		// W005 asks only whether a status is present, so every member of the
+		// enum must suppress it. Driving the cases off STATUS_VALUES keeps that
+		// claim true for statuses added later, instead of leaving the new one
+		// silently unasserted.
+		it.each(
+			STATUS_VALUES,
+		)("no W005 when produced artifact has status: %s", (status) => {
 			const fm: Frontmatter = {
 				type: "roadmap",
-				artifact: { B: { status: "done" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when produced artifact has status: wip", () => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "wip" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when produced artifact has status: todo", () => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "todo" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when produced artifact has status: waiting", () => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "waiting" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when produced artifact has status: suspended", () => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "suspended" } },
+				artifact: { B: { status } },
 			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});

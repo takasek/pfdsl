@@ -82,12 +82,15 @@ describe("sortEdges", () => {
 		expect(result[0]).toMatchObject({ artifact: "a" });
 	});
 
-	it("cyclic primary graph: terminates and emits all edges with rank-0 fallback", () => {
+	// The timeout is the non-termination check: a cycle that made ranking loop
+	// forever would hang here rather than return. Measuring elapsed time inside
+	// the test instead would assert on machine speed, not on termination.
+	it("cyclic primary graph: terminates and emits all edges with rank-0 fallback", {
+		timeout: 1000,
+	}, () => {
 		// A -> P1 -> B -> P2 -> A forms a cycle on the primary graph.
 		// No source ⇒ all ranks fall back to 0 ⇒ stable sort by kind then lex key.
-		const start = Date.now();
 		const result = sorted("A >> P1 -> B\nB >> P2 -> A");
-		expect(Date.now() - start).toBeLessThan(1000);
 		expect(result).toEqual([
 			{ kind: "input", artifact: "A", process: "P1" },
 			{ kind: "input", artifact: "B", process: "P2" },

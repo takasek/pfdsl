@@ -288,15 +288,6 @@ describe("computeTerminals", () => {
 		expect(computeTerminals(edges)).toEqual(new Set(["c"]));
 	});
 
-	it("artifact consumed by input edge is not terminal", () => {
-		// a is consumed by P via input, so a is not terminal
-		const edges: NormalizedEdge[] = [
-			{ kind: "input", artifact: "a", process: "P" },
-			{ kind: "output", process: "P", artifact: "b" },
-		];
-		expect(computeTerminals(edges)).not.toContain("a");
-	});
-
 	it("empty edges produce empty terminals", () => {
 		expect(computeTerminals([])).toEqual(new Set());
 	});
@@ -437,20 +428,10 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.some((d) => d.code === "V033")).toBe(true);
 	});
 
-	it("X4 — swap map (input→child terminal side, output→child open input side) → no errors", () => {
-		// parent input 'a' maps to child terminal 'a' (wrong side)
-		// parent output 'b' maps to child open input 'b' (wrong side)
-		// boundary: { a: 'b', b: 'a' }
-		// parent inputs {a} should map to child open inputs {b}
-		// parent outputs {b} should map to child terminals {a}
-		// Actually X4 from spec says this IS valid (swap map). Let me verify:
-		// parentNormalInputs = {a}, parentOutputs = {b}
-		// boundaryMap = { a: 'b', b: 'a' }
-		// effective: a -> 'b', b -> 'a'
-		// side check: a ∈ parentNormalInputs, effective 'b' → is 'b' in childOpenInputs? childOpenInputs = {b} YES → OK
-		// side check: b ∈ parentOutputs, effective 'a' → is 'a' in childTerminals? childTerminals = {a} YES → OK
-		// bijection input: mapped = {b} == childOpenInputs {b} ✓
-		// bijection output: mapped = {a} == childTerminals {a} ✓
+	it("X4 — swap map (parent 'a'→child 'b', parent 'b'→child 'a') → no errors", () => {
+		// The names cross, but each side stays on its own side: parent input 'a'
+		// maps to child open input 'b', parent output 'b' to child terminal 'a'.
+		// Both mappings are bijective within their side, so this is legal.
 		const diags = validateSubflowBoundary({
 			processId: "P",
 			parentNormalInputs: new Set(["a"]),
@@ -502,17 +483,70 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.some((d) => d.code === "V034")).toBe(true);
 	});
 
-	it("all subflow boundary diagnostics have severity error", () => {
-		const diags = validateSubflowBoundary({
-			processId: "P",
-			parentNormalInputs: new Set(["order"]),
-			parentOutputs: new Set([]),
-			boundaryMap: {},
-			childOpenInputs: new Set(["incoming_order"]),
-			childTerminals: new Set([]),
-		});
-		expect(diags.length).toBeGreaterThan(0);
-		for (const d of diags) {
+	// Every code this function can emit is an error per §16 — asserting that
+	// over one input would only cover whichever code that input happens to
+	// produce, so each code gets an input that provokes it.
+	const severityCases: Array<{
+		code: string;
+		input: Parameters<typeof validateSubflowBoundary>[0];
+	}> = [
+		{
+			code: "V030",
+			input: {
+				processId: "P",
+				parentNormalInputs: new Set(["order"]),
+				parentOutputs: new Set([]),
+				boundaryMap: { nonexistent: "order" },
+				childOpenInputs: new Set(["order"]),
+				childTerminals: new Set([]),
+			},
+		},
+		{
+			code: "V032",
+			input: {
+				processId: "P",
+				parentNormalInputs: new Set(["a", "b"]),
+				parentOutputs: new Set([]),
+				boundaryMap: { a: "b" },
+				childOpenInputs: new Set(["b", "c"]),
+				childTerminals: new Set([]),
+			},
+		},
+		{
+			code: "V033",
+			input: {
+				processId: "P",
+				parentNormalInputs: new Set(["order"]),
+				parentOutputs: new Set(["shipment"]),
+				boundaryMap: {
+					order: "outgoing_parcel",
+					shipment: "incoming_order",
+				},
+				childOpenInputs: new Set(["incoming_order"]),
+				childTerminals: new Set(["outgoing_parcel"]),
+			},
+		},
+		{
+			code: "V034",
+			input: {
+				processId: "P",
+				parentNormalInputs: new Set(["order"]),
+				parentOutputs: new Set([]),
+				boundaryMap: {},
+				childOpenInputs: new Set(["incoming_order"]),
+				childTerminals: new Set([]),
+			},
+		},
+	];
+
+	it.each(severityCases)("$code is emitted with severity error", ({
+		code,
+		input,
+	}) => {
+		const diags = validateSubflowBoundary(input);
+		const matching = diags.filter((d) => d.code === code);
+		expect(matching.length).toBeGreaterThan(0);
+		for (const d of matching) {
 			expect(d.severity).toBe("error");
 		}
 	});

@@ -103,13 +103,14 @@ describe("normalize", () => {
 		).toBe(true);
 	});
 
-	it("front matter artifact declaration takes priority", () => {
-		const fm = { artifact: { P: { label: "Override" } } };
-		const { diagnostics } = (() => {
-			const { tokens } = lex("A >> P");
-			const { document } = parseTokens(tokens);
-			return normalize(document, fm as any);
-		})();
+	it("front matter artifact declaration wins over the process role the body implies", () => {
+		// Body position makes P a process; front matter declares it an artifact.
+		// The declaration decides the kind, and the conflict is reported.
+		const fm = { artifact: { P: { label: "Override" } } } as Frontmatter;
+		const { tokens } = lex("A >> P");
+		const { document } = parseTokens(tokens);
+		const { diagnostics, nodeKinds } = normalize(document, fm);
+		expect(nodeKinds.get("P")).toBe("artifact");
 		expect(diagnostics.some((d) => d.code === "N002")).toBe(true);
 	});
 
