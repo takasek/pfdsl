@@ -4,8 +4,6 @@ import { sharedCoverageConfig } from "../../vitest.shared";
 export default mergeConfig(
 	sharedCoverageConfig,
 	defineConfig({
-		test: {
-			globals: false,
-		},
+		test: { include: ["src/**/*.test.ts"] },
 	}),
 );
