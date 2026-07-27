@@ -1,10 +1,12 @@
 // Guards against a test file that exists but is never run. `node --test` takes
-// explicit glob arguments (it has no recursive directory mode we can use here —
-// passing a bare directory makes it try to load the directory as a module), so a
-// test file dropped outside the enumerated directories is silently skipped: it
-// passes locally when invoked by hand and never runs in CI. That is how
+// explicit glob arguments (passing a bare directory makes it try to load the
+// directory as a module rather than recurse into it), so a test file dropped
+// outside the enumerated globs is silently skipped: it passes locally when
+// invoked by hand and never runs in CI. That is how
 // scripts/review-measurement.test.mjs — including its shell-injection guard —
 // sat unrun.
+
+import { matchesGlob as nodeMatchesGlob } from "node:path";
 
 const NODE_TEST_LINE_RE = /node\s+--test\s+(.*)$/gm;
 const QUOTED_ARG_RE = /"([^"]+)"/g;
@@ -27,19 +29,17 @@ export function extractTestGlobs(source) {
 }
 
 /**
- * Match a repo-relative path against a single glob, with `*` standing for any
- * run of characters other than the path separator (node's own `--test` glob
- * semantics). Every other character is literal.
+ * Match a repo-relative path against a single glob, with the same semantics
+ * `node --test` itself uses to resolve its glob arguments. Delegates to
+ * `node:path`'s `matchesGlob` — the same underlying engine `node --test`
+ * resolves its arguments through — so this check cannot drift from the
+ * behavior it is modeling the way a hand-rolled regex translation could.
  * @param {string} path
  * @param {string} glob
  * @returns {boolean}
  */
 export function matchesGlob(path, glob) {
-	const pattern = glob
-		.split("*")
-		.map((literal) => literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-		.join("[^/]*");
-	return new RegExp(`^${pattern}$`).test(path);
+	return nodeMatchesGlob(path, glob);
 }
 
 /**
