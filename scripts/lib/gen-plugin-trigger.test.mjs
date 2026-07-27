@@ -43,6 +43,10 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/agents/pfd-lens.md"), true);
 	});
 
+	it("matches .claude/agents/pfd-implementer.md", () => {
+		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/agents/pfd-implementer.md"), true);
+	});
+
 	it("matches packages/cli/package.json", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test("packages/cli/package.json"), true);
 	});
