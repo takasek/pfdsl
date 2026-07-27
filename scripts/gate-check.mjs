@@ -7,7 +7,6 @@
 // MANUAL: lines.
 // Usage: node scripts/gate-check.mjs [--base main] [--artifact <key>]
 
-import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +29,7 @@ import {
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 import { GEN_INSTALL_TRIGGER } from "./lib/gen-install-trigger.mjs";
+import { tryRun } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -42,23 +42,17 @@ const flag = (name) => {
 const base = flag("--base") ?? "main";
 const artifactKey = flag("--artifact");
 
-function sh(cmd, input) {
-	return execSync(cmd, { cwd: root, encoding: "utf-8", input });
-}
-function trySh(cmd, input) {
-	try {
-		return { ok: true, out: sh(cmd, input) };
-	} catch (e) {
-		return { ok: false, out: e.stdout || e.message, status: e.status };
-	}
-}
+// Every call names the executable and its arguments separately — `base` and
+// `artifactKey` come from argv and must never be parsed by a shell (#572).
+const exec = (file, execArgs, input) => tryRun(file, execArgs, { cwd: root, ...(input === undefined ? {} : { input }) });
+const node = (execArgs, input) => exec(process.execPath, execArgs, input);
 
 // Best-effort — a stale/missing origin ref surfaces as a clear diff failure below.
-trySh("git fetch origin");
+exec("git", ["fetch", "origin"]);
 
 // --diff-filter=d excludes deleted paths — a deleted .pfdsl/.md would
 // otherwise fail the check/linebreaks gates against a file that no longer exists.
-const diffFiles = trySh(`git diff --diff-filter=d --name-only origin/${base}...HEAD`);
+const diffFiles = exec("git", ["diff", "--diff-filter=d", "--name-only", `origin/${base}...HEAD`]);
 if (!diffFiles.ok) {
 	console.error(`gate-check: failed to diff against origin/${base}: ${diffFiles.out.trim()}`);
 	process.exit(1);
@@ -81,7 +75,7 @@ if (pfdslFiles.length === 0) {
 			detail: "packages/cli/dist/cli.js not built; run 'pnpm -r build' first",
 		});
 	} else {
-		const failed = pfdslFiles.filter((f) => !trySh(`node "${cliPath}" check "${f}"`).ok);
+		const failed = pfdslFiles.filter((f) => !node([cliPath, "check", f]).ok);
 		results.push({
 			name: "pfdsl check",
 			status: failed.length === 0 ? "PASS" : "FAIL",
@@ -92,7 +86,7 @@ if (pfdslFiles.length === 0) {
 
 // 2. audit-issues-flow (no --fix: fails if manual findings remain)
 {
-	const r = trySh("node scripts/pfdsl/audit-issues-flow.mjs");
+	const r = node(["scripts/pfdsl/audit-issues-flow.mjs"]);
 	results.push({ name: "audit-issues-flow", ...classifyAuditIssuesFlowResult(r.ok, r.status) });
 }
 
@@ -100,7 +94,7 @@ if (pfdslFiles.length === 0) {
 if (mdFiles.length === 0) {
 	results.push({ name: "check-md-linebreaks", status: "SKIP", detail: "no .md changes" });
 } else {
-	const r = trySh(`node scripts/check-md-linebreaks.mjs ${mdFiles.map((f) => `"${f}"`).join(" ")}`);
+	const r = node(["scripts/check-md-linebreaks.mjs", ...mdFiles]);
 	results.push({ name: "check-md-linebreaks", status: r.ok ? "PASS" : "FAIL" });
 }
 
@@ -114,15 +108,16 @@ if (mdFiles.length === 0) {
 if (!matchesTrigger(changedFiles, GEN_PLUGIN_TRIGGER) && !matchesTrigger(changedFiles, GEN_INSTALL_TRIGGER)) {
 	results.push({ name: "gen-plugin identity", status: "SKIP", detail: "no skill/plugin/install-source changes" });
 } else {
-	const r = trySh("node scripts/gen-plugin.mjs && git diff --exit-code -- plugin .claude/skills/pfd-ops/install");
-	results.push({ name: "gen-plugin identity", status: r.ok ? "PASS" : "FAIL" });
+	const regenerated = node(["scripts/gen-plugin.mjs"]);
+	const clean = regenerated.ok && exec("git", ["diff", "--exit-code", "--", "plugin", ".claude/skills/pfd-ops/install"]).ok;
+	results.push({ name: "gen-plugin identity", status: clean ? "PASS" : "FAIL" });
 }
 
 // 5. snapshot freshness (only when .pfdsl files changed)
 if (pfdslFiles.length === 0) {
 	results.push({ name: "snapshot freshness", status: "SKIP", detail: "no .pfdsl changes" });
 } else {
-	const vitestRun = trySh("pnpm --filter @pfdsl/core exec vitest run -u");
+	const vitestRun = exec("pnpm", ["--filter", "@pfdsl/core", "exec", "vitest", "run", "-u"]);
 	if (!vitestRun.ok) {
 		results.push({
 			name: "snapshot freshness",
@@ -130,7 +125,7 @@ if (pfdslFiles.length === 0) {
 			detail: `vitest run failed: ${vitestRun.out.trim().slice(-200)}`,
 		});
 	} else {
-		const r = trySh("git diff --quiet -- packages/core/src/__snapshots__/");
+		const r = exec("git", ["diff", "--quiet", "--", "packages/core/src/__snapshots__/"]);
 		results.push({
 			name: "snapshot freshness",
 			status: r.ok ? "PASS" : "FAIL",
@@ -148,8 +143,8 @@ if (pfdslFiles.length === 0) {
 			...classifyOutputArtifactStatus({ artifactKey, roadmapChanged }),
 		});
 	} else if (artifactKey) {
-		const before = trySh(`git show origin/${base}:.pfdsl/roadmap.pfdsl`);
-		const after = trySh("git show HEAD:.pfdsl/roadmap.pfdsl");
+		const before = exec("git", ["show", `origin/${base}:.pfdsl/roadmap.pfdsl`]);
+		const after = exec("git", ["show", "HEAD:.pfdsl/roadmap.pfdsl"]);
 		if (!before.ok || !after.ok) {
 			results.push({
 				name: "output artifact status update",
@@ -164,7 +159,7 @@ if (pfdslFiles.length === 0) {
 			});
 		}
 	} else {
-		const diffResult = trySh(`git diff origin/${base}...HEAD -- .pfdsl/roadmap.pfdsl`);
+		const diffResult = exec("git", ["diff", `origin/${base}...HEAD`, "--", ".pfdsl/roadmap.pfdsl"]);
 		if (!diffResult.ok) {
 			results.push({ name: "output artifact status update", status: "FAIL", detail: diffResult.out.trim() });
 		} else {
@@ -181,7 +176,7 @@ if (pfdslFiles.length === 0) {
 if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 	results.push({ name: "vscode-extension typecheck", status: "SKIP", detail: "no vscode-extension changes" });
 } else {
-	const r = trySh("pnpm --filter @pfdsl/vscode-extension typecheck");
+	const r = exec("pnpm", ["--filter", "@pfdsl/vscode-extension", "typecheck"]);
 	results.push({
 		name: "vscode-extension typecheck",
 		status: r.ok ? "PASS" : "FAIL",
@@ -191,7 +186,7 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 
 // 8. commit subject lint (Conventional Commits message format; granularity stays MANUAL)
 {
-	const subjectsOut = trySh(`git log origin/${base}..HEAD --format=%s`);
+	const subjectsOut = exec("git", ["log", `origin/${base}..HEAD`, "--format=%s"]);
 	if (!subjectsOut.ok) {
 		results.push({ name: "commit subject lint", status: "FAIL", detail: subjectsOut.out.trim() });
 	} else {
@@ -214,13 +209,13 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 if (!changedFiles.includes(".pfdsl/roadmap.pfdsl")) {
 	results.push({ name: "wip transition", status: "SKIP", detail: "no .pfdsl/roadmap.pfdsl changes" });
 } else {
-	const shasOut = trySh(`git log --format=%H origin/${base}..HEAD -- .pfdsl/roadmap.pfdsl`);
+	const shasOut = exec("git", ["log", "--format=%H", `origin/${base}..HEAD`, "--", ".pfdsl/roadmap.pfdsl"]);
 	if (!shasOut.ok) {
 		results.push({ name: "wip transition", status: "FAIL", detail: shasOut.out.trim() });
 	} else {
 		const shas = shasOut.out.trim().split("\n").filter(Boolean);
 		const snapshots = shas
-			.map((sha) => trySh(`git show ${sha}:.pfdsl/roadmap.pfdsl`))
+			.map((sha) => exec("git", ["show", `${sha}:.pfdsl/roadmap.pfdsl`]))
 			.filter((r) => r.ok)
 			.map((r) => r.out);
 		const detected = wipTransitionDetected(snapshots, artifactKey);
@@ -252,11 +247,11 @@ console.log(formatGateTable(results));
 	if (pfdslFiles.length > 0 && existsSync(cliPath)) {
 		const newTerminalsByFile = [];
 		for (const f of pfdslFiles) {
-			const before = trySh(`git show origin/${base}:${f}`);
-			const after = trySh(`git show HEAD:${f}`);
+			const before = exec("git", ["show", `origin/${base}:${f}`]);
+			const after = exec("git", ["show", `HEAD:${f}`]);
 			if (!after.ok) continue;
-			const beforeAudit = before.ok ? trySh(`node "${cliPath}" graph io -`, before.out) : { ok: true, out: "" };
-			const afterAudit = trySh(`node "${cliPath}" graph io -`, after.out);
+			const beforeAudit = before.ok ? node([cliPath, "graph", "io", "-"], before.out) : { ok: true, out: "" };
+			const afterAudit = node([cliPath, "graph", "io", "-"], after.out);
 			if (!afterAudit.ok) continue;
 			const newTerminals = diffNewTerminals(
 				beforeAudit.ok ? parseAuditTerminals(beforeAudit.out) : [],
@@ -279,11 +274,11 @@ console.log(formatGateTable(results));
 {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	if (changedFiles.includes(".pfdsl/roadmap.pfdsl") && existsSync(cliPath)) {
-		const before = trySh(`git show origin/${base}:.pfdsl/roadmap.pfdsl`);
-		const after = trySh("git show HEAD:.pfdsl/roadmap.pfdsl");
+		const before = exec("git", ["show", `origin/${base}:.pfdsl/roadmap.pfdsl`]);
+		const after = exec("git", ["show", "HEAD:.pfdsl/roadmap.pfdsl"]);
 		if (before.ok && after.ok) {
-			const beforeReady = trySh(`node "${cliPath}" status ready - --json`, before.out);
-			const afterReady = trySh(`node "${cliPath}" status ready - --json`, after.out);
+			const beforeReady = node([cliPath, "status", "ready", "-", "--json"], before.out);
+			const afterReady = node([cliPath, "status", "ready", "-", "--json"], after.out);
 			if (beforeReady.ok && afterReady.ok) {
 				const beforeIds = JSON.parse(beforeReady.out).ready.map((p) => p.id);
 				const afterIds = JSON.parse(afterReady.out).ready.map((p) => p.id);
