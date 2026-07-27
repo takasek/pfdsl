@@ -15,6 +15,14 @@ describe("GEN_SKILL_TRIGGER", () => {
 		assert.equal(GEN_SKILL_TRIGGER.test("scripts/gen-skill.mjs"), true);
 	});
 
+	it("matches scripts/gen-skill-refs.mjs", () => {
+		assert.equal(GEN_SKILL_TRIGGER.test("scripts/gen-skill-refs.mjs"), true);
+	});
+
+	it("matches scripts/lib/gen-skill-refs.mjs", () => {
+		assert.equal(GEN_SKILL_TRIGGER.test("scripts/lib/gen-skill-refs.mjs"), true);
+	});
+
 	it("does not match an unrelated root-level README.md", () => {
 		assert.equal(GEN_SKILL_TRIGGER.test("README.md"), false);
 	});
