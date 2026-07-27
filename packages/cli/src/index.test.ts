@@ -1646,6 +1646,32 @@ req >> design -> spec
 		expect(after).not.toContain("status: todo");
 	});
 
+	it("writes a node whose first child line is a comment, as sort and reindex accept", async () => {
+		// detectChildIndent in core skips comment lines when deriving the child
+		// indent; this command derived it inline and took the comment's own
+		// indent, producing a rewrite the guard then refused (#510).
+		const f = join(dir, "status-set-comment-first.pfdsl");
+		writeFileSync(
+			f,
+			`---
+artifact:
+  req:
+    # why this exists
+      status: todo
+  spec:
+    status: done
+---
+req >> design -> spec
+`,
+		);
+		const r = await run(["meta", "set", f, "req", "status", "wip"]);
+		expect(r.stderr).not.toContain("refusing to write");
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("# why this exists");
+		expect(after).toContain("      status: wip");
+	});
+
 	it("exits 1 when artifact id not found", async () => {
 		const f = join(dir, "status-set-notfound.pfdsl");
 		writeFileSync(f, base);

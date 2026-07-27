@@ -16,6 +16,7 @@ import {
 	type Diagnostic,
 	type DiagnosticRegistryEntry,
 	type DiffReport,
+	detectChildIndent,
 	escapeRe,
 	format,
 	formatEdges,
@@ -943,17 +944,20 @@ function setFieldInSource(
 	} else {
 		// Block-style. Detect indent width from the header line (#430).
 		const nodeIndent = headerMatch![1]!.length;
-		const afterHeader = fmBlock.slice(
-			headerMatch!.index + headerMatch![0].length,
-		);
-		const afterHeaderNl = afterHeader.indexOf("\n");
-		const firstLine =
-			afterHeaderNl === -1 ? afterHeader : afterHeader.slice(0, afterHeaderNl);
-		const firstLineIndent = firstLine.length - firstLine.trimStart().length;
-		const childIndent =
-			firstLine.trim() !== "" && firstLineIndent > nodeIndent
-				? firstLineIndent
-				: nodeIndent * 2;
+		// Shared with sort/reindex/insert-definition rather than derived here:
+		// deriving it inline took a leading comment's own indent as the child
+		// indent, and the rewrite that produced was refused by the guard on a
+		// file those three commands handle (#510).
+		const childLines: string[] = [];
+		for (const line of fmBlock
+			.slice(headerMatch!.index + headerMatch![0].length)
+			.split("\n")) {
+			const isBlank = line.trim() === "";
+			if (!isBlank && line.length - line.trimStart().length <= nodeIndent)
+				break;
+			childLines.push(line);
+		}
+		const childIndent = detectChildIndent(childLines, nodeIndent * 2);
 
 		const nodePad = " ".repeat(nodeIndent);
 		const childPad = " ".repeat(childIndent);
@@ -967,7 +971,7 @@ function setFieldInSource(
 		// when a deeper-indented line follows (a trailing blank belongs to the
 		// mapping, not the scalar).
 		const fieldLineRe = new RegExp(
-			`(${nodePad}${escapedId}:[ \\t]*\\n(?:(?:${childPad}[^\\n]*|[ \\t]*)\\n)*?)${childPad}${escapedField}:[^\\n]*\\n(?:(?:[ \\t]*\\n)*${childPad} +[^\\n]*\\n)*`,
+			`(${nodePad}${escapedId}:[ \\t]*\\n(?:(?:${nodePad}[ \\t]+[^\\n]*|[ \\t]*)\\n)*?)${childPad}${escapedField}:[^\\n]*\\n(?:(?:[ \\t]*\\n)*${childPad} +[^\\n]*\\n)*`,
 		);
 		if (fieldLineRe.test(fmBlock)) {
 			newFm = fmBlock.replace(
