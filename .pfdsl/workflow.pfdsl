@@ -181,7 +181,7 @@ artifact:
     label: pfd-ops 配布ソース（repo ルート）
     description: 採用リポへ配る監査スクリプトと GitHub Actions workflow の一次情報。実体は repo ルート側にあり、配布対象は scripts/lib/install-templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）。このリポ自身の運用にも同じ実体を使う
     criteria: install-templates.mjs のリストに挙がる全パスが実在し、このリポの運用で実際に使われている
-    location: ../scripts/pfdsl/
+    location: [../scripts/pfdsl/, ../.github/workflows/pfdsl-flow-on-issue-close.yml]
     group: generation
   ops_install_templates:
     label: pfd-ops 採用テンプレート（install/）
