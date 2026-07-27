@@ -4,7 +4,8 @@
 // sh script that captures the raw ERE string via command substitution,
 // since it cannot `import` JS). Keep this ERE-compatible for `grep -E`.
 
-export const GEN_SKILL_TRIGGER_PATTERN = "^(docs/|scripts/skill-template/|scripts/gen-skill\\.mjs)";
+export const GEN_SKILL_TRIGGER_PATTERN =
+	"^(docs/|scripts/skill-template/|scripts/gen-skill\\.mjs|scripts/gen-skill-refs\\.mjs|scripts/lib/gen-skill-refs\\.mjs)";
 
 export const GEN_SKILL_TRIGGER = new RegExp(GEN_SKILL_TRIGGER_PATTERN);
 
