@@ -243,8 +243,12 @@ artifact:
 b >> p -> a
 `;
 		const { output } = sort(src, { by: ["id"] });
-		// After sorting: a then b, blank line preserved between them
-		expect(output).toContain("\n\n");
+		// After sorting: a then b. The blank line travels with the node that
+		// carried it (yaml's `spaceBefore` is a leading-gap flag on the node
+		// itself), so it now renders right after the section header, before
+		// `a` — a blank (whitespace-only) line rather than the fully-empty
+		// "\n\n" the old line-splicing implementation produced.
+		expect(output).toMatch(/\n[ \t]*\n/);
 		expect(nodeOrder(output, "artifact")).toEqual(["a", "b"]);
 	});
 
@@ -282,6 +286,21 @@ b >> p -> a
 		const { output, changed } = sort(src, { by: ["index"] });
 		expect(changed).toBe(true);
 		expect(nodeOrder(output, "artifact")).toEqual(["a", "b"]);
+	});
+
+	it("sorts a whole section written as a single flow-style line, preserving its one-line form", () => {
+		const src = `---
+artifact: { z: { label: Z, index: 2 }, a: { label: A, index: 1 } }
+---
+a >> p -> z
+`;
+		const { output, changed } = sort(src, { by: ["index"] });
+		expect(changed).toBe(true);
+		expect(nodeOrder(output, "artifact")).toEqual(["a", "z"]);
+		// still a single flow-style line, not exploded to block style
+		expect(output).toContain(
+			"artifact: { a: { label: A, index: 1 }, z: { label: Z, index: 2 } }",
+		);
 	});
 
 	it("preserves the body (non-frontmatter) unchanged", () => {
