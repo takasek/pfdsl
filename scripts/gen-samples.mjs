@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Generates .dot, .svg, and README.md for every .pfdsl in docs/samples/.
 // Run from repo root: node scripts/gen-samples.mjs
-// Requires graphviz `dot` CLI to be installed.
+// Renders .svg through @pfdsl/preview-engine's wasm graphviz — deterministic,
+// no host `dot` binary required.
 
-import { run } from "./lib/run-exec.mjs";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,9 +16,11 @@ const samplesDir = resolve(root, "docs/samples");
 // Import from built dist. @pfdsl/core resolves via packages/graphviz-exporter/node_modules symlink.
 const exporterDist = resolve(root, "packages/graphviz-exporter/dist/index.js");
 const coreDist = resolve(root, "packages/core/dist/index.js");
+const previewEngineDist = resolve(root, "packages/preview-engine/dist/index.js");
 
 const { parse, buildGraph, normalizeDocument } = await import(coreDist);
 const { exportDot } = await import(exporterDist);
+const { renderDotToSvg } = await import(previewEngineDist);
 
 // --- Generate .dot + .svg ---
 
@@ -38,7 +40,7 @@ for (const f of files) {
   const svgPath = resolve(samplesDir, `${base}.svg`);
 
   writeFileSync(dotPath, dot);
-  run("dot", ["-Tsvg", dotPath, "-o", svgPath]);
+  writeFileSync(svgPath, await renderDotToSvg(dot));
   console.log(`${base} → .dot + .svg`);
 }
 
