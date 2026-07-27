@@ -11,7 +11,7 @@
 // carry no record. Those are missing samples, not zero-finding cycles, and
 // silently dropping them would shrink the denominator the rate depends on.
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -29,12 +29,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const since = args.includes("--since") ? args[args.indexOf("--since") + 1] : undefined;
 
-function sh(cmd) {
-	return execSync(cmd, { cwd: root, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024 });
-}
-function trySh(cmd) {
+// argv form, never a shell string: a ref is user input and reaches git verbatim.
+function tryGit(args) {
 	try {
-		return { ok: true, out: sh(cmd) };
+		return { ok: true, out: execFileSync("git", args, { cwd: root, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024 }) };
 	} catch (e) {
 		return { ok: false, out: e.stdout || e.message };
 	}
@@ -43,7 +41,7 @@ function trySh(cmd) {
 const range = since ? `${since}..HEAD` : "HEAD";
 const logFormat = `--format=%H${FIELD_SEP}%B${RECORD_SEP}`;
 // --grep lets git skip non-record commits instead of us reading all of history.
-const logResult = trySh(`git log --grep="${TRAILER_GREP}" ${logFormat} ${range}`);
+const logResult = tryGit(["log", `--grep=${TRAILER_GREP}`, logFormat, range]);
 if (!logResult.ok) {
 	console.error(`review-measurement: failed to read git log for ${range}: ${logResult.out.trim()}`);
 	process.exit(1);
@@ -87,15 +85,15 @@ if (!since) {
 	process.exit(0);
 }
 
-const mergesResult = trySh(`git log --merges --format=%H ${since}..HEAD`);
+const mergesResult = tryGit(["log", "--merges", "--format=%H", `${since}..HEAD`]);
 const merges = mergesResult.ok ? mergesResult.out.trim().split("\n").filter(Boolean) : [];
 const missing = [];
 for (const merge of merges) {
-	const files = trySh(`git diff --name-only ${merge}^1 ${merge}`);
+	const files = tryGit(["diff", "--name-only", `${merge}^1`, merge]);
 	if (!files.ok || !IN_SAMPLE_PATH.test(files.out)) continue;
-	const bodies = trySh(`git log --format=%B ${merge}^1..${merge}^2`);
+	const bodies = tryGit(["log", "--format=%B", `${merge}^1..${merge}^2`]);
 	if (bodies.ok && parseMeasurementTrailer(bodies.out)) continue;
-	const subject = trySh(`git log -1 --format=%s ${merge}`);
+	const subject = tryGit(["log", "-1", "--format=%s", merge]);
 	missing.push(`${merge.slice(0, 7)} ${subject.ok ? subject.out.trim() : ""}`);
 }
 
