@@ -53,14 +53,23 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 **`/code-review` の実測期間中（#561 が open の間）**: `packages/` または `scripts/` に変更があるサイクルでは、終端ゲートの `/simplify` または `/code-review` 項目を省略しない。
 散文・PFD のみのサイクルは**実測の対象外**として PR 本文にその旨を書く（「実施して指摘なし」として数えない — コード変更のないサイクルを分母に入れると出現率が下振れする）。
 自己レビュー（差分の読み直し）は実施済みとみなし、それに**加えて**軽い設定のレビューを実施する（角度を絞る。8角度 × 検証 agent の高効度設定は使わない）。
-実行手段は `/simplify` を既定とする — `/code-review` は `disable-model-invocation` のため AI からは起動できず、ユーザーが手で打つ回でしか実測に乗らない。
-どちらを回したかは trailer の `angles` に現れる観点で判別できるので、追加のフィールドは持たない。
-記録はサイクル内のいずれか1コミットの trailer に置く。
+実行手段は次の優先順で選ぶ。
+
+1. **A（基本）— ユーザーが `/code-review` を実行する。** AI は判断軸（対象 diff の範囲・絞る角度・level）を添えて依頼を出し、**結果を受け取って反映するまでサイクルを閉じない**（`/vscode-ext-debug` の UI 確認と同じ扱い）。依頼を出しただけで PR を作るとゲートが実質スキップになる
+2. **B（AI へ委任する回の最有力）— `code-reviewer` agent を Agent tool で起動する。** `disable-model-invocation` を持たないため、ユーザーが不在の回でも回る。**導入が前提** — `pr-review-toolkit` / `feature-dev` plugin のいずれかを有効化していないと選べない
+3. **C（fallback）— `/simplify`。** 常に使えるが、角度は4つ固定でレビューの深さは A に劣る
+
+`/code-review` は `disable-model-invocation` のため AI からは起動できない。A を AI 単独で満たすことはできない。
+
+記録はサイクル内のいずれか1コミットの trailer に置き、`tool=` でどれを回したかを書く。
+プールした rate は「レビューの価値」でなく「その回どちらを回したか」を測ってしまうため、集計は `tool` 別に分ける。
 
 ```
-Review-Measurement: sample=in new=2 adopted=1 angles="branch coverage; error paths"
+Review-Measurement: sample=in new=2 adopted=1 tool=code-review angles="branch coverage; error paths"
 Review-Measurement: sample=out
 ```
+
+`tool` の値は `code-review` / `code-reviewer-agent` / `simplify` のいずれか。`sample=out` の回は不要。
 
 `new` は自己レビューで気付いていなかった指摘の件数、`adopted` はうち採用した件数。
 **`new=0` の回も必ず書く** — ヒットだけ記録すると分母が消えて出現率が出ない。
