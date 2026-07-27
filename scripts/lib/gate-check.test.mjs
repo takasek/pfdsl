@@ -52,6 +52,22 @@ describe("classifyOutputArtifactStatus", () => {
 		assert.equal(result.status, "PASS");
 	});
 
+	it("SKIPs when the cycle declares it has no roadmap output artifact", () => {
+		const result = classifyOutputArtifactStatus({ noArtifact: true, roadmapChanged: true, changed: false });
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /declared/);
+	});
+
+	it("keeps the declaration authoritative even when a status: line did move", () => {
+		const result = classifyOutputArtifactStatus({ noArtifact: true, roadmapChanged: true, changed: true });
+		assert.equal(result.status, "SKIP");
+	});
+
+	it("points at the declaration when the fallback FAILs, so the way out is in the message", () => {
+		const result = classifyOutputArtifactStatus({ artifactKey: undefined, roadmapChanged: true, changed: false });
+		assert.match(result.detail, /--no-artifact/);
+	});
+
 	it("FAILs on the presence-only fallback when roadmap.pfdsl changed but no status: line moved", () => {
 		const result = classifyOutputArtifactStatus({ artifactKey: undefined, roadmapChanged: true, changed: false });
 		assert.equal(result.status, "FAIL");

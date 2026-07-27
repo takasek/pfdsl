@@ -44,12 +44,17 @@ export function formatGateTable(results) {
 		.join("\n");
 }
 
+/** Shared by both checks scoped to the output artifact, so they cannot drift apart. */
+export const NO_ARTIFACT_DETAIL = "cycle declared it has no roadmap output artifact (--no-artifact)";
+
 /**
  * Classify the output-artifact status-update gate (item 6). No new states:
  * this reuses the existing reasoned-SKIP vocabulary the same way item 9
  * (wip transition) already does for the no-roadmap-change case.
- * @param {{artifactKey?: string, roadmapChanged?: boolean, changed?: boolean}} params
+ * @param {{artifactKey?: string, noArtifact?: boolean, roadmapChanged?: boolean, changed?: boolean}} params
  *   - artifactKey: the --artifact CLI flag value, if given.
+ *   - noArtifact: the cycle declared it owns no output artifact (--no-artifact).
+ *     Wins over everything else — it is a statement about the work, not the diff.
  *   - roadmapChanged: whether .pfdsl/roadmap.pfdsl appears in the changed-files list.
  *     Only consulted when artifactKey is absent.
  *   - changed: whether a status: change was detected (precise per-artifact
@@ -57,7 +62,14 @@ export function formatGateTable(results) {
  *     Not evaluated (may be undefined) in the SKIP case.
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
-export function classifyOutputArtifactStatus({ artifactKey, roadmapChanged, changed }) {
+export function classifyOutputArtifactStatus({ artifactKey, noArtifact, roadmapChanged, changed }) {
+	// A declaration beats inference. Bookkeeping cycles (a rename, a location:)
+	// touch roadmap.pfdsl without owning an output artifact, and no reading of
+	// the diff distinguishes those from a cycle that forgot its status update —
+	// the check FAILed on every one of them, which is how a gate stops being read.
+	if (noArtifact) {
+		return { status: "SKIP", detail: NO_ARTIFACT_DETAIL };
+	}
 	if (!artifactKey && !roadmapChanged) {
 		return {
 			status: "SKIP",
@@ -76,7 +88,7 @@ export function classifyOutputArtifactStatus({ artifactKey, roadmapChanged, chan
 		status: changed ? "PASS" : "FAIL",
 		detail: changed
 			? "presence-only check; pass --artifact <key> to verify the specific output artifact"
-			: "no status: line changed in .pfdsl/roadmap.pfdsl",
+			: "no status: line changed in .pfdsl/roadmap.pfdsl — pass --artifact <key>, or --no-artifact if this cycle produces none",
 	};
 }
 

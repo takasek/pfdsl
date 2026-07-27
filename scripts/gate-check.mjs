@@ -5,7 +5,7 @@
 // against the diff from origin/<base> to HEAD, then prints the remaining
 // checklist items (extracted from the work-cycle checklist itself) as
 // MANUAL: lines.
-// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key>]
+// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact]
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -26,6 +26,7 @@ import {
 	diffNewTerminals,
 	diffReadySets,
 	classifyAuditIssuesFlowResult,
+	NO_ARTIFACT_DETAIL,
 } from "./lib/gate-check.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
 import { GEN_INSTALL_TRIGGER } from "./lib/gen-install-trigger.mjs";
@@ -41,6 +42,14 @@ const flag = (name) => {
 };
 const base = flag("--base") ?? "main";
 const artifactKey = flag("--artifact");
+// Declared, not inferred: a bookkeeping cycle touches roadmap.pfdsl without
+// owning an output artifact, and the diff cannot tell that apart from a cycle
+// that forgot its status update (#564).
+const noArtifact = args.includes("--no-artifact");
+if (noArtifact && artifactKey) {
+	console.error("gate-check: --artifact and --no-artifact are mutually exclusive");
+	process.exit(2);
+}
 
 // Every call names the executable and its arguments separately — `base` and
 // `artifactKey` come from argv and must never be parsed by a shell (#572).
@@ -137,10 +146,10 @@ if (pfdslFiles.length === 0) {
 // 6. output artifact status update in .pfdsl/roadmap.pfdsl
 {
 	const roadmapChanged = changedFiles.includes(".pfdsl/roadmap.pfdsl");
-	if (!artifactKey && !roadmapChanged) {
+	if (noArtifact || (!artifactKey && !roadmapChanged)) {
 		results.push({
 			name: "output artifact status update",
-			...classifyOutputArtifactStatus({ artifactKey, roadmapChanged }),
+			...classifyOutputArtifactStatus({ artifactKey, noArtifact, roadmapChanged }),
 		});
 	} else if (artifactKey) {
 		const before = exec("git", ["show", `origin/${base}:.pfdsl/roadmap.pfdsl`]);
@@ -206,7 +215,9 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 }
 
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
-if (!changedFiles.includes(".pfdsl/roadmap.pfdsl")) {
+if (noArtifact) {
+	results.push({ name: "wip transition", status: "SKIP", detail: NO_ARTIFACT_DETAIL });
+} else if (!changedFiles.includes(".pfdsl/roadmap.pfdsl")) {
 	results.push({ name: "wip transition", status: "SKIP", detail: "no .pfdsl/roadmap.pfdsl changes" });
 } else {
 	const shasOut = exec("git", ["log", "--format=%H", `origin/${base}..HEAD`, "--", ".pfdsl/roadmap.pfdsl"]);
