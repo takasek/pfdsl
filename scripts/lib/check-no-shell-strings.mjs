@@ -1,64 +1,61 @@
 /**
- * Detects shell command lines built by interpolation in scripts/**\/*.mjs.
+ * Detects shell-executing calls in scripts/**\/*.mjs.
  *
  * `execSync` hands its argument to a shell, so any value spliced into it is
  * parsed as shell syntax: a space word-splits and a semicolon starts another
  * command. Refs, artifact keys, tags and paths all reach these scripts from
  * argv or from other commands' output (takasek/pfdsl#571, #572).
  *
- * A constant command line is left alone — nothing can be injected into it, and
- * the repo has several (`git ls-files "<glob>"`) where the shell does no harm.
- * The rule is about interpolation, not about execSync as such.
+ * The rule is the *import*, not the argument. An earlier version tried to flag
+ * only interpolated command lines and let constant ones through, which meant
+ * deciding what a call's first argument was by scanning characters. Every way
+ * of writing the vulnerable code that did not look like the expected shape
+ * slipped past it: assigning the template to a variable one line earlier, a
+ * `)` inside a `--format="%h)"` string, an aliased import, `{shell: true}` on
+ * a call that otherwise takes argv. Banning the import needs no such analysis
+ * — `scripts/lib/run-exec.mjs` covers every use in this repo.
  */
 
-/** Shell-executing calls. `execFileSync`/`spawnSync` take argv and are safe. */
-const SHELL_CALL = /\b(execSync|exec)\s*\(/g;
+/** `shell: true` turns the argv-taking calls into shell-executing ones. */
+const SHELL_OPTION = /\bshell\s*:\s*true\b/;
+
+/** Names that execute through a shell when imported from child_process. */
+const SHELL_EXECUTORS = new Set(["exec", "execSync"]);
+
+const IMPORT_FROM_CHILD_PROCESS = /import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["']/g;
+const REQUIRE_CHILD_PROCESS = /require\(\s*["'](?:node:)?child_process["']\s*\)/;
 
 /**
  * @param {string} source
- * @returns {Array<{line: number, snippet: string}>}
+ * @returns {Array<{line: number, reason: string}>}
  */
-export function findShellStringInterpolations(source) {
+export function findShellExecutors(source) {
 	const findings = [];
-	for (const match of source.matchAll(SHELL_CALL)) {
-		const argStart = match.index + match[0].length;
-		const arg = readFirstArgument(source, argStart);
-		if (arg === null) continue;
-		if (!isInterpolated(arg)) continue;
-		findings.push({
-			line: source.slice(0, match.index).split("\n").length,
-			snippet: arg.length > 80 ? `${arg.slice(0, 77)}...` : arg,
-		});
+
+	for (const match of source.matchAll(IMPORT_FROM_CHILD_PROCESS)) {
+		for (const clause of match[1].split(",")) {
+			// `execSync as sh` still names execSync on the left of `as`.
+			const imported = clause.trim().split(/\s+as\s+/)[0].trim();
+			if (!SHELL_EXECUTORS.has(imported)) continue;
+			findings.push({
+				line: lineOf(source, match.index),
+				reason: `imports ${imported} from child_process`,
+			});
+		}
 	}
+
+	if (REQUIRE_CHILD_PROCESS.test(source)) {
+		const idx = source.search(REQUIRE_CHILD_PROCESS);
+		findings.push({ line: lineOf(source, idx), reason: "requires child_process" });
+	}
+
+	source.split("\n").forEach((text, i) => {
+		if (SHELL_OPTION.test(text)) findings.push({ line: i + 1, reason: "passes shell: true" });
+	});
+
 	return findings;
 }
 
-/**
- * Read the first argument's source text, stopping at the comma or the closing
- * paren that ends it. Nesting is tracked so a call inside the argument does not
- * end it early.
- */
-function readFirstArgument(source, start) {
-	let depth = 0;
-	for (let i = start; i < source.length; i++) {
-		const ch = source[i];
-		if (ch === "(" || ch === "[" || ch === "{") depth++;
-		else if (ch === ")" || ch === "]" || ch === "}") {
-			if (depth === 0) return source.slice(start, i);
-			depth--;
-		} else if (ch === "," && depth === 0) return source.slice(start, i);
-		else if (ch === "\n" && depth === 0 && source.slice(start, i).trim().length > 0) {
-			// A bare newline inside the first argument only happens in a template
-			// literal, which the depth counter does not track; keep reading.
-			continue;
-		}
-	}
-	return null;
-}
-
-/** A template literal with a substitution, or a string joined with `+`. */
-function isInterpolated(arg) {
-	const text = arg.trim();
-	if (text.includes("${")) return true;
-	return /^["'`][^"'`]*["'`]\s*\+/.test(text) || /\+\s*["'`]/.test(text);
+function lineOf(source, index) {
+	return source.slice(0, index).split("\n").length;
 }

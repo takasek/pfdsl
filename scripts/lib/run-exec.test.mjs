@@ -55,3 +55,24 @@ describe("run-exec stderr handling", () => {
 		assert.match(result.out, /definitely-not-a-ref|unknown revision|ambiguous/);
 	});
 });
+
+describe("run-exec stderr routing", () => {
+	it("leaves stderr inherited by default, as the callers relied on", () => {
+		const result = tryRun(process.execPath, ["-e", "process.stderr.write('x'); process.exit(1)"], { cwd: root });
+
+		assert.equal(result.ok, false);
+		assert.equal(result.status, 1);
+		// Inherited, so nothing was captured for us to read back.
+		assert.equal(typeof result.out, "string");
+	});
+
+	it("captures stderr when the caller asks, so a failing probe stays quiet", () => {
+		const result = tryRun(process.execPath, ["-e", "process.stderr.write('probe reason'); process.exit(1)"], {
+			cwd: root,
+			captureStderr: true,
+		});
+
+		assert.equal(result.ok, false);
+		assert.match(result.out, /probe reason/);
+	});
+});

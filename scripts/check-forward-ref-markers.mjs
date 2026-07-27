@@ -18,7 +18,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { git } from "./lib/run-exec.mjs";
 import {
 	findForwardRefMarkers,
 	findImplementsMarkers,
@@ -30,7 +30,7 @@ const args = process.argv.slice(2);
 const files =
 	args.length > 0
 		? args
-		: execSync('git ls-files "docs/**/*.md"', { encoding: "utf8" })
+		: git(["ls-files", "docs/**/*.md"])
 				.trim()
 				.split("\n")
 				.filter(Boolean);

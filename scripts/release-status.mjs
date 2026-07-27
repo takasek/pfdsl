@@ -6,7 +6,11 @@
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { git } from "./lib/run-exec.mjs";
+import { git as rawGit } from "./lib/run-exec.mjs";
+
+// These probes fail as a matter of course — an unreleased tag has no ref yet —
+// so their stderr is captured rather than printed as if something broke.
+const git = (args) => rawGit(args, { captureStderr: true });
 import {
 	compareVersions,
 	formatResults,

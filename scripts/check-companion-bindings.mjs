@@ -21,7 +21,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { git } from "./lib/run-exec.mjs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -35,10 +35,7 @@ const root = resolve(__dirname, "..");
 
 const REQUIRED_PFD_RETRO_BINDING_HEADINGS = ["pfd-retro バインディング"];
 
-const files = execSync('git ls-files ".pfdsl/*.md"', {
-	encoding: "utf8",
-	cwd: root,
-})
+const files = git(["ls-files", ".pfdsl/*.md"], { cwd: root })
 	.trim()
 	.split("\n")
 	.filter(Boolean);

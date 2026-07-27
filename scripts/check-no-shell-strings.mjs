@@ -2,15 +2,14 @@
 /**
  * check-no-shell-strings.mjs
  *
- * Fails when a script builds a shell command line by interpolation. Those
- * scripts take refs, artifact keys, tags and paths from argv and from other
- * commands' output, and `execSync` hands the whole string to a shell — a space
- * word-splits and a semicolon starts another command (#571 found this in
+ * Fails when a script can run a command through a shell. These scripts take
+ * refs, artifact keys, tags and paths from argv and from other commands'
+ * output, and a shell parses whatever is spliced into the command line — a
+ * space word-splits and a semicolon starts another command (#571 found this in
  * review-measurement, #572 in gate-check and cycle-status).
  *
  * Use `scripts/lib/run-exec.mjs`, which names the executable and its arguments
- * separately. A constant command line stays allowed: nothing can be injected
- * into it.
+ * separately.
  *
  * Usage: node scripts/check-no-shell-strings.mjs
  */
@@ -18,7 +17,7 @@
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { findShellStringInterpolations } from "./lib/check-no-shell-strings.mjs";
+import { findShellExecutors } from "./lib/check-no-shell-strings.mjs";
 import { git } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,24 +29,25 @@ const files = git(["ls-files", "scripts/*.mjs", "scripts/**/*.mjs"], { cwd: root
 	.split("\n")
 	.filter(Boolean)
 	.filter((f, i, arr) => arr.indexOf(f) === i)
-	// The detector's own fixtures are offending snippets as string data.
-	.filter((f) => !f.endsWith(".test.mjs"));
+	// The detector and its tests hold the offending patterns as data.
+	.filter((f) => !f.endsWith(".test.mjs"))
+	.filter((f) => f !== "scripts/lib/check-no-shell-strings.mjs");
 
 const findings = [];
 for (const file of files) {
-	for (const finding of findShellStringInterpolations(readFileSync(resolve(root, file), "utf-8"))) {
+	for (const finding of findShellExecutors(readFileSync(resolve(root, file), "utf-8"))) {
 		findings.push({ file, ...finding });
 	}
 }
 
 if (findings.length === 0) {
-	console.log(`check-no-shell-strings: all ${files.length} script(s) keep interpolation out of shell command lines`);
+	console.log(`check-no-shell-strings: all ${files.length} script(s) run commands without a shell`);
 	process.exit(0);
 }
 
-console.log("check-no-shell-strings: interpolated shell command line(s) found:");
-for (const { file, line, snippet } of findings) {
-	console.log(`  ${file}:${line}: ${snippet.trim()}`);
+console.log("check-no-shell-strings: shell-executing call(s) found:");
+for (const { file, line, reason } of findings) {
+	console.log(`  ${file}:${line}: ${reason}`);
 }
 console.log(`\ncheck-no-shell-strings: ${findings.length} error(s) — use scripts/lib/run-exec.mjs`);
 process.exit(1);

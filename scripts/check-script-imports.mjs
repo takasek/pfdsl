@@ -17,7 +17,7 @@
  * Usage: node scripts/check-script-imports.mjs
  */
 
-import { execSync } from "node:child_process";
+import { git } from "./lib/run-exec.mjs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findBrokenImports } from "./lib/check-script-imports.mjs";
@@ -27,10 +27,7 @@ const root = resolve(__dirname, "..");
 
 // Both patterns are needed: "scripts/**/*.mjs" only matches one-or-more
 // directories deep and misses scripts/*.mjs at the top level.
-const files = execSync('git ls-files "scripts/*.mjs" "scripts/**/*.mjs"', {
-	encoding: "utf-8",
-	cwd: root,
-})
+const files = git(["ls-files", "scripts/*.mjs", "scripts/**/*.mjs"], { cwd: root })
 	.trim()
 	.split("\n")
 	.filter(Boolean)
