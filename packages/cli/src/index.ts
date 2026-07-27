@@ -92,13 +92,35 @@ export function shouldColorize(input: ShouldColorizeInput): boolean {
 	return Boolean(input.stream.isTTY);
 }
 
+/**
+ * The process-level inputs the CLI reads. Held behind an interface so a test
+ * can hand the CLI a stdin and a TTY state directly, instead of patching
+ * node:fs and process.stdout out from under it.
+ */
+export interface CliHost {
+	/** Reads standard input, for a `-` file argument. */
+	readStdin(): string;
+	/** The stream colour would be written to. */
+	stdout: { isTTY?: boolean };
+	/** The environment consulted for NO_COLOR. */
+	env: { NO_COLOR?: string };
+}
+
+const nodeHost: CliHost = {
+	readStdin: () => readFileSync(0, "utf-8"),
+	stdout: process.stdout,
+	env: process.env,
+};
+
+let host: CliHost = nodeHost;
+
 function isCommandResult(v: string | CommandResult): v is CommandResult {
 	return typeof v === "object";
 }
 
 function readSource(file: string): string | CommandResult {
 	if (file === "-") {
-		return readFileSync(0, "utf-8");
+		return host.readStdin();
 	}
 	try {
 		return readFileSync(file, "utf-8");
@@ -2498,8 +2520,8 @@ function parseLimitFlag(
 function resolveColor(flags: Record<string, string | boolean>): boolean {
 	return shouldColorize({
 		noColorFlag: flags["no-color"] === true,
-		stream: process.stdout,
-		env: process.env,
+		stream: host.stdout,
+		env: host.env,
 	});
 }
 
@@ -2731,7 +2753,25 @@ function runStatusGroup(
 	}
 }
 
-export async function run(argv: readonly string[]): Promise<CommandResult> {
+/**
+ * Runs one CLI invocation. `hostOverride` replaces the process-level inputs
+ * for the duration of the call — a test supplies a stdin or a TTY state
+ * through it rather than reaching into node:fs or process.stdout.
+ */
+export async function run(
+	argv: readonly string[],
+	hostOverride?: Partial<CliHost>,
+): Promise<CommandResult> {
+	const previousHost = host;
+	if (hostOverride) host = { ...host, ...hostOverride };
+	try {
+		return await dispatch(argv);
+	} finally {
+		host = previousHost;
+	}
+}
+
+async function dispatch(argv: readonly string[]): Promise<CommandResult> {
 	const { command, positional, flags } = parseArgs(argv);
 	switch (command) {
 		case "--version":

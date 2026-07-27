@@ -1,32 +1,13 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import {
-	afterAll,
-	afterEach,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	it,
-	vi,
-} from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { parseArgs, run, runCheck, runDiff, shouldColorize } from "./index.js";
 
-// Lets "meta get -" tests inject stdin content without touching the real fd 0
-// (which would otherwise hang/behave unpredictably under the test runner).
-// All other fs calls pass through to the real implementation unchanged.
-let stdinOverride: string | null = null;
-vi.mock("node:fs", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("node:fs")>();
-	return {
-		...actual,
-		readFileSync: (path: unknown, opts?: unknown) => {
-			if (path === 0 && stdinOverride !== null) return stdinOverride;
-			return (actual.readFileSync as (...a: unknown[]) => unknown)(path, opts);
-		},
-	};
-});
+/** A stdin the CLI will read for a `-` argument, without touching fd 0. */
+const withStdin = (input: string) => ({ readStdin: () => input });
+/** Colour is decided from these, so a test states them instead of patching the process. */
+const onATty = { stdout: { isTTY: true }, env: {} };
 
 let dir: string;
 const valid = "req >> design -> spec\nspec >> impl -> code\n";
@@ -142,14 +123,12 @@ describe("fmt", () => {
 	});
 
 	it("--check is allowed with stdin (-)", async () => {
-		stdinOverride = "   req>>design->spec\n";
-		try {
-			const r = await run(["fmt", "-", "--check"]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stdout).toBe("not formatted\n");
-		} finally {
-			stdinOverride = null;
-		}
+		const r = await run(
+			["fmt", "-", "--check"],
+			withStdin("   req>>design->spec\n"),
+		);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toBe("not formatted\n");
 	});
 
 	it("--check combined with --write is rejected (exit 2)", async () => {
@@ -599,15 +578,13 @@ describe("diff", () => {
 	it("one side may be stdin (-)", async () => {
 		const b = join(dir, "diff-stdin-b.pfdsl");
 		writeFileSync(b, "req >> design -> spec\n");
-		stdinOverride = "req >> design -> spec\nspec >> impl -> code\n";
-		try {
-			const r = await run(["diff", "-", b]);
-			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toContain("- node code");
-			expect(r.stdout).toContain("- node impl");
-		} finally {
-			stdinOverride = null;
-		}
+		const r = await run(
+			["diff", "-", b],
+			withStdin("req >> design -> spec\nspec >> impl -> code\n"),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("- node code");
+		expect(r.stdout).toContain("- node impl");
 	});
 });
 
@@ -815,12 +792,11 @@ describe("help / unknown", () => {
 });
 
 describe("--no-color / NO_COLOR (#180)", () => {
-	afterEach(() => {
-		delete process.env.NO_COLOR;
-	});
-
 	it("a clean check prints OK, and prints it unstyled when stdout is not a TTY", async () => {
-		const r = await run(["check", join(dir, "valid-with-status.pfdsl")]);
+		const r = await run(["check", join(dir, "valid-with-status.pfdsl")], {
+			stdout: { isTTY: false },
+			env: {},
+		});
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("OK");
 		expect(r.stdout).not.toContain("\x1b[");
@@ -835,8 +811,10 @@ describe("--no-color / NO_COLOR (#180)", () => {
 	});
 
 	it("NO_COLOR env var suppresses ANSI codes", async () => {
-		process.env.NO_COLOR = "1";
-		const r = await run(["check", join(dir, "valid.pfdsl")]);
+		const r = await run(["check", join(dir, "valid.pfdsl")], {
+			stdout: { isTTY: true },
+			env: { NO_COLOR: "1" },
+		});
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).not.toContain("\x1b[");
 		expect(r.stderr).not.toContain("\x1b[");
@@ -866,41 +844,24 @@ describe("ANSI color for check diagnostics (#435)", () => {
 });
 
 describe("run() wires color into the check command (#435)", () => {
-	const originalIsTTY = process.stdout.isTTY;
-
-	afterEach(() => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: originalIsTTY,
-			configurable: true,
-		});
-		delete process.env.NO_COLOR;
-	});
-
 	it("emits ANSI codes on a TTY with no NO_COLOR and no --no-color flag", async () => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
-		});
-		const r = await run(["check", join(dir, "invalid.pfdsl")]);
+		const r = await run(["check", join(dir, "invalid.pfdsl")], onATty);
 		expect(r.stderr).toContain("\x1b[31merror\x1b[0m");
 	});
 
 	it("suppresses ANSI codes on a TTY when --no-color is passed", async () => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
-		});
-		const r = await run(["check", join(dir, "invalid.pfdsl"), "--no-color"]);
+		const r = await run(
+			["check", join(dir, "invalid.pfdsl"), "--no-color"],
+			onATty,
+		);
 		expect(r.stderr).not.toContain("\x1b[");
 	});
 
 	it("suppresses ANSI codes on a TTY when NO_COLOR env is set", async () => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
+		const r = await run(["check", join(dir, "invalid.pfdsl")], {
+			stdout: { isTTY: true },
+			env: { NO_COLOR: "1" },
 		});
-		process.env.NO_COLOR = "1";
-		const r = await run(["check", join(dir, "invalid.pfdsl")]);
 		expect(r.stderr).not.toContain("\x1b[");
 	});
 });
@@ -999,22 +960,6 @@ describe("--json failure payload on a file that does not validate", () => {
 });
 
 describe("--no-color wired into all diagnostic-emitting commands (#508)", () => {
-	const originalIsTTY = process.stdout.isTTY;
-
-	beforeEach(() => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
-		});
-	});
-
-	afterEach(() => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: originalIsTTY,
-			configurable: true,
-		});
-	});
-
 	const invalidFile = () => join(dir, "invalid.pfdsl");
 
 	const cases: Array<{ name: string; argv: (noColor: boolean) => string[] }> = [
@@ -1218,10 +1163,10 @@ describe("--no-color wired into all diagnostic-emitting commands (#508)", () => 
 	)("$name emits ANSI red on TTY without --no-color, suppresses it with --no-color", async ({
 		argv,
 	}) => {
-		const withColor = await run(argv(false));
+		const withColor = await run(argv(false), onATty);
 		expect(withColor.stderr).toContain("\x1b[31merror\x1b[0m");
 
-		const noColor = await run(argv(true));
+		const noColor = await run(argv(true), onATty);
 		expect(noColor.stderr).not.toContain("\x1b[");
 	});
 });
@@ -2872,36 +2817,22 @@ req -> spec
 	});
 
 	it("returns null with a warning when an explicit derived field is requested from stdin", async () => {
-		stdinOverride = `---
-process:
-  build:
-    location: src/build.ts
-    command: npm run build
----
-req >> build -> out
-`;
-		try {
-			const r = await run([
-				"meta",
-				"get",
-				"-",
-				"build",
-				"location.resolved,command.cwd",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(0);
-			expect(JSON.parse(r.stdout)).toEqual({
-				ok: true,
-				values: {
-					build: { "location.resolved": null, "command.cwd": null },
-				},
-			});
-			expect(r.stderr).toContain("stdin");
-			expect(r.stderr).toContain("location.resolved");
-			expect(r.stderr).toContain("command.cwd");
-		} finally {
-			stdinOverride = null;
-		}
+		const r = await run(
+			["meta", "get", "-", "build", "location.resolved,command.cwd", "--json"],
+			withStdin(
+				"---\nprocess:\n  build:\n    location: src/build.ts\n    command: npm run build\n---\nreq >> build -> out\n",
+			),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: {
+				build: { "location.resolved": null, "command.cwd": null },
+			},
+		});
+		expect(r.stderr).toContain("stdin");
+		expect(r.stderr).toContain("location.resolved");
+		expect(r.stderr).toContain("command.cwd");
 	});
 
 	it("round-trips a relative location unchanged through meta set then meta get", async () => {
