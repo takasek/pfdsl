@@ -40,9 +40,9 @@
    - [ ] 変換コンポーネントを追加・変更・削除した場合、それをモデル化している採用済み PFD（`.pfdsl/runtime-pipeline.pfdsl` または `.pfdsl/workflow.pfdsl` の該当箇所）に反映した（該当なしも明示。runtime-pipeline.pfdsl 未採用は自動的に N/A にならない — workflow.pfdsl 側を確認）。影響範囲の特定には `pfdsl graph impact <file> <id>`（下流の消費者全て）・`graph depends-on <file> <id>`（上流の生産者全て）が使える — 変更対象ノードを grep で手繰るより網羅的
    - [ ] 作業中に偶発的に見つけたスコープ外の既存問題（バグ等）を起票した（ユーザーの指摘を待たない）
    - [ ] 変更した全 .pfdsl が `check` を通過する
-   - [ ] コミット粒度（論理単位ごとの分割）が規約（CLAUDE.md または companion で定義）に従っている
+   - [ ] コミット粒度（論理単位ごとの分割）が規約（CLAUDE.md または companion で定義）に従っている。**生成元と生成物は同一コミットに入れる** — 作業ツリー全体から再生成して staged 分と突き合わせる型の drift 検査を持つリポでは、両者を別コミットに割ると生成元だけを staged にした時点で不一致になり弾かれる。論理単位が2つ以上あってもこの境界では割れないので、割れない理由を PR 本文に書く
    - [ ] コミット subject が Conventional Commits 形式に従う
-   - [ ] `/simplify` または `/code-review` を実施した（実装規模・品質基準は companion で定義。省略する場合はその理由を明示）
+   - [ ] `/simplify` または `/code-review` を実施した（実装規模・品質基準は companion で定義。省略する場合はその理由を明示）。**レビューの重さは diff の規模に合わせる** — 数十行・1〜2ファイル中心の scoped な修正に多角度 finder × 候補ごと検証 agent のような高効度設定をかけると diff に対して過剰になる。角度を絞るか、そもそも委譲せず自分で読む。重量級の構成は大規模 diff 向け
    - [ ] 変更束を PR にまとめた（PR 作成後にローカルで追加コミットした場合、push し忘れていないか `git log origin/<branch>..<branch>` で確認する — CI は push 済みの内容にしか反応しない）
 4. **報告**: 完了したプロセス、それにより解放された後続プロセス、更新後の着手可能集合。特定 status の全体像（例: 残 wip 一覧）が要る場合は都度 `status list <roadmap.pfdsl> --status wip,waiting --json` 等で機械的に絞り込む — 全文 Read や個別 `meta get` の積み上げに頼らない
 5. **retro**: `/pfd-cycle` コマンド経由の場合、プロトコル7の (a)(b) 両条件を確認する（定義は SKILL.md 本文が一次情報 — ここには複製しない）。このサイクル手順自体に最終ステップとして組み込み、報告を出して終わりにしない。**バックストップ**（(a) について、このリポでは）: `roadmap.pfdsl` に `status: done` を追加するコミットで pre-commit が stderr に advisory warning を出す（`scripts/lib/retro-reminder-check.mjs`、非ブロッキング）。セッション記憶が抜けても done 付与コミットの Bash tool result 経由で気付ける。(b) にはバックストップがない — セッション記憶のみに依存する既知の弱点
