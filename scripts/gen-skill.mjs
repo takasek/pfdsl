@@ -11,7 +11,7 @@ import { execFileSync } from "node:child_process";
 
 import { findMissingFields } from "./lib/skill-field-drift.mjs";
 import { renderCliSection } from "./lib/skill-cli-section.mjs";
-import { assertSafeSkillOutDir } from "./lib/skill-out-dir.mjs";
+import { parseSkillOutDir } from "./lib/skill-out-dir.mjs";
 import { writeSkillRefs } from "./lib/gen-skill-refs.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -19,17 +19,9 @@ const root = resolve(__dirname, "..");
 
 // --- Parse args ---
 
-const outIdx = process.argv.indexOf("--out");
-if (outIdx === -1 || !process.argv[outIdx + 1] || process.argv[outIdx + 1].startsWith("-")) {
-  console.error("Usage: node scripts/gen-skill.mjs --out <skill-dir>");
-  console.error("Example: node scripts/gen-skill.mjs --out .claude/skills/pfdsl");
-  process.exit(2);
-}
+const outDir = parseSkillOutDir("scripts/gen-skill.mjs", process.argv);
 
-const outDir = resolve(process.cwd(), process.argv[outIdx + 1]);
-assertSafeSkillOutDir(outDir);
-
-// --- 1/1b/1c/2/2b. Write references/*.md (dist非依存 — see scripts/lib/gen-skill-refs.mjs) ---
+// --- 1/1b/1c/2/2b. Write references/*.md (build-independent — see scripts/lib/gen-skill-refs.mjs) ---
 
 const specVersion = writeSkillRefs(root, outDir);
 

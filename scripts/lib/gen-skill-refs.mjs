@@ -1,4 +1,4 @@
-// Generates the dist非依存 references/*.md files for the pfdsl skill
+// Generates the build-independent references/*.md files for the pfdsl skill
 // (spec / review-perspectives / quality-guide / samples / examples).
 // Split out of scripts/gen-skill.mjs (#586) so a references-only drift check
 // can run in scripts/pre-commit without requiring packages/cli/dist/cli.js —
@@ -6,7 +6,7 @@
 // help` output and therefore needs the built CLI.
 //
 // This module (and anything it imports) must never touch packages/cli/dist
-// or spawn a child process — that dist非依存 property is what the pre-commit
+// or spawn a child process — that build-independence is what the pre-commit
 // drift check in scripts/pre-commit relies on. scripts/lib/gen-skill-refs.test.mjs
 // asserts this via static import-graph inspection.
 
