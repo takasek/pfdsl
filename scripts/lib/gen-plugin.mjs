@@ -1,6 +1,12 @@
 import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 
+// The agents bundled into plugin/pfdsl/agents/, as .claude/agents/-relative
+// filenames. Single source of truth: gen-plugin.mjs mirrors this list, and
+// gen-plugin-trigger.mjs derives its drift-trigger alternation from it, so
+// adding an agent cannot land in one place and be forgotten in the other.
+export const PLUGIN_AGENT_FILES = ["pfd-lens.md", "pfd-implementer.md"];
+
 function requireExists(path) {
 	if (!existsSync(path)) {
 		throw new Error(`${path} not found.`);

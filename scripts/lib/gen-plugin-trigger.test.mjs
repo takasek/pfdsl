@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
+import { PLUGIN_AGENT_FILES } from "./gen-plugin.mjs";
 
 describe("GEN_PLUGIN_TRIGGER", () => {
 	it("matches everything GEN_SKILL_TRIGGER matches (docs/ path)", () => {
@@ -39,8 +40,10 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/commands/pfd-retro.md"), true);
 	});
 
-	it("matches .claude/agents/pfd-lens.md", () => {
-		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/agents/pfd-lens.md"), true);
+	it("matches every bundled agent file", () => {
+		for (const file of PLUGIN_AGENT_FILES) {
+			assert.equal(GEN_PLUGIN_TRIGGER.test(`.claude/agents/${file}`), true);
+		}
 	});
 
 	it("matches packages/cli/package.json", () => {

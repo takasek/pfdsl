@@ -13,7 +13,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
-import { buildPluginManifest, mirrorDir, mirrorFiles } from "./lib/gen-plugin.mjs";
+import { PLUGIN_AGENT_FILES, buildPluginManifest, mirrorDir, mirrorFiles } from "./lib/gen-plugin.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -49,14 +49,16 @@ function assemble() {
 		console.log(`plugin/pfdsl/commands/${file} ← .claude/commands/${file}`);
 	}
 
-	// --- 4. Copy the agents (pfd-lens) into agents/ ---
+	// --- 4. Copy the agents (pfd-lens, pfd-implementer) into agents/ ---
 	// pfd-retro's SKILL.md delegates large-diagram audits to the pfd-lens agent
 	// (.claude/agents/pfd-lens.md); without it bundled, that delegation path is
 	// unreachable for plugin-only installs.
+	// work-cycle.md tells the caller to delegate implementation to an agent whose
+	// tools: cannot reach GitHub; pfd-implementer is that agent, so bundling it
+	// is what makes the rule actionable in an adopting repo (#558).
 
-	const agentFiles = ["pfd-lens.md"];
-	mirrorFiles(agentFiles, resolve(root, ".claude/agents"), resolve(pluginRoot, "agents"));
-	for (const file of agentFiles) {
+	mirrorFiles(PLUGIN_AGENT_FILES, resolve(root, ".claude/agents"), resolve(pluginRoot, "agents"));
+	for (const file of PLUGIN_AGENT_FILES) {
 		console.log(`plugin/pfdsl/agents/${file} ← .claude/agents/${file}`);
 	}
 
