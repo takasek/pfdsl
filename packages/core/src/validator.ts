@@ -282,28 +282,25 @@ export function validate(
 		}
 		for (const n of allNodes) color.set(n, "white");
 
-		let cycleReported = false;
-		function dfsV010(id: string): boolean {
-			if (color.get(id) === "gray") return true;
-			if (color.get(id) === "black") return false;
+		// One diagnostic per back edge — a back edge is exactly what closes a
+		// cycle, so disjoint cycles each get reported instead of the first one
+		// masking the rest. Matches how V019 reports revises cycles.
+		function dfsV010(id: string): void {
 			color.set(id, "gray");
 			for (const neighbor of primaryAdj.get(id) ?? []) {
-				if (dfsV010(neighbor)) {
-					if (!cycleReported) {
-						cycleReported = true;
-						diagnostics.push({
-							severity: "error",
-							code: "V010",
-							message: `Primary graph contains a cycle involving '${id}' → '${neighbor}'`,
-							range: zeroRange(),
-						});
-					}
-					color.set(id, "black");
-					return false;
+				const neighborColor = color.get(neighbor);
+				if (neighborColor === "gray") {
+					diagnostics.push({
+						severity: "error",
+						code: "V010",
+						message: `Primary graph contains a cycle involving '${id}' → '${neighbor}'`,
+						range: zeroRange(),
+					});
+				} else if (neighborColor !== "black") {
+					dfsV010(neighbor);
 				}
 			}
 			color.set(id, "black");
-			return false;
 		}
 		for (const n of allNodes) {
 			if (color.get(n) === "white") dfsV010(n);

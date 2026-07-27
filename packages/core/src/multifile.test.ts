@@ -151,6 +151,25 @@ describe("loadSubflowGraph", () => {
 		expect(result.diagnostics.some((d) => d.code === "V022")).toBe(true);
 	});
 
+	// §16: one diagnostic per independent cycle, never just the first.
+	it("reports both disjoint subflow cycles, not only the first", () => {
+		const docs = makeLoad({
+			"/p/a.pfdsl": {
+				frontmatter: {
+					process: { P: { subflow: "./b.pfdsl" }, Q: { subflow: "./c.pfdsl" } },
+				},
+			},
+			"/p/b.pfdsl": {
+				frontmatter: { process: { R: { subflow: "./a.pfdsl" } } },
+			},
+			"/p/c.pfdsl": {
+				frontmatter: { process: { S: { subflow: "./a.pfdsl" } } },
+			},
+		});
+		const result = loadSubflowGraph("/p/a.pfdsl", docs);
+		expect(result.diagnostics.filter((d) => d.code === "V022")).toHaveLength(2);
+	});
+
 	it("reports a multi-hop subflow cycle (a->b->c->a) (§15.11)", () => {
 		const docs = makeLoad({
 			"/p/a.pfdsl": {
@@ -585,6 +604,17 @@ describe("loadExtendsChain", () => {
 		});
 		const result = loadExtendsChain("/p/self.pfdsl", docs);
 		expect(result.diagnostics.some((d) => d.code === "V027")).toBe(true);
+	});
+
+	// §16: one diagnostic per independent cycle, never just the first.
+	it("reports both disjoint extends cycles, not only the first", () => {
+		const docs = makeLoad({
+			"/p/a.pfdsl": { frontmatter: { extends: ["./b.pfdsl", "./c.pfdsl"] } },
+			"/p/b.pfdsl": { frontmatter: { extends: "./a.pfdsl" } },
+			"/p/c.pfdsl": { frontmatter: { extends: "./a.pfdsl" } },
+		});
+		const result = loadExtendsChain("/p/a.pfdsl", docs);
+		expect(result.diagnostics.filter((d) => d.code === "V027")).toHaveLength(2);
 	});
 
 	it("reports multi-hop extends cycle (a→b→c→a) as V027", () => {

@@ -324,6 +324,41 @@ a >> design -> b
 			expect(codes("a >> p -> b\nb >> q -> c\nc >> r -> a")).toContain("V010");
 		});
 
+		it("reports all independent cycles, not just the first", () => {
+			// Two disjoint cycles: a→p→b→q→a and c→r→d→s→c. Reporting only the
+			// first would leave the second silent until the first is fixed, one
+			// re-run per cycle. V019 already reports every revises cycle; the
+			// primary-graph check answers the same way.
+			const cs = codes("a >> p -> b\nb >> q -> a\nc >> r -> d\nd >> s -> c");
+			expect(cs.filter((c) => c === "V010")).toHaveLength(2);
+		});
+
+		it("each V010 names an edge of the cycle it reports, so the two are distinguishable", () => {
+			const firstCycle = new Set(["a", "p", "b", "q"]);
+			const secondCycle = new Set(["c", "r", "d", "s"]);
+			const diags = diagnose(
+				"a >> p -> b\nb >> q -> a\nc >> r -> d\nd >> s -> c",
+			);
+			// Classify by the quoted node ids, not by substring: every message
+			// shares the wording, so a bare includes() would match either one.
+			const reported = diags
+				.filter((d) => d.code === "V010")
+				.map((d) => {
+					const [, from, to] = d.message.match(/'([^']+)' → '([^']+)'/) ?? [];
+					return { from, to };
+				});
+			expect(
+				reported.filter(
+					(e) => firstCycle.has(e.from ?? "") && firstCycle.has(e.to ?? ""),
+				),
+			).toHaveLength(1);
+			expect(
+				reported.filter(
+					(e) => secondCycle.has(e.from ?? "") && secondCycle.has(e.to ?? ""),
+				),
+			).toHaveLength(1);
+		});
+
 		it("does not report V010 for a valid acyclic graph", () => {
 			expect(
 				codes("req >> design -> spec\nspec >> impl -> code"),
@@ -623,6 +658,37 @@ a >> design -> b
 				process: { P: { subflow: "./child.pfdsl" } },
 			} as unknown as Frontmatter;
 			expect(codes("A >> P -> B", fm)).not.toContain("V024");
+		});
+	});
+
+	// §16 requires every cycle-detecting code to report one diagnostic per
+	// independent cycle. V010 used to stop after the first; these lock the rule
+	// for the codes that live in this module so none of them regresses to it.
+	describe("cycle codes report every independent cycle (§16)", () => {
+		it("V006 reports both disjoint parts cycles", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					a: { parts: ["b"] },
+					b: { parts: ["a"] },
+					c: { parts: ["d"] },
+					d: { parts: ["c"] },
+				},
+			};
+			expect(codes("", fm).filter((c) => c === "V006")).toHaveLength(2);
+		});
+
+		it("V025 reports both disjoint group parent cycles", () => {
+			const fm: Frontmatter = {
+				group: {
+					g1: { parent: "g2" },
+					g2: { parent: "g1" },
+					g3: { parent: "g4" },
+					g4: { parent: "g3" },
+				},
+			};
+			expect(codes("A >> P -> B", fm).filter((c) => c === "V025")).toHaveLength(
+				2,
+			);
 		});
 	});
 
