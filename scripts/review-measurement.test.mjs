@@ -53,4 +53,16 @@ describe("review-measurement CLI", () => {
 		assert.equal(result.status, 0, result.stderr);
 		assert.doesNotMatch(result.stdout, /pass --since <ref>/, "the scan was skipped");
 	});
+
+	it("does not treat a back-merge of main into a branch as a cycle", () => {
+		// d115b57 is a PR merge whose branch side contains the back-merge 79d8885
+		// ("Merge remote-tracking branch 'origin/main' into ..."). On a back-merge
+		// ^1 is the branch tip and ^2 is main, so the diff reads as main's changes
+		// and ^1..^2 as already-merged commits — it is not a cycle at all.
+		const result = run(["--since", "d115b57~1"]);
+
+		assert.equal(result.status, 0, result.stderr);
+		assert.doesNotMatch(result.stdout, /79d8885/);
+		assert.match(result.stdout, /d115b57/, "PR merges must still be scanned");
+	});
 });

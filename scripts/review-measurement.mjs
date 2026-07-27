@@ -90,7 +90,11 @@ if (!since) {
 	process.exit(0);
 }
 
-const mergesResult = tryGit(["log", "--merges", "--format=%H", `${since}..HEAD`]);
+// --first-parent keeps this to merges that landed on the base branch. Without
+// it a back-merge of main into a feature branch is scanned too, and there ^1 is
+// the branch tip and ^2 is main — the diff reads as main's changes and ^1..^2
+// as commits already merged, so it is reported as a cycle that never existed.
+const mergesResult = tryGit(["log", "--merges", "--first-parent", "--format=%H", `${since}..HEAD`]);
 const merges = mergesResult.ok ? mergesResult.out.trim().split("\n").filter(Boolean) : [];
 const missing = [];
 for (const merge of merges) {
