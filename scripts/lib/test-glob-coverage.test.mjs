@@ -55,6 +55,14 @@ describe("matchesGlob", () => {
 		assert.equal(matchesGlob("scripts/a.test.mjs", "scripts/*.test.mjs"), true);
 		assert.equal(matchesGlob("scripts/axtestxmjs", "scripts/*.test.mjs"), false);
 	});
+
+	it("lets `**` span directories, matching node --test's own glob semantics", () => {
+		assert.equal(matchesGlob("scripts/pfdsl/lib/gh-compat.test.mjs", "scripts/**/*.test.mjs"), true);
+	});
+
+	it("lets `**` match zero directories too", () => {
+		assert.equal(matchesGlob("scripts/review-measurement.test.mjs", "scripts/**/*.test.mjs"), true);
+	});
 });
 
 describe("findUnrunTestFiles", () => {
