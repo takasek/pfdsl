@@ -25,6 +25,7 @@ import { loadFrontmatter } from "./frontmatter.js";
 import {
 	parseFrontmatterCst,
 	renderFrontmatterCst,
+	setFrontmatterField,
 } from "./frontmatter-cst.js";
 import { detectChildIndent, escapeRe } from "./frontmatter-text.js";
 import { buildGraph } from "./graph.js";
@@ -81,7 +82,7 @@ export type {
 	TokenType,
 } from "./types/index.js";
 export { PFD_TYPE_VALUES, STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
-export { detectChildIndent, escapeRe };
+export { detectChildIndent, escapeRe, setFrontmatterField };
 
 export interface ParseDocResult {
 	document: Document;

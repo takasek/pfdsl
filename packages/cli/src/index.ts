@@ -16,8 +16,6 @@ import {
 	type Diagnostic,
 	type DiagnosticRegistryEntry,
 	type DiffReport,
-	detectChildIndent,
-	escapeRe,
 	format,
 	formatEdges,
 	groupEdges,
@@ -34,6 +32,7 @@ import {
 	resolveRefPath,
 	type SortKey,
 	STATUS_VALUES,
+	setFrontmatterField,
 	sort,
 	sortEdges,
 	validatePresetKeys,
@@ -844,175 +843,6 @@ const NON_SCALAR_FIELDS = new Set([
 	"boundary",
 ]);
 
-/**
- * Render a value as a single-line YAML scalar, double-quoting when a bare
- * scalar would misparse (YAML indicators, colon, quotes, leading/trailing
- * whitespace, ...). Inner spaces are fine bare ("make spec").
- */
-function yamlScalar(value: string, quoteAmbiguous = true): string {
-	// Core-schema resolution: bare true/null/42/2026-07-19 etc. re-type to
-	// boolean/null/number/date on parse, so string fields must quote them
-	// (integer fields like index pass quoteAmbiguous=false to stay bare).
-	const resolvesToNonString =
-		/^(?:true|false|null|yes|no|on|off|~)$/i.test(value) ||
-		(value.trim() !== "" && !Number.isNaN(Number(value))) ||
-		/^\d{4}-\d{2}-\d{2}/.test(value);
-	const needsQuoting =
-		value === "" ||
-		/[:#"'\\\n,{}[\]]/.test(value) ||
-		/^[\s&*!|>%@`?-]/.test(value) ||
-		/^\s|\s$/.test(value) ||
-		(quoteAmbiguous && resolvesToNonString);
-	if (!needsQuoting) return value;
-	return `"${value
-		.replace(/\\/g, "\\\\")
-		.replace(/"/g, '\\"')
-		.replace(/\n/g, "\\n")}"`;
-}
-
-/**
- * Split a flow-map inner text ("key: val, key2: val2") into its top-level
- * entries, honoring double- and single-quoted strings so commas inside
- * quoted values do not split.
- */
-function splitFlowEntries(inner: string): string[] {
-	const parts: string[] = [];
-	let cur = "";
-	let quote: '"' | "'" | null = null;
-	for (let i = 0; i < inner.length; i++) {
-		const ch = inner[i]!;
-		if (quote === '"') {
-			cur += ch;
-			if (ch === "\\") cur += inner[++i] ?? "";
-			else if (ch === '"') quote = null;
-		} else if (quote === "'") {
-			cur += ch;
-			if (ch === "'") {
-				// YAML single-quote escape: '' stays inside the string
-				if (inner[i + 1] === "'") cur += inner[++i]!;
-				else quote = null;
-			}
-		} else if (ch === '"' || ch === "'") {
-			quote = ch;
-			cur += ch;
-		} else if (ch === ",") {
-			parts.push(cur);
-			cur = "";
-		} else {
-			cur += ch;
-		}
-	}
-	if (cur.trim() !== "") parts.push(cur);
-	return parts;
-}
-
-/**
- * Rewrite one node's field in the raw source, preserving all other
- * formatting. The id is escaped since quoted ids may contain regex
- * metacharacters (#430). Two styles are supported:
- *   block-style: "<indent><id>:\n  <fields>..."
- *   flow-style:  "<indent><id>: { key: val, ... }"  (#415)
- * Returns null when the id has no frontmatter entry.
- */
-function setFieldInSource(
-	src: string,
-	id: string,
-	field: string,
-	scalar: string,
-): string | null {
-	const frontmatterMatch = /^---\n([\s\S]*?\n)---\n/.exec(src);
-	const fmBlock = frontmatterMatch?.[1];
-	if (!frontmatterMatch || !fmBlock) return null;
-	const fmBodyStart = frontmatterMatch[0].length - fmBlock.length - 4; // after "---\n"
-
-	const escapedId = escapeRe(id);
-	const escapedField = escapeRe(field);
-	// Match only the line's own leading indent: "[ \t]+", not "\s+". "\s"
-	// includes "\n", so with the "m" anchor it would start on a preceding blank
-	// line and swallow the newline plus indent, inflating the detected node
-	// indent and making the block-style rewrite silently no-op (#530).
-	const headerRe = new RegExp(`^([ \\t]+)${escapedId}:\\s*\\n`, "m");
-	const headerMatch = headerRe.exec(fmBlock);
-
-	// Flow-style body match is quote-aware: a "}" inside a quoted value must
-	// not terminate the map.
-	const flowHeaderRe = new RegExp(
-		`^([ \\t]+)${escapedId}:\\s*(\\{(?:"(?:[^"\\\\]|\\\\.)*"|'(?:[^']|'')*'|[^}"'])*\\})[ \\t]*$`,
-		"m",
-	);
-	const flowMatch = headerMatch ? null : flowHeaderRe.exec(fmBlock);
-
-	if (!headerMatch && !flowMatch) return null;
-
-	let newFm: string;
-	if (flowMatch) {
-		// Flow-style: split "{ ... }" into top-level entries (quote-aware, so a
-		// decoy "field:" inside another value's string is never matched), then
-		// replace the matching entry or append a new one.
-		const flowBody = flowMatch[2]!;
-		const entries = splitFlowEntries(flowBody.slice(1, -1));
-		const keyRe = new RegExp(`^\\s*${escapedField}:`);
-		const idx = entries.findIndex((e) => keyRe.test(e));
-		const newEntry = `${field}: ${scalar}`;
-		if (idx >= 0) entries[idx] = newEntry;
-		else entries.push(newEntry);
-		const newFlowBody = `{ ${entries.map((e) => e.trim()).join(", ")} }`;
-		const matchedLine = flowMatch[0]!;
-		const newLine = matchedLine.replace(flowBody, newFlowBody);
-		newFm =
-			fmBlock.slice(0, flowMatch.index) +
-			newLine +
-			fmBlock.slice(flowMatch.index + matchedLine.length);
-	} else {
-		// Block-style. Detect indent width from the header line (#430).
-		const nodeIndent = headerMatch![1]!.length;
-		// Shared with sort/reindex/insert-definition rather than derived here:
-		// deriving it inline took a leading comment's own indent as the child
-		// indent, and the rewrite that produced was refused by the guard on a
-		// file those three commands handle (#510).
-		const childLines: string[] = [];
-		for (const line of fmBlock
-			.slice(headerMatch!.index + headerMatch![0].length)
-			.split("\n")) {
-			const isBlank = line.trim() === "";
-			if (!isBlank && line.length - line.trimStart().length <= nodeIndent)
-				break;
-			childLines.push(line);
-		}
-		const childIndent = detectChildIndent(childLines, nodeIndent * 2);
-
-		const nodePad = " ".repeat(nodeIndent);
-		const childPad = " ".repeat(childIndent);
-
-		// Replace "<childPad><field>: <old>" under this node — including any
-		// deeper-indented continuation lines (multi-line block scalars), so
-		// replacing them never leaves orphan lines — or insert after the header.
-		// Both the walk to the field and the continuation consumption tolerate
-		// blank lines, which are legal inside block scalars: the walk accepts
-		// whitespace-only lines, and the consumption takes blank lines only
-		// when a deeper-indented line follows (a trailing blank belongs to the
-		// mapping, not the scalar).
-		const fieldLineRe = new RegExp(
-			`(${nodePad}${escapedId}:[ \\t]*\\n(?:(?:${nodePad}[ \\t]+[^\\n]*|[ \\t]*)\\n)*?)${childPad}${escapedField}:[^\\n]*\\n(?:(?:[ \\t]*\\n)*${childPad} +[^\\n]*\\n)*`,
-		);
-		if (fieldLineRe.test(fmBlock)) {
-			newFm = fmBlock.replace(
-				fieldLineRe,
-				`$1${childPad}${field}: ${scalar}\n`,
-			);
-		} else {
-			newFm = fmBlock.replace(
-				new RegExp(`(${nodePad}${escapedId}:[ \\t]*\\n)`),
-				`$1${childPad}${field}: ${scalar}\n`,
-			);
-		}
-	}
-
-	return (
-		src.slice(0, fmBodyStart) + newFm + src.slice(fmBodyStart + fmBlock.length)
-	);
-}
-
 export function runMetaSet(
 	file: string,
 	idList: string,
@@ -1078,10 +908,15 @@ export function runMetaSet(
 	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
 	const beforeSet = new Set(beforeIds);
 
-	const scalar = yamlScalar(value, field !== "index");
+	// Quoting for the new value is left to the yaml package's own core-schema
+	// judgment (ADR-0034) — pass a number for the integer-typed index field,
+	// a string for everything else.
+	const parsedValue: string | number =
+		field === "index" ? Number(value) : value;
 	let newSrc = src;
 	for (const id of ids) {
-		const applied = setFieldInSource(newSrc, id, field, scalar);
+		const kind = nodeKinds.get(id) as NodeKind;
+		const applied = setFrontmatterField(newSrc, kind, id, field, parsedValue);
 		if (applied === null) {
 			if (opts.json) return failJson({ missing: [id] });
 			return fail(`error: '${id}' not found in ${file}\n`);

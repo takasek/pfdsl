@@ -1,4 +1,5 @@
 import { Document, parseDocument } from "yaml";
+import type { NodeKind } from "./types/index.js";
 
 /**
  * Fence-location + CST parse of a `.pfdsl` file's `---`-fenced frontmatter
@@ -62,4 +63,25 @@ export function parseFrontmatterCst(source: string): FrontmatterCst {
 /** Render a frontmatter CST `Document` back into a fenced `---` block. */
 export function renderFrontmatterCst(doc: Document): string {
 	return `---\n${doc.toString({ lineWidth: 0 })}---\n`;
+}
+
+/**
+ * Rewrite one node's field in `source`'s frontmatter, preserving everything
+ * else (comments, quote style, flow-vs-block). Used by `meta set` (ADR-0034).
+ * Quoting for the new value is left to the `yaml` package's own core-schema
+ * judgment — pass a `number` for integer fields (e.g. `index`) and a
+ * `string` for everything else. Returns null when there is no frontmatter,
+ * or when `id` has no entry under `kind`.
+ */
+export function setFrontmatterField(
+	source: string,
+	kind: NodeKind,
+	id: string,
+	field: string,
+	value: string | number,
+): string | null {
+	const { present, doc, body } = parseFrontmatterCst(source);
+	if (!present || !doc.hasIn([kind, id])) return null;
+	doc.setIn([kind, id, field], value);
+	return renderFrontmatterCst(doc) + body;
 }
