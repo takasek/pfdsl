@@ -108,12 +108,19 @@ check_drift "$gen_plugin_trigger" "packages/cli/dist/cli.js" \
 
 # The .dot/README drift guard and the .svg drift guard are separate vitest
 # suites (graphviz-exporter and preview-engine respectively — see the
-# "docs/samples svg drift" comment in preview-engine's index.test.ts for why
-# the .svg guard can't live next to the .dot guard).
+# "docs/samples drift" comment in graphviz-exporter's index.test.ts for why
+# the .svg guard can't live next to the .dot guard). Kept as two check_drift
+# calls sharing one trigger so each reports its own failure and gates on only
+# the dist it actually needs.
 check_drift '^docs/samples/' \
-  "packages/core/dist/index.js packages/graphviz-exporter/dist/index.js packages/preview-engine/dist/index.js" \
-  "pnpm --filter @pfdsl/graphviz-exporter exec vitest run index.test && pnpm --filter @pfdsl/preview-engine exec vitest run index.test" \
-  "docs/samples drift: run 'make gen-samples' and re-stage .dot / README.md / .svg."
+  "packages/core/dist/index.js packages/graphviz-exporter/dist/index.js" \
+  "pnpm --filter @pfdsl/graphviz-exporter exec vitest run index.test" \
+  "docs/samples drift: run 'make gen-samples' and re-stage .dot / README.md."
+
+check_drift '^docs/samples/' \
+  "packages/preview-engine/dist/index.js" \
+  "pnpm --filter @pfdsl/preview-engine exec vitest run index.test" \
+  "docs/samples .svg drift: run 'make gen-samples' and re-stage .svg."
 
 # Verifies the README `## CLI` generated block matches `pfdsl help` output;
 # reads packages/cli/dist/cli.js directly.
