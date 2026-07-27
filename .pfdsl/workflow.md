@@ -112,23 +112,18 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 ## 委譲先の外向き操作の制御（3層）
 
-実装を subagent へ委譲するとき、push・PR 作成・issue 操作は呼び出し元が持つ。
-ブリーフに「push するな」と書くだけでは守られないことが実証されているため、機構で制御する。
+3層の**原則**は配布層（pfd-ops `references/work-cycle.md` 手順2）が一次情報（#558 で昇格）。
+ここにはこのリポの実装値のみを書く。
 
-**1. agent の選択。** 実装だけを委譲するなら `pfd-implementer` を使う（`tools:` に `mcp__github__*` を含まないため、MCP 経由の PR 作成ができない）。
+**1. agent の選択。** 実装だけを委譲するなら `pfd-implementer`（`tools:` に `mcp__github__*` を含まない）。
 `general-purpose` は `tools: *` で GitHub MCP を丸ごと持つので、実装委譲には使わない。
 worktree 作成から PR 作成までを一気通貫でやらせる場合のみ `issue-worker` を使う。
+`pfd-implementer.md` は `gen_plugin` が plugin へミラーする配布物でもあるため、リポ固有の agent 名・スクリプトパスを本文に書かない。
 
-**2. PreToolUse hook。** `scripts/delegation-guard.mjs` が、allowlist 外の subagent による `git push` と `gh` の変更系サブコマンドを拒否する。
-subagent の hook payload には `agent_type` / `agent_id` が入り、呼び出し元の payload には入らない。
-この差が判別子になる（`session_id` / `transcript_path` / `prompt_id` は親子で共通のため使えない）。
-allowlist は `scripts/lib/delegation-guard.mjs` の `DEFAULT_ALLOWED_AGENTS`。
-デフォルト拒否なので、新しい agent を足しても黙って push 権を得ることはない。
+**2. PreToolUse hook。** 実装は `scripts/delegation-guard.mjs`、allowlist は `scripts/lib/delegation-guard.mjs` の `DEFAULT_ALLOWED_AGENTS`。
 `settings.json` の `permissions.deny` を使わないのは、プロジェクト全体に効いて呼び出し元と `issue-worker` まで巻き込むため。
 
-**3. 戻り時の検出。** 委譲から戻ったら `git log origin/<branch>..HEAD` と PR 一覧を確認する。
-上2層をすり抜ける経路（生 `curl`・スクリプト経由の間接実行）は塞げないため、この層が最後の網になる。
-ツール面が将来増えても効くのはここだけである。
+**3. 戻り時の検出。** 汎用手順のまま（`git log origin/<branch>..HEAD` と open PR 一覧の突合）。このリポ固有の追加値はない。
 
 ## flow:exempt issue の roadmap 追加除外
 
