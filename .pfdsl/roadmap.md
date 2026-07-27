@@ -61,8 +61,9 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 `/code-review` は `disable-model-invocation` のため AI からは起動できない。A を AI 単独で満たすことはできない。
 
-記録はサイクル内のいずれか1コミットの trailer に置き、`tool=` でどれを回したかを書く。
-プールした rate は「レビューの価値」でなく「その回どちらを回したか」を測ってしまうため、集計は `tool` 別に分ける。
+記録はコミットの trailer に置き、`tool=` でどれを回したかを書く。
+**1サイクルで複数回レビューしたら、その回数だけ書く** — 自己レビュー → ツール → 指摘対応、と複数パスが走るのが普通で、1本に丸めると何が何を見つけたかが失われる。集計はマージ（first-parent）単位でサイクルを数え、同一サイクル内の複数記録は合算する。
+プールした rate は「レビューの価値」でなく「その回どちらを回したか」を測ってしまうため、tool 別の内訳は**レビューパス単位**で出す（1サイクルが2つのツールを回せば、サイクルは1・パスは2）。
 
 ```
 Review-Measurement: sample=in new=2 adopted=1 tool=code-review angles="branch coverage; error paths"

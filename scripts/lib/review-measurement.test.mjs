@@ -11,6 +11,7 @@ import {
 	parseSinceArg,
 	countMeasurementTrailers,
 	classifyCycle,
+	mergeCycleRecords,
 } from "./review-measurement.mjs";
 
 const log = (...entries) => entries.map(([sha, body]) => `${sha}${FIELD_SEP}${body}`).join(RECORD_SEP);
@@ -108,11 +109,13 @@ describe("IN_SAMPLE_PATH", () => {
 });
 
 describe("summarize", () => {
+	const cycle = (...records) => ({ records });
+
 	it("counts only in-sample records toward the target", () => {
 		const s = summarize([
-			{ sample: "in", new: 0, adopted: 0 },
-			{ sample: "out" },
-			{ sample: "in", new: 2, adopted: 1 },
+			cycle({ sample: "in", new: 2, adopted: 1 }),
+			cycle({ sample: "out" }),
+			cycle({ sample: "in", new: 0, adopted: 0 }),
 		]);
 		assert.equal(s.sampled, 2);
 		assert.equal(s.outOfSample, 1);
@@ -121,26 +124,25 @@ describe("summarize", () => {
 
 	it("reports the finding rate over in-sample cycles, not over all cycles", () => {
 		const s = summarize([
-			{ sample: "in", new: 0, adopted: 0 },
-			{ sample: "in", new: 3, adopted: 2 },
-			{ sample: "out" },
+			cycle({ sample: "in", new: 2, adopted: 1 }),
+			cycle({ sample: "in", new: 0, adopted: 0 }),
+			cycle({ sample: "out" }),
 		]);
 		assert.equal(s.cyclesWithFindings, 1);
-		assert.equal(s.totalNew, 3);
-		assert.equal(s.totalAdopted, 2);
 		assert.equal(s.findingRate, 0.5);
+		assert.equal(s.totalNew, 2);
+		assert.equal(s.totalAdopted, 1);
 	});
 
 	it("reports a null rate rather than dividing by zero when nothing is sampled yet", () => {
-		const s = summarize([{ sample: "out" }]);
-		assert.equal(s.sampled, 0);
+		const s = summarize([cycle({ sample: "out" })]);
 		assert.equal(s.findingRate, null);
 	});
 
 	it("separates malformed records so they cannot silently count as zero-finding cycles", () => {
 		const s = summarize([
-			{ sample: "in", new: 0, adopted: 0 },
-			{ sample: "in", error: "missing new" },
+			cycle({ sample: "in", new: 0, adopted: 0 }),
+			cycle({ sample: "in", error: "missing new" }),
 		]);
 		assert.equal(s.sampled, 1);
 		assert.equal(s.malformed, 1);
@@ -214,9 +216,9 @@ describe("classifyCycle", () => {
 		assert.deepEqual(c.issues.map((i) => i.type), ["mismatch"]);
 	});
 
-	it("reports a cycle that recorded more than once, which double-counts it", () => {
+	it("accepts a cycle that recorded several passes, which is how reviewing twice looks", () => {
 		const c = classifyCycle({ changedFiles: "scripts/a.mjs\n", trailerCount: 2, sample: "in" });
-		assert.deepEqual(c.issues.map((i) => i.type), ["duplicate"]);
+		assert.deepEqual(c.issues, []);
 	});
 });
 
@@ -237,15 +239,79 @@ describe("tool field", () => {
 		assert.equal(r.tool, undefined);
 	});
 
-	it("breaks the rate down per tool, since the tools do not have equal yield", () => {
+	it("breaks the yield down per tool, since the tools do not have equal yield", () => {
 		const s = summarize([
-			{ sample: "in", new: 3, adopted: 2, tool: "code-review" },
-			{ sample: "in", new: 0, adopted: 0, tool: "simplify" },
-			{ sample: "in", new: 1, adopted: 1, tool: "simplify" },
-			{ sample: "in", new: 2, adopted: 0 },
+			{ records: [{ sample: "in", new: 3, adopted: 2, tool: "code-review" }] },
+			{ records: [{ sample: "in", new: 0, adopted: 0, tool: "simplify" }] },
+			{ records: [{ sample: "in", new: 1, adopted: 1, tool: "simplify" }] },
+			{ records: [{ sample: "in", new: 2, adopted: 0 }] },
 		]);
-		assert.deepEqual(s.byTool["code-review"], { sampled: 1, withFindings: 1, totalNew: 3, totalAdopted: 2 });
-		assert.deepEqual(s.byTool.simplify, { sampled: 2, withFindings: 1, totalNew: 1, totalAdopted: 1 });
-		assert.deepEqual(s.byTool.unspecified, { sampled: 1, withFindings: 1, totalNew: 2, totalAdopted: 0 });
+		assert.deepEqual(s.byTool["code-review"], { passes: 1, withFindings: 1, totalNew: 3, totalAdopted: 2 });
+		assert.deepEqual(s.byTool.simplify, { passes: 2, withFindings: 1, totalNew: 1, totalAdopted: 1 });
+		assert.deepEqual(s.byTool.unspecified, { passes: 1, withFindings: 1, totalNew: 2, totalAdopted: 0 });
+	});
+});
+
+describe("mergeCycleRecords", () => {
+	it("returns null for a cycle that recorded nothing", () => {
+		assert.equal(mergeCycleRecords([]), null);
+	});
+
+	it("passes a single record through", () => {
+		const r = mergeCycleRecords([{ sample: "in", new: 2, adopted: 1, tool: "simplify" }]);
+		assert.equal(r.sample, "in");
+		assert.equal(r.new, 2);
+		assert.deepEqual(r.tools, ["simplify"]);
+	});
+
+	it("sums the findings of every review pass in one cycle", () => {
+		// A cycle commonly reviews more than once: self review, then the tool,
+		// then the fixes the tool prompted.
+		const r = mergeCycleRecords([
+			{ sample: "in", new: 1, adopted: 1, tool: "simplify" },
+			{ sample: "in", new: 2, adopted: 2, tool: "code-review" },
+		]);
+		assert.equal(r.new, 3);
+		assert.equal(r.adopted, 3);
+		assert.deepEqual(r.tools, ["simplify", "code-review"]);
+	});
+
+	it("counts the cycle as in-sample when any pass says so", () => {
+		// Order must not decide it: taking the first record found made the
+		// classification depend on which commit git happened to list first.
+		const r = mergeCycleRecords([
+			{ sample: "out" },
+			{ sample: "in", new: 2, adopted: 2, tool: "code-review" },
+		]);
+		assert.equal(r.sample, "in");
+		assert.equal(r.new, 2);
+	});
+
+	it("keeps a malformed pass visible instead of averaging it away", () => {
+		const r = mergeCycleRecords([{ sample: "in", error: "adopted cannot exceed new" }]);
+		assert.match(r.error, /adopted/);
+	});
+});
+
+describe("summarize over cycles", () => {
+	const cycle = (...records) => ({ records });
+
+	it("counts one cycle however many passes it recorded", () => {
+		const s = summarize([
+			cycle({ sample: "in", new: 1, adopted: 1, tool: "simplify" }, { sample: "in", new: 2, adopted: 2, tool: "code-review" }),
+			cycle({ sample: "in", new: 0, adopted: 0, tool: "simplify" }),
+		]);
+		assert.equal(s.sampled, 2);
+		assert.equal(s.totalNew, 3);
+		assert.equal(s.cyclesWithFindings, 1);
+	});
+
+	it("reports tool yield per review pass, since a cycle can run more than one", () => {
+		const s = summarize([
+			cycle({ sample: "in", new: 1, adopted: 1, tool: "simplify" }, { sample: "in", new: 2, adopted: 2, tool: "code-review" }),
+		]);
+		assert.equal(s.byTool.simplify.passes, 1);
+		assert.equal(s.byTool["code-review"].passes, 1);
+		assert.equal(s.byTool["code-review"].totalNew, 2);
 	});
 });
