@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { analyze, buildGraph, normalizeDocument, parse } from "@pfdsl/core";
 import { exportDiffDot } from "@pfdsl/graphviz-exporter";
 import { describe, expect, it } from "vitest";
@@ -9,6 +12,11 @@ function buildFromSource(src: string) {
 	const graph = buildGraph(edges, nodeKinds);
 	return { graph, frontmatter };
 }
+
+const samplesDir = resolve(
+	dirname(fileURLToPath(import.meta.url)),
+	"../../../docs/samples",
+);
 
 describe("preview-engine", () => {
 	it("renderGraph format=dot returns DOT", async () => {
@@ -63,4 +71,27 @@ describe("renderDiff", () => {
 		);
 		expect(svg).toContain("<svg");
 	});
+});
+
+// Deterministic drift guard for docs/samples/*.svg. gen-samples.mjs renders
+// through this same renderDotToSvg (wasm graphviz), so given the committed
+// .dot the output is byte-identical to the committed .svg — no host `dot`
+// binary version to drift against. Mechanically enforces what `make
+// gen-samples` produces so a stale render is caught in pre-commit and CI.
+describe("docs/samples svg drift", () => {
+	const dotFiles = readdirSync(samplesDir)
+		.filter((f) => f.endsWith(".dot"))
+		.sort();
+
+	for (const f of dotFiles) {
+		const base = f.replace(/\.dot$/, "");
+		it(`${base}.svg equals renderDotToSvg(${base}.dot)`, async () => {
+			const dot = readFileSync(resolve(samplesDir, f), "utf-8");
+			const committed = readFileSync(
+				resolve(samplesDir, `${base}.svg`),
+				"utf-8",
+			);
+			expect(committed).toBe(await renderDotToSvg(dot));
+		});
+	}
 });

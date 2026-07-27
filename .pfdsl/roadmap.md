@@ -55,11 +55,11 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 自己レビュー（差分の読み直し）は実施済みとみなし、それに**加えて**軽い設定のレビューを実施する（角度を絞る。8角度 × 検証 agent の高効度設定は使わない）。
 実行手段は次の優先順で選ぶ。
 
-1. **A（基本）— ユーザーが `/code-review` を実行する。** AI は判断軸（対象 diff の範囲・絞る角度・level）を添えて依頼を出し、**結果を受け取って反映するまでサイクルを閉じない**（`/vscode-ext-debug` の UI 確認と同じ扱い）。依頼を出しただけで PR を作るとゲートが実質スキップになる
-2. **B（AI へ委任する回の最有力）— `code-reviewer` agent を Agent tool で起動する。** `disable-model-invocation` を持たないため、ユーザーが不在の回でも回る。**導入が前提** — `pr-review-toolkit` / `feature-dev` plugin のいずれかを有効化していないと選べない
-3. **C（fallback）— `/simplify`。** 常に使えるが、角度は4つ固定でレビューの深さは A に劣る
+1. **A — `/code-review`。** 既存 PR に対する大規模 diff のレビュー向け。プロトコルが 5 並列 finder agent + 候補ごとの検証 agent を起動し、結果を対象 PR にコメントする形なので、**PR 作成前のサイクル**と**数十行規模の diff** には構造的に合わない。選ぶのは PR が既にあり diff が大きい回に限る
+2. **B — `code-reviewer` agent を Agent tool で起動する。** **導入が前提** — `pr-review-toolkit` / `feature-dev` plugin のいずれかを有効化していないと選べない
+3. **C（既定）— `/simplify`。** 常に使え、PR 作成前でも回せる。角度は4つ固定。scoped な修正にはこれが規模相応
 
-`/code-review` は `disable-model-invocation` のため AI からは起動できない。A を AI 単独で満たすことはできない。
+起動可否は harness と plugin の版に依存する。過去に「AI からは起動できない」と記録された手段でも、規約に従う前にその回の実体（コマンド定義の `disable-model-invocation`）を確認する。2026-07-28 時点で `/code-review` は `disable-model-invocation: false`。
 
 記録はコミットの trailer に置き、`tool=` でどれを回したかを書く。
 **1サイクルで複数回レビューしたら、その回数だけ書く** — 自己レビュー → ツール → 指摘対応、と複数パスが走るのが普通で、1本に丸めると何が何を見つけたかが失われる。集計はマージ（first-parent）単位でサイクルを数え、同一サイクル内の複数記録は合算する。
@@ -85,7 +85,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 - [ ] CLIコマンドを追加・変更した場合、HELP テキスト（`packages/cli/src/index.ts`）と README のコマンド一覧の両方を更新した
 - [ ] 実装を subagent へ委譲した場合、戻り時に `git log origin/<branch>..HEAD` と open PR 一覧を確認し、委譲先がブリーフの留保作業（push・PR 作成・issue 操作）を実行していないか照合した
 
-**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。`.claude/skills/pfdsl/` は生成物かつ gitignore 済（#348）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — CI（test.yml）と同様に `make bootstrap-pfdsl-skill` を先に実行する。`make gen-samples` は graphviz の `dot` バイナリを要求する。web/worktree 環境には未インストールのことがあるため、未導入なら `apt-get install graphviz` 等で先に用意する。ビルド後は `npx @pfdsl/cli@latest` でなく `node packages/cli/dist/cli.js` を使う（`npx` は npm の公開バージョンを使うため、未リリースの status 値等が V008 エラーになる）。
+**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。`.claude/skills/pfdsl/` は生成物かつ gitignore 済（#348）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — CI（test.yml）と同様に `make bootstrap-pfdsl-skill` を先に実行する。ビルド後は `npx @pfdsl/cli@latest` でなく `node packages/cli/dist/cli.js` を使う（`npx` は npm の公開バージョンを使うため、未リリースの status 値等が V008 エラーになる）。
 
 **vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。クリック・ホバー等の UI 挙動変更（DocumentLinkProvider・HoverProvider 等）、または preview/export の描画内容変更（statusStyles・tag・group 解決ロジック等）を含む場合は `/vscode-ext-debug` スキルで PR 作成前に実動作確認し、ユーザーの確認結果を受け取るまで完了とみなさない。
 
@@ -103,7 +103,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 **新 frontmatter フィールドを追加した場合**: 対応する feature sample（`docs/samples/`）を同一 PR で追加する（生成物 `.dot` / README / `references/` の再生成・ドリフト検査は pre-commit と CI が強制する）。加えて `packages/core/src/__fixtures__/pipeline-scale.pfdsl` にもそのフィールドを追記する（fixture がスナップショットの入力であり、feature sample とは別に網羅性を担う）。
 
-**`make gen-samples` 実行後**: 全 `.svg` が再生成されるが、`.svg` は graphviz のバージョンに依存して描画差分が出る。今回追加・変更したサンプルの `.pfdsl` / `.dot` / `.svg` のみをステージし、無関係なサンプルの `.svg` 差分（バージョン差由来）は `git checkout` で戻してからコミットする。`.dot` と README は決定論的（純 JS）のため差分はそのまま採用してよい。
+**`make gen-samples` 実行後**: `.dot` / `.svg` / README はいずれも決定論的（純 JS + `@pfdsl/preview-engine` の wasm graphviz）に生成されるため、再生成された全ファイルの差分をそのままステージしてよい（#588）。
 
 **新規 `.md` を Write で作成した場合**: commit 前に `node scripts/check-md-linebreaks.mjs <対象ファイル>` で自己検査する（pre-commit 任せで一発コミットすると、読点位置の改行違反が複数箇所まとめて出て全文書き直しになりやすい）。
 

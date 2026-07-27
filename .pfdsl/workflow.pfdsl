@@ -245,7 +245,7 @@ artifact:
     tags: [distilled_doc]
   sample_previews:
     label: サンプル描画物
-    description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samples で再生成。サンプル・ロードマップ変更時に更新（make push がドリフト検知）。GitHub 上の閲覧用終端成果物（README からリンクされるが README 執筆の入力ではない）"
+    description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samples で再生成。サンプル・ロードマップ変更時に更新（.dot / README は graphviz-exporter、.svg は preview-engine の vitest が pre-commit と CI でドリフト検知。.svg は #588 で描画を wasm graphviz に移し決定化したことで検査対象になった）。GitHub 上の閲覧用終端成果物（README からリンクされるが README 執筆の入力ではない）"
     criteria: make gen-samples が差分なしで完了し、README からのリンクが正常
     location: ../docs/samples/
     group: release

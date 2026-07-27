@@ -1141,9 +1141,11 @@ spec >> P -> X
 	});
 });
 
-// Deterministic drift guard for docs/samples (.dot + README). The .svg is
-// graphviz-version-dependent and excluded. Mechanically enforces what
-// `make gen-samples` produces so a stale exporter / un-regenerated sample is
+// Deterministic drift guard for docs/samples (.dot + README). The .svg guard
+// lives in @pfdsl/preview-engine's index.test.ts instead, since it needs
+// renderDotToSvg and preview-engine depends on this package (a guard here
+// would be a circular dependency). Mechanically enforces what `make
+// gen-samples` produces so a stale exporter / un-regenerated sample is
 // caught in pre-commit (vitest) and CI rather than by a human gate.
 describe("docs/samples drift", () => {
 	const pfdslFiles = readdirSync(samplesDir)
