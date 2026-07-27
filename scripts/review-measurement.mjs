@@ -87,6 +87,18 @@ if (summary.malformed > 0) {
 	console.log(`  malformed records     ${summary.malformed}  — fix these; they are not zero-finding cycles`);
 }
 
+// Per tool, because a pooled rate measures which tool ran rather than what
+// review is worth.
+const tools = Object.entries(summary.byTool);
+if (tools.length > 0) {
+	console.log("");
+	console.log("  by tool:");
+	for (const [tool, b] of tools) {
+		const toolRate = b.sampled === 0 ? "n/a" : `${((b.withFindings / b.sampled) * 100).toFixed(0)}%`;
+		console.log(`    ${tool.padEnd(20)} ${b.sampled} cycle(s), ${b.withFindings} with findings (${toolRate}), new/adopted ${b.totalNew}/${b.totalAdopted}`);
+	}
+}
+
 // Missing-sample detection. Only meaningful from the point the rule took effect,
 // so it needs an explicit starting ref rather than a guess.
 if (!since) {
@@ -99,25 +111,31 @@ if (!since) {
 // it a back-merge of main into a feature branch is scanned too, and there ^1 is
 // the branch tip and ^2 is main — the diff reads as main's changes and ^1..^2
 // as commits already merged, so it is reported as a cycle that never existed.
-const mergesResult = tryGit(["log", "--merges", "--first-parent", "--format=%H", `${since}..HEAD`]);
+const mergesResult = tryGit(["log", "--merges", "--first-parent", `--format=%H${FIELD_SEP}%s`, `${since}..HEAD`]);
 if (!mergesResult.ok) {
 	console.error(`review-measurement: failed to list merges since ${since}: ${mergesResult.out.trim()}`);
 	process.exit(1);
 }
-const merges = mergesResult.out.trim().split("\n").filter(Boolean);
+// Subject comes from the same listing rather than a git call per merge.
+const merges = mergesResult.out
+	.trim()
+	.split("\n")
+	.filter(Boolean)
+	.map((line) => {
+		const [sha, subject = ""] = line.split(FIELD_SEP);
+		return { sha, subject };
+	});
 
 const issues = [];
 // A cycle we could not read is not a clean cycle. Collected rather than skipped
 // so a shallow clone cannot produce an all-green report from zero evidence.
 const unreadable = [];
 
-for (const merge of merges) {
-	const short = merge.slice(0, 7);
-	const subject = tryGit(["log", "-1", "--format=%s", merge]);
-	const label = `${short} ${subject.ok ? subject.out.trim() : ""}`.trim();
+for (const { sha, subject } of merges) {
+	const label = `${sha.slice(0, 7)} ${subject}`.trim();
 
-	const files = tryGit(["diff", "--name-only", `${merge}^1`, merge]);
-	const bodies = tryGit(["log", "--format=%B", `${merge}^1..${merge}^2`]);
+	const files = tryGit(["diff", "--name-only", `${sha}^1`, sha]);
+	const bodies = tryGit(["log", "--format=%B", `${sha}^1..${sha}^2`]);
 	if (!files.ok || !bodies.ok) {
 		unreadable.push(`${label} — ${(files.ok ? bodies.out : files.out).trim().split("\n")[0]}`);
 		continue;

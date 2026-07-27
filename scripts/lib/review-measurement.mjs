@@ -34,6 +34,15 @@ export const TRAILER_GREP = "Review-Measurement:";
 export const IN_SAMPLE_PATH = /^(packages|scripts)\//m;
 
 /**
+ * The review tools the rule allows, in descending expected yield.
+ * The rate is meaningless pooled across them: `/code-review` fans out further
+ * than `/simplify`, so a pooled figure measures which tool ran that cycle
+ * rather than what review is worth. Records written before the field existed
+ * carry no tool and are summarised as `unspecified`.
+ */
+export const REVIEW_TOOLS = ["code-review", "code-reviewer-agent", "simplify"];
+
+/**
  * Parse a trailer out of a commit message (subject and body).
  * A malformed record carries `error` instead of throwing — the aggregate view
  * reports it separately so it cannot be mistaken for a zero-finding cycle.
@@ -51,6 +60,12 @@ export function parseMeasurementTrailer(text) {
 	}
 
 	const record = { sample: fields.sample, angles: fields.angles };
+	if (fields.tool !== undefined) {
+		if (!REVIEW_TOOLS.includes(fields.tool)) {
+			return { ...record, error: `tool must be one of ${REVIEW_TOOLS.join(", ")}, got ${JSON.stringify(fields.tool)}` };
+		}
+		record.tool = fields.tool;
+	}
 
 	if (record.sample !== "in" && record.sample !== "out") {
 		return { ...record, error: `sample must be "in" or "out", got ${JSON.stringify(fields.sample ?? null)}` };
@@ -94,7 +109,19 @@ export function summarize(records) {
 	const outOfSample = records.filter((r) => r.sample === "out" && !r.error).length;
 	const cyclesWithFindings = sampled.filter((r) => r.new > 0).length;
 
+	/** @type {Record<string, {sampled: number, withFindings: number, totalNew: number, totalAdopted: number}>} */
+	const byTool = {};
+	for (const r of sampled) {
+		const key = r.tool ?? "unspecified";
+		const bucket = (byTool[key] ??= { sampled: 0, withFindings: 0, totalNew: 0, totalAdopted: 0 });
+		bucket.sampled += 1;
+		if (r.new > 0) bucket.withFindings += 1;
+		bucket.totalNew += r.new;
+		bucket.totalAdopted += r.adopted;
+	}
+
 	return {
+		byTool,
 		sampled: sampled.length,
 		outOfSample,
 		malformed: malformed.length,

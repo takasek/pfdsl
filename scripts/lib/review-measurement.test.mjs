@@ -219,3 +219,33 @@ describe("classifyCycle", () => {
 		assert.deepEqual(c.issues.map((i) => i.type), ["duplicate"]);
 	});
 });
+
+describe("tool field", () => {
+	it("parses the tool that produced the findings", () => {
+		const r = parseMeasurementTrailer("Review-Measurement: sample=in new=1 adopted=1 tool=code-review");
+		assert.equal(r.tool, "code-review");
+	});
+
+	it("rejects a tool outside the three the rule names", () => {
+		const r = parseMeasurementTrailer("Review-Measurement: sample=in new=1 adopted=1 tool=eyeballs");
+		assert.match(r.error, /tool/);
+	});
+
+	it("leaves the tool unspecified on records written before the field existed", () => {
+		const r = parseMeasurementTrailer("Review-Measurement: sample=in new=1 adopted=1");
+		assert.equal(r.error, undefined);
+		assert.equal(r.tool, undefined);
+	});
+
+	it("breaks the rate down per tool, since the tools do not have equal yield", () => {
+		const s = summarize([
+			{ sample: "in", new: 3, adopted: 2, tool: "code-review" },
+			{ sample: "in", new: 0, adopted: 0, tool: "simplify" },
+			{ sample: "in", new: 1, adopted: 1, tool: "simplify" },
+			{ sample: "in", new: 2, adopted: 0 },
+		]);
+		assert.deepEqual(s.byTool["code-review"], { sampled: 1, withFindings: 1, totalNew: 3, totalAdopted: 2 });
+		assert.deepEqual(s.byTool.simplify, { sampled: 2, withFindings: 1, totalNew: 1, totalAdopted: 1 });
+		assert.deepEqual(s.byTool.unspecified, { sampled: 1, withFindings: 1, totalNew: 2, totalAdopted: 0 });
+	});
+});
