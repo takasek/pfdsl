@@ -1,10 +1,8 @@
+import { Document } from "yaml";
 import {
-	detectChildIndent,
-	escapeRe,
-	findFrontmatterFences,
-	indentOf,
-	locateSection,
-} from "./frontmatter-text.js";
+	parseFrontmatterCst,
+	renderFrontmatterCst,
+} from "./frontmatter-cst.js";
 import { analyze } from "./index.js";
 import { computeTopoOrder } from "./sorter.js";
 import type { Diagnostic, NodeKind } from "./types/index.js";
@@ -30,17 +28,12 @@ export interface ReindexOptions {
 	renumber?: boolean;
 }
 
-interface Write {
-	kind: NodeKind;
-	id: string;
-	value: number;
-}
-
 /**
  * Assign integer `index:` values to nodes in topological order, with
  * independent counters for processes and artifacts. Default mode fills only
  * nodes lacking an index; `renumber` reassigns all from 1. Edits are applied
- * surgically to the front matter text to preserve comments and formatting.
+ * through the frontmatter yaml CST (ADR-0034), so comments, quote style, and
+ * flow-vs-block choice survive untouched.
  */
 export function reindex(
 	source: string,
@@ -100,178 +93,22 @@ export function reindex(
 		}
 	}
 
-	// Diff against existing to build change list + writes.
+	// Diff against existing to build the change list.
 	const changes: IndexChange[] = [];
-	const writes: Write[] = [];
 	for (const id of order) {
 		const to = assigned.get(id)!;
 		const from = existingIndex(id) ?? null;
 		if (from === to) continue;
-		const kind = kindOf(id);
-		changes.push({ kind, id, from, to });
-		writes.push({ kind, id, value: to });
+		changes.push({ kind: kindOf(id), id, from, to });
 	}
 
-	if (!writes.length) return { output: source, changes, diagnostics };
-	const { output, skipped } = applyWrites(source, writes);
-	// A write skipped as unsafe (e.g. an inline flow-style section one-liner)
-	// never happened — drop its entry so callers don't report a change that
-	// isn't reflected in the output.
-	const reportedChanges = skipped.size
-		? changes.filter((c) => !skipped.has(`${c.kind}:${c.id}`))
-		: changes;
-	return { output, changes: reportedChanges, diagnostics };
-}
+	if (!changes.length) return { output: source, changes, diagnostics };
 
-// --- front matter text editing ---------------------------------------------
-
-function applyWrites(
-	source: string,
-	writes: Write[],
-): { output: string; skipped: Set<string> } {
-	const lines = source.split("\n");
-	const trailingNewline = source.endsWith("\n");
-
-	const fences = findFrontmatterFences(lines);
-
-	// No front matter: synthesize one from the writes.
-	if (!fences) {
-		const fm = buildFrontmatter(writes);
-		return { output: `${fm}${source}`, skipped: new Set() };
+	const cst = parseFrontmatterCst(source);
+	const doc = cst.present ? cst.doc : new Document();
+	for (const c of changes) {
+		doc.setIn([c.kind, c.id, "index"], c.to);
 	}
-
-	const { open, close } = fences;
-	// Mutable view of the YAML region (exclusive of the --- fences).
-	const yaml = lines.slice(open + 1, close);
-	const skipped = new Set<string>();
-	for (const w of writes) {
-		if (!setIndex(yaml, w)) skipped.add(`${w.kind}:${w.id}`);
-	}
-
-	const rebuilt = [...lines.slice(0, open + 1), ...yaml, ...lines.slice(close)];
-	let result = rebuilt.join("\n");
-	if (trailingNewline && !result.endsWith("\n")) result += "\n";
-	return { output: result, skipped };
-}
-
-function buildFrontmatter(writes: Write[]): string {
-	const lines: string[] = ["---"];
-	for (const section of ["artifact", "process"] as const) {
-		const ws = writes.filter((w) => w.kind === section);
-		if (ws.length === 0) continue;
-		lines.push(`${section}:`);
-		for (const w of ws) {
-			lines.push(`  ${w.id}:`);
-			lines.push(`    index: ${w.value}`);
-		}
-	}
-	lines.push("---", "");
-	return lines.join("\n");
-}
-
-/** @returns false when the write was skipped as unsafe (caller reports no change). */
-function setIndex(yaml: string[], w: Write): boolean {
-	const section = w.kind; // NodeKind values are exactly the YAML section names
-	const located = locateSection(yaml, section);
-
-	if (!located) {
-		// Append a fresh section at the end of the YAML region.
-		yaml.push(`${section}:`, `  ${w.id}:`, `    index: ${w.value}`);
-		return true;
-	}
-
-	if (located.flowStyle) {
-		// Inline flow-style section (`kind: { ... }`) — splicing a block-style
-		// index: line in isn't safe without a full YAML rewrite (mirrors
-		// insert-definition.ts's handling of the same case).
-		return false;
-	}
-
-	const { start: sectionStart, end: sectionEnd } = located;
-
-	// Node keys sit at the section's child-indent level, detected from the
-	// first content line (supports 2-space, 4-space, etc. — not hardcoded).
-	const sectionIndent = detectChildIndent(
-		yaml.slice(sectionStart + 1, sectionEnd),
-	);
-
-	// Find the node key line within the section (block or inline mapping).
-	const keyRe = new RegExp(`^(\\s+)${escapeRe(w.id)}:(.*)$`);
-	let nodeLine = -1;
-	let nodeIndent = sectionIndent;
-	let nodeRest = "";
-	for (let i = sectionStart + 1; i < sectionEnd; i++) {
-		const m = keyRe.exec(yaml[i]!);
-		if (m && m[1]!.length === sectionIndent) {
-			nodeLine = i;
-			nodeIndent = m[1]!.length;
-			nodeRest = m[2]!;
-			break;
-		}
-	}
-
-	const pad = (n: number) => " ".repeat(n);
-
-	if (nodeLine === -1) {
-		// Node not declared: insert a fresh block at the end of the section,
-		// matching the section's existing indentation.
-		const block = [
-			`${pad(sectionIndent)}${w.id}:`,
-			`${pad(sectionIndent * 2)}index: ${w.value}`,
-		];
-		yaml.splice(sectionEnd, 0, ...block);
-		return true;
-	}
-
-	// Inline flow mapping: `id: { ... }` — edit inside the braces only. The brace
-	// span is located by balance scanning (not a greedy regex) so nested braces
-	// and a trailing comment containing braces are left untouched.
-	if (nodeRest.trimStart().startsWith("{")) {
-		const span = innerBraceSpan(nodeRest);
-		if (span) {
-			const prefix = yaml[nodeLine]!.slice(
-				0,
-				yaml[nodeLine]!.length - nodeRest.length,
-			);
-			const before = nodeRest.slice(0, span.open); // whitespace after the colon
-			const after = nodeRest.slice(span.close + 1); // trailing comment, if any
-			const inner = nodeRest.slice(span.open + 1, span.close).trim();
-			let merged: string;
-			if (/\bindex:\s*\d/.test(inner)) {
-				merged = inner.replace(/(\bindex:\s*)\d+/, `$1${w.value}`);
-			} else {
-				merged =
-					inner === "" ? `index: ${w.value}` : `index: ${w.value}, ${inner}`;
-			}
-			yaml[nodeLine] = `${prefix}${before}{ ${merged} }${after}`;
-			return true;
-		}
-	}
-
-	// Within the block mapping, update an existing index: or insert a new one.
-	const childIndent = nodeIndent + sectionIndent;
-	for (let i = nodeLine + 1; i < sectionEnd; i++) {
-		const line = yaml[i]!;
-		if (line.trim() === "") continue;
-		if (indentOf(line) <= nodeIndent) break; // left the node block
-		if (/^\s*index:\s*/.test(line)) {
-			// Replace the integer value; keep any trailing comment.
-			yaml[i] = line.replace(/^(\s*index:\s*)\d+/, `$1${w.value}`);
-			return true;
-		}
-	}
-	yaml.splice(nodeLine + 1, 0, `${pad(childIndent)}index: ${w.value}`);
-	return true;
-}
-
-/** Locate the first balanced `{ ... }` group in s, or null if unbalanced. */
-function innerBraceSpan(s: string): { open: number; close: number } | null {
-	const open = s.indexOf("{");
-	if (open === -1) return null;
-	let depth = 0;
-	for (let i = open; i < s.length; i++) {
-		if (s[i] === "{") depth++;
-		else if (s[i] === "}" && --depth === 0) return { open, close: i };
-	}
-	return null;
+	const output = renderFrontmatterCst(doc) + cst.body;
+	return { output, changes, diagnostics };
 }
