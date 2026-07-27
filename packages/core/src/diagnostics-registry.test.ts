@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -74,18 +74,28 @@ describe("DIAGNOSTIC_REGISTRY section/summary metadata", () => {
 });
 
 describe("DIAGNOSTIC_REGISTRY vs. real source", () => {
-	const coreSrcDir = __dirname;
-	const sourceFiles = [
-		"frontmatter.ts",
-		"parser.ts",
-		"validator.ts",
-		"multifile.ts",
-		"lexer.ts",
-		"normalizer.ts",
-	];
+	// Walking the tree beats naming the files: a hard-coded list silently stops
+	// covering a code when the emitting rule moves to a new module, which is
+	// exactly what happened when the validator was split into rules/.
+	function sourceFilesUnder(dir: string): string[] {
+		const files: string[] = [];
+		for (const entry of readdirSync(dir, { withFileTypes: true })) {
+			const full = join(dir, entry.name);
+			if (entry.isDirectory()) {
+				files.push(...sourceFilesUnder(full));
+			} else if (
+				entry.name.endsWith(".ts") &&
+				!entry.name.endsWith(".test.ts") &&
+				entry.name !== "diagnostics-registry.ts"
+			) {
+				files.push(full);
+			}
+		}
+		return files;
+	}
 
-	const foundByFile = sourceFiles.map((f) =>
-		extractDiagnosticCodesFromSource(readFileSync(join(coreSrcDir, f), "utf8")),
+	const foundByFile = sourceFilesUnder(__dirname).map((f) =>
+		extractDiagnosticCodesFromSource(readFileSync(f, "utf8")),
 	);
 	const found: Record<string, string[]> = Object.assign({}, ...foundByFile);
 

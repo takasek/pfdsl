@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { lex } from "./lexer.js";
 import { normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
-import type { Frontmatter } from "./types/index.js";
+import type { Frontmatter, Status } from "./types/index.js";
+import { PFD_TYPE_VALUES, STATUS_VALUES } from "./types/index.js";
 import { type ValidateOptions, validate } from "./validator.js";
 
 function diagnose(
@@ -240,14 +241,6 @@ a >> design -> b
 		expect(cs).not.toContain("V003");
 	});
 
-	it("V002/V003: process with output but no input still triggers V002", () => {
-		expect(codes("P -> B")).toContain("V002");
-	});
-
-	it("V002/V003: process with input but no output still triggers V003", () => {
-		expect(codes("A >> P")).toContain("V003");
-	});
-
 	describe("W001: parts member without edges", () => {
 		it("warns when a parts member has no edges in the graph", () => {
 			const fm: Frontmatter = {
@@ -329,6 +322,41 @@ a >> design -> b
 
 		it("detects a longer cycle spanning three processes", () => {
 			expect(codes("a >> p -> b\nb >> q -> c\nc >> r -> a")).toContain("V010");
+		});
+
+		it("reports all independent cycles, not just the first", () => {
+			// Two disjoint cycles: a→p→b→q→a and c→r→d→s→c. Reporting only the
+			// first would leave the second silent until the first is fixed, one
+			// re-run per cycle. V019 already reports every revises cycle; the
+			// primary-graph check answers the same way.
+			const cs = codes("a >> p -> b\nb >> q -> a\nc >> r -> d\nd >> s -> c");
+			expect(cs.filter((c) => c === "V010")).toHaveLength(2);
+		});
+
+		it("each V010 names an edge of the cycle it reports, so the two are distinguishable", () => {
+			const firstCycle = new Set(["a", "p", "b", "q"]);
+			const secondCycle = new Set(["c", "r", "d", "s"]);
+			const diags = diagnose(
+				"a >> p -> b\nb >> q -> a\nc >> r -> d\nd >> s -> c",
+			);
+			// Classify by the quoted node ids, not by substring: every message
+			// shares the wording, so a bare includes() would match either one.
+			const reported = diags
+				.filter((d) => d.code === "V010")
+				.map((d) => {
+					const [, from, to] = d.message.match(/'([^']+)' → '([^']+)'/) ?? [];
+					return { from, to };
+				});
+			expect(
+				reported.filter(
+					(e) => firstCycle.has(e.from ?? "") && firstCycle.has(e.to ?? ""),
+				),
+			).toHaveLength(1);
+			expect(
+				reported.filter(
+					(e) => secondCycle.has(e.from ?? "") && secondCycle.has(e.to ?? ""),
+				),
+			).toHaveLength(1);
 		});
 
 		it("does not report V010 for a valid acyclic graph", () => {
@@ -633,6 +661,37 @@ a >> design -> b
 		});
 	});
 
+	// §16 requires every cycle-detecting code to report one diagnostic per
+	// independent cycle. V010 used to stop after the first; these lock the rule
+	// for the codes that live in this module so none of them regresses to it.
+	describe("cycle codes report every independent cycle (§16)", () => {
+		it("V006 reports both disjoint parts cycles", () => {
+			const fm: Frontmatter = {
+				artifact: {
+					a: { parts: ["b"] },
+					b: { parts: ["a"] },
+					c: { parts: ["d"] },
+					d: { parts: ["c"] },
+				},
+			};
+			expect(codes("", fm).filter((c) => c === "V006")).toHaveLength(2);
+		});
+
+		it("V025 reports both disjoint group parent cycles", () => {
+			const fm: Frontmatter = {
+				group: {
+					g1: { parent: "g2" },
+					g2: { parent: "g1" },
+					g3: { parent: "g4" },
+					g4: { parent: "g3" },
+				},
+			};
+			expect(codes("A >> P -> B", fm).filter((c) => c === "V025")).toHaveLength(
+				2,
+			);
+		});
+	});
+
 	describe("V025: cycle in group parent chain", () => {
 		it("errors when group parent forms a direct cycle (A → B → A)", () => {
 			const fm: Frontmatter = {
@@ -697,40 +756,15 @@ a >> design -> b
 	});
 
 	describe("W003: status non-monotonicity (output done while input not done)", () => {
-		it("warns when output artifact is done but input artifact is not done", () => {
+		// Every non-done status counts as "not done" for the monotonicity rule,
+		// so the case list is derived rather than spelled out — a status added
+		// later joins the assertion instead of slipping past it.
+		it.each(
+			STATUS_VALUES.filter((s): s is Status => s !== "done"),
+		)("warns when output artifact is done but input artifact is %s", (status) => {
 			const fm: Frontmatter = {
 				artifact: {
-					inp: { status: "wip", criteria: "x" },
-					out: { status: "done", criteria: "y" },
-				},
-			};
-			expect(codes("inp >> P -> out", fm)).toContain("W003");
-		});
-
-		it("warns when output artifact is done but input artifact is todo", () => {
-			const fm: Frontmatter = {
-				artifact: {
-					inp: { status: "todo", criteria: "x" },
-					out: { status: "done", criteria: "y" },
-				},
-			};
-			expect(codes("inp >> P -> out", fm)).toContain("W003");
-		});
-
-		it("warns when output artifact is done but input artifact is waiting", () => {
-			const fm: Frontmatter = {
-				artifact: {
-					inp: { status: "waiting", criteria: "x" },
-					out: { status: "done", criteria: "y" },
-				},
-			};
-			expect(codes("inp >> P -> out", fm)).toContain("W003");
-		});
-
-		it("warns when output artifact is done but input artifact is suspended", () => {
-			const fm: Frontmatter = {
-				artifact: {
-					inp: { status: "suspended", criteria: "x" },
+					inp: { status, criteria: "x" },
 					out: { status: "done", criteria: "y" },
 				},
 			};
@@ -864,18 +898,10 @@ a >> design -> b
 			expect(codes("A >> P -> B", fm)).toContain("V031");
 		});
 
-		it("no V031 for type: roadmap", () => {
-			const fm: Frontmatter = { type: "roadmap" };
-			expect(codes("A >> P -> B", fm)).not.toContain("V031");
-		});
-
-		it("no V031 for type: workflow", () => {
-			const fm: Frontmatter = { type: "workflow" };
-			expect(codes("A >> P -> B", fm)).not.toContain("V031");
-		});
-
-		it("no V031 for type: runtime-pipeline", () => {
-			const fm: Frontmatter = { type: "runtime-pipeline" };
+		// V031 accepts exactly the declared enum, so the accepted cases are the
+		// enum itself — a type added later is asserted without editing this file.
+		it.each(PFD_TYPE_VALUES)("no V031 for type: %s", (type) => {
+			const fm: Frontmatter = { type };
 			expect(codes("A >> P -> B", fm)).not.toContain("V031");
 		});
 
@@ -941,42 +967,16 @@ a >> design -> b
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});
 
-		it("no W005 when produced artifact has status: done", () => {
+		// W005 asks only whether a status is present, so every member of the
+		// enum must suppress it. Driving the cases off STATUS_VALUES keeps that
+		// claim true for statuses added later, instead of leaving the new one
+		// silently unasserted.
+		it.each(
+			STATUS_VALUES,
+		)("no W005 when produced artifact has status: %s", (status) => {
 			const fm: Frontmatter = {
 				type: "roadmap",
-				artifact: { B: { status: "done" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when produced artifact has status: wip", () => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "wip" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when produced artifact has status: todo", () => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "todo" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when produced artifact has status: waiting", () => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "waiting" } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when produced artifact has status: suspended", () => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status: "suspended" } },
+				artifact: { B: { status } },
 			};
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});

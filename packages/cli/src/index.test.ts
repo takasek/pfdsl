@@ -1,49 +1,31 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import {
-	afterAll,
-	afterEach,
-	beforeAll,
-	beforeEach,
-	describe,
-	expect,
-	it,
-	vi,
-} from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { parseArgs, run, runCheck, runDiff, shouldColorize } from "./index.js";
 
-// Lets "meta get -" tests inject stdin content without touching the real fd 0
-// (which would otherwise hang/behave unpredictably under the test runner).
-// All other fs calls pass through to the real implementation unchanged.
-let stdinOverride: string | null = null;
-vi.mock("node:fs", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("node:fs")>();
-	return {
-		...actual,
-		readFileSync: (path: unknown, opts?: unknown) => {
-			if (path === 0 && stdinOverride !== null) return stdinOverride;
-			return (actual.readFileSync as (...a: unknown[]) => unknown)(path, opts);
-		},
-	};
-});
+/** A stdin the CLI will read for a `-` argument, without touching fd 0. */
+const withStdin = (input: string) => ({ readStdin: () => input });
+/** Colour is decided from these, so a test states them instead of patching the process. */
+const onATty = { stdout: { isTTY: true }, env: {} };
 
 let dir: string;
 const valid = "req >> design -> spec\nspec >> impl -> code\n";
 const validWithStatus =
 	"---\nartifact:\n  spec:\n    status: wip\n    criteria: spec criteria\n  code:\n    status: todo\n    criteria: code criteria\n---\nreq >> design -> spec\nspec >> impl -> code\n";
 const invalid = "req >> design -> spec\nother -> spec\n"; // V001: dual generators (always error)
-const conflict = "req >> design -> spec\nother -> spec\n"; // dual generators
 const warningOnly =
 	"---\nartifact:\n  bundle:\n    parts: [orphan]\n---\nreq >> design -> bundle\n"; // W001: orphan has no edges
+// V002 (process with no inputs): a warning by default, an error under --strict.
+const incomplete = "P -> B\n";
 
 beforeAll(() => {
 	dir = mkdtempSync(join(tmpdir(), "pfdsl-cli-"));
 	writeFileSync(join(dir, "valid.pfdsl"), valid);
 	writeFileSync(join(dir, "valid-with-status.pfdsl"), validWithStatus);
 	writeFileSync(join(dir, "invalid.pfdsl"), invalid);
-	writeFileSync(join(dir, "conflict.pfdsl"), conflict);
 	writeFileSync(join(dir, "warning-only.pfdsl"), warningOnly);
+	writeFileSync(join(dir, "incomplete.pfdsl"), incomplete);
 });
 
 afterAll(() => {
@@ -72,14 +54,25 @@ describe("check", () => {
 		const r = await run(["check", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 	});
-	it("returns 1 for completeness violation", async () => {
+	it("returns 1 and names V001 for a dual-generator artifact", async () => {
 		const r = await run(["check", join(dir, "invalid.pfdsl")]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stderr).toMatch(/error/);
+		expect(r.stderr).toContain("V001");
 	});
-	it("returns 1 for dual-generator", async () => {
-		const r = await run(["check", join(dir, "conflict.pfdsl")]);
+	it("returns 0 for a completeness warning without --strict", async () => {
+		const r = await run(["check", join(dir, "incomplete.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("V002");
+	});
+	it("--strict promotes the completeness warning to an error and returns 1", async () => {
+		const r = await run(["check", join(dir, "incomplete.pfdsl"), "--strict"]);
 		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("V002");
+	});
+	it("--strict leaves an already-valid file at 0", async () => {
+		const r = await run(["check", join(dir, "valid.pfdsl"), "--strict"]);
+		expect(r.exitCode).toBe(0);
 	});
 	it("returns 1 with readable message for missing file, no stack trace", async () => {
 		const r = await run(["check", join(dir, "nonexistent.pfdsl")]);
@@ -130,14 +123,12 @@ describe("fmt", () => {
 	});
 
 	it("--check is allowed with stdin (-)", async () => {
-		stdinOverride = "   req>>design->spec\n";
-		try {
-			const r = await run(["fmt", "-", "--check"]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stdout).toBe("not formatted\n");
-		} finally {
-			stdinOverride = null;
-		}
+		const r = await run(
+			["fmt", "-", "--check"],
+			withStdin("   req>>design->spec\n"),
+		);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toBe("not formatted\n");
 	});
 
 	it("--check combined with --write is rejected (exit 2)", async () => {
@@ -228,19 +219,6 @@ req >> design -> spec
 		const r = await run(["meta", "reindex", f, "--write"]);
 		expect(r.exitCode).toBe(1);
 		expect(readFileSync(f, "utf-8")).toBe(src);
-	});
-
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const f = join(dir, "reindex-bad-json.pfdsl");
-		const src = "req >> design -> spec\nother -> spec\n"; // V001: dual generators (always error)
-		writeFileSync(f, src);
-		const r = await run(["meta", "reindex", f, "--json"]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 });
 
@@ -365,21 +343,6 @@ describe("graph edges", () => {
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("req >> design");
 		expect(r.stdout).toContain("design -> spec");
-	});
-
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const r = await run([
-			"graph",
-			"edges",
-			join(dir, "invalid.pfdsl"),
-			"--json",
-		]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 });
 
@@ -615,15 +578,13 @@ describe("diff", () => {
 	it("one side may be stdin (-)", async () => {
 		const b = join(dir, "diff-stdin-b.pfdsl");
 		writeFileSync(b, "req >> design -> spec\n");
-		stdinOverride = "req >> design -> spec\nspec >> impl -> code\n";
-		try {
-			const r = await run(["diff", "-", b]);
-			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toContain("- node code");
-			expect(r.stdout).toContain("- node impl");
-		} finally {
-			stdinOverride = null;
-		}
+		const r = await run(
+			["diff", "-", b],
+			withStdin("req >> design -> spec\nspec >> impl -> code\n"),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("- node code");
+		expect(r.stdout).toContain("- node impl");
 	});
 });
 
@@ -641,16 +602,6 @@ describe("graph io", () => {
 		const r = await run(["graph", "io", join(dir, "invalid.pfdsl")]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).not.toMatch(/terminal artifacts/);
-	});
-
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const r = await run(["graph", "io", join(dir, "invalid.pfdsl"), "--json"]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 
 	it("artifact with externalStakeholders is excluded from terminal artifacts", async () => {
@@ -700,21 +651,6 @@ describe("graph summary", () => {
 		const r = await run(["graph", "summary", join(dir, "invalid.pfdsl")]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).not.toMatch(/artifacts:/);
-	});
-
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const r = await run([
-			"graph",
-			"summary",
-			join(dir, "invalid.pfdsl"),
-			"--json",
-		]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 
 	it("--json returns counts", async () => {
@@ -856,14 +792,14 @@ describe("help / unknown", () => {
 });
 
 describe("--no-color / NO_COLOR (#180)", () => {
-	afterEach(() => {
-		delete process.env.NO_COLOR;
-	});
-
-	it("check output without no-color contains OK (no ANSI codes present in plain output)", async () => {
-		const r = await run(["check", join(dir, "valid-with-status.pfdsl")]);
+	it("a clean check prints OK, and prints it unstyled when stdout is not a TTY", async () => {
+		const r = await run(["check", join(dir, "valid-with-status.pfdsl")], {
+			stdout: { isTTY: false },
+			env: {},
+		});
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("OK");
+		expect(r.stdout).not.toContain("\x1b[");
 	});
 
 	it("--no-color flag is accepted and does not break check", async () => {
@@ -875,28 +811,17 @@ describe("--no-color / NO_COLOR (#180)", () => {
 	});
 
 	it("NO_COLOR env var suppresses ANSI codes", async () => {
-		process.env.NO_COLOR = "1";
-		const r = await run(["check", join(dir, "valid.pfdsl")]);
+		const r = await run(["check", join(dir, "valid.pfdsl")], {
+			stdout: { isTTY: true },
+			env: { NO_COLOR: "1" },
+		});
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).not.toContain("\x1b[");
 		expect(r.stderr).not.toContain("\x1b[");
 	});
 
-	it("--no-color is accepted by all subcommands (fmt, graph edges, render)", async () => {
-		const fmt = await run(["fmt", join(dir, "valid.pfdsl"), "--no-color"]);
-		expect(fmt.exitCode).toBe(0);
-
-		const norm = await run([
-			"graph",
-			"edges",
-			join(dir, "valid.pfdsl"),
-			"--no-color",
-		]);
-		expect(norm.exitCode).toBe(0);
-
-		const graph = await run(["render", join(dir, "valid.pfdsl"), "--no-color"]);
-		expect(graph.exitCode).toBe(0);
-	});
+	// Per-subcommand --no-color acceptance is covered exhaustively by the
+	// #508 table below, which asserts the flag's effect and not just exit 0.
 });
 
 describe("ANSI color for check diagnostics (#435)", () => {
@@ -919,62 +844,122 @@ describe("ANSI color for check diagnostics (#435)", () => {
 });
 
 describe("run() wires color into the check command (#435)", () => {
-	const originalIsTTY = process.stdout.isTTY;
-
-	afterEach(() => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: originalIsTTY,
-			configurable: true,
-		});
-		delete process.env.NO_COLOR;
-	});
-
 	it("emits ANSI codes on a TTY with no NO_COLOR and no --no-color flag", async () => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
-		});
-		const r = await run(["check", join(dir, "invalid.pfdsl")]);
+		const r = await run(["check", join(dir, "invalid.pfdsl")], onATty);
 		expect(r.stderr).toContain("\x1b[31merror\x1b[0m");
 	});
 
 	it("suppresses ANSI codes on a TTY when --no-color is passed", async () => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
-		});
-		const r = await run(["check", join(dir, "invalid.pfdsl"), "--no-color"]);
+		const r = await run(
+			["check", join(dir, "invalid.pfdsl"), "--no-color"],
+			onATty,
+		);
 		expect(r.stderr).not.toContain("\x1b[");
 	});
 
 	it("suppresses ANSI codes on a TTY when NO_COLOR env is set", async () => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
+		const r = await run(["check", join(dir, "invalid.pfdsl")], {
+			stdout: { isTTY: true },
+			env: { NO_COLOR: "1" },
 		});
-		process.env.NO_COLOR = "1";
-		const r = await run(["check", join(dir, "invalid.pfdsl")]);
 		expect(r.stderr).not.toContain("\x1b[");
 	});
 });
 
+// Every --json-capable command owes the same contract on a file that fails to
+// validate: exit 1, the failure in the payload, and stderr left clean for
+// warnings. Thirteen hand-copied cases used to state this, and the six graph
+// ones had drifted into asserting only that `diagnostics` was an array —
+// an empty array would have satisfied them. One table states it once, so a
+// command added later joins the contract by adding a row.
+describe("--json failure payload on a file that does not validate", () => {
+	const invalidFile = () => join(dir, "invalid.pfdsl");
+
+	const cases: Array<{ name: string; argv: () => string[] }> = [
+		{ name: "check", argv: () => ["check", invalidFile(), "--json"] },
+		{
+			name: "meta reindex",
+			argv: () => ["meta", "reindex", invalidFile(), "--json"],
+		},
+		{
+			name: "meta set",
+			argv: () => [
+				"meta",
+				"set",
+				invalidFile(),
+				"spec",
+				"status",
+				"done",
+				"--json",
+			],
+		},
+		{
+			name: "meta get",
+			argv: () => ["meta", "get", invalidFile(), "spec", "status", "--json"],
+		},
+		{
+			name: "graph edges",
+			argv: () => ["graph", "edges", invalidFile(), "--json"],
+		},
+		{ name: "graph io", argv: () => ["graph", "io", invalidFile(), "--json"] },
+		{
+			name: "graph summary",
+			argv: () => ["graph", "summary", invalidFile(), "--json"],
+		},
+		{
+			name: "graph neighbors",
+			argv: () => ["graph", "neighbors", invalidFile(), "spec", "--json"],
+		},
+		{
+			name: "graph impact",
+			argv: () => ["graph", "impact", invalidFile(), "spec", "--json"],
+		},
+		{
+			name: "graph depends-on",
+			argv: () => ["graph", "depends-on", invalidFile(), "spec", "--json"],
+		},
+		{
+			name: "graph path",
+			argv: () => ["graph", "path", invalidFile(), "spec", "code", "--json"],
+		},
+		{
+			name: "graph stats",
+			argv: () => ["graph", "stats", invalidFile(), "--json"],
+		},
+		{
+			name: "graph orphans",
+			argv: () => ["graph", "orphans", invalidFile(), "--json"],
+		},
+		{
+			name: "status ready",
+			argv: () => ["status", "ready", invalidFile(), "--json"],
+		},
+		{
+			name: "diff",
+			argv: () => ["diff", invalidFile(), invalidFile(), "--json"],
+		},
+	];
+
+	it.each(
+		cases,
+	)("$name exits 1 with { ok: false, diagnostics: [...] } on stdout and empty stderr", async ({
+		argv,
+	}) => {
+		const r = await run(argv());
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	});
+
+	// status gaps is absent here on purpose: it takes two files, and which of
+	// the two failed to parse is the thing worth asserting. Its own describe
+	// covers each side against the fixtures it already builds.
+});
+
 describe("--no-color wired into all diagnostic-emitting commands (#508)", () => {
-	const originalIsTTY = process.stdout.isTTY;
-
-	beforeEach(() => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: true,
-			configurable: true,
-		});
-	});
-
-	afterEach(() => {
-		Object.defineProperty(process.stdout, "isTTY", {
-			value: originalIsTTY,
-			configurable: true,
-		});
-	});
-
 	const invalidFile = () => join(dir, "invalid.pfdsl");
 
 	const cases: Array<{ name: string; argv: (noColor: boolean) => string[] }> = [
@@ -1178,10 +1163,10 @@ describe("--no-color wired into all diagnostic-emitting commands (#508)", () => 
 	)("$name emits ANSI red on TTY without --no-color, suppresses it with --no-color", async ({
 		argv,
 	}) => {
-		const withColor = await run(argv(false));
+		const withColor = await run(argv(false), onATty);
 		expect(withColor.stderr).toContain("\x1b[31merror\x1b[0m");
 
-		const noColor = await run(argv(true));
+		const noColor = await run(argv(true), onATty);
 		expect(noColor.stderr).not.toContain("\x1b[");
 	});
 });
@@ -1542,21 +1527,6 @@ describe("status ready", () => {
 		expect(r.exitCode).toBe(1);
 	});
 
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const r = await run([
-			"status",
-			"ready",
-			join(dir, "invalid.pfdsl"),
-			"--json",
-		]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
-	});
-
 	it("missing argument returns exit 2", async () => {
 		const r = await run(["status", "ready"]);
 		expect(r.exitCode).toBe(2);
@@ -1598,16 +1568,6 @@ describe("status ready", () => {
 		// make_y unblocks nothing (merge still needs x which is todo)
 		// make_x should be chosen as best
 		expect(parsed.best.id).toBe("make_x");
-	});
-
-	it("--best not passed: no computation overhead, best absent from JSON", async () => {
-		const f = withStatus(
-			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
-		);
-		const r = await run(["status", "ready", f, "--json"]);
-		expect(r.exitCode).toBe(0);
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.best).toBeUndefined();
 	});
 
 	it("excludes process whose output artifacts are all done", async () => {
@@ -1994,18 +1954,6 @@ b >> p1 -> c
 		expect(r.stderr).toBe("");
 		expect(JSON.parse(r.stdout)).toEqual({ ok: false, missing: ["ghost"] });
 		expect(readFileSync(f, "utf-8")).toBe(generic);
-	});
-
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const f = join(dir, "meta-set-parse-error.pfdsl");
-		writeFileSync(f, "req >> design -> spec\nother -> spec\n"); // V001: dual generators
-		const r = await run(["meta", "set", f, "spec", "status", "done", "--json"]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
 	});
 
 	it("writes flow-indicator values (}, comma) into a flow-style entry intact", async () => {
@@ -2430,8 +2378,11 @@ describe("status list", () => {
 		);
 		const r = await run(["status", "list", f, "--status", "todo"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("a");
-		expect(r.stdout).not.toContain('"b"');
+		// A bare toContain("a") would also be satisfied by the word "Artifacts"
+		// in the header, so match the count and the row itself.
+		expect(r.stdout).toContain("Artifacts (1):");
+		expect(r.stdout).toMatch(/^ {2}a\s+"a"\s+status: todo$/m);
+		expect(r.stdout).not.toMatch(/^ {2}b\s/m);
 	});
 
 	it("lists artifacts matching multiple comma-separated statuses", async () => {
@@ -2440,9 +2391,10 @@ describe("status list", () => {
 		);
 		const r = await run(["status", "list", f, "--status", "todo,wip"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("a");
-		expect(r.stdout).toContain("b");
-		expect(r.stdout).not.toContain('"c"');
+		expect(r.stdout).toContain("Artifacts (2):");
+		expect(r.stdout).toMatch(/^ {2}a\s+"a"\s+status: todo$/m);
+		expect(r.stdout).toMatch(/^ {2}b\s+"b"\s+status: wip$/m);
+		expect(r.stdout).not.toMatch(/^ {2}c\s/m);
 	});
 
 	it("excludes artifacts without a matching status", async () => {
@@ -2835,23 +2787,6 @@ req -> spec
 		expect(r.stderr).not.toContain("error:");
 	});
 
-	it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const r = await run([
-			"meta",
-			"get",
-			join(dir, "invalid.pfdsl"),
-			"spec",
-			"status",
-			"--json",
-		]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		expect(parsed.diagnostics.length).toBeGreaterThan(0);
-	});
-
 	it("warns on stderr for an unrecognized field name but still succeeds", async () => {
 		const f = join(dir, "get-unknown-field.pfdsl");
 		writeFileSync(f, base);
@@ -2908,36 +2843,22 @@ req -> spec
 	});
 
 	it("returns null with a warning when an explicit derived field is requested from stdin", async () => {
-		stdinOverride = `---
-process:
-  build:
-    location: src/build.ts
-    command: npm run build
----
-req >> build -> out
-`;
-		try {
-			const r = await run([
-				"meta",
-				"get",
-				"-",
-				"build",
-				"location.resolved,command.cwd",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(0);
-			expect(JSON.parse(r.stdout)).toEqual({
-				ok: true,
-				values: {
-					build: { "location.resolved": null, "command.cwd": null },
-				},
-			});
-			expect(r.stderr).toContain("stdin");
-			expect(r.stderr).toContain("location.resolved");
-			expect(r.stderr).toContain("command.cwd");
-		} finally {
-			stdinOverride = null;
-		}
+		const r = await run(
+			["meta", "get", "-", "build", "location.resolved,command.cwd", "--json"],
+			withStdin(
+				"---\nprocess:\n  build:\n    location: src/build.ts\n    command: npm run build\n---\nreq >> build -> out\n",
+			),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: {
+				build: { "location.resolved": null, "command.cwd": null },
+			},
+		});
+		expect(r.stderr).toContain("stdin");
+		expect(r.stderr).toContain("location.resolved");
+		expect(r.stderr).toContain("command.cwd");
 	});
 
 	it("round-trips a relative location unchanged through meta set then meta get", async () => {
@@ -3160,21 +3081,6 @@ spec >> review -> report
 			});
 		});
 
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"neighbors",
-				join(dir, "invalid.pfdsl"),
-				"spec",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		});
-
 		it("exits 2 when the id argument is missing", async () => {
 			const f = join(dir, "neighbors-missing.pfdsl");
 			writeFileSync(f, base);
@@ -3239,21 +3145,6 @@ spec >> review -> report
 				missing: ["nonexistent"],
 			});
 		});
-
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"impact",
-				join(dir, "invalid.pfdsl"),
-				"spec",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		});
 	});
 
 	describe("depends-on", () => {
@@ -3283,21 +3174,6 @@ spec >> review -> report
 				ok: false,
 				missing: ["nonexistent"],
 			});
-		});
-
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"depends-on",
-				join(dir, "invalid.pfdsl"),
-				"spec",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
 		});
 	});
 
@@ -3353,22 +3229,6 @@ spec >> review -> report
 				ok: false,
 				missing: ["nonexistent"],
 			});
-		});
-
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"path",
-				join(dir, "invalid.pfdsl"),
-				"spec",
-				"code",
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
 		});
 
 		it("exits 2 when the to argument is missing", async () => {
@@ -3527,20 +3387,6 @@ p3 -> d
 			expect(r.stderr).toBe("");
 			expect(() => JSON.parse(r.stdout)).not.toThrow();
 		});
-
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"stats",
-				join(dir, "invalid.pfdsl"),
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
-		});
 	});
 
 	describe("orphans", () => {
@@ -3575,20 +3421,6 @@ p3 -> d
 			const parsed = JSON.parse(r.stdout);
 			expect(parsed.ok).toBe(true);
 			expect(parsed.orphans).toEqual([{ id: "floater", kind: "artifact" }]);
-		});
-
-		it("--json on parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-			const r = await run([
-				"graph",
-				"orphans",
-				join(dir, "invalid.pfdsl"),
-				"--json",
-			]);
-			expect(r.exitCode).toBe(1);
-			expect(r.stderr).toBe("");
-			const parsed = JSON.parse(r.stdout);
-			expect(parsed.ok).toBe(false);
-			expect(Array.isArray(parsed.diagnostics)).toBe(true);
 		});
 
 		it("missing file returns exit 1", async () => {

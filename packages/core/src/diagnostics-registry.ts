@@ -329,7 +329,10 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 };
 
 const CODE_RE = /code:\s*"([A-Z]+\d+)"/g;
+// Both spellings of "warning by default, error under --strict": the inline
+// ternary, and the ctx.strictly() helper the rule modules call.
 const STRICT_TERNARY_RE = /options\?\.strict\s*\?\s*"error"\s*:\s*"warning"/;
+const STRICTLY_CALL_RE = /strictly\(\s*"(error|warning|info)"\s*\)/;
 const PLAIN_SEVERITY_RE = /"(error|warning|info)"/;
 
 /**
@@ -357,8 +360,9 @@ export function extractDiagnosticCodesFromSource(
 		const window = source.slice(windowStart, windowEnd);
 
 		let severities: string[];
-		if (STRICT_TERNARY_RE.test(window)) {
-			severities = ["warning", "error"];
+		if (STRICT_TERNARY_RE.test(window) || STRICTLY_CALL_RE.test(window)) {
+			const strictlyMatch = window.match(STRICTLY_CALL_RE);
+			severities = [strictlyMatch?.[1] ?? "warning", "error"];
 		} else {
 			const sevMatch = window.match(PLAIN_SEVERITY_RE);
 			severities = sevMatch?.[1] !== undefined ? [sevMatch[1]] : [];
