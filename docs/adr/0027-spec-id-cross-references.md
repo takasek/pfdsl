@@ -80,7 +80,7 @@ GFM の table セル内はインライン要素のみのため、「table 行内
 - 本 ADR と同時に最小 lint（ID 一意性チェック・`[[SPEC_xxx]]` の dangling 参照チェック）を導入する。
   実装は `scripts/check-spec-ids.mjs`、`make check-docs` 経由で CI 実行する。
 - `spec.md` 全節への遡及的 ID 付与、および既存の節番号参照を ID 参照へ置き換える移行作業は本 ADR のスコープ外とする。
-  別 issue として起票し段階移行する（roadmap の `migrate_spec_id_refs` プレースホルダが該当する）。
+  別 issue として起票し段階移行する（#542 / roadmap の `i542_migrate_spec_id_refs` が該当する）。
 - ID 指定でレンジ規則に従う該当ブロックを取得するツール（get-by-ID、#402）は遡及的 ID 付与より先に実装する。
   LLM が spec 全文を読まず該当ブロックのみ取得する token 削減手段であり、移行作業での範囲の機械確認とレンジ規則実装の検証を兼ねる。
 - ID 発行・renumber・複数 repo 対応の専用ツール化は時期尚早と判断する。
