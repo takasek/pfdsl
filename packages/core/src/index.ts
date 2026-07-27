@@ -22,6 +22,10 @@ import {
 	splitBodyIntoSegments,
 } from "./formatter.js";
 import { loadFrontmatter } from "./frontmatter.js";
+import {
+	parseFrontmatterCst,
+	renderFrontmatterCst,
+} from "./frontmatter-cst.js";
 import { detectChildIndent, escapeRe } from "./frontmatter-text.js";
 import { buildGraph } from "./graph.js";
 import { lex } from "./lexer.js";
@@ -264,7 +268,15 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 		? []
 		: validate(edges, nodeKinds, frontmatter, { source });
 
-	const frontmatterSection = source.slice(0, source.length - body.length);
+	// Frontmatter is canonicalized through the yaml CST (ADR-0034) rather than
+	// passed through verbatim. Left untouched when absent, or when the fence
+	// is malformed (parseDiags already carries the FM001 diagnostic for that
+	// case, and nothing here is safe to rewrite).
+	const rawFrontmatterSection = source.slice(0, source.length - body.length);
+	const frontmatterCst = parseFrontmatterCst(source);
+	const frontmatterSection = frontmatterCst.present
+		? renderFrontmatterCst(frontmatterCst.doc)
+		: rawFrontmatterSection;
 
 	// Format segment by segment to preserve comment lines. Isolated-node
 	// detection is done once above for the whole document (edgeNodes there
