@@ -38,6 +38,13 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
   具体例: `scripts/cycle-status.mjs` / `scripts/gate-check.mjs`（内部の `audit-issues-flow.mjs`）が `gh` に `execSync`/`execFileSync` で依存しており、`gh` 不在の Claude Code Remote セッションで `audit-issues-flow.mjs` が `spawnSync gh ENOENT` でクラッシュし、gate-check の残り項目の出力ごと失われた（#482 セッション、#489 で追跡）。
   対策: 該当ステップは GitHub MCP のツール呼び出しで個別に代替できる（`.pfdsl/roadmap.md`「自動生成 PR」節に代替手順を記録）。恒久対策（`gh` 依存の解消・try/catch 化）は #489。
 
+- **規約が名指しする手段を実行主体が起動できない trap**: 運用規約が特定のコマンド・スキルを名指しすると、実行主体（AI）の権限でそれを起動できない場合に、規約が構造的に満たせなくなる。
+  外部ツールの不在（上の「実行環境の暗黙前提 trap」）と違い、**同じ harness の中にコマンドは存在する**ため、失敗が「使えない」でなく「呼べない」形で出る。
+  黙って類似コマンドへ落ちるか項目ごと飛ばすかのどちらかになり、どちらも規約の遵守記録を汚す。計測を伴う規約では分母が歪む。
+  問いの形: 「この規約が名指しする手段は、規約を実行する主体の権限で起動できるか。人間が手で打つ前提になっていないか」。
+  具体例: `/code-review` を実施せよという実測規約に対し、`/code-review` は `disable-model-invocation` で AI からは起動できなかった（#561 実測期間、PR #569 で `/simplify` を既定に変更）。ユーザーが手で打った回にしか満たせない規約になっていた。
+  対策: 手段を名指しする規約を書くときは、規約の実行主体を1語で決めてから書く。AI が回す前提なら model-invocable なものを既定に置き、人手前提のものは「ユーザーが実施する回のみ」と条件を明示する。
+
 - **companion 追記手順の見落とし**: SKILL.md 本文の自己点検セクションが1つのスクリプトしか名指ししていないと、同じ契機で実行すべき binding 側の追加ステップ（companion にのみ書かれている）を読み飛ばしたまま作業を始めてしまう。
   問いの形: 「このセルフチェック手順は、binding に追記された継続ステップの存在を保証しているか、それとも読み手が binding 全文を読む前提に依存しているか」。
   具体例: `.pfdsl/bindings/pfd-ops.md` に「配置ファイルの鮮度セルフチェックに続けて `check-scaffold-sync.mjs` も実行する」という追加ステップがあったが、SKILL.md 側の該当セクションはそれへの参照を持たず、セッション開始時に見落とした（retro で気付き実行、drift は無し）。
