@@ -55,11 +55,11 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 自己レビュー（差分の読み直し）は実施済みとみなし、それに**加えて**軽い設定のレビューを実施する（角度を絞る。8角度 × 検証 agent の高効度設定は使わない）。
 実行手段は次の優先順で選ぶ。
 
-1. **A（基本）— ユーザーが `/code-review` を実行する。** AI は判断軸（対象 diff の範囲・絞る角度・level）を添えて依頼を出し、**結果を受け取って反映するまでサイクルを閉じない**（`/vscode-ext-debug` の UI 確認と同じ扱い）。依頼を出しただけで PR を作るとゲートが実質スキップになる
-2. **B（AI へ委任する回の最有力）— `code-reviewer` agent を Agent tool で起動する。** `disable-model-invocation` を持たないため、ユーザーが不在の回でも回る。**導入が前提** — `pr-review-toolkit` / `feature-dev` plugin のいずれかを有効化していないと選べない
-3. **C（fallback）— `/simplify`。** 常に使えるが、角度は4つ固定でレビューの深さは A に劣る
+1. **A — `/code-review`。** 既存 PR に対する大規模 diff のレビュー向け。プロトコルが 5 並列 finder agent + 候補ごとの検証 agent を起動し、結果を対象 PR にコメントする形なので、**PR 作成前のサイクル**と**数十行規模の diff** には構造的に合わない。選ぶのは PR が既にあり diff が大きい回に限る
+2. **B — `code-reviewer` agent を Agent tool で起動する。** **導入が前提** — `pr-review-toolkit` / `feature-dev` plugin のいずれかを有効化していないと選べない
+3. **C（既定）— `/simplify`。** 常に使え、PR 作成前でも回せる。角度は4つ固定。scoped な修正にはこれが規模相応
 
-`/code-review` は `disable-model-invocation` のため AI からは起動できない。A を AI 単独で満たすことはできない。
+起動可否は harness と plugin の版に依存する。過去に「AI からは起動できない」と記録された手段でも、規約に従う前にその回の実体（コマンド定義の `disable-model-invocation`）を確認する。2026-07-28 時点で `/code-review` は `disable-model-invocation: false`。
 
 記録はコミットの trailer に置き、`tool=` でどれを回したかを書く。
 **1サイクルで複数回レビューしたら、その回数だけ書く** — 自己レビュー → ツール → 指摘対応、と複数パスが走るのが普通で、1本に丸めると何が何を見つけたかが失われる。集計はマージ（first-parent）単位でサイクルを数え、同一サイクル内の複数記録は合算する。
