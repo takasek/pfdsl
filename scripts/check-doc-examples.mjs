@@ -17,7 +17,8 @@
  */
 
 import { readFileSync, writeFileSync, unlinkSync } from 'fs';
-import { execSync, spawnSync } from 'child_process';
+import { spawnSync } from 'child_process';
+import { git } from './lib/run-exec.mjs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
@@ -65,7 +66,7 @@ function extractBlocks(filePath) {
 const args = process.argv.slice(2);
 const defaultFiles = [
   'docs/spec/spec.md',
-  ...execSync('git ls-files "docs/spec/proposals/*.md"', { encoding: 'utf8' })
+  ...git(["ls-files", "docs/spec/proposals/*.md"])
     .trim()
     .split('\n')
     .filter(Boolean),

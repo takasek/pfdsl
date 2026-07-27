@@ -33,9 +33,11 @@ jobs:
 
       - run: pnpm -r test
 
-      - run: node --test "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs"
+      - run: node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs"
 
       - run: node scripts/check-script-imports.mjs
+
+      - run: node scripts/check-no-shell-strings.mjs
 
       - run: make check-docs
 

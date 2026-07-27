@@ -3,11 +3,11 @@
 // check, flow-sync PR check, ready listing) into one compact JSON payload.
 // Usage: node scripts/cycle-status.mjs [--base main]
 
-import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
+import { run } from "./lib/run-exec.mjs";
 import {
 	classifyPRs,
 	parseReadyOutput,
@@ -25,13 +25,13 @@ const args = process.argv.slice(2);
 const baseFlagIdx = args.indexOf("--base");
 const base = baseFlagIdx >= 0 ? args[baseFlagIdx + 1] : "main";
 
-function sh(cmd) {
-	return execSync(cmd, { cwd: root, encoding: "utf-8" });
-}
+// `base` comes from argv; naming the executable and arguments separately keeps
+// it out of a shell (#572).
+const sh = (file, args) => run(file, args, { cwd: root });
 
 let fetched = true;
 try {
-	sh("git fetch origin");
+	sh("git", ["fetch", "origin"]);
 } catch {
 	fetched = false;
 }
@@ -39,7 +39,7 @@ try {
 let behindBase = null;
 let behindBaseError = null;
 try {
-	behindBase = countBehind(sh(`git log --oneline HEAD..origin/${base}`));
+	behindBase = countBehind(sh("git", ["log", "--oneline", `HEAD..origin/${base}`]));
 } catch (e) {
 	behindBaseError = e.message;
 }
@@ -63,7 +63,7 @@ let bestOutputs = [];
 let readyError = null;
 if (existsSync(cliPath)) {
 	try {
-		const readyJson = JSON.parse(sh(`node "${cliPath}" status ready .pfdsl/roadmap.pfdsl --best --json`));
+		const readyJson = JSON.parse(sh(process.execPath, [cliPath, "status", "ready", ".pfdsl/roadmap.pfdsl", "--best", "--json"]));
 		({ ready, best, bestOutputs } = parseReadyOutput(readyJson));
 	} catch (e) {
 		readyError = e.message;

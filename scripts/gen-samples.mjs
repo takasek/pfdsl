@@ -3,8 +3,8 @@
 // Run from repo root: node scripts/gen-samples.mjs
 // Requires graphviz `dot` CLI to be installed.
 
+import { run } from "./lib/run-exec.mjs";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { execSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildReadme } from "./gen-samples-readme.mjs";
@@ -38,7 +38,7 @@ for (const f of files) {
   const svgPath = resolve(samplesDir, `${base}.svg`);
 
   writeFileSync(dotPath, dot);
-  execSync(`dot -Tsvg "${dotPath}" -o "${svgPath}"`);
+  run("dot", ["-Tsvg", dotPath, "-o", svgPath]);
   console.log(`${base} → .dot + .svg`);
 }
 

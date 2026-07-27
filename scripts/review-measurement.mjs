@@ -14,9 +14,6 @@
 // be read is listed separately and sets a non-zero exit — an unread cycle is not
 // a clean one.
 
-import { execFileSync } from "node:child_process";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
 	RECORD_SEP,
 	FIELD_SEP,
@@ -30,8 +27,17 @@ import {
 	countMeasurementTrailers,
 	classifyCycle,
 } from "./lib/review-measurement.mjs";
+import { tryGit as sharedTryGit, tryRun } from "./lib/run-exec.mjs";
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+// The repository being aggregated is the one the command runs in, not the one
+// this file happens to live in — the tool reads history, and a checkout other
+// than its own is a legitimate target (the tests build one).
+const toplevel = tryRun("git", ["rev-parse", "--show-toplevel"], { cwd: process.cwd(), captureStderr: true });
+if (!toplevel.ok) {
+	console.error("review-measurement: not inside a git repository");
+	process.exit(1);
+}
+const root = toplevel.out.trim();
 const argv = parseSinceArg(process.argv.slice(2));
 if (argv.error) {
 	console.error(`review-measurement: ${argv.error}`);
@@ -40,13 +46,7 @@ if (argv.error) {
 const since = argv.since;
 
 // argv form, never a shell string: a ref is user input and reaches git verbatim.
-function tryGit(args) {
-	try {
-		return { ok: true, out: execFileSync("git", args, { cwd: root, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024 }) };
-	} catch (e) {
-		return { ok: false, out: e.stdout || e.message };
-	}
-}
+const tryGit = (args) => sharedTryGit(args, { cwd: root });
 
 const range = since ? `${since}..HEAD` : "HEAD";
 const logFormat = `--format=%H${FIELD_SEP}%B${RECORD_SEP}`;

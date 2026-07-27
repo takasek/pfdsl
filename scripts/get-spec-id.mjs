@@ -19,7 +19,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { git } from "./lib/run-exec.mjs";
 import { findSpecIdDefinitions } from "./lib/spec-id-check.mjs";
 import { computeRange } from "./lib/spec-id-range.mjs";
 
@@ -33,7 +33,7 @@ if (!id) {
 const files =
 	fileArgs.length > 0
 		? fileArgs
-		: execSync('git ls-files "docs/**/*.md"', { encoding: "utf8" })
+		: git(["ls-files", "docs/**/*.md"])
 				.trim()
 				.split("\n")
 				.filter(Boolean);

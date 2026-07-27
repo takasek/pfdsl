@@ -19,7 +19,7 @@
  */
 
 import { readFileSync } from 'fs';
-import { execSync } from 'child_process';
+import { git } from "./lib/run-exec.mjs";
 
 const BOUNDARY = new Set([...'。！？」』）…～.!?:*']);
 const CLOSE = new Set([...'`])}'  ]);
@@ -81,7 +81,7 @@ function checkFile(filePath) {
 const args = process.argv.slice(2);
 const files = args.length > 0
   ? args
-  : execSync('git ls-files "*.md"', { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+  : git(["ls-files", "*.md"]).trim().split('\n').filter(Boolean);
 
 let total = 0;
 for (const file of files) {
