@@ -1171,11 +1171,50 @@ const KNOWN_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
  * can also be requested explicitly via the field positional, in which case
  * only the derived value is returned (the base field is not auto-added).
  */
-const DERIVED_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
-	artifact: new Set(["location.resolved"]),
-	process: new Set(["location.resolved", "command.cwd"]),
-	group: new Set(),
+/**
+ * Everything about a derived field in one entry: which kinds accept it, which
+ * field it derives from, and how it is computed. The two paths that produce
+ * derived fields — the auto-add beside a base field, and an explicit request
+ * by name — read the same entry, so they cannot disagree. Adding one means
+ * adding an entry, not editing four places.
+ */
+const DERIVED_FIELD_SPECS: Record<
+	string,
+	{
+		kinds: readonly ("artifact" | "process" | "group")[];
+		base: string;
+		compute: (
+			docFsPath: string,
+			meta: Record<string, unknown>,
+			basePath?: string,
+		) => unknown;
+	}
+> = {
+	"location.resolved": {
+		kinds: ["artifact", "process"],
+		base: "location",
+		compute: (docFsPath, meta, basePath) =>
+			resolveLocationDerived(
+				docFsPath,
+				meta.location as string | string[],
+				basePath,
+			),
+	},
+	"command.cwd": {
+		kinds: ["process"],
+		base: "command",
+		compute: (docFsPath, _meta, basePath) =>
+			commandCwdDerived(docFsPath, basePath),
+	},
 };
+
+/** Which derived fields each kind accepts — read off the specs, never listed twice. */
+function derivedFieldAcceptedBy(
+	kind: "artifact" | "process" | "group",
+	field: string,
+): boolean {
+	return DERIVED_FIELD_SPECS[field]?.kinds.includes(kind) ?? false;
+}
 
 /** Classify a single `location:` element per spec §15.8 and resolve it if it's not a URL. */
 function resolveLocationElement(
@@ -1278,22 +1317,25 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 			if (!displayFields.includes(field)) displayFields.push(field);
 		};
 
-		// Derived fields auto-accompany their base field right after it, but
-		// only when the node actually has the base field and we have a real
-		// file path to resolve against (not stdin).
-		const addLocationResolvedIfApplicable = () => {
-			if (meta?.location === undefined || docFsPath === null) return;
-			row["location.resolved"] = resolveLocationDerived(
-				docFsPath,
-				meta.location,
-				basePath,
-			);
-			addField("location.resolved");
-		};
-		const addCommandCwdIfApplicable = () => {
-			if (meta?.command === undefined || docFsPath === null) return;
-			row["command.cwd"] = commandCwdDerived(docFsPath, basePath);
-			addField("command.cwd");
+		// Derived fields auto-accompany their base field right after it. Two
+		// different conditions, deliberately kept apart: a node without the base
+		// field does not get the derived one at all (it does not apply), while a
+		// node that has it but cannot be resolved against a real path answers
+		// with null and says why. Dropping the latter silently would read as
+		// "this node has no location", and would make the key set of --json
+		// depend on whether the input arrived as a file or a pipe (#510).
+		const addDerivedFor = (baseField: string) => {
+			for (const [derived, spec] of Object.entries(DERIVED_FIELD_SPECS)) {
+				if (spec.base !== baseField || meta?.[baseField] === undefined)
+					continue;
+				addField(derived);
+				if (docFsPath === null) {
+					row[derived] = null;
+					flagStdin(derived, id);
+					continue;
+				}
+				row[derived] = spec.compute(docFsPath, meta, basePath);
+			}
 		};
 
 		if (explicitFields === undefined) {
@@ -1302,37 +1344,32 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 			for (const field of meta ? Object.keys(meta) : []) {
 				row[field] = meta![field];
 				addField(field);
-				if (field === "location") addLocationResolvedIfApplicable();
-				if (field === "command") addCommandCwdIfApplicable();
+				addDerivedFor(field);
 			}
 		} else {
 			for (const field of explicitFields) {
-				if (field === "location.resolved" || field === "command.cwd") {
+				const derivedSpec = DERIVED_FIELD_SPECS[field];
+				if (derivedSpec) {
 					addField(field);
-					if (!DERIVED_FIELDS[kind].has(field)) flagUnknown(kind, field, id);
+					if (!derivedFieldAcceptedBy(kind, field))
+						flagUnknown(kind, field, id);
 					if (docFsPath === null) {
 						row[field] = null;
 						flagStdin(field, id);
 						continue;
 					}
-					if (field === "location.resolved") {
-						row[field] =
-							meta?.location === undefined
-								? null
-								: resolveLocationDerived(docFsPath, meta.location, basePath);
-					} else {
-						row[field] =
-							meta?.command === undefined
-								? null
-								: commandCwdDerived(docFsPath, basePath);
-					}
+					// Asked for by name, so an absent base field answers with null
+					// rather than being dropped from the output.
+					row[field] =
+						meta?.[derivedSpec.base] === undefined
+							? null
+							: derivedSpec.compute(docFsPath, meta, basePath);
 					continue;
 				}
 				addField(field);
 				if (!KNOWN_FIELDS[kind].has(field)) flagUnknown(kind, field, id);
 				row[field] = meta?.[field] ?? null;
-				if (field === "location") addLocationResolvedIfApplicable();
-				if (field === "command") addCommandCwdIfApplicable();
+				addDerivedFor(field);
 			}
 		}
 
