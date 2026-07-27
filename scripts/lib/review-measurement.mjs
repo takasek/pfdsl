@@ -130,3 +130,43 @@ export function parseSinceArg(argv) {
 	if (!value || value.startsWith("-")) return { error: "--since needs a ref" };
 	return { since: value };
 }
+
+/**
+ * How many trailers a cycle's commits carry. The rule allows exactly one per
+ * cycle; more than one is double-counted by the commit-wise summary while the
+ * merge-wise scan sees a single cycle, so the two views disagree silently.
+ * @param {string} text - the concatenated commit messages of one cycle
+ */
+export function countMeasurementTrailers(text) {
+	return (text.match(/^Review-Measurement:/gm) ?? []).length;
+}
+
+/**
+ * Judge one cycle against its own diff.
+ * Trailer presence alone is not enough: `sample=` is written by hand and the
+ * paths it claims are checkable, so a cycle that changed code and declared
+ * itself out of sample silently leaves the denominator.
+ * @param {{changedFiles: string, trailerCount: number, sample?: string}} cycle
+ * @returns {{inSampleByPath: boolean, issues: Array<{type: string, detail: string}>}}
+ */
+export function classifyCycle({ changedFiles, trailerCount, sample }) {
+	const inSampleByPath = IN_SAMPLE_PATH.test(changedFiles);
+	const issues = [];
+
+	if (trailerCount === 0) {
+		if (inSampleByPath) issues.push({ type: "missing", detail: "changed code but carries no record" });
+		return { inSampleByPath, issues };
+	}
+
+	if (trailerCount > 1) {
+		issues.push({ type: "duplicate", detail: `${trailerCount} records in one cycle; the rule allows one` });
+		return { inSampleByPath, issues };
+	}
+
+	if (inSampleByPath && sample === "out") {
+		issues.push({ type: "mismatch", detail: "changed code but recorded sample=out" });
+	} else if (!inSampleByPath && sample === "in") {
+		issues.push({ type: "mismatch", detail: "changed no code but recorded sample=in" });
+	}
+	return { inSampleByPath, issues };
+}

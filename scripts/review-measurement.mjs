@@ -7,9 +7,12 @@
 // Usage:
 //   node scripts/review-measurement.mjs [--since <ref>]
 //
-// --since additionally reports merges that changed packages/ or scripts/ but
-// carry no record. Those are missing samples, not zero-finding cycles, and
-// silently dropping them would shrink the denominator the rate depends on.
+// --since additionally audits every merge that landed on the base branch since
+// the ref: a missing record, a `sample=` that contradicts the merge's own diff,
+// or two records in one cycle. All three shrink or pad the denominator the rate
+// depends on, so they are reported rather than passed over. A merge that cannot
+// be read is listed separately and sets a non-zero exit — an unread cycle is not
+// a clean one.
 
 import { execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
@@ -24,6 +27,8 @@ import {
 	TRAILER_GREP,
 	IN_SAMPLE_PATH,
 	parseSinceArg,
+	countMeasurementTrailers,
+	classifyCycle,
 } from "./lib/review-measurement.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -95,21 +100,48 @@ if (!since) {
 // the branch tip and ^2 is main — the diff reads as main's changes and ^1..^2
 // as commits already merged, so it is reported as a cycle that never existed.
 const mergesResult = tryGit(["log", "--merges", "--first-parent", "--format=%H", `${since}..HEAD`]);
-const merges = mergesResult.ok ? mergesResult.out.trim().split("\n").filter(Boolean) : [];
-const missing = [];
+if (!mergesResult.ok) {
+	console.error(`review-measurement: failed to list merges since ${since}: ${mergesResult.out.trim()}`);
+	process.exit(1);
+}
+const merges = mergesResult.out.trim().split("\n").filter(Boolean);
+
+const issues = [];
+// A cycle we could not read is not a clean cycle. Collected rather than skipped
+// so a shallow clone cannot produce an all-green report from zero evidence.
+const unreadable = [];
+
 for (const merge of merges) {
-	const files = tryGit(["diff", "--name-only", `${merge}^1`, merge]);
-	if (!files.ok || !IN_SAMPLE_PATH.test(files.out)) continue;
-	const bodies = tryGit(["log", "--format=%B", `${merge}^1..${merge}^2`]);
-	if (bodies.ok && parseMeasurementTrailer(bodies.out)) continue;
+	const short = merge.slice(0, 7);
 	const subject = tryGit(["log", "-1", "--format=%s", merge]);
-	missing.push(`${merge.slice(0, 7)} ${subject.ok ? subject.out.trim() : ""}`);
+	const label = `${short} ${subject.ok ? subject.out.trim() : ""}`.trim();
+
+	const files = tryGit(["diff", "--name-only", `${merge}^1`, merge]);
+	const bodies = tryGit(["log", "--format=%B", `${merge}^1..${merge}^2`]);
+	if (!files.ok || !bodies.ok) {
+		unreadable.push(`${label} — ${(files.ok ? bodies.out : files.out).trim().split("\n")[0]}`);
+		continue;
+	}
+
+	const record = parseMeasurementTrailer(bodies.out);
+	const { issues: cycleIssues } = classifyCycle({
+		changedFiles: files.out,
+		trailerCount: countMeasurementTrailers(bodies.out),
+		sample: record?.sample,
+	});
+	for (const issue of cycleIssues) issues.push(`${label} — ${issue.detail}`);
 }
 
 console.log("");
-if (missing.length === 0) {
-	console.log("  no code-changing merges are missing a record");
-} else {
-	console.log(`  missing records (${missing.length}) — code-changing merges with no Review-Measurement trailer:`);
-	for (const m of missing) console.log(`    ${m}`);
+if (issues.length === 0 && unreadable.length === 0) {
+	console.log("  every merge since the ref carries a consistent record");
+}
+if (issues.length > 0) {
+	console.log(`  record problems (${issues.length}):`);
+	for (const i of issues) console.log(`    ${i}`);
+}
+if (unreadable.length > 0) {
+	console.log(`  could not read (${unreadable.length}) — these were not checked:`);
+	for (const u of unreadable) console.log(`    ${u}`);
+	process.exitCode = 1;
 }
