@@ -2599,6 +2599,29 @@ spec >> build -> code
 		);
 	});
 
+	it("reports an auto-added derived field it cannot compute, rather than dropping it", async () => {
+		// Omitting it silently reads as "this node has no location", and makes the
+		// key set of --json depend on whether the input came from a file or a pipe.
+		// Not-applicable (no base field) still omits; applicable-but-uncomputable
+		// answers with null (#510).
+		const r = await run(
+			["meta", "get", "-", "spec", "location"],
+			withStdin(base),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("spec.location.resolved:");
+		expect(r.stderr).toContain("no file path when reading from stdin");
+	});
+
+	it("still omits a derived field whose base field the node does not have", async () => {
+		const r = await run(
+			["meta", "get", "-", "spec", "status"],
+			withStdin(base),
+		);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toContain("command.cwd");
+	});
+
 	it("resolves location for a process the same way as for an artifact", async () => {
 		const f = join(dir, "get-process-location.pfdsl");
 		writeFileSync(f, base);
