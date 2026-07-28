@@ -15,7 +15,7 @@
 	},
 	"scripts": {
 		"build": "tsup",
-		"test": "vitest run",
+		"test": "vitest run --coverage",
 		"coverage": "vitest run --coverage",
 		"typecheck": "tsgo --noEmit"
 	},

@@ -113,7 +113,7 @@
 		"build": "node esbuild.config.mjs",
 		"watch": "node esbuild.config.mjs --watch",
 		"typecheck": "tsgo --noEmit",
-		"test": "vitest run --passWithNoTests",
+		"test": "vitest run --passWithNoTests --coverage",
 		"coverage": "vitest run --coverage --passWithNoTests"
 	},
 	"dependencies": {
