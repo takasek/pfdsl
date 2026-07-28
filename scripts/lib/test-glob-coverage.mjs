@@ -1,10 +1,12 @@
 // Guards against a test file that exists but is never run. `node --test` takes
-// explicit glob arguments (it has no recursive directory mode we can use here —
-// passing a bare directory makes it try to load the directory as a module), so a
-// test file dropped outside the enumerated directories is silently skipped: it
-// passes locally when invoked by hand and never runs in CI. That is how
+// explicit glob arguments (passing a bare directory makes it try to load the
+// directory as a module rather than recurse into it), so a test file dropped
+// outside the enumerated globs is silently skipped: it passes locally when
+// invoked by hand and never runs in CI. That is how
 // scripts/review-measurement.test.mjs — including its shell-injection guard —
 // sat unrun.
+
+import { matchesGlob as nodeMatchesGlob } from "node:path";
 
 const NODE_TEST_LINE_RE = /node\s+--test\s+(.*)$/gm;
 const QUOTED_ARG_RE = /"([^"]+)"/g;
@@ -27,19 +29,24 @@ export function extractTestGlobs(source) {
 }
 
 /**
- * Match a repo-relative path against a single glob, with `*` standing for any
- * run of characters other than the path separator (node's own `--test` glob
- * semantics). Every other character is literal.
+ * Match a repo-relative path against a single glob, with the same semantics
+ * `node --test` uses to resolve its glob arguments. Delegates to `node:path`'s
+ * `matchesGlob` instead of translating the glob to a regex by hand — the
+ * hand-rolled version mapped every `*` to `[^/]*`, so it read a doubled `*` as
+ * a plain one and reported a recursive glob argument as unable to reach
+ * anything nested (#582). Agreement with what `node --test` actually collects
+ * was checked against `fs.globSync` over the repo's tracked test files; the
+ * `matchesGlob` cases below pin the semantics this check depends on.
+ * Metacharacters other than the star — `?`, character classes, brace
+ * alternation — are now interpreted as glob too, where the hand-rolled version
+ * escaped them into literals. No glob written in the Makefile or the workflow
+ * uses any of them today.
  * @param {string} path
  * @param {string} glob
  * @returns {boolean}
  */
 export function matchesGlob(path, glob) {
-	const pattern = glob
-		.split("*")
-		.map((literal) => literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-		.join("[^/]*");
-	return new RegExp(`^${pattern}$`).test(path);
+	return nodeMatchesGlob(path, glob);
 }
 
 /**
