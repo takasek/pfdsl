@@ -14,6 +14,17 @@ export default mergeConfig(
 				),
 			},
 		},
-		test: { include: ["src/**/*.test.ts"], testTimeout: 30000 },
+		test: {
+			include: ["src/**/*.test.ts"],
+			testTimeout: 30000,
+			coverage: {
+				thresholds: {
+					statements: 100,
+					branches: 100,
+					functions: 100,
+					lines: 100,
+				},
+			},
+		},
 	}),
 );

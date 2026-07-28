@@ -6,6 +6,9 @@ export default mergeConfig(
 	defineConfig({
 		test: {
 			globals: false,
+			coverage: {
+				thresholds: { statements: 99, branches: 91, functions: 99, lines: 99 },
+			},
 		},
 	}),
 );

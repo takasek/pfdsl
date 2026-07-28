@@ -113,8 +113,8 @@
 		"build": "node esbuild.config.mjs",
 		"watch": "node esbuild.config.mjs --watch",
 		"typecheck": "tsgo --noEmit",
-		"test": "vitest run --passWithNoTests",
-		"coverage": "vitest run --coverage --passWithNoTests"
+		"test": "vitest run --passWithNoTests --coverage",
+		"coverage": "pnpm test"
 	},
 	"dependencies": {
 		"@hpcc-js/wasm": "^2.18.0",
