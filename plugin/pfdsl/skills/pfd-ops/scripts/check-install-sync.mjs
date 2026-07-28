@@ -8,7 +8,7 @@
 // and sibling files under this directory only.
 //
 // Usage: node check-install-sync.mjs [--target <dir>] [--deploy]
-//        [--force-overwrite] [--force-remove-orphans] [--upstream]
+//        [--overwrite-local-edits] [--delete-edited-orphans] [--upstream]
 
 import {
 	chmodSync,
@@ -200,29 +200,30 @@ export function checkInstallSync(skillRoot, targetRoot) {
 /**
  * Copy canonical install/ files to targetRoot, creating directories as
  * needed. A target file whose hash differs from canonical is treated as a
- * local edit and skipped unless forceOverwrite is true (a local edit would
+ * local edit and skipped unless overwriteLocalEdits is true (a local edit would
  * otherwise be silently destroyed). Also removes files this tool previously
  * deployed (per the deploy manifest) whose canonical source has since been
  * dropped from install/ — unless the on-disk copy was locally modified, in
  * which case it's left alone (reported in `orphanSkipped`) unless
- * forceRemoveOrphans is given.
+ * deleteEditedOrphans is given.
  *
- * The two overrides are deliberately separate: sweeping a renamed old path
- * and discarding a customization on a surviving path are different intents,
- * and a single flag covering both silently reverts customizations the caller
- * only meant to keep (#603).
+ * Neither override decides whether a file is copied or an orphan is removed —
+ * both of those happen on their own. What the overrides decide is whether a
+ * local edit standing in the way is discarded, on a surviving path and on a
+ * vanishing one respectively. Keeping them separate matters because a single
+ * flag covering both discards edits the caller only meant to keep (#603).
  *
  * Writes/updates the deploy manifest afterward so future runs can detect
  * orphans and locally-edited files consistently.
  * @param {string} skillRoot
  * @param {string} targetRoot
- * @param {{ forceOverwrite?: boolean, forceRemoveOrphans?: boolean }} [options]
+ * @param {{ overwriteLocalEdits?: boolean, deleteEditedOrphans?: boolean }} [options]
  * @returns {{ copied: string[], skipped: string[], removed: string[], orphanSkipped: string[] }}
  */
 export function deployInstall(
 	skillRoot,
 	targetRoot,
-	{ forceOverwrite = false, forceRemoveOrphans = false } = {},
+	{ overwriteLocalEdits = false, deleteEditedOrphans = false } = {},
 ) {
 	const installDir = resolve(skillRoot, "install");
 	const files = listInstallFiles(installDir);
@@ -231,7 +232,7 @@ export function deployInstall(
 	for (const rel of files) {
 		const canonicalPath = join(installDir, rel);
 		const targetPath = join(targetRoot, rel);
-		if (existsSync(targetPath) && !forceOverwrite && !filesEqual(canonicalPath, targetPath)) {
+		if (existsSync(targetPath) && !overwriteLocalEdits && !filesEqual(canonicalPath, targetPath)) {
 			skipped.push(rel);
 			continue;
 		}
@@ -253,10 +254,10 @@ export function deployInstall(
 		if (currentSet.has(entry.path)) continue;
 		const targetPath = join(targetRoot, entry.path);
 		if (!existsSync(targetPath)) continue;
-		if (!forceRemoveOrphans && sha256(targetPath) !== entry.hash) {
+		if (!deleteEditedOrphans && sha256(targetPath) !== entry.hash) {
 			orphanSkipped.push(entry.path);
 			// Keep this entry in the manifest — it's still on disk, still
-			// orphaned, and still needs a future --force-remove-orphans deploy
+			// orphaned, and still needs a future --delete-edited-orphans deploy
 			// (or check) to find it. Dropping it here would make it invisible
 			// from now on.
 			retainedOrphanEntries.push(entry);
@@ -280,8 +281,8 @@ export function parseArgs(argv) {
 	const args = {
 		target: process.cwd(),
 		deploy: false,
-		forceOverwrite: false,
-		forceRemoveOrphans: false,
+		overwriteLocalEdits: false,
+		deleteEditedOrphans: false,
 		upstream: false,
 	};
 	for (let i = 0; i < argv.length; i++) {
@@ -297,15 +298,15 @@ export function parseArgs(argv) {
 			args.deploy = true;
 		} else if (arg === "--force") {
 			// Rejected rather than ignored: an unrecognized flag is silently
-			// dropped here, which would run an unforced deploy while the caller
-			// believes they forced one (#603).
+			// dropped here, so the deploy would keep every local edit while the
+			// caller believes they asked to discard them (#603).
 			throw new Error(
-				"--force was split into --force-overwrite and --force-remove-orphans; pass the one you mean",
+				"--force was split into --overwrite-local-edits and --delete-edited-orphans; pass the one you mean",
 			);
-		} else if (arg === "--force-overwrite") {
-			args.forceOverwrite = true;
-		} else if (arg === "--force-remove-orphans") {
-			args.forceRemoveOrphans = true;
+		} else if (arg === "--overwrite-local-edits") {
+			args.overwriteLocalEdits = true;
+		} else if (arg === "--delete-edited-orphans") {
+			args.deleteEditedOrphans = true;
 		} else if (arg === "--upstream") {
 			args.upstream = true;
 		}
@@ -344,19 +345,19 @@ async function main() {
 		// delete the very orphans a rename is inferred from.
 		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
 		// Printed before the deploy runs, not after it. With
-		// --force-remove-orphans the old path is about to be deleted, and an
+		// --delete-edited-orphans the old path is about to be deleted, and an
 		// instruction to carry its local edit over to the new path is worth
 		// nothing once the file it points at is gone (#603).
 		printRenameCandidates(renameCandidates);
 		const { copied, skipped, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, {
-			forceOverwrite: args.forceOverwrite,
-			forceRemoveOrphans: args.forceRemoveOrphans,
+			overwriteLocalEdits: args.overwriteLocalEdits,
+			deleteEditedOrphans: args.deleteEditedOrphans,
 		});
 		printGroup("Copied:", copied);
-		printGroup("Skipped (locally modified; re-run with --force-overwrite to overwrite):", skipped);
+		printGroup("Skipped (locally modified; re-run with --overwrite-local-edits to overwrite):", skipped);
 		printGroup("Removed (no longer part of canonical install/):", removed);
 		printGroup(
-			"Orphaned but locally modified; re-run with --force-remove-orphans to remove:",
+			"Orphaned but locally modified; re-run with --delete-edited-orphans to remove:",
 			orphanSkipped,
 		);
 		if (skipped.length > 0 || orphanSkipped.length > 0) exitCode = 1;
@@ -379,7 +380,7 @@ async function main() {
 				for (const r of issues) console.log(`  ${r.status}: ${r.path}`);
 				printRenameCandidates(renameCandidates);
 				console.log(
-					"Run with --deploy to refresh (add --force-overwrite to overwrite locally edited files, --force-remove-orphans to delete orphans).",
+					"Run with --deploy to refresh. Files that carry no local edit are copied, and orphans that carry none are removed, without any further flag — add --overwrite-local-edits or --delete-edited-orphans only to discard the edits standing in the way.",
 				);
 				exitCode = 1;
 			}

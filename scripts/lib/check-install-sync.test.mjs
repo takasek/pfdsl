@@ -257,7 +257,7 @@ describe("deployInstall", () => {
 		assert.equal(readFileSync(join(targetRoot, "sub", "b.txt"), "utf-8"), "canonical-b");
 	});
 
-	it("skips a locally-edited file without --force-overwrite and leaves it untouched", () => {
+	it("skips a locally-edited file without --overwrite-local-edits and leaves it untouched", () => {
 		const skillRoot = makeSkillRoot();
 		const targetRoot = join(tmp, "target-edited");
 		writeFile(targetRoot, "a.txt", "locally-edited");
@@ -268,29 +268,29 @@ describe("deployInstall", () => {
 		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "locally-edited");
 	});
 
-	it("overwrites a locally-edited file when forceOverwrite is given", () => {
+	it("overwrites a locally-edited file when overwriteLocalEdits is given", () => {
 		const skillRoot = makeSkillRoot();
-		const targetRoot = join(tmp, "target-force");
+		const targetRoot = join(tmp, "target-overwrite-edits");
 		writeFile(targetRoot, "a.txt", "locally-edited");
 
-		const { copied, skipped } = deployInstall(skillRoot, targetRoot, { forceOverwrite: true });
+		const { copied, skipped } = deployInstall(skillRoot, targetRoot, { overwriteLocalEdits: true });
 		assert.deepEqual(copied.sort(), ["a.txt", "sub/b.txt"]);
 		assert.deepEqual(skipped, []);
 		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "canonical-a");
 	});
 
-	it("keeps a locally-edited file when only forceRemoveOrphans is given", () => {
+	it("keeps a locally-edited file when only deleteEditedOrphans is given", () => {
 		// The #603 accident: sweeping an orphaned old path must not also revert
 		// the customization just re-applied to the surviving canonical path.
 		const skillRoot = makeSkillRoot();
-		const targetRoot = join(tmp, "target-force-orphans-only");
+		const targetRoot = join(tmp, "target-delete-edited-orphans-only");
 		deployInstall(skillRoot, targetRoot);
 		writeFile(targetRoot, "a.txt", "locally-edited");
 		writeFile(targetRoot, "sub/b.txt", "locally-edited-before-drop");
 		rmSync(join(skillRoot, "install", "sub", "b.txt"));
 
 		const { copied, skipped, removed } = deployInstall(skillRoot, targetRoot, {
-			forceRemoveOrphans: true,
+			deleteEditedOrphans: true,
 		});
 		assert.deepEqual(copied, []);
 		assert.deepEqual(skipped, ["a.txt"]);
@@ -298,16 +298,16 @@ describe("deployInstall", () => {
 		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "locally-edited");
 	});
 
-	it("keeps a locally-modified orphan when only forceOverwrite is given", () => {
+	it("keeps a locally-modified orphan when only overwriteLocalEdits is given", () => {
 		const skillRoot = makeSkillRoot();
-		const targetRoot = join(tmp, "target-force-overwrite-only");
+		const targetRoot = join(tmp, "target-overwrite-edits-only");
 		deployInstall(skillRoot, targetRoot);
 		writeFile(targetRoot, "a.txt", "locally-edited");
 		writeFile(targetRoot, "sub/b.txt", "locally-edited-before-drop");
 		rmSync(join(skillRoot, "install", "sub", "b.txt"));
 
 		const { copied, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, {
-			forceOverwrite: true,
+			overwriteLocalEdits: true,
 		});
 		assert.deepEqual(copied, ["a.txt"]);
 		assert.deepEqual(removed, []);
@@ -340,7 +340,7 @@ describe("deployInstall", () => {
 		assert.deepEqual(first.orphanSkipped, ["sub/b.txt"]);
 		assert.equal(existsSync(join(targetRoot, "sub", "b.txt")), true);
 
-		const forced = deployInstall(skillRoot, targetRoot, { forceRemoveOrphans: true });
+		const forced = deployInstall(skillRoot, targetRoot, { deleteEditedOrphans: true });
 		assert.deepEqual(forced.removed, ["sub/b.txt"]);
 		assert.equal(existsSync(join(targetRoot, "sub", "b.txt")), false);
 	});
@@ -427,7 +427,7 @@ describe("CLI output", () => {
 	});
 
 	it("prints rename candidates before the removals they warn about", () => {
-		// --force-remove-orphans deletes the old path, so a hint telling the
+		// --delete-edited-orphans deletes the old path, so a hint telling the
 		// reader to carry its local edit over is only actionable if it appears
 		// before the deletion is reported rather than after it (#603).
 		const skillRoot = join(tmp, "skill-cli-order");
@@ -438,7 +438,7 @@ describe("CLI output", () => {
 		rmSync(join(skillRoot, "install", "scripts", "lib", "fixture-tool.mjs"));
 		writeFile(join(skillRoot, "install"), "scripts/pfdsl/lib/fixture-tool.mjs", "canonical-rewritten");
 
-		const { stdout } = runCli(skillRoot, targetRoot, ["--deploy", "--force-remove-orphans"]);
+		const { stdout } = runCli(skillRoot, targetRoot, ["--deploy", "--delete-edited-orphans"]);
 		const renameAt = stdout.indexOf("Possible renames");
 		const removedAt = stdout.indexOf("Removed (no longer part of canonical install/):");
 		assert.notEqual(renameAt, -1, `expected a rename hint, got:\n${stdout}`);
@@ -454,7 +454,7 @@ describe("CLI output", () => {
 
 		const result = runCli(skillRoot, targetRoot, ["--deploy", "--force"]);
 		assert.equal(result.status, 2);
-		assert.match(result.stderr, /--force was split into --force-overwrite and --force-remove-orphans/);
+		assert.match(result.stderr, /--force was split into --overwrite-local-edits and --delete-edited-orphans/);
 	});
 });
 
@@ -464,25 +464,25 @@ describe("parseArgs", () => {
 			"--target",
 			"/tmp/foo",
 			"--deploy",
-			"--force-overwrite",
-			"--force-remove-orphans",
+			"--overwrite-local-edits",
+			"--delete-edited-orphans",
 			"--upstream",
 		]);
 		assert.equal(args.target, "/tmp/foo");
 		assert.equal(args.deploy, true);
-		assert.equal(args.forceOverwrite, true);
-		assert.equal(args.forceRemoveOrphans, true);
+		assert.equal(args.overwriteLocalEdits, true);
+		assert.equal(args.deleteEditedOrphans, true);
 		assert.equal(args.upstream, true);
 	});
 
 	it("keeps the two force flags independent", () => {
-		const overwriteOnly = parseArgs(["--deploy", "--force-overwrite"]);
-		assert.equal(overwriteOnly.forceOverwrite, true);
-		assert.equal(overwriteOnly.forceRemoveOrphans, false);
+		const overwriteOnly = parseArgs(["--deploy", "--overwrite-local-edits"]);
+		assert.equal(overwriteOnly.overwriteLocalEdits, true);
+		assert.equal(overwriteOnly.deleteEditedOrphans, false);
 
-		const orphansOnly = parseArgs(["--deploy", "--force-remove-orphans"]);
-		assert.equal(orphansOnly.forceOverwrite, false);
-		assert.equal(orphansOnly.forceRemoveOrphans, true);
+		const orphansOnly = parseArgs(["--deploy", "--delete-edited-orphans"]);
+		assert.equal(orphansOnly.overwriteLocalEdits, false);
+		assert.equal(orphansOnly.deleteEditedOrphans, true);
 	});
 
 	it("rejects the retired --force instead of silently ignoring it", () => {
@@ -490,7 +490,7 @@ describe("parseArgs", () => {
 		// believes they forced one — the failure mode #603 is about.
 		assert.throws(
 			() => parseArgs(["--deploy", "--force"]),
-			/--force was split into --force-overwrite and --force-remove-orphans/,
+			/--force was split into --overwrite-local-edits and --delete-edited-orphans/,
 		);
 	});
 
