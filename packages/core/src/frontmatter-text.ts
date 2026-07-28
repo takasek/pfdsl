@@ -11,7 +11,13 @@
 const indentOf = (line: string): number =>
 	line.length - line.trimStart().length;
 
-/** Escape a string for literal use inside a `new RegExp(...)` pattern. */
+/**
+ * Escape a string for literal use inside a `new RegExp(...)` pattern.
+ *
+ * Exported for the extension's jump and connector logic, which build patterns
+ * around a node id and had their own copies of this until #635 — an id may
+ * contain `-`, and nothing stops a future id syntax from allowing more.
+ */
 export function escapeRe(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
