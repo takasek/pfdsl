@@ -1,10 +1,4 @@
-import type { Range as CoreRange, DiagnosticSeverity } from "@pfdsl/core";
-
-export const SEVERITY_VALUES: Record<DiagnosticSeverity, number> = {
-	error: 0,
-	warning: 1,
-	info: 2,
-};
+import type { Range as CoreRange } from "@pfdsl/core";
 
 export interface VscodeRangeLike {
 	startLine: number;
