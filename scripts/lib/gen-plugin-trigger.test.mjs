@@ -40,7 +40,10 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/commands/pfd-retro.md"), true);
 	});
 
-	it("matches every bundled agent file", () => {
+	// Whether PLUGIN_AGENT_FILES itself lists every agent that should ship is a
+	// different question, checked against .claude/agents/ in
+	// intentional-duplication.test.mjs (#613).
+	it("matches each agent file PLUGIN_AGENT_FILES names", () => {
 		for (const file of PLUGIN_AGENT_FILES) {
 			assert.equal(GEN_PLUGIN_TRIGGER.test(`.claude/agents/${file}`), true);
 		}

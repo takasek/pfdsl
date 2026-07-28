@@ -7,6 +7,16 @@ import { basename, dirname, resolve } from "node:path";
 // adding an agent cannot land in one place and be forgotten in the other.
 export const PLUGIN_AGENT_FILES = ["pfd-lens.md", "pfd-implementer.md"];
 
+// Agents that stay out of the bundle, with why — an adopting repo gets the
+// pfd-* ones because they operate on the .pfdsl files it now has, and nothing
+// else. Named rather than merely absent so a drift test can require every file
+// in .claude/agents/ to be either bundled or listed here (#613).
+export const PLUGIN_AGENT_EXCLUSIONS = {
+	"ci-triage.md": "reads this repo's GitHub Actions logs",
+	"issue-worker.md": "encodes this repo's worktree and PR conventions",
+	"vscode-ext-debugger.md": "debugs the extension this repo builds",
+};
+
 function requireExists(path) {
 	if (!existsSync(path)) {
 		throw new Error(`${path} not found.`);
