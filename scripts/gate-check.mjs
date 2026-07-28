@@ -15,21 +15,19 @@ import {
 	deriveManualItems,
 	matchesTrigger,
 	formatGateTable,
-	hasStatusChange,
-	statusChangedForArtifact,
-	classifyOutputArtifactStatus,
 	GATE_CHECKLIST_SOURCE_PATH,
 	VSCODE_EXT_TRIGGER,
 	lintCommitSubjects,
-	wipTransitionDetected,
 	parseAuditTerminals,
 	diffNewTerminals,
 	diffReadySets,
 	classifyAuditIssuesFlowResult,
-	NO_ARTIFACT_DETAIL,
 } from "./lib/gate-check.mjs";
-import { GEN_PLUGIN_TRIGGER } from "./lib/gen-plugin-trigger.mjs";
-import { GEN_INSTALL_TRIGGER } from "./lib/gen-install-trigger.mjs";
+import {
+	genPluginIdentityStep,
+	outputArtifactStatusStep,
+	wipTransitionStep,
+} from "./lib/gate-check-steps.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -107,20 +105,8 @@ if (mdFiles.length === 0) {
 	results.push({ name: "check-md-linebreaks", status: r.ok ? "PASS" : "FAIL" });
 }
 
-// 4. gen-plugin identity (only when skill/plugin/install-source paths changed).
-// GEN_INSTALL_TRIGGER is consulted too: install/ is generated from repo-root
-// sources (#547) that GEN_PLUGIN_TRIGGER doesn't match, so a PR editing only a
-// template source (e.g. scripts/pfdsl/lib/*.mjs) would otherwise report SKIP
-// while in fact owing install/ and plugin/ churn. gen-plugin.mjs runs
-// gen-install internally, so one regeneration covers both hops — hence both
-// output trees are diffed.
-if (!matchesTrigger(changedFiles, GEN_PLUGIN_TRIGGER) && !matchesTrigger(changedFiles, GEN_INSTALL_TRIGGER)) {
-	results.push({ name: "gen-plugin identity", status: "SKIP", detail: "no skill/plugin/install-source changes" });
-} else {
-	const regenerated = node(["scripts/gen-plugin.mjs"]);
-	const clean = regenerated.ok && exec("git", ["diff", "--exit-code", "--", "plugin", ".claude/skills/pfd-ops/install"]).ok;
-	results.push({ name: "gen-plugin identity", status: clean ? "PASS" : "FAIL" });
-}
+// 4. gen-plugin identity (only when skill/plugin/install-source paths changed)
+results.push(genPluginIdentityStep({ exec, node, changedFiles }));
 
 // 5. snapshot freshness (only when .pfdsl files changed)
 if (pfdslFiles.length === 0) {
@@ -144,42 +130,7 @@ if (pfdslFiles.length === 0) {
 }
 
 // 6. output artifact status update in .pfdsl/roadmap.pfdsl
-{
-	const roadmapChanged = changedFiles.includes(".pfdsl/roadmap.pfdsl");
-	if (noArtifact || (!artifactKey && !roadmapChanged)) {
-		results.push({
-			name: "output artifact status update",
-			...classifyOutputArtifactStatus({ artifactKey, noArtifact, roadmapChanged }),
-		});
-	} else if (artifactKey) {
-		const before = exec("git", ["show", `origin/${base}:.pfdsl/roadmap.pfdsl`]);
-		const after = exec("git", ["show", "HEAD:.pfdsl/roadmap.pfdsl"]);
-		if (!before.ok || !after.ok) {
-			results.push({
-				name: "output artifact status update",
-				status: "FAIL",
-				detail: `could not read .pfdsl/roadmap.pfdsl at origin/${base} or HEAD`,
-			});
-		} else {
-			const changed = statusChangedForArtifact(before.out, after.out, artifactKey);
-			results.push({
-				name: "output artifact status update",
-				...classifyOutputArtifactStatus({ artifactKey, changed }),
-			});
-		}
-	} else {
-		const diffResult = exec("git", ["diff", `origin/${base}...HEAD`, "--", ".pfdsl/roadmap.pfdsl"]);
-		if (!diffResult.ok) {
-			results.push({ name: "output artifact status update", status: "FAIL", detail: diffResult.out.trim() });
-		} else {
-			const changed = hasStatusChange(diffResult.out);
-			results.push({
-				name: "output artifact status update",
-				...classifyOutputArtifactStatus({ artifactKey, roadmapChanged, changed }),
-			});
-		}
-	}
-}
+results.push(outputArtifactStatusStep({ exec, base, artifactKey, noArtifact, changedFiles }));
 
 // 7. vscode-extension typecheck (only when packages/vscode-extension/ changed)
 if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
@@ -215,34 +166,7 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 }
 
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
-if (noArtifact) {
-	results.push({ name: "wip transition", status: "SKIP", detail: NO_ARTIFACT_DETAIL });
-} else if (!changedFiles.includes(".pfdsl/roadmap.pfdsl")) {
-	results.push({ name: "wip transition", status: "SKIP", detail: "no .pfdsl/roadmap.pfdsl changes" });
-} else {
-	const shasOut = exec("git", ["log", "--format=%H", `origin/${base}..HEAD`, "--", ".pfdsl/roadmap.pfdsl"]);
-	if (!shasOut.ok) {
-		results.push({ name: "wip transition", status: "FAIL", detail: shasOut.out.trim() });
-	} else {
-		const shas = shasOut.out.trim().split("\n").filter(Boolean);
-		const snapshots = shas
-			.map((sha) => exec("git", ["show", `${sha}:.pfdsl/roadmap.pfdsl`]))
-			.filter((r) => r.ok)
-			.map((r) => r.out);
-		const detected = wipTransitionDetected(snapshots, artifactKey);
-		results.push({
-			name: "wip transition",
-			status: detected ? "PASS" : "FAIL",
-			detail: detected
-				? artifactKey
-					? `wip found for '${artifactKey}'`
-					: "presence-only check; pass --artifact <key> to verify the specific output artifact"
-				: artifactKey
-					? `no status: wip snapshot found for artifact '${artifactKey}'`
-					: "no status: wip found in any commit snapshot",
-		});
-	}
-}
+results.push(wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }));
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
 const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdPath, "utf-8")));
