@@ -237,7 +237,7 @@ process:
     tags: [ g ]
   check_install_sync:
     label: 配置鮮度セルフチェック
-    description: "pfd-ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。--upstreamで上流plugin.json versionとのskewもベストエフォートで警告する。check-pfd-ops-sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR-0028）"
+    description: "pfd-ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。missingな新パスとorphanedな旧パスが同一ファイルのリネームとみなせる場合はPossible renamesとして対で報告する。--upstreamで上流plugin.json versionとのskewもベストエフォートで警告する。check-pfd-ops-sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR-0028）"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
     location: ../.claude/skills/pfd-ops/scripts/check-install-sync.mjs
     tags: [ g ]
