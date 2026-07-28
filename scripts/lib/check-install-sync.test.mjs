@@ -5,6 +5,7 @@ import {
 	mkdirSync,
 	writeFileSync,
 	readFileSync,
+	copyFileSync,
 	rmSync,
 	existsSync,
 	symlinkSync,
@@ -12,7 +13,7 @@ import {
 	statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -385,12 +386,18 @@ describe("CLI output", () => {
 	);
 
 	function runCli(skillRoot, targetRoot, extraArgs = []) {
-		// The script resolves install/ from its own location, so point a stub
-		// skill root at it via a symlinked copy of the scripts directory.
+		// The script resolves install/ from its own location, so it has to be
+		// copied into the fixture skill root rather than symlinked there: the
+		// ESM loader realpath-resolves import.meta.url (see the note at the
+		// bottom of the script), so a symlink would silently point skillRoot at
+		// the repository's own install/ tree and the fixture would go unread.
+		// plugin-version-check.mjs comes along as the script's only sibling
+		// import.
 		const stubScripts = join(skillRoot, "scripts");
 		mkdirSync(stubScripts, { recursive: true });
 		const stubScript = join(stubScripts, "check-install-sync.mjs");
-		if (!existsSync(stubScript)) symlinkSync(scriptPath, stubScript);
+		copyFileSync(scriptPath, stubScript);
+		copyFileSync(join(dirname(scriptPath), "plugin-version-check.mjs"), join(stubScripts, "plugin-version-check.mjs"));
 		return spawnSync(process.execPath, [stubScript, "--target", targetRoot, ...extraArgs], {
 			encoding: "utf-8",
 		});
@@ -399,12 +406,15 @@ describe("CLI output", () => {
 	it("surfaces rename candidates on --deploy, not just on a bare check", () => {
 		// The #603 report: --deploy printed nothing pointing the old path's
 		// local edit at the new path, so the customization was silently lost.
+		// The fixture basename is deliberately absent from this repo's own
+		// install/ tree, so a stub that failed to override skillRoot would show
+		// up as a failure here instead of matching the real tree by accident.
 		const skillRoot = join(tmp, "skill-cli");
 		const targetRoot = join(tmp, "target-cli");
-		writeFile(join(skillRoot, "install"), "scripts/lib/gh-exec.mjs", "canonical-original");
+		writeFile(join(skillRoot, "install"), "scripts/lib/fixture-tool.mjs", "canonical-original");
 		deployInstall(skillRoot, targetRoot);
-		rmSync(join(skillRoot, "install", "scripts", "lib", "gh-exec.mjs"));
-		writeFile(join(skillRoot, "install"), "scripts/pfdsl/lib/gh-exec.mjs", "canonical-rewritten");
+		rmSync(join(skillRoot, "install", "scripts", "lib", "fixture-tool.mjs"));
+		writeFile(join(skillRoot, "install"), "scripts/pfdsl/lib/fixture-tool.mjs", "canonical-rewritten");
 
 		const checked = runCli(skillRoot, targetRoot);
 		assert.match(checked.stdout, /Possible renames/);
@@ -413,7 +423,7 @@ describe("CLI output", () => {
 		// the pre-deploy state the hint is derived from.
 		const deployed = runCli(skillRoot, targetRoot, ["--deploy"]);
 		assert.match(deployed.stdout, /Possible renames/);
-		assert.match(deployed.stdout, /scripts\/lib\/gh-exec\.mjs -> scripts\/pfdsl\/lib\/gh-exec\.mjs/);
+		assert.match(deployed.stdout, /scripts\/lib\/fixture-tool\.mjs -> scripts\/pfdsl\/lib\/fixture-tool\.mjs/);
 	});
 
 	it("exits non-zero with a migration message when given the retired --force", () => {
