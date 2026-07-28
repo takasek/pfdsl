@@ -23,7 +23,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkUpstreamVersion } from "./plugin-version-check.mjs";
 
@@ -108,11 +108,6 @@ function writeManifest(targetRoot, entries) {
 	writeFileSync(manifestPath, `${JSON.stringify({ files: sorted }, null, "\t")}\n`);
 }
 
-function basenameOf(rel) {
-	const slash = rel.lastIndexOf("/");
-	return slash === -1 ? rel : rel.slice(slash + 1);
-}
-
 // A rename that only prefixes the basename (flow-on-issue-close.yml ->
 // pfdsl-flow-on-issue-close.yml) still has to be recognizable. Requiring the
 // added part to end at a separator is what keeps this from pairing files that
@@ -125,15 +120,14 @@ function sharesSeparatedSuffix(a, b) {
 	return BASENAME_SEPARATORS.has(longer[longer.length - shorter.length - 1]);
 }
 
-// Strongest first. Each signal is exact — no similarity threshold to tune, so
-// the same inputs always produce the same pairing.
-const RENAME_REASONS = ["same canonical hash", "same basename", "same basename suffix"];
-
 /**
  * Pair each orphaned path with the missing canonical path that most likely
  * superseded it. Without this, an upstream rename shows up as an unrelated
  * "missing" plus "orphaned" pair, and a local edit living on the old path is
  * left behind with nothing pointing at the new one (#603).
+ *
+ * The signals are tried strongest first, and each one is exact — no similarity
+ * threshold to tune, so the same inputs always produce the same pairing.
  * @param {string} installDir
  * @param {string[]} missing repo-relative canonical paths absent from the target
  * @param {Array<{path: string, hash: string}>} orphanEntries manifest entries whose canonical source is gone
@@ -145,20 +139,19 @@ function detectRenameCandidates(installDir, missing, orphanEntries) {
 
 	const candidates = [];
 	for (const entry of orphanEntries) {
-		const orphanBase = basenameOf(entry.path);
-		let best = null;
-		for (const rel of missing) {
-			const base = basenameOf(rel);
-			let reason = null;
-			if (canonicalHashes.get(rel) === entry.hash) reason = "same canonical hash";
-			else if (base === orphanBase) reason = "same basename";
-			else if (sharesSeparatedSuffix(base, orphanBase)) reason = "same basename suffix";
-			if (reason === null) continue;
-			if (best === null || RENAME_REASONS.indexOf(reason) < RENAME_REASONS.indexOf(best.reason)) {
-				best = { from: entry.path, to: rel, reason };
+		const orphanBase = basename(entry.path);
+		const signals = [
+			["same canonical hash", (rel) => canonicalHashes.get(rel) === entry.hash],
+			["same basename", (rel) => basename(rel) === orphanBase],
+			["same basename suffix", (rel) => sharesSeparatedSuffix(basename(rel), orphanBase)],
+		];
+		for (const [reason, matches] of signals) {
+			const to = missing.find(matches);
+			if (to !== undefined) {
+				candidates.push({ from: entry.path, to, reason });
+				break;
 			}
 		}
-		if (best !== null) candidates.push(best);
 	}
 	return candidates;
 }
