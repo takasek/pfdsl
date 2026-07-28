@@ -1,6 +1,7 @@
 import { auditGraph } from "./audit.js";
 
 export type { AuditResult, ConsumerAsymmetryHint } from "./audit.js";
+export { compareIds } from "./compare.js";
 export type { DiagnosticRegistryEntry } from "./diagnostics-registry.js";
 export { DIAGNOSTIC_REGISTRY } from "./diagnostics-registry.js";
 export type { EdgeGroups } from "./edge-groups.js";

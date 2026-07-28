@@ -1,12 +1,8 @@
-import { loadFrontmatter } from "@pfdsl/core";
+import { escapeRe, loadFrontmatter } from "@pfdsl/core";
 
 export interface FrontmatterPosition {
 	line: number;
 	column: number;
-}
-
-function escapeRegex(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function findFrontmatterDefinitionInText(
@@ -16,7 +12,7 @@ export function findFrontmatterDefinitionInText(
 	const { bodyStartLine } = loadFrontmatter(text);
 	const lines = text.split("\n");
 	const fmEnd = bodyStartLine - 1;
-	const pattern = new RegExp(`^(\\s+)(${escapeRegex(nodeId)})\\s*:`);
+	const pattern = new RegExp(`^(\\s+)(${escapeRe(nodeId)})\\s*:`);
 	for (let i = 0; i < fmEnd && i < lines.length; i++) {
 		const line = lines[i];
 		if (line === undefined) continue;

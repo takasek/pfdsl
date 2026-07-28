@@ -1,4 +1,5 @@
 import { isMap, isScalar, type Pair, type YAMLMap } from "yaml";
+import { compareIds } from "./compare.js";
 import {
 	parseFrontmatterCst,
 	renderFrontmatterCst,
@@ -129,14 +130,14 @@ export function sort(source: string, opts: SortOptions): SortResult {
 					if (ga === null && gb === null) cmp = 0;
 					else if (ga === null) cmp = 1;
 					else if (gb === null) cmp = -1;
-					else cmp = ga.localeCompare(gb);
+					else cmp = compareIds(ga, gb);
 				} else {
 					const va = getSortValue(a.id, key);
 					const vb = getSortValue(b.id, key);
 					if (typeof va === "number" && typeof vb === "number") {
 						cmp = va - vb;
 					} else {
-						cmp = String(va).localeCompare(String(vb));
+						cmp = compareIds(String(va), String(vb));
 					}
 				}
 				if (cmp !== 0) return cmp;

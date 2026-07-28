@@ -96,9 +96,14 @@ export function loadFrontmatter(source: string): LoadResult {
 		};
 	}
 
+	// The -1 drops the newline that ends the last yaml line. On CRLF input that
+	// newline is two characters, so the \r survived into the yaml text and ended
+	// up on the last line's value — a last-line `status: done` then failed V007
+	// (#636). Earlier lines were fine, since the yaml parser handles \r\n inside
+	// the text it is given.
 	const yamlText =
 		closingLineStart > firstNl + 1
-			? source.slice(firstNl + 1, closingLineStart - 1)
+			? source.slice(firstNl + 1, closingLineStart - 1).replace(/\r$/, "")
 			: "";
 	const body =
 		closingLineEnd === source.length ? "" : source.slice(closingLineEnd + 1);

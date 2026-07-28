@@ -1,4 +1,5 @@
 import {
+	escapeRe,
 	ID_PATTERN,
 	loadFrontmatter,
 	type NodeKind,
@@ -39,10 +40,6 @@ export interface ConnectorInsertion {
 	anchored: boolean;
 }
 
-function escapeRegex(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 const CONTINUATION_PREFIXES = [">>?", ">>", "->"];
 
 /**
@@ -54,7 +51,7 @@ const CONTINUATION_PREFIXES = [">>?", ">>", "->"];
  */
 function wholeIdPattern(nodeId: string): RegExp {
 	return new RegExp(
-		`(?<![\\p{L}\\p{N}_-])${escapeRegex(nodeId)}(?![\\p{L}\\p{N}_]|-(?!>))`,
+		`(?<![\\p{L}\\p{N}_-])${escapeRe(nodeId)}(?![\\p{L}\\p{N}_]|-(?!>))`,
 		"u",
 	);
 }

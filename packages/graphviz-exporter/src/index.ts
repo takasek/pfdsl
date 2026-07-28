@@ -1,5 +1,5 @@
 import type { Frontmatter, Graph, NodeKind } from "@pfdsl/core";
-import { diffGraphs, resolveMeta } from "@pfdsl/core";
+import { compareIds, diffGraphs, resolveMeta } from "@pfdsl/core";
 import { wrapLabel } from "./label.js";
 import {
 	calcMinWidth,
@@ -228,11 +228,11 @@ export function exportDiffDot(
 	// Visible edges (added & removed only)
 	const visiblePrimaryEdges = [...primaryEdgeMap.entries()]
 		.filter(([, val]) => val.status === "added" || val.status === "removed")
-		.sort(([a], [b]) => a.localeCompare(b));
+		.sort(([a], [b]) => compareIds(a, b));
 
 	const visibleFeedbackEdges = [...feedbackEdgeMap.entries()]
 		.filter(([, val]) => val.status === "added" || val.status === "removed")
-		.sort(([a], [b]) => a.localeCompare(b));
+		.sort(([a], [b]) => compareIds(a, b));
 
 	// Graph header
 	const rankdir =

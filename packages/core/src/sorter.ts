@@ -1,3 +1,4 @@
+import { compareIds } from "./compare.js";
 import type { Frontmatter, Graph, NormalizedEdge } from "./types/index.js";
 
 export function sortIsolated(isolatedNodes: Set<string>): string[] {
@@ -140,12 +141,12 @@ export function sortEdges(
 	}
 
 	return [...edges].sort((a, b) => {
-		const ck = compKeys.get(a)!.localeCompare(compKeys.get(b)!);
+		const ck = compareIds(compKeys.get(a)!, compKeys.get(b)!);
 		if (ck !== 0) return ck;
 		const rk = edgeRank(a) - edgeRank(b);
 		if (rk !== 0) return rk;
 		const kk = edgeKindOrder(a) - edgeKindOrder(b);
 		if (kk !== 0) return kk;
-		return edgeLexKey(a).localeCompare(edgeLexKey(b));
+		return compareIds(edgeLexKey(a), edgeLexKey(b));
 	});
 }
