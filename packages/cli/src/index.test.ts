@@ -453,14 +453,6 @@ describe("diff", () => {
 		expect(r.stdout).not.toContain("- edge");
 	});
 
-	it("fails with an error when a file cannot be read", async () => {
-		const a = join(dir, "diff-a.pfdsl");
-		writeFileSync(a, "req >> design -> spec\n");
-		const r = await runDiff(a, join(dir, "does-not-exist.pfdsl"));
-		expect(r.exitCode).not.toBe(0);
-		expect(r.stderr).toBeTruthy();
-	});
-
 	it("CLI diff output for identical files", async () => {
 		const a = join(dir, "same.pfdsl");
 		writeFileSync(a, valid);
@@ -831,6 +823,101 @@ describe("help / unknown", () => {
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain(`unknown ${group} subcommand`);
 		expect(r.stderr).toContain(`pfdsl ${group}`);
+	});
+});
+
+// Seven hand-copied "--help returns help text" cases each asserted one
+// substring, so a subcommand could lose its whole usage line and flag list and
+// still pass on the command name alone. One table, stating the usage line and
+// the flags each subcommand documents (#614).
+describe("--help on a subcommand", () => {
+	const cases: Array<{ name: string; argv: string[]; flags: string[] }> = [
+		{
+			name: "status ready",
+			argv: ["status", "ready"],
+			flags: ["--best", "--json", "--no-color"],
+		},
+		{
+			name: "status gaps",
+			argv: ["status", "gaps"],
+			flags: ["--json", "--no-color"],
+		},
+		{
+			name: "status list",
+			argv: ["status", "list"],
+			flags: ["--status", "--json", "--no-color"],
+		},
+		{
+			name: "status blocked",
+			argv: ["status", "blocked"],
+			flags: ["--json", "--no-color"],
+		},
+		{
+			name: "meta set",
+			argv: ["meta", "set"],
+			flags: ["--json", "--no-color"],
+		},
+		{
+			name: "meta get",
+			argv: ["meta", "get"],
+			flags: ["--json", "--no-color"],
+		},
+		{
+			name: "meta check-links",
+			argv: ["meta", "check-links"],
+			flags: ["--json", "--no-color"],
+		},
+		{
+			name: "graph orphans",
+			argv: ["graph", "orphans"],
+			flags: ["--json", "--no-color"],
+		},
+	];
+
+	it.each(
+		cases,
+	)("$name prints its usage line and documents every flag it takes", async ({
+		name,
+		argv,
+		flags,
+	}) => {
+		const r = await run([...argv, "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+		expect(r.stdout).toContain(`usage: pfdsl ${name}`);
+		for (const flag of flags) expect(r.stdout).toContain(flag);
+	});
+});
+
+// Five more copies asserted only `exitCode === 1`, which an argument error
+// produces just as well. The file that could not be read is the thing worth
+// naming (#614).
+describe("a file argument that does not exist", () => {
+	const missing = () => join(dir, "nonexistent.pfdsl");
+
+	const cases: Array<{ name: string; argv: () => string[] }> = [
+		{ name: "status ready", argv: () => ["status", "ready", missing()] },
+		{
+			name: "status list",
+			argv: () => ["status", "list", missing(), "--status", "todo"],
+		},
+		{ name: "status blocked", argv: () => ["status", "blocked", missing()] },
+		{
+			name: "meta check-links",
+			argv: () => ["meta", "check-links", missing()],
+		},
+		{ name: "graph orphans", argv: () => ["graph", "orphans", missing()] },
+		{ name: "check", argv: () => ["check", missing()] },
+		{ name: "diff", argv: () => ["diff", join(dir, "valid.pfdsl"), missing()] },
+	];
+
+	it.each(cases)("$name exits 1 and names the unreadable file", async ({
+		argv,
+	}) => {
+		const r = await run(argv());
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain(missing());
+		expect(r.stderr).toContain("No such file or directory");
 	});
 });
 
@@ -1462,7 +1549,7 @@ describe("status ready", () => {
 		expect(r.stdout).toContain("impl");
 	});
 
-	it("--json returns structured output", async () => {
+	it("--json lists the ready processes under { ok, ready }", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
 		);
@@ -1565,20 +1652,9 @@ describe("status ready", () => {
 		expect(parsed.warnings).toBeUndefined();
 	});
 
-	it("missing file returns exit 1", async () => {
-		const r = await run(["status", "ready", join(dir, "nonexistent.pfdsl")]);
-		expect(r.exitCode).toBe(1);
-	});
-
 	it("missing argument returns exit 2", async () => {
 		const r = await run(["status", "ready"]);
 		expect(r.exitCode).toBe(2);
-	});
-
-	it("--help returns help text", async () => {
-		const r = await run(["status", "ready", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl status ready");
 	});
 
 	it("--best prefers process that removes last blocker, not just any consumer", async () => {
@@ -1699,12 +1775,6 @@ req >> design -> spec
 		expect(r1.exitCode).toBe(2);
 		const r2 = await run(["meta", "set", f, "req"]);
 		expect(r2.exitCode).toBe(2);
-	});
-
-	it("--help returns help text", async () => {
-		const r = await run(["meta", "set", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("meta set");
 	});
 
 	it("warns (W006) on stderr when type: is omitted (#308)", async () => {
@@ -2366,12 +2436,6 @@ describe("status gaps", () => {
 		expect(r.exitCode).toBe(2);
 	});
 
-	it("--help returns help text", async () => {
-		const r = await run(["status", "gaps", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("status gaps");
-	});
-
 	it("accepts multiple flow files", async () => {
 		const rm = roadmapWith("  tracked:\n    status: todo\n");
 		const fl1 = join(dir, "as-flow1.pfdsl");
@@ -2457,7 +2521,7 @@ describe("status list", () => {
 		expect(r.stdout).toBe("No artifacts match status: todo.\n");
 	});
 
-	it("--json returns structured output", async () => {
+	it("--json lists the matching items under { ok, items }", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  a:\n    status: todo\n    label: Alpha\n---\nx >> p -> a\n",
 		);
@@ -2482,23 +2546,6 @@ describe("status list", () => {
 			"bogus",
 		]);
 		expect(r.exitCode).toBe(2);
-	});
-
-	it("missing file returns exit 1", async () => {
-		const r = await run([
-			"status",
-			"list",
-			join(dir, "nonexistent.pfdsl"),
-			"--status",
-			"todo",
-		]);
-		expect(r.exitCode).toBe(1);
-	});
-
-	it("--help returns help text", async () => {
-		const r = await run(["status", "list", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl status list");
 	});
 });
 
@@ -2528,7 +2575,7 @@ describe("status blocked", () => {
 		expect(r.stdout).toBe("No blocked processes.\n");
 	});
 
-	it("--json returns structured output", async () => {
+	it("--json lists the blocked processes with their unmet inputs", async () => {
 		const f = withStatus(
 			"---\nartifact:\n  req:\n    status: waiting\n---\nreq >> design -> spec\n",
 		);
@@ -2551,17 +2598,6 @@ describe("status blocked", () => {
 		const r = await run(["status", "blocked", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toContain("W006");
-	});
-
-	it("missing file returns exit 1", async () => {
-		const r = await run(["status", "blocked", join(dir, "nonexistent.pfdsl")]);
-		expect(r.exitCode).toBe(1);
-	});
-
-	it("--help returns help text", async () => {
-		const r = await run(["status", "blocked", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl status blocked");
 	});
 });
 
@@ -2962,12 +2998,6 @@ req -> spec
 			`spec.location: ../docs/spec.md\nspec.location.resolved: ${resolve(dir, "../docs/spec.md")}\n`,
 		);
 	});
-
-	it("--help returns help text", async () => {
-		const r = await run(["meta", "get", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl meta get");
-	});
 });
 
 // group is a NodeKind alongside artifact and process, with its own field set
@@ -3106,7 +3136,7 @@ req >> design -> spec
 		expect(r.stdout).toContain("design");
 	});
 
-	it("--json returns structured output", async () => {
+	it("--json reports the unresolvable locations under { ok: false, missing }", async () => {
 		const f = join(dir, "check-links-json.pfdsl");
 		writeFileSync(
 			f,
@@ -3136,21 +3166,6 @@ req -> spec
 		const r = await run(["meta", "check-links", "-"]);
 		expect(r.exitCode).toBe(2);
 	});
-
-	it("missing file returns exit 1", async () => {
-		const r = await run([
-			"meta",
-			"check-links",
-			join(dir, "nonexistent.pfdsl"),
-		]);
-		expect(r.exitCode).toBe(1);
-	});
-
-	it("--help returns help text", async () => {
-		const r = await run(["meta", "check-links", "--help"]);
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("pfdsl meta check-links");
-	});
 });
 
 describe("graph analysis", () => {
@@ -3172,7 +3187,7 @@ spec >> review -> report
 			);
 		});
 
-		it("emits JSON", async () => {
+		it("--json emits the predecessors and successors of the named node", async () => {
 			const f = join(dir, "neighbors-json.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "neighbors", f, "spec", "--json"]);
@@ -3237,7 +3252,7 @@ spec >> review -> report
 			expect(r.stdout).toBe("(none)\n");
 		});
 
-		it("emits JSON", async () => {
+		it("--json emits the downstream set under { ok, impact }", async () => {
 			const f = join(dir, "impact-json.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "impact", f, "spec", "--json"]);
@@ -3317,7 +3332,7 @@ spec >> review -> report
 			expect(r.stdout).toBe("no path found\n");
 		});
 
-		it("emits JSON", async () => {
+		it("--json emits every path between the two nodes", async () => {
 			const f = join(dir, "path-json.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "path", f, "spec", "code", "--json"]);
@@ -3457,7 +3472,7 @@ p3 -> d
 			expect(r.stdout.trim().split("\n")).toHaveLength(1);
 		});
 
-		it("emits JSON", async () => {
+		it("--json emits per-node degree stats in rank order", async () => {
 			const f = join(dir, "stats-json.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "stats", f, "--json"]);
@@ -3533,7 +3548,7 @@ p3 -> d
 			expect(r.stdout).toBe("(none)\n");
 		});
 
-		it("emits JSON", async () => {
+		it("--json emits the nodes that no edge reaches", async () => {
 			const f = join(dir, "orphans-json.pfdsl");
 			writeFileSync(
 				f,
@@ -3545,36 +3560,14 @@ p3 -> d
 			expect(parsed.ok).toBe(true);
 			expect(parsed.orphans).toEqual([{ id: "floater", kind: "artifact" }]);
 		});
-
-		it("missing file returns exit 1", async () => {
-			const r = await run(["graph", "orphans", join(dir, "nonexistent.pfdsl")]);
-			expect(r.exitCode).toBe(1);
-		});
-
-		it("--help returns help text", async () => {
-			const r = await run(["graph", "orphans", "--help"]);
-			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toContain("pfdsl graph orphans");
-		});
 	});
 });
 
 // Regression tests for the code-review findings on the restructure PR (#506).
 describe("review hardening", () => {
-	const invalidSrc = "req >> design -> spec\nother -> spec\n"; // V001
-
-	it("diff --json emits { ok: false, diagnostics } when an input fails to parse", async () => {
-		const bad = join(dir, "review-diff-bad.pfdsl");
-		const good = join(dir, "review-diff-good.pfdsl");
-		writeFileSync(bad, invalidSrc);
-		writeFileSync(good, "req >> design -> spec\n");
-		const r = await run(["diff", bad, good, "--json"]);
-		expect(r.exitCode).toBe(1);
-		expect(r.stderr).toBe("");
-		const parsed = JSON.parse(r.stdout);
-		expect(parsed.ok).toBe(false);
-		expect(Array.isArray(parsed.diagnostics)).toBe(true);
-	});
+	// diff's own { ok: false, diagnostics } case lives in the shared
+	// "--json failure payload" table, which additionally requires the
+	// diagnostics array to be non-empty — this copy had dropped that (#614).
 
 	it("meta set --json on an edge-only id (no frontmatter entry) emits { ok: false, missing }", async () => {
 		const f = join(dir, "review-set-edge-only.pfdsl");
