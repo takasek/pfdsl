@@ -53,74 +53,74 @@ artifact:
     label: 正準化グラフ
     description: "正規化済みエッジ・ノード種別・isolatedノード集合とGraph構造。validate/render_graph/export_metadata/diff_graphsの共通入力。CLI graph edgesコマンドはこれをJSONで直接出力する"
     criteria: node packages/cli/dist/cli.js graph edges が実装され動作確認済み（validate/render_graph/export_metadata/diff_graphsの共通入力として機能）
-    externalStakeholders: [CLIユーザー]
+    externalStakeholders: [ CLIユーザー ]
     group: in_memory
   diagnostics_report:
     label: 診断結果
     description: "V/Wルールに基づくエラー・警告一覧。CLI checkコマンドの出力で、VSCode拡張は同じvalidateをエディタ内リアルタイム診断に使う"
     criteria: node packages/cli/dist/cli.js check が実装され動作確認済み（VSCode拡張のリアルタイム診断でも共有）
-    externalStakeholders: [CLIユーザー, CI, VSCode拡張ユーザー]
+    externalStakeholders: [ CLIユーザー, CI, VSCode拡張ユーザー ]
     group: run_outputs
   formatted_source:
     label: 整形済みソース
     description: ソースからの独立した再parseで生成する正準整形済み.pfdslテキスト
     criteria: node packages/cli/dist/cli.js fmt --write が実装され動作確認済み
-    externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
     group: run_outputs
   dot_graph:
     label: DOTグラフ
     description: Graphviz DOT形式テキスト（renderコマンドのデフォルト出力）
     criteria: node packages/cli/dist/cli.js render が実装され動作確認済み
-    externalStakeholders: [CLIユーザー]
+    externalStakeholders: [ CLIユーザー ]
     group: run_outputs
   rendered_image:
     label: レンダリング画像
     description: DOTから変換したSVG（wasm）またはPDF/PNG（puppeteer経由）
     criteria: node packages/cli/dist/cli.js render --format svg/pdf/png が実装され動作確認済み
-    externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
     group: run_outputs
   metadata_tsv:
     label: メタデータTSV
     description: ノードのkind/label/description/status/tags/ownerを抽出したタブ区切りテキスト
     criteria: メタデータ抽出処理が実装され、VSCode拡張のエクスポート機能から動作確認済み
-    externalStakeholders: [VSCode拡張ユーザー]
+    externalStakeholders: [ VSCode拡張ユーザー ]
     group: run_outputs
   diff_report:
     label: 差分レポート
     description: "2つのグラフ間の構造差分（追加・削除・改名ノード等）。この図は単一ドキュメントの変換を軸にモデル化しているため、比較対象の2つ目のグラフは図上に現れない"
     criteria: node packages/cli/dist/cli.js diff が実装され動作確認済み
-    externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
     group: run_outputs
   sorted_source:
     label: ソート済みソース
     description: 指定キーでノード定義を並べ替えた.pfdslテキスト
     criteria: meta sortコマンドが実装され動作確認済み
-    externalStakeholders: [CLIユーザー, VSCode拡張ユーザー]
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
     group: run_outputs
   pfdsl_skill:
     label: PFD読み書き分析skill
     description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため、図にはassemble_pluginへの素材提供のみが現れる"
     location: ../.claude/skills/pfdsl/
     group: skill_sources
-    tags: [c]
+    tags: [ c ]
   ops_skill_general:
     label: PFD運用フレームワーク 汎用層
     description: "pfd-opsのL1（汎用手順）+L2（ディスパッチ）。SKILL.md本文で配布。L4（リポ固有）は配布対象外でpfd-ops自体に含まれない。内容の一次情報はworkflow.pfdslのops_skill_general"
     location: ../.claude/skills/pfd-ops/SKILL.md
     group: skill_sources
-    tags: [f1]
+    tags: [ f1 ]
   ops_skill_l3:
     label: PFD運用フレームワーク GitHub Issuesバックエンド層
     description: "pfd-opsのL3プリセットの規約本文。内容の一次情報はworkflow.pfdslのops_skill_l3。採用リポが配置するテンプレート本体はops_install_templates"
     location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
     group: skill_sources
-    tags: [f2]
+    tags: [ f2 ]
   ops_install_templates:
     label: pfd-ops 採用テンプレート（install/）
     description: "採用リポへ配置されるテンプレート一式。生成の経路（repoルートのソース → install/）はworkflow.pfdslのgen_installが持ち、この図では配布素材として現れる。内容の一次情報はworkflow.pfdslのops_install_templates"
     location: ../.claude/skills/pfd-ops/install/
     group: skill_sources
-    tags: [f2]
+    tags: [ f2 ]
   retro_skill:
     label: ふりかえり監査スキル
     description: "内容の一次情報はworkflow.pfdsl。ここではplugin_dirへの同梱対象としてのみ扱う"
@@ -140,13 +140,13 @@ artifact:
     label: 導入済みL3レイヤー
     description: "plugin同梱install/由来ファイル（GitHub Actionsワークフロー・監査スクリプト）の採用リポルートへの実配置結果"
     criteria: check-install-sync.mjs --deploy が実装され、採用リポへの実配置が動作確認済み
-    externalStakeholders: [採用リポのGitHub Actions]
+    externalStakeholders: [ 採用リポのGitHub Actions ]
     group: adopter_repo
   gh_labels:
     label: GitHubラベル整備結果
     description: "flow:managed / flow:exempt ラベルの存在保証（gh CLI経由）"
     criteria: audit-issues-flow.mjs --fix によるラベル自動生成が実装され動作確認済み
-    externalStakeholders: [採用リポのGitHubリポジトリ]
+    externalStakeholders: [ 採用リポのGitHubリポジトリ ]
     group: adopter_repo
   plugin_dir:
     label: 配布プラグインディレクトリ
@@ -157,13 +157,13 @@ artifact:
     label: 導入済みプラグイン
     description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。4スキル・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）"
     criteria: marketplace経由の導入が動作確認済み（4スキル・pfd-*コマンド・pfd-lens agentが一括で届く）
-    externalStakeholders: [採用リポのAIエージェント]
+    externalStakeholders: [ 採用リポのAIエージェント ]
     group: adopter_env
   drift_report:
     label: 配置鮮度警告
     description: "配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、および上流plugin versionとのskew警告（stdout）。警告が出たら--deployでrefreshする"
     criteria: check-install-sync.mjs --upstream によるhash照合・skew警告が実装され動作確認済み
-    externalStakeholders: [採用リポのAIエージェント]
+    externalStakeholders: [ 採用リポのAIエージェント ]
     group: run_outputs
 
 process:
@@ -171,82 +171,82 @@ process:
     label: 構文解析
     description: "frontmatter読込・lex・parseの3段を1トランザクションで実行しdocument+frontmatterを得る。CLI（c経由）・VSCode拡張（d）双方の全コマンドが内部で通る"
     location: ../packages/core/src/index.ts
-    tags: [b]
+    tags: [ b ]
   normalize:
     label: 正規化
     description: エッジリストとノード種別を正規化しGraphを構築する
     command: node packages/cli/dist/cli.js graph edges
     location: ../packages/core/src/normalizer.ts
-    tags: [b]
+    tags: [ b ]
   validate:
     label: 検証
     description: "正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する。ルールの一次情報docs/spec/spec.md（a層）は設計時にこの実装へ反映されるもので、実行時の入力ではない"
     command: node packages/cli/dist/cli.js check
     location: ../packages/core/src/validator.ts
-    tags: [b]
+    tags: [ b ]
   format:
     label: 整形
     description: ソースを独立に再lex/parseし正準整形済みテキストを生成する（parseの出力を再利用しない別経路）
     command: node packages/cli/dist/cli.js fmt --write
     location: ../packages/core/src/formatter.ts
-    tags: [b]
+    tags: [ b ]
   render_graph:
     label: DOT変換
     description: 正準化グラフとfrontmatter（スタイル・タイトル）からGraphviz DOTを構築する
     command: node packages/cli/dist/cli.js render
     location: ../packages/graphviz-exporter/src/index.ts
-    tags: [b]
+    tags: [ b ]
   export_image:
     label: 画像化
     description: DOTをSVG（wasm、外部依存なし）またはPDF/PNG（puppeteer必須）へ変換する
     command: node packages/cli/dist/cli.js render --format svg
     location: ../packages/preview-engine/src/index.ts
-    tags: [b]
+    tags: [ b ]
   export_metadata:
     label: メタデータ抽出
     description: "正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する。CLIサブコマンドはなくVSCode拡張のエクスポート機能のみが呼ぶ"
     location: ../packages/metadata-exporter/src/index.ts
-    tags: [b]
+    tags: [ b ]
   diff_graphs:
     label: 差分算出
     description: 2つの正準化グラフ（とそれぞれのfrontmatter）の構造差分を計算する
     command: node packages/cli/dist/cli.js diff
     location: ../packages/core/src/diff.ts
-    tags: [b]
+    tags: [ b ]
   sort_meta:
     label: ノード定義ソート
     description: ソースを再parseし、指定キーでfrontmatterのノード定義を並べ替えたテキストを生成する
     command: node packages/cli/dist/cli.js meta sort
     location: ../packages/core/src/sort.ts
-    tags: [b]
+    tags: [ b ]
   assemble_plugin:
     label: プラグイン組み立て
     description: "4スキルツリー（pfdslはgen-skillで生成、他3つは.claude/skills/からコピー）とcommands/pfd-*.md・agents/pfd-lens.mdをplugin/pfdsl/へ集約しplugin.jsonをCLI versionから生成する。同梱対象リストはgen-plugin.mjsに一元化"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
-    tags: [g]
+    tags: [ g ]
   install_plugin:
     label: プラグインインストール
     description: "外部ユーザーがClaude Codeのmarketplace機構で導入・更新する（/plugin install、更新は/plugin marketplace update）。リポ内コミットを伴わない"
-    tags: [g]
+    tags: [ g ]
   deploy_install_layer:
     label: L3レイヤー実配置
     description: "/pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。既配置ファイルがcanonicalとhash不一致（ローカル編集）なら上書きせず警告し、--force指定時のみ上書きする"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --deploy
     location: ../.claude/skills/pfd-ops/scripts/check-install-sync.mjs
-    tags: [g]
+    tags: [ g ]
   check_install_sync:
     label: 配置鮮度セルフチェック
     description: "pfd-ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する。--upstreamで上流plugin.json versionとのskewもベストエフォートで警告する。check-pfd-ops-sync.ymlは採用リポへ配布されなくなり、この経路が採用リポ唯一の安全網（ADR-0028）"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
     location: ../.claude/skills/pfd-ops/scripts/check-install-sync.mjs
-    tags: [g]
+    tags: [ g ]
   ensure_labels:
     label: ラベル保証
     description: "L3採用手順の一部として flow:managed / flow:exempt ラベルの存在を確認・作成する（deployed の audit-issues-flow.mjs --fix が未作成ラベルを自動生成する。旧skill syncのensure機能の移管先）"
     command: node scripts/pfdsl/audit-issues-flow.mjs --fix
     location: ../scripts/pfdsl/audit-issues-flow.mjs
-    tags: [g]
+    tags: [ g ]
 ---
 
 pfdsl_source >> parse -> parsed_doc
