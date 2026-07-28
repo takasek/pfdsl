@@ -777,6 +777,38 @@ describe("stdin (-)", () => {
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("--write");
 	});
+
+	it("check - reports a clean document as OK", async () => {
+		const r = await run(["check", "-"], withStdin(validWithStatus));
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("OK");
+	});
+
+	it("check - names the source as '-' when it reports a warning", async () => {
+		const r = await run(["check", "-"], withStdin(warningOnly));
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("W001");
+		expect(r.stdout).toContain("-:1:1:");
+	});
+
+	// #428: the stdin + --json success path hardcoded `diagnostics: []`, so
+	// warnings the file-path and non-json stdin paths both report were dropped.
+	// cli-smoke covers this too, but only when the bundle is current.
+	it("check - --json keeps the warnings the non-json path prints (#428)", async () => {
+		const r = await run(["check", "-", "--json"], withStdin(warningOnly));
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(
+			(parsed.diagnostics as Array<{ code: string }>).map((d) => d.code),
+		).toContain("W001");
+	});
+
+	it("check - reports errors from stdin with exit 1", async () => {
+		const r = await run(["check", "-"], withStdin(invalid));
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toMatch(/error/);
+	});
 });
 
 describe("help / unknown", () => {
@@ -788,6 +820,17 @@ describe("help / unknown", () => {
 	it("unknown command returns 2", async () => {
 		const r = await run(["nonsense"]);
 		expect(r.exitCode).toBe(2);
+	});
+
+	it.each([
+		"graph",
+		"meta",
+		"status",
+	])("unknown %s subcommand returns 2 and prints that group's help", async (group) => {
+		const r = await run([group, "nonsense"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain(`unknown ${group} subcommand`);
+		expect(r.stderr).toContain(`pfdsl ${group}`);
 	});
 });
 
@@ -2924,6 +2967,55 @@ req -> spec
 		const r = await run(["meta", "get", "--help"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("pfdsl meta get");
+	});
+});
+
+// group is a NodeKind alongside artifact and process, with its own field set
+// (label|color|parent), and meta had no coverage of it at all (#607).
+describe("meta get / set on a group id", () => {
+	const grouped = `---
+group:
+  backend: { label: Backend, color: lightyellow }
+  db: { label: DB Layer, parent: backend }
+artifact:
+  schema: { group: db, criteria: schema criteria }
+---
+schema >> migrate -> migrated
+`;
+
+	it("reads a single group field", async () => {
+		const f = join(dir, "group-get-one.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "get", f, "db", "label"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("db.label: DB Layer\n");
+	});
+
+	it("reads every set field of a group when no field is named", async () => {
+		const f = join(dir, "group-get-all.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "get", f, "db", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: { db: { label: "DB Layer", parent: "backend" } },
+		});
+	});
+
+	it("warns that status is not a group field, since group has its own field set", async () => {
+		const f = join(dir, "group-get-unknown-field.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "get", f, "db", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'status' is not a recognized field for 'db'");
+	});
+
+	it("writes a group field in place", async () => {
+		const f = join(dir, "group-set.pfdsl");
+		writeFileSync(f, grouped);
+		const r = await run(["meta", "set", f, "db", "label", "Database"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toContain("label: Database");
 	});
 });
 
