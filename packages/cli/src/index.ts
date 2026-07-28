@@ -1100,16 +1100,21 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	const basePath = frontmatter?.basePath;
 	const docFsPath = file === "-" ? null : resolve(file);
 
-	const metaFor = (id: string): Record<string, unknown> | undefined => {
-		switch (nodeKinds.get(id)) {
+	// Takes the kind the caller already resolved: ids absent from nodeKinds are
+	// collected as missing before this runs, so a fall-through case here would
+	// be unreachable. Listing the three kinds exhaustively lets tsc flag a new
+	// NodeKind instead (#607).
+	const metaFor = (
+		id: string,
+		kind: NodeKind,
+	): Record<string, unknown> | undefined => {
+		switch (kind) {
 			case "artifact":
 				return frontmatter?.artifact?.[id];
 			case "process":
 				return frontmatter?.process?.[id];
 			case "group":
 				return frontmatter?.group?.[id];
-			default:
-				return undefined;
 		}
 	};
 
@@ -1145,7 +1150,7 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 			missing.push(id);
 			continue;
 		}
-		const meta = metaFor(id);
+		const meta = metaFor(id, kind);
 		const row: Record<string, unknown> = {};
 		const displayFields: string[] = [];
 		const addField = (field: string) => {
