@@ -428,7 +428,7 @@ artifact:
   frontmatter_cst_impl:
     label: frontmatter CST 化実装済みコード
     description: "ADR-0034 (#578/#592) の実装。fmt/meta set/sort/reindex/insert-definition が yaml Document ベースで frontmatter を読み書きする"
-    status: wip
+    status: done
     criteria: "4コマンド + fmt が CST 経由で frontmatter を読み書きし、frontmatter-text.ts の手術用ヘルパーが削除され、既存テストが更新済みで green"
   cli_release_frontmatter_cst:
     label: "CLIリリース: frontmatter CST 化（破壊的変更）"
