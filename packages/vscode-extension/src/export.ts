@@ -7,6 +7,11 @@ import {
 	analyzeDocument,
 	resolveEffectiveFrontmatterForUri,
 } from "./analyze.js";
+import {
+	exportAllOutcome,
+	exportStem,
+	skippedBinaryFormats,
+} from "./export-logic.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
 const outputChannel = vscode.window.createOutputChannel("PFDSL");
@@ -69,7 +74,7 @@ export function registerExport(
 					title: "Save base path (extensions added automatically)",
 				});
 				if (!dirUri) return;
-				const stem = dirUri.fsPath.replace(/\.[^.]+$/, "");
+				const stem = exportStem(dirUri.fsPath);
 
 				const svg = await renderDotToSvg(dot);
 				const coreWrites = [
@@ -84,28 +89,23 @@ export function registerExport(
 				]);
 
 				const binaryWrites: Promise<void>[] = [];
-				const failed: string[] = [];
 				if (pdfResult.status === "fulfilled") {
 					binaryWrites.push(writeFile(`${stem}.pdf`, pdfResult.value));
-				} else {
-					failed.push("PDF");
 				}
 				if (pngResult.status === "fulfilled") {
 					binaryWrites.push(writeFile(`${stem}.png`, pngResult.value));
-				} else {
-					failed.push("PNG");
 				}
 
 				await Promise.all([...coreWrites, ...binaryWrites]);
 
-				if (failed.length > 0) {
-					vscode.window.showWarningMessage(
-						`Exported: ${stem}.* (${failed.join(", ")} skipped — puppeteer required)`,
-					);
+				const outcome = exportAllOutcome(
+					stem,
+					skippedBinaryFormats(pdfResult, pngResult),
+				);
+				if (outcome.kind === "warning") {
+					vscode.window.showWarningMessage(outcome.message);
 				} else {
-					vscode.window.showInformationMessage(
-						`Exported: ${stem}.dot / .svg / .pdf / .png / .tsv`,
-					);
+					vscode.window.showInformationMessage(outcome.message);
 				}
 				return;
 			}

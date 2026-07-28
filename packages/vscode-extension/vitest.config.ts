@@ -19,8 +19,14 @@ export default mergeConfig(
 				// acquireVsCodeApi と getElementById を実行する）。pan / zoom /
 				// minimap の算術は webview-logic.ts、preview.ts の判定は
 				// preview-logic.ts、ディレクトリ展開は expand-directory.ts、
-				// connector の入力検証は connector-logic.ts にあり、いずれも
-				// このリストの外でテストされている（#611）。
+				// connector の入力検証は connector-logic.ts、codelens の行判定は
+				// codelens-logic.ts、export の命名と部分失敗の集約は
+				// export-logic.ts にあり、いずれもこのリストの外でテストされている
+				// （#611, #634）。
+				//
+				// このリストの内容は src/coverage-exclusions.test.ts が固定する。
+				// 除外の追加は floor を保ったまま計測対象を減らせるため、無審査で
+				// 通らないようにする（#634）。
 				exclude: [
 					...sharedCoverageExclude,
 					"**/codelens.ts",
