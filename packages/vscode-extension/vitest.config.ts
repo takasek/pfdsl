@@ -10,9 +10,17 @@ export default mergeConfig(
 		test: {
 			include: ["src/**/*.test.ts"],
 			coverage: {
-				// vscode API 直結層 — API 呼び出しのみでロジックを持たず、実行環境
-				// (vscode extension host) 依存のため unit test で到達できない。
-				// テスト可能なロジックは対応する *-logic.ts へ分離済み。
+				// 宿主 API 直結層 — 実行環境（vscode extension host、または
+				// webview の document）に依存し、unit test から import した時点で
+				// 成立しないファイル。判断・算術はいずれも対応する *-logic.ts か
+				// 共有モジュールへ出し、ここに残るのは API 呼び出しと配線のみ。
+				//
+				// webview.ts だけは vscode API でなく DOM 直結（読み込み時に
+				// acquireVsCodeApi と getElementById を実行する）。pan / zoom /
+				// minimap の算術は webview-logic.ts、preview.ts の判定は
+				// preview-logic.ts、ディレクトリ展開は expand-directory.ts、
+				// connector の入力検証は connector-logic.ts にあり、いずれも
+				// このリストの外でテストされている（#611）。
 				exclude: [
 					...sharedCoverageExclude,
 					"**/codelens.ts",

@@ -15,9 +15,10 @@ import {
 import type { MessageFromWebview, MessageToWebview } from "./messages.js";
 import {
 	allIdsOfDocument,
+	blockingDiagnosticMessage,
 	buildHtml,
-	idsOfStatement,
 	nodeIdAtCursor,
+	positionOfNodeId,
 } from "./preview-logic.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
@@ -136,8 +137,8 @@ function dotForDocument(doc: vscode.TextDocument): {
 	error?: string;
 } {
 	const { graph, frontmatter, diagnostics } = analyzeDocument(doc);
-	const fatal = diagnostics.find((d) => d.severity === "error");
-	if (fatal) return { error: `${fatal.code}: ${fatal.message}` };
+	const blocking = blockingDiagnosticMessage(diagnostics);
+	if (blocking) return { error: blocking };
 	try {
 		const effectiveFrontmatter = resolveEffectiveFrontmatterForUri(
 			doc.uri,
@@ -159,18 +160,11 @@ function jumpToNode(
 		targetPos = findFrontmatterDefinition(doc, nodeId);
 	}
 	if (!targetPos) {
-		const result = analyzeDocument(doc);
-		outer: for (const stmt of result.document.statements) {
-			for (const id of idsOfStatement(stmt)) {
-				if (id.value === nodeId) {
-					targetPos = new vscode.Position(
-						id.start.line - 1,
-						id.start.column - 1,
-					);
-					break outer;
-				}
-			}
-		}
+		const found = positionOfNodeId(
+			analyzeDocument(doc).document.statements,
+			nodeId,
+		);
+		if (found) targetPos = new vscode.Position(found.line, found.column);
 	}
 	if (!targetPos) return;
 	const range = new vscode.Range(

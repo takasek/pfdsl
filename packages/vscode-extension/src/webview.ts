@@ -3,6 +3,15 @@ import type { DiffReport } from "@pfdsl/core";
 import { buildDiffPanelHtml } from "./diff-panel.js";
 import type { MessageFromWebview, MessageToWebview } from "./messages.js";
 import { unwrapAnchors } from "./svg-anchors.js";
+import {
+	centerPan,
+	minimapScale,
+	minimapViewport,
+	panFromMinimapPoint,
+	panToCenterNode,
+	shouldReleaseDrag,
+	zoomAt,
+} from "./webview-logic.js";
 
 declare const acquireVsCodeApi: () => {
 	postMessage: (msg: MessageFromWebview) => void;
@@ -131,14 +140,15 @@ let svgNatH = 0;
 
 function updateMinimapVp() {
 	if (!svgNatW || !svgNatH) return;
-	const vx = (-panX / scale) * mmScale;
-	const vy = (-panY / scale) * mmScale;
-	const vw = (root.clientWidth / scale) * mmScale;
-	const vh = (root.clientHeight / scale) * mmScale;
-	minimapVp.style.left = `${vx}px`;
-	minimapVp.style.top = `${vy}px`;
-	minimapVp.style.width = `${vw}px`;
-	minimapVp.style.height = `${vh}px`;
+	const vp = minimapViewport(
+		{ scale, panX, panY },
+		{ width: root.clientWidth, height: root.clientHeight },
+		mmScale,
+	);
+	minimapVp.style.left = `${vp.left}px`;
+	minimapVp.style.top = `${vp.top}px`;
+	minimapVp.style.width = `${vp.width}px`;
+	minimapVp.style.height = `${vp.height}px`;
 }
 
 function refreshMinimap() {
@@ -153,7 +163,10 @@ function refreshMinimap() {
 		minimap.style.display = "none";
 		return;
 	}
-	mmScale = Math.min(MINIMAP_W / svgNatW, MINIMAP_H / svgNatH);
+	mmScale = minimapScale(
+		{ width: svgNatW, height: svgNatH },
+		{ width: MINIMAP_W, height: MINIMAP_H },
+	);
 	const scaledW = svgNatW * mmScale;
 	const scaledH = svgNatH * mmScale;
 	minimap.style.width = `${scaledW}px`;
@@ -172,11 +185,14 @@ let minimapDragRect: DOMRect | null = null;
 
 function panToMinimapPoint(clientX: number, clientY: number) {
 	if (!svgNatW || !svgNatH) return;
-	const rect = minimapDragRect ?? minimap.getBoundingClientRect();
-	const gx = (clientX - rect.left) / mmScale;
-	const gy = (clientY - rect.top) / mmScale;
-	panX = root.clientWidth / 2 - gx * scale;
-	panY = root.clientHeight / 2 - gy * scale;
+	({ panX, panY } = panFromMinimapPoint(
+		clientX,
+		clientY,
+		minimapDragRect ?? minimap.getBoundingClientRect(),
+		mmScale,
+		scale,
+		{ width: root.clientWidth, height: root.clientHeight },
+	));
 	applyTransform();
 }
 
@@ -198,8 +214,11 @@ function applyTransform() {
 function centerGraph() {
 	const w = inner.offsetWidth;
 	const h = inner.offsetHeight;
-	panX = (root.clientWidth - w * scale) / 2;
-	panY = (root.clientHeight - h * scale) / 2;
+	({ panX, panY } = centerPan(
+		{ width: root.clientWidth, height: root.clientHeight },
+		{ width: w, height: h },
+		scale,
+	));
 	log("centerGraph", {
 		w,
 		h,
@@ -221,14 +240,12 @@ function focusNode(nodeId: string) {
 	for (const node of nodes) {
 		if ((node as HTMLElement).dataset.nodeId === nodeId) {
 			lastFocusedNodeId = nodeId;
-			const nodeRect = node.getBoundingClientRect();
-			const rootRect = root.getBoundingClientRect();
-			panX +=
-				root.clientWidth / 2 -
-				(nodeRect.left + nodeRect.width / 2 - rootRect.left);
-			panY +=
-				root.clientHeight / 2 -
-				(nodeRect.top + nodeRect.height / 2 - rootRect.top);
+			({ panX, panY } = panToCenterNode(
+				{ scale, panX, panY },
+				node.getBoundingClientRect(),
+				root.getBoundingClientRect(),
+				{ width: root.clientWidth, height: root.clientHeight },
+			));
 			applyTransform();
 			return;
 		}
@@ -240,12 +257,12 @@ root.addEventListener(
 	(e) => {
 		e.preventDefault();
 		const rect = root.getBoundingClientRect();
-		const cx = e.clientX - rect.left;
-		const cy = e.clientY - rect.top;
-		const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-		panX = cx - (cx - panX) * factor;
-		panY = cy - (cy - panY) * factor;
-		scale = Math.max(0.05, Math.min(10, scale * factor));
+		({ scale, panX, panY } = zoomAt(
+			{ scale, panX, panY },
+			e.clientX - rect.left,
+			e.clientY - rect.top,
+			e.deltaY,
+		));
 		applyTransform();
 	},
 	{ passive: false },
@@ -259,7 +276,9 @@ root.addEventListener("mousedown", (e) => {
 });
 
 window.addEventListener("mousemove", (e) => {
-	if (e.buttons === 0 && (dragging || minimapDragging)) {
+	if (
+		shouldReleaseDrag(e.buttons, { graph: dragging, minimap: minimapDragging })
+	) {
 		dragging = false;
 		minimapDragging = false;
 		minimapDragRect = null;
