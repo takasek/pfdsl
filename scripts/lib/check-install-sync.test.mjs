@@ -426,6 +426,26 @@ describe("CLI output", () => {
 		assert.match(deployed.stdout, /scripts\/lib\/fixture-tool\.mjs -> scripts\/pfdsl\/lib\/fixture-tool\.mjs/);
 	});
 
+	it("prints rename candidates before the removals they warn about", () => {
+		// --force-remove-orphans deletes the old path, so a hint telling the
+		// reader to carry its local edit over is only actionable if it appears
+		// before the deletion is reported rather than after it (#603).
+		const skillRoot = join(tmp, "skill-cli-order");
+		const targetRoot = join(tmp, "target-cli-order");
+		writeFile(join(skillRoot, "install"), "scripts/lib/fixture-tool.mjs", "canonical-original");
+		deployInstall(skillRoot, targetRoot);
+		writeFile(targetRoot, "scripts/lib/fixture-tool.mjs", "canonical-original\nlocal tweak\n");
+		rmSync(join(skillRoot, "install", "scripts", "lib", "fixture-tool.mjs"));
+		writeFile(join(skillRoot, "install"), "scripts/pfdsl/lib/fixture-tool.mjs", "canonical-rewritten");
+
+		const { stdout } = runCli(skillRoot, targetRoot, ["--deploy", "--force-remove-orphans"]);
+		const renameAt = stdout.indexOf("Possible renames");
+		const removedAt = stdout.indexOf("Removed (no longer part of canonical install/):");
+		assert.notEqual(renameAt, -1, `expected a rename hint, got:\n${stdout}`);
+		assert.notEqual(removedAt, -1, `expected a removal report, got:\n${stdout}`);
+		assert.ok(renameAt < removedAt, `rename hint must precede the removals, got:\n${stdout}`);
+	});
+
 	it("exits non-zero with a migration message when given the retired --force", () => {
 		const skillRoot = join(tmp, "skill-cli-force");
 		const targetRoot = join(tmp, "target-cli-force");

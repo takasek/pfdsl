@@ -343,6 +343,11 @@ async function main() {
 		// Read the pre-deploy state: deployInstall rewrites the manifest and may
 		// delete the very orphans a rename is inferred from.
 		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
+		// Printed before the deploy runs, not after it. With
+		// --force-remove-orphans the old path is about to be deleted, and an
+		// instruction to carry its local edit over to the new path is worth
+		// nothing once the file it points at is gone (#603).
+		printRenameCandidates(renameCandidates);
 		const { copied, skipped, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, {
 			forceOverwrite: args.forceOverwrite,
 			forceRemoveOrphans: args.forceRemoveOrphans,
@@ -354,7 +359,6 @@ async function main() {
 			"Orphaned but locally modified; re-run with --force-remove-orphans to remove:",
 			orphanSkipped,
 		);
-		printRenameCandidates(renameCandidates);
 		if (skipped.length > 0 || orphanSkipped.length > 0) exitCode = 1;
 		if (copied.length === 0 && skipped.length === 0 && removed.length === 0 && orphanSkipped.length === 0) {
 			console.log("Nothing to deploy: install/ is empty.");
