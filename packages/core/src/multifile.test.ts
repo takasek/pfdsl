@@ -423,7 +423,11 @@ describe("validateSubflowBoundary", () => {
 		expect(diags.some((d) => d.code === "V030")).toBe(true);
 	});
 
-	it("M5 — dangling value in boundary map → V030", () => {
+	// The two early returns in validateSubflowBoundary exist to stop a broken
+	// map from also reporting the bijection mismatch it causes. Asserting the
+	// whole code list is what makes those guards testable: with either one
+	// removed, a V034 joins the set below (#609).
+	it("M5 — dangling value in boundary map → V030 alone, with no cascading V034", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",
 			parentNormalInputs: new Set(["order"]),
@@ -432,10 +436,10 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["incoming_order"]),
 			childTerminals: new Set([]),
 		});
-		expect(diags.some((d) => d.code === "V030")).toBe(true);
+		expect(diags.map((d) => d.code)).toEqual(["V030"]);
 	});
 
-	it("X1 — side crossing: input mapped to terminal → V033", () => {
+	it("X1 — side crossing: input mapped to terminal → V033 alone, with no cascading V034", () => {
 		const diags = validateSubflowBoundary({
 			processId: "P",
 			parentNormalInputs: new Set(["order"]),
@@ -444,7 +448,7 @@ describe("validateSubflowBoundary", () => {
 			childOpenInputs: new Set(["incoming_order"]),
 			childTerminals: new Set(["outgoing_parcel"]),
 		});
-		expect(diags.some((d) => d.code === "V033")).toBe(true);
+		expect(diags.map((d) => d.code)).toEqual(["V033", "V033"]);
 	});
 
 	it("X4 — swap map (parent 'a'→child 'b', parent 'b'→child 'a') → no errors", () => {

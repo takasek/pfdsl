@@ -34,6 +34,19 @@ describe("auditGraph", () => {
 		expect(result.terminals).not.toContain("req");
 	});
 
+	it("audits artifacts known only from edges, which nodeKinds may not list yet", () => {
+		// Every other case here pre-registers each artifact, so the branch that
+		// picks up edge-only artifacts was unreached (#609). A caller that
+		// normalized without frontmatter hands over exactly this shape.
+		const edges = mkEdges(
+			{ kind: "input", a: "req", p: "design" },
+			{ kind: "output", a: "spec", p: "design" },
+		);
+		const result = auditGraph(edges, new Map<string, NodeKind>());
+		expect(result.terminals).toEqual(["spec"]);
+		expect(result.externalInputs).toEqual(["req"]);
+	});
+
 	it("identifies an external input (consumed but never produced by any process)", () => {
 		// req >> design -> spec  (req is external: consumed but never produced)
 		const edges = mkEdges(
