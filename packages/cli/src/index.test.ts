@@ -1607,9 +1607,11 @@ req >> design -> spec
 	});
 
 	it("writes a node whose first child line is a comment, as sort and reindex accept", async () => {
-		// detectChildIndent in core skips comment lines when deriving the child
-		// indent; this command derived it inline and took the comment's own
-		// indent, producing a rewrite the guard then refused (#510).
+		// Originally a regression test for #510 (surgical indent-detection took
+		// a leading comment's own, deeper indent as the child indent). Now that
+		// meta set rewrites through the yaml CST (ADR-0034), the child's
+		// original 6-space indent is canonicalized to the section's real
+		// 4-space step regardless — the guard never has anything to refuse.
 		const f = join(dir, "status-set-comment-first.pfdsl");
 		writeFileSync(
 			f,
@@ -1629,7 +1631,7 @@ req >> design -> spec
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("# why this exists");
-		expect(after).toContain("      status: wip");
+		expect(after).toContain("    status: wip");
 	});
 
 	it("exits 1 when artifact id not found", async () => {
@@ -1877,7 +1879,9 @@ req >> design -> spec
 		const r = await run(["meta", "set", f, "spec", "owner", "alice"]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
-		expect(after).toMatch(/spec:\n {4}owner: alice\n/);
+		// A new field is appended as the node's last mapping entry (yaml CST
+		// `setIn`, ADR-0034) rather than spliced in right after the header.
+		expect(after).toMatch(/ {4}owner: alice\n/);
 		// existing fields survive
 		expect(after).toContain("label: Old Label");
 	});
@@ -2074,7 +2078,10 @@ req >> design -> spec
 		const r = await run(["meta", "set", f, "spec", "description", "short."]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
-		expect(after).toContain("description: short.");
+		// The yaml CST (ADR-0034) keeps the field's original block-literal
+		// style when replacing its value, rather than flattening to a plain
+		// scalar — "short." lands as the block's sole line.
+		expect(after).toContain("description: |-\n      short.\n");
 		expect(after).not.toContain("line one.");
 		expect(after).toContain("status: done");
 		const check = await run(["check", f]);
@@ -2102,7 +2109,8 @@ req >> design -> spec
 		const r = await run(["meta", "set", f, "spec", "description", "short."]);
 		expect(r.exitCode).toBe(0);
 		const after = readFileSync(f, "utf-8");
-		expect(after).toContain("description: short.");
+		// See the block-literal-style note on the previous test.
+		expect(after).toContain("description: |-\n      short.\n");
 		expect(after).not.toContain("line one.");
 		expect(after).not.toContain("line three.");
 		expect(after).toContain("status: done");

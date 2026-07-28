@@ -1,4 +1,8 @@
-import { detectChildIndent, indentOf } from "./frontmatter-text.js";
+import { isMap, isScalar, type Pair, type YAMLMap } from "yaml";
+import {
+	parseFrontmatterCst,
+	renderFrontmatterCst,
+} from "./frontmatter-cst.js";
 import { analyze } from "./index.js";
 import { computeTopoOrder } from "./sorter.js";
 import type { Diagnostic, NodeKind } from "./types/index.js";
@@ -15,98 +19,44 @@ export interface SortResult {
 	diagnostics: Diagnostic[];
 }
 
-interface NodeBlock {
-	id: string;
-	/** Lines that form the block: preceding comment lines + key line + child lines. */
-	lines: string[];
-}
-
-function extractNodeId(line: string): string {
-	const m = /^\s+(\S[^:]*?)\s*:/.exec(line);
-	return m?.[1] ?? "";
+/** The node id a `Pair`'s key represents, or "" when the key isn't a plain scalar. */
+function pairId(pair: Pair): string {
+	return isScalar(pair.key) ? String(pair.key.value) : "";
 }
 
 /**
- * Extract sortable node blocks and the inter-block gaps from the content lines
- * of an artifact/process section (everything after the section header line).
- *
- * A block = directly preceding comment lines (no blank line between) + key line
- * + child lines (deeper indent, no blank line).
- * Blank lines and orphaned comment lines (separated from the next key by a blank)
- * become part of the inter-block gap.
- *
- * Result: gaps[i] is the gap BEFORE blocks[i]; gaps[N] is the trailing gap.
+ * `yaml` attaches a leading comment/blank-line immediately after the section
+ * header to the map itself, but only for the very first entry — every other
+ * entry carries its own leading comment/blank-line on its key node. Move that
+ * map-level trivia onto the current first entry's key so it travels with the
+ * entry (rather than the position) once `map.items` is reordered; `yaml`
+ * renders a non-first entry's leading comment/blank-line identically to a
+ * first entry's, so this is a no-op on output when the first entry stays
+ * first.
  */
-function extractBlocksAndGaps(
-	sectionLines: string[],
-	childIndent: number,
-): { blocks: NodeBlock[]; gaps: string[][] } {
-	const blocks: NodeBlock[] = [];
-	const gaps: string[][] = [];
-
-	let currentGap: string[] = [];
-	let pendingComments: string[] = [];
-	let i = 0;
-
-	while (i < sectionLines.length) {
-		const line = sectionLines[i]!;
-		const trimmed = line.trim();
-
-		if (trimmed === "") {
-			// Blank line: flush any pending comments as orphaned (part of gap)
-			if (pendingComments.length > 0) {
-				currentGap.push(...pendingComments);
-				pendingComments = [];
-			}
-			currentGap.push(line);
-			i++;
-			continue;
-		}
-
-		if (trimmed.startsWith("#")) {
-			pendingComments.push(line);
-			i++;
-			continue;
-		}
-
-		if (indentOf(line) === childIndent) {
-			// Node key line: close current gap, start new block
-			gaps.push([...currentGap]);
-			currentGap = [];
-
-			const blockLines = [...pendingComments, line];
-			pendingComments = [];
-			i++;
-
-			// Collect child lines: deeper indent, stop on blank or same/shallower
-			while (i < sectionLines.length) {
-				const childLine = sectionLines[i]!;
-				if (childLine.trim() === "") break;
-				if (indentOf(childLine) <= childIndent) break;
-				blockLines.push(childLine);
-				i++;
-			}
-
-			blocks.push({ id: extractNodeId(line), lines: blockLines });
-			continue;
-		}
-
-		// Unexpected line: treat as gap material
-		if (pendingComments.length > 0) {
-			currentGap.push(...pendingComments);
-			pendingComments = [];
-		}
-		currentGap.push(line);
-		i++;
+function hoistLeadingTrivia(map: YAMLMap): void {
+	const first = map.items[0];
+	if (!first || !isScalar(first.key)) return;
+	if (map.commentBefore != null) {
+		first.key.commentBefore = first.key.commentBefore
+			? `${map.commentBefore}\n${first.key.commentBefore}`
+			: map.commentBefore;
+		map.commentBefore = null;
 	}
-
-	// Trailing gap
-	const trailingGap = [...currentGap, ...pendingComments];
-	gaps.push(trailingGap);
-
-	return { blocks, gaps };
+	if (map.spaceBefore) {
+		first.key.spaceBefore = true;
+		map.spaceBefore = false;
+	}
 }
 
+/**
+ * Reorder nodes within the frontmatter `artifact:`/`process:` sections by one
+ * or more sort keys. Applied through the frontmatter yaml CST (ADR-0034):
+ * each section's `YAMLMap.items` (an array of `Pair`s) is stable-sorted and
+ * reassigned in place, so per-node comments, quote style, and flow-vs-block
+ * choice — for both individual nodes and whole sections written as a single
+ * flow-style line — survive untouched.
+ */
 export function sort(source: string, opts: SortOptions): SortResult {
 	const { edges, graph, nodeKinds, frontmatter, diagnostics } = analyze(source);
 	if (diagnostics.some((d) => d.severity === "error")) {
@@ -153,79 +103,36 @@ export function sort(source: string, opts: SortOptions): SortResult {
 		}
 	};
 
-	// Parse frontmatter line range
-	const lines = source.split("\n");
-	const trailingNewline = source.endsWith("\n");
-
-	let fmOpen = -1;
-	let fmClose = -1;
-	if (lines[0]?.trim() === "---") {
-		fmOpen = 0;
-		for (let i = 1; i < lines.length; i++) {
-			if (lines[i]?.trim() === "---") {
-				fmClose = i;
-				break;
-			}
-		}
-	}
-	if (fmOpen === -1 || fmClose === -1) {
+	const cst = parseFrontmatterCst(source);
+	if (!cst.present) {
 		return { output: source, changed: false, diagnostics };
 	}
 
-	const yaml = lines.slice(fmOpen + 1, fmClose);
-
-	// Collect section modifications in order, then apply bottom-up.
-	const sectionMods: Array<{
-		yamlStart: number;
-		yamlEnd: number;
-		newLines: string[];
-	}> = [];
-
+	let anyChanged = false;
 	for (const section of ["artifact", "process"] as const) {
-		let sectionStart = -1;
-		for (let i = 0; i < yaml.length; i++) {
-			const line = yaml[i]!;
-			if (/^[^\s#]/.test(line) && line.replace(/\s*:.*$/, "") === section) {
-				sectionStart = i;
-				break;
-			}
-		}
-		if (sectionStart === -1) continue;
+		const map = cst.doc.get(section, true);
+		if (!isMap(map) || map.items.length === 0) continue;
 
-		// Section content ends at the next top-level (indent-0, non-comment) line
-		let sectionEnd = yaml.length;
-		for (let i = sectionStart + 1; i < yaml.length; i++) {
-			const line = yaml[i]!;
-			if (line.trim() !== "" && /^[^\s#]/.test(line)) {
-				sectionEnd = i;
-				break;
-			}
-		}
+		const indexed = map.items.map((item, idx) => ({
+			item,
+			idx,
+			id: pairId(item as Pair),
+		}));
 
-		const sectionContent = yaml.slice(sectionStart + 1, sectionEnd);
-
-		// Detect child indent from the first content line
-		const childIndent = detectChildIndent(sectionContent);
-
-		const { blocks, gaps } = extractBlocksAndGaps(sectionContent, childIndent);
-		if (blocks.length === 0) continue;
-
-		// Stable sort: track original index for stable tiebreaking
-		const indexed = blocks.map((block, idx) => ({ block, idx }));
 		indexed.sort((a, b) => {
 			for (const key of opts.by) {
 				let cmp: number;
 				if (key === "group") {
-					const ga = getGroup(a.block.id);
-					const gb = getGroup(b.block.id);
+					const ga = getGroup(a.id);
+					const gb = getGroup(b.id);
 					// nodes without a group always sort after nodes with a group
 					if (ga === null && gb === null) cmp = 0;
 					else if (ga === null) cmp = 1;
 					else if (gb === null) cmp = -1;
 					else cmp = ga.localeCompare(gb);
 				} else {
-					const va = getSortValue(a.block.id, key);
-					const vb = getSortValue(b.block.id, key);
+					const va = getSortValue(a.id, key);
+					const vb = getSortValue(b.id, key);
 					if (typeof va === "number" && typeof vb === "number") {
 						cmp = va - vb;
 					} else {
@@ -240,44 +147,15 @@ export function sort(source: string, opts: SortOptions): SortResult {
 		const orderChanged = indexed.some((x, i) => x.idx !== i);
 		if (!orderChanged) continue;
 
-		const sortedBlocks = indexed.map((x) => x.block);
-
-		// Reconstruct: gaps[i] before sortedBlocks[i], gaps[N] at the end
-		const newLines: string[] = [];
-		for (let j = 0; j < sortedBlocks.length; j++) {
-			newLines.push(...gaps[j]!);
-			newLines.push(...sortedBlocks[j]!.lines);
-		}
-		newLines.push(...gaps[sortedBlocks.length]!);
-
-		sectionMods.push({
-			yamlStart: sectionStart + 1,
-			yamlEnd: sectionEnd,
-			newLines,
-		});
+		hoistLeadingTrivia(map);
+		map.items = indexed.map((x) => x.item);
+		anyChanged = true;
 	}
 
-	if (sectionMods.length === 0) {
+	if (!anyChanged) {
 		return { output: source, changed: false, diagnostics };
 	}
 
-	// Apply modifications bottom-up to preserve line indices
-	const mutableYaml = [...yaml];
-	for (const mod of [...sectionMods].reverse()) {
-		mutableYaml.splice(
-			mod.yamlStart,
-			mod.yamlEnd - mod.yamlStart,
-			...mod.newLines,
-		);
-	}
-
-	const rebuilt = [
-		...lines.slice(0, fmOpen + 1),
-		...mutableYaml,
-		...lines.slice(fmClose),
-	];
-	let result = rebuilt.join("\n");
-	if (trailingNewline && !result.endsWith("\n")) result += "\n";
-
-	return { output: result, changed: true, diagnostics };
+	const output = renderFrontmatterCst(cst.doc) + cst.body;
+	return { output, changed: true, diagnostics };
 }

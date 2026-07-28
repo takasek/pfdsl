@@ -208,7 +208,11 @@ spec >> design -> out
 		expect(output).not.toContain("{ index: 1}");
 	});
 
-	it("is a safe no-op for a node in an inline flow-style section one-liner (#493)", () => {
+	it("writes into a node in an inline flow-style section one-liner (#493)", () => {
+		// Originally a regression test for the surgical writer, which had to
+		// skip a flow-style section entirely (splicing a block-style `index:`
+		// line into a one-liner would have produced broken YAML). The yaml CST
+		// (ADR-0034) writes into flow maps natively, so this now succeeds.
 		const src = `---
 artifact: { a: { label: A } }
 process:
@@ -219,10 +223,8 @@ a >> p -> b
 `;
 		const { output, changes, diagnostics } = reindex(src, { renumber: true });
 		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
-		// the flow-style artifact section is left untouched (splicing a
-		// block-style index: line into it would produce broken YAML)
-		expect(output).toContain("artifact: { a: { label: A } }");
-		expect(changes.some((c) => c.id === "a")).toBe(false);
+		expect(output).toContain("artifact: { a: { label: A, index: 1 }");
+		expect(changes.some((c) => c.id === "a")).toBe(true);
 		// the ordinary block-style process section still gets its index
 		expect(changes.some((c) => c.id === "p")).toBe(true);
 		const { diagnostics: reparsed } = analyze(output);

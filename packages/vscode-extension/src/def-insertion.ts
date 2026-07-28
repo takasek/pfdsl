@@ -14,26 +14,34 @@ export function registerDefInsertion(context: vscode.ExtensionContext): void {
 			if (!wordRange) return;
 			const id = document.getText(wordRange);
 
-			const { frontmatter, nodeKinds } = analyzeDocument(document);
+			const { frontmatter, nodeKinds, bodyStartLine } =
+				analyzeDocument(document);
 			const kind = findUndefinedNodeKind(nodeKinds, frontmatter, id);
 			if (!kind) return;
 
 			const source = document.getText();
-			const { inserted, insertion } = insertDefinition(source, kind, id);
-			if (!inserted || !insertion) return;
+			const { inserted, output } = insertDefinition(source, kind, id);
+			if (!inserted) return;
 
 			const action = new vscode.CodeAction(
 				`Insert ${kind} definition for "${id}"`,
 				vscode.CodeActionKind.QuickFix,
 			);
-			// Minimal edit (insert only) instead of a full-document replace, so a
-			// concurrent edit elsewhere in the document between code-action
-			// computation and application isn't silently discarded (#494).
+			// insertDefinition (ADR-0034) rewrites frontmatter through the yaml
+			// CST, which can reformat any part of the block — so the edit
+			// replaces the whole frontmatter range (or inserts one fresh at the
+			// top when there was none) rather than the single-line minimal
+			// insert this used before (#494's concurrency guard no longer
+			// applies: there is no smaller edit that's still guaranteed
+			// consistent with a CST-driven rewrite).
 			action.edit = new vscode.WorkspaceEdit();
-			action.edit.insert(
+			action.edit.replace(
 				document.uri,
-				new vscode.Position(insertion.line, 0),
-				insertion.text,
+				new vscode.Range(
+					new vscode.Position(0, 0),
+					new vscode.Position(bodyStartLine - 1, 0),
+				),
+				output,
 			);
 			return [action];
 		},

@@ -78,6 +78,51 @@ describe("public API", () => {
 		expect(output).toBe("# just a comment\n");
 	});
 
+	describe("format: frontmatter CST canonicalization (ADR-0034)", () => {
+		it("collapses runs of blank lines to one", () => {
+			const src =
+				"---\ntitle: T\n\n\n\nartifact:\n  a:\n    label: A\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("title: T\n\nartifact:");
+			expect(output).not.toContain("\n\n\n");
+		});
+
+		it("normalizes extra spacing after a colon", () => {
+			const src = "---\ntitle:    T\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("title: T\n");
+		});
+
+		it("preserves frontmatter comments and blank lines", () => {
+			const src =
+				"---\n# top comment\ntitle: T\n\nartifact:\n  a:\n    label: A # trailing\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("# top comment\ntitle: T\n\nartifact:");
+			expect(output).toContain("label: A # trailing");
+		});
+
+		it("normalizes indentation to 2 spaces", () => {
+			const src =
+				"---\nartifact:\n    a:\n        label: A\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("artifact:\n  a:\n    label: A\n");
+		});
+
+		it("preserves flow-style collections as flow-style", () => {
+			const src = "---\nartifact: { a: { label: A } }\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("artifact: { a: { label: A } }\n");
+		});
+
+		it("does not throw when the fences are well-formed but the YAML content is invalid (FM002)", () => {
+			const src = "---\n: bad: yaml\n---\na >> P -> b\n";
+			expect(() => format(src)).not.toThrow();
+			const { output, diagnostics } = format(src);
+			expect(output).toContain(": bad: yaml");
+			expect(diagnostics.some((d) => d.code === "FM002")).toBe(true);
+		});
+	});
+
 	it("format: isolated frontmatter node appears exactly once across multiple flow segments (regression #368)", () => {
 		const src =
 			"---\nartifact:\n  isolated_x: {}\n---\nA >> P -> B\nC >> Q -> D\n";
