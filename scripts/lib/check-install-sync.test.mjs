@@ -446,6 +446,29 @@ describe("CLI output", () => {
 		assert.ok(renameAt < removedAt, `rename hint must precede the removals, got:\n${stdout}`);
 	});
 
+	it("marks a rename target in Copied as carrying canonical content only", () => {
+		// Readers take a bare "Copied:" line under a detected rename to mean the
+		// old path's edit came along. It did not — the new path holds plain
+		// canonical content, which is how #603 lost its customization.
+		const skillRoot = join(tmp, "skill-cli-copied");
+		const targetRoot = join(tmp, "target-cli-copied");
+		writeFile(join(skillRoot, "install"), "scripts/lib/fixture-tool.mjs", "canonical-original");
+		writeFile(join(skillRoot, "install"), "unrelated.txt", "canonical-unrelated");
+		deployInstall(skillRoot, targetRoot);
+		writeFile(targetRoot, "scripts/lib/fixture-tool.mjs", "canonical-original\nlocal tweak\n");
+		rmSync(join(skillRoot, "install", "scripts", "lib", "fixture-tool.mjs"));
+		rmSync(join(targetRoot, "unrelated.txt"));
+		writeFile(join(skillRoot, "install"), "scripts/pfdsl/lib/fixture-tool.mjs", "canonical-rewritten");
+
+		const { stdout } = runCli(skillRoot, targetRoot, ["--deploy"]);
+		assert.match(
+			stdout,
+			/scripts\/pfdsl\/lib\/fixture-tool\.mjs {2}\(canonical content only — the edit at scripts\/lib\/fixture-tool\.mjs is not in it\)/,
+		);
+		// A copy unrelated to any rename stays unannotated.
+		assert.match(stdout, /^ {2}unrelated\.txt$/m);
+	});
+
 	it("exits non-zero with a migration message when given the retired --force", () => {
 		const skillRoot = join(tmp, "skill-cli-force");
 		const targetRoot = join(tmp, "target-cli-force");

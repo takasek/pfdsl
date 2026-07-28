@@ -353,7 +353,19 @@ async function main() {
 			overwriteLocalEdits: args.overwriteLocalEdits,
 			deleteEditedOrphans: args.deleteEditedOrphans,
 		});
-		printGroup("Copied:", copied);
+		// A bare path under "Copied:" reads as "your file moved here", so the
+		// destination of a detected rename says outright that it holds canonical
+		// content and the old path's edit is not in it — the thing #603 could
+		// not tell from the output.
+		const renameSources = new Map(renameCandidates.map((c) => [c.to, c.from]));
+		printGroup(
+			"Copied:",
+			copied.map((rel) =>
+				renameSources.has(rel)
+					? `${rel}  (canonical content only — the edit at ${renameSources.get(rel)} is not in it)`
+					: rel,
+			),
+		);
 		printGroup("Skipped (locally modified; re-run with --overwrite-local-edits to overwrite):", skipped);
 		printGroup("Removed (no longer part of canonical install/):", removed);
 		printGroup(
