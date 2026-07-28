@@ -1,7 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { findShellExecutors } from "./check-no-shell-strings.mjs";
+import { findShellExecutors, selectScannedFiles } from "./check-no-shell-strings.mjs";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("findShellExecutors", () => {
 	it("flags importing execSync", () => {
@@ -60,5 +65,62 @@ describe("findShellExecutors", () => {
 
 	it("passes a file that only uses the shared runner", () => {
 		assert.deepEqual(findShellExecutors('import { git } from "./lib/run-exec.mjs";\ngit(["show", ref]);'), []);
+	});
+});
+
+describe("selectScannedFiles", () => {
+	it("scans a script outside scripts/, which an enumerated glob list would miss", () => {
+		assert.deepEqual(selectScannedFiles(["hooks/retro-reminder-post-tool-use.mjs"]), [
+			"hooks/retro-reminder-post-tool-use.mjs",
+		]);
+	});
+
+	it("scans a directory nobody has created yet, so a new one needs no glob edit", () => {
+		assert.deepEqual(selectScannedFiles(["tools/release/publish.mjs"]), ["tools/release/publish.mjs"]);
+	});
+
+	it("scans scripts/ at both its top level and nested", () => {
+		const files = ["scripts/gate-check.mjs", "scripts/pfdsl/lib/gh-exec.mjs"];
+		assert.deepEqual(selectScannedFiles(files), files);
+	});
+
+	it("skips test files, which hold the offending patterns as data", () => {
+		assert.deepEqual(selectScannedFiles(["scripts/lib/gate-check.test.mjs"]), []);
+	});
+
+	it("skips the detector itself, whose patterns name the banned imports", () => {
+		assert.deepEqual(selectScannedFiles(["scripts/lib/check-no-shell-strings.mjs"]), []);
+	});
+
+	it("skips the generated plugin mirror, whose sources are scanned and whose identity is gated", () => {
+		const files = ["plugin/pfdsl/hooks/retro-reminder-post-tool-use.mjs", "hooks/retro-reminder-post-tool-use.mjs"];
+		assert.deepEqual(selectScannedFiles(files), ["hooks/retro-reminder-post-tool-use.mjs"]);
+	});
+
+	it("skips non-.mjs files", () => {
+		assert.deepEqual(selectScannedFiles(["scripts/pre-commit", "packages/cli/src/index.ts"]), []);
+	});
+});
+
+describe("the repository's own scan set", () => {
+	/** Every tracked `.mjs` path, repo-relative — the candidates the gate filters. */
+	function trackedMjsFiles() {
+		return execFileSync("git", ["ls-files", "*.mjs"], { cwd: root, encoding: "utf-8" }).split("\n").filter(Boolean);
+	}
+
+	it("covers every tracked .mjs that is not excluded on purpose", () => {
+		const scanned = new Set(selectScannedFiles(trackedMjsFiles()));
+		const missed = trackedMjsFiles().filter(
+			(f) =>
+				!scanned.has(f) &&
+				!f.endsWith(".test.mjs") &&
+				!f.startsWith("plugin/") &&
+				f !== "scripts/lib/check-no-shell-strings.mjs",
+		);
+		assert.deepEqual(missed, [], `outside the gate's reach: ${missed.join(", ")}`);
+	});
+
+	it("reaches hooks/, which runs on every Bash tool call in an adopting repo", () => {
+		assert.ok(selectScannedFiles(trackedMjsFiles()).includes("hooks/retro-reminder-post-tool-use.mjs"));
 	});
 });
