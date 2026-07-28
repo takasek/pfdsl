@@ -4,6 +4,7 @@ import {
 	buildXlabel,
 	calcMinWidth,
 	darkenHex,
+	nodeAttrs,
 	quote,
 	resolveStyleAttrs,
 } from "./node-attrs.js";
@@ -189,5 +190,110 @@ describe("resolveStyleAttrs", () => {
 			statusStyles: { done: { fillcolor: "green" } },
 		} as unknown as Frontmatter;
 		expect(resolveStyleAttrs("p", "process", fm).fillcolor).toBeUndefined();
+	});
+});
+
+// nodeAttrs is the branchiest function here, and every one of these fields was
+// only ever exercised through a docs/samples fixture — a .dot regenerated from
+// a sample states no intent, so deleting the sample would silently drop the
+// coverage. These name the contract directly (#608).
+describe("nodeAttrs", () => {
+	/** The tooltip attribute's value, unescaped back into real newlines. */
+	function tooltipOf(attrs: string): string | undefined {
+		const m = /tooltip="((?:[^"\\]|\\.)*)"/.exec(attrs);
+		return m?.[1]?.replace(/\\n/g, "\n").replace(/\\"/g, '"');
+	}
+
+	it("lists owner after criteria for an artifact", () => {
+		const fm: Frontmatter = {
+			artifact: {
+				a: { label: "A", criteria: "done when green", owner: "ops" },
+			},
+		};
+		expect(tooltipOf(nodeAttrs("a", "artifact", fm))).toBe(
+			"A\ncriteria: done when green\nowner: ops",
+		);
+	});
+
+	it("lists a process's command and subflow", () => {
+		const fm = {
+			process: {
+				p: { label: "P", command: "make build", subflow: "build.pfdsl" },
+			},
+		} as unknown as Frontmatter;
+		expect(tooltipOf(nodeAttrs("p", "process", fm))).toBe(
+			"P\ncommand: make build\nsubflow: build.pfdsl",
+		);
+	});
+
+	it("gives a process with a subflow a double outline, so a drill-down is visible", () => {
+		const fm = {
+			process: { p: { subflow: "build.pfdsl" } },
+		} as unknown as Frontmatter;
+		expect(nodeAttrs("p", "process", fm)).toContain('peripheries="2"');
+	});
+
+	it("leaves a process without a subflow single-outlined", () => {
+		const fm = { process: { p: { label: "P" } } } as unknown as Frontmatter;
+		expect(nodeAttrs("p", "process", fm)).not.toContain("peripheries");
+	});
+
+	it("shows an unknown string field, so frontmatter the exporter does not know still reaches the reader", () => {
+		const fm = {
+			artifact: { a: { label: "A", ticket: "#608" } },
+		} as unknown as Frontmatter;
+		expect(tooltipOf(nodeAttrs("a", "artifact", fm))).toBe("A\nticket: #608");
+	});
+
+	it("joins an unknown string-array field with commas", () => {
+		const fm = {
+			artifact: { a: { label: "A", reviewers: ["ann", "bo"] } },
+		} as unknown as Frontmatter;
+		expect(tooltipOf(nodeAttrs("a", "artifact", fm))).toBe(
+			"A\nreviewers: ann, bo",
+		);
+	});
+
+	it("skips an unknown field that is neither a string nor a non-empty string array", () => {
+		const fm = {
+			artifact: {
+				a: { label: "A", criteria: "c", retries: 3, flags: [1, 2], empty: [] },
+			},
+		} as unknown as Frontmatter;
+		// criteria keeps a tooltip in the output at all; nothing else may join it.
+		expect(tooltipOf(nodeAttrs("a", "artifact", fm))).toBe("A\ncriteria: c");
+	});
+
+	it("omits the tooltip entirely when the label is all there is to say", () => {
+		const fm: Frontmatter = { artifact: { a: { label: "A" } } };
+		expect(nodeAttrs("a", "artifact", fm)).not.toContain("tooltip=");
+	});
+
+	it("skips the fields rendered elsewhere rather than repeating them in the tooltip", () => {
+		const fm: Frontmatter = {
+			artifact: {
+				a: {
+					label: "A",
+					description: "why",
+					status: "wip",
+					tags: ["hot"],
+					location: "docs/a.md",
+				},
+			},
+		};
+		// description leads, status and tags show as colour and xlabel, location
+		// is appended last with its own formatting.
+		expect(tooltipOf(nodeAttrs("a", "artifact", fm))).toBe(
+			"A\n\nwhy\nlocation: docs/a.md",
+		);
+	});
+
+	it("indents a multi-line value under its own key instead of running it onto one line", () => {
+		const fm: Frontmatter = {
+			artifact: { a: { label: "A", criteria: "first line\nsecond line" } },
+		};
+		expect(tooltipOf(nodeAttrs("a", "artifact", fm))).toBe(
+			"A\ncriteria:\n  first line\n  second line",
+		);
 	});
 });
