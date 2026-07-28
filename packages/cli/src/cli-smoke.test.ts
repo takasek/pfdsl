@@ -32,6 +32,13 @@ const distIsCurrent =
 	statSync(distCli).mtimeMs >= newestMtimeUnder(__dirname);
 
 describe("dist/cli.js smoke", () => {
+	// A suite that skips every case is green, and reads as one that ran. CI
+	// builds before it tests, so there the bundle must be current and the
+	// skips must not fire; locally they still may (#607).
+	it.runIf(process.env.CI)("has a current bundle to run against in CI", () => {
+		expect(distIsCurrent).toBe(true);
+	});
+
 	it.skipIf(!distIsCurrent)("--help exits 0 with usage", () => {
 		const stdout = execFileSync(process.execPath, [distCli, "--help"], {
 			encoding: "utf8",
