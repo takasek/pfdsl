@@ -903,12 +903,20 @@ spec >> P -> X
 			expect(dot).not.toContain("href=");
 		});
 
-		it("does not crash when location is a non-string YAML value", () => {
+		it.each([
+			["scalar", 42],
+			["array of non-strings", [42]],
+			["array mixing strings and non-strings", ["docs/spec.md", 42]],
+			["array of objects", [{ path: "docs/spec.md" }]],
+		])("does not crash when location is a %s", (_name, location) => {
 			const fm = {
-				artifact: { spec: { label: "仕様書", location: 42 } },
+				artifact: { spec: { label: "仕様書", location } },
 			} as unknown as Parameters<typeof exportDot>[1];
 			const { graph } = buildFromSource("spec >> P -> X");
 			expect(() => exportDot(graph, fm)).not.toThrow();
+			const dot = exportDot(graph, fm);
+			expect(dot).not.toContain("location:");
+			expect(dot).not.toContain("href=");
 		});
 
 		it("includes location in tooltip after description", () => {

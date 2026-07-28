@@ -109,6 +109,18 @@ export function resolveStyleAttrs(
 	return styleAttrs;
 }
 
+/** A string, or a non-empty array of strings — anything else is not renderable. */
+function asStringArray(value: unknown): string[] | undefined {
+	if (typeof value === "string") return [value];
+	if (
+		Array.isArray(value) &&
+		value.length > 0 &&
+		value.every((i) => typeof i === "string")
+	)
+		return value;
+	return undefined;
+}
+
 export function nodeAttrs(
 	id: string,
 	kind: NodeKind,
@@ -124,12 +136,7 @@ export function nodeAttrs(
 	const criteria = ameta?.criteria;
 	const locationRaw = (meta as { location?: string | string[] } | undefined)
 		?.location;
-	const locationArray: string[] | undefined =
-		typeof locationRaw === "string"
-			? [locationRaw]
-			: Array.isArray(locationRaw) && locationRaw.length > 0
-				? (locationRaw as string[])
-				: undefined;
+	const locationArray = asStringArray(locationRaw);
 	const location = locationArray?.join(", ");
 	const revises = ameta?.revises;
 
@@ -164,23 +171,12 @@ export function nodeAttrs(
 	if (typeof (meta as ProcessMeta | undefined)?.subflow === "string")
 		knownFields.push(["subflow", (meta as ProcessMeta).subflow!]);
 	const extraFields: [string, string][] = meta
-		? Object.entries(meta)
-				.filter(([k, v]) => {
-					if (KNOWN_TOOLTIP_SKIP.has(k)) return false;
-					if (knownFields.some(([kf]) => kf === k)) return false;
-					if (typeof v === "string") return true;
-					if (
-						Array.isArray(v) &&
-						v.length > 0 &&
-						v.every((i) => typeof i === "string")
-					)
-						return true;
-					return false;
-				})
-				.map(([k, v]) => [
-					k,
-					Array.isArray(v) ? (v as string[]).join(", ") : (v as string),
-				])
+		? Object.entries(meta).flatMap(([k, v]) => {
+				if (KNOWN_TOOLTIP_SKIP.has(k)) return [];
+				if (knownFields.some(([kf]) => kf === k)) return [];
+				const values = asStringArray(v);
+				return values ? [[k, values.join(", ")] as [string, string]] : [];
+			})
 		: [];
 
 	for (const [key, val] of [...knownFields, ...extraFields]) {
