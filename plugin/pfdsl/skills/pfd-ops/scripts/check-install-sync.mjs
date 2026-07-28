@@ -7,7 +7,8 @@
 // so it must not import anything outside its own skill tree — Node stdlib
 // and sibling files under this directory only.
 //
-// Usage: node check-install-sync.mjs [--target <dir>] [--deploy] [--force] [--upstream]
+// Usage: node check-install-sync.mjs [--target <dir>] [--deploy]
+//        [--overwrite-local-edits] [--delete-edited-orphans] [--upstream]
 
 import {
 	chmodSync,
@@ -22,7 +23,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkUpstreamVersion } from "./plugin-version-check.mjs";
 
@@ -107,17 +108,66 @@ function writeManifest(targetRoot, entries) {
 	writeFileSync(manifestPath, `${JSON.stringify({ files: sorted }, null, "\t")}\n`);
 }
 
+// A rename that only prefixes the basename (flow-on-issue-close.yml ->
+// pfdsl-flow-on-issue-close.yml) still has to be recognizable. Requiring the
+// added part to end at a separator is what keeps this from pairing files that
+// merely share a word ending (exec.mjs / ghexec.mjs).
+const BASENAME_SEPARATORS = new Set(["-", "_", "."]);
+
+function sharesSeparatedSuffix(a, b) {
+	const [longer, shorter] = a.length >= b.length ? [a, b] : [b, a];
+	if (!longer.endsWith(shorter)) return false;
+	return BASENAME_SEPARATORS.has(longer[longer.length - shorter.length - 1]);
+}
+
+/**
+ * Pair each orphaned path with the missing canonical path that most likely
+ * superseded it. Without this, an upstream rename shows up as an unrelated
+ * "missing" plus "orphaned" pair, and a local edit living on the old path is
+ * left behind with nothing pointing at the new one (#603).
+ *
+ * The signals are tried strongest first, and each one is exact — no similarity
+ * threshold to tune, so the same inputs always produce the same pairing.
+ * @param {string} installDir
+ * @param {string[]} missing repo-relative canonical paths absent from the target
+ * @param {Array<{path: string, hash: string}>} orphanEntries manifest entries whose canonical source is gone
+ * @returns {Array<{from: string, to: string, reason: string}>}
+ */
+function detectRenameCandidates(installDir, missing, orphanEntries) {
+	if (missing.length === 0 || orphanEntries.length === 0) return [];
+	const canonicalHashes = new Map(missing.map((rel) => [rel, sha256(join(installDir, rel))]));
+
+	const candidates = [];
+	for (const entry of orphanEntries) {
+		const orphanBase = basename(entry.path);
+		const signals = [
+			["same canonical hash", (rel) => canonicalHashes.get(rel) === entry.hash],
+			["same basename", (rel) => basename(rel) === orphanBase],
+			["same basename suffix", (rel) => sharesSeparatedSuffix(basename(rel), orphanBase)],
+		];
+		for (const [reason, matches] of signals) {
+			const to = missing.find(matches);
+			if (to !== undefined) {
+				candidates.push({ from: entry.path, to, reason });
+				break;
+			}
+		}
+	}
+	return candidates;
+}
+
 /**
  * Compare canonical install/ files against their deployed copies at
  * targetRoot. Returns per-file status ("ok" | "modified" | "missing" |
- * "orphaned") plus an overall `adopted` flag (true iff at least one file is
- * deployed). "orphaned" covers a file this tool previously deployed (per the
+ * "orphaned"), an overall `adopted` flag (true iff at least one file is
+ * deployed), and `renameCandidates` pairing orphans with their likely
+ * successors. "orphaned" covers a file this tool previously deployed (per the
  * deploy manifest) whose canonical source no longer exists — otherwise such
  * files would be invisible to every check, since they aren't part of the
  * current install/ listing at all.
  * @param {string} skillRoot
  * @param {string} targetRoot
- * @returns {{ results: Array<{path: string, status: "ok"|"modified"|"missing"|"orphaned"}>, adopted: boolean }}
+ * @returns {{ results: Array<{path: string, status: "ok"|"modified"|"missing"|"orphaned"}>, adopted: boolean, renameCandidates: Array<{from: string, to: string, reason: string}> }}
  */
 export function checkInstallSync(skillRoot, targetRoot) {
 	const installDir = resolve(skillRoot, "install");
@@ -132,32 +182,49 @@ export function checkInstallSync(skillRoot, targetRoot) {
 	});
 
 	const currentSet = new Set(files);
-	const orphaned = readManifest(targetRoot)
+	const orphanEntries = readManifest(targetRoot)
 		.filter((entry) => !currentSet.has(entry.path))
-		.filter((entry) => existsSync(join(targetRoot, entry.path)))
-		.map((entry) => ({ path: entry.path, status: "orphaned" }));
+		.filter((entry) => existsSync(join(targetRoot, entry.path)));
+	const orphaned = orphanEntries.map((entry) => ({ path: entry.path, status: "orphaned" }));
 
 	const allResults = [...results, ...orphaned];
 	const adopted = allResults.some((r) => r.status !== "missing");
-	return { results: allResults, adopted };
+	const renameCandidates = detectRenameCandidates(
+		installDir,
+		results.filter((r) => r.status === "missing").map((r) => r.path),
+		orphanEntries,
+	);
+	return { results: allResults, adopted, renameCandidates };
 }
 
 /**
  * Copy canonical install/ files to targetRoot, creating directories as
  * needed. A target file whose hash differs from canonical is treated as a
- * local edit and skipped unless force is true (a local edit would otherwise
- * be silently destroyed). Also removes files this tool previously deployed
- * (per the deploy manifest) whose canonical source has since been dropped
- * from install/ — unless the on-disk copy was locally modified, in which
- * case it's left alone (reported in `orphanSkipped`) unless force is given.
+ * local edit and skipped unless overwriteLocalEdits is true (a local edit would
+ * otherwise be silently destroyed). Also removes files this tool previously
+ * deployed (per the deploy manifest) whose canonical source has since been
+ * dropped from install/ — unless the on-disk copy was locally modified, in
+ * which case it's left alone (reported in `orphanSkipped`) unless
+ * deleteEditedOrphans is given.
+ *
+ * Neither override decides whether a file is copied or an orphan is removed —
+ * both of those happen on their own. What the overrides decide is whether a
+ * local edit standing in the way is discarded, on a surviving path and on a
+ * vanishing one respectively. Keeping them separate matters because a single
+ * flag covering both discards edits the caller only meant to keep (#603).
+ *
  * Writes/updates the deploy manifest afterward so future runs can detect
  * orphans and locally-edited files consistently.
  * @param {string} skillRoot
  * @param {string} targetRoot
- * @param {{ force?: boolean }} [options]
+ * @param {{ overwriteLocalEdits?: boolean, deleteEditedOrphans?: boolean }} [options]
  * @returns {{ copied: string[], skipped: string[], removed: string[], orphanSkipped: string[] }}
  */
-export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
+export function deployInstall(
+	skillRoot,
+	targetRoot,
+	{ overwriteLocalEdits = false, deleteEditedOrphans = false } = {},
+) {
 	const installDir = resolve(skillRoot, "install");
 	const files = listInstallFiles(installDir);
 	const copied = [];
@@ -165,7 +232,7 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 	for (const rel of files) {
 		const canonicalPath = join(installDir, rel);
 		const targetPath = join(targetRoot, rel);
-		if (existsSync(targetPath) && !force && !filesEqual(canonicalPath, targetPath)) {
+		if (existsSync(targetPath) && !overwriteLocalEdits && !filesEqual(canonicalPath, targetPath)) {
 			skipped.push(rel);
 			continue;
 		}
@@ -187,11 +254,12 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 		if (currentSet.has(entry.path)) continue;
 		const targetPath = join(targetRoot, entry.path);
 		if (!existsSync(targetPath)) continue;
-		if (!force && sha256(targetPath) !== entry.hash) {
+		if (!deleteEditedOrphans && sha256(targetPath) !== entry.hash) {
 			orphanSkipped.push(entry.path);
 			// Keep this entry in the manifest — it's still on disk, still
-			// orphaned, and still needs a future --force deploy (or check) to
-			// find it. Dropping it here would make it invisible from now on.
+			// orphaned, and still needs a future --delete-edited-orphans deploy
+			// (or check) to find it. Dropping it here would make it invisible
+			// from now on.
 			retainedOrphanEntries.push(entry);
 			continue;
 		}
@@ -210,7 +278,13 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 // --- CLI ---
 
 export function parseArgs(argv) {
-	const args = { target: process.cwd(), deploy: false, force: false, upstream: false };
+	const args = {
+		target: process.cwd(),
+		deploy: false,
+		overwriteLocalEdits: false,
+		deleteEditedOrphans: false,
+		upstream: false,
+	};
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
 		if (arg === "--target") {
@@ -223,7 +297,16 @@ export function parseArgs(argv) {
 		} else if (arg === "--deploy") {
 			args.deploy = true;
 		} else if (arg === "--force") {
-			args.force = true;
+			// Rejected rather than ignored: an unrecognized flag is silently
+			// dropped here, so the deploy would keep every local edit while the
+			// caller believes they asked to discard them (#603).
+			throw new Error(
+				"--force was split into --overwrite-local-edits and --delete-edited-orphans; pass the one you mean",
+			);
+		} else if (arg === "--overwrite-local-edits") {
+			args.overwriteLocalEdits = true;
+		} else if (arg === "--delete-edited-orphans") {
+			args.deleteEditedOrphans = true;
 		} else if (arg === "--upstream") {
 			args.upstream = true;
 		}
@@ -235,6 +318,13 @@ function printGroup(title, items) {
 	if (items.length === 0) return;
 	console.log(title);
 	for (const item of items) console.log(`  ${item}`);
+}
+
+function printRenameCandidates(candidates) {
+	printGroup(
+		"Possible renames (carry any local edit from the old path over to the new one before trusting the deployed copy):",
+		candidates.map((c) => `${c.from} -> ${c.to}  (${c.reason})`),
+	);
 }
 
 async function main() {
@@ -251,17 +341,43 @@ async function main() {
 	let exitCode = 0;
 
 	if (args.deploy) {
-		const { copied, skipped, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, { force: args.force });
-		printGroup("Copied:", copied);
-		printGroup("Skipped (locally modified; re-run with --force to overwrite):", skipped);
+		// Read the pre-deploy state: deployInstall rewrites the manifest and may
+		// delete the very orphans a rename is inferred from.
+		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
+		// Printed before the deploy runs, not after it. With
+		// --delete-edited-orphans the old path is about to be deleted, and an
+		// instruction to carry its local edit over to the new path is worth
+		// nothing once the file it points at is gone (#603).
+		printRenameCandidates(renameCandidates);
+		const { copied, skipped, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, {
+			overwriteLocalEdits: args.overwriteLocalEdits,
+			deleteEditedOrphans: args.deleteEditedOrphans,
+		});
+		// A bare path under "Copied:" reads as "your file moved here", so the
+		// destination of a detected rename says outright that it holds canonical
+		// content and the old path's edit is not in it — the thing #603 could
+		// not tell from the output.
+		const renameSources = new Map(renameCandidates.map((c) => [c.to, c.from]));
+		printGroup(
+			"Copied:",
+			copied.map((rel) =>
+				renameSources.has(rel)
+					? `${rel}  (canonical content only — the edit at ${renameSources.get(rel)} is not in it)`
+					: rel,
+			),
+		);
+		printGroup("Skipped (locally modified; re-run with --overwrite-local-edits to overwrite):", skipped);
 		printGroup("Removed (no longer part of canonical install/):", removed);
-		printGroup("Orphaned but locally modified; re-run with --force to remove:", orphanSkipped);
+		printGroup(
+			"Orphaned but locally modified; re-run with --delete-edited-orphans to remove:",
+			orphanSkipped,
+		);
 		if (skipped.length > 0 || orphanSkipped.length > 0) exitCode = 1;
 		if (copied.length === 0 && skipped.length === 0 && removed.length === 0 && orphanSkipped.length === 0) {
 			console.log("Nothing to deploy: install/ is empty.");
 		}
 	} else {
-		const { results, adopted } = checkInstallSync(skillRoot, targetRoot);
+		const { results, adopted, renameCandidates } = checkInstallSync(skillRoot, targetRoot);
 		if (!adopted) {
 			console.log(
 				"The GitHub Issues backend (L3) is not adopted in this repo — no pfd-ops install/ files are deployed.\n" +
@@ -274,7 +390,10 @@ async function main() {
 			} else {
 				console.log("pfd-ops install/ files are out of sync:");
 				for (const r of issues) console.log(`  ${r.status}: ${r.path}`);
-				console.log("Run with --deploy to refresh (add --force to overwrite locally edited files).");
+				printRenameCandidates(renameCandidates);
+				console.log(
+					"Run with --deploy to refresh. Files that carry no local edit are copied, and orphans that carry none are removed, without any further flag — add --overwrite-local-edits or --delete-edited-orphans only to discard the edits standing in the way.",
+				);
 				exitCode = 1;
 			}
 		}

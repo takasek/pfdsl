@@ -4,7 +4,13 @@ pfd-ops 運用に紐づく、Claude へ恒常的に届けたい指示（PR 本�
 
 新しい指示が生まれたら、配布先リポでも一般に有効かを評価する。有効なら `.claude/skills/pfd-ops/references/` に追記し配布に載せる（workflow.md「知見の振り分け（3経路）」の経路1と同じ）。このリポ固有の事情に依るなら、このファイルに追記する（採用リポ側でも既定の置き場になる。pfd-ops SKILL.md「Claude 向け指示の置き場」参照）。
 
-## scaffold/ ドリフトのセルフチェック
+## 配置ファイル鮮度セルフチェックはこのリポでは repo-local 版を正とする
+
+このリポは pfd-ops スキルの上流であり、`.claude/skills/pfd-ops/` が canonical、plugin cache 配下（`~/.claude/plugins/cache/pfdsl/pfdsl/<version>/`）はそこから配布された過去のスナップショットである。SKILL.md の鮮度セルフチェックはコマンド行のパス置換有無でロード元を判定するが、その判定はどちらの版で走らせるかしか決めず、**両方が実在してかつ食い違うこのリポの状況**を扱わない。
+
+plugin cache の版が上流より古い場合、その `check-install-sync.mjs --upstream` は古い canonical の `install/` を基準に照合するため、その後にリネームされたパスをすべて `missing` + `orphaned` として報告する。実体は drift でなく plugin の陳腐化であり、`--deploy` で追随してはならない（古いファイルを復活させる）。
+
+したがってこのリポでは、pfd-ops 発火時のセルフチェックは `node .claude/skills/pfd-ops/scripts/check-install-sync.mjs --upstream` で実行する。plugin cache 版が drift を報告し repo-local 版が in sync を報告した場合、差分は plugin の版差であり、対応は `--deploy` ではなく plugin 更新の案内である。
 
 pfd-ops 発火時、SKILL.md の配置ファイル鮮度セルフチェックに続けて次を実行する:
 
