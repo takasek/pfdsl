@@ -34,8 +34,8 @@
 - **parse（`@pfdsl/core` の `parse()`）**: frontmatter 読込 → lex → parse の3段を1トランザクションとして扱う。出力は `document`（構文木）と `frontmatter`。個別サブコマンドとしては露出しない内部境界
 - **normalize（`normalizer.ts` + `buildGraph`）**: parse の出力からエッジリスト・ノード種別・孤立ノード集合・`Graph` 構造を組み立てる。CLI `normalize` コマンドはこれをそのまま JSON 出力する
 - **validate（`validator.ts`）**: 正準化グラフと frontmatter に V/W ルールを適用し診断を生成する。CLI `check` は parse→normalize→validate を1回で実行する。VSCode 拡張は `analyze()` 経由で同じ validate をエディタ内リアルタイム診断に使う（`diagnostics.ts`）
-- **format（`formatter.ts`）**: ソーステキストから独立に再 lex/parse し整形済みテキストを生成する。check の parse 結果を再利用しない別経路
-- **sort_meta（`sort.ts` の `sort(source, opts)`）**: 入力はソーステキスト（format と同じく独立再 parse）。構文木を受け取る経路ではない
+- **format（`formatter.ts`）**: ソーステキストから独立に再 lex/parse し整形済みテキストを生成する。check の parse 結果を再利用しない別経路。frontmatter は yaml CST（`frontmatter-cst.ts`）経由で正準化する（ADR-0034）
+- **sort_meta（`sort.ts` の `sort(source, opts)`）**: 入力はソーステキスト（format と同じく独立再 parse）。構文木を受け取る経路ではない。frontmatter の並べ替えは yaml CST（`frontmatter-cst.ts`）経由（ADR-0034）
 - **render_graph（`graphviz-exporter` の `exportDot(graph, frontmatter)`）**: 正準化グラフと frontmatter（layout / title / statusStyles）から DOT 文字列を組む
 - **export_image**: DOT→SVG は `@hpcc-js/wasm`（`preview-engine` の `renderDotToSvg`）で外部依存なし。PDF/PNG は `svgToBinary` が `puppeteer` を動的 import し、未インストール時は明示エラーで失敗する（フォールバックしない）
 - **export_metadata（`metadata-exporter` の `extractMetadata(graph, frontmatter)`）**: VSCode 拡張の `pfdsl.export`（`export.ts`）のみが呼ぶ
