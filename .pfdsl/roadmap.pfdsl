@@ -296,7 +296,7 @@ artifact:
     criteria: Obsidian 上で .pfdsl のプレビュー・編集が動作確認済み
   type_field:
     label: "type フィールド追加 (#268)"
-    description: "frontmatter に type: roadmap|workflow|runtime-pipeline を追加し、ready を roadmap 型にゲート。draft_proposals 経由"
+    description: "frontmatter に type: roadmap|workflow|runtime-pipeline を追加し、ready を roadmap 型にゲート"
     status: done
     criteria: "type: フィールドが spec に統合済み、ready が roadmap 型以外で error を出力する"
   w002_hierarchy:
@@ -579,14 +579,14 @@ process:
     updated_at: 2026-06-12T08:18:35Z
   i268_implement_type_field:
     label: type フィールド実装
-    description: "frontmatter type: フィールドと ready コマンドのロードマップ型ゲートを実装する。draft_proposals 経由"
+    description: "frontmatter type: フィールドと ready コマンドのロードマップ型ゲートを実装する"
     location: https://github.com/takasek/pfdsl/issues/268
   i272_implement_w002_hierarchy:
     label: W002 criteria 階層化実装
     location: https://github.com/takasek/pfdsl/issues/272
   i273_implement_blocked_by:
     label: blockedBy フィールド実装
-    description: "blockedBy: フィールドの spec 統合と CLI 対応。draft_proposals 経由"
+    description: "blockedBy: フィールドの spec 統合と CLI 対応"
     location: https://github.com/takasek/pfdsl/issues/273
   i356_implement_explain_cmd:
     label: explain コマンド実装
