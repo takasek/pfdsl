@@ -5,6 +5,10 @@ import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { execGh } from "./gh-exec.mjs";
 
 // A real `gh` binary may live anywhere on PATH depending on the environment
@@ -83,5 +87,127 @@ describe("execGh", () => {
 		});
 		const out = await execGh(["label", "list", "--json", "name,description", "--limit", "100"]);
 		assert.deepEqual(JSON.parse(out), [{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" }]);
+	});
+
+	// This whole path only runs where `gh` is absent (Claude Code Remote and
+	// the like), so CI never executes it and only listLabels above was covered.
+	// A property renamed between the argv plan and the REST call would surface
+	// nowhere until someone hit it for real (#639).
+	describe("every argv shape the scripts emit", () => {
+		/** Records each fetch and answers with `body`. */
+		function recordingFetch(body) {
+			const calls = [];
+			globalThis.fetch = async (url, init = {}) => {
+				calls.push({ url: String(url), init });
+				return {
+					ok: true,
+					status: 200,
+					headers: { get: () => null },
+					json: async () => body,
+					text: async () => JSON.stringify(body),
+				};
+			};
+			return calls;
+		}
+
+		beforeEach(() => {
+			process.env.GH_TOKEN = "tok";
+		});
+
+		it("creates a label with its name, description and colour in the body", async () => {
+			const calls = recordingFetch({});
+			await execGh([
+				"label",
+				"create",
+				"flow:exempt",
+				"--description",
+				"not tracked",
+				"--color",
+				"ededed",
+			]);
+			assert.equal(calls.length, 1);
+			assert.match(calls[0].url, /\/labels$/);
+			assert.equal(calls[0].init.method, "POST");
+			assert.deepEqual(JSON.parse(calls[0].init.body), {
+				name: "flow:exempt",
+				description: "not tracked",
+				color: "ededed",
+			});
+		});
+
+		it("edits a label by name, sending only the new description", async () => {
+			const calls = recordingFetch({});
+			await execGh(["label", "edit", "flow:exempt", "--description", "reworded"]);
+			assert.match(calls[0].url, /\/labels\/flow%3Aexempt$/);
+			assert.equal(calls[0].init.method, "PATCH");
+			assert.deepEqual(JSON.parse(calls[0].init.body), { description: "reworded" });
+		});
+
+		it("lists issues, normalized into the shape gh --json would print", async () => {
+			recordingFetch([{ number: 1, title: "x", labels: [], state: "open" }]);
+			const out = await execGh(["issue", "list", "--state", "open", "--json", "number,title,labels"]);
+			const issues = JSON.parse(out);
+			assert.equal(issues.length, 1);
+			assert.equal(issues[0].number, 1);
+			assert.equal(issues[0].labels.length, 0);
+			// gh reports state in caps and carries stateReason; the REST payload
+			// does neither, so the fallback has to add them.
+			assert.equal(issues[0].state, "OPEN");
+			assert.ok("stateReason" in issues[0]);
+		});
+
+		it("adds a label to an issue by number", async () => {
+			const calls = recordingFetch({});
+			await execGh(["issue", "edit", "612", "--add-label", "flow:exempt"]);
+			assert.match(calls[0].url, /\/issues\/612\/labels$/);
+			assert.equal(calls[0].init.method, "POST");
+			assert.deepEqual(JSON.parse(calls[0].init.body), { labels: ["flow:exempt"] });
+		});
+
+		it("reads an issue body", async () => {
+			recordingFetch({ number: 612, body: "## 現象\n..." });
+			assert.equal(await execGh(["issue", "view", "612", "--json", "body"]), "## 現象\n...");
+		});
+
+		it("surfaces an unhandled op rather than silently doing nothing", async () => {
+			// planGhRestCall only returns the ops above, so this is reached by
+			// handing runGhRestPlan a plan it does not know — which is what a new
+			// argv shape mapped without a matching case would look like.
+			recordingFetch({});
+			await assert.rejects(
+				() => execGh(["repo", "view", "--json", "name"]),
+				(e) => e.code === "ENOENT",
+				"an argv shape with no plan keeps the original gh error",
+			);
+		});
+
+		it("lists open PRs", async () => {
+			recordingFetch([]);
+			assert.deepEqual(JSON.parse(await execGh(["pr", "list", "--state", "open", "--json", "number,title"])), []);
+		});
+	});
+});
+
+// planGhRestCall (gh-compat.mjs) decides which ops exist; runGhRestPlan
+// (gh-exec.mjs) implements them. They are in different files, and the
+// mismatch case — an op planned but not implemented — reaches only the
+// default branch, which no argv can produce today. Comparing the two op sets
+// is what actually holds them together (#639).
+describe("the REST op sets on both sides of the fallback", () => {
+	const here = dirname(fileURLToPath(import.meta.url));
+	const read = (name) => readFileSync(resolve(here, name), "utf-8");
+
+	/** Op names in `{ op: "name"` literals. */
+	const planned = [...read("gh-compat.mjs").matchAll(/\bop:\s*"([^"]+)"/g)].map((m) => m[1]);
+	/** Op names in `case "name":` labels. */
+	const implemented = [...read("gh-exec.mjs").matchAll(/case\s+"([^"]+)":/g)].map((m) => m[1]);
+
+	it("plans at least one op, so the extraction still finds something", () => {
+		assert.ok(planned.length > 0);
+		assert.ok(implemented.length > 0);
+	});
+
+	it("implements exactly the ops it plans", () => {
+		assert.deepEqual([...implemented].sort(), [...planned].sort());
 	});
 });

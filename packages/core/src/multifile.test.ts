@@ -25,6 +25,16 @@ function makeLoad(docs: Record<string, FakeDoc>) {
 	return (path: string): FakeDoc | null => docs[path] ?? null;
 }
 
+/** A loader that also records how many times each path was asked for. */
+function makeCountingLoad(docs: Record<string, FakeDoc>) {
+	const calls = new Map<string, number>();
+	const load = (path: string): FakeDoc | null => {
+		calls.set(path, (calls.get(path) ?? 0) + 1);
+		return docs[path] ?? null;
+	};
+	return { load, calls };
+}
+
 describe("collectExtendsRefs", () => {
 	it("returns [] when no extends key is present", () => {
 		expect(collectExtendsRefs({})).toEqual([]);
@@ -112,6 +122,33 @@ describe("isUrlLike", () => {
 });
 
 describe("loadSubflowGraph", () => {
+	// resolveRefPath is unit-tested directly, but the wiring around this call —
+	// the V021 code, the message, and the `continue` that keeps the load going —
+	// was reached only through extends:, never through subflow: (#638).
+	it.each([
+		["an absolute path", "/abs/child.pfdsl", "absolute"],
+		["a URL", "https://example.com/child.pfdsl", "url"],
+	])("reports %s in subflow: as V021 and keeps loading", (_name, ref, reason) => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						P1: { subflow: ref },
+						P2: { subflow: "./ok.pfdsl" },
+					},
+				},
+			},
+			"/p/ok.pfdsl": { frontmatter: {} },
+		});
+		const result = loadSubflowGraph("/p/main.pfdsl", docs);
+		const v021 = result.diagnostics.filter((d) => d.code === "V021");
+		expect(v021).toHaveLength(1);
+		expect(v021[0]?.message).toContain(reason);
+		expect(v021[0]?.message).toContain(ref);
+		// The good sibling still loaded: the bad ref is skipped, not fatal.
+		expect(result.docs.has("/p/ok.pfdsl")).toBe(true);
+	});
+
 	it("loads the entry and its subflow children", () => {
 		const docs = makeLoad({
 			"/p/main.pfdsl": {
@@ -629,6 +666,27 @@ describe("loadExtendsChain", () => {
 		});
 		const result = loadExtendsChain("/p/a.pfdsl", docs);
 		expect(result.diagnostics.some((d) => d.code === "V027")).toBe(true);
+	});
+
+	// The subflow loader has the same guard as the extends loader, but only the
+	// extends side had a diamond test — removing the subflow guard left every
+	// test green even though the shared child was then loaded once per parent
+	// (#637).
+	it("diamond: a subflow reached from two parents is loaded once", () => {
+		const { load, calls } = makeCountingLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						P1: { subflow: "./shared.pfdsl" },
+						P2: { subflow: "./shared.pfdsl" },
+					},
+				},
+			},
+			"/p/shared.pfdsl": { frontmatter: {} },
+		});
+		const result = loadSubflowGraph("/p/main.pfdsl", load);
+		expect(result.diagnostics).toEqual([]);
+		expect(calls.get("/p/shared.pfdsl")).toBe(1);
 	});
 
 	it("diamond: shared preset loaded once, no diagnostics", () => {

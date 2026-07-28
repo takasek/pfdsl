@@ -53,7 +53,32 @@ describe("dist/cli.js smoke", () => {
 		expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
 	});
 
-	// #428: stdin + --json success path hardcoded `diagnostics: []`, dropping
+	// Every case above exits 0, so cli.ts's own lines — choosing between binary
+	// output and stdout, writing stderr, and passing the exit code to the
+	// process — were never executed as themselves (#638). This is the failure
+	// side of that boundary.
+	it.skipIf(!distIsCurrent)(
+		"passes a non-zero exit code and the message through to the process",
+		() => {
+			const missing = join(__dirname, "no-such-file.pfdsl");
+			let status: number | undefined;
+			let stderr = "";
+			try {
+				execFileSync(process.execPath, [distCli, "check", missing], {
+					encoding: "utf8",
+					stdio: "pipe",
+				});
+			} catch (e) {
+				const err = e as { status?: number; stderr?: string };
+				status = err.status;
+				stderr = err.stderr ?? "";
+			}
+			expect(status).toBe(1);
+			expect(stderr).toContain("no-such-file.pfdsl");
+		},
+	);
+
+	// #428: stdin + --json success path hardcoded `diagnostics: []`, dropping	// #428: stdin + --json success path hardcoded `diagnostics: []`, dropping
 	// warnings (e.g. W002) that both the file-path --json path and the stdin
 	// non-json path do report.
 	it.skipIf(!distIsCurrent)(

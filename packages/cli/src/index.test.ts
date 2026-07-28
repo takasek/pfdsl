@@ -1482,6 +1482,34 @@ describe("multifile check — extends", () => {
 		}
 	});
 
+	// The non-json branch above was covered; --json builds its own payload and
+	// was not, so the machine-readable shape of a preset failure went unchecked
+	// (#638).
+	it("preset with forbidden key → --json emits { ok: false, diagnostics }", async () => {
+		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-extends-json-"));
+		try {
+			writeFileSync(join(d, "main.pfdsl"), mainFile);
+			writeFileSync(join(d, "preset.yaml"), presetContaminated);
+			const r = await run(["check", join(d, "main.pfdsl"), "--json"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			const parsed = JSON.parse(r.stdout);
+			expect(parsed.ok).toBe(false);
+			expect(
+				(parsed.diagnostics as Array<{ code: string; severity: string }>).map(
+					(d) => d.code,
+				),
+			).toContain("V028");
+			expect(
+				(parsed.diagnostics as Array<{ severity: string }>).every(
+					(d) => d.severity === "error",
+				),
+			).toBe(true);
+		} finally {
+			rmSync(d, { recursive: true, force: true });
+		}
+	});
+
 	it("missing preset file → exit 1 with V026", async () => {
 		const d = mkdtempSync(join(tmpdir(), "pfdsl-mf-extends-"));
 		try {
@@ -1698,6 +1726,33 @@ artifact:
 ---
 req >> design -> spec
 `;
+
+	// The id is in the graph but has no frontmatter entry, so the pre-check
+	// (nodeKinds, read from the body) passes and setFrontmatterField (doc.hasIn,
+	// read from the frontmatter) refuses. The two disagree by design; nothing
+	// covered the gap between them (#638).
+	it("exits 1 when the id is in the body but has no frontmatter entry", async () => {
+		const f = join(dir, "set-body-only-id.pfdsl");
+		writeFileSync(f, "req >> design -> spec\n");
+		const r = await run(["meta", "set", f, "spec", "status", "done"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("'spec' not found");
+		expect(readFileSync(f, "utf-8")).toBe("req >> design -> spec\n");
+	});
+
+	it("--json reports that same case as { ok: false, missing: [id] }", async () => {
+		const f = join(dir, "set-body-only-id-json.pfdsl");
+		writeFileSync(f, "req >> design -> spec\n");
+		const r = await run(["meta", "set", f, "spec", "status", "done", "--json"]);
+		expect(r.exitCode).toBe(1);
+		expect(JSON.parse(r.stdout)).toEqual({ ok: false, missing: ["spec"] });
+	});
+
+	it("refuses stdin, since it has nowhere to write the result", async () => {
+		const r = await run(["meta", "set", "-", "req", "status", "done"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("stdin");
+	});
 
 	it("rewrites artifact status in place and exits 0", async () => {
 		const f = join(dir, "status-set-write.pfdsl");
@@ -2922,6 +2977,14 @@ req -> spec
 		writeFileSync(f, base);
 		const r = await run(["meta", "get", f, "spec"]);
 		expect(r.exitCode).toBe(0);
+	});
+
+	it("exits 2 when the field positional is present but empty", async () => {
+		const f = join(dir, "get-empty-field.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "get", f, "spec", ""]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain("field is required");
 	});
 
 	it("exits 2 with usage help when the id positional is missing", async () => {

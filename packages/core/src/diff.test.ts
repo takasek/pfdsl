@@ -109,6 +109,35 @@ req >> design -> spec
 			expect(r.changedNodes).toEqual([]);
 		});
 
+		// Both sides come through the same parser everywhere else, so their keys
+		// are always inserted in the same order and the sort in stableStringify
+		// never mattered. Hand-built frontmatters disagree on order (#637).
+		it("reports changedNodes empty when the same fields are written in a different order", () => {
+			const graph = analyze("req >> design -> spec\n").graph;
+			const a = { artifact: { spec: { status: "done", criteria: "x" } } };
+			const b = { artifact: { spec: { criteria: "x", status: "done" } } };
+			const r = diffGraphs(
+				graph,
+				graph,
+				a as unknown as Parameters<typeof diffGraphs>[2],
+				b as unknown as Parameters<typeof diffGraphs>[3],
+			);
+			expect(r.changedNodes).toEqual([]);
+		});
+
+		it("still reports a node whose field value actually differs", () => {
+			const graph = analyze("req >> design -> spec\n").graph;
+			const a = { artifact: { spec: { status: "done", criteria: "x" } } };
+			const b = { artifact: { spec: { criteria: "y", status: "done" } } };
+			const r = diffGraphs(
+				graph,
+				graph,
+				a as unknown as Parameters<typeof diffGraphs>[2],
+				b as unknown as Parameters<typeof diffGraphs>[3],
+			);
+			expect(r.changedNodes).toEqual(["spec"]);
+		});
+
 		it("reports changedNodes empty when frontmatters are omitted (2-arg call)", () => {
 			const srcA = `---
 artifact:

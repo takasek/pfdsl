@@ -10,6 +10,12 @@ function edges(src: string, fm = null): NormalizedEdge[] {
 	return normalize(document, fm).edges;
 }
 
+function isolated(src: string, fm: Frontmatter | null = null): string[] {
+	const { tokens } = lex(src);
+	const { document } = parseTokens(tokens);
+	return [...normalize(document, fm).isolatedNodes].sort();
+}
+
 describe("normalize", () => {
 	it("chain A >> P -> B produces 2 edges", () => {
 		const result = edges("A >> P -> B");
@@ -173,5 +179,35 @@ describe("normalize", () => {
 		const { document } = parseTokens(tokens);
 		const { isolatedNodes } = normalize(document, fm);
 		expect(isolatedNodes.has("idle")).toBe(true);
+	});
+});
+
+// A group takes part in no edge by design, so it must not be collected as an
+// isolated node — otherwise `fmt` writes it into the body as a standalone
+// declaration the user never typed. Nothing tested this (#637).
+describe("isolated nodes", () => {
+	it("collects an artifact declared only in frontmatter", () => {
+		const fm = { artifact: { orphan: {} } } as unknown as Frontmatter;
+		expect(isolated("A >> P -> B", fm)).toEqual(["orphan"]);
+	});
+
+	it("does not collect a group, which is not part of the edge graph", () => {
+		const fm = {
+			group: { backend: { label: "Backend" } },
+		} as unknown as Frontmatter;
+		expect(isolated("A >> P -> B", fm)).toEqual([]);
+	});
+
+	it("collects the artifacts but not the group when both are declared", () => {
+		const fm = {
+			group: { backend: {} },
+			artifact: { orphan: {} },
+		} as unknown as Frontmatter;
+		expect(isolated("A >> P -> B", fm)).toEqual(["orphan"]);
+	});
+
+	it("does not collect a node that an edge already mentions", () => {
+		const fm = { artifact: { A: { label: "A" } } } as unknown as Frontmatter;
+		expect(isolated("A >> P -> B", fm)).toEqual([]);
 	});
 });

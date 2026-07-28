@@ -82,6 +82,15 @@ describe("sortEdges", () => {
 		expect(result[0]).toMatchObject({ artifact: "a" });
 	});
 
+	// The case above passes whether the component is keyed by its smallest or
+	// its largest id — a/b sort before x/y either way. Here the two answers
+	// disagree: keyed by min, {m,z} (m) comes before {n}; keyed by max, {m,z}
+	// (z) comes after (#637).
+	it("keys a component by its smallest id, not its largest", () => {
+		const result = sorted("m >> P1 -> z\nn >> P2 -> o");
+		expect(result[0]).toMatchObject({ artifact: "m" });
+	});
+
 	// The timeout is the non-termination check: a cycle that made ranking loop
 	// forever would hang here rather than return. Measuring elapsed time inside
 	// the test instead would assert on machine speed, not on termination.

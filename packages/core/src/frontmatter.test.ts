@@ -83,6 +83,21 @@ describe("loadFrontmatter", () => {
 				"",
 			);
 			expect(loadFrontmatter(src).diagnostics).toHaveLength(0);
+
+			// The trailing-space and CRLF cases above show the fence match tolerates a
+			// padded line end; these two show it does not tolerate everything — removing
+			// the trim, or loosening the match, has to fail one side or the other (#637).
+			describe("closing fence refusals", () => {
+				it("still reports FM001 when the fence is genuinely absent", () => {
+					const result = loadFrontmatter("---\ntitle: Test\nA >> P\n");
+					expect(result.diagnostics.map((d) => d.code)).toEqual(["FM001"]);
+				});
+
+				it("does not take an indented --- as the closing fence", () => {
+					const result = loadFrontmatter("---\ntitle: Test\n  ---\nA >> P\n");
+					expect(result.diagnostics.map((d) => d.code)).toEqual(["FM001"]);
+				});
+			});
 		});
 	});
 
