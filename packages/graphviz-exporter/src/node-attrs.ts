@@ -127,8 +127,10 @@ export function nodeAttrs(
 	const locationArray: string[] | undefined =
 		typeof locationRaw === "string"
 			? [locationRaw]
-			: Array.isArray(locationRaw) && locationRaw.length > 0
-				? (locationRaw as string[])
+			: Array.isArray(locationRaw) &&
+					locationRaw.length > 0 &&
+					locationRaw.every((i) => typeof i === "string")
+				? locationRaw
 				: undefined;
 	const location = locationArray?.join(", ");
 	const revises = ameta?.revises;
