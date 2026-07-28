@@ -108,17 +108,73 @@ function writeManifest(targetRoot, entries) {
 	writeFileSync(manifestPath, `${JSON.stringify({ files: sorted }, null, "\t")}\n`);
 }
 
+function basenameOf(rel) {
+	const slash = rel.lastIndexOf("/");
+	return slash === -1 ? rel : rel.slice(slash + 1);
+}
+
+// A rename that only prefixes the basename (flow-on-issue-close.yml ->
+// pfdsl-flow-on-issue-close.yml) still has to be recognizable. Requiring the
+// added part to end at a separator is what keeps this from pairing files that
+// merely share a word ending (exec.mjs / ghexec.mjs).
+const BASENAME_SEPARATORS = new Set(["-", "_", "."]);
+
+function sharesSeparatedSuffix(a, b) {
+	const [longer, shorter] = a.length >= b.length ? [a, b] : [b, a];
+	if (!longer.endsWith(shorter)) return false;
+	return BASENAME_SEPARATORS.has(longer[longer.length - shorter.length - 1]);
+}
+
+// Strongest first. Each signal is exact — no similarity threshold to tune, so
+// the same inputs always produce the same pairing.
+const RENAME_REASONS = ["same canonical hash", "same basename", "same basename suffix"];
+
+/**
+ * Pair each orphaned path with the missing canonical path that most likely
+ * superseded it. Without this, an upstream rename shows up as an unrelated
+ * "missing" plus "orphaned" pair, and a local edit living on the old path is
+ * left behind with nothing pointing at the new one (#603).
+ * @param {string} installDir
+ * @param {string[]} missing repo-relative canonical paths absent from the target
+ * @param {Array<{path: string, hash: string}>} orphanEntries manifest entries whose canonical source is gone
+ * @returns {Array<{from: string, to: string, reason: string}>}
+ */
+function detectRenameCandidates(installDir, missing, orphanEntries) {
+	if (missing.length === 0 || orphanEntries.length === 0) return [];
+	const canonicalHashes = new Map(missing.map((rel) => [rel, sha256(join(installDir, rel))]));
+
+	const candidates = [];
+	for (const entry of orphanEntries) {
+		const orphanBase = basenameOf(entry.path);
+		let best = null;
+		for (const rel of missing) {
+			const base = basenameOf(rel);
+			let reason = null;
+			if (canonicalHashes.get(rel) === entry.hash) reason = "same canonical hash";
+			else if (base === orphanBase) reason = "same basename";
+			else if (sharesSeparatedSuffix(base, orphanBase)) reason = "same basename suffix";
+			if (reason === null) continue;
+			if (best === null || RENAME_REASONS.indexOf(reason) < RENAME_REASONS.indexOf(best.reason)) {
+				best = { from: entry.path, to: rel, reason };
+			}
+		}
+		if (best !== null) candidates.push(best);
+	}
+	return candidates;
+}
+
 /**
  * Compare canonical install/ files against their deployed copies at
  * targetRoot. Returns per-file status ("ok" | "modified" | "missing" |
- * "orphaned") plus an overall `adopted` flag (true iff at least one file is
- * deployed). "orphaned" covers a file this tool previously deployed (per the
+ * "orphaned"), an overall `adopted` flag (true iff at least one file is
+ * deployed), and `renameCandidates` pairing orphans with their likely
+ * successors. "orphaned" covers a file this tool previously deployed (per the
  * deploy manifest) whose canonical source no longer exists — otherwise such
  * files would be invisible to every check, since they aren't part of the
  * current install/ listing at all.
  * @param {string} skillRoot
  * @param {string} targetRoot
- * @returns {{ results: Array<{path: string, status: "ok"|"modified"|"missing"|"orphaned"}>, adopted: boolean }}
+ * @returns {{ results: Array<{path: string, status: "ok"|"modified"|"missing"|"orphaned"}>, adopted: boolean, renameCandidates: Array<{from: string, to: string, reason: string}> }}
  */
 export function checkInstallSync(skillRoot, targetRoot) {
 	const installDir = resolve(skillRoot, "install");
@@ -133,14 +189,19 @@ export function checkInstallSync(skillRoot, targetRoot) {
 	});
 
 	const currentSet = new Set(files);
-	const orphaned = readManifest(targetRoot)
+	const orphanEntries = readManifest(targetRoot)
 		.filter((entry) => !currentSet.has(entry.path))
-		.filter((entry) => existsSync(join(targetRoot, entry.path)))
-		.map((entry) => ({ path: entry.path, status: "orphaned" }));
+		.filter((entry) => existsSync(join(targetRoot, entry.path)));
+	const orphaned = orphanEntries.map((entry) => ({ path: entry.path, status: "orphaned" }));
 
 	const allResults = [...results, ...orphaned];
 	const adopted = allResults.some((r) => r.status !== "missing");
-	return { results: allResults, adopted };
+	const renameCandidates = detectRenameCandidates(
+		installDir,
+		results.filter((r) => r.status === "missing").map((r) => r.path),
+		orphanEntries,
+	);
+	return { results: allResults, adopted, renameCandidates };
 }
 
 /**
@@ -265,6 +326,13 @@ function printGroup(title, items) {
 	for (const item of items) console.log(`  ${item}`);
 }
 
+function printRenameCandidates(candidates) {
+	printGroup(
+		"Possible renames (carry any local edit from the old path over to the new one before trusting the deployed copy):",
+		candidates.map((c) => `${c.from} -> ${c.to}  (${c.reason})`),
+	);
+}
+
 async function main() {
 	let args;
 	try {
@@ -279,6 +347,9 @@ async function main() {
 	let exitCode = 0;
 
 	if (args.deploy) {
+		// Read the pre-deploy state: deployInstall rewrites the manifest and may
+		// delete the very orphans a rename is inferred from.
+		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
 		const { copied, skipped, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, {
 			forceOverwrite: args.forceOverwrite,
 			forceRemoveOrphans: args.forceRemoveOrphans,
@@ -290,12 +361,13 @@ async function main() {
 			"Orphaned but locally modified; re-run with --force-remove-orphans to remove:",
 			orphanSkipped,
 		);
+		printRenameCandidates(renameCandidates);
 		if (skipped.length > 0 || orphanSkipped.length > 0) exitCode = 1;
 		if (copied.length === 0 && skipped.length === 0 && removed.length === 0 && orphanSkipped.length === 0) {
 			console.log("Nothing to deploy: install/ is empty.");
 		}
 	} else {
-		const { results, adopted } = checkInstallSync(skillRoot, targetRoot);
+		const { results, adopted, renameCandidates } = checkInstallSync(skillRoot, targetRoot);
 		if (!adopted) {
 			console.log(
 				"The GitHub Issues backend (L3) is not adopted in this repo — no pfd-ops install/ files are deployed.\n" +
@@ -308,6 +380,7 @@ async function main() {
 			} else {
 				console.log("pfd-ops install/ files are out of sync:");
 				for (const r of issues) console.log(`  ${r.status}: ${r.path}`);
+				printRenameCandidates(renameCandidates);
 				console.log(
 					"Run with --deploy to refresh (add --force-overwrite to overwrite locally edited files, --force-remove-orphans to delete orphans).",
 				);

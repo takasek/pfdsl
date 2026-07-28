@@ -13,6 +13,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 import {
 	listInstallFiles,
@@ -152,6 +154,95 @@ describe("checkInstallSync", () => {
 	});
 });
 
+describe("checkInstallSync rename candidates", () => {
+	// Renaming a canonical file splits into an unrelated-looking "missing" and
+	// "orphaned" pair, so a repo carrying a local edit on the old path gets the
+	// bare upstream file at the new path with no hint that its customization
+	// needs carrying over (#603).
+	function deployThenRename(targetRoot, from, to, { newContent } = {}) {
+		const skillRoot = join(tmp, "skill-rename");
+		writeFile(join(skillRoot, "install"), from, "canonical-original");
+		deployInstall(skillRoot, targetRoot);
+		rmSync(join(skillRoot, "install", ...from.split("/")));
+		writeFile(join(skillRoot, "install"), to, newContent ?? "canonical-original");
+		return skillRoot;
+	}
+
+	it("pairs an orphan with a missing file that carries the same canonical hash", () => {
+		const targetRoot = join(tmp, "target-rename-hash");
+		const skillRoot = deployThenRename(targetRoot, "scripts/old.mjs", "scripts/pfdsl/new.mjs");
+
+		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
+		assert.deepEqual(renameCandidates, [
+			{ from: "scripts/old.mjs", to: "scripts/pfdsl/new.mjs", reason: "same canonical hash" },
+		]);
+	});
+
+	it("pairs a moved file whose content also changed, by basename", () => {
+		const targetRoot = join(tmp, "target-rename-basename");
+		const skillRoot = deployThenRename(targetRoot, "scripts/lib/gh-exec.mjs", "scripts/pfdsl/lib/gh-exec.mjs", {
+			newContent: "canonical-rewritten",
+		});
+
+		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
+		assert.deepEqual(renameCandidates, [
+			{
+				from: "scripts/lib/gh-exec.mjs",
+				to: "scripts/pfdsl/lib/gh-exec.mjs",
+				reason: "same basename",
+			},
+		]);
+	});
+
+	it("pairs a prefixed basename when the prefix ends at a separator", () => {
+		const targetRoot = join(tmp, "target-rename-suffix");
+		const skillRoot = deployThenRename(
+			targetRoot,
+			".github/workflows/flow-on-issue-close.yml",
+			".github/workflows/pfdsl-flow-on-issue-close.yml",
+			{ newContent: "canonical-rewritten" },
+		);
+
+		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
+		assert.deepEqual(renameCandidates, [
+			{
+				from: ".github/workflows/flow-on-issue-close.yml",
+				to: ".github/workflows/pfdsl-flow-on-issue-close.yml",
+				reason: "same basename suffix",
+			},
+		]);
+	});
+
+	it("does not pair an orphan with an unrelated missing file", () => {
+		const targetRoot = join(tmp, "target-rename-unrelated");
+		const skillRoot = deployThenRename(targetRoot, "scripts/old.mjs", "scripts/unrelated.mjs", {
+			newContent: "canonical-rewritten",
+		});
+
+		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
+		assert.deepEqual(renameCandidates, []);
+	});
+
+	it("does not treat a mid-word basename overlap as a suffix match", () => {
+		const targetRoot = join(tmp, "target-rename-midword");
+		const skillRoot = deployThenRename(targetRoot, "scripts/exec.mjs", "scripts/ghexec.mjs", {
+			newContent: "canonical-rewritten",
+		});
+
+		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
+		assert.deepEqual(renameCandidates, []);
+	});
+
+	it("reports no candidates when nothing was renamed", () => {
+		const skillRoot = makeSkillRoot();
+		const targetRoot = join(tmp, "target-rename-none");
+		deployInstall(skillRoot, targetRoot);
+
+		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
+		assert.deepEqual(renameCandidates, []);
+	});
+});
+
 describe("deployInstall", () => {
 	it("copies every canonical file into an empty target, creating directories as needed", () => {
 		const skillRoot = makeSkillRoot();
@@ -285,6 +376,55 @@ describe("deployInstall", () => {
 
 		deployInstall(skillRoot, targetRoot);
 		assert.equal(statSync(join(targetRoot, "a.txt")).mode & 0o777, 0o755);
+	});
+});
+
+describe("CLI output", () => {
+	const scriptPath = fileURLToPath(
+		new URL("../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs", import.meta.url),
+	);
+
+	function runCli(skillRoot, targetRoot, extraArgs = []) {
+		// The script resolves install/ from its own location, so point a stub
+		// skill root at it via a symlinked copy of the scripts directory.
+		const stubScripts = join(skillRoot, "scripts");
+		mkdirSync(stubScripts, { recursive: true });
+		const stubScript = join(stubScripts, "check-install-sync.mjs");
+		if (!existsSync(stubScript)) symlinkSync(scriptPath, stubScript);
+		return spawnSync(process.execPath, [stubScript, "--target", targetRoot, ...extraArgs], {
+			encoding: "utf-8",
+		});
+	}
+
+	it("surfaces rename candidates on --deploy, not just on a bare check", () => {
+		// The #603 report: --deploy printed nothing pointing the old path's
+		// local edit at the new path, so the customization was silently lost.
+		const skillRoot = join(tmp, "skill-cli");
+		const targetRoot = join(tmp, "target-cli");
+		writeFile(join(skillRoot, "install"), "scripts/lib/gh-exec.mjs", "canonical-original");
+		deployInstall(skillRoot, targetRoot);
+		rmSync(join(skillRoot, "install", "scripts", "lib", "gh-exec.mjs"));
+		writeFile(join(skillRoot, "install"), "scripts/pfdsl/lib/gh-exec.mjs", "canonical-rewritten");
+
+		const checked = runCli(skillRoot, targetRoot);
+		assert.match(checked.stdout, /Possible renames/);
+
+		// Deploying resolves the drift, so this has to run second to still see
+		// the pre-deploy state the hint is derived from.
+		const deployed = runCli(skillRoot, targetRoot, ["--deploy"]);
+		assert.match(deployed.stdout, /Possible renames/);
+		assert.match(deployed.stdout, /scripts\/lib\/gh-exec\.mjs -> scripts\/pfdsl\/lib\/gh-exec\.mjs/);
+	});
+
+	it("exits non-zero with a migration message when given the retired --force", () => {
+		const skillRoot = join(tmp, "skill-cli-force");
+		const targetRoot = join(tmp, "target-cli-force");
+		writeFile(join(skillRoot, "install"), "a.txt", "canonical-a");
+		mkdirSync(targetRoot, { recursive: true });
+
+		const result = runCli(skillRoot, targetRoot, ["--deploy", "--force"]);
+		assert.equal(result.status, 2);
+		assert.match(result.stderr, /--force was split into --force-overwrite and --force-remove-orphans/);
 	});
 });
 
