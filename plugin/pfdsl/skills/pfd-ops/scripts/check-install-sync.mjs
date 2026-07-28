@@ -7,7 +7,8 @@
 // so it must not import anything outside its own skill tree — Node stdlib
 // and sibling files under this directory only.
 //
-// Usage: node check-install-sync.mjs [--target <dir>] [--deploy] [--force] [--upstream]
+// Usage: node check-install-sync.mjs [--target <dir>] [--deploy]
+//        [--force-overwrite] [--force-remove-orphans] [--upstream]
 
 import {
 	chmodSync,
@@ -145,19 +146,30 @@ export function checkInstallSync(skillRoot, targetRoot) {
 /**
  * Copy canonical install/ files to targetRoot, creating directories as
  * needed. A target file whose hash differs from canonical is treated as a
- * local edit and skipped unless force is true (a local edit would otherwise
- * be silently destroyed). Also removes files this tool previously deployed
- * (per the deploy manifest) whose canonical source has since been dropped
- * from install/ — unless the on-disk copy was locally modified, in which
- * case it's left alone (reported in `orphanSkipped`) unless force is given.
+ * local edit and skipped unless forceOverwrite is true (a local edit would
+ * otherwise be silently destroyed). Also removes files this tool previously
+ * deployed (per the deploy manifest) whose canonical source has since been
+ * dropped from install/ — unless the on-disk copy was locally modified, in
+ * which case it's left alone (reported in `orphanSkipped`) unless
+ * forceRemoveOrphans is given.
+ *
+ * The two overrides are deliberately separate: sweeping a renamed old path
+ * and discarding a customization on a surviving path are different intents,
+ * and a single flag covering both silently reverts customizations the caller
+ * only meant to keep (#603).
+ *
  * Writes/updates the deploy manifest afterward so future runs can detect
  * orphans and locally-edited files consistently.
  * @param {string} skillRoot
  * @param {string} targetRoot
- * @param {{ force?: boolean }} [options]
+ * @param {{ forceOverwrite?: boolean, forceRemoveOrphans?: boolean }} [options]
  * @returns {{ copied: string[], skipped: string[], removed: string[], orphanSkipped: string[] }}
  */
-export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
+export function deployInstall(
+	skillRoot,
+	targetRoot,
+	{ forceOverwrite = false, forceRemoveOrphans = false } = {},
+) {
 	const installDir = resolve(skillRoot, "install");
 	const files = listInstallFiles(installDir);
 	const copied = [];
@@ -165,7 +177,7 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 	for (const rel of files) {
 		const canonicalPath = join(installDir, rel);
 		const targetPath = join(targetRoot, rel);
-		if (existsSync(targetPath) && !force && !filesEqual(canonicalPath, targetPath)) {
+		if (existsSync(targetPath) && !forceOverwrite && !filesEqual(canonicalPath, targetPath)) {
 			skipped.push(rel);
 			continue;
 		}
@@ -187,11 +199,12 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 		if (currentSet.has(entry.path)) continue;
 		const targetPath = join(targetRoot, entry.path);
 		if (!existsSync(targetPath)) continue;
-		if (!force && sha256(targetPath) !== entry.hash) {
+		if (!forceRemoveOrphans && sha256(targetPath) !== entry.hash) {
 			orphanSkipped.push(entry.path);
 			// Keep this entry in the manifest — it's still on disk, still
-			// orphaned, and still needs a future --force deploy (or check) to
-			// find it. Dropping it here would make it invisible from now on.
+			// orphaned, and still needs a future --force-remove-orphans deploy
+			// (or check) to find it. Dropping it here would make it invisible
+			// from now on.
 			retainedOrphanEntries.push(entry);
 			continue;
 		}
@@ -210,7 +223,13 @@ export function deployInstall(skillRoot, targetRoot, { force = false } = {}) {
 // --- CLI ---
 
 export function parseArgs(argv) {
-	const args = { target: process.cwd(), deploy: false, force: false, upstream: false };
+	const args = {
+		target: process.cwd(),
+		deploy: false,
+		forceOverwrite: false,
+		forceRemoveOrphans: false,
+		upstream: false,
+	};
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
 		if (arg === "--target") {
@@ -223,7 +242,16 @@ export function parseArgs(argv) {
 		} else if (arg === "--deploy") {
 			args.deploy = true;
 		} else if (arg === "--force") {
-			args.force = true;
+			// Rejected rather than ignored: an unrecognized flag is silently
+			// dropped here, which would run an unforced deploy while the caller
+			// believes they forced one (#603).
+			throw new Error(
+				"--force was split into --force-overwrite and --force-remove-orphans; pass the one you mean",
+			);
+		} else if (arg === "--force-overwrite") {
+			args.forceOverwrite = true;
+		} else if (arg === "--force-remove-orphans") {
+			args.forceRemoveOrphans = true;
 		} else if (arg === "--upstream") {
 			args.upstream = true;
 		}
@@ -251,11 +279,17 @@ async function main() {
 	let exitCode = 0;
 
 	if (args.deploy) {
-		const { copied, skipped, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, { force: args.force });
+		const { copied, skipped, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, {
+			forceOverwrite: args.forceOverwrite,
+			forceRemoveOrphans: args.forceRemoveOrphans,
+		});
 		printGroup("Copied:", copied);
-		printGroup("Skipped (locally modified; re-run with --force to overwrite):", skipped);
+		printGroup("Skipped (locally modified; re-run with --force-overwrite to overwrite):", skipped);
 		printGroup("Removed (no longer part of canonical install/):", removed);
-		printGroup("Orphaned but locally modified; re-run with --force to remove:", orphanSkipped);
+		printGroup(
+			"Orphaned but locally modified; re-run with --force-remove-orphans to remove:",
+			orphanSkipped,
+		);
 		if (skipped.length > 0 || orphanSkipped.length > 0) exitCode = 1;
 		if (copied.length === 0 && skipped.length === 0 && removed.length === 0 && orphanSkipped.length === 0) {
 			console.log("Nothing to deploy: install/ is empty.");
@@ -274,7 +308,9 @@ async function main() {
 			} else {
 				console.log("pfd-ops install/ files are out of sync:");
 				for (const r of issues) console.log(`  ${r.status}: ${r.path}`);
-				console.log("Run with --deploy to refresh (add --force to overwrite locally edited files).");
+				console.log(
+					"Run with --deploy to refresh (add --force-overwrite to overwrite locally edited files, --force-remove-orphans to delete orphans).",
+				);
 				exitCode = 1;
 			}
 		}
