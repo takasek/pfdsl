@@ -65,7 +65,7 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 ```
 
 `<pfd-ops skill root>` はステップ 3 と同じ規則で解決する（plugin: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops`、repo-local: `.claude/skills/pfd-ops`）。
-既導入リポでは同じコマンドが refresh になる — ローカル編集されたファイルは上書きせず警告するので、上書きする場合のみユーザーに確認して `--force` を付ける。
+既導入リポでは同じコマンドが refresh になる — ローカル編集されたファイルは上書きせず警告するので、上書きする場合のみユーザーに確認して `--force-overwrite` を付ける（canonical から消えた旧ファイルの削除は別フラグ `--force-remove-orphans`）。
 バックエンド規約の詳細は pfd-ops スキルの `references/github-issues-backend.md`。
 
 ## ステップ 4: 種別ごとに対話しながら構築する

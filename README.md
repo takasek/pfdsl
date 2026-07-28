@@ -185,7 +185,7 @@ Adopt it in any repo through the plugin:
 /pfd-init
 ```
 
-`/pfd-init` copies the `.pfdsl/` scaffold for the PFD kinds your project needs, and (optionally, step 3.5) deploys the GitHub-Issues backend automation — workflows and audit scripts — to the repo root, via the `check-install-sync.mjs` script bundled with the `pfd-ops` skill. Running it again refreshes an already-adopted repo: locally edited files are warned about rather than overwritten, unless you pass `--force`.
+`/pfd-init` copies the `.pfdsl/` scaffold for the PFD kinds your project needs, and (optionally, step 3.5) deploys the GitHub-Issues backend automation — workflows and audit scripts — to the repo root, via the `check-install-sync.mjs` script bundled with the `pfd-ops` skill. Running it again refreshes an already-adopted repo: locally edited files are warned about rather than overwritten, unless you pass `--force-overwrite`. Deleting files a later release dropped is a separate `--force-remove-orphans`, and a rename on the canonical side is reported as a `Possible renames` pair so a local edit on the old path can be carried over to the new one.
 
 Once adopted, use `/pfd-cycle` to run a work cycle and `/pfd-retro` to audit and improve the process.
 

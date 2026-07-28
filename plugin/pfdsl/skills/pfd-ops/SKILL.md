@@ -29,7 +29,9 @@ node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstr
 
 CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${CLAUDE_PLUGIN_ROOT}` の形でのみ置換対象 — この説明文中の表記のように波括弧を外せば置換されない）。上のコマンド行がパス置換されず変数名のまま見えている場合は plugin 外（repo-local）ロード — `node .claude/skills/pfd-ops/scripts/check-install-sync.mjs --upstream` を使う。
 GitHub Issues バックエンド未採用のリポでは何も出ない。
-**警告が出たら対応する**: drift 警告は `--deploy` で refresh する（ローカル編集を意図的に上書きする場合のみ `--force`）。plugin バージョンの上流差分警告は plugin の更新をユーザーに案内する。CI 強制ではなくこのランタイムチェックだけが採用リポの安全網なので、警告を黙殺しない。
+**警告が出たら対応する**: drift 警告は `--deploy` で refresh する。上書き・削除の強制は用途別に分かれており、`--force-overwrite` がローカル編集済みの配置ファイルを canonical で上書きし、`--force-remove-orphans` が canonical から消えた旧ファイルを削除する。**旧ファイルの掃除だけが目的なら後者のみを渡す** — 両方の意味を持つ単一フラグは、直前に再適用したローカルカスタマイズを巻き戻す（#603）。
+`Possible renames` の行が出たら、それは canonical 側のリネームで新旧パスが別々に `missing` / `orphaned` として現れている状態を意味する。**新パスの配置ファイルを信用する前に、旧パスのローカル編集を新パスへ引き継ぐ**。
+plugin バージョンの上流差分警告は plugin の更新をユーザーに案内する。CI 強制ではなくこのランタイムチェックだけが採用リポの安全網なので、警告を黙殺しない。
 
 このチェックと同じタイミングで、`.pfdsl/bindings/pfd-ops.md` が存在すれば読み、そこに追加のセルフチェック手順が定義されていればそれも実行する（binding は各リポ固有の追加自己点検の一次置き場 — SKILL.md 本文は個別スクリプト名を持たない）。
 

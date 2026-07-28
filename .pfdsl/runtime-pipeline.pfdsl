@@ -231,7 +231,7 @@ process:
     tags: [ g ]
   deploy_install_layer:
     label: L3レイヤー実配置
-    description: "/pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。既配置ファイルがcanonicalとhash不一致（ローカル編集）なら上書きせず警告し、--force指定時のみ上書きする"
+    description: "/pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする。既配置ファイルがcanonicalとhash不一致（ローカル編集）なら上書きせず警告し、--force-overwrite指定時のみ上書きする。canonicalから消えた旧ファイルの削除は独立した--force-remove-orphansが担う。canonical側のリネームは新旧パスの対をPossible renamesとして報告する"
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --deploy
     location: ../.claude/skills/pfd-ops/scripts/check-install-sync.mjs
     tags: [ g ]

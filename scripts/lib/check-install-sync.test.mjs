@@ -256,7 +256,7 @@ describe("deployInstall", () => {
 		assert.equal(readFileSync(join(targetRoot, "sub", "b.txt"), "utf-8"), "canonical-b");
 	});
 
-	it("skips a locally-edited file without --force and leaves it untouched", () => {
+	it("skips a locally-edited file without --force-overwrite and leaves it untouched", () => {
 		const skillRoot = makeSkillRoot();
 		const targetRoot = join(tmp, "target-edited");
 		writeFile(targetRoot, "a.txt", "locally-edited");
