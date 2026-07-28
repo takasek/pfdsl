@@ -129,4 +129,11 @@ a >> p -> b
 		const { output } = insertDefinition(src, "artifact", "b");
 		expect(output).toContain("  b:\n    label: b");
 	});
+
+	it("does not throw when the fences are well-formed but the YAML content is invalid (FM002)", () => {
+		const src = "---\n: bad: yaml\n---\na >> p -> b\n";
+		expect(() => insertDefinition(src, "artifact", "b")).not.toThrow();
+		const { inserted } = insertDefinition(src, "artifact", "b");
+		expect(inserted).toBe(false);
+	});
 });

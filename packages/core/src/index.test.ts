@@ -113,6 +113,14 @@ describe("public API", () => {
 			const { output } = format(src);
 			expect(output).toContain("artifact: { a: { label: A } }\n");
 		});
+
+		it("does not throw when the fences are well-formed but the YAML content is invalid (FM002)", () => {
+			const src = "---\n: bad: yaml\n---\na >> P -> b\n";
+			expect(() => format(src)).not.toThrow();
+			const { output, diagnostics } = format(src);
+			expect(output).toContain(": bad: yaml");
+			expect(diagnostics.some((d) => d.code === "FM002")).toBe(true);
+		});
 	});
 
 	it("format: isolated frontmatter node appears exactly once across multiple flow segments (regression #368)", () => {

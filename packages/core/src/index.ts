@@ -270,14 +270,17 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 		: validate(edges, nodeKinds, frontmatter, { source });
 
 	// Frontmatter is canonicalized through the yaml CST (ADR-0034) rather than
-	// passed through verbatim. Left untouched when absent, or when the fence
-	// is malformed (parseDiags already carries the FM001 diagnostic for that
-	// case, and nothing here is safe to rewrite).
+	// passed through verbatim. Left untouched when absent, when the fence is
+	// malformed (FM001), or when the fence is well-formed but its YAML
+	// content doesn't parse (FM002) — `Document#toString()` throws on a
+	// Document carrying parse errors, and parseDiags already surfaces both
+	// diagnostics to the caller, so there is nothing safe to rewrite here.
 	const rawFrontmatterSection = source.slice(0, source.length - body.length);
 	const frontmatterCst = parseFrontmatterCst(source);
-	const frontmatterSection = frontmatterCst.present
-		? renderFrontmatterCst(frontmatterCst.doc)
-		: rawFrontmatterSection;
+	const frontmatterSection =
+		frontmatterCst.present && frontmatterCst.doc.errors.length === 0
+			? renderFrontmatterCst(frontmatterCst.doc)
+			: rawFrontmatterSection;
 
 	// Format segment by segment to preserve comment lines. Isolated-node
 	// detection is done once above for the whole document (edgeNodes there
