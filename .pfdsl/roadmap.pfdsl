@@ -660,7 +660,6 @@ process:
     label: frontmatter CST 化実装
     description: "ADR-0034 の決定を実装する。fmt/meta set/sort/reindex/insert-definition の frontmatter 読み書きを yaml Document ベースに統一し、frontmatter-text.ts の手術用ヘルパーを削除する"
     location: https://github.com/takasek/pfdsl/issues/592
-    updated_at: 2026-07-27T22:30:12Z
   publish_cli_frontmatter_cst:
     label: CLI frontmatter CST 化公開
 
