@@ -159,11 +159,6 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
   具体例: glob 判定を Node の API へ委譲した際、実測したのは `fs.globSync` との**挙動の一致**だったが、JSDoc には「`node --test` が引数解決に使うのと同じエンジン」と書いた（#582。実装内部は確認していない。検証した内容の記述へ差し替えた）。
   対策: 主張を書いたら、その根拠として走らせたコマンドを1つ思い出せるか確認する。思い出せない語（同一・常に・原理的に等）が入っていたら、測った内容の記述へ落とす。
 
-- **「マージ」ユーティリティの配列非結合 trap**: 名前が「マージ」を謳う設定合成ユーティリティ（vitest の `mergeConfig` 等）は、オブジェクトフィールドは deep merge する一方、配列フィールドは override 側の値で base 側を丸ごと置換することがある。ドキュメントの「deep merge」という言葉から配列も結合されると推測すると、override 側に追加した要素だけが有効になり、base 側の既定値が無言で消える。
-  問いの形: 「このマージ関数は配列フィールドを結合しているか、それとも置換しているか。ドキュメントの言葉でなく実行結果で確認したか」。
-  具体例: `vitest.shared.ts` の `sharedCoverageConfig`（`coverage.exclude: ["**/*.test.ts", ...]`）を `mergeConfig(sharedCoverageConfig, defineConfig({ coverage: { exclude: [...] } }))` の形でパッケージ側の除外パターンと合成しようとしたところ、override 側の配列が base 側を完全に置換し、パッケージ側に追加したはずの要素が反映されず base の3要素のみが残った（#587）。`console.log` でマージ後の値を出力して初めて判明した。
-  対策: base 側の配列を named export にして、override 側で `[...baseArray, ...追加要素]` と明示的にスプレッドする。マージ関数の「配列結合」を信じず、疑わしければ一度 `console.log(merged)` で実測する。
-
 ## 配布物への finding 反映
 
 配布 bundle（plugin 同梱の pfd-* スキル本文・reference）は上流リポ（takasek/pfdsl）の生成・同梱物であり、採用リポ側のコピーは編集対象にならない（ADR-0028。plugin cache 内のファイルはインストール更新で消える）。
