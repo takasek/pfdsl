@@ -13,7 +13,10 @@
 // PostToolUse fires) rather than the staged diff `git diff --cached` that
 // the pre-commit version reads before the commit exists.
 import { existsSync } from "node:fs";
-import { execSync } from "node:child_process";
+// execFileSync, not execSync: the shell gate bans handing a command line to a
+// shell in any tracked .mjs (#571, #572, #605). scripts/lib/run-exec.mjs is
+// off limits here — this file must not import outside hooks/ (see above).
+import { execFileSync } from "node:child_process";
 
 const DONE_ADDITION_PATTERN = /^\+(?!\+\+).*status:\s*done/;
 
@@ -62,7 +65,7 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
 
 	let diff;
 	try {
-		diff = execSync("git show HEAD -- .pfdsl/roadmap.pfdsl", { cwd, encoding: "utf8" });
+		diff = execFileSync("git", ["show", "HEAD", "--", ".pfdsl/roadmap.pfdsl"], { cwd, encoding: "utf8" });
 	} catch {
 		process.exit(0);
 	}
