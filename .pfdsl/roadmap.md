@@ -87,6 +87,8 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。`.claude/skills/pfdsl/` は生成物かつ gitignore 済（#348）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — CI（test.yml）と同様に `make bootstrap-pfdsl-skill` を先に実行する。ビルド後は `npx @pfdsl/cli@latest` でなく `node packages/cli/dist/cli.js` を使う（`npx` は npm の公開バージョンを使うため、未リリースの status 値等が V008 エラーになる）。
 
+**ブランチを切り替えた直後のローカル検証**: 同一ツリーでブランチを切り替えても `dist/` は前ブランチのビルドのまま残る。`pnpm -r typecheck` は他パッケージをこの `dist/` の型定義越しに見るため、新ブランチで追加した参照がローカルでは通り、`pnpm -r build` を先に走らせる CI で初めて落ちる。ブランチ切り替え後に typecheck・test を回すなら先に `pnpm -r build` する（#642 でこれを踏み、ローカル green のまま CI が `TS6059` で落ちた）。
+
 **vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。クリック・ホバー等の UI 挙動変更（DocumentLinkProvider・HoverProvider 等）、または preview/export の描画内容変更（statusStyles・tag・group 解決ロジック等）を含む場合は `/vscode-ext-debug` スキルで PR 作成前に実動作確認し、ユーザーの確認結果を受け取るまで完了とみなさない。
 
 **`docs/spec/spec.md` / `docs/samples/` を変更した場合**: workflow.md「生成物の再生成と自動ドリフト検査」に従う（再生成手続きの一次情報はそちら。ここには複製しない）。
