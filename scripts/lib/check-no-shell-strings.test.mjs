@@ -104,13 +104,13 @@ describe("selectScannedFiles", () => {
 
 describe("the repository's own scan set", () => {
 	/** Every tracked `.mjs` path, repo-relative — the candidates the gate filters. */
-	function trackedMjsFiles() {
-		return execFileSync("git", ["ls-files", "*.mjs"], { cwd: root, encoding: "utf-8" }).split("\n").filter(Boolean);
-	}
+	const tracked = execFileSync("git", ["ls-files", "*.mjs"], { cwd: root, encoding: "utf-8" })
+		.split("\n")
+		.filter(Boolean);
 
 	it("covers every tracked .mjs that is not excluded on purpose", () => {
-		const scanned = new Set(selectScannedFiles(trackedMjsFiles()));
-		const missed = trackedMjsFiles().filter(
+		const scanned = new Set(selectScannedFiles(tracked));
+		const missed = tracked.filter(
 			(f) =>
 				!scanned.has(f) &&
 				!f.endsWith(".test.mjs") &&
@@ -121,6 +121,6 @@ describe("the repository's own scan set", () => {
 	});
 
 	it("reaches hooks/, which runs on every Bash tool call in an adopting repo", () => {
-		assert.ok(selectScannedFiles(trackedMjsFiles()).includes("hooks/retro-reminder-post-tool-use.mjs"));
+		assert.ok(selectScannedFiles(tracked).includes("hooks/retro-reminder-post-tool-use.mjs"));
 	});
 });

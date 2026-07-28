@@ -31,21 +31,21 @@ const REQUIRE_CHILD_PROCESS = /require\(\s*["'](?:node:)?child_process["']\s*\)/
  * when someone remembers to add it, and `hooks/` — which runs on every Bash
  * tool call in an adopting repo — went uncovered that way (#605).
  */
-const EXCLUSIONS = [
+function isExcluded(file) {
 	// The detector and its tests hold the offending patterns as data.
-	(file) => file.endsWith(".test.mjs"),
-	(file) => file === "scripts/lib/check-no-shell-strings.mjs",
+	if (file.endsWith(".test.mjs")) return true;
+	if (file === "scripts/lib/check-no-shell-strings.mjs") return true;
 	// Generated mirror of hooks/ and .claude/skills/ — the sources are scanned,
 	// and scripts/gen-plugin.mjs' identity gate keeps the copy equal to them.
-	(file) => file.startsWith("plugin/"),
-];
+	return file.startsWith("plugin/");
+}
 
 /**
  * @param {string[]} trackedFiles - repo-relative paths, e.g. `git ls-files` output
  * @returns {string[]} the subset the gate scans
  */
 export function selectScannedFiles(trackedFiles) {
-	return trackedFiles.filter((file) => file.endsWith(".mjs") && !EXCLUSIONS.some((excluded) => excluded(file)));
+	return trackedFiles.filter((file) => file.endsWith(".mjs") && !isExcluded(file));
 }
 
 /**
