@@ -122,6 +122,33 @@ describe("isUrlLike", () => {
 });
 
 describe("loadSubflowGraph", () => {
+	// resolveRefPath is unit-tested directly, but the wiring around this call —
+	// the V021 code, the message, and the `continue` that keeps the load going —
+	// was reached only through extends:, never through subflow: (#638).
+	it.each([
+		["an absolute path", "/abs/child.pfdsl", "absolute"],
+		["a URL", "https://example.com/child.pfdsl", "url"],
+	])("reports %s in subflow: as V021 and keeps loading", (_name, ref, reason) => {
+		const docs = makeLoad({
+			"/p/main.pfdsl": {
+				frontmatter: {
+					process: {
+						P1: { subflow: ref },
+						P2: { subflow: "./ok.pfdsl" },
+					},
+				},
+			},
+			"/p/ok.pfdsl": { frontmatter: {} },
+		});
+		const result = loadSubflowGraph("/p/main.pfdsl", docs);
+		const v021 = result.diagnostics.filter((d) => d.code === "V021");
+		expect(v021).toHaveLength(1);
+		expect(v021[0]?.message).toContain(reason);
+		expect(v021[0]?.message).toContain(ref);
+		// The good sibling still loaded: the bad ref is skipped, not fatal.
+		expect(result.docs.has("/p/ok.pfdsl")).toBe(true);
+	});
+
 	it("loads the entry and its subflow children", () => {
 		const docs = makeLoad({
 			"/p/main.pfdsl": {
