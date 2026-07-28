@@ -921,37 +921,21 @@ describe("a file argument that does not exist", () => {
 	});
 });
 
-describe("--no-color / NO_COLOR (#180)", () => {
-	it("a clean check prints OK, and prints it unstyled when stdout is not a TTY", async () => {
+// The three cases that used to live here passed `valid.pfdsl`, which produces
+// no diagnostics — and severity words are the only thing the CLI colours, so
+// "no ANSI in the output" held whether or not --no-color and NO_COLOR worked
+// at all (#615). The colour switches are actually exercised against an invalid
+// file in the two #435 describes below, and per-subcommand acceptance in the
+// #508 table. What was worth keeping is the plain-output assertion.
+describe("a clean check", () => {
+	it("prints OK", async () => {
 		const r = await run(["check", join(dir, "valid-with-status.pfdsl")], {
 			stdout: { isTTY: false },
 			env: {},
 		});
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toContain("OK");
-		expect(r.stdout).not.toContain("\x1b[");
 	});
-
-	it("--no-color flag is accepted and does not break check", async () => {
-		const r = await run(["check", join(dir, "valid.pfdsl"), "--no-color"]);
-		expect(r.exitCode).toBe(0);
-		// No ANSI escape sequences in output
-		expect(r.stdout).not.toContain("\x1b[");
-		expect(r.stderr).not.toContain("\x1b[");
-	});
-
-	it("NO_COLOR env var suppresses ANSI codes", async () => {
-		const r = await run(["check", join(dir, "valid.pfdsl")], {
-			stdout: { isTTY: true },
-			env: { NO_COLOR: "1" },
-		});
-		expect(r.exitCode).toBe(0);
-		expect(r.stdout).not.toContain("\x1b[");
-		expect(r.stderr).not.toContain("\x1b[");
-	});
-
-	// Per-subcommand --no-color acceptance is covered exhaustively by the
-	// #508 table below, which asserts the flag's effect and not just exit 0.
 });
 
 describe("ANSI color for check diagnostics (#435)", () => {
@@ -1725,12 +1709,13 @@ req >> design -> spec
 		expect(after).not.toContain("status: todo");
 	});
 
-	it("writes a node whose first child line is a comment, as sort and reindex accept", async () => {
-		// Originally a regression test for #510 (surgical indent-detection took
-		// a leading comment's own, deeper indent as the child indent). Now that
-		// meta set rewrites through the yaml CST (ADR-0034), the child's
-		// original 6-space indent is canonicalized to the section's real
-		// 4-space step regardless — the guard never has anything to refuse.
+	it("keeps a leading comment above the field it rewrites", async () => {
+		// No longer a regression test: #510's guard (surgical indent-detection
+		// mistaking a leading comment's deeper indent for the child indent) has
+		// no implementation left to protect, since ADR-0034 moved meta set onto
+		// the yaml CST and the 6-space indent below is canonicalized either way.
+		// What it still checks is that the comment survives the rewrite, which
+		// the CST path could plausibly drop (#615).
 		const f = join(dir, "status-set-comment-first.pfdsl");
 		writeFileSync(
 			f,
@@ -1887,7 +1872,10 @@ req >> design -> spec
 		expect(after).not.toContain("status: todo");
 	});
 
-	it("handles artifact ids containing regex metacharacters (#430)", async () => {
+	// Also not a regression test any more: #430 was about building a RegExp
+	// from the id, and the CST path (frontmatter-cst.ts's doc.setIn) never
+	// does. Kept as a smoke test that punctuation-bearing ids round-trip (#615).
+	it("writes to an artifact id containing punctuation", async () => {
 		const withMetaId = `---
 artifact:
   req(v2):

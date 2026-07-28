@@ -928,8 +928,12 @@ spec >> P -> X
 `;
 			const { graph, frontmatter } = buildFromSource(src);
 			const dot = exportDot(graph, frontmatter);
-			expect(dot).toContain("docs/spec.md");
-			expect(dot).toContain("詳細");
+			// The order is the claim: location is appended last (node-attrs.ts),
+			// after the description. Asserting each substring separately left
+			// that free to swap (#615).
+			expect(dot).toContain(
+				'tooltip="仕様書\\n\\n詳細\\nlocation: docs/spec.md"',
+			);
 		});
 
 		it("includes location in tooltip when no description", () => {
@@ -1016,7 +1020,9 @@ spec >> P -> X
 `;
 			const { graph, frontmatter } = buildFromSource(src);
 			const dot = exportDot(graph, frontmatter);
-			expect(dot).toContain("TL承認済み");
+			// With the "criteria: " prefix the exporter writes, as the revises
+			// case below already asserts for its own field (#615).
+			expect(dot).toContain("criteria: TL承認済み");
 		});
 
 		it("includes criteria and description both in tooltip", () => {
@@ -1059,23 +1065,6 @@ v2 >> P -> X
 			expect(dot).not.toContain("revises:");
 		});
 	});
-});
-
-describe("fixture files", () => {
-	const files = readdirSync(samplesDir)
-		.filter((f) => f.endsWith(".pfdsl"))
-		.sort();
-	for (const f of files) {
-		it(f.replace(".pfdsl", ""), () => {
-			const src = readFileSync(resolve(samplesDir, f), "utf-8");
-			const expected = readFileSync(
-				resolve(samplesDir, f.replace(".pfdsl", ".dot")),
-				"utf-8",
-			);
-			const { graph, frontmatter } = buildFromSource(src);
-			expect(exportDot(graph, frontmatter)).toBe(expected);
-		});
-	}
 });
 
 describe("exportDiffDot", () => {
@@ -1168,6 +1157,9 @@ describe("docs/samples drift", () => {
 	);
 	const readme = readFileSync(resolve(samplesDir, "README.md"), "utf-8");
 
+	// One pass per sample: an earlier "fixture files" describe ran the same
+	// comparison with the arguments swapped, so every sample was parsed and
+	// exported twice for one assertion's worth of information (#615).
 	for (const f of pfdslFiles) {
 		const base = f.replace(/\.pfdsl$/, "");
 		it(`${base}.dot equals exportDot(source)`, () => {
