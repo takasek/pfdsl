@@ -1,3 +1,4 @@
+import { compareIds } from "./compare.js";
 import type { Graph, NodeKind } from "./types/index.js";
 
 export interface Neighbors {
@@ -99,7 +100,7 @@ export function computeStats(graph: Graph): NodeStats[] {
 	}));
 	stats.sort((a, b) => {
 		const degreeDiff = b.fanIn + b.fanOut - (a.fanIn + a.fanOut);
-		return degreeDiff !== 0 ? degreeDiff : a.id.localeCompare(b.id);
+		return degreeDiff !== 0 ? degreeDiff : compareIds(a.id, b.id);
 	});
 	return stats;
 }

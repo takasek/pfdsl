@@ -4,6 +4,7 @@ import {
 	analyze,
 	auditGraph,
 	type ConsumerAsymmetryHint,
+	compareIds,
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
@@ -737,7 +738,7 @@ export function runStatusList(
 			label: meta.label ?? id,
 			status: meta.status as string,
 		}))
-		.sort((a, b) => a.id.localeCompare(b.id));
+		.sort((a, b) => compareIds(a.id, b.id));
 
 	if (opts.json) {
 		return ok(`${JSON.stringify({ ok: true, items })}\n`);
@@ -807,7 +808,7 @@ export function runStatusBlocked(
 			blockedBy,
 		});
 	}
-	blockedItems.sort((a, b) => a.id.localeCompare(b.id));
+	blockedItems.sort((a, b) => compareIds(a.id, b.id));
 
 	if (opts.json) {
 		const payload: Record<string, unknown> = {
@@ -1319,7 +1320,7 @@ export function runCheckLinks(
 	for (const [id, meta] of Object.entries(frontmatter?.process ?? {})) {
 		checkNode(id, "process", meta.location);
 	}
-	missing.sort((a, b) => a.id.localeCompare(b.id));
+	missing.sort((a, b) => compareIds(a.id, b.id));
 
 	if (opts.json) {
 		const exitCode = missing.length > 0 ? 1 : 0;
