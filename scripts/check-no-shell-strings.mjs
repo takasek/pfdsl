@@ -17,21 +17,13 @@
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { findShellExecutors } from "./lib/check-no-shell-strings.mjs";
+import { findShellExecutors, selectScannedFiles } from "./lib/check-no-shell-strings.mjs";
 import { git } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-// Both patterns are needed: "scripts/**/*.mjs" misses scripts/*.mjs itself.
-const files = git(["ls-files", "scripts/*.mjs", "scripts/**/*.mjs"], { cwd: root })
-	.trim()
-	.split("\n")
-	.filter(Boolean)
-	.filter((f, i, arr) => arr.indexOf(f) === i)
-	// The detector and its tests hold the offending patterns as data.
-	.filter((f) => !f.endsWith(".test.mjs"))
-	.filter((f) => f !== "scripts/lib/check-no-shell-strings.mjs");
+const files = selectScannedFiles(git(["ls-files", "*.mjs"], { cwd: root }).trim().split("\n").filter(Boolean));
 
 const findings = [];
 for (const file of files) {

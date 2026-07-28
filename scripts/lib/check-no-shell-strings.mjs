@@ -26,6 +26,29 @@ const IMPORT_FROM_CHILD_PROCESS = /import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?c
 const REQUIRE_CHILD_PROCESS = /require\(\s*["'](?:node:)?child_process["']\s*\)/;
 
 /**
+ * Files the gate leaves alone. Everything else tracked as `.mjs` is scanned:
+ * enumerating the directories to scan instead means a new one is only covered
+ * when someone remembers to add it, and `hooks/` — which runs on every Bash
+ * tool call in an adopting repo — went uncovered that way (#605).
+ */
+function isExcluded(file) {
+	// The detector and its tests hold the offending patterns as data.
+	if (file.endsWith(".test.mjs")) return true;
+	if (file === "scripts/lib/check-no-shell-strings.mjs") return true;
+	// Generated mirror of hooks/ and .claude/skills/ — the sources are scanned,
+	// and scripts/gen-plugin.mjs' identity gate keeps the copy equal to them.
+	return file.startsWith("plugin/");
+}
+
+/**
+ * @param {string[]} trackedFiles - repo-relative paths, e.g. `git ls-files` output
+ * @returns {string[]} the subset the gate scans
+ */
+export function selectScannedFiles(trackedFiles) {
+	return trackedFiles.filter((file) => file.endsWith(".mjs") && !isExcluded(file));
+}
+
+/**
  * @param {string} source
  * @returns {Array<{line: number, reason: string}>}
  */
