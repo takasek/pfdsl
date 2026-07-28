@@ -10,6 +10,82 @@ describe("loadFrontmatter", () => {
 		expect(result.diagnostics).toHaveLength(0);
 	});
 
+	// A CRLF file's last frontmatter line used to keep its \r, because the
+	// slice dropped exactly one character before the closing fence (#636). The
+	// value silently gained a \r, so a last-line `status: done` failed V007.
+	describe("CRLF and padded fences", () => {
+		const crlf = (...lines: string[]) => lines.join("\r\n");
+
+		it("does not leave a \\r on the value of the last frontmatter line", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    criteria: approved",
+				"---",
+				"req >> design -> spec",
+				"",
+			);
+			const result = loadFrontmatter(src);
+			expect(result.frontmatter).toEqual({
+				artifact: { spec: { criteria: "approved" } },
+			});
+		});
+
+		it("keeps a last-line status usable, so a CRLF file is not rejected", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: done",
+				"---",
+				"req >> design -> spec",
+				"",
+			);
+			const fm = loadFrontmatter(src).frontmatter as {
+				artifact: { spec: { status: string } };
+			};
+			expect(fm.artifact.spec.status).toBe("done");
+		});
+
+		it("reads a CRLF file with several frontmatter lines the same as LF", () => {
+			const lines = [
+				"---",
+				"title: Test",
+				"artifact:",
+				"  spec:",
+				"    label: Spec",
+				"---",
+				"req >> design -> spec",
+				"",
+			];
+			expect(loadFrontmatter(lines.join("\r\n")).frontmatter).toEqual(
+				loadFrontmatter(lines.join("\n")).frontmatter,
+			);
+		});
+
+		it("accepts a closing fence with trailing spaces", () => {
+			const src =
+				"---\nartifact:\n  spec:\n    label: Spec\n---   \nreq >> design -> spec\n";
+			const result = loadFrontmatter(src);
+			expect(result.diagnostics).toHaveLength(0);
+			expect(result.frontmatter).toEqual({
+				artifact: { spec: { label: "Spec" } },
+			});
+		});
+
+		it("accepts a CRLF closing fence, which carries a \\r of its own", () => {
+			const src = crlf(
+				"---",
+				"title: Test",
+				"---",
+				"req >> design -> spec",
+				"",
+			);
+			expect(loadFrontmatter(src).diagnostics).toHaveLength(0);
+		});
+	});
+
 	it("valid frontmatter: parses YAML and extracts body", () => {
 		const src = "---\ntitle: Test\n---\nA >> P\n";
 		const result = loadFrontmatter(src);

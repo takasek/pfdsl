@@ -9,6 +9,65 @@ describe("setFrontmatterField", () => {
 		expect(out).not.toContain("status: todo");
 	});
 
+	// This path slices the yaml text the same way frontmatter.ts did when it
+	// left a \r on the last line (#636), but the CST parser absorbs it — so
+	// these pass as written. Kept as the guard that says so: the two paths are
+	// independent implementations and only one of them was ever broken.
+	describe("CRLF and padded fences", () => {
+		const crlf = (...lines: string[]) => lines.join("\r\n");
+
+		it("rewrites a last-line field in a CRLF file without carrying a \\r", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: todo",
+				"---",
+				"a >> P -> b",
+				"",
+			);
+			const out = setFrontmatterField(
+				src,
+				"artifact",
+				"spec",
+				"status",
+				"done",
+			);
+			expect(out).toContain("status: done");
+			expect(out).not.toContain("todo");
+		});
+
+		it("finds a node whose value is on the last frontmatter line of a CRLF file", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    label: Spec",
+				"---",
+				"a >> P -> b",
+				"",
+			);
+			expect(
+				setFrontmatterField(src, "artifact", "spec", "label", "Renamed"),
+			).toContain("label: Renamed");
+		});
+
+		it("returns null for an id the frontmatter does not have, CRLF or not", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: todo",
+				"---",
+				"a >> P -> b",
+				"",
+			);
+			expect(
+				setFrontmatterField(src, "artifact", "ghost", "status", "done"),
+			).toBeNull();
+		});
+	});
+
 	it("inserts a field that is not yet present", () => {
 		const src = "---\nartifact:\n  spec:\n    label: Spec\n---\na >> P -> b\n";
 		const out = setFrontmatterField(src, "artifact", "spec", "owner", "alice");
