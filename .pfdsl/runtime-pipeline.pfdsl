@@ -186,7 +186,7 @@ process:
     tags: [ b ]
   format:
     label: 整形
-    description: ソースを独立に再lex/parseし正準整形済みテキストを生成する（parseの出力を再利用しない別経路）
+    description: "ソースを独立に再lex/parseし正準整形済みテキストを生成する（parseの出力を再利用しない別経路）。frontmatterはyaml CST経由で正準化し、bodyはformatter.tsが担う（ADR-0034）"
     command: node packages/cli/dist/cli.js fmt --write
     location: ../packages/core/src/formatter.ts
     tags: [ b ]
@@ -215,7 +215,7 @@ process:
     tags: [ b ]
   sort_meta:
     label: ノード定義ソート
-    description: ソースを再parseし、指定キーでfrontmatterのノード定義を並べ替えたテキストを生成する
+    description: "frontmatterをyaml CSTとして再parseし、指定キーでノード定義を並べ替えたテキストを生成する（ADR-0034）"
     command: node packages/cli/dist/cli.js meta sort
     location: ../packages/core/src/sort.ts
     tags: [ b ]
