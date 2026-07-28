@@ -1,12 +1,14 @@
-import { ID_PATTERN, type NodeKind } from "@pfdsl/core";
+import { ID_PATTERN } from "@pfdsl/core";
 import * as vscode from "vscode";
 import { analyzeDocument, LANGUAGE_ID } from "./analyze.js";
 import {
 	buildConnectorEdgeLine,
 	type ConnectorKind,
 	type ConnectorRole,
+	compatibleOtherKind,
 	edgeAlreadyExists,
 	insertConnectorEdge,
+	validateNewNodeId,
 } from "./connector-logic.js";
 
 const PLACEHOLDER = "…";
@@ -52,15 +54,6 @@ function connectorItemsFor(
 			description: "Add an output",
 		},
 	];
-}
-
-/** The kind an "other node" must have to be a valid endpoint for a given connector choice. */
-function compatibleOtherKind(nodeRole: ConnectorRole): NodeKind {
-	return nodeRole === "artifact" ? "process" : "artifact";
-}
-
-function articleFor(word: string): string {
-	return /^[aeiou]/i.test(word) ? "an" : "a";
 }
 
 function nodeIdAtCursor(
@@ -141,20 +134,15 @@ export function registerConnectorEditing(
 
 			let otherId = idPick.label;
 			if (idPick.label === newIdItem) {
-				const fullIdPattern = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
 				const input = await vscode.window.showInputBox({
 					prompt: `New ${wantedKind} ID`,
-					validateInput: (value) => {
-						if (!fullIdPattern.test(value)) {
-							return "Invalid ID — use letters, numbers, _ or - (must start with a letter, number, or _)";
-						}
-						if (value === nodeId) return "Cannot connect a node to itself";
-						const existingKind = nodeKinds.get(value);
-						if (existingKind && existingKind !== wantedKind) {
-							return `"${value}" is already ${articleFor(existingKind)} ${existingKind}, not ${articleFor(wantedKind)} ${wantedKind}`;
-						}
-						return undefined;
-					},
+					validateInput: (value) =>
+						validateNewNodeId({
+							value,
+							currentNodeId: nodeId,
+							wantedKind,
+							kindOfExisting: (id) => nodeKinds.get(id),
+						}),
 				});
 				if (!input) return;
 				otherId = input;

@@ -5,6 +5,7 @@ import {
 	analyzeDocument,
 	resolveEffectiveFrontmatterForUri,
 } from "./analyze.js";
+import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
 import { findFrontmatterDefinition } from "./jump.js";
 import {
 	buildDescriptions,
@@ -14,9 +15,10 @@ import {
 import type { MessageFromWebview, MessageToWebview } from "./messages.js";
 import {
 	allIdsOfDocument,
+	blockingDiagnosticMessage,
 	buildHtml,
-	idsOfStatement,
 	nodeIdAtCursor,
+	positionOfNodeId,
 } from "./preview-logic.js";
 import { requireActivePfdslEditor } from "./utils.js";
 
@@ -28,29 +30,17 @@ interface PreviewState {
 	pendingDiff?: DiffReport | null; // null = clearDiff
 }
 
-async function expandDirectory(dirUri: vscode.Uri): Promise<string[]> {
-	let entries: [string, vscode.FileType][];
-	try {
-		entries = await vscode.workspace.fs.readDirectory(dirUri);
-	} catch {
-		return [];
-	}
-	const files: string[] = [];
-	for (const [name, type] of entries) {
-		if (type === vscode.FileType.File) {
-			files.push(vscode.Uri.joinPath(dirUri, name).fsPath);
-		}
-	}
-	if (files.length === 0) {
-		for (const [name, type] of entries) {
-			if (type === vscode.FileType.Directory) {
-				const sub = await expandDirectory(vscode.Uri.joinPath(dirUri, name));
-				files.push(...sub);
-			}
-		}
-	}
-	return files;
-}
+/** The vscode filesystem, shaped for expandDirectory: fsPaths in, fsPaths out. */
+const workspaceDirectoryAccess: DirectoryAccess = {
+	read: async (path) =>
+		(await vscode.workspace.fs.readDirectory(vscode.Uri.file(path))).map(
+			([name, type]) => ({
+				name,
+				isDirectory: type === vscode.FileType.Directory,
+			}),
+		),
+	join: (path, name) => vscode.Uri.joinPath(vscode.Uri.file(path), name).fsPath,
+};
 
 type QuickPickLocationItem = vscode.QuickPickItem & {
 	fsPath?: string;
@@ -80,7 +70,10 @@ async function handleOpenLocation(
 				// treat as file if stat fails
 			}
 			if (stat?.type === vscode.FileType.Directory) {
-				const children = await expandDirectory(resolvedUri);
+				const children = await expandDirectory(
+					workspaceDirectoryAccess,
+					resolvedPath,
+				);
 				if (children.length === 0) {
 					vscode.window.showWarningMessage(`No files found in ${loc}`);
 					return;
@@ -144,8 +137,8 @@ function dotForDocument(doc: vscode.TextDocument): {
 	error?: string;
 } {
 	const { graph, frontmatter, diagnostics } = analyzeDocument(doc);
-	const fatal = diagnostics.find((d) => d.severity === "error");
-	if (fatal) return { error: `${fatal.code}: ${fatal.message}` };
+	const blocking = blockingDiagnosticMessage(diagnostics);
+	if (blocking) return { error: blocking };
 	try {
 		const effectiveFrontmatter = resolveEffectiveFrontmatterForUri(
 			doc.uri,
@@ -167,18 +160,11 @@ function jumpToNode(
 		targetPos = findFrontmatterDefinition(doc, nodeId);
 	}
 	if (!targetPos) {
-		const result = analyzeDocument(doc);
-		outer: for (const stmt of result.document.statements) {
-			for (const id of idsOfStatement(stmt)) {
-				if (id.value === nodeId) {
-					targetPos = new vscode.Position(
-						id.start.line - 1,
-						id.start.column - 1,
-					);
-					break outer;
-				}
-			}
-		}
+		const found = positionOfNodeId(
+			analyzeDocument(doc).document.statements,
+			nodeId,
+		);
+		if (found) targetPos = new vscode.Position(found.line, found.column);
 	}
 	if (!targetPos) return;
 	const range = new vscode.Range(

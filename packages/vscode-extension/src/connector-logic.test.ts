@@ -4,6 +4,7 @@ import {
 	buildConnectorEdgeLine,
 	edgeAlreadyExists,
 	insertConnectorEdge,
+	validateNewNodeId,
 } from "./connector-logic.js";
 
 describe("buildConnectorEdgeLine", () => {
@@ -230,5 +231,66 @@ describe("edgeAlreadyExists", () => {
 		expect(edgeAlreadyExists(edges, "build", "process", ">>", "review")).toBe(
 			false,
 		);
+	});
+});
+
+// The predicate behind the connector's "New … ID" input box. It lived inline
+// as a showInputBox option, where no test could reach it — the self-connection
+// and kind-mismatch refusals had no coverage at all (#611).
+describe("validateNewNodeId", () => {
+	const base = {
+		currentNodeId: "spec",
+		wantedKind: "process" as const,
+		kindOfExisting: () => undefined,
+	};
+
+	it("accepts an id in the DSL's id syntax", () => {
+		expect(validateNewNodeId({ ...base, value: "build_v2" })).toBeUndefined();
+	});
+
+	it.each([
+		"",
+		"-leading-dash",
+		"has space",
+		"日本語?",
+	])("rejects %o, which the id syntax does not allow", (value) => {
+		expect(validateNewNodeId({ ...base, value })).toMatch(/Invalid ID/);
+	});
+
+	it("refuses to connect a node to itself", () => {
+		expect(validateNewNodeId({ ...base, value: "spec" })).toBe(
+			"Cannot connect a node to itself",
+		);
+	});
+
+	it("refuses an existing id whose kind is not the one being connected", () => {
+		expect(
+			validateNewNodeId({
+				...base,
+				value: "review",
+				kindOfExisting: () => "artifact",
+			}),
+		).toBe('"review" is already an artifact, not a process');
+	});
+
+	it("accepts an existing id that already has the wanted kind", () => {
+		expect(
+			validateNewNodeId({
+				...base,
+				value: "review",
+				kindOfExisting: () => "process",
+			}),
+		).toBeUndefined();
+	});
+
+	it("picks the article from the kind word, so 'artifact' reads 'an'", () => {
+		expect(
+			validateNewNodeId({
+				...base,
+				value: "review",
+				wantedKind: "artifact",
+				kindOfExisting: () => "process",
+			}),
+		).toBe('"review" is already a process, not an artifact');
 	});
 });
