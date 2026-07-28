@@ -94,6 +94,17 @@ describe("computePaths", () => {
 });
 
 describe("computeStats", () => {
+	// The test below only pins the top entry, which is the sole node with the
+	// highest degree — the "then id asc" half of the contract went unchecked
+	// even though the fixture has three nodes tied at degree 2 (#637).
+	it("breaks a degree tie by id, ascending", () => {
+		const tied = computeStats(graph)
+			.filter((s) => s.fanIn + s.fanOut === 2)
+			.map((s) => s.id);
+		expect(tied).toEqual([...tied].sort());
+		expect(tied.length).toBeGreaterThan(1);
+	});
+
 	it("computes fan-in/fan-out per node, sorted by total degree desc then id asc", () => {
 		const stats = computeStats(graph);
 		const spec = stats.find((s) => s.id === "spec");
