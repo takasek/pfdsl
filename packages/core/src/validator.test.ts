@@ -66,7 +66,7 @@ describe("validate", () => {
 	it("V004: parts member is a process", () => {
 		const fm: Frontmatter = { artifact: { C: { parts: ["P"] } } };
 		const diags = diagnose("A >> P -> B", fm);
-		expect(diags.map((d) => d.code)).toContain("V004");
+		expect(diags.map((d) => d.code)).toEqual(["V004"]);
 	});
 
 	it("V004: parts member is a front-matter-only process (not in body)", () => {
@@ -74,13 +74,20 @@ describe("validate", () => {
 			process: { ghost: {} },
 			artifact: { C: { parts: ["ghost"] } },
 		};
-		expect(codes("", fm)).toContain("V004");
+		// This member has no edges either, and W001 says exactly that — but
+		// parts.ts suppresses it for a process, whose real problem V004 already
+		// names. Asserting the whole set is what holds that guard in place.
+		expect(codes("", fm)).toEqual(["V020", "V004"]);
 	});
 
-	it("V005: parts self-reference", () => {
+	it("V005: parts self-reference, which is also reported as a one-node cycle", () => {
 		const fm: Frontmatter = { artifact: { A: { parts: ["A"] } } };
 		const diags = diagnose("A >> P -> B", fm);
-		expect(diags.map((d) => d.code)).toContain("V005");
+		// Both fire, and that is the intended set: §15.5 lists self-reference and
+		// cycle as separate errors, and suppressing V006 here would make the
+		// cycle walk depend on another rule's findings. Pinned as a set so a
+		// future change to either rule has to state which one it means.
+		expect(diags.map((d) => d.code)).toEqual(["V005", "V006"]);
 	});
 
 	it("V006: parts cycle", () => {
@@ -127,25 +134,26 @@ describe("validate", () => {
 		expect(codes("A >> P -> B", fm)).toContain("V007");
 	});
 
-	it("V029: index must be a positive integer (zero rejected)", () => {
-		const fm = {
-			artifact: { B: { index: 0 } },
-		} as unknown as Frontmatter;
-		expect(codes("A >> P -> B", fm)).toContain("V029");
+	// One case per disjunct of the `typeof idx !== "number" ||
+	// !Number.isInteger(idx) || idx < 1` guard; the non-number disjunct was the
+	// one no test reached (#609).
+	it.each([
+		["a non-number", { artifact: { B: { index: "high" } } }],
+		["zero", { artifact: { B: { index: 0 } } }],
+		["a non-integer", { process: { P: { index: 1.5 } } }],
+		["a negative number", { artifact: { B: { index: -3 } } }],
+	])("V029: index rejects %s", (_name, fm) => {
+		expect(codes("A >> P -> B", fm as unknown as Frontmatter)).toContain(
+			"V029",
+		);
 	});
 
-	it("V029: index must be a positive integer (non-integer rejected)", () => {
+	it("V029: names the offending value in the message, whatever its type", () => {
 		const fm = {
-			process: { P: { index: 1.5 } },
+			artifact: { B: { index: "high" } },
 		} as unknown as Frontmatter;
-		expect(codes("A >> P -> B", fm)).toContain("V029");
-	});
-
-	it("V029: index must be a positive integer (negative rejected)", () => {
-		const fm = {
-			artifact: { B: { index: -3 } },
-		} as unknown as Frontmatter;
-		expect(codes("A >> P -> B", fm)).toContain("V029");
+		const v029 = diagnose("A >> P -> B", fm).find((d) => d.code === "V029");
+		expect(v029?.message).toContain("'high'");
 	});
 
 	it("V029: valid positive-integer index produces no error", () => {
