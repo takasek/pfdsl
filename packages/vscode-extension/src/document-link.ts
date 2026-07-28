@@ -1,40 +1,31 @@
 import * as vscode from "vscode";
 import { LANGUAGE_ID } from "./analyze.js";
 import { extractDocumentLinks } from "./document-link-logic.js";
+import { type DirectoryAccess, expandDirectory } from "./expand-directory.js";
 
 const OPEN_DIR_COMMAND = "pfdsl._openDirLocation";
 
-async function expandDirectory(dirUri: vscode.Uri): Promise<string[]> {
-	let entries: [string, vscode.FileType][];
-	try {
-		entries = await vscode.workspace.fs.readDirectory(dirUri);
-	} catch {
-		return [];
-	}
-	const files: string[] = [];
-	for (const [name, type] of entries) {
-		if (type === vscode.FileType.File) {
-			files.push(vscode.Uri.joinPath(dirUri, name).fsPath);
-		}
-	}
-	if (files.length === 0) {
-		for (const [name, type] of entries) {
-			if (type === vscode.FileType.Directory) {
-				const sub = await expandDirectory(vscode.Uri.joinPath(dirUri, name));
-				files.push(...sub);
-			}
-		}
-	}
-	return files;
-}
+/** The vscode filesystem, shaped for expandDirectory: fsPaths in, fsPaths out. */
+const workspaceDirectoryAccess: DirectoryAccess = {
+	read: async (path) =>
+		(await vscode.workspace.fs.readDirectory(vscode.Uri.file(path))).map(
+			([name, type]) => ({
+				name,
+				isDirectory: type === vscode.FileType.Directory,
+			}),
+		),
+	join: (path, name) => vscode.Uri.joinPath(vscode.Uri.file(path), name).fsPath,
+};
 
 export function registerDocumentLinks(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
 		vscode.commands.registerCommand(
 			OPEN_DIR_COMMAND,
 			async (dirFsPath: string) => {
-				const dirUri = vscode.Uri.file(dirFsPath);
-				const children = await expandDirectory(dirUri);
+				const children = await expandDirectory(
+					workspaceDirectoryAccess,
+					dirFsPath,
+				);
 				if (children.length === 0) {
 					vscode.window.showWarningMessage(`No files found in ${dirFsPath}`);
 					return;
