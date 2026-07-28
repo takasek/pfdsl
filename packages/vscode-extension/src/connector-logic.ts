@@ -1,4 +1,9 @@
-import { loadFrontmatter, type NormalizedEdge } from "@pfdsl/core";
+import {
+	ID_PATTERN,
+	loadFrontmatter,
+	type NodeKind,
+	type NormalizedEdge,
+} from "@pfdsl/core";
 
 /** The DSL role the current node plays in the edge being built. */
 export type ConnectorRole = "artifact" | "process";
@@ -143,4 +148,47 @@ export function edgeAlreadyExists(
 	return edges.some(
 		(e) => e.kind === kind && e.artifact === artifact && e.process === process,
 	);
+}
+
+/** The kind an "other node" must have to be a valid endpoint for a given connector choice. */
+export function compatibleOtherKind(nodeRole: ConnectorRole): NodeKind {
+	return nodeRole === "artifact" ? "process" : "artifact";
+}
+
+function articleFor(word: string): string {
+	return /^[aeiou]/i.test(word) ? "an" : "a";
+}
+
+export interface NewNodeIdCheck {
+	/** What the user has typed so far. */
+	value: string;
+	/** The node the connector was invoked on, which cannot be the other end. */
+	currentNodeId: string;
+	/** The kind the other end must have for this connector. */
+	wantedKind: NodeKind;
+	/** The kind an id already has in the document, or undefined if it is new. */
+	kindOfExisting: (id: string) => NodeKind | undefined;
+}
+
+/**
+ * The message to show under the connector's id input box, or undefined when
+ * the id is usable. Written as a predicate rather than inline in the
+ * showInputBox options so the three refusals are testable (#611).
+ */
+export function validateNewNodeId({
+	value,
+	currentNodeId,
+	wantedKind,
+	kindOfExisting,
+}: NewNodeIdCheck): string | undefined {
+	const fullIdPattern = new RegExp(`^(?:${ID_PATTERN.source})$`, "u");
+	if (!fullIdPattern.test(value)) {
+		return "Invalid ID — use letters, numbers, _ or - (must start with a letter, number, or _)";
+	}
+	if (value === currentNodeId) return "Cannot connect a node to itself";
+	const existingKind = kindOfExisting(value);
+	if (existingKind && existingKind !== wantedKind) {
+		return `"${value}" is already ${articleFor(existingKind)} ${existingKind}, not ${articleFor(wantedKind)} ${wantedKind}`;
+	}
+	return undefined;
 }
