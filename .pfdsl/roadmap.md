@@ -99,7 +99,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 **PR 本文の `Closes` キーワード確認**: L3 reference「PR 本文規約」に従う（main 直接マージのみ使用・中間 PR では使わない）。
 
-**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。pre-commit hook（`.git/hooks/`）は全 worktree 共有で、他ブランチのセッションが `make setup` を実行すると当該ブランチ版の hook に置き換わる — 自ブランチに存在しないファイル・ターゲットを hook が要求して commit が拒否されたら、自 worktree で `make setup` を実行して hook を入れ直す。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる。Read/Edit/Write 等のファイル操作ツールも同様 — worktree セッション中でも絶対パスを worktree ディレクトリ配下で明示せず main repo パスを渡すと、意図せず main チェックアウトのファイルを直接書き換える（#357 実装セッションで実際に発生。git 履歴でなく作業ツリーが対象のため git 側の防止策では検知できない）。パスに疑いがあれば `pwd` でなく渡すパス文字列自体を確認する。
+**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。pre-commit hook（`.git/hooks/`）は全 worktree 共有で、他ブランチのセッションが `make setup` を実行すると当該ブランチ版の hook に置き換わる — 自ブランチに存在しないファイル・ターゲットを hook が要求して commit が拒否されたら、自 worktree で `make setup` を実行して hook を入れ直す。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる。Edit/Write が worktree 外（main repo・別 worktree）を指す場合は `scripts/worktree-write-guard.mjs`（PreToolUse(Edit|Write) hook、`.claude/settings.json` で配線）が deny する（#357 実装セッションで実際に発生した事故の機械化、#650）。意図的に worktree 外を触りたい場合は、対象パスへセッションの作業ディレクトリを切り替えてから行う。
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる。
 
@@ -109,7 +109,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 **`make gen-samples` 実行後**: `.dot` / `.svg` / README はいずれも決定論的（純 JS + `@pfdsl/preview-engine` の wasm graphviz）に生成されるため、再生成された全ファイルの差分をそのままステージしてよい（#588）。
 
-**新規 `.md` を Write で作成した場合**: commit 前に `node scripts/check-md-linebreaks.mjs <対象ファイル>` で自己検査する（pre-commit 任せで一発コミットすると、読点位置の改行違反が複数箇所まとめて出て全文書き直しになりやすい）。
+**新規 `.md` を Write で作成した場合**: `scripts/md-write-check.mjs`（PostToolUse(Write) hook、`.claude/settings.json` で配線）が書いた直後に `check-md-linebreaks.mjs` を当該ファイルにだけ実行し、違反があれば advisory で知らせる（#650）。pre-commit の全量検査（「全部書いた後」）とは捕まえる時点が違うため手動での事前検査は不要。
 
 - [ ] このサイクルで起票した issue を `flow:managed` / `flow:exempt` に分類した（判定は L3 reference の「ラベル判定基準」。保守・基盤・修正は exempt）
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
