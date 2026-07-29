@@ -236,17 +236,3 @@ export function evaluateDelegationGuard(payload, { allowedAgents = DEFAULT_ALLOW
 			"to your caller and let it review, push and open the pull request. Do not look for another route.",
 	};
 }
-
-/**
- * Build the PreToolUse hook response for a deny decision.
- * @param {{reason: string}} result
- */
-export function buildDenyOutput(result) {
-	return {
-		hookSpecificOutput: {
-			hookEventName: "PreToolUse",
-			permissionDecision: "deny",
-			permissionDecisionReason: result.reason,
-		},
-	};
-}

@@ -50,17 +50,3 @@ export function evaluateMainCommitGuard(payload, { currentBranch, mainBranch = "
 			"Create or switch to a feature branch first (e.g. via the worktree skill), then commit there.",
 	};
 }
-
-/**
- * Build the PreToolUse hook response for a deny decision.
- * @param {{reason: string}} result
- */
-export function buildDenyOutput(result) {
-	return {
-		hookSpecificOutput: {
-			hookEventName: "PreToolUse",
-			permissionDecision: "deny",
-			permissionDecisionReason: result.reason,
-		},
-	};
-}

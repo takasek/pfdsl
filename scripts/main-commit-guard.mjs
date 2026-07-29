@@ -11,23 +11,15 @@
 // Usage (wired in .claude/settings.json): node scripts/main-commit-guard.mjs
 
 import { tryGit } from "./lib/run-exec.mjs";
-import { buildDenyOutput, evaluateMainCommitGuard, isGitCommitCommand } from "./lib/main-commit-guard.mjs";
+import { evaluateMainCommitGuard, isGitCommitCommand } from "./lib/main-commit-guard.mjs";
+import { buildDenyOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
 
-let input = "";
-process.stdin.setEncoding("utf8");
-for await (const chunk of process.stdin) {
-	input += chunk;
-}
+const payload = parseHookPayload(await readStdinText());
+if (!payload) process.exit(0);
 
-let payload;
-try {
-	payload = JSON.parse(input);
-} catch {
-	process.exit(0);
-}
-
-// Skip the git call entirely when the command is not even a commit — the
-// common case for every other Bash invocation this hook sees.
+// Re-checks what evaluateMainCommitGuard also checks, purely to skip the
+// `git branch` subprocess on the common case (every non-commit Bash call).
+// Kept in sync by hand — if the eligibility rule changes, update both.
 if (payload?.tool_name !== "Bash" || !isGitCommitCommand(payload?.tool_input?.command)) {
 	process.exit(0);
 }
