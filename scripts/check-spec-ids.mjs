@@ -18,6 +18,7 @@
 import { readFileSync } from "node:fs";
 import { git } from "./lib/run-exec.mjs";
 import { runSpecIdCheck } from "./lib/spec-id-check-steps.mjs";
+import { emitLinesAndExit } from "./lib/emit-lines.mjs";
 
 const args = process.argv.slice(2);
 const listFiles = () =>
@@ -26,11 +27,10 @@ const listFiles = () =>
 		.split("\n")
 		.filter(Boolean);
 
-const { exitCode, stdoutLines, stderrLines } = runSpecIdCheck({
-	args,
-	listFiles,
-	readFile: (file) => readFileSync(file, "utf8"),
-});
-for (const line of stdoutLines) console.log(line);
-for (const line of stderrLines) console.error(line);
-process.exit(exitCode);
+emitLinesAndExit(
+	runSpecIdCheck({
+		args,
+		listFiles,
+		readFile: (file) => readFileSync(file, "utf8"),
+	}),
+);

@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseSpecDiagTable, diffDiagRegistry, evaluateDiagRegistryDiff } from "./lib/diag-registry-check.mjs";
+import { emitLinesAndExit } from "./lib/emit-lines.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -34,12 +35,11 @@ const { missingInSpec, staleInSpec, severityMismatches } = diffDiagRegistry(
 	DIAGNOSTIC_REGISTRY,
 );
 
-const { exitCode, stdoutLines, stderrLines } = evaluateDiagRegistryDiff({
-	missingInSpec,
-	staleInSpec,
-	severityMismatches,
-	specCodesCount: Object.keys(specCodes).length,
-});
-for (const line of stdoutLines) console.log(line);
-for (const line of stderrLines) console.error(line);
-process.exit(exitCode);
+emitLinesAndExit(
+	evaluateDiagRegistryDiff({
+		missingInSpec,
+		staleInSpec,
+		severityMismatches,
+		specCodesCount: Object.keys(specCodes).length,
+	}),
+);
