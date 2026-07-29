@@ -9,19 +9,12 @@
 // Deny, not advisory: this event surfaces as "the edit silently landed on
 // the wrong branch," which is the "proceeds unnoticed" shape the roadmap.md
 // warning already calls out as the reason advisory would be missed.
-
-const WORKTREE_SEGMENT = /^(.*)\/\.claude\/worktrees\/([^/]+)(?:\/.*)?$/;
-
-/**
- * @param {string} cwd
- * @returns {{ mainRoot: string, worktreeRoot: string } | null}
- */
-function worktreeRootsFromCwd(cwd) {
-	const match = WORKTREE_SEGMENT.exec(cwd);
-	if (!match) return null;
-	const [, mainRoot, name] = match;
-	return { mainRoot, worktreeRoot: `${mainRoot}/.claude/worktrees/${name}` };
-}
+//
+// worktreeRoot/mainRoot are resolved by the hook wrapper via `git rev-parse
+// --show-toplevel` / `--git-common-dir` rather than by matching cwd against
+// the `.claude/worktrees/<name>` naming convention here — git's own notion
+// of worktree boundaries also covers a worktree created anywhere else (e.g.
+// a bare `git worktree add ../scratch`), which a path regex would miss.
 
 /** Whether `path` is `root` itself or a descendant of it (prefix-safe: no partial-segment match). */
 function isUnder(path, root) {
@@ -31,42 +24,32 @@ function isUnder(path, root) {
 /**
  * Decide whether a PreToolUse Edit/Write invocation may proceed.
  * @param {object} payload PreToolUse hook payload
+ * @param {{worktreeRoot: string, mainRoot: string} | null} roots git-derived
+ *   roots for the session's cwd, or null when they could not be resolved
+ *   (cwd missing, not a git repo, `git rev-parse` failure)
  * @returns {{decision: "allow"} | {decision: "deny", reason: string}}
  */
-export function evaluateWorktreeWriteGuard(payload) {
+export function evaluateWorktreeWriteGuard(payload, roots) {
 	if (payload?.tool_name !== "Edit" && payload?.tool_name !== "Write") return { decision: "allow" };
 
-	const cwd = payload?.cwd;
 	const filePath = payload?.tool_input?.file_path;
-	if (typeof cwd !== "string" || typeof filePath !== "string") return { decision: "allow" };
-	if (!filePath.startsWith("/")) return { decision: "allow" };
-
-	const roots = worktreeRootsFromCwd(cwd);
+	if (typeof filePath !== "string" || !filePath.startsWith("/")) return { decision: "allow" };
 	if (!roots) return { decision: "allow" };
 
-	if (isUnder(filePath, roots.worktreeRoot)) return { decision: "allow" };
-	if (!isUnder(filePath, roots.mainRoot)) return { decision: "allow" };
+	const { worktreeRoot, mainRoot } = roots;
+	// cwd's toplevel and its git-common-dir's parent coincide exactly when cwd
+	// is the main checkout itself — nothing to guard against there.
+	if (worktreeRoot === mainRoot) return { decision: "allow" };
+
+	if (isUnder(filePath, worktreeRoot)) return { decision: "allow" };
+	if (!isUnder(filePath, mainRoot)) return { decision: "allow" };
 
 	return {
 		decision: "deny",
 		reason:
-			`Blocked write to '${filePath}': this session's cwd ('${cwd}') is inside a worktree, ` +
-			`but the target path is outside it. Writing there would silently edit the main checkout ` +
-			`(or a different worktree) instead of this branch. If this is intentional, switch the ` +
-			"session's active directory to the target path first.",
-	};
-}
-
-/**
- * Build the PreToolUse hook response for a deny decision.
- * @param {{reason: string}} result
- */
-export function buildDenyOutput(result) {
-	return {
-		hookSpecificOutput: {
-			hookEventName: "PreToolUse",
-			permissionDecision: "deny",
-			permissionDecisionReason: result.reason,
-		},
+			`Blocked write to '${filePath}': this session is running in worktree '${worktreeRoot}', ` +
+			`but the target path is in the main checkout ('${mainRoot}') or a different worktree. Writing ` +
+			"there would silently edit the wrong branch's working tree. If this is intentional, switch " +
+			"the session's active directory to the target path first.",
 	};
 }
