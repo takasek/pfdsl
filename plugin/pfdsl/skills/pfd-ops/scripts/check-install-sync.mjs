@@ -25,6 +25,7 @@ import {
 import { createHash } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs as parseNodeArgs } from "node:util";
 import { checkUpstreamVersion } from "./plugin-version-check.mjs";
 
 /**
@@ -278,40 +279,41 @@ export function deployInstall(
 // --- CLI ---
 
 export function parseArgs(argv) {
-	const args = {
-		target: process.cwd(),
-		deploy: false,
-		overwriteLocalEdits: false,
-		deleteEditedOrphans: false,
-		upstream: false,
-	};
-	for (let i = 0; i < argv.length; i++) {
-		const arg = argv[i];
-		if (arg === "--target") {
-			const value = argv[i + 1];
-			if (value === undefined || value.startsWith("--")) {
-				throw new Error("--target requires a path argument");
-			}
-			args.target = value;
-			i++;
-		} else if (arg === "--deploy") {
-			args.deploy = true;
-		} else if (arg === "--force") {
-			// Rejected rather than ignored: an unrecognized flag is silently
-			// dropped here, so the deploy would keep every local edit while the
-			// caller believes they asked to discard them (#603).
-			throw new Error(
-				"--force was split into --overwrite-local-edits and --delete-edited-orphans; pass the one you mean",
-			);
-		} else if (arg === "--overwrite-local-edits") {
-			args.overwriteLocalEdits = true;
-		} else if (arg === "--delete-edited-orphans") {
-			args.deleteEditedOrphans = true;
-		} else if (arg === "--upstream") {
-			args.upstream = true;
-		}
+	// The migration hint has to be raised before the strict parse, which would
+	// otherwise reject --force as a plain unknown option and lose the pointer to
+	// the two flags that replaced it (#603). The inline form is matched too:
+	// the strict parse rejects it either way, but only this message says what
+	// to pass instead.
+	if (argv.some((arg) => arg === "--force" || arg.startsWith("--force="))) {
+		throw new Error(
+			"--force was split into --overwrite-local-edits and --delete-edited-orphans; pass the one you mean",
+		);
 	}
-	return args;
+	// strict mode is the whole point of delegating here: a hand-written argv
+	// loop drops anything it doesn't recognize, so a typo'd or --flag=value
+	// form of an irreversible option ran a deploy that overwrote and deleted
+	// nothing while the caller believed it had (#631). Node rejects unknown
+	// options, inline values for booleans, a missing or dash-leading --target
+	// value, and stray positionals, none of which this file has to encode.
+	const { values } = parseNodeArgs({
+		args: argv,
+		strict: true,
+		allowPositionals: false,
+		options: {
+			target: { type: "string", default: process.cwd() },
+			deploy: { type: "boolean", default: false },
+			"overwrite-local-edits": { type: "boolean", default: false },
+			"delete-edited-orphans": { type: "boolean", default: false },
+			upstream: { type: "boolean", default: false },
+		},
+	});
+	return {
+		target: values.target,
+		deploy: values.deploy,
+		overwriteLocalEdits: values["overwrite-local-edits"],
+		deleteEditedOrphans: values["delete-edited-orphans"],
+		upstream: values.upstream,
+	};
 }
 
 function printGroup(title, items) {

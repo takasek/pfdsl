@@ -517,12 +517,46 @@ describe("parseArgs", () => {
 		);
 	});
 
+	it("points --force=value at its replacements too, not just the bare form", () => {
+		// The inline form is rejected either way, but only the migration
+		// message says which two flags to reach for instead.
+		assert.throws(
+			() => parseArgs(["--deploy", "--force=true"]),
+			/--force was split into --overwrite-local-edits and --delete-edited-orphans/,
+		);
+	});
+
+	// The assertions below match on error code rather than wording: the text is
+	// Node's and may be reworded between releases, while the codes are API.
 	it("throws when --target is immediately followed by another flag", () => {
-		assert.throws(() => parseArgs(["--target", "--deploy"]), /--target requires a path argument/);
+		assert.throws(() => parseArgs(["--target", "--deploy"]), {
+			code: "ERR_PARSE_ARGS_INVALID_OPTION_VALUE",
+		});
 	});
 
 	it("throws when --target is the last argument", () => {
-		assert.throws(() => parseArgs(["--target"]), /--target requires a path argument/);
+		assert.throws(() => parseArgs(["--target"]), { code: "ERR_PARSE_ARGS_INVALID_OPTION_VALUE" });
+	});
+
+	// The three cases below are what #631 is about: each was silently ignored,
+	// so a caller asking for an irreversible overwrite or delete got a run that
+	// did neither and reported success.
+	it("rejects a near-miss flag name instead of silently ignoring it", () => {
+		assert.throws(() => parseArgs(["--deploy", "--overwrite-local-edit"]), {
+			code: "ERR_PARSE_ARGS_UNKNOWN_OPTION",
+		});
+	});
+
+	it("rejects an inline --flag=value form for a boolean flag", () => {
+		assert.throws(() => parseArgs(["--deploy=true"]), {
+			code: "ERR_PARSE_ARGS_INVALID_OPTION_VALUE",
+		});
+	});
+
+	it("rejects a bare positional argument", () => {
+		assert.throws(() => parseArgs(["/tmp/foo"]), {
+			code: "ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL",
+		});
 	});
 });
 
