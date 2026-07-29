@@ -10,9 +10,11 @@ describe("setFrontmatterField", () => {
 	});
 
 	// This path slices the yaml text the same way frontmatter.ts did when it
-	// left a \r on the last line (#636), but the CST parser absorbs it — so
-	// these pass as written. Kept as the guard that says so: the two paths are
-	// independent implementations and only one of them was ever broken.
+	// left a \r on the last line (#636). The first three cases pass even
+	// before that slice is corrected, because they only look at the field
+	// being rewritten — which is what let the same bug live on here (#644).
+	// The cases after them look at the sibling field and at the line endings,
+	// where the two paths actually differed.
 	describe("CRLF and padded fences", () => {
 		const crlf = (...lines: string[]) => lines.join("\r\n");
 
