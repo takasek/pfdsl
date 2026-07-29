@@ -458,7 +458,7 @@ pfdsl_skill >>? review_examples
 retro_skill >>? review_examples
 toolchain >>? review_examples
 
-[adrs, decisions, payoff_log] >> distill_ops -> [bindings_pfd_ops, bindings_pfd_retro, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, retro_skill, review_perspectives, spec_stress_skill, vscode_ext_debug_skill, workflow_md]
+[adrs, decisions, payoff_log] >> distill_ops -> [bindings_pfd_ops, bindings_pfd_retro, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives, spec_stress_skill, vscode_ext_debug_skill, workflow_md]
 
 spec_stress_skill >>? maintain_spec
 
