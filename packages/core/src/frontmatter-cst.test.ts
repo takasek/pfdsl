@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { setFrontmatterField } from "./frontmatter-cst.js";
+import { loadFrontmatter } from "./frontmatter.js";
+import { parseFrontmatterCst, setFrontmatterField } from "./frontmatter-cst.js";
 
 describe("setFrontmatterField", () => {
 	it("replaces an existing field's value", () => {
@@ -110,6 +111,27 @@ describe("setFrontmatterField", () => {
 			);
 			expect(out).not.toBeNull();
 			expect((out as string).replace(/\r\n/g, "")).not.toContain("\n");
+		});
+
+		// frontmatter.ts (read) and frontmatter-cst.ts (write) are deliberately
+		// independent implementations of the same fence math, and the \r bug
+		// was fixed in each of them separately, one release apart (#636, then
+		// #644). This pins the two to the same reading of the same bytes so a
+		// third divergence shows up as a failure rather than as a stained file.
+		it("reads the same values as the read path for the same CRLF source", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: todo",
+				"    criteria: approved",
+				"---",
+				"a >> P -> b",
+				"",
+			);
+			expect(parseFrontmatterCst(src).doc.toJSON()).toEqual(
+				loadFrontmatter(src).frontmatter,
+			);
 		});
 
 		it("keeps a LF source on LF", () => {
