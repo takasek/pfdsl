@@ -220,6 +220,16 @@ req >> design -> spec
 		expect(r.exitCode).toBe(1);
 		expect(readFileSync(f, "utf-8")).toBe(src);
 	});
+
+	it("--write leaves a CRLF file on CRLF (#644)", async () => {
+		const f = join(dir, "reindex-crlf.pfdsl");
+		writeFileSync(f, declared.replace(/\n/g, "\r\n"));
+		const r = await run(["meta", "reindex", f, "--write", "--renumber"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("index:");
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
+	});
 });
 
 describe("meta sort", () => {
@@ -253,6 +263,16 @@ z >> p -> a
 		const aIdx = after.indexOf("  a:");
 		const zIdx = after.indexOf("  z:");
 		expect(aIdx).toBeLessThan(zIdx);
+	});
+
+	it("--write leaves a CRLF file on CRLF (#644)", async () => {
+		const f = join(dir, "sort-crlf.pfdsl");
+		writeFileSync(f, unsorted.replace(/\n/g, "\r\n"));
+		const r = await run(["meta", "sort", f, "--by", "id", "--write"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after.indexOf("  a:")).toBeLessThan(after.indexOf("  z:"));
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
 	});
 
 	it("--check exits 1 when not sorted", async () => {
@@ -1762,6 +1782,28 @@ req >> design -> spec
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("status: done");
 		expect(after).not.toContain("status: todo");
+	});
+
+	// The reproduction from #644: a file written on Windows came back with an
+	// LF frontmatter glued onto a CRLF body, and the untouched sibling field
+	// carrying a quoted \r.
+	it("leaves a CRLF file on CRLF, siblings included (#644)", async () => {
+		const f = join(dir, "status-set-crlf.pfdsl");
+		const src = `---
+artifact:
+  req:
+    status: todo
+    criteria: approved
+---
+req >> design -> spec
+`.replace(/\n/g, "\r\n");
+		writeFileSync(f, src);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("status: done");
+		expect(after).toContain("criteria: approved");
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
 	});
 
 	it("keeps a leading comment above the field it rewrites", async () => {
