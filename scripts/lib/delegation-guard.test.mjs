@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { evaluateDelegationGuard, findOutwardCommand } from "./delegation-guard.mjs";
+import { evaluateDelegationGuard, findOutwardCommand, runDelegationGuard } from "./delegation-guard.mjs";
 
 function payload({ agentType, command, toolName = "Bash" }) {
 	const p = { hook_event_name: "PreToolUse", tool_name: toolName, tool_input: { command } };
@@ -116,5 +116,27 @@ describe("findOutwardCommand — unrelated commands", () => {
 	it("ignores ordinary work", () => {
 		assert.equal(findOutwardCommand("node --test 'scripts/lib/*.test.mjs'"), null);
 		assert.equal(findOutwardCommand("git add -A && git commit -m 'feat: x'"), null);
+	});
+});
+
+describe("runDelegationGuard", () => {
+	it("prints a deny payload for a deny decision", () => {
+		const input = JSON.stringify(payload({ agentType: "builder", command: "git push -u origin topic" }));
+		const { shouldOutput, output } = runDelegationGuard(input);
+		assert.equal(shouldOutput, true);
+		assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
+	});
+
+	it("produces no output for an allow decision", () => {
+		const input = JSON.stringify(payload({ command: "git push -u origin topic" }));
+		const { shouldOutput, output } = runDelegationGuard(input);
+		assert.equal(shouldOutput, false);
+		assert.equal(output, undefined);
+	});
+
+	it("silently allows malformed stdin JSON", () => {
+		const { shouldOutput, output } = runDelegationGuard("not json{{{");
+		assert.equal(shouldOutput, false);
+		assert.equal(output, undefined);
 	});
 });

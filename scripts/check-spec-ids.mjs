@@ -17,44 +17,20 @@
 
 import { readFileSync } from "node:fs";
 import { git } from "./lib/run-exec.mjs";
-import {
-	findSpecIdDefinitions,
-	findStrictRefs,
-	findDuplicateDefinitions,
-	findDanglingStrictRefs,
-	formatSpecIdViolations,
-} from "./lib/spec-id-check.mjs";
+import { runSpecIdCheck } from "./lib/spec-id-check-steps.mjs";
+import { emitLinesAndExit } from "./lib/emit-lines.mjs";
 
 const args = process.argv.slice(2);
-const files =
-	args.length > 0
-		? args
-		: git(["ls-files", "docs/**/*.md"])
-				.trim()
-				.split("\n")
-				.filter(Boolean);
+const listFiles = () =>
+	git(["ls-files", "docs/**/*.md"])
+		.trim()
+		.split("\n")
+		.filter(Boolean);
 
-const definitionHits = [];
-const strictRefHits = [];
-for (const file of files) {
-	const text = readFileSync(file, "utf8");
-	for (const hit of findSpecIdDefinitions(text)) {
-		definitionHits.push({ file, ...hit });
-	}
-	for (const hit of findStrictRefs(text)) {
-		strictRefHits.push({ file, ...hit });
-	}
-}
-
-const duplicates = findDuplicateDefinitions(definitionHits);
-const dangling = findDanglingStrictRefs(strictRefHits, definitionHits);
-
-if (duplicates.length > 0 || dangling.length > 0) {
-	console.error(
-		`check-spec-ids: ${duplicates.length} duplicate definition(s), ${dangling.length} dangling strict reference(s):\n`,
-	);
-	console.error(formatSpecIdViolations(duplicates, dangling));
-	process.exit(1);
-} else {
-	console.log("check-spec-ids: no violations found");
-}
+emitLinesAndExit(
+	runSpecIdCheck({
+		args,
+		listFiles,
+		readFile: (file) => readFileSync(file, "utf8"),
+	}),
+);

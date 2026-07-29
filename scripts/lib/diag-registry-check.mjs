@@ -77,3 +77,43 @@ export function diffDiagRegistry(specCodes, registry) {
 		severityMismatches: severityMismatches.sort(),
 	};
 }
+
+/**
+ * check-diag-registry.mjs orchestration: three independent drift kinds each
+ * set `failed` and print their own message; none of that wiring was tested
+ * (#645) — only parseSpecDiagTable/diffDiagRegistry had tests. This guards
+ * against e.g. an accidental `else if` between the three checks, which would
+ * silently stop reporting all but the first kind of drift found.
+ *
+ * No I/O: takes the already-diffed result plus the spec code count for the
+ * OK message. The dynamic `import()` of packages/core/dist/index.js stays a
+ * module-load boundary in the main script, not injected here.
+ *
+ * @param {{missingInSpec: string[], staleInSpec: string[], severityMismatches: string[], specCodesCount: number}} args
+ * @returns {{exitCode: 0|1, stdoutLines: string[], stderrLines: string[]}}
+ */
+export function evaluateDiagRegistryDiff({ missingInSpec, staleInSpec, severityMismatches, specCodesCount }) {
+	const stderrLines = [];
+	let failed = false;
+
+	if (missingInSpec.length > 0) {
+		failed = true;
+		stderrLines.push(`Codes emitted by core but missing from spec.md §16 table: ${missingInSpec.join(", ")}`);
+	}
+	if (staleInSpec.length > 0) {
+		failed = true;
+		stderrLines.push(`Codes in spec.md §16 table but not emitted by core (stale): ${staleInSpec.join(", ")}`);
+	}
+	if (severityMismatches.length > 0) {
+		failed = true;
+		stderrLines.push(`Severity mismatch between spec.md §16 table and core registry: ${severityMismatches.join(", ")}`);
+	}
+
+	if (failed) {
+		stderrLines.push(
+			"\ncheck-diag-registry: FAILED. Update docs/spec/spec.md §16 and/or packages/core/src/diagnostics-registry.ts to match.",
+		);
+		return { exitCode: 1, stdoutLines: [], stderrLines };
+	}
+	return { exitCode: 0, stdoutLines: [`check-diag-registry: OK (${specCodesCount} codes match)`], stderrLines: [] };
+}
