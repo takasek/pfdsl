@@ -278,10 +278,8 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	// diagnostics to the caller, so there is nothing safe to rewrite here.
 	// LF is passed explicitly here, unlike the other callers of
 	// renderFrontmatterCst which pass the source's own newline (#644): format
-	// rebuilds the body from re-emitted statements, which are LF, so a CRLF
-	// block would be the mixed-endings case rather than the fix for it.
-	// Normalizing the whole file's line endings is a property of `fmt` as a
-	// command, tracked separately (#656).
+	// re-emits the body from parsed statements, which are LF, so both halves are
+	// assembled on LF and the whole output is converted once at the end (#656).
 	const rawFrontmatterSection = source.slice(0, source.length - body.length);
 	const frontmatterCst = parseFrontmatterCst(source);
 	const frontmatterSection =
@@ -320,8 +318,16 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 				? formatAsFlows([], isolatedIds)
 				: formatEdges([], isolatedIds);
 
+	// Both halves are on LF at this point: the body was re-emitted and the
+	// frontmatter was rendered with an explicit LF above. The FM001/FM002
+	// fallback is the one part passed through verbatim from the source, so the
+	// conversion tolerates a \r that is already there rather than doubling it.
+	const output = frontmatterSection + formattedBody + isolatedBlock;
 	return {
-		output: frontmatterSection + formattedBody + isolatedBlock,
+		output:
+			frontmatterCst.newline === "\r\n"
+				? output.replace(/\r?\n/g, "\r\n")
+				: output,
 		diagnostics: [...parseDiags, ...normDiags, ...valDiags],
 	};
 }

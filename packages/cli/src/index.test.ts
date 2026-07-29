@@ -104,6 +104,27 @@ describe("fmt", () => {
 		expect(after).toContain("req >> design");
 	});
 
+	it("--write leaves a CRLF file on CRLF (#656)", async () => {
+		const f = join(dir, "fmt-write-crlf.pfdsl");
+		writeFileSync(f, "   req>>design->spec\r\n");
+		const r = await run(["fmt", f, "--write"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("req >> design");
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
+	});
+
+	// Before #656 a CRLF file could never satisfy --check, since fmt's output
+	// was LF no matter what went in. A repo on CRLF could not put fmt --check
+	// in CI at all.
+	it("--check exits 0 for a formatted CRLF file (#656)", async () => {
+		const f = join(dir, "fmt-check-crlf.pfdsl");
+		writeFileSync(f, valid.replace(/\n/g, "\r\n"));
+		const r = await run(["fmt", f, "--check"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("");
+	});
+
 	it("--check exits 1 and prints 'not formatted' when the file is not formatted, without writing", async () => {
 		const f = join(dir, "fmt-check-unformatted.pfdsl");
 		const src = "   req>>design->spec\n";
