@@ -276,6 +276,11 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	// content doesn't parse (FM002) — `Document#toString()` throws on a
 	// Document carrying parse errors, and parseDiags already surfaces both
 	// diagnostics to the caller, so there is nothing safe to rewrite here.
+	// No `newline` is passed here, unlike the other callers of
+	// renderFrontmatterCst (#644): format rebuilds the body from re-emitted
+	// statements, which are LF, so a CRLF block would be the mixed-endings
+	// case rather than the fix for it. Normalizing the whole file's line
+	// endings is a property of `fmt` as a command, tracked separately.
 	const rawFrontmatterSection = source.slice(0, source.length - body.length);
 	const frontmatterCst = parseFrontmatterCst(source);
 	const frontmatterSection =

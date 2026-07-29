@@ -43,11 +43,11 @@ export function insertDefinition(
 
 	if (doc.hasIn([kind, id])) {
 		return {
-			output: cst.present ? renderFrontmatterCst(doc) : "",
+			output: cst.present ? renderFrontmatterCst(doc, cst.newline) : "",
 			inserted: false,
 		};
 	}
 
 	doc.setIn([kind, id, "label"], id);
-	return { output: renderFrontmatterCst(doc), inserted: true };
+	return { output: renderFrontmatterCst(doc, cst.newline), inserted: true };
 }
