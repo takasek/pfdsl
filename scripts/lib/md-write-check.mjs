@@ -1,17 +1,19 @@
-// Runs check-md-linebreaks.mjs against a single .md file right after it is
-// Written (#650), instead of leaving the violation to surface at the next
-// pre-commit run. roadmap.md noted this concretely: writing several new .md
-// files in one session and only finding out about mid-sentence line breaks
-// at commit time turns into a full rewrite pass, because by then the
-// violations are spread across every file written that session.
+// Runs check-md-linebreaks.mjs's check against a single .md file right
+// after it is Written (#650), instead of leaving the violation to surface
+// at the next pre-commit run. roadmap.md noted this concretely: writing
+// several new .md files in one session and only finding out about
+// mid-sentence line breaks at commit time turns into a full rewrite pass,
+// because by then the violations are spread across every file written that
+// session.
 //
 // Advisory only, and PostToolUse rather than PreToolUse: the file is already
 // written by the time this runs, so there is nothing to block — only a
 // prompt to fix it while the content is still fresh in context.
 //
-// The actual check is not reimplemented here; the hook wrapper shells out to
-// check-md-linebreaks.mjs (scoped to the one file) so there is exactly one
-// place that defines what a violation is.
+// checkFile/formatViolation are imported from check-md-linebreaks.mjs
+// in-process (that script exports them for this reason) rather than shelled
+// out to, so this hook does not pay a second Node process spawn on every
+// .md Write and there stays exactly one place that defines a violation.
 
 /**
  * Whether this PostToolUse payload is a Write of a .md file.
@@ -28,13 +30,17 @@ export function isMarkdownWrite(payload) {
 }
 
 /**
- * The advisory text, or undefined when the check passed.
+ * The advisory text, or undefined when there are no violations. formatViolation
+ * is injected — the hook wrapper passes check-md-linebreaks.mjs's own
+ * formatter, so this file never re-implements what a violation looks like.
  * @param {string} filePath
- * @param {{ok: boolean, out: string}} checkResult result of running
- *   check-md-linebreaks.mjs against `filePath` (scripts/lib/run-exec.mjs's tryRun shape)
+ * @param {Array<{file: string, line: number, prev: string, cont: string}>} violations
+ *   check-md-linebreaks.mjs's checkFile() result
+ * @param {(v: object) => string} formatViolation
  * @returns {string | undefined}
  */
-export function formatLinebreakAdvisory(filePath, checkResult) {
-	if (checkResult.ok) return undefined;
-	return `note: ${filePath} has mid-sentence line break violation(s) (check-md-linebreaks.mjs):\n${checkResult.out.trim()}`;
+export function formatLinebreakAdvisory(filePath, violations, formatViolation) {
+	if (violations.length === 0) return undefined;
+	const lines = violations.map(formatViolation).join("\n");
+	return `note: ${filePath} has mid-sentence line break violation(s) (check-md-linebreaks.mjs):\n${lines}`;
 }

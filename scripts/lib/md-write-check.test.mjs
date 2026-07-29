@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { formatLinebreakAdvisory, isMarkdownWrite } from "./md-write-check.mjs";
+import { formatViolation } from "../check-md-linebreaks.mjs";
 
 describe("isMarkdownWrite", () => {
 	it("flags a Write of a .md file", () => {
@@ -38,17 +39,17 @@ describe("isMarkdownWrite", () => {
 });
 
 describe("formatLinebreakAdvisory", () => {
-	it("is undefined when the check passed, so the hook prints nothing", () => {
-		const result = formatLinebreakAdvisory("/repo/docs/foo.md", { ok: true, out: "check-md-linebreaks: OK\n" });
-		assert.equal(result, undefined);
+	it("is undefined when there are no violations, so the hook prints nothing", () => {
+		assert.equal(formatLinebreakAdvisory("/repo/docs/foo.md", [], formatViolation), undefined);
 	});
 
-	it("names the file and includes the checker's output when it failed", () => {
-		const result = formatLinebreakAdvisory("/repo/docs/foo.md", {
-			ok: false,
-			out: "docs/foo.md:12: mid-sentence line break\n1 violation(s) found.",
-		});
+	it("names the file and includes each violation when there are some", () => {
+		const violations = [
+			{ file: "/repo/docs/foo.md", line: 12, prev: "- item", cont: "continuation" },
+		];
+		const result = formatLinebreakAdvisory("/repo/docs/foo.md", violations, formatViolation);
 		assert.match(result, /\/repo\/docs\/foo\.md/);
 		assert.match(result, /mid-sentence line break/);
+		assert.match(result, /continuation/);
 	});
 });
