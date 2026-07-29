@@ -61,7 +61,7 @@ C・D 層で過去に検出済みのパターンは `.pfdsl/bindings/pfd-retro.m
 | ゲート項目の追加・修正 | 該当する PFD の criteria または sibling companion の終端ゲート（**ルール文のみ。発見括弧禁止**）。どの companion に書くかは `pfd-ops/references/architecture.md` の「companion への書き分けルール」表に従う |
 | 能力成果物の起動条件漏れ | 当該スキルまたは workflow.pfdsl の description に追記。当該スキルが配布 bundle 内（`.claude/skills/pfd-*`）の場合は `.pfdsl/bindings/<当該スキル名>.md` |
 | 体感した効果 | 効果ログ（companion で宛先を指定。未定義の場合は記録しない） |
-| 監査の新パターン発見 | `.pfdsl/bindings/pfd-retro.md`。問いの構造・パターン種別・具体例をここに書く |
+| 監査の新パターン発見 | `.pfdsl/bindings/pfd-retro.md`。問いの構造・パターン種別・具体例を本文に書き、索引にも同じコミットで一行追加する |
 
 宛先の上書き・追加は pfd-ops の workflow companion に従う。配布物（`.claude/skills/pfd-*` 配下）への finding 反映手続きは `.pfdsl/bindings/pfd-retro.md` に従う。
 
