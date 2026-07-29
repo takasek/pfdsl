@@ -18,7 +18,7 @@
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseSpecDiagTable, diffDiagRegistry } from "./lib/diag-registry-check.mjs";
+import { parseSpecDiagTable, diffDiagRegistry, evaluateDiagRegistryDiff } from "./lib/diag-registry-check.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -34,34 +34,12 @@ const { missingInSpec, staleInSpec, severityMismatches } = diffDiagRegistry(
 	DIAGNOSTIC_REGISTRY,
 );
 
-let failed = false;
-
-if (missingInSpec.length > 0) {
-	failed = true;
-	console.error(
-		`Codes emitted by core but missing from spec.md §16 table: ${missingInSpec.join(", ")}`,
-	);
-}
-if (staleInSpec.length > 0) {
-	failed = true;
-	console.error(
-		`Codes in spec.md §16 table but not emitted by core (stale): ${staleInSpec.join(", ")}`,
-	);
-}
-if (severityMismatches.length > 0) {
-	failed = true;
-	console.error(
-		`Severity mismatch between spec.md §16 table and core registry: ${severityMismatches.join(", ")}`,
-	);
-}
-
-if (failed) {
-	console.error(
-		"\ncheck-diag-registry: FAILED. Update docs/spec/spec.md §16 and/or packages/core/src/diagnostics-registry.ts to match.",
-	);
-	process.exit(1);
-}
-
-console.log(
-	`check-diag-registry: OK (${Object.keys(specCodes).length} codes match)`,
-);
+const { exitCode, stdoutLines, stderrLines } = evaluateDiagRegistryDiff({
+	missingInSpec,
+	staleInSpec,
+	severityMismatches,
+	specCodesCount: Object.keys(specCodes).length,
+});
+for (const line of stdoutLines) console.log(line);
+for (const line of stderrLines) console.error(line);
+process.exit(exitCode);
