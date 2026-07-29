@@ -247,3 +247,26 @@ export function buildDenyOutput(result) {
 		},
 	};
 }
+
+/**
+ * Orchestrates the hook's stdin payload into a print-or-not decision.
+ * Malformed JSON must silently allow (no output), matching the top-level
+ * script's `process.exit(0)` on a parse failure — a crash in this guard must
+ * not wedge every Bash call (#645).
+ * @param {string} inputText - raw stdin payload
+ * @returns {{shouldOutput: boolean, output?: object}}
+ */
+export function runDelegationGuard(inputText) {
+	let payload;
+	try {
+		payload = JSON.parse(inputText);
+	} catch {
+		return { shouldOutput: false };
+	}
+
+	const result = evaluateDelegationGuard(payload);
+	if (result.decision === "deny") {
+		return { shouldOutput: true, output: buildDenyOutput(result) };
+	}
+	return { shouldOutput: false };
+}

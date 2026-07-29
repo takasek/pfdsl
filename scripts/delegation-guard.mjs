@@ -12,7 +12,7 @@
 //
 // Usage (wired in .claude/settings.json): node scripts/delegation-guard.mjs
 
-import { buildDenyOutput, evaluateDelegationGuard } from "./lib/delegation-guard.mjs";
+import { runDelegationGuard } from "./lib/delegation-guard.mjs";
 
 let input = "";
 process.stdin.setEncoding("utf8");
@@ -20,15 +20,8 @@ for await (const chunk of process.stdin) {
 	input += chunk;
 }
 
-let payload;
-try {
-	payload = JSON.parse(input);
-} catch {
-	process.exit(0);
-}
-
-const result = evaluateDelegationGuard(payload);
-if (result.decision === "deny") {
-	console.log(JSON.stringify(buildDenyOutput(result)));
+const { shouldOutput, output } = runDelegationGuard(input);
+if (shouldOutput) {
+	console.log(JSON.stringify(output));
 }
 process.exit(0);
