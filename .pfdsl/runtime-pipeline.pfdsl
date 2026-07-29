@@ -155,8 +155,8 @@ artifact:
     location: ../plugin/pfdsl/
   installed_plugin:
     label: 導入済みプラグイン
-    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。4スキル・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）"
-    criteria: marketplace経由の導入が動作確認済み（4スキル・pfd-*コマンド・pfd-lens agentが一括で届く）
+    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。assemble_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）"
+    criteria: marketplace経由の導入が動作確認済み（assemble_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agentが一括で届く）
     externalStakeholders: [ 採用リポのAIエージェント ]
     group: adopter_env
   drift_report:
@@ -221,7 +221,7 @@ process:
     tags: [ b ]
   assemble_plugin:
     label: プラグイン組み立て
-    description: "4スキルツリー（pfdslはgen-skillで生成、他3つは.claude/skills/からコピー）とcommands/pfd-*.md・agents/pfd-lens.mdをplugin/pfdsl/へ集約しplugin.jsonをCLI versionから生成する。同梱対象リストはgen-plugin.mjsに一元化"
+    description: "スキルツリー（pfdslはgen-skillで生成、pfd-ops・pfd-ecosystem・pfd-grill・pfd-retroは.claude/skills/からコピー）とcommands/pfd-*.md・agents/pfd-lens.mdをplugin/pfdsl/へ集約しplugin.jsonをCLI versionから生成する。同梱対象リストはgen-plugin.mjsに一元化。本数を数字で書かない — スキルが増えても文面が古びないよう列挙で持つ"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
     tags: [ g ]
