@@ -21,36 +21,11 @@
  */
 
 import { readFileSync } from "node:fs";
-import {
-	normalizeId,
-	findOccurrencesInText,
-	formatOccurrences,
-	mintCheckExitCode,
-} from "./lib/mint-check.mjs";
+import { runMintCheck } from "./lib/mint-check-steps.mjs";
 
 const [slugArg, ...fileArgs] = process.argv.slice(2);
 
-if (!slugArg) {
-	console.error("usage: node scripts/mint-check.mjs <slug> [files...]");
-	process.exit(2);
-}
-
-const id = normalizeId(slugArg);
-const files = fileArgs.length > 0 ? fileArgs : ["docs/spec/spec.md"];
-
-const occurrences = [];
-for (const file of files) {
-	const text = readFileSync(file, "utf8");
-	occurrences.push(...findOccurrencesInText(id, file, text));
-}
-
-const exitCode = mintCheckExitCode(occurrences);
-if (exitCode === 0) {
-	console.error(`mint-check: "${id}" has no prior occurrence — safe to mint.`);
-} else {
-	console.log(formatOccurrences(occurrences));
-	console.error(
-		`mint-check: "${id}" already occurs ${occurrences.length} time(s) — resolve before minting.`,
-	);
-}
-process.exit(exitCode);
+const result = runMintCheck({ slugArg, fileArgs, readFile: (file) => readFileSync(file, "utf8") });
+if (result.stdout) console.log(result.stdout);
+console.error(result.stderr);
+process.exit(result.exitCode);
