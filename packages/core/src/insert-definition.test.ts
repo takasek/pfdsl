@@ -136,4 +136,21 @@ a >> p -> b
 		const { inserted } = insertDefinition(src, "artifact", "b");
 		expect(inserted).toBe(false);
 	});
+
+	// The block returned here is spliced into the caller's document, so it has
+	// to arrive in that document's line ending or the splice mixes the two.
+	it("emits a CRLF block for a CRLF source (#644)", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  a:",
+			"    label: A",
+			"---",
+			"a >> p -> b",
+			"",
+		].join("\r\n");
+		const { output, inserted } = insertDefinition(src, "artifact", "b");
+		expect(inserted).toBe(true);
+		expect(output.replace(/\r\n/g, "")).not.toContain("\n");
+	});
 });

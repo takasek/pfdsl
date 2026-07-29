@@ -104,6 +104,27 @@ describe("fmt", () => {
 		expect(after).toContain("req >> design");
 	});
 
+	it("--write leaves a CRLF file on CRLF (#656)", async () => {
+		const f = join(dir, "fmt-write-crlf.pfdsl");
+		writeFileSync(f, "   req>>design->spec\r\n");
+		const r = await run(["fmt", f, "--write"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("req >> design");
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
+	});
+
+	// Before #656 a CRLF file could never satisfy --check, since fmt's output
+	// was LF no matter what went in. A repo on CRLF could not put fmt --check
+	// in CI at all.
+	it("--check exits 0 for a formatted CRLF file (#656)", async () => {
+		const f = join(dir, "fmt-check-crlf.pfdsl");
+		writeFileSync(f, valid.replace(/\n/g, "\r\n"));
+		const r = await run(["fmt", f, "--check"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("");
+	});
+
 	it("--check exits 1 and prints 'not formatted' when the file is not formatted, without writing", async () => {
 		const f = join(dir, "fmt-check-unformatted.pfdsl");
 		const src = "   req>>design->spec\n";
@@ -220,6 +241,16 @@ req >> design -> spec
 		expect(r.exitCode).toBe(1);
 		expect(readFileSync(f, "utf-8")).toBe(src);
 	});
+
+	it("--write leaves a CRLF file on CRLF (#644)", async () => {
+		const f = join(dir, "reindex-crlf.pfdsl");
+		writeFileSync(f, declared.replace(/\n/g, "\r\n"));
+		const r = await run(["meta", "reindex", f, "--write", "--renumber"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("index:");
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
+	});
 });
 
 describe("meta sort", () => {
@@ -253,6 +284,16 @@ z >> p -> a
 		const aIdx = after.indexOf("  a:");
 		const zIdx = after.indexOf("  z:");
 		expect(aIdx).toBeLessThan(zIdx);
+	});
+
+	it("--write leaves a CRLF file on CRLF (#644)", async () => {
+		const f = join(dir, "sort-crlf.pfdsl");
+		writeFileSync(f, unsorted.replace(/\n/g, "\r\n"));
+		const r = await run(["meta", "sort", f, "--by", "id", "--write"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after.indexOf("  a:")).toBeLessThan(after.indexOf("  z:"));
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
 	});
 
 	it("--check exits 1 when not sorted", async () => {
@@ -1762,6 +1803,28 @@ req >> design -> spec
 		const after = readFileSync(f, "utf-8");
 		expect(after).toContain("status: done");
 		expect(after).not.toContain("status: todo");
+	});
+
+	// The reproduction from #644: a file written on Windows came back with an
+	// LF frontmatter glued onto a CRLF body, and the untouched sibling field
+	// carrying a quoted \r.
+	it("leaves a CRLF file on CRLF, siblings included (#644)", async () => {
+		const f = join(dir, "status-set-crlf.pfdsl");
+		const src = `---
+artifact:
+  req:
+    status: todo
+    criteria: approved
+---
+req >> design -> spec
+`.replace(/\n/g, "\r\n");
+		writeFileSync(f, src);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		expect(r.exitCode).toBe(0);
+		const after = readFileSync(f, "utf-8");
+		expect(after).toContain("status: done");
+		expect(after).toContain("criteria: approved");
+		expect(after.replace(/\r\n/g, "")).not.toContain("\n");
 	});
 
 	it("keeps a leading comment above the field it rewrites", async () => {

@@ -109,6 +109,6 @@ export function reindex(
 	for (const c of changes) {
 		doc.setIn([c.kind, c.id, "index"], c.to);
 	}
-	const output = renderFrontmatterCst(doc) + cst.body;
+	const output = renderFrontmatterCst(doc, cst.newline) + cst.body;
 	return { output, changes, diagnostics };
 }

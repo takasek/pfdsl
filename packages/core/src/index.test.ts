@@ -121,6 +121,31 @@ describe("public API", () => {
 			expect(output).toContain(": bad: yaml");
 			expect(diagnostics.some((d) => d.code === "FM002")).toBe(true);
 		});
+
+		// Canonicalizing the notation is format's job; rewriting the file's byte
+		// representation is not. The write path preserves line endings (#644) and
+		// fmt is held to the same rule (#656).
+		it("keeps a CRLF source on CRLF, body included", () => {
+			const src =
+				"---\nartifact:\n  a:\n    label: A\n---\na >> P -> b\n".replace(
+					/\n/g,
+					"\r\n",
+				);
+			const { output } = format(src);
+			expect(output).toContain("label: A");
+			expect(output.replace(/\r\n/g, "")).not.toContain("\n");
+		});
+
+		it("keeps a CRLF source on CRLF when the frontmatter does not parse (FM002)", () => {
+			const src = "---\n: bad: yaml\n---\na >> P -> b\n".replace(/\n/g, "\r\n");
+			const { output } = format(src);
+			expect(output.replace(/\r\n/g, "")).not.toContain("\n");
+		});
+
+		it("keeps a LF source on LF", () => {
+			const src = "---\nartifact:\n  a:\n    label: A\n---\na >> P -> b\n";
+			expect(format(src).output).not.toContain("\r");
+		});
 	});
 
 	it("format: isolated frontmatter node appears exactly once across multiple flow segments (regression #368)", () => {

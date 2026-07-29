@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { setFrontmatterField } from "./frontmatter-cst.js";
+import { loadFrontmatter } from "./frontmatter.js";
+import { parseFrontmatterCst, setFrontmatterField } from "./frontmatter-cst.js";
 
 describe("setFrontmatterField", () => {
 	it("replaces an existing field's value", () => {
@@ -10,9 +11,11 @@ describe("setFrontmatterField", () => {
 	});
 
 	// This path slices the yaml text the same way frontmatter.ts did when it
-	// left a \r on the last line (#636), but the CST parser absorbs it — so
-	// these pass as written. Kept as the guard that says so: the two paths are
-	// independent implementations and only one of them was ever broken.
+	// left a \r on the last line (#636). The first three cases pass even
+	// before that slice is corrected, because they only look at the field
+	// being rewritten — which is what let the same bug live on here (#644).
+	// The cases after them look at the sibling field and at the line endings,
+	// where the two paths actually differed.
 	describe("CRLF and padded fences", () => {
 		const crlf = (...lines: string[]) => lines.join("\r\n");
 
@@ -65,6 +68,83 @@ describe("setFrontmatterField", () => {
 			expect(
 				setFrontmatterField(src, "artifact", "ghost", "status", "done"),
 			).toBeNull();
+		});
+
+		it("leaves a sibling field on the last frontmatter line untouched", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: todo",
+				"    criteria: approved",
+				"---",
+				"a >> P -> b",
+				"",
+			);
+			const out = setFrontmatterField(
+				src,
+				"artifact",
+				"spec",
+				"status",
+				"done",
+			);
+			expect(out).toContain("criteria: approved");
+			expect(out).not.toContain('criteria: "approved\r"');
+		});
+
+		it("keeps every line CRLF when the source is CRLF", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: todo",
+				"---",
+				"a >> P -> b",
+				"",
+			);
+			const out = setFrontmatterField(
+				src,
+				"artifact",
+				"spec",
+				"status",
+				"done",
+			);
+			expect(out).not.toBeNull();
+			expect((out as string).replace(/\r\n/g, "")).not.toContain("\n");
+		});
+
+		// frontmatter.ts (read) and frontmatter-cst.ts (write) are deliberately
+		// independent implementations of the same fence math, and the \r bug
+		// was fixed in each of them separately, one release apart (#636, then
+		// #644). This pins the two to the same reading of the same bytes so a
+		// third divergence shows up as a failure rather than as a stained file.
+		it("reads the same values as the read path for the same CRLF source", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: todo",
+				"    criteria: approved",
+				"---",
+				"a >> P -> b",
+				"",
+			);
+			expect(parseFrontmatterCst(src).doc.toJSON()).toEqual(
+				loadFrontmatter(src).frontmatter,
+			);
+		});
+
+		it("keeps a LF source on LF", () => {
+			const src =
+				"---\nartifact:\n  spec:\n    status: todo\n---\na >> P -> b\n";
+			const out = setFrontmatterField(
+				src,
+				"artifact",
+				"spec",
+				"status",
+				"done",
+			);
+			expect(out).not.toContain("\r");
 		});
 	});
 
