@@ -342,4 +342,19 @@ a >> p -> b
 		expect(changed).toBe(false);
 		expect(output).toBe(src);
 	});
+
+	it("keeps a CRLF source on CRLF (#644)", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  z: { label: Z }",
+			"  a: { label: A }",
+			"---",
+			"a >> p -> z",
+			"",
+		].join("\r\n");
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output.replace(/\r\n/g, "")).not.toContain("\n");
+	});
 });
