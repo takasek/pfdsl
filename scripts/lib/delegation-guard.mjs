@@ -32,7 +32,10 @@ const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tr
 // Split on shell separators that start a new command, ignoring separators
 // inside quotes. Quote tracking is what keeps `echo "git push"` from being
 // read as a push.
-function splitSegments(command) {
+//
+// Exported so other command-inspecting guards (main-commit-guard.mjs) reuse
+// this parsing instead of re-implementing quote/segment handling.
+export function splitSegments(command) {
 	const segments = [];
 	let current = "";
 	let quote = null;
@@ -78,7 +81,7 @@ function splitSegments(command) {
 
 // Tokens are only inspected when unquoted, so a quoted argument can never be
 // mistaken for a subcommand.
-function tokenize(segment) {
+export function tokenize(segment) {
 	const tokens = [];
 	let current = "";
 	let quote = null;
@@ -114,7 +117,7 @@ function tokenize(segment) {
 }
 
 // `FOO=bar cmd` and `sudo cmd` still run cmd.
-function stripLeadingNoise(tokens) {
+export function stripLeadingNoise(tokens) {
 	let i = 0;
 	while (i < tokens.length) {
 		const value = tokens[i].value;
@@ -131,7 +134,7 @@ function stripLeadingNoise(tokens) {
 	return tokens.slice(i);
 }
 
-function gitSubcommand(tokens) {
+export function gitSubcommand(tokens) {
 	for (let i = 1; i < tokens.length; i++) {
 		const { value, quoted } = tokens[i];
 		if (quoted) return null;
