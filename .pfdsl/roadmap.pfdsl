@@ -433,7 +433,7 @@ artifact:
   cli_release_frontmatter_cst:
     label: "CLIリリース: frontmatter CST 化（破壊的変更）"
     description: "#592 frontmatter の CST ベース読み書きを含む次期 npm リリース。既存 .pfdsl の再整形を伴う破壊的変更"
-    status: todo
+    status: done
     criteria: "npm 公開版で fmt/meta set/sort/reindex/insert-definition が CST ベースの frontmatter 読み書きで動作する"
 process:
   implement_version_cmd:
