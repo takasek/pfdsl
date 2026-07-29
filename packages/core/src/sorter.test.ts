@@ -43,6 +43,21 @@ describe("sortEdges", () => {
 		]);
 	});
 
+	it("merge shape: input edges sort by source-side (upstream) rank, not process-side rank", () => {
+		// D(0) >> E(1) -> A(2); Z(0) >> P(3); A(2) >> P(3) -> Out(4).
+		// Both A>>P and Z>>P share the same process (P, rank 3), so a
+		// process-side edgeRank would tie them and fall back to the lex
+		// tiebreak (A before Z). The current source-side rule instead ranks
+		// them by artifact rank (Z=0 before A=2), producing [Z, A] under P.
+		// A chain fixture can't distinguish these two rules — see #646.
+		const result = sorted("D >> E -> A\nZ >> P\nA >> P -> Out");
+		const intoP = result.filter((e) => e.kind === "input" && e.process === "P");
+		expect(intoP).toEqual([
+			{ kind: "input", artifact: "Z", process: "P" },
+			{ kind: "input", artifact: "A", process: "P" },
+		]);
+	});
+
 	it("within same rank: >> before ->", () => {
 		const result = sorted("[a, b] >> P -> [x, y]");
 		const inputs = result.filter((e) => e.kind === "input");
