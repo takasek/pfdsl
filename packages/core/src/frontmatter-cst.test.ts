@@ -66,6 +66,62 @@ describe("setFrontmatterField", () => {
 				setFrontmatterField(src, "artifact", "ghost", "status", "done"),
 			).toBeNull();
 		});
+
+		it("leaves a sibling field on the last frontmatter line untouched", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: todo",
+				"    criteria: approved",
+				"---",
+				"a >> P -> b",
+				"",
+			);
+			const out = setFrontmatterField(
+				src,
+				"artifact",
+				"spec",
+				"status",
+				"done",
+			);
+			expect(out).toContain("criteria: approved");
+			expect(out).not.toContain('criteria: "approved\r"');
+		});
+
+		it("keeps every line CRLF when the source is CRLF", () => {
+			const src = crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    status: todo",
+				"---",
+				"a >> P -> b",
+				"",
+			);
+			const out = setFrontmatterField(
+				src,
+				"artifact",
+				"spec",
+				"status",
+				"done",
+			);
+			expect(out).not.toBeNull();
+			expect((out as string).replace(/\r\n/g, "")).not.toContain("\n");
+		});
+
+		it("keeps a LF source on LF", () => {
+			const src =
+				"---\nartifact:\n  spec:\n    status: todo\n---\na >> P -> b\n";
+			const out = setFrontmatterField(
+				src,
+				"artifact",
+				"spec",
+				"status",
+				"done",
+			);
+			expect(out).not.toContain("\r");
+		});
 	});
 
 	it("inserts a field that is not yet present", () => {
