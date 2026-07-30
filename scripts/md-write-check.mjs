@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// PostToolUse(Write) hook: runs check-md-linebreaks.mjs's check against a
+// PostToolUse(Write|Edit) hook: runs check-md-linebreaks.mjs's check against a
 // .md file right after it is written (#650). See scripts/lib/md-write-check.mjs
 // for why this catches the file individually instead of waiting for pre-commit.
 //
@@ -10,11 +10,11 @@
 // Usage (wired in .claude/settings.json): node scripts/md-write-check.mjs
 
 import { checkFile, formatViolation } from "./check-md-linebreaks.mjs";
-import { formatLinebreakAdvisory, isMarkdownWrite } from "./lib/md-write-check.mjs";
+import { formatLinebreakAdvisory, isMarkdownChange } from "./lib/md-write-check.mjs";
 import { buildAdvisoryOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
 
 const payload = parseHookPayload(await readStdinText());
-if (!payload || !isMarkdownWrite(payload)) {
+if (!payload || !isMarkdownChange(payload)) {
 	process.exit(0);
 }
 

@@ -1,12 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { formatLinebreakAdvisory, isMarkdownWrite } from "./md-write-check.mjs";
+import { formatLinebreakAdvisory, isMarkdownChange } from "./md-write-check.mjs";
 import { formatViolation } from "../check-md-linebreaks.mjs";
 
-describe("isMarkdownWrite", () => {
+describe("isMarkdownChange", () => {
 	it("flags a Write of a .md file", () => {
-		const result = isMarkdownWrite({
+		const result = isMarkdownChange({
 			hook_event_name: "PostToolUse",
 			tool_name: "Write",
 			tool_input: { file_path: "/repo/docs/foo.md" },
@@ -14,17 +14,17 @@ describe("isMarkdownWrite", () => {
 		assert.equal(result, true);
 	});
 
-	it("ignores Edit — this hook is only about newly written files", () => {
-		const result = isMarkdownWrite({
+	it("flags an Edit of a .md file — most prose arrives that way", () => {
+		const result = isMarkdownChange({
 			hook_event_name: "PostToolUse",
 			tool_name: "Edit",
 			tool_input: { file_path: "/repo/docs/foo.md" },
 		});
-		assert.equal(result, false);
+		assert.equal(result, true);
 	});
 
-	it("ignores a non-.md Write", () => {
-		const result = isMarkdownWrite({
+	it("ignores a non-.md change", () => {
+		const result = isMarkdownChange({
 			hook_event_name: "PostToolUse",
 			tool_name: "Write",
 			tool_input: { file_path: "/repo/scripts/foo.mjs" },
@@ -32,8 +32,17 @@ describe("isMarkdownWrite", () => {
 		assert.equal(result, false);
 	});
 
+	it("ignores tools that write no file", () => {
+		const result = isMarkdownChange({
+			hook_event_name: "PostToolUse",
+			tool_name: "Bash",
+			tool_input: { command: "touch docs/foo.md" },
+		});
+		assert.equal(result, false);
+	});
+
 	it("ignores a payload with no file_path", () => {
-		const result = isMarkdownWrite({ hook_event_name: "PostToolUse", tool_name: "Write", tool_input: {} });
+		const result = isMarkdownChange({ hook_event_name: "PostToolUse", tool_name: "Write", tool_input: {} });
 		assert.equal(result, false);
 	});
 });

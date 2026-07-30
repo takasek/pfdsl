@@ -16,15 +16,18 @@
 // .md Write and there stays exactly one place that defines a violation.
 
 /**
- * Whether this PostToolUse payload is a Write of a .md file.
- * Edit is excluded on purpose: this hook exists to catch the newly-written
- * case roadmap.md described (several fresh files, one late pre-commit
- * catch-all), not every touch of an existing file.
+ * Whether this PostToolUse payload changed a .md file.
+ * Edit counts as well as Write: most prose reaches a .md file through Edit, and
+ * the check reads the whole file either way, so an Edit-shaped violation would
+ * otherwise still wait for pre-commit. Reporting violations the current change
+ * did not introduce is not a concern in practice — CI runs
+ * check-md-linebreaks over every tracked .md, so the tree is clean before the
+ * edit.
  * @param {object} payload PostToolUse hook payload
  * @returns {boolean}
  */
-export function isMarkdownWrite(payload) {
-	if (payload?.tool_name !== "Write") return false;
+export function isMarkdownChange(payload) {
+	if (payload?.tool_name !== "Write" && payload?.tool_name !== "Edit") return false;
 	const filePath = payload?.tool_input?.file_path;
 	return typeof filePath === "string" && filePath.endsWith(".md");
 }
