@@ -51,6 +51,11 @@
             "type": "command",
             "command": "node scripts/worktree-write-guard.mjs",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/roadmap-publish-guard.mjs",
+            "timeout": 10
           }
         ]
       }
