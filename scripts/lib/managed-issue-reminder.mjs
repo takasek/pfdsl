@@ -14,13 +14,22 @@
 // pfd-retro when a commit marks an artifact done.
 
 import { splitSegments, stripLeadingNoise, tokenize } from "./delegation-guard.mjs";
+import { flagValues, parseGhCommand } from "./gh-command.mjs";
 
 /** The URL `gh issue create` prints on success — the only success signal it gives. */
 const CREATED_ISSUE_URL = /https:\/\/[^\s/]+\/[^\s/]+\/[^\s/]+\/issues\/(\d+)/;
 
+/** The flags that carry labels on `gh issue create`. */
+const LABEL_FLAGS = ["--label", "-l"];
+
 /**
  * Whether `command` creates an issue labelled `flow:managed`. `flow:exempt`
  * issues are deliberately absent from the roadmap, so they are left alone.
+ *
+ * The label is read out of the label flags' own values rather than searched for
+ * across the whole line, so a title that happens to contain the label name does
+ * not count — and neither does a `create` appearing as some other flag's value
+ * on an `edit` call.
  * @param {string} command
  * @returns {boolean}
  */
@@ -28,10 +37,10 @@ export function createsManagedIssue(command) {
 	if (typeof command !== "string" || command.trim() === "") return false;
 
 	for (const segment of splitSegments(command)) {
-		const tokens = stripLeadingNoise(tokenize(segment)).filter((token) => !token.quoted);
-		const values = tokens.map((token) => token.value);
-		if (values[0] !== "gh" || values[1] !== "issue" || !values.includes("create")) continue;
-		if (values.some((value) => value.split(/[=,]/).includes("flow:managed"))) return true;
+		const parsed = parseGhCommand(stripLeadingNoise(tokenize(segment)));
+		if (!parsed || parsed.group !== "issue" || parsed.verb !== "create") continue;
+		const labels = flagValues(parsed.args, LABEL_FLAGS).flatMap((value) => value.split(","));
+		if (labels.includes("flow:managed")) return true;
 	}
 	return false;
 }

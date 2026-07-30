@@ -33,6 +33,22 @@ describe("createsManagedIssue", () => {
 		assert.equal(createsManagedIssue("gh issue create --label flow:exempt"), false);
 	});
 
+	it("flags a quoted label value, which is how a colon-bearing label is usually written", () => {
+		assert.equal(createsManagedIssue('gh issue create --title x --label "flow:managed"'), true);
+	});
+
+	it("flags a create behind a gh global flag", () => {
+		assert.equal(createsManagedIssue("gh --repo owner/repo issue create --label flow:managed"), true);
+	});
+
+	it("does not read a label out of some other flag's value", () => {
+		assert.equal(createsManagedIssue('gh issue create --title "flow:managed" --label bug'), false);
+	});
+
+	it("does not treat a stray 'create' in a flag value as the verb", () => {
+		assert.equal(createsManagedIssue("gh issue edit 650 --title create --add-label flow:managed"), false);
+	});
+
 	it("ignores an unlabelled create and other issue verbs", () => {
 		assert.equal(createsManagedIssue("gh issue create --title x --body y"), false);
 		assert.equal(createsManagedIssue("gh issue edit 650 --add-label flow:managed"), false);
