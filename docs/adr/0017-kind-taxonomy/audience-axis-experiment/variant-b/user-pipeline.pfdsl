@@ -1,0 +1,79 @@
+---
+title: Polaris 利用者側パイプライン（変種B・読み手軸・第5のPFD）
+type: runtime-pipeline
+description: "読み手が利用者（消費チーム）である変換。公開以降、消費チームの環境で起きる決定的変換を収める。実行主体はプラットフォームチームでも読み手は利用者という節が混在する"
+layout:
+  direction: LR
+  maxWidth: 130
+
+group:
+  registry:
+    label: レジストリ・公開面
+    color: "#eafaf1"
+  consumer_env:
+    label: 消費チームの環境
+    color: "#fef9e7"
+  portal:
+    label: 社内ポータル
+    color: "#fdebd0"
+
+artifact:
+  sdk_packages:
+    label: SDK パッケージ
+    description: dev-pipeline.pfdsl が生産する。ここでは公開の入力として現れる
+    group: registry
+  published_packages:
+    label: 公開済みパッケージ
+    description: 各レジストリへ公開され消費チームが取得できる状態
+    externalStakeholders: [ Aチーム, Bチーム, Cチーム ]
+    group: registry
+  sdk_version_table:
+    label: SDK バージョン表
+    description: 3言語の最新版・サポート終了予定日の一覧。公開済みパッケージから機械的に決まる
+    group: registry
+  resolved_dependencies:
+    label: 解決済み依存ツリー
+    description: 消費チームのロックファイル上で確定したSDKとその推移的依存
+    group: consumer_env
+  service_build:
+    label: サービスビルド成果物
+    description: SDKを組み込んでビルドされた消費チームのデプロイ可能物
+    externalStakeholders: [ Aチーム, Bチーム, Cチーム ]
+    group: consumer_env
+  portal_page:
+    label: 社内ポータル掲載ページ
+    description: "社内ポータルのSDK案内ページ。読み手は利用者だが、転記の実行主体はプラットフォームチーム。この軸では実行主体と読み手が分裂する"
+    externalStakeholders: [ Aチーム, Bチーム, Cチーム, 社内他部門 ]
+    group: portal
+
+process:
+  publish_registries:
+    label: レジストリ公開
+    description: "npm・PyPI・Go module proxy へ公開する。実行主体は開発者だが出力の読み手は利用者。この軸では dev 側にも置けてしまう"
+    owner: プラットフォームチーム
+  compile_version_table:
+    label: バージョン表生成
+    description: 公開済みパッケージからバージョン表を機械的に組む
+  resolve_dependencies:
+    label: 依存解決
+    description: 消費チームのパッケージマネージャがロックファイルを更新し推移的依存を確定する
+    owner: 各消費チーム
+  build_service:
+    label: サービスビルド
+    description: 解決済み依存を用いて消費チームのサービスをビルドする
+    owner: 各消費チーム
+  transcribe_to_portal:
+    label: ポータルへ転記
+    description: "バージョン表を社内ポータルのページへ写す。判断は要らないが、ポータルに書き込みAPIがないため人が手で行う"
+    owner: プラットフォームチーム
+---
+
+sdk_packages >> publish_registries -> published_packages
+
+published_packages >> compile_version_table -> sdk_version_table
+
+published_packages >> resolve_dependencies -> resolved_dependencies
+
+resolved_dependencies >> build_service -> service_build
+
+sdk_version_table >> transcribe_to_portal -> portal_page

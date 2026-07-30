@@ -1,0 +1,131 @@
+---
+title: Polaris SDK 変換パイプライン（変種A・主語軸）
+type: runtime-pipeline
+description: "主語が機械の変換のみを収める。入力が揃えば決定的に同じ出力を出す変換が対象。プローブ2件（LLM起草・人の転記）を含み、この軸での置き場所の妥当性を検証する"
+layout:
+  direction: LR
+  maxWidth: 140
+
+group:
+  source:
+    label: 一次ソース
+    color: "#e8f4fd"
+  intermediate:
+    label: 中間生成物（保存されるが配布しない）
+    color: "#fef9e7"
+  distributable:
+    label: 配布物
+    color: "#eafaf1"
+  consumer_env:
+    label: 消費チームの環境
+    color: "#fdf2f8"
+  external_surface:
+    label: 社外・他チームが読む面
+    color: "#fdebd0"
+
+artifact:
+  openapi_spec:
+    label: OpenAPI 仕様
+    description: 全SDKの一次ソース。手書きで管理する
+    group: source
+  api_diff:
+    label: API 差分
+    description: 前リリースとのスキーマ差分。破壊的変更の候補を機械的に列挙したもの
+    group: intermediate
+  generated_clients:
+    label: 生成クライアントコード
+    description: TypeScript・Python・Go の3言語ぶんのクライアント実装
+    group: intermediate
+  conformance_report:
+    label: 適合テスト結果
+    description: 3言語の生成コードが同一の契約を満たすかの検証結果
+    group: intermediate
+  sdk_packages:
+    label: SDK パッケージ
+    description: npm・PyPI・Go module の3形式へパッケージングした配布単位
+    group: distributable
+  published_packages:
+    label: 公開済みパッケージ
+    description: 各レジストリへ公開され消費チームが取得できる状態
+    externalStakeholders: [ Aチーム, Bチーム, Cチーム ]
+    group: distributable
+  sdk_version_table:
+    label: SDK バージョン表
+    description: 3言語の最新版・サポート終了予定日の一覧。公開済みパッケージから機械的に決まる
+    group: distributable
+  resolved_dependencies:
+    label: 解決済み依存ツリー
+    description: 消費チームのロックファイル上で確定したSDKとその推移的依存
+    group: consumer_env
+  service_build:
+    label: サービスビルド成果物
+    description: SDKを組み込んでビルドされた消費チームのデプロイ可能物
+    externalStakeholders: [ Aチーム, Bチーム, Cチーム ]
+    group: consumer_env
+  migration_guide_draft:
+    label: 移行ガイド草稿
+    description: API差分から起こした移行手順の草稿。破壊的変更の重大度と回避策の判断を含む
+    group: intermediate
+  portal_page:
+    label: 社内ポータル掲載ページ
+    description: 社内ポータルのSDK案内ページ。ポータルに書き込みAPIがないため人が手で写す
+    externalStakeholders: [ Aチーム, Bチーム, Cチーム, 社内他部門 ]
+    group: external_surface
+
+process:
+  extract_api_diff:
+    label: API 差分抽出
+    description: 前リリースのスキーマと比較し追加・削除・型変更を列挙する
+  generate_clients:
+    label: クライアント生成
+    description: OpenAPI仕様から3言語のクライアントコードを生成する
+  run_conformance:
+    label: 適合テスト実行
+    description: 生成コードが3言語間で同一の契約を満たすか検証する
+  package_release:
+    label: パッケージング
+    description: 生成コードと適合結果から各言語のレジストリ形式へ固める
+  publish_registries:
+    label: レジストリ公開
+    description: npm・PyPI・Go module proxy へ公開する
+    owner: プラットフォームチーム
+  compile_version_table:
+    label: バージョン表生成
+    description: 公開済みパッケージからバージョン表を機械的に組む
+  resolve_dependencies:
+    label: 依存解決
+    description: 消費チームのパッケージマネージャがロックファイルを更新し推移的依存を確定する
+    owner: 各消費チーム
+  build_service:
+    label: サービスビルド
+    description: 解決済み依存を用いて消費チームのサービスをビルドする
+    owner: 各消費チーム
+  draft_migration_guide:
+    label: 移行ガイド起草
+    description: "API差分から移行手順の草稿を書く。LLMエージェントが担当する。破壊的変更の重大度判断と回避策の提案を含むため、同じ差分から同じ草稿が出るとは限らない"
+    owner: ドキュメントLLMエージェント
+  transcribe_to_portal:
+    label: ポータルへ転記
+    description: "バージョン表を社内ポータルのページへ写す。判断は要らないが、ポータルに書き込みAPIがないため人が手で行う"
+    owner: プラットフォームチーム
+---
+
+openapi_spec >> extract_api_diff -> api_diff
+
+openapi_spec >> generate_clients -> generated_clients
+
+generated_clients >> run_conformance -> conformance_report
+
+[conformance_report, generated_clients] >> package_release -> sdk_packages
+
+sdk_packages >> publish_registries -> published_packages
+
+published_packages >> compile_version_table -> sdk_version_table
+
+published_packages >> resolve_dependencies -> resolved_dependencies
+
+resolved_dependencies >> build_service -> service_build
+
+api_diff >> draft_migration_guide -> migration_guide_draft
+
+sdk_version_table >> transcribe_to_portal -> portal_page

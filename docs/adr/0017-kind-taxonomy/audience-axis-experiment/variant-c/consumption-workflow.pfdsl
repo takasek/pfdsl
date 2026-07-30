@@ -1,0 +1,77 @@
+---
+title: Polaris 消費ワークフロー（変種C）
+type: workflow
+description: "判断を含む営みのうち、消費チームが担うもの。プラットフォーム側と分けた根拠は読み手が完全に別であること。ADR-0017 が既に認めるファイル分割の例外に当たり、新しい種別ではない"
+layout:
+  direction: LR
+  maxWidth: 130
+
+group:
+  received:
+    label: プラットフォームチームからの受領物
+    color: "#e8f4fd"
+  consumers:
+    label: 消費チーム（A決済・B在庫・C配送）
+    color: "#fef9e7"
+
+artifact:
+  approved_migration_guide:
+    label: 承認済み移行ガイド
+    description: platform-workflow.pfdsl が生産する。採用判断の入力
+    group: received
+  release_decision:
+    label: リリース判断記録
+    description: platform-workflow.pfdsl が生産する。採用判断の入力
+    group: received
+  service_build:
+    label: サービスビルド成果物
+    description: pipeline.pfdsl が生産する。採用可否判断の材料
+    group: received
+  runbooks:
+    label: ランブック3種
+    description: 障害対応・デプロイ・ロールバックの手順書。参照実績が利用実績に計上される
+    group: received
+  adoption_decision:
+    label: 採用判断記録
+    description: 新バージョンを採用するか見送るかの各チームの決定と理由
+    owner: 各消費チーム
+    externalStakeholders: [ プラットフォームチーム ]
+    group: consumers
+  incident_record:
+    label: 障害対応記録
+    description: ランブックを参照して対応した経緯の記録。手順の逸脱があればその判断も含む
+    owner: 各消費チーム
+    externalStakeholders: [ プラットフォームチーム ]
+    group: consumers
+  feedback_issues:
+    label: フィードバック起票
+    description: バグ報告・改善要望・ドキュメント誤記。消費チームからのプッシュ
+    owner: 各消費チーム
+    externalStakeholders: [ プラットフォームチーム ]
+    group: consumers
+
+process:
+  decide_adoption:
+    label: 採用の是非判断
+    description: 移行コストとビルド結果を見て新バージョンを採用するか見送るかを決める
+    owner: 各消費チーム
+    group: consumers
+  operate_incident:
+    label: 障害対応
+    description: 障害時にランブックを参照して復旧する。手順の逸脱判断を含む
+    owner: 各消費チーム
+    group: consumers
+  file_feedback:
+    label: フィードバック起票
+    description: 採用時の詰まりと障害対応の経緯から報告すべきものを選んで起票する
+    owner: 各消費チーム
+    group: consumers
+---
+
+[approved_migration_guide, release_decision, service_build] >> decide_adoption -> adoption_decision
+
+runbooks >> operate_incident -> incident_record
+
+[adoption_decision, incident_record] >> file_feedback -> feedback_issues
+
+feedback_issues >>? decide_adoption
