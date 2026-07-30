@@ -3,18 +3,30 @@
 `runtime-pipeline.pfdsl` のグラフが運べない、変換境界に関する補足をここに置く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
 
 この図は「システムが動くとき、データは何に変換されるか。変換の境界はどこか」だけに答える。
-互いに独立した2本のチェーンを持つ: .pfdsl ドキュメント変換チェーン（b層）と、スキル配布チェーン（g層）。
+収録範囲は**判断を含まない決定的変換**である（ADR-0035）。
+判断・承認・裁量が変換の一部であるものは workflow.pfdsl 側にあり、実行主体が人か LLM か機械かは判定に使わない。
+
+互いに独立した3本のチェーンを持つ。
+
+- **b層**: .pfdsl ドキュメント変換（source → 構文木 → 正準化グラフ → 各出力）
+- **生成**: 一次ソース → リポ内生成物（スキル・install/・plugin・描画物）
+- **配布・公開**: plugin → 採用リポ／ユーザー環境、タグ → npm・Marketplace
+
+3本は互いにエッジで繋がらない。
 `group` は成果物の存在様式（住処）で切り、層識別は `tags` で表す（両者は独立の軸）。
+
+ファイルが実用上の限界に近づいた場合の分割候補は「読み手が完全に別」の線であり、b層（読み手は CLI ユーザー・VSCode 拡張ユーザー）と生成・配布（読み手はメンテナ・採用リポ）の間に入る。
+現時点では分割していない。
 
 ## a-g 層との対応
 
 - **a（言語仕様）**: `docs/spec/spec.md`。図に現れない — validate が適用する V/W ルールの根拠だが、実装へ反映されるのは設計時であり、実行時に読まれる入力ではないため
 - **b（処理系）**: `tags: [b]` の process 群。実体は `@pfdsl/core` + `graphviz-exporter` + `preview-engine` + `metadata-exporter` の4パッケージ（各 process の `location` 参照）
-- **c（PFD読み書き分析skill）**: `pfdsl_skill`。bのホストとしては図外（次節）、配布素材としてのみ `bundle_skills` の入力に現れる
+- **c（PFD読み書き分析skill）**: `pfdsl_skill`。bのホストとしては図外（次節）だが、`gen_skill` の生成物であり `gen_plugin` の同梱素材でもあるため、その2つの役では図に現れる
 - **d（VSCode拡張）**: `packages/vscode-extension/`。図に現れない — bのホストであり、データを供給も保管もしないため（次節）
-- **e（a,bの配布）**: このファイルの対象外。npm 公開は workflow.pfdsl 側で表現する
-- **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 GitHub Issues バックエンド層）。f2 は規約本文（`ops_skill_l3`）と採用テンプレート（`ops_install_templates`）の2 artifact に分かれる — 前者は手書き、後者は `gen_install` の生成物であり、生成経路は workflow.pfdsl が持つ。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`。L4 はリポ固有で配布対象外・pfd-ops 自体に含まれない。ここでは配布素材としてのみ扱う
-- **g（fの配布）**: `tags: [g]` の process 群。make gen-plugin（組み立て）・Claude Code plugin marketplace（インストール）・check-install-sync.mjs（実配置とランタイム照合）が実装
+- **e（a,bの配布）**: `publish_packages`（タグ起点の npm publish）と `package_vsix` / `upload_vsix`。ADR-0035 までは workflow.pfdsl 側にあったが、タグが押された後の公開変換に判断は入らないためこちらへ移した。リリース可否・版数の判断は workflow.pfdsl の `decide_release` が持ち、この図はその出力 `release_tag` を入力として受ける
+- **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 GitHub Issues バックエンド層）。f2 は規約本文（`ops_skill_l3`）と採用テンプレート（`ops_install_templates`）の2 artifact に分かれる — 前者は手書き、後者は `gen_install` の生成物であり、生成経路も ADR-0035 でこの図へ移った（`ops_install_sources` → `gen_install` → `ops_install_templates`）。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`
+- **g（fの配布）**: `tags: [g]` の process 群。make gen-plugin（組み立て）・Claude Code plugin marketplace（インストール）・check-install-sync.mjs（実配置とランタイム照合）が実装。`gen_plugin` と `gen_install` は生成でもあるため `gen` タグも併せ持つ
 
 ## ホスト（c/d）とbの関係
 
@@ -41,9 +53,25 @@
 - **export_metadata（`metadata-exporter` の `extractMetadata(graph, frontmatter)`）**: VSCode 拡張の `pfdsl.export`（`export.ts`）のみが呼ぶ
 - **diff_graphs（`diff.ts` の `diffGraphs(a, b, fmA, fmB)`）**: 入力は2組の（グラフ, frontmatter）。この図は単一ドキュメントの変換を軸にモデル化しているため、比較対象の2つ目は図上に現れない
 
+生成・公開チェーン（ADR-0035 で workflow.pfdsl から移動）:
+
+- **gen_skill（`scripts/gen-skill.mjs`）**: 一次ソース（skill-template / spec / samples / examples / review-perspectives）からリポ内 pfdsl スキルを組む。`references/*.md` の生成は `packages/cli/dist` に触れない `scripts/gen-skill-refs.mjs` に切り出し済みで、SKILL.md（`pfdsl help` 埋め込み）のみ dist を必要とする（#586）
+- **gen_install（`scripts/lib/install-templates.mjs` の明示リスト）**: repo ルートの配布ソースから `install/` ミラーを一方向で再生成する。生成の向きは repo ルート → `install/` → `plugin/` の一本のみ（#547 で双方向 sync を廃止）
+- **gen_plugin（`scripts/gen-plugin.mjs`）**: 同梱素材を `plugin/pfdsl/` へ集約し `plugin.json` を CLI version から書く。内部で gen_install を実行するため、plugin が古い `install/` から組まれることはない
+- **render_previews（`make gen-samples`）**: 機能カタログとロードマップを dot/svg に描画する。`.dot` / README は graphviz-exporter、`.svg` は preview-engine の wasm graphviz で生成され、いずれも決定論的（#588）
+- **publish_packages**: `v*` タグで `@pfdsl/cli`、`lib-v*` タグでライブラリ群を GitHub Actions が npm publish する（Trusted Publishing / OIDC）。ライブラリは core → graphviz-exporter → preview-engine の順
+- **package_vsix / upload_vsix**: `make vscode-package` が `.vsix` を生成し、人が marketplace.visualstudio.com へアップロードする
+
+**判断の境界は `release_tag` にある。** リリースするか・どの版で切るかは workflow.pfdsl の `decide_release` が判断し、タグが押された後の変換に判断は入らない。
+そのため公開チェーン全体がこの図の収録対象になる。
+
+**`upload_vsix` はこの図で唯一の人手ノードである。** 判断を含まないため、実行主体が人であってもこちらに置く（ADR-0035）。
+機械の変換チェーンの中で1ノードだけ浮く構図が、そのまま自動化候補の指摘になっている。
+marketplace の発行 API を使う経路を整えればこのノードは消える。
+
 ## plugin 配布チェーンの依存
 
-- **同梱対象リストの一元化（`assemble_plugin`）**: 同梱スキル・コマンド・agent の列挙は `scripts/gen-plugin.mjs` のみが持つ（旧 skill sync 時代の tsup.config.ts との二重ハードコードは解消済み）。スキル・agent を追加するときは gen-plugin.mjs を更新する。
+- **同梱対象リストの一元化（`gen_plugin`）**: 同梱スキル・コマンド・agent の列挙は `scripts/gen-plugin.mjs` のみが持つ（旧 skill sync 時代の tsup.config.ts との二重ハードコードは解消済み）。スキル・agent を追加するときは gen-plugin.mjs を更新する。PFD 側の照合先は workflow.pfdsl companion の「配布スキルの新規追加時の横断照合」が一次情報。ADR-0035 まではこのプロセスが `assemble_plugin` としてこの図に、`gen_plugin` として workflow.pfdsl に二重にモデル化されており、入力列挙が乖離していた（`pfd_lens_agent` / `implementer_agent` がこちらに無かった）。
 - **`deploy_install_layer` のコピー元は plugin 同梱 canonical**: `check-install-sync.mjs --deploy` は `<skill root>/install/` から採用リポルートへコピーする。ローカル編集された配置済みファイルは hash 不一致として skip・警告され、`--overwrite-local-edits` でのみ上書きされる（ADR-0028）。canonical から消えた旧ファイルは、ローカル編集が無ければフラグ無しで削除され、編集を抱えている場合のみ独立した `--delete-edited-orphans` を要する（#603。単一 `--force` は掃除の意図で渡したときに新パスのカスタマイズまで巻き戻した）。canonical 側のリネームで新旧パスが `missing` / `orphaned` に分かれた場合は `Possible renames` として対で報告され、旧パスのローカル編集を新パスへ引き継ぐ手掛かりになる。
 - **採用リポの drift 検知はランタイムのみ**: `check-pfd-ops-sync.yml` は採用リポへ配布されない。pfd-ops 発火時の `check_install_sync` が唯一の安全網で、警告への対応は pfd-ops SKILL.md「配置ファイルの鮮度セルフチェック」が定める。
 
