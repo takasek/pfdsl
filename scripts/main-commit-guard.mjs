@@ -12,7 +12,7 @@
 
 import { tryGit } from "./lib/run-exec.mjs";
 import { evaluateMainCommitGuard, isGitCommitCommand } from "./lib/main-commit-guard.mjs";
-import { buildDenyOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
+import { buildPermissionOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
 
 const payload = parseHookPayload(await readStdinText());
 if (!payload) process.exit(0);
@@ -30,6 +30,6 @@ const currentBranch = branch.ok ? branch.out.trim() : undefined;
 
 const result = evaluateMainCommitGuard(payload, { currentBranch });
 if (result.decision === "deny") {
-	console.log(JSON.stringify(buildDenyOutput(result)));
+	console.log(JSON.stringify(buildPermissionOutput(result)));
 }
 process.exit(0);

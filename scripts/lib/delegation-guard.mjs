@@ -1,7 +1,7 @@
 // Blocks outward-facing Bash commands (push, PR/issue mutation) when they
 // come from a delegated subagent rather than from the caller (#554).
 //
-// buildDenyOutput/parseHookPayload are shared with the other guard hooks
+// buildPermissionOutput/parseHookPayload are shared with the other guard hooks
 // via lib/hook-io.mjs (#650) rather than redefined here.
 // Why a hook and not permissions/frontmatter:
 //   - agent frontmatter `tools:` is tool-granularity, so any agent holding
@@ -19,7 +19,7 @@
 // caller re-checking `git log origin/<branch>..HEAD` and the PR list when the
 // delegation returns.
 
-import { buildDenyOutput, parseHookPayload } from "./hook-io.mjs";
+import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 /** Agents permitted to perform outward-facing actions. Publishing is their job. */
 export const DEFAULT_ALLOWED_AGENTS = ["issue-worker"];
@@ -255,7 +255,7 @@ export function runDelegationGuard(inputText) {
 
 	const result = evaluateDelegationGuard(payload);
 	if (result.decision === "deny") {
-		return { shouldOutput: true, output: buildDenyOutput(result) };
+		return { shouldOutput: true, output: buildPermissionOutput(result) };
 	}
 	return { shouldOutput: false };
 }

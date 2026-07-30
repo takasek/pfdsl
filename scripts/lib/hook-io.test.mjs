@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildDenyOutput, parseHookPayload } from "./hook-io.mjs";
+import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 describe("parseHookPayload", () => {
 	it("parses a valid JSON payload", () => {
@@ -15,14 +15,25 @@ describe("parseHookPayload", () => {
 	});
 });
 
-describe("buildDenyOutput", () => {
+describe("buildPermissionOutput", () => {
 	it("builds a PreToolUse deny response carrying the reason", () => {
-		const output = buildDenyOutput({ reason: "blocked for testing" });
+		const output = buildPermissionOutput({ decision: "deny", reason: "blocked for testing" });
 		assert.deepEqual(output, {
 			hookSpecificOutput: {
 				hookEventName: "PreToolUse",
 				permissionDecision: "deny",
 				permissionDecisionReason: "blocked for testing",
+			},
+		});
+	});
+
+	it("builds an ask response, for guards that hand the call to the human", () => {
+		const output = buildPermissionOutput({ decision: "ask", reason: "confirm first" });
+		assert.deepEqual(output, {
+			hookSpecificOutput: {
+				hookEventName: "PreToolUse",
+				permissionDecision: "ask",
+				permissionDecisionReason: "confirm first",
 			},
 		});
 	});

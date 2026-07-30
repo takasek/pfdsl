@@ -33,14 +33,20 @@ export function parseHookPayload(text) {
 }
 
 /**
- * Build the PreToolUse hook response for a deny decision.
- * @param {{reason: string}} result
+ * Build the PreToolUse hook response for a permission decision.
+ *
+ * "ask" exists because a PreToolUse hook has no advisory channel that reaches
+ * the model: `hookSpecificOutput.additionalContext` is PostToolUse-only, and
+ * stderr on exit 0 is not fed back. So a PreToolUse rule that should not hard-
+ * block (command-usage-guard's npx case, roadmap-publish-guard) routes through
+ * the permission prompt instead of printing a note nobody reads.
+ * @param {{decision: "deny" | "ask", reason: string}} result
  */
-export function buildDenyOutput(result) {
+export function buildPermissionOutput(result) {
 	return {
 		hookSpecificOutput: {
 			hookEventName: "PreToolUse",
-			permissionDecision: "deny",
+			permissionDecision: result.decision,
 			permissionDecisionReason: result.reason,
 		},
 	};

@@ -13,7 +13,7 @@
 import { dirname, resolve } from "node:path";
 
 import { evaluateWorktreeWriteGuard } from "./lib/worktree-write-guard.mjs";
-import { buildDenyOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
+import { buildPermissionOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
 import { tryGit } from "./lib/run-exec.mjs";
 
 /**
@@ -38,6 +38,6 @@ const roots = typeof cwd === "string" ? resolveRoots(cwd) : null;
 
 const result = evaluateWorktreeWriteGuard(payload, roots);
 if (result.decision === "deny") {
-	console.log(JSON.stringify(buildDenyOutput(result)));
+	console.log(JSON.stringify(buildPermissionOutput(result)));
 }
 process.exit(0);
