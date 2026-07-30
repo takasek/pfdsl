@@ -94,7 +94,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 - [ ] 実装を subagent へ委譲した場合、戻り時に `git log origin/<branch>..HEAD` と open PR 一覧を確認し、委譲先がブリーフの留保作業（push・PR 作成・issue 操作）を実行していないか照合した
 - [ ] `/simplify` または `/code-review` を実施した回は、実施直後（コミット作成前）に `Review-Measurement` trailer をそのコミットのメッセージへ含めた。レビュー実施とコミット作成の間に他の作業（PR 作成・push 等）を挟むと記載を失念しやすい — 実施済みで未記載のまま次の作業に進んでいないか、コミット直前に再確認する
 
-**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。`.claude/skills/pfdsl/` は生成物かつ gitignore 済（#348）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — CI（test.yml）と同様に `make bootstrap-pfdsl-skill` を先に実行する。ビルド後は `npx @pfdsl/cli@latest` でなく `node packages/cli/dist/cli.js` を使う（`npx` は npm の公開バージョンを使うため、未リリースの status 値等が V008 エラーになる）。
+**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。`.claude/skills/pfdsl/` は生成物かつ gitignore 済（#348）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — CI（test.yml）と同様に `make bootstrap-pfdsl-skill` を先に実行する。
 
 **古いビルドに依るローカル検証**: `scripts/stale-dist-guard.mjs`（PreToolUse hook、`.claude/settings.json` で配線）が typecheck・test の実行直前に `dist/` の鮮度を検査し、ソースより古いパッケージを stderr で知らせる。ブランチを切り替えても `dist/` は前ブランチのビルドのまま残り、`pnpm -r typecheck` は他パッケージをその型定義越しに見るため、ローカル green のまま CI（先に `pnpm -r build` する）で落ちうる（#642 の `TS6059`）。警告が出たら `pnpm -r build` してから測り直す。
 
@@ -110,7 +110,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる。
 
-**`flow:managed` issue の起票と roadmap 追加は同時に行う**（→ workflow.pfdsl `file_issues` プロセスの description 参照）。`flow:exempt`（保守・基盤・修正など roadmap 非管理。判定は L3 reference の「ラベル判定基準」）は roadmap に登録しない。
+**`flow:exempt` は roadmap に登録しない**（保守・基盤・修正など roadmap 非管理。判定は L3 reference の「ラベル判定基準」）。
 
 **新 frontmatter フィールドを追加した場合**: 対応する feature sample（`docs/samples/`）を同一 PR で追加する（生成物 `.dot` / README / `references/` の再生成・ドリフト検査は pre-commit と CI が強制する）。加えて `packages/core/src/__fixtures__/pipeline-scale.pfdsl` にもそのフィールドを追記する（fixture がスナップショットの入力であり、feature sample とは別に網羅性を担う）。
 
@@ -125,8 +125,6 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 **spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際は、前バージョンの spec artifact への `revises:` を新バージョン artifact に設定する（例: `spec_v0011.revises: spec_v0010`）。`>>?` フィードバック入力は使わない — V011（strict mode の feedback 到達性検査）は `>>?` を前方到達可能な修正ループとして検査するが、版の前後関係はそれに当たらず誤検出になる（#480 で `spec_v006 >>? integrate_spec` 等を `revises:` に置き換えて解消）。
 
 **`integrate_spec_vXXX` の入力列挙**: `integrate_spec_vXXX` の通常入力には、そのバージョンで spec に統合される全ての変更を引き起こした artifact を列挙する。「実装が完了した artifact のうち、未統合のもの」を漏らさず書く（例: basepath と ready_cmd の両方が v0.0.10 の変更点なら `[basepath, ready_cmd] >> integrate_spec_v0010`）。
-
-**publish 系 artifact を新規追加するとき**: 追加前に `make release-status` を実行し、現行リリース済みバージョンを確認してから次バージョンの artifact を起こす。確認せずに追加すると、已リリースのバージョンを「次期」として登録する drift が発生する。
 
 **publish_cli_vXXXX の入力列挙**: そのバージョンに含まれる全実装 artifact を入力として列挙する。実装 artifact の追加と同一サイクルで publish の入力集合も更新する（後回しにすると artifact が publish チェーンから切れる）。
 
