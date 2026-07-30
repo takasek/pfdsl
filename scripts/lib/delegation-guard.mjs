@@ -19,6 +19,7 @@
 // caller re-checking `git log origin/<branch>..HEAD` and the PR list when the
 // delegation returns.
 
+import { flagValues, parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 /** Agents permitted to perform outward-facing actions. Publishing is their job. */
@@ -152,25 +153,9 @@ export function gitSubcommand(tokens) {
 	return null;
 }
 
-function ghApiMethod(tokens) {
-	for (let i = 2; i < tokens.length; i++) {
-		const { value } = tokens[i];
-		if (value === "-X" || value === "--method") return tokens[i + 1]?.value ?? null;
-		if (value.startsWith("--method=")) return value.slice("--method=".length);
-	}
-	return null;
-}
-
-function ghVerb(tokens) {
-	// tokens[1] is the group (pr, issue, run, ...); the verb is the next
-	// non-flag token after it.
-	for (let i = 2; i < tokens.length; i++) {
-		const { value, quoted } = tokens[i];
-		if (quoted) return null;
-		if (value.startsWith("-")) continue;
-		return value;
-	}
-	return null;
+function ghApiMethod(args) {
+	const [method] = flagValues(args, ["-X", "--method"]);
+	return method ?? null;
 }
 
 /**
@@ -195,19 +180,21 @@ export function findOutwardCommand(command) {
 		}
 
 		if (head.value === "gh") {
-			const group = tokens[1];
-			if (!group || group.quoted || group.value.startsWith("-")) continue;
-			if (group.value === "api") {
-				const method = ghApiMethod(tokens);
+			// The group is not necessarily tokens[1] — a global flag can come
+			// first, and reading the flag as the group made this guard fail open
+			// on `gh -R owner/repo pr create` (review finding, #650).
+			const parsed = parseGhCommand(tokens);
+			if (!parsed) continue;
+			if (parsed.group === "api") {
+				const method = ghApiMethod(parsed.args);
 				// No explicit method means GET, which only reads.
 				if (method && method.toUpperCase() !== "GET") return `gh api ${method.toUpperCase()}`;
 				continue;
 			}
-			const verb = ghVerb(tokens);
 			// An unrecognised or absent verb is treated as mutating: guessing
 			// in the permissive direction is what this guard exists to prevent.
-			if (verb === null) return `gh ${group.value}`;
-			if (!READ_ONLY_GH_VERBS.has(verb)) return `gh ${group.value} ${verb}`;
+			if (parsed.verb === null) return `gh ${parsed.group}`;
+			if (!READ_ONLY_GH_VERBS.has(parsed.verb)) return `gh ${parsed.group} ${parsed.verb}`;
 			continue;
 		}
 	}
