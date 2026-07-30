@@ -1,10 +1,10 @@
 ---
-title: pfdsl CLI 変換パイプライン
+title: pfdsl 変換パイプライン
 type: runtime-pipeline
-description: "pfdslソースが実行時に何へ変換されるか、変換の境界はどこか。独立した2本のチェーンを持つ: .pfdslドキュメント変換（b: 処理系）とスキル配布（g: plugin）。処理系の呼び出し元（c: pfdsl skill / d: VSCode拡張）はパイプラインを実行するホストでありデータではないため、図には現れない（pfdsl_skillのみ配布素材として登場）。a-g層との対応と設計判断はsibling runtime-pipeline.md参照"
+description: "判断を含まない決定的変換を収める（ADR-0035）。3本の独立チェーンを持つ: .pfdslドキュメント変換（b: 処理系）・生成（一次ソース→スキル・plugin・描画物）・配布（plugin→採用リポ）。判断を含む営みはworkflow.pfdsl側。処理系の呼び出し元（c: pfdsl skill / d: VSCode拡張）はパイプラインを実行するホストでありデータではないため図には現れない。a-g層との対応と設計判断はsibling runtime-pipeline.md参照"
 layout:
   direction: LR
-  maxWidth: 140
+  maxWidth: 160
 
 group:
   in_memory:
@@ -13,9 +13,18 @@ group:
   run_outputs:
     label: 実行結果（stdout・ファイル・エディタ表示）
     color: "#f3e8fd"
+  gen_sources:
+    label: 生成の一次ソース（workflow.pfdsl が生産）
+    color: "#fdf2f8"
   skill_sources:
-    label: 配布素材（このリポの .claude/）
+    label: 手書き配布素材（このリポの .claude/）
     color: "#fef9e7"
+  repo_generated:
+    label: リポ内生成物（コミット対象・手編集禁止）
+    color: "#e8f8f5"
+  published:
+    label: 公開物（npm・Marketplace）
+    color: "#fde8e8"
   adopter_repo:
     label: 採用リポ
     color: "#eafaf1"
@@ -39,6 +48,12 @@ tag:
   g:
     label: "g: fの配布"
     style: { color: "#16a085" }
+  gen:
+    label: "生成（一次ソース→リポ内生成物）"
+    style: { color: "#8e44ad" }
+  manual_no_judgment:
+    label: "人手だが判断なし（自動化候補）"
+    style: { color: "#c0392b" }
 
 artifact:
   pfdsl_source:
@@ -97,12 +112,50 @@ artifact:
     criteria: meta sortコマンドが実装され動作確認済み
     externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
     group: run_outputs
-  pfdsl_skill:
-    label: PFD読み書き分析skill
-    description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため、図にはassemble_pluginへの素材提供のみが現れる"
-    location: ../.claude/skills/pfdsl/
-    group: skill_sources
-    tags: [ c ]
+  spec:
+    label: 言語仕様書
+    description: "workflow.pfdsl の maintain_spec が生産する。gen_skill・gen_plugin の一次ソースとして現れる"
+    location: ../docs/spec/spec.md
+    group: gen_sources
+  skill_template:
+    label: スキルテンプレート
+    description: "workflow.pfdsl の maintain_template が生産する。gen-skill.mjs がこれを読み込んで pfdsl_skill を生成する"
+    location: ../scripts/skill-template/SKILL.md
+    group: gen_sources
+  quality_guide:
+    label: 品質ガイド
+    description: "workflow.pfdsl の maintain_template が生産する。pfdsl スキルに references として同梱される"
+    location: ../docs/quality-guide.md
+    group: gen_sources
+  feature_samples:
+    label: 機能カタログ
+    description: "workflow.pfdsl の maintain_samples が生産する。skill の references/samples.md と描画物の生成元"
+    location: ../docs/samples/
+    group: gen_sources
+  review_perspectives:
+    label: レビュー観点集
+    description: "workflow.pfdsl の distill_ops が生産する。pfdsl スキルに references として同梱される"
+    location: ../docs/review-perspectives.md
+    group: gen_sources
+  roadmap_pfdsl:
+    label: issue 依存グラフ
+    description: "workflow.pfdsl の map_deps が生産する。描画対象として render_previews の入力になる"
+    location: roadmap.pfdsl
+    group: gen_sources
+  toolchain:
+    label: ツールチェーン
+    description: "workflow.pfdsl の merge_pr が生産する。plugin.json の version 由来であり、公開・パッケージングの素材でもある"
+    location: ../packages/
+    group: gen_sources
+  ops_install_sources:
+    label: pfd-ops 配布ソース（repo ルート）
+    description: "採用リポへ配る監査スクリプトと GitHub Actions workflow の一次情報。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install-templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）"
+    location: [ ../scripts/pfdsl/, ../.github/workflows/pfdsl-flow-on-issue-close.yml ]
+    group: gen_sources
+  release_tag:
+    label: リリースタグ
+    description: "workflow.pfdsl の decide_release が生産する v* / lib-v* / vscode-v* タグ。判断の終端であり、ここから先の公開変換は判断を含まない"
+    group: gen_sources
   ops_skill_general:
     label: PFD運用フレームワーク 汎用層
     description: "pfd-opsのL1（汎用手順）+L2（ディスパッチ）。SKILL.md本文で配布。L4（リポ固有）は配布対象外でpfd-ops自体に含まれない。内容の一次情報はworkflow.pfdslのops_skill_general"
@@ -115,27 +168,94 @@ artifact:
     location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
     group: skill_sources
     tags: [ f2 ]
-  ops_install_templates:
-    label: pfd-ops 採用テンプレート（install/）
-    description: "採用リポへ配置されるテンプレート一式。生成の経路（repoルートのソース → install/）はworkflow.pfdslのgen_installが持ち、この図では配布素材として現れる。内容の一次情報はworkflow.pfdslのops_install_templates"
-    location: ../.claude/skills/pfd-ops/install/
-    group: skill_sources
-    tags: [ f2 ]
   retro_skill:
     label: ふりかえり監査スキル
-    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_dirへの同梱対象としてのみ扱う"
+    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う"
     location: ../.claude/skills/pfd-retro/
     group: skill_sources
   ecosystem_skill:
     label: PFDセット構築スキル
-    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_dirへの同梱対象としてのみ扱う"
+    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う"
     location: ../.claude/skills/pfd-ecosystem/
     group: skill_sources
   grill_skill:
     label: 後ろ向き対話構築スキル
-    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_dirへの同梱対象としてのみ扱う"
+    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う"
     location: ../.claude/skills/pfd-grill/
     group: skill_sources
+  pfd_lens_agent:
+    label: pfd-lens agent
+    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
+    location: ../.claude/agents/pfd-lens.md
+    group: skill_sources
+  implementer_agent:
+    label: 実装委譲agent
+    description: "agent定義はplugin同梱対象。同居するPreToolUseガードはリポ固有のため配布しない（内容の一次情報はworkflow.pfdsl）。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
+    location: ../.claude/agents/pfd-implementer.md
+    group: skill_sources
+  pfdsl_skill:
+    label: PFD読み書き分析skill（リポ内）
+    description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。make gen-skillで再生成し手編集禁止。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため図には現れない。gen_pluginの入力ではない — plugin側のpfdslスキルは同じ一次ソースから独立再生成されるため、この成果物をコピーする経路は存在しない"
+    criteria: make gen-skill が差分なしで完了する
+    externalStakeholders: [ このリポのAIエージェント ]
+    location: ../.claude/skills/pfdsl/
+    group: repo_generated
+    tags: [ c, gen ]
+  ops_install_templates:
+    label: pfd-ops 採用テンプレート（install/）
+    description: "採用リポへ配置されるテンプレート一式。make gen-installがrepoルートのソースから一方向で再生成する生成物であり手編集しない。内容の一次情報はworkflow.pfdslのops_install_sources"
+    criteria: repo ルートのソースから make gen-install で再生成でき、check-pfd-ops-sync.yml が生成物一致と identity の両方で通過する
+    location: ../.claude/skills/pfd-ops/install/
+    group: repo_generated
+    tags: [ f2, gen ]
+  plugin_dist:
+    label: 配布プラグインディレクトリ
+    description: "make gen-plugin が組み立てる plugin/pfdsl/（コミット対象、git-subdir marketplace source としてそのまま配布される）。canonical スキル群との identity は check-gen-plugin.yml が CI 強制する。plugin.json の version は toolchain の CLI package.json 由来。旧版ではこの図のplugin_dirとworkflow.pfdslのplugin_distが同一物の二重モデル化だった（ADR-0035で統合）"
+    criteria: make gen-plugin が実装され、check-gen-plugin.yml のCI強制込みで動作確認済み
+    location: ../plugin/pfdsl/
+    group: repo_generated
+    tags: [ gen ]
+  sample_previews:
+    label: サンプル描画物
+    description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samplesで再生成。.dot / README は graphviz-exporter、.svg は preview-engine の vitest が pre-commit と CI でドリフト検知する。GitHub 上の閲覧用終端成果物"
+    criteria: make gen-samples が差分なしで完了し、README からのリンクが正常
+    externalStakeholders: [ GitHub 閲覧者 ]
+    location: ../docs/samples/
+    group: repo_generated
+    tags: [ gen ]
+  vsix_package:
+    label: .vsix パッケージ
+    description: "make vscode-package が生成する VS Code 拡張の配布アーカイブ。marketplace へのアップロード素材"
+    criteria: make vscode-package が .vsix を生成し、ローカルインストールで動作確認済み
+    group: repo_generated
+    tags: [ gen ]
+  published_cli:
+    label: npm 公開 CLI
+    description: "外部利用者向け配布物。v* tag push で GitHub Actions が自動 publish する（Trusted Publishing / OIDC）。plugin_dist の marketplace.json も同じ v* タグへ pin される"
+    criteria: npm show @pfdsl/cli version が期待バージョンを返す
+    externalStakeholders: [ 外部CLIユーザー, CI ]
+    location: https://www.npmjs.com/package/@pfdsl/cli
+    group: published
+  published_libraries:
+    label: npm 公開ライブラリ群
+    description: "@pfdsl/core / graphviz-exporter / preview-engine の npm 公開物。lib-v* tag push で GitHub Actions が自動 publish する（core → graphviz-exporter → preview-engine 順）"
+    criteria: npm show @pfdsl/core version が期待バージョンを返す
+    externalStakeholders: [ 外部ライブラリ利用者 ]
+    location: https://www.npmjs.com/package/@pfdsl/core
+    group: published
+  published_ext:
+    label: Marketplace 公開 extension
+    description: "外部利用者向け VS Code 拡張配布物。.vsix を marketplace.visualstudio.com へアップロードした結果"
+    criteria: Marketplace の takasek.pfdsl version が期待バージョンを返す
+    externalStakeholders: [ VSCode拡張ユーザー ]
+    location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
+    group: published
+  installed_plugin:
+    label: 導入済みプラグイン
+    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。gen_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）"
+    criteria: marketplace経由の導入が動作確認済み（gen_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agentが一括で届く）
+    externalStakeholders: [ 採用リポのAIエージェント ]
+    group: adopter_env
   installed_l3_layer:
     label: 導入済みL3レイヤー
     description: "plugin同梱install/由来ファイル（GitHub Actionsワークフロー・監査スクリプト）の採用リポルートへの実配置結果"
@@ -148,17 +268,6 @@ artifact:
     criteria: audit-issues-flow.mjs --fix によるラベル自動生成が実装され動作確認済み
     externalStakeholders: [ 採用リポのGitHubリポジトリ ]
     group: adopter_repo
-  plugin_dir:
-    label: 配布プラグインディレクトリ
-    description: "make gen-plugin が組み立てる plugin/pfdsl/（コミット対象、git-subdir marketplace source としてそのまま配布される）。canonical スキル群との identity は check-gen-plugin.yml が CI 強制する"
-    criteria: make gen-plugin が実装され、check-gen-plugin.yml のCI強制込みで動作確認済み
-    location: ../plugin/pfdsl/
-  installed_plugin:
-    label: 導入済みプラグイン
-    description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。assemble_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）"
-    criteria: marketplace経由の導入が動作確認済み（assemble_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agentが一括で届く）
-    externalStakeholders: [ 採用リポのAIエージェント ]
-    group: adopter_env
   drift_report:
     label: 配置鮮度警告
     description: "配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、および上流plugin versionとのskew警告（stdout）。警告が出たら--deployでrefreshする"
@@ -219,12 +328,45 @@ process:
     command: node packages/cli/dist/cli.js meta sort
     location: ../packages/core/src/sort.ts
     tags: [ b ]
-  assemble_plugin:
+  gen_skill:
+    label: スキル生成
+    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）からリポ内 pfdsl スキルを再生成する。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/gen-skill-refs.mjs に切り出し済み。SKILL.md（pfdsl help 埋め込み）のみ dist 必須のまま（#586）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制する"
+    command: make gen-skill
+    location: ../scripts/gen-skill.mjs
+    tags: [ gen ]
+  gen_install:
+    label: install/ 生成
+    description: "repo ルートの配布ソースから pfd-ops スキルの install/ ミラーを一方向で再生成する（#547 で双方向 sync を廃止）。生成の向きは repo ルートのソース → install/ → plugin/ の一本のみ。gen_plugin が内部で実行するため plugin が古い install/ から組まれることはない。drift は pre-commit と check-pfd-ops-sync.yml が強制する"
+    command: make gen-install
+    location: ../scripts/lib/install-templates.mjs
+    tags: [ gen, g ]
+  gen_plugin:
     label: プラグイン組み立て
-    description: "スキルツリー（pfdslはgen-skillで生成、pfd-ops・pfd-ecosystem・pfd-grill・pfd-retroは.claude/skills/からコピー）とcommands/pfd-*.md・agents/pfd-lens.mdをplugin/pfdsl/へ集約しplugin.jsonをCLI versionから生成する。同梱対象リストはgen-plugin.mjsに一元化。本数を数字で書かない — スキルが増えても文面が古びないよう列挙で持つ"
+    description: "スキルツリー（pfdslはgen-skillと同じ一次ソースから独立再生成、pfd-ops・pfd-ecosystem・pfd-grill・pfd-retroは.claude/skills/からコピー）とcommands/pfd-*.md・agentsをplugin/pfdsl/へ集約しplugin.jsonをCLI versionから生成する。同梱対象リストはgen-plugin.mjsに一元化。本数を数字で書かない — スキルが増えても文面が古びないよう列挙で持つ。旧版ではこの図のassemble_pluginとworkflow.pfdslのgen_pluginに二重モデル化されており、入力列挙が乖離していた（ADR-0035で統合）"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
-    tags: [ g ]
+    tags: [ gen, g ]
+  render_previews:
+    label: サンプル描画
+    description: "機能カタログとロードマップを dot/svg に描画する。toolchain のビルド（make build-deps）が実行前提だがコンテンツ依存ではない — 呼び出し元ソフトウェアと同様、入力エッジに含めない。.dot / .svg / README はいずれも決定論的に生成される（#588）"
+    command: make gen-samples
+    location: ../scripts/gen-samples.mjs
+    tags: [ gen ]
+  publish_packages:
+    label: タグ起点の自動公開
+    description: "v* tag push で @pfdsl/cli、lib-v* tag push でライブラリ群を GitHub Actions が npm publish する（Trusted Publishing / OIDC）。リリースするか・どの版で切るかの判断はworkflow.pfdslのdecide_releaseが持ち、タグが押された後この変換に判断は入らない"
+    location: ../.github/workflows/publish-cli.yml
+    tags: [ gen ]
+  package_vsix:
+    label: vsix 生成
+    description: "vscode-extension を .vsix へパッケージングする。vscode-v* タグと同じ版で切る"
+    command: "make vscode-package VERSION=<VERSION>"
+    tags: [ gen ]
+  upload_vsix:
+    label: marketplace へ手動アップロード
+    description: "生成済み .vsix を marketplace.visualstudio.com へ人が手でアップロードする。判断は不要で、発行APIを使う経路を整えていないという境界の問題だけが理由。この図で唯一の人手ノードであり自動化候補（ADR-0035の判定基準により、判断がないためworkflowでなくこちらに置く）"
+    owner: takasek
+    tags: [ manual_no_judgment ]
   install_plugin:
     label: プラグインインストール
     description: "外部ユーザーがClaude Codeのmarketplace機構で導入・更新する（/plugin install、更新は/plugin marketplace update）。リポ内コミットを伴わない"
@@ -267,9 +409,21 @@ dot_graph >> export_image -> rendered_image
 
 [normalized_graph, parsed_doc] >> diff_graphs -> diff_report
 
-[ecosystem_skill, grill_skill, ops_install_templates, ops_skill_general, ops_skill_l3, pfdsl_skill, retro_skill] >> assemble_plugin -> plugin_dir
+[feature_samples, quality_guide, review_perspectives, skill_template, spec] >> gen_skill -> pfdsl_skill
 
-plugin_dir >> install_plugin -> installed_plugin
+ops_install_sources >> gen_install -> ops_install_templates
+
+[ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
+
+[feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
+
+[release_tag, toolchain] >> publish_packages -> [published_cli, published_libraries]
+
+[release_tag, toolchain] >> package_vsix -> vsix_package
+
+vsix_package >> upload_vsix -> published_ext
+
+plugin_dist >> install_plugin -> installed_plugin
 
 installed_plugin >> deploy_install_layer -> installed_l3_layer
 

@@ -1,0 +1,70 @@
+---
+title: Polaris 開発者側パイプライン（変種B・読み手軸）
+type: runtime-pipeline
+description: "読み手が開発者（プラットフォームチーム）である変換。社内で完結し、まだ消費チームの手に渡らない段階までを収める。配布境界をどこに引くかが争点になる"
+layout:
+  direction: LR
+  maxWidth: 130
+
+group:
+  source:
+    label: 一次ソース
+    color: "#e8f4fd"
+  intermediate:
+    label: 中間生成物
+    color: "#fef9e7"
+
+artifact:
+  openapi_spec:
+    label: OpenAPI 仕様
+    description: 全SDKの一次ソース。手書きで管理する
+    group: source
+  api_diff:
+    label: API 差分
+    description: 前リリースとのスキーマ差分
+    group: intermediate
+  generated_clients:
+    label: 生成クライアントコード
+    description: TypeScript・Python・Go の3言語ぶんのクライアント実装
+    group: intermediate
+  conformance_report:
+    label: 適合テスト結果
+    description: 3言語の生成コードが同一の契約を満たすかの検証結果
+    group: intermediate
+  sdk_packages:
+    label: SDK パッケージ
+    description: 各レジストリ形式へパッケージングした配布単位。公開前なので読み手はまだ開発者のみ
+    group: intermediate
+  migration_guide_draft:
+    label: 移行ガイド草稿
+    description: "API差分から起こした移行手順の草稿。最終的な読み手は消費チームだが、草稿の段階での読み手はレビュアーである開発者。この軸では置き場所が割れる"
+    group: intermediate
+
+process:
+  extract_api_diff:
+    label: API 差分抽出
+    description: 前リリースのスキーマと比較し追加・削除・型変更を列挙する
+  generate_clients:
+    label: クライアント生成
+    description: OpenAPI仕様から3言語のクライアントコードを生成する
+  run_conformance:
+    label: 適合テスト実行
+    description: 生成コードが3言語間で同一の契約を満たすか検証する
+  package_release:
+    label: パッケージング
+    description: 生成コードと適合結果から各言語のレジストリ形式へ固める
+  draft_migration_guide:
+    label: 移行ガイド起草
+    description: "API差分から移行手順の草稿を書く。LLMエージェントが担当し、破壊的変更の重大度判断を含む。判断を含むのでこの軸では workflow 側にも置けてしまう"
+    owner: ドキュメントLLMエージェント
+---
+
+openapi_spec >> extract_api_diff -> api_diff
+
+openapi_spec >> generate_clients -> generated_clients
+
+generated_clients >> run_conformance -> conformance_report
+
+[conformance_report, generated_clients] >> package_release -> sdk_packages
+
+api_diff >> draft_migration_guide -> migration_guide_draft

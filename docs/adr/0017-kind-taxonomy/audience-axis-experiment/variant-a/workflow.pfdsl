@@ -1,0 +1,132 @@
+---
+title: Polaris 運用ワークフロー（変種A・主語軸）
+type: workflow
+description: "主語が人の営みのみを収める。1種別1ファイル原則により、月次リリース判断・ドキュメントレビュー・消費チームの利用・廃止判断を1ファイルへ統合した。判断が変換の一部である変換が対象"
+layout:
+  direction: LR
+  maxWidth: 140
+
+group:
+  platform:
+    label: プラットフォームチーム
+    color: "#e8f4fd"
+  consumers:
+    label: 消費チーム（A決済・B在庫・C配送）
+    color: "#fef9e7"
+  feedback:
+    label: フィードバック
+    color: "#fde8e8"
+
+artifact:
+  conformance_report:
+    label: 適合テスト結果
+    description: pipeline.pfdsl が生産する。ここではGo/No-go判断の入力として現れる
+    group: platform
+  migration_guide_draft:
+    label: 移行ガイド草稿
+    description: pipeline.pfdsl が生産する。ここでは人のレビュー対象として現れる
+    group: platform
+  service_build:
+    label: サービスビルド成果物
+    description: pipeline.pfdsl が生産する。ここでは採用可否判断の材料として現れる
+    group: consumers
+  runbooks:
+    label: ランブック3種
+    description: 障害対応・デプロイ・ロールバックの手順書。手書きで管理する
+    externalStakeholders: [ Aチーム, Bチーム, Cチーム ]
+    group: platform
+  release_decision:
+    label: リリース判断記録
+    description: 月次リリースのGo/No-go と、No-goの場合の保留理由
+    owner: リリースエンジニア
+    group: platform
+  approved_migration_guide:
+    label: 承認済み移行ガイド
+    description: 草稿にレビューを通し公開して良いと判断された移行ガイド
+    owner: ドキュメント担当
+    externalStakeholders: [ Aチーム, Bチーム, Cチーム ]
+    group: platform
+  adoption_decision:
+    label: 採用判断記録
+    description: 新バージョンを採用するか見送るかの各チームの決定と理由
+    owner: 各消費チーム
+    group: consumers
+  incident_record:
+    label: 障害対応記録
+    description: ランブックを参照して対応した経緯の記録。手順の逸脱があればその判断も含む
+    owner: 各消費チーム
+    group: consumers
+  feedback_issues:
+    label: フィードバック起票
+    description: バグ報告・改善要望・ドキュメント誤記。消費チームからのプッシュ
+    owner: 各消費チーム
+    group: feedback
+  usage_report:
+    label: 利用実績レポート
+    description: どの成果物がどのチームに使われたかの集計。登場しない成果物が廃止候補
+    owner: プラットフォームチーム
+    group: feedback
+  retirement_decision:
+    label: 廃止・統合判断
+    description: 利用実績に現れない成果物を廃止するか統合するかの決定
+    owner: プラットフォームチーム
+    group: platform
+
+process:
+  decide_release:
+    label: リリース Go/No-go 判断
+    description: 適合テスト結果と未解決フィードバックを見て月次リリースの実施を判断する
+    owner: リリースエンジニア
+    group: platform
+  review_migration_guide:
+    label: 移行ガイドレビュー
+    description: 草稿の重大度判断が妥当か、回避策が実際に機能するかを人が確認し承認する
+    owner: ドキュメント担当
+    group: platform
+  decide_adoption:
+    label: 採用の是非判断
+    description: 移行コストとビルド結果を見て新バージョンを採用するか見送るかを決める
+    owner: 各消費チーム
+    group: consumers
+  operate_incident:
+    label: 障害対応
+    description: 障害時にランブックを参照して復旧する。手順の逸脱判断を含む
+    owner: 各消費チーム
+    group: consumers
+  file_feedback:
+    label: フィードバック起票
+    description: 採用時の詰まりと障害対応の経緯から報告すべきものを選んで起票する
+    owner: 各消費チーム
+    group: consumers
+  aggregate_usage:
+    label: 利用実績集計
+    description: 採用記録と参照ログを集計し成果物ごとの利用状況をレポート化する
+    owner: プラットフォームチーム
+    group: platform
+  decide_retirement:
+    label: 廃止・統合の判断
+    description: 利用実績レポートを見て使われていない成果物の扱いを決める
+    owner: プラットフォームチーム
+    group: platform
+---
+
+conformance_report >> decide_release -> release_decision
+
+feedback_issues >>? decide_release
+
+migration_guide_draft >> review_migration_guide -> approved_migration_guide
+
+[approved_migration_guide, release_decision, service_build] >> decide_adoption -> adoption_decision
+
+runbooks >> operate_incident -> incident_record
+
+[adoption_decision, incident_record] >> file_feedback -> feedback_issues
+
+[adoption_decision, incident_record] >> aggregate_usage -> usage_report
+
+usage_report >> decide_retirement -> retirement_decision
+
+retirement_decision >>? aggregate_usage
+
+
+feedback_issues >>? decide_adoption

@@ -1,6 +1,7 @@
 ---
-title: pfdsl開発ワークフロー
-description: ユーザーの関心を起点に、対話・仕様整備・実践・実装・リリースが繰り返されるサイクル全体。誰が何をトリガーに何を行うかを記述する
+title: pfdsl開発ワークフロー（判断軸で描き直し）
+type: workflow
+description: "判断・承認・裁量を含む営みのみを収める。gen_skill・gen_install・gen_plugin・render_previews と公開の自動部分は判断を含まないため pipeline.pfdsl へ移した。publish_* は「リリースするか・どの版か」の判断（decide_release）だけがここに残り、タグ以降の変換は pipeline が持つ"
 layout:
   direction: LR
   maxWidth: 130
@@ -58,18 +59,18 @@ artifact:
     group: generation
   pfdsl_skill:
     label: AI agent スキル（リポ内）
-    description: "runtime-pipeline.pfdsl の gen_skill が生産する（判断を含まない生成のため、ADR-0035 でそちらへ移した）。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる"
+    description: "pipeline.pfdsl の gen_skill が生産する。ここでは実践・レビューへの還流入力としてのみ現れる"
     location: ../.claude/skills/pfdsl/
     group: generation
   plugin_dist:
     label: marketplace 配布プラグイン
-    description: "runtime-pipeline.pfdsl の gen_plugin が生産する（同上）。/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl で外部ユーザーが導入する Claude Code プラグイン。この図では README 更新の入力に現れる"
+    description: "pipeline.pfdsl の gen_plugin が生産する。ここでは README 更新の入力としてのみ現れる"
     location: ../plugin/pfdsl/
     group: release
   release_tag:
     label: リリースタグ
-    description: "decide_release が push する v* / lib-v* / vscode-v* タグ。判断の終端であり、これ以降の npm publish・vsix 生成・marketplace アップロードは判断を含まないため runtime-pipeline.pfdsl が持つ"
-    criteria: make release-status で behind でないことを確認したうえで打たれたタグが push 済み
+    description: "decide_release が打つ v* / lib-v* / vscode-v* タグ。判断の終端であり、これ以降の公開変換は pipeline.pfdsl が持つ"
+    criteria: make release-status で behind でないことを確認済みのタグが push されている
     group: release
   user_intent:
     label: ユーザーの関心・意図
@@ -139,13 +140,13 @@ artifact:
     group: planning
   published_cli:
     label: npm 公開 CLI
-    description: "runtime-pipeline.pfdsl の publish_packages が生産する。toolchain の CLI 部分または plugin 同梱物（配布スキル群と pfd-* コマンド・agents）が変更されたら公開が必要という判定は decide_release が担う。この図では README 更新の入力に現れる"
+    description: "pipeline.pfdsl の publish_artifacts が生産する。ここでは README 更新の入力としてのみ現れる"
     criteria: npm show @pfdsl/cli version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/cli
     group: release
   published_libraries:
     label: npm 公開ライブラリ群
-    description: "runtime-pipeline.pfdsl の publish_packages が生産する。toolchain のライブラリ部分が変更されたら公開が必要という判定は decide_release が担う。この図では README 更新の入力に現れる"
+    description: "pipeline.pfdsl の publish_artifacts が生産する。ここでは README 更新の入力としてのみ現れる"
     criteria: npm show @pfdsl/core version が期待バージョンを返す
     location: https://www.npmjs.com/package/@pfdsl/core
     group: release
@@ -343,7 +344,7 @@ process:
     group: planning
   decide_release:
     label: リリース判断・タグ打ち
-    description: "事前に make release-status で behind を確認し、公開するか・どの版で切るかを判断してタグを push する。旧 publish_cli / publish_libraries / publish_ext のうち判断を含む部分がこれ（ADR-0035）。タグ以降の npm publish・vsix 生成・marketplace アップロードは判断を含まないため runtime-pipeline.pfdsl が持つ。make release 完了後、roadmap の publish_cli_* プロセスのうち ready になったものの出力 artifact を自動 done 化してコミット・push する（#278）。バージョン番号からの artifact ID 逆算はしない — ready 判定はグラフの入力充足のみで行うため、計画外リリースでも整合する。手作業は make release のみ"
+    description: "make release-status で behind を確認し、公開するか・どの版で切るかを判断してタグを push する。旧 publish_cli / publish_libraries / publish_ext のうち判断を含む部分だけを残した。タグ以降の npm publish・vsix 生成・marketplace アップロードは判断を含まないため pipeline.pfdsl が持つ"
     command: "make release VERSION=<VERSION>"
     group: release
   update_readme:
