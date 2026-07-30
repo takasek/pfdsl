@@ -1,8 +1,8 @@
-// Shared plumbing for this repo's PreToolUse/PostToolUse guard hooks
-// (delegation-guard, worktree-write-guard, main-commit-guard, md-write-check,
-// #650 review). Every one of them reads a JSON payload from stdin and, for
-// the PreToolUse deny cases, emits the same hookSpecificOutput shape — this
-// used to be copy-pasted into each wrapper.
+// Shared plumbing for this repo's PreToolUse/PostToolUse guard hooks (the
+// scripts/*-guard.mjs and reminder wrappers wired in .claude/settings.json,
+// #650 review). Every one of them reads a JSON payload from stdin and emits
+// one of two hookSpecificOutput shapes — both used to be copy-pasted into
+// each wrapper.
 
 /**
  * Read all of stdin as text. Not unit-tested here (it is I/O, not logic);

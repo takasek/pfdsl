@@ -1,5 +1,5 @@
 // Runs check-md-linebreaks.mjs's check against a single .md file right
-// after it is Written (#650), instead of leaving the violation to surface
+// after it changes (#650), instead of leaving the violation to surface
 // at the next pre-commit run. roadmap.md noted this concretely: writing
 // several new .md files in one session and only finding out about
 // mid-sentence line breaks at commit time turns into a full rewrite pass,
@@ -13,7 +13,7 @@
 // checkFile/formatViolation are imported from check-md-linebreaks.mjs
 // in-process (that script exports them for this reason) rather than shelled
 // out to, so this hook does not pay a second Node process spawn on every
-// .md Write and there stays exactly one place that defines a violation.
+// .md change and there stays exactly one place that defines a violation.
 
 /**
  * Whether this PostToolUse payload changed a .md file.
