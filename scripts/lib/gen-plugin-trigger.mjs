@@ -14,10 +14,14 @@
 // in scripts/lib/gen-plugin.mjs's assemblePluginDistIndependent): a change
 // to it is itself a drift-check target, so it must trigger the same
 // check_drift that regenerates and diffs plugin/ in scripts/pre-commit.
-// Its own gen-install.mjs dependency doesn't need adding here — that's
-// already covered by GEN_INSTALL_TRIGGER's own check_drift in
-// scripts/pre-commit, and a gen-install change can't affect plugin/'s
-// contents (install/ lives outside plugin/pfdsl/).
+// Its own gen-install.mjs dependency doesn't need adding here — not because
+// gen-install can't affect plugin/'s contents (it can: mirrorDir("pfd-ops",
+// …) in scripts/lib/gen-plugin.mjs copies the whole pfd-ops skill tree,
+// install/ included, into plugin/pfdsl/skills/pfd-ops/install/), but because
+// a template-source-only change is already blocked by GEN_INSTALL_TRIGGER's
+// own check_drift in scripts/pre-commit (which runs first) until install/ is
+// regenerated and re-staged too — and that staged install/ path itself
+// matches this pattern's `\.claude/skills/pfd-ops/` alternative.
 
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";

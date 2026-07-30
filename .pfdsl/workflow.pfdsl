@@ -328,7 +328,7 @@ process:
     group: generation
   gen_skill:
     label: スキル生成
-    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）を変更した場合に実行する。gh skill install 向け配布コピーは廃止済み（#366、marketplace に一本化）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制（CI backstop）。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/gen-skill-refs.mjs に切り出し済みで、pre-commit はこの部分を dist stale でも skip しない別の drift 検査で常時強制する。SKILL.md（pfdsl help 埋め込み）のみ dist 必須のまま（#586）"
+    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）を変更した場合に実行する。gh skill install 向け配布コピーは廃止済み（#366、marketplace に一本化）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制（CI backstop）。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/gen-skill-refs.mjs に切り出し済み。marketplace 配布物側（plugin/pfdsl/skills/pfdsl/references）は pre-commit が gen_plugin の dist 非依存 drift 検査（scripts/gen-plugin-dist-independent.mjs、#593）で dist stale でも常時強制する。SKILL.md（pfdsl help 埋め込み）のみ dist 必須のまま（#586）"
     command: make gen-skill
     group: generation
 

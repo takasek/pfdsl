@@ -96,6 +96,10 @@ check_drift "$gen_install_trigger" "-" \
   "node scripts/gen-install.mjs && git diff --quiet -- .claude/skills/pfd-ops/install" \
   ".claude/skills/pfd-ops/install is stale (or was hand-edited). Run 'make gen-install' and re-stage."
 
+# Trigger pattern is sourced from scripts/lib/gen-plugin-trigger.mjs (single
+# source of truth shared with gate-check.mjs).
+gen_plugin_trigger=$(node scripts/lib/gen-plugin-trigger.mjs) || { echo "gen-plugin trigger derivation failed"; exit 1; }
+
 # plugin/pfdsl/skills/pfdsl/SKILL.md is the only part of plugin/ that needs
 # the CLI dist (it embeds `pfdsl help` output via gen-skill.mjs — see the
 # gen-skill check above). Scoped to just that file so a dist-missing/stale
@@ -105,7 +109,12 @@ check_drift "$gen_install_trigger" "-" \
 # commands, agents, hooks, plugin.json — silently passed whenever dist was
 # stale, which is how #579 shipped a stale
 # plugin/pfdsl/skills/pfdsl/references/spec.md).
-check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
+# Uses $gen_plugin_trigger, not $gen_skill_trigger: SKILL.md also embeds
+# packages/cli/package.json's version (scripts/gen-skill.mjs's {{cliVersion}}
+# substitution), which only $gen_plugin_trigger's pattern covers — using the
+# narrower $gen_skill_trigger here let a CLI version bump land without
+# re-stamping SKILL.md, caught only by CI's check-gen-plugin.yml.
+check_drift "$gen_plugin_trigger" "packages/cli/dist/cli.js" \
   "node scripts/gen-skill.mjs --out plugin/pfdsl/skills/pfdsl && git diff --quiet -- plugin/pfdsl/skills/pfdsl/SKILL.md" \
   "plugin/pfdsl/skills/pfdsl/SKILL.md is stale. Run 'make gen-plugin' and re-stage the plugin files."
 
@@ -116,13 +125,13 @@ check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
 # even when dist is missing/stale (require_dist "-"), replacing the old
 # references-only check above it (absorbed here — same trigger, same
 # machinery, no net increase in check count) so this bulk is never gated on
-# dist freshness.
-# Trigger pattern is sourced from scripts/lib/gen-plugin-trigger.mjs (single
-# source of truth shared with gate-check.mjs).
-gen_plugin_trigger=$(node scripts/lib/gen-plugin-trigger.mjs) || { echo "gen-plugin trigger derivation failed"; exit 1; }
+# dist freshness. If dist is missing, this is the only gen-plugin check that
+# can run locally — the hint below intentionally doesn't suggest `make
+# gen-plugin` (it would fail on the SKILL.md step without dist); run this
+# check's own command directly, or `pnpm -r build` first to unblock both.
 check_drift "$gen_plugin_trigger" "-" \
   "node scripts/gen-plugin-dist-independent.mjs && git diff --quiet -- plugin ':(exclude)plugin/pfdsl/skills/pfdsl/SKILL.md'" \
-  "plugin/pfdsl is stale (excluding SKILL.md, checked above). Run 'make gen-plugin' and re-stage the plugin files."
+  "plugin/pfdsl is stale (excluding SKILL.md, checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the plugin files, or 'pnpm -r build && make gen-plugin' to regenerate everything."
 
 # The .dot/README drift guard and the .svg drift guard are separate vitest
 # suites (graphviz-exporter and preview-engine respectively — see the
