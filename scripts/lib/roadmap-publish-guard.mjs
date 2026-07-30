@@ -37,10 +37,16 @@ export function addedPublishProcesses(after, before) {
 
 /**
  * Decide whether a PreToolUse Edit/Write may proceed.
+ *
+ * `readFile` is injected so this stays a pure function: a Write replaces the
+ * whole file, so the only way to tell a new declaration from one being written
+ * back unchanged is to read what is on disk. An unreadable file falls back to
+ * asking — nothing rules the declaration out then.
  * @param {object} payload PreToolUse hook payload
+ * @param {{readFile?: (path: string) => string | undefined}} [io]
  * @returns {{decision: "allow"} | {decision: "ask", reason: string}}
  */
-export function evaluateRoadmapPublishGuard(payload) {
+export function evaluateRoadmapPublishGuard(payload, { readFile = () => undefined } = {}) {
 	if (payload?.tool_name !== "Edit" && payload?.tool_name !== "Write") return { decision: "allow" };
 
 	const filePath = payload?.tool_input?.file_path;
@@ -49,7 +55,7 @@ export function evaluateRoadmapPublishGuard(payload) {
 	const input = payload.tool_input;
 	const added =
 		payload.tool_name === "Write"
-			? addedPublishProcesses(input.content, "")
+			? addedPublishProcesses(input.content, readFile(filePath) ?? "")
 			: addedPublishProcesses(input.new_string, input.old_string);
 	if (added.length === 0) return { decision: "allow" };
 

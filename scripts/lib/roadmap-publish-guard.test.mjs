@@ -52,8 +52,25 @@ describe("evaluateRoadmapPublishGuard", () => {
 		assert.match(result.reason, /publish_ext_v0016/);
 	});
 
-	it("asks on a Write of the roadmap that declares one", () => {
-		const result = evaluateRoadmapPublishGuard(write({ content: "processes:\n  publish_cli_x:\n" }));
+	it("asks on a Write of the roadmap that declares one the file did not have", () => {
+		const result = evaluateRoadmapPublishGuard(write({ content: "processes:\n  publish_cli_x:\n" }), {
+			readFile: () => "processes:\n",
+		});
+		assert.equal(result.decision, "ask");
+	});
+
+	it("allows a Write that only carries the declarations the file already had", () => {
+		const existing = "processes:\n  publish_cli_x:\n    label: release\n";
+		const result = evaluateRoadmapPublishGuard(write({ content: existing }), {
+			readFile: () => existing,
+		});
+		assert.equal(result.decision, "allow");
+	});
+
+	it("asks on a Write when the file cannot be read, since nothing rules the declaration out", () => {
+		const result = evaluateRoadmapPublishGuard(write({ content: "  publish_cli_x:\n" }), {
+			readFile: () => undefined,
+		});
 		assert.equal(result.decision, "ask");
 	});
 

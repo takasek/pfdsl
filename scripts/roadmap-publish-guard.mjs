@@ -10,13 +10,24 @@
 //
 // Usage (wired in .claude/settings.json): node scripts/roadmap-publish-guard.mjs
 
+import { readFileSync } from "node:fs";
+
 import { evaluateRoadmapPublishGuard } from "./lib/roadmap-publish-guard.mjs";
 import { buildPermissionOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
+
+/** The file as it stands, or undefined when it cannot be read (new file, no access). */
+function readFile(path) {
+	try {
+		return readFileSync(path, "utf8");
+	} catch {
+		return undefined;
+	}
+}
 
 const payload = parseHookPayload(await readStdinText());
 if (!payload) process.exit(0);
 
-const result = evaluateRoadmapPublishGuard(payload);
+const result = evaluateRoadmapPublishGuard(payload, { readFile });
 if (result.decision !== "allow") {
 	console.log(JSON.stringify(buildPermissionOutput(result)));
 }
