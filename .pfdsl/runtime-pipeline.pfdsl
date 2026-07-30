@@ -195,8 +195,9 @@ artifact:
     group: skill_sources
   pfdsl_skill:
     label: PFD読み書き分析skill（リポ内）
-    description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。make gen-skillで再生成し手編集禁止。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため図には現れない"
+    description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。make gen-skillで再生成し手編集禁止。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため図には現れない。gen_pluginの入力ではない — plugin側のpfdslスキルは同じ一次ソースから独立再生成されるため、この成果物をコピーする経路は存在しない"
     criteria: make gen-skill が差分なしで完了する
+    externalStakeholders: [ このリポのAIエージェント ]
     location: ../.claude/skills/pfdsl/
     group: repo_generated
     tags: [ c, gen ]
