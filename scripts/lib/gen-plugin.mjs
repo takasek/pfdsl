@@ -1,5 +1,8 @@
-import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
+
+import { genInstall } from "./gen-install.mjs";
+import { writeSkillRefs } from "./gen-skill-refs.mjs";
 
 // The agents bundled into plugin/pfdsl/agents/, as .claude/agents/-relative
 // filenames. Single source of truth: gen-plugin.mjs mirrors this list, and
@@ -92,4 +95,57 @@ export function buildPluginManifest({ cliVersion }) {
 		homepage: "https://github.com/takasek/pfdsl",
 		license: "MIT",
 	};
+}
+
+// Assembles everything gen-plugin.mjs bundles into plugin/pfdsl/ except
+// plugin/pfdsl/skills/pfdsl/SKILL.md (which embeds `pfdsl help` output and
+// therefore needs packages/cli/dist — see scripts/gen-skill.mjs). None of
+// this touches dist or spawns a child process, so scripts/pre-commit can
+// drift-check it even when dist is missing/stale (#593, same split
+// rationale as writeSkillRefs in #586). deps defaults to the real
+// implementations; tests inject fakes to assert the wiring without touching
+// the filesystem.
+export function assemblePluginDistIndependent({
+	root,
+	pluginRoot,
+	deps = {
+		genInstall,
+		mirrorDir,
+		mirrorFiles,
+		writeSkillRefs,
+		readFileSync,
+		writeFileSync,
+		mkdirSync,
+	},
+}) {
+	deps.genInstall(root);
+	console.log(".claude/skills/pfd-ops/install ← repo-root sources (gen-install)");
+
+	for (const name of ["pfd-grill", "pfd-ops", "pfd-retro", "pfd-ecosystem"]) {
+		deps.mirrorDir(name, resolve(root, ".claude/skills"), resolve(pluginRoot, "skills"));
+		console.log(`plugin/pfdsl/skills/${name} ← .claude/skills/${name}`);
+	}
+
+	const commandFiles = ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"];
+	deps.mirrorFiles(commandFiles, resolve(root, ".claude/commands"), resolve(pluginRoot, "commands"));
+	for (const file of commandFiles) {
+		console.log(`plugin/pfdsl/commands/${file} ← .claude/commands/${file}`);
+	}
+
+	deps.mirrorFiles(PLUGIN_AGENT_FILES, resolve(root, ".claude/agents"), resolve(pluginRoot, "agents"));
+	for (const file of PLUGIN_AGENT_FILES) {
+		console.log(`plugin/pfdsl/agents/${file} ← .claude/agents/${file}`);
+	}
+
+	deps.mirrorDir("hooks", root, pluginRoot);
+	console.log("plugin/pfdsl/hooks ← hooks");
+
+	const cliVersion = JSON.parse(deps.readFileSync(resolve(root, "packages/cli/package.json"), "utf-8")).version;
+	const manifest = buildPluginManifest({ cliVersion });
+	const pluginManifestDir = resolve(pluginRoot, ".claude-plugin");
+	deps.mkdirSync(pluginManifestDir, { recursive: true });
+	deps.writeFileSync(resolve(pluginManifestDir, "plugin.json"), `${JSON.stringify(manifest, null, "\t")}\n`);
+	console.log("plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version");
+
+	deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));
 }

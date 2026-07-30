@@ -16,6 +16,10 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test("scripts/lib/gen-plugin.mjs"), true);
 	});
 
+	it("matches scripts/gen-plugin-dist-independent.mjs", () => {
+		assert.equal(GEN_PLUGIN_TRIGGER.test("scripts/gen-plugin-dist-independent.mjs"), true);
+	});
+
 	it("matches a .claude/skills/pfd-ecosystem/ path", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude/skills/pfd-ecosystem/SKILL.md"), true);
 	});
