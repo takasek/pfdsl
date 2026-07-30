@@ -41,6 +41,10 @@ describe("usesPublishedCli", () => {
 		assert.equal(usesPublishedCli('echo "npx @pfdsl/cli check"'), false);
 	});
 
+	it("flags a quoted package argument — the quotes do not change what npx runs", () => {
+		assert.equal(usesPublishedCli('npx "@pfdsl/cli" check x.pfdsl'), true);
+	});
+
 	it("ignores a non-string command", () => {
 		assert.equal(usesPublishedCli(undefined), false);
 	});
@@ -71,6 +75,15 @@ describe("usesBodyDroppingView", () => {
 
 	it("does not flag the flag inside a quoted string", () => {
 		assert.equal(usesBodyDroppingView('echo "gh issue view 650 --comments"'), false);
+	});
+
+	it("flags it behind a gh global flag, where the group is not the second token", () => {
+		assert.equal(usesBodyDroppingView("gh -R owner/repo issue view 650 --comments"), true);
+		assert.equal(usesBodyDroppingView("gh --repo owner/repo pr view 664 --comments"), true);
+	});
+
+	it("flags a quoted --comments", () => {
+		assert.equal(usesBodyDroppingView('gh issue view 650 "--comments"'), true);
 	});
 
 	it("ignores a non-string command", () => {

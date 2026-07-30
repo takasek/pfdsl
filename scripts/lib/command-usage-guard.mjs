@@ -23,6 +23,7 @@
 // is what was wanted.
 
 import { splitSegments, stripLeadingNoise, tokenize } from "./delegation-guard.mjs";
+import { parseGhCommand } from "./gh-command.mjs";
 
 /** `@pfdsl/cli`, optionally with a version spec. */
 const PUBLISHED_CLI_SPEC = /^@pfdsl\/cli(@.+)?$/;
@@ -31,18 +32,15 @@ const PUBLISHED_CLI_SPEC = /^@pfdsl\/cli(@.+)?$/;
 const VIEW_GROUPS = new Set(["issue", "pr"]);
 
 /**
- * The unquoted tokens of each command segment, leading `FOO=bar`/`sudo` noise
- * stripped. Quoted tokens are dropped, so a command mentioned inside a string
- * never trips a rule.
+ * The tokens of each command segment, leading `FOO=bar`/`sudo` noise stripped.
+ * Quoting is preserved so callers can require an unquoted head — that is what
+ * keeps a command mentioned inside a string from tripping a rule, while its
+ * arguments are matched however they are quoted.
  * @param {string} command
- * @returns {string[][]}
+ * @returns {Array<Array<{value: string, quoted: boolean}>>}
  */
 function commandSegments(command) {
-	return splitSegments(command).map((segment) =>
-		stripLeadingNoise(tokenize(segment))
-			.filter((token) => !token.quoted)
-			.map((token) => token.value),
-	);
+	return splitSegments(command).map((segment) => stripLeadingNoise(tokenize(segment)));
 }
 
 /**
@@ -56,11 +54,12 @@ export function usesPublishedCli(command) {
 	if (typeof command !== "string" || command.trim() === "") return false;
 
 	for (const tokens of commandSegments(command)) {
-		if (tokens.length === 0) continue;
-		const runsFromRegistry =
-			tokens[0] === "npx" || (tokens[0] === "pnpm" && tokens.includes("dlx"));
+		const head = tokens[0];
+		if (!head || head.quoted) continue;
+		const values = tokens.map((token) => token.value);
+		const runsFromRegistry = head.value === "npx" || (head.value === "pnpm" && values.includes("dlx"));
 		if (!runsFromRegistry) continue;
-		if (tokens.some((token) => PUBLISHED_CLI_SPEC.test(token))) return true;
+		if (values.some((value) => PUBLISHED_CLI_SPEC.test(value))) return true;
 	}
 	return false;
 }
@@ -76,10 +75,10 @@ export function usesBodyDroppingView(command) {
 	if (typeof command !== "string" || command.trim() === "") return false;
 
 	for (const tokens of commandSegments(command)) {
-		if (tokens[0] !== "gh" || !VIEW_GROUPS.has(tokens[1])) continue;
-		if (!tokens.includes("view")) continue;
-		if (!tokens.includes("--comments")) continue;
-		if (tokens.some((token) => token === "--json" || token.startsWith("--json="))) continue;
+		const parsed = parseGhCommand(tokens);
+		if (!parsed || !VIEW_GROUPS.has(parsed.group) || parsed.verb !== "view") continue;
+		if (!parsed.args.includes("--comments")) continue;
+		if (parsed.args.some((arg) => arg === "--json" || arg.startsWith("--json="))) continue;
 		return true;
 	}
 	return false;
