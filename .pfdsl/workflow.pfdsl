@@ -328,7 +328,7 @@ process:
     group: generation
   gen_skill:
     label: スキル生成
-    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）を変更した場合に実行する。gh skill install 向け配布コピーは廃止済み（#366、marketplace に一本化）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制（CI backstop）。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/gen-skill-refs.mjs に切り出し済みで、pre-commit はこの部分を dist stale でも skip しない別の drift 検査で常時強制する。SKILL.md（pfdsl help 埋め込み）のみ dist 必須のまま（#586）"
+    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）を変更した場合に実行する。gh skill install 向け配布コピーは廃止済み（#366、marketplace に一本化）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制（CI backstop）。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/gen-skill-refs.mjs に切り出し済み。marketplace 配布物側（plugin/pfdsl/skills/pfdsl/references）は pre-commit が gen_plugin の dist 非依存 drift 検査（scripts/gen-plugin-dist-independent.mjs、#593）で dist stale でも常時強制する。SKILL.md（pfdsl help 埋め込み）のみ dist 必須のまま（#586）"
     command: make gen-skill
     group: generation
 
@@ -340,7 +340,7 @@ process:
 
   gen_plugin:
     label: プラグイン生成
-    description: "gen_skill と同じ一次ソース（spec/skill_template/quality_guide/feature_samples/review_perspectives）から pfdsl スキルを独立再生成し、grill_skill・ops_skill_general・ops_skill_l3・retro_skill・ecosystem_skill、/pfd-cycle・/pfd-init・/pfd-retro コマンド、pfd-lens agent を plugin/pfdsl/ に束ね plugin.json を書く。pfdsl_skill（.claude/skills/pfdsl/）を直接コピーするわけではない。version は toolchain の CLI package.json 由来。check-gen-plugin.yml が全 PR で drift を強制（CI backstop、CLI リリース後の version 反映漏れも検出）"
+    description: "gen_skill と同じ一次ソース（spec/skill_template/quality_guide/feature_samples/review_perspectives）から pfdsl スキルを独立再生成し、grill_skill・ops_skill_general・ops_skill_l3・retro_skill・ecosystem_skill、/pfd-cycle・/pfd-init・/pfd-retro コマンド、pfd-lens agent を plugin/pfdsl/ に束ね plugin.json を書く。pfdsl_skill（.claude/skills/pfdsl/）を直接コピーするわけではない。version は toolchain の CLI package.json 由来。check-gen-plugin.yml が全 PR で drift を強制（CI backstop、CLI リリース後の version 反映漏れも検出）。出力のうち plugin/pfdsl/skills/pfdsl/SKILL.md（pfdsl help 埋め込み）以外（install/ ミラー・静的 skills・commands・agents・hooks・plugin.json・skill references）は packages/cli/dist に触れない scripts/gen-plugin-dist-independent.mjs に切り出し済みで、pre-commit はこの部分を dist stale でも skip しない別の drift 検査で常時強制する（#593）"
     command: make gen-plugin
     group: release
 

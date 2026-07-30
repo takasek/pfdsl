@@ -2,9 +2,14 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { buildPluginManifest, mirrorDir, mirrorFiles } from "./gen-plugin.mjs";
+import { assemblePluginDistIndependent, buildPluginManifest, mirrorDir, mirrorFiles, PLUGIN_AGENT_FILES } from "./gen-plugin.mjs";
+import { collectModuleClosure, findDistDependentFiles } from "./check-script-imports.mjs";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dirname, "../..");
 
 describe("buildPluginManifest", () => {
 	it("uses the CLI version as the plugin version", () => {
@@ -150,5 +155,76 @@ describe("mirrorFiles", () => {
 		const srcDir = join(tmp, "src");
 		mkdirSync(srcDir, { recursive: true });
 		assert.throws(() => mirrorFiles(["missing.md"], srcDir, join(tmp, "dest")), /not found/);
+	});
+});
+
+describe("assemblePluginDistIndependent", () => {
+	function fakeDeps(overrides = {}) {
+		const calls = [];
+		return {
+			calls,
+			deps: {
+				genInstall: (root) => calls.push(["genInstall", root]),
+				mirrorDir: (name, srcRoot, destRoot) => calls.push(["mirrorDir", name, srcRoot, destRoot]),
+				mirrorFiles: (names, srcDir, destDir) => calls.push(["mirrorFiles", names, srcDir, destDir]),
+				writeSkillRefs: (root, outDir) => calls.push(["writeSkillRefs", root, outDir]),
+				readFileSync: () => JSON.stringify({ version: "1.2.3" }),
+				writeFileSync: (path, content) => calls.push(["writeFileSync", path, content]),
+				mkdirSync: (path) => calls.push(["mkdirSync", path]),
+				...overrides,
+			},
+		};
+	}
+
+	it("regenerates install/ from the repo root", () => {
+		const { calls, deps } = fakeDeps();
+		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		assert.deepEqual(
+			calls.filter((c) => c[0] === "genInstall"),
+			[["genInstall", "/repo"]],
+		);
+	});
+
+	it("mirrors each static skill directory and hooks into plugin/", () => {
+		const { calls, deps } = fakeDeps();
+		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		const mirrored = calls.filter((c) => c[0] === "mirrorDir").map((c) => c[1]);
+		assert.deepEqual(mirrored.sort(), ["hooks", "pfd-ecosystem", "pfd-grill", "pfd-ops", "pfd-retro"].sort());
+	});
+
+	it("mirrors command files and bundled agent files", () => {
+		const { calls, deps } = fakeDeps();
+		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		const mirroredFileSets = calls.filter((c) => c[0] === "mirrorFiles").map((c) => c[1]);
+		assert.deepEqual(mirroredFileSets, [["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"], PLUGIN_AGENT_FILES]);
+	});
+
+	it("writes plugin.json derived from the CLI package version", () => {
+		const { calls, deps } = fakeDeps();
+		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		const [, path, content] = calls.find((c) => c[0] === "writeFileSync");
+		assert.match(path, /\.claude-plugin\/plugin\.json$/);
+		assert.equal(JSON.parse(content).version, "1.2.3");
+	});
+
+	it("writes skill references for the bundled pfdsl skill", () => {
+		const { calls, deps } = fakeDeps();
+		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		assert.deepEqual(
+			calls.filter((c) => c[0] === "writeSkillRefs"),
+			[["writeSkillRefs", "/repo", "/repo/plugin/pfdsl/skills/pfdsl"]],
+		);
+	});
+});
+
+describe("dist independence", () => {
+	it("scripts/gen-plugin-dist-independent.mjs and its module closure never reference packages/cli/dist or spawn a child process", () => {
+		const entry = resolve(repoRoot, "scripts/gen-plugin-dist-independent.mjs");
+		const closure = collectModuleClosure(entry);
+
+		assert.ok(closure.size >= 2, "expected the closure to include at least the entry and lib/gen-plugin.mjs");
+
+		const violations = findDistDependentFiles([...closure]);
+		assert.deepEqual(violations, [], violations.map((v) => `${v.file}: ${v.reason}`).join("; "));
 	});
 });
