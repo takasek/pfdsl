@@ -11,7 +11,7 @@
 
 import { checkFile, formatViolation } from "./check-md-linebreaks.mjs";
 import { formatLinebreakAdvisory, isMarkdownWrite } from "./lib/md-write-check.mjs";
-import { parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
+import { buildAdvisoryOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
 
 const payload = parseHookPayload(await readStdinText());
 if (!payload || !isMarkdownWrite(payload)) {
@@ -30,13 +30,6 @@ try {
 
 const advisory = formatLinebreakAdvisory(filePath, violations, formatViolation);
 if (advisory) {
-	console.log(
-		JSON.stringify({
-			hookSpecificOutput: {
-				hookEventName: "PostToolUse",
-				additionalContext: advisory,
-			},
-		}),
-	);
+	console.log(JSON.stringify(buildAdvisoryOutput(advisory)));
 }
 process.exit(0);

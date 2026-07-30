@@ -51,3 +51,18 @@ export function buildPermissionOutput(result) {
 		},
 	};
 }
+
+/**
+ * Build the PostToolUse hook response for an advisory. additionalContext is
+ * what reaches the model, and PostToolUse is the only one of the two events
+ * that supports it — which is why the advisory hooks are PostToolUse.
+ * @param {string} advisory
+ */
+export function buildAdvisoryOutput(advisory) {
+	return {
+		hookSpecificOutput: {
+			hookEventName: "PostToolUse",
+			additionalContext: advisory,
+		},
+	};
+}

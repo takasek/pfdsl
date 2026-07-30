@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+import { buildAdvisoryOutput, buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 describe("parseHookPayload", () => {
 	it("parses a valid JSON payload", () => {
@@ -34,6 +34,17 @@ describe("buildPermissionOutput", () => {
 				hookEventName: "PreToolUse",
 				permissionDecision: "ask",
 				permissionDecisionReason: "confirm first",
+			},
+		});
+	});
+});
+
+describe("buildAdvisoryOutput", () => {
+	it("builds a PostToolUse response carrying the advisory as additionalContext", () => {
+		assert.deepEqual(buildAdvisoryOutput("note: something to fix"), {
+			hookSpecificOutput: {
+				hookEventName: "PostToolUse",
+				additionalContext: "note: something to fix",
 			},
 		});
 	});
