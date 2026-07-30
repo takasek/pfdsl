@@ -141,3 +141,70 @@ workflow に追い出すと人の営みの中に埋没し、この価値が消�
 Polaris の `sdk-build-pipeline` はビルド時であって実行時ではないが、判断を含まないため pipeline に分類される。
 `pipeline` への改名は筋が通るが、`type:` の列挙値変更は採用リポに及ぶ破壊的変更であり、実利は名前1語ぶんである。
 判断基準の明文化とは独立の決定として扱う。
+
+## 追試: pfdsl 自身の PFD 群を判断軸で描き直す
+
+`pfdsl-redraw/` に `.pfdsl/workflow.pfdsl` と `.pfdsl/runtime-pipeline.pfdsl` を判断軸で組み替えたものを置いた。
+process 総数は 35 のまま（22+13 → 16+19）で、発明も欠落もない。
+
+### 移動したもの
+
+`workflow.pfdsl` の 22 プロセスを判断の有無で棚卸しし、6件が pipeline 側へ移った。
+
+| プロセス | 判断 | 移動先 | 理由 |
+|---|---|---|---|
+| `gen_skill` | なし | pipeline | `make gen-skill`。入力が揃えば出力が決まる |
+| `gen_install` | なし | pipeline | `make gen-install`。同上 |
+| `gen_plugin` | なし | pipeline | `make gen-plugin`。旧 `assemble_plugin` と統合 |
+| `render_previews` | なし | pipeline | `make gen-samples`。同上 |
+| `publish_cli` / `publish_libraries` | 判断は版数決定のみ | 分割 | タグを打つ判断は workflow、タグ以降の npm publish は pipeline |
+| `publish_ext` | 判断なし＋人手 | 分割 | vsix 生成と marketplace アップロードは判断を含まない |
+
+判断を含むため残ったもの: `discuss` / `draft_adrs` / `draft_proposals` / `maintain_spec` / `maintain_template` / `maintain_samples` / `distill_ops` / `write_examples` / `review_examples` / `write_article` / `file_issues` / `map_deps` / `map_transform_boundaries` / `develop` / `merge_pr` / `update_readme`。
+`develop` は LLM エージェントが担当するが判断を含むため workflow に残る（プローブ1の結論の適用）。
+
+### 定量結果
+
+| ファイル | process | edge | artifact |
+|---|---|---|---|
+| 現行 workflow | 22 | 48 | 44 |
+| 描き直し workflow | 16 | 41 | 41 |
+| 現行 runtime-pipeline | 13 | 14 | 21 |
+| 描き直し pipeline | 19 | 20 | 31 |
+
+### 得られたもの
+
+**二重モデル化が構造的に解消する。**
+旧 `runtime-pipeline.pfdsl` の `assemble_plugin` → `plugin_dir` と `workflow.pfdsl` の `gen_plugin` → `plugin_dist` は同一の `make gen-plugin` を別ノードIDで二重に持っていた。
+判断軸ではどちらも「判断なし」なので pipeline 側の1ノードに統合される。
+`workflow.md` が要求していた4箇所の手作業照合（`distill_ops` 出力・`publish_cli` 入力・`gen_plugin` 入力・`assemble_plugin` 入力）が、`gen_plugin` の入力エッジ1箇所に集約される。
+`pfd_lens_agent` / `implementer_agent` が片方の図にしか無かった乖離も、統合により発生しなくなる。
+
+**「公開・配布」group が判断だけに縮む。**
+現行は `publish_cli` / `publish_libraries` / `publish_ext` / `gen_install` / `gen_plugin` / `render_previews` の6プロセスが混在していた。
+描き直しでは `decide_release`（リリース判断・タグ打ち）と `update_readme` の2つだけになる。
+「リリースで人が何を決めるのか」が図から直接読める。
+
+**`upload_vsix` が唯一の人手ノードとして可視化される。**
+`manual_no_judgment` タグで赤く描かれ、機械チェーンの中で色として孤立する。
+現行では `publish_ext` の description 中の「marketplace.visualstudio.com で .vsix を手動アップロード」という一文に埋もれており、図としては見えていなかった。
+判断のない人手はここだけであり、自動化候補が1件に確定する。
+
+### 新しく生じたコスト
+
+**pipeline が3本の独立チェーンを抱える。**
+現行 runtime-pipeline は2本（b層の文書変換・g層の配布）だったが、生成チェーン（一次ソース → スキル・plugin・描画物）が加わって3本になる。
+3本は互いにエッジで繋がらないため、1枚の図としての凝集度は下がる。
+
+ここで「読み手が完全に別」によるファイル分割が効く候補になる。
+
+- 処理系（`.pfdsl` → 診断・DOT・画像）の読み手は CLI ユーザー・VSCode 拡張ユーザー
+- 生成・配布（一次ソース → plugin → 採用リポ）の読み手はメンテナと採用リポ
+
+Polaris では workflow を読み手で割るのが有効だったが、pfdsl では pipeline を割る側に回る。
+「pfdsl は開発者と利用者が同一なので読み手分割の恩恵が小さい」という予想は外れており、恩恵はあるが切れ目の位置が Polaris と異なるだけだった。
+
+**workflow の読みにくさは解決しない。**
+`distill_ops` が13成果物へ扇状に出る構造は判断軸では動かない（蒸留は判断そのもの）。
+描き直し後も workflow は 16 プロセス・41 エッジで、フィードバックの破線が図の下半分を大きく回り込む。
+これは軸の問題ではなく `distill_ops` の粒度の問題であり、別途扱う。

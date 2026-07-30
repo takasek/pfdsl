@@ -1,0 +1,341 @@
+---
+title: pfdsl 変換パイプライン（判断軸で描き直し）
+type: runtime-pipeline
+description: "判断を含まない決定的変換をすべて収める。既存 runtime-pipeline.pfdsl のb層（処理系）とg層（配布）に加え、workflow.pfdsl から gen_skill・gen_install・gen_plugin・render_previews と公開の自動部分が移ってきた。人手だが判断のない upload_vsix もここに置く（自動化候補として機械チェーン内で際立たせるため）"
+layout:
+  direction: LR
+  maxWidth: 160
+
+group:
+  in_memory:
+    label: 処理系内の中間表現（メモリ内・保存されない）
+    color: "#e8f4fd"
+  run_outputs:
+    label: 実行結果（stdout・ファイル・エディタ表示）
+    color: "#f3e8fd"
+  repo_sources:
+    label: 生成の一次ソース（workflow.pfdsl が生産）
+    color: "#fdf2f8"
+  repo_generated:
+    label: リポ内生成物（コミット対象）
+    color: "#fef9e7"
+  published:
+    label: 公開物
+    color: "#fde8e8"
+  adopter_repo:
+    label: 採用リポ
+    color: "#eafaf1"
+  adopter_env:
+    label: 採用ユーザー環境（ユーザー単位・リポ外）
+    color: "#fdebd0"
+
+tag:
+  b:
+    label: "b: 処理系"
+    style: { color: "#27ae60" }
+  gen:
+    label: "生成（判断なし・決定的）"
+    style: { color: "#8e44ad" }
+  g:
+    label: "g: fの配布"
+    style: { color: "#16a085" }
+  manual_no_judgment:
+    label: "人手だが判断なし（自動化候補）"
+    style: { color: "#c0392b" }
+
+artifact:
+  pfdsl_source:
+    label: .pfdslソースファイル
+    description: ユーザーが記述するfrontmatter+bodyのテキスト
+  parsed_doc:
+    label: 構文木・frontmatter
+    description: frontmatter読込・lex・parseの出力（document構造とfrontmatter）
+    group: in_memory
+  normalized_graph:
+    label: 正準化グラフ
+    description: "正規化済みエッジ・ノード種別・isolatedノード集合とGraph構造。validate/render_graph/export_metadata/diff_graphsの共通入力"
+    externalStakeholders: [ CLIユーザー ]
+    group: in_memory
+  diagnostics_report:
+    label: 診断結果
+    description: V/Wルールに基づくエラー・警告一覧
+    externalStakeholders: [ CLIユーザー, CI, VSCode拡張ユーザー ]
+    group: run_outputs
+  formatted_source:
+    label: 整形済みソース
+    description: ソースからの独立した再parseで生成する正準整形済み.pfdslテキスト
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
+    group: run_outputs
+  dot_graph:
+    label: DOTグラフ
+    description: Graphviz DOT形式テキスト
+    externalStakeholders: [ CLIユーザー ]
+    group: run_outputs
+  rendered_image:
+    label: レンダリング画像
+    description: DOTから変換したSVG（wasm）またはPDF/PNG（puppeteer経由）
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
+    group: run_outputs
+  metadata_tsv:
+    label: メタデータTSV
+    description: ノードのkind/label/description/status/tags/ownerを抽出したタブ区切りテキスト
+    externalStakeholders: [ VSCode拡張ユーザー ]
+    group: run_outputs
+  diff_report:
+    label: 差分レポート
+    description: 2つのグラフ間の構造差分
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
+    group: run_outputs
+  sorted_source:
+    label: ソート済みソース
+    description: 指定キーでノード定義を並べ替えた.pfdslテキスト
+    externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
+    group: run_outputs
+  spec:
+    label: 言語仕様書
+    description: workflow.pfdsl の maintain_spec が生産する。生成の一次ソース
+    group: repo_sources
+  skill_template:
+    label: スキルテンプレート
+    description: workflow.pfdsl の maintain_template が生産する
+    group: repo_sources
+  quality_guide:
+    label: 品質ガイド
+    description: workflow.pfdsl の maintain_template が生産する
+    group: repo_sources
+  feature_samples:
+    label: 機能カタログ
+    description: workflow.pfdsl の maintain_samples が生産する
+    group: repo_sources
+  review_perspectives:
+    label: レビュー観点集
+    description: workflow.pfdsl の distill_ops が生産する
+    group: repo_sources
+  static_skills:
+    label: 手書きスキル・agent群
+    description: "workflow.pfdsl の distill_ops が生産する ops_skill_general / ops_skill_l3 / retro_skill / ecosystem_skill / grill_skill / pfd_lens_agent / implementer_agent。個別列挙は workflow.pfdsl が一次情報で、ここでは同梱素材の束としてのみ扱う"
+    group: repo_sources
+  ops_install_sources:
+    label: pfd-ops 配布ソース（repo ルート）
+    description: 採用リポへ配る監査スクリプトと GitHub Actions workflow の一次情報
+    group: repo_sources
+  toolchain:
+    label: ツールチェーン
+    description: workflow.pfdsl の merge_pr が生産する。公開とパッケージングの素材
+    group: repo_sources
+  roadmap_pfdsl:
+    label: issue 依存グラフ
+    description: workflow.pfdsl の map_deps が生産する。描画対象
+    group: repo_sources
+  release_tag:
+    label: リリースタグ
+    description: "workflow.pfdsl の decide_release が生産する。v* / lib-v* / vscode-v* のいずれか。ここから先は判断が介在しない"
+    group: repo_sources
+  pfdsl_skill:
+    label: AI agent スキル（リポ内）
+    description: make gen-skill で再生成。手編集禁止。全 .pfdsl 作業の起点（このリポ内の Claude Code が消費）
+    location: ../.claude/skills/pfdsl/
+    group: repo_generated
+  ops_install_templates:
+    label: pfd-ops 採用テンプレート（install/）
+    description: 採用リポが自リポへ配置するテンプレート一式。生成物であり手編集しない
+    location: ../.claude/skills/pfd-ops/install/
+    group: repo_generated
+  plugin_dist:
+    label: marketplace 配布プラグイン
+    description: "make gen-plugin が組み立てる plugin/pfdsl/（コミット対象、git-subdir marketplace source としてそのまま配布される）。旧 runtime-pipeline.pfdsl の plugin_dir と workflow.pfdsl の plugin_dist が同一物の二重モデル化だったため統合した"
+    location: ../plugin/pfdsl/
+    group: repo_generated
+  sample_previews:
+    label: サンプル描画物
+    description: docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samples で再生成
+    location: ../docs/samples/
+    group: repo_generated
+  vsix_package:
+    label: .vsix パッケージ
+    description: make vscode-package が生成する VS Code 拡張の配布アーカイブ
+    group: repo_generated
+  published_cli:
+    label: npm 公開 CLI
+    description: v* tag push で GitHub Actions が自動 publish（Trusted Publishing / OIDC）
+    externalStakeholders: [ 外部CLIユーザー ]
+    group: published
+  published_libraries:
+    label: npm 公開ライブラリ群
+    description: lib-v* tag push で GitHub Actions が自動 publish（core → graphviz-exporter → preview-engine 順）
+    externalStakeholders: [ 外部ライブラリ利用者 ]
+    group: published
+  published_ext:
+    label: Marketplace 公開 extension
+    description: marketplace.visualstudio.com へアップロード済みの VS Code 拡張
+    externalStakeholders: [ VSCode拡張ユーザー ]
+    group: published
+  installed_plugin:
+    label: 導入済みプラグイン
+    description: /plugin marketplace add + /plugin install でユーザー環境（plugin cache）へ展開されたコピー
+    externalStakeholders: [ 採用リポのAIエージェント ]
+    group: adopter_env
+  installed_l3_layer:
+    label: 導入済みL3レイヤー
+    description: plugin同梱install/由来ファイルの採用リポルートへの実配置結果
+    externalStakeholders: [ 採用リポのGitHub Actions ]
+    group: adopter_repo
+  gh_labels:
+    label: GitHubラベル整備結果
+    description: flow:managed / flow:exempt ラベルの存在保証（gh CLI経由）
+    externalStakeholders: [ 採用リポのGitHubリポジトリ ]
+    group: adopter_repo
+  drift_report:
+    label: 配置鮮度警告
+    description: 配置済みinstall/由来ファイルと同梱canonicalのhash照合結果、および上流plugin versionとのskew警告
+    externalStakeholders: [ 採用リポのAIエージェント ]
+    group: run_outputs
+
+process:
+  parse:
+    label: 構文解析
+    description: frontmatter読込・lex・parseの3段を1トランザクションで実行しdocument+frontmatterを得る
+    location: ../packages/core/src/index.ts
+    tags: [ b ]
+  normalize:
+    label: 正規化
+    description: エッジリストとノード種別を正規化しGraphを構築する
+    command: node packages/cli/dist/cli.js graph edges
+    location: ../packages/core/src/normalizer.ts
+    tags: [ b ]
+  validate:
+    label: 検証
+    description: 正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する
+    command: node packages/cli/dist/cli.js check
+    location: ../packages/core/src/validator.ts
+    tags: [ b ]
+  format:
+    label: 整形
+    description: ソースを独立に再lex/parseし正準整形済みテキストを生成する
+    command: node packages/cli/dist/cli.js fmt --write
+    location: ../packages/core/src/formatter.ts
+    tags: [ b ]
+  render_graph:
+    label: DOT変換
+    description: 正準化グラフとfrontmatterからGraphviz DOTを構築する
+    command: node packages/cli/dist/cli.js render
+    location: ../packages/graphviz-exporter/src/index.ts
+    tags: [ b ]
+  export_image:
+    label: 画像化
+    description: DOTをSVG（wasm、外部依存なし）またはPDF/PNG（puppeteer必須）へ変換する
+    command: node packages/cli/dist/cli.js render --format svg
+    location: ../packages/preview-engine/src/index.ts
+    tags: [ b ]
+  export_metadata:
+    label: メタデータ抽出
+    description: 正準化グラフとfrontmatterからノードメタデータを抽出しTSV化する
+    location: ../packages/metadata-exporter/src/index.ts
+    tags: [ b ]
+  diff_graphs:
+    label: 差分算出
+    description: 2つの正準化グラフの構造差分を計算する
+    command: node packages/cli/dist/cli.js diff
+    location: ../packages/core/src/diff.ts
+    tags: [ b ]
+  sort_meta:
+    label: ノード定義ソート
+    description: frontmatterをyaml CSTとして再parseし指定キーでノード定義を並べ替えたテキストを生成する
+    command: node packages/cli/dist/cli.js meta sort
+    location: ../packages/core/src/sort.ts
+    tags: [ b ]
+  gen_skill:
+    label: スキル生成
+    description: "スキル生成ソースからリポ内 pfdsl スキルを再生成する。workflow.pfdsl から移動。判断を含まず入力が揃えば出力が決まるため"
+    command: make gen-skill
+    tags: [ gen ]
+  gen_install:
+    label: install/ 生成
+    description: "repo ルートの配布ソースから pfd-ops スキルの install/ ミラーを一方向で再生成する。workflow.pfdsl から移動"
+    command: make gen-install
+    tags: [ gen ]
+  gen_plugin:
+    label: プラグイン生成
+    description: "スキルツリー・commands・agents を plugin/pfdsl/ に束ね plugin.json を書く。旧 runtime-pipeline.pfdsl の assemble_plugin と workflow.pfdsl の gen_plugin を統合した。同梱対象リストは gen-plugin.mjs に一元化"
+    command: make gen-plugin
+    location: ../scripts/gen-plugin.mjs
+    tags: [ gen, g ]
+  render_previews:
+    label: サンプル描画
+    description: "機能カタログとロードマップを dot/svg に描画する。workflow.pfdsl から移動"
+    command: make gen-samples
+    tags: [ gen ]
+  publish_artifacts:
+    label: タグ起点の自動公開
+    description: "v* / lib-v* tag push を GitHub Actions が受けて npm publish する。判断はタグを打つ時点で済んでおり以降は決定的。workflow.pfdsl の publish_cli / publish_libraries の自動部分"
+    tags: [ gen ]
+  package_vsix:
+    label: vsix 生成
+    description: vscode-extension を .vsix へパッケージングする
+    command: "make vscode-package VERSION=<VERSION>"
+    tags: [ gen ]
+  upload_vsix:
+    label: marketplace へ手動アップロード
+    description: "生成済み .vsix を marketplace.visualstudio.com へ人が手でアップロードする。判断は不要で、marketplace に発行APIを使う経路が整っていないという境界の問題だけが理由。機械チェーン内の唯一の人手ノードとして自動化候補になる"
+    owner: takasek
+    tags: [ manual_no_judgment ]
+  install_plugin:
+    label: プラグインインストール
+    description: 外部ユーザーがClaude Codeのmarketplace機構で導入・更新する
+    tags: [ g ]
+  deploy_install_layer:
+    label: L3レイヤー実配置
+    description: /pfd-init ステップ3.5。plugin同梱install/を採用リポルートへコピーする
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --deploy
+    tags: [ g ]
+  check_install_sync:
+    label: 配置鮮度セルフチェック
+    description: pfd-ops発火時に同梱canonicalと配置済みファイルをhash照合しdriftを警告する
+    command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
+    tags: [ g ]
+  ensure_labels:
+    label: ラベル保証
+    description: flow:managed / flow:exempt ラベルの存在を確認・作成する
+    command: node scripts/pfdsl/audit-issues-flow.mjs --fix
+    tags: [ g ]
+---
+
+pfdsl_source >> parse -> parsed_doc
+
+parsed_doc >> normalize -> normalized_graph
+
+[normalized_graph, parsed_doc] >> validate -> diagnostics_report
+
+pfdsl_source >> format -> formatted_source
+
+pfdsl_source >> sort_meta -> sorted_source
+
+[normalized_graph, parsed_doc] >> render_graph -> dot_graph
+
+dot_graph >> export_image -> rendered_image
+
+[normalized_graph, parsed_doc] >> export_metadata -> metadata_tsv
+
+[normalized_graph, parsed_doc] >> diff_graphs -> diff_report
+
+[feature_samples, quality_guide, review_perspectives, skill_template, spec] >> gen_skill -> pfdsl_skill
+
+ops_install_sources >> gen_install -> ops_install_templates
+
+[feature_samples, ops_install_templates, quality_guide, review_perspectives, skill_template, spec, static_skills, toolchain] >> gen_plugin -> plugin_dist
+
+[feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
+
+[release_tag, toolchain] >> publish_artifacts -> [published_cli, published_libraries]
+
+[release_tag, toolchain] >> package_vsix -> vsix_package
+
+vsix_package >> upload_vsix -> published_ext
+
+plugin_dist >> install_plugin -> installed_plugin
+
+installed_plugin >> deploy_install_layer -> installed_l3_layer
+
+[installed_l3_layer, installed_plugin] >> check_install_sync -> drift_report
+
+installed_l3_layer >> ensure_labels -> gh_labels
