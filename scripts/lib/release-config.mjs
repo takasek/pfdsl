@@ -19,12 +19,6 @@ export const RELEASE_KINDS = {
 		tagPrefix: "v",
 		workflow: "publish-cli.yml",
 		commitMessage: (v) => `chore(package): bump version to ${v}`,
-		// plugin.json mirrors this package's version and this release pins
-		// marketplace.json, so this is the kind that puts a bundle in adopters'
-		// hands — the boundary ADR-0036 gates on. Declared rather than re-derived
-		// from the kind name at the call site, where `kind` is the resolved object
-		// and a `kind === "cli"` test silently never fires.
-		shipsPluginBundle: true,
 	},
 	libs: {
 		packages: [

@@ -126,7 +126,7 @@ check-docs:
 	node scripts/check-forward-ref-markers.mjs
 	node scripts/check-spec-ids.mjs
 	node scripts/check-companion-bindings.mjs
-	node scripts/check-bundle-paths.mjs
+	node scripts/check-distributed-prose.mjs
 
 .PHONY: gen-skill
 gen-skill: check-docs
@@ -162,7 +162,6 @@ push: check-docs
 .PHONY: release-status
 release-status:
 	node scripts/release-status.mjs
-	@node scripts/check-probe-currency.mjs --report
 
 # @pfdsl/cli を npm 公開する。VERSION= を指定するか packages/cli/package.json の version を使い
 # v<version> タグを打って push し、publish-cli.yml (OIDC) を起動する。

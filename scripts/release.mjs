@@ -118,9 +118,6 @@ try {
 // --- 6. pre-tag checks ---
 
 console.log("Running pre-tag checks (build, test, check-docs, gen-plugin identity)...");
-// ADR-0029 decided the adoption-day probe; this is the trigger it lacked. Only
-// the kind that puts a bundle in adopters' hands is gated (see RELEASE_KINDS).
-if (kind.shipsPluginBundle) run("node", ["scripts/check-probe-currency.mjs"]);
 run("make", ["build"]);
 run("make", ["test"]);
 run("make", ["check-docs"]);

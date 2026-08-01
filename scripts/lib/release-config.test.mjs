@@ -134,19 +134,3 @@ test("releaseMilestoneArtifactIds respects a custom prefix", () => {
 	const ready = [{ id: "publish_ext_foo", label: "x", inputs: [], outputs: ["ext_foo"] }];
 	assert.deepEqual(releaseMilestoneArtifactIds(ready, "publish_ext_"), ["ext_foo"]);
 });
-
-test("shipsPluginBundle marks exactly the kind that puts a bundle in adopters' hands", () => {
-	// The probe gate in release.mjs keys off this. A `kind === "cli"` test at the
-	// call site compared the resolved object to a string and never fired, so the
-	// fact is declared here where it can be asserted.
-	const shipping = Object.entries(RELEASE_KINDS)
-		.filter(([, v]) => v.shipsPluginBundle)
-		.map(([k]) => k);
-	assert.deepEqual(shipping, ["cli"]);
-});
-
-test("shipsPluginBundle is truthy on the resolved kind object", () => {
-	assert.equal(RELEASE_KINDS.cli.shipsPluginBundle, true);
-	assert.ok(!RELEASE_KINDS.libs.shipsPluginBundle);
-	assert.ok(!RELEASE_KINDS.vscode.shipsPluginBundle);
-});
