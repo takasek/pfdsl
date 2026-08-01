@@ -13,14 +13,9 @@
 // Usage (wired in .claude/settings.json): node scripts/delegation-guard.mjs
 
 import { runDelegationGuard } from "./lib/delegation-guard.mjs";
+import { readStdinText } from "./lib/hook-io.mjs";
 
-let input = "";
-process.stdin.setEncoding("utf8");
-for await (const chunk of process.stdin) {
-	input += chunk;
-}
-
-const { shouldOutput, output } = runDelegationGuard(input);
+const { shouldOutput, output } = runDelegationGuard(await readStdinText());
 if (shouldOutput) {
 	console.log(JSON.stringify(output));
 }
