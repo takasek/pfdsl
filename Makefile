@@ -76,7 +76,7 @@ vscode-dev: vscode-build
 
 # vscode-extension を .vsix にパッケージし vscode-v<version> タグを打って push する。
 # VERSION=x.y.z を渡すと package.json を更新してコミットしてからパッケージする。
-# tag を打つ前に build/test/check-docs/gen-skill identity を検査する (scripts/release.mjs)。
+# tag を打つ前に build/test/check-docs/gen-skill identity/配布レビューの鮮度を検査する (scripts/release.mjs)。
 # 例: make vscode-package VERSION=0.0.13
 .PHONY: vscode-package
 vscode-package: vscode-build
@@ -166,7 +166,7 @@ release-status:
 # @pfdsl/cli を npm 公開する。VERSION= を指定するか packages/cli/package.json の version を使い
 # v<version> タグを打って push し、publish-cli.yml (OIDC) を起動する。
 # VERSION= を指定した場合は package.json を更新してコミットしてからタグを打つ。
-# tag を打つ前に build/test/check-docs/gen-skill identity を検査する (scripts/release.mjs)。
+# tag を打つ前に build/test/check-docs/gen-skill identity/配布レビューの鮮度を検査する (scripts/release.mjs)。
 # 例: make release VERSION=0.0.8
 .PHONY: release
 release:
@@ -176,7 +176,7 @@ release:
 # VERSION= を指定するか packages/core/package.json の version を使い
 # lib-v<version> タグを打って push し、publish-libraries.yml (OIDC) を起動する。
 # VERSION= を指定した場合は3パッケージの package.json を同時に更新してコミットしてからタグを打つ。
-# tag を打つ前に build/test/check-docs/gen-skill identity を検査する (scripts/release.mjs)。
+# tag を打つ前に build/test/check-docs/gen-skill identity/配布レビューの鮮度を検査する (scripts/release.mjs)。
 # 例: make release-libs VERSION=0.0.2
 .PHONY: release-libs
 release-libs:

@@ -8,7 +8,8 @@
 //   3. clean working tree check
 //   4. resolve target version (from --version, or the current package.json)
 //   5. tag-duplicate check (cheap, version is already known)
-//   6. pre-tag checks: build, test, check-docs, gen-plugin identity
+//   6. pre-tag checks: build, test, check-docs, gen-plugin identity,
+//      distribution review currency
 //   7. bump package.json(s) + commit (only if --version was given)
 //   7b. cli only: pin marketplace.json's plugin source to this release's tag
 //   8. push origin main
@@ -117,7 +118,7 @@ try {
 
 // --- 6. pre-tag checks ---
 
-console.log("Running pre-tag checks (build, test, check-docs, gen-plugin identity)...");
+console.log("Running pre-tag checks (build, test, check-docs, gen-plugin identity, distribution review)...");
 run("make", ["build"]);
 run("make", ["test"]);
 run("make", ["check-docs"]);
@@ -134,6 +135,18 @@ try {
 } catch (err) {
 	if (err.status === undefined) throw err; // execFileSync itself failed to spawn
 	fail("generated plugin dir (plugin/pfdsl) is stale — run 'make gen-plugin' and commit the result before releasing.");
+}
+
+// Has anyone read what the bundle now says, as someone who is not sitting in
+// this repository? Runs after the identity check above, so the prompts it
+// judges are the ones this tag will actually ship. No override: a release is
+// the only moment an adopter is handed this prose, and an escape hatch used
+// once under deadline becomes the way the gate is passed.
+try {
+	run("node", [resolve(root, "scripts/check-distribution-review.mjs")]);
+} catch (err) {
+	if (err.status === undefined) throw err; // execFileSync itself failed to spawn
+	fail("the distributed prompts have changed since their last review (see above).");
 }
 
 // --- 7. bump + commit (only if --version was given) ---

@@ -3,7 +3,7 @@
 // Usage: node scripts/release-status.mjs
 // Exit 1 if any package is behind or has a fetch error.
 
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { git as rawGit } from "./lib/run-exec.mjs";
@@ -11,10 +11,14 @@ import { git as rawGit } from "./lib/run-exec.mjs";
 // These probes fail as a matter of course — an unreleased tag has no ref yet —
 // so their stderr is captured rather than printed as if something broke.
 const git = (args) => rawGit(args, { captureStderr: true });
+import { diffBase, unreviewedFiles } from "./lib/distribution-review.mjs";
 import {
 	compareVersions,
+	formatDistributionReviewStatus,
+	formatFullReviewStatus,
 	formatResults,
 	formatSkillBundleStatus,
+	latestFullReviewDate,
 } from "./lib/release-status-check.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -203,9 +207,33 @@ function countSkillBundleCommits(sinceTag) {
 const skillBundleTag = findLatestCliTag();
 const skillBundleCommits = countSkillBundleCommits(skillBundleTag);
 
+// The distribution review's state, reported but not enforced here. `make
+// release` blocks on the same reading (scripts/check-distribution-review.mjs);
+// showing it at status time is what keeps that refusal from arriving as a
+// surprise mid-release.
+function readDistributionReview() {
+	const dir = resolve(root, "docs/distribution-review");
+	const recordPath = resolve(dir, "reviewed.json");
+	const record = existsSync(recordPath) ? JSON.parse(readFileSync(recordPath, "utf-8")) : { commit: null };
+	const base = diffBase(record);
+	let unreviewedCount = 0;
+	try {
+		const changed = git(["diff", "--name-only", base, "HEAD", "--", "plugin/pfdsl"]).trim().split("\n");
+		unreviewedCount = unreviewedFiles(changed).length;
+	} catch (e) {
+		console.warn(`warn: could not diff against the reviewed commit ${base}: ${e.message}`);
+	}
+	const logs = existsSync(dir) ? readdirSync(dir) : [];
+	return { record, unreviewedCount, lastFullReview: latestFullReviewDate(logs) };
+}
+
+const distributionReview = readDistributionReview();
+
 console.log("release-status:");
 console.log(formatResults(results));
 console.log(formatSkillBundleStatus(skillBundleCommits, skillBundleTag));
+console.log(formatDistributionReviewStatus(distributionReview));
+console.log(formatFullReviewStatus(distributionReview.lastFullReview));
 
 const needsAction =
 	results.some(

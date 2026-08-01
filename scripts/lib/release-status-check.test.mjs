@@ -4,6 +4,9 @@ import {
 	compareVersions,
 	formatResults,
 	formatSkillBundleStatus,
+	formatDistributionReviewStatus,
+	latestFullReviewDate,
+	formatFullReviewStatus,
 } from "./release-status-check.mjs";
 
 describe("compareVersions", () => {
@@ -152,5 +155,55 @@ describe("formatSkillBundleStatus", () => {
 	it("shows up-to-date when there is no prior CLI tag yet", () => {
 		const out = formatSkillBundleStatus(0, null);
 		assert.match(out, /up-to-date/);
+	});
+});
+
+describe("formatDistributionReviewStatus", () => {
+	it("reports how many bundled prompts are past their review", () => {
+		const out = formatDistributionReviewStatus({
+			record: { commit: "abcdef1234567890abcdef1234567890abcdef12", date: "2026-08-01" },
+			unreviewedCount: 3,
+		});
+		assert.match(out, /3 file/);
+		assert.match(out, /abcdef1/);
+		assert.match(out, /2026-08-01/);
+	});
+
+	it("says the bundle has never been reviewed when there is no record", () => {
+		const out = formatDistributionReviewStatus({ record: { commit: null }, unreviewedCount: 22 });
+		assert.match(out, /never reviewed/);
+		assert.match(out, /22 file/);
+	});
+
+	it("shows current when nothing has moved", () => {
+		const out = formatDistributionReviewStatus({
+			record: { commit: "a".repeat(40), date: "2026-08-01" },
+			unreviewedCount: 0,
+		});
+		assert.match(out, /✓/);
+		assert.doesNotMatch(out, /file\(s\) unreviewed/);
+	});
+});
+
+describe("latestFullReviewDate", () => {
+	it("takes the newest full-mode log", () => {
+		const files = ["2026-07-01-full.md", "2026-08-01-diff.md", "2026-07-20-full.md", "reviewed.json"];
+		assert.equal(latestFullReviewDate(files), "2026-07-20");
+	});
+
+	it("is null when no full review has been run", () => {
+		assert.equal(latestFullReviewDate(["2026-08-01-diff.md"]), null);
+	});
+});
+
+describe("formatFullReviewStatus", () => {
+	it("names the date of the last full review", () => {
+		assert.match(formatFullReviewStatus("2026-07-20"), /2026-07-20/);
+	});
+
+	it("says so when a full review has never been run", () => {
+		// Manual-only by design, so this line is the whole reminder that it
+		// exists — the dormancy ADR-0029 fell into started exactly this way.
+		assert.match(formatFullReviewStatus(null), /never run/);
 	});
 });
