@@ -120,6 +120,26 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 **これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。終端ゲートのプロトコル5(b) 判定では「消費者は sibling の `runtime-pipeline.pfdsl` に在る」と記録して該当なしとする。判定時は `.pfdsl/runtime-pipeline.pfdsl` の `gen_skill` / `gen_plugin` / `publish_packages` / `package_vsix` の入力エッジに当該 artifact が列挙されているかを確認する — 列挙が無ければそれは本物の門番違反である。
 
+## 配布プロンプトのレビューと承認記録（`review_distribution`）
+
+`make release` は `docs/distribution-review/reviewed.json` の commit と HEAD の間に配布 `.md` の差分があると pre-tag checks で止まる。
+逃げ道は用意していない。
+公開は稀で、かつ利用側が実際にその散文を渡される唯一の瞬間なので、その希少性自体を起動条件に使っている（ADR-0029 が起動条件ゼロで休眠した反省）。
+
+**hash を進めるのは差分モードだけである。**
+全文モードは実行記録と修正だけを残す。
+全体を見る分ひとつの変更に対する解像度が差分モードに劣るため、これで承認済みとすると差分観点の穴を見逃したまま記録が進む。
+全文モードで直したものは未レビュー差分として残り、次の差分モードが必ず拾う。
+
+**記録コミットで配布プロンプトを触らないこと。**
+触ると記録が指す内容と HEAD の内容がその場でずれ、自分で自分を無効化する。
+修正は先にコミットし、`reviewed.json` の更新は別コミットにする。
+
+**この手順は配布しない。**
+`.claude/skills/distribution-review/` は repo-local であり、上の「配布スキルの新規追加時の横断照合」の対象外である（`runtime-pipeline.pfdsl` の `gen_plugin` 入力エッジに足さない）。
+利用側リポには配布という行為自体が無く、この手順の実施先が存在しない。
+`spec_stress_skill` / `vscode_ext_debug_skill` と同じ扱いで、`distill_ops` の出力にだけ現れる。
+
 ## 新 frontmatter フィールド追加時の sample 追加
 
 frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で追加する（「フィールドが仕様にあるがサンプルに示されていない」状態を防ぐ設計ルール）。生成物の再生成・ドリフト検査は上記のとおり機械的に強制される。
