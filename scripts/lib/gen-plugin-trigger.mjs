@@ -30,7 +30,11 @@ import { PLUGIN_AGENT_FILES } from "./gen-plugin.mjs";
 
 const AGENT_PATTERNS = PLUGIN_AGENT_FILES.map((file) => `\\.claude/agents/${file.replace(/\./g, "\\.")}`).join("|");
 
-export const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|\\.claude/skills/pfd-ecosystem/|\\.claude/skills/pfd-ops/|\\.claude/skills/pfd-retro/|\\.claude/skills/pfd-grill/|\\.claude/commands/pfd-cycle\\.md|\\.claude/commands/pfd-init\\.md|\\.claude/commands/pfd-retro\\.md|${AGENT_PATTERNS}|^hooks/|packages/cli/package\\.json`;
+// `^plugin/` covers the generated side, mirroring what GEN_INSTALL_TRIGGER
+// already does for install/: a hand-edit there is about to be overwritten by
+// the next assembly, and check_drift is what tells the author so instead of
+// letting the edit ship and then vanish (#666, same shape as #579).
+export const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|\\.claude/skills/pfd-ecosystem/|\\.claude/skills/pfd-ops/|\\.claude/skills/pfd-retro/|\\.claude/skills/pfd-grill/|\\.claude/commands/pfd-cycle\\.md|\\.claude/commands/pfd-init\\.md|\\.claude/commands/pfd-retro\\.md|${AGENT_PATTERNS}|^hooks/|^plugin/|packages/cli/package\\.json`;
 
 export const GEN_PLUGIN_TRIGGER = new RegExp(GEN_PLUGIN_TRIGGER_PATTERN);
 

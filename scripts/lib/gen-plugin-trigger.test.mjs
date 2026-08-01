@@ -1,5 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { collectModuleClosure } from "./check-script-imports.mjs";
+import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
 import { PLUGIN_AGENT_FILES } from "./gen-plugin.mjs";
 
@@ -71,5 +75,30 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 
 	it("does not match an unrelated root-level file", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test("packages/core/src/index.ts"), false);
+	});
+
+	it("matches a hand-edit of the generated side", () => {
+		// gen-install-trigger covers its own generated side for the same reason:
+		// an edit made there is about to be overwritten, and the drift check is
+		// what says so (#666).
+		assert.equal(GEN_PLUGIN_TRIGGER.test("plugin/pfdsl/skills/pfdsl/references/spec.md"), true);
+		assert.equal(GEN_PLUGIN_TRIGGER.test("plugin/pfdsl/.claude-plugin/plugin.json"), true);
+	});
+
+	it("covers every module the dist-independent assembly imports", () => {
+		// The hand-kept alternation above drifts from the code it is supposed to
+		// track. Deriving the expectation from the real import closure makes a
+		// new dependency fail here rather than ship a stale bundle (#666).
+		const root = `${resolve(dirname(fileURLToPath(import.meta.url)), "../..")}/`;
+		const closure = [...collectModuleClosure("scripts/gen-plugin-dist-independent.mjs")].map((file) =>
+			file.startsWith(root) ? file.slice(root.length) : file,
+		);
+		assert.ok(closure.length > 0);
+		for (const file of closure) {
+			// gen-install's own inputs are guarded by GEN_INSTALL_TRIGGER, whose
+			// check_drift runs first and blocks until install/ is regenerated.
+			const covered = GEN_PLUGIN_TRIGGER.test(file) || GEN_INSTALL_TRIGGER.test(file);
+			assert.ok(covered, `${file} triggers no drift check`);
+		}
 	});
 });
