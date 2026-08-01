@@ -10,6 +10,15 @@ import { writeSkillRefs } from "./gen-skill-refs.mjs";
 // adding an agent cannot land in one place and be forgotten in the other.
 export const PLUGIN_AGENT_FILES = ["pfd-lens.md", "pfd-implementer.md"];
 
+// The skill trees mirrored into plugin/pfdsl/skills/ from .claude/skills/, and
+// the commands mirrored into plugin/pfdsl/commands/. Named here for the same
+// reason as PLUGIN_AGENT_FILES: assemblePluginDistIndependent bundles exactly
+// these, and scripts/lib/distribution-review.mjs maps a bundled file back to
+// the source a reviewer edits, so the two cannot disagree about what ships.
+// The pfdsl skill is absent because it is rendered, not mirrored (gen-skill).
+export const PLUGIN_SKILL_DIRS = ["pfd-grill", "pfd-ops", "pfd-retro", "pfd-ecosystem"];
+export const PLUGIN_COMMAND_FILES = ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"];
+
 // Agents that stay out of the bundle, with why — an adopting repo gets the
 // pfd-* ones because they operate on the .pfdsl files it now has, and nothing
 // else. Named rather than merely absent so a drift test can require every file
@@ -121,14 +130,13 @@ export function assemblePluginDistIndependent({
 	deps.genInstall(root);
 	console.log(".claude/skills/pfd-ops/install ← repo-root sources (gen-install)");
 
-	for (const name of ["pfd-grill", "pfd-ops", "pfd-retro", "pfd-ecosystem"]) {
+	for (const name of PLUGIN_SKILL_DIRS) {
 		deps.mirrorDir(name, resolve(root, ".claude/skills"), resolve(pluginRoot, "skills"));
 		console.log(`plugin/pfdsl/skills/${name} ← .claude/skills/${name}`);
 	}
 
-	const commandFiles = ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"];
-	deps.mirrorFiles(commandFiles, resolve(root, ".claude/commands"), resolve(pluginRoot, "commands"));
-	for (const file of commandFiles) {
+	deps.mirrorFiles(PLUGIN_COMMAND_FILES, resolve(root, ".claude/commands"), resolve(pluginRoot, "commands"));
+	for (const file of PLUGIN_COMMAND_FILES) {
 		console.log(`plugin/pfdsl/commands/${file} ← .claude/commands/${file}`);
 	}
 
