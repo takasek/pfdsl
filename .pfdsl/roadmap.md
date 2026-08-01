@@ -86,6 +86,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 - [ ] 変更が公開物の挙動・同梱内容を変える場合（CLI 出力・拡張機能の動作変化に加え、plugin 同梱物 = 配布スキル群・pfd-* コマンド・agents（`make gen-plugin` の対象）の変更を含む — パスでなく挙動と同梱内容で判定）、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending なら次サイクルの先頭タスクとして明記する）
 - [ ] CLIコマンドを追加・変更した場合、HELP テキスト（`packages/cli/src/index.ts`）と README のコマンド一覧の両方を更新した
 - [ ] 実装を subagent へ委譲した場合、戻り時に `git log origin/<branch>..HEAD` と open PR 一覧を確認し、委譲先がブリーフの留保作業（push・PR 作成・issue 操作）を実行していないか照合した
+- [ ] `/simplify` または `/code-review` を実施した回は、実施直後（コミット作成前）に `Review-Measurement` trailer をそのコミットのメッセージへ含めた。レビュー実施とコミット作成の間に他の作業（PR 作成・push 等）を挟むと記載を失念しやすい — 実施済みで未記載のまま次の作業に進んでいないか、コミット直前に再確認する
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。`.claude/skills/pfdsl/` は生成物かつ gitignore 済（#348）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — CI（test.yml）と同様に `make bootstrap-pfdsl-skill` を先に実行する。ビルド後は `npx @pfdsl/cli@latest` でなく `node packages/cli/dist/cli.js` を使う（`npx` は npm の公開バージョンを使うため、未リリースの status 値等が V008 エラーになる）。
 

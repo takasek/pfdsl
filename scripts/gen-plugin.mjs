@@ -8,12 +8,11 @@
 // CLAUDE.md, etc). `claude plugin validate` flags a plugin-root CLAUDE.md as
 // unshippable context, which is what surfaced this during local verification.
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
-import { PLUGIN_AGENT_FILES, buildPluginManifest, mirrorDir, mirrorFiles } from "./lib/gen-plugin.mjs";
+import { assemblePluginDistIndependent } from "./lib/gen-plugin.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -22,59 +21,20 @@ const pluginRoot = resolve(root, "plugin/pfdsl");
 function assemble() {
 	// --- 1. Generate the pfdsl skill directly into plugin/pfdsl/skills/pfdsl ---
 	// (reuses gen-skill.mjs rather than copying skills/pfdsl, so this stays in
-	// sync even if the two ever diverge in generation logic)
+	// sync even if the two ever diverge in generation logic). This is the only
+	// step that needs packages/cli/dist (it embeds `pfdsl help` output into
+	// SKILL.md) — everything else is dist-independent (#593).
 
 	execFileSync(process.execPath, [resolve(__dirname, "gen-skill.mjs"), "--out", resolve(pluginRoot, "skills/pfdsl")], {
 		stdio: "inherit",
 	});
 
-	// --- 1b. Regenerate .claude/skills/pfd-ops/install/ from its repo-root
-	// sources (#547) before mirroring the pfd-ops skill tree below, so
-	// plugin/ is never built from a stale install/ mirror.
+	// --- 1b-6. Everything else: install/ mirror, static skills, commands,
+	// agents, hooks, plugin.json, and skills/pfdsl/references. Shared with
+	// scripts/gen-plugin-dist-independent.mjs, which pre-commit drift-checks
+	// even when dist is missing/stale (#593).
 
-	execFileSync(process.execPath, [resolve(__dirname, "gen-install.mjs")], { stdio: "inherit" });
-
-	// --- 2. Copy the static skills (pfd-grill, pfd-ops, pfd-retro, pfd-ecosystem) into skills/ ---
-
-	for (const name of ["pfd-grill", "pfd-ops", "pfd-retro", "pfd-ecosystem"]) {
-		mirrorDir(name, resolve(root, ".claude/skills"), resolve(pluginRoot, "skills"));
-		console.log(`plugin/pfdsl/skills/${name} ← .claude/skills/${name}`);
-	}
-
-	// --- 3. Copy the commands (pfd-cycle, pfd-init, pfd-retro) into commands/ ---
-
-	const commandFiles = ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"];
-	mirrorFiles(commandFiles, resolve(root, ".claude/commands"), resolve(pluginRoot, "commands"));
-	for (const file of commandFiles) {
-		console.log(`plugin/pfdsl/commands/${file} ← .claude/commands/${file}`);
-	}
-
-	// --- 4. Copy the agents (pfd-lens, pfd-implementer) into agents/ ---
-	// pfd-retro's SKILL.md delegates large-diagram audits to the pfd-lens agent
-	// (.claude/agents/pfd-lens.md); without it bundled, that delegation path is
-	// unreachable for plugin-only installs.
-	// work-cycle.md tells the caller to delegate implementation to an agent whose
-	// tools: cannot reach GitHub; pfd-implementer is that agent, so bundling it
-	// is what makes the rule actionable in an adopting repo (#558).
-
-	mirrorFiles(PLUGIN_AGENT_FILES, resolve(root, ".claude/agents"), resolve(pluginRoot, "agents"));
-	for (const file of PLUGIN_AGENT_FILES) {
-		console.log(`plugin/pfdsl/agents/${file} ← .claude/agents/${file}`);
-	}
-
-	// --- 5. Copy the plugin hooks (retro reminder, #465) into hooks/ ---
-
-	mirrorDir("hooks", root, pluginRoot);
-	console.log("plugin/pfdsl/hooks ← hooks");
-
-	// --- 6. Write plugin/pfdsl/.claude-plugin/plugin.json ---
-
-	const cliVersion = JSON.parse(readFileSync(resolve(root, "packages/cli/package.json"), "utf-8")).version;
-	const manifest = buildPluginManifest({ cliVersion });
-	const pluginManifestDir = resolve(pluginRoot, ".claude-plugin");
-	mkdirSync(pluginManifestDir, { recursive: true });
-	writeFileSync(resolve(pluginManifestDir, "plugin.json"), `${JSON.stringify(manifest, null, "\t")}\n`);
-	console.log("plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version");
+	assemblePluginDistIndependent({ root, pluginRoot });
 
 	console.log("\nPlugin assembled at plugin/pfdsl/. Verify locally with: claude --plugin-dir plugin/pfdsl");
 }

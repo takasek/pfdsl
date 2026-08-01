@@ -12,14 +12,11 @@
 //
 // Usage (wired in .claude/settings.json): node scripts/delegation-guard.mjs
 
-import { evaluateDelegationGuard } from "./lib/delegation-guard.mjs";
-import { buildDenyOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
+import { runDelegationGuard } from "./lib/delegation-guard.mjs";
+import { readStdinText } from "./lib/hook-io.mjs";
 
-const payload = parseHookPayload(await readStdinText());
-if (!payload) process.exit(0);
-
-const result = evaluateDelegationGuard(payload);
-if (result.decision === "deny") {
-	console.log(JSON.stringify(buildDenyOutput(result)));
+const { shouldOutput, output } = runDelegationGuard(await readStdinText());
+if (shouldOutput) {
+	console.log(JSON.stringify(output));
 }
 process.exit(0);

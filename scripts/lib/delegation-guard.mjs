@@ -1,6 +1,8 @@
 // Blocks outward-facing Bash commands (push, PR/issue mutation) when they
 // come from a delegated subagent rather than from the caller (#554).
 //
+// buildDenyOutput/parseHookPayload are shared with the other guard hooks
+// via lib/hook-io.mjs (#650) rather than redefined here.
 // Why a hook and not permissions/frontmatter:
 //   - agent frontmatter `tools:` is tool-granularity, so any agent holding
 //     Bash can still reach `git push` and `gh`
@@ -16,6 +18,8 @@
 // the API, a script that shells out) is not stopped here. The backstop is the
 // caller re-checking `git log origin/<branch>..HEAD` and the PR list when the
 // delegation returns.
+
+import { buildDenyOutput, parseHookPayload } from "./hook-io.mjs";
 
 /** Agents permitted to perform outward-facing actions. Publishing is their job. */
 export const DEFAULT_ALLOWED_AGENTS = ["issue-worker"];
@@ -235,4 +239,23 @@ export function evaluateDelegationGuard(payload, { allowedAgents = DEFAULT_ALLOW
 			"Publishing is the caller's to do. Finish the work as commits on the current branch, then report back " +
 			"to your caller and let it review, push and open the pull request. Do not look for another route.",
 	};
+}
+
+/**
+ * Orchestrates the hook's stdin payload into a print-or-not decision.
+ * Malformed JSON must silently allow (no output), matching the top-level
+ * script's `process.exit(0)` on a parse failure — a crash in this guard must
+ * not wedge every Bash call (#645).
+ * @param {string} inputText - raw stdin payload
+ * @returns {{shouldOutput: boolean, output?: object}}
+ */
+export function runDelegationGuard(inputText) {
+	const payload = parseHookPayload(inputText);
+	if (!payload) return { shouldOutput: false };
+
+	const result = evaluateDelegationGuard(payload);
+	if (result.decision === "deny") {
+		return { shouldOutput: true, output: buildDenyOutput(result) };
+	}
+	return { shouldOutput: false };
 }

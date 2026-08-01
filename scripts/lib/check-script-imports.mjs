@@ -47,3 +47,55 @@ export function findBrokenImports(files) {
 	}
 	return broken;
 }
+
+/**
+ * Walks the relative-import graph starting at entryFile and returns the set
+ * of every file reached (entryFile included). Used by dist-independence
+ * guards (e.g. scripts/lib/gen-skill-refs.test.mjs, scripts/lib/gen-plugin.test.mjs)
+ * that need to inspect a module's whole closure, not just its direct source.
+ * @param {string} entryFile - absolute path
+ * @returns {Set<string>}
+ */
+export function collectModuleClosure(entryFile) {
+	const seen = new Set();
+	const queue = [entryFile];
+	while (queue.length > 0) {
+		const file = queue.pop();
+		if (seen.has(file)) continue;
+		seen.add(file);
+		const source = readFileSync(file, "utf-8");
+		for (const specifier of extractRelativeImports(source)) {
+			queue.push(resolve(dirname(file), specifier));
+		}
+	}
+	return seen;
+}
+
+// Strips `//` and `/* */` comments before scanning for forbidden references,
+// so a file is free to *explain in prose* why it avoids packages/cli/dist
+// without that explanation itself tripping the check.
+function stripComments(source) {
+	return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+}
+
+/**
+ * Flags files that import node:child_process or reference packages/cli/dist
+ * outside of a comment — the two ways a "dist-independent" script could
+ * secretly gain a build dependency (either by spawning the CLI, or by
+ * reading its dist output directly).
+ * @param {string[]} files - absolute paths
+ * @returns {Array<{file: string, reason: string}>}
+ */
+export function findDistDependentFiles(files) {
+	const violations = [];
+	for (const file of files) {
+		const code = stripComments(readFileSync(file, "utf-8"));
+		if (/node:child_process/.test(code)) {
+			violations.push({ file, reason: "imports node:child_process (that's how CLI dist gets invoked)" });
+		}
+		if (/dist[\\/]cli\.js|cli[\\/]dist/.test(code)) {
+			violations.push({ file, reason: "references packages/cli/dist" });
+		}
+	}
+	return violations;
+}

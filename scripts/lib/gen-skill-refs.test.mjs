@@ -6,7 +6,7 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
-import { extractRelativeImports } from "./check-script-imports.mjs";
+import { collectModuleClosure, findDistDependentFiles } from "./check-script-imports.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../..");
@@ -85,43 +85,14 @@ describe("writeSkillRefs", () => {
 	});
 });
 
-// Strips `//` and `/* */` comments before scanning for forbidden references,
-// so a file is free to *explain in prose* why it avoids packages/cli/dist
-// (as scripts/gen-skill-refs.mjs and scripts/lib/gen-skill-refs.mjs do)
-// without that explanation itself tripping the check.
-function stripComments(source) {
-	return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-}
-
 describe("dist independence", () => {
 	it("scripts/gen-skill-refs.mjs and its module closure never reference packages/cli/dist or spawn a child process", () => {
 		const entry = resolve(repoRoot, "scripts/gen-skill-refs.mjs");
-		const seen = new Set();
-		const queue = [entry];
-		while (queue.length > 0) {
-			const file = queue.pop();
-			if (seen.has(file)) continue;
-			seen.add(file);
-			const source = readFileSync(file, "utf-8");
-			for (const specifier of extractRelativeImports(source)) {
-				queue.push(resolve(dirname(file), specifier));
-			}
-		}
+		const closure = collectModuleClosure(entry);
 
-		assert.ok(seen.size >= 2, "expected the closure to include at least the entry and gen-skill-refs.mjs lib");
+		assert.ok(closure.size >= 2, "expected the closure to include at least the entry and gen-skill-refs.mjs lib");
 
-		for (const file of seen) {
-			const code = stripComments(readFileSync(file, "utf-8"));
-			assert.equal(
-				/node:child_process/.test(code),
-				false,
-				`${file} must not import node:child_process (that's how CLI dist gets invoked)`,
-			);
-			assert.equal(
-				/dist[\\/]cli\.js|cli[\\/]dist/.test(code),
-				false,
-				`${file} must not reference packages/cli/dist`,
-			);
-		}
+		const violations = findDistDependentFiles([...closure]);
+		assert.deepEqual(violations, [], violations.map((v) => `${v.file}: ${v.reason}`).join("; "));
 	});
 });

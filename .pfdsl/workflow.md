@@ -85,9 +85,9 @@ proposal 起草を subagent に委譲する場合、対象 spec の**現行 fron
 
 ## 生成物の再生成と自動ドリフト検査（gen-skill / gen-plugin / gen-samples / gen-readme-cli）
 
-`docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。`packages/cli/src/` の CLI コマンド定義を変更したら `make gen-readme-cli`（README `## CLI` セクション）で再生成する。`.claude/skills/pfd-grill` / `.claude/skills/pfd-ops` / `.claude/skills/pfd-retro` / `.claude/skills/pfd-ecosystem` / `.claude/agents/pfd-lens.md` / `.claude/commands/pfd-cycle.md` / `.claude/commands/pfd-init.md` / `.claude/commands/pfd-retro.md` または gen-skill の入力を変更したら `make gen-plugin`（`plugin/pfdsl/`、marketplace 配布プラグイン。gen-skill 分は内部で自動実行）で再生成する（ADR-0028 で pfd-ops も同梱対象に追加）。再生成漏れは機械的に検出されるため手動チェックは不要 — gen-skill / gen-plugin の identity は pre-commit（各々の入力 staged 時）と CI（check-gen-plugin.yml）、`.dot` / README のドリフトは graphviz-exporter の vitest テスト、`.svg` のドリフトは preview-engine の vitest テスト（いずれも pre-commit の `docs/samples/` staged 時と CI test）、README `## CLI` セクションのドリフトは `make check-readme-cli`（pre-commit の `packages/cli/src/` / `README.md` staged 時と CI test.yml）が検査する。`references/*.md` は dist 非依存の `scripts/gen-skill-refs.mjs` が生成し、pre-commit は gen-plugin の check_drift より前に専用の check_drift でこれを検査する。dist が stale で gen-skill / gen-plugin の検査が skip されても references のドリフトはここで止まる（#586。粒度と経緯は `scripts/pre-commit` の当該コメントが一次情報）。
+`docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。`packages/cli/src/` の CLI コマンド定義を変更したら `make gen-readme-cli`（README `## CLI` セクション）で再生成する。`.claude/skills/pfd-grill` / `.claude/skills/pfd-ops` / `.claude/skills/pfd-retro` / `.claude/skills/pfd-ecosystem` / `.claude/agents/pfd-lens.md` / `.claude/commands/pfd-cycle.md` / `.claude/commands/pfd-init.md` / `.claude/commands/pfd-retro.md` または gen-skill の入力を変更したら `make gen-plugin`（`plugin/pfdsl/`、marketplace 配布プラグイン。gen-skill 分は内部で自動実行）で再生成する（ADR-0028 で pfd-ops も同梱対象に追加）。再生成漏れは機械的に検出されるため手動チェックは不要 — gen-skill / gen-plugin の identity は pre-commit（各々の入力 staged 時）と CI（check-gen-plugin.yml）、`.dot` / README のドリフトは graphviz-exporter の vitest テスト、`.svg` のドリフトは preview-engine の vitest テスト（いずれも pre-commit の `docs/samples/` staged 時と CI test）、README `## CLI` セクションのドリフトは `make check-readme-cli`（pre-commit の `packages/cli/src/` / `README.md` staged 時と CI test.yml）が検査する。`references/*.md` を含む plugin/ の dist 非依存部分（install/ ミラー・静的 skills・commands・agents・hooks・plugin.json・skill references）は `scripts/gen-plugin-dist-independent.mjs` が生成し、pre-commit は dist 必須の SKILL.md 検査とは別の check_drift でこれを常時検査する。dist が stale で gen-skill / gen-plugin の SKILL.md 部分の検査が skip されても、このドリフトはここで止まる（#593。前身は #586 の references 専用検査で、粒度拡張の経緯は `scripts/pre-commit` の当該コメントが一次情報）。
 
-**dist 鮮度の機械検査**: pre-commit の drift 検査（README `## CLI` セクション・gen-skill の SKILL.md 部分・gen-plugin）は対象 dist（`packages/cli/dist/cli.js` 等）を実行または import して出力を取得する。`scripts/lib/dist-freshness.mjs` が dist の mtime を sibling `src/` の最新 mtime と比較し、dist が存在しない場合と同様に古い場合も検査を skip して「run 'pnpm -r build'」を促す（#450/#452）。skip は「検査対象が信頼できないので判定を CI に委ねる」意味であり、ローカルで検査 PASS しなかったからといって drift が無いとは限らない — コミット前に `pnpm -r build` を済ませて skip を解消してから判断する。gen-skill の `references/*.md` 部分は dist に触れないため、この skip の影響を受けない（#586）。
+**dist 鮮度の機械検査**: pre-commit の drift 検査（README `## CLI` セクション・gen-skill の SKILL.md 部分・gen-plugin）は対象 dist（`packages/cli/dist/cli.js` 等）を実行または import して出力を取得する。`scripts/lib/dist-freshness.mjs` が dist の mtime を sibling `src/` の最新 mtime と比較し、dist が存在しない場合と同様に古い場合も検査を skip して「run 'pnpm -r build'」を促す（#450/#452）。skip は「検査対象が信頼できないので判定を CI に委ねる」意味であり、ローカルで検査 PASS しなかったからといって drift が無いとは限らない — コミット前に `pnpm -r build` を済ませて skip を解消してから判断する。gen-skill の `references/*.md` 部分と gen-plugin の SKILL.md 以外の部分は dist に触れないため、この skip の影響を受けない（#586 / #593）。
 
 **pfd-ops `install/` は生成物**: `.claude/skills/pfd-ops/install/**` は手編集しない。
 生成の構造（ソース・生成器・向き）は `workflow.pfdsl` の `ops_install_sources >> gen_install -> ops_install_templates` が一次情報 — ここには手続きだけを書く。
@@ -103,7 +103,22 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 **出力抑制**: `make gen-samples` / `make gen-skill` は pnpm 全パッケージビルド + 全サンプル check の warning を毎回出力するため数百行に及ぶ。実行後は `git status --short docs/samples/ .claude/skills/pfdsl/ plugin/pfdsl/` で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
-**配布スキルの新規追加時の横断照合**: 新しい配布スキル（`.claude/skills/pfd-*`）を追加したら、`grep -rn "<既存スキルID>\b" .pfdsl/ scripts/` で既存の兄弟スキル（例: `retro_skill`）の全参照箇所を洗い出し、新スキルにも同じ箇所（`workflow.pfdsl` の `distill_ops` 出力エッジ・`publish_cli` 入力エッジ・`gen_plugin` 入力エッジ、`runtime-pipeline.pfdsl` の `assemble_plugin` 入力エッジ）が揃っているか1つずつ照合する。`scripts/gen-plugin.mjs` の静的リストと `plugin.json` description は pre-commit の drift 検査が機械的に強制するが、PFD 側のこれらのエッジは check で強制されず目視追随に依存する（#481 で `grill_skill` 追加時に発見。当初 `distill_ops`・`publish_cli`・`assemble_plugin` の3箇所を見落とし、pfd-retro の A層「同種対称性」監査で気付いた）。
+**配布スキルの新規追加時の横断照合**: 新しい配布スキル（`.claude/skills/pfd-*`）を追加したら、`grep -rn "<既存スキルID>\b" .pfdsl/ scripts/` で既存の兄弟スキル（例: `retro_skill`）の全参照箇所を洗い出し、新スキルにも同じ箇所が揃っているか1つずつ照合する。照合先は2箇所である。
+
+- `workflow.pfdsl` の `distill_ops` 出力エッジ（スキルの一次情報としての生産）
+- `runtime-pipeline.pfdsl` の `gen_plugin` 入力エッジ（同梱素材としての消費）
+
+`scripts/gen-plugin.mjs` の静的リストと `plugin.json` description は pre-commit の drift 検査が機械的に強制するが、PFD 側のこれらのエッジは check で強制されず目視追随に依存する（#481 で `grill_skill` 追加時に発見。当初3箇所を見落とし、pfd-retro の A層「同種対称性」監査で気付いた）。
+
+照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が `decide_release` になり素材列挙を持たなくなり、`runtime-pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
+
+**判断軸による分担（ADR-0035）**: 判断を含まない生成・公開の変換は `runtime-pipeline.pfdsl` が持つ。`make gen-skill` / `make gen-install` / `make gen-plugin` / `make gen-samples` と、タグ push 以降の npm publish・vsix 生成・marketplace アップロードがそちらにある。この図に残るのは「リリースするか・どの版で切るか」の判断（`decide_release`）までである。生成コマンドの手続き・drift 検査の話はこの companion が引き続き一次情報として持つ（グラフで運べない散文のため）。
+
+**`pfdsl_skill` は `graph orphans` に出る**: `runtime-pipeline.pfdsl` の `gen_skill` が生産する境界 artifact であり、この図では `>>?` フィードバック入力としてのみ現れる。primary エッジを持たないため `graph orphans` が報告するが、これは能力成果物が世代をまたいで還流する形（ADR-0011）の帰結であって欠陥ではない。
+
+**生成の一次ソースは `graph io` の終端に出る（ADR-0035 の副作用）**: `skill_template` / `quality_guide` / `feature_samples` / `review_perspectives` / `release_tag` と、`distill_ops` が生産する配布スキル・agent 群は、この図では消費者を持たない終端 artifact として報告される。消費者（`gen_skill` / `gen_plugin` / `publish_packages` / `package_vsix`）は `runtime-pipeline.pfdsl` 側に実在するが、`graph io` はファイル単位で走るため参照できない。
+
+**これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。終端ゲートのプロトコル5(b) 判定では「消費者は sibling の `runtime-pipeline.pfdsl` に在る」と記録して該当なしとする。判定時は `.pfdsl/runtime-pipeline.pfdsl` の `gen_skill` / `gen_plugin` / `publish_packages` / `package_vsix` の入力エッジに当該 artifact が列挙されているかを確認する — 列挙が無ければそれは本物の門番違反である。
 
 ## 新 frontmatter フィールド追加時の sample 追加
 
