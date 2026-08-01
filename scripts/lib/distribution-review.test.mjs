@@ -12,6 +12,7 @@ import {
 	diffBase,
 	formatGateFailure,
 	inScope,
+	runDistributionReviewCheck,
 	unreviewedFiles,
 } from "./distribution-review.mjs";
 
@@ -159,5 +160,58 @@ describe("formatGateFailure", () => {
 	it("says the bundle has never been reviewed when the base is the empty tree", () => {
 		const message = formatGateFailure({ base: EMPTY_TREE, files: ["plugin/pfdsl/commands/pfd-cycle.md"] });
 		assert.match(message, /never been reviewed/);
+	});
+});
+
+describe("runDistributionReviewCheck", () => {
+	const deps = ({ record, changed = [], reachable = true }) => ({
+		readRecord: () => record,
+		commitExists: () => reachable,
+		changedSince: () => changed,
+	});
+
+	it("passes when nothing distributed has moved since the reviewed commit", () => {
+		const result = runDistributionReviewCheck(
+			deps({ record: { commit: "a".repeat(40) }, changed: ["packages/cli/src/cli.ts"] }),
+		);
+		assert.equal(result.ok, true);
+	});
+
+	it("fails, naming the files, when a distributed prompt has moved", () => {
+		const result = runDistributionReviewCheck(
+			deps({ record: { commit: "a".repeat(40) }, changed: ["plugin/pfdsl/skills/pfd-ops/SKILL.md"] }),
+		);
+		assert.equal(result.ok, false);
+		assert.match(result.message, /pfd-ops\/SKILL\.md/);
+	});
+
+	it("fails when the record is absent, rather than treating absence as approval", () => {
+		const result = runDistributionReviewCheck(
+			deps({ record: null, changed: ["plugin/pfdsl/skills/pfd-ops/SKILL.md"] }),
+		);
+		assert.equal(result.ok, false);
+		assert.match(result.message, /never been reviewed/);
+	});
+
+	it("asks for a fetch when the reviewed commit is not in this clone", () => {
+		// A shallow clone or a squash-merged branch can leave the recorded
+		// commit unreachable. Passing there would approve by accident.
+		const result = runDistributionReviewCheck(deps({ record: { commit: "b".repeat(40) }, reachable: false }));
+		assert.equal(result.ok, false);
+		assert.match(result.message, /git fetch/);
+	});
+
+	it("does not probe reachability of the empty tree", () => {
+		let probed = false;
+		const result = runDistributionReviewCheck({
+			readRecord: () => ({ commit: null }),
+			commitExists: () => {
+				probed = true;
+				return false;
+			},
+			changedSince: () => [],
+		});
+		assert.equal(probed, false);
+		assert.equal(result.ok, true);
 	});
 });

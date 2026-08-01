@@ -98,6 +98,36 @@ export function diffBase(record) {
 	return record?.commit ?? EMPTY_TREE;
 }
 
+/**
+ * The gate itself. Deps are injected so the decision can be tested without a
+ * repository: readRecord returns the parsed record (null if there is none),
+ * commitExists answers whether a hash is in this clone, and changedSince lists
+ * paths that differ between a base and HEAD.
+ *
+ * Every failure path here is fail-closed. An absent record, an unreachable
+ * commit and a moved prompt all block, because the alternative in each case is
+ * to ship prose on the strength of a record that says nothing about it.
+ */
+export function runDistributionReviewCheck({ readRecord, commitExists, changedSince }) {
+	const record = readRecord();
+	const base = diffBase(record);
+
+	if (base !== EMPTY_TREE && !commitExists(base)) {
+		return {
+			ok: false,
+			message: [
+				`The reviewed commit ${base} is not in this clone.`,
+				"Run git fetch (or git fetch --unshallow) and try again — the gate cannot",
+				"tell what has changed since a commit it cannot read.",
+			].join("\n"),
+		};
+	}
+
+	const files = unreviewedFiles(changedSince(base));
+	if (files.length === 0) return { ok: true, message: `Distribution review is current (base ${base}).` };
+	return { ok: false, message: formatGateFailure({ base, files }) };
+}
+
 export function formatGateFailure({ base, files }) {
 	const preface =
 		base === EMPTY_TREE
