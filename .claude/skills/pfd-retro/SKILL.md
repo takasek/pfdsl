@@ -19,7 +19,7 @@ A・B 層はセッション文脈不要 — 任意の PFD のレビューに単�
 
 問い詰めに入る前の機械的な下ごしらえとして、`graph orphans <file>` で predecessor・successor どちらも持たないノード（配線忘れの典型）を検出しておく — エッジ実在性の問いを個別ノードへ総当たりする前に、明らかな配線漏れを機械側で洗い出せる。
 
-対象が大きい図・複数図の場合は pfd-lens agent（`.claude/agents/pfd-lens.md`）へ委譲する。pfd-lens はセッション文脈不要な read-only agent で、A・B カタログを自ら読み込み file:line アンカー付き findings を返す — main context にカタログ全文・対象図・思考過程を載せずに済む。返った findings は C・D 層の監査結果と合流させて出力表へ振り分ける。
+対象が大きい図・複数図の場合は pfd-lens agent へ委譲する。pfd-lens はセッション文脈不要な read-only agent で、A・B カタログを自ら読み込み file:line アンカー付き findings を返す — main context にカタログ全文・対象図・思考過程を載せずに済む。返った findings は C・D 層の監査結果と合流させて出力表へ振り分ける。
 
 小さい図1枚のみのレビューであれば委譲の cold start（agent 起動オーバーヘッド）が割に合わないため main thread でカタログを直接参照する。全文 Read の前に `pfdsl graph io <file> --json`（終端 artifact・外部入力）と `graph edges <file> --json`（正準エッジ一覧）で機械的に輪郭を掴んでおくと、目視との食い違いが監査の当たりになる。カタログ本文は `.pfdsl/bindings/pfd-retro.md` が示す一次情報を読むこと（例: `.pfdsl/review-perspectives.md`）。記載がない場合は pfdsl スキルの `references/review-perspectives.md`（plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/references/`、repo-local なら `.claude/skills/pfdsl/references/`）を読む。それも無い場合のみ下記カテゴリ名で監査する。A = 図 vs 現実（エッジ実在性・駆動源・名前の一般化水準・偽の不変性・入力充足）、B = 粒度・型（万能成果物・プロセス実在性・並列主張・修正案への再挑戦・型違い）。
 
@@ -57,10 +57,10 @@ A・B 層はセッション文脈不要 — 任意の PFD のレビューに単�
 | 設計判断の記録 | 設計決定記録（ADR 等。companion で所在を指定。運用しないリポでは新設を提案する） |
 | 未着手作業の発見 | issue 起票 + roadmap.pfdsl に依存チェーン追加 |
 | ゲート項目の追加・修正 | 該当する PFD の criteria または sibling companion の終端ゲート（**ルール文のみ。発見括弧禁止**）。どの companion に書くかは `pfd-ops/references/architecture.md` の「companion への書き分けルール」表に従う |
-| 能力成果物の起動条件漏れ | 当該スキルまたは workflow.pfdsl の description に追記。当該スキルが配布 bundle 内（`.claude/skills/pfd-*`）の場合は `.pfdsl/bindings/<当該スキル名>.md` |
+| 能力成果物の起動条件漏れ | 当該スキルまたは workflow.pfdsl の description に追記。当該スキルが配布 bundle 同梱のもの（pfd-* スキル）の場合は `.pfdsl/bindings/<当該スキル名>.md` |
 | 体感した効果 | 効果ログ（companion で宛先を指定。未定義の場合は記録しない） |
 | 監査の新パターン発見 | `.pfdsl/bindings/pfd-retro.md`。問いの構造・パターン種別・具体例をここに書く |
 
-宛先の上書き・追加は pfd-ops の workflow companion に従う。配布物（`.claude/skills/pfd-*` 配下）への finding 反映手続きは `.pfdsl/bindings/pfd-retro.md` に従う。
+宛先の上書き・追加は pfd-ops の workflow companion に従う。配布 bundle 同梱物への finding 反映手続きは `.pfdsl/bindings/pfd-retro.md` に従う。
 
 各 companion の終端ゲートセクションはチェックリストであり発見記録ではない。追加するのはルール文1行のみ。

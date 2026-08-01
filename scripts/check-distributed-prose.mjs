@@ -11,9 +11,12 @@
  * whose *subject* is this repo's workbench — is what the review is for. Run
  * every CI via `make check-docs`, so the count only ever ratchets down.
  *
- * Scans the assembled bundle and reports the canonical source of each hit, so
- * the scope matches the review's exactly (scripts/lib/distribution-review.mjs)
- * while the reported location stays the file to edit.
+ * Takes its file list from what the bundle actually ships — so the scope is the
+ * review's, exactly (scripts/lib/distribution-review.mjs) — but reads each
+ * file's content from the canonical source it is assembled from. Both halves
+ * matter: a hand-kept glob silently drops a future bundle member, and reading
+ * the assembled copy would deadlock this check, since `make gen-skill` depends
+ * on `check-docs` and could not run to clear it.
  *
  * Run: node scripts/check-distributed-prose.mjs
  */
@@ -28,20 +31,26 @@ import { git } from "./lib/run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const paths = git(["ls-files", "plugin/pfdsl/**/*.md"], { cwd: root })
-	.split("\n")
-	.filter(inScope)
-	.sort();
+const paths = [
+	...new Set(
+		git(["ls-files", "plugin/pfdsl/**/*.md"], { cwd: root })
+			.split("\n")
+			.filter(inScope)
+			.map(canonicalSourceOf)
+			// A directory pointer stands for an aggregate whose sources are
+			// governed where they are written; there is no single file to read.
+			.filter((path) => !path.endsWith("/")),
+	),
+].sort();
 
 const files = paths.map((path) => ({ path, content: readFileSync(resolve(root, path), "utf-8") }));
 const found = findRepoSpecificProse(files);
 
 if (found.length > 0) {
 	console.error("check-distributed-prose: content an adopting repo cannot resolve:");
-	for (const f of found) console.error(`  ${canonicalSourceOf(f.path)}:${f.line}: ${f.reason}\n    ${f.text}`);
+	for (const f of found) console.error(`  ${f.path}:${f.line}: ${f.reason}\n    ${f.text}`);
 	console.error("\nThese ship to repositories that are not this one. State the rule without the");
 	console.error("local detail, or give the detail in a form the reader can resolve.");
-	console.error("Line numbers are the bundle's; the path is the file to edit.");
 	process.exit(1);
 }
 

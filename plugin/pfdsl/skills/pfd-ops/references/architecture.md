@@ -53,7 +53,7 @@ findings やゲート項目を companion に書くとき、**どの companion �
 
 pfdsl / pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem の5スキルツリー・pfd-* コマンド群・pfd-lens agent は、1つの Claude Code plugin（`plugin/pfdsl/`、`make gen-plugin` で組み立て）として marketplace 配布される（ADR-0028。旧 `pfdsl skill sync` は廃止）。
 スキル間の相互参照（pfd-retro → pfdsl の review-perspectives、pfd-ecosystem → pfd-ops の scaffold、コマンド → 各スキル）はこの bundle 配布が担保する。
-`hooks/`（PostToolUse retro リマインダ等）も同じ bundle に同梱される（リポルート `hooks/` が同梱元、`.claude/skills` 等と並ぶ第5の配布ソース。#465）。plugin hook はインストール/有効化の同意機構を Claude Code プラットフォーム側に委ねる（`install/` + `check-install-sync.mjs --deploy` の配線を pfd-ops が自前で持たずに済む代替経路）。
+`hooks/`（PostToolUse retro リマインダ等）も同じ bundle に同梱される。plugin hook はインストール/有効化の同意機構を Claude Code プラットフォーム側に委ねる（`install/` + `check-install-sync.mjs --deploy` の配線を pfd-ops が自前で持たずに済む代替経路）。
 
 L3 を採用するには `install/` テンプレートをリポルートへ実配置する（`/pfd-init` のステップ 3.5 が実行する）:
 
