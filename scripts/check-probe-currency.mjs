@@ -4,7 +4,7 @@
 // trigger sits at the publish boundary rather than on every cycle.
 //
 // Run: node scripts/check-probe-currency.mjs [--report]
-//   --report  print the same verdict but always exit 0 (for status output)
+//   --report  print the same verdict to stdout and always exit 0 (status output)
 
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -23,7 +23,7 @@ const published = JSON.parse(
 const result = checkProbeCurrency(readFileSync(resolve(root, LOG), "utf-8"), published);
 
 if (result.ok) {
-	console.log(`check-probe-currency: OK (probed v${result.probed}, published v${result.published})`);
+	console.log(`check-probe-currency: OK (probed v${result.probed}, published v${published})`);
 	process.exit(0);
 }
 

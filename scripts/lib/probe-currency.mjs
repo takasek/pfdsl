@@ -15,24 +15,33 @@
 // gate keeps alive is the rest: guidance executability and idempotency, which
 // no static check reaches.
 
-/** Newest `対象バージョン: ... vX.Y.Z` recorded in the probe log. */
+import { compareVersions } from "./release-status-check.mjs";
+
+const SEMVER = /^v?(\d+\.\d+\.\d+)$/;
+const LABEL = /対象バージョン:[^\n]*/g;
+
+/**
+ * Newest version recorded in the probe log, as "X.Y.Z".
+ *
+ * The version has to sit on the label's own line. Reading across lines instead
+ * would let a label with no version silently borrow the next entry's, which
+ * reads as "probe is current" — the one direction this gate must never fail in.
+ * A label without a version is therefore an error, not a skip.
+ *
+ * @param {string} logText
+ * @returns {string | undefined} undefined when the log records no run at all
+ */
 export function latestProbedVersion(logText) {
-	const versions = [...logText.matchAll(/対象バージョン:[^\n]*?v(\d+)\.(\d+)\.(\d+)/g)].map((m) =>
-		[m[1], m[2], m[3]].map(Number),
-	);
+	const labels = logText.match(LABEL) ?? [];
+	const versions = labels.map((line) => /v(\d+\.\d+\.\d+)/.exec(line)?.[1]);
+	const bare = versions.findIndex((v) => !v);
+	if (bare !== -1) {
+		throw new Error(
+			`probe log line records no vX.Y.Z on the label's own line: ${labels[bare].trim()}`,
+		);
+	}
 	if (versions.length === 0) return undefined;
-	return versions.sort(compare).at(-1);
-}
-
-/** @param {number[]} a @param {number[]} b */
-function compare(a, b) {
-	return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
-}
-
-/** @param {string} v e.g. "0.0.24" */
-export function parseVersion(v) {
-	const m = /^v?(\d+)\.(\d+)\.(\d+)/.exec(v.trim());
-	return m ? [m[1], m[2], m[3]].map(Number) : undefined;
+	return versions.sort((a, b) => (compareVersions(a, b) === "local-ahead" ? 1 : -1)).at(-1);
 }
 
 /**
@@ -42,23 +51,18 @@ export function parseVersion(v) {
  *
  * @param {string} logText contents of the probe execution log
  * @param {string} publishedVersion the plugin version adopters currently get
- * @returns {{ok: boolean, probed?: string, published: string, reason?: string}}
+ * @returns {{ok: true, probed: string} | {ok: false, reason: string}}
  */
 export function checkProbeCurrency(logText, publishedVersion) {
-	const published = parseVersion(publishedVersion);
+	const published = SEMVER.exec(publishedVersion.trim())?.[1];
 	if (!published) throw new Error(`unparseable published version: ${publishedVersion}`);
 	const probed = latestProbedVersion(logText);
-	if (!probed) {
-		return { ok: false, published: publishedVersion, reason: "the probe log records no run" };
-	}
-	const fmt = probed.join(".");
-	if (compare(probed, published) < 0) {
+	if (!probed) return { ok: false, reason: "the probe log records no run" };
+	if (compareVersions(probed, published) === "published-ahead") {
 		return {
 			ok: false,
-			probed: fmt,
-			published: publishedVersion,
-			reason: `the newest probe covers v${fmt}, but adopters already hold v${publishedVersion}`,
+			reason: `the newest probe covers v${probed}, but adopters already hold v${published}`,
 		};
 	}
-	return { ok: true, probed: fmt, published: publishedVersion };
+	return { ok: true, probed };
 }

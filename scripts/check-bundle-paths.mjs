@@ -10,25 +10,28 @@
 // step, so checking one checks both.
 
 import { readFileSync } from "node:fs";
-import { globSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { findUnqualifiedBundlePaths } from "./lib/bundle-paths.mjs";
+import { PLUGIN_AGENT_FILES, PLUGIN_COMMAND_FILES, PLUGIN_SKILL_DIRS } from "./lib/gen-plugin.mjs";
+import { git } from "./lib/run-exec.mjs";
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// The pfdsl skill is excluded: its references are generated snapshots of docs/
-// and carry sample .pfdsl content, so they are governed at their own source.
+// Derived from what gen-plugin actually mirrors into the bundle, not from a
+// filename convention: a hand-written glob silently drops any future member
+// that is not named pfd-*, and the check would stay green while an unscanned
+// file shipped. The pfdsl skill is excluded — its references are generated
+// snapshots of docs/ carrying sample .pfdsl content, governed at their source.
 const PATTERNS = [
-	".claude/skills/pfd-*/**/*.md",
-	".claude/skills/pfd-*/*.md",
-	".claude/agents/pfd-*.md",
-	".claude/commands/pfd-*.md",
+	...PLUGIN_SKILL_DIRS.flatMap((d) => [`.claude/skills/${d}/*.md`, `.claude/skills/${d}/**/*.md`]),
+	...PLUGIN_AGENT_FILES.map((f) => `.claude/agents/${f}`),
+	...PLUGIN_COMMAND_FILES.map((f) => `.claude/commands/${f}`),
 ];
 
-const paths = [...new Set(PATTERNS.flatMap((p) => globSync(p, { cwd: root })))].sort();
+const paths = [...new Set(git(["ls-files", "--", ...PATTERNS], { cwd: root }).split("\n").filter(Boolean))].sort();
 const files = paths.map((path) => ({ path, content: readFileSync(resolve(root, path), "utf-8") }));
-
-const { findUnqualifiedBundlePaths } = await import("./lib/bundle-paths.mjs");
 const found = findUnqualifiedBundlePaths(files);
 
 if (found.length > 0) {

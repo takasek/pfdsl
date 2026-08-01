@@ -12,11 +12,11 @@
 // 「リポルート」 appears 7 times and 6 mean the *adopting* repo's root. A check
 // that fires on those would be the constant-false-positive trap, so it is not
 // attempted here. This catches the subset that is actually decidable from text.
-const BUNDLE_PATH = /`?\.claude\/(?:skills|agents|commands)\//;
+const BUNDLE_PATH = /\.claude\/(?:skills|agents|commands)\//;
 
 // Either marker resolves the ambiguity: naming the plugin root shows the other
 // load mode, and naming the mode labels the path as the repo-local branch.
-const QUALIFIERS = [/CLAUDE_PLUGIN_ROOT/, /repo-local/];
+const QUALIFIERS = ["CLAUDE_PLUGIN_ROOT", "repo-local"];
 
 /**
  * @param {Array<{path: string, content: string}>} files
@@ -27,7 +27,7 @@ export function findUnqualifiedBundlePaths(files) {
 	for (const { path, content } of files) {
 		content.split("\n").forEach((text, i) => {
 			if (!BUNDLE_PATH.test(text)) return;
-			if (QUALIFIERS.some((q) => q.test(text))) return;
+			if (QUALIFIERS.some((q) => text.includes(q))) return;
 			found.push({ path, line: i + 1, text: text.trim() });
 		});
 	}
