@@ -162,6 +162,7 @@ push: check-docs
 .PHONY: release-status
 release-status:
 	node scripts/release-status.mjs
+	@node scripts/check-probe-currency.mjs --report
 
 # @pfdsl/cli を npm 公開する。VERSION= を指定するか packages/cli/package.json の version を使い
 # v<version> タグを打って push し、publish-cli.yml (OIDC) を起動する。

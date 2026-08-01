@@ -118,6 +118,11 @@ try {
 // --- 6. pre-tag checks ---
 
 console.log("Running pre-tag checks (build, test, check-docs, gen-plugin identity)...");
+// The cli release is what ships the plugin bundle (plugin.json mirrors this
+// package's version, and 7b pins marketplace.json to this tag), so it is the
+// boundary where an unprobed bundle would reach adopters. ADR-0029 decided the
+// probe; this is the trigger it lacked. libs/vscode do not ship the bundle.
+if (kind === "cli") run("node", ["scripts/check-probe-currency.mjs"]);
 run("make", ["build"]);
 run("make", ["test"]);
 run("make", ["check-docs"]);
