@@ -38,10 +38,29 @@ findings やゲート項目を companion に書くとき、**どの companion �
 
 この表が一次情報。`pfd-ops SKILL.md` の L2 ディスパッチ・`pfd-retro` の出力振り分け・`.pfdsl/bindings/pfd-retro.md` はすべてここを参照する。
 
+### 昇格先の判定ルール（L4 → 配布層、一次情報）
+
+上の表は**どの companion に書くか**を決めるものであり、companion に溜まった汎用ルールを**配布層のどのファイルへ昇格するか**は決められない。昇格先は次の2段で決める。
+
+**1段目 — どのスキルの管轄か。** 昇格元の companion がこれを決める。
+
+| 昇格元 | 管轄スキル |
+|---|---|
+| `roadmap.md` | pfd-ops（作業項目バックエンドの規約） |
+| `workflow.md` | pfd-ops（サイクル手順・知見振り分け） |
+| `runtime-pipeline.md` | pfd-ops（変換境界の手続き） |
+| `.pfdsl/bindings/<スキル名>.md` | 当該スキル |
+
+**2段目 — そのスキルの中で SKILL.md 本文か reference か。** 固有名詞を含まず、そのスキルの全利用者に無条件で効く原則・プロトコルなら SKILL.md 本文（L1）。特定バックエンドの採用を前提にする規約なら L3 reference。手順の細目で、本文から手続きとして切り出されているものはその reference（pfd-ops のサイクル4手順なら `references/work-cycle.md`）。
+
+固有名詞（リポ名・パッケージ名・ツール名・パス・issue 番号・ADR 番号）が残るものは、どの段でも配布層へ昇格できない。一般化してから昇格し、一般化できない具体例は companion に残す。
+
 ### バインディングファイルの命名規則
 
 スキル固有の恒常指示・監査結果等は `.pfdsl/bindings/<スキル名>.md` に置く（例: `.pfdsl/bindings/pfd-retro.md`、`.pfdsl/bindings/pfd-ops.md`）。SKILL.md 側は「`.pfdsl/bindings/<スキル名>.md` が存在すれば読んで従う」とだけ書き、ファイルの中身（具体的な運用手続き）は書かない。1ファイルに集約しない（例えば全スキル分を `workflow.md` に集約しない）のは、companion がスキルと無関係な PFD 操作のたびに毎回丸ごと読まれる既存の読み込みモデルでは、集約するほど無関係な読み込みコストが増えるため。ファイル名（セクション名でなく）を規約にするのは、スキルが増えても既存ファイルへの追記でなく新規ファイル追加で済み、規約自体の変更が不要なため。
-スキル数だけ scaffold にファイルを用意する（内容が空でも実害のないファイル含む）。存在確認のコストは空ファイルでも実質変わらないため、都度作成でなく最初から揃えておく。
+`bindings/<スキル名>.md` を読む規約を持つスキルの数だけ scaffold にファイルを用意する（内容が空でも実害のないファイル含む）。存在確認のコストは空ファイルでも実質変わらないため、都度作成でなく最初から揃えておく。
+bundle 同梱スキル全数ではない — 自分の binding を読まないスキルの分を置いても、誰も読まないファイルが採用リポに増えるだけである。
+スキルが新たに binding を読み始めたら、その時点で scaffold にも1ファイル追加する。
 
 ## L3: GitHub Issues バックエンド（`references/github-issues-backend.md`）
 
@@ -91,6 +110,7 @@ pfdsl 開発リポ固有の例:
   SKILL.md                     ← L1 + L2
   references/
     architecture.md            ← このファイル
+    work-cycle.md              ← /pfd-cycle のサイクル4手順（L1 の手順本文を SKILL.md から切り出したもの）
     github-issues-backend.md   ← L3 プリセット規約
     scaffold/                  ← L4 雛形テンプレート
   scripts/

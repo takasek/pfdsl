@@ -13,6 +13,7 @@ import { findMissingFields } from "./lib/skill-field-drift.mjs";
 import { renderCliSection } from "./lib/skill-cli-section.mjs";
 import { parseSkillOutDir } from "./lib/skill-out-dir.mjs";
 import { writeSkillRefs } from "./lib/gen-skill-refs.mjs";
+import { injectGeneratedHeader } from "./lib/skill-header.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -56,7 +57,7 @@ if (!cliVersion) {
   process.exit(1);
 }
 
-const skillMd = templateSrc
+const skillMd = injectGeneratedHeader(templateSrc)
 	.replace(/\{\{specVersion\}\}/g, specVersion)
 	.replace(/\{\{cliVersion\}\}/g, cliVersion)
 	.replace("{{cliCommands}}", renderCliSection(helpOutput));
