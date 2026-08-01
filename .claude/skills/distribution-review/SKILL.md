@@ -60,10 +60,13 @@ node -e 'import("./scripts/lib/distribution-review.mjs").then(async(m)=>{
 ### 3. sandbox を実体化する
 
 ```
-<scratch>/adopt-<timestamp>/
+<scratch>/adopt-<timestamp>-<課題名>/
   repo/                 ← git init。README + 最小の .pfdsl
   plugin-cache/pfdsl/   ← plugin/pfdsl のコピー
 ```
+
+**1 probe = 1 sandbox。** 複数の probe に同じ sandbox を共有させない。
+probe は実際にファイルを書くので、共有すると互いの編集が相手の入力になり、詰まりが配布物由来なのか他の probe の書き込み由来なのか切り分けられなくなる。
 
 subagent には cwd を `repo/`、plugin root を `../plugin-cache/pfdsl` とだけ伝え、**上流リポの存在を伝えない**。
 このリポのパスを読もうとすれば実際に存在しないので、行き止まりが自然に再現する。
