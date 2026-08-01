@@ -24,18 +24,23 @@ export const SKILL_HEADER =
  * scanning to end-of-file when the closing `---` is missing would search the
  * whole document, so a body mention of the phrase would read as a header.
  *
+ * Line endings are taken from the document rather than assumed: a Windows
+ * checkout (core.autocrlf=true, and .gitattributes pins no eol here) delivers
+ * CRLF, and the injected line has to match or the file ends up mixed (#644).
+ *
  * @param {string} templateSrc contents of scripts/skill-template/SKILL.md
  * @returns {string} the same document with the header inserted
  */
 export function injectGeneratedHeader(templateSrc) {
-	const frontmatter = templateSrc.match(/^---\n([\s\S]*?\n)---\n/);
+	const frontmatter = templateSrc.match(/^---(\r?\n)([\s\S]*?\r?\n)---\r?\n/);
 	if (!frontmatter) {
 		throw new Error("skill template must start with a YAML frontmatter block ('---')");
 	}
-	if (/DO NOT EDIT/.test(frontmatter[1])) {
+	if (/DO NOT EDIT/.test(frontmatter[2])) {
 		throw new Error(
 			"skill template must not carry a DO NOT EDIT header — it is injected by scripts/lib/skill-header.mjs at generation time",
 		);
 	}
-	return `---\n${SKILL_HEADER}\n${templateSrc.slice("---\n".length)}`;
+	const open = `---${frontmatter[1]}`;
+	return `${open}${SKILL_HEADER}${frontmatter[1]}${templateSrc.slice(open.length)}`;
 }

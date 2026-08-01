@@ -28,6 +28,23 @@ describe("injectGeneratedHeader", () => {
 		);
 	});
 
+	it("accepts a CRLF template and injects the header with CRLF too", () => {
+		// A Windows checkout with core.autocrlf=true hands the generator CRLF.
+		// The generator used to be pure .replace() and never saw line endings, so
+		// rejecting them here would break a platform that used to work. Emitting an
+		// LF line into a CRLF document would mix endings the author owns (#644).
+		const template = "---\r\nname: pfdsl\r\n---\r\n\r\n# Title\r\n";
+		const out = injectGeneratedHeader(template);
+		assert.equal(out, `---\r\n${SKILL_HEADER}\r\n${template.slice("---\r\n".length)}`);
+	});
+
+	it("still rejects a DO NOT EDIT header in a CRLF template", () => {
+		assert.throws(
+			() => injectGeneratedHeader("---\r\n# DO NOT EDIT — x\r\nname: pfdsl\r\n---\r\n"),
+			/must not carry a DO NOT EDIT header/,
+		);
+	});
+
 	it("rejects a template with no frontmatter", () => {
 		assert.throws(() => injectGeneratedHeader("# Title\n"), /must start with a YAML frontmatter/);
 	});

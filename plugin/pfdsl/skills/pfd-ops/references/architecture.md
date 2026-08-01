@@ -43,13 +43,9 @@ findings やゲート項目を companion に書くとき、**どの companion �
 上の表は**どの companion に書くか**を決めるものであり、companion に溜まった汎用ルールを**配布層のどのファイルへ昇格するか**は決められない。昇格先は次の2段で決める。
 
 **1段目 — どのスキルの管轄か。** 昇格元の companion がこれを決める。
-
-| 昇格元 | 管轄スキル |
-|---|---|
-| `roadmap.md` | pfd-ops（作業項目バックエンドの規約） |
-| `workflow.md` | pfd-ops（サイクル手順・知見振り分け） |
-| `runtime-pipeline.md` | pfd-ops（変換境界の手続き） |
-| `.pfdsl/bindings/<スキル名>.md` | 当該スキル |
+PFD の sibling companion（上の表が宛先として挙げるもの）はすべて pfd-ops の管轄で、扱う PFD が違っても昇格先のスキルは変わらない。
+`.pfdsl/bindings/<スキル名>.md` はファイル名が名乗るスキルの管轄。
+companion の一覧をここに再掲しないのは、上の表と二重管理になり、companion が増えたとき片方だけ古くなるため。
 
 **2段目 — そのスキルの中で SKILL.md 本文か reference か。** 固有名詞を含まず、そのスキルの全利用者に無条件で効く原則・プロトコルなら SKILL.md 本文（L1）。特定バックエンドの採用を前提にする規約なら L3 reference。手順の細目で、本文から手続きとして切り出されているものはその reference（pfd-ops のサイクル4手順なら `references/work-cycle.md`）。
 
