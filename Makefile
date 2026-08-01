@@ -126,6 +126,7 @@ check-docs:
 	node scripts/check-forward-ref-markers.mjs
 	node scripts/check-spec-ids.mjs
 	node scripts/check-companion-bindings.mjs
+	node scripts/check-bundle-paths.mjs
 
 .PHONY: gen-skill
 gen-skill: check-docs
