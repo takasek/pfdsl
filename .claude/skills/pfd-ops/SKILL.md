@@ -53,7 +53,7 @@ plugin バージョンの上流差分警告は plugin の更新をユーザー�
 - **知見の振り分け先・運用手続き**: `.pfdsl/workflow.pfdsl` の知識系成果物と、その sibling companion `.md`
 - **変換境界の定義と変更手続き**: `.pfdsl/runtime-pipeline.pfdsl`（採用時）とその sibling companion `.md`
 - **issue バックエンド規約**: companion が指す references（例: `references/github-issues-backend.md`）
-- **Claude 向け指示の置き場**: pfd-ops 運用に紐づく恒常指示（PR 本文規約等）は `.pfdsl/bindings/pfd-ops.md` が存在すれば読んで従う（命名規則は `references/architecture.md` 参照）。ファイルが無ければ該当なしとみなす。サイクル外でも常時届けたい指示は、root `CLAUDE.md` から当該ファイルへポインタを張ることを推奨する。project CLAUDE.md は当該リポ固有の非配布設定のみ、global CLAUDE.md は全リポ横断設定のみ
+- **Claude 向け指示の置き場**: pfd-ops 運用に紐づく恒常指示（PR 本文規約等）は `.pfdsl/bindings/pfd-ops.md` が存在すれば読んで従う（命名規則は `references/architecture.md` 参照）。ファイルが無ければ該当なしとみなす。サイクル外でも常時届けたい指示は、root `CLAUDE.md` から当該ファイルへポインタを張ることを推奨する。project CLAUDE.md はこのリポでのみ有効な設定のみ、global CLAUDE.md は全リポ横断の設定のみ
 - **companion への書き分けルール**（どの companion に何を書くか）: `references/architecture.md` の「companion への書き分けルール」表が一次情報
 
 ## 運用プロトコル
