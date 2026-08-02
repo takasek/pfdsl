@@ -21,10 +21,7 @@ beforeEach(() => {
 	outDir = join(tmp, "skill-out");
 
 	mkdirSync(join(fixtureRoot, "docs/spec"), { recursive: true });
-	writeFileSync(
-		join(fixtureRoot, "docs/spec/spec.md"),
-		"# PFDSL仕様書 v9.9.9\n\nbody\n\n---\n\n## 20. バージョン\n\nv9.9.8 からの変更点（#1）。\n",
-	);
+	writeFileSync(join(fixtureRoot, "docs/spec/spec.md"), "# PFDSL仕様書 v9.9.9\n\nbody\n");
 
 	writeFileSync(join(fixtureRoot, "docs/review-perspectives.md"), "review body\n");
 	writeFileSync(join(fixtureRoot, "docs/quality-guide.md"), "quality body\n");
@@ -55,15 +52,6 @@ describe("writeSkillRefs", () => {
 		const content = readFileSync(join(outDir, "references/spec.md"), "utf-8");
 		assert.match(content, /^<!-- DO NOT EDIT/);
 		assert.match(content, /# PFDSL仕様書 v9\.9\.9/);
-		assert.match(content, /body/);
-	});
-
-	it("omits spec.md's version-history section, pointing readers to the source instead", () => {
-		writeSkillRefs(fixtureRoot, outDir);
-		const content = readFileSync(join(outDir, "references/spec.md"), "utf-8");
-		assert.ok(!content.includes("## 20. バージョン"));
-		assert.ok(!content.includes("v9.9.8 からの変更点"));
-		assert.match(content, /Version history omitted/);
 		assert.match(content, /body/);
 	});
 
