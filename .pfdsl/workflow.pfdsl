@@ -321,7 +321,7 @@ process:
     group: generation
   maintain_spec:
     label: 仕様改訂（統合）
-    description: "spec_proposals を既存仕様に統合して spec を改版する。外部レビュー（Opus 等）を推奨 — cross-proposal constraints は統合時にのみ検出される。仕様変更は必ず issue を通す"
+    description: "spec_proposals を既存仕様に統合して spec を改版する。タイトル行の版番号 bump と docs/spec/spec-history.md への変更履歴エントリ追記はこの統合作業の一部（release まで持ち越さない — release の pre-tag checks は取りこぼし検出用の安全網）。外部レビュー（Opus 等）を推奨 — cross-proposal constraints は統合時にのみ検出される。仕様変更は必ず issue を通す"
     group: generation
   write_examples:
     label: 実践例執筆
