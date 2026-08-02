@@ -63,8 +63,26 @@ artifact:
     group: generation
   plugin_dist:
     label: marketplace 配布プラグイン
-    description: "runtime-pipeline.pfdsl の gen_plugin が生産する（同上）。/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl で外部ユーザーが導入する Claude Code プラグイン。この図では README 更新の入力に現れる"
+    description: "runtime-pipeline.pfdsl の gen_plugin が生産する（同上）。/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl で外部ユーザーが導入する Claude Code プラグイン。この図では README 更新と配布レビューの入力に現れる"
     location: ../plugin/pfdsl/
+    group: release
+  distribution_review_perspectives:
+    label: 配布レビュー観点集
+    description: "配布 bundle の散文を利用側の読み手として問い詰める観点の一次情報。review_perspectives（配布レンズ）側には置かない — あれは利用側にも同梱されるため、実施先の無い観点を配ることになる。回ごとの実行記録から一般化できた型だけを昇格して育てる"
+    criteria: 各観点が実際に検出された欠陥に由来し、機械検査で決定可能な分との境界が書かれている
+    location: ../docs/distribution-review.md
+    group: generation
+  distribution_review_skill:
+    label: 配布レビュースキル
+    description: "/distribution-review コマンド。sandbox に隔離した subagent を利用側の読み手として走らせ、詰まりを分類し、canonical の修正と承認済み commit hash の更新までを持つ。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポには配布という行為自体が無く、この手順の実施先が存在しない）"
+    criteria: /distribution-review が期待通り動作する
+    location: ../.claude/skills/distribution-review/
+    group: generation
+  distribution_review_record:
+    label: 配布レビュー記録
+    description: "承認済み commit hash（reviewed.json）と回ごとの実行記録。hash を進めるのは差分モードだけで、全文モードは記録だけを残す。check-distribution-review.mjs が記録と配布ツリーの齟齬を判定し、decide_release の pre-tag checks で release を止める"
+    criteria: reviewed.json の commit と HEAD の間に、レビュー対象スコープの差分が無い
+    location: ../docs/distribution-review/
     group: release
   release_tag:
     label: リリースタグ
@@ -346,6 +364,11 @@ process:
     description: "事前に make release-status で behind を確認し、公開するか・どの版で切るかを判断してタグを push する。旧 publish_cli / publish_libraries / publish_ext のうち判断を含む部分がこれ（ADR-0035）。タグ以降の npm publish・vsix 生成・marketplace アップロードは判断を含まないため runtime-pipeline.pfdsl が持つ。make release 完了後、roadmap の publish_cli_* プロセスのうち ready になったものの出力 artifact を自動 done 化してコミット・push する（#278）。バージョン番号からの artifact ID 逆算はしない — ready 判定はグラフの入力充足のみで行うため、計画外リリースでも整合する。手作業は make release のみ"
     command: "make release VERSION=<VERSION>"
     group: release
+  review_distribution:
+    label: 配布プロンプトのレビュー
+    description: "組み上がった bundle の散文を、利用側リポの読み手として問い詰める。観点を当てるだけでは足りないため、sandbox に隔離した subagent に実作業をさせて詰まりを観測し、配布物の欠陥に由来するものを canonical 側で直してから承認済み commit hash を進める。決定可能な部分は check-distributed-prose.mjs が毎 CI で先に潰しており、このプロセスが見るのは語彙でなく主語の問題（ADR-0029 の配布物監査に起動条件を与えたもの）"
+    command: "/distribution-review"
+    group: release
   update_readme:
     label: README 更新
     description: CLI の提供形態・サンプル構成の変更を導入文書に反映する。CLI コマンドリファレンスは gen-readme-cli が自動化済みのため対象外
@@ -400,7 +423,7 @@ pfdsl_skill >>? review_examples
 retro_skill >>? review_examples
 toolchain >>? review_examples
 
-[adrs, decisions, payoff_log] >> distill_ops -> [bindings_pfd_ops, bindings_pfd_retro, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives, spec_stress_skill, vscode_ext_debug_skill, workflow_md]
+[adrs, decisions, payoff_log] >> distill_ops -> [bindings_pfd_ops, bindings_pfd_retro, distribution_review_perspectives, distribution_review_skill, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives, spec_stress_skill, vscode_ext_debug_skill, workflow_md]
 
 spec_stress_skill >>? maintain_spec
 
@@ -442,4 +465,9 @@ issue_updates >>? file_issues
 
 [plugin_dist, published_cli, published_libraries, toolchain] >> update_readme -> readme
 
-toolchain >> decide_release -> release_tag
+[distribution_review_perspectives, plugin_dist] >> review_distribution -> distribution_review_record
+
+distribution_review_record >>? distill_ops
+distribution_review_skill >>? review_distribution
+
+[distribution_review_record, toolchain] >> decide_release -> release_tag

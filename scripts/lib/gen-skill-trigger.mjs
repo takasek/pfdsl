@@ -4,8 +4,12 @@
 // sh script that captures the raw ERE string via command substitution,
 // since it cannot `import` JS). Keep this ERE-compatible for `grep -E`.
 
+// examples-index.mjs and sample-companions.mjs are here because they render
+// references/examples.md and references/samples.md: a change to either moves
+// the generated output while touching nothing else this pattern names, so the
+// bundle could go stale with every drift check silently green (#666).
 export const GEN_SKILL_TRIGGER_PATTERN =
-	"^(docs/|scripts/skill-template/|scripts/gen-skill\\.mjs|scripts/gen-skill-refs\\.mjs|scripts/lib/gen-skill-refs\\.mjs)";
+	"^(docs/|scripts/skill-template/|scripts/gen-skill\\.mjs|scripts/gen-skill-refs\\.mjs|scripts/lib/gen-skill-refs\\.mjs|scripts/lib/examples-index\\.mjs|scripts/lib/sample-companions\\.mjs|scripts/lib/skill-header\\.mjs|scripts/lib/skill-out-dir\\.mjs|scripts/lib/skill-cli-section\\.mjs|scripts/lib/skill-field-drift\\.mjs)";
 
 export const GEN_SKILL_TRIGGER = new RegExp(GEN_SKILL_TRIGGER_PATTERN);
 

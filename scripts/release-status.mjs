@@ -3,18 +3,22 @@
 // Usage: node scripts/release-status.mjs
 // Exit 1 if any package is behind or has a fetch error.
 
-import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { git as rawGit } from "./lib/run-exec.mjs";
 
 // These probes fail as a matter of course — an unreleased tag has no ref yet —
 // so their stderr is captured rather than printed as if something broke.
 const git = (args) => rawGit(args, { captureStderr: true });
+import { RECORD_PATH, repoDeps, runDistributionReviewCheck } from "./lib/distribution-review.mjs";
 import {
 	compareVersions,
+	formatDistributionReviewStatus,
+	formatFullReviewStatus,
 	formatResults,
 	formatSkillBundleStatus,
+	latestFullReviewDate,
 } from "./lib/release-status-check.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -203,9 +207,32 @@ function countSkillBundleCommits(sinceTag) {
 const skillBundleTag = findLatestCliTag();
 const skillBundleCommits = countSkillBundleCommits(skillBundleTag);
 
+// The distribution review's state, reported but not enforced here. `make
+// release` blocks on the same reading (scripts/check-distribution-review.mjs);
+// showing it at status time is what keeps that refusal from arriving as a
+// surprise mid-release.
+function readDistributionReview() {
+	const deps = repoDeps(root);
+	const result = runDistributionReviewCheck(deps);
+	const logDir = resolve(root, dirname(RECORD_PATH));
+	return {
+		record: deps.readRecord() ?? { commit: null },
+		// An unreachable reviewed commit yields no file list; reporting it as
+		// "0 unreviewed" would say current where the release gate refuses.
+		unreviewedCount: result.files?.length,
+		blockedReason: result.files === undefined ? result.message : null,
+		lastFullReview: latestFullReviewDate(existsSync(logDir) ? readdirSync(logDir) : []),
+	};
+}
+
+const distributionReview = readDistributionReview();
+if (distributionReview.blockedReason) console.warn(`warn: ${distributionReview.blockedReason}`);
+
 console.log("release-status:");
 console.log(formatResults(results));
 console.log(formatSkillBundleStatus(skillBundleCommits, skillBundleTag));
+console.log(formatDistributionReviewStatus(distributionReview));
+console.log(formatFullReviewStatus(distributionReview.lastFullReview));
 
 const needsAction =
 	results.some(

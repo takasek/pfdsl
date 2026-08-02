@@ -56,3 +56,49 @@ export function formatSkillBundleStatus(commitCount, sinceTag) {
 	const suffix = sinceTag ? ` (no changes since ${sinceTag})` : "";
 	return `  ${name} ✓ up-to-date${suffix}`;
 }
+
+/**
+ * The distribution review's currency, shown without blocking. `make release`
+ * refuses on the same state; this line is so the refusal is not a surprise.
+ * @param {{record: {commit: string|null, date?: string}, unreviewedCount: number}} args
+ * @returns {string}
+ */
+export function formatDistributionReviewStatus({ record, unreviewedCount }) {
+	const name = "distribution review (plugin/pfdsl prompts)";
+	const at = record.commit ? `${record.commit.slice(0, 7)} ${record.date ?? ""}`.trim() : null;
+	// undefined means the gate could not read the recorded commit at all.
+	// Printing "current" there would contradict the release gate's refusal.
+	if (unreviewedCount === undefined) return `  ${name} ! cannot determine (see warning above)`;
+	if (unreviewedCount > 0) {
+		const since = at ? `since ${at}` : "never reviewed";
+		return `  ${name} ! ${unreviewedCount} file(s) unreviewed (${since})`;
+	}
+	return `  ${name} ✓ current (${at})`;
+}
+
+/**
+ * Newest full-mode run, read from the record directory's filenames
+ * (`<date>-<mode>.md`). Full mode never advances the reviewed commit, so the
+ * logs are the only place its history lives.
+ * @param {string[]} filenames
+ * @returns {string | null}
+ */
+export function latestFullReviewDate(filenames) {
+	const dates = filenames
+		.map((name) => /^(\d{4}-\d{2}-\d{2})-full\.md$/.exec(name)?.[1])
+		.filter(Boolean)
+		.sort();
+	return dates.length > 0 ? dates[dates.length - 1] : null;
+}
+
+/**
+ * Full mode is manual by design — nothing forces it. This line is the whole
+ * reminder that it exists, which is the failure ADR-0029 already demonstrated:
+ * a practice with no trigger anywhere runs once and is never run again.
+ * @param {string | null} date
+ * @returns {string}
+ */
+export function formatFullReviewStatus(date) {
+	const name = "distribution review (full mode, manual)";
+	return date ? `  ${name}   last run ${date}` : `  ${name}   never run`;
+}
