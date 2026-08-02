@@ -16,7 +16,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { PLUGIN_AGENT_FILES, PLUGIN_COMMAND_FILES, PLUGIN_SKILL_DIRS } from "./gen-plugin.mjs";
+import { PLUGIN_MIRRORS } from "./gen-plugin.mjs";
 import { git, tryGit } from "./run-exec.mjs";
 
 /** git's empty tree — the diff base when nothing has been reviewed yet. */
@@ -51,18 +51,6 @@ const GENERATED_SOURCES = {
 	"plugin/pfdsl/skills/pfdsl/references/samples.md": "docs/samples/",
 };
 
-// The bundle's mirrored roots, each with the members gen-plugin actually
-// copies into it. The names come from gen-plugin so the two cannot disagree
-// about what ships; what stays restated here is only the shape of the mapping
-// (bundle root ← .claude root). Deriving that too would mean gen-plugin
-// declaring a manifest both it and this module consume — the deeper fix, out
-// of scope here and tracked separately.
-const MIRRORED_MEMBERS = {
-	skills: PLUGIN_SKILL_DIRS,
-	commands: PLUGIN_COMMAND_FILES,
-	agents: PLUGIN_AGENT_FILES,
-};
-
 /** Where the reviewed-state record lives, relative to the repo root. */
 export const RECORD_PATH = "docs/distribution-review/reviewed.json";
 
@@ -86,15 +74,20 @@ export function canonicalSourceOf(distPath) {
 	const generated = GENERATED_SOURCES[distPath];
 	if (generated) return generated;
 
+	// The inverse of the assembly's own manifest: find the bundle root this
+	// path sits under, check the file is one gen-plugin actually copies there,
+	// and swap the root back. Nothing about the layout is restated here.
 	if (distPath.startsWith(DIST_ROOT)) {
-		const rest = distPath.slice(DIST_ROOT.length);
-		const [dir, ...tail] = rest.split("/");
-		// Whole-tree mirrors keep their path; only the root moves. `hooks/` has
-		// no allowlist because gen-plugin mirrors the directory entire, where
-		// the other three copy a named set.
-		if (dir === "hooks" && tail.length > 0) return rest;
-		const member = MIRRORED_MEMBERS[dir];
-		if (member?.includes(dir === "skills" ? tail[0] : tail.join("/"))) return `.claude/${rest}`;
+		const [dir, ...tail] = distPath.slice(DIST_ROOT.length).split("/");
+		const mirror = PLUGIN_MIRRORS.find((m) => m.dest === dir);
+		const relative = tail.join("/");
+		if (mirror && relative) {
+			const members = mirror.trees ?? mirror.files;
+			// A whole-tree mirror has no member list: everything under it ships.
+			if (!members || members.includes(mirror.trees ? tail[0] : relative)) {
+				return `${mirror.src}/${relative}`;
+			}
+		}
 	}
 
 	throw new Error(`no canonical source for ${distPath} — teach canonicalSourceOf where it is assembled from`);

@@ -19,6 +19,25 @@ export const PLUGIN_AGENT_FILES = ["pfd-lens.md", "pfd-implementer.md"];
 export const PLUGIN_SKILL_DIRS = ["pfd-grill", "pfd-ops", "pfd-retro", "pfd-ecosystem"];
 export const PLUGIN_COMMAND_FILES = ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"];
 
+/**
+ * What the bundle is made of, as data: where each bundled subtree comes from,
+ * and which members are copied into it. `trees` mirrors each named directory,
+ * `files` copies a named set, `whole` mirrors the source directory entire.
+ *
+ * assemblePluginDistIndependent iterates this to build the bundle, and
+ * scripts/lib/distribution-review.mjs inverts it to send a reviewer from a
+ * bundled file back to the file they must edit. Declaring it once means the
+ * two agree about the *shape* of the mapping and not merely about the names —
+ * renaming a bundle root or adding a mirrored source can no longer land in the
+ * assembly while the reverse map keeps pointing at the old layout.
+ */
+export const PLUGIN_MIRRORS = [
+	{ dest: "skills", src: ".claude/skills", trees: PLUGIN_SKILL_DIRS },
+	{ dest: "commands", src: ".claude/commands", files: PLUGIN_COMMAND_FILES },
+	{ dest: "agents", src: ".claude/agents", files: PLUGIN_AGENT_FILES },
+	{ dest: "hooks", src: "hooks", whole: true },
+];
+
 // Agents that stay out of the bundle, with why — an adopting repo gets the
 // pfd-* ones because they operate on the .pfdsl files it now has, and nothing
 // else. Named rather than merely absent so a drift test can require every file
@@ -130,23 +149,24 @@ export function assemblePluginDistIndependent({
 	deps.genInstall(root);
 	console.log(".claude/skills/pfd-ops/install ← repo-root sources (gen-install)");
 
-	for (const name of PLUGIN_SKILL_DIRS) {
-		deps.mirrorDir(name, resolve(root, ".claude/skills"), resolve(pluginRoot, "skills"));
-		console.log(`plugin/pfdsl/skills/${name} ← .claude/skills/${name}`);
+	for (const mirror of PLUGIN_MIRRORS) {
+		if (mirror.whole) {
+			// The source directory is copied entire, so its name is the bundle
+			// root's name and the mirror runs from the repo root.
+			deps.mirrorDir(mirror.dest, root, pluginRoot);
+			console.log(`plugin/pfdsl/${mirror.dest} ← ${mirror.src}`);
+		} else if (mirror.trees) {
+			for (const name of mirror.trees) {
+				deps.mirrorDir(name, resolve(root, mirror.src), resolve(pluginRoot, mirror.dest));
+				console.log(`plugin/pfdsl/${mirror.dest}/${name} ← ${mirror.src}/${name}`);
+			}
+		} else {
+			deps.mirrorFiles(mirror.files, resolve(root, mirror.src), resolve(pluginRoot, mirror.dest));
+			for (const file of mirror.files) {
+				console.log(`plugin/pfdsl/${mirror.dest}/${file} ← ${mirror.src}/${file}`);
+			}
+		}
 	}
-
-	deps.mirrorFiles(PLUGIN_COMMAND_FILES, resolve(root, ".claude/commands"), resolve(pluginRoot, "commands"));
-	for (const file of PLUGIN_COMMAND_FILES) {
-		console.log(`plugin/pfdsl/commands/${file} ← .claude/commands/${file}`);
-	}
-
-	deps.mirrorFiles(PLUGIN_AGENT_FILES, resolve(root, ".claude/agents"), resolve(pluginRoot, "agents"));
-	for (const file of PLUGIN_AGENT_FILES) {
-		console.log(`plugin/pfdsl/agents/${file} ← .claude/agents/${file}`);
-	}
-
-	deps.mirrorDir("hooks", root, pluginRoot);
-	console.log("plugin/pfdsl/hooks ← hooks");
 
 	const cliVersion = JSON.parse(deps.readFileSync(resolve(root, "packages/cli/package.json"), "utf-8")).version;
 	const manifest = buildPluginManifest({ cliVersion });
