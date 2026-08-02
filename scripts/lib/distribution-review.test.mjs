@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -15,6 +14,7 @@ import {
 	runDistributionReviewCheck,
 	unreviewedFiles,
 } from "./distribution-review.mjs";
+import { git } from "./run-exec.mjs";
 
 describe("inScope", () => {
 	it("takes a distributed prompt", () => {
@@ -48,32 +48,26 @@ describe("inScope", () => {
 });
 
 describe("canonicalSourceOf", () => {
-	it("maps a mirrored skill tree back to .claude/skills", () => {
-		assert.equal(
-			canonicalSourceOf("plugin/pfdsl/skills/pfd-ops/references/architecture.md"),
-			".claude/skills/pfd-ops/references/architecture.md",
-		);
-	});
+	// Mirrored trees keep their path and only move root; rendered files point at
+	// what they are rendered from, which for the two aggregates is a directory.
+	const PAIRS = [
+		["plugin/pfdsl/skills/pfd-ops/references/architecture.md", ".claude/skills/pfd-ops/references/architecture.md"],
+		["plugin/pfdsl/commands/pfd-cycle.md", ".claude/commands/pfd-cycle.md"],
+		["plugin/pfdsl/agents/pfd-lens.md", ".claude/agents/pfd-lens.md"],
+		["plugin/pfdsl/hooks/retro-reminder-post-tool-use.mjs", "hooks/retro-reminder-post-tool-use.mjs"],
+		["plugin/pfdsl/skills/pfdsl/SKILL.md", "scripts/skill-template/SKILL.md"],
+		["plugin/pfdsl/skills/pfdsl/references/spec.md", "docs/spec/spec.md"],
+		["plugin/pfdsl/skills/pfdsl/references/quality-guide.md", "docs/quality-guide.md"],
+		["plugin/pfdsl/skills/pfdsl/references/review-perspectives.md", "docs/review-perspectives.md"],
+		["plugin/pfdsl/skills/pfdsl/references/examples.md", "docs/examples/"],
+		["plugin/pfdsl/skills/pfdsl/references/samples.md", "docs/samples/"],
+	];
 
-	it("maps commands and agents back to their .claude directories", () => {
-		assert.equal(canonicalSourceOf("plugin/pfdsl/commands/pfd-cycle.md"), ".claude/commands/pfd-cycle.md");
-		assert.equal(canonicalSourceOf("plugin/pfdsl/agents/pfd-lens.md"), ".claude/agents/pfd-lens.md");
-	});
-
-	it("maps the generated pfdsl skill to the template it is rendered from", () => {
-		assert.equal(canonicalSourceOf("plugin/pfdsl/skills/pfdsl/SKILL.md"), "scripts/skill-template/SKILL.md");
-	});
-
-	it("maps each generated reference to the docs it is generated from", () => {
-		assert.equal(canonicalSourceOf("plugin/pfdsl/skills/pfdsl/references/spec.md"), "docs/spec/spec.md");
-		assert.equal(canonicalSourceOf("plugin/pfdsl/skills/pfdsl/references/quality-guide.md"), "docs/quality-guide.md");
-		assert.equal(
-			canonicalSourceOf("plugin/pfdsl/skills/pfdsl/references/review-perspectives.md"),
-			"docs/review-perspectives.md",
-		);
-		assert.equal(canonicalSourceOf("plugin/pfdsl/skills/pfdsl/references/examples.md"), "docs/examples/");
-		assert.equal(canonicalSourceOf("plugin/pfdsl/skills/pfdsl/references/samples.md"), "docs/samples/");
-	});
+	for (const [dist, canonical] of PAIRS) {
+		it(`maps ${dist} to ${canonical}`, () => {
+			assert.equal(canonicalSourceOf(dist), canonical);
+		});
+	}
 
 	it("refuses a distributed file it has no origin for", () => {
 		// A new bundled file with no known canonical source is a gap in this
@@ -85,7 +79,7 @@ describe("canonicalSourceOf", () => {
 
 describe("the map against the bundle that actually ships", () => {
 	const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-	const bundled = execFileSync("git", ["ls-files", "plugin/pfdsl/**/*.md"], { cwd: root, encoding: "utf-8" })
+	const bundled = git(["ls-files", "plugin/pfdsl/**/*.md"], { cwd: root })
 		.trim()
 		.split("\n")
 		.filter(Boolean);
@@ -152,14 +146,10 @@ describe("formatGateFailure", () => {
 		assert.match(message, /abc1234/);
 	});
 
-	it("says how to clear the gate", () => {
-		const message = formatGateFailure({ base: EMPTY_TREE, files: ["plugin/pfdsl/commands/pfd-cycle.md"] });
-		assert.match(message, /distribution-review/);
-	});
-
-	it("says the bundle has never been reviewed when the base is the empty tree", () => {
+	it("says the bundle was never reviewed, and how to clear the gate", () => {
 		const message = formatGateFailure({ base: EMPTY_TREE, files: ["plugin/pfdsl/commands/pfd-cycle.md"] });
 		assert.match(message, /never been reviewed/);
+		assert.match(message, /distribution-review/);
 	});
 });
 

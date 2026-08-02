@@ -52,7 +52,10 @@ export function findRepoSpecificProse(files) {
 	for (const { path, content } of files) {
 		let inFence = false;
 		content.split("\n").forEach((text, i) => {
-			if (/^\s*```/.test(text)) {
+			// Tilde fences count too — the repo's four other markdown scanners
+			// all recognize both, and a rule that fires inside a ~~~ block
+			// would flag quoted material as prose.
+			if (/^\s*(```|~~~)/.test(text)) {
 				inFence = !inFence;
 				return;
 			}

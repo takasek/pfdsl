@@ -31,24 +31,18 @@ import { git } from "./lib/run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const paths = [
-	...new Set(
-		git(["ls-files", "plugin/pfdsl/**/*.md"], { cwd: root })
-			.split("\n")
-			.filter(inScope)
-			.map(canonicalSourceOf)
-			// A directory pointer stands for an aggregate whose sources are
-			// governed where they are written; there is no single file to read.
-			.filter((path) => !path.endsWith("/")),
-	),
-].sort();
+const paths = git(["ls-files", "plugin/pfdsl/**/*.md"], { cwd: root })
+	.split("\n")
+	.filter(inScope)
+	.map(canonicalSourceOf)
+	.sort();
 
 const files = paths.map((path) => ({ path, content: readFileSync(resolve(root, path), "utf-8") }));
 const found = findRepoSpecificProse(files);
 
 if (found.length > 0) {
 	console.error("check-distributed-prose: content an adopting repo cannot resolve:");
-	for (const f of found) console.error(`  ${f.path}:${f.line}: ${f.reason}\n    ${f.text}`);
+	for (const f of found) console.error(`  ${f.path}:${f.line}: [${f.rule}] ${f.reason}\n    ${f.text}`);
 	console.error("\nThese ship to repositories that are not this one. State the rule without the");
 	console.error("local detail, or give the detail in a form the reader can resolve.");
 	process.exit(1);

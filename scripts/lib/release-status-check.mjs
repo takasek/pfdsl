@@ -66,6 +66,9 @@ export function formatSkillBundleStatus(commitCount, sinceTag) {
 export function formatDistributionReviewStatus({ record, unreviewedCount }) {
 	const name = "distribution review (plugin/pfdsl prompts)";
 	const at = record.commit ? `${record.commit.slice(0, 7)} ${record.date ?? ""}`.trim() : null;
+	// undefined means the gate could not read the recorded commit at all.
+	// Printing "current" there would contradict the release gate's refusal.
+	if (unreviewedCount === undefined) return `  ${name} ! cannot determine (see warning above)`;
 	if (unreviewedCount > 0) {
 		const since = at ? `since ${at}` : "never reviewed";
 		return `  ${name} ! ${unreviewedCount} file(s) unreviewed (${since})`;

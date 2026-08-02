@@ -35,6 +35,7 @@ import {
 	releaseMilestoneArtifactIds,
 } from "./lib/release-config.mjs";
 import { parseHost } from "./pfdsl/lib/github-rest.mjs";
+import { tryRun } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -142,12 +143,11 @@ try {
 // judges are the ones this tag will actually ship. No override: a release is
 // the only moment an adopter is handed this prose, and an escape hatch used
 // once under deadline becomes the way the gate is passed.
-try {
-	run("node", [resolve(root, "scripts/check-distribution-review.mjs")]);
-} catch (err) {
-	if (err.status === undefined) throw err; // execFileSync itself failed to spawn
-	fail("the distributed prompts have changed since their last review (see above).");
-}
+// The child prints the file list and what to do about it, so this only has to
+// stop the release — restating the reason here would double-report it.
+const reviewCheck = tryRun(process.execPath, [resolve(root, "scripts/check-distribution-review.mjs")], { cwd: root });
+if (!reviewCheck.ok) process.exit(1);
+console.log(reviewCheck.out.trim());
 
 // --- 7. bump + commit (only if --version was given) ---
 

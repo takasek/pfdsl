@@ -13,7 +13,11 @@
 // adopting reader against the changed prose, and `make release` refuses to tag
 // while the bundle has moved past it.
 
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { PLUGIN_AGENT_FILES, PLUGIN_COMMAND_FILES, PLUGIN_SKILL_DIRS } from "./gen-plugin.mjs";
+import { git, tryGit } from "./run-exec.mjs";
 
 /** git's empty tree — the diff base when nothing has been reviewed yet. */
 export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -47,6 +51,21 @@ const GENERATED_SOURCES = {
 	"plugin/pfdsl/skills/pfdsl/references/samples.md": "docs/samples/",
 };
 
+// The bundle's mirrored roots, each with the members gen-plugin actually
+// copies into it. The names come from gen-plugin so the two cannot disagree
+// about what ships; what stays restated here is only the shape of the mapping
+// (bundle root ← .claude root). Deriving that too would mean gen-plugin
+// declaring a manifest both it and this module consume — the deeper fix, out
+// of scope here and tracked separately.
+const MIRRORED_MEMBERS = {
+	skills: PLUGIN_SKILL_DIRS,
+	commands: PLUGIN_COMMAND_FILES,
+	agents: PLUGIN_AGENT_FILES,
+};
+
+/** Where the reviewed-state record lives, relative to the repo root. */
+export const RECORD_PATH = "docs/distribution-review/reviewed.json";
+
 /** Is this path a distributed prompt that a review is answerable for? */
 export function inScope(path) {
 	if (!path.startsWith(DIST_ROOT)) return false;
@@ -67,22 +86,15 @@ export function canonicalSourceOf(distPath) {
 	const generated = GENERATED_SOURCES[distPath];
 	if (generated) return generated;
 
-	const rest = distPath.startsWith(DIST_ROOT) ? distPath.slice(DIST_ROOT.length) : null;
-	if (rest) {
-		const skill = /^skills\/([^/]+)\/(.+)$/.exec(rest);
-		if (skill && PLUGIN_SKILL_DIRS.includes(skill[1])) {
-			return `.claude/skills/${skill[1]}/${skill[2]}`;
-		}
-		const command = /^commands\/(.+)$/.exec(rest);
-		if (command && PLUGIN_COMMAND_FILES.includes(command[1])) {
-			return `.claude/commands/${command[1]}`;
-		}
-		const agent = /^agents\/(.+)$/.exec(rest);
-		if (agent && PLUGIN_AGENT_FILES.includes(agent[1])) {
-			return `.claude/agents/${agent[1]}`;
-		}
-		const hook = /^hooks\/(.+)$/.exec(rest);
-		if (hook) return `hooks/${hook[1]}`;
+	if (distPath.startsWith(DIST_ROOT)) {
+		const rest = distPath.slice(DIST_ROOT.length);
+		const [dir, ...tail] = rest.split("/");
+		// Whole-tree mirrors keep their path; only the root moves. `hooks/` has
+		// no allowlist because gen-plugin mirrors the directory entire, where
+		// the other three copy a named set.
+		if (dir === "hooks" && tail.length > 0) return rest;
+		const member = MIRRORED_MEMBERS[dir];
+		if (member?.includes(dir === "skills" ? tail[0] : tail.join("/"))) return `.claude/${rest}`;
 	}
 
 	throw new Error(`no canonical source for ${distPath} — teach canonicalSourceOf where it is assembled from`);
@@ -124,8 +136,38 @@ export function runDistributionReviewCheck({ readRecord, commitExists, changedSi
 	}
 
 	const files = unreviewedFiles(changedSince(base));
-	if (files.length === 0) return { ok: true, message: `Distribution review is current (base ${base}).` };
-	return { ok: false, message: formatGateFailure({ base, files }) };
+	if (files.length === 0)
+		return { ok: true, base, files, message: `Distribution review is current (base ${base}).` };
+	return { ok: false, base, files, message: formatGateFailure({ base, files }) };
+}
+
+/**
+ * The real-repository deps for runDistributionReviewCheck. Exported so the
+ * blocking check and the non-blocking status line reach the same verdict —
+ * a second hand-rolled reading of the record would let status report "current"
+ * where `make release` refuses, which is the surprise the status line exists
+ * to prevent.
+ * @param {string} root
+ */
+export function repoDeps(root) {
+	return {
+		readRecord: () => {
+			const abs = resolve(root, RECORD_PATH);
+			return existsSync(abs) ? JSON.parse(readFileSync(abs, "utf-8")) : null;
+		},
+		// A probe expected to fail when the record points somewhere this clone
+		// cannot see, so its stderr is captured rather than printed as if
+		// something broke — the gate's own message says it better.
+		commitExists: (sha) => tryGit(["cat-file", "-e", `${sha}^{commit}`], { cwd: root, captureStderr: true }).ok,
+		// HEAD, not the working tree: the record names a commit, so the
+		// comparison that decides whether it still holds has to be against one
+		// too. A release refuses to run on a dirty tree anyway (release.mjs).
+		changedSince: (base) =>
+			git(["diff", "--name-only", base, "HEAD", "--", "plugin/pfdsl"], { cwd: root })
+				.trim()
+				.split("\n")
+				.filter(Boolean),
+	};
 }
 
 export function formatGateFailure({ base, files }) {

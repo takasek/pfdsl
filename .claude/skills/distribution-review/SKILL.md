@@ -34,14 +34,14 @@ description: |
 ### 1. 対象を出す
 
 ```sh
-node -e 'import("./scripts/lib/distribution-review.mjs").then(async(m)=>{
-  const {execFileSync}=await import("node:child_process");
-  const {readFileSync}=await import("node:fs");
-  const base=m.diffBase(JSON.parse(readFileSync("docs/distribution-review/reviewed.json","utf8")));
-  const changed=execFileSync("git",["diff","--name-only",base,"HEAD","--","plugin/pfdsl"],{encoding:"utf8"}).trim().split("\n");
-  console.log(base);console.log(m.unreviewedFiles(changed).join("\n"));
+node -e 'import("./scripts/lib/distribution-review.mjs").then((m)=>{
+  const r=m.runDistributionReviewCheck(m.repoDeps(process.cwd()));
+  console.log(r.base);console.log(r.files.join("\n"));
 })'
 ```
+
+ゲートと同じ関数を通す。
+別に書くと、レビューが見た集合とリリースが止まる集合がずれる。
 
 `reviewed.json` の `commit` が `null` のときは base が git の空ツリーになり、差分＝配布ツリー全体になる。
 初回は特別扱いせずこのまま回せばよい。
