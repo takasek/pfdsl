@@ -135,6 +135,12 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 触ると記録が指す内容と HEAD の内容がその場でずれ、自分で自分を無効化する。
 修正は先にコミットし、`reviewed.json` の更新は別コミットにする。
 
+**`distribution_review_skill` は終端 artifact として報告される。**
+`distill_ops` が生産し、`review_distribution` へは `>>?` でしか入らないため、primary の消費エッジを持たない。
+能力成果物が世代をまたいで還流する形（ADR-0011）の帰結であって欠陥ではない。
+`pfdsl_skill` と違い消費者は sibling の `runtime-pipeline.pfdsl` に**無い** — このスキルは配布されないので `gen_plugin` の入力にならない。
+終端ゲートのプロトコル5(b) 判定では、手段（能力成果物）であり後続門番を要さないものとして扱う。
+
 **この手順は配布しない。**
 `.claude/skills/distribution-review/` は repo-local であり、上の「配布スキルの新規追加時の横断照合」の対象外である（`runtime-pipeline.pfdsl` の `gen_plugin` 入力エッジに足さない）。
 利用側リポには配布という行為自体が無く、この手順の実施先が存在しない。
