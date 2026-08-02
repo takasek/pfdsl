@@ -9,7 +9,7 @@
 // the generated output while touching nothing else this pattern names, so the
 // bundle could go stale with every drift check silently green (#666).
 export const GEN_SKILL_TRIGGER_PATTERN =
-	"^(docs/|scripts/skill-template/|scripts/gen-skill\\.mjs|scripts/gen-skill-refs\\.mjs|scripts/lib/gen-skill-refs\\.mjs|scripts/lib/examples-index\\.mjs|scripts/lib/sample-companions\\.mjs|scripts/lib/skill-header\\.mjs|scripts/lib/skill-out-dir\\.mjs|scripts/lib/skill-cli-section\\.mjs|scripts/lib/skill-field-drift\\.mjs)";
+	"^(docs/|scripts/skill-template/|scripts/gen-skill\\.mjs|scripts/gen-skill-refs\\.mjs|scripts/lib/gen-skill-refs\\.mjs|scripts/lib/examples-index\\.mjs|scripts/lib/sample-companions\\.mjs|scripts/lib/skill-header\\.mjs|scripts/lib/skill-out-dir\\.mjs|scripts/lib/skill-cli-section\\.mjs|scripts/lib/skill-field-drift\\.mjs|scripts/lib/skill-spec-version-history\\.mjs)";
 
 export const GEN_SKILL_TRIGGER = new RegExp(GEN_SKILL_TRIGGER_PATTERN);
 

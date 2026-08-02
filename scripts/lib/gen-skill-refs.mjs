@@ -15,6 +15,7 @@ import { resolve } from "node:path";
 
 import { resolveCompanions } from "./sample-companions.mjs";
 import { buildExamplesMd } from "./examples-index.mjs";
+import { dropVersionHistory } from "./skill-spec-version-history.mjs";
 
 function buildExamplesIndexMd(dir) {
 	const entries = readdirSync(dir)
@@ -48,8 +49,11 @@ export function writeSkillRefs(root, outDir) {
 	const specVersion = specSrc.match(/^# PFDSL仕様書 (v[\d.]+)/m)?.[1] ?? "unknown";
 	const baseHeader = (src) =>
 		`<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/${src} -->\n\n`;
-	writeFileSync(resolve(refsDir, "spec.md"), baseHeader("docs/spec/spec.md") + specSrc);
-	console.log("references/spec.md ← docs/spec/spec.md");
+	const specHeader =
+		baseHeader("docs/spec/spec.md") +
+		"<!-- Version history omitted — see §20 of the source above. -->\n\n";
+	writeFileSync(resolve(refsDir, "spec.md"), specHeader + dropVersionHistory(specSrc));
+	console.log("references/spec.md ← docs/spec/spec.md (version history omitted, #692)");
 
 	// --- 1b. Copy review perspectives ---
 
