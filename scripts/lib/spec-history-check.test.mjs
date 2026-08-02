@@ -31,6 +31,14 @@ describe("runSpecHistoryCheck", () => {
 		assert.match(result.message, /v0\.0\.18/);
 	});
 
+	it("does not treat a shorter version as documented merely because it's a prefix of a longer one", () => {
+		const result = runSpecHistoryCheck({
+			readSpec: () => "# PFDSL仕様書 v0.0.1\n\nbody\n",
+			readHistory: () => "v0.0.16 からの主な変更点（v0.0.17）：...\n",
+		});
+		assert.equal(result.ok, false);
+	});
+
 	it("fails when spec.md has no title-line version to check", () => {
 		const result = runSpecHistoryCheck({
 			readSpec: () => "no title here\n",

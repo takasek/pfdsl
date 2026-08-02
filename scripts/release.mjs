@@ -34,6 +34,7 @@ import {
 	filesToCommitForBump,
 	releaseMilestoneArtifactIds,
 } from "./lib/release-config.mjs";
+import { repoDeps as specHistoryRepoDeps, runSpecHistoryCheck } from "./lib/spec-history-check.mjs";
 import { parseHost } from "./pfdsl/lib/github-rest.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 
@@ -153,10 +154,12 @@ console.log(reviewCheck.out.trim());
 // the coupling splitting the changelog into its own file (#692) traded away
 // physical proximity for. Gated here, not per-commit: a title-line bump made
 // mid-development doesn't need its changelog entry until the release that
-// ships it.
-const specHistoryCheck = tryRun(process.execPath, [resolve(root, "scripts/check-spec-history.mjs")], { cwd: root });
-if (!specHistoryCheck.ok) process.exit(1);
-console.log(specHistoryCheck.out.trim());
+// ships it. In-process (unlike the distribution review check above, which
+// shells out): just two file reads and a regex, and release-status.mjs
+// already calls it the same way, so the two can't drift on how they invoke it.
+const specHistoryResult = runSpecHistoryCheck(specHistoryRepoDeps(root));
+console[specHistoryResult.ok ? "log" : "error"](specHistoryResult.message);
+if (!specHistoryResult.ok) process.exit(1);
 
 // --- 7. bump + commit (only if --version was given) ---
 

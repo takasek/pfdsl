@@ -30,7 +30,12 @@ export function runSpecHistoryCheck({ readSpec, readHistory }) {
 		};
 	}
 
-	if (readHistory().includes(version)) {
+	// Not just `includes` — a shorter version string is a substring of any
+	// longer one sharing its prefix (v0.0.1 inside v0.0.17), so the match has
+	// to reject a trailing digit to avoid a false positive once versions run
+	// past single digits.
+	const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	if (new RegExp(`${escaped}(?!\\d)`).test(readHistory())) {
 		return { ok: true, message: `docs/spec/spec-history.md documents ${version}.` };
 	}
 	return {

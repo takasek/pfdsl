@@ -15,6 +15,7 @@ import { resolve } from "node:path";
 
 import { resolveCompanions } from "./sample-companions.mjs";
 import { buildExamplesMd } from "./examples-index.mjs";
+import { currentSpecVersion } from "./spec-history-check.mjs";
 
 function buildExamplesIndexMd(dir) {
 	const entries = readdirSync(dir)
@@ -45,7 +46,7 @@ export function writeSkillRefs(root, outDir) {
 	// --- 1. Copy spec ---
 
 	const specSrc = readFileSync(resolve(root, "docs/spec/spec.md"), "utf-8");
-	const specVersion = specSrc.match(/^# PFDSL仕様書 (v[\d.]+)/m)?.[1] ?? "unknown";
+	const specVersion = currentSpecVersion(specSrc) ?? "unknown";
 	const baseHeader = (src) =>
 		`<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/${src} -->\n\n`;
 	writeFileSync(resolve(refsDir, "spec.md"), baseHeader("docs/spec/spec.md") + specSrc);
