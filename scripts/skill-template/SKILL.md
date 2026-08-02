@@ -1,5 +1,4 @@
 ---
-# DO NOT EDIT — generated from scripts/skill-template/SKILL.md. Re-run: make gen-skill
 name: pfdsl
 description: |
   Use when working with .pfdsl (Process Flow DSL) files — reading, writing,
