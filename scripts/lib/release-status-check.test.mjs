@@ -5,6 +5,7 @@ import {
 	formatResults,
 	formatSkillBundleStatus,
 	formatDistributionReviewStatus,
+	formatSpecHistoryStatus,
 	latestFullReviewDate,
 	formatFullReviewStatus,
 } from "./release-status-check.mjs";
@@ -182,6 +183,23 @@ describe("formatDistributionReviewStatus", () => {
 		});
 		assert.match(out, /✓/);
 		assert.doesNotMatch(out, /file\(s\) unreviewed/);
+	});
+});
+
+describe("formatSpecHistoryStatus", () => {
+	it("shows current when spec-history.md documents the spec version", () => {
+		const out = formatSpecHistoryStatus({ ok: true, message: "docs/spec/spec-history.md documents v0.0.17." });
+		assert.match(out, /✓/);
+		assert.match(out, /v0\.0\.17/);
+	});
+
+	it("flags a missing changelog entry", () => {
+		const out = formatSpecHistoryStatus({
+			ok: false,
+			message: "docs/spec/spec.md is at v0.0.18, but docs/spec/spec-history.md has no changelog\nentry mentioning it.",
+		});
+		assert.match(out, /!/);
+		assert.match(out, /v0\.0\.18/);
 	});
 });
 

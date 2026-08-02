@@ -44,6 +44,8 @@ PFD の効果を体感した局面は `docs/pfd_payoff_log.md`（`payoff_log` ar
 
 **spec のバージョンはタイトル行（`# PFDSL仕様書 vX.Y.Z`）が唯一の権威。** `docs/spec/spec-history.md` の changelog は変更点の記述であり、バージョンの確認に使わない。バージョンを参照・更新する際は必ずタイトル行を読み、タイトル行を更新してからコミットする。changelog 冒頭やその他の本文で版番号を再記載しない（タイトル行との二重管理になり bump 時の同期漏れを生む。changelog 見出しの「vX.Y.Z からの主な変更点（vA.B.C）」形式は変更点の記述として許容する）。
 
+タイトル行を bump したコミットで changelog を同時更新する必要はない（spec.md と spec-history.md が別ファイルになった #692 以降、両者の同期を per-commit では強制しない）。かわりに `make release` の pre-tag checks（`scripts/check-spec-history.mjs`）が、リリース対象のバージョンに対応する changelog エントリの有無をブロッキングで検査する。`make release-status` は同じ判定を非ブロッキングで表示する。#689 の distribution review ゲートと同型（bump は自由、公開の瞬間にだけ強制）。
+
 ## 実装 PR での spec 直接更新
 
 issue が spec 変更を明示しており、変更が単一の制約節・severity 定義の修正程度の規模であれば、`spec_proposals` 文書を省略して実装 PR に spec.md 更新を含めてよい。省略の判断基準: 既存 proposal 不要・統合レビューの対称性チェックが不要なスコープ。

@@ -9,7 +9,7 @@
 //   4. resolve target version (from --version, or the current package.json)
 //   5. tag-duplicate check (cheap, version is already known)
 //   6. pre-tag checks: build, test, check-docs, gen-plugin identity,
-//      distribution review currency
+//      distribution review currency, spec-history currency
 //   7. bump package.json(s) + commit (only if --version was given)
 //   7b. cli only: pin marketplace.json's plugin source to this release's tag
 //   8. push origin main
@@ -148,6 +148,15 @@ try {
 const reviewCheck = tryRun(process.execPath, [resolve(root, "scripts/check-distribution-review.mjs")], { cwd: root });
 if (!reviewCheck.ok) process.exit(1);
 console.log(reviewCheck.out.trim());
+
+// A spec.md version bump with no matching docs/spec/spec-history.md entry —
+// the coupling splitting the changelog into its own file (#692) traded away
+// physical proximity for. Gated here, not per-commit: a title-line bump made
+// mid-development doesn't need its changelog entry until the release that
+// ships it.
+const specHistoryCheck = tryRun(process.execPath, [resolve(root, "scripts/check-spec-history.mjs")], { cwd: root });
+if (!specHistoryCheck.ok) process.exit(1);
+console.log(specHistoryCheck.out.trim());
 
 // --- 7. bump + commit (only if --version was given) ---
 
