@@ -301,8 +301,12 @@ describe("wipTransitionStep", () => {
 });
 
 describe("designRecordStep", () => {
-	const issueViewOut = ({ author, body, comments = [] }) =>
-		JSON.stringify({ author: { login: author }, body, comments });
+	const issue = ({ author, body, comments = [], createdAt = "2026-06-01T00:00:00Z" }) => ({
+		author: { login: author },
+		body,
+		comments,
+		createdAt,
+	});
 
 	const validRecordBody = [
 		"前提: x",
@@ -320,100 +324,103 @@ describe("designRecordStep", () => {
 	});
 
 	it("SKIPs when gh CLI is unavailable", () => {
-		const { exec } = fakeExec({ "gh issue view": { ok: false } });
-		const result = designRecordStep({ exec, base: "main", issueNumber: 669 });
+		const { exec } = fakeExec();
+		const result = designRecordStep({ exec, base: "main", issue: null, issueError: "gh CLI unavailable" });
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /gh CLI unavailable/);
 	});
 
-	it("PASSes when the decision is already recorded in the issue body, without checking timing", () => {
-		const { exec, calls } = fakeExec({
-			"gh issue view": { out: issueViewOut({ author: "owner", body: "決定: 案A を採用する。" }) },
+	it("judges a decision written into the issue body by the same rules as a comment", () => {
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({ author: "owner", body: validRecordBody }),
 		});
-		const result = designRecordStep({ exec, base: "main", issueNumber: 669 });
 		assert.equal(result.status, "PASS");
-		assert.match(result.detail, /issue body/);
-		assert.deepEqual(
-			calls.filter((c) => c.startsWith("git log")),
-			[],
-		);
+	});
+
+	it("FAILs a body decision that lacks the required structure — the body is not an exemption", () => {
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({ author: "owner", body: "決定: 案A を採用する。" }),
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /missing required line/);
 	});
 
 	it("FAILs when no owner-authored decision comment exists", () => {
-		const { exec } = fakeExec({
-			"gh issue view": {
-				out: issueViewOut({
-					author: "owner",
-					body: "## 対応案\n1. 案A\n2. 案B\n",
-					comments: [{ author: { login: "someone-else" }, body: "決定: 案A", createdAt: "2026-07-01T00:00:00Z" }],
-				}),
-			},
-			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				author: "owner",
+				body: "## 対応案\n1. 案A\n2. 案B\n",
+				comments: [{ author: { login: "someone-else" }, body: "決定: 案A", createdAt: "2026-07-01T00:00:00Z" }],
+			}),
 		});
-		const result = designRecordStep({ exec, base: "main", issueNumber: 669 });
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /no design-selection record found/);
 	});
 
 	it("FAILs when the owner's record was posted after the first commit", () => {
-		const { exec } = fakeExec({
-			"gh issue view": {
-				out: issueViewOut({
-					author: "owner",
-					body: "## 対応案\n1. 案A\n2. 案B\n",
-					comments: [{ author: { login: "owner" }, body: validRecordBody, createdAt: "2026-07-03T00:00:00Z" }],
-				}),
-			},
-			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				author: "owner",
+				body: "## 対応案\n1. 案A\n2. 案B\n",
+				comments: [{ author: { login: "owner" }, body: validRecordBody, createdAt: "2026-07-03T00:00:00Z" }],
+			}),
 		});
-		const result = designRecordStep({ exec, base: "main", issueNumber: 669 });
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /after the first commit/);
 	});
 
 	it("FAILs when the record content is missing required prefixes, even though timing is fine", () => {
-		const { exec } = fakeExec({
-			"gh issue view": {
-				out: issueViewOut({
-					author: "owner",
-					body: "普通の説明文。",
-					comments: [{ author: { login: "owner" }, body: "決定: 案A", createdAt: "2026-07-01T00:00:00Z" }],
-				}),
-			},
-			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				author: "owner",
+				body: "普通の説明文。",
+				comments: [{ author: { login: "owner" }, body: "決定: 案A", createdAt: "2026-07-01T00:00:00Z" }],
+			}),
 		});
-		const result = designRecordStep({ exec, base: "main", issueNumber: 669 });
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /missing required line/);
 	});
 
 	it("SKIPs when a valid record exists but there is no commit in range", () => {
-		const { exec } = fakeExec({
-			"gh issue view": {
-				out: issueViewOut({
-					author: "owner",
-					body: "普通の説明文。",
-					comments: [{ author: { login: "owner" }, body: validRecordBody, createdAt: "2026-07-01T00:00:00Z" }],
-				}),
-			},
-			"git log --format=%aI": { out: "" },
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				author: "owner",
+				body: "普通の説明文。",
+				comments: [{ author: { login: "owner" }, body: validRecordBody, createdAt: "2026-07-01T00:00:00Z" }],
+			}),
 		});
-		const result = designRecordStep({ exec, base: "main", issueNumber: 669 });
 		assert.equal(result.status, "SKIP");
 	});
 
 	it("PASSes when the record predates the first commit and covers every enumerated option", () => {
-		const { exec } = fakeExec({
-			"gh issue view": {
-				out: issueViewOut({
-					author: "owner",
-					body: "普通の説明文。",
-					comments: [{ author: { login: "owner" }, body: validRecordBody, createdAt: "2026-07-01T00:00:00Z" }],
-				}),
-			},
-			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				author: "owner",
+				body: "普通の説明文。",
+				comments: [{ author: { login: "owner" }, body: validRecordBody, createdAt: "2026-07-01T00:00:00Z" }],
+			}),
 		});
-		const result = designRecordStep({ exec, base: "main", issueNumber: 669 });
 		assert.equal(result.status, "PASS");
 	});
 });
@@ -428,29 +435,33 @@ describe("sizeDirectionStep", () => {
 	});
 
 	it("SKIPs when gh CLI is unavailable", () => {
-		const { exec } = fakeExec({ "gh issue view": { ok: false } });
-		const result = sizeDirectionStep({ exec, base: "main", issueNumber: 669, changedFiles: [] });
+		const { exec } = fakeExec();
+		const result = sizeDirectionStep({
+			exec,
+			base: "main",
+			issue: null,
+			issueError: "gh CLI unavailable",
+			changedFiles: [],
+		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /gh CLI unavailable/);
 	});
 
-	it("SKIPs when the linked issue states no shrink intent", () => {
-		const { exec } = fakeExec({
-			"gh issue view": { out: JSON.stringify({ body: "普通の説明。" }) },
-		});
+	it("SKIPs without spending any subprocess when the linked issue states no shrink intent", () => {
+		const { exec, calls } = fakeExec();
 		const result = sizeDirectionStep({
 			exec,
 			base: "main",
-			issueNumber: 669,
+			issue: { body: "普通の説明。" },
 			changedFiles: [".pfdsl/bindings/x.pfdsl"],
 		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /no shrink intent/);
+		assert.deepEqual(calls, []);
 	});
 
 	it("computes byte/line deltas for tracked paths only, and FAILs on growth without an override", () => {
 		const { exec, calls } = fakeExec({
-			"gh issue view": { out: JSON.stringify({ body: "肥大への対策。" }) },
 			"git show origin/main:.pfdsl/bindings/x.pfdsl": { out: "aa\n" },
 			"git show HEAD:.pfdsl/bindings/x.pfdsl": { out: "aaaaaa\n" },
 			"gh pr view": { out: "" },
@@ -458,7 +469,7 @@ describe("sizeDirectionStep", () => {
 		const result = sizeDirectionStep({
 			exec,
 			base: "main",
-			issueNumber: 669,
+			issue: { body: "肥大への対策。" },
 			changedFiles: [".pfdsl/bindings/x.pfdsl", "packages/core/src/graph.ts"],
 		});
 		assert.equal(result.status, "FAIL");
@@ -467,7 +478,6 @@ describe("sizeDirectionStep", () => {
 
 	it("PASSes growth when the PR body carries a Size-Override token", () => {
 		const { exec } = fakeExec({
-			"gh issue view": { out: JSON.stringify({ body: "肥大への対策。" }) },
 			"git show origin/main:.pfdsl/bindings/x.pfdsl": { out: "aa\n" },
 			"git show HEAD:.pfdsl/bindings/x.pfdsl": { out: "aaaaaa\n" },
 			"gh pr view": { out: "Size-Override: intentional" },
@@ -475,7 +485,7 @@ describe("sizeDirectionStep", () => {
 		const result = sizeDirectionStep({
 			exec,
 			base: "main",
-			issueNumber: 669,
+			issue: { body: "肥大への対策。" },
 			changedFiles: [".pfdsl/bindings/x.pfdsl"],
 		});
 		assert.equal(result.status, "PASS");
@@ -483,7 +493,6 @@ describe("sizeDirectionStep", () => {
 
 	it("treats a new tracked file (no origin/base copy) as growth from zero", () => {
 		const { exec } = fakeExec({
-			"gh issue view": { out: JSON.stringify({ body: "肥大への対策。" }) },
 			"git show origin/main:.pfdsl/bindings/new.pfdsl": { ok: false, out: "fatal: does not exist" },
 			"git show HEAD:.pfdsl/bindings/new.pfdsl": { out: "hello\n" },
 			"gh pr view": { out: "" },
@@ -491,7 +500,7 @@ describe("sizeDirectionStep", () => {
 		const result = sizeDirectionStep({
 			exec,
 			base: "main",
-			issueNumber: 669,
+			issue: { body: "肥大への対策。" },
 			changedFiles: [".pfdsl/bindings/new.pfdsl"],
 		});
 		assert.equal(result.status, "FAIL");

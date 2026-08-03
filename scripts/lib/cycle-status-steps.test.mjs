@@ -260,7 +260,12 @@ describe("runCycleStatus", () => {
 				readFileSync: () => roadmapWithIssue("proc_a", 42),
 			}),
 		);
-		assert.equal(result.gateCheckCommand, "node scripts/gate-check.mjs --base main --artifact proc_a_out");
+		// The resolved issue rides along: the operator copies this line verbatim,
+		// so the checks that need --issue would otherwise SKIP every cycle (#669).
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact proc_a_out --issue 42",
+		);
 	});
 
 	it("returns a null gate-check command when there is no best process", async () => {

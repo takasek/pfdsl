@@ -72,7 +72,7 @@ export function findIssueNumberForProcess(pfdslText, processId) {
 	return match ? Number(match[1]) : null;
 }
 
-export const OPTION_HEADING_PATTERNS = [/検討したい方向/, /対応案/, /方針案/, /選択肢/];
+const OPTION_HEADING_PATTERNS = [/検討したい方向/, /対応案/, /方針案/, /選択肢/];
 
 const HEADING_LINE_PATTERN = /^(#{2,6})\s+(.*)$/;
 const NUMBERED_ITEM_PATTERN = /^\d+\.\s/;
@@ -105,7 +105,7 @@ export function detectEnumeratedOptions(body) {
 	return { enumerated: count >= 2, count, headings };
 }
 
-export const DECISION_LINE_PATTERN = /^決定:\s*案\s*(\S+)/;
+const DECISION_LINE_PATTERN = /^決定:\s*案\s*(\S+)/;
 
 /**
  * 確定の証拠となる `決定: 案N` 行を、issue 本文とコメントから収集する。
@@ -170,13 +170,18 @@ export function classifyDesignSettlement({ body, ownerLogin, comments }) {
 }
 
 /**
+ * The gate-check invocation for this cycle. `--issue` is folded in for the
+ * same reason `--artifact` is: the operator copies this line verbatim, so a
+ * flag left out here is a check that silently SKIPs every cycle (#669).
  * @param {string | null} artifactKey
  * @param {string} base
+ * @param {number | null} [issueNumber]
  * @returns {string | null}
  */
-export function buildGateCheckCommand(artifactKey, base) {
+export function buildGateCheckCommand(artifactKey, base, issueNumber = null) {
 	if (!artifactKey) return null;
-	return `node scripts/gate-check.mjs --base ${base} --artifact ${artifactKey}`;
+	const issueFlag = issueNumber != null ? ` --issue ${issueNumber}` : "";
+	return `node scripts/gate-check.mjs --base ${base} --artifact ${artifactKey}${issueFlag}`;
 }
 
 const DESIGN_UNSETTLED_PATTERNS = [/design TBD/i, /設計未確定/, /設計未合意/];

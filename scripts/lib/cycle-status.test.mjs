@@ -273,6 +273,13 @@ describe("buildGateCheckCommand", () => {
 		);
 	});
 
+	it("appends --issue when the cycle's issue is known", () => {
+		assert.equal(
+			buildGateCheckCommand("mint_check_tool", "main", 669),
+			"node scripts/gate-check.mjs --base main --artifact mint_check_tool --issue 669",
+		);
+	});
+
 	it("returns null when artifactKey is missing", () => {
 		assert.equal(buildGateCheckCommand(null, "main"), null);
 	});

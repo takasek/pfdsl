@@ -47,6 +47,9 @@ export function formatGateTable(results) {
 /** Shared by both checks scoped to the output artifact, so they cannot drift apart. */
 export const NO_ARTIFACT_DETAIL = "cycle declared it has no roadmap output artifact (--no-artifact)";
 
+/** Shared by both checks that read the linked issue, for the same reason. */
+export const NO_ISSUE_DETAIL = "no --issue given; pass --issue <n> to check this against the linked issue";
+
 /**
  * Classify the output-artifact status-update gate (item 6). No new states:
  * this reuses the existing reasoned-SKIP vocabulary the same way item 9
@@ -361,9 +364,19 @@ export const SIZE_OVERRIDE_PATTERN = /^Size-Override:\s*\S/m;
  *          beforeLines: number, afterLines: number}>, prBody?: string}} params
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
+/**
+ * Does the linked issue ask for something to get smaller? Both the classifier
+ * and its caller consult this, so the caller can skip the I/O the classifier
+ * would only throw away.
+ * @param {string | undefined | null} issueBody
+ * @returns {boolean}
+ */
+export function hasShrinkIntent(issueBody) {
+	return SHRINK_INTENT_KEYWORDS.some((kw) => (issueBody ?? "").includes(kw));
+}
+
 export function classifySizeDirection({ issueBody, deltas, prBody }) {
-	const body = issueBody ?? "";
-	if (!SHRINK_INTENT_KEYWORDS.some((kw) => body.includes(kw))) {
+	if (!hasShrinkIntent(issueBody)) {
 		return { status: "SKIP", detail: "linked issue states no shrink intent" };
 	}
 	if (!deltas || deltas.length === 0) {

@@ -18,14 +18,16 @@ import {
 	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
+	hasShrinkIntent,
 	hasStatusChange,
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
+	NO_ISSUE_DETAIL,
 	SIZE_TRACKED_PATTERNS,
 	statusChangedForArtifact,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
-import { detectEnumeratedOptions } from "./cycle-status.mjs";
+import { detectEnumeratedOptions, findDecisionRecords } from "./cycle-status.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
 
@@ -132,41 +134,33 @@ export function wipTransitionStep({ exec, base, artifactKey, noArtifact, changed
  * started, with the required structure (issue #669's protection against
  * "the record is written after the fact, or is unstructured prose")?
  */
-export function designRecordStep({ exec, base, issueNumber }) {
+export function designRecordStep({ exec, base, issue, issueError }) {
 	const name = "design-selection record";
-	if (issueNumber == null) {
-		return { name, status: "SKIP", detail: "no --issue given; pass --issue <n> to check the design-selection record" };
-	}
+	if (!issue) return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
 
-	const issueResult = exec("gh", ["issue", "view", String(issueNumber), "--json", "author,body,comments"]);
-	if (!issueResult.ok) return { name, status: "SKIP", detail: "gh CLI unavailable" };
-
-	let issueJson;
-	try {
-		issueJson = JSON.parse(issueResult.out);
-	} catch {
-		return { name, status: "SKIP", detail: "gh CLI unavailable" };
-	}
-
-	const ownerLogin = issueJson.author?.login;
-	const body = issueJson.body ?? "";
+	const ownerLogin = issue.author?.login;
+	const body = issue.body ?? "";
 	const optionCount = detectEnumeratedOptions(body).count;
 
-	if (/^決定:/m.test(body)) {
-		return { name, status: "PASS", detail: "decision recorded in the issue body" };
-	}
+	// The issue body is one entry among the comments, not a special case that
+	// bypasses the checks: a decision written into the body is still a record
+	// whose timing and structure are judged the same way (its createdAt is the
+	// issue's, so it passes timing on its own merits rather than by exemption).
+	const entries = [
+		{ author: ownerLogin, body, createdAt: issue.createdAt },
+		...(issue.comments ?? []).map((c) => ({ author: c.author?.login, body: c.body, createdAt: c.createdAt })),
+	];
+	const record = entries.find((e) => e.author === ownerLogin && findDecisionRecords([e]).length > 0);
 
-	const recordComment = (issueJson.comments ?? []).find(
-		(c) => c.author?.login === ownerLogin && /^決定:/m.test(c.body ?? ""),
-	);
+	if (!record) {
+		return { name, ...classifyDesignRecordTiming(undefined, null) };
+	}
 
 	const firstCommitOut = exec("git", ["log", "--format=%aI", "--reverse", `origin/${base}..HEAD`]);
 	const firstCommitIso = firstCommitOut.ok ? firstCommitOut.out.trim().split("\n")[0] || null : null;
 
-	const timing = classifyDesignRecordTiming(recordComment?.createdAt, firstCommitIso);
-	if (!recordComment) return { name, status: timing.status, detail: timing.detail };
-
-	const content = classifyDesignRecordContent(recordComment.body, optionCount);
+	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso);
+	const content = classifyDesignRecordContent(record.body, optionCount);
 	const detail = [timing.detail, content.detail].filter(Boolean).join("; ") || undefined;
 	if (timing.status === "FAIL" || content.status === "FAIL") return { name, status: "FAIL", detail };
 	if (timing.status === "SKIP") return { name, status: "SKIP", detail };
@@ -179,19 +173,16 @@ export function designRecordStep({ exec, base, issueNumber }) {
  * whose linked issue states shrink intent (issue #669's protection against
  * "the countermeasure's effect on size is never measured")?
  */
-export function sizeDirectionStep({ exec, base, issueNumber, changedFiles }) {
+export function sizeDirectionStep({ exec, base, issue, issueError, changedFiles }) {
 	const name = "knowledge-artifact size direction";
-	if (issueNumber == null) return { name, status: "SKIP", detail: "no --issue given" };
+	if (!issue) return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
 
-	const issueResult = exec("gh", ["issue", "view", String(issueNumber), "--json", "body"]);
-	if (!issueResult.ok) return { name, status: "SKIP", detail: "gh CLI unavailable" };
-
-	let issueBody;
-	try {
-		issueBody = JSON.parse(issueResult.out).body ?? "";
-	} catch {
-		return { name, status: "SKIP", detail: "gh CLI unavailable" };
-	}
+	const issueBody = issue.body ?? "";
+	// Check the intent before spending a `git show` pair per tracked file and a
+	// `gh pr view` — most cycles carry no shrink intent, and every one of those
+	// subprocesses would be thrown away. classifySizeDirection reaches the same
+	// verdict from the same predicate, so the two cannot disagree.
+	if (!hasShrinkIntent(issueBody)) return { name, ...classifySizeDirection({ issueBody, deltas: [] }) };
 
 	const tracked = changedFiles.filter((f) => SIZE_TRACKED_PATTERNS.some((p) => p.test(f)));
 	const deltas = tracked.map((path) => {

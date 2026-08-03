@@ -131,7 +131,7 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 
 	// bestOutputs[0] のみ使う。複数出力プロセス（例: 1プロセスが複数 artifact を生成する edge）は
 	// 最初の出力のみを gate-check の対象にする単純化。
-	const gateCheckCommand = buildGateCheckCommand(bestOutputs[0] ?? null, base);
+	const gateCheckCommand = buildGateCheckCommand(bestOutputs[0] ?? null, base, targetIssue);
 
 	const result = {
 		fetched,

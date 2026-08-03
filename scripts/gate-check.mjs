@@ -32,6 +32,7 @@ import {
 	sizeDirectionStep,
 } from "./lib/gate-check-steps.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
+import { execGh } from "./pfdsl/lib/gh-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -176,13 +177,28 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }));
 
+// The linked issue, fetched once for the two checks that read it. execGh keeps
+// the REST fallback that a bare `gh` call would lose in environments without
+// the binary (#489/#492); a failure degrades both checks to SKIP, not FAIL.
+let issue = null;
+let issueError = null;
+if (issueNumber != null) {
+	try {
+		issue = JSON.parse(
+			await execGh(["issue", "view", String(issueNumber), "--json", "author,body,comments,createdAt"], { cwd: root }),
+		);
+	} catch {
+		issueError = "gh CLI unavailable";
+	}
+}
+
 // 10. design-selection record: was the design choice recorded before the first commit,
 // with the required structure (#669)?
-results.push(designRecordStep({ exec, base, issueNumber }));
+results.push(designRecordStep({ exec, base, issue, issueError }));
 
 // 11. knowledge-artifact size direction: did tracked knowledge artifacts grow
 // without an explicit override, on a cycle whose linked issue states shrink intent (#669)?
-results.push(sizeDirectionStep({ exec, base, issueNumber, changedFiles }));
+results.push(sizeDirectionStep({ exec, base, issue, issueError, changedFiles }));
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
 const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdPath, "utf-8")));
