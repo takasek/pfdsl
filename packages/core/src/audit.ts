@@ -69,22 +69,22 @@ export function auditGraph(
 		if (!nodeKinds.has(a)) artifacts.push(a);
 	}
 
-	const terminals = [...new Set(artifacts)].filter(
-		(a) =>
-			produced.has(a) &&
-			!consumed.has(a) &&
-			!artifactMeta?.[a]?.externalStakeholders?.length,
+	const uniqueArtifacts = [...new Set(artifacts)];
+	// `terminals` and `externalTerminals` partition the same produced-and-
+	// unconsumed boundary set, so derive the boundary once and split it on the
+	// single discriminator — otherwise the produced/consumed predicate lives in
+	// two places and the two lists can drift on what "not consumed" means.
+	const boundary = uniqueArtifacts.filter(
+		(a) => produced.has(a) && !consumed.has(a),
 	);
-	const externalTerminals = [...new Set(artifacts)].filter(
-		(a) =>
-			produced.has(a) &&
-			!consumed.has(a) &&
-			!!artifactMeta?.[a]?.externalStakeholders?.length,
+	const terminals = boundary.filter(
+		(a) => !artifactMeta?.[a]?.externalStakeholders?.length,
+	);
+	const externalTerminals = boundary.filter(
+		(a) => !!artifactMeta?.[a]?.externalStakeholders?.length,
 	);
 	const openInputs = computeOpenInputs(edges);
-	const externalInputs = [...new Set(artifacts)].filter((a) =>
-		openInputs.has(a),
-	);
+	const externalInputs = uniqueArtifacts.filter((a) => openInputs.has(a));
 
 	// Consumer asymmetry: group artifacts by their frontmatter group, then
 	// compare normal (non-feedback) consumer sets pairwise within each group.

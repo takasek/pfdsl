@@ -181,8 +181,21 @@ console.log(formatGateTable(results));
 {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	if (pfdslFiles.length > 0 && existsSync(cliPath)) {
-		const newTerminalsByFile = [];
-		const newExternalTerminalsByFile = [];
+		// One entry per audit category `graph io` reports. Adding a third is a
+		// row here, not a fourth copy of the collect-and-print pair.
+		const reports = [
+			{
+				parse: parseAuditTerminals,
+				heading: "New terminal artifacts (classify means vs. deliverable; register todo consumer if missing)",
+				byFile: [],
+			},
+			{
+				parse: parseAuditExternalTerminals,
+				heading:
+					"New external-stakeholder terminal artifacts (verify each has a genuine external consumer, not a mistakenly-tagged means artifact)",
+				byFile: [],
+			},
+		];
 		for (const f of pfdslFiles) {
 			const before = exec("git", ["show", `origin/${base}:${f}`]);
 			const after = exec("git", ["show", `HEAD:${f}`]);
@@ -190,29 +203,19 @@ console.log(formatGateTable(results));
 			const beforeAudit = before.ok ? node([cliPath, "graph", "io", "-"], before.out) : { ok: true, out: "" };
 			const afterAudit = node([cliPath, "graph", "io", "-"], after.out);
 			if (!afterAudit.ok) continue;
-			const newTerminals = diffNewTerminals(
-				beforeAudit.ok ? parseAuditTerminals(beforeAudit.out) : [],
-				parseAuditTerminals(afterAudit.out),
-			);
-			if (newTerminals.length > 0) newTerminalsByFile.push({ file: f, newTerminals });
-			const newExternalTerminals = diffNewTerminals(
-				beforeAudit.ok ? parseAuditExternalTerminals(beforeAudit.out) : [],
-				parseAuditExternalTerminals(afterAudit.out),
-			);
-			if (newExternalTerminals.length > 0) newExternalTerminalsByFile.push({ file: f, newExternalTerminals });
-		}
-		if (newTerminalsByFile.length > 0) {
-			console.log("\nNew terminal artifacts (classify means vs. deliverable; register todo consumer if missing):");
-			for (const { file, newTerminals } of newTerminalsByFile) {
-				console.log(`  ${file}: ${newTerminals.join(", ")}`);
+			for (const report of reports) {
+				const added = diffNewTerminals(
+					beforeAudit.ok ? report.parse(beforeAudit.out) : [],
+					report.parse(afterAudit.out),
+				);
+				if (added.length > 0) report.byFile.push({ file: f, added });
 			}
 		}
-		if (newExternalTerminalsByFile.length > 0) {
-			console.log(
-				"\nNew external-stakeholder terminal artifacts (verify each has a genuine external consumer, not a mistakenly-tagged means artifact):",
-			);
-			for (const { file, newExternalTerminals } of newExternalTerminalsByFile) {
-				console.log(`  ${file}: ${newExternalTerminals.join(", ")}`);
+		for (const { heading, byFile } of reports) {
+			if (byFile.length === 0) continue;
+			console.log(`\n${heading}:`);
+			for (const { file, added } of byFile) {
+				console.log(`  ${file}: ${added.join(", ")}`);
 			}
 		}
 	}

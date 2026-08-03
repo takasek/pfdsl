@@ -66,8 +66,9 @@ describe("buildPluginDescription", () => {
 		assert.throws(() => buildPluginDescription({ skillDirs: ["not-a-real-skill"], commandFiles: [] }), /not-a-real-skill/);
 	});
 
-	it("throws when a bundled command has no description blurb, instead of silently omitting it", () => {
-		assert.throws(() => buildPluginDescription({ skillDirs: [], commandFiles: ["not-a-real-command.md"] }), /not-a-real-command\.md/);
+	it("derives a command's blurb from its filename, so no table can drift from PLUGIN_COMMAND_FILES", () => {
+		const description = buildPluginDescription({ skillDirs: [], commandFiles: ["brand-new-command.md"] });
+		assert.match(description, /\/brand-new-command\b/);
 	});
 });
 

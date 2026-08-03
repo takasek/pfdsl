@@ -171,19 +171,29 @@ export function lintCommitSubjects(subjects) {
 }
 
 /**
+ * Parse a `<label> a, b, c` list line out of `pfdsl graph io` text output.
+ * @param {string} auditText
+ * @param {string} label line prefix, including its trailing colon
+ * @returns {string[]}
+ */
+function parseAuditLine(auditText, label) {
+	const line = auditText.split("\n").find((l) => l.startsWith(label));
+	if (!line) return [];
+	return line
+		.slice(label.length)
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+}
+
+/**
  * Parse the `terminal artifacts: a, b, c` line out of `pfdsl graph io`
  * text output.
  * @param {string} auditText
  * @returns {string[]}
  */
 export function parseAuditTerminals(auditText) {
-	const line = auditText.split("\n").find((l) => l.startsWith("terminal artifacts:"));
-	if (!line) return [];
-	return line
-		.slice("terminal artifacts:".length)
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
+	return parseAuditLine(auditText, "terminal artifacts:");
 }
 
 /**
@@ -195,13 +205,7 @@ export function parseAuditTerminals(auditText) {
  * @returns {string[]}
  */
 export function parseAuditExternalTerminals(auditText) {
-	const line = auditText.split("\n").find((l) => l.startsWith("external-stakeholder terminals:"));
-	if (!line) return [];
-	return line
-		.slice("external-stakeholder terminals:".length)
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
+	return parseAuditLine(auditText, "external-stakeholder terminals:");
 }
 
 /**

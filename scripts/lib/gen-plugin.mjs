@@ -120,14 +120,6 @@ const SKILL_DESCRIPTION_BLURBS = {
 	"pfd-ecosystem": "ecosystem bootstrap (pfd-ecosystem skill)",
 };
 
-// One-line blurb per bundled command file, keyed the same way as
-// PLUGIN_COMMAND_FILES.
-const COMMAND_DESCRIPTION_BLURBS = {
-	"pfd-cycle.md": "/pfd-cycle",
-	"pfd-init.md": "/pfd-init",
-	"pfd-retro.md": "/pfd-retro",
-};
-
 function blurbFor(map, key, kind) {
 	const blurb = map[key];
 	if (!blurb) {
@@ -139,13 +131,14 @@ function blurbFor(map, key, kind) {
 // Builds the plugin/marketplace manifest description from what's actually
 // bundled (skillDirs, commandFiles), rather than a hand-maintained sentence
 // that can drift from PLUGIN_SKILL_DIRS/PLUGIN_COMMAND_FILES as skills and
-// commands are added or removed. Each bundled entry must have a blurb (see
-// blurbFor) — an entry with no blurb throws instead of being silently
-// dropped from the description.
+// commands are added or removed. A skill needs a blurb (see blurbFor) — one
+// with none throws instead of being silently dropped from the description.
+// Commands need no table: their blurb is the slash form of the filename, so
+// there is nothing that could drift from PLUGIN_COMMAND_FILES independently.
 // @param {{skillDirs?: string[], commandFiles?: string[]}} [options]
 export function buildPluginDescription({ skillDirs = ["pfdsl", ...PLUGIN_SKILL_DIRS], commandFiles = PLUGIN_COMMAND_FILES } = {}) {
 	const skillParts = skillDirs.map((name) => blurbFor(SKILL_DESCRIPTION_BLURBS, name, "skill"));
-	const commandParts = commandFiles.map((file) => blurbFor(COMMAND_DESCRIPTION_BLURBS, file, "command"));
+	const commandParts = commandFiles.map((file) => `/${file.replace(/\.md$/, "")}`);
 	return `PFD-DSL authoring toolkit: ${skillParts.join(", ")}, and ${commandParts.join(", ")} commands.`;
 }
 
