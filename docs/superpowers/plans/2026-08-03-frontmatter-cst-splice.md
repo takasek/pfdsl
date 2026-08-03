@@ -477,20 +477,22 @@ fieldValueSplice now touches only the target field's byte range."
 
 ### Task 4: `reindex.ts` を splice バッチ適用へ書き換え
 
+**前提**: このタスクは Task 5 が追加する `newEntrySplice`（`frontmatter-cst.ts`）に依存する。**Task 5 を先に実装してから着手すること。** `reindex` は「フロントマターに全く存在しないノード」にも `index` を新規付与する必要があり（body にしか登場しないノードへの reindex は実際の主要ユースケース）、Task 3 の `fieldValueSplice` は「既存ノードの中の1フィールド」しか扱えない設計のため、これだけでは不十分。バッチの中に「既存ノードの `index` 追加/上書き」と「フロントマターに未登場のノードを丸ごと新規作成」が混在しうる。
+
 **Files:**
 - Modify: `packages/core/src/reindex.ts`
 - Test: `packages/core/src/reindex.test.ts`
 
 **Interfaces:**
-- Consumes: `fieldValueSplice`, `applySplices`（Task 3, Task 1）
+- Consumes: `fieldValueSplice`（Task 3）、`newEntrySplice`（Task 5）、`applySplices`（Task 1）
 - Produces: 既存の `reindex()` シグネチャは変更しない。
 
 - [ ] **Step 1: 失敗するテストを書く**
 
-`packages/core/src/reindex.test.ts` に追加（ファイル冒頭の import に合わせて配置):
+`packages/core/src/reindex.test.ts` に追加（ファイル冒頭の import に合わせて配置）。このテストは意図的に「既存ノード（`a`、折り返し済み `description` 持ち）」と「フロントマターに全く登場しない body-only ノード（`p`、`b`）」を同一バッチに混在させる — 両方の splice 経路が同時に動くことを確認するため:
 
 ```ts
-it("preserves an untouched folded-scalar sibling's line wraps", () => {
+it("preserves an untouched folded-scalar sibling's line wraps, even when the same batch also creates brand-new entries", () => {
 	const src = [
 		"---",
 		"artifact:",
@@ -505,13 +507,17 @@ it("preserves an untouched folded-scalar sibling's line wraps", () => {
 	].join("\n");
 	const { output } = reindex(src, { renumber: true });
 	expect(output).toContain("description: >\n      long text\n      wrapped here\n");
+	// p (process, body-only) and b (artifact, body-only) both get a fresh
+	// frontmatter entry with an index in the same pass.
+	expect(output).toContain("process:\n  p:\n    index: 1");
+	expect(output).toMatch(/b:\n\s*index: 2/);
 });
 ```
 
 - [ ] **Step 2: 失敗を確認**
 
-Run: `cd packages/core && npx vitest run src/reindex.test.ts -t "folded-scalar"`
-Expected: FAIL — 現行実装は `doc.toString()` 全文再直列化を通すため1行化される。
+Run: `cd packages/core && npx vitest run src/reindex.test.ts -t "brand-new entries"`
+Expected: FAIL — 現行実装は `doc.toString()` 全文再直列化を通すため折り返しが1行化される。
 
 - [ ] **Step 3: 実装**
 
@@ -527,7 +533,7 @@ Expected: FAIL — 現行実装は `doc.toString()` 全文再直列化を通す�
 	return { output, changes, diagnostics };
 ```
 
-置き換え後:
+置き換え後（各変更ごとに「既存ノードなら `fieldValueSplice`、未登場ノードなら `newEntrySplice`」を振り分け、いずれか1件でも `ok:false` ならバッチ全体を安全にフォールバックする — Task 3 の設計と同じ「部分的に splice・部分的に全文再直列化」という中途半端な結果を避ける方針を踏襲）:
 
 ```ts
 	const cst = parseFrontmatterCst(source);
@@ -543,7 +549,9 @@ Expected: FAIL — 現行実装は `doc.toString()` 全文再直列化を通す�
 	const splices: Splice[] = [];
 	let fallbackNeeded = false;
 	for (const c of changes) {
-		const result = fieldValueSplice(cst.yamlText, cst.doc, c.kind, c.id, "index", c.to, cst.newline);
+		const result = cst.doc.hasIn([c.kind, c.id])
+			? fieldValueSplice(cst.yamlText, cst.doc, c.kind, c.id, "index", c.to, cst.newline)
+			: newEntrySplice(cst.yamlText, cst.doc, c.kind, c.id, "index", c.to, cst.newline);
 		if (!result.ok) {
 			fallbackNeeded = true;
 			break;
@@ -568,11 +576,14 @@ import { Document } from "yaml";
 import {
 	applySplices,
 	fieldValueSplice,
+	newEntrySplice,
 	parseFrontmatterCst,
 	renderFrontmatterCst,
 	type Splice,
 } from "./frontmatter-cst.js";
 ```
+
+`newEntrySplice` のシグネチャは Task 5 で `(yamlText, doc, kind, id, field, value, newline)` として定義される（`fieldValueSplice` と同じ引数順）。`kind` の型は `"artifact" | "process"` — `reindex` の `changes` は `NodeKind`（`group` を含みうる）なので、`c.kind` を渡す箇所は `c.kind === "group"` を弾く必要がある点に注意。既存の `reindex` は `group` ノードに `index` を割り当てる経路が元々ないか確認し（`computeTopoOrder` や `assigned` の扱いを見る限り、`group` は index 割当の対象外のはず）、対象外であることを型でも表現できるなら表現する。もし型上 `NodeKind` のまま渡さざるを得ない場合は、呼び出し直前に `c.kind !== "group"` をアサートするか、`newEntrySplice`/`fieldValueSplice` 呼び出し側で `as "artifact" | "process"` を使う（Task 3 の `fieldValueSplice` 自体は `kind: NodeKind` を受けるので `group` が来ても型エラーにはならないが、`newEntrySplice` は Task 5 で `"artifact" | "process"` に絞る設計なので、ここだけ型が食い違う可能性がある — 実装時に `tsgo` の指摘に従って調整すること）。
 
 - [ ] **Step 4: 通過を確認**
 
@@ -593,15 +604,222 @@ git commit -m "fix(core): splice reindex's index: writes instead of full re-seri
 
 ---
 
-### Task 5: `insert-definition.ts` を splice 方式へ書き換え
+### Task 5: `newEntrySplice` 共有プリミティブ + `insert-definition.ts` の書き換え
+
+**設計変更の経緯**: 当初このタスクは `insert-definition.ts` 単体の書き換えとして計画されていたが、Task 4（`reindex.ts`）の実装中に「フロントマターに全く存在しないノードへも書き込む」という要求が `insert-definition.ts` 固有ではなく `reindex.ts` にも共通することが判明した。そのため「新規 `[kind, id]` エントリを1フィールド分だけ挿入する」ロジックを `frontmatter-cst.ts` 側の汎用プリミティブ `newEntrySplice` として切り出し、`insertDefinition`（`label` 固定）と `reindex`（`index` 固定）の両方がこれを呼ぶ形にする。Task 3 の `fieldValueSplice` が「既存ノードの中の1フィールド」を扱うのに対し、`newEntrySplice` は「`kind.id` というノード自体が存在しないとき、それを1フィールドだけ持つ形で新規作成する」ことを扱う——住み分けが異なるだけで、内部で使うヘルパー（`lineIndent`, `renderValue`, `padLine`）は Task 3 で `frontmatter-cst.ts` に追加済みのものをそのまま再利用する。
 
 **Files:**
-- Modify: `packages/core/src/insert-definition.ts`
-- Test: `packages/core/src/insert-definition.test.ts`
+- Modify: `packages/core/src/frontmatter-cst.ts`（`newEntrySplice` 追加）
+- Modify: `packages/core/src/insert-definition.ts`（`newEntrySplice` を使う薄いラッパーへ置き換え）
+- Test: `packages/core/src/frontmatter-cst.test.ts`（`newEntrySplice` の直接テスト）
+- Test: `packages/core/src/insert-definition.test.ts`（既存2件の期待値更新 + 回帰確認）
 
 **Interfaces:**
-- Consumes: `applySplices`（Task 1）、`parseFrontmatterCst` の `yamlText`（Task 2）
-- Produces: 既存の `insertDefinition()` シグネチャは変更しない。
+- Consumes: `applySplices`（Task 1）、`parseFrontmatterCst` の `yamlText`（Task 2）、`lineIndent` / `renderValue` / `padLine`（Task 3 で `frontmatter-cst.ts` に追加済み、re-export 不要・同一ファイル内での再利用）
+- Produces: `export function newEntrySplice(yamlText: string, doc: Document, kind: "artifact" | "process", id: string, field: string, value: string | number, newline: "\n" | "\r\n"): { ok: true; splice: Splice } | { ok: false; reason: "unsupported" }` — Task 4（`reindex`）がこれを直接再利用する。既存の `insertDefinition()` シグネチャは変更しない。
+
+#### Part A: `newEntrySplice` を `frontmatter-cst.ts` に追加
+
+- [ ] **Step 1: 失敗するテストを書く**
+
+`packages/core/src/frontmatter-cst.test.ts` に追加。`newEntrySplice` は低レベルプリミティブなので、ここでは戻り値の `splice` を自分で `applySplices` に通した結果を検証する（`insertDefinition`/`reindex` 経由の統合テストは Part B・Task 4 で別途行う）:
+
+```ts
+import { newEntrySplice } from "./frontmatter-cst.js";
+
+describe("newEntrySplice", () => {
+	it("appends a new entry after the last sibling in a non-empty block section", () => {
+		const yamlText = "artifact:\n  a:\n    label: A\nprocess:\n  p:\n    label: P";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(yamlText, doc, "artifact", "b", "label", "b", "\n");
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const out = applySplices(yamlText, [result.splice]);
+		expect(out).toBe("artifact:\n  a:\n    label: A\n  b:\n    label: b\nprocess:\n  p:\n    label: P");
+	});
+
+	it("creates the kind section itself when it doesn't exist at all", () => {
+		const yamlText = "artifact:\n  a:\n    label: A";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(yamlText, doc, "process", "p", "label", "p", "\n");
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const out = applySplices(yamlText, [result.splice]);
+		expect(out).toBe("artifact:\n  a:\n    label: A\nprocess:\n  p:\n    label: p");
+	});
+
+	it("inserts into a flow-style section", () => {
+		const yamlText = "artifact: { a: { label: A } }";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(yamlText, doc, "artifact", "b", "label", "b", "\n");
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const out = applySplices(yamlText, [result.splice]);
+		expect(out).toBe("artifact: { a: { label: A }, b: { label: b } }");
+	});
+
+	it("supports a non-string value (index: number)", () => {
+		const yamlText = "artifact:\n  a:\n    label: A";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(yamlText, doc, "artifact", "b", "index", 2, "\n");
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const out = applySplices(yamlText, [result.splice]);
+		expect(out).toBe("artifact:\n  a:\n    label: A\n  b:\n    index: 2");
+	});
+
+	it("returns unsupported for an empty block-style section (no sibling to anchor on)", () => {
+		const yamlText = "artifact:\nprocess:\n  p:\n    label: P";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(yamlText, doc, "artifact", "b", "label", "b", "\n");
+		expect(result).toEqual({ ok: false, reason: "unsupported" });
+	});
+});
+```
+
+実際のテストファイルはすでに `parseDocument` を import 済みかもしれないので、重複 import にならないよう既存の import 文を確認してから追記すること（`frontmatter-cst.test.ts` は現時点で `import { parseFrontmatterCst, setFrontmatterField } from "./frontmatter-cst.js";` および Task 1 で追加した `applySplices` の import を持つ — `newEntrySplice` をこれらと同じ import 文にまとめてよい）。`parseDocument` 自体は `yaml` パッケージから直接 import する必要がある（`import { parseDocument } from "yaml";`）。
+
+- [ ] **Step 2: 失敗を確認**
+
+Run: `cd packages/core && npx vitest run src/frontmatter-cst.test.ts -t newEntrySplice`
+Expected: FAIL — `newEntrySplice` is not exported.
+
+- [ ] **Step 3: 実装**
+
+`packages/core/src/frontmatter-cst.ts` に追加（ファイル末尾、`fieldValueSplice` の後）。`lineIndent` と `renderValue` は Task 3 で追加済みのものをそのまま使う。新規に `renderKey` と `childIndentStep` を追加する:
+
+```ts
+/** Renders `key` the way `yaml` would quote it as a plain map key. */
+function renderKey(key: string): string {
+	const tmp = parseDocument("0: 0");
+	tmp.set(key, 0);
+	const line = tmp
+		.toString({ lineWidth: 0 })
+		.split("\n")
+		.find((l) => l.endsWith(": 0") && !l.startsWith("0:"));
+	return (line as string).slice(0, -": 0".length);
+}
+
+/**
+ * Learn the file's actual per-level indent step from an existing sibling
+ * entry's own nested field, instead of assuming the canonical 2 spaces —
+ * indentation normalization is `fmt`'s job, not this function's.
+ */
+function childIndentStep(items: readonly { key: unknown; value: unknown }[], yamlText: string): number {
+	for (const item of items) {
+		const value = item.value;
+		if (isMap(value) && value.items.length > 0) {
+			const parentIndent = lineIndent(yamlText, (item.key as Node).range![0]);
+			const childKey = value.items[0].key as Node;
+			const childIndent = lineIndent(yamlText, childKey.range![0]);
+			if (childIndent.length > parentIndent.length) {
+				return childIndent.length - parentIndent.length;
+			}
+		}
+	}
+	return 2;
+}
+
+/**
+ * Compute the byte-range splice that creates a brand-new `[kind, id]`
+ * frontmatter entry with exactly one field (`field: value`), without
+ * touching any other byte of `yamlText`. Shared by `insertDefinition`
+ * (always `field: "label"`) and `reindex` (always `field: "index"`) — the
+ * two places in this codebase that need to create a node's frontmatter
+ * entry from nothing rather than edit an existing one (`fieldValueSplice`
+ * handles the latter). Returns `{ ok: false, reason: "unsupported" }` when
+ * there is no sibling entry to anchor indentation on (an empty block-style
+ * `kind:` section, or an entirely empty document) — callers fall back to
+ * full re-serialization for that rare case.
+ */
+export function newEntrySplice(
+	yamlText: string,
+	doc: Document,
+	kind: "artifact" | "process",
+	id: string,
+	field: string,
+	value: string | number,
+	newline: "\n" | "\r\n",
+): { ok: true; splice: Splice } | { ok: false; reason: "unsupported" } {
+	const idKey = renderKey(id);
+	const kindNode = doc.get(kind, true);
+
+	if (isMap(kindNode) && kindNode.items.length > 0) {
+		const last = kindNode.items[kindNode.items.length - 1];
+		const insertAt = (last.value as Node).range![1];
+		if (kindNode.flow) {
+			return {
+				ok: true,
+				splice: {
+					start: insertAt,
+					end: insertAt,
+					replacement: `, ${idKey}: { ${field}: ${renderValue(value, true)} }`,
+				},
+			};
+		}
+		const indent = lineIndent(yamlText, (last.key as Node).range![0]);
+		const step = childIndentStep(kindNode.items, yamlText);
+		const childIndent = indent + " ".repeat(step);
+		const content = `${indent}${idKey}:\n${childIndent}${field}: ${renderValue(value, false)}`.replace(
+			/\n/g,
+			newline,
+		);
+		const line = padLine(yamlText, insertAt, content, newline);
+		return { ok: true, splice: { start: insertAt, end: insertAt, replacement: line } };
+	}
+
+	if (isMap(kindNode) && kindNode.items.length === 0) {
+		if (kindNode.flow) {
+			const openBrace = (kindNode as unknown as Node).range![0];
+			return {
+				ok: true,
+				splice: {
+					start: openBrace + 1,
+					end: openBrace + 1,
+					replacement: ` ${idKey}: { ${field}: ${renderValue(value, true)} }`,
+				},
+			};
+		}
+		return { ok: false, reason: "unsupported" };
+	}
+
+	// `kind` section doesn't exist yet — insert it as a new top-level key.
+	const rootMap = doc.contents;
+	if (!isMap(rootMap) || rootMap.items.length === 0) {
+		return { ok: false, reason: "unsupported" };
+	}
+	const last = rootMap.items[rootMap.items.length - 1];
+	const insertAt = (last.value as Node).range![1];
+	const kindKey = renderKey(kind);
+	const content = `${kindKey}:\n  ${idKey}:\n    ${field}: ${renderValue(value, false)}`.replace(
+		/\n/g,
+		newline,
+	);
+	const line = padLine(yamlText, insertAt, content, newline);
+	return { ok: true, splice: { start: insertAt, end: insertAt, replacement: line } };
+}
+```
+
+`Node` 型を使うため、ファイル冒頭の `yaml` からの import に `type Node` を追加する: `import { Document, type Node, isAlias, isMap, isScalar, parseDocument } from "yaml";`（Task 3 で追加済みの `isAlias, isMap, isScalar` はそのまま）。`.range![0]` のような非null表明は、Task 3 のレビューで確立した「範囲は必ず存在する」という前提を踏襲している（既存コードの `as [number, number, number]` キャストと同じ意図 — どちらのスタイルでもよいが、ファイル内で混在させない）。
+
+- [ ] **Step 4: 通過を確認**
+
+Run: `cd packages/core && npx vitest run src/frontmatter-cst.test.ts`
+Expected: PASS — 全件（既存 + `newEntrySplice` の新規5件）。
+
+- [ ] **Step 5: 型チェック**
+
+Run: `cd packages/core && npx tsgo --noEmit`
+Expected: エラーなし。
+
+- [ ] **Step 6: コミット**
+
+```bash
+git add packages/core/src/frontmatter-cst.ts packages/core/src/frontmatter-cst.test.ts
+git commit -m "feat(core): add newEntrySplice primitive for creating new frontmatter entries"
+```
+
+#### Part B: `insert-definition.ts` を `newEntrySplice` の薄いラッパーへ書き換え
 
 - [ ] **Step 1: 既存2件の期待値を更新し、失敗させる**
 
@@ -659,76 +877,24 @@ Expected: この2件が新しい期待値で FAIL（現行実装がまだ splice
 
 - [ ] **Step 3: 実装**
 
-`packages/core/src/insert-definition.ts` を全面置換:
+`packages/core/src/insert-definition.ts` を全面置換（Part A の `newEntrySplice` を薄く呼ぶだけになる）:
 
 ```ts
-import { Document, isMap, parseDocument } from "yaml";
-import { applySplices, parseFrontmatterCst, renderFrontmatterCst, type Splice } from "./frontmatter-cst.js";
+import { Document } from "yaml";
+import { applySplices, newEntrySplice, parseFrontmatterCst, renderFrontmatterCst } from "./frontmatter-cst.js";
 
 export interface InsertDefinitionResult {
 	output: string;
 	inserted: boolean;
 }
 
-/** Renders `key` the way `yaml` would quote it as a plain map key. */
-function renderKey(key: string): string {
-	const tmp = parseDocument("0: 0");
-	tmp.set(key, 0);
-	const line = tmp
-		.toString({ lineWidth: 0 })
-		.split("\n")
-		.find((l) => l.endsWith(": 0") && !l.startsWith("0:"));
-	return (line as string).slice(0, -": 0".length);
-}
-
-function renderValue(value: string, flow: boolean): string {
-	const tmp = parseDocument(flow ? "{ y: 0 }" : "y: 0");
-	tmp.setIn(["y"], value);
-	const rendered = tmp.toString({ lineWidth: 0 });
-	return flow
-		? rendered.replace(/^\{ y: /, "").replace(/ \}\n$/, "")
-		: rendered.replace(/^y: /, "").replace(/\n$/, "");
-}
-
-function lineIndent(text: string, pos: number): string {
-	const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
-	return (text.slice(lineStart, pos).match(/^[ \t]*/) ?? [""])[0];
-}
-
-function padLine(yamlText: string, insertAt: number, content: string, newline: string): string {
-	const before = yamlText.slice(0, insertAt);
-	const afterChar = yamlText[insertAt];
-	const lead = before.length > 0 && !before.endsWith("\n") ? newline : "";
-	const trail = afterChar !== undefined && afterChar !== "\n" && afterChar !== "\r" ? newline : "";
-	return `${lead}${content}${trail}`;
-}
-
-/**
- * Learn the file's actual per-level indent step from an existing sibling
- * entry's own nested field, instead of assuming the canonical 2 spaces —
- * indentation normalization is `fmt`'s job, not this function's (#issue).
- */
-function childIndentStep(items: readonly { key: unknown; value: unknown }[], yamlText: string): number {
-	for (const item of items) {
-		const value = item.value;
-		if (isMap(value) && value.items.length > 0) {
-			const parentIndent = lineIndent(yamlText, (item.key as { range: [number, number, number] }).range[0]);
-			const childKey = value.items[0].key as { range: [number, number, number] };
-			const childIndent = lineIndent(yamlText, childKey.range[0]);
-			if (childIndent.length > parentIndent.length) {
-				return childIndent.length - parentIndent.length;
-			}
-		}
-	}
-	return 2;
-}
-
 /**
  * Insert a `label: <id>` definition block for a node that appears only in
- * edges. Splices the new entry's text directly into the source (ADR-0034 /
- * frontmatter-cst-splice-design): unrelated comments, quote style,
- * flow-vs-block choice, and indentation all survive byte-for-byte — a
- * no-op (and idempotent) when `id` is already defined under `kind`.
+ * edges. Splices the new entry's text directly into the source via
+ * `newEntrySplice` (ADR-0034 / frontmatter-cst-splice-design): unrelated
+ * comments, quote style, flow-vs-block choice, and indentation all survive
+ * byte-for-byte — a no-op (and idempotent) when `id` is already defined
+ * under `kind`.
  *
  * Returns only the frontmatter block's text, not the whole document —
  * callers (e.g. the VS Code extension's code action) apply it by replacing
@@ -755,62 +921,16 @@ export function insertDefinition(
 		return { output: renderFrontmatterCst(doc, newline), inserted: false };
 	}
 
-	const idKey = renderKey(id);
-	const kindNode = doc.get(kind, true);
-	let splice: Splice;
-
-	if (isMap(kindNode) && kindNode.items.length > 0) {
-		const last = kindNode.items[kindNode.items.length - 1];
-		const insertAt = (last.value.range as [number, number, number])[1];
-		if (kindNode.flow) {
-			splice = {
-				start: insertAt,
-				end: insertAt,
-				replacement: `, ${idKey}: { label: ${renderValue(id, true)} }`,
-			};
-		} else {
-			const indent = lineIndent(yamlText, (last.key.range as [number, number, number])[0]);
-			const step = childIndentStep(kindNode.items, yamlText);
-			const childIndent = indent + " ".repeat(step);
-			const content = `${indent}${idKey}:\n${childIndent}label: ${renderValue(id, false)}`.replace(
-				/\n/g,
-				newline,
-			);
-			const line = padLine(yamlText, insertAt, content, newline);
-			splice = { start: insertAt, end: insertAt, replacement: line };
-		}
-	} else if (isMap(kindNode) && kindNode.items.length === 0) {
-		if (kindNode.flow) {
-			const openBrace = (kindNode.range as [number, number, number])[0];
-			splice = {
-				start: openBrace + 1,
-				end: openBrace + 1,
-				replacement: ` ${idKey}: { label: ${renderValue(id, true)} }`,
-			};
-		} else {
-			// Empty block map: no sibling to anchor indentation on.
-			doc.setIn([kind, id, "label"], id);
-			return { output: renderFrontmatterCst(doc, newline), inserted: true };
-		}
-	} else {
-		// `kind` section doesn't exist yet — insert it as a new top-level key.
-		const rootMap = doc.contents;
-		if (!isMap(rootMap) || rootMap.items.length === 0) {
-			doc.setIn([kind, id, "label"], id);
-			return { output: renderFrontmatterCst(doc, newline), inserted: true };
-		}
-		const last = rootMap.items[rootMap.items.length - 1];
-		const insertAt = (last.value.range as [number, number, number])[1];
-		const kindKey = renderKey(kind);
-		const content = `${kindKey}:\n  ${idKey}:\n    label: ${renderValue(id, false)}`.replace(
-			/\n/g,
-			newline,
-		);
-		const line = padLine(yamlText, insertAt, content, newline);
-		splice = { start: insertAt, end: insertAt, replacement: line };
+	const result = newEntrySplice(yamlText, doc, kind, id, "label", id, newline);
+	if (!result.ok) {
+		// Empty block-style kind section, or an entirely empty document body
+		// with no other top-level key to anchor on — no sibling text to
+		// preserve either way, so a full re-serialize is safe here.
+		doc.setIn([kind, id, "label"], id);
+		return { output: renderFrontmatterCst(doc, newline), inserted: true };
 	}
 
-	const newYamlText = applySplices(yamlText, [splice]);
+	const newYamlText = applySplices(yamlText, [result.splice]);
 	return { output: `---${newline}${newYamlText}${newline}---${newline}`, inserted: true };
 }
 ```
@@ -836,7 +956,8 @@ side effect of inserting an unrelated new id — an unusual indent step
 got canonicalized to 2 spaces, and a header's trailing comment moved
 to its own line. Neither is insertDefinition's job to do; indentation
 normalization belongs to fmt, and comment placement is the author's
-choice. Splicing only the new entry's bytes leaves both alone."
+choice. Splicing only the new entry's bytes (via the shared
+newEntrySplice primitive) leaves both alone."
 ```
 
 ---
