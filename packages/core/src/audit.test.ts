@@ -107,6 +107,7 @@ describe("auditGraph", () => {
 		const result = auditGraph([], new Map());
 		expect(result.terminals).toEqual([]);
 		expect(result.externalInputs).toEqual([]);
+		expect(result.externalTerminals).toEqual([]);
 	});
 
 	describe("consumerAsymmetry", () => {
@@ -355,6 +356,63 @@ describe("auditGraph", () => {
 			};
 			const result = auditGraph(edges, nodeKinds, artifactMeta);
 			expect(result.terminals).toContain("report");
+			expect(result.externalTerminals).not.toContain("report");
+		});
+
+		it("artifact with externalStakeholders is reported in externalTerminals, not terminals", () => {
+			const edges = mkEdges(
+				{ kind: "input", a: "req", p: "design" },
+				{ kind: "output", a: "report", p: "design" },
+			);
+			const nodeKinds = new Map<string, NodeKind>([
+				["req", "artifact"],
+				["design", "process"],
+				["report", "artifact"],
+			]);
+			const artifactMeta: Record<string, ArtifactMeta> = {
+				report: { externalStakeholders: ["規制当局"] },
+			};
+			const result = auditGraph(edges, nodeKinds, artifactMeta);
+			expect(result.externalTerminals).toContain("report");
+			expect(result.terminals).not.toContain("report");
+		});
+
+		it("a plain terminal artifact (no externalStakeholders) does not appear in externalTerminals", () => {
+			const edges = mkEdges(
+				{ kind: "input", a: "req", p: "design" },
+				{ kind: "output", a: "spec", p: "design" },
+			);
+			const nodeKinds = new Map<string, NodeKind>([
+				["req", "artifact"],
+				["design", "process"],
+				["spec", "artifact"],
+			]);
+			const result = auditGraph(edges, nodeKinds);
+			expect(result.terminals).toContain("spec");
+			expect(result.externalTerminals).not.toContain("spec");
+		});
+
+		it("an artifact consumed by a normal edge does not appear in externalTerminals even with externalStakeholders", () => {
+			// req >> design -> spec\nspec >> impl -> code  (spec is consumed by impl)
+			const edges = mkEdges(
+				{ kind: "input", a: "req", p: "design" },
+				{ kind: "output", a: "spec", p: "design" },
+				{ kind: "input", a: "spec", p: "impl" },
+				{ kind: "output", a: "code", p: "impl" },
+			);
+			const nodeKinds = new Map<string, NodeKind>([
+				["req", "artifact"],
+				["design", "process"],
+				["spec", "artifact"],
+				["impl", "process"],
+				["code", "artifact"],
+			]);
+			const artifactMeta: Record<string, ArtifactMeta> = {
+				spec: { externalStakeholders: ["外部ユーザー"] },
+			};
+			const result = auditGraph(edges, nodeKinds, artifactMeta);
+			expect(result.externalTerminals).not.toContain("spec");
+			expect(result.terminals).not.toContain("spec");
 		});
 
 		it("artifact with externalStakeholders and a consuming edge is neither terminal nor flagged", () => {
