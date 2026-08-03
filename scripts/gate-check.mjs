@@ -5,7 +5,7 @@
 // against the diff from origin/<base> to HEAD, then prints the remaining
 // checklist items (extracted from the work-cycle checklist itself) as
 // MANUAL: lines.
-// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact]
+// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n>]
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -28,6 +28,7 @@ import {
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	wipTransitionStep,
+	designRecordStep,
 } from "./lib/gate-check-steps.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 
@@ -49,6 +50,11 @@ if (noArtifact && artifactKey) {
 	console.error("gate-check: --artifact and --no-artifact are mutually exclusive");
 	process.exit(2);
 }
+// Optional: powers the design-selection-record and size-direction checks
+// (#669), which need the linked issue to read from. Without it those checks
+// SKIP rather than guess which issue the cycle belongs to.
+const issueFlagValue = flag("--issue");
+const issueNumber = issueFlagValue !== undefined ? Number(issueFlagValue) : null;
 
 // Every call names the executable and its arguments separately — `base` and
 // `artifactKey` come from argv and must never be parsed by a shell (#572).
@@ -168,6 +174,10 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }));
+
+// 10. design-selection record: was the design choice recorded before the first commit,
+// with the required structure (#669)?
+results.push(designRecordStep({ exec, base, issueNumber }));
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
 const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdPath, "utf-8")));

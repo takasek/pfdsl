@@ -283,3 +283,68 @@ const COVERED_BY_GATE_CHECK = [
 export function deriveManualItems(checklistItems) {
 	return checklistItems.filter((item) => !COVERED_BY_GATE_CHECK.some((kw) => item.includes(kw)));
 }
+
+/**
+ * Classify the timing of a design-selection record against the branch's
+ * first commit (issue #669's protection against "the decision record is
+ * written after the fact"). A record posted after work already started
+ * documents a choice that was made retroactively, not one that guided it.
+ * @param {string | null | undefined} recordIso - createdAt of the record comment.
+ * @param {string | null | undefined} firstCommitIso - authorDate of the range's first commit.
+ * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
+ */
+export function classifyDesignRecordTiming(recordIso, firstCommitIso) {
+	if (!recordIso) return { status: "FAIL", detail: "no design-selection record found" };
+	if (!firstCommitIso) return { status: "SKIP", detail: "no commits in range" };
+	if (new Date(recordIso).getTime() > new Date(firstCommitIso).getTime()) {
+		return {
+			status: "FAIL",
+			detail: `record posted at ${recordIso}, after the first commit at ${firstCommitIso}`,
+		};
+	}
+	return { status: "PASS" };
+}
+
+export const DESIGN_RECORD_REQUIRED_PREFIXES = ["前提:", "否定案:", "却下理由:"];
+export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
+
+/**
+ * Classify the content of a design-selection record. Two independent checks:
+ * required line-head tokens are present, and every enumerated option got a
+ * disposition word somewhere in the record.
+ *
+ * The disposition-token count is checked as "at least optionCount", not an
+ * exact match, because ordinary prose can name the same option's disposition
+ * more than once (e.g. "案2は却下する。却下理由は…") — an exact-match check
+ * would FAIL a correct record for that.
+ * @param {string} recordBody
+ * @param {number} optionCount
+ * @returns {{status: 'PASS'|'FAIL', detail?: string}}
+ */
+export function classifyDesignRecordContent(recordBody, optionCount) {
+	const body = recordBody ?? "";
+	const lines = body
+		.split("\n")
+		.map((line) => line.trim().replace(/^#{1,6}\s*/, "").replace(/^\*\*/, ""));
+	const missing = DESIGN_RECORD_REQUIRED_PREFIXES.filter(
+		(prefix) => !lines.some((line) => line.startsWith(prefix)),
+	);
+
+	const problems = [];
+	if (missing.length > 0) problems.push(`missing required line(s): ${missing.join(", ")}`);
+
+	if (optionCount > 0) {
+		const dispositionCount = DISPOSITION_TOKENS.reduce(
+			(sum, token) => sum + (body.split(token).length - 1),
+			0,
+		);
+		if (dispositionCount < optionCount) {
+			problems.push(
+				`disposition tokens (${DISPOSITION_TOKENS.join("/")}) found ${dispositionCount} time(s), fewer than ${optionCount} enumerated option(s)`,
+			);
+		}
+	}
+
+	if (problems.length > 0) return { status: "FAIL", detail: problems.join("; ") };
+	return { status: "PASS" };
+}

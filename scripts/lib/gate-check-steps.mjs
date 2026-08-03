@@ -14,6 +14,8 @@
  */
 
 import {
+	classifyDesignRecordContent,
+	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
 	hasStatusChange,
 	matchesTrigger,
@@ -21,6 +23,7 @@ import {
 	statusChangedForArtifact,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
+import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
 
@@ -120,4 +123,50 @@ export function wipTransitionStep({ exec, base, artifactKey, noArtifact, changed
 				? `no status: wip snapshot found for artifact '${artifactKey}'`
 				: "no status: wip found in any commit snapshot",
 	};
+}
+
+/**
+ * design-selection record: was the design choice recorded before work
+ * started, with the required structure (issue #669's protection against
+ * "the record is written after the fact, or is unstructured prose")?
+ */
+export function designRecordStep({ exec, base, issueNumber }) {
+	const name = "design-selection record";
+	if (issueNumber == null) {
+		return { name, status: "SKIP", detail: "no --issue given; pass --issue <n> to check the design-selection record" };
+	}
+
+	const issueResult = exec("gh", ["issue", "view", String(issueNumber), "--json", "author,body,comments"]);
+	if (!issueResult.ok) return { name, status: "SKIP", detail: "gh CLI unavailable" };
+
+	let issueJson;
+	try {
+		issueJson = JSON.parse(issueResult.out);
+	} catch {
+		return { name, status: "SKIP", detail: "gh CLI unavailable" };
+	}
+
+	const ownerLogin = issueJson.author?.login;
+	const body = issueJson.body ?? "";
+	const optionCount = detectEnumeratedOptions(body).count;
+
+	if (/^決定:/m.test(body)) {
+		return { name, status: "PASS", detail: "decision recorded in the issue body" };
+	}
+
+	const recordComment = (issueJson.comments ?? []).find(
+		(c) => c.author?.login === ownerLogin && /^決定:/m.test(c.body ?? ""),
+	);
+
+	const firstCommitOut = exec("git", ["log", "--format=%aI", "--reverse", `origin/${base}..HEAD`]);
+	const firstCommitIso = firstCommitOut.ok ? firstCommitOut.out.trim().split("\n")[0] || null : null;
+
+	const timing = classifyDesignRecordTiming(recordComment?.createdAt, firstCommitIso);
+	if (!recordComment) return { name, status: timing.status, detail: timing.detail };
+
+	const content = classifyDesignRecordContent(recordComment.body, optionCount);
+	const detail = [timing.detail, content.detail].filter(Boolean).join("; ") || undefined;
+	if (timing.status === "FAIL" || content.status === "FAIL") return { name, status: "FAIL", detail };
+	if (timing.status === "SKIP") return { name, status: "SKIP", detail };
+	return { name, status: "PASS", detail };
 }
