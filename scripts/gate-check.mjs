@@ -19,6 +19,7 @@ import {
 	VSCODE_EXT_TRIGGER,
 	lintCommitSubjects,
 	parseAuditTerminals,
+	parseAuditExternalTerminals,
 	diffNewTerminals,
 	diffReadySets,
 	classifyAuditIssuesFlowResult,
@@ -181,6 +182,7 @@ console.log(formatGateTable(results));
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	if (pfdslFiles.length > 0 && existsSync(cliPath)) {
 		const newTerminalsByFile = [];
+		const newExternalTerminalsByFile = [];
 		for (const f of pfdslFiles) {
 			const before = exec("git", ["show", `origin/${base}:${f}`]);
 			const after = exec("git", ["show", `HEAD:${f}`]);
@@ -193,11 +195,24 @@ console.log(formatGateTable(results));
 				parseAuditTerminals(afterAudit.out),
 			);
 			if (newTerminals.length > 0) newTerminalsByFile.push({ file: f, newTerminals });
+			const newExternalTerminals = diffNewTerminals(
+				beforeAudit.ok ? parseAuditExternalTerminals(beforeAudit.out) : [],
+				parseAuditExternalTerminals(afterAudit.out),
+			);
+			if (newExternalTerminals.length > 0) newExternalTerminalsByFile.push({ file: f, newExternalTerminals });
 		}
 		if (newTerminalsByFile.length > 0) {
 			console.log("\nNew terminal artifacts (classify means vs. deliverable; register todo consumer if missing):");
 			for (const { file, newTerminals } of newTerminalsByFile) {
 				console.log(`  ${file}: ${newTerminals.join(", ")}`);
+			}
+		}
+		if (newExternalTerminalsByFile.length > 0) {
+			console.log(
+				"\nNew external-stakeholder terminal artifacts (verify each has a genuine external consumer, not a mistakenly-tagged means artifact):",
+			);
+			for (const { file, newExternalTerminals } of newExternalTerminalsByFile) {
+				console.log(`  ${file}: ${newExternalTerminals.join(", ")}`);
 			}
 		}
 	}

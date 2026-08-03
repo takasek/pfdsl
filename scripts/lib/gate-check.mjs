@@ -187,6 +187,24 @@ export function parseAuditTerminals(auditText) {
 }
 
 /**
+ * Parse the `external-stakeholder terminals: a, b, c` line out of
+ * `pfdsl graph io` text output — terminals kept out of the plain
+ * `terminal artifacts:` line solely because they declare a non-empty
+ * externalStakeholders.
+ * @param {string} auditText
+ * @returns {string[]}
+ */
+export function parseAuditExternalTerminals(auditText) {
+	const line = auditText.split("\n").find((l) => l.startsWith("external-stakeholder terminals:"));
+	if (!line) return [];
+	return line
+		.slice("external-stakeholder terminals:".length)
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+}
+
+/**
  * Terminal artifacts present after a change but not before — candidates for
  * the follow-up gatekeeper (protocol5(b)): classify each as means or
  * deliverable, and register a todo consumer if a means artifact lacks one.
