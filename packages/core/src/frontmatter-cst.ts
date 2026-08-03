@@ -163,7 +163,7 @@ export interface Splice {
 export function applySplices(text: string, splices: Splice[]): string {
 	const sorted = [...splices].sort((a, b) => a.start - b.start);
 	for (let i = 1; i < sorted.length; i++) {
-		if (sorted[i].start < sorted[i - 1].end) {
+		if (sorted[i]!.start < sorted[i - 1]!.end) {
 			throw new Error("applySplices: overlapping splices");
 		}
 	}
