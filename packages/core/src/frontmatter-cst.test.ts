@@ -203,6 +203,83 @@ describe("setFrontmatterField", () => {
 		);
 		expect(out).toContain("req(v2):\n    status: done");
 	});
+
+	it("preserves an untouched folded-scalar sibling's line wraps (#issue)", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  foo:",
+			"    label: Foo",
+			"    description: >",
+			"      This is a long description",
+			"      that spans multiple lines",
+			"      intentionally folded.",
+			"    status: todo",
+			"---",
+			"body",
+			"",
+		].join("\n");
+		const out = setFrontmatterField(src, "artifact", "foo", "status", "wip");
+		expect(out).toBe(
+			[
+				"---",
+				"artifact:",
+				"  foo:",
+				"    label: Foo",
+				"    description: >",
+				"      This is a long description",
+				"      that spans multiple lines",
+				"      intentionally folded.",
+				"    status: wip",
+				"---",
+				"body",
+				"",
+			].join("\n"),
+		);
+	});
+
+	it("inserts a missing field mid-document without duplicating the next section's newline", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    label: Spec\nprocess:\n  p:\n    label: P\n---\na >> P -> b\n";
+		const out = setFrontmatterField(src, "artifact", "spec", "owner", "alice");
+		expect(out).toBe(
+			"---\nartifact:\n  spec:\n    label: Spec\n    owner: alice\nprocess:\n  p:\n    label: P\n---\na >> P -> b\n",
+		);
+	});
+
+	it("inserts a missing field under CRLF without mixing line endings", () => {
+		const crlf = (...lines: string[]) => lines.join("\r\n");
+		const src = crlf(
+			"---",
+			"artifact:",
+			"  spec:",
+			"    label: Spec",
+			"---",
+			"a >> P -> b",
+			"",
+		);
+		const out = setFrontmatterField(src, "artifact", "spec", "owner", "alice");
+		expect(out).toBe(
+			crlf(
+				"---",
+				"artifact:",
+				"  spec:",
+				"    label: Spec",
+				"    owner: alice",
+				"---",
+				"a >> P -> b",
+				"",
+			),
+		);
+	});
+
+	it("falls back to full re-serialization for a field that is an alias reference", () => {
+		const src =
+			"---\ndefaults: &d\n  owner: alice\nartifact:\n  spec:\n    label: Spec\n    owner: *d\n---\na >> P -> b\n";
+		const out = setFrontmatterField(src, "artifact", "spec", "owner", "bob");
+		expect(out).toContain("owner: bob");
+		expect(out).not.toContain("owner: *d");
+	});
 });
 
 describe("parseFrontmatterCst yamlText", () => {

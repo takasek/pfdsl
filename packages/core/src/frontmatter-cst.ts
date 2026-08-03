@@ -1,4 +1,11 @@
-import { Document, parseDocument } from "yaml";
+import {
+	Document,
+	isAlias,
+	isMap,
+	isScalar,
+	type Node,
+	parseDocument,
+} from "yaml";
 import type { NodeKind } from "./types/index.js";
 
 /**
@@ -126,27 +133,6 @@ export function renderFrontmatterCst(
 	return newline === "\r\n" ? block.replace(/\n/g, "\r\n") : block;
 }
 
-/**
- * Rewrite one node's field in `source`'s frontmatter, preserving everything
- * else (comments, quote style, flow-vs-block). Used by `meta set` (ADR-0034).
- * Quoting for the new value is left to the `yaml` package's own core-schema
- * judgment — pass a `number` for integer fields (e.g. `index`) and a
- * `string` for everything else. Returns null when there is no frontmatter,
- * or when `id` has no entry under `kind`.
- */
-export function setFrontmatterField(
-	source: string,
-	kind: NodeKind,
-	id: string,
-	field: string,
-	value: string | number,
-): string | null {
-	const { present, doc, body, newline } = parseFrontmatterCst(source);
-	if (!present || !doc.hasIn([kind, id])) return null;
-	doc.setIn([kind, id, field], value);
-	return renderFrontmatterCst(doc, newline) + body;
-}
-
 export interface Splice {
 	start: number;
 	end: number;
@@ -174,4 +160,163 @@ export function applySplices(text: string, splices: Splice[]): string {
 		cursor = s.end;
 	}
 	return out + text.slice(cursor);
+}
+
+/** The indent (leading spaces/tabs) of the line containing byte offset `pos`. */
+function lineIndent(text: string, pos: number): string {
+	const lineStart = text.lastIndexOf("\n", pos - 1) + 1;
+	return (text.slice(lineStart, pos).match(/^[ \t]*/) ?? [""])[0];
+}
+
+/**
+ * Render `value` the way the `yaml` package would inside a map with the
+ * given flow-ness, without re-serializing anything else. Quoting rules
+ * differ between flow and block context (`,` and `}` are structural only
+ * in flow), so the throwaway document must match the real target's flow
+ * setting for the quoting decision to come out right.
+ */
+function renderValue(value: string | number, flow: boolean): string {
+	const tmp = parseDocument(flow ? "{ y: 0 }" : "y: 0");
+	tmp.setIn(["y"], value);
+	const rendered = tmp.toString({ lineWidth: 0 });
+	return flow
+		? rendered.replace(/^\{ y: /, "").replace(/ \}\n$/, "")
+		: rendered.replace(/^y: /, "").replace(/\n$/, "");
+}
+
+/**
+ * Wrap `content` (a bare, unterminated new line of YAML) with whatever
+ * leading/trailing newline the surrounding text is missing at `insertAt`,
+ * checked against the single adjacent character. Never assumes based on
+ * node type whether a boundary already has its own newline — block-map
+ * and scalar `range` endpoints disagree on whether they swallow the
+ * following newline, so the only reliable signal is the actual text.
+ */
+function padLine(
+	yamlText: string,
+	insertAt: number,
+	content: string,
+	newline: string,
+): string {
+	const before = yamlText.slice(0, insertAt);
+	const afterChar = yamlText[insertAt];
+	const lead = before.length > 0 && !before.endsWith("\n") ? newline : "";
+	const trail =
+		afterChar !== undefined && afterChar !== "\n" && afterChar !== "\r"
+			? newline
+			: "";
+	return `${lead}${content}${trail}`;
+}
+
+/**
+ * Compute the byte-range splice that sets `[kind, id, field]` to `value`,
+ * without touching any other byte of `yamlText`. Returns `{ ok: false }`
+ * when the node's field is an alias reference (splicing just the value
+ * would desync it from whatever anchor it points at) or when the parent
+ * map is an empty block map (no sibling to anchor indentation on) — both
+ * are rare enough that callers fall back to full re-serialization.
+ */
+export function fieldValueSplice(
+	yamlText: string,
+	doc: Document,
+	kind: NodeKind,
+	id: string,
+	field: string,
+	value: string | number,
+	newline: "\n" | "\r\n",
+):
+	| { ok: true; splice: Splice }
+	| { ok: false; reason: "not-found" | "unsupported" } {
+	const node = doc.getIn([kind, id], true);
+	if (!isMap(node)) return { ok: false, reason: "not-found" };
+	const pair = node.items.find((p) => isScalar(p.key) && p.key.value === field);
+	const replacement = renderValue(value, !!node.flow);
+
+	if (pair?.value) {
+		if (isAlias(pair.value)) return { ok: false, reason: "unsupported" };
+		const [start, end] = (pair.value as Node).range as [number, number, number];
+		return { ok: true, splice: { start, end, replacement } };
+	}
+
+	if (node.items.length === 0) {
+		if (node.flow) {
+			const openBrace = (node.range as [number, number, number])[0];
+			return {
+				ok: true,
+				splice: {
+					start: openBrace + 1,
+					end: openBrace + 1,
+					replacement: ` ${field}: ${replacement}`,
+				},
+			};
+		}
+		return { ok: false, reason: "unsupported" };
+	}
+
+	const last = node.items[node.items.length - 1]!;
+	const insertAt = ((last.value as Node).range as [number, number, number])[1];
+	if (node.flow) {
+		return {
+			ok: true,
+			splice: {
+				start: insertAt,
+				end: insertAt,
+				replacement: `, ${field}: ${replacement}`,
+			},
+		};
+	}
+	const indent = lineIndent(
+		yamlText,
+		((last.key as Node).range as [number, number, number])[0],
+	);
+	const line = padLine(
+		yamlText,
+		insertAt,
+		`${indent}${field}: ${replacement}`,
+		newline,
+	);
+	return {
+		ok: true,
+		splice: { start: insertAt, end: insertAt, replacement: line },
+	};
+}
+
+/**
+ * Rewrite one node's field in `source`'s frontmatter, preserving everything
+ * else (comments, quote style, flow-vs-block, and — unlike a full
+ * `Document#toString()` round trip — the exact line-wrap positions of any
+ * untouched folded/literal block scalar) byte-for-byte. Used by `meta set`
+ * (ADR-0034). Quoting for the new value is left to the `yaml` package's own
+ * core-schema judgment — pass a `number` for integer fields (e.g. `index`)
+ * and a `string` for everything else. Returns null when there is no
+ * frontmatter, or when `id` has no entry under `kind`.
+ */
+export function setFrontmatterField(
+	source: string,
+	kind: NodeKind,
+	id: string,
+	field: string,
+	value: string | number,
+): string | null {
+	const { present, doc, body, newline, yamlText } = parseFrontmatterCst(source);
+	if (!present || !doc.hasIn([kind, id])) return null;
+
+	const result = fieldValueSplice(
+		yamlText,
+		doc,
+		kind,
+		id,
+		field,
+		value,
+		newline,
+	);
+	if (result.ok) {
+		const newYamlText = applySplices(yamlText, [result.splice]);
+		return `---${newline}${newYamlText}${newline}---${newline}${body}`;
+	}
+
+	// Alias reference or empty block map: nothing safe to splice, fall back
+	// to the pre-existing full re-serialize path.
+	doc.setIn([kind, id, field], value);
+	return renderFrontmatterCst(doc, newline) + body;
 }
