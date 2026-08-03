@@ -399,4 +399,55 @@ a >> p -> b
 		expect(changed).toBe(true);
 		expect(output.replace(/\r\n/g, "")).not.toContain("\n");
 	});
+
+	it("leaves a section with an anchor/alias untouched instead of splicing the alias before its anchor", () => {
+		// Sorting by id alphabetically would want `a` before `z`, but `z`
+		// defines the anchor that `a`'s value aliases — no reorder mechanism
+		// can honor that order without breaking the anchor/alias relationship
+		// (an anchor must precede its alias in the serialized stream). This is
+		// out of scope for `sort()`: it must leave the section exactly as it
+		// found it rather than produce invalid YAML.
+		const src = `---
+artifact:
+  z:
+    label: &sharedLabel Z
+  a:
+    label: *sharedLabel
+---
+z >> p -> a
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(false);
+		expect(output).toBe(src);
+		const { diagnostics, frontmatter } = analyze(output);
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(frontmatter?.artifact?.a?.label).toBe("Z");
+		expect(frontmatter?.artifact?.z?.label).toBe("Z");
+		expect(nodeOrder(output, "artifact")).toEqual(["z", "a"]);
+	});
+
+	it("still splices a section with no anchor/alias, even when another section is skipped for having one", () => {
+		const src = `---
+artifact:
+  z:
+    label: &sharedLabel Z
+  a:
+    label: *sharedLabel
+process:
+  q: { label: Q }
+  p: { label: P }
+---
+z >> p -> a
+a >> q -> w
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		const { diagnostics, frontmatter } = analyze(output);
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(frontmatter?.artifact?.a?.label).toBe("Z");
+		// artifact has an anchor/alias, so it's left untouched...
+		expect(nodeOrder(output, "artifact")).toEqual(["z", "a"]);
+		// ...but process has none, so it's still spliced into sorted order.
+		expect(nodeOrder(output, "process")).toEqual(["p", "q"]);
+	});
 });

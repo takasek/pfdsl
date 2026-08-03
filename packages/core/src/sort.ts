@@ -1,4 +1,12 @@
-import { isMap, isScalar, type Node, type Pair, type YAMLMap } from "yaml";
+import {
+	isAlias,
+	isMap,
+	isScalar,
+	type Node,
+	type Pair,
+	visit,
+	type YAMLMap,
+} from "yaml";
 import { compareIds } from "./compare.js";
 import {
 	applySplices,
@@ -24,6 +32,37 @@ export interface SortResult {
 /** The node id a `Pair`'s key represents, or "" when the key isn't a plain scalar. */
 function pairId(pair: Pair): string {
 	return isScalar(pair.key) ? String(pair.key.value) : "";
+}
+
+/**
+ * True when any entry's value subtree in `map` defines a YAML anchor
+ * (`&name`, a truthy `.anchor` on any node — not only aliases can carry one)
+ * or references one via an alias (`*name`). Reordering such a section is out
+ * of scope for `sort()`: an anchor must precede its alias in the serialized
+ * stream, and no reorder mechanism — byte-splice, or a full re-serialize via
+ * `Document#toString()` after mutating `map.items` — can honor a sort order
+ * that would invert that relationship (`yaml`'s own `verifyAliasOrder`
+ * throws in exactly that case, confirmed against both this splice-based
+ * implementation and the pre-splice implementation it replaced). Callers
+ * skip reordering any section this returns true for, leaving its bytes
+ * untouched, rather than attempting a fallback that can't actually succeed.
+ * Mirrors the `isAlias(pair.value)` guard in `fieldValueSplice`
+ * (frontmatter-cst.ts), generalized to walk the whole subtree via `yaml`'s
+ * own `visit` rather than just the top-level value.
+ */
+function sectionHasAnchorOrAlias(map: YAMLMap): boolean {
+	for (const item of map.items as Pair[]) {
+		let found = false;
+		visit(item.value as Node | null, (_key, node) => {
+			if (node == null) return;
+			if (isAlias(node) || (node as { anchor?: string }).anchor) {
+				found = true;
+				return visit.BREAK;
+			}
+		});
+		if (found) return true;
+	}
+	return false;
 }
 
 /**
@@ -260,10 +299,17 @@ export function sort(source: string, opts: SortOptions): SortResult {
 	const rootItems = (
 		isMap(cst.doc.contents) ? cst.doc.contents.items : []
 	) as Pair[];
+
 	const splices: Splice[] = [];
 	for (const section of ["artifact", "process"] as const) {
 		const map = cst.doc.get(section, true);
 		if (!isMap(map)) continue;
+		// A section whose subtree defines or references a YAML anchor/alias is
+		// out of scope for reordering (see `sectionHasAnchorOrAlias`'s doc
+		// comment for why no fallback mechanism can safely reorder one) — skip
+		// it entirely rather than splice or otherwise touch its bytes, leaving
+		// its relative order (and therefore its anchor/alias validity) intact.
+		if (sectionHasAnchorOrAlias(map)) continue;
 		const splice = sortSplice(
 			cst.yamlText,
 			rootItems,
