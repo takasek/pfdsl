@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
 	evaluateCommandUsageGuard,
+	runCommandUsageGuard,
 	usesBodyDroppingView,
 	usesPublishedCli,
 } from "./command-usage-guard.mjs";
@@ -122,5 +123,31 @@ describe("evaluateCommandUsageGuard", () => {
 			payload({ command: "gh issue view 650 --comments && npx @pfdsl/cli check x.pfdsl" }),
 		);
 		assert.equal(result.decision, "deny");
+	});
+});
+
+describe("runCommandUsageGuard", () => {
+	it("prints an ask payload for the published-CLI case", () => {
+		const input = JSON.stringify(payload({ command: "npx @pfdsl/cli check x.pfdsl" }));
+		const { shouldOutput, output } = runCommandUsageGuard(input);
+		assert.equal(shouldOutput, true);
+		assert.equal(output.hookSpecificOutput.permissionDecision, "ask");
+	});
+
+	it("prints a deny payload for the body-dropping view", () => {
+		const input = JSON.stringify(payload({ command: "gh issue view 650 --comments" }));
+		const { shouldOutput, output } = runCommandUsageGuard(input);
+		assert.equal(shouldOutput, true);
+		assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
+	});
+
+	it("produces no output for an ordinary command", () => {
+		const { shouldOutput, output } = runCommandUsageGuard(JSON.stringify(payload({ command: "git status" })));
+		assert.equal(shouldOutput, false);
+		assert.equal(output, undefined);
+	});
+
+	it("silently allows malformed stdin JSON", () => {
+		assert.deepEqual(runCommandUsageGuard("not json{{{"), { shouldOutput: false });
 	});
 });

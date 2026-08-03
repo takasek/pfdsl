@@ -15,6 +15,7 @@
 
 import { splitSegments, stripLeadingNoise, tokenize } from "./delegation-guard.mjs";
 import { flagValues, parseGhCommand } from "./gh-command.mjs";
+import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
 
 /** The URL `gh issue create` prints on success — the only success signal it gives. */
 const CREATED_ISSUE_URL = /https:\/\/[^\s/]+\/[^\s/]+\/[^\s/]+\/issues\/(\d+)/;
@@ -79,4 +80,20 @@ export function formatManagedIssueAdvisory(payload) {
 		"in this same cycle (see workflow.pfdsl's file_issues description for what the artifact carries). " +
 		"audit-issues-flow.mjs only reports a missing entry at the next gate-check, when the cycle's context is gone."
 	);
+}
+
+/**
+ * Orchestrates the hook's stdin payload into a print-or-not decision, the way
+ * runDelegationGuard does (#645) — the wrapper script cannot be unit-tested, so
+ * nothing that can be decided belongs there.
+ * @param {string} inputText raw stdin payload
+ * @returns {{shouldOutput: boolean, output?: object}}
+ */
+export function runManagedIssueReminder(inputText) {
+	const payload = parseHookPayload(inputText);
+	if (!payload) return { shouldOutput: false };
+
+	const advisory = formatManagedIssueAdvisory(payload);
+	if (!advisory) return { shouldOutput: false };
+	return { shouldOutput: true, output: buildAdvisoryOutput(advisory) };
 }

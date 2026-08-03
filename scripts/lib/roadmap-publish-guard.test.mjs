@@ -1,7 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { addedPublishProcesses, evaluateRoadmapPublishGuard } from "./roadmap-publish-guard.mjs";
+import {
+	addedPublishProcesses,
+	evaluateRoadmapPublishGuard,
+	runRoadmapPublishGuard,
+} from "./roadmap-publish-guard.mjs";
 
 const ROADMAP = "/repo/.pfdsl/roadmap.pfdsl";
 
@@ -102,5 +106,29 @@ describe("evaluateRoadmapPublishGuard", () => {
 			tool_input: {},
 		});
 		assert.equal(result.decision, "allow");
+	});
+});
+
+describe("runRoadmapPublishGuard", () => {
+	it("prints an ask payload when the edit adds a publish process", () => {
+		const input = JSON.stringify(edit({ newString: "  publish_ext_v0016:\n" }));
+		const { shouldOutput, output } = runRoadmapPublishGuard(input, { readFile: () => "" });
+		assert.equal(shouldOutput, true);
+		assert.equal(output.hookSpecificOutput.permissionDecision, "ask");
+	});
+
+	it("produces no output for an unrelated edit", () => {
+		const input = JSON.stringify(edit({ newString: "  status: done\n" }));
+		assert.deepEqual(runRoadmapPublishGuard(input, { readFile: () => "" }), { shouldOutput: false });
+	});
+
+	it("reads the file on disk for a Write, so an unchanged rewrite stays silent", () => {
+		const existing = "  publish_ext_v0016:\n";
+		const input = JSON.stringify(write({ content: existing }));
+		assert.deepEqual(runRoadmapPublishGuard(input, { readFile: () => existing }), { shouldOutput: false });
+	});
+
+	it("silently allows malformed stdin JSON", () => {
+		assert.deepEqual(runRoadmapPublishGuard("not json{{{"), { shouldOutput: false });
 	});
 });

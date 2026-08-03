@@ -24,6 +24,7 @@
 
 import { splitSegments, stripLeadingNoise, tokenize } from "./delegation-guard.mjs";
 import { parseGhCommand } from "./gh-command.mjs";
+import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 /** `@pfdsl/cli`, optionally with a version spec. */
 const PUBLISHED_CLI_SPEC = /^@pfdsl\/cli(@.+)?$/;
@@ -114,4 +115,21 @@ export function evaluateCommandUsageGuard(payload) {
 	}
 
 	return { decision: "allow" };
+}
+
+/**
+ * Orchestrates the hook's stdin payload into a print-or-not decision, the way
+ * runDelegationGuard does (#645): the wrapper script is not unit-testable, so
+ * nothing that can be decided belongs there. Malformed JSON produces no output
+ * — a crash in this guard must not wedge every Bash call.
+ * @param {string} inputText raw stdin payload
+ * @returns {{shouldOutput: boolean, output?: object}}
+ */
+export function runCommandUsageGuard(inputText) {
+	const payload = parseHookPayload(inputText);
+	if (!payload) return { shouldOutput: false };
+
+	const result = evaluateCommandUsageGuard(payload);
+	if (result.decision === "allow") return { shouldOutput: false };
+	return { shouldOutput: true, output: buildPermissionOutput(result) };
 }

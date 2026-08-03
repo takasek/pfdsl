@@ -5,6 +5,7 @@ import {
 	createdIssueNumber,
 	createsManagedIssue,
 	formatManagedIssueAdvisory,
+	runManagedIssueReminder,
 } from "./managed-issue-reminder.mjs";
 
 const CREATED_URL = "https://github.com/takasek/pfdsl/issues/671";
@@ -110,5 +111,23 @@ describe("formatManagedIssueAdvisory", () => {
 			formatManagedIssueAdvisory({ hook_event_name: "PostToolUse", tool_name: "Write", tool_input: {} }),
 			undefined,
 		);
+	});
+});
+
+describe("runManagedIssueReminder", () => {
+	it("prints the advisory for a successful managed create", () => {
+		const input = JSON.stringify(payload({ command: "gh issue create --label flow:managed" }));
+		const { shouldOutput, output } = runManagedIssueReminder(input);
+		assert.equal(shouldOutput, true);
+		assert.match(output.hookSpecificOutput.additionalContext, /#671/);
+	});
+
+	it("produces no output for an exempt create", () => {
+		const input = JSON.stringify(payload({ command: "gh issue create --label flow:exempt" }));
+		assert.deepEqual(runManagedIssueReminder(input), { shouldOutput: false });
+	});
+
+	it("silently allows malformed stdin JSON", () => {
+		assert.deepEqual(runManagedIssueReminder("not json{{{"), { shouldOutput: false });
 	});
 });

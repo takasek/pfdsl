@@ -13,6 +13,8 @@
 // implementation artifact to an existing publish process's inputs is the
 // routine case and says nothing about release state.
 
+import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
+
 /** A process declaration whose name marks it as a publish step. */
 const PUBLISH_DECLARATION = /^\s*(publish_[a-z0-9_]+):/gm;
 
@@ -66,4 +68,22 @@ export function evaluateRoadmapPublishGuard(payload, { readFile = () => undefine
 			"Run 'make release-status' first and check what is already published — registering a released version as the " +
 			"upcoming one makes every artifact under it describe the past. Approve once the released version is confirmed.",
 	};
+}
+
+/**
+ * Orchestrates the hook's stdin payload into a print-or-not decision, the way
+ * runDelegationGuard does (#645). `readFile` stays injected here rather than
+ * being read in the wrapper, so the Write branch's on-disk comparison is
+ * covered by tests instead of living in an untestable script.
+ * @param {string} inputText raw stdin payload
+ * @param {{readFile?: (path: string) => string | undefined}} [io]
+ * @returns {{shouldOutput: boolean, output?: object}}
+ */
+export function runRoadmapPublishGuard(inputText, { readFile = () => undefined } = {}) {
+	const payload = parseHookPayload(inputText);
+	if (!payload) return { shouldOutput: false };
+
+	const result = evaluateRoadmapPublishGuard(payload, { readFile });
+	if (result.decision === "allow") return { shouldOutput: false };
+	return { shouldOutput: true, output: buildPermissionOutput(result) };
 }
