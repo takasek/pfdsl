@@ -368,6 +368,10 @@ async function main() {
 					: rel,
 			),
 		);
+		// The manifest is written on every deploy but is not one of the copied
+		// files, so it would otherwise turn up in `git status` as an unexplained
+		// new file (a distribution-review probe hit exactly that).
+		console.log(`Wrote deploy manifest: ${MANIFEST_RELATIVE_PATH}`);
 		printGroup("Skipped (locally modified; re-run with --overwrite-local-edits to overwrite):", skipped);
 		printGroup("Removed (no longer part of canonical install/):", removed);
 		printGroup(
@@ -383,7 +387,11 @@ async function main() {
 		if (!adopted) {
 			console.log(
 				"The GitHub Issues backend (L3) is not adopted in this repo — no pfd-ops install/ files are deployed.\n" +
-					"To adopt it, run: node check-install-sync.mjs --deploy",
+					// The full path, not the bare filename: the reader is standing
+					// in their repo root while this script lives in a plugin
+					// cache outside it, so a bare name — or a relative one —
+					// makes them reconstruct the path the caller just used.
+					`To adopt it, run: node ${fileURLToPath(import.meta.url)} --deploy`,
 			);
 		} else {
 			const issues = results.filter((r) => r.status !== "ok");

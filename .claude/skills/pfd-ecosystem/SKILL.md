@@ -39,7 +39,7 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 �
 ステップ 2 で Yes になった種別のテンプレートを `.pfdsl/` にコピーする。
 テンプレートは pfd-ops スキルの `references/scaffold/` にある。所在はロード元で異なる（ADR-0028）:
 
-- plugin 経由（通常）: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/references/scaffold/` — CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${CLAUDE_PLUGIN_ROOT}` の形でのみ置換対象）。上のパスが置換されず変数名のまま見えている場合は plugin 外ロードなので次項のパスを使う
+- plugin 経由（通常）: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/references/scaffold/` — CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${CLAUDE_PLUGIN_ROOT}` の形でのみ置換対象）。上のパスが置換されず変数名のまま見えている場合は plugin 外ロードなので次項のパスを使う。次項も存在しない場合は、いま読んでいるこのファイル自身の所在を skill root とみなして相対で辿る（skill 本文をファイルとして直接読んだ場合、置換はプロンプト取り込み時に行われるため中身は常に変数名のまま見える）
 - repo-local: `.claude/skills/pfd-ops/references/scaffold/`
 
 ```

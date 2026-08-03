@@ -12,7 +12,8 @@
 // Detection reads `git show HEAD` (the commit already happened by the time
 // PostToolUse fires) rather than the staged diff `git diff --cached` that
 // the pre-commit version reads before the commit exists.
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 // execFileSync, not execSync: the shell gate bans handing a command line to a
 // shell in any tracked .mjs (#571, #572, #605). scripts/lib/run-exec.mjs is
 // off limits here — this file must not import outside hooks/ (see above).
@@ -37,10 +38,28 @@ export function buildHookOutput() {
 	};
 }
 
+/**
+ * Is this module the process entrypoint? Node resolves symlinks when it builds
+ * `import.meta.url` but leaves `process.argv[1]` as it was typed, so comparing
+ * the two verbatim answers "no" whenever the invocation path crosses a symlink
+ * — `/tmp` on macOS, or a plugin cache reached through one. The hook only ever
+ * prints an advisory, so that mismatch disables it without a word.
+ */
+export function isCliEntrypoint(metaUrl, argv1, { realpath = realpathSync } = {}) {
+	if (!argv1) return false;
+	let resolved = argv1;
+	try {
+		resolved = realpath(argv1);
+	} catch {
+		// Unresolvable path: fall back to comparing what we were given.
+	}
+	return metaUrl === pathToFileURL(resolved).href;
+}
+
 // CLI mode: read the PostToolUse JSON payload from stdin, print an advisory
 // hookSpecificOutput.additionalContext when the commit added `status: done`
 // to .pfdsl/roadmap.pfdsl. Always exits 0 — this never blocks anything.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	let input = "";
 	process.stdin.setEncoding("utf8");
 	for await (const chunk of process.stdin) {

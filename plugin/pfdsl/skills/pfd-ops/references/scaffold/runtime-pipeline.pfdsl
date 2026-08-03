@@ -8,6 +8,7 @@ artifact:
     label: (入力データに置き換える)
   processed_output:
     label: (変換後の出力に置き換える)
+    criteria: (変換後の出力が満たすべき条件に置き換える)
 
 process:
   transform:

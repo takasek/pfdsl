@@ -43,6 +43,8 @@ jobs:
 
       - run: make check-fmt
 
+      - run: make check-scaffold
+
       - run: make check-readme-cli
 
       - name: Verify snapshots are up-to-date with .pfdsl files

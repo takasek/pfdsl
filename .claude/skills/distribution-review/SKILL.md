@@ -61,9 +61,15 @@ node -e 'import("./scripts/lib/distribution-review.mjs").then((m)=>{
 
 ```
 <scratch>/adopt-<timestamp>-<課題名>/
-  repo/                 ← git init。README + 最小の .pfdsl
+  repo/                 ← git init。README + 最小の .pfdsl + npm i @pfdsl/cli@<公開版>
   plugin-cache/pfdsl/   ← plugin/pfdsl のコピー
 ```
+
+**CLI は npm の公開版を入れる。** この作業ツリーのビルドを使わせない。
+配布散文はここで検証すると通るが、利用側が入れるのは公開版なので通らない、という食い違いがこの層でしか出ない。
+公開版と作業ツリーのビルドが同じバージョン番号を名乗る間はバージョンが判別子にならないため、`npm view @pfdsl/cli version` と `packages/cli/package.json` を突き合わせ、`make release-status` が behind を報告していないかも見る。
+
+**README が名指しするファイルは実際に置く。** 品質ガイドは「実装が実在するならエッジは実装で裏取り」を要求するので、名前だけあって実体が無いと probe はそこで空回りする。
 
 **1 probe = 1 sandbox。** 複数の probe に同じ sandbox を共有させない。
 probe は実際にファイルを書くので、共有すると互いの編集が相手の入力になり、詰まりが配布物由来なのか他の probe の書き込み由来なのか切り分けられなくなる。
@@ -77,8 +83,14 @@ subagent には cwd を `repo/`、plugin root を `../plugin-cache/pfdsl` とだ
 ### 4. subagent を走らせる
 
 `general-purpose` を使う。
-ブリーフに入れるもの: 課題・cwd・plugin root・「詰まったら何を読んで何が解決できなかったかを報告せよ」・「完遂は目的でない」。
+ブリーフに入れるもの: 課題・cwd・plugin root・「詰まったら何を読んで何が解決できなかったかを報告せよ」・「完遂は目的でない」・**作業量の上限**。
 入れないもの: 観点カタログ・上流リポの存在・この検査を回している事実。
+
+**上限はツール呼び出し回数で書く**（例: 30回以内、findings は各層1〜2件で足りる）。
+上限なしの probe は完遂しようとして長時間走り、途中で落ちると1本まるごと失われる。
+上限を書いた probe は半分の呼び出し回数で同じ詰まりを報告した — 検出したいのは詰まりであって成果物ではないので、網羅性は要らない。
+
+**シェルに残る上流への経路を塞ぐ。** 別名・グローバル導入・PATH はブリーフでは消せないので、「`which` / `type` / `alias` で CLI の実体を調べない」と書いたうえで、手順5の事後検出に委ねる。
 
 ### 5. 越境を事後検出する
 

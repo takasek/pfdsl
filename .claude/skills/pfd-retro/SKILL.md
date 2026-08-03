@@ -16,7 +16,7 @@ description: |
 
 ## 前提条件
 
-`.pfdsl/roadmap.pfdsl` が scaffold のまま（プレースホルダ未置換）でないことが前提。判定は pfd-ops スキルの「前提条件」節と同じ機械判定に従う（ここには複製しない）。scaffold のままの場合、A〜D 監査を実行せず pfd-ecosystem スキル（`/pfd-init`）へ案内してセッションを終了する。
+`.pfdsl/roadmap.pfdsl` が scaffold のまま（プレースホルダ未置換）でないことが前提。判定は pfd-ops スキルの `SKILL.md`「前提条件」節にある機械判定に従う（ここには複製しない）。scaffold のままの場合、A〜D 監査を実行せず pfd-ecosystem スキル（`/pfd-init`）へ案内してセッションを終了する。
 
 A・B 層はセッション文脈不要 — 任意の PFD のレビューに単体で適用できる（品質ガイドが「書くときのルール」、A・B は「問い詰めるときのプロンプト」）。C・D 層はふりかえり固有。
 
@@ -26,14 +26,14 @@ A・B 層はセッション文脈不要 — 任意の PFD のレビューに単�
 
 対象が大きい図・複数図の場合は pfd-lens agent へ委譲する。pfd-lens はセッション文脈不要な read-only agent で、A・B カタログを自ら読み込み file:line アンカー付き findings を返す — main context にカタログ全文・対象図・思考過程を載せずに済む。返った findings は C・D 層の監査結果と合流させて出力表へ振り分ける。
 
-小さい図1枚のみのレビューであれば委譲の cold start（agent 起動オーバーヘッド）が割に合わないため main thread でカタログを直接参照する。全文 Read の前に `pfdsl graph io <file> --json`（終端 artifact・外部入力）と `graph edges <file> --json`（正準エッジ一覧）で機械的に輪郭を掴んでおくと、目視との食い違いが監査の当たりになる。カタログ本文は `.pfdsl/bindings/pfd-retro.md` が示す一次情報を読むこと（例: `.pfdsl/review-perspectives.md`）。記載がない場合は pfdsl スキルの `references/review-perspectives.md`（plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/references/`、repo-local なら `.claude/skills/pfdsl/references/`）を読む。それも無い場合のみ下記カテゴリ名で監査する。A = 図 vs 現実（エッジ実在性・駆動源・名前の一般化水準・偽の不変性・入力充足）、B = 粒度・型（万能成果物・プロセス実在性・並列主張・修正案への再挑戦・型違い）。
+小さい図1枚のみのレビューであれば委譲の cold start（agent 起動オーバーヘッド）が割に合わないため main thread でカタログを直接参照する。**小さい図が複数枚のように、規模の条件と枚数の条件が食い違う場合は main thread を既定にする** — 委譲は cold start を先払いする側なので、割に合うかが自明でない規模では委譲しない。全文 Read の前に `pfdsl graph io <file> --json`（終端 artifact・外部入力）と `graph edges <file> --json`（正準エッジ一覧）で機械的に輪郭を掴んでおくと、目視との食い違いが監査の当たりになる。カタログ本文は `.pfdsl/bindings/pfd-retro.md` が示す一次情報を読むこと（例: `.pfdsl/review-perspectives.md`）。記載がない場合は pfdsl スキルの `references/review-perspectives.md`（plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/references/`、repo-local なら `.claude/skills/pfdsl/references/`）を読む。それも無い場合のみ下記カテゴリ名で監査する。A = 図 vs 現実（エッジ実在性・駆動源・名前の一般化水準・偽の不変性・入力充足）、B = 粒度・型（万能成果物・プロセス実在性・並列主張・修正案への再挑戦・型違い）。
 
 カタログの C 系（仕様・制約）は図でなく normative 仕様文書を問い詰める観点であり、リポが DSL・プロトコル等の仕様を保守している場合のみ適用する。実行手順（具体例の構築・agent プローブ）がリポにあれば `.pfdsl/bindings/pfd-retro.md` が指す。
 
 ## C. 運用イベント監査
 
 - **忘れ物 = 構造の欠落**: セッション中に実際に忘れた作業（例: issue クローズ、tag 更新）は、図に無いエッジ・ゲートに無い項目として読み、両方に反映する。個別「更新したか」より「edge が無い」を機械的に探す方が安い — 同型の複数件を1回の監査で束ねて検出できる
-- **起票 issue の roadmap 未追加スキャン**: セッション中に起票した issue を列挙し、全て `roadmap.pfdsl` の artifact として登録済みか機械的に確認する。「起票したが roadmap に追加しなかった」は「edge が無い」の典型型（例: issue 起票後に roadmap 追加を忘れてユーザー指摘まで気付かなかった）。`gh issue list --state open` と `pfdsl meta get <roadmap.pfdsl> <id,...> location --json`（対象 id は `graph edges <roadmap.pfdsl> --json` から）を突合すると漏れが見える
+- **起票 issue の roadmap 未追加スキャン**: セッション中に起票した issue を列挙し、全て `roadmap.pfdsl` の artifact として登録済みか機械的に確認する。「起票したが roadmap に追加しなかった」は「edge が無い」の典型型（例: issue 起票後に roadmap 追加を忘れてユーザー指摘まで気付かなかった）。`gh issue list --state open` と `pfdsl meta get <roadmap.pfdsl> <id,...> location --json`（対象 id は `graph edges <roadmap.pfdsl> --json` から）を突合すると漏れが見える。issue バックエンドを採用していないリポでは列挙元を差し替える — `roadmap.md` の「バックエンド」節が指す一次情報（作業項目ファイル等）で当セッションに追加された項目を列挙し、同じ突合をかける
 - **委譲の失敗様式**: subagent の誤り（ID 捏造等）はプロセスの入力不足の発見として扱う
 - **片肺更新スキャン**: companion `.md` を更新したセッションでは、対応する `.pfdsl` 本体（同じ変換をモデル化しているノード・エッジ・description・criteria）も更新が必要でないか確認する。機械列挙が先: `git diff --name-only <range>` で「`.md` が変更され sibling `.pfdsl` が未変更」のペア（と逆方向）を列挙してから中身を判断する — 全ファイル読みより安い。`.md` は手続き散文、`.pfdsl` は構造の一次置き場 — 片方だけ更新して構造反映が漏れるのが典型パターン。逆方向（`.pfdsl` だけ更新して companion 記述が古いまま）も同様に確認する
 - **決定の先取り（責務境界の圧縮）スキャン**: PFD が複数の逐次プロセス（例: まとめ→MTG→見直し）としてモデル化する作業を現実の1セッションが一気に片付けた回では、生成物が最上流プロセスの出力 artifact に書き込まれ、そのプロセス単独の入力からは導けない下流の決定を含みがち。A層「駆動源」レンズで静的には検出できるが、C層に運用トリガーが無いと能動的に見に行けない。会議・集中作業の後は、その回で done にした上流成果物の criteria/description に生産プロセスの入力から導けない内容が混じっていないか点検し、混じっていれば (a) 責務境界を実態に合わせ再モデル化する、または (b) 生成物を実際の生産プロセスへ付け替える
@@ -61,11 +61,11 @@ A・B 層はセッション文脈不要 — 任意の PFD のレビューに単�
 |---|---|
 | ツール・チェッカー品質ルール | 上流ツールスキルの品質ガイド（companion で宛先を指定） |
 | 設計判断の記録 | 設計決定記録（ADR 等。companion で所在を指定。運用しないリポでは新設を提案する） |
-| 未着手作業の発見 | issue バックエンド採用時: issue 起票 + roadmap.pfdsl に依存チェーン追加。未採用時（issue バックエンドを採用していないリポ）: roadmap.pfdsl への依存チェーン追加のみ（起票は省略。roadmap.md の「バックエンド」節が採用状況を示す） |
+| 未着手作業の発見 | issue バックエンド採用時: issue 起票 + roadmap.pfdsl に依存チェーン追加。未採用時（issue バックエンドを採用していないリポ）: roadmap.pfdsl への依存チェーン追加のみ（起票は省略。roadmap.md の「バックエンド」節が採用状況を示す）。**どちらの場合も roadmap へ追加するのは他作業の着手をゲートするものだけ**（pfd-ops プロトコル2）— ゲートしないもの（バグ修正・tooling・図や doc の bookkeeping 等）は起票または一次情報への記録だけで止め、roadmap には登録しない |
 | ゲート項目の追加・修正 | 該当する PFD の criteria または sibling companion の終端ゲート（**ルール文のみ。発見括弧禁止**）。どの companion に書くかは `pfd-ops/references/architecture.md` の「companion への書き分けルール」表に従う |
 | 能力成果物の起動条件漏れ | 当該スキル自身の description に追記する。そのスキルが workflow.pfdsl にノードとして登録されている場合は、そのノードの description にも追記する（片方だけ直すと図と実体が食い違う）。当該スキルが配布 bundle 同梱のもの（pfd-* スキル）の場合は、スキル本文でなく `.pfdsl/bindings/<当該スキル名>.md` に書く |
 | 体感した効果 | 効果ログ（companion で宛先を指定。未定義の場合は記録しない） |
-| 監査の新パターン発見 | `.pfdsl/bindings/pfd-retro.md`。問いの構造・パターン種別・具体例をここに書く |
+| 監査の新パターン発見 | `.pfdsl/bindings/pfd-retro.md`。問いの構造・パターン種別・具体例をここに書く。**ここに載るのは標準カタログに無い新しい問いの構造だけ** — 既にカタログにある観点をこのリポで検出した実例は、bindings が指すインスタンス・カタログ（例: `.pfdsl/review-perspectives.md`）側に蓄積する。同じ「具体例」の語が両方に出るため、判定は「観点そのものが新しいか」で行う |
 | 今サイクルの成果物そのものの妥当性への疑い | 追記先を探さず、PR を draft に戻して判断をユーザーへ返す（PR 未作成なら作成せず同様に返す）。**運用規律の追加に翻訳しない** |
 
 宛先の上書き・追加は pfd-ops の workflow companion（`.pfdsl/workflow.md`「知見の振り分け」節）に従う。当該節が未記入・該当記述なしの場合は上の基本表に従う。
