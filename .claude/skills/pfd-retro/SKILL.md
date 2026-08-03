@@ -16,7 +16,7 @@ description: |
 
 ## 前提条件
 
-`.pfdsl/roadmap.pfdsl` が scaffold のまま（プレースホルダ未置換）でないことが前提。判定は pfd-ops スキルの「前提条件」節と同じ機械判定に従う（ここには複製しない）。scaffold のままの場合、A〜D 監査を実行せず pfd-ecosystem スキル（`/pfd-init`）へ案内してセッションを終了する。
+`.pfdsl/roadmap.pfdsl` が scaffold のまま（プレースホルダ未置換）でないことが前提。判定は pfd-ops スキルの `SKILL.md`「前提条件」節にある機械判定に従う（ここには複製しない）。scaffold のままの場合、A〜D 監査を実行せず pfd-ecosystem スキル（`/pfd-init`）へ案内してセッションを終了する。
 
 A・B 層はセッション文脈不要 — 任意の PFD のレビューに単体で適用できる（品質ガイドが「書くときのルール」、A・B は「問い詰めるときのプロンプト」）。C・D 層はふりかえり固有。
 
