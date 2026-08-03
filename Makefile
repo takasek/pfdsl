@@ -129,6 +129,7 @@ check-docs:
 	node scripts/check-spec-ids.mjs
 	node scripts/check-companion-bindings.mjs
 	node scripts/check-distributed-prose.mjs
+	node scripts/check-skill-wiring.mjs
 
 .PHONY: gen-skill
 gen-skill: check-docs
