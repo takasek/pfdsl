@@ -7,6 +7,7 @@ import {
 	wipTransitionStep,
 	designRecordStep,
 	sizeDirectionStep,
+	collectSizeDeltas,
 } from "./gate-check-steps.mjs";
 
 /**
@@ -428,7 +429,7 @@ describe("designRecordStep", () => {
 describe("sizeDirectionStep", () => {
 	it("SKIPs when no --issue given", () => {
 		const { exec, calls } = fakeExec();
-		const result = sizeDirectionStep({ exec, base: "main", changedFiles: [] });
+		const result = sizeDirectionStep({ exec });
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /--issue/);
 		assert.deepEqual(calls, []);
@@ -436,74 +437,62 @@ describe("sizeDirectionStep", () => {
 
 	it("SKIPs when gh CLI is unavailable", () => {
 		const { exec } = fakeExec();
-		const result = sizeDirectionStep({
-			exec,
-			base: "main",
-			issue: null,
-			issueError: "gh CLI unavailable",
-			changedFiles: [],
-		});
+		const result = sizeDirectionStep({ exec, issue: null, issueError: "gh CLI unavailable" });
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /gh CLI unavailable/);
 	});
 
-	it("SKIPs without spending any subprocess when the linked issue states no shrink intent", () => {
+	const grown = [
+		{ path: ".pfdsl/bindings/x.pfdsl", beforeBytes: 3, afterBytes: 7, beforeLines: 2, afterLines: 2 },
+	];
+	const declared = "Size-Intent: shrink\n";
+
+	it("SKIPs without spending any subprocess when the issue declares no size intent", () => {
 		const { exec, calls } = fakeExec();
-		const result = sizeDirectionStep({
-			exec,
-			base: "main",
-			issue: { body: "普通の説明。" },
-			changedFiles: [".pfdsl/bindings/x.pfdsl"],
-		});
+		const result = sizeDirectionStep({ exec, issue: { body: "肥大について書いただけ。" }, deltas: grown });
 		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /no shrink intent/);
+		assert.match(result.detail, /Size-Intent/);
 		assert.deepEqual(calls, []);
 	});
 
-	it("computes byte/line deltas for tracked paths only, and FAILs on growth without an override", () => {
-		const { exec, calls } = fakeExec({
-			"git show origin/main:.pfdsl/bindings/x.pfdsl": { out: "aa\n" },
-			"git show HEAD:.pfdsl/bindings/x.pfdsl": { out: "aaaaaa\n" },
-			"gh pr view": { out: "" },
-		});
-		const result = sizeDirectionStep({
-			exec,
-			base: "main",
-			issue: { body: "肥大への対策。" },
-			changedFiles: [".pfdsl/bindings/x.pfdsl", "packages/core/src/graph.ts"],
-		});
+	it("FAILs on growth when the PR body has no override", () => {
+		const { exec } = fakeExec({ "gh pr view": { out: "" } });
+		const result = sizeDirectionStep({ exec, issue: { body: declared }, deltas: grown });
 		assert.equal(result.status, "FAIL");
-		assert.ok(!calls.some((c) => c.includes("graph.ts")));
+		assert.match(result.detail, /x\.pfdsl/);
 	});
 
 	it("PASSes growth when the PR body carries a Size-Override token", () => {
-		const { exec } = fakeExec({
+		const { exec } = fakeExec({ "gh pr view": { out: "Size-Override: intentional" } });
+		const result = sizeDirectionStep({ exec, issue: { body: declared }, deltas: grown });
+		assert.equal(result.status, "PASS");
+	});
+});
+
+describe("collectSizeDeltas", () => {
+	it("measures tracked paths only", () => {
+		const { exec, calls } = fakeExec({
 			"git show origin/main:.pfdsl/bindings/x.pfdsl": { out: "aa\n" },
 			"git show HEAD:.pfdsl/bindings/x.pfdsl": { out: "aaaaaa\n" },
-			"gh pr view": { out: "Size-Override: intentional" },
 		});
-		const result = sizeDirectionStep({
+		const deltas = collectSizeDeltas({
 			exec,
 			base: "main",
-			issue: { body: "肥大への対策。" },
-			changedFiles: [".pfdsl/bindings/x.pfdsl"],
+			changedFiles: [".pfdsl/bindings/x.pfdsl", "packages/core/src/graph.ts"],
 		});
-		assert.equal(result.status, "PASS");
+		assert.deepEqual(deltas, [
+			{ path: ".pfdsl/bindings/x.pfdsl", beforeBytes: 3, afterBytes: 7, beforeLines: 2, afterLines: 2 },
+		]);
+		assert.ok(!calls.some((c) => c.includes("graph.ts")));
 	});
 
 	it("treats a new tracked file (no origin/base copy) as growth from zero", () => {
 		const { exec } = fakeExec({
 			"git show origin/main:.pfdsl/bindings/new.pfdsl": { ok: false, out: "fatal: does not exist" },
 			"git show HEAD:.pfdsl/bindings/new.pfdsl": { out: "hello\n" },
-			"gh pr view": { out: "" },
 		});
-		const result = sizeDirectionStep({
-			exec,
-			base: "main",
-			issue: { body: "肥大への対策。" },
-			changedFiles: [".pfdsl/bindings/new.pfdsl"],
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /new\.pfdsl/);
+		const deltas = collectSizeDeltas({ exec, base: "main", changedFiles: [".pfdsl/bindings/new.pfdsl"] });
+		assert.equal(deltas[0].beforeBytes, 0);
+		assert.equal(deltas[0].afterBytes, 6);
 	});
 });

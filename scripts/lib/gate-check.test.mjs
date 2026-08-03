@@ -26,7 +26,8 @@ import {
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
 	classifySizeDirection,
-	SHRINK_INTENT_KEYWORDS,
+	SIZE_INTENT_PATTERN,
+	formatSizeDelta,
 	SIZE_TRACKED_PATTERNS,
 	SIZE_OVERRIDE_PATTERN,
 } from "./gate-check.mjs";
@@ -473,20 +474,31 @@ describe("classifySizeDirection", () => {
 	const grownDelta = { path: ".pfdsl/bindings/x.pfdsl", beforeBytes: 100, afterBytes: 150, beforeLines: 10, afterLines: 15 };
 	const shrunkDelta = { path: "docs/adr/0001-x.md", beforeBytes: 200, afterBytes: 100, beforeLines: 20, afterLines: 10 };
 
-	it("SKIPs when the linked issue states no shrink intent", () => {
+	const declared = "## 症状\n何かが肥大している。\n\nSize-Intent: shrink\n";
+
+	it("SKIPs when the issue declares no size intent", () => {
 		const result = classifySizeDirection({ issueBody: "普通の説明。", deltas: [grownDelta] });
 		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /no shrink intent/);
+		assert.match(result.detail, /Size-Intent/);
+	});
+
+	it("SKIPs when the issue merely mentions shrink vocabulary without declaring the intent", () => {
+		const result = classifySizeDirection({
+			issueBody: "#659 の案2（蒸留）を判断する前に入れておく価値がある。",
+			deltas: [grownDelta],
+		});
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /Size-Intent/);
 	});
 
 	it("SKIPs when there are no tracked knowledge-artifact changes", () => {
-		const result = classifySizeDirection({ issueBody: "肥大への対策。", deltas: [] });
+		const result = classifySizeDirection({ issueBody: declared, deltas: [] });
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /no tracked knowledge-artifact changes/);
 	});
 
 	it("FAILs when a tracked artifact grew and the PR body has no Size-Override", () => {
-		const result = classifySizeDirection({ issueBody: "肥大への対策。", deltas: [grownDelta], prBody: "" });
+		const result = classifySizeDirection({ issueBody: declared, deltas: [grownDelta], prBody: "" });
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /\+50 bytes/);
 		assert.match(result.detail, /\+5 lines/);
@@ -494,7 +506,7 @@ describe("classifySizeDirection", () => {
 
 	it("PASSes growth when the PR body carries a Size-Override token", () => {
 		const result = classifySizeDirection({
-			issueBody: "全読の防止。",
+			issueBody: declared,
 			deltas: [grownDelta],
 			prBody: "Size-Override: intentional growth, see discussion",
 		});
@@ -503,14 +515,32 @@ describe("classifySizeDirection", () => {
 	});
 
 	it("PASSes when no tracked artifact grew", () => {
-		const result = classifySizeDirection({ issueBody: "スケール監査の一環。", deltas: [shrunkDelta] });
+		const result = classifySizeDirection({ issueBody: declared, deltas: [shrunkDelta] });
 		assert.deepEqual(result, { status: "PASS" });
 	});
 });
 
-describe("SHRINK_INTENT_KEYWORDS / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", () => {
-	it("exposes the expected shrink-intent keywords", () => {
-		assert.deepEqual(SHRINK_INTENT_KEYWORDS, ["肥大", "全読", "スケール監査", "蒸留"]);
+describe("formatSizeDelta", () => {
+	it("signs both deltas and keeps the absolute sizes alongside", () => {
+		assert.equal(
+			formatSizeDelta({ path: "docs/adr/x.md", beforeBytes: 30, afterBytes: 80, beforeLines: 3, afterLines: 8 }),
+			"docs/adr/x.md: +50 bytes / +5 lines (30 → 80 bytes)",
+		);
+	});
+
+	it("signs a shrink negatively rather than dropping the sign", () => {
+		assert.match(
+			formatSizeDelta({ path: "docs/adr/x.md", beforeBytes: 80, afterBytes: 30, beforeLines: 8, afterLines: 3 }),
+			/-50 bytes \/ -5 lines/,
+		);
+	});
+});
+
+describe("SIZE_INTENT_PATTERN / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", () => {
+	it("SIZE_INTENT_PATTERN matches a declared shrink intent at line head only", () => {
+		assert.ok(SIZE_INTENT_PATTERN.test("## 症状\nSize-Intent: shrink\n"));
+		assert.ok(!SIZE_INTENT_PATTERN.test("この issue には Size-Intent: shrink とは書かない"));
+		assert.ok(!SIZE_INTENT_PATTERN.test("Size-Intent: grow"));
 	});
 
 	it("SIZE_TRACKED_PATTERNS matches bindings, ADRs, and SKILL.md", () => {
