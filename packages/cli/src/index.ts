@@ -1613,6 +1613,8 @@ export interface StatusGap {
 export interface StatusGapsResult {
 	ok: boolean;
 	gaps: StatusGap[];
+	/** Number of status: todo artifacts scanned across all flow files, tracked or not. */
+	todoArtifactCount: number;
 	warnings?: Diagnostic[];
 }
 
@@ -1662,6 +1664,7 @@ export function runStatusGaps(
 	}
 
 	const gaps: StatusGap[] = [];
+	let todoArtifactCount = 0;
 
 	for (const flowFile of flowFiles) {
 		const flowSrc = readSource(flowFile);
@@ -1681,6 +1684,7 @@ export function runStatusGaps(
 
 		for (const [aid, meta] of Object.entries(flowFm?.artifact ?? {})) {
 			if (meta.status === "todo") {
+				todoArtifactCount++;
 				if (!roadmapArtifactIds.has(aid)) {
 					gaps.push({
 						file: flowFile,
@@ -1693,7 +1697,11 @@ export function runStatusGaps(
 		}
 	}
 
-	const result: StatusGapsResult = { ok: gaps.length === 0, gaps };
+	const result: StatusGapsResult = {
+		ok: gaps.length === 0,
+		gaps,
+		todoArtifactCount,
+	};
 	if (warnings.length) result.warnings = warnings;
 
 	if (opts.json) {
@@ -1706,6 +1714,13 @@ export function runStatusGaps(
 	}
 
 	if (gaps.length === 0) {
+		if (todoArtifactCount === 0) {
+			return ok(
+				"No todo artifacts found in the flow files — this check verified nothing. " +
+					"It only inspects artifacts with status: todo; if the flow files don't record status, this check has no target.\n",
+				warnText,
+			);
+		}
 		return ok(
 			"All todo artifacts in flow files are tracked in the roadmap.\n",
 			warnText,
@@ -2225,12 +2240,14 @@ Cross-check todo artifacts in workflow/runtime-pipeline files against the roadma
 Reports artifacts with status: todo in flow files that have no corresponding entry
 in the roadmap, indicating a build chain is missing.
 Omitting type: on the roadmap file is treated as roadmap and allowed, with a warning (W006).
+This check only inspects artifacts with status: todo; if a flow file records no
+status at all, this check has nothing to look at and passes without verifying anything.
 
   <roadmap>  path to a .pfdsl file with type: roadmap
   <flow>     one or more .pfdsl files with type: workflow or runtime-pipeline
 
 Options:
-  --json      output as JSON ({ ok, gaps: [{file, artifactId, label, status}], warnings? })
+  --json      output as JSON ({ ok, gaps: [{file, artifactId, label, status}], todoArtifactCount, warnings? })
               on parse failure: { ok: false, diagnostics }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 

@@ -2488,6 +2488,35 @@ describe("status gaps", () => {
 		expect(r.exitCode).toBe(0);
 	});
 
+	it("distinguishes an empty-target check from an actual pass when no flow artifact has status: todo", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith(
+			"  done_art:\n    status: done\n  wip_art:\n    status: wip\n",
+		);
+		const r = await run(["status", "gaps", rm, fl]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toContain("tracked");
+		expect(r.stdout).toMatch(/no todo artifacts/i);
+	});
+
+	it("--json reports todoArtifactCount: 0 when no flow artifact has status: todo", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  done_art:\n    status: done\n");
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.todoArtifactCount).toBe(0);
+	});
+
+	it("--json reports todoArtifactCount reflecting the scanned todo artifacts when gaps exist", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  gap_art:\n    status: todo\n    label: Gap\n");
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.todoArtifactCount).toBe(1);
+	});
+
 	it("--json returns structured output with ok=true when no gaps", async () => {
 		const rm = roadmapWith("  tracked:\n    status: todo\n");
 		const fl = flowWith("  tracked:\n    status: todo\n");
