@@ -107,6 +107,23 @@ check-fmt:
 	done
 	@echo "check-fmt: all passed"
 
+# The distributed scaffold must pass the check the skills themselves
+# prescribe: pfd-grill gates on `check --strict` and pfd-ecosystem on
+# `check`, so a scaffold that fails either hands every adopting repo a file
+# that fails their own gate the moment they copy it. check-fmt above covers
+# formatting only, which is how a strict-mode failure survived it (found by
+# the 2026-08-04 distribution review). Operational .pfdsl/ files are exempt
+# here — they carry statuses and in-flight nodes that strict mode rejects by
+# design.
+.PHONY: check-scaffold
+check-scaffold:
+	@find .claude/skills/pfd-ops/references/scaffold -name "*.pfdsl" -type f | sort | while read f; do \
+		echo "check --strict $$f"; \
+		node packages/cli/dist/cli.js check "$$f" --strict || \
+			{ echo "$$f fails the check the skills prescribe for adopting repos."; exit 1; }; \
+	done
+	@echo "check-scaffold: all passed"
+
 # Rewrite the operational .pfdsl/ and scaffold .pfdsl/ files to canonical fmt
 # (companion to check-fmt).
 .PHONY: fmt-pfdsl
