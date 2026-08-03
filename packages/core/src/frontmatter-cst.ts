@@ -264,7 +264,7 @@ export function fieldValueSplice(
 				splice: {
 					start: openBrace + 1,
 					end: openBrace + 1,
-					replacement: ` ${field}: ${replacement}`,
+					replacement: ` ${field}: ${replacement} `,
 				},
 			};
 		}
@@ -434,7 +434,7 @@ export function newEntrySplice(
 				splice: {
 					start: openBrace + 1,
 					end: openBrace + 1,
-					replacement: ` ${idKey}: { ${field}: ${renderValue(value, true)} }`,
+					replacement: ` ${idKey}: { ${field}: ${renderValue(value, true)} } `,
 				},
 			};
 		}

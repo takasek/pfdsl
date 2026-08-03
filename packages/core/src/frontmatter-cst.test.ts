@@ -189,6 +189,18 @@ describe("setFrontmatterField", () => {
 		expect(out).toContain('owner: "a} b, c"');
 	});
 
+	// Inserting into an empty flow map (`spec: {}`) has no existing sibling
+	// text to lean on for the closing brace's leading space, unlike the
+	// non-empty case above — the splice has to supply both delimiters
+	// itself. It was only supplying the leading one, producing `{ index: 1}`.
+	it("adds a trailing space when splicing a field into an empty flow map", () => {
+		const src = "---\nartifact:\n  spec: {}\n---\na >> P -> b\n";
+		const out = setFrontmatterField(src, "artifact", "spec", "index", 1);
+		expect(out).toBe(
+			"---\nartifact:\n  spec: { index: 1 }\n---\na >> P -> b\n",
+		);
+	});
+
 	it("writes a numeric value bare (index)", () => {
 		const src = "---\nartifact:\n  spec:\n    label: Spec\n---\na >> P -> b\n";
 		const out = setFrontmatterField(src, "artifact", "spec", "index", 5);
@@ -467,6 +479,27 @@ describe("newEntrySplice", () => {
 		if (!result.ok) return;
 		const out = applySplices(yamlText, [result.splice]);
 		expect(out).toBe("artifact:\n  a:\n    label: A\n  b:\n    index: 2");
+	});
+
+	// Same shape as the empty-flow-map bug in fieldValueSplice above: inserting
+	// the first id right after `{` with no existing trailing text to lean on
+	// for the closing brace's leading space.
+	it("adds a trailing space when inserting the first entry into an empty flow-style section", () => {
+		const yamlText = "artifact: {}";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(
+			yamlText,
+			doc,
+			"artifact",
+			"b",
+			"label",
+			"b",
+			"\n",
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const out = applySplices(yamlText, [result.splice]);
+		expect(out).toBe("artifact: { b: { label: b } }");
 	});
 
 	it("returns unsupported for an empty block-style section (no sibling to anchor on)", () => {
