@@ -23,6 +23,7 @@ import {
 	diffNewTerminals,
 	diffReadySets,
 	classifyAuditIssuesFlowResult,
+	formatSizeDelta,
 } from "./lib/gate-check.mjs";
 import {
 	genPluginIdentityStep,
@@ -30,6 +31,7 @@ import {
 	wipTransitionStep,
 	designRecordStep,
 	sizeDirectionStep,
+	collectSizeDeltas,
 } from "./lib/gate-check-steps.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
@@ -197,8 +199,14 @@ if (issueNumber != null) {
 results.push(designRecordStep({ exec, base, issue, issueError }));
 
 // 11. knowledge-artifact size direction: did tracked knowledge artifacts grow
-// without an explicit override, on a cycle whose linked issue states shrink intent (#669)?
-results.push(sizeDirectionStep({ exec, base, issue, issueError, changedFiles }));
+// without an explicit override, on a cycle whose linked issue declares one (#669)?
+// The deltas are collected regardless — they are printed as report material below,
+// so a cycle that never declared an intent still shows its numbers. Collected here
+// rather than inside the step because two consumers need the same measurement; the
+// roadmap-based blocks below still read the file per block, which is the older
+// convention and stays until something needs them shared too.
+const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
+results.push(sizeDirectionStep({ exec, issue, issueError, deltas: sizeDeltas }));
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
 const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdPath, "utf-8")));
@@ -273,6 +281,15 @@ console.log(formatGateTable(results));
 			}
 		}
 	}
+}
+
+// Report material: the size of every tracked knowledge artifact this branch
+// touched. Printed whether or not the linked issue declared a shrink intent —
+// the verdict is gated on the declaration, the numbers are not, so the cycle
+// that forgot the token still has something to put in the PR body.
+if (sizeDeltas.length > 0) {
+	console.log(`\nKnowledge-artifact size (origin/${base} → HEAD):`);
+	for (const d of sizeDeltas) console.log(`  ${formatSizeDelta(d)}`);
 }
 
 console.log("\nMANUAL (judge and confirm each):");

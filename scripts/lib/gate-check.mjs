@@ -352,32 +352,55 @@ export function classifyDesignRecordContent(recordBody, optionCount) {
 	return { status: "PASS" };
 }
 
-export const SHRINK_INTENT_KEYWORDS = ["肥大", "全読", "スケール監査", "蒸留"];
+// A declaration, not a reading. Scanning the body for shrink vocabulary fired
+// on issues that merely quoted another issue's option name, which is the same
+// "the machine guesses what the prose meant" failure the other #669 checks
+// replaced with a token the filer writes.
+export const SIZE_INTENT_PATTERN = /^Size-Intent:\s*shrink\b/m;
 export const SIZE_TRACKED_PATTERNS = [/^\.pfdsl\/bindings\//, /^docs\/adr\//, /(^|\/)SKILL\.md$/];
 export const SIZE_OVERRIDE_PATTERN = /^Size-Override:\s*\S/m;
 
 /**
- * Classify whether tracked knowledge artifacts moved in the direction a
- * shrink-intent issue asked for (issue #669's protection against "the
- * countermeasure's effect on size is never measured").
- * @param {{issueBody?: string, deltas: Array<{path: string, beforeBytes: number, afterBytes: number,
- *          beforeLines: number, afterLines: number}>, prBody?: string}} params
- * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
- */
-/**
- * Does the linked issue ask for something to get smaller? Both the classifier
- * and its caller consult this, so the caller can skip the I/O the classifier
- * would only throw away.
+ * Does the linked issue declare that something should get smaller?
  * @param {string | undefined | null} issueBody
  * @returns {boolean}
  */
 export function hasShrinkIntent(issueBody) {
-	return SHRINK_INTENT_KEYWORDS.some((kw) => (issueBody ?? "").includes(kw));
+	return SIZE_INTENT_PATTERN.test(issueBody ?? "");
 }
 
+/**
+ * One tracked knowledge artifact's size across the range under review.
+ * @typedef {{path: string, beforeBytes: number, afterBytes: number,
+ *            beforeLines: number, afterLines: number}} SizeDelta
+ */
+
+/**
+ * One line describing a delta, in the one shape both the verdict's detail and
+ * the report block use — an operator seeing them back to back reads the same
+ * sentence twice, not two wordings of the same numbers.
+ * @param {SizeDelta} d
+ * @returns {string}
+ */
+export function formatSizeDelta(d) {
+	const sign = (n) => (n >= 0 ? `+${n}` : `${n}`);
+	const bytes = sign(d.afterBytes - d.beforeBytes);
+	const lines = sign(d.afterLines - d.beforeLines);
+	return `${d.path}: ${bytes} bytes / ${lines} lines (${d.beforeBytes} → ${d.afterBytes} bytes)`;
+}
+
+/**
+ * Classify whether tracked knowledge artifacts moved in the direction a
+ * shrink-intent issue asked for (issue #669's protection against "the
+ * countermeasure's effect on size is never measured"). Only the verdict is
+ * gated on the declaration — the deltas themselves are reported either way, so
+ * a missing declaration costs the numbers nothing.
+ * @param {{issueBody?: string, deltas: SizeDelta[], prBody?: string}} params
+ * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
+ */
 export function classifySizeDirection({ issueBody, deltas, prBody }) {
 	if (!hasShrinkIntent(issueBody)) {
-		return { status: "SKIP", detail: "linked issue states no shrink intent" };
+		return { status: "SKIP", detail: "linked issue declares no Size-Intent: shrink" };
 	}
 	if (!deltas || deltas.length === 0) {
 		return { status: "SKIP", detail: "no tracked knowledge-artifact changes" };
@@ -386,9 +409,7 @@ export function classifySizeDirection({ issueBody, deltas, prBody }) {
 	const grown = deltas.filter((d) => d.afterBytes > d.beforeBytes);
 	if (grown.length === 0) return { status: "PASS" };
 
-	const list = grown
-		.map((d) => `${d.path}: +${d.afterBytes - d.beforeBytes} bytes / +${d.afterLines - d.beforeLines} lines`)
-		.join(", ");
+	const list = grown.map(formatSizeDelta).join(", ");
 	if (SIZE_OVERRIDE_PATTERN.test(prBody ?? "")) {
 		return { status: "PASS", detail: `growth accepted via Size-Override: ${list}` };
 	}

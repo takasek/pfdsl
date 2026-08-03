@@ -168,36 +168,44 @@ export function designRecordStep({ exec, base, issue, issueError }) {
 }
 
 /**
+ * Byte/line deltas for the tracked knowledge artifacts this branch touched.
+ * Measured whether or not the issue declares a shrink intent: the numbers are
+ * report material in their own right, and gating their collection on the
+ * declaration would leave a cycle that forgot the token with nothing to read.
+ * @returns {import("./gate-check.mjs").SizeDelta[]}
+ */
+export function collectSizeDeltas({ exec, base, changedFiles }) {
+	return changedFiles
+		.filter((f) => SIZE_TRACKED_PATTERNS.some((p) => p.test(f)))
+		.map((path) => {
+			const before = exec("git", ["show", `origin/${base}:${path}`]);
+			const after = exec("git", ["show", `HEAD:${path}`]);
+			const beforeText = before.ok ? before.out : "";
+			const afterText = after.ok ? after.out : "";
+			return {
+				path,
+				beforeBytes: before.ok ? Buffer.byteLength(beforeText, "utf-8") : 0,
+				afterBytes: Buffer.byteLength(afterText, "utf-8"),
+				beforeLines: before.ok ? beforeText.split("\n").length : 0,
+				afterLines: afterText.split("\n").length,
+			};
+		});
+}
+
+/**
  * knowledge-artifact size direction: did tracked knowledge artifacts
  * (bindings, ADRs, SKILL.md) grow without an explicit override, on a cycle
- * whose linked issue states shrink intent (issue #669's protection against
- * "the countermeasure's effect on size is never measured")?
+ * whose linked issue declares `Size-Intent: shrink` (issue #669's protection
+ * against "the countermeasure's effect on size is never measured")?
  */
-export function sizeDirectionStep({ exec, base, issue, issueError, changedFiles }) {
+export function sizeDirectionStep({ exec, issue, issueError, deltas }) {
 	const name = "knowledge-artifact size direction";
 	if (!issue) return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
 
 	const issueBody = issue.body ?? "";
-	// Check the intent before spending a `git show` pair per tracked file and a
-	// `gh pr view` — most cycles carry no shrink intent, and every one of those
-	// subprocesses would be thrown away. classifySizeDirection reaches the same
-	// verdict from the same predicate, so the two cannot disagree.
-	if (!hasShrinkIntent(issueBody)) return { name, ...classifySizeDirection({ issueBody, deltas: [] }) };
-
-	const tracked = changedFiles.filter((f) => SIZE_TRACKED_PATTERNS.some((p) => p.test(f)));
-	const deltas = tracked.map((path) => {
-		const before = exec("git", ["show", `origin/${base}:${path}`]);
-		const after = exec("git", ["show", `HEAD:${path}`]);
-		const beforeText = before.ok ? before.out : "";
-		const afterText = after.ok ? after.out : "";
-		return {
-			path,
-			beforeBytes: before.ok ? Buffer.byteLength(beforeText, "utf-8") : 0,
-			afterBytes: Buffer.byteLength(afterText, "utf-8"),
-			beforeLines: before.ok ? beforeText.split("\n").length : 0,
-			afterLines: afterText.split("\n").length,
-		};
-	});
+	// The verdict needs the PR body; the SKIP does not. Asking gh for a PR that
+	// most cycles will not be judged against is the one subprocess worth saving.
+	if (!hasShrinkIntent(issueBody)) return { name, ...classifySizeDirection({ issueBody, deltas }) };
 
 	const prBodyResult = exec("gh", ["pr", "view", "--json", "body", "--jq", ".body"]);
 	const prBody = prBodyResult.ok ? prBodyResult.out : "";
