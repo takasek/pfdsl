@@ -39,6 +39,29 @@ describe("buildPluginManifest", () => {
 		assert.match(manifest.description, /pfd-ops/);
 	});
 
+	it("reads skill blurbs through the injected root and readFileSync, not the real filesystem", () => {
+		const root = mkdtempSync(join(tmpdir(), "gen-plugin-manifest-"));
+		try {
+			const skillDir = join(root, ".claude/skills/pfd-ops");
+			mkdirSync(skillDir, { recursive: true });
+			writeFileSync(join(skillDir, "SKILL.md"), "---\nname: pfd-ops\nsummary: injected-root blurb\ndescription: |\n  long form\n---\nbody\n");
+			const pfdslDir = join(root, "scripts/skill-template");
+			mkdirSync(pfdslDir, { recursive: true });
+			writeFileSync(join(pfdslDir, "SKILL.md"), "---\nname: pfdsl\nsummary: injected-root pfdsl blurb\ndescription: |\n  long form\n---\nbody\n");
+
+			const manifest = buildPluginManifest({
+				cliVersion: "0.0.18",
+				root,
+				skillDirs: ["pfdsl", "pfd-ops"],
+				commandFiles: [],
+			});
+
+			assert.match(manifest.description, /injected-root blurb/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it("mentions the pfd-grill skill in the description", () => {
 		const manifest = buildPluginManifest({ cliVersion: "0.0.18" });
 		assert.match(manifest.description, /pfd-grill/);

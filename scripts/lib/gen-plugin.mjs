@@ -170,10 +170,10 @@ export function buildPluginDescription({ skillDirs = ["pfdsl", ...PLUGIN_SKILL_D
 // description is derived from the actual bundle contents (buildPluginDescription)
 // so it can't drift from what plugin/pfdsl/ ships. Used by scripts/gen-plugin.mjs.
 
-export function buildPluginManifest({ cliVersion }) {
+export function buildPluginManifest({ cliVersion, root, readFileSync: readFile, skillDirs, commandFiles }) {
 	return {
 		name: "pfdsl",
-		description: buildPluginDescription(),
+		description: buildPluginDescription({ skillDirs, commandFiles, root, readFileSync: readFile }),
 		version: cliVersion,
 		author: { name: "takasek" },
 		homepage: "https://github.com/takasek/pfdsl",
