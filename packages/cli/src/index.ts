@@ -1583,16 +1583,18 @@ export function runGraphIo(
 	const loaded = loadForAudit(file, opts.json, opts.color);
 	if ("exitCode" in loaded) return loaded;
 	const { edges, nodeKinds, artifactMeta } = loaded;
-	const { terminals, externalInputs } = auditGraph(
+	const { terminals, externalInputs, externalTerminals } = auditGraph(
 		edges,
 		nodeKinds,
 		artifactMeta,
 	);
 	if (opts.json) {
-		return ok(`${JSON.stringify({ ok: true, externalInputs, terminals })}\n`);
+		return ok(
+			`${JSON.stringify({ ok: true, externalInputs, terminals, externalTerminals })}\n`,
+		);
 	}
 	return ok(
-		`external inputs: ${externalInputs.join(", ")}\nterminal artifacts: ${terminals.join(", ")}\n`,
+		`external inputs: ${externalInputs.join(", ")}\nterminal artifacts: ${terminals.join(", ")}\nexternal-stakeholder terminals: ${externalTerminals.join(", ")}\n`,
 	);
 }
 
@@ -1868,10 +1870,13 @@ const HELP_GRAPH_IO = `usage: pfdsl graph io <file|-> [--json] [--no-color]
 Print the graph's boundary: external inputs (artifacts consumed but never
 produced — where the flow starts) and terminal artifacts (produced but never
 consumed — where it ends). Artifacts with externalStakeholders are treated
-as having an external consumer and excluded from terminals. Use - to read
-from stdin.
+as having an external consumer and excluded from terminal artifacts; they
+are reported separately as external-stakeholder terminals, since the
+externalStakeholders declaration itself is what needs auditing (it is easy
+to attach it to a means artifact by mistake, which would otherwise vanish
+from the terminal-artifact audit unexamined). Use - to read from stdin.
 
-  --json      output as JSON ({ ok, externalInputs: string[], terminals: string[] })
+  --json      output as JSON ({ ok, externalInputs: string[], terminals: string[], externalTerminals: string[] })
               on failure: { ok: false, diagnostics }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 

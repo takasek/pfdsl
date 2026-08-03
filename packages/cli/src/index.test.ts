@@ -654,13 +654,51 @@ describe("graph io", () => {
 		expect(r.stdout).toMatch(/external inputs:.*req/);
 	});
 
-	it("--json returns externalInputs and terminals arrays", async () => {
+	it("artifact with externalStakeholders is listed under external-stakeholder terminals", async () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  report:",
+			"    externalStakeholders: [規制当局]",
+			"---",
+			"req >> analyze -> report",
+		].join("\n");
+		const f = join(dir, "ext-stakeholders.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["graph", "io", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toMatch(/external-stakeholder terminals:.*report/);
+	});
+
+	it("--json returns externalInputs, terminals, and externalTerminals arrays", async () => {
 		const r = await run(["graph", "io", join(dir, "valid.pfdsl"), "--json"]);
 		expect(r.exitCode).toBe(0);
 		expect(JSON.parse(r.stdout)).toEqual({
 			ok: true,
 			externalInputs: ["req"],
 			terminals: ["code"],
+			externalTerminals: [],
+		});
+	});
+
+	it("--json includes externalTerminals for artifacts with externalStakeholders", async () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  report:",
+			"    externalStakeholders: [規制当局]",
+			"---",
+			"req >> analyze -> report",
+		].join("\n");
+		const f = join(dir, "ext-stakeholders.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["graph", "io", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			externalInputs: ["req"],
+			terminals: [],
+			externalTerminals: ["report"],
 		});
 	});
 });
