@@ -3,9 +3,9 @@
 // the changelog out of spec.md, both lived in one file, so a version bump and
 // its changelog entry sat a scroll apart — no enforcement, but proximity
 // made forgetting one unlikely. The split removed that proximity, so this
-// check replaces it, gated at release time (scripts/release.mjs's pre-tag
-// checks) rather than per-commit: a title-line bump mid-development doesn't
-// need its changelog entry until the release that ships it (follow-up to #692).
+// check replaces it. The entry is supposed to be written at bump time, in the
+// same maintain_spec integrate step (.pfdsl/workflow.md) — this check is a
+// release-time backstop for when that was missed, not a license to defer it.
 //
 // Checks the *top* entry specifically, not just any matching text anywhere in
 // the file — spec-history.md is newest-first, so the top entry is the one

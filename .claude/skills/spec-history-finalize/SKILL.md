@@ -1,70 +1,64 @@
 ---
 name: spec-history-finalize
 description: |
-  Use before a release, or when `scripts/check-spec-history.mjs` /
-  `make release` refuses because docs/spec/spec-history.md's top entry
-  doesn't document docs/spec/spec.md's current version. Rewrites the top of
-  spec-history.md so its newest entry matches the canonical heading format
-  and targets the version that's actually about to ship — consolidating
-  several intermediate version-bump entries into one if spec.md was bumped
-  more than once since the last release. Not a per-commit step: an entry
-  written during maintain_spec's integrate phase (the normal case) needs no
-  rewriting here — this is for closing the gap when that didn't happen, or
-  when several integrate steps landed since the last release.
+  Use when `scripts/check-spec-history.mjs` / `make release` refuses because
+  docs/spec/spec-history.md's top entry doesn't document docs/spec/spec.md's
+  current title-line version. Writes the missing entry, in the canonical
+  format, for the version that's actually current. Not a per-commit step: an
+  entry written during maintain_spec's integrate phase (the normal case)
+  needs no help from this skill — this is only for closing the gap after
+  that step was skipped.
 ---
 
-# spec-history.md の release 前仕上げ
+# spec-history.md の欠落エントリを埋める
 
-`docs/spec/spec-history.md` の先頭エントリを、これからリリースされる実バージョンに対して
-正しい形式で揃える。形式の一次情報は `docs/spec/spec-history.md` 自身の冒頭注記。
+`docs/spec/spec-history.md` の先頭エントリが `docs/spec/spec.md` の現行タイトル行と
+一致しない場合に、欠けているエントリを書き足す。形式の一次情報は
+`docs/spec/spec-history.md` 自身の冒頭注記。
 
-## いつ要るか
+## 前提
 
-通常は `maintain_spec`（統合フェーズ）でタイトル行 bump と同じ作業の中でエントリを書くので、
-release 時点で直すことは無い（`.pfdsl/workflow.md` の spec バージョンの権威節を参照）。
-このスキルが要るのは次のいずれか:
+エントリは本来 maintain_spec（統合フェーズ）でタイトル行 bump と同じ作業の中で書く
+（`.pfdsl/workflow.md` の spec バージョンの権威節）。それが守られていれば
+`check-spec-history.mjs` は release 時点で必ず通り、このスキルの出番はない。
+このスキルが要るのは、その場で書き忘れたケースのみ。
 
-- エントリを書き忘れた（`check-spec-history.mjs` が先頭エントリのバージョン不一致・見出し不一致で fail）
-- 直近のリリース以降に spec.md が複数回 bump された（v0.0.16→17→18 のように統合が複数回走った）ため、先頭に複数の中間エントリが並んでおり、実際に出荷される版1つに対してまとめ直す必要がある
+**既存エントリを結合・削除しない。** 各バージョンは spec.md が実際にそのバージョンを
+名乗っていた期間の記録であり、CLI リリースへ独立に出荷されたかどうかとは無関係に
+1バージョン1エントリで永続する（通常の CHANGELOG と同じ考え方）。過去のエントリを
+「実質同じリリースに含まれるから」といった理由でまとめたり消したりしない。
 
 ## 手順
 
-### 1. 現行バージョンと直近リリース時点のバージョンを出す
+### 1. 欠けている範囲を特定する
 
 ```sh
-# これからリリースされる版（spec.md のタイトル行）
-head -1 docs/spec/spec.md
-
-# 直近の CLI リリースタグ（spec.md は CLI リリースのたびに配布 bundle へ焼き込まれる —
-# 「リリース済み」の実体的な境界はこのタグ）
-git describe --tags --match 'v*' --abbrev=0
-
-# そのタグ時点で spec.md が名乗っていたバージョン（= 直近リリースで実際に配布された版）
-git show "$(git describe --tags --match 'v*' --abbrev=0)":docs/spec/spec.md | head -1
+head -1 docs/spec/spec.md                 # 現行タイトル行のバージョン
+head -20 docs/spec/spec-history.md        # 先頭エントリが指す vNEW と比較
 ```
 
-### 2. 対象範囲を特定する
+先頭エントリの `vNEW` が現行バージョンより古ければ、その間の各バージョンごとに
+エントリが1つずつ欠けている可能性がある。`git log -p -- docs/spec/spec.md` で
+タイトル行が実際に何回 bump されたかを確認する。
 
-`docs/spec/spec-history.md` の先頭から、直近リリース時点のバージョン（手順1の3つ目）に一致する
-エントリが現れるまでが今回まとめ直す対象。1エントリしかなければ手順3は形式チェックのみでよい。
+### 2. 欠けている各バージョンのエントリを書く
 
-### 3. 先頭エントリを1つにまとめ直す
-
-対象エントリ群を、次の形式の単一エントリに書き換える:
+bump が複数回あった場合は、1 bump = 1 エントリで、それぞれ次の形式で先頭に追加する
+（新しい順、既存の先頭エントリより上）:
 
 ```
-vLAST_RELEASED からの主な変更点（vCURRENT）：<一文要約>
+vOLD からの主な変更点（vNEW）：<一文要約>
 
 * <変更点1>
 * <変更点2>
 ...
 ```
 
-- `vLAST_RELEASED` は手順1で読んだ直近リリース版、`vCURRENT` は spec.md の現行タイトル行と完全一致させる
-- 各中間エントリの実質的な変更点（破壊的変更フラグ・issue 番号・設計判断の一文要約）は落とさず引き継ぐ。中間エントリ自体は削除する — それらは実際に外部へ出荷されたことのない中間状態であり、歴史的記録として残す理由がない（v0.0.1 以前の旧形式エントリと違い、これは一度も公開されていない）
-- 一文要約は「何が変わったか」であって「どの issue で」ではない。issue 番号は本文中の `（#NNN）` で添える
+内容は該当コミットの diff（`git log -p -- docs/spec/spec.md`）と、その bump が
+消費した `spec_proposals`（`.pfdsl/spec_proposals/` 等、統合済みなら roadmap の
+履歴から辿る）から復元する。破壊的変更フラグ・issue 番号は本文中の `（#NNN）` で添える。
 
-### 4. 検査する
+### 3. 検査する
 
 ```sh
 node scripts/check-spec-history.mjs
