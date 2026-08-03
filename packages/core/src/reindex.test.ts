@@ -134,6 +134,29 @@ a >> p -> b
 		expect(output).toContain("a >> p -> b");
 	});
 
+	it("preserves an untouched folded-scalar sibling's line wraps, even when the same batch also creates brand-new entries", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  a:",
+			"    label: A",
+			"    description: >",
+			"      long text",
+			"      wrapped here",
+			"---",
+			"a >> p -> b",
+			"",
+		].join("\n");
+		const { output } = reindex(src, { renumber: true });
+		expect(output).toContain(
+			"description: >\n      long text\n      wrapped here\n",
+		);
+		// p (process, body-only) and b (artifact, body-only) both get a fresh
+		// frontmatter entry with an index in the same pass.
+		expect(output).toContain("process:\n  p:\n    index: 1");
+		expect(output).toMatch(/b:\n\s*index: 2/);
+	});
+
 	it("handles 4-space indented front matter without corrupting it", () => {
 		const src = `---
 artifact:

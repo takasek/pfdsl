@@ -1,7 +1,11 @@
 import { Document } from "yaml";
 import {
+	applySplices,
+	fieldValueSplice,
+	newEntrySplice,
 	parseFrontmatterCst,
 	renderFrontmatterCst,
+	type Splice,
 } from "./frontmatter-cst.js";
 import { analyze } from "./index.js";
 import { computeTopoOrder } from "./sorter.js";
@@ -105,10 +109,64 @@ export function reindex(
 	if (!changes.length) return { output: source, changes, diagnostics };
 
 	const cst = parseFrontmatterCst(source);
-	const doc = cst.present ? cst.doc : new Document();
-	for (const c of changes) {
-		doc.setIn([c.kind, c.id, "index"], c.to);
+	if (!cst.present) {
+		// No frontmatter to splice into (shouldn't happen once `changes` is
+		// non-empty, since every changed id came from parsed frontmatter, but
+		// keep the pre-existing full-render fallback for safety).
+		const doc = new Document();
+		for (const c of changes) doc.setIn([c.kind, c.id, "index"], c.to);
+		return {
+			output: renderFrontmatterCst(doc, cst.newline) + cst.body,
+			changes,
+			diagnostics,
+		};
 	}
-	const output = renderFrontmatterCst(doc, cst.newline) + cst.body;
+
+	// `changes` only ever contains ids drawn from `order`, which is built from
+	// `graph.nodes` (populated exclusively with "artifact"/"process" by
+	// buildGraph) plus frontmatter.artifact/process keys — frontmatter.group
+	// ids are never added. So `c.kind` is never "group" here; the cast below
+	// is safe, not a type-check workaround.
+	const splices: Splice[] = [];
+	let fallbackNeeded = false;
+	for (const c of changes) {
+		const kind = c.kind as "artifact" | "process";
+		const result = cst.doc.hasIn([c.kind, c.id])
+			? fieldValueSplice(
+					cst.yamlText,
+					cst.doc,
+					c.kind,
+					c.id,
+					"index",
+					c.to,
+					cst.newline,
+				)
+			: newEntrySplice(
+					cst.yamlText,
+					cst.doc,
+					kind,
+					c.id,
+					"index",
+					c.to,
+					cst.newline,
+				);
+		if (!result.ok) {
+			fallbackNeeded = true;
+			break;
+		}
+		splices.push(result.splice);
+	}
+
+	if (fallbackNeeded) {
+		for (const c of changes) cst.doc.setIn([c.kind, c.id, "index"], c.to);
+		return {
+			output: renderFrontmatterCst(cst.doc, cst.newline) + cst.body,
+			changes,
+			diagnostics,
+		};
+	}
+
+	const newYamlText = applySplices(cst.yamlText, splices);
+	const output = `---${cst.newline}${newYamlText}${cst.newline}---${cst.newline}${cst.body}`;
 	return { output, changes, diagnostics };
 }
