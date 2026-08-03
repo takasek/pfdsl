@@ -91,5 +91,5 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 
 ## ステップ 5: 検証とゲート
 
-- 各 `.pfdsl` ファイルに対して `pfdsl check <file>` が通ること
-- **roadmap.pfdsl を採用している場合のみ**: 作成した `.pfdsl` が `roadmap.pfdsl` に artifact として登録されているか確認する（未登録なら pfd-ops スキルの「成果物の門番」に従って登録する）。roadmap 未採用のリポではこの項目は N/A
+- 各 `.pfdsl` ファイルに対して `pfdsl check <file> --strict` が通ること
+- **roadmap.pfdsl を採用している場合のみ**: 作成した `.pfdsl` のうち、他作業の着手をゲートする成果物を生むものだけ登録する（何がゲートに当たるかの判定基準は pfd-ops スキルの運用プロトコル手順2が一次情報 — ここには複製しない）。登録対象は `roadmap.pfdsl` に artifact として登録されているか確認し、未登録なら pfd-ops スキルの「成果物の門番」に従って登録する。roadmap 未採用のリポではこの項目は N/A
