@@ -60,9 +60,21 @@ function applySplices(source: string, splices: Splice[]): string
 
 1. Red: 今回の再現ケース（無関係フィールド更新で `>` 折り返しが1行化される）を先にテストとして書く。`setFrontmatterField` / `reindex` / `sort` / `insertDefinition` それぞれ最低1本。
 2. 各プリミティブ（値置換 splice／挿入 splice／並び替え splice、および `applySplices` 自体）を最小ユニットから Green にする。
-3. 既存の `meta set` / `reindex` / `sort` / `insert-definition` のテストスイートは全て通過必須（振る舞い自体は変えない、書式温存の強化のみが差分）。
+3. 既存の `meta set` / `reindex` / `sort` / `insert-definition` のテストスイートは全て通過必須。ただし後述の2件は期待値そのものを更新する。
+
+## `fmt` は対象外
+
+`packages/core/src/index.ts` の `format()`（`fmt`）も `renderFrontmatterCst` 全文再直列化を使うが、インデント幅の正規化は `fmt` 本来の責務であり、splice 方式（未変更バイトの温存）をそのまま適用できない。一方で `>` の折り返し位置はユーザー裁量であり `fmt` が触ってよい対象ではない。つまり `fmt` には「インデントは正規化しつつ fold の折り返しだけ温存する」という、今回の4箇所とは別種の修正（元の折り返し行を新インデント幅へ再インデントしてスプライスし直す）が要る。実装量・検証観点が異なるため別 issue/plan へ先送りする。
+
+## 既存テストの期待値変更（insert-definition）
+
+`insert-definition.test.ts` の以下2件は、全文再直列化の副作用を期待値として固定していたことが判明した。splice 方式ではこの副作用自体が起きなくなるため、期待値を「元の書式を保持する」方向に更新する。
+
+- **インデント幅の正規化**: 4スペースインデントの既存ファイルへ挿入すると、現行は2スペースへ強制正規化される。splice 方式（兄弟キーのインデントを踏襲）では元の4スペースのまま保持される。挿入という操作自体はインデント正規化（`fmt` の責務）とは無関係な副作用だったため、これは是正であって新たな欠陥ではない。
+- **ヘッダ末尾コメントの位置**: `artifact: # user artifacts` のような一行コメントは、現行では別行 `artifact:\n  # user artifacts\n` へ強制的に移動する。splice 方式では元の一行コメントのまま保持される。
 
 ## スコープ外
 
-- `renderFrontmatterCst` の全文再直列化パス自体の削除（新規フロントマター作成時は引き続き使用）。
+- `renderFrontmatterCst` の全文再直列化パス自体の削除（`fmt` および「フロントマター自体が存在しない新規作成」時は引き続き使用）。
 - anchor/alias を含むフィールドの splice 対応（フォールバックで現状維持のみ）。
+- `fmt` の fold 保存修正（別 issue/plan で扱う）。
