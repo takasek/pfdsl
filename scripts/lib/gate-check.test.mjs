@@ -25,6 +25,10 @@ import {
 	classifyDesignRecordContent,
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
+	classifySizeDirection,
+	SHRINK_INTENT_KEYWORDS,
+	SIZE_TRACKED_PATTERNS,
+	SIZE_OVERRIDE_PATTERN,
 } from "./gate-check.mjs";
 
 describe("classifyAuditIssuesFlowResult", () => {
@@ -462,5 +466,62 @@ describe("DESIGN_RECORD_REQUIRED_PREFIXES / DISPOSITION_TOKENS", () => {
 	it("exposes the expected prefix and disposition vocabularies", () => {
 		assert.deepEqual(DESIGN_RECORD_REQUIRED_PREFIXES, ["前提:", "否定案:", "却下理由:"]);
 		assert.deepEqual(DISPOSITION_TOKENS, ["採用", "却下", "保留"]);
+	});
+});
+
+describe("classifySizeDirection", () => {
+	const grownDelta = { path: ".pfdsl/bindings/x.pfdsl", beforeBytes: 100, afterBytes: 150, beforeLines: 10, afterLines: 15 };
+	const shrunkDelta = { path: "docs/adr/0001-x.md", beforeBytes: 200, afterBytes: 100, beforeLines: 20, afterLines: 10 };
+
+	it("SKIPs when the linked issue states no shrink intent", () => {
+		const result = classifySizeDirection({ issueBody: "普通の説明。", deltas: [grownDelta] });
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no shrink intent/);
+	});
+
+	it("SKIPs when there are no tracked knowledge-artifact changes", () => {
+		const result = classifySizeDirection({ issueBody: "肥大への対策。", deltas: [] });
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no tracked knowledge-artifact changes/);
+	});
+
+	it("FAILs when a tracked artifact grew and the PR body has no Size-Override", () => {
+		const result = classifySizeDirection({ issueBody: "肥大への対策。", deltas: [grownDelta], prBody: "" });
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /\+50 bytes/);
+		assert.match(result.detail, /\+5 lines/);
+	});
+
+	it("PASSes growth when the PR body carries a Size-Override token", () => {
+		const result = classifySizeDirection({
+			issueBody: "全読の防止。",
+			deltas: [grownDelta],
+			prBody: "Size-Override: intentional growth, see discussion",
+		});
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /Size-Override/);
+	});
+
+	it("PASSes when no tracked artifact grew", () => {
+		const result = classifySizeDirection({ issueBody: "スケール監査の一環。", deltas: [shrunkDelta] });
+		assert.deepEqual(result, { status: "PASS" });
+	});
+});
+
+describe("SHRINK_INTENT_KEYWORDS / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", () => {
+	it("exposes the expected shrink-intent keywords", () => {
+		assert.deepEqual(SHRINK_INTENT_KEYWORDS, ["肥大", "全読", "スケール監査", "蒸留"]);
+	});
+
+	it("SIZE_TRACKED_PATTERNS matches bindings, ADRs, and SKILL.md", () => {
+		assert.ok(SIZE_TRACKED_PATTERNS.some((p) => p.test(".pfdsl/bindings/x.pfdsl")));
+		assert.ok(SIZE_TRACKED_PATTERNS.some((p) => p.test("docs/adr/0020-x/README.md")));
+		assert.ok(SIZE_TRACKED_PATTERNS.some((p) => p.test(".claude/skills/pfd-ops/SKILL.md")));
+		assert.ok(!SIZE_TRACKED_PATTERNS.some((p) => p.test("packages/core/src/graph.ts")));
+	});
+
+	it("SIZE_OVERRIDE_PATTERN matches a Size-Override: token line", () => {
+		assert.ok(SIZE_OVERRIDE_PATTERN.test("intro\nSize-Override: reason\nmore"));
+		assert.ok(!SIZE_OVERRIDE_PATTERN.test("no override mentioned here"));
 	});
 });

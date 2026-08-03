@@ -29,6 +29,7 @@ import {
 	outputArtifactStatusStep,
 	wipTransitionStep,
 	designRecordStep,
+	sizeDirectionStep,
 } from "./lib/gate-check-steps.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 
@@ -178,6 +179,10 @@ results.push(wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFil
 // 10. design-selection record: was the design choice recorded before the first commit,
 // with the required structure (#669)?
 results.push(designRecordStep({ exec, base, issueNumber }));
+
+// 11. knowledge-artifact size direction: did tracked knowledge artifacts grow
+// without an explicit override, on a cycle whose linked issue states shrink intent (#669)?
+results.push(sizeDirectionStep({ exec, base, issueNumber, changedFiles }));
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
 const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdPath, "utf-8")));

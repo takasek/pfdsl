@@ -17,9 +17,11 @@ import {
 	classifyDesignRecordContent,
 	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
+	classifySizeDirection,
 	hasStatusChange,
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
+	SIZE_TRACKED_PATTERNS,
 	statusChangedForArtifact,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
@@ -169,4 +171,45 @@ export function designRecordStep({ exec, base, issueNumber }) {
 	if (timing.status === "FAIL" || content.status === "FAIL") return { name, status: "FAIL", detail };
 	if (timing.status === "SKIP") return { name, status: "SKIP", detail };
 	return { name, status: "PASS", detail };
+}
+
+/**
+ * knowledge-artifact size direction: did tracked knowledge artifacts
+ * (bindings, ADRs, SKILL.md) grow without an explicit override, on a cycle
+ * whose linked issue states shrink intent (issue #669's protection against
+ * "the countermeasure's effect on size is never measured")?
+ */
+export function sizeDirectionStep({ exec, base, issueNumber, changedFiles }) {
+	const name = "knowledge-artifact size direction";
+	if (issueNumber == null) return { name, status: "SKIP", detail: "no --issue given" };
+
+	const issueResult = exec("gh", ["issue", "view", String(issueNumber), "--json", "body"]);
+	if (!issueResult.ok) return { name, status: "SKIP", detail: "gh CLI unavailable" };
+
+	let issueBody;
+	try {
+		issueBody = JSON.parse(issueResult.out).body ?? "";
+	} catch {
+		return { name, status: "SKIP", detail: "gh CLI unavailable" };
+	}
+
+	const tracked = changedFiles.filter((f) => SIZE_TRACKED_PATTERNS.some((p) => p.test(f)));
+	const deltas = tracked.map((path) => {
+		const before = exec("git", ["show", `origin/${base}:${path}`]);
+		const after = exec("git", ["show", `HEAD:${path}`]);
+		const beforeText = before.ok ? before.out : "";
+		const afterText = after.ok ? after.out : "";
+		return {
+			path,
+			beforeBytes: before.ok ? Buffer.byteLength(beforeText, "utf-8") : 0,
+			afterBytes: Buffer.byteLength(afterText, "utf-8"),
+			beforeLines: before.ok ? beforeText.split("\n").length : 0,
+			afterLines: afterText.split("\n").length,
+		};
+	});
+
+	const prBodyResult = exec("gh", ["pr", "view", "--json", "body", "--jq", ".body"]);
+	const prBody = prBodyResult.ok ? prBodyResult.out : "";
+
+	return { name, ...classifySizeDirection({ issueBody, deltas, prBody }) };
 }

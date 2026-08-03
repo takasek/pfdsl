@@ -348,3 +348,36 @@ export function classifyDesignRecordContent(recordBody, optionCount) {
 	if (problems.length > 0) return { status: "FAIL", detail: problems.join("; ") };
 	return { status: "PASS" };
 }
+
+export const SHRINK_INTENT_KEYWORDS = ["肥大", "全読", "スケール監査", "蒸留"];
+export const SIZE_TRACKED_PATTERNS = [/^\.pfdsl\/bindings\//, /^docs\/adr\//, /(^|\/)SKILL\.md$/];
+export const SIZE_OVERRIDE_PATTERN = /^Size-Override:\s*\S/m;
+
+/**
+ * Classify whether tracked knowledge artifacts moved in the direction a
+ * shrink-intent issue asked for (issue #669's protection against "the
+ * countermeasure's effect on size is never measured").
+ * @param {{issueBody?: string, deltas: Array<{path: string, beforeBytes: number, afterBytes: number,
+ *          beforeLines: number, afterLines: number}>, prBody?: string}} params
+ * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
+ */
+export function classifySizeDirection({ issueBody, deltas, prBody }) {
+	const body = issueBody ?? "";
+	if (!SHRINK_INTENT_KEYWORDS.some((kw) => body.includes(kw))) {
+		return { status: "SKIP", detail: "linked issue states no shrink intent" };
+	}
+	if (!deltas || deltas.length === 0) {
+		return { status: "SKIP", detail: "no tracked knowledge-artifact changes" };
+	}
+
+	const grown = deltas.filter((d) => d.afterBytes > d.beforeBytes);
+	if (grown.length === 0) return { status: "PASS" };
+
+	const list = grown
+		.map((d) => `${d.path}: +${d.afterBytes - d.beforeBytes} bytes / +${d.afterLines - d.beforeLines} lines`)
+		.join(", ");
+	if (SIZE_OVERRIDE_PATTERN.test(prBody ?? "")) {
+		return { status: "PASS", detail: `growth accepted via Size-Override: ${list}` };
+	}
+	return { status: "FAIL", detail: list };
+}

@@ -6,6 +6,7 @@ import {
 	outputArtifactStatusStep,
 	wipTransitionStep,
 	designRecordStep,
+	sizeDirectionStep,
 } from "./gate-check-steps.mjs";
 
 /**
@@ -414,5 +415,86 @@ describe("designRecordStep", () => {
 		});
 		const result = designRecordStep({ exec, base: "main", issueNumber: 669 });
 		assert.equal(result.status, "PASS");
+	});
+});
+
+describe("sizeDirectionStep", () => {
+	it("SKIPs when no --issue given", () => {
+		const { exec, calls } = fakeExec();
+		const result = sizeDirectionStep({ exec, base: "main", changedFiles: [] });
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /--issue/);
+		assert.deepEqual(calls, []);
+	});
+
+	it("SKIPs when gh CLI is unavailable", () => {
+		const { exec } = fakeExec({ "gh issue view": { ok: false } });
+		const result = sizeDirectionStep({ exec, base: "main", issueNumber: 669, changedFiles: [] });
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /gh CLI unavailable/);
+	});
+
+	it("SKIPs when the linked issue states no shrink intent", () => {
+		const { exec } = fakeExec({
+			"gh issue view": { out: JSON.stringify({ body: "普通の説明。" }) },
+		});
+		const result = sizeDirectionStep({
+			exec,
+			base: "main",
+			issueNumber: 669,
+			changedFiles: [".pfdsl/bindings/x.pfdsl"],
+		});
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no shrink intent/);
+	});
+
+	it("computes byte/line deltas for tracked paths only, and FAILs on growth without an override", () => {
+		const { exec, calls } = fakeExec({
+			"gh issue view": { out: JSON.stringify({ body: "肥大への対策。" }) },
+			"git show origin/main:.pfdsl/bindings/x.pfdsl": { out: "aa\n" },
+			"git show HEAD:.pfdsl/bindings/x.pfdsl": { out: "aaaaaa\n" },
+			"gh pr view": { out: "" },
+		});
+		const result = sizeDirectionStep({
+			exec,
+			base: "main",
+			issueNumber: 669,
+			changedFiles: [".pfdsl/bindings/x.pfdsl", "packages/core/src/graph.ts"],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.ok(!calls.some((c) => c.includes("graph.ts")));
+	});
+
+	it("PASSes growth when the PR body carries a Size-Override token", () => {
+		const { exec } = fakeExec({
+			"gh issue view": { out: JSON.stringify({ body: "肥大への対策。" }) },
+			"git show origin/main:.pfdsl/bindings/x.pfdsl": { out: "aa\n" },
+			"git show HEAD:.pfdsl/bindings/x.pfdsl": { out: "aaaaaa\n" },
+			"gh pr view": { out: "Size-Override: intentional" },
+		});
+		const result = sizeDirectionStep({
+			exec,
+			base: "main",
+			issueNumber: 669,
+			changedFiles: [".pfdsl/bindings/x.pfdsl"],
+		});
+		assert.equal(result.status, "PASS");
+	});
+
+	it("treats a new tracked file (no origin/base copy) as growth from zero", () => {
+		const { exec } = fakeExec({
+			"gh issue view": { out: JSON.stringify({ body: "肥大への対策。" }) },
+			"git show origin/main:.pfdsl/bindings/new.pfdsl": { ok: false, out: "fatal: does not exist" },
+			"git show HEAD:.pfdsl/bindings/new.pfdsl": { out: "hello\n" },
+			"gh pr view": { out: "" },
+		});
+		const result = sizeDirectionStep({
+			exec,
+			base: "main",
+			issueNumber: 669,
+			changedFiles: [".pfdsl/bindings/new.pfdsl"],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /new\.pfdsl/);
 	});
 });
