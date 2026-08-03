@@ -157,6 +157,35 @@ a >> p -> b
 		expect(output).toMatch(/b:\n\s*index: 2/);
 	});
 
+	it("keeps independent brand-new entries under their own parent section even when all splices land at the same offset (#corruption)", () => {
+		// a is the sole entry in artifact: and the last thing in the file, so
+		// three independent splices (extend a's fields, create process:, append
+		// to artifact:) all anchor on the exact same byte offset. A batched
+		// single-pass apply concatenated their replacement texts in whatever
+		// order the stable sort produced, nesting b (an artifact) as a YAML
+		// sibling of p under process: instead of under artifact:.
+		const src = [
+			"---",
+			"artifact:",
+			"  a:",
+			"    label: A",
+			"    description: >",
+			"      long text",
+			"      wrapped here",
+			"---",
+			"a >> p -> b",
+			"",
+		].join("\n");
+		const { output } = reindex(src, { renumber: true });
+		const { frontmatter } = analyze(output);
+		expect(frontmatter?.artifact?.a?.index).toBe(1);
+		expect(frontmatter?.process?.p?.index).toBe(1);
+		expect(frontmatter?.artifact?.b?.index).toBe(2);
+		// b must NOT have ended up nested under process:.
+		expect(Object.keys(frontmatter?.process ?? {}).sort()).toEqual(["p"]);
+		expect(Object.keys(frontmatter?.artifact ?? {}).sort()).toEqual(["a", "b"]);
+	});
+
 	it("handles 4-space indented front matter without corrupting it", () => {
 		const src = `---
 artifact:
