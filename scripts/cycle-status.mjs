@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Cycle preflight: bundles step-1 mechanical operations (fetch, rebase-behind
 // check, flow-sync PR check, ready listing) into one compact JSON payload.
-// Usage: node scripts/cycle-status.mjs [--base main]
+// Usage: node scripts/cycle-status.mjs [--base main] [--issue <n>]
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -16,6 +16,8 @@ const root = resolve(__dirname, "..");
 const args = process.argv.slice(2);
 const baseFlagIdx = args.indexOf("--base");
 const base = baseFlagIdx >= 0 ? args[baseFlagIdx + 1] : "main";
+const issueFlagIdx = args.indexOf("--issue");
+const issueNumber = issueFlagIdx >= 0 ? Number(args[issueFlagIdx + 1]) : null;
 
 // `base` comes from argv; naming the executable and arguments separately keeps
 // it out of a shell (#572).
@@ -28,6 +30,7 @@ const result = await runCycleStatus({
 	readFileSync,
 	root,
 	base,
+	issueNumber,
 });
 
 console.log(JSON.stringify(result, null, 2));
