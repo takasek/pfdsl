@@ -204,3 +204,39 @@ describe("setFrontmatterField", () => {
 		expect(out).toContain("req(v2):\n    status: done");
 	});
 });
+
+import { applySplices } from "./frontmatter-cst.js";
+
+describe("applySplices", () => {
+	it("replaces a single range", () => {
+		expect(
+			applySplices("hello world", [
+				{ start: 6, end: 11, replacement: "there" },
+			]),
+		).toBe("hello there");
+	});
+
+	it("applies multiple non-overlapping splices regardless of input order", () => {
+		const text = "aaa bbb ccc";
+		const out = applySplices(text, [
+			{ start: 8, end: 11, replacement: "ZZZ" },
+			{ start: 0, end: 3, replacement: "XXX" },
+		]);
+		expect(out).toBe("XXX bbb ZZZ");
+	});
+
+	it("supports pure insertion (start === end)", () => {
+		expect(applySplices("ab", [{ start: 1, end: 1, replacement: "-" }])).toBe(
+			"a-b",
+		);
+	});
+
+	it("throws on overlapping splices", () => {
+		expect(() =>
+			applySplices("abcdef", [
+				{ start: 0, end: 3, replacement: "X" },
+				{ start: 2, end: 5, replacement: "Y" },
+			]),
+		).toThrow(/overlap/);
+	});
+});

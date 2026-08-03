@@ -115,3 +115,32 @@ export function setFrontmatterField(
 	doc.setIn([kind, id, field], value);
 	return renderFrontmatterCst(doc, newline) + body;
 }
+
+export interface Splice {
+	start: number;
+	end: number;
+	replacement: string;
+}
+
+/**
+ * Apply non-overlapping byte-range replacements to `text` in one pass.
+ * Splice order in the input array doesn't matter — they're sorted by
+ * `start` before applying. Used by every write path in this file to touch
+ * only the bytes an operation actually changed, leaving everything else
+ * (comments, folded-scalar line wraps, indentation) byte-identical.
+ */
+export function applySplices(text: string, splices: Splice[]): string {
+	const sorted = [...splices].sort((a, b) => a.start - b.start);
+	for (let i = 1; i < sorted.length; i++) {
+		if (sorted[i].start < sorted[i - 1].end) {
+			throw new Error("applySplices: overlapping splices");
+		}
+	}
+	let out = "";
+	let cursor = 0;
+	for (const s of sorted) {
+		out += text.slice(cursor, s.start) + s.replacement;
+		cursor = s.end;
+	}
+	return out + text.slice(cursor);
+}
