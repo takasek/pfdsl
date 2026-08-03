@@ -15,6 +15,8 @@
 // out to, so this hook does not pay a second Node process spawn on every
 // .md change and there stays exactly one place that defines a violation.
 
+import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
+
 /**
  * Whether this PostToolUse payload changed a .md file.
  * Edit counts as well as Write: most prose reaches a .md file through Edit, and
@@ -46,4 +48,32 @@ export function formatLinebreakAdvisory(filePath, violations, formatViolation) {
 	if (violations.length === 0) return undefined;
 	const lines = violations.map(formatViolation).join("\n");
 	return `note: ${filePath} has mid-sentence line break violation(s) (check-md-linebreaks.mjs):\n${lines}`;
+}
+
+/**
+ * Orchestrates the hook's stdin payload into a print-or-not decision, the way
+ * runDelegationGuard does (#645). `checkFile` and `formatViolation` are
+ * injected — the wrapper passes check-md-linebreaks.mjs's own pair, so this
+ * file still never re-implements what a violation is, and the read failure
+ * path (the file may already be gone) is covered by a test rather than living
+ * in an untestable script.
+ * @param {string} inputText raw stdin payload
+ * @param {{checkFile: (path: string) => object[], formatViolation: (v: object) => string}} io
+ * @returns {{shouldOutput: boolean, output?: object}}
+ */
+export function runMdWriteCheck(inputText, { checkFile, formatViolation }) {
+	const payload = parseHookPayload(inputText);
+	if (!payload || !isMarkdownChange(payload)) return { shouldOutput: false };
+
+	const filePath = payload.tool_input.file_path;
+	let violations;
+	try {
+		violations = checkFile(filePath);
+	} catch {
+		return { shouldOutput: false };
+	}
+
+	const advisory = formatLinebreakAdvisory(filePath, violations, formatViolation);
+	if (!advisory) return { shouldOutput: false };
+	return { shouldOutput: true, output: buildAdvisoryOutput(advisory) };
 }

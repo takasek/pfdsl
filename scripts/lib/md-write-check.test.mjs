@@ -1,7 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { formatLinebreakAdvisory, isMarkdownChange } from "./md-write-check.mjs";
+import {
+	formatLinebreakAdvisory,
+	isMarkdownChange,
+	runMdWriteCheck,
+} from "./md-write-check.mjs";
 import { formatViolation } from "../check-md-linebreaks.mjs";
 
 describe("isMarkdownChange", () => {
@@ -60,5 +64,62 @@ describe("formatLinebreakAdvisory", () => {
 		assert.match(result, /\/repo\/docs\/foo\.md/);
 		assert.match(result, /mid-sentence line break/);
 		assert.match(result, /continuation/);
+	});
+});
+
+describe("runMdWriteCheck", () => {
+	const violation = { file: "/repo/docs/foo.md", line: 12, prev: "- item", cont: "continuation" };
+	const input = JSON.stringify({
+		hook_event_name: "PostToolUse",
+		tool_name: "Edit",
+		tool_input: { file_path: "/repo/docs/foo.md" },
+	});
+
+	it("prints the advisory for a file with violations", () => {
+		const { shouldOutput, output } = runMdWriteCheck(input, {
+			checkFile: () => [violation],
+			formatViolation,
+		});
+		assert.equal(shouldOutput, true);
+		assert.match(output.hookSpecificOutput.additionalContext, /mid-sentence line break/);
+	});
+
+	it("produces no output for a clean file", () => {
+		assert.deepEqual(runMdWriteCheck(input, { checkFile: () => [], formatViolation }), {
+			shouldOutput: false,
+		});
+	});
+
+	it("stays silent when the file cannot be read — it may already be gone", () => {
+		const result = runMdWriteCheck(input, {
+			checkFile: () => {
+				throw new Error("ENOENT");
+			},
+			formatViolation,
+		});
+		assert.deepEqual(result, { shouldOutput: false });
+	});
+
+	it("never reads a file for a payload that is not a .md change", () => {
+		let called = false;
+		const other = JSON.stringify({
+			hook_event_name: "PostToolUse",
+			tool_name: "Edit",
+			tool_input: { file_path: "/repo/scripts/foo.mjs" },
+		});
+		runMdWriteCheck(other, {
+			checkFile: () => {
+				called = true;
+				return [];
+			},
+			formatViolation,
+		});
+		assert.equal(called, false);
+	});
+
+	it("silently allows malformed stdin JSON", () => {
+		assert.deepEqual(runMdWriteCheck("not json{{{", { checkFile: () => [], formatViolation }), {
+			shouldOutput: false,
+		});
 	});
 });

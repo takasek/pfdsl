@@ -1,35 +1,19 @@
 #!/usr/bin/env node
 // PostToolUse(Write|Edit) hook: runs check-md-linebreaks.mjs's check against a
-// .md file right after it is written (#650). See scripts/lib/md-write-check.mjs
-// for why this catches the file individually instead of waiting for pre-commit.
+// .md file right after it changes (#650). See scripts/lib/md-write-check.mjs
+// for why this catches the file individually instead of waiting for pre-commit,
+// and for the stdin orchestration.
 //
-// Reads the hook payload on stdin. Prints an advisory additionalContext only
-// when the file has violations; stays silent otherwise. Always exits 0 —
-// this never blocks anything, and a crash here must not wedge every Write.
+// Always exits 0 — this never blocks anything.
 //
 // Usage (wired in .claude/settings.json): node scripts/md-write-check.mjs
 
 import { checkFile, formatViolation } from "./check-md-linebreaks.mjs";
-import { formatLinebreakAdvisory, isMarkdownChange } from "./lib/md-write-check.mjs";
-import { buildAdvisoryOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
+import { runMdWriteCheck } from "./lib/md-write-check.mjs";
+import { readStdinText } from "./lib/hook-io.mjs";
 
-const payload = parseHookPayload(await readStdinText());
-if (!payload || !isMarkdownChange(payload)) {
-	process.exit(0);
-}
-
-const filePath = payload.tool_input.file_path;
-let violations;
-try {
-	violations = checkFile(filePath);
-} catch {
-	// The file may already be gone or unreadable by the time this runs — not
-	// this hook's problem to report.
-	process.exit(0);
-}
-
-const advisory = formatLinebreakAdvisory(filePath, violations, formatViolation);
-if (advisory) {
-	console.log(JSON.stringify(buildAdvisoryOutput(advisory)));
+const { shouldOutput, output } = runMdWriteCheck(await readStdinText(), { checkFile, formatViolation });
+if (shouldOutput) {
+	console.log(JSON.stringify(output));
 }
 process.exit(0);
