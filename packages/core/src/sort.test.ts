@@ -303,6 +303,25 @@ a >> p -> z
 		);
 	});
 
+	it("preserves an untouched folded-scalar's line wraps when the section reorders", () => {
+		const src = `---
+artifact:
+  z:
+    label: Z
+  foo:
+    description: >
+      long text
+      wrapped here
+    label: Foo
+---
+z >> p -> foo
+`;
+		const { output } = sort(src, { by: ["id"] });
+		expect(output).toContain(
+			"description: >\n      long text\n      wrapped here\n",
+		);
+	});
+
 	it("preserves the body (non-frontmatter) unchanged", () => {
 		const body = "b >> p -> a\na >> p2 -> b\n";
 		const src = `---
