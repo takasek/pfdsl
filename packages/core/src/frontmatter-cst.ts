@@ -339,3 +339,131 @@ export function setFrontmatterField(
 	doc.setIn([kind, id, field], value);
 	return renderFrontmatterCst(doc, newline) + body;
 }
+
+/** Renders `key` the way `yaml` would quote it as a plain map key. */
+function renderKey(key: string): string {
+	const tmp = parseDocument("0: 0");
+	tmp.set(key, 0);
+	const line = tmp
+		.toString({ lineWidth: 0 })
+		.split("\n")
+		.find((l) => l.endsWith(": 0") && !l.startsWith("0:"));
+	return (line as string).slice(0, -": 0".length);
+}
+
+/**
+ * Learn the file's actual per-level indent step from an existing sibling
+ * entry's own nested field, instead of assuming the canonical 2 spaces —
+ * indentation normalization is `fmt`'s job, not this function's.
+ */
+function childIndentStep(
+	items: readonly { key: unknown; value: unknown }[],
+	yamlText: string,
+): number {
+	for (const item of items) {
+		const value = item.value;
+		if (isMap(value) && value.items.length > 0) {
+			const parentIndent = lineIndent(yamlText, (item.key as Node).range![0]);
+			const childKey = value.items[0]!.key as Node;
+			const childIndent = lineIndent(yamlText, childKey.range![0]);
+			if (childIndent.length > parentIndent.length) {
+				return childIndent.length - parentIndent.length;
+			}
+		}
+	}
+	return 2;
+}
+
+/**
+ * Compute the byte-range splice that creates a brand-new `[kind, id]`
+ * frontmatter entry with exactly one field (`field: value`), without
+ * touching any other byte of `yamlText`. Shared by `insertDefinition`
+ * (always `field: "label"`) and `reindex` (always `field: "index"`) — the
+ * two places in this codebase that need to create a node's frontmatter
+ * entry from nothing rather than edit an existing one (`fieldValueSplice`
+ * handles the latter). Returns `{ ok: false, reason: "unsupported" }` when
+ * there is no sibling entry to anchor indentation on (an empty block-style
+ * `kind:` section, or an entirely empty document) — callers fall back to
+ * full re-serialization for that rare case.
+ */
+export function newEntrySplice(
+	yamlText: string,
+	doc: Document,
+	kind: "artifact" | "process",
+	id: string,
+	field: string,
+	value: string | number,
+	newline: "\n" | "\r\n",
+): { ok: true; splice: Splice } | { ok: false; reason: "unsupported" } {
+	const idKey = renderKey(id);
+	const kindNode = doc.get(kind, true);
+
+	if (isMap(kindNode) && kindNode.items.length > 0) {
+		const last = kindNode.items[kindNode.items.length - 1]!;
+		const insertAt = (last.value as Node).range![1];
+		if (kindNode.flow) {
+			return {
+				ok: true,
+				splice: {
+					start: insertAt,
+					end: insertAt,
+					replacement: `, ${idKey}: { ${field}: ${renderValue(value, true)} }`,
+				},
+			};
+		}
+		const indent = lineIndent(yamlText, (last.key as Node).range![0]);
+		const step = childIndentStep(kindNode.items, yamlText);
+		const childIndent = indent + " ".repeat(step);
+		const content =
+			`${indent}${idKey}:\n${childIndent}${field}: ${renderValue(value, false)}`.replace(
+				/\n/g,
+				newline,
+			);
+		const line = padLine(yamlText, insertAt, content, newline);
+		return {
+			ok: true,
+			splice: { start: insertAt, end: insertAt, replacement: line },
+		};
+	}
+
+	if (isMap(kindNode) && kindNode.items.length === 0) {
+		if (kindNode.flow) {
+			const openBrace = (kindNode as unknown as Node).range![0];
+			return {
+				ok: true,
+				splice: {
+					start: openBrace + 1,
+					end: openBrace + 1,
+					replacement: ` ${idKey}: { ${field}: ${renderValue(value, true)} }`,
+				},
+			};
+		}
+		return { ok: false, reason: "unsupported" };
+	}
+
+	if (doc.has(kind)) {
+		// `kind` key exists but isn't a map (e.g. bare `artifact:` with a null
+		// value) — no sibling text to anchor on, and not safe to treat as a
+		// fresh top-level key either (that would duplicate the existing key).
+		return { ok: false, reason: "unsupported" };
+	}
+
+	// `kind` section doesn't exist yet — insert it as a new top-level key.
+	const rootMap = doc.contents;
+	if (!isMap(rootMap) || rootMap.items.length === 0) {
+		return { ok: false, reason: "unsupported" };
+	}
+	const last = rootMap.items[rootMap.items.length - 1]!;
+	const insertAt = (last.value as Node).range![1];
+	const kindKey = renderKey(kind);
+	const content =
+		`${kindKey}:\n  ${idKey}:\n    ${field}: ${renderValue(value, false)}`.replace(
+			/\n/g,
+			newline,
+		);
+	const line = padLine(yamlText, insertAt, content, newline);
+	return {
+		ok: true,
+		splice: { start: insertAt, end: insertAt, replacement: line },
+	};
+}

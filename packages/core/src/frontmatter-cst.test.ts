@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { parseDocument } from "yaml";
 import { loadFrontmatter } from "./frontmatter.js";
-import { parseFrontmatterCst, setFrontmatterField } from "./frontmatter-cst.js";
+import {
+	newEntrySplice,
+	parseFrontmatterCst,
+	setFrontmatterField,
+} from "./frontmatter-cst.js";
 
 describe("setFrontmatterField", () => {
 	it("replaces an existing field's value", () => {
@@ -383,5 +388,99 @@ describe("applySplices", () => {
 				{ start: 2, end: 5, replacement: "Y" },
 			]),
 		).toThrow(/overlap/);
+	});
+});
+
+describe("newEntrySplice", () => {
+	it("appends a new entry after the last sibling in a non-empty block section", () => {
+		const yamlText =
+			"artifact:\n  a:\n    label: A\nprocess:\n  p:\n    label: P";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(
+			yamlText,
+			doc,
+			"artifact",
+			"b",
+			"label",
+			"b",
+			"\n",
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const out = applySplices(yamlText, [result.splice]);
+		expect(out).toBe(
+			"artifact:\n  a:\n    label: A\n  b:\n    label: b\nprocess:\n  p:\n    label: P",
+		);
+	});
+
+	it("creates the kind section itself when it doesn't exist at all", () => {
+		const yamlText = "artifact:\n  a:\n    label: A";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(
+			yamlText,
+			doc,
+			"process",
+			"p",
+			"label",
+			"p",
+			"\n",
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const out = applySplices(yamlText, [result.splice]);
+		expect(out).toBe(
+			"artifact:\n  a:\n    label: A\nprocess:\n  p:\n    label: p",
+		);
+	});
+
+	it("inserts into a flow-style section", () => {
+		const yamlText = "artifact: { a: { label: A } }";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(
+			yamlText,
+			doc,
+			"artifact",
+			"b",
+			"label",
+			"b",
+			"\n",
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const out = applySplices(yamlText, [result.splice]);
+		expect(out).toBe("artifact: { a: { label: A }, b: { label: b } }");
+	});
+
+	it("supports a non-string value (index: number)", () => {
+		const yamlText = "artifact:\n  a:\n    label: A";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(
+			yamlText,
+			doc,
+			"artifact",
+			"b",
+			"index",
+			2,
+			"\n",
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const out = applySplices(yamlText, [result.splice]);
+		expect(out).toBe("artifact:\n  a:\n    label: A\n  b:\n    index: 2");
+	});
+
+	it("returns unsupported for an empty block-style section (no sibling to anchor on)", () => {
+		const yamlText = "artifact:\nprocess:\n  p:\n    label: P";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		const result = newEntrySplice(
+			yamlText,
+			doc,
+			"artifact",
+			"b",
+			"label",
+			"b",
+			"\n",
+		);
+		expect(result).toEqual({ ok: false, reason: "unsupported" });
 	});
 });
