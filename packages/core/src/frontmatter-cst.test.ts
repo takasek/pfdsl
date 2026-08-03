@@ -205,6 +205,18 @@ describe("setFrontmatterField", () => {
 	});
 });
 
+describe("parseFrontmatterCst yamlText", () => {
+	it("exposes the raw yaml text between the fences", () => {
+		const src = "---\nartifact:\n  spec:\n    status: todo\n---\na >> P -> b\n";
+		const cst = parseFrontmatterCst(src);
+		expect(cst.yamlText).toBe("artifact:\n  spec:\n    status: todo");
+	});
+
+	it("is empty when there is no frontmatter", () => {
+		expect(parseFrontmatterCst("a >> P -> b\n").yamlText).toBe("");
+	});
+});
+
 import { applySplices } from "./frontmatter-cst.js";
 
 describe("applySplices", () => {

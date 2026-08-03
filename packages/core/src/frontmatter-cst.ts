@@ -25,6 +25,13 @@ export interface FrontmatterCst {
 	 * than it found it, not to normalize what the author wrote (#644).
 	 */
 	newline: "\n" | "\r\n";
+	/**
+	 * The raw YAML text between the fences, exactly as sliced for
+	 * `parseDocument` (same #644 trailing-\r handling). Never carries its
+	 * own trailing newline — callers that splice into it must supply the
+	 * separator themselves when reassembling (see `padLine` in Task 3).
+	 */
+	yamlText: string;
 }
 
 /** The line ending of `source`'s first line break; LF when it has none. */
@@ -43,11 +50,23 @@ function detectNewline(source: string): "\n" | "\r\n" {
 export function parseFrontmatterCst(source: string): FrontmatterCst {
 	const newline = detectNewline(source);
 	if (!source.startsWith("---")) {
-		return { present: false, doc: new Document(), body: source, newline };
+		return {
+			present: false,
+			doc: new Document(),
+			body: source,
+			newline,
+			yamlText: "",
+		};
 	}
 	const firstNl = source.indexOf("\n");
 	if (firstNl === -1) {
-		return { present: false, doc: new Document(), body: source, newline };
+		return {
+			present: false,
+			doc: new Document(),
+			body: source,
+			newline,
+			yamlText: "",
+		};
 	}
 	let lineStart = firstNl + 1;
 	let closingStart = -1;
@@ -64,7 +83,13 @@ export function parseFrontmatterCst(source: string): FrontmatterCst {
 		lineStart = nl + 1;
 	}
 	if (closingStart === -1) {
-		return { present: false, doc: new Document(), body: source, newline };
+		return {
+			present: false,
+			doc: new Document(),
+			body: source,
+			newline,
+			yamlText: "",
+		};
 	}
 	// Under CRLF the closing fence's own line break is two characters, so
 	// slicing to `closingStart - 1` leaves a \r on the last yaml line — which
@@ -77,7 +102,13 @@ export function parseFrontmatterCst(source: string): FrontmatterCst {
 			? source.slice(firstNl + 1, closingStart - 1).replace(/\r$/, "")
 			: "";
 	const body = closingEnd === source.length ? "" : source.slice(closingEnd + 1);
-	return { present: true, doc: parseDocument(yamlText), body, newline };
+	return {
+		present: true,
+		doc: parseDocument(yamlText),
+		body,
+		newline,
+		yamlText,
+	};
 }
 
 /**
