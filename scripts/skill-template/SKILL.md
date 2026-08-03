@@ -1,5 +1,6 @@
 ---
 name: pfdsl
+summary: syntax/CLI reference
 description: |
   Use when working with .pfdsl (Process Flow DSL) files — reading, writing,
   editing, or validating them. Always invoke before touching any .pfdsl file,

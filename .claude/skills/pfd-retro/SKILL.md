@@ -1,5 +1,6 @@
 ---
 name: pfd-retro
+summary: retrospective audit
 description: |
   Use after a sustained stretch of design dialogue or work sessions, when the
   user asks for a retrospective, or before consolidating decision records

@@ -1,5 +1,6 @@
 ---
 name: pfd-ecosystem
+summary: ecosystem bootstrap
 description: |
   Use when bootstrapping or restructuring a project's PFD set (roadmap /
   workflow / runtime-pipeline) — initializing .pfdsl/ in a new repo, when
