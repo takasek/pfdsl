@@ -212,9 +212,12 @@ function padLine(
  * Compute the byte-range splice that sets `[kind, id, field]` to `value`,
  * without touching any other byte of `yamlText`. Returns `{ ok: false }`
  * when the node's field is an alias reference (splicing just the value
- * would desync it from whatever anchor it points at) or when the parent
- * map is an empty block map (no sibling to anchor indentation on) — both
- * are rare enough that callers fall back to full re-serialization.
+ * would desync it from whatever anchor it points at), when a field's
+ * `Pair.value` is a raw `null` (an explicit-key field with no value line,
+ * e.g. `? status` with no following `: value` — valid YAML, but there is no
+ * `Node` range to splice into or anchor on), or when the parent map is an
+ * empty block map (no sibling to anchor indentation on) — all rare enough
+ * that callers fall back to full re-serialization.
  */
 export function fieldValueSplice(
 	yamlText: string,
@@ -232,7 +235,8 @@ export function fieldValueSplice(
 	const pair = node.items.find((p) => isScalar(p.key) && p.key.value === field);
 	const replacement = renderValue(value, !!node.flow);
 
-	if (pair?.value) {
+	if (pair) {
+		if (pair.value === null) return { ok: false, reason: "unsupported" };
 		if (isAlias(pair.value)) return { ok: false, reason: "unsupported" };
 		const [start, end] = (pair.value as Node).range as [number, number, number];
 		return { ok: true, splice: { start, end, replacement } };
@@ -254,6 +258,7 @@ export function fieldValueSplice(
 	}
 
 	const last = node.items[node.items.length - 1]!;
+	if (last.value === null) return { ok: false, reason: "unsupported" };
 	const insertAt = ((last.value as Node).range as [number, number, number])[1];
 	if (node.flow) {
 		return {
@@ -315,8 +320,8 @@ export function setFrontmatterField(
 		return `---${newline}${newYamlText}${newline}---${newline}${body}`;
 	}
 
-	// Alias reference or empty block map: nothing safe to splice, fall back
-	// to the pre-existing full re-serialize path.
+	// Alias reference, null-valued field, or empty block map: nothing safe to
+	// splice, fall back to the pre-existing full re-serialize path.
 	doc.setIn([kind, id, field], value);
 	return renderFrontmatterCst(doc, newline) + body;
 }

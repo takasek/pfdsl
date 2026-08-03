@@ -280,6 +280,40 @@ describe("setFrontmatterField", () => {
 		expect(out).toContain("owner: bob");
 		expect(out).not.toContain("owner: *d");
 	});
+
+	// A field can be present with a genuinely null value without being a
+	// simple "key:" with nothing after the colon — that shape composes to a
+	// zero-width Scalar node (still truthy), not a raw `null`. The construct
+	// that actually parses to `Pair.value === null` in the `yaml` package is
+	// the explicit-key indicator with no corresponding value line (`? key`,
+	// no following `: value`) — valid YAML, no parse errors, semantically
+	// equivalent to `key: null`.
+	it("overwrites an explicit-key (null-valued) existing field instead of duplicating it", () => {
+		// `pair?.value` is falsy for this pair, so the naive check falls
+		// through to the "field not found" insertion branch below instead of
+		// recognizing the field already exists, appending a second copy.
+		const src =
+			"---\nartifact:\n  spec:\n    label: Spec\n    ? status\n    owner: alice\n---\na >> P -> b\n";
+		const out = setFrontmatterField(src, "artifact", "spec", "status", "done");
+		const statusOccurrences = ((out as string).match(/status/g) ?? []).length;
+		expect(statusOccurrences).toBe(1);
+		expect(out).toContain("status: done");
+		expect(out).not.toContain("? status");
+	});
+
+	it("does not crash inserting a new field when the map's last existing field is explicit-key null", () => {
+		// The insertion branch anchors on the map's last item only to find
+		// indentation/position — but if that unrelated last field's value is
+		// itself raw `null` (not a Node), `(last.value as Node).range`
+		// dereferences null at runtime despite the compile-time `as Node` cast.
+		const src =
+			"---\nartifact:\n  spec:\n    label: Spec\n    ? status\n---\na >> P -> b\n";
+		expect(() =>
+			setFrontmatterField(src, "artifact", "spec", "owner", "alice"),
+		).not.toThrow();
+		const out = setFrontmatterField(src, "artifact", "spec", "owner", "alice");
+		expect(out).toContain("owner: alice");
+	});
 });
 
 describe("parseFrontmatterCst yamlText", () => {
