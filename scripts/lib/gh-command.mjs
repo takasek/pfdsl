@@ -13,7 +13,13 @@
 // and the head check (an unquoted `gh`) is already what keeps
 // `echo "gh issue create ..."` from matching.
 
-/** Global flags that consume the following token. */
+// Global flags that consume the following token. `-R`/`--repo` are the only
+// value-taking flags gh accepts before the group: measured against gh 2.96.0
+// on 2026-08-03, `gh --repo owner/repo issue view <n>` runs, while
+// `gh --hostname github.com issue view <n>` is rejected with "unknown flag"
+// (--hostname is a command flag, valid only after the group, e.g. `gh api
+// --hostname ...`). If gh ever promotes another value-taking flag to
+// persistent, its value would read as the group here.
 const GLOBAL_FLAGS_WITH_VALUE = new Set(["-R", "--repo"]);
 
 /**
