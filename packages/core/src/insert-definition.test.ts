@@ -87,10 +87,10 @@ a >> p -> b
 `;
 		const { output, inserted } = insertDefinition(src, "artifact", "b");
 		expect(inserted).toBe(true);
-		// The yaml CST (ADR-0034) re-serializes the header's trailing comment
-		// onto its own line when the section's map is otherwise rewritten —
-		// the comment itself is preserved, just not its exact line placement.
-		expect(output).toContain("artifact:\n  # user artifacts\n");
+		// splice 方式では一行コメントの元位置がそのまま残る(#issue)
+		expect(output).toContain(
+			"artifact: # user artifacts\n  a:\n    label: A\n",
+		);
 		const { diagnostics } = analyze(`${output}a >> p -> b\n`);
 		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
 		expect(output).toContain("b:\n    label: b");
@@ -116,9 +116,9 @@ a >> p -> b
 		);
 	});
 
-	it("normalizes an unusual indent width to the canonical 2-space step", () => {
-		// The yaml CST (ADR-0034) re-serializes the whole frontmatter block, so
-		// an oddly-indented section is canonicalized rather than mirrored.
+	it("mirrors an unusual indent width instead of normalizing it", () => {
+		// indentation normalization is fmt's job, not insertDefinition's;
+		// splicing mirrors whatever step the file already uses (#issue)
 		const src = `---
 artifact:
     a:
@@ -127,7 +127,7 @@ artifact:
 a >> p -> b
 `;
 		const { output } = insertDefinition(src, "artifact", "b");
-		expect(output).toContain("  b:\n    label: b");
+		expect(output).toContain("    b:\n        label: b");
 	});
 
 	it("does not throw when the fences are well-formed but the YAML content is invalid (FM002)", () => {
