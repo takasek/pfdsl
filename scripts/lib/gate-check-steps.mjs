@@ -14,13 +14,20 @@
  */
 
 import {
+	classifyDesignRecordContent,
+	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
+	classifySizeDirection,
+	hasShrinkIntent,
 	hasStatusChange,
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
+	NO_ISSUE_DETAIL,
+	SIZE_TRACKED_PATTERNS,
 	statusChangedForArtifact,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
+import { detectEnumeratedOptions, findDecisionRecords } from "./cycle-status.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
 
@@ -120,4 +127,80 @@ export function wipTransitionStep({ exec, base, artifactKey, noArtifact, changed
 				? `no status: wip snapshot found for artifact '${artifactKey}'`
 				: "no status: wip found in any commit snapshot",
 	};
+}
+
+/**
+ * design-selection record: was the design choice recorded before work
+ * started, with the required structure (issue #669's protection against
+ * "the record is written after the fact, or is unstructured prose")?
+ */
+export function designRecordStep({ exec, base, issue, issueError }) {
+	const name = "design-selection record";
+	if (!issue) return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
+
+	const ownerLogin = issue.author?.login;
+	const body = issue.body ?? "";
+	const optionCount = detectEnumeratedOptions(body).count;
+
+	// The issue body is one entry among the comments, not a special case that
+	// bypasses the checks: a decision written into the body is still a record
+	// whose timing and structure are judged the same way (its createdAt is the
+	// issue's, so it passes timing on its own merits rather than by exemption).
+	const entries = [
+		{ author: ownerLogin, body, createdAt: issue.createdAt },
+		...(issue.comments ?? []).map((c) => ({ author: c.author?.login, body: c.body, createdAt: c.createdAt })),
+	];
+	const record = entries.find((e) => e.author === ownerLogin && findDecisionRecords([e]).length > 0);
+
+	if (!record) {
+		return { name, ...classifyDesignRecordTiming(undefined, null) };
+	}
+
+	const firstCommitOut = exec("git", ["log", "--format=%aI", "--reverse", `origin/${base}..HEAD`]);
+	const firstCommitIso = firstCommitOut.ok ? firstCommitOut.out.trim().split("\n")[0] || null : null;
+
+	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso);
+	const content = classifyDesignRecordContent(record.body, optionCount);
+	const detail = [timing.detail, content.detail].filter(Boolean).join("; ") || undefined;
+	if (timing.status === "FAIL" || content.status === "FAIL") return { name, status: "FAIL", detail };
+	if (timing.status === "SKIP") return { name, status: "SKIP", detail };
+	return { name, status: "PASS", detail };
+}
+
+/**
+ * knowledge-artifact size direction: did tracked knowledge artifacts
+ * (bindings, ADRs, SKILL.md) grow without an explicit override, on a cycle
+ * whose linked issue states shrink intent (issue #669's protection against
+ * "the countermeasure's effect on size is never measured")?
+ */
+export function sizeDirectionStep({ exec, base, issue, issueError, changedFiles }) {
+	const name = "knowledge-artifact size direction";
+	if (!issue) return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
+
+	const issueBody = issue.body ?? "";
+	// Check the intent before spending a `git show` pair per tracked file and a
+	// `gh pr view` — most cycles carry no shrink intent, and every one of those
+	// subprocesses would be thrown away. classifySizeDirection reaches the same
+	// verdict from the same predicate, so the two cannot disagree.
+	if (!hasShrinkIntent(issueBody)) return { name, ...classifySizeDirection({ issueBody, deltas: [] }) };
+
+	const tracked = changedFiles.filter((f) => SIZE_TRACKED_PATTERNS.some((p) => p.test(f)));
+	const deltas = tracked.map((path) => {
+		const before = exec("git", ["show", `origin/${base}:${path}`]);
+		const after = exec("git", ["show", `HEAD:${path}`]);
+		const beforeText = before.ok ? before.out : "";
+		const afterText = after.ok ? after.out : "";
+		return {
+			path,
+			beforeBytes: before.ok ? Buffer.byteLength(beforeText, "utf-8") : 0,
+			afterBytes: Buffer.byteLength(afterText, "utf-8"),
+			beforeLines: before.ok ? beforeText.split("\n").length : 0,
+			afterLines: afterText.split("\n").length,
+		};
+	});
+
+	const prBodyResult = exec("gh", ["pr", "view", "--json", "body", "--jq", ".body"]);
+	const prBody = prBodyResult.ok ? prBodyResult.out : "";
+
+	return { name, ...classifySizeDirection({ issueBody, deltas, prBody }) };
 }

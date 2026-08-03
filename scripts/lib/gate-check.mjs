@@ -47,6 +47,9 @@ export function formatGateTable(results) {
 /** Shared by both checks scoped to the output artifact, so they cannot drift apart. */
 export const NO_ARTIFACT_DETAIL = "cycle declared it has no roadmap output artifact (--no-artifact)";
 
+/** Shared by both checks that read the linked issue, for the same reason. */
+export const NO_ISSUE_DETAIL = "no --issue given; pass --issue <n> to check this against the linked issue";
+
 /**
  * Classify the output-artifact status-update gate (item 6). No new states:
  * this reuses the existing reasoned-SKIP vocabulary the same way item 9
@@ -282,4 +285,112 @@ const COVERED_BY_GATE_CHECK = [
  */
 export function deriveManualItems(checklistItems) {
 	return checklistItems.filter((item) => !COVERED_BY_GATE_CHECK.some((kw) => item.includes(kw)));
+}
+
+/**
+ * Classify the timing of a design-selection record against the branch's
+ * first commit (issue #669's protection against "the decision record is
+ * written after the fact"). A record posted after work already started
+ * documents a choice that was made retroactively, not one that guided it.
+ * @param {string | null | undefined} recordIso - createdAt of the record comment.
+ * @param {string | null | undefined} firstCommitIso - authorDate of the range's first commit.
+ * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
+ */
+export function classifyDesignRecordTiming(recordIso, firstCommitIso) {
+	if (!recordIso) return { status: "FAIL", detail: "no design-selection record found" };
+	if (!firstCommitIso) return { status: "SKIP", detail: "no commits in range" };
+	if (new Date(recordIso).getTime() > new Date(firstCommitIso).getTime()) {
+		return {
+			status: "FAIL",
+			detail: `record posted at ${recordIso}, after the first commit at ${firstCommitIso}`,
+		};
+	}
+	return { status: "PASS" };
+}
+
+export const DESIGN_RECORD_REQUIRED_PREFIXES = ["前提:", "否定案:", "却下理由:"];
+export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
+
+/**
+ * Classify the content of a design-selection record. Two independent checks:
+ * required line-head tokens are present, and every enumerated option got a
+ * disposition word somewhere in the record.
+ *
+ * The disposition-token count is checked as "at least optionCount", not an
+ * exact match, because ordinary prose can name the same option's disposition
+ * more than once (e.g. "案2は却下する。却下理由は…") — an exact-match check
+ * would FAIL a correct record for that.
+ * @param {string} recordBody
+ * @param {number} optionCount
+ * @returns {{status: 'PASS'|'FAIL', detail?: string}}
+ */
+export function classifyDesignRecordContent(recordBody, optionCount) {
+	const body = recordBody ?? "";
+	const lines = body
+		.split("\n")
+		.map((line) => line.trim().replace(/^#{1,6}\s*/, "").replace(/^\*\*/, ""));
+	const missing = DESIGN_RECORD_REQUIRED_PREFIXES.filter(
+		(prefix) => !lines.some((line) => line.startsWith(prefix)),
+	);
+
+	const problems = [];
+	if (missing.length > 0) problems.push(`missing required line(s): ${missing.join(", ")}`);
+
+	if (optionCount > 0) {
+		const dispositionCount = DISPOSITION_TOKENS.reduce(
+			(sum, token) => sum + (body.split(token).length - 1),
+			0,
+		);
+		if (dispositionCount < optionCount) {
+			problems.push(
+				`disposition tokens (${DISPOSITION_TOKENS.join("/")}) found ${dispositionCount} time(s), fewer than ${optionCount} enumerated option(s)`,
+			);
+		}
+	}
+
+	if (problems.length > 0) return { status: "FAIL", detail: problems.join("; ") };
+	return { status: "PASS" };
+}
+
+export const SHRINK_INTENT_KEYWORDS = ["肥大", "全読", "スケール監査", "蒸留"];
+export const SIZE_TRACKED_PATTERNS = [/^\.pfdsl\/bindings\//, /^docs\/adr\//, /(^|\/)SKILL\.md$/];
+export const SIZE_OVERRIDE_PATTERN = /^Size-Override:\s*\S/m;
+
+/**
+ * Classify whether tracked knowledge artifacts moved in the direction a
+ * shrink-intent issue asked for (issue #669's protection against "the
+ * countermeasure's effect on size is never measured").
+ * @param {{issueBody?: string, deltas: Array<{path: string, beforeBytes: number, afterBytes: number,
+ *          beforeLines: number, afterLines: number}>, prBody?: string}} params
+ * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
+ */
+/**
+ * Does the linked issue ask for something to get smaller? Both the classifier
+ * and its caller consult this, so the caller can skip the I/O the classifier
+ * would only throw away.
+ * @param {string | undefined | null} issueBody
+ * @returns {boolean}
+ */
+export function hasShrinkIntent(issueBody) {
+	return SHRINK_INTENT_KEYWORDS.some((kw) => (issueBody ?? "").includes(kw));
+}
+
+export function classifySizeDirection({ issueBody, deltas, prBody }) {
+	if (!hasShrinkIntent(issueBody)) {
+		return { status: "SKIP", detail: "linked issue states no shrink intent" };
+	}
+	if (!deltas || deltas.length === 0) {
+		return { status: "SKIP", detail: "no tracked knowledge-artifact changes" };
+	}
+
+	const grown = deltas.filter((d) => d.afterBytes > d.beforeBytes);
+	if (grown.length === 0) return { status: "PASS" };
+
+	const list = grown
+		.map((d) => `${d.path}: +${d.afterBytes - d.beforeBytes} bytes / +${d.afterLines - d.beforeLines} lines`)
+		.join(", ");
+	if (SIZE_OVERRIDE_PATTERN.test(prBody ?? "")) {
+		return { status: "PASS", detail: `growth accepted via Size-Override: ${list}` };
+	}
+	return { status: "FAIL", detail: list };
 }

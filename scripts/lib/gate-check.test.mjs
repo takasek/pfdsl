@@ -21,6 +21,14 @@ import {
 	classifyAuditIssuesFlowResult,
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
 	classifyOutputArtifactStatus,
+	classifyDesignRecordTiming,
+	classifyDesignRecordContent,
+	DESIGN_RECORD_REQUIRED_PREFIXES,
+	DISPOSITION_TOKENS,
+	classifySizeDirection,
+	SHRINK_INTENT_KEYWORDS,
+	SIZE_TRACKED_PATTERNS,
+	SIZE_OVERRIDE_PATTERN,
 } from "./gate-check.mjs";
 
 describe("classifyAuditIssuesFlowResult", () => {
@@ -375,5 +383,145 @@ describe("GATE_CHECKLIST_SOURCE_PATH", () => {
 		const text = readFileSync(resolve(root, GATE_CHECKLIST_SOURCE_PATH), "utf-8");
 		const items = deriveManualItems(extractGateChecklist(text));
 		assert.ok(items.length > 0, "expected at least one MANUAL checklist item from the deployed source file");
+	});
+});
+
+describe("classifyDesignRecordTiming", () => {
+	it("FAILs when there is no record at all", () => {
+		const result = classifyDesignRecordTiming(null, "2026-07-30T00:00:00Z");
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /no design-selection record found/);
+	});
+
+	it("SKIPs when there is no commit in range to compare against", () => {
+		const result = classifyDesignRecordTiming("2026-07-30T00:00:00Z", null);
+		assert.equal(result.status, "SKIP");
+	});
+
+	it("PASSes when the record predates the first commit", () => {
+		const result = classifyDesignRecordTiming("2026-07-30T00:00:00Z", "2026-07-30T12:00:00Z");
+		assert.equal(result.status, "PASS");
+	});
+
+	it("FAILs when the record was posted after the first commit", () => {
+		const result = classifyDesignRecordTiming("2026-07-30T12:00:00Z", "2026-07-30T00:00:00Z");
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /after the first commit/);
+	});
+});
+
+describe("classifyDesignRecordContent", () => {
+	const validRecord = [
+		"前提: 実行主体が判定語を自分に有利に解釈できることを機械照合で塞ぐ。",
+		"否定案: D のみ（機械検査を足さず撤回経路だけ新設する）。",
+		"却下理由: designUnsettled が別プロセス用の判定である点は出力の誤りであり撤回経路では塞げない。",
+		"決定: 案A を採用する。",
+	].join("\n");
+
+	it("PASSes a record with all required prefixes and enough disposition tokens", () => {
+		assert.deepEqual(classifyDesignRecordContent(validRecord, 1), { status: "PASS" });
+	});
+
+	it("FAILs and lists the missing required-prefix line(s)", () => {
+		const missingRejection = [DESIGN_RECORD_REQUIRED_PREFIXES[0] + " x", "決定: 案A を採用する。"].join("\n");
+		const result = classifyDesignRecordContent(missingRejection, 0);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /否定案:/);
+		assert.match(result.detail, /却下理由:/);
+	});
+
+	it("recognizes required prefixes under markdown heading/emphasis decoration", () => {
+		const decorated = [
+			"## 前提: 背景説明",
+			"**否定案:** 案B",
+			"### 却下理由: 理由の説明",
+			"決定: 案A",
+		].join("\n");
+		assert.equal(classifyDesignRecordContent(decorated, 0).status, "PASS");
+	});
+
+	it("FAILs when disposition tokens appear fewer times than the enumerated option count", () => {
+		const result = classifyDesignRecordContent(validRecord, 3);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /disposition tokens/);
+	});
+
+	it("does not require disposition-token coverage when optionCount is 0", () => {
+		const record = DESIGN_RECORD_REQUIRED_PREFIXES.map((p) => `${p} x`).join("\n");
+		assert.deepEqual(classifyDesignRecordContent(record, 0), { status: "PASS" });
+	});
+
+	it("PASSes when the same option's disposition word appears twice, as ordinary prose", () => {
+		const record = [
+			"前提: x",
+			"否定案: 案2",
+			"却下理由: 案2は却下する。却下理由はここに書く通り。",
+			"決定: 案1を採用する。",
+		].join("\n");
+		assert.deepEqual(classifyDesignRecordContent(record, 2), { status: "PASS" });
+	});
+});
+
+describe("DESIGN_RECORD_REQUIRED_PREFIXES / DISPOSITION_TOKENS", () => {
+	it("exposes the expected prefix and disposition vocabularies", () => {
+		assert.deepEqual(DESIGN_RECORD_REQUIRED_PREFIXES, ["前提:", "否定案:", "却下理由:"]);
+		assert.deepEqual(DISPOSITION_TOKENS, ["採用", "却下", "保留"]);
+	});
+});
+
+describe("classifySizeDirection", () => {
+	const grownDelta = { path: ".pfdsl/bindings/x.pfdsl", beforeBytes: 100, afterBytes: 150, beforeLines: 10, afterLines: 15 };
+	const shrunkDelta = { path: "docs/adr/0001-x.md", beforeBytes: 200, afterBytes: 100, beforeLines: 20, afterLines: 10 };
+
+	it("SKIPs when the linked issue states no shrink intent", () => {
+		const result = classifySizeDirection({ issueBody: "普通の説明。", deltas: [grownDelta] });
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no shrink intent/);
+	});
+
+	it("SKIPs when there are no tracked knowledge-artifact changes", () => {
+		const result = classifySizeDirection({ issueBody: "肥大への対策。", deltas: [] });
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no tracked knowledge-artifact changes/);
+	});
+
+	it("FAILs when a tracked artifact grew and the PR body has no Size-Override", () => {
+		const result = classifySizeDirection({ issueBody: "肥大への対策。", deltas: [grownDelta], prBody: "" });
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /\+50 bytes/);
+		assert.match(result.detail, /\+5 lines/);
+	});
+
+	it("PASSes growth when the PR body carries a Size-Override token", () => {
+		const result = classifySizeDirection({
+			issueBody: "全読の防止。",
+			deltas: [grownDelta],
+			prBody: "Size-Override: intentional growth, see discussion",
+		});
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /Size-Override/);
+	});
+
+	it("PASSes when no tracked artifact grew", () => {
+		const result = classifySizeDirection({ issueBody: "スケール監査の一環。", deltas: [shrunkDelta] });
+		assert.deepEqual(result, { status: "PASS" });
+	});
+});
+
+describe("SHRINK_INTENT_KEYWORDS / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", () => {
+	it("exposes the expected shrink-intent keywords", () => {
+		assert.deepEqual(SHRINK_INTENT_KEYWORDS, ["肥大", "全読", "スケール監査", "蒸留"]);
+	});
+
+	it("SIZE_TRACKED_PATTERNS matches bindings, ADRs, and SKILL.md", () => {
+		assert.ok(SIZE_TRACKED_PATTERNS.some((p) => p.test(".pfdsl/bindings/x.pfdsl")));
+		assert.ok(SIZE_TRACKED_PATTERNS.some((p) => p.test("docs/adr/0020-x/README.md")));
+		assert.ok(SIZE_TRACKED_PATTERNS.some((p) => p.test(".claude/skills/pfd-ops/SKILL.md")));
+		assert.ok(!SIZE_TRACKED_PATTERNS.some((p) => p.test("packages/core/src/graph.ts")));
+	});
+
+	it("SIZE_OVERRIDE_PATTERN matches a Size-Override: token line", () => {
+		assert.ok(SIZE_OVERRIDE_PATTERN.test("intro\nSize-Override: reason\nmore"));
+		assert.ok(!SIZE_OVERRIDE_PATTERN.test("no override mentioned here"));
 	});
 });

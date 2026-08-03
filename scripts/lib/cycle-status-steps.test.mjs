@@ -131,28 +131,53 @@ describe("runCycleStatus", () => {
 		assert.equal(result.best, null);
 	});
 
-	it("parses ready/best from a successful CLI call and skips the design-unsettled lookup when there is no best", async () => {
-		const calls = [];
+	it("parses ready/best from a successful CLI call", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				sh: (file, args) => {
-					calls.push(args);
 					if (args.includes(CLI_PATH)) return readyJsonOk(null);
 					return "";
-				},
-				execGh: async (args) => {
-					calls.push(["gh", ...args]);
-					return JSON.stringify([]);
 				},
 			}),
 		);
 		assert.deepEqual(result.ready, ["a"]);
 		assert.equal(result.best, null);
-		assert.equal(result.designUnsettled, null);
-		assert.ok(!calls.some((c) => c.includes("issue")));
 	});
 
-	it("looks up the design-unsettled status for the best process when one exists", async () => {
+	const issueJson = ({ author, body, comments = [] }) => JSON.stringify({ author: { login: author }, body, comments });
+
+	it("resolves the target issue from --issue when given, ignoring any best process", async () => {
+		const calls = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumber: 669,
+				sh: (file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					calls.push(args);
+					if (args[0] === "issue") return issueJson({ author: "owner", body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.designUnsettledFor, {
+			issue: 669,
+			source: "flag",
+			unsettled: false,
+			reason: "no-enumerated-options",
+			matchedLines: [],
+			optionCount: 0,
+			decision: null,
+		});
+		assert.equal(result.designUnsettledError, undefined);
+		assert.ok(calls.some((c) => c[0] === "issue" && c.includes("669")));
+		assert.ok(!calls.some((c) => c[0] === "issue" && c.includes("42")));
+	});
+
+	it("resolves the target issue from the best process when --issue is absent", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				sh: (file, args) => {
@@ -161,18 +186,40 @@ describe("runCycleStatus", () => {
 				},
 				readFileSync: () => roadmapWithIssue("proc_a", 42),
 				execGh: async (args) => {
-					if (args[0] === "issue") return "設計未確定な点がある。";
+					if (args[0] === "issue") return issueJson({ author: "owner", body: "設計未確定な点がある。" });
 					return JSON.stringify([]);
 				},
 			}),
 		);
-		assert.equal(result.best, "proc_a");
-		assert.equal(result.designUnsettled, true);
-		assert.deepEqual(result.designUnsettledLines, ["設計未確定な点がある。"]);
-		assert.equal(result.designUnsettledError, undefined);
+		assert.equal(result.designUnsettledFor.issue, 42);
+		assert.equal(result.designUnsettledFor.source, "best-process");
+		assert.equal(result.designUnsettledFor.unsettled, true);
+		assert.equal(result.designUnsettledFor.reason, "phrase");
 	});
 
-	it("sets designUnsettledError when no issue number is found for the best process", async () => {
+	it("returns a null designUnsettledFor with an error when neither --issue nor a best process is available", async () => {
+		const calls = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				execGh: async (args) => {
+					calls.push(args);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.designUnsettledFor, null);
+		assert.equal(
+			result.designUnsettledError,
+			"no --issue given and no best process to resolve an issue number from",
+		);
+		assert.ok(!calls.some((c) => c[0] === "issue"));
+	});
+
+	it("returns a null designUnsettledFor with the roadmap error when the best process has no issue number", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				sh: (file, args) => {
@@ -182,27 +229,24 @@ describe("runCycleStatus", () => {
 				readFileSync: () => "processes:\n  proc_a:\n    label: x\n",
 			}),
 		);
+		assert.equal(result.designUnsettledFor, null);
 		assert.equal(
 			result.designUnsettledError,
 			"no issue number found for process 'proc_a' in .pfdsl/roadmap.pfdsl",
 		);
-		assert.equal(result.designUnsettled, null);
 	});
 
-	it("sets designUnsettledError when the gh issue lookup throws", async () => {
+	it("returns a null designUnsettledFor with the gh error when the gh issue lookup throws", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
-					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
-					return "";
-				},
-				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				issueNumber: 669,
 				execGh: async (args) => {
 					if (args[0] === "issue") throw new Error("gh: issue not found");
 					return JSON.stringify([]);
 				},
 			}),
 		);
+		assert.equal(result.designUnsettledFor, null);
 		assert.equal(result.designUnsettledError, "gh: issue not found");
 	});
 
@@ -216,7 +260,12 @@ describe("runCycleStatus", () => {
 				readFileSync: () => roadmapWithIssue("proc_a", 42),
 			}),
 		);
-		assert.equal(result.gateCheckCommand, "node scripts/gate-check.mjs --base main --artifact proc_a_out");
+		// The resolved issue rides along: the operator copies this line verbatim,
+		// so the checks that need --issue would otherwise SKIP every cycle (#669).
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact proc_a_out --issue 42",
+		);
 	});
 
 	it("returns a null gate-check command when there is no best process", async () => {

@@ -14,9 +14,9 @@
 import { resolve } from "node:path";
 import {
 	buildGateCheckCommand,
+	classifyDesignSettlement,
 	classifyPRs,
 	countBehind,
-	detectDesignUnsettled,
 	findIssueNumberForProcess,
 	parseReadyOutput,
 } from "./cycle-status.mjs";
@@ -29,9 +29,10 @@ import {
  *   readFileSync: (path: string, encoding: string) => string,
  *   root: string,
  *   base: string,
+ *   issueNumber?: number | null,
  * }} deps
  */
-export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, root, base }) {
+export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, root, base, issueNumber = null }) {
 	let fetched = true;
 	try {
 		sh("git", ["fetch", "origin"]);
@@ -75,16 +76,23 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 		readyError = "packages/cli/dist/cli.js not built; run 'pnpm -r build' first";
 	}
 
-	let designUnsettled = null;
-	let designUnsettledLines = [];
+	// Target issue resolution order: an explicit --issue flag wins; otherwise
+	// fall back to the best process's roadmap-declared issue. Neither present
+	// means the design-settlement check has nothing to look at (#669).
+	let designUnsettledFor = null;
 	let designUnsettledError = null;
-	if (best) {
+	let targetIssue = null;
+	let targetSource = null;
+	if (issueNumber != null) {
+		targetIssue = issueNumber;
+		targetSource = "flag";
+	} else if (best) {
 		try {
 			const roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
-			const issueNumber = findIssueNumberForProcess(roadmapText, best);
-			if (issueNumber) {
-				const body = await execGh(["issue", "view", String(issueNumber), "--json", "body", "--jq", ".body"]);
-				({ designUnsettled, matchedLines: designUnsettledLines } = detectDesignUnsettled(body));
+			const found = findIssueNumberForProcess(roadmapText, best);
+			if (found) {
+				targetIssue = found;
+				targetSource = "best-process";
 			} else {
 				designUnsettledError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
 			}
@@ -93,9 +101,37 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 		}
 	}
 
+	if (targetIssue != null) {
+		try {
+			const issueJson = JSON.parse(
+				await execGh(["issue", "view", String(targetIssue), "--json", "author,body,comments"]),
+			);
+			const ownerLogin = issueJson.author?.login;
+			const comments = (issueJson.comments ?? []).map((c) => ({
+				author: c.author?.login,
+				body: c.body,
+				createdAt: c.createdAt,
+			}));
+			const classification = classifyDesignSettlement({ body: issueJson.body, ownerLogin, comments });
+			designUnsettledFor = {
+				issue: targetIssue,
+				source: targetSource,
+				unsettled: classification.unsettled,
+				reason: classification.reason,
+				matchedLines: classification.matchedLines ?? [],
+				optionCount: classification.optionCount ?? 0,
+				decision: classification.decision ?? null,
+			};
+		} catch (e) {
+			designUnsettledError = e.message;
+		}
+	} else if (!designUnsettledError) {
+		designUnsettledError = "no --issue given and no best process to resolve an issue number from";
+	}
+
 	// bestOutputs[0] のみ使う。複数出力プロセス（例: 1プロセスが複数 artifact を生成する edge）は
 	// 最初の出力のみを gate-check の対象にする単純化。
-	const gateCheckCommand = buildGateCheckCommand(bestOutputs[0] ?? null, base);
+	const gateCheckCommand = buildGateCheckCommand(bestOutputs[0] ?? null, base, targetIssue);
 
 	const result = {
 		fetched,
@@ -104,8 +140,7 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 		otherOpenPRs,
 		ready,
 		best,
-		designUnsettled,
-		designUnsettledLines,
+		designUnsettledFor,
 		gateCheckCommand,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;
