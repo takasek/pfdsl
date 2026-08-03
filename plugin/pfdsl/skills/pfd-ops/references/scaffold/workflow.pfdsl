@@ -8,7 +8,7 @@ artifact:
     label: (繰り返しのトリガーに置き換える)
   first_output:
     label: (ワークフローの出力成果物に置き換える)
-    status: done
+    criteria: (この成果物が出来たと言える条件に置き換える)
 
 process:
   first_process:
