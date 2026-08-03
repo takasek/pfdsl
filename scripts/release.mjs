@@ -9,7 +9,7 @@
 //   4. resolve target version (from --version, or the current package.json)
 //   5. tag-duplicate check (cheap, version is already known)
 //   6. pre-tag checks: build, test, check-docs, gen-plugin identity,
-//      distribution review currency
+//      distribution review currency, spec-history currency
 //   7. bump package.json(s) + commit (only if --version was given)
 //   7b. cli only: pin marketplace.json's plugin source to this release's tag
 //   8. push origin main
@@ -34,6 +34,7 @@ import {
 	filesToCommitForBump,
 	releaseMilestoneArtifactIds,
 } from "./lib/release-config.mjs";
+import { repoDeps as specHistoryRepoDeps, runSpecHistoryCheck } from "./lib/spec-history-check.mjs";
 import { parseHost } from "./pfdsl/lib/github-rest.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 
@@ -148,6 +149,17 @@ try {
 const reviewCheck = tryRun(process.execPath, [resolve(root, "scripts/check-distribution-review.mjs")], { cwd: root });
 if (!reviewCheck.ok) process.exit(1);
 console.log(reviewCheck.out.trim());
+
+// A spec.md version bump with no matching docs/spec/spec-history.md entry —
+// the coupling splitting the changelog into its own file (#692) traded away
+// physical proximity for. Gated here, not per-commit: a title-line bump made
+// mid-development doesn't need its changelog entry until the release that
+// ships it. In-process (unlike the distribution review check above, which
+// shells out): just two file reads and a regex, and release-status.mjs
+// already calls it the same way, so the two can't drift on how they invoke it.
+const specHistoryResult = runSpecHistoryCheck(specHistoryRepoDeps(root));
+console[specHistoryResult.ok ? "log" : "error"](specHistoryResult.message);
+if (!specHistoryResult.ok) process.exit(1);
 
 // --- 7. bump + commit (only if --version was given) ---
 

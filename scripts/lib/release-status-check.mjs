@@ -77,6 +77,18 @@ export function formatDistributionReviewStatus({ record, unreviewedCount }) {
 }
 
 /**
+ * The spec-history check's currency, shown without blocking. `make release`
+ * refuses on the same verdict (scripts/check-spec-history.mjs); this line is
+ * so the refusal is not a surprise.
+ * @param {{ok: boolean, message: string}} result
+ * @returns {string}
+ */
+export function formatSpecHistoryStatus({ ok, message }) {
+	const name = "spec-history (docs/spec/spec-history.md)";
+	return ok ? `  ${name} ✓ ${message}` : `  ${name} ! ${message}`;
+}
+
+/**
  * Newest full-mode run, read from the record directory's filenames
  * (`<date>-<mode>.md`). Full mode never advances the reviewed commit, so the
  * logs are the only place its history lives.

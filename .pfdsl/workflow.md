@@ -44,6 +44,10 @@ PFD の効果を体感した局面は `docs/pfd_payoff_log.md`（`payoff_log` ar
 
 **spec のバージョンはタイトル行（`# PFDSL仕様書 vX.Y.Z`）が唯一の権威。** `docs/spec/spec-history.md` の changelog は変更点の記述であり、バージョンの確認に使わない。バージョンを参照・更新する際は必ずタイトル行を読み、タイトル行を更新してからコミットする。changelog 冒頭やその他の本文で版番号を再記載しない（タイトル行との二重管理になり bump 時の同期漏れを生む。changelog 見出しの「vX.Y.Z からの主な変更点（vA.B.C）」形式は変更点の記述として許容する）。
 
+**changelog エントリは maintain_spec（統合フェーズ）でタイトル行 bump と同じ作業の中で書く** — 消費する `spec_proposals` に概要・設計判断・影響範囲がすでに揃っているので、この時点が最も情報が新鮮。「同一コミットである必要はない」（複数コミットに分けてよい、spec.md と spec-history.md が別ファイルになった #692 以降 per-commit では機械強制しない）だけであり、「release まで書かなくてよい」という意味ではない。
+
+`make release` の pre-tag checks（`scripts/check-spec-history.mjs`）はこの手続きの取りこぼしを拾うブロッキングな安全網であり、一次的な執筆トリガーではない。#689 の distribution review ゲートと機構は同型だが、あちらは「レビューは公開境界でのみ走る」性質そのものが正当な設計（プロンプトの読み手は公開時にしか現れない）なのに対し、こちらは integrate 時点で書ける・書くべき情報を release まで持ち越す理由がない。忘れた場合の検出が release-status（非ブロッキング）と release（ブロッキング）に付いている、という位置づけ。
+
 ## 実装 PR での spec 直接更新
 
 issue が spec 変更を明示しており、変更が単一の制約節・severity 定義の修正程度の規模であれば、`spec_proposals` 文書を省略して実装 PR に spec.md 更新を含めてよい。省略の判断基準: 既存 proposal 不要・統合レビューの対称性チェックが不要なスコープ。

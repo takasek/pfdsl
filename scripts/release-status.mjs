@@ -12,12 +12,14 @@ import { git as rawGit } from "./lib/run-exec.mjs";
 // so their stderr is captured rather than printed as if something broke.
 const git = (args) => rawGit(args, { captureStderr: true });
 import { RECORD_PATH, repoDeps, runDistributionReviewCheck } from "./lib/distribution-review.mjs";
+import { repoDeps as specHistoryRepoDeps, runSpecHistoryCheck } from "./lib/spec-history-check.mjs";
 import {
 	compareVersions,
 	formatDistributionReviewStatus,
 	formatFullReviewStatus,
 	formatResults,
 	formatSkillBundleStatus,
+	formatSpecHistoryStatus,
 	latestFullReviewDate,
 } from "./lib/release-status-check.mjs";
 
@@ -228,11 +230,16 @@ function readDistributionReview() {
 const distributionReview = readDistributionReview();
 if (distributionReview.blockedReason) console.warn(`warn: ${distributionReview.blockedReason}`);
 
+// `make release` blocks on the same reading (scripts/check-spec-history.mjs);
+// showing it here keeps that refusal from arriving as a surprise mid-release.
+const specHistory = runSpecHistoryCheck(specHistoryRepoDeps(root));
+
 console.log("release-status:");
 console.log(formatResults(results));
 console.log(formatSkillBundleStatus(skillBundleCommits, skillBundleTag));
 console.log(formatDistributionReviewStatus(distributionReview));
 console.log(formatFullReviewStatus(distributionReview.lastFullReview));
+console.log(formatSpecHistoryStatus(specHistory));
 
 const needsAction =
 	results.some(
