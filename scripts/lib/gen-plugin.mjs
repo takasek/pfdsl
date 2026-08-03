@@ -108,16 +108,57 @@ export function mirrorFiles(names, srcDir, destDir) {
 	renameSync(tempDestDir, destDir);
 }
 
+// One-line blurb per bundled skill directory, keyed the same way as
+// PLUGIN_SKILL_DIRS. "pfdsl" is included even though it's rendered rather
+// than mirrored (see PLUGIN_SKILL_DIRS's comment) because it still ships and
+// the manifest description must mention it too.
+const SKILL_DESCRIPTION_BLURBS = {
+	pfdsl: "syntax/CLI reference (pfdsl skill)",
+	"pfd-grill": "backward-dialogue diagram construction (pfd-grill skill)",
+	"pfd-ops": "project operations (pfd-ops skill)",
+	"pfd-retro": "retrospective audit (pfd-retro skill)",
+	"pfd-ecosystem": "ecosystem bootstrap (pfd-ecosystem skill)",
+};
+
+// One-line blurb per bundled command file, keyed the same way as
+// PLUGIN_COMMAND_FILES.
+const COMMAND_DESCRIPTION_BLURBS = {
+	"pfd-cycle.md": "/pfd-cycle",
+	"pfd-init.md": "/pfd-init",
+	"pfd-retro.md": "/pfd-retro",
+};
+
+function blurbFor(map, key, kind) {
+	const blurb = map[key];
+	if (!blurb) {
+		throw new Error(`No manifest description blurb for bundled ${kind} "${key}". Add one in scripts/lib/gen-plugin.mjs so plugin.json's description can't silently omit it.`);
+	}
+	return blurb;
+}
+
+// Builds the plugin/marketplace manifest description from what's actually
+// bundled (skillDirs, commandFiles), rather than a hand-maintained sentence
+// that can drift from PLUGIN_SKILL_DIRS/PLUGIN_COMMAND_FILES as skills and
+// commands are added or removed. Each bundled entry must have a blurb (see
+// blurbFor) — an entry with no blurb throws instead of being silently
+// dropped from the description.
+// @param {{skillDirs?: string[], commandFiles?: string[]}} [options]
+export function buildPluginDescription({ skillDirs = ["pfdsl", ...PLUGIN_SKILL_DIRS], commandFiles = PLUGIN_COMMAND_FILES } = {}) {
+	const skillParts = skillDirs.map((name) => blurbFor(SKILL_DESCRIPTION_BLURBS, name, "skill"));
+	const commandParts = commandFiles.map((file) => blurbFor(COMMAND_DESCRIPTION_BLURBS, file, "command"));
+	return `PFD-DSL authoring toolkit: ${skillParts.join(", ")}, and ${commandParts.join(", ")} commands.`;
+}
+
 // Builds the Claude Code plugin manifest object for .claude-plugin/plugin.json.
 // version is derived from packages/cli/package.json so drift (a CLI release
 // without a matching plugin.json update) shows up as a diff, not a silent gap.
-// Used by scripts/gen-plugin.mjs.
+// description is derived from the actual bundle contents (buildPluginDescription)
+// so it can't drift from what plugin/pfdsl/ ships. Used by scripts/gen-plugin.mjs.
 
 export function buildPluginManifest({ cliVersion }) {
 	return {
 		name: "pfdsl",
-		description:
-			"PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), and /pfd-cycle, /pfd-init commands.",
+		description: buildPluginDescription(),
 		version: cliVersion,
 		author: { name: "takasek" },
 		homepage: "https://github.com/takasek/pfdsl",
@@ -174,6 +215,20 @@ export function assemblePluginDistIndependent({
 	deps.mkdirSync(pluginManifestDir, { recursive: true });
 	deps.writeFileSync(resolve(pluginManifestDir, "plugin.json"), `${JSON.stringify(manifest, null, "\t")}\n`);
 	console.log("plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version");
+
+	// The repo-root marketplace listing duplicates the per-plugin description
+	// (a separate file so /plugin marketplace can list plugins without
+	// fetching each one's own manifest) — keep it derived from the same bundle
+	// contents as plugin.json instead of hand-edited, so it can't drift the
+	// way it had (#685). Only the description is touched; $schema, the
+	// marketplace-level description, owner, and the plugin's source (pinned
+	// separately by scripts/lib/release-config.mjs at release time) pass
+	// through unchanged.
+	const marketplacePath = resolve(root, ".claude-plugin/marketplace.json");
+	const marketplace = JSON.parse(deps.readFileSync(marketplacePath, "utf-8"));
+	marketplace.plugins[0].description = manifest.description;
+	deps.writeFileSync(marketplacePath, `${JSON.stringify(marketplace, null, "\t")}\n`);
+	console.log(".claude-plugin/marketplace.json ← plugin manifest description");
 
 	deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));
 }

@@ -120,7 +120,9 @@ check_drift "$gen_plugin_trigger" "packages/cli/dist/cli.js" \
 
 # Everything else gen-plugin.mjs assembles — install/ mirror, static skills
 # (pfd-grill/pfd-ops/pfd-retro/pfd-ecosystem), commands, agents, hooks,
-# plugin.json, and skills/pfdsl/references — never touches packages/cli/dist
+# plugin.json, the repo-root marketplace.json's plugin description (derived
+# from the same bundle contents as plugin.json, #685), and
+# skills/pfdsl/references — never touches packages/cli/dist
 # (scripts/lib/gen-plugin.mjs's assemblePluginDistIndependent, #593). Runs
 # even when dist is missing/stale (require_dist "-"), replacing the old
 # references-only check above it (absorbed here — same trigger, same
@@ -130,8 +132,8 @@ check_drift "$gen_plugin_trigger" "packages/cli/dist/cli.js" \
 # gen-plugin` (it would fail on the SKILL.md step without dist); run this
 # check's own command directly, or `pnpm -r build` first to unblock both.
 check_drift "$gen_plugin_trigger" "-" \
-  "node scripts/gen-plugin-dist-independent.mjs && git diff --quiet -- plugin ':(exclude)plugin/pfdsl/skills/pfdsl/SKILL.md'" \
-  "plugin/pfdsl is stale (excluding SKILL.md, checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the plugin files, or 'pnpm -r build && make gen-plugin' to regenerate everything."
+  "node scripts/gen-plugin-dist-independent.mjs && git diff --quiet -- plugin ':(exclude)plugin/pfdsl/skills/pfdsl/SKILL.md' .claude-plugin/marketplace.json" \
+  "plugin/pfdsl or .claude-plugin/marketplace.json is stale (SKILL.md checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the plugin/marketplace files, or 'pnpm -r build && make gen-plugin' to regenerate everything."
 
 # The .dot/README drift guard and the .svg drift guard are separate vitest
 # suites (graphviz-exporter and preview-engine respectively — see the

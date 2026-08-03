@@ -28,10 +28,11 @@ jobs:
       - name: Regenerate plugin dir and assert no drift
         run: |
           make gen-plugin
-          if ! git diff --exit-code plugin; then
+          if ! git diff --exit-code plugin .claude-plugin/marketplace.json; then
             echo ""
-            echo "ERROR: plugin/pfdsl is stale (this also catches a plugin.json version left behind"
-            echo "after a CLI release — its version is derived from packages/cli/package.json)."
+            echo "ERROR: plugin/pfdsl or .claude-plugin/marketplace.json is stale (this also catches a"
+            echo "plugin.json version left behind after a CLI release, and a marketplace.json"
+            echo "description left behind after a bundled skill/command change)."
             echo "Run 'make gen-plugin' and commit the result."
             exit 1
           fi

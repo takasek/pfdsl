@@ -40,7 +40,10 @@ const COMMAND_PATTERNS = PLUGIN_COMMAND_FILES.map((file) => `\\.claude/commands/
 // already does for install/: a hand-edit there is about to be overwritten by
 // the next assembly, and check_drift is what tells the author so instead of
 // letting the edit ship and then vanish (#666, same shape as #579).
-export const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|${SKILL_PATTERNS}|${COMMAND_PATTERNS}|${AGENT_PATTERNS}|^hooks/|^plugin/|packages/cli/package\\.json`;
+// `.claude-plugin/marketplace\.json` joins it for the same reason: its
+// per-plugin description is generated (assemblePluginDistIndependent, #685)
+// even though the file lives outside plugin/pfdsl/.
+export const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|${SKILL_PATTERNS}|${COMMAND_PATTERNS}|${AGENT_PATTERNS}|^hooks/|^plugin/|packages/cli/package\\.json|^\\.claude-plugin/marketplace\\.json`;
 
 export const GEN_PLUGIN_TRIGGER = new RegExp(GEN_PLUGIN_TRIGGER_PATTERN);
 
