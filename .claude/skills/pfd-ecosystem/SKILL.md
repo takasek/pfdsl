@@ -57,9 +57,11 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 �
 `bindings/pfd-retro.md`・`bindings/pfd-ops.md`・`review-perspectives.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-ops.md`・`.pfdsl/review-perspectives.md` として常にコピーする（`bindings/pfd-retro.md` がこのファイルを参照する）。
 既に `.pfdsl/` にファイルが存在する場合は上書きしない。
 
-## ステップ 3.5: GitHub Issues バックエンド（L3）の採用・更新（任意）
+## ステップ 3.5: 作業項目バックエンド（L3）の採用・更新（任意）
 
-作業項目を GitHub Issues で管理する場合、リポ側自動化（GitHub Actions workflow・監査スクリプト）をリポルートへ実配置する:
+作業項目の一次情報と同期手段を選ぶ。プリセットは2つある — GitHub Issues とファイルベース・トラッカー。どちらも任意で、採用しない場合は `roadmap.pfdsl` の依存構造管理のみで運用する。
+
+**GitHub Issues を使う場合**は、リポ側自動化（GitHub Actions workflow・監査スクリプト）をリポルートへ実配置する:
 
 ```bash
 node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
@@ -68,6 +70,8 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 `<pfd-ops skill root>` はステップ 3 と同じ規則で解決する（plugin: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops`、repo-local: `.claude/skills/pfd-ops`）。
 既導入リポでは同じコマンドが refresh になる — ローカル編集されたファイルは上書きせず警告するので、編集を捨てて上書きする場合のみユーザーに確認して `--overwrite-local-edits` を付ける（編集を抱えた旧ファイルを編集ごと削除するのは別フラグ `--delete-edited-orphans`。編集の無い旧ファイルはフラグ無しで削除される）。
 バックエンド規約の詳細は pfd-ops スキルの `references/github-issues-backend.md`。
+
+**リポ内 markdown ファイルで管理する場合**は、リポルートへの実配置手順は無い（GitHub Actions を使わないため）。バックエンド規約の詳細は pfd-ops スキルの `references/file-based-tracker-backend.md`。
 
 ## ステップ 4: 種別ごとに対話しながら構築する
 

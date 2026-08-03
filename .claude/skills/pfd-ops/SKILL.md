@@ -89,3 +89,4 @@ plugin バージョンの上流差分警告は plugin の更新をユーザー�
 - `references/work-cycle.md` — /pfd-cycle のワークサイクル4手順（選択・実行・終端ゲート・報告）
 - `references/architecture.md` — スキルの層構成（L1〜L4・install/ の役割・採用とは何か）の説明
 - `references/github-issues-backend.md` — GitHub Issues バックエンドのプリセット規約（採用リポのみ）
+- `references/file-based-tracker-backend.md` — ファイルベース・トラッカーのプリセット規約（採用リポのみ）
