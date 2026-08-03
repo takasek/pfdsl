@@ -301,6 +301,28 @@ describe("setFrontmatterField", () => {
 		expect(out).not.toContain("? status");
 	});
 
+	// `status:` with nothing after the colon (not even a trailing space)
+	// parses to a real Scalar node (Pair.value is truthy, unlike the
+	// explicit-key case above) whose range is zero-width, positioned
+	// immediately after the colon. Splicing the replacement straight into
+	// that zero-width range produces `status:done` — no space after the
+	// colon, which is invalid YAML on re-parse and merges the following
+	// field's key into the corrupted line (confirmed via MULTILINE_IMPLICIT_KEY
+	// and a garbled `toJS()` key before this test's fix).
+	it("adds a space when splicing into a bare key's zero-width empty value", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    status:\n    owner: alice\n---\na >> P -> b\n";
+		const out = setFrontmatterField(src, "artifact", "spec", "status", "done");
+		expect(out).not.toBeNull();
+		expect(out).toContain("status: done");
+		expect(out).not.toContain("status:done");
+
+		const reparsed = parseFrontmatterCst(out as string);
+		expect(reparsed.doc.errors).toHaveLength(0);
+		expect(reparsed.doc.getIn(["artifact", "spec", "status"])).toBe("done");
+		expect(reparsed.doc.getIn(["artifact", "spec", "owner"])).toBe("alice");
+	});
+
 	it("does not crash inserting a new field when the map's last existing field is explicit-key null", () => {
 		// The insertion branch anchors on the map's last item only to find
 		// indentation/position — but if that unrelated last field's value is

@@ -239,7 +239,21 @@ export function fieldValueSplice(
 		if (pair.value === null) return { ok: false, reason: "unsupported" };
 		if (isAlias(pair.value)) return { ok: false, reason: "unsupported" };
 		const [start, end] = (pair.value as Node).range as [number, number, number];
-		return { ok: true, splice: { start, end, replacement } };
+		// A bare key with nothing after the colon (`status:`) still composes
+		// to a real Scalar node — just a zero-width one, positioned
+		// immediately after the colon with no space. Splicing straight into
+		// that range would produce `status:done`: invalid YAML on re-parse
+		// (MULTILINE_IMPLICIT_KEY) that merges the next field's key into the
+		// corrupted line. Prepend the space the colon is missing.
+		const needsSpace = start === end && yamlText[start - 1] === ":";
+		return {
+			ok: true,
+			splice: {
+				start,
+				end,
+				replacement: needsSpace ? ` ${replacement}` : replacement,
+			},
+		};
 	}
 
 	if (node.items.length === 0) {
