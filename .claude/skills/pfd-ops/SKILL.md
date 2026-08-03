@@ -1,5 +1,6 @@
 ---
 name: pfd-ops
+summary: project operations
 description: |
   Use when operating a project with PFDs — prioritizing or accepting issues,
   updating progress status after completing work, adding new artifacts or

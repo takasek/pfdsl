@@ -1,8 +1,11 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { genInstall } from "./gen-install.mjs";
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 // The agents bundled into plugin/pfdsl/agents/, as .claude/agents/-relative
 // filenames. Single source of truth: gen-plugin.mjs mirrors this list, and
@@ -108,36 +111,55 @@ export function mirrorFiles(names, srcDir, destDir) {
 	renameSync(tempDestDir, destDir);
 }
 
-// One-line blurb per bundled skill directory, keyed the same way as
-// PLUGIN_SKILL_DIRS. "pfdsl" is included even though it's rendered rather
-// than mirrored (see PLUGIN_SKILL_DIRS's comment) because it still ships and
-// the manifest description must mention it too.
-const SKILL_DESCRIPTION_BLURBS = {
-	pfdsl: "syntax/CLI reference (pfdsl skill)",
-	"pfd-grill": "backward-dialogue diagram construction (pfd-grill skill)",
-	"pfd-ops": "project operations (pfd-ops skill)",
-	"pfd-retro": "retrospective audit (pfd-retro skill)",
-	"pfd-ecosystem": "ecosystem bootstrap (pfd-ecosystem skill)",
+// Where each bundled skill's source SKILL.md lives, keyed the same way as
+// PLUGIN_SKILL_DIRS. "pfdsl" points at the template (scripts/skill-template/)
+// rather than .claude/skills/pfdsl/SKILL.md because the latter is generated
+// output (DO NOT EDIT) — the template is what a human actually maintains.
+const SKILL_SOURCE_DIRS = {
+	pfdsl: "scripts/skill-template",
+	...Object.fromEntries(PLUGIN_SKILL_DIRS.map((name) => [name, `.claude/skills/${name}`])),
 };
 
-function blurbFor(map, key, kind) {
-	const blurb = map[key];
-	if (!blurb) {
-		throw new Error(`No manifest description blurb for bundled ${kind} "${key}". Add one in scripts/lib/gen-plugin.mjs so plugin.json's description can't silently omit it.`);
+/** Extract a single-line scalar frontmatter field from SKILL.md source. */
+function extractFrontmatterField(source, field) {
+	const m = source.match(new RegExp(`^${field}:[ \\t]*(.+)$`, "m"));
+	return m?.[1]?.trim();
+}
+
+// Reads a bundled skill's one-line manifest blurb from its own SKILL.md
+// frontmatter ("summary:", next to "description:") instead of a
+// hand-maintained table (#696): editing a skill's role no longer requires
+// remembering a second file, because there is no second file to remember.
+function summaryFor(name, kind, { root = REPO_ROOT, readFileSync: readFile = readFileSync } = {}) {
+	const dir = SKILL_SOURCE_DIRS[name];
+	if (!dir) {
+		throw new Error(`No manifest description summary for bundled ${kind} "${name}". Register its source dir in SKILL_SOURCE_DIRS in scripts/lib/gen-plugin.mjs.`);
 	}
-	return blurb;
+	const path = resolve(root, dir, "SKILL.md");
+	let source;
+	try {
+		source = readFile(path, "utf-8");
+	} catch {
+		throw new Error(`No manifest description summary for bundled ${kind} "${name}": ${path} not found.`);
+	}
+	const summary = extractFrontmatterField(source, "summary");
+	if (!summary) {
+		throw new Error(`${path} has no "summary:" frontmatter field for the plugin manifest description. Add one alongside "description:".`);
+	}
+	return summary;
 }
 
 // Builds the plugin/marketplace manifest description from what's actually
 // bundled (skillDirs, commandFiles), rather than a hand-maintained sentence
 // that can drift from PLUGIN_SKILL_DIRS/PLUGIN_COMMAND_FILES as skills and
-// commands are added or removed. A skill needs a blurb (see blurbFor) — one
-// with none throws instead of being silently dropped from the description.
-// Commands need no table: their blurb is the slash form of the filename, so
-// there is nothing that could drift from PLUGIN_COMMAND_FILES independently.
-// @param {{skillDirs?: string[], commandFiles?: string[]}} [options]
-export function buildPluginDescription({ skillDirs = ["pfdsl", ...PLUGIN_SKILL_DIRS], commandFiles = PLUGIN_COMMAND_FILES } = {}) {
-	const skillParts = skillDirs.map((name) => blurbFor(SKILL_DESCRIPTION_BLURBS, name, "skill"));
+// commands are added or removed. A skill needs a "summary:" frontmatter
+// field (see summaryFor) — one with none throws instead of being silently
+// dropped from the description. Commands need no table: their blurb is the
+// slash form of the filename, so there is nothing that could drift from
+// PLUGIN_COMMAND_FILES independently.
+// @param {{skillDirs?: string[], commandFiles?: string[], root?: string, readFileSync?: Function}} [options]
+export function buildPluginDescription({ skillDirs = ["pfdsl", ...PLUGIN_SKILL_DIRS], commandFiles = PLUGIN_COMMAND_FILES, root, readFileSync: readFile } = {}) {
+	const skillParts = skillDirs.map((name) => `${summaryFor(name, "skill", { root, readFileSync: readFile })} (${name} skill)`);
 	const commandParts = commandFiles.map((file) => `/${file.replace(/\.md$/, "")}`);
 	return `PFD-DSL authoring toolkit: ${skillParts.join(", ")}, and ${commandParts.join(", ")} commands.`;
 }
@@ -148,10 +170,10 @@ export function buildPluginDescription({ skillDirs = ["pfdsl", ...PLUGIN_SKILL_D
 // description is derived from the actual bundle contents (buildPluginDescription)
 // so it can't drift from what plugin/pfdsl/ ships. Used by scripts/gen-plugin.mjs.
 
-export function buildPluginManifest({ cliVersion }) {
+export function buildPluginManifest({ cliVersion, root, readFileSync: readFile, skillDirs, commandFiles }) {
 	return {
 		name: "pfdsl",
-		description: buildPluginDescription(),
+		description: buildPluginDescription({ skillDirs, commandFiles, root, readFileSync: readFile }),
 		version: cliVersion,
 		author: { name: "takasek" },
 		homepage: "https://github.com/takasek/pfdsl",

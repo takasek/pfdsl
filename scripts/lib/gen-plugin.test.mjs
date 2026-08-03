@@ -39,6 +39,29 @@ describe("buildPluginManifest", () => {
 		assert.match(manifest.description, /pfd-ops/);
 	});
 
+	it("reads skill blurbs through the injected root and readFileSync, not the real filesystem", () => {
+		const root = mkdtempSync(join(tmpdir(), "gen-plugin-manifest-"));
+		try {
+			const skillDir = join(root, ".claude/skills/pfd-ops");
+			mkdirSync(skillDir, { recursive: true });
+			writeFileSync(join(skillDir, "SKILL.md"), "---\nname: pfd-ops\nsummary: injected-root blurb\ndescription: |\n  long form\n---\nbody\n");
+			const pfdslDir = join(root, "scripts/skill-template");
+			mkdirSync(pfdslDir, { recursive: true });
+			writeFileSync(join(pfdslDir, "SKILL.md"), "---\nname: pfdsl\nsummary: injected-root pfdsl blurb\ndescription: |\n  long form\n---\nbody\n");
+
+			const manifest = buildPluginManifest({
+				cliVersion: "0.0.18",
+				root,
+				skillDirs: ["pfdsl", "pfd-ops"],
+				commandFiles: [],
+			});
+
+			assert.match(manifest.description, /injected-root blurb/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it("mentions the pfd-grill skill in the description", () => {
 		const manifest = buildPluginManifest({ cliVersion: "0.0.18" });
 		assert.match(manifest.description, /pfd-grill/);
@@ -69,6 +92,34 @@ describe("buildPluginDescription", () => {
 	it("derives a command's blurb from its filename, so no table can drift from PLUGIN_COMMAND_FILES", () => {
 		const description = buildPluginDescription({ skillDirs: [], commandFiles: ["brand-new-command.md"] });
 		assert.match(description, /\/brand-new-command\b/);
+	});
+
+	it("reads a skill's blurb from its SKILL.md summary frontmatter field, not a hand-maintained table", () => {
+		const root = mkdtempSync(join(tmpdir(), "gen-plugin-desc-"));
+		try {
+			const skillDir = join(root, ".claude/skills/pfd-ops");
+			mkdirSync(skillDir, { recursive: true });
+			writeFileSync(join(skillDir, "SKILL.md"), "---\nname: pfd-ops\nsummary: a totally new blurb never in any table\ndescription: |\n  long form\n---\nbody\n");
+
+			const description = buildPluginDescription({ skillDirs: ["pfd-ops"], commandFiles: [], root });
+
+			assert.match(description, /a totally new blurb never in any table/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("throws naming the missing frontmatter field when a bundled skill's SKILL.md has no summary", () => {
+		const root = mkdtempSync(join(tmpdir(), "gen-plugin-desc-"));
+		try {
+			const skillDir = join(root, ".claude/skills/pfd-ops");
+			mkdirSync(skillDir, { recursive: true });
+			writeFileSync(join(skillDir, "SKILL.md"), "---\nname: pfd-ops\ndescription: |\n  long form\n---\nbody\n");
+
+			assert.throws(() => buildPluginDescription({ skillDirs: ["pfd-ops"], commandFiles: [], root }), /summary/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 });
 
