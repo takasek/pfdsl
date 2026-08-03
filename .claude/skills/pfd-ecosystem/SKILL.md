@@ -50,10 +50,11 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 �
 <scaffold>/runtime-pipeline.md
 <scaffold>/bindings/pfd-retro.md
 <scaffold>/bindings/pfd-ops.md
+<scaffold>/review-perspectives.md
 ```
 
 必要な種別のファイルだけを `.pfdsl/` にコピーする（不要な種別はコピーしない）。
-`bindings/pfd-retro.md`・`bindings/pfd-ops.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-ops.md` として常にコピーする。
+`bindings/pfd-retro.md`・`bindings/pfd-ops.md`・`review-perspectives.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-ops.md`・`.pfdsl/review-perspectives.md` として常にコピーする（`bindings/pfd-retro.md` がこのファイルを参照する）。
 既に `.pfdsl/` にファイルが存在する場合は上書きしない。
 
 ## ステップ 3.5: GitHub Issues バックエンド（L3）の採用・更新（任意）
