@@ -1,13 +1,13 @@
 ---
-title: Issue 依存フロー
+title: 作業項目依存フロー
 type: roadmap
-description: オープン issue の依存関係と着手可能順序。issue 本体が一次情報、本ファイルは依存構造のみ管理。詳細は sibling roadmap.md 参照。
+description: 作業項目の依存関係と着手可能順序。一次情報の所在は sibling roadmap.md 参照、本ファイルは依存構造のみ管理。
 
 statusStyles:
   done: { fillcolor: "#d4edda", style: filled }
   wip: { fillcolor: "#fff3cd", style: filled }
   todo: { fillcolor: "#f8f9fa", style: filled }
-  waiting:   { fillcolor: "#f8d7da", style: filled }
+  waiting: { fillcolor: "#f8d7da", style: filled }
   suspended: { fillcolor: "#e2e3e5", style: filled }
 
 artifact:

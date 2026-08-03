@@ -5,7 +5,14 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { assemblePluginDistIndependent, buildPluginManifest, mirrorDir, mirrorFiles, PLUGIN_AGENT_FILES } from "./gen-plugin.mjs";
+import {
+	assemblePluginDistIndependent,
+	buildPluginDescription,
+	buildPluginManifest,
+	mirrorDir,
+	mirrorFiles,
+	PLUGIN_AGENT_FILES,
+} from "./gen-plugin.mjs";
 import { collectModuleClosure, findDistDependentFiles } from "./check-script-imports.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -35,6 +42,33 @@ describe("buildPluginManifest", () => {
 	it("mentions the pfd-grill skill in the description", () => {
 		const manifest = buildPluginManifest({ cliVersion: "0.0.18" });
 		assert.match(manifest.description, /pfd-grill/);
+	});
+
+	it("mentions the /pfd-retro command in the description, not just the pfd-retro skill", () => {
+		const manifest = buildPluginManifest({ cliVersion: "0.0.18" });
+		assert.match(manifest.description, /\/pfd-retro/);
+	});
+});
+
+describe("buildPluginDescription", () => {
+	it("mentions every bundled skill and every bundled command", () => {
+		const description = buildPluginDescription({
+			skillDirs: ["pfdsl", "pfd-grill"],
+			commandFiles: ["pfd-cycle.md", "pfd-retro.md"],
+		});
+		assert.match(description, /pfdsl skill/);
+		assert.match(description, /pfd-grill skill/);
+		assert.match(description, /\/pfd-cycle/);
+		assert.match(description, /\/pfd-retro/);
+	});
+
+	it("throws when a bundled skill has no description blurb, instead of silently omitting it", () => {
+		assert.throws(() => buildPluginDescription({ skillDirs: ["not-a-real-skill"], commandFiles: [] }), /not-a-real-skill/);
+	});
+
+	it("derives a command's blurb from its filename, so no table can drift from PLUGIN_COMMAND_FILES", () => {
+		const description = buildPluginDescription({ skillDirs: [], commandFiles: ["brand-new-command.md"] });
+		assert.match(description, /\/brand-new-command\b/);
 	});
 });
 
@@ -159,6 +193,20 @@ describe("mirrorFiles", () => {
 });
 
 describe("assemblePluginDistIndependent", () => {
+	const fakeMarketplace = {
+		$schema: "https://json.schemastore.org/claude-code-marketplace.json",
+		name: "pfdsl",
+		description: "top-level marketplace description, distinct from the per-plugin one",
+		owner: { name: "takasek" },
+		plugins: [
+			{
+				name: "pfdsl",
+				description: "stale description left behind by a prior manual edit",
+				source: { source: "git-subdir", url: "https://github.com/takasek/pfdsl.git", path: "plugin/pfdsl", ref: "v0.0.1" },
+			},
+		],
+	};
+
 	function fakeDeps(overrides = {}) {
 		const calls = [];
 		return {
@@ -168,7 +216,7 @@ describe("assemblePluginDistIndependent", () => {
 				mirrorDir: (name, srcRoot, destRoot) => calls.push(["mirrorDir", name, srcRoot, destRoot]),
 				mirrorFiles: (names, srcDir, destDir) => calls.push(["mirrorFiles", names, srcDir, destDir]),
 				writeSkillRefs: (root, outDir) => calls.push(["writeSkillRefs", root, outDir]),
-				readFileSync: () => JSON.stringify({ version: "1.2.3" }),
+				readFileSync: (path) => (String(path).endsWith("marketplace.json") ? JSON.stringify(fakeMarketplace) : JSON.stringify({ version: "1.2.3" })),
 				writeFileSync: (path, content) => calls.push(["writeFileSync", path, content]),
 				mkdirSync: (path) => calls.push(["mkdirSync", path]),
 				...overrides,
@@ -205,6 +253,27 @@ describe("assemblePluginDistIndependent", () => {
 		const [, path, content] = calls.find((c) => c[0] === "writeFileSync");
 		assert.match(path, /\.claude-plugin\/plugin\.json$/);
 		assert.equal(JSON.parse(content).version, "1.2.3");
+	});
+
+	it("writes marketplace.json's plugin description to match plugin.json's derived description", () => {
+		const { calls, deps } = fakeDeps();
+		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		const writes = calls.filter((c) => c[0] === "writeFileSync");
+		const [, pluginJsonPath, pluginJsonContent] = writes.find(([, path]) => /\.claude-plugin\/plugin\.json$/.test(path));
+		const [, marketplacePath, marketplaceContent] = writes.find(([, path]) => /\.claude-plugin\/marketplace\.json$/.test(path));
+		assert.ok(pluginJsonPath, "expected a plugin.json write");
+		assert.ok(marketplacePath, "expected a marketplace.json write");
+		assert.equal(JSON.parse(marketplaceContent).plugins[0].description, JSON.parse(pluginJsonContent).description);
+	});
+
+	it("preserves marketplace.json's other fields when updating the description", () => {
+		const { calls, deps } = fakeDeps();
+		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		const [, , marketplaceContent] = calls.filter((c) => c[0] === "writeFileSync").find(([, path]) => /\.claude-plugin\/marketplace\.json$/.test(path));
+		const written = JSON.parse(marketplaceContent);
+		assert.equal(written.description, fakeMarketplace.description);
+		assert.deepEqual(written.plugins[0].source, fakeMarketplace.plugins[0].source);
+		assert.equal(written.plugins[0].name, fakeMarketplace.plugins[0].name);
 	});
 
 	it("writes skill references for the bundled pfdsl skill", () => {

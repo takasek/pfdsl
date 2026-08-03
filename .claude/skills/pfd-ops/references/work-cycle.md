@@ -7,7 +7,8 @@
 1. **選択**:
    - **companion（roadmap.md 等）がサイクル・プリフライトの集約スクリプトを指す場合**、それを実行し出力（fetch 実施有無・base への遅れ・自動生成 PR の open 有無・着手可能プロセス一覧・best 推薦。集約スクリプトが追加で返す付随情報があればそれも従う対象に含む）に従う。指していない場合は以下を手動で行う。**以下3項目は「選択判断はすべて origin の現在状態を前提にする」という1原則の各論である** — fetch 漏れ・stale な base・未マージの自動生成 PR は、いずれもこの原則からの逸脱として検出する:
      - まず `git fetch origin` でリモートの最新状態を取得する。新規ブランチは `origin/<base>` を起点に作成する — fetch は remote-tracking ref のみ更新し local ブランチは更新しないため、local 経由で切ると stale なまま気づかず作業してしまう
-     - **既存ブランチ（前セッションから継続する worktree 等）で作業を再開する場合**、`git log --oneline HEAD..origin/<base>` で base が先行していないか確認し、先行していれば rebase してから続行する。stale なまま進めると無関係な PR diff（他 PR で先行 merge された変更の revert に見える差分）が混入する
+     - **既存ブランチ（前セッションから継続する worktree 等）で作業を再開する場合**、`git log --oneline HEAD..origin/<base>` で base が先行していないか確認し、先行していれば rebase してから続行する。stale なまま進めると無関係な PR diff（他 PR で先行 merge された変更の revert に見える差分）が混入する。**再開時に限らずサイクルの途中でも起こる** — ゲート集約チェッカーやツールが内部で `git fetch` を実行すると、着手時は最新だった base がその場で先行しうる
+     - **自分の変更を確認する差分は三点（`origin/<base>...HEAD`）で取る。** 二点（`origin/<base>..HEAD`）は base 側の先行分も差分に含めるため、他者が追加したファイルが自分のブランチによる削除として現れる。上の遅れが生じている間、二点で見た差分は「身に覚えのない大量削除」の形で出るので、削除を疑う前に差分の取り方を疑う
      - **同一セッションで続けてサイクルを回す場合も、着手時に `origin/<base>` から新しいブランチを切る。** 前サイクルのブランチに続けてコミットすると、前サイクルの差分が次サイクルの PR に混入する。前サイクルの PR が未マージであれば必ずこの形になる。検出は着手時に `git log --oneline origin/<base>..HEAD` が空であることの確認、または終端ゲートのコミット数が想定と合っているかの照合で行う（コミット数はサイクル完了時に初めて見るため、混入に気付くのは PR 作成後になりやすい）
      - **CI やツールが自動生成した PR が open のままであれば、新規作業より先にマージを確認する** — open のまま作業を始めると選択判断が stale な状態に基づく（どのような PR が自動生成されるかはリポ固有 — companion の roadmap.md に記載する）
      - `.pfdsl/roadmap.pfdsl` の着手可能プロセスを列挙する。`pfdsl status ready <roadmap.pfdsl> --best --json` で、入力 artifact が全て done のプロセス一覧と `--best` 推薦（合流点を解放するもの＝後続プロセスの最後の未完入力になっているもの）が JSON で得られる。着手可能集合が薄く「何が止めているか」を知りたい場合は `status blocked <roadmap.pfdsl>` で各未着手プロセスの未達入力 artifact を一覧できる（`graph stats` の fan-out と併せればボトルネックの優先度づけもできる）
@@ -37,16 +38,16 @@
    - [ ] 出力 artifact の status を更新した（タイミングは companion の規約が最優先。無ければプロトコル4のデフォルト — 着手時に wip・完了コミットと同時に done）
    - [ ] 知見を `.pfdsl/workflow.pfdsl` の sibling companion の振り分け手続きに従って振り分けた
    - [ ] 実行中に発見した新プロセス・成果物を `.pfdsl/roadmap.pfdsl` に追記した（消費者を明示できないものは作らない）
-   - [ ] ゲート集約チェッカーが報告する新規終端 artifact リスト（変更 `.pfdsl` の `graph io` 差分）を見て、今サイクルの出力 artifact が手段（仕様・設計・計画・提案）なら、それを消費する後続プロセスがグラフに在るか確認した。無ければ todo プレースホルダで登録した（後続門番、プロトコル5(b)。分類と登録のみ MANUAL — 抽出・差分は機械化済み。真の納品物のみ終端を許す）
+   - [ ] 変更した `.pfdsl` に対して `pfdsl graph io <file> --json` を実行し、`terminals`（消費者が疑わしい終端）と `externalTerminals`（`externalStakeholders` 宣言による終端）を確認した。今サイクルの出力 artifact が `terminals` に現れ、かつ手段（仕様・設計・計画・提案）なら、それを消費する後続プロセスがグラフに在るか確認した。無ければ todo プレースホルダで登録した（後続門番、プロトコル5(b)。真の納品物のみ終端を許す）。`externalTerminals` に現れる場合は、宣言が妥当か（手段成果物に誤って `externalStakeholders` を付けていないか）を確認した。companion がゲート集約チェッカーを指す場合はその差分報告を使ってよい
    - [ ] 変換コンポーネントを追加・変更・削除した場合、それをモデル化している採用済み PFD（`.pfdsl/runtime-pipeline.pfdsl` または `.pfdsl/workflow.pfdsl` の該当箇所）に反映した（該当なしも明示。runtime-pipeline.pfdsl 未採用は自動的に N/A にならない — workflow.pfdsl 側を確認）。影響範囲の特定には `pfdsl graph impact <file> <id>`（下流の消費者全て）・`graph depends-on <file> <id>`（上流の生産者全て）が使える — 変更対象ノードを grep で手繰るより網羅的
    - [ ] 作業中に偶発的に見つけたスコープ外の既存問題（バグ等）を起票した（ユーザーの指摘を待たない）
    - [ ] 変更した全 .pfdsl が `check` を通過する
    - [ ] コミット粒度（論理単位ごとの分割）が規約（CLAUDE.md または companion で定義）に従っている。**生成元と生成物は同一コミットに入れる** — 作業ツリー全体から再生成して staged 分と突き合わせる型の drift 検査を持つリポでは、両者を別コミットに割ると生成元だけを staged にした時点で不一致になり弾かれる。論理単位が2つ以上あってもこの境界では割れないので、割れない理由を PR 本文に書く
    - [ ] コミット subject が Conventional Commits 形式に従う
-   - [ ] `/simplify` または `/code-review` を実施した（実装規模・品質基準は companion で定義。省略する場合はその理由を明示）。**レビューの重さは diff の規模に合わせる** — 数十行・1〜2ファイル中心の scoped な修正に多角度 finder × 候補ごと検証 agent のような高効度設定をかけると diff に対して過剰になる。角度を絞るか、そもそも委譲せず自分で読む。重量級の構成は大規模 diff 向け
+   - [ ] コミット前にレビューを1パス通した（レビューコマンド・チェックリスト等の具体的な手段は companion で定義。定まっていなければ最低限、差分を自分で読み直す。省略する場合はその理由を明示）。**レビューの重さは diff の規模に合わせる** — 数十行・1〜2ファイル中心の scoped な修正に多角度 finder × 候補ごと検証 agent のような高効度設定をかけると diff に対して過剰になる。角度を絞るか、そもそも委譲せず自分で読む。重量級の構成は大規模 diff 向け
    - [ ] 変更束を PR にまとめた（PR 作成後にローカルで追加コミットした場合、push し忘れていないか `git log origin/<branch>..<branch>` で確認する — CI は push 済みの内容にしか反応しない）
 4. **報告**: 完了したプロセス、それにより解放された後続プロセス、更新後の着手可能集合。特定 status の全体像（例: 残 wip 一覧）が要る場合は都度 `status list <roadmap.pfdsl> --status wip,waiting --json` 等で機械的に絞り込む — 全文 Read や個別 `meta get` の積み上げに頼らない
-5. **retro**: `/pfd-cycle` コマンド経由の場合、プロトコル7の (a)(b) 両条件を確認する（定義は SKILL.md 本文が一次情報 — ここには複製しない）。このサイクル手順自体に最終ステップとして組み込み、報告を出して終わりにしない。**バックストップ**（(a) について、このリポでは）: `roadmap.pfdsl` に `status: done` を追加するコミットで pre-commit が stderr に advisory warning を出す（`scripts/lib/retro-reminder-check.mjs`、非ブロッキング）。セッション記憶が抜けても done 付与コミットの Bash tool result 経由で気付ける。(b) にはバックストップがない — セッション記憶のみに依存する既知の弱点
+5. **retro**: `/pfd-cycle` コマンド経由の場合、プロトコル7の (a)(b) 両条件を確認する（定義は SKILL.md 本文が一次情報 — ここには複製しない）。このサイクル手順自体に最終ステップとして組み込み、報告を出して終わりにしない。**バックストップ**（(a) について）: plugin を導入したリポでは、`roadmap.pfdsl` に `status: done` を追加するコミットの後、同梱の PostToolUse hook（`hooks/`、`hooks/hooks.json` で配線済み）が advisory reminder を返す（非ブロッキング）。セッション記憶が抜けても done 付与コミットの Bash tool result 経由で気付ける。(b) にはバックストップがない — セッション記憶のみに依存する既知の弱点
 
 ## 免除条項（比較対象生成の原則）
 

@@ -171,19 +171,41 @@ export function lintCommitSubjects(subjects) {
 }
 
 /**
+ * Parse a `<label> a, b, c` list line out of `pfdsl graph io` text output.
+ * @param {string} auditText
+ * @param {string} label line prefix, including its trailing colon
+ * @returns {string[]}
+ */
+function parseAuditLine(auditText, label) {
+	const line = auditText.split("\n").find((l) => l.startsWith(label));
+	if (!line) return [];
+	return line
+		.slice(label.length)
+		.split(",")
+		.map((s) => s.trim())
+		.filter(Boolean);
+}
+
+/**
  * Parse the `terminal artifacts: a, b, c` line out of `pfdsl graph io`
  * text output.
  * @param {string} auditText
  * @returns {string[]}
  */
 export function parseAuditTerminals(auditText) {
-	const line = auditText.split("\n").find((l) => l.startsWith("terminal artifacts:"));
-	if (!line) return [];
-	return line
-		.slice("terminal artifacts:".length)
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
+	return parseAuditLine(auditText, "terminal artifacts:");
+}
+
+/**
+ * Parse the `external-stakeholder terminals: a, b, c` line out of
+ * `pfdsl graph io` text output — terminals kept out of the plain
+ * `terminal artifacts:` line solely because they declare a non-empty
+ * externalStakeholders.
+ * @param {string} auditText
+ * @returns {string[]}
+ */
+export function parseAuditExternalTerminals(auditText) {
+	return parseAuditLine(auditText, "external-stakeholder terminals:");
 }
 
 /**

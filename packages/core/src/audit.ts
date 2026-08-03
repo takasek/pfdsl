@@ -17,6 +17,18 @@ export interface AuditResult {
 	terminals: string[];
 	/** Artifacts consumed by a process but not produced by any process */
 	externalInputs: string[];
+	/**
+	 * Artifacts produced but not consumed by a normal input, kept out of
+	 * `terminals` solely because they declare a non-empty
+	 * `externalStakeholders`. Disjoint from `terminals` by construction — a
+	 * produced-and-unconsumed artifact lands in exactly one of the two lists,
+	 * depending on whether `externalStakeholders` is set. Reported separately
+	 * because the declaration itself is what needs auditing: it is easy to
+	 * mistakenly attach `externalStakeholders` to a means artifact (spec,
+	 * design, plan) rather than a real deliverable, which would otherwise
+	 * silently vanish from the terminal-artifact audit.
+	 */
+	externalTerminals: string[];
 	/** Same-kind symmetry hints: artifact whose normal consumer set is a proper subset of a same-group sibling's */
 	consumerAsymmetry: ConsumerAsymmetryHint[];
 	/** Number of additional hints beyond the 10-hint cap */
@@ -38,7 +50,8 @@ export interface AuditResult {
  * implements the same "consumed by `>>`, not produced" check.
  *
  * Artifacts with a non-empty `externalStakeholders` list are treated as
- * having an external consumer and are excluded from terminals.
+ * having an external consumer and are excluded from `terminals`; they are
+ * reported instead in `externalTerminals` (see its doc comment above).
  */
 export function auditGraph(
 	edges: NormalizedEdge[],
@@ -56,16 +69,22 @@ export function auditGraph(
 		if (!nodeKinds.has(a)) artifacts.push(a);
 	}
 
-	const terminals = [...new Set(artifacts)].filter(
-		(a) =>
-			produced.has(a) &&
-			!consumed.has(a) &&
-			!artifactMeta?.[a]?.externalStakeholders?.length,
+	const uniqueArtifacts = [...new Set(artifacts)];
+	// `terminals` and `externalTerminals` partition the same produced-and-
+	// unconsumed boundary set, so derive the boundary once and split it on the
+	// single discriminator — otherwise the produced/consumed predicate lives in
+	// two places and the two lists can drift on what "not consumed" means.
+	const boundary = uniqueArtifacts.filter(
+		(a) => produced.has(a) && !consumed.has(a),
+	);
+	const terminals = boundary.filter(
+		(a) => !artifactMeta?.[a]?.externalStakeholders?.length,
+	);
+	const externalTerminals = boundary.filter(
+		(a) => !!artifactMeta?.[a]?.externalStakeholders?.length,
 	);
 	const openInputs = computeOpenInputs(edges);
-	const externalInputs = [...new Set(artifacts)].filter((a) =>
-		openInputs.has(a),
-	);
+	const externalInputs = uniqueArtifacts.filter((a) => openInputs.has(a));
 
 	// Consumer asymmetry: group artifacts by their frontmatter group, then
 	// compare normal (non-feedback) consumer sets pairwise within each group.
@@ -126,6 +145,7 @@ export function auditGraph(
 	return {
 		terminals,
 		externalInputs,
+		externalTerminals,
 		consumerAsymmetry,
 		consumerAsymmetryRemainder,
 	};

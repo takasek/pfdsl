@@ -50,15 +50,19 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 �
 <scaffold>/runtime-pipeline.md
 <scaffold>/bindings/pfd-retro.md
 <scaffold>/bindings/pfd-ops.md
+<scaffold>/review-perspectives.md
 ```
 
 必要な種別のファイルだけを `.pfdsl/` にコピーする（不要な種別はコピーしない）。
-`bindings/pfd-retro.md`・`bindings/pfd-ops.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-ops.md` として常にコピーする。
+`bindings/pfd-retro.md`・`bindings/pfd-ops.md`・`review-perspectives.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-ops.md`・`.pfdsl/review-perspectives.md` として常にコピーする（`bindings/pfd-retro.md` がこのファイルを参照する）。
 既に `.pfdsl/` にファイルが存在する場合は上書きしない。
+companion をどの言語で書くかは pfd-ops スキルの `references/architecture.md`「companion の記述言語」節に従う。
 
-## ステップ 3.5: GitHub Issues バックエンド（L3）の採用・更新（任意）
+## ステップ 3.5: 作業項目バックエンド（L3）の採用・更新（任意）
 
-作業項目を GitHub Issues で管理する場合、リポ側自動化（GitHub Actions workflow・監査スクリプト）をリポルートへ実配置する:
+作業項目の一次情報と同期手段を選ぶ。プリセットは2つある — GitHub Issues とファイルベース・トラッカー。どちらも任意で、採用しない場合は `roadmap.pfdsl` の依存構造管理のみで運用する。
+
+**GitHub Issues を使う場合**は、リポ側自動化（GitHub Actions workflow・監査スクリプト）をリポルートへ実配置する:
 
 ```bash
 node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
@@ -67,6 +71,8 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 `<pfd-ops skill root>` はステップ 3 と同じ規則で解決する（plugin: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops`、repo-local: `.claude/skills/pfd-ops`）。
 既導入リポでは同じコマンドが refresh になる — ローカル編集されたファイルは上書きせず警告するので、編集を捨てて上書きする場合のみユーザーに確認して `--overwrite-local-edits` を付ける（編集を抱えた旧ファイルを編集ごと削除するのは別フラグ `--delete-edited-orphans`。編集の無い旧ファイルはフラグ無しで削除される）。
 バックエンド規約の詳細は pfd-ops スキルの `references/github-issues-backend.md`。
+
+**リポ内 markdown ファイルで管理する場合**は、リポルートへの実配置手順は無い（GitHub Actions を使わないため）。バックエンド規約の詳細は pfd-ops スキルの `references/file-based-tracker-backend.md`。
 
 ## ステップ 4: 種別ごとに対話しながら構築する
 
@@ -90,5 +96,5 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 
 ## ステップ 5: 検証とゲート
 
-- 各 `.pfdsl` ファイルに対して `pfdsl check <file>` が通ること
-- **roadmap.pfdsl を採用している場合のみ**: 作成した `.pfdsl` が `roadmap.pfdsl` に artifact として登録されているか確認する（未登録なら pfd-ops スキルの「成果物の門番」に従って登録する）。roadmap 未採用のリポではこの項目は N/A
+- 各 `.pfdsl` ファイルに対して `pfdsl check <file> --strict` が通ること
+- **roadmap.pfdsl を採用している場合のみ**: 作成した `.pfdsl` のうち、他作業の着手をゲートする成果物を生むものだけ登録する（何がゲートに当たるかの判定基準は pfd-ops スキルの運用プロトコル手順2が一次情報 — ここには複製しない）。登録対象は `roadmap.pfdsl` に artifact として登録されているか確認し、未登録なら pfd-ops スキルの「成果物の門番」に従って登録する。roadmap 未採用のリポではこの項目は N/A

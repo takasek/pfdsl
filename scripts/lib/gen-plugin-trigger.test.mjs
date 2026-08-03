@@ -85,6 +85,12 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		assert.equal(GEN_PLUGIN_TRIGGER.test("plugin/pfdsl/.claude-plugin/plugin.json"), true);
 	});
 
+	it("matches a hand-edit of .claude-plugin/marketplace.json", () => {
+		// Its per-plugin description is generated too (#685), even though the
+		// file lives outside plugin/pfdsl/ — same reasoning as the previous test.
+		assert.equal(GEN_PLUGIN_TRIGGER.test(".claude-plugin/marketplace.json"), true);
+	});
+
 	it("covers every module the dist-independent assembly imports", () => {
 		// The hand-kept alternation above drifts from the code it is supposed to
 		// track. Deriving the expectation from the real import closure makes a

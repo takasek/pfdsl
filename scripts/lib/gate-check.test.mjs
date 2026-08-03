@@ -15,6 +15,7 @@ import {
 	lintCommitSubjects,
 	wipTransitionDetected,
 	parseAuditTerminals,
+	parseAuditExternalTerminals,
 	diffNewTerminals,
 	diffReadySets,
 	classifyAuditIssuesFlowResult,
@@ -270,6 +271,25 @@ describe("parseAuditTerminals", () => {
 
 	it("returns an empty array when the terminal artifacts line is empty", () => {
 		assert.deepEqual(parseAuditTerminals("terminal artifacts: \nexternal inputs:\n"), []);
+	});
+});
+
+describe("parseAuditExternalTerminals", () => {
+	it("parses the comma-separated external-stakeholder terminals line", () => {
+		const text =
+			"external inputs: adr_corpus\nterminal artifacts: article\nexternal-stakeholder terminals: monthly_report, published_skill\n";
+		assert.deepEqual(parseAuditExternalTerminals(text), ["monthly_report", "published_skill"]);
+	});
+
+	it("returns an empty array when there is no external-stakeholder terminals line", () => {
+		assert.deepEqual(parseAuditExternalTerminals("terminal artifacts: article\n"), []);
+	});
+
+	it("returns an empty array when the external-stakeholder terminals line is empty", () => {
+		assert.deepEqual(
+			parseAuditExternalTerminals("terminal artifacts: article\nexternal-stakeholder terminals: \n"),
+			[],
+		);
 	});
 });
 

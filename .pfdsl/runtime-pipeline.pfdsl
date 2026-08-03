@@ -342,7 +342,7 @@ process:
     tags: [ gen, g ]
   gen_plugin:
     label: プラグイン組み立て
-    description: "スキルツリー（pfdslはgen-skillと同じ一次ソースから独立再生成、pfd-ops・pfd-ecosystem・pfd-grill・pfd-retroは.claude/skills/からコピー）とcommands/pfd-*.md・agentsをplugin/pfdsl/へ集約しplugin.jsonをCLI versionから生成する。同梱対象リストはgen-plugin.mjsに一元化。本数を数字で書かない — スキルが増えても文面が古びないよう列挙で持つ。旧版ではこの図のassemble_pluginとworkflow.pfdslのgen_pluginに二重モデル化されており、入力列挙が乖離していた（ADR-0035で統合）"
+    description: "スキルツリー（pfdslはgen-skillと同じ一次ソースから独立再生成、pfd-ops・pfd-ecosystem・pfd-grill・pfd-retroは.claude/skills/からコピー）とcommands/pfd-*.md・agentsをplugin/pfdsl/へ集約しplugin.jsonをCLI versionから生成する。plugin.jsonのdescriptionと.claude-plugin/marketplace.jsonのプラグインdescriptionも同じ同梱実体から導出するため、手書きの列挙が同梱物から乖離することはない。同梱対象リストはgen-plugin.mjsに一元化。本数を数字で書かない — スキルが増えても文面が古びないよう列挙で持つ。旧版ではこの図のassemble_pluginとworkflow.pfdslのgen_pluginに二重モデル化されており、入力列挙が乖離していた（ADR-0035で統合）"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
     tags: [ gen, g ]
