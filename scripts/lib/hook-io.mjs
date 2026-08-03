@@ -1,8 +1,8 @@
-// Shared plumbing for this repo's PreToolUse/PostToolUse guard hooks
-// (delegation-guard, worktree-write-guard, main-commit-guard, md-write-check,
-// #650 review). Every one of them reads a JSON payload from stdin and, for
-// the PreToolUse deny cases, emits the same hookSpecificOutput shape — this
-// used to be copy-pasted into each wrapper.
+// Shared plumbing for this repo's PreToolUse/PostToolUse guard hooks (the
+// scripts/*-guard.mjs and reminder wrappers wired in .claude/settings.json,
+// #650 review). Every one of them reads a JSON payload from stdin and emits
+// one of two hookSpecificOutput shapes — both used to be copy-pasted into
+// each wrapper.
 
 /**
  * Read all of stdin as text. Not unit-tested here (it is I/O, not logic);
@@ -33,15 +33,36 @@ export function parseHookPayload(text) {
 }
 
 /**
- * Build the PreToolUse hook response for a deny decision.
- * @param {{reason: string}} result
+ * Build the PreToolUse hook response for a permission decision.
+ *
+ * "ask" exists because a PreToolUse hook has no advisory channel that reaches
+ * the model: `hookSpecificOutput.additionalContext` is PostToolUse-only, and
+ * stderr on exit 0 is not fed back. So a PreToolUse rule that should not hard-
+ * block (command-usage-guard's npx case, roadmap-publish-guard) routes through
+ * the permission prompt instead of printing a note nobody reads.
+ * @param {{decision: "deny" | "ask", reason: string}} result
  */
-export function buildDenyOutput(result) {
+export function buildPermissionOutput(result) {
 	return {
 		hookSpecificOutput: {
 			hookEventName: "PreToolUse",
-			permissionDecision: "deny",
+			permissionDecision: result.decision,
 			permissionDecisionReason: result.reason,
+		},
+	};
+}
+
+/**
+ * Build the PostToolUse hook response for an advisory. additionalContext is
+ * what reaches the model, and PostToolUse is the only one of the two events
+ * that supports it — which is why the advisory hooks are PostToolUse.
+ * @param {string} advisory
+ */
+export function buildAdvisoryOutput(advisory) {
+	return {
+		hookSpecificOutput: {
+			hookEventName: "PostToolUse",
+			additionalContext: advisory,
 		},
 	};
 }

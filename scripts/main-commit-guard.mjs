@@ -1,35 +1,44 @@
 #!/usr/bin/env node
-// PreToolUse(Bash) hook: denies `git commit` while the current branch is
-// main (#650). See scripts/lib/main-commit-guard.mjs for the detection
-// logic and why this is deny rather than advisory.
+// PreToolUse(Bash) hook: denies `git commit` while the current branch is the
+// repo's default branch (#650). See scripts/lib/main-commit-guard.mjs for the
+// detection logic, why this is deny rather than advisory, and the stdin
+// orchestration.
 //
-// Reads the hook payload on stdin, resolves the current branch via `git
-// branch --show-current` (the payload does not carry it), and prints a
-// deny decision only when both conditions hold. Always exits 0 — a crash
-// here, or a `git branch` failure, must not wedge every Bash call.
+// Both branch names come from git rather than being assumed: the current one
+// from `git branch --show-current`, the default one from `origin/HEAD`. A repo
+// whose default branch is `trunk` or `master` was previously guarded against a
+// branch name it does not have. Neither is read unless the command turns out
+// to be a commit — the lib calls resolveBranches only then.
+//
+// Always exits 0 — a crash here, or a `git` failure, must not wedge every Bash
+// call.
 //
 // Usage (wired in .claude/settings.json): node scripts/main-commit-guard.mjs
 
 import { tryGit } from "./lib/run-exec.mjs";
-import { evaluateMainCommitGuard, isGitCommitCommand } from "./lib/main-commit-guard.mjs";
-import { buildDenyOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
+import { runMainCommitGuard } from "./lib/main-commit-guard.mjs";
+import { readStdinText } from "./lib/hook-io.mjs";
 
-const payload = parseHookPayload(await readStdinText());
-if (!payload) process.exit(0);
-
-// Re-checks what evaluateMainCommitGuard also checks, purely to skip the
-// `git branch` subprocess on the common case (every non-commit Bash call).
-// Kept in sync by hand — if the eligibility rule changes, update both.
-if (payload?.tool_name !== "Bash" || !isGitCommitCommand(payload?.tool_input?.command)) {
-	process.exit(0);
+/**
+ * @param {object} payload PreToolUse hook payload
+ * @returns {{currentBranch: string | undefined, mainBranch: string}}
+ */
+function resolveBranches(payload) {
+	const cwd = payload?.cwd ?? process.cwd();
+	const current = tryGit(["branch", "--show-current"], { cwd });
+	const head = tryGit(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], { cwd });
+	// `origin/main` -> `main`. Falling back to "main" keeps the guard working in
+	// a clone whose origin/HEAD was never set. An undefined current branch
+	// (detached HEAD, or git failing) makes the lib allow, which is the safe
+	// direction: this guard must not wedge commits it cannot reason about.
+	return {
+		currentBranch: current.ok ? current.out.trim() : undefined,
+		mainBranch: head.ok ? head.out.trim().replace(/^origin\//, "") : "main",
+	};
 }
 
-const cwd = payload?.cwd ?? process.cwd();
-const branch = tryGit(["branch", "--show-current"], { cwd });
-const currentBranch = branch.ok ? branch.out.trim() : undefined;
-
-const result = evaluateMainCommitGuard(payload, { currentBranch });
-if (result.decision === "deny") {
-	console.log(JSON.stringify(buildDenyOutput(result)));
+const { shouldOutput, output } = runMainCommitGuard(await readStdinText(), { resolveBranches });
+if (shouldOutput) {
+	console.log(JSON.stringify(output));
 }
 process.exit(0);

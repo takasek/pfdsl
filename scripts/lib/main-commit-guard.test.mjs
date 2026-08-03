@@ -1,7 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { evaluateMainCommitGuard, isGitCommitCommand } from "./main-commit-guard.mjs";
+import {
+	evaluateMainCommitGuard,
+	isGitCommitCommand,
+	runMainCommitGuard,
+} from "./main-commit-guard.mjs";
 
 function payload({ toolName = "Bash", command }) {
 	return { hook_event_name: "PreToolUse", tool_name: toolName, tool_input: { command } };
@@ -77,5 +81,50 @@ describe("evaluateMainCommitGuard", () => {
 	it("allows when currentBranch is unknown (detached HEAD, detection failure)", () => {
 		const result = evaluateMainCommitGuard(payload({ command: "git commit -m 'x'" }), { currentBranch: undefined });
 		assert.equal(result.decision, "allow");
+	});
+});
+
+describe("runMainCommitGuard", () => {
+	const commit = JSON.stringify(payload({ command: "git commit -m 'x'" }));
+
+	it("denies a commit on the default branch", () => {
+		const { shouldOutput, output } = runMainCommitGuard(commit, {
+			resolveBranches: () => ({ currentBranch: "main", mainBranch: "main" }),
+		});
+		assert.equal(shouldOutput, true);
+		assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
+	});
+
+	it("denies on a default branch that is not called main", () => {
+		const { shouldOutput } = runMainCommitGuard(commit, {
+			resolveBranches: () => ({ currentBranch: "trunk", mainBranch: "trunk" }),
+		});
+		assert.equal(shouldOutput, true);
+	});
+
+	it("allows a commit on a feature branch", () => {
+		const { shouldOutput } = runMainCommitGuard(commit, {
+			resolveBranches: () => ({ currentBranch: "topic", mainBranch: "main" }),
+		});
+		assert.equal(shouldOutput, false);
+	});
+
+	it("never resolves branches for a command that is not a commit", () => {
+		let called = false;
+		const input = JSON.stringify(payload({ command: "git status" }));
+		const { shouldOutput } = runMainCommitGuard(input, {
+			resolveBranches: () => {
+				called = true;
+				return { currentBranch: "main", mainBranch: "main" };
+			},
+		});
+		assert.equal(shouldOutput, false);
+		assert.equal(called, false);
+	});
+
+	it("silently allows malformed stdin JSON", () => {
+		assert.deepEqual(runMainCommitGuard("not json{{{", { resolveBranches: () => ({}) }), {
+			shouldOutput: false,
+		});
 	});
 });

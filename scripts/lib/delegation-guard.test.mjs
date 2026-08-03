@@ -97,6 +97,20 @@ describe("findOutwardCommand — gh", () => {
 		assert.equal(findOutwardCommand("gh pr"), "gh pr");
 	});
 
+	it("flags a mutating call behind a global flag, which used to fail open", () => {
+		assert.equal(findOutwardCommand("gh -R owner/repo pr create --fill"), "gh pr create");
+		assert.equal(findOutwardCommand("gh --repo owner/repo issue close 42"), "gh issue close");
+		assert.equal(findOutwardCommand("gh --repo=owner/repo pr merge 12"), "gh pr merge");
+	});
+
+	it("still allows a read-only call behind a global flag", () => {
+		assert.equal(findOutwardCommand("gh -R owner/repo pr view 12"), null);
+	});
+
+	it("flags gh api with a mutating method behind a global flag", () => {
+		assert.equal(findOutwardCommand("gh -R owner/repo api -X POST repos/o/r/pulls"), "gh api POST");
+	});
+
 	it("allows gh api without an explicit method (GET by default)", () => {
 		assert.equal(findOutwardCommand("gh api repos/o/r/pulls"), null);
 	});

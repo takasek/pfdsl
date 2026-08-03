@@ -9,6 +9,15 @@
 // This is advisory: it prints what is stale and lets the command run. A
 // guard that blocked here would be wrong as often as it was right — reading
 // a stale build on purpose is a normal thing to do while debugging.
+//
+// Wired to both events, and the event decides who hears it. PreToolUse can
+// only write to stderr, which does not reach the model (additionalContext is
+// PostToolUse-only and stderr on exit 0 is not fed back, #650) — so the same
+// check runs again on PostToolUse, where additionalContext reaches the model
+// exactly when it is about to draw a conclusion from a result that read a
+// stale build. Without that half the warning lands nowhere the reader is.
+
+import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
 
 /** Commands that resolve cross-package imports through dist/. */
 const TRUSTS_BUILD_OUTPUT =
@@ -58,4 +67,26 @@ export function formatStaleWarning(stale) {
 		"Cross-package types and imports resolve through dist/, so this run can pass here and fail in CI. " +
 		"Run 'pnpm -r build' first if the result is meant to predict CI."
 	);
+}
+
+/**
+ * Orchestrates the hook's stdin payload into a print-or-not decision, the way
+ * runDelegationGuard does (#645). `findStale` is injected and called lazily, so
+ * a command that does not read the build never touches the filesystem.
+ * @param {string} inputText raw stdin payload
+ * @param {{findStale: () => string[]}} io
+ * @returns {{shouldOutput: boolean, output?: object, stderr?: string}}
+ */
+export function runStaleDistGuard(inputText, { findStale }) {
+	const payload = parseHookPayload(inputText);
+	if (!payload) return { shouldOutput: false };
+	if (!trustsBuildOutput(payload?.tool_input?.command)) return { shouldOutput: false };
+
+	const warning = formatStaleWarning(findStale());
+	if (!warning) return { shouldOutput: false };
+
+	if (payload.hook_event_name === "PostToolUse") {
+		return { shouldOutput: true, output: buildAdvisoryOutput(warning) };
+	}
+	return { shouldOutput: false, stderr: `[pfdsl] ${warning}` };
 }

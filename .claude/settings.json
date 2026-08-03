@@ -36,6 +36,11 @@
             "type": "command",
             "command": "node scripts/main-commit-guard.mjs",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/command-usage-guard.mjs",
+            "timeout": 10
           }
         ]
       },
@@ -46,17 +51,37 @@
             "type": "command",
             "command": "node scripts/worktree-write-guard.mjs",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/roadmap-publish-guard.mjs",
+            "timeout": 10
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Write",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
             "command": "node scripts/md-write-check.mjs",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/stale-dist-guard.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/managed-issue-reminder.mjs",
             "timeout": 10
           }
         ]
