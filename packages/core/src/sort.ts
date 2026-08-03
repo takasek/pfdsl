@@ -125,6 +125,7 @@ function sortSplice(
 	const changed = order.some((b, i) => b !== bounds[i]);
 	if (!changed) return null;
 
+	const end = (map.range as [number, number, number])[1];
 	const parts = order.map((b) => {
 		let part = yamlText.slice(b.start, b.end);
 		const precededByNewlineOriginally =
@@ -147,11 +148,29 @@ function sortSplice(
 		}
 		replacement += part;
 	}
-	if (!replacement.endsWith(newline)) replacement += newline;
+	// The original text right after the splice's own end (whatever follows
+	// `map.range[1]` — a following top-level key's own leading bytes, or
+	// nothing when this section is the last thing in `yamlText`, in which
+	// case the closing fence's own newline is appended later by `sort()`'s
+	// template) tells us whether a separator is still needed here. Append
+	// one only when something actually follows within `yamlText` and it
+	// doesn't already start with a newline — mirroring the leading-boundary
+	// check above. Skipping the empty-remainder case is what a flow-valued
+	// last entry (whose own range doesn't end in a newline) needs: without
+	// it, this would stack a second, spurious newline on top of the one
+	// `sort()`'s template already supplies before `---`.
+	const remainder = yamlText.slice(end);
+	if (
+		!replacement.endsWith(newline) &&
+		remainder.length > 0 &&
+		!remainder.startsWith(newline)
+	) {
+		replacement += newline;
+	}
 
 	return {
 		start: bodyStart,
-		end: (map.range as [number, number, number])[1],
+		end,
 		replacement,
 	};
 }

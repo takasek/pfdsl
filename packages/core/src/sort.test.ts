@@ -322,6 +322,29 @@ z >> p -> foo
 		);
 	});
 
+	it("doesn't add a spurious blank line before the closing fence when the last entry in sorted order is flow-valued (#695-fix2)", () => {
+		const src = `---
+artifact:
+  z: { label: Z }
+  a: { label: A }
+  m: { label: M }
+---
+z >> p -> a
+m >> p2 -> z
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output).toBe(`---
+artifact:
+  a: { label: A }
+  m: { label: M }
+  z: { label: Z }
+---
+z >> p -> a
+m >> p2 -> z
+`);
+	});
+
 	it("preserves the body (non-frontmatter) unchanged", () => {
 		const body = "b >> p -> a\na >> p2 -> b\n";
 		const src = `---
