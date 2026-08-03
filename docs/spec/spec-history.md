@@ -8,6 +8,13 @@
 
 `vOLD` は直前のバージョン、`vNEW` はこのエントリが導入したバージョン（＝そのエントリを書いた時点の spec.md タイトル行と一致）。先頭エントリの `vNEW` は常に spec.md の現行バージョンと一致していなければならない（`scripts/check-spec-history.mjs` が release 前に機械検査する）。エントリは maintain_spec（統合フェーズ）でタイトル行 bump と同じ作業の中で書く（`.pfdsl/workflow.md`）ので、release 時点で複数バージョン分がまとまって欠けている状態は本来生じない。生じていた場合は書き忘れであり、欠けているエントリを追記する（`spec-history-finalize` スキル）。エントリは version ごとに永続する記録であり、release 単位でまとめたり削除したりしない。v0.0.2 以前のエントリは旧形式（丸括弧なし）のまま残す — 過去の記録は書き換えない。
 
+v0.0.17 からの主な変更点（v0.0.18）：`pfdsl graph io` の終端監査を2列に分割した（#686）。`externalStakeholders` を宣言した audit-terminal は、従来どおり `terminals` からは除外されるが、新設の `externalTerminals`（テキスト出力では `external-stakeholder terminals:`）へ引き続き列挙される。破壊的変更ではない（追加のみ。`terminals` の内容・意味論は不変）。
+
+* §2.3 externalStakeholders の記述に、`graph io` が2列に分けて報告する旨を追記
+* §3.3 audit-terminal の記述に、externalStakeholders 宣言時の分岐先を追記
+* `packages/core/src/audit.ts` の `auditGraph` に `externalTerminals: string[]` を追加
+* `pfdsl graph io` の `--json` 出力・テキスト出力・ヘルプに `externalTerminals` を追加
+
 v0.0.16 からの主な変更点（v0.0.17）：CLI コマンド体系を再編し、フラットな17コマンドを操作対象の種類で分類し直した（graph/meta/status グループ導入）。外部ユーザーが不在の段階のため後方互換は取らず、旧コマンド名は一括で廃止する（**破壊的変更**、旧名は exit 2、ADR-0030）。
 
 * `pfdsl graph <file>`（DOT/SVG/PDF/PNG描画）を `pfdsl render <file>` に改名
