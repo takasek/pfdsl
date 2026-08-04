@@ -196,17 +196,25 @@ function renderValue(value: string | number, flow: boolean): string {
  * yaml's own default indent step, which won't match unless the real
  * document happens to also use 2-space-per-level, so the rendered value's
  * continuation lines are re-indented to match.
+ *
+ * Returns `null` when the skeleton itself doesn't parse cleanly — this
+ * happens when `originalValueText` is a block sequence or a multi-key block
+ * map: gluing that text onto `y: ` puts the sequence dash or a second key on
+ * the wrong line, producing invalid YAML that `Document#toString()` refuses
+ * to stringify. The caller falls back to full re-serialization in that case
+ * rather than crashing.
  */
 function renderValueLike(
 	originalValueText: string,
 	flow: boolean,
 	newValue: string | number,
 	targetIndent: string | null,
-): string {
+): string | null {
 	const skeletonSrc = flow
 		? `{ y: ${originalValueText} }`
 		: `y: ${originalValueText}`;
 	const tmp = parseDocument(skeletonSrc);
+	if (tmp.errors.length > 0) return null;
 	tmp.setIn(["y"], newValue);
 	const rendered = tmp.toString({ lineWidth: 0 });
 	let extracted = flow
@@ -325,6 +333,11 @@ export function fieldValueSplice(
 			value,
 			realTargetIndent,
 		);
+		// The existing value's own raw source doesn't compose into valid
+		// standalone YAML as a skeleton (block sequence, multi-key block
+		// map) — decline the splice and let the caller fall back to full
+		// re-serialization instead of crashing on an errored `Document`.
+		if (replacement === null) return { ok: false, reason: "unsupported" };
 		// Multi-line block scalars' `range` swallows their own trailing
 		// newline (unlike single-line scalars), so replacing the whole span
 		// with a newline-less short value would glue the next field onto the

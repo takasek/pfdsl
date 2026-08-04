@@ -460,6 +460,105 @@ describe("setFrontmatterField", () => {
 		);
 		expect(reparsed.doc.getIn(["artifact", "spec", "status"])).toBe("done");
 	});
+
+	// `renderValueLike` reuses the existing value's raw source as a skeleton
+	// (`y: <original text>`), which is only valid standalone YAML when the
+	// original value was itself a single scalar-shaped span. A block
+	// sequence or a multi-key block map's own text glued onto `y: ` composes
+	// into invalid YAML (the sequence dash or the second key land on the
+	// wrong line), and `Document#toString()` throws on an errored document
+	// with no validity check beforehand. These must fall back to full
+	// re-serialization instead of crashing (final-review C1).
+	describe("replacing an existing field whose value is a non-scalar node", () => {
+		it("falls back cleanly when the existing value is a block sequence", () => {
+			const src =
+				"---\nartifact:\n  spec:\n    description:\n      - a\n      - b\n    status: done\n---\nx >> p -> spec\n";
+			const out = setFrontmatterField(
+				src,
+				"artifact",
+				"spec",
+				"description",
+				"short",
+			);
+			expect(out).toBe(
+				"---\nartifact:\n  spec:\n    description: short\n    status: done\n---\nx >> p -> spec\n",
+			);
+			const reparsed = parseFrontmatterCst(out as string);
+			expect(reparsed.doc.errors).toHaveLength(0);
+			expect(reparsed.doc.getIn(["artifact", "spec", "description"])).toBe(
+				"short",
+			);
+			expect(reparsed.doc.getIn(["artifact", "spec", "status"])).toBe("done");
+		});
+
+		it("falls back cleanly when the existing value is a multi-key block map", () => {
+			const src =
+				"---\nartifact:\n  spec:\n    criteria:\n      a: 1\n      b: 2\n    status: done\n---\nx >> p -> spec\n";
+			const out = setFrontmatterField(
+				src,
+				"artifact",
+				"spec",
+				"criteria",
+				"short",
+			);
+			expect(out).toBe(
+				"---\nartifact:\n  spec:\n    criteria: short\n    status: done\n---\nx >> p -> spec\n",
+			);
+			const reparsed = parseFrontmatterCst(out as string);
+			expect(reparsed.doc.errors).toHaveLength(0);
+			expect(reparsed.doc.getIn(["artifact", "spec", "criteria"])).toBe(
+				"short",
+			);
+			expect(reparsed.doc.getIn(["artifact", "spec", "status"])).toBe("done");
+		});
+
+		it("still succeeds when the existing value is a single-key block map", () => {
+			const src =
+				"---\nartifact:\n  spec:\n    criteria:\n      a: 1\n    status: done\n---\nx >> p -> spec\n";
+			const out = setFrontmatterField(
+				src,
+				"artifact",
+				"spec",
+				"criteria",
+				"short",
+			);
+			expect(out).toBe(
+				"---\nartifact:\n  spec:\n    criteria: short\n    status: done\n---\nx >> p -> spec\n",
+			);
+			const reparsed = parseFrontmatterCst(out as string);
+			expect(reparsed.doc.errors).toHaveLength(0);
+			expect(reparsed.doc.getIn(["artifact", "spec", "criteria"])).toBe(
+				"short",
+			);
+			expect(reparsed.doc.getIn(["artifact", "spec", "status"])).toBe("done");
+		});
+
+		it("succeeds when the existing value is a flow sequence", () => {
+			const src =
+				"---\nartifact:\n  spec:\n    tags: [a, b]\n    status: done\n---\nx >> p -> spec\n";
+			const out = setFrontmatterField(src, "artifact", "spec", "tags", "short");
+			expect(out).toBe(
+				"---\nartifact:\n  spec:\n    tags: short\n    status: done\n---\nx >> p -> spec\n",
+			);
+			const reparsed = parseFrontmatterCst(out as string);
+			expect(reparsed.doc.errors).toHaveLength(0);
+			expect(reparsed.doc.getIn(["artifact", "spec", "tags"])).toBe("short");
+			expect(reparsed.doc.getIn(["artifact", "spec", "status"])).toBe("done");
+		});
+
+		it("succeeds when the existing value is a flow map", () => {
+			const src =
+				"---\nartifact:\n  spec:\n    obj: { a: 1, b: 2 }\n    status: done\n---\nx >> p -> spec\n";
+			const out = setFrontmatterField(src, "artifact", "spec", "obj", "short");
+			expect(out).toBe(
+				"---\nartifact:\n  spec:\n    obj: short\n    status: done\n---\nx >> p -> spec\n",
+			);
+			const reparsed = parseFrontmatterCst(out as string);
+			expect(reparsed.doc.errors).toHaveLength(0);
+			expect(reparsed.doc.getIn(["artifact", "spec", "obj"])).toBe("short");
+			expect(reparsed.doc.getIn(["artifact", "spec", "status"])).toBe("done");
+		});
+	});
 });
 
 describe("parseFrontmatterCst yamlText", () => {
