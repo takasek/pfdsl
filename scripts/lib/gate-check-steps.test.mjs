@@ -9,6 +9,8 @@ import {
 	sizeDirectionStep,
 	collectSizeDeltas,
 	commitSubjectStep,
+	checkDocsStep,
+	reviewMeasurementStep,
 } from "./gate-check-steps.mjs";
 
 /**
@@ -543,5 +545,60 @@ describe("commitSubjectStep", () => {
 		const result = commitSubjectStep({ exec, base: "main" });
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /non-English/);
+	});
+});
+
+describe("checkDocsStep", () => {
+	it("runs the whole check-docs target rather than one migrated check", () => {
+		const { exec, calls } = fakeExec();
+		const result = checkDocsStep({ exec });
+		assert.equal(result.status, "PASS");
+		assert.ok(calls.some((c) => c === "make check-docs"));
+	});
+
+	it("FAILs and reports the tail of the output when a check inside the target fails", () => {
+		const { exec } = fakeExec({
+			"make check-docs": {
+				ok: false,
+				out: "check-distributed-prose: content an adopting repo cannot resolve:\n  a.md:8: [issue-ref] bare issue reference #716",
+			},
+		});
+		const result = checkDocsStep({ exec });
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /issue-ref/);
+	});
+});
+
+describe("reviewMeasurementStep", () => {
+	const trailer = "Review-Measurement: sample=in new=1 adopted=1 tool=simplify angles=\"reuse\"";
+
+	it("PASSes when a code-touching branch carries a matching record", () => {
+		const { exec } = fakeExec({
+			"git log --no-merges": { out: `subject\n\n${trailer}\n` },
+		});
+		const result = reviewMeasurementStep({ exec, base: "main", changedFiles: ["scripts/lib/x.mjs"] });
+		assert.equal(result.status, "PASS");
+	});
+
+	it("FAILs when a code-touching branch carries no record at all", () => {
+		const { exec } = fakeExec({ "git log --no-merges": { out: "subject\n\nbody without a trailer\n" } });
+		const result = reviewMeasurementStep({ exec, base: "main", changedFiles: ["scripts/lib/x.mjs"] });
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /no record/);
+	});
+
+	it("FAILs when the record says sample=out but the branch changed code", () => {
+		const { exec } = fakeExec({
+			"git log --no-merges": { out: "subject\n\nReview-Measurement: sample=out\n" },
+		});
+		const result = reviewMeasurementStep({ exec, base: "main", changedFiles: ["scripts/lib/x.mjs"] });
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /sample=out/);
+	});
+
+	it("PASSes a prose-only branch that carries no record", () => {
+		const { exec } = fakeExec({ "git log --no-merges": { out: "docs: x\n\nbody\n" } });
+		const result = reviewMeasurementStep({ exec, base: "main", changedFiles: ["docs/adr/0001-x.md"] });
+		assert.equal(result.status, "PASS");
 	});
 });

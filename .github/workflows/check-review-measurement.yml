@@ -1,0 +1,23 @@
+name: check review measurement
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The check reads the branch's commit messages and its diff against
+          # the base, so the shallow default clone is not enough.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Check the Review-Measurement record against the branch diff
+        run: node scripts/check-review-measurement.mjs --base "$BASE_REF"
+        env:
+          BASE_REF: ${{ github.base_ref }}

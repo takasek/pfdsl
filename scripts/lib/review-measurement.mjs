@@ -87,6 +87,24 @@ export function parseMeasurementTrailer(text) {
 }
 
 /**
+ * Every record in one blob of commit messages.
+ *
+ * A cycle writes one trailer per review pass, and `parseMeasurementTrailer`
+ * reads only the first it finds, so the blob has to be cut at each trailer
+ * before parsing. Both callers — the merged-history audit and the pre-PR gate —
+ * need the same cut, and the split pattern is the sort of thing that drifts
+ * silently when it lives in two places.
+ * @param {string} text - concatenated commit messages
+ * @returns {Array<object>} one parsed record per trailer, in order
+ */
+export function parseMeasurementRecords(text) {
+	return text
+		.split(/^(?=Review-Measurement:)/m)
+		.map(parseMeasurementTrailer)
+		.filter(Boolean);
+}
+
+/**
  * Extract one record per commit from a `git log` dump.
  * @param {string} logText - records separated by RECORD_SEP, `<sha>FIELD_SEP<body>` within each
  * @returns {Array<{sha: string}>}
