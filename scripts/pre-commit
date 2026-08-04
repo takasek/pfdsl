@@ -72,16 +72,10 @@ check_drift() {
 # is itself the check). Left as-is — no functional difference, and
 # converging them isn't worth the churn (see #265).
 
-# gen-skill.mjs embeds `pfdsl help` output, so it needs the CLI dist. Only
-# regenerates the .claude/skills/pfdsl dev working copy — the tracked
-# distribution copy (skills/pfdsl, for `gh skill install`) was removed in
-# favor of the plugin marketplace (#366).
-# Trigger pattern is sourced from scripts/lib/gen-skill-trigger.mjs (single
-# source of truth shared with gate-check.mjs) since this sh script can't import JS.
-gen_skill_trigger=$(node scripts/lib/gen-skill-trigger.mjs) || { echo "gen-skill trigger derivation failed"; exit 1; }
-check_drift "$gen_skill_trigger" "packages/cli/dist/cli.js" \
-  "node scripts/gen-skill.mjs --out .claude/skills/pfdsl" \
-  "The .claude/skills/pfdsl dev copy failed to regenerate. Run 'make gen-skill' and investigate."
+# The .claude/skills/pfdsl dev copy has no drift check of its own: it is a
+# symlink to plugin/pfdsl/skills/pfdsl (#714), so the tracked-copy check below
+# covers the same bytes. Its trigger pattern (scripts/lib/gen-skill-trigger.mjs)
+# is still used by gate-check.mjs.
 
 # install/ is a generated mirror of its repo-root sources (#547) — one
 # direction only, repo-root source -> .claude/skills/pfd-ops/install/. Runs

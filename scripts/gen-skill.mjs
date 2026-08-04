@@ -4,7 +4,7 @@
 // The --out path must contain '.claude/' or 'skills/' (safety check).
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { dirname, relative, resolve, sep } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { execFileSync } from "node:child_process";
@@ -74,19 +74,9 @@ if (leftover.length > 0) {
 writeFileSync(resolve(outDir, "SKILL.md"), skillMd);
 console.log("SKILL.md → generated from skill-template/SKILL.md");
 
-// --- 4. Write CLAUDE.md guard (in-repo working copy only, .claude/ outputs) ---
-// .claude/skills/pfdsl is a generated + gitignored working copy (#348); the
-// marketplace plugin copy (plugin/pfdsl/skills/pfdsl, #366) intentionally
-// omits this dev-only guard.
-// Must check the path *relative to the repo root*, not raw absolute path
-// components — the repo itself may be checked out under a directory that
-// contains a literal ".claude" segment (e.g. a worktree at .claude/worktrees/*),
-// which would otherwise false-positive for every --out target.
-const relOutParts = relative(root, outDir).split(sep);
-if (relOutParts[0] === ".claude") {
-  const claudeMd = readFileSync(resolve(__dirname, "skill-template/CLAUDE.md"), "utf-8");
-  writeFileSync(resolve(outDir, "CLAUDE.md"), claudeMd);
-  console.log("CLAUDE.md → generated from skill-template/CLAUDE.md (in-repo working copy guard)");
-}
+// No skill-root CLAUDE.md guard is written: .claude/skills/pfdsl is now a
+// symlink to this output rather than a second copy (#714), so anything written
+// beside SKILL.md lands in the distributed bundle. The "DO NOT EDIT" header
+// injected above already tells a reader the file is generated.
 
 console.log(`\nSkill written to: ${outDir}`);

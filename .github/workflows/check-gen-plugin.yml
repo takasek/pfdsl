@@ -20,10 +20,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # .claude/skills/pfdsl is generated + gitignored (#348), so it doesn't exist
-      # on a fresh checkout yet — bootstrap-pfdsl-skill builds once, generates it,
-      # then rebuilds so the CLI bundle picks it up (see Makefile comment).
-      - run: make bootstrap-pfdsl-skill
+      # .claude/skills/pfdsl is gitignored (#348), so it doesn't exist on a
+      # fresh checkout — link it to the tracked bundle copy the way `make
+      # setup` does (#714).
+      - run: node scripts/link-repo-skill.mjs
+
+      # gen-plugin renders SKILL.md from `pfdsl help` and runs check-docs, both
+      # of which read packages/cli/dist. The build used to ride along inside
+      # bootstrap-pfdsl-skill; the link replaced that target, so name it here.
+      - run: pnpm -r build
 
       - name: Regenerate plugin dir and assert no drift
         run: |

@@ -22,10 +22,10 @@ jobs:
 
       - run: make lint
 
-      # .claude/skills/pfdsl is generated + gitignored (#348) and absent on a
-      # fresh checkout — bootstrap it before the plain 'pnpm -r build' below
-      # (which would otherwise fail at the CLI's onSuccess bundling step).
-      - run: make bootstrap-pfdsl-skill
+      # .claude/skills/pfdsl is gitignored (#348) and absent on a fresh
+      # checkout — link it to the tracked bundle copy the way `make setup`
+      # does (#714), so checks that read the repo-local skill path resolve.
+      - run: node scripts/link-repo-skill.mjs
 
       - run: pnpm -r build
 
