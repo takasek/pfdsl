@@ -15,7 +15,7 @@
 ## B. 粒度・型
 
 - **万能成果物**: `dialogue` → お題・提案・判断の3型に分割
-- **プロセス実在性（双方向）**: `payoff_log` 追記は対話の終端動作。逆に、ADR 起草は突合検証を固有入力に持つと委譲失敗で判明
+- **プロセス実在性（双方向）**: `payoff_log` 追記は対話の終端動作。逆に、ADR 起草は突合検証を固有入力に持つと委譲失敗で判明。計画時に分けたリリースが1回の公開にまとまると、publish プロセスと release artifact が現実にない公開イベントを主張したまま残る — 版番号を書いて初めて同一版を指す兄弟として現れる（`cli_release_grill_tolerance` と `cli_release_query_tools` がともに npm 0.0.21 で、`cli_release_tolerance_query` へ統合。規約は `.pfdsl/roadmap.md`「1公開イベント = 1 リリース artifact」）
 - **自動化は description**: 自動 publish は `publish_cli` の description、close 時 flow 同期は `map_deps` の description に記す
 - **並列主張への挑戦**: ADR-0004 基準3
 
