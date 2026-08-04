@@ -3,19 +3,13 @@ setup:
 	pnpm install
 	cp scripts/hooks/pre-commit-shim $$(git rev-parse --git-common-dir)/hooks/pre-commit
 	chmod +x $$(git rev-parse --git-common-dir)/hooks/pre-commit
-	@if [ ! -d .claude/skills/pfdsl ]; then $(MAKE) bootstrap-pfdsl-skill; fi
+	node scripts/link-repo-skill.mjs
 
-# .claude/skills/pfdsl is generated + gitignored (#348), not tracked in git.
-# gen-skill.mjs needs a built CLI (packages/cli/dist/cli.js) to render the CLI
-# help section, so build the packages first, then generate the skill once.
-.PHONY: bootstrap-pfdsl-skill
-bootstrap-pfdsl-skill:
-	pnpm --filter @pfdsl/core build
-	pnpm --filter @pfdsl/graphviz-exporter build
-	pnpm --filter @pfdsl/metadata-exporter build
-	pnpm --filter @pfdsl/preview-engine build
-	pnpm --filter @pfdsl/cli build
-	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
+# .claude/skills/pfdsl is gitignored (#348) and points at the tracked bundle
+# copy (#714): a symlink, so a branch switch synchronises the skill an agent
+# reads through git. It used to be a separately generated directory, which
+# needed a built CLI to bootstrap and silently kept the previous branch's
+# version until someone re-ran the generator.
 
 .PHONY: build
 build:
@@ -150,7 +144,7 @@ check-docs:
 
 .PHONY: gen-skill
 gen-skill: check-docs
-	node scripts/gen-skill.mjs --out .claude/skills/pfdsl
+	node scripts/gen-skill.mjs --out plugin/pfdsl/skills/pfdsl
 
 .PHONY: gen-install
 gen-install:
