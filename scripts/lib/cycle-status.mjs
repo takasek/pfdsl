@@ -3,6 +3,13 @@
  * git/gh I/O lives in the main script; this module stays testable.
  */
 
+import {
+	DESIGN_RECORD_REQUIRED_PREFIXES,
+	DISPOSITION_TOKENS,
+	lineHeadPattern,
+	normalizeRecordLine,
+} from "./gate-check.mjs";
+
 /**
  * @param {Array<{conclusion?: string|null, status?: string}>} [statusCheckRollup]
  * @returns {"NONE"|"PASS"|"FAIL"|"PENDING"|"UNKNOWN"}
@@ -105,7 +112,44 @@ export function detectEnumeratedOptions(body) {
 	return { enumerated: count >= 2, count, headings };
 }
 
-const DECISION_LINE_PATTERN = /^決定:\s*案\s*(\S+)/;
+export const DECISION_LINE_PREFIX = "決定:";
+const DECISION_LINE_PATTERN = lineHeadPattern(DECISION_LINE_PREFIX, "\\s*案\\s*(\\S+)");
+
+/**
+ * The design-selection record, pre-shaped so the runner never has to know the
+ * format to satisfy it. Every line head here is the one the terminal gate
+ * matches on, taken from the gate's own constants rather than restated — a
+ * template that drifts from the checker is worse than none, because it is
+ * trusted.
+ *
+ * `決定: 案N` is deliberately absent. That line belongs to the filer and is
+ * evidence that the design was settled; this record belongs to the runner and
+ * is evidence that alternatives were generated. Putting the filer's line in the
+ * runner's template would teach every cycle to write it, which is exactly how
+ * the distinction the gate protects gets dissolved by the act of passing it.
+ *
+ * Emitted on every cycle, not only when the issue enumerates options: the gate
+ * FAILs a missing record regardless of the option count, so a record is owed
+ * whenever the cycle names an issue at all.
+ * @param {{optionCount?: number}} [params]
+ * @returns {{note: string, lines: string[]}}
+ */
+export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
+	const lines = [
+		`${DESIGN_RECORD_REQUIRED_PREFIXES[0]} 本案は〈○○という状態が存在し続けること〉を前提にする`,
+		`${DESIGN_RECORD_REQUIRED_PREFIXES[1]} 上の前提を否定した案（起票者が挙げていなくても作る）`,
+		`${DESIGN_RECORD_REQUIRED_PREFIXES[2]} 外部制約か所有者に帰着させる（「手間がかかる」「スコープ外」は無効）`,
+	];
+	if (optionCount > 0) {
+		lines.push(
+			`案の処分: 列挙された ${optionCount} 件それぞれに ${DISPOSITION_TOKENS.join(" / ")} のいずれかを書く`,
+		);
+	}
+	return {
+		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 雛形のまま投稿しても形式は通るが、記録としては何も残らない。行頭 ${DECISION_LINE_PREFIX} 案N は別の記録であり、起票者本人が書く。実行主体はこの記録に書かない。`,
+		lines,
+	};
+}
 
 /**
  * 確定の証拠となる `決定: 案N` 行を、issue 本文とコメントから収集する。
@@ -116,11 +160,11 @@ const DECISION_LINE_PATTERN = /^決定:\s*案\s*(\S+)/;
 export function findDecisionRecords(entries) {
 	const records = [];
 	for (const entry of entries ?? []) {
-		const lines = (entry.body ?? "").split("\n");
-		for (const line of lines) {
-			const match = line.match(DECISION_LINE_PATTERN);
+		for (const line of (entry.body ?? "").split("\n")) {
+			const normalized = normalizeRecordLine(line);
+			const match = normalized.match(DECISION_LINE_PATTERN);
 			if (match) {
-				records.push({ author: entry.author, option: match[1], line: line.trim(), createdAt: entry.createdAt });
+				records.push({ author: entry.author, option: match[1], line: normalized, createdAt: entry.createdAt });
 			}
 		}
 	}

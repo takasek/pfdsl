@@ -24,15 +24,31 @@ import {
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
+	selectDesignRecord,
 	SIZE_TRACKED_PATTERNS,
 	statusChangedForArtifact,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
-import { detectEnumeratedOptions, findDecisionRecords } from "./cycle-status.mjs";
+import { detectEnumeratedOptions } from "./cycle-status.mjs";
+import { classifyCycle, mergeCycleRecords, parseMeasurementRecords } from "./review-measurement.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
+
+/**
+ * The branch's changed paths, three-dot against the base.
+ *
+ * --diff-filter=d excludes deleted paths — a deleted .pfdsl/.md would otherwise
+ * fail the check/linebreaks gates against a file that no longer exists.
+ * @param {{exec: Function, base: string}} params
+ * @returns {{ok: boolean, files: string[], error?: string}}
+ */
+export function changedFilesSince({ exec, base }) {
+	const r = exec("git", ["diff", "--diff-filter=d", "--name-only", `origin/${base}...HEAD`]);
+	if (!r.ok) return { ok: false, files: [], error: r.out.trim() };
+	return { ok: true, files: r.out.trim().split("\n").filter(Boolean) };
+}
 
 /**
  * gen-plugin identity: regenerate the distributed trees and require no diff.
@@ -144,14 +160,18 @@ export function designRecordStep({ exec, base, issue, issueError }) {
 	const optionCount = detectEnumeratedOptions(body).count;
 
 	// The issue body is one entry among the comments, not a special case that
-	// bypasses the checks: a decision written into the body is still a record
-	// whose timing and structure are judged the same way (its createdAt is the
-	// issue's, so it passes timing on its own merits rather than by exemption).
+	// bypasses the checks: a record written into the body is judged for timing
+	// and structure the same way (its createdAt is the issue's, so it passes
+	// timing on its own merits rather than by exemption).
+	//
+	// No author condition. The reference assigns the selection record to the
+	// runner, so requiring the filer's login here is what made a conforming
+	// record impossible to post without also writing the filer's decision line.
 	const entries = [
 		{ author: ownerLogin, body, createdAt: issue.createdAt },
 		...(issue.comments ?? []).map((c) => ({ author: c.author?.login, body: c.body, createdAt: c.createdAt })),
 	];
-	const record = entries.find((e) => e.author === ownerLogin && findDecisionRecords([e]).length > 0);
+	const record = selectDesignRecord(entries);
 
 	if (!record) {
 		return { name, ...classifyDesignRecordTiming(undefined, null) };
@@ -241,5 +261,56 @@ export function commitSubjectStep({ exec, base }) {
 			failed.length === 0
 				? `${subjects.length} commit(s)`
 				: failed.map((r) => `${r.reason}: ${r.subject}`).join("; "),
+	};
+}
+
+/**
+ * check-docs: the documentation and distributed-prose checks CI runs.
+ *
+ * The whole `make check-docs` target rather than one check lifted out of it.
+ * Seven checks sit behind that target and none of them was on the gate, so
+ * migrating one — the one whose absence happened to be noticed — would leave
+ * six with the same gap and the same issue waiting to be filed. Whole-repo
+ * scope is not a problem in practice: CI runs this same target on every push,
+ * so the tree the branch starts from is already clean (the argument
+ * md-write-check.mjs makes for reading whole files rather than diffs).
+ */
+export function checkDocsStep({ exec }) {
+	const name = "check-docs";
+	const r = exec("make", ["check-docs"]);
+	return { name, status: r.ok ? "PASS" : "FAIL", detail: r.ok ? undefined : r.out.trim().slice(-400) };
+}
+
+/**
+ * Review-Measurement record: does this branch carry a trailer consistent with
+ * what it changed? The rule says the trailer cannot be added after the fact —
+ * it is part of a commit message — yet every detector for it used to sit after
+ * the merge, where the only fix left is rewriting history.
+ *
+ * The verdict is classifyCycle's, called on `origin/<base>...HEAD` the way the
+ * aggregate script calls it on a merge. Nothing is decided here that the
+ * merged-history audit would decide differently; a malformed record is reported
+ * because parseMeasurementTrailer already judged it, not as an extra rule.
+ */
+export function reviewMeasurementStep({ exec, base, changedFiles }) {
+	const name = "Review-Measurement record";
+	const bodies = exec("git", ["log", "--no-merges", `origin/${base}..HEAD`, "--format=%B"]);
+	if (!bodies.ok) return { name, status: "FAIL", detail: bodies.out.trim() };
+
+	const records = parseMeasurementRecords(bodies.out);
+	const merged = mergeCycleRecords(records);
+	const { issues } = classifyCycle({
+		changedFiles: changedFiles.join("\n"),
+		trailerCount: records.length,
+		sample: merged?.sample,
+	});
+
+	const problems = issues.map((i) => i.detail);
+	if (merged?.error) problems.push(`malformed record: ${merged.error}`);
+	if (problems.length > 0) return { name, status: "FAIL", detail: problems.join("; ") };
+	return {
+		name,
+		status: "PASS",
+		detail: records.length === 0 ? "prose-only branch, no record owed" : `${records.length} record(s)`,
 	};
 }

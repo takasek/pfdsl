@@ -19,7 +19,7 @@ import {
 	FIELD_SEP,
 	mergeCycleRecords,
 	summarize,
-	parseMeasurementTrailer,
+	parseMeasurementRecords,
 	TARGET_SAMPLE_COUNT,
 	IN_SAMPLE_PATH,
 	parseSinceArg,
@@ -68,11 +68,7 @@ for (const line of stepsResult.out.trim().split("\n").filter(Boolean)) {
 		? tryGit(["log", "--format=%B", `${sha}^1..${sha}^2`])
 		: tryGit(["log", "-1", "--format=%B", sha]);
 	if (!bodies.ok) continue;
-	const records = [];
-	for (const body of bodies.out.split(/^(?=Review-Measurement:)/m)) {
-		const record = parseMeasurementTrailer(body);
-		if (record) records.push(record);
-	}
+	const records = parseMeasurementRecords(bodies.out);
 	cycles.push({ sha, subject: subject.trim(), secondParent, records });
 }
 

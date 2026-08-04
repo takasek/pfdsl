@@ -338,6 +338,94 @@ export function classifyDesignRecordTiming(recordIso, firstCommitIso) {
 export const DESIGN_RECORD_REQUIRED_PREFIXES = ["前提:", "否定案:", "却下理由:"];
 export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
 
+/** Markdown line-head decoration: blockquote, heading, or list marker. */
+const LINE_HEAD_DECORATION = /^(?:>+|#{1,6}|[-*+]|\d+[.)])\s*/;
+
+/**
+ * A record line with its markdown stripped, ready for a line-head match.
+ *
+ * Emphasis goes first and everywhere, because it wraps the label in three
+ * different places (`**前提:**`, `**前提**:`) and none of them is the label.
+ * Then every layer of line-head decoration, not just the first: a record line
+ * is as likely to read `> - 却下理由:` as `却下理由:`, and peeling one layer
+ * leaves the rest unrecognisable.
+ * @param {string} line
+ * @returns {string}
+ */
+export function normalizeRecordLine(line) {
+	let stripped = line.trim().replace(/\*\*/g, "");
+	while (LINE_HEAD_DECORATION.test(stripped)) {
+		stripped = stripped.replace(LINE_HEAD_DECORATION, "");
+	}
+	return stripped.trim();
+}
+
+const REGEXP_METACHARS = /[.*+?^${}()|[\]\\]/g;
+
+/**
+ * A line head that carries `prefix`, for a line already through
+ * normalizeRecordLine. The label text itself is fixed — a record saying
+ * `前提条件:` has not written a `前提:` line — but two things around it are not
+ * part of the label and must not decide the verdict: a parenthesised qualifier
+ * (`却下理由（外部制約）:`, whose parenthetical carries the exemption clause's
+ * required attribution) and a full-width colon.
+ *
+ * `tail` extends the match past the colon for the one line head that reads
+ * something after it — the decision line's `案N`. Without it that line would be
+ * the only member of the design-record family still matched by a bare regexp,
+ * which is the fragility this whole normalisation exists to remove.
+ * @param {string} prefix - a design-record line-head token, colon included
+ * @param {string} [tail] - regexp source appended after the colon
+ * @returns {RegExp}
+ */
+export function lineHeadPattern(prefix, tail = "") {
+	const label = prefix.replace(/[:：]$/, "").replace(REGEXP_METACHARS, "\\$&");
+	return new RegExp(`^${label}\\s*(?:（[^）]*）|\\([^)]*\\))?\\s*[:：]${tail}`);
+}
+
+/**
+ * Which of the required line heads this text carries, in canonical order.
+ * Serves both the content verdict and the record's identification, so the two
+ * cannot disagree about what counts as a required line.
+ * @param {string} recordBody
+ * @returns {string[]} a subset of DESIGN_RECORD_REQUIRED_PREFIXES
+ */
+export function presentRequiredPrefixes(recordBody) {
+	const lines = (recordBody ?? "").split("\n").map(normalizeRecordLine);
+	return DESIGN_RECORD_REQUIRED_PREFIXES.filter((prefix) => {
+		const pattern = lineHeadPattern(prefix);
+		return lines.some((line) => pattern.test(line));
+	});
+}
+
+/**
+ * The entry that is this issue's selection record, or undefined.
+ *
+ * Identified by its own required line heads rather than by a `決定:` line. The
+ * two are separate records with separate authors — the filer settles the design
+ * with `決定:`, the runner writes the selection record — and keying one to the
+ * other left no way to post a conforming record without also forging the
+ * filer's decision line.
+ *
+ * Most matches wins rather than first match. Measured over this repo's issues,
+ * bodies carry a stray required line head often enough that a first-match
+ * search would elect the body and never examine the real record in a comment —
+ * a check aimed at the wrong text, which reads exactly like a check that ran.
+ * @param {Array<{author?: string, body?: string, createdAt?: string}>} entries
+ */
+export function selectDesignRecord(entries) {
+	let best;
+	let bestCount = 0;
+	for (const entry of entries ?? []) {
+		const count = presentRequiredPrefixes(entry.body).length;
+		if (count > bestCount) {
+			best = entry;
+			bestCount = count;
+		}
+	}
+	return best;
+}
+
 /**
  * Classify the content of a design-selection record. Two independent checks:
  * required line-head tokens are present, and every enumerated option got a
@@ -353,12 +441,8 @@ export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
  */
 export function classifyDesignRecordContent(recordBody, optionCount) {
 	const body = recordBody ?? "";
-	const lines = body
-		.split("\n")
-		.map((line) => line.trim().replace(/^#{1,6}\s*/, "").replace(/^\*\*/, ""));
-	const missing = DESIGN_RECORD_REQUIRED_PREFIXES.filter(
-		(prefix) => !lines.some((line) => line.startsWith(prefix)),
-	);
+	const present = presentRequiredPrefixes(body);
+	const missing = DESIGN_RECORD_REQUIRED_PREFIXES.filter((prefix) => !present.includes(prefix));
 
 	const problems = [];
 	if (missing.length > 0) problems.push(`missing required line(s): ${missing.join(", ")}`);

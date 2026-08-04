@@ -33,6 +33,9 @@ import {
 	sizeDirectionStep,
 	collectSizeDeltas,
 	commitSubjectStep,
+	checkDocsStep,
+	changedFilesSince,
+	reviewMeasurementStep,
 } from "./lib/gate-check-steps.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
@@ -84,14 +87,12 @@ const node = (execArgs, input) => exec(process.execPath, execArgs, input);
 // Best-effort — a stale/missing origin ref surfaces as a clear diff failure below.
 exec("git", ["fetch", "origin"]);
 
-// --diff-filter=d excludes deleted paths — a deleted .pfdsl/.md would
-// otherwise fail the check/linebreaks gates against a file that no longer exists.
-const diffFiles = exec("git", ["diff", "--diff-filter=d", "--name-only", `origin/${base}...HEAD`]);
-if (!diffFiles.ok) {
-	console.error(`gate-check: failed to diff against origin/${base}: ${diffFiles.out.trim()}`);
+const diff = changedFilesSince({ exec, base });
+if (!diff.ok) {
+	console.error(`gate-check: failed to diff against origin/${base}: ${diff.error}`);
 	process.exit(1);
 }
-const changedFiles = diffFiles.out.trim().split("\n").filter(Boolean);
+const changedFiles = diff.files;
 const pfdslFiles = changedFiles.filter((f) => f.endsWith(".pfdsl"));
 const mdFiles = changedFiles.filter((f) => f.endsWith(".md"));
 
@@ -131,6 +132,11 @@ if (mdFiles.length === 0) {
 	const r = node(["scripts/check-md-linebreaks.mjs", ...mdFiles]);
 	results.push({ name: "check-md-linebreaks", status: r.ok ? "PASS" : "FAIL" });
 }
+
+// 3b. check-docs: the whole documentation/prose check suite CI runs, as one
+// step (#721). Unconditional — it is whole-repo by construction, and at ~4s it
+// costs less than the two steps below it.
+results.push(checkDocsStep({ exec }));
 
 // 4. gen-plugin identity (only when skill/plugin/install-source paths changed)
 results.push(genPluginIdentityStep({ exec, node, changedFiles }));
@@ -174,6 +180,10 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 // 8. commit subject lint (Conventional Commits message format and language;
 // granularity stays MANUAL)
 results.push(commitSubjectStep({ exec, base }));
+
+// 8b. Review-Measurement record: judged here, before the PR, because the
+// trailer lives in a commit message and cannot be added afterwards (#698).
+results.push(reviewMeasurementStep({ exec, base, changedFiles }));
 
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }));
