@@ -29,8 +29,15 @@ export function isDistStale(distFile) {
 	return statSync(distFile).mtimeMs < newestMtimeUnder(srcDir);
 }
 
-// CLI mode: exit 0 if fresh, 1 if stale/absent. Usage: node dist-freshness.mjs <distFile>
+// CLI mode: exit 0 if fresh, 1 if stale/absent, 2 if asked without a path.
+// The third case has to be its own exit code: every caller in
+// scripts/pre-commit reads "stale" as "skip this drift check and say so", so a
+// caller that dropped its argument would silently turn the check off (#648).
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	const distFile = process.argv[2];
+	if (!distFile) {
+		console.error("Usage: node scripts/lib/dist-freshness.mjs <distFile>");
+		process.exit(2);
+	}
 	process.exit(isDistStale(distFile) ? 1 : 0);
 }

@@ -90,6 +90,16 @@ describe("entry scripts reject argv they do not understand", () => {
 		assert.match(stderr, /must contain a '\.claude' or 'skills' directory component/);
 	});
 
+	// A missing required positional is the same silence in a different place.
+	// dist-freshness answers "stale" when it gets no path, and every caller in
+	// scripts/pre-commit reads "stale" as "skip this drift check" — so a caller
+	// that dropped its argument would turn the check off and report nothing.
+	it("dist-freshness.mjs refuses to answer without a path", () => {
+		const { status, stderr } = runScript("scripts/lib/dist-freshness.mjs", []);
+		assert.equal(status, 2);
+		assert.match(stderr, /Usage/);
+	});
+
 	// Mutual exclusion is a script-level rule that strict parsing does not
 	// replace (#564) — it still has to hold for the separated form.
 	it("gate-check.mjs still rejects --artifact together with --no-artifact", () => {
