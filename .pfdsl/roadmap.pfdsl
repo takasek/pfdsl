@@ -410,15 +410,9 @@ artifact:
     description: "neighbors / impact / depends-on / path / hubs / group-graph / rollup 等の分析サブコマンド。完全リストと優先度は issue #479 が一次情報。着手時に段階を切り分ける"
     status: done
     criteria: "issue #479 の分析サブコマンドが実装され、到達性・近傍・集計が動作確認済み、テスト通過"
-  cli_release_grill_tolerance:
-    label: "CLIリリース: 診断緩和 + pfd-grill（npm v0.0.21）"
-    description: "#480 warning 降格 / #478 V011 緩和 / #481 pfd-grill スキル同梱を含む。計画上は cli_release_query_tools と別リリースだったが、実際には 0.0.21 として同時公開された"
-    status: done
-    criteria: "npm show @pfdsl/cli version が 0.0.21 を返す"
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_release_query_tools:
-    label: "CLIリリース: フィールド取得 + graph 分析（npm v0.0.21）"
-    description: "#476 get コマンド / #479 graph-analysis サブコマンド群を含む。計画上は cli_release_grill_tolerance と別リリースだったが、実際には 0.0.21 として同時公開された"
+  cli_release_tolerance_query:
+    label: "CLIリリース: 診断緩和 + pfd-grill + クエリツール（npm v0.0.21）"
+    description: "#480 warning 降格 / #478 V011 緩和 / #481 pfd-grill スキル同梱 / #476 get コマンド / #479 graph-analysis サブコマンド群を含む。計画では診断緩和系とクエリツール系の2リリースだったが、実際には 0.0.21 の1回で公開された"
     status: done
     criteria: "npm show @pfdsl/cli version が 0.0.21 を返す"
     location: https://www.npmjs.com/package/@pfdsl/cli
@@ -654,8 +648,8 @@ process:
   i484_implement_def_insertion:
     label: 定義挿入 code action 実装
     location: https://github.com/takasek/pfdsl/issues/484
-  publish_cli_grill_tolerance:
-    label: CLI 診断緩和 + grill 公開
+  publish_cli_tolerance_query:
+    label: CLI 診断緩和 + grill + クエリツール公開
   publish_ext_editing:
     label: extension 編集支援リリース
   i476_implement_field_get:
@@ -667,8 +661,6 @@ process:
   i479_implement_graph_analysis:
     label: graph-analysis サブコマンド実装
     location: https://github.com/takasek/pfdsl/issues/479
-  publish_cli_query_tools:
-    label: CLI フィールド取得 + graph 分析公開
   i592_cst_frontmatter:
     label: frontmatter CST 化実装
     description: "ADR-0034 の決定を実装する。fmt/meta set/sort/reindex/insert-definition の frontmatter 読み書きを yaml Document ベースに統一し、frontmatter-text.ts の手術用ヘルパーを削除する"
@@ -801,14 +793,12 @@ marketplace_dist >> i404_integrate_pfd_ops_plugin -> pfd_ops_plugin_dist
 cli_release_explain_lens >> i435_implement_ansi_color -> ansi_color
 ansi_color >> publish_cli_ansi_color -> cli_release_ansi_color
 
+cli_release_ansi_color >> i476_implement_field_get -> field_get_cmd
 cli_release_ansi_color >> i478_relax_v011 -> v011_semantics
+cli_release_ansi_color >> i479_implement_graph_analysis -> graph_analysis
 cli_release_ansi_color >> i480_relax_incomplete_graph -> incomplete_tolerance
 incomplete_tolerance >> i481_create_grill_skill -> grill_skill
-[incomplete_tolerance, v011_semantics, grill_skill] >> publish_cli_grill_tolerance -> cli_release_grill_tolerance
-
-cli_release_ansi_color >> i476_implement_field_get -> field_get_cmd
-cli_release_ansi_color >> i479_implement_graph_analysis -> graph_analysis
-[field_get_cmd, graph_analysis] >> publish_cli_query_tools -> cli_release_query_tools
+[field_get_cmd, graph_analysis, incomplete_tolerance, v011_semantics, grill_skill] >> publish_cli_tolerance_query -> cli_release_tolerance_query
 
 cli_tool >> i592_cst_frontmatter -> frontmatter_cst_impl
 frontmatter_cst_impl >> publish_cli_frontmatter_cst -> cli_release_frontmatter_cst
