@@ -1,6 +1,22 @@
+import { parseArgs } from "node:util";
 import { build, context } from "esbuild";
 
-const watch = process.argv.includes("--watch");
+// strict parsing, not includes("--watch"): a typo'd or --watch=true form is
+// invisible to includes(), so `pnpm watch` builds once and exits as though it
+// were watching (#648).
+let watch;
+try {
+	const { values } = parseArgs({
+		args: process.argv.slice(2),
+		options: { watch: { type: "boolean" } },
+		strict: true,
+		allowPositionals: false,
+	});
+	watch = values.watch === true;
+} catch (err) {
+	console.error(`esbuild.config: ${err.message}`);
+	process.exit(2);
+}
 
 const extensionOptions = {
 	entryPoints: ["src/extension.ts"],
