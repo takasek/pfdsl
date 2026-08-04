@@ -163,18 +163,41 @@ export const VSCODE_EXT_TRIGGER = /^packages\/vscode-extension\//;
 const CONVENTIONAL_COMMIT_PATTERN =
 	/^(feat|fix|refactor|docs|chore|test|style|perf|build|ci|revert)(\([\w.,/-]+\))?!?: .+/;
 
+// CJK punctuation through unified ideographs, plus fullwidth forms — the
+// marker this repo's commit-language rule (CLAUDE.md: messages are English)
+// can be checked by. "Is this English" is not mechanically decidable; "does
+// this carry Japanese" is. One contiguous range rather than kana and
+// ideographs separately: what sits between the obvious blocks — iteration
+// marks, halfwidth katakana — is just as Japanese as the blocks.
+//
+// Deliberately not shared with graphviz-exporter's CJK_RE, which spans a
+// similar range for an unrelated reason (the wasm Graphviz measures these
+// glyphs at ASCII width). Tying the two together would drag this rule along
+// whenever font metrics change.
+const CJK_PATTERN = /[　-鿿＀-￯]/u;
+
+// Backtick and double-quote spans are exempt: a subject may legitimately quote
+// a Japanese identifier or heading that exists in the tree. Measured over this
+// repo's 1795 non-merge subjects, 7 carry CJK and 1 of those is such a quote.
+const QUOTED_SPAN_PATTERN = /`[^`]*`|"[^"]*"/g;
+
 /**
- * Lint commit subjects against the Conventional Commits format (message
- * format only — commit granularity is a judgment call left to code review).
+ * Lint commit subjects against the Conventional Commits format and the
+ * English-language rule (message format and language only — commit
+ * granularity is a judgment call left to code review).
  * @param {string[]} subjects
  * @returns {Array<{subject: string, ok: boolean, reason?: string}>}
  */
 export function lintCommitSubjects(subjects) {
-	return subjects.map((subject) =>
-		CONVENTIONAL_COMMIT_PATTERN.test(subject)
-			? { subject, ok: true }
-			: { subject, ok: false, reason: "not Conventional Commits" },
-	);
+	return subjects.map((subject) => {
+		if (!CONVENTIONAL_COMMIT_PATTERN.test(subject)) {
+			return { subject, ok: false, reason: "not Conventional Commits" };
+		}
+		if (CJK_PATTERN.test(subject.replace(QUOTED_SPAN_PATTERN, ""))) {
+			return { subject, ok: false, reason: "non-English text outside quoted spans" };
+		}
+		return { subject, ok: true };
+	});
 }
 
 /**

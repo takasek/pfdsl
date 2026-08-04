@@ -535,4 +535,13 @@ describe("commitSubjectStep", () => {
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /add a thing/);
 	});
+
+	it("FAILs on a subject carrying unquoted Japanese (#595)", () => {
+		const { exec } = fakeExec({
+			"git log": { out: "refactor(scripts): move it into a dist非依存 module\n" },
+		});
+		const result = commitSubjectStep({ exec, base: "main" });
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /non-English/);
+	});
 });
