@@ -25,6 +25,11 @@ jobs:
       # setup` does (#714).
       - run: node scripts/link-repo-skill.mjs
 
+      # gen-plugin renders SKILL.md from `pfdsl help` and runs check-docs, both
+      # of which read packages/cli/dist. The build used to ride along inside
+      # bootstrap-pfdsl-skill; the link replaced that target, so name it here.
+      - run: pnpm -r build
+
       - name: Regenerate plugin dir and assert no drift
         run: |
           make gen-plugin
