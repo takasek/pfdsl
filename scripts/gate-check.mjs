@@ -10,6 +10,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import {
 	extractGateChecklist,
 	deriveManualItems,
@@ -39,17 +40,33 @@ import { execGh } from "./pfdsl/lib/gh-exec.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-const args = process.argv.slice(2);
-const flag = (name) => {
-	const idx = args.indexOf(name);
-	return idx >= 0 ? args[idx + 1] : undefined;
-};
-const base = flag("--base") ?? "main";
-const artifactKey = flag("--artifact");
+// strict parsing, not an indexOf sweep: a hand-rolled lookup drops the
+// --artifact=key form and any typo'd flag, and this script's response to a
+// missing --artifact is to downgrade to a coarse audit and report PASS — the
+// caller is told nothing (#648).
+let values;
+try {
+	({ values } = parseArgs({
+		args: process.argv.slice(2),
+		options: {
+			base: { type: "string" },
+			artifact: { type: "string" },
+			"no-artifact": { type: "boolean" },
+			issue: { type: "string" },
+		},
+		strict: true,
+		allowPositionals: false,
+	}));
+} catch (err) {
+	console.error(`gate-check: ${err.message}`);
+	process.exit(2);
+}
+const base = values.base ?? "main";
+const artifactKey = values.artifact;
 // Declared, not inferred: a bookkeeping cycle touches roadmap.pfdsl without
 // owning an output artifact, and the diff cannot tell that apart from a cycle
 // that forgot its status update (#564).
-const noArtifact = args.includes("--no-artifact");
+const noArtifact = values["no-artifact"] === true;
 if (noArtifact && artifactKey) {
 	console.error("gate-check: --artifact and --no-artifact are mutually exclusive");
 	process.exit(2);
@@ -57,8 +74,7 @@ if (noArtifact && artifactKey) {
 // Optional: powers the design-selection-record and size-direction checks
 // (#669), which need the linked issue to read from. Without it those checks
 // SKIP rather than guess which issue the cycle belongs to.
-const issueFlagValue = flag("--issue");
-const issueNumber = issueFlagValue !== undefined ? Number(issueFlagValue) : null;
+const issueNumber = values.issue !== undefined ? Number(values.issue) : null;
 
 // Every call names the executable and its arguments separately — `base` and
 // `artifactKey` come from argv and must never be parsed by a shell (#572).

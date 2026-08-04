@@ -16,7 +16,7 @@ import { writeSkillRefs } from "./lib/gen-skill-refs.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-const outDir = parseSkillOutDir("scripts/gen-skill-refs.mjs", process.argv);
+const outDir = parseSkillOutDir("scripts/gen-skill-refs.mjs", process.argv.slice(2));
 
 writeSkillRefs(root, outDir);
 console.log(`\nreferences/ written to: ${resolve(outDir, "references")}`);

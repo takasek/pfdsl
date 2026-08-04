@@ -5,21 +5,41 @@
 // contract can't drift between them.
 
 import { resolve } from "node:path";
+import { parseArgs } from "node:util";
 
 /**
  * @param {string} scriptName path used in the usage message, e.g. "scripts/gen-skill.mjs"
- * @param {string[]} argv argument vector to read --out from
+ * @param {string[]} argv argument vector past the script name, i.e. process.argv.slice(2)
  * @returns {string} absolute output directory path
  */
-export function parseSkillOutDir(scriptName, argv = process.argv) {
-	const outIdx = argv.indexOf("--out");
-	if (outIdx === -1 || !argv[outIdx + 1] || argv[outIdx + 1].startsWith("-")) {
+export function parseSkillOutDir(scriptName, argv) {
+	// strict parsing, not indexOf("--out"): the inline --out=… form was
+	// invisible to the lookup, so the generators printed their usage as though
+	// no destination had been named, and a typo'd flag alongside a valid --out
+	// was dropped without a word (#648).
+	const usage = () => {
 		console.error(`Usage: node ${scriptName} --out <skill-dir>`);
 		console.error(`Example: node ${scriptName} --out .claude/skills/pfdsl`);
+	};
+	let values;
+	try {
+		({ values } = parseArgs({
+			args: argv,
+			options: { out: { type: "string" } },
+			strict: true,
+			allowPositionals: false,
+		}));
+	} catch (err) {
+		console.error(`${scriptName}: ${err.message}`);
+		usage();
+		process.exit(2);
+	}
+	if (!values.out) {
+		usage();
 		process.exit(2);
 	}
 
-	const outDir = resolve(process.cwd(), argv[outIdx + 1]);
+	const outDir = resolve(process.cwd(), values.out);
 	const parts = outDir.split(/[\\/]/);
 	if (!parts.includes(".claude") && !parts.includes("skills")) {
 		console.error(`Error: output path must contain a '.claude' or 'skills' directory component — got: ${outDir}`);

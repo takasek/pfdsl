@@ -420,7 +420,9 @@ async function main() {
 // realpathSync (not resolve) matters here: on macOS, import.meta.url reflects
 // the ESM loader's realpath-resolved location (e.g. /tmp -> /private/tmp), so
 // a plain resolve() of argv[1] still mismatches when the invocation path
-// crosses a symlink.
+// crosses a symlink. This is the same comparison scripts/lib/cli-entrypoint.mjs
+// makes, spelled inline rather than imported: the file is distributed with the
+// pfd-ops skill and runs in adopting repos, which have no scripts/lib/ (#707).
 if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
 	main();
 }

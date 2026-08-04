@@ -23,8 +23,7 @@
 // regenerated and re-staged too — and that staged install/ path itself
 // matches this pattern's `\.claude/skills/pfd-ops/` alternative.
 
-import { realpathSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { isCliEntrypoint } from "./cli-entrypoint.mjs";
 import { GEN_SKILL_TRIGGER_PATTERN } from "./gen-skill-trigger.mjs";
 import { PLUGIN_AGENT_FILES, PLUGIN_COMMAND_FILES, PLUGIN_SKILL_DIRS } from "./gen-plugin.mjs";
 
@@ -48,9 +47,6 @@ export const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/
 export const GEN_PLUGIN_TRIGGER = new RegExp(GEN_PLUGIN_TRIGGER_PATTERN);
 
 // CLI mode: print the raw ERE pattern string for shell command substitution.
-// realpathSync (not a raw string compare) matters here: on macOS, import.meta.url
-// reflects the ESM loader's realpath-resolved location (e.g. /tmp -> /private/tmp),
-// so a plain argv[1] comparison mismatches when the invocation path crosses a symlink.
-if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	console.log(GEN_PLUGIN_TRIGGER_PATTERN);
 }

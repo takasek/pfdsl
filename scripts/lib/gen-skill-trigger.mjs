@@ -4,6 +4,8 @@
 // sh script that captures the raw ERE string via command substitution,
 // since it cannot `import` JS). Keep this ERE-compatible for `grep -E`.
 
+import { isCliEntrypoint } from "./cli-entrypoint.mjs";
+
 // examples-index.mjs and sample-companions.mjs are here because they render
 // references/examples.md and references/samples.md: a change to either moves
 // the generated output while touching nothing else this pattern names, so the
@@ -14,6 +16,6 @@ export const GEN_SKILL_TRIGGER_PATTERN =
 export const GEN_SKILL_TRIGGER = new RegExp(GEN_SKILL_TRIGGER_PATTERN);
 
 // CLI mode: print the raw ERE pattern string for shell command substitution.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	console.log(GEN_SKILL_TRIGGER_PATTERN);
 }

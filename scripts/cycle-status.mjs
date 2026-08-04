@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import { run } from "./lib/run-exec.mjs";
 import { runCycleStatus } from "./lib/cycle-status-steps.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
@@ -13,11 +14,26 @@ import { execGh } from "./pfdsl/lib/gh-exec.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-const args = process.argv.slice(2);
-const baseFlagIdx = args.indexOf("--base");
-const base = baseFlagIdx >= 0 ? args[baseFlagIdx + 1] : "main";
-const issueFlagIdx = args.indexOf("--issue");
-const issueNumber = issueFlagIdx >= 0 ? Number(args[issueFlagIdx + 1]) : null;
+// strict parsing, not an indexOf sweep: --base=foo was skipped outright, so
+// the preflight measured the lag against main while reporting the branch the
+// caller had asked for nowhere at all (#648).
+let values;
+try {
+	({ values } = parseArgs({
+		args: process.argv.slice(2),
+		options: {
+			base: { type: "string" },
+			issue: { type: "string" },
+		},
+		strict: true,
+		allowPositionals: false,
+	}));
+} catch (err) {
+	console.error(`cycle-status: ${err.message}`);
+	process.exit(2);
+}
+const base = values.base ?? "main";
+const issueNumber = values.issue !== undefined ? Number(values.issue) : null;
 
 // `base` comes from argv; naming the executable and arguments separately keeps
 // it out of a shell (#572).

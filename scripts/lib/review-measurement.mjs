@@ -13,6 +13,8 @@
  * Process/git I/O lives in the main script; this module stays testable.
  */
 
+import { parseArgs } from "node:util";
+
 /** Number of in-sample cycles to collect before deciding the skip condition. */
 export const TARGET_SAMPLE_COUNT = 10;
 
@@ -178,26 +180,31 @@ export function summarize(cycles) {
 
 /**
  * Read the --since ref from argv.
- * Both accepted forms are checked explicitly, and a missing value is an error
- * rather than a silent fall-through: without a ref the script skips the
- * missing-record scan entirely and still exits 0, which reads as "nothing
- * missing" to whoever asked for the scan.
+ * Anything unrecognised is an error rather than a silent fall-through: without
+ * a ref the script skips the missing-record scan entirely and still exits 0,
+ * which reads as "nothing missing" to whoever asked for the scan — and a
+ * mistyped flag lands in exactly that state (#648). Node's strict parse
+ * supplies the rejections (unknown flag, dash-leading or absent value, stray
+ * positional); only the empty inline form has to be caught here, since
+ * `--since=` parses cleanly to an empty string.
  * @param {string[]} argv
  * @returns {{since?: string, error?: string}}
  */
 export function parseSinceArg(argv) {
-	const inline = argv.find((a) => a.startsWith("--since="));
-	if (inline) {
-		const value = inline.slice("--since=".length);
-		return value ? { since: value } : { error: "--since= needs a ref" };
+	let values;
+	try {
+		({ values } = parseArgs({
+			args: argv,
+			options: { since: { type: "string" } },
+			strict: true,
+			allowPositionals: false,
+		}));
+	} catch (err) {
+		return { error: err.message };
 	}
-
-	const idx = argv.indexOf("--since");
-	if (idx === -1) return { since: undefined };
-
-	const value = argv[idx + 1];
-	if (!value || value.startsWith("-")) return { error: "--since needs a ref" };
-	return { since: value };
+	if (values.since === undefined) return { since: undefined };
+	if (values.since === "") return { error: "--since needs a ref" };
+	return { since: values.since };
 }
 
 /**

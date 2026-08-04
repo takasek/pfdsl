@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 import { parseIssueProcesses, buildProcessOutputs, computeFindings, applyFixes, applyClosedInFlowFixes, computeLabelFindings, FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
 import { isGhUnavailableError, GH_UNAVAILABLE_EXIT_CODE } from "./lib/gh-compat.mjs";
@@ -14,7 +15,25 @@ import { parseDocument } from "./lib/yaml-require.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "../..");
 
-const fix = process.argv.includes("--fix");
+// strict parsing, not includes("--fix"): --fix is the one irreversible thing
+// this script does, and includes() answers false for --fix=true — the audit
+// then runs read-only while the caller believes the roadmap was repaired
+// (#648). node:util rather than a shared helper because this file is mirrored
+// into .claude/skills/pfd-ops/install/ and runs in adopting repos, which have
+// no scripts/lib/.
+let fix;
+try {
+	const { values } = parseArgs({
+		args: process.argv.slice(2),
+		options: { fix: { type: "boolean" } },
+		strict: true,
+		allowPositionals: false,
+	});
+	fix = values.fix === true;
+} catch (err) {
+	console.error(`audit-issues-flow: ${err.message}`);
+	process.exit(2);
+}
 
 // --- Read and split roadmap.pfdsl ---
 
