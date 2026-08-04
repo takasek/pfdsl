@@ -13,10 +13,12 @@
 
 import { resolve } from "node:path";
 import {
+	buildDesignRecordTemplate,
 	buildGateCheckCommand,
 	classifyDesignSettlement,
 	classifyPRs,
 	countBehind,
+	detectEnumeratedOptions,
 	findIssueNumberForProcess,
 	parseReadyOutput,
 } from "./cycle-status.mjs";
@@ -65,6 +67,21 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 					`Start the cycle's branch from origin/${base} (git switch -c <branch> origin/${base}) and re-run.`,
 			},
 		};
+	}
+
+	// Where HEAD sits, for the "second cycle in one session lands on the previous
+	// cycle's branch" accident (#629). Reported, not refused: continuing an
+	// existing branch is sometimes deliberate, so the judgement stays with the
+	// reader — but at selection time, not at the terminal gate where the commits
+	// are already stacked.
+	let currentBranch = null;
+	let commitsAheadOfBase = null;
+	let headStateError = null;
+	try {
+		currentBranch = sh("git", ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
+		commitsAheadOfBase = countBehind(sh("git", ["log", "--oneline", `origin/${base}..HEAD`]));
+	} catch (e) {
+		headStateError = e.message;
 	}
 
 	let openFlowSyncPRs = [];
@@ -120,11 +137,18 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 		}
 	}
 
+	// The record's option count comes from the issue when one is resolvable, and
+	// is 0 otherwise. The template itself is emitted either way: a cycle whose
+	// issue lookup failed still owes a record, and printing nothing is what left
+	// the format invisible at writing time in the first place (#720).
+	let recordOptionCount = 0;
+
 	if (targetIssue != null) {
 		try {
 			const issueJson = JSON.parse(
 				await execGh(["issue", "view", String(targetIssue), "--json", "author,body,comments"]),
 			);
+			recordOptionCount = detectEnumeratedOptions(issueJson.body).count;
 			const ownerLogin = issueJson.author?.login;
 			const comments = (issueJson.comments ?? []).map((c) => ({
 				author: c.author?.login,
@@ -155,14 +179,18 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 	const result = {
 		fetched,
 		behindBase,
+		currentBranch,
+		commitsAheadOfBase,
 		openFlowSyncPRs,
 		otherOpenPRs,
 		ready,
 		best,
 		designUnsettledFor,
+		designRecordTemplate: buildDesignRecordTemplate({ optionCount: recordOptionCount }),
 		gateCheckCommand,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;
+	if (headStateError) result.headStateError = headStateError;
 	if (prError) result.prError = prError;
 	if (readyError) result.readyError = readyError;
 	if (designUnsettledError) result.designUnsettledError = designUnsettledError;

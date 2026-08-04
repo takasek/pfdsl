@@ -11,7 +11,9 @@ import {
 	classifyDesignSettlement,
 	findIssueNumberForProcess,
 	buildGateCheckCommand,
+	buildDesignRecordTemplate,
 } from "./cycle-status.mjs";
+import { classifyDesignRecordContent } from "./gate-check.mjs";
 
 describe("summarizeCiStatus", () => {
 	it("returns NONE for empty/missing rollup", () => {
@@ -174,6 +176,17 @@ describe("findDecisionRecords", () => {
 		]);
 	});
 
+	it("recognizes a decision line under the same decoration its sibling line heads allow", () => {
+		const decorated = [
+			{ author: "owner", body: "> - **決定：** 案2" },
+			{ author: "owner", body: "## 決定（最終）: 案3" },
+		];
+		assert.deepEqual(
+			findDecisionRecords(decorated).map((r) => r.option),
+			["2", "3"],
+		);
+	});
+
 	it("returns an empty array when no entry contains a 決定: line", () => {
 		assert.deepEqual(findDecisionRecords([{ author: "owner", body: "まだ検討中。" }]), []);
 	});
@@ -293,5 +306,35 @@ describe("countBehind", () => {
 	it("returns 0 for empty output", () => {
 		assert.equal(countBehind(""), 0);
 		assert.equal(countBehind("\n"), 0);
+	});
+});
+
+describe("buildDesignRecordTemplate", () => {
+	it("emits a skeleton that the terminal gate's own content check accepts", () => {
+		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
+		assert.deepEqual(classifyDesignRecordContent(lines.join("\n"), 0), { status: "PASS" });
+	});
+
+	it("emits a decision line the settlement classifier recognizes as a record", () => {
+		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
+		const records = findDecisionRecords([{ author: "someone", body: lines.join("\n") }]);
+		assert.equal(records.length, 1);
+	});
+
+	it("adds a disposition line naming the enumerated option count", () => {
+		const { lines } = buildDesignRecordTemplate({ optionCount: 3 });
+		const dispositionLine = lines.find((l) => l.includes("処分"));
+		assert.ok(dispositionLine, "expected a disposition line");
+		assert.match(dispositionLine, /3/);
+	});
+
+	it("omits the disposition line when the issue enumerates no options", () => {
+		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
+		assert.equal(lines.some((l) => l.includes("処分")), false);
+	});
+
+	it("carries a note explaining that the line heads are machine-matched", () => {
+		const { note } = buildDesignRecordTemplate({ optionCount: 0 });
+		assert.match(note, /gate-check/);
 	});
 });
