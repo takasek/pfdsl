@@ -4,7 +4,13 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { extractRelativeImports, findBrokenImports, collectModuleClosure, findDistDependentFiles } from "./check-script-imports.mjs";
+import {
+	extractRelativeImports,
+	findBrokenImports,
+	collectModuleClosure,
+	findDistDependentFiles,
+	countUnanalyzableImports,
+} from "./check-script-imports.mjs";
 
 describe("extractRelativeImports", () => {
 	it("extracts a single named import specifier", () => {
@@ -30,6 +36,68 @@ describe("extractRelativeImports", () => {
 
 	it("returns an empty array when there are no imports", () => {
 		assert.deepEqual(extractRelativeImports("const x = 1;\n"), []);
+	});
+
+	it("extracts a named re-export specifier", () => {
+		assert.deepEqual(extractRelativeImports('export { a } from "./x.mjs";\n'), ["./x.mjs"]);
+	});
+
+	it("extracts a star re-export specifier", () => {
+		assert.deepEqual(extractRelativeImports('export * from "./z.mjs";\n'), ["./z.mjs"]);
+	});
+
+	it("extracts a namespaced star re-export specifier", () => {
+		assert.deepEqual(extractRelativeImports('export * as ns from "./z.mjs";\n'), ["./z.mjs"]);
+	});
+
+	it("extracts a re-export whose binding list spans several lines", () => {
+		const src = ['export {', "\ta,", "\tb,", '} from "./x.mjs";'].join("\n");
+		assert.deepEqual(extractRelativeImports(src), ["./x.mjs"]);
+	});
+
+	it("extracts a dynamic import with a literal specifier", () => {
+		assert.deepEqual(extractRelativeImports('const m = await import("./y.mjs");\n'), ["./y.mjs"]);
+	});
+
+	it("extracts every form from one line (the #667 reproduction)", () => {
+		const src =
+			'export { a } from "./x.mjs"; await import("./y.mjs"); export * from "./z.mjs"; import { q } from "./ok.mjs";';
+		// Order across the forms is not part of the contract; presence is.
+		assert.deepEqual(extractRelativeImports(src).sort(), ["./ok.mjs", "./x.mjs", "./y.mjs", "./z.mjs"]);
+	});
+
+	it("does not mistake an exported string constant for a re-export", () => {
+		assert.deepEqual(extractRelativeImports('export const path = "./not-an-import.mjs";\n'), []);
+	});
+
+	it("reports a specifier imported twice only once", () => {
+		const src = ['import { a } from "./x.mjs";', 'export { b } from "./x.mjs";'].join("\n");
+		assert.deepEqual(extractRelativeImports(src), ["./x.mjs"]);
+	});
+});
+
+describe("countUnanalyzableImports", () => {
+	it("reports a dynamic import whose specifier is not a string literal", () => {
+		assert.equal(countUnanalyzableImports("const name = f();\nawait import(name);\n"), 1);
+	});
+
+	it("reports a dynamic import built from a template literal", () => {
+		assert.equal(countUnanalyzableImports("await import(`./${kind}.mjs`);\n"), 1);
+	});
+
+	it("does not report a dynamic import with a literal specifier", () => {
+		assert.equal(countUnanalyzableImports('await import("./y.mjs");\n'), 0);
+	});
+
+	it("does not report an import() written inside a comment", () => {
+		// This module's own header explains why a dry-`import()` sweep is unsafe;
+		// prose about the construct must not read as a use of it.
+		const src = ["// a dry-`import()` sweep isn't safe here", "export const x = 1;"].join("\n");
+		assert.equal(countUnanalyzableImports(src), 0);
+	});
+
+	it("does not report a plain static import", () => {
+		assert.equal(countUnanalyzableImports('import { a } from "./x.mjs";\n'), 0);
 	});
 });
 
@@ -123,6 +191,26 @@ describe("collectModuleClosure", () => {
 		const closure = collectModuleClosure(entry);
 
 		assert.equal(closure.size, 2);
+	});
+
+	it("follows a re-exported module", () => {
+		const b = write("lib/b.mjs", "export const b = 1;\n");
+		const entry = write("main.mjs", 'export * from "./lib/b.mjs";\n');
+
+		assert.deepEqual([...collectModuleClosure(entry)].sort(), [b, entry].sort());
+	});
+
+	it("follows a dynamic import with a literal specifier", () => {
+		const b = write("lib/b.mjs", "export const b = 1;\n");
+		const entry = write("main.mjs", 'export const load = () => import("./lib/b.mjs");\n');
+
+		assert.deepEqual([...collectModuleClosure(entry)].sort(), [b, entry].sort());
+	});
+
+	it("refuses to return a closure it cannot compute, rather than silently under-covering", () => {
+		const entry = write("main.mjs", "export const load = (name) => import(name);\n");
+
+		assert.throws(() => collectModuleClosure(entry), /main\.mjs/);
 	});
 });
 

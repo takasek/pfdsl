@@ -86,11 +86,14 @@ describe("writeSkillRefs", () => {
 });
 
 describe("dist independence", () => {
-	it("scripts/gen-skill-refs.mjs and its module closure never reference packages/cli/dist or spawn a child process", () => {
-		const entry = resolve(repoRoot, "scripts/gen-skill-refs.mjs");
+	it("scripts/lib/gen-skill-refs.mjs and its module closure never reference packages/cli/dist or spawn a child process", () => {
+		// The module itself, not a CLI wrapper around it: the wrapper was removed
+		// in #668 once nothing called it, and this guarantee belongs to the code
+		// that gen-skill.mjs and gen-plugin.mjs actually run.
+		const entry = resolve(repoRoot, "scripts/lib/gen-skill-refs.mjs");
 		const closure = collectModuleClosure(entry);
 
-		assert.ok(closure.size >= 2, "expected the closure to include at least the entry and gen-skill-refs.mjs lib");
+		assert.ok(closure.size >= 2, "expected the closure to include at least gen-skill-refs.mjs and a helper it imports");
 
 		const violations = findDistDependentFiles([...closure]);
 		assert.deepEqual(violations, [], violations.map((v) => `${v.file}: ${v.reason}`).join("; "));

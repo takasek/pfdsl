@@ -40,7 +40,6 @@ const UNKNOWN_FLAG_CASES = [
 	{ script: "scripts/pfdsl/audit-issues-flow.mjs", args: ["--definitely-not-a-flag"] },
 	{ script: "scripts/release.mjs", args: ["cli", "--definitely-not-a-flag"] },
 	{ script: "scripts/gen-skill.mjs", args: ["--out", ".claude/skills/pfdsl", "--definitely-not-a-flag"] },
-	{ script: "scripts/gen-skill-refs.mjs", args: ["--out", ".claude/skills/pfdsl", "--definitely-not-a-flag"] },
 	// Outside scripts/, and missed by the first sweep for that reason: the
 	// grep that counted the shape only looked at scripts/ and .claude/skills/.
 	{ script: "packages/vscode-extension/esbuild.config.mjs", args: ["--definitely-not-a-flag"] },

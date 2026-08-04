@@ -55,7 +55,9 @@
 
 生成・公開チェーン（ADR-0035 で workflow.pfdsl から移動）:
 
-- **gen_skill（`scripts/gen-skill.mjs`）**: 一次ソース（skill-template / spec / samples / examples / review-perspectives）からリポ内 pfdsl スキルを組む。`references/*.md` の生成は `packages/cli/dist` に触れない `scripts/gen-skill-refs.mjs` に切り出し済みで、SKILL.md（`pfdsl help` 埋め込み）のみ dist を必要とする（#586）
+- **gen_skill（`scripts/gen-skill.mjs`）**: 一次ソース（skill-template / spec / samples / examples / review-perspectives）からリポ内 pfdsl スキルを組む。`references/*.md` の生成は `packages/cli/dist` に触れない `scripts/lib/gen-skill-refs.mjs` に切り出し済みで、SKILL.md（`pfdsl help` 埋め込み）のみ dist を必要とする（#586）。
+同モジュールを単体で呼ぶ CLI エントリもあったが、`scripts/pre-commit` が呼び出しをやめた後は誰も起動しておらず削除した（#668）。
+dist 非依存の手動再生成は `scripts/gen-plugin-dist-independent.mjs` が担う
 - **gen_install（`scripts/lib/install-templates.mjs` の明示リスト）**: repo ルートの配布ソースから `install/` ミラーを一方向で再生成する。生成の向きは repo ルート → `install/` → `plugin/` の一本のみ（#547 で双方向 sync を廃止）
 - **gen_plugin（`scripts/gen-plugin.mjs`）**: 同梱素材を `plugin/pfdsl/` へ集約し `plugin.json` を CLI version から書く。内部で gen_install を実行するため、plugin が古い `install/` から組まれることはない
 - **render_previews（`make gen-samples`）**: 機能カタログとロードマップを dot/svg に描画する。`.dot` / README は graphviz-exporter、`.svg` は preview-engine の wasm graphviz で生成され、いずれも決定論的（#588）
