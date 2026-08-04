@@ -72,7 +72,7 @@ plugin バージョンの上流差分警告は plugin の更新をユーザー�
 5. **成果物の門番（双方向、ADR-0018）**: 終端監査は両向きに行う
    - **(a) 消費者側**: 消費者を書けない成果物は作らない
    - **(b) 後続側**: 終端を名乗れるのは真の納品物（公開物・外部提出物・運用される成果物）のみ。**手段成果物（仕様・設計・計画・提案）は終端たりえない**。それを出力・計画した時点で、消費する後続プロセスをプレースホルダ（todo）でもグラフに登録する。明らかに必要な後続が欠けた終端 artifact は門番違反（例: `spec_vN` に実装プロセスが繋がっていない）。終端 artifact 一覧は `pfdsl graph io <file> --json` で機械列挙できる（全文 Read での目視に頼らない。`externalStakeholders` を宣言した artifact は `terminals` から外れ別枠 `externalTerminals` に入るので、そちらも見る — 手順の詳細は `references/work-cycle.md`）
-   - 新しい種類の成果物は `.pfdsl/workflow.pfdsl` に producer・consumer を登録してから作る（外部消費者は `externalStakeholders` フィールドで明示）
+   - 新しい種類の成果物は `.pfdsl/workflow.pfdsl` に producer・consumer を登録してから作る（外部消費者は `externalStakeholders` フィールドで明示）。`workflow.pfdsl` を採用していない、または scaffold のまま置いてあるリポではこの登録は該当なし — 採用済みの PFD の中で消費者を明示できれば足りる。**前提条件の scaffold 判定は `roadmap.pfdsl` しか見ない**ので、roadmap だけ実データで他が雛形という状態は判定をすり抜ける。登録先を探す前に、その PFD が実データかを自分で確かめる
    - 変換コンポーネントを追加・変更・削除する場合は、その変換を実際にモデル化している採用済み PFD の description・criteria・edge を更新する。「runtime-pipeline.pfdsl が存在しない = 該当なし」と即断しない — 別の PFD（多くの場合 `.pfdsl/workflow.pfdsl` の該当ノード・エッジ）が同じ変換を表現していないか確認してから N/A と記録する
 6. **知見の振り分け**: 実践・レビューで得た知見を記録先成果物へ振り分ける。**構造的事実**（新しいエッジ・成果物の生成方式が変わった等、図に描ける変化）は対応する `.pfdsl` 本体のノード・エッジ・description・criteria を更新する。**手続き散文**（グラフで運べない運用ルール・振り分け手続き自体）は sibling companion `.md` に書く。両方に該当する変更（新成果物の追加等）は両方を更新する
 7. **定期監査**: `/pfd-cycle` コマンド経由のセッションには pfd-retro 起動条件が2つある。両方を独立に確認する（一方の非該当がもう一方の免除にならない）:
