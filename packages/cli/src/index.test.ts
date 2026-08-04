@@ -3741,6 +3741,31 @@ p3 -> d
 			expect(parsed.ok).toBe(true);
 			expect(parsed.orphans).toEqual([{ id: "floater", kind: "artifact" }]);
 		});
+
+		// Groups never carry edges, so counting them made every group in a file
+		// an orphan — five of the five rows this repo's runtime-pipeline.pfdsl
+		// reported were groups, leaving zero real findings among them (#676).
+		it("does not report a group", async () => {
+			const f = join(dir, "orphans-group.pfdsl");
+			writeFileSync(
+				f,
+				`---\ngroup:\n  planning:\n    label: "Planning"\nartifact:\n  req:\n    status: todo\n    group: planning\n  spec:\n    status: done\n---\nreq >> design -> spec\n`,
+			);
+			const r = await run(["graph", "orphans", f]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("(none)\n");
+		});
+
+		// `>>?` is how a node that feeds practice rather than a pipeline stage is
+		// meant to be wired, and the help text promises "fully disconnected"
+		// (#704).
+		it("does not report a node held only by a feedback edge", async () => {
+			const f = join(dir, "orphans-feedback.pfdsl");
+			writeFileSync(f, `${base}guide >>? design\n`);
+			const r = await run(["graph", "orphans", f]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("(none)\n");
+		});
 	});
 });
 

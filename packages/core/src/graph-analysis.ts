@@ -89,6 +89,38 @@ export interface NodeStats {
 	fanOut: number;
 }
 
+export interface GraphOrphan {
+	id: string;
+	kind: NodeKind;
+}
+
+/**
+ * Nodes wired to nothing — no primary edge and no feedback edge (§518).
+ *
+ * Deliberately not `computeStats(...).filter(degree === 0)`, which is what
+ * this used to be. That reading counted only primary edges and treated every
+ * node kind alike, so it reported two shapes that are wired: a `group`, which
+ * is a container and by construction never carries an edge, and a node held
+ * only by `>>?`. Both are stable per-file false positives, and a check whose
+ * output is mostly noise fails by going unread rather than by failing
+ * (#676/#704).
+ */
+export function computeOrphans(graph: Graph): GraphOrphan[] {
+	const wired = new Set<string>();
+	for (const e of graph.primaryEdges) {
+		wired.add(e.from);
+		wired.add(e.to);
+	}
+	for (const e of graph.feedbackEdges) {
+		wired.add(e.artifact);
+		wired.add(e.process);
+	}
+	return [...graph.nodes.entries()]
+		.filter(([id, kind]) => kind !== "group" && !wired.has(id))
+		.map(([id, kind]) => ({ id, kind }))
+		.sort((a, b) => compareIds(a.id, b.id));
+}
+
 /** Fan-in/fan-out per node, ranked by total degree descending then id ascending (§ issue #479 `hubs`/`stats`). */
 export function computeStats(graph: Graph): NodeStats[] {
 	const { out, in: inn } = buildAdjacency(graph);
