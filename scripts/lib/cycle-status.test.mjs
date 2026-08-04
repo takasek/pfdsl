@@ -13,7 +13,7 @@ import {
 	buildGateCheckCommand,
 	buildDesignRecordTemplate,
 } from "./cycle-status.mjs";
-import { classifyDesignRecordContent } from "./gate-check.mjs";
+import { classifyDesignRecordContent, selectDesignRecord } from "./gate-check.mjs";
 
 describe("summarizeCiStatus", () => {
 	it("returns NONE for empty/missing rollup", () => {
@@ -315,10 +315,16 @@ describe("buildDesignRecordTemplate", () => {
 		assert.deepEqual(classifyDesignRecordContent(lines.join("\n"), 0), { status: "PASS" });
 	});
 
-	it("emits a decision line the settlement classifier recognizes as a record", () => {
+	it("omits the 決定 line — that record belongs to the filer, not to the runner", () => {
+		const { lines, note } = buildDesignRecordTemplate({ optionCount: 0 });
+		assert.deepEqual(findDecisionRecords([{ author: "someone", body: lines.join("\n") }]), []);
+		assert.match(note, /起票者本人が書く/);
+	});
+
+	it("emits a skeleton the gate identifies as the selection record", () => {
 		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
-		const records = findDecisionRecords([{ author: "someone", body: lines.join("\n") }]);
-		assert.equal(records.length, 1);
+		const entries = [{ author: "filer", body: "普通の説明文。" }, { author: "runner", body: lines.join("\n") }];
+		assert.equal(selectDesignRecord(entries)?.author, "runner");
 	});
 
 	it("adds a disposition line naming the enumerated option count", () => {

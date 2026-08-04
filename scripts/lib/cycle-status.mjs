@@ -116,21 +116,26 @@ export const DECISION_LINE_PREFIX = "決定:";
 const DECISION_LINE_PATTERN = lineHeadPattern(DECISION_LINE_PREFIX, "\\s*案\\s*(\\S+)");
 
 /**
- * The design-selection record, pre-shaped so the operator never has to know the
+ * The design-selection record, pre-shaped so the runner never has to know the
  * format to satisfy it. Every line head here is the one the terminal gate
  * matches on, taken from the gate's own constants rather than restated — a
  * template that drifts from the checker is worse than none, because it is
  * trusted.
  *
- * Emitted on every cycle, not only when the issue enumerates options:
- * classifyDesignRecordTiming FAILs on a missing record regardless of the option
- * count, so a record is owed whenever the cycle names an issue at all.
+ * `決定: 案N` is deliberately absent. That line belongs to the filer and is
+ * evidence that the design was settled; this record belongs to the runner and
+ * is evidence that alternatives were generated. Putting the filer's line in the
+ * runner's template would teach every cycle to write it, which is exactly how
+ * the distinction the gate protects gets dissolved by the act of passing it.
+ *
+ * Emitted on every cycle, not only when the issue enumerates options: the gate
+ * FAILs a missing record regardless of the option count, so a record is owed
+ * whenever the cycle names an issue at all.
  * @param {{optionCount?: number}} [params]
  * @returns {{note: string, lines: string[]}}
  */
 export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
 	const lines = [
-		`${DECISION_LINE_PREFIX} 案N`,
 		`${DESIGN_RECORD_REQUIRED_PREFIXES[0]} 本案は〈○○という状態が存在し続けること〉を前提にする`,
 		`${DESIGN_RECORD_REQUIRED_PREFIXES[1]} 上の前提を否定した案（起票者が挙げていなくても作る）`,
 		`${DESIGN_RECORD_REQUIRED_PREFIXES[2]} 外部制約か所有者に帰着させる（「手間がかかる」「スコープ外」は無効）`,
@@ -141,7 +146,7 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
 		);
 	}
 	return {
-		note: "着手前（ブランチ最初のコミットより前）に issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 雛形のまま投稿しても形式は通るが、記録としては何も残らない。",
+		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 雛形のまま投稿しても形式は通るが、記録としては何も残らない。行頭 ${DECISION_LINE_PREFIX} 案N は別の記録であり、起票者本人が書く。実行主体はこの記録に書かない。`,
 		lines,
 	};
 }

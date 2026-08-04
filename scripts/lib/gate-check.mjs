@@ -384,6 +384,49 @@ export function lineHeadPattern(prefix, tail = "") {
 }
 
 /**
+ * Which of the required line heads this text carries, in canonical order.
+ * Serves both the content verdict and the record's identification, so the two
+ * cannot disagree about what counts as a required line.
+ * @param {string} recordBody
+ * @returns {string[]} a subset of DESIGN_RECORD_REQUIRED_PREFIXES
+ */
+export function presentRequiredPrefixes(recordBody) {
+	const lines = (recordBody ?? "").split("\n").map(normalizeRecordLine);
+	return DESIGN_RECORD_REQUIRED_PREFIXES.filter((prefix) => {
+		const pattern = lineHeadPattern(prefix);
+		return lines.some((line) => pattern.test(line));
+	});
+}
+
+/**
+ * The entry that is this issue's selection record, or undefined.
+ *
+ * Identified by its own required line heads rather than by a `決定:` line. The
+ * two are separate records with separate authors — the filer settles the design
+ * with `決定:`, the runner writes the selection record — and keying one to the
+ * other left no way to post a conforming record without also forging the
+ * filer's decision line.
+ *
+ * Most matches wins rather than first match. Measured over this repo's issues,
+ * bodies carry a stray required line head often enough that a first-match
+ * search would elect the body and never examine the real record in a comment —
+ * a check aimed at the wrong text, which reads exactly like a check that ran.
+ * @param {Array<{author?: string, body?: string, createdAt?: string}>} entries
+ */
+export function selectDesignRecord(entries) {
+	let best;
+	let bestCount = 0;
+	for (const entry of entries ?? []) {
+		const count = presentRequiredPrefixes(entry.body).length;
+		if (count > bestCount) {
+			best = entry;
+			bestCount = count;
+		}
+	}
+	return best;
+}
+
+/**
  * Classify the content of a design-selection record. Two independent checks:
  * required line-head tokens are present, and every enumerated option got a
  * disposition word somewhere in the record.
@@ -398,11 +441,8 @@ export function lineHeadPattern(prefix, tail = "") {
  */
 export function classifyDesignRecordContent(recordBody, optionCount) {
 	const body = recordBody ?? "";
-	const lines = body.split("\n").map(normalizeRecordLine);
-	const missing = DESIGN_RECORD_REQUIRED_PREFIXES.filter((prefix) => {
-		const pattern = lineHeadPattern(prefix);
-		return !lines.some((line) => pattern.test(line));
-	});
+	const present = presentRequiredPrefixes(body);
+	const missing = DESIGN_RECORD_REQUIRED_PREFIXES.filter((prefix) => !present.includes(prefix));
 
 	const problems = [];
 	if (missing.length > 0) problems.push(`missing required line(s): ${missing.join(", ")}`);

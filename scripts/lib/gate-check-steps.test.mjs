@@ -344,7 +344,7 @@ describe("designRecordStep", () => {
 		assert.equal(result.status, "PASS");
 	});
 
-	it("FAILs a body decision that lacks the required structure — the body is not an exemption", () => {
+	it("FAILs a body carrying only a 決定 line — that line is the filer's settlement, not a selection record", () => {
 		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
 		const result = designRecordStep({
 			exec,
@@ -352,10 +352,10 @@ describe("designRecordStep", () => {
 			issue: issue({ author: "owner", body: "決定: 案A を採用する。" }),
 		});
 		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /missing required line/);
+		assert.match(result.detail, /no design-selection record found/);
 	});
 
-	it("FAILs when no owner-authored decision comment exists", () => {
+	it("FAILs when no entry carries any required line head", () => {
 		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
 		const result = designRecordStep({
 			exec,
@@ -385,7 +385,7 @@ describe("designRecordStep", () => {
 		assert.match(result.detail, /after the first commit/);
 	});
 
-	it("FAILs when the record content is missing required prefixes, even though timing is fine", () => {
+	it("reports a partial record as content-deficient rather than as missing", () => {
 		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
 		const result = designRecordStep({
 			exec,
@@ -393,11 +393,55 @@ describe("designRecordStep", () => {
 			issue: issue({
 				author: "owner",
 				body: "普通の説明文。",
-				comments: [{ author: { login: "owner" }, body: "決定: 案A", createdAt: "2026-07-01T00:00:00Z" }],
+				comments: [{ author: { login: "owner" }, body: "前提: x", createdAt: "2026-07-01T00:00:00Z" }],
 			}),
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /missing required line/);
+		assert.doesNotMatch(result.detail, /no design-selection record found/);
+	});
+
+	it("identifies the record by its required line heads, with no 決定 line present", () => {
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				author: "owner",
+				body: "普通の説明文。",
+				comments: [
+					{
+						author: { login: "the-agent" },
+						body: "前提: x\n否定案: y\n却下理由: z",
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
+			}),
+		});
+		assert.equal(result.status, "PASS");
+	});
+
+	it("picks the entry carrying the most required line heads, not the first one carrying any", () => {
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			// The body mentions 前提: in passing — measured to happen in 4 of this
+			// repo's issues — and would win a first-match search, leaving the real
+			// record in the comment unexamined.
+			issue: issue({
+				author: "owner",
+				body: "## 症状\n前提: この検査は行頭しか見ていない。",
+				comments: [
+					{
+						author: { login: "the-agent" },
+						body: "前提: x\n否定案: y\n却下理由: z",
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
+			}),
+		});
+		assert.equal(result.status, "PASS");
 	});
 
 	it("SKIPs when a valid record exists but there is no commit in range", () => {

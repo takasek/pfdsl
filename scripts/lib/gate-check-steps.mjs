@@ -24,11 +24,12 @@ import {
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
+	selectDesignRecord,
 	SIZE_TRACKED_PATTERNS,
 	statusChangedForArtifact,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
-import { detectEnumeratedOptions, findDecisionRecords } from "./cycle-status.mjs";
+import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import { classifyCycle, mergeCycleRecords, parseMeasurementRecords } from "./review-measurement.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
@@ -159,14 +160,18 @@ export function designRecordStep({ exec, base, issue, issueError }) {
 	const optionCount = detectEnumeratedOptions(body).count;
 
 	// The issue body is one entry among the comments, not a special case that
-	// bypasses the checks: a decision written into the body is still a record
-	// whose timing and structure are judged the same way (its createdAt is the
-	// issue's, so it passes timing on its own merits rather than by exemption).
+	// bypasses the checks: a record written into the body is judged for timing
+	// and structure the same way (its createdAt is the issue's, so it passes
+	// timing on its own merits rather than by exemption).
+	//
+	// No author condition. The reference assigns the selection record to the
+	// runner, so requiring the filer's login here is what made a conforming
+	// record impossible to post without also writing the filer's decision line.
 	const entries = [
 		{ author: ownerLogin, body, createdAt: issue.createdAt },
 		...(issue.comments ?? []).map((c) => ({ author: c.author?.login, body: c.body, createdAt: c.createdAt })),
 	];
-	const record = entries.find((e) => e.author === ownerLogin && findDecisionRecords([e]).length > 0);
+	const record = selectDesignRecord(entries);
 
 	if (!record) {
 		return { name, ...classifyDesignRecordTiming(undefined, null) };
