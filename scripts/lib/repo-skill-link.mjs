@@ -21,10 +21,16 @@ export const SKILL_LINK_TARGET = "../../plugin/pfdsl/skills/pfdsl";
 export function decideSkillLinkAction(state, expectedTarget) {
 	if (!state.present) return { action: "create" };
 	if (!state.isSymlink) {
-		return { action: "replace", reason: "a real directory is present (generated copy from before #714)" };
+		return {
+			action: "replace",
+			reason: "a real directory is present (generated copy from before #714)",
+		};
 	}
 	if (state.linkTarget !== expectedTarget) {
-		return { action: "relink", reason: `symlink points at ${state.linkTarget}` };
+		return {
+			action: "relink",
+			reason: `symlink points at ${state.linkTarget}`,
+		};
 	}
 	return { action: "ok" };
 }

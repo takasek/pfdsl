@@ -33,9 +33,12 @@ const DIST_ROOT = "plugin/pfdsl/";
  * text that never makes a claim about this repo's workbench.
  */
 export const SCOPE_EXCLUSIONS = {
-	"plugin/pfdsl/skills/pfdsl/references/spec.md": "the DSL grammar, generated from docs/spec/spec.md",
-	"plugin/pfdsl/skills/pfdsl/references/examples.md": "worked .pfdsl examples, generated from docs/examples/",
-	"plugin/pfdsl/skills/pfdsl/references/samples.md": "sample .pfdsl catalogue, generated from docs/samples/",
+	"plugin/pfdsl/skills/pfdsl/references/spec.md":
+		"the DSL grammar, generated from docs/spec/spec.md",
+	"plugin/pfdsl/skills/pfdsl/references/examples.md":
+		"worked .pfdsl examples, generated from docs/examples/",
+	"plugin/pfdsl/skills/pfdsl/references/samples.md":
+		"sample .pfdsl catalogue, generated from docs/samples/",
 };
 
 // Bundled files that are rendered rather than mirrored: the copy in the bundle
@@ -43,8 +46,10 @@ export const SCOPE_EXCLUSIONS = {
 const GENERATED_SOURCES = {
 	"plugin/pfdsl/skills/pfdsl/SKILL.md": "scripts/skill-template/SKILL.md",
 	"plugin/pfdsl/skills/pfdsl/references/spec.md": "docs/spec/spec.md",
-	"plugin/pfdsl/skills/pfdsl/references/quality-guide.md": "docs/quality-guide.md",
-	"plugin/pfdsl/skills/pfdsl/references/review-perspectives.md": "docs/review-perspectives.md",
+	"plugin/pfdsl/skills/pfdsl/references/quality-guide.md":
+		"docs/quality-guide.md",
+	"plugin/pfdsl/skills/pfdsl/references/review-perspectives.md":
+		"docs/review-perspectives.md",
 	// Aggregated from many files, so the pointer is the directory: no single
 	// source file answers "where does this line come from".
 	"plugin/pfdsl/skills/pfdsl/references/examples.md": "docs/examples/",
@@ -90,7 +95,9 @@ export function canonicalSourceOf(distPath) {
 		}
 	}
 
-	throw new Error(`no canonical source for ${distPath} — teach canonicalSourceOf where it is assembled from`);
+	throw new Error(
+		`no canonical source for ${distPath} — teach canonicalSourceOf where it is assembled from`,
+	);
 }
 
 /** The in-scope subset of a `git diff --name-only` listing. */
@@ -113,7 +120,11 @@ export function diffBase(record) {
  * commit and a moved prompt all block, because the alternative in each case is
  * to ship prose on the strength of a record that says nothing about it.
  */
-export function runDistributionReviewCheck({ readRecord, commitExists, changedSince }) {
+export function runDistributionReviewCheck({
+	readRecord,
+	commitExists,
+	changedSince,
+}) {
 	const record = readRecord();
 	const base = diffBase(record);
 
@@ -130,8 +141,18 @@ export function runDistributionReviewCheck({ readRecord, commitExists, changedSi
 
 	const files = unreviewedFiles(changedSince(base));
 	if (files.length === 0)
-		return { ok: true, base, files, message: `Distribution review is current (base ${base}).` };
-	return { ok: false, base, files, message: formatGateFailure({ base, files }) };
+		return {
+			ok: true,
+			base,
+			files,
+			message: `Distribution review is current (base ${base}).`,
+		};
+	return {
+		ok: false,
+		base,
+		files,
+		message: formatGateFailure({ base, files }),
+	};
 }
 
 /**
@@ -151,12 +172,18 @@ export function repoDeps(root) {
 		// A probe expected to fail when the record points somewhere this clone
 		// cannot see, so its stderr is captured rather than printed as if
 		// something broke — the gate's own message says it better.
-		commitExists: (sha) => tryGit(["cat-file", "-e", `${sha}^{commit}`], { cwd: root, captureStderr: true }).ok,
+		commitExists: (sha) =>
+			tryGit(["cat-file", "-e", `${sha}^{commit}`], {
+				cwd: root,
+				captureStderr: true,
+			}).ok,
 		// HEAD, not the working tree: the record names a commit, so the
 		// comparison that decides whether it still holds has to be against one
 		// too. A release refuses to run on a dirty tree anyway (release.mjs).
 		changedSince: (base) =>
-			git(["diff", "--name-only", base, "HEAD", "--", "plugin/pfdsl"], { cwd: root })
+			git(["diff", "--name-only", base, "HEAD", "--", "plugin/pfdsl"], {
+				cwd: root,
+			})
 				.trim()
 				.split("\n")
 				.filter(Boolean),
@@ -168,7 +195,9 @@ export function formatGateFailure({ base, files }) {
 		base === EMPTY_TREE
 			? "The distributed bundle has never been reviewed."
 			: `Distributed prompts have changed since the reviewed commit ${base}.`;
-	const rows = files.map((file) => `  ${file}\n    fix in: ${canonicalSourceOf(file)}`);
+	const rows = files.map(
+		(file) => `  ${file}\n    fix in: ${canonicalSourceOf(file)}`,
+	);
 	return [
 		preface,
 		`${files.length} file(s) are not covered by the review record:`,

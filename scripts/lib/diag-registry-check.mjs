@@ -92,21 +92,32 @@ export function diffDiagRegistry(specCodes, registry) {
  * @param {{missingInSpec: string[], staleInSpec: string[], severityMismatches: string[], specCodesCount: number}} args
  * @returns {{exitCode: 0|1, stdoutLines: string[], stderrLines: string[]}}
  */
-export function evaluateDiagRegistryDiff({ missingInSpec, staleInSpec, severityMismatches, specCodesCount }) {
+export function evaluateDiagRegistryDiff({
+	missingInSpec,
+	staleInSpec,
+	severityMismatches,
+	specCodesCount,
+}) {
 	const stderrLines = [];
 	let failed = false;
 
 	if (missingInSpec.length > 0) {
 		failed = true;
-		stderrLines.push(`Codes emitted by core but missing from spec.md §16 table: ${missingInSpec.join(", ")}`);
+		stderrLines.push(
+			`Codes emitted by core but missing from spec.md §16 table: ${missingInSpec.join(", ")}`,
+		);
 	}
 	if (staleInSpec.length > 0) {
 		failed = true;
-		stderrLines.push(`Codes in spec.md §16 table but not emitted by core (stale): ${staleInSpec.join(", ")}`);
+		stderrLines.push(
+			`Codes in spec.md §16 table but not emitted by core (stale): ${staleInSpec.join(", ")}`,
+		);
 	}
 	if (severityMismatches.length > 0) {
 		failed = true;
-		stderrLines.push(`Severity mismatch between spec.md §16 table and core registry: ${severityMismatches.join(", ")}`);
+		stderrLines.push(
+			`Severity mismatch between spec.md §16 table and core registry: ${severityMismatches.join(", ")}`,
+		);
 	}
 
 	if (failed) {
@@ -115,5 +126,9 @@ export function evaluateDiagRegistryDiff({ missingInSpec, staleInSpec, severityM
 		);
 		return { exitCode: 1, stdoutLines: [], stderrLines };
 	}
-	return { exitCode: 0, stdoutLines: [`check-diag-registry: OK (${specCodesCount} codes match)`], stderrLines: [] };
+	return {
+		exitCode: 0,
+		stdoutLines: [`check-diag-registry: OK (${specCodesCount} codes match)`],
+		stderrLines: [],
+	};
 }

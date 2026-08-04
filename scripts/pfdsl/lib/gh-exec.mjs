@@ -12,15 +12,15 @@
 import { execFileSync } from "node:child_process";
 import { isGhUnavailableError, planGhRestCall } from "./gh-compat.mjs";
 import {
-	parseOwnerRepo,
-	parseHost,
-	fetchAllLabels,
-	fetchAllIssues,
+	addIssueLabel,
 	createLabel,
 	editLabel,
-	addIssueLabel,
-	getIssueBody,
+	fetchAllIssues,
+	fetchAllLabels,
 	fetchOpenPrsWithCi,
+	getIssueBody,
+	parseHost,
+	parseOwnerRepo,
 } from "./github-rest.mjs";
 
 /**
@@ -28,9 +28,15 @@ import {
  * @returns {{owner: string, repo: string}}
  */
 function ownerRepoFromGitRemote(cwd) {
-	const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], { cwd, encoding: "utf-8" }).trim();
+	const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
+		cwd,
+		encoding: "utf-8",
+	}).trim();
 	const ownerRepo = parseOwnerRepo(remoteUrl);
-	if (!ownerRepo) throw new Error(`could not determine owner/repo from git remote: ${remoteUrl}`);
+	if (!ownerRepo)
+		throw new Error(
+			`could not determine owner/repo from git remote: ${remoteUrl}`,
+		);
 	return ownerRepo;
 }
 
@@ -43,7 +49,10 @@ function ownerRepoFromGitRemote(cwd) {
  */
 function hostFromGitRemote(cwd) {
 	try {
-		const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], { cwd, encoding: "utf-8" }).trim();
+		const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
+			cwd,
+			encoding: "utf-8",
+		}).trim();
 		return parseHost(remoteUrl);
 	} catch {
 		return null;
@@ -62,7 +71,14 @@ async function runGhRestPlan(plan, cwd, token) {
 		case "listLabels":
 			return JSON.stringify(await fetchAllLabels(owner, repo, token));
 		case "createLabel":
-			await createLabel(owner, repo, token, plan.name, plan.description, plan.color);
+			await createLabel(
+				owner,
+				repo,
+				token,
+				plan.name,
+				plan.description,
+				plan.color,
+			);
 			return "";
 		case "editLabel":
 			await editLabel(owner, repo, token, plan.name, plan.description);

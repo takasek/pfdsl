@@ -3,11 +3,10 @@
 // and each pair had tests on both sides but nothing asserting the two still
 // agree (#613). Tightening one copy would leave the other behind silently.
 
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-	mkdtempSync,
 	mkdirSync,
+	mkdtempSync,
 	readdirSync,
 	readFileSync,
 	rmSync,
@@ -17,12 +16,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-
-import { detectDoneAddition as detectInPreCommit } from "./retro-reminder-check.mjs";
 import { detectDoneAddition as detectInHook } from "../../hooks/retro-reminder-post-tool-use.mjs";
 import { isDistStale } from "./dist-freshness.mjs";
 import { PLUGIN_AGENT_EXCLUSIONS, PLUGIN_AGENT_FILES } from "./gen-plugin.mjs";
+import { detectDoneAddition as detectInPreCommit } from "./retro-reminder-check.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (rel) => readFileSync(resolve(root, rel), "utf-8");
@@ -49,10 +48,16 @@ describe("retro-reminder: the pre-commit check and the plugin hook", () => {
 	// meant to separate, including the ones its comment calls acceptable.
 	const diffs = [
 		["an added done line", "+    status: done"],
-		["an added done line among context", " artifact:\n+    status: done\n   label: x"],
+		[
+			"an added done line among context",
+			" artifact:\n+    status: done\n   label: x",
+		],
 		["a removed done line", "-    status: done"],
 		["an unchanged done line", "     status: done"],
-		["a file header, which starts with +++", "+++ b/.pfdsl/roadmap.pfdsl\n status: done"],
+		[
+			"a file header, which starts with +++",
+			"+++ b/.pfdsl/roadmap.pfdsl\n status: done",
+		],
 		["an added wip line", "+    status: wip"],
 		["done with no space after the colon", "+    status:done"],
 		["an empty diff", ""],
@@ -74,14 +79,18 @@ describe("dist-freshness: the tooling check and the cli-smoke copy", () => {
 	 * only as text — a reformat should not fail this, a behaviour change should.
 	 */
 	function smokeNewestMtimeUnder() {
-		const body = /function newestMtimeUnder\(dir: string\): number \{([\s\S]*?)\n\}/.exec(smokeText);
+		const body =
+			/function newestMtimeUnder\(dir: string\): number \{([\s\S]*?)\n\}/.exec(
+				smokeText,
+			);
 		assert.ok(body, "cli-smoke.test.ts no longer defines newestMtimeUnder");
 		const js = body[1].replaceAll(": number", "").replaceAll(": string", "");
-		return new Function("readdirSync", "statSync", "join", `return function newestMtimeUnder(dir) {${js}\n}`)(
-			readdirSync,
-			statSync,
-			join,
-		);
+		return new Function(
+			"readdirSync",
+			"statSync",
+			"join",
+			`return function newestMtimeUnder(dir) {${js}\n}`,
+		)(readdirSync, statSync, join);
 	}
 
 	it("compares a dist file against src/ the same way", () => {
@@ -101,11 +110,19 @@ describe("dist-freshness: the tooling check and the cli-smoke copy", () => {
 
 			// Touch a source file so the built output is now behind it.
 			const later = Date.now() + 5_000;
-			utimesSync(join(dir, "src", "nested", "b.ts"), later / 1000, later / 1000);
+			utimesSync(
+				join(dir, "src", "nested", "b.ts"),
+				later / 1000,
+				later / 1000,
+			);
 
 			const newestAfter = smokeNewestMtimeUnder()(join(dir, "src"));
 			const smokeSaysCurrentAfter = statSync(distFile).mtimeMs >= newestAfter;
-			assert.equal(smokeSaysCurrentAfter, false, "the smoke copy should see the newer source");
+			assert.equal(
+				smokeSaysCurrentAfter,
+				false,
+				"the smoke copy should see the newer source",
+			);
 			assert.equal(smokeSaysCurrentAfter, !isDistStale(distFile));
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
@@ -132,7 +149,10 @@ describe("PLUGIN_AGENT_FILES: the bundled list and .claude/agents/", () => {
 
 	it("bundles only agents that exist", () => {
 		for (const file of PLUGIN_AGENT_FILES) {
-			assert.ok(onDisk.includes(file), `${file} is bundled but not in .claude/agents/`);
+			assert.ok(
+				onDisk.includes(file),
+				`${file} is bundled but not in .claude/agents/`,
+			);
 		}
 	});
 

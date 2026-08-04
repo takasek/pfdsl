@@ -29,8 +29,10 @@ export function runForwardRefMarkerCheck({ args, listFiles, readFile }) {
 	const implementsHits = [];
 	for (const file of files) {
 		const text = readFile(file);
-		for (const hit of findForwardRefMarkers(text)) forwardRefHits.push({ file, ...hit });
-		for (const hit of findImplementsMarkers(text)) implementsHits.push({ file, ...hit });
+		for (const hit of findForwardRefMarkers(text))
+			forwardRefHits.push({ file, ...hit });
+		for (const hit of findImplementsMarkers(text))
+			implementsHits.push({ file, ...hit });
 	}
 
 	const resolved = matchResolvedForwardRefs(forwardRefHits, implementsHits);
@@ -43,5 +45,7 @@ export function runForwardRefMarkerCheck({ args, listFiles, readFile }) {
 			],
 		};
 	}
-	return { lines: ["check-forward-ref-markers: no resolved forward-ref markers found"] };
+	return {
+		lines: ["check-forward-ref-markers: no resolved forward-ref markers found"],
+	};
 }

@@ -9,7 +9,7 @@
 //
 // Usage (wired in .claude/settings.json): node scripts/stale-dist-guard.mjs
 
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDistStale } from "./lib/dist-freshness.mjs";
@@ -21,9 +21,18 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 /** The packages whose dist/ other packages import through. */
 const PACKAGES = [
 	{ name: "@pfdsl/core", distFile: "packages/core/dist/index.js" },
-	{ name: "@pfdsl/graphviz-exporter", distFile: "packages/graphviz-exporter/dist/index.js" },
-	{ name: "@pfdsl/metadata-exporter", distFile: "packages/metadata-exporter/dist/index.js" },
-	{ name: "@pfdsl/preview-engine", distFile: "packages/preview-engine/dist/index.js" },
+	{
+		name: "@pfdsl/graphviz-exporter",
+		distFile: "packages/graphviz-exporter/dist/index.js",
+	},
+	{
+		name: "@pfdsl/metadata-exporter",
+		distFile: "packages/metadata-exporter/dist/index.js",
+	},
+	{
+		name: "@pfdsl/preview-engine",
+		distFile: "packages/preview-engine/dist/index.js",
+	},
 	{ name: "@pfdsl/cli", distFile: "packages/cli/dist/cli.js" },
 ];
 
@@ -33,7 +42,10 @@ const findStale = () =>
 		isDistStale,
 	);
 
-const { shouldOutput, output, stderr } = runStaleDistGuard(await readStdinText(), { findStale });
+const { shouldOutput, output, stderr } = runStaleDistGuard(
+	await readStdinText(),
+	{ findStale },
+);
 if (shouldOutput) console.log(JSON.stringify(output));
 if (stderr) console.error(stderr);
 process.exit(0);

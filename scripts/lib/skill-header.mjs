@@ -34,7 +34,9 @@ export const SKILL_HEADER =
 export function injectGeneratedHeader(templateSrc) {
 	const frontmatter = templateSrc.match(/^---(\r?\n)([\s\S]*?\r?\n)---\r?\n/);
 	if (!frontmatter) {
-		throw new Error("skill template must start with a YAML frontmatter block ('---')");
+		throw new Error(
+			"skill template must start with a YAML frontmatter block ('---')",
+		);
 	}
 	if (/DO NOT EDIT/.test(frontmatter[2])) {
 		throw new Error(

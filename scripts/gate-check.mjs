@@ -8,34 +8,34 @@
 // Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n>]
 
 import { existsSync, readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
-	extractGateChecklist,
+	classifyAuditIssuesFlowResult,
 	deriveManualItems,
-	matchesTrigger,
-	formatGateTable,
-	GATE_CHECKLIST_SOURCE_PATH,
-	VSCODE_EXT_TRIGGER,
-	parseAuditTerminals,
-	parseAuditExternalTerminals,
 	diffNewTerminals,
 	diffReadySets,
-	classifyAuditIssuesFlowResult,
+	extractGateChecklist,
+	formatGateTable,
 	formatSizeDelta,
+	GATE_CHECKLIST_SOURCE_PATH,
+	matchesTrigger,
+	parseAuditExternalTerminals,
+	parseAuditTerminals,
+	VSCODE_EXT_TRIGGER,
 } from "./lib/gate-check.mjs";
 import {
-	genPluginIdentityStep,
-	outputArtifactStatusStep,
-	wipTransitionStep,
-	designRecordStep,
-	sizeDirectionStep,
+	changedFilesSince,
+	checkDocsStep,
 	collectSizeDeltas,
 	commitSubjectStep,
-	checkDocsStep,
-	changedFilesSince,
+	designRecordStep,
+	genPluginIdentityStep,
+	outputArtifactStatusStep,
 	reviewMeasurementStep,
+	sizeDirectionStep,
+	wipTransitionStep,
 } from "./lib/gate-check-steps.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
@@ -71,7 +71,9 @@ const artifactKey = values.artifact;
 // that forgot its status update (#564).
 const noArtifact = values["no-artifact"] === true;
 if (noArtifact && artifactKey) {
-	console.error("gate-check: --artifact and --no-artifact are mutually exclusive");
+	console.error(
+		"gate-check: --artifact and --no-artifact are mutually exclusive",
+	);
 	process.exit(2);
 }
 // Optional: powers the design-selection-record and size-direction checks
@@ -81,7 +83,11 @@ const issueNumber = values.issue !== undefined ? Number(values.issue) : null;
 
 // Every call names the executable and its arguments separately — `base` and
 // `artifactKey` come from argv and must never be parsed by a shell (#572).
-const exec = (file, execArgs, input) => tryRun(file, execArgs, { cwd: root, ...(input === undefined ? {} : { input }) });
+const exec = (file, execArgs, input) =>
+	tryRun(file, execArgs, {
+		cwd: root,
+		...(input === undefined ? {} : { input }),
+	});
 const node = (execArgs, input) => exec(process.execPath, execArgs, input);
 
 // Best-effort — a stale/missing origin ref surfaces as a clear diff failure below.
@@ -89,7 +95,9 @@ exec("git", ["fetch", "origin"]);
 
 const diff = changedFilesSince({ exec, base });
 if (!diff.ok) {
-	console.error(`gate-check: failed to diff against origin/${base}: ${diff.error}`);
+	console.error(
+		`gate-check: failed to diff against origin/${base}: ${diff.error}`,
+	);
 	process.exit(1);
 }
 const changedFiles = diff.files;
@@ -100,7 +108,11 @@ const results = [];
 
 // 1. pfdsl check on changed .pfdsl files
 if (pfdslFiles.length === 0) {
-	results.push({ name: "pfdsl check", status: "SKIP", detail: "no .pfdsl changes" });
+	results.push({
+		name: "pfdsl check",
+		status: "SKIP",
+		detail: "no .pfdsl changes",
+	});
 } else {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	if (!existsSync(cliPath)) {
@@ -114,7 +126,10 @@ if (pfdslFiles.length === 0) {
 		results.push({
 			name: "pfdsl check",
 			status: failed.length === 0 ? "PASS" : "FAIL",
-			detail: failed.length === 0 ? `${pfdslFiles.length} file(s)` : `failed: ${failed.join(", ")}`,
+			detail:
+				failed.length === 0
+					? `${pfdslFiles.length} file(s)`
+					: `failed: ${failed.join(", ")}`,
 		});
 	}
 }
@@ -122,12 +137,19 @@ if (pfdslFiles.length === 0) {
 // 2. audit-issues-flow (no --fix: fails if manual findings remain)
 {
 	const r = node(["scripts/pfdsl/audit-issues-flow.mjs"]);
-	results.push({ name: "audit-issues-flow", ...classifyAuditIssuesFlowResult(r.ok, r.status) });
+	results.push({
+		name: "audit-issues-flow",
+		...classifyAuditIssuesFlowResult(r.ok, r.status),
+	});
 }
 
 // 3. check-md-linebreaks on changed .md files
 if (mdFiles.length === 0) {
-	results.push({ name: "check-md-linebreaks", status: "SKIP", detail: "no .md changes" });
+	results.push({
+		name: "check-md-linebreaks",
+		status: "SKIP",
+		detail: "no .md changes",
+	});
 } else {
 	const r = node(["scripts/check-md-linebreaks.mjs", ...mdFiles]);
 	results.push({ name: "check-md-linebreaks", status: r.ok ? "PASS" : "FAIL" });
@@ -143,9 +165,20 @@ results.push(genPluginIdentityStep({ exec, node, changedFiles }));
 
 // 5. snapshot freshness (only when .pfdsl files changed)
 if (pfdslFiles.length === 0) {
-	results.push({ name: "snapshot freshness", status: "SKIP", detail: "no .pfdsl changes" });
+	results.push({
+		name: "snapshot freshness",
+		status: "SKIP",
+		detail: "no .pfdsl changes",
+	});
 } else {
-	const vitestRun = exec("pnpm", ["--filter", "@pfdsl/core", "exec", "vitest", "run", "-u"]);
+	const vitestRun = exec("pnpm", [
+		"--filter",
+		"@pfdsl/core",
+		"exec",
+		"vitest",
+		"run",
+		"-u",
+	]);
 	if (!vitestRun.ok) {
 		results.push({
 			name: "snapshot freshness",
@@ -153,21 +186,40 @@ if (pfdslFiles.length === 0) {
 			detail: `vitest run failed: ${vitestRun.out.trim().slice(-200)}`,
 		});
 	} else {
-		const r = exec("git", ["diff", "--quiet", "--", "packages/core/src/__snapshots__/"]);
+		const r = exec("git", [
+			"diff",
+			"--quiet",
+			"--",
+			"packages/core/src/__snapshots__/",
+		]);
 		results.push({
 			name: "snapshot freshness",
 			status: r.ok ? "PASS" : "FAIL",
-			detail: r.ok ? undefined : "snapshots stale; re-stage packages/core/src/__snapshots__/",
+			detail: r.ok
+				? undefined
+				: "snapshots stale; re-stage packages/core/src/__snapshots__/",
 		});
 	}
 }
 
 // 6. output artifact status update in .pfdsl/roadmap.pfdsl
-results.push(outputArtifactStatusStep({ exec, base, artifactKey, noArtifact, changedFiles }));
+results.push(
+	outputArtifactStatusStep({
+		exec,
+		base,
+		artifactKey,
+		noArtifact,
+		changedFiles,
+	}),
+);
 
 // 7. vscode-extension typecheck (only when packages/vscode-extension/ changed)
 if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
-	results.push({ name: "vscode-extension typecheck", status: "SKIP", detail: "no vscode-extension changes" });
+	results.push({
+		name: "vscode-extension typecheck",
+		status: "SKIP",
+		detail: "no vscode-extension changes",
+	});
 } else {
 	const r = exec("pnpm", ["--filter", "@pfdsl/vscode-extension", "typecheck"]);
 	results.push({
@@ -186,7 +238,9 @@ results.push(commitSubjectStep({ exec, base }));
 results.push(reviewMeasurementStep({ exec, base, changedFiles }));
 
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
-results.push(wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }));
+results.push(
+	wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }),
+);
 
 // The linked issue, fetched once for the two checks that read it. execGh keeps
 // the REST fallback that a bare `gh` call would lose in environments without
@@ -196,7 +250,16 @@ let issueError = null;
 if (issueNumber != null) {
 	try {
 		issue = JSON.parse(
-			await execGh(["issue", "view", String(issueNumber), "--json", "author,body,comments,createdAt"], { cwd: root }),
+			await execGh(
+				[
+					"issue",
+					"view",
+					String(issueNumber),
+					"--json",
+					"author,body,comments,createdAt",
+				],
+				{ cwd: root },
+			),
 		);
 	} catch {
 		issueError = "gh CLI unavailable";
@@ -215,10 +278,14 @@ results.push(designRecordStep({ exec, base, issue, issueError }));
 // roadmap-based blocks below still read the file per block, which is the older
 // convention and stays until something needs them shared too.
 const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
-results.push(sizeDirectionStep({ exec, issue, issueError, deltas: sizeDeltas }));
+results.push(
+	sizeDirectionStep({ exec, issue, issueError, deltas: sizeDeltas }),
+);
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
-const manualItems = deriveManualItems(extractGateChecklist(readFileSync(skillMdPath, "utf-8")));
+const manualItems = deriveManualItems(
+	extractGateChecklist(readFileSync(skillMdPath, "utf-8")),
+);
 
 console.log("gate-check:");
 console.log(formatGateTable(results));
@@ -234,7 +301,8 @@ console.log(formatGateTable(results));
 		const reports = [
 			{
 				parse: parseAuditTerminals,
-				heading: "New terminal artifacts (classify means vs. deliverable; register todo consumer if missing)",
+				heading:
+					"New terminal artifacts (classify means vs. deliverable; register todo consumer if missing)",
 				byFile: [],
 			},
 			{
@@ -248,7 +316,9 @@ console.log(formatGateTable(results));
 			const before = exec("git", ["show", `origin/${base}:${f}`]);
 			const after = exec("git", ["show", `HEAD:${f}`]);
 			if (!after.ok) continue;
-			const beforeAudit = before.ok ? node([cliPath, "graph", "io", "-"], before.out) : { ok: true, out: "" };
+			const beforeAudit = before.ok
+				? node([cliPath, "graph", "io", "-"], before.out)
+				: { ok: true, out: "" };
 			const afterAudit = node([cliPath, "graph", "io", "-"], after.out);
 			if (!afterAudit.ok) continue;
 			for (const report of reports) {
@@ -278,15 +348,28 @@ console.log(formatGateTable(results));
 		const before = exec("git", ["show", `origin/${base}:.pfdsl/roadmap.pfdsl`]);
 		const after = exec("git", ["show", "HEAD:.pfdsl/roadmap.pfdsl"]);
 		if (before.ok && after.ok) {
-			const beforeReady = node([cliPath, "status", "ready", "-", "--json"], before.out);
-			const afterReady = node([cliPath, "status", "ready", "-", "--json"], after.out);
+			const beforeReady = node(
+				[cliPath, "status", "ready", "-", "--json"],
+				before.out,
+			);
+			const afterReady = node(
+				[cliPath, "status", "ready", "-", "--json"],
+				after.out,
+			);
 			if (beforeReady.ok && afterReady.ok) {
 				const beforeIds = JSON.parse(beforeReady.out).ready.map((p) => p.id);
 				const afterIds = JSON.parse(afterReady.out).ready.map((p) => p.id);
-				const { newlyReady, noLongerReady } = diffReadySets(beforeIds, afterIds);
+				const { newlyReady, noLongerReady } = diffReadySets(
+					beforeIds,
+					afterIds,
+				);
 				console.log(`\nReady-set diff (origin/${base} → HEAD):`);
-				console.log(`  newly ready: ${newlyReady.length > 0 ? newlyReady.join(", ") : "(none)"}`);
-				console.log(`  no longer ready: ${noLongerReady.length > 0 ? noLongerReady.join(", ") : "(none)"}`);
+				console.log(
+					`  newly ready: ${newlyReady.length > 0 ? newlyReady.join(", ") : "(none)"}`,
+				);
+				console.log(
+					`  no longer ready: ${noLongerReady.length > 0 ? noLongerReady.join(", ") : "(none)"}`,
+				);
 			}
 		}
 	}

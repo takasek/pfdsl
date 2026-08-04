@@ -1,10 +1,21 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-
+import {
+	collectModuleClosure,
+	findDistDependentFiles,
+} from "./check-script-imports.mjs";
 import {
 	assemblePluginDistIndependent,
 	buildPluginDescription,
@@ -13,7 +24,6 @@ import {
 	mirrorFiles,
 	PLUGIN_AGENT_FILES,
 } from "./gen-plugin.mjs";
-import { collectModuleClosure, findDistDependentFiles } from "./check-script-imports.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../..");
@@ -44,10 +54,16 @@ describe("buildPluginManifest", () => {
 		try {
 			const skillDir = join(root, ".claude/skills/pfd-ops");
 			mkdirSync(skillDir, { recursive: true });
-			writeFileSync(join(skillDir, "SKILL.md"), "---\nname: pfd-ops\nsummary: injected-root blurb\ndescription: |\n  long form\n---\nbody\n");
+			writeFileSync(
+				join(skillDir, "SKILL.md"),
+				"---\nname: pfd-ops\nsummary: injected-root blurb\ndescription: |\n  long form\n---\nbody\n",
+			);
 			const pfdslDir = join(root, "scripts/skill-template");
 			mkdirSync(pfdslDir, { recursive: true });
-			writeFileSync(join(pfdslDir, "SKILL.md"), "---\nname: pfdsl\nsummary: injected-root pfdsl blurb\ndescription: |\n  long form\n---\nbody\n");
+			writeFileSync(
+				join(pfdslDir, "SKILL.md"),
+				"---\nname: pfdsl\nsummary: injected-root pfdsl blurb\ndescription: |\n  long form\n---\nbody\n",
+			);
 
 			const manifest = buildPluginManifest({
 				cliVersion: "0.0.18",
@@ -86,11 +102,21 @@ describe("buildPluginDescription", () => {
 	});
 
 	it("throws when a bundled skill has no description blurb, instead of silently omitting it", () => {
-		assert.throws(() => buildPluginDescription({ skillDirs: ["not-a-real-skill"], commandFiles: [] }), /not-a-real-skill/);
+		assert.throws(
+			() =>
+				buildPluginDescription({
+					skillDirs: ["not-a-real-skill"],
+					commandFiles: [],
+				}),
+			/not-a-real-skill/,
+		);
 	});
 
 	it("derives a command's blurb from its filename, so no table can drift from PLUGIN_COMMAND_FILES", () => {
-		const description = buildPluginDescription({ skillDirs: [], commandFiles: ["brand-new-command.md"] });
+		const description = buildPluginDescription({
+			skillDirs: [],
+			commandFiles: ["brand-new-command.md"],
+		});
 		assert.match(description, /\/brand-new-command\b/);
 	});
 
@@ -99,9 +125,16 @@ describe("buildPluginDescription", () => {
 		try {
 			const skillDir = join(root, ".claude/skills/pfd-ops");
 			mkdirSync(skillDir, { recursive: true });
-			writeFileSync(join(skillDir, "SKILL.md"), "---\nname: pfd-ops\nsummary: a totally new blurb never in any table\ndescription: |\n  long form\n---\nbody\n");
+			writeFileSync(
+				join(skillDir, "SKILL.md"),
+				"---\nname: pfd-ops\nsummary: a totally new blurb never in any table\ndescription: |\n  long form\n---\nbody\n",
+			);
 
-			const description = buildPluginDescription({ skillDirs: ["pfd-ops"], commandFiles: [], root });
+			const description = buildPluginDescription({
+				skillDirs: ["pfd-ops"],
+				commandFiles: [],
+				root,
+			});
 
 			assert.match(description, /a totally new blurb never in any table/);
 		} finally {
@@ -114,9 +147,20 @@ describe("buildPluginDescription", () => {
 		try {
 			const skillDir = join(root, ".claude/skills/pfd-ops");
 			mkdirSync(skillDir, { recursive: true });
-			writeFileSync(join(skillDir, "SKILL.md"), "---\nname: pfd-ops\ndescription: |\n  long form\n---\nbody\n");
+			writeFileSync(
+				join(skillDir, "SKILL.md"),
+				"---\nname: pfd-ops\ndescription: |\n  long form\n---\nbody\n",
+			);
 
-			assert.throws(() => buildPluginDescription({ skillDirs: ["pfd-ops"], commandFiles: [], root }), /summary/);
+			assert.throws(
+				() =>
+					buildPluginDescription({
+						skillDirs: ["pfd-ops"],
+						commandFiles: [],
+						root,
+					}),
+				/summary/,
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -144,7 +188,10 @@ describe("mirrorDir", () => {
 		mirrorDir("foo", join(tmp, "src"), destRoot);
 
 		assert.equal(readFileSync(join(destRoot, "foo", "a.txt"), "utf-8"), "a");
-		assert.equal(readFileSync(join(destRoot, "foo", "nested", "b.txt"), "utf-8"), "b");
+		assert.equal(
+			readFileSync(join(destRoot, "foo", "nested", "b.txt"), "utf-8"),
+			"b",
+		);
 	});
 
 	it("removes a stale destination file that no longer exists in the source", () => {
@@ -153,7 +200,10 @@ describe("mirrorDir", () => {
 		writeFileSync(join(src, "a.txt"), "a");
 		const destRoot = join(tmp, "dest");
 		mkdirSync(join(destRoot, "foo"), { recursive: true });
-		writeFileSync(join(destRoot, "foo", "stale.txt"), "leftover from a prior run");
+		writeFileSync(
+			join(destRoot, "foo", "stale.txt"),
+			"leftover from a prior run",
+		);
 
 		mirrorDir("foo", join(tmp, "src"), destRoot);
 
@@ -162,7 +212,10 @@ describe("mirrorDir", () => {
 	});
 
 	it("exits with an error when the source directory is missing", () => {
-		assert.throws(() => mirrorDir("missing", join(tmp, "src"), join(tmp, "dest")), /not found/);
+		assert.throws(
+			() => mirrorDir("missing", join(tmp, "src"), join(tmp, "dest")),
+			/not found/,
+		);
 	});
 
 	it("excludes a top-level CLAUDE.md dev-only guard from the mirrored copy", () => {
@@ -175,7 +228,10 @@ describe("mirrorDir", () => {
 		mirrorDir("foo", join(tmp, "src"), destRoot);
 
 		assert.equal(existsSync(join(destRoot, "foo", "CLAUDE.md")), false);
-		assert.equal(readFileSync(join(destRoot, "foo", "SKILL.md"), "utf-8"), "skill body");
+		assert.equal(
+			readFileSync(join(destRoot, "foo", "SKILL.md"), "utf-8"),
+			"skill body",
+		);
 	});
 
 	it("keeps the prior destination content when the source copy fails partway", (t) => {
@@ -185,7 +241,9 @@ describe("mirrorDir", () => {
 		// root ignores permission bits, so this fault injection can't trigger
 		// there; skip rather than false-fail (#509).
 		if (process.getuid?.() === 0) {
-			t.skip("root ignores chmod 0o000, so this fault injection can't fail the copy");
+			t.skip(
+				"root ignores chmod 0o000, so this fault injection can't fail the copy",
+			);
 			return;
 		}
 		const src = join(tmp, "src", "foo");
@@ -204,7 +262,10 @@ describe("mirrorDir", () => {
 			chmodSync(join(src, "unreadable.txt"), 0o644);
 		}
 
-		assert.equal(readFileSync(join(destRoot, "foo", "a.txt"), "utf-8"), "prior-good-a");
+		assert.equal(
+			readFileSync(join(destRoot, "foo", "a.txt"), "utf-8"),
+			"prior-good-a",
+		);
 	});
 });
 
@@ -239,7 +300,10 @@ describe("mirrorFiles", () => {
 	it("exits with an error when a named source file is missing", () => {
 		const srcDir = join(tmp, "src");
 		mkdirSync(srcDir, { recursive: true });
-		assert.throws(() => mirrorFiles(["missing.md"], srcDir, join(tmp, "dest")), /not found/);
+		assert.throws(
+			() => mirrorFiles(["missing.md"], srcDir, join(tmp, "dest")),
+			/not found/,
+		);
 	});
 });
 
@@ -247,13 +311,19 @@ describe("assemblePluginDistIndependent", () => {
 	const fakeMarketplace = {
 		$schema: "https://json.schemastore.org/claude-code-marketplace.json",
 		name: "pfdsl",
-		description: "top-level marketplace description, distinct from the per-plugin one",
+		description:
+			"top-level marketplace description, distinct from the per-plugin one",
 		owner: { name: "takasek" },
 		plugins: [
 			{
 				name: "pfdsl",
 				description: "stale description left behind by a prior manual edit",
-				source: { source: "git-subdir", url: "https://github.com/takasek/pfdsl.git", path: "plugin/pfdsl", ref: "v0.0.1" },
+				source: {
+					source: "git-subdir",
+					url: "https://github.com/takasek/pfdsl.git",
+					path: "plugin/pfdsl",
+					ref: "v0.0.1",
+				},
 			},
 		],
 	};
@@ -264,11 +334,18 @@ describe("assemblePluginDistIndependent", () => {
 			calls,
 			deps: {
 				genInstall: (root) => calls.push(["genInstall", root]),
-				mirrorDir: (name, srcRoot, destRoot) => calls.push(["mirrorDir", name, srcRoot, destRoot]),
-				mirrorFiles: (names, srcDir, destDir) => calls.push(["mirrorFiles", names, srcDir, destDir]),
-				writeSkillRefs: (root, outDir) => calls.push(["writeSkillRefs", root, outDir]),
-				readFileSync: (path) => (String(path).endsWith("marketplace.json") ? JSON.stringify(fakeMarketplace) : JSON.stringify({ version: "1.2.3" })),
-				writeFileSync: (path, content) => calls.push(["writeFileSync", path, content]),
+				mirrorDir: (name, srcRoot, destRoot) =>
+					calls.push(["mirrorDir", name, srcRoot, destRoot]),
+				mirrorFiles: (names, srcDir, destDir) =>
+					calls.push(["mirrorFiles", names, srcDir, destDir]),
+				writeSkillRefs: (root, outDir) =>
+					calls.push(["writeSkillRefs", root, outDir]),
+				readFileSync: (path) =>
+					String(path).endsWith("marketplace.json")
+						? JSON.stringify(fakeMarketplace)
+						: JSON.stringify({ version: "1.2.3" }),
+				writeFileSync: (path, content) =>
+					calls.push(["writeFileSync", path, content]),
 				mkdirSync: (path) => calls.push(["mkdirSync", path]),
 				...overrides,
 			},
@@ -277,7 +354,11 @@ describe("assemblePluginDistIndependent", () => {
 
 	it("regenerates install/ from the repo root", () => {
 		const { calls, deps } = fakeDeps();
-		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
 		assert.deepEqual(
 			calls.filter((c) => c[0] === "genInstall"),
 			[["genInstall", "/repo"]],
@@ -286,21 +367,41 @@ describe("assemblePluginDistIndependent", () => {
 
 	it("mirrors each static skill directory and hooks into plugin/", () => {
 		const { calls, deps } = fakeDeps();
-		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
 		const mirrored = calls.filter((c) => c[0] === "mirrorDir").map((c) => c[1]);
-		assert.deepEqual(mirrored.sort(), ["hooks", "pfd-ecosystem", "pfd-grill", "pfd-ops", "pfd-retro"].sort());
+		assert.deepEqual(
+			mirrored.sort(),
+			["hooks", "pfd-ecosystem", "pfd-grill", "pfd-ops", "pfd-retro"].sort(),
+		);
 	});
 
 	it("mirrors command files and bundled agent files", () => {
 		const { calls, deps } = fakeDeps();
-		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
-		const mirroredFileSets = calls.filter((c) => c[0] === "mirrorFiles").map((c) => c[1]);
-		assert.deepEqual(mirroredFileSets, [["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"], PLUGIN_AGENT_FILES]);
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+		const mirroredFileSets = calls
+			.filter((c) => c[0] === "mirrorFiles")
+			.map((c) => c[1]);
+		assert.deepEqual(mirroredFileSets, [
+			["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"],
+			PLUGIN_AGENT_FILES,
+		]);
 	});
 
 	it("writes plugin.json derived from the CLI package version", () => {
 		const { calls, deps } = fakeDeps();
-		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
 		const [, path, content] = calls.find((c) => c[0] === "writeFileSync");
 		assert.match(path, /\.claude-plugin\/plugin\.json$/);
 		assert.equal(JSON.parse(content).version, "1.2.3");
@@ -308,28 +409,52 @@ describe("assemblePluginDistIndependent", () => {
 
 	it("writes marketplace.json's plugin description to match plugin.json's derived description", () => {
 		const { calls, deps } = fakeDeps();
-		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
 		const writes = calls.filter((c) => c[0] === "writeFileSync");
-		const [, pluginJsonPath, pluginJsonContent] = writes.find(([, path]) => /\.claude-plugin\/plugin\.json$/.test(path));
-		const [, marketplacePath, marketplaceContent] = writes.find(([, path]) => /\.claude-plugin\/marketplace\.json$/.test(path));
+		const [, pluginJsonPath, pluginJsonContent] = writes.find(([, path]) =>
+			/\.claude-plugin\/plugin\.json$/.test(path),
+		);
+		const [, marketplacePath, marketplaceContent] = writes.find(([, path]) =>
+			/\.claude-plugin\/marketplace\.json$/.test(path),
+		);
 		assert.ok(pluginJsonPath, "expected a plugin.json write");
 		assert.ok(marketplacePath, "expected a marketplace.json write");
-		assert.equal(JSON.parse(marketplaceContent).plugins[0].description, JSON.parse(pluginJsonContent).description);
+		assert.equal(
+			JSON.parse(marketplaceContent).plugins[0].description,
+			JSON.parse(pluginJsonContent).description,
+		);
 	});
 
 	it("preserves marketplace.json's other fields when updating the description", () => {
 		const { calls, deps } = fakeDeps();
-		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
-		const [, , marketplaceContent] = calls.filter((c) => c[0] === "writeFileSync").find(([, path]) => /\.claude-plugin\/marketplace\.json$/.test(path));
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+		const [, , marketplaceContent] = calls
+			.filter((c) => c[0] === "writeFileSync")
+			.find(([, path]) => /\.claude-plugin\/marketplace\.json$/.test(path));
 		const written = JSON.parse(marketplaceContent);
 		assert.equal(written.description, fakeMarketplace.description);
-		assert.deepEqual(written.plugins[0].source, fakeMarketplace.plugins[0].source);
+		assert.deepEqual(
+			written.plugins[0].source,
+			fakeMarketplace.plugins[0].source,
+		);
 		assert.equal(written.plugins[0].name, fakeMarketplace.plugins[0].name);
 	});
 
 	it("writes skill references for the bundled pfdsl skill", () => {
 		const { calls, deps } = fakeDeps();
-		assemblePluginDistIndependent({ root: "/repo", pluginRoot: "/repo/plugin/pfdsl", deps });
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
 		assert.deepEqual(
 			calls.filter((c) => c[0] === "writeSkillRefs"),
 			[["writeSkillRefs", "/repo", "/repo/plugin/pfdsl/skills/pfdsl"]],
@@ -342,9 +467,16 @@ describe("dist independence", () => {
 		const entry = resolve(repoRoot, "scripts/gen-plugin-dist-independent.mjs");
 		const closure = collectModuleClosure(entry);
 
-		assert.ok(closure.size >= 2, "expected the closure to include at least the entry and lib/gen-plugin.mjs");
+		assert.ok(
+			closure.size >= 2,
+			"expected the closure to include at least the entry and lib/gen-plugin.mjs",
+		);
 
 		const violations = findDistDependentFiles([...closure]);
-		assert.deepEqual(violations, [], violations.map((v) => `${v.file}: ${v.reason}`).join("; "));
+		assert.deepEqual(
+			violations,
+			[],
+			violations.map((v) => `${v.file}: ${v.reason}`).join("; "),
+		);
 	});
 });

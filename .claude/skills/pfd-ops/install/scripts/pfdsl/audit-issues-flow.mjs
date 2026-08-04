@@ -6,10 +6,20 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-
-import { parseIssueProcesses, buildProcessOutputs, computeFindings, applyFixes, applyClosedInFlowFixes, computeLabelFindings, FLOW_LABELS } from "./lib/issues-flow-audit.mjs";
-import { isGhUnavailableError, GH_UNAVAILABLE_EXIT_CODE } from "./lib/gh-compat.mjs";
+import {
+	GH_UNAVAILABLE_EXIT_CODE,
+	isGhUnavailableError,
+} from "./lib/gh-compat.mjs";
 import { execGh } from "./lib/gh-exec.mjs";
+import {
+	applyClosedInFlowFixes,
+	applyFixes,
+	buildProcessOutputs,
+	computeFindings,
+	computeLabelFindings,
+	FLOW_LABELS,
+	parseIssueProcesses,
+} from "./lib/issues-flow-audit.mjs";
 import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -57,18 +67,32 @@ const body = lines.slice(fmEnd + 1).join("\n");
 // --- Fetch labels from GitHub ---
 
 async function fetchLabels() {
-	const out = await execGh(["label", "list", "--json", "name,description", "--limit", "100"]);
-	return JSON.parse(out).map((l) => ({ name: l.name, description: l.description ?? "" }));
+	const out = await execGh([
+		"label",
+		"list",
+		"--json",
+		"name,description",
+		"--limit",
+		"100",
+	]);
+	return JSON.parse(out).map((l) => ({
+		name: l.name,
+		description: l.description ?? "",
+	}));
 }
 
 // --- Fetch issues from GitHub ---
 
 async function fetchIssues() {
 	const out = await execGh([
-		"issue", "list",
-		"--state", "all",
-		"--json", "number,state,stateReason,labels,updatedAt",
-		"--limit", "500",
+		"issue",
+		"list",
+		"--state",
+		"all",
+		"--json",
+		"number,state,stateReason,labels,updatedAt",
+		"--limit",
+		"500",
 	]);
 	return JSON.parse(out).map((i) => ({
 		number: i.number,
@@ -89,8 +113,8 @@ const outputsByProcess = buildProcessOutputs(body);
 // Mark artifacts that are consumed (have downstream) in the flow body
 function getConsumedArtifactIds(body) {
 	const consumed = new Set();
-	for (const line of body.split('\n')) {
-		const idx = line.indexOf('>>');
+	for (const line of body.split("\n")) {
+		const idx = line.indexOf(">>");
 		if (idx < 0) continue;
 		const left = line.slice(0, idx);
 		for (const m of left.matchAll(/\b([a-z][a-z0-9_]*)\b/g)) {
@@ -132,7 +156,9 @@ for (const proc of processes) {
 // --- Check labels ---
 
 function exitGhUnavailable() {
-	console.log("gh unavailable: skipping GitHub-dependent checks (label sync, issue sync)");
+	console.log(
+		"gh unavailable: skipping GitHub-dependent checks (label sync, issue sync)",
+	);
 	process.exit(GH_UNAVAILABLE_EXIT_CODE);
 }
 
@@ -153,7 +179,15 @@ if (labelFindings.length > 0) {
 	if (fix) {
 		for (const f of labelFindings) {
 			if (f.type === "label_missing") {
-				await execGh(["label", "create", f.name, "--description", f.description, "--color", "ededed"]);
+				await execGh([
+					"label",
+					"create",
+					f.name,
+					"--description",
+					f.description,
+					"--color",
+					"ededed",
+				]);
 			} else if (f.type === "label_description_mismatch") {
 				await execGh(["label", "edit", f.name, "--description", f.description]);
 			}
@@ -211,7 +245,13 @@ if (!fix) {
 // 1. Add flow:managed label to issues missing it
 const missingLabel = findings.filter((f) => f.fixVia === "github");
 for (const f of missingLabel) {
-	await execGh(["issue", "edit", String(f.issueNumber), "--add-label", "flow:managed"]);
+	await execGh([
+		"issue",
+		"edit",
+		String(f.issueNumber),
+		"--add-label",
+		"flow:managed",
+	]);
 }
 
 // 2. Re-fetch issues (labeling changes updatedAt), recompute

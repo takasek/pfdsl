@@ -50,7 +50,11 @@ export function tryRun(file, args, opts = {}) {
 		return { ok: true, out: run(file, args, opts), status: 0 };
 	} catch (e) {
 		// stderr carries the reason for most git failures; stdout is often empty.
-		return { ok: false, out: e.stdout || e.stderr || e.message, status: e.status ?? null };
+		return {
+			ok: false,
+			out: e.stdout || e.stderr || e.message,
+			status: e.status ?? null,
+		};
 	}
 }
 

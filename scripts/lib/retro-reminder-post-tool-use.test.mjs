@@ -1,10 +1,10 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import {
-	isGitCommitCommand,
-	detectDoneAddition,
 	buildHookOutput,
+	detectDoneAddition,
 	isCliEntrypoint,
+	isGitCommitCommand,
 } from "../../hooks/retro-reminder-post-tool-use.mjs";
 
 describe("isGitCommitCommand", () => {
@@ -38,7 +38,10 @@ describe("detectDoneAddition", () => {
 	});
 
 	it("ignores unrelated added lines", () => {
-		const diff = ["diff --git a/.pfdsl/roadmap.pfdsl b/.pfdsl/roadmap.pfdsl", "+  label: something"].join("\n");
+		const diff = [
+			"diff --git a/.pfdsl/roadmap.pfdsl b/.pfdsl/roadmap.pfdsl",
+			"+  label: something",
+		].join("\n");
 		assert.equal(detectDoneAddition(diff), false);
 	});
 
@@ -58,29 +61,53 @@ describe("isCliEntrypoint", () => {
 	// entrypoint" whenever the invocation path crosses a symlink — the plugin
 	// cache under /tmp on macOS, for one. The hook's whole job is a reminder,
 	// so the failure mode is silence.
-	const realpath = (p) => (p.startsWith("/tmp/") ? p.replace("/tmp/", "/private/tmp/") : p);
+	const realpath = (p) =>
+		p.startsWith("/tmp/") ? p.replace("/tmp/", "/private/tmp/") : p;
 
 	it("recognises the entrypoint when the invocation path crosses a symlink", () => {
-		assert.equal(isCliEntrypoint("file:///private/tmp/hooks/h.mjs", "/tmp/hooks/h.mjs", { realpath }), true);
+		assert.equal(
+			isCliEntrypoint("file:///private/tmp/hooks/h.mjs", "/tmp/hooks/h.mjs", {
+				realpath,
+			}),
+			true,
+		);
 	});
 
 	it("recognises the entrypoint when no symlink is involved", () => {
-		assert.equal(isCliEntrypoint("file:///opt/hooks/h.mjs", "/opt/hooks/h.mjs", { realpath }), true);
+		assert.equal(
+			isCliEntrypoint("file:///opt/hooks/h.mjs", "/opt/hooks/h.mjs", {
+				realpath,
+			}),
+			true,
+		);
 	});
 
 	it("rejects a different module imported by the entrypoint", () => {
-		assert.equal(isCliEntrypoint("file:///opt/hooks/lib.mjs", "/opt/hooks/h.mjs", { realpath }), false);
+		assert.equal(
+			isCliEntrypoint("file:///opt/hooks/lib.mjs", "/opt/hooks/h.mjs", {
+				realpath,
+			}),
+			false,
+		);
 	});
 
 	it("rejects an absent argv[1]", () => {
-		assert.equal(isCliEntrypoint("file:///opt/hooks/h.mjs", undefined, { realpath }), false);
+		assert.equal(
+			isCliEntrypoint("file:///opt/hooks/h.mjs", undefined, { realpath }),
+			false,
+		);
 	});
 
 	it("falls back to the verbatim comparison when the path cannot be resolved", () => {
 		const throwing = () => {
 			throw new Error("ENOENT");
 		};
-		assert.equal(isCliEntrypoint("file:///opt/hooks/h.mjs", "/opt/hooks/h.mjs", { realpath: throwing }), true);
+		assert.equal(
+			isCliEntrypoint("file:///opt/hooks/h.mjs", "/opt/hooks/h.mjs", {
+				realpath: throwing,
+			}),
+			true,
+		);
 	});
 });
 

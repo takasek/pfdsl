@@ -1,9 +1,9 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import {
 	extractPathReferences,
-	resolveCheckTarget,
 	findMissingHeadings,
+	resolveCheckTarget,
 } from "./companion-binding-check.mjs";
 
 describe("extractPathReferences", () => {
@@ -19,7 +19,8 @@ describe("extractPathReferences", () => {
 	});
 
 	it("ignores non-path inline code and npm package names", () => {
-		const text = "Run `onSuccess` and import `@pfdsl/core` and use `docs` as a word.";
+		const text =
+			"Run `onSuccess` and import `@pfdsl/core` and use `docs` as a word.";
 		assert.deepEqual(extractPathReferences(text), []);
 	});
 
@@ -34,8 +35,11 @@ describe("extractPathReferences", () => {
 	});
 
 	it("skips inline code inside fenced code blocks", () => {
-		const text = "```\n`docs/should-not-be-checked.md`\n```\nBut `docs/should-be-checked.md` is fine.";
-		assert.deepEqual(extractPathReferences(text), ["docs/should-be-checked.md"]);
+		const text =
+			"```\n`docs/should-not-be-checked.md`\n```\nBut `docs/should-be-checked.md` is fine.";
+		assert.deepEqual(extractPathReferences(text), [
+			"docs/should-be-checked.md",
+		]);
 	});
 
 	it("extracts a path token embedded in a command inside inline code", () => {
@@ -90,7 +94,8 @@ describe("resolveCheckTarget", () => {
 
 describe("findMissingHeadings", () => {
 	it("returns an empty array when all required headings are present", () => {
-		const text = "# Title\n\n## pfd-retro バインディング\n\n### retro 実行記録\n";
+		const text =
+			"# Title\n\n## pfd-retro バインディング\n\n### retro 実行記録\n";
 		assert.deepEqual(
 			findMissingHeadings(text, ["pfd-retro バインディング", "retro 実行記録"]),
 			[],
@@ -106,7 +111,8 @@ describe("findMissingHeadings", () => {
 	});
 
 	it("does not match heading text appearing outside a heading line", () => {
-		const text = "# Title\n\nprose mentioning retro 実行記録 in passing, not as a heading.\n";
+		const text =
+			"# Title\n\nprose mentioning retro 実行記録 in passing, not as a heading.\n";
 		assert.deepEqual(findMissingHeadings(text, ["retro 実行記録"]), [
 			"retro 実行記録",
 		]);

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
+
 // Regenerates the README.md `## CLI` generated block from `pfdsl help` output.
 // Run from repo root: node scripts/gen-readme-cli.mjs
 
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,11 +13,15 @@ const root = resolve(__dirname, "..");
 
 const cliPath = resolve(root, "packages/cli/dist/cli.js");
 if (!existsSync(cliPath)) {
-  console.error("Error: packages/cli/dist/cli.js not found. Run 'pnpm -r build' first.");
-  process.exit(1);
+	console.error(
+		"Error: packages/cli/dist/cli.js not found. Run 'pnpm -r build' first.",
+	);
+	process.exit(1);
 }
 
-const helpOutput = execFileSync(process.execPath, [cliPath, "help"], { encoding: "utf-8" }).replace(/\s+$/, "");
+const helpOutput = execFileSync(process.execPath, [cliPath, "help"], {
+	encoding: "utf-8",
+}).replace(/\s+$/, "");
 
 const readmePath = resolve(root, "README.md");
 const readme = readFileSync(readmePath, "utf-8");
@@ -27,8 +32,10 @@ const startIdx = readme.indexOf(startMarker);
 const endIdx = readme.indexOf(endMarker);
 
 if (startIdx === -1 || endIdx === -1) {
-  console.error("Error: README.md is missing gen-readme-cli sentinel comments. See scripts/gen-readme-cli.mjs.");
-  process.exit(1);
+	console.error(
+		"Error: README.md is missing gen-readme-cli sentinel comments. See scripts/gen-readme-cli.mjs.",
+	);
+	process.exit(1);
 }
 
 const before = readme.slice(0, startIdx + startMarker.length);

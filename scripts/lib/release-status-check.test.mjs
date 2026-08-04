@@ -1,13 +1,13 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import {
 	compareVersions,
+	formatDistributionReviewStatus,
+	formatFullReviewStatus,
 	formatResults,
 	formatSkillBundleStatus,
-	formatDistributionReviewStatus,
 	formatSpecHistoryStatus,
 	latestFullReviewDate,
-	formatFullReviewStatus,
 } from "./release-status-check.mjs";
 
 describe("compareVersions", () => {
@@ -162,7 +162,10 @@ describe("formatSkillBundleStatus", () => {
 describe("formatDistributionReviewStatus", () => {
 	it("reports how many bundled prompts are past their review", () => {
 		const out = formatDistributionReviewStatus({
-			record: { commit: "abcdef1234567890abcdef1234567890abcdef12", date: "2026-08-01" },
+			record: {
+				commit: "abcdef1234567890abcdef1234567890abcdef12",
+				date: "2026-08-01",
+			},
 			unreviewedCount: 3,
 		});
 		assert.match(out, /3 file/);
@@ -171,7 +174,10 @@ describe("formatDistributionReviewStatus", () => {
 	});
 
 	it("says the bundle has never been reviewed when there is no record", () => {
-		const out = formatDistributionReviewStatus({ record: { commit: null }, unreviewedCount: 22 });
+		const out = formatDistributionReviewStatus({
+			record: { commit: null },
+			unreviewedCount: 22,
+		});
 		assert.match(out, /never reviewed/);
 		assert.match(out, /22 file/);
 	});
@@ -188,7 +194,10 @@ describe("formatDistributionReviewStatus", () => {
 
 describe("formatSpecHistoryStatus", () => {
 	it("shows current when spec-history.md documents the spec version", () => {
-		const out = formatSpecHistoryStatus({ ok: true, message: "docs/spec/spec-history.md documents v0.0.17." });
+		const out = formatSpecHistoryStatus({
+			ok: true,
+			message: "docs/spec/spec-history.md documents v0.0.17.",
+		});
 		assert.match(out, /✓/);
 		assert.match(out, /v0\.0\.17/);
 	});
@@ -196,7 +205,8 @@ describe("formatSpecHistoryStatus", () => {
 	it("flags a missing changelog entry", () => {
 		const out = formatSpecHistoryStatus({
 			ok: false,
-			message: "docs/spec/spec.md is at v0.0.18, but docs/spec/spec-history.md has no changelog\nentry mentioning it.",
+			message:
+				"docs/spec/spec.md is at v0.0.18, but docs/spec/spec-history.md has no changelog\nentry mentioning it.",
 		});
 		assert.match(out, /!/);
 		assert.match(out, /v0\.0\.18/);
@@ -205,7 +215,12 @@ describe("formatSpecHistoryStatus", () => {
 
 describe("latestFullReviewDate", () => {
 	it("takes the newest full-mode log", () => {
-		const files = ["2026-07-01-full.md", "2026-08-01-diff.md", "2026-07-20-full.md", "reviewed.json"];
+		const files = [
+			"2026-07-01-full.md",
+			"2026-08-01-diff.md",
+			"2026-07-20-full.md",
+			"reviewed.json",
+		];
 		assert.equal(latestFullReviewDate(files), "2026-07-20");
 	});
 

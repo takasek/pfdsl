@@ -9,10 +9,13 @@
 // Usage (wired in .claude/settings.json): node scripts/md-write-check.mjs
 
 import { checkFile, formatViolation } from "./check-md-linebreaks.mjs";
-import { runMdWriteCheck } from "./lib/md-write-check.mjs";
 import { readStdinText } from "./lib/hook-io.mjs";
+import { runMdWriteCheck } from "./lib/md-write-check.mjs";
 
-const { shouldOutput, output } = runMdWriteCheck(await readStdinText(), { checkFile, formatViolation });
+const { shouldOutput, output } = runMdWriteCheck(await readStdinText(), {
+	checkFile,
+	formatViolation,
+});
 if (shouldOutput) {
 	console.log(JSON.stringify(output));
 }

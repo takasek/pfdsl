@@ -18,7 +18,12 @@ export function summarizeCiStatus(statusCheckRollup) {
 	if (!statusCheckRollup || statusCheckRollup.length === 0) return "NONE";
 	const conclusions = statusCheckRollup.map((c) => c.conclusion ?? null);
 	if (conclusions.some((c) => c === "FAILURE" || c === "ERROR")) return "FAIL";
-	if (conclusions.some((c) => c === null || c === "PENDING" || c === "IN_PROGRESS")) return "PENDING";
+	if (
+		conclusions.some(
+			(c) => c === null || c === "PENDING" || c === "IN_PROGRESS",
+		)
+	)
+		return "PENDING";
 	if (conclusions.every((c) => c === "SUCCESS")) return "PASS";
 	return "UNKNOWN";
 }
@@ -33,7 +38,11 @@ export function classifyPRs(prs, flowSyncPattern = /^flow-sync\//) {
 	const otherOpenPRs = [];
 	for (const pr of prs) {
 		if (flowSyncPattern.test(pr.headRefName)) {
-			openFlowSyncPRs.push({ number: pr.number, title: pr.title, ci: summarizeCiStatus(pr.statusCheckRollup) });
+			openFlowSyncPRs.push({
+				number: pr.number,
+				title: pr.title,
+				ci: summarizeCiStatus(pr.statusCheckRollup),
+			});
 		} else {
 			otherOpenPRs.push({ number: pr.number, title: pr.title });
 		}
@@ -79,7 +88,12 @@ export function findIssueNumberForProcess(pfdslText, processId) {
 	return match ? Number(match[1]) : null;
 }
 
-const OPTION_HEADING_PATTERNS = [/検討したい方向/, /対応案/, /方針案/, /選択肢/];
+const OPTION_HEADING_PATTERNS = [
+	/検討したい方向/,
+	/対応案/,
+	/方針案/,
+	/選択肢/,
+];
 
 const HEADING_LINE_PATTERN = /^(#{2,6})\s+(.*)$/;
 const NUMBERED_ITEM_PATTERN = /^\d+\.\s/;
@@ -106,14 +120,21 @@ export function detectEnumeratedOptions(body) {
 		for (let j = i + 1; j < lines.length; j++) {
 			const nextHeadingMatch = lines[j].match(/^(#{2,6})\s+/);
 			if (nextHeadingMatch && nextHeadingMatch[1].length <= level) break;
-			if (NUMBERED_ITEM_PATTERN.test(lines[j]) || LABELED_SUBHEADING_ITEM_PATTERN.test(lines[j])) count++;
+			if (
+				NUMBERED_ITEM_PATTERN.test(lines[j]) ||
+				LABELED_SUBHEADING_ITEM_PATTERN.test(lines[j])
+			)
+				count++;
 		}
 	}
 	return { enumerated: count >= 2, count, headings };
 }
 
 export const DECISION_LINE_PREFIX = "決定:";
-const DECISION_LINE_PATTERN = lineHeadPattern(DECISION_LINE_PREFIX, "\\s*案\\s*(\\S+)");
+const DECISION_LINE_PATTERN = lineHeadPattern(
+	DECISION_LINE_PREFIX,
+	"\\s*案\\s*(\\S+)",
+);
 
 /**
  * The design-selection record, pre-shaped so the runner never has to know the
@@ -164,7 +185,12 @@ export function findDecisionRecords(entries) {
 			const normalized = normalizeRecordLine(line);
 			const match = normalized.match(DECISION_LINE_PATTERN);
 			if (match) {
-				records.push({ author: entry.author, option: match[1], line: normalized, createdAt: entry.createdAt });
+				records.push({
+					author: entry.author,
+					option: match[1],
+					line: normalized,
+					createdAt: entry.createdAt,
+				});
 			}
 		}
 	}
@@ -186,7 +212,11 @@ export function findDecisionRecords(entries) {
 export function classifyDesignSettlement({ body, ownerLogin, comments }) {
 	const phrase = detectDesignUnsettled(body);
 	if (phrase.designUnsettled) {
-		return { unsettled: true, reason: "phrase", matchedLines: phrase.matchedLines };
+		return {
+			unsettled: true,
+			reason: "phrase",
+			matchedLines: phrase.matchedLines,
+		};
 	}
 
 	const entries = [{ author: ownerLogin, body }, ...(comments ?? [])];
@@ -196,7 +226,11 @@ export function classifyDesignSettlement({ body, ownerLogin, comments }) {
 		return {
 			unsettled: false,
 			reason: "decision-recorded",
-			decision: { author: ownerDecision.author, option: ownerDecision.option, createdAt: ownerDecision.createdAt },
+			decision: {
+				author: ownerDecision.author,
+				option: ownerDecision.option,
+				createdAt: ownerDecision.createdAt,
+			},
 		};
 	}
 
@@ -236,9 +270,14 @@ const DESIGN_UNSETTLED_PATTERNS = [/design TBD/i, /設計未確定/, /設計未�
  * @param {RegExp[]} patterns
  * @returns {{designUnsettled: boolean, matchedLines: string[]}}
  */
-export function detectDesignUnsettled(body, patterns = DESIGN_UNSETTLED_PATTERNS) {
+export function detectDesignUnsettled(
+	body,
+	patterns = DESIGN_UNSETTLED_PATTERNS,
+) {
 	if (!body) return { designUnsettled: false, matchedLines: [] };
-	const matchedLines = body.split("\n").filter((line) => patterns.some((p) => p.test(line)));
+	const matchedLines = body
+		.split("\n")
+		.filter((line) => patterns.some((p) => p.test(line)));
 	return { designUnsettled: matchedLines.length > 0, matchedLines };
 }
 

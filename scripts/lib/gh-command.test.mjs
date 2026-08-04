@@ -1,8 +1,7 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-
-import { flagValues, parseGhCommand } from "./gh-command.mjs";
+import { describe, it } from "node:test";
 import { tokenize } from "./delegation-guard.mjs";
+import { flagValues, parseGhCommand } from "./gh-command.mjs";
 
 /** @param {string} segment */
 function parse(segment) {
@@ -21,7 +20,10 @@ describe("parseGhCommand", () => {
 	it("looks past a global flag and its value", () => {
 		assert.equal(parse("gh -R owner/repo issue view 650")?.group, "issue");
 		assert.equal(parse("gh -R owner/repo issue view 650")?.verb, "view");
-		assert.equal(parse("gh --repo owner/repo issue create --title x")?.verb, "create");
+		assert.equal(
+			parse("gh --repo owner/repo issue create --title x")?.verb,
+			"create",
+		);
 		assert.equal(parse("gh --repo=owner/repo pr create")?.verb, "create");
 	});
 
@@ -47,29 +49,53 @@ describe("parseGhCommand", () => {
 describe("flagValues", () => {
 	it("collects the value that follows a flag", () => {
 		const parsed = parse("gh issue create --title x --label flow:managed");
-		assert.deepEqual(flagValues(parsed.args, ["--label", "-l"]), ["flow:managed"]);
+		assert.deepEqual(flagValues(parsed.args, ["--label", "-l"]), [
+			"flow:managed",
+		]);
 	});
 
 	it("collects the = form and the short form", () => {
-		assert.deepEqual(flagValues(parse("gh issue create --label=flow:managed").args, ["--label", "-l"]), [
-			"flow:managed",
-		]);
-		assert.deepEqual(flagValues(parse("gh issue create -l flow:exempt").args, ["--label", "-l"]), [
-			"flow:exempt",
-		]);
+		assert.deepEqual(
+			flagValues(parse("gh issue create --label=flow:managed").args, [
+				"--label",
+				"-l",
+			]),
+			["flow:managed"],
+		);
+		assert.deepEqual(
+			flagValues(parse("gh issue create -l flow:exempt").args, [
+				"--label",
+				"-l",
+			]),
+			["flow:exempt"],
+		);
 	});
 
 	it("collects a quoted value, and every occurrence of the flag", () => {
-		const parsed = parse('gh issue create --label "flow:managed" --label enhancement');
-		assert.deepEqual(flagValues(parsed.args, ["--label"]), ["flow:managed", "enhancement"]);
+		const parsed = parse(
+			'gh issue create --label "flow:managed" --label enhancement',
+		);
+		assert.deepEqual(flagValues(parsed.args, ["--label"]), [
+			"flow:managed",
+			"enhancement",
+		]);
 	});
 
 	it("is empty when the flag is absent or has no value", () => {
-		assert.deepEqual(flagValues(parse("gh issue create --title x").args, ["--label"]), []);
-		assert.deepEqual(flagValues(parse("gh issue create --label").args, ["--label"]), []);
+		assert.deepEqual(
+			flagValues(parse("gh issue create --title x").args, ["--label"]),
+			[],
+		);
+		assert.deepEqual(
+			flagValues(parse("gh issue create --label").args, ["--label"]),
+			[],
+		);
 	});
 
 	it("does not read the next flag as a value", () => {
-		assert.deepEqual(flagValues(parse("gh issue create --label --json").args, ["--label"]), []);
+		assert.deepEqual(
+			flagValues(parse("gh issue create --label --json").args, ["--label"]),
+			[],
+		);
 	});
 });

@@ -18,4 +18,8 @@ rmSync("node_modules", { recursive: true, force: true });
 // which resolves the exact version from this repo's package.json "packageManager" field.
 execFileSync("corepack", ["enable"], { stdio: "inherit" });
 execFileSync("pnpm", ["install", "--frozen-lockfile"], { stdio: "inherit" });
-execFileSync("pnpm", ["--filter", "@pfdsl/core", "exec", "vitest", "run", "-u"], { stdio: "inherit" });
+execFileSync(
+	"pnpm",
+	["--filter", "@pfdsl/core", "exec", "vitest", "run", "-u"],
+	{ stdio: "inherit" },
+);

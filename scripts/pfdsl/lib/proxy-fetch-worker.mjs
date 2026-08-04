@@ -9,4 +9,6 @@ import { readFileSync } from "node:fs";
 const { url, method, headers, body } = JSON.parse(readFileSync(0, "utf-8"));
 const res = await fetch(url, { method, headers, body });
 const bodyText = await res.text();
-process.stdout.write(JSON.stringify({ ok: res.ok, status: res.status, bodyText }));
+process.stdout.write(
+	JSON.stringify({ ok: res.ok, status: res.status, bodyText }),
+);

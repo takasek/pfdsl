@@ -28,9 +28,15 @@ export const AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE = 2;
 export function classifyAuditIssuesFlowResult(ok, exitStatus) {
 	if (ok) return { status: "PASS" };
 	if (exitStatus === AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE) {
-		return { status: "SKIP", detail: "gh CLI unavailable; GitHub-dependent checks skipped (see #492)" };
+		return {
+			status: "SKIP",
+			detail: "gh CLI unavailable; GitHub-dependent checks skipped (see #492)",
+		};
 	}
-	return { status: "FAIL", detail: "re-run: node scripts/pfdsl/audit-issues-flow.mjs (findings)" };
+	return {
+		status: "FAIL",
+		detail: "re-run: node scripts/pfdsl/audit-issues-flow.mjs (findings)",
+	};
 }
 
 /**
@@ -38,17 +44,23 @@ export function classifyAuditIssuesFlowResult(ok, exitStatus) {
  * @returns {string}
  */
 export function formatGateTable(results) {
-	const symbol = (status) => (status === "PASS" ? "✓" : status === "FAIL" ? "✗" : "-");
+	const symbol = (status) =>
+		status === "PASS" ? "✓" : status === "FAIL" ? "✗" : "-";
 	return results
-		.map((r) => `  ${symbol(r.status)} ${r.status.padEnd(4)} ${r.name}${r.detail ? ` — ${r.detail}` : ""}`)
+		.map(
+			(r) =>
+				`  ${symbol(r.status)} ${r.status.padEnd(4)} ${r.name}${r.detail ? ` — ${r.detail}` : ""}`,
+		)
 		.join("\n");
 }
 
 /** Shared by both checks scoped to the output artifact, so they cannot drift apart. */
-export const NO_ARTIFACT_DETAIL = "cycle declared it has no roadmap output artifact (--no-artifact)";
+export const NO_ARTIFACT_DETAIL =
+	"cycle declared it has no roadmap output artifact (--no-artifact)";
 
 /** Shared by both checks that read the linked issue, for the same reason. */
-export const NO_ISSUE_DETAIL = "no --issue given; pass --issue <n> to check this against the linked issue";
+export const NO_ISSUE_DETAIL =
+	"no --issue given; pass --issue <n> to check this against the linked issue";
 
 /**
  * Classify the output-artifact status-update gate (item 6). No new states:
@@ -65,7 +77,12 @@ export const NO_ISSUE_DETAIL = "no --issue given; pass --issue <n> to check this
  *     Not evaluated (may be undefined) in the SKIP case.
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
-export function classifyOutputArtifactStatus({ artifactKey, noArtifact, roadmapChanged, changed }) {
+export function classifyOutputArtifactStatus({
+	artifactKey,
+	noArtifact,
+	roadmapChanged,
+	changed,
+}) {
 	// A declaration beats inference. Bookkeeping cycles (a rename, a location:)
 	// touch roadmap.pfdsl without owning an output artifact, and no reading of
 	// the diff distinguishes those from a cycle that forgot its status update —
@@ -84,7 +101,9 @@ export function classifyOutputArtifactStatus({ artifactKey, noArtifact, roadmapC
 	if (artifactKey) {
 		return {
 			status: changed ? "PASS" : "FAIL",
-			detail: changed ? undefined : `no status: change detected for artifact '${artifactKey}'`,
+			detail: changed
+				? undefined
+				: `no status: change detected for artifact '${artifactKey}'`,
 		};
 	}
 	return {
@@ -117,7 +136,9 @@ export function hasStatusChange(diffText) {
  * @returns {string | undefined}
  */
 export function extractArtifactStatus(text, artifactKey) {
-	const block = text.match(new RegExp(`\\n {2}${artifactKey}:\\n([\\s\\S]*?)(?=\\n {2}\\S+:\\n|$)`));
+	const block = text.match(
+		new RegExp(`\\n {2}${artifactKey}:\\n([\\s\\S]*?)(?=\\n {2}\\S+:\\n|$)`),
+	);
 	if (!block) return undefined;
 	const status = block[1].match(/status:\s*(\S+)/);
 	return status ? status[1] : undefined;
@@ -132,7 +153,10 @@ export function extractArtifactStatus(text, artifactKey) {
  * @returns {boolean}
  */
 export function statusChangedForArtifact(beforeText, afterText, artifactKey) {
-	return extractArtifactStatus(beforeText, artifactKey) !== extractArtifactStatus(afterText, artifactKey);
+	return (
+		extractArtifactStatus(beforeText, artifactKey) !==
+		extractArtifactStatus(afterText, artifactKey)
+	);
 }
 
 /**
@@ -146,7 +170,9 @@ export function statusChangedForArtifact(beforeText, afterText, artifactKey) {
  */
 export function wipTransitionDetected(fileSnapshots, artifactKey) {
 	if (artifactKey) {
-		return fileSnapshots.some((text) => extractArtifactStatus(text, artifactKey) === "wip");
+		return fileSnapshots.some(
+			(text) => extractArtifactStatus(text, artifactKey) === "wip",
+		);
 	}
 	return fileSnapshots.some((text) => /status:\s*wip/.test(text));
 }
@@ -194,7 +220,11 @@ export function lintCommitSubjects(subjects) {
 			return { subject, ok: false, reason: "not Conventional Commits" };
 		}
 		if (CJK_PATTERN.test(subject.replace(QUOTED_SPAN_PATTERN, ""))) {
-			return { subject, ok: false, reason: "non-English text outside quoted spans" };
+			return {
+				subject,
+				ok: false,
+				reason: "non-English text outside quoted spans",
+			};
 		}
 		return { subject, ok: true };
 	});
@@ -273,7 +303,8 @@ export function diffReadySets(beforeIds, afterIds) {
  * file is the single source of truth for wording — gate-check derives its
  * MANUAL: list from it instead of duplicating the text.
  */
-export const GATE_CHECKLIST_SOURCE_PATH = ".claude/skills/pfd-ops/references/work-cycle.md";
+export const GATE_CHECKLIST_SOURCE_PATH =
+	".claude/skills/pfd-ops/references/work-cycle.md";
 
 /**
  * Parse the terminal-gate checklist (workcycle step 3) into raw item strings.
@@ -311,7 +342,9 @@ const COVERED_BY_GATE_CHECK = [
  * @returns {string[]}
  */
 export function deriveManualItems(checklistItems) {
-	return checklistItems.filter((item) => !COVERED_BY_GATE_CHECK.some((kw) => item.includes(kw)));
+	return checklistItems.filter(
+		(item) => !COVERED_BY_GATE_CHECK.some((kw) => item.includes(kw)),
+	);
 }
 
 /**
@@ -324,7 +357,8 @@ export function deriveManualItems(checklistItems) {
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
 export function classifyDesignRecordTiming(recordIso, firstCommitIso) {
-	if (!recordIso) return { status: "FAIL", detail: "no design-selection record found" };
+	if (!recordIso)
+		return { status: "FAIL", detail: "no design-selection record found" };
 	if (!firstCommitIso) return { status: "SKIP", detail: "no commits in range" };
 	if (new Date(recordIso).getTime() > new Date(firstCommitIso).getTime()) {
 		return {
@@ -335,7 +369,11 @@ export function classifyDesignRecordTiming(recordIso, firstCommitIso) {
 	return { status: "PASS" };
 }
 
-export const DESIGN_RECORD_REQUIRED_PREFIXES = ["前提:", "否定案:", "却下理由:"];
+export const DESIGN_RECORD_REQUIRED_PREFIXES = [
+	"前提:",
+	"否定案:",
+	"却下理由:",
+];
 export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
 
 /** Markdown line-head decoration: blockquote, heading, or list marker. */
@@ -442,10 +480,13 @@ export function selectDesignRecord(entries) {
 export function classifyDesignRecordContent(recordBody, optionCount) {
 	const body = recordBody ?? "";
 	const present = presentRequiredPrefixes(body);
-	const missing = DESIGN_RECORD_REQUIRED_PREFIXES.filter((prefix) => !present.includes(prefix));
+	const missing = DESIGN_RECORD_REQUIRED_PREFIXES.filter(
+		(prefix) => !present.includes(prefix),
+	);
 
 	const problems = [];
-	if (missing.length > 0) problems.push(`missing required line(s): ${missing.join(", ")}`);
+	if (missing.length > 0)
+		problems.push(`missing required line(s): ${missing.join(", ")}`);
 
 	if (optionCount > 0) {
 		const dispositionCount = DISPOSITION_TOKENS.reduce(
@@ -459,7 +500,8 @@ export function classifyDesignRecordContent(recordBody, optionCount) {
 		}
 	}
 
-	if (problems.length > 0) return { status: "FAIL", detail: problems.join("; ") };
+	if (problems.length > 0)
+		return { status: "FAIL", detail: problems.join("; ") };
 	return { status: "PASS" };
 }
 
@@ -468,7 +510,11 @@ export function classifyDesignRecordContent(recordBody, optionCount) {
 // "the machine guesses what the prose meant" failure the other #669 checks
 // replaced with a token the filer writes.
 export const SIZE_INTENT_PATTERN = /^Size-Intent:\s*shrink\b/m;
-export const SIZE_TRACKED_PATTERNS = [/^\.pfdsl\/bindings\//, /^docs\/adr\//, /(^|\/)SKILL\.md$/];
+export const SIZE_TRACKED_PATTERNS = [
+	/^\.pfdsl\/bindings\//,
+	/^docs\/adr\//,
+	/(^|\/)SKILL\.md$/,
+];
 export const SIZE_OVERRIDE_PATTERN = /^Size-Override:\s*\S/m;
 
 /**
@@ -511,7 +557,10 @@ export function formatSizeDelta(d) {
  */
 export function classifySizeDirection({ issueBody, deltas, prBody }) {
 	if (!hasShrinkIntent(issueBody)) {
-		return { status: "SKIP", detail: "linked issue declares no Size-Intent: shrink" };
+		return {
+			status: "SKIP",
+			detail: "linked issue declares no Size-Intent: shrink",
+		};
 	}
 	if (!deltas || deltas.length === 0) {
 		return { status: "SKIP", detail: "no tracked knowledge-artifact changes" };
@@ -522,7 +571,10 @@ export function classifySizeDirection({ issueBody, deltas, prBody }) {
 
 	const list = grown.map(formatSizeDelta).join(", ");
 	if (SIZE_OVERRIDE_PATTERN.test(prBody ?? "")) {
-		return { status: "PASS", detail: `growth accepted via Size-Override: ${list}` };
+		return {
+			status: "PASS",
+			detail: `growth accepted via Size-Override: ${list}`,
+		};
 	}
 	return { status: "FAIL", detail: list };
 }

@@ -14,18 +14,28 @@ import { fileURLToPath } from "node:url";
 import { checkScaffoldSync } from "./lib/check-scaffold-sync.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const canonicalDir = resolve(root, ".claude/skills/pfd-ops/references/scaffold");
-const deployedDir = resolve(root, "plugin/pfdsl/skills/pfd-ops/references/scaffold");
+const canonicalDir = resolve(
+	root,
+	".claude/skills/pfd-ops/references/scaffold",
+);
+const deployedDir = resolve(
+	root,
+	"plugin/pfdsl/skills/pfd-ops/references/scaffold",
+);
 
 const results = checkScaffoldSync(canonicalDir, deployedDir);
 const issues = results.filter((r) => r.status !== "ok");
 
 if (issues.length === 0) {
-	console.log("pfd-ops scaffold/ is in sync with plugin/pfdsl/skills/pfd-ops/references/scaffold/.");
+	console.log(
+		"pfd-ops scaffold/ is in sync with plugin/pfdsl/skills/pfd-ops/references/scaffold/.",
+	);
 	process.exit(0);
 }
 
-console.log("pfd-ops scaffold/ is out of sync with plugin/pfdsl/skills/pfd-ops/references/scaffold/:");
+console.log(
+	"pfd-ops scaffold/ is out of sync with plugin/pfdsl/skills/pfd-ops/references/scaffold/:",
+);
 for (const r of issues) console.log(`  ${r.status}: ${r.path}`);
 console.log("Run: node scripts/gen-plugin.mjs");
 process.exit(1);

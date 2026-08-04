@@ -9,7 +9,12 @@
  * touching the filesystem.
  */
 
-import { findOccurrencesInText, formatOccurrences, mintCheckExitCode, normalizeId } from "./mint-check.mjs";
+import {
+	findOccurrencesInText,
+	formatOccurrences,
+	mintCheckExitCode,
+	normalizeId,
+} from "./mint-check.mjs";
 
 const DEFAULT_FILE = "docs/spec/spec.md";
 const USAGE = "usage: node scripts/mint-check.mjs <slug> [files...]";
@@ -34,7 +39,11 @@ export function runMintCheck({ slugArg, fileArgs, readFile }) {
 
 	const exitCode = mintCheckExitCode(occurrences);
 	if (exitCode === 0) {
-		return { exitCode, stdout: null, stderr: `mint-check: "${id}" has no prior occurrence — safe to mint.` };
+		return {
+			exitCode,
+			stdout: null,
+			stderr: `mint-check: "${id}" has no prior occurrence — safe to mint.`,
+		};
 	}
 	return {
 		exitCode,

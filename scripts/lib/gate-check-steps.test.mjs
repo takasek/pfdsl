@@ -1,16 +1,16 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import {
-	genPluginIdentityStep,
-	outputArtifactStatusStep,
-	wipTransitionStep,
-	designRecordStep,
-	sizeDirectionStep,
+	checkDocsStep,
 	collectSizeDeltas,
 	commitSubjectStep,
-	checkDocsStep,
+	designRecordStep,
+	genPluginIdentityStep,
+	outputArtifactStatusStep,
 	reviewMeasurementStep,
+	sizeDirectionStep,
+	wipTransitionStep,
 } from "./gate-check-steps.mjs";
 
 /**
@@ -141,7 +141,9 @@ describe("outputArtifactStatusStep", () => {
 
 	it("fails when a different artifact moved but the named one did not", () => {
 		const { exec } = fakeExec({
-			"git show origin/main:": { out: "artifact:\n  other:\n    status: wip\n" },
+			"git show origin/main:": {
+				out: "artifact:\n  other:\n    status: wip\n",
+			},
 			"git show HEAD:": { out: "artifact:\n  other:\n    status: done\n" },
 		});
 		const result = outputArtifactStatusStep({
@@ -168,7 +170,9 @@ describe("outputArtifactStatusStep", () => {
 
 	it("falls back to a whole-file status diff when no artifact key was given", () => {
 		const { exec, calls } = fakeExec({
-			"git diff origin/main...HEAD": { out: "-    status: todo\n+    status: wip\n" },
+			"git diff origin/main...HEAD": {
+				out: "-    status: todo\n+    status: wip\n",
+			},
 		});
 		const result = outputArtifactStatusStep({
 			exec,
@@ -305,7 +309,12 @@ describe("wipTransitionStep", () => {
 });
 
 describe("designRecordStep", () => {
-	const issue = ({ author, body, comments = [], createdAt = "2026-06-01T00:00:00Z" }) => ({
+	const issue = ({
+		author,
+		body,
+		comments = [],
+		createdAt = "2026-06-01T00:00:00Z",
+	}) => ({
 		author: { login: author },
 		body,
 		comments,
@@ -329,13 +338,20 @@ describe("designRecordStep", () => {
 
 	it("SKIPs when gh CLI is unavailable", () => {
 		const { exec } = fakeExec();
-		const result = designRecordStep({ exec, base: "main", issue: null, issueError: "gh CLI unavailable" });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: null,
+			issueError: "gh CLI unavailable",
+		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /gh CLI unavailable/);
 	});
 
 	it("judges a decision written into the issue body by the same rules as a comment", () => {
-		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
 		const result = designRecordStep({
 			exec,
 			base: "main",
@@ -345,7 +361,9 @@ describe("designRecordStep", () => {
 	});
 
 	it("FAILs a body carrying only a 決定 line — that line is the filer's settlement, not a selection record", () => {
-		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
 		const result = designRecordStep({
 			exec,
 			base: "main",
@@ -356,14 +374,22 @@ describe("designRecordStep", () => {
 	});
 
 	it("FAILs when no entry carries any required line head", () => {
-		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
 		const result = designRecordStep({
 			exec,
 			base: "main",
 			issue: issue({
 				author: "owner",
 				body: "## 対応案\n1. 案A\n2. 案B\n",
-				comments: [{ author: { login: "someone-else" }, body: "決定: 案A", createdAt: "2026-07-01T00:00:00Z" }],
+				comments: [
+					{
+						author: { login: "someone-else" },
+						body: "決定: 案A",
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
 			}),
 		});
 		assert.equal(result.status, "FAIL");
@@ -371,14 +397,22 @@ describe("designRecordStep", () => {
 	});
 
 	it("FAILs when the owner's record was posted after the first commit", () => {
-		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
 		const result = designRecordStep({
 			exec,
 			base: "main",
 			issue: issue({
 				author: "owner",
 				body: "## 対応案\n1. 案A\n2. 案B\n",
-				comments: [{ author: { login: "owner" }, body: validRecordBody, createdAt: "2026-07-03T00:00:00Z" }],
+				comments: [
+					{
+						author: { login: "owner" },
+						body: validRecordBody,
+						createdAt: "2026-07-03T00:00:00Z",
+					},
+				],
 			}),
 		});
 		assert.equal(result.status, "FAIL");
@@ -386,14 +420,22 @@ describe("designRecordStep", () => {
 	});
 
 	it("reports a partial record as content-deficient rather than as missing", () => {
-		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
 		const result = designRecordStep({
 			exec,
 			base: "main",
 			issue: issue({
 				author: "owner",
 				body: "普通の説明文。",
-				comments: [{ author: { login: "owner" }, body: "前提: x", createdAt: "2026-07-01T00:00:00Z" }],
+				comments: [
+					{
+						author: { login: "owner" },
+						body: "前提: x",
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
 			}),
 		});
 		assert.equal(result.status, "FAIL");
@@ -402,7 +444,9 @@ describe("designRecordStep", () => {
 	});
 
 	it("identifies the record by its required line heads, with no 決定 line present", () => {
-		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
 		const result = designRecordStep({
 			exec,
 			base: "main",
@@ -422,7 +466,9 @@ describe("designRecordStep", () => {
 	});
 
 	it("picks the entry carrying the most required line heads, not the first one carrying any", () => {
-		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
 		const result = designRecordStep({
 			exec,
 			base: "main",
@@ -452,21 +498,35 @@ describe("designRecordStep", () => {
 			issue: issue({
 				author: "owner",
 				body: "普通の説明文。",
-				comments: [{ author: { login: "owner" }, body: validRecordBody, createdAt: "2026-07-01T00:00:00Z" }],
+				comments: [
+					{
+						author: { login: "owner" },
+						body: validRecordBody,
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
 			}),
 		});
 		assert.equal(result.status, "SKIP");
 	});
 
 	it("PASSes when the record predates the first commit and covers every enumerated option", () => {
-		const { exec } = fakeExec({ "git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" } });
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
 		const result = designRecordStep({
 			exec,
 			base: "main",
 			issue: issue({
 				author: "owner",
 				body: "普通の説明文。",
-				comments: [{ author: { login: "owner" }, body: validRecordBody, createdAt: "2026-07-01T00:00:00Z" }],
+				comments: [
+					{
+						author: { login: "owner" },
+						body: validRecordBody,
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
 			}),
 		});
 		assert.equal(result.status, "PASS");
@@ -484,19 +544,33 @@ describe("sizeDirectionStep", () => {
 
 	it("SKIPs when gh CLI is unavailable", () => {
 		const { exec } = fakeExec();
-		const result = sizeDirectionStep({ exec, issue: null, issueError: "gh CLI unavailable" });
+		const result = sizeDirectionStep({
+			exec,
+			issue: null,
+			issueError: "gh CLI unavailable",
+		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /gh CLI unavailable/);
 	});
 
 	const grown = [
-		{ path: ".pfdsl/bindings/x.pfdsl", beforeBytes: 3, afterBytes: 7, beforeLines: 2, afterLines: 2 },
+		{
+			path: ".pfdsl/bindings/x.pfdsl",
+			beforeBytes: 3,
+			afterBytes: 7,
+			beforeLines: 2,
+			afterLines: 2,
+		},
 	];
 	const declared = "Size-Intent: shrink\n";
 
 	it("SKIPs without spending any subprocess when the issue declares no size intent", () => {
 		const { exec, calls } = fakeExec();
-		const result = sizeDirectionStep({ exec, issue: { body: "肥大について書いただけ。" }, deltas: grown });
+		const result = sizeDirectionStep({
+			exec,
+			issue: { body: "肥大について書いただけ。" },
+			deltas: grown,
+		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /Size-Intent/);
 		assert.deepEqual(calls, []);
@@ -504,14 +578,24 @@ describe("sizeDirectionStep", () => {
 
 	it("FAILs on growth when the PR body has no override", () => {
 		const { exec } = fakeExec({ "gh pr view": { out: "" } });
-		const result = sizeDirectionStep({ exec, issue: { body: declared }, deltas: grown });
+		const result = sizeDirectionStep({
+			exec,
+			issue: { body: declared },
+			deltas: grown,
+		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /x\.pfdsl/);
 	});
 
 	it("PASSes growth when the PR body carries a Size-Override token", () => {
-		const { exec } = fakeExec({ "gh pr view": { out: "Size-Override: intentional" } });
-		const result = sizeDirectionStep({ exec, issue: { body: declared }, deltas: grown });
+		const { exec } = fakeExec({
+			"gh pr view": { out: "Size-Override: intentional" },
+		});
+		const result = sizeDirectionStep({
+			exec,
+			issue: { body: declared },
+			deltas: grown,
+		});
 		assert.equal(result.status, "PASS");
 	});
 });
@@ -528,17 +612,30 @@ describe("collectSizeDeltas", () => {
 			changedFiles: [".pfdsl/bindings/x.pfdsl", "packages/core/src/graph.ts"],
 		});
 		assert.deepEqual(deltas, [
-			{ path: ".pfdsl/bindings/x.pfdsl", beforeBytes: 3, afterBytes: 7, beforeLines: 2, afterLines: 2 },
+			{
+				path: ".pfdsl/bindings/x.pfdsl",
+				beforeBytes: 3,
+				afterBytes: 7,
+				beforeLines: 2,
+				afterLines: 2,
+			},
 		]);
 		assert.ok(!calls.some((c) => c.includes("graph.ts")));
 	});
 
 	it("treats a new tracked file (no origin/base copy) as growth from zero", () => {
 		const { exec } = fakeExec({
-			"git show origin/main:.pfdsl/bindings/new.pfdsl": { ok: false, out: "fatal: does not exist" },
+			"git show origin/main:.pfdsl/bindings/new.pfdsl": {
+				ok: false,
+				out: "fatal: does not exist",
+			},
 			"git show HEAD:.pfdsl/bindings/new.pfdsl": { out: "hello\n" },
 		});
-		const deltas = collectSizeDeltas({ exec, base: "main", changedFiles: [".pfdsl/bindings/new.pfdsl"] });
+		const deltas = collectSizeDeltas({
+			exec,
+			base: "main",
+			changedFiles: [".pfdsl/bindings/new.pfdsl"],
+		});
 		assert.equal(deltas[0].beforeBytes, 0);
 		assert.equal(deltas[0].afterBytes, 6);
 	});
@@ -546,7 +643,9 @@ describe("collectSizeDeltas", () => {
 
 describe("commitSubjectStep", () => {
 	it("excludes merge commits from the collected range (#690)", () => {
-		const { exec, calls } = fakeExec({ "git log": { out: "feat(cli): add a thing\n" } });
+		const { exec, calls } = fakeExec({
+			"git log": { out: "feat(cli): add a thing\n" },
+		});
 		const result = commitSubjectStep({ exec, base: "main" });
 		const logCall = calls.find((c) => c.startsWith("git log"));
 		assert.ok(
@@ -569,14 +668,18 @@ describe("commitSubjectStep", () => {
 	});
 
 	it("FAILs when git log fails", () => {
-		const { exec } = fakeExec({ "git log": { ok: false, out: "fatal: bad revision" } });
+		const { exec } = fakeExec({
+			"git log": { ok: false, out: "fatal: bad revision" },
+		});
 		const result = commitSubjectStep({ exec, base: "main" });
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /bad revision/);
 	});
 
 	it("FAILs on a non-Conventional subject and names it", () => {
-		const { exec } = fakeExec({ "git log": { out: "feat(cli): ok\nadd a thing\n" } });
+		const { exec } = fakeExec({
+			"git log": { out: "feat(cli): ok\nadd a thing\n" },
+		});
 		const result = commitSubjectStep({ exec, base: "main" });
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /add a thing/);
@@ -584,7 +687,9 @@ describe("commitSubjectStep", () => {
 
 	it("FAILs on a subject carrying unquoted Japanese (#595)", () => {
 		const { exec } = fakeExec({
-			"git log": { out: "refactor(scripts): move it into a dist非依存 module\n" },
+			"git log": {
+				out: "refactor(scripts): move it into a dist非依存 module\n",
+			},
 		});
 		const result = commitSubjectStep({ exec, base: "main" });
 		assert.equal(result.status, "FAIL");
@@ -614,35 +719,58 @@ describe("checkDocsStep", () => {
 });
 
 describe("reviewMeasurementStep", () => {
-	const trailer = "Review-Measurement: sample=in new=1 adopted=1 tool=simplify angles=\"reuse\"";
+	const trailer =
+		'Review-Measurement: sample=in new=1 adopted=1 tool=simplify angles="reuse"';
 
 	it("PASSes when a code-touching branch carries a matching record", () => {
 		const { exec } = fakeExec({
 			"git log --no-merges": { out: `subject\n\n${trailer}\n` },
 		});
-		const result = reviewMeasurementStep({ exec, base: "main", changedFiles: ["scripts/lib/x.mjs"] });
+		const result = reviewMeasurementStep({
+			exec,
+			base: "main",
+			changedFiles: ["scripts/lib/x.mjs"],
+		});
 		assert.equal(result.status, "PASS");
 	});
 
 	it("FAILs when a code-touching branch carries no record at all", () => {
-		const { exec } = fakeExec({ "git log --no-merges": { out: "subject\n\nbody without a trailer\n" } });
-		const result = reviewMeasurementStep({ exec, base: "main", changedFiles: ["scripts/lib/x.mjs"] });
+		const { exec } = fakeExec({
+			"git log --no-merges": { out: "subject\n\nbody without a trailer\n" },
+		});
+		const result = reviewMeasurementStep({
+			exec,
+			base: "main",
+			changedFiles: ["scripts/lib/x.mjs"],
+		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /no record/);
 	});
 
 	it("FAILs when the record says sample=out but the branch changed code", () => {
 		const { exec } = fakeExec({
-			"git log --no-merges": { out: "subject\n\nReview-Measurement: sample=out\n" },
+			"git log --no-merges": {
+				out: "subject\n\nReview-Measurement: sample=out\n",
+			},
 		});
-		const result = reviewMeasurementStep({ exec, base: "main", changedFiles: ["scripts/lib/x.mjs"] });
+		const result = reviewMeasurementStep({
+			exec,
+			base: "main",
+			changedFiles: ["scripts/lib/x.mjs"],
+		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /sample=out/);
 	});
 
 	it("PASSes a prose-only branch that carries no record", () => {
-		const { exec } = fakeExec({ "git log --no-merges": { out: "docs: x\n\nbody\n" } });
-		const result = reviewMeasurementStep({ exec, base: "main", changedFiles: ["docs/adr/0001-x.md"] });
+		const { exec } = fakeExec({
+			"git log --no-merges": { out: "docs: x\n\nbody\n" },
+		});
+		const result = reviewMeasurementStep({
+			exec,
+			base: "main",
+			changedFiles: ["docs/adr/0001-x.md"],
+		});
 		assert.equal(result.status, "PASS");
 	});
 });

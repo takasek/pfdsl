@@ -2,16 +2,20 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 
 import {
-	RELEASE_KINDS,
 	bumpVersionInPackageJson,
-	tagName,
-	pinMarketplaceSourceToTag,
 	filesToCommitForBump,
+	pinMarketplaceSourceToTag,
+	RELEASE_KINDS,
 	releaseMilestoneArtifactIds,
+	tagName,
 } from "./release-config.mjs";
 
 test("RELEASE_KINDS has the three known kinds with distinct tag prefixes", () => {
-	assert.deepEqual(Object.keys(RELEASE_KINDS).sort(), ["cli", "libs", "vscode"]);
+	assert.deepEqual(Object.keys(RELEASE_KINDS).sort(), [
+		"cli",
+		"libs",
+		"vscode",
+	]);
 	const prefixes = Object.values(RELEASE_KINDS).map((k) => k.tagPrefix);
 	assert.equal(new Set(prefixes).size, prefixes.length);
 });
@@ -33,13 +37,16 @@ test("libs kind targets the three library packages and watches publish-libraries
 });
 
 test("vscode kind has no GHA workflow to watch (local vsce packaging instead)", () => {
-	assert.deepEqual(RELEASE_KINDS.vscode.packages, ["packages/vscode-extension/package.json"]);
+	assert.deepEqual(RELEASE_KINDS.vscode.packages, [
+		"packages/vscode-extension/package.json",
+	]);
 	assert.equal(RELEASE_KINDS.vscode.tagPrefix, "vscode-v");
 	assert.equal(RELEASE_KINDS.vscode.workflow, null);
 });
 
 test("bumpVersionInPackageJson rewrites only the version field, preserving key order and trailing newline", () => {
-	const before = '{\n\t"name": "@pfdsl/cli",\n\t"version": "0.0.17",\n\t"type": "module"\n}\n';
+	const before =
+		'{\n\t"name": "@pfdsl/cli",\n\t"version": "0.0.17",\n\t"type": "module"\n}\n';
 	const after = bumpVersionInPackageJson(before, "0.0.18");
 	assert.equal(
 		after,
@@ -94,43 +101,85 @@ test("pinMarketplaceSourceToTag updates ref on an already-pinned source", () => 
 });
 
 test("pinMarketplaceSourceToTag preserves tab indentation and trailing newline", () => {
-	const before = '{\n\t"plugins": [\n\t\t{ "name": "pfdsl", "source": "./plugin/pfdsl" }\n\t]\n}\n';
+	const before =
+		'{\n\t"plugins": [\n\t\t{ "name": "pfdsl", "source": "./plugin/pfdsl" }\n\t]\n}\n';
 	const after = pinMarketplaceSourceToTag(before, "v0.0.19");
 	assert.match(after, /\n$/);
 	assert.match(after, /\t"plugins"/);
 });
 
 test("filesToCommitForBump includes plugin/pfdsl for cli releases, since gen-plugin mirrors packages/cli/package.json's version", () => {
-	assert.deepEqual(filesToCommitForBump("cli", RELEASE_KINDS.cli), ["packages/cli/package.json", "plugin"]);
+	assert.deepEqual(filesToCommitForBump("cli", RELEASE_KINDS.cli), [
+		"packages/cli/package.json",
+		"plugin",
+	]);
 });
 
 test("filesToCommitForBump excludes plugin/pfdsl for libs and vscode releases, which don't touch the cli version", () => {
-	assert.deepEqual(filesToCommitForBump("libs", RELEASE_KINDS.libs), RELEASE_KINDS.libs.packages);
-	assert.deepEqual(filesToCommitForBump("vscode", RELEASE_KINDS.vscode), RELEASE_KINDS.vscode.packages);
+	assert.deepEqual(
+		filesToCommitForBump("libs", RELEASE_KINDS.libs),
+		RELEASE_KINDS.libs.packages,
+	);
+	assert.deepEqual(
+		filesToCommitForBump("vscode", RELEASE_KINDS.vscode),
+		RELEASE_KINDS.vscode.packages,
+	);
 });
 
 test("releaseMilestoneArtifactIds collects outputs of ready processes whose id starts with the given prefix", () => {
 	const ready = [
-		{ id: "publish_cli_ansi_color", label: "x", inputs: [], outputs: ["cli_release_ansi_color"] },
-		{ id: "implement_something", label: "x", inputs: [], outputs: ["something"] },
+		{
+			id: "publish_cli_ansi_color",
+			label: "x",
+			inputs: [],
+			outputs: ["cli_release_ansi_color"],
+		},
+		{
+			id: "implement_something",
+			label: "x",
+			inputs: [],
+			outputs: ["something"],
+		},
 	];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready), ["cli_release_ansi_color"]);
+	assert.deepEqual(releaseMilestoneArtifactIds(ready), [
+		"cli_release_ansi_color",
+	]);
 });
 
 test("releaseMilestoneArtifactIds returns an empty array when no ready process matches the prefix", () => {
-	const ready = [{ id: "implement_something", label: "x", inputs: [], outputs: ["something"] }];
+	const ready = [
+		{
+			id: "implement_something",
+			label: "x",
+			inputs: [],
+			outputs: ["something"],
+		},
+	];
 	assert.deepEqual(releaseMilestoneArtifactIds(ready), []);
 });
 
 test("releaseMilestoneArtifactIds flattens outputs across multiple matching processes", () => {
 	const ready = [
 		{ id: "publish_cli_a", label: "x", inputs: [], outputs: ["cli_release_a"] },
-		{ id: "publish_cli_b", label: "x", inputs: [], outputs: ["cli_release_b1", "cli_release_b2"] },
+		{
+			id: "publish_cli_b",
+			label: "x",
+			inputs: [],
+			outputs: ["cli_release_b1", "cli_release_b2"],
+		},
 	];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready), ["cli_release_a", "cli_release_b1", "cli_release_b2"]);
+	assert.deepEqual(releaseMilestoneArtifactIds(ready), [
+		"cli_release_a",
+		"cli_release_b1",
+		"cli_release_b2",
+	]);
 });
 
 test("releaseMilestoneArtifactIds respects a custom prefix", () => {
-	const ready = [{ id: "publish_ext_foo", label: "x", inputs: [], outputs: ["ext_foo"] }];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready, "publish_ext_"), ["ext_foo"]);
+	const ready = [
+		{ id: "publish_ext_foo", label: "x", inputs: [], outputs: ["ext_foo"] },
+	];
+	assert.deepEqual(releaseMilestoneArtifactIds(ready, "publish_ext_"), [
+		"ext_foo",
+	]);
 });

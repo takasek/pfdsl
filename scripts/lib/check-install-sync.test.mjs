@@ -1,26 +1,26 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import {
-	mkdtempSync,
-	mkdirSync,
-	writeFileSync,
-	readFileSync,
-	copyFileSync,
-	rmSync,
-	existsSync,
-	symlinkSync,
 	chmodSync,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
 	statSync,
+	symlinkSync,
+	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
 
 import {
-	listInstallFiles,
 	checkInstallSync,
 	deployInstall,
+	listInstallFiles,
 	parseArgs,
 } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
 
@@ -147,7 +147,14 @@ describe("checkInstallSync", () => {
 		writeFile(
 			targetRoot,
 			".claude/pfd-ops-install-manifest.json",
-			JSON.stringify({ files: [{}, "not-an-object", { path: 123, hash: "x" }, { path: "a.txt", hash: "irrelevant" }] }),
+			JSON.stringify({
+				files: [
+					{},
+					"not-an-object",
+					{ path: 123, hash: "x" },
+					{ path: "a.txt", hash: "irrelevant" },
+				],
+			}),
 		);
 
 		const { results } = checkInstallSync(skillRoot, targetRoot);
@@ -165,25 +172,42 @@ describe("checkInstallSync rename candidates", () => {
 		writeFile(join(skillRoot, "install"), from, "canonical-original");
 		deployInstall(skillRoot, targetRoot);
 		rmSync(join(skillRoot, "install", ...from.split("/")));
-		writeFile(join(skillRoot, "install"), to, newContent ?? "canonical-original");
+		writeFile(
+			join(skillRoot, "install"),
+			to,
+			newContent ?? "canonical-original",
+		);
 		return skillRoot;
 	}
 
 	it("pairs an orphan with a missing file that carries the same canonical hash", () => {
 		const targetRoot = join(tmp, "target-rename-hash");
-		const skillRoot = deployThenRename(targetRoot, "scripts/old.mjs", "scripts/pfdsl/new.mjs");
+		const skillRoot = deployThenRename(
+			targetRoot,
+			"scripts/old.mjs",
+			"scripts/pfdsl/new.mjs",
+		);
 
 		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
 		assert.deepEqual(renameCandidates, [
-			{ from: "scripts/old.mjs", to: "scripts/pfdsl/new.mjs", reason: "same canonical hash" },
+			{
+				from: "scripts/old.mjs",
+				to: "scripts/pfdsl/new.mjs",
+				reason: "same canonical hash",
+			},
 		]);
 	});
 
 	it("pairs a moved file whose content also changed, by basename", () => {
 		const targetRoot = join(tmp, "target-rename-basename");
-		const skillRoot = deployThenRename(targetRoot, "scripts/lib/gh-exec.mjs", "scripts/pfdsl/lib/gh-exec.mjs", {
-			newContent: "canonical-rewritten",
-		});
+		const skillRoot = deployThenRename(
+			targetRoot,
+			"scripts/lib/gh-exec.mjs",
+			"scripts/pfdsl/lib/gh-exec.mjs",
+			{
+				newContent: "canonical-rewritten",
+			},
+		);
 
 		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
 		assert.deepEqual(renameCandidates, [
@@ -216,9 +240,14 @@ describe("checkInstallSync rename candidates", () => {
 
 	it("does not pair an orphan with an unrelated missing file", () => {
 		const targetRoot = join(tmp, "target-rename-unrelated");
-		const skillRoot = deployThenRename(targetRoot, "scripts/old.mjs", "scripts/unrelated.mjs", {
-			newContent: "canonical-rewritten",
-		});
+		const skillRoot = deployThenRename(
+			targetRoot,
+			"scripts/old.mjs",
+			"scripts/unrelated.mjs",
+			{
+				newContent: "canonical-rewritten",
+			},
+		);
 
 		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
 		assert.deepEqual(renameCandidates, []);
@@ -226,9 +255,14 @@ describe("checkInstallSync rename candidates", () => {
 
 	it("does not treat a mid-word basename overlap as a suffix match", () => {
 		const targetRoot = join(tmp, "target-rename-midword");
-		const skillRoot = deployThenRename(targetRoot, "scripts/exec.mjs", "scripts/ghexec.mjs", {
-			newContent: "canonical-rewritten",
-		});
+		const skillRoot = deployThenRename(
+			targetRoot,
+			"scripts/exec.mjs",
+			"scripts/ghexec.mjs",
+			{
+				newContent: "canonical-rewritten",
+			},
+		);
 
 		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
 		assert.deepEqual(renameCandidates, []);
@@ -253,8 +287,14 @@ describe("deployInstall", () => {
 		const { copied, skipped } = deployInstall(skillRoot, targetRoot);
 		assert.deepEqual(copied.sort(), ["a.txt", "sub/b.txt"]);
 		assert.deepEqual(skipped, []);
-		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "canonical-a");
-		assert.equal(readFileSync(join(targetRoot, "sub", "b.txt"), "utf-8"), "canonical-b");
+		assert.equal(
+			readFileSync(join(targetRoot, "a.txt"), "utf-8"),
+			"canonical-a",
+		);
+		assert.equal(
+			readFileSync(join(targetRoot, "sub", "b.txt"), "utf-8"),
+			"canonical-b",
+		);
 	});
 
 	it("skips a locally-edited file without --overwrite-local-edits and leaves it untouched", () => {
@@ -265,7 +305,10 @@ describe("deployInstall", () => {
 		const { copied, skipped } = deployInstall(skillRoot, targetRoot);
 		assert.deepEqual(copied.sort(), ["sub/b.txt"]);
 		assert.deepEqual(skipped, ["a.txt"]);
-		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "locally-edited");
+		assert.equal(
+			readFileSync(join(targetRoot, "a.txt"), "utf-8"),
+			"locally-edited",
+		);
 	});
 
 	it("overwrites a locally-edited file when overwriteLocalEdits is given", () => {
@@ -273,10 +316,15 @@ describe("deployInstall", () => {
 		const targetRoot = join(tmp, "target-overwrite-edits");
 		writeFile(targetRoot, "a.txt", "locally-edited");
 
-		const { copied, skipped } = deployInstall(skillRoot, targetRoot, { overwriteLocalEdits: true });
+		const { copied, skipped } = deployInstall(skillRoot, targetRoot, {
+			overwriteLocalEdits: true,
+		});
 		assert.deepEqual(copied.sort(), ["a.txt", "sub/b.txt"]);
 		assert.deepEqual(skipped, []);
-		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "canonical-a");
+		assert.equal(
+			readFileSync(join(targetRoot, "a.txt"), "utf-8"),
+			"canonical-a",
+		);
 	});
 
 	it("keeps a locally-edited file when only deleteEditedOrphans is given", () => {
@@ -295,7 +343,10 @@ describe("deployInstall", () => {
 		assert.deepEqual(copied, []);
 		assert.deepEqual(skipped, ["a.txt"]);
 		assert.deepEqual(removed, ["sub/b.txt"]);
-		assert.equal(readFileSync(join(targetRoot, "a.txt"), "utf-8"), "locally-edited");
+		assert.equal(
+			readFileSync(join(targetRoot, "a.txt"), "utf-8"),
+			"locally-edited",
+		);
 	});
 
 	it("keeps a locally-modified orphan when only overwriteLocalEdits is given", () => {
@@ -306,9 +357,13 @@ describe("deployInstall", () => {
 		writeFile(targetRoot, "sub/b.txt", "locally-edited-before-drop");
 		rmSync(join(skillRoot, "install", "sub", "b.txt"));
 
-		const { copied, removed, orphanSkipped } = deployInstall(skillRoot, targetRoot, {
-			overwriteLocalEdits: true,
-		});
+		const { copied, removed, orphanSkipped } = deployInstall(
+			skillRoot,
+			targetRoot,
+			{
+				overwriteLocalEdits: true,
+			},
+		);
 		assert.deepEqual(copied, ["a.txt"]);
 		assert.deepEqual(removed, []);
 		assert.deepEqual(orphanSkipped, ["sub/b.txt"]);
@@ -340,7 +395,9 @@ describe("deployInstall", () => {
 		assert.deepEqual(first.orphanSkipped, ["sub/b.txt"]);
 		assert.equal(existsSync(join(targetRoot, "sub", "b.txt")), true);
 
-		const forced = deployInstall(skillRoot, targetRoot, { deleteEditedOrphans: true });
+		const forced = deployInstall(skillRoot, targetRoot, {
+			deleteEditedOrphans: true,
+		});
 		assert.deepEqual(forced.removed, ["sub/b.txt"]);
 		assert.equal(existsSync(join(targetRoot, "sub", "b.txt")), false);
 	});
@@ -351,7 +408,9 @@ describe("deployInstall", () => {
 		writeFile(
 			targetRoot,
 			".claude/pfd-ops-install-manifest.json",
-			JSON.stringify({ files: [{}, "not-an-object", { path: 123, hash: "x" }] }),
+			JSON.stringify({
+				files: [{}, "not-an-object", { path: 123, hash: "x" }],
+			}),
 		);
 
 		const { copied } = deployInstall(skillRoot, targetRoot);
@@ -382,7 +441,10 @@ describe("deployInstall", () => {
 
 describe("CLI output", () => {
 	const scriptPath = fileURLToPath(
-		new URL("../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs", import.meta.url),
+		new URL(
+			"../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs",
+			import.meta.url,
+		),
 	);
 
 	function runCli(skillRoot, targetRoot, extraArgs = []) {
@@ -397,10 +459,17 @@ describe("CLI output", () => {
 		mkdirSync(stubScripts, { recursive: true });
 		const stubScript = join(stubScripts, "check-install-sync.mjs");
 		copyFileSync(scriptPath, stubScript);
-		copyFileSync(join(dirname(scriptPath), "plugin-version-check.mjs"), join(stubScripts, "plugin-version-check.mjs"));
-		return spawnSync(process.execPath, [stubScript, "--target", targetRoot, ...extraArgs], {
-			encoding: "utf-8",
-		});
+		copyFileSync(
+			join(dirname(scriptPath), "plugin-version-check.mjs"),
+			join(stubScripts, "plugin-version-check.mjs"),
+		);
+		return spawnSync(
+			process.execPath,
+			[stubScript, "--target", targetRoot, ...extraArgs],
+			{
+				encoding: "utf-8",
+			},
+		);
 	}
 
 	it("surfaces rename candidates on --deploy, not just on a bare check", () => {
@@ -411,10 +480,18 @@ describe("CLI output", () => {
 		// up as a failure here instead of matching the real tree by accident.
 		const skillRoot = join(tmp, "skill-cli");
 		const targetRoot = join(tmp, "target-cli");
-		writeFile(join(skillRoot, "install"), "scripts/lib/fixture-tool.mjs", "canonical-original");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/lib/fixture-tool.mjs",
+			"canonical-original",
+		);
 		deployInstall(skillRoot, targetRoot);
 		rmSync(join(skillRoot, "install", "scripts", "lib", "fixture-tool.mjs"));
-		writeFile(join(skillRoot, "install"), "scripts/pfdsl/lib/fixture-tool.mjs", "canonical-rewritten");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/pfdsl/lib/fixture-tool.mjs",
+			"canonical-rewritten",
+		);
 
 		const checked = runCli(skillRoot, targetRoot);
 		assert.match(checked.stdout, /Possible renames/);
@@ -423,7 +500,10 @@ describe("CLI output", () => {
 		// the pre-deploy state the hint is derived from.
 		const deployed = runCli(skillRoot, targetRoot, ["--deploy"]);
 		assert.match(deployed.stdout, /Possible renames/);
-		assert.match(deployed.stdout, /scripts\/lib\/fixture-tool\.mjs -> scripts\/pfdsl\/lib\/fixture-tool\.mjs/);
+		assert.match(
+			deployed.stdout,
+			/scripts\/lib\/fixture-tool\.mjs -> scripts\/pfdsl\/lib\/fixture-tool\.mjs/,
+		);
 	});
 
 	it("prints rename candidates before the removals they warn about", () => {
@@ -432,18 +512,42 @@ describe("CLI output", () => {
 		// before the deletion is reported rather than after it (#603).
 		const skillRoot = join(tmp, "skill-cli-order");
 		const targetRoot = join(tmp, "target-cli-order");
-		writeFile(join(skillRoot, "install"), "scripts/lib/fixture-tool.mjs", "canonical-original");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/lib/fixture-tool.mjs",
+			"canonical-original",
+		);
 		deployInstall(skillRoot, targetRoot);
-		writeFile(targetRoot, "scripts/lib/fixture-tool.mjs", "canonical-original\nlocal tweak\n");
+		writeFile(
+			targetRoot,
+			"scripts/lib/fixture-tool.mjs",
+			"canonical-original\nlocal tweak\n",
+		);
 		rmSync(join(skillRoot, "install", "scripts", "lib", "fixture-tool.mjs"));
-		writeFile(join(skillRoot, "install"), "scripts/pfdsl/lib/fixture-tool.mjs", "canonical-rewritten");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/pfdsl/lib/fixture-tool.mjs",
+			"canonical-rewritten",
+		);
 
-		const { stdout } = runCli(skillRoot, targetRoot, ["--deploy", "--delete-edited-orphans"]);
+		const { stdout } = runCli(skillRoot, targetRoot, [
+			"--deploy",
+			"--delete-edited-orphans",
+		]);
 		const renameAt = stdout.indexOf("Possible renames");
-		const removedAt = stdout.indexOf("Removed (no longer part of canonical install/):");
+		const removedAt = stdout.indexOf(
+			"Removed (no longer part of canonical install/):",
+		);
 		assert.notEqual(renameAt, -1, `expected a rename hint, got:\n${stdout}`);
-		assert.notEqual(removedAt, -1, `expected a removal report, got:\n${stdout}`);
-		assert.ok(renameAt < removedAt, `rename hint must precede the removals, got:\n${stdout}`);
+		assert.notEqual(
+			removedAt,
+			-1,
+			`expected a removal report, got:\n${stdout}`,
+		);
+		assert.ok(
+			renameAt < removedAt,
+			`rename hint must precede the removals, got:\n${stdout}`,
+		);
 	});
 
 	it("marks a rename target in Copied as carrying canonical content only", () => {
@@ -452,13 +556,29 @@ describe("CLI output", () => {
 		// canonical content, which is how #603 lost its customization.
 		const skillRoot = join(tmp, "skill-cli-copied");
 		const targetRoot = join(tmp, "target-cli-copied");
-		writeFile(join(skillRoot, "install"), "scripts/lib/fixture-tool.mjs", "canonical-original");
-		writeFile(join(skillRoot, "install"), "unrelated.txt", "canonical-unrelated");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/lib/fixture-tool.mjs",
+			"canonical-original",
+		);
+		writeFile(
+			join(skillRoot, "install"),
+			"unrelated.txt",
+			"canonical-unrelated",
+		);
 		deployInstall(skillRoot, targetRoot);
-		writeFile(targetRoot, "scripts/lib/fixture-tool.mjs", "canonical-original\nlocal tweak\n");
+		writeFile(
+			targetRoot,
+			"scripts/lib/fixture-tool.mjs",
+			"canonical-original\nlocal tweak\n",
+		);
 		rmSync(join(skillRoot, "install", "scripts", "lib", "fixture-tool.mjs"));
 		rmSync(join(targetRoot, "unrelated.txt"));
-		writeFile(join(skillRoot, "install"), "scripts/pfdsl/lib/fixture-tool.mjs", "canonical-rewritten");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/pfdsl/lib/fixture-tool.mjs",
+			"canonical-rewritten",
+		);
 
 		const { stdout } = runCli(skillRoot, targetRoot, ["--deploy"]);
 		assert.match(
@@ -477,7 +597,10 @@ describe("CLI output", () => {
 
 		const result = runCli(skillRoot, targetRoot, ["--deploy", "--force"]);
 		assert.equal(result.status, 2);
-		assert.match(result.stderr, /--force was split into --overwrite-local-edits and --delete-edited-orphans/);
+		assert.match(
+			result.stderr,
+			/--force was split into --overwrite-local-edits and --delete-edited-orphans/,
+		);
 	});
 });
 
@@ -535,7 +658,9 @@ describe("parseArgs", () => {
 	});
 
 	it("throws when --target is the last argument", () => {
-		assert.throws(() => parseArgs(["--target"]), { code: "ERR_PARSE_ARGS_INVALID_OPTION_VALUE" });
+		assert.throws(() => parseArgs(["--target"]), {
+			code: "ERR_PARSE_ARGS_INVALID_OPTION_VALUE",
+		});
 	});
 
 	// The three cases below are what #631 is about: each was silently ignored,

@@ -1,8 +1,13 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseSpecDiagTable, diffDiagRegistry, evaluateDiagRegistryDiff } from "./diag-registry-check.mjs";
+import { describe, it } from "node:test";
+import {
+	diffDiagRegistry,
+	evaluateDiagRegistryDiff,
+	parseSpecDiagTable,
+} from "./diag-registry-check.mjs";
 
-const TABLE_HEADER = "| コード | severity | 定義節 | 条件 |\n|---|---|---|---|\n";
+const TABLE_HEADER =
+	"| コード | severity | 定義節 | 条件 |\n|---|---|---|---|\n";
 
 describe("parseSpecDiagTable", () => {
 	it("parses plain error/warning rows", () => {
@@ -35,7 +40,10 @@ describe("parseSpecDiagTable", () => {
 	});
 
 	it("throws when the §16 table header is absent", () => {
-		assert.throws(() => parseSpecDiagTable("no table here"), /table header not found/);
+		assert.throws(
+			() => parseSpecDiagTable("no table here"),
+			/table header not found/,
+		);
 	});
 
 	it("throws on an unrecognized severity label", () => {
@@ -86,26 +94,43 @@ describe("evaluateDiagRegistryDiff", () => {
 	it("exits 0 with an OK message carrying the spec code count when there is no drift", () => {
 		const result = evaluateDiagRegistryDiff({ ...noDiff, specCodesCount: 42 });
 		assert.equal(result.exitCode, 0);
-		assert.deepEqual(result.stdoutLines, ["check-diag-registry: OK (42 codes match)"]);
+		assert.deepEqual(result.stdoutLines, [
+			"check-diag-registry: OK (42 codes match)",
+		]);
 		assert.deepEqual(result.stderrLines, []);
 	});
 
 	// Each of the 3 branches must independently set `failed` — guards against
 	// e.g. someone turning these into `else if` and silently only checking one.
 	it("fails on missingInSpec alone", () => {
-		const result = evaluateDiagRegistryDiff({ ...noDiff, missingInSpec: ["V999"], specCodesCount: 1 });
+		const result = evaluateDiagRegistryDiff({
+			...noDiff,
+			missingInSpec: ["V999"],
+			specCodesCount: 1,
+		});
 		assert.equal(result.exitCode, 1);
-		assert.match(result.stderrLines[0], /missing from spec\.md §16 table: V999/);
+		assert.match(
+			result.stderrLines[0],
+			/missing from spec\.md §16 table: V999/,
+		);
 	});
 
 	it("fails on staleInSpec alone", () => {
-		const result = evaluateDiagRegistryDiff({ ...noDiff, staleInSpec: ["V013"], specCodesCount: 1 });
+		const result = evaluateDiagRegistryDiff({
+			...noDiff,
+			staleInSpec: ["V013"],
+			specCodesCount: 1,
+		});
 		assert.equal(result.exitCode, 1);
 		assert.match(result.stderrLines[0], /not emitted by core \(stale\): V013/);
 	});
 
 	it("fails on severityMismatches alone", () => {
-		const result = evaluateDiagRegistryDiff({ ...noDiff, severityMismatches: ["W002"], specCodesCount: 1 });
+		const result = evaluateDiagRegistryDiff({
+			...noDiff,
+			severityMismatches: ["W002"],
+			specCodesCount: 1,
+		});
 		assert.equal(result.exitCode, 1);
 		assert.match(result.stderrLines[0], /Severity mismatch.*W002/);
 	});

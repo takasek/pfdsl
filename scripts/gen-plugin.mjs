@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 // Assembles the pfdsl Claude Code plugin at plugin/pfdsl/ for marketplace
 // distribution. Run: node scripts/gen-plugin.mjs
 //
@@ -8,9 +9,9 @@
 // CLAUDE.md, etc). `claude plugin validate` flags a plugin-root CLAUDE.md as
 // unshippable context, which is what surfaced this during local verification.
 
+import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFileSync } from "node:child_process";
 
 import { assemblePluginDistIndependent } from "./lib/gen-plugin.mjs";
 
@@ -25,9 +26,17 @@ function assemble() {
 	// step that needs packages/cli/dist (it embeds `pfdsl help` output into
 	// SKILL.md) — everything else is dist-independent (#593).
 
-	execFileSync(process.execPath, [resolve(__dirname, "gen-skill.mjs"), "--out", resolve(pluginRoot, "skills/pfdsl")], {
-		stdio: "inherit",
-	});
+	execFileSync(
+		process.execPath,
+		[
+			resolve(__dirname, "gen-skill.mjs"),
+			"--out",
+			resolve(pluginRoot, "skills/pfdsl"),
+		],
+		{
+			stdio: "inherit",
+		},
+	);
 
 	// --- 1b-6. Everything else: install/ mirror, static skills, commands,
 	// agents, hooks, plugin.json, and skills/pfdsl/references. Shared with
@@ -36,7 +45,9 @@ function assemble() {
 
 	assemblePluginDistIndependent({ root, pluginRoot });
 
-	console.log("\nPlugin assembled at plugin/pfdsl/. Verify locally with: claude --plugin-dir plugin/pfdsl");
+	console.log(
+		"\nPlugin assembled at plugin/pfdsl/. Verify locally with: claude --plugin-dir plugin/pfdsl",
+	);
 }
 
 try {

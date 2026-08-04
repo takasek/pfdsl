@@ -10,18 +10,26 @@
 // drift check in scripts/pre-commit relies on. scripts/lib/gen-skill-refs.test.mjs
 // asserts this via static import-graph inspection.
 
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { resolve } from "node:path";
-
-import { resolveCompanions } from "./sample-companions.mjs";
 import { buildExamplesMd } from "./examples-index.mjs";
+import { resolveCompanions } from "./sample-companions.mjs";
 import { currentSpecVersion } from "./spec-history-check.mjs";
 
 function buildExamplesIndexMd(dir) {
 	const entries = readdirSync(dir)
 		.filter((f) => f.endsWith(".pfdsl"))
 		.sort()
-		.map((f) => ({ id: f.replace(".pfdsl", ""), source: readFileSync(resolve(dir, f), "utf-8") }));
+		.map((f) => ({
+			id: f.replace(".pfdsl", ""),
+			source: readFileSync(resolve(dir, f), "utf-8"),
+		}));
 
 	if (entries.length === 0) {
 		console.warn(`warn: no .pfdsl files found in ${dir}`);
@@ -49,19 +57,36 @@ export function writeSkillRefs(root, outDir) {
 	const specVersion = currentSpecVersion(specSrc) ?? "unknown";
 	const baseHeader = (src) =>
 		`<!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/${src} -->\n\n`;
-	writeFileSync(resolve(refsDir, "spec.md"), baseHeader("docs/spec/spec.md") + specSrc);
+	writeFileSync(
+		resolve(refsDir, "spec.md"),
+		baseHeader("docs/spec/spec.md") + specSrc,
+	);
 	console.log("references/spec.md ← docs/spec/spec.md");
 
 	// --- 1b. Copy review perspectives ---
 
-	const promptsSrc = readFileSync(resolve(root, "docs/review-perspectives.md"), "utf-8");
-	writeFileSync(resolve(refsDir, "review-perspectives.md"), baseHeader("docs/review-perspectives.md") + promptsSrc);
-	console.log("references/review-perspectives.md ← docs/review-perspectives.md");
+	const promptsSrc = readFileSync(
+		resolve(root, "docs/review-perspectives.md"),
+		"utf-8",
+	);
+	writeFileSync(
+		resolve(refsDir, "review-perspectives.md"),
+		baseHeader("docs/review-perspectives.md") + promptsSrc,
+	);
+	console.log(
+		"references/review-perspectives.md ← docs/review-perspectives.md",
+	);
 
 	// --- 1c. Copy quality guide ---
 
-	const qualityGuideSrc = readFileSync(resolve(root, "docs/quality-guide.md"), "utf-8");
-	writeFileSync(resolve(refsDir, "quality-guide.md"), baseHeader("docs/quality-guide.md") + qualityGuideSrc);
+	const qualityGuideSrc = readFileSync(
+		resolve(root, "docs/quality-guide.md"),
+		"utf-8",
+	);
+	writeFileSync(
+		resolve(refsDir, "quality-guide.md"),
+		baseHeader("docs/quality-guide.md") + qualityGuideSrc,
+	);
 	console.log("references/quality-guide.md ← docs/quality-guide.md");
 
 	// --- 2. Generate samples.md from TSV ---
@@ -74,15 +99,24 @@ export function writeSkillRefs(root, outDir) {
 		.slice(1)
 		.map((line) => {
 			const [id, summary, description] = line.split("\t");
-			return { id: id.trim(), summary: summary?.trim() ?? "", description: description?.trim() ?? "" };
+			return {
+				id: id.trim(),
+				summary: summary?.trim() ?? "",
+				description: description?.trim() ?? "",
+			};
 		});
 
 	const sampleFileIds = readdirSync(samplesDir)
 		.filter((f) => f.endsWith(".pfdsl"))
 		.map((f) => f.replace(".pfdsl", ""));
-	const { companionsById, orphans } = resolveCompanions(rows.map((r) => r.id), sampleFileIds);
+	const { companionsById, orphans } = resolveCompanions(
+		rows.map((r) => r.id),
+		sampleFileIds,
+	);
 	for (const id of orphans) {
-		console.warn(`  warn: ${id}.pfdsl exists but has no entry in samples.tsv — will not appear in references/samples.md`);
+		console.warn(
+			`  warn: ${id}.pfdsl exists but has no entry in samples.tsv — will not appear in references/samples.md`,
+		);
 	}
 
 	let samplesMd = `<!-- DO NOT EDIT — generated from docs/samples/ in https://github.com/takasek/pfdsl -->\n\n# PFDSL Samples Reference\n\nAnnotated .pfdsl files illustrating each language feature.\n\n`;
@@ -107,16 +141,24 @@ export function writeSkillRefs(root, outDir) {
 	}
 
 	if (sampleCount === 0) {
-		console.warn("warn: no sample .pfdsl files found — references/samples.md will contain no examples");
+		console.warn(
+			"warn: no sample .pfdsl files found — references/samples.md will contain no examples",
+		);
 	}
 	writeFileSync(resolve(refsDir, "samples.md"), samplesMd);
-	console.log(`references/samples.md ← docs/samples/*.pfdsl via samples.tsv (${sampleCount} samples)`);
+	console.log(
+		`references/samples.md ← docs/samples/*.pfdsl via samples.tsv (${sampleCount} samples)`,
+	);
 
 	// --- 2b. Generate examples.md from frontmatter ---
 
-	const { md: examplesMd, count: exampleCount } = buildExamplesIndexMd(resolve(root, "docs/examples"));
+	const { md: examplesMd, count: exampleCount } = buildExamplesIndexMd(
+		resolve(root, "docs/examples"),
+	);
 	writeFileSync(resolve(refsDir, "examples.md"), examplesMd);
-	console.log(`references/examples.md ← docs/examples/*.pfdsl (${exampleCount} examples)`);
+	console.log(
+		`references/examples.md ← docs/examples/*.pfdsl (${exampleCount} examples)`,
+	);
 
 	return specVersion;
 }

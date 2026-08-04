@@ -54,13 +54,21 @@ export function planGhRestCall(args) {
 		};
 	}
 	if (cmd === "label" && sub === "edit") {
-		return { op: "editLabel", name: rest[0], description: flagValue(rest, "--description") };
+		return {
+			op: "editLabel",
+			name: rest[0],
+			description: flagValue(rest, "--description"),
+		};
 	}
 	if (cmd === "issue" && sub === "list") {
 		return { op: "listIssues" };
 	}
 	if (cmd === "issue" && sub === "edit") {
-		return { op: "addIssueLabel", number: Number(rest[0]), label: flagValue(rest, "--add-label") };
+		return {
+			op: "addIssueLabel",
+			number: Number(rest[0]),
+			label: flagValue(rest, "--add-label"),
+		};
 	}
 	if (cmd === "issue" && sub === "view") {
 		return { op: "getIssueBody", number: Number(rest[0]) };

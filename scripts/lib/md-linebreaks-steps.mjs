@@ -29,11 +29,19 @@ export function runMdLinebreaksCheck({ args, listFiles, readFile }) {
 		try {
 			text = readFile(file);
 		} catch (e) {
-			return { exitCode: 1, messages: [{ stream: "error", text: `Error reading ${file}: ${e.message}` }] };
+			return {
+				exitCode: 1,
+				messages: [
+					{ stream: "error", text: `Error reading ${file}: ${e.message}` },
+				],
+			};
 		}
 
 		for (const v of checkFile(file, text)) {
-			messages.push({ stream: "log", text: `${v.file}:${v.line}: mid-sentence line break` });
+			messages.push({
+				stream: "log",
+				text: `${v.file}:${v.line}: mid-sentence line break`,
+			});
 			messages.push({ stream: "log", text: `  prev: …${v.prev.slice(-80)}` });
 			messages.push({ stream: "log", text: `  cont: ${v.cont.slice(0, 80)}` });
 			total++;

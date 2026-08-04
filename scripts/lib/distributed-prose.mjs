@@ -26,8 +26,10 @@ const RULES = [
 		// there. Naming the plugin root, or labelling the line as the repo-local
 		// branch, resolves it.
 		test(line) {
-			if (!/\.claude\/(?:skills|agents|commands)\//.test(line)) return undefined;
-			if (["CLAUDE_PLUGIN_ROOT", "repo-local"].some((q) => line.includes(q))) return undefined;
+			if (!/\.claude\/(?:skills|agents|commands)\//.test(line))
+				return undefined;
+			if (["CLAUDE_PLUGIN_ROOT", "repo-local"].some((q) => line.includes(q)))
+				return undefined;
 			return "bundle path written only in its repo-local form";
 		},
 	},
@@ -38,7 +40,9 @@ const RULES = [
 		// resolves to whatever the reader's own tracker holds under that number.
 		test(line) {
 			const m = /#\d{2,}/.exec(stripCode(line));
-			return m ? `bare issue reference ${m[0]} — adopters cannot resolve it` : undefined;
+			return m
+				? `bare issue reference ${m[0]} — adopters cannot resolve it`
+				: undefined;
 		},
 	},
 ];
@@ -62,7 +66,14 @@ export function findRepoSpecificProse(files) {
 			if (inFence) return;
 			for (const rule of RULES) {
 				const reason = rule.test(text);
-				if (reason) found.push({ path, line: i + 1, rule: rule.name, reason, text: text.trim() });
+				if (reason)
+					found.push({
+						path,
+						line: i + 1,
+						rule: rule.name,
+						reason,
+						text: text.trim(),
+					});
 			}
 		});
 	}

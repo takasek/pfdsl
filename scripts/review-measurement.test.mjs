@@ -1,10 +1,16 @@
-import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { resolve, dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { after, before, describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 // End-to-end guards for the parts that only exist at the process boundary: how
 // the ref reaches git, and what the scan reports. The pure parsing and
@@ -29,21 +35,36 @@ function run(args, cwd = root) {
 		});
 		return { status: 0, stdout, stderr: "" };
 	} catch (e) {
-		return { status: e.status ?? 1, stdout: e.stdout ?? "", stderr: e.stderr ?? String(e.message) };
+		return {
+			status: e.status ?? 1,
+			stdout: e.stdout ?? "",
+			stderr: e.stderr ?? String(e.message),
+		};
 	}
 }
 
 describe("review-measurement CLI argument handling", () => {
 	it("does not let a ref reach a shell", () => {
-		const marker = resolve(tmpdir(), `review-measurement-injection-${process.pid}`);
+		const marker = resolve(
+			tmpdir(),
+			`review-measurement-injection-${process.pid}`,
+		);
 		rmSync(marker, { force: true });
 
 		// The trailing `#` swallows the `..HEAD` the script appends, so a shell
 		// would create exactly `marker` rather than a suffixed name.
 		const result = run(["--since", `HEAD; touch ${marker} #`]);
 
-		assert.equal(existsSync(marker), false, "the ref was interpreted as a shell command");
-		assert.notEqual(result.status, 0, "an unusable ref must fail rather than report a clean run");
+		assert.equal(
+			existsSync(marker),
+			false,
+			"the ref was interpreted as a shell command",
+		);
+		assert.notEqual(
+			result.status,
+			0,
+			"an unusable ref must fail rather than report a clean run",
+		);
 	});
 
 	it("fails when --since is given without a ref instead of silently dropping the scan", () => {
@@ -82,7 +103,9 @@ describe("review-measurement scan over a built repository", () => {
 
 	before(() => {
 		repo = mkdtempSync(join(tmpdir(), "review-measurement-"));
-		execFileSync("git", ["init", "-q", "-b", "main", repo], { encoding: "utf-8" });
+		execFileSync("git", ["init", "-q", "-b", "main", repo], {
+			encoding: "utf-8",
+		});
 		commit("README.md", "start\n", "chore: start");
 		sha.base = git(["rev-parse", "HEAD"]).trim();
 
@@ -94,10 +117,24 @@ describe("review-measurement scan over a built repository", () => {
 		git(["switch", "-q", "main"]);
 		commit("docs/note.md", "prose\n", "docs: unrelated prose");
 		git(["switch", "-q", "feature"]);
-		git(["merge", "-q", "--no-ff", "main", "-m", "Merge remote-tracking branch 'origin/main' into feature"]);
+		git([
+			"merge",
+			"-q",
+			"--no-ff",
+			"main",
+			"-m",
+			"Merge remote-tracking branch 'origin/main' into feature",
+		]);
 		sha.backMerge = git(["rev-parse", "HEAD"]).trim();
 		git(["switch", "-q", "main"]);
-		git(["merge", "-q", "--no-ff", "feature", "-m", "Merge pull request #1 from feature"]);
+		git([
+			"merge",
+			"-q",
+			"--no-ff",
+			"feature",
+			"-m",
+			"Merge pull request #1 from feature",
+		]);
 		sha.unrecorded = git(["rev-parse", "HEAD"]).trim();
 
 		// A branch that changes code and records a trailer.
@@ -111,7 +148,14 @@ describe("review-measurement scan over a built repository", () => {
 			"feat(scripts): extend the tool\n\nReview-Measurement: sample=in new=1 adopted=1 tool=simplify",
 		]);
 		git(["switch", "-q", "main"]);
-		git(["merge", "-q", "--no-ff", "recorded", "-m", "Merge pull request #2 from recorded"]);
+		git([
+			"merge",
+			"-q",
+			"--no-ff",
+			"recorded",
+			"-m",
+			"Merge pull request #2 from recorded",
+		]);
 		sha.recorded = git(["rev-parse", "HEAD"]).trim();
 	});
 
@@ -128,19 +172,29 @@ describe("review-measurement scan over a built repository", () => {
 	it("reports a code-changing merge that carries no record", () => {
 		const result = run(["--since", sha.base], repo);
 
-		assert.match(result.stdout, new RegExp(`${sha.unrecorded.slice(0, 7)}.*no record`));
+		assert.match(
+			result.stdout,
+			new RegExp(`${sha.unrecorded.slice(0, 7)}.*no record`),
+		);
 	});
 
 	it("stays silent about a merge that recorded one trailer", () => {
 		const result = run(["--since", sha.base], repo);
 
-		assert.doesNotMatch(result.stdout, new RegExp(`${sha.recorded.slice(0, 7)}.*no record`));
+		assert.doesNotMatch(
+			result.stdout,
+			new RegExp(`${sha.recorded.slice(0, 7)}.*no record`),
+		);
 	});
 
 	it("accepts the --since=<ref> form", () => {
 		const result = run([`--since=${sha.base}`], repo);
 
 		assert.equal(result.status, 0, result.stderr);
-		assert.doesNotMatch(result.stdout, /pass --since <ref>/, "the scan was skipped");
+		assert.doesNotMatch(
+			result.stdout,
+			/pass --since <ref>/,
+			"the scan was skipped",
+		);
 	});
 });

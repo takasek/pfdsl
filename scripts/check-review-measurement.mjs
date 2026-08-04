@@ -8,11 +8,14 @@
 //
 // Usage: node scripts/check-review-measurement.mjs [--base main]
 
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
-import { changedFilesSince, reviewMeasurementStep } from "./lib/gate-check-steps.mjs";
+import {
+	changedFilesSince,
+	reviewMeasurementStep,
+} from "./lib/gate-check-steps.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,17 +41,27 @@ const exec = (file, execArgs) => tryRun(file, execArgs, { cwd: root });
 
 const diff = changedFilesSince({ exec, base });
 if (!diff.ok) {
-	console.error(`check-review-measurement: failed to diff against origin/${base}: ${diff.error}`);
+	console.error(
+		`check-review-measurement: failed to diff against origin/${base}: ${diff.error}`,
+	);
 	process.exit(1);
 }
 
 const result = reviewMeasurementStep({ exec, base, changedFiles: diff.files });
-console.log(`check-review-measurement: ${result.status}${result.detail ? ` — ${result.detail}` : ""}`);
+console.log(
+	`check-review-measurement: ${result.status}${result.detail ? ` — ${result.detail}` : ""}`,
+);
 
 if (result.status === "FAIL") {
-	console.error("\nThe trailer is part of a commit message, so it cannot be appended later.");
-	console.error("Run the review, then record the pass in the message of the commit you make next:");
-	console.error('  Review-Measurement: sample=in new=<n> adopted=<n> tool=simplify angles="…"');
+	console.error(
+		"\nThe trailer is part of a commit message, so it cannot be appended later.",
+	);
+	console.error(
+		"Run the review, then record the pass in the message of the commit you make next:",
+	);
+	console.error(
+		'  Review-Measurement: sample=in new=<n> adopted=<n> tool=simplify angles="…"',
+	);
 	console.error("  Review-Measurement: sample=out");
 	process.exit(1);
 }

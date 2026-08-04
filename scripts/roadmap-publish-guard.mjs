@@ -9,9 +9,8 @@
 // Usage (wired in .claude/settings.json): node scripts/roadmap-publish-guard.mjs
 
 import { readFileSync } from "node:fs";
-
-import { runRoadmapPublishGuard } from "./lib/roadmap-publish-guard.mjs";
 import { readStdinText } from "./lib/hook-io.mjs";
+import { runRoadmapPublishGuard } from "./lib/roadmap-publish-guard.mjs";
 
 /** The file as it stands, or undefined when it cannot be read (new file, no access). */
 function readFile(path) {
@@ -22,7 +21,9 @@ function readFile(path) {
 	}
 }
 
-const { shouldOutput, output } = runRoadmapPublishGuard(await readStdinText(), { readFile });
+const { shouldOutput, output } = runRoadmapPublishGuard(await readStdinText(), {
+	readFile,
+});
 if (shouldOutput) {
 	console.log(JSON.stringify(output));
 }

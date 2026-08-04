@@ -33,7 +33,10 @@ export function runDocExamplesCheck({ files, readFile, exec }) {
 		try {
 			text = readFile(file);
 		} catch (e) {
-			messages.push({ stream: "error", text: `Error reading ${file}: ${e.message}` });
+			messages.push({
+				stream: "error",
+				text: `Error reading ${file}: ${e.message}`,
+			});
 			return { exitCode: 1, messages };
 		}
 
@@ -43,9 +46,14 @@ export function runDocExamplesCheck({ files, readFile, exec }) {
 
 			if (result.status !== 0) {
 				failures++;
-				messages.push({ stream: "error", text: `${file}:${block.startLine}: pfdsl block check FAILED` });
-				if (result.stdout) messages.push({ stream: "stdout", text: result.stdout });
-				if (result.stderr) messages.push({ stream: "stderr", text: result.stderr });
+				messages.push({
+					stream: "error",
+					text: `${file}:${block.startLine}: pfdsl block check FAILED`,
+				});
+				if (result.stdout)
+					messages.push({ stream: "stdout", text: result.stdout });
+				if (result.stderr)
+					messages.push({ stream: "stderr", text: result.stderr });
 			}
 		}
 	}

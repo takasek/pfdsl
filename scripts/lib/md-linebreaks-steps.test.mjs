@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { runMdLinebreaksCheck } from "./md-linebreaks-steps.mjs";
 
@@ -42,7 +42,9 @@ describe("runMdLinebreaksCheck", () => {
 			readFile: () => "prose\n続き。\n  次の行",
 		});
 		assert.equal(result.exitCode, 0);
-		assert.deepEqual(result.messages, [{ stream: "log", text: "check-md-linebreaks: OK" }]);
+		assert.deepEqual(result.messages, [
+			{ stream: "log", text: "check-md-linebreaks: OK" },
+		]);
 	});
 
 	it("exits 1 immediately when a file cannot be read, without a summary line", () => {
@@ -55,7 +57,10 @@ describe("runMdLinebreaksCheck", () => {
 		});
 		assert.equal(result.exitCode, 1);
 		assert.deepEqual(result.messages, [
-			{ stream: "error", text: "Error reading missing.md: ENOENT: no such file" },
+			{
+				stream: "error",
+				text: "Error reading missing.md: ENOENT: no such file",
+			},
 		]);
 	});
 
@@ -85,6 +90,8 @@ describe("runMdLinebreaksCheck", () => {
 			readFile: (file) => texts[file],
 		});
 		assert.equal(result.exitCode, 1);
-		assert.ok(result.messages.some((m) => m.text === "\n2 violation(s) found."));
+		assert.ok(
+			result.messages.some((m) => m.text === "\n2 violation(s) found."),
+		);
 	});
 });

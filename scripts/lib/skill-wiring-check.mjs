@@ -57,7 +57,11 @@ export function isBundledSource(sourcePath, mirrors) {
 export function edgeMembers(edges, { kind, process }) {
 	return new Set(
 		edges
-			.filter((edge) => edge.kind === kind && (process === undefined || edge.process === process))
+			.filter(
+				(edge) =>
+					edge.kind === kind &&
+					(process === undefined || edge.process === process),
+			)
 			.map((edge) => edge.artifact),
 	);
 }
@@ -87,9 +91,20 @@ export function declarationLine(text, id) {
  * }} input
  * @returns {Array<{id: string, location: string, missing: string[]}>}
  */
-export function findUnwiredSkills({ artifacts, workflowEdges, pipelineEdges, mirrors }) {
-	const distillOutputs = edgeMembers(workflowEdges, { kind: "output", process: "distill_ops" });
-	const genPluginInputs = edgeMembers(pipelineEdges, { kind: "input", process: "gen_plugin" });
+export function findUnwiredSkills({
+	artifacts,
+	workflowEdges,
+	pipelineEdges,
+	mirrors,
+}) {
+	const distillOutputs = edgeMembers(workflowEdges, {
+		kind: "output",
+		process: "distill_ops",
+	});
+	const genPluginInputs = edgeMembers(pipelineEdges, {
+		kind: "input",
+		process: "gen_plugin",
+	});
 	const generated = edgeMembers(pipelineEdges, { kind: "output" });
 
 	const findings = [];
@@ -101,7 +116,8 @@ export function findUnwiredSkills({ artifacts, workflowEdges, pipelineEdges, mir
 		const missing = [];
 		if (!distillOutputs.has(id)) missing.push("distill_ops outputs");
 		if (!genPluginInputs.has(id)) missing.push("gen_plugin inputs");
-		if (missing.length > 0) findings.push({ id, location: meta.location, missing });
+		if (missing.length > 0)
+			findings.push({ id, location: meta.location, missing });
 	}
 	return findings;
 }

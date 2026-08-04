@@ -1,8 +1,17 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, chmodSync, statSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, it } from "node:test";
 
 import { genInstall } from "./gen-install.mjs";
 
@@ -41,8 +50,14 @@ describe("genInstall", () => {
 
 		genInstall(tmp, ["scripts/pfdsl/lib/x.mjs", ".github/workflows/y.yml"]);
 
-		assert.equal(readFileSync(installPath(tmp, "scripts/pfdsl/lib/x.mjs"), "utf-8"), "export const x = 1;");
-		assert.equal(readFileSync(installPath(tmp, ".github/workflows/y.yml"), "utf-8"), "name: y");
+		assert.equal(
+			readFileSync(installPath(tmp, "scripts/pfdsl/lib/x.mjs"), "utf-8"),
+			"export const x = 1;",
+		);
+		assert.equal(
+			readFileSync(installPath(tmp, ".github/workflows/y.yml"), "utf-8"),
+			"name: y",
+		);
 	});
 
 	it("preserves the source file's mode on the generated copy, including the executable bit", () => {
@@ -67,7 +82,11 @@ describe("genInstall", () => {
 
 	it("removes a file under install/ that is not in the template list", () => {
 		writeFile(tmp, "a.txt", "hello");
-		writeFile(tmp, ".claude/skills/pfd-ops/install/stale.txt", "leftover from a dropped template");
+		writeFile(
+			tmp,
+			".claude/skills/pfd-ops/install/stale.txt",
+			"leftover from a dropped template",
+		);
 
 		genInstall(tmp, ["a.txt"]);
 
@@ -79,7 +98,10 @@ describe("genInstall", () => {
 		writeFile(tmp, "present.txt", "here");
 		// "missing.txt" is intentionally never created.
 
-		assert.throws(() => genInstall(tmp, ["present.txt", "missing.txt"]), /missing\.txt/);
+		assert.throws(
+			() => genInstall(tmp, ["present.txt", "missing.txt"]),
+			/missing\.txt/,
+		);
 		assert.equal(existsSync(installPath(tmp, "present.txt")), false);
 	});
 

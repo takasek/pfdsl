@@ -20,7 +20,10 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { repoDeps, runDistributionReviewCheck } from "./lib/distribution-review.mjs";
+import {
+	repoDeps,
+	runDistributionReviewCheck,
+} from "./lib/distribution-review.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const result = runDistributionReviewCheck(repoDeps(root));

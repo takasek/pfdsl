@@ -18,10 +18,16 @@
 //   GH_TOKEN           — GitHub token (phase 2 only)
 
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
-import { dirname, join, basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+	appendFileSync,
+	existsSync,
+	mkdirSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { parseHost } from "./pfdsl/lib/github-rest.mjs";
 
@@ -33,7 +39,10 @@ const root = join(__dirname, "..");
 const ghEnv = (() => {
 	try {
 		const host = parseHost(
-			execFileSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf-8" }).trim(),
+			execFileSync("git", ["remote", "get-url", "origin"], {
+				cwd: root,
+				encoding: "utf-8",
+			}).trim(),
 		);
 		return host ? { ...process.env, GH_HOST: host } : process.env;
 	} catch {
@@ -49,11 +58,15 @@ if (mode !== "generate" && mode !== "update-pr") {
 
 const baseSha = process.env.BASE_SHA;
 const prNumber = process.env.PR_NUMBER;
-const changedFiles = (process.env.CHANGED_FILES ?? "").split("\n").filter(Boolean);
+const changedFiles = (process.env.CHANGED_FILES ?? "")
+	.split("\n")
+	.filter(Boolean);
 const repo = process.env.GITHUB_REPOSITORY;
 
 if (!baseSha || !prNumber || changedFiles.length === 0 || !repo) {
-	console.error("Missing required env: BASE_SHA, PR_NUMBER, CHANGED_FILES, GITHUB_REPOSITORY");
+	console.error(
+		"Missing required env: BASE_SHA, PR_NUMBER, CHANGED_FILES, GITHUB_REPOSITORY",
+	);
 	process.exit(1);
 }
 
@@ -133,8 +146,16 @@ if (mode === "generate") {
 			const diffSvg = renderDiffSvg(aPath, bPath);
 			writeFileSync(join(svgDir, `${stem}.diff.svg`), diffSvg, "utf-8");
 		} finally {
-			try { unlinkSync(tmpFile); } catch { /* ignore */ }
-			try { unlinkSync(emptyTmp); } catch { /* ignore */ }
+			try {
+				unlinkSync(tmpFile);
+			} catch {
+				/* ignore */
+			}
+			try {
+				unlinkSync(emptyTmp);
+			} catch {
+				/* ignore */
+			}
 		}
 	}
 

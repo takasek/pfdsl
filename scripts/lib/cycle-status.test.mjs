@@ -1,19 +1,22 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import {
+	buildDesignRecordTemplate,
+	buildGateCheckCommand,
+	classifyDesignSettlement,
 	classifyPRs,
-	parseReadyOutput,
 	countBehind,
-	summarizeCiStatus,
 	detectDesignUnsettled,
 	detectEnumeratedOptions,
 	findDecisionRecords,
-	classifyDesignSettlement,
 	findIssueNumberForProcess,
-	buildGateCheckCommand,
-	buildDesignRecordTemplate,
+	parseReadyOutput,
+	summarizeCiStatus,
 } from "./cycle-status.mjs";
-import { classifyDesignRecordContent, selectDesignRecord } from "./gate-check.mjs";
+import {
+	classifyDesignRecordContent,
+	selectDesignRecord,
+} from "./gate-check.mjs";
 
 describe("summarizeCiStatus", () => {
 	it("returns NONE for empty/missing rollup", () => {
@@ -22,19 +25,31 @@ describe("summarizeCiStatus", () => {
 	});
 
 	it("returns PASS when all checks succeeded", () => {
-		assert.equal(summarizeCiStatus([{ conclusion: "SUCCESS" }, { conclusion: "SUCCESS" }]), "PASS");
+		assert.equal(
+			summarizeCiStatus([{ conclusion: "SUCCESS" }, { conclusion: "SUCCESS" }]),
+			"PASS",
+		);
 	});
 
 	it("returns FAIL when any check failed", () => {
-		assert.equal(summarizeCiStatus([{ conclusion: "SUCCESS" }, { conclusion: "FAILURE" }]), "FAIL");
+		assert.equal(
+			summarizeCiStatus([{ conclusion: "SUCCESS" }, { conclusion: "FAILURE" }]),
+			"FAIL",
+		);
 	});
 
 	it("returns PENDING when any check is still running", () => {
-		assert.equal(summarizeCiStatus([{ conclusion: null, status: "IN_PROGRESS" }]), "PENDING");
+		assert.equal(
+			summarizeCiStatus([{ conclusion: null, status: "IN_PROGRESS" }]),
+			"PENDING",
+		);
 	});
 
 	it("FAIL takes precedence over PENDING", () => {
-		assert.equal(summarizeCiStatus([{ conclusion: "FAILURE" }, { conclusion: null }]), "FAIL");
+		assert.equal(
+			summarizeCiStatus([{ conclusion: "FAILURE" }, { conclusion: null }]),
+			"FAIL",
+		);
 	});
 });
 
@@ -45,7 +60,9 @@ describe("classifyPRs", () => {
 			{ number: 2, title: "feature work", headRefName: "feat/foo" },
 		];
 		const { openFlowSyncPRs, otherOpenPRs } = classifyPRs(prs);
-		assert.deepEqual(openFlowSyncPRs, [{ number: 1, title: "flow sync", ci: "NONE" }]);
+		assert.deepEqual(openFlowSyncPRs, [
+			{ number: 1, title: "flow sync", ci: "NONE" },
+		]);
 		assert.deepEqual(otherOpenPRs, [{ number: 2, title: "feature work" }]);
 	});
 
@@ -59,11 +76,16 @@ describe("classifyPRs", () => {
 			},
 		];
 		const { openFlowSyncPRs } = classifyPRs(prs);
-		assert.deepEqual(openFlowSyncPRs, [{ number: 1, title: "flow sync", ci: "PASS" }]);
+		assert.deepEqual(openFlowSyncPRs, [
+			{ number: 1, title: "flow sync", ci: "PASS" },
+		]);
 	});
 
 	it("returns empty lists for no PRs", () => {
-		assert.deepEqual(classifyPRs([]), { openFlowSyncPRs: [], otherOpenPRs: [] });
+		assert.deepEqual(classifyPRs([]), {
+			openFlowSyncPRs: [],
+			otherOpenPRs: [],
+		});
 	});
 
 	it("accepts a custom flow-sync pattern", () => {
@@ -77,24 +99,47 @@ describe("parseReadyOutput", () => {
 	it("extracts ready ids, best id, and best outputs", () => {
 		const json = {
 			ok: true,
-			ready: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
+			ready: [
+				{ id: "a", label: "A" },
+				{ id: "b", label: "B" },
+			],
 			best: { id: "a", label: "A", outputs: ["a_out"] },
 		};
-		assert.deepEqual(parseReadyOutput(json), { ready: ["a", "b"], best: "a", bestOutputs: ["a_out"] });
+		assert.deepEqual(parseReadyOutput(json), {
+			ready: ["a", "b"],
+			best: "a",
+			bestOutputs: ["a_out"],
+		});
 	});
 
 	it("returns empty when ok is false", () => {
-		assert.deepEqual(parseReadyOutput({ ok: false }), { ready: [], best: null, bestOutputs: [] });
+		assert.deepEqual(parseReadyOutput({ ok: false }), {
+			ready: [],
+			best: null,
+			bestOutputs: [],
+		});
 	});
 
 	it("returns empty for missing/invalid input", () => {
-		assert.deepEqual(parseReadyOutput(null), { ready: [], best: null, bestOutputs: [] });
-		assert.deepEqual(parseReadyOutput(undefined), { ready: [], best: null, bestOutputs: [] });
+		assert.deepEqual(parseReadyOutput(null), {
+			ready: [],
+			best: null,
+			bestOutputs: [],
+		});
+		assert.deepEqual(parseReadyOutput(undefined), {
+			ready: [],
+			best: null,
+			bestOutputs: [],
+		});
 	});
 
 	it("returns null best and empty bestOutputs when absent", () => {
 		const json = { ok: true, ready: [] };
-		assert.deepEqual(parseReadyOutput(json), { ready: [], best: null, bestOutputs: [] });
+		assert.deepEqual(parseReadyOutput(json), {
+			ready: [],
+			best: null,
+			bestOutputs: [],
+		});
 	});
 });
 
@@ -122,14 +167,24 @@ describe("detectDesignUnsettled", () => {
 	});
 
 	it("returns false for empty/missing body", () => {
-		assert.deepEqual(detectDesignUnsettled(""), { designUnsettled: false, matchedLines: [] });
-		assert.deepEqual(detectDesignUnsettled(undefined), { designUnsettled: false, matchedLines: [] });
+		assert.deepEqual(detectDesignUnsettled(""), {
+			designUnsettled: false,
+			matchedLines: [],
+		});
+		assert.deepEqual(detectDesignUnsettled(undefined), {
+			designUnsettled: false,
+			matchedLines: [],
+		});
 	});
 });
 
 describe("detectEnumeratedOptions", () => {
 	it("returns not enumerated for a body without an option heading", () => {
-		assert.deepEqual(detectEnumeratedOptions("ただの説明文。"), { enumerated: false, count: 0, headings: [] });
+		assert.deepEqual(detectEnumeratedOptions("ただの説明文。"), {
+			enumerated: false,
+			count: 0,
+			headings: [],
+		});
 	});
 
 	it("counts numbered list items under a matching heading, stopping at the next same-level heading", () => {
@@ -148,19 +203,36 @@ describe("detectEnumeratedOptions", () => {
 	});
 
 	it("counts labeled sub-headings under a matching heading", () => {
-		const body = ["## 対応案", "### A. 最小案", "本文", "### B. 拡張案", "本文"].join("\n");
+		const body = [
+			"## 対応案",
+			"### A. 最小案",
+			"本文",
+			"### B. 拡張案",
+			"本文",
+		].join("\n");
 		const result = detectEnumeratedOptions(body);
 		assert.equal(result.enumerated, true);
 		assert.equal(result.count, 2);
 	});
 
 	it("does not enumerate when only one candidate item is found", () => {
-		assert.equal(detectEnumeratedOptions("## 選択肢\n1. ひとつだけ").enumerated, false);
+		assert.equal(
+			detectEnumeratedOptions("## 選択肢\n1. ひとつだけ").enumerated,
+			false,
+		);
 	});
 
 	it("returns not enumerated for empty/missing body", () => {
-		assert.deepEqual(detectEnumeratedOptions(""), { enumerated: false, count: 0, headings: [] });
-		assert.deepEqual(detectEnumeratedOptions(undefined), { enumerated: false, count: 0, headings: [] });
+		assert.deepEqual(detectEnumeratedOptions(""), {
+			enumerated: false,
+			count: 0,
+			headings: [],
+		});
+		assert.deepEqual(detectEnumeratedOptions(undefined), {
+			enumerated: false,
+			count: 0,
+			headings: [],
+		});
 	});
 });
 
@@ -172,7 +244,12 @@ describe("findDecisionRecords", () => {
 		];
 		assert.deepEqual(findDecisionRecords(entries), [
 			{ author: "owner", option: "2", line: "決定: 案2", createdAt: undefined },
-			{ author: "other", option: "1", line: "決定: 案1", createdAt: "2026-01-01T00:00:00Z" },
+			{
+				author: "other",
+				option: "1",
+				line: "決定: 案1",
+				createdAt: "2026-01-01T00:00:00Z",
+			},
 		]);
 	});
 
@@ -188,7 +265,10 @@ describe("findDecisionRecords", () => {
 	});
 
 	it("returns an empty array when no entry contains a 決定: line", () => {
-		assert.deepEqual(findDecisionRecords([{ author: "owner", body: "まだ検討中。" }]), []);
+		assert.deepEqual(
+			findDecisionRecords([{ author: "owner", body: "まだ検討中。" }]),
+			[],
+		);
 	});
 
 	it("returns an empty array for no entries", () => {
@@ -212,11 +292,21 @@ describe("classifyDesignSettlement", () => {
 		const result = classifyDesignSettlement({
 			body: "## 対応案\n1. 案A\n2. 案B\n",
 			ownerLogin: "owner",
-			comments: [{ author: "owner", body: "決定: 案2", createdAt: "2026-01-01T00:00:00Z" }],
+			comments: [
+				{
+					author: "owner",
+					body: "決定: 案2",
+					createdAt: "2026-01-01T00:00:00Z",
+				},
+			],
 		});
 		assert.equal(result.unsettled, false);
 		assert.equal(result.reason, "decision-recorded");
-		assert.deepEqual(result.decision, { author: "owner", option: "2", createdAt: "2026-01-01T00:00:00Z" });
+		assert.deepEqual(result.decision, {
+			author: "owner",
+			option: "2",
+			createdAt: "2026-01-01T00:00:00Z",
+		});
 	});
 
 	it("does not accept a decision recorded by someone other than the issue owner", () => {
@@ -241,10 +331,17 @@ describe("classifyDesignSettlement", () => {
 	});
 
 	it("reports settled with no-enumerated-options when nothing indicates unsettled design", () => {
-		assert.deepEqual(classifyDesignSettlement({ body: "普通の説明文。", ownerLogin: "owner", comments: [] }), {
-			unsettled: false,
-			reason: "no-enumerated-options",
-		});
+		assert.deepEqual(
+			classifyDesignSettlement({
+				body: "普通の説明文。",
+				ownerLogin: "owner",
+				comments: [],
+			}),
+			{
+				unsettled: false,
+				reason: "no-enumerated-options",
+			},
+		);
 	});
 });
 
@@ -266,11 +363,17 @@ processes:
 `;
 
 	it("extracts the issue number from the process block's location", () => {
-		assert.equal(findIssueNumberForProcess(pfdsl, "i405_implement_mint_check"), 405);
+		assert.equal(
+			findIssueNumberForProcess(pfdsl, "i405_implement_mint_check"),
+			405,
+		);
 	});
 
 	it("does not bleed into a neighboring process's location", () => {
-		assert.equal(findIssueNumberForProcess(pfdsl, "i402_implement_get_by_id"), 402);
+		assert.equal(
+			findIssueNumberForProcess(pfdsl, "i402_implement_get_by_id"),
+			402,
+		);
 	});
 
 	it("returns null for an unknown process id", () => {
@@ -312,18 +415,26 @@ describe("countBehind", () => {
 describe("buildDesignRecordTemplate", () => {
 	it("emits a skeleton that the terminal gate's own content check accepts", () => {
 		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
-		assert.deepEqual(classifyDesignRecordContent(lines.join("\n"), 0), { status: "PASS" });
+		assert.deepEqual(classifyDesignRecordContent(lines.join("\n"), 0), {
+			status: "PASS",
+		});
 	});
 
 	it("omits the 決定 line — that record belongs to the filer, not to the runner", () => {
 		const { lines, note } = buildDesignRecordTemplate({ optionCount: 0 });
-		assert.deepEqual(findDecisionRecords([{ author: "someone", body: lines.join("\n") }]), []);
+		assert.deepEqual(
+			findDecisionRecords([{ author: "someone", body: lines.join("\n") }]),
+			[],
+		);
 		assert.match(note, /起票者本人が書く/);
 	});
 
 	it("emits a skeleton the gate identifies as the selection record", () => {
 		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
-		const entries = [{ author: "filer", body: "普通の説明文。" }, { author: "runner", body: lines.join("\n") }];
+		const entries = [
+			{ author: "filer", body: "普通の説明文。" },
+			{ author: "runner", body: lines.join("\n") },
+		];
 		assert.equal(selectDesignRecord(entries)?.author, "runner");
 	});
 
@@ -336,7 +447,10 @@ describe("buildDesignRecordTemplate", () => {
 
 	it("omits the disposition line when the issue enumerates no options", () => {
 		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
-		assert.equal(lines.some((l) => l.includes("処分")), false);
+		assert.equal(
+			lines.some((l) => l.includes("処分")),
+			false,
+		);
 	});
 
 	it("carries a note explaining that the line heads are machine-matched", () => {

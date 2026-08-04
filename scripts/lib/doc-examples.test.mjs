@@ -1,11 +1,18 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { extractBlocks } from "./doc-examples.mjs";
 
 describe("extractBlocks", () => {
 	it("extracts a single pfdsl block with its start line and content", () => {
-		const text = ["intro", "```pfdsl", "processes:", "  a: {}", "```", "tail"].join("\n");
+		const text = [
+			"intro",
+			"```pfdsl",
+			"processes:",
+			"  a: {}",
+			"```",
+			"tail",
+		].join("\n");
 		const blocks = extractBlocks("spec.md", text);
 		assert.equal(blocks.length, 1);
 		assert.deepEqual(blocks[0], {
@@ -16,7 +23,15 @@ describe("extractBlocks", () => {
 	});
 
 	it("extracts multiple blocks in source order", () => {
-		const text = ["```pfdsl", "a: {}", "```", "between", "```pfdsl", "b: {}", "```"].join("\n");
+		const text = [
+			"```pfdsl",
+			"a: {}",
+			"```",
+			"between",
+			"```pfdsl",
+			"b: {}",
+			"```",
+		].join("\n");
 		const blocks = extractBlocks("spec.md", text);
 		assert.equal(blocks.length, 2);
 		assert.equal(blocks[0].content, "a: {}");
@@ -24,7 +39,12 @@ describe("extractBlocks", () => {
 	});
 
 	it("skips a block whose immediately preceding non-blank line has the nocheck annotation", () => {
-		const text = ["<!-- pfdsl-nocheck -->", "```pfdsl", "broken: [", "```"].join("\n");
+		const text = [
+			"<!-- pfdsl-nocheck -->",
+			"```pfdsl",
+			"broken: [",
+			"```",
+		].join("\n");
 		assert.deepEqual(extractBlocks("spec.md", text), []);
 	});
 
@@ -32,7 +52,13 @@ describe("extractBlocks", () => {
 		// The lookback only skips blank lines, not arbitrary distance — the
 		// annotation must be the immediately preceding *non-blank* line, and a
 		// blank line here still counts as "immediately preceding" once skipped.
-		const text = ["<!-- pfdsl-nocheck -->", "", "```pfdsl", "a: {}", "```"].join("\n");
+		const text = [
+			"<!-- pfdsl-nocheck -->",
+			"",
+			"```pfdsl",
+			"a: {}",
+			"```",
+		].join("\n");
 		assert.deepEqual(extractBlocks("spec.md", text), []);
 	});
 

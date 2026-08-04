@@ -30,10 +30,12 @@ function isUnder(path, root) {
  * @returns {{decision: "allow"} | {decision: "deny", reason: string}}
  */
 export function evaluateWorktreeWriteGuard(payload, roots) {
-	if (payload?.tool_name !== "Edit" && payload?.tool_name !== "Write") return { decision: "allow" };
+	if (payload?.tool_name !== "Edit" && payload?.tool_name !== "Write")
+		return { decision: "allow" };
 
 	const filePath = payload?.tool_input?.file_path;
-	if (typeof filePath !== "string" || !filePath.startsWith("/")) return { decision: "allow" };
+	if (typeof filePath !== "string" || !filePath.startsWith("/"))
+		return { decision: "allow" };
 	if (!roots) return { decision: "allow" };
 
 	const { worktreeRoot, mainRoot } = roots;

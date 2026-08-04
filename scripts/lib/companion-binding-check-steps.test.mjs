@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { runCompanionBindingsCheck } from "./companion-binding-check-steps.mjs";
 
@@ -18,7 +18,9 @@ describe("runCompanionBindingsCheck", () => {
 	it("passes with no companion files and no pfd-retro.md", () => {
 		const result = runCompanionBindingsCheck(baseDeps());
 		assert.equal(result.exitCode, 0);
-		assert.deepEqual(result.stdoutLines, ["check-companion-bindings: all passed"]);
+		assert.deepEqual(result.stdoutLines, [
+			"check-companion-bindings: all passed",
+		]);
 		assert.deepEqual(result.stderrLines, []);
 	});
 
@@ -31,7 +33,10 @@ describe("runCompanionBindingsCheck", () => {
 			}),
 		);
 		assert.equal(result.exitCode, 1);
-		assert.match(result.stderrLines[0], /dead path reference `docs\/missing\.md`/);
+		assert.match(
+			result.stderrLines[0],
+			/dead path reference `docs\/missing\.md`/,
+		);
 		assert.match(result.stderrLines.at(-1), /1 error\(s\)/);
 	});
 
@@ -58,7 +63,10 @@ describe("runCompanionBindingsCheck", () => {
 			}),
 		);
 		assert.equal(result.exitCode, 0);
-		assert.ok(!readCalls.includes(PFD_RETRO_PATH), "pfd-retro.md must not be read when it does not exist");
+		assert.ok(
+			!readCalls.includes(PFD_RETRO_PATH),
+			"pfd-retro.md must not be read when it does not exist",
+		);
 	});
 
 	// Isolates the second check: no companion-file dead paths at all, only a
@@ -68,18 +76,23 @@ describe("runCompanionBindingsCheck", () => {
 		const result = runCompanionBindingsCheck(
 			baseDeps({
 				exists: (path) => path === PFD_RETRO_PATH,
-				readFile: (file) => (file === PFD_RETRO_PATH ? "# unrelated heading\n" : ""),
+				readFile: (file) =>
+					file === PFD_RETRO_PATH ? "# unrelated heading\n" : "",
 			}),
 		);
 		assert.equal(result.exitCode, 1);
-		assert.match(result.stderrLines[0], /missing required heading "pfd-retro バインディング"/);
+		assert.match(
+			result.stderrLines[0],
+			/missing required heading "pfd-retro バインディング"/,
+		);
 	});
 
 	it("passes when pfd-retro.md exists and has the required heading", () => {
 		const result = runCompanionBindingsCheck(
 			baseDeps({
 				exists: (path) => path === PFD_RETRO_PATH,
-				readFile: (file) => (file === PFD_RETRO_PATH ? "# pfd-retro バインディング\n" : ""),
+				readFile: (file) =>
+					file === PFD_RETRO_PATH ? "# pfd-retro バインディング\n" : "",
 			}),
 		);
 		assert.equal(result.exitCode, 0);
@@ -89,7 +102,9 @@ describe("runCompanionBindingsCheck", () => {
 		const result = runCompanionBindingsCheck({
 			listFiles: () => [".pfdsl/foo.md"],
 			readFile: (file) =>
-				file === PFD_RETRO_PATH ? "# unrelated heading\n" : "see `docs/missing.md`",
+				file === PFD_RETRO_PATH
+					? "# unrelated heading\n"
+					: "see `docs/missing.md`",
 			exists: (path) => path === PFD_RETRO_PATH,
 		});
 		assert.equal(result.exitCode, 1);

@@ -11,10 +11,13 @@
 // Usage (wired in .claude/settings.json): node scripts/worktree-write-guard.mjs
 
 import { dirname, resolve } from "node:path";
-
-import { evaluateWorktreeWriteGuard } from "./lib/worktree-write-guard.mjs";
-import { buildPermissionOutput, parseHookPayload, readStdinText } from "./lib/hook-io.mjs";
+import {
+	buildPermissionOutput,
+	parseHookPayload,
+	readStdinText,
+} from "./lib/hook-io.mjs";
 import { tryGit } from "./lib/run-exec.mjs";
+import { evaluateWorktreeWriteGuard } from "./lib/worktree-write-guard.mjs";
 
 /**
  * @param {string} cwd

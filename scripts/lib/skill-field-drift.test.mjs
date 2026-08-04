@@ -1,9 +1,9 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import {
-	extractTypedFields,
 	extractSectionText,
+	extractTypedFields,
 	findMissingFields,
 } from "./skill-field-drift.mjs";
 
@@ -82,26 +82,42 @@ boundary という語がセクション外に出てもカウントされない�
 describe("extractTypedFields", () => {
 	it("collects property names per interface, skipping index signatures and comments", () => {
 		const fields = extractTypedFields(TS_FIXTURE);
-		assert.deepEqual(fields.ArtifactMeta, ["label", "description", "index", "status"]);
+		assert.deepEqual(fields.ArtifactMeta, [
+			"label",
+			"description",
+			"index",
+			"status",
+		]);
 		assert.deepEqual(fields.ProcessMeta, ["label", "subflow", "boundary"]);
 		assert.deepEqual(fields.GroupMeta, ["label", "parent"]);
 	});
 
 	it("collects top-level Frontmatter fields without descending into nested object types", () => {
 		const fields = extractTypedFields(TS_FIXTURE);
-		assert.deepEqual(fields.Frontmatter, ["title", "layout", "artifact", "basePath", "type"]);
+		assert.deepEqual(fields.Frontmatter, [
+			"title",
+			"layout",
+			"artifact",
+			"basePath",
+			"type",
+		]);
 	});
 });
 
 describe("extractSectionText", () => {
 	it("returns text from the heading up to the next same-level heading", () => {
-		const section = extractSectionText(TEMPLATE_FIXTURE, "## Frontmatter structure");
+		const section = extractSectionText(
+			TEMPLATE_FIXTURE,
+			"## Frontmatter structure",
+		);
 		assert.ok(section.includes("basePath"));
 		assert.ok(!section.includes("カウントされない"));
 	});
 
 	it("throws when the heading is absent", () => {
-		assert.throws(() => extractSectionText("# nothing here", "## Frontmatter structure"));
+		assert.throws(() =>
+			extractSectionText("# nothing here", "## Frontmatter structure"),
+		);
 	});
 });
 
@@ -111,13 +127,19 @@ describe("findMissingFields", () => {
 	});
 
 	it("reports fields absent from the section, qualified by interface", () => {
-		const template = TEMPLATE_FIXTURE.replace("    index: 1\n", "").replace("basePath: ../\n", "");
+		const template = TEMPLATE_FIXTURE.replace("    index: 1\n", "").replace(
+			"basePath: ../\n",
+			"",
+		);
 		const missing = findMissingFields(TS_FIXTURE, template);
 		assert.deepEqual(missing, ["Frontmatter.basePath", "ArtifactMeta.index"]);
 	});
 
 	it("does not count mentions outside the frontmatter section", () => {
-		const template = TEMPLATE_FIXTURE.replace("    boundary: { parent_id: child_id }\n", "");
+		const template = TEMPLATE_FIXTURE.replace(
+			"    boundary: { parent_id: child_id }\n",
+			"",
+		);
 		const missing = findMissingFields(TS_FIXTURE, template);
 		assert.deepEqual(missing, ["ProcessMeta.boundary"]);
 	});

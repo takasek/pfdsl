@@ -1,8 +1,8 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, it } from "node:test";
 
 import { checkUpstreamVersion } from "../../.claude/skills/pfd-ops/scripts/plugin-version-check.mjs";
 
@@ -27,7 +27,11 @@ describe("checkUpstreamVersion", () => {
 		const pluginRoot = join(tmp, "plugin-root");
 		const skillRoot = join(pluginRoot, "skills", "pfd-ops");
 		mkdirSync(skillRoot, { recursive: true });
-		writeFile(pluginRoot, ".claude-plugin/plugin.json", JSON.stringify({ version: localVersion }));
+		writeFile(
+			pluginRoot,
+			".claude-plugin/plugin.json",
+			JSON.stringify({ version: localVersion }),
+		);
 		return skillRoot;
 	}
 

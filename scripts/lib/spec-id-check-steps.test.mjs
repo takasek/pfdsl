@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { runSpecIdCheck } from "./spec-id-check-steps.mjs";
 
@@ -42,7 +42,9 @@ describe("runSpecIdCheck", () => {
 			readFile: () => "## Heading (SPEC_foo)\nsee [[SPEC_foo]]",
 		});
 		assert.equal(result.exitCode, 0);
-		assert.deepEqual(result.stdoutLines, ["check-spec-ids: no violations found"]);
+		assert.deepEqual(result.stdoutLines, [
+			"check-spec-ids: no violations found",
+		]);
 		assert.deepEqual(result.stderrLines, []);
 	});
 
@@ -56,8 +58,14 @@ describe("runSpecIdCheck", () => {
 			readFile: () => "## A (SPEC_foo)\n## B (SPEC_foo)",
 		});
 		assert.equal(result.exitCode, 1);
-		assert.match(result.stderrLines[0], /1 duplicate definition\(s\), 0 dangling strict reference\(s\)/);
-		assert.match(result.stderrLines[1], /duplicate definition of id "SPEC_foo"/);
+		assert.match(
+			result.stderrLines[0],
+			/1 duplicate definition\(s\), 0 dangling strict reference\(s\)/,
+		);
+		assert.match(
+			result.stderrLines[1],
+			/duplicate definition of id "SPEC_foo"/,
+		);
 	});
 
 	// The other half of the same `||`: a dangling-only case must independently
@@ -70,7 +78,10 @@ describe("runSpecIdCheck", () => {
 			readFile: () => "see [[SPEC_bar]]",
 		});
 		assert.equal(result.exitCode, 1);
-		assert.match(result.stderrLines[0], /0 duplicate definition\(s\), 1 dangling strict reference\(s\)/);
+		assert.match(
+			result.stderrLines[0],
+			/0 duplicate definition\(s\), 1 dangling strict reference\(s\)/,
+		);
 		assert.match(result.stderrLines[1], /dangling strict reference "SPEC_bar"/);
 	});
 

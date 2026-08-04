@@ -48,11 +48,16 @@ export function addedPublishProcesses(after, before) {
  * @param {{readFile?: (path: string) => string | undefined}} [io]
  * @returns {{decision: "allow"} | {decision: "ask", reason: string}}
  */
-export function evaluateRoadmapPublishGuard(payload, { readFile = () => undefined } = {}) {
-	if (payload?.tool_name !== "Edit" && payload?.tool_name !== "Write") return { decision: "allow" };
+export function evaluateRoadmapPublishGuard(
+	payload,
+	{ readFile = () => undefined } = {},
+) {
+	if (payload?.tool_name !== "Edit" && payload?.tool_name !== "Write")
+		return { decision: "allow" };
 
 	const filePath = payload?.tool_input?.file_path;
-	if (typeof filePath !== "string" || !filePath.endsWith("roadmap.pfdsl")) return { decision: "allow" };
+	if (typeof filePath !== "string" || !filePath.endsWith("roadmap.pfdsl"))
+		return { decision: "allow" };
 
 	const input = payload.tool_input;
 	const added =
@@ -79,7 +84,10 @@ export function evaluateRoadmapPublishGuard(payload, { readFile = () => undefine
  * @param {{readFile?: (path: string) => string | undefined}} [io]
  * @returns {{shouldOutput: boolean, output?: object}}
  */
-export function runRoadmapPublishGuard(inputText, { readFile = () => undefined } = {}) {
+export function runRoadmapPublishGuard(
+	inputText,
+	{ readFile = () => undefined } = {},
+) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 

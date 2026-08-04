@@ -17,7 +17,10 @@ const raw = readFileSync(filePath, "utf-8");
 const lines = raw.split("\n");
 let fmEnd = -1;
 for (let i = 1; i < lines.length; i++) {
-	if (lines[i].trimEnd() === "---") { fmEnd = i; break; }
+	if (lines[i].trimEnd() === "---") {
+		fmEnd = i;
+		break;
+	}
 }
 if (fmEnd === -1) throw new Error(`No closing --- found in ${filePath}`);
 

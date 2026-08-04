@@ -59,13 +59,15 @@ export function findCliConventionViolations(source, file = "") {
 		if (flagLookupApplies && FLAG_LOOKUP.test(text)) {
 			findings.push({
 				line: i + 1,
-				reason: "looks a flag up by name — use node:util's parseArgs with strict: true",
+				reason:
+					"looks a flag up by name — use node:util's parseArgs with strict: true",
 			});
 		}
 		if (ENTRYPOINT_COMPARE.test(text) && !/realpath/.test(text)) {
 			findings.push({
 				line: i + 1,
-				reason: "compares import.meta.url against process.argv[1] verbatim — use isCliEntrypoint from scripts/lib/cli-entrypoint.mjs",
+				reason:
+					"compares import.meta.url against process.argv[1] verbatim — use isCliEntrypoint from scripts/lib/cli-entrypoint.mjs",
 			});
 		}
 	});
@@ -95,5 +97,7 @@ function isExcluded(file) {
  * @returns {string[]} the subset the gate scans
  */
 export function selectScannedFiles(trackedFiles) {
-	return trackedFiles.filter((file) => file.endsWith(".mjs") && !isExcluded(file));
+	return trackedFiles.filter(
+		(file) => file.endsWith(".mjs") && !isExcluded(file),
+	);
 }

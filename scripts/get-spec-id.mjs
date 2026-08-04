@@ -33,10 +33,7 @@ if (!id) {
 const files =
 	fileArgs.length > 0
 		? fileArgs
-		: git(["ls-files", "docs/**/*.md"])
-				.trim()
-				.split("\n")
-				.filter(Boolean);
+		: git(["ls-files", "docs/**/*.md"]).trim().split("\n").filter(Boolean);
 
 const matches = [];
 const textByFile = new Map();
@@ -64,7 +61,10 @@ if (matches.length > 1) {
 const [match] = matches;
 const text = textByFile.get(match.file);
 const { startLine, endLine } = computeRange(text, match.line);
-const block = text.split("\n").slice(startLine - 1, endLine).join("\n");
+const block = text
+	.split("\n")
+	.slice(startLine - 1, endLine)
+	.join("\n");
 
 console.log(block);
 console.error(`${match.file}:${startLine}-${endLine}`);

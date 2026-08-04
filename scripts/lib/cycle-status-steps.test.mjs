@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { runCycleStatus } from "./cycle-status-steps.mjs";
 
@@ -140,7 +140,10 @@ describe("runCycleStatus", () => {
 				existsSync: () => false,
 			}),
 		);
-		assert.equal(result.readyError, "packages/cli/dist/cli.js not built; run 'pnpm -r build' first");
+		assert.equal(
+			result.readyError,
+			"packages/cli/dist/cli.js not built; run 'pnpm -r build' first",
+		);
 		assert.deepEqual(result.ready, []);
 		assert.equal(result.best, null);
 		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
@@ -173,7 +176,8 @@ describe("runCycleStatus", () => {
 		assert.equal(result.best, null);
 	});
 
-	const issueJson = ({ author, body, comments = [] }) => JSON.stringify({ author: { login: author }, body, comments });
+	const issueJson = ({ author, body, comments = [] }) =>
+		JSON.stringify({ author: { login: author }, body, comments });
 
 	it("resolves the target issue from --issue when given, ignoring any best process", async () => {
 		const calls = [];
@@ -187,7 +191,8 @@ describe("runCycleStatus", () => {
 				readFileSync: () => roadmapWithIssue("proc_a", 42),
 				execGh: async (args) => {
 					calls.push(args);
-					if (args[0] === "issue") return issueJson({ author: "owner", body: "普通の説明文。" });
+					if (args[0] === "issue")
+						return issueJson({ author: "owner", body: "普通の説明文。" });
 					return JSON.stringify([]);
 				},
 			}),
@@ -215,7 +220,11 @@ describe("runCycleStatus", () => {
 				},
 				readFileSync: () => roadmapWithIssue("proc_a", 42),
 				execGh: async (args) => {
-					if (args[0] === "issue") return issueJson({ author: "owner", body: "設計未確定な点がある。" });
+					if (args[0] === "issue")
+						return issueJson({
+							author: "owner",
+							body: "設計未確定な点がある。",
+						});
 					return JSON.stringify([]);
 				},
 			}),
@@ -231,7 +240,8 @@ describe("runCycleStatus", () => {
 			baseDeps({
 				sh: (file, args) => {
 					if (args.includes("rev-parse")) return "feat/second-cycle\n";
-					if (args.join(" ").includes("origin/main..HEAD")) return "abc one\ndef two\n";
+					if (args.join(" ").includes("origin/main..HEAD"))
+						return "abc one\ndef two\n";
 					return "";
 				},
 			}),
@@ -249,7 +259,8 @@ describe("runCycleStatus", () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				sh: (file, args) => {
-					if (args.includes("rev-parse")) throw new Error("fatal: not a git repository");
+					if (args.includes("rev-parse"))
+						throw new Error("fatal: not a git repository");
 					return "";
 				},
 			}),
@@ -265,13 +276,18 @@ describe("runCycleStatus", () => {
 				issueNumber: 721,
 				execGh: async (args) => {
 					if (args[0] === "issue") {
-						return issueJson({ author: "owner", body: "## 検討したい方向\n1. 案A\n2. 案B\n3. 案C\n" });
+						return issueJson({
+							author: "owner",
+							body: "## 検討したい方向\n1. 案A\n2. 案B\n3. 案C\n",
+						});
 					}
 					return JSON.stringify([]);
 				},
 			}),
 		);
-		const dispositionLine = result.designRecordTemplate.lines.find((l) => l.includes("処分"));
+		const dispositionLine = result.designRecordTemplate.lines.find((l) =>
+			l.includes("処分"),
+		);
 		assert.match(dispositionLine, /3/);
 	});
 
@@ -279,7 +295,10 @@ describe("runCycleStatus", () => {
 		const result = await runCycleStatus(baseDeps({}));
 		assert.equal(result.designUnsettledFor, null);
 		assert.ok(result.designRecordTemplate.lines.length > 0);
-		assert.equal(result.designRecordTemplate.lines.some((l) => l.includes("処分")), false);
+		assert.equal(
+			result.designRecordTemplate.lines.some((l) => l.includes("処分")),
+			false,
+		);
 	});
 
 	it("returns a null designUnsettledFor with an error when neither --issue nor a best process is available", async () => {

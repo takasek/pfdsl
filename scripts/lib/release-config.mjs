@@ -34,7 +34,8 @@ export const RELEASE_KINDS = {
 		packages: ["packages/vscode-extension/package.json"],
 		tagPrefix: "vscode-v",
 		workflow: null,
-		commitMessage: (v) => `chore(package): bump vscode-extension version to ${v}`,
+		commitMessage: (v) =>
+			`chore(package): bump vscode-extension version to ${v}`,
 	},
 };
 
@@ -86,7 +87,10 @@ export function filesToCommitForBump(kindArg, kind) {
  * @param {string} [prefix]
  * @returns {string[]}
  */
-export function releaseMilestoneArtifactIds(readyItems, prefix = "publish_cli_") {
+export function releaseMilestoneArtifactIds(
+	readyItems,
+	prefix = "publish_cli_",
+) {
 	return readyItems
 		.filter((item) => item.id.startsWith(prefix))
 		.flatMap((item) => item.outputs);

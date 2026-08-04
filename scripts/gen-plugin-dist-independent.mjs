@@ -17,7 +17,9 @@ const pluginRoot = resolve(root, "plugin/pfdsl");
 
 try {
 	assemblePluginDistIndependent({ root, pluginRoot });
-	console.log("\nDist-independent portion of plugin/pfdsl/ assembled (skills/pfdsl/SKILL.md excluded — run 'node scripts/gen-skill.mjs --out plugin/pfdsl/skills/pfdsl' for that).");
+	console.log(
+		"\nDist-independent portion of plugin/pfdsl/ assembled (skills/pfdsl/SKILL.md excluded — run 'node scripts/gen-skill.mjs --out plugin/pfdsl/skills/pfdsl' for that).",
+	);
 } catch (e) {
 	console.error(e instanceof Error ? e.message : String(e));
 	process.exit(1);

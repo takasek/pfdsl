@@ -34,7 +34,12 @@ export function buildExamplesMd(entries, header) {
 	const indexHead = "## Index\n\n";
 	const indexTail = "\n";
 	const headerLines = header.split("\n").length - 1;
-	const indexLines = indexHead.split("\n").length - 1 + sections.length + indexTail.split("\n").length - 1;
+	const indexLines =
+		indexHead.split("\n").length -
+		1 +
+		sections.length +
+		indexTail.split("\n").length -
+		1;
 
 	let cursor = headerLines + indexLines + 1; // 1-based first line after the index
 	const indexEntries = sections.map((s) => {
@@ -46,5 +51,11 @@ export function buildExamplesMd(entries, header) {
 		return `- ${s.id}（${s.title}）L${start}–L${end}${demonstrates}\n`;
 	});
 
-	return header + indexHead + indexEntries.join("") + indexTail + sections.map((s) => s.body).join("");
+	return (
+		header +
+		indexHead +
+		indexEntries.join("") +
+		indexTail +
+		sections.map((s) => s.body).join("")
+	);
 }

@@ -1,14 +1,21 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { runMintCheck } from "./mint-check-steps.mjs";
 
 describe("runMintCheck", () => {
 	it("exits 2 with the usage message when slugArg is missing", () => {
-		const result = runMintCheck({ slugArg: undefined, fileArgs: [], readFile: () => "" });
+		const result = runMintCheck({
+			slugArg: undefined,
+			fileArgs: [],
+			readFile: () => "",
+		});
 		assert.equal(result.exitCode, 2);
 		assert.equal(result.stdout, null);
-		assert.equal(result.stderr, "usage: node scripts/mint-check.mjs <slug> [files...]");
+		assert.equal(
+			result.stderr,
+			"usage: node scripts/mint-check.mjs <slug> [files...]",
+		);
 	});
 
 	it("defaults the file list to docs/spec/spec.md when no files are given", () => {
