@@ -494,6 +494,38 @@ describe("classifyDesignRecordContent", () => {
 		assert.equal(classifyDesignRecordContent(decorated, 0).status, "PASS");
 	});
 
+	it("recognizes required prefixes under list markers and blockquote markers", () => {
+		const listed = ["- 前提: 背景説明", "* 否定案: 案B", "1. 却下理由: 理由の説明", "> 決定: 案A"].join("\n");
+		assert.equal(classifyDesignRecordContent(listed, 0).status, "PASS");
+	});
+
+	it("recognizes a prefix whose emphasis wraps the label alone", () => {
+		const record = ["**前提**: x", "**否定案**: y", "**却下理由**: z"].join("\n");
+		assert.equal(classifyDesignRecordContent(record, 0).status, "PASS");
+	});
+
+	it("recognizes a parenthesised qualifier on the label", () => {
+		const record = ["前提（案A・案B 共通）: x", "否定案: y", "却下理由（外部制約）: z"].join("\n");
+		assert.equal(classifyDesignRecordContent(record, 0).status, "PASS");
+	});
+
+	it("recognizes a full-width colon after the label", () => {
+		const record = ["前提： x", "否定案： y", "却下理由： z"].join("\n");
+		assert.equal(classifyDesignRecordContent(record, 0).status, "PASS");
+	});
+
+	it("recognizes decoration, qualifier and full-width colon stacked on one line", () => {
+		const record = ["> - **前提（案A）**： x", "否定案: y", "却下理由: z"].join("\n");
+		assert.equal(classifyDesignRecordContent(record, 0).status, "PASS");
+	});
+
+	it("still FAILs when the label text itself differs, not just its decoration", () => {
+		const record = ["前提条件: x", "否定案: y", "却下理由: z"].join("\n");
+		const result = classifyDesignRecordContent(record, 0);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /前提:/);
+	});
+
 	it("FAILs when disposition tokens appear fewer times than the enumerated option count", () => {
 		const result = classifyDesignRecordContent(validRecord, 3);
 		assert.equal(result.status, "FAIL");
