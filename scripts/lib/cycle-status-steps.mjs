@@ -59,7 +59,6 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 			behindBase,
 			staleTree: {
 				base,
-				behindBase,
 				message:
 					`This tree is ${behindBase} commits behind origin/${base}, so this preflight ran from that older version of itself. ` +
 					"Its judgments — including which checks exist at all — would describe the old tree, not this cycle. " +

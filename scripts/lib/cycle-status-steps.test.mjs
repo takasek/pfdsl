@@ -87,7 +87,6 @@ describe("runCycleStatus", () => {
 		);
 		assert.equal(result.behindBase, 2);
 		assert.equal(result.staleTree.base, "main");
-		assert.equal(result.staleTree.behindBase, 2);
 		assert.match(result.staleTree.message, /2 commits behind origin\/main/);
 		// Every judgment is withheld, not merely annotated: an old tree's output
 		// cannot say whether a check ran and passed or does not exist there (#716).
