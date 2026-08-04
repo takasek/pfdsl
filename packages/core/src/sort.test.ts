@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyze } from "./index.js";
+import { analyze, format } from "./index.js";
 import { sort } from "./sort.js";
 
 /** Return node IDs in declaration order from the given section of a re-parsed source. */
@@ -343,6 +343,73 @@ artifact:
 z >> p -> a
 m >> p2 -> z
 `);
+	});
+
+	// Mirror of the #695-fix2 case above: there, the entry landing last after
+	// reorder was flow-valued (whose own range never carries a trailing
+	// newline), and the fix was to skip adding one. Here, the entry landing
+	// last is block-valued — its own captured span DOES carry a trailing
+	// newline, because it wasn't originally last (block-style value ranges
+	// swallow their own trailing newline, per this file's own doc comments).
+	// That newline survives into the splice replacement, so when this
+	// section is the last thing in the frontmatter, `yamlText` ends up
+	// carrying a trailing newline of its own — violating the invariant
+	// documented on `FrontmatterCst.yamlText` — and `sort()`'s own template
+	// then adds a second one before `---`, producing a spurious blank line
+	// (final-review C2).
+	it("doesn't add a spurious blank line before the closing fence when the last entry in sorted order is block-valued", () => {
+		const src = `---
+artifact:
+  z:
+    label: Z
+  a:
+    label: A
+---
+a >> p -> z
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output).toBe(`---
+artifact:
+  a:
+    label: A
+  z:
+    label: Z
+---
+a >> p -> z
+`);
+		// The output must itself already be canonically formatted — otherwise
+		// `sort --write` would hand the user a file `fmt --check` rejects.
+		expect(format(output, { style: "flows" }).output).toBe(output);
+	});
+
+	it("doesn't add a spurious blank line before the closing fence when the last entry in sorted order is block-valued (CRLF)", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  z:",
+			"    label: Z",
+			"  a:",
+			"    label: A",
+			"---",
+			"a >> p -> z",
+			"",
+		].join("\r\n");
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output).toBe(
+			[
+				"---",
+				"artifact:",
+				"  a:",
+				"    label: A",
+				"  z:",
+				"    label: Z",
+				"---",
+				"a >> p -> z",
+				"",
+			].join("\r\n"),
+		);
 	});
 
 	it("preserves the body (non-frontmatter) unchanged", () => {

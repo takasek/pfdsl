@@ -198,8 +198,21 @@ function sortSplice(
 	// last entry (whose own range doesn't end in a newline) needs: without
 	// it, this would stack a second, spurious newline on top of the one
 	// `sort()`'s template already supplies before `---`.
+	//
+	// The mirror problem shows up when nothing follows AND the entry that
+	// lands last is block-valued: a block-style value's range swallows its
+	// own trailing newline only when something else originally followed it
+	// — so an entry that wasn't originally last still carries that trailing
+	// newline in its captured span. When reordering moves it to the new
+	// last position, that newline survives into `replacement`, leaving
+	// `yamlText` carrying a trailing newline of its own — violating the
+	// invariant documented on `FrontmatterCst.yamlText` — right before
+	// `sort()`'s template adds a second one. Strip the redundant one here
+	// rather than let it double up.
 	const remainder = yamlText.slice(end);
-	if (
+	if (remainder.length === 0 && replacement.endsWith(newline)) {
+		replacement = replacement.slice(0, -newline.length);
+	} else if (
 		!replacement.endsWith(newline) &&
 		remainder.length > 0 &&
 		!remainder.startsWith(newline)
