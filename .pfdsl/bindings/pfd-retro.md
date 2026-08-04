@@ -61,6 +61,12 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
   具体例: pfd-ops 発火時の鮮度セルフチェックで、plugin cache 0.0.21 版が `missing` 10件 + `orphaned` 10件を報告する一方、repo-local 版は in sync を報告した。差分の実体は #358 のリネームであり、drift ではなく plugin の陳腐化だった。SKILL.md の判定規則はコマンド行のパス置換有無しか見ておらず、上流リポで両方が実在する状況を扱っていない（`.pfdsl/bindings/pfd-ops.md` に repo-local を正とする規約を追加）。
   対策: 上流リポでは正とする実体を companion で1つに固定する。両者が食い違ったときの解釈（版差であって drift ではない）と、してはならない対応（古い側へ `--deploy` で追随する）も併せて書く。
 
+  **同じ主題の第2の軸: 版ずれ（空間でなく時間）。** 検査器がリポのツリーに載っている場合、実体は1つでもブランチごとに別版が併存する。**プリフライトは手順上いちばん先に走るため、ツリーがまだ古いまま実行されるのが既定の経路になる** — 「新規ブランチは `origin/<base>` を起点に」はプリフライトの後段に書かれており、順序として先にプリフライトが古い版で走る。
+  この失敗は「誤った値を出す」でなく**出力フィールドが存在しない**形で現れるため、出力を読んだだけでは検出できない。旧版に無い判定は、走らなかったのではなく最初から無かったのと区別がつかない。
+  問いの形: 「いま読んでいるこの出力は、どの版のスクリプトが出したものか。`origin/<base>` の版で走らせ直したら同じ形の出力になるか」。
+  具体例: 56コミット遅れたチェックアウトで `cycle-status.mjs` を実行した回（2026-08-04）。旧版の出力は `designUnsettledFor`（判定の対象 issue を名乗るフィールド）を持たず、`gateCheckCommand` も `--issue` を含まなかった。実行者はその形に従って `gate-check.mjs` を `--issue` なしで回し続け、design-selection record の判定が全サイクル SKIP のまま終端まで到達した。気付いたのは MANUAL 項目を手で潰す段階で、その時点で既にコミットが存在し、選択記録は「着手前」に書けなくなっていた。
+  対策: プリフライトは `origin/<base>` を取り込んだツリーで走らせる。または、出力に自分の版を書かせて読み手が照合できるようにする。
+
 - **実行環境の暗黙前提 trap**: リポの運用スクリプトが特定の CLI ツール（`gh` 等）の存在を暗黙の前提にしていると、そのツールを持たない実行環境（Claude Code Remote 等、GitHub 操作が MCP server 経由に限定されるセッション）では preflight/gate-check の一部〜全部がエラーで止まる。
   問いの形: 「このスクリプトが前提にしている外部 CLI は、全ての起動元セッション種別で利用可能か」。
   具体例: `scripts/cycle-status.mjs` / `scripts/gate-check.mjs`（内部の `audit-issues-flow.mjs`）が `gh` に `execSync`/`execFileSync` で依存しており、`gh` 不在の Claude Code Remote セッションで `audit-issues-flow.mjs` が `spawnSync gh ENOENT` でクラッシュし、gate-check の残り項目の出力ごと失われた（#482 セッション、#489 で追跡）。
