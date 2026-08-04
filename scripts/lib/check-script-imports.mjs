@@ -8,24 +8,62 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-const IMPORT_RE = /import\s+(?:[\s\S]*?\bfrom\s+)?["']([^"']+)["']/g;
+// Each form that can name a module. `[^;]*?` rather than `[\s\S]*?` so a
+// clause cannot bridge a statement boundary to borrow the next statement's
+// `from` — that is what let `export const path = "./x.mjs";` pair up with an
+// unrelated import further down the file.
+const IMPORT_RE = /\bimport\b(?:[^;]*?\bfrom\b)?\s*["']([^"']+)["']/g;
+const EXPORT_FROM_RE = /\bexport\b[^;]*?\bfrom\b\s*["']([^"']+)["']/g;
+const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
 
 /**
- * Extract the specifier of every `import ... from "..."` (or side-effect
- * `import "..."`) statement whose specifier is relative (starts with `./` or
- * `../`). Bare specifiers (npm packages) and `node:` builtins are ignored.
+ * Extract the specifier of every statement that names another module and whose
+ * specifier is relative (starts with `./` or `../`): static `import`,
+ * side-effect `import "..."`, `export ... from`, `export * from`, and dynamic
+ * `import()` given a string literal. Bare specifiers (npm packages) and `node:`
+ * builtins are ignored. A specifier named more than once is returned once.
+ *
+ * A dynamic `import()` whose argument is *not* a literal cannot be resolved
+ * statically at all — see findUnanalyzableImports, which reports those instead.
  * @param {string} source
  * @returns {string[]}
  */
 export function extractRelativeImports(source) {
-	const specifiers = [];
-	for (const match of source.matchAll(IMPORT_RE)) {
-		const specifier = match[1];
-		if (specifier.startsWith("./") || specifier.startsWith("../")) {
-			specifiers.push(specifier);
+	const specifiers = new Set();
+	for (const re of [IMPORT_RE, EXPORT_FROM_RE, DYNAMIC_IMPORT_RE]) {
+		for (const match of source.matchAll(re)) {
+			const specifier = match[1];
+			if (specifier.startsWith("./") || specifier.startsWith("../")) {
+				specifiers.add(specifier);
+			}
 		}
 	}
-	return specifiers;
+	return [...specifiers];
+}
+
+// A dynamic import whose argument does not open with a string literal: an
+// identifier, a template literal, a concatenation. Matched against
+// comment-stripped source, because several scripts in this repo *explain* the
+// construct in prose — including this module's own header. The extraction above
+// deliberately does not strip comments: stripComments drops from `//` to the
+// end of the line, so a URL inside a string would take a real import sharing
+// that line with it. Losing an edge is the worse error there; here it only
+// costs a missed warning.
+const UNANALYZABLE_IMPORT_RE = /\bimport\s*\(\s*(?!["'])/g;
+
+/**
+ * Count the dynamic `import()` calls whose target cannot be determined without
+ * running the code. Callers that reason about a whole module closure need this:
+ * such an edge is invisible to the walk, so a closure-wide claim ("nothing here
+ * touches packages/cli/dist") would quietly stop covering whatever it reaches.
+ *
+ * A count rather than positions, because the offsets would be into the
+ * comment-stripped copy and so would not point where a reader expects.
+ * @param {string} source
+ * @returns {number}
+ */
+export function countUnanalyzableImports(source) {
+	return [...stripComments(source).matchAll(UNANALYZABLE_IMPORT_RE)].length;
 }
 
 /**
@@ -50,9 +88,16 @@ export function findBrokenImports(files) {
 
 /**
  * Walks the relative-import graph starting at entryFile and returns the set
- * of every file reached (entryFile included). Used by dist-independence
- * guards (e.g. scripts/lib/gen-skill-refs.test.mjs, scripts/lib/gen-plugin.test.mjs)
- * that need to inspect a module's whole closure, not just its direct source.
+ * of every file reached (entryFile included). Used by guards (e.g.
+ * scripts/lib/gen-plugin.test.mjs, scripts/lib/gen-plugin-trigger.test.mjs)
+ * that assert something of a module's whole closure, not just its direct
+ * source.
+ *
+ * Throws when a file in the closure contains a dynamic import this walk cannot
+ * follow. Every caller states a property of the *entire* closure, so an edge
+ * the walk misses does not weaken the answer visibly — it shrinks the set the
+ * property is checked against while the assertion still passes. Refusing to
+ * return is the only outcome those callers can act on.
  * @param {string} entryFile - absolute path
  * @returns {Set<string>}
  */
@@ -64,6 +109,12 @@ export function collectModuleClosure(entryFile) {
 		if (seen.has(file)) continue;
 		seen.add(file);
 		const source = readFileSync(file, "utf-8");
+		const unanalyzable = countUnanalyzableImports(source);
+		if (unanalyzable > 0) {
+			throw new Error(
+				`${file}: ${unanalyzable} dynamic import(s) with a non-literal specifier — the module closure cannot be computed statically. Give the import a literal specifier, or drop the closure-wide guard that reads this file.`,
+			);
+		}
 		for (const specifier of extractRelativeImports(source)) {
 			queue.push(resolve(dirname(file), specifier));
 		}
