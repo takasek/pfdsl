@@ -1,7 +1,7 @@
-# `.claude/skills/pfdsl/` は生成物
+# `scripts/skill-template/` は pfdsl スキルの一次ソース
 
-`.claude/skills/pfdsl/` は `make gen-skill`（`scripts/gen-skill.mjs`）で自動生成される。**その配下を直接編集しない。**
-このガード文の一次ソースは `scripts/skill-template/CLAUDE.md` であり、そちらは編集してよい（生成先へバイト同一でコピーされるため、どちらの場所で読んでも同じ本文になる。宛先を「このディレクトリ」と書かずパスで名指しするのはそのため）。
+`plugin/pfdsl/skills/pfdsl/` は `make gen-skill`（`scripts/gen-skill.mjs`）が生成する。**生成先を直接編集しない。**
+`.claude/skills/pfdsl` は生成先への symlink であり（#714）、ブランチ切替時の同期は git が担う。そちらを開いて編集することは生成先を編集することと同じ。
 
 | 編集したい内容 | 一次ソース |
 |---|---|
@@ -12,4 +12,4 @@
 | サンプル | `docs/samples/*.pfdsl` |
 | examples（`references/examples.md`） | `docs/examples/*.pfdsl`（index の要約も本文も frontmatter の `title:` / `description:` 由来） |
 
-編集後は `make gen-skill` を実行する。`.claude/skills/pfdsl` は gitignore 対象のローカル作業コピーのため commit 不要。marketplace 配布用コピー `plugin/pfdsl/skills/pfdsl` は `make gen-plugin` で再生成し、そちらは commit する。
+編集後は `make gen-plugin` を実行し、生成された `plugin/pfdsl/skills/pfdsl` を同じコミットに含める（marketplace 配布物であり追跡対象）。
