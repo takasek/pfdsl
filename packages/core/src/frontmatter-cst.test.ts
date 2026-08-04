@@ -433,6 +433,33 @@ describe("setFrontmatterField", () => {
 		);
 		expect(reparsed.doc.getIn(["artifact", "spec", "status"])).toBe("done");
 	});
+
+	// A block-literal scalar's continuation lines may ALL be blank (a
+	// degenerate but legal YAML shape: no actual content line exists to
+	// derive a safe reindent from). `firstNonBlankContinuation` is then
+	// `undefined` and `realTargetIndent` falls back to `null`, which skips
+	// `renderValueLike`'s reindent entirely — leaving the replacement's
+	// continuation lines at the throwaway skeleton's own indent instead of
+	// the real document's. `fieldValueSplice` must decline this shape
+	// (`{ ok: false }`) and let `setFrontmatterField` fall back to full
+	// re-serialization instead of attempting an unreliable splice.
+	it("falls back to full re-serialization when a block-literal's continuation lines are all blank", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    description: |\n\n\n    status: done\n---\na >> P -> b\n";
+		const out = setFrontmatterField(
+			src,
+			"artifact",
+			"spec",
+			"description",
+			"short.",
+		);
+		const reparsed = parseFrontmatterCst(out as string);
+		expect(reparsed.doc.errors).toHaveLength(0);
+		expect(reparsed.doc.getIn(["artifact", "spec", "description"])).toBe(
+			"short.",
+		);
+		expect(reparsed.doc.getIn(["artifact", "spec", "status"])).toBe("done");
+	});
 });
 
 describe("parseFrontmatterCst yamlText", () => {

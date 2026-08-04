@@ -304,6 +304,17 @@ export function fieldValueSplice(
 		const firstNonBlankContinuation = originalLines
 			.slice(1)
 			.find((line) => line.trim() !== "");
+		// A block scalar's continuation lines may ALL be blank (a legal but
+		// degenerate shape with no actual content) — there is then no line
+		// to derive a safe reindent from, so `realTargetIndent` would be
+		// `null`, which skips `renderValueLike`'s reindent entirely and
+		// leaves the replacement at the throwaway skeleton's own indent
+		// instead of the real document's. Decline the splice and let the
+		// caller fall back to full re-serialization, which computes
+		// indentation structurally instead of copying source text.
+		if (originalLines.length > 1 && firstNonBlankContinuation === undefined) {
+			return { ok: false, reason: "unsupported" };
+		}
 		const realTargetIndent =
 			firstNonBlankContinuation !== undefined
 				? (firstNonBlankContinuation.match(/^[ \t]*/) as RegExpMatchArray)[0]
