@@ -1,9 +1,12 @@
 #!/bin/sh
-pnpm biome check --write packages/ --no-errors-on-unmatched
-
-staged_packages=$(git diff --cached --name-only --diff-filter=d -- packages/)
-if [ -n "$staged_packages" ] && ! git diff --quiet -- $staged_packages; then
-  echo "Biome formatted files. Review changes and re-stage."
+# Biome's own exit code decides the outcome (#723). The previous shape wrote
+# fixes and then inferred failure from "did a staged file change", which a
+# syntax error slips through: biome can't parse the file, so it can't format
+# it, so nothing changes even though biome exits non-zero (#596). --staged
+# scopes the check to the files this commit stages, so the paths live only in
+# biome.json's files.includes.
+if ! pnpm biome check --staged --no-errors-on-unmatched; then
+  echo "Biome check failed on staged files. Run 'make format' to apply the mechanical fixes, resolve what remains, and re-stage."
   exit 1
 fi
 
