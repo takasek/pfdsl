@@ -220,6 +220,9 @@ describe("lintCommitSubjects", () => {
 		assert.equal(results[0].ok, false);
 	});
 
+	// Kept as a statement about this predicate alone. Real merge subjects never
+	// reach it: commitSubjectStep collects with --no-merges, because git writes
+	// those subjects and no author can make them conventional (#690).
 	it("rejects a merge-style subject that lacks a colon", () => {
 		const results = lintCommitSubjects(["Merge pull request #466 from foo/bar"]);
 		assert.equal(results[0].ok, false);
@@ -239,6 +242,12 @@ describe("lintCommitSubjects", () => {
 			[true, false],
 		);
 	});
+
+	it("reports why a subject failed", () => {
+		const results = lintCommitSubjects(["add commit lint"]);
+		assert.equal(results[0].reason, "not Conventional Commits");
+	});
+
 });
 
 describe("wipTransitionDetected", () => {

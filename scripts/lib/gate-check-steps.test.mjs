@@ -8,6 +8,7 @@ import {
 	designRecordStep,
 	sizeDirectionStep,
 	collectSizeDeltas,
+	commitSubjectStep,
 } from "./gate-check-steps.mjs";
 
 /**
@@ -494,5 +495,44 @@ describe("collectSizeDeltas", () => {
 		const deltas = collectSizeDeltas({ exec, base: "main", changedFiles: [".pfdsl/bindings/new.pfdsl"] });
 		assert.equal(deltas[0].beforeBytes, 0);
 		assert.equal(deltas[0].afterBytes, 6);
+	});
+});
+
+describe("commitSubjectStep", () => {
+	it("excludes merge commits from the collected range (#690)", () => {
+		const { exec, calls } = fakeExec({ "git log": { out: "feat(cli): add a thing\n" } });
+		const result = commitSubjectStep({ exec, base: "main" });
+		const logCall = calls.find((c) => c.startsWith("git log"));
+		assert.ok(
+			logCall?.includes("--no-merges"),
+			`expected --no-merges in the log call, got: ${logCall}`,
+		);
+		assert.equal(result.status, "PASS");
+	});
+
+	it("reads the range from origin/<base> to HEAD", () => {
+		const { exec, calls } = fakeExec({ "git log": { out: "feat(cli): a\n" } });
+		commitSubjectStep({ exec, base: "release" });
+		assert.ok(calls.some((c) => c.includes("origin/release..HEAD")));
+	});
+
+	it("SKIPs when the range holds no non-merge commits", () => {
+		const { exec } = fakeExec({ "git log": { out: "\n" } });
+		const result = commitSubjectStep({ exec, base: "main" });
+		assert.equal(result.status, "SKIP");
+	});
+
+	it("FAILs when git log fails", () => {
+		const { exec } = fakeExec({ "git log": { ok: false, out: "fatal: bad revision" } });
+		const result = commitSubjectStep({ exec, base: "main" });
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /bad revision/);
+	});
+
+	it("FAILs on a non-Conventional subject and names it", () => {
+		const { exec } = fakeExec({ "git log": { out: "feat(cli): ok\nadd a thing\n" } });
+		const result = commitSubjectStep({ exec, base: "main" });
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /add a thing/);
 	});
 });

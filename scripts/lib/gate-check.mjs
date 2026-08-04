@@ -167,10 +167,14 @@ const CONVENTIONAL_COMMIT_PATTERN =
  * Lint commit subjects against the Conventional Commits format (message
  * format only — commit granularity is a judgment call left to code review).
  * @param {string[]} subjects
- * @returns {Array<{subject: string, ok: boolean}>}
+ * @returns {Array<{subject: string, ok: boolean, reason?: string}>}
  */
 export function lintCommitSubjects(subjects) {
-	return subjects.map((subject) => ({ subject, ok: CONVENTIONAL_COMMIT_PATTERN.test(subject) }));
+	return subjects.map((subject) =>
+		CONVENTIONAL_COMMIT_PATTERN.test(subject)
+			? { subject, ok: true }
+			: { subject, ok: false, reason: "not Conventional Commits" },
+	);
 }
 
 /**

@@ -17,7 +17,6 @@ import {
 	formatGateTable,
 	GATE_CHECKLIST_SOURCE_PATH,
 	VSCODE_EXT_TRIGGER,
-	lintCommitSubjects,
 	parseAuditTerminals,
 	parseAuditExternalTerminals,
 	diffNewTerminals,
@@ -32,6 +31,7 @@ import {
 	designRecordStep,
 	sizeDirectionStep,
 	collectSizeDeltas,
+	commitSubjectStep,
 } from "./lib/gate-check-steps.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
@@ -155,26 +155,9 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 	});
 }
 
-// 8. commit subject lint (Conventional Commits message format; granularity stays MANUAL)
-{
-	const subjectsOut = exec("git", ["log", `origin/${base}..HEAD`, "--format=%s"]);
-	if (!subjectsOut.ok) {
-		results.push({ name: "commit subject lint", status: "FAIL", detail: subjectsOut.out.trim() });
-	} else {
-		const subjects = subjectsOut.out.trim().split("\n").filter(Boolean);
-		if (subjects.length === 0) {
-			results.push({ name: "commit subject lint", status: "SKIP", detail: "no commits in range" });
-		} else {
-			const linted = lintCommitSubjects(subjects);
-			const failed = linted.filter((r) => !r.ok);
-			results.push({
-				name: "commit subject lint",
-				status: failed.length === 0 ? "PASS" : "FAIL",
-				detail: failed.length === 0 ? `${subjects.length} commit(s)` : `not Conventional Commits: ${failed.map((r) => r.subject).join(", ")}`,
-			});
-		}
-	}
-}
+// 8. commit subject lint (Conventional Commits message format and language;
+// granularity stays MANUAL)
+results.push(commitSubjectStep({ exec, base }));
 
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }));
