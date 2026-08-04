@@ -38,7 +38,7 @@
    - [ ] 出力 artifact の status を更新した（タイミングは companion の規約が最優先。無ければプロトコル4のデフォルト — 着手時に wip・完了コミットと同時に done）
    - [ ] 知見を `.pfdsl/workflow.pfdsl` の sibling companion の振り分け手続きに従って振り分けた
    - [ ] 実行中に発見した新プロセス・成果物を `.pfdsl/roadmap.pfdsl` に追記した（消費者を明示できないものは作らない）
-   - [ ] 変更した `.pfdsl` に対して `pfdsl graph io <file> --json` を実行し、`terminals`（消費者が疑わしい終端）と `externalStakeholders` 宣言による終端を確認した（後者を別枠 `externalTerminals` として返す CLI ではそのキーを、返さない版では `meta get <file> <id,...> externalStakeholders` を使う。後者は `terminals` から外れるため、見に行かないと監査対象が丸ごと落ちる）。今サイクルの出力 artifact が `terminals` に現れ、かつ手段（仕様・設計・計画・提案）なら、それを消費する後続プロセスがグラフに在るか確認した。無ければ todo プレースホルダで登録した（後続門番、プロトコル5(b)。真の納品物のみ終端を許す）。宣言による終端に現れる場合は、その宣言が妥当か（手段成果物に誤って `externalStakeholders` を付けていないか）を確認した。companion がゲート集約チェッカーを指す場合はその差分報告を使ってよい
+   - [ ] 変更した `.pfdsl` に対して `pfdsl graph io <file> --json` を実行し、`terminals`（消費者が疑わしい終端）と `externalTerminals`（`externalStakeholders` 宣言による終端）を確認した。後者は `terminals` から外れるため、見に行かないと監査対象が丸ごと落ちる。今サイクルの出力 artifact が `terminals` に現れ、かつ手段（仕様・設計・計画・提案）なら、それを消費する後続プロセスがグラフに在るか確認した。無ければ todo プレースホルダで登録した（後続門番、プロトコル5(b)。真の納品物のみ終端を許す）。`externalTerminals` に現れる場合は、その宣言が妥当か（手段成果物に誤って `externalStakeholders` を付けていないか）を確認した。companion がゲート集約チェッカーを指す場合はその差分報告を使ってよい
    - [ ] 変換コンポーネントを追加・変更・削除した場合、それをモデル化している採用済み PFD（`.pfdsl/runtime-pipeline.pfdsl` または `.pfdsl/workflow.pfdsl` の該当箇所）に反映した（該当なしも明示。runtime-pipeline.pfdsl 未採用は自動的に N/A にならない — workflow.pfdsl 側を確認）。影響範囲の特定には `pfdsl graph impact <file> <id>`（下流の消費者全て）・`graph depends-on <file> <id>`（上流の生産者全て）が使える — 変更対象ノードを grep で手繰るより網羅的
    - [ ] 作業中に偶発的に見つけたスコープ外の既存問題（バグ等）を起票した（ユーザーの指摘を待たない）
    - [ ] 否定案は採用案と競合するか — 「何もしない」「現状維持」に帰着する否定案は、採用案と別クラスの実装案に置き換える（前提の否定が対策の有無を分けるだけで、採用した手段の対立仮説になっていない形の検出）

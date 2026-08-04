@@ -88,11 +88,11 @@ statusStyles:
 
 ## CLI
 
-**Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.0.25**; the commands below use the grouped `graph`/`meta`/`status` surface that older releases lack, so an outdated CLI fails with `unknown command` rather than an obvious version error. Run `pfdsl --version` once at the start of the session.
+**Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.0.25**. An older release answers these commands rather than rejecting them, with less in the answer — so skipping this check surfaces as an audit that quietly verified less, never as an error. Run `pfdsl --version` once at the start of the session.
 
 - **`pfdsl` not found?** Check `package.json` first — if the repo already depends on `@pfdsl/cli`, the CLI is there and every command below runs as `npx pfdsl <cmd>`. Confirm with `npx pfdsl --version`. Do not treat a bare `pfdsl` that fails to resolve as "missing" until this branch is ruled out.
-- **Genuinely absent, or below `0.0.25`?** Do **not** run the commands below — ask the user to install or update it with `npm install -g @pfdsl/cli@latest`, and continue only after they confirm.
-- **Cannot install globally?** Substitute a version-pinned `npx @pfdsl/cli@0.0.25 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic.
+- **Genuinely absent, or below `0.0.25`?** Do **not** run the commands below against it. Substitute a version-pinned `npx @pfdsl/cli@0.0.25 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic. This branch always works and needs nobody's permission, so take it rather than stalling.
+- **Want it fixed properly?** Ask the user to install or update with `npm install -g @pfdsl/cli@latest`. Worth raising, but do not block on it — the pinned `npx` above already lets the session proceed.
 
 ```bash
 pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
@@ -106,7 +106,7 @@ pfdsl status ready|blocked|list|gaps   # Planning queries derived from artifact 
 pfdsl help   # Show this help
 ```
 
-Full flag reference: `pfdsl help`. If a command above is still reported as `unknown command` after the preflight, the installed CLI is older than `0.0.25` — update via `npm install -g @pfdsl/cli@latest` (or run `npx @pfdsl/cli@latest help` to inspect the current published surface).
+Full flag reference: `pfdsl help`. If a command above is reported as `unknown command`, the installed CLI predates that command entirely — update via `npm install -g @pfdsl/cli@latest` (or run `npx @pfdsl/cli@latest help` to inspect the current published surface).
 
 ## Key constraints
 
@@ -127,8 +127,8 @@ PFD はタスクリストではなく成果物の変換グラフ。
 
 - **読解**: 大きい PFD は全読しない。`graph io`（外部入力と終端 artifact）で輪郭を掴み、対象ノードの frontmatter だけ読む。roadmap では `status ready --best` が着手可能プロセスを返す
 - **書いた後の点検**: 同じ `graph io` で、終端が全て意図した納品物か、外部入力に生成元を持つべきものが混ざっていないかを確認。あわせて各プロセスが「この入力だけで出力を作れるか」を見る。`graph orphans` は predecessor・successor どちらも持たないノード（配線忘れ）を検出する — graph io の外部入力・終端はそれぞれ片側のみの欠落なので、両方欠落した本当に浮いたノードは別途これで見る。**`(group)` と付いた行は読み飛ばす**: group はエッジに参加しない種類のノードなので、宣言してあれば必ず全件ここに出る（`graph stats` の fan-in/fan-out が 0 の行として現れるのも同じ理由）
-- **`terminal artifacts:` が空でもグラフ破損ではない**: `externalStakeholders` を宣言した artifact は外部消費者を持つとみなされ、終端一覧から外れる。最終納品物にこのフィールドを付けると終端行は空になる — グラフが壊れたのではなく、監査対象が別枠へ移っただけ。別枠を報告する CLI ではそれが `external-stakeholder terminals:` の行（`--json` では `externalTerminals` キー）に出る。出ない版では `meta get <file> <id,...> externalStakeholders` で宣言済みの artifact を引いて同じ点検をする。いずれの場合も点検の中身は「そのフィールドが妥当か（手段成果物に誤って付けていないか）」
-- roadmap と flow ファイルが併存する構成では `status gaps <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する。**flow ファイルに status を書いていなければこの検査は何も見ずに緑になる** — flow 種別は通常 status を書かないので、それが既定の状態である。対象0件をそう言って区別する CLI もあるが、区別せず合格文だけを出す版もあるため、緑を根拠に使う前に対象 flow ファイルが status を持つかを自分で確かめる。roadmap 内の artifact を status で絞り込む場合は `status list <file> --status <s[,s...]>`、着手不可なプロセスがなぜ止まっているか見るなら `status blocked <file>`
+- **`terminal artifacts:` が空でもグラフ破損ではない**: `externalStakeholders` を宣言した artifact は外部消費者を持つとみなされ、終端一覧から外れる。最終納品物にこのフィールドを付けると終端行は空になる — グラフが壊れたのではなく、監査対象が `external-stakeholder terminals:` の行（`--json` では `externalTerminals` キー）へ移っただけ。点検の中身は「そのフィールドが妥当か（手段成果物に誤って付けていないか）」
+- roadmap と flow ファイルが併存する構成では `status gaps <roadmap> <flow>...` で flow 側 todo artifact と roadmap の整合も点検する。**flow ファイルに status を書いていなければこの検査は何も見ずに緑になる** — flow 種別は通常 status を書かないので、それが既定の状態である。対象0件のときは CLI 自身が「何も検証しなかった」と言うので、合格文と読み違えない。roadmap 内の artifact を status で絞り込む場合は `status list <file> --status <s[,s...]>`、着手不可なプロセスがなぜ止まっているか見るなら `status blocked <file>`
 - `location:` を書いたら `meta check-links <file>` で参照先ファイルの実在を確認できる（URL・glob は自動的にスキップされる）
 - 図の視覚確認が必要なときだけ `render --format dot` を使う（大きい図では dot 全読より graph io が安い）
 - ノードの変更・削除前の影響範囲調査は `graph impact <file> <id>`（下流の全消費者）・`graph depends-on <file> <id>`（上流の全生産者）・`graph neighbors <file> <id>`（直接の前後のみ）を使う。grep での手繰りより網羅的
