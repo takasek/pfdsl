@@ -91,8 +91,8 @@ statusStyles:
 **Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.0.25**. An older release still accepts every command below — it answers them differently, and quietly: `graph io` omits the `external-stakeholder terminals:` line entirely, and `status gaps` reports a pass where a newer one says it verified nothing. Both read as a clean result, so the version gap surfaces as an audit that silently checked less than you think, never as an error. Run `pfdsl --version` once at the start of the session.
 
 - **`pfdsl` not found?** Check `package.json` first — if the repo already depends on `@pfdsl/cli`, the CLI is there and every command below runs as `npx pfdsl <cmd>`. Confirm with `npx pfdsl --version`. Do not treat a bare `pfdsl` that fails to resolve as "missing" until this branch is ruled out.
-- **Genuinely absent, or below `0.0.25`?** Do **not** run the commands below — ask the user to install or update it with `npm install -g @pfdsl/cli@latest`, and continue only after they confirm.
-- **Cannot install globally?** Substitute a version-pinned `npx @pfdsl/cli@0.0.25 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic.
+- **Genuinely absent, or below `0.0.25`?** Do **not** run the commands below against it. Substitute a version-pinned `npx @pfdsl/cli@0.0.25 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic. This branch always works and needs nobody's permission, so take it rather than stalling.
+- **Want it fixed properly?** Ask the user to install or update with `npm install -g @pfdsl/cli@latest`. Worth raising, but do not block on it — the pinned `npx` above already lets the session proceed.
 
 ```bash
 pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
