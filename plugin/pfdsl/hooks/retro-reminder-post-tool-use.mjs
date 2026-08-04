@@ -44,6 +44,9 @@ export function buildHookOutput() {
  * the two verbatim answers "no" whenever the invocation path crosses a symlink
  * — `/tmp` on macOS, or a plugin cache reached through one. The hook only ever
  * prints an advisory, so that mismatch disables it without a word.
+ *
+ * Deliberately a copy of scripts/lib/cli-entrypoint.mjs rather than an import:
+ * this file ships as a hook and must not reach outside hooks/ (#707).
  */
 export function isCliEntrypoint(metaUrl, argv1, { realpath = realpathSync } = {}) {
 	if (!argv1) return false;

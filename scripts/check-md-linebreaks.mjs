@@ -19,6 +19,7 @@
  */
 
 import { readFileSync } from 'fs';
+import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 import { git } from "./lib/run-exec.mjs";
 import { checkFile as checkFileText } from "./lib/md-linebreaks.mjs";
 import { runMdLinebreaksCheck } from "./lib/md-linebreaks-steps.mjs";
@@ -40,7 +41,7 @@ export function formatViolation(v) {
 // CLI mode: `node scripts/check-md-linebreaks.mjs [files...]`. Guarded so
 // scripts/lib/md-write-check.mjs can import checkFile/formatViolation
 // in-process without spawning this as a subprocess.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
   const args = process.argv.slice(2);
   const listFiles = () => git(["ls-files", "*.md"]).trim().split('\n').filter(Boolean);
 

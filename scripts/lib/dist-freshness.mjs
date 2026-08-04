@@ -5,6 +5,7 @@
 // build from before a source change (see #450).
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { isCliEntrypoint } from "./cli-entrypoint.mjs";
 
 function newestMtimeUnder(dir) {
 	let newest = 0;
@@ -29,7 +30,7 @@ export function isDistStale(distFile) {
 }
 
 // CLI mode: exit 0 if fresh, 1 if stale/absent. Usage: node dist-freshness.mjs <distFile>
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	const distFile = process.argv[2];
 	process.exit(isDistStale(distFile) ? 1 : 0);
 }
