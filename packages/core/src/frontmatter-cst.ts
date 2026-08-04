@@ -485,8 +485,11 @@ function childIndentStep(
  * entry from nothing rather than edit an existing one (`fieldValueSplice`
  * handles the latter). Returns `{ ok: false, reason: "unsupported" }` when
  * there is no sibling entry to anchor indentation on (an empty block-style
- * `kind:` section, or an entirely empty document) — callers fall back to
- * full re-serialization for that rare case.
+ * `kind:` section, or an entirely empty document), or when the anchoring
+ * sibling's `Pair.value` is a raw `null` (an explicit-key entry with no
+ * value line, e.g. `? b` — valid YAML, but there is no `Node` range to
+ * anchor on) — callers fall back to full re-serialization for these rare
+ * cases.
  */
 export function newEntrySplice(
 	yamlText: string,
@@ -502,6 +505,11 @@ export function newEntrySplice(
 
 	if (isMap(kindNode) && kindNode.items.length > 0) {
 		const last = kindNode.items[kindNode.items.length - 1]!;
+		// Mirrors fieldValueSplice's null-value guard (162485a): the anchoring
+		// sibling can be an explicit-key entry (`? b`, no value line) — legal
+		// YAML, but `Pair.value` is a raw `null`, not a `Node` to dereference
+		// `.range` on.
+		if (last.value === null) return { ok: false, reason: "unsupported" };
 		const insertAt = (last.value as Node).range![1];
 		if (kindNode.flow) {
 			return {
@@ -556,6 +564,8 @@ export function newEntrySplice(
 		return { ok: false, reason: "unsupported" };
 	}
 	const last = rootMap.items[rootMap.items.length - 1]!;
+	// Same guard as above, for the root-map anchor sibling.
+	if (last.value === null) return { ok: false, reason: "unsupported" };
 	const insertAt = (last.value as Node).range![1];
 	const kindKey = renderKey(kind);
 	const content =

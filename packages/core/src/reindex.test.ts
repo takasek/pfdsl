@@ -291,6 +291,33 @@ a >> p -> b
 		expect(output).toBe(src);
 	});
 
+	// newEntrySplice (used here for a brand-new node with no frontmatter
+	// entry yet, e.g. `c` below) anchors on the kind section's last existing
+	// sibling. When that sibling is an explicit-key entry (`? b`, no value
+	// line — `Pair.value` is genuinely `null`), the anchor dereference used
+	// to crash with a TypeError (final-review I3); reindex must instead take
+	// its existing full-re-serialize fallback, same as any other
+	// newEntrySplice-declined shape.
+	it("falls back to full re-serialization when the anchor sibling is explicit-key null", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  a:",
+			"    label: A",
+			"  ? b",
+			"---",
+			"a >> p -> c",
+			"",
+		].join("\n");
+		expect(() => reindex(src, { renumber: true })).not.toThrow();
+		const { output, changes, diagnostics } = reindex(src, { renumber: true });
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(changes.some((c) => c.id === "c")).toBe(true);
+		const idx = indices(output);
+		expect(idx.artifact.a).toBe(1);
+		expect(idx.artifact.c).toBe(2);
+	});
+
 	it("keeps a CRLF source on CRLF (#644)", () => {
 		const src = [
 			"---",

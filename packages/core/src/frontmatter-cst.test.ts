@@ -722,4 +722,47 @@ describe("newEntrySplice", () => {
 		);
 		expect(result).toEqual({ ok: false, reason: "unsupported" });
 	});
+
+	// Mirror of fieldValueSplice's null-value guard (162485a): the last
+	// sibling anchoring the insertion position can itself be an explicit-key
+	// entry (`? b`, no value line) — legal YAML, `Pair.value` is genuinely
+	// `null` at runtime. newEntrySplice had the same `(last.value as
+	// Node).range` dereference pattern at two call sites but never got the
+	// guard, so both crashed with `TypeError: Cannot read properties of
+	// null (reading 'range')` (final-review I3).
+	it("returns unsupported instead of crashing when the kind section's last sibling is explicit-key null", () => {
+		const yamlText = "artifact:\n  a:\n    label: A\n  ? b";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		expect(() =>
+			newEntrySplice(yamlText, doc, "artifact", "c", "label", "c", "\n"),
+		).not.toThrow();
+		const result = newEntrySplice(
+			yamlText,
+			doc,
+			"artifact",
+			"c",
+			"label",
+			"c",
+			"\n",
+		);
+		expect(result).toEqual({ ok: false, reason: "unsupported" });
+	});
+
+	it("returns unsupported instead of crashing when the root map's last sibling is explicit-key null (kind section doesn't exist yet)", () => {
+		const yamlText = "other:\n  x: 1\n? bar";
+		const doc = parseDocument(yamlText) as unknown as import("yaml").Document;
+		expect(() =>
+			newEntrySplice(yamlText, doc, "artifact", "c", "label", "c", "\n"),
+		).not.toThrow();
+		const result = newEntrySplice(
+			yamlText,
+			doc,
+			"artifact",
+			"c",
+			"label",
+			"c",
+			"\n",
+		);
+		expect(result).toEqual({ ok: false, reason: "unsupported" });
+	});
 });

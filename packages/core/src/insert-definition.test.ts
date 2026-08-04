@@ -137,6 +137,30 @@ a >> p -> b
 		expect(inserted).toBe(false);
 	});
 
+	// newEntrySplice anchors the new entry's insertion position on the
+	// section's last existing sibling. When that sibling is an explicit-key
+	// entry (`? b`, no value line — legal YAML, `Pair.value` is genuinely
+	// `null`), the anchor dereference used to crash with a TypeError
+	// (final-review I3); it must instead fall back to full re-serialization,
+	// same as the other unsupported shapes above.
+	it("falls back to full re-serialization when the section's last sibling is explicit-key null", () => {
+		const src = `---
+artifact:
+  a:
+    label: A
+  ? b
+---
+a >> p -> c
+`;
+		expect(() => insertDefinition(src, "artifact", "c")).not.toThrow();
+		const { output, inserted } = insertDefinition(src, "artifact", "c");
+		expect(inserted).toBe(true);
+		const { diagnostics, frontmatter } = analyze(`${output}a >> p -> c\n`);
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(frontmatter?.artifact?.c?.label).toBe("c");
+		expect(frontmatter?.artifact?.a?.label).toBe("A");
+	});
+
 	// The block returned here is spliced into the caller's document, so it has
 	// to arrive in that document's line ending or the splice mixes the two.
 	it("emits a CRLF block for a CRLF source (#644)", () => {
