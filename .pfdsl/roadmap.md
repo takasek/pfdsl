@@ -46,6 +46,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **複数方針を列挙した issue の着手前選択記録**: issue 本文が対応方針を複数案で提示し最終選択を明記していない場合、実装着手前に選んだ方針を issue コメントに一言残す。選択を記録せず着手すると、issue 本文だけを読んだ第三者が「なぜその方針になったか」を実装差分からしか追えなくなる。
 
+**配布層の散文を変更した回**: push 前に `make check-docs` を回す。終端ゲートが回す `.md` 検査は `check-md-linebreaks` だけで `check-distributed-prose` を含まないため、bare な issue 参照のように採用リポで解決できない記述はゲート緑のまま CI で落ちる。機械化は #721。
+
 汎用ゲート（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、**マージ時にのみ**:
 
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
