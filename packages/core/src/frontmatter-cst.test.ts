@@ -368,9 +368,9 @@ describe("setFrontmatterField", () => {
 			"description",
 			"short.",
 		);
-		expect(out).toContain("description: |-\n      short.\n");
-		expect(out).not.toContain("line one.");
-		expect(out).toContain("status: done");
+		expect(out).toBe(
+			"---\nartifact:\n  spec:\n    description: |-\n      short.\n    status: done\n---\na >> P -> b\n",
+		);
 	});
 
 	// Same as above but for block-folded (`>`) style.
@@ -384,9 +384,9 @@ describe("setFrontmatterField", () => {
 			"description",
 			"short.",
 		);
-		expect(out).toContain("description: >-\n      short.\n");
-		expect(out).not.toContain("line one.");
-		expect(out).toContain("status: done");
+		expect(out).toBe(
+			"---\nartifact:\n  spec:\n    description: >-\n      short.\n    status: done\n---\na >> P -> b\n",
+		);
 	});
 
 	// Regression guard: an ordinary single-line plain scalar's replacement
@@ -401,9 +401,37 @@ describe("setFrontmatterField", () => {
 			"description",
 			"new value",
 		);
-		expect(out).toContain("description: new value\n");
-		expect(out).not.toContain("old value");
-		expect(out).toContain("status: done");
+		expect(out).toBe(
+			"---\nartifact:\n  spec:\n    description: new value\n    status: done\n---\na >> P -> b\n",
+		);
+	});
+
+	// A block-literal scalar's first content line may legally be blank
+	// (a leading blank line inside `|` is valid YAML). The reindent lookup
+	// must skip that blank line and derive `realTargetIndent` from the first
+	// non-blank continuation line instead of hardcoding index 1 — otherwise
+	// it derives an empty indent, and the replacement's continuation lines
+	// come out unindented: invalid YAML on re-parse
+	// (MULTILINE_IMPLICIT_KEY).
+	it("derives block-literal reindent from the first non-blank continuation line when the first line is blank", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    description: |\n\n      line two.\n      line three.\n    status: done\n---\na >> P -> b\n";
+		const out = setFrontmatterField(
+			src,
+			"artifact",
+			"spec",
+			"description",
+			"short.",
+		);
+		expect(out).toBe(
+			"---\nartifact:\n  spec:\n    description: |-\n      short.\n    status: done\n---\na >> P -> b\n",
+		);
+		const reparsed = parseFrontmatterCst(out as string);
+		expect(reparsed.doc.errors).toHaveLength(0);
+		expect(reparsed.doc.getIn(["artifact", "spec", "description"])).toBe(
+			"short.",
+		);
+		expect(reparsed.doc.getIn(["artifact", "spec", "status"])).toBe("done");
 	});
 });
 

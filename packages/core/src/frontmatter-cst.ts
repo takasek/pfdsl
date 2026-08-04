@@ -297,9 +297,16 @@ export function fieldValueSplice(
 		// styles that a fresh plain rendering would otherwise flatten away.
 		const originalValueText = yamlText.slice(start, end);
 		const originalLines = originalValueText.split("\n");
+		// A block scalar's first content line may legally be blank (a leading
+		// blank line inside `|`/`>` is valid YAML), so a hardcoded index-1
+		// lookup can land on an empty line and derive an empty indent. Skip
+		// blank lines and use the first non-blank continuation line instead.
+		const firstNonBlankContinuation = originalLines
+			.slice(1)
+			.find((line) => line.trim() !== "");
 		const realTargetIndent =
-			originalLines.length > 1
-				? ((originalLines[1] as string).match(/^[ \t]*/) as RegExpMatchArray)[0]
+			firstNonBlankContinuation !== undefined
+				? (firstNonBlankContinuation.match(/^[ \t]*/) as RegExpMatchArray)[0]
 				: null;
 		let replacement = renderValueLike(
 			originalValueText,
