@@ -1,8 +1,7 @@
-// Shared --out handling for the skill generators (gen-skill.mjs,
-// gen-skill-refs.mjs). Parses the flag and enforces that the path contains
-// '.claude' or 'skills' as a path component, so a typo'd --out can't clobber
-// an arbitrary directory. Both entry points go through this so the --out
-// contract can't drift between them.
+// --out handling for the skill generator. Parses the flag and enforces that
+// the path contains '.claude' or 'skills' as a path component, so a typo'd
+// --out can't clobber an arbitrary directory. Shared by two entry points until
+// #668 removed gen-skill-refs.mjs; gen-skill.mjs is now the only caller.
 
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";

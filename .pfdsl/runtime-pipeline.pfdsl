@@ -330,7 +330,7 @@ process:
     tags: [ b ]
   gen_skill:
     label: スキル生成
-    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）からリポ内 pfdsl スキルを再生成する。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/gen-skill-refs.mjs に切り出し済み。SKILL.md（pfdsl help 埋め込み）のみ dist 必須のまま（#586）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制する"
+    description: "スキル生成ソース（skill-template/spec/samples/examples/review-perspectives/skill dirs 等）からリポ内 pfdsl スキルを再生成する。出力のうち references/*.md（spec/samples/examples 等）は packages/cli/dist に触れない scripts/lib/gen-skill-refs.mjs に切り出し済み（同モジュールの単体 CLI エントリは呼び出し元を失って #668 で削除、dist 非依存の手動再生成は gen-plugin-dist-independent.mjs が担う）。SKILL.md（pfdsl help 埋め込み）のみ dist 必須のまま（#586）。identity は gen_plugin が内包する形で check-gen-plugin.yml が全 PR で強制する"
     command: make gen-skill
     location: ../scripts/gen-skill.mjs
     tags: [ gen ]

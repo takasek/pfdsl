@@ -4,7 +4,7 @@
 // `pfdsl help` output — see scripts/gen-skill.mjs). Never touches dist or
 // spawns a child process, so scripts/pre-commit can drift-check this bulk
 // even when dist is missing/stale (#593, same split rationale as
-// scripts/gen-skill-refs.mjs in #586).
+// scripts/lib/gen-skill-refs.mjs in #586).
 // Run: node scripts/gen-plugin-dist-independent.mjs
 
 import { dirname, resolve } from "node:path";
