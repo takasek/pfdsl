@@ -50,3 +50,8 @@ const result = await runCycleStatus({
 });
 
 console.log(JSON.stringify(result, null, 2));
+
+// Non-zero so a caller that only reads the exit status still stops: the payload
+// carries no judgments in this case, and an old tree's preflight is exactly the
+// output a reader mistakes for "checked, nothing wrong" (#716).
+if (result.staleTree) process.exit(1);

@@ -48,6 +48,25 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 		behindBaseError = e.message;
 	}
 
+	// A tree behind base serves this script's own older version, so the output
+	// would describe which checks that version has — and a check absent there is
+	// indistinguishable from one that ran and found nothing (#716). Withhold
+	// every judgment rather than annotate them: annotation leaves the reader the
+	// same interpretation that already failed once.
+	if (behindBase > 0) {
+		return {
+			fetched,
+			behindBase,
+			staleTree: {
+				base,
+				message:
+					`This tree is ${behindBase} commits behind origin/${base}, so this preflight ran from that older version of itself. ` +
+					"Its judgments — including which checks exist at all — would describe the old tree, not this cycle. " +
+					`Start the cycle's branch from origin/${base} (git switch -c <branch> origin/${base}) and re-run.`,
+			},
+		};
+	}
+
 	let openFlowSyncPRs = [];
 	let otherOpenPRs = [];
 	let prError = null;

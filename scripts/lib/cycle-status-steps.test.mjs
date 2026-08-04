@@ -69,6 +69,35 @@ describe("runCycleStatus", () => {
 		assert.equal(result.behindBaseError, undefined);
 	});
 
+	it("refuses to produce judgments when the tree is behind base", async () => {
+		const calls = [];
+		const ghCalls = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (file, args) => {
+					calls.push([file, args]);
+					if (args.includes("log")) return "abc commit one\ndef commit two\n";
+					return readyJsonOk("proc_a");
+				},
+				execGh: async (args) => {
+					ghCalls.push(args);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.behindBase, 2);
+		assert.equal(result.staleTree.base, "main");
+		assert.match(result.staleTree.message, /2 commits behind origin\/main/);
+		// Every judgment is withheld, not merely annotated: an old tree's output
+		// cannot say whether a check ran and passed or does not exist there (#716).
+		assert.equal(result.ready, undefined);
+		assert.equal(result.best, undefined);
+		assert.equal(result.designUnsettledFor, undefined);
+		assert.equal(result.gateCheckCommand, undefined);
+		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
+		assert.deepEqual(ghCalls, []);
+	});
+
 	it("sets prError and empty PR lists when gh pr list fails", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
