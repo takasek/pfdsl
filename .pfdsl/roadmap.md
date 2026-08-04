@@ -124,6 +124,23 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
 - [ ] `node scripts/pfdsl/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する。`gate-check.mjs` 実行時はその一部として自動実行される）
 
+**バージョン artifact を起こす契機**: 版を表す artifact（`spec_vXXX` / `cli_release_*` / `ext_vXXXX`）を roadmap に置く契機は次の2つに限る。
+どちらにも当たらない版は、実体が公開されていても roadmap には起こさない。
+
+1. **その版が後続プロセスをゲートする** — 版が上がらないと着手できないプロセスが roadmap にある
+2. **その版自体が納品物であり、roadmap 管理下の実装 artifact を消費する publish プロセスの出力である**
+
+spec 版は手段成果物であって納品物ではないため、1 にしか該当しえない。
+つまり spec の版が上がったこと自体は artifact を起こす理由にならない。
+npm・Marketplace の公開版は 2 に該当するが、roadmap 管理下の実装 artifact を含まない版（`flow:exempt` の修正のみで出た版等）は起こさない。
+
+この規定の帰結として、**roadmap の版チェーンが実体の現行版より古いことは、それ自体では欠陥ではない**。
+公開された版の履歴の一次情報は roadmap ではなく、spec は `docs/spec/spec-history.md`（`scripts/check-spec-history.mjs` が release 前に機械検査する）、npm は npm レジストリ、extension は Marketplace である。
+artifact の `criteria` が図に存在しない版番号に言及していても同じで（例: `boundary_feedback` の「spec v0.0.12 に統合済み」）、その版番号は上記の一次情報を指す外部参照として読む。
+`revises:` チェーンは起こした版どうしを繋ぐものであり、飛んだ版番号の存在は線形性の違反にならない。
+
+判定の実測は `pfdsl status blocked` / `status ready` で行う（版待ちのプロセスが実在するかを見る。「そのうち要るはず」で起こさない）。
+
 **spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact（spec_v007 / spec_v008 / spec_v009 等）は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
 
 **spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際は、前バージョンの spec artifact への `revises:` を新バージョン artifact に設定する（例: `spec_v0011.revises: spec_v0010`）。`>>?` フィードバック入力は使わない — V011（strict mode の feedback 到達性検査）は `>>?` を前方到達可能な修正ループとして検査するが、版の前後関係はそれに当たらず誤検出になる（#480 で `spec_v006 >>? integrate_spec` 等を `revises:` に置き換えて解消）。
@@ -131,5 +148,9 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 **`integrate_spec_vXXX` の入力列挙**: `integrate_spec_vXXX` の通常入力には、そのバージョンで spec に統合される全ての変更を引き起こした artifact を列挙する。「実装が完了した artifact のうち、未統合のもの」を漏らさず書く（例: basepath と ready_cmd の両方が v0.0.10 の変更点なら `[basepath, ready_cmd] >> integrate_spec_v0010`）。
 
 **publish_cli_vXXXX の入力列挙**: そのバージョンに含まれる全実装 artifact を入力として列挙する。実装 artifact の追加と同一サイクルで publish の入力集合も更新する（後回しにすると artifact が publish チェーンから切れる）。
+
+**1公開イベント = 1 リリース artifact**: 計画段階で複数のリリースに分けていた実装群が結果的に1回の公開にまとまった場合、publish プロセスとリリース artifact も1つに統合する。
+同じ版番号を持つ artifact を複数残すと、図が実在しない公開イベントを主張することになる。
+統合したノードの `description` には、計画上いくつのリリースだったかを書く（統合の事実が失われると、入力集合が肥大しただけに見える）。
 
 **レビュー findings の残余系 artifact（`i300_spec_editorial` 等）**: `description` に個別 finding 番号（例: F1, F2）を issue 番号付きで除外列挙している場合、その finding が個別 issue として切り出される都度、切り出し先 issue の PR と同一コミットで除外列挙に追記する。一次情報（レビュー findings 表）との二重管理になるため、追記漏れは列挙ドリフトの原因になる。

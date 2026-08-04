@@ -47,19 +47,19 @@ artifact:
     label: "CLIリリース: 初回公開ベースライン（npm v0.0.9）"
     description: "後続実装群の入力ベースとなる最初の公開版"
     status: done
-    criteria: npm show @pfdsl/cli version が 0.0.9 を返す
+    criteria: npm view @pfdsl/cli versions に 0.0.9 が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_release_ux_flags:
     label: "CLIリリース: DXフラグ群（npm v0.0.10）"
     description: "#172 --version / #177 per-command --help / #178 stdin / #180 --no-color / #181 --json 対応を含む"
     status: done
-    criteria: npm show @pfdsl/cli version が 0.0.10 を返す
+    criteria: npm view @pfdsl/cli versions に 0.0.10 が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_release_index_sort:
     label: "CLIリリース: index/reindex + node sort（npm v0.0.11）"
     description: "#219 W002 診断行番号修正 / #221 index+reindex / #236 node sort を含む（#216-218 hover jump 等は extension 側 ext_v0014 への出力）"
     status: done
-    criteria: npm show @pfdsl/cli version が 0.0.11 を返す
+    criteria: npm view @pfdsl/cli versions に 0.0.11 が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
   spec_v009:
     label: 仕様書 v0.0.9（index:統合）
@@ -205,25 +205,25 @@ artifact:
     label: "CLIリリース: basePath対応（npm v0.0.12）"
     description: "#261 basePath フィールド対応を含む"
     status: done
-    criteria: npm show @pfdsl/cli version が 0.0.12 を返す
+    criteria: npm view @pfdsl/cli versions に 0.0.12 が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_release_ready_cmd:
     label: "CLIリリース: readyコマンド（npm v0.0.13）"
     description: "ready コマンド (#267) を含む"
     status: done
-    criteria: npm show @pfdsl/cli version が 0.0.13 を返す
+    criteria: npm view @pfdsl/cli versions に 0.0.13 が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_release_status_lifecycle:
     label: "CLIリリース: statusライフサイクル機能群（npm v0.0.14）"
     description: "#268 type フィールド / #269 audit-sync / #272 W002 階層化 / #273 waiting・suspended 分割 / #277 status-set を含む"
     status: done
-    criteria: npm show @pfdsl/cli version が 0.0.14 を返す
+    criteria: npm view @pfdsl/cli versions に 0.0.14 が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
   cli_release_statusset_impact:
     label: "CLIリリース: status-set影響レポート（npm v0.0.15）"
     description: "#291 status-set 解放プロセス報告 / #292 audit 同種対称性ヒントを含む"
     status: done
-    criteria: npm show @pfdsl/cli version が 0.0.15 を返す
+    criteria: npm view @pfdsl/cli versions に 0.0.15 が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
   ext_v0015:
     label: "extension v0.0.15（次期）"
@@ -323,7 +323,7 @@ artifact:
     label: "CLIリリース: explain + pfd-lens agent（npm v0.0.18）"
     description: "#356 explain コマンド / #357 pfd-lens agent 配布 / #404 pfd-ops plugin 統合を含む"
     status: done
-    criteria: npm show @pfdsl/cli version が 0.0.18 を返す
+    criteria: npm view @pfdsl/cli versions に 0.0.18 が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
   spec_id_syntax:
     label: "仕様ID構文 ADR + 最小lint (#328)"
@@ -368,7 +368,7 @@ artifact:
     label: "CLIリリース: 診断ANSIカラー出力（npm v0.0.20）"
     description: "#435 診断 ANSI カラー出力を含む"
     status: done
-    criteria: npm show @pfdsl/cli version が 0.0.20 を返す
+    criteria: npm view @pfdsl/cli versions に 0.0.20 が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
   incomplete_tolerance:
     label: "書き途中グラフ非strict許容 (#480)"
@@ -410,16 +410,12 @@ artifact:
     description: "neighbors / impact / depends-on / path / hubs / group-graph / rollup 等の分析サブコマンド。完全リストと優先度は issue #479 が一次情報。着手時に段階を切り分ける"
     status: done
     criteria: "issue #479 の分析サブコマンドが実装され、到達性・近傍・集計が動作確認済み、テスト通過"
-  cli_release_grill_tolerance:
-    label: "CLIリリース: 診断緩和 + pfd-grill"
-    description: "#480 warning 降格 / #478 V011 緩和 / #481 pfd-grill スキル同梱を含む次期 npm リリース"
+  cli_release_tolerance_query:
+    label: "CLIリリース: 診断緩和 + pfd-grill + クエリツール（npm v0.0.21）"
+    description: "#480 warning 降格 / #478 V011 緩和 / #481 pfd-grill スキル同梱 / #476 get コマンド / #479 graph-analysis サブコマンド群を含む。計画では診断緩和系とクエリツール系の2リリースだったが、実際には 0.0.21 の1回で公開された"
     status: done
-    criteria: "npm 公開版の check で V020/V002/V003 が非 strict warning かつ V011 が正当な補助入力を許容し、plugin に pfd-grill が同梱されている"
-  cli_release_query_tools:
-    label: "CLIリリース: フィールド取得 + graph 分析"
-    description: "#476 get コマンド / #479 graph-analysis サブコマンド群を含む次期 npm リリース"
-    status: done
-    criteria: "npm 公開版で get と graph-analysis サブコマンドが動作する"
+    criteria: "npm view @pfdsl/cli versions に 0.0.21 が含まれる"
+    location: https://www.npmjs.com/package/@pfdsl/cli
   ext_editing_release:
     label: "extension 編集支援リリース"
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
@@ -431,10 +427,11 @@ artifact:
     status: done
     criteria: "4コマンド + fmt が CST 経由で frontmatter を読み書きし、frontmatter-text.ts の手術用ヘルパーが削除され、既存テストが更新済みで green"
   cli_release_frontmatter_cst:
-    label: "CLIリリース: frontmatter CST 化（破壊的変更）"
-    description: "#592 frontmatter の CST ベース読み書きを含む次期 npm リリース。既存 .pfdsl の再整形を伴う破壊的変更"
+    label: "CLIリリース: frontmatter CST 化（破壊的変更、npm v0.0.24）"
+    description: "#592 frontmatter の CST ベース読み書きを含む。既存 .pfdsl の再整形を伴う破壊的変更"
     status: done
-    criteria: "npm 公開版で fmt/meta set/sort/reindex/insert-definition が CST ベースの frontmatter 読み書きで動作する"
+    criteria: "npm view @pfdsl/cli versions に 0.0.24 が含まれる"
+    location: https://www.npmjs.com/package/@pfdsl/cli
   pipeline_kind_rename:
     label: "PFD種別名 pipeline への改名 (#670)"
     description: "type: 列挙値 runtime-pipeline を pipeline へ改名する破壊的変更。spec §2.10・core の列挙・ADR-0017・kind-taxonomy.md・scaffold・サンプルを一括更新し、旧値の扱い（deprecated 警告かエラーか）を決める"
@@ -651,8 +648,8 @@ process:
   i484_implement_def_insertion:
     label: 定義挿入 code action 実装
     location: https://github.com/takasek/pfdsl/issues/484
-  publish_cli_grill_tolerance:
-    label: CLI 診断緩和 + grill 公開
+  publish_cli_tolerance_query:
+    label: CLI 診断緩和 + grill + クエリツール公開
   publish_ext_editing:
     label: extension 編集支援リリース
   i476_implement_field_get:
@@ -664,8 +661,6 @@ process:
   i479_implement_graph_analysis:
     label: graph-analysis サブコマンド実装
     location: https://github.com/takasek/pfdsl/issues/479
-  publish_cli_query_tools:
-    label: CLI フィールド取得 + graph 分析公開
   i592_cst_frontmatter:
     label: frontmatter CST 化実装
     description: "ADR-0034 の決定を実装する。fmt/meta set/sort/reindex/insert-definition の frontmatter 読み書きを yaml Document ベースに統一し、frontmatter-text.ts の手術用ヘルパーを削除する"
@@ -798,14 +793,12 @@ marketplace_dist >> i404_integrate_pfd_ops_plugin -> pfd_ops_plugin_dist
 cli_release_explain_lens >> i435_implement_ansi_color -> ansi_color
 ansi_color >> publish_cli_ansi_color -> cli_release_ansi_color
 
+cli_release_ansi_color >> i476_implement_field_get -> field_get_cmd
 cli_release_ansi_color >> i478_relax_v011 -> v011_semantics
+cli_release_ansi_color >> i479_implement_graph_analysis -> graph_analysis
 cli_release_ansi_color >> i480_relax_incomplete_graph -> incomplete_tolerance
 incomplete_tolerance >> i481_create_grill_skill -> grill_skill
-[incomplete_tolerance, v011_semantics, grill_skill] >> publish_cli_grill_tolerance -> cli_release_grill_tolerance
-
-cli_release_ansi_color >> i476_implement_field_get -> field_get_cmd
-cli_release_ansi_color >> i479_implement_graph_analysis -> graph_analysis
-[field_get_cmd, graph_analysis] >> publish_cli_query_tools -> cli_release_query_tools
+[field_get_cmd, graph_analysis, incomplete_tolerance, v011_semantics, grill_skill] >> publish_cli_tolerance_query -> cli_release_tolerance_query
 
 cli_tool >> i592_cst_frontmatter -> frontmatter_cst_impl
 frontmatter_cst_impl >> publish_cli_frontmatter_cst -> cli_release_frontmatter_cst
