@@ -38,6 +38,7 @@ jobs:
       - run: node scripts/check-script-imports.mjs
 
       - run: node scripts/check-no-shell-strings.mjs
+      - run: node scripts/check-cli-conventions.mjs
 
       - run: make check-docs
 

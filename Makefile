@@ -27,6 +27,7 @@ test:
 	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs"
 	node scripts/check-script-imports.mjs
 	node scripts/check-no-shell-strings.mjs
+	node scripts/check-cli-conventions.mjs
 
 .PHONY: coverage
 coverage:
