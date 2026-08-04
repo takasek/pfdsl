@@ -11,7 +11,7 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 - **close 時の挙動**: issue の `stateReason` によって異なる。判定起点は process（`iN_` から issue 番号を解決し、body の edge から出力 artifact を逆引きする）
   - **COMPLETED**（`Close as completed`）: 実装済みとして扱う。終端はチェーンごと削除（`closed_in_flow`）。下流入力が残るものは process 側の `tags`/`updated_at` を削除するのみ — `iN_` prefix は恒久のため剥がさず、`status` も強制しない（マージ時に既に `done` になっている）
   - **NOT_PLANNED**（`Close as not planned`）: 未実装のまま廃止。終端は自動削除（`closed_not_planned`）、下流入力が残るものは手動対応 finding — 下流 artifact も廃止するか代替を用意するかを人が判断する
-  - **チェーンの定義**: 削除対象の「チェーン」= 当該 artifact + それを唯一生産する process + 関連 edge。process を残すと出力なき孤児 process になる（`check` が検出する。入力だけ残った process は V003、入力も出力も持たない宣言済み process は V020。全 predecessor/successor を失ったノードは `graph orphans` でも一覧できる）
+  - **チェーンの定義**: 削除対象の「チェーン」= 当該 artifact + それを唯一生産する process + 関連 edge。process を残すと出力なき孤児 process になる（`check` が検出する。入力だけ残った process は V003、入力も出力も持たない宣言済み process は V020。エッジを一切失ったノードは `graph orphans` でも一覧できる）
 
 ## ラベル判定基準
 

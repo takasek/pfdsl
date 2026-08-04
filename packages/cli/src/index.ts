@@ -9,6 +9,7 @@ import {
 	computeImpact,
 	computeNeighbors,
 	computeOpenInputs,
+	computeOrphans,
 	computePaths,
 	computeStats,
 	computeTerminals,
@@ -19,6 +20,7 @@ import {
 	type DiffReport,
 	format,
 	formatEdges,
+	type GraphOrphan,
 	groupEdges,
 	hasErrors,
 	type IndexChange,
@@ -1483,21 +1485,19 @@ export interface GraphOrphansOptions {
 	color?: boolean;
 }
 
-export interface GraphOrphan {
-	id: string;
-	kind: NodeKind;
-}
+// The shape moved to core with computeOrphans; re-exported because this
+// package publishes dist/index.d.ts as a type surface and the name was
+// already on it.
+export type { GraphOrphan };
 
-/** Nodes with neither predecessor nor successor — fully disconnected from the graph (§518). */
+/** Nodes wired to nothing — no primary edge and no feedback edge (§518). */
 export function runGraphOrphans(
 	file: string,
 	opts: GraphOrphansOptions = {},
 ): CommandResult {
 	const loaded = loadGraph(file, opts.json, opts.color);
 	if (isGraphLoadFailure(loaded)) return loaded;
-	const orphans: GraphOrphan[] = computeStats(loaded.graph)
-		.filter((s) => s.fanIn === 0 && s.fanOut === 0)
-		.map((s) => ({ id: s.id, kind: s.kind }));
+	const orphans: GraphOrphan[] = computeOrphans(loaded.graph);
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, orphans })}\n`);
 	if (orphans.length === 0) return ok("(none)\n");
 	return ok(`${orphans.map((o) => `${o.id} (${o.kind})`).join("\n")}\n`);
@@ -2219,10 +2219,11 @@ Exit codes:
 
 const HELP_GRAPH_ORPHANS = `usage: pfdsl graph orphans <file|-> [--json] [--no-color]
 
-Print nodes with neither predecessor nor successor — fully disconnected
-from the graph. Distinct from \`graph io\`'s external inputs (no predecessor
-only) and terminals (no successor only): an orphan has neither. Use - to
-read from stdin.
+Print nodes wired to nothing — no primary edge and no \`>>?\` feedback edge,
+so fully disconnected from the graph. Groups are containers that never
+carry edges and are not counted. Distinct from \`graph io\`'s external
+inputs (no predecessor only) and terminals (no successor only): an orphan
+has neither. Use - to read from stdin.
 
   --json      output as JSON ({ ok, orphans: {id, kind}[] })
               on parse failure: { ok: false, diagnostics }

@@ -4,6 +4,7 @@ import {
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
+	computeOrphans,
 	computePaths,
 	computeStats,
 } from "./graph-analysis.js";
@@ -111,5 +112,58 @@ describe("computeStats", () => {
 		expect(spec).toEqual({ id: "spec", kind: "artifact", fanIn: 1, fanOut: 2 });
 		// spec has the highest total degree (3) among all nodes
 		expect(stats[0]?.id).toBe("spec");
+	});
+});
+
+describe("computeOrphans", () => {
+	it("returns nothing when every node carries a primary edge", () => {
+		expect(computeOrphans(graph)).toEqual([]);
+	});
+
+	it("returns a node wired to nothing at all", () => {
+		const withStray = buildGraph(
+			edges,
+			new Map([...kinds, ["stray", "artifact"]]),
+		);
+		expect(computeOrphans(withStray)).toEqual([
+			{ id: "stray", kind: "artifact" },
+		]);
+	});
+
+	// A group is a container for artifacts and processes and never carries an
+	// edge, so counting it as a node makes every group in the file an orphan.
+	// Measured before the fix: runtime-pipeline.pfdsl reported 5 orphans, all 5
+	// of them groups (#676).
+	it("never reports a group, which by construction has no edges", () => {
+		const withGroup = buildGraph(
+			edges,
+			new Map<string, "artifact" | "process" | "group">([
+				...kinds,
+				["planning", "group"],
+			]),
+		);
+		expect(computeOrphans(withGroup)).toEqual([]);
+	});
+
+	// A node reachable only by `>>?` is a shape the notation supports on
+	// purpose: workflow.pfdsl's pfdsl_skill says so in its own description
+	// (#704). "Fully disconnected" is what the help text already promises.
+	it("does not report a node held only by a feedback edge", () => {
+		const withFeedback = buildGraph(
+			[...edges, { kind: "feedback", artifact: "guide", process: "review" }],
+			new Map([...kinds, ["guide", "artifact"]]),
+		);
+		expect(computeOrphans(withFeedback)).toEqual([]);
+	});
+
+	it("reports a node whose only would-be partner is itself unwired", () => {
+		const two = buildGraph(
+			edges,
+			new Map([...kinds, ["stray_a", "artifact"], ["stray_b", "artifact"]]),
+		);
+		expect(computeOrphans(two).map((o) => o.id)).toEqual([
+			"stray_a",
+			"stray_b",
+		]);
 	});
 });

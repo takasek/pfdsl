@@ -117,8 +117,6 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 **判断軸による分担（ADR-0035）**: 判断を含まない生成・公開の変換は `runtime-pipeline.pfdsl` が持つ。`make gen-skill` / `make gen-install` / `make gen-plugin` / `make gen-samples` と、タグ push 以降の npm publish・vsix 生成・marketplace アップロードがそちらにある。この図に残るのは「リリースするか・どの版で切るか」の判断（`decide_release`）までである。生成コマンドの手続き・drift 検査の話はこの companion が引き続き一次情報として持つ（グラフで運べない散文のため）。
 
-**`pfdsl_skill` は `graph orphans` に出る**: `runtime-pipeline.pfdsl` の `gen_skill` が生産する境界 artifact であり、この図では `>>?` フィードバック入力としてのみ現れる。primary エッジを持たないため `graph orphans` が報告するが、これは能力成果物が世代をまたいで還流する形（ADR-0011）の帰結であって欠陥ではない。
-
 **生成の一次ソースは `graph io` の終端に出る（ADR-0035 の副作用）**: `skill_template` / `quality_guide` / `feature_samples` / `review_perspectives` / `release_tag` と、`distill_ops` が生産する配布スキル・agent 群は、この図では消費者を持たない終端 artifact として報告される。消費者（`gen_skill` / `gen_plugin` / `publish_packages` / `package_vsix`）は `runtime-pipeline.pfdsl` 側に実在するが、`graph io` はファイル単位で走るため参照できない。
 
 **これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。終端ゲートのプロトコル5(b) 判定では「消費者は sibling の `runtime-pipeline.pfdsl` に在る」と記録して該当なしとする。判定時は `.pfdsl/runtime-pipeline.pfdsl` の `gen_skill` / `gen_plugin` / `publish_packages` / `package_vsix` の入力エッジに当該 artifact が列挙されているかを確認する — 列挙が無ければそれは本物の門番違反である。

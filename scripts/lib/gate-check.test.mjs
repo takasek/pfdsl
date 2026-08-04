@@ -220,6 +220,9 @@ describe("lintCommitSubjects", () => {
 		assert.equal(results[0].ok, false);
 	});
 
+	// Kept as a statement about this predicate alone. Real merge subjects never
+	// reach it: commitSubjectStep collects with --no-merges, because git writes
+	// those subjects and no author can make them conventional (#690).
 	it("rejects a merge-style subject that lacks a colon", () => {
 		const results = lintCommitSubjects(["Merge pull request #466 from foo/bar"]);
 		assert.equal(results[0].ok, false);
@@ -238,6 +241,56 @@ describe("lintCommitSubjects", () => {
 			results.map((r) => r.ok),
 			[true, false],
 		);
+	});
+
+	it("reports why a subject failed", () => {
+		const results = lintCommitSubjects(["add commit lint"]);
+		assert.equal(results[0].reason, "not Conventional Commits");
+	});
+
+	// #595: the commit convention is English, but only the format was checked.
+	// A delegated subagent carried a Japanese term straight out of its brief
+	// into an otherwise English subject and the lint passed it.
+	it("rejects a subject with Japanese text outside quoted spans (#595)", () => {
+		const results = lintCommitSubjects([
+			"refactor(scripts): split gen-skill's references into a dist非依存 module",
+		]);
+		assert.equal(results[0].ok, false);
+		assert.equal(results[0].reason, "non-English text outside quoted spans");
+	});
+
+	it("rejects a wholly Japanese subject that is otherwise well-formed (#595)", () => {
+		const results = lintCommitSubjects(["fix(graphviz-exporter): CJK ラベルに最小ノード幅を付与"]);
+		assert.equal(results[0].ok, false);
+	});
+
+	// Measured on this repo's history: 1 of the 7 subjects carrying CJK quotes a
+	// Japanese heading that genuinely exists in the tree. Quoting an identifier
+	// is not the failure #595 is after.
+	it("accepts Japanese quoted in a backtick code span (#595)", () => {
+		const results = lintCommitSubjects(["docs(pfd-retro): add a `保留した違和感の想起` step"]);
+		assert.equal(results[0].ok, true);
+	});
+
+	it("accepts Japanese inside double quotes (#595)", () => {
+		const results = lintCommitSubjects(['feat(pfd-retro): add "保留した違和感の想起" to the catalog']);
+		assert.equal(results[0].ok, true);
+	});
+
+	it("rejects Japanese that trails a legitimately quoted span (#595)", () => {
+		const results = lintCommitSubjects(["docs(skill): clarify `前回` refers to 直近のログ"]);
+		assert.equal(results[0].ok, false);
+	});
+
+	it("accepts a plain English subject with no quoting", () => {
+		const results = lintCommitSubjects(["fix(cli): drop the unreachable default"]);
+		assert.equal(results[0].ok, true);
+	});
+
+	it("catches Japanese that falls between the obvious blocks (#595)", () => {
+		for (const subject of ["docs(ops): note 人々 here", "docs(ops): note ﾊﾝｶｸ here"]) {
+			assert.equal(lintCommitSubjects([subject])[0].ok, false, subject);
+		}
 	});
 });
 

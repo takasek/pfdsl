@@ -20,6 +20,7 @@ import {
 	classifySizeDirection,
 	hasShrinkIntent,
 	hasStatusChange,
+	lintCommitSubjects,
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
@@ -211,4 +212,34 @@ export function sizeDirectionStep({ exec, issue, issueError, deltas }) {
 	const prBody = prBodyResult.ok ? prBodyResult.out : "";
 
 	return { name, ...classifySizeDirection({ issueBody, deltas, prBody }) };
+}
+
+/**
+ * commit subject lint: Conventional Commits format plus the English-language
+ * rule. Granularity stays MANUAL.
+ *
+ * --no-merges is not an optimisation. Taking base into a branch is a step this
+ * repo's own procedure prescribes, and git writes those subjects itself
+ * ("Merge remote-tracking branch 'origin/main' into …"), which can never be
+ * Conventional Commits. Without the exclusion the gate fails on every branch
+ * that followed the procedure, and a FAIL the runner is told to ignore is a
+ * FAIL they stop reading (#690).
+ */
+export function commitSubjectStep({ exec, base }) {
+	const name = "commit subject lint";
+	const subjectsOut = exec("git", ["log", "--no-merges", `origin/${base}..HEAD`, "--format=%s"]);
+	if (!subjectsOut.ok) return { name, status: "FAIL", detail: subjectsOut.out.trim() };
+
+	const subjects = subjectsOut.out.trim().split("\n").filter(Boolean);
+	if (subjects.length === 0) return { name, status: "SKIP", detail: "no commits in range" };
+
+	const failed = lintCommitSubjects(subjects).filter((r) => !r.ok);
+	return {
+		name,
+		status: failed.length === 0 ? "PASS" : "FAIL",
+		detail:
+			failed.length === 0
+				? `${subjects.length} commit(s)`
+				: failed.map((r) => `${r.reason}: ${r.subject}`).join("; "),
+	};
 }

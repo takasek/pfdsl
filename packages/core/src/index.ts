@@ -6,11 +6,12 @@ export type { DiagnosticRegistryEntry } from "./diagnostics-registry.js";
 export { DIAGNOSTIC_REGISTRY } from "./diagnostics-registry.js";
 export type { EdgeGroups } from "./edge-groups.js";
 export { groupEdges } from "./edge-groups.js";
-export type { Neighbors, NodeStats } from "./graph-analysis.js";
+export type { GraphOrphan, Neighbors, NodeStats } from "./graph-analysis.js";
 export {
 	computeDependsOn,
 	computeImpact,
 	computeNeighbors,
+	computeOrphans,
 	computePaths,
 	computeStats,
 } from "./graph-analysis.js";
