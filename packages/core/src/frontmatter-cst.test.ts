@@ -353,6 +353,58 @@ describe("setFrontmatterField", () => {
 		const out = setFrontmatterField(src, "artifact", "spec", "owner", "alice");
 		expect(out).toContain("owner: alice");
 	});
+
+	// Replacing a multi-line block-literal (`|`) scalar's value must keep its
+	// block-literal style (not flatten to plain) and must not lose the
+	// newline that separated it from the following sibling field (#regression
+	// found in packages/cli's meta-set block-scalar tests).
+	it("preserves block-literal style and indent when replacing its value", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    description: |\n      line one.\n      line two.\n    status: done\n---\na >> P -> b\n";
+		const out = setFrontmatterField(
+			src,
+			"artifact",
+			"spec",
+			"description",
+			"short.",
+		);
+		expect(out).toContain("description: |-\n      short.\n");
+		expect(out).not.toContain("line one.");
+		expect(out).toContain("status: done");
+	});
+
+	// Same as above but for block-folded (`>`) style.
+	it("preserves block-folded style and indent when replacing its value", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    description: >\n      line one.\n      line two.\n    status: done\n---\na >> P -> b\n";
+		const out = setFrontmatterField(
+			src,
+			"artifact",
+			"spec",
+			"description",
+			"short.",
+		);
+		expect(out).toContain("description: >-\n      short.\n");
+		expect(out).not.toContain("line one.");
+		expect(out).toContain("status: done");
+	});
+
+	// Regression guard: an ordinary single-line plain scalar's replacement
+	// must remain unaffected by the block-scalar-preserving codepath.
+	it("still renders a plain scalar replacement as plain (regression guard)", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    description: old value\n    status: done\n---\na >> P -> b\n";
+		const out = setFrontmatterField(
+			src,
+			"artifact",
+			"spec",
+			"description",
+			"new value",
+		);
+		expect(out).toContain("description: new value\n");
+		expect(out).not.toContain("old value");
+		expect(out).toContain("status: done");
+	});
 });
 
 describe("parseFrontmatterCst yamlText", () => {

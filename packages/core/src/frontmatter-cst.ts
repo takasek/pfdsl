@@ -185,6 +185,52 @@ function renderValue(value: string | number, flow: boolean): string {
 }
 
 /**
+ * Render `value` the way `yaml` would if it overwrote the EXISTING scalar at
+ * `originalValueText` in place — reusing that scalar's own raw source as a
+ * skeleton so `setIn` (which preserves an existing node's style when only
+ * its value changes) reproduces the same style (block-literal `|`,
+ * block-folded `>`, plain, quoted, ...) for the new value instead of always
+ * falling back to `renderValue`'s fresh plain rendering. `targetIndent` is
+ * the original multi-line content's own indent (from its second line); a
+ * skeleton parsed at a shallower nesting depth than the real document picks
+ * yaml's own default indent step, which won't match unless the real
+ * document happens to also use 2-space-per-level, so the rendered value's
+ * continuation lines are re-indented to match.
+ */
+function renderValueLike(
+	originalValueText: string,
+	flow: boolean,
+	newValue: string | number,
+	targetIndent: string | null,
+): string {
+	const skeletonSrc = flow
+		? `{ y: ${originalValueText} }`
+		: `y: ${originalValueText}`;
+	const tmp = parseDocument(skeletonSrc);
+	tmp.setIn(["y"], newValue);
+	const rendered = tmp.toString({ lineWidth: 0 });
+	let extracted = flow
+		? rendered.replace(/^\{ y: /, "").replace(/ \}\n$/, "")
+		: rendered.replace(/^y: /, "").replace(/\n$/, "");
+	if (!flow && targetIndent !== null && extracted.includes("\n")) {
+		const lines = extracted.split("\n");
+		const skeletonIndentMatch = lines[1]
+			? (lines[1].match(/^[ \t]*/) as RegExpMatchArray)[0]
+			: "";
+		extracted = lines
+			.map((line, i) => {
+				if (i === 0 || line === "") return line;
+				const dedented = line.startsWith(skeletonIndentMatch)
+					? line.slice(skeletonIndentMatch.length)
+					: line;
+				return targetIndent + dedented;
+			})
+			.join("\n");
+	}
+	return extracted;
+}
+
+/**
  * Wrap `content` (a bare, unterminated new line of YAML) with whatever
  * leading/trailing newline the surrounding text is missing at `insertAt`,
  * checked against the single adjacent character. Never assumes based on
@@ -233,7 +279,6 @@ export function fieldValueSplice(
 	const node = doc.getIn([kind, id], true);
 	if (!isMap(node)) return { ok: false, reason: "not-found" };
 	const pair = node.items.find((p) => isScalar(p.key) && p.key.value === field);
-	const replacement = renderValue(value, !!node.flow);
 
 	if (pair) {
 		if (pair.value === null) return { ok: false, reason: "unsupported" };
@@ -246,6 +291,30 @@ export function fieldValueSplice(
 		// (MULTILINE_IMPLICIT_KEY) that merges the next field's key into the
 		// corrupted line. Prepend the space the colon is missing.
 		const needsSpace = start === end && yamlText[start - 1] === ":";
+		// Reuse the EXISTING scalar's own raw source as the skeleton to
+		// re-render from, rather than a style-agnostic throwaway (`renderValue`)
+		// — this preserves block-literal (`|`), block-folded (`>`), and other
+		// styles that a fresh plain rendering would otherwise flatten away.
+		const originalValueText = yamlText.slice(start, end);
+		const originalLines = originalValueText.split("\n");
+		const realTargetIndent =
+			originalLines.length > 1
+				? ((originalLines[1] as string).match(/^[ \t]*/) as RegExpMatchArray)[0]
+				: null;
+		let replacement = renderValueLike(
+			originalValueText,
+			!!node.flow,
+			value,
+			realTargetIndent,
+		);
+		// Multi-line block scalars' `range` swallows their own trailing
+		// newline (unlike single-line scalars), so replacing the whole span
+		// with a newline-less short value would glue the next field onto the
+		// same line. Restore the separator the original span's own last
+		// character shows was there.
+		if (yamlText[end - 1] === "\n" && !replacement.endsWith("\n")) {
+			replacement += "\n";
+		}
 		return {
 			ok: true,
 			splice: {
@@ -255,6 +324,8 @@ export function fieldValueSplice(
 			},
 		};
 	}
+
+	const replacement = renderValue(value, !!node.flow);
 
 	if (node.items.length === 0) {
 		if (node.flow) {
