@@ -10,6 +10,9 @@
  * migration from the old real directory — is testable without a fixture tree.
  */
 
+/** Where .claude/skills/pfdsl points, relative to its own directory. */
+export const SKILL_LINK_TARGET = "../../plugin/pfdsl/skills/pfdsl";
+
 /**
  * @param {{present: boolean, isSymlink?: boolean, linkTarget?: string}} state
  * @param {string} expectedTarget link target, relative to the link's own directory

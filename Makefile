@@ -1,15 +1,14 @@
+# link-repo-skill.mjs points .claude/skills/pfdsl (gitignored, #348) at the
+# tracked bundle copy: a symlink, so a branch switch synchronises the skill an
+# agent reads through git (#714). It used to be a separately generated
+# directory, which needed a built CLI to bootstrap and silently kept the
+# previous branch's version until someone re-ran the generator.
 .PHONY: setup
 setup:
 	pnpm install
 	cp scripts/hooks/pre-commit-shim $$(git rev-parse --git-common-dir)/hooks/pre-commit
 	chmod +x $$(git rev-parse --git-common-dir)/hooks/pre-commit
 	node scripts/link-repo-skill.mjs
-
-# .claude/skills/pfdsl is gitignored (#348) and points at the tracked bundle
-# copy (#714): a symlink, so a branch switch synchronises the skill an agent
-# reads through git. It used to be a separately generated directory, which
-# needed a built CLI to bootstrap and silently kept the previous branch's
-# version until someone re-ran the generator.
 
 .PHONY: build
 build:

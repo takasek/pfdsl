@@ -1,9 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { decideSkillLinkAction } from "./repo-skill-link.mjs";
-
-const TARGET = "../../plugin/pfdsl/skills/pfdsl";
+import { decideSkillLinkAction, SKILL_LINK_TARGET as TARGET } from "./repo-skill-link.mjs";
 
 describe("decideSkillLinkAction", () => {
 	it("creates the link when nothing is at the path", () => {

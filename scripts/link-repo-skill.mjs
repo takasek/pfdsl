@@ -12,11 +12,10 @@ import { lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from "node:fs
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { decideSkillLinkAction } from "./lib/repo-skill-link.mjs";
+import { decideSkillLinkAction, SKILL_LINK_TARGET as TARGET } from "./lib/repo-skill-link.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const linkPath = resolve(root, ".claude/skills/pfdsl");
-const TARGET = "../../plugin/pfdsl/skills/pfdsl";
 
 // lstat, not stat: a symlink must be reported as itself here, not as the
 // directory it resolves to.
