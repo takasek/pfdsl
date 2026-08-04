@@ -20,7 +20,7 @@ const root = resolve(__dirname, "..");
 
 // --- Parse args ---
 
-const outDir = parseSkillOutDir("scripts/gen-skill.mjs", process.argv);
+const outDir = parseSkillOutDir("scripts/gen-skill.mjs", process.argv.slice(2));
 
 // --- 1/1b/1c/2/2b. Write references/*.md (build-independent — see scripts/lib/gen-skill-refs.mjs) ---
 

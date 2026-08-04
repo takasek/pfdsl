@@ -25,6 +25,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 import {
 	RELEASE_KINDS,
@@ -68,15 +69,30 @@ function fail(message) {
 
 // --- Parse args ---
 
-const [, , kindArg, ...rest] = process.argv;
+// strict parsing, not an indexOf sweep over the leftovers: a mistyped flag was
+// dropped and the release went ahead on the computed version instead of the
+// one the caller named (#648). Node rejects the unknown flag, the --version=
+// form's missing value, and a stray second positional; none of that has to be
+// spelled out here.
+let parsed;
+try {
+	parsed = parseArgs({
+		args: process.argv.slice(2),
+		options: { version: { type: "string" } },
+		strict: true,
+		allowPositionals: true,
+	});
+} catch (err) {
+	fail(err.message);
+}
+if (parsed.positionals.length > 1) {
+	fail(`expected one release kind, got: ${parsed.positionals.join(", ")}`);
+}
+const kindArg = parsed.positionals[0];
+const explicitVersion = parsed.values.version;
 const kind = RELEASE_KINDS[kindArg];
 if (!kind) {
 	fail(`unknown release kind '${kindArg}' (expected one of: ${Object.keys(RELEASE_KINDS).join(", ")})`);
-}
-const versionFlagIdx = rest.indexOf("--version");
-const explicitVersion = versionFlagIdx === -1 ? undefined : rest[versionFlagIdx + 1];
-if (versionFlagIdx !== -1 && !explicitVersion) {
-	fail("--version requires a value");
 }
 
 // --- 1. branch check ---

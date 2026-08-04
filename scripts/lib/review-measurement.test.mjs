@@ -173,6 +173,17 @@ describe("parseSinceArg", () => {
 	it("errors on an empty inline value", () => {
 		assert.match(parseSinceArg(["--since="]).error, /--since/);
 	});
+
+	// #648: an unrecognised argument used to fall through to {since: undefined},
+	// which the caller reads as "no ref was asked for" and reports as a clean
+	// scan — the same answer it gives when the flag really was absent.
+	it("errors on an unknown flag instead of reporting no ref", () => {
+		assert.match(parseSinceArg(["--sinse", "v1.0"]).error, /sinse/);
+	});
+
+	it("errors on a stray positional", () => {
+		assert.ok(parseSinceArg(["v1.0"]).error);
+	});
 });
 
 describe("countMeasurementTrailers", () => {
