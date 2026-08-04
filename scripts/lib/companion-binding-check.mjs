@@ -60,17 +60,13 @@ export function extractPathReferences(text) {
 	const unfenced = stripFencedBlocks(text);
 	const refs = [];
 
-	INLINE_CODE_RE.lastIndex = 0;
-	let inlineMatch;
-	while ((inlineMatch = INLINE_CODE_RE.exec(unfenced)) !== null) {
+	for (const inlineMatch of unfenced.matchAll(INLINE_CODE_RE)) {
 		for (const token of inlineMatch[1].split(/\s+/)) {
 			if (PATH_TOKEN_RE.test(token)) refs.push(normalizeRef(token));
 		}
 	}
 
-	MD_LINK_RE.lastIndex = 0;
-	let linkMatch;
-	while ((linkMatch = MD_LINK_RE.exec(unfenced)) !== null) {
+	for (const linkMatch of unfenced.matchAll(MD_LINK_RE)) {
 		refs.push(normalizeRef(linkMatch[1]));
 	}
 
