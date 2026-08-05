@@ -47,7 +47,7 @@ describe("parseSpecDiagTable", () => {
 	});
 
 	it("throws on an unrecognized severity label", () => {
-		const text = TABLE_HEADER + "| V001 | oops | §15.1 | condition |\n";
+		const text = `${TABLE_HEADER}| V001 | oops | §15.1 | condition |\n`;
 		assert.throws(() => parseSpecDiagTable(text), /unrecognized severity/);
 	});
 });

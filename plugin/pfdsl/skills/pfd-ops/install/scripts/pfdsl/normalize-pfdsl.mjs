@@ -29,7 +29,7 @@ const body = lines.slice(fmEnd + 1).join("\n");
 const normalized = normalizeBody(body);
 
 if (normalized !== body) {
-	writeFileSync(filePath, fmPart + "\n" + normalized, "utf-8");
+	writeFileSync(filePath, `${fmPart}\n${normalized}`, "utf-8");
 	console.log(`normalized: ${filePath}`);
 } else {
 	console.log("already normalized");

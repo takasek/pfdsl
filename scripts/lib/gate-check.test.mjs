@@ -637,7 +637,7 @@ describe("classifyDesignRecordContent", () => {
 
 	it("FAILs and lists the missing required-prefix line(s)", () => {
 		const missingRejection = [
-			DESIGN_RECORD_REQUIRED_PREFIXES[0] + " x",
+			`${DESIGN_RECORD_REQUIRED_PREFIXES[0]} x`,
 			"決定: 案A を採用する。",
 		].join("\n");
 		const result = classifyDesignRecordContent(missingRejection, 0);
