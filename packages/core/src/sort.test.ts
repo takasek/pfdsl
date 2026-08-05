@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyze } from "./index.js";
+import { analyze, format } from "./index.js";
 import { sort } from "./sort.js";
 
 /** Return node IDs in declaration order from the given section of a re-parsed source. */
@@ -303,6 +303,115 @@ a >> p -> z
 		);
 	});
 
+	it("preserves an untouched folded-scalar's line wraps when the section reorders", () => {
+		const src = `---
+artifact:
+  z:
+    label: Z
+  foo:
+    description: >
+      long text
+      wrapped here
+    label: Foo
+---
+z >> p -> foo
+`;
+		const { output } = sort(src, { by: ["id"] });
+		expect(output).toContain(
+			"description: >\n      long text\n      wrapped here\n",
+		);
+	});
+
+	it("doesn't add a spurious blank line before the closing fence when the last entry in sorted order is flow-valued (#695-fix2)", () => {
+		const src = `---
+artifact:
+  z: { label: Z }
+  a: { label: A }
+  m: { label: M }
+---
+z >> p -> a
+m >> p2 -> z
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output).toBe(`---
+artifact:
+  a: { label: A }
+  m: { label: M }
+  z: { label: Z }
+---
+z >> p -> a
+m >> p2 -> z
+`);
+	});
+
+	// Mirror of the #695-fix2 case above: there, the entry landing last after
+	// reorder was flow-valued (whose own range never carries a trailing
+	// newline), and the fix was to skip adding one. Here, the entry landing
+	// last is block-valued — its own captured span DOES carry a trailing
+	// newline, because it wasn't originally last (block-style value ranges
+	// swallow their own trailing newline, per this file's own doc comments).
+	// That newline survives into the splice replacement, so when this
+	// section is the last thing in the frontmatter, `yamlText` ends up
+	// carrying a trailing newline of its own — violating the invariant
+	// documented on `FrontmatterCst.yamlText` — and `sort()`'s own template
+	// then adds a second one before `---`, producing a spurious blank line
+	// (final-review C2).
+	it("doesn't add a spurious blank line before the closing fence when the last entry in sorted order is block-valued", () => {
+		const src = `---
+artifact:
+  z:
+    label: Z
+  a:
+    label: A
+---
+a >> p -> z
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output).toBe(`---
+artifact:
+  a:
+    label: A
+  z:
+    label: Z
+---
+a >> p -> z
+`);
+		// The output must itself already be canonically formatted — otherwise
+		// `sort --write` would hand the user a file `fmt --check` rejects.
+		expect(format(output, { style: "flows" }).output).toBe(output);
+	});
+
+	it("doesn't add a spurious blank line before the closing fence when the last entry in sorted order is block-valued (CRLF)", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  z:",
+			"    label: Z",
+			"  a:",
+			"    label: A",
+			"---",
+			"a >> p -> z",
+			"",
+		].join("\r\n");
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output).toBe(
+			[
+				"---",
+				"artifact:",
+				"  a:",
+				"    label: A",
+				"  z:",
+				"    label: Z",
+				"---",
+				"a >> p -> z",
+				"",
+			].join("\r\n"),
+		);
+	});
+
 	it("preserves the body (non-frontmatter) unchanged", () => {
 		const body = "b >> p -> a\na >> p2 -> b\n";
 		const src = `---
@@ -356,5 +465,56 @@ a >> p -> b
 		const { output, changed } = sort(src, { by: ["id"] });
 		expect(changed).toBe(true);
 		expect(output.replace(/\r\n/g, "")).not.toContain("\n");
+	});
+
+	it("leaves a section with an anchor/alias untouched instead of splicing the alias before its anchor", () => {
+		// Sorting by id alphabetically would want `a` before `z`, but `z`
+		// defines the anchor that `a`'s value aliases — no reorder mechanism
+		// can honor that order without breaking the anchor/alias relationship
+		// (an anchor must precede its alias in the serialized stream). This is
+		// out of scope for `sort()`: it must leave the section exactly as it
+		// found it rather than produce invalid YAML.
+		const src = `---
+artifact:
+  z:
+    label: &sharedLabel Z
+  a:
+    label: *sharedLabel
+---
+z >> p -> a
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(false);
+		expect(output).toBe(src);
+		const { diagnostics, frontmatter } = analyze(output);
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(frontmatter?.artifact?.a?.label).toBe("Z");
+		expect(frontmatter?.artifact?.z?.label).toBe("Z");
+		expect(nodeOrder(output, "artifact")).toEqual(["z", "a"]);
+	});
+
+	it("still splices a section with no anchor/alias, even when another section is skipped for having one", () => {
+		const src = `---
+artifact:
+  z:
+    label: &sharedLabel Z
+  a:
+    label: *sharedLabel
+process:
+  q: { label: Q }
+  p: { label: P }
+---
+z >> p -> a
+a >> q -> w
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		const { diagnostics, frontmatter } = analyze(output);
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(frontmatter?.artifact?.a?.label).toBe("Z");
+		// artifact has an anchor/alias, so it's left untouched...
+		expect(nodeOrder(output, "artifact")).toEqual(["z", "a"]);
+		// ...but process has none, so it's still spliced into sorted order.
+		expect(nodeOrder(output, "process")).toEqual(["p", "q"]);
 	});
 });

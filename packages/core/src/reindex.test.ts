@@ -134,6 +134,58 @@ a >> p -> b
 		expect(output).toContain("a >> p -> b");
 	});
 
+	it("preserves an untouched folded-scalar sibling's line wraps, even when the same batch also creates brand-new entries", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  a:",
+			"    label: A",
+			"    description: >",
+			"      long text",
+			"      wrapped here",
+			"---",
+			"a >> p -> b",
+			"",
+		].join("\n");
+		const { output } = reindex(src, { renumber: true });
+		expect(output).toContain(
+			"description: >\n      long text\n      wrapped here\n",
+		);
+		// p (process, body-only) and b (artifact, body-only) both get a fresh
+		// frontmatter entry with an index in the same pass.
+		expect(output).toContain("process:\n  p:\n    index: 1");
+		expect(output).toMatch(/b:\n\s*index: 2/);
+	});
+
+	it("keeps independent brand-new entries under their own parent section even when all splices land at the same offset (#corruption)", () => {
+		// a is the sole entry in artifact: and the last thing in the file, so
+		// three independent splices (extend a's fields, create process:, append
+		// to artifact:) all anchor on the exact same byte offset. A batched
+		// single-pass apply concatenated their replacement texts in whatever
+		// order the stable sort produced, nesting b (an artifact) as a YAML
+		// sibling of p under process: instead of under artifact:.
+		const src = [
+			"---",
+			"artifact:",
+			"  a:",
+			"    label: A",
+			"    description: >",
+			"      long text",
+			"      wrapped here",
+			"---",
+			"a >> p -> b",
+			"",
+		].join("\n");
+		const { output } = reindex(src, { renumber: true });
+		const { frontmatter } = analyze(output);
+		expect(frontmatter?.artifact?.a?.index).toBe(1);
+		expect(frontmatter?.process?.p?.index).toBe(1);
+		expect(frontmatter?.artifact?.b?.index).toBe(2);
+		// b must NOT have ended up nested under process:.
+		expect(Object.keys(frontmatter?.process ?? {}).sort()).toEqual(["p"]);
+		expect(Object.keys(frontmatter?.artifact ?? {}).sort()).toEqual(["a", "b"]);
+	});
+
 	it("handles 4-space indented front matter without corrupting it", () => {
 		const src = `---
 artifact:
@@ -237,6 +289,33 @@ a >> p -> b
 		expect(diagnostics.some((d) => d.severity === "error")).toBe(true);
 		expect(changes).toHaveLength(0);
 		expect(output).toBe(src);
+	});
+
+	// newEntrySplice (used here for a brand-new node with no frontmatter
+	// entry yet, e.g. `c` below) anchors on the kind section's last existing
+	// sibling. When that sibling is an explicit-key entry (`? b`, no value
+	// line — `Pair.value` is genuinely `null`), the anchor dereference used
+	// to crash with a TypeError (final-review I3); reindex must instead take
+	// its existing full-re-serialize fallback, same as any other
+	// newEntrySplice-declined shape.
+	it("falls back to full re-serialization when the anchor sibling is explicit-key null", () => {
+		const src = [
+			"---",
+			"artifact:",
+			"  a:",
+			"    label: A",
+			"  ? b",
+			"---",
+			"a >> p -> c",
+			"",
+		].join("\n");
+		expect(() => reindex(src, { renumber: true })).not.toThrow();
+		const { output, changes, diagnostics } = reindex(src, { renumber: true });
+		expect(diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+		expect(changes.some((c) => c.id === "c")).toBe(true);
+		const idx = indices(output);
+		expect(idx.artifact.a).toBe(1);
+		expect(idx.artifact.c).toBe(2);
 	});
 
 	it("keeps a CRLF source on CRLF (#644)", () => {

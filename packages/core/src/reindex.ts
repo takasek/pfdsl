@@ -1,5 +1,8 @@
-import { Document } from "yaml";
+import { Document, parseDocument } from "yaml";
 import {
+	applySplices,
+	fieldValueSplice,
+	newEntrySplice,
 	parseFrontmatterCst,
 	renderFrontmatterCst,
 } from "./frontmatter-cst.js";
@@ -105,10 +108,81 @@ export function reindex(
 	if (!changes.length) return { output: source, changes, diagnostics };
 
 	const cst = parseFrontmatterCst(source);
-	const doc = cst.present ? cst.doc : new Document();
-	for (const c of changes) {
-		doc.setIn([c.kind, c.id, "index"], c.to);
+	if (!cst.present) {
+		// No frontmatter to splice into (shouldn't happen once `changes` is
+		// non-empty, since every changed id came from parsed frontmatter, but
+		// keep the pre-existing full-render fallback for safety).
+		const doc = new Document();
+		for (const c of changes) doc.setIn([c.kind, c.id, "index"], c.to);
+		return {
+			output: renderFrontmatterCst(doc, cst.newline) + cst.body,
+			changes,
+			diagnostics,
+		};
 	}
-	const output = renderFrontmatterCst(doc, cst.newline) + cst.body;
+
+	// Splices are computed and applied one at a time, re-parsing the
+	// (possibly already-edited-by-a-prior-iteration) yaml text fresh before
+	// each one. Batching all splices against a single snapshot and applying
+	// them together is unsafe: independent structural insertions (e.g. "create
+	// process:" and "append to artifact:") can resolve to the exact same byte
+	// offset when the node they both anchor on is the last thing in the file
+	// — `applySplices`'s overlap check doesn't flag same-offset zero-width
+	// insertions, so it just concatenates their replacement texts in
+	// whatever order the stable sort produced, with no awareness that they
+	// belong under different parents. Sequential apply-and-reparse mirrors
+	// the pattern already proven correct by `setFrontmatterField` /
+	// `insertDefinition`, which only ever compute and apply one splice.
+	let currentYamlText = cst.yamlText;
+	let fallbackNeeded = false;
+	for (const c of changes) {
+		const currentDoc = parseDocument(currentYamlText);
+		// A "group"-kind id is always already defined under ["group", id] in
+		// frontmatter (that's how the normalizer classified it as "group" in
+		// the first place), so `hasIn` is always true for it and it always
+		// routes to fieldValueSplice — never to the newEntrySplice branch
+		// below, where the narrowing cast lives. The cast is only ever
+		// evaluated for "artifact"/"process" in practice; it exists purely so
+		// TypeScript accepts c.kind (typed as the full NodeKind) as the
+		// narrower "artifact" | "process" newEntrySplice expects.
+		const kind = c.kind as "artifact" | "process";
+		const result = currentDoc.hasIn([c.kind, c.id])
+			? fieldValueSplice(
+					currentYamlText,
+					currentDoc,
+					c.kind,
+					c.id,
+					"index",
+					c.to,
+					cst.newline,
+				)
+			: newEntrySplice(
+					currentYamlText,
+					currentDoc,
+					kind,
+					c.id,
+					"index",
+					c.to,
+					cst.newline,
+				);
+		if (!result.ok) {
+			fallbackNeeded = true;
+			break;
+		}
+		currentYamlText = applySplices(currentYamlText, [result.splice]);
+	}
+
+	if (fallbackNeeded) {
+		// Full re-serialize fallback operates on the original cst.doc, not the
+		// partially-mutated currentYamlText above.
+		for (const c of changes) cst.doc.setIn([c.kind, c.id, "index"], c.to);
+		return {
+			output: renderFrontmatterCst(cst.doc, cst.newline) + cst.body,
+			changes,
+			diagnostics,
+		};
+	}
+
+	const output = `---${cst.newline}${currentYamlText}${cst.newline}---${cst.newline}${cst.body}`;
 	return { output, changes, diagnostics };
 }
