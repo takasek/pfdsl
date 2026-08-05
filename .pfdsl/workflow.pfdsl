@@ -133,8 +133,7 @@ artifact:
     group: decision
   article:
     label: 公開記事
-    description: "ADR 群を素材とした外部公開記事。本生態系の最終納品物のひとつ"
-    status: todo
+    description: "ADR 群を素材とした外部公開記事。本生態系の最終納品物のひとつ。進捗 status の一次情報は roadmap.pfdsl の同 id — この図は手続きを描くもので status を持たない"
     criteria: 外部メディアに公開済みで URL が存在する
     group: decision
   gh_issues:
