@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
 	evaluateMainCommitGuard,
 	isGitCommitCommand,
+	resolveCommandCwd,
 	runMainCommitGuard,
 } from "./main-commit-guard.mjs";
 
@@ -44,6 +45,84 @@ describe("isGitCommitCommand", () => {
 
 	it("ignores a non-string command", () => {
 		assert.equal(isGitCommitCommand(undefined), false);
+	});
+});
+
+describe("resolveCommandCwd", () => {
+	const HOOK_CWD = "/repo";
+
+	it("keeps the hook's cwd for a plain commit", () => {
+		assert.equal(resolveCommandCwd("git commit -m 'x'", HOOK_CWD), HOOK_CWD);
+	});
+
+	it("follows a leading cd into the tree the commit lands in (#751)", () => {
+		assert.equal(
+			resolveCommandCwd(
+				"cd .claude/worktrees/w && git commit -m 'x'",
+				HOOK_CWD,
+			),
+			"/repo/.claude/worktrees/w",
+		);
+	});
+
+	it("follows an absolute cd", () => {
+		assert.equal(
+			resolveCommandCwd("cd /elsewhere/w && git commit -m 'x'", HOOK_CWD),
+			"/elsewhere/w",
+		);
+	});
+
+	it("reads git -C, which used to bypass the guard entirely (#751)", () => {
+		assert.equal(
+			resolveCommandCwd("git -C /elsewhere/w commit -m 'x'", HOOK_CWD),
+			"/elsewhere/w",
+		);
+	});
+
+	it("lets git -C win over an earlier cd, since git resolves last", () => {
+		assert.equal(
+			resolveCommandCwd("cd /a && git -C /b commit -m 'x'", HOOK_CWD),
+			"/b",
+		);
+	});
+
+	it("uses the cd in effect where the commit runs, not a later one", () => {
+		assert.equal(
+			resolveCommandCwd("cd /a && git commit -m 'x' && cd /b", HOOK_CWD),
+			"/a",
+		);
+	});
+
+	it("strips quotes around a cd path", () => {
+		assert.equal(
+			resolveCommandCwd("cd '/a b/w' && git commit -m 'x'", HOOK_CWD),
+			"/a b/w",
+		);
+	});
+
+	it("falls back to the hook cwd when the path is not statically known", () => {
+		assert.equal(
+			resolveCommandCwd("cd $WORKTREE && git commit -m 'x'", HOOK_CWD),
+			HOOK_CWD,
+		);
+		assert.equal(
+			resolveCommandCwd("cd ~/works/x && git commit -m 'x'", HOOK_CWD),
+			HOOK_CWD,
+		);
+	});
+
+	it("falls back for a bare cd, which means the home directory", () => {
+		assert.equal(
+			resolveCommandCwd("cd && git commit -m 'x'", HOOK_CWD),
+			HOOK_CWD,
+		);
+	});
+
+	it("ignores a cd inside a quoted string", () => {
+		assert.equal(
+			resolveCommandCwd("echo 'cd /a' && git commit -m 'x'", HOOK_CWD),
+			HOOK_CWD,
+		);
 	});
 });
 
