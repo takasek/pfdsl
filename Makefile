@@ -32,7 +32,7 @@ typecheck:
 
 .PHONY: lint
 lint:
-	pnpm biome check .
+	pnpm biome check --error-on-warnings .
 
 .PHONY: format
 format:
