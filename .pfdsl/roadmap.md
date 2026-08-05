@@ -115,7 +115,9 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 **PR 本文の `Closes` キーワード確認**: L3 reference「PR 本文規約」に従う（main 直接マージのみ使用・中間 PR では使わない）。
 
-**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。pre-commit hook（`.git/hooks/`）は全 worktree 共有で、他ブランチのセッションが `make setup` を実行すると当該ブランチ版の hook に置き換わる — 自ブランチに存在しないファイル・ターゲットを hook が要求して commit が拒否されたら、自 worktree で `make setup` を実行して hook を入れ直す。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる（`git add`・`git reset` 等、`git commit` 以外のコマンドは `scripts/main-commit-guard.mjs` の対象外）。
+**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。pre-commit hook（`.git/hooks/`）は全 worktree 共有で、他ブランチのセッションが `make setup` を実行すると当該ブランチ版の hook に置き換わる — 自ブランチに存在しないファイル・ターゲットを hook が要求して commit が拒否されたら、自 worktree で `make setup` を実行して hook を入れ直す。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる。
+`scripts/main-commit-guard.mjs` は `git commit` に加えてツリー・インデックスを変える git コマンドも見る（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）。
+`git fetch` / `git worktree` / `git status` 等の読み取り系と `git stash list` / `git stash show` は素通しなので、main repo のツリーを読むだけの操作は従来どおり動く。
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる。
 

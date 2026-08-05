@@ -28,7 +28,7 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 ただし事後的な分割（先に一括で変更してから複数コミットへ割り直す）が中間ファイル再構成等でトークン効率を著しく損なう場合は、論理単位の純度より作業順=コミット順を優先してよい。
 
-変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook、`.claude/settings.json` で配線）が main ブランチ上の `git commit` を機械的に deny する（#650）。
+変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook、`.claude/settings.json` で配線）が main ブランチ上でツリー・インデックスを変える git コマンドを機械的に止める（#650・#777）。`commit` / `add` / `rm` / `mv` / `apply` / `am` は deny（worktree で同じことをするのが等価な代替）、`reset` / `restore` / `checkout` / `switch` / `stash` / `clean` / `merge` / `rebase` / `cherry-pick` / `revert` は ask（事故と main ツリー復旧手順を payload から区別できないため人間に渡す）。
 
 コミットメッセージは**英語**。
 
