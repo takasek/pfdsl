@@ -462,7 +462,7 @@ issue_updates >>? file_issues
 
 
 
-[plugin_dist, published_cli, published_libraries, toolchain] >> update_readme -> readme
+[plugin_dist, published_cli, published_libraries] >> update_readme -> readme
 
 [distribution_review_perspectives, plugin_dist] >> review_distribution -> distribution_review_record
 
