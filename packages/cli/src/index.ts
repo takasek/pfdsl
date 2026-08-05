@@ -595,8 +595,9 @@ export interface EmptyReadyBreakdown {
 /**
  * Classify every non-ready process into the bucket that explains it.
  * Each falls into one: blocked on its inputs, or (inputs done) named by
- * whichever output status is holding it. Kept apart from the rendering so
- * more than one renderer can share the single classification.
+ * whichever output status is holding it. Both the human text and the --json
+ * payload render this one result, so the two cannot answer the question to
+ * different degrees (#741).
  */
 function classifyEmptyReady(
 	processInputs: Map<string, string[]>,
@@ -757,6 +758,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	if (opts.json) {
 		const payload: Record<string, unknown> = { ok: true, ready: readyItems };
 		if (opts.best && bestItem) payload.best = bestItem;
+		if (breakdown) payload.empty = breakdown;
 		if (warnings.length) payload.warnings = warnings;
 		return ok(`${JSON.stringify(payload)}\n`, warnText);
 	}
@@ -2081,7 +2083,8 @@ Omitting type: is treated as roadmap and allowed, with a warning (W006).
 
 Options:
   --best      highlight the process that unblocks the most downstream work
-  --json      output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, warnings? })
+  --json      output as JSON ({ ok, ready: [{id, label, inputs, outputs}], best?, empty?, warnings? })
+              empty (only when ready is []): { inProgress, parked, complete, blocked }
               on parse failure: { ok: false, diagnostics }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;

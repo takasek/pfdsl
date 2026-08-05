@@ -1715,6 +1715,53 @@ describe("status ready", () => {
 		expect(parsed.best.outputs).toContain("spec");
 	});
 
+	it("--json carries the empty-set breakdown that the human output explains", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: wip\n  gate:\n    status: todo\n---\nreq >> design -> spec\ngate >> impl -> code\n",
+		);
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ready).toEqual([]);
+		expect(parsed.empty).toEqual({
+			inProgress: ["design"],
+			parked: [],
+			complete: 0,
+			blocked: 1,
+		});
+	});
+
+	it("--json breakdown names parked processes and counts complete ones", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: waiting\n  code:\n    status: done\n---\nreq >> design -> spec\nspec >> impl -> code\n",
+		);
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.empty.parked).toEqual(["design"]);
+		expect(parsed.empty.inProgress).toEqual([]);
+		expect(parsed.empty.blocked).toBe(1);
+	});
+
+	it("--json breakdown counts processes whose outputs are all done", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.empty.complete).toBe(1);
+	});
+
+	it("--json omits empty when there is something ready", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f, "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout).empty).toBeUndefined();
+	});
+
 	it("--best marks recommended process with *", async () => {
 		const r = await run([
 			"status",
