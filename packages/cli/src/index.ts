@@ -511,6 +511,14 @@ export interface ReadyOptions {
 }
 
 /**
+ * Whether an input artifact stops gating its consumers. An omitted status
+ * counts as satisfied — a roadmap that tracks status on only some artifacts
+ * must not have the untracked ones read as unfinished.
+ */
+const inputSatisfied = (status: string | undefined): boolean =>
+	status === "done" || status === undefined;
+
+/**
  * Core ready-process algorithm operating on pre-analyzed data.
  * "Ready" = all input artifacts done/undefined AND at least one output still actionable (not done/wip/suspended/waiting).
  * Returns processInputs and processOutputs maps in addition to readyIds so
@@ -533,10 +541,9 @@ function computeReadyIdsCore(
 	const readyIds: string[] = [];
 	for (const [pid, inputs] of processInputs) {
 		if (nodeKinds.get(pid) !== "process") continue;
-		const allInputsDone = inputs.every((aid) => {
-			const s = artifactMeta[aid]?.status;
-			return s === "done" || s === undefined;
-		});
+		const allInputsDone = inputs.every((aid) =>
+			inputSatisfied(artifactMeta[aid]?.status),
+		);
 		if (!allInputsDone) continue;
 		const outputs = processOutputs.get(pid) ?? [];
 		const outputsInert =
@@ -603,10 +610,7 @@ function emptyReadyText(
 	let blocked = 0;
 	for (const [pid, inputs] of processInputs) {
 		if (nodeKinds.get(pid) !== "process") continue;
-		const isBlocked = inputs.some((aid) => {
-			const s = statusOf(aid);
-			return s !== "done" && s !== undefined;
-		});
+		const isBlocked = inputs.some((aid) => !inputSatisfied(statusOf(aid)));
 		if (isBlocked) {
 			blocked++;
 			continue;
@@ -691,8 +695,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 					const otherInputsAllDone =
 						processInputs.get(consumer)?.every((inp) => {
 							if (outputs.has(inp)) return true; // pid will satisfy this
-							const s = artifactMeta[inp]?.status;
-							return s === "done" || s === undefined;
+							return inputSatisfied(artifactMeta[inp]?.status);
 						}) ?? true;
 					if (otherInputsAllDone) unlocked.add(consumer);
 				}
@@ -867,10 +870,9 @@ export function runStatusBlocked(
 	const blockedItems: StatusBlockedItem[] = [];
 	for (const [pid, inputs] of processInputs) {
 		if (nodeKinds.get(pid) !== "process") continue;
-		const blockedBy = inputs.filter((aid) => {
-			const s = artifactMeta[aid]?.status;
-			return s !== "done" && s !== undefined;
-		});
+		const blockedBy = inputs.filter(
+			(aid) => !inputSatisfied(artifactMeta[aid]?.status),
+		);
 		if (blockedBy.length === 0) continue;
 		blockedItems.push({
 			id: pid,
