@@ -19,8 +19,10 @@ artifact:
     criteria: skill_template または adr_corpus への反映が確認済み
   cli_tool:
     label: CLI 実装（現行）
+    description: 後続プロセスが前提にするのは「CLI が存在すること」であって特定の版ではない。現行版は cli_release_* チェーンを経て進み続けており、公開版の一次情報は npm レジストリ（ここに版数を書かない — ドリフトするため）
     status: done
     criteria: check/fmt/graph が全サンプルに対してエラーなし、npm 公開済み
+    location: ../packages/cli/
   skill_gen:
     label: スキル生成系（現行）
     description: scripts/gen-skill.mjs と docs/samples 構成。identity は check-gen-plugin.yml が CI 強制

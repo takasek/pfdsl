@@ -193,6 +193,10 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 汎用ルール（着手時 todo→wip、PR を待たない）は pfd-ops プロトコル「進捗更新」が一次情報。このリポでは flow-sync が merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
 
+## workflow.pfdsl に status を書かない
+
+進捗 status の一次情報は `roadmap.pfdsl` だけに置く。`workflow.pfdsl` は手続きを描く図であり、artifact に `status:` を書かない。同一 id が両図に現れる場合（`article` 等）、workflow 側にも status を書くと2つの図が同じ現実に別の状態を主張する状態が作れてしまい、実際 #763 でそうなった。
+
 ## release milestone artifact の作成規約
 
 roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョン番号の事前予約ではない。**下流作業がそれを入力として要求する時点**でのみ作成する（pfd-ops プロトコル2・5の適用）。バージョン番号は roadmap 本体に書かず、done 後の label/criteria に事実として付記するのみ — 番号を先に書いて後から実態と合わせる運用（#278 導入前の運用）は廃止した。

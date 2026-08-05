@@ -133,8 +133,7 @@ artifact:
     group: decision
   article:
     label: 公開記事
-    description: "ADR 群を素材とした外部公開記事。本生態系の最終納品物のひとつ"
-    status: todo
+    description: "ADR 群を素材とした外部公開記事。本生態系の最終納品物のひとつ。進捗 status の一次情報は roadmap.pfdsl の同 id — この図は手続きを描くもので status を持たない"
     criteria: 外部メディアに公開済みで URL が存在する
     group: decision
   gh_issues:
@@ -206,10 +205,16 @@ artifact:
     location: ../.claude/agents/pfd-lens.md
     group: generation
   implementer_agent:
-    label: 実装委譲agentと外向き操作ガード
-    description: "pfd-implementer agent（実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す）と、それを機構で担保する PreToolUse ガード。委譲ブリーフの留保指定を、指示でなく権限として強制する。agent 定義は手書きだが gen_plugin が plugin へミラーする（#558）。ガードはリポ固有のため配布しない"
-    criteria: allowlist 外の subagent からの外向きコマンドが拒否され、呼び出し元と allowlist 対象 agent は影響を受けない。agent 定義が plugin 同梱物に含まれ、採用リポで設置作業なしに層1が効く
+    label: 実装委譲agent
+    description: "pfd-implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない"
+    criteria: agent 定義が plugin 同梱物に含まれ、採用リポで設置作業なしに層1が効く
     location: ../.claude/agents/pfd-implementer.md
+    group: generation
+  delegation_guard:
+    label: 外向き操作ガード
+    description: "委譲先 subagent の push・PR 作成・issue 操作を拒否する PreToolUse(Bash) フック（#554）。implementer_agent のブリーフが書く留保指定を、指示でなく権限として強制する。.claude/settings.json の配線を伴うリポ固有の機構であり、implementer_agent と違って配布対象外"
+    criteria: allowlist 外の subagent からの外向きコマンドが拒否され、呼び出し元と allowlist 対象 agent は影響を受けない
+    location: ../scripts/delegation-guard.mjs
     group: generation
   ecosystem_skill:
     label: PFDセット構築スキル
@@ -423,7 +428,7 @@ pfdsl_skill >>? review_examples
 retro_skill >>? review_examples
 toolchain >>? review_examples
 
-[adrs, decisions, payoff_log] >> distill_ops -> [bindings_pfd_ops, bindings_pfd_retro, distribution_review_perspectives, distribution_review_skill, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives, spec_stress_skill, vscode_ext_debug_skill, workflow_md]
+[adrs, decisions, payoff_log] >> distill_ops -> [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, distribution_review_perspectives, distribution_review_skill, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives, spec_stress_skill, vscode_ext_debug_skill, workflow_md]
 
 spec_stress_skill >>? maintain_spec
 
@@ -454,6 +459,7 @@ runtime_pipeline_pfdsl >>? develop
 toolchain >>? develop
 vscode_ext_debug_skill >>? develop
 
+delegation_guard >>? develop
 implementer_agent >>? develop
 workflow_md >>? develop
 
@@ -463,7 +469,7 @@ issue_updates >>? file_issues
 
 
 
-[plugin_dist, published_cli, published_libraries, toolchain] >> update_readme -> readme
+[plugin_dist, published_cli, published_libraries] >> update_readme -> readme
 
 [distribution_review_perspectives, plugin_dist] >> review_distribution -> distribution_review_record
 

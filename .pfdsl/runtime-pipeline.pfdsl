@@ -112,6 +112,18 @@ artifact:
     criteria: meta sortコマンドが実装され動作確認済み
     externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
     group: run_outputs
+  updated_source:
+    label: フィールド更新済みソース
+    description: 指定ノードの指定フィールドを書き換えた.pfdslテキスト。定義が無ければ新規に挿入する
+    criteria: meta setコマンドが実装され動作確認済み
+    externalStakeholders: [ CLIユーザー ]
+    group: run_outputs
+  reindexed_source:
+    label: index採番済みソース
+    description: トポロジ順に沿ってノードのindexフィールドを採番し直した.pfdslテキスト
+    criteria: meta reindexコマンドが実装され動作確認済み
+    externalStakeholders: [ CLIユーザー ]
+    group: run_outputs
   spec:
     label: 言語仕様書
     description: "workflow.pfdsl の maintain_spec が生産する。gen_skill・gen_plugin の一次ソースとして現れる"
@@ -183,6 +195,11 @@ artifact:
     description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う"
     location: ../.claude/skills/pfd-grill/
     group: skill_sources
+  pfd_commands:
+    label: pfd-*スラッシュコマンド
+    description: "/pfd-cycle・/pfd-init・/pfd-retro の起動口となるコマンド定義。対応するスキル本体（ops_skill_general・ecosystem_skill・retro_skill）とは別ファイルであり、同梱対象としても別に扱われる。手書き、生成対象外。ここではplugin_distへの同梱対象としてのみ扱う"
+    location: ../.claude/commands/
+    group: skill_sources
   pfd_lens_agent:
     label: pfd-lens agent
     description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
@@ -190,7 +207,7 @@ artifact:
     group: skill_sources
   implementer_agent:
     label: 実装委譲agent
-    description: "agent定義はplugin同梱対象。同居するPreToolUseガードはリポ固有のため配布しない（内容の一次情報はworkflow.pfdsl）。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
+    description: "agent定義はplugin同梱対象。留保指定を強制するPreToolUseガードは別のartifact（workflow.pfdslのdelegation_guard、実体はscripts/delegation-guard.mjs）であり、リポ固有のため配布せずこの図には現れない（内容の一次情報はworkflow.pfdsl）。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
     location: ../.claude/agents/pfd-implementer.md
     group: skill_sources
   pfdsl_skill:
@@ -324,9 +341,21 @@ process:
     tags: [ b ]
   sort_meta:
     label: ノード定義ソート
-    description: "frontmatterをyaml CSTとして再parseし、指定キーでノード定義を並べ替えたテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644。meta set・meta reindex・formatも同じ性質を持つ）"
+    description: "frontmatterをyaml CSTとして再parseし、指定キーでノード定義を並べ替えたテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
     command: node packages/cli/dist/cli.js meta sort
     location: ../packages/core/src/sort.ts
+    tags: [ b ]
+  set_meta:
+    label: フィールド更新
+    description: "frontmatterをyaml CSTとして再parseし、指定ノードの指定フィールドを書き換えたテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
+    command: node packages/cli/dist/cli.js meta set
+    location: ../packages/core/src/frontmatter-cst.ts
+    tags: [ b ]
+  reindex_meta:
+    label: index採番
+    description: "frontmatterをyaml CSTとして再parseし、トポロジ順に沿ってindexフィールドを採番し直したテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
+    command: node packages/cli/dist/cli.js meta reindex
+    location: ../packages/core/src/reindex.ts
     tags: [ b ]
   gen_skill:
     label: スキル生成
@@ -401,6 +430,10 @@ pfdsl_source >> format -> formatted_source
 
 pfdsl_source >> sort_meta -> sorted_source
 
+pfdsl_source >> set_meta -> updated_source
+
+pfdsl_source >> reindex_meta -> reindexed_source
+
 [normalized_graph, parsed_doc] >> render_graph -> dot_graph
 
 dot_graph >> export_image -> rendered_image
@@ -413,7 +446,7 @@ dot_graph >> export_image -> rendered_image
 
 ops_install_sources >> gen_install -> ops_install_templates
 
-[ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
+[ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
 
 [feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
 
@@ -426,6 +459,8 @@ vsix_package >> upload_vsix -> published_ext
 plugin_dist >> install_plugin -> installed_plugin
 
 installed_plugin >> deploy_install_layer -> installed_l3_layer
+
+installed_l3_layer >>? deploy_install_layer
 
 [installed_l3_layer, installed_plugin] >> check_install_sync -> drift_report
 
