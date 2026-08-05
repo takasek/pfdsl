@@ -1,11 +1,18 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
-import { currentSpecVersion, topHistoryVersion, runSpecHistoryCheck } from "./spec-history-check.mjs";
+import {
+	currentSpecVersion,
+	runSpecHistoryCheck,
+	topHistoryVersion,
+} from "./spec-history-check.mjs";
 
 describe("currentSpecVersion", () => {
 	it("extracts the version from the title line", () => {
-		assert.equal(currentSpecVersion("# PFDSL仕様書 v0.0.17\n\nbody\n"), "v0.0.17");
+		assert.equal(
+			currentSpecVersion("# PFDSL仕様書 v0.0.17\n\nbody\n"),
+			"v0.0.17",
+		);
 	});
 
 	it("returns null when there is no title-line version", () => {
@@ -15,12 +22,14 @@ describe("currentSpecVersion", () => {
 
 describe("topHistoryVersion", () => {
 	it("reads the target version off the first changelog heading", () => {
-		const history = "# PFDSL仕様書 変更履歴\n\nintro\n\nv0.0.16 からの主な変更点（v0.0.17）：...\n\nv0.0.15 からの主な変更点（v0.0.16）：...\n";
+		const history =
+			"# PFDSL仕様書 変更履歴\n\nintro\n\nv0.0.16 からの主な変更点（v0.0.17）：...\n\nv0.0.15 からの主な変更点（v0.0.16）：...\n";
 		assert.equal(topHistoryVersion(history), "v0.0.17");
 	});
 
 	it("ignores a placeholder version in prose before the first real heading", () => {
-		const history = "現行バージョンはタイトル行（`# PFDSL仕様書 vX.Y.Z`）が唯一の権威。\n\nv0.0.16 からの主な変更点（v0.0.17）：...\n";
+		const history =
+			"現行バージョンはタイトル行（`# PFDSL仕様書 vX.Y.Z`）が唯一の権威。\n\nv0.0.16 からの主な変更点（v0.0.17）：...\n";
 		assert.equal(topHistoryVersion(history), "v0.0.17");
 	});
 
@@ -29,7 +38,10 @@ describe("topHistoryVersion", () => {
 	});
 
 	it("does not match a legacy-format heading (no parens around the target version)", () => {
-		assert.equal(topHistoryVersion("v0.0.1 から v0.0.2 の主な変更点：...\n"), null);
+		assert.equal(
+			topHistoryVersion("v0.0.1 から v0.0.2 の主な変更点：...\n"),
+			null,
+		);
 	});
 });
 
@@ -55,7 +67,8 @@ describe("runSpecHistoryCheck", () => {
 	it("fails when the matching entry exists but isn't the top (newest) one — ordering matters", () => {
 		const result = runSpecHistoryCheck({
 			readSpec: () => "# PFDSL仕様書 v0.0.16\n\nbody\n",
-			readHistory: () => "v0.0.16 からの主な変更点（v0.0.17）：...\n\nv0.0.15 からの主な変更点（v0.0.16）：...\n",
+			readHistory: () =>
+				"v0.0.16 からの主な変更点（v0.0.17）：...\n\nv0.0.15 からの主な変更点（v0.0.16）：...\n",
 		});
 		assert.equal(result.ok, false);
 	});

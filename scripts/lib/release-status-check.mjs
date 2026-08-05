@@ -20,21 +20,30 @@ export function compareVersions(local, published) {
  */
 export function formatResults(results) {
 	return results
-		.map(({ name, registry, localVersion, publishedVersion, status, commitsAhead }) => {
-			let label;
-			if (status === "local-ahead") {
-				label = "! behind (needs publish)";
-			} else if (status === "published-ahead") {
-				label = "! published-ahead (unexpected)";
-			} else if (status === "error") {
-				label = "! error";
-			} else if (commitsAhead > 0) {
-				label = `! commits-ahead (${commitsAhead} commit(s), needs version bump)`;
-			} else {
-				label = "✓ up-to-date";
-			}
-			return `  ${name.padEnd(24)} local=${localVersion}  ${registry}=${publishedVersion}  ${label}`;
-		})
+		.map(
+			({
+				name,
+				registry,
+				localVersion,
+				publishedVersion,
+				status,
+				commitsAhead,
+			}) => {
+				let label;
+				if (status === "local-ahead") {
+					label = "! behind (needs publish)";
+				} else if (status === "published-ahead") {
+					label = "! published-ahead (unexpected)";
+				} else if (status === "error") {
+					label = "! error";
+				} else if (commitsAhead > 0) {
+					label = `! commits-ahead (${commitsAhead} commit(s), needs version bump)`;
+				} else {
+					label = "✓ up-to-date";
+				}
+				return `  ${name.padEnd(24)} local=${localVersion}  ${registry}=${publishedVersion}  ${label}`;
+			},
+		)
 		.join("\n");
 }
 
@@ -65,10 +74,13 @@ export function formatSkillBundleStatus(commitCount, sinceTag) {
  */
 export function formatDistributionReviewStatus({ record, unreviewedCount }) {
 	const name = "distribution review (plugin/pfdsl prompts)";
-	const at = record.commit ? `${record.commit.slice(0, 7)} ${record.date ?? ""}`.trim() : null;
+	const at = record.commit
+		? `${record.commit.slice(0, 7)} ${record.date ?? ""}`.trim()
+		: null;
 	// undefined means the gate could not read the recorded commit at all.
 	// Printing "current" there would contradict the release gate's refusal.
-	if (unreviewedCount === undefined) return `  ${name} ! cannot determine (see warning above)`;
+	if (unreviewedCount === undefined)
+		return `  ${name} ! cannot determine (see warning above)`;
 	if (unreviewedCount > 0) {
 		const since = at ? `since ${at}` : "never reviewed";
 		return `  ${name} ! ${unreviewedCount} file(s) unreviewed (${since})`;

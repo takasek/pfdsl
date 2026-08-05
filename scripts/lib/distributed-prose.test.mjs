@@ -1,16 +1,19 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { findRepoSpecificProse } from "./distributed-prose.mjs";
 
 const at = (content, path = "skills/pfd-retro/SKILL.md") => [{ path, content }];
-const rules = (content) => findRepoSpecificProse(at(content)).map((f) => f.rule);
+const rules = (content) =>
+	findRepoSpecificProse(at(content)).map((f) => f.rule);
 
 describe("bundle-path rule", () => {
 	it("flags a bundle path written only in its repo-local form", () => {
 		// An adopting repo loads the bundle from the plugin cache, so `.claude/`
 		// never resolves there and the reader is sent to a file that cannot exist.
-		const found = findRepoSpecificProse(at("pfd-lens agent（`.claude/agents/pfd-lens.md`）へ委譲する。\n"));
+		const found = findRepoSpecificProse(
+			at("pfd-lens agent（`.claude/agents/pfd-lens.md`）へ委譲する。\n"),
+		);
 		assert.equal(found.length, 1);
 		assert.equal(found[0].rule, "bundle-path");
 		assert.equal(found[0].line, 1);
@@ -18,13 +21,18 @@ describe("bundle-path rule", () => {
 
 	it("accepts a path qualified with the plugin root on the same line", () => {
 		assert.deepEqual(
-			rules("plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/`、repo-local なら `.claude/skills/pfdsl/`。\n"),
+			rules(
+				"plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/`、repo-local なら `.claude/skills/pfdsl/`。\n",
+			),
 			[],
 		);
 	});
 
 	it("accepts a repo-local path that names the load mode it belongs to", () => {
-		assert.deepEqual(rules("- repo-local: `.claude/skills/pfd-ops/references/scaffold/`\n"), []);
+		assert.deepEqual(
+			rules("- repo-local: `.claude/skills/pfd-ops/references/scaffold/`\n"),
+			[],
+		);
 	});
 
 	it("ignores .pfdsl paths, which live in the adopting repo and resolve there", () => {
@@ -38,7 +46,9 @@ describe("bundle-path rule", () => {
 
 describe("issue-ref rule", () => {
 	it("flags a bare issue citation", () => {
-		const found = findRepoSpecificProse(at("素の `--deploy` を先に実行する（#603）。\n"));
+		const found = findRepoSpecificProse(
+			at("素の `--deploy` を先に実行する（#603）。\n"),
+		);
 		assert.equal(found.length, 1);
 		assert.equal(found[0].rule, "issue-ref");
 		assert.match(found[0].reason, /#603/);
@@ -46,7 +56,10 @@ describe("issue-ref rule", () => {
 
 	it("allows a number inside inline code, which reads as an example", () => {
 		// `- [ ] #123` shows the reader a task-list syntax, it does not cite an issue.
-		assert.deepEqual(rules("本文中の手書き `- [ ] #123` 形式は自動チェックされない\n"), []);
+		assert.deepEqual(
+			rules("本文中の手書き `- [ ] #123` 形式は自動チェックされない\n"),
+			[],
+		);
 	});
 
 	it("allows ADR references, which the bundle resolves for the reader", () => {
@@ -60,11 +73,16 @@ describe("issue-ref rule", () => {
 
 describe("scanning", () => {
 	it("skips fenced blocks, which are quoted commands rather than prose", () => {
-		assert.deepEqual(rules("```sh\nnode .claude/skills/pfd-ops/x.mjs # see #603\n```\n"), []);
+		assert.deepEqual(
+			rules("```sh\nnode .claude/skills/pfd-ops/x.mjs # see #603\n```\n"),
+			[],
+		);
 	});
 
 	it("reports every offending line with its 1-based number", () => {
-		const found = findRepoSpecificProse(at("ok\n`.claude/skills/pfd-ops/` を読む\nok\n（#480）\n"));
+		const found = findRepoSpecificProse(
+			at("ok\n`.claude/skills/pfd-ops/` を読む\nok\n（#480）\n"),
+		);
 		assert.deepEqual(
 			found.map((f) => [f.line, f.rule]),
 			[

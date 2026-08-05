@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { checkFile, endsAtBoundary } from "./md-linebreaks.mjs";
 
@@ -31,19 +31,31 @@ describe("endsAtBoundary", () => {
 
 	it("accepts Japanese sentence-ending punctuation", () => {
 		for (const ch of ["。", "！", "？", "」", "』", "）", "…", "～"]) {
-			assert.equal(endsAtBoundary(`text${ch}`), true, `expected "${ch}" to be a boundary`);
+			assert.equal(
+				endsAtBoundary(`text${ch}`),
+				true,
+				`expected "${ch}" to be a boundary`,
+			);
 		}
 	});
 
 	it("accepts English sentence-ending punctuation", () => {
 		for (const ch of [".", "!", "?", ":", "*"]) {
-			assert.equal(endsAtBoundary(`text${ch}`), true, `expected "${ch}" to be a boundary`);
+			assert.equal(
+				endsAtBoundary(`text${ch}`),
+				true,
+				`expected "${ch}" to be a boundary`,
+			);
 		}
 	});
 
 	it("accepts closing-bracket characters", () => {
 		for (const ch of ["`", "]", ")", "}"]) {
-			assert.equal(endsAtBoundary(`text${ch}`), true, `expected "${ch}" to be a boundary`);
+			assert.equal(
+				endsAtBoundary(`text${ch}`),
+				true,
+				`expected "${ch}" to be a boundary`,
+			);
 		}
 	});
 
@@ -65,7 +77,12 @@ describe("checkFile", () => {
 		const text = ["para", "続き", "  次の行"].join("\n");
 		const violations = checkFile("a.md", text);
 		assert.equal(violations.length, 1);
-		assert.deepEqual(violations[0], { file: "a.md", line: 3, prev: "続き", cont: "次の行" });
+		assert.deepEqual(violations[0], {
+			file: "a.md",
+			line: 3,
+			prev: "続き",
+			cont: "次の行",
+		});
 	});
 
 	it("does not flag a continuation whose previous line ends at a boundary", () => {

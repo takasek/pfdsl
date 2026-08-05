@@ -64,7 +64,8 @@ export function checkFile(filePath, text) {
 		if (inFence) continue;
 
 		// Only check indented continuation lines that are not list markers
-		if (!line || line[0] !== " " || !stripped || LIST_RE.test(stripped)) continue;
+		if (!line || line[0] !== " " || !stripped || LIST_RE.test(stripped))
+			continue;
 
 		const prev = lines[i - 1];
 

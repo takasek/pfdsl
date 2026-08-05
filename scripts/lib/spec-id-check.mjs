@@ -40,9 +40,7 @@ export function findSpecIdDefinitions(text) {
 	const hits = [];
 	forEachNonFencedLine(text, (line, lineNumber) => {
 		const stripped = stripInlineCode(line);
-		DEFINITION_RE.lastIndex = 0;
-		let match;
-		while ((match = DEFINITION_RE.exec(stripped)) !== null) {
+		for (const match of stripped.matchAll(DEFINITION_RE)) {
 			hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
 		}
 	});
@@ -57,9 +55,7 @@ export function findStrictRefs(text) {
 	const hits = [];
 	forEachNonFencedLine(text, (line, lineNumber) => {
 		const stripped = stripInlineCode(line);
-		STRICT_REF_RE.lastIndex = 0;
-		let match;
-		while ((match = STRICT_REF_RE.exec(stripped)) !== null) {
+		for (const match of stripped.matchAll(STRICT_REF_RE)) {
 			hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
 		}
 	});
@@ -107,7 +103,9 @@ export function findDanglingStrictRefs(strictRefHits, definitionHits) {
 export function formatSpecIdViolations(duplicates, dangling) {
 	const lines = [];
 	for (const dup of duplicates) {
-		const locations = dup.definitions.map((h) => `${h.file}:${h.line}`).join(", ");
+		const locations = dup.definitions
+			.map((h) => `${h.file}:${h.line}`)
+			.join(", ");
 		lines.push(`duplicate definition of id "${dup.id}" at ${locations}`);
 	}
 	for (const dang of dangling) {

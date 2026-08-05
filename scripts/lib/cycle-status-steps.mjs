@@ -34,7 +34,15 @@ import {
  *   issueNumber?: number | null,
  * }} deps
  */
-export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, root, base, issueNumber = null }) {
+export async function runCycleStatus({
+	sh,
+	execGh,
+	existsSync,
+	readFileSync,
+	root,
+	base,
+	issueNumber = null,
+}) {
 	let fetched = true;
 	try {
 		sh("git", ["fetch", "origin"]);
@@ -45,7 +53,9 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 	let behindBase = null;
 	let behindBaseError = null;
 	try {
-		behindBase = countBehind(sh("git", ["log", "--oneline", `HEAD..origin/${base}`]));
+		behindBase = countBehind(
+			sh("git", ["log", "--oneline", `HEAD..origin/${base}`]),
+		);
 	} catch (e) {
 		behindBaseError = e.message;
 	}
@@ -79,7 +89,9 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 	let headStateError = null;
 	try {
 		currentBranch = sh("git", ["rev-parse", "--abbrev-ref", "HEAD"]).trim();
-		commitsAheadOfBase = countBehind(sh("git", ["log", "--oneline", `origin/${base}..HEAD`]));
+		commitsAheadOfBase = countBehind(
+			sh("git", ["log", "--oneline", `origin/${base}..HEAD`]),
+		);
 	} catch (e) {
 		headStateError = e.message;
 	}
@@ -89,7 +101,14 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 	let prError = null;
 	try {
 		const prJson = JSON.parse(
-			await execGh(["pr", "list", "--state", "open", "--json", "number,title,headRefName,statusCheckRollup"]),
+			await execGh([
+				"pr",
+				"list",
+				"--state",
+				"open",
+				"--json",
+				"number,title,headRefName,statusCheckRollup",
+			]),
 		);
 		({ openFlowSyncPRs, otherOpenPRs } = classifyPRs(prJson));
 	} catch (e) {
@@ -103,13 +122,23 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 	let readyError = null;
 	if (existsSync(cliPath)) {
 		try {
-			const readyJson = JSON.parse(sh(process.execPath, [cliPath, "status", "ready", ".pfdsl/roadmap.pfdsl", "--best", "--json"]));
+			const readyJson = JSON.parse(
+				sh(process.execPath, [
+					cliPath,
+					"status",
+					"ready",
+					".pfdsl/roadmap.pfdsl",
+					"--best",
+					"--json",
+				]),
+			);
 			({ ready, best, bestOutputs } = parseReadyOutput(readyJson));
 		} catch (e) {
 			readyError = e.message;
 		}
 	} else {
-		readyError = "packages/cli/dist/cli.js not built; run 'pnpm -r build' first";
+		readyError =
+			"packages/cli/dist/cli.js not built; run 'pnpm -r build' first";
 	}
 
 	// Target issue resolution order: an explicit --issue flag wins; otherwise
@@ -124,7 +153,10 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 		targetSource = "flag";
 	} else if (best) {
 		try {
-			const roadmapText = readFileSync(resolve(root, ".pfdsl/roadmap.pfdsl"), "utf-8");
+			const roadmapText = readFileSync(
+				resolve(root, ".pfdsl/roadmap.pfdsl"),
+				"utf-8",
+			);
 			const found = findIssueNumberForProcess(roadmapText, best);
 			if (found) {
 				targetIssue = found;
@@ -146,7 +178,13 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 	if (targetIssue != null) {
 		try {
 			const issueJson = JSON.parse(
-				await execGh(["issue", "view", String(targetIssue), "--json", "author,body,comments"]),
+				await execGh([
+					"issue",
+					"view",
+					String(targetIssue),
+					"--json",
+					"author,body,comments",
+				]),
 			);
 			recordOptionCount = detectEnumeratedOptions(issueJson.body).count;
 			const ownerLogin = issueJson.author?.login;
@@ -155,7 +193,11 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 				body: c.body,
 				createdAt: c.createdAt,
 			}));
-			const classification = classifyDesignSettlement({ body: issueJson.body, ownerLogin, comments });
+			const classification = classifyDesignSettlement({
+				body: issueJson.body,
+				ownerLogin,
+				comments,
+			});
 			designUnsettledFor = {
 				issue: targetIssue,
 				source: targetSource,
@@ -169,12 +211,17 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 			designUnsettledError = e.message;
 		}
 	} else if (!designUnsettledError) {
-		designUnsettledError = "no --issue given and no best process to resolve an issue number from";
+		designUnsettledError =
+			"no --issue given and no best process to resolve an issue number from";
 	}
 
 	// bestOutputs[0] のみ使う。複数出力プロセス（例: 1プロセスが複数 artifact を生成する edge）は
 	// 最初の出力のみを gate-check の対象にする単純化。
-	const gateCheckCommand = buildGateCheckCommand(bestOutputs[0] ?? null, base, targetIssue);
+	const gateCheckCommand = buildGateCheckCommand(
+		bestOutputs[0] ?? null,
+		base,
+		targetIssue,
+	);
 
 	const result = {
 		fetched,
@@ -186,7 +233,9 @@ export async function runCycleStatus({ sh, execGh, existsSync, readFileSync, roo
 		ready,
 		best,
 		designUnsettledFor,
-		designRecordTemplate: buildDesignRecordTemplate({ optionCount: recordOptionCount }),
+		designRecordTemplate: buildDesignRecordTemplate({
+			optionCount: recordOptionCount,
+		}),
 		gateCheckCommand,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;

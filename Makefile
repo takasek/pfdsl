@@ -32,11 +32,11 @@ typecheck:
 
 .PHONY: lint
 lint:
-	pnpm biome check packages/
+	pnpm biome check .
 
 .PHONY: format
 format:
-	pnpm biome check --write packages/
+	pnpm biome check --write .
 
 .PHONY: build-deps
 build-deps:

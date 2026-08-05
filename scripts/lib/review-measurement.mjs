@@ -64,19 +64,28 @@ export function parseMeasurementTrailer(text) {
 	const record = { sample: fields.sample, angles: fields.angles };
 	if (fields.tool !== undefined) {
 		if (!REVIEW_TOOLS.includes(fields.tool)) {
-			return { ...record, error: `tool must be one of ${REVIEW_TOOLS.join(", ")}, got ${JSON.stringify(fields.tool)}` };
+			return {
+				...record,
+				error: `tool must be one of ${REVIEW_TOOLS.join(", ")}, got ${JSON.stringify(fields.tool)}`,
+			};
 		}
 		record.tool = fields.tool;
 	}
 
 	if (record.sample !== "in" && record.sample !== "out") {
-		return { ...record, error: `sample must be "in" or "out", got ${JSON.stringify(fields.sample ?? null)}` };
+		return {
+			...record,
+			error: `sample must be "in" or "out", got ${JSON.stringify(fields.sample ?? null)}`,
+		};
 	}
 	if (record.sample === "out") return record;
 
 	for (const key of ["new", "adopted"]) {
 		if (!/^\d+$/.test(fields[key] ?? "")) {
-			return { ...record, error: `${key} must be a non-negative integer on an in-sample record` };
+			return {
+				...record,
+				error: `${key} must be a non-negative integer on an in-sample record`,
+			};
 		}
 		record[key] = Number(fields[key]);
 	}
@@ -151,7 +160,8 @@ export function mergeCycleRecords(records) {
 		merged.new += r.new;
 		merged.adopted += r.adopted;
 		if (r.tool && !merged.tools.includes(r.tool)) merged.tools.push(r.tool);
-		if (r.angles && !merged.angles.includes(r.angles)) merged.angles.push(r.angles);
+		if (r.angles && !merged.angles.includes(r.angles))
+			merged.angles.push(r.angles);
 	}
 	return merged;
 }
@@ -160,10 +170,14 @@ export function mergeCycleRecords(records) {
  * @param {Array<{records: Array<object>}>} cycles - one entry per cycle, in any order
  */
 export function summarize(cycles) {
-	const merged = cycles.map((c) => mergeCycleRecords(c.records)).filter(Boolean);
+	const merged = cycles
+		.map((c) => mergeCycleRecords(c.records))
+		.filter(Boolean);
 	const malformed = merged.filter((r) => r.error);
 	const sampled = merged.filter((r) => r.sample === "in" && !r.error);
-	const outOfSample = merged.filter((r) => r.sample === "out" && !r.error).length;
+	const outOfSample = merged.filter(
+		(r) => r.sample === "out" && !r.error,
+	).length;
 	const cyclesWithFindings = sampled.filter((r) => r.new > 0).length;
 
 	// Per review pass, not per cycle: a cycle that ran two tools is one cycle
@@ -174,7 +188,13 @@ export function summarize(cycles) {
 		for (const r of c.records) {
 			if (r.error || r.sample !== "in") continue;
 			const key = r.tool ?? "unspecified";
-			const bucket = (byTool[key] ??= { passes: 0, withFindings: 0, totalNew: 0, totalAdopted: 0 });
+			byTool[key] ??= {
+				passes: 0,
+				withFindings: 0,
+				totalNew: 0,
+				totalAdopted: 0,
+			};
+			const bucket = byTool[key];
 			bucket.passes += 1;
 			if (r.new > 0) bucket.withFindings += 1;
 			bucket.totalNew += r.new;
@@ -191,7 +211,8 @@ export function summarize(cycles) {
 		totalNew: sampled.reduce((sum, r) => sum + r.new, 0),
 		totalAdopted: sampled.reduce((sum, r) => sum + r.adopted, 0),
 		// Null rather than 0 or NaN: "no data yet" and "measured zero" are different answers.
-		findingRate: sampled.length === 0 ? null : cyclesWithFindings / sampled.length,
+		findingRate:
+			sampled.length === 0 ? null : cyclesWithFindings / sampled.length,
 		remaining: Math.max(0, TARGET_SAMPLE_COUNT - sampled.length),
 	};
 }
@@ -249,14 +270,24 @@ export function classifyCycle({ changedFiles, trailerCount, sample }) {
 	const issues = [];
 
 	if (trailerCount === 0) {
-		if (inSampleByPath) issues.push({ type: "missing", detail: "changed code but carries no record" });
+		if (inSampleByPath)
+			issues.push({
+				type: "missing",
+				detail: "changed code but carries no record",
+			});
 		return { inSampleByPath, issues };
 	}
 
 	if (inSampleByPath && sample === "out") {
-		issues.push({ type: "mismatch", detail: "changed code but recorded sample=out" });
+		issues.push({
+			type: "mismatch",
+			detail: "changed code but recorded sample=out",
+		});
 	} else if (!inSampleByPath && sample === "in") {
-		issues.push({ type: "mismatch", detail: "changed no code but recorded sample=in" });
+		issues.push({
+			type: "mismatch",
+			detail: "changed no code but recorded sample=in",
+		});
 	}
 	return { inSampleByPath, issues };
 }

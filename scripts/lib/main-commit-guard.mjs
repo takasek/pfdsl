@@ -12,7 +12,12 @@
 // payload does not carry it — the hook wrapper resolves it once via `git
 // branch --show-current` and this stays a pure function.
 
-import { gitSubcommand, splitSegments, stripLeadingNoise, tokenize } from "./delegation-guard.mjs";
+import {
+	gitSubcommand,
+	splitSegments,
+	stripLeadingNoise,
+	tokenize,
+} from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 /**
@@ -39,10 +44,15 @@ export function isGitCommitCommand(command) {
  * @param {{currentBranch: string | undefined, mainBranch?: string}} context
  * @returns {{decision: "allow"} | {decision: "deny", reason: string}}
  */
-export function evaluateMainCommitGuard(payload, { currentBranch, mainBranch = "main" } = {}) {
+export function evaluateMainCommitGuard(
+	payload,
+	{ currentBranch, mainBranch = "main" } = {},
+) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
-	if (!isGitCommitCommand(payload?.tool_input?.command)) return { decision: "allow" };
-	if (!currentBranch || currentBranch !== mainBranch) return { decision: "allow" };
+	if (!isGitCommitCommand(payload?.tool_input?.command))
+		return { decision: "allow" };
+	if (!currentBranch || currentBranch !== mainBranch)
+		return { decision: "allow" };
 
 	return {
 		decision: "deny",
@@ -69,7 +79,8 @@ export function runMainCommitGuard(inputText, { resolveBranches }) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 	if (payload?.tool_name !== "Bash") return { shouldOutput: false };
-	if (!isGitCommitCommand(payload?.tool_input?.command)) return { shouldOutput: false };
+	if (!isGitCommitCommand(payload?.tool_input?.command))
+		return { shouldOutput: false };
 
 	const result = evaluateMainCommitGuard(payload, resolveBranches(payload));
 	if (result.decision !== "deny") return { shouldOutput: false };

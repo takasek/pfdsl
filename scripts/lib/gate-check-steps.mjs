@@ -13,6 +13,7 @@
  * and report failure as `{ ok: false, out }`.
  */
 
+import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
 	classifyDesignRecordContent,
 	classifyDesignRecordTiming,
@@ -24,15 +25,18 @@ import {
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
-	selectDesignRecord,
 	SIZE_TRACKED_PATTERNS,
+	selectDesignRecord,
 	statusChangedForArtifact,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
-import { detectEnumeratedOptions } from "./cycle-status.mjs";
-import { classifyCycle, mergeCycleRecords, parseMeasurementRecords } from "./review-measurement.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
+import {
+	classifyCycle,
+	mergeCycleRecords,
+	parseMeasurementRecords,
+} from "./review-measurement.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
 
@@ -45,7 +49,12 @@ const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
  * @returns {{ok: boolean, files: string[], error?: string}}
  */
 export function changedFilesSince({ exec, base }) {
-	const r = exec("git", ["diff", "--diff-filter=d", "--name-only", `origin/${base}...HEAD`]);
+	const r = exec("git", [
+		"diff",
+		"--diff-filter=d",
+		"--name-only",
+		`origin/${base}...HEAD`,
+	]);
 	if (!r.ok) return { ok: false, files: [], error: r.out.trim() };
 	return { ok: true, files: r.out.trim().split("\n").filter(Boolean) };
 }
@@ -65,12 +74,22 @@ export function genPluginIdentityStep({ exec, node, changedFiles }) {
 		!matchesTrigger(changedFiles, GEN_PLUGIN_TRIGGER) &&
 		!matchesTrigger(changedFiles, GEN_INSTALL_TRIGGER)
 	) {
-		return { name, status: "SKIP", detail: "no skill/plugin/install-source changes" };
+		return {
+			name,
+			status: "SKIP",
+			detail: "no skill/plugin/install-source changes",
+		};
 	}
 	const regenerated = node(["scripts/gen-plugin.mjs"]);
 	const clean =
 		regenerated.ok &&
-		exec("git", ["diff", "--exit-code", "--", "plugin", ".claude/skills/pfd-ops/install"]).ok;
+		exec("git", [
+			"diff",
+			"--exit-code",
+			"--",
+			"plugin",
+			".claude/skills/pfd-ops/install",
+		]).ok;
 	return { name, status: clean ? "PASS" : "FAIL" };
 }
 
@@ -81,12 +100,25 @@ export function genPluginIdentityStep({ exec, node, changedFiles }) {
  * two roadmap snapshots, and everything else falls back to "some status: line
  * moved", which is all the diff can honestly say.
  */
-export function outputArtifactStatusStep({ exec, base, artifactKey, noArtifact, changedFiles }) {
+export function outputArtifactStatusStep({
+	exec,
+	base,
+	artifactKey,
+	noArtifact,
+	changedFiles,
+}) {
 	const name = "output artifact status update";
 	const roadmapChanged = changedFiles.includes(ROADMAP_PATH);
 
 	if (noArtifact || (!artifactKey && !roadmapChanged)) {
-		return { name, ...classifyOutputArtifactStatus({ artifactKey, noArtifact, roadmapChanged }) };
+		return {
+			name,
+			...classifyOutputArtifactStatus({
+				artifactKey,
+				noArtifact,
+				roadmapChanged,
+			}),
+		};
 	}
 
 	if (artifactKey) {
@@ -99,14 +131,27 @@ export function outputArtifactStatusStep({ exec, base, artifactKey, noArtifact, 
 				detail: `could not read ${ROADMAP_PATH} at origin/${base} or HEAD`,
 			};
 		}
-		const changed = statusChangedForArtifact(before.out, after.out, artifactKey);
+		const changed = statusChangedForArtifact(
+			before.out,
+			after.out,
+			artifactKey,
+		);
 		return { name, ...classifyOutputArtifactStatus({ artifactKey, changed }) };
 	}
 
-	const diffResult = exec("git", ["diff", `origin/${base}...HEAD`, "--", ROADMAP_PATH]);
-	if (!diffResult.ok) return { name, status: "FAIL", detail: diffResult.out.trim() };
+	const diffResult = exec("git", [
+		"diff",
+		`origin/${base}...HEAD`,
+		"--",
+		ROADMAP_PATH,
+	]);
+	if (!diffResult.ok)
+		return { name, status: "FAIL", detail: diffResult.out.trim() };
 	const changed = hasStatusChange(diffResult.out);
-	return { name, ...classifyOutputArtifactStatus({ artifactKey, roadmapChanged, changed }) };
+	return {
+		name,
+		...classifyOutputArtifactStatus({ artifactKey, roadmapChanged, changed }),
+	};
 }
 
 /**
@@ -114,14 +159,26 @@ export function outputArtifactStatusStep({ exec, base, artifactKey, noArtifact, 
  * not only done at the end. Only the commits' own snapshots can show that, so
  * this walks the roadmap as each commit in the range left it.
  */
-export function wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }) {
+export function wipTransitionStep({
+	exec,
+	base,
+	artifactKey,
+	noArtifact,
+	changedFiles,
+}) {
 	const name = "wip transition";
 	if (noArtifact) return { name, status: "SKIP", detail: NO_ARTIFACT_DETAIL };
 	if (!changedFiles.includes(ROADMAP_PATH)) {
 		return { name, status: "SKIP", detail: `no ${ROADMAP_PATH} changes` };
 	}
 
-	const shasOut = exec("git", ["log", "--format=%H", `origin/${base}..HEAD`, "--", ROADMAP_PATH]);
+	const shasOut = exec("git", [
+		"log",
+		"--format=%H",
+		`origin/${base}..HEAD`,
+		"--",
+		ROADMAP_PATH,
+	]);
 	if (!shasOut.ok) return { name, status: "FAIL", detail: shasOut.out.trim() };
 
 	const snapshots = shasOut.out
@@ -153,7 +210,8 @@ export function wipTransitionStep({ exec, base, artifactKey, noArtifact, changed
  */
 export function designRecordStep({ exec, base, issue, issueError }) {
 	const name = "design-selection record";
-	if (!issue) return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
+	if (!issue)
+		return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
 
 	const ownerLogin = issue.author?.login;
 	const body = issue.body ?? "";
@@ -169,7 +227,11 @@ export function designRecordStep({ exec, base, issue, issueError }) {
 	// record impossible to post without also writing the filer's decision line.
 	const entries = [
 		{ author: ownerLogin, body, createdAt: issue.createdAt },
-		...(issue.comments ?? []).map((c) => ({ author: c.author?.login, body: c.body, createdAt: c.createdAt })),
+		...(issue.comments ?? []).map((c) => ({
+			author: c.author?.login,
+			body: c.body,
+			createdAt: c.createdAt,
+		})),
 	];
 	const record = selectDesignRecord(entries);
 
@@ -177,13 +239,22 @@ export function designRecordStep({ exec, base, issue, issueError }) {
 		return { name, ...classifyDesignRecordTiming(undefined, null) };
 	}
 
-	const firstCommitOut = exec("git", ["log", "--format=%aI", "--reverse", `origin/${base}..HEAD`]);
-	const firstCommitIso = firstCommitOut.ok ? firstCommitOut.out.trim().split("\n")[0] || null : null;
+	const firstCommitOut = exec("git", [
+		"log",
+		"--format=%aI",
+		"--reverse",
+		`origin/${base}..HEAD`,
+	]);
+	const firstCommitIso = firstCommitOut.ok
+		? firstCommitOut.out.trim().split("\n")[0] || null
+		: null;
 
 	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso);
 	const content = classifyDesignRecordContent(record.body, optionCount);
-	const detail = [timing.detail, content.detail].filter(Boolean).join("; ") || undefined;
-	if (timing.status === "FAIL" || content.status === "FAIL") return { name, status: "FAIL", detail };
+	const detail =
+		[timing.detail, content.detail].filter(Boolean).join("; ") || undefined;
+	if (timing.status === "FAIL" || content.status === "FAIL")
+		return { name, status: "FAIL", detail };
 	if (timing.status === "SKIP") return { name, status: "SKIP", detail };
 	return { name, status: "PASS", detail };
 }
@@ -221,14 +292,23 @@ export function collectSizeDeltas({ exec, base, changedFiles }) {
  */
 export function sizeDirectionStep({ exec, issue, issueError, deltas }) {
 	const name = "knowledge-artifact size direction";
-	if (!issue) return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
+	if (!issue)
+		return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
 
 	const issueBody = issue.body ?? "";
 	// The verdict needs the PR body; the SKIP does not. Asking gh for a PR that
 	// most cycles will not be judged against is the one subprocess worth saving.
-	if (!hasShrinkIntent(issueBody)) return { name, ...classifySizeDirection({ issueBody, deltas }) };
+	if (!hasShrinkIntent(issueBody))
+		return { name, ...classifySizeDirection({ issueBody, deltas }) };
 
-	const prBodyResult = exec("gh", ["pr", "view", "--json", "body", "--jq", ".body"]);
+	const prBodyResult = exec("gh", [
+		"pr",
+		"view",
+		"--json",
+		"body",
+		"--jq",
+		".body",
+	]);
 	const prBody = prBodyResult.ok ? prBodyResult.out : "";
 
 	return { name, ...classifySizeDirection({ issueBody, deltas, prBody }) };
@@ -247,11 +327,18 @@ export function sizeDirectionStep({ exec, issue, issueError, deltas }) {
  */
 export function commitSubjectStep({ exec, base }) {
 	const name = "commit subject lint";
-	const subjectsOut = exec("git", ["log", "--no-merges", `origin/${base}..HEAD`, "--format=%s"]);
-	if (!subjectsOut.ok) return { name, status: "FAIL", detail: subjectsOut.out.trim() };
+	const subjectsOut = exec("git", [
+		"log",
+		"--no-merges",
+		`origin/${base}..HEAD`,
+		"--format=%s",
+	]);
+	if (!subjectsOut.ok)
+		return { name, status: "FAIL", detail: subjectsOut.out.trim() };
 
 	const subjects = subjectsOut.out.trim().split("\n").filter(Boolean);
-	if (subjects.length === 0) return { name, status: "SKIP", detail: "no commits in range" };
+	if (subjects.length === 0)
+		return { name, status: "SKIP", detail: "no commits in range" };
 
 	const failed = lintCommitSubjects(subjects).filter((r) => !r.ok);
 	return {
@@ -278,7 +365,11 @@ export function commitSubjectStep({ exec, base }) {
 export function checkDocsStep({ exec }) {
 	const name = "check-docs";
 	const r = exec("make", ["check-docs"]);
-	return { name, status: r.ok ? "PASS" : "FAIL", detail: r.ok ? undefined : r.out.trim().slice(-400) };
+	return {
+		name,
+		status: r.ok ? "PASS" : "FAIL",
+		detail: r.ok ? undefined : r.out.trim().slice(-400),
+	};
 }
 
 /**
@@ -294,7 +385,12 @@ export function checkDocsStep({ exec }) {
  */
 export function reviewMeasurementStep({ exec, base, changedFiles }) {
 	const name = "Review-Measurement record";
-	const bodies = exec("git", ["log", "--no-merges", `origin/${base}..HEAD`, "--format=%B"]);
+	const bodies = exec("git", [
+		"log",
+		"--no-merges",
+		`origin/${base}..HEAD`,
+		"--format=%B",
+	]);
 	if (!bodies.ok) return { name, status: "FAIL", detail: bodies.out.trim() };
 
 	const records = parseMeasurementRecords(bodies.out);
@@ -307,10 +403,14 @@ export function reviewMeasurementStep({ exec, base, changedFiles }) {
 
 	const problems = issues.map((i) => i.detail);
 	if (merged?.error) problems.push(`malformed record: ${merged.error}`);
-	if (problems.length > 0) return { name, status: "FAIL", detail: problems.join("; ") };
+	if (problems.length > 0)
+		return { name, status: "FAIL", detail: problems.join("; ") };
 	return {
 		name,
 		status: "PASS",
-		detail: records.length === 0 ? "prose-only branch, no record owed" : `${records.length} record(s)`,
+		detail:
+			records.length === 0
+				? "prose-only branch, no record owed"
+				: `${records.length} record(s)`,
 	};
 }

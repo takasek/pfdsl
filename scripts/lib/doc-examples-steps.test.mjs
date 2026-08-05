@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { runDocExamplesCheck } from "./doc-examples-steps.mjs";
 
@@ -14,7 +14,10 @@ describe("runDocExamplesCheck", () => {
 		});
 		assert.equal(result.exitCode, 0);
 		assert.deepEqual(result.messages, [
-			{ stream: "log", text: "check-doc-examples: checked 0 block(s) across 1 file(s)" },
+			{
+				stream: "log",
+				text: "check-doc-examples: checked 0 block(s) across 1 file(s)",
+			},
 			{ stream: "log", text: "check-doc-examples: OK" },
 		]);
 	});
@@ -29,7 +32,10 @@ describe("runDocExamplesCheck", () => {
 		});
 		assert.equal(result.exitCode, 1);
 		assert.deepEqual(result.messages, [
-			{ stream: "error", text: "Error reading missing.md: ENOENT: no such file" },
+			{
+				stream: "error",
+				text: "Error reading missing.md: ENOENT: no such file",
+			},
 		]);
 	});
 
@@ -37,7 +43,8 @@ describe("runDocExamplesCheck", () => {
 		const calls = [];
 		const result = runDocExamplesCheck({
 			files: ["a.md"],
-			readFile: () => ["```pfdsl", "a: {}", "```", "```pfdsl", "b: {}", "```"].join("\n"),
+			readFile: () =>
+				["```pfdsl", "a: {}", "```", "```pfdsl", "b: {}", "```"].join("\n"),
 			exec: (block) => {
 				calls.push(block.content);
 				return { status: 0 };
@@ -45,21 +52,30 @@ describe("runDocExamplesCheck", () => {
 		});
 		assert.deepEqual(calls, ["a: {}", "b: {}"]);
 		assert.equal(result.exitCode, 0);
-		assert.ok(result.messages.some((m) => m.text.includes("checked 2 block(s)")));
+		assert.ok(
+			result.messages.some((m) => m.text.includes("checked 2 block(s)")),
+		);
 	});
 
 	it("counts a nonzero exec status as a failure and prints its stdout/stderr", () => {
 		const result = runDocExamplesCheck({
 			files: ["a.md"],
 			readFile: () => ["```pfdsl", "broken", "```"].join("\n"),
-			exec: () => ({ status: 1, stdout: "diagnostic output", stderr: "stderr output" }),
+			exec: () => ({
+				status: 1,
+				stdout: "diagnostic output",
+				stderr: "stderr output",
+			}),
 		});
 		assert.equal(result.exitCode, 1);
 		assert.deepEqual(result.messages, [
 			{ stream: "error", text: "a.md:1: pfdsl block check FAILED" },
 			{ stream: "stdout", text: "diagnostic output" },
 			{ stream: "stderr", text: "stderr output" },
-			{ stream: "log", text: "check-doc-examples: checked 1 block(s) across 1 file(s)" },
+			{
+				stream: "log",
+				text: "check-doc-examples: checked 1 block(s) across 1 file(s)",
+			},
 			{ stream: "error", text: "1 block(s) failed." },
 		]);
 	});
@@ -72,7 +88,10 @@ describe("runDocExamplesCheck", () => {
 		});
 		assert.deepEqual(result.messages, [
 			{ stream: "error", text: "a.md:1: pfdsl block check FAILED" },
-			{ stream: "log", text: "check-doc-examples: checked 1 block(s) across 1 file(s)" },
+			{
+				stream: "log",
+				text: "check-doc-examples: checked 1 block(s) across 1 file(s)",
+			},
 			{ stream: "error", text: "1 block(s) failed." },
 		]);
 	});
@@ -85,10 +104,15 @@ describe("runDocExamplesCheck", () => {
 		const result = runDocExamplesCheck({
 			files: ["a.md", "b.md"],
 			readFile: (file) => texts[file],
-			exec: (block) => (block.filePath === "b.md" ? { status: 1 } : { status: 0 }),
+			exec: (block) =>
+				block.filePath === "b.md" ? { status: 1 } : { status: 0 },
 		});
 		assert.equal(result.exitCode, 1);
-		assert.ok(result.messages.some((m) => m.text.includes("checked 2 block(s) across 2 file(s)")));
+		assert.ok(
+			result.messages.some((m) =>
+				m.text.includes("checked 2 block(s) across 2 file(s)"),
+			),
+		);
 		assert.ok(result.messages.some((m) => m.text === "1 block(s) failed."));
 	});
 });

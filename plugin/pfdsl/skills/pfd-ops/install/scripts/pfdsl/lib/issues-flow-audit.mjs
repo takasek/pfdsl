@@ -3,7 +3,10 @@
 
 export const FLOW_LABELS = [
 	{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" },
-	{ name: "flow:exempt", description: "intentionally out of .pfdsl/roadmap.pfdsl scope" },
+	{
+		name: "flow:exempt",
+		description: "intentionally out of .pfdsl/roadmap.pfdsl scope",
+	},
 ];
 
 /**
@@ -48,7 +51,9 @@ export function parseIssueProcesses(frontmatter) {
 	for (const [id, val] of Object.entries(process)) {
 		const prefixMatch = id.match(/^(?:i\d+_)+/);
 		if (!prefixMatch) continue;
-		const issueNumbers = [...prefixMatch[0].matchAll(/i(\d+)_/g)].map((m) => Number(m[1]));
+		const issueNumbers = [...prefixMatch[0].matchAll(/i(\d+)_/g)].map((m) =>
+			Number(m[1]),
+		);
 		const tags = val.tags ?? [];
 		const priorities = tags.filter((t) => t.startsWith("priority:")).sort();
 		result.push({ id, issueNumbers, updatedAt: val.updated_at, priorities });
@@ -91,7 +96,8 @@ export function computeFindings(entries, issues) {
 			// left to fix. `status` is not observed here: "done" does not prove demotion ran,
 			// it's also the normal end-state of this repo's completion-then-close ordering.
 			if (entry.hasDownstream) {
-				const hasTrackingFields = entry.updatedAt !== undefined || entry.priorities.length > 0;
+				const hasTrackingFields =
+					entry.updatedAt !== undefined || entry.priorities.length > 0;
 				if (!hasTrackingFields) {
 					continue;
 				}
@@ -151,7 +157,9 @@ export function computeFindings(entries, issues) {
 		}
 
 		// Priority drift
-		const issuePriorities = iss.labels.filter((l) => l.startsWith("priority:")).sort();
+		const issuePriorities = iss.labels
+			.filter((l) => l.startsWith("priority:"))
+			.sort();
 		if (JSON.stringify(issuePriorities) !== JSON.stringify(entry.priorities)) {
 			findings.push({
 				type: "priority_drift",
@@ -225,7 +233,9 @@ export function applyFixes(doc, findings, issuesByNumber) {
 				const arr = existingTags.toJSON ? existingTags.toJSON() : existingTags;
 				nonPriorityTags = arr.filter((t) => !t.startsWith("priority:"));
 			}
-			const issuePriorities = issue.labels.filter((l) => l.startsWith("priority:")).sort();
+			const issuePriorities = issue.labels
+				.filter((l) => l.startsWith("priority:"))
+				.sort();
 			const newTags = [...nonPriorityTags, ...issuePriorities];
 			if (newTags.length === 0) {
 				doc.deleteIn(["process", processId, "tags"]);
@@ -271,7 +281,10 @@ function parseEdgeLine(line) {
 	const process = m[2];
 	const isList = m[3].startsWith("[");
 	const outputs = isList
-		? m[4].split(",").map((s) => s.trim()).filter(Boolean)
+		? m[4]
+				.split(",")
+				.map((s) => s.trim())
+				.filter(Boolean)
 		: [m[5]];
 	return { raw: line, prefix, process, outputs, isList };
 }
@@ -310,11 +323,13 @@ export function normalizeBody(body) {
  */
 export function applyClosedInFlowFixes(doc, body, findings, issuesByNumber) {
 	const closedFindings = findings.filter(
-		(f) => (f.type === "closed_in_flow" || f.type === "closed_not_planned") && f.fixVia === "flow",
+		(f) =>
+			(f.type === "closed_in_flow" || f.type === "closed_not_planned") &&
+			f.fixVia === "flow",
 	);
 	if (closedFindings.length === 0) return body;
 
-	let lines = body.split("\n");
+	const lines = body.split("\n");
 
 	for (const finding of closedFindings) {
 		const { processId, artifactId, hasDownstream } = finding;
@@ -324,12 +339,19 @@ export function applyClosedInFlowFixes(doc, body, findings, issuesByNumber) {
 			// know whether removing this artifact would fully retire the process.
 			const edgeIdx = lines.findIndex((line) => {
 				const parsed = parseEdgeLine(line);
-				return parsed && parsed.process === processId && parsed.outputs.includes(artifactId);
+				return (
+					parsed &&
+					parsed.process === processId &&
+					parsed.outputs.includes(artifactId)
+				);
 			});
 
-			const remainingOutputs = edgeIdx >= 0
-				? parseEdgeLine(lines[edgeIdx]).outputs.filter((o) => o !== artifactId)
-				: null;
+			const remainingOutputs =
+				edgeIdx >= 0
+					? parseEdgeLine(lines[edgeIdx]).outputs.filter(
+							(o) => o !== artifactId,
+						)
+					: null;
 
 			if (remainingOutputs !== null && remainingOutputs.length === 0) {
 				// A1: this would be the process's last output. Only retire the whole process
@@ -338,7 +360,9 @@ export function applyClosedInFlowFixes(doc, body, findings, issuesByNumber) {
 				const issueNumbers = prefixMatch
 					? [...prefixMatch[0].matchAll(/i(\d+)_/g)].map((m) => Number(m[1]))
 					: [];
-				const allClosed = issueNumbers.every((n) => issuesByNumber.get(n)?.state === "CLOSED");
+				const allClosed = issueNumbers.every(
+					(n) => issuesByNumber.get(n)?.state === "CLOSED",
+				);
 				if (!allClosed) continue;
 
 				doc.deleteIn(["artifact", artifactId]);

@@ -23,7 +23,11 @@ import { pathToFileURL } from "node:url";
  * @param {{realpath?: (p: string) => string}} [deps]
  * @returns {boolean}
  */
-export function isCliEntrypoint(metaUrl, argv1, { realpath = realpathSync } = {}) {
+export function isCliEntrypoint(
+	metaUrl,
+	argv1,
+	{ realpath = realpathSync } = {},
+) {
 	if (!argv1) return false;
 	let resolved = argv1;
 	try {

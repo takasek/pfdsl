@@ -6,7 +6,15 @@
 // Mirrors the scripts/check-scaffold-sync.mjs / scripts/lib/check-scaffold-sync.mjs
 // split: pure logic here, thin CLI wrapper in ../gen-install.mjs.
 
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import {
+	chmodSync,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	statSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 
 import { listInstallFiles } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
@@ -68,5 +76,9 @@ export function genInstall(root, templatePaths = INSTALL_TEMPLATE_PATHS) {
 		}
 	}
 
-	return { changed: changed.sort(), unchanged: unchanged.sort(), removed: removed.sort() };
+	return {
+		changed: changed.sort(),
+		unchanged: unchanged.sort(),
+		removed: removed.sort(),
+	};
 }

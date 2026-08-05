@@ -20,7 +20,9 @@ export function checkScaffoldSync(canonicalDir, deployedDir) {
 	return listInstallFiles(canonicalDir).map((rel) => {
 		const deployedPath = join(deployedDir, rel);
 		if (!existsSync(deployedPath)) return { path: rel, status: "missing" };
-		const same = readFileSync(join(canonicalDir, rel)).equals(readFileSync(deployedPath));
+		const same = readFileSync(join(canonicalDir, rel)).equals(
+			readFileSync(deployedPath),
+		);
 		return { path: rel, status: same ? "ok" : "modified" };
 	});
 }

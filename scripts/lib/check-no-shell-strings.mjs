@@ -22,8 +22,10 @@ const SHELL_OPTION = /\bshell\s*:\s*true\b/;
 /** Names that execute through a shell when imported from child_process. */
 const SHELL_EXECUTORS = new Set(["exec", "execSync"]);
 
-const IMPORT_FROM_CHILD_PROCESS = /import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["']/g;
-const REQUIRE_CHILD_PROCESS = /require\(\s*["'](?:node:)?child_process["']\s*\)/;
+const IMPORT_FROM_CHILD_PROCESS =
+	/import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["']/g;
+const REQUIRE_CHILD_PROCESS =
+	/require\(\s*["'](?:node:)?child_process["']\s*\)/;
 
 /**
  * Files the gate leaves alone. Everything else tracked as `.mjs` is scanned:
@@ -45,7 +47,9 @@ function isExcluded(file) {
  * @returns {string[]} the subset the gate scans
  */
 export function selectScannedFiles(trackedFiles) {
-	return trackedFiles.filter((file) => file.endsWith(".mjs") && !isExcluded(file));
+	return trackedFiles.filter(
+		(file) => file.endsWith(".mjs") && !isExcluded(file),
+	);
 }
 
 /**
@@ -58,7 +62,10 @@ export function findShellExecutors(source) {
 	for (const match of source.matchAll(IMPORT_FROM_CHILD_PROCESS)) {
 		for (const clause of match[1].split(",")) {
 			// `execSync as sh` still names execSync on the left of `as`.
-			const imported = clause.trim().split(/\s+as\s+/)[0].trim();
+			const imported = clause
+				.trim()
+				.split(/\s+as\s+/)[0]
+				.trim();
 			if (!SHELL_EXECUTORS.has(imported)) continue;
 			findings.push({
 				line: lineOf(source, match.index),
@@ -69,11 +76,15 @@ export function findShellExecutors(source) {
 
 	if (REQUIRE_CHILD_PROCESS.test(source)) {
 		const idx = source.search(REQUIRE_CHILD_PROCESS);
-		findings.push({ line: lineOf(source, idx), reason: "requires child_process" });
+		findings.push({
+			line: lineOf(source, idx),
+			reason: "requires child_process",
+		});
 	}
 
 	source.split("\n").forEach((text, i) => {
-		if (SHELL_OPTION.test(text)) findings.push({ line: i + 1, reason: "passes shell: true" });
+		if (SHELL_OPTION.test(text))
+			findings.push({ line: i + 1, reason: "passes shell: true" });
 	});
 
 	return findings;

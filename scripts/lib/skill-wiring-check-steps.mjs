@@ -21,7 +21,11 @@ const PIPELINE = ".pfdsl/runtime-pipeline.pfdsl";
  * }} deps readFile is root-bound, so paths are repo-relative
  * @returns {{exitCode: 0|1, stdoutLines: string[], stderrLines: string[]}}
  */
-export function runSkillWiringCheck({ readFile, analyzeFile, mirrors = PLUGIN_MIRRORS }) {
+export function runSkillWiringCheck({
+	readFile,
+	analyzeFile,
+	mirrors = PLUGIN_MIRRORS,
+}) {
 	const workflowText = readFile(WORKFLOW);
 	const workflow = analyzeFile(workflowText);
 	const pipeline = analyzeFile(readFile(PIPELINE));
@@ -34,7 +38,11 @@ export function runSkillWiringCheck({ readFile, analyzeFile, mirrors = PLUGIN_MI
 	});
 
 	if (findings.length === 0) {
-		return { exitCode: 0, stdoutLines: ["check-skill-wiring: OK"], stderrLines: [] };
+		return {
+			exitCode: 0,
+			stdoutLines: ["check-skill-wiring: OK"],
+			stderrLines: [],
+		};
 	}
 
 	const stderrLines = findings.map((finding) => {

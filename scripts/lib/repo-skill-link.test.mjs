@@ -1,7 +1,10 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
-import { decideSkillLinkAction, SKILL_LINK_TARGET as TARGET } from "./repo-skill-link.mjs";
+import {
+	decideSkillLinkAction,
+	SKILL_LINK_TARGET as TARGET,
+} from "./repo-skill-link.mjs";
 
 describe("decideSkillLinkAction", () => {
 	it("creates the link when nothing is at the path", () => {
@@ -10,7 +13,10 @@ describe("decideSkillLinkAction", () => {
 	});
 
 	it("leaves an already-correct link alone", () => {
-		const decision = decideSkillLinkAction({ present: true, isSymlink: true, linkTarget: TARGET }, TARGET);
+		const decision = decideSkillLinkAction(
+			{ present: true, isSymlink: true, linkTarget: TARGET },
+			TARGET,
+		);
 		assert.equal(decision.action, "ok");
 	});
 
@@ -27,7 +33,10 @@ describe("decideSkillLinkAction", () => {
 	// generated directory, which is exactly the copy that goes stale on a
 	// branch switch (#714). Replacing it is safe — it is gitignored output.
 	it("replaces a real directory left over from the generated-copy era", () => {
-		const decision = decideSkillLinkAction({ present: true, isSymlink: false }, TARGET);
+		const decision = decideSkillLinkAction(
+			{ present: true, isSymlink: false },
+			TARGET,
+		);
 		assert.equal(decision.action, "replace");
 	});
 });

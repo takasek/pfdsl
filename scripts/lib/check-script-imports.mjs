@@ -142,7 +142,10 @@ export function findDistDependentFiles(files) {
 	for (const file of files) {
 		const code = stripComments(readFileSync(file, "utf-8"));
 		if (/node:child_process/.test(code)) {
-			violations.push({ file, reason: "imports node:child_process (that's how CLI dist gets invoked)" });
+			violations.push({
+				file,
+				reason: "imports node:child_process (that's how CLI dist gets invoked)",
+			});
 		}
 		if (/dist[\\/]cli\.js|cli[\\/]dist/.test(code)) {
 			violations.push({ file, reason: "references packages/cli/dist" });

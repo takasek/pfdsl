@@ -28,16 +28,19 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 import {
-	RELEASE_KINDS,
 	bumpVersionInPackageJson,
-	tagName,
-	pinMarketplaceSourceToTag,
 	filesToCommitForBump,
+	pinMarketplaceSourceToTag,
+	RELEASE_KINDS,
 	releaseMilestoneArtifactIds,
+	tagName,
 } from "./lib/release-config.mjs";
-import { repoDeps as specHistoryRepoDeps, runSpecHistoryCheck } from "./lib/spec-history-check.mjs";
-import { parseHost } from "./pfdsl/lib/github-rest.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
+import {
+	runSpecHistoryCheck,
+	repoDeps as specHistoryRepoDeps,
+} from "./lib/spec-history-check.mjs";
+import { parseHost } from "./pfdsl/lib/github-rest.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -47,7 +50,11 @@ function run(cmd, args, opts = {}) {
 }
 
 function capture(cmd, args, opts = {}) {
-	return execFileSync(cmd, args, { cwd: root, encoding: "utf-8", ...opts }).trim();
+	return execFileSync(cmd, args, {
+		cwd: root,
+		encoding: "utf-8",
+		...opts,
+	}).trim();
 }
 
 // Pin GH_HOST to this repo's own remote host so `gh` doesn't fail under an
@@ -92,7 +99,9 @@ const kindArg = parsed.positionals[0];
 const explicitVersion = parsed.values.version;
 const kind = RELEASE_KINDS[kindArg];
 if (!kind) {
-	fail(`unknown release kind '${kindArg}' (expected one of: ${Object.keys(RELEASE_KINDS).join(", ")})`);
+	fail(
+		`unknown release kind '${kindArg}' (expected one of: ${Object.keys(RELEASE_KINDS).join(", ")})`,
+	);
 }
 
 // --- 1. branch check ---
@@ -120,7 +129,9 @@ if (capture("git", ["status", "--porcelain"]) !== "") {
 // --- 4. resolve target version ---
 
 const firstPackagePath = resolve(root, kind.packages[0]);
-const currentVersion = JSON.parse(readFileSync(firstPackagePath, "utf-8")).version;
+const currentVersion = JSON.parse(
+	readFileSync(firstPackagePath, "utf-8"),
+).version;
 const version = explicitVersion ?? currentVersion;
 
 // --- 5. tag-duplicate check ---
@@ -136,7 +147,9 @@ try {
 
 // --- 6. pre-tag checks ---
 
-console.log("Running pre-tag checks (build, test, check-docs, gen-plugin identity, distribution review)...");
+console.log(
+	"Running pre-tag checks (build, test, check-docs, gen-plugin identity, distribution review)...",
+);
 run("make", ["build"]);
 run("make", ["test"]);
 run("make", ["check-docs"]);
@@ -152,7 +165,9 @@ try {
 	});
 } catch (err) {
 	if (err.status === undefined) throw err; // execFileSync itself failed to spawn
-	fail("generated plugin dir (plugin/pfdsl) is stale — run 'make gen-plugin' and commit the result before releasing.");
+	fail(
+		"generated plugin dir (plugin/pfdsl) is stale — run 'make gen-plugin' and commit the result before releasing.",
+	);
 }
 
 // Has anyone read what the bundle now says, as someone who is not sitting in
@@ -162,7 +177,11 @@ try {
 // once under deadline becomes the way the gate is passed.
 // The child prints the file list and what to do about it, so this only has to
 // stop the release — restating the reason here would double-report it.
-const reviewCheck = tryRun(process.execPath, [resolve(root, "scripts/check-distribution-review.mjs")], { cwd: root });
+const reviewCheck = tryRun(
+	process.execPath,
+	[resolve(root, "scripts/check-distribution-review.mjs")],
+	{ cwd: root },
+);
 if (!reviewCheck.ok) process.exit(1);
 console.log(reviewCheck.out.trim());
 
@@ -182,7 +201,10 @@ if (!specHistoryResult.ok) process.exit(1);
 if (explicitVersion) {
 	for (const pkgPath of kind.packages) {
 		const abs = resolve(root, pkgPath);
-		writeFileSync(abs, bumpVersionInPackageJson(readFileSync(abs, "utf-8"), explicitVersion));
+		writeFileSync(
+			abs,
+			bumpVersionInPackageJson(readFileSync(abs, "utf-8"), explicitVersion),
+		);
 	}
 	if (kindArg === "cli") {
 		// The bump above just changed packages/cli/package.json's version, which
@@ -207,7 +229,11 @@ if (kindArg === "cli") {
 	if (after !== before) {
 		writeFileSync(marketplacePath, after);
 		run("git", ["add", ".claude-plugin/marketplace.json"]);
-		run("git", ["commit", "-m", `chore(plugin): pin marketplace source to ${tag}`]);
+		run("git", [
+			"commit",
+			"-m",
+			`chore(plugin): pin marketplace source to ${tag}`,
+		]);
 	}
 }
 
@@ -218,7 +244,9 @@ run("git", ["push", "origin", "main", "--quiet"]);
 // --- 9. kind-specific pre-tag step ---
 
 if (kindArg === "vscode") {
-	run("vsce", ["package", "--no-dependencies"], { cwd: resolve(root, "packages/vscode-extension") });
+	run("vsce", ["package", "--no-dependencies"], {
+		cwd: resolve(root, "packages/vscode-extension"),
+	});
 }
 
 // --- 10. tag + push tag ---
@@ -263,19 +291,39 @@ if (kind.workflow) {
 if (kindArg === "cli") {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	const roadmapPath = resolve(root, ".pfdsl/roadmap.pfdsl");
-	const readyOutput = capture("node", [cliPath, "status", "ready", roadmapPath, "--json"]);
+	const readyOutput = capture("node", [
+		cliPath,
+		"status",
+		"ready",
+		roadmapPath,
+		"--json",
+	]);
 	const { ready } = JSON.parse(readyOutput);
 	const artifactIds = releaseMilestoneArtifactIds(ready);
 
 	if (artifactIds.length === 0) {
-		console.log("No roadmap release milestone is ready to mark done (this release ships no planned milestone).");
+		console.log(
+			"No roadmap release milestone is ready to mark done (this release ships no planned milestone).",
+		);
 	} else {
 		for (const artifactId of artifactIds) {
 			console.log(`Marking roadmap artifact ${artifactId} as done...`);
-			run("node", [cliPath, "meta", "set", roadmapPath, artifactId, "status", "done"]);
+			run("node", [
+				cliPath,
+				"meta",
+				"set",
+				roadmapPath,
+				artifactId,
+				"status",
+				"done",
+			]);
 		}
 		run("git", ["add", roadmapPath]);
-		run("git", ["commit", "-m", `chore(roadmap): mark ${artifactIds.join(", ")} as done`]);
+		run("git", [
+			"commit",
+			"-m",
+			`chore(roadmap): mark ${artifactIds.join(", ")} as done`,
+		]);
 		run("git", ["push", "origin", "main", "--quiet"]);
 	}
 }

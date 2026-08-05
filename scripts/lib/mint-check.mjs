@@ -20,8 +20,8 @@
  * No I/O — callers read files and pass text in, mirroring the sibling libs.
  */
 
-import { findSpecIdDefinitions, findStrictRefs } from "./spec-id-check.mjs";
 import { findForwardRefMarkers } from "./forward-ref-marker-check.mjs";
+import { findSpecIdDefinitions, findStrictRefs } from "./spec-id-check.mjs";
 
 /**
  * Ensure the argument carries the fixed `SPEC_` prefix (ADR-0027 §"命名").

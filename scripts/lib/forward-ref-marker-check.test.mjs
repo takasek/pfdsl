@@ -1,10 +1,10 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 import {
 	findForwardRefMarkers,
 	findImplementsMarkers,
-	matchResolvedForwardRefs,
 	formatResolvedForwardRefs,
+	matchResolvedForwardRefs,
 } from "./forward-ref-marker-check.mjs";
 
 describe("findForwardRefMarkers", () => {
@@ -74,7 +74,8 @@ describe("findForwardRefMarkers", () => {
 
 describe("findImplementsMarkers", () => {
 	it("finds a single marker on a heading line", () => {
-		const text = "line one\n## Multifile (SPEC_multifile_cross_ref)\nline three";
+		const text =
+			"line one\n## Multifile (SPEC_multifile_cross_ref)\nline three";
 		const hits = findImplementsMarkers(text);
 		assert.equal(hits.length, 1);
 		assert.equal(hits[0].line, 2);
@@ -135,8 +136,12 @@ describe("matchResolvedForwardRefs", () => {
 	});
 
 	it("matches when forward-ref and implements share the same id", () => {
-		const forwardRefHits = [{ file: "spec.md", line: 10, id: "SPEC_multifile" }];
-		const implementsHits = [{ file: "spec.md", line: 20, id: "SPEC_multifile" }];
+		const forwardRefHits = [
+			{ file: "spec.md", line: 10, id: "SPEC_multifile" },
+		];
+		const implementsHits = [
+			{ file: "spec.md", line: 20, id: "SPEC_multifile" },
+		];
 		const resolved = matchResolvedForwardRefs(forwardRefHits, implementsHits);
 		assert.equal(resolved.length, 1);
 		assert.equal(resolved[0].id, "SPEC_multifile");
@@ -145,7 +150,9 @@ describe("matchResolvedForwardRefs", () => {
 	});
 
 	it("matches ids across multiple files", () => {
-		const forwardRefHits = [{ file: "spec.md", line: 10, id: "SPEC_multifile" }];
+		const forwardRefHits = [
+			{ file: "spec.md", line: 10, id: "SPEC_multifile" },
+		];
 		const implementsHits = [
 			{ file: "other.md", line: 5, id: "SPEC_multifile" },
 		];
@@ -156,7 +163,9 @@ describe("matchResolvedForwardRefs", () => {
 	});
 
 	it("collects multiple implements hits for the same forward-ref id", () => {
-		const forwardRefHits = [{ file: "spec.md", line: 10, id: "SPEC_multifile" }];
+		const forwardRefHits = [
+			{ file: "spec.md", line: 10, id: "SPEC_multifile" },
+		];
 		const implementsHits = [
 			{ file: "a.md", line: 1, id: "SPEC_multifile" },
 			{ file: "b.md", line: 2, id: "SPEC_multifile" },

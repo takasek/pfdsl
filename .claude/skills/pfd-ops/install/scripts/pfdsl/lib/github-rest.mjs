@@ -29,10 +29,15 @@ const MAX_PAGES = 100;
 export function parseOwnerRepo(remoteUrl) {
 	const stripped = remoteUrl.trim().replace(/\.git$/, "");
 	const scpMatch = stripped.match(/^[\w.-]+@[\w.-]+:(.+)$/);
-	const pathPart = scpMatch ? scpMatch[1] : stripped.replace(/^\w+:\/\/(?:[^/@]+@)?[^/]+/, "");
+	const pathPart = scpMatch
+		? scpMatch[1]
+		: stripped.replace(/^\w+:\/\/(?:[^/@]+@)?[^/]+/, "");
 	const segments = pathPart.split("/").filter(Boolean);
 	if (segments.length < 2) return null;
-	return { owner: segments[segments.length - 2], repo: segments[segments.length - 1] };
+	return {
+		owner: segments[segments.length - 2],
+		repo: segments[segments.length - 1],
+	};
 }
 
 /**
@@ -59,7 +64,10 @@ export function parseHost(remoteUrl) {
  * @returns {{name: string, description: string}[]}
  */
 export function mapLabelsResponse(apiLabels) {
-	return apiLabels.map((l) => ({ name: l.name, description: l.description ?? "" }));
+	return apiLabels.map((l) => ({
+		name: l.name,
+		description: l.description ?? "",
+	}));
 }
 
 /**
@@ -77,7 +85,9 @@ export function mapIssuesResponse(apiIssues) {
 			number: i.number,
 			state: String(i.state).toUpperCase(),
 			stateReason: i.state_reason ? String(i.state_reason).toUpperCase() : null,
-			labels: (i.labels ?? []).map((l) => ({ name: typeof l === "string" ? l : l.name })),
+			labels: (i.labels ?? []).map((l) => ({
+				name: typeof l === "string" ? l : l.name,
+			})),
 			updatedAt: i.updated_at,
 		}));
 }
@@ -91,7 +101,10 @@ export function mapIssuesResponse(apiIssues) {
  */
 export function mapCheckRunsToRollup(checkRuns) {
 	return checkRuns.map((run) => ({
-		conclusion: run.status === "completed" && run.conclusion ? run.conclusion.toUpperCase() : null,
+		conclusion:
+			run.status === "completed" && run.conclusion
+				? run.conclusion.toUpperCase()
+				: null,
 	}));
 }
 
@@ -115,7 +128,9 @@ function authHeaders({ token }) {
 async function request(fetchImpl, url, init) {
 	const res = await fetchImpl(url, init);
 	if (!res.ok) {
-		throw new Error(`GitHub REST API ${init?.method ?? "GET"} ${url} failed: ${res.status} ${await res.text()}`);
+		throw new Error(
+			`GitHub REST API ${init?.method ?? "GET"} ${url} failed: ${res.status} ${await res.text()}`,
+		);
 	}
 	return res;
 }
@@ -149,10 +164,18 @@ async function request(fetchImpl, url, init) {
  * @param {number} [maxPages]
  * @returns {Promise<any[]>}
  */
-async function fetchAllPages(fetchImpl, buildUrl, token, getPageItems = (body) => body, maxPages = MAX_PAGES) {
+async function fetchAllPages(
+	fetchImpl,
+	buildUrl,
+	token,
+	getPageItems = (body) => body,
+	maxPages = MAX_PAGES,
+) {
 	const all = [];
 	for (let page = 1; page <= maxPages; page++) {
-		const res = await request(fetchImpl, buildUrl(page), { headers: authHeaders({ token }) });
+		const res = await request(fetchImpl, buildUrl(page), {
+			headers: authHeaders({ token }),
+		});
 		const batch = getPageItems(await res.json());
 		all.push(...batch);
 		if (batch.length < PER_PAGE) return all;
@@ -169,10 +192,16 @@ async function fetchAllPages(fetchImpl, buildUrl, token, getPageItems = (body) =
  * @param {typeof fetch} [fetchImpl]
  * @returns {Promise<{name: string, description: string}[]>}
  */
-export async function fetchAllLabels(owner, repo, token, fetchImpl = proxyAwareFetch) {
+export async function fetchAllLabels(
+	owner,
+	repo,
+	token,
+	fetchImpl = proxyAwareFetch,
+) {
 	const raw = await fetchAllPages(
 		fetchImpl,
-		(page) => `${API_ROOT}/repos/${owner}/${repo}/labels?per_page=${PER_PAGE}&page=${page}`,
+		(page) =>
+			`${API_ROOT}/repos/${owner}/${repo}/labels?per_page=${PER_PAGE}&page=${page}`,
 		token,
 	);
 	return mapLabelsResponse(raw);
@@ -186,7 +215,13 @@ export async function fetchAllLabels(owner, repo, token, fetchImpl = proxyAwareF
  * @param {number} [limit]
  * @returns {Promise<ReturnType<typeof mapIssuesResponse>>}
  */
-export async function fetchAllIssues(owner, repo, token, fetchImpl = proxyAwareFetch, limit = 500) {
+export async function fetchAllIssues(
+	owner,
+	repo,
+	token,
+	fetchImpl = proxyAwareFetch,
+	limit = 500,
+) {
 	// The `limit` is on issues, matching `gh issue list --limit N`. It must be
 	// counted *after* filtering out pull requests, which the REST `/issues`
 	// feed interleaves: counting raw entries capped the walk at `limit`
@@ -210,7 +245,8 @@ export async function fetchAllIssues(owner, repo, token, fetchImpl = proxyAwareF
 		);
 		const batch = await res.json();
 		issues.push(...mapIssuesResponse(batch));
-		if (batch.length < PER_PAGE || issues.length >= limit) return issues.slice(0, limit);
+		if (batch.length < PER_PAGE || issues.length >= limit)
+			return issues.slice(0, limit);
 	}
 	throw new Error(
 		`GitHub REST pagination exceeded ${MAX_PAGES} pages listing issues for ${owner}/${repo} — no page shorter than ${PER_PAGE} was returned`,
@@ -226,7 +262,15 @@ export async function fetchAllIssues(owner, repo, token, fetchImpl = proxyAwareF
  * @param {string} [color]
  * @param {typeof fetch} [fetchImpl]
  */
-export async function createLabel(owner, repo, token, name, description, color, fetchImpl = proxyAwareFetch) {
+export async function createLabel(
+	owner,
+	repo,
+	token,
+	name,
+	description,
+	color,
+	fetchImpl = proxyAwareFetch,
+) {
 	await request(fetchImpl, `${API_ROOT}/repos/${owner}/${repo}/labels`, {
 		method: "POST",
 		headers: { ...authHeaders({ token }), "Content-Type": "application/json" },
@@ -242,12 +286,26 @@ export async function createLabel(owner, repo, token, name, description, color, 
  * @param {string} [description]
  * @param {typeof fetch} [fetchImpl]
  */
-export async function editLabel(owner, repo, token, name, description, fetchImpl = proxyAwareFetch) {
-	await request(fetchImpl, `${API_ROOT}/repos/${owner}/${repo}/labels/${encodeURIComponent(name)}`, {
-		method: "PATCH",
-		headers: { ...authHeaders({ token }), "Content-Type": "application/json" },
-		body: JSON.stringify({ description }),
-	});
+export async function editLabel(
+	owner,
+	repo,
+	token,
+	name,
+	description,
+	fetchImpl = proxyAwareFetch,
+) {
+	await request(
+		fetchImpl,
+		`${API_ROOT}/repos/${owner}/${repo}/labels/${encodeURIComponent(name)}`,
+		{
+			method: "PATCH",
+			headers: {
+				...authHeaders({ token }),
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ description }),
+		},
+	);
 }
 
 /**
@@ -258,12 +316,26 @@ export async function editLabel(owner, repo, token, name, description, fetchImpl
  * @param {string} label
  * @param {typeof fetch} [fetchImpl]
  */
-export async function addIssueLabel(owner, repo, token, issueNumber, label, fetchImpl = proxyAwareFetch) {
-	await request(fetchImpl, `${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}/labels`, {
-		method: "POST",
-		headers: { ...authHeaders({ token }), "Content-Type": "application/json" },
-		body: JSON.stringify({ labels: [label] }),
-	});
+export async function addIssueLabel(
+	owner,
+	repo,
+	token,
+	issueNumber,
+	label,
+	fetchImpl = proxyAwareFetch,
+) {
+	await request(
+		fetchImpl,
+		`${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
+		{
+			method: "POST",
+			headers: {
+				...authHeaders({ token }),
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ labels: [label] }),
+		},
+	);
 }
 
 /**
@@ -274,10 +346,20 @@ export async function addIssueLabel(owner, repo, token, issueNumber, label, fetc
  * @param {typeof fetch} [fetchImpl]
  * @returns {Promise<string>}
  */
-export async function getIssueBody(owner, repo, token, issueNumber, fetchImpl = proxyAwareFetch) {
-	const res = await request(fetchImpl, `${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}`, {
-		headers: authHeaders({ token }),
-	});
+export async function getIssueBody(
+	owner,
+	repo,
+	token,
+	issueNumber,
+	fetchImpl = proxyAwareFetch,
+) {
+	const res = await request(
+		fetchImpl,
+		`${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}`,
+		{
+			headers: authHeaders({ token }),
+		},
+	);
 	const issue = await res.json();
 	return issue.body ?? "";
 }
@@ -290,10 +372,17 @@ export async function getIssueBody(owner, repo, token, issueNumber, fetchImpl = 
  * @param {typeof fetch} [fetchImpl]
  * @returns {Promise<{conclusion: string|null}[]>}
  */
-async function fetchCiRollupForSha(owner, repo, token, sha, fetchImpl = proxyAwareFetch) {
+async function fetchCiRollupForSha(
+	owner,
+	repo,
+	token,
+	sha,
+	fetchImpl = proxyAwareFetch,
+) {
 	const checkRuns = await fetchAllPages(
 		fetchImpl,
-		(page) => `${API_ROOT}/repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=${PER_PAGE}&page=${page}`,
+		(page) =>
+			`${API_ROOT}/repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=${PER_PAGE}&page=${page}`,
 		token,
 		(body) => body.check_runs ?? [],
 	);
@@ -308,10 +397,16 @@ async function fetchCiRollupForSha(owner, repo, token, sha, fetchImpl = proxyAwa
  * @param {typeof fetch} [fetchImpl]
  * @returns {Promise<Array<{number: number, title: string, headRefName: string, statusCheckRollup: {conclusion: string|null}[]}>>}
  */
-export async function fetchOpenPrsWithCi(owner, repo, token, fetchImpl = proxyAwareFetch) {
+export async function fetchOpenPrsWithCi(
+	owner,
+	repo,
+	token,
+	fetchImpl = proxyAwareFetch,
+) {
 	const prs = await fetchAllPages(
 		fetchImpl,
-		(page) => `${API_ROOT}/repos/${owner}/${repo}/pulls?state=open&per_page=${PER_PAGE}&page=${page}`,
+		(page) =>
+			`${API_ROOT}/repos/${owner}/${repo}/pulls?state=open&per_page=${PER_PAGE}&page=${page}`,
 		token,
 	);
 	return Promise.all(
@@ -319,7 +414,13 @@ export async function fetchOpenPrsWithCi(owner, repo, token, fetchImpl = proxyAw
 			number: pr.number,
 			title: pr.title,
 			headRefName: pr.head.ref,
-			statusCheckRollup: await fetchCiRollupForSha(owner, repo, token, pr.head.sha, fetchImpl),
+			statusCheckRollup: await fetchCiRollupForSha(
+				owner,
+				repo,
+				token,
+				pr.head.sha,
+				fetchImpl,
+			),
 		})),
 	);
 }

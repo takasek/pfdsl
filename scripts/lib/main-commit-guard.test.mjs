@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import {
 	evaluateMainCommitGuard,
@@ -8,7 +8,11 @@ import {
 } from "./main-commit-guard.mjs";
 
 function payload({ toolName = "Bash", command }) {
-	return { hook_event_name: "PreToolUse", tool_name: toolName, tool_input: { command } };
+	return {
+		hook_event_name: "PreToolUse",
+		tool_name: toolName,
+		tool_input: { command },
+	};
 }
 
 describe("isGitCommitCommand", () => {
@@ -46,40 +50,58 @@ describe("isGitCommitCommand", () => {
 describe("evaluateMainCommitGuard", () => {
 	it("ignores tools other than Bash", () => {
 		const result = evaluateMainCommitGuard(
-			{ hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path: "/tmp/x" } },
+			{
+				hook_event_name: "PreToolUse",
+				tool_name: "Read",
+				tool_input: { file_path: "/tmp/x" },
+			},
 			{ currentBranch: "main" },
 		);
 		assert.equal(result.decision, "allow");
 	});
 
 	it("allows a non-commit command on main", () => {
-		const result = evaluateMainCommitGuard(payload({ command: "git status" }), { currentBranch: "main" });
-		assert.equal(result.decision, "allow");
-	});
-
-	it("allows a commit on a feature branch", () => {
-		const result = evaluateMainCommitGuard(payload({ command: "git commit -m 'x'" }), {
-			currentBranch: "feature/x",
+		const result = evaluateMainCommitGuard(payload({ command: "git status" }), {
+			currentBranch: "main",
 		});
 		assert.equal(result.decision, "allow");
 	});
 
+	it("allows a commit on a feature branch", () => {
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git commit -m 'x'" }),
+			{
+				currentBranch: "feature/x",
+			},
+		);
+		assert.equal(result.decision, "allow");
+	});
+
 	it("denies a commit on main", () => {
-		const result = evaluateMainCommitGuard(payload({ command: "git commit -m 'x'" }), { currentBranch: "main" });
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git commit -m 'x'" }),
+			{ currentBranch: "main" },
+		);
 		assert.equal(result.decision, "deny");
 		assert.match(result.reason, /main/);
 	});
 
 	it("respects a configured default branch other than main", () => {
-		const result = evaluateMainCommitGuard(payload({ command: "git commit -m 'x'" }), {
-			currentBranch: "trunk",
-			mainBranch: "trunk",
-		});
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git commit -m 'x'" }),
+			{
+				currentBranch: "trunk",
+				mainBranch: "trunk",
+			},
+		);
 		assert.equal(result.decision, "deny");
 	});
 
 	it("allows when currentBranch is unknown (detached HEAD, detection failure)", () => {
-		const result = evaluateMainCommitGuard(payload({ command: "git commit -m 'x'" }), { currentBranch: undefined });
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git commit -m 'x'" }),
+			{ currentBranch: undefined },
+		);
 		assert.equal(result.decision, "allow");
 	});
 });
@@ -123,8 +145,11 @@ describe("runMainCommitGuard", () => {
 	});
 
 	it("silently allows malformed stdin JSON", () => {
-		assert.deepEqual(runMainCommitGuard("not json{{{", { resolveBranches: () => ({}) }), {
-			shouldOutput: false,
-		});
+		assert.deepEqual(
+			runMainCommitGuard("not json{{{", { resolveBranches: () => ({}) }),
+			{
+				shouldOutput: false,
+			},
+		);
 	});
 });

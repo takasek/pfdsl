@@ -11,7 +11,11 @@
  * without touching git or the filesystem.
  */
 
-import { extractPathReferences, findMissingHeadings, resolveCheckTarget } from "./companion-binding-check.mjs";
+import {
+	extractPathReferences,
+	findMissingHeadings,
+	resolveCheckTarget,
+} from "./companion-binding-check.mjs";
 
 const REQUIRED_PFD_RETRO_BINDING_HEADINGS = ["pfd-retro バインディング"];
 const PFD_RETRO_BINDING_PATH = ".pfdsl/bindings/pfd-retro.md";
@@ -35,7 +39,9 @@ export function runCompanionBindingsCheck({ listFiles, readFile, exists }) {
 			const target = resolveCheckTarget(ref);
 			if (target === null) continue; // placeholder, not a concrete path
 			if (!exists(target)) {
-				stderrLines.push(`${file}: dead path reference \`${ref}\` (resolved: ${target})`);
+				stderrLines.push(
+					`${file}: dead path reference \`${ref}\` (resolved: ${target})`,
+				);
 				errorCount++;
 			}
 		}
@@ -43,7 +49,10 @@ export function runCompanionBindingsCheck({ listFiles, readFile, exists }) {
 
 	if (exists(PFD_RETRO_BINDING_PATH)) {
 		const text = readFile(PFD_RETRO_BINDING_PATH);
-		for (const heading of findMissingHeadings(text, REQUIRED_PFD_RETRO_BINDING_HEADINGS)) {
+		for (const heading of findMissingHeadings(
+			text,
+			REQUIRED_PFD_RETRO_BINDING_HEADINGS,
+		)) {
 			stderrLines.push(
 				`${PFD_RETRO_BINDING_PATH}: missing required heading "${heading}" (pfd-retro's audit protocol depends on it)`,
 			);
@@ -55,5 +64,9 @@ export function runCompanionBindingsCheck({ listFiles, readFile, exists }) {
 		stderrLines.push(`\ncheck-companion-bindings: ${errorCount} error(s)`);
 		return { exitCode: 1, stdoutLines: [], stderrLines };
 	}
-	return { exitCode: 0, stdoutLines: ["check-companion-bindings: all passed"], stderrLines: [] };
+	return {
+		exitCode: 0,
+		stdoutLines: ["check-companion-bindings: all passed"],
+		stderrLines: [],
+	};
 }

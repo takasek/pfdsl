@@ -29,7 +29,8 @@ import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
  * @returns {boolean}
  */
 export function isMarkdownChange(payload) {
-	if (payload?.tool_name !== "Write" && payload?.tool_name !== "Edit") return false;
+	if (payload?.tool_name !== "Write" && payload?.tool_name !== "Edit")
+		return false;
 	const filePath = payload?.tool_input?.file_path;
 	return typeof filePath === "string" && filePath.endsWith(".md");
 }
@@ -73,7 +74,11 @@ export function runMdWriteCheck(inputText, { checkFile, formatViolation }) {
 		return { shouldOutput: false };
 	}
 
-	const advisory = formatLinebreakAdvisory(filePath, violations, formatViolation);
+	const advisory = formatLinebreakAdvisory(
+		filePath,
+		violations,
+		formatViolation,
+	);
 	if (!advisory) return { shouldOutput: false };
 	return { shouldOutput: true, output: buildAdvisoryOutput(advisory) };
 }

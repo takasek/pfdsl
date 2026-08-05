@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 // PreToolUse(Bash) hook: denies `git commit` while the current branch is the
 // repo's default branch (#650). See scripts/lib/main-commit-guard.mjs for the
 // detection logic, why this is deny rather than advisory, and the stdin
@@ -15,9 +16,9 @@
 //
 // Usage (wired in .claude/settings.json): node scripts/main-commit-guard.mjs
 
-import { tryGit } from "./lib/run-exec.mjs";
-import { runMainCommitGuard } from "./lib/main-commit-guard.mjs";
 import { readStdinText } from "./lib/hook-io.mjs";
+import { runMainCommitGuard } from "./lib/main-commit-guard.mjs";
+import { tryGit } from "./lib/run-exec.mjs";
 
 /**
  * @param {object} payload PreToolUse hook payload
@@ -26,7 +27,9 @@ import { readStdinText } from "./lib/hook-io.mjs";
 function resolveBranches(payload) {
 	const cwd = payload?.cwd ?? process.cwd();
 	const current = tryGit(["branch", "--show-current"], { cwd });
-	const head = tryGit(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], { cwd });
+	const head = tryGit(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], {
+		cwd,
+	});
 	// `origin/main` -> `main`. Falling back to "main" keeps the guard working in
 	// a clone whose origin/HEAD was never set. An undefined current branch
 	// (detached HEAD, or git failing) makes the lib allow, which is the safe
@@ -37,7 +40,9 @@ function resolveBranches(payload) {
 	};
 }
 
-const { shouldOutput, output } = runMainCommitGuard(await readStdinText(), { resolveBranches });
+const { shouldOutput, output } = runMainCommitGuard(await readStdinText(), {
+	resolveBranches,
+});
 if (shouldOutput) {
 	console.log(JSON.stringify(output));
 }

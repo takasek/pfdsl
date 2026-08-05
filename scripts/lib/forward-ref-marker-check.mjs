@@ -39,9 +39,7 @@ export function forEachNonFencedLine(text, visit) {
 export function findForwardRefMarkers(text) {
 	const hits = [];
 	forEachNonFencedLine(text, (line, lineNumber) => {
-		FORWARD_REF_RE.lastIndex = 0;
-		let match;
-		while ((match = FORWARD_REF_RE.exec(line)) !== null) {
+		for (const match of line.matchAll(FORWARD_REF_RE)) {
 			hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
 		}
 	});

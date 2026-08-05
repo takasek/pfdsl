@@ -15,25 +15,35 @@
  */
 
 import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { findCliConventionViolations, selectScannedFiles } from "./lib/check-cli-conventions.mjs";
+import {
+	findCliConventionViolations,
+	selectScannedFiles,
+} from "./lib/check-cli-conventions.mjs";
 import { git } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-const files = selectScannedFiles(git(["ls-files", "*.mjs"], { cwd: root }).trim().split("\n").filter(Boolean));
+const files = selectScannedFiles(
+	git(["ls-files", "*.mjs"], { cwd: root }).trim().split("\n").filter(Boolean),
+);
 
 const findings = [];
 for (const file of files) {
-	for (const finding of findCliConventionViolations(readFileSync(resolve(root, file), "utf-8"), file)) {
+	for (const finding of findCliConventionViolations(
+		readFileSync(resolve(root, file), "utf-8"),
+		file,
+	)) {
 		findings.push({ file, ...finding });
 	}
 }
 
 if (findings.length === 0) {
-	console.log(`check-cli-conventions: all ${files.length} script(s) parse argv strictly`);
+	console.log(
+		`check-cli-conventions: all ${files.length} script(s) parse argv strictly`,
+	);
 	process.exit(0);
 }
 

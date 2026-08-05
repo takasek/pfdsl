@@ -24,9 +24,8 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { canonicalSourceOf, inScope } from "./lib/distribution-review.mjs";
 import { findRepoSpecificProse } from "./lib/distributed-prose.mjs";
+import { canonicalSourceOf, inScope } from "./lib/distribution-review.mjs";
 import { git } from "./lib/run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -37,14 +36,26 @@ const paths = git(["ls-files", "plugin/pfdsl/**/*.md"], { cwd: root })
 	.map(canonicalSourceOf)
 	.sort();
 
-const files = paths.map((path) => ({ path, content: readFileSync(resolve(root, path), "utf-8") }));
+const files = paths.map((path) => ({
+	path,
+	content: readFileSync(resolve(root, path), "utf-8"),
+}));
 const found = findRepoSpecificProse(files);
 
 if (found.length > 0) {
-	console.error("check-distributed-prose: content an adopting repo cannot resolve:");
-	for (const f of found) console.error(`  ${f.path}:${f.line}: [${f.rule}] ${f.reason}\n    ${f.text}`);
-	console.error("\nThese ship to repositories that are not this one. State the rule without the");
-	console.error("local detail, or give the detail in a form the reader can resolve.");
+	console.error(
+		"check-distributed-prose: content an adopting repo cannot resolve:",
+	);
+	for (const f of found)
+		console.error(
+			`  ${f.path}:${f.line}: [${f.rule}] ${f.reason}\n    ${f.text}`,
+		);
+	console.error(
+		"\nThese ship to repositories that are not this one. State the rule without the",
+	);
+	console.error(
+		"local detail, or give the detail in a form the reader can resolve.",
+	);
 	process.exit(1);
 }
 

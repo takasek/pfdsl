@@ -13,7 +13,11 @@
 // Same shape as hooks/retro-reminder-post-tool-use.mjs, which reminds about
 // pfd-retro when a commit marks an artifact done.
 
-import { splitSegments, stripLeadingNoise, tokenize } from "./delegation-guard.mjs";
+import {
+	splitSegments,
+	stripLeadingNoise,
+	tokenize,
+} from "./delegation-guard.mjs";
 import { flagValues, parseGhCommand } from "./gh-command.mjs";
 import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
 
@@ -39,8 +43,11 @@ export function createsManagedIssue(command) {
 
 	for (const segment of splitSegments(command)) {
 		const parsed = parseGhCommand(stripLeadingNoise(tokenize(segment)));
-		if (!parsed || parsed.group !== "issue" || parsed.verb !== "create") continue;
-		const labels = flagValues(parsed.args, LABEL_FLAGS).flatMap((value) => value.split(","));
+		if (!parsed || parsed.group !== "issue" || parsed.verb !== "create")
+			continue;
+		const labels = flagValues(parsed.args, LABEL_FLAGS).flatMap((value) =>
+			value.split(","),
+		);
 		if (labels.includes("flow:managed")) return true;
 	}
 	return false;
@@ -57,7 +64,9 @@ export function createdIssueNumber(toolResponse) {
 	const text =
 		typeof toolResponse === "string"
 			? toolResponse
-			: [toolResponse?.stdout, toolResponse?.output].filter((part) => typeof part === "string").join("\n");
+			: [toolResponse?.stdout, toolResponse?.output]
+					.filter((part) => typeof part === "string")
+					.join("\n");
 	const match = CREATED_ISSUE_URL.exec(text ?? "");
 	return match ? match[1] : null;
 }

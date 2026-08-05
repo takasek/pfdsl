@@ -1,4 +1,12 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,8 +27,17 @@ export const PLUGIN_AGENT_FILES = ["pfd-lens.md", "pfd-implementer.md"];
 // these, and scripts/lib/distribution-review.mjs maps a bundled file back to
 // the source a reviewer edits, so the two cannot disagree about what ships.
 // The pfdsl skill is absent because it is rendered, not mirrored (gen-skill).
-export const PLUGIN_SKILL_DIRS = ["pfd-grill", "pfd-ops", "pfd-retro", "pfd-ecosystem"];
-export const PLUGIN_COMMAND_FILES = ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"];
+export const PLUGIN_SKILL_DIRS = [
+	"pfd-grill",
+	"pfd-ops",
+	"pfd-retro",
+	"pfd-ecosystem",
+];
+export const PLUGIN_COMMAND_FILES = [
+	"pfd-cycle.md",
+	"pfd-init.md",
+	"pfd-retro.md",
+];
 
 /**
  * What the bundle is made of, as data: where each bundled subtree comes from,
@@ -62,7 +79,8 @@ function requireExists(path) {
 // copy. Mirrors the exclusion the deleted skill-sync.ts's copySkillTree used
 // to apply uniformly to every bundled skill tree.
 function excludeSkillRootClaudeMd(skillRoot) {
-	return (source) => basename(source) !== "CLAUDE.md" || dirname(source) !== skillRoot;
+	return (source) =>
+		basename(source) !== "CLAUDE.md" || dirname(source) !== skillRoot;
 }
 
 /**
@@ -83,7 +101,10 @@ export function mirrorDir(name, srcRoot, destRoot) {
 	requireExists(src);
 	const tempDest = resolve(destRoot, `.${name}.mirror-tmp`);
 	rmSync(tempDest, { recursive: true, force: true });
-	cpSync(src, tempDest, { recursive: true, filter: excludeSkillRootClaudeMd(src) });
+	cpSync(src, tempDest, {
+		recursive: true,
+		filter: excludeSkillRootClaudeMd(src),
+	});
 	rmSync(dest, { recursive: true, force: true });
 	renameSync(tempDest, dest);
 }
@@ -117,7 +138,9 @@ export function mirrorFiles(names, srcDir, destDir) {
 // output (DO NOT EDIT) — the template is what a human actually maintains.
 const SKILL_SOURCE_DIRS = {
 	pfdsl: "scripts/skill-template",
-	...Object.fromEntries(PLUGIN_SKILL_DIRS.map((name) => [name, `.claude/skills/${name}`])),
+	...Object.fromEntries(
+		PLUGIN_SKILL_DIRS.map((name) => [name, `.claude/skills/${name}`]),
+	),
 };
 
 /** Extract a single-line scalar frontmatter field from SKILL.md source. */
@@ -130,21 +153,31 @@ function extractFrontmatterField(source, field) {
 // frontmatter ("summary:", next to "description:") instead of a
 // hand-maintained table (#696): editing a skill's role no longer requires
 // remembering a second file, because there is no second file to remember.
-function summaryFor(name, kind, { root = REPO_ROOT, readFileSync: readFile = readFileSync } = {}) {
+function summaryFor(
+	name,
+	kind,
+	{ root = REPO_ROOT, readFileSync: readFile = readFileSync } = {},
+) {
 	const dir = SKILL_SOURCE_DIRS[name];
 	if (!dir) {
-		throw new Error(`No manifest description summary for bundled ${kind} "${name}". Register its source dir in SKILL_SOURCE_DIRS in scripts/lib/gen-plugin.mjs.`);
+		throw new Error(
+			`No manifest description summary for bundled ${kind} "${name}". Register its source dir in SKILL_SOURCE_DIRS in scripts/lib/gen-plugin.mjs.`,
+		);
 	}
 	const path = resolve(root, dir, "SKILL.md");
 	let source;
 	try {
 		source = readFile(path, "utf-8");
 	} catch {
-		throw new Error(`No manifest description summary for bundled ${kind} "${name}": ${path} not found.`);
+		throw new Error(
+			`No manifest description summary for bundled ${kind} "${name}": ${path} not found.`,
+		);
 	}
 	const summary = extractFrontmatterField(source, "summary");
 	if (!summary) {
-		throw new Error(`${path} has no "summary:" frontmatter field for the plugin manifest description. Add one alongside "description:".`);
+		throw new Error(
+			`${path} has no "summary:" frontmatter field for the plugin manifest description. Add one alongside "description:".`,
+		);
 	}
 	return summary;
 }
@@ -158,9 +191,19 @@ function summaryFor(name, kind, { root = REPO_ROOT, readFileSync: readFile = rea
 // slash form of the filename, so there is nothing that could drift from
 // PLUGIN_COMMAND_FILES independently.
 // @param {{skillDirs?: string[], commandFiles?: string[], root?: string, readFileSync?: Function}} [options]
-export function buildPluginDescription({ skillDirs = ["pfdsl", ...PLUGIN_SKILL_DIRS], commandFiles = PLUGIN_COMMAND_FILES, root, readFileSync: readFile } = {}) {
-	const skillParts = skillDirs.map((name) => `${summaryFor(name, "skill", { root, readFileSync: readFile })} (${name} skill)`);
-	const commandParts = commandFiles.map((file) => `/${file.replace(/\.md$/, "")}`);
+export function buildPluginDescription({
+	skillDirs = ["pfdsl", ...PLUGIN_SKILL_DIRS],
+	commandFiles = PLUGIN_COMMAND_FILES,
+	root,
+	readFileSync: readFile,
+} = {}) {
+	const skillParts = skillDirs.map(
+		(name) =>
+			`${summaryFor(name, "skill", { root, readFileSync: readFile })} (${name} skill)`,
+	);
+	const commandParts = commandFiles.map(
+		(file) => `/${file.replace(/\.md$/, "")}`,
+	);
 	return `PFD-DSL authoring toolkit: ${skillParts.join(", ")}, and ${commandParts.join(", ")} commands.`;
 }
 
@@ -170,10 +213,21 @@ export function buildPluginDescription({ skillDirs = ["pfdsl", ...PLUGIN_SKILL_D
 // description is derived from the actual bundle contents (buildPluginDescription)
 // so it can't drift from what plugin/pfdsl/ ships. Used by scripts/gen-plugin.mjs.
 
-export function buildPluginManifest({ cliVersion, root, readFileSync: readFile, skillDirs, commandFiles }) {
+export function buildPluginManifest({
+	cliVersion,
+	root,
+	readFileSync: readFile,
+	skillDirs,
+	commandFiles,
+}) {
 	return {
 		name: "pfdsl",
-		description: buildPluginDescription({ skillDirs, commandFiles, root, readFileSync: readFile }),
+		description: buildPluginDescription({
+			skillDirs,
+			commandFiles,
+			root,
+			readFileSync: readFile,
+		}),
 		version: cliVersion,
 		author: { name: "takasek" },
 		homepage: "https://github.com/takasek/pfdsl",
@@ -203,7 +257,9 @@ export function assemblePluginDistIndependent({
 	},
 }) {
 	deps.genInstall(root);
-	console.log(".claude/skills/pfd-ops/install ← repo-root sources (gen-install)");
+	console.log(
+		".claude/skills/pfd-ops/install ← repo-root sources (gen-install)",
+	);
 
 	for (const mirror of PLUGIN_MIRRORS) {
 		if (mirror.whole) {
@@ -213,23 +269,42 @@ export function assemblePluginDistIndependent({
 			console.log(`plugin/pfdsl/${mirror.dest} ← ${mirror.src}`);
 		} else if (mirror.trees) {
 			for (const name of mirror.trees) {
-				deps.mirrorDir(name, resolve(root, mirror.src), resolve(pluginRoot, mirror.dest));
-				console.log(`plugin/pfdsl/${mirror.dest}/${name} ← ${mirror.src}/${name}`);
+				deps.mirrorDir(
+					name,
+					resolve(root, mirror.src),
+					resolve(pluginRoot, mirror.dest),
+				);
+				console.log(
+					`plugin/pfdsl/${mirror.dest}/${name} ← ${mirror.src}/${name}`,
+				);
 			}
 		} else {
-			deps.mirrorFiles(mirror.files, resolve(root, mirror.src), resolve(pluginRoot, mirror.dest));
+			deps.mirrorFiles(
+				mirror.files,
+				resolve(root, mirror.src),
+				resolve(pluginRoot, mirror.dest),
+			);
 			for (const file of mirror.files) {
-				console.log(`plugin/pfdsl/${mirror.dest}/${file} ← ${mirror.src}/${file}`);
+				console.log(
+					`plugin/pfdsl/${mirror.dest}/${file} ← ${mirror.src}/${file}`,
+				);
 			}
 		}
 	}
 
-	const cliVersion = JSON.parse(deps.readFileSync(resolve(root, "packages/cli/package.json"), "utf-8")).version;
+	const cliVersion = JSON.parse(
+		deps.readFileSync(resolve(root, "packages/cli/package.json"), "utf-8"),
+	).version;
 	const manifest = buildPluginManifest({ cliVersion });
 	const pluginManifestDir = resolve(pluginRoot, ".claude-plugin");
 	deps.mkdirSync(pluginManifestDir, { recursive: true });
-	deps.writeFileSync(resolve(pluginManifestDir, "plugin.json"), `${JSON.stringify(manifest, null, "\t")}\n`);
-	console.log("plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version");
+	deps.writeFileSync(
+		resolve(pluginManifestDir, "plugin.json"),
+		`${JSON.stringify(manifest, null, "\t")}\n`,
+	);
+	console.log(
+		"plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version",
+	);
 
 	// The repo-root marketplace listing duplicates the per-plugin description
 	// (a separate file so /plugin marketplace can list plugins without
@@ -242,7 +317,10 @@ export function assemblePluginDistIndependent({
 	const marketplacePath = resolve(root, ".claude-plugin/marketplace.json");
 	const marketplace = JSON.parse(deps.readFileSync(marketplacePath, "utf-8"));
 	marketplace.plugins[0].description = manifest.description;
-	deps.writeFileSync(marketplacePath, `${JSON.stringify(marketplace, null, "\t")}\n`);
+	deps.writeFileSync(
+		marketplacePath,
+		`${JSON.stringify(marketplace, null, "\t")}\n`,
+	);
 	console.log(".claude-plugin/marketplace.json ← plugin manifest description");
 
 	deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));

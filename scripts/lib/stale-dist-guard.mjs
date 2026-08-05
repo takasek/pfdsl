@@ -80,7 +80,8 @@ export function formatStaleWarning(stale) {
 export function runStaleDistGuard(inputText, { findStale }) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
-	if (!trustsBuildOutput(payload?.tool_input?.command)) return { shouldOutput: false };
+	if (!trustsBuildOutput(payload?.tool_input?.command))
+		return { shouldOutput: false };
 
 	const warning = formatStaleWarning(findStale());
 	if (!warning) return { shouldOutput: false };

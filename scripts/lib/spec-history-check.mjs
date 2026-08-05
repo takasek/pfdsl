@@ -46,13 +46,17 @@ export function runSpecHistoryCheck({ readSpec, readHistory }) {
 	if (!version) {
 		return {
 			ok: false,
-			message: "docs/spec/spec.md has no title-line version (# PFDSL仕様書 vX.Y.Z) to check spec-history.md against.",
+			message:
+				"docs/spec/spec.md has no title-line version (# PFDSL仕様書 vX.Y.Z) to check spec-history.md against.",
 		};
 	}
 
 	const topVersion = topHistoryVersion(readHistory());
 	if (topVersion === version) {
-		return { ok: true, message: `docs/spec/spec-history.md's top entry documents ${version}.` };
+		return {
+			ok: true,
+			message: `docs/spec/spec-history.md's top entry documents ${version}.`,
+		};
 	}
 	return {
 		ok: false,
@@ -72,6 +76,7 @@ export function runSpecHistoryCheck({ readSpec, readHistory }) {
 export function repoDeps(root) {
 	return {
 		readSpec: () => readFileSync(resolve(root, "docs/spec/spec.md"), "utf-8"),
-		readHistory: () => readFileSync(resolve(root, "docs/spec/spec-history.md"), "utf-8"),
+		readHistory: () =>
+			readFileSync(resolve(root, "docs/spec/spec-history.md"), "utf-8"),
 	};
 }

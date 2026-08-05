@@ -1,8 +1,8 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, beforeEach, describe, it } from "node:test";
 
 import { checkScaffoldSync } from "./check-scaffold-sync.mjs";
 
@@ -50,7 +50,9 @@ describe("checkScaffoldSync", () => {
 		mkdirSync(deployedDir, { recursive: true });
 
 		const results = checkScaffoldSync(canonicalDir, deployedDir);
-		assert.deepEqual(results, [{ path: "bindings/pfd-ops.md", status: "missing" }]);
+		assert.deepEqual(results, [
+			{ path: "bindings/pfd-ops.md", status: "missing" },
+		]);
 	});
 
 	it("compares every nested file independently", () => {

@@ -25,7 +25,11 @@ import { runMintCheck } from "./lib/mint-check-steps.mjs";
 
 const [slugArg, ...fileArgs] = process.argv.slice(2);
 
-const result = runMintCheck({ slugArg, fileArgs, readFile: (file) => readFileSync(file, "utf8") });
+const result = runMintCheck({
+	slugArg,
+	fileArgs,
+	readFile: (file) => readFileSync(file, "utf8"),
+});
 if (result.stdout) console.log(result.stdout);
 console.error(result.stderr);
 process.exit(result.exitCode);

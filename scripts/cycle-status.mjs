@@ -4,11 +4,11 @@
 // Usage: node scripts/cycle-status.mjs [--base main] [--issue <n>]
 
 import { existsSync, readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { run } from "./lib/run-exec.mjs";
 import { runCycleStatus } from "./lib/cycle-status-steps.mjs";
+import { run } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -9,10 +9,10 @@
 // doing any work; a parser tested in isolation cannot show that the entry
 // point actually consults it.
 
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
+import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -37,12 +37,21 @@ function runScript(script, args) {
 const UNKNOWN_FLAG_CASES = [
 	{ script: "scripts/gate-check.mjs", args: ["--definitely-not-a-flag"] },
 	{ script: "scripts/cycle-status.mjs", args: ["--definitely-not-a-flag"] },
-	{ script: "scripts/pfdsl/audit-issues-flow.mjs", args: ["--definitely-not-a-flag"] },
+	{
+		script: "scripts/pfdsl/audit-issues-flow.mjs",
+		args: ["--definitely-not-a-flag"],
+	},
 	{ script: "scripts/release.mjs", args: ["cli", "--definitely-not-a-flag"] },
-	{ script: "scripts/gen-skill.mjs", args: ["--out", ".claude/skills/pfdsl", "--definitely-not-a-flag"] },
+	{
+		script: "scripts/gen-skill.mjs",
+		args: ["--out", ".claude/skills/pfdsl", "--definitely-not-a-flag"],
+	},
 	// Outside scripts/, and missed by the first sweep for that reason: the
 	// grep that counted the shape only looked at scripts/ and .claude/skills/.
-	{ script: "packages/vscode-extension/esbuild.config.mjs", args: ["--definitely-not-a-flag"] },
+	{
+		script: "packages/vscode-extension/esbuild.config.mjs",
+		args: ["--definitely-not-a-flag"],
+	},
 ];
 
 describe("entry scripts reject argv they do not understand", () => {
@@ -55,7 +64,9 @@ describe("entry scripts reject argv they do not understand", () => {
 	}
 
 	it("cycle-status.mjs rejects a flag whose value is missing", () => {
-		const { status, stderr } = runScript("scripts/cycle-status.mjs", ["--base"]);
+		const { status, stderr } = runScript("scripts/cycle-status.mjs", [
+			"--base",
+		]);
 		assert.notEqual(status, 0);
 		assert.match(stderr, /--base/);
 	});
@@ -64,7 +75,10 @@ describe("entry scripts reject argv they do not understand", () => {
 	// for the fix": includes("--fix") misses "--fix=true" entirely, so the
 	// audit runs read-only while the caller believes it repaired the roadmap.
 	it("audit-issues-flow.mjs rejects --fix=true rather than running read-only", () => {
-		const { status, stderr } = runScript("scripts/pfdsl/audit-issues-flow.mjs", ["--fix=true"]);
+		const { status, stderr } = runScript(
+			"scripts/pfdsl/audit-issues-flow.mjs",
+			["--fix=true"],
+		);
 		assert.notEqual(status, 0);
 		assert.match(stderr, /--fix/);
 	});
@@ -74,7 +88,10 @@ describe("entry scripts reject argv they do not understand", () => {
 	// conflict with --no-artifact goes unreported and the gate scopes itself
 	// coarsely instead of stopping.
 	it("gate-check.mjs sees --artifact=k in its inline form", () => {
-		const { status, stderr } = runScript("scripts/gate-check.mjs", ["--artifact=k", "--no-artifact"]);
+		const { status, stderr } = runScript("scripts/gate-check.mjs", [
+			"--artifact=k",
+			"--no-artifact",
+		]);
 		assert.equal(status, 2);
 		assert.match(stderr, /mutually exclusive/);
 	});
@@ -84,9 +101,14 @@ describe("entry scripts reject argv they do not understand", () => {
 	// indexOf("--out") misses "--out=…" and the generators print their usage
 	// instead, as though no destination had been named.
 	it("gen-skill.mjs reads --out in its inline form", () => {
-		const { status, stderr } = runScript("scripts/gen-skill.mjs", ["--out=/tmp/pfdsl-argv-probe"]);
+		const { status, stderr } = runScript("scripts/gen-skill.mjs", [
+			"--out=/tmp/pfdsl-argv-probe",
+		]);
 		assert.equal(status, 1);
-		assert.match(stderr, /must contain a '\.claude' or 'skills' directory component/);
+		assert.match(
+			stderr,
+			/must contain a '\.claude' or 'skills' directory component/,
+		);
 	});
 
 	// A missing required positional is the same silence in a different place.
@@ -102,7 +124,11 @@ describe("entry scripts reject argv they do not understand", () => {
 	// Mutual exclusion is a script-level rule that strict parsing does not
 	// replace (#564) — it still has to hold for the separated form.
 	it("gate-check.mjs still rejects --artifact together with --no-artifact", () => {
-		const { status, stderr } = runScript("scripts/gate-check.mjs", ["--artifact", "k", "--no-artifact"]);
+		const { status, stderr } = runScript("scripts/gate-check.mjs", [
+			"--artifact",
+			"k",
+			"--no-artifact",
+		]);
 		assert.equal(status, 2);
 		assert.match(stderr, /mutually exclusive/);
 	});

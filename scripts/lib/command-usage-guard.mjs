@@ -22,7 +22,11 @@
 // nothing else — and unlike C there is no case where dropping the body silently
 // is what was wanted.
 
-import { splitSegments, stripLeadingNoise, tokenize } from "./delegation-guard.mjs";
+import {
+	splitSegments,
+	stripLeadingNoise,
+	tokenize,
+} from "./delegation-guard.mjs";
 import { parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
@@ -41,7 +45,9 @@ const VIEW_GROUPS = new Set(["issue", "pr"]);
  * @returns {Array<Array<{value: string, quoted: boolean}>>}
  */
 function commandSegments(command) {
-	return splitSegments(command).map((segment) => stripLeadingNoise(tokenize(segment)));
+	return splitSegments(command).map((segment) =>
+		stripLeadingNoise(tokenize(segment)),
+	);
 }
 
 /**
@@ -58,7 +64,8 @@ export function usesPublishedCli(command) {
 		const head = tokens[0];
 		if (!head || head.quoted) continue;
 		const values = tokens.map((token) => token.value);
-		const runsFromRegistry = head.value === "npx" || (head.value === "pnpm" && values.includes("dlx"));
+		const runsFromRegistry =
+			head.value === "npx" || (head.value === "pnpm" && values.includes("dlx"));
 		if (!runsFromRegistry) continue;
 		if (values.some((value) => PUBLISHED_CLI_SPEC.test(value))) return true;
 	}
@@ -77,9 +84,13 @@ export function usesBodyDroppingView(command) {
 
 	for (const tokens of commandSegments(command)) {
 		const parsed = parseGhCommand(tokens);
-		if (!parsed || !VIEW_GROUPS.has(parsed.group) || parsed.verb !== "view") continue;
+		if (!parsed || !VIEW_GROUPS.has(parsed.group) || parsed.verb !== "view")
+			continue;
 		if (!parsed.args.includes("--comments")) continue;
-		if (parsed.args.some((arg) => arg === "--json" || arg.startsWith("--json="))) continue;
+		if (
+			parsed.args.some((arg) => arg === "--json" || arg.startsWith("--json="))
+		)
+			continue;
 		return true;
 	}
 	return false;

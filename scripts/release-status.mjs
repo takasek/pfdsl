@@ -11,8 +11,12 @@ import { git as rawGit } from "./lib/run-exec.mjs";
 // These probes fail as a matter of course — an unreleased tag has no ref yet —
 // so their stderr is captured rather than printed as if something broke.
 const git = (args) => rawGit(args, { captureStderr: true });
-import { RECORD_PATH, repoDeps, runDistributionReviewCheck } from "./lib/distribution-review.mjs";
-import { repoDeps as specHistoryRepoDeps, runSpecHistoryCheck } from "./lib/spec-history-check.mjs";
+
+import {
+	RECORD_PATH,
+	repoDeps,
+	runDistributionReviewCheck,
+} from "./lib/distribution-review.mjs";
 import {
 	compareVersions,
 	formatDistributionReviewStatus,
@@ -22,6 +26,10 @@ import {
 	formatSpecHistoryStatus,
 	latestFullReviewDate,
 } from "./lib/release-status-check.mjs";
+import {
+	runSpecHistoryCheck,
+	repoDeps as specHistoryRepoDeps,
+} from "./lib/spec-history-check.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -162,13 +170,24 @@ const results = await Promise.all(
 			publishedVersion = await pkg.fetchPublishedVersion();
 			status = compareVersions(localVersion, publishedVersion);
 			if (status === "equal") {
-				commitsAhead = fetchCommitsAhead(localVersion, pkg.packageDir, pkg.tagPrefix);
+				commitsAhead = fetchCommitsAhead(
+					localVersion,
+					pkg.packageDir,
+					pkg.tagPrefix,
+				);
 			}
 		} catch (e) {
 			publishedVersion = `error: ${e.message}`;
 			status = "error";
 		}
-		return { name: pkg.name, registry: pkg.registry, localVersion, publishedVersion, status, commitsAhead };
+		return {
+			name: pkg.name,
+			registry: pkg.registry,
+			localVersion,
+			publishedVersion,
+			status,
+			commitsAhead,
+		};
 	}),
 );
 
@@ -181,7 +200,13 @@ function findLatestCliTag() {
 		// 'v[0-9]*' (not 'v*') so this matches CLI tags like v0.0.17 without
 		// also matching lib-v* / vscode-v* (both start with 'v' after the
 		// prefix, and glob 'v*' would match "vscode-v0.0.17" too).
-		return git(["describe", "--tags", "--match", "v[0-9]*", "--abbrev=0"]).trim();
+		return git([
+			"describe",
+			"--tags",
+			"--match",
+			"v[0-9]*",
+			"--abbrev=0",
+		]).trim();
 	} catch {
 		return null;
 	}
@@ -190,9 +215,12 @@ function findLatestCliTag() {
 // Keep in sync with tsup.config.ts's onSuccess allowlist — .claude/skills/
 // also holds skills that aren't bundled into the CLI (spec-stress-test,
 // vscode-ext-debug), which would be false positives here.
-const BUNDLED_SKILL_DIRS = ["pfd-ops", "pfd-retro", "pfd-ecosystem", "pfdsl"].map(
-	(name) => `.claude/skills/${name}`,
-);
+const BUNDLED_SKILL_DIRS = [
+	"pfd-ops",
+	"pfd-retro",
+	"pfd-ecosystem",
+	"pfdsl",
+].map((name) => `.claude/skills/${name}`);
 
 function countSkillBundleCommits(sinceTag) {
 	if (!sinceTag) return 0;
@@ -201,7 +229,9 @@ function countSkillBundleCommits(sinceTag) {
 		const out = git(["log", `${sinceTag}..HEAD`, "--oneline", "--", ...paths]);
 		return out.trim().split("\n").filter(Boolean).length;
 	} catch (e) {
-		console.warn(`warn: could not count skill bundle commits since ${sinceTag}: ${e.message}`);
+		console.warn(
+			`warn: could not count skill bundle commits since ${sinceTag}: ${e.message}`,
+		);
 		return 0;
 	}
 }
@@ -223,12 +253,15 @@ function readDistributionReview() {
 		// "0 unreviewed" would say current where the release gate refuses.
 		unreviewedCount: result.files?.length,
 		blockedReason: result.files === undefined ? result.message : null,
-		lastFullReview: latestFullReviewDate(existsSync(logDir) ? readdirSync(logDir) : []),
+		lastFullReview: latestFullReviewDate(
+			existsSync(logDir) ? readdirSync(logDir) : [],
+		),
 	};
 }
 
 const distributionReview = readDistributionReview();
-if (distributionReview.blockedReason) console.warn(`warn: ${distributionReview.blockedReason}`);
+if (distributionReview.blockedReason)
+	console.warn(`warn: ${distributionReview.blockedReason}`);
 
 // `make release` blocks on the same reading (scripts/check-spec-history.mjs);
 // showing it here keeps that refusal from arriving as a surprise mid-release.
@@ -243,6 +276,7 @@ console.log(formatSpecHistoryStatus(specHistory));
 
 const needsAction =
 	results.some(
-		(r) => r.status === "local-ahead" || r.status === "error" || r.commitsAhead > 0,
+		(r) =>
+			r.status === "local-ahead" || r.status === "error" || r.commitsAhead > 0,
 	) || skillBundleCommits > 0;
 if (needsAction) process.exit(1);

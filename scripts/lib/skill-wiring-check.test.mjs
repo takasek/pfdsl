@@ -1,5 +1,5 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import {
 	declarationLine,
@@ -11,7 +11,11 @@ import {
 
 /** The shape of gen-plugin's PLUGIN_MIRRORS, with this repo's current members. */
 const MIRRORS = [
-	{ dest: "skills", src: ".claude/skills", trees: ["pfd-grill", "pfd-ops", "pfd-retro"] },
+	{
+		dest: "skills",
+		src: ".claude/skills",
+		trees: ["pfd-grill", "pfd-ops", "pfd-retro"],
+	},
 	{ dest: "agents", src: ".claude/agents", files: ["pfd-lens.md"] },
 	{ dest: "hooks", src: "hooks", whole: true },
 ];
@@ -19,7 +23,9 @@ const MIRRORS = [
 const ARTIFACTS = {
 	retro_skill: { location: "../.claude/skills/pfd-retro/" },
 	grill_skill: { location: "../.claude/skills/pfd-grill/" },
-	ops_skill_l3: { location: "../.claude/skills/pfd-ops/references/github-issues-backend.md" },
+	ops_skill_l3: {
+		location: "../.claude/skills/pfd-ops/references/github-issues-backend.md",
+	},
 	pfd_lens_agent: { location: "../.claude/agents/pfd-lens.md" },
 	pfdsl_skill: { location: "../.claude/skills/pfdsl/" },
 	vscode_ext_debug_skill: { location: "../.claude/skills/vscode-ext-debug/" },
@@ -46,9 +52,15 @@ const PIPELINE_EDGES = [
 
 describe("repoRelative", () => {
 	it("strips the companion-relative prefix", () => {
-		assert.equal(repoRelative("../.claude/skills/pfd-retro/"), ".claude/skills/pfd-retro/");
+		assert.equal(
+			repoRelative("../.claude/skills/pfd-retro/"),
+			".claude/skills/pfd-retro/",
+		);
 		assert.equal(repoRelative("./docs/samples/"), "docs/samples/");
-		assert.equal(repoRelative(".claude/agents/pfd-lens.md"), ".claude/agents/pfd-lens.md");
+		assert.equal(
+			repoRelative(".claude/agents/pfd-lens.md"),
+			".claude/agents/pfd-lens.md",
+		);
 	});
 });
 
@@ -58,7 +70,13 @@ describe("isBundledSource", () => {
 	});
 
 	it("accepts a file inside a mirrored tree", () => {
-		assert.equal(isBundledSource(".claude/skills/pfd-ops/references/github-issues-backend.md", MIRRORS), true);
+		assert.equal(
+			isBundledSource(
+				".claude/skills/pfd-ops/references/github-issues-backend.md",
+				MIRRORS,
+			),
+			true,
+		);
 	});
 
 	it("accepts a file the manifest names individually", () => {
@@ -66,8 +84,14 @@ describe("isBundledSource", () => {
 	});
 
 	it("rejects a sibling the manifest does not carry", () => {
-		assert.equal(isBundledSource(".claude/skills/vscode-ext-debug/", MIRRORS), false);
-		assert.equal(isBundledSource(".claude/agents/other-agent.md", MIRRORS), false);
+		assert.equal(
+			isBundledSource(".claude/skills/vscode-ext-debug/", MIRRORS),
+			false,
+		);
+		assert.equal(
+			isBundledSource(".claude/agents/other-agent.md", MIRRORS),
+			false,
+		);
 	});
 
 	it("rejects a path under no mirror at all", () => {
@@ -81,7 +105,10 @@ describe("isBundledSource", () => {
 
 describe("edgeMembers", () => {
 	it("reads one process's inputs", () => {
-		const members = edgeMembers(PIPELINE_EDGES, { kind: "input", process: "gen_plugin" });
+		const members = edgeMembers(PIPELINE_EDGES, {
+			kind: "input",
+			process: "gen_plugin",
+		});
 		assert.equal(members.has("retro_skill"), true);
 		assert.equal(members.has("plugin_dist"), false);
 	});
@@ -92,7 +119,11 @@ describe("edgeMembers", () => {
 	});
 
 	it("keeps feedback edges out of input membership", () => {
-		assert.equal(edgeMembers(WORKFLOW_EDGES, { kind: "input", process: "write_examples" }).size, 0);
+		assert.equal(
+			edgeMembers(WORKFLOW_EDGES, { kind: "input", process: "write_examples" })
+				.size,
+			0,
+		);
 	});
 });
 
@@ -123,7 +154,10 @@ describe("findUnwiredSkills", () => {
 	});
 
 	it("reports an artifact missing from both edges — the #481 case", () => {
-		const artifacts = { ...ARTIFACTS, newcomer_skill: { location: "../.claude/skills/pfd-ops/" } };
+		const artifacts = {
+			...ARTIFACTS,
+			newcomer_skill: { location: "../.claude/skills/pfd-ops/" },
+		};
 		const found = run({ artifacts });
 		assert.deepEqual(found, [
 			{
@@ -135,7 +169,9 @@ describe("findUnwiredSkills", () => {
 	});
 
 	it("reports an artifact wired on only one edge", () => {
-		const pipelineEdges = PIPELINE_EDGES.filter((edge) => edge.artifact !== "grill_skill");
+		const pipelineEdges = PIPELINE_EDGES.filter(
+			(edge) => edge.artifact !== "grill_skill",
+		);
 		const found = run({ pipelineEdges });
 		assert.equal(found.length, 1);
 		assert.equal(found[0].id, "grill_skill");
@@ -152,7 +188,13 @@ describe("findUnwiredSkills", () => {
 	it("ignores an artifact the runtime pipeline produces", () => {
 		// pfdsl_skill is generated and reaches the bundle through its sources.
 		// The manifest already excludes it; this pins the second reason too.
-		const mirrors = [{ dest: "skills", src: ".claude/skills", trees: ["pfd-retro", "pfd-grill", "pfd-ops", "pfdsl"] }];
+		const mirrors = [
+			{
+				dest: "skills",
+				src: ".claude/skills",
+				trees: ["pfd-retro", "pfd-grill", "pfd-ops", "pfdsl"],
+			},
+		];
 		assert.equal(
 			run({ mirrors }).some((f) => f.id === "pfdsl_skill"),
 			false,

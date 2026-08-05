@@ -1,12 +1,9 @@
-import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { execGh } from "./gh-exec.mjs";
@@ -69,24 +66,49 @@ describe("execGh", () => {
 		delete process.env.GH_TOKEN;
 		delete process.env.GITHUB_TOKEN;
 		await assert.rejects(
-			() => execGh(["label", "list", "--json", "name,description", "--limit", "100"]),
+			() =>
+				execGh([
+					"label",
+					"list",
+					"--json",
+					"name,description",
+					"--limit",
+					"100",
+				]),
 			(e) => e.code === "ENOENT",
 		);
 	});
 
 	it("rethrows the original ENOENT for an argv shape with no REST plan", async () => {
 		process.env.GH_TOKEN = "tok";
-		await assert.rejects(() => execGh(["repo", "view"]), (e) => e.code === "ENOENT");
+		await assert.rejects(
+			() => execGh(["repo", "view"]),
+			(e) => e.code === "ENOENT",
+		);
 	});
 
 	it("falls back to REST and returns gh-shaped JSON when a token is present", async () => {
 		process.env.GH_TOKEN = "tok";
 		globalThis.fetch = async () => ({
 			ok: true,
-			json: async () => [{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" }],
+			json: async () => [
+				{
+					name: "flow:managed",
+					description: "tracked in .pfdsl/roadmap.pfdsl",
+				},
+			],
 		});
-		const out = await execGh(["label", "list", "--json", "name,description", "--limit", "100"]);
-		assert.deepEqual(JSON.parse(out), [{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" }]);
+		const out = await execGh([
+			"label",
+			"list",
+			"--json",
+			"name,description",
+			"--limit",
+			"100",
+		]);
+		assert.deepEqual(JSON.parse(out), [
+			{ name: "flow:managed", description: "tracked in .pfdsl/roadmap.pfdsl" },
+		]);
 	});
 
 	// This whole path only runs where `gh` is absent (Claude Code Remote and
@@ -137,15 +159,30 @@ describe("execGh", () => {
 
 		it("edits a label by name, sending only the new description", async () => {
 			const calls = recordingFetch({});
-			await execGh(["label", "edit", "flow:exempt", "--description", "reworded"]);
+			await execGh([
+				"label",
+				"edit",
+				"flow:exempt",
+				"--description",
+				"reworded",
+			]);
 			assert.match(calls[0].url, /\/labels\/flow%3Aexempt$/);
 			assert.equal(calls[0].init.method, "PATCH");
-			assert.deepEqual(JSON.parse(calls[0].init.body), { description: "reworded" });
+			assert.deepEqual(JSON.parse(calls[0].init.body), {
+				description: "reworded",
+			});
 		});
 
 		it("lists issues, normalized into the shape gh --json would print", async () => {
 			recordingFetch([{ number: 1, title: "x", labels: [], state: "open" }]);
-			const out = await execGh(["issue", "list", "--state", "open", "--json", "number,title,labels"]);
+			const out = await execGh([
+				"issue",
+				"list",
+				"--state",
+				"open",
+				"--json",
+				"number,title,labels",
+			]);
 			const issues = JSON.parse(out);
 			assert.equal(issues.length, 1);
 			assert.equal(issues[0].number, 1);
@@ -161,12 +198,17 @@ describe("execGh", () => {
 			await execGh(["issue", "edit", "612", "--add-label", "flow:exempt"]);
 			assert.match(calls[0].url, /\/issues\/612\/labels$/);
 			assert.equal(calls[0].init.method, "POST");
-			assert.deepEqual(JSON.parse(calls[0].init.body), { labels: ["flow:exempt"] });
+			assert.deepEqual(JSON.parse(calls[0].init.body), {
+				labels: ["flow:exempt"],
+			});
 		});
 
 		it("reads an issue body", async () => {
 			recordingFetch({ number: 612, body: "## 現象\n..." });
-			assert.equal(await execGh(["issue", "view", "612", "--json", "body"]), "## 現象\n...");
+			assert.equal(
+				await execGh(["issue", "view", "612", "--json", "body"]),
+				"## 現象\n...",
+			);
 		});
 
 		it("surfaces an unhandled op rather than silently doing nothing", async () => {
@@ -183,7 +225,19 @@ describe("execGh", () => {
 
 		it("lists open PRs", async () => {
 			recordingFetch([]);
-			assert.deepEqual(JSON.parse(await execGh(["pr", "list", "--state", "open", "--json", "number,title"])), []);
+			assert.deepEqual(
+				JSON.parse(
+					await execGh([
+						"pr",
+						"list",
+						"--state",
+						"open",
+						"--json",
+						"number,title",
+					]),
+				),
+				[],
+			);
 		});
 	});
 });
@@ -198,9 +252,13 @@ describe("the REST op sets on both sides of the fallback", () => {
 	const read = (name) => readFileSync(resolve(here, name), "utf-8");
 
 	/** Op names in `{ op: "name"` literals. */
-	const planned = [...read("gh-compat.mjs").matchAll(/\bop:\s*"([^"]+)"/g)].map((m) => m[1]);
+	const planned = [...read("gh-compat.mjs").matchAll(/\bop:\s*"([^"]+)"/g)].map(
+		(m) => m[1],
+	);
 	/** Op names in `case "name":` labels. */
-	const implemented = [...read("gh-exec.mjs").matchAll(/case\s+"([^"]+)":/g)].map((m) => m[1]);
+	const implemented = [
+		...read("gh-exec.mjs").matchAll(/case\s+"([^"]+)":/g),
+	].map((m) => m[1]);
 
 	it("plans at least one op, so the extraction still finds something", () => {
 		assert.ok(planned.length > 0);

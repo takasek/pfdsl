@@ -15,25 +15,34 @@
  */
 
 import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { findShellExecutors, selectScannedFiles } from "./lib/check-no-shell-strings.mjs";
+import {
+	findShellExecutors,
+	selectScannedFiles,
+} from "./lib/check-no-shell-strings.mjs";
 import { git } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-const files = selectScannedFiles(git(["ls-files", "*.mjs"], { cwd: root }).trim().split("\n").filter(Boolean));
+const files = selectScannedFiles(
+	git(["ls-files", "*.mjs"], { cwd: root }).trim().split("\n").filter(Boolean),
+);
 
 const findings = [];
 for (const file of files) {
-	for (const finding of findShellExecutors(readFileSync(resolve(root, file), "utf-8"))) {
+	for (const finding of findShellExecutors(
+		readFileSync(resolve(root, file), "utf-8"),
+	)) {
 		findings.push({ file, ...finding });
 	}
 }
 
 if (findings.length === 0) {
-	console.log(`check-no-shell-strings: all ${files.length} script(s) run commands without a shell`);
+	console.log(
+		`check-no-shell-strings: all ${files.length} script(s) run commands without a shell`,
+	);
 	process.exit(0);
 }
 
@@ -41,5 +50,7 @@ console.log("check-no-shell-strings: shell-executing call(s) found:");
 for (const { file, line, reason } of findings) {
 	console.log(`  ${file}:${line}: ${reason}`);
 }
-console.log(`\ncheck-no-shell-strings: ${findings.length} error(s) — use scripts/lib/run-exec.mjs`);
+console.log(
+	`\ncheck-no-shell-strings: ${findings.length} error(s) — use scripts/lib/run-exec.mjs`,
+);
 process.exit(1);

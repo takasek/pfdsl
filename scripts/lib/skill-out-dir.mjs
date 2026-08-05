@@ -41,8 +41,12 @@ export function parseSkillOutDir(scriptName, argv) {
 	const outDir = resolve(process.cwd(), values.out);
 	const parts = outDir.split(/[\\/]/);
 	if (!parts.includes(".claude") && !parts.includes("skills")) {
-		console.error(`Error: output path must contain a '.claude' or 'skills' directory component — got: ${outDir}`);
-		console.error("This check prevents accidentally writing to the wrong location.");
+		console.error(
+			`Error: output path must contain a '.claude' or 'skills' directory component — got: ${outDir}`,
+		);
+		console.error(
+			"This check prevents accidentally writing to the wrong location.",
+		);
 		process.exit(1);
 	}
 	return outDir;

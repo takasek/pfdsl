@@ -25,7 +25,9 @@ try {
 	printGroup("Changed:", changed);
 	printGroup("Removed:", removed);
 	if (changed.length === 0 && removed.length === 0) {
-		console.log(`.claude/skills/pfd-ops/install/ already up to date (${unchanged.length} file(s)).`);
+		console.log(
+			`.claude/skills/pfd-ops/install/ already up to date (${unchanged.length} file(s)).`,
+		);
 	} else {
 		console.log(
 			`.claude/skills/pfd-ops/install/ regenerated (${changed.length} changed, ${removed.length} removed, ${unchanged.length} unchanged).`,

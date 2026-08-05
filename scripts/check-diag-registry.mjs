@@ -16,9 +16,13 @@
  */
 
 import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseSpecDiagTable, diffDiagRegistry, evaluateDiagRegistryDiff } from "./lib/diag-registry-check.mjs";
+import {
+	diffDiagRegistry,
+	evaluateDiagRegistryDiff,
+	parseSpecDiagTable,
+} from "./lib/diag-registry-check.mjs";
 import { emitLinesAndExit } from "./lib/emit-lines.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

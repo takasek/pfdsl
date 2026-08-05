@@ -5,13 +5,13 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
-	EMPTY_TREE,
-	SCOPE_EXCLUSIONS,
 	canonicalSourceOf,
 	diffBase,
+	EMPTY_TREE,
 	formatGateFailure,
 	inScope,
 	runDistributionReviewCheck,
+	SCOPE_EXCLUSIONS,
 	unreviewedFiles,
 } from "./distribution-review.mjs";
 import { git } from "./run-exec.mjs";
@@ -25,8 +25,14 @@ describe("inScope", () => {
 
 	it("leaves out what is not markdown", () => {
 		assert.equal(inScope("plugin/pfdsl/.claude-plugin/plugin.json"), false);
-		assert.equal(inScope("plugin/pfdsl/hooks/retro-reminder-post-tool-use.mjs"), false);
-		assert.equal(inScope("plugin/pfdsl/skills/pfd-ops/references/scaffold/roadmap.pfdsl"), false);
+		assert.equal(
+			inScope("plugin/pfdsl/hooks/retro-reminder-post-tool-use.mjs"),
+			false,
+		);
+		assert.equal(
+			inScope("plugin/pfdsl/skills/pfd-ops/references/scaffold/roadmap.pfdsl"),
+			false,
+		);
 	});
 
 	it("leaves out anything outside the distributed tree", () => {
@@ -51,14 +57,26 @@ describe("canonicalSourceOf", () => {
 	// Mirrored trees keep their path and only move root; rendered files point at
 	// what they are rendered from, which for the two aggregates is a directory.
 	const PAIRS = [
-		["plugin/pfdsl/skills/pfd-ops/references/architecture.md", ".claude/skills/pfd-ops/references/architecture.md"],
+		[
+			"plugin/pfdsl/skills/pfd-ops/references/architecture.md",
+			".claude/skills/pfd-ops/references/architecture.md",
+		],
 		["plugin/pfdsl/commands/pfd-cycle.md", ".claude/commands/pfd-cycle.md"],
 		["plugin/pfdsl/agents/pfd-lens.md", ".claude/agents/pfd-lens.md"],
-		["plugin/pfdsl/hooks/retro-reminder-post-tool-use.mjs", "hooks/retro-reminder-post-tool-use.mjs"],
+		[
+			"plugin/pfdsl/hooks/retro-reminder-post-tool-use.mjs",
+			"hooks/retro-reminder-post-tool-use.mjs",
+		],
 		["plugin/pfdsl/skills/pfdsl/SKILL.md", "scripts/skill-template/SKILL.md"],
 		["plugin/pfdsl/skills/pfdsl/references/spec.md", "docs/spec/spec.md"],
-		["plugin/pfdsl/skills/pfdsl/references/quality-guide.md", "docs/quality-guide.md"],
-		["plugin/pfdsl/skills/pfdsl/references/review-perspectives.md", "docs/review-perspectives.md"],
+		[
+			"plugin/pfdsl/skills/pfdsl/references/quality-guide.md",
+			"docs/quality-guide.md",
+		],
+		[
+			"plugin/pfdsl/skills/pfdsl/references/review-perspectives.md",
+			"docs/review-perspectives.md",
+		],
 		["plugin/pfdsl/skills/pfdsl/references/examples.md", "docs/examples/"],
 		["plugin/pfdsl/skills/pfdsl/references/samples.md", "docs/samples/"],
 	];
@@ -73,7 +91,10 @@ describe("canonicalSourceOf", () => {
 		// A new bundled file with no known canonical source is a gap in this
 		// map, not a file to review in place: reviewers would be sent to edit a
 		// generated copy that the next `make gen-plugin` overwrites.
-		assert.throws(() => canonicalSourceOf("plugin/pfdsl/skills/pfd-new/SKILL.md"), /no canonical source/);
+		assert.throws(
+			() => canonicalSourceOf("plugin/pfdsl/skills/pfd-new/SKILL.md"),
+			/no canonical source/,
+		);
 	});
 });
 
@@ -91,7 +112,10 @@ describe("the map against the bundle that actually ships", () => {
 	it("resolves every bundled markdown file to a canonical source that exists", () => {
 		for (const path of bundled) {
 			const canonical = canonicalSourceOf(path);
-			assert.ok(existsSync(resolve(root, canonical)), `${path} → ${canonical} does not exist`);
+			assert.ok(
+				existsSync(resolve(root, canonical)),
+				`${path} → ${canonical} does not exist`,
+			);
 		}
 	});
 
@@ -119,7 +143,10 @@ describe("unreviewedFiles", () => {
 	});
 
 	it("is empty when nothing distributed changed", () => {
-		assert.deepEqual(unreviewedFiles(["packages/cli/src/cli.ts", "docs/adr/README.md"]), []);
+		assert.deepEqual(
+			unreviewedFiles(["packages/cli/src/cli.ts", "docs/adr/README.md"]),
+			[],
+		);
 	});
 });
 
@@ -147,7 +174,10 @@ describe("formatGateFailure", () => {
 	});
 
 	it("says the bundle was never reviewed, and how to clear the gate", () => {
-		const message = formatGateFailure({ base: EMPTY_TREE, files: ["plugin/pfdsl/commands/pfd-cycle.md"] });
+		const message = formatGateFailure({
+			base: EMPTY_TREE,
+			files: ["plugin/pfdsl/commands/pfd-cycle.md"],
+		});
 		assert.match(message, /never been reviewed/);
 		assert.match(message, /distribution-review/);
 	});
@@ -162,14 +192,20 @@ describe("runDistributionReviewCheck", () => {
 
 	it("passes when nothing distributed has moved since the reviewed commit", () => {
 		const result = runDistributionReviewCheck(
-			deps({ record: { commit: "a".repeat(40) }, changed: ["packages/cli/src/cli.ts"] }),
+			deps({
+				record: { commit: "a".repeat(40) },
+				changed: ["packages/cli/src/cli.ts"],
+			}),
 		);
 		assert.equal(result.ok, true);
 	});
 
 	it("fails, naming the files, when a distributed prompt has moved", () => {
 		const result = runDistributionReviewCheck(
-			deps({ record: { commit: "a".repeat(40) }, changed: ["plugin/pfdsl/skills/pfd-ops/SKILL.md"] }),
+			deps({
+				record: { commit: "a".repeat(40) },
+				changed: ["plugin/pfdsl/skills/pfd-ops/SKILL.md"],
+			}),
 		);
 		assert.equal(result.ok, false);
 		assert.match(result.message, /pfd-ops\/SKILL\.md/);
@@ -186,7 +222,9 @@ describe("runDistributionReviewCheck", () => {
 	it("asks for a fetch when the reviewed commit is not in this clone", () => {
 		// A shallow clone or a squash-merged branch can leave the recorded
 		// commit unreachable. Passing there would approve by accident.
-		const result = runDistributionReviewCheck(deps({ record: { commit: "b".repeat(40) }, reachable: false }));
+		const result = runDistributionReviewCheck(
+			deps({ record: { commit: "b".repeat(40) }, reachable: false }),
+		);
 		assert.equal(result.ok, false);
 		assert.match(result.message, /git fetch/);
 	});

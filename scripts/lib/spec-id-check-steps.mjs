@@ -30,8 +30,10 @@ export function runSpecIdCheck({ args, listFiles, readFile }) {
 	const strictRefHits = [];
 	for (const file of files) {
 		const text = readFile(file);
-		for (const hit of findSpecIdDefinitions(text)) definitionHits.push({ file, ...hit });
-		for (const hit of findStrictRefs(text)) strictRefHits.push({ file, ...hit });
+		for (const hit of findSpecIdDefinitions(text))
+			definitionHits.push({ file, ...hit });
+		for (const hit of findStrictRefs(text))
+			strictRefHits.push({ file, ...hit });
 	}
 
 	const duplicates = findDuplicateDefinitions(definitionHits);
@@ -47,5 +49,9 @@ export function runSpecIdCheck({ args, listFiles, readFile }) {
 			],
 		};
 	}
-	return { exitCode: 0, stdoutLines: ["check-spec-ids: no violations found"], stderrLines: [] };
+	return {
+		exitCode: 0,
+		stdoutLines: ["check-spec-ids: no violations found"],
+		stderrLines: [],
+	};
 }

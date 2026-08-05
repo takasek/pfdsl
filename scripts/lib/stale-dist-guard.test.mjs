@@ -1,10 +1,10 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import {
 	formatStaleWarning,
-	stalePackages,
 	runStaleDistGuard,
+	stalePackages,
 	trustsBuildOutput,
 } from "./stale-dist-guard.mjs";
 
@@ -54,7 +54,10 @@ describe("trustsBuildOutput", () => {
 	});
 
 	it("does not fire on a path that merely contains the word test", () => {
-		assert.equal(trustsBuildOutput("cat packages/cli/src/index.test.ts"), false);
+		assert.equal(
+			trustsBuildOutput("cat packages/cli/src/index.test.ts"),
+			false,
+		);
 	});
 });
 
@@ -97,33 +100,48 @@ describe("formatStaleWarning", () => {
 	});
 
 	it("agrees with itself in number for several packages", () => {
-		assert.match(formatStaleWarning(["a", "b"]), /a, b have builds older than their sources/);
+		assert.match(
+			formatStaleWarning(["a", "b"]),
+			/a, b have builds older than their sources/,
+		);
 	});
 });
 
 describe("runStaleDistGuard", () => {
 	const staleInput = (event) =>
-		JSON.stringify({ hook_event_name: event, tool_name: "Bash", tool_input: { command: "pnpm -r typecheck" } });
+		JSON.stringify({
+			hook_event_name: event,
+			tool_name: "Bash",
+			tool_input: { command: "pnpm -r typecheck" },
+		});
 
 	it("hands the warning to the model as additionalContext after the command ran", () => {
-		const { shouldOutput, output } = runStaleDistGuard(staleInput("PostToolUse"), {
-			findStale: () => ["@pfdsl/core"],
-		});
+		const { shouldOutput, output } = runStaleDistGuard(
+			staleInput("PostToolUse"),
+			{
+				findStale: () => ["@pfdsl/core"],
+			},
+		);
 		assert.equal(shouldOutput, true);
 		assert.equal(output.hookSpecificOutput.hookEventName, "PostToolUse");
 		assert.match(output.hookSpecificOutput.additionalContext, /@pfdsl\/core/);
 	});
 
 	it("writes to stderr before the command runs, where the model cannot be reached", () => {
-		const result = runStaleDistGuard(staleInput("PreToolUse"), { findStale: () => ["@pfdsl/core"] });
+		const result = runStaleDistGuard(staleInput("PreToolUse"), {
+			findStale: () => ["@pfdsl/core"],
+		});
 		assert.equal(result.shouldOutput, false);
 		assert.match(result.stderr, /@pfdsl\/core/);
 	});
 
 	it("says nothing when nothing is stale", () => {
-		assert.deepEqual(runStaleDistGuard(staleInput("PostToolUse"), { findStale: () => [] }), {
-			shouldOutput: false,
-		});
+		assert.deepEqual(
+			runStaleDistGuard(staleInput("PostToolUse"), { findStale: () => [] }),
+			{
+				shouldOutput: false,
+			},
+		);
 	});
 
 	it("does not go near the filesystem for a command that does not read the build", () => {
@@ -144,8 +162,11 @@ describe("runStaleDistGuard", () => {
 	});
 
 	it("silently allows malformed stdin JSON", () => {
-		assert.deepEqual(runStaleDistGuard("not json{{{", { findStale: () => ["@pfdsl/core"] }), {
-			shouldOutput: false,
-		});
+		assert.deepEqual(
+			runStaleDistGuard("not json{{{", { findStale: () => ["@pfdsl/core"] }),
+			{
+				shouldOutput: false,
+			},
+		);
 	});
 });

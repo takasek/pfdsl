@@ -1,44 +1,49 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
+import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-	matchesTrigger,
-	formatGateTable,
-	hasStatusChange,
-	statusChangedForArtifact,
-	extractGateChecklist,
-	deriveManualItems,
-	GATE_CHECKLIST_SOURCE_PATH,
-	VSCODE_EXT_TRIGGER,
-	lintCommitSubjects,
-	wipTransitionDetected,
-	parseAuditTerminals,
-	parseAuditExternalTerminals,
-	diffNewTerminals,
-	diffReadySets,
-	classifyAuditIssuesFlowResult,
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
-	classifyOutputArtifactStatus,
-	classifyDesignRecordTiming,
+	classifyAuditIssuesFlowResult,
 	classifyDesignRecordContent,
+	classifyDesignRecordTiming,
+	classifyOutputArtifactStatus,
+	classifySizeDirection,
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
-	classifySizeDirection,
-	SIZE_INTENT_PATTERN,
+	deriveManualItems,
+	diffNewTerminals,
+	diffReadySets,
+	extractGateChecklist,
+	formatGateTable,
 	formatSizeDelta,
-	SIZE_TRACKED_PATTERNS,
+	GATE_CHECKLIST_SOURCE_PATH,
+	hasStatusChange,
+	lintCommitSubjects,
+	matchesTrigger,
+	parseAuditExternalTerminals,
+	parseAuditTerminals,
+	SIZE_INTENT_PATTERN,
 	SIZE_OVERRIDE_PATTERN,
+	SIZE_TRACKED_PATTERNS,
+	statusChangedForArtifact,
+	VSCODE_EXT_TRIGGER,
+	wipTransitionDetected,
 } from "./gate-check.mjs";
 
 describe("classifyAuditIssuesFlowResult", () => {
 	it("PASS when ok", () => {
-		assert.deepEqual(classifyAuditIssuesFlowResult(true, 0), { status: "PASS" });
+		assert.deepEqual(classifyAuditIssuesFlowResult(true, 0), {
+			status: "PASS",
+		});
 	});
 
 	it("SKIP with gh-unavailable detail when exit code is the gh-unavailable code", () => {
-		const result = classifyAuditIssuesFlowResult(false, AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE);
+		const result = classifyAuditIssuesFlowResult(
+			false,
+			AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
+		);
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /gh CLI unavailable/);
 	});
@@ -52,45 +57,74 @@ describe("classifyAuditIssuesFlowResult", () => {
 
 describe("classifyOutputArtifactStatus", () => {
 	it("SKIPs when there is no --artifact key and roadmap.pfdsl itself was not touched", () => {
-		const result = classifyOutputArtifactStatus({ artifactKey: undefined, roadmapChanged: false });
+		const result = classifyOutputArtifactStatus({
+			artifactKey: undefined,
+			roadmapChanged: false,
+		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /--artifact/);
 	});
 
 	it("PASSes on the presence-only fallback when roadmap.pfdsl changed and a status: line moved", () => {
-		const result = classifyOutputArtifactStatus({ artifactKey: undefined, roadmapChanged: true, changed: true });
+		const result = classifyOutputArtifactStatus({
+			artifactKey: undefined,
+			roadmapChanged: true,
+			changed: true,
+		});
 		assert.equal(result.status, "PASS");
 	});
 
 	it("SKIPs when the cycle declares it has no roadmap output artifact", () => {
-		const result = classifyOutputArtifactStatus({ noArtifact: true, roadmapChanged: true, changed: false });
+		const result = classifyOutputArtifactStatus({
+			noArtifact: true,
+			roadmapChanged: true,
+			changed: false,
+		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /declared/);
 	});
 
 	it("keeps the declaration authoritative even when a status: line did move", () => {
-		const result = classifyOutputArtifactStatus({ noArtifact: true, roadmapChanged: true, changed: true });
+		const result = classifyOutputArtifactStatus({
+			noArtifact: true,
+			roadmapChanged: true,
+			changed: true,
+		});
 		assert.equal(result.status, "SKIP");
 	});
 
 	it("points at the declaration when the fallback FAILs, so the way out is in the message", () => {
-		const result = classifyOutputArtifactStatus({ artifactKey: undefined, roadmapChanged: true, changed: false });
+		const result = classifyOutputArtifactStatus({
+			artifactKey: undefined,
+			roadmapChanged: true,
+			changed: false,
+		});
 		assert.match(result.detail, /--no-artifact/);
 	});
 
 	it("FAILs on the presence-only fallback when roadmap.pfdsl changed but no status: line moved", () => {
-		const result = classifyOutputArtifactStatus({ artifactKey: undefined, roadmapChanged: true, changed: false });
+		const result = classifyOutputArtifactStatus({
+			artifactKey: undefined,
+			roadmapChanged: true,
+			changed: false,
+		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /no status: line changed/);
 	});
 
 	it("PASSes the strict per-artifact check when a status: change was found for the key", () => {
-		const result = classifyOutputArtifactStatus({ artifactKey: "ops_checkers", changed: true });
+		const result = classifyOutputArtifactStatus({
+			artifactKey: "ops_checkers",
+			changed: true,
+		});
 		assert.equal(result.status, "PASS");
 	});
 
 	it("FAILs the strict per-artifact check and names the artifact when no status: change was found", () => {
-		const result = classifyOutputArtifactStatus({ artifactKey: "ops_checkers", changed: false });
+		const result = classifyOutputArtifactStatus({
+			artifactKey: "ops_checkers",
+			changed: false,
+		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /ops_checkers/);
 	});
@@ -98,11 +132,20 @@ describe("classifyOutputArtifactStatus", () => {
 
 describe("VSCODE_EXT_TRIGGER", () => {
 	it("matches files under packages/vscode-extension", () => {
-		assert.equal(matchesTrigger(["packages/vscode-extension/src/extension.ts"], VSCODE_EXT_TRIGGER), true);
+		assert.equal(
+			matchesTrigger(
+				["packages/vscode-extension/src/extension.ts"],
+				VSCODE_EXT_TRIGGER,
+			),
+			true,
+		);
 	});
 
 	it("does not match files outside packages/vscode-extension", () => {
-		assert.equal(matchesTrigger(["packages/cli/src/index.ts"], VSCODE_EXT_TRIGGER), false);
+		assert.equal(
+			matchesTrigger(["packages/cli/src/index.ts"], VSCODE_EXT_TRIGGER),
+			false,
+		);
 	});
 });
 
@@ -110,7 +153,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("matchesTrigger", () => {
 	it("matches when any file hits the pattern", () => {
-		assert.equal(matchesTrigger(["docs/spec/spec.md", "README.md"], /^docs\//), true);
+		assert.equal(
+			matchesTrigger(["docs/spec/spec.md", "README.md"], /^docs\//),
+			true,
+		);
 	});
 
 	it("returns false when nothing matches", () => {
@@ -126,11 +172,18 @@ describe("formatGateTable", () => {
 	it("renders PASS/FAIL/SKIP rows with symbols", () => {
 		const out = formatGateTable([
 			{ name: "pfdsl check", status: "PASS" },
-			{ name: "gen-plugin identity", status: "SKIP", detail: "no skill/plugin-source changes" },
+			{
+				name: "gen-plugin identity",
+				status: "SKIP",
+				detail: "no skill/plugin-source changes",
+			},
 			{ name: "audit-issues-flow", status: "FAIL", detail: "diff detected" },
 		]);
 		assert.match(out, /✓ PASS\s+pfdsl check/);
-		assert.match(out, /- SKIP\s+gen-plugin identity — no skill\/plugin-source changes/);
+		assert.match(
+			out,
+			/- SKIP\s+gen-plugin identity — no skill\/plugin-source changes/,
+		);
 		assert.match(out, /✗ FAIL\s+audit-issues-flow — diff detected/);
 	});
 });
@@ -142,12 +195,13 @@ describe("hasStatusChange", () => {
 	});
 
 	it("returns false when no status: line changed", () => {
-		const diff = "@@ -1,2 +1,2 @@\n-    label: \"old\"\n+    label: \"new\"\n";
+		const diff = '@@ -1,2 +1,2 @@\n-    label: "old"\n+    label: "new"\n';
 		assert.equal(hasStatusChange(diff), false);
 	});
 
 	it("ignores the +++/--- file header lines", () => {
-		const diff = "--- a/.pfdsl/roadmap.pfdsl\n+++ b/.pfdsl/roadmap.pfdsl\n status: todo\n";
+		const diff =
+			"--- a/.pfdsl/roadmap.pfdsl\n+++ b/.pfdsl/roadmap.pfdsl\n status: todo\n";
 		assert.equal(hasStatusChange(diff), false);
 	});
 
@@ -156,7 +210,8 @@ describe("hasStatusChange", () => {
 	});
 
 	it("still detects a status: line whose content itself starts with a dash", () => {
-		const diff = "@@ -1,2 +1,2 @@\n--status: dash-prefixed-value\n+status: wip\n";
+		const diff =
+			"@@ -1,2 +1,2 @@\n--status: dash-prefixed-value\n+status: wip\n";
 		assert.equal(hasStatusChange(diff), true);
 	});
 });
@@ -164,7 +219,7 @@ describe("hasStatusChange", () => {
 describe("statusChangedForArtifact", () => {
 	const before = [
 		"artifact:",
-		'  ops_checkers:',
+		"  ops_checkers:",
 		'    label: "scripts"',
 		"    status: todo",
 		"  retro_due_hook:",
@@ -186,18 +241,26 @@ describe("statusChangedForArtifact", () => {
 			'  retro_due_hook:\n    label: "hook"\n    status: todo',
 			'  retro_due_hook:\n    label: "hook"\n    status: wip',
 		);
-		assert.equal(statusChangedForArtifact(before, after, "ops_checkers"), false);
+		assert.equal(
+			statusChangedForArtifact(before, after, "ops_checkers"),
+			false,
+		);
 	});
 
 	it("returns false when the artifact block is missing from both snapshots", () => {
-		assert.equal(statusChangedForArtifact(before, before, "nonexistent_artifact"), false);
+		assert.equal(
+			statusChangedForArtifact(before, before, "nonexistent_artifact"),
+			false,
+		);
 	});
 });
 
 describe("lintCommitSubjects", () => {
 	it("accepts a Conventional Commits subject", () => {
 		const results = lintCommitSubjects(["feat(gate-check): add commit lint"]);
-		assert.deepEqual(results, [{ subject: "feat(gate-check): add commit lint", ok: true }]);
+		assert.deepEqual(results, [
+			{ subject: "feat(gate-check): add commit lint", ok: true },
+		]);
 	});
 
 	it("accepts a breaking-change subject with !", () => {
@@ -224,7 +287,9 @@ describe("lintCommitSubjects", () => {
 	// reach it: commitSubjectStep collects with --no-merges, because git writes
 	// those subjects and no author can make them conventional (#690).
 	it("rejects a merge-style subject that lacks a colon", () => {
-		const results = lintCommitSubjects(["Merge pull request #466 from foo/bar"]);
+		const results = lintCommitSubjects([
+			"Merge pull request #466 from foo/bar",
+		]);
 		assert.equal(results[0].ok, false);
 	});
 
@@ -260,7 +325,9 @@ describe("lintCommitSubjects", () => {
 	});
 
 	it("rejects a wholly Japanese subject that is otherwise well-formed (#595)", () => {
-		const results = lintCommitSubjects(["fix(graphviz-exporter): CJK ラベルに最小ノード幅を付与"]);
+		const results = lintCommitSubjects([
+			"fix(graphviz-exporter): CJK ラベルに最小ノード幅を付与",
+		]);
 		assert.equal(results[0].ok, false);
 	});
 
@@ -268,48 +335,98 @@ describe("lintCommitSubjects", () => {
 	// Japanese heading that genuinely exists in the tree. Quoting an identifier
 	// is not the failure #595 is after.
 	it("accepts Japanese quoted in a backtick code span (#595)", () => {
-		const results = lintCommitSubjects(["docs(pfd-retro): add a `保留した違和感の想起` step"]);
+		const results = lintCommitSubjects([
+			"docs(pfd-retro): add a `保留した違和感の想起` step",
+		]);
 		assert.equal(results[0].ok, true);
 	});
 
 	it("accepts Japanese inside double quotes (#595)", () => {
-		const results = lintCommitSubjects(['feat(pfd-retro): add "保留した違和感の想起" to the catalog']);
+		const results = lintCommitSubjects([
+			'feat(pfd-retro): add "保留した違和感の想起" to the catalog',
+		]);
 		assert.equal(results[0].ok, true);
 	});
 
 	it("rejects Japanese that trails a legitimately quoted span (#595)", () => {
-		const results = lintCommitSubjects(["docs(skill): clarify `前回` refers to 直近のログ"]);
+		const results = lintCommitSubjects([
+			"docs(skill): clarify `前回` refers to 直近のログ",
+		]);
 		assert.equal(results[0].ok, false);
 	});
 
 	it("accepts a plain English subject with no quoting", () => {
-		const results = lintCommitSubjects(["fix(cli): drop the unreachable default"]);
+		const results = lintCommitSubjects([
+			"fix(cli): drop the unreachable default",
+		]);
 		assert.equal(results[0].ok, true);
 	});
 
 	it("catches Japanese that falls between the obvious blocks (#595)", () => {
-		for (const subject of ["docs(ops): note 人々 here", "docs(ops): note ﾊﾝｶｸ here"]) {
+		for (const subject of [
+			"docs(ops): note 人々 here",
+			"docs(ops): note ﾊﾝｶｸ here",
+		]) {
 			assert.equal(lintCommitSubjects([subject])[0].ok, false, subject);
 		}
 	});
 });
 
 describe("wipTransitionDetected", () => {
-	const wipSnapshot = ["artifact:", "  ops_checkers:", '    label: "scripts"', "    status: wip", ""].join("\n");
-	const todoSnapshot = ["artifact:", "  ops_checkers:", '    label: "scripts"', "    status: todo", ""].join("\n");
-	const doneSnapshot = ["artifact:", "  ops_checkers:", '    label: "scripts"', "    status: done", ""].join("\n");
-	const otherWipSnapshot = ["artifact:", "  retro_due_hook:", '    label: "hook"', "    status: wip", ""].join("\n");
+	const wipSnapshot = [
+		"artifact:",
+		"  ops_checkers:",
+		'    label: "scripts"',
+		"    status: wip",
+		"",
+	].join("\n");
+	const todoSnapshot = [
+		"artifact:",
+		"  ops_checkers:",
+		'    label: "scripts"',
+		"    status: todo",
+		"",
+	].join("\n");
+	const doneSnapshot = [
+		"artifact:",
+		"  ops_checkers:",
+		'    label: "scripts"',
+		"    status: done",
+		"",
+	].join("\n");
+	const otherWipSnapshot = [
+		"artifact:",
+		"  retro_due_hook:",
+		'    label: "hook"',
+		"    status: wip",
+		"",
+	].join("\n");
 
 	it("detects a wip snapshot for the named artifact", () => {
-		assert.equal(wipTransitionDetected([todoSnapshot, wipSnapshot, doneSnapshot], "ops_checkers"), true);
+		assert.equal(
+			wipTransitionDetected(
+				[todoSnapshot, wipSnapshot, doneSnapshot],
+				"ops_checkers",
+			),
+			true,
+		);
 	});
 
 	it("returns false when the named artifact was never wip", () => {
-		assert.equal(wipTransitionDetected([todoSnapshot, doneSnapshot], "ops_checkers"), false);
+		assert.equal(
+			wipTransitionDetected([todoSnapshot, doneSnapshot], "ops_checkers"),
+			false,
+		);
 	});
 
 	it("ignores a wip snapshot belonging to a different artifact", () => {
-		assert.equal(wipTransitionDetected([todoSnapshot, otherWipSnapshot, doneSnapshot], "ops_checkers"), false);
+		assert.equal(
+			wipTransitionDetected(
+				[todoSnapshot, otherWipSnapshot, doneSnapshot],
+				"ops_checkers",
+			),
+			false,
+		);
 	});
 
 	it("without an artifact key, detects wip anywhere in any snapshot", () => {
@@ -323,8 +440,13 @@ describe("wipTransitionDetected", () => {
 
 describe("parseAuditTerminals", () => {
 	it("parses the comma-separated terminal artifacts line", () => {
-		const text = "terminal artifacts: spec_v0010, article, obsidian_plugin\nexternal inputs: adr_corpus\n";
-		assert.deepEqual(parseAuditTerminals(text), ["spec_v0010", "article", "obsidian_plugin"]);
+		const text =
+			"terminal artifacts: spec_v0010, article, obsidian_plugin\nexternal inputs: adr_corpus\n";
+		assert.deepEqual(parseAuditTerminals(text), [
+			"spec_v0010",
+			"article",
+			"obsidian_plugin",
+		]);
 	});
 
 	it("returns an empty array when there is no terminal artifacts line", () => {
@@ -332,7 +454,10 @@ describe("parseAuditTerminals", () => {
 	});
 
 	it("returns an empty array when the terminal artifacts line is empty", () => {
-		assert.deepEqual(parseAuditTerminals("terminal artifacts: \nexternal inputs:\n"), []);
+		assert.deepEqual(
+			parseAuditTerminals("terminal artifacts: \nexternal inputs:\n"),
+			[],
+		);
 	});
 });
 
@@ -340,16 +465,24 @@ describe("parseAuditExternalTerminals", () => {
 	it("parses the comma-separated external-stakeholder terminals line", () => {
 		const text =
 			"external inputs: adr_corpus\nterminal artifacts: article\nexternal-stakeholder terminals: monthly_report, published_skill\n";
-		assert.deepEqual(parseAuditExternalTerminals(text), ["monthly_report", "published_skill"]);
+		assert.deepEqual(parseAuditExternalTerminals(text), [
+			"monthly_report",
+			"published_skill",
+		]);
 	});
 
 	it("returns an empty array when there is no external-stakeholder terminals line", () => {
-		assert.deepEqual(parseAuditExternalTerminals("terminal artifacts: article\n"), []);
+		assert.deepEqual(
+			parseAuditExternalTerminals("terminal artifacts: article\n"),
+			[],
+		);
 	});
 
 	it("returns an empty array when the external-stakeholder terminals line is empty", () => {
 		assert.deepEqual(
-			parseAuditExternalTerminals("terminal artifacts: article\nexternal-stakeholder terminals: \n"),
+			parseAuditExternalTerminals(
+				"terminal artifacts: article\nexternal-stakeholder terminals: \n",
+			),
 			[],
 		);
 	});
@@ -386,7 +519,10 @@ describe("diffReadySets", () => {
 	});
 
 	it("returns empty arrays for identical sets", () => {
-		assert.deepEqual(diffReadySets(["p1"], ["p1"]), { newlyReady: [], noLongerReady: [] });
+		assert.deepEqual(diffReadySets(["p1"], ["p1"]), {
+			newlyReady: [],
+			noLongerReady: [],
+		});
 	});
 });
 
@@ -417,7 +553,11 @@ describe("extractGateChecklist", () => {
 
 describe("deriveManualItems", () => {
 	it("drops items already covered by gate-check's mechanized checks", () => {
-		const items = ["出力 artifact の status を更新した", "知見を振り分けた", "変更した全 .pfdsl が `check` を通過する"];
+		const items = [
+			"出力 artifact の status を更新した",
+			"知見を振り分けた",
+			"変更した全 .pfdsl が `check` を通過する",
+		];
 		assert.deepEqual(deriveManualItems(items), ["知見を振り分けた"]);
 	});
 
@@ -427,16 +567,27 @@ describe("deriveManualItems", () => {
 	});
 
 	it("drops the Conventional Commits subject-format item, keeps the granularity item", () => {
-		const items = ["コミット粒度が規約に従っている", "コミット subject が Conventional Commits 形式に従う"];
-		assert.deepEqual(deriveManualItems(items), ["コミット粒度が規約に従っている"]);
+		const items = [
+			"コミット粒度が規約に従っている",
+			"コミット subject が Conventional Commits 形式に従う",
+		];
+		assert.deepEqual(deriveManualItems(items), [
+			"コミット粒度が規約に従っている",
+		]);
 	});
 });
 
 describe("GATE_CHECKLIST_SOURCE_PATH", () => {
 	it("points at a file whose checklist section yields MANUAL items", () => {
-		const text = readFileSync(resolve(root, GATE_CHECKLIST_SOURCE_PATH), "utf-8");
+		const text = readFileSync(
+			resolve(root, GATE_CHECKLIST_SOURCE_PATH),
+			"utf-8",
+		);
 		const items = deriveManualItems(extractGateChecklist(text));
-		assert.ok(items.length > 0, "expected at least one MANUAL checklist item from the deployed source file");
+		assert.ok(
+			items.length > 0,
+			"expected at least one MANUAL checklist item from the deployed source file",
+		);
 	});
 });
 
@@ -453,12 +604,18 @@ describe("classifyDesignRecordTiming", () => {
 	});
 
 	it("PASSes when the record predates the first commit", () => {
-		const result = classifyDesignRecordTiming("2026-07-30T00:00:00Z", "2026-07-30T12:00:00Z");
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T00:00:00Z",
+			"2026-07-30T12:00:00Z",
+		);
 		assert.equal(result.status, "PASS");
 	});
 
 	it("FAILs when the record was posted after the first commit", () => {
-		const result = classifyDesignRecordTiming("2026-07-30T12:00:00Z", "2026-07-30T00:00:00Z");
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T12:00:00Z",
+			"2026-07-30T00:00:00Z",
+		);
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /after the first commit/);
 	});
@@ -473,11 +630,16 @@ describe("classifyDesignRecordContent", () => {
 	].join("\n");
 
 	it("PASSes a record with all required prefixes and enough disposition tokens", () => {
-		assert.deepEqual(classifyDesignRecordContent(validRecord, 1), { status: "PASS" });
+		assert.deepEqual(classifyDesignRecordContent(validRecord, 1), {
+			status: "PASS",
+		});
 	});
 
 	it("FAILs and lists the missing required-prefix line(s)", () => {
-		const missingRejection = [DESIGN_RECORD_REQUIRED_PREFIXES[0] + " x", "決定: 案A を採用する。"].join("\n");
+		const missingRejection = [
+			DESIGN_RECORD_REQUIRED_PREFIXES[0] + " x",
+			"決定: 案A を採用する。",
+		].join("\n");
 		const result = classifyDesignRecordContent(missingRejection, 0);
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /否定案:/);
@@ -495,17 +657,28 @@ describe("classifyDesignRecordContent", () => {
 	});
 
 	it("recognizes required prefixes under list markers and blockquote markers", () => {
-		const listed = ["- 前提: 背景説明", "* 否定案: 案B", "1. 却下理由: 理由の説明", "> 決定: 案A"].join("\n");
+		const listed = [
+			"- 前提: 背景説明",
+			"* 否定案: 案B",
+			"1. 却下理由: 理由の説明",
+			"> 決定: 案A",
+		].join("\n");
 		assert.equal(classifyDesignRecordContent(listed, 0).status, "PASS");
 	});
 
 	it("recognizes a prefix whose emphasis wraps the label alone", () => {
-		const record = ["**前提**: x", "**否定案**: y", "**却下理由**: z"].join("\n");
+		const record = ["**前提**: x", "**否定案**: y", "**却下理由**: z"].join(
+			"\n",
+		);
 		assert.equal(classifyDesignRecordContent(record, 0).status, "PASS");
 	});
 
 	it("recognizes a parenthesised qualifier on the label", () => {
-		const record = ["前提（案A・案B 共通）: x", "否定案: y", "却下理由（外部制約）: z"].join("\n");
+		const record = [
+			"前提（案A・案B 共通）: x",
+			"否定案: y",
+			"却下理由（外部制約）: z",
+		].join("\n");
 		assert.equal(classifyDesignRecordContent(record, 0).status, "PASS");
 	});
 
@@ -515,7 +688,9 @@ describe("classifyDesignRecordContent", () => {
 	});
 
 	it("recognizes decoration, qualifier and full-width colon stacked on one line", () => {
-		const record = ["> - **前提（案A）**： x", "否定案: y", "却下理由: z"].join("\n");
+		const record = ["> - **前提（案A）**： x", "否定案: y", "却下理由: z"].join(
+			"\n",
+		);
 		assert.equal(classifyDesignRecordContent(record, 0).status, "PASS");
 	});
 
@@ -533,8 +708,12 @@ describe("classifyDesignRecordContent", () => {
 	});
 
 	it("does not require disposition-token coverage when optionCount is 0", () => {
-		const record = DESIGN_RECORD_REQUIRED_PREFIXES.map((p) => `${p} x`).join("\n");
-		assert.deepEqual(classifyDesignRecordContent(record, 0), { status: "PASS" });
+		const record = DESIGN_RECORD_REQUIRED_PREFIXES.map((p) => `${p} x`).join(
+			"\n",
+		);
+		assert.deepEqual(classifyDesignRecordContent(record, 0), {
+			status: "PASS",
+		});
 	});
 
 	it("PASSes when the same option's disposition word appears twice, as ordinary prose", () => {
@@ -544,25 +723,46 @@ describe("classifyDesignRecordContent", () => {
 			"却下理由: 案2は却下する。却下理由はここに書く通り。",
 			"決定: 案1を採用する。",
 		].join("\n");
-		assert.deepEqual(classifyDesignRecordContent(record, 2), { status: "PASS" });
+		assert.deepEqual(classifyDesignRecordContent(record, 2), {
+			status: "PASS",
+		});
 	});
 });
 
 describe("DESIGN_RECORD_REQUIRED_PREFIXES / DISPOSITION_TOKENS", () => {
 	it("exposes the expected prefix and disposition vocabularies", () => {
-		assert.deepEqual(DESIGN_RECORD_REQUIRED_PREFIXES, ["前提:", "否定案:", "却下理由:"]);
+		assert.deepEqual(DESIGN_RECORD_REQUIRED_PREFIXES, [
+			"前提:",
+			"否定案:",
+			"却下理由:",
+		]);
 		assert.deepEqual(DISPOSITION_TOKENS, ["採用", "却下", "保留"]);
 	});
 });
 
 describe("classifySizeDirection", () => {
-	const grownDelta = { path: ".pfdsl/bindings/x.pfdsl", beforeBytes: 100, afterBytes: 150, beforeLines: 10, afterLines: 15 };
-	const shrunkDelta = { path: "docs/adr/0001-x.md", beforeBytes: 200, afterBytes: 100, beforeLines: 20, afterLines: 10 };
+	const grownDelta = {
+		path: ".pfdsl/bindings/x.pfdsl",
+		beforeBytes: 100,
+		afterBytes: 150,
+		beforeLines: 10,
+		afterLines: 15,
+	};
+	const shrunkDelta = {
+		path: "docs/adr/0001-x.md",
+		beforeBytes: 200,
+		afterBytes: 100,
+		beforeLines: 20,
+		afterLines: 10,
+	};
 
 	const declared = "## 症状\n何かが肥大している。\n\nSize-Intent: shrink\n";
 
 	it("SKIPs when the issue declares no size intent", () => {
-		const result = classifySizeDirection({ issueBody: "普通の説明。", deltas: [grownDelta] });
+		const result = classifySizeDirection({
+			issueBody: "普通の説明。",
+			deltas: [grownDelta],
+		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /Size-Intent/);
 	});
@@ -583,7 +783,11 @@ describe("classifySizeDirection", () => {
 	});
 
 	it("FAILs when a tracked artifact grew and the PR body has no Size-Override", () => {
-		const result = classifySizeDirection({ issueBody: declared, deltas: [grownDelta], prBody: "" });
+		const result = classifySizeDirection({
+			issueBody: declared,
+			deltas: [grownDelta],
+			prBody: "",
+		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /\+50 bytes/);
 		assert.match(result.detail, /\+5 lines/);
@@ -600,7 +804,10 @@ describe("classifySizeDirection", () => {
 	});
 
 	it("PASSes when no tracked artifact grew", () => {
-		const result = classifySizeDirection({ issueBody: declared, deltas: [shrunkDelta] });
+		const result = classifySizeDirection({
+			issueBody: declared,
+			deltas: [shrunkDelta],
+		});
 		assert.deepEqual(result, { status: "PASS" });
 	});
 });
@@ -608,14 +815,26 @@ describe("classifySizeDirection", () => {
 describe("formatSizeDelta", () => {
 	it("signs both deltas and keeps the absolute sizes alongside", () => {
 		assert.equal(
-			formatSizeDelta({ path: "docs/adr/x.md", beforeBytes: 30, afterBytes: 80, beforeLines: 3, afterLines: 8 }),
+			formatSizeDelta({
+				path: "docs/adr/x.md",
+				beforeBytes: 30,
+				afterBytes: 80,
+				beforeLines: 3,
+				afterLines: 8,
+			}),
 			"docs/adr/x.md: +50 bytes / +5 lines (30 → 80 bytes)",
 		);
 	});
 
 	it("signs a shrink negatively rather than dropping the sign", () => {
 		assert.match(
-			formatSizeDelta({ path: "docs/adr/x.md", beforeBytes: 80, afterBytes: 30, beforeLines: 8, afterLines: 3 }),
+			formatSizeDelta({
+				path: "docs/adr/x.md",
+				beforeBytes: 80,
+				afterBytes: 30,
+				beforeLines: 8,
+				afterLines: 3,
+			}),
 			/-50 bytes \/ -5 lines/,
 		);
 	});
@@ -624,15 +843,29 @@ describe("formatSizeDelta", () => {
 describe("SIZE_INTENT_PATTERN / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", () => {
 	it("SIZE_INTENT_PATTERN matches a declared shrink intent at line head only", () => {
 		assert.ok(SIZE_INTENT_PATTERN.test("## 症状\nSize-Intent: shrink\n"));
-		assert.ok(!SIZE_INTENT_PATTERN.test("この issue には Size-Intent: shrink とは書かない"));
+		assert.ok(
+			!SIZE_INTENT_PATTERN.test(
+				"この issue には Size-Intent: shrink とは書かない",
+			),
+		);
 		assert.ok(!SIZE_INTENT_PATTERN.test("Size-Intent: grow"));
 	});
 
 	it("SIZE_TRACKED_PATTERNS matches bindings, ADRs, and SKILL.md", () => {
-		assert.ok(SIZE_TRACKED_PATTERNS.some((p) => p.test(".pfdsl/bindings/x.pfdsl")));
-		assert.ok(SIZE_TRACKED_PATTERNS.some((p) => p.test("docs/adr/0020-x/README.md")));
-		assert.ok(SIZE_TRACKED_PATTERNS.some((p) => p.test(".claude/skills/pfd-ops/SKILL.md")));
-		assert.ok(!SIZE_TRACKED_PATTERNS.some((p) => p.test("packages/core/src/graph.ts")));
+		assert.ok(
+			SIZE_TRACKED_PATTERNS.some((p) => p.test(".pfdsl/bindings/x.pfdsl")),
+		);
+		assert.ok(
+			SIZE_TRACKED_PATTERNS.some((p) => p.test("docs/adr/0020-x/README.md")),
+		);
+		assert.ok(
+			SIZE_TRACKED_PATTERNS.some((p) =>
+				p.test(".claude/skills/pfd-ops/SKILL.md"),
+			),
+		);
+		assert.ok(
+			!SIZE_TRACKED_PATTERNS.some((p) => p.test("packages/core/src/graph.ts")),
+		);
 	});
 
 	it("SIZE_OVERRIDE_PATTERN matches a Size-Override: token line", () => {

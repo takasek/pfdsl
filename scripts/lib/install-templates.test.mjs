@@ -4,9 +4,9 @@
 // catch a template added to install/ without updating the list, or vice
 // versa — both are silent-drift failure modes #547 exists to prevent.
 
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { dirname, resolve } from "node:path";
+import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { listInstallFiles } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
@@ -17,6 +17,9 @@ const installDir = resolve(root, ".claude/skills/pfd-ops/install");
 
 describe("INSTALL_TEMPLATE_PATHS", () => {
 	it("matches exactly what exists under .claude/skills/pfd-ops/install/", () => {
-		assert.deepEqual([...INSTALL_TEMPLATE_PATHS].sort(), listInstallFiles(installDir));
+		assert.deepEqual(
+			[...INSTALL_TEMPLATE_PATHS].sort(),
+			listInstallFiles(installDir),
+		);
 	});
 });

@@ -1,11 +1,11 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, rmSync } from "node:fs";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { dirname, resolve } from "node:path";
+import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
-import { run, tryRun, git, tryGit } from "./run-exec.mjs";
+import { git, run, tryGit, tryRun } from "./run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -14,7 +14,9 @@ describe("run-exec", () => {
 		const marker = resolve(tmpdir(), `run-exec-injection-${process.pid}`);
 		rmSync(marker, { force: true });
 
-		const result = tryGit(["rev-parse", `HEAD; touch ${marker}`], { cwd: root });
+		const result = tryGit(["rev-parse", `HEAD; touch ${marker}`], {
+			cwd: root,
+		});
 
 		assert.equal(existsSync(marker), false, "the argument reached a shell");
 		assert.equal(result.ok, false, "an unusable ref must fail");
@@ -28,15 +30,23 @@ describe("run-exec", () => {
 	});
 
 	it("reports the exit status of a failed command instead of throwing", () => {
-		const result = tryRun("git", ["rev-parse", "definitely-not-a-ref"], { cwd: root });
+		const result = tryRun("git", ["rev-parse", "definitely-not-a-ref"], {
+			cwd: root,
+		});
 
 		assert.equal(result.ok, false);
 		assert.notEqual(result.status, 0);
-		assert.ok(result.out.length > 0, "the reason must survive for the caller to print");
+		assert.ok(
+			result.out.length > 0,
+			"the reason must survive for the caller to print",
+		);
 	});
 
 	it("returns stdout on success", () => {
-		assert.match(git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: root }).trim(), /\S/);
+		assert.match(
+			git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: root }).trim(),
+			/\S/,
+		);
 	});
 
 	it("forwards stdin to the command", () => {
@@ -44,13 +54,17 @@ describe("run-exec", () => {
 	});
 
 	it("throws on a non-zero exit so callers that need a hard failure get one", () => {
-		assert.throws(() => git(["rev-parse", "definitely-not-a-ref"], { cwd: root }));
+		assert.throws(() =>
+			git(["rev-parse", "definitely-not-a-ref"], { cwd: root }),
+		);
 	});
 });
 
 describe("run-exec stderr handling", () => {
 	it("carries the failure reason from stderr, where git writes it", () => {
-		const result = tryRun("git", ["rev-parse", "definitely-not-a-ref"], { cwd: root });
+		const result = tryRun("git", ["rev-parse", "definitely-not-a-ref"], {
+			cwd: root,
+		});
 
 		assert.match(result.out, /definitely-not-a-ref|unknown revision|ambiguous/);
 	});
@@ -58,7 +72,11 @@ describe("run-exec stderr handling", () => {
 
 describe("run-exec stderr routing", () => {
 	it("leaves stderr inherited by default, as the callers relied on", () => {
-		const result = tryRun(process.execPath, ["-e", "process.stderr.write('x'); process.exit(1)"], { cwd: root });
+		const result = tryRun(
+			process.execPath,
+			["-e", "process.stderr.write('x'); process.exit(1)"],
+			{ cwd: root },
+		);
 
 		assert.equal(result.ok, false);
 		assert.equal(result.status, 1);
@@ -67,10 +85,14 @@ describe("run-exec stderr routing", () => {
 	});
 
 	it("captures stderr when the caller asks, so a failing probe stays quiet", () => {
-		const result = tryRun(process.execPath, ["-e", "process.stderr.write('probe reason'); process.exit(1)"], {
-			cwd: root,
-			captureStderr: true,
-		});
+		const result = tryRun(
+			process.execPath,
+			["-e", "process.stderr.write('probe reason'); process.exit(1)"],
+			{
+				cwd: root,
+				captureStderr: true,
+			},
+		);
 
 		assert.equal(result.ok, false);
 		assert.match(result.out, /probe reason/);

@@ -24,16 +24,26 @@
 // matches this pattern's `\.claude/skills/pfd-ops/` alternative.
 
 import { isCliEntrypoint } from "./cli-entrypoint.mjs";
+import {
+	PLUGIN_AGENT_FILES,
+	PLUGIN_COMMAND_FILES,
+	PLUGIN_SKILL_DIRS,
+} from "./gen-plugin.mjs";
 import { GEN_SKILL_TRIGGER_PATTERN } from "./gen-skill-trigger.mjs";
-import { PLUGIN_AGENT_FILES, PLUGIN_COMMAND_FILES, PLUGIN_SKILL_DIRS } from "./gen-plugin.mjs";
 
 // All three alternations are derived from the same lists gen-plugin bundles
 // from, so adding a skill, command or agent cannot land in the assembly and be
 // forgotten in the drift trigger.
-const escape = (name) => name.replace(/\./g, "\\.");
-const AGENT_PATTERNS = PLUGIN_AGENT_FILES.map((file) => `\\.claude/agents/${escape(file)}`).join("|");
-const SKILL_PATTERNS = PLUGIN_SKILL_DIRS.map((dir) => `\\.claude/skills/${escape(dir)}/`).join("|");
-const COMMAND_PATTERNS = PLUGIN_COMMAND_FILES.map((file) => `\\.claude/commands/${escape(file)}`).join("|");
+const escapeDots = (name) => name.replace(/\./g, "\\.");
+const AGENT_PATTERNS = PLUGIN_AGENT_FILES.map(
+	(file) => `\\.claude/agents/${escapeDots(file)}`,
+).join("|");
+const SKILL_PATTERNS = PLUGIN_SKILL_DIRS.map(
+	(dir) => `\\.claude/skills/${escapeDots(dir)}/`,
+).join("|");
+const COMMAND_PATTERNS = PLUGIN_COMMAND_FILES.map(
+	(file) => `\\.claude/commands/${escapeDots(file)}`,
+).join("|");
 
 // `^plugin/` covers the generated side, mirroring what GEN_INSTALL_TRIGGER
 // already does for install/: a hand-edit there is about to be overwritten by

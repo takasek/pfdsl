@@ -21,11 +21,11 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { git } from "./lib/run-exec.mjs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCompanionBindingsCheck } from "./lib/companion-binding-check-steps.mjs";
 import { emitLinesAndExit } from "./lib/emit-lines.mjs";
+import { git } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");

@@ -26,13 +26,28 @@ import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 export const DEFAULT_ALLOWED_AGENTS = ["issue-worker"];
 
 /** gh verbs that only read. Everything else is treated as mutating. */
-const READ_ONLY_GH_VERBS = new Set(["view", "list", "status", "checks", "diff", "download", "log"]);
+const READ_ONLY_GH_VERBS = new Set([
+	"view",
+	"list",
+	"status",
+	"checks",
+	"diff",
+	"download",
+	"log",
+]);
 
 /** git subcommands that publish to a remote. */
 const OUTWARD_GIT_SUBCOMMANDS = new Set(["push"]);
 
 /** git global flags that take a separate value, so the value is not the subcommand. */
-const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"]);
+const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
+	"-C",
+	"-c",
+	"--git-dir",
+	"--work-tree",
+	"--namespace",
+	"--exec-path",
+]);
 
 // Split on shell separators that start a new command, ignoring separators
 // inside quotes. Quote tracking is what keeps `echo "git push"` from being
@@ -130,7 +145,13 @@ export function stripLeadingNoise(tokens) {
 			i++;
 			continue;
 		}
-		if (value === "sudo" || value === "command" || value === "nohup" || value === "time" || value === "env") {
+		if (
+			value === "sudo" ||
+			value === "command" ||
+			value === "nohup" ||
+			value === "time" ||
+			value === "env"
+		) {
 			i++;
 			continue;
 		}
@@ -188,14 +209,15 @@ export function findOutwardCommand(command) {
 			if (parsed.group === "api") {
 				const method = ghApiMethod(parsed.args);
 				// No explicit method means GET, which only reads.
-				if (method && method.toUpperCase() !== "GET") return `gh api ${method.toUpperCase()}`;
+				if (method && method.toUpperCase() !== "GET")
+					return `gh api ${method.toUpperCase()}`;
 				continue;
 			}
 			// An unrecognised or absent verb is treated as mutating: guessing
 			// in the permissive direction is what this guard exists to prevent.
 			if (parsed.verb === null) return `gh ${parsed.group}`;
-			if (!READ_ONLY_GH_VERBS.has(parsed.verb)) return `gh ${parsed.group} ${parsed.verb}`;
-			continue;
+			if (!READ_ONLY_GH_VERBS.has(parsed.verb))
+				return `gh ${parsed.group} ${parsed.verb}`;
 		}
 	}
 	return null;
@@ -207,7 +229,10 @@ export function findOutwardCommand(command) {
  * @param {{allowedAgents?: string[]}} [options]
  * @returns {{decision: "allow"} | {decision: "deny", reason: string, matched: string}}
  */
-export function evaluateDelegationGuard(payload, { allowedAgents = DEFAULT_ALLOWED_AGENTS } = {}) {
+export function evaluateDelegationGuard(
+	payload,
+	{ allowedAgents = DEFAULT_ALLOWED_AGENTS } = {},
+) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
 
 	const agentType = payload?.agent_type;
