@@ -1,8 +1,5 @@
-#!/usr/bin/env node
-// Single source of truth for the gen-plugin drift trigger pattern, shared by
-// scripts/gate-check.mjs (JS RegExp import) and scripts/pre-commit (a POSIX
-// sh script that captures the raw ERE string via command substitution,
-// since it cannot `import` JS). Keep this ERE-compatible for `grep -E`.
+// Single source of truth for the gen-plugin drift trigger pattern, imported as
+// a RegExp by scripts/gate-check.mjs and scripts/check-drift-gates.mjs.
 //
 // Superset of GEN_SKILL_TRIGGER: gen-plugin.mjs re-runs gen-skill.mjs
 // internally (see scripts/gen-plugin.mjs), plus bundles pfd-grill/
@@ -12,18 +9,17 @@
 //
 // Includes scripts/gen-plugin-dist-independent.mjs (#593, split rationale
 // in scripts/lib/gen-plugin.mjs's assemblePluginDistIndependent): a change
-// to it is itself a drift-check target, so it must trigger the same
-// check_drift that regenerates and diffs plugin/ in scripts/pre-commit.
+// to it is itself a drift-check target, so it must trigger the same gate
+// that regenerates and diffs plugin/ in scripts/check-drift-gates.mjs.
 // Its own gen-install.mjs dependency doesn't need adding here — not because
 // gen-install can't affect plugin/'s contents (it can: mirrorDir("pfd-ops",
 // …) in scripts/lib/gen-plugin.mjs copies the whole pfd-ops skill tree,
 // install/ included, into plugin/pfdsl/skills/pfd-ops/install/), but because
 // a template-source-only change is already blocked by GEN_INSTALL_TRIGGER's
-// own check_drift in scripts/pre-commit (which runs first) until install/ is
+// own gate, declared ahead of these in scripts/check-drift-gates.mjs, until install/ is
 // regenerated and re-staged too — and that staged install/ path itself
 // matches this pattern's `\.claude/skills/pfd-ops/` alternative.
 
-import { isCliEntrypoint } from "./cli-entrypoint.mjs";
 import {
 	PLUGIN_AGENT_FILES,
 	PLUGIN_COMMAND_FILES,
@@ -47,16 +43,11 @@ const COMMAND_PATTERNS = PLUGIN_COMMAND_FILES.map(
 
 // `^plugin/` covers the generated side, mirroring what GEN_INSTALL_TRIGGER
 // already does for install/: a hand-edit there is about to be overwritten by
-// the next assembly, and check_drift is what tells the author so instead of
+// the next assembly, and the drift gate is what tells the author so instead of
 // letting the edit ship and then vanish (#666, same shape as #579).
 // `.claude-plugin/marketplace\.json` joins it for the same reason: its
 // per-plugin description is generated (assemblePluginDistIndependent, #685)
 // even though the file lives outside plugin/pfdsl/.
-export const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|${SKILL_PATTERNS}|${COMMAND_PATTERNS}|${AGENT_PATTERNS}|^hooks/|^plugin/|packages/cli/package\\.json|^\\.claude-plugin/marketplace\\.json`;
+const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|${SKILL_PATTERNS}|${COMMAND_PATTERNS}|${AGENT_PATTERNS}|^hooks/|^plugin/|packages/cli/package\\.json|^\\.claude-plugin/marketplace\\.json`;
 
 export const GEN_PLUGIN_TRIGGER = new RegExp(GEN_PLUGIN_TRIGGER_PATTERN);
-
-// CLI mode: print the raw ERE pattern string for shell command substitution.
-if (isCliEntrypoint(import.meta.url, process.argv[1])) {
-	console.log(GEN_PLUGIN_TRIGGER_PATTERN);
-}

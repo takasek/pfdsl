@@ -1,10 +1,6 @@
-#!/usr/bin/env node
-// Single source of truth for the gen-skill drift trigger pattern, shared by
-// scripts/gate-check.mjs (JS RegExp import) and scripts/pre-commit (a POSIX
-// sh script that captures the raw ERE string via command substitution,
-// since it cannot `import` JS). Keep this ERE-compatible for `grep -E`.
-
-import { isCliEntrypoint } from "./cli-entrypoint.mjs";
+// Single source of truth for the gen-skill drift trigger pattern, imported as a
+// RegExp by scripts/gate-check.mjs and, through GEN_PLUGIN_TRIGGER_PATTERN, by
+// scripts/check-drift-gates.mjs.
 
 // examples-index.mjs and sample-companions.mjs are here because they render
 // references/examples.md and references/samples.md: a change to either moves
@@ -14,8 +10,3 @@ export const GEN_SKILL_TRIGGER_PATTERN =
 	"^(docs/|scripts/skill-template/|scripts/gen-skill\\.mjs|scripts/lib/gen-skill-refs\\.mjs|scripts/lib/examples-index\\.mjs|scripts/lib/sample-companions\\.mjs|scripts/lib/skill-header\\.mjs|scripts/lib/skill-out-dir\\.mjs|scripts/lib/skill-cli-section\\.mjs|scripts/lib/skill-field-drift\\.mjs|scripts/lib/spec-history-check\\.mjs)";
 
 export const GEN_SKILL_TRIGGER = new RegExp(GEN_SKILL_TRIGGER_PATTERN);
-
-// CLI mode: print the raw ERE pattern string for shell command substitution.
-if (isCliEntrypoint(import.meta.url, process.argv[1])) {
-	console.log(GEN_SKILL_TRIGGER_PATTERN);
-}

@@ -49,114 +49,19 @@ if [ -n "$staged_md" ]; then
   fi
 fi
 
-# Shared shape for "regenerate/verify derived output, fail if stale" checks.
-# require_dist: space-separated dist files that must exist first, or "-" if
-# none needed. check_cmd: a command that itself returns non-zero when the
-# derived output is stale (regenerate-then-diff, or a drift-asserting test).
-check_drift() {
-  trigger=$1; require_dist=$2; check_cmd=$3; hint=$4
-  if ! git diff --cached --name-only | grep -qE "$trigger"; then
-    return 0
-  fi
-  if [ "$require_dist" != "-" ]; then
-    for f in $require_dist; do
-      if ! node scripts/lib/dist-freshness.mjs "$f"; then
-        echo "note: skipping drift check ($f missing or stale vs its src/) — run 'pnpm -r build' to enable locally; CI verifies it."
-        return 0
-      fi
-    done
-  fi
-  if ! eval "$check_cmd" >/dev/null 2>&1; then
-    echo "$hint"
-    exit 1
-  fi
-}
-
-# CI runs these three checks via different mechanisms (dedicated workflow
-# for gen-skill since it also needs its own checkout for cross-repo
-# install-skill consumption; inline `make check-readme-cli` step in
-# test.yml; a vitest test for gen-samples since dogfooding the exporter
-# is itself the check). Left as-is — no functional difference, and
-# converging them isn't worth the churn (see #265).
-
-# The .claude/skills/pfdsl dev copy has no drift check of its own: it is a
-# symlink to plugin/pfdsl/skills/pfdsl (#714), so the tracked-copy check below
-# covers the same bytes. Its trigger pattern (scripts/lib/gen-skill-trigger.mjs)
-# is still used by gate-check.mjs.
-
-# install/ is a generated mirror of its repo-root sources (#547) — one
-# direction only, repo-root source -> .claude/skills/pfd-ops/install/. Runs
-# even when packages/cli/dist/cli.js is missing/stale (require_dist "-"):
-# gen-install is pure file copying and needs no build output, unlike the
-# gen-skill/gen-plugin checks below.
-# Trigger pattern is sourced from scripts/lib/gen-install-trigger.mjs (single
-# source of truth; also covers a hand-edit to the generated install/ side,
-# which this regenerate-then-diff overwrites and flags).
-gen_install_trigger=$(node scripts/lib/gen-install-trigger.mjs) || { echo "gen-install trigger derivation failed"; exit 1; }
-check_drift "$gen_install_trigger" "-" \
-  "node scripts/gen-install.mjs && git diff --quiet -- .claude/skills/pfd-ops/install" \
-  ".claude/skills/pfd-ops/install is stale (or was hand-edited). Run 'make gen-install' and re-stage."
-
-# Trigger pattern is sourced from scripts/lib/gen-plugin-trigger.mjs (single
-# source of truth shared with gate-check.mjs).
-gen_plugin_trigger=$(node scripts/lib/gen-plugin-trigger.mjs) || { echo "gen-plugin trigger derivation failed"; exit 1; }
-
-# plugin/pfdsl/skills/pfdsl/SKILL.md is the only part of plugin/ that needs
-# the CLI dist (it embeds `pfdsl help` output via gen-skill.mjs — see the
-# gen-skill check above). Scoped to just that file so a dist-missing/stale
-# worktree doesn't also skip the dist-independent bulk of plugin/ below
-# (#593 — previously the whole-plugin check below bundled both, so any
-# dist-independent drift under plugin/ — references, static skills,
-# commands, agents, hooks, plugin.json — silently passed whenever dist was
-# stale, which is how #579 shipped a stale
-# plugin/pfdsl/skills/pfdsl/references/spec.md).
-# Uses $gen_plugin_trigger, not $gen_skill_trigger: SKILL.md also embeds
-# packages/cli/package.json's version (scripts/gen-skill.mjs's {{cliVersion}}
-# substitution), which only $gen_plugin_trigger's pattern covers — using the
-# narrower $gen_skill_trigger here let a CLI version bump land without
-# re-stamping SKILL.md, caught only by CI's check-gen-plugin.yml.
-check_drift "$gen_plugin_trigger" "packages/cli/dist/cli.js" \
-  "node scripts/gen-skill.mjs --out plugin/pfdsl/skills/pfdsl && git diff --quiet -- plugin/pfdsl/skills/pfdsl/SKILL.md" \
-  "plugin/pfdsl/skills/pfdsl/SKILL.md is stale. Run 'make gen-plugin' and re-stage the plugin files."
-
-# Everything else gen-plugin.mjs assembles — install/ mirror, static skills
-# (pfd-grill/pfd-ops/pfd-retro/pfd-ecosystem), commands, agents, hooks,
-# plugin.json, the repo-root marketplace.json's plugin description (derived
-# from the same bundle contents as plugin.json, #685), and
-# skills/pfdsl/references — never touches packages/cli/dist
-# (scripts/lib/gen-plugin.mjs's assemblePluginDistIndependent, #593). Runs
-# even when dist is missing/stale (require_dist "-"), replacing the old
-# references-only check above it (absorbed here — same trigger, same
-# machinery, no net increase in check count) so this bulk is never gated on
-# dist freshness. If dist is missing, this is the only gen-plugin check that
-# can run locally — the hint below intentionally doesn't suggest `make
-# gen-plugin` (it would fail on the SKILL.md step without dist); run this
-# check's own command directly, or `pnpm -r build` first to unblock both.
-check_drift "$gen_plugin_trigger" "-" \
-  "node scripts/gen-plugin-dist-independent.mjs && git diff --quiet -- plugin ':(exclude)plugin/pfdsl/skills/pfdsl/SKILL.md' .claude-plugin/marketplace.json" \
-  "plugin/pfdsl or .claude-plugin/marketplace.json is stale (SKILL.md checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the plugin/marketplace files, or 'pnpm -r build && make gen-plugin' to regenerate everything."
-
-# The .dot/README drift guard and the .svg drift guard are separate vitest
-# suites (graphviz-exporter and preview-engine respectively — see the
-# "docs/samples drift" comment in graphviz-exporter's index.test.ts for why
-# the .svg guard can't live next to the .dot guard). Kept as two check_drift
-# calls sharing one trigger so each reports its own failure and gates on only
-# the dist it actually needs.
-check_drift '^docs/samples/' \
-  "packages/core/dist/index.js packages/graphviz-exporter/dist/index.js" \
-  "pnpm --filter @pfdsl/graphviz-exporter exec vitest run index.test" \
-  "docs/samples drift: run 'make gen-samples' and re-stage .dot / README.md."
-
-check_drift '^docs/samples/' \
-  "packages/preview-engine/dist/index.js" \
-  "pnpm --filter @pfdsl/preview-engine exec vitest run index.test" \
-  "docs/samples .svg drift: run 'make gen-samples' and re-stage .svg."
-
-# Verifies the README `## CLI` generated block matches `pfdsl help` output;
-# reads packages/cli/dist/cli.js directly.
-check_drift '^(packages/cli/src/|README\.md)' "packages/cli/dist/cli.js" \
-  "node scripts/gen-readme-cli.mjs && git diff --quiet -- README.md" \
-  "README.md CLI section is stale. Run 'make gen-readme-cli' and re-stage README.md."
+# The "regenerate the derived output, fail if it changed" checks. They live in
+# scripts/check-drift-gates.mjs, which evaluates all of them and reports every
+# stale one at once — the sh version here exited on the first, so a commit with
+# two stale outputs took two attempts to discover the second (#755). Their
+# declaration order, triggers and hints are documented there.
+#
+# The checks above this line still exit on the first failure. biome
+# deliberately so: with a file it cannot parse, the later checks' verdicts are
+# not trustworthy, and a generator crashing on the broken file would be
+# reported as drift. The rest are simply not converged yet (#759).
+if ! node scripts/check-drift-gates.mjs; then
+  exit 1
+fi
 
 # Advisory-only (see #463): reminds to consider pfd-retro when a commit
 # marks a roadmap artifact done. Never blocks the commit.
