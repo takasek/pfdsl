@@ -584,17 +584,21 @@ function computeReadyIds(src: string): {
 	return { readyIds, isRoadmap: true, warnings };
 }
 
+/** Why the ready set came out empty, one bucket per non-ready process. */
+export interface EmptyReadyBreakdown {
+	inProgress: string[];
+	parked: string[];
+	complete: number;
+	blocked: number;
+}
+
 /**
- * Explain why the ready set came out empty.
- * Every cause is legitimate — the sole process already being wip is the one a
- * freshly adopted roadmap hits first — but the bare "Check artifact statuses"
- * hint reads as if the statuses had been mistyped, so it sent readers looking
- * for a fault that was not there (#710). Each non-ready process falls into one
- * bucket: blocked on its inputs, or (inputs done) named by whichever output
- * status is holding it.
+ * Classify every non-ready process into the bucket that explains it.
+ * Each falls into one: blocked on its inputs, or (inputs done) named by
+ * whichever output status is holding it. Kept apart from the rendering so
+ * more than one renderer can share the single classification.
  */
-function emptyReadyText(
-	file: string,
+function classifyEmptyReady(
 	processInputs: Map<string, string[]>,
 	processOutputs: Map<string, string[]>,
 	nodeKinds: ReturnType<typeof analyze>["nodeKinds"],
@@ -602,7 +606,7 @@ function emptyReadyText(
 		ReturnType<typeof analyze>["frontmatter"]
 	>["artifact"] &
 		object,
-): string {
+): EmptyReadyBreakdown {
 	const statusOf = (aid: string) => artifactMeta[aid]?.status;
 	const inProgress: string[] = [];
 	const parked: string[] = [];
@@ -623,7 +627,18 @@ function emptyReadyText(
 	}
 	inProgress.sort(compareIds);
 	parked.sort(compareIds);
+	return { inProgress, parked, complete, blocked };
+}
 
+/**
+ * Explain why the ready set came out empty.
+ * Every cause is legitimate — the sole process already being wip is the one a
+ * freshly adopted roadmap hits first — but the bare "Check artifact statuses"
+ * hint reads as if the statuses had been mistyped, so it sent readers looking
+ * for a fault that was not there (#710).
+ */
+function emptyReadyText(file: string, breakdown: EmptyReadyBreakdown): string {
+	const { inProgress, parked, complete, blocked } = breakdown;
 	const lines: string[] = [];
 	if (inProgress.length > 0)
 		lines.push(`  in progress (outputs wip): ${inProgress.join(", ")}`);
@@ -729,6 +744,16 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const readyItems = readyIds.map(toItem);
 	const bestItem = bestId ? toItem(bestId) : undefined;
 
+	const breakdown =
+		readyItems.length === 0
+			? classifyEmptyReady(
+					processInputs,
+					processOutputs,
+					nodeKinds,
+					artifactMeta,
+				)
+			: undefined;
+
 	if (opts.json) {
 		const payload: Record<string, unknown> = { ok: true, ready: readyItems };
 		if (opts.best && bestItem) payload.best = bestItem;
@@ -736,17 +761,8 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 		return ok(`${JSON.stringify(payload)}\n`, warnText);
 	}
 
-	if (readyItems.length === 0) {
-		return ok(
-			emptyReadyText(
-				file,
-				processInputs,
-				processOutputs,
-				nodeKinds,
-				artifactMeta,
-			),
-			warnText,
-		);
+	if (breakdown) {
+		return ok(emptyReadyText(file, breakdown), warnText);
 	}
 
 	const lines: string[] = [`Ready processes (${readyItems.length}):`];
