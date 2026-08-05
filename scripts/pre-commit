@@ -5,60 +5,26 @@
 # it, so nothing changes even though biome exits non-zero (#596). --staged
 # scopes the check to the files this commit stages, so the paths live only in
 # biome.json's files.includes.
-# --error-on-warnings makes warning-severity diagnostics blocking (#742): by
-# default they print and exit 0, so they accumulate and drown the new ones.
-# Rules whose default severity is info are raised to warn in biome.json —
-# --error-on-warnings does not cover info.
-if ! pnpm biome check --staged --no-errors-on-unmatched --error-on-warnings; then
-  echo "Biome check failed on staged files. Run 'make format' to apply the mechanical fixes, resolve what remains, and re-stage."
+# scripts/check-biome.mjs fails on a diagnostic of any severity (#747). The
+# flags it replaced reached errors and, with --error-on-warnings, warnings
+# (#742) — info severity was covered by neither, so those diagnostics printed
+# and exited 0, accumulating until they drowned the new ones. The wrapper
+# reports the failure itself, including what to run.
+if ! node scripts/check-biome.mjs --staged --no-errors-on-unmatched; then
   exit 1
 fi
 
-# When .pfdsl files are staged, verify snapshots are up-to-date.
-# Runs vitest -u to regenerate, then fails if any snapshot file changed.
-if git diff --cached --name-only | grep -q '\.pfdsl$'; then
-  pnpm --filter @pfdsl/core exec vitest run -u 2>/dev/null
-  if ! git diff --quiet -- packages/core/src/__snapshots__/; then
-    echo "Snapshots are stale. Run 'pnpm --filter @pfdsl/core exec vitest run -u' and re-stage the snapshot file."
-    exit 1
-  fi
-fi
-
-# When operational .pfdsl/ files are staged, verify they are canonically
-# formatted. Scoped to .pfdsl/ — hand-authored teaching material under docs/
-# is intentionally exempt, since fmt can materialize implied nodes there (#529).
-staged_ops_pfdsl=$(git diff --cached --name-only --diff-filter=d | grep -E '^\.pfdsl/.*\.pfdsl$' || true)
-if [ -n "$staged_ops_pfdsl" ]; then
-  if node scripts/lib/dist-freshness.mjs packages/cli/dist/cli.js; then
-    for f in $staged_ops_pfdsl; do
-      if ! node packages/cli/dist/cli.js fmt "$f" --check >/dev/null 2>&1; then
-        echo "$f is not canonically formatted. Run 'make fmt-pfdsl' and re-stage."
-        exit 1
-      fi
-    done
-  else
-    echo "note: skipping .pfdsl fmt check (packages/cli/dist/cli.js missing or stale) — run 'pnpm -r build' to enable locally; CI verifies it."
-  fi
-fi
-
-# When .md files are staged, reject mid-sentence line breaks (see #302).
-staged_md=$(git diff --cached --name-only --diff-filter=d -- '*.md')
-if [ -n "$staged_md" ]; then
-  if ! node scripts/check-md-linebreaks.mjs $staged_md; then
-    exit 1
-  fi
-fi
-
-# The "regenerate the derived output, fail if it changed" checks. They live in
-# scripts/check-drift-gates.mjs, which evaluates all of them and reports every
-# stale one at once — the sh version here exited on the first, so a commit with
-# two stale outputs took two attempts to discover the second (#755). Their
-# declaration order, triggers and hints are documented there.
+# Every remaining gate: snapshot freshness, .pfdsl canonical format, markdown
+# line breaks, and the "regenerate the derived output, fail if it changed"
+# checks. They live in scripts/check-drift-gates.mjs, which evaluates all of
+# them and reports every failing one at once — the sh versions here exited on
+# the first, so a commit with two problems took two attempts to discover the
+# second (#755, #759). Their declaration order, triggers and hints are
+# documented there.
 #
-# The checks above this line still exit on the first failure. biome
-# deliberately so: with a file it cannot parse, the later checks' verdicts are
-# not trustworthy, and a generator crashing on the broken file would be
-# reported as drift. The rest are simply not converged yet (#759).
+# biome, above, stays an immediate exit: with a file it cannot parse, the later
+# checks' verdicts are not trustworthy, and a generator crashing on the broken
+# file would be reported as drift.
 if ! node scripts/check-drift-gates.mjs; then
   exit 1
 fi

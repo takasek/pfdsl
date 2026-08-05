@@ -18,9 +18,7 @@
 		"rules": {
 			"recommended": true,
 			"style": {
-				"noNonNullAssertion": "off",
-				"useNodejsImportProtocol": "warn",
-				"useTemplate": "warn"
+				"noNonNullAssertion": "off"
 			},
 			"suspicious": {
 				"noExplicitAny": "off"

@@ -32,7 +32,7 @@ typecheck:
 
 .PHONY: lint
 lint:
-	pnpm biome check --error-on-warnings .
+	node scripts/check-biome.mjs .
 
 .PHONY: format
 format:
