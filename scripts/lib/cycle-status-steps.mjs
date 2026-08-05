@@ -20,6 +20,7 @@ import {
 	countBehind,
 	detectEnumeratedOptions,
 	findIssueNumberForProcess,
+	parsePorcelainPaths,
 	parseReadyOutput,
 } from "./cycle-status.mjs";
 
@@ -75,6 +76,39 @@ export async function runCycleStatus({
 					`This tree is ${behindBase} commits behind origin/${base}, so this preflight ran from that older version of itself. ` +
 					"Its judgments — including which checks exist at all — would describe the old tree, not this cycle. " +
 					`Start the cycle's branch from origin/${base} (git switch -c <branch> origin/${base}) and re-run.`,
+			},
+		};
+	}
+
+	// The same accident as behindBase, arriving through the working tree instead
+	// of through commits (#744). Switching branches carries uncommitted edits
+	// along, so the previous cycle's changes are still sitting there to be swept
+	// into this cycle's first commit — and neither gate-check (which reads
+	// committed diffs) nor the pre-commit hook (which sees a file only once it
+	// is staged, by which time it is already in) is positioned to say so.
+	//
+	// Refused rather than reported, unlike commitsAheadOfBase: a cycle is
+	// expected to start from a clean tree, and `git worktree add` produces one,
+	// so the refusal is answered by making a worktree rather than by weighing it.
+	let uncommittedFiles = null;
+	let dirtyTreeError = null;
+	try {
+		uncommittedFiles = parsePorcelainPaths(
+			sh("git", ["status", "--porcelain"]),
+		);
+	} catch (e) {
+		dirtyTreeError = e.message;
+	}
+
+	if (uncommittedFiles && uncommittedFiles.length > 0) {
+		return {
+			fetched,
+			behindBase,
+			uncommittedFiles,
+			dirtyTree: {
+				message:
+					`This tree has ${uncommittedFiles.length} uncommitted change(s), so work started here would mix them into this cycle's commits. ` +
+					"Commit or stash them, or start the cycle in a fresh worktree (git worktree add), and re-run.",
 			},
 		};
 	}
@@ -249,6 +283,7 @@ export async function runCycleStatus({
 		gateCheckCommand,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;
+	if (dirtyTreeError) result.dirtyTreeError = dirtyTreeError;
 	if (headStateError) result.headStateError = headStateError;
 	if (prError) result.prError = prError;
 	if (readyError) result.readyError = readyError;

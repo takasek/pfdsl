@@ -47,6 +47,7 @@ describe("runCycleStatus", () => {
 			baseDeps({
 				sh: (_file, args) => {
 					if (args.includes("log")) throw new Error("fatal: bad revision");
+					if (args.includes("--porcelain")) return "";
 					return readyJsonOk(null);
 				},
 			}),
@@ -95,6 +96,89 @@ describe("runCycleStatus", () => {
 		assert.equal(result.gateCheckCommand, undefined);
 		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
 		assert.deepEqual(ghCalls, []);
+	});
+
+	// #744: `commitsAheadOfBase` closes the committed path from one cycle into
+	// the next, and leaves the working tree's. Switching branches carries
+	// uncommitted edits along, so the previous cycle's changes are still there
+	// to be swept into this cycle's first commit.
+	it("refuses to produce judgments when the tree has uncommitted changes", async () => {
+		const calls = [];
+		const ghCalls = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (file, args) => {
+					calls.push([file, args]);
+					if (args.includes("--porcelain"))
+						return " M scripts/gate-check.mjs\n?? notes.txt\n";
+					if (args.includes("log")) return "";
+					return readyJsonOk("proc_a");
+				},
+				execGh: async (args) => {
+					ghCalls.push(args);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.uncommittedFiles, [
+			"scripts/gate-check.mjs",
+			"notes.txt",
+		]);
+		assert.match(result.dirtyTree.message, /uncommitted/i);
+		assert.equal(result.ready, undefined);
+		assert.equal(result.best, undefined);
+		assert.equal(result.designUnsettledFor, undefined);
+		assert.equal(result.gateCheckCommand, undefined);
+		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
+		assert.deepEqual(ghCalls, []);
+	});
+
+	it("says nothing about a dirty tree when the tree is clean", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("--porcelain")) return "";
+					if (args.includes("log")) return "";
+					return readyJsonOk("proc_a");
+				},
+			}),
+		);
+		assert.equal(result.dirtyTree, undefined);
+		assert.equal(result.uncommittedFiles, undefined);
+		assert.equal(result.best, "proc_a");
+	});
+
+	// A tree that is both behind and dirty is reported as behind: that verdict
+	// says the script itself is the wrong version, which makes every other
+	// judgment — including the dirty one — unreliable (#716).
+	it("reports a stale tree ahead of a dirty one", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("--porcelain"))
+						return " M scripts/gate-check.mjs\n";
+					if (args.includes("log")) return "abc one\n";
+					return readyJsonOk("proc_a");
+				},
+			}),
+		);
+		assert.ok(result.staleTree);
+		assert.equal(result.dirtyTree, undefined);
+	});
+
+	it("sets dirtyTreeError and keeps judging when git status itself fails", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("--porcelain"))
+						throw new Error("fatal: not a git repo");
+					if (args.includes("log")) return "";
+					return readyJsonOk("proc_a");
+				},
+			}),
+		);
+		assert.equal(result.dirtyTreeError, "fatal: not a git repo");
+		assert.equal(result.best, "proc_a");
 	});
 
 	it("sets prError and empty PR lists when gh pr list fails", async () => {

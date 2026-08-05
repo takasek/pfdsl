@@ -10,6 +10,7 @@ import {
 	detectEnumeratedOptions,
 	findDecisionRecords,
 	findIssueNumberForProcess,
+	parsePorcelainPaths,
 	parseReadyOutput,
 	summarizeCiStatus,
 } from "./cycle-status.mjs";
@@ -423,6 +424,37 @@ describe("countBehind", () => {
 	it("returns 0 for empty output", () => {
 		assert.equal(countBehind(""), 0);
 		assert.equal(countBehind("\n"), 0);
+	});
+});
+
+describe("parsePorcelainPaths", () => {
+	it("returns the path of every entry, tracked or not", () => {
+		assert.deepEqual(
+			parsePorcelainPaths(
+				" M scripts/gate-check.mjs\n?? notes.txt\nA  x.mjs\n",
+			),
+			["scripts/gate-check.mjs", "notes.txt", "x.mjs"],
+		);
+	});
+
+	it("returns an empty list for a clean tree", () => {
+		assert.deepEqual(parsePorcelainPaths(""), []);
+		assert.deepEqual(parsePorcelainPaths("\n"), []);
+	});
+
+	// A rename is one entry naming two paths. The destination is where the
+	// content sits now, so that is the path a reader has to deal with.
+	it("takes the destination of a rename", () => {
+		assert.deepEqual(parsePorcelainPaths("R  old.mjs -> new.mjs\n"), [
+			"new.mjs",
+		]);
+	});
+
+	// Porcelain v1 pads the status to two columns, so a path is never shorter
+	// than its line minus three — but a path containing " -> " outside a rename
+	// entry would be split by a naive replace.
+	it("keeps a space-bearing path intact", () => {
+		assert.deepEqual(parsePorcelainPaths("?? docs/a b.md\n"), ["docs/a b.md"]);
 	});
 });
 

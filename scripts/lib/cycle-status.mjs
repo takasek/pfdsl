@@ -284,6 +284,28 @@ export function detectDesignUnsettled(
 }
 
 /**
+ * The paths named by `git status --porcelain`, tracked edits and untracked
+ * files alike — both reach the next commit through `git add -A`.
+ *
+ * A rename entry names two paths; the destination is where the content sits
+ * now, so that is the one a reader has to deal with. The status field is two
+ * columns plus a space, which is why the path is taken by offset rather than
+ * by splitting on whitespace: a path may contain spaces.
+ * @param {string} porcelainOutput - output of `git status --porcelain`
+ * @returns {string[]}
+ */
+export function parsePorcelainPaths(porcelainOutput) {
+	return porcelainOutput
+		.split("\n")
+		.filter((line) => line.length > 3)
+		.map((line) => {
+			const path = line.slice(3);
+			const arrow = path.indexOf(" -> ");
+			return arrow >= 0 && line.startsWith("R") ? path.slice(arrow + 4) : path;
+		});
+}
+
+/**
  * @param {string} logOutput - output of `git log --oneline HEAD..origin/<base>`
  * @returns {number}
  */
