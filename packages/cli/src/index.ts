@@ -577,6 +577,65 @@ function computeReadyIds(src: string): {
 	return { readyIds, isRoadmap: true, warnings };
 }
 
+/**
+ * Explain why the ready set came out empty.
+ * Every cause is legitimate — the sole process already being wip is the one a
+ * freshly adopted roadmap hits first — but the bare "Check artifact statuses"
+ * hint reads as if the statuses had been mistyped, so it sent readers looking
+ * for a fault that was not there (#710). Each non-ready process falls into one
+ * bucket: blocked on its inputs, or (inputs done) named by whichever output
+ * status is holding it.
+ */
+function emptyReadyText(
+	file: string,
+	processInputs: Map<string, string[]>,
+	processOutputs: Map<string, string[]>,
+	nodeKinds: ReturnType<typeof analyze>["nodeKinds"],
+	artifactMeta: NonNullable<
+		ReturnType<typeof analyze>["frontmatter"]
+	>["artifact"] &
+		object,
+): string {
+	const statusOf = (aid: string) => artifactMeta[aid]?.status;
+	const inProgress: string[] = [];
+	const parked: string[] = [];
+	let complete = 0;
+	let blocked = 0;
+	for (const [pid, inputs] of processInputs) {
+		if (nodeKinds.get(pid) !== "process") continue;
+		const isBlocked = inputs.some((aid) => {
+			const s = statusOf(aid);
+			return s !== "done" && s !== undefined;
+		});
+		if (isBlocked) {
+			blocked++;
+			continue;
+		}
+		const outputStatuses = (processOutputs.get(pid) ?? []).map(statusOf);
+		if (outputStatuses.includes("wip")) inProgress.push(pid);
+		else if (outputStatuses.some((s) => s === "waiting" || s === "suspended"))
+			parked.push(pid);
+		else if (outputStatuses.length > 0) complete++;
+	}
+	inProgress.sort(compareIds);
+	parked.sort(compareIds);
+
+	const lines: string[] = [];
+	if (inProgress.length > 0)
+		lines.push(`  in progress (outputs wip): ${inProgress.join(", ")}`);
+	if (parked.length > 0)
+		lines.push(`  parked (outputs waiting/suspended): ${parked.join(", ")}`);
+	if (complete > 0) lines.push(`  complete: ${complete}`);
+	if (blocked > 0)
+		lines.push(
+			`  blocked: ${blocked} — run \`pfdsl status blocked ${file}\` for what each is waiting on`,
+		);
+
+	if (lines.length === 0)
+		return "No ready processes. Check artifact statuses.\n";
+	return `No ready processes.\n${lines.join("\n")}\n`;
+}
+
 export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
@@ -675,7 +734,16 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	}
 
 	if (readyItems.length === 0) {
-		return ok("No ready processes. Check artifact statuses.\n", warnText);
+		return ok(
+			emptyReadyText(
+				file,
+				processInputs,
+				processOutputs,
+				nodeKinds,
+				artifactMeta,
+			),
+			warnText,
+		);
 	}
 
 	const lines: string[] = [`Ready processes (${readyItems.length}):`];
