@@ -110,7 +110,22 @@ describe("planGhRestCall", () => {
 			"--jq",
 			".body",
 		]);
-		assert.deepEqual(result, { op: "getIssueBody", number: 42 });
+		assert.deepEqual(result, {
+			op: "viewIssue",
+			number: 42,
+			fields: ["body"],
+			jqField: "body",
+		});
+	});
+
+	// A jq program is not something this layer evaluates, and a `.field` naming
+	// something the caller never requested has no value to select.
+	it("issue view with a --jq this layer cannot evaluate is unanswerable", () => {
+		const jq = (expr) =>
+			planGhRestCall(["issue", "view", "42", "--json", "body", "--jq", expr]);
+		assert.equal(jq(".comments[].body"), null);
+		assert.equal(jq(".author.login"), null);
+		assert.equal(jq(".title"), null);
 	});
 
 	// Without --jq, gh prints the JSON object itself, and the callers that ask

@@ -232,28 +232,34 @@ export async function fetchIssueView(
 		);
 	}
 
-	const result = {};
 	// The issue itself is only worth a request when something other than the
-	// comments was asked for.
-	if (fields.some((f) => f !== "comments")) {
-		const res = await request(
-			fetchImpl,
-			`${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}`,
-			{ headers: authHeaders({ token }) },
-		);
-		const issue = await res.json();
-		for (const field of fields) {
-			if (field !== "comments") result[field] = ISSUE_VIEW_FIELDS[field](issue);
-		}
-	}
+	// comments was asked for, and the two endpoints are independent — the
+	// gh-less environment this serves pays for every extra round-trip, and the
+	// one production caller asks for both together.
+	const wantsIssue = fields.some((f) => f !== "comments");
+	const [issue, comments] = await Promise.all([
+		wantsIssue
+			? request(
+					fetchImpl,
+					`${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}`,
+					{ headers: authHeaders({ token }) },
+				).then((res) => res.json())
+			: null,
+		fields.includes("comments")
+			? fetchAllPages(
+					fetchImpl,
+					(page) =>
+						`${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=${PER_PAGE}&page=${page}`,
+					token,
+				)
+			: null,
+	]);
 
-	if (fields.includes("comments")) {
-		const comments = await fetchAllPages(
-			fetchImpl,
-			(page) =>
-				`${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=${PER_PAGE}&page=${page}`,
-			token,
-		);
+	const result = {};
+	for (const field of fields) {
+		if (field !== "comments") result[field] = ISSUE_VIEW_FIELDS[field](issue);
+	}
+	if (comments) {
 		result.comments = comments.map((c) => ({
 			author: { login: c.user?.login },
 			body: c.body ?? "",
@@ -415,32 +421,6 @@ export async function addIssueLabel(
 			body: JSON.stringify({ labels: [label] }),
 		},
 	);
-}
-
-/**
- * @param {string} owner
- * @param {string} repo
- * @param {string} token
- * @param {number} issueNumber
- * @param {typeof fetch} [fetchImpl]
- * @returns {Promise<string>}
- */
-export async function getIssueBody(
-	owner,
-	repo,
-	token,
-	issueNumber,
-	fetchImpl = proxyAwareFetch,
-) {
-	const res = await request(
-		fetchImpl,
-		`${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}`,
-		{
-			headers: authHeaders({ token }),
-		},
-	);
-	const issue = await res.json();
-	return issue.body ?? "";
 }
 
 /**

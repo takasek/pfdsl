@@ -19,7 +19,6 @@ import {
 	fetchAllLabels,
 	fetchIssueView,
 	fetchOpenPrsWithCi,
-	getIssueBody,
 	parseHost,
 	parseOwnerRepo,
 } from "./github-rest.mjs";
@@ -89,12 +88,18 @@ async function runGhRestPlan(plan, cwd, token) {
 		case "addIssueLabel":
 			await addIssueLabel(owner, repo, token, plan.number, plan.label);
 			return "";
-		case "getIssueBody":
-			return await getIssueBody(owner, repo, token, plan.number);
-		case "viewIssue":
-			return JSON.stringify(
-				await fetchIssueView(owner, repo, token, plan.number, plan.fields),
+		case "viewIssue": {
+			const view = await fetchIssueView(
+				owner,
+				repo,
+				token,
+				plan.number,
+				plan.fields,
 			);
+			// gh prints the selected field's value alone under --jq, and the whole
+			// object without it.
+			return plan.jqField ? String(view[plan.jqField]) : JSON.stringify(view);
+		}
 		case "listOpenPrsWithCi":
 			return JSON.stringify(await fetchOpenPrsWithCi(owner, repo, token));
 		default:

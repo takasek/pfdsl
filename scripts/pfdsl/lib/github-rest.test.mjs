@@ -6,7 +6,6 @@ import {
 	fetchAllLabels,
 	fetchIssueView,
 	fetchOpenPrsWithCi,
-	getIssueBody,
 	mapCheckRunsToRollup,
 	mapIssuesResponse,
 	mapLabelsResponse,
@@ -406,24 +405,6 @@ describe("fetchAllIssues", () => {
 		await assert.rejects(
 			() => fetchAllIssues("takasek", "pfdsl", "tok", fetchImpl, 100000),
 			/pagination exceeded/,
-		);
-	});
-});
-
-describe("getIssueBody", () => {
-	it("returns the raw body text", async () => {
-		const fetchImpl = async () => jsonResponse({ body: "design TBD" });
-		assert.equal(
-			await getIssueBody("takasek", "pfdsl", "tok", 42, fetchImpl),
-			"design TBD",
-		);
-	});
-
-	it("returns empty string for a null body", async () => {
-		const fetchImpl = async () => jsonResponse({ body: null });
-		assert.equal(
-			await getIssueBody("takasek", "pfdsl", "tok", 42, fetchImpl),
-			"",
 		);
 	});
 });
