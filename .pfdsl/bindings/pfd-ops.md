@@ -20,6 +20,18 @@ node scripts/check-scaffold-sync.mjs
 
 `.claude/skills/pfd-ops/references/scaffold/`（`gen-plugin.mjs` のコピー元）と `plugin/pfdsl/skills/pfd-ops/references/scaffold/`（配布用ミラー）の drift を検知する。警告が出たら `node scripts/gen-plugin.mjs` で反映してからコミットする。`install/` と異なり `scaffold/` に `--deploy` 相当の機構はない（scaffold は `/pfd-init` がコピー後にユーザーが値を埋めるテンプレートのため、実配置先は用途的に別物になる）。
 
+## CLI はこのリポでは常にローカルビルドを叩く
+
+`pfdsl` / `npx pfdsl` は npm 公開版の `@pfdsl/cli` を走らせる。
+このリポは上流であり、公開版は main より必ず遅れているため、公開版で `.pfdsl` を検査すると main で既に直っている欠陥を実在の所見として拾う。
+`--version` はどちらも同じ番号を返すので、番号を見比べても区別できない。
+
+したがって手で CLI を叩く場合も `node packages/cli/dist/cli.js <cmd>` を使う（`cycle-status.mjs` / `gate-check.mjs` および `.pfdsl` の `command:` フィールドが既にこの形を使っている — 手打ちだけが例外になっていた）。
+worktree では先に `pnpm install && pnpm -r build` を済ませる。
+pfdsl スキル本文の CLI プリフライトは採用リポ向けに `pfdsl` / `npx pfdsl` を指示するが、上流であるこのリポではこの規約が優先する。
+
+`check-install-sync.mjs` を repo-local 版で走らせる上の規約と同じ形（上流リポでは正とする実体を1つに固定する）であり、適用先が検査スクリプトから CLI 本体へ広がったもの。
+
 ## spec 参照の token 節約（get-by-ID）
 
 `docs/` 内の `(SPEC_xxx)` 定義済みブロックを参照する際は、ファイル全文を Read せず `node scripts/get-spec-id.mjs SPEC_xxx` で該当ブロックのみ取得する（レンジ規則は ADR-0027）。
