@@ -159,6 +159,12 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 `.claude/agents/` の agent に worktree 作成を含むフローを委譲する場合、`superpowers:using-git-worktrees` skill の Step 0（既存 isolation 検出時は再利用）を素通しにしない。subagent は呼び出し元セッションが使用中の worktree 内で起動されることがあり、Step 0 はその共有 worktree を「既存の分離ワークスペース」と誤認識して乗っ取る（issue #439 の issue-worker 試走で発生。呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねない）。agent 定義側で「Step 0 をバイパスし常に新規 worktree を作成する」旨を明記する（例: `.claude/agents/issue-worker.md`）。
 
+## workflow.pfdsl に登録する agent の範囲
+
+`.claude/agents/` の agent のうち `workflow.pfdsl` に artifact として登録するのは、plugin 同梱の配布物（`PLUGIN_AGENT_FILES`）だけである。
+repo scope の agent（plugin 同梱から除外したもの）は登録しない。
+配布物は `distill_ops` の出力であり採用リポの運用に届くのに対し、repo scope の agent はこのリポの開発都合の道具で、変換グラフの参加者ではないため。
+
 ## agent を追加するサイクルの動作確認
 
 新規に追加した `.claude/agents/` の agent は、それを追加したセッションからは起動できない。
