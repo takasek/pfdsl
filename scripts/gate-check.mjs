@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
 	classifyAuditIssuesFlowResult,
+	classifyIssueLookupFailure,
 	deriveManualItems,
 	diffNewTerminals,
 	diffReadySets,
@@ -256,8 +257,10 @@ results.push(
 
 // The linked issues, fetched once each for the two checks that read them.
 // execGh keeps the REST fallback that a bare `gh` call would lose in
-// environments without the binary (#489/#492); a failure degrades that issue's
-// checks to SKIP, not FAIL, and leaves the other issues judged on their own.
+// environments without the binary (#489/#492). Only that environment degrades
+// the issue's checks to SKIP — every other failure FAILs, because the check did
+// not run and a SKIP row is one nobody acts on (#745). Either way the other
+// issues stay judged on their own.
 const issues = [];
 for (const number of issueNumbers) {
 	try {
@@ -276,8 +279,12 @@ for (const number of issueNumbers) {
 				),
 			),
 		});
-	} catch {
-		issues.push({ number, issue: null, issueError: "gh CLI unavailable" });
+	} catch (e) {
+		issues.push({
+			number,
+			issue: null,
+			issueFailure: classifyIssueLookupFailure(e),
+		});
 	}
 }
 

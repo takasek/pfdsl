@@ -204,14 +204,25 @@ export function wipTransitionStep({
 }
 
 /**
+ * The row for an issue the gate could not read, shared by both checks that read
+ * one so they cannot disagree about what a failed lookup costs. No failure means
+ * no `--issue` was given at all, which is a reasoned SKIP; a failure carries its
+ * own verdict from classifyIssueLookupFailure (#745).
+ * @param {{status: 'SKIP'|'FAIL', detail: string} | null | undefined} issueFailure
+ * @returns {{status: 'SKIP'|'FAIL', detail: string}}
+ */
+function missingIssueRow(issueFailure) {
+	return issueFailure ?? { status: "SKIP", detail: NO_ISSUE_DETAIL };
+}
+
+/**
  * design-selection record: was the design choice recorded before work
  * started, with the required structure (issue #669's protection against
  * "the record is written after the fact, or is unstructured prose")?
  */
-export function designRecordStep({ exec, base, issue, issueError }) {
+export function designRecordStep({ exec, base, issue, issueFailure }) {
 	const name = "design-selection record";
-	if (!issue)
-		return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
+	if (!issue) return { name, ...missingIssueRow(issueFailure) };
 
 	const ownerLogin = issue.author?.login;
 	const body = issue.body ?? "";
@@ -270,13 +281,14 @@ export function designRecordStep({ exec, base, issue, issueError }) {
  * unlabelled SKIP row.
  *
  * @param {(args: object) => import("./gate-check.mjs").GateResult} step
- * @param {{number: number, issue?: object|null, issueError?: string|null}[]} issues
+ * @param {{number: number, issue?: object|null,
+ *          issueFailure?: {status: 'SKIP'|'FAIL', detail: string}|null}[]} issues
  * @param {object} [args] arguments shared by every call (exec, base, deltas, …)
  */
 export function perIssueSteps(step, issues, args = {}) {
 	if (issues.length === 0) return [step(args)];
-	return issues.map(({ number, issue, issueError }) => {
-		const result = step({ ...args, issue, issueError });
+	return issues.map(({ number, issue, issueFailure }) => {
+		const result = step({ ...args, issue, issueFailure });
 		return { ...result, name: `${result.name} (#${number})` };
 	});
 }
@@ -312,10 +324,9 @@ export function collectSizeDeltas({ exec, base, changedFiles }) {
  * whose linked issue declares `Size-Intent: shrink` (issue #669's protection
  * against "the countermeasure's effect on size is never measured")?
  */
-export function sizeDirectionStep({ exec, issue, issueError, deltas }) {
+export function sizeDirectionStep({ exec, issue, issueFailure, deltas }) {
 	const name = "knowledge-artifact size direction";
-	if (!issue)
-		return { name, status: "SKIP", detail: issueError ?? NO_ISSUE_DETAIL };
+	if (!issue) return { name, ...missingIssueRow(issueFailure) };
 
 	const issueBody = issue.body ?? "";
 	// The verdict needs the PR body; the SKIP does not. Asking gh for a PR that

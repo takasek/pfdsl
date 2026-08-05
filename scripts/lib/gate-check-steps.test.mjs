@@ -343,10 +343,25 @@ describe("designRecordStep", () => {
 			exec,
 			base: "main",
 			issue: null,
-			issueError: "gh CLI unavailable",
+			issueFailure: { status: "SKIP", detail: "gh CLI unavailable" },
 		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /gh CLI unavailable/);
+	});
+
+	// A lookup that failed for any other reason is not an environment this
+	// check tolerates: SKIP here is a row nobody acts on, which is how a check
+	// that never ran passed for a whole cycle (#745).
+	it("FAILs when the lookup failed for a reason other than a missing gh", () => {
+		const { exec } = fakeExec();
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: null,
+			issueFailure: { status: "FAIL", detail: "issue lookup failed: boom" },
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /boom/);
 	});
 
 	it("judges a decision written into the issue body by the same rules as a comment", () => {
@@ -548,10 +563,21 @@ describe("sizeDirectionStep", () => {
 		const result = sizeDirectionStep({
 			exec,
 			issue: null,
-			issueError: "gh CLI unavailable",
+			issueFailure: { status: "SKIP", detail: "gh CLI unavailable" },
 		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /gh CLI unavailable/);
+	});
+
+	it("FAILs when the lookup failed for a reason other than a missing gh", () => {
+		const { exec } = fakeExec();
+		const result = sizeDirectionStep({
+			exec,
+			issue: null,
+			issueFailure: { status: "FAIL", detail: "issue lookup failed: boom" },
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /boom/);
 	});
 
 	const grown = [
@@ -602,10 +628,10 @@ describe("sizeDirectionStep", () => {
 });
 
 describe("perIssueSteps", () => {
-	const step = ({ issue, issueError }) => ({
+	const step = ({ issue, issueFailure }) => ({
 		name: "a step",
-		status: issue ? "PASS" : "SKIP",
-		detail: issueError ?? issue?.body,
+		status: issue ? "PASS" : (issueFailure?.status ?? "SKIP"),
+		detail: issueFailure?.detail ?? issue?.body,
 	});
 
 	it("runs the step once per issue and names each row after its issue", () => {
@@ -622,11 +648,30 @@ describe("perIssueSteps", () => {
 	it("keeps a per-issue verdict rather than collapsing to the first one", () => {
 		const rows = perIssueSteps(step, [
 			{ number: 667, issue: { body: "one" } },
-			{ number: 668, issue: null, issueError: "gh CLI unavailable" },
+			{
+				number: 668,
+				issue: null,
+				issueFailure: { status: "SKIP", detail: "gh CLI unavailable" },
+			},
 		]);
 		assert.deepEqual(
 			rows.map((r) => r.status),
 			["PASS", "SKIP"],
+		);
+	});
+
+	it("carries a FAILing lookup through as that issue's own verdict", () => {
+		const rows = perIssueSteps(step, [
+			{ number: 667, issue: { body: "one" } },
+			{
+				number: 668,
+				issue: null,
+				issueFailure: { status: "FAIL", detail: "issue lookup failed: boom" },
+			},
+		]);
+		assert.deepEqual(
+			rows.map((r) => r.status),
+			["PASS", "FAIL"],
 		);
 	});
 
