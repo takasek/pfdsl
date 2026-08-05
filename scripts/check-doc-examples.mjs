@@ -17,11 +17,11 @@
  * Exit 0 = all checked blocks valid, Exit 1 = any violation found.
  */
 
-import { spawnSync } from "child_process";
-import { readFileSync, unlinkSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
+import { spawnSync } from "node:child_process";
+import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { runDocExamplesCheck } from "./lib/doc-examples-steps.mjs";
 import { git } from "./lib/run-exec.mjs";
 

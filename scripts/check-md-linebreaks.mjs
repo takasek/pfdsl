@@ -18,7 +18,7 @@
  * Exit 0 = clean, Exit 1 = violations found.
  */
 
-import { readFileSync } from "fs";
+import { readFileSync } from "node:fs";
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 import { checkFile as checkFileText } from "./lib/md-linebreaks.mjs";
 import { runMdLinebreaksCheck } from "./lib/md-linebreaks-steps.mjs";

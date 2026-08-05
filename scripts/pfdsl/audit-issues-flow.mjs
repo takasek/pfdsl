@@ -61,7 +61,7 @@ for (let i = 1; i < lines.length; i++) {
 }
 if (fmEnd === -1) throw new Error("No closing --- found in roadmap.pfdsl");
 
-const fmText = lines.slice(1, fmEnd).join("\n") + "\n";
+const fmText = `${lines.slice(1, fmEnd).join("\n")}\n`;
 const body = lines.slice(fmEnd + 1).join("\n");
 
 // --- Fetch labels from GitHub ---
@@ -266,7 +266,7 @@ const newBody = applyClosedInFlowFixes(doc, body, findings, issuesByNumber);
 const docAfter = doc.toString({ lineWidth: 0 });
 
 if (docAfter !== docBefore || newBody !== body) {
-	const newRaw = "---\n" + docAfter + "---\n" + newBody;
+	const newRaw = `---\n${docAfter}---\n${newBody}`;
 	writeFileSync(flowPath, newRaw, "utf-8");
 	console.log("updated .pfdsl/roadmap.pfdsl");
 }

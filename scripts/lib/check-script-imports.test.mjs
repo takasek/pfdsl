@@ -110,6 +110,7 @@ describe("countUnanalyzableImports", () => {
 
 	it("reports a dynamic import built from a template literal", () => {
 		assert.equal(
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: fixture source under test, not an interpolation
 			countUnanalyzableImports("await import(`./${kind}.mjs`);\n"),
 			1,
 		);

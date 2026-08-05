@@ -17,11 +17,9 @@
 import {
 	classifyCycle,
 	FIELD_SEP,
-	IN_SAMPLE_PATH,
 	mergeCycleRecords,
 	parseMeasurementRecords,
 	parseSinceArg,
-	RECORD_SEP,
 	summarize,
 	TARGET_SAMPLE_COUNT,
 } from "./lib/review-measurement.mjs";

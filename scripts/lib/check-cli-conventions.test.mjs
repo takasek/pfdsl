@@ -61,6 +61,7 @@ describe("findCliConventionViolations — argv flag lookup", () => {
 describe("findCliConventionViolations — entrypoint detection", () => {
 	it("flags a raw string comparison against process.argv[1]", () => {
 		const found = findCliConventionViolations(
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: fixture source under test, not an interpolation
 			"if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {",
 		);
 		assert.equal(found.length, 1);
@@ -86,6 +87,7 @@ describe("findCliConventionViolations — entrypoint detection", () => {
 		const source = [
 			"const a = 1;",
 			"",
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: fixture source under test, not an interpolation
 			"if (import.meta.url === `file://${process.argv[1]}`) {}",
 		].join("\n");
 		assert.equal(findCliConventionViolations(source)[0].line, 3);
@@ -156,6 +158,7 @@ describe("per-rule exemptions", () => {
 	// and that is the shape #707 was about.
 	it("still checks the exempt file's entrypoint detection", () => {
 		const source =
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: fixture source under test, not an interpolation
 			"if (import.meta.url === `file://${process.argv[1]}`) main();";
 		assert.equal(findCliConventionViolations(source, SYNC).length, 1);
 	});
