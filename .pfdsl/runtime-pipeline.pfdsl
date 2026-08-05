@@ -202,7 +202,7 @@ artifact:
     group: skill_sources
   implementer_agent:
     label: 実装委譲agent
-    description: "agent定義はplugin同梱対象。同居するPreToolUseガードはリポ固有のため配布しない（内容の一次情報はworkflow.pfdsl）。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
+    description: "agent定義はplugin同梱対象。留保指定を強制するPreToolUseガードは別のartifact（workflow.pfdslのdelegation_guard、実体はscripts/delegation-guard.mjs）であり、リポ固有のため配布せずこの図には現れない（内容の一次情報はworkflow.pfdsl）。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
     location: ../.claude/agents/pfd-implementer.md
     group: skill_sources
   pfdsl_skill:
