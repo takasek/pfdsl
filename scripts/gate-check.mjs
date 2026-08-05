@@ -38,6 +38,7 @@ import {
 	sizeDirectionStep,
 	wipTransitionStep,
 } from "./lib/gate-check-steps.mjs";
+import { parseIssueNumbers } from "./lib/issue-args.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
 
@@ -82,8 +83,15 @@ if (noArtifact && artifactKey) {
 // checks SKIP rather than guess which issue the cycle belongs to. Every issue
 // the cycle closes belongs here — judging one of them and reporting a single
 // verdict is what let a cycle turn green on the one issue that happened to have
-// a record (#734).
-const issueNumbers = (values.issue ?? []).map(Number);
+// a record (#734). A value that is not an issue number is refused here, not
+// coerced: NaN reaches gh and comes back as that issue's checks being
+// unavailable, which reads as a tool outage rather than a typo (#745).
+const parsedIssues = parseIssueNumbers(values.issue);
+if (!parsedIssues.ok) {
+	console.error(`gate-check: ${parsedIssues.message}`);
+	process.exit(2);
+}
+const issueNumbers = parsedIssues.numbers;
 
 // Every call names the executable and its arguments separately — `base` and
 // `artifactKey` come from argv and must never be parsed by a shell (#572).
