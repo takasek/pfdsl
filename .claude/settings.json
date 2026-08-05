@@ -14,7 +14,10 @@
       "Bash(command -v *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(gh issue edit *)"
+      "Bash(gh issue edit *)",
+      "Bash(gh issue create *)",
+      "Bash(gh issue comment *)",
+      "Bash(gh pr create *)"
     ]
   },
   "hooks": {
