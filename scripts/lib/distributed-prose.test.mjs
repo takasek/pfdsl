@@ -22,6 +22,7 @@ describe("bundle-path rule", () => {
 	it("accepts a path qualified with the plugin root on the same line", () => {
 		assert.deepEqual(
 			rules(
+				// biome-ignore lint/suspicious/noTemplateCurlyInString: documents the literal ${CLAUDE_PLUGIN_ROOT} placeholder
 				"plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/`、repo-local なら `.claude/skills/pfdsl/`。\n",
 			),
 			[],

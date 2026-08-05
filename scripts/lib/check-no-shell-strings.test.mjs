@@ -80,6 +80,7 @@ describe("findShellExecutors", () => {
 	it("catches the evasion of assigning the command to a variable first", () => {
 		// The point of banning the import: no argument analysis to slip past.
 		const source =
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: fixture source under test, not an interpolation
 			'import { execSync } from "node:child_process";\nconst cmd = `git show ${ref}`;\nexecSync(cmd);';
 		assert.equal(findShellExecutors(source).length, 1);
 	});
