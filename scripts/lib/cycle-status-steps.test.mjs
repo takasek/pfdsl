@@ -5,7 +5,6 @@ import { runCycleStatus } from "./cycle-status-steps.mjs";
 
 const ROOT = "/repo";
 const CLI_PATH = "/repo/packages/cli/dist/cli.js";
-const ROADMAP_PATH = "/repo/.pfdsl/roadmap.pfdsl";
 
 const readyJsonOk = (best) =>
 	JSON.stringify({
@@ -33,7 +32,7 @@ describe("runCycleStatus", () => {
 	it("reports fetched:false when git fetch throws, without aborting the rest", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes("fetch")) throw new Error("no network");
 					if (args.includes("log")) return "";
 					return readyJsonOk(null);
@@ -46,7 +45,7 @@ describe("runCycleStatus", () => {
 	it("sets behindBaseError and leaves behindBase null when the log command throws", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes("log")) throw new Error("fatal: bad revision");
 					return readyJsonOk(null);
 				},
@@ -59,7 +58,7 @@ describe("runCycleStatus", () => {
 	it("counts behindBase from git log output on success", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes("log")) return "abc commit one\ndef commit two\n";
 					return readyJsonOk(null);
 				},
@@ -152,7 +151,7 @@ describe("runCycleStatus", () => {
 	it("sets readyError when the built CLI call throws", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes(CLI_PATH)) throw new Error("cli crashed");
 					return "";
 				},
@@ -166,7 +165,7 @@ describe("runCycleStatus", () => {
 	it("parses ready/best from a successful CLI call", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes(CLI_PATH)) return readyJsonOk(null);
 					return "";
 				},
@@ -184,7 +183,7 @@ describe("runCycleStatus", () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				issueNumbers: [669],
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
 					return "";
 				},
@@ -216,7 +215,7 @@ describe("runCycleStatus", () => {
 	it("resolves the target issue from the best process when --issue is absent", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
 					return "";
 				},
@@ -286,7 +285,7 @@ describe("runCycleStatus", () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				issueNumbers: [667, 668],
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes(CLI_PATH))
 						return JSON.stringify({
 							ok: true,
@@ -308,7 +307,7 @@ describe("runCycleStatus", () => {
 	it("reports the current branch and how far HEAD leads the base", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes("rev-parse")) return "feat/second-cycle\n";
 					if (args.join(" ").includes("origin/main..HEAD"))
 						return "abc one\ndef two\n";
@@ -328,7 +327,7 @@ describe("runCycleStatus", () => {
 	it("sets headStateError and leaves both head fields null when git cannot answer", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes("rev-parse"))
 						throw new Error("fatal: not a git repository");
 					return "";
@@ -375,7 +374,7 @@ describe("runCycleStatus", () => {
 		const calls = [];
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes(CLI_PATH)) return readyJsonOk(null);
 					return "";
 				},
@@ -396,7 +395,7 @@ describe("runCycleStatus", () => {
 	it("returns a null designUnsettledFor with the roadmap error when the best process has no issue number", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
 					return "";
 				},
@@ -427,7 +426,7 @@ describe("runCycleStatus", () => {
 	it("selects the first best output for the gate-check command", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				sh: (file, args) => {
+				sh: (_file, args) => {
 					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
 					return "";
 				},
