@@ -74,6 +74,18 @@ describe("classifyGitCommand", () => {
 		assert.equal(classifyGitCommand("git stash show -p"), null);
 	});
 
+	it("leaves the read-only apply forms alone, since they only report", () => {
+		assert.equal(classifyGitCommand("git apply --check patch.diff"), null);
+		assert.equal(classifyGitCommand("git apply --stat patch.diff"), null);
+	});
+
+	it("still denies an apply that writes", () => {
+		assert.deepEqual(classifyGitCommand("git apply patch.diff"), {
+			subcommand: "apply",
+			decision: "deny",
+		});
+	});
+
 	it("treats a bare `git stash` as the push it is", () => {
 		assert.deepEqual(classifyGitCommand("git stash"), {
 			subcommand: "stash",

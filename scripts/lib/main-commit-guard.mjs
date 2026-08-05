@@ -61,6 +61,18 @@ const ASKED_SUBCOMMANDS = new Set([
 const READ_ONLY_STASH_VERBS = new Set(["list", "show"]);
 
 /**
+ * `git apply` flags that report instead of writing. A deny cannot be overridden
+ * by the human it prints to, so a subcommand's read-only forms have to stay
+ * out of the denied set rather than rely on the prompt.
+ */
+const READ_ONLY_APPLY_FLAGS = new Set([
+	"--check",
+	"--stat",
+	"--numstat",
+	"--summary",
+]);
+
+/**
  * The guarded git subcommand one already-tokenized segment runs, or null.
  * @param {{value: string, quoted: boolean}[]} tokens
  * @returns {{subcommand: string, decision: "deny" | "ask"} | null}
@@ -72,7 +84,14 @@ function classifySegment(tokens) {
 
 	const sub = gitSubcommand(tokens);
 	if (!sub) return null;
-	if (DENIED_SUBCOMMANDS.has(sub)) return { subcommand: sub, decision: "deny" };
+	if (DENIED_SUBCOMMANDS.has(sub)) {
+		if (
+			sub === "apply" &&
+			tokens.some((t) => !t.quoted && READ_ONLY_APPLY_FLAGS.has(t.value))
+		)
+			return null;
+		return { subcommand: sub, decision: "deny" };
+	}
 	if (!ASKED_SUBCOMMANDS.has(sub)) return null;
 	// The verb sits to `stash` exactly as a subcommand sits to `git`, so the
 	// same reader finds it — including its refusal to read a quoted token,
