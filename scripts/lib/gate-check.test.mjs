@@ -869,6 +869,28 @@ describe("SIZE_INTENT_PATTERN / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", 
 		);
 	});
 
+	it("SIZE_TRACKED_PATTERNS matches the .pfdsl companions, the largest of them (#732)", () => {
+		for (const path of [
+			".pfdsl/roadmap.md",
+			".pfdsl/workflow.md",
+			".pfdsl/runtime-pipeline.md",
+			".pfdsl/review-perspectives.md",
+		]) {
+			assert.ok(
+				SIZE_TRACKED_PATTERNS.some((p) => p.test(path)),
+				`${path} should be tracked`,
+			);
+		}
+	});
+
+	it("SIZE_TRACKED_PATTERNS leaves the graphs themselves untracked", () => {
+		// The .pfdsl files are graphs, not prose that accumulates procedure, and
+		// their size moves for reasons the knowledge-artifact audit is not about.
+		assert.ok(
+			!SIZE_TRACKED_PATTERNS.some((p) => p.test(".pfdsl/roadmap.pfdsl")),
+		);
+	});
+
 	it("SIZE_OVERRIDE_PATTERN matches a Size-Override: token line", () => {
 		assert.ok(SIZE_OVERRIDE_PATTERN.test("intro\nSize-Override: reason\nmore"));
 		assert.ok(!SIZE_OVERRIDE_PATTERN.test("no override mentioned here"));

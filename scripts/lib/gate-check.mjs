@@ -541,7 +541,15 @@ export function classifyDesignRecordContent(recordBody, optionCount) {
 // "the machine guesses what the prose meant" failure the other #669 checks
 // replaced with a token the filer writes.
 export const SIZE_INTENT_PATTERN = /^Size-Intent:\s*shrink\b/m;
+// Prose that accumulates procedure, wherever this repo keeps it. #669 named
+// the first three and left the reason for that particular list unwritten; the
+// companions were the gap (#732/#752), and being the largest of the set they
+// were the ones the audit most needed. `.pfdsl/*.md` covers them by shape
+// rather than by name, so a fourth companion arrives already tracked, while
+// the graphs beside them stay out — a .pfdsl file's size moves for reasons
+// this audit is not about.
 export const SIZE_TRACKED_PATTERNS = [
+	/^\.pfdsl\/[^/]+\.md$/,
 	/^\.pfdsl\/bindings\//,
 	/^docs\/adr\//,
 	/(^|\/)SKILL\.md$/,
