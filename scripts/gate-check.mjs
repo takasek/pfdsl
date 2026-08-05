@@ -5,7 +5,7 @@
 // against the diff from origin/<base> to HEAD, then prints the remaining
 // checklist items (extracted from the work-cycle checklist itself) as
 // MANUAL: lines.
-// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n>]
+// Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n> ...]
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -33,6 +33,7 @@ import {
 	designRecordStep,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
+	perIssueSteps,
 	reviewMeasurementStep,
 	sizeDirectionStep,
 	wipTransitionStep,
@@ -55,7 +56,7 @@ try {
 			base: { type: "string" },
 			artifact: { type: "string" },
 			"no-artifact": { type: "boolean" },
-			issue: { type: "string" },
+			issue: { type: "string", multiple: true },
 		},
 		strict: true,
 		allowPositionals: false,
@@ -76,10 +77,13 @@ if (noArtifact && artifactKey) {
 	);
 	process.exit(2);
 }
-// Optional: powers the design-selection-record and size-direction checks
-// (#669), which need the linked issue to read from. Without it those checks
-// SKIP rather than guess which issue the cycle belongs to.
-const issueNumber = values.issue !== undefined ? Number(values.issue) : null;
+// Optional and repeatable: powers the design-selection-record and size-direction
+// checks (#669), which need the linked issue to read from. Without it those
+// checks SKIP rather than guess which issue the cycle belongs to. Every issue
+// the cycle closes belongs here — judging one of them and reporting a single
+// verdict is what let a cycle turn green on the one issue that happened to have
+// a record (#734).
+const issueNumbers = (values.issue ?? []).map(Number);
 
 // Every call names the executable and its arguments separately — `base` and
 // `artifactKey` come from argv and must never be parsed by a shell (#572).
@@ -242,33 +246,36 @@ results.push(
 	wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }),
 );
 
-// The linked issue, fetched once for the two checks that read it. execGh keeps
-// the REST fallback that a bare `gh` call would lose in environments without
-// the binary (#489/#492); a failure degrades both checks to SKIP, not FAIL.
-let issue = null;
-let issueError = null;
-if (issueNumber != null) {
+// The linked issues, fetched once each for the two checks that read them.
+// execGh keeps the REST fallback that a bare `gh` call would lose in
+// environments without the binary (#489/#492); a failure degrades that issue's
+// checks to SKIP, not FAIL, and leaves the other issues judged on their own.
+const issues = [];
+for (const number of issueNumbers) {
 	try {
-		issue = JSON.parse(
-			await execGh(
-				[
-					"issue",
-					"view",
-					String(issueNumber),
-					"--json",
-					"author,body,comments,createdAt",
-				],
-				{ cwd: root },
+		issues.push({
+			number,
+			issue: JSON.parse(
+				await execGh(
+					[
+						"issue",
+						"view",
+						String(number),
+						"--json",
+						"author,body,comments,createdAt",
+					],
+					{ cwd: root },
+				),
 			),
-		);
+		});
 	} catch {
-		issueError = "gh CLI unavailable";
+		issues.push({ number, issue: null, issueError: "gh CLI unavailable" });
 	}
 }
 
 // 10. design-selection record: was the design choice recorded before the first commit,
-// with the required structure (#669)?
-results.push(designRecordStep({ exec, base, issue, issueError }));
+// with the required structure (#669)? One row per issue the cycle closes (#734).
+results.push(...perIssueSteps(designRecordStep, issues, { exec, base }));
 
 // 11. knowledge-artifact size direction: did tracked knowledge artifacts grow
 // without an explicit override, on a cycle whose linked issue declares one (#669)?
@@ -279,7 +286,7 @@ results.push(designRecordStep({ exec, base, issue, issueError }));
 // convention and stays until something needs them shared too.
 const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
 results.push(
-	sizeDirectionStep({ exec, issue, issueError, deltas: sizeDeltas }),
+	...perIssueSteps(sizeDirectionStep, issues, { exec, deltas: sizeDeltas }),
 );
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
