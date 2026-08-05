@@ -134,8 +134,8 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		].map((file) => (file.startsWith(root) ? file.slice(root.length) : file));
 		assert.ok(closure.length > 0);
 		for (const file of closure) {
-			// gen-install's own inputs are guarded by GEN_INSTALL_TRIGGER, whose
-			// check_drift runs first and blocks until install/ is regenerated.
+			// gen-install's own inputs are guarded by GEN_INSTALL_TRIGGER, whose gate
+			// is declared first and blocks until install/ is regenerated.
 			const covered =
 				GEN_PLUGIN_TRIGGER.test(file) || GEN_INSTALL_TRIGGER.test(file);
 			assert.ok(covered, `${file} triggers no drift check`);

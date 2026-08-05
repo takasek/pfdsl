@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Checks whether a dist file (e.g. packages/cli/dist/cli.js) is stale
 // relative to its sibling src/ directory (packages/cli/src/), so drift
-// checks in scripts/pre-commit can skip instead of trusting a leftover
-// build from before a source change (see #450).
+// gates in scripts/check-drift-gates.mjs, and the checks still inline in
+// scripts/pre-commit, can skip instead of trusting a leftover build from
+// before a source change (see #450).
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { isCliEntrypoint } from "./cli-entrypoint.mjs";
@@ -30,7 +31,7 @@ export function isDistStale(distFile) {
 }
 
 // CLI mode: exit 0 if fresh, 1 if stale/absent, 2 if asked without a path.
-// The third case has to be its own exit code: every caller in
+// The third case has to be its own exit code: the sh caller left in
 // scripts/pre-commit reads "stale" as "skip this drift check and say so", so a
 // caller that dropped its argument would silently turn the check off (#648).
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
