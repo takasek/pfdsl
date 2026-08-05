@@ -48,6 +48,8 @@
 - **validate（`validator.ts`）**: 正準化グラフと frontmatter に V/W ルールを適用し診断を生成する。CLI `check` は parse→normalize→validate を1回で実行する。VSCode 拡張は `analyze()` 経由で同じ validate をエディタ内リアルタイム診断に使う（`diagnostics.ts`）
 - **format（`formatter.ts`）**: ソーステキストから独立に再 lex/parse し整形済みテキストを生成する。check の parse 結果を再利用しない別経路。frontmatter は yaml CST（`frontmatter-cst.ts`）経由で正準化する（ADR-0034）
 - **sort_meta（`sort.ts` の `sort(source, opts)`）**: 入力はソーステキスト（format と同じく独立再 parse）。構文木を受け取る経路ではない。frontmatter の並べ替えは yaml CST（`frontmatter-cst.ts`）経由（ADR-0034）
+- **set_meta（`frontmatter-cst.ts` の `setFrontmatterField(source, kind, id, field, value)`）**: sort_meta と同じくソーステキストを入力に取り、指定ノードの指定フィールドだけを yaml CST 上で書き換える。対象ノードの定義が無い場合の新規挿入は `insert-definition.ts` が担う
+- **reindex_meta（`reindex.ts` の `reindex(source, opts)`）**: ソーステキストを入力に取り、`computeTopoOrder` の順序に沿って `index` フィールドを採番し直す。位相順を要するため内部で `analyze()` を通す点が sort_meta / set_meta と異なる
 - **render_graph（`graphviz-exporter` の `exportDot(graph, frontmatter)`）**: 正準化グラフと frontmatter（layout / title / statusStyles）から DOT 文字列を組む
 - **export_image**: DOT→SVG は `@hpcc-js/wasm`（`preview-engine` の `renderDotToSvg`）で外部依存なし。PDF/PNG は `svgToBinary` が `puppeteer` を動的 import し、未インストール時は明示エラーで失敗する（フォールバックしない）
 - **export_metadata（`metadata-exporter` の `extractMetadata(graph, frontmatter)`）**: VSCode 拡張の `pfdsl.export`（`export.ts`）のみが呼ぶ
