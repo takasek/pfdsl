@@ -260,6 +260,28 @@ export function designRecordStep({ exec, base, issue, issueError }) {
 }
 
 /**
+ * Fan a single-issue step out over every issue the cycle closes (#734).
+ *
+ * The two issue-scoped checks used to see one issue per run, so a cycle closing
+ * several of them turned green as soon as the one issue that was passed had a
+ * record — the other issues were never looked at. One row per issue keeps the
+ * verdicts separate; the row name carries the number so a FAIL says which issue
+ * it belongs to. An empty list is the no-`--issue` case and keeps the step's own
+ * unlabelled SKIP row.
+ *
+ * @param {(args: object) => import("./gate-check.mjs").GateResult} step
+ * @param {{number: number, issue?: object|null, issueError?: string|null}[]} issues
+ * @param {object} [args] arguments shared by every call (exec, base, deltas, …)
+ */
+export function perIssueSteps(step, issues, args = {}) {
+	if (issues.length === 0) return [step(args)];
+	return issues.map(({ number, issue, issueError }) => {
+		const result = step({ ...args, issue, issueError });
+		return { ...result, name: `${result.name} (#${number})` };
+	});
+}
+
+/**
  * Byte/line deltas for the tracked knowledge artifacts this branch touched.
  * Measured whether or not the issue declares a shrink intent: the numbers are
  * report material in their own right, and gating their collection on the

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Cycle preflight: bundles step-1 mechanical operations (fetch, rebase-behind
 // check, flow-sync PR check, ready listing) into one compact JSON payload.
-// Usage: node scripts/cycle-status.mjs [--base main] [--issue <n>]
+// Usage: node scripts/cycle-status.mjs [--base main] [--issue <n> ...]
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -23,7 +23,7 @@ try {
 		args: process.argv.slice(2),
 		options: {
 			base: { type: "string" },
-			issue: { type: "string" },
+			issue: { type: "string", multiple: true },
 		},
 		strict: true,
 		allowPositionals: false,
@@ -33,7 +33,10 @@ try {
 	process.exit(2);
 }
 const base = values.base ?? "main";
-const issueNumber = values.issue !== undefined ? Number(values.issue) : null;
+// Repeatable: a cycle that closes several issues owes a record on each one, so
+// the preflight judges them all and the gate-check line it prints names them all
+// (#734).
+const issueNumbers = (values.issue ?? []).map(Number);
 
 // `base` comes from argv; naming the executable and arguments separately keeps
 // it out of a shell (#572).
@@ -46,7 +49,7 @@ const result = await runCycleStatus({
 	readFileSync,
 	root,
 	base,
-	issueNumber,
+	issueNumbers,
 });
 
 console.log(JSON.stringify(result, null, 2));
