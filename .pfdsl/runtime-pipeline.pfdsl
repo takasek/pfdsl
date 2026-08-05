@@ -195,6 +195,11 @@ artifact:
     description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う"
     location: ../.claude/skills/pfd-grill/
     group: skill_sources
+  pfd_commands:
+    label: pfd-*スラッシュコマンド
+    description: "/pfd-cycle・/pfd-init・/pfd-retro の起動口となるコマンド定義。対応するスキル本体（ops_skill_general・ecosystem_skill・retro_skill）とは別ファイルであり、同梱対象としても別に扱われる。手書き、生成対象外。ここではplugin_distへの同梱対象としてのみ扱う"
+    location: ../.claude/commands/
+    group: skill_sources
   pfd_lens_agent:
     label: pfd-lens agent
     description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
@@ -441,7 +446,7 @@ dot_graph >> export_image -> rendered_image
 
 ops_install_sources >> gen_install -> ops_install_templates
 
-[ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
+[ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
 
 [feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
 
