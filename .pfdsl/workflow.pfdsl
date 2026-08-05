@@ -212,7 +212,7 @@ artifact:
     group: generation
   delegation_guard:
     label: 外向き操作ガード
-    description: "委譲先 subagent の push・PR 作成・issue 操作を拒否する PreToolUse(Bash) フック（#554）。implementer_agent のブリーフが書く留保指定を、指示でなく権限として強制する。リポ固有の配線（.claude/settings.json）を持つため配布対象外 — この点だけが implementer_agent と異なり、両者を1 artifact に束ねると gen_plugin への同梱エッジが半分にしか実在しないことになる"
+    description: "委譲先 subagent の push・PR 作成・issue 操作を拒否する PreToolUse(Bash) フック（#554）。implementer_agent のブリーフが書く留保指定を、指示でなく権限として強制する。.claude/settings.json の配線を伴うリポ固有の機構であり、implementer_agent と違って配布対象外"
     criteria: allowlist 外の subagent からの外向きコマンドが拒否され、呼び出し元と allowlist 対象 agent は影響を受けない
     location: ../scripts/delegation-guard.mjs
     group: generation
