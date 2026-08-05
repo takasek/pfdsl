@@ -949,7 +949,7 @@ describe("applyFixes", () => {
 		const lines = out.split("\n");
 		const descLine = lines.find((l) => l.includes("description:"));
 		assert.ok(
-			descLine && descLine.includes(longDesc),
+			descLine?.includes(longDesc),
 			`description should be on one line, got: ${descLine}`,
 		);
 	});

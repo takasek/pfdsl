@@ -70,7 +70,7 @@ export function checkFile(filePath, text) {
 		const prev = lines[i - 1];
 
 		// Blank line before → indented code block or loose list paragraph; skip
-		if (!prev || !prev.trim()) continue;
+		if (!prev?.trim()) continue;
 
 		if (!endsAtBoundary(prev)) {
 			violations.push({
