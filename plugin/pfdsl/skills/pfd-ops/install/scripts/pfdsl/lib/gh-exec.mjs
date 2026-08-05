@@ -17,6 +17,7 @@ import {
 	editLabel,
 	fetchAllIssues,
 	fetchAllLabels,
+	fetchCurrentPrView,
 	fetchIssueView,
 	fetchOpenPrsWithCi,
 	parseHost,
@@ -98,6 +99,23 @@ async function runGhRestPlan(plan, cwd, token) {
 			);
 			// gh prints the selected field's value alone under --jq, and the whole
 			// object without it.
+			return plan.jqField ? String(view[plan.jqField]) : JSON.stringify(view);
+		}
+		case "viewCurrentPr": {
+			// gh reads the branch from the checkout; over REST it is a lookup key,
+			// so it comes from the same git the owner/repo above did.
+			const branch = execFileSync("git", ["branch", "--show-current"], {
+				cwd,
+				encoding: "utf-8",
+			}).trim();
+			if (!branch) throw new Error("cannot resolve the current branch");
+			const view = await fetchCurrentPrView(
+				owner,
+				repo,
+				token,
+				branch,
+				plan.fields,
+			);
 			return plan.jqField ? String(view[plan.jqField]) : JSON.stringify(view);
 		}
 		case "listOpenPrsWithCi":

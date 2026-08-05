@@ -10,6 +10,7 @@ import {
 	classifyDesignRecordTiming,
 	classifyIssueLookupFailure,
 	classifyOutputArtifactStatus,
+	classifyPrBodyFailure,
 	classifySizeDirection,
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
@@ -810,6 +811,80 @@ describe("classifySizeDirection", () => {
 			deltas: [shrunkDelta],
 		});
 		assert.deepEqual(result, { status: "PASS" });
+	});
+
+	it("takes the caller's verdict when the PR body could not be read (#749)", () => {
+		// An unreadable body is not an absent Size-Override. Treating the two
+		// alike failed cycles that had written the token correctly, in exactly
+		// the environments that cannot fetch it.
+		const result = classifySizeDirection({
+			issueBody: declared,
+			deltas: [grownDelta],
+			prBodyFailure: { status: "SKIP", detail: "gh CLI unavailable" },
+		});
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /gh CLI unavailable/);
+		// The growth still has to be visible; a verdict that hid it would report
+		// less than the FAIL it replaces.
+		assert.match(result.detail, /\+50 bytes/);
+	});
+
+	it("FAILs an unreadable body the caller judged a real error, not an absent one", () => {
+		const result = classifySizeDirection({
+			issueBody: declared,
+			deltas: [grownDelta],
+			prBodyFailure: { status: "FAIL", detail: "PR body lookup failed: 401" },
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /401/);
+	});
+
+	it("still PASSes an unreadable body when nothing grew", () => {
+		const result = classifySizeDirection({
+			issueBody: declared,
+			deltas: [shrunkDelta],
+			prBodyFailure: { status: "SKIP", detail: "gh CLI unavailable" },
+		});
+		assert.equal(result.status, "PASS");
+	});
+});
+
+// The same SKIP-vs-FAIL split classifyIssueLookupFailure draws for issues
+// (#745): only a missing binary is the environment's doing. A lookup that ran
+// and failed has to FAIL, or the row is one nobody acts on.
+describe("classifyPrBodyFailure", () => {
+	it("SKIPs when the gh binary is missing", () => {
+		const result = classifyPrBodyFailure({ code: "ENOENT" });
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /gh CLI unavailable/);
+	});
+
+	it("SKIPs when the branch simply has no open PR yet", () => {
+		// The terminal gate normally runs before the PR exists, so this is the
+		// ordinary case rather than an error.
+		for (const message of [
+			"no open pull request for branch 'feat/x'",
+			"Command failed: gh pr view\nno pull requests found for branch",
+		]) {
+			const result = classifyPrBodyFailure(new Error(message));
+			assert.equal(result.status, "SKIP");
+			assert.match(result.detail, /no open PR/);
+		}
+	});
+
+	it("FAILs a lookup that ran and failed for any other reason", () => {
+		const result = classifyPrBodyFailure(
+			new Error("HTTP 401: Bad credentials"),
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /401/);
+	});
+
+	it("reads gh's message out of stderr, where execFileSync leaves it", () => {
+		const error = Object.assign(new Error("Command failed: gh pr view"), {
+			stderr: "no pull requests found for branch 'feat/x'\n",
+		});
+		assert.equal(classifyPrBodyFailure(error).status, "SKIP");
 	});
 });
 

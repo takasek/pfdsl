@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
 	fetchAllIssues,
 	fetchAllLabels,
+	fetchCurrentPrView,
 	fetchIssueView,
 	fetchOpenPrsWithCi,
 	mapCheckRunsToRollup,
@@ -607,5 +608,65 @@ describe("fetchOpenPrsWithCi", () => {
 		const [pr] = await fetchOpenPrsWithCi("takasek", "pfdsl", "tok", fetchImpl);
 		assert.equal(pr.statusCheckRollup.length, 101);
 		assert.equal(pr.statusCheckRollup.at(-1).conclusion, "FAILURE");
+	});
+});
+
+describe("fetchCurrentPrView", () => {
+	const prApi = {
+		number: 77,
+		body: "Size-Override: intentional",
+		state: "open",
+	};
+
+	it("resolves the branch's open PR and returns gh's field names", async () => {
+		const urls = [];
+		const fetchImpl = async (url) => {
+			urls.push(url);
+			return jsonResponse([prApi]);
+		};
+		const result = await fetchCurrentPrView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			"feat/x",
+			["body"],
+			fetchImpl,
+		);
+		assert.deepEqual(result, { body: "Size-Override: intentional" });
+		assert.ok(urls[0].includes("head=takasek%3Afeat%2Fx"));
+		assert.ok(urls[0].includes("state=open"));
+	});
+
+	// gh exits non-zero with "no pull requests found" here, and the caller's
+	// distinction between "no override written" and "could not read it" rests
+	// on this staying an error rather than an empty body (#749).
+	it("throws when the branch has no open PR", async () => {
+		const fetchImpl = async () => jsonResponse([]);
+		await assert.rejects(
+			fetchCurrentPrView(
+				"takasek",
+				"pfdsl",
+				"tok",
+				"feat/x",
+				["body"],
+				fetchImpl,
+			),
+			/no open pull request/i,
+		);
+	});
+
+	it("refuses a field it cannot map rather than omitting it", async () => {
+		const fetchImpl = async () => jsonResponse([prApi]);
+		await assert.rejects(
+			fetchCurrentPrView(
+				"takasek",
+				"pfdsl",
+				"tok",
+				"feat/x",
+				["reviewDecision"],
+				fetchImpl,
+			),
+			/reviewDecision/,
+		);
 	});
 });

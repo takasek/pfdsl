@@ -19,7 +19,6 @@ import {
 	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
-	hasShrinkIntent,
 	hasStatusChange,
 	lintCommitSubjects,
 	matchesTrigger,
@@ -325,27 +324,25 @@ export function collectSizeDeltas({ exec, base, changedFiles }) {
  * whose linked issue declares `Size-Intent: shrink` (issue #669's protection
  * against "the countermeasure's effect on size is never measured")?
  */
-export function sizeDirectionStep({ exec, issue, issueFailure, deltas }) {
+export function sizeDirectionStep({
+	issue,
+	issueFailure,
+	deltas,
+	prBody,
+	prBodyFailure,
+}) {
 	const name = "knowledge-artifact size direction";
 	if (!issue) return { name, ...missingIssueRow(issueFailure) };
 
+	// The PR body is fetched by the caller, once for every linked issue and only
+	// when one of them declares a shrink intent — the verdict needs it, the SKIP
+	// does not, and the lookup has to go through execGh's REST fallback rather
+	// than a bare `gh` this step could run itself (#749).
 	const issueBody = issue.body ?? "";
-	// The verdict needs the PR body; the SKIP does not. Asking gh for a PR that
-	// most cycles will not be judged against is the one subprocess worth saving.
-	if (!hasShrinkIntent(issueBody))
-		return { name, ...classifySizeDirection({ issueBody, deltas }) };
-
-	const prBodyResult = exec("gh", [
-		"pr",
-		"view",
-		"--json",
-		"body",
-		"--jq",
-		".body",
-	]);
-	const prBody = prBodyResult.ok ? prBodyResult.out : "";
-
-	return { name, ...classifySizeDirection({ issueBody, deltas, prBody }) };
+	return {
+		name,
+		...classifySizeDirection({ issueBody, deltas, prBody, prBodyFailure }),
+	};
 }
 
 /**

@@ -94,6 +94,34 @@ export function classifyIssueLookupFailure(error) {
 }
 
 /**
+ * The same split for the PR body the size-direction check reads.
+ *
+ * Two causes are the environment's rather than the cycle's: no gh binary, and
+ * no PR yet — the terminal gate normally runs before the PR is opened, so that
+ * one is the ordinary case. Everything else ran and failed, and per the
+ * reasoning above it has to FAIL rather than leave a row nobody acts on.
+ * execFileSync puts gh's own wording on `stderr` rather than in the message,
+ * so both are searched.
+ * @param {{ code?: string, message?: string, stderr?: unknown }} error
+ * @returns {{status: 'SKIP'|'FAIL', detail: string}}
+ */
+export function classifyPrBodyFailure(error) {
+	if (isGhUnavailableError(error)) {
+		return { status: "SKIP", detail: "gh CLI unavailable" };
+	}
+	const said = [error?.message, error?.stderr?.toString?.()]
+		.filter(Boolean)
+		.join(" ");
+	if (/no (open )?pull requests? /i.test(said)) {
+		return { status: "SKIP", detail: "no open PR for this branch yet" };
+	}
+	return {
+		status: "FAIL",
+		detail: `PR body lookup failed: ${error?.message ?? String(error)}`,
+	};
+}
+
+/**
  * Classify the output-artifact status-update gate (item 6). No new states:
  * this reuses the existing reasoned-SKIP vocabulary the same way item 9
  * (wip transition) already does for the no-roadmap-change case.
@@ -591,10 +619,23 @@ export function formatSizeDelta(d) {
  * countermeasure's effect on size is never measured"). Only the verdict is
  * gated on the declaration — the deltas themselves are reported either way, so
  * a missing declaration costs the numbers nothing.
- * @param {{issueBody?: string, deltas: SizeDelta[], prBody?: string}} params
+ *
+ * `prBodyFailure` is what separates "no override was written" from "the
+ * override could not be read", which an empty body used to conflate: a cycle
+ * that wrote the token correctly failed anyway wherever the body was
+ * unfetchable, and the detail said only that things had grown (#749). Whether
+ * that is a SKIP or a FAIL is classifyPrBodyFailure's call, not this
+ * function's — the growth is appended to whichever it chose.
+ * @param {{issueBody?: string, deltas: SizeDelta[], prBody?: string,
+ *          prBodyFailure?: {status: 'SKIP'|'FAIL', detail: string}}} params
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
-export function classifySizeDirection({ issueBody, deltas, prBody }) {
+export function classifySizeDirection({
+	issueBody,
+	deltas,
+	prBody,
+	prBodyFailure,
+}) {
 	if (!hasShrinkIntent(issueBody)) {
 		return {
 			status: "SKIP",
@@ -609,6 +650,12 @@ export function classifySizeDirection({ issueBody, deltas, prBody }) {
 	if (grown.length === 0) return { status: "PASS" };
 
 	const list = grown.map(formatSizeDelta).join(", ");
+	if (prBodyFailure) {
+		return {
+			status: prBodyFailure.status,
+			detail: `${prBodyFailure.detail}, so Size-Override could not be checked; growth left unjudged: ${list}`,
+		};
+	}
 	if (SIZE_OVERRIDE_PATTERN.test(prBody ?? "")) {
 		return {
 			status: "PASS",

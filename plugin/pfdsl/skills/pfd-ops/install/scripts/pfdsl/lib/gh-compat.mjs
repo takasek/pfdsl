@@ -32,6 +32,36 @@ function flagValue(args, flag) {
 }
 
 /**
+ * The `--json`/`--jq` pair the `view` verbs share, without the op name — that
+ * stays a literal at each call site, because the test holding the two sides of
+ * the fallback together reads the op names straight out of this file's source
+ * (#639).
+ *
+ * One op per verb serves both shapes. `--jq .field` reduces gh's output to
+ * that field's value; without it gh prints the JSON object and the caller
+ * parses it. Answering both with the body alone is what made the
+ * object-shaped callers throw inside a catch that blamed a missing gh (#745),
+ * and answering `--jq` from a second REST path would leave two ways to ask the
+ * same question.
+ * @param {string[]} rest argv after the group and verb
+ * @returns {{ fields: string[], jqField?: string } | null}
+ */
+function planView(rest) {
+	const json = flagValue(rest, "--json");
+	if (!json) return null;
+	const fields = json.split(",");
+
+	const jq = flagValue(rest, "--jq");
+	if (jq === undefined) return { fields };
+	// Only a bare `.field` naming one of the requested fields is something this
+	// layer can evaluate. Anything else is a jq program, and guessing at it
+	// would answer a question that was not asked.
+	const field = /^\.(\w+)$/.exec(jq)?.[1];
+	if (!field || !fields.includes(field)) return null;
+	return { fields, jqField: field };
+}
+
+/**
  * Parse a `gh` argv (as passed to execFileSync("gh", argv)) into a
  * REST-callable operation descriptor. Only covers the argv shapes this
  * repo's scripts actually emit — returns null for anything else, so callers
@@ -71,30 +101,19 @@ export function planGhRestCall(args) {
 		};
 	}
 	if (cmd === "issue" && sub === "view") {
-		// One op for both shapes. `--jq .field` reduces gh's output to that
-		// field's value; without it gh prints the JSON object and the caller
-		// parses it. Answering both with the body alone is what made the
-		// object-shaped callers throw inside a catch that blamed a missing gh
-		// (#745), and answering `--jq` from a second REST path would leave two
-		// ways to ask the same question.
-		const json = flagValue(rest, "--json");
-		if (!json) return null;
-		const plan = {
-			op: "viewIssue",
-			number: Number(rest[0]),
-			fields: json.split(","),
-		};
-		const jq = flagValue(rest, "--jq");
-		if (jq === undefined) return plan;
-		// Only a bare `.field` naming one of the requested fields is something
-		// this layer can evaluate. Anything else is a jq program, and guessing
-		// at it would answer a question that was not asked.
-		const field = /^\.(\w+)$/.exec(jq)?.[1];
-		if (!field || !plan.fields.includes(field)) return null;
-		return { ...plan, jqField: field };
+		const view = planView(rest);
+		return view && { op: "viewIssue", number: Number(rest[0]), ...view };
 	}
 	if (cmd === "pr" && sub === "list") {
 		return { op: "listOpenPrsWithCi" };
+	}
+	if (cmd === "pr" && sub === "view") {
+		// Only the no-argument form, which asks about the current branch's PR.
+		// A numbered `pr view` is a different question, and the REST side
+		// resolves the branch rather than a number (#749).
+		if (rest[0] !== undefined && !rest[0].startsWith("-")) return null;
+		const view = planView(rest);
+		return view && { op: "viewCurrentPr", ...view };
 	}
 	return null;
 }

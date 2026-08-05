@@ -14,6 +14,7 @@ import { parseArgs } from "node:util";
 import {
 	classifyAuditIssuesFlowResult,
 	classifyIssueLookupFailure,
+	classifyPrBodyFailure,
 	deriveManualItems,
 	diffNewTerminals,
 	diffReadySets,
@@ -21,6 +22,7 @@ import {
 	formatGateTable,
 	formatSizeDelta,
 	GATE_CHECKLIST_SOURCE_PATH,
+	hasShrinkIntent,
 	matchesTrigger,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
@@ -300,8 +302,29 @@ results.push(...perIssueSteps(designRecordStep, issues, { exec, base }));
 // roadmap-based blocks below still read the file per block, which is the older
 // convention and stays until something needs them shared too.
 const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
+
+// The PR body carries Size-Override, so only a cycle whose issue declares a
+// shrink intent needs it — and it goes through execGh, since a bare `gh` came
+// back empty wherever the binary is missing and read as "no override was
+// written" (#749). One lookup serves every issue; a failure is passed along as
+// itself so the step can SKIP rather than fail a cycle it could not judge.
+let prBody;
+let prBodyFailure;
+if (issues.some(({ issue }) => hasShrinkIntent(issue?.body ?? ""))) {
+	try {
+		prBody = await execGh(["pr", "view", "--json", "body", "--jq", ".body"], {
+			cwd: root,
+		});
+	} catch (e) {
+		prBodyFailure = classifyPrBodyFailure(e);
+	}
+}
 results.push(
-	...perIssueSteps(sizeDirectionStep, issues, { exec, deltas: sizeDeltas }),
+	...perIssueSteps(sizeDirectionStep, issues, {
+		deltas: sizeDeltas,
+		prBody,
+		prBodyFailure,
+	}),
 );
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);

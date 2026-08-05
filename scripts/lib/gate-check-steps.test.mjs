@@ -591,39 +591,43 @@ describe("sizeDirectionStep", () => {
 	];
 	const declared = "Size-Intent: shrink\n";
 
-	it("SKIPs without spending any subprocess when the issue declares no size intent", () => {
-		const { exec, calls } = fakeExec();
+	it("SKIPs when the issue declares no size intent", () => {
 		const result = sizeDirectionStep({
-			exec,
 			issue: { body: "肥大について書いただけ。" },
 			deltas: grown,
 		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /Size-Intent/);
-		assert.deepEqual(calls, []);
 	});
 
 	it("FAILs on growth when the PR body has no override", () => {
-		const { exec } = fakeExec({ "gh pr view": { out: "" } });
 		const result = sizeDirectionStep({
-			exec,
 			issue: { body: declared },
 			deltas: grown,
+			prBody: "",
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /x\.pfdsl/);
 	});
 
 	it("PASSes growth when the PR body carries a Size-Override token", () => {
-		const { exec } = fakeExec({
-			"gh pr view": { out: "Size-Override: intentional" },
-		});
 		const result = sizeDirectionStep({
-			exec,
 			issue: { body: declared },
 			deltas: grown,
+			prBody: "Size-Override: intentional",
 		});
 		assert.equal(result.status, "PASS");
+	});
+
+	it("carries the caller's verdict on an unfetchable PR body (#749)", () => {
+		const result = sizeDirectionStep({
+			issue: { body: declared },
+			deltas: grown,
+			prBodyFailure: { status: "SKIP", detail: "gh CLI unavailable" },
+		});
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /gh CLI unavailable/);
+		assert.match(result.detail, /x\.pfdsl/);
 	});
 });
 
