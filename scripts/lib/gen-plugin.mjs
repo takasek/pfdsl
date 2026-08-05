@@ -65,6 +65,7 @@ export const PLUGIN_MIRRORS = [
 export const PLUGIN_AGENT_EXCLUSIONS = {
 	"ci-triage.md": "reads this repo's GitHub Actions logs",
 	"issue-worker.md": "encodes this repo's worktree and PR conventions",
+	"local-check-triage.md": "triages this repo's make/pre-commit/test failures",
 	"vscode-ext-debugger.md": "debugs the extension this repo builds",
 };
 
