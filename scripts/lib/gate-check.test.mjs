@@ -8,6 +8,7 @@ import {
 	classifyAuditIssuesFlowResult,
 	classifyDesignRecordContent,
 	classifyDesignRecordTiming,
+	classifyIssueLookupFailure,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
 	DESIGN_RECORD_REQUIRED_PREFIXES,
@@ -871,5 +872,46 @@ describe("SIZE_INTENT_PATTERN / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", 
 	it("SIZE_OVERRIDE_PATTERN matches a Size-Override: token line", () => {
 		assert.ok(SIZE_OVERRIDE_PATTERN.test("intro\nSize-Override: reason\nmore"));
 		assert.ok(!SIZE_OVERRIDE_PATTERN.test("no override mentioned here"));
+	});
+});
+
+// #745: every failure of the per-issue lookup was reported as "gh CLI
+// unavailable", so three different causes wore the same sentence — a typo'd
+// number, gh answering with an error, and the REST fallback returning a shape
+// the caller cannot parse. Only the first of those is an environment this repo
+// accepts (#489), and only it may reduce the issue's checks to SKIP.
+describe("classifyIssueLookupFailure", () => {
+	it("SKIPs when the gh binary itself is missing", () => {
+		const enoent = Object.assign(new Error("spawn gh ENOENT"), {
+			code: "ENOENT",
+		});
+		const result = classifyIssueLookupFailure(enoent);
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /gh CLI unavailable/);
+	});
+
+	it("FAILs when gh ran and reported an error", () => {
+		const result = classifyIssueLookupFailure(
+			new Error("could not resolve to an Issue with the number 999999"),
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /999999/);
+	});
+
+	// The REST fallback path: gh is absent but a token is present, so execGh
+	// answers — with the wrong shape, and JSON.parse throws. Reported as gh
+	// being unavailable, this said the opposite of what happened.
+	it("FAILs when the response could not be parsed", () => {
+		const result = classifyIssueLookupFailure(
+			new SyntaxError("Unexpected token 'N', \"No body\" is not valid JSON"),
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /not valid JSON/);
+	});
+
+	it("says the lookup failed rather than naming a cause it does not know", () => {
+		const result = classifyIssueLookupFailure(new Error("boom"));
+		assert.doesNotMatch(result.detail, /gh CLI unavailable/);
+		assert.match(result.detail, /issue lookup failed/);
 	});
 });

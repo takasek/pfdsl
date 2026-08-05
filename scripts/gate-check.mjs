@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
 	classifyAuditIssuesFlowResult,
+	classifyIssueLookupFailure,
 	deriveManualItems,
 	diffNewTerminals,
 	diffReadySets,
@@ -38,6 +39,7 @@ import {
 	sizeDirectionStep,
 	wipTransitionStep,
 } from "./lib/gate-check-steps.mjs";
+import { parseIssueNumbers } from "./lib/issue-args.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
 
@@ -82,8 +84,15 @@ if (noArtifact && artifactKey) {
 // checks SKIP rather than guess which issue the cycle belongs to. Every issue
 // the cycle closes belongs here — judging one of them and reporting a single
 // verdict is what let a cycle turn green on the one issue that happened to have
-// a record (#734).
-const issueNumbers = (values.issue ?? []).map(Number);
+// a record (#734). A value that is not an issue number is refused here, not
+// coerced: NaN reaches gh and comes back as that issue's checks being
+// unavailable, which reads as a tool outage rather than a typo (#745).
+const parsedIssues = parseIssueNumbers(values.issue);
+if (!parsedIssues.ok) {
+	console.error(`gate-check: ${parsedIssues.message}`);
+	process.exit(2);
+}
+const issueNumbers = parsedIssues.numbers;
 
 // Every call names the executable and its arguments separately — `base` and
 // `artifactKey` come from argv and must never be parsed by a shell (#572).
@@ -248,8 +257,10 @@ results.push(
 
 // The linked issues, fetched once each for the two checks that read them.
 // execGh keeps the REST fallback that a bare `gh` call would lose in
-// environments without the binary (#489/#492); a failure degrades that issue's
-// checks to SKIP, not FAIL, and leaves the other issues judged on their own.
+// environments without the binary (#489/#492). Only that environment degrades
+// the issue's checks to SKIP — every other failure FAILs, because the check did
+// not run and a SKIP row is one nobody acts on (#745). Either way the other
+// issues stay judged on their own.
 const issues = [];
 for (const number of issueNumbers) {
 	try {
@@ -268,8 +279,12 @@ for (const number of issueNumbers) {
 				),
 			),
 		});
-	} catch {
-		issues.push({ number, issue: null, issueError: "gh CLI unavailable" });
+	} catch (e) {
+		issues.push({
+			number,
+			issue: null,
+			issueFailure: classifyIssueLookupFailure(e),
+		});
 	}
 }
 

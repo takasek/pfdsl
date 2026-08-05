@@ -203,10 +203,29 @@ describe("execGh", () => {
 			});
 		});
 
-		it("reads an issue body", async () => {
+		// `--json` alone: gh prints the object, so the fallback does too. This
+		// used to assert the bare body, which is what gh prints for `--jq .body`
+		// — the divergence that made the multi-field callers throw (#745).
+		it("reads an issue as the JSON object gh would print", async () => {
 			recordingFetch({ number: 612, body: "## 現象\n..." });
 			assert.equal(
 				await execGh(["issue", "view", "612", "--json", "body"]),
+				JSON.stringify({ body: "## 現象\n..." }),
+			);
+		});
+
+		it("reduces to the raw body for the --jq .body form", async () => {
+			recordingFetch({ number: 612, body: "## 現象\n..." });
+			assert.equal(
+				await execGh([
+					"issue",
+					"view",
+					"612",
+					"--json",
+					"body",
+					"--jq",
+					".body",
+				]),
 				"## 現象\n...",
 			);
 		});

@@ -4,8 +4,8 @@ import { describe, it } from "node:test";
 import {
 	fetchAllIssues,
 	fetchAllLabels,
+	fetchIssueView,
 	fetchOpenPrsWithCi,
-	getIssueBody,
 	mapCheckRunsToRollup,
 	mapIssuesResponse,
 	mapLabelsResponse,
@@ -409,21 +409,114 @@ describe("fetchAllIssues", () => {
 	});
 });
 
-describe("getIssueBody", () => {
-	it("returns the raw body text", async () => {
-		const fetchImpl = async () => jsonResponse({ body: "design TBD" });
-		assert.equal(
-			await getIssueBody("takasek", "pfdsl", "tok", 42, fetchImpl),
-			"design TBD",
+// #745: the fallback answered `issue view --json author,body,comments` with
+// the body text alone, so JSON.parse threw in the caller and the failure was
+// reported as gh being unavailable — in the one environment where the fallback
+// is the whole point of having gh-exec.
+describe("fetchIssueView", () => {
+	const issueApi = {
+		number: 42,
+		body: "design TBD",
+		user: { login: "takasek" },
+		created_at: "2026-08-01T00:00:00Z",
+	};
+
+	it("returns gh's --json field names, not the REST ones", async () => {
+		const fetchImpl = async () => jsonResponse(issueApi);
+		const result = await fetchIssueView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			42,
+			["author", "body", "createdAt"],
+			fetchImpl,
+		);
+		assert.deepEqual(result, {
+			author: { login: "takasek" },
+			body: "design TBD",
+			createdAt: "2026-08-01T00:00:00Z",
+		});
+	});
+
+	it("returns only the fields that were asked for", async () => {
+		const fetchImpl = async () => jsonResponse(issueApi);
+		const result = await fetchIssueView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			42,
+			["body"],
+			fetchImpl,
+		);
+		assert.deepEqual(result, { body: "design TBD" });
+	});
+
+	it("fetches comments from their own endpoint and maps them to gh's shape", async () => {
+		const urls = [];
+		const fetchImpl = async (url) => {
+			urls.push(url);
+			if (url.includes("/comments"))
+				return jsonResponse([
+					{
+						body: "前提: ...",
+						user: { login: "takasek" },
+						created_at: "2026-08-02T00:00:00Z",
+					},
+				]);
+			return jsonResponse(issueApi);
+		};
+		const result = await fetchIssueView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			42,
+			["comments"],
+			fetchImpl,
+		);
+		assert.deepEqual(result, {
+			comments: [
+				{
+					author: { login: "takasek" },
+					body: "前提: ...",
+					createdAt: "2026-08-02T00:00:00Z",
+				},
+			],
+		});
+		assert.ok(urls.some((u) => u.includes("/issues/42/comments")));
+	});
+
+	it("does not call the comments endpoint when comments were not asked for", async () => {
+		const urls = [];
+		const fetchImpl = async (url) => {
+			urls.push(url);
+			return jsonResponse(issueApi);
+		};
+		await fetchIssueView("takasek", "pfdsl", "tok", 42, ["body"], fetchImpl);
+		assert.ok(!urls.some((u) => u.includes("/comments")));
+	});
+
+	// Omitting an unknown field would hand the caller an object missing a key
+	// it asked for — the same silent shape mismatch this whole change is about.
+	it("refuses a field it cannot map rather than omitting it", async () => {
+		const fetchImpl = async () => jsonResponse(issueApi);
+		await assert.rejects(
+			() =>
+				fetchIssueView("takasek", "pfdsl", "tok", 42, ["milestone"], fetchImpl),
+			/milestone/,
 		);
 	});
 
 	it("returns empty string for a null body", async () => {
-		const fetchImpl = async () => jsonResponse({ body: null });
-		assert.equal(
-			await getIssueBody("takasek", "pfdsl", "tok", 42, fetchImpl),
-			"",
+		const fetchImpl = async () => jsonResponse({ ...issueApi, body: null });
+		const result = await fetchIssueView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			42,
+			["body"],
+			fetchImpl,
 		);
+		assert.deepEqual(result, { body: "" });
 	});
 });
 

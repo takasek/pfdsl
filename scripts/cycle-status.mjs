@@ -8,6 +8,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { runCycleStatus } from "./lib/cycle-status-steps.mjs";
+import { parseIssueNumbers } from "./lib/issue-args.mjs";
 import { run } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
 
@@ -35,8 +36,15 @@ try {
 const base = values.base ?? "main";
 // Repeatable: a cycle that closes several issues owes a record on each one, so
 // the preflight judges them all and the gate-check line it prints names them all
-// (#734).
-const issueNumbers = (values.issue ?? []).map(Number);
+// (#734). Rejected here rather than coerced, for the same reason parseArgs is
+// strict: a value this script reinterprets is a mode the caller did not ask for
+// (#745).
+const parsedIssues = parseIssueNumbers(values.issue);
+if (!parsedIssues.ok) {
+	console.error(`cycle-status: ${parsedIssues.message}`);
+	process.exit(2);
+}
+const issueNumbers = parsedIssues.numbers;
 
 // `base` comes from argv; naming the executable and arguments separately keeps
 // it out of a shell (#572).
@@ -55,6 +63,6 @@ const result = await runCycleStatus({
 console.log(JSON.stringify(result, null, 2));
 
 // Non-zero so a caller that only reads the exit status still stops: the payload
-// carries no judgments in this case, and an old tree's preflight is exactly the
-// output a reader mistakes for "checked, nothing wrong" (#716).
-if (result.staleTree) process.exit(1);
+// carries no judgments in either case, and such a preflight is exactly the
+// output a reader mistakes for "checked, nothing wrong" (#716, #744).
+if (result.staleTree || result.dirtyTree) process.exit(1);

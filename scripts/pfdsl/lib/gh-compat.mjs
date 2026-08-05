@@ -71,7 +71,27 @@ export function planGhRestCall(args) {
 		};
 	}
 	if (cmd === "issue" && sub === "view") {
-		return { op: "getIssueBody", number: Number(rest[0]) };
+		// One op for both shapes. `--jq .field` reduces gh's output to that
+		// field's value; without it gh prints the JSON object and the caller
+		// parses it. Answering both with the body alone is what made the
+		// object-shaped callers throw inside a catch that blamed a missing gh
+		// (#745), and answering `--jq` from a second REST path would leave two
+		// ways to ask the same question.
+		const json = flagValue(rest, "--json");
+		if (!json) return null;
+		const plan = {
+			op: "viewIssue",
+			number: Number(rest[0]),
+			fields: json.split(","),
+		};
+		const jq = flagValue(rest, "--jq");
+		if (jq === undefined) return plan;
+		// Only a bare `.field` naming one of the requested fields is something
+		// this layer can evaluate. Anything else is a jq program, and guessing
+		// at it would answer a question that was not asked.
+		const field = /^\.(\w+)$/.exec(jq)?.[1];
+		if (!field || !plan.fields.includes(field)) return null;
+		return { ...plan, jqField: field };
 	}
 	if (cmd === "pr" && sub === "list") {
 		return { op: "listOpenPrsWithCi" };

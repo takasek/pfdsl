@@ -121,6 +121,31 @@ describe("entry scripts reject argv they do not understand", () => {
 		assert.match(stderr, /Usage/);
 	});
 
+	// Strict parsing accepts any string for a `type: "string"` flag, so a value
+	// that is not an issue number passes the parse and becomes NaN downstream.
+	// `gh issue view NaN` then fails, and the failure is reported as the issue's
+	// checks being unavailable — a row that reads like a tool outage rather than
+	// a typo, on a table whose other rows are green (#745).
+	for (const script of ["scripts/gate-check.mjs", "scripts/cycle-status.mjs"]) {
+		for (const value of ["abc", "#744", "744.5", ""]) {
+			it(`${script} rejects --issue ${JSON.stringify(value)}`, () => {
+				const { status, stderr } = runScript(script, ["--issue", value]);
+				assert.equal(status, 2);
+				assert.match(stderr, /--issue/);
+			});
+		}
+
+		it(`${script} names the offending --issue value`, () => {
+			const { stderr } = runScript(script, [
+				"--issue",
+				"744",
+				"--issue",
+				"abc",
+			]);
+			assert.match(stderr, /abc/);
+		});
+	}
+
 	// Mutual exclusion is a script-level rule that strict parsing does not
 	// replace (#564) — it still has to hold for the separated form.
 	it("gate-check.mjs still rejects --artifact together with --no-artifact", () => {

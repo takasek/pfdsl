@@ -3,6 +3,8 @@
  * Process/git I/O lives in the main script; this module stays testable.
  */
 
+import { isGhUnavailableError } from "../pfdsl/lib/gh-compat.mjs";
+
 /**
  * @param {string[]} files
  * @param {RegExp} pattern
@@ -61,6 +63,35 @@ export const NO_ARTIFACT_DETAIL =
 /** Shared by both checks that read the linked issue, for the same reason. */
 export const NO_ISSUE_DETAIL =
 	"no --issue given; pass --issue <n> to check this against the linked issue";
+
+/**
+ * Why an issue lookup failed, and what that costs the issue's rows.
+ *
+ * Every failure used to read "gh CLI unavailable", which is true of exactly one
+ * of them. The other two — gh running and answering with an error, and the REST
+ * fallback returning a shape JSON.parse rejects — wore a sentence naming a
+ * cause that was not theirs, and took a SKIP that the reader had every reason
+ * to attribute to their environment (#745).
+ *
+ * Only a missing binary degrades to SKIP, matching the vocabulary
+ * classifyAuditIssuesFlowResult already uses for the same environment (#489):
+ * a repo whose sessions have no gh cannot be asked to fail on its absence.
+ * Anything else FAILs — the check did not run, and a row nobody acts on is how
+ * that goes unnoticed for a whole cycle.
+ * @param {{code?: string, message?: string}} error
+ * @returns {{status: 'SKIP'|'FAIL', detail: string}}
+ */
+export function classifyIssueLookupFailure(error) {
+	// The same predicate execGh uses to decide whether a REST fallback is even
+	// possible, rather than a second spelling of ENOENT that could drift from it.
+	if (isGhUnavailableError(error)) {
+		return { status: "SKIP", detail: "gh CLI unavailable" };
+	}
+	return {
+		status: "FAIL",
+		detail: `issue lookup failed: ${error?.message ?? String(error)}`,
+	};
+}
 
 /**
  * Classify the output-artifact status-update gate (item 6). No new states:
