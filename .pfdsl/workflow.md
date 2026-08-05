@@ -159,6 +159,13 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 `.claude/agents/` の agent に worktree 作成を含むフローを委譲する場合、`superpowers:using-git-worktrees` skill の Step 0（既存 isolation 検出時は再利用）を素通しにしない。subagent は呼び出し元セッションが使用中の worktree 内で起動されることがあり、Step 0 はその共有 worktree を「既存の分離ワークスペース」と誤認識して乗っ取る（issue #439 の issue-worker 試走で発生。呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねない）。agent 定義側で「Step 0 をバイパスし常に新規 worktree を作成する」旨を明記する（例: `.claude/agents/issue-worker.md`）。
 
+## agent を追加するサイクルの動作確認
+
+新規に追加した `.claude/agents/` の agent は、それを追加したセッションからは起動できない。
+agent レジストリはセッション開始時に読まれるため、`Agent` tool は追加直後のファイルを認識せず `Agent type '<name>' not found` を返す（#754 で実測）。
+「壊した状態を作って呼び、報告を生ログと照合する」型の受け入れ基準は、そのサイクル内では満たせない。
+検証は次セッションで行い、サイクルは未了である旨を PR 本文に明示して閉じる。
+
 ## 委譲先の外向き操作の制御（3層）
 
 3層の**原則**は配布層（pfd-ops `references/work-cycle.md` 手順2）が一次情報（#558 で昇格）。
