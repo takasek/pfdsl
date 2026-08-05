@@ -511,6 +511,14 @@ export interface ReadyOptions {
 }
 
 /**
+ * Whether an input artifact stops gating its consumers. An omitted status
+ * counts as satisfied — a roadmap that tracks status on only some artifacts
+ * must not have the untracked ones read as unfinished.
+ */
+const inputSatisfied = (status: string | undefined): boolean =>
+	status === "done" || status === undefined;
+
+/**
  * Core ready-process algorithm operating on pre-analyzed data.
  * "Ready" = all input artifacts done/undefined AND at least one output still actionable (not done/wip/suspended/waiting).
  * Returns processInputs and processOutputs maps in addition to readyIds so
@@ -533,10 +541,9 @@ function computeReadyIdsCore(
 	const readyIds: string[] = [];
 	for (const [pid, inputs] of processInputs) {
 		if (nodeKinds.get(pid) !== "process") continue;
-		const allInputsDone = inputs.every((aid) => {
-			const s = artifactMeta[aid]?.status;
-			return s === "done" || s === undefined;
-		});
+		const allInputsDone = inputs.every((aid) =>
+			inputSatisfied(artifactMeta[aid]?.status),
+		);
 		if (!allInputsDone) continue;
 		const outputs = processOutputs.get(pid) ?? [];
 		const outputsInert =
@@ -575,6 +582,62 @@ function computeReadyIds(src: string): {
 	const artifactMeta = frontmatter?.artifact ?? {};
 	const { readyIds } = computeReadyIdsCore(edges, nodeKinds, artifactMeta);
 	return { readyIds, isRoadmap: true, warnings };
+}
+
+/**
+ * Explain why the ready set came out empty.
+ * Every cause is legitimate — the sole process already being wip is the one a
+ * freshly adopted roadmap hits first — but the bare "Check artifact statuses"
+ * hint reads as if the statuses had been mistyped, so it sent readers looking
+ * for a fault that was not there (#710). Each non-ready process falls into one
+ * bucket: blocked on its inputs, or (inputs done) named by whichever output
+ * status is holding it.
+ */
+function emptyReadyText(
+	file: string,
+	processInputs: Map<string, string[]>,
+	processOutputs: Map<string, string[]>,
+	nodeKinds: ReturnType<typeof analyze>["nodeKinds"],
+	artifactMeta: NonNullable<
+		ReturnType<typeof analyze>["frontmatter"]
+	>["artifact"] &
+		object,
+): string {
+	const statusOf = (aid: string) => artifactMeta[aid]?.status;
+	const inProgress: string[] = [];
+	const parked: string[] = [];
+	let complete = 0;
+	let blocked = 0;
+	for (const [pid, inputs] of processInputs) {
+		if (nodeKinds.get(pid) !== "process") continue;
+		const isBlocked = inputs.some((aid) => !inputSatisfied(statusOf(aid)));
+		if (isBlocked) {
+			blocked++;
+			continue;
+		}
+		const outputStatuses = (processOutputs.get(pid) ?? []).map(statusOf);
+		if (outputStatuses.includes("wip")) inProgress.push(pid);
+		else if (outputStatuses.some((s) => s === "waiting" || s === "suspended"))
+			parked.push(pid);
+		else if (outputStatuses.length > 0) complete++;
+	}
+	inProgress.sort(compareIds);
+	parked.sort(compareIds);
+
+	const lines: string[] = [];
+	if (inProgress.length > 0)
+		lines.push(`  in progress (outputs wip): ${inProgress.join(", ")}`);
+	if (parked.length > 0)
+		lines.push(`  parked (outputs waiting/suspended): ${parked.join(", ")}`);
+	if (complete > 0) lines.push(`  complete: ${complete}`);
+	if (blocked > 0)
+		lines.push(
+			`  blocked: ${blocked} — run \`pfdsl status blocked ${file}\` for what each is waiting on`,
+		);
+
+	if (lines.length === 0)
+		return "No ready processes. Check artifact statuses.\n";
+	return `No ready processes.\n${lines.join("\n")}\n`;
 }
 
 export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
@@ -632,8 +695,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 					const otherInputsAllDone =
 						processInputs.get(consumer)?.every((inp) => {
 							if (outputs.has(inp)) return true; // pid will satisfy this
-							const s = artifactMeta[inp]?.status;
-							return s === "done" || s === undefined;
+							return inputSatisfied(artifactMeta[inp]?.status);
 						}) ?? true;
 					if (otherInputsAllDone) unlocked.add(consumer);
 				}
@@ -675,7 +737,16 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	}
 
 	if (readyItems.length === 0) {
-		return ok("No ready processes. Check artifact statuses.\n", warnText);
+		return ok(
+			emptyReadyText(
+				file,
+				processInputs,
+				processOutputs,
+				nodeKinds,
+				artifactMeta,
+			),
+			warnText,
+		);
 	}
 
 	const lines: string[] = [`Ready processes (${readyItems.length}):`];
@@ -799,10 +870,9 @@ export function runStatusBlocked(
 	const blockedItems: StatusBlockedItem[] = [];
 	for (const [pid, inputs] of processInputs) {
 		if (nodeKinds.get(pid) !== "process") continue;
-		const blockedBy = inputs.filter((aid) => {
-			const s = artifactMeta[aid]?.status;
-			return s !== "done" && s !== undefined;
-		});
+		const blockedBy = inputs.filter(
+			(aid) => !inputSatisfied(artifactMeta[aid]?.status),
+		);
 		if (blockedBy.length === 0) continue;
 		blockedItems.push({
 			id: pid,

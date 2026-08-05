@@ -1629,6 +1629,54 @@ describe("status ready", () => {
 		);
 		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("No ready processes.");
+		expect(r.stdout).not.toContain("design");
+	});
+
+	it("says how many processes are blocked and where to list them", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: todo\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("blocked: 1");
+		expect(r.stdout).toContain(`status blocked ${f}`);
+	});
+
+	it("names the processes that are already in progress", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: wip\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("in progress");
+		expect(r.stdout).toContain("design");
+		expect(r.stdout).not.toContain("Check artifact statuses.");
+	});
+
+	it("names the processes parked on waiting or suspended outputs", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: waiting\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("parked");
+		expect(r.stdout).toContain("design");
+	});
+
+	it("counts the processes whose outputs are all done", async () => {
+		const f = withStatus(
+			"---\nartifact:\n  req:\n    status: done\n  spec:\n    status: done\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["status", "ready", f]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("complete: 1");
+	});
+
+	it("keeps the generic hint when nothing can be classified", async () => {
+		const f = withStatus("---\nartifact: {}\n---\nreq -> spec\n");
+		const r = await run(["status", "ready", f]);
+		expect(r.exitCode).toBe(0);
 		expect(r.stdout).toBe("No ready processes. Check artifact statuses.\n");
 	});
 
