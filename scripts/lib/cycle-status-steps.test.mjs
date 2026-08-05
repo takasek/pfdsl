@@ -183,7 +183,7 @@ describe("runCycleStatus", () => {
 		const calls = [];
 		const result = await runCycleStatus(
 			baseDeps({
-				issueNumber: 669,
+				issueNumbers: [669],
 				sh: (file, args) => {
 					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
 					return "";
@@ -197,15 +197,17 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.deepEqual(result.designUnsettledFor, {
-			issue: 669,
-			source: "flag",
-			unsettled: false,
-			reason: "no-enumerated-options",
-			matchedLines: [],
-			optionCount: 0,
-			decision: null,
-		});
+		assert.deepEqual(result.designUnsettledFor, [
+			{
+				issue: 669,
+				source: "flag",
+				unsettled: false,
+				reason: "no-enumerated-options",
+				matchedLines: [],
+				optionCount: 0,
+				decision: null,
+			},
+		]);
 		assert.equal(result.designUnsettledError, undefined);
 		assert.ok(calls.some((c) => c[0] === "issue" && c.includes("669")));
 		assert.ok(!calls.some((c) => c[0] === "issue" && c.includes("42")));
@@ -229,10 +231,78 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.equal(result.designUnsettledFor.issue, 42);
-		assert.equal(result.designUnsettledFor.source, "best-process");
-		assert.equal(result.designUnsettledFor.unsettled, true);
-		assert.equal(result.designUnsettledFor.reason, "phrase");
+		assert.equal(result.designUnsettledFor.length, 1);
+		assert.equal(result.designUnsettledFor[0].issue, 42);
+		assert.equal(result.designUnsettledFor[0].source, "best-process");
+		assert.equal(result.designUnsettledFor[0].unsettled, true);
+		assert.equal(result.designUnsettledFor[0].reason, "phrase");
+	});
+
+	it("judges every issue the cycle closes, not just the first", async () => {
+		const bodies = {
+			667: "普通の説明文。",
+			668: "## 対応案\n1. 案A\n2. 案B\n",
+		};
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [667, 668],
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({ author: "owner", body: bodies[args[2]] });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(
+			result.designUnsettledFor.map((d) => [d.issue, d.unsettled]),
+			[
+				[667, false],
+				[668, true],
+			],
+		);
+	});
+
+	it("keeps the issues it could read when one lookup throws", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [667, 668],
+				execGh: async (args) => {
+					if (args[0] === "issue") {
+						if (args[2] === "668") throw new Error("gh: issue not found");
+						return issueJson({ author: "owner", body: "普通の説明文。" });
+					}
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(
+			result.designUnsettledFor.map((d) => d.issue),
+			[667],
+		);
+		assert.equal(result.designUnsettledError, "gh: issue not found");
+	});
+
+	it("builds a gate-check command naming every issue the cycle closes", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [667, 668],
+				sh: (file, args) => {
+					if (args.includes(CLI_PATH))
+						return JSON.stringify({
+							ok: true,
+							ready: [{ id: "a" }],
+							best: { id: "a", outputs: ["art_a"] },
+						});
+					return "";
+				},
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({ author: "owner", body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.match(result.gateCheckCommand, /--issue 667 --issue 668$/);
 	});
 
 	it("reports the current branch and how far HEAD leads the base", async () => {
@@ -273,7 +343,7 @@ describe("runCycleStatus", () => {
 	it("emits the design-record template with the issue's enumerated option count", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				issueNumber: 721,
+				issueNumbers: [721],
 				execGh: async (args) => {
 					if (args[0] === "issue") {
 						return issueJson({
@@ -293,7 +363,7 @@ describe("runCycleStatus", () => {
 
 	it("emits the design-record template even when no issue could be resolved", async () => {
 		const result = await runCycleStatus(baseDeps({}));
-		assert.equal(result.designUnsettledFor, null);
+		assert.deepEqual(result.designUnsettledFor, []);
 		assert.ok(result.designRecordTemplate.lines.length > 0);
 		assert.equal(
 			result.designRecordTemplate.lines.some((l) => l.includes("処分")),
@@ -315,7 +385,7 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.equal(result.designUnsettledFor, null);
+		assert.deepEqual(result.designUnsettledFor, []);
 		assert.equal(
 			result.designUnsettledError,
 			"no --issue given and no best process to resolve an issue number from",
@@ -333,7 +403,7 @@ describe("runCycleStatus", () => {
 				readFileSync: () => "processes:\n  proc_a:\n    label: x\n",
 			}),
 		);
-		assert.equal(result.designUnsettledFor, null);
+		assert.deepEqual(result.designUnsettledFor, []);
 		assert.equal(
 			result.designUnsettledError,
 			"no issue number found for process 'proc_a' in .pfdsl/roadmap.pfdsl",
@@ -343,14 +413,14 @@ describe("runCycleStatus", () => {
 	it("returns a null designUnsettledFor with the gh error when the gh issue lookup throws", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
-				issueNumber: 669,
+				issueNumbers: [669],
 				execGh: async (args) => {
 					if (args[0] === "issue") throw new Error("gh: issue not found");
 					return JSON.stringify([]);
 				},
 			}),
 		);
-		assert.equal(result.designUnsettledFor, null);
+		assert.deepEqual(result.designUnsettledFor, []);
 		assert.equal(result.designUnsettledError, "gh: issue not found");
 	});
 

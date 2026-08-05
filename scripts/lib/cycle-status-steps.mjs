@@ -31,7 +31,7 @@ import {
  *   readFileSync: (path: string, encoding: string) => string,
  *   root: string,
  *   base: string,
- *   issueNumber?: number | null,
+ *   issueNumbers?: number[],
  * }} deps
  */
 export async function runCycleStatus({
@@ -41,7 +41,7 @@ export async function runCycleStatus({
 	readFileSync,
 	root,
 	base,
-	issueNumber = null,
+	issueNumbers = [],
 }) {
 	let fetched = true;
 	try {
@@ -141,15 +141,18 @@ export async function runCycleStatus({
 			"packages/cli/dist/cli.js not built; run 'pnpm -r build' first";
 	}
 
-	// Target issue resolution order: an explicit --issue flag wins; otherwise
+	// Target issue resolution order: explicit --issue flags win; otherwise
 	// fall back to the best process's roadmap-declared issue. Neither present
-	// means the design-settlement check has nothing to look at (#669).
-	let designUnsettledFor = null;
+	// means the design-settlement check has nothing to look at (#669). The flag
+	// is repeatable because a cycle can close several issues, and judging one of
+	// them is what let the terminal gate turn green on the one issue that had a
+	// record (#734).
+	const designUnsettledFor = [];
 	let designUnsettledError = null;
-	let targetIssue = null;
+	let targetIssues = [];
 	let targetSource = null;
-	if (issueNumber != null) {
-		targetIssue = issueNumber;
+	if (issueNumbers.length > 0) {
+		targetIssues = issueNumbers;
 		targetSource = "flag";
 	} else if (best) {
 		try {
@@ -159,7 +162,7 @@ export async function runCycleStatus({
 			);
 			const found = findIssueNumberForProcess(roadmapText, best);
 			if (found) {
-				targetIssue = found;
+				targetIssues = [found];
 				targetSource = "best-process";
 			} else {
 				designUnsettledError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
@@ -173,42 +176,49 @@ export async function runCycleStatus({
 	// is 0 otherwise. The template itself is emitted either way: a cycle whose
 	// issue lookup failed still owes a record, and printing nothing is what left
 	// the format invisible at writing time in the first place (#720).
+	// The count shown is the largest across the cycle's issues: a record is owed
+	// on each one separately, and the template is written once.
 	let recordOptionCount = 0;
 
-	if (targetIssue != null) {
-		try {
-			const issueJson = JSON.parse(
-				await execGh([
-					"issue",
-					"view",
-					String(targetIssue),
-					"--json",
-					"author,body,comments",
-				]),
-			);
-			recordOptionCount = detectEnumeratedOptions(issueJson.body).count;
-			const ownerLogin = issueJson.author?.login;
-			const comments = (issueJson.comments ?? []).map((c) => ({
-				author: c.author?.login,
-				body: c.body,
-				createdAt: c.createdAt,
-			}));
-			const classification = classifyDesignSettlement({
-				body: issueJson.body,
-				ownerLogin,
-				comments,
-			});
-			designUnsettledFor = {
-				issue: targetIssue,
-				source: targetSource,
-				unsettled: classification.unsettled,
-				reason: classification.reason,
-				matchedLines: classification.matchedLines ?? [],
-				optionCount: classification.optionCount ?? 0,
-				decision: classification.decision ?? null,
-			};
-		} catch (e) {
-			designUnsettledError = e.message;
+	if (targetIssues.length > 0) {
+		for (const targetIssue of targetIssues) {
+			try {
+				const issueJson = JSON.parse(
+					await execGh([
+						"issue",
+						"view",
+						String(targetIssue),
+						"--json",
+						"author,body,comments",
+					]),
+				);
+				recordOptionCount = Math.max(
+					recordOptionCount,
+					detectEnumeratedOptions(issueJson.body).count,
+				);
+				const ownerLogin = issueJson.author?.login;
+				const comments = (issueJson.comments ?? []).map((c) => ({
+					author: c.author?.login,
+					body: c.body,
+					createdAt: c.createdAt,
+				}));
+				const classification = classifyDesignSettlement({
+					body: issueJson.body,
+					ownerLogin,
+					comments,
+				});
+				designUnsettledFor.push({
+					issue: targetIssue,
+					source: targetSource,
+					unsettled: classification.unsettled,
+					reason: classification.reason,
+					matchedLines: classification.matchedLines ?? [],
+					optionCount: classification.optionCount ?? 0,
+					decision: classification.decision ?? null,
+				});
+			} catch (e) {
+				designUnsettledError = e.message;
+			}
 		}
 	} else if (!designUnsettledError) {
 		designUnsettledError =
@@ -220,7 +230,7 @@ export async function runCycleStatus({
 	const gateCheckCommand = buildGateCheckCommand(
 		bestOutputs[0] ?? null,
 		base,
-		targetIssue,
+		targetIssues,
 	);
 
 	const result = {
