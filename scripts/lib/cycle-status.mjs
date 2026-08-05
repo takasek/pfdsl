@@ -250,16 +250,18 @@ export function classifyDesignSettlement({ body, ownerLogin, comments }) {
 /**
  * The gate-check invocation for this cycle. `--issue` is folded in for the
  * same reason `--artifact` is: the operator copies this line verbatim, so a
- * flag left out here is a check that silently SKIPs every cycle (#669).
+ * flag left out here is a check that silently SKIPs every cycle (#669). It is
+ * repeated per issue rather than folded into one value, because gate-check
+ * judges each issue on its own row (#734).
  * @param {string | null} artifactKey
  * @param {string} base
- * @param {number | null} [issueNumber]
+ * @param {number[]} [issueNumbers]
  * @returns {string | null}
  */
-export function buildGateCheckCommand(artifactKey, base, issueNumber = null) {
+export function buildGateCheckCommand(artifactKey, base, issueNumbers = []) {
 	if (!artifactKey) return null;
-	const issueFlag = issueNumber != null ? ` --issue ${issueNumber}` : "";
-	return `node scripts/gate-check.mjs --base ${base} --artifact ${artifactKey}${issueFlag}`;
+	const issueFlags = issueNumbers.map((n) => ` --issue ${n}`).join("");
+	return `node scripts/gate-check.mjs --base ${base} --artifact ${artifactKey}${issueFlags}`;
 }
 
 const DESIGN_UNSETTLED_PATTERNS = [/design TBD/i, /設計未確定/, /設計未合意/];
