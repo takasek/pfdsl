@@ -8,6 +8,7 @@ import {
 	designRecordStep,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
+	perIssueSteps,
 	reviewMeasurementStep,
 	sizeDirectionStep,
 	wipTransitionStep,
@@ -597,6 +598,59 @@ describe("sizeDirectionStep", () => {
 			deltas: grown,
 		});
 		assert.equal(result.status, "PASS");
+	});
+});
+
+describe("perIssueSteps", () => {
+	const step = ({ issue, issueError }) => ({
+		name: "a step",
+		status: issue ? "PASS" : "SKIP",
+		detail: issueError ?? issue?.body,
+	});
+
+	it("runs the step once per issue and names each row after its issue", () => {
+		const rows = perIssueSteps(step, [
+			{ number: 667, issue: { body: "one" } },
+			{ number: 668, issue: { body: "two" } },
+		]);
+		assert.deepEqual(rows, [
+			{ name: "a step (#667)", status: "PASS", detail: "one" },
+			{ name: "a step (#668)", status: "PASS", detail: "two" },
+		]);
+	});
+
+	it("keeps a per-issue verdict rather than collapsing to the first one", () => {
+		const rows = perIssueSteps(step, [
+			{ number: 667, issue: { body: "one" } },
+			{ number: 668, issue: null, issueError: "gh CLI unavailable" },
+		]);
+		assert.deepEqual(
+			rows.map((r) => r.status),
+			["PASS", "SKIP"],
+		);
+	});
+
+	it("falls back to the unlabelled single SKIP row when the cycle names no issue", () => {
+		const rows = perIssueSteps(step, []);
+		assert.deepEqual(rows, [
+			{ name: "a step", status: "SKIP", detail: undefined },
+		]);
+	});
+
+	it("passes the shared arguments through to every call", () => {
+		/** @type {unknown[]} */
+		const seen = [];
+		const spy = (args) => {
+			seen.push(args);
+			return { name: "s", status: "PASS" };
+		};
+		perIssueSteps(spy, [{ number: 1, issue: { body: "b" } }], {
+			base: "main",
+			deltas: [],
+		});
+		assert.equal(seen.length, 1);
+		assert.equal(seen[0].base, "main");
+		assert.deepEqual(seen[0].deltas, []);
 	});
 });
 
