@@ -186,6 +186,85 @@ async function fetchAllPages(
 }
 
 /**
+ * `gh issue view --json <fields>` field names, and how to read each one out of
+ * the REST issue payload. A field absent from here is one this fallback cannot
+ * answer, and fetchIssueView says so rather than omitting the key: an object
+ * missing a field the caller asked for is the silent shape mismatch that made
+ * the fallback unusable in the first place (#745).
+ *
+ * `comments` is not here — it comes from its own endpoint, below.
+ */
+const ISSUE_VIEW_FIELDS = {
+	author: (issue) => ({ login: issue.user?.login }),
+	body: (issue) => issue.body ?? "",
+	createdAt: (issue) => issue.created_at,
+	number: (issue) => issue.number,
+	state: (issue) => issue.state,
+	title: (issue) => issue.title,
+	url: (issue) => issue.html_url,
+};
+
+/**
+ * The REST equivalent of `gh issue view <n> --json <fields>`, shaped the way gh
+ * would have printed it so callers parse one thing either way.
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} token
+ * @param {number} issueNumber
+ * @param {string[]} fields gh's --json field names
+ * @param {typeof fetch} [fetchImpl]
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export async function fetchIssueView(
+	owner,
+	repo,
+	token,
+	issueNumber,
+	fields,
+	fetchImpl = proxyAwareFetch,
+) {
+	const unknown = fields.filter(
+		(f) => f !== "comments" && !(f in ISSUE_VIEW_FIELDS),
+	);
+	if (unknown.length > 0) {
+		throw new Error(
+			`gh REST fallback cannot answer 'issue view --json' field(s): ${unknown.join(", ")}`,
+		);
+	}
+
+	const result = {};
+	// The issue itself is only worth a request when something other than the
+	// comments was asked for.
+	if (fields.some((f) => f !== "comments")) {
+		const res = await request(
+			fetchImpl,
+			`${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}`,
+			{ headers: authHeaders({ token }) },
+		);
+		const issue = await res.json();
+		for (const field of fields) {
+			if (field !== "comments") result[field] = ISSUE_VIEW_FIELDS[field](issue);
+		}
+	}
+
+	if (fields.includes("comments")) {
+		const comments = await fetchAllPages(
+			fetchImpl,
+			(page) =>
+				`${API_ROOT}/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=${PER_PAGE}&page=${page}`,
+			token,
+		);
+		result.comments = comments.map((c) => ({
+			author: { login: c.user?.login },
+			body: c.body ?? "",
+			createdAt: c.created_at,
+		}));
+	}
+
+	return result;
+}
+
+/**
  * @param {string} owner
  * @param {string} repo
  * @param {string} token

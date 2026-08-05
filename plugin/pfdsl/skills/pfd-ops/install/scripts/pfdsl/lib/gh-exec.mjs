@@ -17,6 +17,7 @@ import {
 	editLabel,
 	fetchAllIssues,
 	fetchAllLabels,
+	fetchIssueView,
 	fetchOpenPrsWithCi,
 	getIssueBody,
 	parseHost,
@@ -90,6 +91,10 @@ async function runGhRestPlan(plan, cwd, token) {
 			return "";
 		case "getIssueBody":
 			return await getIssueBody(owner, repo, token, plan.number);
+		case "viewIssue":
+			return JSON.stringify(
+				await fetchIssueView(owner, repo, token, plan.number, plan.fields),
+			);
 		case "listOpenPrsWithCi":
 			return JSON.stringify(await fetchOpenPrsWithCi(owner, repo, token));
 		default:

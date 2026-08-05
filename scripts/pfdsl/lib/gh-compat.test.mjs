@@ -113,6 +113,29 @@ describe("planGhRestCall", () => {
 		assert.deepEqual(result, { op: "getIssueBody", number: 42 });
 	});
 
+	// Without --jq, gh prints the JSON object itself, and the callers that ask
+	// for several fields parse it. Mapping that to the body-only op handed them
+	// a string to JSON.parse, and the resulting throw was reported as gh being
+	// unavailable (#745).
+	it("issue view --json with several fields keeps the object shape", () => {
+		const result = planGhRestCall([
+			"issue",
+			"view",
+			"42",
+			"--json",
+			"author,body,comments,createdAt",
+		]);
+		assert.deepEqual(result, {
+			op: "viewIssue",
+			number: 42,
+			fields: ["author", "body", "comments", "createdAt"],
+		});
+	});
+
+	it("issue view without --json is not something the fallback can answer", () => {
+		assert.equal(planGhRestCall(["issue", "view", "42"]), null);
+	});
+
 	it("pr list", () => {
 		const result = planGhRestCall([
 			"pr",

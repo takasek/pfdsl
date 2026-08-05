@@ -71,7 +71,20 @@ export function planGhRestCall(args) {
 		};
 	}
 	if (cmd === "issue" && sub === "view") {
-		return { op: "getIssueBody", number: Number(rest[0]) };
+		// `--jq .body` reduces gh's output to the body text; without it gh prints
+		// the JSON object and the caller parses it. Answering both with the body
+		// alone is what made the object-shaped callers throw inside a catch that
+		// blamed a missing gh (#745).
+		const json = flagValue(rest, "--json");
+		if (!json) return null;
+		if (args.includes("--jq")) {
+			return { op: "getIssueBody", number: Number(rest[0]) };
+		}
+		return {
+			op: "viewIssue",
+			number: Number(rest[0]),
+			fields: json.split(","),
+		};
 	}
 	if (cmd === "pr" && sub === "list") {
 		return { op: "listOpenPrsWithCi" };
