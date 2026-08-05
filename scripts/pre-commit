@@ -5,12 +5,12 @@
 # it, so nothing changes even though biome exits non-zero (#596). --staged
 # scopes the check to the files this commit stages, so the paths live only in
 # biome.json's files.includes.
-# --error-on-warnings makes warning-severity diagnostics blocking (#742): by
-# default they print and exit 0, so they accumulate and drown the new ones.
-# Rules whose default severity is info are raised to warn in biome.json —
-# --error-on-warnings does not cover info.
-if ! pnpm biome check --staged --no-errors-on-unmatched --error-on-warnings; then
-  echo "Biome check failed on staged files. Run 'make format' to apply the mechanical fixes, resolve what remains, and re-stage."
+# scripts/check-biome.mjs fails on a diagnostic of any severity (#747). The
+# flags it replaced reached errors and, with --error-on-warnings, warnings
+# (#742) — info severity was covered by neither, so those diagnostics printed
+# and exited 0, accumulating until they drowned the new ones. The wrapper
+# reports the failure itself, including what to run.
+if ! node scripts/check-biome.mjs --staged --no-errors-on-unmatched; then
   exit 1
 fi
 
