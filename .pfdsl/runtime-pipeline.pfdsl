@@ -112,6 +112,18 @@ artifact:
     criteria: meta sortコマンドが実装され動作確認済み
     externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
     group: run_outputs
+  updated_source:
+    label: フィールド更新済みソース
+    description: 指定ノードの指定フィールドを書き換えた.pfdslテキスト。定義が無ければ新規に挿入する
+    criteria: meta setコマンドが実装され動作確認済み
+    externalStakeholders: [ CLIユーザー ]
+    group: run_outputs
+  reindexed_source:
+    label: index採番済みソース
+    description: トポロジ順に沿ってノードのindexフィールドを採番し直した.pfdslテキスト
+    criteria: meta reindexコマンドが実装され動作確認済み
+    externalStakeholders: [ CLIユーザー ]
+    group: run_outputs
   spec:
     label: 言語仕様書
     description: "workflow.pfdsl の maintain_spec が生産する。gen_skill・gen_plugin の一次ソースとして現れる"
@@ -324,9 +336,21 @@ process:
     tags: [ b ]
   sort_meta:
     label: ノード定義ソート
-    description: "frontmatterをyaml CSTとして再parseし、指定キーでノード定義を並べ替えたテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644。meta set・meta reindex・formatも同じ性質を持つ）"
+    description: "frontmatterをyaml CSTとして再parseし、指定キーでノード定義を並べ替えたテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
     command: node packages/cli/dist/cli.js meta sort
     location: ../packages/core/src/sort.ts
+    tags: [ b ]
+  set_meta:
+    label: フィールド更新
+    description: "frontmatterをyaml CSTとして再parseし、指定ノードの指定フィールドを書き換えたテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
+    command: node packages/cli/dist/cli.js meta set
+    location: ../packages/core/src/frontmatter-cst.ts
+    tags: [ b ]
+  reindex_meta:
+    label: index採番
+    description: "frontmatterをyaml CSTとして再parseし、トポロジ順に沿ってindexフィールドを採番し直したテキストを生成する（ADR-0034）。出力はソースの改行スタイル（LF/CRLF）を保つ（#644）"
+    command: node packages/cli/dist/cli.js meta reindex
+    location: ../packages/core/src/reindex.ts
     tags: [ b ]
   gen_skill:
     label: スキル生成
@@ -400,6 +424,10 @@ parsed_doc >> normalize -> normalized_graph
 pfdsl_source >> format -> formatted_source
 
 pfdsl_source >> sort_meta -> sorted_source
+
+pfdsl_source >> set_meta -> updated_source
+
+pfdsl_source >> reindex_meta -> reindexed_source
 
 [normalized_graph, parsed_doc] >> render_graph -> dot_graph
 
