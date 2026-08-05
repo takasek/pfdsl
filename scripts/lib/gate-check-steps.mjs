@@ -36,6 +36,7 @@ import {
 	classifyCycle,
 	mergeCycleRecords,
 	parseMeasurementRecords,
+	RECORD_SEP,
 } from "./review-measurement.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
@@ -422,7 +423,7 @@ export function reviewMeasurementStep({ exec, base, changedFiles }) {
 		"log",
 		"--no-merges",
 		`origin/${base}..HEAD`,
-		"--format=%B",
+		`--format=%B${RECORD_SEP}`,
 	]);
 	if (!bodies.ok) return { name, status: "FAIL", detail: bodies.out.trim() };
 

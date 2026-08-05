@@ -7,6 +7,7 @@ import {
 	FIELD_SEP,
 	IN_SAMPLE_PATH,
 	mergeCycleRecords,
+	parseMeasurementRecords,
 	parseMeasurementTrailer,
 	parseSinceArg,
 	RECORD_SEP,
@@ -106,6 +107,81 @@ describe("extractMeasurements", () => {
 				["aaa", "in"],
 				["bbb", "out"],
 			],
+		);
+	});
+});
+
+/** Commit messages as the callers hand them over: one blob, RECORD_SEP between. */
+const messages = (...bodies) => bodies.join(RECORD_SEP);
+
+describe("parseMeasurementRecords", () => {
+	it("reads a record whose paragraph is not the message's last", () => {
+		// The shape every commit in this repo actually has: the record sits in
+		// its own paragraph, with Co-Authored-By following after a blank line.
+		const records = parseMeasurementRecords(
+			messages(
+				"fix: something\n\nBody prose.\n\nRefs #757\n\nReview-Measurement: sample=in new=2 adopted=1\n\nCo-Authored-By: Someone <a@b>\n",
+			),
+		);
+		assert.equal(records.length, 1);
+		assert.equal(records[0].new, 2);
+	});
+
+	it("ignores prose that merely begins a line with the token (#726)", () => {
+		const records = parseMeasurementRecords(
+			messages(
+				"docs: explain the mechanism\n\nReview-Measurement: the rule states that the trailer cannot be added\nafterwards, since it is part of a commit message.\n\nRefs #726\n",
+			),
+		);
+		assert.deepEqual(records, []);
+	});
+
+	it("still reads the real record when the same commit also discusses it", () => {
+		const records = parseMeasurementRecords(
+			messages(
+				"docs: explain the mechanism\n\nReview-Measurement: the rule states that the trailer cannot be added\nafterwards, since it is part of a commit message.\n\nReview-Measurement: sample=out\n",
+			),
+		);
+		assert.equal(records.length, 1);
+		assert.equal(records[0].sample, "out");
+	});
+
+	it("crosses a bare issue reference, which carries no colon", () => {
+		// `Refs #603` is how this repo writes the reference, and one commit put
+		// it between the record and Co-Authored-By. Stopping at it dropped a
+		// genuine record (found by replaying the parser over origin/main).
+		const records = parseMeasurementRecords(
+			messages(
+				"refactor: something\n\nBody prose.\n\nReview-Measurement: sample=in new=2 adopted=2\n\nRefs #603\n\nCo-Authored-By: Someone <a@b>\n",
+			),
+		);
+		assert.equal(records.length, 1);
+		assert.equal(records[0].adopted, 2);
+	});
+
+	it("reads both passes when one commit recorded twice", () => {
+		const records = parseMeasurementRecords(
+			messages(
+				"fix: two passes\n\nReview-Measurement: sample=in new=1 adopted=1\nReview-Measurement: sample=out\n",
+			),
+		);
+		assert.deepEqual(
+			records.map((r) => r.sample),
+			["in", "out"],
+		);
+	});
+
+	it("keeps commits apart, so one message's prose cannot end another's region", () => {
+		const records = parseMeasurementRecords(
+			messages(
+				"fix: a\n\nReview-Measurement: sample=in new=1 adopted=0\n",
+				"docs: b\n\nTrailing prose with no record at all.\n",
+				"fix: c\n\nReview-Measurement: sample=out\n",
+			),
+		);
+		assert.deepEqual(
+			records.map((r) => r.sample),
+			["in", "out"],
 		);
 	});
 });
