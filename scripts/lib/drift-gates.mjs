@@ -50,6 +50,10 @@ export function buildGates({ stagedPresent }) {
 	const pfdslFiles = stagedPresent.filter((f) => OPS_PFDSL.test(f));
 	const mdFiles = stagedPresent.filter((f) => f.endsWith(".md"));
 
+	// Declaration order is load-bearing among the generator gates: gen-install
+	// rewrites .claude/skills/pfd-ops/install/, and the gen-plugin gates mirror
+	// that tree into plugin/. Running gen-plugin first would diff plugin/ against
+	// an install/ that is about to change.
 	return [
 		{
 			id: "pfdsl-snapshots",
