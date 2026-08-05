@@ -17,7 +17,10 @@
 // Usage (wired in .claude/settings.json): node scripts/main-commit-guard.mjs
 
 import { readStdinText } from "./lib/hook-io.mjs";
-import { runMainCommitGuard } from "./lib/main-commit-guard.mjs";
+import {
+	resolveCommandCwd,
+	runMainCommitGuard,
+} from "./lib/main-commit-guard.mjs";
 import { tryGit } from "./lib/run-exec.mjs";
 
 /**
@@ -25,7 +28,13 @@ import { tryGit } from "./lib/run-exec.mjs";
  * @returns {{currentBranch: string | undefined, mainBranch: string}}
  */
 function resolveBranches(payload) {
-	const cwd = payload?.cwd ?? process.cwd();
+	// The command's own tree, not the shell's: a `cd` or `git -C` in the command
+	// decides where the commit lands, and the hook runs before either takes
+	// effect (#751).
+	const cwd = resolveCommandCwd(
+		payload?.tool_input?.command,
+		payload?.cwd ?? process.cwd(),
+	);
 	const current = tryGit(["branch", "--show-current"], { cwd });
 	const head = tryGit(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], {
 		cwd,

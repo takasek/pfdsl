@@ -12,6 +12,7 @@
 // payload does not carry it — the hook wrapper resolves it once via `git
 // branch --show-current` and this stays a pure function.
 
+import { resolve } from "node:path";
 import {
 	gitSubcommand,
 	splitSegments,
@@ -36,6 +37,67 @@ export function isGitCommitCommand(command) {
 		if (gitSubcommand(tokens) === "commit") return true;
 	}
 	return false;
+}
+
+/** A path this layer can resolve without running a shell. */
+function staticPath(token) {
+	if (!token) return null;
+	if (token.quoted) return token.value;
+	return /[$~*?`]/.test(token.value) ? null : token.value;
+}
+
+/**
+ * The directory the commit in `command` actually runs in.
+ *
+ * A PreToolUse hook fires before the shell does, so `payload.cwd` is where the
+ * shell stands now — not where a `cd` in the command itself will put it. That
+ * gap ran both ways (#751): `cd <worktree> && git commit` was denied as a
+ * commit on main while it landed on a feature branch, and the inverse form
+ * committed to main from a worktree session without the guard noticing. `git
+ * -C <path>` bypassed it outright, since nothing looked at the flag.
+ *
+ * Anything the layer cannot resolve statically — a variable, a `~`, a bare
+ * `cd` — falls back to the hook's cwd rather than being guessed at, which
+ * leaves the guard exactly as accurate as it was before for those forms. An
+ * absolute `cd` afterwards restores the trail, since it does not depend on
+ * where the unresolvable one led.
+ * @param {string} command
+ * @param {string} hookCwd payload.cwd
+ * @returns {string}
+ */
+export function resolveCommandCwd(command, hookCwd) {
+	if (typeof command !== "string") return hookCwd;
+
+	/** Where the shell stands, or null once a `cd` moved it somewhere unknown. */
+	let cwd = hookCwd;
+
+	for (const segment of splitSegments(command)) {
+		const tokens = stripLeadingNoise(tokenize(segment));
+		if (tokens.length === 0 || tokens[0].quoted) continue;
+		const head = tokens[0].value;
+
+		if (head === "cd") {
+			const target = tokens.length === 2 ? staticPath(tokens[1]) : null;
+			if (target === null) cwd = null;
+			// An absolute target ignores whatever came before it, so a trail lost
+			// to an unresolvable `cd` is known again from here on.
+			else if (target.startsWith("/")) cwd = resolve(target);
+			else if (cwd !== null) cwd = resolve(cwd, target);
+			continue;
+		}
+
+		if (head !== "git" || gitSubcommand(tokens) !== "commit") continue;
+
+		// `git -C` decides the tree regardless of any cd before it.
+		const flag = tokens.findIndex(
+			(t, i) => i > 0 && !t.quoted && t.value === "-C",
+		);
+		const explicit = flag > 0 ? staticPath(tokens[flag + 1]) : null;
+		return explicit === null
+			? (cwd ?? hookCwd)
+			: resolve(cwd ?? hookCwd, explicit);
+	}
+	return cwd ?? hookCwd;
 }
 
 /**

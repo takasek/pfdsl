@@ -163,6 +163,43 @@ describe("planGhRestCall", () => {
 		assert.deepEqual(result, { op: "listOpenPrsWithCi" });
 	});
 
+	// The terminal gate reads the PR body to look for Size-Override, and used to
+	// call gh directly — so in a gh-less environment the body came back empty
+	// and read as "no override was written" (#749).
+	it("pr view --json body --jq .body, for the current branch's PR", () => {
+		const result = planGhRestCall([
+			"pr",
+			"view",
+			"--json",
+			"body",
+			"--jq",
+			".body",
+		]);
+		assert.deepEqual(result, {
+			op: "viewCurrentPr",
+			fields: ["body"],
+			jqField: "body",
+		});
+	});
+
+	it("pr view --json body keeps the object shape without --jq", () => {
+		assert.deepEqual(planGhRestCall(["pr", "view", "--json", "body"]), {
+			op: "viewCurrentPr",
+			fields: ["body"],
+		});
+	});
+
+	it("pr view naming an explicit PR is not the current-branch question", () => {
+		assert.equal(planGhRestCall(["pr", "view", "12", "--json", "body"]), null);
+	});
+
+	it("pr view with a --jq this layer cannot evaluate is unanswerable", () => {
+		assert.equal(
+			planGhRestCall(["pr", "view", "--json", "body", "--jq", ".title"]),
+			null,
+		);
+	});
+
 	it("returns null for an unrecognized argv shape", () => {
 		assert.equal(planGhRestCall(["repo", "view"]), null);
 	});

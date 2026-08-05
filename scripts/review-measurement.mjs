@@ -20,6 +20,7 @@ import {
 	mergeCycleRecords,
 	parseMeasurementRecords,
 	parseSinceArg,
+	RECORD_SEP,
 	summarize,
 	TARGET_SAMPLE_COUNT,
 } from "./lib/review-measurement.mjs";
@@ -73,8 +74,8 @@ for (const line of stepsResult.out.trim().split("\n").filter(Boolean)) {
 	const secondParent = parents.trim().split(/\s+/)[1];
 	// A merge's records live on its branch side; a direct commit carries its own.
 	const bodies = secondParent
-		? tryGit(["log", "--format=%B", `${sha}^1..${sha}^2`])
-		: tryGit(["log", "-1", "--format=%B", sha]);
+		? tryGit(["log", `--format=%B${RECORD_SEP}`, `${sha}^1..${sha}^2`])
+		: tryGit(["log", "-1", `--format=%B${RECORD_SEP}`, sha]);
 	if (!bodies.ok) continue;
 	const records = parseMeasurementRecords(bodies.out);
 	cycles.push({ sha, subject: subject.trim(), secondParent, records });

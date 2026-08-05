@@ -194,6 +194,24 @@ async function fetchAllPages(
  *
  * `comments` is not here — it comes from its own endpoint, below.
  */
+/**
+ * Refuse a `--json` field this fallback has no mapping for, rather than
+ * omitting it: an object missing a field the caller asked for is the silent
+ * shape mismatch that made the fallback unusable in the first place (#745).
+ * @param {string} verb gh's group and verb, for the message
+ * @param {string[]} fields gh's --json field names
+ * @param {Record<string, Function>} map the field map to check against
+ * @param {string[]} [alsoKnown] answerable fields that live outside the map
+ */
+function requireMappableFields(verb, fields, map, alsoKnown = []) {
+	const unknown = fields.filter((f) => !alsoKnown.includes(f) && !(f in map));
+	if (unknown.length > 0) {
+		throw new Error(
+			`gh REST fallback cannot answer '${verb} --json' field(s): ${unknown.join(", ")}`,
+		);
+	}
+}
+
 const ISSUE_VIEW_FIELDS = {
 	author: (issue) => ({ login: issue.user?.login }),
 	body: (issue) => issue.body ?? "",
@@ -223,14 +241,9 @@ export async function fetchIssueView(
 	fields,
 	fetchImpl = proxyAwareFetch,
 ) {
-	const unknown = fields.filter(
-		(f) => f !== "comments" && !(f in ISSUE_VIEW_FIELDS),
-	);
-	if (unknown.length > 0) {
-		throw new Error(
-			`gh REST fallback cannot answer 'issue view --json' field(s): ${unknown.join(", ")}`,
-		);
-	}
+	// `comments` is answerable but comes from its own endpoint, so it is not in
+	// the field map the rest are read from.
+	requireMappableFields("issue view", fields, ISSUE_VIEW_FIELDS, ["comments"]);
 
 	// The issue itself is only worth a request when something other than the
 	// comments was asked for, and the two endpoints are independent — the
@@ -267,6 +280,62 @@ export async function fetchIssueView(
 		}));
 	}
 
+	return result;
+}
+
+/**
+ * `gh pr view --json <fields>` field names, for the subset this fallback can
+ * answer. Same contract as ISSUE_VIEW_FIELDS: a field absent here is refused
+ * rather than omitted.
+ */
+const PR_VIEW_FIELDS = {
+	body: (pr) => pr.body ?? "",
+	headRefName: (pr) => pr.head?.ref,
+	number: (pr) => pr.number,
+	state: (pr) => pr.state,
+	title: (pr) => pr.title,
+	url: (pr) => pr.html_url,
+};
+
+/**
+ * The REST equivalent of `gh pr view --json <fields>` with no PR named — the
+ * form that asks about the current branch's open PR.
+ *
+ * gh resolves the branch itself; over REST the branch has to be handed in and
+ * looked up as a head ref. A branch with no open PR throws, matching gh's own
+ * non-zero exit: the terminal gate distinguishes "no Size-Override written"
+ * from "the body could not be read", and an empty body for the second case is
+ * what collapsed them (#749).
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} token
+ * @param {string} branch head ref of the PR to find
+ * @param {string[]} fields gh's --json field names
+ * @param {typeof fetch} [fetchImpl]
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export async function fetchCurrentPrView(
+	owner,
+	repo,
+	token,
+	branch,
+	fields,
+	fetchImpl = proxyAwareFetch,
+) {
+	requireMappableFields("pr view", fields, PR_VIEW_FIELDS);
+
+	const head = encodeURIComponent(`${owner}:${branch}`);
+	const prs = await request(
+		fetchImpl,
+		`${API_ROOT}/repos/${owner}/${repo}/pulls?head=${head}&state=open`,
+		{ headers: authHeaders({ token }) },
+	).then((res) => res.json());
+
+	const [pr] = prs;
+	if (!pr) throw new Error(`no open pull request for branch '${branch}'`);
+
+	const result = {};
+	for (const field of fields) result[field] = PR_VIEW_FIELDS[field](pr);
 	return result;
 }
 
