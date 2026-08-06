@@ -20,6 +20,20 @@ const WORKFLOW = {
 	edges: [{ kind: "output", artifact: "retro_skill", process: "distill_ops" }],
 };
 
+const WORKFLOW_MULTI_LOCATION = {
+	frontmatter: {
+		artifact: {
+			retro_skill: {
+				location: [
+					"../.claude/skills/pfd-retro/",
+					"../.claude/skills/pfd-retro-patterns/",
+				],
+			},
+		},
+	},
+	edges: [{ kind: "output", artifact: "retro_skill", process: "distill_ops" }],
+};
+
 const PIPELINE = {
 	frontmatter: { artifact: {} },
 	edges: [{ kind: "input", artifact: "retro_skill", process: "gen_plugin" }],
@@ -77,5 +91,17 @@ describe("runSkillWiringCheck", () => {
 		);
 		assert.match(result.stderrLines.join("\n"), /distill_ops -> \[\.\.\.\]/);
 		assert.match(result.stderrLines.join("\n"), /\[\.\.\.\] >> gen_plugin/);
+	});
+
+	it("lists every location when an array-location artifact is reported", () => {
+		const result = runSkillWiringCheck(
+			deps({
+				workflow: WORKFLOW_MULTI_LOCATION,
+				pipeline: { frontmatter: {}, edges: [] },
+			}),
+		);
+		assert.equal(result.exitCode, 1);
+		assert.match(result.stderrLines[0], /pfd-retro\//);
+		assert.match(result.stderrLines[0], /pfd-retro-patterns\//);
 	});
 });

@@ -82,14 +82,16 @@ export function declarationLine(text, id) {
 
 /**
  * The distributed hand-written artifacts missing from one or both of the edges
- * that model them.
+ * that model them. `location` may be a scalar path or (per spec.md §15.8) an
+ * array of them — an artifact counts as bundled if any one of its locations
+ * is, since a single bundled entry is enough to need the wiring this checks.
  * @param {{
- *   artifacts: Record<string, {location?: string}>,
+ *   artifacts: Record<string, {location?: string | string[]}>,
  *   workflowEdges: Array<{kind: string, artifact: string, process: string}>,
  *   pipelineEdges: Array<{kind: string, artifact: string, process: string}>,
  *   mirrors: Array<object>,
  * }} input
- * @returns {Array<{id: string, location: string, missing: string[]}>}
+ * @returns {Array<{id: string, location: string | string[], missing: string[]}>}
  */
 export function findUnwiredSkills({
 	artifacts,
@@ -110,7 +112,11 @@ export function findUnwiredSkills({
 	const findings = [];
 	for (const [id, meta] of Object.entries(artifacts)) {
 		if (!meta?.location) continue;
-		if (!isBundledSource(repoRelative(meta.location), mirrors)) continue;
+		const locations = Array.isArray(meta.location)
+			? meta.location
+			: [meta.location];
+		if (!locations.some((loc) => isBundledSource(repoRelative(loc), mirrors)))
+			continue;
 		if (generated.has(id)) continue;
 
 		const missing = [];
