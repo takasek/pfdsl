@@ -5,7 +5,7 @@
 // scripts/pre-commit, can skip instead of trusting a leftover build from
 // before a source change (see #450).
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { isCliEntrypoint } from "./cli-entrypoint.mjs";
 
 function newestMtimeUnder(dir) {
@@ -23,7 +23,19 @@ function newestMtimeUnder(dir) {
 // distFile is stale if it's missing, or older than the newest file under
 // its sibling src/ directory. Fresh (false) if src/ doesn't exist to
 // compare against, since there's nothing to detect drift from.
+//
+// The path must be absolute. A relative one would be resolved against
+// process.cwd(), so a caller started from another directory asked about a
+// dist file under *that* tree, found nothing, and read "stale" — which the
+// drift gates spell as "skip this check and say so", printing a note and
+// exiting 0 (#771). Refusing is what makes that impossible: a call site that
+// forgets to resolve now crashes, where before it read as a passing run.
 export function isDistStale(distFile) {
+	if (!isAbsolute(distFile)) {
+		throw new Error(
+			`isDistStale needs an absolute path, got: ${distFile}. Resolve it against the repository root before asking.`,
+		);
+	}
 	if (!existsSync(distFile)) return true;
 	const srcDir = join(dirname(dirname(distFile)), "src");
 	if (!existsSync(srcDir)) return false;
@@ -40,5 +52,7 @@ if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 		console.error("Usage: node scripts/lib/dist-freshness.mjs <distFile>");
 		process.exit(2);
 	}
-	process.exit(isDistStale(distFile) ? 1 : 0);
+	// Argv paths stay cwd-relative, as a command line's paths are — the
+	// resolution happens here, at the boundary, rather than inside the rule.
+	process.exit(isDistStale(resolve(process.cwd(), distFile)) ? 1 : 0);
 }
