@@ -1,5 +1,5 @@
 ---
-tags: [target:check-script, method:sweep]
+tags: [method:widen-data, target:check-script]
 ---
 
 - **型が許す形の幅と、消費側が仮定した幅がずれる trap**: 型や仕様がスカラーと配列、ASCII と非 ASCII のように広い形を許していても、消費側のコードはリポに実在する狭い形だけを想定して書かれることがある。
