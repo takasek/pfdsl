@@ -286,7 +286,7 @@ artifact:
   bindings_pfd_retro:
     label: pfd-retro バインディング
     description: "pfd-retro が読むカタログ参照・配布物への finding 反映手続き・パターン追記の書式。sibling companion でなく独立ファイル（理由は bindings_pfd_ops と同じ）。このリポで検出した監査パターンの本体は持たず bindings/pfd-retro-patterns/ に1件1ファイルで置き、pfd-retro skill はこのファイルを全読せず scripts/retro-patterns.mjs で引く。タグ語彙の正準リストは持たない — tags サブコマンドの出力が語彙の実体"
-    criteria: 記載内容が現行の pfd-retro 運用と矛盾せず、カタログ参照先が実在し、パターン各ファイルが frontmatter の tags と冒頭一文の定義文を持つ
+    criteria: 記載内容が現行の pfd-retro 運用と矛盾せず、カタログ参照先が実在し、パターン各ファイルが frontmatter の tags を持つ
     location: [ bindings/pfd-retro.md, bindings/pfd-retro-patterns/ ]
     group: generation
     tags: [ distilled_doc ]
