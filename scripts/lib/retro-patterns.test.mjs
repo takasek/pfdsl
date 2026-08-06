@@ -8,6 +8,7 @@ import {
 	renderPatternFile,
 	selectByTag,
 	splitCatalog,
+	summaryOf,
 } from "./retro-patterns.mjs";
 
 describe("splitCatalog", () => {
@@ -48,8 +49,6 @@ describe("joinCatalog", () => {
 
 describe("pattern files", () => {
 	const pattern = {
-		summary:
-			"並行委譲した成果物同士の接合部は各委譲の受け入れ基準では検証されない。",
 		tags: ["delegation", "parallel-work"],
 		body: "- **並行委譲の接合部**: 冒頭の一文。\n  続きの行。",
 	};
@@ -59,7 +58,6 @@ describe("pattern files", () => {
 			renderPatternFile(pattern),
 			[
 				"---",
-				`summary: ${pattern.summary}`,
 				"tags: [delegation, parallel-work]",
 				"---",
 				"",
@@ -120,5 +118,25 @@ describe("searching", () => {
 			selectByTag(patterns, "nonexistent").map((p) => p.name),
 			["常時"],
 		);
+	});
+});
+
+describe("summaryOf", () => {
+	it("takes the sentence the bullet opens with, without the name", () => {
+		assert.equal(
+			summaryOf("- **並行委譲の接合部**: 冒頭の一文。\n  二文目は要らない。"),
+			"冒頭の一文。",
+		);
+	});
+
+	it("keeps a first sentence that runs past the end of its line", () => {
+		assert.equal(
+			summaryOf("- **名前**: 折り返す\n  一文。\n  次の文。"),
+			"折り返す 一文。",
+		);
+	});
+
+	it("falls back to the whole bullet when it has no sentence end", () => {
+		assert.equal(summaryOf("- **名前**: 句点のない一行"), "句点のない一行");
 	});
 });

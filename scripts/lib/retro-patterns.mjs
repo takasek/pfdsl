@@ -15,7 +15,6 @@ const PATTERN_HEAD = /^- \*\*(.+?)\*\*/;
 /** `---` fence, frontmatter, `---` fence, blank line, then the bullet. */
 const PATTERN_FILE = /^---\n([\s\S]*?)\n---\n\n([\s\S]*)$/;
 
-const SUMMARY_LINE = /^summary: (.*)$/m;
 const TAGS_LINE = /^tags: \[(.*)\]$/m;
 
 /**
@@ -61,22 +60,24 @@ export function joinCatalog(patterns) {
  * catalog bullet, unchanged.
  *
  * The bullet keeps its `- **name**:` head rather than being flattened into a
- * heading, and the name is not repeated in the frontmatter. Both follow from
- * the same decision: the file's body has to stay byte-identical to the slice
- * it came from, because that identity is the whole proof that the migration
- * lost nothing. A name in the frontmatter would be a second copy of something
- * the bullet already says.
- * @param {{summary: string, tags: string[], body: string}} pattern
+ * heading, and neither the name nor the summary is restated in the
+ * frontmatter. All of it follows from one decision: the file's body has to
+ * stay byte-identical to the slice it came from, because that identity is the
+ * whole proof that the migration lost nothing. Anything the bullet already
+ * says would be a second copy, free to go stale, and prose is not something a
+ * checker can compare against prose.
+ * @param {{tags: string[], body: string}} pattern
  * @returns {string}
  */
-export function renderPatternFile({ summary, tags, body }) {
-	return `---\nsummary: ${summary}\ntags: [${tags.join(", ")}]\n---\n\n${body}\n`;
+export function renderPatternFile({ tags, body }) {
+	return `---\ntags: [${tags.join(", ")}]\n---\n\n${body}\n`;
 }
 
 /**
- * A pattern file, back into its parts. The name comes from the bullet.
+ * A pattern file, back into its parts. The name comes from the bullet; the
+ * summary is summaryOf(body), not a field.
  * @param {string} text
- * @returns {{name: string, summary: string, tags: string[], body: string}}
+ * @returns {{name: string, tags: string[], body: string}}
  */
 export function parsePatternFile(text) {
 	const file = PATTERN_FILE.exec(text);
@@ -88,7 +89,6 @@ export function parsePatternFile(text) {
 	const tags = TAGS_LINE.exec(frontmatter)?.[1].trim() ?? "";
 	return {
 		name: head[1],
-		summary: SUMMARY_LINE.exec(frontmatter)?.[1] ?? "",
 		tags: tags === "" ? [] : tags.split(",").map((t) => t.trim()),
 		body,
 	};
@@ -135,4 +135,28 @@ export function selectByTag(patterns, tag) {
 	return patterns.filter(
 		(p) => p.tags.includes(tag) || p.tags.includes(ALWAYS_TAG),
 	);
+}
+
+/**
+ * The pattern's opening sentence, which by convention states what the pattern
+ * is.
+ *
+ * Derived rather than stored: a summary written into the frontmatter would be
+ * a second copy of this sentence, free to go stale when the body is edited,
+ * and prose against prose is not something a checker can compare. The cost is
+ * that a pattern cannot carry a summary that differs from how it opens — so
+ * the writing convention is that the first sentence is the definition.
+ * @param {string} body - a pattern's catalog bullet, head included.
+ * @returns {string}
+ */
+export function summaryOf(body) {
+	const text = body
+		.replace(PATTERN_HEAD, "")
+		.replace(/^[:：]\s*/, "")
+		.split("\n")
+		.map((line) => line.trim())
+		.join(" ")
+		.trim();
+	const end = text.indexOf("。");
+	return end === -1 ? text : text.slice(0, end + 1);
 }
