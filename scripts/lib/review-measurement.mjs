@@ -25,9 +25,6 @@ export const RECORD_SEP = "";
 const TRAILER = /^Review-Measurement:\s*(.+)$/m;
 const PAIR = /(\w+)=(?:"([^"]*)"|(\S+))/g;
 
-/** Substring for `git log --grep`, so git filters instead of us reading all of history. */
-export const TRAILER_GREP = "Review-Measurement:";
-
 /**
  * Paths whose change makes a cycle in-sample. Kept beside the parser so the
  * predicate has one anchor in code; the prose statement of the same rule lives
@@ -156,25 +153,6 @@ export function parseMeasurementRecords(text) {
 }
 
 /**
- * Extract one record per commit from a `git log` dump.
- * @param {string} logText - records separated by RECORD_SEP, `<sha>FIELD_SEP<body>` within each
- * @returns {Array<{sha: string}>}
- */
-export function extractMeasurements(logText) {
-	return logText
-		.split(RECORD_SEP)
-		.map((entry) => {
-			const [sha, body = ""] = entry.split(FIELD_SEP);
-			const record = parseMeasurementTrailer(body);
-			return record ? { sha: sha.trim(), ...record } : null;
-		})
-		.filter(Boolean);
-}
-
-/**
- * @param {Array<{sample?: string, new?: number, adopted?: number, error?: string}>} records
- */
-/**
  * Collapse one cycle's review passes into a single record.
  * A cycle commonly reviews more than once — the self review, the tool, then
  * the fixes the tool prompted — and each pass writes its own trailer. Counting
@@ -286,16 +264,6 @@ export function parseSinceArg(argv) {
 	if (values.since === undefined) return { since: undefined };
 	if (values.since === "") return { error: "--since needs a ref" };
 	return { since: values.since };
-}
-
-/**
- * How many trailers a cycle's commits carry. More than one is expected — a
- * cycle reviews more than once — and mergeCycleRecords folds them into one
- * record so the cycle is still counted once.
- * @param {string} text - the concatenated commit messages of one cycle
- */
-export function countMeasurementTrailers(text) {
-	return (text.match(/^Review-Measurement:/gm) ?? []).length;
 }
 
 /**

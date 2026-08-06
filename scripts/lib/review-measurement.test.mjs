@@ -2,9 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
 	classifyCycle,
-	countMeasurementTrailers,
-	extractMeasurements,
-	FIELD_SEP,
 	IN_SAMPLE_PATH,
 	mergeCycleRecords,
 	parseMeasurementRecords,
@@ -14,9 +11,6 @@ import {
 	summarize,
 	TARGET_SAMPLE_COUNT,
 } from "./review-measurement.mjs";
-
-const log = (...entries) =>
-	entries.map(([sha, body]) => `${sha}${FIELD_SEP}${body}`).join(RECORD_SEP);
 
 describe("parseMeasurementTrailer", () => {
 	it("returns null for a line that is not the trailer", () => {
@@ -73,41 +67,6 @@ describe("parseMeasurementTrailer", () => {
 			"Review-Measurement: sample=in new=1 adopted=3",
 		);
 		assert.match(r.error, /adopted/);
-	});
-});
-
-describe("extractMeasurements", () => {
-	it("finds the trailer anywhere in a multi-line commit body", () => {
-		const body =
-			"feat: something\n\nBody text.\n\nReview-Measurement: sample=in new=1 adopted=1\nRefs #561\n";
-		const found = extractMeasurements(log(["abc1234", body]));
-		assert.equal(found.length, 1);
-		assert.equal(found[0].sha, "abc1234");
-		assert.equal(found[0].new, 1);
-	});
-
-	it("returns nothing for commits without the trailer", () => {
-		assert.deepEqual(
-			extractMeasurements(log(["abc1234", "docs: no trailer here\n"])),
-			[],
-		);
-	});
-
-	it("keeps one record per commit across several commits", () => {
-		const found = extractMeasurements(
-			log(
-				["aaa", "x\n\nReview-Measurement: sample=in new=0 adopted=0\n"],
-				["bbb", "y\n\nReview-Measurement: sample=out\n"],
-				["ccc", "z\n"],
-			),
-		);
-		assert.deepEqual(
-			found.map((r) => [r.sha, r.sample]),
-			[
-				["aaa", "in"],
-				["bbb", "out"],
-			],
-		);
 	});
 });
 
@@ -285,25 +244,6 @@ describe("parseSinceArg", () => {
 
 	it("errors on a stray positional", () => {
 		assert.ok(parseSinceArg(["v1.0"]).error);
-	});
-});
-
-describe("countMeasurementTrailers", () => {
-	it("counts one trailer per cycle", () => {
-		assert.equal(
-			countMeasurementTrailers("body\nReview-Measurement: sample=out\n"),
-			1,
-		);
-	});
-
-	it("counts every trailer, so a cycle that recorded twice is visible", () => {
-		const text =
-			"a\nReview-Measurement: sample=in new=1 adopted=1\nb\nReview-Measurement: sample=out\n";
-		assert.equal(countMeasurementTrailers(text), 2);
-	});
-
-	it("counts none when the cycle recorded nothing", () => {
-		assert.equal(countMeasurementTrailers("just a commit body"), 0);
 	});
 });
 
