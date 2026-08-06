@@ -7,6 +7,7 @@ import {
 	joinCatalog,
 	parsePatternFile,
 	renderPatternFile,
+	select,
 	selectByTag,
 	splitCatalog,
 	summaryOf,
@@ -82,43 +83,34 @@ describe("pattern files", () => {
 	});
 });
 
-describe("searching", () => {
+describe("selectByTag", () => {
 	const patterns = [
-		{ name: "委譲A", tags: ["delegation", "parallel-work"] },
-		{ name: "委譲B", tags: ["delegation"] },
+		{ name: "委譲A", tags: ["method:delegate", "context:parallel-work"] },
+		{ name: "委譲B", tags: ["method:delegate"] },
 		{ name: "常時", tags: [ALWAYS_TAG] },
-		{ name: "無関係", tags: ["deletion"] },
+		{ name: "無関係", tags: ["method:remove"] },
 	];
 
 	it("lists the tags that exist, most used first", () => {
 		assert.deepEqual(collectTags(patterns), [
-			{ tag: "delegation", count: 2 },
+			{ tag: "method:delegate", count: 2 },
 			{ tag: ALWAYS_TAG, count: 1 },
-			{ tag: "deletion", count: 1 },
-			{ tag: "parallel-work", count: 1 },
+			{ tag: "context:parallel-work", count: 1 },
+			{ tag: "method:remove", count: 1 },
 		]);
 	});
 
-	it("includes the always-tagged patterns in every selection", () => {
+	it("unions the given tags rather than intersecting them", () => {
 		assert.deepEqual(
-			selectByTag(patterns, "delegation").map((p) => p.name),
-			["委譲A", "委譲B", "常時"],
+			selectByTag(patterns, ["method:delegate", "method:remove"]).map(
+				(p) => p.name,
+			),
+			["委譲A", "委譲B", "無関係"],
 		);
 	});
 
-	it("does not list an always-tagged pattern twice when it also matches", () => {
-		const both = [{ name: "両方", tags: ["delegation", ALWAYS_TAG] }];
-		assert.deepEqual(
-			selectByTag(both, "delegation").map((p) => p.name),
-			["両方"],
-		);
-	});
-
-	it("still yields the always-tagged patterns when nothing matches", () => {
-		assert.deepEqual(
-			selectByTag(patterns, "nonexistent").map((p) => p.name),
-			["常時"],
-		);
+	it("yields nothing for a tag no pattern carries", () => {
+		assert.deepEqual(selectByTag(patterns, ["nonexistent"]), []);
 	});
 });
 
@@ -169,6 +161,61 @@ describe("groupTagsByAxis", () => {
 		assert.deepEqual(
 			groupTagsByAxis(collectTags(patterns)).map((g) => g.axis),
 			["target", ""],
+		);
+	});
+});
+
+describe("select", () => {
+	const patterns = [
+		{
+			name: "委譲の接合部",
+			tags: ["method:delegate"],
+			body: "- **委譲の接合部**: 冒頭。\n  具体例: CRLF の話。",
+		},
+		{
+			name: "観測範囲",
+			tags: ["context:dual-copy"],
+			body: "- **観測範囲**: 冒頭。\n  具体例: 読み側の CRLF 混入を直した回。",
+		},
+		{ name: "常時", tags: [ALWAYS_TAG], body: "- **常時**: 毎回効く。" },
+	];
+
+	it("separates what only the words found from what the tags found", () => {
+		const result = select(patterns, {
+			tags: ["method:delegate"],
+			words: ["CRLF"],
+		});
+
+		assert.deepEqual(
+			result.tagged.map((p) => p.name),
+			["委譲の接合部"],
+		);
+		assert.deepEqual(
+			result.wordOnly.map((m) => m.pattern.name),
+			["観測範囲"],
+		);
+		assert.deepEqual(
+			result.always.map((p) => p.name),
+			["常時"],
+		);
+	});
+
+	it("anchors each word hit to the line it matched, for judging precision", () => {
+		const { wordOnly } = select(patterns, { tags: [], words: ["混入"] });
+
+		assert.deepEqual(wordOnly[0].hits, [
+			{ word: "混入", line: 2, text: "具体例: 読み側の CRLF 混入を直した回。" },
+		]);
+	});
+
+	it("yields the always-tagged patterns even when nothing else matches", () => {
+		const result = select(patterns, { tags: [], words: [] });
+
+		assert.deepEqual(result.tagged, []);
+		assert.deepEqual(result.wordOnly, []);
+		assert.deepEqual(
+			result.always.map((p) => p.name),
+			["常時"],
 		);
 	});
 });

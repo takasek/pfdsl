@@ -125,16 +125,20 @@ export function collectTags(patterns) {
 }
 
 /**
- * The patterns to read for a tag, in catalog order, always-tagged ones
- * included.
+ * The patterns carrying any of these tags, in catalog order.
+ *
+ * A union, never an intersection, and there is deliberately no intersecting
+ * counterpart. Measured on the real catalog, intersecting two axes cuts a
+ * fourteen-pattern result to three — and a pattern missed here is missed
+ * silently, which is the failure this whole catalog exists to catch. An
+ * operation that looks reasonable and loses eleven patterns should not be
+ * one keystroke away.
  * @param {{tags: string[]}[]} patterns
- * @param {string} tag
+ * @param {string[]} tags
  * @returns {{tags: string[]}[]}
  */
-export function selectByTag(patterns, tag) {
-	return patterns.filter(
-		(p) => p.tags.includes(tag) || p.tags.includes(ALWAYS_TAG),
-	);
+export function selectByTag(patterns, tags) {
+	return patterns.filter((p) => tags.some((tag) => p.tags.includes(tag)));
 }
 
 /**
@@ -190,4 +194,50 @@ export function groupTagsByAxis(tags) {
 			if (b.axis === "") return -1;
 			return total(b.tags) - total(a.tags) || a.axis.localeCompare(b.axis);
 		});
+}
+
+/**
+ * Where each word appears in a pattern, one hit per line it occurs on.
+ * @param {{body: string}} pattern
+ * @param {string[]} words
+ * @returns {{word: string, line: number, text: string}[]}
+ */
+function wordHits({ body }, words) {
+	/** @type {{word: string, line: number, text: string}[]} */
+	const hits = [];
+	body.split("\n").forEach((text, index) => {
+		for (const word of words) {
+			if (text.includes(word))
+				hits.push({ word, line: index + 1, text: text.trim() });
+		}
+	});
+	return hits;
+}
+
+/**
+ * What to read this cycle, in three groups.
+ *
+ * The word search is not a fallback for when the tags come back empty. The
+ * dangerous case is the opposite one: tags that return something invite the
+ * reader to stop, and a pattern the tagger never anticipated stays unread with
+ * nothing to show for it. So both searches run together and `wordOnly` names
+ * what the tags missed — a standing measurement of the vocabulary's reach,
+ * rather than a prompt someone has to remember to follow.
+ *
+ * Hits carry the line they matched on, because a word search also finds
+ * patterns that merely mention the term in an example, and telling those apart
+ * is the reader's job, cheaply.
+ * @param {{tags: string[], body: string}[]} patterns
+ * @param {{tags: string[], words: string[]}} query
+ */
+export function select(patterns, { tags, words }) {
+	const always = patterns.filter((p) => p.tags.includes(ALWAYS_TAG));
+	const tagged = selectByTag(patterns, tags).filter(
+		(p) => !p.tags.includes(ALWAYS_TAG),
+	);
+	const wordOnly = patterns
+		.filter((p) => !tagged.includes(p) && !always.includes(p))
+		.map((pattern) => ({ pattern, hits: wordHits(pattern, words) }))
+		.filter((m) => m.hits.length > 0);
+	return { tagged, wordOnly, always };
 }
