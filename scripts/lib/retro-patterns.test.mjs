@@ -186,37 +186,59 @@ describe("select", () => {
 describe("checkPatternFile", () => {
 	const valid = renderPatternFile({
 		tags: ["method:delegate"],
-		body: "- **委譲の接合部**: 冒頭の一文。",
+		body: "- **並行委譲の接合部**: 冒頭の一文。",
 	});
 
-	it("reports nothing for a well-formed file", () => {
+	it("reports nothing for a well-formed file with an ascii kebab-case filename", () => {
 		assert.deepEqual(
-			checkPatternFile({ name: "委譲の接合部", text: valid }),
+			checkPatternFile({ name: "parallel-delegation-seam", text: valid }),
 			[],
 		);
 	});
 
 	it("reports the parse error when the file has no frontmatter fence", () => {
 		const [reason] = checkPatternFile({
-			name: "委譲の接合部",
+			name: "parallel-delegation-seam",
 			text: "no fence here",
 		});
 		assert.match(reason, /missing frontmatter fence/);
 	});
 
-	it("reports a filename that does not match the bullet's name", () => {
-		assert.deepEqual(checkPatternFile({ name: "別の名前", text: valid }), [
-			'filename does not match the bullet name "委譲の接合部"',
-		]);
+	it("reports a filename that is not ascii kebab-case", () => {
+		assert.deepEqual(
+			checkPatternFile({ name: "並行委譲の接合部", text: valid }),
+			["filename is not ascii kebab-case"],
+		);
+	});
+
+	it("reports a filename with an uppercase letter", () => {
+		assert.deepEqual(
+			checkPatternFile({ name: "Parallel-Delegation-Seam", text: valid }),
+			["filename is not ascii kebab-case"],
+		);
+	});
+
+	it("reports a filename with a trailing hyphen", () => {
+		assert.deepEqual(
+			checkPatternFile({ name: "parallel-delegation-seam-", text: valid }),
+			["filename is not ascii kebab-case"],
+		);
+	});
+
+	it("reports a filename with consecutive hyphens", () => {
+		assert.deepEqual(
+			checkPatternFile({ name: "parallel--delegation-seam", text: valid }),
+			["filename is not ascii kebab-case"],
+		);
 	});
 
 	it("reports a file with no tags", () => {
 		const untagged = renderPatternFile({
 			tags: [],
-			body: "- **委譲の接合部**: 冒頭の一文。",
+			body: "- **並行委譲の接合部**: 冒頭の一文。",
 		});
 		assert.deepEqual(
-			checkPatternFile({ name: "委譲の接合部", text: untagged }),
+			checkPatternFile({ name: "parallel-delegation-seam", text: untagged }),
 			["has no tags"],
 		);
 	});
@@ -227,7 +249,7 @@ describe("checkPatternFile", () => {
 			"tags: [ method:delegate ]",
 		);
 		const [reason] = checkPatternFile({
-			name: "委譲の接合部",
+			name: "parallel-delegation-seam",
 			text: driftedTags,
 		});
 		assert.match(reason, /does not round-trip/);

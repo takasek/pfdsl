@@ -12,6 +12,9 @@ const PATTERN_FILE = /^---\n([\s\S]*?)\n---\n\n([\s\S]*)$/;
 
 const TAGS_LINE = /^tags: \[(.*)\]$/m;
 
+/** An ASCII kebab-case slug: lowercase letters and digits, hyphen-joined. */
+const ASCII_KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
 /**
  * One pattern as a standalone file: frontmatter, then the pattern's own
  * catalog bullet, unchanged.
@@ -54,10 +57,13 @@ export function parsePatternFile(text) {
 /**
  * The invariants a pattern file has to keep once it is no longer a slice
  * produced by a migration script but a file people hand-edit: that it still
- * parses, that its filename has not drifted from the bullet it names, that it
- * carries at least one tag to be selected by, and that it is still exactly
- * what renderPatternFile would write — catching the whitespace and ordering
- * slips a hand edit introduces that parsePatternFile alone tolerates.
+ * parses, that its filename is an ASCII kebab-case slug (so the catalog stays
+ * the repo's only non-ASCII-free directory, and shells/tools that mishandle
+ * non-ASCII or quoting never have to touch it), that it carries at least one
+ * tag to be selected by, and that it is still exactly what renderPatternFile
+ * would write — catching the whitespace and ordering slips a hand edit
+ * introduces that parsePatternFile alone tolerates. Uniqueness of the
+ * filename is the filesystem's job, not this function's.
  * @param {{name: string, text: string}} file - name is the filename minus
  *   its extension.
  * @returns {string[]} one reason per violation, empty when the file is clean.
@@ -70,8 +76,8 @@ export function checkPatternFile({ name, text }) {
 		return [e.message];
 	}
 	const reasons = [];
-	if (parsed.name !== name) {
-		reasons.push(`filename does not match the bullet name "${parsed.name}"`);
+	if (!ASCII_KEBAB_CASE.test(name)) {
+		reasons.push("filename is not ascii kebab-case");
 	}
 	if (parsed.tags.length === 0) {
 		reasons.push("has no tags");
