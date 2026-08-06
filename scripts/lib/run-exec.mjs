@@ -67,3 +67,43 @@ export function git(args, opts = {}) {
 export function tryGit(args, opts = {}) {
 	return tryRun("git", args, opts);
 }
+
+/**
+ * NUL-separated paths, as `git ls-files -z` / `git diff -z --name-only`
+ * both produce, split into one string per path.
+ *
+ * Without `-z`, git escapes any path containing a byte outside ASCII and
+ * wraps it in quotes, so the caller gets `"\346\274\242.md"` where the file
+ * is `漢.md`. Splitting that output on newlines then hands every consumer a
+ * path that does not open — and a path containing a newline arrives as two.
+ * Both go unnoticed until a repo grows such a file, at which point whichever
+ * checker reaches it first crashes with ENOENT on a name nobody typed.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function splitNulSeparated(text) {
+	return text.split("\0").filter(Boolean);
+}
+
+/**
+ * Tracked paths matching `patterns`, one string each.
+ * @param {string[]} patterns - pathspecs, passed through untouched.
+ * @param {{cwd?: string, exec?: (args: string[], opts: object) => string}} [opts]
+ * @returns {string[]}
+ */
+export function gitLsFiles(patterns, { cwd, exec = git } = {}) {
+	return splitNulSeparated(exec(["ls-files", "-z", ...patterns], { cwd }));
+}
+
+/**
+ * Changed paths for `git diff --name-only`, one string each.
+ * @param {string[]} args - everything after `--name-only`: refs, `--cached`,
+ *   `--diff-filter=…`, a `-- <pathspec>` tail. Passed through untouched.
+ * @param {{cwd?: string, exec?: (args: string[], opts: object) => string}} [opts]
+ * @returns {string[]}
+ */
+export function gitDiffNames(args, { cwd, exec = git } = {}) {
+	return splitNulSeparated(
+		exec(["diff", "-z", "--name-only", ...args], { cwd }),
+	);
+}

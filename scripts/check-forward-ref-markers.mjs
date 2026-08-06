@@ -19,11 +19,10 @@
 
 import { readFileSync } from "node:fs";
 import { runForwardRefMarkerCheck } from "./lib/forward-ref-marker-check-steps.mjs";
-import { git } from "./lib/run-exec.mjs";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 
 const args = process.argv.slice(2);
-const listFiles = () =>
-	git(["ls-files", "docs/**/*.md"]).trim().split("\n").filter(Boolean);
+const listFiles = () => gitLsFiles(["docs/**/*.md"]);
 
 const { lines } = runForwardRefMarkerCheck({
 	args,

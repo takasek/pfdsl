@@ -24,7 +24,11 @@ import {
 	summarize,
 	TARGET_SAMPLE_COUNT,
 } from "./lib/review-measurement.mjs";
-import { tryGit as sharedTryGit, tryRun } from "./lib/run-exec.mjs";
+import {
+	tryGit as sharedTryGit,
+	splitNulSeparated,
+	tryRun,
+} from "./lib/run-exec.mjs";
 
 // The repository being aggregated is the one the command runs in, not the one
 // this file happens to live in — the tool reads history, and a checkout other
@@ -165,7 +169,13 @@ const unreadable = [];
 for (const cycle of cycles.filter((c) => c.secondParent)) {
 	const label = `${cycle.sha.slice(0, 7)} ${cycle.subject}`.trim();
 
-	const files = tryGit(["diff", "--name-only", `${cycle.sha}^1`, cycle.sha]);
+	const files = tryGit([
+		"diff",
+		"-z",
+		"--name-only",
+		`${cycle.sha}^1`,
+		cycle.sha,
+	]);
 	if (!files.ok) {
 		unreadable.push(`${label} — ${files.out.trim().split("\n")[0]}`);
 		continue;
@@ -173,7 +183,7 @@ for (const cycle of cycles.filter((c) => c.secondParent)) {
 
 	const merged = mergeCycleRecords(cycle.records);
 	const { issues: cycleIssues } = classifyCycle({
-		changedFiles: files.out,
+		changedFiles: splitNulSeparated(files.out).join("\n"),
 		trailerCount: cycle.records.length,
 		sample: merged?.sample,
 	});

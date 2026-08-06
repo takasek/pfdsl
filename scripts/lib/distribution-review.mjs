@@ -17,7 +17,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { PLUGIN_MIRRORS } from "./gen-plugin.mjs";
-import { git, tryGit } from "./run-exec.mjs";
+import { gitDiffNames, tryGit } from "./run-exec.mjs";
 
 /** git's empty tree — the diff base when nothing has been reviewed yet. */
 export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -181,12 +181,7 @@ export function repoDeps(root) {
 		// comparison that decides whether it still holds has to be against one
 		// too. A release refuses to run on a dirty tree anyway (release.mjs).
 		changedSince: (base) =>
-			git(["diff", "--name-only", base, "HEAD", "--", "plugin/pfdsl"], {
-				cwd: root,
-			})
-				.trim()
-				.split("\n")
-				.filter(Boolean),
+			gitDiffNames([base, "HEAD", "--", "plugin/pfdsl"], { cwd: root }),
 	};
 }
 

@@ -48,7 +48,10 @@ export function runSkillWiringCheck({
 	const stderrLines = findings.map((finding) => {
 		const line = declarationLine(workflowText, finding.id);
 		const anchor = line === null ? WORKFLOW : `${WORKFLOW}:${line}`;
-		return `${anchor}: '${finding.id}' is bundled (${finding.location}) but missing from ${finding.missing.join(" and ")}`;
+		const location = Array.isArray(finding.location)
+			? finding.location.join(", ")
+			: finding.location;
+		return `${anchor}: '${finding.id}' is bundled (${location}) but missing from ${finding.missing.join(" and ")}`;
 	});
 	stderrLines.push(
 		"",

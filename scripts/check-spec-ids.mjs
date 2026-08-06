@@ -17,12 +17,11 @@
 
 import { readFileSync } from "node:fs";
 import { emitLinesAndExit } from "./lib/emit-lines.mjs";
-import { git } from "./lib/run-exec.mjs";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 import { runSpecIdCheck } from "./lib/spec-id-check-steps.mjs";
 
 const args = process.argv.slice(2);
-const listFiles = () =>
-	git(["ls-files", "docs/**/*.md"]).trim().split("\n").filter(Boolean);
+const listFiles = () => gitLsFiles(["docs/**/*.md"]);
 
 emitLinesAndExit(
 	runSpecIdCheck({

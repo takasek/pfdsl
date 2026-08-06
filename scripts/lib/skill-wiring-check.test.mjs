@@ -206,4 +206,49 @@ describe("findUnwiredSkills", () => {
 		assert.equal(ids.includes("adrs"), false);
 		assert.equal(ids.includes("feature_samples"), false);
 	});
+
+	it("treats an array location as bundled when any entry matches a mirror", () => {
+		const artifacts = {
+			...ARTIFACTS,
+			multi_location_skill: {
+				location: ["../docs/samples/", "../.claude/skills/pfd-ops/"],
+			},
+		};
+		const found = run({ artifacts });
+		assert.deepEqual(found, [
+			{
+				id: "multi_location_skill",
+				location: ["../docs/samples/", "../.claude/skills/pfd-ops/"],
+				missing: ["distill_ops outputs", "gen_plugin inputs"],
+			},
+		]);
+	});
+
+	it("ignores an artifact whose array location has no bundled entry", () => {
+		const artifacts = {
+			...ARTIFACTS,
+			no_bundle_skill: {
+				location: ["../docs/samples/", "../not/bundled/anywhere.md"],
+			},
+		};
+		assert.equal(
+			run({ artifacts }).some((f) => f.id === "no_bundle_skill"),
+			false,
+		);
+	});
+
+	it("keeps scalar-location behavior unchanged", () => {
+		const artifacts = {
+			...ARTIFACTS,
+			newcomer_skill: { location: "../.claude/skills/pfd-ops/" },
+		};
+		const found = run({ artifacts });
+		assert.deepEqual(found, [
+			{
+				id: "newcomer_skill",
+				location: "../.claude/skills/pfd-ops/",
+				missing: ["distill_ops outputs", "gen_plugin inputs"],
+			},
+		]);
+	});
 });

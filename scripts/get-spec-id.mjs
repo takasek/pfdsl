@@ -19,7 +19,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { git } from "./lib/run-exec.mjs";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 import { findSpecIdDefinitions } from "./lib/spec-id-check.mjs";
 import { computeRange } from "./lib/spec-id-range.mjs";
 
@@ -30,10 +30,7 @@ if (!id) {
 	process.exit(1);
 }
 
-const files =
-	fileArgs.length > 0
-		? fileArgs
-		: git(["ls-files", "docs/**/*.md"]).trim().split("\n").filter(Boolean);
+const files = fileArgs.length > 0 ? fileArgs : gitLsFiles(["docs/**/*.md"]);
 
 const matches = [];
 const textByFile = new Map();
