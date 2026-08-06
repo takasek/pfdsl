@@ -12,6 +12,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 import {
@@ -52,25 +53,25 @@ function loadPatterns() {
 }
 
 /**
- * Repeated `--tag` / `--word` options, read by walking argv rather than
- * searching it: a lookup that misses its flag reports nothing (#707).
+ * Repeated `--tag` / `--word` options. Strict parsing, not a hand-rolled
+ * argv walk: a walk that only recognizes the bare `--flag value` form drops
+ * the `--flag=value` spelling silently and calls it done rather than an
+ * unrecognized flag — the defect scripts/gate-check.mjs's own parseArgs
+ * migration was written to close (#648).
  * @param {string[]} argv
  * @returns {{tags: string[], words: string[]}}
  */
 function parseQuery(argv) {
-	/** @type {{tags: string[], words: string[]}} */
-	const query = { tags: [], words: [] };
-	for (let i = 0; i < argv.length; i += 1) {
-		const value = argv[i + 1];
-		if (argv[i] === "--tag" || argv[i] === "--word") {
-			if (value === undefined) throw new Error(`${argv[i]} needs a value`);
-			(argv[i] === "--tag" ? query.tags : query.words).push(value);
-			i += 1;
-		} else {
-			throw new Error(`unknown option: ${argv[i]}`);
-		}
-	}
-	return query;
+	const { values } = parseArgs({
+		args: argv,
+		options: {
+			tag: { type: "string", multiple: true },
+			word: { type: "string", multiple: true },
+		},
+		strict: true,
+		allowPositionals: false,
+	});
+	return { tags: values.tag ?? [], words: values.word ?? [] };
 }
 
 /** @param {{name: string, tags: string[], body: string}} pattern */
