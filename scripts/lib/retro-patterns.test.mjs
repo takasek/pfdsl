@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
 	ALWAYS_TAG,
 	collectTags,
+	groupTagsByAxis,
 	joinCatalog,
 	parsePatternFile,
 	renderPatternFile,
@@ -138,5 +139,36 @@ describe("summaryOf", () => {
 
 	it("falls back to the whole bullet when it has no sentence end", () => {
 		assert.equal(summaryOf("- **名前**: 句点のない一行"), "句点のない一行");
+	});
+});
+
+describe("groupTagsByAxis", () => {
+	it("groups prefixed tags under their axis, most used first", () => {
+		const patterns = [
+			{ tags: ["target:check", "method:remove"] },
+			{ tags: ["target:check", "context:parallel"] },
+			{ tags: ["target:doc"] },
+		];
+
+		assert.deepEqual(groupTagsByAxis(collectTags(patterns)), [
+			{
+				axis: "target",
+				tags: [
+					{ tag: "target:check", count: 2 },
+					{ tag: "target:doc", count: 1 },
+				],
+			},
+			{ axis: "context", tags: [{ tag: "context:parallel", count: 1 }] },
+			{ axis: "method", tags: [{ tag: "method:remove", count: 1 }] },
+		]);
+	});
+
+	it("keeps unprefixed tags in an axis of their own, listed last", () => {
+		const patterns = [{ tags: [ALWAYS_TAG] }, { tags: ["target:doc"] }];
+
+		assert.deepEqual(
+			groupTagsByAxis(collectTags(patterns)).map((g) => g.axis),
+			["target", ""],
+		);
 	});
 });

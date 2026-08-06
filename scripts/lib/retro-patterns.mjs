@@ -160,3 +160,34 @@ export function summaryOf(body) {
 	const end = text.indexOf("。");
 	return end === -1 ? text : text.slice(0, end + 1);
 }
+
+/**
+ * The tag list, split into the axes its prefixes name.
+ *
+ * Prefixes are a reading and writing aid, not a schema: nothing declares which
+ * axes exist and nothing rejects a new one. The payoff is at authoring time —
+ * "which target, which method, which context" prompts for the dimensions a
+ * flat list lets you forget, which is where tags actually get missed. A stray
+ * axis shows up here as a group of one, the same way a stray tag does.
+ *
+ * Axes come most-used first; unprefixed tags trail behind in an axis named "".
+ * @param {{tag: string, count: number}[]} tags - as returned by collectTags.
+ * @returns {{axis: string, tags: {tag: string, count: number}[]}[]}
+ */
+export function groupTagsByAxis(tags) {
+	/** @type {Map<string, {tag: string, count: number}[]>} */
+	const axes = new Map();
+	for (const entry of tags) {
+		const axis = entry.tag.includes(":") ? entry.tag.split(":", 1)[0] : "";
+		axes.set(axis, [...(axes.get(axis) ?? []), entry]);
+	}
+	const total = (/** @type {{count: number}[]} */ group) =>
+		group.reduce((sum, t) => sum + t.count, 0);
+	return [...axes]
+		.map(([axis, group]) => ({ axis, tags: group }))
+		.sort((a, b) => {
+			if (a.axis === "") return 1;
+			if (b.axis === "") return -1;
+			return total(b.tags) - total(a.tags) || a.axis.localeCompare(b.axis);
+		});
+}
