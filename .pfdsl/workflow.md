@@ -195,7 +195,7 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 ## workflow.pfdsl に status を書かない
 
-進捗 status の一次情報は `roadmap.pfdsl` だけに置く。`workflow.pfdsl` は手続きを描く図であり、artifact に `status:` を書かない。同一 id が両図に現れる場合（`article` 等）、workflow 側にも status を書くと2つの図が同じ現実に別の状態を主張する状態が作れてしまい、実際 #763 でそうなった。
+汎用ルール（flow 種別の artifact に `status:` を書かない。同一 id が複数の図に現れる場合も一次情報は roadmap 側に一元化する）は `docs/quality-guide.md`「進捗 status は roadmap にだけ書く」が一次情報。このリポで両図に現れる id は `article` で、workflow 側にも status を書いたため #763 の食い違いが起きた。
 
 ## release milestone artifact の作成規約
 
