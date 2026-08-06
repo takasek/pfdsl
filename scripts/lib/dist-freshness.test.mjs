@@ -73,4 +73,17 @@ describe("isDistStale", () => {
 		writeFileSync(distFile, "y");
 		assert.equal(isDistStale(distFile), false);
 	});
+
+	// #771: a relative path was resolved against process.cwd(), so a caller
+	// running from anywhere but the repository root asked about a dist file
+	// under *that* directory. It is absent there, so the answer was "stale",
+	// and every gate reading that dist was skipped with a note and exit 0 —
+	// the check not running is indistinguishable from it passing. Refusing
+	// the relative form turns that into a crash at the offending call site.
+	it("refuses a relative path rather than resolving it against the cwd", () => {
+		assert.throws(
+			() => isDistStale("packages/cli/dist/cli.js"),
+			/absolute path/,
+		);
+	});
 });

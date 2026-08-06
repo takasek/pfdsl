@@ -50,7 +50,11 @@ const stagedPresent = stagedPaths(["--diff-filter=d"]);
 
 const { failures, notes } = runDriftGates(buildGates({ stagedPresent }), {
 	stagedFiles: staged,
-	isDistFresh: (path) => !isDistStale(path),
+	// The gates name their dist files relative to the repository root, as their
+	// hints and commands do; git already runs at `root` above. Resolving here
+	// keeps that true of the freshness question too, which was the one thing
+	// still asked against process.cwd() (#771).
+	isDistFresh: (path) => !isDistStale(resolve(root, path)),
 	runCommand: (file, args) =>
 		tryRun(file, args, { cwd: root, captureStderr: true }).ok,
 });
