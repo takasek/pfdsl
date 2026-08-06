@@ -5,7 +5,14 @@ import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { git, gitLsFiles, run, tryGit, tryRun } from "./run-exec.mjs";
+import {
+	git,
+	gitDiffNames,
+	gitLsFiles,
+	run,
+	tryGit,
+	tryRun,
+} from "./run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -126,6 +133,41 @@ describe("gitLsFiles", () => {
 	it("keeps a filename containing a newline in one piece", () => {
 		assert.deepEqual(
 			gitLsFiles(["*"], { cwd: "/repo", exec: () => "od\nd.md\0b.md\0" }),
+			["od\nd.md", "b.md"],
+		);
+	});
+});
+
+describe("gitDiffNames", () => {
+	it("asks for NUL separators and splits on them", () => {
+		/** @type {string[][]} */
+		const calls = [];
+		const files = gitDiffNames(["--cached"], {
+			cwd: "/repo",
+			exec: (args, opts) => {
+				calls.push(args);
+				assert.equal(opts.cwd, "/repo");
+				return "a.md\0名前.md\0";
+			},
+		});
+
+		assert.deepEqual(calls, [["diff", "-z", "--name-only", "--cached"]]);
+		assert.deepEqual(files, ["a.md", "名前.md"]);
+	});
+
+	it("returns nothing for an empty diff", () => {
+		assert.deepEqual(
+			gitDiffNames(["main", "HEAD"], { cwd: "/repo", exec: () => "" }),
+			[],
+		);
+	});
+
+	it("keeps a filename containing a newline in one piece", () => {
+		assert.deepEqual(
+			gitDiffNames(["main", "HEAD"], {
+				cwd: "/repo",
+				exec: () => "od\nd.md\0b.md\0",
+			}),
 			["od\nd.md", "b.md"],
 		);
 	});

@@ -33,15 +33,13 @@ import { fileURLToPath } from "node:url";
 import { isDistStale } from "./lib/dist-freshness.mjs";
 import { buildGates } from "./lib/drift-gates.mjs";
 import { runDriftGates } from "./lib/pre-commit-drift.mjs";
-import { git, tryRun } from "./lib/run-exec.mjs";
+import { gitDiffNames, tryRun } from "./lib/run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** @param {string[]} args */
 function stagedPaths(args) {
-	return git(["diff", "--cached", "--name-only", ...args], { cwd: root })
-		.split("\n")
-		.filter(Boolean);
+	return gitDiffNames(["--cached", ...args], { cwd: root });
 }
 
 const staged = stagedPaths([]);
