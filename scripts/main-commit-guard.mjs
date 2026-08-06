@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 
-// PreToolUse(Bash) hook: denies `git commit` while the current branch is the
-// repo's default branch (#650). See scripts/lib/main-commit-guard.mjs for the
-// detection logic, why this is deny rather than advisory, and the stdin
-// orchestration.
+// PreToolUse(Bash) hook: denies or prompts for git commands that change the
+// working tree or index while the current branch is the repo's default branch
+// (#650, widened beyond `git commit` in #777). See
+// scripts/lib/main-commit-guard.mjs for the detection logic, which subcommand
+// gets which decision and why, and the stdin orchestration.
 //
 // Both branch names come from git rather than being assumed: the current one
 // from `git branch --show-current`, the default one from `origin/HEAD`. A repo
 // whose default branch is `trunk` or `master` was previously guarded against a
 // branch name it does not have. Neither is read unless the command turns out
-// to be a commit — the lib calls resolveBranches only then.
+// to be a guarded one — the lib calls resolveBranches only then.
 //
 // Always exits 0 — a crash here, or a `git` failure, must not wedge every Bash
 // call.
@@ -29,7 +30,7 @@ import { tryGit } from "./lib/run-exec.mjs";
  */
 function resolveBranches(payload) {
 	// The command's own tree, not the shell's: a `cd` or `git -C` in the command
-	// decides where the commit lands, and the hook runs before either takes
+	// decides which tree it acts on, and the hook runs before either takes
 	// effect (#751).
 	const cwd = resolveCommandCwd(
 		payload?.tool_input?.command,
