@@ -173,7 +173,9 @@ export function groupTagsByAxis(tags) {
 	const axes = new Map();
 	for (const entry of tags) {
 		const axis = entry.tag.includes(":") ? entry.tag.split(":", 1)[0] : "";
-		axes.set(axis, [...(axes.get(axis) ?? []), entry]);
+		const group = axes.get(axis);
+		if (group) group.push(entry);
+		else axes.set(axis, [entry]);
 	}
 	const total = (/** @type {{count: number}[]} */ group) =>
 		group.reduce((sum, t) => sum + t.count, 0);
