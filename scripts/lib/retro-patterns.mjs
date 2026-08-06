@@ -221,12 +221,17 @@ function wordHits({ body }, words) {
  * @param {{tags: string[], words: string[]}} query
  */
 export function select(patterns, { tags, words }) {
-	const always = patterns.filter((p) => p.tags.includes(ALWAYS_TAG));
-	const tagged = selectByTag(patterns, tags).filter(
-		(p) => !p.tags.includes(ALWAYS_TAG),
-	);
-	const wordOnly = patterns
-		.filter((p) => !tagged.includes(p) && !always.includes(p))
+	/** @type {{tags: string[]}[]} */
+	const always = [];
+	/** @type {{tags: string[]}[]} */
+	const rest = [];
+	for (const p of patterns)
+		(p.tags.includes(ALWAYS_TAG) ? always : rest).push(p);
+
+	const tagged = selectByTag(rest, tags);
+	const taggedSet = new Set(tagged);
+	const wordOnly = rest
+		.filter((p) => !taggedSet.has(p))
 		.map((pattern) => ({ pattern, hits: wordHits(pattern, words) }))
 		.filter((m) => m.hits.length > 0);
 	return { tagged, wordOnly, always };
