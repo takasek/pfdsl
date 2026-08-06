@@ -1,5 +1,5 @@
 ---
-tags: [context:external-dependency]
+tags: [target:prose-doc, context:external-dependency]
 ---
 
 - **規約が名指しする手段を実行主体が起動できない trap**: 運用規約が特定のコマンド・スキルを名指しすると、実行主体（AI）の権限でそれを起動できない場合に、規約が構造的に満たせなくなる。
