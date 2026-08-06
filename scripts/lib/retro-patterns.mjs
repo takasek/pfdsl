@@ -12,6 +12,12 @@
 /** A top-level catalog bullet: `- **name**: first line`. */
 const PATTERN_HEAD = /^- \*\*(.+?)\*\*/;
 
+/** `---` fence, frontmatter, `---` fence, blank line, then the bullet. */
+const PATTERN_FILE = /^---\n([\s\S]*?)\n---\n\n([\s\S]*)$/;
+
+const SUMMARY_LINE = /^summary: (.*)$/m;
+const TAGS_LINE = /^tags: \[(.*)\]$/m;
+
 /**
  * The catalog's patterns, in source order.
  *
@@ -48,4 +54,42 @@ export function splitCatalog(markdown) {
  */
 export function joinCatalog(patterns) {
 	return patterns.map((p) => p.body).join("\n\n");
+}
+
+/**
+ * One pattern as a standalone file: frontmatter, then the pattern's own
+ * catalog bullet, unchanged.
+ *
+ * The bullet keeps its `- **name**:` head rather than being flattened into a
+ * heading, and the name is not repeated in the frontmatter. Both follow from
+ * the same decision: the file's body has to stay byte-identical to the slice
+ * it came from, because that identity is the whole proof that the migration
+ * lost nothing. A name in the frontmatter would be a second copy of something
+ * the bullet already says.
+ * @param {{summary: string, tags: string[], body: string}} pattern
+ * @returns {string}
+ */
+export function renderPatternFile({ summary, tags, body }) {
+	return `---\nsummary: ${summary}\ntags: [${tags.join(", ")}]\n---\n\n${body}\n`;
+}
+
+/**
+ * A pattern file, back into its parts. The name comes from the bullet.
+ * @param {string} text
+ * @returns {{name: string, summary: string, tags: string[], body: string}}
+ */
+export function parsePatternFile(text) {
+	const file = PATTERN_FILE.exec(text);
+	if (!file) throw new Error("not a pattern file: missing frontmatter fence");
+	const [, frontmatter, rest] = file;
+	const body = rest.replace(/\n+$/, "");
+	const head = PATTERN_HEAD.exec(body);
+	if (!head) throw new Error("not a pattern file: body has no pattern bullet");
+	const tags = TAGS_LINE.exec(frontmatter)?.[1].trim() ?? "";
+	return {
+		name: head[1],
+		summary: SUMMARY_LINE.exec(frontmatter)?.[1] ?? "",
+		tags: tags === "" ? [] : tags.split(",").map((t) => t.trim()),
+		body,
+	};
 }
