@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+	ALWAYS_TAG,
+	collectTags,
 	joinCatalog,
 	parsePatternFile,
 	renderPatternFile,
+	selectByTag,
 	splitCatalog,
 } from "./retro-patterns.mjs";
 
@@ -77,5 +80,45 @@ describe("pattern files", () => {
 	it("reports an empty tag list rather than omitting the field", () => {
 		const untagged = { ...pattern, tags: [] };
 		assert.deepEqual(parsePatternFile(renderPatternFile(untagged)).tags, []);
+	});
+});
+
+describe("searching", () => {
+	const patterns = [
+		{ name: "委譲A", tags: ["delegation", "parallel-work"] },
+		{ name: "委譲B", tags: ["delegation"] },
+		{ name: "常時", tags: [ALWAYS_TAG] },
+		{ name: "無関係", tags: ["deletion"] },
+	];
+
+	it("lists the tags that exist, most used first", () => {
+		assert.deepEqual(collectTags(patterns), [
+			{ tag: "delegation", count: 2 },
+			{ tag: ALWAYS_TAG, count: 1 },
+			{ tag: "deletion", count: 1 },
+			{ tag: "parallel-work", count: 1 },
+		]);
+	});
+
+	it("includes the always-tagged patterns in every selection", () => {
+		assert.deepEqual(
+			selectByTag(patterns, "delegation").map((p) => p.name),
+			["委譲A", "委譲B", "常時"],
+		);
+	});
+
+	it("does not list an always-tagged pattern twice when it also matches", () => {
+		const both = [{ name: "両方", tags: ["delegation", ALWAYS_TAG] }];
+		assert.deepEqual(
+			selectByTag(both, "delegation").map((p) => p.name),
+			["両方"],
+		);
+	});
+
+	it("still yields the always-tagged patterns when nothing matches", () => {
+		assert.deepEqual(
+			selectByTag(patterns, "nonexistent").map((p) => p.name),
+			["常時"],
+		);
 	});
 });

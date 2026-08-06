@@ -93,3 +93,46 @@ export function parsePatternFile(text) {
 		body,
 	};
 }
+
+/**
+ * The tag for patterns that hold in every cycle.
+ *
+ * A few patterns have no discriminating condition — they fire whenever a cycle
+ * happens at all. Tagging them like the rest would make their tag match almost
+ * every query and dilute the others, so selection always adds them instead of
+ * making the caller remember to ask.
+ */
+export const ALWAYS_TAG = "always";
+
+/**
+ * Every tag that exists, with how many patterns carry it. This output is the
+ * vocabulary: there is no canonical list elsewhere to drift from it.
+ *
+ * Most-used first, then alphabetical. A tag that shows up once is visible as
+ * such, which is how a typo or a synonym of an existing tag gets noticed.
+ * @param {{tags: string[]}[]} patterns
+ * @returns {{tag: string, count: number}[]}
+ */
+export function collectTags(patterns) {
+	/** @type {Map<string, number>} */
+	const counts = new Map();
+	for (const { tags } of patterns) {
+		for (const tag of tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+	}
+	return [...counts]
+		.map(([tag, count]) => ({ tag, count }))
+		.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+}
+
+/**
+ * The patterns to read for a tag, in catalog order, always-tagged ones
+ * included.
+ * @param {{tags: string[]}[]} patterns
+ * @param {string} tag
+ * @returns {{tags: string[]}[]}
+ */
+export function selectByTag(patterns, tag) {
+	return patterns.filter(
+		(p) => p.tags.includes(tag) || p.tags.includes(ALWAYS_TAG),
+	);
+}
