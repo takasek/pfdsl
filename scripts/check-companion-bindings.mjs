@@ -25,18 +25,14 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCompanionBindingsCheck } from "./lib/companion-binding-check-steps.mjs";
 import { emitLinesAndExit } from "./lib/emit-lines.mjs";
-import { git } from "./lib/run-exec.mjs";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
 emitLinesAndExit(
 	runCompanionBindingsCheck({
-		listFiles: () =>
-			git(["ls-files", ".pfdsl/*.md"], { cwd: root })
-				.trim()
-				.split("\n")
-				.filter(Boolean),
+		listFiles: () => gitLsFiles([".pfdsl/*.md"], { cwd: root }),
 		readFile: (file) => readFileSync(resolve(root, file), "utf-8"),
 		exists: (path) => existsSync(resolve(root, path)),
 	}),

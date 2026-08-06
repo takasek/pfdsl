@@ -22,19 +22,16 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findBrokenImports } from "./lib/check-script-imports.mjs";
-import { git } from "./lib/run-exec.mjs";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
 // Both patterns are needed: "scripts/**/*.mjs" only matches one-or-more
 // directories deep and misses scripts/*.mjs at the top level.
-const files = git(["ls-files", "scripts/*.mjs", "scripts/**/*.mjs"], {
+const files = gitLsFiles(["scripts/*.mjs", "scripts/**/*.mjs"], {
 	cwd: root,
 })
-	.trim()
-	.split("\n")
-	.filter(Boolean)
 	.map((f) => resolve(root, f))
 	// dedupe: a file directly under scripts/ matches both patterns
 	.filter((f, i, arr) => arr.indexOf(f) === i)

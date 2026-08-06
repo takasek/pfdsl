@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runDocExamplesCheck } from "./lib/doc-examples-steps.mjs";
-import { git } from "./lib/run-exec.mjs";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = join(__dirname, "..", "packages", "cli", "dist", "cli.js");
@@ -31,10 +31,7 @@ const CLI = join(__dirname, "..", "packages", "cli", "dist", "cli.js");
 const args = process.argv.slice(2);
 const defaultFiles = [
 	"docs/spec/spec.md",
-	...git(["ls-files", "docs/spec/proposals/*.md"])
-		.trim()
-		.split("\n")
-		.filter(Boolean),
+	...gitLsFiles(["docs/spec/proposals/*.md"]),
 ];
 const files = args.length > 0 ? args : defaultFiles;
 

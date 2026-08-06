@@ -26,12 +26,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findRepoSpecificProse } from "./lib/distributed-prose.mjs";
 import { canonicalSourceOf, inScope } from "./lib/distribution-review.mjs";
-import { git } from "./lib/run-exec.mjs";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const paths = git(["ls-files", "plugin/pfdsl/**/*.md"], { cwd: root })
-	.split("\n")
+const paths = gitLsFiles(["plugin/pfdsl/**/*.md"], { cwd: root })
 	.filter(inScope)
 	.map(canonicalSourceOf)
 	.sort();

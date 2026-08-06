@@ -22,7 +22,7 @@ import { readFileSync } from "node:fs";
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 import { checkFile as checkFileText } from "./lib/md-linebreaks.mjs";
 import { runMdLinebreaksCheck } from "./lib/md-linebreaks-steps.mjs";
-import { git } from "./lib/run-exec.mjs";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 
 /**
  * Reads filePath and runs lib/md-linebreaks.mjs's pure checkFile against it.
@@ -43,8 +43,7 @@ export function formatViolation(v) {
 // in-process without spawning this as a subprocess.
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	const args = process.argv.slice(2);
-	const listFiles = () =>
-		git(["ls-files", "*.md"]).trim().split("\n").filter(Boolean);
+	const listFiles = () => gitLsFiles(["*.md"]);
 
 	const { exitCode, messages } = runMdLinebreaksCheck({
 		args,

@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { git, run, tryGit, tryRun } from "./run-exec.mjs";
+import { git, gitLsFiles, run, tryGit, tryRun } from "./run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -96,5 +96,37 @@ describe("run-exec stderr routing", () => {
 
 		assert.equal(result.ok, false);
 		assert.match(result.out, /probe reason/);
+	});
+});
+
+describe("gitLsFiles", () => {
+	it("asks for NUL separators and splits on them", () => {
+		/** @type {string[][]} */
+		const calls = [];
+		const files = gitLsFiles(["*.md"], {
+			cwd: "/repo",
+			exec: (args, opts) => {
+				calls.push(args);
+				assert.equal(opts.cwd, "/repo");
+				return "a.md\0名前.md\0";
+			},
+		});
+
+		assert.deepEqual(calls, [["ls-files", "-z", "*.md"]]);
+		assert.deepEqual(files, ["a.md", "名前.md"]);
+	});
+
+	it("returns nothing for an empty listing", () => {
+		assert.deepEqual(
+			gitLsFiles(["*.none"], { cwd: "/repo", exec: () => "" }),
+			[],
+		);
+	});
+
+	it("keeps a filename containing a newline in one piece", () => {
+		assert.deepEqual(
+			gitLsFiles(["*"], { cwd: "/repo", exec: () => "od\nd.md\0b.md\0" }),
+			["od\nd.md", "b.md"],
+		);
 	});
 });

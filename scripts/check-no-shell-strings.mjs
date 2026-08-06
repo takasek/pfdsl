@@ -21,14 +21,12 @@ import {
 	findShellExecutors,
 	selectScannedFiles,
 } from "./lib/check-no-shell-strings.mjs";
-import { git } from "./lib/run-exec.mjs";
+import { gitLsFiles } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-const files = selectScannedFiles(
-	git(["ls-files", "*.mjs"], { cwd: root }).trim().split("\n").filter(Boolean),
-);
+const files = selectScannedFiles(gitLsFiles(["*.mjs"], { cwd: root }));
 
 const findings = [];
 for (const file of files) {
