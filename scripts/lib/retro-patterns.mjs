@@ -1,12 +1,7 @@
 /**
- * The retro audit-pattern catalog: splitting the monolith into one file per
- * pattern, and reading those files back.
- *
- * The catalog used to be a single markdown file whose only documented way in
- * was to read all of it. An index inside that same file does not fix it — you
- * have to read the file to learn not to read the file, and the index becomes a
- * second copy of the pattern list to keep in sync. So the patterns become
- * files, and selection happens over their frontmatter instead of over prose.
+ * The retro audit-pattern catalog: one file per pattern under
+ * .pfdsl/bindings/pfd-retro-patterns/, selected over their frontmatter
+ * instead of read as one prose file.
  */
 
 /** A top-level catalog bullet: `- **name**: first line`. */
@@ -16,44 +11,6 @@ const PATTERN_HEAD = /^- \*\*(.+?)\*\*/;
 const PATTERN_FILE = /^---\n([\s\S]*?)\n---\n\n([\s\S]*)$/;
 
 const TAGS_LINE = /^tags: \[(.*)\]$/m;
-
-/**
- * The catalog's patterns, in source order.
- *
- * A pattern owns every line after its head up to the next head, minus the
- * blank line that separates them — the separator belongs to the catalog's
- * layout, not to either neighbour, and re-adding it is the joiner's business.
- * @param {string} markdown - the catalog section, patterns only.
- * @returns {{name: string, body: string}[]}
- */
-export function splitCatalog(markdown) {
-	/** @type {{name: string, body: string[]}[]} */
-	const patterns = [];
-	for (const line of markdown.split("\n")) {
-		const head = PATTERN_HEAD.exec(line);
-		if (head) {
-			patterns.push({ name: head[1], body: [line] });
-			continue;
-		}
-		patterns.at(-1)?.body.push(line);
-	}
-	return patterns.map(({ name, body }) => ({
-		name,
-		body: body.join("\n").replace(/\n+$/, ""),
-	}));
-}
-
-/**
- * The catalog section the patterns came from.
- *
- * Inverse of splitCatalog, and the only reason the split is verifiable: the
- * migration is trustworthy exactly when this reproduces the original bytes.
- * @param {{body: string}[]} patterns
- * @returns {string}
- */
-export function joinCatalog(patterns) {
-	return patterns.map((p) => p.body).join("\n\n");
-}
 
 /**
  * One pattern as a standalone file: frontmatter, then the pattern's own
@@ -92,6 +49,39 @@ export function parsePatternFile(text) {
 		tags: tags === "" ? [] : tags.split(",").map((t) => t.trim()),
 		body,
 	};
+}
+
+/**
+ * The invariants a pattern file has to keep once it is no longer a slice
+ * produced by a migration script but a file people hand-edit: that it still
+ * parses, that its filename has not drifted from the bullet it names, that it
+ * carries at least one tag to be selected by, and that it is still exactly
+ * what renderPatternFile would write — catching the whitespace and ordering
+ * slips a hand edit introduces that parsePatternFile alone tolerates.
+ * @param {{name: string, text: string}} file - name is the filename minus
+ *   its extension.
+ * @returns {string[]} one reason per violation, empty when the file is clean.
+ */
+export function checkPatternFile({ name, text }) {
+	let parsed;
+	try {
+		parsed = parsePatternFile(text);
+	} catch (e) {
+		return [e.message];
+	}
+	const reasons = [];
+	if (parsed.name !== name) {
+		reasons.push(`filename does not match the bullet name "${parsed.name}"`);
+	}
+	if (parsed.tags.length === 0) {
+		reasons.push("has no tags");
+	}
+	if (renderPatternFile(parsed) !== text) {
+		reasons.push(
+			"does not round-trip through renderPatternFile (formatting drift)",
+		);
+	}
+	return reasons;
 }
 
 /**

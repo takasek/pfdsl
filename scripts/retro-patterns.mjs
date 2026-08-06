@@ -7,13 +7,15 @@
 //   node scripts/retro-patterns.mjs tags
 //   node scripts/retro-patterns.mjs list
 //   node scripts/retro-patterns.mjs select [--tag <tag>]... [--word <word>]...
+//   node scripts/retro-patterns.mjs check
 
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 import {
+	checkPatternFile,
 	collectTags,
 	groupTagsByAxis,
 	parsePatternFile,
@@ -25,16 +27,28 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PATTERN_DIR = resolve(root, ".pfdsl/bindings/pfd-retro-patterns");
 
 /**
+ * Every pattern file's name and raw text, by filename.
+ * @returns {{path: string, name: string, text: string}[]}
+ */
+function loadPatternFiles() {
+	return readdirSync(PATTERN_DIR)
+		.filter((f) => f.endsWith(".md"))
+		.sort()
+		.map((f) => ({
+			path: join(PATTERN_DIR, f),
+			name: basename(f, extname(f)),
+			text: readFileSync(join(PATTERN_DIR, f), "utf8"),
+		}));
+}
+
+/**
  * Every pattern, by filename. Catalog order died with the monolith and is not
  * worth a field to resurrect — it recorded when each pattern was appended,
  * which is in the git history and is not how anyone reads them.
  * @returns {{name: string, tags: string[], body: string}[]}
  */
 function loadPatterns() {
-	return readdirSync(PATTERN_DIR)
-		.filter((f) => f.endsWith(".md"))
-		.sort()
-		.map((f) => parsePatternFile(readFileSync(join(PATTERN_DIR, f), "utf8")));
+	return loadPatternFiles().map(({ text }) => parsePatternFile(text));
 }
 
 /**
@@ -107,16 +121,42 @@ function printSelection(patterns, query) {
 	console.log(`\nRead ${read} of ${patterns.length}.`);
 }
 
+/**
+ * Every pattern file's violations, printed as `path: reason`. Runs
+ * checkPatternFile per file rather than through loadPatterns/parsePatternFile,
+ * so a single unparsable file is reported as one violation among the rest
+ * instead of aborting the whole command.
+ * @param {{path: string, name: string, text: string}[]} files
+ * @returns {boolean} whether every file was clean.
+ */
+function printCheck(files) {
+	let clean = true;
+	for (const file of files) {
+		for (const reason of checkPatternFile(file)) {
+			clean = false;
+			console.log(`${file.path}: ${reason}`);
+		}
+	}
+	if (clean) console.log(`${files.length} pattern file(s), no violations.`);
+	return clean;
+}
+
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	const [command, ...rest] = process.argv.slice(2);
-	const patterns = loadPatterns();
 	try {
-		if (command === "tags") printTags(patterns);
-		else if (command === "list") for (const p of patterns) printPattern(p);
-		else if (command === "select") printSelection(patterns, parseQuery(rest));
-		else {
-			console.error("usage: retro-patterns.mjs tags | list | select [...]");
-			process.exit(1);
+		if (command === "check") {
+			if (!printCheck(loadPatternFiles())) process.exit(1);
+		} else {
+			const patterns = loadPatterns();
+			if (command === "tags") printTags(patterns);
+			else if (command === "list") for (const p of patterns) printPattern(p);
+			else if (command === "select") printSelection(patterns, parseQuery(rest));
+			else {
+				console.error(
+					"usage: retro-patterns.mjs tags | list | select [...] | check",
+				);
+				process.exit(1);
+			}
 		}
 	} catch (e) {
 		console.error(`retro-patterns: ${e.message}`);

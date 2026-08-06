@@ -2,52 +2,15 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
 	ALWAYS_TAG,
+	checkPatternFile,
 	collectTags,
 	groupTagsByAxis,
-	joinCatalog,
 	parsePatternFile,
 	renderPatternFile,
 	select,
 	selectByTag,
-	splitCatalog,
 	summaryOf,
 } from "./retro-patterns.mjs";
-
-describe("splitCatalog", () => {
-	it("returns one entry per top-level bullet, carrying its continuation lines", () => {
-		const src = [
-			"- **一つ目**: 冒頭の一文。",
-			"  続きの行。",
-			"",
-			"- **二つ目**: 別のパターン。",
-		].join("\n");
-
-		const patterns = splitCatalog(src);
-
-		assert.deepEqual(
-			patterns.map((p) => p.name),
-			["一つ目", "二つ目"],
-		);
-		assert.equal(patterns[0].body, "- **一つ目**: 冒頭の一文。\n  続きの行。");
-		assert.equal(patterns[1].body, "- **二つ目**: 別のパターン。");
-	});
-});
-
-describe("joinCatalog", () => {
-	it("round-trips a catalog through the split", () => {
-		const src = [
-			"- **一つ目**: 冒頭の一文。",
-			"  続きの行。",
-			"",
-			"- **二つ目**: 別のパターン。",
-			"  こちらも続く。",
-			"",
-			"- **三つ目**: 最後。",
-		].join("\n");
-
-		assert.equal(joinCatalog(splitCatalog(src)), src);
-	});
-});
 
 describe("pattern files", () => {
 	const pattern = {
@@ -217,5 +180,56 @@ describe("select", () => {
 			result.always.map((p) => p.name),
 			["常時"],
 		);
+	});
+});
+
+describe("checkPatternFile", () => {
+	const valid = renderPatternFile({
+		tags: ["method:delegate"],
+		body: "- **委譲の接合部**: 冒頭の一文。",
+	});
+
+	it("reports nothing for a well-formed file", () => {
+		assert.deepEqual(
+			checkPatternFile({ name: "委譲の接合部", text: valid }),
+			[],
+		);
+	});
+
+	it("reports the parse error when the file has no frontmatter fence", () => {
+		const [reason] = checkPatternFile({
+			name: "委譲の接合部",
+			text: "no fence here",
+		});
+		assert.match(reason, /missing frontmatter fence/);
+	});
+
+	it("reports a filename that does not match the bullet's name", () => {
+		assert.deepEqual(checkPatternFile({ name: "別の名前", text: valid }), [
+			'filename does not match the bullet name "委譲の接合部"',
+		]);
+	});
+
+	it("reports a file with no tags", () => {
+		const untagged = renderPatternFile({
+			tags: [],
+			body: "- **委譲の接合部**: 冒頭の一文。",
+		});
+		assert.deepEqual(
+			checkPatternFile({ name: "委譲の接合部", text: untagged }),
+			["has no tags"],
+		);
+	});
+
+	it("reports formatting that does not round-trip through renderPatternFile", () => {
+		const driftedTags = valid.replace(
+			"tags: [method:delegate]",
+			"tags: [ method:delegate ]",
+		);
+		const [reason] = checkPatternFile({
+			name: "委譲の接合部",
+			text: driftedTags,
+		});
+		assert.match(reason, /does not round-trip/);
 	});
 });
