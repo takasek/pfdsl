@@ -55,13 +55,19 @@ describe("selectByTag", () => {
 		{ name: "無関係", tags: ["method:remove"] },
 	];
 
-	it("lists the tags that exist, most used first", () => {
-		assert.deepEqual(collectTags(patterns), [
-			{ tag: "method:delegate", count: 2 },
-			{ tag: ALWAYS_TAG, count: 1 },
-			{ tag: "context:parallel-work", count: 1 },
-			{ tag: "method:remove", count: 1 },
-		]);
+	it("lists the tags that exist, most used first, carrying their own patterns", () => {
+		assert.deepEqual(
+			collectTags(patterns).map(({ tag, patterns: ps }) => ({
+				tag,
+				names: ps.map((p) => p.name),
+			})),
+			[
+				{ tag: "method:delegate", names: ["委譲A", "委譲B"] },
+				{ tag: ALWAYS_TAG, names: ["常時"] },
+				{ tag: "context:parallel-work", names: ["委譲A"] },
+				{ tag: "method:remove", names: ["無関係"] },
+			],
+		);
 	});
 
 	it("unions the given tags rather than intersecting them", () => {
@@ -151,12 +157,18 @@ describe("groupTagsByAxis", () => {
 			{
 				axis: "target",
 				tags: [
-					{ tag: "target:check", count: 2 },
-					{ tag: "target:doc", count: 1 },
+					{ tag: "target:check", patterns: [patterns[0], patterns[1]] },
+					{ tag: "target:doc", patterns: [patterns[2]] },
 				],
 			},
-			{ axis: "context", tags: [{ tag: "context:parallel", count: 1 }] },
-			{ axis: "method", tags: [{ tag: "method:remove", count: 1 }] },
+			{
+				axis: "context",
+				tags: [{ tag: "context:parallel", patterns: [patterns[1]] }],
+			},
+			{
+				axis: "method",
+				tags: [{ tag: "method:remove", patterns: [patterns[0]] }],
+			},
 		]);
 	});
 

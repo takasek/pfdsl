@@ -96,7 +96,10 @@ function printPattern({ name, tags, body, path }) {
 function printTags(patterns) {
 	for (const { axis, tags } of groupTagsByAxis(collectTags(patterns))) {
 		console.log(`[${axis || "no axis"}]`);
-		for (const { tag, count } of tags) console.log(`  ${tag}  ${count}`);
+		for (const { tag, patterns: tagged } of tags) {
+			console.log(`  ${tag}  ${tagged.length}`);
+			for (const p of tagged) console.log(`    ${p.name}  ${p.path}`);
+		}
 	}
 	console.log(
 		`\n${patterns.length} pattern(s). Pick the tags whose condition held this cycle; --tag unions them.`,

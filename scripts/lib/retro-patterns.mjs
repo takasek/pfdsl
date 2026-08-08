@@ -101,23 +101,36 @@ export function checkPatternFile({ name, text }) {
 export const ALWAYS_TAG = "always";
 
 /**
- * Every tag that exists, with how many patterns carry it. This output is the
+ * Every tag that exists, with the patterns that carry it. This output is the
  * vocabulary: there is no canonical list elsewhere to drift from it.
+ *
+ * Patterns ride along rather than a count, so a reader picking a tag to read
+ * does not have to go read the whole catalog first to find out which
+ * patterns it names — the count would otherwise be the only thing visible
+ * before opening a file, closing the same circle #803 found in `tags`.
  *
  * Most-used first, then alphabetical. A tag that shows up once is visible as
  * such, which is how a typo or a synonym of an existing tag gets noticed.
- * @param {{tags: string[]}[]} patterns
- * @returns {{tag: string, count: number}[]}
+ * @template {{tags: string[]}} T
+ * @param {T[]} patterns
+ * @returns {{tag: string, patterns: T[]}[]}
  */
 export function collectTags(patterns) {
-	/** @type {Map<string, number>} */
-	const counts = new Map();
-	for (const { tags } of patterns) {
-		for (const tag of tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+	/** @type {Map<string, T[]>} */
+	const groups = new Map();
+	for (const p of patterns) {
+		for (const tag of p.tags) {
+			const group = groups.get(tag);
+			if (group) group.push(p);
+			else groups.set(tag, [p]);
+		}
 	}
-	return [...counts]
-		.map(([tag, count]) => ({ tag, count }))
-		.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+	return [...groups]
+		.map(([tag, patterns]) => ({ tag, patterns }))
+		.sort(
+			(a, b) =>
+				b.patterns.length - a.patterns.length || a.tag.localeCompare(b.tag),
+		);
 }
 
 /**
@@ -193,11 +206,12 @@ export function keyLinesOf(body) {
  * axis shows up here as a group of one, the same way a stray tag does.
  *
  * Axes come most-used first; unprefixed tags trail behind in an axis named "".
- * @param {{tag: string, count: number}[]} tags - as returned by collectTags.
- * @returns {{axis: string, tags: {tag: string, count: number}[]}[]}
+ * @template T
+ * @param {{tag: string, patterns: T[]}[]} tags - as returned by collectTags.
+ * @returns {{axis: string, tags: {tag: string, patterns: T[]}[]}[]}
  */
 export function groupTagsByAxis(tags) {
-	/** @type {Map<string, {tag: string, count: number}[]>} */
+	/** @type {Map<string, {tag: string, patterns: T[]}[]>} */
 	const axes = new Map();
 	for (const entry of tags) {
 		const axis = entry.tag.includes(":") ? entry.tag.split(":", 1)[0] : "";
@@ -205,8 +219,8 @@ export function groupTagsByAxis(tags) {
 		if (group) group.push(entry);
 		else axes.set(axis, [entry]);
 	}
-	const total = (/** @type {{count: number}[]} */ group) =>
-		group.reduce((sum, t) => sum + t.count, 0);
+	const total = (/** @type {{patterns: T[]}[]} */ group) =>
+		group.reduce((sum, t) => sum + t.patterns.length, 0);
 	return [...axes]
 		.map(([axis, group]) => ({ axis, tags: group }))
 		.sort((a, b) => {
