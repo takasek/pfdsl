@@ -249,6 +249,22 @@ function wordHits({ body }, words) {
 }
 
 /**
+ * The patterns any of these words hit, each with the lines they hit, in the
+ * given order. The one definition of "this word reaches this pattern": every
+ * caller that counts or ranks word matches goes through here, so widening the
+ * match (case folding, stemming) stays a single edit rather than a sweep.
+ * @template {{body: string}} T
+ * @param {T[]} patterns
+ * @param {string[]} words
+ * @returns {{pattern: T, hits: {word: string, line: number, text: string}[]}[]}
+ */
+function hitsFor(patterns, words) {
+	return patterns
+		.map((pattern) => ({ pattern, hits: wordHits(pattern, words) }))
+		.filter((m) => m.hits.length > 0);
+}
+
+/**
  * What to read this cycle, in three groups.
  *
  * The word search is not a fallback for when the tags come back empty. The
@@ -280,13 +296,13 @@ export function select(patterns, { tags, words }) {
 
 	const tagged = selectByTag(rest, tags);
 	const taggedSet = new Set(tagged);
-	const wordOnly = rest
-		.filter((p) => !taggedSet.has(p))
-		.map((pattern) => ({ pattern, hits: wordHits(pattern, words) }))
-		.filter((m) => m.hits.length > 0);
+	const wordOnly = hitsFor(
+		rest.filter((p) => !taggedSet.has(p)),
+		words,
+	);
 	const reach = words.map((word) => ({
 		word,
-		count: patterns.filter((p) => p.body.includes(word)).length,
+		count: hitsFor(patterns, [word]).length,
 	}));
 	return { tagged, wordOnly, always, reach };
 }
@@ -305,8 +321,5 @@ export function select(patterns, { tags, words }) {
  * @returns {{pattern: T, hits: {word: string, line: number, text: string}[]}[]}
  */
 export function near(patterns, words) {
-	return patterns
-		.map((pattern) => ({ pattern, hits: wordHits(pattern, words) }))
-		.filter((m) => m.hits.length > 0)
-		.sort((a, b) => b.hits.length - a.hits.length);
+	return hitsFor(patterns, words).sort((a, b) => b.hits.length - a.hits.length);
 }

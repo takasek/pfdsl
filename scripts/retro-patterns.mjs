@@ -87,21 +87,18 @@ function parseQuery(argv) {
 }
 
 /**
- * Repeated `--word` options; `--tag` is not accepted. Ranking a draft against
- * the whole catalog has no cycle whose tags would narrow it, so there is
- * nothing for a tag to do here. Rejecting the option outright beats parsing
- * it with `parseQuery` and then silently ignoring it.
+ * The `--word` options of a query whose `--tag` is refused rather than
+ * ignored. Ranking a draft against the whole catalog has no cycle whose tags
+ * would narrow it, so a tag here means the caller expected `select`.
  * @param {string[]} argv
  * @returns {string[]}
  */
 function parseWords(argv) {
-	const { values } = parseArgs({
-		args: argv,
-		options: { word: { type: "string", multiple: true } },
-		strict: true,
-		allowPositionals: false,
-	});
-	return values.word ?? [];
+	const { tags, words } = parseQuery(argv);
+	if (tags.length > 0) {
+		throw new Error("near takes no --tag: it ranks the whole catalog");
+	}
+	return words;
 }
 
 /** @param {{name: string, tags: string[], body: string, path: string}} pattern */
