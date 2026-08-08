@@ -15,8 +15,9 @@ PFD 採用状況: roadmap（`.pfdsl/roadmap.pfdsl`）・workflow（`.pfdsl/workf
 このファイルを全読しても本文は出てこない — 引くのはスクリプトである。
 
 ```bash
-node scripts/retro-patterns.mjs tags                                  # 語彙を prefix ごとに列挙する
+node scripts/retro-patterns.mjs tags                                  # 語彙を prefix ごとに列挙する（タグの下に、それを持つパターンの名前とパスが並ぶ）
 node scripts/retro-patterns.mjs select --tag <tag> --word <word>      # 今サイクルで読むべきものを出す
+node scripts/retro-patterns.mjs near --word <word>                    # 語が触れた行数の多い順に、既存パターンとの近さを見る
 node scripts/retro-patterns.mjs list                                  # 全件を名前と一文で並べる
 node scripts/retro-patterns.mjs check                                 # 全ファイルの解析可否・名前一致・タグ有無・往復一致を検査する（make check-docs から自動実行、手動は書式直後の確認用）
 ```
@@ -31,7 +32,9 @@ prefix も値も宣言されておらず、新しいものを弾く機構も無�
 `--tag` は常に和集合で、積を取る手段は用意していない（実測で14件が3件へ落ちる操作であり、落ちた分は黙って読まれないため）。
 
 - **tagged** — 渡したタグのいずれかを持つもの
-- **word-only** — 語だけが当てたもの。**タグが取りこぼした分がここに出る**。`--word` を渡さない回はその旨が出る
+- **word-only** — 語だけが当てたもの。**タグが取りこぼした分がここに出る**。`--word` を渡さない回はその旨が出る。
+  見出し直下の `reach before subtraction:` 行は、語ごとに減算前（tagged も always も含む全パターン）でのヒット件数を示す。
+  ある語の件数が0なら、その語は本文のどこにも当たっていない。件数が0でないのに word-only に同名のパターンが出てこないなら、当てた分はすでに tagged がタグとして持っていたということ。
 - **always** — 毎サイクル成立するパターン。渡したものに関わらず必ず付く
 
 タグが N 件返した回ほど危ない。
@@ -41,6 +44,7 @@ prefix も値も宣言されておらず、新しいものを弾く機構も無�
 
 ### パターンを追記するとき
 
+- 書く前に `near --word <草案の固有語>` を叩き、上位数件を実際に開いて草案との差を判定する。タグ軸の重複は `tags` の出力に並ぶパターン一覧で見る
 - ファイル名はパターン名そのもの。本文は `- **パターン名**: ` で始める（この bullet 形式は、分割前のカタログとバイト単位で一致させるために保っている）
 - **冒頭の一文が定義文になるように書く。** 要約は frontmatter に持たず、この一文から導出される。二文目以降に `問いの形:`・`具体例:`・`対策:` を置く
 - frontmatter は `tags` のみ。既存の語彙を `tags` で見てから選ぶ

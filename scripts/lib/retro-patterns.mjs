@@ -290,3 +290,23 @@ export function select(patterns, { tags, words }) {
 	}));
 	return { tagged, wordOnly, always, reach };
 }
+
+/**
+ * Every pattern the given words hit anywhere in its body, ranked by how many
+ * lines they hit — for checking whether a pattern close to a draft already
+ * exists before writing a new one (#803).
+ *
+ * Unlike `select`, nothing is excluded and nothing is added: every pattern is
+ * a candidate, `always`-tagged ones included, because a near-duplicate check
+ * has no cycle to exclude patterns for already answering.
+ * @template {{tags: string[], body: string}} T
+ * @param {T[]} patterns
+ * @param {string[]} words
+ * @returns {{pattern: T, hits: {word: string, line: number, text: string}[]}[]}
+ */
+export function near(patterns, words) {
+	return patterns
+		.map((pattern) => ({ pattern, hits: wordHits(pattern, words) }))
+		.filter((m) => m.hits.length > 0)
+		.sort((a, b) => b.hits.length - a.hits.length);
+}

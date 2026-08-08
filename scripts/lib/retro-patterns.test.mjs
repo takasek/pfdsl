@@ -6,6 +6,7 @@ import {
 	collectTags,
 	groupTagsByAxis,
 	keyLinesOf,
+	near,
 	parsePatternFile,
 	renderPatternFile,
 	select,
@@ -246,6 +247,41 @@ describe("select", () => {
 			result.always.map((p) => p.name),
 			["常時"],
 		);
+	});
+});
+
+describe("near", () => {
+	const patterns = [
+		{
+			name: "多い",
+			tags: [],
+			body: "- **多い**: 冒頭。\n  行1 語。\n  行2 語。",
+		},
+		{ name: "少ない", tags: [], body: "- **少ない**: 冒頭。\n  行1 語のみ。" },
+		{ name: "常時", tags: [ALWAYS_TAG], body: "- **常時**: 冒頭 語。" },
+		{ name: "無関係", tags: [], body: "- **無関係**: 何もない。" },
+	];
+
+	it("ranks every pattern by hit count, always-tagged patterns included", () => {
+		assert.deepEqual(
+			near(patterns, ["語"]).map((r) => r.pattern.name),
+			["多い", "少ない", "常時"],
+		);
+	});
+
+	it("drops patterns the words never hit", () => {
+		assert.equal(
+			near(patterns, ["語"]).some((r) => r.pattern.name === "無関係"),
+			false,
+		);
+	});
+
+	it("carries hits in the same {word, line, text} shape as select's word-only hits", () => {
+		const [{ hits }] = near(patterns, ["語"]);
+		assert.deepEqual(hits, [
+			{ word: "語", line: 2, text: "行1 語。" },
+			{ word: "語", line: 3, text: "行2 語。" },
+		]);
 	});
 });
 

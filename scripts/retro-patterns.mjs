@@ -7,6 +7,7 @@
 //   node scripts/retro-patterns.mjs tags
 //   node scripts/retro-patterns.mjs list
 //   node scripts/retro-patterns.mjs select [--tag <tag>]... [--word <word>]...
+//   node scripts/retro-patterns.mjs near --word <word>...
 //   node scripts/retro-patterns.mjs check
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -20,6 +21,7 @@ import {
 	collectTags,
 	groupTagsByAxis,
 	keyLinesOf,
+	near,
 	parsePatternFile,
 	select,
 	summaryOf,
@@ -84,6 +86,24 @@ function parseQuery(argv) {
 	return { tags: values.tag ?? [], words: values.word ?? [] };
 }
 
+/**
+ * Repeated `--word` options; `--tag` is not accepted. Ranking a draft against
+ * the whole catalog has no cycle whose tags would narrow it, so there is
+ * nothing for a tag to do here. Rejecting the option outright beats parsing
+ * it with `parseQuery` and then silently ignoring it.
+ * @param {string[]} argv
+ * @returns {string[]}
+ */
+function parseWords(argv) {
+	const { values } = parseArgs({
+		args: argv,
+		options: { word: { type: "string", multiple: true } },
+		strict: true,
+		allowPositionals: false,
+	});
+	return values.word ?? [];
+}
+
 /** @param {{name: string, tags: string[], body: string, path: string}} pattern */
 function printPattern({ name, tags, body, path }) {
 	console.log(`${name}  [${tags.join(", ")}]`);
@@ -145,6 +165,24 @@ function printSelection(patterns, query) {
 }
 
 /**
+ * The patterns near a draft's words, ranked most-hit-lines first, for
+ * checking whether one close enough already exists before writing a new
+ * pattern.
+ * @param {{name: string, tags: string[], body: string, path: string}[]} patterns
+ * @param {string[]} words
+ */
+function printNear(patterns, words) {
+	const matches = near(patterns, words);
+	console.log(
+		`## near (${matches.length}) — ranked by how many lines the words hit, most first. Open the top few before writing a new pattern.`,
+	);
+	for (const { pattern, hits } of matches) {
+		printPattern(pattern);
+		for (const h of hits) console.log(`    L${h.line} ${h.word}: ${h.text}`);
+	}
+}
+
+/**
  * Every pattern file's violations, printed as `path: reason`. Runs
  * checkPatternFile per file rather than through loadPatterns/parsePatternFile,
  * so a single unparsable file is reported as one violation among the rest
@@ -174,9 +212,14 @@ if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 			if (command === "tags") printTags(patterns);
 			else if (command === "list") for (const p of patterns) printPattern(p);
 			else if (command === "select") printSelection(patterns, parseQuery(rest));
-			else {
+			else if (command === "near") {
+				const words = parseWords(rest);
+				if (words.length === 0)
+					throw new Error("near requires at least one --word");
+				printNear(patterns, words);
+			} else {
 				console.error(
-					"usage: retro-patterns.mjs tags | list | select [...] | check",
+					"usage: retro-patterns.mjs tags | list | select [...] | near --word <word>... | check",
 				);
 				process.exit(1);
 			}
