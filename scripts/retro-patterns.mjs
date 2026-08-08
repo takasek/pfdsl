@@ -7,6 +7,7 @@
 //   node scripts/retro-patterns.mjs tags
 //   node scripts/retro-patterns.mjs list
 //   node scripts/retro-patterns.mjs select [--tag <tag>]... [--word <word>]...
+//   node scripts/retro-patterns.mjs near --word <word>...
 //   node scripts/retro-patterns.mjs check
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -20,6 +21,7 @@ import {
 	collectTags,
 	groupTagsByAxis,
 	keyLinesOf,
+	near,
 	parsePatternFile,
 	select,
 	summaryOf,
@@ -84,6 +86,21 @@ function parseQuery(argv) {
 	return { tags: values.tag ?? [], words: values.word ?? [] };
 }
 
+/**
+ * The `--word` options of a query whose `--tag` is refused rather than
+ * ignored. Ranking a draft against the whole catalog has no cycle whose tags
+ * would narrow it, so a tag here means the caller expected `select`.
+ * @param {string[]} argv
+ * @returns {string[]}
+ */
+function parseWords(argv) {
+	const { tags, words } = parseQuery(argv);
+	if (tags.length > 0) {
+		throw new Error("near takes no --tag: it ranks the whole catalog");
+	}
+	return words;
+}
+
 /** @param {{name: string, tags: string[], body: string, path: string}} pattern */
 function printPattern({ name, tags, body, path }) {
 	console.log(`${name}  [${tags.join(", ")}]`);
@@ -96,7 +113,10 @@ function printPattern({ name, tags, body, path }) {
 function printTags(patterns) {
 	for (const { axis, tags } of groupTagsByAxis(collectTags(patterns))) {
 		console.log(`[${axis || "no axis"}]`);
-		for (const { tag, count } of tags) console.log(`  ${tag}  ${count}`);
+		for (const { tag, patterns: tagged } of tags) {
+			console.log(`  ${tag}  ${tagged.length}`);
+			for (const p of tagged) console.log(`    ${p.name}  ${p.path}`);
+		}
 	}
 	console.log(
 		`\n${patterns.length} pattern(s). Pick the tags whose condition held this cycle; --tag unions them.`,
@@ -108,12 +128,17 @@ function printTags(patterns) {
  * @param {{tags: string[], words: string[]}} query
  */
 function printSelection(patterns, query) {
-	const { tagged, wordOnly, always } = select(patterns, query);
+	const { tagged, wordOnly, always, reach } = select(patterns, query);
 
 	console.log(`## tagged (${tagged.length})`);
 	for (const p of tagged) printPattern(p);
 
 	console.log(`\n## word-only (${wordOnly.length}) — what the tags missed`);
+	if (reach.length > 0) {
+		console.log(
+			`  reach before subtraction: ${reach.map((r) => `${r.word} ${r.count}`).join(", ")}`,
+		);
+	}
 	if (query.words.length === 0) {
 		console.log(
 			"  no --word given. Tags only answer what someone anticipated; pass a few",
@@ -130,8 +155,28 @@ function printSelection(patterns, query) {
 	console.log(`\n## always (${always.length})`);
 	for (const p of always) printPattern(p);
 
-	const read = tagged.length + wordOnly.length + always.length;
-	console.log(`\nRead ${read} of ${patterns.length}.`);
+	const shown = tagged.length + wordOnly.length + always.length;
+	console.log(
+		`\nShown ${shown} of ${patterns.length} — shown, not read. Open the paths above.`,
+	);
+}
+
+/**
+ * The patterns near a draft's words, ranked most-hit-lines first, for
+ * checking whether one close enough already exists before writing a new
+ * pattern.
+ * @param {{name: string, tags: string[], body: string, path: string}[]} patterns
+ * @param {string[]} words
+ */
+function printNear(patterns, words) {
+	const matches = near(patterns, words);
+	console.log(
+		`## near (${matches.length}) — ranked by how many lines the words hit, most first. Open the top few before writing a new pattern.`,
+	);
+	for (const { pattern, hits } of matches) {
+		printPattern(pattern);
+		for (const h of hits) console.log(`    L${h.line} ${h.word}: ${h.text}`);
+	}
 }
 
 /**
@@ -164,9 +209,14 @@ if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 			if (command === "tags") printTags(patterns);
 			else if (command === "list") for (const p of patterns) printPattern(p);
 			else if (command === "select") printSelection(patterns, parseQuery(rest));
-			else {
+			else if (command === "near") {
+				const words = parseWords(rest);
+				if (words.length === 0)
+					throw new Error("near requires at least one --word");
+				printNear(patterns, words);
+			} else {
 				console.error(
-					"usage: retro-patterns.mjs tags | list | select [...] | check",
+					"usage: retro-patterns.mjs tags | list | select [...] | near --word <word>... | check",
 				);
 				process.exit(1);
 			}

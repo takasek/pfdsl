@@ -6,6 +6,7 @@ import {
 	collectTags,
 	groupTagsByAxis,
 	keyLinesOf,
+	near,
 	parsePatternFile,
 	renderPatternFile,
 	select,
@@ -55,13 +56,19 @@ describe("selectByTag", () => {
 		{ name: "無関係", tags: ["method:remove"] },
 	];
 
-	it("lists the tags that exist, most used first", () => {
-		assert.deepEqual(collectTags(patterns), [
-			{ tag: "method:delegate", count: 2 },
-			{ tag: ALWAYS_TAG, count: 1 },
-			{ tag: "context:parallel-work", count: 1 },
-			{ tag: "method:remove", count: 1 },
-		]);
+	it("lists the tags that exist, most used first, carrying their own patterns", () => {
+		assert.deepEqual(
+			collectTags(patterns).map(({ tag, patterns: ps }) => ({
+				tag,
+				names: ps.map((p) => p.name),
+			})),
+			[
+				{ tag: "method:delegate", names: ["委譲A", "委譲B"] },
+				{ tag: ALWAYS_TAG, names: ["常時"] },
+				{ tag: "context:parallel-work", names: ["委譲A"] },
+				{ tag: "method:remove", names: ["無関係"] },
+			],
+		);
 	});
 
 	it("unions the given tags rather than intersecting them", () => {
@@ -151,12 +158,18 @@ describe("groupTagsByAxis", () => {
 			{
 				axis: "target",
 				tags: [
-					{ tag: "target:check", count: 2 },
-					{ tag: "target:doc", count: 1 },
+					{ tag: "target:check", patterns: [patterns[0], patterns[1]] },
+					{ tag: "target:doc", patterns: [patterns[2]] },
 				],
 			},
-			{ axis: "context", tags: [{ tag: "context:parallel", count: 1 }] },
-			{ axis: "method", tags: [{ tag: "method:remove", count: 1 }] },
+			{
+				axis: "context",
+				tags: [{ tag: "context:parallel", patterns: [patterns[1]] }],
+			},
+			{
+				axis: "method",
+				tags: [{ tag: "method:remove", patterns: [patterns[0]] }],
+			},
 		]);
 	});
 
@@ -213,6 +226,18 @@ describe("select", () => {
 		]);
 	});
 
+	it("reports each word's reach over every pattern, before subtracting the tagged", () => {
+		const { reach } = select(patterns, {
+			tags: ["method:delegate"],
+			words: ["CRLF", "存在しない語"],
+		});
+
+		assert.deepEqual(reach, [
+			{ word: "CRLF", count: 2 },
+			{ word: "存在しない語", count: 0 },
+		]);
+	});
+
 	it("yields the always-tagged patterns even when nothing else matches", () => {
 		const result = select(patterns, { tags: [], words: [] });
 
@@ -222,6 +247,41 @@ describe("select", () => {
 			result.always.map((p) => p.name),
 			["常時"],
 		);
+	});
+});
+
+describe("near", () => {
+	const patterns = [
+		{
+			name: "多い",
+			tags: [],
+			body: "- **多い**: 冒頭。\n  行1 語。\n  行2 語。",
+		},
+		{ name: "少ない", tags: [], body: "- **少ない**: 冒頭。\n  行1 語のみ。" },
+		{ name: "常時", tags: [ALWAYS_TAG], body: "- **常時**: 冒頭 語。" },
+		{ name: "無関係", tags: [], body: "- **無関係**: 何もない。" },
+	];
+
+	it("ranks every pattern by hit count, always-tagged patterns included", () => {
+		assert.deepEqual(
+			near(patterns, ["語"]).map((r) => r.pattern.name),
+			["多い", "少ない", "常時"],
+		);
+	});
+
+	it("drops patterns the words never hit", () => {
+		assert.equal(
+			near(patterns, ["語"]).some((r) => r.pattern.name === "無関係"),
+			false,
+		);
+	});
+
+	it("carries hits in the same {word, line, text} shape as select's word-only hits", () => {
+		const [{ hits }] = near(patterns, ["語"]);
+		assert.deepEqual(hits, [
+			{ word: "語", line: 2, text: "行1 語。" },
+			{ word: "語", line: 3, text: "行2 語。" },
+		]);
 	});
 });
 
