@@ -88,21 +88,17 @@ export function findIssueNumberForProcess(pfdslText, processId) {
 	return match ? Number(match[1]) : null;
 }
 
-const OPTION_HEADING_PATTERNS = [
-	/検討したい方向/,
-	/対応案/,
-	/方針案/,
-	/選択肢/,
-];
-
 const HEADING_LINE_PATTERN = /^(#{2,6})\s+(.*)$/;
 const NUMBERED_ITEM_PATTERN = /^\d+\.\s/;
 const LABELED_SUBHEADING_ITEM_PATTERN = /^#{3,6}\s+([A-Za-z]|\d+)[.、]\s/;
+const LABELED_BULLET_ITEM_PATTERN = /^-\s*(案\s*\S+|[A-Za-z]|\d+)[.:：]\s/;
 
 /**
  * 候補列挙の構造検出。issue #669 の対策3: 「選択肢を並べただけで確定させないまま着手する」を
- * 機械的に検出するための入力。markdown 見出し行のうち OPTION_HEADING_PATTERNS に一致するものを
- * 起点に、同レベル以上の見出しが現れるまでの範囲を走査して候補項目を数える。
+ * 機械的に検出するための入力。markdown 見出し行なら語彙を問わず起点とし、同レベル以上の見出しが
+ * 現れるまでの範囲を走査して候補項目を数える（#800: 語彙 allowlist は撤廃済み。偽陽性
+ * — 候補列挙でない見出し配下も enumerated:true になりうる — は許容するトレードオフで、
+ * allowlist が生んでいた偽陰性の方が実害が大きいという判断による）。
  * @param {string | undefined | null} body
  * @returns {{enumerated: boolean, count: number, headings: string[]}}
  */
@@ -114,7 +110,6 @@ export function detectEnumeratedOptions(body) {
 	for (let i = 0; i < lines.length; i++) {
 		const headingMatch = lines[i].match(HEADING_LINE_PATTERN);
 		if (!headingMatch) continue;
-		if (!OPTION_HEADING_PATTERNS.some((p) => p.test(lines[i]))) continue;
 		const level = headingMatch[1].length;
 		headings.push(lines[i].trim());
 		for (let j = i + 1; j < lines.length; j++) {
@@ -122,7 +117,8 @@ export function detectEnumeratedOptions(body) {
 			if (nextHeadingMatch && nextHeadingMatch[1].length <= level) break;
 			if (
 				NUMBERED_ITEM_PATTERN.test(lines[j]) ||
-				LABELED_SUBHEADING_ITEM_PATTERN.test(lines[j])
+				LABELED_SUBHEADING_ITEM_PATTERN.test(lines[j]) ||
+				LABELED_BULLET_ITEM_PATTERN.test(lines[j])
 			)
 				count++;
 		}
