@@ -88,6 +88,39 @@ export function findIssueNumberForProcess(pfdslText, processId) {
 	return match ? Number(match[1]) : null;
 }
 
+/**
+ * roadmap.pfdsl の `process:` セクション全体を切り出す（次の非インデントキーの行まで、
+ * それが無ければ文字列末尾まで）。process ブロックの列挙は、この部分文字列に対してのみ行う
+ * ことで artifact: セクション側の location を誤って拾わないようにする。
+ * @param {string} pfdslText
+ * @returns {string}
+ */
+function extractProcessSection(pfdslText) {
+	const withBoundary = pfdslText.match(/^process:\n([\s\S]*?)(?=^\S)/m);
+	if (withBoundary) return withBoundary[1];
+	const toEnd = pfdslText.match(/^process:\n([\s\S]*)$/m);
+	return toEnd ? toEnd[1] : "";
+}
+
+/**
+ * `findIssueNumberForProcess` の逆方向: issue 番号から、それを `location:` に持つ
+ * process の processId を返す。
+ * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
+ * @param {number} issueNumber
+ * @returns {string | null}
+ */
+export function findProcessIdForIssueNumber(pfdslText, issueNumber) {
+	// 番兵行を足し、最後のエントリも他のエントリと同じ境界規則
+	// (`^  \S` か `^\S` の手前まで) で終端できるようにする。
+	const scanText = `${extractProcessSection(pfdslText)}\n\x00`;
+	const entryPattern = /^ {2}(\S+):\n([\s\S]*?)(?=^ {2}\S|^\S)/gm;
+	for (const [, processId, block] of scanText.matchAll(entryPattern)) {
+		const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
+		if (match && Number(match[1]) === issueNumber) return processId;
+	}
+	return null;
+}
+
 const HEADING_LINE_PATTERN = /^(#{2,6})\s+(.*)$/;
 const NUMBERED_ITEM_PATTERN = /^\d+\.\s/;
 const LABELED_SUBHEADING_ITEM_PATTERN = /^#{3,6}\s+([A-Za-z]|\d+)[.、]\s/;

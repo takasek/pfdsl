@@ -20,6 +20,7 @@ import {
 	countBehind,
 	detectEnumeratedOptions,
 	findIssueNumberForProcess,
+	findProcessIdForIssueNumber,
 	parsePorcelainPaths,
 	parseReadyOutput,
 } from "./cycle-status.mjs";
@@ -152,7 +153,6 @@ export async function runCycleStatus({
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	let ready = [];
 	let best = null;
-	let bestOutputs = [];
 	let readyError = null;
 	if (existsSync(cliPath)) {
 		try {
@@ -166,7 +166,7 @@ export async function runCycleStatus({
 					"--json",
 				]),
 			);
-			({ ready, best, bestOutputs } = parseReadyOutput(readyJson));
+			({ ready, best } = parseReadyOutput(readyJson));
 		} catch (e) {
 			readyError = e.message;
 		}
@@ -185,12 +185,15 @@ export async function runCycleStatus({
 	let designUnsettledError = null;
 	let targetIssues = [];
 	let targetSource = null;
+	// Read once and reused below for the gate-check artifact resolution — same
+	// file, whichever branch below (or that step) needs it first.
+	let roadmapText = null;
 	if (issueNumbers.length > 0) {
 		targetIssues = issueNumbers;
 		targetSource = "flag";
 	} else if (best) {
 		try {
-			const roadmapText = readFileSync(
+			roadmapText = readFileSync(
 				resolve(root, ".pfdsl/roadmap.pfdsl"),
 				"utf-8",
 			);
@@ -259,10 +262,54 @@ export async function runCycleStatus({
 			"no --issue given and no best process to resolve an issue number from";
 	}
 
-	// bestOutputs[0] のみ使う。複数出力プロセス（例: 1プロセスが複数 artifact を生成する edge）は
-	// 最初の出力のみを gate-check の対象にする単純化。
+	// The artifact comes from the process each target issue maps to in
+	// roadmap.pfdsl, not from bestOutputs: an --issue may name an issue that has
+	// nothing to do with the best process, or one exempt from roadmap management
+	// entirely (the case for #800/#772/#794 themselves, all flow:exempt) — using
+	// bestOutputs there would silently attach an unrelated artifact (#794).
+	// No resolvable process, or issues split across different processes, falls
+	// back to null rather than guessing; buildGateCheckCommand turns that into
+	// the --no-artifact equivalent.
+	let artifactKey = null;
+	if (targetIssues.length > 0) {
+		if (roadmapText === null) {
+			try {
+				roadmapText = readFileSync(
+					resolve(root, ".pfdsl/roadmap.pfdsl"),
+					"utf-8",
+				);
+			} catch {
+				roadmapText = null;
+			}
+		}
+		if (roadmapText !== null) {
+			const resolvedProcessIds = new Set(
+				targetIssues
+					.map((issue) => findProcessIdForIssueNumber(roadmapText, issue))
+					.filter((id) => id !== null),
+			);
+			if (resolvedProcessIds.size === 1 && existsSync(cliPath)) {
+				const [processId] = resolvedProcessIds;
+				try {
+					const neighborsJson = JSON.parse(
+						sh(process.execPath, [
+							cliPath,
+							"graph",
+							"neighbors",
+							".pfdsl/roadmap.pfdsl",
+							processId,
+							"--json",
+						]),
+					);
+					artifactKey = neighborsJson?.successors?.[0] ?? null;
+				} catch {
+					artifactKey = null;
+				}
+			}
+		}
+	}
 	const gateCheckCommand = buildGateCheckCommand(
-		bestOutputs[0] ?? null,
+		artifactKey,
 		base,
 		targetIssues,
 	);

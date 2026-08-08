@@ -10,6 +10,7 @@ import {
 	detectEnumeratedOptions,
 	findDecisionRecords,
 	findIssueNumberForProcess,
+	findProcessIdForIssueNumber,
 	parsePorcelainPaths,
 	parseReadyOutput,
 	summarizeCiStatus,
@@ -423,6 +424,63 @@ processes:
 
 	it("returns null for an unknown process id", () => {
 		assert.equal(findIssueNumberForProcess(pfdsl, "i999_nonexistent"), null);
+	});
+});
+
+describe("findProcessIdForIssueNumber", () => {
+	// The top-level key is the singular `process:`, matching the real
+	// .pfdsl/roadmap.pfdsl (confirmed by reading the file directly — an earlier
+	// version of this task's brief assumed a plural `processes:` key and a
+	// per-process `outputs:` field, neither of which exists there).
+	const pfdsl = `artifact:
+  spec_id_syntax:
+    label: 仕様ID構文
+    location: https://github.com/takasek/pfdsl/issues/999
+process:
+  i402_implement_get_by_id:
+    label: get-by-ID ツール実装
+    location: https://github.com/takasek/pfdsl/issues/402
+  i405_implement_mint_check:
+    label: mint-check ツール実装
+    location: https://github.com/takasek/pfdsl/issues/405
+    updated_at: 2026-07-10T01:50:30Z
+  i435_implement_ansi_color:
+    label: 診断 ANSI カラー実装
+    location: https://github.com/takasek/pfdsl/issues/435
+tag:
+  some_tag: {}
+`;
+
+	it("returns the processId whose location matches the issue number", () => {
+		assert.equal(
+			findProcessIdForIssueNumber(pfdsl, 405),
+			"i405_implement_mint_check",
+		);
+	});
+
+	it("does not bleed into a neighboring process's location", () => {
+		assert.equal(
+			findProcessIdForIssueNumber(pfdsl, 402),
+			"i402_implement_get_by_id",
+		);
+	});
+
+	it("resolves the last process entry in the section, proving the section boundary (before tag:) is handled", () => {
+		assert.equal(
+			findProcessIdForIssueNumber(pfdsl, 435),
+			"i435_implement_ansi_color",
+		);
+	});
+
+	it("does not match an issue number that only appears in the artifact section", () => {
+		// issue 999 is only referenced from spec_id_syntax's location, in
+		// artifact:, not process:. A naive scan across the whole file would wrongly
+		// resolve this.
+		assert.equal(findProcessIdForIssueNumber(pfdsl, 999), null);
+	});
+
+	it("returns null for an issue number with no matching process at all", () => {
+		assert.equal(findProcessIdForIssueNumber(pfdsl, 1), null);
 	});
 });
 
