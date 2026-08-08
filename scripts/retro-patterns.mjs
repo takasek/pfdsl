@@ -138,8 +138,10 @@ function printSelection(patterns, query) {
 	console.log(`\n## always (${always.length})`);
 	for (const p of always) printPattern(p);
 
-	const read = tagged.length + wordOnly.length + always.length;
-	console.log(`\nRead ${read} of ${patterns.length}.`);
+	const shown = tagged.length + wordOnly.length + always.length;
+	console.log(
+		`\nShown ${shown} of ${patterns.length} — shown, not read. Open the paths above.`,
+	);
 }
 
 /**
