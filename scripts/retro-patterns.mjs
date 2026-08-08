@@ -10,7 +10,7 @@
 //   node scripts/retro-patterns.mjs check
 
 import { readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
@@ -19,6 +19,7 @@ import {
 	checkPatternFile,
 	collectTags,
 	groupTagsByAxis,
+	keyLinesOf,
 	parsePatternFile,
 	select,
 	summaryOf,
@@ -46,10 +47,19 @@ function loadPatternFiles() {
  * Every pattern, by filename. Catalog order died with the monolith and is not
  * worth a field to resurrect — it recorded when each pattern was appended,
  * which is in the git history and is not how anyone reads them.
- * @returns {{name: string, tags: string[], body: string}[]}
+ *
+ * `path` is carried alongside the parsed bullet because the two names
+ * disagree: the display name comes from the bullet's own Japanese heading,
+ * the path is the ASCII kebab-case filename `checkPatternFile` enforces.
+ * Without both, a reader who wants to open the file the display name came
+ * from has nothing to search on (#803).
+ * @returns {{name: string, tags: string[], body: string, path: string}[]}
  */
 function loadPatterns() {
-	return loadPatternFiles().map(({ text }) => parsePatternFile(text));
+	return loadPatternFiles().map((file) => ({
+		...parsePatternFile(file.text),
+		path: relative(root, file.path),
+	}));
 }
 
 /**
@@ -74,13 +84,15 @@ function parseQuery(argv) {
 	return { tags: values.tag ?? [], words: values.word ?? [] };
 }
 
-/** @param {{name: string, tags: string[], body: string}} pattern */
-function printPattern({ name, tags, body }) {
+/** @param {{name: string, tags: string[], body: string, path: string}} pattern */
+function printPattern({ name, tags, body, path }) {
 	console.log(`${name}  [${tags.join(", ")}]`);
+	console.log(`  ${path}`);
 	console.log(`  ${summaryOf(body)}`);
+	for (const line of keyLinesOf(body)) console.log(`  ${line}`);
 }
 
-/** @param {{name: string, tags: string[], body: string}[]} patterns */
+/** @param {{name: string, tags: string[], body: string, path: string}[]} patterns */
 function printTags(patterns) {
 	for (const { axis, tags } of groupTagsByAxis(collectTags(patterns))) {
 		console.log(`[${axis || "no axis"}]`);
@@ -92,7 +104,7 @@ function printTags(patterns) {
 }
 
 /**
- * @param {{name: string, tags: string[], body: string}[]} patterns
+ * @param {{name: string, tags: string[], body: string, path: string}[]} patterns
  * @param {{tags: string[], words: string[]}} query
  */
 function printSelection(patterns, query) {
