@@ -161,6 +161,28 @@ export function summaryOf(body) {
 	return end === -1 ? text : text.slice(0, end + 1);
 }
 
+/** A body line that is a 問いの形 / 具体例 label, numbering and suffix included. */
+const KEY_LINE = /^(問いの形|具体例)/;
+
+/**
+ * The 問いの形 / 具体例 label lines a pattern's body carries, trimmed and in
+ * body order. These are the lines tagged selection was missing (#803):
+ * without them, a `tagged` match shows only the opening sentence and a
+ * reader cannot judge whether the pattern is worth opening.
+ *
+ * Only the label line itself is pulled, not the unlabeled continuation lines
+ * that follow it — the same depth `select`'s word-hit lines already show,
+ * so this stays a pointer into the file rather than a second copy of it.
+ * @param {string} body
+ * @returns {string[]}
+ */
+export function keyLinesOf(body) {
+	return body
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => KEY_LINE.test(line));
+}
+
 /**
  * The tag list, split into the axes its prefixes name.
  *

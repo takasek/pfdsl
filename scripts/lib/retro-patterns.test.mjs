@@ -5,6 +5,7 @@ import {
 	checkPatternFile,
 	collectTags,
 	groupTagsByAxis,
+	keyLinesOf,
 	parsePatternFile,
 	renderPatternFile,
 	select,
@@ -94,6 +95,47 @@ describe("summaryOf", () => {
 
 	it("falls back to the whole bullet when it has no sentence end", () => {
 		assert.equal(summaryOf("- **名前**: 句点のない一行"), "句点のない一行");
+	});
+});
+
+describe("keyLinesOf", () => {
+	it("pulls the 問いの形 and 具体例 lines, trimmed, in body order", () => {
+		const body = [
+			"- **名前**: 冒頭の一文。",
+			"  問いの形: 「これは問いか」。",
+			"  具体例: これは例。",
+		].join("\n");
+		assert.deepEqual(keyLinesOf(body), [
+			"問いの形: 「これは問いか」。",
+			"具体例: これは例。",
+		]);
+	});
+
+	it("matches numbered and suffixed labels by prefix", () => {
+		const body = [
+			"- **名前**: 冒頭。",
+			"  具体例1（識別子）: 一つ目。",
+			"  具体例2（別件）: 二つ目。",
+			"  問いの形の追加: 追加分。",
+		].join("\n");
+		assert.deepEqual(keyLinesOf(body), [
+			"具体例1（識別子）: 一つ目。",
+			"具体例2（別件）: 二つ目。",
+			"問いの形の追加: 追加分。",
+		]);
+	});
+
+	it("returns nothing for a pattern with neither label", () => {
+		assert.deepEqual(keyLinesOf("- **名前**: 冒頭の一文だけ。"), []);
+	});
+
+	it("does not pull continuation lines that lack the label", () => {
+		const body = [
+			"- **名前**: 冒頭。",
+			"  具体例: 一行目。",
+			"  ラベルの無い続きの行。",
+		].join("\n");
+		assert.deepEqual(keyLinesOf(body), ["具体例: 一行目。"]);
 	});
 });
 
