@@ -88,21 +88,50 @@ export function findIssueNumberForProcess(pfdslText, processId) {
 	return match ? Number(match[1]) : null;
 }
 
-const OPTION_HEADING_PATTERNS = [
-	/検討したい方向/,
-	/対応案/,
-	/方針案/,
-	/選択肢/,
-];
+/**
+ * roadmap.pfdsl の `process:` セクション全体を切り出す（次の非インデントキーの行まで、
+ * それが無ければ文字列末尾まで）。process ブロックの列挙は、この部分文字列に対してのみ行う
+ * ことで artifact: セクション側の location を誤って拾わないようにする。
+ * @param {string} pfdslText
+ * @returns {string}
+ */
+function extractProcessSection(pfdslText) {
+	const withBoundary = pfdslText.match(/^process:\n([\s\S]*?)(?=^\S)/m);
+	if (withBoundary) return withBoundary[1];
+	const toEnd = pfdslText.match(/^process:\n([\s\S]*)$/m);
+	return toEnd ? toEnd[1] : "";
+}
+
+/**
+ * `findIssueNumberForProcess` の逆方向: issue 番号から、それを `location:` に持つ
+ * process の processId を返す。
+ * @param {string} pfdslText - .pfdsl/roadmap.pfdsl の全文
+ * @param {number} issueNumber
+ * @returns {string | null}
+ */
+export function findProcessIdForIssueNumber(pfdslText, issueNumber) {
+	// 番兵行を足し、最後のエントリも他のエントリと同じ境界規則
+	// (`^  \S` か `^\S` の手前まで) で終端できるようにする。
+	const scanText = `${extractProcessSection(pfdslText)}\n\x00`;
+	const entryPattern = /^ {2}(\S+):\n([\s\S]*?)(?=^ {2}\S|^\S)/gm;
+	for (const [, processId, block] of scanText.matchAll(entryPattern)) {
+		const match = block.match(/location:\s*\S*\/issues\/(\d+)/);
+		if (match && Number(match[1]) === issueNumber) return processId;
+	}
+	return null;
+}
 
 const HEADING_LINE_PATTERN = /^(#{2,6})\s+(.*)$/;
 const NUMBERED_ITEM_PATTERN = /^\d+\.\s/;
 const LABELED_SUBHEADING_ITEM_PATTERN = /^#{3,6}\s+([A-Za-z]|\d+)[.、]\s/;
+const LABELED_BULLET_ITEM_PATTERN = /^-\s*(案\s*\S+|[A-Za-z]|\d+)[.:：]\s/;
 
 /**
  * 候補列挙の構造検出。issue #669 の対策3: 「選択肢を並べただけで確定させないまま着手する」を
- * 機械的に検出するための入力。markdown 見出し行のうち OPTION_HEADING_PATTERNS に一致するものを
- * 起点に、同レベル以上の見出しが現れるまでの範囲を走査して候補項目を数える。
+ * 機械的に検出するための入力。markdown 見出し行なら語彙を問わず起点とし、同レベル以上の見出しが
+ * 現れるまでの範囲を走査して候補項目を数える（#800: 語彙 allowlist は撤廃済み。偽陽性
+ * — 候補列挙でない見出し配下も enumerated:true になりうる — は許容するトレードオフで、
+ * allowlist が生んでいた偽陰性の方が実害が大きいという判断による）。
  * @param {string | undefined | null} body
  * @returns {{enumerated: boolean, count: number, headings: string[]}}
  */
@@ -114,7 +143,6 @@ export function detectEnumeratedOptions(body) {
 	for (let i = 0; i < lines.length; i++) {
 		const headingMatch = lines[i].match(HEADING_LINE_PATTERN);
 		if (!headingMatch) continue;
-		if (!OPTION_HEADING_PATTERNS.some((p) => p.test(lines[i]))) continue;
 		const level = headingMatch[1].length;
 		headings.push(lines[i].trim());
 		for (let j = i + 1; j < lines.length; j++) {
@@ -122,7 +150,8 @@ export function detectEnumeratedOptions(body) {
 			if (nextHeadingMatch && nextHeadingMatch[1].length <= level) break;
 			if (
 				NUMBERED_ITEM_PATTERN.test(lines[j]) ||
-				LABELED_SUBHEADING_ITEM_PATTERN.test(lines[j])
+				LABELED_SUBHEADING_ITEM_PATTERN.test(lines[j]) ||
+				LABELED_BULLET_ITEM_PATTERN.test(lines[j])
 			)
 				count++;
 		}

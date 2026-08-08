@@ -13,8 +13,25 @@ const readyJsonOk = (best) =>
 		best: best ? { id: best, outputs: [`${best}_out`] } : undefined,
 	});
 
+// The top-level key is the singular `process:`, matching the real
+// .pfdsl/roadmap.pfdsl (an earlier version of this task's brief assumed a
+// plural `processes:` key and a per-process `outputs:` field; neither exists
+// there — outputs are derived from `>> processId -> artifact` flow-arrow
+// lines elsewhere in the file, resolved at runtime via the built CLI's
+// `graph neighbors` command rather than parsed from this section).
 const roadmapWithIssue = (processId, issueNumber) =>
-	`processes:\n  ${processId}:\n    label: x\n    location: https://github.com/takasek/pfdsl/issues/${issueNumber}\nartifacts:\n`;
+	roadmapWithIssues([[processId, issueNumber]]);
+
+const roadmapWithIssues = (entries) =>
+	`process:\n${entries
+		.map(
+			([processId, issueNumber]) =>
+				`  ${processId}:\n    label: x\n    location: https://github.com/takasek/pfdsl/issues/${issueNumber}\n`,
+		)
+		.join("")}artifact:\n`;
+
+const neighborsJsonOk = (successors) =>
+	JSON.stringify({ ok: true, predecessors: [], successors });
 
 function baseDeps(overrides = {}) {
 	return {
@@ -370,14 +387,20 @@ describe("runCycleStatus", () => {
 			baseDeps({
 				issueNumbers: [667, 668],
 				sh: (_file, args) => {
-					if (args.includes(CLI_PATH))
+					if (args.includes("neighbors"))
 						return JSON.stringify({
 							ok: true,
-							ready: [{ id: "a" }],
-							best: { id: "a", outputs: ["art_a"] },
+							predecessors: [],
+							successors: ["art_a"],
 						});
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
 					return "";
 				},
+				readFileSync: () =>
+					roadmapWithIssues([
+						["proc_a", 667],
+						["proc_a", 668],
+					]),
 				execGh: async (args) => {
 					if (args[0] === "issue")
 						return issueJson({ author: "owner", body: "普通の説明文。" });
@@ -507,10 +530,18 @@ describe("runCycleStatus", () => {
 		assert.equal(result.designUnsettledError, "gh: issue not found");
 	});
 
-	it("selects the first best output for the gate-check command", async () => {
+	// #794: the artifact named in the gate-check command comes from the process
+	// the resolved issue maps to in roadmap.pfdsl (via `graph neighbors`), not
+	// from bestOutputs — an --issue can name an issue that has nothing to do
+	// with the best process.
+	it("resolves the gate-check artifact through the process the best-process issue maps to", async () => {
+		const calls = [];
 		const result = await runCycleStatus(
 			baseDeps({
 				sh: (_file, args) => {
+					calls.push(args);
+					if (args.includes("neighbors"))
+						return neighborsJsonOk(["proc_a_out"]);
 					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
 					return "";
 				},
@@ -523,6 +554,102 @@ describe("runCycleStatus", () => {
 			result.gateCheckCommand,
 			"node scripts/gate-check.mjs --base main --artifact proc_a_out --issue 42",
 		);
+		assert.ok(
+			calls.some(
+				(args) => args.includes("neighbors") && args.includes("proc_a"),
+			),
+		);
+	});
+
+	it("resolves the gate-check artifact through the process an explicit --issue maps to", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) return neighborsJsonOk(["art_x"]);
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_x", 669),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({ author: "owner", body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact art_x --issue 669",
+		);
+	});
+
+	// This is the actual shape of #800/#772/#794 themselves: all three are
+	// flow:exempt, so none has a roadmap process to resolve an artifact from.
+	it("falls back to --no-artifact when the --issue's issue has no roadmap process (exempt issue)", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [800],
+				readFileSync: () => roadmapWithIssue("proc_x", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({ author: "owner", body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+	});
+
+	it("uses the shared process's artifact when every --issue resolves to the same process", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [667, 668],
+				sh: (_file, args) => {
+					if (args.includes("neighbors"))
+						return neighborsJsonOk(["shared_art"]);
+					return "";
+				},
+				readFileSync: () =>
+					roadmapWithIssues([
+						["proc_shared", 667],
+						["proc_shared", 668],
+					]),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({ author: "owner", body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact shared_art --issue 667 --issue 668",
+		);
+	});
+
+	it("falls back to --no-artifact when --issue numbers resolve to different processes", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [667, 668],
+				sh: (_file, args) => {
+					if (args.includes("neighbors"))
+						return neighborsJsonOk(["should_not_be_used"]);
+					return "";
+				},
+				readFileSync: () =>
+					roadmapWithIssues([
+						["proc_a", 667],
+						["proc_b", 668],
+					]),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({ author: "owner", body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
 	});
 
 	it("returns a null gate-check command when there is no best process", async () => {

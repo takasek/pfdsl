@@ -10,6 +10,7 @@ import {
 	detectEnumeratedOptions,
 	findDecisionRecords,
 	findIssueNumberForProcess,
+	findProcessIdForIssueNumber,
 	parsePorcelainPaths,
 	parseReadyOutput,
 	summarizeCiStatus,
@@ -188,19 +189,28 @@ describe("detectEnumeratedOptions", () => {
 		});
 	});
 
-	it("counts numbered list items under a matching heading, stopping at the next same-level heading", () => {
+	// Since #800, every heading is a scan origin (not only vocabulary-matched
+	// ones), so a later heading is now itself pushed into `headings` too — it is
+	// no longer excluded just for not matching a fixed vocabulary. What this test
+	// still demonstrates: the first heading's scan stops at the next heading, so
+	// content past that boundary is not attributed back to the first heading's
+	// count.
+	it("counts numbered list items under a heading, stopping at the next same-level heading", () => {
 		const body = [
 			"## 検討したい方向",
 			"1. 案A: 説明",
 			"2. 案B: 説明",
 			"",
 			"## 次のセクション",
-			"1. 関係ない項目",
+			"関係ない説明文。",
 		].join("\n");
 		const result = detectEnumeratedOptions(body);
 		assert.equal(result.enumerated, true);
 		assert.equal(result.count, 2);
-		assert.deepEqual(result.headings, ["## 検討したい方向"]);
+		assert.deepEqual(result.headings, [
+			"## 検討したい方向",
+			"## 次のセクション",
+		]);
 	});
 
 	it("counts labeled sub-headings under a matching heading", () => {
@@ -221,6 +231,41 @@ describe("detectEnumeratedOptions", () => {
 			detectEnumeratedOptions("## 選択肢\n1. ひとつだけ").enumerated,
 			false,
 		);
+	});
+
+	// #800: the vocabulary allowlist that previously gated which headings counted
+	// (検討したい方向/対応案/方針案/選択肢 only) is gone. Any markdown heading now
+	// starts a scan, regardless of wording — a filer whose heading uses different
+	// words (e.g. "対応の方向", issue #774's actual case) is no longer missed.
+	it("counts items under a heading whose wording is not in any fixed vocabulary", () => {
+		const body = ["## 対応の方向", "1. 案A: 説明", "2. 案B: 説明"].join("\n");
+		const result = detectEnumeratedOptions(body);
+		assert.equal(result.enumerated, true);
+		assert.equal(result.count, 2);
+	});
+
+	// #772: a bullet-list option label ("- 案A: ..." / "- 案1: ..." / "- A: ...")
+	// is a candidate-enumeration shape the numbered-item and labeled-subheading
+	// patterns both miss.
+	it("counts labeled bullet items under a heading", () => {
+		const body = ["## 対応案", "- 案A: 最小案", "- 案B: 拡張案"].join("\n");
+		const result = detectEnumeratedOptions(body);
+		assert.equal(result.enumerated, true);
+		assert.equal(result.count, 2);
+	});
+
+	// Allowlist removal is a deliberate scope widening, not a side effect: a
+	// heading followed by an ordinary step-by-step procedure now also reads as
+	// "enumerated options", even though it names no design choice. This false
+	// positive is an accepted tradeoff — a human glances at it once and moves on
+	// — against the false negative the allowlist produced when a filer's wording
+	// fell outside the fixed vocabulary (see
+	// .pfdsl/bindings/pfd-retro-patterns/unmatched-vocabulary-defaults-to-pass.md).
+	it("also enumerates a plain step-by-step procedure under a heading (accepted false positive)", () => {
+		const body = ["## 実装手順", "1. ステップ1", "2. ステップ2"].join("\n");
+		const result = detectEnumeratedOptions(body);
+		assert.equal(result.enumerated, true);
+		assert.equal(result.count, 2);
 	});
 
 	it("returns not enumerated for empty/missing body", () => {
@@ -379,6 +424,63 @@ processes:
 
 	it("returns null for an unknown process id", () => {
 		assert.equal(findIssueNumberForProcess(pfdsl, "i999_nonexistent"), null);
+	});
+});
+
+describe("findProcessIdForIssueNumber", () => {
+	// The top-level key is the singular `process:`, matching the real
+	// .pfdsl/roadmap.pfdsl (confirmed by reading the file directly — an earlier
+	// version of this task's brief assumed a plural `processes:` key and a
+	// per-process `outputs:` field, neither of which exists there).
+	const pfdsl = `artifact:
+  spec_id_syntax:
+    label: 仕様ID構文
+    location: https://github.com/takasek/pfdsl/issues/999
+process:
+  i402_implement_get_by_id:
+    label: get-by-ID ツール実装
+    location: https://github.com/takasek/pfdsl/issues/402
+  i405_implement_mint_check:
+    label: mint-check ツール実装
+    location: https://github.com/takasek/pfdsl/issues/405
+    updated_at: 2026-07-10T01:50:30Z
+  i435_implement_ansi_color:
+    label: 診断 ANSI カラー実装
+    location: https://github.com/takasek/pfdsl/issues/435
+tag:
+  some_tag: {}
+`;
+
+	it("returns the processId whose location matches the issue number", () => {
+		assert.equal(
+			findProcessIdForIssueNumber(pfdsl, 405),
+			"i405_implement_mint_check",
+		);
+	});
+
+	it("does not bleed into a neighboring process's location", () => {
+		assert.equal(
+			findProcessIdForIssueNumber(pfdsl, 402),
+			"i402_implement_get_by_id",
+		);
+	});
+
+	it("resolves the last process entry in the section, proving the section boundary (before tag:) is handled", () => {
+		assert.equal(
+			findProcessIdForIssueNumber(pfdsl, 435),
+			"i435_implement_ansi_color",
+		);
+	});
+
+	it("does not match an issue number that only appears in the artifact section", () => {
+		// issue 999 is only referenced from spec_id_syntax's location, in
+		// artifact:, not process:. A naive scan across the whole file would wrongly
+		// resolve this.
+		assert.equal(findProcessIdForIssueNumber(pfdsl, 999), null);
+	});
+
+	it("returns null for an issue number with no matching process at all", () => {
+		assert.equal(findProcessIdForIssueNumber(pfdsl, 1), null);
 	});
 });
 
