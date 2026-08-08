@@ -111,12 +111,17 @@ function printTags(patterns) {
  * @param {{tags: string[], words: string[]}} query
  */
 function printSelection(patterns, query) {
-	const { tagged, wordOnly, always } = select(patterns, query);
+	const { tagged, wordOnly, always, reach } = select(patterns, query);
 
 	console.log(`## tagged (${tagged.length})`);
 	for (const p of tagged) printPattern(p);
 
 	console.log(`\n## word-only (${wordOnly.length}) — what the tags missed`);
+	if (reach.length > 0) {
+		console.log(
+			`  reach before subtraction: ${reach.map((r) => `${r.word} ${r.count}`).join(", ")}`,
+		);
+	}
 	if (query.words.length === 0) {
 		console.log(
 			"  no --word given. Tags only answer what someone anticipated; pass a few",

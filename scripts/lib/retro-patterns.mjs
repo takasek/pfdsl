@@ -261,6 +261,12 @@ function wordHits({ body }, words) {
  * Hits carry the line they matched on, because a word search also finds
  * patterns that merely mention the term in an example, and telling those apart
  * is the reader's job, cheaply.
+ *
+ * `reach` counts each word's hits across every pattern, tagged or not, before
+ * `wordOnly` subtracts the ones the tags already caught. Without it, a word
+ * with zero hits in `wordOnly` reads as one signal ("the word found nothing")
+ * when it is really two: the word found nothing at all, or it found patterns
+ * the tags already had (#803).
  * @param {{tags: string[], body: string}[]} patterns
  * @param {{tags: string[], words: string[]}} query
  */
@@ -278,5 +284,9 @@ export function select(patterns, { tags, words }) {
 		.filter((p) => !taggedSet.has(p))
 		.map((pattern) => ({ pattern, hits: wordHits(pattern, words) }))
 		.filter((m) => m.hits.length > 0);
-	return { tagged, wordOnly, always };
+	const reach = words.map((word) => ({
+		word,
+		count: patterns.filter((p) => p.body.includes(word)).length,
+	}));
+	return { tagged, wordOnly, always, reach };
 }

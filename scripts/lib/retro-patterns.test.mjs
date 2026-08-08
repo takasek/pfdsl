@@ -225,6 +225,18 @@ describe("select", () => {
 		]);
 	});
 
+	it("reports each word's reach over every pattern, before subtracting the tagged", () => {
+		const { reach } = select(patterns, {
+			tags: ["method:delegate"],
+			words: ["CRLF", "存在しない語"],
+		});
+
+		assert.deepEqual(reach, [
+			{ word: "CRLF", count: 2 },
+			{ word: "存在しない語", count: 0 },
+		]);
+	});
+
 	it("yields the always-tagged patterns even when nothing else matches", () => {
 		const result = select(patterns, { tags: [], words: [] });
 
