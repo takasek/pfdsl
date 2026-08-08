@@ -6,10 +6,7 @@ import {
 	mergeCycleRecords,
 	parseMeasurementRecords,
 	parseMeasurementTrailer,
-	parseSinceArg,
 	RECORD_SEP,
-	summarize,
-	TARGET_SAMPLE_COUNT,
 } from "./review-measurement.mjs";
 
 describe("parseMeasurementTrailer", () => {
@@ -169,84 +166,6 @@ describe("IN_SAMPLE_PATH", () => {
 	});
 });
 
-describe("summarize", () => {
-	const cycle = (...records) => ({ records });
-
-	it("counts only in-sample records toward the target", () => {
-		const s = summarize([
-			cycle({ sample: "in", new: 2, adopted: 1 }),
-			cycle({ sample: "out" }),
-			cycle({ sample: "in", new: 0, adopted: 0 }),
-		]);
-		assert.equal(s.sampled, 2);
-		assert.equal(s.outOfSample, 1);
-		assert.equal(s.remaining, TARGET_SAMPLE_COUNT - 2);
-	});
-
-	it("reports the finding rate over in-sample cycles, not over all cycles", () => {
-		const s = summarize([
-			cycle({ sample: "in", new: 2, adopted: 1 }),
-			cycle({ sample: "in", new: 0, adopted: 0 }),
-			cycle({ sample: "out" }),
-		]);
-		assert.equal(s.cyclesWithFindings, 1);
-		assert.equal(s.findingRate, 0.5);
-		assert.equal(s.totalNew, 2);
-		assert.equal(s.totalAdopted, 1);
-	});
-
-	it("reports a null rate rather than dividing by zero when nothing is sampled yet", () => {
-		const s = summarize([cycle({ sample: "out" })]);
-		assert.equal(s.findingRate, null);
-	});
-
-	it("separates malformed records so they cannot silently count as zero-finding cycles", () => {
-		const s = summarize([
-			cycle({ sample: "in", new: 0, adopted: 0 }),
-			cycle({ sample: "in", error: "missing new" }),
-		]);
-		assert.equal(s.sampled, 1);
-		assert.equal(s.malformed, 1);
-	});
-});
-
-describe("parseSinceArg", () => {
-	it("returns no ref when the flag is absent", () => {
-		assert.deepEqual(parseSinceArg([]), { since: undefined });
-	});
-
-	it("reads the separate-argument form", () => {
-		assert.deepEqual(parseSinceArg(["--since", "v1.0"]), { since: "v1.0" });
-	});
-
-	it("reads the inline form, which otherwise looks like an unknown flag", () => {
-		assert.deepEqual(parseSinceArg(["--since=v1.0"]), { since: "v1.0" });
-	});
-
-	it("errors when the flag carries no ref rather than dropping the scan", () => {
-		assert.match(parseSinceArg(["--since"]).error, /--since/);
-	});
-
-	it("errors when the next argument is another flag, not a ref", () => {
-		assert.match(parseSinceArg(["--since", "--verbose"]).error, /--since/);
-	});
-
-	it("errors on an empty inline value", () => {
-		assert.match(parseSinceArg(["--since="]).error, /--since/);
-	});
-
-	// #648: an unrecognised argument used to fall through to {since: undefined},
-	// which the caller reads as "no ref was asked for" and reports as a clean
-	// scan — the same answer it gives when the flag really was absent.
-	it("errors on an unknown flag instead of reporting no ref", () => {
-		assert.match(parseSinceArg(["--sinse", "v1.0"]).error, /sinse/);
-	});
-
-	it("errors on a stray positional", () => {
-		assert.ok(parseSinceArg(["v1.0"]).error);
-	});
-});
-
 describe("classifyCycle", () => {
 	it("reports nothing when a code cycle recorded one in-sample trailer", () => {
 		const c = classifyCycle({
@@ -329,33 +248,6 @@ describe("tool field", () => {
 		assert.equal(r.error, undefined);
 		assert.equal(r.tool, undefined);
 	});
-
-	it("breaks the yield down per tool, since the tools do not have equal yield", () => {
-		const s = summarize([
-			{ records: [{ sample: "in", new: 3, adopted: 2, tool: "code-review" }] },
-			{ records: [{ sample: "in", new: 0, adopted: 0, tool: "simplify" }] },
-			{ records: [{ sample: "in", new: 1, adopted: 1, tool: "simplify" }] },
-			{ records: [{ sample: "in", new: 2, adopted: 0 }] },
-		]);
-		assert.deepEqual(s.byTool["code-review"], {
-			passes: 1,
-			withFindings: 1,
-			totalNew: 3,
-			totalAdopted: 2,
-		});
-		assert.deepEqual(s.byTool.simplify, {
-			passes: 2,
-			withFindings: 1,
-			totalNew: 1,
-			totalAdopted: 1,
-		});
-		assert.deepEqual(s.byTool.unspecified, {
-			passes: 1,
-			withFindings: 1,
-			totalNew: 2,
-			totalAdopted: 0,
-		});
-	});
 });
 
 describe("mergeCycleRecords", () => {
@@ -400,34 +292,5 @@ describe("mergeCycleRecords", () => {
 			{ sample: "in", error: "adopted cannot exceed new" },
 		]);
 		assert.match(r.error, /adopted/);
-	});
-});
-
-describe("summarize over cycles", () => {
-	const cycle = (...records) => ({ records });
-
-	it("counts one cycle however many passes it recorded", () => {
-		const s = summarize([
-			cycle(
-				{ sample: "in", new: 1, adopted: 1, tool: "simplify" },
-				{ sample: "in", new: 2, adopted: 2, tool: "code-review" },
-			),
-			cycle({ sample: "in", new: 0, adopted: 0, tool: "simplify" }),
-		]);
-		assert.equal(s.sampled, 2);
-		assert.equal(s.totalNew, 3);
-		assert.equal(s.cyclesWithFindings, 1);
-	});
-
-	it("reports tool yield per review pass, since a cycle can run more than one", () => {
-		const s = summarize([
-			cycle(
-				{ sample: "in", new: 1, adopted: 1, tool: "simplify" },
-				{ sample: "in", new: 2, adopted: 2, tool: "code-review" },
-			),
-		]);
-		assert.equal(s.byTool.simplify.passes, 1);
-		assert.equal(s.byTool["code-review"].passes, 1);
-		assert.equal(s.byTool["code-review"].totalNew, 2);
 	});
 });

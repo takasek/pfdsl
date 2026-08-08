@@ -2,9 +2,8 @@
 // explicit glob arguments (passing a bare directory makes it try to load the
 // directory as a module rather than recurse into it), so a test file dropped
 // outside the enumerated globs is silently skipped: it passes locally when
-// invoked by hand and never runs in CI. That is how
-// scripts/review-measurement.test.mjs — including its shell-injection guard —
-// sat unrun.
+// invoked by hand and never runs in CI. That is how a top-level scripts/
+// test file's own shell-injection guard once sat unrun.
 
 import { matchesGlob as nodeMatchesGlob } from "node:path";
 

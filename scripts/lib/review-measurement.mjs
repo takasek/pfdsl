@@ -13,11 +13,6 @@
  * Process/git I/O lives in the main script; this module stays testable.
  */
 
-import { parseArgs } from "node:util";
-
-/** Number of in-sample cycles to collect before deciding the skip condition. */
-export const TARGET_SAMPLE_COUNT = 10;
-
 /** Separators used by the caller's `git log --format` invocation. */
 export const FIELD_SEP = "";
 export const RECORD_SEP = "";
@@ -184,86 +179,6 @@ export function mergeCycleRecords(records) {
 			merged.angles.push(r.angles);
 	}
 	return merged;
-}
-
-/**
- * @param {Array<{records: Array<object>}>} cycles - one entry per cycle, in any order
- */
-export function summarize(cycles) {
-	const merged = cycles
-		.map((c) => mergeCycleRecords(c.records))
-		.filter(Boolean);
-	const malformed = merged.filter((r) => r.error);
-	const sampled = merged.filter((r) => r.sample === "in" && !r.error);
-	const outOfSample = merged.filter(
-		(r) => r.sample === "out" && !r.error,
-	).length;
-	const cyclesWithFindings = sampled.filter((r) => r.new > 0).length;
-
-	// Per review pass, not per cycle: a cycle that ran two tools is one cycle
-	// but two data points about what each tool finds.
-	/** @type {Record<string, {passes: number, withFindings: number, totalNew: number, totalAdopted: number}>} */
-	const byTool = {};
-	for (const c of cycles) {
-		for (const r of c.records) {
-			if (r.error || r.sample !== "in") continue;
-			const key = r.tool ?? "unspecified";
-			byTool[key] ??= {
-				passes: 0,
-				withFindings: 0,
-				totalNew: 0,
-				totalAdopted: 0,
-			};
-			const bucket = byTool[key];
-			bucket.passes += 1;
-			if (r.new > 0) bucket.withFindings += 1;
-			bucket.totalNew += r.new;
-			bucket.totalAdopted += r.adopted;
-		}
-	}
-
-	return {
-		byTool,
-		sampled: sampled.length,
-		outOfSample,
-		malformed: malformed.length,
-		cyclesWithFindings,
-		totalNew: sampled.reduce((sum, r) => sum + r.new, 0),
-		totalAdopted: sampled.reduce((sum, r) => sum + r.adopted, 0),
-		// Null rather than 0 or NaN: "no data yet" and "measured zero" are different answers.
-		findingRate:
-			sampled.length === 0 ? null : cyclesWithFindings / sampled.length,
-		remaining: Math.max(0, TARGET_SAMPLE_COUNT - sampled.length),
-	};
-}
-
-/**
- * Read the --since ref from argv.
- * Anything unrecognised is an error rather than a silent fall-through: without
- * a ref the script skips the missing-record scan entirely and still exits 0,
- * which reads as "nothing missing" to whoever asked for the scan — and a
- * mistyped flag lands in exactly that state (#648). Node's strict parse
- * supplies the rejections (unknown flag, dash-leading or absent value, stray
- * positional); only the empty inline form has to be caught here, since
- * `--since=` parses cleanly to an empty string.
- * @param {string[]} argv
- * @returns {{since?: string, error?: string}}
- */
-export function parseSinceArg(argv) {
-	let values;
-	try {
-		({ values } = parseArgs({
-			args: argv,
-			options: { since: { type: "string" } },
-			strict: true,
-			allowPositionals: false,
-		}));
-	} catch (err) {
-		return { error: err.message };
-	}
-	if (values.since === undefined) return { since: undefined };
-	if (values.since === "") return { error: "--since needs a ref" };
-	return { since: values.since };
 }
 
 /**
