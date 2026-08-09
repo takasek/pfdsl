@@ -1,4 +1,4 @@
-name: check review measurement
+name: check review record
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: 24
 
-      - name: Check the Review-Measurement record against the branch diff
-        run: node scripts/check-review-measurement.mjs --base "$BASE_REF"
+      - name: Check the review record against the branch diff
+        run: node scripts/check-review-record.mjs --base "$BASE_REF"
         env:
           BASE_REF: ${{ github.base_ref }}

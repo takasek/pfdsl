@@ -9,7 +9,7 @@ import {
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
-	reviewMeasurementStep,
+	reviewRecordStep,
 	sizeDirectionStep,
 	wipTransitionStep,
 } from "./gate-check-steps.mjs";
@@ -821,15 +821,14 @@ describe("checkDocsStep", () => {
 	});
 });
 
-describe("reviewMeasurementStep", () => {
-	const trailer =
-		'Review-Measurement: sample=in new=1 adopted=1 tool=simplify angles="reuse"';
+describe("reviewRecordStep", () => {
+	const trailer = "Review: tool=simplify";
 
 	it("PASSes when a code-touching branch carries a matching record", () => {
 		const { exec } = fakeExec({
 			"git log --no-merges": { out: `subject\n\n${trailer}\n` },
 		});
-		const result = reviewMeasurementStep({
+		const result = reviewRecordStep({
 			exec,
 			base: "main",
 			changedFiles: ["scripts/lib/x.mjs"],
@@ -841,35 +840,35 @@ describe("reviewMeasurementStep", () => {
 		const { exec } = fakeExec({
 			"git log --no-merges": { out: "subject\n\nbody without a trailer\n" },
 		});
-		const result = reviewMeasurementStep({
+		const result = reviewRecordStep({
 			exec,
 			base: "main",
 			changedFiles: ["scripts/lib/x.mjs"],
 		});
 		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /no record/);
+		assert.match(result.detail, /no review record/);
 	});
 
-	it("FAILs when the record says sample=out but the branch changed code", () => {
+	it("FAILs when the record names a tool outside the allowed set", () => {
 		const { exec } = fakeExec({
 			"git log --no-merges": {
-				out: "subject\n\nReview-Measurement: sample=out\n",
+				out: "subject\n\nReview: tool=eyeballs\n",
 			},
 		});
-		const result = reviewMeasurementStep({
+		const result = reviewRecordStep({
 			exec,
 			base: "main",
 			changedFiles: ["scripts/lib/x.mjs"],
 		});
 		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /sample=out/);
+		assert.match(result.detail, /malformed record/);
 	});
 
 	it("PASSes a prose-only branch that carries no record", () => {
 		const { exec } = fakeExec({
 			"git log --no-merges": { out: "docs: x\n\nbody\n" },
 		});
-		const result = reviewMeasurementStep({
+		const result = reviewRecordStep({
 			exec,
 			base: "main",
 			changedFiles: ["docs/adr/0001-x.md"],

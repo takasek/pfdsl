@@ -37,7 +37,7 @@ import {
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
-	reviewMeasurementStep,
+	reviewRecordStep,
 	sizeDirectionStep,
 	wipTransitionStep,
 } from "./lib/gate-check-steps.mjs";
@@ -248,9 +248,9 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 // granularity stays MANUAL)
 results.push(commitSubjectStep({ exec, base }));
 
-// 8b. Review-Measurement record: judged here, before the PR, because the
-// trailer lives in a commit message and cannot be added afterwards (#698).
-results.push(reviewMeasurementStep({ exec, base, changedFiles }));
+// 8b. Review record: judged here, before the PR, because the trailer lives
+// in a commit message and cannot be added afterwards (#698).
+results.push(reviewRecordStep({ exec, base, changedFiles }));
 
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(
