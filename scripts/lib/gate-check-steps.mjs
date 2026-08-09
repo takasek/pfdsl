@@ -33,10 +33,9 @@ import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
 import {
 	classifyCycle,
-	mergeCycleRecords,
-	parseMeasurementRecords,
+	parseReviewRecords,
 	RECORD_SEP,
-} from "./review-measurement.mjs";
+} from "./review-record.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
 
@@ -404,18 +403,17 @@ export function checkDocsStep({ exec }) {
 }
 
 /**
- * Review-Measurement record: does this branch carry a trailer consistent with
- * what it changed? The rule says the trailer cannot be added after the fact —
- * it is part of a commit message — yet every detector for it used to sit after
- * the merge, where the only fix left is rewriting history.
+ * Review record: does this branch carry a trailer for the code it changed?
+ * The rule says the trailer cannot be added after the fact — it is part of a
+ * commit message — yet every detector for it used to sit after the merge,
+ * where the only fix left is rewriting history.
  *
- * The verdict is classifyCycle's, called on `origin/<base>...HEAD` the way the
- * aggregate script calls it on a merge. Nothing is decided here that the
- * merged-history audit would decide differently; a malformed record is reported
- * because parseMeasurementTrailer already judged it, not as an extra rule.
+ * The verdict is classifyCycle's, called on `origin/<base>...HEAD`. A
+ * malformed record is reported because parseReviewTrailer already judged it,
+ * not as an extra rule.
  */
-export function reviewMeasurementStep({ exec, base, changedFiles }) {
-	const name = "Review-Measurement record";
+export function reviewRecordStep({ exec, base, changedFiles }) {
+	const name = "Review record";
 	const bodies = exec("git", [
 		"log",
 		"--no-merges",
@@ -424,16 +422,13 @@ export function reviewMeasurementStep({ exec, base, changedFiles }) {
 	]);
 	if (!bodies.ok) return { name, status: "FAIL", detail: bodies.out.trim() };
 
-	const records = parseMeasurementRecords(bodies.out);
-	const merged = mergeCycleRecords(records);
-	const { issues } = classifyCycle({
-		changedFiles: changedFiles.join("\n"),
-		trailerCount: records.length,
-		sample: merged?.sample,
+	const records = parseReviewRecords(bodies.out);
+	const problems = classifyCycle({
+		changedFiles,
+		recordCount: records.length,
 	});
-
-	const problems = issues.map((i) => i.detail);
-	if (merged?.error) problems.push(`malformed record: ${merged.error}`);
+	for (const r of records.filter((r) => r.error))
+		problems.push(`malformed record: ${r.error}`);
 	if (problems.length > 0)
 		return { name, status: "FAIL", detail: problems.join("; ") };
 	return {

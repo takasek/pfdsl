@@ -78,7 +78,7 @@ describe("matchesGlob", () => {
 	it("does not match a file in a sibling directory", () => {
 		assert.equal(
 			matchesGlob(
-				"scripts/review-measurement.test.mjs",
+				"scripts/check-review-record.test.mjs",
 				"scripts/lib/*.test.mjs",
 			),
 			false,
@@ -106,7 +106,7 @@ describe("matchesGlob", () => {
 	it("lets `**` match zero directories too", () => {
 		assert.equal(
 			matchesGlob(
-				"scripts/review-measurement.test.mjs",
+				"scripts/check-review-record.test.mjs",
 				"scripts/**/*.test.mjs",
 			),
 			true,
