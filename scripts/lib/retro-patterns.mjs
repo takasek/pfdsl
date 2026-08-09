@@ -101,23 +101,36 @@ export function checkPatternFile({ name, text }) {
 export const ALWAYS_TAG = "always";
 
 /**
- * Every tag that exists, with how many patterns carry it. This output is the
+ * Every tag that exists, with the patterns that carry it. This output is the
  * vocabulary: there is no canonical list elsewhere to drift from it.
+ *
+ * Patterns ride along rather than a count, so a reader picking a tag to read
+ * does not have to go read the whole catalog first to find out which
+ * patterns it names — the count would otherwise be the only thing visible
+ * before opening a file, closing the same circle #803 found in `tags`.
  *
  * Most-used first, then alphabetical. A tag that shows up once is visible as
  * such, which is how a typo or a synonym of an existing tag gets noticed.
- * @param {{tags: string[]}[]} patterns
- * @returns {{tag: string, count: number}[]}
+ * @template {{tags: string[]}} T
+ * @param {T[]} patterns
+ * @returns {{tag: string, patterns: T[]}[]}
  */
 export function collectTags(patterns) {
-	/** @type {Map<string, number>} */
-	const counts = new Map();
-	for (const { tags } of patterns) {
-		for (const tag of tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+	/** @type {Map<string, T[]>} */
+	const groups = new Map();
+	for (const p of patterns) {
+		for (const tag of p.tags) {
+			const group = groups.get(tag);
+			if (group) group.push(p);
+			else groups.set(tag, [p]);
+		}
 	}
-	return [...counts]
-		.map(([tag, count]) => ({ tag, count }))
-		.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+	return [...groups]
+		.map(([tag, patterns]) => ({ tag, patterns }))
+		.sort(
+			(a, b) =>
+				b.patterns.length - a.patterns.length || a.tag.localeCompare(b.tag),
+		);
 }
 
 /**
@@ -193,11 +206,12 @@ export function keyLinesOf(body) {
  * axis shows up here as a group of one, the same way a stray tag does.
  *
  * Axes come most-used first; unprefixed tags trail behind in an axis named "".
- * @param {{tag: string, count: number}[]} tags - as returned by collectTags.
- * @returns {{axis: string, tags: {tag: string, count: number}[]}[]}
+ * @template T
+ * @param {{tag: string, patterns: T[]}[]} tags - as returned by collectTags.
+ * @returns {{axis: string, tags: {tag: string, patterns: T[]}[]}[]}
  */
 export function groupTagsByAxis(tags) {
-	/** @type {Map<string, {tag: string, count: number}[]>} */
+	/** @type {Map<string, {tag: string, patterns: T[]}[]>} */
 	const axes = new Map();
 	for (const entry of tags) {
 		const axis = entry.tag.includes(":") ? entry.tag.split(":", 1)[0] : "";
@@ -205,8 +219,8 @@ export function groupTagsByAxis(tags) {
 		if (group) group.push(entry);
 		else axes.set(axis, [entry]);
 	}
-	const total = (/** @type {{count: number}[]} */ group) =>
-		group.reduce((sum, t) => sum + t.count, 0);
+	const total = (/** @type {{patterns: T[]}[]} */ group) =>
+		group.reduce((sum, t) => sum + t.patterns.length, 0);
 	return [...axes]
 		.map(([axis, group]) => ({ axis, tags: group }))
 		.sort((a, b) => {
@@ -235,6 +249,22 @@ function wordHits({ body }, words) {
 }
 
 /**
+ * The patterns any of these words hit, each with the lines they hit, in the
+ * given order. The one definition of "this word reaches this pattern": every
+ * caller that counts or ranks word matches goes through here, so widening the
+ * match (case folding, stemming) stays a single edit rather than a sweep.
+ * @template {{body: string}} T
+ * @param {T[]} patterns
+ * @param {string[]} words
+ * @returns {{pattern: T, hits: {word: string, line: number, text: string}[]}[]}
+ */
+function hitsFor(patterns, words) {
+	return patterns
+		.map((pattern) => ({ pattern, hits: wordHits(pattern, words) }))
+		.filter((m) => m.hits.length > 0);
+}
+
+/**
  * What to read this cycle, in three groups.
  *
  * The word search is not a fallback for when the tags come back empty. The
@@ -247,6 +277,12 @@ function wordHits({ body }, words) {
  * Hits carry the line they matched on, because a word search also finds
  * patterns that merely mention the term in an example, and telling those apart
  * is the reader's job, cheaply.
+ *
+ * `reach` counts each word's hits across every pattern, tagged or not, before
+ * `wordOnly` subtracts the ones the tags already caught. Without it, a word
+ * with zero hits in `wordOnly` reads as one signal ("the word found nothing")
+ * when it is really two: the word found nothing at all, or it found patterns
+ * the tags already had (#803).
  * @param {{tags: string[], body: string}[]} patterns
  * @param {{tags: string[], words: string[]}} query
  */
@@ -260,9 +296,30 @@ export function select(patterns, { tags, words }) {
 
 	const tagged = selectByTag(rest, tags);
 	const taggedSet = new Set(tagged);
-	const wordOnly = rest
-		.filter((p) => !taggedSet.has(p))
-		.map((pattern) => ({ pattern, hits: wordHits(pattern, words) }))
-		.filter((m) => m.hits.length > 0);
-	return { tagged, wordOnly, always };
+	const wordOnly = hitsFor(
+		rest.filter((p) => !taggedSet.has(p)),
+		words,
+	);
+	const reach = words.map((word) => ({
+		word,
+		count: hitsFor(patterns, [word]).length,
+	}));
+	return { tagged, wordOnly, always, reach };
+}
+
+/**
+ * Every pattern the given words hit anywhere in its body, ranked by how many
+ * lines they hit — for checking whether a pattern close to a draft already
+ * exists before writing a new one (#803).
+ *
+ * Unlike `select`, nothing is excluded and nothing is added: every pattern is
+ * a candidate, `always`-tagged ones included, because a near-duplicate check
+ * has no cycle to exclude patterns for already answering.
+ * @template {{tags: string[], body: string}} T
+ * @param {T[]} patterns
+ * @param {string[]} words
+ * @returns {{pattern: T, hits: {word: string, line: number, text: string}[]}[]}
+ */
+export function near(patterns, words) {
+	return hitsFor(patterns, words).sort((a, b) => b.hits.length - a.hits.length);
 }
