@@ -107,57 +107,55 @@ describe("parseReviewRecords", () => {
 
 describe("CODE_PATH", () => {
 	it("matches the code paths a cycle can change", () => {
-		assert.equal(CODE_PATH.test("scripts/lib/review-record.mjs\n"), true);
-		assert.equal(CODE_PATH.test("packages/core/src/parser.ts\n"), true);
+		assert.equal(CODE_PATH.test("scripts/lib/review-record.mjs"), true);
+		assert.equal(CODE_PATH.test("packages/core/src/parser.ts"), true);
 	});
 
 	it("does not match prose-only changes", () => {
-		assert.equal(
-			CODE_PATH.test(".pfdsl/roadmap.md\ndocs/adr/README.md\n"),
-			false,
-		);
-	});
-
-	it("matches when a code path appears on any line of a file list", () => {
-		assert.equal(
-			CODE_PATH.test("docs/adr/README.md\nscripts/gate-check.mjs\n"),
-			true,
-		);
+		assert.equal(CODE_PATH.test(".pfdsl/roadmap.md"), false);
+		assert.equal(CODE_PATH.test("docs/adr/README.md"), false);
 	});
 });
 
 describe("classifyCycle", () => {
 	it("reports nothing when a code cycle carries a record", () => {
-		const c = classifyCycle({
-			changedFiles: "scripts/a.mjs\n",
-			recordCount: 1,
-		});
-		assert.equal(c.changedCode, true);
-		assert.deepEqual(c.issues, []);
+		assert.deepEqual(
+			classifyCycle({ changedFiles: ["scripts/a.mjs"], recordCount: 1 }),
+			[],
+		);
 	});
 
 	it("reports a missing record when a code cycle carries none", () => {
-		const c = classifyCycle({
-			changedFiles: "packages/core/src/a.ts\n",
-			recordCount: 0,
-		});
-		assert.equal(c.changedCode, true);
-		assert.deepEqual(c.issues, [
-			{ type: "missing", detail: "changed code but carries no review record" },
-		]);
+		assert.deepEqual(
+			classifyCycle({
+				changedFiles: ["packages/core/src/a.ts"],
+				recordCount: 0,
+			}),
+			["changed code but carries no review record"],
+		);
+	});
+
+	it("reports it when the code path is one entry among prose ones", () => {
+		assert.deepEqual(
+			classifyCycle({
+				changedFiles: ["docs/adr/README.md", "scripts/gate-check.mjs"],
+				recordCount: 0,
+			}),
+			["changed code but carries no review record"],
+		);
 	});
 
 	it("stays silent about a prose cycle that carries no record", () => {
-		const c = classifyCycle({ changedFiles: "docs/a.md\n", recordCount: 0 });
-		assert.equal(c.changedCode, false);
-		assert.deepEqual(c.issues, []);
+		assert.deepEqual(
+			classifyCycle({ changedFiles: ["docs/a.md"], recordCount: 0 }),
+			[],
+		);
 	});
 
 	it("accepts a cycle that recorded several passes", () => {
-		const c = classifyCycle({
-			changedFiles: "scripts/a.mjs\n",
-			recordCount: 2,
-		});
-		assert.deepEqual(c.issues, []);
+		assert.deepEqual(
+			classifyCycle({ changedFiles: ["scripts/a.mjs"], recordCount: 2 }),
+			[],
+		);
 	});
 });

@@ -423,12 +423,10 @@ export function reviewRecordStep({ exec, base, changedFiles }) {
 	if (!bodies.ok) return { name, status: "FAIL", detail: bodies.out.trim() };
 
 	const records = parseReviewRecords(bodies.out);
-	const { issues } = classifyCycle({
-		changedFiles: changedFiles.join("\n"),
+	const problems = classifyCycle({
+		changedFiles,
 		recordCount: records.length,
 	});
-
-	const problems = issues.map((i) => i.detail);
 	for (const r of records.filter((r) => r.error))
 		problems.push(`malformed record: ${r.error}`);
 	if (problems.length > 0)

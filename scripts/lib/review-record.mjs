@@ -13,6 +13,8 @@
  * Process/git I/O lives in the caller scripts; this module stays testable.
  */
 
+import { matchesTrigger } from "./gate-check.mjs";
+
 /** Separator used by the callers' `git log --format` invocation. */
 export const RECORD_SEP = "\x1e";
 
@@ -25,7 +27,7 @@ const PAIR = /(\w+)=(?:"([^"]*)"|(\S+))/g;
  * statement of the same rule lives in the terminal-gate section of the
  * roadmap companion.
  */
-export const CODE_PATH = /^(packages|scripts)\//m;
+export const CODE_PATH = /^(packages|scripts)\//;
 
 /** The review tools the rule accepts. */
 export const REVIEW_TOOLS = ["code-review", "code-reviewer-agent", "simplify"];
@@ -121,17 +123,11 @@ export function parseReviewRecords(text) {
  * The only question this asks is whether a cycle that changed code carries
  * at least one record — a cycle that recorded several passes is not a
  * problem, it reviewed several times.
- * @param {{changedFiles: string, recordCount: number}} cycle
- * @returns {{changedCode: boolean, issues: Array<{type: string, detail: string}>}}
+ * @param {{changedFiles: string[], recordCount: number}} cycle
+ * @returns {string[]} one line per problem, empty when the cycle is in order
  */
 export function classifyCycle({ changedFiles, recordCount }) {
-	const changedCode = CODE_PATH.test(changedFiles);
-	const issues = [];
-	if (changedCode && recordCount === 0) {
-		issues.push({
-			type: "missing",
-			detail: "changed code but carries no review record",
-		});
-	}
-	return { changedCode, issues };
+	if (matchesTrigger(changedFiles, CODE_PATH) && recordCount === 0)
+		return ["changed code but carries no review record"];
+	return [];
 }
