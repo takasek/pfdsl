@@ -57,6 +57,30 @@ export function formatGateTable(results) {
 		.join("\n");
 }
 
+/**
+ * One line reporting which tree this gate actually ran against (#840).
+ *
+ * A worktree session's shell cwd can drift back to the main checkout between
+ * commands; a gate run there is silently checking a tree without the
+ * branch's changes, and a PASS from it reads exactly like a PASS from the
+ * worktree. This does not stop that run (verification-tree-guard.mjs's
+ * PreToolUse hook does, for the paths it can see) — it prints where the run
+ * happened, so a run that slipped past that guard (e.g. inside a subagent) is
+ * still checkable after the fact.
+ * @param {{root: string, mainRoot: string, branch: string | null}} params
+ *   - root: the tree gate-check actually inspected (its own script location,
+ *     not cwd — see the call site for why those can differ).
+ *   - mainRoot: the repo's main checkout, from `git rev-parse --git-common-dir`.
+ *   - branch: the branch checked out at `root`, or null when it could not be
+ *     resolved (detached HEAD, or the git calls failed).
+ * @returns {string}
+ */
+export function formatRunTreeLine({ root, mainRoot, branch }) {
+	const treeKind = root === mainRoot ? "main checkout" : "linked worktree";
+	const branchLabel = branch ? `branch ${branch}` : "branch unresolved";
+	return `gate-check: running in ${treeKind} (${root}), ${branchLabel}`;
+}
+
 /** Shared by both checks scoped to the output artifact, so they cannot drift apart. */
 export const NO_ARTIFACT_DETAIL =
 	"cycle declared it has no roadmap output artifact (--no-artifact)";
