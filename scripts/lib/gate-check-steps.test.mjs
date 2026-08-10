@@ -620,6 +620,39 @@ describe("designRecordStep", () => {
 		assert.equal(result.status, "SKIP");
 	});
 
+	// Review A-4: `timing.status === "SKIP" ? undefined : editNote` had no test
+	// asserting on `detail` for a SKIP row, so it could regress to always
+	// including or always dropping editNote without a test noticing. Uses the
+	// id-mismatch note (A-3) rather than a coincidentally-empty one, so a
+	// broken suppression would make this test fail on content, not on absence.
+	it("suppresses the edit note on a SKIP row, even when edit detection has its own note to report", () => {
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				body: "普通の説明文。",
+				comments: [
+					{
+						id: "c1",
+						author: { login: "owner" },
+						body: validRecordBody,
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
+			}),
+			editInfo: {
+				issueLastEditedAt: null,
+				comments: {
+					totalCount: 1,
+					nodes: [{ id: "different-id", lastEditedAt: null }],
+				},
+			},
+		});
+		assert.equal(result.status, "SKIP");
+		assert.doesNotMatch(result.detail ?? "", /id not found/);
+	});
+
 	// #768: the #757 shape — the decision led to not implementing, and a
 	// later, unrelated PR happens to be what closes this issue's range. The
 	// range is not empty, so the no-commit SKIP above never fires; the record
