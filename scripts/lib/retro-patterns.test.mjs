@@ -74,9 +74,16 @@ describe("selectByTag", () => {
 	it("unions the given tags rather than intersecting them", () => {
 		assert.deepEqual(
 			selectByTag(patterns, ["method:delegate", "method:remove"]).map(
-				(p) => p.name,
+				(m) => m.pattern.name,
 			),
 			["委譲A", "委譲B", "無関係"],
+		);
+	});
+
+	it("carries the tags each pattern matched, not the ones it merely has", () => {
+		assert.deepEqual(
+			selectByTag(patterns, ["method:delegate"]).map((m) => m.matched),
+			[["method:delegate"], ["method:delegate"]],
 		);
 	});
 

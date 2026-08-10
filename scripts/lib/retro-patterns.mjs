@@ -134,7 +134,8 @@ export function collectTags(patterns) {
 }
 
 /**
- * The patterns carrying any of these tags, in catalog order.
+ * The patterns carrying any of these tags, in catalog order, each with the
+ * tags it actually matched.
  *
  * A union, never an intersection, and there is deliberately no intersecting
  * counterpart. Measured on the real catalog, intersecting two axes cuts a
@@ -142,12 +143,23 @@ export function collectTags(patterns) {
  * silently, which is the failure this whole catalog exists to catch. An
  * operation that looks reasonable and loses eleven patterns should not be
  * one keystroke away.
- * @param {{tags: string[]}[]} patterns
+ *
+ * Membership and the matched list come out of the same pass, so "this tag
+ * reaches this pattern" has one definition — widening the match (prefixes,
+ * synonyms) stays a single edit rather than a sweep, the same reason `hitsFor`
+ * is the sole definition on the word side.
+ * @template {{tags: string[]}} T
+ * @param {T[]} patterns
  * @param {string[]} tags
- * @returns {{tags: string[]}[]}
+ * @returns {{pattern: T, matched: string[]}[]}
  */
 export function selectByTag(patterns, tags) {
-	return patterns.filter((p) => tags.some((tag) => p.tags.includes(tag)));
+	return patterns
+		.map((pattern) => ({
+			pattern,
+			matched: pattern.tags.filter((tag) => tags.includes(tag)),
+		}))
+		.filter((m) => m.matched.length > 0);
 }
 
 /**
@@ -309,14 +321,10 @@ export function select(patterns, { tags, words }) {
 	for (const p of patterns)
 		(p.tags.includes(ALWAYS_TAG) ? always : rest).push(p);
 
-	const matching = selectByTag(rest, tags);
-	const tagged = matching
-		.map((pattern) => ({
-			pattern,
-			matched: pattern.tags.filter((tag) => tags.includes(tag)),
-		}))
-		.sort((a, b) => b.matched.length - a.matched.length);
-	const taggedSet = new Set(matching);
+	const tagged = selectByTag(rest, tags).sort(
+		(a, b) => b.matched.length - a.matched.length,
+	);
+	const taggedSet = new Set(tagged.map((t) => t.pattern));
 	const wordOnly = hitsFor(
 		rest.filter((p) => !taggedSet.has(p)),
 		words,
