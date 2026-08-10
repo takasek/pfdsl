@@ -2658,8 +2658,18 @@ Print the direct predecessors (in-edges) and successors (out-edges) of a
 node — its immediate producer(s)/consumer(s) only, not the full closure.
 Feedback (\`>>?\`) neighbors are included, annotated \`(feedback)\` in text.
 
-  --json      output as JSON ({ ok, predecessors, successors }), each neighbor
-              { id, kind: "primary" | "feedback" }
+Text mode leads with \`<id> (<kind>)\`, then names the kind the neighbors
+share on each list: \`predecessors (process): design\`. Every edge runs
+artifact -> process or process -> artifact, so all of a node's neighbors
+have the kind opposite its own — naming it per list saves a \`describe\` per
+neighbor to classify them. A group has no edges, so its lists stay bare
+(\`predecessors: (none)\`) and \`neighborKind\` is null.
+
+  --json      output as JSON ({ ok, id, kind, neighborKind, predecessors,
+              successors }), each neighbor { id, kind: "primary" | "feedback" }
+              — the neighbor's own \`kind\` is the edge's, the top-level
+              \`kind\` is the queried node's, and \`neighborKind\` is the kind
+              every neighbor has (null for a group)
               on failure: { ok: false, diagnostics } / { ok: false, missing }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
@@ -2712,11 +2722,16 @@ it appears in the file (same as \`graph locate\`) — folding several
 read-only queries an agent would otherwise make separately into one.
 
 Only the node named by <id> is described: neighbors are listed by id, so
-their own kind and fields take a \`describe\` (or \`meta get\`) of their own.
+their fields take a \`describe\` (or \`meta get\`) of their own. Their kind
+does not — the neighbor lists name it once (\`predecessors (artifact): req\`,
+\`neighborKind\` in --json), the same as \`graph neighbors\`.
 
-  --json      output as JSON ({ ok, id, kind, meta, predecessors, successors,
-              declarationLine: number | null, edgeLines: number[] }), each
-              neighbor { id, kind: "primary" | "feedback" }
+  --json      output as JSON ({ ok, id, kind, meta, neighborKind,
+              predecessors, successors, declarationLine: number | null,
+              edgeLines: number[] }), each neighbor
+              { id, kind: "primary" | "feedback" } — that \`kind\` is the
+              edge's, while \`neighborKind\` is the kind the neighbors
+              themselves share (null for a group, which has none)
               on failure: { ok: false, diagnostics } / { ok: false, missing }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
