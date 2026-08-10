@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { loadFrontmatter } from "./frontmatter.js";
 import { parseFrontmatterCst, setFrontmatterField } from "./frontmatter-cst.js";
 
+describe("parseFrontmatterCst yamlText", () => {
+	it("captures the raw yaml text between the fences", () => {
+		const src = "---\nartifact:\n  spec:\n    status: todo\n---\na >> P -> b\n";
+		const cst = parseFrontmatterCst(src);
+		expect(cst.yamlText).toBe("artifact:\n  spec:\n    status: todo");
+	});
+
+	it("is empty when there is no frontmatter", () => {
+		const cst = parseFrontmatterCst("a >> P -> b\n");
+		expect(cst.yamlText).toBe("");
+	});
+});
+
 describe("setFrontmatterField", () => {
 	it("replaces an existing field's value", () => {
 		const src = "---\nartifact:\n  spec:\n    status: todo\n---\na >> P -> b\n";

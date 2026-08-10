@@ -19,6 +19,13 @@ export interface FrontmatterCst {
 	/** Everything in `source` after the closing fence — the pfdsl body, verbatim. */
 	body: string;
 	/**
+	 * The frontmatter's raw YAML text (LF-normalized), exactly as parsed into
+	 * `doc`. `""` when `present` is false. Kept alongside the parsed `doc` so
+	 * `renderFrontmatterCst` can diff re-rendered folded scalars against what
+	 * the author actually wrote (#815).
+	 */
+	yamlText: string;
+	/**
 	 * The line ending `source` is written with, taken from its first line
 	 * break. A file mixing both styles is treated as being in the style of its
 	 * first break: the write path's job is to leave the file no more mixed
@@ -43,11 +50,23 @@ function detectNewline(source: string): "\n" | "\r\n" {
 export function parseFrontmatterCst(source: string): FrontmatterCst {
 	const newline = detectNewline(source);
 	if (!source.startsWith("---")) {
-		return { present: false, doc: new Document(), body: source, newline };
+		return {
+			present: false,
+			doc: new Document(),
+			body: source,
+			yamlText: "",
+			newline,
+		};
 	}
 	const firstNl = source.indexOf("\n");
 	if (firstNl === -1) {
-		return { present: false, doc: new Document(), body: source, newline };
+		return {
+			present: false,
+			doc: new Document(),
+			body: source,
+			yamlText: "",
+			newline,
+		};
 	}
 	let lineStart = firstNl + 1;
 	let closingStart = -1;
@@ -64,7 +83,13 @@ export function parseFrontmatterCst(source: string): FrontmatterCst {
 		lineStart = nl + 1;
 	}
 	if (closingStart === -1) {
-		return { present: false, doc: new Document(), body: source, newline };
+		return {
+			present: false,
+			doc: new Document(),
+			body: source,
+			yamlText: "",
+			newline,
+		};
 	}
 	// Under CRLF the closing fence's own line break is two characters, so
 	// slicing to `closingStart - 1` leaves a \r on the last yaml line — which
@@ -77,7 +102,13 @@ export function parseFrontmatterCst(source: string): FrontmatterCst {
 			? source.slice(firstNl + 1, closingStart - 1).replace(/\r$/, "")
 			: "";
 	const body = closingEnd === source.length ? "" : source.slice(closingEnd + 1);
-	return { present: true, doc: parseDocument(yamlText), body, newline };
+	return {
+		present: true,
+		doc: parseDocument(yamlText),
+		body,
+		yamlText,
+		newline,
+	};
 }
 
 /**
