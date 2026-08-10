@@ -1169,48 +1169,45 @@ function commandCwdDerived(docFsPath: string, basePath?: string): string {
 	return resolveLocationFsPath(docFsPath, ".", basePath);
 }
 
-export function runGet(file: string, opts: GetOptions = {}): CommandResult {
-	if (!opts.id) return fail(`error: id is required\n\n${HELP_GET}`, 2);
-	const ids = splitCommaList(opts.id);
-	if (ids.length === 0) return fail(`error: id is required\n\n${HELP_GET}`, 2);
-
-	// Omitted field positional means "all set fields"; present-but-empty
-	// (e.g. an empty/blank field positional) is still a usage error.
-	const explicitFields =
-		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
-	if (explicitFields !== undefined && explicitFields.length === 0) {
-		return fail(`error: field is required\n\n${HELP_GET}`, 2);
+/** Takes the kind the caller already resolved (nodeKinds.get(id)). Listing the
+ * three kinds exhaustively lets tsc flag a new NodeKind instead (#607). */
+function metaFor(
+	frontmatter: ReturnType<typeof analyze>["frontmatter"],
+	id: string,
+	kind: NodeKind,
+): Record<string, unknown> | undefined {
+	switch (kind) {
+		case "artifact":
+			return frontmatter?.artifact?.[id];
+		case "process":
+			return frontmatter?.process?.[id];
+		case "group":
+			return frontmatter?.group?.[id];
 	}
+}
 
-	const src = readSource(file);
-	if (isCommandResult(src)) return src;
+interface NodeFieldsResult {
+	values: Record<string, Record<string, unknown>>;
+	displayFieldsById: Record<string, string[]>;
+	warnText: string;
+}
 
-	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
-	if (failed) return failed;
-
-	const basePath = frontmatter?.basePath;
-	const docFsPath = file === "-" ? null : resolve(file);
-
-	// Takes the kind the caller already resolved: ids absent from nodeKinds are
-	// collected as missing before this runs, so a fall-through case here would
-	// be unreachable. Listing the three kinds exhaustively lets tsc flag a new
-	// NodeKind instead (#607).
-	const metaFor = (
-		id: string,
-		kind: NodeKind,
-	): Record<string, unknown> | undefined => {
-		switch (kind) {
-			case "artifact":
-				return frontmatter?.artifact?.[id];
-			case "process":
-				return frontmatter?.process?.[id];
-			case "group":
-				return frontmatter?.group?.[id];
-		}
-	};
-
-	const missing: string[] = [];
+/**
+ * Shared field-rendering core of `meta get` and `meta list`: for each
+ * (id, kind) pair, builds the row of field values — the explicit field list,
+ * or (when omitted) every field set on the node, raw, in frontmatter order —
+ * plus derived fields (`location.resolved`, `command.cwd`) auto-added right
+ * after their base field. Also collects the warning families both commands
+ * emit (an unrecognized field name; a derived field unresolvable from stdin)
+ * into one formatted block.
+ */
+function collectNodeFields(
+	idsAndKinds: readonly { id: string; kind: NodeKind }[],
+	frontmatter: ReturnType<typeof analyze>["frontmatter"],
+	explicitFields: string[] | undefined,
+	docFsPath: string | null,
+	basePath: string | undefined,
+): NodeFieldsResult {
 	// Keyed by "kind::field" so one warning covers every id sharing that
 	// (kind, field) pair instead of repeating per id (#479 usability re-check).
 	const unknownFieldIds = new Map<string, string[]>();
@@ -1236,13 +1233,8 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	const values: Record<string, Record<string, unknown>> = {};
 	const displayFieldsById: Record<string, string[]> = {};
 
-	for (const id of ids) {
-		const kind = nodeKinds.get(id);
-		if (kind === undefined) {
-			missing.push(id);
-			continue;
-		}
-		const meta = metaFor(id, kind);
+	for (const { id, kind } of idsAndKinds) {
+		const meta = metaFor(frontmatter, id, kind);
 		const row: Record<string, unknown> = {};
 		const displayFields: string[] = [];
 		const addField = (field: string) => {
@@ -1320,7 +1312,51 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 			`warning: cannot resolve '${field}' for ${affectedIds.length === 1 ? `'${affectedIds[0]}'` : `id(s) ${affectedIds.join(", ")}`}: no file path when reading from stdin`,
 	);
 	const warnings = [...unknownWarnings, ...stdinWarnings];
-	const warnText = warnings.length ? `${warnings.join("\n")}\n` : "";
+	return {
+		values,
+		displayFieldsById,
+		warnText: warnings.length ? `${warnings.join("\n")}\n` : "",
+	};
+}
+
+export function runGet(file: string, opts: GetOptions = {}): CommandResult {
+	if (!opts.id) return fail(`error: id is required\n\n${HELP_GET}`, 2);
+	const ids = splitCommaList(opts.id);
+	if (ids.length === 0) return fail(`error: id is required\n\n${HELP_GET}`, 2);
+
+	// Omitted field positional means "all set fields"; present-but-empty
+	// (e.g. an empty/blank field positional) is still a usage error.
+	const explicitFields =
+		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
+	if (explicitFields !== undefined && explicitFields.length === 0) {
+		return fail(`error: field is required\n\n${HELP_GET}`, 2);
+	}
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const basePath = frontmatter?.basePath;
+	const docFsPath = file === "-" ? null : resolve(file);
+
+	const missing: string[] = [];
+	const known: { id: string; kind: NodeKind }[] = [];
+	for (const id of ids) {
+		const kind = nodeKinds.get(id);
+		if (kind === undefined) missing.push(id);
+		else known.push({ id, kind });
+	}
+
+	const { values, displayFieldsById, warnText } = collectNodeFields(
+		known,
+		frontmatter,
+		explicitFields,
+		docFsPath,
+		basePath,
+	);
 
 	const linesFor = (idsToPrint: string[]) =>
 		idsToPrint.flatMap((id) =>
