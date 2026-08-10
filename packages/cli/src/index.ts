@@ -28,6 +28,7 @@ import {
 	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
+	locateNode,
 	type NodeKind,
 	type PfdType,
 	reindex,
@@ -1627,6 +1628,39 @@ export function runNeighbors(
 	);
 }
 
+/**
+ * Where <id> appears in the file: its frontmatter declaration key line (if
+ * any) and every body line it's mentioned on. `loadGraph` doesn't expose the
+ * source text it read, and `locateNode` needs it, so this reads and analyzes
+ * the file itself rather than going through that shared loader.
+ */
+export function runGraphLocate(
+	file: string,
+	id: string,
+	opts: GraphAnalysisOptions = {},
+): CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, graph } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+	if (!graph.nodes.has(id)) return idsNotFoundError(file, [id], opts.json);
+
+	const { declarationLine, edgeLines } = locateNode(src, id);
+
+	if (opts.json) {
+		return ok(
+			`${JSON.stringify({ ok: true, id, declarationLine, edgeLines })}\n`,
+		);
+	}
+	const lines: string[] = [];
+	if (declarationLine !== null) {
+		lines.push(`${file}:${declarationLine}: declaration`);
+	}
+	for (const line of edgeLines) lines.push(`${file}:${line}: edge`);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "");
+}
+
 export function runImpact(
 	file: string,
 	id: string,
@@ -2424,6 +2458,25 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
+const HELP_GRAPH_LOCATE = `usage: pfdsl graph locate <file|-> <id> [--json] [--no-color]
+
+Print every place <id> appears in the file: its frontmatter declaration key
+line (\`declaration\`) and every body line it's mentioned in an edge or a
+bare node-decl on (\`edge\`) — the line numbers a Read/Edit tool call needs,
+without opening the whole file first. Text mode prints one occurrence per
+line, declaration before edge, each edge line ascending.
+
+  --json      output as JSON ({ ok, id, declarationLine: number | null,
+              edgeLines: number[] })
+              on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success
+  1  id not found in the file
+  2  invalid usage (missing id)
+`;
+
 const HELP_IMPACT = `usage: pfdsl graph impact <file|-> <id> [--json] [--no-color]
 
 Print the full downstream closure reachable from <id> via primary edges
@@ -2590,6 +2643,7 @@ Subcommands:
   io <file|->                 Print external inputs and terminal artifacts
   stats <file|-> [--limit]    Rank nodes by fan-in/fan-out degree
   neighbors <file|-> <id>     Direct predecessors/successors of a node
+  locate <file|-> <id>        Frontmatter declaration line and body edge lines of a node
   impact <file|-> <id>        Full downstream closure of a node
   depends-on <file|-> <id>    Full upstream closure of a node
   path <file|-> <from> <to> [--limit]
@@ -2646,7 +2700,7 @@ Commands:
                            Structural diff (text), or visual diff DOT/SVG
 
 Command groups (run \`pfdsl <group>\` for their subcommands):
-  graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans
+  graph summary|io|stats|neighbors|locate|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
   meta get|list|set|sort|reindex|check-links
                            Read and write frontmatter metadata
@@ -2757,6 +2811,15 @@ function runGraphGroup(
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
 			return runNeighbors(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		}
+		case "locate": {
+			if (flags.help) return ok(HELP_GRAPH_LOCATE);
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_GRAPH_LOCATE, 2);
+			return runGraphLocate(f, id, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});

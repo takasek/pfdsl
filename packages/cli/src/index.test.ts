@@ -4074,6 +4074,86 @@ p3 -> d
 			expect(r.stdout).toBe("(none)\n");
 		});
 	});
+
+	describe("locate", () => {
+		const src = `---
+artifact:
+  spec:
+    label: Spec
+process:
+  design:
+    label: Design
+---
+req >> design -> spec
+`;
+
+		it("prints the declaration line then the edge line(s) as text", async () => {
+			const f = join(dir, "locate.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(`${f}:6: declaration\n${f}:9: edge\n`);
+		});
+
+		it("--json emits { ok, id, declarationLine, edgeLines }", async () => {
+			const f = join(dir, "locate-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+			});
+		});
+
+		it("uses - as the file part of a text line when reading from stdin", async () => {
+			const r = await run(["graph", "locate", "-", "design"], withStdin(src));
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("-:6: declaration\n-:9: edge\n");
+		});
+
+		it("a node declared only via a bare node-decl has no declaration line, only edge line(s)", async () => {
+			const f = join(dir, "locate-isolated.pfdsl");
+			writeFileSync(f, "req >> design -> spec\niso\n");
+			const r = await run(["graph", "locate", f, "iso", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "iso",
+				declarationLine: null,
+				edgeLines: [2],
+			});
+		});
+
+		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
+			const f = join(dir, "locate-notfound.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "nonexistent"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
+		});
+
+		it("--json on id-not-found emits { ok: false, missing } on stdout, empty stderr", async () => {
+			const f = join(dir, "locate-notfound-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "nonexistent", "--json"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: false,
+				missing: ["nonexistent"],
+			});
+		});
+
+		it("exits 2 when the id argument is missing", async () => {
+			const f = join(dir, "locate-missing.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f]);
+			expect(r.exitCode).toBe(2);
+		});
+	});
 });
 
 // Regression tests for the code-review findings on the restructure PR (#506).
