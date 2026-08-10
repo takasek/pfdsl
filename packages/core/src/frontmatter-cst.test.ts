@@ -1,6 +1,478 @@
 import { describe, expect, it } from "vitest";
+import { parseDocument } from "yaml";
 import { loadFrontmatter } from "./frontmatter.js";
-import { parseFrontmatterCst, setFrontmatterField } from "./frontmatter-cst.js";
+import {
+	parseFrontmatterCst,
+	renderFrontmatterCst,
+	setFrontmatterField,
+} from "./frontmatter-cst.js";
+
+describe("parseFrontmatterCst yamlText", () => {
+	it("captures the raw yaml text between the fences", () => {
+		const src = "---\nartifact:\n  spec:\n    status: todo\n---\na >> P -> b\n";
+		const cst = parseFrontmatterCst(src);
+		expect(cst.yamlText).toBe("artifact:\n  spec:\n    status: todo");
+	});
+
+	it("is empty when there is no frontmatter", () => {
+		const cst = parseFrontmatterCst("a >> P -> b\n");
+		expect(cst.yamlText).toBe("");
+	});
+});
+
+// The `yaml` package's `Document#toString({ lineWidth: 0 })` re-serializes
+// every BLOCK_FOLDED (`>`) scalar onto a single continuation line, discarding
+// any line wraps the author put in by hand. `renderFrontmatterCst`'s
+// optional third argument re-splices the author's original wraps back into
+// the rendered folded scalars — reindented onto the render's own (canonical)
+// indentation — as long as the scalar's decoded value is unchanged (#815).
+describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", () => {
+	/**
+	 * Parse `yamlText`, apply `mutate` to the resulting doc, then render with
+	 * fold-preservation against the original text. Strips the `---` fences
+	 * `renderFrontmatterCst` always adds, so callers can assert on the yaml
+	 * content alone.
+	 */
+	function renderMutated(
+		yamlText: string,
+		mutate: (doc: ReturnType<typeof parseDocument>) => void,
+	): string {
+		const doc = parseDocument(yamlText);
+		mutate(doc);
+		const block = renderFrontmatterCst(doc, "\n", yamlText);
+		return block.slice(4, -4);
+	}
+
+	it("keeps a hand-wrapped >, folded scalar's line breaks when a sibling field changes", () => {
+		const src = `artifact:
+  a:
+    description: >
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      Hello
+      world.
+    status: done
+`);
+	});
+
+	it("preserves the >- strip chomping indicator alongside the wraps", () => {
+		const src = `artifact:
+  a:
+    description: >-
+      Hello
+      world.
+
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >-
+      Hello
+      world.
+
+    status: done
+`);
+	});
+
+	it("preserves the >+ keep chomping indicator alongside the wraps", () => {
+		const src = `artifact:
+  a:
+    description: >+
+      Hello
+      world.
+
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >+
+      Hello
+      world.
+
+    status: done
+`);
+	});
+
+	it("preserves a more-indented (hanging) line and blank lines inside the fold", () => {
+		const src = `artifact:
+  a:
+    description: >
+      Para one.
+
+        more indented line.
+
+      Para two.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      Para one.
+
+        more indented line.
+
+      Para two.
+    status: done
+`);
+	});
+
+	it("preserves multiple folded fields in the same file independently", () => {
+		const src = `artifact:
+  a:
+    description: >
+      Hello
+      world.
+  b:
+    description: >
+      Second
+      one.
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "label"], "A"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      Hello
+      world.
+    label: A
+  b:
+    description: >
+      Second
+      one.
+`);
+	});
+
+	it("preserves wraps on an anchored folded scalar", () => {
+		const src = `artifact:
+  a:
+    description: &anc >
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: &anc >
+      Hello
+      world.
+    status: done
+`);
+	});
+
+	it("preserves wraps on a folded scalar reached through a nested path", () => {
+		const src = `artifact:
+  a:
+    b:
+      description: >
+        Hello
+        world.
+      status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "b", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    b:
+      description: >
+        Hello
+        world.
+      status: done
+`);
+	});
+
+	it("canonicalizes 8-space continuation indentation to the render's 2-space indent, keeping the wraps", () => {
+		const src = `artifact:
+  a:
+    description: >
+        Hello
+        world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      Hello
+      world.
+    status: done
+`);
+	});
+
+	// reindentFold's indentation measurement used JS's line.trimStart(),
+	// which strips Unicode whitespace generally, not just YAML's ASCII-space
+	// indentation. A continuation line that itself starts with a full-width
+	// space (U+3000) or NBSP (U+00A0) — plausible for a hand-indented
+	// Japanese paragraph — inflated the measured indent by one, and slicing
+	// at that inflated indent then ate the leading full-width-space/NBSP
+	// character out of the decoded value (#815).
+	it("does not eat a leading full-width space from continuation lines", () => {
+		const src = `artifact:
+  a:
+    description: >
+      　最初の行です。
+      　次の行です。
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      　最初の行です。
+      　次の行です。
+    status: done
+`);
+	});
+
+	it("does not eat a leading NBSP from continuation lines", () => {
+		const src =
+			"artifact:\n  a:\n    description: >\n      \u00a0first line.\n      \u00a0second line.\n    status: todo\n";
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(
+			"artifact:\n  a:\n    description: >\n      \u00a0first line.\n      \u00a0second line.\n    status: done\n",
+		);
+	});
+
+	// reindentFold used to test the whole header line for a digit to detect
+	// an explicit indentation indicator (`>2`), so a header-line comment
+	// containing a digit (e.g. an issue number) made it wrongly bail out and
+	// stop preserving the wraps, even though there is no indentation
+	// indicator at all (#815).
+	it("preserves wraps when the fold header has a trailing comment containing a digit", () => {
+		const src = `artifact:
+  a:
+    description: > # note 815
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: > # note 815
+      Hello
+      world.
+    status: done
+`);
+	});
+
+	it("does not preserve wraps when the scalar has an explicit indentation indicator (>2)", () => {
+		const src = `artifact:
+  a:
+    description: >2
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      Hello world.
+    status: done
+`);
+	});
+
+	// YAML allows the chomping and indentation indicators after `>` in either
+	// order; both must still be detected as "explicit indicator present".
+	it("does not preserve wraps when the indicator is indentation-then-chomping (>2-)", () => {
+		const src = `artifact:
+  a:
+    description: >2-
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >-
+      Hello world.
+    status: done
+`);
+	});
+
+	it("does not preserve wraps when the indicator is chomping-then-indentation (>-2)", () => {
+		const src = `artifact:
+  a:
+    description: >-2
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >-
+      Hello world.
+    status: done
+`);
+	});
+
+	it("re-serializes (does not preserve) a folded field whose own value was rewritten", () => {
+		const src = `artifact:
+  a:
+    description: >
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "description"], "changed value"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >-
+      changed value
+    status: todo
+`);
+	});
+
+	// parseFrontmatterCst's yamlText slice excludes the closing fence's own
+	// line break (#644), so when a fold is the last field in the frontmatter,
+	// origRaw is missing the trailing newline that newRaw's render always has.
+	// reindentFold used to build the replacement purely from origRaw's line
+	// structure, losing that newline and merging the closing fence into the
+	// fold's last continuation line (#815).
+	describe("keeps newRaw's trailing newline count when the fold is the document's last field (#815)", () => {
+		it("clip chomping (>)", () => {
+			const src = `artifact:
+  a:
+    status: todo
+    description: >
+      Hello
+      world.`;
+			const out = renderMutated(src, (doc) =>
+				doc.setIn(["artifact", "a", "status"], "done"),
+			);
+			expect(out).toBe(`artifact:
+  a:
+    status: done
+    description: >
+      Hello
+      world.
+`);
+		});
+
+		it("strip chomping (>-)", () => {
+			const src = `artifact:
+  a:
+    status: todo
+    description: >-
+      Hello
+      world.`;
+			const out = renderMutated(src, (doc) =>
+				doc.setIn(["artifact", "a", "status"], "done"),
+			);
+			expect(out).toBe(`artifact:
+  a:
+    status: done
+    description: >-
+      Hello
+      world.
+`);
+		});
+
+		it("keep chomping (>+), preserving a trailing blank line as part of the value", () => {
+			const src = `artifact:
+  a:
+    status: todo
+    description: >+
+      Hello
+      world.
+
+`;
+			const out = renderMutated(src, (doc) =>
+				doc.setIn(["artifact", "a", "status"], "done"),
+			);
+			expect(out).toBe(`artifact:
+  a:
+    status: done
+    description: >+
+      Hello
+      world.
+
+`);
+		});
+	});
+
+	// collectFoldedScalars used to build a fold's `keys` path from only the
+	// `isPair` steps on its `visit` path, dropping the sequence index. When a
+	// map key inside a sequence element happened to be numeric, that number
+	// was read back as the dropped index and resolved to a *different* seq
+	// element — splicing one fold's wraps onto another node entirely (#815).
+	// ADR-0037 already scopes fold preservation out of sequences; this locks
+	// that in as an explicit skip rather than an accident of `getIn` missing.
+	it("does not preserve wraps on folded scalars inside a sequence, even with a numeric map key (ADR-0037)", () => {
+		const src = `seqfield:
+  - 3: >
+      shared value
+      wrapped here
+  - one
+  - two
+  - >
+      shared value
+      wrapped here
+`;
+		const withFold = renderMutated(src, () => {});
+		const withoutFold = (() => {
+			const doc = parseDocument(src);
+			return renderFrontmatterCst(doc, "\n").slice(4, -4);
+		})();
+		expect(withFold).toBe(withoutFold);
+	});
+
+	it("leaves output unchanged when there are no folded scalars (no regression)", () => {
+		const src = `artifact:
+  a:
+    label: A
+`;
+		const withFold = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "label"], "B"),
+		);
+		const withoutFold = (() => {
+			const doc = parseDocument(src);
+			doc.setIn(["artifact", "a", "label"], "B");
+			return renderFrontmatterCst(doc, "\n").slice(4, -4);
+		})();
+		expect(withFold).toBe(withoutFold);
+	});
+});
 
 describe("setFrontmatterField", () => {
 	it("replaces an existing field's value", () => {
@@ -202,5 +674,48 @@ describe("setFrontmatterField", () => {
 			"done",
 		);
 		expect(out).toContain("req(v2):\n    status: done");
+	});
+
+	// Document#toString({ lineWidth: 0 }) would otherwise collapse a folded
+	// (`>`) scalar's hand-chosen line wraps onto one continuation line (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks on a sibling field", () => {
+		const src =
+			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
+		const out = setFrontmatterField(src, "artifact", "a", "status", "done");
+		expect(out).toBe(
+			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: done\n---\na >> P -> b\n",
+		);
+	});
+
+	// When the fold is the frontmatter's last field, parseFrontmatterCst's
+	// yamlText slice has already dropped the trailing newline the closing
+	// fence's own line break carried, and the write path used to fail to make
+	// that up on re-splice — gluing the fence onto the fold's last line (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
+		const src =
+			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n---\na >> P -> b\n";
+		const out = setFrontmatterField(src, "artifact", "a", "status", "done");
+		expect(out).toBe(
+			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: done\n---\na >> P -> b\n",
+		);
+	});
+
+	// preserveFolds guards on node.value !== fold.value precisely so that
+	// rewriting the folded field's own value doesn't keep its stale wraps —
+	// exercise that guard through the public setFrontmatterField entry point,
+	// not just the internal preserveFolds unit tests above.
+	it("re-serializes the folded field itself, without its stale wraps, when its own value is rewritten", () => {
+		const src =
+			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
+		const out = setFrontmatterField(
+			src,
+			"artifact",
+			"a",
+			"description",
+			"changed value",
+		);
+		expect(out).toBe(
+			"---\nartifact:\n  a:\n    description: >-\n      changed value\n    status: todo\n---\na >> P -> b\n",
+		);
 	});
 });

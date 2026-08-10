@@ -285,7 +285,7 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	const frontmatterCst = parseFrontmatterCst(source);
 	const frontmatterSection =
 		frontmatterCst.present && frontmatterCst.doc.errors.length === 0
-			? renderFrontmatterCst(frontmatterCst.doc, "\n")
+			? renderFrontmatterCst(frontmatterCst.doc, "\n", frontmatterCst.yamlText)
 			: rawFrontmatterSection;
 
 	// Format segment by segment to preserve comment lines. Isolated-node

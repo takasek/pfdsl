@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parseFrontmatterCst } from "./frontmatter-cst.js";
 import {
 	format,
 	normalizeDocument,
@@ -145,6 +146,80 @@ describe("public API", () => {
 		it("keeps a LF source on LF", () => {
 			const src = "---\nartifact:\n  a:\n    label: A\n---\na >> P -> b\n";
 			expect(format(src).output).not.toContain("\r");
+		});
+
+		// Document#toString({ lineWidth: 0 }) would otherwise collapse a folded
+		// (`>`) scalar's hand-chosen line wraps onto one continuation line (#815).
+		it("preserves a folded scalar's hand-wrapped line breaks", () => {
+			const src =
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toBe(
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P\nP -> b\n",
+			);
+		});
+
+		it("is idempotent for a folded scalar's hand-wrapped line breaks", () => {
+			const src =
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
+			const { output: first } = format(src);
+			const { output: second } = format(first);
+			expect(second).toBe(first);
+		});
+
+		// The write path preserves the source's own line ending (#644); a
+		// folded scalar's preserved wraps must not introduce a bare LF into an
+		// otherwise all-CRLF file.
+		it("preserves a folded scalar's hand-wrapped line breaks in a CRLF file without introducing a bare LF", () => {
+			const src =
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n".replace(
+					/\n/g,
+					"\r\n",
+				);
+			const { output: first } = format(src);
+			expect(first).toContain(
+				"description: >\r\n      Hello\r\n      world.\r\n",
+			);
+			expect(first.replace(/\r\n/g, "")).not.toContain("\n");
+			const { output: second } = format(first);
+			expect(second).toBe(first);
+		});
+
+		// parseFrontmatterCst's yamlText slice excludes the closing fence's own
+		// line break (#644), so when a fold is the last field in the
+		// frontmatter, the write path used to lose that newline on re-splice —
+		// gluing the closing fence onto the fold's last continuation line (#815).
+		it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
+			const src =
+				"---\nartifact:\n  a:\n    status: todo\n    description: >\n      Hello\n      world.\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toBe(
+				"---\nartifact:\n  a:\n    status: todo\n    description: >\n      Hello\n      world.\n---\na >> P\nP -> b\n",
+			);
+		});
+
+		// collectFoldedScalars used to build a fold's path from only the
+		// isPair steps on its visit path, dropping the sequence index — a
+		// numeric map key inside a sequence element then read back as that
+		// dropped index and resolved to a *different* seq element, splicing
+		// one fold's wraps onto it (#815). ADR-0037 already scopes fold
+		// preservation out of sequences; ensure fmt is idempotent and doesn't
+		// cross-contaminate seq elements now that the skip is explicit.
+		it("does not move a sequence element's folded wraps onto another element (ADR-0037, #815)", () => {
+			const src =
+				"---\nseqfield:\n  - 3: >\n      shared value\n      wrapped here\n  - one\n  - two\n  - >\n      shared value\n      wrapped here\n---\na >> P -> b\n";
+			const { output: first } = format(src);
+			const cst = parseFrontmatterCst(first);
+			expect(cst.doc.toJSON()).toEqual({
+				seqfield: [
+					{ "3": "shared value wrapped here\n" },
+					"one",
+					"two",
+					"shared value wrapped here\n",
+				],
+			});
+			const { output: second } = format(first);
+			expect(second).toBe(first);
 		});
 	});
 

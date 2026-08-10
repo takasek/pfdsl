@@ -157,6 +157,7 @@ export function sort(source: string, opts: SortOptions): SortResult {
 		return { output: source, changed: false, diagnostics };
 	}
 
-	const output = renderFrontmatterCst(cst.doc, cst.newline) + cst.body;
+	const output =
+		renderFrontmatterCst(cst.doc, cst.newline, cst.yamlText) + cst.body;
 	return { output, changed: true, diagnostics };
 }

@@ -357,4 +357,66 @@ a >> p -> b
 		expect(changed).toBe(true);
 		expect(output.replace(/\r\n/g, "")).not.toContain("\n");
 	});
+
+	// Document#toString({ lineWidth: 0 }) would otherwise collapse a folded
+	// (`>`) scalar's hand-chosen line wraps onto one continuation line (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks", () => {
+		const src = `---
+artifact:
+  z:
+    description: >
+      Hello
+      world.
+    label: Z
+  a: { label: A }
+---
+a >> p -> z
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output).toBe(`---
+artifact:
+  a: { label: A }
+  z:
+    description: >
+      Hello
+      world.
+    label: Z
+---
+a >> p -> z
+`);
+	});
+
+	// parseFrontmatterCst's yamlText slice excludes the closing fence's own
+	// line break (#644), so when a fold is the last field in the frontmatter,
+	// the write path used to lose that newline on re-splice — gluing the
+	// closing fence onto the fold's last continuation line (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
+		const src = `---
+artifact:
+  m: { label: M }
+  a: { label: A }
+  z:
+    label: Z
+    description: >
+      Hello
+      world.
+---
+a >> p -> z
+`;
+		const { output, changed } = sort(src, { by: ["id"] });
+		expect(changed).toBe(true);
+		expect(output).toBe(`---
+artifact:
+  a: { label: A }
+  m: { label: M }
+  z:
+    label: Z
+    description: >
+      Hello
+      world.
+---
+a >> p -> z
+`);
+	});
 });
