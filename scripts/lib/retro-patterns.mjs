@@ -283,6 +283,14 @@ function hitsFor(patterns, words) {
  * with zero hits in `wordOnly` reads as one signal ("the word found nothing")
  * when it is really two: the word found nothing at all, or it found patterns
  * the tags already had (#803).
+ *
+ * `tagged` carries which of the cycle's tags each pattern matched, ranked by
+ * how many. The union never shrinks — a broad cycle satisfies many tags and
+ * gets most of the catalog back, measured at 38 of 43 for one real cycle — so
+ * ranking is what a reader gets instead of a shorter list: a pattern whose
+ * conditions all held this cycle sorts above one that shares a single tag, and
+ * the named tags say why each entry is here at all (#819). Ties keep catalog
+ * order, so the ranking never reorders what it cannot distinguish.
  * @param {{tags: string[], body: string}[]} patterns
  * @param {{tags: string[], words: string[]}} query
  */
@@ -294,8 +302,14 @@ export function select(patterns, { tags, words }) {
 	for (const p of patterns)
 		(p.tags.includes(ALWAYS_TAG) ? always : rest).push(p);
 
-	const tagged = selectByTag(rest, tags);
-	const taggedSet = new Set(tagged);
+	const matching = selectByTag(rest, tags);
+	const tagged = matching
+		.map((pattern) => ({
+			pattern,
+			matched: pattern.tags.filter((tag) => tags.includes(tag)),
+		}))
+		.sort((a, b) => b.matched.length - a.matched.length);
+	const taggedSet = new Set(matching);
 	const wordOnly = hitsFor(
 		rest.filter((p) => !taggedSet.has(p)),
 		words,

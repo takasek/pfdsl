@@ -101,9 +101,14 @@ function parseWords(argv) {
 	return words;
 }
 
-/** @param {{name: string, tags: string[], body: string, path: string}} pattern */
-function printPattern({ name, tags, body, path }) {
+/**
+ * @param {{name: string, tags: string[], body: string, path: string}} pattern
+ * @param {string} [note] - printed under the head line, where a reader looks
+ *   for why this entry is in front of them at all.
+ */
+function printPattern({ name, tags, body, path }, note) {
 	console.log(`${name}  [${tags.join(", ")}]`);
+	if (note !== undefined) console.log(`  ${note}`);
 	console.log(`  ${path}`);
 	console.log(`  ${summaryOf(body)}`);
 	for (const line of keyLinesOf(body)) console.log(`  ${line}`);
@@ -131,7 +136,11 @@ function printSelection(patterns, query) {
 	const { tagged, wordOnly, always, reach } = select(patterns, query);
 
 	console.log(`## tagged (${tagged.length})`);
-	for (const p of tagged) printPattern(p);
+	for (const { pattern, matched } of tagged)
+		printPattern(
+			pattern,
+			`matched ${matched.length}/${query.tags.length}: ${matched.join(", ")}`,
+		);
 
 	console.log(`\n## word-only (${wordOnly.length}) — what the tags missed`);
 	if (reach.length > 0) {

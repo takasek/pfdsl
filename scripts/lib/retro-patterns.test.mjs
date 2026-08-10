@@ -205,7 +205,7 @@ describe("select", () => {
 		});
 
 		assert.deepEqual(
-			result.tagged.map((p) => p.name),
+			result.tagged.map((t) => t.pattern.name),
 			["委譲の接合部"],
 		);
 		assert.deepEqual(
@@ -236,6 +236,45 @@ describe("select", () => {
 			{ word: "CRLF", count: 2 },
 			{ word: "存在しない語", count: 0 },
 		]);
+	});
+
+	it("ranks the tagged by how many of the cycle's tags each one carries", () => {
+		const cycle = [
+			{ name: "一致1", tags: ["a"], body: "- **一致1**: 冒頭。" },
+			{ name: "一致3", tags: ["a", "b", "c"], body: "- **一致3**: 冒頭。" },
+			{ name: "一致2", tags: ["a", "b"], body: "- **一致2**: 冒頭。" },
+		];
+
+		const { tagged } = select(cycle, { tags: ["a", "b", "c"], words: [] });
+
+		assert.deepEqual(
+			tagged.map((t) => t.pattern.name),
+			["一致3", "一致2", "一致1"],
+		);
+	});
+
+	it("names which of the cycle's tags each pattern matched", () => {
+		const cycle = [
+			{ name: "二軸", tags: ["a", "b", "z"], body: "- **二軸**: 冒頭。" },
+		];
+
+		const { tagged } = select(cycle, { tags: ["b", "a"], words: [] });
+
+		assert.deepEqual(tagged[0].matched, ["a", "b"]);
+	});
+
+	it("keeps catalog order among patterns matching the same number of tags", () => {
+		const cycle = [
+			{ name: "先", tags: ["a"], body: "- **先**: 冒頭。" },
+			{ name: "後", tags: ["b"], body: "- **後**: 冒頭。" },
+		];
+
+		const { tagged } = select(cycle, { tags: ["b", "a"], words: [] });
+
+		assert.deepEqual(
+			tagged.map((t) => t.pattern.name),
+			["先", "後"],
+		);
 	});
 
 	it("yields the always-tagged patterns even when nothing else matches", () => {
