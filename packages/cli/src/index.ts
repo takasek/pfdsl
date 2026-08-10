@@ -1092,9 +1092,6 @@ const KNOWN_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
 	group: new Set(["label", "color", "parent"]),
 };
 
-/** The keys of KNOWN_FIELDS, for checks that ask "on any kind at all". */
-const KINDS_WITH_FIELDS = ["artifact", "process", "group"] as const;
-
 /**
  * Read-only fields computed from a base field rather than stored in
  * frontmatter. `location.resolved` auto-accompanies `location` (artifact and
@@ -1589,7 +1586,7 @@ export function runMetaValues(
 				tally.set(key, (tally.get(key) ?? 0) + 1);
 			}
 		}
-		if (!KINDS_WITH_FIELDS.some((k) => KNOWN_FIELDS[k].has(f)))
+		if (!Object.values(KNOWN_FIELDS).some((known) => known.has(f)))
 			unknownFields.push(f);
 		counts[f] = Object.fromEntries(
 			[...tally.entries()].sort(([a], [b]) => compareIds(a, b)),
