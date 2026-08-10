@@ -580,10 +580,7 @@ export function reviewRecordStep({ commitMessages, changedFiles }) {
 		return { name, status: "FAIL", detail: commitMessages.error };
 
 	const records = parseReviewRecords(commitMessages.text);
-	const problems = classifyCycle({
-		changedFiles,
-		recordCount: records.length,
-	});
+	const problems = classifyCycle({ changedFiles, records });
 	for (const r of records.filter((r) => r.error))
 		problems.push(`malformed record: ${r.error}`);
 	if (problems.length > 0)
