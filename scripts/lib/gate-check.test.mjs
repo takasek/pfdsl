@@ -712,6 +712,24 @@ describe("resolveRecordEditedAt", () => {
 		assert.equal(result.editedAtIso, null);
 		assert.match(result.note, /detection/);
 	});
+
+	// Review A-3: without a note, "record id not found among the fetched
+	// nodes" was indistinguishable from "confirmed unedited" — both returned
+	// { editedAtIso: null } with nothing else. The two mean different things.
+	it("notes when the record's id has no match among the fetched comment nodes", () => {
+		const result = resolveRecordEditedAt(
+			{ id: "c-not-fetched", body: "前提: x" },
+			editInfo({
+				comments: {
+					totalCount: 1,
+					nodes: [{ id: "c1", lastEditedAt: null }],
+				},
+			}),
+		);
+		assert.equal(result.editedAtIso, null);
+		assert.match(result.note, /id/);
+		assert.match(result.note, /detection/);
+	});
 });
 
 describe("buildDesignRecordEditQuery", () => {

@@ -431,12 +431,15 @@ export function parseDesignRecordEditResponse(jsonText) {
  * guaranteed to return comments in the same order, and a position-based
  * match could silently attribute one comment's edit to another's.
  *
- * Two conditions make edit detection impossible rather than merely absent,
- * and both are reported as a note rather than folded into `editedAtIso`
+ * Three conditions make edit detection impossible rather than merely absent,
+ * and all three are reported as a note rather than folded into `editedAtIso`
  * (which stays a plain timestamp-or-null so classifyDesignRecordTiming does
  * not have to parse a sentinel out of it): the GraphQL lookup itself failing
- * (`editInfo` is null), and the issue carrying more comments than the single
- * page fetched (`totalCount` exceeds the fetched `nodes`).
+ * (`editInfo` is null), the issue carrying more comments than the single
+ * page fetched (`totalCount` exceeds the fetched `nodes`), and the selected
+ * record's own id having no match among the fetched nodes — without a note
+ * this last case is indistinguishable from "confirmed unedited", when it is
+ * actually "could not be checked".
  * @param {{id?: string}} record - selectDesignRecord's return value
  * @param {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}} | null} editInfo
  * @returns {{editedAtIso: string | null, note?: string}}
@@ -451,7 +454,13 @@ export function resolveRecordEditedAt(record, editInfo) {
 	}
 	if (!record.id) return { editedAtIso: editInfo.issueLastEditedAt };
 	const match = editInfo.comments.nodes.find((c) => c.id === record.id);
-	return { editedAtIso: match ? match.lastEditedAt : null };
+	if (!match) {
+		return {
+			editedAtIso: null,
+			note: "record id not found among fetched comments; edit detection skipped",
+		};
+	}
+	return { editedAtIso: match.lastEditedAt };
 }
 
 /**
