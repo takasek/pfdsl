@@ -19,10 +19,13 @@ export interface FrontmatterCst {
 	/** Everything in `source` after the closing fence — the pfdsl body, verbatim. */
 	body: string;
 	/**
-	 * The frontmatter's raw YAML text (LF-normalized), exactly as parsed into
-	 * `doc`. `""` when `present` is false. Kept alongside the parsed `doc` so
-	 * `renderFrontmatterCst` can diff re-rendered folded scalars against what
-	 * the author actually wrote (#815).
+	 * The frontmatter's raw YAML text, exactly as parsed into `doc` — in the
+	 * source's own line endings, so a CRLF file's interior breaks are still
+	 * CRLF here (only the last line's overhang before the fence is stripped,
+	 * see the slice below). `""` when `present` is false. Kept alongside the
+	 * parsed `doc` so `renderFrontmatterCst` can diff re-rendered folded
+	 * scalars against what the author actually wrote (#815); that comparison
+	 * is what normalizes to LF, not this field.
 	 */
 	yamlText: string;
 	/**
