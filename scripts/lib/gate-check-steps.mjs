@@ -426,22 +426,29 @@ export function collectCycleWindow({ exec, base }) {
 	if (!laggedOut.ok) return { ok: false, error: laggedOut.out.trim() };
 	const lagged = parseCommitLogLines(laggedOut.out);
 
-	const revListOut = exec("git", ["rev-list", `origin/${base}..HEAD`]);
-	if (!revListOut.ok)
-		return { ok: true, entries: lagged, note: CYCLE_WINDOW_INCOMPLETE_NOTE };
+	const incomplete = () => ({
+		ok: true,
+		entries: lagged,
+		note: CYCLE_WINDOW_INCOMPLETE_NOTE,
+	});
 
-	// git rev-list lists newest first, so the branch's first (oldest) commit is
-	// the last line. An empty range means the branch has no commits yet — part
-	// (2) has no branch start to measure from, so it is skipped rather than
+	// The branch's own commits, committer dates only: the date is all part (2)
+	// needs, so asking git log for it costs one spawn where rev-list plus a
+	// `show -s` on the sha it names costs two.
+	const branchDates = exec("git", [
+		"log",
+		"--format=%cI",
+		`origin/${base}..HEAD`,
+	]);
+	if (!branchDates.ok) return incomplete();
+
+	// git log lists newest first, so the branch's first (oldest) commit is the
+	// last line. An empty range means the branch has no commits yet — part (2)
+	// has no branch start to measure from, so it is skipped rather than
 	// reported as incomplete.
-	const shas = revListOut.out.trim().split("\n").filter(Boolean);
-	if (shas.length === 0) return { ok: true, entries: lagged };
-	const firstSha = shas[shas.length - 1];
-
-	const dateOut = exec("git", ["show", "-s", "--format=%cI", firstSha]);
-	if (!dateOut.ok)
-		return { ok: true, entries: lagged, note: CYCLE_WINDOW_INCOMPLETE_NOTE };
-	const since = dateOut.out.trim();
+	const dates = branchDates.out.trim().split("\n").filter(Boolean);
+	if (dates.length === 0) return { ok: true, entries: lagged };
+	const since = dates[dates.length - 1];
 
 	const laterOut = exec("git", [
 		"log",
@@ -449,8 +456,7 @@ export function collectCycleWindow({ exec, base }) {
 		`--since=${since}`,
 		`origin/${base}`,
 	]);
-	if (!laterOut.ok)
-		return { ok: true, entries: lagged, note: CYCLE_WINDOW_INCOMPLETE_NOTE };
+	if (!laterOut.ok) return incomplete();
 	const later = parseCommitLogLines(laterOut.out);
 
 	return { ok: true, entries: unionCommitLogEntries(lagged, later) };

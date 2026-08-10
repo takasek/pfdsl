@@ -1199,8 +1199,9 @@ describe("collectCycleWindow", () => {
 			"git log --format=%h%x09%s HEAD..origin/main": {
 				out: "aaa1111\tfix: b\n",
 			},
-			"git rev-list origin/main..HEAD": { out: "sha3\nsha2\nsha1\n" },
-			"git show -s --format=%cI sha1": { out: "2026-08-01T00:00:00+09:00\n" },
+			"git log --format=%cI origin/main..HEAD": {
+				out: "2026-08-03T00:00:00+09:00\n2026-08-02T00:00:00+09:00\n2026-08-01T00:00:00+09:00\n",
+			},
 			"git log --format=%h%x09%s --since=": { out: "bbb2222\tfeat: c\n" },
 		});
 		const result = collectCycleWindow({ exec, base: "main" });
@@ -1210,13 +1211,10 @@ describe("collectCycleWindow", () => {
 			{ sha: "bbb2222", subject: "feat: c" },
 		]);
 		assert.ok(
-			calls.some((c) => c.startsWith("git show -s --format=%cI sha1")),
-			"reads the committer date of the branch's oldest commit, the last line of rev-list",
-		);
-		assert.ok(
 			calls.some((c) =>
 				c.includes("--since=2026-08-01T00:00:00+09:00 origin/main"),
 			),
+			"measures from the branch's oldest commit, the last line git log prints",
 		);
 	});
 
@@ -1225,12 +1223,12 @@ describe("collectCycleWindow", () => {
 			"git log --format=%h%x09%s HEAD..origin/main": {
 				out: "aaa1111\tfix: b\n",
 			},
-			"git rev-list origin/main..HEAD": { out: "" },
+			"git log --format=%cI origin/main..HEAD": { out: "" },
 		});
 		const result = collectCycleWindow({ exec, base: "main" });
 		assert.equal(result.ok, true);
 		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
-		assert.ok(!calls.some((c) => c.startsWith("git show")));
+		assert.equal(result.note, undefined);
 		assert.ok(!calls.some((c) => c.includes("--since=")));
 	});
 
@@ -1246,26 +1244,15 @@ describe("collectCycleWindow", () => {
 		assert.equal(result.error, "fatal: bad revision");
 	});
 
-	it("keeps part (1) when rev-list (part 2's first step) fails, noting the gap", () => {
+	it("keeps part (1) when reading the branch's commit dates fails, noting the gap", () => {
 		const { exec } = fakeExec({
 			"git log --format=%h%x09%s HEAD..origin/main": {
 				out: "aaa1111\tfix: b\n",
 			},
-			"git rev-list origin/main..HEAD": { ok: false, out: "fatal: bad object" },
-		});
-		const result = collectCycleWindow({ exec, base: "main" });
-		assert.equal(result.ok, true);
-		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
-		assert.match(result.note ?? "", /could not/);
-	});
-
-	it("keeps part (1) when reading the first commit's committer date fails, noting the gap", () => {
-		const { exec } = fakeExec({
-			"git log --format=%h%x09%s HEAD..origin/main": {
-				out: "aaa1111\tfix: b\n",
+			"git log --format=%cI origin/main..HEAD": {
+				ok: false,
+				out: "fatal: bad object",
 			},
-			"git rev-list origin/main..HEAD": { out: "sha1\n" },
-			"git show -s --format=%cI sha1": { ok: false, out: "fatal: bad object" },
 		});
 		const result = collectCycleWindow({ exec, base: "main" });
 		assert.equal(result.ok, true);
@@ -1278,8 +1265,9 @@ describe("collectCycleWindow", () => {
 			"git log --format=%h%x09%s HEAD..origin/main": {
 				out: "aaa1111\tfix: b\n",
 			},
-			"git rev-list origin/main..HEAD": { out: "sha1\n" },
-			"git show -s --format=%cI sha1": { out: "2026-08-01T00:00:00+09:00\n" },
+			"git log --format=%cI origin/main..HEAD": {
+				out: "2026-08-01T00:00:00+09:00\n",
+			},
 			"git log --format=%h%x09%s --since=": {
 				ok: false,
 				out: "fatal: bad revision",
