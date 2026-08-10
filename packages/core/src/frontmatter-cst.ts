@@ -157,7 +157,7 @@ function collectFoldedScalars(yamlText: string): FoldedScalarSnapshot[] {
 function reindentFold(origRaw: string, newRaw: string): string | null {
 	const origLines = origRaw.split("\n");
 	const newLines = newRaw.split("\n");
-	if (/\d/.test(origLines[0])) return null;
+	if (/\d/.test(origLines[0] ?? "")) return null;
 	const newBody = newLines.slice(1);
 	const firstNonBlank = newBody.find((line) => line.trim() !== "");
 	if (firstNonBlank === undefined) return null;
