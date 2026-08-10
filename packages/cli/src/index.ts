@@ -2863,8 +2863,8 @@ Read-only queries on the graph topology. Run
 Subcommands:
   summary <file|->            Print artifact/process/edge counts
   io <file|->                 Print external inputs and terminal artifacts
-  stats <file|-> [--limit]    Rank nodes by fan-in/fan-out degree
-  neighbors <file|-> <id>     Direct predecessors/successors of a node
+  stats <file|-> [--limit]    Rank nodes by primary degree, feedback degree apart
+  neighbors <file|-> <id>     Direct predecessors/successors of a node, feedback included
   locate <file|-> <id>        Frontmatter declaration line and body edge lines of a node
   describe <file|-> <id>      Kind, fields, neighbors, and locate lines of a node, in one call
   impact <file|-> <id>        Full downstream closure of a node
