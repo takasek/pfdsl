@@ -13,6 +13,13 @@ export interface LocateResult {
 	declarationLine: number | null;
 	/** 1-based lines (ascending, deduped) where the id appears in the body AST. */
 	edgeLines: number[];
+	/**
+	 * 1-based line of each requested field's key, within the id's declaration
+	 * block — null when the node's declaration block doesn't have that field.
+	 * Keyed by field name, in request order. Empty when no fields were
+	 * requested.
+	 */
+	fieldLines: Record<string, number | null>;
 }
 
 /** The node id a `Pair`'s key represents, or null when the key isn't a plain scalar. */
@@ -21,20 +28,36 @@ function pairId(pair: Pair): string | null {
 }
 
 /**
- * The offset of `id`'s key scalar within the frontmatter's yaml text (as
- * parsed by `parseFrontmatterCst`), looked up in the one section its `kind`
- * names — the same kind-scoped dispatch `setFrontmatterField` uses on the
- * write path. Null when `id` has no frontmatter entry.
+ * `id`'s declaration `Pair` within the frontmatter's yaml CST (as parsed by
+ * `parseFrontmatterCst`), looked up in the one section its `kind` names — the
+ * same kind-scoped dispatch `setFrontmatterField` uses on the write path.
+ * Null when `id` has no frontmatter entry. Returns the whole `Pair` (not
+ * just the key's offset) so callers can also reach into its value map for
+ * field key offsets.
  */
-function declarationOffset(
+function declarationPair(
 	doc: ReturnType<typeof parseFrontmatterCst>["doc"],
 	id: string,
 	kind: NodeKind,
-): number | null {
+): Pair | null {
 	const section = doc.get(kind, true);
 	if (!isMap(section)) return null;
 	for (const item of section.items) {
-		if (pairId(item) === id && isScalar(item.key) && item.key.range) {
+		if (pairId(item) === id) return item;
+	}
+	return null;
+}
+
+/**
+ * The offset of `field`'s key scalar within `pair`'s value map — `id`'s
+ * declaration block, the same map `setFrontmatterField` writes into. Null
+ * when the block isn't a map (empty/scalar node declaration) or doesn't
+ * have that field.
+ */
+function fieldOffset(pair: Pair, field: string): number | null {
+	if (!isMap(pair.value)) return null;
+	for (const item of pair.value.items) {
+		if (pairId(item) === field && isScalar(item.key) && item.key.range) {
 			return item.key.range[0];
 		}
 	}
@@ -114,12 +137,17 @@ function collectStatementIds(
  * normalize and validate the same source a second time. `source` is still
  * needed because `AnalyzeResult` carries no frontmatter CST, and the key
  * offsets only exist there.
+ *
+ * `fields`, when given, additionally locates each named field's key line
+ * within `id`'s declaration block (`fieldLines`, #844) — reusing the same
+ * yaml CST pass rather than re-scanning `source`'s lines.
  */
 export function locateNode(
 	document: Document,
 	source: string,
 	id: string,
 	kind: NodeKind,
+	fields: readonly string[] = [],
 ): LocateResult {
 	const edgeLineSet = new Set<number>();
 	for (const stmt of document.statements) {
@@ -128,16 +156,29 @@ export function locateNode(
 
 	const cst = parseFrontmatterCst(source);
 	let declarationLine: number | null = null;
+	let pair: Pair | null = null;
 	if (cst.present) {
-		const offset = declarationOffset(cst.doc, id, kind);
-		if (offset !== null) {
+		pair = declarationPair(cst.doc, id, kind);
+		if (pair && isScalar(pair.key) && pair.key.range) {
 			declarationLine =
-				FRONTMATTER_YAML_START_LINE - 1 + lineAtOffset(cst.yamlText, offset);
+				FRONTMATTER_YAML_START_LINE -
+				1 +
+				lineAtOffset(cst.yamlText, pair.key.range[0]);
 		}
+	}
+
+	const fieldLines: Record<string, number | null> = {};
+	for (const field of fields) {
+		const offset = pair ? fieldOffset(pair, field) : null;
+		fieldLines[field] =
+			offset === null
+				? null
+				: FRONTMATTER_YAML_START_LINE - 1 + lineAtOffset(cst.yamlText, offset);
 	}
 
 	return {
 		declarationLine,
 		edgeLines: [...edgeLineSet].sort((a, b) => a - b),
+		fieldLines,
 	};
 }

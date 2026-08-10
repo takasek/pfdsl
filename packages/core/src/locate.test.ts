@@ -9,9 +9,14 @@ describe("locateNode", () => {
 	 * analyze(), so the document and the node's kind are already in hand. `kind`
 	 * is passed explicitly for the cases where the id isn't in the file at all.
 	 */
-	const locate = (source: string, id: string, kind?: NodeKind) => {
+	const locate = (
+		source: string,
+		id: string,
+		kind?: NodeKind,
+		fields?: readonly string[],
+	) => {
 		const { document, nodeKinds } = analyze(source);
-		return locateNode(document, source, id, kind ?? nodeKinds.get(id)!);
+		return locateNode(document, source, id, kind ?? nodeKinds.get(id)!, fields);
 	};
 
 	const src = `---
@@ -95,5 +100,40 @@ a >> p2 -> b
 	it("finds a node-decl (isolated node) occurrence as an edge line", () => {
 		const withIsolated = `iso\nr >> p -> a\n`;
 		expect(locate(withIsolated, "iso").edgeLines).toEqual([1]);
+	});
+
+	it("returns an empty fieldLines object when no fields are requested", () => {
+		expect(locate(src, "req").fieldLines).toEqual({});
+	});
+
+	it("finds a field's key line within the node's declaration block", () => {
+		const result = locate(src, "req", undefined, ["label"]);
+		expect(result.fieldLines).toEqual({ label: 4 });
+	});
+
+	it("finds multiple fields' key lines, keyed by field name", () => {
+		const multiField = `---
+artifact:
+  spec:
+    label: Spec
+    description: >
+      a description
+    status: done
+---
+x -> spec
+`;
+		const result = locate(multiField, "spec", undefined, ["label", "status"]);
+		expect(result.fieldLines).toEqual({ label: 4, status: 7 });
+	});
+
+	it("maps a field the node's declaration block doesn't have to null", () => {
+		const result = locate(src, "req", undefined, ["nonexistent"]);
+		expect(result.fieldLines).toEqual({ nonexistent: null });
+	});
+
+	it("keeps field line numbers correct on a CRLF file", () => {
+		const crlf = src.replace(/\n/g, "\r\n");
+		const result = locate(crlf, "design", undefined, ["label"]);
+		expect(result.fieldLines).toEqual({ label: 9 });
 	});
 });
