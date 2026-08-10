@@ -253,8 +253,8 @@ export function setFrontmatterField(
 	field: string,
 	value: string | number,
 ): string | null {
-	const { present, doc, body, newline } = parseFrontmatterCst(source);
+	const { present, doc, body, yamlText, newline } = parseFrontmatterCst(source);
 	if (!present || !doc.hasIn([kind, id])) return null;
 	doc.setIn([kind, id, field], value);
-	return renderFrontmatterCst(doc, newline) + body;
+	return renderFrontmatterCst(doc, newline, yamlText) + body;
 }

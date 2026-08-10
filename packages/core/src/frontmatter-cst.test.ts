@@ -478,4 +478,13 @@ describe("setFrontmatterField", () => {
 		);
 		expect(out).toContain("req(v2):\n    status: done");
 	});
+
+	// Document#toString({ lineWidth: 0 }) would otherwise collapse a folded
+	// (`>`) scalar's hand-chosen line wraps onto one continuation line (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks on a sibling field", () => {
+		const src =
+			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
+		const out = setFrontmatterField(src, "artifact", "a", "status", "done");
+		expect(out).toContain("description: >\n      Hello\n      world.\n");
+	});
 });
