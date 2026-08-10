@@ -58,16 +58,25 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 - [ ] 完了した issue をクローズし、進捗・新発見を issue に反映した
 - [ ] close 時の降格規則を適用した（定義は L3 reference。専属 process も含めて削除する）
 
-**コード変更のあるサイクルはレビューを省略しない**: `packages/` または `scripts/` に変更があるサイクルでは、終端ゲートの `/simplify` または `/code-review` 項目を省略しない。
+**コード変更のあるサイクルはレビューを省略しない**: `packages/` または `scripts/` に変更があるサイクルでは、終端ゲートの該当チェックリスト項目を省略しない。
 #561 が 48 サイクル（目標 10）を実測し、自己レビューで気付いていなかった指摘が 85% のサイクルで出た（new/adopted 合計 142/119）。
 「どういう条件なら省略してよいか」を条件式として書ける、という前提が実測に支持されなかったため、条件を置かず必須とする。
 散文・PFD のみのサイクルは記録を要さない（レビューの要否は diff の規模で別に判断し、省略する回はその理由を PR 本文に書く）。
 自己レビュー（差分の読み直し）は実施済みとみなし、それに**加えて**軽い設定のレビューを実施する（角度を絞る。8角度 × 検証 agent の高効度設定は使わない）。
-実行手段は次の優先順で選ぶ。
 
-1. **A — `/code-review`。** 既存 PR に対する大規模 diff のレビュー向け。プロトコルが 5 並列 finder agent + 候補ごとの検証 agent を起動し、結果を対象 PR にコメントする形なので、**PR 作成前のサイクル**と**数十行規模の diff** には構造的に合わない。選ぶのは PR が既にあり diff が大きい回に限る
-2. **B — `code-reviewer` agent を Agent tool で起動する。** **導入が前提** — `pr-review-toolkit` / `feature-dev` plugin のいずれかを有効化していないと選べない
-3. **C（既定）— `/simplify`。** 常に使え、PR 作成前でも回せる。角度は4つ固定。scoped な修正にはこれが規模相応
+menu は「どの手段を選ぶか」の優先順でなく「**どの観点が担保されたか**」で組む。
+手段を1つに固定すると、その手段が探さない型の欠陥だけが常に無担当になる — 実測（#836）で `/simplify` 4角度が findings なしだった回に、別レビューが採用案の adoption rationale 不成立と JSDoc の事実誤認の2件を検出した。
+そこで手段を固定せず、観点ごとにブリーフ要件を課す。
+
+1. **観点1 — 品質（簡素化・保守性）。** `/simplify` を使う。常に使え、PR 作成前でも回せる。角度は4つ固定。`/simplify` は correctness を明示的には探さない — skill 本文が「Do not look for correctness bugs — that is what /code-review is for」と宣言しており、この観点の実施だけをレビュー済みの根拠にしてはならない。
+2. **観点2 — correctness。** コード変更のある全サイクルで担保する。ブリーフ要件は (a) diff が導入・変更した事実主張（コメント・JSDoc・doc 散文・criteria 文言）を列挙し、各主張の**反証を試みる**こと（真偽判定でなく偽になる入力・状態を構成させる — 追認バイアスを falsification に固定するため）、(b) 変更行の外の消費者（散文を含む）を読んでよいこと（`/code-review` の bug 角度が持つ「shallow scan, avoid extra context」の逆を明示する）。軽量 subagent 1本を想定する。
+3. **観点3 — 設計妥当性。** 条件付き発火 — そのサイクルが複数案から採用を選んだ場合のみ、つまり選択記録に否定案がある回に限る。ブリーフ要件は (a) 結論・採用理由を伏せて同じ設計問題を独立に解かせること（採用案を見せて攻めさせると提示解にアンカーされるため、検出機構の本体は敵対的姿勢でなく独立性に置く）、(b) 採用案の adoption rationale を名指しし、実装がそれを満たさない箇所を敵対的に探させること。観点2 の要件を含むため、発火した回は観点2 の別実行を要さない。
+4. **観点4 — 体験（シナリオ実行）。** 条件付き発火 — ユーザー可視の挙動・同梱内容を変える回に限る（終端ゲートの release-status 項目と同じ判定軸を流用し、新しい判定を発明しない）。ブリーフ要件は (a) subagent に成果物（doc・CLI・skill 本文）と現実的シナリオのみ渡し変更内容・意図は渡さないこと、(b) 詰まった箇所・誤読した箇所を原因となった記述や出力の引用付きで報告させること、(c) 合否判定を伴う場合は実物（checker・実行結果）で採点し自己申告にしないこと、(d) シナリオには変更が壊しうる既存動線を最低1本含めること（作者がシナリオを選ぶと通る道を選びがちなことへのガード）。`distribution-review`（plugin バンドル読者の模擬）と `spec-stress-test`（spec write-probe）はこの観点のドメイン特化版であり、その領域はそちらへ委ね、観点4 は CLI UX・拡張機能挙動等の未カバー領域へ汎用のブリーフ要件を与える。
+
+**全観点共通**: finding には具体的な failure scenario（入力・状態 → 誤出力/誤誘導）を必須とし、構成できない指摘は報告しない（敵対的指示は「何か見つけねば」圧で false positive を量産するため）。
+
+`/code-review` は PR 作成後・大 diff の補完レビューへ降格し、**ゲート充足手段からは外す** — trailer はコミット前必須であり、PR 後に走る `/code-review` は構造的にゲートを満たせないためで、これは規約変更でなく役割分離である。
+`code-reviewer` agent を Agent tool で起動する手段は **導入が前提** — `pr-review-toolkit` / `feature-dev` plugin のいずれかを有効化していないと選べない。
 
 起動可否は harness と plugin の版に依存する。過去に「AI からは起動できない」と記録された手段でも、規約に従う前にその回の実体（コマンド定義の `disable-model-invocation`）を確認する。2026-07-28 時点で `/code-review` は `disable-model-invocation: false`。
 
@@ -76,17 +85,20 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 ```
 Review: tool=simplify
+Review: tool=correctness
 ```
 
-`tool` の値は `code-review` / `code-reviewer-agent` / `simplify` のいずれか。
-3つ以外の値、または `tool=` を欠く行は malformed として FAIL する。
+`tool` の値は `simplify` / `correctness` / `design` / `experience` / `code-review` / `code-reviewer-agent` の6つ。
+6つ以外の値、または `tool=` を欠く行は malformed として FAIL する。
+ゲートを充足するのはこのうち `code-review` を除く5値 — `code-review` は有効な trailer 値として記録は残せるが、ゲート充足には数えない。
+コード変更のある回はさらに `correctness` または `design` の記録を最低1本要する。
+`design` は観点2 の要件を包含するため、`correctness` の代替になる。
 diff の規模に合わせて委譲せず自分で読んだだけの回は `Review:` 行を書かない。
-記録が要求するのは、コード変更のあるサイクルで委譲したレビューを最低1回は回したことである。
 **レビューはコミットの前に回す。** trailer は commit message の一部であり、後から追記できない。
 終端ゲートで気付いた時点で push 済みなら、trailer の追加は履歴の作り直しになる。
 記録先をファイルにも PR 本文にもしないのは、前者が並列 worktree で追記コンフリクトを起こし（ADR-0026 が同型の記録機構を廃止した理由）、後者は終端ゲート実行時点でまだ存在しないため。
 記録漏れは終端ゲートと CI（`check-review-record.yml`）が判定する。
-どちらも `classifyCycle` を呼び、`packages/` / `scripts/` への変更があるのに記録が無い回だけを FAIL にする。
+どちらも `classifyCycle` を呼び、`packages/` / `scripts/` への変更があるのに記録が無い回、またはコード変更があるのに `correctness`/`design` の記録が無い回を FAIL にする。
 **判定は path だけを見る**（#789）。
 以前は `sample=in` / `sample=out` の二値を手で書き、その値と path 判定の食い違いも検査していたが、`scripts/` 配下の純散文変更では必ず食い違うため撤去した。
 散文だけを変えた回も記録を書く側に倒れる — その回に軽いレビューを1本回すコストは、同じ二値の分類を人と機械の双方に維持させるコストより小さい。
@@ -96,7 +108,7 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 - [ ] 変更が公開物の挙動・同梱内容を変える場合（CLI 出力・拡張機能の動作変化に加え、plugin 同梱物 = 配布スキル群・pfd-* コマンド・agents（`make gen-plugin` の対象）の変更を含む — パスでなく挙動と同梱内容で判定）、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending なら次サイクルの先頭タスクとして明記する）
 - [ ] CLIコマンドを追加・変更した場合、HELP テキスト（`packages/cli/src/index.ts`）と README のコマンド一覧の両方を更新した
 - [ ] 実装を subagent へ委譲した場合、戻り時に `git log origin/<branch>..HEAD` と open PR 一覧を確認し、委譲先がブリーフの留保作業（push・PR 作成・issue 操作）を実行していないか照合した
-- [ ] `/simplify` または `/code-review` を実施した回は、実施直後（コミット作成前）に `Review` trailer をそのコミットのメッセージへ含めた。レビュー実施とコミット作成の間に他の作業（PR 作成・push 等）を挟むと記載を失念しやすい — 実施済みで未記載のまま次の作業に進んでいないか、コミット直前に再確認する
+- [ ] コード変更のあるサイクルでは、観点1（品質）の記録に加えて観点2（correctness）または観点3（設計妥当性）の記録が入っていることを、コミット直前に確認した。レビュー実施とコミット作成の間に他の作業（PR 作成・push 等）を挟むと記載を失念しやすい — 実施済みで未記載のまま次の作業に進んでいないか、コミット直前に再確認する
 
 **サイクルは worktree で回す**: ブランチをルート作業ツリー（`~/works/pfdsl` 直下）で切らない。ルートツリーの HEAD は複数のセッションが共有する資源で、他セッションの `git stash` / `git switch` が自分の未コミット編集をツリーから取り去り HEAD を別ブランチへ移す。編集ツールは成功を返すため、消失は次に同じ箇所を触るまで検出されない。消えた編集を探すときは `git stash list` を先に見る（`git stash` は内部で reset を行うため reflog では `git reset` と区別がつかない）。
 
