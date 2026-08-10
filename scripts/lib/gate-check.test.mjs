@@ -21,6 +21,7 @@ import {
 	diffReadySets,
 	extractGateChecklist,
 	formatGateTable,
+	formatRunTreeLine,
 	formatSizeDelta,
 	GATE_CHECKLIST_SOURCE_PATH,
 	hasNoImplementationDisposition,
@@ -1371,5 +1372,37 @@ describe("unionCommitLogEntries", () => {
 
 	it("returns an empty array when both are empty", () => {
 		assert.deepEqual(unionCommitLogEntries([], []), []);
+	});
+});
+
+describe("formatRunTreeLine", () => {
+	it("names the main checkout when root equals mainRoot", () => {
+		const line = formatRunTreeLine({
+			root: "/repo",
+			mainRoot: "/repo",
+			branch: "main",
+		});
+		assert.match(line, /main checkout/);
+		assert.match(line, /main/);
+	});
+
+	it("names a linked worktree when root differs from mainRoot", () => {
+		const line = formatRunTreeLine({
+			root: "/repo/.claude/worktrees/feature-x",
+			mainRoot: "/repo",
+			branch: "feature-x",
+		});
+		assert.match(line, /linked worktree/);
+		assert.match(line, /feature-x/);
+	});
+
+	it("stays readable when branch is null (unresolved or detached HEAD)", () => {
+		const line = formatRunTreeLine({
+			root: "/repo",
+			mainRoot: "/repo",
+			branch: null,
+		});
+		assert.doesNotMatch(line, /null/);
+		assert.match(line, /main checkout/);
 	});
 });
