@@ -111,7 +111,7 @@ Commands:
                            Structural diff (text), or visual diff DOT/SVG
 
 Command groups (run `pfdsl <group>` for their subcommands):
-  graph summary|io|stats|neighbors|locate|impact|depends-on|path|edges|orphans
+  graph summary|io|stats|neighbors|locate|describe|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
   meta get|list|set|sort|reindex|check-links
                            Read and write frontmatter metadata

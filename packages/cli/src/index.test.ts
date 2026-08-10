@@ -4154,6 +4154,96 @@ req >> design -> spec
 			expect(r.exitCode).toBe(2);
 		});
 	});
+
+	describe("describe", () => {
+		const src = `---
+artifact:
+  spec:
+    label: Spec
+process:
+  design:
+    label: Design
+---
+req >> design -> spec
+`;
+
+		it("prints kind, fields, neighbors, and locate lines as text", async () => {
+			const f = join(dir, "describe.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "design"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`design (process)\ndesign.label: Design\npredecessors: req\nsuccessors: spec\n${f}:6: declaration\n${f}:9: edge\n`,
+			);
+		});
+
+		it("--json emits { ok, id, kind, meta, predecessors, successors, declarationLine, edgeLines }", async () => {
+			const f = join(dir, "describe-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "design", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				kind: "process",
+				meta: { label: "Design" },
+				predecessors: [{ id: "req", kind: "primary" }],
+				successors: [{ id: "spec", kind: "primary" }],
+				declarationLine: 6,
+				edgeLines: [9],
+			});
+		});
+
+		// group is a NodeKind alongside artifact/process, with no edges of its
+		// own — describe still resolves it (unlike graph.nodes-based
+		// subcommands, which only ever see artifact/process).
+		it("resolves a group id, with empty predecessors/successors and no edge lines", async () => {
+			const f = join(dir, "describe-group.pfdsl");
+			writeFileSync(
+				f,
+				"---\ngroup:\n  core:\n    label: Core\nartifact:\n  spec:\n    group: core\n---\nreq >> design -> spec\n",
+			);
+			const r = await run(["graph", "describe", f, "core", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "core",
+				kind: "group",
+				meta: { label: "Core" },
+				predecessors: [],
+				successors: [],
+				declarationLine: 3,
+				edgeLines: [],
+			});
+		});
+
+		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
+			const f = join(dir, "describe-notfound.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "nonexistent"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
+		});
+
+		it("--json on id-not-found emits { ok: false, missing } on stdout, empty stderr", async () => {
+			const f = join(dir, "describe-notfound-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "nonexistent", "--json"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: false,
+				missing: ["nonexistent"],
+			});
+		});
+
+		it("exits 2 when the id argument is missing", async () => {
+			const f = join(dir, "describe-missing.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f]);
+			expect(r.exitCode).toBe(2);
+		});
+	});
 });
 
 // Regression tests for the code-review findings on the restructure PR (#506).

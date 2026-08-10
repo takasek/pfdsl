@@ -1676,6 +1676,71 @@ export function runGraphLocate(
 	return ok(lines.length ? `${lines.join("\n")}\n` : "");
 }
 
+/**
+ * One node's full picture in a single call: kind, every frontmatter field
+ * (`collectNodeFields`, same as `meta get`/`meta list`), direct
+ * predecessors/successors (`computeNeighbors`, same as `graph neighbors`),
+ * and where it appears in the file (`locateNode`, same as `graph locate`) —
+ * folding several read-only queries an agent would otherwise make
+ * separately into one (#829). Existence is checked via `nodeKinds`, not
+ * `graph.nodes`: unlike the other graph-analysis subcommands above, `kind`
+ * here can also be `group`, and group ids never appear in the edge graph.
+ */
+export function runGraphDescribe(
+	file: string,
+	id: string,
+	opts: GraphAnalysisOptions = {},
+): CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, frontmatter, nodeKinds, graph } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const kind = nodeKinds.get(id);
+	if (kind === undefined) return idsNotFoundError(file, [id], opts.json);
+
+	const basePath = frontmatter?.basePath;
+	const docFsPath = file === "-" ? null : resolve(file);
+	const { values, displayFieldsById, warnText } = collectNodeFields(
+		[{ id, kind }],
+		frontmatter,
+		undefined,
+		docFsPath,
+		basePath,
+	);
+	const { predecessors, successors } = computeNeighbors(graph, id);
+	const { declarationLine, edgeLines } = locateNode(src, id);
+
+	if (opts.json) {
+		return ok(
+			`${JSON.stringify({
+				ok: true,
+				id,
+				kind,
+				meta: values[id],
+				predecessors,
+				successors,
+				declarationLine,
+				edgeLines,
+			})}\n`,
+			warnText,
+		);
+	}
+
+	const fieldLines = (displayFieldsById[id] ?? []).map((field) =>
+		formatGetLine(id, field, values),
+	);
+	const lines = [
+		`${id} (${kind})`,
+		...fieldLines,
+		`predecessors: ${renderNeighborList(predecessors)}`,
+		`successors: ${renderNeighborList(successors)}`,
+		...renderLocateLines(file, declarationLine, edgeLines),
+	];
+	return ok(`${lines.join("\n")}\n`, warnText);
+}
+
 export function runImpact(
 	file: string,
 	id: string,
@@ -2492,6 +2557,25 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
+const HELP_GRAPH_DESCRIBE = `usage: pfdsl graph describe <file|-> <id> [--json] [--no-color]
+
+Print a single node's full picture in one call: its kind (artifact/process/
+group), every frontmatter field (same rendering as \`meta get\`/\`meta list\`),
+its direct predecessors/successors (same as \`graph neighbors\`), and where
+it appears in the file (same as \`graph locate\`) — folding several
+read-only queries an agent would otherwise make separately into one.
+
+  --json      output as JSON ({ ok, id, kind, meta, predecessors, successors,
+              declarationLine: number | null, edgeLines: number[] })
+              on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success
+  1  id not found in the file
+  2  invalid usage (missing id)
+`;
+
 const HELP_IMPACT = `usage: pfdsl graph impact <file|-> <id> [--json] [--no-color]
 
 Print the full downstream closure reachable from <id> via primary edges
@@ -2659,6 +2743,7 @@ Subcommands:
   stats <file|-> [--limit]    Rank nodes by fan-in/fan-out degree
   neighbors <file|-> <id>     Direct predecessors/successors of a node
   locate <file|-> <id>        Frontmatter declaration line and body edge lines of a node
+  describe <file|-> <id>      Kind, fields, neighbors, and locate lines of a node, in one call
   impact <file|-> <id>        Full downstream closure of a node
   depends-on <file|-> <id>    Full upstream closure of a node
   path <file|-> <from> <to> [--limit]
@@ -2715,7 +2800,7 @@ Commands:
                            Structural diff (text), or visual diff DOT/SVG
 
 Command groups (run \`pfdsl <group>\` for their subcommands):
-  graph summary|io|stats|neighbors|locate|impact|depends-on|path|edges|orphans
+  graph summary|io|stats|neighbors|locate|describe|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
   meta get|list|set|sort|reindex|check-links
                            Read and write frontmatter metadata
@@ -2835,6 +2920,15 @@ function runGraphGroup(
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_GRAPH_LOCATE, 2);
 			return runGraphLocate(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		}
+		case "describe": {
+			if (flags.help) return ok(HELP_GRAPH_DESCRIBE);
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_GRAPH_DESCRIBE, 2);
+			return runGraphDescribe(f, id, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
