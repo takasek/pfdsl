@@ -1,8 +1,8 @@
 import { isMap, isScalar, type Pair } from "yaml";
 import { parseFrontmatterCst } from "./frontmatter-cst.js";
-import { analyze } from "./index.js";
 import type {
 	ArtifactExpr,
+	Document,
 	IdNode,
 	NodeKind,
 	Statement,
@@ -15,12 +15,6 @@ export interface LocateResult {
 	edgeLines: number[];
 }
 
-const FRONTMATTER_SECTION_KINDS: readonly NodeKind[] = [
-	"artifact",
-	"process",
-	"group",
-];
-
 /** The node id a `Pair`'s key represents, or null when the key isn't a plain scalar. */
 function pairId(pair: Pair): string | null {
 	return isScalar(pair.key) ? String(pair.key.value) : null;
@@ -28,20 +22,20 @@ function pairId(pair: Pair): string | null {
 
 /**
  * The offset of `id`'s key scalar within the frontmatter's yaml text (as
- * parsed by `parseFrontmatterCst`), searching `artifact:`/`process:`/`group:`
- * in turn. Null when `id` has no frontmatter entry.
+ * parsed by `parseFrontmatterCst`), looked up in the one section its `kind`
+ * names — the same kind-scoped dispatch `setFrontmatterField` uses on the
+ * write path. Null when `id` has no frontmatter entry.
  */
 function declarationOffset(
 	doc: ReturnType<typeof parseFrontmatterCst>["doc"],
 	id: string,
+	kind: NodeKind,
 ): number | null {
-	for (const kind of FRONTMATTER_SECTION_KINDS) {
-		const section = doc.get(kind, true);
-		if (!isMap(section)) continue;
-		for (const item of section.items) {
-			if (pairId(item) === id && isScalar(item.key) && item.key.range) {
-				return item.key.range[0];
-			}
+	const section = doc.get(kind, true);
+	if (!isMap(section)) return null;
+	for (const item of section.items) {
+		if (pairId(item) === id && isScalar(item.key) && item.key.range) {
+			return item.key.range[0];
 		}
 	}
 	return null;
@@ -113,9 +107,20 @@ function collectStatementIds(
  * from `analyze()`'s AST (`document`, whose `IdNode` positions are already
  * shifted onto full-file line numbers) and `parseFrontmatterCst`'s yaml CST
  * (`range` offsets) — no re-scanning of `source`'s lines (#829).
+ *
+ * Takes the `document` and `kind` the caller already resolved, the way
+ * `computeNeighbors` takes an already-built `graph`: every caller reaches
+ * here through its own `analyze()`, so re-deriving them would parse,
+ * normalize and validate the same source a second time. `source` is still
+ * needed because `AnalyzeResult` carries no frontmatter CST, and the key
+ * offsets only exist there.
  */
-export function locateNode(source: string, id: string): LocateResult {
-	const { document } = analyze(source);
+export function locateNode(
+	document: Document,
+	source: string,
+	id: string,
+	kind: NodeKind,
+): LocateResult {
 	const edgeLineSet = new Set<number>();
 	for (const stmt of document.statements) {
 		collectStatementIds(stmt, id, edgeLineSet);
@@ -124,7 +129,7 @@ export function locateNode(source: string, id: string): LocateResult {
 	const cst = parseFrontmatterCst(source);
 	let declarationLine: number | null = null;
 	if (cst.present) {
-		const offset = declarationOffset(cst.doc, id);
+		const offset = declarationOffset(cst.doc, id, kind);
 		if (offset !== null) {
 			declarationLine =
 				FRONTMATTER_YAML_START_LINE - 1 + lineAtOffset(cst.yamlText, offset);

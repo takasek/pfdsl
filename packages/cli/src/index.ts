@@ -1660,12 +1660,16 @@ export function runGraphLocate(
 ): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
-	const { diagnostics, graph } = analyze(src);
+	const { diagnostics, document, nodeKinds } = analyze(src);
 	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
-	if (!graph.nodes.has(id)) return idsNotFoundError(file, [id], opts.json);
+	// nodeKinds rather than graph.nodes: the two hold the same id set (the
+	// graph's node map is seeded from nodeKinds), and locateNode needs the
+	// kind to know which frontmatter section to look the id up in.
+	const kind = nodeKinds.get(id);
+	if (kind === undefined) return idsNotFoundError(file, [id], opts.json);
 
-	const { declarationLine, edgeLines } = locateNode(src, id);
+	const { declarationLine, edgeLines } = locateNode(document, src, id, kind);
 
 	if (opts.json) {
 		return ok(
@@ -1682,9 +1686,9 @@ export function runGraphLocate(
  * predecessors/successors (`computeNeighbors`, same as `graph neighbors`),
  * and where it appears in the file (`locateNode`, same as `graph locate`) —
  * folding several read-only queries an agent would otherwise make
- * separately into one (#829). Existence is checked via `nodeKinds`, not
- * `graph.nodes`: unlike the other graph-analysis subcommands above, `kind`
- * here can also be `group`, and group ids never appear in the edge graph.
+ * separately into one (#829). Existence is checked via `nodeKinds` rather
+ * than `graph.nodes` — the same id set either way, but the kind this
+ * command reports (and `collectNodeFields` needs) is what that map holds.
  */
 export function runGraphDescribe(
 	file: string,
@@ -1693,7 +1697,7 @@ export function runGraphDescribe(
 ): CommandResult {
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
-	const { diagnostics, frontmatter, nodeKinds, graph } = analyze(src);
+	const { diagnostics, document, frontmatter, nodeKinds, graph } = analyze(src);
 	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
@@ -1710,7 +1714,7 @@ export function runGraphDescribe(
 		basePath,
 	);
 	const { predecessors, successors } = computeNeighbors(graph, id);
-	const { declarationLine, edgeLines } = locateNode(src, id);
+	const { declarationLine, edgeLines } = locateNode(document, src, id, kind);
 
 	if (opts.json) {
 		return ok(
