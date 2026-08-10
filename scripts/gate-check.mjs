@@ -336,7 +336,7 @@ const manualItems = deriveManualItems(
 // they start, but a run that slips past it (e.g. inside a subagent) still
 // needs to be checkable after the fact — and it is only checkable if the
 // tree named here is the one gate-check actually inspected, not wherever the
-// invoking shell happened to be sitting (#840, 案3).
+// invoking shell happened to be sitting (#840).
 const mainRootLookup = exec("git", ["rev-parse", "--git-common-dir"]);
 const branchLookup = exec("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
 // Either lookup failing (e.g. no git on PATH) must not stop the gate itself
