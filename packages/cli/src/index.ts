@@ -28,6 +28,7 @@ import {
 	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
+	locateNode,
 	type NodeKind,
 	type PfdType,
 	reindex,
@@ -1169,48 +1170,45 @@ function commandCwdDerived(docFsPath: string, basePath?: string): string {
 	return resolveLocationFsPath(docFsPath, ".", basePath);
 }
 
-export function runGet(file: string, opts: GetOptions = {}): CommandResult {
-	if (!opts.id) return fail(`error: id is required\n\n${HELP_GET}`, 2);
-	const ids = splitCommaList(opts.id);
-	if (ids.length === 0) return fail(`error: id is required\n\n${HELP_GET}`, 2);
-
-	// Omitted field positional means "all set fields"; present-but-empty
-	// (e.g. an empty/blank field positional) is still a usage error.
-	const explicitFields =
-		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
-	if (explicitFields !== undefined && explicitFields.length === 0) {
-		return fail(`error: field is required\n\n${HELP_GET}`, 2);
+/** Takes the kind the caller already resolved (nodeKinds.get(id)). Listing the
+ * three kinds exhaustively lets tsc flag a new NodeKind instead (#607). */
+function metaFor(
+	frontmatter: ReturnType<typeof analyze>["frontmatter"],
+	id: string,
+	kind: NodeKind,
+): Record<string, unknown> | undefined {
+	switch (kind) {
+		case "artifact":
+			return frontmatter?.artifact?.[id];
+		case "process":
+			return frontmatter?.process?.[id];
+		case "group":
+			return frontmatter?.group?.[id];
 	}
+}
 
-	const src = readSource(file);
-	if (isCommandResult(src)) return src;
+interface NodeFieldsResult {
+	values: Record<string, Record<string, unknown>>;
+	displayFieldsById: Record<string, string[]>;
+	warnText: string;
+}
 
-	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
-	if (failed) return failed;
-
-	const basePath = frontmatter?.basePath;
-	const docFsPath = file === "-" ? null : resolve(file);
-
-	// Takes the kind the caller already resolved: ids absent from nodeKinds are
-	// collected as missing before this runs, so a fall-through case here would
-	// be unreachable. Listing the three kinds exhaustively lets tsc flag a new
-	// NodeKind instead (#607).
-	const metaFor = (
-		id: string,
-		kind: NodeKind,
-	): Record<string, unknown> | undefined => {
-		switch (kind) {
-			case "artifact":
-				return frontmatter?.artifact?.[id];
-			case "process":
-				return frontmatter?.process?.[id];
-			case "group":
-				return frontmatter?.group?.[id];
-		}
-	};
-
-	const missing: string[] = [];
+/**
+ * Shared field-rendering core of `meta get` and `meta list`: for each
+ * (id, kind) pair, builds the row of field values — the explicit field list,
+ * or (when omitted) every field set on the node, raw, in frontmatter order —
+ * plus derived fields (`location.resolved`, `command.cwd`) auto-added right
+ * after their base field. Also collects the warning families both commands
+ * emit (an unrecognized field name; a derived field unresolvable from stdin)
+ * into one formatted block.
+ */
+function collectNodeFields(
+	idsAndKinds: readonly { id: string; kind: NodeKind }[],
+	frontmatter: ReturnType<typeof analyze>["frontmatter"],
+	explicitFields: string[] | undefined,
+	docFsPath: string | null,
+	basePath: string | undefined,
+): NodeFieldsResult {
 	// Keyed by "kind::field" so one warning covers every id sharing that
 	// (kind, field) pair instead of repeating per id (#479 usability re-check).
 	const unknownFieldIds = new Map<string, string[]>();
@@ -1236,13 +1234,8 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	const values: Record<string, Record<string, unknown>> = {};
 	const displayFieldsById: Record<string, string[]> = {};
 
-	for (const id of ids) {
-		const kind = nodeKinds.get(id);
-		if (kind === undefined) {
-			missing.push(id);
-			continue;
-		}
-		const meta = metaFor(id, kind);
+	for (const { id, kind } of idsAndKinds) {
+		const meta = metaFor(frontmatter, id, kind);
 		const row: Record<string, unknown> = {};
 		const displayFields: string[] = [];
 		const addField = (field: string) => {
@@ -1320,7 +1313,51 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 			`warning: cannot resolve '${field}' for ${affectedIds.length === 1 ? `'${affectedIds[0]}'` : `id(s) ${affectedIds.join(", ")}`}: no file path when reading from stdin`,
 	);
 	const warnings = [...unknownWarnings, ...stdinWarnings];
-	const warnText = warnings.length ? `${warnings.join("\n")}\n` : "";
+	return {
+		values,
+		displayFieldsById,
+		warnText: warnings.length ? `${warnings.join("\n")}\n` : "",
+	};
+}
+
+export function runGet(file: string, opts: GetOptions = {}): CommandResult {
+	if (!opts.id) return fail(`error: id is required\n\n${HELP_GET}`, 2);
+	const ids = splitCommaList(opts.id);
+	if (ids.length === 0) return fail(`error: id is required\n\n${HELP_GET}`, 2);
+
+	// Omitted field positional means "all set fields"; present-but-empty
+	// (e.g. an empty/blank field positional) is still a usage error.
+	const explicitFields =
+		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
+	if (explicitFields !== undefined && explicitFields.length === 0) {
+		return fail(`error: field is required\n\n${HELP_GET}`, 2);
+	}
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const basePath = frontmatter?.basePath;
+	const docFsPath = file === "-" ? null : resolve(file);
+
+	const missing: string[] = [];
+	const known: { id: string; kind: NodeKind }[] = [];
+	for (const id of ids) {
+		const kind = nodeKinds.get(id);
+		if (kind === undefined) missing.push(id);
+		else known.push({ id, kind });
+	}
+
+	const { values, displayFieldsById, warnText } = collectNodeFields(
+		known,
+		frontmatter,
+		explicitFields,
+		docFsPath,
+		basePath,
+	);
 
 	const linesFor = (idsToPrint: string[]) =>
 		idsToPrint.flatMap((id) =>
@@ -1351,6 +1388,141 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 
 	const lines = linesFor(ids);
 	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
+}
+
+export interface MetaListOptions {
+	tag?: string;
+	group?: string;
+	producer?: string;
+	field?: string;
+	json?: boolean;
+	color?: boolean;
+}
+
+/** True when a node's tags: array (if any) includes at least one of `filter`. */
+function matchesAnyTag(
+	meta: Record<string, unknown> | undefined,
+	filter: Set<string>,
+): boolean {
+	const tags = meta?.tags;
+	if (!Array.isArray(tags)) return false;
+	return tags.some((t) => filter.has(String(t)));
+}
+
+export function runMetaList(
+	file: string,
+	opts: MetaListOptions = {},
+): CommandResult {
+	if (
+		opts.tag === undefined &&
+		opts.group === undefined &&
+		opts.producer === undefined
+	) {
+		return fail(
+			`error: at least one selector is required (--tag, --group, --producer)\n\n${HELP_META_LIST}`,
+			2,
+		);
+	}
+
+	const explicitFields =
+		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
+	if (explicitFields !== undefined && explicitFields.length === 0) {
+		return fail(`error: field is required\n\n${HELP_META_LIST}`, 2);
+	}
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter, nodeKinds, graph } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const basePath = frontmatter?.basePath;
+	const docFsPath = file === "-" ? null : resolve(file);
+
+	const tagFilter =
+		opts.tag !== undefined ? new Set(splitCommaList(opts.tag)) : undefined;
+	const producerOutputs =
+		opts.producer !== undefined
+			? new Set(
+					graph.primaryEdges
+						.filter((e) => e.kind === "output" && e.from === opts.producer)
+						.map((e) => e.to),
+				)
+			: undefined;
+
+	const known: { id: string; kind: NodeKind }[] = [];
+	// Tracked independent of tagFilter/opts.group/producerOutputs matching so
+	// a selector value's use across the whole file, not just within the AND
+	// intersection with other selectors, decides whether it warns (#844):
+	// an AND combination legitimately narrowing to zero rows is not a typo.
+	const usedTags = new Set<string>();
+	let groupUsed = false;
+	for (const [id, kind] of nodeKinds) {
+		// meta list only ever selects artifact/process — --producer can only
+		// ever match an artifact, and --tag/--group read a field group nodes
+		// don't have, but the kind check keeps that implicit rather than
+		// depending on the two selectors to exclude group on their own.
+		if (kind !== "artifact" && kind !== "process") continue;
+		const meta = metaFor(frontmatter, id, kind);
+		const tags = meta?.tags;
+		if (tagFilter !== undefined && Array.isArray(tags))
+			for (const t of tags) usedTags.add(String(t));
+		if (opts.group !== undefined && meta?.group === opts.group)
+			groupUsed = true;
+		if (tagFilter !== undefined && !matchesAnyTag(meta, tagFilter)) continue;
+		if (opts.group !== undefined && meta?.group !== opts.group) continue;
+		if (producerOutputs !== undefined && !producerOutputs.has(id)) continue;
+		known.push({ id, kind });
+	}
+	known.sort((a, b) => compareIds(a.id, b.id));
+
+	const selectorWarnings: string[] = [];
+	if (tagFilter !== undefined) {
+		for (const t of tagFilter) {
+			if (!usedTags.has(t)) {
+				selectorWarnings.push(
+					`warning: '${t}' does not match any node's tag (possible typo?)`,
+				);
+			}
+		}
+	}
+	if (opts.group !== undefined && !groupUsed) {
+		selectorWarnings.push(
+			`warning: '${opts.group}' does not match any node's group (possible typo?)`,
+		);
+	}
+	if (opts.producer !== undefined && producerOutputs?.size === 0) {
+		selectorWarnings.push(
+			`warning: '${opts.producer}' has no output edges (possible typo?)`,
+		);
+	}
+	const selectorWarnText = selectorWarnings.length
+		? `${selectorWarnings.join("\n")}\n`
+		: "";
+
+	const { values, displayFieldsById, warnText } = collectNodeFields(
+		known,
+		frontmatter,
+		explicitFields,
+		docFsPath,
+		basePath,
+	);
+	const combinedWarnText = `${selectorWarnText}${warnText}`;
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, values })}\n`, combinedWarnText);
+	}
+
+	if (known.length === 0) {
+		return ok("No nodes match the given selectors.\n", combinedWarnText);
+	}
+	const lines = known.flatMap(({ id }) =>
+		(displayFieldsById[id] ?? []).map((field) =>
+			formatGetLine(id, field, values),
+		),
+	);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", combinedWarnText);
 }
 
 export interface CheckLinksOptions {
@@ -1470,6 +1642,15 @@ function idsNotFoundError(
 	return fail(`error: id(s) not found in ${file}: ${ids.join(", ")}\n`, 1);
 }
 
+/** Text rendering shared by `graph neighbors` and `graph describe`: an id list, feedback neighbors annotated. */
+function renderNeighborList(ns: GraphNeighbor[]): string {
+	return (
+		ns
+			.map((n) => (n.kind === "feedback" ? `${n.id} (feedback)` : n.id))
+			.join(", ") || "(none)"
+	);
+}
+
 export function runNeighbors(
 	file: string,
 	id: string,
@@ -1483,13 +1664,175 @@ export function runNeighbors(
 	if (opts.json) {
 		return ok(`${JSON.stringify({ ok: true, predecessors, successors })}\n`);
 	}
-	const render = (ns: GraphNeighbor[]): string =>
-		ns
-			.map((n) => (n.kind === "feedback" ? `${n.id} (feedback)` : n.id))
-			.join(", ") || "(none)";
 	return ok(
-		`predecessors: ${render(predecessors)}\nsuccessors: ${render(successors)}\n`,
+		`predecessors: ${renderNeighborList(predecessors)}\nsuccessors: ${renderNeighborList(successors)}\n`,
 	);
+}
+
+/**
+ * Text rendering shared by `graph locate` and `graph describe`: one
+ * `<file>:<line>: <kind>` line per occurrence — declaration, then the found
+ * field lines, then edge lines. Field lines are ordered by line, not by the
+ * order they were asked for, so the whole list reads top-to-bottom like the
+ * file does; each line names its field, so the correspondence with the
+ * request survives the reordering. `fields`/`fieldLines` default to empty,
+ * so `graph describe` (which never requests fields) renders exactly as
+ * before.
+ */
+function renderLocateLines(
+	file: string,
+	declarationLine: number | null,
+	edgeLines: readonly number[],
+	fields: readonly string[] = [],
+	fieldLines: Record<string, number | null> = {},
+): string[] {
+	const lines: string[] = [];
+	if (declarationLine !== null) {
+		lines.push(`${file}:${declarationLine}: declaration`);
+	}
+	const foundFields = fields
+		.map((field) => ({ field, line: fieldLines[field] }))
+		.filter(
+			(f): f is { field: string; line: number } =>
+				f.line !== null && f.line !== undefined,
+		)
+		.sort((a, b) => a.line - b.line);
+	for (const { field, line } of foundFields) {
+		lines.push(`${file}:${line}: field ${field}`);
+	}
+	for (const line of edgeLines) lines.push(`${file}:${line}: edge`);
+	return lines;
+}
+
+export interface GraphLocateOptions extends GraphAnalysisOptions {
+	field?: string;
+}
+
+/**
+ * Where <id> appears in the file: its frontmatter declaration key line (if
+ * any), every body line it's mentioned on, and (with `--field`) the line of
+ * each named field within its declaration block. `loadGraph` doesn't expose
+ * the source text it read, and `locateNode` needs it, so this reads and
+ * analyzes the file itself rather than going through that shared loader.
+ */
+export function runGraphLocate(
+	file: string,
+	id: string,
+	opts: GraphLocateOptions = {},
+): CommandResult {
+	const fields = opts.field !== undefined ? splitCommaList(opts.field) : [];
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, document, nodeKinds } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+	// nodeKinds rather than graph.nodes: the two hold the same id set (the
+	// graph's node map is seeded from nodeKinds), and locateNode needs the
+	// kind to know which frontmatter section to look the id up in.
+	const kind = nodeKinds.get(id);
+	if (kind === undefined) return idsNotFoundError(file, [id], opts.json);
+
+	const { declarationLine, edgeLines, fieldLines } = locateNode(
+		document,
+		src,
+		id,
+		kind,
+		fields,
+	);
+
+	// A requested field with no line in the node's declaration block is
+	// usually a typo — warn, same style as meta get's unknown-field warning
+	// (#844) — without failing the command.
+	const missingFieldWarnings = fields
+		.filter((field) => fieldLines[field] === null)
+		.map(
+			(field) =>
+				`warning: '${field}' has no line in '${id}'s declaration block (possible typo?)`,
+		);
+	const warnText = missingFieldWarnings.length
+		? `${missingFieldWarnings.join("\n")}\n`
+		: "";
+
+	if (opts.json) {
+		return ok(
+			`${JSON.stringify({ ok: true, id, declarationLine, edgeLines, fieldLines })}\n`,
+			warnText,
+		);
+	}
+	const lines = renderLocateLines(
+		file,
+		declarationLine,
+		edgeLines,
+		fields,
+		fieldLines,
+	);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
+}
+
+/**
+ * One node's full picture in a single call: kind, every frontmatter field
+ * (`collectNodeFields`, same as `meta get`/`meta list`), direct
+ * predecessors/successors (`computeNeighbors`, same as `graph neighbors`),
+ * and where it appears in the file (`locateNode`, same as `graph locate`) —
+ * folding several read-only queries an agent would otherwise make
+ * separately into one (#829). Existence is checked via `nodeKinds` rather
+ * than `graph.nodes` — the same id set either way, but the kind this
+ * command reports (and `collectNodeFields` needs) is what that map holds.
+ */
+export function runGraphDescribe(
+	file: string,
+	id: string,
+	opts: GraphAnalysisOptions = {},
+): CommandResult {
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, document, frontmatter, nodeKinds, graph } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const kind = nodeKinds.get(id);
+	if (kind === undefined) return idsNotFoundError(file, [id], opts.json);
+
+	const basePath = frontmatter?.basePath;
+	const docFsPath = file === "-" ? null : resolve(file);
+	const { values, displayFieldsById, warnText } = collectNodeFields(
+		[{ id, kind }],
+		frontmatter,
+		undefined,
+		docFsPath,
+		basePath,
+	);
+	const { predecessors, successors } = computeNeighbors(graph, id);
+	const { declarationLine, edgeLines } = locateNode(document, src, id, kind);
+
+	if (opts.json) {
+		return ok(
+			`${JSON.stringify({
+				ok: true,
+				id,
+				kind,
+				meta: values[id],
+				predecessors,
+				successors,
+				declarationLine,
+				edgeLines,
+			})}\n`,
+			warnText,
+		);
+	}
+
+	const fieldLines = (displayFieldsById[id] ?? []).map((field) =>
+		formatGetLine(id, field, values),
+	);
+	const lines = [
+		`${id} (${kind})`,
+		...fieldLines,
+		`predecessors: ${renderNeighborList(predecessors)}`,
+		`successors: ${renderNeighborList(successors)}`,
+		...renderLocateLines(file, declarationLine, edgeLines),
+	];
+	return ok(`${lines.join("\n")}\n`, warnText);
 }
 
 export function runImpact(
@@ -2237,6 +2580,51 @@ Exit codes:
   2  invalid usage (missing id, or too many positional arguments)
 `;
 
+const HELP_META_LIST = `usage: pfdsl meta list <file|-> [--tag <t[,t...]>] [--group <g>] [--producer <p>] [field[,field...]] [--json] [--no-color]
+
+Print field values for every artifact/process node matching the given
+selectors — a supply-side counterpart to \`meta get\`'s explicit id list.
+At least one selector is required; multiple selectors combine with AND, so
+\`--producer p --tag t\` reads as "the artifacts p produces that are tagged
+t" — the successors-filtered-by-tag query, without a separate neighbors
+call.
+
+  --tag <t[,t...]>    matches when the node's tags: array includes any of
+                      the given tags (OR within the comma-separated list)
+  --group <g>         matches when the node's group: field exactly equals
+                      <g>. No parent-group traversal: a node in a nested
+                      child group is not matched by an ancestor group's id.
+  --producer <p>      matches an artifact reachable via process <p>'s
+                      output edge (process -> artifact). Only artifacts can
+                      match this selector; a process id is never selected.
+
+  [field[,field...]]  comma-separated field names. Omit the positional
+                      entirely to print every field set in each matched
+                      node's frontmatter entry, plus applicable derived
+                      fields (location.resolved, command.cwd) — same
+                      semantics as \`meta get\`. Passing it as an empty or
+                      blank string is a usage error rather than the same
+                      thing as omitting it.
+  --json              emit JSON ({ ok, values: { [id]: { [field]: value } } }),
+                      the same shape as \`meta get\` --json
+                      on parse failure: { ok: false, diagnostics }
+  --no-color          disable ANSI color codes (also: NO_COLOR env var)
+
+Matched nodes are printed in id order. Zero matches is not an error: text
+mode prints "No nodes match the given selectors."; --json prints an empty
+values object. Both exit 0.
+
+A selector value that no node uses at all (checked per value, independent of
+the AND combination with other selectors) prints a warning to stderr —
+possible typo — without changing the exit code; an AND combination that
+legitimately narrows to zero rows does not warn.
+
+Exit codes:
+  0  success (including zero matches)
+  1  parse/validation error
+  2  invalid usage (no selector given, or an empty field positional)
+`;
+
 const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json] [--no-color]
 
 Print the direct predecessors (in-edges) and successors (out-edges) of a
@@ -2245,6 +2633,63 @@ Feedback (\`>>?\`) neighbors are included, annotated \`(feedback)\` in text.
 
   --json      output as JSON ({ ok, predecessors, successors }), each neighbor
               { id, kind: "primary" | "feedback" }
+              on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success
+  1  id not found in the file
+  2  invalid usage (missing id)
+`;
+
+const HELP_GRAPH_LOCATE = `usage: pfdsl graph locate <file|-> <id> [--field <name[,name...]>] [--json] [--no-color]
+
+Print every place <id> appears in the file: its frontmatter declaration key
+line (\`declaration\`), and every body line naming it (\`edge\`) — whether in
+an edge or in a bare node-decl. These are the line numbers a Read/Edit tool
+call needs, without opening the whole file first. Text mode prints one
+occurrence per line, declaration before edge, each edge line ascending.
+
+By default, line granularity is the node, not the field: a declaration line
+points at the id's key, and the fields under it are on the lines that
+follow. \`--field <name[,name...]>\` narrows past that: it adds one line per
+named field, pointing at that field's own key within the id's declaration
+block, printed after the declaration line and ordered by line rather than
+by the order asked for (each line names its field, so text output as a
+whole reads top-to-bottom like the file). A named field with no line is
+skipped in text mode and printed as null in --json, with a warning on
+stderr (possible typo) — that covers both a declaration block without the
+field and a node that has no frontmatter block at all, the latter being the
+case where the declaration line is null as well.
+
+  --field <name[,name...]>  also locate these frontmatter fields within
+                             <id>'s declaration block
+  --json      output as JSON ({ ok, id, declarationLine: number | null,
+              edgeLines: number[], fieldLines: { [name]: number | null } })
+              on failure: { ok: false, diagnostics } / { ok: false, missing }
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success (including a --field name the node doesn't have)
+  1  id not found in the file
+  2  invalid usage (missing id, or --field given with no value)
+`;
+
+const HELP_GRAPH_DESCRIBE = `usage: pfdsl graph describe <file|-> <id> [--json] [--no-color]
+
+Print a single node's full picture in one call: its kind (artifact/process/
+group), every frontmatter field (same rendering as \`meta get\`/\`meta list\`),
+its direct predecessors/successors (same as \`graph neighbors\`, feedback
+(\`>>?\`) neighbors included and annotated \`(feedback)\` in text), and where
+it appears in the file (same as \`graph locate\`) — folding several
+read-only queries an agent would otherwise make separately into one.
+
+Only the node named by <id> is described: neighbors are listed by id, so
+their own kind and fields take a \`describe\` (or \`meta get\`) of their own.
+
+  --json      output as JSON ({ ok, id, kind, meta, predecessors, successors,
+              declarationLine: number | null, edgeLines: number[] }), each
+              neighbor { id, kind: "primary" | "feedback" }
               on failure: { ok: false, diagnostics } / { ok: false, missing }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
@@ -2420,6 +2865,8 @@ Subcommands:
   io <file|->                 Print external inputs and terminal artifacts
   stats <file|-> [--limit]    Rank nodes by fan-in/fan-out degree
   neighbors <file|-> <id>     Direct predecessors/successors of a node
+  locate <file|-> <id>        Frontmatter declaration line and body edge lines of a node
+  describe <file|-> <id>      Kind, fields, neighbors, and locate lines of a node, in one call
   impact <file|-> <id>        Full downstream closure of a node
   depends-on <file|-> <id>    Full upstream closure of a node
   path <file|-> <from> <to> [--limit]
@@ -2437,6 +2884,8 @@ Read and write frontmatter metadata. Run
 
 Subcommands:
   get <file|-> <id[,id...]> [field[,field...]]   Print field values
+  list <file|-> [--tag|--group|--producer] [field[,field...]]
+                                                  Print field values for nodes matching selectors
   set <file> <id> <field> <value>                Set a field value in place
   sort <file|-> --by <keys>                      Sort node definitions
   reindex <file|->                               Assign topological index: values
@@ -2474,9 +2923,9 @@ Commands:
                            Structural diff (text), or visual diff DOT/SVG
 
 Command groups (run \`pfdsl <group>\` for their subcommands):
-  graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans
+  graph summary|io|stats|neighbors|locate|describe|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
-  meta get|set|sort|reindex|check-links
+  meta get|list|set|sort|reindex|check-links
                            Read and write frontmatter metadata
   status ready|blocked|list|gaps
                            Planning queries derived from artifact status
@@ -2585,6 +3034,27 @@ function runGraphGroup(
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
 			return runNeighbors(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		}
+		case "locate": {
+			if (flags.help) return ok(HELP_GRAPH_LOCATE);
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_GRAPH_LOCATE, 2);
+			const fieldVal = flags.field;
+			if (fieldVal === true) return fail(HELP_GRAPH_LOCATE, 2);
+			return runGraphLocate(f, id, {
+				...(typeof fieldVal === "string" ? { field: fieldVal } : {}),
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		}
+		case "describe": {
+			if (flags.help) return ok(HELP_GRAPH_DESCRIBE);
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_GRAPH_DESCRIBE, 2);
+			return runGraphDescribe(f, id, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
@@ -2710,6 +3180,26 @@ function runMetaGroup(
 			const f = rest[0];
 			if (!f) return fail(HELP_CHECK_LINKS, 2);
 			return runCheckLinks(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		}
+		case "list": {
+			if (flags.help) return ok(HELP_META_LIST);
+			const [f, field, ...extra] = rest;
+			if (!f) return fail(HELP_META_LIST, 2);
+			if (extra.length > 0) return fail(HELP_META_LIST, 2);
+			const tagVal = flags.tag;
+			const groupVal = flags.group;
+			const producerVal = flags.producer;
+			if (tagVal === true || groupVal === true || producerVal === true) {
+				return fail(HELP_META_LIST, 2);
+			}
+			return runMetaList(f, {
+				...(typeof tagVal === "string" ? { tag: tagVal } : {}),
+				...(typeof groupVal === "string" ? { group: groupVal } : {}),
+				...(typeof producerVal === "string" ? { producer: producerVal } : {}),
+				...(field !== undefined ? { field } : {}),
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});

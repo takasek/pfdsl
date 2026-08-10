@@ -3276,6 +3276,211 @@ req -> spec
 	});
 });
 
+describe("meta list", () => {
+	const base = `---
+artifact:
+  spec:
+    status: done
+    tags: [design, backend]
+    group: core
+  code:
+    status: todo
+    tags: [backend]
+    group: core
+  docs:
+    status: done
+    tags: [design]
+process:
+  build:
+    tags: [backend]
+  write: {}
+group:
+  core:
+    label: Core
+---
+req >> design -> spec
+spec >> build -> code
+spec >> write -> docs
+`;
+
+	it("--tag matches a node whose tags: array includes it", async () => {
+		const f = join(dir, "list-tag.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("docs.status: done\nspec.status: done\n");
+	});
+
+	it("--group matches the group: field exactly", async () => {
+		const f = join(dir, "list-group.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--group", "core", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("code.status: todo\nspec.status: done\n");
+	});
+
+	it("--producer matches an artifact reachable via the process's output edge, not the process itself", async () => {
+		const f = join(dir, "list-producer.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--producer", "build"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"code.status: todo\ncode.tags: backend\ncode.group: core\n",
+		);
+	});
+
+	it("combines multiple selectors with AND", async () => {
+		const f = join(dir, "list-and.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"list",
+			f,
+			"--tag",
+			"design",
+			"--group",
+			"core",
+			"status",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("spec.status: done\n");
+	});
+
+	it("zero matches is not an error", async () => {
+		const f = join(dir, "list-empty.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No nodes match the given selectors.\n");
+	});
+
+	it("--json emits { ok, values } — zero matches as an empty object", async () => {
+		const f = join(dir, "list-empty-json.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({ ok: true, values: {} });
+	});
+
+	it("--json emits the same { ok, values } shape as meta get", async () => {
+		const f = join(dir, "list-json.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"list",
+			f,
+			"--group",
+			"core",
+			"status",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: { code: { status: "todo" }, spec: { status: "done" } },
+		});
+	});
+
+	it("no selector at all is a usage error (exit 2)", async () => {
+		const f = join(dir, "list-no-selector.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("warns on an unrecognized field name, same as meta get", async () => {
+		const f = join(dir, "list-unknown-field.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design", "bogus"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus' is not a recognized field");
+	});
+
+	it("warns when a --tag value matches no node's tags, without failing", async () => {
+		const f = join(dir, "list-tag-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
+
+	it("warns per unmatched value when --tag has multiple comma-separated values", async () => {
+		const f = join(dir, "list-tag-multi-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design,bogus1,bogus2"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus1'");
+		expect(r.stderr).toContain("'bogus2'");
+		expect(r.stderr).not.toContain("'design'");
+	});
+
+	it("does not warn for a --tag value that does match a node", async () => {
+		const f = join(dir, "list-tag-used.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+	});
+
+	it("warns when --group matches no node's group field", async () => {
+		const f = join(dir, "list-group-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--group", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
+
+	it("warns when --producer names a process id that does not exist", async () => {
+		const f = join(dir, "list-producer-missing.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--producer", "bogus"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus'");
+	});
+
+	it("warns when --producer names a process with no output edges", async () => {
+		const f = join(dir, "list-producer-no-outputs.pfdsl");
+		const noOutput = `---
+artifact:
+  spec: {}
+process:
+  investigate: {}
+---
+spec >> investigate
+`;
+		writeFileSync(f, noOutput);
+		const r = await run(["meta", "list", f, "--producer", "investigate"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'investigate'");
+	});
+
+	it("does not warn when an AND combination yields zero matches but every selector value matches individually", async () => {
+		const f = join(dir, "list-and-zero-no-warning.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"list",
+			f,
+			"--tag",
+			"design",
+			"--producer",
+			"build",
+			"status",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No nodes match the given selectors.\n");
+		expect(r.stderr).toBe("");
+	});
+
+	it("keeps exit code 0 when a selector value warning fires", async () => {
+		const f = join(dir, "list-tag-unused-exit.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
+});
+
 // group is a NodeKind alongside artifact and process, with its own field set
 // (label|color|parent), and meta had no coverage of it at all (#607).
 describe("meta get / set on a group id", () => {
@@ -3951,6 +4156,278 @@ p3 -> d
 			const r = await run(["graph", "orphans", f]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe("(none)\n");
+		});
+	});
+
+	describe("locate", () => {
+		const src = `---
+artifact:
+  spec:
+    label: Spec
+process:
+  design:
+    label: Design
+---
+req >> design -> spec
+`;
+
+		it("prints the declaration line then the edge line(s) as text", async () => {
+			const f = join(dir, "locate.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(`${f}:6: declaration\n${f}:9: edge\n`);
+		});
+
+		it("--json emits { ok, id, declarationLine, edgeLines, fieldLines }", async () => {
+			const f = join(dir, "locate-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+				fieldLines: {},
+			});
+		});
+
+		it("--field <name> adds the field's key line to --json fieldLines", async () => {
+			const f = join(dir, "locate-field-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"label",
+				"--json",
+			]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+				fieldLines: { label: 7 },
+			});
+		});
+
+		it("--field <name> prints a field line right after declaration, before edge lines", async () => {
+			const f = join(dir, "locate-field-text.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--field", "label"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`${f}:6: declaration\n${f}:7: field label\n${f}:9: edge\n`,
+			);
+		});
+
+		it("--field with multiple comma-separated names prints them in line order, not request order", async () => {
+			const f = join(dir, "locate-field-multi.pfdsl");
+			const multi = `---
+artifact:
+  spec:
+    label: Spec
+    description: a description
+    status: done
+---
+x -> spec
+`;
+			writeFileSync(f, multi);
+			const r = await run([
+				"graph",
+				"locate",
+				f,
+				"spec",
+				"--field",
+				"status,label",
+			]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`${f}:3: declaration\n${f}:4: field label\n${f}:6: field status\n${f}:8: edge\n`,
+			);
+		});
+
+		it("--field naming a field the node doesn't have: null in JSON, no text line, stderr warning", async () => {
+			const f = join(dir, "locate-field-missing.pfdsl");
+			writeFileSync(f, src);
+			const jsonRun = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"bogus",
+				"--json",
+			]);
+			expect(jsonRun.exitCode).toBe(0);
+			expect(JSON.parse(jsonRun.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+				fieldLines: { bogus: null },
+			});
+			expect(jsonRun.stderr).toContain("'bogus'");
+
+			const textRun = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"bogus",
+			]);
+			expect(textRun.exitCode).toBe(0);
+			expect(textRun.stdout).toBe(`${f}:6: declaration\n${f}:9: edge\n`);
+			expect(textRun.stderr).toContain("'bogus'");
+		});
+
+		it("a bare --field flag with no value is a usage error (exit 2)", async () => {
+			const f = join(dir, "locate-field-bare.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--field"]);
+			expect(r.exitCode).toBe(2);
+		});
+
+		it("uses - as the file part of a text line when reading from stdin", async () => {
+			const r = await run(["graph", "locate", "-", "design"], withStdin(src));
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe("-:6: declaration\n-:9: edge\n");
+		});
+
+		it("a node declared only via a bare node-decl has no declaration line, only edge line(s)", async () => {
+			const f = join(dir, "locate-isolated.pfdsl");
+			writeFileSync(f, "req >> design -> spec\niso\n");
+			const r = await run(["graph", "locate", f, "iso", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "iso",
+				declarationLine: null,
+				edgeLines: [2],
+				fieldLines: {},
+			});
+		});
+
+		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
+			const f = join(dir, "locate-notfound.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "nonexistent"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
+		});
+
+		it("--json on id-not-found emits { ok: false, missing } on stdout, empty stderr", async () => {
+			const f = join(dir, "locate-notfound-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "nonexistent", "--json"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: false,
+				missing: ["nonexistent"],
+			});
+		});
+
+		it("exits 2 when the id argument is missing", async () => {
+			const f = join(dir, "locate-missing.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f]);
+			expect(r.exitCode).toBe(2);
+		});
+	});
+
+	describe("describe", () => {
+		const src = `---
+artifact:
+  spec:
+    label: Spec
+process:
+  design:
+    label: Design
+---
+req >> design -> spec
+`;
+
+		it("prints kind, fields, neighbors, and locate lines as text", async () => {
+			const f = join(dir, "describe.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "design"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`design (process)\ndesign.label: Design\npredecessors: req\nsuccessors: spec\n${f}:6: declaration\n${f}:9: edge\n`,
+			);
+		});
+
+		it("--json emits { ok, id, kind, meta, predecessors, successors, declarationLine, edgeLines }", async () => {
+			const f = join(dir, "describe-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "design", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				kind: "process",
+				meta: { label: "Design" },
+				predecessors: [{ id: "req", kind: "primary" }],
+				successors: [{ id: "spec", kind: "primary" }],
+				declarationLine: 6,
+				edgeLines: [9],
+			});
+		});
+
+		// group is a NodeKind alongside artifact/process, with no edges of its
+		// own — describe still resolves it (unlike graph.nodes-based
+		// subcommands, which only ever see artifact/process).
+		it("resolves a group id, with empty predecessors/successors and no edge lines", async () => {
+			const f = join(dir, "describe-group.pfdsl");
+			writeFileSync(
+				f,
+				"---\ngroup:\n  core:\n    label: Core\nartifact:\n  spec:\n    group: core\n---\nreq >> design -> spec\n",
+			);
+			const r = await run(["graph", "describe", f, "core", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "core",
+				kind: "group",
+				meta: { label: "Core" },
+				predecessors: [],
+				successors: [],
+				declarationLine: 3,
+				edgeLines: [],
+			});
+		});
+
+		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
+			const f = join(dir, "describe-notfound.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "nonexistent"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe(`error: id(s) not found in ${f}: nonexistent\n`);
+		});
+
+		it("--json on id-not-found emits { ok: false, missing } on stdout, empty stderr", async () => {
+			const f = join(dir, "describe-notfound-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "nonexistent", "--json"]);
+			expect(r.exitCode).toBe(1);
+			expect(r.stderr).toBe("");
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: false,
+				missing: ["nonexistent"],
+			});
+		});
+
+		it("exits 2 when the id argument is missing", async () => {
+			const f = join(dir, "describe-missing.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f]);
+			expect(r.exitCode).toBe(2);
 		});
 	});
 });
