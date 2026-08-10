@@ -172,6 +172,19 @@ function headerHasIndentIndicator(headerLine: string): boolean {
 }
 
 /**
+ * The number of leading ASCII spaces at the start of `line` — YAML's only
+ * valid indentation character. `String#trimStart()` also strips other
+ * Unicode whitespace (full-width space U+3000, NBSP U+00A0, ...), which are
+ * ordinary content characters in YAML, not indentation; measuring with it
+ * over-counts a continuation line that happens to start with one of those
+ * and eats it out of the reindented value (#816). Tabs are invalid YAML
+ * indentation, so they aren't counted either.
+ */
+function leadingSpaceCount(line: string): number {
+	return line.match(/^ */)?.[0].length ?? 0;
+}
+
+/**
  * Re-derive `origRaw`'s continuation-line wraps at `newRaw`'s (canonical)
  * indentation. Returns null when the reindent can't be trusted: an explicit
  * indentation indicator in the fold header (a digit, e.g. `>2`) makes the
@@ -186,11 +199,11 @@ function reindentFold(origRaw: string, newRaw: string): string | null {
 	const newBody = newLines.slice(1);
 	const firstNonBlank = newBody.find((line) => line.trim() !== "");
 	if (firstNonBlank === undefined) return null;
-	const targetIndent = firstNonBlank.length - firstNonBlank.trimStart().length;
+	const targetIndent = leadingSpaceCount(firstNonBlank);
 	const origBody = origLines.slice(1);
 	const origIndents = origBody
 		.filter((line) => line.trim() !== "")
-		.map((line) => line.length - line.trimStart().length);
+		.map((line) => leadingSpaceCount(line));
 	if (origIndents.length === 0) return null;
 	const baseIndent = Math.min(...origIndents);
 	const reindentedBody = origBody.map((line) =>

@@ -222,6 +222,44 @@ describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", 
 `);
 	});
 
+	// reindentFold's indentation measurement used JS's line.trimStart(),
+	// which strips Unicode whitespace generally, not just YAML's ASCII-space
+	// indentation. A continuation line that itself starts with a full-width
+	// space (U+3000) or NBSP (U+00A0) — plausible for a hand-indented
+	// Japanese paragraph — inflated the measured indent by one, and slicing
+	// at that inflated indent then ate the leading full-width-space/NBSP
+	// character out of the decoded value (#816).
+	it("does not eat a leading full-width space from continuation lines", () => {
+		const src = `artifact:
+  a:
+    description: >
+      　最初の行です。
+      　次の行です。
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      　最初の行です。
+      　次の行です。
+    status: done
+`);
+	});
+
+	it("does not eat a leading NBSP from continuation lines", () => {
+		const src =
+			"artifact:\n  a:\n    description: >\n      \u00a0first line.\n      \u00a0second line.\n    status: todo\n";
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(
+			"artifact:\n  a:\n    description: >\n      \u00a0first line.\n      \u00a0second line.\n    status: done\n",
+		);
+	});
+
 	// reindentFold used to test the whole header line for a digit to detect
 	// an explicit indentation indicator (`>2`), so a header-line comment
 	// containing a digit (e.g. an issue number) made it wrongly bail out and
