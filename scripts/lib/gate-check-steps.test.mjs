@@ -434,7 +434,11 @@ describe("designRecordStep", () => {
 		assert.match(result.detail, /after the first commit/);
 	});
 
-	it("reports a partial record as content-deficient rather than as missing", () => {
+	// #737 案1: content deficiency no longer decides the row — only timing
+	// does. A content-deficient record still PASSes when its timing is clean,
+	// with the deficiency printed as a WARN so it stays legible, distinct from
+	// a timing FAIL sharing the same detail string.
+	it("PASSes a content-deficient record whose timing is clean, with the deficiency reported as WARN", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
 		});
@@ -452,9 +456,8 @@ describe("designRecordStep", () => {
 				],
 			}),
 		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /missing required line/);
-		assert.doesNotMatch(result.detail, /no design-selection record found/);
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /WARN:.*missing required line/);
 	});
 
 	it("identifies the record by its required line heads, with no 決定 line present", () => {

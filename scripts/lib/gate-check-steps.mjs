@@ -266,13 +266,18 @@ export function designRecordStep({ exec, base, issue, issueFailure }) {
 		: null;
 
 	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso);
+	// #737 案1: content structure (required line heads, disposition-token
+	// coverage) is report material, not a judge — only timing decides the row.
+	// Real repro over this repo's history: 0 true positives, 3 false positives
+	// for content, against timing's 3 true / 0 false. classifyDesignRecordContent
+	// still runs every time and its finding still prints, prefixed WARN so a
+	// reader can tell it apart from a timing detail sharing the same line.
 	const content = classifyDesignRecordContent(record.body, optionCount);
+	const contentDetail =
+		content.status === "FAIL" ? `WARN: ${content.detail}` : undefined;
 	const detail =
-		[timing.detail, content.detail].filter(Boolean).join("; ") || undefined;
-	if (timing.status === "FAIL" || content.status === "FAIL")
-		return { name, status: "FAIL", detail };
-	if (timing.status === "SKIP") return { name, status: "SKIP", detail };
-	return { name, status: "PASS", detail };
+		[timing.detail, contentDetail].filter(Boolean).join("; ") || undefined;
+	return { name, status: timing.status, detail };
 }
 
 /**
