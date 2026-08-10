@@ -20,6 +20,8 @@ export {
 	computePaths,
 	computeStats,
 } from "./graph-analysis.js";
+export type { LocateResult } from "./locate.js";
+export { locateNode } from "./locate.js";
 export { resolveLocationFsPath } from "./location-path.js";
 export { auditGraph };
 
