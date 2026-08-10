@@ -471,7 +471,12 @@ export function resolveRecordEditedAt(record, editInfo) {
  *     wins over every other check, since a cycle with no implementation
  *     commits in this range has nothing for timing to compare against, even
  *     when the range is not literally empty (the #757 shape: commits present,
- *     but belonging to a different, derived PR).
+ *     but belonging to a different, derived PR). Status still SKIPs, but the
+ *     posted-time comparison still runs: a record that both declares no
+ *     implementation and was posted after the first commit is evidence of a
+ *     retroactive record, and #824's forgeability tradeoff for this
+ *     disposition assumes a reviewer can see that evidence rather than have
+ *     it silently dropped (review A-1).
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
 export function classifyDesignRecordTiming(
@@ -481,8 +486,17 @@ export function classifyDesignRecordTiming(
 ) {
 	if (!recordIso)
 		return { status: "FAIL", detail: "no design-selection record found" };
-	if (noImplementation)
-		return { status: "SKIP", detail: NO_IMPLEMENTATION_COMMITS_DETAIL };
+	if (noImplementation) {
+		const postedAfterFirstCommit =
+			firstCommitIso &&
+			new Date(recordIso).getTime() > new Date(firstCommitIso).getTime();
+		return {
+			status: "SKIP",
+			detail: postedAfterFirstCommit
+				? `${NO_IMPLEMENTATION_COMMITS_DETAIL}; WARN: record posted at ${recordIso}, after the first commit at ${firstCommitIso}`
+				: NO_IMPLEMENTATION_COMMITS_DETAIL,
+		};
+	}
 	if (!firstCommitIso)
 		return { status: "SKIP", detail: NO_IMPLEMENTATION_COMMITS_DETAIL };
 	if (new Date(recordIso).getTime() > new Date(firstCommitIso).getTime()) {

@@ -788,6 +788,26 @@ describe("classifyDesignRecordTiming", () => {
 		assert.match(result.detail, /no implementation commits/);
 	});
 
+	// Review A-1: `noImplementation` used to return before the posted-time
+	// comparison ran at all, so a record that both declared no implementation
+	// and was itself posted after the first commit produced no detail
+	// distinguishable from an ordinary, well-timed no-implementation record —
+	// the retroactive-record evidence #824's forgeability tradeoff assumes a
+	// reviewer can see was silently dropped, not merely downgraded. Status
+	// stays SKIP (the design does not change), but the comparison still runs
+	// and its result is folded into detail as a WARN note.
+	it("SKIPs but WARNs when the no-implementation record was itself posted after the first commit", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T12:00:00Z",
+			"2026-07-30T00:00:00Z",
+			{ noImplementation: true },
+		);
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no implementation commits/);
+		assert.match(result.detail, /WARN/);
+		assert.match(result.detail, /posted at .*after the first commit/);
+	});
+
 	it("PASSes when the record predates the first commit", () => {
 		const result = classifyDesignRecordTiming(
 			"2026-07-30T00:00:00Z",
