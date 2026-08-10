@@ -112,7 +112,14 @@ export function classifyCycle({ changedFiles, records }) {
 	const tools = records.filter((r) => r.tool !== undefined).map((r) => r.tool);
 	const problems = [];
 	if (!tools.some((tool) => GATE_TOOLS.includes(tool)))
-		problems.push("changed code but carries no review record");
+		problems.push(
+			// A cycle that recorded only a non-gate tool did write a record, so
+			// "carries no review record" would send its author grepping for a
+			// trailer that is right there. Name which half of the rule is unmet.
+			tools.length === 0
+				? "changed code but carries no review record"
+				: "changed code but carries a review record that counts toward no gate (code-review runs after the PR exists)",
+		);
 	if (!tools.some((tool) => CORRECTNESS_TOOLS.includes(tool)))
 		problems.push(
 			"changed code but carries no correctness review record (tool=correctness or design)",

@@ -203,7 +203,7 @@ describe("classifyCycle", () => {
 				records: records("code-review"),
 			}),
 			[
-				"changed code but carries no review record",
+				"changed code but carries a review record that counts toward no gate (code-review runs after the PR exists)",
 				"changed code but carries no correctness review record (tool=correctness or design)",
 			],
 		);
