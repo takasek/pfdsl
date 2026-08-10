@@ -226,23 +226,17 @@ export async function runCycleStatus({
 						"view",
 						String(targetIssue),
 						"--json",
-						"author,body,comments",
+						"body,comments,createdAt",
 					]),
 				);
 				recordOptionCount = Math.max(
 					recordOptionCount,
 					detectEnumeratedOptions(issueJson.body).count,
 				);
-				const ownerLogin = issueJson.author?.login;
-				const comments = (issueJson.comments ?? []).map((c) => ({
-					author: c.author?.login,
-					body: c.body,
-					createdAt: c.createdAt,
-				}));
 				const classification = classifyDesignSettlement({
 					body: issueJson.body,
-					ownerLogin,
-					comments,
+					createdAt: issueJson.createdAt,
+					comments: issueJson.comments,
 				});
 				designUnsettledFor.push({
 					issue: targetIssue,
@@ -251,7 +245,7 @@ export async function runCycleStatus({
 					reason: classification.reason,
 					matchedLines: classification.matchedLines ?? [],
 					optionCount: classification.optionCount ?? 0,
-					decision: classification.decision ?? null,
+					record: classification.record ?? null,
 				});
 			} catch (e) {
 				designUnsettledError = e.message;

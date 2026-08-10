@@ -28,6 +28,7 @@ import {
 	SIZE_TRACKED_PATTERNS,
 	selectDesignRecord,
 	statusChangedForArtifact,
+	toDesignRecordEntries,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
@@ -241,7 +242,6 @@ export function designRecordStep({ exec, base, issue, issueFailure }) {
 	const name = "design-selection record";
 	if (!issue) return { name, ...missingIssueRow(issueFailure) };
 
-	const ownerLogin = issue.author?.login;
 	const body = issue.body ?? "";
 	const optionCount = detectEnumeratedOptions(body).count;
 
@@ -249,19 +249,7 @@ export function designRecordStep({ exec, base, issue, issueFailure }) {
 	// bypasses the checks: a record written into the body is judged for timing
 	// and structure the same way (its createdAt is the issue's, so it passes
 	// timing on its own merits rather than by exemption).
-	//
-	// No author condition. The reference assigns the selection record to the
-	// runner, so requiring the filer's login here is what made a conforming
-	// record impossible to post without also writing the filer's decision line.
-	const entries = [
-		{ author: ownerLogin, body, createdAt: issue.createdAt },
-		...(issue.comments ?? []).map((c) => ({
-			author: c.author?.login,
-			body: c.body,
-			createdAt: c.createdAt,
-		})),
-	];
-	const record = selectDesignRecord(entries);
+	const record = selectDesignRecord(toDesignRecordEntries(issue));
 
 	if (!record) {
 		return { name, ...classifyDesignRecordTiming(undefined, null) };

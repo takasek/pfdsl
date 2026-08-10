@@ -6,8 +6,8 @@
 import {
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
-	lineHeadPattern,
-	normalizeRecordLine,
+	selectDesignRecord,
+	toDesignRecordEntries,
 } from "./gate-check.mjs";
 
 /**
@@ -159,24 +159,12 @@ export function detectEnumeratedOptions(body) {
 	return { enumerated: count >= 2, count, headings };
 }
 
-export const DECISION_LINE_PREFIX = "決定:";
-const DECISION_LINE_PATTERN = lineHeadPattern(
-	DECISION_LINE_PREFIX,
-	"\\s*案\\s*(\\S+)",
-);
-
 /**
  * The design-selection record, pre-shaped so the runner never has to know the
  * format to satisfy it. Every line head here is the one the terminal gate
  * matches on, taken from the gate's own constants rather than restated — a
  * template that drifts from the checker is worse than none, because it is
  * trusted.
- *
- * `決定: 案N` is deliberately absent. That line belongs to the filer and is
- * evidence that the design was settled; this record belongs to the runner and
- * is evidence that alternatives were generated. Putting the filer's line in the
- * runner's template would teach every cycle to write it, which is exactly how
- * the distinction the gate protects gets dissolved by the act of passing it.
  *
  * Emitted on every cycle, not only when the issue enumerates options: the gate
  * FAILs a missing record regardless of the option count, so a record is owed
@@ -196,49 +184,31 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
 		);
 	}
 	return {
-		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 雛形のまま投稿しても形式は通るが、記録としては何も残らない。行頭 ${DECISION_LINE_PREFIX} 案N は別の記録であり、起票者本人が書く。実行主体はこの記録に書かない。`,
+		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 雛形のまま投稿しても形式は通るが、記録としては何も残らない。`,
 		lines,
 	};
 }
 
 /**
- * 確定の証拠となる `決定: 案N` 行を、issue 本文とコメントから収集する。
- * @param {Array<{author: string, body: string, createdAt?: string}>} entries
- *   issue 本文は entries の先頭要素として author=issue の起票者 login で渡す。
- * @returns {Array<{author: string, option: string, line: string, createdAt?: string}>}
- */
-export function findDecisionRecords(entries) {
-	const records = [];
-	for (const entry of entries ?? []) {
-		for (const line of (entry.body ?? "").split("\n")) {
-			const normalized = normalizeRecordLine(line);
-			const match = normalized.match(DECISION_LINE_PATTERN);
-			if (match) {
-				records.push({
-					author: entry.author,
-					option: match[1],
-					line: normalized,
-					createdAt: entry.createdAt,
-				});
-			}
-		}
-	}
-	return records;
-}
-
-/**
  * issue の設計確定状態を分類する。判定順（前段がヒットしたら後段は評価しない）:
  * 1. 既存の「設計未確定」フレーズがヒット → unsettled (reason: "phrase")
- * 2. issue の起票者本人による `決定: 案N` 記録がある → settled (reason: "decision-recorded")
- * 3. 候補列挙構造があるのに確定記録が無い → unsettled (reason: "enumerated-options-without-decision")
+ * 2. `selectDesignRecord` が本文・コメントから記録を同定できる → settled (reason: "record-posted")
+ * 3. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
  * 4. それ以外 → settled (reason: "no-enumerated-options")
  *
- * 起票者と author が一致しない `決定:` 行は確定の証拠にならない（3 に落ちる）。
- * @param {{body: string, ownerLogin: string, comments: Array<{author: string, body: string, createdAt?: string}>}} params
+ * 記録の同定は終端ゲート（gate-check.mjs）と同じ `selectDesignRecord`
+ * （と、それに entries を渡す `toDesignRecordEntries`）を使う。プリフライトと
+ * 終端ゲートが別々の同定ロジックを持つと、どちらかが記録だと見なした文章を
+ * もう一方が見なさない、という食い違いが生まれるため。共有しているのは
+ * この同定だけで、記録の内容検査（`classifyDesignRecordContent`）と
+ * 時点照合（`classifyDesignRecordTiming`）は終端ゲート側だけが持つ —
+ * ここで record-posted になった記録が、終端ゲートでは内容不備・時点不備で
+ * FAIL することがあるのは意図した非対称である。
+ * @param {{body: string, createdAt?: string, comments?: Array<{body: string, createdAt?: string}>}} params
  * @returns {{unsettled: boolean, reason: string, matchedLines?: string[], optionCount?: number,
- *            decision?: {author: string, option: string, createdAt?: string} | null}}
+ *            record?: {createdAt?: string} | null}}
  */
-export function classifyDesignSettlement({ body, ownerLogin, comments }) {
+export function classifyDesignSettlement({ body, createdAt, comments }) {
 	const phrase = detectDesignUnsettled(body);
 	if (phrase.designUnsettled) {
 		return {
@@ -248,18 +218,14 @@ export function classifyDesignSettlement({ body, ownerLogin, comments }) {
 		};
 	}
 
-	const entries = [{ author: ownerLogin, body }, ...(comments ?? [])];
-	const decisions = findDecisionRecords(entries);
-	const ownerDecision = decisions.find((d) => d.author === ownerLogin);
-	if (ownerDecision) {
+	const record = selectDesignRecord(
+		toDesignRecordEntries({ body, createdAt, comments }),
+	);
+	if (record) {
 		return {
 			unsettled: false,
-			reason: "decision-recorded",
-			decision: {
-				author: ownerDecision.author,
-				option: ownerDecision.option,
-				createdAt: ownerDecision.createdAt,
-			},
+			reason: "record-posted",
+			record: { createdAt: record.createdAt },
 		};
 	}
 
@@ -267,7 +233,7 @@ export function classifyDesignSettlement({ body, ownerLogin, comments }) {
 	if (enumerated.enumerated) {
 		return {
 			unsettled: true,
-			reason: "enumerated-options-without-decision",
+			reason: "enumerated-options-without-record",
 			matchedLines: enumerated.headings,
 			optionCount: enumerated.count,
 		};

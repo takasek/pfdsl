@@ -8,7 +8,6 @@ import {
 	countBehind,
 	detectDesignUnsettled,
 	detectEnumeratedOptions,
-	findDecisionRecords,
 	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
 	parsePorcelainPaths,
@@ -282,105 +281,56 @@ describe("detectEnumeratedOptions", () => {
 	});
 });
 
-describe("findDecisionRecords", () => {
-	it("collects 決定: 案N lines from entries, tagged with author and createdAt", () => {
-		const entries = [
-			{ author: "owner", body: "## 概要\n決定: 案2\n" },
-			{ author: "other", body: "決定: 案1", createdAt: "2026-01-01T00:00:00Z" },
-		];
-		assert.deepEqual(findDecisionRecords(entries), [
-			{ author: "owner", option: "2", line: "決定: 案2", createdAt: undefined },
-			{
-				author: "other",
-				option: "1",
-				line: "決定: 案1",
-				createdAt: "2026-01-01T00:00:00Z",
-			},
-		]);
-	});
-
-	it("recognizes a decision line under the same decoration its sibling line heads allow", () => {
-		const decorated = [
-			{ author: "owner", body: "> - **決定：** 案2" },
-			{ author: "owner", body: "## 決定（最終）: 案3" },
-		];
-		assert.deepEqual(
-			findDecisionRecords(decorated).map((r) => r.option),
-			["2", "3"],
-		);
-	});
-
-	it("returns an empty array when no entry contains a 決定: line", () => {
-		assert.deepEqual(
-			findDecisionRecords([{ author: "owner", body: "まだ検討中。" }]),
-			[],
-		);
-	});
-
-	it("returns an empty array for no entries", () => {
-		assert.deepEqual(findDecisionRecords([]), []);
-	});
-});
-
 describe("classifyDesignSettlement", () => {
-	it("reports unsettled by phrase before checking for a recorded decision", () => {
+	it("reports unsettled by phrase before checking for a posted record", () => {
 		const result = classifyDesignSettlement({
 			body: "設計未確定な点がある。",
-			ownerLogin: "owner",
-			comments: [{ author: "owner", body: "決定: 案1" }],
+			comments: [{ body: "前提: x\n否定案: y\n却下理由: z" }],
 		});
 		assert.equal(result.unsettled, true);
 		assert.equal(result.reason, "phrase");
 		assert.deepEqual(result.matchedLines, ["設計未確定な点がある。"]);
 	});
 
-	it("reports settled when the issue owner recorded a decision", () => {
+	it("reports settled when a design-selection record was posted", () => {
 		const result = classifyDesignSettlement({
 			body: "## 対応案\n1. 案A\n2. 案B\n",
-			ownerLogin: "owner",
 			comments: [
 				{
-					author: "owner",
-					body: "決定: 案2",
+					body: "前提: x\n否定案: y\n却下理由: z",
 					createdAt: "2026-01-01T00:00:00Z",
 				},
 			],
 		});
 		assert.equal(result.unsettled, false);
-		assert.equal(result.reason, "decision-recorded");
-		assert.deepEqual(result.decision, {
-			author: "owner",
-			option: "2",
-			createdAt: "2026-01-01T00:00:00Z",
-		});
+		assert.equal(result.reason, "record-posted");
+		assert.deepEqual(result.record, { createdAt: "2026-01-01T00:00:00Z" });
 	});
 
-	it("does not accept a decision recorded by someone other than the issue owner", () => {
+	it("fills record.createdAt from the issue's own createdAt when the body is the record", () => {
 		const result = classifyDesignSettlement({
-			body: "## 対応案\n1. 案A\n2. 案B\n",
-			ownerLogin: "owner",
-			comments: [{ author: "someone-else", body: "決定: 案2" }],
+			body: "前提: x\n否定案: y\n却下理由: z",
+			createdAt: "2026-01-01T00:00:00Z",
+			comments: [],
 		});
-		assert.equal(result.unsettled, true);
-		assert.equal(result.reason, "enumerated-options-without-decision");
-		assert.equal(result.optionCount, 2);
+		assert.equal(result.reason, "record-posted");
+		assert.deepEqual(result.record, { createdAt: "2026-01-01T00:00:00Z" });
 	});
 
-	it("reports unsettled when options are enumerated and no decision is recorded", () => {
+	it("reports unsettled when options are enumerated and no record was posted", () => {
 		const result = classifyDesignSettlement({
 			body: "## 選択肢\n1. 案A\n2. 案B\n",
-			ownerLogin: "owner",
 			comments: [],
 		});
 		assert.equal(result.unsettled, true);
-		assert.equal(result.reason, "enumerated-options-without-decision");
+		assert.equal(result.reason, "enumerated-options-without-record");
+		assert.equal(result.optionCount, 2);
 	});
 
 	it("reports settled with no-enumerated-options when nothing indicates unsettled design", () => {
 		assert.deepEqual(
 			classifyDesignSettlement({
 				body: "普通の説明文。",
-				ownerLogin: "owner",
 				comments: [],
 			}),
 			{
@@ -566,15 +516,6 @@ describe("buildDesignRecordTemplate", () => {
 		assert.deepEqual(classifyDesignRecordContent(lines.join("\n"), 0), {
 			status: "PASS",
 		});
-	});
-
-	it("omits the 決定 line — that record belongs to the filer, not to the runner", () => {
-		const { lines, note } = buildDesignRecordTemplate({ optionCount: 0 });
-		assert.deepEqual(
-			findDecisionRecords([{ author: "someone", body: lines.join("\n") }]),
-			[],
-		);
-		assert.match(note, /起票者本人が書く/);
 	});
 
 	it("emits a skeleton the gate identifies as the selection record", () => {

@@ -276,8 +276,8 @@ describe("runCycleStatus", () => {
 		assert.equal(result.best, null);
 	});
 
-	const issueJson = ({ author, body, comments = [] }) =>
-		JSON.stringify({ author: { login: author }, body, comments });
+	const issueJson = ({ body, comments = [] }) =>
+		JSON.stringify({ body, comments });
 
 	it("resolves the target issue from --issue when given, ignoring any best process", async () => {
 		const calls = [];
@@ -291,8 +291,7 @@ describe("runCycleStatus", () => {
 				readFileSync: () => roadmapWithIssue("proc_a", 42),
 				execGh: async (args) => {
 					calls.push(args);
-					if (args[0] === "issue")
-						return issueJson({ author: "owner", body: "普通の説明文。" });
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
 					return JSON.stringify([]);
 				},
 			}),
@@ -305,7 +304,7 @@ describe("runCycleStatus", () => {
 				reason: "no-enumerated-options",
 				matchedLines: [],
 				optionCount: 0,
-				decision: null,
+				record: null,
 			},
 		]);
 		assert.equal(result.designUnsettledError, undefined);
@@ -324,7 +323,6 @@ describe("runCycleStatus", () => {
 				execGh: async (args) => {
 					if (args[0] === "issue")
 						return issueJson({
-							author: "owner",
 							body: "設計未確定な点がある。",
 						});
 					return JSON.stringify([]);
@@ -347,8 +345,7 @@ describe("runCycleStatus", () => {
 			baseDeps({
 				issueNumbers: [667, 668],
 				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({ author: "owner", body: bodies[args[2]] });
+					if (args[0] === "issue") return issueJson({ body: bodies[args[2]] });
 					return JSON.stringify([]);
 				},
 			}),
@@ -369,7 +366,7 @@ describe("runCycleStatus", () => {
 				execGh: async (args) => {
 					if (args[0] === "issue") {
 						if (args[2] === "668") throw new Error("gh: issue not found");
-						return issueJson({ author: "owner", body: "普通の説明文。" });
+						return issueJson({ body: "普通の説明文。" });
 					}
 					return JSON.stringify([]);
 				},
@@ -402,8 +399,7 @@ describe("runCycleStatus", () => {
 						["proc_a", 668],
 					]),
 				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({ author: "owner", body: "普通の説明文。" });
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
 					return JSON.stringify([]);
 				},
 			}),
@@ -453,7 +449,6 @@ describe("runCycleStatus", () => {
 				execGh: async (args) => {
 					if (args[0] === "issue") {
 						return issueJson({
-							author: "owner",
 							body: "## 検討したい方向\n1. 案A\n2. 案B\n3. 案C\n",
 						});
 					}
@@ -572,8 +567,7 @@ describe("runCycleStatus", () => {
 				},
 				readFileSync: () => roadmapWithIssue("proc_x", 669),
 				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({ author: "owner", body: "普通の説明文。" });
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
 					return JSON.stringify([]);
 				},
 			}),
@@ -592,8 +586,7 @@ describe("runCycleStatus", () => {
 				issueNumbers: [800],
 				readFileSync: () => roadmapWithIssue("proc_x", 42),
 				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({ author: "owner", body: "普通の説明文。" });
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
 					return JSON.stringify([]);
 				},
 			}),
@@ -616,8 +609,7 @@ describe("runCycleStatus", () => {
 						["proc_shared", 668],
 					]),
 				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({ author: "owner", body: "普通の説明文。" });
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
 					return JSON.stringify([]);
 				},
 			}),
@@ -643,8 +635,7 @@ describe("runCycleStatus", () => {
 						["proc_b", 668],
 					]),
 				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({ author: "owner", body: "普通の説明文。" });
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
 					return JSON.stringify([]);
 				},
 			}),
