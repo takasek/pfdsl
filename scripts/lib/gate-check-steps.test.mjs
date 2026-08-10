@@ -378,14 +378,17 @@ describe("designRecordStep", () => {
 		assert.equal(result.status, "PASS");
 	});
 
-	it("FAILs a body carrying only a 決定 line — that line is the filer's settlement, not a selection record", () => {
+	it("FAILs when the issue body carries no required line head", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
 		});
 		const result = designRecordStep({
 			exec,
 			base: "main",
-			issue: issue({ author: "owner", body: "決定: 案A を採用する。" }),
+			issue: issue({
+				author: "owner",
+				body: "特に決めていない、ただの説明文です。",
+			}),
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /no design-selection record found/);

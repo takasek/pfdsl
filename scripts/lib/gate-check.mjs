@@ -439,18 +439,12 @@ const REGEXP_METACHARS = /[.*+?^${}()|[\]\\]/g;
  * part of the label and must not decide the verdict: a parenthesised qualifier
  * (`却下理由（外部制約）:`, whose parenthetical carries the exemption clause's
  * required attribution) and a full-width colon.
- *
- * `tail` extends the match past the colon for the one line head that reads
- * something after it — the decision line's `案N`. Without it that line would be
- * the only member of the design-record family still matched by a bare regexp,
- * which is the fragility this whole normalisation exists to remove.
  * @param {string} prefix - a design-record line-head token, colon included
- * @param {string} [tail] - regexp source appended after the colon
  * @returns {RegExp}
  */
-export function lineHeadPattern(prefix, tail = "") {
+export function lineHeadPattern(prefix) {
 	const label = prefix.replace(/[:：]$/, "").replace(REGEXP_METACHARS, "\\$&");
-	return new RegExp(`^${label}\\s*(?:（[^）]*）|\\([^)]*\\))?\\s*[:：]${tail}`);
+	return new RegExp(`^${label}\\s*(?:（[^）]*）|\\([^)]*\\))?\\s*[:：]`);
 }
 
 /**
@@ -471,11 +465,8 @@ export function presentRequiredPrefixes(recordBody) {
 /**
  * The entry that is this issue's selection record, or undefined.
  *
- * Identified by its own required line heads rather than by a `決定:` line. The
- * two are separate records with separate authors — the filer settles the design
- * with `決定:`, the runner writes the selection record — and keying one to the
- * other left no way to post a conforming record without also forging the
- * filer's decision line.
+ * Identified by its own required line heads rather than by any external
+ * marker — nothing else has to agree on which entry the record is.
  *
  * Most matches wins rather than first match. Measured over this repo's issues,
  * bodies carry a stray required line head often enough that a first-match
