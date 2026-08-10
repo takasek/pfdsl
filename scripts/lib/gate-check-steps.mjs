@@ -241,7 +241,6 @@ export function designRecordStep({ exec, base, issue, issueFailure }) {
 	const name = "design-selection record";
 	if (!issue) return { name, ...missingIssueRow(issueFailure) };
 
-	const ownerLogin = issue.author?.login;
 	const body = issue.body ?? "";
 	const optionCount = detectEnumeratedOptions(body).count;
 
@@ -250,13 +249,11 @@ export function designRecordStep({ exec, base, issue, issueFailure }) {
 	// and structure the same way (its createdAt is the issue's, so it passes
 	// timing on its own merits rather than by exemption).
 	//
-	// No author condition. The reference assigns the selection record to the
-	// runner, so requiring the filer's login here is what made a conforming
-	// record impossible to post without also writing the filer's decision line.
+	// No author condition: the selection record is the runner's to write, so
+	// nothing here checks whose entry it is.
 	const entries = [
-		{ author: ownerLogin, body, createdAt: issue.createdAt },
+		{ body, createdAt: issue.createdAt },
 		...(issue.comments ?? []).map((c) => ({
-			author: c.author?.login,
 			body: c.body,
 			createdAt: c.createdAt,
 		})),
