@@ -682,7 +682,9 @@ describe("setFrontmatterField", () => {
 		const src =
 			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
 		const out = setFrontmatterField(src, "artifact", "a", "status", "done");
-		expect(out).toContain("description: >\n      Hello\n      world.\n");
+		expect(out).toBe(
+			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: done\n---\na >> P -> b\n",
+		);
 	});
 
 	// When the fold is the frontmatter's last field, parseFrontmatterCst's
