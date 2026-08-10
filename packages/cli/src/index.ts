@@ -1562,10 +1562,16 @@ export function runStats(file: string, opts: StatsOptions = {}): CommandResult {
 	const all = computeStats(loaded.graph);
 	const stats = opts.limit !== undefined ? all.slice(0, opts.limit) : all;
 	if (opts.json) return ok(`${JSON.stringify({ ok: true, stats })}\n`);
-	const lines = stats.map(
-		(s) =>
-			`${s.id} (${s.kind})   fan-in=${s.fanIn}  fan-out=${s.fanOut}  total=${s.fanIn + s.fanOut}`,
-	);
+	const lines = stats.map((s) => {
+		// Appended rather than columnar: most files carry no feedback at all, and
+		// a pair of zeroes on every row would cost more than it tells.
+		const feedback = [
+			s.feedbackFanIn ? `feedback-in=${s.feedbackFanIn}` : "",
+			s.feedbackFanOut ? `feedback-out=${s.feedbackFanOut}` : "",
+		].filter(Boolean);
+		const suffix = feedback.length ? `  ${feedback.join("  ")}` : "";
+		return `${s.id} (${s.kind})   fan-in=${s.fanIn}  fan-out=${s.fanOut}  total=${s.fanIn + s.fanOut}${suffix}`;
+	});
 	const hint =
 		opts.limit === undefined && all.length > STATS_HINT_THRESHOLD
 			? `(${all.length} nodes total — pass --limit <n> to narrow)\n`
@@ -2301,12 +2307,23 @@ Exit codes:
 const HELP_STATS = `usage: pfdsl graph stats <file|-> [--limit <n>] [--json] [--no-color]
 
 Print fan-in/fan-out per node, ranked by total degree descending (hubs
-first) then id ascending. Text mode prints a hint to stderr suggesting
+first) then id ascending.
+
+\`fan-in\`, \`fan-out\`, \`total\` and the ranking cover primary (\`>>\` / \`->\`)
+edges only, so fan-out reads as what a node gates or produces. Feedback
+(\`>>?\`) degree is reported apart, as a \`feedback-in=N\` / \`feedback-out=N\`
+suffix on the rows that have one, and is in none of those three numbers:
+a node held only by \`>>?\` prints \`total=0\` (\`graph orphans\` still counts
+it as wired). Because --limit cuts after the primary sort, a sweep for
+raw connectivity has to read the full listing.
+
+Text mode prints a hint to stderr suggesting
 --limit when the file has more than ${STATS_HINT_THRESHOLD} nodes and --limit wasn't given
 (kept off stdout so \`stats <file> | ...\` pipelines aren't affected).
 
   --limit <n>  only print the top n rows
-  --json       output as JSON ({ ok, stats: {id, kind, fanIn, fanOut}[] })
+  --json       output as JSON ({ ok, stats: {id, kind, fanIn, fanOut,
+               feedbackFanIn, feedbackFanOut}[] })
                on parse failure: { ok: false, diagnostics }
   --no-color   disable ANSI color codes (also: NO_COLOR env var)
 

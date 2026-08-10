@@ -8,7 +8,7 @@ import {
 	computePaths,
 	computeStats,
 } from "./graph-analysis.js";
-import type { NormalizedEdge } from "./types/index.js";
+import type { Graph, NormalizedEdge } from "./types/index.js";
 
 // req >> design -> spec >> build -> code
 //                spec >> review -> report
@@ -139,9 +139,77 @@ describe("computeStats", () => {
 	it("computes fan-in/fan-out per node, sorted by total degree desc then id asc", () => {
 		const stats = computeStats(graph);
 		const spec = stats.find((s) => s.id === "spec");
-		expect(spec).toEqual({ id: "spec", kind: "artifact", fanIn: 1, fanOut: 2 });
+		expect(spec).toEqual({
+			id: "spec",
+			kind: "artifact",
+			fanIn: 1,
+			fanOut: 2,
+			feedbackFanIn: 0,
+			feedbackFanOut: 0,
+		});
 		// spec has the highest total degree (3) among all nodes
 		expect(stats[0]?.id).toBe("spec");
+	});
+
+	// `report >>? design`. Why the feedback degree is reported apart rather than
+	// added in: see computeStats' doc comment (#831).
+	const withFeedback = buildGraph(
+		[...edges, { kind: "feedback", artifact: "report", process: "design" }],
+		kinds,
+	);
+
+	it("counts an incoming feedback edge in feedbackFanIn, not fanIn", () => {
+		const design = computeStats(withFeedback).find((s) => s.id === "design");
+		expect(design).toEqual({
+			id: "design",
+			kind: "process",
+			fanIn: 1,
+			fanOut: 1,
+			feedbackFanIn: 1,
+			feedbackFanOut: 0,
+		});
+	});
+
+	it("counts an outgoing feedback edge in feedbackFanOut, not fanOut", () => {
+		const report = computeStats(withFeedback).find((s) => s.id === "report");
+		expect(report).toEqual({
+			id: "report",
+			kind: "artifact",
+			fanIn: 1,
+			fanOut: 0,
+			feedbackFanIn: 0,
+			feedbackFanOut: 1,
+		});
+	});
+
+	// Two consumers read the ranking itself. Letting feedback into the sort key
+	// would reorder it: on .pfdsl/workflow.pfdsl, 33 of 73 nodes carry feedback
+	// and every one of the top 10 places changes.
+	it("ranks on the primary degree alone, ignoring feedback", () => {
+		const ids = (g: Graph) => computeStats(g).map((s) => s.id);
+		expect(ids(withFeedback)).toEqual(ids(graph));
+	});
+
+	// A node held only by `>>?` — workflow.pfdsl's pfdsl_skill is the real one.
+	// It is the sharpest case of the primary-only sort key: zero primary degree
+	// puts it near the bottom however much feedback it carries, which is why the
+	// skill tells a connectivity sweep not to pass --limit.
+	it("gives a node held only by feedback a zero primary degree", () => {
+		const heldOnlyByFeedback = buildGraph(
+			[...edges, { kind: "feedback", artifact: "guide", process: "review" }],
+			new Map([...kinds, ["guide", "artifact"] as const]),
+		);
+		const stats = computeStats(heldOnlyByFeedback);
+		expect(stats.find((s) => s.id === "guide")).toEqual({
+			id: "guide",
+			kind: "artifact",
+			fanIn: 0,
+			fanOut: 0,
+			feedbackFanIn: 0,
+			feedbackFanOut: 1,
+		});
+		// Last place, tied at primary degree 0 with nothing else here.
+		expect(stats.at(-1)?.id).toBe("guide");
 	});
 });
 

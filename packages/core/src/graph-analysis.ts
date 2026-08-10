@@ -32,6 +32,30 @@ function buildAdjacency(graph: Graph): {
 }
 
 /**
+ * The same two maps for feedback (`>>?`) edges: `out` from the artifact that
+ * feeds back to the processes it reaches, `in` from the process to the
+ * artifacts reaching it. Kept separate from `buildAdjacency` rather than folded
+ * into it, because every reachability query below depends on the primary maps
+ * holding primary edges alone.
+ */
+function buildFeedbackAdjacency(graph: Graph): {
+	out: Map<string, string[]>;
+	in: Map<string, string[]>;
+} {
+	const out = new Map<string, string[]>();
+	const inn = new Map<string, string[]>();
+	for (const e of graph.feedbackEdges) {
+		const outArr = out.get(e.artifact);
+		if (outArr) outArr.push(e.process);
+		else out.set(e.artifact, [e.process]);
+		const inArr = inn.get(e.process);
+		if (inArr) inArr.push(e.artifact);
+		else inn.set(e.process, [e.artifact]);
+	}
+	return { out, in: inn };
+}
+
+/**
  * Direct producer/consumer neighbors of a node — the immediate in/out edges
  * only (§ issue #479 `neighbors`), `>>?` feedback edges included and tagged as
  * such (#828).
@@ -44,15 +68,20 @@ function buildAdjacency(graph: Graph): {
  */
 export function computeNeighbors(graph: Graph, id: string): Neighbors {
 	const { out, in: inn } = buildAdjacency(graph);
-	const asPrimary = (n: string): GraphNeighbor => ({ id: n, kind: "primary" });
-	const predecessors = (inn.get(id) ?? []).map(asPrimary);
-	const successors = (out.get(id) ?? []).map(asPrimary);
-	for (const e of graph.feedbackEdges) {
-		if (e.process === id)
-			predecessors.push({ id: e.artifact, kind: "feedback" });
-		if (e.artifact === id) successors.push({ id: e.process, kind: "feedback" });
-	}
-	return { predecessors, successors };
+	const fb = buildFeedbackAdjacency(graph);
+	const tag =
+		(kind: GraphNeighbor["kind"]) =>
+		(n: string): GraphNeighbor => ({ id: n, kind });
+	return {
+		predecessors: [
+			...(inn.get(id) ?? []).map(tag("primary")),
+			...(fb.in.get(id) ?? []).map(tag("feedback")),
+		],
+		successors: [
+			...(out.get(id) ?? []).map(tag("primary")),
+			...(fb.out.get(id) ?? []).map(tag("feedback")),
+		],
+	};
 }
 
 function closure(adjacency: Map<string, string[]>, id: string): string[] {
@@ -106,8 +135,14 @@ export function computePaths(
 export interface NodeStats {
 	id: string;
 	kind: NodeKind;
+	/** Primary (`>>` / `->`) in-edges. */
 	fanIn: number;
+	/** Primary out-edges. */
 	fanOut: number;
+	/** Feedback (`>>?`) in-edges, kept out of `fanIn`. */
+	feedbackFanIn: number;
+	/** Feedback out-edges, kept out of `fanOut`. */
+	feedbackFanOut: number;
 }
 
 export interface GraphOrphan {
@@ -127,14 +162,11 @@ export interface GraphOrphan {
  * (#676/#704).
  */
 export function computeOrphans(graph: Graph): GraphOrphan[] {
-	const wired = new Set<string>();
+	const fb = buildFeedbackAdjacency(graph);
+	const wired = new Set<string>([...fb.in.keys(), ...fb.out.keys()]);
 	for (const e of graph.primaryEdges) {
 		wired.add(e.from);
 		wired.add(e.to);
-	}
-	for (const e of graph.feedbackEdges) {
-		wired.add(e.artifact);
-		wired.add(e.process);
 	}
 	return [...graph.nodes.entries()]
 		.filter(([id, kind]) => kind !== "group" && !wired.has(id))
@@ -142,14 +174,34 @@ export function computeOrphans(graph: Graph): GraphOrphan[] {
 		.sort((a, b) => compareIds(a.id, b.id));
 }
 
-/** Fan-in/fan-out per node, ranked by total degree descending then id ascending (§ issue #479 `hubs`/`stats`). */
+/**
+ * Fan-in/fan-out per node, ranked by total degree descending then id ascending
+ * (§ issue #479 `hubs`/`stats`).
+ *
+ * Feedback (`>>?`) degree is reported in its own pair of fields and stays out
+ * of both the primary counts and the sort key, because the command's readers
+ * ask different questions of it (#831). Bottleneck ranking reads an artifact's
+ * fan-out as how many processes it gates, and a feedback edge gates nothing —
+ * `groupEdges` keeps it out of `processInputs`, so readiness never waits on
+ * one. Hub detection for restructuring wants the connection counted. Reporting
+ * the two apart answers both without either reading the other's number.
+ *
+ * A node's feedback degree is one-sided by construction: an edge's endpoints
+ * are an artifact and a process, so an artifact only ever gains
+ * `feedbackFanOut` and a process only `feedbackFanIn`. The god-process lens
+ * therefore reads a process fan-out that folding feedback in would not have
+ * touched — what it would have moved is that lens's ranking, not its column.
+ */
 export function computeStats(graph: Graph): NodeStats[] {
 	const { out, in: inn } = buildAdjacency(graph);
+	const fb = buildFeedbackAdjacency(graph);
 	const stats: NodeStats[] = [...graph.nodes.entries()].map(([id, kind]) => ({
 		id,
 		kind,
 		fanIn: inn.get(id)?.length ?? 0,
 		fanOut: out.get(id)?.length ?? 0,
+		feedbackFanIn: fb.in.get(id)?.length ?? 0,
+		feedbackFanOut: fb.out.get(id)?.length ?? 0,
 	}));
 	stats.sort((a, b) => {
 		const degreeDiff = b.fanIn + b.fanOut - (a.fanIn + a.fanOut);
