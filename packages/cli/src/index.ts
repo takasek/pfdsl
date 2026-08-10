@@ -2494,7 +2494,10 @@ const HELP_META_LIST = `usage: pfdsl meta list <file|-> [--tag <t[,t...]>] [--gr
 
 Print field values for every artifact/process node matching the given
 selectors — a supply-side counterpart to \`meta get\`'s explicit id list.
-At least one selector is required; multiple selectors combine with AND.
+At least one selector is required; multiple selectors combine with AND, so
+\`--producer p --tag t\` reads as "the artifacts p produces that are tagged
+t" — the successors-filtered-by-tag query, without a separate neighbors
+call.
 
   --tag <t[,t...]>    matches when the node's tags: array includes any of
                       the given tags (OR within the comma-separated list)
@@ -2505,11 +2508,13 @@ At least one selector is required; multiple selectors combine with AND.
                       output edge (process -> artifact). Only artifacts can
                       match this selector; a process id is never selected.
 
-  [field[,field...]]  comma-separated field names (optional), same
-                      semantics as \`meta get\`: omit to print every field
-                      set in each matched node's frontmatter entry, plus
-                      applicable derived fields (location.resolved,
-                      command.cwd).
+  [field[,field...]]  comma-separated field names. Omit the positional
+                      entirely to print every field set in each matched
+                      node's frontmatter entry, plus applicable derived
+                      fields (location.resolved, command.cwd) — same
+                      semantics as \`meta get\`. Passing it as an empty or
+                      blank string is a usage error rather than the same
+                      thing as omitting it.
   --json              emit JSON ({ ok, values: { [id]: { [field]: value } } }),
                       the same shape as \`meta get\` --json
                       on parse failure: { ok: false, diagnostics }
@@ -2545,10 +2550,13 @@ Exit codes:
 const HELP_GRAPH_LOCATE = `usage: pfdsl graph locate <file|-> <id> [--json] [--no-color]
 
 Print every place <id> appears in the file: its frontmatter declaration key
-line (\`declaration\`) and every body line it's mentioned in an edge or a
-bare node-decl on (\`edge\`) — the line numbers a Read/Edit tool call needs,
-without opening the whole file first. Text mode prints one occurrence per
-line, declaration before edge, each edge line ascending.
+line (\`declaration\`), and every body line naming it (\`edge\`) — whether in
+an edge or in a bare node-decl. These are the line numbers a Read/Edit tool
+call needs, without opening the whole file first. Text mode prints one
+occurrence per line, declaration before edge, each edge line ascending.
+
+Line granularity is the node, not the field: a declaration line points at
+the id's key, and the fields under it are on the lines that follow.
 
   --json      output as JSON ({ ok, id, declarationLine: number | null,
               edgeLines: number[] })
@@ -2565,12 +2573,17 @@ const HELP_GRAPH_DESCRIBE = `usage: pfdsl graph describe <file|-> <id> [--json] 
 
 Print a single node's full picture in one call: its kind (artifact/process/
 group), every frontmatter field (same rendering as \`meta get\`/\`meta list\`),
-its direct predecessors/successors (same as \`graph neighbors\`), and where
+its direct predecessors/successors (same as \`graph neighbors\`, feedback
+(\`>>?\`) neighbors included and annotated \`(feedback)\` in text), and where
 it appears in the file (same as \`graph locate\`) — folding several
 read-only queries an agent would otherwise make separately into one.
 
+Only the node named by <id> is described: neighbors are listed by id, so
+their own kind and fields take a \`describe\` (or \`meta get\`) of their own.
+
   --json      output as JSON ({ ok, id, kind, meta, predecessors, successors,
-              declarationLine: number | null, edgeLines: number[] })
+              declarationLine: number | null, edgeLines: number[] }), each
+              neighbor { id, kind: "primary" | "feedback" }
               on failure: { ok: false, diagnostics } / { ok: false, missing }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
