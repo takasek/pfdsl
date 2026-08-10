@@ -253,4 +253,23 @@ a >> p -> b
 		expect(changes.length).toBeGreaterThan(0);
 		expect(output.replace(/\r\n/g, "")).not.toContain("\n");
 	});
+
+	// Document#toString({ lineWidth: 0 }) would otherwise collapse a folded
+	// (`>`) scalar's hand-chosen line wraps onto one continuation line (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks", () => {
+		const src = `---
+artifact:
+  a:
+    description: >
+      Hello
+      world.
+    label: A
+  b: { label: B }
+---
+a >> p -> b
+`;
+		const { output, changes } = reindex(src);
+		expect(changes.length).toBeGreaterThan(0);
+		expect(output).toContain("description: >\n      Hello\n      world.\n");
+	});
 });
