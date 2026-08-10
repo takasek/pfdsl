@@ -277,6 +277,35 @@ describe("select", () => {
 		);
 	});
 
+	const pool4 = [
+		{ name: "1", tags: ["a"], body: "- **1**: 冒頭。" },
+		{ name: "2", tags: ["b"], body: "- **2**: 冒頭。" },
+		{ name: "3", tags: ["b"], body: "- **3**: 冒頭。" },
+		{ name: "4", tags: ["c"], body: "- **4**: 冒頭。" },
+		{ name: "常時", tags: [ALWAYS_TAG], body: "- **常時**: 冒頭。" },
+	];
+
+	it("counts the pool the tags select from, always-tagged excluded", () => {
+		assert.equal(select(pool4, { tags: ["a"], words: [] }).pool, 4);
+	});
+
+	it("calls a selection unselective once it holds more than half the pool", () => {
+		assert.equal(
+			select(pool4, { tags: ["a", "b"], words: [] }).unselective,
+			true,
+		);
+	});
+
+	it("leaves a selection of exactly half the pool unflagged", () => {
+		assert.equal(select(pool4, { tags: ["b"], words: [] }).unselective, false);
+	});
+
+	it("does not call an empty selection unselective", () => {
+		const { unselective } = select(patterns, { tags: [], words: [] });
+
+		assert.equal(unselective, false);
+	});
+
 	it("yields the always-tagged patterns even when nothing else matches", () => {
 		const result = select(patterns, { tags: [], words: [] });
 

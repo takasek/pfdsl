@@ -133,9 +133,20 @@ function printTags(patterns) {
  * @param {{tags: string[], words: string[]}} query
  */
 function printSelection(patterns, query) {
-	const { tagged, wordOnly, always, reach } = select(patterns, query);
+	const { tagged, wordOnly, always, reach, pool, unselective } = select(
+		patterns,
+		query,
+	);
 
-	console.log(`## tagged (${tagged.length})`);
+	console.log(`## tagged (${tagged.length} of ${pool})`);
+	if (unselective) {
+		console.log(
+			`  ${tagged.length} of ${pool} is not a narrowing — the tags held too widely this cycle.`,
+		);
+		console.log(
+			"  Read down the ranking, not across the list, and do not treat the end of it as the end of the audit.",
+		);
+	}
 	for (const { pattern, matched } of tagged)
 		printPattern(
 			pattern,

@@ -291,6 +291,13 @@ function hitsFor(patterns, words) {
  * conditions all held this cycle sorts above one that shares a single tag, and
  * the named tags say why each entry is here at all (#819). Ties keep catalog
  * order, so the ranking never reorders what it cannot distinguish.
+ *
+ * `unselective` is the same measurement stated as a verdict: a result holding
+ * more than half of `pool` has removed less than half of what reading the
+ * catalog outright would cost, which is not a narrowing. Ranking alone cannot
+ * say this, because a ranked list of 38 looks exactly like a ranked list of 4
+ * until someone compares it to the catalog's size — and the failure this
+ * catalog exists to catch is a reader who stops at "narrowed, read, done".
  * @param {{tags: string[], body: string}[]} patterns
  * @param {{tags: string[], words: string[]}} query
  */
@@ -318,7 +325,14 @@ export function select(patterns, { tags, words }) {
 		word,
 		count: hitsFor(patterns, [word]).length,
 	}));
-	return { tagged, wordOnly, always, reach };
+	return {
+		tagged,
+		wordOnly,
+		always,
+		reach,
+		pool: rest.length,
+		unselective: tagged.length > rest.length / 2,
+	};
 }
 
 /**
