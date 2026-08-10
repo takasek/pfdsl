@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	checkDocsStep,
+	collectCycleWindow,
 	collectSizeDeltas,
 	commitMessagesSince,
 	commitSubjectStep,
@@ -1184,5 +1185,109 @@ describe("reviewRecordStep", () => {
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /bad revision/);
+	});
+});
+
+// #834: report material, not a verdict. The window is the union of (1) base
+// commits this tree currently lacks and (2) base commits that landed at/after
+// the branch's first commit — (2) is what survives a rebase, since after one
+// those same commits are ancestors of HEAD while still being reachable from
+// origin/<base> with a committer date past the branch's start.
+describe("collectCycleWindow", () => {
+	it("unions the lagged list with the since-branch-start list", () => {
+		const { exec, calls } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				out: "aaa1111\tfix: b\n",
+			},
+			"git rev-list origin/main..HEAD": { out: "sha3\nsha2\nsha1\n" },
+			"git show -s --format=%cI sha1": { out: "2026-08-01T00:00:00+09:00\n" },
+			"git log --format=%h%x09%s --since=": { out: "bbb2222\tfeat: c\n" },
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.deepEqual(result.entries, [
+			{ sha: "aaa1111", subject: "fix: b" },
+			{ sha: "bbb2222", subject: "feat: c" },
+		]);
+		assert.ok(
+			calls.some((c) => c.startsWith("git show -s --format=%cI sha1")),
+			"reads the committer date of the branch's oldest commit, the last line of rev-list",
+		);
+		assert.ok(
+			calls.some((c) =>
+				c.includes("--since=2026-08-01T00:00:00+09:00 origin/main"),
+			),
+		);
+	});
+
+	it("skips the since-branch-start half entirely when the branch has no commits yet", () => {
+		const { exec, calls } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				out: "aaa1111\tfix: b\n",
+			},
+			"git rev-list origin/main..HEAD": { out: "" },
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
+		assert.ok(!calls.some((c) => c.startsWith("git show")));
+		assert.ok(!calls.some((c) => c.includes("--since=")));
+	});
+
+	it("reports failure of the base-commits-this-tree-lacks query as ok: false", () => {
+		const { exec } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				ok: false,
+				out: "fatal: bad revision",
+			},
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, false);
+		assert.equal(result.error, "fatal: bad revision");
+	});
+
+	it("keeps part (1) when rev-list (part 2's first step) fails, noting the gap", () => {
+		const { exec } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				out: "aaa1111\tfix: b\n",
+			},
+			"git rev-list origin/main..HEAD": { ok: false, out: "fatal: bad object" },
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
+		assert.match(result.note ?? "", /could not/);
+	});
+
+	it("keeps part (1) when reading the first commit's committer date fails, noting the gap", () => {
+		const { exec } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				out: "aaa1111\tfix: b\n",
+			},
+			"git rev-list origin/main..HEAD": { out: "sha1\n" },
+			"git show -s --format=%cI sha1": { ok: false, out: "fatal: bad object" },
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
+		assert.match(result.note ?? "", /could not/);
+	});
+
+	it("keeps part (1) when the since-branch-start query fails, noting the gap", () => {
+		const { exec } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				out: "aaa1111\tfix: b\n",
+			},
+			"git rev-list origin/main..HEAD": { out: "sha1\n" },
+			"git show -s --format=%cI sha1": { out: "2026-08-01T00:00:00+09:00\n" },
+			"git log --format=%h%x09%s --since=": {
+				ok: false,
+				out: "fatal: bad revision",
+			},
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
+		assert.match(result.note ?? "", /could not/);
 	});
 });

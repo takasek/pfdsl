@@ -28,12 +28,14 @@ import {
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
+	parseCommitLogLines,
 	parseDesignRecordEditResponse,
 	resolveRecordEditedAt,
 	SIZE_TRACKED_PATTERNS,
 	selectDesignRecord,
 	statusChangedForArtifact,
 	toDesignRecordEntries,
+	unionCommitLogEntries,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
@@ -385,6 +387,73 @@ export function collectSizeDeltas({ exec, base, changedFiles }) {
 				afterLines: afterText.split("\n").length,
 			};
 		});
+}
+
+// #834: a failure past the base-commits-this-tree-lacks query costs only the
+// rebase-invariant half — collectCycleWindow still has part (1) to hand back,
+// and silently narrowing the window to it would read as "the window is
+// empty" rather than "half of it could not be measured".
+const CYCLE_WINDOW_INCOMPLETE_NOTE =
+	"could not determine which base commits landed since the branch started; showing only the commits this tree currently lacks";
+
+/**
+ * The cycle window (#834): report material for the terminal gate, not a
+ * verdict — union of two things a runner re-reading issue bodies, comments
+ * and PR bodies against base's current conventions needs to know landed
+ * without them.
+ *
+ * (1) base commits this tree currently lacks (`HEAD..origin/<base>`) covers
+ * a branch cut from an already-stale base. (2) base commits that landed
+ * at/after the branch's first commit's committer date covers the shape a
+ * rebase does not clear: after `git rebase origin/<base>`, those commits
+ * become ancestors of HEAD, but the same shas are still reachable from
+ * `origin/<base>` with a committer date past the branch's start, so a plain
+ * `HEAD..origin/<base>` diff (which would show 0 once rebased) misses them
+ * while this still finds them. This is exactly the gap #834 named: every
+ * option the issue enumerated fires on `behindBase > 0`, i.e. assumes the
+ * tree is *still* behind when the gate runs, but the measured sequence is
+ * notice→rebase→re-run, at which point behindBase is 0 and none of them
+ * print anything.
+ * @param {{exec: Function, base: string}} params
+ * @returns {{ok: boolean, entries?: {sha: string, subject: string}[], error?: string, note?: string}}
+ */
+export function collectCycleWindow({ exec, base }) {
+	const laggedOut = exec("git", [
+		"log",
+		"--format=%h%x09%s",
+		`HEAD..origin/${base}`,
+	]);
+	if (!laggedOut.ok) return { ok: false, error: laggedOut.out.trim() };
+	const lagged = parseCommitLogLines(laggedOut.out);
+
+	const revListOut = exec("git", ["rev-list", `origin/${base}..HEAD`]);
+	if (!revListOut.ok)
+		return { ok: true, entries: lagged, note: CYCLE_WINDOW_INCOMPLETE_NOTE };
+
+	// git rev-list lists newest first, so the branch's first (oldest) commit is
+	// the last line. An empty range means the branch has no commits yet — part
+	// (2) has no branch start to measure from, so it is skipped rather than
+	// reported as incomplete.
+	const shas = revListOut.out.trim().split("\n").filter(Boolean);
+	if (shas.length === 0) return { ok: true, entries: lagged };
+	const firstSha = shas[shas.length - 1];
+
+	const dateOut = exec("git", ["show", "-s", "--format=%cI", firstSha]);
+	if (!dateOut.ok)
+		return { ok: true, entries: lagged, note: CYCLE_WINDOW_INCOMPLETE_NOTE };
+	const since = dateOut.out.trim();
+
+	const laterOut = exec("git", [
+		"log",
+		"--format=%h%x09%s",
+		`--since=${since}`,
+		`origin/${base}`,
+	]);
+	if (!laterOut.ok)
+		return { ok: true, entries: lagged, note: CYCLE_WINDOW_INCOMPLETE_NOTE };
+	const later = parseCommitLogLines(laterOut.out);
+
+	return { ok: true, entries: unionCommitLogEntries(lagged, later) };
 }
 
 /**
