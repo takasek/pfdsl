@@ -1452,6 +1452,12 @@ export function runMetaList(
 			: undefined;
 
 	const known: { id: string; kind: NodeKind }[] = [];
+	// Tracked independent of tagFilter/opts.group/producerOutputs matching so
+	// a selector value's use across the whole file, not just within the AND
+	// intersection with other selectors, decides whether it warns (#844):
+	// an AND combination legitimately narrowing to zero rows is not a typo.
+	const usedTags = new Set<string>();
+	let groupUsed = false;
 	for (const [id, kind] of nodeKinds) {
 		// meta list only ever selects artifact/process — --producer can only
 		// ever match an artifact, and --tag/--group read a field group nodes
@@ -1459,12 +1465,40 @@ export function runMetaList(
 		// depending on the two selectors to exclude group on their own.
 		if (kind !== "artifact" && kind !== "process") continue;
 		const meta = metaFor(frontmatter, id, kind);
+		const tags = meta?.tags;
+		if (Array.isArray(tags)) for (const t of tags) usedTags.add(String(t));
+		if (opts.group !== undefined && meta?.group === opts.group)
+			groupUsed = true;
 		if (tagFilter !== undefined && !matchesAnyTag(meta, tagFilter)) continue;
 		if (opts.group !== undefined && meta?.group !== opts.group) continue;
 		if (producerOutputs !== undefined && !producerOutputs.has(id)) continue;
 		known.push({ id, kind });
 	}
 	known.sort((a, b) => compareIds(a.id, b.id));
+
+	const selectorWarnings: string[] = [];
+	if (tagFilter !== undefined) {
+		for (const t of tagFilter) {
+			if (!usedTags.has(t)) {
+				selectorWarnings.push(
+					`warning: '${t}' does not match any node's tag (possible typo?)`,
+				);
+			}
+		}
+	}
+	if (opts.group !== undefined && !groupUsed) {
+		selectorWarnings.push(
+			`warning: '${opts.group}' does not match any node's group (possible typo?)`,
+		);
+	}
+	if (opts.producer !== undefined && producerOutputs?.size === 0) {
+		selectorWarnings.push(
+			`warning: '${opts.producer}' has no output edges (possible typo?)`,
+		);
+	}
+	const selectorWarnText = selectorWarnings.length
+		? `${selectorWarnings.join("\n")}\n`
+		: "";
 
 	const { values, displayFieldsById, warnText } = collectNodeFields(
 		known,
@@ -1473,20 +1507,21 @@ export function runMetaList(
 		docFsPath,
 		basePath,
 	);
+	const combinedWarnText = `${selectorWarnText}${warnText}`;
 
 	if (opts.json) {
-		return ok(`${JSON.stringify({ ok: true, values })}\n`, warnText);
+		return ok(`${JSON.stringify({ ok: true, values })}\n`, combinedWarnText);
 	}
 
 	if (known.length === 0) {
-		return ok("No nodes match the given selectors.\n", warnText);
+		return ok("No nodes match the given selectors.\n", combinedWarnText);
 	}
 	const lines = known.flatMap(({ id }) =>
 		(displayFieldsById[id] ?? []).map((field) =>
 			formatGetLine(id, field, values),
 		),
 	);
-	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", combinedWarnText);
 }
 
 export interface CheckLinksOptions {
@@ -2523,6 +2558,11 @@ call.
 Matched nodes are printed in id order. Zero matches is not an error: text
 mode prints "No nodes match the given selectors."; --json prints an empty
 values object. Both exit 0.
+
+A selector value that no node uses at all (checked per value, independent of
+the AND combination with other selectors) prints a warning to stderr —
+possible typo — without changing the exit code; an AND combination that
+legitimately narrows to zero rows does not warn.
 
 Exit codes:
   0  success (including zero matches)

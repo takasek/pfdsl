@@ -3395,6 +3395,90 @@ spec >> write -> docs
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toContain("'bogus' is not a recognized field");
 	});
+
+	it("warns when a --tag value matches no node's tags, without failing", async () => {
+		const f = join(dir, "list-tag-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
+
+	it("warns per unmatched value when --tag has multiple comma-separated values", async () => {
+		const f = join(dir, "list-tag-multi-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design,bogus1,bogus2"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus1'");
+		expect(r.stderr).toContain("'bogus2'");
+		expect(r.stderr).not.toContain("'design'");
+	});
+
+	it("does not warn for a --tag value that does match a node", async () => {
+		const f = join(dir, "list-tag-used.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+	});
+
+	it("warns when --group matches no node's group field", async () => {
+		const f = join(dir, "list-group-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--group", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
+
+	it("warns when --producer names a process id that does not exist", async () => {
+		const f = join(dir, "list-producer-missing.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--producer", "bogus"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus'");
+	});
+
+	it("warns when --producer names a process with no output edges", async () => {
+		const f = join(dir, "list-producer-no-outputs.pfdsl");
+		const noOutput = `---
+artifact:
+  spec: {}
+process:
+  investigate: {}
+---
+spec >> investigate
+`;
+		writeFileSync(f, noOutput);
+		const r = await run(["meta", "list", f, "--producer", "investigate"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'investigate'");
+	});
+
+	it("does not warn when an AND combination yields zero matches but every selector value matches individually", async () => {
+		const f = join(dir, "list-and-zero-no-warning.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"list",
+			f,
+			"--tag",
+			"design",
+			"--producer",
+			"build",
+			"status",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No nodes match the given selectors.\n");
+		expect(r.stderr).toBe("");
+	});
+
+	it("keeps exit code 0 when a selector value warning fires", async () => {
+		const f = join(dir, "list-tag-unused-exit.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
 });
 
 // group is a NodeKind alongside artifact and process, with its own field set
