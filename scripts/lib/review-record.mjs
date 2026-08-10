@@ -98,14 +98,24 @@ export function parseReviewRecords(text) {
 
 /**
  * Judge one cycle against its own diff.
- * The only question this asks is whether a cycle that changed code carries
- * at least one record — a cycle that recorded several passes is not a
- * problem, it reviewed several times.
- * @param {{changedFiles: string[], recordCount: number}} cycle
+ * Two independent questions, both scoped to a cycle that changed code: does
+ * it carry a record from a tool that can satisfy the gate at all, and does
+ * it carry one whose brief includes falsifying the diff's factual claims
+ * (#838). Malformed records (no `tool`) carry no value to check against
+ * either set, so they are excluded here — the caller reports them on its own.
+ * @param {{changedFiles: string[], records: Array<{tool?: string, error?: string}>}} cycle
  * @returns {string[]} one line per problem, empty when the cycle is in order
  */
-export function classifyCycle({ changedFiles, recordCount }) {
-	if (matchesTrigger(changedFiles, CODE_PATH) && recordCount === 0)
-		return ["changed code but carries no review record"];
-	return [];
+export function classifyCycle({ changedFiles, records }) {
+	if (!matchesTrigger(changedFiles, CODE_PATH)) return [];
+
+	const tools = records.filter((r) => r.tool !== undefined).map((r) => r.tool);
+	const problems = [];
+	if (!tools.some((tool) => GATE_TOOLS.includes(tool)))
+		problems.push("changed code but carries no review record");
+	if (!tools.some((tool) => CORRECTNESS_TOOLS.includes(tool)))
+		problems.push(
+			"changed code but carries no correctness review record (tool=correctness or design)",
+		);
+	return problems;
 }

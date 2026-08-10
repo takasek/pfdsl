@@ -147,21 +147,78 @@ describe("CODE_PATH", () => {
 	});
 });
 
+/** Build a parsed-record array from bare tool names, the shape classifyCycle consumes. */
+const records = (...tools) => tools.map((tool) => ({ tool }));
+
 describe("classifyCycle", () => {
-	it("reports nothing when a code cycle carries a record", () => {
+	it("reports nothing when a code cycle carries a gate record and a correctness record", () => {
 		assert.deepEqual(
-			classifyCycle({ changedFiles: ["scripts/a.mjs"], recordCount: 1 }),
+			classifyCycle({
+				changedFiles: ["scripts/a.mjs"],
+				records: records("simplify", "correctness"),
+			}),
 			[],
 		);
 	});
 
-	it("reports a missing record when a code cycle carries none", () => {
+	it("accepts a single design record, which subsumes both requirements", () => {
+		assert.deepEqual(
+			classifyCycle({
+				changedFiles: ["scripts/a.mjs"],
+				records: records("design"),
+			}),
+			[],
+		);
+	});
+
+	it("reports both problems when a code cycle carries no record at all", () => {
 		assert.deepEqual(
 			classifyCycle({
 				changedFiles: ["packages/core/src/a.ts"],
-				recordCount: 0,
+				records: [],
 			}),
-			["changed code but carries no review record"],
+			[
+				"changed code but carries no review record",
+				"changed code but carries no correctness review record (tool=correctness or design)",
+			],
+		);
+	});
+
+	it("reports only the correctness gap when a quality-only record is present", () => {
+		assert.deepEqual(
+			classifyCycle({
+				changedFiles: ["scripts/a.mjs"],
+				records: records("simplify"),
+			}),
+			[
+				"changed code but carries no correctness review record (tool=correctness or design)",
+			],
+		);
+	});
+
+	it("does not count a code-review record toward the gate, since it structurally runs after commit", () => {
+		assert.deepEqual(
+			classifyCycle({
+				changedFiles: ["scripts/a.mjs"],
+				records: records("code-review"),
+			}),
+			[
+				"changed code but carries no review record",
+				"changed code but carries no correctness review record (tool=correctness or design)",
+			],
+		);
+	});
+
+	it("ignores malformed records (no tool), which the caller reports separately", () => {
+		assert.deepEqual(
+			classifyCycle({
+				changedFiles: ["scripts/a.mjs"],
+				records: [{ error: "tool is required" }],
+			}),
+			[
+				"changed code but carries no review record",
+				"changed code but carries no correctness review record (tool=correctness or design)",
+			],
 		);
 	});
 
@@ -169,22 +226,28 @@ describe("classifyCycle", () => {
 		assert.deepEqual(
 			classifyCycle({
 				changedFiles: ["docs/adr/README.md", "scripts/gate-check.mjs"],
-				recordCount: 0,
+				records: [],
 			}),
-			["changed code but carries no review record"],
+			[
+				"changed code but carries no review record",
+				"changed code but carries no correctness review record (tool=correctness or design)",
+			],
 		);
 	});
 
 	it("stays silent about a prose cycle that carries no record", () => {
 		assert.deepEqual(
-			classifyCycle({ changedFiles: ["docs/a.md"], recordCount: 0 }),
+			classifyCycle({ changedFiles: ["docs/a.md"], records: [] }),
 			[],
 		);
 	});
 
 	it("accepts a cycle that recorded several passes", () => {
 		assert.deepEqual(
-			classifyCycle({ changedFiles: ["scripts/a.mjs"], recordCount: 2 }),
+			classifyCycle({
+				changedFiles: ["scripts/a.mjs"],
+				records: records("simplify", "code-review", "correctness"),
+			}),
 			[],
 		);
 	});
