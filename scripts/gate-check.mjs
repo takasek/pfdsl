@@ -20,6 +20,7 @@ import {
 	diffReadySets,
 	extractGateChecklist,
 	formatGateTable,
+	formatRunTreeLine,
 	formatSizeDelta,
 	GATE_CHECKLIST_SOURCE_PATH,
 	hasSizeOverride,
@@ -328,6 +329,29 @@ const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
 const manualItems = deriveManualItems(
 	extractGateChecklist(readFileSync(skillMdPath, "utf-8")),
 );
+
+// `root` here is this script's own location (resolved from import.meta.url
+// above), not the shell's cwd. gate-check's PreToolUse guard
+// (verification-tree-guard.mjs) already stops most cwd-drifted runs before
+// they start, but a run that slips past it (e.g. inside a subagent) still
+// needs to be checkable after the fact — and it is only checkable if the
+// tree named here is the one gate-check actually inspected, not wherever the
+// invoking shell happened to be sitting (#840, 案3).
+const mainRootLookup = exec("git", ["rev-parse", "--git-common-dir"]);
+const branchLookup = exec("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
+// Either lookup failing (e.g. no git on PATH) must not stop the gate itself
+// — only this report line degrades, to a null-branch/root-as-mainRoot line
+// via formatRunTreeLine, same as verification-tree-guard.mjs's own read of a
+// failed git call as "cannot tell".
+const mainRoot = mainRootLookup.ok
+	? dirname(resolve(root, mainRootLookup.out.trim()))
+	: root;
+const resolvedBranch = branchLookup.ok ? branchLookup.out.trim() : null;
+// A detached HEAD prints the literal string "HEAD" here, which is not a
+// branch name.
+const branch =
+	resolvedBranch && resolvedBranch !== "HEAD" ? resolvedBranch : null;
+console.log(formatRunTreeLine({ root, mainRoot, branch }));
 
 console.log("gate-check:");
 console.log(formatGateTable(results));
