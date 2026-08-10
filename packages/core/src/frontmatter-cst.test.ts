@@ -222,6 +222,31 @@ describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", 
 `);
 	});
 
+	// reindentFold used to test the whole header line for a digit to detect
+	// an explicit indentation indicator (`>2`), so a header-line comment
+	// containing a digit (e.g. an issue number) made it wrongly bail out and
+	// stop preserving the wraps, even though there is no indentation
+	// indicator at all (#816).
+	it("preserves wraps when the fold header has a trailing comment containing a digit", () => {
+		const src = `artifact:
+  a:
+    description: > # note 815
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: > # note 815
+      Hello
+      world.
+    status: done
+`);
+	});
+
 	it("does not preserve wraps when the scalar has an explicit indentation indicator (>2)", () => {
 		const src = `artifact:
   a:
@@ -236,6 +261,46 @@ describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", 
 		expect(out).toBe(`artifact:
   a:
     description: >
+      Hello world.
+    status: done
+`);
+	});
+
+	// YAML allows the chomping and indentation indicators after `>` in either
+	// order; both must still be detected as "explicit indicator present".
+	it("does not preserve wraps when the indicator is indentation-then-chomping (>2-)", () => {
+		const src = `artifact:
+  a:
+    description: >2-
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >-
+      Hello world.
+    status: done
+`);
+	});
+
+	it("does not preserve wraps when the indicator is chomping-then-indentation (>-2)", () => {
+		const src = `artifact:
+  a:
+    description: >-2
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >-
       Hello world.
     status: done
 `);

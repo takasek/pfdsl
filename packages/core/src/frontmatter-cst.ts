@@ -158,6 +158,20 @@ function collectFoldedScalars(yamlText: string): FoldedScalarSnapshot[] {
 }
 
 /**
+ * True when `headerLine` (a fold's `key: >...` line) carries an explicit
+ * indentation indicator — a digit directly after the `>`, e.g. `>2`, `>2-`,
+ * `>-2`. Only the indicator zone between `>` and any trailing `# comment` is
+ * checked: a comment containing a digit (an issue number is common in this
+ * repo) is not an indentation indicator and must not trip this (#816).
+ */
+function headerHasIndentIndicator(headerLine: string): boolean {
+	const withoutComment = headerLine.split("#")[0] ?? "";
+	const foldMarker = withoutComment.lastIndexOf(">");
+	if (foldMarker === -1) return false;
+	return /\d/.test(withoutComment.slice(foldMarker + 1));
+}
+
+/**
  * Re-derive `origRaw`'s continuation-line wraps at `newRaw`'s (canonical)
  * indentation. Returns null when the reindent can't be trusted: an explicit
  * indentation indicator in the fold header (a digit, e.g. `>2`) makes the
@@ -168,7 +182,7 @@ function collectFoldedScalars(yamlText: string): FoldedScalarSnapshot[] {
 function reindentFold(origRaw: string, newRaw: string): string | null {
 	const origLines = origRaw.split("\n");
 	const newLines = newRaw.split("\n");
-	if (/\d/.test(origLines[0] ?? "")) return null;
+	if (headerHasIndentIndicator(origLines[0] ?? "")) return null;
 	const newBody = newLines.slice(1);
 	const firstNonBlank = newBody.find((line) => line.trim() !== "");
 	if (firstNonBlank === undefined) return null;
