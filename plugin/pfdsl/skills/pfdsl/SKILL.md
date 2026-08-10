@@ -101,7 +101,7 @@ pfdsl fmt <file|-> [--write] [--check] [--no-color]   # Format a .pfdsl file (- 
 pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]   # Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
 pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]   # Structural diff (text), or visual diff DOT/SVG
 pfdsl graph summary|io|stats|neighbors|locate|describe|impact|depends-on|path|edges|orphans   # Read-only queries on the graph topology
-pfdsl meta get|list|set|sort|reindex|check-links   # Read and write frontmatter metadata
+pfdsl meta get|list|values|set|sort|reindex|check-links   # Read and write frontmatter metadata
 pfdsl status ready|blocked|list|gaps   # Planning queries derived from artifact status
 pfdsl help   # Show this help
 ```
@@ -135,6 +135,7 @@ PFD はタスクリストではなく成果物の変換グラフ。
 - 隣接がどちらの種別かは隣接ごとに調べなくてよい。エッジは必ず artifact と process の間を走るので、ある1ノードの隣接は全て自分と逆の種別になる。`neighbors` / `describe` はそれを各リストに一度だけ書く（text は `successors (artifact): ...`、`--json` は `neighborKind`）
 - 2ノード間の関係を確かめたいときは `graph path <file> <from> <to>` で全単純経路を得る
 - 複数 artifact のフィールドを横断的に読むときは `meta get <file> <id1,id2,...> [field1,field2,...]` を使う（フルファイル Read 不要）。id を明示せず条件で絞りたいときは `meta list <file> --tag|--group|--producer [field...]`（セレクタは AND 結合 — `--producer <process> --tag <t>` は「その process の出力のうち tag が付くもの」を1回で引く）。ノードが持たないフィールドは `(unset)` と印字される — 空文字列が入っているフィールドはコロンの後に何も出ないので、両者は text のまま区別できる
+- セレクタに何を渡せるかを知らないときは `meta values <file> <field>` でそのフィールドの語彙（使われている値と件数）を引く。frontmatter の grep は要らない。`group` / `tags` は宣言セクションを持つため、宣言はされているがどのノードも使っていない値も件数 0 の行として出る。`status` など他のフィールドにも同じように使える
 - `Edit` する前に行番号だけ知りたいときは `graph locate <file> <id>` を使う（frontmatter 宣言行と本文の出現行を返す。フルファイル Read 不要）。特定フィールドだけ直接編集したいときは `--field <name[,name...]>` でそのフィールドの行番号も一緒に返す
 - 1ノードの kind・フィールド・隣接・出現行をまとめて知りたいときは `graph describe <file> <id>` 一回で済む（`meta get` + `graph neighbors` + `graph locate` を束ねたカード）
 
