@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
+	buildDesignRecordEditQuery,
 	classifyAuditIssuesFlowResult,
 	classifyDesignRecordContent,
 	classifyDesignRecordTiming,
@@ -22,12 +23,16 @@ import {
 	formatGateTable,
 	formatSizeDelta,
 	GATE_CHECKLIST_SOURCE_PATH,
+	hasNoImplementationDisposition,
 	hasSizeOverride,
 	hasStatusChange,
 	lintCommitSubjects,
 	matchesTrigger,
+	NO_IMPLEMENTATION_TOKEN,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
+	parseDesignRecordEditResponse,
+	resolveRecordEditedAt,
 	SIZE_INTENT_PATTERN,
 	SIZE_OVERRIDE_PATTERN,
 	SIZE_TRACKED_PATTERNS,
@@ -608,12 +613,13 @@ describe("toDesignRecordEntries", () => {
 		]);
 	});
 
-	it("appends each comment's body and createdAt, dropping everything else it carries", () => {
+	it("appends each comment's body, createdAt and id, dropping everything else it carries", () => {
 		const entries = toDesignRecordEntries({
 			body: "普通の説明文。",
 			createdAt: "2026-07-01T00:00:00Z",
 			comments: [
 				{
+					id: "IC_kwDOSYTJ888AAAABOCVvqQ",
 					author: { login: "runner" },
 					body: "前提: x\n否定案: y\n却下理由: z",
 					createdAt: "2026-07-02T00:00:00Z",
@@ -623,15 +629,152 @@ describe("toDesignRecordEntries", () => {
 		assert.deepEqual(entries, [
 			{ body: "普通の説明文。", createdAt: "2026-07-01T00:00:00Z" },
 			{
+				id: "IC_kwDOSYTJ888AAAABOCVvqQ",
 				body: "前提: x\n否定案: y\n却下理由: z",
 				createdAt: "2026-07-02T00:00:00Z",
 			},
 		]);
 	});
 
+	// #737 案2: the body itself has no comment id to match a GraphQL edit-info
+	// node against, and must not gain a spurious one — resolveRecordEditedAt
+	// tells the body case apart from the comment case by this key's presence.
+	it("carries no id on the body entry", () => {
+		const [bodyEntry] = toDesignRecordEntries({
+			body: "前提: x",
+			createdAt: "2026-07-01T00:00:00Z",
+			comments: [],
+		});
+		assert.equal(Object.hasOwn(bodyEntry, "id"), false);
+	});
+
 	it("returns just the body entry when there are no comments", () => {
 		const entries = toDesignRecordEntries({ body: "x", createdAt: undefined });
 		assert.deepEqual(entries, [{ body: "x", createdAt: undefined }]);
+	});
+});
+
+describe("resolveRecordEditedAt", () => {
+	const editInfo = (overrides = {}) => ({
+		issueLastEditedAt: null,
+		comments: { totalCount: 1, nodes: [{ id: "c1", lastEditedAt: null }] },
+		...overrides,
+	});
+
+	it("falls back to the issue's own lastEditedAt for a body-selected record", () => {
+		const result = resolveRecordEditedAt(
+			{ body: "前提: x" },
+			editInfo({ issueLastEditedAt: "2026-07-01T00:00:00Z" }),
+		);
+		assert.deepEqual(result, { editedAtIso: "2026-07-01T00:00:00Z" });
+	});
+
+	it("matches a comment-selected record by id, not by array position", () => {
+		const result = resolveRecordEditedAt(
+			{ id: "c2", body: "前提: x" },
+			editInfo({
+				comments: {
+					totalCount: 2,
+					nodes: [
+						{ id: "c1", lastEditedAt: "2026-01-01T00:00:00Z" },
+						{ id: "c2", lastEditedAt: "2026-07-05T00:00:00Z" },
+					],
+				},
+			}),
+		);
+		assert.deepEqual(result, { editedAtIso: "2026-07-05T00:00:00Z" });
+	});
+
+	it("reads null as unedited for the matched comment", () => {
+		const result = resolveRecordEditedAt(
+			{ id: "c1", body: "前提: x" },
+			editInfo(),
+		);
+		assert.deepEqual(result, { editedAtIso: null });
+	});
+
+	it("notes edit history as unavailable when the GraphQL lookup failed", () => {
+		const result = resolveRecordEditedAt({ id: "c1", body: "前提: x" }, null);
+		assert.equal(result.editedAtIso, null);
+		assert.match(result.note, /unavailable/);
+	});
+
+	it("skips edit detection and notes it when totalCount exceeds the fetched nodes", () => {
+		const result = resolveRecordEditedAt(
+			{ id: "c1", body: "前提: x" },
+			editInfo({
+				comments: {
+					totalCount: 101,
+					nodes: [{ id: "c1", lastEditedAt: null }],
+				},
+			}),
+		);
+		assert.equal(result.editedAtIso, null);
+		assert.match(result.note, /detection/);
+	});
+
+	// Review A-3: without a note, "record id not found among the fetched
+	// nodes" was indistinguishable from "confirmed unedited" — both returned
+	// { editedAtIso: null } with nothing else. The two mean different things.
+	it("notes when the record's id has no match among the fetched comment nodes", () => {
+		const result = resolveRecordEditedAt(
+			{ id: "c-not-fetched", body: "前提: x" },
+			editInfo({
+				comments: {
+					totalCount: 1,
+					nodes: [{ id: "c1", lastEditedAt: null }],
+				},
+			}),
+		);
+		assert.equal(result.editedAtIso, null);
+		assert.match(result.note, /id/);
+		assert.match(result.note, /detection/);
+	});
+});
+
+describe("buildDesignRecordEditQuery", () => {
+	it("names the owner, repo and issue number as GraphQL variables", () => {
+		const args = buildDesignRecordEditQuery({
+			owner: "takasek",
+			repo: "pfdsl",
+			number: 737,
+		});
+		assert.deepEqual(args.slice(0, 2), ["api", "graphql"]);
+		assert.ok(args.includes("owner=takasek"));
+		assert.ok(args.includes("repo=pfdsl"));
+		assert.ok(args.includes("number=737"));
+		const queryArg = args[args.length - 1];
+		assert.match(queryArg, /lastEditedAt/);
+		assert.match(queryArg, /comments\(first:100\)/);
+	});
+});
+
+describe("parseDesignRecordEditResponse", () => {
+	it("reads the issue's own lastEditedAt and each comment's, keyed by id", () => {
+		const json = JSON.stringify({
+			data: {
+				repository: {
+					issue: {
+						lastEditedAt: null,
+						comments: {
+							totalCount: 1,
+							nodes: [{ id: "c1", lastEditedAt: "2026-07-05T00:00:00Z" }],
+						},
+					},
+				},
+			},
+		});
+		assert.deepEqual(parseDesignRecordEditResponse(json), {
+			issueLastEditedAt: null,
+			comments: {
+				totalCount: 1,
+				nodes: [{ id: "c1", lastEditedAt: "2026-07-05T00:00:00Z" }],
+			},
+		});
+	});
+
+	it("throws on a response shape it does not recognize", () => {
+		assert.throws(() => parseDesignRecordEditResponse(JSON.stringify({})));
 	});
 });
 
@@ -645,6 +788,42 @@ describe("classifyDesignRecordTiming", () => {
 	it("SKIPs when there is no commit in range to compare against", () => {
 		const result = classifyDesignRecordTiming("2026-07-30T00:00:00Z", null);
 		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no implementation commits/);
+	});
+
+	// #768: a cycle can settle on not implementing at all, then close on
+	// commits that belong to a different, derived PR (the #757 shape) — those
+	// commits exist, so the no-commit SKIP above never fires, yet their timing
+	// against this record says nothing either. The record itself carries the
+	// signal.
+	it("SKIPs on a commit-bearing range when the record declares no implementation", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T00:00:00Z",
+			"2026-07-30T12:00:00Z",
+			{ noImplementation: true },
+		);
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no implementation commits/);
+	});
+
+	// Review A-1: `noImplementation` used to return before the posted-time
+	// comparison ran at all, so a record that both declared no implementation
+	// and was itself posted after the first commit produced no detail
+	// distinguishable from an ordinary, well-timed no-implementation record —
+	// the retroactive-record evidence #824's forgeability tradeoff assumes a
+	// reviewer can see was silently dropped, not merely downgraded. Status
+	// stays SKIP (the design does not change), but the comparison still runs
+	// and its result is folded into detail as a WARN note.
+	it("SKIPs but WARNs when the no-implementation record was itself posted after the first commit", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T12:00:00Z",
+			"2026-07-30T00:00:00Z",
+			{ noImplementation: true },
+		);
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no implementation commits/);
+		assert.match(result.detail, /WARN/);
+		assert.match(result.detail, /posted at .*after the first commit/);
 	});
 
 	it("PASSes when the record predates the first commit", () => {
@@ -662,6 +841,37 @@ describe("classifyDesignRecordTiming", () => {
 		);
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /after the first commit/);
+	});
+
+	// #737 案2: the record itself can be edited after the fact, which the
+	// createdAt-only check above cannot see — createdAt never moves.
+	it("PASSes an unedited record (lastEditedAt: null)", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T00:00:00Z",
+			"2026-07-30T12:00:00Z",
+			{ editedAtIso: null },
+		);
+		assert.equal(result.status, "PASS");
+	});
+
+	it("FAILs when the record was edited after the first commit", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T00:00:00Z",
+			"2026-07-30T06:00:00Z",
+			{ editedAtIso: "2026-07-30T12:00:00Z" },
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /edited at/);
+		assert.match(result.detail, /after the first commit/);
+	});
+
+	it("PASSes when the record was edited before the first commit", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T00:00:00Z",
+			"2026-07-30T12:00:00Z",
+			{ editedAtIso: "2026-07-30T01:00:00Z" },
+		);
+		assert.equal(result.status, "PASS");
 	});
 });
 
@@ -781,6 +991,47 @@ describe("DESIGN_RECORD_REQUIRED_PREFIXES / DISPOSITION_TOKENS", () => {
 			"却下理由:",
 		]);
 		assert.deepEqual(DISPOSITION_TOKENS, ["採用", "却下", "保留"]);
+	});
+});
+
+describe("hasNoImplementationDisposition", () => {
+	it("is false for an ordinary record", () => {
+		assert.equal(
+			hasNoImplementationDisposition("前提: x\n否定案: y\n却下理由: z"),
+			false,
+		);
+	});
+
+	it("is true when a line's head declares the token, mirroring Size-Intent's line-head design", () => {
+		assert.equal(
+			hasNoImplementationDisposition(
+				`前提: x\n否定案: y\n却下理由: z\n${NO_IMPLEMENTATION_TOKEN} 理由`,
+			),
+			true,
+		);
+	});
+
+	// #768 実害: 前提の一文が「実装しないと決めたサイクルが、その判断を選択記録の
+	// `案の処分:` に明記する運用が守られること」のように、この語を主題として言及する
+	// 前提行を書くと、行頭一致でなく部分一致で判定していた旧実装は誤って SKIP した。
+	it("is false when the token is only mentioned inside another line's prose, not declared at a line head", () => {
+		assert.equal(
+			hasNoImplementationDisposition(
+				`前提: 本案は〈「${NO_IMPLEMENTATION_TOKEN.replace(/:$/, "")}」と決めたサイクルが、その判断を選択記録の \`案の処分:\` に明記する運用が守られること〉を前提にする\n否定案: y\n却下理由: z`,
+			),
+			false,
+		);
+	});
+
+	it("recognizes the token through the same markdown decoration presentRequiredPrefixes tolerates", () => {
+		assert.equal(
+			hasNoImplementationDisposition(`> - **${NO_IMPLEMENTATION_TOKEN}** 理由`),
+			true,
+		);
+	});
+
+	it("is false for a missing body", () => {
+		assert.equal(hasNoImplementationDisposition(undefined), false);
 	});
 });
 

@@ -8,6 +8,7 @@ import {
 	commitMessagesSince,
 	commitSubjectStep,
 	designRecordStep,
+	fetchDesignRecordEditInfo,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
@@ -311,6 +312,101 @@ describe("wipTransitionStep", () => {
 	});
 });
 
+describe("fetchDesignRecordEditInfo", () => {
+	const graphqlResponse = (overrides = {}) =>
+		JSON.stringify({
+			data: {
+				repository: {
+					issue: {
+						lastEditedAt: null,
+						comments: {
+							totalCount: 1,
+							nodes: [{ id: "c1", lastEditedAt: null }],
+							...overrides.comments,
+						},
+						...overrides.issue,
+					},
+				},
+			},
+		});
+
+	it("resolves owner/repo from the git remote and queries via execGh", async () => {
+		const { exec } = fakeExec({
+			"git remote get-url origin": {
+				out: "https://github.com/takasek/pfdsl.git\n",
+			},
+		});
+		/** @type {unknown[]} */
+		const calls = [];
+		const execGh = async (args, opts) => {
+			calls.push({ args, opts });
+			return graphqlResponse();
+		};
+		const result = await fetchDesignRecordEditInfo({
+			exec,
+			execGh,
+			cwd: "/repo",
+			number: 737,
+		});
+		assert.deepEqual(result, {
+			issueLastEditedAt: null,
+			comments: { totalCount: 1, nodes: [{ id: "c1", lastEditedAt: null }] },
+		});
+		assert.equal(calls.length, 1);
+		assert.deepEqual(calls[0].opts, { cwd: "/repo" });
+		assert.ok(calls[0].args.includes("owner=takasek"));
+		assert.ok(calls[0].args.includes("repo=pfdsl"));
+		assert.ok(calls[0].args.includes("number=737"));
+	});
+
+	it("throws when the git remote cannot be read", async () => {
+		const { exec } = fakeExec({
+			"git remote get-url origin": { ok: false, out: "fatal: no remote" },
+		});
+		await assert.rejects(
+			fetchDesignRecordEditInfo({
+				exec,
+				execGh: async () => graphqlResponse(),
+				cwd: "/repo",
+				number: 737,
+			}),
+		);
+	});
+
+	it("throws when the remote URL carries no owner/repo", async () => {
+		const { exec } = fakeExec({
+			"git remote get-url origin": { out: "not-a-url\n" },
+		});
+		await assert.rejects(
+			fetchDesignRecordEditInfo({
+				exec,
+				execGh: async () => graphqlResponse(),
+				cwd: "/repo",
+				number: 737,
+			}),
+		);
+	});
+
+	it("propagates a rejection from execGh (gh unavailable, GraphQL error, ...)", async () => {
+		const { exec } = fakeExec({
+			"git remote get-url origin": {
+				out: "https://github.com/takasek/pfdsl.git\n",
+			},
+		});
+		await assert.rejects(
+			fetchDesignRecordEditInfo({
+				exec,
+				execGh: async () => {
+					throw new Error("boom");
+				},
+				cwd: "/repo",
+				number: 737,
+			}),
+			/boom/,
+		);
+	});
+});
+
 describe("designRecordStep", () => {
 	const issue = ({
 		body,
@@ -434,7 +530,11 @@ describe("designRecordStep", () => {
 		assert.match(result.detail, /after the first commit/);
 	});
 
-	it("reports a partial record as content-deficient rather than as missing", () => {
+	// #737 案1: content deficiency no longer decides the row — only timing
+	// does. A content-deficient record still PASSes when its timing is clean,
+	// with the deficiency printed as a WARN so it stays legible, distinct from
+	// a timing FAIL sharing the same detail string.
+	it("PASSes a content-deficient record whose timing is clean, with the deficiency reported as WARN", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
 		});
@@ -452,9 +552,8 @@ describe("designRecordStep", () => {
 				],
 			}),
 		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /missing required line/);
-		assert.doesNotMatch(result.detail, /no design-selection record found/);
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /WARN:.*missing required line/);
 	});
 
 	it("identifies the record by its required line heads, with no 決定 line present", () => {
@@ -521,6 +620,89 @@ describe("designRecordStep", () => {
 		assert.equal(result.status, "SKIP");
 	});
 
+	// Review A-4: `timing.status === "SKIP" ? undefined : editNote` had no test
+	// asserting on `detail` for a SKIP row, so it could regress to always
+	// including or always dropping editNote without a test noticing. Uses the
+	// id-mismatch note (A-3) rather than a coincidentally-empty one, so a
+	// broken suppression would make this test fail on content, not on absence.
+	it("suppresses the edit note on a SKIP row, even when edit detection has its own note to report", () => {
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "" } });
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				body: "普通の説明文。",
+				comments: [
+					{
+						id: "c1",
+						author: { login: "owner" },
+						body: validRecordBody,
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
+			}),
+			editInfo: {
+				issueLastEditedAt: null,
+				comments: {
+					totalCount: 1,
+					nodes: [{ id: "different-id", lastEditedAt: null }],
+				},
+			},
+		});
+		assert.equal(result.status, "SKIP");
+		assert.doesNotMatch(result.detail ?? "", /id not found/);
+	});
+
+	// #768: the #757 shape — the decision led to not implementing, and a
+	// later, unrelated PR happens to be what closes this issue's range. The
+	// range is not empty, so the no-commit SKIP above never fires; the record
+	// itself has to carry the signal instead.
+	it("SKIPs a commit-bearing range when the record's own line head declares no implementation", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				body: "普通の説明文。",
+				comments: [
+					{
+						author: { login: "owner" },
+						body: "前提: x\n否定案: y\n却下理由: z\n実装しない: 外部制約に帰着",
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
+			}),
+		});
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no implementation commits/);
+	});
+
+	// #768 実害の再現: 実際に踏んだ形。前提の一文がこの語を主題として言及しているだけで、
+	// どの行の行頭にも `実装しない:` を書いていない。旧実装（部分一致）はこれを誤って
+	// SKIP した — 実装コミットが現に存在する回で timing 検査が無効化される偽陰性だった。
+	it("does NOT SKIP when the record only mentions the token in prose, not as a line-head declaration", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				body: "普通の説明文。",
+				comments: [
+					{
+						author: { login: "owner" },
+						body: "前提: 本案は〈「実装しない」と決めたサイクルが、その判断を選択記録の `案の処分:` に明記する運用が守られること〉を前提にする\n否定案: y\n却下理由: z",
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
+			}),
+		});
+		assert.equal(result.status, "PASS");
+	});
+
 	it("PASSes when the record predates the first commit and covers every enumerated option", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
@@ -540,6 +722,120 @@ describe("designRecordStep", () => {
 			}),
 		});
 		assert.equal(result.status, "PASS");
+	});
+
+	// #737 案2: edit detection, wired through the fetched editInfo.
+	describe("edit detection", () => {
+		const recordComment = (overrides = {}) => ({
+			id: "c1",
+			author: { login: "owner" },
+			body: validRecordBody,
+			createdAt: "2026-07-01T00:00:00Z",
+			...overrides,
+		});
+		const firstCommit = {
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		};
+
+		it("PASSes an unedited record (lastEditedAt: null)", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
+				editInfo: {
+					issueLastEditedAt: null,
+					comments: {
+						totalCount: 1,
+						nodes: [{ id: "c1", lastEditedAt: null }],
+					},
+				},
+			});
+			assert.equal(result.status, "PASS");
+		});
+
+		it("FAILs when the record was edited after the first commit", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
+				editInfo: {
+					issueLastEditedAt: null,
+					comments: {
+						totalCount: 1,
+						nodes: [{ id: "c1", lastEditedAt: "2026-07-03T00:00:00Z" }],
+					},
+				},
+			});
+			assert.equal(result.status, "FAIL");
+			assert.match(result.detail, /edited at/);
+		});
+
+		it("PASSes when the record was edited before the first commit", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
+				editInfo: {
+					issueLastEditedAt: null,
+					comments: {
+						totalCount: 1,
+						nodes: [{ id: "c1", lastEditedAt: "2026-07-01T12:00:00Z" }],
+					},
+				},
+			});
+			assert.equal(result.status, "PASS");
+		});
+
+		it("judges on timing alone and notes the gap when GraphQL is unavailable", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
+				editInfo: null,
+			});
+			assert.equal(result.status, "PASS");
+			assert.match(result.detail, /unavailable/);
+		});
+
+		it("skips edit detection and notes it when totalCount exceeds the fetched comments", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
+				editInfo: {
+					issueLastEditedAt: null,
+					comments: {
+						totalCount: 101,
+						nodes: [{ id: "c1", lastEditedAt: null }],
+					},
+				},
+			});
+			assert.equal(result.status, "PASS");
+			assert.match(result.detail, /detection/);
+		});
+
+		it("reads the issue's own lastEditedAt when the body is the selected record", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({
+					body: validRecordBody,
+					createdAt: "2026-07-01T00:00:00Z",
+				}),
+				editInfo: {
+					issueLastEditedAt: "2026-07-03T00:00:00Z",
+					comments: { totalCount: 0, nodes: [] },
+				},
+			});
+			assert.equal(result.status, "FAIL");
+			assert.match(result.detail, /edited at/);
+		});
 	});
 });
 
@@ -706,6 +1002,22 @@ describe("perIssueSteps", () => {
 		assert.equal(seen.length, 1);
 		assert.equal(seen[0].base, "main");
 		assert.deepEqual(seen[0].deltas, []);
+	});
+
+	// #737 案2: each issue's own edit-info must reach its own row, not the
+	// shared args (which have no per-issue value to give).
+	it("forwards each issue's own editInfo, not a shared one", () => {
+		/** @type {unknown[]} */
+		const seen = [];
+		const spy = (args) => {
+			seen.push(args.editInfo);
+			return { name: "s", status: "PASS" };
+		};
+		perIssueSteps(spy, [
+			{ number: 1, issue: { body: "b" }, editInfo: { issueLastEditedAt: "a" } },
+			{ number: 2, issue: { body: "c" }, editInfo: null },
+		]);
+		assert.deepEqual(seen, [{ issueLastEditedAt: "a" }, null]);
 	});
 });
 

@@ -35,6 +35,7 @@ import {
 	commitMessagesSince,
 	commitSubjectStep,
 	designRecordStep,
+	fetchDesignRecordEditInfo,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
@@ -270,26 +271,29 @@ results.push(
 const issues = [];
 for (const number of issueNumbers) {
 	try {
-		issues.push({
-			number,
-			issue: JSON.parse(
-				await execGh(
-					[
-						"issue",
-						"view",
-						String(number),
-						"--json",
-						"body,comments,createdAt",
-					],
-					{ cwd: root },
-				),
+		const issue = JSON.parse(
+			await execGh(
+				["issue", "view", String(number), "--json", "body,comments,createdAt"],
+				{ cwd: root },
 			),
-		});
+		);
+		// The edit-history fetch (#737 案2) is a separate lookup from the one
+		// above and fails independently: a failure here only costs edit
+		// detection, never the row itself — timing still judges on createdAt
+		// alone, same as before this check existed.
+		const editInfo = await fetchDesignRecordEditInfo({
+			exec,
+			execGh,
+			cwd: root,
+			number,
+		}).catch(() => null);
+		issues.push({ number, issue, editInfo });
 	} catch (e) {
 		issues.push({
 			number,
 			issue: null,
 			issueFailure: classifyIssueLookupFailure(e),
+			editInfo: null,
 		});
 	}
 }

@@ -380,22 +380,147 @@ export function deriveManualItems(checklistItems) {
 }
 
 /**
+ * The GraphQL query that reads a design-selection record's edit history
+ * (#737 案2): the issue's own `lastEditedAt`, and every comment's, in one
+ * round trip. REST's `updated_at` is not used — it moves on new comments
+ * alone, so it is not evidence the record's own text changed. `gh issue view
+ * --json comments` doesn't carry `lastEditedAt` at all (verified against a
+ * live issue), which is why this goes through `gh api graphql` instead.
+ * @param {{owner: string, repo: string, number: number}} params
+ * @returns {string[]} argv for execGh
+ */
+export function buildDesignRecordEditQuery({ owner, repo, number }) {
+	return [
+		"api",
+		"graphql",
+		"-F",
+		`owner=${owner}`,
+		"-F",
+		`repo=${repo}`,
+		"-F",
+		`number=${number}`,
+		"-f",
+		"query=query($owner:String!,$repo:String!,$number:Int!){ repository(owner:$owner,name:$repo){ issue(number:$number){ lastEditedAt comments(first:100){ totalCount nodes { id lastEditedAt } } } } } ",
+	];
+}
+
+/**
+ * Parse `buildDesignRecordEditQuery`'s response into the shape
+ * resolveRecordEditedAt reads.
+ * @param {string} jsonText - execGh's stdout for the graphql call
+ * @returns {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}}
+ */
+export function parseDesignRecordEditResponse(jsonText) {
+	const issueData = JSON.parse(jsonText)?.data?.repository?.issue;
+	if (!issueData)
+		throw new Error(
+			"unexpected GraphQL response shape for design-record edit info",
+		);
+	return {
+		issueLastEditedAt: issueData.lastEditedAt ?? null,
+		comments: {
+			totalCount: issueData.comments.totalCount,
+			nodes: issueData.comments.nodes,
+		},
+	};
+}
+
+/**
+ * The selected design-selection record's own `lastEditedAt` (#737 案2),
+ * matched by id rather than by array position — `gh` and GraphQL are not
+ * guaranteed to return comments in the same order, and a position-based
+ * match could silently attribute one comment's edit to another's.
+ *
+ * Three conditions make edit detection impossible rather than merely absent,
+ * and all three are reported as a note rather than folded into `editedAtIso`
+ * (which stays a plain timestamp-or-null so classifyDesignRecordTiming does
+ * not have to parse a sentinel out of it): the GraphQL lookup itself failing
+ * (`editInfo` is null), the issue carrying more comments than the single
+ * page fetched (`totalCount` exceeds the fetched `nodes`), and the selected
+ * record's own id having no match among the fetched nodes — without a note
+ * this last case is indistinguishable from "confirmed unedited", when it is
+ * actually "could not be checked".
+ * @param {{id?: string}} record - selectDesignRecord's return value
+ * @param {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}} | null} editInfo
+ * @returns {{editedAtIso: string | null, note?: string}}
+ */
+export function resolveRecordEditedAt(record, editInfo) {
+	if (!editInfo) return { editedAtIso: null, note: "edit history unavailable" };
+	if (editInfo.comments.totalCount > editInfo.comments.nodes.length) {
+		return {
+			editedAtIso: null,
+			note: "more comments than fetched; edit detection skipped",
+		};
+	}
+	if (!record.id) return { editedAtIso: editInfo.issueLastEditedAt };
+	const match = editInfo.comments.nodes.find((c) => c.id === record.id);
+	if (!match) {
+		return {
+			editedAtIso: null,
+			note: "record id not found among fetched comments; edit detection skipped",
+		};
+	}
+	return { editedAtIso: match.lastEditedAt };
+}
+
+/**
  * Classify the timing of a design-selection record against the branch's
  * first commit (issue #669's protection against "the decision record is
  * written after the fact"). A record posted after work already started
  * documents a choice that was made retroactively, not one that guided it.
+ *
+ * Only GitHub's server-side timestamps decide PASS/FAIL/SKIP here — the
+ * runner cannot forge `createdAt`/`lastEditedAt`/commit `authorDate` (#824).
  * @param {string | null | undefined} recordIso - createdAt of the record comment.
  * @param {string | null | undefined} firstCommitIso - authorDate of the range's first commit.
+ * @param {{editedAtIso?: string | null, noImplementation?: boolean}} [options]
+ *   - editedAtIso: the record's own lastEditedAt (#737 案2), or null/undefined
+ *     when it was never edited or edit history could not be read.
+ *   - noImplementation: the record itself declared no implementation (#768) —
+ *     wins over every other check, since a cycle with no implementation
+ *     commits in this range has nothing for timing to compare against, even
+ *     when the range is not literally empty (the #757 shape: commits present,
+ *     but belonging to a different, derived PR). Status still SKIPs, but the
+ *     posted-time comparison still runs: a record that both declares no
+ *     implementation and was posted after the first commit is evidence of a
+ *     retroactive record, and #824's forgeability tradeoff for this
+ *     disposition assumes a reviewer can see that evidence rather than have
+ *     it silently dropped (review A-1).
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
-export function classifyDesignRecordTiming(recordIso, firstCommitIso) {
+export function classifyDesignRecordTiming(
+	recordIso,
+	firstCommitIso,
+	{ editedAtIso, noImplementation } = {},
+) {
 	if (!recordIso)
 		return { status: "FAIL", detail: "no design-selection record found" };
-	if (!firstCommitIso) return { status: "SKIP", detail: "no commits in range" };
+	if (noImplementation) {
+		const postedAfterFirstCommit =
+			firstCommitIso &&
+			new Date(recordIso).getTime() > new Date(firstCommitIso).getTime();
+		return {
+			status: "SKIP",
+			detail: postedAfterFirstCommit
+				? `${NO_IMPLEMENTATION_COMMITS_DETAIL}; WARN: record posted at ${recordIso}, after the first commit at ${firstCommitIso}`
+				: NO_IMPLEMENTATION_COMMITS_DETAIL,
+		};
+	}
+	if (!firstCommitIso)
+		return { status: "SKIP", detail: NO_IMPLEMENTATION_COMMITS_DETAIL };
 	if (new Date(recordIso).getTime() > new Date(firstCommitIso).getTime()) {
 		return {
 			status: "FAIL",
 			detail: `record posted at ${recordIso}, after the first commit at ${firstCommitIso}`,
+		};
+	}
+	if (
+		editedAtIso &&
+		new Date(editedAtIso).getTime() > new Date(firstCommitIso).getTime()
+	) {
+		return {
+			status: "FAIL",
+			detail: `record edited at ${editedAtIso}, after the first commit at ${firstCommitIso}`,
 		};
 	}
 	return { status: "PASS" };
@@ -407,6 +532,23 @@ export const DESIGN_RECORD_REQUIRED_PREFIXES = [
 	"却下理由:",
 ];
 export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
+
+// #768: a design-selection record can settle on not implementing at all (the
+// #757 shape — the decision led elsewhere, and any commits later found in
+// range belong to a different, derived PR). A line-head declaration, the
+// same design as `Size-Intent: shrink` (SIZE_INTENT_PATTERN below): the
+// record's prose is free to discuss "not implementing" as a topic — #768's
+// own record did, inside its 前提 line, describing the very rule this token
+// enacts — without that discussion being mistaken for the declaration
+// itself. A plain substring match could not tell the two apart and SKIPped
+// timing on a record that never made the disposition (#768's reported
+// defect); requiring a matched line head, via the same lineHeadPattern /
+// normalizeRecordLine machinery presentRequiredPrefixes uses, can.
+export const NO_IMPLEMENTATION_TOKEN = "実装しない:";
+
+/** Shared by both timing SKIP paths that mean "there is nothing to compare". */
+export const NO_IMPLEMENTATION_COMMITS_DETAIL =
+	"no implementation commits — timing unverifiable";
 
 /** Markdown line-head decoration: blockquote, heading, or list marker. */
 const LINE_HEAD_DECORATION = /^(?:>+|#{1,6}|[-*+]|\d+[.)])\s*/;
@@ -462,6 +604,27 @@ export function presentRequiredPrefixes(recordBody) {
 	});
 }
 
+const NO_IMPLEMENTATION_LINE_HEAD_PATTERN = lineHeadPattern(
+	NO_IMPLEMENTATION_TOKEN,
+);
+
+/**
+ * Did the selected design-selection record itself declare the disposition
+ * "not implementing" (#768)? A line-head match, not a substring search over
+ * the whole body — a record's 前提/否定案/却下理由 prose is free to discuss
+ * this token as a topic (#768's own record did) without that discussion
+ * being read as the declaration. Forgeable by a runner that implemented
+ * anyway and mislabels the record — accepted (#824): the PR diff would then
+ * contradict the label, and that contradiction is what human review catches.
+ * No detector is added to close this, on purpose.
+ * @param {string | undefined | null} recordBody
+ * @returns {boolean}
+ */
+export function hasNoImplementationDisposition(recordBody) {
+	const lines = (recordBody ?? "").split("\n").map(normalizeRecordLine);
+	return lines.some((line) => NO_IMPLEMENTATION_LINE_HEAD_PATTERN.test(line));
+}
+
 /**
  * Shapes an issue into the flat entry list selectDesignRecord scans: the
  * body as one entry, each comment as another. `author` is left out on
@@ -469,13 +632,24 @@ export function presentRequiredPrefixes(recordBody) {
  * alone and never reads it, so carrying it here would read as a check that
  * is still looking at who posted the record, when none of this repo's
  * design-record logic does anymore (#824).
- * @param {{body?: string, createdAt?: string, comments?: Array<{body?: string, createdAt?: string}>}} issue
- * @returns {Array<{body?: string, createdAt?: string}>}
+ *
+ * A comment entry carries `id` — the GraphQL node id `gh issue view` already
+ * returns on every comment — so resolveRecordEditedAt can match the selected
+ * record to its GraphQL edit-info node without depending on array order
+ * (#737 案2). The body entry carries no `id`: it has no comment to match, and
+ * that absence is itself the signal resolveRecordEditedAt reads to fall back
+ * to the issue's own `lastEditedAt`.
+ * @param {{body?: string, createdAt?: string, comments?: Array<{id?: string, body?: string, createdAt?: string}>}} issue
+ * @returns {Array<{id?: string, body?: string, createdAt?: string}>}
  */
 export function toDesignRecordEntries({ body, createdAt, comments }) {
 	return [
 		{ body, createdAt },
-		...(comments ?? []).map((c) => ({ body: c.body, createdAt: c.createdAt })),
+		...(comments ?? []).map((c) => ({
+			id: c.id,
+			body: c.body,
+			createdAt: c.createdAt,
+		})),
 	];
 }
 
