@@ -59,6 +59,25 @@ export function changedFilesSince({ exec, base }) {
 }
 
 /**
+ * The branch's commit messages, RECORD_SEP between them — the input every
+ * trailer-borne declaration is read from. Two checks want it (the review
+ * record and the size override), and they have to agree about the range and
+ * the separator, so the invocation lives here rather than in each of them.
+ * @param {{exec: Function, base: string}} params
+ * @returns {{ok: boolean, text: string, error?: string}}
+ */
+export function commitMessagesSince({ exec, base }) {
+	const r = exec("git", [
+		"log",
+		"--no-merges",
+		`origin/${base}..HEAD`,
+		`--format=%B${RECORD_SEP}`,
+	]);
+	if (!r.ok) return { ok: false, text: "", error: r.out.trim() };
+	return { ok: true, text: r.out };
+}
+
+/**
  * gen-plugin identity: regenerate the distributed trees and require no diff.
  *
  * GEN_INSTALL_TRIGGER is consulted too: install/ is generated from repo-root
@@ -327,20 +346,18 @@ export function sizeDirectionStep({
 	issue,
 	issueFailure,
 	deltas,
-	prBody,
-	prBodyFailure,
+	overrideDeclared,
 }) {
 	const name = "knowledge-artifact size direction";
 	if (!issue) return { name, ...missingIssueRow(issueFailure) };
 
-	// The PR body is fetched by the caller, once for every linked issue and only
-	// when one of them declares a shrink intent — the verdict needs it, the SKIP
-	// does not, and the lookup has to go through execGh's REST fallback rather
-	// than a bare `gh` this step could run itself (#749).
+	// The override is read from the branch's commit trailers by the caller, once
+	// for every linked issue. Local git, so unlike the PR body it left (#775)
+	// there is no lookup that can fail and no verdict that means "unreadable".
 	const issueBody = issue.body ?? "";
 	return {
 		name,
-		...classifySizeDirection({ issueBody, deltas, prBody, prBodyFailure }),
+		...classifySizeDirection({ issueBody, deltas, overrideDeclared }),
 	};
 }
 
@@ -414,15 +431,10 @@ export function checkDocsStep({ exec }) {
  */
 export function reviewRecordStep({ exec, base, changedFiles }) {
 	const name = "Review record";
-	const bodies = exec("git", [
-		"log",
-		"--no-merges",
-		`origin/${base}..HEAD`,
-		`--format=%B${RECORD_SEP}`,
-	]);
-	if (!bodies.ok) return { name, status: "FAIL", detail: bodies.out.trim() };
+	const bodies = commitMessagesSince({ exec, base });
+	if (!bodies.ok) return { name, status: "FAIL", detail: bodies.error };
 
-	const records = parseReviewRecords(bodies.out);
+	const records = parseReviewRecords(bodies.text);
 	const problems = classifyCycle({
 		changedFiles,
 		recordCount: records.length,

@@ -14,7 +14,6 @@ import { parseArgs } from "node:util";
 import {
 	classifyAuditIssuesFlowResult,
 	classifyIssueLookupFailure,
-	classifyPrBodyFailure,
 	deriveManualItems,
 	diffNewTerminals,
 	diffReadySets,
@@ -22,7 +21,7 @@ import {
 	formatGateTable,
 	formatSizeDelta,
 	GATE_CHECKLIST_SOURCE_PATH,
-	hasShrinkIntent,
+	hasSizeOverride,
 	matchesTrigger,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
@@ -32,6 +31,7 @@ import {
 	changedFilesSince,
 	checkDocsStep,
 	collectSizeDeltas,
+	commitMessagesSince,
 	commitSubjectStep,
 	designRecordStep,
 	genPluginIdentityStep,
@@ -303,27 +303,17 @@ results.push(...perIssueSteps(designRecordStep, issues, { exec, base }));
 // convention and stays until something needs them shared too.
 const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
 
-// The PR body carries Size-Override, so only a cycle whose issue declares a
-// shrink intent needs it — and it goes through execGh, since a bare `gh` came
-// back empty wherever the binary is missing and read as "no override was
-// written" (#749). One lookup serves every issue; a failure is passed along as
-// itself so the step can SKIP rather than fail a cycle it could not judge.
-let prBody;
-let prBodyFailure;
-if (issues.some(({ issue }) => hasShrinkIntent(issue?.body ?? ""))) {
-	try {
-		prBody = await execGh(["pr", "view", "--json", "body", "--jq", ".body"], {
-			cwd: root,
-		});
-	} catch (e) {
-		prBodyFailure = classifyPrBodyFailure(e);
-	}
-}
+// Size-Override rides in a commit trailer (#775). The branch's own messages
+// are always readable here, which is what the PR body never was: the gate runs
+// before the PR exists, so the lookup it replaced spent most of its life
+// reporting that it could not run.
+const overrideDeclared = hasSizeOverride(
+	commitMessagesSince({ exec, base }).text,
+);
 results.push(
 	...perIssueSteps(sizeDirectionStep, issues, {
 		deltas: sizeDeltas,
-		prBody,
-		prBodyFailure,
+		overrideDeclared,
 	}),
 );
 
