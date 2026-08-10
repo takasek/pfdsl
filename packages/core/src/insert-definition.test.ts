@@ -153,4 +153,22 @@ a >> p -> b
 		expect(inserted).toBe(true);
 		expect(output.replace(/\r\n/g, "")).not.toContain("\n");
 	});
+
+	// Document#toString({ lineWidth: 0 }) would otherwise collapse a folded
+	// (`>`) scalar's hand-chosen line wraps onto one continuation line (#815).
+	it("preserves a folded scalar's hand-wrapped line breaks when inserting a sibling definition", () => {
+		const src = `---
+artifact:
+  a:
+    description: >
+      Hello
+      world.
+    label: A
+---
+a >> p -> b
+`;
+		const { output, inserted } = insertDefinition(src, "artifact", "b");
+		expect(inserted).toBe(true);
+		expect(output).toContain("description: >\n      Hello\n      world.\n");
+	});
 });
