@@ -12,6 +12,26 @@ export interface Neighbors {
 	predecessors: GraphNeighbor[];
 	/** Nodes this node has an edge pointing to. */
 	successors: GraphNeighbor[];
+	/**
+	 * The kind every neighbor above has, or `null` for a group (which has
+	 * none). Every edge runs artifact -> process or process -> artifact, so
+	 * this is the opposite of the queried node's own kind — see
+	 * `oppositeNodeKind`.
+	 */
+	neighborKind: NodeKind | null;
+}
+
+/**
+ * The kind a node's neighbors all share. `buildGraph` assigns each edge's
+ * endpoints by the edge's kind (`input`/`feedback`: artifact -> process,
+ * `output`: process -> artifact), and N002 rejects a file that uses one id as
+ * both, so the two sides never hold the same kind. A group is declared in
+ * front matter and never appears on an edge, so it has no opposite.
+ */
+function oppositeNodeKind(kind: NodeKind | undefined): NodeKind | null {
+	if (kind === "artifact") return "process";
+	if (kind === "process") return "artifact";
+	return null;
 }
 
 function buildAdjacency(graph: Graph): {
@@ -81,6 +101,7 @@ export function computeNeighbors(graph: Graph, id: string): Neighbors {
 			...(out.get(id) ?? []).map(tag("primary")),
 			...(fb.out.get(id) ?? []).map(tag("feedback")),
 		],
+		neighborKind: oppositeNodeKind(graph.nodes.get(id)),
 	};
 }
 

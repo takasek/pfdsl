@@ -46,6 +46,7 @@ describe("computeNeighbors", () => {
 				{ id: "build", kind: "primary" },
 				{ id: "review", kind: "primary" },
 			],
+			neighborKind: "process",
 		});
 	});
 
@@ -53,6 +54,7 @@ describe("computeNeighbors", () => {
 		expect(computeNeighbors(graph, "build")).toEqual({
 			predecessors: [{ id: "spec", kind: "primary" }],
 			successors: [{ id: "code", kind: "primary" }],
+			neighborKind: "artifact",
 		});
 	});
 
@@ -60,6 +62,7 @@ describe("computeNeighbors", () => {
 		expect(computeNeighbors(graph, "req")).toEqual({
 			predecessors: [],
 			successors: [{ id: "design", kind: "primary" }],
+			neighborKind: "process",
 		});
 	});
 
@@ -73,6 +76,7 @@ describe("computeNeighbors", () => {
 				{ id: "report", kind: "feedback" },
 			],
 			successors: [{ id: "spec", kind: "primary" }],
+			neighborKind: "artifact",
 		});
 	});
 
@@ -80,6 +84,7 @@ describe("computeNeighbors", () => {
 		expect(computeNeighbors(withFeedback, "report")).toEqual({
 			predecessors: [{ id: "review", kind: "primary" }],
 			successors: [{ id: "design", kind: "feedback" }],
+			neighborKind: "process",
 		});
 	});
 
