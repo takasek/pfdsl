@@ -32,6 +32,30 @@ function buildAdjacency(graph: Graph): {
 }
 
 /**
+ * The same two maps for feedback (`>>?`) edges: `out` from the artifact that
+ * feeds back to the processes it reaches, `in` from the process to the
+ * artifacts reaching it. Kept separate from `buildAdjacency` rather than folded
+ * into it, because every reachability query below depends on the primary maps
+ * holding primary edges alone.
+ */
+function buildFeedbackAdjacency(graph: Graph): {
+	out: Map<string, string[]>;
+	in: Map<string, string[]>;
+} {
+	const out = new Map<string, string[]>();
+	const inn = new Map<string, string[]>();
+	for (const e of graph.feedbackEdges) {
+		const outArr = out.get(e.artifact);
+		if (outArr) outArr.push(e.process);
+		else out.set(e.artifact, [e.process]);
+		const inArr = inn.get(e.process);
+		if (inArr) inArr.push(e.artifact);
+		else inn.set(e.process, [e.artifact]);
+	}
+	return { out, in: inn };
+}
+
+/**
  * Direct producer/consumer neighbors of a node — the immediate in/out edges
  * only (§ issue #479 `neighbors`), `>>?` feedback edges included and tagged as
  * such (#828).
@@ -44,15 +68,20 @@ function buildAdjacency(graph: Graph): {
  */
 export function computeNeighbors(graph: Graph, id: string): Neighbors {
 	const { out, in: inn } = buildAdjacency(graph);
-	const asPrimary = (n: string): GraphNeighbor => ({ id: n, kind: "primary" });
-	const predecessors = (inn.get(id) ?? []).map(asPrimary);
-	const successors = (out.get(id) ?? []).map(asPrimary);
-	for (const e of graph.feedbackEdges) {
-		if (e.process === id)
-			predecessors.push({ id: e.artifact, kind: "feedback" });
-		if (e.artifact === id) successors.push({ id: e.process, kind: "feedback" });
-	}
-	return { predecessors, successors };
+	const fb = buildFeedbackAdjacency(graph);
+	const tag =
+		(kind: GraphNeighbor["kind"]) =>
+		(n: string): GraphNeighbor => ({ id: n, kind });
+	return {
+		predecessors: [
+			...(inn.get(id) ?? []).map(tag("primary")),
+			...(fb.in.get(id) ?? []).map(tag("feedback")),
+		],
+		successors: [
+			...(out.get(id) ?? []).map(tag("primary")),
+			...(fb.out.get(id) ?? []).map(tag("feedback")),
+		],
+	};
 }
 
 function closure(adjacency: Map<string, string[]>, id: string): string[] {
@@ -133,14 +162,11 @@ export interface GraphOrphan {
  * (#676/#704).
  */
 export function computeOrphans(graph: Graph): GraphOrphan[] {
-	const wired = new Set<string>();
+	const fb = buildFeedbackAdjacency(graph);
+	const wired = new Set<string>([...fb.in.keys(), ...fb.out.keys()]);
 	for (const e of graph.primaryEdges) {
 		wired.add(e.from);
 		wired.add(e.to);
-	}
-	for (const e of graph.feedbackEdges) {
-		wired.add(e.artifact);
-		wired.add(e.process);
 	}
 	return [...graph.nodes.entries()]
 		.filter(([id, kind]) => kind !== "group" && !wired.has(id))
@@ -163,19 +189,14 @@ export function computeOrphans(graph: Graph): GraphOrphan[] {
  */
 export function computeStats(graph: Graph): NodeStats[] {
 	const { out, in: inn } = buildAdjacency(graph);
-	const feedbackIn = new Map<string, number>();
-	const feedbackOut = new Map<string, number>();
-	for (const e of graph.feedbackEdges) {
-		feedbackIn.set(e.process, (feedbackIn.get(e.process) ?? 0) + 1);
-		feedbackOut.set(e.artifact, (feedbackOut.get(e.artifact) ?? 0) + 1);
-	}
+	const fb = buildFeedbackAdjacency(graph);
 	const stats: NodeStats[] = [...graph.nodes.entries()].map(([id, kind]) => ({
 		id,
 		kind,
 		fanIn: inn.get(id)?.length ?? 0,
 		fanOut: out.get(id)?.length ?? 0,
-		feedbackFanIn: feedbackIn.get(id) ?? 0,
-		feedbackFanOut: feedbackOut.get(id) ?? 0,
+		feedbackFanIn: fb.in.get(id)?.length ?? 0,
+		feedbackFanOut: fb.out.get(id)?.length ?? 0,
 	}));
 	stats.sort((a, b) => {
 		const degreeDiff = b.fanIn + b.fanOut - (a.fanIn + a.fanOut);
