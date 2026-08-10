@@ -1452,6 +1452,12 @@ export function runMetaList(
 			: undefined;
 
 	const known: { id: string; kind: NodeKind }[] = [];
+	// Tracked independent of tagFilter/opts.group/producerOutputs matching so
+	// a selector value's use across the whole file, not just within the AND
+	// intersection with other selectors, decides whether it warns (#844):
+	// an AND combination legitimately narrowing to zero rows is not a typo.
+	const usedTags = new Set<string>();
+	let groupUsed = false;
 	for (const [id, kind] of nodeKinds) {
 		// meta list only ever selects artifact/process — --producer can only
 		// ever match an artifact, and --tag/--group read a field group nodes
@@ -1459,12 +1465,41 @@ export function runMetaList(
 		// depending on the two selectors to exclude group on their own.
 		if (kind !== "artifact" && kind !== "process") continue;
 		const meta = metaFor(frontmatter, id, kind);
+		const tags = meta?.tags;
+		if (tagFilter !== undefined && Array.isArray(tags))
+			for (const t of tags) usedTags.add(String(t));
+		if (opts.group !== undefined && meta?.group === opts.group)
+			groupUsed = true;
 		if (tagFilter !== undefined && !matchesAnyTag(meta, tagFilter)) continue;
 		if (opts.group !== undefined && meta?.group !== opts.group) continue;
 		if (producerOutputs !== undefined && !producerOutputs.has(id)) continue;
 		known.push({ id, kind });
 	}
 	known.sort((a, b) => compareIds(a.id, b.id));
+
+	const selectorWarnings: string[] = [];
+	if (tagFilter !== undefined) {
+		for (const t of tagFilter) {
+			if (!usedTags.has(t)) {
+				selectorWarnings.push(
+					`warning: '${t}' does not match any node's tag (possible typo?)`,
+				);
+			}
+		}
+	}
+	if (opts.group !== undefined && !groupUsed) {
+		selectorWarnings.push(
+			`warning: '${opts.group}' does not match any node's group (possible typo?)`,
+		);
+	}
+	if (opts.producer !== undefined && producerOutputs?.size === 0) {
+		selectorWarnings.push(
+			`warning: '${opts.producer}' has no output edges (possible typo?)`,
+		);
+	}
+	const selectorWarnText = selectorWarnings.length
+		? `${selectorWarnings.join("\n")}\n`
+		: "";
 
 	const { values, displayFieldsById, warnText } = collectNodeFields(
 		known,
@@ -1473,20 +1508,21 @@ export function runMetaList(
 		docFsPath,
 		basePath,
 	);
+	const combinedWarnText = `${selectorWarnText}${warnText}`;
 
 	if (opts.json) {
-		return ok(`${JSON.stringify({ ok: true, values })}\n`, warnText);
+		return ok(`${JSON.stringify({ ok: true, values })}\n`, combinedWarnText);
 	}
 
 	if (known.length === 0) {
-		return ok("No nodes match the given selectors.\n", warnText);
+		return ok("No nodes match the given selectors.\n", combinedWarnText);
 	}
 	const lines = known.flatMap(({ id }) =>
 		(displayFieldsById[id] ?? []).map((field) =>
 			formatGetLine(id, field, values),
 		),
 	);
-	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", combinedWarnText);
 }
 
 export interface CheckLinksOptions {
@@ -1633,31 +1669,59 @@ export function runNeighbors(
 	);
 }
 
-/** Text rendering shared by `graph locate` and `graph describe`: one `<file>:<line>: <kind>` line per occurrence. */
+/**
+ * Text rendering shared by `graph locate` and `graph describe`: one
+ * `<file>:<line>: <kind>` line per occurrence — declaration, then the found
+ * field lines, then edge lines. Field lines are ordered by line, not by the
+ * order they were asked for, so the whole list reads top-to-bottom like the
+ * file does; each line names its field, so the correspondence with the
+ * request survives the reordering. `fields`/`fieldLines` default to empty,
+ * so `graph describe` (which never requests fields) renders exactly as
+ * before.
+ */
 function renderLocateLines(
 	file: string,
 	declarationLine: number | null,
 	edgeLines: readonly number[],
+	fields: readonly string[] = [],
+	fieldLines: Record<string, number | null> = {},
 ): string[] {
 	const lines: string[] = [];
 	if (declarationLine !== null) {
 		lines.push(`${file}:${declarationLine}: declaration`);
 	}
+	const foundFields = fields
+		.map((field) => ({ field, line: fieldLines[field] }))
+		.filter(
+			(f): f is { field: string; line: number } =>
+				f.line !== null && f.line !== undefined,
+		)
+		.sort((a, b) => a.line - b.line);
+	for (const { field, line } of foundFields) {
+		lines.push(`${file}:${line}: field ${field}`);
+	}
 	for (const line of edgeLines) lines.push(`${file}:${line}: edge`);
 	return lines;
 }
 
+export interface GraphLocateOptions extends GraphAnalysisOptions {
+	field?: string;
+}
+
 /**
  * Where <id> appears in the file: its frontmatter declaration key line (if
- * any) and every body line it's mentioned on. `loadGraph` doesn't expose the
- * source text it read, and `locateNode` needs it, so this reads and analyzes
- * the file itself rather than going through that shared loader.
+ * any), every body line it's mentioned on, and (with `--field`) the line of
+ * each named field within its declaration block. `loadGraph` doesn't expose
+ * the source text it read, and `locateNode` needs it, so this reads and
+ * analyzes the file itself rather than going through that shared loader.
  */
 export function runGraphLocate(
 	file: string,
 	id: string,
-	opts: GraphAnalysisOptions = {},
+	opts: GraphLocateOptions = {},
 ): CommandResult {
+	const fields = opts.field !== undefined ? splitCommaList(opts.field) : [];
+
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 	const { diagnostics, document, nodeKinds } = analyze(src);
@@ -1669,15 +1733,41 @@ export function runGraphLocate(
 	const kind = nodeKinds.get(id);
 	if (kind === undefined) return idsNotFoundError(file, [id], opts.json);
 
-	const { declarationLine, edgeLines } = locateNode(document, src, id, kind);
+	const { declarationLine, edgeLines, fieldLines } = locateNode(
+		document,
+		src,
+		id,
+		kind,
+		fields,
+	);
+
+	// A requested field with no line in the node's declaration block is
+	// usually a typo — warn, same style as meta get's unknown-field warning
+	// (#844) — without failing the command.
+	const missingFieldWarnings = fields
+		.filter((field) => fieldLines[field] === null)
+		.map(
+			(field) =>
+				`warning: '${field}' has no line in '${id}'s declaration block (possible typo?)`,
+		);
+	const warnText = missingFieldWarnings.length
+		? `${missingFieldWarnings.join("\n")}\n`
+		: "";
 
 	if (opts.json) {
 		return ok(
-			`${JSON.stringify({ ok: true, id, declarationLine, edgeLines })}\n`,
+			`${JSON.stringify({ ok: true, id, declarationLine, edgeLines, fieldLines })}\n`,
+			warnText,
 		);
 	}
-	const lines = renderLocateLines(file, declarationLine, edgeLines);
-	return ok(lines.length ? `${lines.join("\n")}\n` : "");
+	const lines = renderLocateLines(
+		file,
+		declarationLine,
+		edgeLines,
+		fields,
+		fieldLines,
+	);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
 }
 
 /**
@@ -2524,6 +2614,11 @@ Matched nodes are printed in id order. Zero matches is not an error: text
 mode prints "No nodes match the given selectors."; --json prints an empty
 values object. Both exit 0.
 
+A selector value that no node uses at all (checked per value, independent of
+the AND combination with other selectors) prints a warning to stderr —
+possible typo — without changing the exit code; an AND combination that
+legitimately narrows to zero rows does not warn.
+
 Exit codes:
   0  success (including zero matches)
   1  parse/validation error
@@ -2547,7 +2642,7 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_GRAPH_LOCATE = `usage: pfdsl graph locate <file|-> <id> [--json] [--no-color]
+const HELP_GRAPH_LOCATE = `usage: pfdsl graph locate <file|-> <id> [--field <name[,name...]>] [--json] [--no-color]
 
 Print every place <id> appears in the file: its frontmatter declaration key
 line (\`declaration\`), and every body line naming it (\`edge\`) — whether in
@@ -2555,18 +2650,29 @@ an edge or in a bare node-decl. These are the line numbers a Read/Edit tool
 call needs, without opening the whole file first. Text mode prints one
 occurrence per line, declaration before edge, each edge line ascending.
 
-Line granularity is the node, not the field: a declaration line points at
-the id's key, and the fields under it are on the lines that follow.
+By default, line granularity is the node, not the field: a declaration line
+points at the id's key, and the fields under it are on the lines that
+follow. \`--field <name[,name...]>\` narrows past that: it adds one line per
+named field, pointing at that field's own key within the id's declaration
+block, printed after the declaration line and ordered by line rather than
+by the order asked for (each line names its field, so text output as a
+whole reads top-to-bottom like the file). A named field with no line is
+skipped in text mode and printed as null in --json, with a warning on
+stderr (possible typo) — that covers both a declaration block without the
+field and a node that has no frontmatter block at all, the latter being the
+case where the declaration line is null as well.
 
+  --field <name[,name...]>  also locate these frontmatter fields within
+                             <id>'s declaration block
   --json      output as JSON ({ ok, id, declarationLine: number | null,
-              edgeLines: number[] })
+              edgeLines: number[], fieldLines: { [name]: number | null } })
               on failure: { ok: false, diagnostics } / { ok: false, missing }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
-  0  success
+  0  success (including a --field name the node doesn't have)
   1  id not found in the file
-  2  invalid usage (missing id)
+  2  invalid usage (missing id, or --field given with no value)
 `;
 
 const HELP_GRAPH_DESCRIBE = `usage: pfdsl graph describe <file|-> <id> [--json] [--no-color]
@@ -2936,7 +3042,10 @@ function runGraphGroup(
 			if (flags.help) return ok(HELP_GRAPH_LOCATE);
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_GRAPH_LOCATE, 2);
+			const fieldVal = flags.field;
+			if (fieldVal === true) return fail(HELP_GRAPH_LOCATE, 2);
 			return runGraphLocate(f, id, {
+				...(typeof fieldVal === "string" ? { field: fieldVal } : {}),
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});

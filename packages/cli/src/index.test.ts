@@ -3395,6 +3395,90 @@ spec >> write -> docs
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toContain("'bogus' is not a recognized field");
 	});
+
+	it("warns when a --tag value matches no node's tags, without failing", async () => {
+		const f = join(dir, "list-tag-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
+
+	it("warns per unmatched value when --tag has multiple comma-separated values", async () => {
+		const f = join(dir, "list-tag-multi-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design,bogus1,bogus2"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus1'");
+		expect(r.stderr).toContain("'bogus2'");
+		expect(r.stderr).not.toContain("'design'");
+	});
+
+	it("does not warn for a --tag value that does match a node", async () => {
+		const f = join(dir, "list-tag-used.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+	});
+
+	it("warns when --group matches no node's group field", async () => {
+		const f = join(dir, "list-group-unused.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--group", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
+
+	it("warns when --producer names a process id that does not exist", async () => {
+		const f = join(dir, "list-producer-missing.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--producer", "bogus"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus'");
+	});
+
+	it("warns when --producer names a process with no output edges", async () => {
+		const f = join(dir, "list-producer-no-outputs.pfdsl");
+		const noOutput = `---
+artifact:
+  spec: {}
+process:
+  investigate: {}
+---
+spec >> investigate
+`;
+		writeFileSync(f, noOutput);
+		const r = await run(["meta", "list", f, "--producer", "investigate"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'investigate'");
+	});
+
+	it("does not warn when an AND combination yields zero matches but every selector value matches individually", async () => {
+		const f = join(dir, "list-and-zero-no-warning.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"list",
+			f,
+			"--tag",
+			"design",
+			"--producer",
+			"build",
+			"status",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No nodes match the given selectors.\n");
+		expect(r.stderr).toBe("");
+	});
+
+	it("keeps exit code 0 when a selector value warning fires", async () => {
+		const f = join(dir, "list-tag-unused-exit.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'nonexistent'");
+	});
 });
 
 // group is a NodeKind alongside artifact and process, with its own field set
@@ -4095,7 +4179,7 @@ req >> design -> spec
 			expect(r.stdout).toBe(`${f}:6: declaration\n${f}:9: edge\n`);
 		});
 
-		it("--json emits { ok, id, declarationLine, edgeLines }", async () => {
+		it("--json emits { ok, id, declarationLine, edgeLines, fieldLines }", async () => {
 			const f = join(dir, "locate-json.pfdsl");
 			writeFileSync(f, src);
 			const r = await run(["graph", "locate", f, "design", "--json"]);
@@ -4105,7 +4189,108 @@ req >> design -> spec
 				id: "design",
 				declarationLine: 6,
 				edgeLines: [9],
+				fieldLines: {},
 			});
+		});
+
+		it("--field <name> adds the field's key line to --json fieldLines", async () => {
+			const f = join(dir, "locate-field-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"label",
+				"--json",
+			]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+				fieldLines: { label: 7 },
+			});
+		});
+
+		it("--field <name> prints a field line right after declaration, before edge lines", async () => {
+			const f = join(dir, "locate-field-text.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--field", "label"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`${f}:6: declaration\n${f}:7: field label\n${f}:9: edge\n`,
+			);
+		});
+
+		it("--field with multiple comma-separated names prints them in line order, not request order", async () => {
+			const f = join(dir, "locate-field-multi.pfdsl");
+			const multi = `---
+artifact:
+  spec:
+    label: Spec
+    description: a description
+    status: done
+---
+x -> spec
+`;
+			writeFileSync(f, multi);
+			const r = await run([
+				"graph",
+				"locate",
+				f,
+				"spec",
+				"--field",
+				"status,label",
+			]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`${f}:3: declaration\n${f}:4: field label\n${f}:6: field status\n${f}:8: edge\n`,
+			);
+		});
+
+		it("--field naming a field the node doesn't have: null in JSON, no text line, stderr warning", async () => {
+			const f = join(dir, "locate-field-missing.pfdsl");
+			writeFileSync(f, src);
+			const jsonRun = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"bogus",
+				"--json",
+			]);
+			expect(jsonRun.exitCode).toBe(0);
+			expect(JSON.parse(jsonRun.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+				fieldLines: { bogus: null },
+			});
+			expect(jsonRun.stderr).toContain("'bogus'");
+
+			const textRun = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"bogus",
+			]);
+			expect(textRun.exitCode).toBe(0);
+			expect(textRun.stdout).toBe(`${f}:6: declaration\n${f}:9: edge\n`);
+			expect(textRun.stderr).toContain("'bogus'");
+		});
+
+		it("a bare --field flag with no value is a usage error (exit 2)", async () => {
+			const f = join(dir, "locate-field-bare.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--field"]);
+			expect(r.exitCode).toBe(2);
 		});
 
 		it("uses - as the file part of a text line when reading from stdin", async () => {
@@ -4124,6 +4309,7 @@ req >> design -> spec
 				id: "iso",
 				declarationLine: null,
 				edgeLines: [2],
+				fieldLines: {},
 			});
 		});
 
