@@ -1389,6 +1389,105 @@ export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
 }
 
+export interface MetaListOptions {
+	tag?: string;
+	group?: string;
+	producer?: string;
+	field?: string;
+	json?: boolean;
+	color?: boolean;
+}
+
+/** True when a node's tags: array (if any) includes at least one of `filter`. */
+function matchesAnyTag(
+	meta: Record<string, unknown> | undefined,
+	filter: Set<string>,
+): boolean {
+	const tags = meta?.tags;
+	if (!Array.isArray(tags)) return false;
+	return tags.some((t) => filter.has(String(t)));
+}
+
+export function runMetaList(
+	file: string,
+	opts: MetaListOptions = {},
+): CommandResult {
+	if (
+		opts.tag === undefined &&
+		opts.group === undefined &&
+		opts.producer === undefined
+	) {
+		return fail(
+			`error: at least one selector is required (--tag, --group, --producer)\n\n${HELP_META_LIST}`,
+			2,
+		);
+	}
+
+	const explicitFields =
+		opts.field !== undefined ? splitCommaList(opts.field) : undefined;
+	if (explicitFields !== undefined && explicitFields.length === 0) {
+		return fail(`error: field is required\n\n${HELP_META_LIST}`, 2);
+	}
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+
+	const { diagnostics, frontmatter, nodeKinds, graph } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const basePath = frontmatter?.basePath;
+	const docFsPath = file === "-" ? null : resolve(file);
+
+	const tagFilter =
+		opts.tag !== undefined ? new Set(splitCommaList(opts.tag)) : undefined;
+	const producerOutputs =
+		opts.producer !== undefined
+			? new Set(
+					graph.primaryEdges
+						.filter((e) => e.kind === "output" && e.from === opts.producer)
+						.map((e) => e.to),
+				)
+			: undefined;
+
+	const known: { id: string; kind: NodeKind }[] = [];
+	for (const [id, kind] of nodeKinds) {
+		// meta list only ever selects artifact/process — --producer can only
+		// ever match an artifact, and --tag/--group read a field group nodes
+		// don't have, but the kind check keeps that implicit rather than
+		// depending on the two selectors to exclude group on their own.
+		if (kind !== "artifact" && kind !== "process") continue;
+		const meta = metaFor(frontmatter, id, kind);
+		if (tagFilter !== undefined && !matchesAnyTag(meta, tagFilter)) continue;
+		if (opts.group !== undefined && meta?.group !== opts.group) continue;
+		if (producerOutputs !== undefined && !producerOutputs.has(id)) continue;
+		known.push({ id, kind });
+	}
+	known.sort((a, b) => compareIds(a.id, b.id));
+
+	const { values, displayFieldsById, warnText } = collectNodeFields(
+		known,
+		frontmatter,
+		explicitFields,
+		docFsPath,
+		basePath,
+	);
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, values })}\n`, warnText);
+	}
+
+	if (known.length === 0) {
+		return ok("No nodes match the given selectors.\n", warnText);
+	}
+	const lines = known.flatMap(({ id }) =>
+		(displayFieldsById[id] ?? []).map((field) =>
+			formatGetLine(id, field, values),
+		),
+	);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
+}
+
 export interface CheckLinksOptions {
 	json?: boolean;
 	color?: boolean;
@@ -2273,6 +2372,41 @@ Exit codes:
   2  invalid usage (missing id, or too many positional arguments)
 `;
 
+const HELP_META_LIST = `usage: pfdsl meta list <file|-> [--tag <t[,t...]>] [--group <g>] [--producer <p>] [field[,field...]] [--json] [--no-color]
+
+Print field values for every artifact/process node matching the given
+selectors — a supply-side counterpart to \`meta get\`'s explicit id list.
+At least one selector is required; multiple selectors combine with AND.
+
+  --tag <t[,t...]>    matches when the node's tags: array includes any of
+                      the given tags (OR within the comma-separated list)
+  --group <g>         matches when the node's group: field exactly equals
+                      <g>. No parent-group traversal: a node in a nested
+                      child group is not matched by an ancestor group's id.
+  --producer <p>      matches an artifact reachable via process <p>'s
+                      output edge (process -> artifact). Only artifacts can
+                      match this selector; a process id is never selected.
+
+  [field[,field...]]  comma-separated field names (optional), same
+                      semantics as \`meta get\`: omit to print every field
+                      set in each matched node's frontmatter entry, plus
+                      applicable derived fields (location.resolved,
+                      command.cwd).
+  --json              emit JSON ({ ok, values: { [id]: { [field]: value } } }),
+                      the same shape as \`meta get\` --json
+                      on parse failure: { ok: false, diagnostics }
+  --no-color          disable ANSI color codes (also: NO_COLOR env var)
+
+Matched nodes are printed in id order. Zero matches is not an error: text
+mode prints "No nodes match the given selectors."; --json prints an empty
+values object. Both exit 0.
+
+Exit codes:
+  0  success (including zero matches)
+  1  parse/validation error
+  2  invalid usage (no selector given, or an empty field positional)
+`;
+
 const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json] [--no-color]
 
 Print the direct predecessors (in-edges) and successors (out-edges) of a
@@ -2473,6 +2607,8 @@ Read and write frontmatter metadata. Run
 
 Subcommands:
   get <file|-> <id[,id...]> [field[,field...]]   Print field values
+  list <file|-> [--tag|--group|--producer] [field[,field...]]
+                                                  Print field values for nodes matching selectors
   set <file> <id> <field> <value>                Set a field value in place
   sort <file|-> --by <keys>                      Sort node definitions
   reindex <file|->                               Assign topological index: values
@@ -2512,7 +2648,7 @@ Commands:
 Command groups (run \`pfdsl <group>\` for their subcommands):
   graph summary|io|stats|neighbors|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
-  meta get|set|sort|reindex|check-links
+  meta get|list|set|sort|reindex|check-links
                            Read and write frontmatter metadata
   status ready|blocked|list|gaps
                            Planning queries derived from artifact status
@@ -2746,6 +2882,26 @@ function runMetaGroup(
 			const f = rest[0];
 			if (!f) return fail(HELP_CHECK_LINKS, 2);
 			return runCheckLinks(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		}
+		case "list": {
+			if (flags.help) return ok(HELP_META_LIST);
+			const [f, field, ...extra] = rest;
+			if (!f) return fail(HELP_META_LIST, 2);
+			if (extra.length > 0) return fail(HELP_META_LIST, 2);
+			const tagVal = flags.tag;
+			const groupVal = flags.group;
+			const producerVal = flags.producer;
+			if (tagVal === true || groupVal === true || producerVal === true) {
+				return fail(HELP_META_LIST, 2);
+			}
+			return runMetaList(f, {
+				...(typeof tagVal === "string" ? { tag: tagVal } : {}),
+				...(typeof groupVal === "string" ? { group: groupVal } : {}),
+				...(typeof producerVal === "string" ? { producer: producerVal } : {}),
+				...(field !== undefined ? { field } : {}),
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});

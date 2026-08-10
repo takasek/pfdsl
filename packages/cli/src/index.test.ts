@@ -3276,6 +3276,127 @@ req -> spec
 	});
 });
 
+describe("meta list", () => {
+	const base = `---
+artifact:
+  spec:
+    status: done
+    tags: [design, backend]
+    group: core
+  code:
+    status: todo
+    tags: [backend]
+    group: core
+  docs:
+    status: done
+    tags: [design]
+process:
+  build:
+    tags: [backend]
+  write: {}
+group:
+  core:
+    label: Core
+---
+req >> design -> spec
+spec >> build -> code
+spec >> write -> docs
+`;
+
+	it("--tag matches a node whose tags: array includes it", async () => {
+		const f = join(dir, "list-tag.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("docs.status: done\nspec.status: done\n");
+	});
+
+	it("--group matches the group: field exactly", async () => {
+		const f = join(dir, "list-group.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--group", "core", "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("code.status: todo\nspec.status: done\n");
+	});
+
+	it("--producer matches an artifact reachable via the process's output edge, not the process itself", async () => {
+		const f = join(dir, "list-producer.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--producer", "build"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"code.status: todo\ncode.tags: backend\ncode.group: core\n",
+		);
+	});
+
+	it("combines multiple selectors with AND", async () => {
+		const f = join(dir, "list-and.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"list",
+			f,
+			"--tag",
+			"design",
+			"--group",
+			"core",
+			"status",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("spec.status: done\n");
+	});
+
+	it("zero matches is not an error", async () => {
+		const f = join(dir, "list-empty.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("No nodes match the given selectors.\n");
+	});
+
+	it("--json emits { ok, values } — zero matches as an empty object", async () => {
+		const f = join(dir, "list-empty-json.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "nonexistent", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({ ok: true, values: {} });
+	});
+
+	it("--json emits the same { ok, values } shape as meta get", async () => {
+		const f = join(dir, "list-json.pfdsl");
+		writeFileSync(f, base);
+		const r = await run([
+			"meta",
+			"list",
+			f,
+			"--group",
+			"core",
+			"status",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			values: { code: { status: "todo" }, spec: { status: "done" } },
+		});
+	});
+
+	it("no selector at all is a usage error (exit 2)", async () => {
+		const f = join(dir, "list-no-selector.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("warns on an unrecognized field name, same as meta get", async () => {
+		const f = join(dir, "list-unknown-field.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "list", f, "--tag", "design", "bogus"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus' is not a recognized field");
+	});
+});
+
 // group is a NodeKind alongside artifact and process, with its own field set
 // (label|color|parent), and meta had no coverage of it at all (#607).
 describe("meta get / set on a group id", () => {
