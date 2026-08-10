@@ -3658,23 +3658,32 @@ spec >> review -> report
 `;
 
 	describe("neighbors", () => {
-		it("prints predecessors and successors as text", async () => {
+		// The neighbor kind is named once per list rather than per id, because
+		// every neighbor has the same one (every edge runs artifact -> process
+		// or the reverse). Without it the caller has to run `describe` on each
+		// neighbor to learn which are artifacts — what an audit agent did with
+		// eight of them (#844). The queried node's own kind leads the output, so
+		// the answer carries the derivation, not just its result.
+		it("prints the queried node, then predecessors and successors, as text", async () => {
 			const f = join(dir, "neighbors.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "neighbors", f, "spec"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe(
-				"predecessors: design\nsuccessors: build, review\n",
+				"spec (artifact)\npredecessors (process): design\nsuccessors (process): build, review\n",
 			);
 		});
 
-		it("--json emits the predecessors and successors of the named node", async () => {
+		it("--json emits the queried node's id and kind, neighborKind, and the two lists", async () => {
 			const f = join(dir, "neighbors-json.pfdsl");
 			writeFileSync(f, base);
 			const r = await run(["graph", "neighbors", f, "spec", "--json"]);
 			expect(r.exitCode).toBe(0);
 			expect(JSON.parse(r.stdout)).toEqual({
 				ok: true,
+				id: "spec",
+				kind: "artifact",
+				neighborKind: "process",
 				predecessors: [{ id: "design", kind: "primary" }],
 				successors: [
 					{ id: "build", kind: "primary" },
@@ -3693,7 +3702,7 @@ spec >> review -> report
 			const r = await run(["graph", "neighbors", f, "design"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe(
-				"predecessors: req, report (feedback)\nsuccessors: spec\n",
+				"design (process)\npredecessors (artifact): req, report (feedback)\nsuccessors (artifact): spec\n",
 			);
 		});
 
@@ -3704,6 +3713,9 @@ spec >> review -> report
 			expect(r.exitCode).toBe(0);
 			expect(JSON.parse(r.stdout)).toEqual({
 				ok: true,
+				id: "report",
+				kind: "artifact",
+				neighborKind: "process",
 				predecessors: [{ id: "review", kind: "primary" }],
 				successors: [{ id: "design", kind: "feedback" }],
 			});
@@ -3726,34 +3738,6 @@ spec >> review -> report
 			expect(JSON.parse(r.stdout)).toEqual({
 				ok: false,
 				missing: ["nonexistent"],
-			});
-		});
-
-		// The kind is the same for every neighbor (every edge runs artifact ->
-		// process or the reverse), so it is named once per list rather than per
-		// id. Without it the caller has to run `describe` on each neighbor to
-		// learn which are artifacts — what an audit agent did with eight of them
-		// (#844). The queried node's own kind leads the output, so the answer
-		// carries the derivation, not just its result.
-		it("names the queried node's kind and the kind its neighbors share", async () => {
-			const f = join(dir, "neighbors-kind.pfdsl");
-			writeFileSync(f, base);
-			const r = await run(["graph", "neighbors", f, "spec"]);
-			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toBe(
-				"spec (artifact)\npredecessors (process): design\nsuccessors (process): build, review\n",
-			);
-		});
-
-		it("--json carries the queried node's id and kind alongside neighborKind", async () => {
-			const f = join(dir, "neighbors-kind-json.pfdsl");
-			writeFileSync(f, base);
-			const r = await run(["graph", "neighbors", f, "spec", "--json"]);
-			expect(r.exitCode).toBe(0);
-			expect(JSON.parse(r.stdout)).toMatchObject({
-				id: "spec",
-				kind: "artifact",
-				neighborKind: "process",
 			});
 		});
 
@@ -4398,17 +4382,21 @@ process:
 req >> design -> spec
 `;
 
+		// The neighbor lists carry the kind their members share, from the same
+		// shared renderer as `graph neighbors`: describe already led with the
+		// node's own kind, but bare neighbor ids still cost a describe per
+		// neighbor to classify (#844).
 		it("prints kind, fields, neighbors, and locate lines as text", async () => {
 			const f = join(dir, "describe.pfdsl");
 			writeFileSync(f, src);
 			const r = await run(["graph", "describe", f, "design"]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe(
-				`design (process)\ndesign.label: Design\npredecessors: req\nsuccessors: spec\n${f}:6: declaration\n${f}:9: edge\n`,
+				`design (process)\ndesign.label: Design\npredecessors (artifact): req\nsuccessors (artifact): spec\n${f}:6: declaration\n${f}:9: edge\n`,
 			);
 		});
 
-		it("--json emits { ok, id, kind, meta, predecessors, successors, declarationLine, edgeLines }", async () => {
+		it("--json emits { ok, id, kind, meta, neighborKind, predecessors, successors, declarationLine, edgeLines }", async () => {
 			const f = join(dir, "describe-json.pfdsl");
 			writeFileSync(f, src);
 			const r = await run(["graph", "describe", f, "design", "--json"]);
@@ -4418,6 +4406,7 @@ req >> design -> spec
 				id: "design",
 				kind: "process",
 				meta: { label: "Design" },
+				neighborKind: "artifact",
 				predecessors: [{ id: "req", kind: "primary" }],
 				successors: [{ id: "spec", kind: "primary" }],
 				declarationLine: 6,
@@ -4441,27 +4430,12 @@ req >> design -> spec
 				id: "core",
 				kind: "group",
 				meta: { label: "Core" },
+				neighborKind: null,
 				predecessors: [],
 				successors: [],
 				declarationLine: 3,
 				edgeLines: [],
 			});
-		});
-
-		// Same annotation as `graph neighbors`, from the same shared renderer:
-		// describe already led with the node's own kind, but its neighbor lists
-		// were bare ids, so answering "which of these are artifacts" took a
-		// describe per neighbor (#844).
-		it("names the kind the neighbors share, in text and in --json", async () => {
-			const f = join(dir, "describe-neighbor-kind.pfdsl");
-			writeFileSync(f, src);
-			const r = await run(["graph", "describe", f, "design"]);
-			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toBe(
-				`design (process)\ndesign.label: Design\npredecessors (artifact): req\nsuccessors (artifact): spec\n${f}:6: declaration\n${f}:9: edge\n`,
-			);
-			const j = await run(["graph", "describe", f, "design", "--json"]);
-			expect(JSON.parse(j.stdout).neighborKind).toBe("artifact");
 		});
 
 		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
