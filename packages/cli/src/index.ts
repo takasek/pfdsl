@@ -1600,13 +1600,24 @@ export function runCheckLinks(
 	return { stdout: `${lines.join("\n")}\n`, stderr: "", exitCode: 1 };
 }
 
+/**
+ * One `id.field: value` line. A field the node doesn't set reads `(unset)`
+ * rather than an empty value, which is what a field set to the empty string
+ * prints — the two were indistinguishable in text mode while `--json` had
+ * null against "", so the default output was the one that said less (#844).
+ * The marker is bracketed like `graph neighbors`'s `(none)`.
+ */
 function formatGetLine(
 	id: string,
 	field: string,
 	values: Record<string, Record<string, unknown>>,
 ): string {
 	const v = values[id]?.[field];
-	const display = Array.isArray(v) ? v.join(", ") : v === null ? "" : String(v);
+	const display = Array.isArray(v)
+		? v.join(", ")
+		: v === null
+			? "(unset)"
+			: String(v);
 	return `${id}.${field}: ${display}`;
 }
 

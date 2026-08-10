@@ -3184,7 +3184,9 @@ req -> spec
 		writeFileSync(f, base);
 		const r = await run(["meta", "get", f, "spec", "lable"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toBe("spec.lable: \n");
+		// A misspelled field is unset like any other the node doesn't have; the
+		// warning, not the value, is what says the name itself is wrong.
+		expect(r.stdout).toBe("spec.lable: (unset)\n");
 		expect(r.stderr).toContain("warning");
 		expect(r.stderr).toContain("lable");
 	});
