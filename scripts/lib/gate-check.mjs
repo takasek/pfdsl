@@ -850,3 +850,46 @@ export function classifySizeDirection({ issueBody, deltas, overrideDeclared }) {
 	}
 	return { status: "FAIL", detail: list };
 }
+
+/**
+ * Parse `git log --format=%h%x09%s <range>` output into sha/subject records,
+ * one per non-blank line (#834's cycle window: collectCycleWindow in
+ * gate-check-steps.mjs is what runs the git calls this shape comes from).
+ *
+ * Splits on the first tab only. `%s` does not escape a tab that a subject
+ * itself carries, so splitting on every tab would cut such a subject short
+ * and drop its tail rather than keep it whole.
+ * @param {string} text
+ * @returns {{sha: string, subject: string}[]}
+ */
+export function parseCommitLogLines(text) {
+	return text
+		.split("\n")
+		.filter((line) => line !== "")
+		.map((line) => {
+			const i = line.indexOf("\t");
+			return i === -1
+				? { sha: line, subject: "" }
+				: { sha: line.slice(0, i), subject: line.slice(i + 1) };
+		});
+}
+
+/**
+ * Union two parsed commit-log lists, de-duplicated by sha, first-seen order
+ * preserved (#834). `a`'s entries win ties — collectCycleWindow calls this
+ * with the "base commits this tree lacks" list first and the "base commits
+ * landed since the branch started" list second, and the two can overlap.
+ * @param {{sha: string, subject: string}[]} a
+ * @param {{sha: string, subject: string}[]} b
+ * @returns {{sha: string, subject: string}[]}
+ */
+export function unionCommitLogEntries(a, b) {
+	const seen = new Set();
+	const result = [];
+	for (const entry of [...a, ...b]) {
+		if (seen.has(entry.sha)) continue;
+		seen.add(entry.sha);
+		result.push(entry);
+	}
+	return result;
+}

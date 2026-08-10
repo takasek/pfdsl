@@ -31,6 +31,7 @@ import {
 	NO_IMPLEMENTATION_TOKEN,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
+	parseCommitLogLines,
 	parseDesignRecordEditResponse,
 	resolveRecordEditedAt,
 	SIZE_INTENT_PATTERN,
@@ -38,6 +39,7 @@ import {
 	SIZE_TRACKED_PATTERNS,
 	statusChangedForArtifact,
 	toDesignRecordEntries,
+	unionCommitLogEntries,
 	VSCODE_EXT_TRIGGER,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
@@ -1302,5 +1304,72 @@ describe("classifyIssueLookupFailure", () => {
 		const result = classifyIssueLookupFailure(new Error("boom"));
 		assert.doesNotMatch(result.detail, /gh CLI unavailable/);
 		assert.match(result.detail, /issue lookup failed/);
+	});
+});
+
+// #834: the cycle window — base commits this tree currently lacks, unioned
+// with base commits that landed at/after the branch's first commit. These two
+// pure helpers turn `git log --format=%h%x09%s` output into records and merge
+// two such lists; collectCycleWindow (gate-check-steps.mjs) is what actually
+// runs the three git calls this shape comes from.
+describe("parseCommitLogLines", () => {
+	it("parses sha/subject pairs, one per line", () => {
+		assert.deepEqual(
+			parseCommitLogLines("76ccc2c5\tfix(gate-check): note a mismatch\n"),
+			[{ sha: "76ccc2c5", subject: "fix(gate-check): note a mismatch" }],
+		);
+	});
+
+	it("ignores blank lines", () => {
+		assert.deepEqual(
+			parseCommitLogLines("abc123\tfeat: a\n\ndef456\tfix: b\n"),
+			[
+				{ sha: "abc123", subject: "feat: a" },
+				{ sha: "def456", subject: "fix: b" },
+			],
+		);
+	});
+
+	it("splits on the first tab only, so a subject carrying its own tab survives whole", () => {
+		assert.deepEqual(parseCommitLogLines("abc123\tfeat: a\tb\n"), [
+			{ sha: "abc123", subject: "feat: a\tb" },
+		]);
+	});
+
+	it("returns an empty array for empty input", () => {
+		assert.deepEqual(parseCommitLogLines(""), []);
+		assert.deepEqual(parseCommitLogLines("\n"), []);
+	});
+});
+
+describe("unionCommitLogEntries", () => {
+	it("de-duplicates by sha, preserving first-seen order", () => {
+		const a = [
+			{ sha: "a1", subject: "one" },
+			{ sha: "a2", subject: "two" },
+		];
+		const b = [
+			{ sha: "a2", subject: "two (duplicate)" },
+			{ sha: "a3", subject: "three" },
+		];
+		assert.deepEqual(unionCommitLogEntries(a, b), [
+			{ sha: "a1", subject: "one" },
+			{ sha: "a2", subject: "two" },
+			{ sha: "a3", subject: "three" },
+		]);
+	});
+
+	it("returns the first list unchanged when the second is empty", () => {
+		const a = [{ sha: "a1", subject: "one" }];
+		assert.deepEqual(unionCommitLogEntries(a, []), a);
+	});
+
+	it("returns the second list when the first is empty", () => {
+		const b = [{ sha: "b1", subject: "one" }];
+		assert.deepEqual(unionCommitLogEntries([], b), b);
+	});
+
+	it("returns an empty array when both are empty", () => {
+		assert.deepEqual(unionCommitLogEntries([], []), []);
 	});
 });

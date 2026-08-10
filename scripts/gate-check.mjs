@@ -31,6 +31,7 @@ import {
 import {
 	changedFilesSince,
 	checkDocsStep,
+	collectCycleWindow,
 	collectSizeDeltas,
 	commitMessagesSince,
 	commitSubjectStep,
@@ -423,6 +424,34 @@ console.log(formatGateTable(results));
 if (sizeDeltas.length > 0) {
 	console.log(`\nKnowledge-artifact size (origin/${base} → HEAD):`);
 	for (const d of sizeDeltas) console.log(`  ${formatSizeDelta(d)}`);
+}
+
+// Report material: the cycle window (#834), which collectCycleWindow's own doc
+// comment defines and motivates. Not a verdict — it hands the runner a starting
+// point for re-reading what the cycle wrote outside the repo (issue bodies,
+// comments, PR bodies) against conventions base may have retired since, and
+// `git rebase` fixes the tree, not those.
+//
+// Printed unconditionally, including the empty case: an empty window is itself
+// the record work-cycle.md's terminal-gate step asks for ("窓が空だったなら1行
+// そう記録する"). A failed measurement says so out loud, unlike the report
+// blocks above that fall silent — silence here is indistinguishable from the
+// empty window, which is the reading #834 exists to stop.
+{
+	const window = collectCycleWindow({ exec, base });
+	console.log(
+		"\nCycle window (base commits this tree lacked, or that landed after its first commit):",
+	);
+	if (!window.ok) {
+		console.log(`  could not be measured: ${window.error}`);
+	} else if (window.entries.length === 0) {
+		console.log("  (none)");
+	} else {
+		for (const { sha, subject } of window.entries) {
+			console.log(`  ${sha} ${subject}`);
+		}
+	}
+	if (window.note) console.log(`  (${window.note})`);
 }
 
 // Report material: the package layers the diff touched, for the PR body. Not a

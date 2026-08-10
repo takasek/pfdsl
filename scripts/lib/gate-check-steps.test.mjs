@@ -4,11 +4,13 @@ import { describe, it } from "node:test";
 import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	checkDocsStep,
+	collectCycleWindow,
 	collectSizeDeltas,
 	commitMessagesSince,
 	commitSubjectStep,
 	designRecordStep,
 	fetchDesignRecordEditInfo,
+	firstCommitAuthorDate,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
@@ -1184,5 +1186,161 @@ describe("reviewRecordStep", () => {
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /bad revision/);
+	});
+});
+
+// The branch's start, as both the design-record timing check and the cycle
+// window measure it. One helper because the two must not drift apart about
+// what "when this cycle started" means (#834).
+describe("firstCommitAuthorDate", () => {
+	it("returns the oldest commit's author date", () => {
+		const { exec, calls } = fakeExec({
+			"git log --format=%aI --reverse origin/main..HEAD": {
+				out: "2026-08-11T00:06:33+09:00\n2026-08-11T00:09:30+09:00\n",
+			},
+		});
+		assert.deepEqual(firstCommitAuthorDate({ exec, base: "main" }), {
+			ok: true,
+			iso: "2026-08-11T00:06:33+09:00",
+		});
+		assert.ok(calls.some((c) => c.includes("--reverse")));
+	});
+
+	it("reports an empty range as ok with no date, not as a failure", () => {
+		const { exec } = fakeExec({ "git log --format=%aI": { out: "" } });
+		assert.deepEqual(firstCommitAuthorDate({ exec, base: "main" }), {
+			ok: true,
+			iso: null,
+		});
+	});
+
+	it("reports a failed lookup as not ok, which is not the same as no commits", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { ok: false, out: "fatal: bad revision" },
+		});
+		assert.deepEqual(firstCommitAuthorDate({ exec, base: "main" }), {
+			ok: false,
+			iso: null,
+		});
+	});
+});
+
+// #834: report material, not a verdict. The window is the union of (1) base
+// commits this tree currently lacks and (2) base commits that landed at/after
+// the branch's first commit — (2) is what survives a rebase, since after one
+// those same commits are ancestors of HEAD while still being reachable from
+// origin/<base> with a committer date past the branch's start.
+describe("collectCycleWindow", () => {
+	it("unions the lagged list with the since-branch-start list", () => {
+		const { exec, calls } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				out: "aaa1111\tfix: b\n",
+			},
+			"git log --format=%aI --reverse origin/main..HEAD": {
+				out: "2026-08-01T00:00:00+09:00\n2026-08-02T00:00:00+09:00\n2026-08-03T00:00:00+09:00\n",
+			},
+			"git log --format=%h%x09%s --since=": { out: "bbb2222\tfeat: c\n" },
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.deepEqual(result.entries, [
+			{ sha: "aaa1111", subject: "fix: b" },
+			{ sha: "bbb2222", subject: "feat: c" },
+		]);
+		assert.ok(
+			calls.some((c) =>
+				c.includes("--since=2026-08-01T00:00:00+09:00 origin/main"),
+			),
+			"measures from the branch's oldest commit, the last line git log prints",
+		);
+	});
+
+	// Measured on this branch: `git rebase origin/main` rewrote every commit's
+	// committer date to the rebase moment while leaving author dates alone. An
+	// anchor read from %cI therefore jumps forward to "now" on the very run this
+	// half exists for, and the window collapses to (none) — the reading #834
+	// exists to stop, arrived at by a different road.
+	it("anchors on the first commit's author date, which a rebase preserves", () => {
+		const { exec, calls } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": { out: "" },
+			"git log --format=%aI --reverse origin/main..HEAD": {
+				out: "2026-08-11T00:06:33+09:00\n2026-08-11T00:09:30+09:00\n",
+			},
+			"git log --format=%h%x09%s --since=": { out: "bbb2222\tfeat: c\n" },
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.deepEqual(result.entries, [{ sha: "bbb2222", subject: "feat: c" }]);
+		assert.ok(
+			calls.some((c) =>
+				c.includes("--since=2026-08-11T00:06:33+09:00 origin/main"),
+			),
+			"measures from the oldest commit's author date, not the newest",
+		);
+		assert.ok(
+			!calls.some((c) => c.includes("--format=%cI")),
+			"committer dates are rewritten by the rebase this half is measuring across",
+		);
+	});
+
+	it("skips the since-branch-start half entirely when the branch has no commits yet", () => {
+		const { exec, calls } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				out: "aaa1111\tfix: b\n",
+			},
+			"git log --format=%aI --reverse origin/main..HEAD": { out: "" },
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
+		assert.equal(result.note, undefined);
+		assert.ok(!calls.some((c) => c.includes("--since=")));
+	});
+
+	it("reports failure of the base-commits-this-tree-lacks query as ok: false", () => {
+		const { exec } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				ok: false,
+				out: "fatal: bad revision",
+			},
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, false);
+		assert.equal(result.error, "fatal: bad revision");
+	});
+
+	it("keeps part (1) when reading the branch's commit dates fails, noting the gap", () => {
+		const { exec } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				out: "aaa1111\tfix: b\n",
+			},
+			"git log --format=%aI --reverse origin/main..HEAD": {
+				ok: false,
+				out: "fatal: bad object",
+			},
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
+		assert.match(result.note ?? "", /could not/);
+	});
+
+	it("keeps part (1) when the since-branch-start query fails, noting the gap", () => {
+		const { exec } = fakeExec({
+			"git log --format=%h%x09%s HEAD..origin/main": {
+				out: "aaa1111\tfix: b\n",
+			},
+			"git log --format=%aI --reverse origin/main..HEAD": {
+				out: "2026-08-01T00:00:00+09:00\n",
+			},
+			"git log --format=%h%x09%s --since=": {
+				ok: false,
+				out: "fatal: bad revision",
+			},
+		});
+		const result = collectCycleWindow({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
+		assert.match(result.note ?? "", /could not/);
 	});
 });

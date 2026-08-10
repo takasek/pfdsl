@@ -28,12 +28,14 @@ import {
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
+	parseCommitLogLines,
 	parseDesignRecordEditResponse,
 	resolveRecordEditedAt,
 	SIZE_TRACKED_PATTERNS,
 	selectDesignRecord,
 	statusChangedForArtifact,
 	toDesignRecordEntries,
+	unionCommitLogEntries,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
@@ -59,6 +61,33 @@ export function changedFilesSince({ exec, base }) {
 	]);
 	if (!r.ok) return { ok: false, files: [], error: r.out.trim() };
 	return { ok: true, files: r.out.trim().split("\n").filter(Boolean) };
+}
+
+/**
+ * When this cycle started: the author date of the branch's oldest commit.
+ *
+ * Author dates, not committer dates. A rebase rewrites every committer date on
+ * the branch to the moment of the rebase, so a %cI anchor jumps forward to
+ * "now" — measured on #834's own branch, where that collapsed the cycle window
+ * to empty on the re-run the window exists for.
+ *
+ * Two checks anchor here (the design-selection record's timing and the cycle
+ * window), and a disagreement between them about when the cycle started would
+ * show up as one of them silently judging a different span, so they share the
+ * one query. `ok: false` is a failed lookup, distinct from `iso: null` on a
+ * branch that has no commits yet — callers report those differently.
+ * @param {{exec: Function, base: string}} params
+ * @returns {{ok: boolean, iso: string | null}}
+ */
+export function firstCommitAuthorDate({ exec, base }) {
+	const r = exec("git", [
+		"log",
+		"--format=%aI",
+		"--reverse",
+		`origin/${base}..HEAD`,
+	]);
+	if (!r.ok) return { ok: false, iso: null };
+	return { ok: true, iso: r.out.trim().split("\n")[0] || null };
 }
 
 /**
@@ -291,15 +320,7 @@ export function designRecordStep({
 		return { name, ...classifyDesignRecordTiming(undefined, null) };
 	}
 
-	const firstCommitOut = exec("git", [
-		"log",
-		"--format=%aI",
-		"--reverse",
-		`origin/${base}..HEAD`,
-	]);
-	const firstCommitIso = firstCommitOut.ok
-		? firstCommitOut.out.trim().split("\n")[0] || null
-		: null;
+	const firstCommitIso = firstCommitAuthorDate({ exec, base }).iso;
 
 	// #737 案2: the record's own edit history (editInfo is undefined/null
 	// whenever the GraphQL fetch failed or was unavailable — resolveRecordEditedAt
@@ -385,6 +406,79 @@ export function collectSizeDeltas({ exec, base, changedFiles }) {
 				afterLines: afterText.split("\n").length,
 			};
 		});
+}
+
+// #834: a failure past the base-commits-this-tree-lacks query costs only the
+// rebase-invariant half — collectCycleWindow still has part (1) to hand back,
+// and silently narrowing the window to it would read as "the window is
+// empty" rather than "half of it could not be measured".
+const CYCLE_WINDOW_INCOMPLETE_NOTE =
+	"could not determine which base commits landed since the branch started; showing only the commits this tree currently lacks";
+
+/**
+ * The cycle window (#834): report material for the terminal gate, not a
+ * verdict — union of two things a runner re-reading issue bodies, comments
+ * and PR bodies against base's current conventions needs to know landed
+ * without them.
+ *
+ * (1) base commits this tree currently lacks (`HEAD..origin/<base>`) covers
+ * a branch cut from an already-stale base. (2) base commits that landed
+ * at/after the branch's first commit covers the shape a rebase does not
+ * clear: afterwards those commits are ancestors of HEAD, but the same shas
+ * stay reachable from `origin/<base>` with a landing date past the branch's
+ * start, so a plain `HEAD..origin/<base>` diff (which shows 0 once rebased)
+ * misses them while this still finds them. This is exactly the gap #834
+ * named: every option the issue enumerated fires on `behindBase > 0`, i.e.
+ * assumes the tree is *still* behind when the gate runs, but the measured
+ * sequence is notice→rebase→re-run, at which point behindBase is 0 and none
+ * of them print anything.
+ *
+ * The one stretch neither half covers after a rebase is between the branch's
+ * creation and its first commit — part (2) has no earlier anchor to measure
+ * from, and part (1) is empty by then. Before a rebase part (1) still covers
+ * it, so the gap only opens on a re-run.
+ *
+ * "Landed" in part (2) means the commit's own date, not the moment it reached
+ * base. A merge brings commits older than the anchor along with it, and only
+ * the merge commit itself carries the landing time — so what part (2) names
+ * for those is the PR's merge, not each commit inside it.
+ * @param {{exec: Function, base: string}} params
+ * @returns {{ok: boolean, entries?: {sha: string, subject: string}[], error?: string, note?: string}}
+ */
+export function collectCycleWindow({ exec, base }) {
+	const laggedOut = exec("git", [
+		"log",
+		"--format=%h%x09%s",
+		`HEAD..origin/${base}`,
+	]);
+	if (!laggedOut.ok) return { ok: false, error: laggedOut.out.trim() };
+	const lagged = parseCommitLogLines(laggedOut.out);
+
+	const incomplete = () => ({
+		ok: true,
+		entries: lagged,
+		note: CYCLE_WINDOW_INCOMPLETE_NOTE,
+	});
+
+	// Where part (2) measures from, shared with the design-record timing check
+	// so the two cannot disagree about when this cycle started.
+	const start = firstCommitAuthorDate({ exec, base });
+	if (!start.ok) return incomplete();
+	// No commits yet leaves part (2) with nothing to measure from, which is a
+	// reasoned skip rather than a gap in the window.
+	if (start.iso === null) return { ok: true, entries: lagged };
+	const since = start.iso;
+
+	const laterOut = exec("git", [
+		"log",
+		"--format=%h%x09%s",
+		`--since=${since}`,
+		`origin/${base}`,
+	]);
+	if (!laterOut.ok) return incomplete();
+	const later = parseCommitLogLines(laterOut.out);
+
+	return { ok: true, entries: unionCommitLogEntries(lagged, later) };
 }
 
 /**
