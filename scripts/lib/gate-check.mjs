@@ -589,6 +589,28 @@ export function hasShrinkIntent(issueBody) {
 }
 
 /**
+ * The package layers this branch touched, read off the diff.
+ *
+ * The companion used to require the runner to name these in the PR body, and
+ * three cycles in a row forgot to (#801). The claim was never the evidence:
+ * the diff is, and it is available at gate time while the PR body is not. So
+ * this is report material — printed for whoever writes the PR, judged by
+ * nobody. What the declaration was for (noticing a layer mismatch before
+ * starting) is a planning-time concern, and a line written at PR time was
+ * always past the point where it could serve that.
+ * @param {string[]} changedFiles
+ * @returns {string[]} package directory names, sorted and deduplicated
+ */
+export function derivePackageLayers(changedFiles) {
+	const layers = new Set();
+	for (const file of changedFiles) {
+		const match = /^packages\/([^/]+)\//.exec(file);
+		if (match) layers.add(match[1]);
+	}
+	return [...layers].sort();
+}
+
+/**
  * One tracked knowledge artifact's size across the range under review.
  * @typedef {{path: string, beforeBytes: number, afterBytes: number,
  *            beforeLines: number, afterLines: number}} SizeDelta

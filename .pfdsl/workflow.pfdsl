@@ -364,7 +364,7 @@ process:
     group: planning
   develop:
     label: ツールチェーン開発
-    description: "着手可能 issue をブランチ上で実装し PR にまとめる。PR body に対象パッケージ層（core / cli / graphviz-exporter 等）を明記する（層未明記だと着手後に層違いで延期コストが発生する）"
+    description: "着手可能 issue をブランチ上で実装し PR にまとめる。対象パッケージ層（core / cli / graphviz-exporter 等）は gate-check が diff から導出して報告材料として印字する — 明記を求める規定は3度忘れられたうえ、PR body に書く時点では層違いの延期コストを避ける契機を過ぎている（#801）"
     group: planning
   merge_pr:
     label: レビュー・マージ

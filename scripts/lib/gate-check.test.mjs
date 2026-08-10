@@ -15,6 +15,7 @@ import {
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
 	deriveManualItems,
+	derivePackageLayers,
 	diffNewTerminals,
 	diffReadySets,
 	extractGateChecklist,
@@ -854,6 +855,37 @@ describe("hasSizeOverride", () => {
 	it("is false for an empty range", () => {
 		assert.equal(hasSizeOverride(""), false);
 		assert.equal(hasSizeOverride(undefined), false);
+	});
+});
+
+// The package layer a cycle targets is the diff, not a claim about it (#801).
+// The companion used to ask for it in the PR body, which is written after the
+// point where knowing the layer would have changed anything.
+describe("derivePackageLayers", () => {
+	it("names each package under packages/ the branch touched, once", () => {
+		assert.deepEqual(
+			derivePackageLayers([
+				"packages/core/src/graph.ts",
+				"packages/core/src/parse.ts",
+				"packages/cli/src/index.ts",
+			]),
+			["cli", "core"],
+		);
+	});
+
+	it("ignores paths outside packages/", () => {
+		assert.deepEqual(
+			derivePackageLayers(["scripts/gate-check.mjs", ".pfdsl/roadmap.md"]),
+			[],
+		);
+	});
+
+	it("ignores a file sitting directly in packages/", () => {
+		assert.deepEqual(derivePackageLayers(["packages/README.md"]), []);
+	});
+
+	it("is empty for an empty diff", () => {
+		assert.deepEqual(derivePackageLayers([]), []);
 	});
 });
 

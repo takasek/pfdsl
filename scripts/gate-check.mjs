@@ -15,6 +15,7 @@ import {
 	classifyAuditIssuesFlowResult,
 	classifyIssueLookupFailure,
 	deriveManualItems,
+	derivePackageLayers,
 	diffNewTerminals,
 	diffReadySets,
 	extractGateChecklist,
@@ -417,6 +418,16 @@ console.log(formatGateTable(results));
 if (sizeDeltas.length > 0) {
 	console.log(`\nKnowledge-artifact size (origin/${base} → HEAD):`);
 	for (const d of sizeDeltas) console.log(`  ${formatSizeDelta(d)}`);
+}
+
+// Report material: the package layers the diff touched, for the PR body. Not a
+// verdict — the diff already is the answer, so there is nothing for the runner
+// to get wrong and nothing for a gate to catch (#801).
+{
+	const layers = derivePackageLayers(changedFiles);
+	if (layers.length > 0) {
+		console.log(`\nPackage layers touched: ${layers.join(", ")}`);
+	}
 }
 
 console.log("\nMANUAL (judge and confirm each):");
