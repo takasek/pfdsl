@@ -2574,12 +2574,14 @@ since there is no file path to resolve against, derived fields are silently
 omitted from auto-accompaniment, and an explicit request for one returns
 null with a warning on stderr instead of failing the command.
 
-A field the node doesn't have prints as an empty value (JSON: null); this is
-not an error. A node that exists but has no frontmatter entry at all yields
-an empty row (JSON: {}, no text lines). Requesting a field name that isn't a
-recognized frontmatter or derived key prints a warning to stderr (possible
-typo) but still returns the value (empty, since it's genuinely unset) — this
-does not fail the command.
+A field the node doesn't have prints as \`(unset)\` (JSON: null); this is not
+an error, and it is what distinguishes the field from one set to the empty
+string, which prints with nothing after the colon (JSON: ""). A node that
+exists but has no frontmatter entry at all yields an empty row (JSON: {}, no
+text lines). Requesting a field name that isn't a recognized frontmatter or
+derived key prints a warning to stderr (possible typo) but still returns the
+value (\`(unset)\`, since it's genuinely unset) — this does not fail the
+command.
 
 If some requested ids exist and others don't, values for the found ids are
 still printed (to stdout, or under "values" in --json) alongside the error
