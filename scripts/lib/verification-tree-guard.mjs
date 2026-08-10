@@ -26,15 +26,20 @@ import {
 /** `make` target prefixes treated as verification. */
 const VERIFICATION_MAKE_TARGET_PREFIXES = ["test", "check", "build"];
 
-/** Flags that make an explicit cwd part of the command, so cwd drift cannot affect it. */
+/** `-C`/`--directory` forms that make an explicit cwd part of the command, so
+ * cwd drift cannot affect it. `--directory=<path>` arrives as one token, so
+ * the flag name is read up to `=` and compared by equality rather than via
+ * `startsWith("--directory=")` — the latter is a string literal handed to
+ * `startsWith`, the shape check-cli-conventions.mjs flags (#648) even though
+ * this parses another command's arguments, not this script's own argv (the
+ * same distinction command-usage-guard.mjs is exempted by name for there).
+ */
 function hasExplicitCwdFlag(tokens) {
-	return tokens.some(
-		(t) =>
-			!t.quoted &&
-			(t.value === "-C" ||
-				t.value === "--directory" ||
-				t.value.startsWith("--directory=")),
-	);
+	return tokens.some((t) => {
+		if (t.quoted) return false;
+		const flagName = t.value.split("=", 1)[0];
+		return flagName === "-C" || flagName === "--directory";
+	});
 }
 
 /** Whether `rest` (the tokens after `make`) targets test/check/build. */
