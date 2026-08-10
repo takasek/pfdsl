@@ -30,8 +30,13 @@ const roadmapWithIssues = (entries) =>
 		)
 		.join("")}artifact:\n`;
 
+// `graph neighbors --json` tags each neighbor with its edge class since #828.
 const neighborsJsonOk = (successors) =>
-	JSON.stringify({ ok: true, predecessors: [], successors });
+	JSON.stringify({
+		ok: true,
+		predecessors: [],
+		successors: successors.map((id) => ({ id, kind: "primary" })),
+	});
 
 function baseDeps(overrides = {}) {
 	return {
@@ -384,12 +389,7 @@ describe("runCycleStatus", () => {
 			baseDeps({
 				issueNumbers: [667, 668],
 				sh: (_file, args) => {
-					if (args.includes("neighbors"))
-						return JSON.stringify({
-							ok: true,
-							predecessors: [],
-							successors: ["art_a"],
-						});
+					if (args.includes("neighbors")) return neighborsJsonOk(["art_a"]);
 					if (args.includes(CLI_PATH)) return readyJsonOk(null);
 					return "";
 				},
@@ -553,6 +553,34 @@ describe("runCycleStatus", () => {
 			calls.some(
 				(args) => args.includes("neighbors") && args.includes("proc_a"),
 			),
+		);
+	});
+
+	// #828 widened `graph neighbors` to report `>>?` neighbors alongside the
+	// producer/consumer ones. The artifact under gate is the process's output, so
+	// a feedback neighbor must not be picked up as one.
+	it("takes the gate-check artifact from a primary successor, not a feedback one", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes("neighbors"))
+						return JSON.stringify({
+							ok: true,
+							predecessors: [],
+							successors: [
+								{ id: "loops_back", kind: "feedback" },
+								{ id: "proc_a_out", kind: "primary" },
+							],
+						});
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+			}),
+		);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --artifact proc_a_out --issue 42",
 		);
 	});
 

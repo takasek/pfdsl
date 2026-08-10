@@ -295,7 +295,12 @@ export async function runCycleStatus({
 							"--json",
 						]),
 					);
-					artifactKey = neighborsJson?.successors?.[0] ?? null;
+					// `neighbors` reports `>>?` neighbors too since #828; the
+					// artifact under gate is the process's output, so only a
+					// primary successor qualifies.
+					artifactKey =
+						neighborsJson?.successors?.find((n) => n?.kind === "primary")?.id ??
+						null;
 				} catch {
 					artifactKey = null;
 				}
