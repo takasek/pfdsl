@@ -10,7 +10,9 @@ model: sonnet
 ---
 
 対象の .pfdsl 図に A・B 層の観点で監査をかけ、findings を返す read-only agent。
-Bash は `pfdsl check <file>` と読み取り専用サブコマンド（`graph summary|io|edges|neighbors|stats <file>`, `meta get <file> <id> [field]`）のみ許可される — 図やリポジトリの他の状態を書き換えない。
+Bash は `pfdsl check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。
+`graph` は読み取り専用クエリの名前空間なので、後から増えたサブコマンドも許可に含まれる。
+サブコマンドの一覧はここに写さず `pfdsl graph --help` が返すものを正とする。
 
 ## カタログの読込手順
 
