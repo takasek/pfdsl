@@ -1,4 +1,4 @@
-import { Document, isPair, isScalar, parseDocument, visit } from "yaml";
+import { Document, isPair, isScalar, isSeq, parseDocument, visit } from "yaml";
 import type { NodeKind } from "./types/index.js";
 
 /**
@@ -119,13 +119,24 @@ interface FoldedScalarSnapshot {
 	range: [number, number, number];
 }
 
-/** Every BLOCK_FOLDED (`>`) scalar in `yamlText`, keyed by its path from the document root. */
+/**
+ * Every BLOCK_FOLDED (`>`) scalar in `yamlText` that is reachable by a plain
+ * `key1.key2...` map path, keyed by that path from the document root.
+ * Sequence elements are skipped entirely (ADR-0037): a fold's `keys` here
+ * are built from only the `isPair` steps on its `visit` path, which drops
+ * any sequence index in between. Trying to keep that index would let a
+ * fold's path collide with a sibling seq element when a map key happens to
+ * be numeric (#816) — excluding the whole subtree up front is what the
+ * `keys` shape can actually represent, not an accident of what `getIn`
+ * later resolves.
+ */
 function collectFoldedScalars(yamlText: string): FoldedScalarSnapshot[] {
 	const doc = parseDocument(yamlText);
 	const found: FoldedScalarSnapshot[] = [];
 	visit(doc, {
 		Scalar(_key, node, path) {
 			if (node.type !== "BLOCK_FOLDED" || !node.range) return;
+			if (path.some((step) => isSeq(step))) return;
 			const keys: (string | number)[] = [];
 			for (const step of path) {
 				if (!isPair(step)) continue;

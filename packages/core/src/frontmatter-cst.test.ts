@@ -328,6 +328,32 @@ describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", 
 		});
 	});
 
+	// collectFoldedScalars used to build a fold's `keys` path from only the
+	// `isPair` steps on its `visit` path, dropping the sequence index. When a
+	// map key inside a sequence element happened to be numeric, that number
+	// was read back as the dropped index and resolved to a *different* seq
+	// element — splicing one fold's wraps onto another node entirely (#816).
+	// ADR-0037 already scopes fold preservation out of sequences; this locks
+	// that in as an explicit skip rather than an accident of `getIn` missing.
+	it("does not preserve wraps on folded scalars inside a sequence, even with a numeric map key (ADR-0037)", () => {
+		const src = `seqfield:
+  - 3: >
+      shared value
+      wrapped here
+  - one
+  - two
+  - >
+      shared value
+      wrapped here
+`;
+		const withFold = renderMutated(src, () => {});
+		const withoutFold = (() => {
+			const doc = parseDocument(src);
+			return renderFrontmatterCst(doc, "\n").slice(4, -4);
+		})();
+		expect(withFold).toBe(withoutFold);
+	});
+
 	it("leaves output unchanged when there are no folded scalars (no regression)", () => {
 		const src = `artifact:
   a:

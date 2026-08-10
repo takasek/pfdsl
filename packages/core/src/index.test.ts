@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parseFrontmatterCst } from "./frontmatter-cst.js";
 import {
 	format,
 	normalizeDocument,
@@ -177,6 +178,30 @@ describe("public API", () => {
 			expect(output).toBe(
 				"---\nartifact:\n  a:\n    status: todo\n    description: >\n      Hello\n      world.\n---\na >> P\nP -> b\n",
 			);
+		});
+
+		// collectFoldedScalars used to build a fold's path from only the
+		// isPair steps on its visit path, dropping the sequence index — a
+		// numeric map key inside a sequence element then read back as that
+		// dropped index and resolved to a *different* seq element, splicing
+		// one fold's wraps onto it (#816). ADR-0037 already scopes fold
+		// preservation out of sequences; ensure fmt is idempotent and doesn't
+		// cross-contaminate seq elements now that the skip is explicit.
+		it("does not move a sequence element's folded wraps onto another element (ADR-0037, #816)", () => {
+			const src =
+				"---\nseqfield:\n  - 3: >\n      shared value\n      wrapped here\n  - one\n  - two\n  - >\n      shared value\n      wrapped here\n---\na >> P -> b\n";
+			const { output: first } = format(src);
+			const cst = parseFrontmatterCst(first);
+			expect(cst.doc.toJSON()).toEqual({
+				seqfield: [
+					{ "3": "shared value wrapped here\n" },
+					"one",
+					"two",
+					"shared value wrapped here\n",
+				],
+			});
+			const { output: second } = format(first);
+			expect(second).toBe(first);
 		});
 	});
 
