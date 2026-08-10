@@ -1581,7 +1581,11 @@ export function runMetaValues(
 			const v = metaFor(frontmatter, id, kind)?.[f];
 			if (v === undefined || v === null) continue;
 			for (const one of Array.isArray(v) ? v : [v]) {
-				const key = String(one);
+				// A map-valued field (boundary) has no vocabulary of its own;
+				// naming the shape keeps it apart from a field nobody sets,
+				// which String() would not (it yields "[object Object]").
+				const key =
+					typeof one === "object" && one !== null ? "(object)" : String(one);
 				tally.set(key, (tally.get(key) ?? 0) + 1);
 			}
 		}
@@ -2768,7 +2772,9 @@ value is wrong, not which ones are right.
   --no-color          disable ANSI color codes (also: NO_COLOR env var)
 
 An array field (tags) counts per element, so a node tagged [a, b] is one
-occurrence of each. Values are printed in the same order ids are elsewhere.
+occurrence of each. A map-valued field (boundary) has no vocabulary of its
+own and counts under \`(object)\`. Values are printed in the same order ids
+are elsewhere.
 
 \`group\` and \`tags\` may also be declared in a frontmatter section of their
 own, and declaring is optional — a node may use an undeclared value (§2.7.2,

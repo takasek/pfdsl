@@ -3591,6 +3591,20 @@ spec >> write -> docs
 		expect(r.stdout).toBe("owner: (no values)\n");
 	});
 
+	// `boundary` is a map, so its value has no vocabulary to enumerate. Naming
+	// the shape keeps that distinguishable from a field no node sets, which is
+	// the collapse this command exists to undo.
+	it("counts an object-valued field under (object) rather than stringifying it", async () => {
+		const f = join(dir, "values-object.pfdsl");
+		writeFileSync(
+			f,
+			"---\nprocess:\n  build:\n    subflow: child.pfdsl\n    boundary: { spec: inner_spec }\n---\nspec >> build -> code\n",
+		);
+		const r = await run(["meta", "values", f, "boundary"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("boundary.(object): 1\n");
+	});
+
 	it("warns for a field name that is not recognized on any kind", async () => {
 		const f = join(dir, "values-unknown.pfdsl");
 		writeFileSync(f, base);
