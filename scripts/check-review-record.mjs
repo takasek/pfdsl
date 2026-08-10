@@ -14,6 +14,7 @@ import { parseArgs } from "node:util";
 
 import {
 	changedFilesSince,
+	commitMessagesSince,
 	reviewRecordStep,
 } from "./lib/gate-check-steps.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
@@ -47,7 +48,10 @@ if (!diff.ok) {
 	process.exit(1);
 }
 
-const result = reviewRecordStep({ exec, base, changedFiles: diff.files });
+const result = reviewRecordStep({
+	commitMessages: commitMessagesSince({ exec, base }),
+	changedFiles: diff.files,
+});
 console.log(
 	`check-review-record: ${result.status}${result.detail ? ` — ${result.detail}` : ""}`,
 );

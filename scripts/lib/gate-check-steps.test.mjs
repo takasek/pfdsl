@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	checkDocsStep,
 	collectSizeDeltas,
+	commitMessagesSince,
 	commitSubjectStep,
 	designRecordStep,
 	genPluginIdentityStep,
@@ -600,34 +602,46 @@ describe("sizeDirectionStep", () => {
 		assert.match(result.detail, /Size-Intent/);
 	});
 
-	it("FAILs on growth when the PR body has no override", () => {
+	it("FAILs on growth when no commit declared an override", () => {
 		const result = sizeDirectionStep({
 			issue: { body: declared },
 			deltas: grown,
-			prBody: "",
+			overrideDeclared: false,
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /x\.pfdsl/);
 	});
 
-	it("PASSes growth when the PR body carries a Size-Override token", () => {
+	it("PASSes growth a commit trailer declared", () => {
 		const result = sizeDirectionStep({
 			issue: { body: declared },
 			deltas: grown,
-			prBody: "Size-Override: intentional",
+			overrideDeclared: true,
 		});
 		assert.equal(result.status, "PASS");
 	});
+});
 
-	it("carries the caller's verdict on an unfetchable PR body (#749)", () => {
-		const result = sizeDirectionStep({
-			issue: { body: declared },
-			deltas: grown,
-			prBodyFailure: { status: "SKIP", detail: "gh CLI unavailable" },
+describe("commitMessagesSince", () => {
+	it("reads the branch's messages with the separator both readers expect", () => {
+		const { exec, calls } = fakeExec({
+			"git log": { out: `feat: a${RECORD_SEP}` },
 		});
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /gh CLI unavailable/);
-		assert.match(result.detail, /x\.pfdsl/);
+		const result = commitMessagesSince({ exec, base: "main" });
+		assert.equal(result.ok, true);
+		assert.equal(result.text, `feat: a${RECORD_SEP}`);
+		assert.deepEqual(calls, [
+			`git log --no-merges origin/main..HEAD --format=%B${RECORD_SEP}`,
+		]);
+	});
+
+	it("reports the failure rather than an empty range", () => {
+		const { exec } = fakeExec({
+			"git log": { ok: false, out: "fatal: bad revision\n" },
+		});
+		const result = commitMessagesSince({ exec, base: "main" });
+		assert.equal(result.ok, false);
+		assert.equal(result.error, "fatal: bad revision");
 	});
 });
 
@@ -823,26 +837,19 @@ describe("checkDocsStep", () => {
 
 describe("reviewRecordStep", () => {
 	const trailer = "Review: tool=simplify";
+	const messages = (text) => ({ ok: true, text });
 
 	it("PASSes when a code-touching branch carries a matching record", () => {
-		const { exec } = fakeExec({
-			"git log --no-merges": { out: `subject\n\n${trailer}\n` },
-		});
 		const result = reviewRecordStep({
-			exec,
-			base: "main",
+			commitMessages: messages(`subject\n\n${trailer}\n`),
 			changedFiles: ["scripts/lib/x.mjs"],
 		});
 		assert.equal(result.status, "PASS");
 	});
 
 	it("FAILs when a code-touching branch carries no record at all", () => {
-		const { exec } = fakeExec({
-			"git log --no-merges": { out: "subject\n\nbody without a trailer\n" },
-		});
 		const result = reviewRecordStep({
-			exec,
-			base: "main",
+			commitMessages: messages("subject\n\nbody without a trailer\n"),
 			changedFiles: ["scripts/lib/x.mjs"],
 		});
 		assert.equal(result.status, "FAIL");
@@ -850,14 +857,8 @@ describe("reviewRecordStep", () => {
 	});
 
 	it("FAILs when the record names a tool outside the allowed set", () => {
-		const { exec } = fakeExec({
-			"git log --no-merges": {
-				out: "subject\n\nReview: tool=eyeballs\n",
-			},
-		});
 		const result = reviewRecordStep({
-			exec,
-			base: "main",
+			commitMessages: messages("subject\n\nReview: tool=eyeballs\n"),
 			changedFiles: ["scripts/lib/x.mjs"],
 		});
 		assert.equal(result.status, "FAIL");
@@ -865,14 +866,19 @@ describe("reviewRecordStep", () => {
 	});
 
 	it("PASSes a prose-only branch that carries no record", () => {
-		const { exec } = fakeExec({
-			"git log --no-merges": { out: "docs: x\n\nbody\n" },
-		});
 		const result = reviewRecordStep({
-			exec,
-			base: "main",
+			commitMessages: messages("docs: x\n\nbody\n"),
 			changedFiles: ["docs/adr/0001-x.md"],
 		});
 		assert.equal(result.status, "PASS");
+	});
+
+	it("FAILs when the caller could not read the range", () => {
+		const result = reviewRecordStep({
+			commitMessages: { ok: false, text: "", error: "fatal: bad revision" },
+			changedFiles: ["scripts/lib/x.mjs"],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /bad revision/);
 	});
 });

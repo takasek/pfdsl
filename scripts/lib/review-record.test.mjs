@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	CODE_PATH,
 	classifyCycle,
 	parseReviewRecords,
 	parseReviewTrailer,
-	RECORD_SEP,
 } from "./review-record.mjs";
 
 describe("parseReviewTrailer", () => {

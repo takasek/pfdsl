@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
 	classifyAuditIssuesFlowResult,
@@ -10,17 +11,18 @@ import {
 	classifyDesignRecordTiming,
 	classifyIssueLookupFailure,
 	classifyOutputArtifactStatus,
-	classifyPrBodyFailure,
 	classifySizeDirection,
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
 	deriveManualItems,
+	derivePackageLayers,
 	diffNewTerminals,
 	diffReadySets,
 	extractGateChecklist,
 	formatGateTable,
 	formatSizeDelta,
 	GATE_CHECKLIST_SOURCE_PATH,
+	hasSizeOverride,
 	hasStatusChange,
 	lintCommitSubjects,
 	matchesTrigger,
@@ -784,22 +786,22 @@ describe("classifySizeDirection", () => {
 		assert.match(result.detail, /no tracked knowledge-artifact changes/);
 	});
 
-	it("FAILs when a tracked artifact grew and the PR body has no Size-Override", () => {
+	it("FAILs when a tracked artifact grew and no commit declares a Size-Override", () => {
 		const result = classifySizeDirection({
 			issueBody: declared,
 			deltas: [grownDelta],
-			prBody: "",
+			overrideDeclared: false,
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /\+50 bytes/);
 		assert.match(result.detail, /\+5 lines/);
 	});
 
-	it("PASSes growth when the PR body carries a Size-Override token", () => {
+	it("PASSes growth that a commit trailer declared", () => {
 		const result = classifySizeDirection({
 			issueBody: declared,
 			deltas: [grownDelta],
-			prBody: "Size-Override: intentional growth, see discussion",
+			overrideDeclared: true,
 		});
 		assert.equal(result.status, "PASS");
 		assert.match(result.detail, /Size-Override/);
@@ -812,79 +814,78 @@ describe("classifySizeDirection", () => {
 		});
 		assert.deepEqual(result, { status: "PASS" });
 	});
+});
 
-	it("takes the caller's verdict when the PR body could not be read (#749)", () => {
-		// An unreadable body is not an absent Size-Override. Treating the two
-		// alike failed cycles that had written the token correctly, in exactly
-		// the environments that cannot fetch it.
-		const result = classifySizeDirection({
-			issueBody: declared,
-			deltas: [grownDelta],
-			prBodyFailure: { status: "SKIP", detail: "gh CLI unavailable" },
-		});
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /gh CLI unavailable/);
-		// The growth still has to be visible; a verdict that hid it would report
-		// less than the FAIL it replaces.
-		assert.match(result.detail, /\+50 bytes/);
+// The declaration moved out of the PR body and into a commit trailer (#775):
+// the terminal gate runs before the PR exists, so the body was unreadable in
+// the ordinary case and editable after the fact in every other one.
+describe("hasSizeOverride", () => {
+	it("finds the token in a commit's trailer region", () => {
+		const message = [
+			"docs: grow the catalogue",
+			"",
+			"prose about the change",
+			"",
+			"Size-Override: the pattern catalogue gained an entry",
+		].join("\n");
+		assert.equal(hasSizeOverride(message), true);
 	});
 
-	it("FAILs an unreadable body the caller judged a real error, not an absent one", () => {
-		const result = classifySizeDirection({
-			issueBody: declared,
-			deltas: [grownDelta],
-			prBodyFailure: { status: "FAIL", detail: "PR body lookup failed: 401" },
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /401/);
+	it("ignores the token quoted in prose, the way the review record does", () => {
+		const message = [
+			"docs: explain the token",
+			"",
+			"A cycle writes Size-Override: <reason> when growth is intended.",
+		].join("\n");
+		assert.equal(hasSizeOverride(message), false);
 	});
 
-	it("still PASSes an unreadable body when nothing grew", () => {
-		const result = classifySizeDirection({
-			issueBody: declared,
-			deltas: [shrunkDelta],
-			prBodyFailure: { status: "SKIP", detail: "gh CLI unavailable" },
-		});
-		assert.equal(result.status, "PASS");
+	it("requires a reason, so a bare token does not pass", () => {
+		assert.equal(hasSizeOverride("docs: x\n\nprose\n\nSize-Override:"), false);
+	});
+
+	it("scans every commit in the range, not just the last", () => {
+		const blob = [
+			"docs: a\n\nprose\n\nSize-Override: intentional",
+			"docs: b\n\nprose\n\nCo-Authored-By: Someone <s@example.com>",
+		].join(RECORD_SEP);
+		assert.equal(hasSizeOverride(blob), true);
+	});
+
+	it("is false for an empty range", () => {
+		assert.equal(hasSizeOverride(""), false);
+		assert.equal(hasSizeOverride(undefined), false);
 	});
 });
 
-// The same SKIP-vs-FAIL split classifyIssueLookupFailure draws for issues
-// (#745): only a missing binary is the environment's doing. A lookup that ran
-// and failed has to FAIL, or the row is one nobody acts on.
-describe("classifyPrBodyFailure", () => {
-	it("SKIPs when the gh binary is missing", () => {
-		const result = classifyPrBodyFailure({ code: "ENOENT" });
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /gh CLI unavailable/);
-	});
-
-	it("SKIPs when the branch simply has no open PR yet", () => {
-		// The terminal gate normally runs before the PR exists, so this is the
-		// ordinary case rather than an error.
-		for (const message of [
-			"no open pull request for branch 'feat/x'",
-			"Command failed: gh pr view\nno pull requests found for branch",
-		]) {
-			const result = classifyPrBodyFailure(new Error(message));
-			assert.equal(result.status, "SKIP");
-			assert.match(result.detail, /no open PR/);
-		}
-	});
-
-	it("FAILs a lookup that ran and failed for any other reason", () => {
-		const result = classifyPrBodyFailure(
-			new Error("HTTP 401: Bad credentials"),
+// The package layer a cycle targets is the diff, not a claim about it (#801).
+// The companion used to ask for it in the PR body, which is written after the
+// point where knowing the layer would have changed anything.
+describe("derivePackageLayers", () => {
+	it("names each package under packages/ the branch touched, once", () => {
+		assert.deepEqual(
+			derivePackageLayers([
+				"packages/core/src/graph.ts",
+				"packages/core/src/parse.ts",
+				"packages/cli/src/index.ts",
+			]),
+			["cli", "core"],
 		);
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /401/);
 	});
 
-	it("reads gh's message out of stderr, where execFileSync leaves it", () => {
-		const error = Object.assign(new Error("Command failed: gh pr view"), {
-			stderr: "no pull requests found for branch 'feat/x'\n",
-		});
-		assert.equal(classifyPrBodyFailure(error).status, "SKIP");
+	it("ignores paths outside packages/", () => {
+		assert.deepEqual(
+			derivePackageLayers(["scripts/gate-check.mjs", ".pfdsl/roadmap.md"]),
+			[],
+		);
+	});
+
+	it("ignores a file sitting directly in packages/", () => {
+		assert.deepEqual(derivePackageLayers(["packages/README.md"]), []);
+	});
+
+	it("is empty for an empty diff", () => {
+		assert.deepEqual(derivePackageLayers([]), []);
 	});
 });
 

@@ -14,15 +14,15 @@ import { parseArgs } from "node:util";
 import {
 	classifyAuditIssuesFlowResult,
 	classifyIssueLookupFailure,
-	classifyPrBodyFailure,
 	deriveManualItems,
+	derivePackageLayers,
 	diffNewTerminals,
 	diffReadySets,
 	extractGateChecklist,
 	formatGateTable,
 	formatSizeDelta,
 	GATE_CHECKLIST_SOURCE_PATH,
-	hasShrinkIntent,
+	hasSizeOverride,
 	matchesTrigger,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
@@ -32,6 +32,7 @@ import {
 	changedFilesSince,
 	checkDocsStep,
 	collectSizeDeltas,
+	commitMessagesSince,
 	commitSubjectStep,
 	designRecordStep,
 	genPluginIdentityStep,
@@ -248,9 +249,12 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 // granularity stays MANUAL)
 results.push(commitSubjectStep({ exec, base }));
 
+// Every trailer-borne declaration reads this, so it is fetched once.
+const commitMessages = commitMessagesSince({ exec, base });
+
 // 8b. Review record: judged here, before the PR, because the trailer lives
 // in a commit message and cannot be added afterwards (#698).
-results.push(reviewRecordStep({ exec, base, changedFiles }));
+results.push(reviewRecordStep({ commitMessages, changedFiles }));
 
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(
@@ -303,27 +307,15 @@ results.push(...perIssueSteps(designRecordStep, issues, { exec, base }));
 // convention and stays until something needs them shared too.
 const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
 
-// The PR body carries Size-Override, so only a cycle whose issue declares a
-// shrink intent needs it — and it goes through execGh, since a bare `gh` came
-// back empty wherever the binary is missing and read as "no override was
-// written" (#749). One lookup serves every issue; a failure is passed along as
-// itself so the step can SKIP rather than fail a cycle it could not judge.
-let prBody;
-let prBodyFailure;
-if (issues.some(({ issue }) => hasShrinkIntent(issue?.body ?? ""))) {
-	try {
-		prBody = await execGh(["pr", "view", "--json", "body", "--jq", ".body"], {
-			cwd: root,
-		});
-	} catch (e) {
-		prBodyFailure = classifyPrBodyFailure(e);
-	}
-}
+// Size-Override rides in a commit trailer (#775). The branch's own messages
+// are always readable here, which is what the PR body never was: the gate runs
+// before the PR exists, so the lookup it replaced spent most of its life
+// reporting that it could not run.
+const overrideDeclared = hasSizeOverride(commitMessages.text);
 results.push(
 	...perIssueSteps(sizeDirectionStep, issues, {
 		deltas: sizeDeltas,
-		prBody,
-		prBodyFailure,
+		overrideDeclared,
 	}),
 );
 
@@ -427,6 +419,16 @@ console.log(formatGateTable(results));
 if (sizeDeltas.length > 0) {
 	console.log(`\nKnowledge-artifact size (origin/${base} → HEAD):`);
 	for (const d of sizeDeltas) console.log(`  ${formatSizeDelta(d)}`);
+}
+
+// Report material: the package layers the diff touched, for the PR body. Not a
+// verdict — the diff already is the answer, so there is nothing for the runner
+// to get wrong and nothing for a gate to catch (#801).
+{
+	const layers = derivePackageLayers(changedFiles);
+	if (layers.length > 0) {
+		console.log(`\nPackage layers touched: ${layers.join(", ")}`);
+	}
 }
 
 console.log("\nMANUAL (judge and confirm each):");

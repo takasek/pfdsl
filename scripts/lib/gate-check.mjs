@@ -4,6 +4,7 @@
  */
 
 import { isGhUnavailableError } from "../pfdsl/lib/gh-compat.mjs";
+import { trailerLines } from "./commit-trailers.mjs";
 
 /**
  * @param {string[]} files
@@ -90,34 +91,6 @@ export function classifyIssueLookupFailure(error) {
 	return {
 		status: "FAIL",
 		detail: `issue lookup failed: ${error?.message ?? String(error)}`,
-	};
-}
-
-/**
- * The same split for the PR body the size-direction check reads.
- *
- * Two causes are the environment's rather than the cycle's: no gh binary, and
- * no PR yet — the terminal gate normally runs before the PR is opened, so that
- * one is the ordinary case. Everything else ran and failed, and per the
- * reasoning above it has to FAIL rather than leave a row nobody acts on.
- * execFileSync puts gh's own wording on `stderr` rather than in the message,
- * so both are searched.
- * @param {{ code?: string, message?: string, stderr?: unknown }} error
- * @returns {{status: 'SKIP'|'FAIL', detail: string}}
- */
-export function classifyPrBodyFailure(error) {
-	if (isGhUnavailableError(error)) {
-		return { status: "SKIP", detail: "gh CLI unavailable" };
-	}
-	const said = [error?.message, error?.stderr?.toString?.()]
-		.filter(Boolean)
-		.join(" ");
-	if (/no (open )?pull requests? /i.test(said)) {
-		return { status: "SKIP", detail: "no open PR for this branch yet" };
-	}
-	return {
-		status: "FAIL",
-		detail: `PR body lookup failed: ${error?.message ?? String(error)}`,
 	};
 }
 
@@ -585,12 +558,56 @@ export const SIZE_TRACKED_PATTERNS = [
 export const SIZE_OVERRIDE_PATTERN = /^Size-Override:\s*\S/m;
 
 /**
+ * Did any commit in the range declare that the growth is intended?
+ *
+ * The declaration lives in a commit trailer rather than the PR body (#775).
+ * The terminal gate runs before the PR is opened, so the body was unreadable
+ * in the ordinary case — the check had to carry a whole SKIP-vs-FAIL split
+ * (`classifyPrBodyFailure`) just to say so — and a body can be edited after
+ * the verdict, which a commit message cannot.
+ *
+ * Scanning the trailer region rather than every line is what keeps a commit
+ * whose prose explains the token from declaring one (#726), and the prefix
+ * filter is what keeps the Conventional Commits subject, itself `Key: value`
+ * shaped, out of the answer.
+ * @param {string | undefined | null} commitMessages - RECORD_SEP between messages
+ * @returns {boolean}
+ */
+export function hasSizeOverride(commitMessages) {
+	return trailerLines(commitMessages).some((line) =>
+		SIZE_OVERRIDE_PATTERN.test(line),
+	);
+}
+
+/**
  * Does the linked issue declare that something should get smaller?
  * @param {string | undefined | null} issueBody
  * @returns {boolean}
  */
 export function hasShrinkIntent(issueBody) {
 	return SIZE_INTENT_PATTERN.test(issueBody ?? "");
+}
+
+/**
+ * The package layers this branch touched, read off the diff.
+ *
+ * The companion used to require the runner to name these in the PR body, and
+ * three cycles in a row forgot to (#801). The claim was never the evidence:
+ * the diff is, and it is available at gate time while the PR body is not. So
+ * this is report material — printed for whoever writes the PR, judged by
+ * nobody. What the declaration was for (noticing a layer mismatch before
+ * starting) is a planning-time concern, and a line written at PR time was
+ * always past the point where it could serve that.
+ * @param {string[]} changedFiles
+ * @returns {string[]} package directory names, sorted and deduplicated
+ */
+export function derivePackageLayers(changedFiles) {
+	const layers = new Set();
+	for (const file of changedFiles) {
+		const match = /^packages\/([^/]+)\//.exec(file);
+		if (match) layers.add(match[1]);
+	}
+	return [...layers].sort();
 }
 
 /**
@@ -620,22 +637,15 @@ export function formatSizeDelta(d) {
  * gated on the declaration — the deltas themselves are reported either way, so
  * a missing declaration costs the numbers nothing.
  *
- * `prBodyFailure` is what separates "no override was written" from "the
- * override could not be read", which an empty body used to conflate: a cycle
- * that wrote the token correctly failed anyway wherever the body was
- * unfetchable, and the detail said only that things had grown (#749). Whether
- * that is a SKIP or a FAIL is classifyPrBodyFailure's call, not this
- * function's — the growth is appended to whichever it chose.
- * @param {{issueBody?: string, deltas: SizeDelta[], prBody?: string,
- *          prBodyFailure?: {status: 'SKIP'|'FAIL', detail: string}}} params
+ * `overrideDeclared` comes from the branch's commit trailers, which are local
+ * and always present. The distinction #749 had to draw — "no override was
+ * written" versus "the override could not be read" — belonged to a PR-body
+ * lookup that no longer happens, so both it and the SKIP/FAIL line it drew are
+ * gone (#775).
+ * @param {{issueBody?: string, deltas: SizeDelta[], overrideDeclared?: boolean}} params
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
-export function classifySizeDirection({
-	issueBody,
-	deltas,
-	prBody,
-	prBodyFailure,
-}) {
+export function classifySizeDirection({ issueBody, deltas, overrideDeclared }) {
 	if (!hasShrinkIntent(issueBody)) {
 		return {
 			status: "SKIP",
@@ -650,13 +660,7 @@ export function classifySizeDirection({
 	if (grown.length === 0) return { status: "PASS" };
 
 	const list = grown.map(formatSizeDelta).join(", ");
-	if (prBodyFailure) {
-		return {
-			status: prBodyFailure.status,
-			detail: `${prBodyFailure.detail}, so Size-Override could not be checked; growth left unjudged: ${list}`,
-		};
-	}
-	if (SIZE_OVERRIDE_PATTERN.test(prBody ?? "")) {
+	if (overrideDeclared) {
 		return {
 			status: "PASS",
 			detail: `growth accepted via Size-Override: ${list}`,
