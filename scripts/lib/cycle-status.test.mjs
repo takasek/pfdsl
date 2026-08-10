@@ -16,6 +16,7 @@ import {
 } from "./cycle-status.mjs";
 import {
 	classifyDesignRecordContent,
+	NO_IMPLEMENTATION_TOKEN,
 	selectDesignRecord,
 } from "./gate-check.mjs";
 
@@ -545,5 +546,12 @@ describe("buildDesignRecordTemplate", () => {
 	it("carries a note explaining that the line heads are machine-matched", () => {
 		const { note } = buildDesignRecordTemplate({ optionCount: 0 });
 		assert.match(note, /gate-check/);
+	});
+
+	// #768: the template has to name the actual token, not a paraphrase of
+	// it — a paraphrase can drift from what gate-check.mjs actually matches.
+	it("names the no-implementation token gate-check.mjs actually matches", () => {
+		const { note } = buildDesignRecordTemplate({ optionCount: 0 });
+		assert.ok(note.includes(NO_IMPLEMENTATION_TOKEN));
 	});
 });

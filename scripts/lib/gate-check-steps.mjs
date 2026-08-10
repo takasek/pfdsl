@@ -20,6 +20,7 @@ import {
 	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
+	hasNoImplementationDisposition,
 	hasStatusChange,
 	lintCommitSubjects,
 	matchesTrigger,
@@ -265,7 +266,10 @@ export function designRecordStep({ exec, base, issue, issueFailure }) {
 		? firstCommitOut.out.trim().split("\n")[0] || null
 		: null;
 
-	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso);
+	const noImplementation = hasNoImplementationDisposition(record.body);
+	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso, {
+		noImplementation,
+	});
 	// #737 案1: content structure (required line heads, disposition-token
 	// coverage) is report material, not a judge — only timing decides the row.
 	// Real repro over this repo's history: 0 true positives, 3 false positives

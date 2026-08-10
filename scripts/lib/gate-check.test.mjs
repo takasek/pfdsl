@@ -22,10 +22,12 @@ import {
 	formatGateTable,
 	formatSizeDelta,
 	GATE_CHECKLIST_SOURCE_PATH,
+	hasNoImplementationDisposition,
 	hasSizeOverride,
 	hasStatusChange,
 	lintCommitSubjects,
 	matchesTrigger,
+	NO_IMPLEMENTATION_TOKEN,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
 	SIZE_INTENT_PATTERN,
@@ -645,6 +647,22 @@ describe("classifyDesignRecordTiming", () => {
 	it("SKIPs when there is no commit in range to compare against", () => {
 		const result = classifyDesignRecordTiming("2026-07-30T00:00:00Z", null);
 		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no implementation commits/);
+	});
+
+	// #768: a cycle can settle on not implementing at all, then close on
+	// commits that belong to a different, derived PR (the #757 shape) — those
+	// commits exist, so the no-commit SKIP above never fires, yet their timing
+	// against this record says nothing either. The record itself carries the
+	// signal.
+	it("SKIPs on a commit-bearing range when the record declares no implementation", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T00:00:00Z",
+			"2026-07-30T12:00:00Z",
+			{ noImplementation: true },
+		);
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no implementation commits/);
 	});
 
 	it("PASSes when the record predates the first commit", () => {
@@ -781,6 +799,28 @@ describe("DESIGN_RECORD_REQUIRED_PREFIXES / DISPOSITION_TOKENS", () => {
 			"却下理由:",
 		]);
 		assert.deepEqual(DISPOSITION_TOKENS, ["採用", "却下", "保留"]);
+	});
+});
+
+describe("hasNoImplementationDisposition", () => {
+	it("is false for an ordinary record", () => {
+		assert.equal(
+			hasNoImplementationDisposition("前提: x\n否定案: y\n却下理由: z"),
+			false,
+		);
+	});
+
+	it("is true when the record's own text carries the token", () => {
+		assert.equal(
+			hasNoImplementationDisposition(
+				`前提: x\n否定案: y\n却下理由: ${NO_IMPLEMENTATION_TOKEN}`,
+			),
+			true,
+		);
+	});
+
+	it("is false for a missing body", () => {
+		assert.equal(hasNoImplementationDisposition(undefined), false);
 	});
 });
 

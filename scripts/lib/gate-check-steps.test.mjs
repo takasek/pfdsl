@@ -524,6 +524,32 @@ describe("designRecordStep", () => {
 		assert.equal(result.status, "SKIP");
 	});
 
+	// #768: the #757 shape — the decision led to not implementing, and a
+	// later, unrelated PR happens to be what closes this issue's range. The
+	// range is not empty, so the no-commit SKIP above never fires; the record
+	// itself has to carry the signal instead.
+	it("SKIPs a commit-bearing range when the record declares no implementation", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				body: "普通の説明文。",
+				comments: [
+					{
+						author: { login: "owner" },
+						body: "前提: x\n否定案: y\n却下理由: 実装しない。",
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
+			}),
+		});
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no implementation commits/);
+	});
+
 	it("PASSes when the record predates the first commit and covers every enumerated option", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },

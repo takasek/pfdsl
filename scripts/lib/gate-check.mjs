@@ -384,18 +384,45 @@ export function deriveManualItems(checklistItems) {
  * first commit (issue #669's protection against "the decision record is
  * written after the fact"). A record posted after work already started
  * documents a choice that was made retroactively, not one that guided it.
+ *
+ * Only GitHub's server-side timestamps decide PASS/FAIL/SKIP here — the
+ * runner cannot forge `createdAt`/`lastEditedAt`/commit `authorDate` (#824).
  * @param {string | null | undefined} recordIso - createdAt of the record comment.
  * @param {string | null | undefined} firstCommitIso - authorDate of the range's first commit.
+ * @param {{editedAtIso?: string | null, noImplementation?: boolean}} [options]
+ *   - editedAtIso: the record's own lastEditedAt (#737 案2), or null/undefined
+ *     when it was never edited or edit history could not be read.
+ *   - noImplementation: the record itself declared no implementation (#768) —
+ *     wins over every other check, since a cycle with no implementation
+ *     commits in this range has nothing for timing to compare against, even
+ *     when the range is not literally empty (the #757 shape: commits present,
+ *     but belonging to a different, derived PR).
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
-export function classifyDesignRecordTiming(recordIso, firstCommitIso) {
+export function classifyDesignRecordTiming(
+	recordIso,
+	firstCommitIso,
+	{ editedAtIso, noImplementation } = {},
+) {
 	if (!recordIso)
 		return { status: "FAIL", detail: "no design-selection record found" };
-	if (!firstCommitIso) return { status: "SKIP", detail: "no commits in range" };
+	if (noImplementation)
+		return { status: "SKIP", detail: NO_IMPLEMENTATION_COMMITS_DETAIL };
+	if (!firstCommitIso)
+		return { status: "SKIP", detail: NO_IMPLEMENTATION_COMMITS_DETAIL };
 	if (new Date(recordIso).getTime() > new Date(firstCommitIso).getTime()) {
 		return {
 			status: "FAIL",
 			detail: `record posted at ${recordIso}, after the first commit at ${firstCommitIso}`,
+		};
+	}
+	if (
+		editedAtIso &&
+		new Date(editedAtIso).getTime() > new Date(firstCommitIso).getTime()
+	) {
+		return {
+			status: "FAIL",
+			detail: `record edited at ${editedAtIso}, after the first commit at ${firstCommitIso}`,
 		};
 	}
 	return { status: "PASS" };
@@ -407,6 +434,30 @@ export const DESIGN_RECORD_REQUIRED_PREFIXES = [
 	"却下理由:",
 ];
 export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
+
+// #768: a design-selection record can settle on not implementing at all (the
+// #757 shape — the decision led elsewhere, and any commits later found in
+// range belong to a different, derived PR). Written into the record body the
+// same way DISPOSITION_TOKENS are, and checked the same way: a plain
+// substring match, not a parsed grammar.
+export const NO_IMPLEMENTATION_TOKEN = "実装しない";
+
+/** Shared by both timing SKIP paths that mean "there is nothing to compare". */
+export const NO_IMPLEMENTATION_COMMITS_DETAIL =
+	"no implementation commits — timing unverifiable";
+
+/**
+ * Did the selected design-selection record itself settle on not
+ * implementing? Forgeable by a runner that implemented anyway and mislabels
+ * the record — accepted (#824): the PR diff would then contradict the label,
+ * and that contradiction is what human review catches. No detector is added
+ * to close this, on purpose.
+ * @param {string | undefined | null} recordBody
+ * @returns {boolean}
+ */
+export function hasNoImplementationDisposition(recordBody) {
+	return (recordBody ?? "").includes(NO_IMPLEMENTATION_TOKEN);
+}
 
 /** Markdown line-head decoration: blockquote, heading, or list marker. */
 const LINE_HEAD_DECORATION = /^(?:>+|#{1,6}|[-*+]|\d+[.)])\s*/;

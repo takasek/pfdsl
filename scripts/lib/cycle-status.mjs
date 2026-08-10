@@ -6,6 +6,7 @@
 import {
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
+	NO_IMPLEMENTATION_TOKEN,
 	selectDesignRecord,
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
@@ -184,7 +185,7 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
 		);
 	}
 	return {
-		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 雛形のまま投稿しても形式は通るが、記録としては何も残らない。`,
+		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 雛形のまま投稿しても形式は通るが、記録としては何も残らない。実装しないと判断した回のみ、記録本文のどこかに「${NO_IMPLEMENTATION_TOKEN}」という語を含める — timing 判定が SKIP になり、コミットとの前後関係を照合しない。`,
 		lines,
 	};
 }
