@@ -153,15 +153,16 @@ function printSelection(patterns, query) {
 			`matched ${matched.length}/${query.tags.length}: ${matched.join(", ")}`,
 		);
 
-	console.log(`\n## word-only (${wordOnly.length}) — what the tags missed`);
+	console.log(
+		`\n## word-only (${wordOnly.length} of ${pool - tagged.length}) — what the tags missed`,
+	);
 	if (reach.length > 0) {
 		console.log(
 			`  reach before subtraction: ${reach.map((r) => `${r.word} ${r.count}`).join(", ")}`,
 		);
 		console.log(
-			"  reach counts patterns; it does not name them. `near --word <word>` names which,",
+			"  reach counts patterns; `near --word <word>` names which, the tagged ones included.",
 		);
-		console.log("  the tagged ones included.");
 	}
 	if (query.words.length === 0) {
 		console.log(
