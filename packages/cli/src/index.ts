@@ -1606,6 +1606,15 @@ function idsNotFoundError(
 	return fail(`error: id(s) not found in ${file}: ${ids.join(", ")}\n`, 1);
 }
 
+/** Text rendering shared by `graph neighbors` and `graph describe`: an id list, feedback neighbors annotated. */
+function renderNeighborList(ns: GraphNeighbor[]): string {
+	return (
+		ns
+			.map((n) => (n.kind === "feedback" ? `${n.id} (feedback)` : n.id))
+			.join(", ") || "(none)"
+	);
+}
+
 export function runNeighbors(
 	file: string,
 	id: string,
@@ -1619,13 +1628,23 @@ export function runNeighbors(
 	if (opts.json) {
 		return ok(`${JSON.stringify({ ok: true, predecessors, successors })}\n`);
 	}
-	const render = (ns: GraphNeighbor[]): string =>
-		ns
-			.map((n) => (n.kind === "feedback" ? `${n.id} (feedback)` : n.id))
-			.join(", ") || "(none)";
 	return ok(
-		`predecessors: ${render(predecessors)}\nsuccessors: ${render(successors)}\n`,
+		`predecessors: ${renderNeighborList(predecessors)}\nsuccessors: ${renderNeighborList(successors)}\n`,
 	);
+}
+
+/** Text rendering shared by `graph locate` and `graph describe`: one `<file>:<line>: <kind>` line per occurrence. */
+function renderLocateLines(
+	file: string,
+	declarationLine: number | null,
+	edgeLines: readonly number[],
+): string[] {
+	const lines: string[] = [];
+	if (declarationLine !== null) {
+		lines.push(`${file}:${declarationLine}: declaration`);
+	}
+	for (const line of edgeLines) lines.push(`${file}:${line}: edge`);
+	return lines;
 }
 
 /**
@@ -1653,11 +1672,7 @@ export function runGraphLocate(
 			`${JSON.stringify({ ok: true, id, declarationLine, edgeLines })}\n`,
 		);
 	}
-	const lines: string[] = [];
-	if (declarationLine !== null) {
-		lines.push(`${file}:${declarationLine}: declaration`);
-	}
-	for (const line of edgeLines) lines.push(`${file}:${line}: edge`);
+	const lines = renderLocateLines(file, declarationLine, edgeLines);
 	return ok(lines.length ? `${lines.join("\n")}\n` : "");
 }
 
