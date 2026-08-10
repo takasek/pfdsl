@@ -2126,10 +2126,11 @@ Exit codes:
 const HELP_META_SET = `usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json] [--no-color]
 
 Set a scalar frontmatter field on one or more nodes, rewriting the file in
-place. The frontmatter is re-emitted in canonical form, except that a folded
-(>) scalar keeps the line breaks its author wrote. Multiple comma-separated
-ids get the same value; the call is atomic (all writes land or none do).
-Quote values containing spaces.
+place. The frontmatter is re-emitted in canonical form, except that other,
+untouched folded (>) scalar fields keep the line breaks their author wrote —
+the field being set is always re-serialized. Multiple comma-separated ids get
+the same value; the call is atomic (all writes land or none do). Quote values
+containing spaces.
 
 Field-aware validation: status must be one of todo | wip | done | waiting |
 suspended; index must be a non-negative integer; the field must be valid for
