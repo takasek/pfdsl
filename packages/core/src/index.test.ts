@@ -146,6 +146,23 @@ describe("public API", () => {
 			const src = "---\nartifact:\n  a:\n    label: A\n---\na >> P -> b\n";
 			expect(format(src).output).not.toContain("\r");
 		});
+
+		// Document#toString({ lineWidth: 0 }) would otherwise collapse a folded
+		// (`>`) scalar's hand-chosen line wraps onto one continuation line (#815).
+		it("preserves a folded scalar's hand-wrapped line breaks", () => {
+			const src =
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toContain("description: >\n      Hello\n      world.\n");
+		});
+
+		it("is idempotent for a folded scalar's hand-wrapped line breaks", () => {
+			const src =
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
+			const { output: first } = format(src);
+			const { output: second } = format(first);
+			expect(second).toBe(first);
+		});
 	});
 
 	it("format: isolated frontmatter node appears exactly once across multiple flow segments (regression #368)", () => {
