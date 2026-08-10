@@ -158,6 +158,10 @@ function printSelection(patterns, query) {
 		console.log(
 			`  reach before subtraction: ${reach.map((r) => `${r.word} ${r.count}`).join(", ")}`,
 		);
+		console.log(
+			"  reach counts patterns; it does not name them. `near --word <word>` names which,",
+		);
+		console.log("  the tagged ones included.");
 	}
 	if (query.words.length === 0) {
 		console.log(
