@@ -186,7 +186,7 @@ artifact:
 	// line break (#644), so when a fold is the last field in the frontmatter,
 	// the write path used to lose that newline on re-splice — gluing the
 	// newly inserted sibling definition onto the fold's last continuation
-	// line with no separating newline (#816).
+	// line with no separating newline (#815).
 	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field before inserting a sibling definition", () => {
 		const src = `---
 artifact:

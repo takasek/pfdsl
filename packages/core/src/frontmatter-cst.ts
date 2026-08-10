@@ -126,7 +126,7 @@ interface FoldedScalarSnapshot {
  * are built from only the `isPair` steps on its `visit` path, which drops
  * any sequence index in between. Trying to keep that index would let a
  * fold's path collide with a sibling seq element when a map key happens to
- * be numeric (#816) — excluding the whole subtree up front is what the
+ * be numeric (#815) — excluding the whole subtree up front is what the
  * `keys` shape can actually represent, not an accident of what `getIn`
  * later resolves.
  */
@@ -162,7 +162,7 @@ function collectFoldedScalars(yamlText: string): FoldedScalarSnapshot[] {
  * indentation indicator — a digit directly after the `>`, e.g. `>2`, `>2-`,
  * `>-2`. Only the indicator zone between `>` and any trailing `# comment` is
  * checked: a comment containing a digit (an issue number is common in this
- * repo) is not an indentation indicator and must not trip this (#816).
+ * repo) is not an indentation indicator and must not trip this (#815).
  */
 function headerHasIndentIndicator(headerLine: string): boolean {
 	const withoutComment = headerLine.split("#")[0] ?? "";
@@ -177,7 +177,7 @@ function headerHasIndentIndicator(headerLine: string): boolean {
  * Unicode whitespace (full-width space U+3000, NBSP U+00A0, ...), which are
  * ordinary content characters in YAML, not indentation; measuring with it
  * over-counts a continuation line that happens to start with one of those
- * and eats it out of the reindented value (#816). Tabs are invalid YAML
+ * and eats it out of the reindented value (#815). Tabs are invalid YAML
  * indentation, so they aren't counted either.
  */
 function leadingSpaceCount(line: string): number {
@@ -213,7 +213,7 @@ function reindentFold(origRaw: string, newRaw: string): string | null {
 	// the last field in the frontmatter, parseFrontmatterCst's yamlText slice
 	// (which excludes the fence's own line break) has dropped one newline that
 	// newRaw's render always has, and a splice built purely from origRaw's line
-	// structure loses it — corrupting the file at the closing fence (#816).
+	// structure loses it — corrupting the file at the closing fence (#815).
 	// Trailing blank lines in the middle of a `>+` fold are part of the decoded
 	// value and come from origBody unchanged; only the count of *fully trailing*
 	// blank lines is corrected to match newRaw's.

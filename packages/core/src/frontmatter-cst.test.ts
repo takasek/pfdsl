@@ -228,7 +228,7 @@ describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", 
 	// space (U+3000) or NBSP (U+00A0) — plausible for a hand-indented
 	// Japanese paragraph — inflated the measured indent by one, and slicing
 	// at that inflated indent then ate the leading full-width-space/NBSP
-	// character out of the decoded value (#816).
+	// character out of the decoded value (#815).
 	it("does not eat a leading full-width space from continuation lines", () => {
 		const src = `artifact:
   a:
@@ -264,7 +264,7 @@ describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", 
 	// an explicit indentation indicator (`>2`), so a header-line comment
 	// containing a digit (e.g. an issue number) made it wrongly bail out and
 	// stop preserving the wraps, even though there is no indentation
-	// indicator at all (#816).
+	// indicator at all (#815).
 	it("preserves wraps when the fold header has a trailing comment containing a digit", () => {
 		const src = `artifact:
   a:
@@ -368,8 +368,8 @@ describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", 
 	// origRaw is missing the trailing newline that newRaw's render always has.
 	// reindentFold used to build the replacement purely from origRaw's line
 	// structure, losing that newline and merging the closing fence into the
-	// fold's last continuation line (#816).
-	describe("keeps newRaw's trailing newline count when the fold is the document's last field (#816)", () => {
+	// fold's last continuation line (#815).
+	describe("keeps newRaw's trailing newline count when the fold is the document's last field (#815)", () => {
 		it("clip chomping (>)", () => {
 			const src = `artifact:
   a:
@@ -435,7 +435,7 @@ describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", 
 	// `isPair` steps on its `visit` path, dropping the sequence index. When a
 	// map key inside a sequence element happened to be numeric, that number
 	// was read back as the dropped index and resolved to a *different* seq
-	// element — splicing one fold's wraps onto another node entirely (#816).
+	// element — splicing one fold's wraps onto another node entirely (#815).
 	// ADR-0037 already scopes fold preservation out of sequences; this locks
 	// that in as an explicit skip rather than an accident of `getIn` missing.
 	it("does not preserve wraps on folded scalars inside a sequence, even with a numeric map key (ADR-0037)", () => {
@@ -688,7 +688,7 @@ describe("setFrontmatterField", () => {
 	// When the fold is the frontmatter's last field, parseFrontmatterCst's
 	// yamlText slice has already dropped the trailing newline the closing
 	// fence's own line break carried, and the write path used to fail to make
-	// that up on re-splice — gluing the fence onto the fold's last line (#816).
+	// that up on re-splice — gluing the fence onto the fold's last line (#815).
 	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
 		const src =
 			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n---\na >> P -> b\n";

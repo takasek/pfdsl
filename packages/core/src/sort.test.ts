@@ -390,7 +390,7 @@ a >> p -> z
 	// parseFrontmatterCst's yamlText slice excludes the closing fence's own
 	// line break (#644), so when a fold is the last field in the frontmatter,
 	// the write path used to lose that newline on re-splice — gluing the
-	// closing fence onto the fold's last continuation line (#816).
+	// closing fence onto the fold's last continuation line (#815).
 	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
 		const src = `---
 artifact:

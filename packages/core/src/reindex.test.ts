@@ -292,7 +292,7 @@ a >> p -> b
 	// the write path used to lose that newline on re-splice — gluing the
 	// closing fence onto the fold's last continuation line, or (with
 	// --renumber) swallowing the following field's added `index:` into the
-	// fold's decoded value with no error reported (#816).
+	// fold's decoded value with no error reported (#815).
 	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
 		const src = `---
 artifact:

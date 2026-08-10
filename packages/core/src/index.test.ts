@@ -188,7 +188,7 @@ describe("public API", () => {
 		// parseFrontmatterCst's yamlText slice excludes the closing fence's own
 		// line break (#644), so when a fold is the last field in the
 		// frontmatter, the write path used to lose that newline on re-splice —
-		// gluing the closing fence onto the fold's last continuation line (#816).
+		// gluing the closing fence onto the fold's last continuation line (#815).
 		it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
 			const src =
 				"---\nartifact:\n  a:\n    status: todo\n    description: >\n      Hello\n      world.\n---\na >> P -> b\n";
@@ -202,10 +202,10 @@ describe("public API", () => {
 		// isPair steps on its visit path, dropping the sequence index — a
 		// numeric map key inside a sequence element then read back as that
 		// dropped index and resolved to a *different* seq element, splicing
-		// one fold's wraps onto it (#816). ADR-0037 already scopes fold
+		// one fold's wraps onto it (#815). ADR-0037 already scopes fold
 		// preservation out of sequences; ensure fmt is idempotent and doesn't
 		// cross-contaminate seq elements now that the skip is explicit.
-		it("does not move a sequence element's folded wraps onto another element (ADR-0037, #816)", () => {
+		it("does not move a sequence element's folded wraps onto another element (ADR-0037, #815)", () => {
 			const src =
 				"---\nseqfield:\n  - 3: >\n      shared value\n      wrapped here\n  - one\n  - two\n  - >\n      shared value\n      wrapped here\n---\na >> P -> b\n";
 			const { output: first } = format(src);
