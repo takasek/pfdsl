@@ -1,11 +1,17 @@
 import { compareIds } from "./compare.js";
 import type { Graph, NodeKind } from "./types/index.js";
 
+export interface GraphNeighbor {
+	id: string;
+	/** `primary` for `>>` / `->`, `feedback` for `>>?`. */
+	kind: "primary" | "feedback";
+}
+
 export interface Neighbors {
-	/** Nodes with a primary edge pointing into this node. */
-	predecessors: string[];
-	/** Nodes this node has a primary edge pointing to. */
-	successors: string[];
+	/** Nodes with an edge pointing into this node. */
+	predecessors: GraphNeighbor[];
+	/** Nodes this node has an edge pointing to. */
+	successors: GraphNeighbor[];
 }
 
 function buildAdjacency(graph: Graph): {
@@ -25,13 +31,28 @@ function buildAdjacency(graph: Graph): {
 	return { out, in: inn };
 }
 
-/** Direct producer/consumer neighbors of a node — the immediate in/out edges only (§ issue #479 `neighbors`). */
+/**
+ * Direct producer/consumer neighbors of a node — the immediate in/out edges
+ * only (§ issue #479 `neighbors`), `>>?` feedback edges included and tagged as
+ * such (#828).
+ *
+ * The reachability queries below stay primary-only on purpose: they rest on
+ * V010's guarantee that the primary graph is a DAG, which a walk over feedback
+ * edges would break. `neighbors` takes one step rather than a closure, so that
+ * argument does not reach it — and omitting feedback here hides the very edges
+ * an audit of feedback wiring is looking for.
+ */
 export function computeNeighbors(graph: Graph, id: string): Neighbors {
 	const { out, in: inn } = buildAdjacency(graph);
-	return {
-		predecessors: inn.get(id) ?? [],
-		successors: out.get(id) ?? [],
-	};
+	const asPrimary = (n: string): GraphNeighbor => ({ id: n, kind: "primary" });
+	const predecessors = (inn.get(id) ?? []).map(asPrimary);
+	const successors = (out.get(id) ?? []).map(asPrimary);
+	for (const e of graph.feedbackEdges) {
+		if (e.process === id)
+			predecessors.push({ id: e.artifact, kind: "feedback" });
+		if (e.artifact === id) successors.push({ id: e.process, kind: "feedback" });
+	}
+	return { predecessors, successors };
 }
 
 function closure(adjacency: Map<string, string[]>, id: string): string[] {

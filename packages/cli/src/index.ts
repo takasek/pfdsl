@@ -20,6 +20,7 @@ import {
 	type DiffReport,
 	format,
 	formatEdges,
+	type GraphNeighbor,
 	type GraphOrphan,
 	groupEdges,
 	hasErrors,
@@ -1482,8 +1483,12 @@ export function runNeighbors(
 	if (opts.json) {
 		return ok(`${JSON.stringify({ ok: true, predecessors, successors })}\n`);
 	}
+	const render = (ns: GraphNeighbor[]): string =>
+		ns
+			.map((n) => (n.kind === "feedback" ? `${n.id} (feedback)` : n.id))
+			.join(", ") || "(none)";
 	return ok(
-		`predecessors: ${predecessors.join(", ") || "(none)"}\nsuccessors: ${successors.join(", ") || "(none)"}\n`,
+		`predecessors: ${render(predecessors)}\nsuccessors: ${render(successors)}\n`,
 	);
 }
 
@@ -2230,8 +2235,10 @@ const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json] [--n
 
 Print the direct predecessors (in-edges) and successors (out-edges) of a
 node — its immediate producer(s)/consumer(s) only, not the full closure.
+Feedback (\`>>?\`) neighbors are included, annotated \`(feedback)\` in text.
 
-  --json      output as JSON ({ ok, predecessors: string[], successors: string[] })
+  --json      output as JSON ({ ok, predecessors, successors }), each neighbor
+              { id, kind: "primary" | "feedback" }
               on failure: { ok: false, diagnostics } / { ok: false, missing }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 

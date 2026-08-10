@@ -32,24 +32,54 @@ const kinds = new Map<string, "artifact" | "process">([
 const graph = buildGraph(edges, kinds);
 
 describe("computeNeighbors", () => {
+	// `report >>? design`: the report feeds back into the process that produced
+	// the spec it reviews.
+	const withFeedback = buildGraph(
+		[...edges, { kind: "feedback", artifact: "report", process: "design" }],
+		kinds,
+	);
+
 	it("returns predecessors (in-edges) and successors (out-edges) of an artifact", () => {
 		expect(computeNeighbors(graph, "spec")).toEqual({
-			predecessors: ["design"],
-			successors: ["build", "review"],
+			predecessors: [{ id: "design", kind: "primary" }],
+			successors: [
+				{ id: "build", kind: "primary" },
+				{ id: "review", kind: "primary" },
+			],
 		});
 	});
 
 	it("returns predecessors and successors of a process", () => {
 		expect(computeNeighbors(graph, "build")).toEqual({
-			predecessors: ["spec"],
-			successors: ["code"],
+			predecessors: [{ id: "spec", kind: "primary" }],
+			successors: [{ id: "code", kind: "primary" }],
 		});
 	});
 
 	it("returns empty arrays for a node with no edges on one side", () => {
 		expect(computeNeighbors(graph, "req")).toEqual({
 			predecessors: [],
-			successors: ["design"],
+			successors: [{ id: "design", kind: "primary" }],
+		});
+	});
+
+	// A `>>?` neighbor is a direct edge of the node, so a query for direct
+	// neighbors that omits it returns an image with the feedback wiring missing
+	// — which is exactly what audits of feedback wiring use this for (#828).
+	it("reports the artifact of an incoming feedback edge as a predecessor", () => {
+		expect(computeNeighbors(withFeedback, "design")).toEqual({
+			predecessors: [
+				{ id: "req", kind: "primary" },
+				{ id: "report", kind: "feedback" },
+			],
+			successors: [{ id: "spec", kind: "primary" }],
+		});
+	});
+
+	it("reports the process of an outgoing feedback edge as a successor", () => {
+		expect(computeNeighbors(withFeedback, "report")).toEqual({
+			predecessors: [{ id: "review", kind: "primary" }],
+			successors: [{ id: "design", kind: "feedback" }],
 		});
 	});
 });

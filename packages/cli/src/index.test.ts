@@ -3470,8 +3470,37 @@ spec >> review -> report
 			expect(r.exitCode).toBe(0);
 			expect(JSON.parse(r.stdout)).toEqual({
 				ok: true,
-				predecessors: ["design"],
-				successors: ["build", "review"],
+				predecessors: [{ id: "design", kind: "primary" }],
+				successors: [
+					{ id: "build", kind: "primary" },
+					{ id: "review", kind: "primary" },
+				],
+			});
+		});
+
+		// Without the annotation a `>>?` neighbor is indistinguishable from a
+		// producer/consumer, and before #828 it was absent from both outputs.
+		const withFeedback = `${base}report >>? design\n`;
+
+		it("annotates a feedback neighbor as such in text", async () => {
+			const f = join(dir, "neighbors-feedback.pfdsl");
+			writeFileSync(f, withFeedback);
+			const r = await run(["graph", "neighbors", f, "design"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				"predecessors: req, report (feedback)\nsuccessors: spec\n",
+			);
+		});
+
+		it("--json tags a feedback neighbor with kind: feedback", async () => {
+			const f = join(dir, "neighbors-feedback-json.pfdsl");
+			writeFileSync(f, withFeedback);
+			const r = await run(["graph", "neighbors", f, "report", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				predecessors: [{ id: "review", kind: "primary" }],
+				successors: [{ id: "design", kind: "feedback" }],
 			});
 		});
 
