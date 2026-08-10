@@ -64,6 +64,33 @@ export function changedFilesSince({ exec, base }) {
 }
 
 /**
+ * When this cycle started: the author date of the branch's oldest commit.
+ *
+ * Author dates, not committer dates. A rebase rewrites every committer date on
+ * the branch to the moment of the rebase, so a %cI anchor jumps forward to
+ * "now" — measured on #834's own branch, where that collapsed the cycle window
+ * to empty on the re-run the window exists for.
+ *
+ * Two checks anchor here (the design-selection record's timing and the cycle
+ * window), and a disagreement between them about when the cycle started would
+ * show up as one of them silently judging a different span, so they share the
+ * one query. `ok: false` is a failed lookup, distinct from `iso: null` on a
+ * branch that has no commits yet — callers report those differently.
+ * @param {{exec: Function, base: string}} params
+ * @returns {{ok: boolean, iso: string | null}}
+ */
+export function firstCommitAuthorDate({ exec, base }) {
+	const r = exec("git", [
+		"log",
+		"--format=%aI",
+		"--reverse",
+		`origin/${base}..HEAD`,
+	]);
+	if (!r.ok) return { ok: false, iso: null };
+	return { ok: true, iso: r.out.trim().split("\n")[0] || null };
+}
+
+/**
  * The branch's commit messages, RECORD_SEP between them — the input every
  * trailer-borne declaration is read from. Two checks want it (the review
  * record and the size override), and they have to agree about the range and
@@ -293,15 +320,7 @@ export function designRecordStep({
 		return { name, ...classifyDesignRecordTiming(undefined, null) };
 	}
 
-	const firstCommitOut = exec("git", [
-		"log",
-		"--format=%aI",
-		"--reverse",
-		`origin/${base}..HEAD`,
-	]);
-	const firstCommitIso = firstCommitOut.ok
-		? firstCommitOut.out.trim().split("\n")[0] || null
-		: null;
+	const firstCommitIso = firstCommitAuthorDate({ exec, base }).iso;
 
 	// #737 案2: the record's own edit history (editInfo is undefined/null
 	// whenever the GraphQL fetch failed or was unavailable — resolveRecordEditedAt
@@ -404,16 +423,20 @@ const CYCLE_WINDOW_INCOMPLETE_NOTE =
  *
  * (1) base commits this tree currently lacks (`HEAD..origin/<base>`) covers
  * a branch cut from an already-stale base. (2) base commits that landed
- * at/after the branch's first commit's committer date covers the shape a
- * rebase does not clear: after `git rebase origin/<base>`, those commits
- * become ancestors of HEAD, but the same shas are still reachable from
- * `origin/<base>` with a committer date past the branch's start, so a plain
- * `HEAD..origin/<base>` diff (which would show 0 once rebased) misses them
- * while this still finds them. This is exactly the gap #834 named: every
- * option the issue enumerated fires on `behindBase > 0`, i.e. assumes the
- * tree is *still* behind when the gate runs, but the measured sequence is
- * notice→rebase→re-run, at which point behindBase is 0 and none of them
- * print anything.
+ * at/after the branch's first commit covers the shape a rebase does not
+ * clear: afterwards those commits are ancestors of HEAD, but the same shas
+ * stay reachable from `origin/<base>` with a landing date past the branch's
+ * start, so a plain `HEAD..origin/<base>` diff (which shows 0 once rebased)
+ * misses them while this still finds them. This is exactly the gap #834
+ * named: every option the issue enumerated fires on `behindBase > 0`, i.e.
+ * assumes the tree is *still* behind when the gate runs, but the measured
+ * sequence is notice→rebase→re-run, at which point behindBase is 0 and none
+ * of them print anything.
+ *
+ * The one stretch neither half covers after a rebase is between the branch's
+ * creation and its first commit — part (2) has no earlier anchor to measure
+ * from, and part (1) is empty by then. Before a rebase part (1) still covers
+ * it, so the gap only opens on a re-run.
  * @param {{exec: Function, base: string}} params
  * @returns {{ok: boolean, entries?: {sha: string, subject: string}[], error?: string, note?: string}}
  */
@@ -432,23 +455,14 @@ export function collectCycleWindow({ exec, base }) {
 		note: CYCLE_WINDOW_INCOMPLETE_NOTE,
 	});
 
-	// The branch's own commits, committer dates only: the date is all part (2)
-	// needs, so asking git log for it costs one spawn where rev-list plus a
-	// `show -s` on the sha it names costs two.
-	const branchDates = exec("git", [
-		"log",
-		"--format=%cI",
-		`origin/${base}..HEAD`,
-	]);
-	if (!branchDates.ok) return incomplete();
-
-	// git log lists newest first, so the branch's first (oldest) commit is the
-	// last line. An empty range means the branch has no commits yet — part (2)
-	// has no branch start to measure from, so it is skipped rather than
-	// reported as incomplete.
-	const dates = branchDates.out.trim().split("\n").filter(Boolean);
-	if (dates.length === 0) return { ok: true, entries: lagged };
-	const since = dates[dates.length - 1];
+	// Where part (2) measures from, shared with the design-record timing check
+	// so the two cannot disagree about when this cycle started.
+	const start = firstCommitAuthorDate({ exec, base });
+	if (!start.ok) return incomplete();
+	// No commits yet leaves part (2) with nothing to measure from, which is a
+	// reasoned skip rather than a gap in the window.
+	if (start.iso === null) return { ok: true, entries: lagged };
+	const since = start.iso;
 
 	const laterOut = exec("git", [
 		"log",
