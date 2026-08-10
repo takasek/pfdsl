@@ -127,7 +127,7 @@ artifact:
     group: decision
   payoff_log:
     label: 効果局面ログ
-    description: "PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材（write_article）と運用スキル蒸留の入力（distill_ops）。追記条件は ADR-0014 反実仮想テスト（冒頭規約参照）"
+    description: "PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材（write_article）と配布スキル蒸留の入力（distill_ops）。追記条件は ADR-0014 反実仮想テスト（冒頭規約参照）"
     criteria: ADR-0014 反実仮想テストを通過した事例が追記済み
     location: ../docs/pfd_payoff_log.md
     group: decision
@@ -311,8 +311,16 @@ artifact:
 
 process:
   distill_ops:
-    label: 運用プロトコル蒸留
-    description: "対話の判断・ADR・効果局面ログから運用手順・監査カタログを抽出しスキル化する。スキル改善は issue を通さず対話から直接行う（知見振り分け経路1）"
+    label: 配布スキル蒸留
+    description: "対話の判断・ADR・効果局面ログから配布スキル・agent の規約本文を蒸留する。スキル改善は issue を通さず対話から直接行う（知見振り分け経路1）。リポローカルスキルは distill_local_skills、リポ固有規約・機構は externalize_bindings が持つ（#672 で分割）"
+    group: generation
+  distill_local_skills:
+    label: リポローカルスキル蒸留
+    description: "このリポ専用の開発スキル・観点集（spec stress-test・VS Code 拡張デバッグ・配布レビュー）を対話の判断・ADR から蒸留する。配布対象外 — 読み手はこのリポの開発セッションのみ（#672 で distill_ops から分割）"
+    group: generation
+  externalize_bindings:
+    label: リポ固有規約の外化
+    description: "リポ固有の運用規約を binding・companion 散文と PreToolUse ガード機構へ外化する。散文と hook は同一変換の媒体違い（companion 冒頭「散文として書く前に機械化を検討する」）。配布対象外（#672 で distill_ops から分割）"
     group: generation
   maintain_template:
     label: テンプレート整備
@@ -388,10 +396,10 @@ process:
 tag:
   distilled_skill:
     label: 蒸留スキル系成果物
-    description: distill_ops が対話判断・ADR・効果局面ログから生成する skill 形態の成果物
+    description: 蒸留プロセス（distill_ops・distill_local_skills）が生成する skill 形態の成果物
   distilled_doc:
     label: 蒸留ドキュメント系成果物
-    description: distill_ops が生成する散文・カタログ形態の成果物
+    description: distill_ops・externalize_bindings が生成する散文・カタログ形態の成果物
 
 statusStyles:
   todo:
@@ -434,7 +442,11 @@ pfdsl_skill >>? review_examples
 retro_skill >>? review_examples
 toolchain >>? review_examples
 
-[adrs, decisions, payoff_log] >> distill_ops -> [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, distribution_review_perspectives, distribution_review_skill, ecosystem_skill, grill_skill, implementer_agent, main_branch_guard, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives, spec_stress_skill, vscode_ext_debug_skill, workflow_md]
+[adrs, decisions, payoff_log] >> distill_ops -> [ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives]
+
+[adrs, decisions] >> distill_local_skills -> [distribution_review_perspectives, distribution_review_skill, spec_stress_skill, vscode_ext_debug_skill]
+
+[adrs, decisions] >> externalize_bindings -> [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, workflow_md]
 
 spec_stress_skill >>? maintain_spec
 
@@ -480,6 +492,7 @@ issue_updates >>? file_issues
 
 [distribution_review_perspectives, plugin_dist] >> review_distribution -> distribution_review_record
 
+distribution_review_record >>? distill_local_skills
 distribution_review_record >>? distill_ops
 distribution_review_skill >>? review_distribution
 
