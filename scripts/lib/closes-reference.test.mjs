@@ -65,4 +65,16 @@ describe("classifyClosesReference", () => {
 		});
 		assert.equal(result.status, "FAIL");
 	});
+
+	// The companion writes the declaration as `hotfix:` at the head of the
+	// description. A line head alone is looser than that, and a PR body
+	// explaining the convention starts lines with the bare word.
+	it("requires the colon the convention writes, not the bare word", () => {
+		const result = classifyClosesReference({
+			...intoMain,
+			closingIssueCount: 0,
+			body: "hotfix PRs are the one case that may skip the issue.",
+		});
+		assert.equal(result.status, "FAIL");
+	});
 });

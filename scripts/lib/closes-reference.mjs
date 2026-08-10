@@ -16,11 +16,14 @@
 
 /**
  * A hotfix declaration: the backend convention (`hotfix 運用`) lets a bug fix
- * skip the issue entirely, and such a PR has nothing to close. Required at a
- * line head, so prose merely containing the word does not excuse a missing
- * link.
+ * skip the issue entirely, and such a PR has nothing to close.
+ *
+ * Spelled the way the companion writes it — `hotfix:` at a line head. The
+ * colon is what separates the declaration from prose about it: a PR body
+ * explaining the convention starts lines with the bare word, and a line-head
+ * match without the colon would let such a PR exempt itself.
  */
-const HOTFIX_DECLARATION = /^hotfix\b/im;
+const HOTFIX_DECLARATION = /^hotfix\s*:/im;
 
 /**
  * @param {{baseRef?: string, defaultBranch?: string,
