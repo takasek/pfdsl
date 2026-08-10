@@ -295,9 +295,13 @@ export async function runCycleStatus({
 							"--json",
 						]),
 					);
-					// `neighbors` reports `>>?` neighbors too since #828; the
-					// artifact under gate is the process's output, so only a
-					// primary successor qualifies.
+					// `neighbors` tags each element since #828, and the artifact
+					// under gate is the process's output, so name the kind rather
+					// than taking [0]. It selects rather than rejects: feedback
+					// edges only run artifact -> process (computeNeighbors in
+					// packages/core/src/graph-analysis.ts, and N001/N002 keep an id
+					// from being both), so a process has no feedback successor to
+					// drop.
 					artifactKey =
 						neighborsJson?.successors?.find((n) => n?.kind === "primary")?.id ??
 						null;
