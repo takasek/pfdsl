@@ -4179,7 +4179,7 @@ req >> design -> spec
 			expect(r.stdout).toBe(`${f}:6: declaration\n${f}:9: edge\n`);
 		});
 
-		it("--json emits { ok, id, declarationLine, edgeLines }", async () => {
+		it("--json emits { ok, id, declarationLine, edgeLines, fieldLines }", async () => {
 			const f = join(dir, "locate-json.pfdsl");
 			writeFileSync(f, src);
 			const r = await run(["graph", "locate", f, "design", "--json"]);
@@ -4189,7 +4189,108 @@ req >> design -> spec
 				id: "design",
 				declarationLine: 6,
 				edgeLines: [9],
+				fieldLines: {},
 			});
+		});
+
+		it("--field <name> adds the field's key line to --json fieldLines", async () => {
+			const f = join(dir, "locate-field-json.pfdsl");
+			writeFileSync(f, src);
+			const r = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"label",
+				"--json",
+			]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+				fieldLines: { label: 7 },
+			});
+		});
+
+		it("--field <name> prints a field line right after declaration, before edge lines", async () => {
+			const f = join(dir, "locate-field-text.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--field", "label"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`${f}:6: declaration\n${f}:7: field label\n${f}:9: edge\n`,
+			);
+		});
+
+		it("--field with multiple comma-separated names prints them in request order", async () => {
+			const f = join(dir, "locate-field-multi.pfdsl");
+			const multi = `---
+artifact:
+  spec:
+    label: Spec
+    description: a description
+    status: done
+---
+x -> spec
+`;
+			writeFileSync(f, multi);
+			const r = await run([
+				"graph",
+				"locate",
+				f,
+				"spec",
+				"--field",
+				"status,label",
+			]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`${f}:3: declaration\n${f}:6: field status\n${f}:4: field label\n${f}:8: edge\n`,
+			);
+		});
+
+		it("--field naming a field the node doesn't have: null in JSON, no text line, stderr warning", async () => {
+			const f = join(dir, "locate-field-missing.pfdsl");
+			writeFileSync(f, src);
+			const jsonRun = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"bogus",
+				"--json",
+			]);
+			expect(jsonRun.exitCode).toBe(0);
+			expect(JSON.parse(jsonRun.stdout)).toEqual({
+				ok: true,
+				id: "design",
+				declarationLine: 6,
+				edgeLines: [9],
+				fieldLines: { bogus: null },
+			});
+			expect(jsonRun.stderr).toContain("'bogus'");
+
+			const textRun = await run([
+				"graph",
+				"locate",
+				f,
+				"design",
+				"--field",
+				"bogus",
+			]);
+			expect(textRun.exitCode).toBe(0);
+			expect(textRun.stdout).toBe(`${f}:6: declaration\n${f}:9: edge\n`);
+			expect(textRun.stderr).toContain("'bogus'");
+		});
+
+		it("a bare --field flag with no value is a usage error (exit 2)", async () => {
+			const f = join(dir, "locate-field-bare.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "locate", f, "design", "--field"]);
+			expect(r.exitCode).toBe(2);
 		});
 
 		it("uses - as the file part of a text line when reading from stdin", async () => {
@@ -4208,6 +4309,7 @@ req >> design -> spec
 				id: "iso",
 				declarationLine: null,
 				edgeLines: [2],
+				fieldLines: {},
 			});
 		});
 

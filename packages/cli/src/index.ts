@@ -1668,31 +1668,52 @@ export function runNeighbors(
 	);
 }
 
-/** Text rendering shared by `graph locate` and `graph describe`: one `<file>:<line>: <kind>` line per occurrence. */
+/**
+ * Text rendering shared by `graph locate` and `graph describe`: one
+ * `<file>:<line>: <kind>` line per occurrence — declaration, then requested
+ * field lines (in request order, only those actually found), then edge
+ * lines. `fields`/`fieldLines` default to empty, so `graph describe` (which
+ * never requests fields) renders exactly as before.
+ */
 function renderLocateLines(
 	file: string,
 	declarationLine: number | null,
 	edgeLines: readonly number[],
+	fields: readonly string[] = [],
+	fieldLines: Record<string, number | null> = {},
 ): string[] {
 	const lines: string[] = [];
 	if (declarationLine !== null) {
 		lines.push(`${file}:${declarationLine}: declaration`);
 	}
+	for (const field of fields) {
+		const line = fieldLines[field];
+		if (line !== null && line !== undefined) {
+			lines.push(`${file}:${line}: field ${field}`);
+		}
+	}
 	for (const line of edgeLines) lines.push(`${file}:${line}: edge`);
 	return lines;
 }
 
+export interface GraphLocateOptions extends GraphAnalysisOptions {
+	field?: string;
+}
+
 /**
  * Where <id> appears in the file: its frontmatter declaration key line (if
- * any) and every body line it's mentioned on. `loadGraph` doesn't expose the
- * source text it read, and `locateNode` needs it, so this reads and analyzes
- * the file itself rather than going through that shared loader.
+ * any), every body line it's mentioned on, and (with `--field`) the line of
+ * each named field within its declaration block. `loadGraph` doesn't expose
+ * the source text it read, and `locateNode` needs it, so this reads and
+ * analyzes the file itself rather than going through that shared loader.
  */
 export function runGraphLocate(
 	file: string,
 	id: string,
-	opts: GraphAnalysisOptions = {},
+	opts: GraphLocateOptions = {},
 ): CommandResult {
+	const fields = opts.field !== undefined ? splitCommaList(opts.field) : [];
+
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 	const { diagnostics, document, nodeKinds } = analyze(src);
@@ -1704,15 +1725,41 @@ export function runGraphLocate(
 	const kind = nodeKinds.get(id);
 	if (kind === undefined) return idsNotFoundError(file, [id], opts.json);
 
-	const { declarationLine, edgeLines } = locateNode(document, src, id, kind);
+	const { declarationLine, edgeLines, fieldLines } = locateNode(
+		document,
+		src,
+		id,
+		kind,
+		fields,
+	);
+
+	// A requested field with no line in the node's declaration block is
+	// usually a typo — warn, same style as meta get's unknown-field warning
+	// (#844) — without failing the command.
+	const missingFieldWarnings = fields
+		.filter((field) => fieldLines[field] === null)
+		.map(
+			(field) =>
+				`warning: '${field}' has no line in '${id}'s declaration block (possible typo?)`,
+		);
+	const warnText = missingFieldWarnings.length
+		? `${missingFieldWarnings.join("\n")}\n`
+		: "";
 
 	if (opts.json) {
 		return ok(
-			`${JSON.stringify({ ok: true, id, declarationLine, edgeLines })}\n`,
+			`${JSON.stringify({ ok: true, id, declarationLine, edgeLines, fieldLines })}\n`,
+			warnText,
 		);
 	}
-	const lines = renderLocateLines(file, declarationLine, edgeLines);
-	return ok(lines.length ? `${lines.join("\n")}\n` : "");
+	const lines = renderLocateLines(
+		file,
+		declarationLine,
+		edgeLines,
+		fields,
+		fieldLines,
+	);
+	return ok(lines.length ? `${lines.join("\n")}\n` : "", warnText);
 }
 
 /**
@@ -2587,7 +2634,7 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_GRAPH_LOCATE = `usage: pfdsl graph locate <file|-> <id> [--json] [--no-color]
+const HELP_GRAPH_LOCATE = `usage: pfdsl graph locate <file|-> <id> [--field <name[,name...]>] [--json] [--no-color]
 
 Print every place <id> appears in the file: its frontmatter declaration key
 line (\`declaration\`), and every body line naming it (\`edge\`) — whether in
@@ -2595,18 +2642,25 @@ an edge or in a bare node-decl. These are the line numbers a Read/Edit tool
 call needs, without opening the whole file first. Text mode prints one
 occurrence per line, declaration before edge, each edge line ascending.
 
-Line granularity is the node, not the field: a declaration line points at
-the id's key, and the fields under it are on the lines that follow.
+By default, line granularity is the node, not the field: a declaration line
+points at the id's key, and the fields under it are on the lines that
+follow. \`--field <name[,name...]>\` narrows past that: it adds one line per
+named field, pointing at that field's own key within the id's declaration
+block, printed in request order right after the declaration line. A named
+field the node's declaration block doesn't have is skipped in text mode and
+printed as null in --json, with a warning on stderr (possible typo).
 
+  --field <name[,name...]>  also locate these frontmatter fields within
+                             <id>'s declaration block
   --json      output as JSON ({ ok, id, declarationLine: number | null,
-              edgeLines: number[] })
+              edgeLines: number[], fieldLines: { [name]: number | null } })
               on failure: { ok: false, diagnostics } / { ok: false, missing }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
-  0  success
+  0  success (including a --field name the node doesn't have)
   1  id not found in the file
-  2  invalid usage (missing id)
+  2  invalid usage (missing id, or --field given with no value)
 `;
 
 const HELP_GRAPH_DESCRIBE = `usage: pfdsl graph describe <file|-> <id> [--json] [--no-color]
@@ -2976,7 +3030,10 @@ function runGraphGroup(
 			if (flags.help) return ok(HELP_GRAPH_LOCATE);
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_GRAPH_LOCATE, 2);
+			const fieldVal = flags.field;
+			if (fieldVal === true) return fail(HELP_GRAPH_LOCATE, 2);
 			return runGraphLocate(f, id, {
+				...(typeof fieldVal === "string" ? { field: fieldVal } : {}),
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
