@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
+	buildDesignRecordEditQuery,
 	classifyAuditIssuesFlowResult,
 	classifyDesignRecordContent,
 	classifyDesignRecordTiming,
@@ -30,6 +31,8 @@ import {
 	NO_IMPLEMENTATION_TOKEN,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
+	parseDesignRecordEditResponse,
+	resolveRecordEditedAt,
 	SIZE_INTENT_PATTERN,
 	SIZE_OVERRIDE_PATTERN,
 	SIZE_TRACKED_PATTERNS,
@@ -610,12 +613,13 @@ describe("toDesignRecordEntries", () => {
 		]);
 	});
 
-	it("appends each comment's body and createdAt, dropping everything else it carries", () => {
+	it("appends each comment's body, createdAt and id, dropping everything else it carries", () => {
 		const entries = toDesignRecordEntries({
 			body: "普通の説明文。",
 			createdAt: "2026-07-01T00:00:00Z",
 			comments: [
 				{
+					id: "IC_kwDOSYTJ888AAAABOCVvqQ",
 					author: { login: "runner" },
 					body: "前提: x\n否定案: y\n却下理由: z",
 					createdAt: "2026-07-02T00:00:00Z",
@@ -625,15 +629,134 @@ describe("toDesignRecordEntries", () => {
 		assert.deepEqual(entries, [
 			{ body: "普通の説明文。", createdAt: "2026-07-01T00:00:00Z" },
 			{
+				id: "IC_kwDOSYTJ888AAAABOCVvqQ",
 				body: "前提: x\n否定案: y\n却下理由: z",
 				createdAt: "2026-07-02T00:00:00Z",
 			},
 		]);
 	});
 
+	// #737 案2: the body itself has no comment id to match a GraphQL edit-info
+	// node against, and must not gain a spurious one — resolveRecordEditedAt
+	// tells the body case apart from the comment case by this key's presence.
+	it("carries no id on the body entry", () => {
+		const [bodyEntry] = toDesignRecordEntries({
+			body: "前提: x",
+			createdAt: "2026-07-01T00:00:00Z",
+			comments: [],
+		});
+		assert.equal(Object.hasOwn(bodyEntry, "id"), false);
+	});
+
 	it("returns just the body entry when there are no comments", () => {
 		const entries = toDesignRecordEntries({ body: "x", createdAt: undefined });
 		assert.deepEqual(entries, [{ body: "x", createdAt: undefined }]);
+	});
+});
+
+describe("resolveRecordEditedAt", () => {
+	const editInfo = (overrides = {}) => ({
+		issueLastEditedAt: null,
+		comments: { totalCount: 1, nodes: [{ id: "c1", lastEditedAt: null }] },
+		...overrides,
+	});
+
+	it("falls back to the issue's own lastEditedAt for a body-selected record", () => {
+		const result = resolveRecordEditedAt(
+			{ body: "前提: x" },
+			editInfo({ issueLastEditedAt: "2026-07-01T00:00:00Z" }),
+		);
+		assert.deepEqual(result, { editedAtIso: "2026-07-01T00:00:00Z" });
+	});
+
+	it("matches a comment-selected record by id, not by array position", () => {
+		const result = resolveRecordEditedAt(
+			{ id: "c2", body: "前提: x" },
+			editInfo({
+				comments: {
+					totalCount: 2,
+					nodes: [
+						{ id: "c1", lastEditedAt: "2026-01-01T00:00:00Z" },
+						{ id: "c2", lastEditedAt: "2026-07-05T00:00:00Z" },
+					],
+				},
+			}),
+		);
+		assert.deepEqual(result, { editedAtIso: "2026-07-05T00:00:00Z" });
+	});
+
+	it("reads null as unedited for the matched comment", () => {
+		const result = resolveRecordEditedAt(
+			{ id: "c1", body: "前提: x" },
+			editInfo(),
+		);
+		assert.deepEqual(result, { editedAtIso: null });
+	});
+
+	it("notes edit history as unavailable when the GraphQL lookup failed", () => {
+		const result = resolveRecordEditedAt({ id: "c1", body: "前提: x" }, null);
+		assert.equal(result.editedAtIso, null);
+		assert.match(result.note, /unavailable/);
+	});
+
+	it("skips edit detection and notes it when totalCount exceeds the fetched nodes", () => {
+		const result = resolveRecordEditedAt(
+			{ id: "c1", body: "前提: x" },
+			editInfo({
+				comments: {
+					totalCount: 101,
+					nodes: [{ id: "c1", lastEditedAt: null }],
+				},
+			}),
+		);
+		assert.equal(result.editedAtIso, null);
+		assert.match(result.note, /detection/);
+	});
+});
+
+describe("buildDesignRecordEditQuery", () => {
+	it("names the owner, repo and issue number as GraphQL variables", () => {
+		const args = buildDesignRecordEditQuery({
+			owner: "takasek",
+			repo: "pfdsl",
+			number: 737,
+		});
+		assert.deepEqual(args.slice(0, 2), ["api", "graphql"]);
+		assert.ok(args.includes("owner=takasek"));
+		assert.ok(args.includes("repo=pfdsl"));
+		assert.ok(args.includes("number=737"));
+		const queryArg = args[args.length - 1];
+		assert.match(queryArg, /lastEditedAt/);
+		assert.match(queryArg, /comments\(first:100\)/);
+	});
+});
+
+describe("parseDesignRecordEditResponse", () => {
+	it("reads the issue's own lastEditedAt and each comment's, keyed by id", () => {
+		const json = JSON.stringify({
+			data: {
+				repository: {
+					issue: {
+						lastEditedAt: null,
+						comments: {
+							totalCount: 1,
+							nodes: [{ id: "c1", lastEditedAt: "2026-07-05T00:00:00Z" }],
+						},
+					},
+				},
+			},
+		});
+		assert.deepEqual(parseDesignRecordEditResponse(json), {
+			issueLastEditedAt: null,
+			comments: {
+				totalCount: 1,
+				nodes: [{ id: "c1", lastEditedAt: "2026-07-05T00:00:00Z" }],
+			},
+		});
+	});
+
+	it("throws on a response shape it does not recognize", () => {
+		assert.throws(() => parseDesignRecordEditResponse(JSON.stringify({})));
 	});
 });
 
@@ -680,6 +803,37 @@ describe("classifyDesignRecordTiming", () => {
 		);
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /after the first commit/);
+	});
+
+	// #737 案2: the record itself can be edited after the fact, which the
+	// createdAt-only check above cannot see — createdAt never moves.
+	it("PASSes an unedited record (lastEditedAt: null)", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T00:00:00Z",
+			"2026-07-30T12:00:00Z",
+			{ editedAtIso: null },
+		);
+		assert.equal(result.status, "PASS");
+	});
+
+	it("FAILs when the record was edited after the first commit", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T00:00:00Z",
+			"2026-07-30T06:00:00Z",
+			{ editedAtIso: "2026-07-30T12:00:00Z" },
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /edited at/);
+		assert.match(result.detail, /after the first commit/);
+	});
+
+	it("PASSes when the record was edited before the first commit", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T00:00:00Z",
+			"2026-07-30T12:00:00Z",
+			{ editedAtIso: "2026-07-30T01:00:00Z" },
+		);
+		assert.equal(result.status, "PASS");
 	});
 });
 

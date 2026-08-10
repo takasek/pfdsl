@@ -8,6 +8,7 @@ import {
 	commitMessagesSince,
 	commitSubjectStep,
 	designRecordStep,
+	fetchDesignRecordEditInfo,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
@@ -311,6 +312,101 @@ describe("wipTransitionStep", () => {
 	});
 });
 
+describe("fetchDesignRecordEditInfo", () => {
+	const graphqlResponse = (overrides = {}) =>
+		JSON.stringify({
+			data: {
+				repository: {
+					issue: {
+						lastEditedAt: null,
+						comments: {
+							totalCount: 1,
+							nodes: [{ id: "c1", lastEditedAt: null }],
+							...overrides.comments,
+						},
+						...overrides.issue,
+					},
+				},
+			},
+		});
+
+	it("resolves owner/repo from the git remote and queries via execGh", async () => {
+		const { exec } = fakeExec({
+			"git remote get-url origin": {
+				out: "https://github.com/takasek/pfdsl.git\n",
+			},
+		});
+		/** @type {unknown[]} */
+		const calls = [];
+		const execGh = async (args, opts) => {
+			calls.push({ args, opts });
+			return graphqlResponse();
+		};
+		const result = await fetchDesignRecordEditInfo({
+			exec,
+			execGh,
+			cwd: "/repo",
+			number: 737,
+		});
+		assert.deepEqual(result, {
+			issueLastEditedAt: null,
+			comments: { totalCount: 1, nodes: [{ id: "c1", lastEditedAt: null }] },
+		});
+		assert.equal(calls.length, 1);
+		assert.deepEqual(calls[0].opts, { cwd: "/repo" });
+		assert.ok(calls[0].args.includes("owner=takasek"));
+		assert.ok(calls[0].args.includes("repo=pfdsl"));
+		assert.ok(calls[0].args.includes("number=737"));
+	});
+
+	it("throws when the git remote cannot be read", async () => {
+		const { exec } = fakeExec({
+			"git remote get-url origin": { ok: false, out: "fatal: no remote" },
+		});
+		await assert.rejects(
+			fetchDesignRecordEditInfo({
+				exec,
+				execGh: async () => graphqlResponse(),
+				cwd: "/repo",
+				number: 737,
+			}),
+		);
+	});
+
+	it("throws when the remote URL carries no owner/repo", async () => {
+		const { exec } = fakeExec({
+			"git remote get-url origin": { out: "not-a-url\n" },
+		});
+		await assert.rejects(
+			fetchDesignRecordEditInfo({
+				exec,
+				execGh: async () => graphqlResponse(),
+				cwd: "/repo",
+				number: 737,
+			}),
+		);
+	});
+
+	it("propagates a rejection from execGh (gh unavailable, GraphQL error, ...)", async () => {
+		const { exec } = fakeExec({
+			"git remote get-url origin": {
+				out: "https://github.com/takasek/pfdsl.git\n",
+			},
+		});
+		await assert.rejects(
+			fetchDesignRecordEditInfo({
+				exec,
+				execGh: async () => {
+					throw new Error("boom");
+				},
+				cwd: "/repo",
+				number: 737,
+			}),
+			/boom/,
+		);
+	});
+});
+
 describe("designRecordStep", () => {
 	const issue = ({
 		body,
@@ -570,6 +666,120 @@ describe("designRecordStep", () => {
 		});
 		assert.equal(result.status, "PASS");
 	});
+
+	// #737 案2: edit detection, wired through the fetched editInfo.
+	describe("edit detection", () => {
+		const recordComment = (overrides = {}) => ({
+			id: "c1",
+			author: { login: "owner" },
+			body: validRecordBody,
+			createdAt: "2026-07-01T00:00:00Z",
+			...overrides,
+		});
+		const firstCommit = {
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		};
+
+		it("PASSes an unedited record (lastEditedAt: null)", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
+				editInfo: {
+					issueLastEditedAt: null,
+					comments: {
+						totalCount: 1,
+						nodes: [{ id: "c1", lastEditedAt: null }],
+					},
+				},
+			});
+			assert.equal(result.status, "PASS");
+		});
+
+		it("FAILs when the record was edited after the first commit", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
+				editInfo: {
+					issueLastEditedAt: null,
+					comments: {
+						totalCount: 1,
+						nodes: [{ id: "c1", lastEditedAt: "2026-07-03T00:00:00Z" }],
+					},
+				},
+			});
+			assert.equal(result.status, "FAIL");
+			assert.match(result.detail, /edited at/);
+		});
+
+		it("PASSes when the record was edited before the first commit", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
+				editInfo: {
+					issueLastEditedAt: null,
+					comments: {
+						totalCount: 1,
+						nodes: [{ id: "c1", lastEditedAt: "2026-07-01T12:00:00Z" }],
+					},
+				},
+			});
+			assert.equal(result.status, "PASS");
+		});
+
+		it("judges on timing alone and notes the gap when GraphQL is unavailable", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
+				editInfo: null,
+			});
+			assert.equal(result.status, "PASS");
+			assert.match(result.detail, /unavailable/);
+		});
+
+		it("skips edit detection and notes it when totalCount exceeds the fetched comments", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
+				editInfo: {
+					issueLastEditedAt: null,
+					comments: {
+						totalCount: 101,
+						nodes: [{ id: "c1", lastEditedAt: null }],
+					},
+				},
+			});
+			assert.equal(result.status, "PASS");
+			assert.match(result.detail, /detection/);
+		});
+
+		it("reads the issue's own lastEditedAt when the body is the selected record", () => {
+			const { exec } = fakeExec(firstCommit);
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({
+					body: validRecordBody,
+					createdAt: "2026-07-01T00:00:00Z",
+				}),
+				editInfo: {
+					issueLastEditedAt: "2026-07-03T00:00:00Z",
+					comments: { totalCount: 0, nodes: [] },
+				},
+			});
+			assert.equal(result.status, "FAIL");
+			assert.match(result.detail, /edited at/);
+		});
+	});
 });
 
 describe("sizeDirectionStep", () => {
@@ -735,6 +945,22 @@ describe("perIssueSteps", () => {
 		assert.equal(seen.length, 1);
 		assert.equal(seen[0].base, "main");
 		assert.deepEqual(seen[0].deltas, []);
+	});
+
+	// #737 案2: each issue's own edit-info must reach its own row, not the
+	// shared args (which have no per-issue value to give).
+	it("forwards each issue's own editInfo, not a shared one", () => {
+		/** @type {unknown[]} */
+		const seen = [];
+		const spy = (args) => {
+			seen.push(args.editInfo);
+			return { name: "s", status: "PASS" };
+		};
+		perIssueSteps(spy, [
+			{ number: 1, issue: { body: "b" }, editInfo: { issueLastEditedAt: "a" } },
+			{ number: 2, issue: { body: "c" }, editInfo: null },
+		]);
+		assert.deepEqual(seen, [{ issueLastEditedAt: "a" }, null]);
 	});
 });
 

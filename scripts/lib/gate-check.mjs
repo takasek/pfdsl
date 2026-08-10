@@ -380,6 +380,81 @@ export function deriveManualItems(checklistItems) {
 }
 
 /**
+ * The GraphQL query that reads a design-selection record's edit history
+ * (#737 案2): the issue's own `lastEditedAt`, and every comment's, in one
+ * round trip. REST's `updated_at` is not used — it moves on new comments
+ * alone, so it is not evidence the record's own text changed. `gh issue view
+ * --json comments` doesn't carry `lastEditedAt` at all (verified against a
+ * live issue), which is why this goes through `gh api graphql` instead.
+ * @param {{owner: string, repo: string, number: number}} params
+ * @returns {string[]} argv for execGh
+ */
+export function buildDesignRecordEditQuery({ owner, repo, number }) {
+	return [
+		"api",
+		"graphql",
+		"-F",
+		`owner=${owner}`,
+		"-F",
+		`repo=${repo}`,
+		"-F",
+		`number=${number}`,
+		"-f",
+		"query=query($owner:String!,$repo:String!,$number:Int!){ repository(owner:$owner,name:$repo){ issue(number:$number){ lastEditedAt comments(first:100){ totalCount nodes { id lastEditedAt } } } } } ",
+	];
+}
+
+/**
+ * Parse `buildDesignRecordEditQuery`'s response into the shape
+ * resolveRecordEditedAt reads.
+ * @param {string} jsonText - execGh's stdout for the graphql call
+ * @returns {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}}
+ */
+export function parseDesignRecordEditResponse(jsonText) {
+	const issueData = JSON.parse(jsonText)?.data?.repository?.issue;
+	if (!issueData)
+		throw new Error(
+			"unexpected GraphQL response shape for design-record edit info",
+		);
+	return {
+		issueLastEditedAt: issueData.lastEditedAt ?? null,
+		comments: {
+			totalCount: issueData.comments.totalCount,
+			nodes: issueData.comments.nodes,
+		},
+	};
+}
+
+/**
+ * The selected design-selection record's own `lastEditedAt` (#737 案2),
+ * matched by id rather than by array position — `gh` and GraphQL are not
+ * guaranteed to return comments in the same order, and a position-based
+ * match could silently attribute one comment's edit to another's.
+ *
+ * Two conditions make edit detection impossible rather than merely absent,
+ * and both are reported as a note rather than folded into `editedAtIso`
+ * (which stays a plain timestamp-or-null so classifyDesignRecordTiming does
+ * not have to parse a sentinel out of it): the GraphQL lookup itself failing
+ * (`editInfo` is null), and the issue carrying more comments than the single
+ * page fetched (`totalCount` exceeds the fetched `nodes`).
+ * @param {{id?: string}} record - selectDesignRecord's return value
+ * @param {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}} | null} editInfo
+ * @returns {{editedAtIso: string | null, note?: string}}
+ */
+export function resolveRecordEditedAt(record, editInfo) {
+	if (!editInfo) return { editedAtIso: null, note: "edit history unavailable" };
+	if (editInfo.comments.totalCount > editInfo.comments.nodes.length) {
+		return {
+			editedAtIso: null,
+			note: "more comments than fetched; edit detection skipped",
+		};
+	}
+	if (!record.id) return { editedAtIso: editInfo.issueLastEditedAt };
+	const match = editInfo.comments.nodes.find((c) => c.id === record.id);
+	return { editedAtIso: match ? match.lastEditedAt : null };
+}
+
+/**
  * Classify the timing of a design-selection record against the branch's
  * first commit (issue #669's protection against "the decision record is
  * written after the fact"). A record posted after work already started
@@ -520,13 +595,24 @@ export function presentRequiredPrefixes(recordBody) {
  * alone and never reads it, so carrying it here would read as a check that
  * is still looking at who posted the record, when none of this repo's
  * design-record logic does anymore (#824).
- * @param {{body?: string, createdAt?: string, comments?: Array<{body?: string, createdAt?: string}>}} issue
- * @returns {Array<{body?: string, createdAt?: string}>}
+ *
+ * A comment entry carries `id` — the GraphQL node id `gh issue view` already
+ * returns on every comment — so resolveRecordEditedAt can match the selected
+ * record to its GraphQL edit-info node without depending on array order
+ * (#737 案2). The body entry carries no `id`: it has no comment to match, and
+ * that absence is itself the signal resolveRecordEditedAt reads to fall back
+ * to the issue's own `lastEditedAt`.
+ * @param {{body?: string, createdAt?: string, comments?: Array<{id?: string, body?: string, createdAt?: string}>}} issue
+ * @returns {Array<{id?: string, body?: string, createdAt?: string}>}
  */
 export function toDesignRecordEntries({ body, createdAt, comments }) {
 	return [
 		{ body, createdAt },
-		...(comments ?? []).map((c) => ({ body: c.body, createdAt: c.createdAt })),
+		...(comments ?? []).map((c) => ({
+			id: c.id,
+			body: c.body,
+			createdAt: c.createdAt,
+		})),
 	];
 }
 

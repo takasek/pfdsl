@@ -13,9 +13,11 @@
  * and report failure as `{ ok: false, out }`.
  */
 
+import { parseOwnerRepo } from "../pfdsl/lib/github-rest.mjs";
 import { RECORD_SEP } from "./commit-trailers.mjs";
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
+	buildDesignRecordEditQuery,
 	classifyDesignRecordContent,
 	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
@@ -26,6 +28,8 @@ import {
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
+	parseDesignRecordEditResponse,
+	resolveRecordEditedAt,
 	SIZE_TRACKED_PATTERNS,
 	selectDesignRecord,
 	statusChangedForArtifact,
@@ -235,11 +239,42 @@ function missingIssueRow(issueFailure) {
 }
 
 /**
+ * The GraphQL edit-history fetch for one issue's design-selection record
+ * candidates (#737 案2): owner/repo come from the git remote (the same
+ * lookup gh-exec.mjs's own REST fallback does internally, repeated here
+ * because that one is not exported), the query itself from
+ * buildDesignRecordEditQuery.
+ * @param {{exec: Function, execGh: (args: string[], opts: {cwd: string}) => Promise<string>, cwd: string, number: number}} params
+ * @returns {Promise<{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}>}
+ */
+export async function fetchDesignRecordEditInfo({ exec, execGh, cwd, number }) {
+	const remote = exec("git", ["remote", "get-url", "origin"]);
+	if (!remote.ok)
+		throw new Error(remote.out.trim() || "git remote get-url origin failed");
+	const ownerRepo = parseOwnerRepo(remote.out.trim());
+	if (!ownerRepo)
+		throw new Error(
+			`could not determine owner/repo from git remote: ${remote.out.trim()}`,
+		);
+	const out = await execGh(
+		buildDesignRecordEditQuery({ ...ownerRepo, number }),
+		{ cwd },
+	);
+	return parseDesignRecordEditResponse(out);
+}
+
+/**
  * design-selection record: was the design choice recorded before work
  * started, with the required structure (issue #669's protection against
  * "the record is written after the fact, or is unstructured prose")?
  */
-export function designRecordStep({ exec, base, issue, issueFailure }) {
+export function designRecordStep({
+	exec,
+	base,
+	issue,
+	issueFailure,
+	editInfo,
+}) {
 	const name = "design-selection record";
 	if (!issue) return { name, ...missingIssueRow(issueFailure) };
 
@@ -266,8 +301,17 @@ export function designRecordStep({ exec, base, issue, issueFailure }) {
 		? firstCommitOut.out.trim().split("\n")[0] || null
 		: null;
 
+	// #737 案2: the record's own edit history (editInfo is undefined/null
+	// whenever the GraphQL fetch failed or was unavailable — resolveRecordEditedAt
+	// reports that as a note rather than silently treating it as "unedited").
+	const { editedAtIso, note: editNote } = resolveRecordEditedAt(
+		record,
+		editInfo ?? null,
+	);
+
 	const noImplementation = hasNoImplementationDisposition(record.body);
 	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso, {
+		editedAtIso,
 		noImplementation,
 	});
 	// #737 案1: content structure (required line heads, disposition-token
@@ -279,8 +323,18 @@ export function designRecordStep({ exec, base, issue, issueFailure }) {
 	const content = classifyDesignRecordContent(record.body, optionCount);
 	const contentDetail =
 		content.status === "FAIL" ? `WARN: ${content.detail}` : undefined;
+	// The edit note is only worth printing once timing actually reached the
+	// stage where an edit could have mattered — a SKIP already means nothing
+	// was compared, so noting missing edit history there would read as a
+	// second reason for a verdict that has only one.
 	const detail =
-		[timing.detail, contentDetail].filter(Boolean).join("; ") || undefined;
+		[
+			timing.detail,
+			timing.status === "SKIP" ? undefined : editNote,
+			contentDetail,
+		]
+			.filter(Boolean)
+			.join("; ") || undefined;
 	return { name, status: timing.status, detail };
 }
 
@@ -296,13 +350,14 @@ export function designRecordStep({ exec, base, issue, issueFailure }) {
  *
  * @param {(args: object) => import("./gate-check.mjs").GateResult} step
  * @param {{number: number, issue?: object|null,
- *          issueFailure?: {status: 'SKIP'|'FAIL', detail: string}|null}[]} issues
+ *          issueFailure?: {status: 'SKIP'|'FAIL', detail: string}|null,
+ *          editInfo?: object|null}[]} issues
  * @param {object} [args] arguments shared by every call (exec, base, deltas, …)
  */
 export function perIssueSteps(step, issues, args = {}) {
 	if (issues.length === 0) return [step(args)];
-	return issues.map(({ number, issue, issueFailure }) => {
-		const result = step({ ...args, issue, issueFailure });
+	return issues.map(({ number, issue, issueFailure, editInfo }) => {
+		const result = step({ ...args, issue, issueFailure, editInfo });
 		return { ...result, name: `${result.name} (#${number})` };
 	});
 }
