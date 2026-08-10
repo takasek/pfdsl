@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { parseDocument } from "yaml";
 import { loadFrontmatter } from "./frontmatter.js";
-import { parseFrontmatterCst, setFrontmatterField } from "./frontmatter-cst.js";
+import {
+	parseFrontmatterCst,
+	renderFrontmatterCst,
+	setFrontmatterField,
+} from "./frontmatter-cst.js";
 
 describe("parseFrontmatterCst yamlText", () => {
 	it("captures the raw yaml text between the fences", () => {
@@ -12,6 +17,263 @@ describe("parseFrontmatterCst yamlText", () => {
 	it("is empty when there is no frontmatter", () => {
 		const cst = parseFrontmatterCst("a >> P -> b\n");
 		expect(cst.yamlText).toBe("");
+	});
+});
+
+// The `yaml` package's `Document#toString({ lineWidth: 0 })` re-serializes
+// every BLOCK_FOLDED (`>`) scalar onto a single continuation line, discarding
+// any line wraps the author put in by hand. `renderFrontmatterCst`'s
+// optional third argument re-splices the author's original wraps back into
+// the rendered folded scalars — reindented onto the render's own (canonical)
+// indentation — as long as the scalar's decoded value is unchanged (#815).
+describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", () => {
+	/**
+	 * Parse `yamlText`, apply `mutate` to the resulting doc, then render with
+	 * fold-preservation against the original text. Strips the `---` fences
+	 * `renderFrontmatterCst` always adds, so callers can assert on the yaml
+	 * content alone.
+	 */
+	function renderMutated(
+		yamlText: string,
+		mutate: (doc: ReturnType<typeof parseDocument>) => void,
+	): string {
+		const doc = parseDocument(yamlText);
+		mutate(doc);
+		const block = renderFrontmatterCst(doc, "\n", yamlText);
+		return block.slice(4, -4);
+	}
+
+	it("keeps a hand-wrapped >, folded scalar's line breaks when a sibling field changes", () => {
+		const src = `artifact:
+  a:
+    description: >
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      Hello
+      world.
+    status: done
+`);
+	});
+
+	it("preserves the >- strip chomping indicator alongside the wraps", () => {
+		const src = `artifact:
+  a:
+    description: >-
+      Hello
+      world.
+
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >-
+      Hello
+      world.
+
+    status: done
+`);
+	});
+
+	it("preserves the >+ keep chomping indicator alongside the wraps", () => {
+		const src = `artifact:
+  a:
+    description: >+
+      Hello
+      world.
+
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >+
+      Hello
+      world.
+
+    status: done
+`);
+	});
+
+	it("preserves a more-indented (hanging) line and blank lines inside the fold", () => {
+		const src = `artifact:
+  a:
+    description: >
+      Para one.
+
+        more indented line.
+
+      Para two.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      Para one.
+
+        more indented line.
+
+      Para two.
+    status: done
+`);
+	});
+
+	it("preserves multiple folded fields in the same file independently", () => {
+		const src = `artifact:
+  a:
+    description: >
+      Hello
+      world.
+  b:
+    description: >
+      Second
+      one.
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "label"], "A"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      Hello
+      world.
+    label: A
+  b:
+    description: >
+      Second
+      one.
+`);
+	});
+
+	it("preserves wraps on an anchored folded scalar", () => {
+		const src = `artifact:
+  a:
+    description: &anc >
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: &anc >
+      Hello
+      world.
+    status: done
+`);
+	});
+
+	it("preserves wraps on a folded scalar reached through a nested path", () => {
+		const src = `artifact:
+  a:
+    b:
+      description: >
+        Hello
+        world.
+      status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "b", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    b:
+      description: >
+        Hello
+        world.
+      status: done
+`);
+	});
+
+	it("canonicalizes 8-space continuation indentation to the render's 2-space indent, keeping the wraps", () => {
+		const src = `artifact:
+  a:
+    description: >
+        Hello
+        world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      Hello
+      world.
+    status: done
+`);
+	});
+
+	it("does not preserve wraps when the scalar has an explicit indentation indicator (>2)", () => {
+		const src = `artifact:
+  a:
+    description: >2
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "status"], "done"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >
+      Hello world.
+    status: done
+`);
+	});
+
+	it("re-serializes (does not preserve) a folded field whose own value was rewritten", () => {
+		const src = `artifact:
+  a:
+    description: >
+      Hello
+      world.
+    status: todo
+`;
+		const out = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "description"], "changed value"),
+		);
+		expect(out).toBe(`artifact:
+  a:
+    description: >-
+      changed value
+    status: todo
+`);
+	});
+
+	it("leaves output unchanged when there are no folded scalars (no regression)", () => {
+		const src = `artifact:
+  a:
+    label: A
+`;
+		const withFold = renderMutated(src, (doc) =>
+			doc.setIn(["artifact", "a", "label"], "B"),
+		);
+		const withoutFold = (() => {
+			const doc = parseDocument(src);
+			doc.setIn(["artifact", "a", "label"], "B");
+			return renderFrontmatterCst(doc, "\n").slice(4, -4);
+		})();
+		expect(withFold).toBe(withoutFold);
 	});
 });
 

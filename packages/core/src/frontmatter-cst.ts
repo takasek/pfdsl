@@ -1,4 +1,4 @@
-import { Document, parseDocument } from "yaml";
+import { Document, isPair, isScalar, parseDocument, visit } from "yaml";
 import type { NodeKind } from "./types/index.js";
 
 /**
@@ -111,18 +111,130 @@ export function parseFrontmatterCst(source: string): FrontmatterCst {
 	};
 }
 
+/** A folded (`>`) scalar's path from the document root, and its raw text and decoded value at that path. */
+interface FoldedScalarSnapshot {
+	keys: (string | number)[];
+	raw: string;
+	value: unknown;
+	range: [number, number, number];
+}
+
+/** Every BLOCK_FOLDED (`>`) scalar in `yamlText`, keyed by its path from the document root. */
+function collectFoldedScalars(yamlText: string): FoldedScalarSnapshot[] {
+	const doc = parseDocument(yamlText);
+	const found: FoldedScalarSnapshot[] = [];
+	visit(doc, {
+		Scalar(_key, node, path) {
+			if (node.type !== "BLOCK_FOLDED" || !node.range) return;
+			const keys: (string | number)[] = [];
+			for (const step of path) {
+				if (!isPair(step)) continue;
+				keys.push(
+					isScalar(step.key)
+						? (step.key.value as string | number)
+						: String(step.key),
+				);
+			}
+			found.push({
+				keys,
+				raw: yamlText.slice(node.range[0], node.range[1]),
+				value: node.value,
+				range: node.range as [number, number, number],
+			});
+		},
+	});
+	return found;
+}
+
+/**
+ * Re-derive `origRaw`'s continuation-line wraps at `newRaw`'s (canonical)
+ * indentation. Returns null when the reindent can't be trusted: an explicit
+ * indentation indicator in the fold header (a digit, e.g. `>2`) makes the
+ * continuation indent unambiguous already, so the yaml package's own
+ * re-render of it is authoritative; a rendered scalar with no non-blank
+ * continuation line has no indent to measure the replacement against.
+ */
+function reindentFold(origRaw: string, newRaw: string): string | null {
+	const origLines = origRaw.split("\n");
+	const newLines = newRaw.split("\n");
+	if (/\d/.test(origLines[0])) return null;
+	const newBody = newLines.slice(1);
+	const firstNonBlank = newBody.find((line) => line.trim() !== "");
+	if (firstNonBlank === undefined) return null;
+	const targetIndent = firstNonBlank.length - firstNonBlank.trimStart().length;
+	const origBody = origLines.slice(1);
+	const origIndents = origBody
+		.filter((line) => line.trim() !== "")
+		.map((line) => line.length - line.trimStart().length);
+	if (origIndents.length === 0) return null;
+	const baseIndent = Math.min(...origIndents);
+	const reindentedBody = origBody.map((line) =>
+		line.trim() === "" ? "" : " ".repeat(targetIndent) + line.slice(baseIndent),
+	);
+	return [newLines[0], ...reindentedBody].join("\n");
+}
+
+/**
+ * Re-splice the author's original line wraps back into `rendered`'s folded
+ * (`>`) scalars. `Document#toString({ lineWidth: 0 })` re-serializes every
+ * folded scalar onto a single continuation line — pfdsl still owns the
+ * frontmatter notation (ADR-0034), but a folded scalar's hand-chosen wrap
+ * points are left as the author wrote them as long as the scalar's decoded
+ * value hasn't itself changed (#815).
+ */
+function preserveFolds(originalYaml: string, rendered: string): string {
+	const original = collectFoldedScalars(originalYaml.replace(/\r\n/g, "\n"));
+	if (original.length === 0) return rendered;
+	const renderedDoc = parseDocument(rendered);
+	const splices: { start: number; end: number; text: string }[] = [];
+	for (const fold of original) {
+		const node = renderedDoc.getIn(fold.keys, true);
+		if (!isScalar(node) || node.type !== "BLOCK_FOLDED" || !node.range)
+			continue;
+		// The author's edit changed this field's own value — let it re-serialize.
+		if (node.value !== fold.value) continue;
+		const newRaw = rendered.slice(node.range[0], node.range[1]);
+		if (newRaw === fold.raw) continue;
+		const replacement = reindentFold(fold.raw, newRaw);
+		if (replacement === null) continue;
+		splices.push({
+			start: node.range[0],
+			end: node.range[1],
+			text: replacement,
+		});
+	}
+	splices.sort((a, b) => b.start - a.start);
+	let out = rendered;
+	for (const splice of splices) {
+		out = out.slice(0, splice.start) + splice.text + out.slice(splice.end);
+	}
+	return out;
+}
+
 /**
  * Render a frontmatter CST `Document` back into a fenced `---` block. The
  * `yaml` package emits LF regardless of the input, so callers that write the
  * result back into a file pass that file's `newline` (from
  * `parseFrontmatterCst`) to keep the block consistent with the body they
  * concatenate it onto.
+ *
+ * `originalYaml`, when given, is the frontmatter's yaml text before this
+ * render (typically `parseFrontmatterCst`'s `yamlText`) — passing it
+ * preserves hand-wrapped folded (`>`) scalar line breaks that
+ * `Document#toString` would otherwise collapse (#815). Omit it for a freshly
+ * synthesized document that has no "original" to preserve against.
  */
 export function renderFrontmatterCst(
 	doc: Document,
 	newline: "\n" | "\r\n" = "\n",
+	originalYaml?: string,
 ): string {
-	const block = `---\n${doc.toString({ lineWidth: 0 })}---\n`;
+	const rendered = doc.toString({ lineWidth: 0 });
+	const withFolds =
+		originalYaml === undefined
+			? rendered
+			: preserveFolds(originalYaml, rendered);
+	const block = `---\n${withFolds}---\n`;
 	return newline === "\r\n" ? block.replace(/\n/g, "\r\n") : block;
 }
 
