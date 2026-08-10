@@ -3769,6 +3769,50 @@ p3 -> d
 			);
 		});
 
+		// The suffix appears only on rows that have feedback, so scanning a file
+		// without any (roadmap.pfdsl has none) is unchanged (#831).
+		it("appends the feedback degree only to rows that carry one", async () => {
+			const f = join(dir, "stats-feedback.pfdsl");
+			writeFileSync(f, `${base}report >>? design\n`);
+			const r = await run(["graph", "stats", f]);
+			expect(r.exitCode).toBe(0);
+			const rows = r.stdout.split("\n");
+			expect(rows.find((l) => l.startsWith("design "))).toBe(
+				"design (process)   fan-in=1  fan-out=1  total=2  feedback-in=1",
+			);
+			expect(rows.find((l) => l.startsWith("report "))).toBe(
+				"report (artifact)   fan-in=1  fan-out=0  total=1  feedback-out=1",
+			);
+			expect(rows.find((l) => l.startsWith("spec "))).toBe(
+				"spec (artifact)   fan-in=1  fan-out=2  total=3",
+			);
+		});
+
+		it("--json reports the feedback degree in its own fields", async () => {
+			const f = join(dir, "stats-feedback-json.pfdsl");
+			writeFileSync(f, `${base}report >>? design\n`);
+			const r = await run(["graph", "stats", f, "--json"]);
+			expect(r.exitCode).toBe(0);
+			const stats = JSON.parse(r.stdout).stats as {
+				id: string;
+				fanIn: number;
+				fanOut: number;
+				feedbackFanIn: number;
+				feedbackFanOut: number;
+			}[];
+			expect(stats.find((s) => s.id === "design")).toEqual({
+				id: "design",
+				kind: "process",
+				fanIn: 1,
+				fanOut: 1,
+				feedbackFanIn: 1,
+				feedbackFanOut: 0,
+			});
+			// The ranking stays on the primary degree: spec (3) still leads design,
+			// which would tie it at 3 if feedback counted.
+			expect(stats[0]?.id).toBe("spec");
+		});
+
 		it("--limit caps the number of rows", async () => {
 			const f = join(dir, "stats-limit.pfdsl");
 			writeFileSync(f, base);
@@ -3789,6 +3833,8 @@ p3 -> d
 				kind: "artifact",
 				fanIn: 1,
 				fanOut: 2,
+				feedbackFanIn: 0,
+				feedbackFanOut: 0,
 			});
 		});
 

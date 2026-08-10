@@ -26,7 +26,7 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 �
 
 - ルートの `README.md`
 - ディレクトリ構成（`ls` で主要ディレクトリを確認）
-- `.pfdsl/roadmap.pfdsl`（存在する場合）— 大きい図は全文 Read せず `pfdsl graph summary <file>`（件数）・`graph io <file>`（外部入力・終端）でまず輪郭を掴む。再構築（restructuring）検討時は `graph stats <file> --limit <n>` で hub ノード（fan-in/fan-out 高）も確認する
+- `.pfdsl/roadmap.pfdsl`（存在する場合）— 大きい図は全文 Read せず `pfdsl graph summary <file>`（件数）・`graph io <file>`（外部入力・終端）でまず輪郭を掴む。再構築（restructuring）検討時は `graph stats <file> --limit <n>` で hub ノード（fan-in/fan-out 高）も確認する。`fan-in` / `fan-out` は primary エッジのみを数え、順位もそれで決まる — 還流の多いノードは `feedback-in` / `feedback-out`（`--json` では `feedbackFanIn` / `feedbackFanOut`）に出るので、接続度で見るならそちらも足して読む
 
 把握できたら、リポジトリの目的をひと言で要約してユーザーに提示する。
 

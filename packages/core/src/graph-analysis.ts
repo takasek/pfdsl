@@ -106,8 +106,14 @@ export function computePaths(
 export interface NodeStats {
 	id: string;
 	kind: NodeKind;
+	/** Primary (`>>` / `->`) in-edges. */
 	fanIn: number;
+	/** Primary out-edges. */
 	fanOut: number;
+	/** Feedback (`>>?`) in-edges, kept out of `fanIn`. */
+	feedbackFanIn: number;
+	/** Feedback out-edges, kept out of `fanOut`. */
+	feedbackFanOut: number;
 }
 
 export interface GraphOrphan {
@@ -142,14 +148,34 @@ export function computeOrphans(graph: Graph): GraphOrphan[] {
 		.sort((a, b) => compareIds(a.id, b.id));
 }
 
-/** Fan-in/fan-out per node, ranked by total degree descending then id ascending (§ issue #479 `hubs`/`stats`). */
+/**
+ * Fan-in/fan-out per node, ranked by total degree descending then id ascending
+ * (§ issue #479 `hubs`/`stats`).
+ *
+ * Feedback (`>>?`) degree is reported in its own pair of fields and stays out
+ * of both the primary counts and the sort key, because the command's readers
+ * ask different questions of it (#831). Bottleneck ranking and the god-process
+ * lens read fan-out as what a node gates or produces, and a feedback edge is
+ * neither — `groupEdges` leaves it out of `processInputs`, so readiness never
+ * waits on one. Hub detection for restructuring wants the connection counted;
+ * reporting the two separately answers both without either reading the other's
+ * number.
+ */
 export function computeStats(graph: Graph): NodeStats[] {
 	const { out, in: inn } = buildAdjacency(graph);
+	const feedbackIn = new Map<string, number>();
+	const feedbackOut = new Map<string, number>();
+	for (const e of graph.feedbackEdges) {
+		feedbackIn.set(e.process, (feedbackIn.get(e.process) ?? 0) + 1);
+		feedbackOut.set(e.artifact, (feedbackOut.get(e.artifact) ?? 0) + 1);
+	}
 	const stats: NodeStats[] = [...graph.nodes.entries()].map(([id, kind]) => ({
 		id,
 		kind,
 		fanIn: inn.get(id)?.length ?? 0,
 		fanOut: out.get(id)?.length ?? 0,
+		feedbackFanIn: feedbackIn.get(id) ?? 0,
+		feedbackFanOut: feedbackOut.get(id) ?? 0,
 	}));
 	stats.sort((a, b) => {
 		const degreeDiff = b.fanIn + b.fanOut - (a.fanIn + a.fanOut);
