@@ -2656,9 +2656,11 @@ follow. \`--field <name[,name...]>\` narrows past that: it adds one line per
 named field, pointing at that field's own key within the id's declaration
 block, printed after the declaration line and ordered by line rather than
 by the order asked for (each line names its field, so text output as a
-whole reads top-to-bottom like the file). A named field the node's
-declaration block doesn't have is skipped in text mode and printed as null
-in --json, with a warning on stderr (possible typo).
+whole reads top-to-bottom like the file). A named field with no line is
+skipped in text mode and printed as null in --json, with a warning on
+stderr (possible typo) — that covers both a declaration block without the
+field and a node that has no frontmatter block at all, the latter being the
+case where the declaration line is null as well.
 
   --field <name[,name...]>  also locate these frontmatter fields within
                              <id>'s declaration block

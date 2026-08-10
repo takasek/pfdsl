@@ -15,9 +15,10 @@ export interface LocateResult {
 	edgeLines: number[];
 	/**
 	 * 1-based line of each requested field's key, within the id's declaration
-	 * block — null when the node's declaration block doesn't have that field.
-	 * Keyed by field name, in request order. Empty when no fields were
-	 * requested.
+	 * block. Null covers both ways a field can have no line: the block exists
+	 * without that field, and the node has no frontmatter block at all (a node
+	 * named only by edges — `declarationLine` is null then too). Keyed by field
+	 * name, in request order. Empty when no fields were requested.
 	 */
 	fieldLines: Record<string, number | null>;
 }
