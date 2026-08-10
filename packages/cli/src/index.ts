@@ -1092,6 +1092,9 @@ const KNOWN_FIELDS: Record<"artifact" | "process" | "group", Set<string>> = {
 	group: new Set(["label", "color", "parent"]),
 };
 
+/** The keys of KNOWN_FIELDS, for checks that ask "on any kind at all". */
+const KINDS_WITH_FIELDS = ["artifact", "process", "group"] as const;
+
 /**
  * Read-only fields computed from a base field rather than stored in
  * frontmatter. `location.resolved` auto-accompanies `location` (artifact and
@@ -1523,6 +1526,90 @@ export function runMetaList(
 		),
 	);
 	return ok(lines.length ? `${lines.join("\n")}\n` : "", combinedWarnText);
+}
+
+/**
+ * Fields whose values may also be declared in a frontmatter section of their
+ * own, where declaring is optional and a node may use an undeclared value
+ * (spec §2.7.2 / §2.8). `meta values` seeds those declarations at a count of
+ * 0, so a declared-but-unused value appears in the table instead of being
+ * absent from it. The section name differs from the field name for `tags`,
+ * which is why this is a table rather than an identity.
+ */
+const DECLARATION_SECTION_FOR_FIELD: Record<string, "group" | "tag"> = {
+	group: "group",
+	tags: "tag",
+};
+
+export interface MetaValuesOptions {
+	json?: boolean;
+	color?: boolean;
+}
+
+/**
+ * The vocabulary of a field: every value in use, with how many nodes use it.
+ * Answers "which values can I pass to `meta list --group`" without a grep of
+ * the frontmatter — the selector warning (#848) tells a caller that a value
+ * is wrong but not which ones are right (#844). Raw frontmatter fields only:
+ * a derived field (location.resolved, command.cwd) has no vocabulary to
+ * enumerate and is reported as unrecognized.
+ */
+export function runMetaValues(
+	file: string,
+	field: string,
+	opts: MetaValuesOptions = {},
+): CommandResult {
+	const fields = splitCommaList(field);
+	if (fields.length === 0) return fail(HELP_META_VALUES, 2);
+
+	const src = readSource(file);
+	if (isCommandResult(src)) return src;
+	const { diagnostics, frontmatter, nodeKinds } = analyze(src);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	const counts: Record<string, Record<string, number>> = {};
+	const unknownFields: string[] = [];
+	for (const f of fields) {
+		const tally = new Map<string, number>();
+		const section = DECLARATION_SECTION_FOR_FIELD[f];
+		if (section) {
+			for (const declared of Object.keys(frontmatter?.[section] ?? {}))
+				tally.set(declared, 0);
+		}
+		for (const [id, kind] of nodeKinds) {
+			const v = metaFor(frontmatter, id, kind)?.[f];
+			if (v === undefined || v === null) continue;
+			for (const one of Array.isArray(v) ? v : [v]) {
+				const key = String(one);
+				tally.set(key, (tally.get(key) ?? 0) + 1);
+			}
+		}
+		if (!KINDS_WITH_FIELDS.some((k) => KNOWN_FIELDS[k].has(f)))
+			unknownFields.push(f);
+		counts[f] = Object.fromEntries(
+			[...tally.entries()].sort(([a], [b]) => compareIds(a, b)),
+		);
+	}
+
+	const warnText = unknownFields.length
+		? `${unknownFields
+				.map(
+					(f) =>
+						`warning: '${f}' is not a recognized field for any node kind (possible typo?)`,
+				)
+				.join("\n")}\n`
+		: "";
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, values: counts })}\n`, warnText);
+	}
+	const lines = fields.flatMap((f) => {
+		const entries = Object.entries(counts[f] ?? {});
+		if (entries.length === 0) return [`${f}: (no values)`];
+		return entries.map(([value, count]) => `${f}.${value}: ${count}`);
+	});
+	return ok(`${lines.join("\n")}\n`, warnText);
 }
 
 export interface CheckLinksOptions {
@@ -2665,6 +2752,39 @@ Exit codes:
   2  invalid usage (no selector given, or an empty field positional)
 `;
 
+const HELP_META_VALUES = `usage: pfdsl meta values <file|-> <field[,field...]> [--json] [--no-color]
+
+Print the vocabulary of a field: every value in use across the file's nodes,
+with the number of nodes using it. Answers "which values can I pass to
+\`meta list --group\`" — the selector warning that \`meta list\` prints says a
+value is wrong, not which ones are right.
+
+  <field[,field...]>  comma-separated frontmatter field names (required).
+                      Raw fields only: a derived field (location.resolved,
+                      command.cwd) has no vocabulary of its own and is
+                      reported as unrecognized.
+  --json              emit JSON ({ ok, values: { [field]: { [value]: count } } })
+                      on parse failure: { ok: false, diagnostics }
+  --no-color          disable ANSI color codes (also: NO_COLOR env var)
+
+An array field (tags) counts per element, so a node tagged [a, b] is one
+occurrence of each. Values are printed in the same order ids are elsewhere.
+
+\`group\` and \`tags\` may also be declared in a frontmatter section of their
+own, and declaring is optional — a node may use an undeclared value (§2.7.2,
+§2.8). A declared value no node uses is printed with a count of 0, so the
+table covers both what is declared and what is used.
+
+A field no node sets prints \`<field>: (no values)\`; this is not an error.
+A field name that isn't recognized on any node kind prints a warning to
+stderr (possible typo) without changing the exit code.
+
+Exit codes:
+  0  success (including a field with no values)
+  1  parse/validation error
+  2  invalid usage (missing or empty field argument)
+`;
+
 const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json] [--no-color]
 
 Print the direct predecessors (in-edges) and successors (out-edges) of a
@@ -2941,6 +3061,7 @@ Subcommands:
   get <file|-> <id[,id...]> [field[,field...]]   Print field values
   list <file|-> [--tag|--group|--producer] [field[,field...]]
                                                   Print field values for nodes matching selectors
+  values <file|-> <field[,field...]>             Print a field's values in use, with counts
   set <file> <id> <field> <value>                Set a field value in place
   sort <file|-> --by <keys>                      Sort node definitions
   reindex <file|->                               Assign topological index: values
@@ -2980,7 +3101,7 @@ Commands:
 Command groups (run \`pfdsl <group>\` for their subcommands):
   graph summary|io|stats|neighbors|locate|describe|impact|depends-on|path|edges|orphans
                            Read-only queries on the graph topology
-  meta get|list|set|sort|reindex|check-links
+  meta get|list|values|set|sort|reindex|check-links
                            Read and write frontmatter metadata
   status ready|blocked|list|gaps
                            Planning queries derived from artifact status
@@ -3255,6 +3376,16 @@ function runMetaGroup(
 				...(typeof groupVal === "string" ? { group: groupVal } : {}),
 				...(typeof producerVal === "string" ? { producer: producerVal } : {}),
 				...(field !== undefined ? { field } : {}),
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		}
+		case "values": {
+			if (flags.help) return ok(HELP_META_VALUES);
+			const [f, field, ...extra] = rest;
+			if (!f || field === undefined) return fail(HELP_META_VALUES, 2);
+			if (extra.length > 0) return fail(HELP_META_VALUES, 2);
+			return runMetaValues(f, field, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
