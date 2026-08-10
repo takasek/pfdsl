@@ -3572,14 +3572,16 @@ spec >> write -> docs
 		);
 	});
 
-	it("--json emits { ok, values: { [field]: { [value]: count } } }", async () => {
+	// `counts`, not the `values` key meta get / meta list use: the shape
+	// underneath is { [field]: { [value]: count } }, not { [id]: { ... } }.
+	it("--json emits { ok, counts: { [field]: { [value]: count } } }", async () => {
 		const f = join(dir, "values-json.pfdsl");
 		writeFileSync(f, base);
 		const r = await run(["meta", "values", f, "group", "--json"]);
 		expect(r.exitCode).toBe(0);
 		expect(JSON.parse(r.stdout)).toEqual({
 			ok: true,
-			values: { group: { archived: 0, core: 2, tooling: 1 } },
+			counts: { group: { archived: 0, core: 2, tooling: 1 } },
 		});
 	});
 

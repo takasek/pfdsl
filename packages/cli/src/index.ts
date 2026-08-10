@@ -1603,7 +1603,11 @@ export function runMetaValues(
 		: "";
 
 	if (opts.json) {
-		return ok(`${JSON.stringify({ ok: true, values: counts })}\n`, warnText);
+		// `counts`, not `values`: `meta get` / `meta list` already use `values`
+		// for `{ [id]: { [field]: value } }`, and one key naming two shapes
+		// across the same command group makes the name useless as a
+		// discriminator to whoever reads the payload.
+		return ok(`${JSON.stringify({ ok: true, counts })}\n`, warnText);
 	}
 	const lines = fields.flatMap((f) => {
 		const entries = Object.entries(counts[f] ?? {});
@@ -2764,7 +2768,9 @@ value is wrong, not which ones are right.
                       Raw fields only: a derived field (location.resolved,
                       command.cwd) has no vocabulary of its own and is
                       reported as unrecognized.
-  --json              emit JSON ({ ok, values: { [field]: { [value]: count } } })
+  --json              emit JSON ({ ok, counts: { [field]: { [value]: count } } })
+                      — the key is counts, not the values key meta get and
+                      meta list use: the shape underneath is a different one
                       on parse failure: { ok: false, diagnostics }
   --no-color          disable ANSI color codes (also: NO_COLOR env var)
 
