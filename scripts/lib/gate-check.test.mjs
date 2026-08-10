@@ -32,6 +32,7 @@ import {
 	SIZE_OVERRIDE_PATTERN,
 	SIZE_TRACKED_PATTERNS,
 	statusChangedForArtifact,
+	toDesignRecordEntries,
 	VSCODE_EXT_TRIGGER,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
@@ -592,6 +593,45 @@ describe("GATE_CHECKLIST_SOURCE_PATH", () => {
 			items.length > 0,
 			"expected at least one MANUAL checklist item from the deployed source file",
 		);
+	});
+});
+
+describe("toDesignRecordEntries", () => {
+	it("puts the body first, tagged with the issue's own createdAt", () => {
+		const entries = toDesignRecordEntries({
+			body: "前提: x",
+			createdAt: "2026-07-01T00:00:00Z",
+			comments: [],
+		});
+		assert.deepEqual(entries, [
+			{ body: "前提: x", createdAt: "2026-07-01T00:00:00Z" },
+		]);
+	});
+
+	it("appends each comment's body and createdAt, dropping everything else it carries", () => {
+		const entries = toDesignRecordEntries({
+			body: "普通の説明文。",
+			createdAt: "2026-07-01T00:00:00Z",
+			comments: [
+				{
+					author: { login: "runner" },
+					body: "前提: x\n否定案: y\n却下理由: z",
+					createdAt: "2026-07-02T00:00:00Z",
+				},
+			],
+		});
+		assert.deepEqual(entries, [
+			{ body: "普通の説明文。", createdAt: "2026-07-01T00:00:00Z" },
+			{
+				body: "前提: x\n否定案: y\n却下理由: z",
+				createdAt: "2026-07-02T00:00:00Z",
+			},
+		]);
+	});
+
+	it("returns just the body entry when there are no comments", () => {
+		const entries = toDesignRecordEntries({ body: "x", createdAt: undefined });
+		assert.deepEqual(entries, [{ body: "x", createdAt: undefined }]);
 	});
 });
 

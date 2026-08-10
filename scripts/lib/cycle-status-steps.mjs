@@ -226,21 +226,17 @@ export async function runCycleStatus({
 						"view",
 						String(targetIssue),
 						"--json",
-						"body,comments",
+						"body,comments,createdAt",
 					]),
 				);
 				recordOptionCount = Math.max(
 					recordOptionCount,
 					detectEnumeratedOptions(issueJson.body).count,
 				);
-				const comments = (issueJson.comments ?? []).map((c) => ({
-					author: c.author?.login,
-					body: c.body,
-					createdAt: c.createdAt,
-				}));
 				const classification = classifyDesignSettlement({
 					body: issueJson.body,
-					comments,
+					createdAt: issueJson.createdAt,
+					comments: issueJson.comments,
 				});
 				designUnsettledFor.push({
 					issue: targetIssue,

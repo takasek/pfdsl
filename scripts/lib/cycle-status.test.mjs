@@ -285,7 +285,7 @@ describe("classifyDesignSettlement", () => {
 	it("reports unsettled by phrase before checking for a posted record", () => {
 		const result = classifyDesignSettlement({
 			body: "設計未確定な点がある。",
-			comments: [{ author: "runner", body: "前提: x\n否定案: y\n却下理由: z" }],
+			comments: [{ body: "前提: x\n否定案: y\n却下理由: z" }],
 		});
 		assert.equal(result.unsettled, true);
 		assert.equal(result.reason, "phrase");
@@ -297,7 +297,6 @@ describe("classifyDesignSettlement", () => {
 			body: "## 対応案\n1. 案A\n2. 案B\n",
 			comments: [
 				{
-					author: "runner",
 					body: "前提: x\n否定案: y\n却下理由: z",
 					createdAt: "2026-01-01T00:00:00Z",
 				},
@@ -305,10 +304,17 @@ describe("classifyDesignSettlement", () => {
 		});
 		assert.equal(result.unsettled, false);
 		assert.equal(result.reason, "record-posted");
-		assert.deepEqual(result.record, {
-			author: "runner",
+		assert.deepEqual(result.record, { createdAt: "2026-01-01T00:00:00Z" });
+	});
+
+	it("fills record.createdAt from the issue's own createdAt when the body is the record", () => {
+		const result = classifyDesignSettlement({
+			body: "前提: x\n否定案: y\n却下理由: z",
 			createdAt: "2026-01-01T00:00:00Z",
+			comments: [],
 		});
+		assert.equal(result.reason, "record-posted");
+		assert.deepEqual(result.record, { createdAt: "2026-01-01T00:00:00Z" });
 	});
 
 	it("reports unsettled when options are enumerated and no record was posted", () => {

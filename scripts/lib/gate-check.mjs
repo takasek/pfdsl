@@ -463,6 +463,23 @@ export function presentRequiredPrefixes(recordBody) {
 }
 
 /**
+ * Shapes an issue into the flat entry list selectDesignRecord scans: the
+ * body as one entry, each comment as another. `author` is left out on
+ * purpose — selectDesignRecord identifies the record by required line heads
+ * alone and never reads it, so carrying it here would read as a check that
+ * is still looking at who posted the record, when none of this repo's
+ * design-record logic does anymore (#824).
+ * @param {{body?: string, createdAt?: string, comments?: Array<{body?: string, createdAt?: string}>}} issue
+ * @returns {Array<{body?: string, createdAt?: string}>}
+ */
+export function toDesignRecordEntries({ body, createdAt, comments }) {
+	return [
+		{ body, createdAt },
+		...(comments ?? []).map((c) => ({ body: c.body, createdAt: c.createdAt })),
+	];
+}
+
+/**
  * The entry that is this issue's selection record, or undefined.
  *
  * Identified by its own required line heads rather than by any external

@@ -7,6 +7,7 @@ import {
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
 	selectDesignRecord,
+	toDesignRecordEntries,
 } from "./gate-check.mjs";
 
 /**
@@ -195,14 +196,19 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
  * 3. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
  * 4. それ以外 → settled (reason: "no-enumerated-options")
  *
- * 記録の同定は終端ゲート（gate-check.mjs）と同じ `selectDesignRecord` を使う。
- * プリフライトと終端ゲートが別々の同定ロジックを持つと、どちらかが記録だと
- * 見なした文章をもう一方が見なさない、という食い違いが生まれるため。
- * @param {{body: string, comments: Array<{author: string, body: string, createdAt?: string}>}} params
+ * 記録の同定は終端ゲート（gate-check.mjs）と同じ `selectDesignRecord`
+ * （と、それに entries を渡す `toDesignRecordEntries`）を使う。プリフライトと
+ * 終端ゲートが別々の同定ロジックを持つと、どちらかが記録だと見なした文章を
+ * もう一方が見なさない、という食い違いが生まれるため。共有しているのは
+ * この同定だけで、記録の内容検査（`classifyDesignRecordContent`）と
+ * 時点照合（`classifyDesignRecordTiming`）は終端ゲート側だけが持つ —
+ * ここで record-posted になった記録が、終端ゲートでは内容不備・時点不備で
+ * FAIL することがあるのは意図した非対称である。
+ * @param {{body: string, createdAt?: string, comments?: Array<{body: string, createdAt?: string}>}} params
  * @returns {{unsettled: boolean, reason: string, matchedLines?: string[], optionCount?: number,
- *            record?: {author: string, createdAt?: string} | null}}
+ *            record?: {createdAt?: string} | null}}
  */
-export function classifyDesignSettlement({ body, comments }) {
+export function classifyDesignSettlement({ body, createdAt, comments }) {
 	const phrase = detectDesignUnsettled(body);
 	if (phrase.designUnsettled) {
 		return {
@@ -212,12 +218,14 @@ export function classifyDesignSettlement({ body, comments }) {
 		};
 	}
 
-	const record = selectDesignRecord([{ body }, ...(comments ?? [])]);
+	const record = selectDesignRecord(
+		toDesignRecordEntries({ body, createdAt, comments }),
+	);
 	if (record) {
 		return {
 			unsettled: false,
 			reason: "record-posted",
-			record: { author: record.author, createdAt: record.createdAt },
+			record: { createdAt: record.createdAt },
 		};
 	}
 
