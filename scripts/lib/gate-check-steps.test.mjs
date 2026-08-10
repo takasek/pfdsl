@@ -624,7 +624,7 @@ describe("designRecordStep", () => {
 	// later, unrelated PR happens to be what closes this issue's range. The
 	// range is not empty, so the no-commit SKIP above never fires; the record
 	// itself has to carry the signal instead.
-	it("SKIPs a commit-bearing range when the record declares no implementation", () => {
+	it("SKIPs a commit-bearing range when the record's own line head declares no implementation", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
 		});
@@ -636,7 +636,7 @@ describe("designRecordStep", () => {
 				comments: [
 					{
 						author: { login: "owner" },
-						body: "前提: x\n否定案: y\n却下理由: 実装しない。",
+						body: "前提: x\n否定案: y\n却下理由: z\n実装しない: 外部制約に帰着",
 						createdAt: "2026-07-01T00:00:00Z",
 					},
 				],
@@ -644,6 +644,30 @@ describe("designRecordStep", () => {
 		});
 		assert.equal(result.status, "SKIP");
 		assert.match(result.detail, /no implementation commits/);
+	});
+
+	// #768 実害の再現: 実際に踏んだ形。前提の一文がこの語を主題として言及しているだけで、
+	// どの行の行頭にも `実装しない:` を書いていない。旧実装（部分一致）はこれを誤って
+	// SKIP した — 実装コミットが現に存在する回で timing 検査が無効化される偽陰性だった。
+	it("does NOT SKIP when the record only mentions the token in prose, not as a line-head declaration", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				body: "普通の説明文。",
+				comments: [
+					{
+						author: { login: "owner" },
+						body: "前提: 本案は〈「実装しない」と決めたサイクルが、その判断を選択記録の `案の処分:` に明記する運用が守られること〉を前提にする\n否定案: y\n却下理由: z",
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
+			}),
+		});
+		assert.equal(result.status, "PASS");
 	});
 
 	it("PASSes when the record predates the first commit and covers every enumerated option", () => {

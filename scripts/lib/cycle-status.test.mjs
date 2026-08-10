@@ -554,4 +554,12 @@ describe("buildDesignRecordTemplate", () => {
 		const { note } = buildDesignRecordTemplate({ optionCount: 0 });
 		assert.ok(note.includes(NO_IMPLEMENTATION_TOKEN));
 	});
+
+	// #768 実害の再現: 「どこかに含める」と読める旧文言は、記録の一文がこの語を
+	// 主題として言及しただけの回を誤って SKIP させた。雛形は行頭宣言でなければ
+	// 判定されないことを明示する。
+	it("clarifies that merely mentioning the token elsewhere is not the declaration", () => {
+		const { note } = buildDesignRecordTemplate({ optionCount: 0 });
+		assert.match(note, /宣言にならない/);
+	});
 });

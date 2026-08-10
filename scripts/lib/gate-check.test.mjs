@@ -964,11 +964,30 @@ describe("hasNoImplementationDisposition", () => {
 		);
 	});
 
-	it("is true when the record's own text carries the token", () => {
+	it("is true when a line's head declares the token, mirroring Size-Intent's line-head design", () => {
 		assert.equal(
 			hasNoImplementationDisposition(
-				`前提: x\n否定案: y\n却下理由: ${NO_IMPLEMENTATION_TOKEN}`,
+				`前提: x\n否定案: y\n却下理由: z\n${NO_IMPLEMENTATION_TOKEN} 理由`,
 			),
+			true,
+		);
+	});
+
+	// #768 実害: 前提の一文が「実装しないと決めたサイクルが、その判断を選択記録の
+	// `案の処分:` に明記する運用が守られること」のように、この語を主題として言及する
+	// 前提行を書くと、行頭一致でなく部分一致で判定していた旧実装は誤って SKIP した。
+	it("is false when the token is only mentioned inside another line's prose, not declared at a line head", () => {
+		assert.equal(
+			hasNoImplementationDisposition(
+				`前提: 本案は〈「${NO_IMPLEMENTATION_TOKEN.replace(/:$/, "")}」と決めたサイクルが、その判断を選択記録の \`案の処分:\` に明記する運用が守られること〉を前提にする\n否定案: y\n却下理由: z`,
+			),
+			false,
+		);
+	});
+
+	it("recognizes the token through the same markdown decoration presentRequiredPrefixes tolerates", () => {
+		assert.equal(
+			hasNoImplementationDisposition(`> - **${NO_IMPLEMENTATION_TOKEN}** 理由`),
 			true,
 		);
 	});

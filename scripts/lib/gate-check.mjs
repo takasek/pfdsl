@@ -512,27 +512,20 @@ export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
 
 // #768: a design-selection record can settle on not implementing at all (the
 // #757 shape — the decision led elsewhere, and any commits later found in
-// range belong to a different, derived PR). Written into the record body the
-// same way DISPOSITION_TOKENS are, and checked the same way: a plain
-// substring match, not a parsed grammar.
-export const NO_IMPLEMENTATION_TOKEN = "実装しない";
+// range belong to a different, derived PR). A line-head declaration, the
+// same design as `Size-Intent: shrink` (SIZE_INTENT_PATTERN below): the
+// record's prose is free to discuss "not implementing" as a topic — #768's
+// own record did, inside its 前提 line, describing the very rule this token
+// enacts — without that discussion being mistaken for the declaration
+// itself. A plain substring match could not tell the two apart and SKIPped
+// timing on a record that never made the disposition (#768's reported
+// defect); requiring a matched line head, via the same lineHeadPattern /
+// normalizeRecordLine machinery presentRequiredPrefixes uses, can.
+export const NO_IMPLEMENTATION_TOKEN = "実装しない:";
 
 /** Shared by both timing SKIP paths that mean "there is nothing to compare". */
 export const NO_IMPLEMENTATION_COMMITS_DETAIL =
 	"no implementation commits — timing unverifiable";
-
-/**
- * Did the selected design-selection record itself settle on not
- * implementing? Forgeable by a runner that implemented anyway and mislabels
- * the record — accepted (#824): the PR diff would then contradict the label,
- * and that contradiction is what human review catches. No detector is added
- * to close this, on purpose.
- * @param {string | undefined | null} recordBody
- * @returns {boolean}
- */
-export function hasNoImplementationDisposition(recordBody) {
-	return (recordBody ?? "").includes(NO_IMPLEMENTATION_TOKEN);
-}
 
 /** Markdown line-head decoration: blockquote, heading, or list marker. */
 const LINE_HEAD_DECORATION = /^(?:>+|#{1,6}|[-*+]|\d+[.)])\s*/;
@@ -586,6 +579,27 @@ export function presentRequiredPrefixes(recordBody) {
 		const pattern = lineHeadPattern(prefix);
 		return lines.some((line) => pattern.test(line));
 	});
+}
+
+const NO_IMPLEMENTATION_LINE_HEAD_PATTERN = lineHeadPattern(
+	NO_IMPLEMENTATION_TOKEN,
+);
+
+/**
+ * Did the selected design-selection record itself declare the disposition
+ * "not implementing" (#768)? A line-head match, not a substring search over
+ * the whole body — a record's 前提/否定案/却下理由 prose is free to discuss
+ * this token as a topic (#768's own record did) without that discussion
+ * being read as the declaration. Forgeable by a runner that implemented
+ * anyway and mislabels the record — accepted (#824): the PR diff would then
+ * contradict the label, and that contradiction is what human review catches.
+ * No detector is added to close this, on purpose.
+ * @param {string | undefined | null} recordBody
+ * @returns {boolean}
+ */
+export function hasNoImplementationDisposition(recordBody) {
+	const lines = (recordBody ?? "").split("\n").map(normalizeRecordLine);
+	return lines.some((line) => NO_IMPLEMENTATION_LINE_HEAD_PATTERN.test(line));
 }
 
 /**
