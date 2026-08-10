@@ -279,7 +279,7 @@ for (const number of issueNumbers) {
 						"view",
 						String(number),
 						"--json",
-						"author,body,comments,createdAt",
+						"body,comments,createdAt",
 					],
 					{ cwd: root },
 				),
