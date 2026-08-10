@@ -313,12 +313,10 @@ describe("wipTransitionStep", () => {
 
 describe("designRecordStep", () => {
 	const issue = ({
-		author,
 		body,
 		comments = [],
 		createdAt = "2026-06-01T00:00:00Z",
 	}) => ({
-		author: { login: author },
 		body,
 		comments,
 		createdAt,
@@ -373,7 +371,7 @@ describe("designRecordStep", () => {
 		const result = designRecordStep({
 			exec,
 			base: "main",
-			issue: issue({ author: "owner", body: validRecordBody }),
+			issue: issue({ body: validRecordBody }),
 		});
 		assert.equal(result.status, "PASS");
 	});
@@ -386,7 +384,6 @@ describe("designRecordStep", () => {
 			exec,
 			base: "main",
 			issue: issue({
-				author: "owner",
 				body: "特に決めていない、ただの説明文です。",
 			}),
 		});
@@ -402,11 +399,9 @@ describe("designRecordStep", () => {
 			exec,
 			base: "main",
 			issue: issue({
-				author: "owner",
 				body: "## 対応案\n1. 案A\n2. 案B\n",
 				comments: [
 					{
-						author: { login: "someone-else" },
 						body: "決定: 案A",
 						createdAt: "2026-07-01T00:00:00Z",
 					},
@@ -425,7 +420,6 @@ describe("designRecordStep", () => {
 			exec,
 			base: "main",
 			issue: issue({
-				author: "owner",
 				body: "## 対応案\n1. 案A\n2. 案B\n",
 				comments: [
 					{
@@ -448,7 +442,6 @@ describe("designRecordStep", () => {
 			exec,
 			base: "main",
 			issue: issue({
-				author: "owner",
 				body: "普通の説明文。",
 				comments: [
 					{
@@ -472,7 +465,6 @@ describe("designRecordStep", () => {
 			exec,
 			base: "main",
 			issue: issue({
-				author: "owner",
 				body: "普通の説明文。",
 				comments: [
 					{
@@ -497,7 +489,6 @@ describe("designRecordStep", () => {
 			// repo's issues — and would win a first-match search, leaving the real
 			// record in the comment unexamined.
 			issue: issue({
-				author: "owner",
 				body: "## 症状\n前提: この検査は行頭しか見ていない。",
 				comments: [
 					{
@@ -517,7 +508,6 @@ describe("designRecordStep", () => {
 			exec,
 			base: "main",
 			issue: issue({
-				author: "owner",
 				body: "普通の説明文。",
 				comments: [
 					{
@@ -539,7 +529,6 @@ describe("designRecordStep", () => {
 			exec,
 			base: "main",
 			issue: issue({
-				author: "owner",
 				body: "普通の説明文。",
 				comments: [
 					{
