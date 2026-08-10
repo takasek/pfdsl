@@ -837,26 +837,19 @@ describe("checkDocsStep", () => {
 
 describe("reviewRecordStep", () => {
 	const trailer = "Review: tool=simplify";
+	const messages = (text) => ({ ok: true, text });
 
 	it("PASSes when a code-touching branch carries a matching record", () => {
-		const { exec } = fakeExec({
-			"git log --no-merges": { out: `subject\n\n${trailer}\n` },
-		});
 		const result = reviewRecordStep({
-			exec,
-			base: "main",
+			commitMessages: messages(`subject\n\n${trailer}\n`),
 			changedFiles: ["scripts/lib/x.mjs"],
 		});
 		assert.equal(result.status, "PASS");
 	});
 
 	it("FAILs when a code-touching branch carries no record at all", () => {
-		const { exec } = fakeExec({
-			"git log --no-merges": { out: "subject\n\nbody without a trailer\n" },
-		});
 		const result = reviewRecordStep({
-			exec,
-			base: "main",
+			commitMessages: messages("subject\n\nbody without a trailer\n"),
 			changedFiles: ["scripts/lib/x.mjs"],
 		});
 		assert.equal(result.status, "FAIL");
@@ -864,14 +857,8 @@ describe("reviewRecordStep", () => {
 	});
 
 	it("FAILs when the record names a tool outside the allowed set", () => {
-		const { exec } = fakeExec({
-			"git log --no-merges": {
-				out: "subject\n\nReview: tool=eyeballs\n",
-			},
-		});
 		const result = reviewRecordStep({
-			exec,
-			base: "main",
+			commitMessages: messages("subject\n\nReview: tool=eyeballs\n"),
 			changedFiles: ["scripts/lib/x.mjs"],
 		});
 		assert.equal(result.status, "FAIL");
@@ -879,14 +866,19 @@ describe("reviewRecordStep", () => {
 	});
 
 	it("PASSes a prose-only branch that carries no record", () => {
-		const { exec } = fakeExec({
-			"git log --no-merges": { out: "docs: x\n\nbody\n" },
-		});
 		const result = reviewRecordStep({
-			exec,
-			base: "main",
+			commitMessages: messages("docs: x\n\nbody\n"),
 			changedFiles: ["docs/adr/0001-x.md"],
 		});
 		assert.equal(result.status, "PASS");
+	});
+
+	it("FAILs when the caller could not read the range", () => {
+		const result = reviewRecordStep({
+			commitMessages: { ok: false, text: "", error: "fatal: bad revision" },
+			changedFiles: ["scripts/lib/x.mjs"],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /bad revision/);
 	});
 });

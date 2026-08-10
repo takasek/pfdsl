@@ -13,10 +13,8 @@
  * Process/git I/O lives in the caller scripts; this module stays testable.
  */
 
-import { RECORD_SEP, trailerLines } from "./commit-trailers.mjs";
+import { trailerLines } from "./commit-trailers.mjs";
 import { matchesTrigger } from "./gate-check.mjs";
-
-export { RECORD_SEP };
 
 const TRAILER = /^Review:\s*(.*)$/m;
 const PAIR = /(\w+)=(?:"([^"]*)"|(\S+))/g;

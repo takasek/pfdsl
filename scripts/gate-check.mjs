@@ -249,9 +249,12 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 // granularity stays MANUAL)
 results.push(commitSubjectStep({ exec, base }));
 
+// Every trailer-borne declaration reads this, so it is fetched once.
+const commitMessages = commitMessagesSince({ exec, base });
+
 // 8b. Review record: judged here, before the PR, because the trailer lives
 // in a commit message and cannot be added afterwards (#698).
-results.push(reviewRecordStep({ exec, base, changedFiles }));
+results.push(reviewRecordStep({ commitMessages, changedFiles }));
 
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(
@@ -308,9 +311,7 @@ const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
 // are always readable here, which is what the PR body never was: the gate runs
 // before the PR exists, so the lookup it replaced spent most of its life
 // reporting that it could not run.
-const overrideDeclared = hasSizeOverride(
-	commitMessagesSince({ exec, base }).text,
-);
+const overrideDeclared = hasSizeOverride(commitMessages.text);
 results.push(
 	...perIssueSteps(sizeDirectionStep, issues, {
 		deltas: sizeDeltas,

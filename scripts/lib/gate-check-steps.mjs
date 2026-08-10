@@ -13,6 +13,7 @@
  * and report failure as `{ ok: false, out }`.
  */
 
+import { RECORD_SEP } from "./commit-trailers.mjs";
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
 	classifyDesignRecordContent,
@@ -31,11 +32,7 @@ import {
 } from "./gate-check.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
-import {
-	classifyCycle,
-	parseReviewRecords,
-	RECORD_SEP,
-} from "./review-record.mjs";
+import { classifyCycle, parseReviewRecords } from "./review-record.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
 
@@ -63,6 +60,8 @@ export function changedFilesSince({ exec, base }) {
  * trailer-borne declaration is read from. Two checks want it (the review
  * record and the size override), and they have to agree about the range and
  * the separator, so the invocation lives here rather than in each of them.
+ * Callers run it once and hand the result to both, rather than each step
+ * spawning its own git.
  * @param {{exec: Function, base: string}} params
  * @returns {{ok: boolean, text: string, error?: string}}
  */
@@ -429,12 +428,12 @@ export function checkDocsStep({ exec }) {
  * malformed record is reported because parseReviewTrailer already judged it,
  * not as an extra rule.
  */
-export function reviewRecordStep({ exec, base, changedFiles }) {
+export function reviewRecordStep({ commitMessages, changedFiles }) {
 	const name = "Review record";
-	const bodies = commitMessagesSince({ exec, base });
-	if (!bodies.ok) return { name, status: "FAIL", detail: bodies.error };
+	if (!commitMessages.ok)
+		return { name, status: "FAIL", detail: commitMessages.error };
 
-	const records = parseReviewRecords(bodies.text);
+	const records = parseReviewRecords(commitMessages.text);
 	const problems = classifyCycle({
 		changedFiles,
 		recordCount: records.length,
