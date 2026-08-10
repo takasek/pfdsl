@@ -260,6 +260,74 @@ describe("renderFrontmatterCst: preserves folded scalar (>) line wraps (#815)", 
 `);
 	});
 
+	// parseFrontmatterCst's yamlText slice excludes the closing fence's own
+	// line break (#644), so when a fold is the last field in the frontmatter,
+	// origRaw is missing the trailing newline that newRaw's render always has.
+	// reindentFold used to build the replacement purely from origRaw's line
+	// structure, losing that newline and merging the closing fence into the
+	// fold's last continuation line (#816).
+	describe("keeps newRaw's trailing newline count when the fold is the document's last field (#816)", () => {
+		it("clip chomping (>)", () => {
+			const src = `artifact:
+  a:
+    status: todo
+    description: >
+      Hello
+      world.`;
+			const out = renderMutated(src, (doc) =>
+				doc.setIn(["artifact", "a", "status"], "done"),
+			);
+			expect(out).toBe(`artifact:
+  a:
+    status: done
+    description: >
+      Hello
+      world.
+`);
+		});
+
+		it("strip chomping (>-)", () => {
+			const src = `artifact:
+  a:
+    status: todo
+    description: >-
+      Hello
+      world.`;
+			const out = renderMutated(src, (doc) =>
+				doc.setIn(["artifact", "a", "status"], "done"),
+			);
+			expect(out).toBe(`artifact:
+  a:
+    status: done
+    description: >-
+      Hello
+      world.
+`);
+		});
+
+		it("keep chomping (>+), preserving a trailing blank line as part of the value", () => {
+			const src = `artifact:
+  a:
+    status: todo
+    description: >+
+      Hello
+      world.
+
+`;
+			const out = renderMutated(src, (doc) =>
+				doc.setIn(["artifact", "a", "status"], "done"),
+			);
+			expect(out).toBe(`artifact:
+  a:
+    status: done
+    description: >+
+      Hello
+      world.
+
+`);
+		});
+	});
+
 	it("leaves output unchanged when there are no folded scalars (no regression)", () => {
 		const src = `artifact:
   a:
@@ -486,5 +554,18 @@ describe("setFrontmatterField", () => {
 			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
 		const out = setFrontmatterField(src, "artifact", "a", "status", "done");
 		expect(out).toContain("description: >\n      Hello\n      world.\n");
+	});
+
+	// When the fold is the frontmatter's last field, parseFrontmatterCst's
+	// yamlText slice has already dropped the trailing newline the closing
+	// fence's own line break carried, and the write path used to fail to make
+	// that up on re-splice — gluing the fence onto the fold's last line (#816).
+	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
+		const src =
+			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n---\na >> P -> b\n";
+		const out = setFrontmatterField(src, "artifact", "a", "status", "done");
+		expect(out).toBe(
+			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: done\n---\na >> P -> b\n",
+		);
 	});
 });

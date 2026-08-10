@@ -153,7 +153,9 @@ describe("public API", () => {
 			const src =
 				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
 			const { output } = format(src);
-			expect(output).toContain("description: >\n      Hello\n      world.\n");
+			expect(output).toBe(
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P\nP -> b\n",
+			);
 		});
 
 		it("is idempotent for a folded scalar's hand-wrapped line breaks", () => {
@@ -162,6 +164,19 @@ describe("public API", () => {
 			const { output: first } = format(src);
 			const { output: second } = format(first);
 			expect(second).toBe(first);
+		});
+
+		// parseFrontmatterCst's yamlText slice excludes the closing fence's own
+		// line break (#644), so when a fold is the last field in the
+		// frontmatter, the write path used to lose that newline on re-splice —
+		// gluing the closing fence onto the fold's last continuation line (#816).
+		it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
+			const src =
+				"---\nartifact:\n  a:\n    status: todo\n    description: >\n      Hello\n      world.\n---\na >> P -> b\n";
+			const { output } = format(src);
+			expect(output).toBe(
+				"---\nartifact:\n  a:\n    status: todo\n    description: >\n      Hello\n      world.\n---\na >> P\nP -> b\n",
+			);
 		});
 	});
 

@@ -169,6 +169,47 @@ a >> p -> b
 `;
 		const { output, inserted } = insertDefinition(src, "artifact", "b");
 		expect(inserted).toBe(true);
-		expect(output).toContain("description: >\n      Hello\n      world.\n");
+		expect(output).toBe(`---
+artifact:
+  a:
+    description: >
+      Hello
+      world.
+    label: A
+  b:
+    label: b
+---
+`);
+	});
+
+	// parseFrontmatterCst's yamlText slice excludes the closing fence's own
+	// line break (#644), so when a fold is the last field in the frontmatter,
+	// the write path used to lose that newline on re-splice — gluing the
+	// newly inserted sibling definition onto the fold's last continuation
+	// line with no separating newline (#816).
+	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field before inserting a sibling definition", () => {
+		const src = `---
+artifact:
+  a:
+    status: todo
+    description: >
+      Hello
+      world.
+---
+a >> p -> b
+`;
+		const { output, inserted } = insertDefinition(src, "artifact", "b");
+		expect(inserted).toBe(true);
+		expect(output).toBe(`---
+artifact:
+  a:
+    status: todo
+    description: >
+      Hello
+      world.
+  b:
+    label: b
+---
+`);
 	});
 });

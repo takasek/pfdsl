@@ -270,6 +270,60 @@ a >> p -> b
 `;
 		const { output, changes } = reindex(src);
 		expect(changes.length).toBeGreaterThan(0);
-		expect(output).toContain("description: >\n      Hello\n      world.\n");
+		expect(output).toBe(`---
+artifact:
+  a:
+    description: >
+      Hello
+      world.
+    label: A
+    index: 1
+  b: { label: B, index: 2 }
+process:
+  p:
+    index: 1
+---
+a >> p -> b
+`);
+	});
+
+	// parseFrontmatterCst's yamlText slice excludes the closing fence's own
+	// line break (#644), so when a fold is the last field in the frontmatter,
+	// the write path used to lose that newline on re-splice — gluing the
+	// closing fence onto the fold's last continuation line, or (with
+	// --renumber) swallowing the following field's added `index:` into the
+	// fold's decoded value with no error reported (#816).
+	it("preserves a folded scalar's hand-wrapped line breaks when the fold is the frontmatter's last field", () => {
+		const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+    description: >
+      Hello
+      world.
+---
+a >> p -> b
+`;
+		const { output, changes } = reindex(src, { renumber: true });
+		expect(changes.length).toBeGreaterThan(0);
+		expect(output).toBe(`---
+artifact:
+  a:
+    label: A
+    index: 1
+  b:
+    label: B
+    description: >
+      Hello
+      world.
+    index: 2
+process:
+  p:
+    index: 1
+---
+a >> p -> b
+`);
 	});
 });

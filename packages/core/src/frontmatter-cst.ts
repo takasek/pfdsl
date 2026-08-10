@@ -171,7 +171,28 @@ function reindentFold(origRaw: string, newRaw: string): string | null {
 	const reindentedBody = origBody.map((line) =>
 		line.trim() === "" ? "" : " ".repeat(targetIndent) + line.slice(baseIndent),
 	);
-	return [newLines[0], ...reindentedBody].join("\n");
+	// origRaw's own trailing newline count can't be trusted: when the fold is
+	// the last field in the frontmatter, parseFrontmatterCst's yamlText slice
+	// (which excludes the fence's own line break) has dropped one newline that
+	// newRaw's render always has, and a splice built purely from origRaw's line
+	// structure loses it — corrupting the file at the closing fence (#816).
+	// Trailing blank lines in the middle of a `>+` fold are part of the decoded
+	// value and come from origBody unchanged; only the count of *fully trailing*
+	// blank lines is corrected to match newRaw's.
+	const trailingBlankCount = (lines: string[]): number => {
+		let count = 0;
+		for (let i = lines.length - 1; i >= 0 && lines[i] === ""; i--) count++;
+		return count;
+	};
+	const trailingDelta =
+		trailingBlankCount(newLines) - trailingBlankCount(origLines);
+	const adjustedBody =
+		trailingDelta > 0
+			? [...reindentedBody, ...Array<string>(trailingDelta).fill("")]
+			: trailingDelta < 0
+				? reindentedBody.slice(0, reindentedBody.length + trailingDelta)
+				: reindentedBody;
+	return [newLines[0], ...adjustedBody].join("\n");
 }
 
 /**
