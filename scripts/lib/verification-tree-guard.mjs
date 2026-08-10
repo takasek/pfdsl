@@ -16,6 +16,14 @@
 // PostToolUse-only (see hook-io.mjs) — so `ask` is the only way this can
 // surface as a warning at all, the same reasoning main-commit-guard.mjs
 // applies to its ASKED_SUBCOMMANDS.
+//
+// The tree this reads is the payload's cwd, which is where the command
+// starts, not where it ends up: a `cd <dir> && make test` is judged on the
+// directory the shell was in before the `cd`. That misses both ways — a
+// drifted shell that cds back into the worktree is asked about anyway, and
+// one that cds out of it is not asked at all. Splitting the directory change
+// into its own call is what makes either case visible, which is why
+// work-cycle.md tells a cycle to do that rather than chain the two.
 
 import {
 	splitSegments,
