@@ -3,9 +3,12 @@ import { describe, it } from "node:test";
 import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	CODE_PATH,
+	CORRECTNESS_TOOLS,
 	classifyCycle,
+	GATE_TOOLS,
 	parseReviewRecords,
 	parseReviewTrailer,
+	REVIEW_TOOLS,
 } from "./review-record.mjs";
 
 describe("parseReviewTrailer", () => {
@@ -19,7 +22,7 @@ describe("parseReviewTrailer", () => {
 		assert.equal(r.error, undefined);
 	});
 
-	it("rejects a tool outside the three the rule names", () => {
+	it("rejects a tool outside the set the rule names", () => {
 		const r = parseReviewTrailer("Review: tool=eyeballs");
 		assert.match(r.error, /tool/);
 	});
@@ -27,6 +30,33 @@ describe("parseReviewTrailer", () => {
 	it("rejects a record missing the tool field", () => {
 		const r = parseReviewTrailer("Review:");
 		assert.match(r.error, /tool/);
+	});
+
+	it("accepts each of the three perspective values added by #838", () => {
+		for (const tool of ["correctness", "design", "experience"]) {
+			const r = parseReviewTrailer(`Review: tool=${tool}`);
+			assert.equal(r.tool, tool);
+			assert.equal(r.error, undefined);
+		}
+	});
+});
+
+describe("GATE_TOOLS", () => {
+	it("excludes code-review, which runs after a PR exists and so cannot satisfy a pre-commit trailer", () => {
+		assert.equal(GATE_TOOLS.includes("code-review"), false);
+	});
+
+	it("keeps every other REVIEW_TOOLS value", () => {
+		assert.deepEqual(
+			GATE_TOOLS,
+			REVIEW_TOOLS.filter((t) => t !== "code-review"),
+		);
+	});
+});
+
+describe("CORRECTNESS_TOOLS", () => {
+	it("is exactly correctness and design, design subsuming correctness's brief", () => {
+		assert.deepEqual(CORRECTNESS_TOOLS, ["correctness", "design"]);
 	});
 });
 

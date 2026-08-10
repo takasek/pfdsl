@@ -28,7 +28,30 @@ const PAIR = /(\w+)=(?:"([^"]*)"|(\S+))/g;
 export const CODE_PATH = /^(packages|scripts)\//;
 
 /** The review tools the rule accepts. */
-export const REVIEW_TOOLS = ["code-review", "code-reviewer-agent", "simplify"];
+export const REVIEW_TOOLS = [
+	"code-review",
+	"code-reviewer-agent",
+	"simplify",
+	"correctness",
+	"design",
+	"experience",
+];
+
+/**
+ * Tools that can satisfy the "delegated review ran" gate.
+ * `code-review` runs after a PR exists, so it structurally cannot satisfy a
+ * trailer required before the commit — it stays a valid trailer value (a
+ * cycle that ran it still records it, so the record does not read as
+ * malformed) but does not count toward the gate.
+ */
+export const GATE_TOOLS = REVIEW_TOOLS.filter((tool) => tool !== "code-review");
+
+/**
+ * Tools whose brief includes falsifying the diff's factual claims.
+ * `design` subsumes `correctness`'s brief, so a cycle that ran `design` owes
+ * no separate `correctness` pass.
+ */
+export const CORRECTNESS_TOOLS = ["correctness", "design"];
 
 /**
  * Parse a trailer out of a commit message (subject and body).
