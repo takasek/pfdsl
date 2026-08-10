@@ -437,6 +437,11 @@ const CYCLE_WINDOW_INCOMPLETE_NOTE =
  * creation and its first commit — part (2) has no earlier anchor to measure
  * from, and part (1) is empty by then. Before a rebase part (1) still covers
  * it, so the gap only opens on a re-run.
+ *
+ * "Landed" in part (2) means the commit's own date, not the moment it reached
+ * base. A merge brings commits older than the anchor along with it, and only
+ * the merge commit itself carries the landing time — so what part (2) names
+ * for those is the PR's merge, not each commit inside it.
  * @param {{exec: Function, base: string}} params
  * @returns {{ok: boolean, entries?: {sha: string, subject: string}[], error?: string, note?: string}}
  */
