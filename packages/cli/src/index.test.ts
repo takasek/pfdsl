@@ -3729,6 +3729,51 @@ spec >> review -> report
 			});
 		});
 
+		// The kind is the same for every neighbor (every edge runs artifact ->
+		// process or the reverse), so it is named once per list rather than per
+		// id. Without it the caller has to run `describe` on each neighbor to
+		// learn which are artifacts — what an audit agent did with eight of them
+		// (#844). The queried node's own kind leads the output, so the answer
+		// carries the derivation, not just its result.
+		it("names the queried node's kind and the kind its neighbors share", async () => {
+			const f = join(dir, "neighbors-kind.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["graph", "neighbors", f, "spec"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				"spec (artifact)\npredecessors (process): design\nsuccessors (process): build, review\n",
+			);
+		});
+
+		it("--json carries the queried node's id and kind alongside neighborKind", async () => {
+			const f = join(dir, "neighbors-kind-json.pfdsl");
+			writeFileSync(f, base);
+			const r = await run(["graph", "neighbors", f, "spec", "--json"]);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toMatchObject({
+				id: "spec",
+				kind: "artifact",
+				neighborKind: "process",
+			});
+		});
+
+		// A group never appears on an edge (N002), so it has no neighbors and no
+		// opposite kind — the lists stay unannotated rather than claiming one.
+		it("omits the neighbor kind for a group, whose neighbors are empty", async () => {
+			const f = join(dir, "neighbors-group.pfdsl");
+			writeFileSync(
+				f,
+				"---\ngroup:\n  core:\n    label: Core\nartifact:\n  spec:\n    group: core\n---\nreq >> design -> spec\n",
+			);
+			const r = await run(["graph", "neighbors", f, "core"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				"core (group)\npredecessors: (none)\nsuccessors: (none)\n",
+			);
+			const j = await run(["graph", "neighbors", f, "core", "--json"]);
+			expect(JSON.parse(j.stdout).neighborKind).toBe(null);
+		});
+
 		it("exits 2 when the id argument is missing", async () => {
 			const f = join(dir, "neighbors-missing.pfdsl");
 			writeFileSync(f, base);
@@ -4401,6 +4446,22 @@ req >> design -> spec
 				declarationLine: 3,
 				edgeLines: [],
 			});
+		});
+
+		// Same annotation as `graph neighbors`, from the same shared renderer:
+		// describe already led with the node's own kind, but its neighbor lists
+		// were bare ids, so answering "which of these are artifacts" took a
+		// describe per neighbor (#844).
+		it("names the kind the neighbors share, in text and in --json", async () => {
+			const f = join(dir, "describe-neighbor-kind.pfdsl");
+			writeFileSync(f, src);
+			const r = await run(["graph", "describe", f, "design"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toBe(
+				`design (process)\ndesign.label: Design\npredecessors (artifact): req\nsuccessors (artifact): spec\n${f}:6: declaration\n${f}:9: edge\n`,
+			);
+			const j = await run(["graph", "describe", f, "design", "--json"]);
+			expect(JSON.parse(j.stdout).neighborKind).toBe("artifact");
 		});
 
 		it("exits 1 with the shared id(s)-not-found message when the id is not found", async () => {
