@@ -101,9 +101,14 @@ function parseWords(argv) {
 	return words;
 }
 
-/** @param {{name: string, tags: string[], body: string, path: string}} pattern */
-function printPattern({ name, tags, body, path }) {
+/**
+ * @param {{name: string, tags: string[], body: string, path: string}} pattern
+ * @param {string} [note] - printed under the head line, where a reader looks
+ *   for why this entry is in front of them at all.
+ */
+function printPattern({ name, tags, body, path }, note) {
 	console.log(`${name}  [${tags.join(", ")}]`);
+	if (note !== undefined) console.log(`  ${note}`);
 	console.log(`  ${path}`);
 	console.log(`  ${summaryOf(body)}`);
 	for (const line of keyLinesOf(body)) console.log(`  ${line}`);
@@ -128,15 +133,35 @@ function printTags(patterns) {
  * @param {{tags: string[], words: string[]}} query
  */
 function printSelection(patterns, query) {
-	const { tagged, wordOnly, always, reach } = select(patterns, query);
+	const { tagged, wordOnly, always, reach, pool, unselective } = select(
+		patterns,
+		query,
+	);
 
-	console.log(`## tagged (${tagged.length})`);
-	for (const p of tagged) printPattern(p);
+	console.log(`## tagged (${tagged.length} of ${pool})`);
+	if (unselective) {
+		console.log(
+			`  ${tagged.length} of ${pool} is not a narrowing — the tags held too widely this cycle.`,
+		);
+		console.log(
+			"  Read down the ranking, not across the list, and do not treat the end of it as the end of the audit.",
+		);
+	}
+	for (const { pattern, matched } of tagged)
+		printPattern(
+			pattern,
+			`matched ${matched.length}/${query.tags.length}: ${matched.join(", ")}`,
+		);
 
-	console.log(`\n## word-only (${wordOnly.length}) — what the tags missed`);
+	console.log(
+		`\n## word-only (${wordOnly.length} of ${pool - tagged.length}) — what the tags missed`,
+	);
 	if (reach.length > 0) {
 		console.log(
 			`  reach before subtraction: ${reach.map((r) => `${r.word} ${r.count}`).join(", ")}`,
+		);
+		console.log(
+			"  reach counts patterns; `near --word <word>` names which, the tagged ones included.",
 		);
 	}
 	if (query.words.length === 0) {

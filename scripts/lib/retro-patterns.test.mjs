@@ -74,9 +74,16 @@ describe("selectByTag", () => {
 	it("unions the given tags rather than intersecting them", () => {
 		assert.deepEqual(
 			selectByTag(patterns, ["method:delegate", "method:remove"]).map(
-				(p) => p.name,
+				(m) => m.pattern.name,
 			),
 			["委譲A", "委譲B", "無関係"],
+		);
+	});
+
+	it("carries the tags each pattern matched, not the ones it merely has", () => {
+		assert.deepEqual(
+			selectByTag(patterns, ["method:delegate"]).map((m) => m.matched),
+			[["method:delegate"], ["method:delegate"]],
 		);
 	});
 
@@ -205,7 +212,7 @@ describe("select", () => {
 		});
 
 		assert.deepEqual(
-			result.tagged.map((p) => p.name),
+			result.tagged.map((t) => t.pattern.name),
 			["委譲の接合部"],
 		);
 		assert.deepEqual(
@@ -236,6 +243,74 @@ describe("select", () => {
 			{ word: "CRLF", count: 2 },
 			{ word: "存在しない語", count: 0 },
 		]);
+	});
+
+	it("ranks the tagged by how many of the cycle's tags each one carries", () => {
+		const cycle = [
+			{ name: "一致1", tags: ["a"], body: "- **一致1**: 冒頭。" },
+			{ name: "一致3", tags: ["a", "b", "c"], body: "- **一致3**: 冒頭。" },
+			{ name: "一致2", tags: ["a", "b"], body: "- **一致2**: 冒頭。" },
+		];
+
+		const { tagged } = select(cycle, { tags: ["a", "b", "c"], words: [] });
+
+		assert.deepEqual(
+			tagged.map((t) => t.pattern.name),
+			["一致3", "一致2", "一致1"],
+		);
+	});
+
+	it("names which of the cycle's tags each pattern matched", () => {
+		const cycle = [
+			{ name: "二軸", tags: ["a", "b", "z"], body: "- **二軸**: 冒頭。" },
+		];
+
+		const { tagged } = select(cycle, { tags: ["b", "a"], words: [] });
+
+		assert.deepEqual(tagged[0].matched, ["a", "b"]);
+	});
+
+	it("keeps catalog order among patterns matching the same number of tags", () => {
+		const cycle = [
+			{ name: "先", tags: ["a"], body: "- **先**: 冒頭。" },
+			{ name: "後", tags: ["b"], body: "- **後**: 冒頭。" },
+		];
+
+		const { tagged } = select(cycle, { tags: ["b", "a"], words: [] });
+
+		assert.deepEqual(
+			tagged.map((t) => t.pattern.name),
+			["先", "後"],
+		);
+	});
+
+	const pool4 = [
+		{ name: "1", tags: ["a"], body: "- **1**: 冒頭。" },
+		{ name: "2", tags: ["b"], body: "- **2**: 冒頭。" },
+		{ name: "3", tags: ["b"], body: "- **3**: 冒頭。" },
+		{ name: "4", tags: ["c"], body: "- **4**: 冒頭。" },
+		{ name: "常時", tags: [ALWAYS_TAG], body: "- **常時**: 冒頭。" },
+	];
+
+	it("counts the pool the tags select from, always-tagged excluded", () => {
+		assert.equal(select(pool4, { tags: ["a"], words: [] }).pool, 4);
+	});
+
+	it("calls a selection unselective once it holds more than half the pool", () => {
+		assert.equal(
+			select(pool4, { tags: ["a", "b"], words: [] }).unselective,
+			true,
+		);
+	});
+
+	it("leaves a selection of exactly half the pool unflagged", () => {
+		assert.equal(select(pool4, { tags: ["b"], words: [] }).unselective, false);
+	});
+
+	it("does not call an empty selection unselective", () => {
+		const { unselective } = select(patterns, { tags: [], words: [] });
+
+		assert.equal(unselective, false);
 	});
 
 	it("yields the always-tagged patterns even when nothing else matches", () => {
