@@ -1145,9 +1145,19 @@ describe("reviewRecordStep", () => {
 	const trailer = "Review: tool=simplify";
 	const messages = (text) => ({ ok: true, text });
 
-	it("PASSes when a code-touching branch carries a matching record", () => {
+	it("PASSes when a code-touching branch carries both a gate record and a correctness record", () => {
 		const result = reviewRecordStep({
-			commitMessages: messages(`subject\n\n${trailer}\n`),
+			commitMessages: messages(
+				`subject\n\n${trailer}\nReview: tool=correctness\n`,
+			),
+			changedFiles: ["scripts/lib/x.mjs"],
+		});
+		assert.equal(result.status, "PASS");
+	});
+
+	it("PASSes on a single design record, which subsumes both requirements", () => {
+		const result = reviewRecordStep({
+			commitMessages: messages("subject\n\nReview: tool=design\n"),
 			changedFiles: ["scripts/lib/x.mjs"],
 		});
 		assert.equal(result.status, "PASS");
@@ -1160,6 +1170,15 @@ describe("reviewRecordStep", () => {
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /no review record/);
+	});
+
+	it("FAILs when a code-touching branch carries only the quality (simplify) record", () => {
+		const result = reviewRecordStep({
+			commitMessages: messages(`subject\n\n${trailer}\n`),
+			changedFiles: ["scripts/lib/x.mjs"],
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /no correctness review record/);
 	});
 
 	it("FAILs when the record names a tool outside the allowed set", () => {

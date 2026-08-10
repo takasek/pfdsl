@@ -61,8 +61,16 @@ if (result.status === "FAIL") {
 		"\nThe trailer is part of a commit message, so it cannot be appended later.",
 	);
 	console.error(
-		"Run the review, then record the pass in the message of the commit you make next:",
+		"Run the reviews, then record each pass in the message of the commit you make next.",
 	);
-	console.error("  Review: tool=simplify");
+	console.error(
+		"Quality (perspective 1, /simplify or equivalent): Review: tool=simplify",
+	);
+	console.error(
+		"Correctness (perspective 2, required for code changes): Review: tool=correctness",
+	);
+	console.error(
+		"(tool=design covers both when the cycle also ran a design-selection review)",
+	);
 	process.exit(1);
 }
