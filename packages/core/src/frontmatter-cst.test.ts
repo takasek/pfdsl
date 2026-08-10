@@ -697,4 +697,23 @@ describe("setFrontmatterField", () => {
 			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: done\n---\na >> P -> b\n",
 		);
 	});
+
+	// preserveFolds guards on node.value !== fold.value precisely so that
+	// rewriting the folded field's own value doesn't keep its stale wraps —
+	// exercise that guard through the public setFrontmatterField entry point,
+	// not just the internal preserveFolds unit tests above.
+	it("re-serializes the folded field itself, without its stale wraps, when its own value is rewritten", () => {
+		const src =
+			"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n";
+		const out = setFrontmatterField(
+			src,
+			"artifact",
+			"a",
+			"description",
+			"changed value",
+		);
+		expect(out).toBe(
+			"---\nartifact:\n  a:\n    description: >-\n      changed value\n    status: todo\n---\na >> P -> b\n",
+		);
+	});
 });

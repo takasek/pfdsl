@@ -167,6 +167,24 @@ describe("public API", () => {
 			expect(second).toBe(first);
 		});
 
+		// The write path preserves the source's own line ending (#644); a
+		// folded scalar's preserved wraps must not introduce a bare LF into an
+		// otherwise all-CRLF file.
+		it("preserves a folded scalar's hand-wrapped line breaks in a CRLF file without introducing a bare LF", () => {
+			const src =
+				"---\nartifact:\n  a:\n    description: >\n      Hello\n      world.\n    status: todo\n---\na >> P -> b\n".replace(
+					/\n/g,
+					"\r\n",
+				);
+			const { output: first } = format(src);
+			expect(first).toContain(
+				"description: >\r\n      Hello\r\n      world.\r\n",
+			);
+			expect(first.replace(/\r\n/g, "")).not.toContain("\n");
+			const { output: second } = format(first);
+			expect(second).toBe(first);
+		});
+
 		// parseFrontmatterCst's yamlText slice excludes the closing fence's own
 		// line break (#644), so when a fold is the last field in the
 		// frontmatter, the write path used to lose that newline on re-splice —
