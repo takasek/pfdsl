@@ -4225,7 +4225,7 @@ req >> design -> spec
 			);
 		});
 
-		it("--field with multiple comma-separated names prints them in request order", async () => {
+		it("--field with multiple comma-separated names prints them in line order, not request order", async () => {
 			const f = join(dir, "locate-field-multi.pfdsl");
 			const multi = `---
 artifact:
@@ -4247,7 +4247,7 @@ x -> spec
 			]);
 			expect(r.exitCode).toBe(0);
 			expect(r.stdout).toBe(
-				`${f}:3: declaration\n${f}:6: field status\n${f}:4: field label\n${f}:8: edge\n`,
+				`${f}:3: declaration\n${f}:4: field label\n${f}:6: field status\n${f}:8: edge\n`,
 			);
 		});
 

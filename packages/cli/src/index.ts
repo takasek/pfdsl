@@ -1466,7 +1466,8 @@ export function runMetaList(
 		if (kind !== "artifact" && kind !== "process") continue;
 		const meta = metaFor(frontmatter, id, kind);
 		const tags = meta?.tags;
-		if (Array.isArray(tags)) for (const t of tags) usedTags.add(String(t));
+		if (tagFilter !== undefined && Array.isArray(tags))
+			for (const t of tags) usedTags.add(String(t));
 		if (opts.group !== undefined && meta?.group === opts.group)
 			groupUsed = true;
 		if (tagFilter !== undefined && !matchesAnyTag(meta, tagFilter)) continue;
@@ -1670,10 +1671,13 @@ export function runNeighbors(
 
 /**
  * Text rendering shared by `graph locate` and `graph describe`: one
- * `<file>:<line>: <kind>` line per occurrence — declaration, then requested
- * field lines (in request order, only those actually found), then edge
- * lines. `fields`/`fieldLines` default to empty, so `graph describe` (which
- * never requests fields) renders exactly as before.
+ * `<file>:<line>: <kind>` line per occurrence — declaration, then the found
+ * field lines, then edge lines. Field lines are ordered by line, not by the
+ * order they were asked for, so the whole list reads top-to-bottom like the
+ * file does; each line names its field, so the correspondence with the
+ * request survives the reordering. `fields`/`fieldLines` default to empty,
+ * so `graph describe` (which never requests fields) renders exactly as
+ * before.
  */
 function renderLocateLines(
 	file: string,
@@ -1686,11 +1690,15 @@ function renderLocateLines(
 	if (declarationLine !== null) {
 		lines.push(`${file}:${declarationLine}: declaration`);
 	}
-	for (const field of fields) {
-		const line = fieldLines[field];
-		if (line !== null && line !== undefined) {
-			lines.push(`${file}:${line}: field ${field}`);
-		}
+	const foundFields = fields
+		.map((field) => ({ field, line: fieldLines[field] }))
+		.filter(
+			(f): f is { field: string; line: number } =>
+				f.line !== null && f.line !== undefined,
+		)
+		.sort((a, b) => a.line - b.line);
+	for (const { field, line } of foundFields) {
+		lines.push(`${file}:${line}: field ${field}`);
 	}
 	for (const line of edgeLines) lines.push(`${file}:${line}: edge`);
 	return lines;
@@ -2646,9 +2654,11 @@ By default, line granularity is the node, not the field: a declaration line
 points at the id's key, and the fields under it are on the lines that
 follow. \`--field <name[,name...]>\` narrows past that: it adds one line per
 named field, pointing at that field's own key within the id's declaration
-block, printed in request order right after the declaration line. A named
-field the node's declaration block doesn't have is skipped in text mode and
-printed as null in --json, with a warning on stderr (possible typo).
+block, printed after the declaration line and ordered by line rather than
+by the order asked for (each line names its field, so text output as a
+whole reads top-to-bottom like the file). A named field the node's
+declaration block doesn't have is skipped in text mode and printed as null
+in --json, with a warning on stderr (possible typo).
 
   --field <name[,name...]>  also locate these frontmatter fields within
                              <id>'s declaration block

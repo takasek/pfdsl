@@ -81,6 +81,11 @@ function lineAtOffset(text: string, offset: number): number {
 	return line;
 }
 
+/** A yaml-text offset as a line number in the whole source, fence included. */
+function sourceLineAtYamlOffset(yamlText: string, offset: number): number {
+	return FRONTMATTER_YAML_START_LINE - 1 + lineAtOffset(yamlText, offset);
+}
+
 function collectIds(node: IdNode, id: string, lines: Set<number>): void {
 	if (node.value === id) lines.add(node.start.line);
 }
@@ -160,10 +165,7 @@ export function locateNode(
 	if (cst.present) {
 		pair = declarationPair(cst.doc, id, kind);
 		if (pair && isScalar(pair.key) && pair.key.range) {
-			declarationLine =
-				FRONTMATTER_YAML_START_LINE -
-				1 +
-				lineAtOffset(cst.yamlText, pair.key.range[0]);
+			declarationLine = sourceLineAtYamlOffset(cst.yamlText, pair.key.range[0]);
 		}
 	}
 
@@ -171,9 +173,7 @@ export function locateNode(
 	for (const field of fields) {
 		const offset = pair ? fieldOffset(pair, field) : null;
 		fieldLines[field] =
-			offset === null
-				? null
-				: FRONTMATTER_YAML_START_LINE - 1 + lineAtOffset(cst.yamlText, offset);
+			offset === null ? null : sourceLineAtYamlOffset(cst.yamlText, offset);
 	}
 
 	return {
