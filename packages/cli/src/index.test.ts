@@ -3813,6 +3813,22 @@ p3 -> d
 			expect(stats[0]?.id).toBe("spec");
 		});
 
+		// --limit cuts the list after the primary-degree sort, so a node whose
+		// connection is mostly feedback can fall outside the window: on
+		// .pfdsl/workflow.pfdsl six of the twenty best-connected nodes do, one of
+		// them at primary rank 56. A connectivity sweep has to read the full
+		// listing, which is what the pfd-ecosystem skill now says.
+		it("--limit cuts on the primary degree, dropping feedback-heavy rows", async () => {
+			const f = join(dir, "stats-limit-feedback.pfdsl");
+			writeFileSync(f, `${base}report >>? design\nreport >>? build\n`);
+			const r = await run(["graph", "stats", f, "--limit", "2"]);
+			expect(r.exitCode).toBe(0);
+			// report has the highest feedback degree (2) and the lowest primary
+			// degree of the two, so the window keeps neither of its rows.
+			expect(r.stdout).not.toContain("report ");
+			expect(r.stdout.split("\n").filter(Boolean)).toHaveLength(2);
+		});
+
 		it("--limit caps the number of rows", async () => {
 			const f = join(dir, "stats-limit.pfdsl");
 			writeFileSync(f, base);

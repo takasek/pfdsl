@@ -28,7 +28,7 @@ npm install -g @pfdsl/cli
 |---|---|
 | `pfdsl graph summary` | Print node/edge counts and per-group breakdown |
 | `pfdsl graph io` | List terminal artifacts and external inputs |
-| `pfdsl graph stats` | Print graph-wide structural stats |
+| `pfdsl graph stats` | Rank nodes by primary degree, reporting feedback (`>>?`) degree apart |
 | `pfdsl graph neighbors <id>` | List direct neighbors of a node, feedback (`>>?`) ones included |
 | `pfdsl graph impact <id>` | List nodes reachable downstream of a node |
 | `pfdsl graph depends-on <id>` | List nodes reachable upstream of a node |

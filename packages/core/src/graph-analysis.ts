@@ -180,12 +180,17 @@ export function computeOrphans(graph: Graph): GraphOrphan[] {
  *
  * Feedback (`>>?`) degree is reported in its own pair of fields and stays out
  * of both the primary counts and the sort key, because the command's readers
- * ask different questions of it (#831). Bottleneck ranking and the god-process
- * lens read fan-out as what a node gates or produces, and a feedback edge is
- * neither — `groupEdges` leaves it out of `processInputs`, so readiness never
- * waits on one. Hub detection for restructuring wants the connection counted;
- * reporting the two separately answers both without either reading the other's
- * number.
+ * ask different questions of it (#831). Bottleneck ranking reads an artifact's
+ * fan-out as how many processes it gates, and a feedback edge gates nothing —
+ * `groupEdges` keeps it out of `processInputs`, so readiness never waits on
+ * one. Hub detection for restructuring wants the connection counted. Reporting
+ * the two apart answers both without either reading the other's number.
+ *
+ * A node's feedback degree is one-sided by construction: an edge's endpoints
+ * are an artifact and a process, so an artifact only ever gains
+ * `feedbackFanOut` and a process only `feedbackFanIn`. The god-process lens
+ * therefore reads a process fan-out that folding feedback in would not have
+ * touched — what it would have moved is that lens's ranking, not its column.
  */
 export function computeStats(graph: Graph): NodeStats[] {
 	const { out, in: inn } = buildAdjacency(graph);

@@ -2307,9 +2307,16 @@ Exit codes:
 const HELP_STATS = `usage: pfdsl graph stats <file|-> [--limit <n>] [--json] [--no-color]
 
 Print fan-in/fan-out per node, ranked by total degree descending (hubs
-first) then id ascending. Counts and ranking cover primary (\`>>\` / \`->\`)
-edges only, so fan-out reads as what a node gates or produces; feedback
-(\`>>?\`) degree is reported alongside and left out of both.
+first) then id ascending.
+
+\`fan-in\`, \`fan-out\`, \`total\` and the ranking cover primary (\`>>\` / \`->\`)
+edges only, so fan-out reads as what a node gates or produces. Feedback
+(\`>>?\`) degree is reported apart, as a \`feedback-in=N\` / \`feedback-out=N\`
+suffix on the rows that have one, and is in none of those three numbers:
+a node held only by \`>>?\` prints \`total=0\` (\`graph orphans\` still counts
+it as wired). Because --limit cuts after the primary sort, a sweep for
+raw connectivity has to read the full listing.
+
 Text mode prints a hint to stderr suggesting
 --limit when the file has more than ${STATS_HINT_THRESHOLD} nodes and --limit wasn't given
 (kept off stdout so \`stats <file> | ...\` pipelines aren't affected).
