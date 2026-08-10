@@ -305,7 +305,7 @@ describe("runCycleStatus", () => {
 				reason: "no-enumerated-options",
 				matchedLines: [],
 				optionCount: 0,
-				decision: null,
+				record: null,
 			},
 		]);
 		assert.equal(result.designUnsettledError, undefined);
