@@ -7,6 +7,7 @@ import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
 	buildDesignRecordEditQuery,
+	buildSiblingConsumedMap,
 	classifyAuditIssuesFlowResult,
 	classifyChangedFilesByModeling,
 	classifyDesignRecordContent,
@@ -36,11 +37,14 @@ import {
 	parseAuditTerminals,
 	parseCommitLogLines,
 	parseDesignRecordEditResponse,
+	parseInputConsumedArtifacts,
 	partitionManualItemsByPhase,
+	partitionNewTerminals,
 	resolveRecordEditedAt,
 	SIZE_INTENT_PATTERN,
 	SIZE_OVERRIDE_PATTERN,
 	SIZE_TRACKED_PATTERNS,
+	sharesSiblingIdNamespace,
 	statusChangedForArtifact,
 	toDesignRecordEntries,
 	unionCommitLogEntries,
@@ -515,6 +519,126 @@ describe("diffNewTerminals", () => {
 
 	it("returns an empty array for identical sets", () => {
 		assert.deepEqual(diffNewTerminals(["a", "b"], ["a", "b"]), []);
+	});
+});
+
+describe("parseInputConsumedArtifacts", () => {
+	it("collects artifacts consumed by a normal input edge", () => {
+		const json = JSON.stringify({
+			ok: true,
+			edges: [
+				{ kind: "input", artifact: "skill_template", process: "gen_skill" },
+				{ kind: "output", process: "gen_skill", artifact: "plugin_bundle" },
+			],
+		});
+		assert.deepEqual(parseInputConsumedArtifacts(json), ["skill_template"]);
+	});
+
+	it("ignores feedback edges, matching audit-terminal semantics", () => {
+		// `graph io`'s terminals are the spec's audit-terminal (§15.11): an
+		// artifact consumed only via `>>?` stays terminal. A sibling's feedback
+		// edge must not rescue it either, or the same artifact would be classed
+		// differently depending on which file its feedback consumer sits in.
+		const json = JSON.stringify({
+			ok: true,
+			edges: [
+				{ kind: "feedback", artifact: "review_findings", process: "distill" },
+			],
+		});
+		assert.deepEqual(parseInputConsumedArtifacts(json), []);
+	});
+
+	it("deduplicates artifacts consumed by more than one process", () => {
+		const json = JSON.stringify({
+			ok: true,
+			edges: [
+				{ kind: "input", artifact: "feature_samples", process: "gen_skill" },
+				{ kind: "input", artifact: "feature_samples", process: "gen_plugin" },
+			],
+		});
+		assert.deepEqual(parseInputConsumedArtifacts(json), ["feature_samples"]);
+	});
+
+	it("returns an empty array when the graph failed to parse", () => {
+		const json = JSON.stringify({ ok: false, diagnostics: [] });
+		assert.deepEqual(parseInputConsumedArtifacts(json), []);
+	});
+
+	it("returns an empty array for non-JSON input", () => {
+		assert.deepEqual(parseInputConsumedArtifacts("not json"), []);
+	});
+});
+
+describe("sharesSiblingIdNamespace", () => {
+	it("holds for the operational PFD set, where same id means same artifact", () => {
+		assert.equal(sharesSiblingIdNamespace(".pfdsl"), true);
+	});
+
+	it("does not hold for docs/samples, whose diagrams are mutually unrelated", () => {
+		// Real collision at the time of writing: docs/samples/10-layout-tb.pfdsl
+		// has `code` as a terminal while docs/samples/02-feedback.pfdsl consumes
+		// an unrelated `code`. Composing those would file a genuine gatekeeper
+		// violation under "consumed in a sibling graph".
+		assert.equal(sharesSiblingIdNamespace("docs/samples"), false);
+	});
+
+	it("does not hold for the repo root", () => {
+		assert.equal(sharesSiblingIdNamespace("."), false);
+	});
+});
+
+describe("buildSiblingConsumedMap", () => {
+	it("gives each file the union of every other file's consumed artifacts", () => {
+		const result = buildSiblingConsumedMap([
+			["a.pfdsl", ["x", "y"]],
+			["b.pfdsl", ["y", "z"]],
+			["c.pfdsl", ["w"]],
+		]);
+		assert.deepEqual(result.get("a.pfdsl"), ["y", "z", "w"]);
+		assert.deepEqual(result.get("b.pfdsl"), ["x", "y", "w"]);
+		assert.deepEqual(result.get("c.pfdsl"), ["x", "y", "z"]);
+	});
+
+	it("excludes the file's own consumers, so a self-consumed artifact stays terminal", () => {
+		const result = buildSiblingConsumedMap([["only.pfdsl", ["x"]]]);
+		assert.deepEqual(result.get("only.pfdsl"), []);
+	});
+
+	it("returns an empty map for no files", () => {
+		assert.equal(buildSiblingConsumedMap([]).size, 0);
+	});
+});
+
+describe("partitionNewTerminals", () => {
+	it("splits terminals a sibling consumes from the genuinely terminal ones", () => {
+		assert.deepEqual(
+			partitionNewTerminals(
+				["skill_template", "article"],
+				["skill_template", "quality_guide"],
+			),
+			{ terminal: ["article"], consumedInSibling: ["skill_template"] },
+		);
+	});
+
+	it("keeps everything terminal when no sibling consumes any of them", () => {
+		assert.deepEqual(partitionNewTerminals(["article"], []), {
+			terminal: ["article"],
+			consumedInSibling: [],
+		});
+	});
+
+	it("preserves the input order within each partition", () => {
+		assert.deepEqual(partitionNewTerminals(["a", "b", "c", "d"], ["c", "a"]), {
+			terminal: ["b", "d"],
+			consumedInSibling: ["a", "c"],
+		});
+	});
+
+	it("returns empty partitions for an empty terminal list", () => {
+		assert.deepEqual(partitionNewTerminals([], ["a"]), {
+			terminal: [],
+			consumedInSibling: [],
+		});
 	});
 });
 
