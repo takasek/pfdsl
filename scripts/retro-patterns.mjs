@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 import {
+	listPatternFilenames,
 	loadPatternCatalogOrThrow,
 	PATTERN_DIR_RELATIVE,
 } from "./lib/retro-patterns.mjs";
@@ -25,14 +26,11 @@ const BINDING_PATH = resolve(root, ".pfdsl/bindings/pfd-retro.md");
  * @returns {{path: string, name: string, text: string}[]}
  */
 function loadPatternFiles() {
-	return readdirSync(PATTERN_DIR)
-		.filter((f) => f.endsWith(".md"))
-		.sort()
-		.map((f) => ({
-			path: join(PATTERN_DIR, f),
-			name: basename(f, extname(f)),
-			text: readFileSync(join(PATTERN_DIR, f), "utf8"),
-		}));
+	return listPatternFilenames(PATTERN_DIR, { readdirSync }).map((f) => ({
+		path: join(PATTERN_DIR, f),
+		name: basename(f, extname(f)),
+		text: readFileSync(join(PATTERN_DIR, f), "utf8"),
+	}));
 }
 
 /**

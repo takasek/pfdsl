@@ -7,6 +7,7 @@ import {
 	counterLineOf,
 	groupTagsByAxis,
 	keyLinesOf,
+	listPatternFilenames,
 	loadPatternCatalog,
 	loadPatternCatalogOrThrow,
 	near,
@@ -531,6 +532,17 @@ describe("checkPatternFile", () => {
 		assert.deepEqual(
 			checkPatternFile({ name: "parallel-delegation-seam", text: valid }),
 			[],
+		);
+	});
+});
+
+describe("listPatternFilenames", () => {
+	it("keeps only .md files, sorted, ignoring readdir's own order", () => {
+		assert.deepEqual(
+			listPatternFilenames("d", {
+				readdirSync: () => ["b.md", "notes.txt", "a.md"],
+			}),
+			["a.md", "b.md"],
 		);
 	});
 });
