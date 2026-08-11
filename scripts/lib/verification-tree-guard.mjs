@@ -133,10 +133,12 @@ function nodeEvalOperandIndices(rest) {
  * from both checks below by position (nodeEvalOperandIndices), regardless
  * of what `/` characters its text happens to contain.
  *
- * Known miss: an eval body that imports a *relative* path
- * (`node -e "import './x.mjs'"`) is cwd-dependent but is not caught here,
- * because that would require parsing the program text rather than the
- * command line — accepted as out of scope. */
+ * Known miss: an eval body whose own import specifier is relative is
+ * cwd-dependent but is not caught here, because that would require parsing
+ * the program text rather than the command line — accepted as out of scope.
+ * (The example is described rather than written out: check-script-imports
+ * reads this file's text and would resolve a literal relative specifier in a
+ * comment as a broken import.) */
 function isVerificationNode(rest) {
 	const evalOperands = nodeEvalOperandIndices(rest);
 	const pathCandidates = rest.filter((_, i) => !evalOperands.has(i));
