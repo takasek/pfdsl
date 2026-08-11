@@ -5,6 +5,18 @@
 // this hook process's own `process.cwd()` and whether they matched. See
 // scripts/lib/cwd-drift-log.mjs for the line format.
 //
+// `payload.cwd` and this process's `process.cwd()` are both very likely
+// harness-reported values, sharing the same origin — if so, they always
+// agree, and a log of only those two columns would just keep confirming
+// that the harness agrees with itself. That is not the question this hook
+// exists to answer: whether the harness's reported cwd matches where the
+// shell actually ran. Answering that needs the shell to say so itself,
+// which is why the line also carries the command string and the head of
+// its response: a call whose command starts with `pwd` (the form
+// work-cycle.md already recommends) puts the shell's real cwd in the
+// response column, directly comparable against `payload.cwd` on the same
+// line.
+//
 // STOP CONDITION: this is not a permanent mechanism. verification-tree-guard.mjs
 // (#840) trusts `payload.cwd` as the shell's actual cwd; this hook exists only
 // to measure, empirically, whether that trust ever breaks — i.e. whether
