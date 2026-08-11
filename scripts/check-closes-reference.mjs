@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 // Closes-keyword check for CI (#801).
 //
-// CI-only, unlike the review record's two-layer net: the evidence is a link
-// GitHub derives from the PR body, and neither exists when the terminal gate
-// runs before the PR is opened. There is no earlier layer to add.
+// This is the final word, but not the only layer anymore: scripts/lib/
+// closes-create-guard.mjs (#871) asks before a `gh pr create` bound for the
+// default branch is even run, from a token found in the command line. That
+// evidence is weaker than what this check uses — the close link GitHub
+// derives from the merged PR body, not a string match — so it can be talked
+// past (approved once) or miss cases this check still catches (`--web`, an
+// unreadable `--body-file`). This check is what actually gates the merge;
+// the guard only narrows how often it has to.
 //
 // Usage: node scripts/check-closes-reference.mjs --pr <n> --base <ref> --default-branch <ref>
 
