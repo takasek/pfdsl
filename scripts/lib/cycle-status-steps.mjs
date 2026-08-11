@@ -29,7 +29,7 @@ import {
 	parseReadyOutput,
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
-import { loadPatternCatalog } from "./retro-patterns.mjs";
+import { loadPatternCatalog, PATTERN_DIR_RELATIVE } from "./retro-patterns.mjs";
 
 /**
  * @param {{
@@ -356,7 +356,7 @@ export async function runCycleStatus({
 	// every branch above — it names nothing about this cycle's git state, so a
 	// failure here (a malformed pattern file) is reported and does not
 	// withhold the rest of the preflight.
-	const PATTERN_DIR = resolve(root, ".pfdsl/bindings/pfd-retro-patterns");
+	const PATTERN_DIR = resolve(root, PATTERN_DIR_RELATIVE);
 	let preArtifactPatterns = [];
 	let preArtifactPatternsError = null;
 	try {
