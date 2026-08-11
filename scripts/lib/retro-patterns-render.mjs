@@ -209,6 +209,22 @@ function parseArgsOptions() {
 }
 
 /**
+ * A repeated option's raw values, each split on comma so `--tag a,b` and
+ * `--tag a --tag b` land the same way `pfdsl meta list --tag` already
+ * accepts both — the sibling command's split surface is what this one was
+ * missing (#883). Empty entries (from `a,,b` or a trailing comma) are
+ * dropped rather than becoming a lookup for the empty string.
+ * @param {string[]} raw
+ * @returns {string[]}
+ */
+function splitCommaLists(raw) {
+	return raw
+		.flatMap((v) => v.split(","))
+		.map((v) => v.trim())
+		.filter((v) => v.length > 0);
+}
+
+/**
  * Repeated `--tag` / `--word` options. Strict parsing, not a hand-rolled
  * argv walk: a walk that only recognizes the bare `--flag value` form drops
  * the `--flag=value` spelling silently and calls it done rather than an
@@ -224,7 +240,10 @@ export function parseQuery(argv) {
 		strict: true,
 		allowPositionals: false,
 	});
-	return { tags: values.tag ?? [], words: values.word ?? [] };
+	return {
+		tags: splitCommaLists(values.tag ?? []),
+		words: splitCommaLists(values.word ?? []),
+	};
 }
 
 /**

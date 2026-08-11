@@ -214,6 +214,27 @@ describe("parseQuery / parseWords", () => {
 	it("parseWords rejects a --tag as a caller error", () => {
 		assert.throws(() => parseWords(["--tag", "a"]), /near takes no --tag/);
 	});
+
+	it("splits comma-separated values within a single --tag/--word", () => {
+		assert.deepEqual(parseQuery(["--tag", "a,b", "--word", "c,d"]), {
+			tags: ["a", "b"],
+			words: ["c", "d"],
+		});
+	});
+
+	it("combines repeated options with comma-separated values", () => {
+		assert.deepEqual(parseQuery(["--tag", "a,b", "--tag", "c"]), {
+			tags: ["a", "b", "c"],
+			words: [],
+		});
+	});
+
+	it("trims whitespace and drops empty entries from comma-separated values", () => {
+		assert.deepEqual(parseQuery(["--tag", "a, ,b,"]), {
+			tags: ["a", "b"],
+			words: [],
+		});
+	});
 });
 
 describe("SUBCOMMANDS / usageText", () => {
