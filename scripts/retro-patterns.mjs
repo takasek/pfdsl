@@ -55,10 +55,9 @@ if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	const [command, ...rest] = process.argv.slice(2);
 	try {
 		const { text, ok } = renderCommand(command, rest, {
-			patterns: command === "check" ? undefined : loadPatterns(),
-			files: command === "check" ? loadPatternFiles() : undefined,
-			bindingText:
-				command === "check" ? readFileSync(BINDING_PATH, "utf8") : undefined,
+			loadPatterns,
+			loadPatternFiles,
+			loadBinding: () => readFileSync(BINDING_PATH, "utf8"),
 		});
 		if (ok) console.log(text);
 		else console.error(text);

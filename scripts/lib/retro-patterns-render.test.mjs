@@ -7,6 +7,7 @@ import {
 	parseWords,
 	renderCheck,
 	renderCommand,
+	renderList,
 	renderNear,
 	renderPattern,
 	renderSelection,
@@ -125,6 +126,21 @@ describe("renderSelection", () => {
 		assert.match(
 			text,
 			/is not a narrowing — the tags held too widely this cycle\./,
+		);
+	});
+});
+
+describe("renderList", () => {
+	it("renders every pattern, one block each, in the order given", () => {
+		const patterns = [
+			{ name: "先", tags: ["a"], path: "1.md", body: "- **先**: 冒頭。" },
+			{ name: "後", tags: [], path: "2.md", body: "- **後**: 冒頭。" },
+		];
+		assert.equal(
+			renderList(patterns),
+			["先  [a]", "  1.md", "  冒頭。", "後  []", "  2.md", "  冒頭。"].join(
+				"\n",
+			),
 		);
 	});
 });
@@ -307,30 +323,56 @@ describe("renderCommand", () => {
 		"```",
 	].join("\n");
 
+	/**
+	 * The loaders renderCommand pulls its inputs from. Each counts its calls,
+	 * so a test can assert which inputs a subcommand did and did not need.
+	 * @param {object} [overrides]
+	 */
+	function loaders(overrides = {}) {
+		const calls = { patterns: 0, files: 0, binding: 0 };
+		return {
+			calls,
+			loadPatterns: () => {
+				calls.patterns++;
+				return overrides.patterns ?? patterns;
+			},
+			loadPatternFiles: () => {
+				calls.files++;
+				return overrides.files ?? files;
+			},
+			loadBinding: () => {
+				calls.binding++;
+				return overrides.bindingText ?? bindingText;
+			},
+		};
+	}
+
 	it("dispatches tags to the tags heading", () => {
 		const tagged = [{ ...patterns[0], tags: ["target:doc"] }];
-		const { text, ok } = renderCommand("tags", [], { patterns: tagged });
+		const { text, ok } = renderCommand(
+			"tags",
+			[],
+			loaders({ patterns: tagged }),
+		);
 		assert.equal(ok, true);
 		assert.match(text, /^\[target\]/);
 	});
 
 	it("dispatches list to one rendered pattern per entry", () => {
-		const { text, ok } = renderCommand("list", [], { patterns });
+		const { text, ok } = renderCommand("list", [], loaders());
 		assert.equal(ok, true);
 		assert.match(text, /多い {2}\[\]/);
 	});
 
 	it("dispatches select to the tagged/word-only/always sections, not near's heading", () => {
-		const { text, ok } = renderCommand("select", ["--word", "語"], {
-			patterns,
-		});
+		const { text, ok } = renderCommand("select", ["--word", "語"], loaders());
 		assert.equal(ok, true);
 		assert.match(text, /^## tagged/);
 		assert.doesNotMatch(text, /^## near/);
 	});
 
 	it("dispatches near to its own heading, not select's sections", () => {
-		const { text, ok } = renderCommand("near", ["--word", "語"], { patterns });
+		const { text, ok } = renderCommand("near", ["--word", "語"], loaders());
 		assert.equal(ok, true);
 		assert.match(text, /^## near/);
 		assert.doesNotMatch(text, /## tagged/);
@@ -338,39 +380,49 @@ describe("renderCommand", () => {
 
 	it("near without --word throws rather than returning ok:false", () => {
 		assert.throws(
-			() => renderCommand("near", [], { patterns }),
+			() => renderCommand("near", [], loaders()),
 			/near requires at least one --word/,
 		);
 	});
 
 	it("dispatches check to the file/binding report and is ok when both are clean", () => {
-		const { text, ok } = renderCommand("check", [], { files, bindingText });
+		const { text, ok } = renderCommand("check", [], loaders());
 		assert.equal(ok, true);
 		assert.equal(text, "1 pattern file(s), no violations.");
 	});
 
+	it("check reads the pattern files without parsing them into patterns", () => {
+		const load = loaders();
+		renderCommand("check", [], load);
+		assert.equal(load.calls.files, 1);
+		assert.equal(load.calls.patterns, 0);
+	});
+
 	it("check is not ok when a file has a violation", () => {
 		const badFiles = [{ path: "bad.md", name: "bad", text: "no fence here" }];
-		const { ok } = renderCommand("check", [], { files: badFiles, bindingText });
+		const { ok } = renderCommand("check", [], loaders({ files: badFiles }));
 		assert.equal(ok, false);
 	});
 
 	it("check is not ok when the binding disagrees with the definitions", () => {
-		const { ok } = renderCommand("check", [], {
-			files,
-			bindingText: "```bash\nnode scripts/retro-patterns.mjs tags\n```",
-		});
+		const { ok } = renderCommand(
+			"check",
+			[],
+			loaders({
+				bindingText: "```bash\nnode scripts/retro-patterns.mjs tags\n```",
+			}),
+		);
 		assert.equal(ok, false);
 	});
 
 	it("returns the usage text with ok:false for an unrecognized command", () => {
-		const { text, ok } = renderCommand("bogus", [], { patterns });
+		const { text, ok } = renderCommand("bogus", [], loaders());
 		assert.equal(ok, false);
 		assert.match(text, /usage/);
 	});
 
 	it("returns the usage text with ok:false when no command is given", () => {
-		const { ok } = renderCommand(undefined, [], { patterns });
+		const { ok } = renderCommand(undefined, [], loaders());
 		assert.equal(ok, false);
 	});
 });

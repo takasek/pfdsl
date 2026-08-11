@@ -117,6 +117,15 @@ export function renderSelection(patterns, query) {
 }
 
 /**
+ * Every pattern, one rendered block each, in catalog order.
+ * @param {{name: string, tags: string[], body: string, path: string}[]} patterns
+ * @returns {string}
+ */
+export function renderList(patterns) {
+	return patterns.map((p) => renderPattern(p)).join("\n");
+}
+
+/**
  * @param {{name: string, tags: string[], body: string, path: string}[]} patterns
  * @param {string[]} words
  */
@@ -281,26 +290,39 @@ export function checkBindingUsage(bindingText, definitions) {
 	const definedNames = new Set(definitions.map((d) => d.name));
 	const definedOptions = new Set(definitions.flatMap((d) => d.options));
 
-	const violations = [];
-	for (const name of bindingNames)
-		if (!definedNames.has(name))
-			violations.push(
+	return [
+		...disagreements(bindingNames, definedNames, {
+			onlyInBinding: (name) =>
 				`binding shows subcommand "${name}" that no definition declares`,
-			);
-	for (const name of definedNames)
-		if (!bindingNames.has(name))
-			violations.push(
+			onlyInDefinitions: (name) =>
 				`definitions declare subcommand "${name}" that the binding never shows`,
-			);
-	for (const opt of bindingOptions)
-		if (!definedOptions.has(opt))
-			violations.push(`binding uses --${opt} that no definition declares`);
-	for (const opt of definedOptions)
-		if (!bindingOptions.has(opt))
-			violations.push(
+		}),
+		...disagreements(bindingOptions, definedOptions, {
+			onlyInBinding: (opt) =>
+				`binding uses --${opt} that no definition declares`,
+			onlyInDefinitions: (opt) =>
 				`definitions declare --${opt} that the binding never shows`,
-			);
-	return violations;
+		}),
+	];
+}
+
+/**
+ * Both directions of a set difference, phrased by the caller. Reported in
+ * both directions because either one alone leaves the other silent: a stale
+ * binding example and an undocumented subcommand are the same drift seen from
+ * opposite sides.
+ * @param {Set<string>} binding
+ * @param {Set<string>} defined
+ * @param {{onlyInBinding: (v: string) => string, onlyInDefinitions: (v: string) => string}} phrase
+ * @returns {string[]}
+ */
+function disagreements(binding, defined, phrase) {
+	return [
+		...[...binding].filter((v) => !defined.has(v)).map(phrase.onlyInBinding),
+		...[...defined]
+			.filter((v) => !binding.has(v))
+			.map(phrase.onlyInDefinitions),
+	];
 }
 
 /**
@@ -328,23 +350,36 @@ function renderCheckCommand(files, bindingText) {
  * it. Kept as one function precisely so a mistake here — near wired to
  * renderSelection, say — shows up in a test that asserts on which heading
  * came back, rather than only in a human reading the terminal (#820).
+ *
+ * Inputs arrive as loaders rather than as loaded values so that which
+ * subcommand needs which input stays here too, instead of being re-derived by
+ * the caller from the same command string. That seam is load-bearing: `check`
+ * must read the pattern files without parsing them, because parsing is the
+ * very thing it reports per file instead of aborting on.
  * @param {string | undefined} command
  * @param {string[]} argv
- * @param {{patterns?: {name: string, tags: string[], body: string, path: string}[], files?: {path: string, name: string, text: string}[], bindingText?: string}} ctx
+ * @param {{loadPatterns: () => {name: string, tags: string[], body: string, path: string}[], loadPatternFiles: () => {path: string, name: string, text: string}[], loadBinding: () => string}} load
  * @returns {{text: string, ok: boolean}}
  */
-export function renderCommand(command, argv, { patterns, files, bindingText }) {
-	if (command === "check") return renderCheckCommand(files, bindingText);
-	if (command === "tags") return { text: renderTags(patterns), ok: true };
-	if (command === "list")
-		return { text: patterns.map((p) => renderPattern(p)).join("\n"), ok: true };
+export function renderCommand(
+	command,
+	argv,
+	{ loadPatterns, loadPatternFiles, loadBinding },
+) {
+	if (command === "check")
+		return renderCheckCommand(loadPatternFiles(), loadBinding());
+	if (command === "tags") return { text: renderTags(loadPatterns()), ok: true };
+	if (command === "list") return { text: renderList(loadPatterns()), ok: true };
 	if (command === "select")
-		return { text: renderSelection(patterns, parseQuery(argv)), ok: true };
+		return {
+			text: renderSelection(loadPatterns(), parseQuery(argv)),
+			ok: true,
+		};
 	if (command === "near") {
 		const words = parseWords(argv);
 		if (words.length === 0)
 			throw new Error("near requires at least one --word");
-		return { text: renderNear(patterns, words), ok: true };
+		return { text: renderNear(loadPatterns(), words), ok: true };
 	}
 	return { text: usageText(), ok: false };
 }
