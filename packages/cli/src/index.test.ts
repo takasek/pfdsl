@@ -3099,7 +3099,21 @@ req -> spec
 		writeFileSync(f, base);
 		const r = await run(["meta", "get", f, "code", "location"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toBe("code.location: \n");
+		expect(r.stdout).toBe("code.location: (unset)\n");
+	});
+
+	// Both states printed as a bare `id.field: ` before, so text mode said less
+	// than --json (which has "" against null) and a reader who needed the
+	// difference had to re-run with --json (#844).
+	it("distinguishes an unset field from one set to the empty string", async () => {
+		const f = join(dir, "get-unset-vs-empty.pfdsl");
+		writeFileSync(
+			f,
+			'---\nartifact:\n  spec:\n    criteria: c\n    label: ""\n---\nspec >> build -> code\n',
+		);
+		const r = await run(["meta", "get", f, "spec", "label,owner"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("spec.label: \nspec.owner: (unset)\n");
 	});
 
 	it("emits JSON with raw location plus derived location.resolved when --json is passed", async () => {
@@ -3170,7 +3184,9 @@ req -> spec
 		writeFileSync(f, base);
 		const r = await run(["meta", "get", f, "spec", "lable"]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toBe("spec.lable: \n");
+		// A misspelled field is unset like any other the node doesn't have; the
+		// warning, not the value, is what says the name itself is wrong.
+		expect(r.stdout).toBe("spec.lable: (unset)\n");
 		expect(r.stderr).toContain("warning");
 		expect(r.stderr).toContain("lable");
 	});

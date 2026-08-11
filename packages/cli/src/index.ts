@@ -1600,13 +1600,24 @@ export function runCheckLinks(
 	return { stdout: `${lines.join("\n")}\n`, stderr: "", exitCode: 1 };
 }
 
+/**
+ * One `id.field: value` line. A field the node doesn't set reads `(unset)`
+ * rather than an empty value, which is what a field set to the empty string
+ * prints — the two were indistinguishable in text mode while `--json` had
+ * null against "", so the default output was the one that said less (#844).
+ * The marker is bracketed like `graph neighbors`'s `(none)`.
+ */
 function formatGetLine(
 	id: string,
 	field: string,
 	values: Record<string, Record<string, unknown>>,
 ): string {
 	const v = values[id]?.[field];
-	const display = Array.isArray(v) ? v.join(", ") : v === null ? "" : String(v);
+	const display = Array.isArray(v)
+		? v.join(", ")
+		: v === null
+			? "(unset)"
+			: String(v);
 	return `${id}.${field}: ${display}`;
 }
 
@@ -2590,12 +2601,14 @@ since there is no file path to resolve against, derived fields are silently
 omitted from auto-accompaniment, and an explicit request for one returns
 null with a warning on stderr instead of failing the command.
 
-A field the node doesn't have prints as an empty value (JSON: null); this is
-not an error. A node that exists but has no frontmatter entry at all yields
-an empty row (JSON: {}, no text lines). Requesting a field name that isn't a
-recognized frontmatter or derived key prints a warning to stderr (possible
-typo) but still returns the value (empty, since it's genuinely unset) — this
-does not fail the command.
+A field the node doesn't have prints as \`(unset)\` (JSON: null); this is not
+an error, and it is what distinguishes the field from one set to the empty
+string, which prints with nothing after the colon (JSON: ""). A node that
+exists but has no frontmatter entry at all yields an empty row (JSON: {}, no
+text lines). Requesting a field name that isn't a recognized frontmatter or
+derived key prints a warning to stderr (possible typo) but still returns the
+value (\`(unset)\`, since it's genuinely unset) — this does not fail the
+command.
 
 If some requested ids exist and others don't, values for the found ids are
 still printed (to stdout, or under "values" in --json) alongside the error
