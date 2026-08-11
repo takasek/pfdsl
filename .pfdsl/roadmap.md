@@ -163,7 +163,7 @@ guard は hook の payload だけを見る静的解析なので `git -C $W commi
 - 契機2 の除外: npm・Marketplace の公開版でも、roadmap 管理下の実装 artifact を含まない版（`flow:exempt` の修正のみで出た版等）は起こさない
 - artifact の `criteria` が図に存在しない版番号に言及していてもよい（例: `boundary_feedback` の「spec v0.0.12 に統合済み」）。その版番号は上の一次情報を指す外部参照として読む
 
-`npm show @pfdsl/cli version` / 「Marketplace の takasek.pfdsl version」は dist-tag `latest`（＝常に最新版）を返すため、最新版を指す1件を除いて文字どおり偽になる（#724）。
+このリポで最新1件しか返さない手段に当たるのは `npm show @pfdsl/cli version` と「Marketplace の takasek.pfdsl version」で、どちらも dist-tag `latest` を返す（#724）。それを criteria の判定手段に据えると何が起きるかは品質ガイド「criteria は判定できる形で書く」が一次情報。
 `scripts/release-status.mjs` が使う gallery API 呼び出しは `flags: 514` + `pageSize: 1` で最新1件しか返さない — 同じ Marketplace を引く呼び方でも作用域が違うので、criteria の検証手段に流用しない。
 
 **spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact（spec_v007 / spec_v008 / spec_v009 等）は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
