@@ -5,8 +5,7 @@
 
 ## Context
 
-pfd-ops のアーキテクチャ（`references/architecture.md`）は L1（汎用プロトコル）〜L4（リポ固有 companion）の層で構成され、
-L1〜L3 は skill sync で採用リポに配布されるが、L4 companion は配布されない。
+pfd-ops のアーキテクチャ（`references/architecture.md`）は L1（汎用プロトコル）〜L4（リポ固有 companion）の層で構成され、L1〜L3 は skill sync で採用リポに配布されるが、L4 companion は配布されない。
 
 pfd-retro の出力表は findings の宛先をほぼすべて companion（L4）に向けていた。
 その結果、汎用的な運用知見が L4 に滞留し、採用リポに永久に届かない構造欠陥があった。
@@ -16,8 +15,7 @@ pfd-retro の出力表は findings の宛先をほぼすべて companion（L4）
 - workflow.md「hotfix 運用（issue 省略）」「flow:exempt の roadmap 追加除外」— GitHub Issues バックエンド汎用の L3 相当ルール
 - roadmap.md の close 降格ゲート — L3 reference の規約の再掲
 
-retro には D 層「知識成果物のライフサイクル」監査があるが、
-「companion に書かれた知見が汎用かどうか」を問う項目が無く、滞留は検出されないままだった。
+retro には D 層「知識成果物のライフサイクル」監査があるが、「companion に書かれた知見が汎用かどうか」を問う項目が無く、滞留は検出されないままだった。
 
 ## Decision
 
@@ -26,9 +24,7 @@ pfd-retro の D 層に **L4 滞留監査** を追加する:
 > companion のルールのうち固有名詞（リポ名・パッケージ名・ツール名・パス）を含まないものは汎用ルールの疑いがある — 配布層（L3 reference / スキル SKILL.md 本文）への昇格候補として検出する。
 
 昇格の宛先判定は architecture.md の層定義に従う:
-PFD 概念だけで導けるルールは L1（SKILL.md 本文）、
-特定バックエンド流儀に属すルールは L3（references/）、
-リポ固有の値・経路を含むものだけが L4 に残る。
+PFD 概念だけで導けるルールは L1（SKILL.md 本文）、特定バックエンド流儀に属すルールは L3（references/）、リポ固有の値・経路を含むものだけが L4 に残る。
 
 ## Rationale
 
