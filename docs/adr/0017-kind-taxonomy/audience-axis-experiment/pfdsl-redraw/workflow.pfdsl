@@ -141,13 +141,13 @@ artifact:
   published_cli:
     label: npm 公開 CLI
     description: "pipeline.pfdsl の publish_artifacts が生産する。ここでは README 更新の入力としてのみ現れる"
-    criteria: npm show @pfdsl/cli version が期待バージョンを返す
+    criteria: npm view @pfdsl/cli versions に packages/cli/package.json の version が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
     group: release
   published_libraries:
     label: npm 公開ライブラリ群
     description: "pipeline.pfdsl の publish_artifacts が生産する。ここでは README 更新の入力としてのみ現れる"
-    criteria: npm show @pfdsl/core version が期待バージョンを返す
+    criteria: npm view @pfdsl/core versions に packages/core/package.json の version が含まれる
     location: https://www.npmjs.com/package/@pfdsl/core
     group: release
   pull_request:

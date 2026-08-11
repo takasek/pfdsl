@@ -249,21 +249,21 @@ artifact:
   published_cli:
     label: npm 公開 CLI
     description: "外部利用者向け配布物。v* tag push で GitHub Actions が自動 publish する（Trusted Publishing / OIDC）。plugin_dist の marketplace.json も同じ v* タグへ pin される"
-    criteria: npm show @pfdsl/cli version が期待バージョンを返す
+    criteria: npm view @pfdsl/cli versions に packages/cli/package.json の version が含まれる
     externalStakeholders: [ 外部CLIユーザー, CI ]
     location: https://www.npmjs.com/package/@pfdsl/cli
     group: published
   published_libraries:
     label: npm 公開ライブラリ群
     description: "@pfdsl/core / graphviz-exporter / preview-engine の npm 公開物。lib-v* tag push で GitHub Actions が自動 publish する（core → graphviz-exporter → preview-engine 順）"
-    criteria: npm show @pfdsl/core version が期待バージョンを返す
+    criteria: npm view @pfdsl/core versions に packages/core/package.json の version が含まれる
     externalStakeholders: [ 外部ライブラリ利用者 ]
     location: https://www.npmjs.com/package/@pfdsl/core
     group: published
   published_ext:
     label: Marketplace 公開 extension
     description: "外部利用者向け VS Code 拡張配布物。.vsix を marketplace.visualstudio.com へアップロードした結果"
-    criteria: Marketplace の takasek.pfdsl version が期待バージョンを返す
+    criteria: npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれる
     externalStakeholders: [ VSCode拡張ユーザー ]
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
     group: published
