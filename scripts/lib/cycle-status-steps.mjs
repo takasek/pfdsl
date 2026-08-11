@@ -26,7 +26,7 @@ import {
 	parsePorcelainPaths,
 	parseReadyOutput,
 } from "./cycle-status.mjs";
-import { parsePatternFile } from "./retro-patterns.mjs";
+import { loadPatternCatalog } from "./retro-patterns.mjs";
 
 /**
  * @param {{
@@ -333,17 +333,17 @@ export async function runCycleStatus({
 	let preArtifactPatterns = [];
 	let preArtifactPatternsError = null;
 	try {
-		const patterns = readdirSync(PATTERN_DIR)
-			.filter((f) => f.endsWith(".md"))
-			.map((f) => {
-				const filePath = resolve(PATTERN_DIR, f);
-				return {
-					...parsePatternFile(readFileSync(filePath, "utf8")),
-					path: relative(root, filePath),
-				};
-			});
+		const { patterns, errors } = loadPatternCatalog(PATTERN_DIR, {
+			readdirSync,
+			readFileSync,
+			displayPath: (path) => relative(root, path),
+		});
 		preArtifactPatterns = buildPreArtifactReminders(patterns);
+		if (errors.length > 0) preArtifactPatternsError = errors.join("; ");
 	} catch (e) {
+		// The directory itself is missing or unreadable: no catalog to remind
+		// from. Per-file failures never reach here — loadPatternCatalog keeps
+		// them off the patterns that did parse.
 		preArtifactPatternsError = e.message;
 	}
 

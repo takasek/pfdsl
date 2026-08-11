@@ -4,6 +4,8 @@
  * instead of read as one prose file.
  */
 
+import { join } from "node:path";
+
 /** A top-level catalog bullet: `- **name**: first line`. */
 const PATTERN_HEAD = /^- \*\*(.+?)\*\*/;
 
@@ -15,8 +17,10 @@ const TAGS_LINE = /^tags: \[(.*)\]$/m;
 const PHASE_LINE = /^phase: (.+)$/m;
 
 /** A 対策 line phrased as effective before some point ("〜前に"). Deliberately
- * loose — see checkPatternFile's JSDoc for why this misses cases on purpose. */
-const PRE_ARTIFACT_PHRASING = /対策[:：][^、。]{1,20}前に/;
+ * loose — see checkPatternFile's JSDoc for why this misses cases on purpose.
+ * The lookbehind drops the two spellings that carry 前に as a substring
+ * without meaning "before": 以前に (previously) and 名前に (to the name). */
+const PRE_ARTIFACT_PHRASING = /対策[:：][^、。]{1,20}(?<![以名])前に/;
 
 /** An ASCII kebab-case slug: lowercase letters and digits, hyphen-joined. */
 const ASCII_KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -42,6 +46,43 @@ const ASCII_KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export function renderPatternFile({ tags, body, phase }) {
 	const phaseLine = phase === undefined ? "" : `phase: ${phase}\n`;
 	return `---\ntags: [${tags.join(", ")}]\n${phaseLine}---\n\n${body}\n`;
+}
+
+/**
+ * Every pattern under `dir`, parsed, in filename order.
+ *
+ * The one place the catalog is read, so that a second caller cannot acquire
+ * its own directory order or its own failure semantics. Filenames are sorted
+ * because `readdirSync` order is the filesystem's, not the catalog's, and a
+ * malformed file is reported as one error among the rest rather than
+ * discarding every pattern that parsed — the same isolation `checkPatternFile`
+ * already gives per file. Callers that need the abort instead can raise on a
+ * non-empty `errors`.
+ * @param {string} dir
+ * @param {{readdirSync: (dir: string) => string[], readFileSync: (path: string, encoding: string) => string, displayPath?: (path: string) => string}} io
+ * @returns {{patterns: {name: string, tags: string[], phase?: string, body: string, path: string}[], errors: string[]}}
+ */
+export function loadPatternCatalog(
+	dir,
+	{ readdirSync, readFileSync, displayPath },
+) {
+	const shown = displayPath ?? ((path) => path);
+	const patterns = [];
+	const errors = [];
+	for (const file of readdirSync(dir)
+		.filter((f) => f.endsWith(".md"))
+		.sort()) {
+		const path = join(dir, file);
+		try {
+			patterns.push({
+				...parsePatternFile(readFileSync(path, "utf8")),
+				path: shown(path),
+			});
+		} catch (e) {
+			errors.push(`${shown(path)}: ${e.message}`);
+		}
+	}
+	return { patterns, errors };
 }
 
 /**

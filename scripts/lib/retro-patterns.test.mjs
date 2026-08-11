@@ -7,6 +7,7 @@ import {
 	counterLineOf,
 	groupTagsByAxis,
 	keyLinesOf,
+	loadPatternCatalog,
 	near,
 	parsePatternFile,
 	renderPatternFile,
@@ -530,5 +531,53 @@ describe("checkPatternFile", () => {
 			checkPatternFile({ name: "parallel-delegation-seam", text: valid }),
 			[],
 		);
+	});
+});
+
+describe("loadPatternCatalog", () => {
+	const file = (name) => `---\ntags: [a]\n---\n\n- **${name}**: 冒頭。\n`;
+
+	/** @param {Record<string, string>} tree */
+	function fsOf(tree) {
+		return {
+			readdirSync: () => Object.keys(tree),
+			readFileSync: (p) => {
+				const text = tree[p.split("/").pop()];
+				if (text === undefined) throw new Error(`ENOENT: ${p}`);
+				return text;
+			},
+		};
+	}
+
+	it("returns the patterns in filename order, whatever order the directory gives", () => {
+		const { patterns, errors } = loadPatternCatalog(
+			"d",
+			fsOf({ "b.md": file("B"), "a.md": file("A") }),
+		);
+		assert.deepEqual(
+			patterns.map((p) => p.name),
+			["A", "B"],
+		);
+		assert.deepEqual(errors, []);
+	});
+
+	it("isolates a malformed file to itself instead of losing the rest", () => {
+		const { patterns, errors } = loadPatternCatalog("d", {
+			...fsOf({ "bad.md": "no fence here", "good.md": file("Good") }),
+		});
+		assert.deepEqual(
+			patterns.map((p) => p.name),
+			["Good"],
+		);
+		assert.equal(errors.length, 1);
+		assert.match(errors[0], /^d\/bad\.md: /);
+	});
+
+	it("labels each pattern with the display path the caller asks for", () => {
+		const { patterns } = loadPatternCatalog("d", {
+			...fsOf({ "a.md": file("A") }),
+			displayPath: (p) => `rel/${p.split("/").pop()}`,
+		});
+		assert.equal(patterns[0].path, "rel/a.md");
 	});
 });
