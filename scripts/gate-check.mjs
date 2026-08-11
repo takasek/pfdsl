@@ -12,6 +12,7 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
+	buildSiblingConsumedMap,
 	classifyAuditIssuesFlowResult,
 	classifyChangedFilesByModeling,
 	classifyIssueLookupFailure,
@@ -29,7 +30,10 @@ import {
 	matchesTrigger,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
+	parseInputConsumedArtifacts,
 	partitionManualItemsByPhase,
+	partitionNewTerminals,
+	sharesSiblingIdNamespace,
 	VSCODE_EXT_TRIGGER,
 } from "./lib/gate-check.mjs";
 import {
@@ -367,22 +371,71 @@ console.log(formatGateTable(results));
 {
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
 	if (pfdslFiles.length > 0 && existsSync(cliPath)) {
-		// One entry per audit category `graph io` reports. Adding a third is a
-		// row here, not a fourth copy of the collect-and-print pair.
-		const reports = [
-			{
-				parse: parseAuditTerminals,
-				heading:
-					"New terminal artifacts (classify means vs. deliverable; register todo consumer if missing)",
-				byFile: [],
-			},
-			{
-				parse: parseAuditExternalTerminals,
-				heading:
-					"New external-stakeholder terminal artifacts (verify each has a genuine external consumer, not a mistakenly-tagged means artifact)",
-				byFile: [],
-			},
-		];
+		// Artifacts consumed by the *other* .pfdsl files sitting in the same
+		// directory, at HEAD (#671). ADR-0035 split the graphs by judgment axis,
+		// which leaves a generation source declared in one file and consumed in
+		// its sibling; `graph io` runs per file and cannot see across. Composing
+		// the sets here rather than in the CLI is deliberate — spec §2.9.1 keeps
+		// ids file-local and forbids a flattened cross-file view, so "same id
+		// means the same artifact" is a local convention of this repo's .pfdsl/,
+		// which runtime-pipeline.md already declares out of modeling scope. Which
+		// directories that convention covers is SIBLING_ID_NAMESPACE_DIRS' job;
+		// this function only does the git + CLI I/O around it.
+		const siblingConsumedByDir = new Map();
+		const siblingConsumedFor = (file) => {
+			const dir = dirname(file);
+			if (!sharesSiblingIdNamespace(dir)) return [];
+			const cached = siblingConsumedByDir.get(dir);
+			if (cached) return cached.get(file) ?? [];
+			const listing = exec("git", [
+				"ls-tree",
+				"--name-only",
+				"HEAD",
+				"--",
+				`${dir}/`,
+			]);
+			const dirFiles = listing.ok
+				? listing.out
+						.split("\n")
+						.map((l) => l.trim())
+						.filter((l) => l.endsWith(".pfdsl"))
+				: [];
+			const perFile = new Map();
+			for (const sib of dirFiles) {
+				const src = exec("git", ["show", `HEAD:${sib}`]);
+				if (!src.ok) continue;
+				const edges = node([cliPath, "graph", "edges", "-", "--json"], src.out);
+				if (!edges.ok) continue;
+				perFile.set(sib, parseInputConsumedArtifacts(edges.out));
+			}
+			const byTarget = buildSiblingConsumedMap(perFile);
+			siblingConsumedByDir.set(dir, byTarget);
+			return byTarget.get(file) ?? [];
+		};
+
+		// One entry per audit category `graph io` reports. Adding a third is a row
+		// in `parsedReports`, not a further copy of the collect-and-print pair.
+		const terminalsReport = {
+			parse: parseAuditTerminals,
+			heading:
+				"New terminal artifacts (classify means vs. deliverable; register todo consumer if missing)",
+			byFile: [],
+		};
+		const externalTerminalsReport = {
+			parse: parseAuditExternalTerminals,
+			heading:
+				"New external-stakeholder terminal artifacts (verify each has a genuine external consumer, not a mistakenly-tagged means artifact)",
+			byFile: [],
+		};
+		const parsedReports = [terminalsReport, externalTerminalsReport];
+		// Not an audit category of its own: `graph io` never reports it. The
+		// terminals split fills it, so it is kept out of the collect loop and
+		// only joins for printing.
+		const siblingConsumedReport = {
+			heading:
+				"New terminal artifacts consumed in a sibling graph (confirm the sibling's input edge exists, then record N/A — do NOT add a todo consumer, that recreates the double modeling ADR-0035 removed)",
+			byFile: [],
+		};
 		for (const f of pfdslFiles) {
 			const before = exec("git", ["show", `origin/${base}:${f}`]);
 			const after = exec("git", ["show", `HEAD:${f}`]);
@@ -392,15 +445,33 @@ console.log(formatGateTable(results));
 				: { ok: true, out: "" };
 			const afterAudit = node([cliPath, "graph", "io", "-"], after.out);
 			if (!afterAudit.ok) continue;
-			for (const report of reports) {
+			for (const report of parsedReports) {
 				const added = diffNewTerminals(
 					beforeAudit.ok ? report.parse(beforeAudit.out) : [],
 					report.parse(afterAudit.out),
 				);
-				if (added.length > 0) report.byFile.push({ file: f, added });
+				if (added.length === 0) continue;
+				if (report !== terminalsReport) {
+					report.byFile.push({ file: f, added });
+					continue;
+				}
+				const split = partitionNewTerminals(added, siblingConsumedFor(f));
+				if (split.terminal.length > 0) {
+					report.byFile.push({ file: f, added: split.terminal });
+				}
+				if (split.consumedInSibling.length > 0) {
+					siblingConsumedReport.byFile.push({
+						file: f,
+						added: split.consumedInSibling,
+					});
+				}
 			}
 		}
-		for (const { heading, byFile } of reports) {
+		for (const { heading, byFile } of [
+			terminalsReport,
+			siblingConsumedReport,
+			externalTerminalsReport,
+		]) {
 			if (byFile.length === 0) continue;
 			console.log(`\n${heading}:`);
 			for (const { file, added } of byFile) {

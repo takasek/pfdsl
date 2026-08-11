@@ -119,7 +119,13 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 **生成の一次ソースは `graph io` の終端に出る（ADR-0035 の副作用）**: `skill_template` / `quality_guide` / `feature_samples` / `review_perspectives` / `release_tag` と、`distill_ops` が生産する配布スキル・agent 群は、この図では消費者を持たない終端 artifact として報告される。消費者（`gen_skill` / `gen_plugin` / `publish_packages` / `package_vsix`）は `runtime-pipeline.pfdsl` 側に実在するが、`graph io` はファイル単位で走るため参照できない。
 
-**これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。終端ゲートのプロトコル5(b) 判定では「消費者は sibling の `runtime-pipeline.pfdsl` に在る」と記録して該当なしとする。判定時は `.pfdsl/runtime-pipeline.pfdsl` の `gen_skill` / `gen_plugin` / `publish_packages` / `package_vsix` の入力エッジに当該 artifact が列挙されているかを確認する — 列挙が無ければそれは本物の門番違反である。
+**これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。終端ゲートのプロトコル5(b) 判定では「消費者は sibling の `runtime-pipeline.pfdsl` に在る」と記録して該当なしとする。
+
+**この振り分けは `gate-check.mjs` が機械的に行う（#671）**: 新規終端の報告は、`.pfdsl/` 内の他の `.pfdsl` を `graph edges --json` で読み、`>>` 入力エッジで消費されているものを別見出し「New terminal artifacts consumed in a sibling graph」へ分ける。上の列挙を手で維持する必要はない — 消費側のエッジが一次情報である。ただし振り分けは PASS/FAIL でなく報告材料であり、手段か納品物かの分類は MANUAL のまま残る。sibling 見出しに出た artifact は、該当なしと記録する前に消費側のエッジを実際に確認する。
+
+**本来の見出しに残ったことは、それだけでは門番違反の確定ではない。** sibling が構文エラー等で `graph edges --json` に落ちた場合、その図の消費エッジは黙って読み飛ばされ、消費者は0件として扱われる（読めなかった側に倒すと本物の違反を沈黙させるため、見に行けと言う側に倒してある）。門番違反と言えるのは、sibling が読めたうえで消費者が無いときである。判定時は `.pfdsl/runtime-pipeline.pfdsl` を単体で `graph edges` に通し、パースが通ることを確かめてから結論する。
+
+合成を CLI でなく `gate-check.mjs` に置いたのは spec §2.9.1 が ID をファイルローカルに保ち、複数ファイルを跨いだ平坦化ビューの構成を禁じているためである。「同名 ID は同じ成果物」はこのリポの `.pfdsl/` のローカルな慣行であり、規範ではない。慣行が及ぶ範囲は `scripts/lib/gate-check.mjs` の `SIBLING_ID_NAMESPACE_DIRS` が持ち、`.pfdsl/` だけを列挙する — `docs/samples/` は互いに無関係なチュートリアル図が `spec` / `code` を使い回しており、同一ディレクトリという理由だけで合成すると本物の門番違反が sibling 見出しへ落ちる。`>>?` フィードバック消費も合成の対象に入れない — `graph io` の `terminals` は spec §15.11 の audit-terminal でフィードバック消費を無視するため、sibling 側だけフィードバックを数えると同じ artifact が消費者の置き場所次第で別分類になる。
 
 ## 配布プロンプトのレビューと承認記録（`review_distribution`）
 
