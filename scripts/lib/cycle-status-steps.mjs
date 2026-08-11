@@ -8,7 +8,9 @@
  * set for which failure, without a real git/gh/filesystem in play.
  *
  * `sh` has the shape of lib/run-exec.mjs' `run`: it throws on failure (unlike
- * `tryRun`), matching how the top-level script already calls it.
+ * `tryRun`), matching how the top-level script already calls it. `shTry` is
+ * `tryRun` itself, for the one call whose non-zero exit is a reading rather
+ * than a breakage (release-status, #814).
  */
 
 import { relative, resolve } from "node:path";
@@ -25,12 +27,14 @@ import {
 	findProcessIdForIssueNumber,
 	parsePorcelainPaths,
 	parseReadyOutput,
+	summarizeReleasePending,
 } from "./cycle-status.mjs";
 import { loadPatternCatalog } from "./retro-patterns.mjs";
 
 /**
  * @param {{
  *   sh: (file: string, args: string[]) => string,
+ *   shTry: (file: string, args: string[]) => {ok: boolean, out: string, status: number|null},
  *   execGh: (args: string[]) => Promise<string>,
  *   existsSync: (path: string) => boolean,
  *   readFileSync: (path: string, encoding: string) => string,
@@ -42,6 +46,7 @@ import { loadPatternCatalog } from "./retro-patterns.mjs";
  */
 export async function runCycleStatus({
 	sh,
+	shTry,
 	execGh,
 	existsSync,
 	readFileSync,
@@ -153,6 +158,27 @@ export async function runCycleStatus({
 		({ openFlowSyncPRs, otherOpenPRs } = classifyPRs(prJson));
 	} catch (e) {
 		prError = e.message;
+	}
+
+	// The publishing backlog, re-derived here every cycle instead of written
+	// down (#814). `.pfdsl/roadmap.md` used to ask a cycle that saw a pending
+	// release to note it as the next cycle's first task, without naming a place
+	// to note it in: the only surface that existed at that moment was the PR
+	// body, which the next cycle's executor never reads. Since the backlog is a
+	// fact the registries and git already hold, it is taken from there and no
+	// ledger of it can go stale.
+	//
+	// shTry rather than sh: release-status exits 1 whenever anything is
+	// unpublished, which is the ordinary state between releases, so a non-zero
+	// exit here is the reading itself and not a failed run.
+	let releasePending = null;
+	let releasePendingError = null;
+	try {
+		releasePending = summarizeReleasePending(
+			shTry(process.execPath, [resolve(root, "scripts/release-status.mjs")]),
+		);
+	} catch (e) {
+		releasePendingError = e.message;
 	}
 
 	const cliPath = resolve(root, "packages/cli/dist/cli.js");
@@ -354,6 +380,7 @@ export async function runCycleStatus({
 		commitsAheadOfBase,
 		openFlowSyncPRs,
 		otherOpenPRs,
+		releasePending,
 		ready,
 		best,
 		designUnsettledFor,
@@ -368,6 +395,7 @@ export async function runCycleStatus({
 	if (dirtyTreeError) result.dirtyTreeError = dirtyTreeError;
 	if (headStateError) result.headStateError = headStateError;
 	if (prError) result.prError = prError;
+	if (releasePendingError) result.releasePendingError = releasePendingError;
 	if (readyError) result.readyError = readyError;
 	if (designUnsettledError) result.designUnsettledError = designUnsettledError;
 	if (preArtifactPatternsError)

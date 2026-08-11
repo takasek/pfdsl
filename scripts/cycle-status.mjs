@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { runCycleStatus } from "./lib/cycle-status-steps.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
-import { run } from "./lib/run-exec.mjs";
+import { run, tryRun } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -49,9 +49,16 @@ const issueNumbers = parsedIssues.numbers;
 // `base` comes from argv; naming the executable and arguments separately keeps
 // it out of a shell (#572).
 const sh = (file, args) => run(file, args, { cwd: root });
+// stderr is left inherited, not captured: release-status warns there about a
+// distribution review it could not read at all, and that warning is the one
+// reading its stdout cannot carry. Capturing it would drop it — `run` returns
+// stdout alone — so it goes to the terminal while stdout becomes the report
+// (#814).
+const shTry = (file, args) => tryRun(file, args, { cwd: root });
 
 const result = await runCycleStatus({
 	sh,
+	shTry,
 	execGh: (execArgs) => execGh(execArgs, { cwd: root }),
 	existsSync,
 	readFileSync,

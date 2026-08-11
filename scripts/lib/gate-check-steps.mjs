@@ -64,6 +64,32 @@ export function changedFilesSince({ exec, base }) {
 }
 
 /**
+ * The branch's deleted paths, the half changedFilesSince drops (#778).
+ *
+ * The gate item this feeds names deletion as one of the changes a PFD has to
+ * reflect, so a deletion that no report mentions leaves the item with nothing
+ * to judge — and a deleted file is precisely the case where the PFD modeling
+ * it is most likely to be left describing something gone. Kept separate from
+ * changedFilesSince rather than folded into it: the gates that call that one
+ * would run `pfdsl check` against a path that no longer exists.
+ *
+ * A git failure yields an empty list rather than an error. The consumer is
+ * report material, and losing the deleted half of it is cheaper than losing
+ * the block.
+ * @param {{exec: Function, base: string}} params
+ * @returns {string[]}
+ */
+export function deletedFilesSince({ exec, base }) {
+	const r = exec("git", [
+		"diff",
+		"--diff-filter=D",
+		"--name-only",
+		`origin/${base}...HEAD`,
+	]);
+	return r.ok ? r.out.trim().split("\n").filter(Boolean) : [];
+}
+
+/**
  * When this cycle started: the author date of the branch's oldest commit.
  *
  * Author dates, not committer dates. A rebase rewrites every committer date on
@@ -593,4 +619,44 @@ export function reviewRecordStep({ commitMessages, changedFiles }) {
 				? "prose-only branch, no record owed"
 				: `${records.length} record(s)`,
 	};
+}
+
+/**
+ * Parse every adopted .pfdsl file, for the report material that says which of
+ * a cycle's changed files any PFD models (#778). One owner for the directory
+ * read and for what a single unparsable file costs — the same reason
+ * loadPatternCatalog exists in retro-patterns.mjs rather than at its callers.
+ *
+ * A failing file is named and skipped rather than aborting: the block this
+ * feeds is material, and a partial reading whose gap is stated is worth more
+ * than none. Paths are repo-relative, so `readdirSync`/`readFile` are expected
+ * to be root-bound by the caller.
+ * @param {{
+ *   readdirSync: (dir: string) => string[],
+ *   readFile: (file: string) => string,
+ *   analyze: (text: string) => {frontmatter: object},
+ *   dir?: string,
+ * }} deps
+ * @returns {{analyzed: Array<{file: string, frontmatter: object}>, unreadable: string[]}}
+ */
+export function analyzeAdoptedPfdsl({
+	readdirSync,
+	readFile,
+	analyze,
+	dir = ".pfdsl",
+}) {
+	const analyzed = [];
+	const unreadable = [];
+	const names = readdirSync(dir)
+		.filter((name) => name.endsWith(".pfdsl"))
+		.sort();
+	for (const name of names) {
+		const file = `${dir}/${name}`;
+		try {
+			analyzed.push({ file, frontmatter: analyze(readFile(file)).frontmatter });
+		} catch (e) {
+			unreadable.push(`${file}: ${e.message}`);
+		}
+	}
+	return { analyzed, unreadable };
 }
