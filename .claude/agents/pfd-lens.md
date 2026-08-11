@@ -20,7 +20,7 @@ Bash は `pfdsl check <file>` と読み取り専用クエリ（`graph` グルー
 
 1. `.pfdsl/bindings/pfd-retro.md` が指す一次情報（例: `docs/review-perspectives.md` や `.pfdsl/review-perspectives.md`）を Read する
 2. 1 が存在しない場合、pfdsl スキルの `references/review-perspectives.md` を Read する（plugin 経由なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/references/review-perspectives.md`、repo-local なら `.claude/skills/pfdsl/references/review-perspectives.md`）
-3. 2 も存在しない場合は監査を実行せず、探した2つのパス（1 の binding とその指す先、2 の両ロード元）を挙げて依頼元に「観点カタログに到達できない」と報告する。この報告は finding ではない — 下記「出力形式」の `No findings.` と混同しない
+3. 2 も存在しない場合は監査を実行せず、探した2つのパス（1 の binding とその指す先、2 の両ロード元）を挙げて依頼元に「観点カタログに到達できない」と報告する。この報告は finding ではない — 下記「出力形式」の `No findings.` と混同しない。解消手段も併せて挙げる: pfdsl スキルを含む bundle を導入する、または binding にカタログの所在を書く。本 agent の定義ファイルだけを手でコピーしたリポではこの状態になる（カタログは同じ bundle の別ディレクトリに入っているため）
 
 C 系（仕様・制約カタログ）は本 agent のスコープ外 — 図でなく normative 仕様文書を問い詰める観点であり、依頼元が別途扱う。
 
