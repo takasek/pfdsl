@@ -6,31 +6,31 @@
 		},
 		{
 			"path": "scripts/pfdsl/audit-issues-flow.mjs",
-			"hash": "ce292986c276311ecb44b4d8eed278fd5a7205e0015bea032d7d7ff468ff23b4"
+			"hash": "918109cbd67b5b2178fcd9d30c010f6e964b4176a04d5a52e8e36b8e0024a87f"
 		},
 		{
 			"path": "scripts/pfdsl/lib/gh-compat.mjs",
-			"hash": "f595333eae7fdb0adbde03aaf9fe4e1d66f532fb9a7ebd46c2d9f9ebf72c7580"
+			"hash": "4b837e1eff9f217bb8532c61ec7c92eb2c7e2b47d4c728d63a4ba7d11fceeb56"
 		},
 		{
 			"path": "scripts/pfdsl/lib/gh-exec.mjs",
-			"hash": "3a36a27151f92cf579627de09e7d6b348551e4ed3b508f22e58f5c743a8e47bf"
+			"hash": "34a894ae905a11f9288020f875361c4a186fe00d7bc08b1d64dfdaf268ebb2cd"
 		},
 		{
 			"path": "scripts/pfdsl/lib/github-rest.mjs",
-			"hash": "b7374e931f73958c3f6321030c5a44356c84469e7bbd4b703ded0360685363e9"
+			"hash": "4108f60889f9782ad3aaccd345559b6305326536efe1f040483acabc58733738"
 		},
 		{
 			"path": "scripts/pfdsl/lib/issues-flow-audit.mjs",
-			"hash": "2da013be559292211c1e02775a3ed9ce5e38c6988f2b54e0ceb4ddd5aa15d17d"
+			"hash": "6b8292471e9bbd367ba2c4b2734d5830a6b793384b49e4dee70fdbac6c5e17e4"
 		},
 		{
 			"path": "scripts/pfdsl/lib/proxy-fetch-worker.mjs",
-			"hash": "e56fcab04e7664172b678f89c7f310e1e4225de558967c4490220df52cead16a"
+			"hash": "0c315f0afc41f21ee0b4914131159b85064b3a39ea633c5b695498c6c41c427e"
 		},
 		{
 			"path": "scripts/pfdsl/lib/proxy-fetch.mjs",
-			"hash": "8f1ba695c933625a10ad98b3cc93c1273b34a7d56ab70d2dd1dfe0faf5f98afb"
+			"hash": "5b9d0c069cab90e327286542f7d53ddf9672e5b66c126e65d3cc21882ded82b2"
 		},
 		{
 			"path": "scripts/pfdsl/lib/yaml-require.mjs",
@@ -38,7 +38,7 @@
 		},
 		{
 			"path": "scripts/pfdsl/normalize-pfdsl.mjs",
-			"hash": "4915314d0347da514c1b8d32bf63388e1b8e001755813340fedb30fb1bdc592b"
+			"hash": "b9392f61826f303d51128ac458d712865ff2af8a40b6416765fbb0ac16289666"
 		}
 	]
 }
