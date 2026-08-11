@@ -162,6 +162,15 @@ artifact の `criteria` が図に存在しない版番号に言及していて�
 
 判定の実測は `pfdsl status blocked` / `status ready` で行う（版待ちのプロセスが実在するかを見る。「そのうち要るはず」で起こさない）。
 
+**版 artifact の criteria の形**: 版の公開は「最新版を返す手段」でなく「版一覧への包含」で書く。
+このリポの具体形は次の2つ。
+
+- npm: `npm view @pfdsl/cli versions に 0.0.11 が含まれる`
+- extension: `npx @vscode/vsce show takasek.pfdsl --json の versions に 0.0.14 が含まれる`
+
+`npm show @pfdsl/cli version` / 「Marketplace の takasek.pfdsl version」は dist-tag `latest`（＝常に最新版）を返すため、最新版を指す1件を除いて文字どおり偽になる（#724）。
+`scripts/release-status.mjs` が使う gallery API 呼び出しは `flags: 514` + `pageSize: 1` で最新1件しか返さない — 同じ Marketplace を引く呼び方でも作用域が違うので、criteria の検証手段に流用しない。
+
 **spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact（spec_v007 / spec_v008 / spec_v009 等）は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
 
 **spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際は、前バージョンの spec artifact への `revises:` を新バージョン artifact に設定する（例: `spec_v0011.revises: spec_v0010`）。`>>?` フィードバック入力は使わない — V011（strict mode の feedback 到達性検査）は `>>?` を前方到達可能な修正ループとして検査するが、版の前後関係はそれに当たらず誤検出になる（#480 で `spec_v006 >>? integrate_spec` 等を `revises:` に置き換えて解消）。

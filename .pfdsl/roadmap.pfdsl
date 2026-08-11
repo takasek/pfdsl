@@ -73,7 +73,7 @@ artifact:
     label: "extension v0.0.14（公開済み）"
     description: "現在コミット先行中の vscode-extension 変更を含む次期 Marketplace リリース"
     status: done
-    criteria: Marketplace の takasek.pfdsl version が 0.0.14 を返す
+    criteria: npx @vscode/vsce show takasek.pfdsl --json の versions に 0.0.14 が含まれる
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
   multifile_policy:
     label: マルチファイル意味論方針
@@ -230,7 +230,7 @@ artifact:
   ext_v0015:
     label: "extension v0.0.15（次期）"
     status: done
-    criteria: Marketplace の takasek.pfdsl version が 0.0.15 を返す
+    criteria: npx @vscode/vsce show takasek.pfdsl --json の versions に 0.0.15 が含まれる
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
   hover_jump:
     label: "hover/quickpick jump (#216)"
