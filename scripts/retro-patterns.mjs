@@ -13,19 +13,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseArgs } from "node:util";
 
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
-import {
-	checkPatternFile,
-	collectTags,
-	groupTagsByAxis,
-	keyLinesOf,
-	near,
-	parsePatternFile,
-	select,
-	summaryOf,
-} from "./lib/retro-patterns.mjs";
+import { parsePatternFile } from "./lib/retro-patterns.mjs";
+import { renderCommand } from "./lib/retro-patterns-render.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PATTERN_DIR = resolve(root, ".pfdsl/bindings/pfd-retro-patterns");
@@ -64,188 +55,16 @@ function loadPatterns() {
 	}));
 }
 
-/**
- * Repeated `--tag` / `--word` options. Strict parsing, not a hand-rolled
- * argv walk: a walk that only recognizes the bare `--flag value` form drops
- * the `--flag=value` spelling silently and calls it done rather than an
- * unrecognized flag — the defect scripts/gate-check.mjs's own parseArgs
- * migration was written to close (#648).
- * @param {string[]} argv
- * @returns {{tags: string[], words: string[]}}
- */
-function parseQuery(argv) {
-	const { values } = parseArgs({
-		args: argv,
-		options: {
-			tag: { type: "string", multiple: true },
-			word: { type: "string", multiple: true },
-		},
-		strict: true,
-		allowPositionals: false,
-	});
-	return { tags: values.tag ?? [], words: values.word ?? [] };
-}
-
-/**
- * The `--word` options of a query whose `--tag` is refused rather than
- * ignored. Ranking a draft against the whole catalog has no cycle whose tags
- * would narrow it, so a tag here means the caller expected `select`.
- * @param {string[]} argv
- * @returns {string[]}
- */
-function parseWords(argv) {
-	const { tags, words } = parseQuery(argv);
-	if (tags.length > 0) {
-		throw new Error("near takes no --tag: it ranks the whole catalog");
-	}
-	return words;
-}
-
-/**
- * @param {{name: string, tags: string[], body: string, path: string}} pattern
- * @param {string} [note] - printed under the head line, where a reader looks
- *   for why this entry is in front of them at all.
- */
-function printPattern({ name, tags, body, path }, note) {
-	console.log(`${name}  [${tags.join(", ")}]`);
-	if (note !== undefined) console.log(`  ${note}`);
-	console.log(`  ${path}`);
-	console.log(`  ${summaryOf(body)}`);
-	for (const line of keyLinesOf(body)) console.log(`  ${line}`);
-}
-
-/** @param {{name: string, tags: string[], body: string, path: string}[]} patterns */
-function printTags(patterns) {
-	for (const { axis, tags } of groupTagsByAxis(collectTags(patterns))) {
-		console.log(`[${axis || "no axis"}]`);
-		for (const { tag, patterns: tagged } of tags) {
-			console.log(`  ${tag}  ${tagged.length}`);
-			for (const p of tagged) console.log(`    ${p.name}  ${p.path}`);
-		}
-	}
-	console.log(
-		`\n${patterns.length} pattern(s). Pick the tags whose condition held this cycle; --tag unions them.`,
-	);
-}
-
-/**
- * @param {{name: string, tags: string[], body: string, path: string}[]} patterns
- * @param {{tags: string[], words: string[]}} query
- */
-function printSelection(patterns, query) {
-	const { tagged, wordOnly, always, reach, pool, unselective } = select(
-		patterns,
-		query,
-	);
-
-	console.log(`## tagged (${tagged.length} of ${pool})`);
-	if (unselective) {
-		console.log(
-			`  ${tagged.length} of ${pool} is not a narrowing — the tags held too widely this cycle.`,
-		);
-		console.log(
-			"  Read down the ranking, not across the list, and do not treat the end of it as the end of the audit.",
-		);
-	}
-	for (const { pattern, matched } of tagged)
-		printPattern(
-			pattern,
-			`matched ${matched.length}/${query.tags.length}: ${matched.join(", ")}`,
-		);
-
-	console.log(
-		`\n## word-only (${wordOnly.length} of ${pool - tagged.length}) — what the tags missed`,
-	);
-	if (reach.length > 0) {
-		console.log(
-			`  reach before subtraction: ${reach.map((r) => `${r.word} ${r.count}`).join(", ")}`,
-		);
-		console.log(
-			"  reach counts patterns; `near --word <word>` names which, the tagged ones included.",
-		);
-	}
-	if (query.words.length === 0) {
-		console.log(
-			"  no --word given. Tags only answer what someone anticipated; pass a few",
-		);
-		console.log(
-			"  concrete terms from this cycle's diff to see what they did not.",
-		);
-	}
-	for (const { pattern, hits } of wordOnly) {
-		printPattern(pattern);
-		for (const h of hits) console.log(`    L${h.line} ${h.word}: ${h.text}`);
-	}
-
-	console.log(`\n## always (${always.length})`);
-	for (const p of always) printPattern(p);
-
-	const shown = tagged.length + wordOnly.length + always.length;
-	console.log(
-		`\nShown ${shown} of ${patterns.length} — shown, not read. Open the paths above.`,
-	);
-}
-
-/**
- * The patterns near a draft's words, ranked most-hit-lines first, for
- * checking whether one close enough already exists before writing a new
- * pattern.
- * @param {{name: string, tags: string[], body: string, path: string}[]} patterns
- * @param {string[]} words
- */
-function printNear(patterns, words) {
-	const matches = near(patterns, words);
-	console.log(
-		`## near (${matches.length}) — ranked by how many lines the words hit, most first. Open the top few before writing a new pattern.`,
-	);
-	for (const { pattern, hits } of matches) {
-		printPattern(pattern);
-		for (const h of hits) console.log(`    L${h.line} ${h.word}: ${h.text}`);
-	}
-}
-
-/**
- * Every pattern file's violations, printed as `path: reason`. Runs
- * checkPatternFile per file rather than through loadPatterns/parsePatternFile,
- * so a single unparsable file is reported as one violation among the rest
- * instead of aborting the whole command.
- * @param {{path: string, name: string, text: string}[]} files
- * @returns {boolean} whether every file was clean.
- */
-function printCheck(files) {
-	let clean = true;
-	for (const file of files) {
-		for (const reason of checkPatternFile(file)) {
-			clean = false;
-			console.log(`${file.path}: ${reason}`);
-		}
-	}
-	if (clean) console.log(`${files.length} pattern file(s), no violations.`);
-	return clean;
-}
-
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	const [command, ...rest] = process.argv.slice(2);
 	try {
-		if (command === "check") {
-			if (!printCheck(loadPatternFiles())) process.exit(1);
-		} else {
-			const patterns = loadPatterns();
-			if (command === "tags") printTags(patterns);
-			else if (command === "list") for (const p of patterns) printPattern(p);
-			else if (command === "select") printSelection(patterns, parseQuery(rest));
-			else if (command === "near") {
-				const words = parseWords(rest);
-				if (words.length === 0)
-					throw new Error("near requires at least one --word");
-				printNear(patterns, words);
-			} else {
-				console.error(
-					"usage: retro-patterns.mjs tags | list | select [...] | near --word <word>... | check",
-				);
-				process.exit(1);
-			}
-		}
+		const { text, ok } = renderCommand(command, rest, {
+			patterns: command === "check" ? undefined : loadPatterns(),
+			files: command === "check" ? loadPatternFiles() : undefined,
+		});
+		if (ok) console.log(text);
+		else console.error(text);
+		if (!ok) process.exit(1);
 	} catch (e) {
 		console.error(`retro-patterns: ${e.message}`);
 		process.exit(1);
