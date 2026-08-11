@@ -10,6 +10,9 @@
  *   - fenced code blocks (``` or ~~~)
  *   - sub-bullet lines (the continuation itself starts with a list marker)
  *   - continuations preceded by a blank line (indented code block / loose list para)
+ *   - breaks with markdown structure on either side: heading, table row,
+ *     blockquote, raw HTML (#770 — these end on non-boundary characters, so
+ *     without the skip every line next to them would report a violation)
  *
  * Usage:
  *   node scripts/check-md-linebreaks.mjs [files...]

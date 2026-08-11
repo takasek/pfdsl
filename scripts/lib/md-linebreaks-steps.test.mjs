@@ -39,7 +39,7 @@ describe("runMdLinebreaksCheck", () => {
 		const result = runMdLinebreaksCheck({
 			args: ["a.md"],
 			listFiles: () => [],
-			readFile: () => "prose\n続き。\n  次の行",
+			readFile: () => "prose.\n続き。\n  次の行",
 		});
 		assert.equal(result.exitCode, 0);
 		assert.deepEqual(result.messages, [
@@ -68,7 +68,7 @@ describe("runMdLinebreaksCheck", () => {
 		const result = runMdLinebreaksCheck({
 			args: ["a.md"],
 			listFiles: () => [],
-			readFile: () => "prose\n続き\n  次の行",
+			readFile: () => "prose.\n続き\n  次の行",
 		});
 		assert.equal(result.exitCode, 1);
 		assert.deepEqual(result.messages, [
@@ -81,8 +81,8 @@ describe("runMdLinebreaksCheck", () => {
 
 	it("aggregates violations across multiple files into one total", () => {
 		const texts = {
-			"a.md": "prose\n続き\n  次の行",
-			"b.md": "prose\n続き\n  次の行",
+			"a.md": "prose.\n続き\n  次の行",
+			"b.md": "prose.\n続き\n  次の行",
 		};
 		const result = runMdLinebreaksCheck({
 			args: ["a.md", "b.md"],

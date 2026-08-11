@@ -19,6 +19,24 @@ export const BOUNDARY = new Set([..."。！？」』）…～.!?:*"]);
 export const CLOSE = new Set([..."`])}"]);
 /** Matches a list-marker-led line (bullet or ordered), with its leading indent captured. */
 export const LIST_RE = /^(\s*)([-*+]|\d+[.)]) /;
+/**
+ * Lines that carry markdown structure rather than prose (#770). A heading, a
+ * table row, a blockquote marker, a raw HTML tag, a thematic break and a setext
+ * underline all end on characters that are not sentence boundaries, so once the
+ * check covers unindented lines these would each report a violation on the line
+ * next to them. Measured on this repo's 218 tracked .md files: without these
+ * skips the broadened check reports 685 violations, with them 149. Of those 149,
+ * 119 were genuine mid-sentence prose breaks and 30 were unfenced code snippets
+ * in a single ADR — code that is not prose is out of this regex's reach, and the
+ * fix for it is a code fence in the document, not another skip here.
+ *
+ * The `<` alternative reads as "raw HTML", but it also exempts angle-bracket
+ * grammar notation (`<statement> ::= …`). Narrowing it is not worth it: dropping
+ * `<` altogether flags 19 real `<details>`/`<summary>` lines in generated docs,
+ * and no pattern separates those from EBNF by their first character. Fence such
+ * blocks so they are skipped for the right reason.
+ */
+export const STRUCTURAL_RE = /^(#{1,6} |\||>|<|-{3,}$|={3,}$|\*{3,}$|_{3,}$)/;
 
 /**
  * @param {string} line
@@ -41,14 +59,17 @@ export function endsAtBoundary(line) {
  */
 export function checkFile(filePath, text) {
 	const lines = text.split("\n");
+	// Stripped once up front rather than per use: every line is needed both as
+	// the continuation under test and, one iteration later, as the previous
+	// line whose structure decides whether the break counts.
+	const strippedLines = lines.map((l) => l.trimStart());
 	const violations = [];
 	let inFence = false;
 	// Track YAML frontmatter (--- ... ---)
 	let inFrontmatter = lines[0]?.trim() === "---";
 
 	for (let i = 1; i < lines.length; i++) {
-		const line = lines[i];
-		const stripped = line.trimStart();
+		const stripped = strippedLines[i];
 
 		// Close frontmatter on second ---
 		if (inFrontmatter) {
@@ -63,14 +84,22 @@ export function checkFile(filePath, text) {
 		}
 		if (inFence) continue;
 
-		// Only check indented continuation lines that are not list markers
-		if (!line || line[0] !== " " || !stripped || LIST_RE.test(stripped))
-			continue;
+		// Continuation lines that are not list markers. Indented and unindented
+		// alike: prose is unindented, and it is prose the docstring and
+		// CLAUDE.md claim is covered (#770).
+		if (!stripped || LIST_RE.test(stripped)) continue;
 
 		const prev = lines[i - 1];
 
 		// Blank line before → indented code block or loose list paragraph; skip
 		if (!prev?.trim()) continue;
+
+		// Either side being markdown structure rather than prose
+		if (
+			STRUCTURAL_RE.test(stripped) ||
+			STRUCTURAL_RE.test(strippedLines[i - 1])
+		)
+			continue;
 
 		if (!endsAtBoundary(prev)) {
 			violations.push({
