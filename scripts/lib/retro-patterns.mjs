@@ -6,6 +6,11 @@
 
 import { join } from "node:path";
 
+/** Where the catalog lives, relative to the repo root. The one definition —
+ * every caller that resolves the directory joins this onto its own root
+ * rather than repeating the path segments. */
+export const PATTERN_DIR_RELATIVE = ".pfdsl/bindings/pfd-retro-patterns";
+
 /** A top-level catalog bullet: `- **name**: first line`. */
 const PATTERN_HEAD = /^- \*\*(.+?)\*\*/;
 
@@ -49,15 +54,31 @@ export function renderPatternFile({ tags, body, phase }) {
 }
 
 /**
+ * Every pattern filename directly under `dir`, in catalog order.
+ *
+ * The one place the directory is listed, so a caller that only wants the raw
+ * files (the CLI's `check` command) and one that wants them parsed
+ * (`loadPatternCatalog`) can't drift into scanning it differently.
+ * `readdirSync` order is the filesystem's, not the catalog's, hence the sort.
+ * @param {string} dir
+ * @param {{readdirSync: (dir: string) => string[]}} io
+ * @returns {string[]}
+ */
+export function listPatternFilenames(dir, { readdirSync }) {
+	return readdirSync(dir)
+		.filter((f) => f.endsWith(".md"))
+		.sort();
+}
+
+/**
  * Every pattern under `dir`, parsed, in filename order.
  *
  * The one place the catalog is read, so that a second caller cannot acquire
- * its own directory order or its own failure semantics. Filenames are sorted
- * because `readdirSync` order is the filesystem's, not the catalog's, and a
- * malformed file is reported as one error among the rest rather than
- * discarding every pattern that parsed — the same isolation `checkPatternFile`
- * already gives per file. Callers that need the abort instead can raise on a
- * non-empty `errors`.
+ * its own directory order or its own failure semantics. A malformed file is
+ * reported as one error among the rest rather than discarding every pattern
+ * that parsed — the same isolation `checkPatternFile` already gives per
+ * file. Callers that need the abort instead can raise on a non-empty
+ * `errors`.
  * @param {string} dir
  * @param {{readdirSync: (dir: string) => string[], readFileSync: (path: string, encoding: string) => string, displayPath?: (path: string) => string}} io
  * @returns {{patterns: {name: string, tags: string[], phase?: string, body: string, path: string}[], errors: string[]}}
@@ -69,9 +90,7 @@ export function loadPatternCatalog(
 	const shown = displayPath ?? ((path) => path);
 	const patterns = [];
 	const errors = [];
-	for (const file of readdirSync(dir)
-		.filter((f) => f.endsWith(".md"))
-		.sort()) {
+	for (const file of listPatternFilenames(dir, { readdirSync })) {
 		const path = join(dir, file);
 		try {
 			patterns.push({
@@ -83,6 +102,21 @@ export function loadPatternCatalog(
 		}
 	}
 	return { patterns, errors };
+}
+
+/**
+ * Every pattern under `dir`, parsed, or an error naming every file that
+ * failed. For a caller that has no isolation story of its own — a single
+ * malformed pattern file should stop it the same way a single malformed input
+ * always has.
+ * @param {string} dir
+ * @param {{readdirSync: (dir: string) => string[], readFileSync: (path: string, encoding: string) => string, displayPath?: (path: string) => string}} io
+ * @returns {{name: string, tags: string[], phase?: string, body: string, path: string}[]}
+ */
+export function loadPatternCatalogOrThrow(dir, io) {
+	const { patterns, errors } = loadPatternCatalog(dir, io);
+	if (errors.length > 0) throw new Error(errors.join("; "));
+	return patterns;
 }
 
 /**

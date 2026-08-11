@@ -10,11 +10,15 @@ import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
-import { parsePatternFile } from "./lib/retro-patterns.mjs";
+import {
+	listPatternFilenames,
+	loadPatternCatalogOrThrow,
+	PATTERN_DIR_RELATIVE,
+} from "./lib/retro-patterns.mjs";
 import { renderCommand } from "./lib/retro-patterns-render.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const PATTERN_DIR = resolve(root, ".pfdsl/bindings/pfd-retro-patterns");
+const PATTERN_DIR = resolve(root, PATTERN_DIR_RELATIVE);
 const BINDING_PATH = resolve(root, ".pfdsl/bindings/pfd-retro.md");
 
 /**
@@ -22,14 +26,11 @@ const BINDING_PATH = resolve(root, ".pfdsl/bindings/pfd-retro.md");
  * @returns {{path: string, name: string, text: string}[]}
  */
 function loadPatternFiles() {
-	return readdirSync(PATTERN_DIR)
-		.filter((f) => f.endsWith(".md"))
-		.sort()
-		.map((f) => ({
-			path: join(PATTERN_DIR, f),
-			name: basename(f, extname(f)),
-			text: readFileSync(join(PATTERN_DIR, f), "utf8"),
-		}));
+	return listPatternFilenames(PATTERN_DIR, { readdirSync }).map((f) => ({
+		path: join(PATTERN_DIR, f),
+		name: basename(f, extname(f)),
+		text: readFileSync(join(PATTERN_DIR, f), "utf8"),
+	}));
 }
 
 /**
@@ -42,13 +43,19 @@ function loadPatternFiles() {
  * the path is the ASCII kebab-case filename `checkPatternFile` enforces.
  * Without both, a reader who wants to open the file the display name came
  * from has nothing to search on (#803).
+ *
+ * Routed through loadPatternCatalogOrThrow rather than its own loop, so this
+ * and the preflight step's reader share one parse of the catalog. The abort
+ * on any malformed file is deliberately kept — unlike the preflight, list /
+ * select / near have no partial-result story of their own.
  * @returns {{name: string, tags: string[], body: string, path: string}[]}
  */
 function loadPatterns() {
-	return loadPatternFiles().map((file) => ({
-		...parsePatternFile(file.text),
-		path: relative(root, file.path),
-	}));
+	return loadPatternCatalogOrThrow(PATTERN_DIR, {
+		readdirSync,
+		readFileSync,
+		displayPath: (p) => relative(root, p),
+	});
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
