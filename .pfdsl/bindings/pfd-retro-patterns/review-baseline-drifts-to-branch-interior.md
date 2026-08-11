@@ -1,5 +1,6 @@
 ---
 tags: [method:respond-review, method:count]
+phase: pre-artifact
 ---
 
 - **改善幅の基準がブランチの中間状態へずれる trap**: レビューはブランチの差分と作業ツリーを見るため、指摘の一部は**そのブランチ自身が作り込んだ欠陥**を指す。

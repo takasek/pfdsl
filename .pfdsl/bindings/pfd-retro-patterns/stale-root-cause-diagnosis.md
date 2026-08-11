@@ -1,5 +1,6 @@
 ---
 tags: [target:issue, context:parallel-work]
+phase: pre-artifact
 ---
 
 - **原因診断の陳腐化 trap**: issue 本文が「症状 → 原因 → 対応案」の形で書かれているとき、症状が現在も再現することを確認しただけで、原因診断まで有効だと受け取ってしまう。

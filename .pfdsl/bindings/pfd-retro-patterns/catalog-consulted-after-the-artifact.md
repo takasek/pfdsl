@@ -1,5 +1,6 @@
 ---
 tags: [target:prose-doc, method:count, context:stale-tool]
+phase: pre-artifact
 ---
 
 - **カタログを引く工程が、対策の効く時点より後ろにある trap**: 監査パターンのカタログは retro の工程で引かれる。retro はサイクルの最後にあるので、**サイクルの途中で書かれる成果物（PR 本文の指標・コミットメッセージ・issue コメント）の中身を守るパターンは、その成果物が既に出来上がってからしか照会されない**。

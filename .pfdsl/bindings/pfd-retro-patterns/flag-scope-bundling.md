@@ -1,5 +1,6 @@
 ---
 tags: [target:cli-surface, method:name, method:bundle, method:remove]
+phase: pre-artifact
 ---
 
 - **フラグの意味範囲 trap**: フラグ名が示唆する狭い意味範囲（「今触っている検査の厳格版」）を信じて未検証のまま既存ゲートに組み込むと、そのフラグが実際に束ねる無関係な検査群が一斉に error 化し、意図しない大量破壊を CI で初めて知ることになる。

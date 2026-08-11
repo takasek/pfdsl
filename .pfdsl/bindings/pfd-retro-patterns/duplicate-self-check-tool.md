@@ -1,5 +1,6 @@
 ---
 tags: [target:check-script, context:dual-copy, context:stale-tool, context:parallel-work]
+phase: pre-artifact
 ---
 
 - **自己点検器が二重に実在する trap**: 配布物の上流リポでは、同じ検査スクリプトが canonical（リポ内）と配布スナップショット（plugin cache 等）の2箇所に実在し、**同じ対象に対して矛盾する答えを返しうる**。

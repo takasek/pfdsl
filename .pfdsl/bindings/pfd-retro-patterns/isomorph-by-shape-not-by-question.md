@@ -1,5 +1,6 @@
 ---
 tags: [method:count, method:sweep, target:issue]
+phase: pre-artifact
 ---
 
 - **実装の形が同じものを同型と呼ぶ trap**: 対策を横展開する先を探すとき、同じ内部機構を呼んでいる箇所が同型に見える。
