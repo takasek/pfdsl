@@ -472,6 +472,13 @@ describe("runCycleStatus", () => {
 		);
 	});
 
+	// #809: unconditional, same posture as designRecordTemplate — whether this
+	// cycle will touch packages/ or scripts/ is undecidable at preflight time.
+	it("emits the review-record template even when no issue could be resolved", async () => {
+		const result = await runCycleStatus(baseDeps({}));
+		assert.match(result.reviewRecordTemplate.line, /^Review: tool=/);
+	});
+
 	it("returns a null designUnsettledFor with an error when neither --issue nor a best process is available", async () => {
 		const calls = [];
 		const result = await runCycleStatus(
