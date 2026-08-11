@@ -84,6 +84,11 @@ function isVerificationPackageManager(rest) {
 	return !hasExplicitCwdFlag(rest, PACKAGE_MANAGER_CWD_FLAGS);
 }
 
+/** `node` flags whose very next token is program source, not a path — `node
+ * -e "import '/abs/x.mjs'"` names a tree inside the program text, but that
+ * text is not itself a path operand just because it contains `/`. */
+const NODE_EVAL_FLAGS = ["-e", "--eval", "-p", "--print"];
+
 /** Whether `token` is a relative-path operand: not a flag (does not start
  * with `-`), not already absolute (does not start with `/`), and looks like
  * a path — either it contains a `/` or it ends in a recognised script
@@ -103,16 +108,42 @@ function isAbsolutePathOperand(token) {
 	return token.value.startsWith("/");
 }
 
+/** The indices in `rest` that are program source rather than a path operand:
+ * the token immediately after an eval flag (`-e`/`--eval`/`-p`/`--print`),
+ * found by position so a preceding flag like `--input-type=module` does not
+ * throw off which token is the program. Position, not `!t.quoted`, is the
+ * criterion: a quoted relative path (`node "scripts/x.mjs"`) must still
+ * count as an operand, so quotedness cannot be what excludes eval bodies. */
+function nodeEvalOperandIndices(rest) {
+	const indices = new Set();
+	rest.forEach((t, i) => {
+		if (!t.quoted && NODE_EVAL_FLAGS.includes(t.value) && i + 1 < rest.length) {
+			indices.add(i + 1);
+		}
+	});
+	return indices;
+}
+
 /** Whether `rest` (the tokens after `node`) targets an implicit-cwd tree: a
  * relative script-path operand (the interpreter reads the script relative to
  * cwd), or a `--test` invocation that names no absolute-path operand (`node
  * --test` alone still resolves its file glob from cwd). `node -e '...'` and
- * similar have no path operand at all and are excluded either way. */
+ * similar have no path operand at all and are excluded either way — the
+ * eval flag's own operand is program source, not a path, and is excluded
+ * from both checks below by position (nodeEvalOperandIndices), regardless
+ * of what `/` characters its text happens to contain.
+ *
+ * Known miss: an eval body that imports a *relative* path
+ * (`node -e "import './x.mjs'"`) is cwd-dependent but is not caught here,
+ * because that would require parsing the program text rather than the
+ * command line — accepted as out of scope. */
 function isVerificationNode(rest) {
-	if (rest.some(isRelativePathOperand)) return true;
+	const evalOperands = nodeEvalOperandIndices(rest);
+	const pathCandidates = rest.filter((_, i) => !evalOperands.has(i));
+	if (pathCandidates.some(isRelativePathOperand)) return true;
 	const hasTest = rest.some((t) => !t.quoted && t.value === "--test");
 	if (!hasTest) return false;
-	return !rest.some(isAbsolutePathOperand);
+	return !pathCandidates.some(isAbsolutePathOperand);
 }
 
 /** Whether one already-split segment is a verification command. */

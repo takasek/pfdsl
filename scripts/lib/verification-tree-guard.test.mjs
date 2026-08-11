@@ -82,6 +82,23 @@ describe("findVerificationSegments", () => {
 		);
 	});
 
+	it("does not match an eval body that merely contains `/` chars — the body is program source, not a path (false-positive fix)", () => {
+		for (const command of [
+			'node -e "console.log(1)"',
+			`node -e "import x from '/abs/path/x.mjs'"`,
+			`node --input-type=module -e "import { checkFile } from '/Users/m5/works/pfdsl/scripts/lib/md-linebreaks.mjs';"`,
+		]) {
+			assert.deepEqual(findVerificationSegments(command), [], command);
+		}
+	});
+
+	it("still matches a real relative script path, and still excludes a real absolute one (eval-flag fix must not widen or narrow those)", () => {
+		assert.deepEqual(findVerificationSegments("node scripts/x.mjs"), [
+			"node scripts/x.mjs",
+		]);
+		assert.deepEqual(findVerificationSegments("node /abs/scripts/x.mjs"), []);
+	});
+
 	it("finds pnpm/npm subcommands generally, not just test/build (#840 gap widening)", () => {
 		for (const command of [
 			"pnpm test",
