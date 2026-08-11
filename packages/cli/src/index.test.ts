@@ -3497,6 +3497,132 @@ spec >> investigate
 	});
 });
 
+// The selector-value warning added in #848 catches a typo but does not answer
+// "which values exist" — an agent that wanted the vocabulary still had to
+// grep the frontmatter, or chain `graph stats --json` into `meta get` over
+// every id and aggregate the rows itself (#844).
+describe("meta values", () => {
+	const base = `---
+artifact:
+  spec:
+    status: done
+    tags: [design, backend]
+    group: core
+  code:
+    status: todo
+    tags: [backend]
+    group: core
+  docs:
+    status: done
+    tags: [design]
+process:
+  build:
+    tags: [backend]
+    group: tooling
+  write: {}
+group:
+  core:
+    label: Core
+  archived:
+    label: Archived
+---
+spec >> build -> code
+spec >> write -> docs
+`;
+
+	it("counts each value of a scalar field, ascending by value", async () => {
+		const f = join(dir, "values-status.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "status"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("status.done: 2\nstatus.todo: 1\n");
+	});
+
+	// An array field counts per element, not per node: a node tagged
+	// [design, backend] is one occurrence of each.
+	it("counts each element of an array field", async () => {
+		const f = join(dir, "values-tags.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "tags"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("tags.backend: 3\ntags.design: 2\n");
+	});
+
+	// `group` and `tag` both have optional frontmatter declaration sections
+	// (spec §2.7.2 / §2.8), and a declared value no node uses is exactly what
+	// a reader looking for the vocabulary wants to see — as a count of 0,
+	// rather than as a separate list needing its own rule.
+	it("includes a declared but unused group as a count of zero", async () => {
+		const f = join(dir, "values-group.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "group"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"group.archived: 0\ngroup.core: 2\ngroup.tooling: 1\n",
+		);
+	});
+
+	it("accepts several fields at once", async () => {
+		const f = join(dir, "values-multi.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "status,tags"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(
+			"status.done: 2\nstatus.todo: 1\ntags.backend: 3\ntags.design: 2\n",
+		);
+	});
+
+	// `counts`, not the `values` key meta get / meta list use: the shape
+	// underneath is { [field]: { [value]: count } }, not { [id]: { ... } }.
+	it("--json emits { ok, counts: { [field]: { [value]: count } } }", async () => {
+		const f = join(dir, "values-json.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "group", "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			counts: { group: { archived: 0, core: 2, tooling: 1 } },
+		});
+	});
+
+	it("reports a field no node sets as an empty table, not an error", async () => {
+		const f = join(dir, "values-empty.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "owner"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("owner: (no values)\n");
+	});
+
+	// `boundary` is a map, so its value has no vocabulary to enumerate. Naming
+	// the shape keeps that distinguishable from a field no node sets, which is
+	// the collapse this command exists to undo.
+	it("counts an object-valued field under (object) rather than stringifying it", async () => {
+		const f = join(dir, "values-object.pfdsl");
+		writeFileSync(
+			f,
+			"---\nprocess:\n  build:\n    subflow: child.pfdsl\n    boundary: { spec: inner_spec }\n---\nspec >> build -> code\n",
+		);
+		const r = await run(["meta", "values", f, "boundary"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("boundary.(object): 1\n");
+	});
+
+	it("warns for a field name that is not recognized on any kind", async () => {
+		const f = join(dir, "values-unknown.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f, "bogus"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toContain("'bogus' is not a recognized field");
+	});
+
+	it("exits 2 when the field argument is missing", async () => {
+		const f = join(dir, "values-missing.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "values", f]);
+		expect(r.exitCode).toBe(2);
+	});
+});
+
 // group is a NodeKind alongside artifact and process, with its own field set
 // (label|color|parent), and meta had no coverage of it at all (#607).
 describe("meta get / set on a group id", () => {
