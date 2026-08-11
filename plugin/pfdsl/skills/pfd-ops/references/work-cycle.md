@@ -62,7 +62,7 @@
    - [ ] コミット subject が Conventional Commits 形式に従う
    - [ ] コミット前にレビューを1パス通した（レビューコマンド・チェックリスト等の具体的な手段は companion で定義。定まっていなければ最低限、差分を自分で読み直す。省略する場合はその理由を明示）。**レビューの重さは diff の規模に合わせる** — 数十行・1〜2ファイル中心の scoped な修正に多角度 finder × 候補ごと検証 agent のような高効度設定をかけると diff に対して過剰になる。角度を絞るか、そもそも委譲せず自分で読む。重量級の構成は大規模 diff 向け
    - [ ] 変更束を PR にまとめた（PR 作成後にローカルで追加コミットした場合、push し忘れていないか `git log origin/<branch>..<branch>` で確認する — CI は push 済みの内容にしか反応しない）
-   - [ ] デフォルトブランチへ直接マージする PR に issue を閉じるキーワード（`Closes #<issue番号>` 等、バックエンドの L3 reference が定義する書式）を含めた（feature branch への中間 PR では使わない）
+   - [ ] デフォルトブランチへ直接マージする PR に issue を閉じるキーワード（`Closes #<issue番号>` 等、バックエンドの L3 reference が定義する書式）を含めた（feature branch への中間 PR では使わない）。閉じる issue が無い場合は、バックエンドの L3 reference が定義する免除宣言（`no-issue: <理由>` 等）を代わりに含めた
 4. **報告**: 完了したプロセス、それにより解放された後続プロセス、更新後の着手可能集合。特定 status の全体像（例: 残 wip 一覧）が要る場合は都度 `status list <roadmap.pfdsl> --status wip,waiting --json` 等で機械的に絞り込む — 全文 Read や個別 `meta get` の積み上げに頼らない
 5. **retro**: `/pfd-cycle` コマンド経由の場合、プロトコル7の (a)(b) 両条件を確認する（定義は SKILL.md 本文が一次情報 — ここには複製しない）。このサイクル手順自体に最終ステップとして組み込み、報告を出して終わりにしない。**バックストップ**（(a) について）: plugin を導入したリポでは、`roadmap.pfdsl` に `status: done` を追加するコミットの後、同梱の PostToolUse hook（`hooks/`、`hooks/hooks.json` で配線済み）が advisory reminder を返す（非ブロッキング）。セッション記憶が抜けても done 付与コミットの Bash tool result 経由で気付ける。(b) にはバックストップがない — セッション記憶のみに依存する既知の弱点
 
