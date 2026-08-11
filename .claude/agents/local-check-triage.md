@@ -49,11 +49,8 @@ HEAD: <git rev-parse HEAD の出力>
 
 ## 配置に関する注記
 
-先頭2行を必須にするのは、subagent が自分のシェルで走り、呼び出し元からは実行場所が
-直接見えなくなるためである。
-このリポでは main repo のツリーで走らせた緑を feature branch の緑と読み違える事故が
-実際に起きている（同じ内容を worktree で走らせ直すと1件赤だった）。
+先頭2行を必須にするのは、subagent が自分のシェルで走り、呼び出し元からは実行場所が直接見えなくなるためである。
+このリポでは main repo のツリーで走らせた緑を feature branch の緑と読み違える事故が実際に起きている（同じ内容を worktree で走らせ直すと1件赤だった）。
 agent を挟むとその穴が1層深くなるので、実行場所を報告の一部として呼び出し元へ渡す。
 
-このリポの `make check` / `scripts/pre-commit` / `node --test` の失敗を扱うため
-repo scope（`.claude/agents/`）に配置し、plugin 配布からは除外する（issue #754）。
+このリポの `make check` / `scripts/pre-commit` / `node --test` の失敗を扱うため repo scope（`.claude/agents/`）に配置し、plugin 配布からは除外する（issue #754）。
