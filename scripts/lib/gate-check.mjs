@@ -411,6 +411,108 @@ export function diffNewTerminals(beforeTerminals, afterTerminals) {
 }
 
 /**
+ * Artifact ids consumed by a normal `>>` input edge, read out of a
+ * `pfdsl graph edges --json` payload (#671).
+ *
+ * Feedback (`>>?`) edges are deliberately excluded: `graph io`'s `terminals`
+ * is the spec's **audit-terminal** (§15.11), which ignores feedback
+ * consumption, so counting a sibling's feedback edge as consumption would
+ * classify the same artifact differently depending on which file its
+ * feedback consumer happens to sit in.
+ *
+ * An unparseable or failed payload yields no consumers, which leaves the
+ * caller's terminals reported as terminal — the pre-#671 behaviour, i.e. the
+ * side that asks for a look rather than the side that stays silent.
+ * @param {string} edgesJson stdout of `pfdsl graph edges <file> --json`
+ * @returns {string[]} consumed artifact ids, first-seen order, deduplicated
+ */
+export function parseInputConsumedArtifacts(edgesJson) {
+	let payload;
+	try {
+		payload = JSON.parse(edgesJson);
+	} catch {
+		return [];
+	}
+	if (!payload?.ok || !Array.isArray(payload.edges)) return [];
+	const consumed = new Set();
+	for (const e of payload.edges) {
+		if (e?.kind === "input" && typeof e.artifact === "string") {
+			consumed.add(e.artifact);
+		}
+	}
+	return [...consumed];
+}
+
+/**
+ * Directories whose sibling `.pfdsl` files share one artifact-id namespace,
+ * i.e. where "same id means the same artifact" holds (#671).
+ *
+ * This is a convention of *this repo's* operational PFD set, not a spec rule
+ * — spec §2.9.1 keeps ids file-local precisely so that unrelated graphs may
+ * reuse a name. `docs/samples/` is the counterexample that forces the list to
+ * exist rather than composing every directory: its diagrams are mutually
+ * unrelated tutorials that reuse `spec` / `code` freely, so composing them
+ * would file a genuine gatekeeper violation under the sibling heading.
+ */
+export const SIBLING_ID_NAMESPACE_DIRS = [".pfdsl"];
+
+/**
+ * Whether sibling `.pfdsl` files in `dir` may be composed for the terminal
+ * report (#671).
+ * @param {string} dir repo-relative directory, as `path.dirname` yields it
+ * @returns {boolean}
+ */
+export function sharesSiblingIdNamespace(dir) {
+	return SIBLING_ID_NAMESPACE_DIRS.includes(dir);
+}
+
+/**
+ * For each file, the artifacts consumed by *every other* file in the set
+ * (#671). Callers hand over the already-parsed per-file consumer lists, so
+ * the N graphs are parsed N times rather than N² — and so this stays a pure
+ * function the tests can drive without git or the CLI.
+ * @param {Iterable<[string, string[]]>} perFileConsumed file → consumed ids
+ * @returns {Map<string, string[]>} file → ids consumed by the other files
+ */
+export function buildSiblingConsumedMap(perFileConsumed) {
+	const entries = [...perFileConsumed];
+	const byFile = new Map();
+	for (const [file] of entries) {
+		const union = new Set();
+		for (const [other, consumed] of entries) {
+			if (other === file) continue;
+			for (const a of consumed) union.add(a);
+		}
+		byFile.set(file, [...union]);
+	}
+	return byFile;
+}
+
+/**
+ * Split new terminal artifacts by whether a sibling graph consumes them
+ * (#671). Splitting the report is the whole point: ADR-0035 moved the
+ * generation chain into `runtime-pipeline.pfdsl`, so a generation source
+ * declared in `workflow.pfdsl` is terminal *in its own file* while its real
+ * consumer sits next door. Reporting those together with genuinely
+ * unconsumed artifacts buries real gatekeeper violations among known-benign
+ * entries.
+ *
+ * Neither partition is a PASS/FAIL: classifying an artifact as means vs.
+ * deliverable stays MANUAL, and a sibling-consumed entry still needs the
+ * claimed edge confirmed before it is recorded as N/A.
+ * @param {string[]} newTerminals
+ * @param {string[]} consumedInSiblings artifact ids consumed by sibling graphs
+ * @returns {{terminal: string[], consumedInSibling: string[]}}
+ */
+export function partitionNewTerminals(newTerminals, consumedInSiblings) {
+	const consumed = new Set(consumedInSiblings);
+	return {
+		terminal: newTerminals.filter((t) => !consumed.has(t)),
+		consumedInSibling: newTerminals.filter((t) => consumed.has(t)),
+	};
+}
+
+/**
  * Diff two `ready --json` process-id sets (workcycle step 4's "released
  * follow-up processes / updated ready set" report), derived mechanically
  * instead of via AI graph traversal.
