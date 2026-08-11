@@ -1,0 +1,428 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { ALWAYS_TAG } from "./retro-patterns.mjs";
+import {
+	checkBindingUsage,
+	parseQuery,
+	parseWords,
+	renderCheck,
+	renderCommand,
+	renderList,
+	renderNear,
+	renderPattern,
+	renderSelection,
+	renderTags,
+	SUBCOMMANDS,
+	usageText,
+} from "./retro-patterns-render.mjs";
+
+describe("renderPattern", () => {
+	const pattern = {
+		name: "委譲の接合部",
+		tags: ["method:delegate"],
+		path: "p/委譲の接合部.md",
+		body: "- **委譲の接合部**: 冒頭の一文。\n  問いの形: 例。",
+	};
+
+	it("renders head, path, summary and key lines, without a note", () => {
+		assert.equal(
+			renderPattern(pattern),
+			[
+				"委譲の接合部  [method:delegate]",
+				"  p/委譲の接合部.md",
+				"  冒頭の一文。",
+				"  問いの形: 例。",
+			].join("\n"),
+		);
+	});
+
+	it("inserts the note between the head and the path when given", () => {
+		assert.equal(
+			renderPattern(pattern, "matched 1/1: method:delegate"),
+			[
+				"委譲の接合部  [method:delegate]",
+				"  matched 1/1: method:delegate",
+				"  p/委譲の接合部.md",
+				"  冒頭の一文。",
+				"  問いの形: 例。",
+			].join("\n"),
+		);
+	});
+});
+
+describe("renderTags", () => {
+	it("groups by axis and appends the pattern count with guidance", () => {
+		const patterns = [
+			{
+				name: "A",
+				tags: ["target:doc"],
+				path: "a.md",
+				body: "- **A**: 冒頭。",
+			},
+			{ name: "B", tags: [ALWAYS_TAG], path: "b.md", body: "- **B**: 冒頭。" },
+		];
+		assert.equal(
+			renderTags(patterns),
+			[
+				"[target]",
+				"  target:doc  1",
+				"    A  a.md",
+				"[no axis]",
+				`  ${ALWAYS_TAG}  1`,
+				"    B  b.md",
+				"",
+				"2 pattern(s). Pick the tags whose condition held this cycle; --tag unions them.",
+			].join("\n"),
+		);
+	});
+});
+
+describe("renderSelection", () => {
+	const patterns = [
+		{
+			name: "委譲の接合部",
+			tags: ["method:delegate"],
+			path: "p1.md",
+			body: "- **委譲の接合部**: 冒頭。\n  具体例: CRLF の話。",
+		},
+		{
+			name: "観測範囲",
+			tags: ["context:dual-copy"],
+			path: "p2.md",
+			body: "- **観測範囲**: 冒頭。\n  具体例: 読み側の CRLF 混入を直した回。",
+		},
+		{
+			name: "常時",
+			tags: [ALWAYS_TAG],
+			path: "p3.md",
+			body: "- **常時**: 毎回効く。",
+		},
+	];
+
+	it("separates tagged, word-only and always into their own headed sections", () => {
+		const text = renderSelection(patterns, {
+			tags: ["method:delegate"],
+			words: ["CRLF"],
+		});
+		assert.match(text, /^## tagged \(1 of 2\)/);
+		assert.match(text, /委譲の接合部 {2}\[method:delegate\]/);
+		assert.match(text, /matched 1\/1: method:delegate/);
+		assert.match(text, /## word-only \(1 of 1\) — what the tags missed/);
+		assert.match(text, /観測範囲 {2}\[context:dual-copy\]/);
+		assert.match(text, /## always \(1\)/);
+		assert.match(text, /常時 {2}\[always\]/);
+		assert.match(
+			text,
+			/Shown 3 of 3 — shown, not read\. Open the paths above\./,
+		);
+	});
+
+	it("flags an unselective result and names it in the tagged section", () => {
+		const wide = [
+			{ name: "1", tags: ["a"], path: "1.md", body: "- **1**: 冒頭。" },
+			{ name: "2", tags: ["a"], path: "2.md", body: "- **2**: 冒頭。" },
+		];
+		const text = renderSelection(wide, { tags: ["a"], words: [] });
+		assert.match(
+			text,
+			/is not a narrowing — the tags held too widely this cycle\./,
+		);
+	});
+});
+
+describe("renderList", () => {
+	it("renders every pattern, one block each, in the order given", () => {
+		const patterns = [
+			{ name: "先", tags: ["a"], path: "1.md", body: "- **先**: 冒頭。" },
+			{ name: "後", tags: [], path: "2.md", body: "- **後**: 冒頭。" },
+		];
+		assert.equal(
+			renderList(patterns),
+			["先  [a]", "  1.md", "  冒頭。", "後  []", "  2.md", "  冒頭。"].join(
+				"\n",
+			),
+		);
+	});
+});
+
+describe("renderNear", () => {
+	it("ranks by hit count and shows hit lines under each pattern", () => {
+		const patterns = [
+			{
+				name: "多い",
+				tags: [],
+				path: "m.md",
+				body: "- **多い**: 冒頭。\n  行1 語。\n  行2 語。",
+			},
+			{
+				name: "無関係",
+				tags: [],
+				path: "n.md",
+				body: "- **無関係**: 何もない。",
+			},
+		];
+		const text = renderNear(patterns, ["語"]);
+		assert.match(
+			text,
+			/^## near \(1\) — ranked by how many lines the words hit/,
+		);
+		assert.match(text, /多い {2}\[\]/);
+		assert.match(text, /L2 語: 行1 語。/);
+		assert.doesNotMatch(text, /無関係/);
+	});
+});
+
+describe("renderCheck", () => {
+	it("reports the file count clean when every file passes", () => {
+		const files = [
+			{
+				path: "x.md",
+				name: "x",
+				text: "---\ntags: [a]\n---\n\n- **X**: 冒頭。\n",
+			},
+		];
+		assert.deepEqual(renderCheck(files), {
+			text: "1 pattern file(s), no violations.",
+			clean: true,
+		});
+	});
+
+	it("reports one line per violation and is not clean", () => {
+		const files = [{ path: "bad.md", name: "bad", text: "no fence here" }];
+		const { text, clean } = renderCheck(files);
+		assert.equal(clean, false);
+		assert.match(text, /^bad\.md: /);
+	});
+});
+
+describe("parseQuery / parseWords", () => {
+	it("collects repeated --tag and --word", () => {
+		assert.deepEqual(parseQuery(["--tag", "a", "--word", "b", "--tag", "c"]), {
+			tags: ["a", "c"],
+			words: ["b"],
+		});
+	});
+
+	it("defaults to empty arrays when neither option is given", () => {
+		assert.deepEqual(parseQuery([]), { tags: [], words: [] });
+	});
+
+	it("parseWords returns the words when no --tag is given", () => {
+		assert.deepEqual(parseWords(["--word", "a"]), ["a"]);
+	});
+
+	it("parseWords rejects a --tag as a caller error", () => {
+		assert.throws(() => parseWords(["--tag", "a"]), /near takes no --tag/);
+	});
+});
+
+describe("SUBCOMMANDS / usageText", () => {
+	it("names every subcommand once, in usage order", () => {
+		assert.deepEqual(
+			SUBCOMMANDS.map((s) => s.name),
+			["tags", "list", "select", "near", "check"],
+		);
+	});
+
+	it("lists one usage line per subcommand, with its argument shape", () => {
+		const text = usageText();
+		assert.match(text, /retro-patterns\.mjs tags\n/);
+		assert.match(text, /retro-patterns\.mjs list\n/);
+		assert.match(
+			text,
+			/retro-patterns\.mjs select \[--tag <tag>\]\.\.\. \[--word <word>\]\.\.\./,
+		);
+		assert.match(text, /retro-patterns\.mjs near --word <word>\.\.\./);
+		assert.match(text, /retro-patterns\.mjs check$/);
+	});
+});
+
+describe("checkBindingUsage", () => {
+	const definitions = [
+		{ name: "tags", options: [] },
+		{ name: "select", options: ["tag", "word"] },
+	];
+
+	it("reports nothing when the binding's names and options match the definitions", () => {
+		const binding = [
+			"```bash",
+			"node scripts/retro-patterns.mjs tags",
+			"node scripts/retro-patterns.mjs select --tag <tag> --word <word>",
+			"```",
+		].join("\n");
+		assert.deepEqual(checkBindingUsage(binding, definitions), []);
+	});
+
+	it("reports a subcommand the binding shows that no definition declares", () => {
+		const binding = [
+			"```bash",
+			"node scripts/retro-patterns.mjs tags",
+			"node scripts/retro-patterns.mjs select --tag <tag> --word <word>",
+			"node scripts/retro-patterns.mjs near --word <word>",
+			"```",
+		].join("\n");
+		const violations = checkBindingUsage(binding, definitions);
+		assert.ok(violations.some((v) => v.includes("near")));
+	});
+
+	it("reports a subcommand a definition declares that the binding never shows", () => {
+		const binding = [
+			"```bash",
+			"node scripts/retro-patterns.mjs tags",
+			"```",
+		].join("\n");
+		const violations = checkBindingUsage(binding, definitions);
+		assert.ok(violations.some((v) => v.includes("select")));
+	});
+
+	it("reports an option renamed in the definitions but not in the binding", () => {
+		const binding = [
+			"```bash",
+			"node scripts/retro-patterns.mjs tags",
+			"node scripts/retro-patterns.mjs select --tag <tag> --word <word>",
+			"```",
+		].join("\n");
+		const renamed = [
+			{ name: "tags", options: [] },
+			{ name: "select", options: ["tag", "words"] },
+		];
+		const violations = checkBindingUsage(binding, renamed);
+		assert.ok(violations.some((v) => v.includes("words")));
+	});
+
+	it("ignores lines outside a bash code block", () => {
+		const binding =
+			"node scripts/retro-patterns.mjs near --word <word>\n\n```bash\nnode scripts/retro-patterns.mjs tags\n```";
+		const violations = checkBindingUsage(binding, definitions);
+		assert.ok(violations.some((v) => v.includes("select")));
+		assert.ok(!violations.some((v) => v.includes("near")));
+	});
+});
+
+describe("renderCommand", () => {
+	const patterns = [
+		{
+			name: "多い",
+			tags: [],
+			path: "m.md",
+			body: "- **多い**: 冒頭。\n  行 語。",
+		},
+	];
+	const files = [
+		{
+			path: "x.md",
+			name: "x",
+			text: "---\ntags: [a]\n---\n\n- **X**: 冒頭。\n",
+		},
+	];
+	const bindingText = [
+		"```bash",
+		...SUBCOMMANDS.map((s) =>
+			`node scripts/retro-patterns.mjs ${s.name} ${s.options.map((o) => `--${o} <${o}>`).join(" ")}`.trimEnd(),
+		),
+		"```",
+	].join("\n");
+
+	/**
+	 * The loaders renderCommand pulls its inputs from. Each counts its calls,
+	 * so a test can assert which inputs a subcommand did and did not need.
+	 * @param {object} [overrides]
+	 */
+	function loaders(overrides = {}) {
+		const calls = { patterns: 0, files: 0, binding: 0 };
+		return {
+			calls,
+			loadPatterns: () => {
+				calls.patterns++;
+				return overrides.patterns ?? patterns;
+			},
+			loadPatternFiles: () => {
+				calls.files++;
+				return overrides.files ?? files;
+			},
+			loadBinding: () => {
+				calls.binding++;
+				return overrides.bindingText ?? bindingText;
+			},
+		};
+	}
+
+	it("dispatches tags to the tags heading", () => {
+		const tagged = [{ ...patterns[0], tags: ["target:doc"] }];
+		const { text, ok } = renderCommand(
+			"tags",
+			[],
+			loaders({ patterns: tagged }),
+		);
+		assert.equal(ok, true);
+		assert.match(text, /^\[target\]/);
+	});
+
+	it("dispatches list to one rendered pattern per entry", () => {
+		const { text, ok } = renderCommand("list", [], loaders());
+		assert.equal(ok, true);
+		assert.match(text, /多い {2}\[\]/);
+	});
+
+	it("dispatches select to the tagged/word-only/always sections, not near's heading", () => {
+		const { text, ok } = renderCommand("select", ["--word", "語"], loaders());
+		assert.equal(ok, true);
+		assert.match(text, /^## tagged/);
+		assert.doesNotMatch(text, /^## near/);
+	});
+
+	it("dispatches near to its own heading, not select's sections", () => {
+		const { text, ok } = renderCommand("near", ["--word", "語"], loaders());
+		assert.equal(ok, true);
+		assert.match(text, /^## near/);
+		assert.doesNotMatch(text, /## tagged/);
+	});
+
+	it("near without --word throws rather than returning ok:false", () => {
+		assert.throws(
+			() => renderCommand("near", [], loaders()),
+			/near requires at least one --word/,
+		);
+	});
+
+	it("dispatches check to the file/binding report and is ok when both are clean", () => {
+		const { text, ok } = renderCommand("check", [], loaders());
+		assert.equal(ok, true);
+		assert.equal(text, "1 pattern file(s), no violations.");
+	});
+
+	it("check reads the pattern files without parsing them into patterns", () => {
+		const load = loaders();
+		renderCommand("check", [], load);
+		assert.equal(load.calls.files, 1);
+		assert.equal(load.calls.patterns, 0);
+	});
+
+	it("check is not ok when a file has a violation", () => {
+		const badFiles = [{ path: "bad.md", name: "bad", text: "no fence here" }];
+		const { ok } = renderCommand("check", [], loaders({ files: badFiles }));
+		assert.equal(ok, false);
+	});
+
+	it("check is not ok when the binding disagrees with the definitions", () => {
+		const { ok } = renderCommand(
+			"check",
+			[],
+			loaders({
+				bindingText: "```bash\nnode scripts/retro-patterns.mjs tags\n```",
+			}),
+		);
+		assert.equal(ok, false);
+	});
+
+	it("returns the usage text with ok:false for an unrecognized command", () => {
+		const { text, ok } = renderCommand("bogus", [], loaders());
+		assert.equal(ok, false);
+		assert.match(text, /usage/);
+	});
+
+	it("returns the usage text with ok:false when no command is given", () => {
+		const { ok } = renderCommand(undefined, [], loaders());
+		assert.equal(ok, false);
+	});
+});

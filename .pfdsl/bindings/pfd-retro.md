@@ -19,7 +19,7 @@ node scripts/retro-patterns.mjs tags                                  # 語彙�
 node scripts/retro-patterns.mjs select --tag <tag> --word <word>      # 今サイクルで読むべきものを出す
 node scripts/retro-patterns.mjs near --word <word>                    # 語が触れた行数の多い順に、既存パターンとの近さを見る
 node scripts/retro-patterns.mjs list                                  # 全件を名前と一文で並べる
-node scripts/retro-patterns.mjs check                                 # 全ファイルの解析可否・名前一致・タグ有無・往復一致を検査する（make check-docs から自動実行、手動は書式直後の確認用）
+node scripts/retro-patterns.mjs check                                 # 全ファイルの解析可否・ファイル名の書式・タグ有無・往復一致に加え、この bash ブロックの例が実サブコマンド・実オプションと一致するかも検査する（make check-docs から自動実行、手動は書式直後の確認用）
 ```
 
 `tags` の出力が語彙の実体である。
