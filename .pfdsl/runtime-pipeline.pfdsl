@@ -197,7 +197,7 @@ artifact:
     group: skill_sources
   pfd_commands:
     label: pfd-*スラッシュコマンド
-    description: "/pfd-cycle・/pfd-init・/pfd-retro の起動口となるコマンド定義。対応するスキル本体（ops_skill_general・ecosystem_skill・retro_skill）とは別ファイルであり、同梱対象としても別に扱われる。手書き、生成対象外。ここではplugin_distへの同梱対象としてのみ扱う"
+    description: "/pfd-cycle・/pfd-init・/pfd-retro の起動口となるコマンド定義。対応するスキル本体（ops_skill_general・ecosystem_skill・retro_skill）とは別ファイルであり、同梱対象としても別に扱われる。手書き、生成対象外。ここではplugin_distへの同梱対象としてのみ扱う。内容の一次情報はworkflow.pfdslだが、そちらではコマンド定義がスキル本体のartifactのdescriptionへ畳まれており専用artifactを持たない。gen_pluginが両者を別パスから集めるため、この図では意図的に別artifactへ割ってある（#780で案Bを採用し、粒度差を解消せず意図として明記する側に倒した）"
     location: ../.claude/commands/
     group: skill_sources
   pfd_lens_agent:
