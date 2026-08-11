@@ -26,6 +26,34 @@
 const HOTFIX_DECLARATION = /^hotfix\s*:/im;
 
 /**
+ * A no-issue declaration: unlike `hotfix:`, this covers any PR that has no
+ * issue to close for a reason other than "it's a hotfix" (retro/docs
+ * spin-offs, bookkeeping — #871). Spelled the same line-head + colon way as
+ * `hotfix:`, for the same reason (a line-head match without the colon would
+ * let prose about the convention exempt itself).
+ *
+ * The reason is mandatory (`\s*\S` after the colon), unlike `hotfix:`: that
+ * declaration names one established, narrow convention on its own, while
+ * `no-issue:` can be attached to any PR — an empty declaration here would be
+ * a blank check, so the colon must be followed by at least one non-space
+ * character on the same line.
+ */
+const NO_ISSUE_DECLARATION = /^no-issue[ \t]*:[ \t]*\S/im;
+
+/**
+ * Whether `body` carries either exemption declaration. Exported so the
+ * PreToolUse `gh pr create` guard (closes-create-guard.mjs, #871) checks a PR
+ * body against the same vocabulary this module uses at merge time, instead
+ * of redefining it.
+ * @param {string} body
+ * @returns {boolean}
+ */
+export function hasExemptionDeclaration(body) {
+	const text = body ?? "";
+	return HOTFIX_DECLARATION.test(text) || NO_ISSUE_DECLARATION.test(text);
+}
+
+/**
  * @param {{baseRef?: string, defaultBranch?: string,
  *          closingIssueCount?: number, body?: string}} params
  *   - baseRef: the branch this PR merges into.
@@ -61,8 +89,15 @@ export function classifyClosesReference({
 			detail: "declared a hotfix, which the backend convention exempts",
 		};
 	}
+	if (NO_ISSUE_DECLARATION.test(body ?? "")) {
+		return {
+			status: "SKIP",
+			detail:
+				"declared no-issue, with a reason the backend convention requires",
+		};
+	}
 	return {
 		status: "FAIL",
-		detail: `GitHub reads this PR as closing no issue; add "Closes #<n>" to the body, or declare a hotfix`,
+		detail: `GitHub reads this PR as closing no issue; add "Closes #<n>" to the body, declare a hotfix, or declare "no-issue: <reason>"`,
 	};
 }

@@ -39,6 +39,8 @@ Closes #<issue番号>
 
 **中間 PR では使わない**: `Closes` を使うのはデフォルトブランチ（main 等）へ直接マージする PR のみ。feature branch への中間 PR に書くと、feature branch マージ時点で issue が閉じられ、デフォルトブランチ未到達のまま誤 close になる。issue close と flow 確定はデフォルトブランチへのマージ時に行う。
 
+**閉じる issue が無い PR**: hotfix（次節）に該当しない、bookkeeping やドキュメントの spin-off 等では、行頭に `no-issue: <理由>` と明示する。理由は必須（コロンの後に空でない理由テキストを書く）。これは「issue なし develop は hotfix のみに限る」の例外であり、理由必須の明示宣言に限って緩めたもの — 宣言なしに閉じる issue が無いまま PR を出すことは変わらず認めない。
+
 ## hotfix 運用（issue 省略）
 
 バグ修正で以下をすべて満たす場合、issue 起票・roadmap 更新を省略してよい:
@@ -47,7 +49,7 @@ Closes #<issue番号>
 - PR 単体で完結し、依存解放を要しない
 - PR description に "hotfix" と明記する
 
-**develop 開始前に hotfix 判定を行う** — 3条件の確認前に issue 起票・roadmap 追加を開始しない。issue なし develop は hotfix のみに限る。
+**develop 開始前に hotfix 判定を行う** — 3条件の確認前に issue 起票・roadmap 追加を開始しない。issue なし develop は hotfix、または「PR 本文規約」の `no-issue: <理由>` 宣言を伴う場合のみに限る。
 
 ## develop 中に見つけたスコープ外バグの扱い
 
