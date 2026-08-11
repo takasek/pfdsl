@@ -1,13 +1,20 @@
-// Asks before a test/build/check command runs while this shell's cwd has
-// drifted from its linked worktree back to the main checkout (#840).
+// Asks before a command whose target tree is implicit in cwd runs while this
+// shell's cwd has drifted from its linked worktree back to the main checkout
+// (#840).
 //
 // A worktree session's Bash cwd can revert to the main checkout between
-// calls (see CLAUDE.md "worktree でのファイル操作パス"). When that happens,
-// `make test` runs against the main checkout's tree — which does not contain
-// the worktree branch's changes — and a pass there reads exactly like a pass
-// of the branch under review, because nothing in the command's own output
-// says which tree it ran against. worktree-write-guard.mjs closes the
-// equivalent gap for Edit/Write; this closes it for verification commands.
+// calls (see CLAUDE.md "worktree でのファイル操作パス"). When that happens, a
+// command that resolves its working tree from cwd — `make`, `pnpm`/`npm`,
+// `npx`, or `node` given a relative script path — runs against the main
+// checkout's tree instead, which does not contain the worktree branch's
+// changes. A pass there reads exactly like a pass of the branch under
+// review, because nothing in the command's own output says which tree it ran
+// against. The detection axis is therefore not "is this command one of a
+// fixed list of verification verbs" but "does this command's target tree
+// depend on cwd" — a command that names its tree explicitly (`-C <path>`, an
+// absolute script path) is unaffected by drift and is excluded regardless of
+// what the command does. worktree-write-guard.mjs closes the equivalent gap
+// for Edit/Write; this closes it for commands whose tree is cwd-implicit.
 //
 // Ask, not deny: a deliberate check of the main checkout itself (e.g. before
 // a release) is a legitimate reason to run these commands there, and denying
@@ -31,48 +38,81 @@ import {
 	tokenize,
 } from "./delegation-guard.mjs";
 
-/** `make` target prefixes treated as verification. */
-const VERIFICATION_MAKE_TARGET_PREFIXES = ["test", "check", "build"];
+/** `-C`/`--directory` forms that make `make`'s cwd explicit, so drift cannot
+ * affect it. */
+const MAKE_CWD_FLAGS = ["-C", "--directory"];
 
-/** `-C`/`--directory` forms that make an explicit cwd part of the command, so
- * cwd drift cannot affect it. `--directory=<path>` arrives as one token, so
- * the flag name is read up to `=` and compared by equality rather than via
- * `startsWith("--directory=")` — the latter is a string literal handed to
- * `startsWith`, the shape check-cli-conventions.mjs flags (#648) even though
- * this parses another command's arguments, not this script's own argv (the
- * same distinction command-usage-guard.mjs is exempted by name for there).
+/** `-C`/`--dir`/`--prefix` forms that make a package manager's (`pnpm`/`npm`)
+ * cwd explicit. */
+const PACKAGE_MANAGER_CWD_FLAGS = ["-C", "--dir", "--prefix"];
+
+/** Script-file extensions treated as a relative-path operand for `node` even
+ * without a `/` in the token (e.g. `foo.mjs` run from the target tree's own
+ * root). */
+const NODE_SCRIPT_EXTENSIONS = [".mjs", ".js", ".cjs", ".ts"];
+
+/** Whether `tokens` contains one of `flagNames`, so cwd is an explicit part
+ * of the command and cwd drift cannot affect it. `--flag=<path>` arrives as
+ * one token, so the flag name is read up to `=` and compared by equality
+ * rather than via `startsWith("--flag=")` — the latter is a string literal
+ * handed to `startsWith`, the shape check-cli-conventions.mjs flags (#648)
+ * even though this parses another command's arguments, not this script's own
+ * argv (the same distinction command-usage-guard.mjs is exempted by name
+ * for there).
  */
-function hasExplicitCwdFlag(tokens) {
+function hasExplicitCwdFlag(tokens, flagNames) {
 	return tokens.some((t) => {
 		if (t.quoted) return false;
 		const flagName = t.value.split("=", 1)[0];
-		return flagName === "-C" || flagName === "--directory";
+		return flagNames.includes(flagName);
 	});
 }
 
-/** Whether `rest` (the tokens after `make`) targets test/check/build. */
+/** Whether `rest` (the tokens after `make`) targets an implicit-cwd tree.
+ * Every `make` invocation does — the target chosen does not change which
+ * tree the Makefile itself is read from — so this is `true` for any
+ * invocation that does not name its cwd explicitly. */
 function isVerificationMake(rest) {
-	if (hasExplicitCwdFlag(rest)) return false;
-	return rest.some(
-		(t) =>
-			!t.quoted &&
-			VERIFICATION_MAKE_TARGET_PREFIXES.some((prefix) =>
-				t.value.startsWith(prefix),
-			),
+	return !hasExplicitCwdFlag(rest, MAKE_CWD_FLAGS);
+}
+
+/** Whether `rest` (the tokens after `pnpm`/`npm`) targets an implicit-cwd
+ * tree. Every subcommand does — `pnpm`/`npm` resolve `package.json` from cwd
+ * regardless of which subcommand runs — so this is `true` for any invocation
+ * that does not name its cwd explicitly. */
+function isVerificationPackageManager(rest) {
+	return !hasExplicitCwdFlag(rest, PACKAGE_MANAGER_CWD_FLAGS);
+}
+
+/** Whether `token` is a relative-path operand: not a flag (does not start
+ * with `-`), not already absolute (does not start with `/`), and looks like
+ * a path — either it contains a `/` or it ends in a recognised script
+ * extension. */
+function isRelativePathOperand(token) {
+	const { value } = token;
+	if (value.startsWith("-") || value.startsWith("/")) return false;
+	return (
+		value.includes("/") ||
+		NODE_SCRIPT_EXTENSIONS.some((ext) => value.endsWith(ext))
 	);
 }
 
-/** Whether `rest` (the tokens after `node`) is a `--test` invocation. */
-function isNodeTest(rest) {
-	return rest.some((t) => !t.quoted && t.value === "--test");
+/** Whether `token` is an absolute-path operand: starts with `/`. An absolute
+ * path names its tree explicitly, so it is unaffected by cwd drift. */
+function isAbsolutePathOperand(token) {
+	return token.value.startsWith("/");
 }
 
-/** Whether `rest` (the tokens after `pnpm`) runs a test or build script. */
-function isVerificationPnpm(rest) {
-	if (rest.some((t) => !t.quoted && t.value === "-C")) return false;
-	return rest.some(
-		(t) => !t.quoted && (t.value === "test" || t.value === "build"),
-	);
+/** Whether `rest` (the tokens after `node`) targets an implicit-cwd tree: a
+ * relative script-path operand (the interpreter reads the script relative to
+ * cwd), or a `--test` invocation that names no absolute-path operand (`node
+ * --test` alone still resolves its file glob from cwd). `node -e '...'` and
+ * similar have no path operand at all and are excluded either way. */
+function isVerificationNode(rest) {
+	if (rest.some(isRelativePathOperand)) return true;
+	const hasTest = rest.some((t) => !t.quoted && t.value === "--test");
+	if (!hasTest) return false;
+	return !rest.some(isAbsolutePathOperand);
 }
 
 /** Whether one already-split segment is a verification command. */
@@ -84,16 +124,22 @@ function isVerificationSegment(segment) {
 	const rest = tokens.slice(1);
 
 	if (head.value === "make") return isVerificationMake(rest);
-	if (head.value === "node") return isNodeTest(rest);
-	if (head.value === "pnpm") return isVerificationPnpm(rest);
+	if (head.value === "node") return isVerificationNode(rest);
+	if (head.value === "pnpm" || head.value === "npm")
+		return isVerificationPackageManager(rest);
+	// `npx` resolves its package from cwd's node_modules with no flag that
+	// names another tree explicitly, so it is always in scope.
+	if (head.value === "npx") return true;
 	return false;
 }
 
 /**
- * The verification-ish segments (test/check/build via make, node --test, or
- * pnpm) found in `command`, trimmed. A command with none returns `[]`.
- * `make -C <path>` / `--directory[=]<path>` and `pnpm -C <path>` are excluded:
- * naming a cwd explicitly means drift cannot change which tree they run
+ * The segments of `command` whose target tree is implicit in cwd (`make`,
+ * `pnpm`/`npm`, `npx`, or `node` given a relative script path or a `--test`
+ * invocation with no absolute-path operand), trimmed. A command with none
+ * returns `[]`. `make -C <path>` / `--directory[=]<path>`, `pnpm`/`npm`
+ * `-C`/`--dir`/`--prefix[=]<path>`, and `node <absolute path>` are excluded:
+ * naming a tree explicitly means drift cannot change which tree they run
  * against.
  * @param {string} command
  * @returns {string[]}

@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 
-// PreToolUse(Bash) hook: asks before a test/build/check command runs while
-// this shell's cwd has drifted from its linked worktree back to the main
-// checkout (#840). See scripts/lib/verification-tree-guard.mjs for the
-// detection logic and why this is `ask`, not `deny`.
+// PreToolUse(Bash) hook: asks before a command whose target tree is implicit
+// in cwd runs while this shell's cwd has drifted from its linked worktree
+// back to the main checkout (#840). See scripts/lib/verification-tree-guard.mjs
+// for the detection logic (which commands qualify and why) and why this is
+// `ask`, not `deny`.
 //
 // Reads the hook payload on stdin. Prints an ask decision only when the cwd
 // resolves to the main checkout, at least one linked worktree exists
-// elsewhere in the repo, and the command contains a verification-ish
-// segment; stays silent otherwise. Always exits 0 — a crash in this guard
-// must not wedge every Bash call.
+// elsewhere in the repo, and the command contains a cwd-implicit segment;
+// stays silent otherwise. Always exits 0 — a crash in this guard must not
+// wedge every Bash call.
 //
 // Usage (wired in .claude/settings.json): node scripts/verification-tree-guard.mjs
 
