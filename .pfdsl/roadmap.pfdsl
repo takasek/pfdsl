@@ -180,19 +180,12 @@ artifact:
     description: "frontmatter の artifact/process node 定義を index/topological/group 等のキーで並べ替える pfdsl sort コマンド。index 採番(#221)と frontmatter 編集基盤の上に乗る"
     status: done
     criteria: "pfdsl sort が --by index|topological|group|id で node 定義を並べ替え、--check で検証できる"
-  spec_v0010:
-    label: 仕様書 v0.0.10（basePath統合）
-    status: done
-    criteria: "basePath: フィールドが spec 本文に統合済み"
-    location: ../docs/spec/spec.md
-    updated_at: 2026-07-03T03:51:00Z
-    revises: spec_v009
   spec_v0011:
     label: 仕様書 v0.0.11（waiting/suspended/type統合）
     status: done
     criteria: "waiting/suspended status 分割・type フィールド・W002 source artifact 免除が spec 本文に統合済み"
     location: ../docs/spec/spec.md
-    revises: spec_v0010
+    revises: spec_v009
   ready_cmd:
     label: "pfdsl ready コマンド (PR #267)"
     description: "着手可能プロセスを機械的に列挙する ready コマンド。--best で合流点優先の推薦、--json で機械可読出力。pfd-ops スキルの step 1 計算を代替する"
@@ -532,8 +525,6 @@ process:
     label: basePath フィールド実装
     description: "spec, CLI/core, vscode-extension に basePath: フィールド対応を実装する。新フロントマターフィールド追加・location/command パス解決変更・拡張コマンド実行 cwd 変更・feature sample 追加を含む"
     location: https://github.com/takasek/pfdsl/issues/261
-  integrate_spec_v0010:
-    label: 仕様書 v0.0.10統合
   implement_ready_cmd:
     label: ready コマンド実装
     description: "pfd-ops スキルのステップ1計算を CLI に移す。--best/--json を含む"
@@ -747,7 +738,6 @@ index_reindex >> integrate_spec_v009 -> spec_v009
 
 [cli_release_index_sort, spec_v009] >> implement_basepath -> basepath
 cli_release_index_sort >> implement_ready_cmd -> ready_cmd
-[basepath, ready_cmd] >> integrate_spec_v0010 -> spec_v0010
 basepath >> publish_cli_basepath -> cli_release_basepath
 [ext_v0014, basepath] >> publish_ext_v0015 -> ext_v0015
 [ready_cmd, cli_release_basepath] >> publish_cli_ready_cmd -> cli_release_ready_cmd
