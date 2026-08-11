@@ -10,6 +10,7 @@ import {
 	selectDesignRecord,
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
+import { counterLineOf } from "./retro-patterns.mjs";
 import {
 	CODE_PATH,
 	CORRECTNESS_TOOLS,
@@ -337,6 +338,25 @@ export function parsePorcelainPaths(porcelainOutput) {
 			const arrow = path.indexOf(" -> ");
 			return arrow >= 0 && line.startsWith("R") ? path.slice(arrow + 4) : path;
 		});
+}
+
+/**
+ * The retro pattern catalog's `phase: pre-artifact` entries, pre-shaped for
+ * printing before this cycle writes its commit messages / issue comments /
+ * PR body / delegation briefs — the reference point `catalog-consulted-
+ * after-the-artifact` (#822) says the catalog otherwise lacks, since retro
+ * only runs after those already exist.
+ * @param {{name: string, path: string, body: string, phase?: string}[]} patterns
+ * @returns {{name: string, path: string, countermeasure: string | undefined}[]}
+ */
+export function buildPreArtifactReminders(patterns) {
+	return patterns
+		.filter((p) => p.phase === "pre-artifact")
+		.map((p) => ({
+			name: p.name,
+			path: p.path,
+			countermeasure: counterLineOf(p.body),
+		}));
 }
 
 /**

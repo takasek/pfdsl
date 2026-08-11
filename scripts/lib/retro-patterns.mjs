@@ -219,6 +219,27 @@ export function summaryOf(body) {
 /** A body line that is a 問いの形 / 具体例 label, numbering and suffix included. */
 const KEY_LINE = /^(問いの形|具体例)/;
 
+/** A body line that is the pattern's own 対策 label — not a suffixed variant
+ * like 対策の追加, which reads as a continuation rather than the prescription
+ * itself. */
+const COUNTER_LINE = /^対策[:：]\s*(.+)$/;
+
+/**
+ * The pattern's own prescription, as one line: the text of its first 対策
+ * line, trimmed, with the label removed. `undefined` for a pattern that has
+ * none (some patterns write only 問いの形 / 具体例, or use different prose
+ * for their resolution).
+ * @param {string} body - a pattern's catalog bullet, head included.
+ * @returns {string | undefined}
+ */
+export function counterLineOf(body) {
+	for (const line of body.split("\n")) {
+		const match = COUNTER_LINE.exec(line.trim());
+		if (match) return match[1];
+	}
+	return undefined;
+}
+
 /**
  * The 問いの形 / 具体例 label lines a pattern's body carries, trimmed and in
  * body order. These are the lines tagged selection was missing (#803):

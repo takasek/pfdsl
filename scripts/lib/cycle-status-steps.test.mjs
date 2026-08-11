@@ -44,6 +44,7 @@ function baseDeps(overrides = {}) {
 		execGh: async () => JSON.stringify([]),
 		existsSync: () => true,
 		readFileSync: () => "",
+		readdirSync: () => [],
 		root: ROOT,
 		base: "main",
 		...overrides,
@@ -116,6 +117,7 @@ describe("runCycleStatus", () => {
 		assert.equal(result.best, undefined);
 		assert.equal(result.designUnsettledFor, undefined);
 		assert.equal(result.gateCheckCommand, undefined);
+		assert.equal(result.preArtifactPatterns, undefined);
 		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
 		assert.deepEqual(ghCalls, []);
 	});
@@ -151,6 +153,7 @@ describe("runCycleStatus", () => {
 		assert.equal(result.best, undefined);
 		assert.equal(result.designUnsettledFor, undefined);
 		assert.equal(result.gateCheckCommand, undefined);
+		assert.equal(result.preArtifactPatterns, undefined);
 		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
 		assert.deepEqual(ghCalls, []);
 	});
@@ -681,5 +684,48 @@ describe("runCycleStatus", () => {
 	it("returns a null gate-check command when there is no best process", async () => {
 		const result = await runCycleStatus(baseDeps());
 		assert.equal(result.gateCheckCommand, null);
+	});
+});
+
+describe("runCycleStatus preArtifactPatterns", () => {
+	const patternText = (phase) =>
+		[
+			"---",
+			`tags: [target:issue]${phase ? `\nphase: ${phase}` : ""}`,
+			"---",
+			"",
+			"- **名前**: 冒頭の一文。",
+			"  対策: 書く前に確認する。",
+			"",
+		].join("\n");
+
+	it("loads only the phase: pre-artifact pattern files, name/path/countermeasure each", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				readdirSync: () => ["a.md", "b.md", "not-a-pattern.txt"],
+				readFileSync: (path) => {
+					if (path.endsWith("a.md")) return patternText("pre-artifact");
+					if (path.endsWith("b.md")) return patternText(undefined);
+					throw new Error(`unexpected read: ${path}`);
+				},
+			}),
+		);
+		assert.deepEqual(result.preArtifactPatterns, [
+			{
+				name: "名前",
+				path: ".pfdsl/bindings/pfd-retro-patterns/a.md",
+				countermeasure: "書く前に確認する。",
+			},
+		]);
+	});
+
+	it("returns an empty list rather than omitting the field when nothing carries the phase", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				readdirSync: () => ["a.md"],
+				readFileSync: () => patternText(undefined),
+			}),
+		);
+		assert.deepEqual(result.preArtifactPatterns, []);
 	});
 });

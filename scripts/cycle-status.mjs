@@ -3,7 +3,7 @@
 // check, flow-sync PR check, ready listing) into one compact JSON payload.
 // Usage: node scripts/cycle-status.mjs [--base main] [--issue <n> ...]
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -55,6 +55,7 @@ const result = await runCycleStatus({
 	execGh: (execArgs) => execGh(execArgs, { cwd: root }),
 	existsSync,
 	readFileSync,
+	readdirSync,
 	root,
 	base,
 	issueNumbers,

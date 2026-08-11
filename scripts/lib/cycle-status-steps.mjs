@@ -11,10 +11,11 @@
  * `tryRun`), matching how the top-level script already calls it.
  */
 
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import {
 	buildDesignRecordTemplate,
 	buildGateCheckCommand,
+	buildPreArtifactReminders,
 	buildReviewRecordTemplate,
 	classifyDesignSettlement,
 	classifyPRs,
@@ -25,6 +26,7 @@ import {
 	parsePorcelainPaths,
 	parseReadyOutput,
 } from "./cycle-status.mjs";
+import { parsePatternFile } from "./retro-patterns.mjs";
 
 /**
  * @param {{
@@ -32,6 +34,7 @@ import {
  *   execGh: (args: string[]) => Promise<string>,
  *   existsSync: (path: string) => boolean,
  *   readFileSync: (path: string, encoding: string) => string,
+ *   readdirSync: (path: string) => string[],
  *   root: string,
  *   base: string,
  *   issueNumbers?: number[],
@@ -42,6 +45,7 @@ export async function runCycleStatus({
 	execGh,
 	existsSync,
 	readFileSync,
+	readdirSync,
 	root,
 	base,
 	issueNumbers = [],
@@ -318,6 +322,31 @@ export async function runCycleStatus({
 		targetIssues,
 	);
 
+	// The catalog's own reminder that referencing it at retro is too late for
+	// patterns whose countermeasure has to land before this cycle's commit
+	// messages / issue comments / PR body / delegation briefs exist
+	// (`catalog-consulted-after-the-artifact`, #822). Loaded independently of
+	// every branch above — it names nothing about this cycle's git state, so a
+	// failure here (a malformed pattern file) is reported and does not
+	// withhold the rest of the preflight.
+	const PATTERN_DIR = resolve(root, ".pfdsl/bindings/pfd-retro-patterns");
+	let preArtifactPatterns = [];
+	let preArtifactPatternsError = null;
+	try {
+		const patterns = readdirSync(PATTERN_DIR)
+			.filter((f) => f.endsWith(".md"))
+			.map((f) => {
+				const filePath = resolve(PATTERN_DIR, f);
+				return {
+					...parsePatternFile(readFileSync(filePath, "utf8")),
+					path: relative(root, filePath),
+				};
+			});
+		preArtifactPatterns = buildPreArtifactReminders(patterns);
+	} catch (e) {
+		preArtifactPatternsError = e.message;
+	}
+
 	const result = {
 		fetched,
 		behindBase,
@@ -333,6 +362,7 @@ export async function runCycleStatus({
 		}),
 		reviewRecordTemplate: buildReviewRecordTemplate(),
 		gateCheckCommand,
+		preArtifactPatterns,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;
 	if (dirtyTreeError) result.dirtyTreeError = dirtyTreeError;
@@ -340,5 +370,7 @@ export async function runCycleStatus({
 	if (prError) result.prError = prError;
 	if (readyError) result.readyError = readyError;
 	if (designUnsettledError) result.designUnsettledError = designUnsettledError;
+	if (preArtifactPatternsError)
+		result.preArtifactPatternsError = preArtifactPatternsError;
 	return result;
 }

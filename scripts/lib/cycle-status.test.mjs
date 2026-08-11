@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
 	buildDesignRecordTemplate,
 	buildGateCheckCommand,
+	buildPreArtifactReminders,
 	buildReviewRecordTemplate,
 	classifyDesignSettlement,
 	classifyPRs,
@@ -612,5 +613,38 @@ describe("buildReviewRecordTemplate", () => {
 		// "packages か scripts/" that dropped the slash on every alternative but
 		// the last (#809 review finding).
 		for (const prefix of alternatives) assert.ok(note.includes(`${prefix}/`));
+	});
+});
+
+describe("buildPreArtifactReminders", () => {
+	const patterns = [
+		{
+			name: "A",
+			path: "a.md",
+			phase: "pre-artifact",
+			body: "- **A**: 冒頭。\n  対策: 書く前に確認する。",
+		},
+		{
+			name: "B",
+			path: "b.md",
+			body: "- **B**: 冒頭。\n  対策: いつでも効く。",
+		},
+		{
+			name: "C",
+			path: "c.md",
+			phase: "pre-artifact",
+			body: "- **C**: 冒頭。\n  対策: 着手前に読み直す。",
+		},
+	];
+
+	it("carries only the phase: pre-artifact patterns, name/path/countermeasure each", () => {
+		assert.deepEqual(buildPreArtifactReminders(patterns), [
+			{ name: "A", path: "a.md", countermeasure: "書く前に確認する。" },
+			{ name: "C", path: "c.md", countermeasure: "着手前に読み直す。" },
+		]);
+	});
+
+	it("returns nothing when no pattern carries the phase", () => {
+		assert.deepEqual(buildPreArtifactReminders([patterns[1]]), []);
 	});
 });

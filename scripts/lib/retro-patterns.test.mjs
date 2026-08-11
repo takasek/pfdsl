@@ -4,6 +4,7 @@ import {
 	ALWAYS_TAG,
 	checkPatternFile,
 	collectTags,
+	counterLineOf,
 	groupTagsByAxis,
 	keyLinesOf,
 	near,
@@ -153,6 +154,30 @@ describe("summaryOf", () => {
 
 	it("falls back to the whole bullet when it has no sentence end", () => {
 		assert.equal(summaryOf("- **名前**: 句点のない一行"), "句点のない一行");
+	});
+});
+
+describe("counterLineOf", () => {
+	it("takes the first 対策 line's text, trimmed, label removed", () => {
+		const body = [
+			"- **名前**: 冒頭の一文。",
+			"  具体例: これは例。",
+			"  対策: 書く前に確認する。",
+		].join("\n");
+		assert.equal(counterLineOf(body), "書く前に確認する。");
+	});
+
+	it("takes the first 対策 line when a pattern has more than one", () => {
+		const body = [
+			"- **名前**: 冒頭の一文。",
+			"  対策: 一つ目。",
+			"  対策の追加: 二つ目。",
+		].join("\n");
+		assert.equal(counterLineOf(body), "一つ目。");
+	});
+
+	it("returns undefined for a pattern with no 対策 line", () => {
+		assert.equal(counterLineOf("- **名前**: 冒頭の一文だけ。"), undefined);
 	});
 });
 
