@@ -16,7 +16,7 @@ artifact:
     label: 実践ラウンド1/2レビュー知見
     description: docs/examples の執筆・レビューで得た品質知見
     status: done
-    criteria: skill_template または adr_corpus への反映が確認済み
+    criteria: skill_template または adrs への反映が確認済み
   toolchain:
     label: ツールチェーン実装（現行）
     description: packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）全体。後続プロセスが前提にするのは「実装が存在すること」であって特定の版ではない。現行版は cli_release_* チェーンを経て進み続けており、公開版の一次情報は npm レジストリ（ここに版数を書かない — ドリフトするため）。名前と粒度は workflow.pfdsl の toolchain に揃えてある（#783）
@@ -81,7 +81,7 @@ artifact:
     status: done
     criteria: ID スコープ・継承解決順・ファイル間参照の決定が文書化済み
     location: ../docs/spec/proposals/multifile-policy.md
-  adr_corpus:
+  adrs:
     label: "ADR 群 (docs/adr)"
     description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
     status: done
@@ -705,7 +705,7 @@ toolchain >> publish_cli_bootstrap -> cli_release_bootstrap
 
 toolchain >> layer_audit_assets -> audit_distribution
 
-adr_corpus >> i12_write_article -> article
+adrs >> i12_write_article -> article
 
 toolchain >> i3_build_obsidian_plugin -> obsidian_plugin
 
