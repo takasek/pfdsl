@@ -10,6 +10,19 @@
  * Trailer form (one per review pass, in any commit of the range):
  *   Review: tool=simplify
  *
+ * The trailer is self-reported: nothing here observes whether the tool ran,
+ * so a runner can write it without running anything (#809 did, and caught
+ * itself only by noticing). Accepted (#869) — the same tradeoff #824 records
+ * for the design-record disposition, but resting on a weaker backstop: that
+ * label is contradicted by the PR diff, whereas a review that found nothing
+ * legitimately leaves no trace, so no diff distinguishes a skipped pass from
+ * a clean one. What is left is one of the three residuals work-cycle.md's
+ * "機械が守らない範囲" already leaves to human review — whether a record has
+ * substance. No detector is added to close this, on purpose: the only trace
+ * of a tool invocation lives in the runner's own session, which the runner
+ * can edit, so a check would rest on one more self-reported layer instead of
+ * on the tamper-proof timestamps classifyDesignRecordTiming stands on.
+ *
  * Process/git I/O lives in the caller scripts; this module stays testable.
  */
 
