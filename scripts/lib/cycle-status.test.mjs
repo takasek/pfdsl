@@ -338,14 +338,14 @@ describe("classifyDesignSettlement", () => {
 		assert.equal(result.optionCount, 2);
 	});
 
-	it("reports settled with no-enumerated-options when nothing indicates unsettled design", () => {
+	it("reports unsettled with no-enumerated-options when nothing indicates unsettled design", () => {
 		assert.deepEqual(
 			classifyDesignSettlement({
 				body: "普通の説明文。",
 				comments: [],
 			}),
 			{
-				unsettled: false,
+				unsettled: true,
 				reason: "no-enumerated-options",
 			},
 		);

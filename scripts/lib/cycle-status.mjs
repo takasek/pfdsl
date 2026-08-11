@@ -234,7 +234,9 @@ export function buildReviewRecordTemplate() {
  * 1. 既存の「設計未確定」フレーズがヒット → unsettled (reason: "phrase")
  * 2. `selectDesignRecord` が本文・コメントから記録を同定できる → settled (reason: "record-posted")
  * 3. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
- * 4. それ以外 → settled (reason: "no-enumerated-options")
+ * 4. それ以外 → unsettled (reason: "no-enumerated-options")。
+ *    列挙構造を検出できなかった回を「対話省略可」の既定にする（fail-open）と、
+ *    散文中に紛れた選択肢が検出をすり抜けたまま既定で通過してしまう（#833・#829）。
  *
  * 記録の同定は終端ゲート（gate-check.mjs）と同じ `selectDesignRecord`
  * （と、それに entries を渡す `toDesignRecordEntries`）を使う。プリフライトと
@@ -279,7 +281,7 @@ export function classifyDesignSettlement({ body, createdAt, comments }) {
 		};
 	}
 
-	return { unsettled: false, reason: "no-enumerated-options" };
+	return { unsettled: true, reason: "no-enumerated-options" };
 }
 
 /**

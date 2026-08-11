@@ -309,7 +309,7 @@ describe("runCycleStatus", () => {
 			{
 				issue: 669,
 				source: "flag",
-				unsettled: false,
+				unsettled: true,
 				reason: "no-enumerated-options",
 				matchedLines: [],
 				optionCount: 0,
@@ -362,7 +362,7 @@ describe("runCycleStatus", () => {
 		assert.deepEqual(
 			result.designUnsettledFor.map((d) => [d.issue, d.unsettled]),
 			[
-				[667, false],
+				[667, true],
 				[668, true],
 			],
 		);
