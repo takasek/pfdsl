@@ -6,6 +6,11 @@
 
 import { join } from "node:path";
 
+/** Where the catalog lives, relative to the repo root. The one definition —
+ * every caller that resolves the directory joins this onto its own root
+ * rather than repeating the path segments. */
+export const PATTERN_DIR_RELATIVE = ".pfdsl/bindings/pfd-retro-patterns";
+
 /** A top-level catalog bullet: `- **name**: first line`. */
 const PATTERN_HEAD = /^- \*\*(.+?)\*\*/;
 
@@ -83,6 +88,21 @@ export function loadPatternCatalog(
 		}
 	}
 	return { patterns, errors };
+}
+
+/**
+ * Every pattern under `dir`, parsed, or an error naming every file that
+ * failed. For a caller that has no isolation story of its own — a single
+ * malformed pattern file should stop it the same way a single malformed input
+ * always has.
+ * @param {string} dir
+ * @param {{readdirSync: (dir: string) => string[], readFileSync: (path: string, encoding: string) => string, displayPath?: (path: string) => string}} io
+ * @returns {{name: string, tags: string[], phase?: string, body: string, path: string}[]}
+ */
+export function loadPatternCatalogOrThrow(dir, io) {
+	const { patterns, errors } = loadPatternCatalog(dir, io);
+	if (errors.length > 0) throw new Error(errors.join("; "));
+	return patterns;
 }
 
 /**
