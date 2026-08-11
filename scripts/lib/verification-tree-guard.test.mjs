@@ -22,13 +22,18 @@ describe("findVerificationSegments", () => {
 		assert.deepEqual(findVerificationSegments("make test"), ["make test"]);
 	});
 
-	it("finds `make` targets starting with check or build", () => {
-		assert.deepEqual(findVerificationSegments("make check-format"), [
+	it("finds any `make` target, not just test/check/build (#840 gap: `make format`)", () => {
+		for (const command of [
 			"make check-format",
-		]);
-		assert.deepEqual(findVerificationSegments("make build-cli"), [
 			"make build-cli",
-		]);
+			"make format",
+		]) {
+			assert.deepEqual(findVerificationSegments(command), [command], command);
+		}
+	});
+
+	it("finds a bare `make` with no target", () => {
+		assert.deepEqual(findVerificationSegments("make"), ["make"]);
 	});
 
 	it("finds `node --test ...`", () => {
@@ -38,16 +43,82 @@ describe("findVerificationSegments", () => {
 		);
 	});
 
-	it("finds pnpm test/build in their common forms", () => {
+	it("finds a bare `node --test` with no operand", () => {
+		assert.deepEqual(findVerificationSegments("node --test"), ["node --test"]);
+	});
+
+	it("finds `node <relative script path>` even without --test (#840 gap: check-md-linebreaks.mjs)", () => {
+		for (const command of [
+			"node scripts/foo.mjs",
+			"node scripts/check-md-linebreaks.mjs",
+			"node ./scripts/foo.js",
+			"node lib/foo.cjs",
+			"node scripts/gen.ts",
+			"node some/dir/entrypoint",
+		]) {
+			assert.deepEqual(findVerificationSegments(command), [command], command);
+		}
+	});
+
+	it("does not match `node <absolute script path>` (explicit path, no drift risk)", () => {
+		assert.deepEqual(findVerificationSegments("node /abs/scripts/foo.mjs"), []);
+	});
+
+	it("does not match `node --test <absolute script path>` (explicit path overrides --test)", () => {
+		assert.deepEqual(
+			findVerificationSegments("node --test /abs/scripts/foo.test.mjs"),
+			[],
+		);
+	});
+
+	it("does not match `node -e '...'` (no path operand)", () => {
+		assert.deepEqual(findVerificationSegments("node -e '1+1'"), []);
+	});
+
+	it("does not match `node --input-type=module -e '...'` (no path operand)", () => {
+		assert.deepEqual(
+			findVerificationSegments("node --input-type=module -e '1+1'"),
+			[],
+		);
+	});
+
+	it("does not match an eval body that merely contains `/` chars — the body is program source, not a path (false-positive fix)", () => {
+		for (const command of [
+			'node -e "console.log(1)"',
+			`node -e "import x from '/abs/path/x.mjs'"`,
+			`node --input-type=module -e "import { checkFile } from '/Users/m5/works/pfdsl/scripts/lib/md-linebreaks.mjs';"`,
+		]) {
+			assert.deepEqual(findVerificationSegments(command), [], command);
+		}
+	});
+
+	it("still matches a real relative script path, and still excludes a real absolute one (eval-flag fix must not widen or narrow those)", () => {
+		assert.deepEqual(findVerificationSegments("node scripts/x.mjs"), [
+			"node scripts/x.mjs",
+		]);
+		assert.deepEqual(findVerificationSegments("node /abs/scripts/x.mjs"), []);
+	});
+
+	it("finds pnpm/npm subcommands generally, not just test/build (#840 gap widening)", () => {
 		for (const command of [
 			"pnpm test",
 			"pnpm -r test",
 			"pnpm -r build",
 			"pnpm run test",
 			"pnpm --filter x build",
+			"pnpm install",
+			"pnpm biome check",
+			"npm install",
+			"npm run build",
 		]) {
 			assert.deepEqual(findVerificationSegments(command), [command], command);
 		}
+	});
+
+	it("always finds npx (resolves from cwd's node_modules, no explicit-cwd escape)", () => {
+		assert.deepEqual(findVerificationSegments("npx biome check"), [
+			"npx biome check",
+		]);
 	});
 
 	it("does not match `make -C <path> ...` (explicit cwd, no drift risk)", () => {
@@ -65,17 +136,27 @@ describe("findVerificationSegments", () => {
 		);
 	});
 
-	it("does not match `pnpm -C <path> ...`", () => {
+	it("does not match `pnpm -C <path> ...`, `--dir <path>`, or `--prefix=<path>`", () => {
 		assert.deepEqual(findVerificationSegments("pnpm -C /some/path test"), []);
+		assert.deepEqual(
+			findVerificationSegments("pnpm --dir /some/path test"),
+			[],
+		);
+		assert.deepEqual(
+			findVerificationSegments("pnpm --prefix=/some/path test"),
+			[],
+		);
+	});
+
+	it("does not match `npm --prefix <path> ...`", () => {
+		assert.deepEqual(
+			findVerificationSegments("npm --prefix /some/path test"),
+			[],
+		);
 	});
 
 	it("does not match unrelated commands", () => {
-		for (const command of [
-			"git status",
-			"ls",
-			"gh issue view 1",
-			"node scripts/foo.mjs",
-		]) {
+		for (const command of ["git status", "ls", "gh issue view 1"]) {
 			assert.deepEqual(findVerificationSegments(command), [], command);
 		}
 	});
