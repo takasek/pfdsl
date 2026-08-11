@@ -9,12 +9,20 @@
  * stays pure and testable.
  */
 
-// 20KB or 40 items (issue #797's own numbers). No FS/CLI script measures
-// these against a second data point yet — see .pfdsl/bindings/pfd-retro.md
-// for the two conditions this repo chose to leave to human judgment instead
-// of mechanizing.
+// Issue #797's own numbers, and the primary source for them (#878): every
+// other statement of these values — the notice text, the CLI wrapper's
+// docstring, .pfdsl/bindings/pfd-retro.md — points here or derives from here
+// rather than restating a literal. No FS/CLI script measures them against a
+// second data point yet; see .pfdsl/bindings/pfd-retro.md for the two
+// conditions this repo chose to leave to human judgment instead of mechanizing.
 export const BYTE_THRESHOLD = 20 * 1024;
 export const ITEM_THRESHOLD = 40;
+
+/**
+ * The thresholds as the notice states them, derived so that changing either
+ * constant cannot leave the printed phrase behind (#878).
+ */
+export const THRESHOLD_SUMMARY = `${BYTE_THRESHOLD / 1024}KB or ${ITEM_THRESHOLD} items`;
 
 /**
  * Counts top-level `- **name**: ...` bullet items — the catalog's per-entry
@@ -61,7 +69,7 @@ export function evaluateCatalogScale(measurements) {
 	const stdoutLines = measurements.map((m) => {
 		const base = `${m.path}: ${m.bytes} bytes, ${m.items} items`;
 		return exceedsSplitThreshold(m)
-			? `${base} — split threshold reached (20KB or 40 items); consider splitting`
+			? `${base} — split threshold reached (${THRESHOLD_SUMMARY}); consider splitting`
 			: base;
 	});
 	return { exitCode: 0, stdoutLines, stderrLines: [] };
