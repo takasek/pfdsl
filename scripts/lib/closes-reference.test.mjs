@@ -77,4 +77,35 @@ describe("classifyClosesReference", () => {
 		});
 		assert.equal(result.status, "FAIL");
 	});
+
+	it("SKIPs a no-issue declaration that gives a reason", () => {
+		const result = classifyClosesReference({
+			...intoMain,
+			closingIssueCount: 0,
+			body: "no-issue: retro bookkeeping only, nothing to gate\n\ndetails",
+		});
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no-issue/);
+	});
+
+	// A reason is required so an empty declaration cannot wave the PR through —
+	// unlike `hotfix:`, which names an established convention on its own,
+	// `no-issue:` covers arbitrary PRs and needs the reason to be reviewable.
+	it("FAILs an empty no-issue declaration", () => {
+		const result = classifyClosesReference({
+			...intoMain,
+			closingIssueCount: 0,
+			body: "no-issue:\n\ndetails",
+		});
+		assert.equal(result.status, "FAIL");
+	});
+
+	it("FAILs no-issue mentioned mid-line rather than at a line head", () => {
+		const result = classifyClosesReference({
+			...intoMain,
+			closingIssueCount: 0,
+			body: "This is not a no-issue: case, it implements the feature.",
+		});
+		assert.equal(result.status, "FAIL");
+	});
 });
