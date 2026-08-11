@@ -46,6 +46,50 @@ describe("pattern files", () => {
 		const untagged = { ...pattern, tags: [] };
 		assert.deepEqual(parsePatternFile(renderPatternFile(untagged)).tags, []);
 	});
+
+	it("omits the phase line when the pattern carries no phase", () => {
+		assert.equal(
+			renderPatternFile(pattern),
+			[
+				"---",
+				"tags: [delegation, parallel-work]",
+				"---",
+				"",
+				"- **並行委譲の接合部**: 冒頭の一文。",
+				"  続きの行。",
+				"",
+			].join("\n"),
+		);
+	});
+
+	it("renders phase after tags when the pattern carries one", () => {
+		const phased = { ...pattern, phase: "pre-artifact" };
+		assert.equal(
+			renderPatternFile(phased),
+			[
+				"---",
+				"tags: [delegation, parallel-work]",
+				"phase: pre-artifact",
+				"---",
+				"",
+				"- **並行委譲の接合部**: 冒頭の一文。",
+				"  続きの行。",
+				"",
+			].join("\n"),
+		);
+	});
+
+	it("reads phase back from a file that carries one", () => {
+		const phased = { ...pattern, phase: "pre-artifact" };
+		assert.equal(
+			parsePatternFile(renderPatternFile(phased)).phase,
+			"pre-artifact",
+		);
+	});
+
+	it("reads back undefined phase for a file with no phase line", () => {
+		assert.equal(parsePatternFile(renderPatternFile(pattern)).phase, undefined);
+	});
 });
 
 describe("selectByTag", () => {
@@ -430,5 +474,36 @@ describe("checkPatternFile", () => {
 			text: driftedTags,
 		});
 		assert.match(reason, /does not round-trip/);
+	});
+
+	it("reports a countermeasure phrased as effective before something, with no phase declared", () => {
+		const undeclared = renderPatternFile({
+			tags: ["method:delegate"],
+			body: "- **並行委譲の接合部**: 冒頭の一文。\n  対策: 書く前に確認する。",
+		});
+		const [reason] = checkPatternFile({
+			name: "parallel-delegation-seam",
+			text: undeclared,
+		});
+		assert.match(reason, /phase/);
+	});
+
+	it("does not report a countermeasure phrased that way when phase is declared", () => {
+		const declared = renderPatternFile({
+			tags: ["method:delegate"],
+			phase: "pre-artifact",
+			body: "- **並行委譲の接合部**: 冒頭の一文。\n  対策: 書く前に確認する。",
+		});
+		assert.deepEqual(
+			checkPatternFile({ name: "parallel-delegation-seam", text: declared }),
+			[],
+		);
+	});
+
+	it("does not report a countermeasure with no before-something phrasing", () => {
+		assert.deepEqual(
+			checkPatternFile({ name: "parallel-delegation-seam", text: valid }),
+			[],
+		);
 	});
 });

@@ -12,6 +12,12 @@ const PATTERN_FILE = /^---\n([\s\S]*?)\n---\n\n([\s\S]*)$/;
 
 const TAGS_LINE = /^tags: \[(.*)\]$/m;
 
+const PHASE_LINE = /^phase: (.+)$/m;
+
+/** A 対策 line phrased as effective before some point ("〜前に"). Deliberately
+ * loose — see checkPatternFile's JSDoc for why this misses cases on purpose. */
+const PRE_ARTIFACT_PHRASING = /対策[:：][^、。]{1,20}前に/;
+
 /** An ASCII kebab-case slug: lowercase letters and digits, hyphen-joined. */
 const ASCII_KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -26,18 +32,24 @@ const ASCII_KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
  * whole proof that the migration lost nothing. Anything the bullet already
  * says would be a second copy, free to go stale, and prose is not something a
  * checker can compare against prose.
- * @param {{tags: string[], body: string}} pattern
+ * `phase` is omitted from the frontmatter entirely when the pattern doesn't
+ * carry one, rather than printed as `phase: ` or similar — the 56 patterns
+ * that predate the field round-trip byte-for-byte through this function only
+ * because an absent field prints nothing.
+ * @param {{tags: string[], body: string, phase?: string}} pattern
  * @returns {string}
  */
-export function renderPatternFile({ tags, body }) {
-	return `---\ntags: [${tags.join(", ")}]\n---\n\n${body}\n`;
+export function renderPatternFile({ tags, body, phase }) {
+	const phaseLine = phase === undefined ? "" : `phase: ${phase}\n`;
+	return `---\ntags: [${tags.join(", ")}]\n${phaseLine}---\n\n${body}\n`;
 }
 
 /**
  * A pattern file, back into its parts. The name comes from the bullet; the
- * summary is summaryOf(body), not a field.
+ * summary is summaryOf(body), not a field. `phase` is `undefined` when the
+ * file carries no `phase:` line, matching renderPatternFile's omission.
  * @param {string} text
- * @returns {{name: string, tags: string[], body: string}}
+ * @returns {{name: string, tags: string[], body: string, phase?: string}}
  */
 export function parsePatternFile(text) {
 	const file = PATTERN_FILE.exec(text);
@@ -47,10 +59,12 @@ export function parsePatternFile(text) {
 	const head = PATTERN_HEAD.exec(body);
 	if (!head) throw new Error("not a pattern file: body has no pattern bullet");
 	const tags = TAGS_LINE.exec(frontmatter)?.[1].trim() ?? "";
+	const phase = PHASE_LINE.exec(frontmatter)?.[1];
 	return {
 		name: head[1],
 		tags: tags === "" ? [] : tags.split(",").map((t) => t.trim()),
 		body,
+		...(phase === undefined ? {} : { phase }),
 	};
 }
 
@@ -64,6 +78,17 @@ export function parsePatternFile(text) {
  * would write — catching the whitespace and ordering slips a hand edit
  * introduces that parsePatternFile alone tolerates. Uniqueness of the
  * filename is the filesystem's job, not this function's.
+ *
+ * The `phase` promotion is a nudge, not a proof: it fires only when a 対策
+ * line is phrased as "対策: <≤20 chars, no 、。>前に" — a pattern that reads
+ * "before"-shaped but is phrased any other way (「着手前に」split across a
+ * continuation line, a longer clause before 前に, no 対策: label at all) is
+ * missed. The miss is one-directional by design: a pattern this misses stays
+ * unpromoted (a false negative), never one this catches that isn't actually
+ * before-something (see `catalog-consulted-after-the-artifact` for why a
+ * missed promotion is the failure this exists to catch). Do not tighten this
+ * into a claim of completeness — hand judgment decided the 56-pattern
+ * baseline's `phase` assignments, and this check will not reproduce it.
  * @param {{name: string, text: string}} file - name is the filename minus
  *   its extension.
  * @returns {string[]} one reason per violation, empty when the file is clean.
@@ -85,6 +110,11 @@ export function checkPatternFile({ name, text }) {
 	if (renderPatternFile(parsed) !== text) {
 		reasons.push(
 			"does not round-trip through renderPatternFile (formatting drift)",
+		);
+	}
+	if (parsed.phase === undefined && PRE_ARTIFACT_PHRASING.test(parsed.body)) {
+		reasons.push(
+			"対策 reads as effective before something ('...前に') but declares no phase",
 		);
 	}
 	return reasons;
