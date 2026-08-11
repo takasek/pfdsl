@@ -50,12 +50,14 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 �
 <scaffold>/runtime-pipeline.pfdsl
 <scaffold>/runtime-pipeline.md
 <scaffold>/bindings/pfd-retro.md
+<scaffold>/bindings/pfd-retro-patterns/sample-pattern.md
 <scaffold>/bindings/pfd-ops.md
 <scaffold>/review-perspectives.md
 ```
 
 必要な種別のファイルだけを `.pfdsl/` にコピーする（不要な種別はコピーしない）。
-`bindings/pfd-retro.md`・`bindings/pfd-ops.md`・`review-perspectives.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-ops.md`・`.pfdsl/review-perspectives.md` として常にコピーする（`bindings/pfd-retro.md` がこのファイルを参照する）。
+`bindings/pfd-retro.md`・`bindings/pfd-retro-patterns/`・`bindings/pfd-ops.md`・`review-perspectives.md` は種別と無関係（pfd-retro・pfd-ops スキルは全リポ共通で同梱される）— それぞれ `.pfdsl/bindings/pfd-retro.md`・`.pfdsl/bindings/pfd-retro-patterns/`・`.pfdsl/bindings/pfd-ops.md`・`.pfdsl/review-perspectives.md` として常にコピーする（`bindings/pfd-retro.md` がこのファイルを参照する）。
+`bindings/pfd-retro-patterns/` は監査パターン本体の置き場で、`sample-pattern.md` は書式の見本 1 件のみを持つ（`bindings/pfd-retro.md` の「監査の新パターン」節が書き方を指す）。
 既に `.pfdsl/` にファイルが存在する場合は上書きしない。
 companion をどの言語で書くかは pfd-ops スキルの `references/architecture.md`「companion の記述言語」節に従う。
 
