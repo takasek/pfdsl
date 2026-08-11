@@ -191,6 +191,14 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 **3. 戻り時の検出。** 汎用手順のまま（`git log origin/<branch>..HEAD` と open PR 一覧の突合）。このリポ固有の追加値はない。
 
+## PreToolUse ガードの artifact 登録基準（#854）
+
+`.claude/settings.json` に配線された PreToolUse ガードのうち、`externalize_bindings` の出力として `workflow.pfdsl` に artifact 登録するのは、pfd-ops 運用プロトコル文書（`references/work-cycle.md`・CLAUDE.md）が名指しで要求する一般的機構だけに限る。個別 issue から生まれたリポ固有の事故防止ガード（`stale-dist-guard` / `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` 等）は登録しない。
+
+現在 artifact 登録済みの2件はこの基準に該当する: `delegation_guard`（`references/work-cycle.md` 手順2「委譲先の外向き操作の制御」節が要求）・`main_branch_guard`（同手順2冒頭「main 直コミットしない」・CLAUDE.md「コミット粒度」節が要求）。それ以外は個別 issue 番号（#642, #650, #871, #840 等）に紐づく実装的ガードであり、登録しない。
+
+判定に迷う新規ガードは、この2条件（プロトコル文書が一般形で名指ししているか／リポ固有の個別事故に対する実装的対処か）で振り分ける。
+
 ## flow:exempt issue の roadmap 追加除外
 
 判定基準・タイミングは L3 reference（`github-issues-backend.md`「ラベル判定基準」）が一次情報。`file_issues` の「起票と同時に roadmap 追加」ルールの例外。
