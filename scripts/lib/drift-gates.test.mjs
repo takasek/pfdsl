@@ -39,6 +39,15 @@ describe("buildGates", () => {
 		);
 	});
 
+	it("fires readme-cli for the npm-page README, which the generator also writes", () => {
+		const gate = gates({ staged: [] }).find((g) => g.id === "readme-cli");
+		assert.ok(gate.trigger.test("packages/cli/README.md"));
+		assert.deepEqual(gate.commands.at(-1), [
+			"git",
+			["diff", "--quiet", "--", "README.md", "packages/cli/README.md"],
+		]);
+	});
+
 	it("derives one fmt gate per staged operational .pfdsl file", () => {
 		const built = gates({
 			staged: [".pfdsl/roadmap.pfdsl", ".pfdsl/workflow.pfdsl"],

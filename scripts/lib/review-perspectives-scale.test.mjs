@@ -7,6 +7,7 @@ import {
 	exceedsSplitThreshold,
 	ITEM_THRESHOLD,
 	measureCatalogScale,
+	THRESHOLD_SUMMARY,
 } from "./review-perspectives-scale.mjs";
 
 describe("countCatalogItems", () => {
@@ -79,6 +80,26 @@ describe("exceedsSplitThreshold", () => {
 			exceedsSplitThreshold({ bytes: BYTE_THRESHOLD, items: ITEM_THRESHOLD }),
 			false,
 		);
+	});
+});
+
+describe("THRESHOLD_SUMMARY", () => {
+	it("is derived from the two thresholds it summarises", () => {
+		assert.equal(
+			THRESHOLD_SUMMARY,
+			`${BYTE_THRESHOLD / 1024}KB or ${ITEM_THRESHOLD} items`,
+		);
+	});
+
+	it("is the phrase the split notice carries, so the two cannot drift apart", () => {
+		const result = evaluateCatalogScale([
+			{
+				path: "docs/review-perspectives.md",
+				bytes: BYTE_THRESHOLD + 1,
+				items: 1,
+			},
+		]);
+		assert.ok(result.stdoutLines[0].includes(THRESHOLD_SUMMARY));
 	});
 });
 

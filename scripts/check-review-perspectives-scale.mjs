@@ -5,8 +5,10 @@
  * Reports the byte size and item count of the two review-perspectives.md
  * catalogs — the distributed catalog (docs/review-perspectives.md) and this
  * repo's instance of it (.pfdsl/review-perspectives.md) — so a growth into
- * split-worthy territory (20KB or 40 items, #797) surfaces without anyone
- * having to measure it by hand.
+ * split-worthy territory surfaces without anyone having to measure it by
+ * hand. The thresholds themselves are lib/review-perspectives-scale.mjs's
+ * BYTE_THRESHOLD / ITEM_THRESHOLD (#797), which the printed notice states —
+ * this file does not restate them (#878).
  *
  * This is a notice, not a gate: exit code is always 0. Whether to split is a
  * judgment call this script does not make.
