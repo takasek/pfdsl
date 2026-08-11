@@ -126,3 +126,41 @@ export function formatFullReviewStatus(date) {
 	const name = "distribution review (full mode, manual)";
 	return date ? `  ${name}   last run ${date}` : `  ${name}   never run`;
 }
+
+/**
+ * Whether anything is left to do before the next publication — the script's
+ * exit code, and what `cycle-status.mjs` re-exports as
+ * `releasePending.needsAction`.
+ *
+ * The distribution review and spec-history readings count here because those
+ * two gates run nowhere else: `make release` refuses on them and neither is
+ * wired into CI or the pre-commit hook (both scripts say so in their own
+ * headers). `release.mjs`'s other pre-tag checks — build, test, check-docs,
+ * gen-plugin identity — are covered continuously by test.yml and
+ * check-gen-plugin.yml, so a failure there is ordinary breakage rather than
+ * publishing work left pending, and folding them in would make this a slow
+ * dry-run of the release for no reading it does not already have (#880).
+ * @param {{results: Array<{status: string, commitsAhead?: number}>, skillBundleCommits: number, distributionReview: {unreviewedCount: number|undefined, blockedReason: string|null}, specHistory: {ok: boolean}}} args
+ * @returns {boolean}
+ */
+export function needsAction({
+	results,
+	skillBundleCommits,
+	distributionReview,
+	specHistory,
+}) {
+	return (
+		results.some(
+			(r) =>
+				r.status === "local-ahead" ||
+				r.status === "error" ||
+				r.commitsAhead > 0,
+		) ||
+		skillBundleCommits > 0 ||
+		// undefined means the gate could not read the recorded commit at all,
+		// which is the state `make release` refuses on rather than a zero.
+		distributionReview.blockedReason !== null ||
+		distributionReview.unreviewedCount > 0 ||
+		specHistory.ok === false
+	);
+}
