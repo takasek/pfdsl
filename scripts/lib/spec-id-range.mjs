@@ -10,18 +10,14 @@
  * `line` into `computeRange`.
  */
 
-const HEADING_RE = /^(#{1,6})\s/;
+import { headingLevel } from "./markdown-heading.mjs";
+
 const LIST_ITEM_RE = /^(\s*)(?:[-*+]|\d+[.)])\s/;
 const TABLE_ROW_RE = /^\s*\|/;
 const FENCE_RE = /^(```|~~~)/;
 
 function isBlank(line) {
 	return line.trim() === "";
-}
-
-function headingLevel(line) {
-	const match = HEADING_RE.exec(line);
-	return match ? match[1].length : null;
 }
 
 function listItemIndent(line) {

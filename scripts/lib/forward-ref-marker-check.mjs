@@ -9,8 +9,9 @@
  * not-yet-implemented construct reserved for #328 and are ignored here.
  */
 
+import { isHeading } from "./markdown-heading.mjs";
+
 const FORWARD_REF_RE = /\[\[SPEC_([A-Za-z0-9_]+)\?\]\]/g;
-const HEADING_RE = /^#{1,6}\s/;
 const IMPLEMENTS_TRAILING_RE = /\(SPEC_([A-Za-z0-9_]+)\)\s*$/;
 const FENCE_RE = /^(```|~~~)/;
 
@@ -53,7 +54,7 @@ export function findForwardRefMarkers(text) {
 export function findImplementsMarkers(text) {
 	const hits = [];
 	forEachNonFencedLine(text, (line, lineNumber) => {
-		if (!HEADING_RE.test(line)) return;
+		if (!isHeading(line)) return;
 		const match = IMPLEMENTS_TRAILING_RE.exec(line);
 		if (!match) return;
 		hits.push({ line: lineNumber, id: `SPEC_${match[1]}` });
