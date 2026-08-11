@@ -41,6 +41,7 @@ const neighborsJsonOk = (successors) =>
 function baseDeps(overrides = {}) {
 	return {
 		sh: () => "",
+		shTry: () => ({ ok: true, out: "", status: 0 }),
 		execGh: async () => JSON.stringify([]),
 		existsSync: () => true,
 		readFileSync: () => "",
@@ -727,5 +728,38 @@ describe("runCycleStatus preArtifactPatterns", () => {
 			}),
 		);
 		assert.deepEqual(result.preArtifactPatterns, []);
+	});
+});
+
+describe("runCycleStatus release pending", () => {
+	it("carries the publishing backlog as report material, non-zero exit and all", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				shTry: (_file, args) => {
+					assert.ok(args[0].endsWith("scripts/release-status.mjs"));
+					return {
+						ok: false,
+						status: 1,
+						out: "release-status:\n@pfdsl/cli 0.0.25 (37 commits ahead)\n",
+					};
+				},
+			}),
+		);
+		assert.deepEqual(result.releasePending, {
+			needsAction: true,
+			report: ["release-status:", "@pfdsl/cli 0.0.25 (37 commits ahead)"],
+		});
+	});
+
+	it("sets releasePendingError and leaves the field null when the runner throws", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				shTry: () => {
+					throw new Error("spawn failed");
+				},
+			}),
+		);
+		assert.equal(result.releasePending, null);
+		assert.equal(result.releasePendingError, "spawn failed");
 	});
 });

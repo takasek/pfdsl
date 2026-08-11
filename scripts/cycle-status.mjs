@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { runCycleStatus } from "./lib/cycle-status-steps.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
-import { run } from "./lib/run-exec.mjs";
+import { run, tryRun } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -49,9 +49,15 @@ const issueNumbers = parsedIssues.numbers;
 // `base` comes from argv; naming the executable and arguments separately keeps
 // it out of a shell (#572).
 const sh = (file, args) => run(file, args, { cwd: root });
+// release-status prints its reasons to stdout and exits 1 on any pending
+// publish, so its stderr is captured rather than inherited: nothing it emits
+// there is breakage the operator needs to see interleaved (#814).
+const shTry = (file, args) =>
+	tryRun(file, args, { cwd: root, captureStderr: true });
 
 const result = await runCycleStatus({
 	sh,
+	shTry,
 	execGh: (execArgs) => execGh(execArgs, { cwd: root }),
 	existsSync,
 	readFileSync,

@@ -15,6 +15,7 @@ import {
 	parsePorcelainPaths,
 	parseReadyOutput,
 	summarizeCiStatus,
+	summarizeReleasePending,
 } from "./cycle-status.mjs";
 import {
 	classifyDesignRecordContent,
@@ -486,6 +487,49 @@ describe("countBehind", () => {
 	it("returns 0 for empty output", () => {
 		assert.equal(countBehind(""), 0);
 		assert.equal(countBehind("\n"), 0);
+	});
+});
+
+describe("summarizeReleasePending", () => {
+	it("reports needsAction when release-status exited non-zero", () => {
+		const summary = summarizeReleasePending({
+			ok: false,
+			status: 1,
+			out: "release-status:\n@pfdsl/cli 0.0.25 (37 commits ahead)\n",
+		});
+		assert.equal(summary.needsAction, true);
+		assert.deepEqual(summary.report, [
+			"release-status:",
+			"@pfdsl/cli 0.0.25 (37 commits ahead)",
+		]);
+	});
+
+	it("reports needsAction false when everything is published", () => {
+		const summary = summarizeReleasePending({
+			ok: true,
+			status: 0,
+			out: "release-status:\nall packages current\n",
+		});
+		assert.equal(summary.needsAction, false);
+	});
+
+	it("drops blank lines so the report carries only the material", () => {
+		const summary = summarizeReleasePending({
+			ok: true,
+			status: 0,
+			out: "\nrelease-status:\n\n  spec history: current  \n\n",
+		});
+		assert.deepEqual(summary.report, [
+			"release-status:",
+			"  spec history: current",
+		]);
+	});
+
+	it("returns an empty report when the command produced no output", () => {
+		assert.deepEqual(
+			summarizeReleasePending({ ok: true, status: 0, out: "" }).report,
+			[],
+		);
 	});
 });
 
