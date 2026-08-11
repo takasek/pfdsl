@@ -35,7 +35,7 @@ function resolveDefaultBranch() {
 }
 
 const { shouldOutput, output } = runClosesCreateGuard(await readStdinText(), {
-	defaultBranch: resolveDefaultBranch(),
+	getDefaultBranch: resolveDefaultBranch,
 	readFile: (path) => readFileSync(path, "utf8"),
 });
 if (shouldOutput) {

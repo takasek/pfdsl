@@ -15,7 +15,10 @@ function payload({ toolName = "Bash", command }) {
 }
 
 const defaultBranch = "main";
-const deps = { defaultBranch, readFile: () => undefined };
+const deps = {
+	getDefaultBranch: () => defaultBranch,
+	readFile: () => undefined,
+};
 
 describe("evaluateClosesCreateGuard", () => {
 	it("asks when a main-bound PR body has no Closes keyword and no exemption", () => {
@@ -102,7 +105,7 @@ describe("evaluateClosesCreateGuard", () => {
 				command: "gh pr create --base main --title x --body-file /tmp/body.md",
 			}),
 			{
-				defaultBranch,
+				getDefaultBranch: () => defaultBranch,
 				readFile: (path) =>
 					path === "/tmp/body.md" ? "no closes here" : undefined,
 			},
@@ -116,7 +119,7 @@ describe("evaluateClosesCreateGuard", () => {
 				command: "gh pr create --base main --title x --body-file /tmp/body.md",
 			}),
 			{
-				defaultBranch,
+				getDefaultBranch: () => defaultBranch,
 				readFile: () => {
 					throw new Error("ENOENT");
 				},
@@ -147,6 +150,22 @@ describe("evaluateClosesCreateGuard", () => {
 		].join("\n");
 		const result = evaluateClosesCreateGuard(payload({ command }), deps);
 		assert.equal(result.decision, "ask");
+	});
+
+	// This guard runs on every Bash call, so resolving the default branch —
+	// which costs a git process — must wait until a `gh pr create` that needs
+	// judging has actually been found.
+	it("does not resolve the default branch for a command it never judges", () => {
+		let calls = 0;
+		const result = evaluateClosesCreateGuard(payload({ command: "ls -la" }), {
+			getDefaultBranch: () => {
+				calls++;
+				return defaultBranch;
+			},
+			readFile: () => undefined,
+		});
+		assert.equal(result.decision, "allow");
+		assert.equal(calls, 0);
 	});
 
 	it("ignores tools other than Bash", () => {

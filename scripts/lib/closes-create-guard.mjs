@@ -59,13 +59,18 @@ function resolveBodyText(args, readFile) {
 
 /**
  * Decide whether a PreToolUse Bash invocation may proceed.
+ *
+ * `getDefaultBranch` is a function rather than a value because this runs on
+ * every Bash call while `gh pr create` is a rare one: resolving the branch up
+ * front would spawn a git process for each of them. It is called only once a
+ * `gh pr create` with a readable body has been found.
  * @param {object} payload PreToolUse hook payload
- * @param {{defaultBranch: string, readFile: (path: string) => string}} deps
+ * @param {{getDefaultBranch: () => string, readFile: (path: string) => string}} deps
  * @returns {{decision: "allow"} | {decision: "ask", reason: string}}
  */
 export function evaluateClosesCreateGuard(
 	payload,
-	{ defaultBranch, readFile },
+	{ getDefaultBranch, readFile },
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
 	const command = payload?.tool_input?.command;
@@ -80,11 +85,12 @@ export function evaluateClosesCreateGuard(
 		const bodyText = resolveBodyText(parsed.args, readFile);
 		if (bodyText === null) continue;
 
-		const [base] = flagValues(parsed.args, ["--base", "-B"]);
-		if ((base ?? defaultBranch) !== defaultBranch) continue;
-
 		if (CLOSE_KEYWORD_REFERENCE.test(bodyText)) continue;
 		if (hasExemptionDeclaration(bodyText)) continue;
+
+		const defaultBranch = getDefaultBranch();
+		const [base] = flagValues(parsed.args, ["--base", "-B"]);
+		if ((base ?? defaultBranch) !== defaultBranch) continue;
 
 		return {
 			decision: "ask",
@@ -104,7 +110,7 @@ export function evaluateClosesCreateGuard(
  * runRoadmapPublishGuard does. Malformed JSON produces no output — a crash in
  * this guard must not wedge every Bash call.
  * @param {string} inputText raw stdin payload
- * @param {{defaultBranch: string, readFile: (path: string) => string}} deps
+ * @param {{getDefaultBranch: () => string, readFile: (path: string) => string}} deps
  * @returns {{shouldOutput: boolean, output?: object}}
  */
 export function runClosesCreateGuard(inputText, deps) {
