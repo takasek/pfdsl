@@ -49,11 +49,12 @@ const issueNumbers = parsedIssues.numbers;
 // `base` comes from argv; naming the executable and arguments separately keeps
 // it out of a shell (#572).
 const sh = (file, args) => run(file, args, { cwd: root });
-// release-status prints its reasons to stdout and exits 1 on any pending
-// publish, so its stderr is captured rather than inherited: nothing it emits
-// there is breakage the operator needs to see interleaved (#814).
-const shTry = (file, args) =>
-	tryRun(file, args, { cwd: root, captureStderr: true });
+// stderr is left inherited, not captured: release-status warns there about a
+// distribution review it could not read at all, and that warning is the one
+// reading its stdout cannot carry. Capturing it would drop it — `run` returns
+// stdout alone — so it goes to the terminal while stdout becomes the report
+// (#814).
+const shTry = (file, args) => tryRun(file, args, { cwd: root });
 
 const result = await runCycleStatus({
 	sh,

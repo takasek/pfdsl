@@ -366,6 +366,14 @@ export function buildPreArtifactReminders(patterns) {
  * broken run, and the reason stays in the text it printed. Nothing here parses
  * that text: this is report material a person reads, and a parser would couple
  * the preflight to release-status's formatting for no judgment it makes.
+ *
+ * `needsAction` is release-status's exit code and nothing more, which is
+ * narrower than "`make release` would go through": that script's status is
+ * computed from the package version comparisons and the skill-bundle commit
+ * count alone, while release itself also refuses on a stale distribution
+ * review and on a spec-history entry that does not name the current version.
+ * Both of those do print into `report`, so the lines are the reading to trust
+ * and the boolean is only the cheapest part of it.
  * @param {{ok: boolean, out: string, status: number|null}} result - a tryRun result
  * @returns {{needsAction: boolean, report: string[]}}
  */
