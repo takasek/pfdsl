@@ -3,12 +3,7 @@
 // per file under .pfdsl/bindings/pfd-retro-patterns/; this is what reads them,
 // so that "consult the catalog" is a command rather than a 74KB file read.
 //
-// Usage:
-//   node scripts/retro-patterns.mjs tags
-//   node scripts/retro-patterns.mjs list
-//   node scripts/retro-patterns.mjs select [--tag <tag>]... [--word <word>]...
-//   node scripts/retro-patterns.mjs near --word <word>...
-//   node scripts/retro-patterns.mjs check
+// Run with no arguments to see usage.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
@@ -20,6 +15,7 @@ import { renderCommand } from "./lib/retro-patterns-render.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PATTERN_DIR = resolve(root, ".pfdsl/bindings/pfd-retro-patterns");
+const BINDING_PATH = resolve(root, ".pfdsl/bindings/pfd-retro.md");
 
 /**
  * Every pattern file's name and raw text, by filename.
@@ -61,6 +57,8 @@ if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 		const { text, ok } = renderCommand(command, rest, {
 			patterns: command === "check" ? undefined : loadPatterns(),
 			files: command === "check" ? loadPatternFiles() : undefined,
+			bindingText:
+				command === "check" ? readFileSync(BINDING_PATH, "utf8") : undefined,
 		});
 		if (ok) console.log(text);
 		else console.error(text);
