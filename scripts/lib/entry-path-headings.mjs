@@ -12,6 +12,8 @@
 // text would blind this check to its own subject. Only ATX headings are
 // examined; a setext heading would slip, and the repo carries none.
 
+import { isHeading } from "./markdown-heading.mjs";
+
 /** A leading slash that starts a command rather than continuing a path. */
 const COMMAND_RE = /(?:^|[^\w./-])\/([a-z][a-z0-9-]+)(?![\w./-])/;
 
@@ -30,7 +32,7 @@ export function findEntryPathHeadings(files) {
 				inFence = !inFence;
 				return;
 			}
-			if (inFence || !/^#{1,6}\s/.test(text)) return;
+			if (inFence || !isHeading(text)) return;
 			const m = COMMAND_RE.exec(text);
 			if (m) found.push({ path, line: i + 1, command: `/${m[1]}`, text });
 		});

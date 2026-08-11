@@ -5,6 +5,8 @@
  * lives in the main script; this module stays testable.
  */
 
+import { headingText, isHeading } from "./markdown-heading.mjs";
+
 const PATH_PREFIXES = ["docs", "\\.claude", "scripts", "packages"];
 const PREFIX_ALT = PATH_PREFIXES.join("|");
 const PATH_TOKEN_RE = new RegExp(`^(?:${PREFIX_ALT})/\\S*$`);
@@ -103,7 +105,7 @@ export function resolveCheckTarget(ref) {
 export function findMissingHeadings(text, requiredHeadings) {
 	const headingLines = stripFencedBlocks(text)
 		.split("\n")
-		.filter((line) => /^#{1,6}\s/.test(line))
-		.map((line) => line.replace(/^#{1,6}\s+/, "").trim());
+		.filter(isHeading)
+		.map(headingText);
 	return requiredHeadings.filter((h) => !headingLines.includes(h));
 }
