@@ -8,6 +8,7 @@ import {
 	groupTagsByAxis,
 	keyLinesOf,
 	loadPatternCatalog,
+	loadPatternCatalogOrThrow,
 	near,
 	parsePatternFile,
 	renderPatternFile,
@@ -579,5 +580,29 @@ describe("loadPatternCatalog", () => {
 			displayPath: (p) => `rel/${p.split("/").pop()}`,
 		});
 		assert.equal(patterns[0].path, "rel/a.md");
+	});
+
+	describe("loadPatternCatalogOrThrow", () => {
+		it("returns the patterns when every file parses", () => {
+			const patterns = loadPatternCatalogOrThrow(
+				"d",
+				fsOf({ "a.md": file("A"), "b.md": file("B") }),
+			);
+			assert.deepEqual(
+				patterns.map((p) => p.name),
+				["A", "B"],
+			);
+		});
+
+		it("throws with the per-file reasons when a file fails to parse", () => {
+			assert.throws(
+				() =>
+					loadPatternCatalogOrThrow(
+						"d",
+						fsOf({ "bad.md": "no fence here", "good.md": file("Good") }),
+					),
+				/d\/bad\.md: /,
+			);
+		});
 	});
 });
