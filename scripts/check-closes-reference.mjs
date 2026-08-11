@@ -85,5 +85,7 @@ if (result.status === "FAIL") {
 	);
 	console.error("the flow-sync workflow. Edit the PR body to include:");
 	console.error("  Closes #<issue number>");
+	console.error("\nIf this PR has no issue to close, declare why instead:");
+	console.error("  no-issue: <reason>");
 	process.exit(1);
 }

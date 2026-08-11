@@ -98,6 +98,6 @@ export function classifyClosesReference({
 	}
 	return {
 		status: "FAIL",
-		detail: `GitHub reads this PR as closing no issue; add "Closes #<n>" to the body, or declare a hotfix`,
+		detail: `GitHub reads this PR as closing no issue; add "Closes #<n>" to the body, declare a hotfix, or declare "no-issue: <reason>"`,
 	};
 }
