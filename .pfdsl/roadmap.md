@@ -145,28 +145,14 @@ guard は hook の payload だけを見る静的解析なので `git -C $W commi
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
 - [ ] `node scripts/pfdsl/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する。`gate-check.mjs` 実行時はその一部として自動実行される）
 
-**バージョン artifact を起こす契機**: 版を表す artifact（`spec_vXXX` / `cli_release_*` / `ext_vXXXX`）を roadmap に置く契機は次の2つに限る。
-どちらにも当たらない版は、実体が公開されていても roadmap には起こさない。
+**バージョン artifact を起こす契機と criteria の形**: 規定の一般形は pfd-ops SKILL.md のプロトコル5 (c)(d) が一次情報（#729 で昇格）。
+ここにはこのリポのインスタンス値だけを置く。
 
-1. **その版が後続プロセスをゲートする** — 版が上がらないと着手できないプロセスが roadmap にある
-2. **その版自体が納品物であり、roadmap 管理下の実装 artifact を消費する publish プロセスの出力である**
-
-spec 版は手段成果物であって納品物ではないため、1 にしか該当しえない。
-つまり spec の版が上がったこと自体は artifact を起こす理由にならない。
-npm・Marketplace の公開版は 2 に該当するが、roadmap 管理下の実装 artifact を含まない版（`flow:exempt` の修正のみで出た版等）は起こさない。
-
-この規定の帰結として、**roadmap の版チェーンが実体の現行版より古いことは、それ自体では欠陥ではない**。
-公開された版の履歴の一次情報は roadmap ではなく、spec は `docs/spec/spec-history.md`（`scripts/check-spec-history.mjs` が release 前に機械検査する）、npm は npm レジストリ、extension は Marketplace である。
-artifact の `criteria` が図に存在しない版番号に言及していても同じで（例: `boundary_feedback` の「spec v0.0.12 に統合済み」）、その版番号は上記の一次情報を指す外部参照として読む。
-`revises:` チェーンは起こした版どうしを繋ぐものであり、飛んだ版番号の存在は線形性の違反にならない。
-
-判定の実測は `pfdsl status blocked` / `status ready` で行う（版待ちのプロセスが実在するかを見る。「そのうち要るはず」で起こさない）。
-
-**版 artifact の criteria の形**: 版の公開は「最新版を返す手段」でなく「版一覧への包含」で書く。
-このリポの具体形は次の2つ。
-
-- npm: `npm view @pfdsl/cli versions に 0.0.11 が含まれる`
-- extension: `npx @vscode/vsce show takasek.pfdsl --json の versions に 0.0.14 が含まれる`
+- 対象ノード: `spec_vXXX` / `cli_release_*` / `ext_vXXXX`
+- 版履歴の一次情報: spec は `docs/spec/spec-history.md`（`scripts/check-spec-history.mjs` が release 前に機械検査する）、npm は npm レジストリ、extension は Marketplace
+- criteria の具体形: npm は `npm view @pfdsl/cli versions に 0.0.11 が含まれる`、extension は `npx @vscode/vsce show takasek.pfdsl --json の versions に 0.0.14 が含まれる`
+- 契機2 の除外: npm・Marketplace の公開版でも、roadmap 管理下の実装 artifact を含まない版（`flow:exempt` の修正のみで出た版等）は起こさない
+- artifact の `criteria` が図に存在しない版番号に言及していてもよい（例: `boundary_feedback` の「spec v0.0.12 に統合済み」）。その版番号は上の一次情報を指す外部参照として読む
 
 `npm show @pfdsl/cli version` / 「Marketplace の takasek.pfdsl version」は dist-tag `latest`（＝常に最新版）を返すため、最新版を指す1件を除いて文字どおり偽になる（#724）。
 `scripts/release-status.mjs` が使う gallery API 呼び出しは `flags: 514` + `pageSize: 1` で最新1件しか返さない — 同じ Marketplace を引く呼び方でも作用域が違うので、criteria の検証手段に流用しない。
