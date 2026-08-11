@@ -19,6 +19,8 @@ describe("trustsBuildOutput", () => {
 		"pnpm --filter @pfdsl/cli exec vitest run",
 		"npm test",
 		'node --test "scripts/lib/*.test.mjs"',
+		"node packages/cli/dist/cli.js graph stats foo.pfdsl",
+		"node packages/cli/dist/cli.js meta get x",
 	]) {
 		it(`flags ${command}`, () => {
 			assert.equal(trustsBuildOutput(command), true);
@@ -31,6 +33,7 @@ describe("trustsBuildOutput", () => {
 		"pnpm -r build",
 		"pnpm -r build && pnpm -r typecheck",
 		"pnpm -r build > /dev/null 2>&1; pnpm -r test",
+		"pnpm -r build && node packages/cli/dist/cli.js check",
 	]) {
 		it(`stays quiet for ${command}`, () => {
 			assert.equal(trustsBuildOutput(command), false);
