@@ -277,6 +277,7 @@ export async function runCycleStatus({
 					matchedLines: classification.matchedLines ?? [],
 					optionCount: classification.optionCount ?? 0,
 					record: classification.record ?? null,
+					recordRequired: classification.recordRequired,
 				});
 			} catch (e) {
 				designUnsettledError = e.message;

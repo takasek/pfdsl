@@ -301,6 +301,7 @@ describe("classifyDesignSettlement", () => {
 		assert.equal(result.unsettled, true);
 		assert.equal(result.reason, "phrase");
 		assert.deepEqual(result.matchedLines, ["設計未確定な点がある。"]);
+		assert.equal(result.recordRequired, true);
 	});
 
 	it("reports settled when a design-selection record was posted", () => {
@@ -316,6 +317,7 @@ describe("classifyDesignSettlement", () => {
 		assert.equal(result.unsettled, false);
 		assert.equal(result.reason, "record-posted");
 		assert.deepEqual(result.record, { createdAt: "2026-01-01T00:00:00Z" });
+		assert.equal(result.recordRequired, false);
 	});
 
 	it("fills record.createdAt from the issue's own createdAt when the body is the record", () => {
@@ -326,6 +328,7 @@ describe("classifyDesignSettlement", () => {
 		});
 		assert.equal(result.reason, "record-posted");
 		assert.deepEqual(result.record, { createdAt: "2026-01-01T00:00:00Z" });
+		assert.equal(result.recordRequired, false);
 	});
 
 	it("reports unsettled when options are enumerated and no record was posted", () => {
@@ -336,17 +339,19 @@ describe("classifyDesignSettlement", () => {
 		assert.equal(result.unsettled, true);
 		assert.equal(result.reason, "enumerated-options-without-record");
 		assert.equal(result.optionCount, 2);
+		assert.equal(result.recordRequired, true);
 	});
 
-	it("reports settled with no-enumerated-options when nothing indicates unsettled design", () => {
+	it("reports unsettled with no-enumerated-options when nothing indicates unsettled design", () => {
 		assert.deepEqual(
 			classifyDesignSettlement({
 				body: "普通の説明文。",
 				comments: [],
 			}),
 			{
-				unsettled: false,
+				unsettled: true,
 				reason: "no-enumerated-options",
+				recordRequired: true,
 			},
 		);
 	});

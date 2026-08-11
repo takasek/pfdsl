@@ -309,11 +309,12 @@ describe("runCycleStatus", () => {
 			{
 				issue: 669,
 				source: "flag",
-				unsettled: false,
+				unsettled: true,
 				reason: "no-enumerated-options",
 				matchedLines: [],
 				optionCount: 0,
 				record: null,
+				recordRequired: true,
 			},
 		]);
 		assert.equal(result.designUnsettledError, undefined);
@@ -343,6 +344,7 @@ describe("runCycleStatus", () => {
 		assert.equal(result.designUnsettledFor[0].source, "best-process");
 		assert.equal(result.designUnsettledFor[0].unsettled, true);
 		assert.equal(result.designUnsettledFor[0].reason, "phrase");
+		assert.equal(result.designUnsettledFor[0].recordRequired, true);
 	});
 
 	it("judges every issue the cycle closes, not just the first", async () => {
@@ -362,7 +364,7 @@ describe("runCycleStatus", () => {
 		assert.deepEqual(
 			result.designUnsettledFor.map((d) => [d.issue, d.unsettled]),
 			[
-				[667, false],
+				[667, true],
 				[668, true],
 			],
 		);
