@@ -145,28 +145,24 @@ guard は hook の payload だけを見る静的解析なので `git -C $W commi
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
 - [ ] `node scripts/pfdsl/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する。`gate-check.mjs` 実行時はその一部として自動実行される）
 
-**バージョン artifact を起こす契機**: 版を表す artifact（`spec_vXXX` / `cli_release_*` / `ext_vXXXX`）を roadmap に置く契機は次の2つに限る。
-どちらにも当たらない版は、実体が公開されていても roadmap には起こさない。
+**バージョン artifact を起こす契機と criteria の形**: 規定の一般形は `.claude/skills/pfd-ops/SKILL.md` の「運用プロトコル」5（成果物の門番）にある2項目「版 artifact を起こす契機」「版 artifact の criteria は版一覧への包含で書く」が一次情報（#729 で昇格）。
+ここにはこのリポのインスタンス値だけを置く。
 
-1. **その版が後続プロセスをゲートする** — 版が上がらないと着手できないプロセスが roadmap にある
-2. **その版自体が納品物であり、roadmap 管理下の実装 artifact を消費する publish プロセスの出力である**
+- 対象ノード: `spec_vXXX` / `cli_release_*` / `ext_vXXXX`
+- 版履歴の一次情報: spec は `docs/spec/spec-history.md`（`scripts/check-spec-history.mjs` が release 前に機械検査する）、npm は npm レジストリ、extension は Marketplace
+- criteria の具体形: npm は `npm view @pfdsl/cli versions に 0.0.11 が含まれる`、extension は `npx @vscode/vsce show takasek.pfdsl --json の versions に 0.0.14 が含まれる`
+- 契機2 の除外: npm・Marketplace の公開版でも、roadmap 管理下の実装 artifact を含まない版（`flow:exempt` の修正のみで出た版等）は起こさない
+- artifact の `criteria` が図に存在しない版番号に言及していてもよい（例: `boundary_feedback` の「spec v0.0.12 に統合済み」）。その版番号は上の一次情報を指す外部参照として読む
 
-spec 版は手段成果物であって納品物ではないため、1 にしか該当しえない。
-つまり spec の版が上がったこと自体は artifact を起こす理由にならない。
-npm・Marketplace の公開版は 2 に該当するが、roadmap 管理下の実装 artifact を含まない版（`flow:exempt` の修正のみで出た版等）は起こさない。
-
-この規定の帰結として、**roadmap の版チェーンが実体の現行版より古いことは、それ自体では欠陥ではない**。
-公開された版の履歴の一次情報は roadmap ではなく、spec は `docs/spec/spec-history.md`（`scripts/check-spec-history.mjs` が release 前に機械検査する）、npm は npm レジストリ、extension は Marketplace である。
-artifact の `criteria` が図に存在しない版番号に言及していても同じで（例: `boundary_feedback` の「spec v0.0.12 に統合済み」）、その版番号は上記の一次情報を指す外部参照として読む。
-`revises:` チェーンは起こした版どうしを繋ぐものであり、飛んだ版番号の存在は線形性の違反にならない。
-
-判定の実測は `pfdsl status blocked` / `status ready` で行う（版待ちのプロセスが実在するかを見る。「そのうち要るはず」で起こさない）。
+`npm show @pfdsl/cli version` / 「Marketplace の takasek.pfdsl version」は dist-tag `latest`（＝常に最新版）を返すため、最新版を指す1件を除いて文字どおり偽になる（#724）。
+`scripts/release-status.mjs` が使う gallery API 呼び出しは `flags: 514` + `pageSize: 1` で最新1件しか返さない — 同じ Marketplace を引く呼び方でも作用域が違うので、criteria の検証手段に流用しない。
 
 **spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact（spec_v007 / spec_v008 / spec_v009 等）は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
 
-**spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際は、前バージョンの spec artifact への `revises:` を新バージョン artifact に設定する（例: `spec_v0011.revises: spec_v0010`）。`>>?` フィードバック入力は使わない — V011（strict mode の feedback 到達性検査）は `>>?` を前方到達可能な修正ループとして検査するが、版の前後関係はそれに当たらず誤検出になる（#480 で `spec_v006 >>? integrate_spec` 等を `revises:` に置き換えて解消）。
+**spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際は、前バージョンの spec artifact への `revises:` を新バージョン artifact に設定する（例: `spec_v0011.revises: spec_v009`）。
+起こしていない版を飛ばして繋いでよい（#725 で `spec_v0010` を削除した結果が現にこの形）。`>>?` フィードバック入力は使わない — V011（strict mode の feedback 到達性検査）は `>>?` を前方到達可能な修正ループとして検査するが、版の前後関係はそれに当たらず誤検出になる（#480 で `spec_v006 >>? integrate_spec` 等を `revises:` に置き換えて解消）。
 
-**`integrate_spec_vXXX` の入力列挙**: `integrate_spec_vXXX` の通常入力には、そのバージョンで spec に統合される全ての変更を引き起こした artifact を列挙する。「実装が完了した artifact のうち、未統合のもの」を漏らさず書く（例: basepath と ready_cmd の両方が v0.0.10 の変更点なら `[basepath, ready_cmd] >> integrate_spec_v0010`）。
+**`integrate_spec_vXXX` の入力列挙**: `integrate_spec_vXXX` の通常入力には、そのバージョンで spec に統合される全ての変更を引き起こした artifact を列挙する。「実装が完了した artifact のうち、未統合のもの」を漏らさず書く（例: blocked_by と type_field と w002_hierarchy の3つが v0.0.11 の変更点なら `[blocked_by, type_field, w002_hierarchy] >> integrate_spec_v0011`）。
 
 **publish_cli_vXXXX の入力列挙**: そのバージョンに含まれる全実装 artifact を入力として列挙する。実装 artifact の追加と同一サイクルで publish の入力集合も更新する（後回しにすると artifact が publish チェーンから切れる）。
 
