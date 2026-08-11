@@ -49,6 +49,11 @@
             "type": "command",
             "command": "node scripts/verification-tree-guard.mjs",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/closes-create-guard.mjs",
+            "timeout": 10
           }
         ]
       },
