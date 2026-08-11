@@ -1,5 +1,6 @@
 ---
 tags: [target:issue, method:respond-review]
+phase: pre-artifact
 ---
 
 - **findings を受け手のトリアージ単位より細かく割る trap**: 監査・レビュー・プローブが出した findings は、1件ずつ独立した欠陥として書けるため、そのまま1件1 issue へ落とせてしまう。

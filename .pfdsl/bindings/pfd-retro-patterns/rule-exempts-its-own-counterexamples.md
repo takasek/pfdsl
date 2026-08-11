@@ -1,5 +1,6 @@
 ---
 tags: [target:prose-doc, method:codify-rule]
+phase: pre-artifact
 ---
 
 - **規定が自分の反例を免除する trap**: 規定を新設・昇格したサイクルで既存の現物がその規定に反していると、規定の側に「既存分は遡及適用しない」という免除条項を書いて食い違いを解消したくなる。

@@ -1,5 +1,6 @@
 ---
 tags: [target:scratch-file, context:parallel-work]
+phase: pre-artifact
 ---
 
 - **隔離機構の外側にある共有スクラッチ trap**: 並行セッションの干渉対策として worktree を切っても、隔離されるのはリポジトリのツリーだけで、`/tmp` のような**リポ外の書き込み先は全セッションで共有されたまま**である。

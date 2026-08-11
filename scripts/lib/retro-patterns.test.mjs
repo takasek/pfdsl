@@ -4,8 +4,10 @@ import {
 	ALWAYS_TAG,
 	checkPatternFile,
 	collectTags,
+	counterLineOf,
 	groupTagsByAxis,
 	keyLinesOf,
+	loadPatternCatalog,
 	near,
 	parsePatternFile,
 	renderPatternFile,
@@ -45,6 +47,50 @@ describe("pattern files", () => {
 	it("reports an empty tag list rather than omitting the field", () => {
 		const untagged = { ...pattern, tags: [] };
 		assert.deepEqual(parsePatternFile(renderPatternFile(untagged)).tags, []);
+	});
+
+	it("omits the phase line when the pattern carries no phase", () => {
+		assert.equal(
+			renderPatternFile(pattern),
+			[
+				"---",
+				"tags: [delegation, parallel-work]",
+				"---",
+				"",
+				"- **並行委譲の接合部**: 冒頭の一文。",
+				"  続きの行。",
+				"",
+			].join("\n"),
+		);
+	});
+
+	it("renders phase after tags when the pattern carries one", () => {
+		const phased = { ...pattern, phase: "pre-artifact" };
+		assert.equal(
+			renderPatternFile(phased),
+			[
+				"---",
+				"tags: [delegation, parallel-work]",
+				"phase: pre-artifact",
+				"---",
+				"",
+				"- **並行委譲の接合部**: 冒頭の一文。",
+				"  続きの行。",
+				"",
+			].join("\n"),
+		);
+	});
+
+	it("reads phase back from a file that carries one", () => {
+		const phased = { ...pattern, phase: "pre-artifact" };
+		assert.equal(
+			parsePatternFile(renderPatternFile(phased)).phase,
+			"pre-artifact",
+		);
+	});
+
+	it("reads back undefined phase for a file with no phase line", () => {
+		assert.equal(parsePatternFile(renderPatternFile(pattern)).phase, undefined);
 	});
 });
 
@@ -109,6 +155,30 @@ describe("summaryOf", () => {
 
 	it("falls back to the whole bullet when it has no sentence end", () => {
 		assert.equal(summaryOf("- **名前**: 句点のない一行"), "句点のない一行");
+	});
+});
+
+describe("counterLineOf", () => {
+	it("takes the first 対策 line's text, trimmed, label removed", () => {
+		const body = [
+			"- **名前**: 冒頭の一文。",
+			"  具体例: これは例。",
+			"  対策: 書く前に確認する。",
+		].join("\n");
+		assert.equal(counterLineOf(body), "書く前に確認する。");
+	});
+
+	it("takes the first 対策 line when a pattern has more than one", () => {
+		const body = [
+			"- **名前**: 冒頭の一文。",
+			"  対策: 一つ目。",
+			"  対策の追加: 二つ目。",
+		].join("\n");
+		assert.equal(counterLineOf(body), "一つ目。");
+	});
+
+	it("returns undefined for a pattern with no 対策 line", () => {
+		assert.equal(counterLineOf("- **名前**: 冒頭の一文だけ。"), undefined);
 	});
 });
 
@@ -430,5 +500,84 @@ describe("checkPatternFile", () => {
 			text: driftedTags,
 		});
 		assert.match(reason, /does not round-trip/);
+	});
+
+	it("reports a countermeasure phrased as effective before something, with no phase declared", () => {
+		const undeclared = renderPatternFile({
+			tags: ["method:delegate"],
+			body: "- **並行委譲の接合部**: 冒頭の一文。\n  対策: 書く前に確認する。",
+		});
+		const [reason] = checkPatternFile({
+			name: "parallel-delegation-seam",
+			text: undeclared,
+		});
+		assert.match(reason, /phase/);
+	});
+
+	it("does not report a countermeasure phrased that way when phase is declared", () => {
+		const declared = renderPatternFile({
+			tags: ["method:delegate"],
+			phase: "pre-artifact",
+			body: "- **並行委譲の接合部**: 冒頭の一文。\n  対策: 書く前に確認する。",
+		});
+		assert.deepEqual(
+			checkPatternFile({ name: "parallel-delegation-seam", text: declared }),
+			[],
+		);
+	});
+
+	it("does not report a countermeasure with no before-something phrasing", () => {
+		assert.deepEqual(
+			checkPatternFile({ name: "parallel-delegation-seam", text: valid }),
+			[],
+		);
+	});
+});
+
+describe("loadPatternCatalog", () => {
+	const file = (name) => `---\ntags: [a]\n---\n\n- **${name}**: 冒頭。\n`;
+
+	/** @param {Record<string, string>} tree */
+	function fsOf(tree) {
+		return {
+			readdirSync: () => Object.keys(tree),
+			readFileSync: (p) => {
+				const text = tree[p.split("/").pop()];
+				if (text === undefined) throw new Error(`ENOENT: ${p}`);
+				return text;
+			},
+		};
+	}
+
+	it("returns the patterns in filename order, whatever order the directory gives", () => {
+		const { patterns, errors } = loadPatternCatalog(
+			"d",
+			fsOf({ "b.md": file("B"), "a.md": file("A") }),
+		);
+		assert.deepEqual(
+			patterns.map((p) => p.name),
+			["A", "B"],
+		);
+		assert.deepEqual(errors, []);
+	});
+
+	it("isolates a malformed file to itself instead of losing the rest", () => {
+		const { patterns, errors } = loadPatternCatalog("d", {
+			...fsOf({ "bad.md": "no fence here", "good.md": file("Good") }),
+		});
+		assert.deepEqual(
+			patterns.map((p) => p.name),
+			["Good"],
+		);
+		assert.equal(errors.length, 1);
+		assert.match(errors[0], /^d\/bad\.md: /);
+	});
+
+	it("labels each pattern with the display path the caller asks for", () => {
+		const { patterns } = loadPatternCatalog("d", {
+			...fsOf({ "a.md": file("A") }),
+			displayPath: (p) => `rel/${p.split("/").pop()}`,
+		});
+		assert.equal(patterns[0].path, "rel/a.md");
 	});
 });

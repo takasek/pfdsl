@@ -1,5 +1,6 @@
 ---
 tags: [target:prose-doc, method:delegate]
+phase: pre-artifact
 ---
 
 - **委譲ブリーフの片肺 trap**: companion `.md` の記述更新を委譲するとき、同じ事実を述べる sibling `.pfdsl` のノード description をブリーフに含めないと、委譲先は指示された `.md` 側だけを直して戻る。

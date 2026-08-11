@@ -1,5 +1,6 @@
 ---
 tags: [target:check-script, target:pr]
+phase: pre-artifact
 ---
 
 - **記録の時点照合がブランチを作業単位とみなす trap**: 着手前の記録を求めるゲートは「記録の投稿時刻がブランチの最初のコミットより前か」で照合する。
