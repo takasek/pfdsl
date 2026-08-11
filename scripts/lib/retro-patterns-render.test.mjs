@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { ALWAYS_TAG } from "./retro-patterns.mjs";
 import {
+	checkBindingUsage,
 	parseQuery,
 	parseWords,
 	renderCheck,
@@ -10,6 +11,8 @@ import {
 	renderPattern,
 	renderSelection,
 	renderTags,
+	SUBCOMMANDS,
+	usageText,
 } from "./retro-patterns-render.mjs";
 
 describe("renderPattern", () => {
@@ -197,6 +200,89 @@ describe("parseQuery / parseWords", () => {
 	});
 });
 
+describe("SUBCOMMANDS / usageText", () => {
+	it("names every subcommand once, in usage order", () => {
+		assert.deepEqual(
+			SUBCOMMANDS.map((s) => s.name),
+			["tags", "list", "select", "near", "check"],
+		);
+	});
+
+	it("lists one usage line per subcommand, with its argument shape", () => {
+		const text = usageText();
+		assert.match(text, /retro-patterns\.mjs tags\n/);
+		assert.match(text, /retro-patterns\.mjs list\n/);
+		assert.match(
+			text,
+			/retro-patterns\.mjs select \[--tag <tag>\]\.\.\. \[--word <word>\]\.\.\./,
+		);
+		assert.match(text, /retro-patterns\.mjs near --word <word>\.\.\./);
+		assert.match(text, /retro-patterns\.mjs check$/);
+	});
+});
+
+describe("checkBindingUsage", () => {
+	const definitions = [
+		{ name: "tags", options: [] },
+		{ name: "select", options: ["tag", "word"] },
+	];
+
+	it("reports nothing when the binding's names and options match the definitions", () => {
+		const binding = [
+			"```bash",
+			"node scripts/retro-patterns.mjs tags",
+			"node scripts/retro-patterns.mjs select --tag <tag> --word <word>",
+			"```",
+		].join("\n");
+		assert.deepEqual(checkBindingUsage(binding, definitions), []);
+	});
+
+	it("reports a subcommand the binding shows that no definition declares", () => {
+		const binding = [
+			"```bash",
+			"node scripts/retro-patterns.mjs tags",
+			"node scripts/retro-patterns.mjs select --tag <tag> --word <word>",
+			"node scripts/retro-patterns.mjs near --word <word>",
+			"```",
+		].join("\n");
+		const violations = checkBindingUsage(binding, definitions);
+		assert.ok(violations.some((v) => v.includes("near")));
+	});
+
+	it("reports a subcommand a definition declares that the binding never shows", () => {
+		const binding = [
+			"```bash",
+			"node scripts/retro-patterns.mjs tags",
+			"```",
+		].join("\n");
+		const violations = checkBindingUsage(binding, definitions);
+		assert.ok(violations.some((v) => v.includes("select")));
+	});
+
+	it("reports an option renamed in the definitions but not in the binding", () => {
+		const binding = [
+			"```bash",
+			"node scripts/retro-patterns.mjs tags",
+			"node scripts/retro-patterns.mjs select --tag <tag> --word <word>",
+			"```",
+		].join("\n");
+		const renamed = [
+			{ name: "tags", options: [] },
+			{ name: "select", options: ["tag", "words"] },
+		];
+		const violations = checkBindingUsage(binding, renamed);
+		assert.ok(violations.some((v) => v.includes("words")));
+	});
+
+	it("ignores lines outside a bash code block", () => {
+		const binding =
+			"node scripts/retro-patterns.mjs near --word <word>\n\n```bash\nnode scripts/retro-patterns.mjs tags\n```";
+		const violations = checkBindingUsage(binding, definitions);
+		assert.ok(violations.some((v) => v.includes("select")));
+		assert.ok(!violations.some((v) => v.includes("near")));
+	});
+});
+
 describe("renderCommand", () => {
 	const patterns = [
 		{
@@ -213,6 +299,14 @@ describe("renderCommand", () => {
 			text: "---\ntags: [a]\n---\n\n- **X**: 冒頭。\n",
 		},
 	];
+	const bindingText = [
+		"```bash",
+		...SUBCOMMANDS.map((s) =>
+			`node scripts/retro-patterns.mjs ${s.name} ${s.options.map((o) => `--${o} <${o}>`).join(" ")}`.trimEnd(),
+		),
+		"```",
+	].join("\n");
+
 	it("dispatches tags to the tags heading", () => {
 		const tagged = [{ ...patterns[0], tags: ["target:doc"] }];
 		const { text, ok } = renderCommand("tags", [], { patterns: tagged });
@@ -249,15 +343,23 @@ describe("renderCommand", () => {
 		);
 	});
 
-	it("dispatches check to the file report and is ok when every file is clean", () => {
-		const { text, ok } = renderCommand("check", [], { files });
+	it("dispatches check to the file/binding report and is ok when both are clean", () => {
+		const { text, ok } = renderCommand("check", [], { files, bindingText });
 		assert.equal(ok, true);
 		assert.equal(text, "1 pattern file(s), no violations.");
 	});
 
 	it("check is not ok when a file has a violation", () => {
 		const badFiles = [{ path: "bad.md", name: "bad", text: "no fence here" }];
-		const { ok } = renderCommand("check", [], { files: badFiles });
+		const { ok } = renderCommand("check", [], { files: badFiles, bindingText });
+		assert.equal(ok, false);
+	});
+
+	it("check is not ok when the binding disagrees with the definitions", () => {
+		const { ok } = renderCommand("check", [], {
+			files,
+			bindingText: "```bash\nnode scripts/retro-patterns.mjs tags\n```",
+		});
 		assert.equal(ok, false);
 	});
 

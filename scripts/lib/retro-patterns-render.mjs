@@ -154,6 +154,52 @@ export function renderCheck(files) {
 }
 
 /**
+ * The one place a subcommand's name, its argument shape, and the long
+ * option names `parseArgs` must accept are declared together (#810). Usage
+ * text, the `parseArgs` options passed to it, and `check`'s binding
+ * cross-check are all generated from this, so a subcommand or option can't
+ * drift between the three separate listings this replaces (the header
+ * comment, the usage error message, and the binding's own bash examples).
+ * @type {{name: string, argsUsage: string, options: string[]}[]}
+ */
+export const SUBCOMMANDS = [
+	{ name: "tags", argsUsage: "", options: [] },
+	{ name: "list", argsUsage: "", options: [] },
+	{
+		name: "select",
+		argsUsage: "[--tag <tag>]... [--word <word>]...",
+		options: ["tag", "word"],
+	},
+	{ name: "near", argsUsage: "--word <word>...", options: ["word"] },
+	{ name: "check", argsUsage: "", options: [] },
+];
+
+/** @returns {string} */
+export function usageText() {
+	const lines = ["usage:"];
+	for (const { name, argsUsage } of SUBCOMMANDS)
+		lines.push(
+			`  node scripts/retro-patterns.mjs ${name}${argsUsage ? ` ${argsUsage}` : ""}`,
+		);
+	return lines.join("\n");
+}
+
+/**
+ * The `parseArgs` `options` for every long option any subcommand declares.
+ * One shared shape rather than one per subcommand: `select` and `near` both
+ * parse through `parseQuery`, and `near` needs `--tag` recognized (not
+ * rejected as "unknown option") so it can reject it itself with a
+ * subcommand-specific message ("near takes no --tag").
+ * @returns {Record<string, {type: "string", multiple: true}>}
+ */
+function parseArgsOptions() {
+	const names = new Set(SUBCOMMANDS.flatMap((s) => s.options));
+	return Object.fromEntries(
+		[...names].map((n) => [n, { type: "string", multiple: true }]),
+	);
+}
+
+/**
  * Repeated `--tag` / `--word` options. Strict parsing, not a hand-rolled
  * argv walk: a walk that only recognizes the bare `--flag value` form drops
  * the `--flag=value` spelling silently and calls it done rather than an
@@ -165,10 +211,7 @@ export function renderCheck(files) {
 export function parseQuery(argv) {
 	const { values } = parseArgs({
 		args: argv,
-		options: {
-			tag: { type: "string", multiple: true },
-			word: { type: "string", multiple: true },
-		},
+		options: parseArgsOptions(),
 		strict: true,
 		allowPositionals: false,
 	});
@@ -190,6 +233,96 @@ export function parseWords(argv) {
 	return words;
 }
 
+/** A fenced ```bash ... ``` block's contents. */
+const BASH_BLOCK = /```bash\n([\s\S]*?)```/g;
+
+/** A binding line invoking this CLI, capturing the subcommand name. */
+const INVOCATION_LINE = /^node scripts\/retro-patterns\.mjs\s+(\S+)(.*)$/;
+
+/** A long option token, e.g. `--tag`, capturing the name without its dashes. */
+const LONG_OPTION = /--([a-z][a-z-]*)/g;
+
+/**
+ * The subcommand names and long option names a binding's bash examples
+ * actually show.
+ * @param {string} bindingText
+ * @returns {{names: Set<string>, options: Set<string>}}
+ */
+function extractBindingUsage(bindingText) {
+	const names = new Set();
+	const options = new Set();
+	for (const [, block] of bindingText.matchAll(BASH_BLOCK)) {
+		for (const rawLine of block.split("\n")) {
+			const line = rawLine.split("#")[0];
+			const m = INVOCATION_LINE.exec(line);
+			if (!m) continue;
+			names.add(m[1]);
+			for (const [, opt] of line.matchAll(LONG_OPTION)) options.add(opt);
+		}
+	}
+	return { names, options };
+}
+
+/**
+ * Where a binding's bash examples and the subcommand definitions disagree,
+ * in either direction: a name or option the binding shows that no
+ * definition declares, or one a definition declares that the binding never
+ * shows. Checking options as well as names catches a rename (`--word` →
+ * `--words`) that a name-only diff would miss — the binding would still name
+ * the right subcommand, and only a reader who copies its example would hit
+ * `unknown option` at run time (#810).
+ * @param {string} bindingText
+ * @param {{name: string, options: string[]}[]} definitions
+ * @returns {string[]}
+ */
+export function checkBindingUsage(bindingText, definitions) {
+	const { names: bindingNames, options: bindingOptions } =
+		extractBindingUsage(bindingText);
+	const definedNames = new Set(definitions.map((d) => d.name));
+	const definedOptions = new Set(definitions.flatMap((d) => d.options));
+
+	const violations = [];
+	for (const name of bindingNames)
+		if (!definedNames.has(name))
+			violations.push(
+				`binding shows subcommand "${name}" that no definition declares`,
+			);
+	for (const name of definedNames)
+		if (!bindingNames.has(name))
+			violations.push(
+				`definitions declare subcommand "${name}" that the binding never shows`,
+			);
+	for (const opt of bindingOptions)
+		if (!definedOptions.has(opt))
+			violations.push(`binding uses --${opt} that no definition declares`);
+	for (const opt of definedOptions)
+		if (!bindingOptions.has(opt))
+			violations.push(
+				`definitions declare --${opt} that the binding never shows`,
+			);
+	return violations;
+}
+
+/**
+ * `check`'s full report: pattern file violations (renderCheck) plus the
+ * binding cross-check (checkBindingUsage), combined into one text and one
+ * ok flag. When both are clean the text is renderCheck's own summary line
+ * unchanged — the binding check adds nothing to see when it finds nothing.
+ * @param {{path: string, name: string, text: string}[]} files
+ * @param {string} bindingText
+ * @returns {{text: string, ok: boolean}}
+ */
+function renderCheckCommand(files, bindingText) {
+	const { text: fileText, clean: filesClean } = renderCheck(files);
+	const bindingViolations = checkBindingUsage(bindingText, SUBCOMMANDS);
+	const ok = filesClean && bindingViolations.length === 0;
+	if (ok) return { text: fileText, ok: true };
+	const lines = [];
+	if (!filesClean) lines.push(fileText);
+	lines.push(...bindingViolations);
+	return { text: lines.join("\n"), ok: false };
+}
+
 /**
  * The sole binding of a subcommand name to the render function that answers
  * it. Kept as one function precisely so a mistake here — near wired to
@@ -197,14 +330,11 @@ export function parseWords(argv) {
  * came back, rather than only in a human reading the terminal (#820).
  * @param {string | undefined} command
  * @param {string[]} argv
- * @param {{patterns?: {name: string, tags: string[], body: string, path: string}[], files?: {path: string, name: string, text: string}[]}} ctx
+ * @param {{patterns?: {name: string, tags: string[], body: string, path: string}[], files?: {path: string, name: string, text: string}[], bindingText?: string}} ctx
  * @returns {{text: string, ok: boolean}}
  */
-export function renderCommand(command, argv, { patterns, files }) {
-	if (command === "check") {
-		const { text, clean } = renderCheck(files);
-		return { text, ok: clean };
-	}
+export function renderCommand(command, argv, { patterns, files, bindingText }) {
+	if (command === "check") return renderCheckCommand(files, bindingText);
 	if (command === "tags") return { text: renderTags(patterns), ok: true };
 	if (command === "list")
 		return { text: patterns.map((p) => renderPattern(p)).join("\n"), ok: true };
@@ -216,8 +346,5 @@ export function renderCommand(command, argv, { patterns, files }) {
 			throw new Error("near requires at least one --word");
 		return { text: renderNear(patterns, words), ok: true };
 	}
-	return {
-		text: "usage: retro-patterns.mjs tags | list | select [...] | near --word <word>... | check",
-		ok: false,
-	};
+	return { text: usageText(), ok: false };
 }
