@@ -6,8 +6,8 @@
 
 - **エッジ実在性**: README はサンプル描画物から書かれず、リンクのみ
 - **駆動源**: issue 起票の駆動源は対話で、レビュー知見は `>>?`
-- **名前の一般化水準**: `cli_tool` → 実際は `packages/` 全体 = toolchain
-- **偽の不変性**: 仕様書は実装知見の issue 経由で改訂される → maintain プロセスが要る。同型で、スキル成果物のうち一部だけが `distill_ops` の出力として更新経路を持ち他は open input のまま残る非対称が起きる（`pfd_lens_agent`）。`status: done` の external input が実際には進み続けている場合、後続が依存するのは版でなく存在であることと現行版の一次情報の所在を description に書いて解消する（`adr_corpus` / `cli_tool`）
+- **名前の一般化水準**: roadmap の `cli_tool` → 実際は `packages/` 全体 = toolchain（#783 で `toolchain` へ改名し `location` を `../packages/` へ広げ、workflow.pfdsl の同名ノードと粒度を揃えた）
+- **偽の不変性**: 仕様書は実装知見の issue 経由で改訂される → maintain プロセスが要る。同型で、スキル成果物のうち一部だけが `distill_ops` の出力として更新経路を持ち他は open input のまま残る非対称が起きる（`pfd_lens_agent`）。`status: done` の external input が実際には進み続けている場合、後続が依存するのは版でなく存在であることと現行版の一次情報の所在を description に書いて解消する（`adr_corpus` / `toolchain`）
 - **入力充足**: 修正開発に `base_code`・PoC が欠落、ADR 起草に参照図が欠落 → ID 捏造が発生。プロセスの description が集約対象として名指しする素材が artifact 化されておらず入力エッジに現れない形も同型（`gen_plugin` の `.claude/commands/pfd-*.md`・`.claude/agents/pfd-lens.md`）。description が既存出力の読み返しを述べるのに入力エッジが無い場合、通常入力は循環になるため `>>?` で表す（`deploy_install_layer` の `installed_l3_layer`）
 - **status 単調性**: `check` の W003 が機械検出する
 - **同種対称性**: `published_cli` が持つ全消費エッジを `published_libraries` も持つか。`quality_guide` 新設時に `findings.criteria` の反映先列挙への追随が漏れた（読み直しで検出、2026-07-08）。`grill_skill`（#481）追加時も同型の見落としを検出（対策は `.pfdsl/workflow.md`「配布スキルの新規追加時の横断照合」参照、2026-07-19）

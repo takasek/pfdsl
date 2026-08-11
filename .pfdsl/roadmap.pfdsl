@@ -17,12 +17,12 @@ artifact:
     description: docs/examples の執筆・レビューで得た品質知見
     status: done
     criteria: skill_template または adr_corpus への反映が確認済み
-  cli_tool:
-    label: CLI 実装（現行）
-    description: 後続プロセスが前提にするのは「CLI が存在すること」であって特定の版ではない。現行版は cli_release_* チェーンを経て進み続けており、公開版の一次情報は npm レジストリ（ここに版数を書かない — ドリフトするため）
+  toolchain:
+    label: ツールチェーン実装（現行）
+    description: packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）全体。後続プロセスが前提にするのは「実装が存在すること」であって特定の版ではない。現行版は cli_release_* チェーンを経て進み続けており、公開版の一次情報は npm レジストリ（ここに版数を書かない — ドリフトするため）。名前と粒度は workflow.pfdsl の toolchain に揃えてある（#783）
     status: done
     criteria: check/fmt/graph が全サンプルに対してエラーなし、npm 公開済み
-    location: ../packages/cli/
+    location: ../packages/
   skill_gen:
     label: スキル生成系（現行）
     description: scripts/gen-skill.mjs と docs/samples 構成。identity は check-gen-plugin.yml が CI 強制
@@ -691,7 +691,7 @@ spec_v006 >> write_design_notes -> design_notes
 
 [criteria_spec, design_notes, external_stakeholders_spec, location_spec, revises_spec] >> integrate_spec -> spec_v007
 
-[cli_tool, findings_r12, spec_v006] >> implement_lints -> lint_checker
+[findings_r12, spec_v006, toolchain] >> implement_lints -> lint_checker
 
 [lint_checker, spec_v007] >> implement_spec_features -> featured_toolchain
 
@@ -701,17 +701,17 @@ spec_v006 >> write_design_notes -> design_notes
 
 skill_gen >> restructure_skillgen -> restructured_gen
 
-cli_tool >> publish_cli_bootstrap -> cli_release_bootstrap
+toolchain >> publish_cli_bootstrap -> cli_release_bootstrap
 
-cli_tool >> layer_audit_assets -> audit_distribution
+toolchain >> layer_audit_assets -> audit_distribution
 
 adr_corpus >> i12_write_article -> article
 
-cli_tool >> i3_build_obsidian_plugin -> obsidian_plugin
+toolchain >> i3_build_obsidian_plugin -> obsidian_plugin
 
 spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
 
-cli_tool >> i119_publish_extension -> published_extension
+toolchain >> i119_publish_extension -> published_extension
 
 cli_release_bootstrap >> implement_json_output -> json_output
 cli_release_bootstrap >> implement_no_color -> no_color
@@ -792,7 +792,7 @@ cli_release_ansi_color >> i480_relax_incomplete_graph -> incomplete_tolerance
 incomplete_tolerance >> i481_create_grill_skill -> grill_skill
 [field_get_cmd, graph_analysis, incomplete_tolerance, v011_semantics, grill_skill] >> publish_cli_tolerance_query -> cli_release_tolerance_query
 
-cli_tool >> i592_cst_frontmatter -> frontmatter_cst_impl
+toolchain >> i592_cst_frontmatter -> frontmatter_cst_impl
 frontmatter_cst_impl >> publish_cli_frontmatter_cst -> cli_release_frontmatter_cst
 
 ext_v0015 >> i482_implement_editor_connector -> editor_connector
