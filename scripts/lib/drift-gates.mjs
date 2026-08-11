@@ -197,14 +197,15 @@ export function buildGates({ stagedPresent }) {
 		},
 		{
 			id: "readme-cli",
-			// Verifies the README `## CLI` generated block matches `pfdsl help`.
-			trigger: /^(packages\/cli\/src\/|README\.md)/,
+			// Verifies both generated CLI listings match `pfdsl help`: the root
+			// README's raw block and packages/cli/README.md's tables (#850).
+			trigger: /^(packages\/cli\/src\/|packages\/cli\/README\.md|README\.md)/,
 			requireDist: [CLI_DIST],
 			commands: regenerateThenDiff(
 				["node", ["scripts/gen-readme-cli.mjs"]],
-				["README.md"],
+				["README.md", "packages/cli/README.md"],
 			),
-			hint: "README.md CLI section is stale. Run 'make gen-readme-cli' and re-stage README.md.",
+			hint: "A README's CLI section is stale. Run 'make gen-readme-cli' and re-stage README.md and packages/cli/README.md.",
 		},
 	];
 }

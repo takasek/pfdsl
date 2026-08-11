@@ -87,7 +87,7 @@ gen-readme-cli:
 .PHONY: check-readme-cli
 check-readme-cli:
 	node scripts/gen-readme-cli.mjs
-	@git diff --exit-code README.md || (echo "README.md CLI section is stale. Run 'make gen-readme-cli' and commit the result." && exit 1)
+	@git diff --exit-code README.md packages/cli/README.md || (echo "A README's CLI section is stale. Run 'make gen-readme-cli' and commit the result." && exit 1)
 
 # Canonical-fmt guard for operational .pfdsl/ files and the distributed
 # scaffold's .pfdsl/ templates (#529, #685). docs/ teaching material is
