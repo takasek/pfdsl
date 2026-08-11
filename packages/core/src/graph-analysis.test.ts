@@ -46,6 +46,7 @@ describe("computeNeighbors", () => {
 				{ id: "build", kind: "primary" },
 				{ id: "review", kind: "primary" },
 			],
+			neighborKind: "process",
 		});
 	});
 
@@ -53,6 +54,7 @@ describe("computeNeighbors", () => {
 		expect(computeNeighbors(graph, "build")).toEqual({
 			predecessors: [{ id: "spec", kind: "primary" }],
 			successors: [{ id: "code", kind: "primary" }],
+			neighborKind: "artifact",
 		});
 	});
 
@@ -60,6 +62,7 @@ describe("computeNeighbors", () => {
 		expect(computeNeighbors(graph, "req")).toEqual({
 			predecessors: [],
 			successors: [{ id: "design", kind: "primary" }],
+			neighborKind: "process",
 		});
 	});
 
@@ -73,6 +76,7 @@ describe("computeNeighbors", () => {
 				{ id: "report", kind: "feedback" },
 			],
 			successors: [{ id: "spec", kind: "primary" }],
+			neighborKind: "artifact",
 		});
 	});
 
@@ -80,7 +84,30 @@ describe("computeNeighbors", () => {
 		expect(computeNeighbors(withFeedback, "report")).toEqual({
 			predecessors: [{ id: "review", kind: "primary" }],
 			successors: [{ id: "design", kind: "feedback" }],
+			neighborKind: "process",
 		});
+	});
+
+	// Every edge runs artifact -> process or process -> artifact (`buildGraph`
+	// assigns the endpoints per edge kind, and N002 rejects a file that uses one
+	// id as both), so a node's neighbors all share the opposite kind. Reporting
+	// it once per query saves the caller a `describe` per neighbor (#844).
+	it("reports the neighbors' shared kind as the opposite of an artifact's", () => {
+		expect(computeNeighbors(graph, "spec").neighborKind).toBe("process");
+	});
+
+	it("reports the neighbors' shared kind as the opposite of a process's", () => {
+		expect(computeNeighbors(graph, "build").neighborKind).toBe("artifact");
+	});
+
+	// A group is declared in front matter but never appears on an edge (N002
+	// again), so it has no neighbors and no opposite kind to name.
+	it("reports no neighbor kind for a group", () => {
+		const withGroup = buildGraph(
+			edges,
+			new Map([...kinds, ["frontend", "group" as const]]),
+		);
+		expect(computeNeighbors(withGroup, "frontend").neighborKind).toBe(null);
 	});
 });
 
