@@ -10,6 +10,21 @@ import {
 	selectDesignRecord,
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
+import {
+	CODE_PATH,
+	CORRECTNESS_TOOLS,
+	GATE_TOOLS,
+	REVIEW_TOOLS,
+} from "./review-record.mjs";
+
+// The human-readable form of CODE_PATH's alternation (`/^(packages|scripts)\//`),
+// so buildReviewRecordTemplate's note names the same paths the checker actually
+// gates on rather than a restated copy that could drift from it.
+const CODE_PATH_LABEL = CODE_PATH.source
+	.match(/^\^\(([^)]+)\)/)[1]
+	.split("|")
+	.map((prefix) => `${prefix}/`)
+	.join(" か ");
 
 /**
  * @param {Array<{conclusion?: string|null, status?: string}>} [statusCheckRollup]
@@ -187,6 +202,29 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
 	return {
 		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 雛形のまま投稿しても形式は通るが、記録としては何も残らない。実装しないと判断した回のみ、記録に \`${NO_IMPLEMENTATION_TOKEN} <理由>\` を行頭から書く行を追加する — timing 判定が SKIP になり、コミットとの前後関係を照合しない。他の行の前提・否定案・却下理由の中でこの語に触れるだけでは宣言にならない — \`Size-Intent: shrink\` と同じ行頭一致で判定する。`,
 		lines,
+	};
+}
+
+/**
+ * The review-record trailer template (#809), pre-shaped the same way
+ * buildDesignRecordTemplate is: the vocabulary comes from review-record.mjs's
+ * own constants rather than restated in prose, so a template that drifts
+ * from the checker cannot happen silently.
+ *
+ * Unlike the design record, this is not a copy-pasteable literal — the
+ * runner substitutes a real tool name after actually running a review, so
+ * `line` keeps a placeholder rather than a fabricated tool value.
+ *
+ * Emitted on every cycle, not only ones that turn out to touch packages/ or
+ * scripts/: whether this cycle will is undecidable at preflight time (the
+ * diff doesn't exist yet), and the failure this closes is exactly a runner
+ * who never saw the format until the terminal gate FAILed on it.
+ * @returns {{note: string, line: string}}
+ */
+export function buildReviewRecordTemplate() {
+	return {
+		note: `着手前（ブランチ最初のコミットより前）にレビューを実施し、実施のたび commit message の trailer へ記録する。後から追記できない — push 済みなら trailer の追加は履歴の作り直しになる。tool は ${REVIEW_TOOLS.join(" / ")} のいずれか。ゲート充足に数えるのは ${GATE_TOOLS.join(" / ")}（\`code-review\` は有効な trailer 値だが数えない）。${CODE_PATH_LABEL} に変更のある回はさらに ${CORRECTNESS_TOOLS.join(" または ")} を最低1本要する。`,
+		line: "Review: tool=<tool-name>",
 	};
 }
 

@@ -15,6 +15,7 @@ import { resolve } from "node:path";
 import {
 	buildDesignRecordTemplate,
 	buildGateCheckCommand,
+	buildReviewRecordTemplate,
 	classifyDesignSettlement,
 	classifyPRs,
 	countBehind,
@@ -330,6 +331,7 @@ export async function runCycleStatus({
 		designRecordTemplate: buildDesignRecordTemplate({
 			optionCount: recordOptionCount,
 		}),
+		reviewRecordTemplate: buildReviewRecordTemplate(),
 		gateCheckCommand,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;
