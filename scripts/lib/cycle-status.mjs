@@ -246,9 +246,15 @@ export function buildReviewRecordTemplate() {
  * 時点照合（`classifyDesignRecordTiming`）は終端ゲート側だけが持つ —
  * ここで record-posted になった記録が、終端ゲートでは内容不備・時点不備で
  * FAIL することがあるのは意図した非対称である。
+ *
+ * `unsettled` は「設計対話が必要か」を表すだけで、記録投稿の要否とは別軸
+ * である。roadmap.md の規約上、design-selection record は列挙構造の有無に
+ * 関わらず全サイクル必須で、`unsettled: false` を「記録不要」と読むのは
+ * 誤読になる（#809）。そのため戻り値には `recordRequired` を独立して持たせる
+ * — `record-posted` のときだけ false、それ以外は常に true（#868）。
  * @param {{body: string, createdAt?: string, comments?: Array<{body: string, createdAt?: string}>}} params
  * @returns {{unsettled: boolean, reason: string, matchedLines?: string[], optionCount?: number,
- *            record?: {createdAt?: string} | null}}
+ *            record?: {createdAt?: string} | null, recordRequired: boolean}}
  */
 export function classifyDesignSettlement({ body, createdAt, comments }) {
 	const phrase = detectDesignUnsettled(body);
@@ -257,6 +263,7 @@ export function classifyDesignSettlement({ body, createdAt, comments }) {
 			unsettled: true,
 			reason: "phrase",
 			matchedLines: phrase.matchedLines,
+			recordRequired: true,
 		};
 	}
 
@@ -268,6 +275,7 @@ export function classifyDesignSettlement({ body, createdAt, comments }) {
 			unsettled: false,
 			reason: "record-posted",
 			record: { createdAt: record.createdAt },
+			recordRequired: false,
 		};
 	}
 
@@ -278,10 +286,15 @@ export function classifyDesignSettlement({ body, createdAt, comments }) {
 			reason: "enumerated-options-without-record",
 			matchedLines: enumerated.headings,
 			optionCount: enumerated.count,
+			recordRequired: true,
 		};
 	}
 
-	return { unsettled: true, reason: "no-enumerated-options" };
+	return {
+		unsettled: true,
+		reason: "no-enumerated-options",
+		recordRequired: true,
+	};
 }
 
 /**

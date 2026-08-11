@@ -314,6 +314,7 @@ describe("runCycleStatus", () => {
 				matchedLines: [],
 				optionCount: 0,
 				record: null,
+				recordRequired: true,
 			},
 		]);
 		assert.equal(result.designUnsettledError, undefined);
@@ -343,6 +344,7 @@ describe("runCycleStatus", () => {
 		assert.equal(result.designUnsettledFor[0].source, "best-process");
 		assert.equal(result.designUnsettledFor[0].unsettled, true);
 		assert.equal(result.designUnsettledFor[0].reason, "phrase");
+		assert.equal(result.designUnsettledFor[0].recordRequired, true);
 	});
 
 	it("judges every issue the cycle closes, not just the first", async () => {
