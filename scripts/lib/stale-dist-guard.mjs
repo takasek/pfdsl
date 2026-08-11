@@ -21,7 +21,7 @@ import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
 
 /** Commands that resolve cross-package imports through dist/. */
 const TRUSTS_BUILD_OUTPUT =
-	/\b(typecheck|tsgo|vitest|node --test)\b|\b(pnpm|npm|yarn)\b[^&|;]*\btest\b/;
+	/\b(typecheck|tsgo|vitest|node --test)\b|\b(pnpm|npm|yarn)\b[^&|;]*\btest\b|\bnode\b.*\bpackages\/[^\s]+\/dist\//;
 
 /** A build step in the same command line means the staleness is about to be fixed. */
 const REBUILDS_FIRST = /\bbuild\b/;
