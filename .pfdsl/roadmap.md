@@ -145,7 +145,7 @@ guard は hook の payload だけを見る静的解析なので `git -C $W commi
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
 - [ ] `node scripts/pfdsl/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する。`gate-check.mjs` 実行時はその一部として自動実行される）
 
-**バージョン artifact を起こす契機と criteria の形**: 規定の一般形は pfd-ops SKILL.md のプロトコル5 (c)(d) が一次情報（#729 で昇格）。
+**バージョン artifact を起こす契機と criteria の形**: 規定の一般形は `.claude/skills/pfd-ops/SKILL.md` の「運用プロトコル」5（成果物の門番）にある2項目「版 artifact を起こす契機」「版 artifact の criteria は版一覧への包含で書く」が一次情報（#729 で昇格）。
 ここにはこのリポのインスタンス値だけを置く。
 
 - 対象ノード: `spec_vXXX` / `cli_release_*` / `ext_vXXXX`
