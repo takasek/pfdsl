@@ -382,14 +382,10 @@ export function buildPreArtifactReminders(patterns) {
  * that text: this is report material a person reads, and a parser would couple
  * the preflight to release-status's formatting for no judgment it makes.
  *
- * `needsAction` is release-status's exit code, which covers every gate that
- * only the release boundary checks — the package version comparisons, the
- * skill-bundle commit count, the distribution review's currency and the
- * spec-history entry (#880). It still is not "`make release` would go
- * through": release also runs build, test, check-docs and the gen-plugin
- * identity check, all of which CI already watches on every push. So a false
- * here means no publishing work is pending, not that the release will
- * succeed, and the reason for a true stays in the lines of `report`.
+ * `needsAction` is release-status's exit code and nothing added to it. What
+ * that code covers, and why it stops where it does, is documented once at its
+ * definition — `needsAction` in ./release-status-check.mjs. Restating the list
+ * here would be a third copy to keep in step (#880).
  * @param {{ok: boolean, out: string, status: number|null}} result - a tryRun result
  * @returns {{needsAction: boolean, report: string[]}}
  */
