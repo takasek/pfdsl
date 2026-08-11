@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-// Checks published versions of all packages against local package.json versions.
+// Checks published versions of all packages against local package.json
+// versions, plus the two release gates that run nowhere else (distribution
+// review currency, spec-history currency).
 // Usage: node scripts/release-status.mjs
-// Exit 1 if any package is behind or has a fetch error.
+// Exit 1 if anything is left to do before the next publication — see
+// needsAction in lib/release-status-check.mjs for what that covers.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -25,6 +28,7 @@ import {
 	formatSkillBundleStatus,
 	formatSpecHistoryStatus,
 	latestFullReviewDate,
+	needsAction,
 } from "./lib/release-status-check.mjs";
 import {
 	runSpecHistoryCheck,
@@ -274,9 +278,10 @@ console.log(formatDistributionReviewStatus(distributionReview));
 console.log(formatFullReviewStatus(distributionReview.lastFullReview));
 console.log(formatSpecHistoryStatus(specHistory));
 
-const needsAction =
-	results.some(
-		(r) =>
-			r.status === "local-ahead" || r.status === "error" || r.commitsAhead > 0,
-	) || skillBundleCommits > 0;
-if (needsAction) process.exit(1);
+const pending = needsAction({
+	results,
+	skillBundleCommits,
+	distributionReview,
+	specHistory,
+});
+if (pending) process.exit(1);

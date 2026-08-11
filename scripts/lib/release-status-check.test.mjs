@@ -8,6 +8,7 @@ import {
 	formatSkillBundleStatus,
 	formatSpecHistoryStatus,
 	latestFullReviewDate,
+	needsAction,
 } from "./release-status-check.mjs";
 
 describe("compareVersions", () => {
@@ -238,5 +239,86 @@ describe("formatFullReviewStatus", () => {
 		// Manual-only by design, so this line is the whole reminder that it
 		// exists — the dormancy ADR-0029 fell into started exactly this way.
 		assert.match(formatFullReviewStatus(null), /never run/);
+	});
+});
+
+describe("needsAction", () => {
+	const current = {
+		results: [
+			{ name: "@pfdsl/cli", status: "equal", commitsAhead: 0 },
+			{ name: "@pfdsl/core", status: "equal", commitsAhead: 0 },
+		],
+		skillBundleCommits: 0,
+		distributionReview: { unreviewedCount: 0, blockedReason: null },
+		specHistory: { ok: true },
+	};
+
+	it("is false when every gate reads current", () => {
+		assert.equal(needsAction(current), false);
+	});
+
+	it("is true when a package version is unpublished", () => {
+		assert.equal(
+			needsAction({
+				...current,
+				results: [{ name: "@pfdsl/cli", status: "local-ahead" }],
+			}),
+			true,
+		);
+	});
+
+	it("is true when a published version could not be read", () => {
+		assert.equal(
+			needsAction({
+				...current,
+				results: [{ name: "@pfdsl/cli", status: "error" }],
+			}),
+			true,
+		);
+	});
+
+	it("is true when commits landed since the published version", () => {
+		assert.equal(
+			needsAction({
+				...current,
+				results: [{ name: "@pfdsl/cli", status: "equal", commitsAhead: 3 }],
+			}),
+			true,
+		);
+	});
+
+	it("is true when the skill bundle moved since the last CLI tag", () => {
+		assert.equal(needsAction({ ...current, skillBundleCommits: 2 }), true);
+	});
+
+	it("is true when bundled prompts are past their last review", () => {
+		// `make release` refuses here (check-distribution-review.mjs), and this
+		// gate runs nowhere else — CI is not wired to it.
+		assert.equal(
+			needsAction({
+				...current,
+				distributionReview: { unreviewedCount: 12, blockedReason: null },
+			}),
+			true,
+		);
+	});
+
+	it("is true when the review record could not be read at all", () => {
+		// unreviewedCount is undefined there; reading that as zero would say
+		// current where the release gate refuses.
+		assert.equal(
+			needsAction({
+				...current,
+				distributionReview: {
+					unreviewedCount: undefined,
+					blockedReason: "reviewed commit f41fe18 is not reachable",
+				},
+			}),
+			true,
+		);
+	});
+
+	it("is true when spec-history does not document the current spec version", () => {
+		assert.equal(needsAction({ ...current, specHistory: { ok: false } }), true);
 	});
 });
