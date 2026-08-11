@@ -20,9 +20,7 @@ Bash は `pfdsl check <file>` と読み取り専用クエリ（`graph` グルー
 
 1. `.pfdsl/bindings/pfd-retro.md` が指す一次情報（例: `docs/review-perspectives.md` や `.pfdsl/review-perspectives.md`）を Read する
 2. 1 が存在しない場合、pfdsl スキルの `references/review-perspectives.md` を Read する（plugin 経由なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/references/review-perspectives.md`、repo-local なら `.claude/skills/pfdsl/references/review-perspectives.md`）
-3. 2 も存在しない場合のみ、以下のカテゴリ名で監査する
-   - A = 図 vs 現実（エッジ実在性・駆動源・名前の一般化水準・偽の不変性・入力充足・到達性）
-   - B = 粒度・型（万能成果物・プロセス実在性・並列主張・修正案への再挑戦・型違い）
+3. 2 も存在しない場合は監査を実行せず、探した2つのパス（1 の binding とその指す先、2 の両ロード元）を挙げて依頼元に「観点カタログに到達できない」と報告する。この報告は finding ではない — 下記「出力形式」の `No findings.` と混同しない
 
 C 系（仕様・制約カタログ）は本 agent のスコープ外 — 図でなく normative 仕様文書を問い詰める観点であり、依頼元が別途扱う。
 
