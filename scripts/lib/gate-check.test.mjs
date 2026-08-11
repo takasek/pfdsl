@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, posix, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { RECORD_SEP } from "./commit-trailers.mjs";
@@ -8,11 +8,13 @@ import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
 	buildDesignRecordEditQuery,
 	classifyAuditIssuesFlowResult,
+	classifyChangedFilesByModeling,
 	classifyDesignRecordContent,
 	classifyDesignRecordTiming,
 	classifyIssueLookupFailure,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
+	collectModeledLocations,
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
 	deriveManualItems,
@@ -34,6 +36,7 @@ import {
 	parseAuditTerminals,
 	parseCommitLogLines,
 	parseDesignRecordEditResponse,
+	partitionManualItemsByPhase,
 	resolveRecordEditedAt,
 	SIZE_INTENT_PATTERN,
 	SIZE_OVERRIDE_PATTERN,
@@ -1404,5 +1407,188 @@ describe("formatRunTreeLine", () => {
 		});
 		assert.doesNotMatch(line, /null/);
 		assert.match(line, /main checkout/);
+	});
+});
+
+describe("collectModeledLocations", () => {
+	// Stands in for the injected @pfdsl/core resolver: the same two decisions
+	// (URLs name nothing in the tree; everything else resolves against the
+	// file's own directory) with none of the build dependency. What core owns
+	// is tested in core; what is asserted here is this function's own job —
+	// which nodes it visits, and what it does with each resolution.
+	// The trailing slash is stripped here because path resolution strips it,
+	// and putting it back is this function's job, not the resolver's.
+	const resolveLocation = (file, location, basePath) =>
+		location.includes("://")
+			? null
+			: posix
+					.join(posix.dirname(file), basePath ?? ".", location)
+					.replace(/\/$/, "");
+
+	const analyzed = [
+		{
+			file: ".pfdsl/workflow.pfdsl",
+			frontmatter: {
+				artifact: {
+					spec: { location: "../docs/spec/spec.md" },
+					roadmap_pfdsl: { location: "roadmap.pfdsl" },
+					issues: { location: "https://github.com/takasek/pfdsl/issues" },
+					unplaced: { label: "no location at all" },
+				},
+				process: {
+					flow_sync: {
+						location: [
+							"../scripts/pfdsl/",
+							"../.github/workflows/pfdsl-flow-on-issue-close.yml",
+						],
+					},
+				},
+			},
+		},
+	];
+
+	it("resolves companion-relative locations against the .pfdsl directory", () => {
+		const modeled = collectModeledLocations(analyzed, resolveLocation);
+		assert.deepEqual(
+			modeled.find((m) => m.id === "spec"),
+			{ path: "docs/spec/spec.md", file: ".pfdsl/workflow.pfdsl", id: "spec" },
+		);
+	});
+
+	it("keeps a sibling location inside the .pfdsl directory", () => {
+		const modeled = collectModeledLocations(analyzed, resolveLocation);
+		assert.equal(
+			modeled.find((m) => m.id === "roadmap_pfdsl").path,
+			".pfdsl/roadmap.pfdsl",
+		);
+	});
+
+	it("drops URLs, which name nothing in the tree", () => {
+		assert.ok(
+			!collectModeledLocations(analyzed, resolveLocation).some(
+				(m) => m.id === "issues",
+			),
+		);
+	});
+
+	it("takes processes as well as artifacts, and every element of a list location", () => {
+		const paths = collectModeledLocations(analyzed, resolveLocation)
+			.filter((m) => m.id === "flow_sync")
+			.map((m) => m.path);
+		assert.deepEqual(paths, [
+			"scripts/pfdsl/",
+			".github/workflows/pfdsl-flow-on-issue-close.yml",
+		]);
+	});
+
+	it("skips nodes that declare no location", () => {
+		assert.ok(
+			!collectModeledLocations(analyzed, resolveLocation).some(
+				(m) => m.id === "unplaced",
+			),
+		);
+	});
+});
+
+describe("classifyChangedFilesByModeling", () => {
+	const modeled = [
+		{ path: "docs/spec/spec.md", file: ".pfdsl/workflow.pfdsl", id: "spec" },
+		{ path: "scripts/pfdsl/", file: ".pfdsl/workflow.pfdsl", id: "flow_sync" },
+	];
+
+	it("matches an exact file location", () => {
+		const result = classifyChangedFilesByModeling(
+			["docs/spec/spec.md"],
+			modeled,
+		);
+		assert.deepEqual(result.modeled, [
+			{
+				path: "docs/spec/spec.md",
+				models: [{ file: ".pfdsl/workflow.pfdsl", id: "spec" }],
+			},
+		]);
+		assert.deepEqual(result.unmodeled, []);
+	});
+
+	it("matches a file under a directory location", () => {
+		const result = classifyChangedFilesByModeling(
+			["scripts/pfdsl/audit-issues-flow.mjs"],
+			modeled,
+		);
+		assert.equal(result.modeled.length, 1);
+		assert.deepEqual(result.modeled[0].models, [
+			{ file: ".pfdsl/workflow.pfdsl", id: "flow_sync" },
+		]);
+	});
+
+	// The whole point of #778: a change no adopted PFD models must be visible as
+	// such, so that the gate item's "N/A" can be read as out-of-scope rather than
+	// as a judgment someone made.
+	it("reports a path no location covers as unmodeled", () => {
+		const result = classifyChangedFilesByModeling(
+			["scripts/gate-check.mjs"],
+			modeled,
+		);
+		assert.deepEqual(result.unmodeled, ["scripts/gate-check.mjs"]);
+		assert.deepEqual(result.modeled, []);
+	});
+
+	it("does not let a directory location match a sibling with the same prefix", () => {
+		const result = classifyChangedFilesByModeling(
+			["scripts/pfdsl-extra.mjs"],
+			modeled,
+		);
+		assert.deepEqual(result.unmodeled, ["scripts/pfdsl-extra.mjs"]);
+	});
+
+	it("lists every node modeling the same path", () => {
+		const result = classifyChangedFilesByModeling(
+			["docs/spec/spec.md"],
+			[
+				...modeled,
+				{
+					path: "docs/spec/spec.md",
+					file: ".pfdsl/runtime-pipeline.pfdsl",
+					id: "spec",
+				},
+			],
+		);
+		assert.deepEqual(result.modeled[0].models, [
+			{ file: ".pfdsl/workflow.pfdsl", id: "spec" },
+			{ file: ".pfdsl/runtime-pipeline.pfdsl", id: "spec" },
+		]);
+	});
+});
+
+describe("partitionManualItemsByPhase", () => {
+	it("splits the list at the first post-PR item, keeping order on both sides", () => {
+		const items = [
+			"知見を振り分けた",
+			"変更束を PR にまとめた",
+			"**PR 作成後**: 指標の数値を PR 本文に書いた",
+			"**PR 作成後**: 割れない理由を PR 本文に書いた",
+		];
+		assert.deepEqual(partitionManualItemsByPhase(items), {
+			beforePr: ["知見を振り分けた", "変更束を PR にまとめた"],
+			afterPr: [
+				"**PR 作成後**: 指標の数値を PR 本文に書いた",
+				"**PR 作成後**: 割れない理由を PR 本文に書いた",
+			],
+		});
+	});
+
+	it("puts everything in the first phase when no item is marked", () => {
+		const items = ["a", "b"];
+		assert.deepEqual(partitionManualItemsByPhase(items), {
+			beforePr: ["a", "b"],
+			afterPr: [],
+		});
+	});
+
+	// The marker is a line head, not a substring: an item that merely mentions
+	// the phrase must not be pulled out of its place in the walk.
+	it("does not move an item that only mentions the phrase mid-sentence", () => {
+		const items = ["push し忘れを **PR 作成後** に確認する"];
+		assert.deepEqual(partitionManualItemsByPhase(items).afterPr, []);
 	});
 });

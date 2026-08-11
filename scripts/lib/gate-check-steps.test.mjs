@@ -3,11 +3,13 @@ import { describe, it } from "node:test";
 
 import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
+	analyzeAdoptedPfdsl,
 	checkDocsStep,
 	collectCycleWindow,
 	collectSizeDeltas,
 	commitMessagesSince,
 	commitSubjectStep,
+	deletedFilesSince,
 	designRecordStep,
 	fetchDesignRecordEditInfo,
 	firstCommitAuthorDate,
@@ -1361,5 +1363,70 @@ describe("collectCycleWindow", () => {
 		assert.equal(result.ok, true);
 		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
 		assert.match(result.note ?? "", /could not/);
+	});
+});
+
+describe("analyzeAdoptedPfdsl", () => {
+	const deps = (overrides = {}) => ({
+		readdirSync: () => ["workflow.pfdsl", "roadmap.pfdsl", "roadmap.md"],
+		readFile: (file) => `text of ${file}`,
+		analyze: (text) => ({ frontmatter: { title: text } }),
+		...overrides,
+	});
+
+	it("parses every .pfdsl in the directory, in a stable order, ignoring other files", () => {
+		const { analyzed, unreadable } = analyzeAdoptedPfdsl(deps());
+		assert.deepEqual(
+			analyzed.map((a) => a.file),
+			[".pfdsl/roadmap.pfdsl", ".pfdsl/workflow.pfdsl"],
+		);
+		assert.deepEqual(unreadable, []);
+	});
+
+	it("passes the file's text through analyze and keeps the frontmatter", () => {
+		const { analyzed } = analyzeAdoptedPfdsl(deps());
+		assert.equal(analyzed[0].frontmatter.title, "text of .pfdsl/roadmap.pfdsl");
+	});
+
+	// One unparsable file must not cost the report every other file's locations:
+	// the block this feeds is material, and a partial reading is worth more than
+	// none as long as the gap is named.
+	it("isolates a failing file, naming it, and keeps the rest", () => {
+		const { analyzed, unreadable } = analyzeAdoptedPfdsl(
+			deps({
+				analyze: (text) => {
+					if (text.includes("workflow")) throw new Error("bad frontmatter");
+					return { frontmatter: {} };
+				},
+			}),
+		);
+		assert.deepEqual(
+			analyzed.map((a) => a.file),
+			[".pfdsl/roadmap.pfdsl"],
+		);
+		assert.deepEqual(unreadable, [".pfdsl/workflow.pfdsl: bad frontmatter"]);
+	});
+});
+
+describe("deletedFilesSince", () => {
+	it("returns the branch's deleted paths, three-dot against the base", () => {
+		const { exec, calls } = fakeExec({
+			"git diff --diff-filter=D": { out: "docs/samples/gone.svg\n" },
+		});
+		assert.deepEqual(deletedFilesSince({ exec, base: "main" }), [
+			"docs/samples/gone.svg",
+		]);
+		assert.ok(
+			calls.some((c) =>
+				c.startsWith("git diff --diff-filter=D --name-only origin/main...HEAD"),
+			),
+		);
+	});
+
+	// The report this feeds is material; a git failure there costs the deleted
+	// half of it, not the whole block.
+	it("returns nothing rather than throwing when git fails", () => {
+		const { exec } = fakeExec({ "git diff --diff-filter=D": { ok: false } });
+		assert.deepEqual(deletedFilesSince({ exec, base: "main" }), []);
 	});
 });

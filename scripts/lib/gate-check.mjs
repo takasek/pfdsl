@@ -7,6 +7,79 @@ import { isGhUnavailableError } from "../pfdsl/lib/gh-compat.mjs";
 import { trailerLines } from "./commit-trailers.mjs";
 
 /**
+ * Every repo-relative path an adopted PFD claims to model, via the `location:`
+ * field its artifacts and processes carry (#778). This is what lets the
+ * terminal gate's "did you reflect the change in the PFD that models it" item
+ * say which of a cycle's changed files any PFD models at all — without that,
+ * a change in an unmodeled area (the check scripts, historically) and a change
+ * someone judged irrelevant both come out as the same silent "N/A".
+ *
+ * `resolveLocation` is injected rather than written here because spec §15.8
+ * owns what a `location:` resolves to (the file's own directory, or the
+ * frontmatter's `basePath` when it has one) and @pfdsl/core already implements
+ * it — a second reading of that rule here would be free to drift from the one
+ * the CLI applies. It returns null for anything that names nothing in the tree
+ * (a URL), which is also core's classification.
+ * @param {Array<{file: string, frontmatter: {artifact?: object, process?: object, basePath?: string}}>} analyzed
+ * @param {(file: string, location: string, basePath?: string) => string|null} resolveLocation
+ * @returns {Array<{path: string, file: string, id: string}>}
+ */
+export function collectModeledLocations(analyzed, resolveLocation) {
+	const modeled = [];
+	for (const { file, frontmatter } of analyzed) {
+		const nodes = {
+			...(frontmatter?.artifact ?? {}),
+			...(frontmatter?.process ?? {}),
+		};
+		for (const [id, meta] of Object.entries(nodes)) {
+			if (!meta?.location) continue;
+			const locations = Array.isArray(meta.location)
+				? meta.location
+				: [meta.location];
+			for (const location of locations) {
+				const resolved = resolveLocation(file, location, frontmatter?.basePath);
+				if (resolved === null) continue;
+				// Path resolution normalizes a trailing slash away, and that slash
+				// is the only mark distinguishing a directory location from a file
+				// one, so it is carried over from what was written.
+				modeled.push({
+					path: location.endsWith("/") ? `${resolved}/` : resolved,
+					file,
+					id,
+				});
+			}
+		}
+	}
+	return modeled;
+}
+
+/**
+ * Split a cycle's changed files by whether any adopted PFD models them (#778).
+ * Report material, not a verdict: whether a modeled path's change actually
+ * needed the PFD updated, and whether an unmodeled one should have been in a
+ * PFD at all, are both judgments the gate leaves to the reader.
+ * @param {string[]} changedFiles repo-relative
+ * @param {Array<{path: string, file: string, id: string}>} modeledLocations
+ * @returns {{modeled: Array<{path: string, models: Array<{file: string, id: string}>}>, unmodeled: string[]}}
+ */
+export function classifyChangedFilesByModeling(changedFiles, modeledLocations) {
+	const modeled = [];
+	const unmodeled = [];
+	for (const path of changedFiles) {
+		const models = modeledLocations
+			.filter((location) =>
+				location.path.endsWith("/")
+					? path.startsWith(location.path)
+					: path === location.path,
+			)
+			.map(({ file, id }) => ({ file, id }));
+		if (models.length > 0) modeled.push({ path, models });
+		else unmodeled.push(path);
+	}
+	return { modeled, unmodeled };
+}
+
+/**
  * @param {string[]} files
  * @param {RegExp} pattern
  * @returns {boolean}
@@ -401,6 +474,27 @@ export function deriveManualItems(checklistItems) {
 	return checklistItems.filter(
 		(item) => !COVERED_BY_GATE_CHECK.some((kw) => item.includes(kw)),
 	);
+}
+
+// The checklist's own mark for an item that can only be done once the PR
+// exists (#816). Matched at the item's head, not anywhere in it: an item that
+// merely mentions the phrase is still an item to do before the PR.
+const AFTER_PR_MARKER = /^\*\*PR 作成後\*\*/;
+
+/**
+ * Split the MANUAL items into the ones to walk before creating the PR and the
+ * ones that can only be done after (#816). Printing them as one flat list puts
+ * "write this into the PR body" in front of a reader who has no PR yet, which
+ * is the timing defect the checklist's ordering was rearranged to fix — an
+ * ordering no reader can act on if the list that reaches them is flat.
+ * @param {string[]} manualItems
+ * @returns {{beforePr: string[], afterPr: string[]}}
+ */
+export function partitionManualItemsByPhase(manualItems) {
+	return {
+		beforePr: manualItems.filter((item) => !AFTER_PR_MARKER.test(item)),
+		afterPr: manualItems.filter((item) => AFTER_PR_MARKER.test(item)),
+	};
 }
 
 /**

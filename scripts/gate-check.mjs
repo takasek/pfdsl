@@ -7,13 +7,15 @@
 // MANUAL: lines.
 // Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n> ...]
 
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
 	classifyAuditIssuesFlowResult,
+	classifyChangedFilesByModeling,
 	classifyIssueLookupFailure,
+	collectModeledLocations,
 	deriveManualItems,
 	derivePackageLayers,
 	diffNewTerminals,
@@ -27,15 +29,18 @@ import {
 	matchesTrigger,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
+	partitionManualItemsByPhase,
 	VSCODE_EXT_TRIGGER,
 } from "./lib/gate-check.mjs";
 import {
+	analyzeAdoptedPfdsl,
 	changedFilesSince,
 	checkDocsStep,
 	collectCycleWindow,
 	collectSizeDeltas,
 	commitMessagesSince,
 	commitSubjectStep,
+	deletedFilesSince,
 	designRecordStep,
 	fetchDesignRecordEditInfo,
 	genPluginIdentityStep,
@@ -488,8 +493,70 @@ if (sizeDeltas.length > 0) {
 	}
 }
 
-console.log("\nMANUAL (judge and confirm each):");
-for (const item of manualItems) console.log(`  MANUAL: ${item}`);
+// Report material: which of this cycle's changed files any adopted PFD claims
+// to model — see collectModeledLocations in lib/gate-check.mjs for why (#778).
+// Which side a given path belongs on, and whether an unmodeled one should have
+// been in a PFD at all, both stay the reader's call.
+{
+	const corePath = resolve(root, "packages/core/dist/index.js");
+	console.log("\nChanged files vs. the adopted PFDs' `location:` fields:");
+	if (!existsSync(corePath)) {
+		console.log(
+			"  could not be measured: packages/core/dist not built (run 'pnpm -r build')",
+		);
+	} else {
+		// The same pair the CLI applies to a `location:` element (spec §15.8),
+		// so this report and `meta get` cannot disagree about where a node lives.
+		const { analyze, isUrlLike, resolveLocationFsPath } = await import(
+			corePath
+		);
+		const { analyzed, unreadable } = analyzeAdoptedPfdsl({
+			readdirSync: (dir) => readdirSync(resolve(root, dir)),
+			readFile: (file) => readFileSync(resolve(root, file), "utf-8"),
+			analyze,
+		});
+		const resolveLocation = (file, location, basePath) =>
+			isUrlLike(location)
+				? null
+				: relative(
+						root,
+						resolveLocationFsPath(resolve(root, file), location, basePath),
+					);
+		// Deletions are in scope here even though every other gate excludes
+		// them: the item asks about additions, changes and deletions alike, and
+		// a deleted file is the case where the PFD modeling it is likeliest to
+		// be left describing something gone.
+		const deletedFiles = deletedFilesSince({ exec, base });
+		const wasDeleted = new Set(deletedFiles);
+		const { modeled, unmodeled } = classifyChangedFilesByModeling(
+			[...changedFiles, ...deletedFiles],
+			collectModeledLocations(analyzed, resolveLocation),
+		);
+		const mark = (path) => (wasDeleted.has(path) ? `${path} (deleted)` : path);
+		console.log("  modeled (confirm the PFD reflects the change):");
+		if (modeled.length === 0) console.log("    (none)");
+		for (const { path, models } of modeled) {
+			const by = models.map((m) => `${m.file}:${m.id}`).join(", ");
+			console.log(`    ${mark(path)} ← ${by}`);
+		}
+		console.log(
+			"  not modeled by any adopted PFD (an N/A here is out-of-scope, not a judgment):",
+		);
+		if (unmodeled.length === 0) console.log("    (none)");
+		for (const path of unmodeled) console.log(`    ${mark(path)}`);
+		for (const reason of unreadable) console.log(`  could not read ${reason}`);
+	}
+}
+
+{
+	const { beforePr, afterPr } = partitionManualItemsByPhase(manualItems);
+	console.log("\nMANUAL (judge and confirm each):");
+	for (const item of beforePr) console.log(`  MANUAL: ${item}`);
+	if (afterPr.length > 0) {
+		console.log("\nMANUAL, after the PR exists (its body is the destination):");
+		for (const item of afterPr) console.log(`  MANUAL: ${item}`);
+	}
+}
 
 const hasFail = results.some((r) => r.status === "FAIL");
 if (hasFail) process.exit(1);
