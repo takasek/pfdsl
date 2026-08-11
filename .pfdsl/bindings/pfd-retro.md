@@ -2,6 +2,12 @@
 
 A・B・C カタログ（監査観点の枠組み）: `docs/review-perspectives.md`（配布レンズ）。当リポの具体例・機構は `.pfdsl/review-perspectives.md`（instance）に蓄積する。
 
+両カタログが分割の検討に値する規模へ育ったかは `node scripts/check-review-perspectives-scale.mjs`（`make check-docs` から自動実行）がバイト数と項目数を毎回印字する。
+閾値（20KB または 40項目、#797）を超えても exit code には出ない — 分割の判断は人間が行う通知であり CI を赤くする違反ではない。
+機械化したのはこの規模判定だけで、残り2条件は未機械化のまま運用判断に委ねている:
+直近5コミットの `git log --numstat` で純追記が3件以上を占めるか（改訂でなく追記のみが続いているか）、
+main thread がカタログを直接読む経路が主になり全読が context を圧迫していると実測できたか、の2つ。
+
 C 系の対象仕様: `docs/spec/spec.md`。実行手順: `/spec-stress-test`（リポローカル）。
 
 設計決定記録: `docs/adr/`（ADR。一覧・改訂規約は `docs/adr/README.md`）。pfd-ops 定期監査トリガーの「設計決定記録」はこれを指す。
