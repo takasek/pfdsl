@@ -266,46 +266,46 @@ artifact:
   readme:
     label: README
     description: "外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照リンクを含むが、リンク先パスは安定しており sample_previews の内容更新では変化しない — 追従更新が要るのは CLI 公開形態・ライブラリ公開形態の変更時のみ。extension 公開（published_ext）は update_readme をトリガーしない — README は marketplace リンクのみで版数を記載しないため。CLI コマンドリファレンス（## CLI 節）は `make gen-readme-cli` が `pfdsl help` 出力から自動生成し、`make check-readme-cli` が pre-commit と CI（test.yml）でドリフトを機械検査するため update_readme の手動対象外。同じ生成器とゲートが `packages/cli/README.md`（npm パッケージページ。toolchain 側の成果物）のコマンド表も書くため、CLI コマンドの追加・変更で手を入れる先は両 README とも HELP テキストのみ（#850）"
-    criteria: CLI インストール手順・Library 節インストール例（pnpm add）が現行バージョンと整合している。CLI コマンドリファレンスは make check-readme-cli が差分なしで通過する
+    criteria: make check-readme-cli が差分なしで通過し、Library 節の pnpm add 例が published_libraries の全パッケージを名指す
     location: ../README.md
     group: release
   workflow_md:
     label: 生態系 companion
     description: "workflow.pfdsl のグラフが運べない運用手続き散文。セクション構成は実ファイルが一次情報（ここに列挙しない）。pfd-ops skill が読む L4 ホスト"
-    criteria: workflow.pfdsl の運用手続きと散文が一致している
+    criteria: check-companion-bindings が参照パスの実在を通す。散文が名指す workflow.pfdsl のノード・エッジを graph describe で引いて食い違いがない（pfd-retro B 層監査の観点）
     location: workflow.md
     group: generation
     tags: [ distilled_doc ]
   bindings_pfd_ops:
     label: pfd-ops バインディング
     description: "pfd-ops 運用に紐づく Claude への恒常指示（PR 本文規約等）。sibling companion でなく独立ファイル（読み込み契機がスキル発火であり PFD グラフ操作と一致しないため）。pfd-ops skill が存在すれば読む"
-    criteria: 記載内容が現行の pfd-ops 運用と矛盾しない
+    criteria: 記載内容を pfd-ops SKILL.md・work-cycle.md の現行記述に突き合わせて矛盾がない（bindings/ 配下に機械検査は無く、pfd-retro D 層監査で観察する）
     location: bindings/pfd-ops.md
     group: generation
     tags: [ distilled_doc ]
   bindings_pfd_retro:
     label: pfd-retro バインディング
     description: "pfd-retro が読むカタログ参照・配布物への finding 反映手続き・パターン追記の書式・改訂と統合と廃止の規約。sibling companion でなく独立ファイル（理由は bindings_pfd_ops と同じ）。このリポで検出した監査パターンの本体は持たず bindings/pfd-retro-patterns/ に1件1ファイルで置き、pfd-retro skill はこのファイルを全読せず scripts/retro-patterns.mjs で引く。タグ語彙の正準リストは持たない — tags サブコマンドの出力が語彙の実体。対策が成果物を書く前に効くパターンは frontmatter の phase で宣言し、それらは retro より前（プリフライト）でも引かれる"
-    criteria: 記載内容が現行の pfd-retro 運用と矛盾せず、カタログ参照先が実在し、パターン各ファイルが frontmatter の tags を持つ
+    criteria: retro-patterns.mjs check が違反なしで通過し、check-companion-bindings が必須見出しの存在を通す。記載内容は pfd-retro SKILL.md の現行記述に突き合わせて矛盾がない
     location: [ bindings/pfd-retro.md, bindings/pfd-retro-patterns/ ]
     group: generation
     tags: [ distilled_doc ]
   roadmap_md:
     label: 計画 companion
     description: "roadmap.pfdsl の sibling。このリポの issue 管理バインディング（GitHub backend、監査スクリプト実パス、L3 reference ポインタ、運用対象の計画 PFD 一覧、issue 固有の終端ゲート項目）。pfd-ops skill が読む L4 ホスト"
-    criteria: roadmap.pfdsl の issue 管理バインディングと散文が一致し、audit-issues-flow.mjs が差分なしで通過
+    criteria: check-companion-bindings と audit-issues-flow.mjs が差分なしで通過する。散文が名指す roadmap.pfdsl のノード・エッジを graph describe で引いて食い違いがない
     location: roadmap.md
     group: planning
   runtime_pipeline_pfdsl:
     label: 変換パイプライン図
     description: "pfdslツールチェーンの実行時データ変換境界（source→AST→正規化グラフ→check/fmt/graph/metadata 出力）。toolchain の変換コンポーネント追加・変更・削除時に更新（ADR-0018 門番）"
-    criteria: check がエラーなし、toolchain の変換境界と整合している
+    criteria: check がエラーなし、meta check-links が通過する。toolchain の各変換段が runtime-pipeline.pfdsl のノードとして現れる
     location: runtime-pipeline.pfdsl
     group: planning
   runtime_pipeline_md:
     label: 変換境界 companion
     description: "runtime-pipeline.pfdsl の sibling。グラフで運べない変換境界の定義・エラー処理方針"
-    criteria: runtime-pipeline.pfdsl の変換境界定義と散文が一致している
+    criteria: check-companion-bindings が参照パスの実在を通す。散文が名指す runtime-pipeline.pfdsl のノード・エッジを graph describe で引いて食い違いがない
     location: runtime-pipeline.md
     group: planning
 
