@@ -33,7 +33,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
   - best 候補プロセスの出力 artifact キーを `status ready --json` の `outputs` フィールドから引き、実行すべき `gate-check.mjs --artifact <key>` の完成形コマンド行を `gateCheckCommand` で出力する（転記ミス・フォールバック判定への意図しない低下を防ぐ。roadmap.pfdsl 自前 regex パースは二重パースで構文変更に弱いため CLI 側の `outputs` フィールドを正とする）
 - **終端ゲートの機械項目と報告材料（pfd-ops 手順3・#462）**: `GH_HOST=github.com node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n> ...]` — 内部で `git fetch origin` を試みたうえで `origin/<base>...HEAD` を基準に差分を取る（fetch 失敗時も既存 remote-tracking ref で続行し、ref 自体が無ければ明示エラーで終了する）。**項目名・PASS/FAIL/SKIP の判定・SKIP 条件はここに列挙しない** — スクリプトの出力が自己記述的であり、実行すれば全項目が detail 付きで印字される（#560。列挙をここに置くとスクリプト変更のたび手で追随することになり、追随を保証する機構が無い）。`--artifact <key>` を渡すと status 更新・wip 経由の両方をその artifact に厳密スコープする（省略時はどちらも粗いフォールバック判定になる旨を detail に明示）。出力 artifact を持たないサイクル（`flow:exempt` の bookkeeping 等）は `--no-artifact` で宣言する — `roadmap.pfdsl` を status 以外の理由で触ると、宣言なしでは構造的に FAIL する（#564）。表のほかに報告材料（PASS/FAIL でなく判断材料）が印字される。**その種類・件数・内容もここに列挙しない** — 上と同じ理由で、スクリプトの出力が節見出しごと自己記述する（#839。列挙を置いた結果、実際に2種で止まったまま実体が6種へ増えた）。判定不能な残り項目は `MANUAL:` prefix で列挙される — 抽出元は `scripts/lib/gate-check.mjs` の `GATE_CHECKLIST_SOURCE_PATH` が指すファイルの終端ゲートチェックリストで、実行時に抽出するため手打ちコピーは持たない。その項目のみ個別に確認する
 - **そのサイクルが閉じる issue を毎サイクル全て渡す（#669・#734）**: `--issue <n>` は繰り返し指定でき、渡した issue ごとに `design-selection record` と `knowledge-artifact size direction` の2項目が1行ずつ評価される。省略すると両項目とも SKIP する（対象 issue を推測しないため）。複数 issue を閉じる回で1件しか渡さないと、渡さなかった issue はゲートを一度も通らないまま表は緑になる — 選択記録の保証が必要なのは閉じる N 件すべてであって、そのうち1件ではない。判定条件は他項目と同じくスクリプト出力の detail が自己記述する — ここには列挙しない。運用側が事前に知る必要がある入力契約は4つで、選択記録の書式は L3 reference「設計確定の証拠」、知識成果物の縮小を目的とする issue は本文に行頭 `Size-Intent: shrink` を書く（これが無い回はサイズ方向の判定を行わない — 語句一致で意図を推し量ると、他 issue の案名を引用しただけで発火する）、サイズ増加を意図的に通す回はコミット trailer の `Size-Override: <理由>`（理由なしの素通しを避けるためトークンだけでは通らない。`Review:` と同じ trailer 領域を走査するので、散文中に書いても宣言にはならない）、実装しないと決めた回は選択記録に行頭 `実装しない: <理由>` を書く（これが無い回は通常どおり timing 判定を行う — `Size-Intent: shrink` と同じ行頭一致で判定するため、前提・否定案・却下理由の中でこの語に触れるだけでは宣言にならない）。宣言の有無に関わらず、変更された知識成果物のバイト・行差分は報告材料として常に印字される。`cycle-status.mjs` の `gateCheckCommand` にはこのフラグが埋め込まれるので、そのままコピーすれば渡し漏れない。`cycle-status.mjs` 側の `--issue` も繰り返し指定でき、渡した分だけ `designUnsettledFor` に判定が並び、`gateCheckCommand` にも全件が並ぶ — サイクルが閉じる issue が preflight の時点で分かっているなら、そこで全て渡しておけば終端ゲートへの転記で落ちない
-- どちらも `packages/cli/dist/cli.js` の存在を前提にする箇所がある（worktree では先に `pnpm install && pnpm -r build` を済ませる）。`gate-check.mjs` はビルド未完了でも最後まで走り、項目名・SKIP 条件・MANUAL 一覧は通常どおり印字される（CLI に依存する `pfdsl check` と gen-plugin identity の2項目が FAIL になるだけ。実測 #560）
+- どちらも `packages/cli/dist/cli.js` の存在を前提にする箇所がある（ビルドの前提は下の「worktree 前提」節）。`gate-check.mjs` はビルド未完了でも最後まで走り、項目名・SKIP 条件・MANUAL 一覧は通常どおり印字される（CLI に依存する `pfdsl check` と gen-plugin identity の2項目が FAIL になるだけ。実測 #560）
 
 ## 自動生成 PR（ワークサイクル選択前に確認）
 
@@ -125,7 +125,9 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順1 が一次情報。
 実際に起きた干渉の症状・検出（`git stash list` を先に見る等）・復旧手順は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。
 
-**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。`.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する。ビルドは不要。
+**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
+`.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する（ビルドは不要）。
+`make setup` が入れる pre-commit hook のシムについては CLAUDE.md「セットアップ」節が一次情報。
 
 **vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。クリック・ホバー等の UI 挙動変更（DocumentLinkProvider・HoverProvider 等）、または preview/export の描画内容変更（statusStyles・tag・group 解決ロジック等）を含む場合は `/vscode-ext-debug` スキルで PR 作成前に実動作確認し、ユーザーの確認結果を受け取るまで完了とみなさない。
 
@@ -136,11 +138,8 @@ worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cyc
 トークンの有無でなくリンクの有無を見るため、コードフェンス内の `Closes #<n>` は通らない。
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順2 が一次情報）。
-pre-commit hook（`.git/hooks/`）は全 worktree 共有で、他ブランチのセッションが `make setup` を実行すると当該ブランチ版の hook に置き換わる — 自ブランチに存在しないファイル・ターゲットを hook が要求して commit が拒否されたら、自 worktree で `make setup` を実行して hook を入れ直す。
-`scripts/main-commit-guard.mjs` は `git commit` に加えてツリー・インデックスを変える git コマンドも見る（#777。deny / ask を分ける原則は CLAUDE.md「コミット粒度」節、割り当ての一次情報は `scripts/lib/main-commit-guard.mjs` の定数）。
-読み取り系は素通しするので、main repo のツリーを読むだけの操作は従来どおり動く。
 **worktree のパスはシェル変数に入れず literal で書く**。
-guard は hook の payload だけを見る静的解析なので `git -C $W commit` の `$W` を解決できず、payload の cwd（cwd が戻っていれば main repo）で判定して deny する。
+`scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）は hook の payload だけを見る静的解析なので `git -C $W commit` の `$W` を解決できず、payload の cwd（cwd が戻っていれば main repo）で判定して deny する。
 `git -C /Users/.../.claude/worktrees/<name> commit` と書けば通る。
 なお deny は Bash 呼び出し全体を止めるため、`git -C $W add … && git -C $W commit …` が弾かれたときは add も実行されていない。
 
