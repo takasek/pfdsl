@@ -106,7 +106,9 @@ export function renderSelection(patterns, query) {
 		for (const h of hits) lines.push(`    L${h.line} ${h.word}: ${h.text}`);
 	}
 
-	lines.push(`\n## always (${always.length})`);
+	lines.push(
+		`\n## always (${always.length}) — held regardless of what you passed`,
+	);
 	for (const p of always) lines.push(renderPattern(p));
 
 	const shown = tagged.length + wordOnly.length + always.length;
