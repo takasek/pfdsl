@@ -6,9 +6,8 @@ pfd-ops 運用に紐づく、Claude へ恒常的に届けたい指示（PR 本�
 
 ## 配置ファイル鮮度セルフチェックはこのリポでは repo-local 版を正とする
 
-このリポは pfd-ops スキルの上流であり、`.claude/skills/pfd-ops/` が canonical、plugin cache 配下（`~/.claude/plugins/cache/pfdsl/pfdsl/<version>/`）はそこから配布された過去のスナップショットである。SKILL.md の鮮度セルフチェックはコマンド行のパス置換有無でロード元を判定するが、その判定はどちらの版で走らせるかしか決めず、**両方が実在してかつ食い違うこのリポの状況**を扱わない。
-
-plugin cache の版が上流より古い場合、その `check-install-sync.mjs --upstream` は古い canonical の `install/` を基準に照合するため、その後にリネームされたパスをすべて `missing` + `orphaned` として報告する。実体は drift でなく plugin の陳腐化であり、`--deploy` で追随してはならない（古いファイルを復活させる）。
+このリポは pfd-ops スキルの上流であり、`.claude/skills/pfd-ops/` が canonical、plugin cache 配下（`~/.claude/plugins/cache/pfdsl/pfdsl/<version>/`）はそこから配布された過去のスナップショットである。
+両方が実在して食い違う状況を SKILL.md のロード元判定が扱わないこと、古い側の報告が drift でなく陳腐化であること、`--deploy` で追随してはならないことは `.pfdsl/bindings/pfd-retro-patterns/duplicate-self-check-tool.md` が一次情報。
 
 したがってこのリポでは、pfd-ops 発火時のセルフチェックは `node .claude/skills/pfd-ops/scripts/check-install-sync.mjs --upstream` で実行する。plugin cache 版が drift を報告し repo-local 版が in sync を報告した場合、差分は plugin の版差であり、対応は `--deploy` ではなく plugin 更新の案内である。
 
@@ -24,7 +23,7 @@ node scripts/check-scaffold-sync.mjs
 
 `pfdsl` / `npx pfdsl` は npm 公開版の `@pfdsl/cli` を走らせる。
 このリポは上流であり、公開版は main より必ず遅れているため、公開版で `.pfdsl` を検査すると main で既に直っている欠陥を実在の所見として拾う。
-`--version` はどちらも同じ番号を返すので、番号を見比べても区別できない。
+同じ番号を名乗る2実体を番号では判別できない形は `.pfdsl/bindings/pfd-retro-patterns/duplicate-name-not-a-discriminator.md` が一次情報。
 
 したがって手で CLI を叩く場合も `node packages/cli/dist/cli.js <cmd>` を使う（`cycle-status.mjs` / `gate-check.mjs` および `.pfdsl` の `command:` フィールドが既にこの形を使っている — 手打ちだけが例外になっていた）。
 worktree では先に `pnpm install && pnpm -r build` を済ませる。
