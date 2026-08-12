@@ -12,11 +12,9 @@
 
 このリポが pfdsl スキルの上流であるため経路1（品質ガイド改訂）が成立する。配布先リポでは経路1は存在しない場合がある。
 
-**散文として書く前に機械化を検討する**: 上記いずれかの経路で companion 等に散文を追記する前に、その内容が機械判定できるか（コマンド文字列・ファイルパス・git の状態から決まるか）を確認する。機械判定できるなら、原則として hook 化が散文に優先する — 散文は読まれて初めて効くが、hook は毎回必ず発火する。散文にとどめてよいのは例外に当たる場合だけで、例外は2つ: (a) 守り忘れたときのコストが警告を出すコスト（hook の実装・維持・誤発火の煩わしさ）を明確には上回らない、(b) 既存機構（pre-commit・gate-check・CI）が既に同じ対象を検査しており hook が重複になる。どちらにも当たらないなら hook 化を先に済ませ、散文はその後で書く。
-
-**hook の決定の選べる幅は event で決まる**: PreToolUse には Claude に届く advisory チャネルが無い（`hookSpecificOutput.additionalContext` は PostToolUse 系専用で、exit 0 の stderr は Claude に渡らない）。したがって PreToolUse で機械化するルールの選択肢は `deny`（対処法をメッセージに書けば1回の retry で自己修復する。対処済みかがルール側から見えるものに限る）と `ask`（人間に判断を渡す。対処済みかが payload から見えないルールはこちら — deny にすると retry も同じく止まって抜け道が無くなる）の2つで、「既定は advisory」は PreToolUse では成立しない。advisory で足りるルールは PostToolUse に寄せる（書き込み後の lint・起票直後の登録促しがこの形）。
-
-hook 化した場合、散文は「hook の deny/advisory メッセージが全情報を運ぶなら書かない」「hook でカバーしきれない残りだけを書く」のどちらかにとどめる — hook へのポインタを機械的に書き足すだけでは、メッセージと重複する散文が残る（#650 の retro で発覚。#650 本文の3条件は、機械判定できる候補が複数出揃った状況でどれに着手するかを絞り込む AND フィルタであり、書く前の毎回の判断にそのまま持ち込むと機械化優先の原則が弱まる）。
+散文として書く前の機械化の検討と、hook で機械化する場合に event が決める決定の幅は、pfd-ops SKILL.md のプロトコル6が一次情報。
+このリポの既存機構は pre-commit・`gate-check.mjs`・CI であり、例外 (b)（重複になる）の判定はこの3つに対して行う。
+#650 本文の3条件は、機械判定できる候補が複数出揃った状況でどれに着手するかを絞り込む AND フィルタであり、書く前の毎回の判断にそのまま持ち込むと機械化優先の原則が弱まる。
 
 ## 学習ループ
 
@@ -83,7 +81,9 @@ issue が spec 変更を明示しており、変更が単一の制約節・sever
 
 ### 委譲時の入力（構造捏造の予防）
 
-proposal 起草を subagent に委譲する場合、対象 spec の**現行 frontmatter キー構造・制約節番号**を委譲入力に明示する（`spec.md` の該当節を読ませる/grep させる）。渡さないと存在しない構造を捏造する（2026-06-20: spec に無い `presentation` ブロックを捏造 — review-perspectives A「入力充足」の委譲版。戻り後レビューで検出したが、入力を渡せば捏造自体を予防できる）。
+一般形（生成物が適合すべき既存構造は実物から読んで委譲入力に明示する）は pfd-ops `references/work-cycle.md` 手順2 適用点3 が一次情報。
+proposal 起草での「既存構造」は対象 spec の現行 frontmatter キー構造・制約節番号であり、`spec.md` の該当節を読ませる/grep させることで渡す。
+渡さなかった実例が 2026-06-20 の捏造（spec に無い `presentation` ブロック — review-perspectives A「入力充足」の委譲版）で、戻り後レビューで検出した。
 
 ## .pfdsl 変更後のスナップショット更新
 
@@ -163,7 +163,9 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 ## subagent へ worktree 作成を委譲する場合の安全確認
 
-`.claude/agents/` の agent に worktree 作成を含むフローを委譲する場合、`superpowers:using-git-worktrees` skill の Step 0（既存 isolation 検出時は再利用）を素通しにしない。subagent は呼び出し元セッションが使用中の worktree 内で起動されることがあり、Step 0 はその共有 worktree を「既存の分離ワークスペース」と誤認識して乗っ取る（issue #439 の issue-worker 試走で発生。呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねない）。agent 定義側で「Step 0 をバイパスし常に新規 worktree を作成する」旨を明記する（例: `.claude/agents/issue-worker.md`）。
+一般形は pfd-ops `references/work-cycle.md` 手順2「委譲先の外向き操作の制御」の 1（agent の選択）が一次情報。
+このリポで再利用判定を持つ手順は `superpowers:using-git-worktrees` skill の Step 0（既存 isolation 検出時は再利用）で、バイパスを明記する先は `.claude/agents/` の agent 定義（例: `.claude/agents/issue-worker.md`）。
+乗っ取りが実際に起きたのは issue #439 の issue-worker 試走で、呼び出し元ブランチは無傷で復旧できたが、一歩間違えば作業中のコミット履歴を破壊しかねなかった。
 
 ## workflow.pfdsl に登録する agent の範囲
 
@@ -193,7 +195,9 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 ## PreToolUse ガードの artifact 登録基準（#854）
 
-`.claude/settings.json` に配線された PreToolUse ガードのうち、`externalize_bindings` の出力として `workflow.pfdsl` に artifact 登録するのは、pfd-ops 運用プロトコル文書（`references/work-cycle.md`・CLAUDE.md）が名指しで要求する一般的機構だけに限る。個別 issue から生まれたリポ固有の事故防止ガード（`stale-dist-guard` / `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` 等）は登録しない。
+一般形（運用機構を運用図に登録するのは運用プロトコル文書が名指しで要求する一般的機構だけ）は pfd-ops SKILL.md プロトコル5が一次情報。
+このリポでの適用対象は `.claude/settings.json` に配線された PreToolUse ガードで、登録先は `externalize_bindings` の出力としての `workflow.pfdsl`、名指しの出所は `references/work-cycle.md` と CLAUDE.md である。
+登録しない側に当たるのは `stale-dist-guard` / `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` 等。
 
 現在 artifact 登録済みの2件はこの基準に該当する: `delegation_guard`（`references/work-cycle.md` 手順2「委譲先の外向き操作の制御」節が要求）・`main_branch_guard`（同手順2冒頭「main 直コミットしない」・CLAUDE.md「コミット粒度」節が要求）。それ以外は個別 issue 番号（#642, #650, #871, #840 等）に紐づく実装的ガードであり、登録しない。
 
@@ -226,10 +230,6 @@ roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョ�
 ## コアライブラリ型を拡張する場合の設計判断
 
 vscode-extension 等で新しいノード種別をホバー対応する場合、「`NodeKind`（コア公開型）に追加する」vs「provider 内で独自チェックする」の選択が生じる。判断基準: `analyze()` の `nodeKinds` マップに新種別が自然に乗る（frontmatter でスコープが確定する）なら型に追加する。provider ローカルの一時的な判定なら独自チェックにとどめる。コアへの変更は全パッケージの再ビルドと `Record<NodeKind, ...>` の exhaustive check 修正が必要になるため、影響範囲を確認してから選択する。
-
-## CI成果物の格納先変更時の workflow.pfdsl 更新
-
-CI が生成・push する成果物（`pr_diagrams` 等）の格納先・push 方式を変える PR では、対応する `workflow.pfdsl` artifact の `description` / `criteria` / `location` を同一 PR で更新する。格納先の変更は artifact の定義を変えるため、workflow 図と実装が乖離する。
 
 ## 終端ゲートの根拠
 
