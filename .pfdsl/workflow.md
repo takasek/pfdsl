@@ -169,9 +169,9 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 ## workflow.pfdsl に登録する agent の範囲
 
-一般形（登録するのはプロトコル文書が一般形で名指しする機構か、外部へ配る成果物に含まれるものだけ）は pfd-ops SKILL.md プロトコル5が一次情報。
-このリポで基準(2)に当たるのは plugin 同梱の配布物（`PLUGIN_AGENT_FILES`）で、repo scope の agent（plugin 同梱から除外したもの）は登録しない。
-配布物は `distill_ops` の出力であり採用リポの運用に届くのに対し、repo scope の agent はこのリポの開発都合の道具で、変換グラフの参加者ではないため。
+一般形（登録するのは図の変換の参加者だけで、参加者性の代理を基準に据えない）は pfd-ops SKILL.md プロトコル5が一次情報。
+このリポで参加者に当たるのは plugin 同梱の配布物（`PLUGIN_AGENT_FILES`）の agent で、repo scope の agent（plugin 同梱から除外したもの）は登録しない。
+配布物は採用リポの運用に届き、図のプロセスがそれを要求するのに対し、repo scope の agent はこのリポの開発都合の道具で、要求している図のプロセスも、生産・消費している図の成果物も名指しできないため。
 
 ## agent を追加するサイクルの動作確認
 
@@ -202,8 +202,8 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 現在 artifact 登録済みの2件はこの基準に該当する: `delegation_guard`（`references/work-cycle.md` 手順2「委譲先の外向き操作の制御」が要求する機構であり、`externalize_bindings` の出力として生まれる）・`main_branch_guard`（同手順2冒頭「main 直コミットしない」・CLAUDE.md「コミット粒度」節が要求する機構で、同じく `externalize_bindings` の出力）。
 **issue 番号に紐づくことは非参加者の判定根拠にならない** — `main_branch_guard` 自身が #650 由来である。区別は出自の issue でなく、運用手順がその機構を要求しているか（＝図のプロセスの出力として生まれるか）で付ける。
 
-判定に迷う新規ガードは、そのガードが図のどのプロセスの出力として生まれるか、図のどの成果物を生産・消費するかを言えるかで振り分ける。
-言えなければ参加者ではない。
+判定に迷う新規ガードは、そのガードを要求している図のプロセスを名指しできるかで振り分ける。
+`externalize_bindings` の出力だと言えることは根拠にならない — 同 description が「PreToolUse ガード機構へ外化する」と書いているため、登録しない側の6つも等しくそう言える。
 
 ## flow:exempt issue の roadmap 追加除外
 
