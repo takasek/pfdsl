@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
 	formatGateFailure,
 	inScope,
+	repoDeps,
 	runAssetSweepCheck,
 	SWEEP_TARGETS,
 } from "./asset-sweep.mjs";
@@ -171,5 +172,35 @@ describe("formatGateFailure", () => {
 			},
 		]);
 		assert.match(message, /git fetch/);
+	});
+});
+
+describe("repoDeps", () => {
+	const captureDiffArgs = (target) => {
+		let seen;
+		const exec = (args) => {
+			seen = args;
+			return "";
+		};
+		repoDeps("/repo", { exec }).changedSince(target, "abc1234");
+		return seen;
+	};
+
+	it("counts additions, not edits", () => {
+		assert.ok(captureDiffArgs(RETRO_TARGET).includes("--diff-filter=A"));
+	});
+
+	it("turns rename detection off so a deletion cannot cancel an addition", () => {
+		// git pairs a delete with a similar-enough add and reports R, which
+		// --diff-filter=A then drops. The catalog's own files share a template,
+		// and retiring one pattern while adding another is an ordinary cycle
+		// here, so the pairing would silently subtract from the accumulation
+		// the threshold exists to measure.
+		assert.ok(captureDiffArgs(RETRO_TARGET).includes("--no-renames"));
+	});
+
+	it("scopes the diff to the target's own prefixes", () => {
+		const args = captureDiffArgs(RETRO_TARGET);
+		assert.deepEqual(args.slice(args.indexOf("--") + 1), RETRO_TARGET.prefixes);
 	});
 });
