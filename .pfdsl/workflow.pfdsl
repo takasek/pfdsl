@@ -96,17 +96,17 @@ artifact:
   topics:
     label: 実践お題
     description: "対話で設定された実践 PFD の題材・シナリオ。write_examples の入力"
-    criteria: write_examples が着手できる具体的な題材・シナリオとして対話ログに記録されている
+    criteria: write_examples が着手できる題材・シナリオが、そのサイクルの issue コメントまたは PR 本文に残っている
     group: dialogue
   proposals:
     label: 作業・仕様提案
     description: "対話で生まれた作業項目・仕様変更案。正式化は必ず file_issues を通る — 仕様変更が issue を経由する唯一の入口"
-    criteria: file_issues が起票判断できる粒度で対話ログに記録されている
+    criteria: file_issues が起票判断できる粒度の作業項目が、そのサイクルの issue コメントまたは PR 本文に残っている
     group: dialogue
   decisions:
     label: 方法論判断
     description: "対話で確定した方法論・運用の判断。品質ガイド即時反映（maintain_template）とADR 起草（draft_adrs）の2経路で消費 — スキル改善は issue を通さない。実体はセッションログと反映先コミットで検証可能"
-    criteria: draft_adrs または maintain_template が反映判断できる確定判断として対話ログに記録されている
+    criteria: draft_adrs または maintain_template が反映判断できる確定判断が、issue コメント・PR 本文または ADR 草稿に残っている
     group: dialogue
   examples:
     label: 実践例
