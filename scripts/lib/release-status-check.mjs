@@ -3,6 +3,8 @@
  * Network I/O lives in the main script; this module stays testable.
  */
 
+import { formatRecordStamp } from "./review-record-gate.mjs";
+
 /** @returns {'equal' | 'local-ahead' | 'published-ahead'} */
 export function compareVersions(local, published) {
 	const parse = (v) => v.split(".").map(Number);
@@ -74,9 +76,7 @@ export function formatSkillBundleStatus(commitCount, sinceTag) {
  */
 export function formatDistributionReviewStatus({ record, unreviewedCount }) {
 	const name = "distribution review (plugin/pfdsl prompts)";
-	const at = record.commit
-		? `${record.commit.slice(0, 7)} ${record.date ?? ""}`.trim()
-		: null;
+	const at = formatRecordStamp(record);
 	// undefined means the gate could not read the recorded commit at all.
 	// Printing "current" there would contradict the release gate's refusal.
 	if (unreviewedCount === undefined)
@@ -100,9 +100,7 @@ export function formatAssetSweepStatus(evaluations) {
 		.map(({ target, record, result }) => {
 			if (result.unreachable)
 				return `  ${target.label} ! cannot determine (recorded sweep commit ${result.base} is not in this clone)`;
-			const at = record?.commit
-				? `${record.commit.slice(0, 7)} ${record.date ?? ""}`.trim()
-				: null;
+			const at = formatRecordStamp(record);
 			if (!result.ok) {
 				const since = at ? `since ${at}` : "never swept";
 				return `  ${target.label} ! ${result.files.length} added file(s) (${since}, threshold ${target.threshold})`;

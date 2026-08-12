@@ -27,6 +27,19 @@ export function diffBase(record) {
 }
 
 /**
+ * A record rendered for a human: short commit and the date it was approved,
+ * or null when there is no record to name. Lives with the record shape rather
+ * than with any one caller's wording — every gate here reads the same two
+ * fields, and three sites had grown their own copy of this two-line join.
+ * @param {{commit?: string | null, date?: string} | null | undefined} record
+ * @returns {string | null}
+ */
+export function formatRecordStamp(record) {
+	if (!record?.commit) return null;
+	return `${record.commit.slice(0, 7)} ${record.date ?? ""}`.trim();
+}
+
+/**
  * Deps are injected so the decision can be tested without a repository:
  * readRecord returns the parsed record (null if there is none), commitExists
  * answers whether a hash is in this clone, changedSince lists paths that
