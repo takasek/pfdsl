@@ -8,7 +8,7 @@
 // tests supply parsed structures directly and need no build.
 
 import { PLUGIN_MIRRORS } from "./gen-plugin.mjs";
-import { declarationLine, findUnwiredSkills } from "./skill-wiring-check.mjs";
+import { findUnwiredSkills } from "./skill-wiring-check.mjs";
 
 const WORKFLOW = ".pfdsl/workflow.pfdsl";
 const PIPELINE = ".pfdsl/runtime-pipeline.pfdsl";
@@ -16,14 +16,16 @@ const PIPELINE = ".pfdsl/runtime-pipeline.pfdsl";
 /**
  * @param {{
  *   readFile: (file: string) => string,
- *   analyzeFile: (text: string) => {frontmatter: {artifact?: object}, edges: Array<object>},
+ *   analyzeFile: (text: string) => {document: object, frontmatter: {artifact?: object}, edges: Array<object>},
+ *   locate: (document: object, source: string, id: string, kind: string) => {declarationLine: number | null},
  *   mirrors?: Array<object>,
- * }} deps readFile is root-bound, so paths are repo-relative
+ * }} deps readFile is root-bound, so paths are repo-relative. locate is @pfdsl/core's locateNode (#842)
  * @returns {{exitCode: 0|1, stdoutLines: string[], stderrLines: string[]}}
  */
 export function runSkillWiringCheck({
 	readFile,
 	analyzeFile,
+	locate,
 	mirrors = PLUGIN_MIRRORS,
 }) {
 	const workflowText = readFile(WORKFLOW);
@@ -46,7 +48,12 @@ export function runSkillWiringCheck({
 	}
 
 	const stderrLines = findings.map((finding) => {
-		const line = declarationLine(workflowText, finding.id);
+		const line = locate(
+			workflow.document,
+			workflowText,
+			finding.id,
+			"artifact",
+		).declarationLine;
 		const anchor = line === null ? WORKFLOW : `${WORKFLOW}:${line}`;
 		const location = Array.isArray(finding.location)
 			? finding.location.join(", ")

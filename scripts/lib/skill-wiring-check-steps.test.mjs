@@ -39,11 +39,23 @@ const PIPELINE = {
 	edges: [{ kind: "input", artifact: "retro_skill", process: "gen_plugin" }],
 };
 
-function deps({ workflow = WORKFLOW, pipeline = PIPELINE } = {}) {
+/** Stands in for @pfdsl/core's locateNode: a frontmatter section key's line, by text search. */
+function fakeLocate(_document, source, id) {
+	const lines = source.split("\n");
+	const index = lines.findIndex((line) => line.trimEnd() === `  ${id}:`);
+	return { declarationLine: index === -1 ? null : index + 1 };
+}
+
+function deps({
+	workflow = WORKFLOW,
+	pipeline = PIPELINE,
+	locate = fakeLocate,
+} = {}) {
 	return {
 		readFile: (file) =>
 			file.includes("runtime-pipeline") ? "" : WORKFLOW_TEXT,
 		analyzeFile: (text) => (text === WORKFLOW_TEXT ? workflow : pipeline),
+		locate,
 		mirrors: MIRRORS,
 	};
 }
@@ -64,6 +76,27 @@ describe("runSkillWiringCheck", () => {
 		assert.match(result.stderrLines[0], /workflow\.pfdsl:2:/);
 		assert.match(result.stderrLines[0], /retro_skill/);
 		assert.match(result.stderrLines[0], /gen_plugin inputs/);
+	});
+
+	it("locates the declaration line by delegating to the injected locate function", () => {
+		const calls = [];
+		const result = runSkillWiringCheck(
+			deps({
+				pipeline: { frontmatter: {}, edges: [] },
+				locate: (document, source, id, kind) => {
+					calls.push({ document, source, id, kind });
+					return fakeLocate(document, source, id);
+				},
+			}),
+		);
+		assert.equal(calls.length, 1);
+		assert.deepEqual(calls[0], {
+			document: WORKFLOW.document,
+			source: WORKFLOW_TEXT,
+			id: "retro_skill",
+			kind: "artifact",
+		});
+		assert.match(result.stderrLines[0], /workflow\.pfdsl:2:/);
 	});
 
 	it("still reports when the declaration line cannot be located", () => {
