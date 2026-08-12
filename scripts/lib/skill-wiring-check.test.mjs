@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-	declarationLine,
 	edgeMembers,
 	findUnwiredSkills,
 	isBundledSource,
@@ -124,18 +123,6 @@ describe("edgeMembers", () => {
 				.size,
 			0,
 		);
-	});
-});
-
-describe("declarationLine", () => {
-	const text = "artifact:\n  retro_skill:\n    label: x\n  grill_skill:\n";
-
-	it("finds the line an artifact is declared on", () => {
-		assert.equal(declarationLine(text, "grill_skill"), 4);
-	});
-
-	it("is null for an id that is not declared here", () => {
-		assert.equal(declarationLine(text, "absent_skill"), null);
 	});
 });
 

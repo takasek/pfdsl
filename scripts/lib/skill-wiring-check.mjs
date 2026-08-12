@@ -67,20 +67,6 @@ export function edgeMembers(edges, { kind, process }) {
 }
 
 /**
- * The line an artifact is declared on, for the report's file:line anchor.
- * Cosmetic only — nothing this check decides depends on it, since the
- * frontmatter analyze() returns carries no positions.
- * @param {string} text .pfdsl source
- * @param {string} id
- * @returns {number | null}
- */
-export function declarationLine(text, id) {
-	const lines = text.split("\n");
-	const index = lines.findIndex((line) => line.trimEnd() === `  ${id}:`);
-	return index === -1 ? null : index + 1;
-}
-
-/**
  * The distributed hand-written artifacts missing from one or both of the edges
  * that model them. `location` may be a scalar path or (per spec.md §15.8) an
  * array of them — an artifact counts as bundled if any one of its locations

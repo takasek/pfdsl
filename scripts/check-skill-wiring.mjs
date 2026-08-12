@@ -25,11 +25,14 @@ import { emitLinesAndExit } from "./lib/emit-lines.mjs";
 import { runSkillWiringCheck } from "./lib/skill-wiring-check-steps.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const { analyze } = await import(resolve(root, "packages/core/dist/index.js"));
+const { analyze, locateNode } = await import(
+	resolve(root, "packages/core/dist/index.js")
+);
 
 emitLinesAndExit(
 	runSkillWiringCheck({
 		readFile: (file) => readFileSync(resolve(root, file), "utf-8"),
 		analyzeFile: (text) => analyze(text),
+		locate: locateNode,
 	}),
 );
