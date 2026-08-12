@@ -121,7 +121,9 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 - [ ] 実装を subagent へ委譲した場合、戻り時に `git log origin/<branch>..HEAD` と open PR 一覧を確認し、委譲先がブリーフの留保作業（push・PR 作成・issue 操作）を実行していないか照合した
 - [ ] コード変更のあるサイクルでは、観点1（品質）の記録に加えて観点2（correctness）または観点3（設計妥当性）の記録が入っていることを、コミット直前に確認した。レビュー実施とコミット作成の間に他の作業（PR 作成・push 等）を挟むと記載を失念しやすい — 実施済みで未記載のまま次の作業に進んでいないか、コミット直前に再確認する
 
-**サイクルは worktree で回す**: ブランチをルート作業ツリー（`~/works/pfdsl` 直下）で切らない。ルートツリーの HEAD は複数のセッションが共有する資源で、他セッションの `git stash` / `git switch` が自分の未コミット編集をツリーから取り去り HEAD を別ブランチへ移す。編集ツールは成功を返すため、消失は次に同じ箇所を触るまで検出されない。消えた編集を探すときは `git stash list` を先に見る（`git stash` は内部で reset を行うため reflog では `git reset` と区別がつかない）。
+**サイクルは worktree で回す**: このリポのルート作業ツリーは `~/works/pfdsl` 直下で、worktree は `.claude/worktrees/<name>/` に置く。
+worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順1 が一次情報。
+実際に起きた干渉の症状・検出（`git stash list` を先に見る等）・復旧手順は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。`.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する。ビルドは不要。
 
@@ -133,7 +135,8 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 判定は CI の `check-closes-reference.yml` が持ち、終端ゲートには項目を置かない — 根拠は GitHub が本文から導出する issue リンクであり、PR 作成前に走る終端ゲートの時点ではリンクも本文も存在しない。
 トークンの有無でなくリンクの有無を見るため、コードフェンス内の `Closes #<n>` は通らない。
 
-**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。pre-commit hook（`.git/hooks/`）は全 worktree 共有で、他ブランチのセッションが `make setup` を実行すると当該ブランチ版の hook に置き換わる — 自ブランチに存在しないファイル・ターゲットを hook が要求して commit が拒否されたら、自 worktree で `make setup` を実行して hook を入れ直す。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる。
+**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順2 が一次情報）。
+pre-commit hook（`.git/hooks/`）は全 worktree 共有で、他ブランチのセッションが `make setup` を実行すると当該ブランチ版の hook に置き換わる — 自ブランチに存在しないファイル・ターゲットを hook が要求して commit が拒否されたら、自 worktree で `make setup` を実行して hook を入れ直す。
 `scripts/main-commit-guard.mjs` は `git commit` に加えてツリー・インデックスを変える git コマンドも見る（#777。deny / ask を分ける原則は CLAUDE.md「コミット粒度」節、割り当ての一次情報は `scripts/lib/main-commit-guard.mjs` の定数）。
 読み取り系は素通しするので、main repo のツリーを読むだけの操作は従来どおり動く。
 **worktree のパスはシェル変数に入れず literal で書く**。
