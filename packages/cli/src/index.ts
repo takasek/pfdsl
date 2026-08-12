@@ -512,6 +512,13 @@ export interface ReadyOptions {
 	color?: boolean;
 }
 
+export interface StatusReadyItem {
+	id: string;
+	label: string;
+	inputs: string[];
+	outputs: string[];
+}
+
 /**
  * Whether an input artifact stops gating its consumers. An omitted status
  * counts as satisfied — a roadmap that tracks status on only some artifacts
@@ -731,13 +738,7 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 		});
 	}
 
-	type ReadyItem = {
-		id: string;
-		label: string;
-		inputs: string[];
-		outputs: string[];
-	};
-	const toItem = (pid: string): ReadyItem => ({
+	const toItem = (pid: string): StatusReadyItem => ({
 		id: pid,
 		label: frontmatter?.process?.[pid]?.label ?? pid,
 		inputs: processInputs.get(pid) ?? [],
