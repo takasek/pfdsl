@@ -163,7 +163,7 @@ artifact:
   published_libraries:
     label: npm 公開ライブラリ群
     description: "runtime-pipeline.pfdsl の publish_packages が生産する。toolchain のライブラリ部分が変更されたら公開が必要という判定は decide_release が担う。この図では README 更新の入力に現れる"
-    criteria: npm view @pfdsl/core versions に packages/core/package.json の version が含まれる
+    criteria: npm view @pfdsl/core・@pfdsl/graphviz-exporter・@pfdsl/preview-engine の versions に、それぞれ packages/core・packages/graphviz-exporter・packages/preview-engine の package.json の version が含まれる
     location: https://www.npmjs.com/package/@pfdsl/core
     group: release
   pull_request:
