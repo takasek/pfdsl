@@ -90,7 +90,12 @@ export type {
 	Token,
 	TokenType,
 } from "./types/index.js";
-export { PFD_TYPE_VALUES, STATUS_VALUES, STYLE_ATTRS } from "./types/index.js";
+export {
+	isRoadmapType,
+	PFD_TYPE_VALUES,
+	STATUS_VALUES,
+	STYLE_ATTRS,
+} from "./types/index.js";
 export { detectChildIndent, escapeRe, setFrontmatterField };
 
 export interface ParseDocResult {

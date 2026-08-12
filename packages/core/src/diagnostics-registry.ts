@@ -299,6 +299,11 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		summary:
 			"a file with no `type:` is treated as roadmap in a ready-gate context (ready / status-set / audit-sync)",
 	},
+	W007: {
+		severities: ["warning", "error"],
+		section: "15.16",
+		summary: "a non-roadmap file's artifact has `status:` set",
+	},
 
 	L001: {
 		severities: ["error"],

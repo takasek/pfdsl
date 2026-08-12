@@ -1,6 +1,6 @@
 import { zeroRange } from "../position.js";
 import type { Diagnostic } from "../types/index.js";
-import { PFD_TYPE_VALUES } from "../types/index.js";
+import { isRoadmapType, PFD_TYPE_VALUES } from "../types/index.js";
 import type { RuleContext } from "./context.js";
 
 const PFD_TYPE_SET: ReadonlySet<string> = new Set(PFD_TYPE_VALUES);
@@ -50,6 +50,29 @@ export function roadmapStatusPresence(ctx: RuleContext): Diagnostic[] {
 				range: ctx.rangeOf(aid),
 			});
 		}
+	}
+	return diagnostics;
+}
+
+/**
+ * W007: outside a roadmap, an artifact carries no progress of its own (§15.16).
+ * The same id can appear in several diagrams, so status lives in one of them —
+ * a flow file that declares it lets two diagrams claim different states for the
+ * same thing. Mirror of W005, which exempts files with no `type:` for the same
+ * reason this one does: an omitted kind declares nothing to hold them to.
+ */
+export function flowStatusAbsence(ctx: RuleContext): Diagnostic[] {
+	const type = ctx.fm?.type;
+	if (isRoadmapType(type)) return [];
+	const diagnostics: Diagnostic[] = [];
+	for (const [aid, meta] of Object.entries(ctx.artifactMeta)) {
+		if (meta?.status === undefined) continue;
+		diagnostics.push({
+			severity: ctx.strictly("warning"),
+			code: "W007",
+			message: `Artifact '${aid}' has 'status' set in a '${type}' file; status belongs to the roadmap`,
+			range: ctx.rangeOf(aid),
+		});
 	}
 	return diagnostics;
 }

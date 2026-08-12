@@ -1018,4 +1018,96 @@ a >> design -> b
 			expect(w005?.severity).toBe("error");
 		});
 	});
+
+	describe("W007: status declared in a non-roadmap file (#787)", () => {
+		// W007 is the mirror of W005: progress belongs to the roadmap, so a file
+		// that explicitly declares any other kind must not carry status at all.
+
+		// Every explicit kind other than roadmap is a flow kind, so driving the
+		// cases off the enum keeps the claim true for kinds added later.
+		it.each(
+			PFD_TYPE_VALUES.filter((type) => type !== "roadmap"),
+		)("warns when an artifact has status in a %s file", (type) => {
+			const fm: Frontmatter = {
+				type,
+				artifact: { B: { status: "wip" } },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("W007");
+		});
+
+		// W007 asks only whether a status is present, so every member of the
+		// enum must trigger it.
+		it.each(STATUS_VALUES)("warns for status: %s", (status) => {
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { B: { status } },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("W007");
+		});
+
+		it("warns for a source artifact too (input-only)", () => {
+			// Unlike W005, W007 does not exempt source artifacts: the rule is
+			// that a flow file carries no status anywhere.
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { A: { status: "done" } },
+			};
+			const diags = diagnose("A >> P -> B", fm);
+			expect(
+				diags.filter((d) => d.code === "W007" && d.message.includes("'A'")),
+			).toHaveLength(1);
+		});
+
+		it("no W007 when no artifact declares a status", () => {
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { A: {}, B: { label: "B" } },
+			};
+			expect(codes("A >> P -> B", fm)).not.toContain("W007");
+		});
+
+		it("no W007 in a roadmap file", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { B: { status: "wip" } },
+			};
+			expect(codes("A >> P -> B", fm)).not.toContain("W007");
+		});
+
+		it("no W007 when type is absent (treated as roadmap, W006 territory)", () => {
+			const fm: Frontmatter = { artifact: { B: { status: "wip" } } };
+			expect(codes("A >> P -> B", fm)).not.toContain("W007");
+		});
+
+		it("reports one diagnostic per offending artifact", () => {
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { A: { status: "done" }, B: { status: "wip" } },
+			};
+			const diags = diagnose("A >> P -> B", fm);
+			expect(diags.filter((d) => d.code === "W007")).toHaveLength(2);
+		});
+
+		it("W007 severity is warning in non-strict mode", () => {
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { B: { status: "wip" } },
+			};
+			const w007 = diagnose("A >> P -> B", fm).find((d) => d.code === "W007");
+			expect(w007?.severity).toBe("warning");
+		});
+
+		it("W007 becomes error in strict mode", () => {
+			const fm: Frontmatter = {
+				type: "workflow",
+				artifact: { B: { status: "wip" } },
+			};
+			const { tokens } = lex("A >> P -> B");
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, fm);
+			const diags = validate(edges, nodeKinds, fm, { strict: true });
+			const w007 = diags.find((d) => d.code === "W007");
+			expect(w007?.severity).toBe("error");
+		});
+	});
 });

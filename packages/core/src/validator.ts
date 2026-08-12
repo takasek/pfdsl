@@ -23,6 +23,7 @@ import { indexShape, styleShape } from "./rules/metadata-shape.js";
 import { partsCycle, partsMembership } from "./rules/parts.js";
 import { revisesChain } from "./rules/revises.js";
 import {
+	flowStatusAbsence,
 	pfdType,
 	readyGateTypeOmitted,
 	roadmapStatusPresence,
@@ -59,6 +60,7 @@ export const RULES: readonly Rule[] = [
 	boundaryWithoutSubflow, // V024
 	groupParentCycle, // V025
 	roadmapStatusPresence, // W005
+	flowStatusAbsence, // W007
 	pfdType, // V031
 	readyGateTypeOmitted, // W006
 ];

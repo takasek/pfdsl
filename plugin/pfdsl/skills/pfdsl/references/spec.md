@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->
 
-# PFDSL仕様書 v0.0.18
+# PFDSL仕様書 v0.0.19
 
 ## 1. 目的
 
@@ -1111,6 +1111,13 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 * **source artifact**（いかなるプロセスの出力でもないもの）は W005 の対象外とする
 * `type:` が `roadmap` 以外（`workflow` / `runtime-pipeline`）または省略されているファイルは W005 の対象外とする
 
+### 15.16 非 roadmap ファイルの status 禁止
+
+* `type:` に `roadmap` 以外の値を明示指定したファイルにおいて、artifact に `status:` が設定されている場合: warning (W007; strict mode では error)。列挙外の値（V031 で error になる値）を指定したファイルも対象に入る — 判定は「`roadmap` と明示されているか」だけを見る
+* produced artifact / source artifact を区別しない。当該ファイルのいずれの artifact も対象とする
+* `type:` が省略されているファイルは W007 の対象外とする。省略は種別を宣言しないため、種別に紐づくこの制約を課さない（§15.14 の「省略時は roadmap として扱う」は `status ready` / `meta set`（status 設定時）/ `status gaps` に限った例外であり、`check` には及ばない）。W005 も同じ理由で省略ファイルを対象外とする（§15.15）
+* 同一 id が複数のファイルに現れうるため、進捗 status の一次情報は roadmap 側に一元化する。flow 種別のファイルが status を宣言すると、2つの図が同じ対象について異なる状態を主張しうる。status 系検査はファイル単位で閉じる（§2.9.1）ため、W003（status 非単調, §15.6）ではこの形を検出できない
+
 ---
 
 ## 16. エラー方針
@@ -1170,6 +1177,7 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 | W004 | warning | §15.13 | 同一名前空間内で `index:` が重複 |
 | W005 | warning (--strict: error) | §15.15 | roadmap ファイルの produced Artifact に `status:` が未設定 |
 | W006 | warning | §15.14 | ready-gate 文脈（status ready / meta set / status gaps）で `type:` 省略ファイルを roadmap として扱う |
+| W007 | warning (--strict: error) | §15.16 | `roadmap` 以外の種別を明示したファイルの Artifact に `status:` が設定されている |
 | L001 | error | §4.2 | quoted-id の閉じ `"` がない |
 | L002 | error | §8 | いずれの有効なトークンも開始しない文字 |
 | N001 | error | §5.1 | front matter で同一IDを artifact と process の両方に宣言 |

@@ -1928,6 +1928,56 @@ req >> design -> spec
 		expect(r.stderr).toContain("stdin");
 	});
 
+	// Status is the roadmap's to carry (§15.14, §15.16). ready / blocked /
+	// status gaps already refuse an explicit non-roadmap type; meta set did not,
+	// so the CLI itself could write the state W007 reports (#923).
+	const flowBase = (type: string) => `---
+type: ${type}
+artifact:
+  req:
+    label: Requirements
+  spec:
+    label: Spec
+---
+req >> design -> spec
+`;
+
+	it.each([
+		"workflow",
+		"runtime-pipeline",
+	])("refuses to set status in a %s file and leaves it untouched", async (type) => {
+		const f = join(dir, `set-status-${type}.pfdsl`);
+		writeFileSync(f, flowBase(type));
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain(`type: ${type}`);
+		expect(readFileSync(f, "utf-8")).toBe(flowBase(type));
+	});
+
+	it("still sets non-status fields in a workflow file", async () => {
+		const f = join(dir, "set-label-workflow.pfdsl");
+		writeFileSync(f, flowBase("workflow"));
+		const r = await run(["meta", "set", f, "req", "label", "Reqs"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toContain("label: Reqs");
+	});
+
+	it("sets status when type: roadmap is explicit", async () => {
+		const f = join(dir, "set-status-roadmap.pfdsl");
+		writeFileSync(f, `---\ntype: roadmap\n${base.slice(4)}`);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).not.toContain("status: todo");
+	});
+
+	it("sets status when type is omitted (treated as roadmap)", async () => {
+		const f = join(dir, "set-status-untyped.pfdsl");
+		writeFileSync(f, base);
+		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).not.toContain("status: todo");
+	});
+
 	it("rewrites artifact status in place and exits 0", async () => {
 		const f = join(dir, "status-set-write.pfdsl");
 		writeFileSync(f, base);
@@ -2066,18 +2116,21 @@ spec >> impl -> code
 		expect(r.stdout).not.toContain("newly ready:");
 	});
 
+	// Ready is a roadmap notion, so a write to any other kind reports none.
+	// The status field can no longer reach this path at all (#923 refuses it),
+	// so the remaining writable fields carry the case.
 	it("non-roadmap file (type: workflow): no newly-ready line in output", async () => {
 		const nonRoadmap = `---
 type: workflow
 artifact:
   req:
-    status: todo
+    label: Requirements
 ---
 req >> design -> spec
 `;
 		const f = join(dir, "status-set-non-roadmap.pfdsl");
 		writeFileSync(f, nonRoadmap);
-		const r = await run(["meta", "set", f, "req", "status", "done"]);
+		const r = await run(["meta", "set", f, "req", "label", "Reqs"]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stdout).not.toContain("newly ready:");
 	});
@@ -2541,12 +2594,14 @@ target >> p -> zz
 });
 
 describe("status gaps", () => {
-	const roadmapWith = (artifacts: string) => {
+	// The body decides what the roadmap produces, and producing is what counts
+	// as tracking — a declaration alone leaves the artifact unbuilt.
+	const roadmapWith = (
+		artifacts: string,
+		body = "req >> build -> output\n",
+	) => {
 		const f = join(dir, "as-roadmap.pfdsl");
-		writeFileSync(
-			f,
-			`---\ntype: roadmap\nartifact:\n${artifacts}---\nreq >> build -> output\n`,
-		);
+		writeFileSync(f, `---\ntype: roadmap\nartifact:\n${artifacts}---\n${body}`);
 		return f;
 	};
 	const flowWith = (artifacts: string) => {
@@ -2555,66 +2610,113 @@ describe("status gaps", () => {
 		return f;
 	};
 
-	it("exits 0 when all todo flow artifacts are in the roadmap", async () => {
+	// The selector is the reserved tag, not status: a flow file carrying status
+	// is itself a violation (W007), so the old status: todo selector could only
+	// ever match files that were already wrong (#787).
+	const TRACKED = "    tags: [roadmap-tracked]\n";
+
+	it("exits 0 when every tagged flow artifact is in the roadmap", async () => {
 		const rm = roadmapWith("  output:\n    status: todo\n");
-		const fl = flowWith("  output:\n    status: todo\n");
+		const fl = flowWith(`  output:\n${TRACKED}`);
 		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).toContain("tracked");
+		expect(r.stdout).toContain("tracked in the roadmap");
 	});
 
-	it("exits 1 and reports gap when todo flow artifact is not in the roadmap", async () => {
+	it("exits 1 and reports gap when a tagged flow artifact is not in the roadmap", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
-		const fl = flowWith(
-			"  missing_artifact:\n    status: todo\n    label: Missing\n",
-		);
+		const fl = flowWith(`  missing_artifact:\n${TRACKED}    label: Missing\n`);
 		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(1);
 		expect(r.stdout).toContain("missing_artifact");
 		expect(r.stdout).toContain("Missing");
 	});
 
-	it("ignores non-todo artifacts in flow files", async () => {
+	it("ignores untagged artifacts in flow files", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
-		const fl = flowWith(
-			"  done_art:\n    status: done\n  wip_art:\n    status: wip\n",
-		);
+		const fl = flowWith("  plain_art:\n    label: Plain\n");
 		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(0);
 	});
 
-	it("distinguishes an empty-target check from an actual pass when no flow artifact has status: todo", async () => {
+	it("ignores artifacts carrying other tags", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
-		const fl = flowWith(
-			"  done_art:\n    status: done\n  wip_art:\n    status: wip\n",
-		);
+		const fl = flowWith("  tagged_art:\n    tags: [distilled_doc]\n");
 		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(0);
-		expect(r.stdout).not.toContain("tracked");
-		expect(r.stdout).toMatch(/no todo artifacts/i);
+		expect(r.stdout).toMatch(/verified nothing/i);
 	});
 
-	it("--json reports todoArtifactCount: 0 when no flow artifact has status: todo", async () => {
+	// `tags:` written without brackets parses as a plain string, and a substring
+	// test on it would accept any value containing the tag as a fragment. The
+	// selector asks for an element of a list, so a scalar matches nothing.
+	it("does not match a scalar tags: value that merely contains the tag", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
-		const fl = flowWith("  done_art:\n    status: done\n");
+		const fl = flowWith(
+			"  gap_art:\n    tags: not-really-roadmap-tracked-thing\n    label: Gap\n",
+		);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout).trackedArtifactCount).toBe(0);
+	});
+
+	it("does not match a tag that merely contains the reserved value", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  gap_art:\n    tags: [not-roadmap-tracked-either]\n");
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout).trackedArtifactCount).toBe(0);
+	});
+
+	// The gap the command reports is "nothing in the roadmap builds this", so an
+	// id the roadmap only ever consumes is not tracked by it (#787).
+	it("reports a gap when the roadmap only consumes the id and never produces it", async () => {
+		const rm = join(dir, "as-roadmap-consumes.pfdsl");
+		writeFileSync(
+			rm,
+			"---\ntype: roadmap\nartifact:\n  built:\n    status: done\n---\nsource_only >> build -> built\n",
+		);
+		const fl = flowWith(`  source_only:\n${TRACKED}    label: Source\n`);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(1);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.gaps).toHaveLength(1);
+		expect(parsed.gaps[0].artifactId).toBe("source_only");
+	});
+
+	it("distinguishes an empty-target check from an actual pass when nothing is tagged", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  plain_art:\n    label: Plain\n");
+		const r = await run(["status", "gaps", rm, fl]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).not.toContain("tracked in the roadmap");
+		expect(r.stdout).toMatch(/roadmap-tracked/);
+	});
+
+	it("--json reports trackedArtifactCount: 0 when nothing is tagged", async () => {
+		const rm = roadmapWith("  other:\n    status: done\n");
+		const fl = flowWith("  plain_art:\n    label: Plain\n");
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.ok).toBe(true);
-		expect(parsed.todoArtifactCount).toBe(0);
+		expect(parsed.trackedArtifactCount).toBe(0);
 	});
 
-	it("--json reports todoArtifactCount reflecting the scanned todo artifacts when gaps exist", async () => {
+	it("--json reports trackedArtifactCount reflecting the scanned tagged artifacts when gaps exist", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
-		const fl = flowWith("  gap_art:\n    status: todo\n    label: Gap\n");
+		const fl = flowWith(`  gap_art:\n${TRACKED}    label: Gap\n`);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		const parsed = JSON.parse(r.stdout);
-		expect(parsed.todoArtifactCount).toBe(1);
+		expect(parsed.trackedArtifactCount).toBe(1);
 	});
 
 	it("--json returns structured output with ok=true when no gaps", async () => {
-		const rm = roadmapWith("  tracked:\n    status: todo\n");
-		const fl = flowWith("  tracked:\n    status: todo\n");
+		const rm = roadmapWith(
+			"  tracked:\n    status: todo\n",
+			"req >> build -> tracked\n",
+		);
+		const fl = flowWith(`  tracked:\n${TRACKED}`);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		expect(r.exitCode).toBe(0);
 		const parsed = JSON.parse(r.stdout);
@@ -2624,7 +2726,7 @@ describe("status gaps", () => {
 
 	it("--json returns structured output with gaps when untracked", async () => {
 		const rm = roadmapWith("  other:\n    status: done\n");
-		const fl = flowWith("  gap_art:\n    status: todo\n    label: Gap\n");
+		const fl = flowWith(`  gap_art:\n${TRACKED}    label: Gap\n`);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		expect(r.exitCode).toBe(1);
 		const parsed = JSON.parse(r.stdout);
@@ -2632,11 +2734,23 @@ describe("status gaps", () => {
 		expect(parsed.gaps).toHaveLength(1);
 		expect(parsed.gaps[0].artifactId).toBe("gap_art");
 		expect(parsed.gaps[0].label).toBe("Gap");
-		expect(parsed.gaps[0].status).toBe("todo");
+	});
+
+	// A tagged flow artifact matches the roadmap by id alone: the roadmap's own
+	// status is not consulted, so a done roadmap entry still counts as tracked.
+	it("counts a tagged artifact as tracked whatever status the roadmap gives it", async () => {
+		const rm = roadmapWith(
+			"  shared:\n    status: done\n",
+			"req >> build -> shared\n",
+		);
+		const fl = flowWith(`  shared:\n${TRACKED}`);
+		const r = await run(["status", "gaps", rm, fl, "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout).gaps).toHaveLength(0);
 	});
 
 	it("--json on roadmap parse error emits { ok: false, diagnostics } on stdout, empty stderr", async () => {
-		const fl = flowWith("  output:\n    status: todo\n");
+		const fl = flowWith(`  output:\n${TRACKED}`);
 		const r = await run([
 			"status",
 			"gaps",
@@ -2675,7 +2789,7 @@ describe("status gaps", () => {
 			nonRoadmap,
 			"---\ntype: workflow\nartifact:\n  x:\n    status: done\n---\n",
 		);
-		const fl = flowWith("  y:\n    status: todo\n");
+		const fl = flowWith(`  y:\n${TRACKED}`);
 		const r = await run(["status", "gaps", nonRoadmap, fl]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("roadmap");
@@ -2705,16 +2819,19 @@ describe("status gaps", () => {
 	});
 
 	it("accepts multiple flow files", async () => {
-		const rm = roadmapWith("  tracked:\n    status: todo\n");
+		const rm = roadmapWith(
+			"  tracked:\n    status: todo\n",
+			"req >> build -> tracked\n",
+		);
 		const fl1 = join(dir, "as-flow1.pfdsl");
 		const fl2 = join(dir, "as-flow2.pfdsl");
 		writeFileSync(
 			fl1,
-			"---\ntype: workflow\nartifact:\n  tracked:\n    status: todo\n---\n",
+			`---\ntype: workflow\nartifact:\n  tracked:\n${TRACKED}---\n`,
 		);
 		writeFileSync(
 			fl2,
-			"---\ntype: runtime-pipeline\nartifact:\n  gap_only:\n    status: todo\n---\n",
+			`---\ntype: runtime-pipeline\nartifact:\n  gap_only:\n${TRACKED}---\n`,
 		);
 		const r = await run(["status", "gaps", rm, fl1, fl2, "--json"]);
 		expect(r.exitCode).toBe(1);
@@ -2729,7 +2846,7 @@ describe("status gaps", () => {
 			rm,
 			"---\nartifact:\n  output:\n    status: todo\n---\nreq >> build -> output\n",
 		);
-		const fl = flowWith("  output:\n    status: todo\n");
+		const fl = flowWith(`  output:\n${TRACKED}`);
 		const r = await run(["status", "gaps", rm, fl]);
 		expect(r.exitCode).toBe(0);
 		expect(r.stderr).toContain("W006");
@@ -2741,7 +2858,7 @@ describe("status gaps", () => {
 			rm,
 			"---\nartifact:\n  output:\n    status: todo\n---\nreq >> build -> output\n",
 		);
-		const fl = flowWith("  output:\n    status: todo\n");
+		const fl = flowWith(`  output:\n${TRACKED}`);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
 		const parsed = JSON.parse(r.stdout);
 		expect(parsed.warnings?.[0]?.code).toBe("W006");
