@@ -89,6 +89,30 @@ export function formatDistributionReviewStatus({ record, unreviewedCount }) {
 }
 
 /**
+ * Each registered asset-sweep target's currency, one line per target, shown
+ * without blocking. `make release` refuses on the same reading
+ * (scripts/check-asset-sweep.mjs); this is so that refusal is not a surprise.
+ * @param {Array<{target: {label: string, threshold: number}, record: {commit: string|null, date?: string}|null, result: {ok: boolean, base: string, files?: string[], unreachable: boolean}}>} evaluations
+ * @returns {string}
+ */
+export function formatAssetSweepStatus(evaluations) {
+	return evaluations
+		.map(({ target, record, result }) => {
+			if (result.unreachable)
+				return `  ${target.label} ! cannot determine (recorded sweep commit ${result.base} is not in this clone)`;
+			const at = record?.commit
+				? `${record.commit.slice(0, 7)} ${record.date ?? ""}`.trim()
+				: null;
+			if (!result.ok) {
+				const since = at ? `since ${at}` : "never swept";
+				return `  ${target.label} ! ${result.files.length} added file(s) (${since}, threshold ${target.threshold})`;
+			}
+			return `  ${target.label} ✓ current${at ? ` (${at})` : ""}`;
+		})
+		.join("\n");
+}
+
+/**
  * The spec-history check's currency, shown without blocking. `make release`
  * refuses on the same verdict (scripts/check-spec-history.mjs); this line is
  * so the refusal is not a surprise.
@@ -132,21 +156,22 @@ export function formatFullReviewStatus(date) {
  * exit code, and what `cycle-status.mjs` re-exports as
  * `releasePending.needsAction`.
  *
- * The distribution review and spec-history readings count here because those
- * two gates run nowhere else: `make release` refuses on them and neither is
- * wired into CI or the pre-commit hook (both scripts say so in their own
- * headers). `release.mjs`'s other pre-tag checks — build, test, check-docs,
- * gen-plugin identity — are covered continuously by test.yml and
+ * The distribution review, asset sweep, and spec-history readings count here
+ * because those gates run nowhere else: `make release` refuses on them and
+ * none is wired into CI or the pre-commit hook (all three scripts say so in
+ * their own headers). `release.mjs`'s other pre-tag checks — build, test,
+ * check-docs, gen-plugin identity — are covered continuously by test.yml and
  * check-gen-plugin.yml, so a failure there is ordinary breakage rather than
  * publishing work left pending, and folding them in would make this a slow
  * dry-run of the release for no reading it does not already have (#880).
- * @param {{results: Array<{status: string, commitsAhead?: number}>, skillBundleCommits: number, distributionReview: {unreviewedCount: number|undefined, blockedReason: string|null}, specHistory: {ok: boolean}}} args
+ * @param {{results: Array<{status: string, commitsAhead?: number}>, skillBundleCommits: number, distributionReview: {unreviewedCount: number|undefined, blockedReason: string|null}, assetSweep: {ok: boolean}, specHistory: {ok: boolean}}} args
  * @returns {boolean}
  */
 export function needsAction({
 	results,
 	skillBundleCommits,
 	distributionReview,
+	assetSweep,
 	specHistory,
 }) {
 	return (
@@ -161,6 +186,7 @@ export function needsAction({
 		// which is the state `make release` refuses on rather than a zero.
 		distributionReview.blockedReason !== null ||
 		distributionReview.unreviewedCount > 0 ||
+		assetSweep.ok === false ||
 		specHistory.ok === false
 	);
 }
