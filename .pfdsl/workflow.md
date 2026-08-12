@@ -169,8 +169,8 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 ## workflow.pfdsl に登録する agent の範囲
 
-`.claude/agents/` の agent のうち `workflow.pfdsl` に artifact として登録するのは、plugin 同梱の配布物（`PLUGIN_AGENT_FILES`）だけである。
-repo scope の agent（plugin 同梱から除外したもの）は登録しない。
+一般形（登録するのはプロトコル文書が一般形で名指しする機構か、外部へ配る成果物に含まれるものだけ）は pfd-ops SKILL.md プロトコル5が一次情報。
+このリポで基準(2)に当たるのは plugin 同梱の配布物（`PLUGIN_AGENT_FILES`）で、repo scope の agent（plugin 同梱から除外したもの）は登録しない。
 配布物は `distill_ops` の出力であり採用リポの運用に届くのに対し、repo scope の agent はこのリポの開発都合の道具で、変換グラフの参加者ではないため。
 
 ## agent を追加するサイクルの動作確認
