@@ -47,7 +47,7 @@ artifact:
   quality_guide:
     label: 品質ガイド
     description: "PFD 設計判断ルールの一次情報。知見・ADR の反映先。pfdsl スキルに references として同梱される"
-    criteria: 書き時ルールが網羅されており、gen-skill で skill の references/quality-guide.md に同梱済み
+    criteria: make gen-skill が差分なしで完了する（skill の references/quality-guide.md に同梱済み）
     location: ../docs/quality-guide.md
     group: generation
   feature_samples:
@@ -117,7 +117,7 @@ artifact:
   findings:
     label: レビュー知見
     description: "実践例レビューで得た品質知見。次世代の対話・整備への還流入力（消費先の一次情報は本図のエッジ）"
-    criteria: quality_guide・skill_template または adrs への反映経路が確定している（未処理の知見がない）
+    criteria: 各 finding の振り分け先が本図のエッジのいずれかに定まり、pfd-retro の出力表に未振り分けの行が残っていない
     group: practice
   adrs:
     label: ADR
@@ -253,7 +253,7 @@ artifact:
   review_perspectives:
     label: レビュー観点集
     description: "PFD を問い詰める A/B 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd-retro はポインタ参照"
-    criteria: 監査観点が網羅されており、gen-skill で skill の references/review-perspectives.md に同梱済み
+    criteria: make gen-skill が差分なしで完了し、check-review-perspectives-scale が分割閾値の通知を出さない
     location: ../docs/review-perspectives.md
     group: generation
     tags: [ distilled_doc ]
