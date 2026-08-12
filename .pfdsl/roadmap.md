@@ -25,7 +25,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 - **選択フェーズ（pfd-ops 手順1）**: `GH_HOST=github.com node scripts/cycle-status.mjs` — fetch 実行・base への遅れコミット数・flow-sync PR / その他 open PR の一覧・`status ready --best` の結果を1回の JSON 出力に集約する。`--base <branch>` で対象ブランチを変更可能（デフォルト `main`）。加えて次の3点を出力する（#461）:
   - `openFlowSyncPRs` の各要素に `ci`（`PASS`/`FAIL`/`PENDING`/`NONE`/`UNKNOWN`）を含む。`gh pr checks` の別往復は不要
   - 対象 issue の本文・コメントを fetch し、設計確定状態を `designUnsettledFor`（`{issue, source, unsettled, reason, matchedLines, optionCount, record, recordRequired}`）で出力する（#669）。`reason` は `phrase`（未合意フレーズ一致）/ `enumerated-options-without-record`（候補2件以上かつ設計選択記録なし）/ `record-posted` / `no-enumerated-options`。`unsettled` は「設計対話が必要か」だけを表し、`no-enumerated-options` も含め `record-posted` 以外は常に `true`（列挙構造を検出できなかった回を対話省略可の既定にしない fail-close、#833）。`recordRequired` は record 投稿の要否を別軸で表す独立フィールドで、`record-posted` のときだけ `false`、それ以外は常に `true`（列挙構造の有無に関わらず design-selection record は全サイクル必須という規約と、`unsettled: false` を「記録不要」と誤読した実測 #809 を受けて `unsettled` から分離した、#868）。対象 issue は `--issue <n>` が最優先（`source: "flag"`）、無ければ best プロセスの `location:` から解決する（`source: "best-process"`）。どちらも得られない場合は `null` + `designUnsettledError` を返す — 旧 `designUnsettled` フィールドはどの issue に対する判定か区別できず、roadmap 非管理の issue に着手する回で無関係な判定を確定の根拠に取り違える経路になっていた
-  - `behindBase > 0` のときは判定を一切出さず `staleTree`（`{base, message}`）と `behindBase` だけを返し、終了コード 1 で拒否する（#716）。プリフライトは作業ツリー内のスクリプトなので、遅れたツリーではその古い版が走り、出力は「どの判定が存在するか」からして古い版のものになる。`origin/<base>` を起点にサイクルのブランチを切ってから実行する。**この拒否は拒否する版へ更新されたツリーでしか起きない**ので、古い版のツリーでは `behindBase` を自分で見る
+  - `behindBase > 0` のときは判定を一切出さず `staleTree`（`{base, message}`）と `behindBase` だけを返し、終了コード 1 で拒否する（#716）。`origin/<base>` を起点にサイクルのブランチを切ってから実行する（遅れたツリーで古い版が走ること・その拒否は拒否する版でしか起きないことは work-cycle.md 手順1 が一次情報）
   - `currentBranch` と `commitsAheadOfBase`（`origin/<base>..HEAD` の件数）を出力する（#629）。0 でなければ前サイクルのブランチに乗っている可能性を示すが、既存ブランチの意図的な継続もあるためスクリプトは拒否せず判断を残す
   - 作業ツリーに未コミットの変更（追跡外ファイルを含む）があるときは、`behindBase` と同じく判定を一切出さず `uncommittedFiles` と `dirtyTree` だけを返し、終了コード 1 で拒否する（#744）。前サイクルの変更はブランチを切り替えてもツリーに残り、次サイクルの最初のコミットに紛れ込む — `commitsAheadOfBase` が塞ぐのと同じ失敗の型で、経路がコミットでなく作業ツリーであるだけ。`commitsAheadOfBase` と違い判断を残さず拒否するのは、サイクルは clean なツリーから始める前提であり、`git worktree add` がそれを作るため、拒否への答えが「weigh する」でなく「worktree を切る」で済むから。ツリーが base に遅れかつ汚れている場合は遅れの方を返す（走っているスクリプト自身が古い版だという判定が、汚れの判定の信頼性も奪う）
   - 設計選択記録の雛形を `designRecordTemplate`（`{note, lines}`）で毎回出力する（#720）。行頭の語は `gate-check.mjs` の `DESIGN_RECORD_REQUIRED_PREFIXES` / `DISPOSITION_TOKENS` から引いており、散文に転記していない。対象 issue が候補を列挙している場合はその件数を添えた処分の行が加わる
@@ -33,7 +33,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
   - best 候補プロセスの出力 artifact キーを `status ready --json` の `outputs` フィールドから引き、実行すべき `gate-check.mjs --artifact <key>` の完成形コマンド行を `gateCheckCommand` で出力する（転記ミス・フォールバック判定への意図しない低下を防ぐ。roadmap.pfdsl 自前 regex パースは二重パースで構文変更に弱いため CLI 側の `outputs` フィールドを正とする）
 - **終端ゲートの機械項目と報告材料（pfd-ops 手順3・#462）**: `GH_HOST=github.com node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n> ...]` — 内部で `git fetch origin` を試みたうえで `origin/<base>...HEAD` を基準に差分を取る（fetch 失敗時も既存 remote-tracking ref で続行し、ref 自体が無ければ明示エラーで終了する）。**項目名・PASS/FAIL/SKIP の判定・SKIP 条件はここに列挙しない** — スクリプトの出力が自己記述的であり、実行すれば全項目が detail 付きで印字される（#560。列挙をここに置くとスクリプト変更のたび手で追随することになり、追随を保証する機構が無い）。`--artifact <key>` を渡すと status 更新・wip 経由の両方をその artifact に厳密スコープする（省略時はどちらも粗いフォールバック判定になる旨を detail に明示）。出力 artifact を持たないサイクル（`flow:exempt` の bookkeeping 等）は `--no-artifact` で宣言する — `roadmap.pfdsl` を status 以外の理由で触ると、宣言なしでは構造的に FAIL する（#564）。表のほかに報告材料（PASS/FAIL でなく判断材料）が印字される。**その種類・件数・内容もここに列挙しない** — 上と同じ理由で、スクリプトの出力が節見出しごと自己記述する（#839。列挙を置いた結果、実際に2種で止まったまま実体が6種へ増えた）。判定不能な残り項目は `MANUAL:` prefix で列挙される — 抽出元は `scripts/lib/gate-check.mjs` の `GATE_CHECKLIST_SOURCE_PATH` が指すファイルの終端ゲートチェックリストで、実行時に抽出するため手打ちコピーは持たない。その項目のみ個別に確認する
 - **そのサイクルが閉じる issue を毎サイクル全て渡す（#669・#734）**: `--issue <n>` は繰り返し指定でき、渡した issue ごとに `design-selection record` と `knowledge-artifact size direction` の2項目が1行ずつ評価される。省略すると両項目とも SKIP する（対象 issue を推測しないため）。複数 issue を閉じる回で1件しか渡さないと、渡さなかった issue はゲートを一度も通らないまま表は緑になる — 選択記録の保証が必要なのは閉じる N 件すべてであって、そのうち1件ではない。判定条件は他項目と同じくスクリプト出力の detail が自己記述する — ここには列挙しない。運用側が事前に知る必要がある入力契約は4つで、選択記録の書式は L3 reference「設計確定の証拠」、知識成果物の縮小を目的とする issue は本文に行頭 `Size-Intent: shrink` を書く（これが無い回はサイズ方向の判定を行わない — 語句一致で意図を推し量ると、他 issue の案名を引用しただけで発火する）、サイズ増加を意図的に通す回はコミット trailer の `Size-Override: <理由>`（理由なしの素通しを避けるためトークンだけでは通らない。`Review:` と同じ trailer 領域を走査するので、散文中に書いても宣言にはならない）、実装しないと決めた回は選択記録に行頭 `実装しない: <理由>` を書く（これが無い回は通常どおり timing 判定を行う — `Size-Intent: shrink` と同じ行頭一致で判定するため、前提・否定案・却下理由の中でこの語に触れるだけでは宣言にならない）。宣言の有無に関わらず、変更された知識成果物のバイト・行差分は報告材料として常に印字される。`cycle-status.mjs` の `gateCheckCommand` にはこのフラグが埋め込まれるので、そのままコピーすれば渡し漏れない。`cycle-status.mjs` 側の `--issue` も繰り返し指定でき、渡した分だけ `designUnsettledFor` に判定が並び、`gateCheckCommand` にも全件が並ぶ — サイクルが閉じる issue が preflight の時点で分かっているなら、そこで全て渡しておけば終端ゲートへの転記で落ちない
-- どちらも `packages/cli/dist/cli.js` の存在を前提にする箇所がある（worktree では先に `pnpm install && pnpm -r build` を済ませる）。`gate-check.mjs` はビルド未完了でも最後まで走り、項目名・SKIP 条件・MANUAL 一覧は通常どおり印字される（CLI に依存する `pfdsl check` と gen-plugin identity の2項目が FAIL になるだけ。実測 #560）
+- どちらも `packages/cli/dist/cli.js` の存在を前提にする箇所がある（ビルドの前提は下の「worktree 前提」節）。`gate-check.mjs` はビルド未完了でも最後まで走り、項目名・SKIP 条件・MANUAL 一覧は通常どおり印字される（CLI に依存する `pfdsl check` と gen-plugin identity の2項目が FAIL になるだけ。実測 #560）
 
 ## 自動生成 PR（ワークサイクル選択前に確認）
 
@@ -49,7 +49,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **タイミング規約**: issue クローズと flow 確定（下記「マージ時のみ」の2項目）は **main への PR マージ時**に行う（生態系図 merge_pr: 進捗・issue 更新はマージで正本になる）。PR 作成時点では行わない — PR がレビューで変わる/却下される可能性があるため。サイクルが PR 作成で終わる場合、この2項目は「マージ時に実施」と記録して未了のまま閉じてよい。**feature branch への中間 PR では `closes #xxx` を使わない**（理由と規約は L3 reference「PR 本文規約」が一次情報）。**出力 artifact の status done 更新はこれに含まれない** — develop 完了時点（PR 作成前）で criteria 達成が言えるなら done にしてよい（プロトコル4のデフォルト通り）。
 
-**着手時**: develop ブランチを切った時点で、実装対象の出力 artifact を `todo → wip` に更新する（workflow.md「develop 着手時の artifact status 更新」）。PR 作成・マージを待たない。
+**着手時**: develop ブランチを切った時点で、実装対象の出力 artifact を `todo → wip` に更新する（規則の一次情報は workflow.md「develop 着手時の artifact status 更新」）。
 
 **着手前の選択記録**: 実装着手前に、選んだ方針を issue コメントとして残す。`--issue` を渡す全サイクルが対象で、issue が複数案を列挙しているかどうかは問わない（候補列挙のある回は各案の処分も要る）。選択を記録せず着手すると、issue 本文だけを読んだ第三者が「なぜその方針になったか」を実装差分からしか追えなくなる。
 書式は覚えなくてよい — `cycle-status.mjs` が `designRecordTemplate` として毎回出すので、それを埋めて投稿する。
@@ -121,9 +121,13 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 - [ ] 実装を subagent へ委譲した場合、戻り時に `git log origin/<branch>..HEAD` と open PR 一覧を確認し、委譲先がブリーフの留保作業（push・PR 作成・issue 操作）を実行していないか照合した
 - [ ] コード変更のあるサイクルでは、観点1（品質）の記録に加えて観点2（correctness）または観点3（設計妥当性）の記録が入っていることを、コミット直前に確認した。レビュー実施とコミット作成の間に他の作業（PR 作成・push 等）を挟むと記載を失念しやすい — 実施済みで未記載のまま次の作業に進んでいないか、コミット直前に再確認する
 
-**サイクルは worktree で回す**: ブランチをルート作業ツリー（`~/works/pfdsl` 直下）で切らない。ルートツリーの HEAD は複数のセッションが共有する資源で、他セッションの `git stash` / `git switch` が自分の未コミット編集をツリーから取り去り HEAD を別ブランチへ移す。編集ツールは成功を返すため、消失は次に同じ箇所を触るまで検出されない。消えた編集を探すときは `git stash list` を先に見る（`git stash` は内部で reset を行うため reflog では `git reset` と区別がつかない）。
+**サイクルは worktree で回す**: このリポのルート作業ツリーは `~/works/pfdsl` 直下で、worktree は `.claude/worktrees/<name>/` に置く。
+worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順1 が一次情報。
+実際に起きた干渉の症状・検出（`git stash list` を先に見る等）・復旧手順は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。
 
-**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。`.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する。ビルドは不要。
+**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
+`.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する（ビルドは不要）。
+`make setup` が入れる pre-commit hook のシムについては CLAUDE.md「セットアップ」節が一次情報。
 
 **vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。クリック・ホバー等の UI 挙動変更（DocumentLinkProvider・HoverProvider 等）、または preview/export の描画内容変更（statusStyles・tag・group 解決ロジック等）を含む場合は `/vscode-ext-debug` スキルで PR 作成前に実動作確認し、ユーザーの確認結果を受け取るまで完了とみなさない。
 
@@ -133,18 +137,14 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 判定は CI の `check-closes-reference.yml` が持ち、終端ゲートには項目を置かない — 根拠は GitHub が本文から導出する issue リンクであり、PR 作成前に走る終端ゲートの時点ではリンクも本文も存在しない。
 トークンの有無でなくリンクの有無を見るため、コードフェンス内の `Closes #<n>` は通らない。
 
-**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリ（`.claude/worktrees/<name>/`）から実行する。pre-commit hook（`.git/hooks/`）は全 worktree 共有で、他ブランチのセッションが `make setup` を実行すると当該ブランチ版の hook に置き換わる — 自ブランチに存在しないファイル・ターゲットを hook が要求して commit が拒否されたら、自 worktree で `make setup` を実行して hook を入れ直す。main repo パスから実行するとその HEAD ブランチ（main など）にコミットが積まれる。
-`scripts/main-commit-guard.mjs` は `git commit` に加えてツリー・インデックスを変える git コマンドも見る（#777。deny / ask を分ける原則は CLAUDE.md「コミット粒度」節、割り当ての一次情報は `scripts/lib/main-commit-guard.mjs` の定数）。
-読み取り系は素通しするので、main repo のツリーを読むだけの操作は従来どおり動く。
+**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順2 が一次情報）。
 **worktree のパスはシェル変数に入れず literal で書く**。
-guard は hook の payload だけを見る静的解析なので `git -C $W commit` の `$W` を解決できず、payload の cwd（cwd が戻っていれば main repo）で判定して deny する。
+`scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）は hook の payload だけを見る静的解析なので `git -C $W commit` の `$W` を解決できず、payload の cwd（cwd が戻っていれば main repo）で判定して deny する。
 `git -C /Users/.../.claude/worktrees/<name> commit` と書けば通る。
 なお deny は Bash 呼び出し全体を止めるため、`git -C $W add … && git -C $W commit …` が弾かれたときは add も実行されていない。
 
 **hotfix PR の明示**: 緊急修正（バグ修正、誤り修正）を PR にのせる場合は description 冒頭に `hotfix:` を明記する。レビュー優先度・マージ判断の依拠になる。
 `check-closes-reference.yml` がこの行を読み、issue を閉じない PR を hotfix として通す唯一の経路にしている — コロンまで含めて一致させる（L3 reference は「"hotfix" と明記」とだけ書くが、機械が読むのはこちらの厳しい形）。
-
-**`flow:exempt` は roadmap に登録しない**（保守・基盤・修正など roadmap 非管理。判定は L3 reference の「ラベル判定基準」）。
 
 **新 frontmatter フィールドを追加した場合**: 対応する feature sample（`docs/samples/`）を同一 PR で追加する（生成物 `.dot` / README / `references/` の再生成・ドリフト検査は pre-commit と CI が強制する）。加えて `packages/core/src/__fixtures__/pipeline-scale.pfdsl` にもそのフィールドを追記する（fixture がスナップショットの入力であり、feature sample とは別に網羅性を担う）。
 
