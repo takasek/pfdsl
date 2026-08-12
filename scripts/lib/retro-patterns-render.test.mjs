@@ -109,7 +109,7 @@ describe("renderSelection", () => {
 		assert.match(text, /matched 1\/1: method:delegate/);
 		assert.match(text, /## word-only \(1 of 1\) — what the tags missed/);
 		assert.match(text, /観測範囲 {2}\[context:dual-copy\]/);
-		assert.match(text, /## always \(1\)/);
+		assert.match(text, /## always \(1\) — held regardless of what you passed/);
 		assert.match(text, /常時 {2}\[always\]/);
 		assert.match(
 			text,

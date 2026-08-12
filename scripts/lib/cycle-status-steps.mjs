@@ -212,6 +212,12 @@ export async function runCycleStatus({
 	// is repeatable because a cycle can close several issues, and judging one of
 	// them is what let the terminal gate turn green on the one issue that had a
 	// record (#734).
+	//
+	// Each verdict carries the issue and the source it was resolved from, rather
+	// than the single top-level `designUnsettled` field this replaced: that field
+	// left the reader unable to tell which issue had been judged, so a cycle
+	// working on a roadmap-unmanaged issue could take an unrelated verdict as its
+	// own evidence of settlement (#669).
 	const designUnsettledFor = [];
 	let designUnsettledError = null;
 	let targetIssues = [];
