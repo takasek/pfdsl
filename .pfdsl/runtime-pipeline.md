@@ -75,7 +75,7 @@ marketplace の発行 API を使う経路を整えればこのノードは消え
 
 ## plugin 配布チェーンの依存
 
-- **同梱対象リストの一元化（`gen_plugin`）**: 同梱スキル・コマンド・agent の列挙は `scripts/gen-plugin.mjs` のみが持つ（旧 skill sync 時代の tsup.config.ts との二重ハードコードは解消済み）。スキル・agent を追加するときは gen-plugin.mjs を更新する。PFD 側の照合先は workflow.pfdsl companion の「配布スキルの新規追加時の横断照合」が一次情報。ADR-0035 まではこのプロセスが `assemble_plugin` としてこの図に、`gen_plugin` として workflow.pfdsl に二重にモデル化されており、入力列挙が乖離していた（`pfd_lens_agent` / `implementer_agent` がこちらに無かった）。
+- **同梱対象リストの一元化（`gen_plugin`）**: 同梱スキル・コマンド・agent の列挙は `scripts/gen-plugin.mjs` のみが持つ（旧 skill sync 時代の tsup.config.ts との二重ハードコードは解消済み）。スキル・agent を追加するときは gen-plugin.mjs を更新する。PFD 側の照合先は workflow.pfdsl companion の「配布スキルの新規追加時の横断照合」が一次情報（ADR-0035 以前の二重モデル化とその乖離の経緯もそちら）。
 - **`deploy_install_layer` のコピー元は plugin 同梱 canonical**: `check-install-sync.mjs --deploy` は `<skill root>/install/` から採用リポルートへコピーする。ローカル編集された配置済みファイルは hash 不一致として skip・警告され、`--overwrite-local-edits` でのみ上書きされる（ADR-0028）。canonical から消えた旧ファイルは、ローカル編集が無ければフラグ無しで削除され、編集を抱えている場合のみ独立した `--delete-edited-orphans` を要する（#603。単一 `--force` は掃除の意図で渡したときに新パスのカスタマイズまで巻き戻した）。canonical 側のリネームで新旧パスが `missing` / `orphaned` に分かれた場合は `Possible renames` として対で報告され、旧パスのローカル編集を新パスへ引き継ぐ手掛かりになる。
 - **採用リポの drift 検知はランタイムのみ**: `check-pfd-ops-sync.yml` は採用リポへ配布されない。pfd-ops 発火時の `check_install_sync` が唯一の安全網で、警告への対応は pfd-ops SKILL.md「配置ファイルの鮮度セルフチェック」が定める。
 
