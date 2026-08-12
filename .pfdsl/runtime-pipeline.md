@@ -86,5 +86,5 @@ marketplace の発行 API を使う経路を整えればこのノードは消え
 ## エラー・例外処理
 
 - 診断は `severity: "error" | "warning"` を持つ。`check --strict` は一部の警告（例: V011 フィードバック検証）をエラー昇格させる
-- `svgToBinary`（PDF/PNG化）は `puppeteer` が未インストールだと `PDF/PNG export requires puppeteer.` で例外を投げる。SVG化（wasm 経路）はこの依存を必要としない
+- `svgToBinary`（PDF/PNG化）は `puppeteer` が未インストールだと例外を投げる（メッセージ本文は `packages/graphviz-exporter/src/index.ts` が一次情報）。SVG化（wasm 経路）はこの依存を必要としない
 - primary graph（`>>` / `->`）の循環は `check` が V010 error として検出する（`>>?` は対象外）。循環する構造は `>>?` か改版 artifact で表現する — pfdsl skill の品質ガイド参照
