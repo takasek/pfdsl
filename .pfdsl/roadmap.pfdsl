@@ -100,20 +100,24 @@ artifact:
   criteria_spec:
     label: "合否基準仕様案 (#7)"
     status: done
-    criteria: 仕様案として起草完了
+    criteria: location の提案ファイルが実在する（meta check-links が通過する）
+    location: ../docs/spec/proposals/i7-criteria.md
   revises_spec:
     label: "改版チェーン仕様案 (#8)"
     status: done
-    criteria: 仕様案として起草完了
+    criteria: location の提案ファイルが実在する（meta check-links が通過する）
+    location: ../docs/spec/proposals/i8-revises.md
   design_notes:
     label: "設計判断ノート・分岐なし方針 (#9)"
     status: done
-    criteria: 仕様案として起草完了
+    criteria: location の提案ファイルが実在する（meta check-links が通過する）
+    location: ../docs/spec/proposals/i9-no-branching.md
   location_spec:
     label: "location/command 仕様案 (#13)"
     description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
     status: done
-    criteria: 仕様案として起草完了
+    criteria: location の提案ファイルが実在する（meta check-links が通過する）
+    location: ../docs/spec/proposals/i13-location.md
   restructured_gen:
     label: "再構成済みスキル生成系 (#10)"
     status: done
@@ -131,15 +135,17 @@ artifact:
     label: "externalStakeholders フィールド仕様案 (#97)"
     description: "artifact / process に外部消費者を列挙するフィールド。owner と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段。v0.0.7 スコープ"
     status: done
-    criteria: 仕様案として起草完了
+    criteria: docs/spec/spec.md に externalStakeholders フィールドの定義節が存在する
   hierarchy_spec:
     label: "階層PFD仕様案 (#5)"
     status: done
-    criteria: 仕様案として起草完了
+    criteria: location の提案ファイルが実在する（meta check-links が通過する）
+    location: ../docs/spec/proposals/i5-hierarchy.md
   presets_spec:
     label: "共有プリセット仕様案 (#6)"
     status: done
-    criteria: 仕様案として起草完了
+    criteria: location の提案ファイルが実在する（meta check-links が通過する）
+    location: ../docs/spec/proposals/i6-presets.md
   version_cmd:
     label: "CLI --version コマンド (#172)"
     description: "pfdsl --version / -V でバージョン番号を出力する。ビルド時に package.json から tsup define で埋め込む"

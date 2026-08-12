@@ -256,7 +256,7 @@ artifact:
   published_libraries:
     label: npm 公開ライブラリ群
     description: "@pfdsl/core / graphviz-exporter / preview-engine の npm 公開物。lib-v* tag push で GitHub Actions が自動 publish する（core → graphviz-exporter → preview-engine 順）"
-    criteria: npm view @pfdsl/core versions に packages/core/package.json の version が含まれる
+    criteria: make release-libs が公開する各パッケージについて、npm view <pkg> versions に当該 package.json の version が含まれる
     externalStakeholders: [ 外部ライブラリ利用者 ]
     location: https://www.npmjs.com/package/@pfdsl/core
     group: published
