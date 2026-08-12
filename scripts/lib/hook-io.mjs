@@ -35,11 +35,13 @@ export function parseHookPayload(text) {
 /**
  * Build the PreToolUse hook response for a permission decision.
  *
- * "ask" exists because a PreToolUse hook has no advisory channel that reaches
- * the model: `hookSpecificOutput.additionalContext` is PostToolUse-only, and
- * stderr on exit 0 is not fed back. So a PreToolUse rule that should not hard-
- * block (command-usage-guard's npx case, roadmap-publish-guard) routes through
- * the permission prompt instead of printing a note nobody reads.
+ * "ask" exists because an advisory cannot stand in for a decision when the harm
+ * is the execution itself. PreToolUse does carry `additionalContext`, but the
+ * docs place it next to the tool result — so it lands after the command has
+ * run, which is too late for a rule whose point is that the command should not
+ * run unexamined. (stderr on exit 0 is not fed back either.) So a PreToolUse
+ * rule that should not hard-block (command-usage-guard's npx case,
+ * roadmap-publish-guard) routes through the permission prompt.
  * @param {{decision: "deny" | "ask", reason: string}} result
  */
 export function buildPermissionOutput(result) {
@@ -54,8 +56,9 @@ export function buildPermissionOutput(result) {
 
 /**
  * Build the PostToolUse hook response for an advisory. additionalContext is
- * what reaches the model, and PostToolUse is the only one of the two events
- * that supports it — which is why the advisory hooks are PostToolUse.
+ * what reaches the model. The advisory hooks are PostToolUse because their
+ * subject only exists after the tool ran (a written file, a created issue),
+ * not because PostToolUse is the only event that can carry the field.
  * @param {string} advisory
  */
 export function buildAdvisoryOutput(advisory) {

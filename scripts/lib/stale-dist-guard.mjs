@@ -10,12 +10,14 @@
 // guard that blocked here would be wrong as often as it was right — reading
 // a stale build on purpose is a normal thing to do while debugging.
 //
-// Wired to both events, and the event decides who hears it. PreToolUse can
-// only write to stderr, which does not reach the model (additionalContext is
-// PostToolUse-only and stderr on exit 0 is not fed back, #650) — so the same
-// check runs again on PostToolUse, where additionalContext reaches the model
-// exactly when it is about to draw a conclusion from a result that read a
-// stale build. Without that half the warning lands nowhere the reader is.
+// Wired to both events. The PreToolUse half currently only writes to stderr,
+// which reaches nobody (stderr on exit 0 goes to the debug log, #650), so the
+// warning that lands is the PostToolUse one, where additionalContext reaches
+// the model exactly when it is about to draw a conclusion from a result that
+// read a stale build. The double wiring is not load-bearing as written —
+// PreToolUse can carry additionalContext too, and the docs deliver it to the
+// same place as the PostToolUse one, so one of the two ends is redundant.
+// Collapsing to a single event is a settings change, tracked separately.
 
 import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
 

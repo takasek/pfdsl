@@ -18,11 +18,11 @@
 //
 // Ask, not deny: a deliberate check of the main checkout itself (e.g. before
 // a release) is a legitimate reason to run these commands there, and denying
-// would remove the only way to do that. A PreToolUse hook also has no
-// advisory channel that reaches the model — `additionalContext` is
-// PostToolUse-only (see hook-io.mjs) — so `ask` is the only way this can
-// surface as a warning at all, the same reasoning main-commit-guard.mjs
-// applies to its ASKED_SUBCOMMANDS.
+// would remove the only way to do that. An advisory is not the alternative
+// either: what these commands do in the main checkout is write to it, so a
+// note delivered next to the result arrives after the tree has already
+// changed (see hook-io.mjs). `ask` is what surfaces the choice before that,
+// the same reasoning main-commit-guard.mjs applies to its ASKED_SUBCOMMANDS.
 //
 // The tree this reads is the payload's cwd, which is where the command
 // starts, not where it ends up: a `cd <dir> && make test` is judged on the

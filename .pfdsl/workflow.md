@@ -12,7 +12,7 @@
 
 このリポが pfdsl スキルの上流であるため経路1（品質ガイド改訂）が成立する。配布先リポでは経路1は存在しない場合がある。
 
-散文として書く前の機械化の検討と、hook で機械化する場合に event が決める決定の幅は、pfd-ops SKILL.md のプロトコル6が一次情報。
+散文として書く前の機械化の検討と、hook で機械化する場合に決定を選ぶ軸（防ぎたい害が実行そのものか、結果の読み違いか）は、pfd-ops SKILL.md のプロトコル6が一次情報。
 このリポの既存機構は pre-commit・`gate-check.mjs`・CI であり、例外 (b)（重複になる）の判定はこの3つに対して行う。
 #650 本文の3条件は、機械判定できる候補が複数出揃った状況でどれに着手するかを絞り込む AND フィルタであり、書く前の毎回の判断にそのまま持ち込むと機械化優先の原則が弱まる。
 
@@ -195,13 +195,15 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 ## PreToolUse ガードの artifact 登録基準（#854）
 
-一般形（運用機構を運用図に登録するのは運用プロトコル文書が名指しで要求する一般的機構だけ）は pfd-ops SKILL.md プロトコル5が一次情報。
-このリポでの適用対象は `.claude/settings.json` に配線された PreToolUse ガードで、登録先は `externalize_bindings` の出力としての `workflow.pfdsl`、名指しの出所は `references/work-cycle.md` と CLAUDE.md である。
-登録しない側に当たるのは `stale-dist-guard` / `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` 等。
+一般形（登録するのは図の変換の参加者だけで、参加者性の代理を基準に据えない）は pfd-ops SKILL.md プロトコル5が一次情報。
+このリポでの適用対象は `.claude/settings.json` に配線された PreToolUse ガードで、登録先は `externalize_bindings` の出力としての `workflow.pfdsl`。
+登録しない側に当たるのは `stale-dist-guard` / `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
 
-現在 artifact 登録済みの2件はこの基準に該当する: `delegation_guard`（`references/work-cycle.md` 手順2「委譲先の外向き操作の制御」節が要求）・`main_branch_guard`（同手順2冒頭「main 直コミットしない」・CLAUDE.md「コミット粒度」節が要求）。それ以外は個別 issue 番号（#642, #650, #871, #840 等）に紐づく実装的ガードであり、登録しない。
+現在 artifact 登録済みの2件はこの基準に該当する: `delegation_guard`（`references/work-cycle.md` 手順2「委譲先の外向き操作の制御」が要求する機構であり、`externalize_bindings` の出力として生まれる）・`main_branch_guard`（同手順2冒頭「main 直コミットしない」・CLAUDE.md「コミット粒度」節が要求する機構で、同じく `externalize_bindings` の出力）。
+**issue 番号に紐づくことは非参加者の判定根拠にならない** — `main_branch_guard` 自身が #650 由来である。区別は出自の issue でなく、運用手順がその機構を要求しているか（＝図のプロセスの出力として生まれるか）で付ける。
 
-判定に迷う新規ガードは、この2条件（プロトコル文書が一般形で名指ししているか／リポ固有の個別事故に対する実装的対処か）で振り分ける。
+判定に迷う新規ガードは、そのガードが図のどのプロセスの出力として生まれるか、図のどの成果物を生産・消費するかを言えるかで振り分ける。
+言えなければ参加者ではない。
 
 ## flow:exempt issue の roadmap 追加除外
 
