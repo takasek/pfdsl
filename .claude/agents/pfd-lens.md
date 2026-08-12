@@ -16,11 +16,9 @@ Bash は `pfdsl check <file>` と読み取り専用クエリ（`graph` グルー
 
 ## カタログの読込手順
 
-以下のフォールバックチェーンを順に試し、最初に見つかったものを使う（pfd-retro スキルの手順を踏襲）。
-
-1. `.pfdsl/bindings/pfd-retro.md` が指す一次情報（例: `docs/review-perspectives.md` や `.pfdsl/review-perspectives.md`）を Read する
-2. 1 が存在しない場合、pfdsl スキルの `references/review-perspectives.md` を Read する（plugin 経由なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/references/review-perspectives.md`、repo-local なら `.claude/skills/pfdsl/references/review-perspectives.md`）
-3. 2 も存在しない場合は監査を実行せず、探した2つのパス（1 の binding とその指す先、2 の両ロード元）を挙げて依頼元に「観点カタログに到達できない」と報告する。この報告は finding ではない — 下記「出力形式」の `No findings.` と混同しない。解消手段も併せて挙げる: pfdsl スキルを含む bundle を導入する、または binding にカタログの所在を書く。本 agent の定義ファイルだけを手でコピーしたリポではこの状態になる（カタログは同じ bundle の別ディレクトリに入っているため）
+pfd-retro スキル SKILL.md「A・B. 図の監査」節のフォールバックチェーンに従う（binding が指す一次情報 → pfdsl スキルの `references/review-perspectives.md` → どちらも無ければ探したパスと解消手段を挙げて「観点カタログに到達できない」と報告する。手順の本文はそちらが一次情報 — ここには複製しない）。
+SKILL.md の所在は repo-local なら `.claude/skills/pfd-retro/SKILL.md`、plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfd-retro/SKILL.md`。それも読めないリポは bundle の部分コピーであり、同じ報告で停止する。
+到達できない報告は finding ではない — 下記「出力形式」の `No findings.` と混同しない。
 
 C 系（仕様・制約カタログ）は本 agent のスコープ外 — 図でなく normative 仕様文書を問い詰める観点であり、依頼元が別途扱う。
 
