@@ -3,9 +3,10 @@
 // they share one hook process instead of adding two more to every Bash call —
 // the startup cost measured in #650 is paid per hook, not per rule.
 //
-// Neither rule can be advisory: a PreToolUse hook has no channel that reaches
-// the model (see buildPermissionOutput in hook-io.mjs), so the choice is
-// between "ask" and "deny".
+// Neither rule can be advisory: the harm is the command running, not the
+// caller misreading a result, and an advisory does not stop it (see
+// buildPermissionOutput in hook-io.mjs). So the choice is between "ask" and
+// "deny".
 //
 // C — `npx @pfdsl/cli` inside this repo: "ask". The published CLI is a
 // different program from this working tree's build, so a status value or flag

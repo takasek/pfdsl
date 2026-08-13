@@ -7,8 +7,8 @@
 //
 // Advisory, and PostToolUse rather than PreToolUse: the issue exists by the
 // time this runs, so there is nothing to block. PostToolUse is also the only
-// event whose output can carry additionalContext back to the model, which is
-// what an advisory needs (see buildPermissionOutput in hook-io.mjs).
+// event that can supply what this needs — the created issue's number comes
+// from `payload.tool_response`, which does not exist before the tool ran.
 //
 // Same shape as hooks/retro-reminder-post-tool-use.mjs, which reminds about
 // pfd-retro when a commit marks an artifact done.
