@@ -17,7 +17,7 @@
 // read a stale build. The double wiring is not load-bearing as written —
 // PreToolUse can carry additionalContext too, and the docs deliver it to the
 // same place as the PostToolUse one, so one of the two ends is redundant.
-// Collapsing to a single event is a settings change, tracked separately.
+// Collapsing to a single event is a settings change, tracked in #929.
 
 import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
 
