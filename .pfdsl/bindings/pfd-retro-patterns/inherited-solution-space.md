@@ -1,5 +1,6 @@
 ---
 tags: [target:issue, method:choose-option]
+phase: pre-artifact
 ---
 
 - **解空間の継承 trap**: 作業項目が対応案を列挙していると、その集合をそのまま設計空間として受け取り、集合の外にある「問題自体が発生しない形」を誰も生成しない。
