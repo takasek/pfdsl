@@ -24,6 +24,11 @@ export type {
 	StyleAttr,
 	TagMeta,
 } from "./frontmatter.js";
-export { PFD_TYPE_VALUES, STATUS_VALUES, STYLE_ATTRS } from "./frontmatter.js";
+export {
+	isRoadmapType,
+	PFD_TYPE_VALUES,
+	STATUS_VALUES,
+	STYLE_ATTRS,
+} from "./frontmatter.js";
 export type { FeedbackEdge, Graph, NodeKind, PrimaryEdge } from "./graph.js";
 export type { Position, Token, TokenType } from "./token.js";

@@ -8,6 +8,13 @@
 
 `vOLD` は直前のバージョン、`vNEW` はこのエントリが導入したバージョン（＝そのエントリを書いた時点の spec.md タイトル行と一致）。先頭エントリの `vNEW` は常に spec.md の現行バージョンと一致していなければならない（`scripts/check-spec-history.mjs` が release 前に機械検査する）。エントリは maintain_spec（統合フェーズ）でタイトル行 bump と同じ作業の中で書く（`.pfdsl/workflow.md`）ので、release 時点で複数バージョン分がまとまって欠けている状態は本来生じない。生じていた場合は書き忘れであり、欠けているエントリを追記する（`spec-history-finalize` スキル）。エントリは version ごとに永続する記録であり、release 単位でまとめたり削除したりしない。v0.0.2 以前のエントリは旧形式（丸括弧なし）のまま残す — 過去の記録は書き換えない。
 
+v0.0.18 からの主な変更点（v0.0.19）：`roadmap` 以外の種別を明示したファイルの artifact に `status:` が設定されていることを検出する W007 を追加した（#787）。**破壊的変更**を含む — `pfdsl meta set <flow ファイル> <id> status <値>` は従来 exit 0 で書き込みに成功していたが、exit 2 で拒否するようになる（§2.10 / §15.14 が既に規定していた挙動に実装を合わせるもの、#923）。既存の flow ファイルが `status:` を持っている場合は新たに warning（strict では error）が出る。
+
+* §15.16「非 roadmap ファイルの status 禁止」を新設し、W007 を規範として定義（W005 の鏡像。produced / source を区別せず、`type:` 省略ファイルは対象外）
+* §16 エラー表に W007 の行を追加
+* `packages/core/src/rules/status.ts` に `flowStatusAbsence` を追加し `validator.ts` へ配線
+* `pfdsl meta set` の status 書き込みに type ガードを追加（§2.10 / §15.14 の既定に実装を追随させた）
+
 v0.0.17 からの主な変更点（v0.0.18）：`pfdsl graph io` の終端監査を2列に分割した（#686）。`externalStakeholders` を宣言した audit-terminal は、従来どおり `terminals` からは除外されるが、新設の `externalTerminals`（テキスト出力では `external-stakeholder terminals:`）へ引き続き列挙される。破壊的変更ではない（追加のみ。`terminals` の内容・意味論は不変）。
 
 * §2.3 externalStakeholders の記述に、`graph io` が2列に分けて報告する旨を追記

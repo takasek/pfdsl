@@ -25,6 +25,7 @@ import {
 	groupEdges,
 	hasErrors,
 	type IndexChange,
+	isRoadmapType,
 	isUrlLike,
 	loadExtendsChain,
 	loadSubflowGraph,
@@ -183,6 +184,23 @@ function failIfErrors(
 	const errs = diags.filter((d) => d.severity === "error");
 	if (json) return failJson({ diagnostics: errs });
 	return fail(diagText(errs, file, color));
+}
+
+/**
+ * Refuse an operation that only a roadmap may take part in (§15.14). `subject`
+ * names what is being refused and opens the message. An omitted `type:` reads
+ * as roadmap, so only an explicit other kind is turned away — the callers all
+ * defer to `isRoadmapType` for that, rather than each restating the condition.
+ */
+function requireRoadmapType(
+	pfdType: PfdType | undefined,
+	subject: string,
+): CommandResult | null {
+	if (isRoadmapType(pfdType)) return null;
+	return fail(
+		`${subject} requires a roadmap file (type: roadmap). This file has type: ${pfdType}\n`,
+		2,
+	);
 }
 
 export interface CheckOptions {
@@ -584,9 +602,8 @@ function computeReadyIds(src: string): {
 		return { readyIds: [], isRoadmap: false, warnings: [] };
 
 	const warnings = diagnostics.filter((d) => d.code === "W006");
-	const pfdType = frontmatter?.type;
-	const isRoadmap = pfdType === undefined || pfdType === "roadmap";
-	if (!isRoadmap) return { readyIds: [], isRoadmap: false, warnings };
+	if (!isRoadmapType(frontmatter?.type))
+		return { readyIds: [], isRoadmap: false, warnings };
 
 	const artifactMeta = frontmatter?.artifact ?? {};
 	const { readyIds } = computeReadyIdsCore(edges, nodeKinds, artifactMeta);
@@ -675,14 +692,8 @@ export function runReady(file: string, opts: ReadyOptions = {}): CommandResult {
 	const earlyFail = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (earlyFail) return earlyFail;
 
-	const READY_REQUIRED_TYPE = "roadmap" satisfies PfdType;
-	const pfdType = frontmatter?.type;
-	if (pfdType !== undefined && pfdType !== READY_REQUIRED_TYPE) {
-		return fail(
-			`ready requires a roadmap file (type: roadmap). This file has type: ${pfdType}\n`,
-			2,
-		);
-	}
+	const typeFail = requireRoadmapType(frontmatter?.type, "ready");
+	if (typeFail) return typeFail;
 
 	const warnings = diagnostics.filter((d) => d.code === "W006");
 	const warnText = warnings.length ? diagText(warnings, file, opts.color) : "";
@@ -873,14 +884,8 @@ export function runStatusBlocked(
 	const earlyFail = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (earlyFail) return earlyFail;
 
-	const BLOCKED_REQUIRED_TYPE = "roadmap" satisfies PfdType;
-	const pfdType = frontmatter?.type;
-	if (pfdType !== undefined && pfdType !== BLOCKED_REQUIRED_TYPE) {
-		return fail(
-			`blocked requires a roadmap file (type: roadmap). This file has type: ${pfdType}\n`,
-			2,
-		);
-	}
+	const typeFail = requireRoadmapType(frontmatter?.type, "blocked");
+	if (typeFail) return typeFail;
 
 	const warnings = diagnostics.filter((d) => d.code === "W006");
 	const warnText = warnings.length ? diagText(warnings, file, opts.color) : "";
@@ -977,9 +982,20 @@ export function runMetaSet(
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 
-	const { diagnostics, nodeKinds } = analyze(src);
+	const { diagnostics, nodeKinds, frontmatter } = analyze(src);
 	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
+
+	// Progress belongs to the roadmap (§15.16), so writing status into a file
+	// that declares another kind would have the CLI produce the state W007
+	// reports. An omitted type is read as roadmap, same as the ready gate.
+	if (field === "status") {
+		const typeFail = requireRoadmapType(
+			frontmatter?.type,
+			"meta set: setting status",
+		);
+		if (typeFail) return typeFail;
+	}
 
 	// Validate every id and field/kind pairing before touching anything, so a
 	// multi-id call is atomic: either all writes land or none do.
@@ -2180,16 +2196,26 @@ export interface StatusGap {
 	file: string;
 	artifactId: string;
 	label: string;
-	status: string;
 }
 
 export interface StatusGapsResult {
 	ok: boolean;
 	gaps: StatusGap[];
-	/** Number of status: todo artifacts scanned across all flow files, tracked or not. */
-	todoArtifactCount: number;
+	/** Number of roadmap-tracked artifacts scanned across all flow files, tracked or not. */
+	trackedArtifactCount: number;
 	warnings?: Diagnostic[];
 }
+
+/**
+ * The tag a flow artifact carries to say "this one is an individually tracked
+ * deliverable, so the roadmap must have a chain that builds it". The selector
+ * used to be `status: todo`, but a flow file may not carry status at all
+ * (W007, §15.16) — that selector could only match files already in violation.
+ * An opt-in tag also keeps the check quiet by default: comparing every flow id
+ * against the roadmap flags 42 of this repo's own 47 workflow artifacts, which
+ * are process byproducts nobody ever meant to track one by one.
+ */
+const ROADMAP_TRACKED_TAG = "roadmap-tracked";
 
 export function runStatusGaps(
 	roadmapFile: string,
@@ -2217,27 +2243,23 @@ export function runStatusGaps(
 		? diagText(warnings, roadmapFile, opts.color)
 		: "";
 
-	const ROADMAP_REQUIRED_TYPE = "roadmap" satisfies PfdType;
-	if (
-		roadmapFm?.type !== undefined &&
-		roadmapFm.type !== ROADMAP_REQUIRED_TYPE
-	) {
+	if (!isRoadmapType(roadmapFm?.type)) {
 		return fail(
-			`status gaps: roadmap file must have type: roadmap. Got type: ${roadmapFm.type}\n`,
+			`status gaps: roadmap file must have type: roadmap. Got type: ${roadmapFm?.type}\n`,
 			2,
 		);
 	}
 
-	// Collect all artifact IDs that appear in the roadmap (declared or in edges)
-	const roadmapArtifactIds = new Set<string>(
-		Object.keys(roadmapFm?.artifact ?? {}),
-	);
+	// The question is whether the roadmap builds the artifact, so only ids it
+	// produces count. An id it merely consumes is an external input there —
+	// present in the file, but with nothing in it that produces the thing.
+	const roadmapArtifactIds = new Set<string>();
 	for (const e of roadmapEdges) {
-		roadmapArtifactIds.add(e.artifact);
+		if (e.kind === "output") roadmapArtifactIds.add(e.artifact);
 	}
 
 	const gaps: StatusGap[] = [];
-	let todoArtifactCount = 0;
+	let trackedArtifactCount = 0;
 
 	for (const flowFile of flowFiles) {
 		const flowSrc = readSource(flowFile);
@@ -2247,8 +2269,9 @@ export function runStatusGaps(
 		const flowFail = failIfErrors(flowDiags, flowFile, opts.json, opts.color);
 		if (flowFail) return flowFail;
 
-		const flowType = flowFm?.type;
-		if (flowType === ROADMAP_REQUIRED_TYPE) {
+		// The flow argument is the mirror case: an explicit roadmap is refused,
+		// while an omitted type is left alone (it is not claiming to be one).
+		if (flowFm?.type === "roadmap") {
 			return fail(
 				`status gaps: flow file must be workflow or runtime-pipeline, not roadmap: ${flowFile}\n`,
 				2,
@@ -2256,16 +2279,18 @@ export function runStatusGaps(
 		}
 
 		for (const [aid, meta] of Object.entries(flowFm?.artifact ?? {})) {
-			if (meta.status === "todo") {
-				todoArtifactCount++;
-				if (!roadmapArtifactIds.has(aid)) {
-					gaps.push({
-						file: flowFile,
-						artifactId: aid,
-						label: meta.label ?? aid,
-						status: "todo",
-					});
-				}
+			// Array.isArray first: `tags:` written without brackets parses as a
+			// plain string, and String#includes would then accept any value with
+			// the tag as a substring.
+			if (!Array.isArray(meta.tags) || !meta.tags.includes(ROADMAP_TRACKED_TAG))
+				continue;
+			trackedArtifactCount++;
+			if (!roadmapArtifactIds.has(aid)) {
+				gaps.push({
+					file: flowFile,
+					artifactId: aid,
+					label: meta.label ?? aid,
+				});
 			}
 		}
 	}
@@ -2273,7 +2298,7 @@ export function runStatusGaps(
 	const result: StatusGapsResult = {
 		ok: gaps.length === 0,
 		gaps,
-		todoArtifactCount,
+		trackedArtifactCount,
 	};
 	if (warnings.length) result.warnings = warnings;
 
@@ -2287,20 +2312,20 @@ export function runStatusGaps(
 	}
 
 	if (gaps.length === 0) {
-		if (todoArtifactCount === 0) {
+		if (trackedArtifactCount === 0) {
 			return ok(
-				"No todo artifacts found in the flow files — this check verified nothing. " +
-					"It only inspects artifacts with status: todo; if the flow files don't record status, this check has no target.\n",
+				`No artifacts tagged ${ROADMAP_TRACKED_TAG} found in the flow files — this check verified nothing. ` +
+					`It only inspects artifacts whose tags include ${ROADMAP_TRACKED_TAG}; without that tag this check has no target.\n`,
 				warnText,
 			);
 		}
 		return ok(
-			"All todo artifacts in flow files are tracked in the roadmap.\n",
+			`All ${ROADMAP_TRACKED_TAG} artifacts in flow files are tracked in the roadmap.\n`,
 			warnText,
 		);
 	}
 
-	const lines: string[] = [`Untracked todo artifacts (${gaps.length}):`];
+	const lines: string[] = [`Untracked artifacts (${gaps.length}):`];
 	for (const g of gaps) {
 		lines.push(`  ${g.artifactId.padEnd(20)} "${g.label}"   in: ${g.file}`);
 	}
@@ -2623,6 +2648,10 @@ each node's kind. Array/map fields (tags, parts, externalStakeholders,
 boundary) and derived read-only fields (location.resolved, command.cwd)
 cannot be set.
 
+Setting status requires a roadmap file: an explicit type: other than roadmap
+is refused (spec §2.10/§15.14), since progress belongs to the roadmap — a file
+that carries status under another kind is also reported by check (W007, §15.16).
+Other fields are writable on any kind.
 When setting status on a roadmap file, reports which processes became newly
 ready after the change (once, after all writes).
 Omitting type: is treated as roadmap and allowed, with a warning (W006).
@@ -2982,24 +3011,29 @@ Exit codes:
 
 const HELP_STATUS_GAPS = `usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json] [--no-color]
 
-Cross-check todo artifacts in workflow/runtime-pipeline files against the roadmap.
-Reports artifacts with status: todo in flow files that have no corresponding entry
-in the roadmap, indicating a build chain is missing.
+Cross-check roadmap-tracked artifacts in workflow/runtime-pipeline files against
+the roadmap. Reports flow artifacts whose tags include roadmap-tracked and that
+no process in the roadmap produces, indicating a build chain is missing. An id
+the roadmap only consumes is an external input there, so it counts as missing.
 Omitting type: on the roadmap file is treated as roadmap and allowed, with a warning (W006).
-This check only inspects artifacts with status: todo; if a flow file records no
-status at all, this check has nothing to look at and passes without verifying anything.
+The tag is opt-in: tag the flow artifacts that are individually tracked
+deliverables. Comparing every flow artifact id instead would flag the routine
+byproducts a process diagram is mostly made of. Flow files carry no status
+(W007, spec §15.16), so status cannot be the selector here.
+If nothing carries the tag, this check has no target and says so rather than
+reporting a pass.
 
   <roadmap>  path to a .pfdsl file with type: roadmap
   <flow>     one or more .pfdsl files with type: workflow or runtime-pipeline
 
 Options:
-  --json      output as JSON ({ ok, gaps: [{file, artifactId, label, status}], todoArtifactCount, warnings? })
+  --json      output as JSON ({ ok, gaps: [{file, artifactId, label}], trackedArtifactCount, warnings? })
               on parse failure: { ok: false, diagnostics }
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 
 Exit codes:
-  0  all todo artifacts are tracked in the roadmap
-  1  one or more todo artifacts have no roadmap entry
+  0  every roadmap-tracked flow artifact has a roadmap entry
+  1  one or more roadmap-tracked artifacts have no roadmap entry
   2  invalid usage
 `;
 
