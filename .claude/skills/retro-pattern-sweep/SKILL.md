@@ -77,6 +77,10 @@ node scripts/retro-patterns.mjs tags
 `docs/asset-sweep/retro-patterns.json` の `commit` / `date` / `log` を更新する（`docs/distribution-review/reviewed.json` と同じ形）。
 `node scripts/check-asset-sweep.mjs` が exit 0 になることを確認してコミットする。
 
+実行記録の冒頭に、前回の記録の `date` からの日数と、その間に追加されたファイル数を書く。
+閾値は「実際の発火間隔を観測したら見直す」前提の値だが、その間隔を数える工程は他にどこにも無い — ここで残さないと、閾値は一度も見直されないまま回り続ける。
+間隔が閾値の意図（数日〜数週間に1回）から外れていたら、`SWEEP_TARGETS` の `threshold` を実測で置き換える。初回は前回が無いので、代わりにカタログが1ファイル1パターンになった日からの日数を書く。
+
 ## このスキルを配布しない理由
 
 利用側リポは `.pfdsl/bindings/pfd-retro-patterns/` を持たないので、この手順には実施先が無い。
