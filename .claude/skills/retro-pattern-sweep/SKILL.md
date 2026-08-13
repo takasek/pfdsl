@@ -22,18 +22,22 @@ description: |
 
 ## 読む範囲を絞る
 
-全61件を毎回読み直さない。前回 sweep の commit は `docs/asset-sweep/retro-patterns.json` が持っているので、そこからの追加分を機械列挙できる。
+カタログ全件を毎回読み直さない。前回 sweep の commit は `docs/asset-sweep/retro-patterns.json` が持っているので、そこからの追加分を機械列挙できる。
 
 ```sh
-node -e 'console.log(JSON.parse(require("fs").readFileSync("docs/asset-sweep/retro-patterns.json","utf8")).commit)'
+cat docs/asset-sweep/retro-patterns.json   # 無ければ初回（下記の初回分岐へ）
 git diff --name-only --diff-filter=A --no-renames <前回 sweep commit> HEAD -- .pfdsl/bindings/pfd-retro-patterns/
 ```
+
+このファイルが存在しないことは初回を意味する（`docs/asset-sweep/README.md`）。
+先回りして空のレコードを置く運用ではないので、不在は異常ではない。
 
 工程3・4・5（`具体例:` の参照実在・`phase:` 宣言漏れ・タグ語彙）は、この追加分だけを対象にしてよい。
 工程2（統合）は追加分を起点に `near` を引くので、返ってきた既存パターンは範囲外でも開く。
 工程1（機械化による廃止）だけは追加分の外に出る — 廃止対象は古いパターンのほうであり、前回 sweep 以降に**機械化されたもの**が引き金になる。
 `git log --oneline <前回 sweep commit>..HEAD -- scripts/ hooks/ .claude/settings.json` で機構が増えたコミットを列挙し、それが潰した trap を持つパターンを探す。
-記録が無い（初回）場合はこの絞り込みが効かないので、全件を対象にする。
+記録が無い（初回）場合は5工程すべてでこの絞り込みが効かず、対象はカタログ全件になる。
+工程1の機構コミットからの逆引きも起点を持たないため、初回だけは全件の `具体例:` を読んで機械化済みかを判定する経路になる。
 
 ## 1. 機械化により廃止できるパターンを探す
 
@@ -47,8 +51,9 @@ git diff --name-only --diff-filter=A --no-renames <前回 sweep commit> HEAD -- 
 node scripts/retro-patterns.mjs near --word <固有語>
 ```
 
-渡す語の選び方（草案そのものの固有語を渡す・一般語では順位が沈む）は同じ binding の「パターンを追記するとき」が一次情報。
-既存パターン同士の総当たりではなく、パターン名や `具体例:` に出てくる固有名詞を1つずつ渡して近さを見る。
+渡す語の選び方（固有語を渡す・一般語では順位が沈む）は同じ binding の「パターンを追記するとき」が一次情報。
+ただしその節が言う「草案の固有語」は追記の文脈の語であり、sweep には草案が無い — sweep では対象パターン（追加分、初回は全件）のパターン名と `具体例:` に出てくる固有名詞がその位置に来る。
+既存パターン同士の総当たりではなく、その固有名詞を1つずつ渡して近さを見る（`--word` は複数回指定できる）。
 上位に返ったペアを実際に開き、同じ問いの構造を2ファイルへ分けたままにする理由が無いなら統合する。
 
 ## 3. `具体例:` が参照する機構の実在を確認する
@@ -70,16 +75,35 @@ node scripts/retro-patterns.mjs tags
 件数1のタグ・見慣れない prefix・軸として成立していなさそうな値を洗い出す。
 正準リストは無いので「乖離」ではなく、そのタグが本当に発火条件を表しているかを個別に判定する。
 
+## 各工程の直後に検査する
+
+```sh
+node scripts/retro-patterns.mjs check
+```
+
+ファイルを削除・統合・書き換えた工程（1〜5 のいずれも該当しうる）の直後に回す。
+解析可否・ファイル名の書式・タグ有無・往復一致に加え、`.pfdsl/bindings/pfd-retro.md` の bash ブロックの例が実サブコマンドと一致するかも見る。
+最後にまとめて回すと、どの工程の編集が壊したかを切り分ける手戻りが出る。
+`make check-docs` からも走るが、そこまで持ち越すと同じ切り分けを後でやることになる。
+
 ## 記録する
 
 結果を `docs/asset-sweep/<YYYY-MM-DD>-retro-patterns.md` に書く。
 何を廃止・統合・修正したか、判定に迷ったが手を付けなかった項目とその理由を含める。
-`docs/asset-sweep/retro-patterns.json` の `commit` / `date` / `log` を更新する（`docs/distribution-review/reviewed.json` と同じ形）。
-`node scripts/check-asset-sweep.mjs` が exit 0 になることを確認してコミットする。
+
+記録は2コミットに分ける。
+
+1. 工程1〜5 のカタログ変更と実行記録の `.md` をコミットする。
+2. `docs/asset-sweep/retro-patterns.json` に `commit`（1 のコミットの40桁 sha）・`date`（`YYYY-MM-DD`）・`log`（実行記録の `.md` のファイル名）を書き、これを2つ目のコミットにする（`docs/distribution-review/reviewed.json` と同じ形。初回はファイルごと新規作成する）。
+
+`commit` に書くのは sweep 済みの状態を指す sha であり、それを書いているコミット自身ではない — 自己言及になるため分けている。
+2つ目のコミットはカタログを触らないので、記録した sha 以降に追加は発生せず、ゲートは緑のままになる。
+2 をコミットする前に `node scripts/check-asset-sweep.mjs` が exit 0 を返すことを確認する（このスクリプトは作業ツリーの json を読み、記録した sha から HEAD までの追加を数えるため、json を書いた時点で判定できる）。
 
 実行記録の冒頭に、前回の記録の `date` からの日数と、その間に追加されたファイル数を書く。
 閾値は「実際の発火間隔を観測したら見直す」前提の値だが、その間隔を数える工程は他にどこにも無い — ここで残さないと、閾値は一度も見直されないまま回り続ける。
-間隔が閾値の意図（数日〜数週間に1回）から外れていたら、`SWEEP_TARGETS` の `threshold` を実測で置き換える。初回は前回が無いので、代わりにカタログが1ファイル1パターンになった日からの日数を書く。
+間隔が閾値の意図（数日〜数週間に1回）から外れていたら、`SWEEP_TARGETS` の `threshold` を実測で置き換える。
+初回は前回が無いので、代わりにカタログが1ファイル1パターンになった日からの日数を書く（その日は `git log --diff-filter=A --format=%ad --date=short -- .pfdsl/bindings/pfd-retro-patterns/ | tail -1` で引ける）。
 
 ## このスキルを配布しない理由
 
