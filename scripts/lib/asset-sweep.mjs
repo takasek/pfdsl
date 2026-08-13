@@ -1,10 +1,10 @@
 /**
- * Sweep gates for accumulating-catalog assets: files that a per-cycle
- * addition discipline keeps growing (a new pattern per retro), but that
- * nothing ever revisits as a set — near-duplicates never merge, patterns
- * whose trap is now machine-enforced never get retired, tag vocabulary
- * drifts. #879 found 4-9 such stale entries out of 61 in
- * .pfdsl/bindings/pfd-retro-patterns/ alone.
+ * Sweep gates for assets a per-cycle discipline keeps adding to but nothing
+ * ever revisits as a set. #879 found 4-9 stale entries out of 61 in the retro
+ * pattern catalog — near-duplicates never merged, patterns whose trap is now
+ * machine-enforced never retired, tag vocabulary drifted. #915 found the same
+ * shape in prose: skills and companions that still teach a discipline some
+ * hook now enforces, or re-explain what a script already prints.
  *
  * Each registered target reuses evaluateRecordGate (review-record-gate.mjs)
  * with a threshold above 1: a sweep is "current" until enough has
@@ -52,6 +52,7 @@ export const SWEEP_TARGETS = [
 		id: "retro-patterns",
 		label: "retro-pattern sweep (.pfdsl/bindings/pfd-retro-patterns)",
 		prefixes: [".pfdsl/bindings/pfd-retro-patterns/"],
+		matches: /\.md$/,
 		// Unit is added files, not changed files: a single editing pass
 		// through the catalog (e.g. a tag-vocabulary fix) can modify 30+
 		// files in one commit, which would swamp a changed-file threshold
@@ -66,13 +67,73 @@ export const SWEEP_TARGETS = [
 		threshold: 20,
 		skill: "retro-pattern-sweep",
 	}),
+	defineTarget({
+		id: "prose-mechanization",
+		label: "prose-mechanization audit (prose assets vs scripts/ + hooks/)",
+		// The only target so far whose counted scope is not its swept scope.
+		// What goes stale is prose — a skill or companion that still teaches a
+		// discipline some hook now enforces, or re-explains what a script
+		// already prints. Prose itself barely moves in a way that measures
+		// that: over the nine days from v0.0.25 (2026-08-04) this repo added 3
+		// prose .md and modified 18, against 14 mechanisms added in the same
+		// window, and the modifications are dominated by sweeping edits that
+		// say nothing about staleness (the same skew that put --diff-filter=A
+		// on the retro-patterns target). Each added mechanism, by contrast, is
+		// one more chance that some existing prose now describes it — so the
+		// mechanisms are counted and the prose is what the sweep then reads.
+		prefixes: ["scripts/", "hooks/"],
+		// Entry points only: a mechanism arrives as a file directly under one
+		// of those directories. scripts/lib/ holds the halves that entry
+		// points are split into, and a .test.mjs is that split's test — both
+		// move with refactors that add no mechanism at all, and over the same
+		// nine days they would have inflated 14 additions into 59.
+		//
+		// Every entry point counts, not just check-*.mjs and *-guard.mjs.
+		// Those two names do not cover the wired hooks (md-write-check.mjs,
+		// cwd-drift-log.mjs are neither), and the sweep reads more than
+		// guards anyway: one of its five steps looks for prose re-explaining
+		// what a script prints, which any entry point can provoke. The cost
+		// is that a generator or a setup helper counts too — one of the 14
+		// measured above.
+		matches: /^(?!.*\.test\.mjs$)[^/]+\.mjs$/,
+		// Sized by yield, not by interval (which is where the retro-patterns
+		// threshold above got its equal-looking 20). The 2026-08-12 audit read
+		// a ledger of ~51 entry points and filed three issues (#912 #913
+		// #914), so roughly one finding per 17 mechanisms. 20 puts the
+		// expected yield of a sweep just above one finding; halving it would
+		// make the empty-handed run the common case, which is how a check
+		// earns the silence that chronic-false-positive-silencing describes.
+		// At the pace measured then (14 additions in nine days) this fires
+		// about fortnightly. Raise it if one hardening arc alone supplies 20
+		// additions faster than a sweep could be run; lower it if a month
+		// passes without reaching 20 as the ledger matures.
+		//
+		// Two things this count cannot see, both of which the sweep's own
+		// first step covers by re-enumerating the whole ledger every run
+		// rather than only the additions. A hook rewired in
+		// .claude/settings.json — pointed at a different event, or its
+		// matcher widened — adds no file, so it never reaches this count.
+		// And the count is of what arrived *since the last sweep*: prose left
+		// stale by mechanisms that landed before it is already in the backlog
+		// and adds nothing here, which is why the absent record blocks rather
+		// than passes.
+		threshold: 20,
+		skill: "prose-mechanization-audit",
+	}),
 ];
 
-/** Is this changed path in scope for `target`'s sweep? */
+/**
+ * Is this changed path one the gate counts for `target`? Not necessarily one
+ * the sweep then reads — prose-mechanization counts the mechanisms whose
+ * arrival makes prose stale, and reads the prose.
+ *
+ * `matches` is tested against the path below the matched prefix, so a target
+ * with a deep prefix does not have to repeat it to anchor its own pattern.
+ */
 export function inScope(target, path) {
-	return (
-		target.prefixes.some((prefix) => path.startsWith(prefix)) &&
-		path.endsWith(".md")
+	return target.prefixes.some(
+		(prefix) =>
+			path.startsWith(prefix) && target.matches.test(path.slice(prefix.length)),
 	);
 }
 
@@ -142,8 +203,8 @@ export function repoDeps(root, { exec } = {}) {
 				cwd: root,
 				captureStderr: true,
 			}).ok,
-		// --diff-filter=A: the threshold counts additions, not edits (see
-		// SWEEP_TARGETS' threshold comment for why).
+		// --diff-filter=A: the threshold counts additions, not edits (see each
+		// target's threshold comment in SWEEP_TARGETS for why).
 		//
 		// --no-renames because git's rename detection is on by default and
 		// would pair a deleted pattern with a similar-enough added one,
