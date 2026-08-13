@@ -17,10 +17,18 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { PLUGIN_MIRRORS } from "./gen-plugin.mjs";
+import {
+	diffBase,
+	EMPTY_TREE,
+	evaluateRecordGate,
+} from "./review-record-gate.mjs";
 import { gitDiffNames, tryGit } from "./run-exec.mjs";
 
-/** git's empty tree — the diff base when nothing has been reviewed yet. */
-export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+// Re-exported so this module's existing importers (this file's own test,
+// canonicalSourceOf callers, etc.) keep working unchanged — the empty-tree
+// constant and the base-selection function now live in review-record-gate.mjs,
+// shared with asset-sweep.mjs.
+export { diffBase, EMPTY_TREE };
 
 const DIST_ROOT = "plugin/pfdsl/";
 
@@ -105,16 +113,17 @@ export function unreviewedFiles(changedPaths) {
 	return changedPaths.filter(inScope);
 }
 
-/** The commit to diff the working tree against, given the record. */
-export function diffBase(record) {
-	return record?.commit ?? EMPTY_TREE;
-}
-
 /**
  * The gate itself. Deps are injected so the decision can be tested without a
  * repository: readRecord returns the parsed record (null if there is none),
  * commitExists answers whether a hash is in this clone, and changedSince lists
  * paths that differ between a base and HEAD.
+ *
+ * The mechanics (read the record, pick a base, fail closed on an unreachable
+ * base, filter the diff, compare against a threshold) live in
+ * evaluateRecordGate (review-record-gate.mjs); this wrapper supplies the
+ * threshold of 1 — any bundled prompt that moved trips it — and the
+ * distribution-review-specific wording for each outcome.
  *
  * Every failure path here is fail-closed. An absent record, an unreachable
  * commit and a moved prompt all block, because the alternative in each case is
@@ -125,22 +134,27 @@ export function runDistributionReviewCheck({
 	commitExists,
 	changedSince,
 }) {
-	const record = readRecord();
-	const base = diffBase(record);
+	const result = evaluateRecordGate({
+		readRecord,
+		commitExists,
+		changedSince,
+		inScope,
+		threshold: 1,
+	});
 
-	if (base !== EMPTY_TREE && !commitExists(base)) {
+	if (result.unreachable) {
 		return {
 			ok: false,
 			message: [
-				`The reviewed commit ${base} is not in this clone.`,
+				`The reviewed commit ${result.base} is not in this clone.`,
 				"Run git fetch (or git fetch --unshallow) and try again — the gate cannot",
 				"tell what has changed since a commit it cannot read.",
 			].join("\n"),
 		};
 	}
 
-	const files = unreviewedFiles(changedSince(base));
-	if (files.length === 0)
+	const { base, files, ok } = result;
+	if (ok)
 		return {
 			ok: true,
 			base,

@@ -9,7 +9,8 @@
 //   4. resolve target version (from --version, or the current package.json)
 //   5. tag-duplicate check (cheap, version is already known)
 //   6. pre-tag checks: build, test, check-docs, gen-plugin identity,
-//      distribution review currency, spec-history currency
+//      distribution review currency, asset sweep currency, spec-history
+//      currency
 //   7. bump package.json(s) + commit (only if --version was given)
 //   7b. cli only: pin marketplace.json's plugin source to this release's tag
 //   8. push origin main
@@ -26,7 +27,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-
+import {
+	repoDeps as assetSweepRepoDeps,
+	runAssetSweepCheck,
+} from "./lib/asset-sweep.mjs";
 import {
 	bumpVersionInPackageJson,
 	filesToCommitForBump,
@@ -148,7 +152,7 @@ try {
 // --- 6. pre-tag checks ---
 
 console.log(
-	"Running pre-tag checks (build, test, check-docs, gen-plugin identity, distribution review)...",
+	"Running pre-tag checks (build, test, check-docs, gen-plugin identity, distribution review, asset sweep)...",
 );
 run("make", ["build"]);
 run("make", ["test"]);
@@ -184,6 +188,14 @@ const reviewCheck = tryRun(
 );
 if (!reviewCheck.ok) process.exit(1);
 console.log(reviewCheck.out.trim());
+
+// Has any registered accumulating catalog (scripts/lib/asset-sweep.mjs's
+// SWEEP_TARGETS) gone unswept past its threshold? In-process, like the
+// spec-history check below: a fixed set of file reads and diffs, not a
+// generated bundle to build first.
+const sweepCheck = runAssetSweepCheck(assetSweepRepoDeps(root));
+console[sweepCheck.ok ? "log" : "error"](sweepCheck.message);
+if (!sweepCheck.ok) process.exit(1);
 
 // A spec.md version bump with no matching docs/spec/spec-history.md entry —
 // the coupling splitting the changelog into its own file (#692) traded away

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Checks published versions of all packages against local package.json
-// versions, plus the two release gates that run nowhere else (distribution
-// review currency, spec-history currency).
+// versions, plus the release gates that run nowhere else (distribution
+// review currency, asset sweep currency, spec-history currency).
 // Usage: node scripts/release-status.mjs
 // Exit 1 if anything is left to do before the next publication — see
 // needsAction in lib/release-status-check.mjs for what that covers.
@@ -16,12 +16,17 @@ import { git as rawGit } from "./lib/run-exec.mjs";
 const git = (args) => rawGit(args, { captureStderr: true });
 
 import {
+	repoDeps as assetSweepRepoDeps,
+	runAssetSweepCheck,
+} from "./lib/asset-sweep.mjs";
+import {
 	RECORD_PATH,
 	repoDeps,
 	runDistributionReviewCheck,
 } from "./lib/distribution-review.mjs";
 import {
 	compareVersions,
+	formatAssetSweepStatus,
 	formatDistributionReviewStatus,
 	formatFullReviewStatus,
 	formatResults,
@@ -267,6 +272,11 @@ const distributionReview = readDistributionReview();
 if (distributionReview.blockedReason)
 	console.warn(`warn: ${distributionReview.blockedReason}`);
 
+// `make release` blocks on the same reading (scripts/check-asset-sweep.mjs),
+// through the same repoDeps as check-asset-sweep.mjs itself calls — so the
+// blocking check and this status line cannot disagree.
+const assetSweepResult = runAssetSweepCheck(assetSweepRepoDeps(root));
+
 // `make release` blocks on the same reading (scripts/check-spec-history.mjs);
 // showing it here keeps that refusal from arriving as a surprise mid-release.
 const specHistory = runSpecHistoryCheck(specHistoryRepoDeps(root));
@@ -276,12 +286,14 @@ console.log(formatResults(results));
 console.log(formatSkillBundleStatus(skillBundleCommits, skillBundleTag));
 console.log(formatDistributionReviewStatus(distributionReview));
 console.log(formatFullReviewStatus(distributionReview.lastFullReview));
+console.log(formatAssetSweepStatus(assetSweepResult.evaluations));
 console.log(formatSpecHistoryStatus(specHistory));
 
 const pending = needsAction({
 	results,
 	skillBundleCommits,
 	distributionReview,
+	assetSweep: { ok: assetSweepResult.ok },
 	specHistory,
 });
 if (pending) process.exit(1);
