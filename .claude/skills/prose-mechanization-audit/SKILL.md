@@ -34,8 +34,11 @@ pfd-ops SKILL.md 運用プロトコル6「散文として書く前に機械化�
 前回 sweep の commit は `docs/asset-sweep/prose-mechanization.json` が持つ。
 
 ```sh
-node -e 'console.log(JSON.parse(require("fs").readFileSync("docs/asset-sweep/prose-mechanization.json","utf8")).commit)'
+cat docs/asset-sweep/prose-mechanization.json   # 無ければ初回（下記の初回分岐へ）
 ```
+
+このファイルが存在しないことは初回を意味する（`docs/asset-sweep/README.md`）。
+先回りして空のレコードを置く運用ではないので、不在は異常ではない。
 
 工程1 は毎回全件を実測する（台帳は小さく、差分で追うと配線だけ変わった機構を見落とす）。
 工程2 と工程5 は前回 sweep 以降に**増えた機構**を起点にする — 陳腐化させた側が新しい機構のほうであり、散文は古いまま動かないからである。
@@ -56,6 +59,8 @@ git diff --name-only <前回 sweep commit> HEAD -- .claude/skills/ .claude/comma
 ```
 
 除外指定を落とすと、`retro-pattern-sweep` の担当であるカタログ（66件規模）が差分を埋め尽くす。
+
+記録が無い（初回）場合は工程2〜5 でこの絞り込みが効かず、対象は散文資産の全件になる。
 
 記録が無い（初回）場合はこの絞り込みが効かないので、全件を対象にする。
 
@@ -111,12 +116,30 @@ guard が読むのは生のコマンド行ではなく hook の payload なの�
 実例: work-cycle.md が教えていた `gh issue view --comments` の形は本文を返さないため、そのまま従うと設計確定コメントは読めても本文を読み落とす（#912）。
 矛盾を見つけたら、散文と機構のどちらが正しいかを決める — 散文を直すとは限らない。
 
+## 各工程の直後に検査する
+
+```sh
+node scripts/check-md-linebreaks.mjs
+make check-docs
+```
+
+散文を削除・ポインタ化・書き換えた工程の直後に回す。
+最後にまとめて回すと、どの工程の編集が壊したかを切り分ける手戻りが出る。
+散文を消す編集では `check-companion-bindings`（必須見出しの実在）と `check-entry-path-headings` が特に落ちやすい — 一次情報へのポインタだけを残したつもりで、見出しごと落としている場合がある。
+
 ## 記録する
 
 結果を `docs/asset-sweep/<YYYY-MM-DD>-prose-mechanization.md` に書く。
 何を削除・ポインタ化・修正したか、判定に迷ったが手を付けなかった項目とその理由を含める。
-`docs/asset-sweep/prose-mechanization.json` の `commit` / `date` / `log` を更新する（`docs/distribution-review/reviewed.json` と同じ形）。
-`node scripts/check-asset-sweep.mjs` が exit 0 になることを確認してコミットする。
+
+記録は2コミットに分ける。
+
+1. 工程1〜5 の散文変更と実行記録の `.md` をコミットする。
+2. `docs/asset-sweep/prose-mechanization.json` に `commit`（1 のコミットの40桁 sha）・`date`（`YYYY-MM-DD`）・`log`（実行記録の `.md` のファイル名）を書き、これを2つ目のコミットにする（`docs/distribution-review/reviewed.json` と同じ形。初回はファイルごと新規作成する）。
+
+`commit` に書くのは sweep 済みの状態を指す sha であり、それを書いているコミット自身ではない — 自己言及になるため分けている。
+2つ目のコミットは `scripts/`・`hooks/` を触らないので、記録した sha 以降に機構の追加は発生せず、ゲートは緑のままになる。
+2 をコミットする前に `node scripts/check-asset-sweep.mjs` が exit 0 を返すことを確認する（このスクリプトは作業ツリーの json を読み、記録した sha から HEAD までの追加を数えるため、json を書いた時点で判定できる）。
 
 実行記録の冒頭に、前回の記録の `date` からの日数・その間に追加された機構の件数・本回の findings 件数を書く。
 閾値 20 は「1回の sweep で期待 findings ≒ 1.2件」を根拠に置いた値だが、その歩留まりを実測し直す工程は他にどこにも無い — ここで残さないと閾値は一度も見直されないまま回り続ける。
