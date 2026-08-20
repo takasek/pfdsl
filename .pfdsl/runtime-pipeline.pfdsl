@@ -205,6 +205,11 @@ artifact:
     description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
     location: ../.claude/agents/pfd-lens.md
     group: skill_sources
+  retro_reminder_hook:
+    label: retroリマインダhook
+    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う。gen_pluginはこれをディレクトリごとミラーする唯一の同梱対象で、ファイル単位の列挙を持たない"
+    location: ../hooks/
+    group: skill_sources
   implementer_agent:
     label: 実装委譲agent
     description: "agent定義はplugin同梱対象。留保指定を強制するPreToolUseガードは別のartifact（workflow.pfdslのdelegation_guard、実体はscripts/delegation-guard.mjs）であり、リポ固有のため配布せずこの図には現れない（内容の一次情報はworkflow.pfdsl）。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
@@ -384,7 +389,7 @@ process:
   publish_packages:
     label: タグ起点の自動公開
     description: "v* tag push で @pfdsl/cli、lib-v* tag push でライブラリ群を GitHub Actions が npm publish する（Trusted Publishing / OIDC）。リリースするか・どの版で切るかの判断はworkflow.pfdslのdecide_releaseが持ち、タグが押された後この変換に判断は入らない"
-    location: ../.github/workflows/publish-cli.yml
+    location: [ ../.github/workflows/publish-cli.yml, ../.github/workflows/publish-libraries.yml ]
     tags: [ gen ]
   package_vsix:
     label: vsix 生成
@@ -446,7 +451,7 @@ dot_graph >> export_image -> rendered_image
 
 ops_install_sources >> gen_install -> ops_install_templates
 
-[ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
+[ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_reminder_hook, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
 
 [feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
 

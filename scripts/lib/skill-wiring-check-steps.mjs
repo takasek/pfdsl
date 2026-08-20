@@ -8,7 +8,10 @@
 // tests supply parsed structures directly and need no build.
 
 import { PLUGIN_MIRRORS } from "./gen-plugin.mjs";
-import { findUnwiredSkills } from "./skill-wiring-check.mjs";
+import {
+	findUnmodeledMirrors,
+	findUnwiredSkills,
+} from "./skill-wiring-check.mjs";
 
 const WORKFLOW = ".pfdsl/workflow.pfdsl";
 const PIPELINE = ".pfdsl/runtime-pipeline.pfdsl";
@@ -39,7 +42,22 @@ export function runSkillWiringCheck({
 		mirrors,
 	});
 
-	if (findings.length === 0) {
+	// The other direction (#930): both graphs' artifacts are pooled, since
+	// bundled material is modelled wherever its artifact was declared. That is a
+	// wider universe than findUnwiredSkills works over above — that one asks
+	// where an artifact sits on the graph, which is a question about
+	// workflow.pfdsl. `pfd_commands` exists only in runtime-pipeline.pfdsl
+	// (#780), so pooling is what keeps the commands mirror from reading as
+	// unmodelled here while staying out of the wiring check there.
+	const unmodeled = findUnmodeledMirrors({
+		artifacts: {
+			...(pipeline.frontmatter.artifact ?? {}),
+			...(workflow.frontmatter.artifact ?? {}),
+		},
+		mirrors,
+	});
+
+	if (findings.length === 0 && unmodeled.length === 0) {
 		return {
 			exitCode: 0,
 			stdoutLines: ["check-skill-wiring: OK"],
@@ -60,10 +78,25 @@ export function runSkillWiringCheck({
 			: finding.location;
 		return `${anchor}: '${finding.id}' is bundled (${location}) but missing from ${finding.missing.join(" and ")}`;
 	});
-	stderrLines.push(
-		"",
-		`Add it to \`distill_ops -> [...]\` in ${WORKFLOW} (it is produced there) and to`,
-		`\`[...] >> gen_plugin\` in ${PIPELINE} (it is bundled material).`,
-	);
+	if (findings.length > 0) {
+		stderrLines.push(
+			"",
+			`Add it to \`distill_ops -> [...]\` in ${WORKFLOW} (it is produced there) and to`,
+			`\`[...] >> gen_plugin\` in ${PIPELINE} (it is bundled material).`,
+		);
+	}
+	for (const mirror of unmodeled) {
+		stderrLines.push(
+			`${WORKFLOW}: bundled '${mirror.member}' (${mirror.dest} mirror) has no artifact modelling it`,
+		);
+	}
+	if (unmodeled.length > 0) {
+		stderrLines.push(
+			"",
+			"Declare an artifact whose `location:` points into that source, and wire it the",
+			`same way the other bundled material is wired (produced in ${WORKFLOW},`,
+			`consumed by gen_plugin in ${PIPELINE}).`,
+		);
+	}
 	return { exitCode: 1, stdoutLines: [], stderrLines };
 }

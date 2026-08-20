@@ -126,6 +126,25 @@ describe("runSkillWiringCheck", () => {
 		assert.match(result.stderrLines.join("\n"), /\[\.\.\.\] >> gen_plugin/);
 	});
 
+	it("fails when the manifest carries an entry no artifact models", () => {
+		const mirrors = [...MIRRORS, { dest: "hooks", src: "hooks", whole: true }];
+		const result = runSkillWiringCheck({ ...deps(), mirrors });
+		assert.equal(result.exitCode, 1);
+		assert.match(result.stderrLines.join("\n"), /hooks/);
+	});
+
+	it("counts an artifact declared in either graph as modelling the entry", () => {
+		const mirrors = [...MIRRORS, { dest: "hooks", src: "hooks", whole: true }];
+		const pipeline = {
+			frontmatter: {
+				artifact: { retro_reminder_hook: { location: "../hooks/" } },
+			},
+			edges: PIPELINE.edges,
+		};
+		const result = runSkillWiringCheck({ ...deps({ pipeline }), mirrors });
+		assert.equal(result.exitCode, 0);
+	});
+
 	it("lists every location when an array-location artifact is reported", () => {
 		const result = runSkillWiringCheck(
 			deps({

@@ -37,6 +37,11 @@ export function repoRelative(location) {
 export function isBundledSource(sourcePath, mirrors) {
 	const path = sourcePath.replace(/\/$/, "");
 	for (const mirror of mirrors) {
+		// A `whole` mirror carries its source directory itself, so an artifact
+		// that models the directory (rather than a file inside it) points at the
+		// bundled thing too. `trees` / `files` mirrors bundle only their listed
+		// members, so their own directory is not bundled.
+		if (mirror.whole && path === mirror.src) return true;
 		const prefix = `${mirror.src}/`;
 		if (!path.startsWith(prefix)) continue;
 		if (mirror.whole) return true;
@@ -45,6 +50,66 @@ export function isBundledSource(sourcePath, mirrors) {
 		return (mirror.files ?? []).includes(rest);
 	}
 	return false;
+}
+
+/**
+ * What one manifest entry actually bundles, as repo-relative paths: each listed
+ * tree or file, or the source directory itself when the entry takes it whole.
+ * @param {{src: string, trees?: string[], files?: string[], whole?: boolean}} mirror
+ * @returns {string[]}
+ */
+function mirrorMembers(mirror) {
+	if (mirror.whole) return [mirror.src];
+	const listed = mirror.trees ?? mirror.files ?? [];
+	return listed.map((name) => `${mirror.src}/${name}`);
+}
+
+/**
+ * The bundled material no artifact models. `isBundledSource` answers "is this
+ * artifact's location bundled?", which only ever runs over artifacts that
+ * already exist — a bundled source with no artifact is never asked about, so
+ * the check returns OK for it (#930). This asks the same question from the
+ * manifest's side.
+ *
+ * The unit is the manifest **member**, not the entry: `PLUGIN_MIRRORS` has four
+ * entries but each carries several trees or files, and an entry-level answer
+ * goes silent for the rest of its members as soon as one of them has an
+ * artifact — a whole skill tree can then drop out of both graphs unreported.
+ *
+ * A member counts as modelled when some artifact's location is that member,
+ * sits inside it, or contains it: one artifact may legitimately model several
+ * members from their shared directory (`pfd_commands` covers three command
+ * files, #780), and another may point at a single file deep inside a tree.
+ * @param {{
+ *   artifacts: Record<string, {location?: string | string[]}>,
+ *   mirrors: Array<{dest: string, src: string, trees?: string[], files?: string[], whole?: boolean}>,
+ * }} input
+ * @returns {Array<{dest: string, member: string}>}
+ */
+export function findUnmodeledMirrors({ artifacts, mirrors }) {
+	const paths = [];
+	for (const meta of Object.values(artifacts)) {
+		if (!meta?.location) continue;
+		const locations = Array.isArray(meta.location)
+			? meta.location
+			: [meta.location];
+		for (const loc of locations)
+			paths.push(repoRelative(loc).replace(/\/$/, ""));
+	}
+
+	const findings = [];
+	for (const mirror of mirrors) {
+		for (const member of mirrorMembers(mirror)) {
+			const covered = paths.some(
+				(path) =>
+					path === member ||
+					path.startsWith(`${member}/`) ||
+					member.startsWith(`${path}/`),
+			);
+			if (!covered) findings.push({ dest: mirror.dest, member });
+		}
+	}
+	return findings;
 }
 
 /**

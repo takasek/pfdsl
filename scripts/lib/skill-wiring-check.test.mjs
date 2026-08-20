@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
 	edgeMembers,
+	findUnmodeledMirrors,
 	findUnwiredSkills,
 	isBundledSource,
 	repoRelative,
@@ -100,6 +101,17 @@ describe("isBundledSource", () => {
 	it("accepts anything under a whole-tree mirror", () => {
 		assert.equal(isBundledSource("hooks/anything.mjs", MIRRORS), true);
 	});
+
+	it("accepts the whole-tree mirror's own directory", () => {
+		// An artifact modelling the directory points at it, not into it.
+		assert.equal(isBundledSource("hooks/", MIRRORS), true);
+		assert.equal(isBundledSource("hooks", MIRRORS), true);
+	});
+
+	it("still rejects the parent of a trees/files mirror, which is not itself bundled", () => {
+		assert.equal(isBundledSource(".claude/skills/", MIRRORS), false);
+		assert.equal(isBundledSource(".claude/agents", MIRRORS), false);
+	});
 });
 
 describe("edgeMembers", () => {
@@ -123,6 +135,86 @@ describe("edgeMembers", () => {
 				.size,
 			0,
 		);
+	});
+});
+
+describe("findUnmodeledMirrors", () => {
+	const run = (overrides = {}) =>
+		findUnmodeledMirrors({
+			artifacts: ARTIFACTS,
+			mirrors: MIRRORS,
+			...overrides,
+		});
+
+	it("reports a manifest member no artifact's location sits under — the hooks case", () => {
+		assert.deepEqual(run(), [{ dest: "hooks", member: "hooks" }]);
+	});
+
+	it("stays silent once one artifact points into the member", () => {
+		const artifacts = {
+			...ARTIFACTS,
+			retro_reminder_hook: { location: "../hooks/" },
+		};
+		assert.deepEqual(run({ artifacts }), []);
+	});
+
+	it("reports a member added to the manifest before its artifact exists", () => {
+		const mirrors = [
+			...MIRRORS,
+			{ dest: "newcomer", src: ".claude/newcomer", whole: true },
+		];
+		const artifacts = {
+			...ARTIFACTS,
+			retro_reminder_hook: { location: "../hooks/" },
+		};
+		assert.deepEqual(run({ artifacts, mirrors }), [
+			{ dest: "newcomer", member: ".claude/newcomer" },
+		]);
+	});
+
+	it("reports one member of a multi-member entry whose artifact is gone, while its siblings stay covered", () => {
+		// The entry-level answer to this is "skills has artifacts, so it is
+		// modelled" — which is how a whole skill tree drops out of both graphs
+		// without a word.
+		const artifacts = {
+			...ARTIFACTS,
+			retro_reminder_hook: { location: "../hooks/" },
+		};
+		delete artifacts.ops_skill_l3;
+		assert.deepEqual(run({ artifacts }), [
+			{ dest: "skills", member: ".claude/skills/pfd-ops" },
+		]);
+	});
+
+	it("counts one artifact on the entry's directory as covering every member under it", () => {
+		// `pfd_commands` models three individually-listed files as one artifact
+		// on the directory (#780). Covering an ancestor covers its members.
+		const mirrors = [
+			{
+				dest: "commands",
+				src: ".claude/commands",
+				files: ["pfd-cycle.md", "pfd-init.md"],
+			},
+		];
+		const artifacts = { pfd_commands: { location: "../.claude/commands/" } };
+		assert.deepEqual(findUnmodeledMirrors({ artifacts, mirrors }), []);
+	});
+
+	it("counts an artifact on a file inside a member as covering that member", () => {
+		// ops_skill_l3 points at one reference file inside the pfd-ops tree.
+		const mirrors = [
+			{ dest: "skills", src: ".claude/skills", trees: ["pfd-ops"] },
+		];
+		const artifacts = { ops_skill_l3: ARTIFACTS.ops_skill_l3 };
+		assert.deepEqual(findUnmodeledMirrors({ artifacts, mirrors }), []);
+	});
+
+	it("counts an array location whose entry sits under the mirror", () => {
+		const artifacts = {
+			...ARTIFACTS,
+			multi: { location: ["../docs/samples/", "../hooks/hooks.json"] },
+		};
+		assert.deepEqual(run({ artifacts }), []);
 	});
 });
 
