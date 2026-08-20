@@ -85,10 +85,16 @@ artifact:
     criteria: reviewed.json の commit と HEAD の間に、レビュー対象スコープの差分が無い
     location: ../docs/distribution-review/
     group: release
-  asset_sweep_record:
-    label: 資産棚卸し記録
-    description: "棚卸し済み commit hash（docs/asset-sweep/<target>.json）と回ごとの実行記録。対象ごとに記録を分けるのは、1本に共有すると片方だけ走らせて hash を進めた時点で、走っていない側まで現行を主張するため。check-asset-sweep.mjs が、前回の記録以降に追加されたファイル数を SWEEP_TARGETS の閾値と比べ、超えていれば decide_release の pre-tag checks で release を止める"
-    criteria: 各 SWEEP_TARGETS の記録が指す commit と HEAD の間で、その対象に追加されたファイル数が閾値未満
+  retro_pattern_sweep_record:
+    label: retroパターン棚卸し記録
+    description: "retro-patterns 対象の棚卸し済み commit hash（docs/asset-sweep/retro-patterns.json）と回ごとの実行記録。check-asset-sweep.mjs が、前回の記録以降にカタログへ追加されたファイル数を SWEEP_TARGETS の閾値と比べ、超えていれば decide_release の pre-tag checks で release を止める。prose_mechanization_sweep_record と別ノードなのは記録を対象ごとに分けているからで、分ける理由は scripts/lib/asset-sweep.mjs の SWEEP_TARGETS の JSDoc が一次情報"
+    criteria: retro-patterns.json が指す commit と HEAD の間で、.pfdsl/bindings/pfd-retro-patterns/ に追加されたファイル数が閾値未満
+    location: ../docs/asset-sweep/
+    group: release
+  prose_mechanization_sweep_record:
+    label: 散文機械化棚卸し記録
+    description: "prose-mechanization 対象の棚卸し済み commit hash（docs/asset-sweep/prose-mechanization.json）と回ごとの実行記録。ゲートの読み方は retro_pattern_sweep_record と同一で、閾値を数える単位だけが違う — 監査対象は散文だが、数えるのは scripts/・hooks/ 直下に追加された機構の件数である（#915）"
+    criteria: prose-mechanization.json が指す commit と HEAD の間で、scripts/・hooks/ 直下に追加されたエントリポイント数が閾値未満
     location: ../docs/asset-sweep/
     group: release
   release_tag:
@@ -257,6 +263,13 @@ artifact:
     location: ../.claude/skills/retro-pattern-sweep/
     group: generation
     tags: [ distilled_skill ]
+  prose_mechanization_audit_skill:
+    label: 散文機械化監査スキル
+    description: "堆積した運用散文を hook・check の台帳と突き合わせる手順（台帳の実測列挙・機械化済み対策を語る散文・スクリプト出力の再説明・層内の同文再掲・散文と機械の矛盾）。「散文として書く前に機械化を検討する」は書く時点の規律であり、既に書かれた分を洗う工程がこれにあたる。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポは突合の片側である hook・check 台帳を持たず、配布された散文の側もその上流はこのリポなので、直す工程はこちらにしか置けない）"
+    criteria: 起動すると5工程が実行され、記録が docs/asset-sweep/ に残り check-asset-sweep.mjs が exit 0 を返す
+    location: ../.claude/skills/prose-mechanization-audit/
+    group: generation
+    tags: [ distilled_skill ]
   spec_stress_skill:
     label: 仕様stress-testスキル
     description: "/spec-stress-test コマンド。仕様制約の具体例 stress-test（ADR-0020）と agent 実書きプローブ（spec のみ読ませた subagent を CLI で採点）の実行手順。仕様改訂の検証能力として maintain_spec に還流。リポローカル・手書き（生成対象外・配布対象外）"
@@ -407,6 +420,11 @@ process:
     description: "追記でしか触られないカタログを集合として洗い、廃止・統合・修正を行って棚卸し済み commit を進める。毎サイクルには重すぎ、やらないと溜まるため、引き金は release という稀な時点に置き、そこで前回以降の追加件数を閾値と比べる。追記時の書式・タグ・往復一致は retro-patterns.mjs check が毎 CI で先に潰しており、このプロセスが見るのは書式でなく集合としての妥当性"
     command: "/retro-pattern-sweep"
     group: release
+  sweep_prose_mechanization:
+    label: 散文機械化の棚卸し
+    description: "堆積した運用散文を hook・check の台帳と突き合わせ、機械化済み対策を語る散文・スクリプト出力の再説明・層内の同文再掲・散文と機械の矛盾を刈って棚卸し済み commit を進める。sweep_retro_patterns とは引き金の機構だけを共有し、対象物も工程も別なので手順の skill は分ける（#915）。数える単位が散文でなく追加された機構なのは、散文は追記でなく既存ファイルの編集で動くため、その件数が滞留の増分を表さないことによる"
+    command: "/prose-mechanization-audit"
+    group: release
   update_readme:
     label: README 更新
     description: CLI の提供形態・サンプル構成の変更を導入文書に反映する。CLI コマンドリファレンスは gen-readme-cli が自動化済みのため対象外
@@ -463,7 +481,7 @@ toolchain >>? review_examples
 
 [adrs, decisions, payoff_log] >> distill_ops -> [ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives]
 
-[adrs, decisions] >> distill_local_skills -> [distribution_review_perspectives, distribution_review_skill, retro_pattern_sweep_skill, spec_stress_skill, vscode_ext_debug_skill]
+[adrs, decisions] >> distill_local_skills -> [distribution_review_perspectives, distribution_review_skill, prose_mechanization_audit_skill, retro_pattern_sweep_skill, spec_stress_skill, vscode_ext_debug_skill]
 
 [adrs, decisions] >> externalize_bindings -> [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, workflow_md]
 
@@ -516,9 +534,13 @@ distribution_review_record >>? distill_local_skills
 distribution_review_record >>? distill_ops
 distribution_review_skill >>? review_distribution
 
-bindings_pfd_retro >> sweep_retro_patterns -> asset_sweep_record
+bindings_pfd_retro >> sweep_retro_patterns -> retro_pattern_sweep_record
 
-asset_sweep_record >>? externalize_bindings
+[bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
+
+prose_mechanization_audit_skill >>? sweep_prose_mechanization
+prose_mechanization_sweep_record >>? externalize_bindings
+retro_pattern_sweep_record >>? externalize_bindings
 retro_pattern_sweep_skill >>? sweep_retro_patterns
 
-[asset_sweep_record, distribution_review_record, toolchain] >> decide_release -> release_tag
+[distribution_review_record, prose_mechanization_sweep_record, retro_pattern_sweep_record, toolchain] >> decide_release -> release_tag

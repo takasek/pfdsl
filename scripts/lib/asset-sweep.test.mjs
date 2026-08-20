@@ -11,6 +11,7 @@ import {
 import { EMPTY_TREE } from "./review-record-gate.mjs";
 
 const RETRO_TARGET = SWEEP_TARGETS.find((t) => t.id === "retro-patterns");
+const PROSE_TARGET = SWEEP_TARGETS.find((t) => t.id === "prose-mechanization");
 
 describe("SWEEP_TARGETS", () => {
 	it("registers the retro-patterns catalog", () => {
@@ -25,6 +26,27 @@ describe("SWEEP_TARGETS", () => {
 		assert.equal(RETRO_TARGET.threshold, 20);
 		assert.equal(RETRO_TARGET.skill, "retro-pattern-sweep");
 		assert.ok(RETRO_TARGET.label.length > 0);
+	});
+
+	it("registers the prose-mechanization audit against the mechanism ledger", () => {
+		assert.ok(PROSE_TARGET, "expected a prose-mechanization target");
+		assert.equal(
+			PROSE_TARGET.recordPath,
+			"docs/asset-sweep/prose-mechanization.json",
+		);
+		assert.deepEqual(PROSE_TARGET.prefixes, ["scripts/", "hooks/"]);
+		assert.equal(PROSE_TARGET.threshold, 20);
+		assert.equal(PROSE_TARGET.skill, "prose-mechanization-audit");
+		assert.ok(PROSE_TARGET.label.length > 0);
+	});
+
+	it("gives every target its own record file", () => {
+		const paths = SWEEP_TARGETS.map((t) => t.recordPath);
+		assert.equal(
+			new Set(paths).size,
+			paths.length,
+			"a shared record would let one target's sweep claim currency for another",
+		);
 	});
 });
 
@@ -45,6 +67,46 @@ describe("inScope", () => {
 			inScope(RETRO_TARGET, ".pfdsl/bindings/pfd-retro-patterns/foo.pfdsl"),
 			false,
 		);
+	});
+
+	it("takes an entry-point script under either of the prose target's prefixes", () => {
+		assert.equal(inScope(PROSE_TARGET, "scripts/check-thing.mjs"), true);
+		assert.equal(inScope(PROSE_TARGET, "hooks/on-done.mjs"), true);
+	});
+
+	it("leaves out a helper nested below the prefix, which adds no mechanism", () => {
+		assert.equal(inScope(PROSE_TARGET, "scripts/lib/thing.mjs"), false);
+	});
+
+	it("leaves out a test file, which adds no mechanism", () => {
+		assert.equal(inScope(PROSE_TARGET, "scripts/thing.test.mjs"), false);
+	});
+
+	it("leaves out a non-script file under a matching prefix", () => {
+		assert.equal(inScope(PROSE_TARGET, "scripts/pre-commit"), false);
+		assert.equal(inScope(PROSE_TARGET, "hooks/hooks.json"), false);
+	});
+
+	it("matches against the path below the prefix, not the whole path", () => {
+		// A target whose prefix is nested would otherwise have to repeat that
+		// prefix inside its own pattern to anchor it.
+		assert.equal(
+			inScope({ prefixes: ["a/b/"], matches: /^[^/]+\.md$/ }, "a/b/c.md"),
+			true,
+		);
+		assert.equal(
+			inScope({ prefixes: ["a/b/"], matches: /^[^/]+\.md$/ }, "a/b/c/d.md"),
+			false,
+		);
+	});
+
+	it("keeps every registered target's pattern stateless across calls", () => {
+		// A /g or /y pattern carries lastIndex between test() calls, so the
+		// same path would answer differently on the second ask.
+		for (const target of SWEEP_TARGETS) {
+			assert.equal(target.matches.global, false, `${target.id} pattern is /g`);
+			assert.equal(target.matches.sticky, false, `${target.id} pattern is /y`);
+		}
 	});
 });
 
