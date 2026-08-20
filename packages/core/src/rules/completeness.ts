@@ -52,6 +52,31 @@ export function processCompleteness(ctx: RuleContext): Diagnostic[] {
 	return diagnostics;
 }
 
+/**
+ * W008: a process driven only by feedback (§15.2). V002 counts a feedback edge
+ * as an input, so a process whose sole inputs are `>>?` satisfies it — the
+ * artifact it actually transforms can be missing from the graph entirely and
+ * the check still passes. §15.2 already requires a normal input of subflow
+ * processes; this generalizes that requirement to every process.
+ *
+ * A process with no inputs at all is V002's, not this rule's.
+ */
+export function feedbackOnlyProcess(ctx: RuleContext): Diagnostic[] {
+	const diagnostics: Diagnostic[] = [];
+	const { processInputs, processFeedback } = ctx.edgeGroups;
+	for (const pid of ctx.edgeProcesses) {
+		if ((processInputs.get(pid)?.length ?? 0) > 0) continue;
+		if ((processFeedback.get(pid)?.length ?? 0) === 0) continue;
+		diagnostics.push({
+			severity: ctx.strictly("warning"),
+			code: "W008",
+			message: `Process '${pid}' has no normal input; feedback edges are its only inputs`,
+			range: zeroRange(),
+		});
+	}
+	return diagnostics;
+}
+
 /** V020: a process declared in front matter but absent from every edge (§15.10). */
 export function orphanedProcess(ctx: RuleContext): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];

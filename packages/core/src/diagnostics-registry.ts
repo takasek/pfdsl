@@ -304,6 +304,18 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		section: "15.16",
 		summary: "a non-roadmap file's artifact has `status:` set",
 	},
+	W008: {
+		severities: ["warning", "error"],
+		section: "15.2",
+		summary:
+			"a process has no normal input; feedback edges are its only inputs",
+	},
+	W009: {
+		severities: ["warning"],
+		section: "15.3",
+		summary:
+			"a feedback edge enters a subflow process from outside that process's downstream",
+	},
 
 	L001: {
 		severities: ["error"],

@@ -1,4 +1,5 @@
 import {
+	feedbackOnlyProcess,
 	orphanedProcess,
 	processCompleteness,
 	singleSource,
@@ -12,6 +13,7 @@ import {
 	groupParentCycle,
 	primaryGraphCycle,
 	strictFeedback,
+	subflowFeedbackDebt,
 } from "./rules/cycles.js";
 import {
 	artifactOnlyFields,
@@ -45,6 +47,7 @@ export type { Rule, RuleContext, ValidateOptions } from "./rules/context.js";
 export const RULES: readonly Rule[] = [
 	singleSource, // V001
 	processCompleteness, // V002, V003
+	feedbackOnlyProcess, // W008
 	orphanedProcess, // V020
 	partsMembership, // V004, V005, V007, W001
 	indexShape, // V029, W004
@@ -52,6 +55,7 @@ export const RULES: readonly Rule[] = [
 	partsCycle, // V006
 	primaryGraphCycle, // V010
 	strictFeedback, // V011
+	subflowFeedbackDebt, // W009
 	processOnlyFields, // V012, V015
 	artifactOnlyFields, // V014, W002
 	revisesChain, // V016, V017, V018, V019
