@@ -123,26 +123,13 @@ describe("validate", () => {
 		expect(diags.map((d) => d.code)).toContain("V006");
 	});
 
-	it("W009: feedback into a subflow process from outside its downstream", () => {
-		const fm: Frontmatter = { process: { P: { subflow: "./child.pfdsl" } } };
-		expect(codes("A >> P -> B\nX >>? P", fm)).toContain("W009");
-	});
-
-	it("W009: silent when the feedback artifact is downstream of the process", () => {
-		const fm: Frontmatter = { process: { P: { subflow: "./child.pfdsl" } } };
-		expect(codes("A >> P -> B\nB >> R -> C\nC >>? P", fm)).not.toContain(
-			"W009",
-		);
-	});
-
-	it("W009: silent for a process without subflow", () => {
-		expect(codes("A >> P -> B\nX >>? P")).not.toContain("W009");
-	});
-
-	it("W009 stays a warning under --strict", () => {
+	it("a feedback edge from outside a subflow process's downstream stays silent", () => {
+		// §15.3 permits both a disconnected feedback artifact and a downstream
+		// one, and the primary graph cannot tell a disconnected-but-wirable edge
+		// from a legitimate generation loop — so nothing is reported here.
 		const fm: Frontmatter = { process: { P: { subflow: "./child.pfdsl" } } };
 		const diags = diagnose("A >> P -> B\nX >>? P", fm, { strict: true });
-		expect(diags.find((d) => d.code === "W009")?.severity).toBe("warning");
+		expect(diags.filter((d) => d.code.startsWith("W0"))).toHaveLength(0);
 	});
 
 	it("valid chain: no errors", () => {

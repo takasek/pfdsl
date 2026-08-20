@@ -46,22 +46,6 @@ export function primaryGraphCycle(ctx: RuleContext): Diagnostic[] {
 	return diagnostics;
 }
 
-/** Every node reachable from `start` through primary (`>>` / `->`) edges. */
-function reachableFrom(ctx: RuleContext, start: string): Set<string> {
-	const reachable = new Set<string>();
-	const queue: string[] = [start];
-	while (queue.length > 0) {
-		const node = queue.shift()!;
-		for (const neighbor of ctx.primaryAdj.get(node) ?? []) {
-			if (!reachable.has(neighbor)) {
-				reachable.add(neighbor);
-				queue.push(neighbor);
-			}
-		}
-	}
-	return reachable;
-}
-
 /**
  * V011: under --strict, a feedback edge `A >>? P` is a reverse cycle when A can
  * already reach P through ordinary edges (§15.3). A feedback artifact from an
@@ -71,9 +55,24 @@ export function strictFeedback(ctx: RuleContext): Diagnostic[] {
 	if (!ctx.options.strict) return [];
 	const diagnostics: Diagnostic[] = [];
 
+	const reachableFrom = (start: string): Set<string> => {
+		const reachable = new Set<string>();
+		const queue: string[] = [start];
+		while (queue.length > 0) {
+			const node = queue.shift()!;
+			for (const neighbor of ctx.primaryAdj.get(node) ?? []) {
+				if (!reachable.has(neighbor)) {
+					reachable.add(neighbor);
+					queue.push(neighbor);
+				}
+			}
+		}
+		return reachable;
+	};
+
 	for (const e of ctx.edges) {
 		if (e.kind !== "feedback") continue;
-		if (reachableFrom(ctx, e.artifact).has(e.process)) {
+		if (reachableFrom(e.artifact).has(e.process)) {
 			diagnostics.push({
 				severity: "error",
 				code: "V011",
@@ -81,36 +80,6 @@ export function strictFeedback(ctx: RuleContext): Diagnostic[] {
 				range: zeroRange(),
 			});
 		}
-	}
-	return diagnostics;
-}
-
-/**
- * W009: a feedback edge into a subflow process from outside that process's
- * downstream (§15.3). Feedback is for sending a downstream artifact back to an
- * earlier process; when the artifact is not downstream, `>>` is not ruled out
- * by V010, and the reason for choosing `>>?` is often that nobody wired the
- * artifact through the subflow boundary. Reporting it keeps that shortcut from
- * settling in as a tool limitation.
- *
- * Restricted to subflow processes deliberately. Applied to every feedback edge,
- * the same test also flags the generation loop §15.3 explicitly permits — a
- * capability artifact fed into a process it shares no primary path with — which
- * on this repo's own graphs is 24 of 35 feedback edges. A warning either way:
- * the wiring may be legitimately absent, and only the author knows.
- */
-export function subflowFeedbackDebt(ctx: RuleContext): Diagnostic[] {
-	const diagnostics: Diagnostic[] = [];
-	for (const e of ctx.edges) {
-		if (e.kind !== "feedback") continue;
-		if (ctx.processMeta[e.process]?.subflow === undefined) continue;
-		if (reachableFrom(ctx, e.process).has(e.artifact)) continue;
-		diagnostics.push({
-			severity: "warning",
-			code: "W009",
-			message: `Feedback artifact '${e.artifact}' is not downstream of subflow process '${e.process}'; it may belong on the subflow boundary as a normal input`,
-			range: zeroRange(),
-		});
 	}
 	return diagnostics;
 }

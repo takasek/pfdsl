@@ -13,7 +13,6 @@ import {
 	groupParentCycle,
 	primaryGraphCycle,
 	strictFeedback,
-	subflowFeedbackDebt,
 } from "./rules/cycles.js";
 import {
 	artifactOnlyFields,
@@ -55,7 +54,6 @@ export const RULES: readonly Rule[] = [
 	partsCycle, // V006
 	primaryGraphCycle, // V010
 	strictFeedback, // V011
-	subflowFeedbackDebt, // W009
 	processOnlyFields, // V012, V015
 	artifactOnlyFields, // V014, W002
 	revisesChain, // V016, V017, V018, V019
