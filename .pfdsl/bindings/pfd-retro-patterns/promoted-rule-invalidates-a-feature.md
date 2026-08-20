@@ -1,5 +1,5 @@
 ---
-tags: [context:rule-promotion, context:conflicting-mechanisms]
+tags: [method:codify-rule, target:cli-surface]
 ---
 
 - **昇格した規約が既存機能の入力前提を無効化する trap**: 散文の規約を昇格させるとき、その規約が「あるデータの形を書くな」と述べているなら、そのデータの形を入力として要求する機能が既にあるかを確認する。規約と機能は別々の文書に住むため、両者を並べて読む工程がどこにも無い。
