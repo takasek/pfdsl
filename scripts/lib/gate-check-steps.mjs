@@ -336,10 +336,12 @@ export function designRecordStep({
 	const body = issue.body ?? "";
 	const optionCount = detectEnumeratedOptions(body).count;
 
-	// The issue body is one entry among the comments, not a special case that
-	// bypasses the checks: a record written into the body is judged for timing
-	// and structure the same way (its createdAt is the issue's, so it passes
-	// timing on its own merits rather than by exemption).
+	// Comments only (#927). The body used to be an entry too, on the reading
+	// that a record written there was judged the same way — but its createdAt is
+	// the issue's, which predates every commit on the branch that closes it, so
+	// the timing check passed by construction for anything the body won. What
+	// looked like one entry among the rest was the one entry the check could not
+	// fail.
 	const record = selectDesignRecord(toDesignRecordEntries(issue));
 
 	if (!record) {

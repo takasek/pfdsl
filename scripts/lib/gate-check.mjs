@@ -660,6 +660,12 @@ export function parseDesignRecordEditResponse(jsonText) {
  * record's own id having no match among the fetched nodes — without a note
  * this last case is indistinguishable from "confirmed unedited", when it is
  * actually "could not be checked".
+ *
+ * A record with no id at all falls into that last case rather than reading the
+ * issue's own `lastEditedAt`. It used to mean "the body was elected", which
+ * made the issue's edit history the right history to read; since #927 the body
+ * is not a candidate, so an id-less record is a comment whose id the lookup did
+ * not carry, and the issue's edit history is somebody else's.
  * @param {{id?: string}} record - selectDesignRecord's return value
  * @param {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}} | null} editInfo
  * @returns {{editedAtIso: string | null, note?: string}}
@@ -672,8 +678,9 @@ export function resolveRecordEditedAt(record, editInfo) {
 			note: "more comments than fetched; edit detection skipped",
 		};
 	}
-	if (!record.id) return { editedAtIso: editInfo.issueLastEditedAt };
-	const match = editInfo.comments.nodes.find((c) => c.id === record.id);
+	const match = record.id
+		? editInfo.comments.nodes.find((c) => c.id === record.id)
+		: undefined;
 	if (!match) {
 		return {
 			editedAtIso: null,
@@ -846,31 +853,34 @@ export function hasNoImplementationDisposition(recordBody) {
 }
 
 /**
- * Shapes an issue into the flat entry list selectDesignRecord scans: the
- * body as one entry, each comment as another. `author` is left out on
- * purpose — selectDesignRecord identifies the record by required line heads
- * alone and never reads it, so carrying it here would read as a check that
- * is still looking at who posted the record, when none of this repo's
- * design-record logic does anymore (#824).
+ * Shapes an issue into the flat entry list selectDesignRecord scans: one entry
+ * per comment. `author` is left out on purpose — selectDesignRecord identifies
+ * the record by required line heads alone and never reads it, so carrying it
+ * here would read as a check that is still looking at who posted the record,
+ * when none of this repo's design-record logic does anymore (#824).
+ *
+ * The issue body is not a candidate (#927). roadmap.md defines the record as a
+ * comment posted before work starts, so a body carrying the same line heads is
+ * a discussion of the same shape rather than the record — #927's own body has a
+ * 「前提と、それを否定する案」section and was elected by it. Admitting the body
+ * also made the terminal gate's timing check unconditional for anything it
+ * elected: the body's createdAt is the issue's, which predates every commit on
+ * the branch that closes it, so "posted before the first commit" was true by
+ * construction rather than by the record having been written first.
  *
  * A comment entry carries `id` — the GraphQL node id `gh issue view` already
  * returns on every comment — so resolveRecordEditedAt can match the selected
  * record to its GraphQL edit-info node without depending on array order
- * (#737 案2). The body entry carries no `id`: it has no comment to match, and
- * that absence is itself the signal resolveRecordEditedAt reads to fall back
- * to the issue's own `lastEditedAt`.
+ * (#737 案2).
  * @param {{body?: string, createdAt?: string, comments?: Array<{id?: string, body?: string, createdAt?: string}>}} issue
  * @returns {Array<{id?: string, body?: string, createdAt?: string}>}
  */
-export function toDesignRecordEntries({ body, createdAt, comments }) {
-	return [
-		{ body, createdAt },
-		...(comments ?? []).map((c) => ({
-			id: c.id,
-			body: c.body,
-			createdAt: c.createdAt,
-		})),
-	];
+export function toDesignRecordEntries({ comments }) {
+	return (comments ?? []).map((c) => ({
+		id: c.id,
+		body: c.body,
+		createdAt: c.createdAt,
+	}));
 }
 
 /**

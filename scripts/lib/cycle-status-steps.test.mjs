@@ -313,6 +313,7 @@ describe("runCycleStatus", () => {
 				reason: "no-enumerated-options",
 				matchedLines: [],
 				optionCount: 0,
+				missingPrefixes: [],
 				record: null,
 				recordRequired: true,
 			},
@@ -320,6 +321,40 @@ describe("runCycleStatus", () => {
 		assert.equal(result.designUnsettledError, undefined);
 		assert.ok(calls.some((c) => c[0] === "issue" && c.includes("669")));
 		assert.ok(!calls.some((c) => c[0] === "issue" && c.includes("42")));
+	});
+
+	// #927: the classifier says which required line the elected record is
+	// missing, and that is the whole reason the threshold sits in the classifier
+	// rather than in selectDesignRecord. It has to survive into the output the
+	// runner reads, or the reason value arrives with no way to act on it.
+	it("carries missingPrefixes through to the reported classification", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({
+							body: "普通の説明文。",
+							comments: [
+								{
+									body: "前提: x\n否定案: y",
+									createdAt: "2026-01-01T00:00:00Z",
+								},
+							],
+						});
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
+		assert.deepEqual(result.designUnsettledFor[0].missingPrefixes, [
+			"却下理由:",
+		]);
 	});
 
 	it("resolves the target issue from the best process when --issue is absent", async () => {

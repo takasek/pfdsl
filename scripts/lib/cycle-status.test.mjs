@@ -320,15 +320,47 @@ describe("classifyDesignSettlement", () => {
 		assert.equal(result.recordRequired, false);
 	});
 
-	it("fills record.createdAt from the issue's own createdAt when the body is the record", () => {
+	// #927: the record is posted as a comment, so a body carrying all three
+	// line heads is a discussion of the same shape, not the record. Electing it
+	// would also pass the terminal gate's timing check unconditionally — an
+	// issue predates every commit on the branch that closes it.
+	it("does not elect the issue body, even when it carries every required line head", () => {
 		const result = classifyDesignSettlement({
 			body: "前提: x\n否定案: y\n却下理由: z",
 			createdAt: "2026-01-01T00:00:00Z",
 			comments: [],
 		});
-		assert.equal(result.reason, "record-posted");
+		assert.equal(result.unsettled, true);
+		assert.equal(result.recordRequired, true);
+		assert.equal(result.record, undefined);
+	});
+
+	// #927's own shape: a "前提と、それを否定する案" section supplies two of the
+	// three line heads, and nothing else on the issue is a record.
+	it("does not elect a body section that supplies only some of the line heads", () => {
+		const result = classifyDesignSettlement({
+			body: "## 前提と、それを否定する案\n\n**前提**: 〜を前提にしている。\n**否定案**: 〜という立場。",
+			createdAt: "2026-01-01T00:00:00Z",
+			comments: [],
+		});
+		assert.equal(result.unsettled, true);
+		assert.equal(result.recordRequired, true);
+	});
+
+	// The election stays coarse so the terminal gate can still say which line is
+	// missing; it is this classifier that refuses to call the partial one settled.
+	it("reports record-incomplete when the elected comment is missing a required line", () => {
+		const result = classifyDesignSettlement({
+			body: "## 対応案\n1. 案A\n2. 案B\n",
+			comments: [
+				{ body: "前提: x\n否定案: y", createdAt: "2026-01-01T00:00:00Z" },
+			],
+		});
+		assert.equal(result.unsettled, true);
+		assert.equal(result.reason, "record-incomplete");
+		assert.deepEqual(result.missingPrefixes, ["却下理由:"]);
 		assert.deepEqual(result.record, { createdAt: "2026-01-01T00:00:00Z" });
-		assert.equal(result.recordRequired, false);
+		assert.equal(result.recordRequired, true);
 	});
 
 	it("reports unsettled when options are enumerated and no record was posted", () => {

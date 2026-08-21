@@ -464,7 +464,10 @@ describe("designRecordStep", () => {
 		assert.match(result.detail, /boom/);
 	});
 
-	it("judges a decision written into the issue body by the same rules as a comment", () => {
+	// #927: a decision written into the issue body is not the record. The body
+	// is authored at issue creation, so accepting it made the timing check pass
+	// by construction — the issue always predates the branch that closes it.
+	it("does not accept a decision written into the issue body", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
 		});
@@ -473,7 +476,8 @@ describe("designRecordStep", () => {
 			base: "main",
 			issue: issue({ body: validRecordBody }),
 		});
-		assert.equal(result.status, "PASS");
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /no design-selection record found/);
 	});
 
 	it("FAILs when the issue body carries no required line head", () => {
@@ -823,7 +827,11 @@ describe("designRecordStep", () => {
 			assert.match(result.detail, /detection/);
 		});
 
-		it("reads the issue's own lastEditedAt when the body is the selected record", () => {
+		// #927 removed the body from the candidate list, so there is no longer a
+		// selected record whose edit history is the issue's own. An issue whose
+		// only record-shaped text is in the body has no record at all, and the
+		// edit lookup never runs.
+		it("never reaches edit detection for an issue whose only record-shaped text is the body", () => {
 			const { exec } = fakeExec(firstCommit);
 			const result = designRecordStep({
 				exec,
@@ -838,7 +846,7 @@ describe("designRecordStep", () => {
 				},
 			});
 			assert.equal(result.status, "FAIL");
-			assert.match(result.detail, /edited at/);
+			assert.match(result.detail, /no design-selection record found/);
 		});
 	});
 });
