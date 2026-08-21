@@ -10,14 +10,11 @@
 // guard that blocked here would be wrong as often as it was right — reading
 // a stale build on purpose is a normal thing to do while debugging.
 //
-// Wired to both events. The PreToolUse half currently only writes to stderr,
-// which reaches nobody (stderr on exit 0 goes to the debug log, #650), so the
-// warning that lands is the PostToolUse one, where additionalContext reaches
-// the model exactly when it is about to draw a conclusion from a result that
-// read a stale build. The double wiring is not load-bearing as written —
-// PreToolUse can carry additionalContext too, and the docs deliver it to the
-// same place as the PostToolUse one, so one of the two ends is redundant.
-// Collapsing to a single event is a settings change, tracked in #929.
+// Wired to PostToolUse only (#929). That is the end where additionalContext
+// reaches the model exactly when it is about to draw a conclusion from a result
+// that read a stale build. It is also the only end available to an advisory at
+// all — see buildAdvisoryOutput in lib/hook-io.mjs for the contract that rules
+// PreToolUse out.
 
 import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
 
@@ -77,7 +74,7 @@ export function formatStaleWarning(stale) {
  * a command that does not read the build never touches the filesystem.
  * @param {string} inputText raw stdin payload
  * @param {{findStale: () => string[]}} io
- * @returns {{shouldOutput: boolean, output?: object, stderr?: string}}
+ * @returns {{shouldOutput: boolean, output?: object}}
  */
 export function runStaleDistGuard(inputText, { findStale }) {
 	const payload = parseHookPayload(inputText);
@@ -88,8 +85,5 @@ export function runStaleDistGuard(inputText, { findStale }) {
 	const warning = formatStaleWarning(findStale());
 	if (!warning) return { shouldOutput: false };
 
-	if (payload.hook_event_name === "PostToolUse") {
-		return { shouldOutput: true, output: buildAdvisoryOutput(warning) };
-	}
-	return { shouldOutput: false, stderr: `[pfdsl] ${warning}` };
+	return { shouldOutput: true, output: buildAdvisoryOutput(warning) };
 }

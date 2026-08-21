@@ -57,8 +57,10 @@ export function buildPermissionOutput(result) {
 /**
  * Build the PostToolUse hook response for an advisory. additionalContext is
  * what reaches the model. The advisory hooks are PostToolUse because their
- * subject only exists after the tool ran (a written file, a created issue),
- * not because PostToolUse is the only event that can carry the field.
+ * subject only exists after the tool ran (a written file, a created issue) —
+ * and, for the ones that could in principle run earlier, because PreToolUse
+ * discards additionalContext whenever the hook returns permissionDecision
+ * "allow", which is the only decision an advisory has to give (#929).
  * @param {string} advisory
  */
 export function buildAdvisoryOutput(advisory) {

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// PreToolUse(Bash) + PostToolUse(Bash) hook: warns about a typecheck or test
-// run that reads a build older than its sources (#642, #650). See
-// scripts/lib/stale-dist-guard.mjs for the detection logic, for why the same
-// check runs on both events, and for the stdin orchestration.
+// PostToolUse(Bash) hook: warns about a typecheck or test run that reads a
+// build older than its sources (#642, #650). See scripts/lib/stale-dist-guard.mjs
+// for the detection logic, for why PostToolUse is the only event this can be
+// wired to (#929), and for the stdin orchestration.
 //
 // Always exits 0: anything unparseable is let through in silence, since a
 // crash here must not wedge every Bash call.
@@ -42,10 +42,8 @@ const findStale = () =>
 		isDistStale,
 	);
 
-const { shouldOutput, output, stderr } = runStaleDistGuard(
-	await readStdinText(),
-	{ findStale },
-);
+const { shouldOutput, output } = runStaleDistGuard(await readStdinText(), {
+	findStale,
+});
 if (shouldOutput) console.log(JSON.stringify(output));
-if (stderr) console.error(stderr);
 process.exit(0);
