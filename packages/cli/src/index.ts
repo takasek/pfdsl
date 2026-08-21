@@ -3578,7 +3578,12 @@ export const COMMAND_GROUPS: readonly GroupDefinition[] = [
 	{
 		name: "meta",
 		description: "Read and write frontmatter metadata",
-		columnWidth: 48,
+		// 47, not 48: the hand-written listing this replaced aligned its
+		// single-line entries at column 49 but indented `list`'s wrapped
+		// description at 50. One width cannot reproduce both, so the
+		// single-line entries (six of them) keep their column and the wrapped
+		// line loses one space (#902).
+		columnWidth: 47,
 		commands: META_COMMANDS,
 	},
 	{
@@ -3699,18 +3704,34 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 	},
 ];
 
+/** Alignment column shared by every listing block in `HELP`; the per-group counterpart is `GroupDefinition.columnWidth`. */
+const TOP_LEVEL_COLUMN_WIDTH = 25;
+
+/**
+ * argv words `dispatch` answers before consulting the tables. They are not
+ * commands — they take no arguments, and `HELP` documents `help` in its own
+ * fixed line rather than as a listing entry — so keeping them out of
+ * `TOP_LEVEL_COMMANDS` avoids entries whose `run`/`synopsis` nothing reads.
+ */
+const VERSION_WORDS = new Set(["--version", "-V"]);
+const HELP_WORDS = new Set(["help", "--help", "-h"]);
+
 export const HELP = (() => {
 	const topLevelEntries = TOP_LEVEL_COMMANDS.map((c) =>
-		renderListingEntry(c.synopsis, c.description, 25),
+		renderListingEntry(c.synopsis, c.description, TOP_LEVEL_COLUMN_WIDTH),
 	).join("\n");
 	const groupEntries = COMMAND_GROUPS.map((g) =>
 		renderListingEntry(
 			`${g.name} ${g.commands.map((c) => c.name).join("|")}`,
 			[g.description],
-			25,
+			TOP_LEVEL_COLUMN_WIDTH,
 		),
 	).join("\n");
-	const helpEntry = renderListingEntry("help", ["Show this help"], 25);
+	const helpEntry = renderListingEntry(
+		"help",
+		["Show this help"],
+		TOP_LEVEL_COLUMN_WIDTH,
+	);
 	return `pfdsl <command> [options]
 
 Commands:
@@ -3743,11 +3764,20 @@ async function runGroup(
 	flags: Record<string, string | boolean>,
 ): Promise<CommandResult> {
 	const [sub, ...rest] = positional;
-	const groupHelp = renderGroupHelp(group);
-	if (!sub) return flags.help ? ok(groupHelp) : fail(groupHelp, 2);
+	// Rendered only on the two branches that print it: the group help was a
+	// module-level constant before the table, so building it on every
+	// `pfdsl <group> <sub> ...` call would be work this refactor added to the
+	// path scripts actually run.
+	if (!sub) {
+		const groupHelp = renderGroupHelp(group);
+		return flags.help ? ok(groupHelp) : fail(groupHelp, 2);
+	}
 	const entry = group.commands.find((c) => c.name === sub);
 	if (!entry)
-		return fail(`unknown ${group.name} subcommand: ${sub}\n${groupHelp}`, 2);
+		return fail(
+			`unknown ${group.name} subcommand: ${sub}\n${renderGroupHelp(group)}`,
+			2,
+		);
 	if (flags.help) return ok(entry.help);
 	return await entry.run(rest, flags);
 }
@@ -3772,25 +3802,18 @@ export async function run(
 
 async function dispatch(argv: readonly string[]): Promise<CommandResult> {
 	const { command, positional, flags } = parseArgs(argv);
-	switch (command) {
-		case "--version":
-		case "-V":
-			return ok(`${__PFDSL_VERSION__}\n`);
-		case "help":
-		case "--help":
-		case "-h":
-			return ok(HELP);
-		case "graph":
-		case "meta":
-		case "status": {
-			const group = COMMAND_GROUPS.find((g) => g.name === command)!;
-			return runGroup(group, positional, flags);
-		}
-		default: {
-			const entry = TOP_LEVEL_COMMANDS.find((c) => c.name === command);
-			if (!entry) return fail(`unknown command: ${command}\n${HELP}`, 2);
-			if (flags.help) return ok(entry.help);
-			return await entry.run(positional, flags);
-		}
-	}
+	if (VERSION_WORDS.has(command)) return ok(`${__PFDSL_VERSION__}\n`);
+	if (HELP_WORDS.has(command)) return ok(HELP);
+	// Group names are read off COMMAND_GROUPS rather than written out here:
+	// a fourth group added to the table has to dispatch, or the table would
+	// be the source of truth for the help listing only — the half-derived
+	// state #902 is about. The same reasoning is why this function holds no
+	// per-command branch at all: a `case` written here would dispatch while
+	// staying out of every listing, which is exactly the defect being fixed.
+	const group = COMMAND_GROUPS.find((g) => g.name === command);
+	if (group) return runGroup(group, positional, flags);
+	const entry = TOP_LEVEL_COMMANDS.find((c) => c.name === command);
+	if (!entry) return fail(`unknown command: ${command}\n${HELP}`, 2);
+	if (flags.help) return ok(entry.help);
+	return await entry.run(positional, flags);
 }

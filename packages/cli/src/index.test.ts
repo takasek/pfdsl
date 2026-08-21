@@ -4883,4 +4883,17 @@ describe("command table / help parity (#902)", () => {
 		const firstLine = entry.help.split("\n")[0]!;
 		expect(firstLine).toBe(`usage: pfdsl ${entry.synopsis}`);
 	});
+
+	// The two tables are separate arrays, and `dispatch` resolves groups
+	// first: a top-level entry sharing a group's name would be listed in HELP
+	// while never reaching its own `run`. That is the #902 defect with the
+	// two surfaces swapped — help promises a command the dispatcher does not
+	// deliver — so the tables have to stay disjoint.
+	it("no top-level command shares a name with a command group", () => {
+		const groupNames = COMMAND_GROUPS.map((g) => g.name);
+		const shadowed = TOP_LEVEL_COMMANDS.map((c) => c.name).filter((n) =>
+			groupNames.includes(n),
+		);
+		expect(shadowed).toEqual([]);
+	});
 });
