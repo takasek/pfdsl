@@ -108,9 +108,31 @@ describe("isBundledSource", () => {
 		assert.equal(isBundledSource("hooks", MIRRORS), true);
 	});
 
-	it("still rejects the parent of a trees/files mirror, which is not itself bundled", () => {
-		assert.equal(isBundledSource(".claude/skills/", MIRRORS), false);
-		assert.equal(isBundledSource(".claude/agents", MIRRORS), false);
+	it("accepts the parent of a trees/files mirror, which contains its listed members", () => {
+		// The directory contains listed members (pfd-grill, pfd-ops, ...), so it
+		// overlaps them the same way an artifact on the directory covers them in
+		// findUnmodeledMirrors (#780's pfd_commands case, pinned below).
+		assert.equal(isBundledSource(".claude/skills/", MIRRORS), true);
+		assert.equal(isBundledSource(".claude/agents", MIRRORS), true);
+	});
+
+	it("still rejects a directory that contains none of a mirror's listed members", () => {
+		assert.equal(isBundledSource("docs/", MIRRORS), false);
+		assert.equal(
+			isBundledSource(".claude/skills/vscode-ext-debug/", MIRRORS),
+			false,
+		);
+	});
+
+	it("accepts a files-mirror's src directory, the pfd_commands shape (#944)", () => {
+		const commandMirrors = [
+			{
+				dest: "commands",
+				src: ".claude/commands",
+				files: ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"],
+			},
+		];
+		assert.equal(isBundledSource(".claude/commands/", commandMirrors), true);
 	});
 });
 

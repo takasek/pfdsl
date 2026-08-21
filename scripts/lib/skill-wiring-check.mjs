@@ -27,29 +27,17 @@ export function repoRelative(location) {
 }
 
 /**
- * Whether gen-plugin mirrors this source path into the bundle, per its own
- * manifest: the mirror whose `src` the path sits under must also list the
- * member (a directory for `trees`, a file for `files`; `whole` takes all).
- * @param {string} sourcePath repo-relative
- * @param {Array<{src: string, trees?: string[], files?: string[], whole?: boolean}>} mirrors
+ * Whether two repo-relative paths sit in a bundled relationship: one names the
+ * other, sits inside it, or contains it. A single direction is not enough —
+ * an artifact may point at a whole directory that a manifest entry lists
+ * several members of (`pfd_commands` covers three command files this way,
+ * #780), or at one file deep inside a member.
+ * @param {string} a repo-relative, trailing slash already stripped
+ * @param {string} b repo-relative, trailing slash already stripped
  * @returns {boolean}
  */
-export function isBundledSource(sourcePath, mirrors) {
-	const path = sourcePath.replace(/\/$/, "");
-	for (const mirror of mirrors) {
-		// A `whole` mirror carries its source directory itself, so an artifact
-		// that models the directory (rather than a file inside it) points at the
-		// bundled thing too. `trees` / `files` mirrors bundle only their listed
-		// members, so their own directory is not bundled.
-		if (mirror.whole && path === mirror.src) return true;
-		const prefix = `${mirror.src}/`;
-		if (!path.startsWith(prefix)) continue;
-		if (mirror.whole) return true;
-		const rest = path.slice(prefix.length);
-		if (mirror.trees) return mirror.trees.includes(rest.split("/")[0]);
-		return (mirror.files ?? []).includes(rest);
-	}
-	return false;
+function pathsOverlap(a, b) {
+	return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
 
 /**
@@ -62,6 +50,22 @@ function mirrorMembers(mirror) {
 	if (mirror.whole) return [mirror.src];
 	const listed = mirror.trees ?? mirror.files ?? [];
 	return listed.map((name) => `${mirror.src}/${name}`);
+}
+
+/**
+ * Whether gen-plugin mirrors this source path into the bundle, per its own
+ * manifest: the path must overlap (per `pathsOverlap`) some mirror member —
+ * a listed tree/file, the whole-mirror's own directory, or (per #780) a
+ * directory that itself contains one or more listed members.
+ * @param {string} sourcePath repo-relative
+ * @param {Array<{src: string, trees?: string[], files?: string[], whole?: boolean}>} mirrors
+ * @returns {boolean}
+ */
+export function isBundledSource(sourcePath, mirrors) {
+	const path = sourcePath.replace(/\/$/, "");
+	return mirrors.some((mirror) =>
+		mirrorMembers(mirror).some((member) => pathsOverlap(path, member)),
+	);
 }
 
 /**
@@ -100,12 +104,7 @@ export function findUnmodeledMirrors({ artifacts, mirrors }) {
 	const findings = [];
 	for (const mirror of mirrors) {
 		for (const member of mirrorMembers(mirror)) {
-			const covered = paths.some(
-				(path) =>
-					path === member ||
-					path.startsWith(`${member}/`) ||
-					member.startsWith(`${path}/`),
-			);
+			const covered = paths.some((path) => pathsOverlap(path, member));
 			if (!covered) findings.push({ dest: mirror.dest, member });
 		}
 	}
