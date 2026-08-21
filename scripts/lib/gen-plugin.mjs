@@ -16,32 +16,31 @@ import {
 } from "./bundle-manifest.mjs";
 import { genInstall } from "./gen-install.mjs";
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
+import {
+	AGENT_EXCLUSIONS,
+	CLAUDE_PLUGIN_MIRRORS,
+	DISTRIBUTED_AGENTS,
+	DISTRIBUTED_COMMANDS,
+	DISTRIBUTED_SKILLS,
+} from "./harness-inventory.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 // The agents bundled into plugin/pfdsl/agents/, as .claude/agents/-relative
-// filenames. Single source of truth: gen-plugin.mjs mirrors this list, and
-// gen-plugin-trigger.mjs derives its drift-trigger alternation from it, so
-// adding an agent cannot land in one place and be forgotten in the other.
-export const PLUGIN_AGENT_FILES = ["pfd-lens.md", "pfd-implementer.md"];
+// filenames. The harness inventory is the single source of truth, and
+// gen-plugin-trigger.mjs derives its drift-trigger alternation from this
+// legacy alias, so adding an agent cannot land in one place and be forgotten
+// in the other.
+export const PLUGIN_AGENT_FILES = DISTRIBUTED_AGENTS;
 
-// The skill trees mirrored into plugin/pfdsl/skills/ from .claude/skills/, and
-// the commands mirrored into plugin/pfdsl/commands/. Named here for the same
-// reason as PLUGIN_AGENT_FILES: assemblePluginDistIndependent bundles exactly
-// these, and scripts/lib/distribution-review.mjs maps a bundled file back to
-// the source a reviewer edits, so the two cannot disagree about what ships.
+// Legacy names for the skill trees mirrored into plugin/pfdsl/skills/ from
+// .claude/skills/ and the commands mirrored into plugin/pfdsl/commands/.
+// assemblePluginDistIndependent bundles exactly these, and
+// scripts/lib/distribution-review.mjs maps a bundled file back to the source a
+// reviewer edits, so the two cannot disagree about what ships.
 // The pfdsl skill is absent because it is rendered, not mirrored (gen-skill).
-export const PLUGIN_SKILL_DIRS = [
-	"pfd-grill",
-	"pfd-ops",
-	"pfd-retro",
-	"pfd-ecosystem",
-];
-export const PLUGIN_COMMAND_FILES = [
-	"pfd-cycle.md",
-	"pfd-init.md",
-	"pfd-retro.md",
-];
+export const PLUGIN_SKILL_DIRS = DISTRIBUTED_SKILLS;
+export const PLUGIN_COMMAND_FILES = DISTRIBUTED_COMMANDS;
 
 /**
  * What the bundle is made of, as data: where each bundled subtree comes from,
@@ -55,23 +54,13 @@ export const PLUGIN_COMMAND_FILES = [
  * renaming a bundle root or adding a mirrored source can no longer land in the
  * assembly while the reverse map keeps pointing at the old layout.
  */
-export const PLUGIN_MIRRORS = [
-	{ dest: "skills", src: ".claude/skills", trees: PLUGIN_SKILL_DIRS },
-	{ dest: "commands", src: ".claude/commands", files: PLUGIN_COMMAND_FILES },
-	{ dest: "agents", src: ".claude/agents", files: PLUGIN_AGENT_FILES },
-	{ dest: "hooks", src: "hooks", whole: true },
-];
+export const PLUGIN_MIRRORS = CLAUDE_PLUGIN_MIRRORS;
 
 // Agents that stay out of the bundle, with why — an adopting repo gets the
 // pfd-* ones because they operate on the .pfdsl files it now has, and nothing
 // else. Named rather than merely absent so a drift test can require every file
 // in .claude/agents/ to be either bundled or listed here (#613).
-export const PLUGIN_AGENT_EXCLUSIONS = {
-	"ci-triage.md": "reads this repo's GitHub Actions logs",
-	"issue-worker.md": "encodes this repo's worktree and PR conventions",
-	"local-check-triage.md": "triages this repo's make/pre-commit/test failures",
-	"vscode-ext-debugger.md": "debugs the extension this repo builds",
-};
+export const PLUGIN_AGENT_EXCLUSIONS = AGENT_EXCLUSIONS;
 
 function requireExists(path) {
 	if (!existsSync(path)) {
