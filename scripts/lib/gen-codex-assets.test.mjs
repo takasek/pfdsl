@@ -14,6 +14,18 @@ import {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
+function parseTomlDeveloperInstructions(source) {
+	const match = source.match(/^developer_instructions = """([\s\S]*)"""\n$/m);
+	assert.ok(match, "expected a multiline TOML developer_instructions value");
+	const encoded = match[1].startsWith("\n") ? match[1].slice(1) : match[1];
+	const escapes = { b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+
+	return encoded.replace(/\\([\\"bfnrt])/g, (_escape, character) => {
+		if (character === "\\" || character === '"') return character;
+		return escapes[character];
+	});
+}
+
 describe("buildCodexPluginManifest", () => {
 	it("emits the native Codex manifest shape without a hooks field", () => {
 		assert.deepEqual(
@@ -98,6 +110,28 @@ describe("agentToCodexToml", () => {
 		assert.match(output, /`AGENTS\.md`/);
 	});
 
+	it("preserves the transformed body through TOML multiline string parsing", () => {
+		const body = [
+			"",
+			"leading newline",
+			String.raw`literal \\n literal \\t literal \\" literal \\u1234`,
+			'quotes " and triple """',
+			"",
+		].join("\n");
+		const source =
+			"---\n" +
+			"name: pfd\n" +
+			"description: x\n" +
+			"tools: Read, Grep, Bash\n" +
+			"model: sonnet\n" +
+			"---\n" +
+			body;
+
+		const output = agentToCodexToml("pfd.md", source);
+
+		assert.equal(parseTomlDeveloperInstructions(output), body);
+	});
+
 	it("rejects an unsupported model with its source path and key", () => {
 		const source =
 			"---\nname: pfd\ndescription: x\ntools: Read, Grep, Bash\nmodel: opus\n---\n\nbody\n";
@@ -110,6 +144,19 @@ describe("agentToCodexToml", () => {
 			"---\nname: pfd\ndescription: x\ntools: Read\nmodel: sonnet\n---\n\nbody\n";
 
 		assert.throws(() => agentToCodexToml("pfd.md", source), /pfd\.md.*tools/);
+	});
+
+	it("rejects unknown agent frontmatter with its source path and key", () => {
+		const source =
+			"---\n" +
+			"name: pfd\n" +
+			"description: x\n" +
+			"tools: Read, Grep, Bash\n" +
+			"model: sonnet\n" +
+			"extra: y\n" +
+			"---\n\nbody\n";
+
+		assert.throws(() => agentToCodexToml("pfd.md", source), /pfd\.md.*extra/);
 	});
 });
 

@@ -1,6 +1,12 @@
 import { parse } from "yaml";
 
 const COMMAND_FRONTMATTER_KEYS = new Set(["description"]);
+const AGENT_FRONTMATTER_KEYS = new Set([
+	"name",
+	"description",
+	"tools",
+	"model",
+]);
 const READ_ONLY_TOOLS = "Read, Grep, Bash";
 const WORKSPACE_WRITE_TOOLS = "Bash, Read, Edit, Write, Grep, Glob, Skill";
 
@@ -37,7 +43,7 @@ function tomlString(value) {
 }
 
 function tomlMultilineString(value) {
-	return value.replaceAll('"""', '\\"""');
+	return JSON.stringify(value).slice(1, -1);
 }
 
 export function buildCodexPluginManifest({ version, description }) {
@@ -98,6 +104,13 @@ export function claudeInstructionsToAgents(source) {
 
 export function agentToCodexToml(sourcePath, source) {
 	const { body, frontmatter } = parseFrontmatter(sourcePath, source);
+	for (const key of Object.keys(frontmatter)) {
+		if (!AGENT_FRONTMATTER_KEYS.has(key)) {
+			throw new Error(
+				`${sourcePath}: unsupported agent frontmatter key ${key}.`,
+			);
+		}
+	}
 	const description = requiredDescription(sourcePath, frontmatter);
 	if (frontmatter.model !== "sonnet") {
 		throw new Error(`${sourcePath}: unsupported model.`);
