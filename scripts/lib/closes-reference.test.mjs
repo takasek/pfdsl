@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
 import { classifyClosesReference } from "./closes-reference.mjs";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("classifyClosesReference", () => {
 	const intoMain = { baseRef: "main", defaultBranch: "main" };
@@ -107,5 +113,33 @@ describe("classifyClosesReference", () => {
 			body: "This is not a no-issue: case, it implements the feature.",
 		});
 		assert.equal(result.status, "FAIL");
+	});
+});
+
+// The verdict is derived from the PR body, which lives on GitHub rather than in
+// the tree (#936). `pull_request` without `types:` defaults to opened /
+// synchronize / reopened — none of which fire when the body is edited, so the
+// very fix this check asks for leaves the red in place until someone re-runs
+// the job by hand. Naming `types:` at all opts out of that default, so the
+// three defaults have to be listed back explicitly or a push stops re-running
+// the check.
+describe("check-closes-reference workflow trigger", () => {
+	// Containment, not equality: the property under test is that these four
+	// types are present, and a later trigger this check has no opinion on
+	// (`ready_for_review`, say) should not fail here.
+	it("re-runs on a body edit as well as on every default trigger", () => {
+		const workflow = parse(
+			readFileSync(
+				resolve(root, ".github/workflows/check-closes-reference.yml"),
+				"utf8",
+			),
+		);
+		const types = workflow.on.pull_request?.types ?? [];
+		for (const type of ["edited", "opened", "synchronize", "reopened"]) {
+			assert.ok(
+				types.includes(type),
+				`expected the workflow to trigger on \`${type}\`, got ${JSON.stringify(types)}`,
+			);
+		}
 	});
 });

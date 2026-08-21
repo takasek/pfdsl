@@ -1,7 +1,14 @@
 name: check closes reference
 
 on:
+  # This check reads the PR body, which the default trigger set never reports a
+  # change to: opened / synchronize / reopened all track the branch. `edited`
+  # is the only type that fires on a body edit — the fix this check's own
+  # failure text demands (#936). It is a superset of that: a title or base
+  # change fires it too, and re-runs the check for nothing. The run costs
+  # seconds, and the alternative is a red that stays red after it is fixed.
   pull_request:
+    types: [opened, synchronize, reopened, edited]
 
 jobs:
   check:
