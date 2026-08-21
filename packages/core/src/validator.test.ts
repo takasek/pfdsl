@@ -52,6 +52,31 @@ describe("validate", () => {
 		expect(strictDiags.find((d) => d.code === "V002")?.severity).toBe("error");
 	});
 
+	it("W008: process whose only input is feedback", () => {
+		expect(codes("A >> P -> B\nB >>? Q -> C")).toContain("W008");
+	});
+
+	it("W008: not emitted once the process has a normal input", () => {
+		expect(codes("A >> P -> B\n[A, B] >> Q -> C\nB >>? Q")).not.toContain(
+			"W008",
+		);
+	});
+
+	it("W008: not emitted for a process with no inputs at all (V002 covers it)", () => {
+		expect(codes("P -> B")).not.toContain("W008");
+	});
+
+	it("W008 severity is warning by default, error with --strict", () => {
+		const src = "A >> P -> B\nB >>? Q -> C";
+		expect(diagnose(src).find((d) => d.code === "W008")?.severity).toBe(
+			"warning",
+		);
+		expect(
+			diagnose(src, null, { strict: true }).find((d) => d.code === "W008")
+				?.severity,
+		).toBe("error");
+	});
+
 	it("V003: process with no outputs", () => {
 		expect(codes("A >> P")).toContain("V003");
 	});
@@ -96,6 +121,15 @@ describe("validate", () => {
 		};
 		const diags = diagnose("", fm);
 		expect(diags.map((d) => d.code)).toContain("V006");
+	});
+
+	it("a feedback edge from outside a subflow process's downstream stays silent", () => {
+		// §15.3 permits both a disconnected feedback artifact and a downstream
+		// one, and the primary graph cannot tell a disconnected-but-wirable edge
+		// from a legitimate generation loop — so nothing is reported here.
+		const fm: Frontmatter = { process: { P: { subflow: "./child.pfdsl" } } };
+		const diags = diagnose("A >> P -> B\nX >>? P", fm, { strict: true });
+		expect(diags.filter((d) => d.code.startsWith("W0"))).toHaveLength(0);
 	});
 
 	it("valid chain: no errors", () => {

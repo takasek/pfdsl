@@ -1,4 +1,5 @@
 import {
+	feedbackOnlyProcess,
 	orphanedProcess,
 	processCompleteness,
 	singleSource,
@@ -45,6 +46,7 @@ export type { Rule, RuleContext, ValidateOptions } from "./rules/context.js";
 export const RULES: readonly Rule[] = [
 	singleSource, // V001
 	processCompleteness, // V002, V003
+	feedbackOnlyProcess, // W008
 	orphanedProcess, // V020
 	partsMembership, // V004, V005, V007, W001
 	indexShape, // V029, W004
