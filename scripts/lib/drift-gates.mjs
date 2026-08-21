@@ -159,9 +159,12 @@ export function buildGates({ stagedPresent }) {
 					"plugin",
 					":(exclude)plugin/pfdsl/skills/pfdsl/SKILL.md",
 					".claude-plugin/marketplace.json",
+					"AGENTS.md",
+					".agents",
+					".codex",
 				],
 			),
-			hint: "plugin/pfdsl or .claude-plugin/marketplace.json is stale (SKILL.md checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the plugin/marketplace files, or 'pnpm -r build && make gen-plugin' to regenerate everything.",
+			hint: "Claude and Codex outputs are stale (plugin/pfdsl, .claude-plugin/marketplace.json, AGENTS.md, .agents, or .codex; SKILL.md checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the Claude and Codex outputs, or 'pnpm -r build && make gen-plugin' to regenerate everything.",
 		},
 		{
 			id: "samples-dot",

@@ -27,6 +27,21 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		);
 	});
 
+	it("matches the Codex assembly sources and generated roots", () => {
+		for (const path of [
+			"scripts/lib/harness-inventory.mjs",
+			"scripts/lib/gen-codex-assets.mjs",
+			"scripts/gen-codex-assets.mjs",
+			"AGENTS.md",
+			".agents/skills/pfd-ops/SKILL.md",
+			".codex/agents/pfd-implementer.toml",
+			".codex/hooks.json",
+			"plugin/pfdsl/.codex-plugin/plugin.json",
+		]) {
+			assert.equal(GEN_PLUGIN_TRIGGER.test(path), true, path);
+		}
+	});
+
 	it("matches a .claude/skills/pfd-ecosystem/ path", () => {
 		assert.equal(
 			GEN_PLUGIN_TRIGGER.test(".claude/skills/pfd-ecosystem/SKILL.md"),

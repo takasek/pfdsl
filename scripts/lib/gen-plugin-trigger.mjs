@@ -48,6 +48,6 @@ const COMMAND_PATTERNS = PLUGIN_COMMAND_FILES.map(
 // `.claude-plugin/marketplace\.json` joins it for the same reason: its
 // per-plugin description is generated (assemblePluginDistIndependent, #685)
 // even though the file lives outside plugin/pfdsl/.
-const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/lib/bundle-manifest\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|${SKILL_PATTERNS}|${COMMAND_PATTERNS}|${AGENT_PATTERNS}|^hooks/|^plugin/|packages/cli/package\\.json|^\\.claude-plugin/marketplace\\.json`;
+const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/lib/bundle-manifest\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|scripts/gen-codex-assets\\.mjs|scripts/lib/gen-codex-assets\\.mjs|scripts/lib/harness-inventory\\.mjs|${SKILL_PATTERNS}|${COMMAND_PATTERNS}|${AGENT_PATTERNS}|^hooks/|^plugin/|^AGENTS\\.md$|^\\.agents/|^\\.codex/|packages/cli/package\\.json|^\\.claude-plugin/marketplace\\.json`;
 
 export const GEN_PLUGIN_TRIGGER = new RegExp(GEN_PLUGIN_TRIGGER_PATTERN);

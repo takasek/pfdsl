@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { buildGates } from "./drift-gates.mjs";
@@ -37,6 +41,27 @@ describe("buildGates", () => {
 			built.indexOf("gen-install") < built.indexOf("gen-plugin-skill-md"),
 			"gen-install rewrites the tree the gen-plugin gates mirror",
 		);
+	});
+
+	it("reports a changed generated Codex file in a temporary fixture", () => {
+		const root = mkdtempSync(join(tmpdir(), "drift-gates-codex-"));
+		try {
+			mkdirSync(join(root, ".codex"), { recursive: true });
+			writeFileSync(join(root, ".codex", "hooks.json"), '{"hooks": []}\n');
+			execFileSync("git", ["init", "--quiet"], { cwd: root });
+			execFileSync("git", ["add", ".codex/hooks.json"], { cwd: root });
+			writeFileSync(join(root, ".codex", "hooks.json"), '{"hooks": [1]}\n');
+
+			const bulk = gates({}).find((gate) => gate.id === "gen-plugin-bulk");
+			const [file, args] = bulk.commands.at(-1);
+			assert.throws(
+				() => execFileSync(file, args, { cwd: root, stdio: "ignore" }),
+				(error) => error.status === 1,
+			);
+			assert.match(bulk.hint, /Claude and Codex outputs/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	it("fires readme-cli for the npm-page README, which the generator also writes", () => {
