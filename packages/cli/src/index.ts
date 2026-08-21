@@ -3713,8 +3713,8 @@ const TOP_LEVEL_COLUMN_WIDTH = 25;
  * fixed line rather than as a listing entry — so keeping them out of
  * `TOP_LEVEL_COMMANDS` avoids entries whose `run`/`synopsis` nothing reads.
  */
-const VERSION_WORDS = new Set(["--version", "-V"]);
-const HELP_WORDS = new Set(["help", "--help", "-h"]);
+export const VERSION_WORDS = new Set(["--version", "-V"]);
+export const HELP_WORDS = new Set(["help", "--help", "-h"]);
 
 export const HELP = (() => {
 	const topLevelEntries = TOP_LEVEL_COMMANDS.map((c) =>
