@@ -541,6 +541,94 @@ describe("assembleCodexAssets", () => {
 		};
 	}
 
+	function statefulCodexDeps({ failRemove, failWrite, failPublish } = {}) {
+		const { calls, deps: sourceDeps } = fakeCodexDeps();
+		const files = new Map();
+		const destinations = [
+			"/repo/AGENTS.md",
+			"/repo/.codex/hooks.json",
+			"/repo/plugin/pfdsl/.codex-plugin/plugin.json",
+			"/repo/.agents/skills",
+			"/repo/.codex/agents",
+			"/repo/plugin/pfdsl/skills/pfd-cycle",
+			"/repo/plugin/pfdsl/skills/pfd-init",
+			"/repo/plugin/pfdsl/skills/source-command-pfd-retro",
+		];
+		for (const destination of destinations) {
+			files.set(destination, "directory");
+			files.set(`${destination}/prior.txt`, `prior ${destination}`);
+		}
+		const before = new Map(files);
+		let publishCount = 0;
+
+		const remove = (path) => {
+			for (const existing of [...files.keys()]) {
+				if (existing === path || existing.startsWith(`${path}/`)) {
+					files.delete(existing);
+				}
+			}
+		};
+		const move = (from, to) => {
+			const moving = [...files.entries()].filter(
+				([path]) => path === from || path.startsWith(`${from}/`),
+			);
+			remove(to);
+			for (const [path, content] of moving) {
+				files.delete(path);
+				files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+
+		return {
+			calls,
+			before,
+			files,
+			deps: {
+				...sourceDeps,
+				existsSync: (path) => files.has(path),
+				mkdirSync: (path) => {
+					calls.push(["mkdirSync", path]);
+					files.set(path, "directory");
+				},
+				rmSync: (path) => {
+					calls.push(["rmSync", path]);
+					if (failRemove?.(path)) throw new Error("cleanup failed");
+					remove(path);
+				},
+				writeFileSync: (path, content) => {
+					calls.push(["writeFileSync", path, content]);
+					files.set(path, content);
+					if (failWrite?.(path)) throw new Error("staging write failed");
+				},
+				renameSync: (from, to) => {
+					calls.push(["renameSync", from, to]);
+					if (from.endsWith(".codex-tmp")) {
+						publishCount += 1;
+						if (failPublish?.(publishCount, from, to)) {
+							throw new Error("publication rename failed");
+						}
+					}
+					move(from, to);
+				},
+			},
+		};
+	}
+
+	function assertNoAssemblyArtifacts(files) {
+		assert.equal(
+			[...files.keys()].some(
+				(path) => path.includes(".codex-tmp") || path.includes(".codex-prev"),
+			),
+			false,
+		);
+	}
+
+	function assertPriorDestinationsRestored(files, before) {
+		for (const [path, content] of before) {
+			assert.equal(files.get(path), content, path);
+		}
+	}
+
 	it("stages and atomically publishes every Codex output", () => {
 		const { calls, deps } = fakeCodexDeps();
 		assembleCodexAssets({
@@ -624,6 +712,59 @@ describe("assembleCodexAssets", () => {
 		assert.deepEqual(
 			calls.filter(([kind]) => kind === "renameSync"),
 			[],
+		);
+	});
+
+	it("removes every staged sibling and keeps prior destinations when staging fails midway", () => {
+		const { before, deps, files } = statefulCodexDeps({
+			failWrite: (path) => path.includes("pfd-init.codex-tmp"),
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/staging write failed/,
+		);
+		assertPriorDestinationsRestored(files, before);
+		assertNoAssemblyArtifacts(files);
+	});
+
+	it("restores every prior destination and removes staging siblings when publication fails", () => {
+		const { before, deps, files } = statefulCodexDeps({
+			failPublish: (count) => count === 2,
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/publication rename failed/,
+		);
+		assertPriorDestinationsRestored(files, before);
+		assertNoAssemblyArtifacts(files);
+	});
+
+	it("keeps the publication error when rollback cleanup also fails", () => {
+		const { deps } = statefulCodexDeps({
+			failPublish: (count) => count === 2,
+			failRemove: (path) => path === "/repo/AGENTS.md",
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/publication rename failed/,
 		);
 	});
 });

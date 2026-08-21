@@ -246,22 +246,56 @@ export function buildPluginManifest({
 
 function stageFile(destination, content, deps) {
 	const temporary = `${destination}.codex-tmp`;
-	deps.rmSync(temporary, { force: true });
-	deps.mkdirSync(dirname(temporary), { recursive: true });
-	deps.writeFileSync(temporary, content);
+	try {
+		deps.rmSync(temporary, { force: true });
+		deps.mkdirSync(dirname(temporary), { recursive: true });
+		deps.writeFileSync(temporary, content);
+	} catch (error) {
+		removeAssemblyArtifact(temporary, deps);
+		throw error;
+	}
 	return { destination, temporary };
 }
 
 function stageDirectory(destination, files, deps) {
 	const temporary = `${destination}.codex-tmp`;
-	deps.rmSync(temporary, { recursive: true, force: true });
-	deps.mkdirSync(temporary, { recursive: true });
-	for (const { path, content } of files) {
-		const output = resolve(temporary, path);
-		deps.mkdirSync(dirname(output), { recursive: true });
-		deps.writeFileSync(output, content);
+	try {
+		deps.rmSync(temporary, { recursive: true, force: true });
+		deps.mkdirSync(temporary, { recursive: true });
+		for (const { path, content } of files) {
+			const output = resolve(temporary, path);
+			deps.mkdirSync(dirname(output), { recursive: true });
+			deps.writeFileSync(output, content);
+		}
+	} catch (error) {
+		removeAssemblyArtifact(temporary, deps);
+		throw error;
 	}
 	return { destination, temporary };
+}
+
+// Cleanup is best effort because an I/O error while removing a temporary
+// sibling must not replace the staging or publication error that triggered it.
+function removeAssemblyArtifact(path, deps) {
+	try {
+		deps.rmSync(path, { recursive: true, force: true });
+	} catch {
+		// Preserve the primary assembly error.
+	}
+}
+
+function removeStagedArtifacts(staged, deps) {
+	for (const { temporary } of staged) {
+		removeAssemblyArtifact(temporary, deps);
+	}
+}
+
+function restoreAssemblyDestination(backup, destination, deps) {
+	try {
+		deps.renameSync(backup, destination);
+	} catch {
+		// Preserve the primary assembly error.
+	}
 }
 
 // All outputs are staged before replacing any final destination. During the
@@ -285,12 +319,13 @@ function publishStaged(staged, deps) {
 		}
 	} catch (error) {
 		for (const entry of published.reverse()) {
-			deps.rmSync(entry.destination, { recursive: true, force: true });
+			removeAssemblyArtifact(entry.destination, deps);
 		}
 		for (const entry of backups.reverse()) {
 			if (entry.hadDestination)
-				deps.renameSync(entry.backup, entry.destination);
+				restoreAssemblyDestination(entry.backup, entry.destination, deps);
 		}
+		removeStagedArtifacts(staged, deps);
 		throw error;
 	}
 	for (const entry of backups) {
@@ -326,61 +361,77 @@ export function assembleCodexAssets({
 		root,
 		readFileSync: deps.readFileSync,
 	});
-	const staged = [
-		stageFile(
-			resolve(root, "AGENTS.md"),
-			claudeInstructionsToAgents(read(resolve(root, "CLAUDE.md"))),
-			deps,
-		),
-		stageFile(
-			resolve(root, ".codex/hooks.json"),
-			claudeHooksToCodexHooks(read(resolve(root, ".claude/settings.json"))),
-			deps,
-		),
-		stageFile(
-			resolve(pluginRoot, ".codex-plugin/plugin.json"),
-			`${JSON.stringify(buildCodexPluginManifest({ version: cliVersion, description }), null, 2)}\n`,
-			deps,
-		),
-		stageDirectory(
-			resolve(root, ".agents/skills"),
-			DISTRIBUTED_SKILLS.map((name) => ({
-				path: `${name}/SKILL.md`,
-				content: read(resolve(root, `.claude/skills/${name}/SKILL.md`)),
-			})),
-			deps,
-		),
-		stageDirectory(
-			resolve(root, ".codex/agents"),
-			DISTRIBUTED_AGENTS.map((source) => ({
-				path: source.replace(/\.md$/, ".toml"),
-				content: agentToCodexToml(
-					source,
-					read(resolve(root, ".claude/agents", source)),
-				),
-			})),
-			deps,
-		),
-		...DISTRIBUTED_COMMANDS.map((source) => {
-			const name = codexCommandSkillName(source);
-			return stageDirectory(
-				resolve(pluginRoot, "skills", name),
-				[
-					{
-						path: "SKILL.md",
-						content: commandToCodexSkill(
-							source,
-							read(resolve(root, ".claude/commands", source)),
-							name,
-						),
-					},
-				],
+	const staged = [];
+	try {
+		staged.push(
+			stageFile(
+				resolve(root, "AGENTS.md"),
+				claudeInstructionsToAgents(read(resolve(root, "CLAUDE.md"))),
 				deps,
+			),
+		);
+		staged.push(
+			stageFile(
+				resolve(root, ".codex/hooks.json"),
+				claudeHooksToCodexHooks(read(resolve(root, ".claude/settings.json"))),
+				deps,
+			),
+		);
+		staged.push(
+			stageFile(
+				resolve(pluginRoot, ".codex-plugin/plugin.json"),
+				`${JSON.stringify(buildCodexPluginManifest({ version: cliVersion, description }), null, 2)}\n`,
+				deps,
+			),
+		);
+		staged.push(
+			stageDirectory(
+				resolve(root, ".agents/skills"),
+				DISTRIBUTED_SKILLS.map((name) => ({
+					path: `${name}/SKILL.md`,
+					content: read(resolve(root, `.claude/skills/${name}/SKILL.md`)),
+				})),
+				deps,
+			),
+		);
+		staged.push(
+			stageDirectory(
+				resolve(root, ".codex/agents"),
+				DISTRIBUTED_AGENTS.map((source) => ({
+					path: source.replace(/\.md$/, ".toml"),
+					content: agentToCodexToml(
+						source,
+						read(resolve(root, ".claude/agents", source)),
+					),
+				})),
+				deps,
+			),
+		);
+		for (const source of DISTRIBUTED_COMMANDS) {
+			const name = codexCommandSkillName(source);
+			staged.push(
+				stageDirectory(
+					resolve(pluginRoot, "skills", name),
+					[
+						{
+							path: "SKILL.md",
+							content: commandToCodexSkill(
+								source,
+								read(resolve(root, ".claude/commands", source)),
+								name,
+							),
+						},
+					],
+					deps,
+				),
 			);
-		}),
-	];
+		}
 
-	publishStaged(staged, deps);
+		publishStaged(staged, deps);
+	} catch (error) {
+		removeStagedArtifacts(staged, deps);
+		throw error;
+	}
 }
 
 // Assembles everything gen-plugin.mjs bundles into plugin/pfdsl/ except
