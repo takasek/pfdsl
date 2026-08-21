@@ -93,7 +93,7 @@ proposal 起草での「既存構造」は対象 spec の現行 frontmatter キ�
 
 `docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。`packages/cli/src/` の CLI コマンド定義を変更したら `make gen-readme-cli`（README `## CLI` セクション）で再生成する。
 
-`.claude/` は現在の canonical input であり、skill・command・agent とsettingsをここで保守する。配布対象は `scripts/lib/harness-inventory.mjs` が一元化し、Claude CodeとCodexのadapterが同じinventoryを消費する。`CLAUDE.md` と `hooks/` もCodex向けリポジトリ資産とClaude Code plugin資産の入力である。
+現在のcanonical inputは、`scripts/lib/harness-inventory.mjs` が選ぶ手書きの`.claude/skills`・`.claude/commands`・`.claude/agents`配布対象と、`CLAUDE.md`・`.claude/settings.json`・`hooks/`である。Claude CodeとCodexのadapterは同じinventoryを消費する。`.claude/skills/pfdsl` は `plugin/pfdsl/skills/pfdsl` への生成symlinkであり、canonical inputでも編集先でもない。
 
 これらの入力、またはgen-skillの入力を変更したら、`pnpm -r build && make gen-plugin` を実行する。これはClaude Code用のmirrorとmanifest、Codex用のplugin manifest・command skill、リポジトリの`AGENTS.md`・`.agents/`・`.codex/`を同時に再生成する。生成先は手編集しない。編集元を直して同じコマンドで再生成する。distが無い、または鮮度確認だけを行う場合は `node scripts/gen-plugin-dist-independent.mjs` を使えるが、`plugin/pfdsl/skills/pfdsl/SKILL.md` は含まれない。
 
@@ -115,7 +115,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 テンプレートのソースを変更したコミットは再ステージが2往復必要になる（1回目で `install/`、2回目で `plugin/`）。
 2ホップの生成チェーンに「直して exit 1」の流儀を適用した結果であり、意図した挙動である。
 
-**生成物 drift 検査はコミット分割を制約する**: 規則は配布層（pfd-ops `references/work-cycle.md` のコミット粒度ゲート）が一次情報。このリポで該当する検査は `gen-plugin`（canonical `.claude` 等とinventory → Claude Code / Codexの生成物）と `gen-install`。
+**生成物 drift 検査はコミット分割を制約する**: 規則は配布層（pfd-ops `references/work-cycle.md` のコミット粒度ゲート）が一次情報。このリポで該当する検査は `gen-plugin`（inventoryが選ぶ手書き入力と `CLAUDE.md`・settings・hooks → Claude Code / Codexの生成物）と `gen-install`。
 
 **出力抑制**: `make gen-samples` / `make gen-skill` はpnpm全パッケージbuild + 全サンプルcheckのwarningを毎回出力するため数百行に及ぶ。実行後は `git status --short docs/samples/ plugin/pfdsl/ AGENTS.md .agents/ .codex/` で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 

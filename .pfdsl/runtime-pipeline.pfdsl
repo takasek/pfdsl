@@ -17,7 +17,7 @@ group:
     label: 生成の一次ソース（workflow.pfdsl が生産）
     color: "#fdf2f8"
   skill_sources:
-    label: 手書き配布素材（このリポの .claude/）
+    label: 手書き配布素材（inventory対象の .claude/）
     color: "#fef9e7"
   repo_generated:
     label: リポ内生成物（コミット対象・手編集禁止）
@@ -165,9 +165,9 @@ artifact:
     location: [ ../scripts/pfdsl/, ../.github/workflows/pfdsl-flow-on-issue-close.yml ]
     group: gen_sources
   claude_harness_sources:
-    label: 現行のClaude Code正本
-    description: "短期の maintained source は CLAUDE.md と .claude/ 配下のskills・commands・agents・hooks設定である。hooks/ もClaude Code pluginへ同梱する正本入力に含む。将来の中立正本移行では、この入力側だけを差し替え、inventory と各adapterの出力契約を維持する"
-    location: [ ../CLAUDE.md, ../.claude/, ../hooks/ ]
+    label: 現行のClaude Code手書き入力
+    description: "短期の maintained source は CLAUDE.md、.claude/settings.json、hooks/、およびharness_inventoryが選ぶ .claude/skills・commands・agents の配布対象である。.claude/skills/pfdsl は plugin/pfdsl/skills/pfdsl への生成symlinkであり、正本入力でも編集先でもない。将来の中立正本移行では、この入力側だけを差し替え、inventory と各adapterの出力契約を維持する"
+    location: [ ../CLAUDE.md, ../.claude/settings.json, ../.claude/commands/, ../.claude/agents/, ../hooks/ ]
     group: skill_sources
   harness_inventory:
     label: ハーネス中立の配布inventory
@@ -227,7 +227,7 @@ artifact:
     group: skill_sources
   pfdsl_skill:
     label: PFD読み書き分析skill（リポ内）
-    description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。make gen-skillで再生成し手編集禁止。実体は plugin/pfdsl/skills/pfdsl（追跡対象の配布コピー）であり、リポ内の .claude/skills/pfdsl はそこへの symlink（#714）。以前は同じ一次ソースから独立再生成される別コピーだったが、ブランチ切替で古い版が残りエージェントが旧ブランチの規約を読む経路になっていた。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため図には現れない"
+    description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。make gen-skillで再生成し手編集禁止。実体は plugin/pfdsl/skills/pfdsl（追跡対象の配布コピー）であり、リポ内の .claude/skills/pfdsl はそこへの生成symlinkであって、canonical inputでも編集先でもない（#714）。以前は同じ一次ソースから独立再生成される別コピーだったが、ブランチ切替で古い版が残りエージェントが旧ブランチの規約を読む経路になっていた。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため図には現れない"
     criteria: make gen-skill が差分なしで完了し、.claude/skills/pfdsl が生成先への symlink である
     externalStakeholders: [ このリポのAIエージェント ]
     location: ../plugin/pfdsl/skills/pfdsl/

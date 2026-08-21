@@ -59,7 +59,7 @@ artifact:
     group: generation
   pfdsl_skill:
     label: AI agent スキル（リポ内）
-    description: "runtime-pipeline.pfdsl の gen_skill が生産する（判断を含まない生成のため、ADR-0035 でそちらへ移した）。実体は plugin/pfdsl/skills/pfdsl で、リポ内の .claude/skills/pfdsl はそこへの symlink（#714）。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる"
+    description: "runtime-pipeline.pfdsl の gen_skill が生産する（判断を含まない生成のため、ADR-0035 でそちらへ移した）。実体は plugin/pfdsl/skills/pfdsl で、リポ内の .claude/skills/pfdsl はそこへの生成symlinkであり、正本入力でも編集先でもない（#714）。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる"
     location: ../plugin/pfdsl/skills/pfdsl/
     group: generation
   plugin_dist:
