@@ -14,6 +14,7 @@ import {
 	SCOPE_EXCLUSIONS,
 	unreviewedFiles,
 } from "./distribution-review.mjs";
+import { codexCommandSkillName, PLUGIN_COMMAND_FILES } from "./gen-plugin.mjs";
 import { git } from "./run-exec.mjs";
 
 describe("inScope", () => {
@@ -83,6 +84,14 @@ describe("canonicalSourceOf", () => {
 
 	for (const [dist, canonical] of PAIRS) {
 		it(`maps ${dist} to ${canonical}`, () => {
+			assert.equal(canonicalSourceOf(dist), canonical);
+		});
+	}
+
+	for (const source of PLUGIN_COMMAND_FILES) {
+		const dist = `plugin/pfdsl/skills/${codexCommandSkillName(source)}/SKILL.md`;
+		const canonical = `.claude/commands/${source}`;
+		it(`maps generated Codex command skill ${dist} to ${canonical}`, () => {
 			assert.equal(canonicalSourceOf(dist), canonical);
 		});
 	}

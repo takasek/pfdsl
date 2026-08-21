@@ -16,7 +16,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { PLUGIN_MIRRORS } from "./gen-plugin.mjs";
+import {
+	codexCommandSkillName,
+	PLUGIN_COMMAND_FILES,
+	PLUGIN_MIRRORS,
+} from "./gen-plugin.mjs";
 import {
 	diffBase,
 	EMPTY_TREE,
@@ -86,6 +90,13 @@ export function inScope(path) {
 export function canonicalSourceOf(distPath) {
 	const generated = GENERATED_SOURCES[distPath];
 	if (generated) return generated;
+
+	const commandSource = PLUGIN_COMMAND_FILES.find(
+		(source) =>
+			distPath ===
+			`plugin/pfdsl/skills/${codexCommandSkillName(source)}/SKILL.md`,
+	);
+	if (commandSource) return `.claude/commands/${commandSource}`;
 
 	// The inverse of the assembly's own manifest: find the bundle root this
 	// path sits under, check the file is one gen-plugin actually copies there,
