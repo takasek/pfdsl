@@ -14,6 +14,13 @@ import {
 	BUNDLE_MANIFEST_RELATIVE_PATH,
 	writeBundleManifest,
 } from "./bundle-manifest.mjs";
+import {
+	agentToCodexToml,
+	buildCodexPluginManifest,
+	claudeHooksToCodexHooks,
+	claudeInstructionsToAgents,
+	commandToCodexSkill,
+} from "./gen-codex-assets.mjs";
 import { genInstall } from "./gen-install.mjs";
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
 import {
@@ -41,6 +48,14 @@ export const PLUGIN_AGENT_FILES = DISTRIBUTED_AGENTS;
 // The pfdsl skill is absent because it is rendered, not mirrored (gen-skill).
 export const PLUGIN_SKILL_DIRS = DISTRIBUTED_SKILLS;
 export const PLUGIN_COMMAND_FILES = DISTRIBUTED_COMMANDS;
+
+// Commands and skills share Codex's plugin/skills namespace. Derive a
+// command's output name from the maintained inventory so a newly overlapping
+// name cannot replace an existing distributed skill at generation time.
+export function codexCommandSkillName(source) {
+	const name = source.replace(/\.md$/, "");
+	return DISTRIBUTED_SKILLS.includes(name) ? `source-command-${name}` : name;
+}
 
 /**
  * What the bundle is made of, as data: where each bundled subtree comes from,
@@ -229,6 +244,145 @@ export function buildPluginManifest({
 	};
 }
 
+function stageFile(destination, content, deps) {
+	const temporary = `${destination}.codex-tmp`;
+	deps.rmSync(temporary, { force: true });
+	deps.mkdirSync(dirname(temporary), { recursive: true });
+	deps.writeFileSync(temporary, content);
+	return { destination, temporary };
+}
+
+function stageDirectory(destination, files, deps) {
+	const temporary = `${destination}.codex-tmp`;
+	deps.rmSync(temporary, { recursive: true, force: true });
+	deps.mkdirSync(temporary, { recursive: true });
+	for (const { path, content } of files) {
+		const output = resolve(temporary, path);
+		deps.mkdirSync(dirname(output), { recursive: true });
+		deps.writeFileSync(output, content);
+	}
+	return { destination, temporary };
+}
+
+// All outputs are staged before replacing any final destination. During the
+// replacement phase, preserve prior destinations as siblings and restore them
+// if an individual rename fails. This keeps a failed generation from exposing
+// a mixed old/new Codex surface or a half-written generated tree.
+function publishStaged(staged, deps) {
+	const published = [];
+	const backups = [];
+	try {
+		for (const entry of staged) {
+			const backup = `${entry.destination}.codex-prev`;
+			deps.rmSync(backup, { recursive: true, force: true });
+			const hadDestination = deps.existsSync(entry.destination);
+			if (hadDestination) deps.renameSync(entry.destination, backup);
+			backups.push({ ...entry, backup, hadDestination });
+		}
+		for (const entry of backups) {
+			deps.renameSync(entry.temporary, entry.destination);
+			published.push(entry);
+		}
+	} catch (error) {
+		for (const entry of published.reverse()) {
+			deps.rmSync(entry.destination, { recursive: true, force: true });
+		}
+		for (const entry of backups.reverse()) {
+			if (entry.hadDestination)
+				deps.renameSync(entry.backup, entry.destination);
+		}
+		throw error;
+	}
+	for (const entry of backups) {
+		if (entry.hadDestination) {
+			deps.rmSync(entry.backup, { recursive: true, force: true });
+		}
+	}
+}
+
+/**
+ * Generates the Codex repository and plugin assets from the maintained
+ * Claude sources. Each output is first written to a temporary sibling; only
+ * after every write succeeds are the destinations replaced together.
+ * @param {{root: string, pluginRoot: string, deps?: object}} options
+ */
+export function assembleCodexAssets({
+	root,
+	pluginRoot,
+	deps = {
+		existsSync,
+		mkdirSync,
+		readFileSync,
+		renameSync,
+		rmSync,
+		writeFileSync,
+	},
+}) {
+	const read = (path) => deps.readFileSync(path, "utf-8");
+	const cliVersion = JSON.parse(
+		read(resolve(root, "packages/cli/package.json")),
+	).version;
+	const description = buildPluginDescription({
+		root,
+		readFileSync: deps.readFileSync,
+	});
+	const staged = [
+		stageFile(
+			resolve(root, "AGENTS.md"),
+			claudeInstructionsToAgents(read(resolve(root, "CLAUDE.md"))),
+			deps,
+		),
+		stageFile(
+			resolve(root, ".codex/hooks.json"),
+			claudeHooksToCodexHooks(read(resolve(root, ".claude/settings.json"))),
+			deps,
+		),
+		stageFile(
+			resolve(pluginRoot, ".codex-plugin/plugin.json"),
+			`${JSON.stringify(buildCodexPluginManifest({ version: cliVersion, description }), null, 2)}\n`,
+			deps,
+		),
+		stageDirectory(
+			resolve(root, ".agents/skills"),
+			DISTRIBUTED_SKILLS.map((name) => ({
+				path: `${name}/SKILL.md`,
+				content: read(resolve(root, `.claude/skills/${name}/SKILL.md`)),
+			})),
+			deps,
+		),
+		stageDirectory(
+			resolve(root, ".codex/agents"),
+			DISTRIBUTED_AGENTS.map((source) => ({
+				path: source.replace(/\.md$/, ".toml"),
+				content: agentToCodexToml(
+					source,
+					read(resolve(root, ".claude/agents", source)),
+				),
+			})),
+			deps,
+		),
+		...DISTRIBUTED_COMMANDS.map((source) => {
+			const name = codexCommandSkillName(source);
+			return stageDirectory(
+				resolve(pluginRoot, "skills", name),
+				[
+					{
+						path: "SKILL.md",
+						content: commandToCodexSkill(
+							source,
+							read(resolve(root, ".claude/commands", source)),
+							name,
+						),
+					},
+				],
+				deps,
+			);
+		}),
+	];
+
+	publishStaged(staged, deps);
+}
+
 // Assembles everything gen-plugin.mjs bundles into plugin/pfdsl/ except
 // plugin/pfdsl/skills/pfdsl/SKILL.md (which embeds `pfdsl help` output and
 // therefore needs packages/cli/dist — see scripts/gen-skill.mjs). None of
@@ -245,10 +399,14 @@ export function assemblePluginDistIndependent({
 		mirrorDir,
 		mirrorFiles,
 		writeSkillRefs,
+		existsSync,
 		readFileSync,
+		renameSync,
+		rmSync,
 		writeFileSync,
 		mkdirSync,
 		writeBundleManifest,
+		assembleCodexAssets,
 	},
 }) {
 	deps.genInstall(root);
@@ -319,6 +477,7 @@ export function assemblePluginDistIndependent({
 	console.log(".claude-plugin/marketplace.json ← plugin manifest description");
 
 	deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));
+	deps.assembleCodexAssets({ root, pluginRoot, deps });
 
 	// Last: the recorded hash covers every other file in the bundle, so anything
 	// written after this point would leave it describing a bundle that is no

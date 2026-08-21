@@ -73,6 +73,25 @@ describe("commandToCodexSkill", () => {
 		);
 	});
 
+	it("uses an assembly-supplied non-colliding output name while retaining the real source path for errors", () => {
+		const source = "---\ndescription: Run the retrospective.\n---\n\nbody\n";
+
+		assert.match(
+			commandToCodexSkill("pfd-retro.md", source, "source-command-pfd-retro"),
+			/^name: source-command-pfd-retro$/m,
+		);
+
+		assert.throws(
+			() =>
+				commandToCodexSkill(
+					"pfd-retro.md",
+					"---\nextra: unsupported\n---\n\nbody\n",
+					"source-command-pfd-retro",
+				),
+			/pfd-retro\.md.*extra/,
+		);
+	});
+
 	it("rejects unknown command frontmatter with its source path and key", () => {
 		const source = "---\ndescription: x\nextra: y\n---\n\nbody\n";
 

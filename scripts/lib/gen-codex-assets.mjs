@@ -68,7 +68,11 @@ export function buildCodexPluginManifest({ version, description }) {
 	};
 }
 
-export function commandToCodexSkill(sourcePath, source) {
+export function commandToCodexSkill(
+	sourcePath,
+	source,
+	outputName = sourcePath.replace(/\.md$/, ""),
+) {
 	const { body, frontmatter } = parseFrontmatter(sourcePath, source);
 	for (const key of Object.keys(frontmatter)) {
 		if (!COMMAND_FRONTMATTER_KEYS.has(key)) {
@@ -78,13 +82,12 @@ export function commandToCodexSkill(sourcePath, source) {
 		}
 	}
 	const description = requiredDescription(sourcePath, frontmatter);
-	const name = sourcePath.replace(/\.md$/, "");
 	const codexBody = body.replace(
 		"引数（あれば作業選択の指定として扱う）: $ARGUMENTS",
 		"ユーザーがスキル呼び出しとともに指定した内容があれば、作業選択の指定として扱う。",
 	);
 
-	return `---\nname: ${name}\ndescription: ${description}\n---\n${codexBody}`;
+	return `---\nname: ${outputName}\ndescription: ${description}\n---\n${codexBody}`;
 }
 
 function sandboxMode(sourcePath, tools) {

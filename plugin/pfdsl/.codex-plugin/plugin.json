@@ -1,0 +1,25 @@
+{
+  "name": "pfdsl",
+  "version": "0.0.25",
+  "description": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), and /pfd-cycle, /pfd-init, /pfd-retro commands.",
+  "author": {
+    "name": "takasek"
+  },
+  "homepage": "https://github.com/takasek/pfdsl",
+  "repository": "https://github.com/takasek/pfdsl",
+  "license": "MIT",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "pfdsl",
+    "shortDescription": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), and /pfd-cycle, /pfd-init, /pfd-retro commands.",
+    "longDescription": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), and /pfd-cycle, /pfd-init, /pfd-retro commands.",
+    "developerName": "takasek",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
+    "defaultPrompt": [
+      "Use pfd-ops to operate this project."
+    ]
+  }
+}

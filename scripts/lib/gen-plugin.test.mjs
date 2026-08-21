@@ -17,9 +17,11 @@ import {
 	findDistDependentFiles,
 } from "./check-script-imports.mjs";
 import {
+	assembleCodexAssets,
 	assemblePluginDistIndependent,
 	buildPluginDescription,
 	buildPluginManifest,
+	codexCommandSkillName,
 	mirrorDir,
 	mirrorFiles,
 	PLUGIN_AGENT_FILES,
@@ -349,6 +351,8 @@ describe("assemblePluginDistIndependent", () => {
 				mkdirSync: (path) => calls.push(["mkdirSync", path]),
 				writeBundleManifest: (bundleRoot) =>
 					calls.push(["writeBundleManifest", bundleRoot]),
+				assembleCodexAssets: (options) =>
+					calls.push(["assembleCodexAssets", options]),
 				...overrides,
 			},
 		};
@@ -463,6 +467,23 @@ describe("assemblePluginDistIndependent", () => {
 		);
 	});
 
+	it("assembles Codex assets after the Claude plugin output", () => {
+		const { calls, deps } = fakeDeps();
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+		const codex = calls.findIndex((call) => call[0] === "assembleCodexAssets");
+		const refs = calls.findIndex((call) => call[0] === "writeSkillRefs");
+		assert.ok(codex > refs);
+		assert.deepEqual(calls[codex][1], {
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+	});
+
 	it("records the bundle content hash last, after every other bundled file is final", () => {
 		const { calls, deps } = fakeDeps();
 		assemblePluginDistIndependent({
@@ -477,6 +498,133 @@ describe("assemblePluginDistIndependent", () => {
 			"writeBundleManifest",
 			"/repo/plugin/pfdsl",
 		]);
+	});
+});
+
+describe("assembleCodexAssets", () => {
+	it("keeps non-colliding command names and prefixes names that collide with distributed skills", () => {
+		assert.equal(codexCommandSkillName("pfd-cycle.md"), "pfd-cycle");
+		assert.equal(
+			codexCommandSkillName("pfd-retro.md"),
+			"source-command-pfd-retro",
+		);
+	});
+
+	function fakeCodexDeps(overrides = {}) {
+		const calls = [];
+		const skillSource =
+			"---\nname: skill\nsummary: generated skill\ndescription: |\n  generated skill\n---\nbody\n";
+		return {
+			calls,
+			deps: {
+				existsSync: () => false,
+				mkdirSync: (path) => calls.push(["mkdirSync", path]),
+				readFileSync: (path) => {
+					const normalized = String(path);
+					if (normalized.endsWith("CLAUDE.md")) return "Read CLAUDE.md.\n";
+					if (normalized.endsWith("settings.json"))
+						return JSON.stringify({ hooks: { PreToolUse: [] } });
+					if (normalized.endsWith("package.json"))
+						return JSON.stringify({ version: "1.2.3" });
+					if (normalized.endsWith(".md") && normalized.includes("commands"))
+						return "---\ndescription: generated command\n---\n\ncommand body\n";
+					if (normalized.endsWith(".md") && normalized.includes("agents"))
+						return "---\nname: generated\ndescription: generated agent\ntools: Read, Grep, Bash\nmodel: sonnet\n---\n\nRead CLAUDE.md.\n";
+					return skillSource;
+				},
+				renameSync: (from, to) => calls.push(["renameSync", from, to]),
+				rmSync: (path) => calls.push(["rmSync", path]),
+				writeFileSync: (path, content) =>
+					calls.push(["writeFileSync", path, content]),
+				...overrides,
+			},
+		};
+	}
+
+	it("stages and atomically publishes every Codex output", () => {
+		const { calls, deps } = fakeCodexDeps();
+		assembleCodexAssets({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+
+		const published = calls
+			.filter(([kind]) => kind === "renameSync")
+			.map(([, , to]) => to);
+		assert.deepEqual(
+			published.sort(),
+			[
+				"/repo/AGENTS.md",
+				"/repo/.agents/skills",
+				"/repo/.codex/agents",
+				"/repo/.codex/hooks.json",
+				"/repo/plugin/pfdsl/.codex-plugin/plugin.json",
+				"/repo/plugin/pfdsl/skills/pfd-cycle",
+				"/repo/plugin/pfdsl/skills/pfd-init",
+				"/repo/plugin/pfdsl/skills/source-command-pfd-retro",
+			].sort(),
+		);
+
+		const staged = calls.filter(([kind]) => kind === "writeFileSync");
+		assert.equal(
+			staged.some(([, path]) =>
+				path.includes(".agents/skills.codex-tmp/pfd-grill/SKILL.md"),
+			),
+			true,
+		);
+		assert.equal(
+			staged.some(([, path]) =>
+				path.includes(".agents/skills.codex-tmp/pfd-ops/SKILL.md"),
+			),
+			true,
+		);
+		assert.equal(
+			staged.some(([, path]) =>
+				path.includes(".codex/agents.codex-tmp/pfd-lens.toml"),
+			),
+			true,
+		);
+		assert.equal(
+			staged.some(([, path]) =>
+				path.includes(".codex/agents.codex-tmp/pfd-implementer.toml"),
+			),
+			true,
+		);
+		assert.equal(
+			staged.some(([, path]) =>
+				path.includes("skills/source-command-pfd-retro.codex-tmp/SKILL.md"),
+			),
+			true,
+		);
+
+		const [, , manifest] = staged.find(([, path]) =>
+			path.endsWith(".codex-plugin/plugin.json.codex-tmp"),
+		);
+		assert.equal(Object.hasOwn(JSON.parse(manifest), "hooks"), false);
+	});
+
+	it("leaves stale destinations untouched when staging a Codex output fails", () => {
+		const { calls, deps } = fakeCodexDeps({
+			writeFileSync: (path, content) => {
+				calls.push(["writeFileSync", path, content]);
+				if (String(path).includes("pfd-init")) throw new Error("write failed");
+			},
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/write failed/,
+		);
+		assert.deepEqual(
+			calls.filter(([kind]) => kind === "renameSync"),
+			[],
+		);
 	});
 });
 
