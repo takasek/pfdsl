@@ -2,7 +2,16 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { parseArgs, run, runCheck, runDiff, shouldColorize } from "./index.js";
+import {
+	COMMAND_GROUPS,
+	HELP,
+	parseArgs,
+	run,
+	runCheck,
+	runDiff,
+	shouldColorize,
+	TOP_LEVEL_COMMANDS,
+} from "./index.js";
 
 /** A stdin the CLI will read for a `-` argument, without touching fd 0. */
 const withStdin = (input: string) => ({ readStdin: () => input });
@@ -4819,5 +4828,59 @@ describe("review hardening", () => {
 		const r = await run(["fmt", f, "--mode", "flat"]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("removed");
+	});
+});
+
+// #902: the command table (COMMAND_GROUPS / TOP_LEVEL_COMMANDS) is the single
+// source both the dispatcher and every help listing are derived from, so a
+// command that dispatches but is missing from help (or vice versa) cannot
+// happen. These tests assert the two derived surfaces — the live dispatch
+// behavior and the live help text — agree with each other, not just with the
+// table (a table that no code path reads would pass a table-only check).
+describe("command table / help parity (#902)", () => {
+	/** Names introduced by a two-space-indented listing line, e.g. "  summary <file|-> ...". */
+	function namesInListing(text: string): string[] {
+		return [...text.matchAll(/^ {2}(\S+)/gm)].map((m) => m[1]!);
+	}
+
+	it.each(
+		COMMAND_GROUPS,
+	)("$name group: help's Subcommands list matches its dispatchable names", async (group) => {
+		const help = await run([group.name, "--help"]);
+		expect(help.exitCode).toBe(0);
+		const subcommandsSection = help.stdout
+			.split("Subcommands:\n")[1]!
+			.split("\n\nAll subcommands accept")[0]!;
+		const listed = namesInListing(subcommandsSection).sort();
+		const dispatchable = group.commands.map((c) => c.name).sort();
+		expect(listed).toEqual(dispatchable);
+	});
+
+	it.each(
+		COMMAND_GROUPS,
+	)("$name group: every listed subcommand's --help exits 0 with a matching usage line", async (group) => {
+		for (const cmd of group.commands) {
+			const r = await run([group.name, cmd.name, "--help"]);
+			expect(r.exitCode).toBe(0);
+			expect(r.stdout).toContain(`usage: pfdsl ${group.name} ${cmd.name}`);
+		}
+	});
+
+	it("top-level HELP Commands section names all dispatch with --help", async () => {
+		const commandsSection =
+			HELP.split("Commands:\n")[1]!.split("\n\nCommand groups")[0]!;
+		const names = namesInListing(commandsSection);
+		expect(names).toEqual(TOP_LEVEL_COMMANDS.map((c) => c.name));
+		for (const name of names) {
+			const r = await run([name, "--help"]);
+			expect(r.exitCode).toBe(0);
+		}
+	});
+
+	it.each(
+		TOP_LEVEL_COMMANDS,
+	)("$name: synopsis matches the first line of its own --help", (entry) => {
+		const firstLine = entry.help.split("\n")[0]!;
+		expect(firstLine).toBe(`usage: pfdsl ${entry.synopsis}`);
 	});
 });

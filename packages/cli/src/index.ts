@@ -3074,90 +3074,6 @@ function runExplain(code: string): CommandResult {
 	return ok(`${lines.join("\n")}\n`);
 }
 
-const HELP_GRAPH_GROUP = `usage: pfdsl graph <subcommand> ...
-
-Read-only queries on the graph topology. Run
-\`pfdsl graph <subcommand> --help\` for details on each.
-
-Subcommands:
-  summary <file|->            Print artifact/process/edge counts
-  io <file|->                 Print external inputs and terminal artifacts
-  stats <file|-> [--limit]    Rank nodes by primary degree, feedback degree apart
-  neighbors <file|-> <id>     Direct predecessors/successors of a node, feedback included
-  locate <file|-> <id>        Frontmatter declaration line and body edge lines of a node
-  describe <file|-> <id>      Kind, fields, neighbors, and locate lines of a node, in one call
-  impact <file|-> <id>        Full downstream closure of a node
-  depends-on <file|-> <id>    Full upstream closure of a node
-  path <file|-> <from> <to> [--limit]
-                              All simple paths between two nodes
-  edges <file|->              Canonical edge list
-  orphans <file|->            Nodes with neither predecessor nor successor
-
-All subcommands accept --json and --no-color.
-`;
-
-const HELP_META_GROUP = `usage: pfdsl meta <subcommand> ...
-
-Read and write frontmatter metadata. Run
-\`pfdsl meta <subcommand> --help\` for details on each.
-
-Subcommands:
-  get <file|-> <id[,id...]> [field[,field...]]   Print field values
-  list <file|-> [--tag|--group|--producer] [field[,field...]]
-                                                  Print field values for nodes matching selectors
-  values <file|-> <field[,field...]>             Print a field's values in use, with counts
-  set <file> <id> <field> <value>                Set a field value in place
-  sort <file|-> --by <keys>                      Sort node definitions
-  reindex <file|->                               Assign topological index: values
-  check-links <file>                             Verify location: file paths exist
-
-All subcommands accept --json and --no-color.
-`;
-
-const HELP_STATUS_GROUP = `usage: pfdsl status <subcommand> ...
-
-Planning queries derived from artifact status. Run
-\`pfdsl status <subcommand> --help\` for details on each.
-
-Subcommands:
-  ready <file|-> [--best]           List ready-to-start processes
-  blocked <file|->                  List not-ready processes and their blocking inputs
-  list <file|-> --status <s[,s...]> List artifacts by status
-  gaps <roadmap> <flow> [<flow>...] Find todo artifacts missing from the roadmap
-
-All subcommands accept --json and --no-color.
-`;
-
-export const HELP = `pfdsl <command> [options]
-
-Commands:
-  check <file|-> [--strict] [--hints] [--json] [--no-color]
-                           Validate a .pfdsl file (- = stdin)
-  explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
-  fmt <file|-> [--write] [--check] [--no-color]
-                           Format a .pfdsl file (- = stdin)
-  render <file|-> [--format dot|svg|pdf|png] [--no-color]
-                           Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
-                           PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)
-  diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
-                           Structural diff (text), or visual diff DOT/SVG
-
-Command groups (run \`pfdsl <group>\` for their subcommands):
-  graph summary|io|stats|neighbors|locate|describe|impact|depends-on|path|edges|orphans
-                           Read-only queries on the graph topology
-  meta get|list|values|set|sort|reindex|check-links
-                           Read and write frontmatter metadata
-  status ready|blocked|list|gaps
-                           Planning queries derived from artifact status
-
-  help                     Show this help
-
-Exit codes:
-  0  success (warnings are non-fatal)
-  1  error (parse/validation error, or file cannot be read)
-  2  invalid usage (missing argument, unknown flag or subcommand)
-`;
-
 export interface CliArgs {
 	command: string;
 	positional: string[];
@@ -3214,103 +3130,109 @@ function resolveColor(flags: Record<string, string | boolean>): boolean {
 	});
 }
 
-function runGraphGroup(
-	positional: string[],
-	flags: Record<string, string | boolean>,
-): CommandResult {
-	const [sub, ...rest] = positional;
-	if (!sub)
-		return flags.help ? ok(HELP_GRAPH_GROUP) : fail(HELP_GRAPH_GROUP, 2);
-	switch (sub) {
-		case "summary": {
-			if (flags.help) return ok(HELP_GRAPH_SUMMARY);
+/**
+ * One dispatchable command: `run` is the handler itself (a function
+ * reference, not a string key — issue #902 rejected a JSON command table
+ * because a string-keyed handler lookup falls outside tsgo's reach), `help`
+ * is its full --help text (one of the hand-written HELP_* constants above,
+ * referenced here rather than rebuilt), and `synopsis`/`description` are the
+ * pieces a listing renders it with.
+ */
+interface CommandEntry {
+	name: string;
+	synopsis: string;
+	description: readonly string[];
+	help: string;
+	run: (
+		positional: string[],
+		flags: Record<string, string | boolean>,
+	) => CommandResult | Promise<CommandResult>;
+}
+
+/** A `pfdsl <name> <subcommand> ...` group: dispatch table plus the pieces its own group help is built from. */
+interface GroupDefinition {
+	name: string;
+	description: string;
+	columnWidth: number;
+	commands: readonly CommandEntry[];
+}
+
+/**
+ * Renders one listing line (or, when the synopsis is at least as wide as
+ * columnWidth, the synopsis on its own line followed by the description
+ * lines indented under it). Shared by every group's "Subcommands:" section
+ * and the top-level HELP's "Commands:"/"Command groups:" sections, so a name
+ * that dispatches always has exactly one place it can go missing from: the
+ * table itself.
+ */
+function renderListingEntry(
+	synopsis: string,
+	description: readonly string[],
+	columnWidth: number,
+): string {
+	const indent = " ".repeat(2 + columnWidth);
+	const [first = "", ...rest] = description;
+	const lines =
+		synopsis.length < columnWidth
+			? [`  ${synopsis.padEnd(columnWidth)}${first}`]
+			: [`  ${synopsis}`, `${indent}${first}`];
+	for (const line of rest) lines.push(`${indent}${line}`);
+	return lines.join("\n");
+}
+
+function renderGroupHelp(group: GroupDefinition): string {
+	const entries = group.commands
+		.map((c) =>
+			renderListingEntry(c.synopsis, c.description, group.columnWidth),
+		)
+		.join("\n");
+	return `usage: pfdsl ${group.name} <subcommand> ...
+
+${group.description}. Run
+\`pfdsl ${group.name} <subcommand> --help\` for details on each.
+
+Subcommands:
+${entries}
+
+All subcommands accept --json and --no-color.
+`;
+}
+
+const GRAPH_COMMANDS: readonly CommandEntry[] = [
+	{
+		name: "summary",
+		synopsis: "summary <file|->",
+		description: ["Print artifact/process/edge counts"],
+		help: HELP_GRAPH_SUMMARY,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_SUMMARY, 2);
 			return runGraphSummary(f, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "io": {
-			if (flags.help) return ok(HELP_GRAPH_IO);
+		},
+	},
+	{
+		name: "io",
+		synopsis: "io <file|->",
+		description: ["Print external inputs and terminal artifacts"],
+		help: HELP_GRAPH_IO,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_IO, 2);
 			return runGraphIo(f, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "edges": {
-			if (flags.help) return ok(HELP_GRAPH_EDGES);
-			const f = rest[0];
-			if (!f) return fail(HELP_GRAPH_EDGES, 2);
-			return runGraphEdges(f, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "neighbors": {
-			if (flags.help) return ok(HELP_NEIGHBORS);
-			const [f, id] = rest;
-			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
-			return runNeighbors(f, id, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "locate": {
-			if (flags.help) return ok(HELP_GRAPH_LOCATE);
-			const [f, id] = rest;
-			if (!f || !id) return fail(HELP_GRAPH_LOCATE, 2);
-			const fieldVal = flags.field;
-			if (fieldVal === true) return fail(HELP_GRAPH_LOCATE, 2);
-			return runGraphLocate(f, id, {
-				...(typeof fieldVal === "string" ? { field: fieldVal } : {}),
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "describe": {
-			if (flags.help) return ok(HELP_GRAPH_DESCRIBE);
-			const [f, id] = rest;
-			if (!f || !id) return fail(HELP_GRAPH_DESCRIBE, 2);
-			return runGraphDescribe(f, id, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "impact": {
-			if (flags.help) return ok(HELP_IMPACT);
-			const [f, id] = rest;
-			if (!f || !id) return fail(HELP_IMPACT, 2);
-			return runImpact(f, id, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "depends-on": {
-			if (flags.help) return ok(HELP_DEPENDS_ON);
-			const [f, id] = rest;
-			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
-			return runDependsOn(f, id, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "path": {
-			if (flags.help) return ok(HELP_PATH);
-			const [f, from, to] = rest;
-			if (!f || !from || !to) return fail(HELP_PATH, 2);
-			const limit = parseLimitFlag(flags, HELP_PATH);
-			if (limit !== undefined && typeof limit !== "number") return limit;
-			return runPath(f, from, to, {
-				...(limit !== undefined ? { limit } : {}),
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "stats": {
-			if (flags.help) return ok(HELP_STATS);
+		},
+	},
+	{
+		name: "stats",
+		synopsis: "stats <file|-> [--limit]",
+		description: ["Rank nodes by primary degree, feedback degree apart"],
+		help: HELP_STATS,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_STATS, 2);
 			const limit = parseLimitFlag(flags, HELP_STATS);
@@ -3320,30 +3242,139 @@ function runGraphGroup(
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "orphans": {
-			if (flags.help) return ok(HELP_GRAPH_ORPHANS);
+		},
+	},
+	{
+		name: "neighbors",
+		synopsis: "neighbors <file|-> <id>",
+		description: [
+			"Direct predecessors/successors of a node, feedback included",
+		],
+		help: HELP_NEIGHBORS,
+		run: (rest, flags) => {
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
+			return runNeighbors(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "locate",
+		synopsis: "locate <file|-> <id>",
+		description: ["Frontmatter declaration line and body edge lines of a node"],
+		help: HELP_GRAPH_LOCATE,
+		run: (rest, flags) => {
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_GRAPH_LOCATE, 2);
+			const fieldVal = flags.field;
+			if (fieldVal === true) return fail(HELP_GRAPH_LOCATE, 2);
+			return runGraphLocate(f, id, {
+				...(typeof fieldVal === "string" ? { field: fieldVal } : {}),
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "describe",
+		synopsis: "describe <file|-> <id>",
+		description: [
+			"Kind, fields, neighbors, and locate lines of a node, in one call",
+		],
+		help: HELP_GRAPH_DESCRIBE,
+		run: (rest, flags) => {
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_GRAPH_DESCRIBE, 2);
+			return runGraphDescribe(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "impact",
+		synopsis: "impact <file|-> <id>",
+		description: ["Full downstream closure of a node"],
+		help: HELP_IMPACT,
+		run: (rest, flags) => {
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_IMPACT, 2);
+			return runImpact(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "depends-on",
+		synopsis: "depends-on <file|-> <id>",
+		description: ["Full upstream closure of a node"],
+		help: HELP_DEPENDS_ON,
+		run: (rest, flags) => {
+			const [f, id] = rest;
+			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
+			return runDependsOn(f, id, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "path",
+		synopsis: "path <file|-> <from> <to> [--limit]",
+		description: ["All simple paths between two nodes"],
+		help: HELP_PATH,
+		run: (rest, flags) => {
+			const [f, from, to] = rest;
+			if (!f || !from || !to) return fail(HELP_PATH, 2);
+			const limit = parseLimitFlag(flags, HELP_PATH);
+			if (limit !== undefined && typeof limit !== "number") return limit;
+			return runPath(f, from, to, {
+				...(limit !== undefined ? { limit } : {}),
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "edges",
+		synopsis: "edges <file|->",
+		description: ["Canonical edge list"],
+		help: HELP_GRAPH_EDGES,
+		run: (rest, flags) => {
+			const f = rest[0];
+			if (!f) return fail(HELP_GRAPH_EDGES, 2);
+			return runGraphEdges(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "orphans",
+		synopsis: "orphans <file|->",
+		description: ["Nodes with neither predecessor nor successor"],
+		help: HELP_GRAPH_ORPHANS,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_ORPHANS, 2);
 			return runGraphOrphans(f, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		default:
-			return fail(`unknown graph subcommand: ${sub}\n${HELP_GRAPH_GROUP}`, 2);
-	}
-}
+		},
+	},
+];
 
-function runMetaGroup(
-	positional: string[],
-	flags: Record<string, string | boolean>,
-): CommandResult {
-	const [sub, ...rest] = positional;
-	if (!sub) return flags.help ? ok(HELP_META_GROUP) : fail(HELP_META_GROUP, 2);
-	switch (sub) {
-		case "get": {
-			if (flags.help) return ok(HELP_GET);
+const META_COMMANDS: readonly CommandEntry[] = [
+	{
+		name: "get",
+		synopsis: "get <file|-> <id[,id...]> [field[,field...]]",
+		description: ["Print field values"],
+		help: HELP_GET,
+		run: (rest, flags) => {
 			const [f, id, field, ...extra] = rest;
 			if (!f || !id) return fail(HELP_GET, 2);
 			if (extra.length > 0) return fail(HELP_GET, 2);
@@ -3353,59 +3384,14 @@ function runMetaGroup(
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "set": {
-			if (flags.help) return ok(HELP_META_SET);
-			const [f, id, field, value, ...extra] = rest;
-			if (!f || !id || !field || value === undefined)
-				return fail(HELP_META_SET, 2);
-			if (extra.length > 0) {
-				return fail(
-					`meta set: too many arguments — quote values containing spaces (got: ${[value, ...extra].join(" ")})\n`,
-					2,
-				);
-			}
-			return runMetaSet(f, id, field, value, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "sort": {
-			if (flags.help) return ok(HELP_SORT);
-			const f = rest[0];
-			if (!f) return fail(HELP_SORT, 2);
-			const byVal = flags.by;
-			if (!byVal || byVal === true) return fail(HELP_SORT, 2);
-			return runSort(f, {
-				by: String(byVal),
-				write: flags.write === true,
-				check: flags.check === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "reindex": {
-			if (flags.help) return ok(HELP_REINDEX);
-			const f = rest[0];
-			if (!f) return fail(HELP_REINDEX, 2);
-			return runReindex(f, {
-				write: flags.write === true,
-				check: flags.check === true,
-				renumber: flags.renumber === true,
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "check-links": {
-			if (flags.help) return ok(HELP_CHECK_LINKS);
-			const f = rest[0];
-			if (!f) return fail(HELP_CHECK_LINKS, 2);
-			return runCheckLinks(f, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "list": {
-			if (flags.help) return ok(HELP_META_LIST);
+		},
+	},
+	{
+		name: "list",
+		synopsis: "list <file|-> [--tag|--group|--producer] [field[,field...]]",
+		description: ["Print field values for nodes matching selectors"],
+		help: HELP_META_LIST,
+		run: (rest, flags) => {
 			const [f, field, ...extra] = rest;
 			if (!f) return fail(HELP_META_LIST, 2);
 			if (extra.length > 0) return fail(HELP_META_LIST, 2);
@@ -3423,9 +3409,14 @@ function runMetaGroup(
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "values": {
-			if (flags.help) return ok(HELP_META_VALUES);
+		},
+	},
+	{
+		name: "values",
+		synopsis: "values <file|-> <field[,field...]>",
+		description: ["Print a field's values in use, with counts"],
+		help: HELP_META_VALUES,
+		run: (rest, flags) => {
 			const [f, field, ...extra] = rest;
 			if (!f || field === undefined) return fail(HELP_META_VALUES, 2);
 			if (extra.length > 0) return fail(HELP_META_VALUES, 2);
@@ -3433,22 +3424,87 @@ function runMetaGroup(
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		default:
-			return fail(`unknown meta subcommand: ${sub}\n${HELP_META_GROUP}`, 2);
-	}
-}
+		},
+	},
+	{
+		name: "set",
+		synopsis: "set <file> <id> <field> <value>",
+		description: ["Set a field value in place"],
+		help: HELP_META_SET,
+		run: (rest, flags) => {
+			const [f, id, field, value, ...extra] = rest;
+			if (!f || !id || !field || value === undefined)
+				return fail(HELP_META_SET, 2);
+			if (extra.length > 0) {
+				return fail(
+					`meta set: too many arguments — quote values containing spaces (got: ${[value, ...extra].join(" ")})\n`,
+					2,
+				);
+			}
+			return runMetaSet(f, id, field, value, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "sort",
+		synopsis: "sort <file|-> --by <keys>",
+		description: ["Sort node definitions"],
+		help: HELP_SORT,
+		run: (rest, flags) => {
+			const f = rest[0];
+			if (!f) return fail(HELP_SORT, 2);
+			const byVal = flags.by;
+			if (!byVal || byVal === true) return fail(HELP_SORT, 2);
+			return runSort(f, {
+				by: String(byVal),
+				write: flags.write === true,
+				check: flags.check === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "reindex",
+		synopsis: "reindex <file|->",
+		description: ["Assign topological index: values"],
+		help: HELP_REINDEX,
+		run: (rest, flags) => {
+			const f = rest[0];
+			if (!f) return fail(HELP_REINDEX, 2);
+			return runReindex(f, {
+				write: flags.write === true,
+				check: flags.check === true,
+				renumber: flags.renumber === true,
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "check-links",
+		synopsis: "check-links <file>",
+		description: ["Verify location: file paths exist"],
+		help: HELP_CHECK_LINKS,
+		run: (rest, flags) => {
+			const f = rest[0];
+			if (!f) return fail(HELP_CHECK_LINKS, 2);
+			return runCheckLinks(f, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+];
 
-function runStatusGroup(
-	positional: string[],
-	flags: Record<string, string | boolean>,
-): CommandResult {
-	const [sub, ...rest] = positional;
-	if (!sub)
-		return flags.help ? ok(HELP_STATUS_GROUP) : fail(HELP_STATUS_GROUP, 2);
-	switch (sub) {
-		case "ready": {
-			if (flags.help) return ok(HELP_READY);
+const STATUS_COMMANDS: readonly CommandEntry[] = [
+	{
+		name: "ready",
+		synopsis: "ready <file|-> [--best]",
+		description: ["List ready-to-start processes"],
+		help: HELP_READY,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_READY, 2);
 			return runReady(f, {
@@ -3456,28 +3512,28 @@ function runStatusGroup(
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "gaps": {
-			if (flags.help) return ok(HELP_STATUS_GAPS);
-			const [roadmapFile, ...flowFiles] = rest;
-			if (!roadmapFile || flowFiles.length === 0)
-				return fail(HELP_STATUS_GAPS, 2);
-			return runStatusGaps(roadmapFile, flowFiles, {
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "blocked": {
-			if (flags.help) return ok(HELP_STATUS_BLOCKED);
+		},
+	},
+	{
+		name: "blocked",
+		synopsis: "blocked <file|->",
+		description: ["List not-ready processes and their blocking inputs"],
+		help: HELP_STATUS_BLOCKED,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_STATUS_BLOCKED, 2);
 			return runStatusBlocked(f, {
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		case "list": {
-			if (flags.help) return ok(HELP_STATUS_LIST);
+		},
+	},
+	{
+		name: "list",
+		synopsis: "list <file|-> --status <s[,s...]>",
+		description: ["List artifacts by status"],
+		help: HELP_STATUS_LIST,
+		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_STATUS_LIST, 2);
 			const statusVal = flags.status;
@@ -3487,10 +3543,213 @@ function runStatusGroup(
 				json: flags.json === true,
 				color: resolveColor(flags),
 			});
-		}
-		default:
-			return fail(`unknown status subcommand: ${sub}\n${HELP_STATUS_GROUP}`, 2);
-	}
+		},
+	},
+	{
+		name: "gaps",
+		synopsis: "gaps <roadmap> <flow> [<flow>...]",
+		description: ["Find todo artifacts missing from the roadmap"],
+		help: HELP_STATUS_GAPS,
+		run: (rest, flags) => {
+			const [roadmapFile, ...flowFiles] = rest;
+			if (!roadmapFile || flowFiles.length === 0)
+				return fail(HELP_STATUS_GAPS, 2);
+			return runStatusGaps(roadmapFile, flowFiles, {
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+];
+
+/**
+ * The command-group dispatch surface (#902): `graph`/`meta`/`status`. Both
+ * `dispatch`'s three group cases and every group's own `--help` text are
+ * derived from this — a subcommand added to a group's `commands` here
+ * dispatches and is listed by construction, so the two cannot drift apart.
+ */
+export const COMMAND_GROUPS: readonly GroupDefinition[] = [
+	{
+		name: "graph",
+		description: "Read-only queries on the graph topology",
+		columnWidth: 28,
+		commands: GRAPH_COMMANDS,
+	},
+	{
+		name: "meta",
+		description: "Read and write frontmatter metadata",
+		columnWidth: 48,
+		commands: META_COMMANDS,
+	},
+	{
+		name: "status",
+		description: "Planning queries derived from artifact status",
+		columnWidth: 34,
+		commands: STATUS_COMMANDS,
+	},
+];
+
+/**
+ * The top-level command dispatch surface (#902), excluding `--version`/`-V`/
+ * `help`/`--help`/`-h` (not commands, handled directly in `dispatch`) and the
+ * three command groups above (their own table). `HELP`'s Commands section is
+ * rendered from this, same reasoning as `COMMAND_GROUPS`.
+ */
+export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
+	{
+		name: "check",
+		synopsis: "check <file|-> [--strict] [--hints] [--json] [--no-color]",
+		description: ["Validate a .pfdsl file (- = stdin)"],
+		help: HELP_CHECK,
+		run: (positional, flags) => {
+			const f = positional[0];
+			if (!f) return fail(HELP_CHECK, 2);
+			return runCheck(f, {
+				hints: flags.hints === true,
+				strict: flags.strict === true,
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "explain",
+		synopsis: "explain <code>",
+		description: [
+			"Print the summary and spec section for a diagnostic code (e.g. V021)",
+		],
+		help: HELP_EXPLAIN,
+		run: (positional) => {
+			const code = positional[0];
+			if (!code) return fail(HELP_EXPLAIN, 2);
+			return runExplain(code);
+		},
+	},
+	{
+		name: "fmt",
+		synopsis: "fmt <file|-> [--write] [--check] [--no-color]",
+		description: ["Format a .pfdsl file (- = stdin)"],
+		help: HELP_FMT,
+		run: (positional, flags) => {
+			const f = positional[0];
+			if (!f) return fail(HELP_FMT, 2);
+			if (flags.mode !== undefined) {
+				return fail(
+					"fmt: --mode was removed; fmt always formats in flows style\n",
+					2,
+				);
+			}
+			return runFmt(f, {
+				write: flags.write === true,
+				check: flags.check === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "render",
+		synopsis: "render <file|-> [--format dot|svg|pdf|png] [--no-color]",
+		description: [
+			"Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)",
+			"PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)",
+		],
+		help: HELP_RENDER,
+		run: (positional, flags) => {
+			const f = positional[0];
+			if (!f) return fail(HELP_RENDER, 2);
+			const fmt = flags.format;
+			if (
+				fmt !== undefined &&
+				fmt !== "dot" &&
+				fmt !== "svg" &&
+				fmt !== "pdf" &&
+				fmt !== "png"
+			) {
+				return fail(`unknown format: ${String(fmt)}\n`, 2);
+			}
+			return runRender(f, {
+				...(fmt ? { format: fmt as CliRenderFormat } : {}),
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "diff",
+		synopsis: "diff <a> <b> [--format text|dot|svg] [--json] [--no-color]",
+		description: ["Structural diff (text), or visual diff DOT/SVG"],
+		help: HELP_DIFF,
+		run: async (positional, flags) => {
+			const [a, b] = positional;
+			if (!a || !b) return fail(HELP_DIFF, 2);
+			const fmt = flags.format;
+			if (
+				fmt !== undefined &&
+				fmt !== "text" &&
+				fmt !== "dot" &&
+				fmt !== "svg"
+			) {
+				return fail(`unknown format: ${String(fmt)}\n`, 2);
+			}
+			return await runDiff(a, b, {
+				...(fmt ? { format: fmt } : {}),
+				json: flags.json === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+];
+
+export const HELP = (() => {
+	const topLevelEntries = TOP_LEVEL_COMMANDS.map((c) =>
+		renderListingEntry(c.synopsis, c.description, 25),
+	).join("\n");
+	const groupEntries = COMMAND_GROUPS.map((g) =>
+		renderListingEntry(
+			`${g.name} ${g.commands.map((c) => c.name).join("|")}`,
+			[g.description],
+			25,
+		),
+	).join("\n");
+	const helpEntry = renderListingEntry("help", ["Show this help"], 25);
+	return `pfdsl <command> [options]
+
+Commands:
+${topLevelEntries}
+
+Command groups (run \`pfdsl <group>\` for their subcommands):
+${groupEntries}
+
+${helpEntry}
+
+Exit codes:
+  0  success (warnings are non-fatal)
+  1  error (parse/validation error, or file cannot be read)
+  2  invalid usage (missing argument, unknown flag or subcommand)
+`;
+})();
+
+/**
+ * Dispatches `positional`/`flags` within one group: no subcommand falls back
+ * to the group's own help (ok on `--help`, usage-error fail otherwise), an
+ * unrecognized subcommand fails with the group help appended, and `--help`
+ * on a recognized subcommand short-circuits to its own help text before
+ * `run` sees the call (every case's own `if (flags.help) ...` used to sit at
+ * the top of its switch case, ahead of argument validation, so lifting it
+ * here changes nothing observable).
+ */
+async function runGroup(
+	group: GroupDefinition,
+	positional: string[],
+	flags: Record<string, string | boolean>,
+): Promise<CommandResult> {
+	const [sub, ...rest] = positional;
+	const groupHelp = renderGroupHelp(group);
+	if (!sub) return flags.help ? ok(groupHelp) : fail(groupHelp, 2);
+	const entry = group.commands.find((c) => c.name === sub);
+	if (!entry)
+		return fail(`unknown ${group.name} subcommand: ${sub}\n${groupHelp}`, 2);
+	if (flags.help) return ok(entry.help);
+	return await entry.run(rest, flags);
 }
 
 /**
@@ -3522,83 +3781,16 @@ async function dispatch(argv: readonly string[]): Promise<CommandResult> {
 		case "-h":
 			return ok(HELP);
 		case "graph":
-			return runGraphGroup(positional, flags);
 		case "meta":
-			return runMetaGroup(positional, flags);
-		case "status":
-			return runStatusGroup(positional, flags);
-		case "check": {
-			if (flags.help) return ok(HELP_CHECK);
-			const f = positional[0];
-			if (!f) return fail(HELP_CHECK, 2);
-			return runCheck(f, {
-				hints: flags.hints === true,
-				strict: flags.strict === true,
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
+		case "status": {
+			const group = COMMAND_GROUPS.find((g) => g.name === command)!;
+			return runGroup(group, positional, flags);
 		}
-		case "fmt": {
-			if (flags.help) return ok(HELP_FMT);
-			const f = positional[0];
-			if (!f) return fail(HELP_FMT, 2);
-			if (flags.mode !== undefined) {
-				return fail(
-					"fmt: --mode was removed; fmt always formats in flows style\n",
-					2,
-				);
-			}
-			return runFmt(f, {
-				write: flags.write === true,
-				check: flags.check === true,
-				color: resolveColor(flags),
-			});
+		default: {
+			const entry = TOP_LEVEL_COMMANDS.find((c) => c.name === command);
+			if (!entry) return fail(`unknown command: ${command}\n${HELP}`, 2);
+			if (flags.help) return ok(entry.help);
+			return await entry.run(positional, flags);
 		}
-		case "render": {
-			if (flags.help) return ok(HELP_RENDER);
-			const f = positional[0];
-			if (!f) return fail(HELP_RENDER, 2);
-			const fmt = flags.format;
-			if (
-				fmt !== undefined &&
-				fmt !== "dot" &&
-				fmt !== "svg" &&
-				fmt !== "pdf" &&
-				fmt !== "png"
-			) {
-				return fail(`unknown format: ${String(fmt)}\n`, 2);
-			}
-			return runRender(f, {
-				...(fmt ? { format: fmt as CliRenderFormat } : {}),
-				color: resolveColor(flags),
-			});
-		}
-		case "diff": {
-			if (flags.help) return ok(HELP_DIFF);
-			const [a, b] = positional;
-			if (!a || !b) return fail(HELP_DIFF, 2);
-			const fmt = flags.format;
-			if (
-				fmt !== undefined &&
-				fmt !== "text" &&
-				fmt !== "dot" &&
-				fmt !== "svg"
-			) {
-				return fail(`unknown format: ${String(fmt)}\n`, 2);
-			}
-			return await runDiff(a, b, {
-				...(fmt ? { format: fmt } : {}),
-				json: flags.json === true,
-				color: resolveColor(flags),
-			});
-		}
-		case "explain": {
-			if (flags.help) return ok(HELP_EXPLAIN);
-			const code = positional[0];
-			if (!code) return fail(HELP_EXPLAIN, 2);
-			return runExplain(code);
-		}
-		default:
-			return fail(`unknown command: ${command}\n${HELP}`, 2);
 	}
 }
