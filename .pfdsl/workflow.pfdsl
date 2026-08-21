@@ -298,7 +298,7 @@ artifact:
     group: release
   readme:
     label: README
-    description: "外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照リンクを含むが、リンク先パスは安定しており sample_previews の内容更新では変化しない — 追従更新が要るのは CLI 公開形態・ライブラリ公開形態の変更時のみ。extension 公開（published_ext）は update_readme をトリガーしない — README は marketplace リンクのみで版数を記載しないため。CLI コマンドリファレンス（## CLI 節）は `make gen-readme-cli` が `pfdsl help` 出力から自動生成し、`make check-readme-cli` が pre-commit と CI（test.yml）でドリフトを機械検査するため update_readme の手動対象外。同じ生成器とゲートが `packages/cli/README.md`（npm パッケージページ。toolchain 側の成果物）のコマンド表も書くため、CLI コマンドの追加・変更で手を入れる先は両 README とも HELP テキストのみ（#850）"
+    description: "外部利用者向けの導入文書。CLI のインストール手順・Library 節のインストール例・サンプル描画物への参照リンクを含むが、リンク先パスは安定しており sample_previews の内容更新では変化しない — 追従更新が要るのは CLI 公開形態・ライブラリ公開形態の変更時のみ。extension 公開（published_ext）は update_readme をトリガーしない — README は marketplace リンクのみで版数を記載しないため。CLI コマンドリファレンス（## CLI 節）は `make gen-readme-cli` が `pfdsl help` 出力から自動生成し、`make check-readme-cli` が pre-commit と CI（test.yml）でドリフトを機械検査するため update_readme の手動対象外。同じ生成器とゲートが `packages/cli/README.md`（npm パッケージページ。toolchain 側の成果物）のコマンド表も書くため、CLI コマンドの追加・変更で手を入れる先は両 README とも packages/cli/src/index.ts のコマンド定義テーブルのみ（#850・#902）。help 本文自体もそのテーブルから生成されるため、dispatcher に載って help に載らないコマンドは表現できない"
     criteria: make check-readme-cli が差分なしで通過し、Library 節の pnpm add 例が published_libraries の全パッケージを名指す
     location: ../README.md
     group: release
