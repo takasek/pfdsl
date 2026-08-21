@@ -83,6 +83,19 @@ export function buildGates({ stagedPresent }) {
 			]),
 			hint: `${file} is not canonically formatted. Run 'make fmt-pfdsl' and re-stage.`,
 		})),
+		// Same per-file shape, same scope: a location: that no longer resolves is
+		// a property only the operational graphs have. docs/ samples and the core
+		// fixtures carry illustrative paths on purpose, so resolving is not
+		// something they are supposed to do (#937).
+		...pfdslFiles.map((file) => ({
+			id: `pfdsl-links:${file}`,
+			trigger: OPS_PFDSL,
+			requireDist: [CLI_DIST],
+			commands: /** @type {[string, string[]][]} */ ([
+				["node", [CLI_DIST, "meta", "check-links", file]],
+			]),
+			hint: `${file} has a location: that does not resolve. Run 'node ${CLI_DIST} meta check-links ${file}' to see which node, then fix the path or restore the file.`,
+		})),
 		// Built only when there are paths to pass: check-md-linebreaks.mjs falls
 		// back to every tracked .md when called with none, so an empty argument
 		// list would quietly turn this into a repo-wide check.

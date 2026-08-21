@@ -329,6 +329,12 @@ artifact:
     criteria: check-companion-bindings と audit-issues-flow.mjs が差分なしで通過する。散文が名指す roadmap.pfdsl のノード・エッジを graph describe で引いて食い違いがない
     location: roadmap.md
     group: planning
+  workflow_pfdsl:
+    label: ワークフロー図
+    description: "この図そのもの。対話から公開までのサイクル全体を変換グラフとして持つ。roadmap_pfdsl（issue 依存）・runtime_pipeline_pfdsl（変換境界）と並ぶ3つ目の運用 PFD で、3つとも専用の整理プロセスが生産する。自分の companion（workflow_md）だけが artifact で図が無い状態を解消した（#904）"
+    criteria: check がエラーなし、meta check-links が通過する。workflow_md が名指すノード・エッジを graph describe で引いて食い違いがない
+    location: workflow.pfdsl
+    group: planning
   runtime_pipeline_pfdsl:
     label: 変換パイプライン図
     description: "pfdslツールチェーンの実行時データ変換境界（source→AST→正規化グラフ→check/fmt/graph/metadata 出力）。toolchain の変換コンポーネント追加・変更・削除時に更新（ADR-0018 門番）"
@@ -399,6 +405,10 @@ process:
     label: 依存整理
     description: "issue 間の依存を PFD 化し着手順を導出する。issue との同期は scripts/pfdsl/audit-issues-flow.mjs で機械監査（flow:managed ラベル・updated_at・priority 突合）。issue close 時は GitHub Action（pfdsl-flow-on-issue-close）が --fix した flow-sync PR を自動起票し、人がレビューして merge する。COMPLETED close は closed_in_flow（終端削除 or done 降格）、NOT_PLANNED close は closed_not_planned（終端は自動削除、下流ありは手動対応 finding）として区別する"
     command: node scripts/pfdsl/audit-issues-flow.mjs
+  map_workflow:
+    label: ワークフロー整理
+    description: "開発サイクルの営み（対話・整備・実践・実装・公開）を PFD 化する。roadmap_pfdsl を map_deps が、runtime_pipeline_pfdsl を map_transform_boundaries が担うのと同じ位置づけで、この図自身の維持を担う。方法論判断と ADR が改訂を駆動する"
+    group: planning
   map_transform_boundaries:
     label: 変換境界整理
     description: "toolchain の実装（parse/normalize/validate/format/render/export 等）から実行時データ変換の境界を PFD 化する。変換コンポーネントの追加・変更・削除時に手動更新（ADR-0018 門番、pfd-ops プロトコル5）"
@@ -509,6 +519,8 @@ gh_issues >> map_deps -> [roadmap_md, roadmap_pfdsl]
 
 toolchain >> map_transform_boundaries -> [runtime_pipeline_md, runtime_pipeline_pfdsl]
 
+[adrs, decisions] >> map_workflow -> workflow_pfdsl
+
 [gh_issues, roadmap_pfdsl, spec] >> develop -> pull_request
 
 pull_request >> merge_pr -> [issue_updates, pr_diagrams, toolchain]
@@ -519,8 +531,10 @@ ops_skill_general >>? develop
 ops_skill_l3 >>? develop
 roadmap_md >>? develop
 runtime_pipeline_pfdsl >>? develop
+
 toolchain >>? develop
 vscode_ext_debug_skill >>? develop
+workflow_pfdsl >>? develop
 
 delegation_guard >>? develop
 implementer_agent >>? develop

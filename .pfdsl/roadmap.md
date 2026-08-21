@@ -101,11 +101,10 @@ Review: tool=simplify
 Review: tool=correctness
 ```
 
-`tool` の値は `simplify` / `correctness` / `design` / `experience` / `code-review` / `code-reviewer-agent` の6つ。
-6つ以外の値、または `tool=` を欠く行は malformed として FAIL する。
-ゲートを充足するのはこのうち `code-review` を除く5値 — `code-review` は有効な trailer 値として記録は残せるが、ゲート充足には数えない。
-コード変更のある回はさらに `correctness` または `design` の記録を最低1本要する。
-`design` は観点2 の要件を包含するため、`correctness` の代替になる。
+許容値と、そのうちゲート充足に数える部分集合は `scripts/lib/review-record.mjs` の `REVIEW_TOOLS` / `GATE_TOOLS` が一次情報。
+値を覚える必要はない — `cycle-status.mjs` が `reviewRecordTemplate` として毎サイクル印字する。
+許容値の外にある値、または `tool=` を欠く行は malformed として FAIL する。
+`design` は観点2 の要件を包含するため、コード変更のある回に要る `correctness` の代替になる。
 diff の規模に合わせて委譲せず自分で読んだだけの回は `Review:` 行を書かない。
 **レビューはコミットの前に回す。** trailer は commit message の一部であり、後から追記できない。
 終端ゲートで気付いた時点で push 済みなら、trailer の追加は履歴の作り直しになる。

@@ -245,6 +245,14 @@ artifact:
     location: ../docs/samples/
     group: repo_generated
     tags: [ gen ]
+  readme_cli_blocks:
+    label: README の CLI 生成ブロック
+    description: "gen_readme_cli が書く2つの sentinel ブロック — root README.md の `## CLI` と packages/cli/README.md のコマンド表。artifact はブロックであってファイル全体ではない（囲みの外は別の生産者が書く）。2つのブロックを1つの artifact にまとめてあるのは、生成器もドリフトゲートも1つで、片方だけ再生成する経路が無いため"
+    criteria: make check-readme-cli が差分なしで通過する
+    externalStakeholders: [ GitHub 閲覧者, npm パッケージページ閲覧者 ]
+    location: [ ../README.md, ../packages/cli/README.md ]
+    group: repo_generated
+    tags: [ gen ]
   vsix_package:
     label: .vsix パッケージ
     description: "make vscode-package が生成する VS Code 拡張の配布アーカイブ。marketplace へのアップロード素材"
@@ -380,6 +388,12 @@ process:
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
     tags: [ gen, g ]
+  gen_readme_cli:
+    label: README CLI 節生成
+    description: "pfdsl help の出力から root README.md の `## CLI` ブロックと packages/cli/README.md のコマンド表を書き直す。どちらも sentinel ブロックで、囲みの外は人手が書く（root 側は workflow.pfdsl の update_readme、packages/cli 側は toolchain の一部）。drift は pre-commit の readme-cli ゲートと CI の make check-readme-cli が強制する。出力もゲートも2つになったのは #850"
+    command: make gen-readme-cli
+    location: ../scripts/gen-readme-cli.mjs
+    tags: [ gen ]
   render_previews:
     label: サンプル描画
     description: "機能カタログとロードマップを dot/svg に描画する。toolchain のビルド（make build-deps）が実行前提だがコンテンツ依存ではない — 呼び出し元ソフトウェアと同様、入力エッジに含めない。.dot / .svg / README はいずれも決定論的に生成される（#588）"
@@ -454,6 +468,8 @@ ops_install_sources >> gen_install -> ops_install_templates
 [ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_reminder_hook, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
 
 [feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
+
+toolchain >> gen_readme_cli -> readme_cli_blocks
 
 [release_tag, toolchain] >> publish_packages -> [published_cli, published_libraries]
 
