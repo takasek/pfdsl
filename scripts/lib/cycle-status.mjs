@@ -7,6 +7,7 @@ import {
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
 	NO_IMPLEMENTATION_TOKEN,
+	presentRequiredPrefixes,
 	selectDesignRecord,
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
@@ -232,20 +233,37 @@ export function buildReviewRecordTemplate() {
 /**
  * issue の設計確定状態を分類する。判定順（前段がヒットしたら後段は評価しない）:
  * 1. 既存の「設計未確定」フレーズがヒット → unsettled (reason: "phrase")
- * 2. `selectDesignRecord` が本文・コメントから記録を同定できる → settled (reason: "record-posted")
- * 3. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
- * 4. それ以外 → unsettled (reason: "no-enumerated-options")。
+ * 2. `selectDesignRecord` が記録を同定でき、必須行頭が全て揃っている
+ *    → settled (reason: "record-posted")
+ * 3. 同定できたが必須行頭が欠けている → unsettled (reason: "record-incomplete")
+ * 4. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
+ * 5. それ以外 → unsettled (reason: "no-enumerated-options")。
  *    列挙構造を検出できなかった回を「対話省略可」の既定にする（fail-open）と、
  *    散文中に紛れた選択肢が検出をすり抜けたまま既定で通過してしまう（#833・#829）。
  *
  * 記録の同定は終端ゲート（gate-check.mjs）と同じ `selectDesignRecord`
  * （と、それに entries を渡す `toDesignRecordEntries`）を使う。プリフライトと
  * 終端ゲートが別々の同定ロジックを持つと、どちらかが記録だと見なした文章を
- * もう一方が見なさない、という食い違いが生まれるため。共有しているのは
- * この同定だけで、記録の内容検査（`classifyDesignRecordContent`）と
- * 時点照合（`classifyDesignRecordTiming`）は終端ゲート側だけが持つ —
- * ここで record-posted になった記録が、終端ゲートでは内容不備・時点不備で
- * FAIL することがあるのは意図した非対称である。
+ * もう一方が見なさない、という食い違いが生まれるため。
+ *
+ * 同定は最大一致数で選ぶ粗いままにしてある。締めたのは同定でなくこの分類の
+ * 側で、record-posted を名乗る条件を「必須行頭が全て揃っている」に上げた
+ * （#927）。同定側に下限を置くと、行頭が1つ欠けた記録が「記録なし」に落ちて、
+ * 終端ゲートが「どの行が欠けているか」を言えなくなる。
+ *
+ * この閾値は終端ゲートに合わせたものではない。終端ゲートの行を決めるのは
+ * 時点照合だけで、内容検査（`classifyDesignRecordContent`）の FAIL は
+ * `WARN:` 付きの報告材料へ降格されている（#737 案1。実測で content は
+ * true 0 / false 3、timing は true 3 / false 0 だった）。上げた理由は
+ * この分類が答える問いが終端ゲートの問いと違うことにある — こちらは
+ * 「いま設計対話が要るか」を答えるので、前提・否定案・却下理由のどれかを
+ * 欠く文章は、対話がまだ済んでいない証拠として読むのが正しい。
+ * #737 の false positive を持ち込まないことは実測で確かめた: 直近の設計記録
+ * 12件に行頭のみの基準を当てて欠落 0 件（複合検査の3件は処分トークン側から
+ * 出ていた）。
+ *
+ * 意図された非対称は時点照合の側だけである（着手前に投稿された完全な記録が、
+ * 着手後の編集で FAIL することはある）。
  *
  * `unsettled` は「設計対話が必要か」を表すだけで、記録投稿の要否とは別軸
  * である。roadmap.md の規約上、design-selection record は列挙構造の有無に
@@ -254,6 +272,7 @@ export function buildReviewRecordTemplate() {
  * — `record-posted` のときだけ false、それ以外は常に true（#868）。
  * @param {{body: string, createdAt?: string, comments?: Array<{body: string, createdAt?: string}>}} params
  * @returns {{unsettled: boolean, reason: string, matchedLines?: string[], optionCount?: number,
+ *            missingPrefixes?: string[],
  *            record?: {createdAt?: string} | null, recordRequired: boolean}}
  */
 export function classifyDesignSettlement({ body, createdAt, comments }) {
@@ -271,11 +290,24 @@ export function classifyDesignSettlement({ body, createdAt, comments }) {
 		toDesignRecordEntries({ body, createdAt, comments }),
 	);
 	if (record) {
+		const present = presentRequiredPrefixes(record.body);
+		const missingPrefixes = DESIGN_RECORD_REQUIRED_PREFIXES.filter(
+			(prefix) => !present.includes(prefix),
+		);
+		if (missingPrefixes.length === 0) {
+			return {
+				unsettled: false,
+				reason: "record-posted",
+				record: { createdAt: record.createdAt },
+				recordRequired: false,
+			};
+		}
 		return {
-			unsettled: false,
-			reason: "record-posted",
+			unsettled: true,
+			reason: "record-incomplete",
+			missingPrefixes,
 			record: { createdAt: record.createdAt },
-			recordRequired: false,
+			recordRequired: true,
 		};
 	}
 

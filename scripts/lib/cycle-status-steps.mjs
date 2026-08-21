@@ -282,6 +282,10 @@ export async function runCycleStatus({
 					reason: classification.reason,
 					matchedLines: classification.matchedLines ?? [],
 					optionCount: classification.optionCount ?? 0,
+					// #927: record-incomplete's whole value to the runner is which
+					// line to add. Dropping it here would leave a reason value with
+					// nothing to act on.
+					missingPrefixes: classification.missingPrefixes ?? [],
 					record: classification.record ?? null,
 					recordRequired: classification.recordRequired,
 				});

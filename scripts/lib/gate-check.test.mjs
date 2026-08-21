@@ -732,18 +732,20 @@ describe("GATE_CHECKLIST_SOURCE_PATH", () => {
 });
 
 describe("toDesignRecordEntries", () => {
-	it("puts the body first, tagged with the issue's own createdAt", () => {
+	// #927: the body is not a candidate. roadmap.md requires the record to be a
+	// comment posted before the first commit, and an issue body cannot be that —
+	// it is written at creation, so its createdAt clears the timing check no
+	// matter when the design was actually settled.
+	it("omits the issue body, whatever line heads it carries", () => {
 		const entries = toDesignRecordEntries({
-			body: "前提: x",
+			body: "前提: x\n否定案: y\n却下理由: z",
 			createdAt: "2026-07-01T00:00:00Z",
 			comments: [],
 		});
-		assert.deepEqual(entries, [
-			{ body: "前提: x", createdAt: "2026-07-01T00:00:00Z" },
-		]);
+		assert.deepEqual(entries, []);
 	});
 
-	it("appends each comment's body, createdAt and id, dropping everything else it carries", () => {
+	it("carries each comment's body, createdAt and id, dropping everything else", () => {
 		const entries = toDesignRecordEntries({
 			body: "普通の説明文。",
 			createdAt: "2026-07-01T00:00:00Z",
@@ -757,7 +759,6 @@ describe("toDesignRecordEntries", () => {
 			],
 		});
 		assert.deepEqual(entries, [
-			{ body: "普通の説明文。", createdAt: "2026-07-01T00:00:00Z" },
 			{
 				id: "IC_kwDOSYTJ888AAAABOCVvqQ",
 				body: "前提: x\n否定案: y\n却下理由: z",
@@ -766,21 +767,9 @@ describe("toDesignRecordEntries", () => {
 		]);
 	});
 
-	// #737 案2: the body itself has no comment id to match a GraphQL edit-info
-	// node against, and must not gain a spurious one — resolveRecordEditedAt
-	// tells the body case apart from the comment case by this key's presence.
-	it("carries no id on the body entry", () => {
-		const [bodyEntry] = toDesignRecordEntries({
-			body: "前提: x",
-			createdAt: "2026-07-01T00:00:00Z",
-			comments: [],
-		});
-		assert.equal(Object.hasOwn(bodyEntry, "id"), false);
-	});
-
-	it("returns just the body entry when there are no comments", () => {
+	it("returns nothing when the issue has no comments", () => {
 		const entries = toDesignRecordEntries({ body: "x", createdAt: undefined });
-		assert.deepEqual(entries, [{ body: "x", createdAt: undefined }]);
+		assert.deepEqual(entries, []);
 	});
 });
 
@@ -791,12 +780,17 @@ describe("resolveRecordEditedAt", () => {
 		...overrides,
 	});
 
-	it("falls back to the issue's own lastEditedAt for a body-selected record", () => {
+	// #927 removed the issue body from the candidate list, so a record without a
+	// comment id is no longer the body case — it is a comment whose id the
+	// lookup did not carry. Falling back to the issue's own lastEditedAt there
+	// would attribute an unrelated edit to the record.
+	it("reports an id-less record as unverifiable rather than reading the issue's lastEditedAt", () => {
 		const result = resolveRecordEditedAt(
 			{ body: "前提: x" },
 			editInfo({ issueLastEditedAt: "2026-07-01T00:00:00Z" }),
 		);
-		assert.deepEqual(result, { editedAtIso: "2026-07-01T00:00:00Z" });
+		assert.equal(result.editedAtIso, null);
+		assert.match(result.note, /edit/);
 	});
 
 	it("matches a comment-selected record by id, not by array position", () => {
