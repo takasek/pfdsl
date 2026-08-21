@@ -31,20 +31,13 @@ export function runSkillWiringCheck({
 	locate,
 	mirrors = PLUGIN_MIRRORS,
 }) {
-	const workflowText = readFile(WORKFLOW);
-	const workflow = analyzeFile(workflowText);
-	const pipelineText = readFile(PIPELINE);
-	const pipeline = analyzeFile(pipelineText);
-	const workflowGraph = {
-		document: workflow.document,
-		text: workflowText,
-		path: WORKFLOW,
+	/** What `locate` needs to anchor a finding in the file it was declared in. */
+	const readGraph = (path) => {
+		const text = readFile(path);
+		return { ...analyzeFile(text), text, path };
 	};
-	const pipelineGraph = {
-		document: pipeline.document,
-		text: pipelineText,
-		path: PIPELINE,
-	};
+	const workflow = readGraph(WORKFLOW);
+	const pipeline = readGraph(PIPELINE);
 
 	const findings = findUnwiredSkills({
 		workflowArtifacts: workflow.frontmatter.artifact ?? {},
@@ -76,8 +69,7 @@ export function runSkillWiringCheck({
 	}
 
 	const stderrLines = findings.map((finding) => {
-		const graph =
-			finding.declaredIn === "pipeline" ? pipelineGraph : workflowGraph;
+		const graph = finding.declaredIn === "pipeline" ? pipeline : workflow;
 		const line = locate(
 			graph.document,
 			graph.text,

@@ -54,9 +54,7 @@ function mirrorMembers(mirror) {
 
 /**
  * Whether gen-plugin mirrors this source path into the bundle, per its own
- * manifest: the path must overlap (per `pathsOverlap`) some mirror member —
- * a listed tree/file, the whole-mirror's own directory, or (per #780) a
- * directory that itself contains one or more listed members.
+ * manifest: the path must overlap some mirror member, per `pathsOverlap`.
  * @param {string} sourcePath repo-relative
  * @param {Array<{src: string, trees?: string[], files?: string[], whole?: boolean}>} mirrors
  * @returns {boolean}
@@ -80,10 +78,8 @@ export function isBundledSource(sourcePath, mirrors) {
  * goes silent for the rest of its members as soon as one of them has an
  * artifact — a whole skill tree can then drop out of both graphs unreported.
  *
- * A member counts as modelled when some artifact's location is that member,
- * sits inside it, or contains it: one artifact may legitimately model several
- * members from their shared directory (`pfd_commands` covers three command
- * files, #780), and another may point at a single file deep inside a tree.
+ * A member counts as modelled when some artifact's location overlaps it, per
+ * `pathsOverlap`.
  * @param {{
  *   artifacts: Record<string, {location?: string | string[]}>,
  *   mirrors: Array<{dest: string, src: string, trees?: string[], files?: string[], whole?: boolean}>,
