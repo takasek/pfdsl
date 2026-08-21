@@ -26,7 +26,7 @@
 - **d（VSCode拡張）**: `packages/vscode-extension/`。図に現れない — bのホストであり、データを供給も保管もしないため（次節）
 - **e（a,bの配布）**: `publish_packages`（タグ起点の npm publish）と `package_vsix` / `upload_vsix`。ADR-0035 までは workflow.pfdsl 側にあったが、タグが押された後の公開変換に判断は入らないためこちらへ移した。リリース可否・版数の判断は workflow.pfdsl の `decide_release` が持ち、この図はその出力 `release_tag` を入力として受ける
 - **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 GitHub Issues バックエンド層）。f2 は規約本文（`ops_skill_l3`）と採用テンプレート（`ops_install_templates`）の2 artifact に分かれる — 前者は手書き、後者は `gen_install` の生成物であり、生成経路も ADR-0035 でこの図へ移った（`ops_install_sources` → `gen_install` → `ops_install_templates`）。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`
-- **g（fの配布）**: `tags: [g]` の process 群。make gen-plugin（組み立て）・Claude Code plugin marketplace（インストール）・check-install-sync.mjs（実配置とランタイム照合）が実装。`gen_plugin` と `gen_install` は生成でもあるため `gen` タグも併せ持つ
+- **g（fの配布）**: `tags: [g]` の process 群。make gen-plugin（Claude Code / Codex両対応の組み立て）・Claude Code plugin marketplace（既存のインストール経路）・check-install-sync.mjs（実配置とランタイム照合）が実装。`gen_plugin` と `gen_install` は生成でもあるため `gen` タグも併せ持つ
 
 ## ホスト（c/d）とbの関係
 
@@ -61,7 +61,7 @@
 同モジュールを単体で呼ぶ CLI エントリもあったが、`scripts/pre-commit` が呼び出しをやめた後は誰も起動しておらず削除した（#668）。
 dist 非依存の手動再生成は `scripts/gen-plugin-dist-independent.mjs` が担う
 - **gen_install（`scripts/lib/install-templates.mjs` の明示リスト）**: repo ルートの配布ソースから `install/` ミラーを一方向で再生成する。生成の向きは repo ルート → `install/` → `plugin/` の一本のみ（#547 で双方向 sync を廃止）
-- **gen_plugin（`scripts/gen-plugin.mjs`）**: 同梱素材を `plugin/pfdsl/` へ集約し `plugin.json` を CLI version から書く。内部で gen_install を実行するため、plugin が古い `install/` から組まれることはない
+- **gen_plugin（`scripts/gen-plugin.mjs`）**: `pnpm -r build && make gen-plugin` が、current canonical inputである`.claude/`と共有inventory（`scripts/lib/harness-inventory.mjs`）から両ハーネスの出力を生成する。Claude Code adapterは既存のplugin tree・manifest・marketplace記述をidentity互換に組み立て、Codex adapterはrepositoryの`AGENTS.md`・`.agents/`・`.codex/`、Codex plugin manifest、command由来skillを生成する。内部でgen_installを実行するため、pluginが古い`install/`から組まれることはない
 - **render_previews（`make gen-samples`）**: 機能カタログとロードマップを dot/svg に描画する。`.dot` / README は graphviz-exporter、`.svg` は preview-engine の wasm graphviz で生成され、いずれも決定論的（#588）
 - **publish_packages**: `v*` タグで `@pfdsl/cli`、`lib-v*` タグでライブラリ群を GitHub Actions が npm publish する（Trusted Publishing / OIDC）。ライブラリは core → graphviz-exporter → preview-engine の順
 - **package_vsix / upload_vsix**: `make vscode-package` が `.vsix` を生成し、人が marketplace.visualstudio.com へアップロードする
@@ -76,6 +76,8 @@ marketplace の発行 API を使う経路を整えればこのノードは消え
 ## plugin 配布チェーンの依存
 
 - **同梱対象リストの一元化（`gen_plugin`）**: 同梱スキル・コマンド・agent の列挙は `scripts/gen-plugin.mjs` のみが持つ（旧 skill sync 時代の tsup.config.ts との二重ハードコードは解消済み）。スキル・agent を追加するときは gen-plugin.mjs を更新する。PFD 側の照合先は workflow.pfdsl companion の「配布スキルの新規追加時の横断照合」が一次情報（ADR-0035 以前の二重モデル化とその乖離の経緯もそちら）。
+- **二重ハーネスのadapter境界**: `scripts/lib/harness-inventory.mjs` が配布対象を一元化し、`scripts/lib/gen-plugin.mjs` のClaude Code mirrorと`assembleCodexAssets()`がそれぞれの出力を作る。Codex adapterは全出力をtemporary siblingへstageしてからまとめて置換する。Codex plugin manifestのcapabilityは現在Skillsのみであり、native agent・hooksはplugin側でなくリポジトリの`.codex/`へ出力する。commandとskillの出力名が衝突する場合はcommandを`source-command-<name>`へ改名する。
+- **正本の移行余地**: `.claude/` は現時点のcanonical inputであり、生成物ではない。中立sourceへ移す場合はinventoryのsource pathとadapterの入力だけを差し替え、Claude Code / Codex出力のidentity契約を保つ。`plugin/pfdsl/`、`AGENTS.md`、`.agents/`、`.codex/`は生成物なので手編集しない。
 - **`deploy_install_layer` のコピー元は plugin 同梱 canonical**: `check-install-sync.mjs --deploy` は `<skill root>/install/` から採用リポルートへコピーする。ローカル編集された配置済みファイルは hash 不一致として skip・警告され、`--overwrite-local-edits` でのみ上書きされる（ADR-0028）。canonical から消えた旧ファイルは、ローカル編集が無ければフラグ無しで削除され、編集を抱えている場合のみ独立した `--delete-edited-orphans` を要する（#603。単一 `--force` は掃除の意図で渡したときに新パスのカスタマイズまで巻き戻した）。canonical 側のリネームで新旧パスが `missing` / `orphaned` に分かれた場合は `Possible renames` として対で報告され、旧パスのローカル編集を新パスへ引き継ぐ手掛かりになる。
 このコピーの向きが成立するのは target が採用リポの場合だけなので、実行のたび target の役割を上流マーカーで分類し、上流リポ・canonical 不明と判定した回は `--deploy` を案内も実行もしない（#971）。
 - **採用リポの drift 検知はランタイムのみ**: `check-pfd-ops-sync.yml` は採用リポへ配布されない。pfd-ops 発火時の `check_install_sync` が唯一の安全網で、警告への対応は pfd-ops SKILL.md「配置ファイルの鮮度セルフチェック」が定める。

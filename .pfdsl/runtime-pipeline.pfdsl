@@ -164,6 +164,16 @@ artifact:
     description: "採用リポへ配る監査スクリプトと GitHub Actions workflow の一次情報。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install-templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）"
     location: [ ../scripts/pfdsl/, ../.github/workflows/pfdsl-flow-on-issue-close.yml ]
     group: gen_sources
+  claude_harness_sources:
+    label: 現行のClaude Code正本
+    description: "短期の maintained source は CLAUDE.md と .claude/ 配下のskills・commands・agents・hooks設定である。hooks/ もClaude Code pluginへ同梱する正本入力に含む。将来の中立正本移行では、この入力側だけを差し替え、inventory と各adapterの出力契約を維持する"
+    location: [ ../CLAUDE.md, ../.claude/, ../hooks/ ]
+    group: skill_sources
+  harness_inventory:
+    label: ハーネス中立の配布inventory
+    description: "配布するskill・command・agent・hookの集合とClaude Code plugin mirrorを一元化する。Claude CodeとCodexのadapterは同じinventoryを読むため、ハーネス別allowlistを重複して持たない"
+    location: ../scripts/lib/harness-inventory.mjs
+    group: skill_sources
   release_tag:
     label: リリースタグ
     description: "workflow.pfdsl の decide_release が生産する v* / lib-v* / vscode-v* タグ。判断の終端であり、ここから先の公開変換は判断を含まない"
@@ -230,13 +240,38 @@ artifact:
     location: ../.claude/skills/pfd-ops/install/
     group: repo_generated
     tags: [ f2, gen ]
+  claude_adapter_output:
+    label: Claude Code adapter 出力
+    description: "共有inventoryに従い、Claude Codeが読むskill tree・Markdown command・Markdown agent・hooks・Claude plugin manifestとmarketplace記述を生成する。既存のClaude Code marketplace導入経路はidentity互換のまま維持する"
+    criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がClaude plugin出力の未再生成を検出し、pre-commitとCIで失敗する
+    externalStakeholders: [ Claude Code利用者 ]
+    location: [ ../plugin/pfdsl/skills/pfdsl/, ../plugin/pfdsl/skills/pfd-ecosystem/, ../plugin/pfdsl/skills/pfd-grill/, ../plugin/pfdsl/skills/pfd-ops/, ../plugin/pfdsl/skills/pfd-retro/, ../plugin/pfdsl/commands/, ../plugin/pfdsl/agents/, ../plugin/pfdsl/hooks/, ../plugin/pfdsl/.claude-plugin/plugin.json, ../.claude-plugin/marketplace.json ]
+    group: repo_generated
+    tags: [ gen ]
+  codex_adapter_output:
+    label: Codex plugin adapter 出力
+    description: "共有inventoryからCodex plugin manifestとcommand由来skillを生成する。Codex plugin manifest の capabilities は Skills のみで、Codex native agent とhooksはpluginではなくリポジトリ開発資産として別に生成する"
+    criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がCodex plugin manifestまたはcommand skillの未再生成を検出し、pre-commitとCIで失敗する
+    externalStakeholders: [ Codex plugin利用者 ]
+    location: [ ../plugin/pfdsl/.codex-plugin/plugin.json, ../plugin/pfdsl/skills/pfd-cycle/, ../plugin/pfdsl/skills/pfd-init/, ../plugin/pfdsl/skills/pfd-retro/ ]
+    group: repo_generated
+    tags: [ gen ]
+  codex_repo_assets:
+    label: Codexリポジトリ開発資産
+    description: "CLAUDE.md・.claude/settings.json・共有inventoryをCodex向けに変換したAGENTS.md、.agents/skills、.codex/agents、.codex/hooks.json。adapterは全出力を一時siblingへ書き、成功後にまとめて置換するため半生成状態を公開しない"
+    criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がAGENTS.md、.agents、.codexの未再生成を検出し、pre-commitとCIで失敗する
+    externalStakeholders: [ このリポのCodex利用者 ]
+    location: [ ../AGENTS.md, ../.agents/skills/, ../.codex/agents/, ../.codex/hooks.json ]
+    group: repo_generated
+    tags: [ gen ]
   plugin_dist:
-    label: 配布プラグインディレクトリ
-    description: "make gen-plugin が組み立てる plugin/pfdsl/（コミット対象、git-subdir marketplace source としてそのまま配布される）。canonical スキル群との identity は check-gen-plugin.yml が CI 強制する。plugin.json の version は toolchain の CLI package.json 由来。旧版ではこの図のplugin_dirとworkflow.pfdslのplugin_distが同一物の二重モデル化だった（ADR-0035で統合）"
-    criteria: make gen-plugin が実装され、check-gen-plugin.yml のCI強制込みで動作確認済み
+    label: 両ハーネス対応の配布プラグイン
+    description: "make gen-plugin が組み立てる plugin/pfdsl/（コミット対象、git-subdir marketplace source）。Claude Code用とCodex用のmanifest・資産を同居させる単一配布ルートであり、各adapter出力をまとめて配布する。canonical スキル群との identity は check-gen-plugin.yml が CI 強制する"
+    criteria: pnpm -r build && make gen-plugin が差分なしで完了し、Claude CodeとCodexの生成出力を含む check-gen-plugin.yml が通過する
     location: ../plugin/pfdsl/
     group: repo_generated
     tags: [ gen ]
+    parts: [ claude_adapter_output, codex_adapter_output ]
   sample_previews:
     label: サンプル描画物
     description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samplesで再生成。.dot / README は graphviz-exporter、.svg は preview-engine の vitest が pre-commit と CI でドリフト検知する。GitHub 上の閲覧用終端成果物"
@@ -383,8 +418,8 @@ process:
     location: ../scripts/lib/install-templates.mjs
     tags: [ gen, g ]
   gen_plugin:
-    label: プラグイン組み立て
-    description: "スキルツリー（pfdslはgen-skillと同じ一次ソースから独立再生成、pfd-ops・pfd-ecosystem・pfd-grill・pfd-retroは.claude/skills/からコピー）とcommands/pfd-*.md・agentsをplugin/pfdsl/へ集約しplugin.jsonをCLI versionから生成する。plugin.jsonのdescriptionと.claude-plugin/marketplace.jsonのプラグインdescriptionも同じ同梱実体から導出するため、手書きの列挙が同梱物から乖離することはない。同梱対象リストはgen-plugin.mjsに一元化。組み立ての最後に、bundle自身を除く全同梱ファイルの内容ハッシュを.claude-plugin/bundle-manifest.jsonへ記録する — plugin.jsonのversionはCLI releaseでしか動かないため、リリース間のbundle内容差を表す識別子が別に要る（#971）。本数を数字で書かない — スキルが増えても文面が古びないよう列挙で持つ。旧版ではこの図のassemble_pluginとworkflow.pfdslのgen_pluginに二重モデル化されており、入力列挙が乖離していた（ADR-0035で統合）"
+    label: 両ハーネス用プラグイン組み立て
+    description: "gen-skillの後、assemblePluginDistIndependent が共有inventoryからClaude Code plugin資産をmirrorし、assembleCodexAssets がCodex native資産を変換する。Codex command名が同名skillと衝突すると source-command- 接頭辞を付ける。plugin rootには両adapterの出力を同居させ、Codex repository資産はatomicに置換する。その後、Claude bundleのmanifest自身を除く全ファイルの内容ハッシュを.claude-plugin/bundle-manifest.jsonへ記録する。plugin.jsonのversionはCLI releaseでしか動かないため、リリース間のbundle内容差を識別する（#971）"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
     tags: [ gen, g ]
@@ -465,7 +500,7 @@ dot_graph >> export_image -> rendered_image
 
 ops_install_sources >> gen_install -> ops_install_templates
 
-[ecosystem_skill, feature_samples, grill_skill, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_reminder_hook, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> plugin_dist
+[claude_harness_sources, ecosystem_skill, feature_samples, grill_skill, harness_inventory, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_reminder_hook, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> [claude_adapter_output, codex_adapter_output, codex_repo_assets, plugin_dist]
 
 [feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
 
