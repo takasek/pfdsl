@@ -443,6 +443,12 @@ artifact:
     description: "#670 の改名を含む次期 npm リリース。採用リポの .pfdsl に書かれた type: 値を変える破壊的変更のため、公開まで通さないと採用リポへ届かない"
     status: todo
     criteria: "npm view @pfdsl/cli versions に packages/cli/package.json の version が含まれ、その公開版が type: pipeline を受理し、旧値 runtime-pipeline へ docs/spec/spec.md の規定どおりの応答を返す"
+  dual_harness_assets:
+    label: Claude Code / Codex 両対応配布資産
+    description: "Claude Code の既存経路を維持しつつ、同じ maintained source から Codex ネイティブな開発・plugin・skill 資産を生成する。短期の canonical input は .claude のまま保ち、中立正本への将来移行点を harness adapter として分離する"
+    status: wip
+    criteria: "同じ maintained source から Claude Code と Codex のリポジトリ開発資産および plugin 資産が決定論的に生成され、Codex 利用者が Claude Code の導入または import なしに plugin・skill を利用でき、両出力の drift 検査が通過する"
+    location: ../docs/superpowers/specs/2026-08-22-codex-dual-harness-design.md
 process:
   implement_version_cmd:
     label: --version コマンド実装
@@ -673,6 +679,11 @@ process:
     updated_at: 2026-07-30T10:46:31Z
   publish_cli_pipeline_kind:
     label: CLI 種別名改名公開
+  i956_generate_dual_harness_assets:
+    label: Claude Code / Codex 両対応配布資産生成
+    description: "既存の Claude Code plugin 配布構造を入力に、共通 inventory と harness adapter を導入して Claude Code・Codex の開発資産と利用者向け配布資産を生成する"
+    location: https://github.com/takasek/pfdsl/issues/956
+    updated_at: 2026-08-21T18:09:59Z
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -808,3 +819,5 @@ editor_connector >> i483_implement_preview_connector -> preview_connector
 
 [spec_v0011, type_field] >> i670_rename_pipeline_kind -> pipeline_kind_rename
 pipeline_kind_rename >> publish_cli_pipeline_kind -> cli_release_pipeline_kind
+
+pfd_ops_plugin_dist >> i956_generate_dual_harness_assets -> dual_harness_assets
