@@ -101,6 +101,25 @@ check-fmt:
 	done
 	@echo "check-fmt: all passed"
 
+# location: の参照先実在ガード。スコープは check-fmt と同じ理由で運用 .pfdsl のみ
+# — docs/ の教材と core の fixture は例示パスを意図して持つので、解決することは
+# そもそもそれらの性質ではない（#937）。pre-commit 側の対は drift-gates.mjs の
+# pfdsl-links ゲートで、そちらは staged 分だけを見る。両方要るのは、他所のファイル
+# 移動で壊れた location: は当の .pfdsl を触らないコミットでは staged に現れないため。
+.PHONY: check-links
+check-links:
+	@files=$$(find .pfdsl -maxdepth 1 -name "*.pfdsl" -type f | sort); \
+	if [ -z "$$files" ]; then \
+		echo "check-links: no operational .pfdsl found — the scope moved, so this target checks nothing. Fix it before trusting the green."; \
+		exit 1; \
+	fi; \
+	for f in $$files; do \
+		echo "check-links $$f"; \
+		node packages/cli/dist/cli.js meta check-links "$$f" || \
+			{ echo "$$f has a location: that does not resolve. Fix the path or restore the file."; exit 1; }; \
+	done; \
+	echo "check-links: all passed"
+
 # The distributed scaffold must pass the check the skills themselves
 # prescribe: pfd-grill gates on `check --strict` and pfd-ecosystem on
 # `check`, so a scaffold that fails either hands every adopting repo a file

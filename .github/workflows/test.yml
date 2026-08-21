@@ -44,6 +44,8 @@ jobs:
 
       - run: make check-fmt
 
+      - run: make check-links
+
       - run: make check-scaffold
 
       - run: make check-readme-cli

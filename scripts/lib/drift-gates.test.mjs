@@ -67,6 +67,40 @@ describe("buildGates", () => {
 		assert.match(fmt[1].hint, /\.pfdsl\/workflow\.pfdsl/);
 	});
 
+	it("derives one check-links gate per staged operational .pfdsl file", () => {
+		const built = gates({
+			staged: [".pfdsl/roadmap.pfdsl", ".pfdsl/workflow.pfdsl"],
+		});
+		const links = built.filter((g) => g.id.startsWith("pfdsl-links:"));
+		assert.deepEqual(ids(links), [
+			"pfdsl-links:.pfdsl/roadmap.pfdsl",
+			"pfdsl-links:.pfdsl/workflow.pfdsl",
+		]);
+		assert.deepEqual(links[0].commands, [
+			[
+				"node",
+				[
+					"packages/cli/dist/cli.js",
+					"meta",
+					"check-links",
+					".pfdsl/roadmap.pfdsl",
+				],
+			],
+		]);
+		// The hint has to name the file whose location: failed to resolve.
+		assert.match(links[1].hint, /\.pfdsl\/workflow\.pfdsl/);
+	});
+
+	it("exempts .pfdsl files outside .pfdsl/ from the check-links gate", () => {
+		// docs/ teaching material and test fixtures carry location: values that
+		// are illustrative, so resolving them is not a property they have.
+		const built = gates({ staged: ["docs/samples/16-basepath.pfdsl"] });
+		assert.deepEqual(
+			ids(built).filter((id) => id.startsWith("pfdsl-links:")),
+			[],
+		);
+	});
+
 	it("exempts .pfdsl files outside .pfdsl/ from the fmt gate", () => {
 		const built = gates({ staged: ["docs/samples/feature/x.pfdsl"] });
 		assert.deepEqual(
