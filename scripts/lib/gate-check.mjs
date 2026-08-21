@@ -696,8 +696,14 @@ export function resolveRecordEditedAt(record, editInfo) {
  * written after the fact"). A record posted after work already started
  * documents a choice that was made retroactively, not one that guided it.
  *
- * Only GitHub's server-side timestamps decide PASS/FAIL/SKIP here — the
- * runner cannot forge `createdAt`/`lastEditedAt`/commit `authorDate` (#824).
+ * Only one side of the comparison is server-side: GitHub records the record's
+ * `createdAt`/`lastEditedAt`, which the runner cannot forge (#824). The commit
+ * side is a git author date, which the runner does set — `git commit --date=`,
+ * `GIT_AUTHOR_DATE`, or a rebase reaching the first commit all move it (#950).
+ * `%aI` is still the right anchor (`%cI` is rewritten by every rebase, erasing
+ * the cycle window), so the asymmetry is not removed here; it is disclosed.
+ * PASS therefore carries `TIMING_ANCHOR_CAVEAT`, and the residual belongs to
+ * the "機械が守らない範囲" human review already owns.
  * @param {string | null | undefined} recordIso - createdAt of the record comment.
  * @param {string | null | undefined} firstCommitIso - authorDate of the range's first commit.
  * @param {{editedAtIso?: string | null, noImplementation?: boolean}} [options]
@@ -750,7 +756,7 @@ export function classifyDesignRecordTiming(
 			detail: `record edited at ${editedAtIso}, after the first commit at ${firstCommitIso}`,
 		};
 	}
-	return { status: "PASS" };
+	return { status: "PASS", detail: TIMING_ANCHOR_CAVEAT };
 }
 
 export const DESIGN_RECORD_REQUIRED_PREFIXES = [
@@ -776,6 +782,15 @@ export const NO_IMPLEMENTATION_TOKEN = "実装しない:";
 /** Shared by both timing SKIP paths that mean "there is nothing to compare". */
 export const NO_IMPLEMENTATION_COMMITS_DETAIL =
 	"no implementation commits — timing unverifiable";
+
+/**
+ * Printed with every timing PASS (#950). The record side is server-recorded,
+ * but the commit side is a git author date the runner sets, so a PASS is
+ * evidence rather than proof — and a reader who only sees the verdict has no
+ * other place to learn that.
+ */
+export const TIMING_ANCHOR_CAVEAT =
+	"the commit side is a git author date the runner can set — evidence, not proof";
 
 /** Markdown line-head decoration: blockquote, heading, or list marker. */
 const LINE_HEAD_DECORATION = /^(?:>+|#{1,6}|[-*+]|\d+[.)])\s*/;
