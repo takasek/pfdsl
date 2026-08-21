@@ -62,7 +62,7 @@ artifact:
   parsed_doc:
     label: 構文木・frontmatter
     description: frontmatter読込・lex・parseの出力（document構造とfrontmatter）
-    criteria: frontmatter読込・lex・parseの3段が実装され、CLI全コマンド・VSCode拡張の双方で動作確認済み
+    criteria: frontmatter 読込・lex・parse の3段が packages/core/src/lexer.test.ts・packages/core/src/parser.test.ts・packages/core/src/frontmatter-cst.test.ts のテストで検証されており、CLI（packages/cli）・VSCode 拡張（packages/vscode-extension）はいずれも @pfdsl/core のこの実装を通じて document を取得する
     group: in_memory
   normalized_graph:
     label: 正準化グラフ
@@ -97,7 +97,7 @@ artifact:
   metadata_tsv:
     label: メタデータTSV
     description: ノードのkind/label/description/status/tags/ownerを抽出したタブ区切りテキスト
-    criteria: メタデータ抽出処理が実装され、VSCode拡張のエクスポート機能から動作確認済み
+    criteria: packages/metadata-exporter/src/index.test.ts でメタデータ抽出・TSV 化が検証されており、VSCode 拡張の export コマンド（packages/vscode-extension/src/export.ts）で TSV 形式を選択すると .tsv ファイルが出力される
     externalStakeholders: [ VSCode拡張ユーザー ]
     group: run_outputs
   diff_report:
@@ -275,7 +275,7 @@ artifact:
   installed_plugin:
     label: 導入済みプラグイン
     description: "/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl でユーザー環境（plugin cache）へ展開されたコピー。gen_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agent が一括で届く。リポ単位でなくユーザー単位のため、バージョンskewはcheck_install_syncの警告で緩和する（ADR-0028 論点4）"
-    criteria: marketplace経由の導入が動作確認済み（gen_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agentが一括で届く）
+    criteria: "/plugin marketplace add takasek/pfdsl に続けて /plugin install pfdsl@pfdsl を実行すると、gen_plugin が束ねるスキルツリー・pfd-*コマンド・pfd-lens agentが一括でユーザー環境に届く"
     externalStakeholders: [ 採用リポのAIエージェント ]
     group: adopter_env
   installed_l3_layer:
