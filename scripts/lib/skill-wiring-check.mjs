@@ -135,16 +135,26 @@ export function edgeMembers(edges, { kind, process }) {
  * that model them. `location` may be a scalar path or (per spec.md §15.8) an
  * array of them — an artifact counts as bundled if any one of its locations
  * is, since a single bundled entry is enough to need the wiring this checks.
+ *
+ * Scans both graphs' artifacts, since bundled material may be declared in
+ * either (`pfd_commands` exists only in runtime-pipeline.pfdsl, #780/#944).
+ * The two edges are not symmetric, though: `gen_plugin inputs` is required of
+ * every bundled artifact regardless of where it is declared, but
+ * `distill_ops outputs` only makes sense for an artifact workflow.pfdsl
+ * actually declares — asking a pipeline-only artifact to appear on a
+ * workflow.pfdsl edge it was never eligible for would be a false positive.
  * @param {{
- *   artifacts: Record<string, {location?: string | string[]}>,
+ *   workflowArtifacts: Record<string, {location?: string | string[]}>,
+ *   pipelineArtifacts: Record<string, {location?: string | string[]}>,
  *   workflowEdges: Array<{kind: string, artifact: string, process: string}>,
  *   pipelineEdges: Array<{kind: string, artifact: string, process: string}>,
  *   mirrors: Array<object>,
  * }} input
- * @returns {Array<{id: string, location: string | string[], missing: string[]}>}
+ * @returns {Array<{id: string, location: string | string[], missing: string[], declaredIn: "workflow" | "pipeline"}>}
  */
 export function findUnwiredSkills({
-	artifacts,
+	workflowArtifacts,
+	pipelineArtifacts,
 	workflowEdges,
 	pipelineEdges,
 	mirrors,
@@ -160,20 +170,27 @@ export function findUnwiredSkills({
 	const generated = edgeMembers(pipelineEdges, { kind: "output" });
 
 	const findings = [];
-	for (const [id, meta] of Object.entries(artifacts)) {
-		if (!meta?.location) continue;
-		const locations = Array.isArray(meta.location)
-			? meta.location
-			: [meta.location];
-		if (!locations.some((loc) => isBundledSource(repoRelative(loc), mirrors)))
-			continue;
-		if (generated.has(id)) continue;
+	const sources = [
+		{ artifacts: workflowArtifacts, declaredIn: "workflow" },
+		{ artifacts: pipelineArtifacts, declaredIn: "pipeline" },
+	];
+	for (const { artifacts, declaredIn } of sources) {
+		for (const [id, meta] of Object.entries(artifacts)) {
+			if (!meta?.location) continue;
+			const locations = Array.isArray(meta.location)
+				? meta.location
+				: [meta.location];
+			if (!locations.some((loc) => isBundledSource(repoRelative(loc), mirrors)))
+				continue;
+			if (generated.has(id)) continue;
 
-		const missing = [];
-		if (!distillOutputs.has(id)) missing.push("distill_ops outputs");
-		if (!genPluginInputs.has(id)) missing.push("gen_plugin inputs");
-		if (missing.length > 0)
-			findings.push({ id, location: meta.location, missing });
+			const missing = [];
+			if (declaredIn === "workflow" && !distillOutputs.has(id))
+				missing.push("distill_ops outputs");
+			if (!genPluginInputs.has(id)) missing.push("gen_plugin inputs");
+			if (missing.length > 0)
+				findings.push({ id, location: meta.location, missing, declaredIn });
+		}
 	}
 	return findings;
 }

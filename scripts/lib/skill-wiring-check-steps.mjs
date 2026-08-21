@@ -33,22 +33,32 @@ export function runSkillWiringCheck({
 }) {
 	const workflowText = readFile(WORKFLOW);
 	const workflow = analyzeFile(workflowText);
-	const pipeline = analyzeFile(readFile(PIPELINE));
+	const pipelineText = readFile(PIPELINE);
+	const pipeline = analyzeFile(pipelineText);
+	const workflowGraph = {
+		document: workflow.document,
+		text: workflowText,
+		path: WORKFLOW,
+	};
+	const pipelineGraph = {
+		document: pipeline.document,
+		text: pipelineText,
+		path: PIPELINE,
+	};
 
 	const findings = findUnwiredSkills({
-		artifacts: workflow.frontmatter.artifact ?? {},
+		workflowArtifacts: workflow.frontmatter.artifact ?? {},
+		pipelineArtifacts: pipeline.frontmatter.artifact ?? {},
 		workflowEdges: workflow.edges,
 		pipelineEdges: pipeline.edges,
 		mirrors,
 	});
 
 	// The other direction (#930): both graphs' artifacts are pooled, since
-	// bundled material is modelled wherever its artifact was declared. That is a
-	// wider universe than findUnwiredSkills works over above — that one asks
-	// where an artifact sits on the graph, which is a question about
-	// workflow.pfdsl. `pfd_commands` exists only in runtime-pipeline.pfdsl
-	// (#780), so pooling is what keeps the commands mirror from reading as
-	// unmodelled here while staying out of the wiring check there.
+	// bundled material is modelled wherever its artifact was declared. `pfd_commands`
+	// exists only in runtime-pipeline.pfdsl (#780) — findUnwiredSkills now scans
+	// both graphs too (#944), so pooling here just keeps the two checks over the
+	// same universe rather than being what makes the commands mirror visible.
 	const unmodeled = findUnmodeledMirrors({
 		artifacts: {
 			...(pipeline.frontmatter.artifact ?? {}),
@@ -66,13 +76,15 @@ export function runSkillWiringCheck({
 	}
 
 	const stderrLines = findings.map((finding) => {
+		const graph =
+			finding.declaredIn === "pipeline" ? pipelineGraph : workflowGraph;
 		const line = locate(
-			workflow.document,
-			workflowText,
+			graph.document,
+			graph.text,
 			finding.id,
 			"artifact",
 		).declarationLine;
-		const anchor = line === null ? WORKFLOW : `${WORKFLOW}:${line}`;
+		const anchor = line === null ? graph.path : `${graph.path}:${line}`;
 		const location = Array.isArray(finding.location)
 			? finding.location.join(", ")
 			: finding.location;

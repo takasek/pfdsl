@@ -243,7 +243,8 @@ describe("findUnmodeledMirrors", () => {
 describe("findUnwiredSkills", () => {
 	const run = (overrides = {}) =>
 		findUnwiredSkills({
-			artifacts: ARTIFACTS,
+			workflowArtifacts: ARTIFACTS,
+			pipelineArtifacts: {},
 			workflowEdges: WORKFLOW_EDGES,
 			pipelineEdges: PIPELINE_EDGES,
 			mirrors: MIRRORS,
@@ -259,12 +260,13 @@ describe("findUnwiredSkills", () => {
 			...ARTIFACTS,
 			newcomer_skill: { location: "../.claude/skills/pfd-ops/" },
 		};
-		const found = run({ artifacts });
+		const found = run({ workflowArtifacts: artifacts });
 		assert.deepEqual(found, [
 			{
 				id: "newcomer_skill",
 				location: "../.claude/skills/pfd-ops/",
 				missing: ["distill_ops outputs", "gen_plugin inputs"],
+				declaredIn: "workflow",
 			},
 		]);
 	});
@@ -315,12 +317,13 @@ describe("findUnwiredSkills", () => {
 				location: ["../docs/samples/", "../.claude/skills/pfd-ops/"],
 			},
 		};
-		const found = run({ artifacts });
+		const found = run({ workflowArtifacts: artifacts });
 		assert.deepEqual(found, [
 			{
 				id: "multi_location_skill",
 				location: ["../docs/samples/", "../.claude/skills/pfd-ops/"],
 				missing: ["distill_ops outputs", "gen_plugin inputs"],
+				declaredIn: "workflow",
 			},
 		]);
 	});
@@ -333,7 +336,9 @@ describe("findUnwiredSkills", () => {
 			},
 		};
 		assert.equal(
-			run({ artifacts }).some((f) => f.id === "no_bundle_skill"),
+			run({ workflowArtifacts: artifacts }).some(
+				(f) => f.id === "no_bundle_skill",
+			),
 			false,
 		);
 	});
@@ -343,13 +348,61 @@ describe("findUnwiredSkills", () => {
 			...ARTIFACTS,
 			newcomer_skill: { location: "../.claude/skills/pfd-ops/" },
 		};
-		const found = run({ artifacts });
+		const found = run({ workflowArtifacts: artifacts });
 		assert.deepEqual(found, [
 			{
 				id: "newcomer_skill",
 				location: "../.claude/skills/pfd-ops/",
 				missing: ["distill_ops outputs", "gen_plugin inputs"],
+				declaredIn: "workflow",
 			},
 		]);
+	});
+
+	it("requires only gen_plugin inputs of a pipeline-only bundled artifact, the pfd_commands case (#944)", () => {
+		const pipelineArtifacts = {
+			pfd_commands: { location: "../.claude/commands/" },
+		};
+		const mirrors = [
+			{
+				dest: "commands",
+				src: ".claude/commands",
+				files: ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"],
+			},
+		];
+		const found = run({
+			pipelineArtifacts,
+			mirrors,
+			pipelineEdges: [],
+		});
+		assert.deepEqual(found, [
+			{
+				id: "pfd_commands",
+				location: "../.claude/commands/",
+				missing: ["gen_plugin inputs"],
+				declaredIn: "pipeline",
+			},
+		]);
+	});
+
+	it("reports nothing for a pipeline-only bundled artifact once gen_plugin inputs carries it", () => {
+		const pipelineArtifacts = {
+			pfd_commands: { location: "../.claude/commands/" },
+		};
+		const mirrors = [
+			{
+				dest: "commands",
+				src: ".claude/commands",
+				files: ["pfd-cycle.md", "pfd-init.md", "pfd-retro.md"],
+			},
+		];
+		const pipelineEdges = [
+			{ kind: "input", artifact: "pfd_commands", process: "gen_plugin" },
+		];
+		const found = run({ pipelineArtifacts, mirrors, pipelineEdges });
+		assert.equal(
+			found.some((f) => f.id === "pfd_commands"),
+			false,
+		);
 	});
 });
