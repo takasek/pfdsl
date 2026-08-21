@@ -4856,13 +4856,19 @@ describe("command table / help parity (#902)", () => {
 		expect(listed).toEqual(dispatchable);
 	});
 
+	// Anchored to the first line, not `toContain`: a body copied from the
+	// neighbouring command mentions that command's own path further down (in
+	// an example line), so a substring match can find the expected path in a
+	// body that opens by naming a different command (#953).
 	it.each(
 		COMMAND_GROUPS,
 	)("$name group: every listed subcommand's --help exits 0 with a matching usage line", async (group) => {
 		for (const cmd of group.commands) {
 			const r = await run([group.name, cmd.name, "--help"]);
 			expect(r.exitCode).toBe(0);
-			expect(r.stdout).toContain(`usage: pfdsl ${group.name} ${cmd.name}`);
+			expect(r.stdout.split("\n")[0]).toMatch(
+				new RegExp(`^usage: pfdsl ${group.name} ${cmd.name}(\\s|$)`),
+			);
 		}
 	});
 
@@ -4882,6 +4888,48 @@ describe("command table / help parity (#902)", () => {
 	)("$name: synopsis matches the first line of its own --help", (entry) => {
 		const firstLine = entry.help.split("\n")[0]!;
 		expect(firstLine).toBe(`usage: pfdsl ${entry.synopsis}`);
+	});
+
+	/** Every entry in either table, paired with the argv path that reaches it. */
+	const helpPaths = [
+		...TOP_LEVEL_COMMANDS.map((entry) => ({ path: [entry.name], entry })),
+		...COMMAND_GROUPS.flatMap((g) =>
+			g.commands.map((entry) => ({ path: [g.name, entry.name], entry })),
+		),
+	];
+
+	// The checks above read the first line of `entry.help`, and separately that
+	// `--help` exits 0 — neither one ties the text `--help` actually prints to
+	// the constant the table holds. A `help:` field pointed at the wrong
+	// constant changes what users read while both checks stay green (#953).
+	it.each(
+		helpPaths.map((h) => [h.path.join(" "), h] as const),
+	)("pfdsl %s --help prints the body its table entry holds", async (_label, {
+		path,
+		entry,
+	}) => {
+		const r = await run([...path, "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(entry.help);
+	});
+
+	// Catches the copy that the usage-line checks cannot: a body duplicated
+	// from a neighbour and then edited only in its first line still documents
+	// the wrong command's arguments. Exact equality is the right bar — the
+	// bodies share a near-verbatim `--no-color` line, so any similarity
+	// threshold loose enough to catch near-copies also flags legitimately
+	// distinct bodies (#953).
+	it("no two commands share a help body below the usage line", () => {
+		const seen = new Map<string, string>();
+		const duplicates: string[] = [];
+		for (const { path, entry } of helpPaths) {
+			const label = path.join(" ");
+			const body = entry.help.split("\n").slice(1).join("\n");
+			const previous = seen.get(body);
+			if (previous) duplicates.push(`${label} duplicates ${previous}`);
+			else seen.set(body, label);
+		}
+		expect(duplicates).toEqual([]);
 	});
 
 	// The two tables are separate arrays, and `dispatch` resolves groups
