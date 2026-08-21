@@ -264,15 +264,6 @@ results.push(commitSubjectStep({ exec, base }));
 // Every trailer-borne declaration reads this, so it is fetched once.
 const commitMessages = commitMessagesSince({ exec, base });
 
-// 8b. Review record: judged here, before the PR, because the trailer lives
-// in a commit message and cannot be added afterwards (#698).
-results.push(reviewRecordStep({ commitMessages, changedFiles }));
-
-// 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
-results.push(
-	wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }),
-);
-
 // The linked issues, fetched once each for the two checks that read them.
 // execGh keeps the REST fallback that a bare `gh` call would lose in
 // environments without the binary (#489/#492). Only that environment degrades
@@ -308,6 +299,15 @@ for (const number of issueNumbers) {
 		});
 	}
 }
+
+// 8b. Review record: judged before the PR, because the trailer lives in a
+// commit message and cannot be added afterwards (#698).
+results.push(reviewRecordStep({ commitMessages, changedFiles, issues }));
+
+// 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
+results.push(
+	wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }),
+);
 
 // 10. design-selection record: was the design choice recorded before the first commit,
 // with the required structure (#669)? One row per issue the cycle closes (#734).

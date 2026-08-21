@@ -40,7 +40,11 @@ import {
 } from "./gate-check.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
-import { classifyCycle, parseReviewRecords } from "./review-record.mjs";
+import {
+	CODE_PATH,
+	classifyCycle,
+	parseReviewRecords,
+} from "./review-record.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
 
@@ -601,14 +605,47 @@ export function checkDocsStep({ exec }) {
  * The verdict is classifyCycle's, called on `origin/<base>...HEAD`. A
  * malformed record is reported because parseReviewTrailer already judged it,
  * not as an extra rule.
+ *
+ * A fetched issue whose body enumerates two or more options additionally owes
+ * `Review: tool=design`; the branch row names every triggering issue.
  */
-export function reviewRecordStep({ commitMessages, changedFiles }) {
+export function reviewRecordStep({
+	commitMessages,
+	changedFiles,
+	issues = [],
+}) {
 	const name = "Review record";
+	const designReviewIssueNumbers = issues.flatMap(({ number, issue }) =>
+		detectEnumeratedOptions(issue?.body ?? "").count >= 2 ? [number] : [],
+	);
+	const designReviewIssues = designReviewIssueNumbers
+		.map((number) => `#${number}`)
+		.join(", ");
 	if (!commitMessages.ok)
-		return { name, status: "FAIL", detail: commitMessages.error };
+		return {
+			name,
+			status: "FAIL",
+			detail: [
+				commitMessages.error,
+				designReviewIssueNumbers.length > 0
+					? `cannot verify required Review: tool=design for issue(s) ${designReviewIssues}`
+					: undefined,
+			]
+				.filter(Boolean)
+				.join("; "),
+		};
 
 	const records = parseReviewRecords(commitMessages.text);
 	const problems = classifyCycle({ changedFiles, records });
+	if (
+		matchesTrigger(changedFiles, CODE_PATH) &&
+		designReviewIssueNumbers.length > 0 &&
+		!records.some(({ tool }) => tool === "design")
+	) {
+		problems.push(
+			`issue(s) ${designReviewIssues} enumerate multiple options; add Review: tool=design`,
+		);
+	}
 	for (const r of records.filter((r) => r.error))
 		problems.push(`malformed record: ${r.error}`);
 	if (problems.length > 0)
