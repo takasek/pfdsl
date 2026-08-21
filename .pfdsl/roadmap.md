@@ -65,9 +65,9 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 散文・PFD のみのサイクルは記録を要さない（レビューの要否は diff の規模で別に判断し、省略する回はその理由を PR 本文に書く）。
 自己レビュー（差分の読み直し）は実施済みとみなし、それに**加えて**軽い設定のレビューを実施する（角度を絞る。8角度 × 検証 agent の高効度設定は使わない）。
 
-menu は「どの手段を選ぶか」の優先順でなく「**どの観点が担保されたか**」で組む。
-手段を1つに固定すると、その手段が探さない型の欠陥だけが常に無担当になる — 実測（#836）で `/simplify` 4角度が findings なしだった回に、別レビューが採用案の adoption rationale 不成立と JSDoc の事実誤認の2件を検出した。
-そこで手段を固定せず、観点ごとにブリーフ要件を課す。
+menu を観点で組むこと（手段で組まないこと）は、配布層（`.claude/skills/pfd-ops/references/work-cycle.md` 手順3 のレビュー項目）が一次情報。
+このリポの実測値は #836 で、`/simplify` 4角度が findings なしだった回に、別レビューが採用案の adoption rationale 不成立と JSDoc の事実誤認の2件を検出した。
+以下はこのリポの観点とブリーフ要件のインスタンス値。
 
 1. **観点1 — 品質（簡素化・保守性）。** `/simplify` を使う。常に使え、PR 作成前でも回せる。角度は4つ固定。`/simplify` は correctness を明示的には探さない — skill 本文が「Do not look for correctness bugs — that is what /code-review is for」と宣言しており、この観点の実施だけをレビュー済みの根拠にしてはならない。
 2. **観点2 — correctness。** コード変更のある全サイクルで担保する。ブリーフ要件は (a) diff が導入・変更した事実主張（コメント・JSDoc・doc 散文・criteria 文言）を列挙し、各主張の**反証を試みる**こと（真偽判定でなく偽になる入力・状態を構成させる — 追認バイアスを falsification に固定するため）、(b) 変更行の外の消費者（散文を含む）を読んでよいこと（`/code-review` の bug 角度が持つ「shallow scan, avoid extra context」の逆を明示する）。軽量 subagent 1本を想定する。
@@ -80,18 +80,17 @@ menu は「どの手段を選ぶか」の優先順でなく「**どの観点が�
 要件 (a) はこの subagent に実装も変更意図も渡さない — したがって報告に現れる原因はすべて推測であり、引用と地続きに書かれると起票時に観測と区別が付かなくなる。
 実際に #844 は「隣接の種別は id から推測できない」を原因として抱えたまま起票され、実測（555 エッジで同種端点 0 件）で誤りと判明したのは実装着手後だった。`distribution-review`（plugin バンドル読者の模擬）と `spec-stress-test`（spec write-probe）はこの観点のドメイン特化版であり、その領域はそちらへ委ね、観点4 は CLI UX・拡張機能挙動等の未カバー領域へ汎用のブリーフ要件を与える。
 
-**全観点共通**: finding には具体的な failure scenario（入力・状態 → 誤出力/誤誘導）を必須とし、構成できない指摘は報告しない（敵対的指示は「何か見つけねば」圧で false positive を量産するため）。
+**全観点共通**: finding に failure scenario を必須とすることは配布層が一次情報（同上）。
 
-**発火した観点は軽くしてよいが、消してはならない**: 観点の発火条件（何を担保するか）と、その観点にかける重さ（subagent へ委譲するか自分で読むか）は別軸である。
-散文のみのサイクルでも条件付き観点は発火しうる — 配布同梱物の散文変更は観点4 の発火条件を満たす。
-diff の規模を理由に重さを落とした回は、落とした観点の名前と落とした理由を PR 本文に書く。
-担保の中核が委譲でしか作れない観点を軽くできないこと・起動できない回はユーザーへ返すこと・起動可否の判断自体を指示の文面で確かめることは、配布層（`references/work-cycle.md` 手順3 のレビュー項目）が一次情報。
+**発火した観点は軽くしてよいが、消してはならない**: この規則そのもの（発火条件と重さが別軸であること・落とした観点の名前と理由を成果物へ書くこと）も配布層が一次情報。
+このリポでのインスタンス: 散文のみのサイクルでも条件付き観点は発火しうる — 配布同梱物の散文変更は観点4 の発火条件を満たす。落とした観点の名前と理由の書き先は PR 本文。
+担保の中核が委譲でしか作れない観点を軽くできないこと・起動できない回はユーザーへ返すこと・起動可否の判断自体を指示の文面で確かめることも、同じ配布層の項目が持つ。
 このリポでそれに当たるのは観点3 で、独立性は解答を含まないツリーで別主体に解かせることでしか成立しない。
 
 `/code-review` は PR 作成後・大 diff の補完レビューへ降格し、**ゲート充足手段からは外す** — trailer はコミット前必須であり、PR 後に走る `/code-review` は構造的にゲートを満たせないためで、これは規約変更でなく役割分離である。
 `code-reviewer` agent を Agent tool で起動する手段は **導入が前提** — `pr-review-toolkit` / `feature-dev` plugin のいずれかを有効化していないと選べない。
 
-起動可否は harness と plugin の版に依存する。過去に「AI からは起動できない」と記録された手段でも、規約に従う前にその回の実体（コマンド定義の `disable-model-invocation`）を確認する。2026-07-28 時点で `/code-review` は `disable-model-invocation: false`。
+起動可否が harness と plugin の版に依存し、記録された「起動できない」がその時点の観測でしかないことは配布層が一次情報（同上）。このリポで確認する実体フィールドは `disable-model-invocation` で、2026-07-28 時点の `/code-review` は `disable-model-invocation: false`。
 
 記録はコミットの trailer に置き、`tool=` でどれを回したかを書く。
 **1サイクルで複数回レビューしたら、その回数だけ書く** — 自己レビュー → ツール → 指摘対応、と複数パスが走るのが普通で、1本に丸めると何が何を見つけたかが失われる。
@@ -124,7 +123,8 @@ develop 完了時点（PR 作成前、マージを待たない）で:
 
 **サイクルは worktree で回す**: このリポのルート作業ツリーは `~/works/pfdsl` 直下で、worktree は `.claude/worktrees/<name>/` に置く。
 worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順1 が一次情報。
-実際に起きた干渉の症状・検出（`git stash list` を先に見る等）・復旧手順は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。
+消えた編集を探すとき `git stash list` を先に見ることも配布層の同じ手順が持つ。
+実際に起きた干渉の症状と復旧手順は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
 `.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する（ビルドは不要）。
