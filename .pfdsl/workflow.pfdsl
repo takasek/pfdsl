@@ -54,7 +54,7 @@ artifact:
   feature_samples:
     label: 機能カタログ
     description: "1機能1ファイルの最小例。skill の references/samples.md の生成元"
-    criteria: spec の全機能に対応する最小サンプルが存在し、check がエラーなしで通過
+    criteria: docs/samples/ に spec の各機能に対応する最小サンプルが存在し、pfdsl check がエラーなしで通過する
     location: ../docs/samples/
     group: generation
   pfdsl_skill:
@@ -70,7 +70,7 @@ artifact:
   distribution_review_perspectives:
     label: 配布レビュー観点集
     description: "配布 bundle の散文を利用側の読み手として問い詰める観点の一次情報。review_perspectives（配布レンズ）側には置かない — あれは利用側にも同梱されるため、実施先の無い観点を配ることになる。回ごとの実行記録から一般化できた型だけを昇格して育てる"
-    criteria: 各観点が実際に検出された欠陥に由来し、機械検査で決定可能な分との境界が書かれている
+    criteria: 「観点」節の各項目について、由来する欠陥が docs/distribution-review/ の実行記録に見つかり、機械検査ルール（bundle-path・issue-ref）で決定可能な分との境界が本文に書かれている
     location: ../docs/distribution-review.md
     group: generation
   distribution_review_skill:
@@ -109,22 +109,22 @@ artifact:
   topics:
     label: 実践お題
     description: "対話で設定された実践 PFD の題材・シナリオ。write_examples の入力"
-    criteria: write_examples が着手できる題材・シナリオが、そのサイクルの issue コメントまたは PR 本文に残っている
+    criteria: write_examples が着手できる題材・シナリオが、gh issue view <該当issue> --comments または gh pr view <該当PR> で読める、そのサイクルのコメント・本文に記述されている
     group: dialogue
   proposals:
     label: 作業・仕様提案
     description: "対話で生まれた作業項目・仕様変更案。正式化は必ず file_issues を通る — 仕様変更が issue を経由する唯一の入口"
-    criteria: file_issues が起票判断できる粒度の作業項目が、そのサイクルの issue コメントまたは PR 本文に残っている
+    criteria: file_issues が起票判断できる粒度の作業項目が、gh issue view <該当issue> --comments または gh pr view <該当PR> で読める、そのサイクルのコメント・本文に記述されている
     group: dialogue
   decisions:
     label: 方法論判断
     description: "対話で確定した方法論・運用の判断。品質ガイド即時反映（maintain_template）とADR 起草（draft_adrs）の2経路で消費 — スキル改善は issue を通さない。実体はセッションログと反映先コミットで検証可能"
-    criteria: draft_adrs または maintain_template が反映判断できる確定判断が、issue コメント・PR 本文または ADR 草稿に残っている
+    criteria: draft_adrs または maintain_template が反映判断できる確定判断が、gh issue view <該当issue> --comments や gh pr view <該当PR> で読めるコメント・本文、または ADR 草稿ファイルに記述されている
     group: dialogue
   examples:
     label: 実践例
     description: "品質ガイドの実証とレビュー素材。スキル参照への採録候補"
-    criteria: check がエラーなし、品質ガイドのレビューで知見として記録済み
+    criteria: check がエラーなし、レビュー結果が pfd-retro の出力表に finding として記録されている
     location: ../docs/examples/
     group: practice
   findings:
@@ -147,12 +147,12 @@ artifact:
   article:
     label: 公開記事
     description: "ADR 群を素材とした外部公開記事。本生態系の最終納品物のひとつ。進捗 status の一次情報は roadmap.pfdsl の同 id — この図は手続きを描くもので status を持たない"
-    criteria: 外部メディアに公開済みで URL が存在する
+    criteria: "roadmap.pfdsl の article ノードに location: として設定される公開先URLをブラウザで開くと記事本文が表示される"
     group: decision
   gh_issues:
     label: GitHub issues
     description: "作業項目の一次情報"
-    criteria: 起票・クローズ・ラベル付けが完了し roadmap_pfdsl と同期済み
+    criteria: 起票・クローズ・ラベル付けが完了し、node scripts/pfdsl/audit-issues-flow.mjs が差分なしで通過する
     location: https://github.com/takasek/pfdsl/issues
     group: planning
   roadmap_pfdsl:
@@ -164,7 +164,7 @@ artifact:
   toolchain:
     label: ツールチェーン
     description: "packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）。実装の本質成果物。CLI に限らず develop の対象すべて"
-    criteria: 対象 issue の実装が完了し、PR がレビュー通過済み
+    criteria: 対象 issue の受け入れ基準を満たす実装が packages/ に入り、make check が通過し、PR がレビュー通過済み
     location: ../packages/
     group: planning
   published_cli:
@@ -182,13 +182,13 @@ artifact:
   pull_request:
     label: Pull Request
     description: "ブランチ上の変更束のレビュー・統合単位。レビュー指摘はブランチ上の修正で解消してからマージする"
-    criteria: レビュー指摘が解消され CI green で merge_pr が実行可能な状態
+    criteria: "レビュー指摘（PR の review comment）が解消済みで、.github/workflows/test.yml の test job が green になっており、merge_pr が実行可能な状態"
     location: https://github.com/takasek/pfdsl/pulls
     group: planning
   issue_updates:
     label: issue 更新内容
     description: "マージ時に確定する issue への反映事項（クローズ・進捗・新発見の起票種）。フロー内で生まれる不定形情報（ADR-0001 と緊張するが、実体は merge コミットと flow 更新で検証可能）。issue 管理への還流シグナル"
-    criteria: merge コミットで issue のクローズ・進捗・新発見の起票が反映済み
+    criteria: "merge_pr の PR 本文に Closes #<issue> 等の keyword 参照が含まれることを node scripts/check-closes-reference.mjs --pr <n>（CI gate）が検査し、進捗・新発見の起票は該当 issue のコメントとして gh issue view <issue> --comments で確認できる"
     group: planning
   ops_skill_general:
     label: PFD運用スキル（汎用層）
@@ -200,7 +200,7 @@ artifact:
   ops_skill_l3:
     label: PFD運用スキル（GitHub Issuesバックエンド層）
     description: GitHub Issues で作業項目管理する採用リポ向けプリセット（L3）の規約本文 = references/github-issues-backend.md。手書き（生成対象外）で、retro_skill の監査結果がこの層の規約改訂に還流する。採用リポが実際に配置するファイル群は ops_install_templates 側
-    criteria: 採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・close 時の降格規則・PR 本文規約）が記述済み
+    criteria: ../.claude/skills/pfd-ops/references/github-issues-backend.md に、採用リポが GitHub Issues バックエンドを採用するのに必要な規約（ラベル判定・close 時の降格規則・PR 本文規約）が記述されている
     location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
     group: generation
     tags: [ distilled_skill ]
@@ -220,7 +220,7 @@ artifact:
   implementer_agent:
     label: 実装委譲agent
     description: "pfd-implementer agent。実装のみを委譲し、push・PR 作成・issue 操作は呼び出し元に残す。手書きだが gen_plugin が plugin へミラーする（#558）。留保指定を機構で担保するのは delegation_guard で、そちらは配布しない"
-    criteria: agent 定義が plugin 同梱物に含まれ、採用リポで設置作業なしに層1が効く
+    criteria: make gen-plugin が差分なしで完了して plugin/pfdsl/agents/pfd-implementer.md が実在し、採用リポで plugin を入れただけで pfd-implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い
     location: ../.claude/agents/pfd-implementer.md
     group: generation
   retro_reminder_hook:
@@ -232,13 +232,13 @@ artifact:
   delegation_guard:
     label: 外向き操作ガード
     description: "委譲先 subagent の push・PR 作成・issue 操作を拒否する PreToolUse(Bash) フック（#554）。implementer_agent のブリーフが書く留保指定を、指示でなく権限として強制する。.claude/settings.json の配線を伴うリポ固有の機構であり、implementer_agent と違って配布対象外"
-    criteria: allowlist 外の subagent からの外向きコマンドが拒否され、呼び出し元と allowlist 対象 agent は影響を受けない
+    criteria: allowlist 外の subagent からの外向きコマンドが拒否され、呼び出し元と allowlist 対象 agent は影響を受けないことが scripts/lib/delegation-guard.test.mjs のテストで検証されている
     location: ../scripts/delegation-guard.mjs
     group: generation
   main_branch_guard:
     label: mainブランチ操作ガード
     description: "main ブランチ上でツリー・インデックスを変える git コマンドを止める PreToolUse(Bash) フック（#650、#777 で commit 以外へ拡張）。develop→PR→merge_pr を正規経路にする規約を、指示でなく権限として強制する。delegation_guard と同じくリポ固有で配布対象外。実体のファイル名は commit のみを見ていた頃のもので、リネームすると起動中セッションが持つ settings.json の配線が消えたパスを指すため据え置いている"
-    criteria: main 上の変更系 git コマンドが deny または ask になり、読み取り系と feature branch 上の操作は影響を受けない
+    criteria: main 上の変更系 git コマンドが deny または ask になり、読み取り系と feature branch 上の操作は影響を受けないことが scripts/lib/main-commit-guard.test.mjs のテストで検証されている
     location: ../scripts/main-commit-guard.mjs
     group: generation
   ecosystem_skill:
@@ -293,7 +293,7 @@ artifact:
   pr_diagrams:
     label: PR差分ダイアグラム
     description: "merged PR が .pfdsl を変更した際に CI（pr-diff-images.yml）が before/after SVG を自動生成し takasek/ci-image-store へ push。PR description に埋め込まれ考古的レビューに使われる終端成果物。ライフサイクル: PR ごとに蓄積（削除規約なし）"
-    criteria: PR マージ後に CI が before/after SVG を自動生成し ci-image-store へ push 済み
+    criteria: PR マージ後に .github/workflows/pr-diff-images.yml が before/after SVG を自動生成し ci-image-store へ push 済み
     location: https://github.com/takasek/ci-image-store
     group: release
   readme:
