@@ -29,6 +29,8 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 
 	it("matches the Codex assembly sources and generated roots", () => {
 		for (const path of [
+			"CLAUDE.md",
+			".claude/settings.json",
 			"scripts/lib/harness-inventory.mjs",
 			"scripts/lib/gen-codex-assets.mjs",
 			"scripts/gen-codex-assets.mjs",
