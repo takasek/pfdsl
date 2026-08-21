@@ -359,6 +359,25 @@ describe("findUnwiredSkills", () => {
 		]);
 	});
 
+	it("reports an artifact declared in both graphs once, as workflow-declared", () => {
+		// Every bundled artifact but pfd_commands is declared in both graphs, so
+		// scanning the two pools naively doubles the common case: one finding per
+		// declaration, anchored at a different file each, for the same defect.
+		const pipelineArtifacts = { retro_skill: ARTIFACTS.retro_skill };
+		const pipelineEdges = PIPELINE_EDGES.filter(
+			(edge) => edge.artifact !== "retro_skill",
+		);
+		const found = run({ pipelineArtifacts, pipelineEdges });
+		assert.deepEqual(found, [
+			{
+				id: "retro_skill",
+				location: "../.claude/skills/pfd-retro/",
+				missing: ["gen_plugin inputs"],
+				declaredIn: "workflow",
+			},
+		]);
+	});
+
 	it("requires only gen_plugin inputs of a pipeline-only bundled artifact, the pfd_commands case (#944)", () => {
 		const pipelineArtifacts = {
 			pfd_commands: { location: "../.claude/commands/" },

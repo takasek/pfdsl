@@ -133,11 +133,31 @@ describe("runSkillWiringCheck", () => {
 	});
 
 	it("tells the reader where to add the missing edges", () => {
+		const workflow = {
+			frontmatter: WORKFLOW.frontmatter,
+			edges: [],
+		};
 		const result = runSkillWiringCheck(
-			deps({ pipeline: { frontmatter: {}, edges: [] } }),
+			deps({ workflow, pipeline: { frontmatter: {}, edges: [] } }),
 		);
 		assert.match(result.stderrLines.join("\n"), /distill_ops -> \[\.\.\.\]/);
 		assert.match(result.stderrLines.join("\n"), /\[\.\.\.\] >> gen_plugin/);
+	});
+
+	it("names only the edges the findings are actually missing", () => {
+		// A pipeline-only artifact is never eligible for distill_ops outputs
+		// (#944), so telling its reader to add one — and that the artifact "is
+		// produced there" — sends them to write an edge the check rejects.
+		const mirrors = [
+			{ dest: "commands", src: ".claude/commands", files: ["pfd-cycle.md"] },
+		];
+		const result = runSkillWiringCheck({
+			...deps({ pipeline: PIPELINE_COMMANDS }),
+			mirrors,
+		});
+		const stderr = result.stderrLines.join("\n");
+		assert.match(stderr, /\[\.\.\.\] >> gen_plugin/);
+		assert.doesNotMatch(stderr, /distill_ops -> \[\.\.\.\]/);
 	});
 
 	it("fails when the manifest carries an entry no artifact models", () => {

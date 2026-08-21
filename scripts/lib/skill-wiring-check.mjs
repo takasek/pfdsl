@@ -170,27 +170,31 @@ export function findUnwiredSkills({
 	const generated = edgeMembers(pipelineEdges, { kind: "output" });
 
 	const findings = [];
-	const sources = [
-		{ artifacts: workflowArtifacts, declaredIn: "workflow" },
-		{ artifacts: pipelineArtifacts, declaredIn: "pipeline" },
-	];
-	for (const { artifacts, declaredIn } of sources) {
-		for (const [id, meta] of Object.entries(artifacts)) {
-			if (!meta?.location) continue;
-			const locations = Array.isArray(meta.location)
-				? meta.location
-				: [meta.location];
-			if (!locations.some((loc) => isBundledSource(repoRelative(loc), mirrors)))
-				continue;
-			if (generated.has(id)) continue;
+	// Keyed by id, so an artifact both graphs declare — which every bundled one
+	// but pfd_commands is — yields one finding rather than one per declaration.
+	// workflow.pfdsl wins the tie: it owns the content, and it is the graph whose
+	// distill_ops edge the artifact is then held to.
+	const universe = new Map();
+	for (const [id, meta] of Object.entries(pipelineArtifacts))
+		universe.set(id, { meta, declaredIn: "pipeline" });
+	for (const [id, meta] of Object.entries(workflowArtifacts))
+		universe.set(id, { meta, declaredIn: "workflow" });
 
-			const missing = [];
-			if (declaredIn === "workflow" && !distillOutputs.has(id))
-				missing.push("distill_ops outputs");
-			if (!genPluginInputs.has(id)) missing.push("gen_plugin inputs");
-			if (missing.length > 0)
-				findings.push({ id, location: meta.location, missing, declaredIn });
-		}
+	for (const [id, { meta, declaredIn }] of universe) {
+		if (!meta?.location) continue;
+		const locations = Array.isArray(meta.location)
+			? meta.location
+			: [meta.location];
+		if (!locations.some((loc) => isBundledSource(repoRelative(loc), mirrors)))
+			continue;
+		if (generated.has(id)) continue;
+
+		const missing = [];
+		if (declaredIn === "workflow" && !distillOutputs.has(id))
+			missing.push("distill_ops outputs");
+		if (!genPluginInputs.has(id)) missing.push("gen_plugin inputs");
+		if (missing.length > 0)
+			findings.push({ id, location: meta.location, missing, declaredIn });
 	}
 	return findings;
 }
