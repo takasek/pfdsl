@@ -10,11 +10,9 @@
 // guard that blocked here would be wrong as often as it was right — reading
 // a stale build on purpose is a normal thing to do while debugging.
 //
-// Wired to PostToolUse only (#929). That is the end where additionalContext
-// reaches the model exactly when it is about to draw a conclusion from a result
-// that read a stale build. It is also the only end available to an advisory at
-// all — see buildAdvisoryOutput in lib/hook-io.mjs for the contract that rules
-// PreToolUse out.
+// What it guards against is therefore the conclusion drawn from the output,
+// which does not exist until the command has run — so it is wired to
+// PostToolUse only (#929). See buildAdvisoryOutput in lib/hook-io.mjs.
 
 import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
 

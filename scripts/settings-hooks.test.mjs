@@ -1,9 +1,10 @@
 // The wiring in .claude/settings.json, checked as data.
 //
-// A script wired to two events runs twice per tool call, and for an advisory
-// only one of the two ends can reach the model (the contract is quoted at
-// buildAdvisoryOutput in lib/hook-io.mjs, #929). Double wiring therefore buys
-// nothing and costs a second process spawn, so nothing should be wired twice.
+// A script wired to two events runs twice per tool call, spawning a second
+// process and, unless it behaves differently per event, saying the same thing
+// twice. Neither is worth paying for, so nothing should be wired twice. Which
+// single event a given hook belongs on is decided where that hook lives —
+// see buildAdvisoryOutput in lib/hook-io.mjs for the advisory case (#929).
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
