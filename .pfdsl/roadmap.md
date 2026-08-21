@@ -118,7 +118,7 @@ diff の規模に合わせて委譲せず自分で読んだだけの回は `Revi
 develop 完了時点（PR 作成前、マージを待たない）で:
 
 - [ ] 変更が公開物の挙動・同梱内容を変える場合（CLI 出力・拡張機能の動作変化に加え、plugin 同梱物 = 配布スキル群・pfd-* コマンド・agents（`make gen-plugin` の対象）の変更を含む — パスでなく挙動と同梱内容で判定）、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending をどこかへ書き写す必要はない — 次サイクルのプリフライトが `releasePending` として毎回一次情報から取り直す。#814）
-- [ ] CLIコマンドを追加・変更した場合、HELP テキスト（`packages/cli/src/index.ts`）を更新し、`make gen-readme-cli` で root README と `packages/cli/README.md` の両方を再生成してコミットした（#850 以降、後者も生成物。drift は pre-commit の `readme-cli` ゲートと CI の `make check-readme-cli` が検出する）
+- [ ] CLIコマンドを追加・変更した場合、コマンド定義テーブル（`packages/cli/src/index.ts` の `COMMAND_GROUPS` / `TOP_LEVEL_COMMANDS`。dispatcher と help 列挙の双方がここから導かれる #902）を更新し、`make gen-readme-cli` で root README と `packages/cli/README.md` の両方を再生成してコミットした（#850 以降、後者も生成物。drift は pre-commit の `readme-cli` ゲートと CI の `make check-readme-cli` が検出する）
 - [ ] 実装を subagent へ委譲した場合、戻り時に `git log origin/<branch>..HEAD` と open PR 一覧を確認し、委譲先がブリーフの留保作業（push・PR 作成・issue 操作）を実行していないか照合した
 - [ ] コード変更のあるサイクルでは、観点1（品質）の記録に加えて観点2（correctness）または観点3（設計妥当性）の記録が入っていることを、コミット直前に確認した。レビュー実施とコミット作成の間に他の作業（PR 作成・push 等）を挟むと記載を失念しやすい — 実施済みで未記載のまま次の作業に進んでいないか、コミット直前に再確認する
 
