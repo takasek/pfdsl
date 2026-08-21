@@ -9,8 +9,12 @@
 //   - .claude/settings.json `permissions.deny` is project-wide, so it would
 //     also disarm the main thread and issue-worker (whose job is to open PRs)
 // Only a PreToolUse hook can scope the rule to the caller, because only the
-// hook payload distinguishes them: a subagent's payload carries `agent_type`
-// and `agent_id`, the main thread's does not (verified, #554). session_id,
+// hook payload distinguishes them: `agent_id` is present "only when the hook
+// fires inside a subagent call", which the hooks reference names as the way to
+// tell subagent calls from main-thread ones. `agent_type` is not that field —
+// it is also present "when the session uses --agent", so a caller started with
+// `claude --agent <name>` reads as a subagent and gets its own push blocked
+// (#932; the earlier "verified, #554" note had missed that clause). session_id,
 // transcript_path and prompt_id are shared by parent and child and cannot be
 // used for this.
 //
@@ -235,9 +239,13 @@ export function evaluateDelegationGuard(
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
 
+	// No agent_id means the caller itself, which owns review and publishing.
+	// See the module header for why agent_id and not agent_type (#932).
+	if (!payload?.agent_id) return { decision: "allow" };
+
+	// agent_type names which agent it is; the contract has it present whenever
+	// agent_id is, so it needs no absence handling here.
 	const agentType = payload?.agent_type;
-	// No agent_type means the caller itself, which owns review and publishing.
-	if (!agentType) return { decision: "allow" };
 	if (allowedAgents.includes(agentType)) return { decision: "allow" };
 
 	const matched = findOutwardCommand(payload?.tool_input?.command);
