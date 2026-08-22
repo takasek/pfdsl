@@ -410,12 +410,14 @@ function restoreAssemblyDestination(backup, destination, deps) {
 	}
 }
 
-function snapshotPluginRoot(pluginRoot, deps, runId) {
-	const backup = temporaryAssemblySibling(pluginRoot, "prev", runId);
+function snapshotAssemblyDestination(destination, backup, deps) {
 	deps.rmSync(backup, { recursive: true, force: true });
-	const hadDestination = deps.existsSync(pluginRoot);
+	const hadDestination = deps.existsSync(destination);
 	try {
-		if (hadDestination) deps.cpSync(pluginRoot, backup, { recursive: true });
+		if (hadDestination) {
+			deps.mkdirSync(dirname(backup), { recursive: true });
+			deps.cpSync(destination, backup, { recursive: true });
+		}
 	} catch (error) {
 		removeAssemblyArtifact(backup, deps);
 		throw error;
@@ -423,11 +425,51 @@ function snapshotPluginRoot(pluginRoot, deps, runId) {
 	return { backup, hadDestination };
 }
 
-function restorePluginRootSnapshot(pluginRoot, snapshot, deps) {
-	removeAssemblyArtifact(pluginRoot, deps);
+function snapshotPluginGeneration(root, pluginRoot, deps, runId) {
+	const transactionRoot = resolve(
+		dirname(pluginRoot),
+		`.pfdsl-gen-txn-${runId}`,
+	);
+	deps.rmSync(transactionRoot, { recursive: true, force: true });
+	try {
+		const snapshots = [
+			[
+				pluginRoot,
+				snapshotAssemblyDestination(
+					pluginRoot,
+					resolve(transactionRoot, "plugin-root"),
+					deps,
+				),
+			],
+			[
+				resolve(root, ".claude-plugin/marketplace.json"),
+				snapshotAssemblyDestination(
+					resolve(root, ".claude-plugin/marketplace.json"),
+					resolve(transactionRoot, "marketplace.json"),
+					deps,
+				),
+			],
+			[
+				resolve(root, ".claude/skills/pfd-ops/install"),
+				snapshotAssemblyDestination(
+					resolve(root, ".claude/skills/pfd-ops/install"),
+					resolve(transactionRoot, "install"),
+					deps,
+				),
+			],
+		];
+		return { transactionRoot, snapshots };
+	} catch (error) {
+		removeAssemblyArtifact(transactionRoot, deps);
+		throw error;
+	}
+}
+
+function restoreAssemblySnapshot(destination, snapshot, deps) {
+	removeAssemblyArtifact(destination, deps);
 	if (!snapshot.hadDestination) return true;
 	try {
-		deps.renameSync(snapshot.backup, pluginRoot);
+		deps.renameSync(snapshot.backup, destination);
 		return true;
 	} catch {
 		return false;
@@ -696,12 +738,9 @@ export function assemblePluginDistIndependent({
 		assembleCodexAssets,
 	},
 }) {
-	const pluginSnapshot = snapshotPluginRoot(
-		pluginRoot,
-		deps,
-		deps.newRunId?.() ?? randomUUID(),
-	);
-	let preserveSnapshot = false;
+	const runId = deps.newRunId?.() ?? randomUUID();
+	const transaction = snapshotPluginGeneration(root, pluginRoot, deps, runId);
+	let preserveTransaction = false;
 	try {
 		deps.genInstall(root);
 		console.log(
@@ -783,13 +822,22 @@ export function assemblePluginDistIndependent({
 
 		deps.assembleCodexAssets({ root, pluginRoot, codexPluginRoot, deps });
 	} catch (error) {
-		if (!restorePluginRootSnapshot(pluginRoot, pluginSnapshot, deps)) {
-			preserveSnapshot = true;
-			if (error && typeof error === "object")
-				error.rollbackBackup = pluginSnapshot.backup;
+		for (const [destination, snapshot] of [
+			...transaction.snapshots,
+		].reverse()) {
+			if (!restoreAssemblySnapshot(destination, snapshot, deps)) {
+				preserveTransaction = true;
+			}
+		}
+		if (preserveTransaction && error && typeof error === "object") {
+			error.rollbackBackup = transaction.transactionRoot;
+			error.rollbackBackups = transaction.snapshots.map(
+				([, snapshot]) => snapshot.backup,
+			);
 		}
 		throw error;
 	} finally {
-		if (!preserveSnapshot) removeAssemblyArtifact(pluginSnapshot.backup, deps);
+		if (!preserveTransaction)
+			removeAssemblyArtifact(transaction.transactionRoot, deps);
 	}
 }

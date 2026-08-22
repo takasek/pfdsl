@@ -555,11 +555,16 @@ describe("assemblePluginDistIndependent", () => {
 	it("restores both plugin roots when the later Codex assembly fails", () => {
 		const pluginRoot = "/repo/plugin/pfdsl";
 		const codexPluginRoot = "/repo/plugin/pfdsl-codex";
+		const marketplacePath = "/repo/.claude-plugin/marketplace.json";
+		const installRoot = "/repo/.claude/skills/pfd-ops/install";
 		const files = new Map([
 			[pluginRoot, "directory"],
 			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
 			[codexPluginRoot, "directory"],
 			[`${codexPluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Codex skill"],
+			[marketplacePath, "legacy marketplace"],
+			[installRoot, "directory"],
+			[`${installRoot}/install.md`, "legacy install"],
 		]);
 		const before = new Map(files);
 		const remove = (path) => {
@@ -587,6 +592,7 @@ describe("assemblePluginDistIndependent", () => {
 		const { deps } = fakeDeps({
 			cpSync: (from, to) => copy(from, to),
 			existsSync: (path) => files.has(path),
+			genInstall: () => files.set(`${installRoot}/install.md`, "new install"),
 			mirrorDir: (name, _source, destination) =>
 				files.set(`${destination}/${name}/SKILL.md`, "new Claude skill"),
 			mirrorFiles: (_names, _source, destination) =>
@@ -615,13 +621,17 @@ describe("assemblePluginDistIndependent", () => {
 			new Map(
 				[...source].filter(
 					([path]) =>
-						path.startsWith(pluginRoot) || path.startsWith(codexPluginRoot),
+						path.startsWith(pluginRoot) ||
+						path.startsWith(codexPluginRoot) ||
+						path === marketplacePath ||
+						path.startsWith(`${installRoot}/`) ||
+						path === installRoot,
 				),
 			);
 		assert.deepEqual(pluginFiles(files), pluginFiles(before));
 		assert.equal(
 			[...files.keys()].some((path) =>
-				path.includes(".codex-prev-rollback-test"),
+				path.includes(".pfdsl-gen-txn-rollback-test"),
 			),
 			false,
 		);
@@ -629,9 +639,14 @@ describe("assemblePluginDistIndependent", () => {
 
 	it("restores the Claude plugin root when an early mirror fails", () => {
 		const pluginRoot = "/repo/plugin/pfdsl";
+		const marketplacePath = "/repo/.claude-plugin/marketplace.json";
+		const installRoot = "/repo/.claude/skills/pfd-ops/install";
 		const files = new Map([
 			[pluginRoot, "directory"],
 			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
+			[marketplacePath, "legacy marketplace"],
+			[installRoot, "directory"],
+			[`${installRoot}/install.md`, "legacy install"],
 		]);
 		const before = new Map(files);
 		const remove = (path) => {
@@ -660,6 +675,7 @@ describe("assemblePluginDistIndependent", () => {
 		const { deps } = fakeDeps({
 			cpSync: copy,
 			existsSync: (path) => files.has(path),
+			genInstall: () => files.set(`${installRoot}/install.md`, "new install"),
 			mirrorDir: (name, _source, destination) => {
 				files.set(`${destination}/${name}/SKILL.md`, "new Claude skill");
 				mirrors += 1;
@@ -679,7 +695,7 @@ describe("assemblePluginDistIndependent", () => {
 		assert.deepEqual(files, before);
 		assert.equal(
 			[...files.keys()].some((path) =>
-				path.includes(".codex-prev-early-failure-test"),
+				path.includes(".pfdsl-gen-txn-early-failure-test"),
 			),
 			false,
 		);
@@ -687,7 +703,7 @@ describe("assemblePluginDistIndependent", () => {
 
 	it("cleans a partial snapshot when its copy fails", () => {
 		const pluginRoot = "/repo/plugin/pfdsl";
-		const backup = `${pluginRoot}.codex-prev-snapshot-failure-test`;
+		const transactionRoot = "/repo/plugin/.pfdsl-gen-txn-snapshot-failure-test";
 		const files = new Map([
 			[pluginRoot, "directory"],
 			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
@@ -714,12 +730,13 @@ describe("assemblePluginDistIndependent", () => {
 			/snapshot copy failed/,
 		);
 		assert.deepEqual(files, before);
-		assert.equal(files.has(backup), false);
+		assert.equal(files.has(transactionRoot), false);
 	});
 
 	it("keeps the snapshot when rollback restoration fails", () => {
 		const pluginRoot = "/repo/plugin/pfdsl";
-		const backup = `${pluginRoot}.codex-prev-restore-failure-test`;
+		const transactionRoot = "/repo/plugin/.pfdsl-gen-txn-restore-failure-test";
+		const backup = `${transactionRoot}/plugin-root`;
 		const files = new Map([
 			[pluginRoot, "directory"],
 			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
@@ -754,10 +771,14 @@ describe("assemblePluginDistIndependent", () => {
 			},
 		});
 
-		assert.throws(
-			() => assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps }),
-			/Codex assembly failed/,
-		);
+		let error;
+		try {
+			assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps });
+		} catch (caught) {
+			error = caught;
+		}
+		assert.match(error.message, /Codex assembly failed/);
+		assert.equal(error.rollbackBackup, transactionRoot);
 		assert.equal(
 			files.get(`${backup}/skills/pfd-ops/SKILL.md`),
 			"legacy Claude skill",
@@ -1305,6 +1326,12 @@ describe("Codex generated consumers", () => {
 				readFileSync(join(pluginRoot, relativePath)).toString("base64"),
 			]),
 			claudeBefore,
+		);
+		assert.equal(
+			readdirSync(join(repoRoot, "plugin")).some((entry) =>
+				entry.startsWith(".pfdsl-gen-txn-"),
+			),
+			false,
 		);
 
 		const consumer = mkdtempSync(join(tmpdir(), "codex-plugin-consumer-"));
