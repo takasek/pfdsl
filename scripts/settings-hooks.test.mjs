@@ -40,6 +40,13 @@ describe(".claude/settings.json hook wiring", () => {
 		assert.deepEqual(duplicates, []);
 	});
 
+	it("wires the pre-artifact advisory to the write events, which is what makes it reach code", () => {
+		assert.deepEqual(
+			wiringByCommand().get("node scripts/pre-artifact-advisory.mjs"),
+			["PostToolUse[Write|Edit]"],
+		);
+	});
+
 	it("wires the stale-dist advisory to PostToolUse, where it reaches the model", () => {
 		assert.deepEqual(
 			wiringByCommand().get("node scripts/stale-dist-guard.mjs"),
