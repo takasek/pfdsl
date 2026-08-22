@@ -25,6 +25,7 @@ import {
 	detectEnumeratedOptions,
 	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
+	isUnregisteredManagedIssue,
 	parsePorcelainPaths,
 	parseReadyOutput,
 	summarizeReleasePending,
@@ -253,6 +254,8 @@ export async function runCycleStatus({
 	// The count shown is the largest across the cycle's issues: a record is owed
 	// on each one separately, and the template is written once.
 	let recordOptionCount = 0;
+	/** @type {Map<number, string[]>} label names of each issue actually fetched */
+	const labelsByIssue = new Map();
 
 	if (targetIssues.length > 0) {
 		for (const targetIssue of targetIssues) {
@@ -263,8 +266,12 @@ export async function runCycleStatus({
 						"view",
 						String(targetIssue),
 						"--json",
-						"body,comments,createdAt",
+						"body,comments,createdAt,labels",
 					]),
+				);
+				labelsByIssue.set(
+					targetIssue,
+					(issueJson.labels ?? []).map((l) => l?.name).filter(Boolean),
 				);
 				recordOptionCount = Math.max(
 					recordOptionCount,
@@ -307,6 +314,8 @@ export async function runCycleStatus({
 	// back to null rather than guessing; buildGateCheckCommand turns that into
 	// the --no-artifact equivalent.
 	let artifactKey = null;
+	/** @type {number[]} target issues labelled flow:managed with no process yet */
+	const unregisteredManagedIssues = [];
 	if (targetIssues.length > 0) {
 		if (roadmapText === null) {
 			try {
@@ -319,10 +328,30 @@ export async function runCycleStatus({
 			}
 		}
 		if (roadmapText !== null) {
+			const processIdByIssue = new Map(
+				targetIssues.map((issue) => [
+					issue,
+					findProcessIdForIssueNumber(roadmapText, issue),
+				]),
+			);
+			// The one moment the missing roadmap entry is actionable (#963): this
+			// cycle is starting this issue, so its inputs and outputs are in hand.
+			// audit-issues-flow reports the same gap for every open issue, but only
+			// as advisory — see isUnregisteredManagedIssue.
+			// Only issues whose labels were actually fetched are judged. An issue
+			// whose `gh issue view` threw has unknown labels: calling it
+			// unregistered would be a false positive, and the failure itself is
+			// already reported loudly through designUnsettledError, so silence
+			// here is not silence overall.
+			for (const [issue, processId] of processIdByIssue) {
+				const labels = labelsByIssue.get(issue);
+				if (labels === undefined) continue;
+				if (isUnregisteredManagedIssue(labels, processId)) {
+					unregisteredManagedIssues.push(issue);
+				}
+			}
 			const resolvedProcessIds = new Set(
-				targetIssues
-					.map((issue) => findProcessIdForIssueNumber(roadmapText, issue))
-					.filter((id) => id !== null),
+				[...processIdByIssue.values()].filter((id) => id !== null),
 			);
 			if (resolvedProcessIds.size === 1 && existsSync(cliPath)) {
 				const [processId] = resolvedProcessIds;
@@ -400,6 +429,7 @@ export async function runCycleStatus({
 		}),
 		reviewRecordTemplate: buildReviewRecordTemplate(),
 		gateCheckCommand,
+		unregisteredManagedIssues,
 		preArtifactPatterns,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;

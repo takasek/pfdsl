@@ -139,6 +139,24 @@ export function findProcessIdForIssueNumber(pfdslText, issueNumber) {
 	return null;
 }
 
+/**
+ * Whether the issue about to be started owes a roadmap entry (#963).
+ *
+ * `audit-issues-flow.mjs` reports the same gap, but only as advisory: a managed
+ * issue's entry lands on the branch that implements it, so every other session
+ * sees the gap until that branch merges, and failing on it made the terminal
+ * gate red in cycles whose diff could not have caused it. The gap is worth
+ * acting on at exactly one moment — when this cycle starts that very issue —
+ * which is the moment this preflight runs.
+ * @param {string[]} labelNames the issue's label names
+ * @param {string | null} processId the process tracking it, or null when none
+ * @returns {boolean}
+ */
+export function isUnregisteredManagedIssue(labelNames, processId) {
+	if (processId !== null) return false;
+	return (labelNames ?? []).includes("flow:managed");
+}
+
 const HEADING_LINE_PATTERN = /^(#{2,6})\s+(.*)$/;
 const NUMBERED_ITEM_PATTERN = /^\d+\.\s/;
 const LABELED_SUBHEADING_ITEM_PATTERN = /^#{3,6}\s+([A-Za-z]|\d+)[.、]\s/;

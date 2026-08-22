@@ -12,6 +12,7 @@ import {
 	detectEnumeratedOptions,
 	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
+	isUnregisteredManagedIssue,
 	parsePorcelainPaths,
 	parseReadyOutput,
 	summarizeCiStatus,
@@ -742,5 +743,30 @@ describe("buildPreArtifactReminders", () => {
 
 	it("returns nothing when no pattern carries the phase", () => {
 		assert.deepEqual(buildPreArtifactReminders([patterns[1]]), []);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// isUnregisteredManagedIssue
+// ---------------------------------------------------------------------------
+
+describe("isUnregisteredManagedIssue", () => {
+	it("reports a flow:managed issue with no process in the roadmap", () => {
+		assert.equal(isUnregisteredManagedIssue(["flow:managed"], null), true);
+	});
+
+	it("stays quiet once the issue has a tracked process", () => {
+		assert.equal(
+			isUnregisteredManagedIssue(["flow:managed"], "i956_generate_codex"),
+			false,
+		);
+	});
+
+	it("stays quiet for flow:exempt issues, which are absent by design", () => {
+		assert.equal(isUnregisteredManagedIssue(["flow:exempt"], null), false);
+	});
+
+	it("stays quiet for an unlabelled issue: triage is a different finding", () => {
+		assert.equal(isUnregisteredManagedIssue([], null), false);
 	});
 });
