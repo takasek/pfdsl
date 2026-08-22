@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: CLAUDE.md. -->
+
 # pfdsl
 
 成果物管理・進捗更新・ワークフロー運用は pfd-ops スキルに従う。
@@ -39,9 +41,10 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 直近の履歴 (`git log --oneline`) を参考にスタイルを合わせる。
 
-## Codex の worktree と git metadata
+## Codex 固有の責務境界
 
-親 agent が `git fetch`、stage、commit を担当する。
-subagent へ git metadata 操作を委譲しない。
-subagent は worktree 内のファイル編集と検査だけを担当する。
+この節は本文中の git に関する指示より優先する。
+親 agent が `git fetch`、stage、commit、`git push`、PR の作成・更新、issue の作成・クローズ・コメントを担当する。
+subagent は worktree 内のファイル編集とテスト・検査だけを担当する。
+subagent は git metadata 操作や外部公開操作を実行しない。
 subagent の権限エラーはユーザーへ直接継続を求めず、親 agent へ引き上げる。

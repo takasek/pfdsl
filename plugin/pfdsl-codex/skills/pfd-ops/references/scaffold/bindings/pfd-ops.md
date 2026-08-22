@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/scaffold/bindings/pfd-ops.md. -->
+
 # pfd-ops バインディング
 
 pfd-ops 運用に紐づく、Codex へ恒常的に届けたい指示（PR 本文規約等）はこのファイルに置く。読まれる契機は pfd-ops SKILL.md の該当行が保証する。サイクル外でも常時届けたい指示は root `AGENTS.md` からこのファイルへポインタを張る。

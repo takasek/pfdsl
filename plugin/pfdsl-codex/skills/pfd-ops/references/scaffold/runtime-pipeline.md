@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/scaffold/runtime-pipeline.md. -->
+
 # runtime-pipeline.md — 変換境界の補足（runtime-pipeline.pfdsl の companion）
 
 `runtime-pipeline.pfdsl` のグラフが運べない、変換境界に関する補足をここに置く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。

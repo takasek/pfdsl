@@ -15,6 +15,7 @@ description: |
   node whose connections remain unclear in an otherwise forward-built
   graph.
 ---
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-grill/SKILL.md. -->
 
 # pfd-grill: 最終成果物からの後ろ向き対話構築
 

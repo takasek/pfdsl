@@ -10,6 +10,7 @@ description: |
   before /pfd-cycle. The PFD kind taxonomy (ADR-0017: kind table, intake
   questions, one-file-per-kind rule) lives in references/kind-taxonomy.md.
 ---
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ecosystem/SKILL.md. -->
 
 # pfd-ecosystem: プロジェクト PFD セット対話的構築
 

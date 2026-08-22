@@ -9,6 +9,7 @@ description: |
   has actually produced, then routes findings into ops improvements.
   Complements pfd-ops (which runs the cycle; this skill improves it).
 ---
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-retro/SKILL.md. -->
 
 # PFD retrospective audit
 

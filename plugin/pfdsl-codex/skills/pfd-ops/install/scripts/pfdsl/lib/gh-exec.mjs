@@ -1,3 +1,4 @@
+// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/lib/gh-exec.mjs.
 /**
  * Drop-in replacement for `execFileSync("gh", args)`: tries the real gh CLI
  * first (unchanged behavior when it's installed), and falls back to the

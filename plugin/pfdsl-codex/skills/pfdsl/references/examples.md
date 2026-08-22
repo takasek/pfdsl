@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: docs/examples/. -->
+
 <!-- DO NOT EDIT — generated from docs/examples/ in https://github.com/takasek/pfdsl -->
 
 # PFDSL Examples Reference

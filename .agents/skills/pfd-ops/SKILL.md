@@ -11,6 +11,7 @@ description: |
   (notation and quality of .pfdsl files); this skill covers how to run the
   project on top of them.
 ---
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/SKILL.md. -->
 
 # PFD-driven project operations
 

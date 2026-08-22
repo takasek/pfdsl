@@ -1,3 +1,4 @@
+// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs.
 /**
  * GitHub REST API fallback for the small subset of `gh` operations this
  * repo's scripts use. Used by gh-exec.mjs's execGh when the `gh` binary is

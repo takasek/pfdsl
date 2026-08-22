@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/architecture.md. -->
+
 # pfd-ops アーキテクチャ
 
 pfd-ops スキルは4層で構成される。各層の「配布可能性」が異なる。

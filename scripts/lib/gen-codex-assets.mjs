@@ -9,6 +9,10 @@ const AGENT_FRONTMATTER_KEYS = new Set([
 ]);
 const READ_ONLY_TOOLS = "Read, Grep, Bash";
 const WORKSPACE_WRITE_TOOLS = "Bash, Read, Edit, Write, Grep, Glob, Skill";
+const MARKDOWN_GENERATED_NOTICE =
+	/^<!--(?=[^\r\n]*DO NOT EDIT)(?=[^\r\n]*Authoritative source:)[^\r\n]*-->$|^#{1,6}[ \t]+(?=[^\r\n]*DO NOT EDIT)(?=[^\r\n]*Authoritative source:)[^\r\n]*$/gm;
+const JAVASCRIPT_GENERATED_NOTICE =
+	/^\/\/(?=[^\r\n]*DO NOT EDIT)(?=[^\r\n]*Authoritative source:)[^\r\n]*$/gm;
 const CODEX_ARGUMENT_INSTRUCTIONS = new Map([
 	[
 		"引数（あれば作業選択の指定として扱う）: $ARGUMENTS",
@@ -67,6 +71,38 @@ function tomlMultilineString(value) {
 	return JSON.stringify(value).slice(1, -1);
 }
 
+function generatedNotice(authoritativeSource) {
+	return `DO NOT EDIT. Authoritative source: ${authoritativeSource}.`;
+}
+
+export function generatedMarkdownNoticeCount(source) {
+	return (source.match(MARKDOWN_GENERATED_NOTICE) ?? []).length;
+}
+
+export function generatedSourceCommentCount(source) {
+	return (source.match(JAVASCRIPT_GENERATED_NOTICE) ?? []).length;
+}
+
+export function addGeneratedMarkdownNotice(source, authoritativeSource) {
+	if (generatedMarkdownNoticeCount(source) > 0) {
+		return source;
+	}
+	const notice = `<!-- ${generatedNotice(authoritativeSource)} -->`;
+	const frontmatter = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+	if (!frontmatter) return `${notice}\n\n${source}`;
+	return `${frontmatter[0]}${notice}\n${source.slice(frontmatter[0].length)}`;
+}
+
+export function addGeneratedSourceComment(source, authoritativeSource) {
+	if (generatedSourceCommentCount(source) > 0) {
+		return source;
+	}
+	const comment = `// ${generatedNotice(authoritativeSource)}\n`;
+	const shebang = source.match(/^#![^\r\n]*\r?\n/);
+	if (!shebang) return `${comment}${source}`;
+	return `${shebang[0]}${comment}${source.slice(shebang[0].length)}`;
+}
+
 export function buildCodexPluginManifest({ version, description }) {
 	return {
 		name: "pfdsl",
@@ -117,7 +153,10 @@ export function commandToCodexSkill(
 		);
 	}
 
-	return `---\nname: ${outputName}\ndescription: ${description}\n---\n${codexBody}`;
+	return addGeneratedMarkdownNotice(
+		`---\nname: ${outputName}\ndescription: ${description}\n---\n${codexBody}`,
+		`.claude/commands/${sourcePath}`,
+	);
 }
 
 function sandboxMode(sourcePath, tools) {
@@ -152,17 +191,21 @@ export function claudeInstructionsToAgents(source) {
 
 const CODEX_WORKTREE_METADATA_INSTRUCTIONS = [
 	"",
-	"## Codex の worktree と git metadata",
+	"## Codex 固有の責務境界",
 	"",
-	"親 agent が `git fetch`、stage、commit を担当する。",
-	"subagent へ git metadata 操作を委譲しない。",
-	"subagent は worktree 内のファイル編集と検査だけを担当する。",
+	"この節は本文中の git に関する指示より優先する。",
+	"親 agent が `git fetch`、stage、commit、`git push`、PR の作成・更新、issue の作成・クローズ・コメントを担当する。",
+	"subagent は worktree 内のファイル編集とテスト・検査だけを担当する。",
+	"subagent は git metadata 操作や外部公開操作を実行しない。",
 	"subagent の権限エラーはユーザーへ直接継続を求めず、親 agent へ引き上げる。",
 	"",
 ].join("\n");
 
 export function claudeRootInstructionsToAgents(source) {
-	return `${claudeInstructionsToAgents(source)}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`;
+	return addGeneratedMarkdownNotice(
+		`${claudeInstructionsToAgents(source)}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`,
+		"CLAUDE.md",
+	);
 }
 
 function codexPfdImplementerDescription() {
@@ -170,23 +213,7 @@ function codexPfdImplementerDescription() {
 }
 
 function pfdImplementerInstructions(source) {
-	return `${claudeInstructionsToAgents(source)
-		.replace(
-			"設計が確定した実装を、指定ブランチ上のコミットとして仕上げる agent。",
-			"設計が確定した実装を、指定された worktree 内のファイル編集と検査として仕上げる agent。",
-		)
-		.replace(
-			"やること: テストを先に書き、実装し、論理単位でコミットする。検証コマンドを実行し、結果を verbatim で報告する。",
-			"やること: テストを先に書き、実装し、検証コマンドを実行して結果を verbatim で報告する。",
-		)
-		.replace(
-			"やらないこと: `git push`、PR の作成・更新、issue の作成・クローズ・コメント、worktree の作成、リリース操作。",
-			"やらないこと: `git fetch`、stage、commit、`git push`、PR の作成・更新、issue の作成・クローズ・コメント、worktree の作成、リリース操作。",
-		)
-		.replace(
-			"リポジトリの `AGENTS.md` に従う（TDD、Conventional Commits、コミット粒度、文字列の言語）",
-			"リポジトリの `AGENTS.md` に従う（TDD と文字列の言語）",
-		)}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`;
+	return `${claudeInstructionsToAgents(source)}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`;
 }
 
 function codexAgentDescription(sourcePath, description) {
@@ -203,6 +230,8 @@ function codexAgentInstructions(sourcePath, body) {
 
 export function buildCodexProjectConfig() {
 	return [
+		`# ${generatedNotice("scripts/lib/gen-codex-assets.mjs")}`,
+		"",
 		'sandbox_mode = "workspace-write"',
 		'approval_policy = "on-request"',
 		"",
@@ -235,6 +264,7 @@ export function agentToCodexToml(sourcePath, source) {
 	);
 
 	return [
+		`# ${generatedNotice(`.claude/agents/${sourcePath}`)}`,
 		`name = ${tomlString(name)}`,
 		`description = ${tomlString(description)}`,
 		`sandbox_mode = ${tomlString(sandbox)}`,

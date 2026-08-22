@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/scaffold/bindings/pfd-retro.md. -->
+
 # pfd-retro バインディング
 
 A/B/C カタログ（監査観点の枠組み・配布）: pfdsl スキルの `references/review-perspectives.md`（plugin なら `${PLUGIN_ROOT}/skills/pfdsl/references/`、repo-local なら `.agents/skills/pfdsl/references/`）。当リポで検出した具体例は `.pfdsl/review-perspectives.md`（配布カタログの当リポ instance）に蓄積する。

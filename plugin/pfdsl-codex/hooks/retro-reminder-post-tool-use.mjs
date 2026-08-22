@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DO NOT EDIT. Authoritative source: hooks/retro-reminder-post-tool-use.mjs.
 // Plugin-distributed PostToolUse (Bash) hook (#465): advisory reminder to
 // consider pfd-retro when a `git commit` marks a roadmap artifact done, for
 // any repo that has adopted the pfdsl plugin. Distributes the repo-local

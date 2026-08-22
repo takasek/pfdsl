@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/work-cycle.md. -->
+
 # ワークサイクル（選択・実行・終端ゲート・報告）
 
 作業項目に着手する回はこの4手順に従う。起動口は問わない。

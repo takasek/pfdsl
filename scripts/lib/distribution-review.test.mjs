@@ -88,6 +88,7 @@ describe("canonicalSourceOf", () => {
 		],
 		["plugin/pfdsl/skills/pfdsl/references/examples.md", "docs/examples/"],
 		["plugin/pfdsl/skills/pfdsl/references/samples.md", "docs/samples/"],
+		["plugin/pfdsl-codex/GENERATED.md", "scripts/lib/gen-plugin.mjs"],
 	];
 
 	for (const [dist, canonical] of PAIRS) {

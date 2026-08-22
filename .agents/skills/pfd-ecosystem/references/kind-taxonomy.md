@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ecosystem/references/kind-taxonomy.md. -->
+
 # PFD 種別タクソノミー（ADR-0017 / ADR-0035）
 
 種別は「このPFDが答える問い」で区別する。**この節が種別選定の一次情報**（pfd-ops はここを参照する）。

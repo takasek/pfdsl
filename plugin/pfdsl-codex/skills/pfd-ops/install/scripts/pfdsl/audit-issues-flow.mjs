@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs.
 // Audits sync between GitHub issues and .pfdsl/roadmap.pfdsl.
 // Usage: node scripts/pfdsl/audit-issues-flow.mjs [--fix] [--enforce-issue <n> ...]
 

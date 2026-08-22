@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/file-based-tracker-backend.md. -->
+
 # ファイルベース・トラッカー（pfd-ops プリセット）
 
 PFD の作業項目を GitHub Issues でなく、リポ内の markdown ファイルで管理する流儀。issue トラッカーを持たない、または使わないリポが選べる再利用可能パターン。採用リポは `roadmap.md` でこのプリセットとファイルの所在を指す。

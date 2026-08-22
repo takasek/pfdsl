@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/scripts/plugin-version-check.mjs.
 // Best-effort plugin version-skew check (ADR-0028). Decoupled from install/
 // sync semantics so any pfd-ops-bundled skill's runtime self-check can call
 // into it, not just check-install-sync.mjs.

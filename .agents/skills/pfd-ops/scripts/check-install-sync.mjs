@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/scripts/check-install-sync.mjs.
 // Runtime self-check for the pfd-ops "install/" tree (ADR-0028).
 //
 // This file ships inside the pfd-ops skill and is copied verbatim (along

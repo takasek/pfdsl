@@ -1,3 +1,4 @@
+// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/lib/proxy-fetch.mjs.
 /**
  * A fetch-compatible function that transparently works behind this
  * environment's HTTPS_PROXY. Node's built-in fetch (undici) doesn't honor

@@ -1,3 +1,4 @@
+# DO NOT EDIT. Authoritative source: .claude/agents/pfd-lens.md.
 name = "pfd-lens"
 description = ".pfdsl 図の A/B 観点監査（エッジ実在性・駆動源・粒度・型）を依頼されたら使う。 セッション文脈は不要 — 任意の .pfdsl 図に単体で適用できる。 大きい図・複数図の監査、または main thread の文脈を汚したくない監査に向く。 findings を file:line アンカー付きで返す。\n"
 sandbox_mode = "read-only"

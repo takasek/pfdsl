@@ -1,3 +1,5 @@
+<!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/scaffold/review-perspectives.md. -->
+
 # review-perspectives.md — instance seed
 
 配布レンズ = pfdsl スキルの `references/review-perspectives.md`（plugin なら `${PLUGIN_ROOT}/skills/pfdsl/references/`、repo-local なら `.agents/skills/pfdsl/references/`）。

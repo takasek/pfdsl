@@ -16,6 +16,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { GENERATED_DISTRIBUTION_SOURCES } from "./distribution-sources.mjs";
 import {
 	codexCommandSkillName,
 	PLUGIN_COMMAND_FILES,
@@ -64,21 +65,6 @@ export const SCOPE_EXCLUSIONS = {
 		"the transformed Codex copy of the sample .pfdsl catalogue generated from docs/samples/",
 };
 
-// Bundled files that are rendered rather than mirrored: the copy in the bundle
-// is output, and editing it is editing something `make gen-plugin` overwrites.
-const GENERATED_SOURCES = {
-	"plugin/pfdsl/skills/pfdsl/SKILL.md": "scripts/skill-template/SKILL.md",
-	"plugin/pfdsl/skills/pfdsl/references/spec.md": "docs/spec/spec.md",
-	"plugin/pfdsl/skills/pfdsl/references/quality-guide.md":
-		"docs/quality-guide.md",
-	"plugin/pfdsl/skills/pfdsl/references/review-perspectives.md":
-		"docs/review-perspectives.md",
-	// Aggregated from many files, so the pointer is the directory: no single
-	// source file answers "where does this line come from".
-	"plugin/pfdsl/skills/pfdsl/references/examples.md": "docs/examples/",
-	"plugin/pfdsl/skills/pfdsl/references/samples.md": "docs/samples/",
-};
-
 /** Where the reviewed-state record lives, relative to the repo root. */
 export const RECORD_PATH = "docs/distribution-review/reviewed.json";
 
@@ -99,7 +85,7 @@ export function inScope(path) {
  * fix at the next `make gen-plugin`.
  */
 export function canonicalSourceOf(distPath) {
-	const generated = GENERATED_SOURCES[distPath];
+	const generated = GENERATED_DISTRIBUTION_SOURCES[distPath];
 	if (generated) return generated;
 
 	const commandSource = PLUGIN_COMMAND_FILES.find(

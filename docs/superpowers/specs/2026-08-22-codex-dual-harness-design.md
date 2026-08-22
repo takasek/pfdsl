@@ -42,6 +42,9 @@ Codex adapter は同じ能力から Codex skill、TOML subagent、Codex hooks、
 リポジトリ開発用には root `AGENTS.md`、`.agents/skills`、`.codex/config.toml`、`.codex/agents`、`.codex/hooks.json` を生成する。
 `CLAUDE.md` と `.claude` の内容を手で複製せず、配布 inventory と同じ adapter を利用する。
 生成された Codex 資産は手編集禁止とし、生成元・生成先・再生成コマンドをファイルまたは隣接ドキュメントに明記する。
+生成された Markdown・TOML・JavaScriptは正本path付きの手編集禁止noticeを持ち、コメントを持てないJSONは隣接する`GENERATED.md` guideで正本を示す。
+`pfd-implementer`のCodex責務境界はClaude本文の完全一致文置換ではなく、共通変換後に優先節として追記する。
+root `.gitattributes`はrepository Codex assetsとCodex plugin rootの生成経路を`linguist-generated`に分類する。
 
 `.codex/config.toml` は trusted project に限定して `workspace-write`、`on-request` approval、sandbox内network accessを有効化する。
 Codexの`workspace-write`はwritable root配下でも`.git` pointerと解決後のgitdirをread-onlyに保護するため、親agentが承認済みの昇格でfetch・stage・commitを担当し、subagentはworktree内ファイルの編集と検査だけを担当する。
