@@ -38,7 +38,7 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 			".agents/skills/pfd-ops/SKILL.md",
 			".codex/agents/pfd-implementer.toml",
 			".codex/hooks.json",
-			"plugin/pfdsl/.codex-plugin/plugin.json",
+			"plugin/pfdsl-codex/.codex-plugin/plugin.json",
 		]) {
 			assert.equal(GEN_PLUGIN_TRIGGER.test(path), true, path);
 		}

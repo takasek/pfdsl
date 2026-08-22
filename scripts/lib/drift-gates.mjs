@@ -164,7 +164,7 @@ export function buildGates({ stagedPresent }) {
 					".codex",
 				],
 			),
-			hint: "Claude and Codex outputs are stale (plugin/pfdsl, .claude-plugin/marketplace.json, AGENTS.md, .agents, or .codex; SKILL.md checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the Claude and Codex outputs, or 'pnpm -r build && make gen-plugin' to regenerate everything.",
+			hint: "Claude and Codex outputs are stale (plugin/pfdsl, plugin/pfdsl-codex, .claude-plugin/marketplace.json, AGENTS.md, .agents, or .codex; SKILL.md checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the Claude and Codex outputs, or 'pnpm -r build && make gen-plugin' to regenerate everything.",
 		},
 		{
 			id: "samples-dot",

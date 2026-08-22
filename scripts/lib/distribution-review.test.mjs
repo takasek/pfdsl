@@ -20,6 +20,7 @@ import { git } from "./run-exec.mjs";
 describe("inScope", () => {
 	it("takes a distributed prompt", () => {
 		assert.equal(inScope("plugin/pfdsl/skills/pfd-ops/SKILL.md"), true);
+		assert.equal(inScope("plugin/pfdsl-codex/skills/pfd-ops/SKILL.md"), true);
 		assert.equal(inScope("plugin/pfdsl/commands/pfd-cycle.md"), true);
 		assert.equal(inScope("plugin/pfdsl/agents/pfd-lens.md"), true);
 	});
@@ -89,7 +90,7 @@ describe("canonicalSourceOf", () => {
 	}
 
 	for (const source of PLUGIN_COMMAND_FILES) {
-		const dist = `plugin/pfdsl/skills/${codexCommandSkillName(source)}/SKILL.md`;
+		const dist = `plugin/pfdsl-codex/skills/${codexCommandSkillName(source)}/SKILL.md`;
 		const canonical = `.claude/commands/${source}`;
 		it(`maps generated Codex command skill ${dist} to ${canonical}`, () => {
 			assert.equal(canonicalSourceOf(dist), canonical);

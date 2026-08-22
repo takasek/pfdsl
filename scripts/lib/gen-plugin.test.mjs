@@ -48,6 +48,17 @@ function markdownFiles(directory, relative = "") {
 		});
 }
 
+function treeFiles(directory, relative = "") {
+	return readdirSync(directory, { withFileTypes: true })
+		.sort((left, right) => left.name.localeCompare(right.name))
+		.flatMap((entry) => {
+			const path = join(directory, entry.name);
+			const entryRelative = join(relative, entry.name);
+			if (entry.isDirectory()) return treeFiles(path, entryRelative);
+			return entry.isFile() ? [entryRelative] : [];
+		});
+}
+
 function codexMarkdownSource(root, relativePath) {
 	const [skillName, ...path] = relativePath.split("/");
 	const generated = GENERATED_SKILLS[skillName];
@@ -511,6 +522,7 @@ describe("assemblePluginDistIndependent", () => {
 		assert.deepEqual(calls[codex][1], {
 			root: "/repo",
 			pluginRoot: "/repo/plugin/pfdsl",
+			codexPluginRoot: "/repo/plugin/pfdsl-codex",
 			deps,
 		});
 	});
@@ -763,18 +775,27 @@ describe("assembleCodexAssets", () => {
 	it("removes stale owned command skills while preserving a new collision target", () => {
 		const { deps, files } = statefulCodexDeps();
 		const skillsRoot = "/repo/plugin/pfdsl/skills";
+		const codexSkillsRoot = "/repo/plugin/pfdsl-codex/skills";
 		const manifestPath =
 			"/repo/plugin/pfdsl/.codex-plugin/codex-command-skills.json";
+		const codexManifestPath =
+			"/repo/plugin/pfdsl-codex/.codex-plugin/codex-command-skills.json";
 		files.set(
 			manifestPath,
 			JSON.stringify({
 				ownedSkillDirectories: ["removed-command", "pfd-retro"],
 			}),
 		);
+		files.set("/repo/plugin/pfdsl/.codex-plugin", "directory");
 		files.set(`${skillsRoot}/removed-command`, "directory");
 		files.set(`${skillsRoot}/removed-command/SKILL.md`, "obsolete command");
 		files.set(`${skillsRoot}/pfd-retro`, "directory");
 		files.set(`${skillsRoot}/pfd-retro/SKILL.md`, "mirrored pfd-retro skill");
+		files.set(`${codexSkillsRoot}/removed-command`, "directory");
+		files.set(
+			`${codexSkillsRoot}/removed-command/SKILL.md`,
+			"obsolete command",
+		);
 
 		assembleCodexAssets({
 			root: "/repo",
@@ -783,11 +804,14 @@ describe("assembleCodexAssets", () => {
 		});
 
 		assert.equal(files.has(`${skillsRoot}/removed-command`), false);
+		assert.equal(files.has(`${codexSkillsRoot}/removed-command`), false);
 		assert.equal(
 			files.get(`${skillsRoot}/pfd-retro/SKILL.md`),
 			"mirrored pfd-retro skill",
 		);
-		assert.deepEqual(JSON.parse(files.get(manifestPath)), {
+		assert.equal(files.has(manifestPath), false);
+		assert.deepEqual(JSON.parse(files.get(codexManifestPath)), {
+			skillRoot: "skills",
 			ownedSkillDirectories: [
 				"pfd-cycle",
 				"pfd-init",
@@ -897,11 +921,10 @@ describe("assembleCodexAssets", () => {
 				"/repo/.agents/skills",
 				"/repo/.codex/agents",
 				"/repo/.codex/hooks.json",
-				"/repo/plugin/pfdsl/.codex-plugin/codex-command-skills.json",
-				"/repo/plugin/pfdsl/.codex-plugin/plugin.json",
-				"/repo/plugin/pfdsl/skills/pfd-cycle",
-				"/repo/plugin/pfdsl/skills/pfd-init",
-				"/repo/plugin/pfdsl/skills/source-command-pfd-retro",
+				"/repo/plugin/pfdsl-codex/.codex-plugin/codex-command-skills.json",
+				"/repo/plugin/pfdsl-codex/.codex-plugin/plugin.json",
+				"/repo/plugin/pfdsl-codex/hooks",
+				"/repo/plugin/pfdsl-codex/skills",
 			].sort(),
 		);
 
@@ -934,22 +957,23 @@ describe("assembleCodexAssets", () => {
 		assert.equal(
 			staged.some(([, path]) =>
 				path.includes(
-					"skills/source-command-pfd-retro.codex-tmp-test-run/SKILL.md",
+					"pfdsl-codex/skills.codex-tmp-test-run/source-command-pfd-retro/SKILL.md",
 				),
 			),
 			true,
 		);
 
 		const [, , manifest] = staged.find(([, path]) =>
-			path.endsWith(".codex-plugin/plugin.json.codex-tmp-test-run"),
+			path.endsWith("pfdsl-codex/.codex-plugin/plugin.json.codex-tmp-test-run"),
 		);
 		assert.equal(Object.hasOwn(JSON.parse(manifest), "hooks"), false);
 		const [, , ownership] = staged.find(([, path]) =>
 			path.endsWith(
-				".codex-plugin/codex-command-skills.json.codex-tmp-test-run",
+				"pfdsl-codex/.codex-plugin/codex-command-skills.json.codex-tmp-test-run",
 			),
 		);
 		assert.deepEqual(JSON.parse(ownership), {
+			skillRoot: "skills",
 			ownedSkillDirectories: [
 				"pfd-cycle",
 				"pfd-init",
@@ -983,7 +1007,8 @@ describe("assembleCodexAssets", () => {
 
 	it("removes every staged sibling and keeps prior destinations when staging fails midway", () => {
 		const { before, deps, files } = statefulCodexDeps({
-			failWrite: (path) => path.includes("pfd-init.codex-tmp"),
+			failWrite: (path) =>
+				path.includes("codex/skills.codex-tmp") && path.includes("pfd-init"),
 		});
 
 		assert.throws(
@@ -1036,9 +1061,133 @@ describe("assembleCodexAssets", () => {
 });
 
 describe("Codex generated consumers", () => {
+	it("ships a self-contained native skill tree without mutating the Claude tree", () => {
+		const pluginRoot = join(repoRoot, "plugin/pfdsl");
+		const codexPluginRoot = join(repoRoot, "plugin/pfdsl-codex");
+		assemblePluginDistIndependent({
+			root: repoRoot,
+			pluginRoot,
+			codexPluginRoot,
+		});
+		const claudeBefore = treeFiles(pluginRoot).map((relativePath) => [
+			relativePath,
+			readFileSync(join(pluginRoot, relativePath)).toString("base64"),
+		]);
+		assemblePluginDistIndependent({
+			root: repoRoot,
+			pluginRoot,
+			codexPluginRoot,
+		});
+		assert.deepEqual(
+			treeFiles(pluginRoot).map((relativePath) => [
+				relativePath,
+				readFileSync(join(pluginRoot, relativePath)).toString("base64"),
+			]),
+			claudeBefore,
+		);
+
+		const consumer = mkdtempSync(join(tmpdir(), "codex-plugin-consumer-"));
+		try {
+			const pluginCopy = join(consumer, "plugin-cache/pfdsl-codex");
+			cpSync(codexPluginRoot, pluginCopy, { recursive: true });
+			const manifest = JSON.parse(
+				readFileSync(join(pluginCopy, ".codex-plugin/plugin.json"), "utf-8"),
+			);
+			assert.equal(manifest.skills, "./skills/");
+			const skillsRoot = resolve(pluginCopy, manifest.skills);
+			assert.equal(existsSync(join(skillsRoot, "pfd-ops/SKILL.md")), true);
+			assert.equal(
+				existsSync(join(pluginCopy, "skills/pfd-cycle/SKILL.md")),
+				true,
+			);
+			const legacyFiles = treeFiles(join(pluginRoot, "skills"));
+			const nativeFiles = treeFiles(skillsRoot);
+			assert.deepEqual(
+				nativeFiles.sort(),
+				[
+					...legacyFiles,
+					"pfd-cycle/SKILL.md",
+					"pfd-init/SKILL.md",
+					"source-command-pfd-retro/SKILL.md",
+				].sort(),
+			);
+			for (const relativePath of legacyFiles) {
+				const legacy = readFileSync(join(pluginRoot, "skills", relativePath));
+				const native = readFileSync(join(skillsRoot, relativePath));
+				if (relativePath.endsWith(".md")) {
+					assert.equal(
+						native.toString("utf-8"),
+						expectedCodexMarkdown(legacy.toString("utf-8")),
+						relativePath,
+					);
+				} else {
+					assert.deepEqual(native, legacy, relativePath);
+				}
+			}
+			assert.equal(
+				readFileSync(
+					join(skillsRoot, "pfd-ops/scripts/check-install-sync.mjs"),
+					"utf-8",
+				),
+				readFileSync(
+					join(pluginRoot, "skills/pfd-ops/scripts/check-install-sync.mjs"),
+					"utf-8",
+				),
+			);
+
+			const legacyBefore = JSON.stringify(
+				markdownFiles(join(pluginRoot, "skills")).map((relativePath) => [
+					relativePath,
+					readFileSync(join(pluginRoot, "skills", relativePath), "utf-8"),
+				]),
+			);
+			const markdown = markdownFiles(skillsRoot);
+			assert.ok(markdown.length > 0);
+			for (const relativePath of markdown) {
+				const output = readFileSync(join(skillsRoot, relativePath), "utf-8");
+				assert.doesNotMatch(output, /\.claude\/skills\//, relativePath);
+				assert.doesNotMatch(output, /\$\{CLAUDE_PLUGIN_ROOT\}/, relativePath);
+				assert.doesNotMatch(
+					output,
+					/CLAUDE_PLUGIN_ROOT|Claude 向け|Claude へ|1つの Claude Code plugin|Claude Code プラットフォーム側/,
+					relativePath,
+				);
+			}
+
+			const output = execFileSync(
+				process.execPath,
+				[join(skillsRoot, "pfd-ops/scripts/check-install-sync.mjs")],
+				{ cwd: consumer, encoding: "utf-8" },
+			);
+			assert.match(output, /not adopted/);
+			const pfdslHelp = execFileSync(
+				process.execPath,
+				[join(repoRoot, "packages/cli/dist/cli.js"), "--help"],
+				{ cwd: consumer, encoding: "utf-8" },
+			);
+			assert.match(pfdslHelp, /^pfdsl <command>/);
+			assert.equal(
+				JSON.stringify(
+					markdownFiles(join(pluginRoot, "skills")).map((relativePath) => [
+						relativePath,
+						readFileSync(join(pluginRoot, "skills", relativePath), "utf-8"),
+					]),
+				),
+				legacyBefore,
+			);
+		} finally {
+			rmSync(consumer, { recursive: true, force: true });
+		}
+	});
+
 	it("transforms every Markdown file in Codex skill trees and preserves scripts", () => {
 		const pluginRoot = join(repoRoot, "plugin/pfdsl");
-		assemblePluginDistIndependent({ root: repoRoot, pluginRoot });
+		const codexPluginRoot = join(repoRoot, "plugin/pfdsl-codex");
+		assemblePluginDistIndependent({
+			root: repoRoot,
+			pluginRoot,
+			codexPluginRoot,
+		});
 
 		const consumer = mkdtempSync(join(tmpdir(), "codex-agents-consumer-"));
 		try {
@@ -1120,12 +1269,17 @@ describe("Codex generated consumers", () => {
 
 	it("runs the generated plugin hook through Codex's compatibility environment", () => {
 		const pluginRoot = join(repoRoot, "plugin/pfdsl");
-		assemblePluginDistIndependent({ root: repoRoot, pluginRoot });
+		const codexPluginRoot = join(repoRoot, "plugin/pfdsl-codex");
+		assemblePluginDistIndependent({
+			root: repoRoot,
+			pluginRoot,
+			codexPluginRoot,
+		});
 
 		const consumer = mkdtempSync(join(tmpdir(), "codex-hook-consumer-"));
 		try {
-			const pluginCopy = join(consumer, "plugin-cache/pfdsl");
-			cpSync(pluginRoot, pluginCopy, { recursive: true });
+			const pluginCopy = join(consumer, "plugin-cache/pfdsl-codex");
+			cpSync(codexPluginRoot, pluginCopy, { recursive: true });
 			assert.equal(existsSync(join(consumer, ".claude")), false);
 
 			const roadmap = join(consumer, ".pfdsl/roadmap.pfdsl");

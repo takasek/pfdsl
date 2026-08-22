@@ -34,7 +34,11 @@ import { gitDiffNames, tryGit } from "./run-exec.mjs";
 // shared with asset-sweep.mjs.
 export { diffBase, EMPTY_TREE };
 
-const DIST_ROOT = "plugin/pfdsl/";
+const CLAUDE_PLUGIN_ROOT = "plugin/pfdsl/";
+const CODEX_PLUGIN_ROOT = "plugin/pfdsl-codex/";
+const DIST_ROOTS = [CLAUDE_PLUGIN_ROOT, CODEX_PLUGIN_ROOT];
+const CLAUDE_SKILLS_ROOT = `${CLAUDE_PLUGIN_ROOT}skills/`;
+const CODEX_SKILLS_ROOT = `${CODEX_PLUGIN_ROOT}skills/`;
 
 /**
  * Bundled markdown held out of review, each with why. These three are
@@ -73,7 +77,7 @@ export const RECORD_PATH = "docs/distribution-review/reviewed.json";
 
 /** Is this path a distributed prompt that a review is answerable for? */
 export function inScope(path) {
-	if (!path.startsWith(DIST_ROOT)) return false;
+	if (!DIST_ROOTS.some((root) => path.startsWith(root))) return false;
 	if (!path.endsWith(".md")) return false;
 	return !(path in SCOPE_EXCLUSIONS);
 }
@@ -94,15 +98,30 @@ export function canonicalSourceOf(distPath) {
 	const commandSource = PLUGIN_COMMAND_FILES.find(
 		(source) =>
 			distPath ===
-			`plugin/pfdsl/skills/${codexCommandSkillName(source)}/SKILL.md`,
+			`${CODEX_SKILLS_ROOT}${codexCommandSkillName(source)}/SKILL.md`,
 	);
 	if (commandSource) return `.claude/commands/${commandSource}`;
+	// Pre-native bundles placed generated Codex command skills below the Claude
+	// tree. The generator removes those owned directories during migration, but
+	// retain their source mapping while a staged deletion is still visible to
+	// the distribution-review gate.
+	const legacyCommandSource = PLUGIN_COMMAND_FILES.find(
+		(source) =>
+			distPath ===
+			`${CLAUDE_SKILLS_ROOT}${codexCommandSkillName(source)}/SKILL.md`,
+	);
+	if (legacyCommandSource) return `.claude/commands/${legacyCommandSource}`;
+	if (distPath.startsWith(CODEX_SKILLS_ROOT)) {
+		return canonicalSourceOf(
+			`${CLAUDE_SKILLS_ROOT}${distPath.slice(CODEX_SKILLS_ROOT.length)}`,
+		);
+	}
 
 	// The inverse of the assembly's own manifest: find the bundle root this
 	// path sits under, check the file is one gen-plugin actually copies there,
 	// and swap the root back. Nothing about the layout is restated here.
-	if (distPath.startsWith(DIST_ROOT)) {
-		const [dir, ...tail] = distPath.slice(DIST_ROOT.length).split("/");
+	if (distPath.startsWith(CLAUDE_PLUGIN_ROOT)) {
+		const [dir, ...tail] = distPath.slice(CLAUDE_PLUGIN_ROOT.length).split("/");
 		const mirror = PLUGIN_MIRRORS.find((m) => m.dest === dir);
 		const relative = tail.join("/");
 		if (mirror && relative) {

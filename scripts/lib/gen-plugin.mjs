@@ -37,6 +37,7 @@ import {
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CODEX_ASSEMBLY_LOCK_DIRECTORY = ".codex-assets-assembly.lock";
 const CODEX_COMMAND_SKILLS_MANIFEST = "codex-command-skills.json";
+const CODEX_SKILLS_ROOT = "skills";
 
 // The agents bundled into plugin/pfdsl/agents/, as .claude/agents/-relative
 // filenames. The harness inventory is the single source of truth, and
@@ -331,6 +332,56 @@ function stageCodexSkillTrees(root, deps, runId) {
 	return { destination, temporary };
 }
 
+// The native tree starts from the complete Claude plugin skill distribution,
+// so rendered pfdsl references and every nested asset travel together. Only
+// Markdown is harness-specific; cpSync preserves scripts and other assets
+// byte-for-byte before normalizeCodexMarkdownTree rewrites Markdown in place.
+function stageCodexPluginSkillTrees(
+	claudePluginRoot,
+	codexPluginRoot,
+	commands,
+	legacyOwnedNames,
+	protectedSkillDirectories,
+	deps,
+	runId,
+) {
+	const destination = resolve(codexPluginRoot, CODEX_SKILLS_ROOT);
+	const temporary = temporaryAssemblySibling(destination, "tmp", runId);
+	try {
+		deps.rmSync(temporary, { recursive: true, force: true });
+		deps.cpSync(resolve(claudePluginRoot, "skills"), temporary, {
+			recursive: true,
+		});
+		for (const name of legacyOwnedNames) {
+			if (protectedSkillDirectories.has(name)) continue;
+			deps.rmSync(resolve(temporary, name), { recursive: true, force: true });
+		}
+		normalizeCodexMarkdownTree(temporary, deps);
+		for (const { name, sourcePath, source } of commands) {
+			const output = resolve(temporary, name, "SKILL.md");
+			deps.mkdirSync(dirname(output), { recursive: true });
+			deps.writeFileSync(output, commandToCodexSkill(sourcePath, source, name));
+		}
+	} catch (error) {
+		removeAssemblyArtifact(temporary, deps);
+		throw error;
+	}
+	return { destination, temporary };
+}
+
+function stageCodexPluginHooks(root, codexPluginRoot, deps, runId) {
+	const destination = resolve(codexPluginRoot, "hooks");
+	const temporary = temporaryAssemblySibling(destination, "tmp", runId);
+	try {
+		deps.rmSync(temporary, { recursive: true, force: true });
+		deps.cpSync(resolve(root, "hooks"), temporary, { recursive: true });
+	} catch (error) {
+		removeAssemblyArtifact(temporary, deps);
+		throw error;
+	}
+	return { destination, temporary };
+}
+
 function stageRemoval(destination) {
 	return { destination, remove: true };
 }
@@ -421,32 +472,9 @@ function commandSkillManifestPath(pluginRoot) {
 	return resolve(pluginRoot, ".codex-plugin", CODEX_COMMAND_SKILLS_MANIFEST);
 }
 
-function commandSkillNames() {
-	const names = DISTRIBUTED_COMMANDS.map(codexCommandSkillName);
-	if (new Set(names).size !== names.length) {
-		throw new Error("Codex command skill names must be unique.");
-	}
-	return names;
-}
-
-function readOwnedCommandSkillDirectories(pluginRoot, deps) {
-	const path = commandSkillManifestPath(pluginRoot);
-	if (!deps.existsSync(path)) return [];
-	let manifest;
-	try {
-		manifest = JSON.parse(deps.readFileSync(path, "utf-8"));
-	} catch {
-		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
-	}
+function validOwnedSkillDirectories(path, owned) {
 	if (
-		!manifest ||
-		typeof manifest !== "object" ||
-		!Array.isArray(manifest.ownedSkillDirectories)
-	) {
-		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
-	}
-	const owned = manifest.ownedSkillDirectories;
-	if (
+		!Array.isArray(owned) ||
 		new Set(owned).size !== owned.length ||
 		owned.some(
 			(name) => typeof name !== "string" || !/^[a-z0-9][a-z0-9-]*$/.test(name),
@@ -457,15 +485,52 @@ function readOwnedCommandSkillDirectories(pluginRoot, deps) {
 	return owned;
 }
 
+function commandSkillNames() {
+	const names = DISTRIBUTED_COMMANDS.map(codexCommandSkillName);
+	if (new Set(names).size !== names.length) {
+		throw new Error("Codex command skill names must be unique.");
+	}
+	return names;
+}
+
+function readOwnedCommandSkillDirectories(pluginRoot, deps) {
+	const path = commandSkillManifestPath(pluginRoot);
+	if (!deps.existsSync(path)) return { codex: [], legacy: [] };
+	let manifest;
+	try {
+		manifest = JSON.parse(deps.readFileSync(path, "utf-8"));
+	} catch {
+		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
+	}
+	if (!manifest || typeof manifest !== "object") {
+		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
+	}
+	const owned = validOwnedSkillDirectories(
+		path,
+		manifest.ownedSkillDirectories,
+	);
+	if (
+		manifest.skillRoot === undefined ||
+		manifest.skillRoot === "codex/skills"
+	) {
+		return { codex: [], legacy: owned };
+	}
+	if (manifest.skillRoot !== CODEX_SKILLS_ROOT) {
+		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
+	}
+	return { codex: owned, legacy: [] };
+}
+
 /**
  * Generates the Codex repository and plugin assets from the maintained
  * Claude sources. Each output is first written to a temporary sibling; only
  * after every write succeeds are the destinations replaced together.
- * @param {{root: string, pluginRoot: string, deps?: object}} options
+ * @param {{root: string, pluginRoot: string, codexPluginRoot?: string, deps?: object}} options
  */
 export function assembleCodexAssets({
 	root,
 	pluginRoot,
+	codexPluginRoot = resolve(root, "plugin/pfdsl-codex"),
 	deps = {
 		cpSync,
 		existsSync,
@@ -492,7 +557,8 @@ export function assembleCodexAssets({
 			readFileSync: deps.readFileSync,
 		});
 		const names = commandSkillNames();
-		const ownedNames = readOwnedCommandSkillDirectories(pluginRoot, deps);
+		readOwnedCommandSkillDirectories(codexPluginRoot, deps);
+		const legacyOwned = readOwnedCommandSkillDirectories(pluginRoot, deps);
 		const protectedSkillDirectories = new Set([
 			...DISTRIBUTED_SKILLS,
 			...Object.keys(GENERATED_SKILLS),
@@ -515,13 +581,30 @@ export function assembleCodexAssets({
 		);
 		staged.push(
 			stageFile(
-				resolve(pluginRoot, ".codex-plugin/plugin.json"),
+				resolve(codexPluginRoot, ".codex-plugin/plugin.json"),
 				`${JSON.stringify(buildCodexPluginManifest({ version: cliVersion, description }), null, 2)}\n`,
 				deps,
 				runId,
 			),
 		);
 		staged.push(stageCodexSkillTrees(root, deps, runId));
+		const commandSkills = DISTRIBUTED_COMMANDS.map((source, index) => ({
+			name: names[index],
+			sourcePath: source,
+			source: read(resolve(root, ".claude/commands", source)),
+		}));
+		staged.push(
+			stageCodexPluginSkillTrees(
+				pluginRoot,
+				codexPluginRoot,
+				commandSkills,
+				legacyOwned.legacy,
+				protectedSkillDirectories,
+				deps,
+				runId,
+			),
+		);
+		staged.push(stageCodexPluginHooks(root, codexPluginRoot, deps, runId));
 		staged.push(
 			stageDirectory(
 				resolve(root, ".codex/agents"),
@@ -538,36 +621,18 @@ export function assembleCodexAssets({
 		);
 		staged.push(
 			stageFile(
-				commandSkillManifestPath(pluginRoot),
-				`${JSON.stringify({ ownedSkillDirectories: names }, null, 2)}\n`,
+				commandSkillManifestPath(codexPluginRoot),
+				`${JSON.stringify({ skillRoot: CODEX_SKILLS_ROOT, ownedSkillDirectories: names }, null, 2)}\n`,
 				deps,
 				runId,
 			),
 		);
-		for (const [index, source] of DISTRIBUTED_COMMANDS.entries()) {
-			const name = names[index];
-			staged.push(
-				stageDirectory(
-					resolve(pluginRoot, "skills", name),
-					[
-						{
-							path: "SKILL.md",
-							content: commandToCodexSkill(
-								source,
-								read(resolve(root, ".claude/commands", source)),
-								name,
-							),
-						},
-					],
-					deps,
-					runId,
-				),
-			);
-		}
-		for (const name of ownedNames) {
-			if (names.includes(name) || protectedSkillDirectories.has(name)) continue;
+		for (const name of legacyOwned.legacy) {
+			if (protectedSkillDirectories.has(name)) continue;
 			staged.push(stageRemoval(resolve(pluginRoot, "skills", name)));
 		}
+		staged.push(stageRemoval(resolve(pluginRoot, ".codex-plugin")));
+		staged.push(stageRemoval(resolve(pluginRoot, "codex")));
 
 		publishStaged(staged, deps, runId);
 	} catch (error) {
@@ -582,17 +647,13 @@ export function assembleCodexAssets({
 	if (primaryError) throw primaryError;
 }
 
-// Assembles everything gen-plugin.mjs bundles into plugin/pfdsl/ except
-// plugin/pfdsl/skills/pfdsl/SKILL.md (which embeds `pfdsl help` output and
-// therefore needs packages/cli/dist — see scripts/gen-skill.mjs). None of
-// this touches dist or spawns a child process, so scripts/pre-commit can
-// drift-check it even when dist is missing/stale (#593, same split
-// rationale as writeSkillRefs in #586). deps defaults to the real
-// implementations; tests inject fakes to assert the wiring without touching
-// the filesystem.
+// Assembles the Claude and Codex plugin roots except plugin/pfdsl/skills/pfdsl/SKILL.md, which embeds `pfdsl help` output and therefore needs packages/cli/dist — see scripts/gen-skill.mjs.
+// None of this touches dist or spawns a child process, so scripts/pre-commit can drift-check it even when dist is missing/stale (#593, same split rationale as writeSkillRefs in #586).
+// deps defaults to the real implementations; tests inject fakes to assert the wiring without touching the filesystem.
 export function assemblePluginDistIndependent({
 	root,
 	pluginRoot,
+	codexPluginRoot = resolve(root, "plugin/pfdsl-codex"),
 	deps = {
 		cpSync,
 		genInstall,
@@ -679,7 +740,7 @@ export function assemblePluginDistIndependent({
 	console.log(".claude-plugin/marketplace.json ← plugin manifest description");
 
 	deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));
-	deps.assembleCodexAssets({ root, pluginRoot, deps });
+	deps.assembleCodexAssets({ root, pluginRoot, codexPluginRoot, deps });
 
 	// Last: the recorded hash covers every other file in the bundle, so anything
 	// written after this point would leave it describing a bundle that is no
