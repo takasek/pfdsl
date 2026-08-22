@@ -9,6 +9,7 @@ import {
 	computeLabelFindings,
 	normalizeBody,
 	parseIssueProcesses,
+	partitionFindings,
 } from "./issues-flow-audit.mjs";
 import { parseDocument } from "./yaml-require.mjs";
 
@@ -261,6 +262,11 @@ describe("computeFindings", () => {
 		assert.equal(f.processId, undefined);
 		assert.equal(f.artifactId, undefined);
 		assert.equal(f.fixVia, undefined);
+		assert.equal(
+			f.advisory,
+			true,
+			"missing_process must not block: the roadmap entry for a managed issue is routinely still on an unmerged branch",
+		);
 	});
 
 	it("untriaged: open issue with no tracked process and no flow labels", () => {
@@ -277,6 +283,11 @@ describe("computeFindings", () => {
 		assert.ok(f);
 		assert.equal(f.issueNumber, 99);
 		assert.equal(f.fixVia, undefined);
+		assert.notEqual(
+			f.advisory,
+			true,
+			"untriaged stays blocking: an unlabelled issue is a triage the cycle owns",
+		);
 	});
 
 	it("no finding: open issue with flow:exempt and no tracked process", () => {
@@ -1386,5 +1397,28 @@ describe("computeLabelFindings", () => {
 			{ name: "bug", description: "Something isn't working" },
 		];
 		assert.deepEqual(computeLabelFindings(expected, actual), []);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// partitionFindings
+// ---------------------------------------------------------------------------
+
+describe("partitionFindings", () => {
+	const fixable = { type: "stale_updated_at", issueNumber: 1, fixVia: "file" };
+	const manual = { type: "untriaged", issueNumber: 2 };
+	const advisory = { type: "missing_process", issueNumber: 3, advisory: true };
+
+	it("splits findings into fixable, manual and advisory", () => {
+		const parts = partitionFindings([fixable, manual, advisory]);
+		assert.deepEqual(parts.fixable, [fixable]);
+		assert.deepEqual(parts.manual, [manual]);
+		assert.deepEqual(parts.advisory, [advisory]);
+	});
+
+	it("keeps advisory findings out of manual, so they cannot fail the audit", () => {
+		const parts = partitionFindings([advisory]);
+		assert.deepEqual(parts.manual, []);
+		assert.equal(parts.advisory.length, 1);
 	});
 });

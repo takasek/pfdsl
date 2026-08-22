@@ -19,6 +19,7 @@ import {
 	computeLabelFindings,
 	FLOW_LABELS,
 	parseIssueProcesses,
+	partitionFindings,
 } from "./lib/issues-flow-audit.mjs";
 import { parseDocument } from "./lib/yaml-require.mjs";
 
@@ -209,9 +210,11 @@ try {
 }
 let findings = computeFindings(entries, issues);
 
+// Returns the partition it printed, so callers deciding the exit code do not
+// walk the same findings again.
 function printFindings(findings) {
-	const fixable = findings.filter((f) => f.fixVia);
-	const manual = findings.filter((f) => !f.fixVia);
+	const parts = partitionFindings(findings);
+	const { fixable, manual, advisory } = parts;
 
 	function fmtFinding(f) {
 		const pid = f.processId ? ` [${f.processId}]` : "";
@@ -227,14 +230,23 @@ function printFindings(findings) {
 		console.log("manual:");
 		for (const f of manual) console.log(fmtFinding(f));
 	}
+	if (advisory.length > 0) {
+		console.log("advisory (does not fail this audit):");
+		for (const f of advisory) console.log(fmtFinding(f));
+	}
+	return parts;
 }
 
-if (findings.length === 0) {
+// Advisory findings never fail the audit (#963): they report drift that a
+// parallel session's unmerged branch produces, which no change to this tree
+// can clear. So "in sync" means "nothing fixable and nothing manual", which
+// also covers the no-findings-at-all case.
+const { fixable: fixableFindings, manual: manualFindings } =
+	printFindings(findings);
+if (fixableFindings.length === 0 && manualFindings.length === 0) {
 	console.log("roadmap.pfdsl is in sync");
 	process.exit(0);
 }
-
-printFindings(findings);
 
 if (!fix) {
 	process.exit(1);
@@ -272,7 +284,7 @@ if (docAfter !== docBefore || newBody !== body) {
 }
 
 // 4. Report remaining manual findings
-const remaining = findings.filter((f) => !f.fixVia);
+const remaining = partitionFindings(findings).manual;
 if (remaining.length > 0) {
 	console.log("remaining manual findings:");
 	printFindings(remaining);

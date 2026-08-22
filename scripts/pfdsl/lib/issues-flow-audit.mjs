@@ -185,11 +185,21 @@ export function computeFindings(entries, issues) {
 			continue;
 		}
 		if (hasManaged) {
+			// Advisory, not blocking (#963). A managed issue's roadmap entry is
+			// added on the branch that implements it, so every other session sees
+			// this gap until that branch merges — the divergence is inherent to
+			// parallel work, not a defect of the tree being audited. Left blocking,
+			// it fails gate-check in cycles whose diff cannot possibly have caused
+			// it, and a permanently red row stops being read at all
+			// (.pfdsl/bindings/pfd-retro-patterns/chronic-false-positive-silencing.md).
+			// The check that still binds runs at the one moment it can be acted on:
+			// cycle-status reports it for the issue being started.
 			findings.push({
 				type: "missing_process",
 				issueNumber: iss.number,
 				processId: undefined,
 				artifactId: undefined,
+				advisory: true,
 				detail: `issue has flow:managed label but no tracked process in the flow`,
 			});
 		} else {
@@ -207,6 +217,22 @@ export function computeFindings(entries, issues) {
 	findings.sort((a, b) => a.issueNumber - b.issueNumber);
 
 	return findings;
+}
+
+/**
+ * Splits findings by how the caller must treat them: `fixable` ones `--fix`
+ * repairs, `manual` ones a human resolves and the audit fails on, and
+ * `advisory` ones that are reported but never fail (see the `missing_process`
+ * comment above for why that class exists).
+ * @param {{fixVia?: string, advisory?: boolean}[]} findings
+ * @returns {{fixable: object[], manual: object[], advisory: object[]}}
+ */
+export function partitionFindings(findings) {
+	return {
+		fixable: findings.filter((f) => f.fixVia),
+		manual: findings.filter((f) => !f.fixVia && !f.advisory),
+		advisory: findings.filter((f) => !f.fixVia && f.advisory),
+	};
 }
 
 /**
