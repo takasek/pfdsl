@@ -265,9 +265,9 @@ artifact:
     group: repo_generated
     tags: [ gen ]
   plugin_dist:
-    label: 両ハーネス対応の配布plugin roots
-    description: "make gen-plugin が組み立てるClaude Code rootのplugin/pfdsl/とCodex native rootのplugin/pfdsl-codex/。公式validator/runtimeのskills固定というroot境界を守るため同居させない。両rootは共有inventoryから導出し、結合drift gateが一緒に検査する"
-    criteria: pnpm -r build && make gen-plugin が差分なしで完了し、Claude rootとCodex rootを比較するcheck-gen-plugin.ymlが通過する
+    label: drift検査済みの両ハーネス配布状態
+    description: "check_plugin_drift が、gen_pluginとassemble_codex_pluginの生成済みClaude Code root（plugin/pfdsl/）・Codex native root（plugin/pfdsl-codex/）・Codexリポジトリ開発資産を正本と照合済みにした状態。これはroot自体ではなく検査済み状態であり、rootの生成は各adapter processが担う。公式validator/runtimeのskills固定というroot境界を守るため、両rootは同居させない"
+    criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のClaude root・Codex root・Codexリポジトリ開発資産の差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
     location: [ ../plugin/pfdsl/, ../plugin/pfdsl-codex/ ]
     group: repo_generated
     tags: [ gen ]
