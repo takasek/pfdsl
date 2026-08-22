@@ -170,6 +170,39 @@ describe("runPreArtifactAdvisory", () => {
 		assert.equal(second.shouldOutput, false);
 	});
 
+	it("gives a delegate its own fire, since parent and subagent share session_id", () => {
+		const s = store();
+		const io = { root: ROOT, loadReminders: () => REMINDERS, ...s };
+		runPreArtifactAdvisory(JSON.stringify(payload()), io);
+		const delegate = runPreArtifactAdvisory(
+			JSON.stringify(payload({ agent_id: "agent-1" })),
+			io,
+		);
+		assert.equal(delegate.shouldOutput, true);
+	});
+
+	it("still fires only once for a given delegate", () => {
+		const s = store();
+		const io = { root: ROOT, loadReminders: () => REMINDERS, ...s };
+		const withAgent = JSON.stringify(payload({ agent_id: "agent-1" }));
+		runPreArtifactAdvisory(withAgent, io);
+		assert.equal(runPreArtifactAdvisory(withAgent, io).shouldOutput, false);
+	});
+
+	it("keeps two delegates of one session apart", () => {
+		const s = store();
+		const io = { root: ROOT, loadReminders: () => REMINDERS, ...s };
+		runPreArtifactAdvisory(
+			JSON.stringify(payload({ agent_id: "agent-1" })),
+			io,
+		);
+		const other = runPreArtifactAdvisory(
+			JSON.stringify(payload({ agent_id: "agent-2" })),
+			io,
+		);
+		assert.equal(other.shouldOutput, true);
+	});
+
 	it("keys the mark per session, so a different session still gets it", () => {
 		const s = store();
 		const io = { root: ROOT, loadReminders: () => REMINDERS, ...s };

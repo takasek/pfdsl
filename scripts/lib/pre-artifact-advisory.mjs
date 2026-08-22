@@ -17,7 +17,8 @@
 // whether a given line takes that shape is not decidable from the diff — the
 // runner gets the patterns, not a verdict.
 //
-// Once per session, because the scope that makes this reach code (every write
+// Once per writer — the caller, and each delegate separately (see
+// advisoryKey) — because the scope that makes this reach code (every write
 // under packages/ and scripts/) is also what would make an unconditional
 // advisory fire dozens of times a cycle. companion-prose-advisory, the closest
 // existing hook, needs no such state only because `.pfdsl/*.md` is narrow
@@ -79,6 +80,29 @@ export function formatPreArtifactAdvisory(reminders) {
 }
 
 /**
+ * What "already reminded" is scoped to, or null when the payload cannot say.
+ *
+ * Not `session_id` alone. A subagent shares its parent's `session_id` —
+ * delegation-guard's module header is the primary source for that, and for
+ * `agent_id` being present only inside a subagent call. Keying on the session
+ * would let whichever of the two writes an implementation file first consume
+ * the single fire, and since work-cycle.md 適用点3 treats delegating the
+ * implementation as an ordinary path, the actor that misses out would
+ * routinely be the one actually writing the code. Each delegate gets its own
+ * scope instead, and so does the caller.
+ * @param {object} payload PostToolUse hook payload
+ * @returns {string | null}
+ */
+export function advisoryKey(payload) {
+	const session = payload?.session_id;
+	if (typeof session !== "string" || session === "") return null;
+	const agent = payload?.agent_id;
+	return typeof agent === "string" && agent !== ""
+		? `${session}:${agent}`
+		: session;
+}
+
+/**
  * Orchestrates the hook's stdin payload into a print-or-not decision.
  *
  * Every quiet path is deliberate. A missing `session_id` means there is no key
@@ -104,8 +128,8 @@ export function runPreArtifactAdvisory(
 	const payload = parseHookPayload(inputText);
 	if (!payload || !isImplementationArtifactWrite(payload, root))
 		return { shouldOutput: false };
-	const key = payload.session_id;
-	if (typeof key !== "string" || key === "") return { shouldOutput: false };
+	const key = advisoryKey(payload);
+	if (key === null) return { shouldOutput: false };
 	let fired;
 	try {
 		fired = hasFired(key);
