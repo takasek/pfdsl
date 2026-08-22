@@ -800,3 +800,88 @@ describe("runCycleStatus release pending", () => {
 		assert.equal(result.releasePendingError, "spawn failed");
 	});
 });
+
+describe("runCycleStatus — unregistered flow:managed target issue (#963)", () => {
+	const issueJsonWithLabels = (labels) =>
+		JSON.stringify({ body: "普通の説明文。", comments: [], labels });
+
+	it("names a flow:managed target issue that has no process in the roadmap", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [956],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJsonWithLabels([{ name: "flow:managed" }]);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.unregisteredManagedIssues, [956]);
+	});
+
+	it("stays quiet for a flow:exempt target issue", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [963],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJsonWithLabels([{ name: "flow:exempt" }]);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.unregisteredManagedIssues, []);
+	});
+
+	it("stays quiet when the managed issue already has a tracked process", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJsonWithLabels([{ name: "flow:managed" }]);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.unregisteredManagedIssues, []);
+	});
+});
+
+describe("runCycleStatus — issue lookup failure and unregisteredManagedIssues", () => {
+	it("excludes an issue whose label lookup failed, and says so via designUnsettledError", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [956],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue") throw new Error("gh: network unreachable");
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		// Reporting it as unregistered would be a false positive (its labels are
+		// unknown); reporting nothing at all would hide that the check never ran.
+		assert.deepEqual(result.unregisteredManagedIssues, []);
+		assert.match(result.designUnsettledError, /network unreachable/);
+	});
+});

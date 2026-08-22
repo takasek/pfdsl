@@ -70,6 +70,15 @@ PR マージ時に issue が自動 close されるには、PR 本文に `Closes 
 
 `scripts/pfdsl/audit-issues-flow.mjs` が GitHub issues と `roadmap.pfdsl` の同期を機械監査する（ラベル・updatedAt・priority 突合）。`--fix` で機械的修復。
 
+findings は3クラスに分かれ、出力の見出しがそれを名乗る。`fixable:` は `--fix` が直すもの、`manual:` は人が直すもので監査を落とす、`advisory:` は報告のみで監査を落とさない。
+`flow:managed` なのに process を持たない issue（`missing_process`）が advisory なのは、その登録が実装ブランチに乗るためである — そのブランチが統合されるまで他の作業ツリーからは常に欠落して見える。
+あるサイクルの差分が消せるのは自分が着手する issue の欠落だけで、他の issue の分は消せない。
+落とす設計にすると、原因を作っていないサイクルが毎回赤くなり、赤い行そのものが読まれなくなる。
+この欠落に行動できるのは、その issue を自分のものとして扱っている側だけなので、検査点はそこへ寄せる。
+着手時点では、プリフライト集約スクリプトを持つリポがそのサイクルの issue について報告する（登録漏れは依存関係を変えうるので、roadmap に着手する前に知りたい）。
+マージ前の時点では、roadmap を編集する PR について、その PR が閉じる issue の分だけを FAIL にする — 対象集合を PR 自身から導けるため、実行主体が渡すフラグに依存しない。
+後者の時点は close 契機に置かない。close 後に気付いても、その PR はもう変えられない。
+
 ## 採用手順
 
 1. pfdsl plugin を導入する（`/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`）— pfd-ops スキル本体はリポでなく plugin から供給される
