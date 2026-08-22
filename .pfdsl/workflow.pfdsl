@@ -241,6 +241,12 @@ artifact:
     criteria: main 上または CLAUDE_PROJECT_DIR と異なる同一リポジトリの worktree 上の変更系 git コマンドが deny または ask になり、読み取り系とセッション自身の feature branch 上の操作は影響を受けないことが scripts/lib/main-commit-guard.test.mjs のテストで検証されている
     location: ../scripts/main-commit-guard.mjs
     group: generation
+  pre_artifact_advisory:
+    label: pre-artifact参照点hook
+    description: "サイクルが最初に packages/・scripts/ 配下へ書いた時点で、retro パターンカタログの `phase: pre-artifact` 宣言を持つものを列挙する PostToolUse(Write|Edit) advisory（#964）。pfd-ops references/work-cycle.md 手順2 の P3 が名指す「書く瞬間に発火する機構」の実体で、散文側の参照点（プリフライトの一覧印字・終端ゲートの項目）がコード成果物に届かない区間を埋める。delegation_guard・main_branch_guard と同じくリポ固有で配布対象外 — 対象パスがこのリポの構成に依存するため、散文側の P3 が採用リポの手当てになる"
+    criteria: セッションごとに1回だけ発火し、リポ外の同名ディレクトリへの書き込みでは発火せず、マーカー書き込みが失敗しても例外を投げないことが scripts/lib/pre-artifact-advisory.test.mjs のテストで検証されている
+    location: ../scripts/pre-artifact-advisory.mjs
+    group: generation
   ecosystem_skill:
     label: PFDセット構築スキル
     description: "/pfd-init コマンド。PFD セット（roadmap / workflow / runtime-pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
@@ -500,7 +506,7 @@ toolchain >>? review_examples
 
 [adrs, decisions] >> distill_local_skills -> [distribution_review_perspectives, distribution_review_skill, prose_mechanization_audit_skill, retro_pattern_sweep_skill, spec_stress_skill, vscode_ext_debug_skill]
 
-[adrs, decisions] >> externalize_bindings -> [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, workflow_md]
+[adrs, decisions] >> externalize_bindings -> [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, pre_artifact_advisory, workflow_md]
 
 spec_stress_skill >>? maintain_spec
 
@@ -539,6 +545,7 @@ workflow_pfdsl >>? develop
 delegation_guard >>? develop
 implementer_agent >>? develop
 main_branch_guard >>? develop
+pre_artifact_advisory >>? develop
 workflow_md >>? develop
 
 issue_updates >>? file_issues
@@ -557,7 +564,7 @@ distribution_review_skill >>? review_distribution
 
 bindings_pfd_retro >> sweep_retro_patterns -> retro_pattern_sweep_record
 
-[bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
+[bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, pre_artifact_advisory, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
 
 prose_mechanization_audit_skill >>? sweep_prose_mechanization
 prose_mechanization_sweep_record >>? externalize_bindings
