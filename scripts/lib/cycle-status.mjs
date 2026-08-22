@@ -145,7 +145,7 @@ export function findProcessIdForIssueNumber(pfdslText, issueNumber) {
  * `audit-issues-flow.mjs` reports the same gap, but only as advisory: a managed
  * issue's entry lands on the branch that implements it, so every other session
  * sees the gap until that branch merges, and failing on it made the terminal
- * gate red in cycles whose diff could not have caused it. The gap is worth
+ * gate red on issues the failing cycle does not own. The gap is worth
  * acting on at exactly one moment — when this cycle starts that very issue —
  * which is the moment this preflight runs.
  * @param {string[]} labelNames the issue's label names

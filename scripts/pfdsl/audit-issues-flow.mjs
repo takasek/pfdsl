@@ -238,9 +238,9 @@ function printFindings(findings) {
 }
 
 // Advisory findings never fail the audit (#963): they report drift that a
-// parallel session's unmerged branch produces, which no change to this tree
-// can clear. So "in sync" means "nothing fixable and nothing manual", which
-// also covers the no-findings-at-all case.
+// parallel session's unmerged branch produces, which this tree can clear only
+// for the issue it is itself working on. So "in sync" means "nothing fixable
+// and nothing manual", which also covers the no-findings-at-all case.
 const { fixable: fixableFindings, manual: manualFindings } =
 	printFindings(findings);
 if (fixableFindings.length === 0 && manualFindings.length === 0) {

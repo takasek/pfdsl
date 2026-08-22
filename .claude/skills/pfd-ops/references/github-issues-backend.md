@@ -71,7 +71,8 @@ PR マージ時に issue が自動 close されるには、PR 本文に `Closes 
 `scripts/pfdsl/audit-issues-flow.mjs` が GitHub issues と `roadmap.pfdsl` の同期を機械監査する（ラベル・updatedAt・priority 突合）。`--fix` で機械的修復。
 
 findings は3クラスに分かれ、出力の見出しがそれを名乗る。`fixable:` は `--fix` が直すもの、`manual:` は人が直すもので監査を落とす、`advisory:` は報告のみで監査を落とさない。
-`flow:managed` なのに process を持たない issue（`missing_process`）が advisory なのは、その登録が実装ブランチに乗るためである — そのブランチが統合されるまで他の作業ツリーからは常に欠落して見え、そこで走るどのサイクルの差分もその欠落を消せない。
+`flow:managed` なのに process を持たない issue（`missing_process`）が advisory なのは、その登録が実装ブランチに乗るためである — そのブランチが統合されるまで他の作業ツリーからは常に欠落して見える。
+あるサイクルの差分が消せるのは自分が着手する issue の欠落だけで、他の issue の分は消せない。
 落とす設計にすると、原因を作っていないサイクルが毎回赤くなり、赤い行そのものが読まれなくなる。
 この欠落に行動できるのはその issue へ着手するサイクルだけなので、検査点はそこへ寄せる — プリフライト集約スクリプトを持つリポでは、着手する issue についてそれが報告する。
 

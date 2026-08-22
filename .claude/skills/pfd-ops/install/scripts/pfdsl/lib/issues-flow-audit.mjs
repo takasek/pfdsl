@@ -188,9 +188,10 @@ export function computeFindings(entries, issues) {
 			// Advisory, not blocking (#963). A managed issue's roadmap entry is
 			// added on the branch that implements it, so every other session sees
 			// this gap until that branch merges — the divergence is inherent to
-			// parallel work, not a defect of the tree being audited. Left blocking,
-			// it fails gate-check in cycles whose diff cannot possibly have caused
-			// it, and a permanently red row stops being read at all
+			// parallel work, not a defect of the tree being audited. A cycle can
+			// clear the gap for the issue it is itself starting, and for no other,
+			// so left blocking it fails gate-check on issues the failing cycle does
+			// not own, and a permanently red row stops being read at all
 			// (.pfdsl/bindings/pfd-retro-patterns/chronic-false-positive-silencing.md).
 			// The check that still binds runs at the one moment it can be acted on:
 			// cycle-status reports it for the issue being started.
