@@ -164,7 +164,7 @@ export function stripLeadingNoise(tokens) {
 	return tokens.slice(i);
 }
 
-export function gitSubcommand(tokens) {
+export function gitSubcommandIndex(tokens) {
 	for (let i = 1; i < tokens.length; i++) {
 		const { value, quoted } = tokens[i];
 		if (quoted) return null;
@@ -173,9 +173,14 @@ export function gitSubcommand(tokens) {
 			continue;
 		}
 		if (value.startsWith("-")) continue;
-		return value;
+		return i;
 	}
 	return null;
+}
+
+export function gitSubcommand(tokens) {
+	const index = gitSubcommandIndex(tokens);
+	return index === null ? null : tokens[index].value;
 }
 
 function ghApiMethod(args) {

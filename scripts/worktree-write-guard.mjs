@@ -10,34 +10,19 @@
 //
 // Usage (wired in .claude/settings.json): node scripts/worktree-write-guard.mjs
 
-import { dirname, resolve } from "node:path";
 import {
 	buildPermissionOutput,
 	parseHookPayload,
 	readStdinText,
 } from "./lib/hook-io.mjs";
-import { tryGit } from "./lib/run-exec.mjs";
+import { resolveGitRoots } from "./lib/run-exec.mjs";
 import { evaluateWorktreeWriteGuard } from "./lib/worktree-write-guard.mjs";
-
-/**
- * @param {string} cwd
- * @returns {{worktreeRoot: string, mainRoot: string} | null}
- */
-function resolveRoots(cwd) {
-	const toplevel = tryGit(["rev-parse", "--show-toplevel"], { cwd });
-	const commonDir = tryGit(["rev-parse", "--git-common-dir"], { cwd });
-	if (!toplevel.ok || !commonDir.ok) return null;
-	return {
-		worktreeRoot: toplevel.out.trim(),
-		mainRoot: dirname(resolve(cwd, commonDir.out.trim())),
-	};
-}
 
 const payload = parseHookPayload(await readStdinText());
 if (!payload) process.exit(0);
 
 const cwd = payload?.cwd;
-const roots = typeof cwd === "string" ? resolveRoots(cwd) : null;
+const roots = typeof cwd === "string" ? resolveGitRoots(cwd) : null;
 
 const result = evaluateWorktreeWriteGuard(payload, roots);
 if (result.decision === "deny") {

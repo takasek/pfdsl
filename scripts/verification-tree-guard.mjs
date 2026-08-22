@@ -14,13 +14,12 @@
 //
 // Usage (wired in .claude/settings.json): node scripts/verification-tree-guard.mjs
 
-import { dirname, resolve } from "node:path";
 import {
 	buildPermissionOutput,
 	parseHookPayload,
 	readStdinText,
 } from "./lib/hook-io.mjs";
-import { tryGit } from "./lib/run-exec.mjs";
+import { resolveGitRoots, tryGit } from "./lib/run-exec.mjs";
 import { evaluateVerificationTreeGuard } from "./lib/verification-tree-guard.mjs";
 
 /**
@@ -28,9 +27,8 @@ import { evaluateVerificationTreeGuard } from "./lib/verification-tree-guard.mjs
  * @returns {{worktreeRoot: string, mainRoot: string, hasLinkedWorktrees: boolean} | null}
  */
 function resolveRoots(cwd) {
-	const toplevel = tryGit(["rev-parse", "--show-toplevel"], { cwd });
-	const commonDir = tryGit(["rev-parse", "--git-common-dir"], { cwd });
-	if (!toplevel.ok || !commonDir.ok) return null;
+	const roots = resolveGitRoots(cwd);
+	if (!roots) return null;
 
 	// A porcelain `worktree list` prints one "worktree <path>" line per
 	// worktree, the main checkout included — more than one such line means at
@@ -44,8 +42,7 @@ function resolveRoots(cwd) {
 		: false;
 
 	return {
-		worktreeRoot: toplevel.out.trim(),
-		mainRoot: dirname(resolve(cwd, commonDir.out.trim())),
+		...roots,
 		hasLinkedWorktrees,
 	};
 }
