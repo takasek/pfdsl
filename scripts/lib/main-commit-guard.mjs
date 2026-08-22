@@ -17,6 +17,7 @@
 import { resolve } from "node:path";
 import {
 	gitSubcommand,
+	gitSubcommandIndex,
 	splitSegments,
 	stripLeadingNoise,
 	tokenize,
@@ -133,34 +134,37 @@ function staticPath(token) {
 	return /[$~*?`]/.test(token.value) ? null : token.value;
 }
 
+/** Resolve every pre-subcommand `git -C` in the order Git applies them. */
+function resolveGitCwd(tokens, shellCwd, hookCwd) {
+	const subcommandAt = gitSubcommandIndex(tokens);
+	if (subcommandAt === null) return shellCwd ?? hookCwd;
+
+	let cwd = shellCwd;
+	for (let i = 1; i < subcommandAt; i++) {
+		const token = tokens[i];
+		if (token.quoted || token.value !== "-C") continue;
+		const target = staticPath(tokens[i + 1]);
+		if (target === null) cwd = null;
+		else if (target.startsWith("/")) cwd = resolve(target);
+		else if (cwd !== null) cwd = resolve(cwd, target);
+		i++;
+	}
+	return cwd ?? hookCwd;
+}
+
 /**
- * The directory the first guarded git command in `command` actually runs in.
- *
- * A PreToolUse hook fires before the shell does, so `payload.cwd` is where the
- * shell stands now — not where a `cd` in the command itself will put it. That
- * gap ran both ways (#751): `cd <worktree> && git commit` was denied as a
- * commit on main while it landed on a feature branch, and the inverse form
- * committed to main from a worktree session without the guard noticing. `git
- * -C <path>` bypassed it outright, since nothing looked at the flag.
- *
- * The first guarded segment is what fixes the tree, even when a later segment
- * carries the stricter decision — a compound that cds between the two is rare
- * enough not to justify a second notion of "the" directory here.
- *
- * Anything the layer cannot resolve statically — a variable, a `~`, a bare
- * `cd` — falls back to the hook's cwd rather than being guessed at, which
- * leaves the guard exactly as accurate as it was before for those forms. An
- * absolute `cd` afterwards restores the trail, since it does not depend on
- * where the unresolvable one led.
- * @param {string} command
- * @param {string} hookCwd payload.cwd
- * @returns {string}
+ * Track the shell cwd and retain each guarded Git segment with its own target.
+ * A PreToolUse hook fires before the shell does, so `payload.cwd` does not yet
+ * reflect `cd` or `git -C` inside the command (#751). Keeping every target is
+ * also necessary because one Bash invocation can move between worktrees
+ * before running another guarded Git command (#784).
  */
-export function resolveCommandCwd(command, hookCwd) {
-	if (typeof command !== "string") return hookCwd;
+function analyzeCommand(command, hookCwd) {
+	if (typeof command !== "string") return { targets: [], finalCwd: hookCwd };
 
 	/** Where the shell stands, or null once a `cd` moved it somewhere unknown. */
 	let cwd = hookCwd;
+	const targets = [];
 
 	for (const segment of splitSegments(command)) {
 		const tokens = stripLeadingNoise(tokenize(segment));
@@ -170,25 +174,32 @@ export function resolveCommandCwd(command, hookCwd) {
 		if (head === "cd") {
 			const target = tokens.length === 2 ? staticPath(tokens[1]) : null;
 			if (target === null) cwd = null;
-			// An absolute target ignores whatever came before it, so a trail lost
-			// to an unresolvable `cd` is known again from here on.
+			// An absolute target restores a trail lost to an unresolvable earlier cd.
 			else if (target.startsWith("/")) cwd = resolve(target);
 			else if (cwd !== null) cwd = resolve(cwd, target);
 			continue;
 		}
 
-		if (head !== "git" || !classifySegment(tokens)) continue;
-
-		// `git -C` decides the tree regardless of any cd before it.
-		const flag = tokens.findIndex(
-			(t, i) => i > 0 && !t.quoted && t.value === "-C",
-		);
-		const explicit = flag > 0 ? staticPath(tokens[flag + 1]) : null;
-		return explicit === null
-			? (cwd ?? hookCwd)
-			: resolve(cwd ?? hookCwd, explicit);
+		if (head !== "git") continue;
+		const guarded = classifySegment(tokens);
+		if (!guarded) continue;
+		targets.push({ ...guarded, cwd: resolveGitCwd(tokens, cwd, hookCwd) });
 	}
-	return cwd ?? hookCwd;
+	return { targets, finalCwd: cwd ?? hookCwd };
+}
+
+/** Every guarded Git segment with the cwd in which Git will run it. */
+export function resolveGuardedGitCommands(command, hookCwd) {
+	return analyzeCommand(command, hookCwd).targets;
+}
+
+/**
+ * The directory the first guarded Git command runs in, retained for callers
+ * that inspect one command. The hook itself evaluates every resolved target.
+ */
+export function resolveCommandCwd(command, hookCwd) {
+	const analysis = analyzeCommand(command, hookCwd);
+	return analysis.targets[0]?.cwd ?? analysis.finalCwd;
 }
 
 /**
@@ -217,6 +228,17 @@ export function evaluateMainCommitGuard(
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
 	const guarded = classifyGitCommand(payload?.tool_input?.command);
 	if (!guarded) return { decision: "allow" };
+	return evaluateGuardedCommand(guarded, {
+		currentBranch,
+		mainBranch,
+		crossesWorktree,
+	});
+}
+
+function evaluateGuardedCommand(
+	guarded,
+	{ currentBranch, mainBranch = "main", crossesWorktree = false } = {},
+) {
 	const targetsDefaultBranch = currentBranch === mainBranch;
 	if (!targetsDefaultBranch && !crossesWorktree) return { decision: "allow" };
 
@@ -255,17 +277,31 @@ export function evaluateMainCommitGuard(
  * version repeated the tool_name/classify check there and carried a comment
  * asking the next reader to keep the two copies in sync by hand.
  * @param {string} inputText raw stdin payload
- * @param {{resolveBranches: (payload: object) => {currentBranch?: string, mainBranch?: string, crossesWorktree?: boolean}}} io
+ * @param {{resolveBranches: (payload: object, targetCwd: string) => {currentBranch?: string, mainBranch?: string, crossesWorktree?: boolean}}} io
  * @returns {{shouldOutput: boolean, output?: object}}
  */
 export function runMainCommitGuard(inputText, { resolveBranches }) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 	if (payload?.tool_name !== "Bash") return { shouldOutput: false };
-	if (!classifyGitCommand(payload?.tool_input?.command))
-		return { shouldOutput: false };
+	const targets = resolveGuardedGitCommands(
+		payload?.tool_input?.command,
+		payload?.cwd ?? process.cwd(),
+	);
+	if (targets.length === 0) return { shouldOutput: false };
 
-	const result = evaluateMainCommitGuard(payload, resolveBranches(payload));
-	if (result.decision === "allow") return { shouldOutput: false };
-	return { shouldOutput: true, output: buildPermissionOutput(result) };
+	let asked = null;
+	for (const target of targets) {
+		const result = evaluateGuardedCommand(
+			target,
+			resolveBranches(payload, target.cwd),
+		);
+		if (result.decision === "deny") {
+			return { shouldOutput: true, output: buildPermissionOutput(result) };
+		}
+		if (result.decision === "ask") asked ??= result;
+	}
+	return asked === null
+		? { shouldOutput: false }
+		: { shouldOutput: true, output: buildPermissionOutput(asked) };
 }

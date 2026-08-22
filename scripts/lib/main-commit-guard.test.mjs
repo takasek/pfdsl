@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { after, before, describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
 	classifyGitCommand,
@@ -9,12 +14,14 @@ import {
 	runMainCommitGuard,
 } from "./main-commit-guard.mjs";
 
-function payload({ toolName = "Bash", command }) {
-	return {
+function payload({ toolName = "Bash", command, cwd }) {
+	const value = {
 		hook_event_name: "PreToolUse",
 		tool_name: toolName,
 		tool_input: { command },
 	};
+	if (cwd !== undefined) value.cwd = cwd;
+	return value;
 }
 
 describe("classifyGitCommand", () => {
@@ -136,6 +143,16 @@ describe("resolveCommandCwd", () => {
 		assert.equal(
 			resolveCommandCwd("git -C /elsewhere/w commit -m 'x'", HOOK_CWD),
 			"/elsewhere/w",
+		);
+	});
+
+	it("applies repeated git -C options from left to right (#784)", () => {
+		assert.equal(
+			resolveCommandCwd(
+				"git -C /worktrees/session -C ../sibling add -A",
+				HOOK_CWD,
+			),
+			"/worktrees/sibling",
 		);
 	});
 
@@ -354,6 +371,57 @@ describe("runMainCommitGuard", () => {
 		assert.equal(shouldOutput, false);
 	});
 
+	it("evaluates every guarded segment in its own effective cwd (#784)", () => {
+		for (const command of [
+			"git add -A && cd /worktrees/sibling && git add -A",
+			"git add -A && git -C /worktrees/sibling add -A",
+		]) {
+			const visited = [];
+			const input = JSON.stringify(
+				payload({ command, cwd: "/worktrees/session" }),
+			);
+			const { shouldOutput, output } = runMainCommitGuard(input, {
+				resolveBranches: (_payload, targetCwd) => {
+					visited.push(targetCwd);
+					return {
+						currentBranch: "topic",
+						mainBranch: "main",
+						crossesWorktree: targetCwd === "/worktrees/sibling",
+					};
+				},
+			});
+			assert.deepEqual(visited, ["/worktrees/session", "/worktrees/sibling"]);
+			assert.equal(shouldOutput, true);
+			assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
+		}
+	});
+
+	it("aggregates per-segment decisions with deny before ask (#784)", () => {
+		const context = (_payload, targetCwd) => ({
+			currentBranch: "topic",
+			mainBranch: "main",
+			crossesWorktree: targetCwd === "/worktrees/sibling",
+		});
+		const askInput = JSON.stringify(
+			payload({
+				command: "git add -A && git -C /worktrees/sibling restore tracked.txt",
+				cwd: "/worktrees/session",
+			}),
+		);
+		const asked = runMainCommitGuard(askInput, { resolveBranches: context });
+		assert.equal(asked.output.hookSpecificOutput.permissionDecision, "ask");
+
+		const denyInput = JSON.stringify(
+			payload({
+				command:
+					"git -C /worktrees/sibling restore tracked.txt && git -C /worktrees/sibling add -A",
+				cwd: "/worktrees/session",
+			}),
+		);
+		const denied = runMainCommitGuard(denyInput, { resolveBranches: context });
+		assert.equal(denied.output.hookSpecificOutput.permissionDecision, "deny");
+	});
+
 	it("asks rather than denies for a state-restoring subcommand (#777)", () => {
 		const input = JSON.stringify(payload({ command: "git reset --hard" }));
 		const { shouldOutput, output } = runMainCommitGuard(input, {
@@ -383,5 +451,70 @@ describe("runMainCommitGuard", () => {
 				shouldOutput: false,
 			},
 		);
+	});
+});
+
+describe("main-commit-guard wrapper", () => {
+	const script = resolve(
+		dirname(fileURLToPath(import.meta.url)),
+		"../main-commit-guard.mjs",
+	);
+	let root;
+	let repo;
+	let session;
+	let sibling;
+
+	function git(cwd, args) {
+		return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+	}
+
+	before(() => {
+		root = mkdtempSync(join(tmpdir(), "main-commit-guard-"));
+		repo = join(root, "repo");
+		session = join(root, "session");
+		sibling = join(root, "sibling");
+		mkdirSync(repo);
+		git(root, ["init", "-b", "main", repo]);
+		git(repo, ["config", "user.email", "guard-test@example.invalid"]);
+		git(repo, ["config", "user.name", "Guard Test"]);
+		writeFileSync(join(repo, "tracked.txt"), "fixture\n");
+		git(repo, ["add", "tracked.txt"]);
+		git(repo, ["commit", "-m", "fixture"]);
+		git(repo, ["remote", "add", "origin", repo]);
+		git(repo, [
+			"symbolic-ref",
+			"refs/remotes/origin/HEAD",
+			"refs/remotes/origin/main",
+		]);
+		git(repo, ["worktree", "add", "-b", "session", session]);
+		git(repo, ["worktree", "add", "-b", "sibling", sibling]);
+	});
+
+	after(() => {
+		rmSync(root, { recursive: true, force: true });
+	});
+
+	function runWrapper(command) {
+		return execFileSync(process.execPath, [script], {
+			encoding: "utf8",
+			env: { ...process.env, CLAUDE_PROJECT_DIR: session },
+			input: JSON.stringify(payload({ command, cwd: session })),
+		}).trim();
+	}
+
+	it("denies compound and repeated-C sibling mutations end to end (#784)", () => {
+		for (const command of [
+			`git add -A && cd ${sibling} && git add -A`,
+			`git add -A && git -C ${sibling} add -A`,
+			`git -C ${session} -C ../sibling add -A`,
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
 	});
 });

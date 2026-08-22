@@ -22,23 +22,18 @@
 import { readStdinText } from "./lib/hook-io.mjs";
 import {
 	crossesWorktree,
-	resolveCommandCwd,
 	runMainCommitGuard,
 } from "./lib/main-commit-guard.mjs";
 import { resolveGitRoots, tryGit } from "./lib/run-exec.mjs";
 
 /**
  * @param {object} payload PreToolUse hook payload
+ * @param {string} targetCwd resolved cwd of one guarded Git segment
  * @returns {{currentBranch: string | undefined, mainBranch: string, crossesWorktree: boolean}}
  */
-function resolveBranches(payload) {
-	// The command's own tree, not the shell's: a `cd` or `git -C` in the command
-	// decides which tree it acts on, and the hook runs before either takes
-	// effect (#751).
-	const targetCwd = resolveCommandCwd(
-		payload?.tool_input?.command,
-		payload?.cwd ?? process.cwd(),
-	);
+function resolveBranches(_payload, targetCwd) {
+	// Each guarded segment supplies its own target, so a compound command that
+	// changes cwd is checked against every worktree it reaches (#751, #784).
 	const targetRoots = resolveGitRoots(targetCwd);
 	const projectDir = process.env.CLAUDE_PROJECT_DIR;
 	const sessionRoots =
