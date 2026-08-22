@@ -11,3 +11,7 @@ tags: [method:delegate, context:parallel-work]
   具体例: JSDoc のブロックコメント内に再帰 glob の例を書いたところ、そのパターンに含まれる星と区切りの並びがコメント終端記号を作り、以降の散文が構文として解釈されてファイルが壊れた（#582 のサイクル）。
   問いの形: 「この例示は、それを囲む記法にとってただの文字列か、それとも意味を持つ並びを含むか」。
   対策: 例示を書いたら、囲みの記法でパースし直す（コメントならファイルを実行・import する、lint なら検出関数を直接走らせる）。目視では終端記号は読み飛ばされる。
+  **同じ形は rebase で併合した、独立に正しい契約同士にも起きる。** Claude root の bundle manifest は全ファイルを書き終えた後に記録する必要があり、Codex migration の cleanup は legacy な Claude-root files を消す必要がある。各変更を単独に通しても、manifest を cleanup より先に書く接合順では、後に消す file まで hash に記録してしまう。
+  具体例: dual-harness generator の rebase でこの順序が混ざり、独立した seam review が manifest を書いた後の legacy cleanup を検出した。cleanup を前へ移した後の failure injection は、strict に失敗として扱う cleanup error を best-effort cleanup が握り潰す経路も検出した。
+  問いの形の追加: 「併合する各契約の操作順は、他方が観測・記録する状態を後から変えないか。途中の cleanup が失敗したとき、その error は契約どおり伝播・rollback されるか」。
+  対策の追加: 結合の受け入れ基準には各 unit の成功試験だけでなく、操作列の順序 assertion と接合部ごとの failure injection を置く。生成・削除・hash・publish・rollback をまたぐ契約は、最後に書くものと strict に失敗させるものを明示して検査する。

@@ -13,3 +13,5 @@ tags: [target:issue, target:prose-doc, context:parallel-work, context:stale-tool
   問いの形の追加: 「窓が取り込んだコミットは、自分がこのサイクルで見本にした成果物を触っているか。触っているなら、その改訂は自分の写しにも当たるか」。
   具体例: `prose-mechanization-audit` スキルを兄弟の `retro-pattern-sweep` スキルを見本に書いた（#915）。着手時 `behindBase: 0` だったツリーが作業中に10コミット遅れ、その窓に兄弟スキルの**初回実行レビュー**（#934・#935）が入っていた。そのレビューが塞いだ3点（記録ファイル不在時に読み取りコマンドがクラッシュする・記録を1コミットに畳むと `commit` フィールドが自己言及になる・検査を最後にまとめると切り分けの手戻りが出る）は、写した側にもそのまま入っていた。写した時点の見本は誰にも欠陥が知られておらず、写す前にどれだけ精査しても出なかった — 出したのは見本の初回実行だけである。
   対策の追加: 窓が触ったファイルを `git diff --name-only <旧base> <新base>` で列挙したら、規約文書かどうかだけでなく、**このサイクルで見本にした成果物が含まれるか**も見る。含まれていればその差分を読み、自分の写しへ当たる分を同じサイクルで反映する。見本がまだ一度も実行されていない設計であった場合、写した側の欠陥は精査ではなく初回実行でしか出ないので、見本側の初回実行は自分の写しの検証を兼ねる。
+  **同じ窓は handoff prompt にも残る。** PR #966 の rebase 後、Claude distribution-review 用の外部 prompt が rebase 前の approval interval と `inScope` file count を保持していた。branch の gate は current tree を検査するため、外部へ渡した本文を訂正しない。
+  対策の追加: handoff の直前に gate と同じ判定から current approval interval と `inScope` 集合を再導出し、その出力を prompt へ転記する。手で数えた file count や rebase 前の range を再利用しない。
