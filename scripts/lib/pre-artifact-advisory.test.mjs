@@ -202,6 +202,13 @@ describe("formatPreArtifactAdvisory", () => {
 		assert.match(text, /同じ形のまま中身だけ差し替える/);
 	});
 
+	it("tells the runner the artifact already landed, rather than claiming to precede it", () => {
+		const text = formatPreArtifactAdvisory(REMINDERS);
+		assert.doesNotMatch(text, /what you are writing/);
+		assert.match(text, /already on disk/);
+		assert.match(text, /Re-read what you just wrote/);
+	});
+
 	it("leaves the countermeasure to the preflight, which can afford the length", () => {
 		assert.doesNotMatch(
 			formatPreArtifactAdvisory(REMINDERS),

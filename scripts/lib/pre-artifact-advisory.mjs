@@ -1,6 +1,7 @@
 // Puts the retro catalog's `phase: pre-artifact` patterns in front of the
-// runner at the moment this cycle's first implementation artifact is written
-// (#964, work-cycle.md 手順2 の P3).
+// runner as soon as this cycle's first implementation artifact has been
+// written — backing up work-cycle.md 手順2 の P3, which is the reference point
+// that actually precedes the writing (#964).
 //
 // The catalog already had two reference points and neither reaches code. The
 // preflight prints these same patterns, but once, before the cycle starts —
@@ -8,10 +9,22 @@
 // typed. The terminal gate asks for them again, but only before the PR body,
 // by which time the code, its comments, the tests and the commit messages are
 // already written. That gap is where a pre-artifact pattern was measured
-// leaking into three implementation comments in PR #962. Prose alone cannot
-// close it: a third reference point in the skill is still a reference point,
-// and "printed" and "read" stay different things. Firing on the write is the
-// only form that does not depend on the runner having remembered.
+// leaking into three implementation comments in PR #962.
+//
+// A backstop, not a replacement for the skill's own "before you write"
+// reference point. Being PostToolUse, this fires once the write has landed:
+// the artifact that triggers it was never shaped by what it says, and a whole
+// file produced in one Write is finished before the first word reaches the
+// runner. What it buys is the artifacts after that one, plus the prompt to
+// re-read the one just written while it is still the thing being worked on.
+// Whether some non-blocking event could instead reach the runner *before* the
+// first write is not settled here and is not claimed either way — this says
+// only what this implementation does.
+//
+// The reach is also bounded by the tool surface it watches. Writes that arrive
+// through Bash, a generator, or any tool other than Write/Edit are not seen,
+// so "the cycle's first implementation artifact" means the first one written
+// through those two tools.
 //
 // Advisory, never a gate. What a pattern reserves is a shape of prose, and
 // whether a given line takes that shape is not decidable from the diff — the
@@ -75,7 +88,7 @@ export function isImplementationArtifactWrite(payload, root) {
  */
 export function formatPreArtifactAdvisory(reminders) {
 	return [
-		"note: this cycle just wrote its first implementation artifact. The retro catalog's `phase: pre-artifact` patterns only bite before the prose exists — the terminal gate asks for them again, but by then this file is written. Open the ones that could reserve the shape of what you are writing:",
+		"note: this cycle just wrote its first implementation artifact — it is already on disk, so this arrives too late to have shaped it. Re-read what you just wrote against the retro catalog's `phase: pre-artifact` patterns, fix it if one of them reserves the shape it took, and apply them to the artifacts still ahead (the terminal gate asks again, but only once the PR body is being written):",
 		...reminders.map((r) => `  - ${r.name} (${r.path})`),
 	].join("\n");
 }
