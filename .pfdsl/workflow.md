@@ -214,7 +214,8 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 節の名前を PreToolUse に限っていた頃に PostToolUse advisory（`companion-prose-advisory`）が現れ、判定の宛先が無いように読める状態になったため、対象を hook 全般へ広げてある。
 登録しない側に当たるのは `stale-dist-guard` / `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` / `companion-prose-advisory` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
 
-現在 artifact 登録済みの2件はこの基準に該当する: `delegation_guard`（`references/work-cycle.md` 手順2「委譲先の外向き操作の制御」が要求する機構であり、`externalize_bindings` の出力として生まれる）・`main_branch_guard`（同手順2冒頭「main 直コミットしない」・CLAUDE.md「コミット粒度」節が要求する機構で、同じく `externalize_bindings` の出力）。
+現在 artifact 登録済みの3件はこの基準に該当する: `delegation_guard`（`references/work-cycle.md` 手順2「委譲先の外向き操作の制御」が要求する機構であり、`externalize_bindings` の出力として生まれる）・`main_branch_guard`（同手順2冒頭「main 直コミットしない」・CLAUDE.md「コミット粒度」節が要求する機構で、同じく `externalize_bindings` の出力）・`pre_artifact_advisory`（同手順2 の参照点 P3 が「書く瞬間に発火する機構」として名指し、その置き場を companion に委ねている。#964）。
+`pre_artifact_advisory` が PostToolUse advisory でありながら登録側に来るのは、advisory か guard かが判定軸でないことによる — 上の列挙で登録しない側に並ぶ `companion-prose-advisory` との違いは、要求元の手順を名指しできるかどうかだけである。
 **issue 番号に紐づくことは非参加者の判定根拠にならない** — `main_branch_guard` 自身が #650 由来である。区別は出自の issue でなく、運用手順がその機構を要求しているか（＝図のプロセスの出力として生まれるか）で付ける。
 
 判定に迷う新規 hook は、その hook を要求している図のプロセスを名指しできるかで振り分ける。
