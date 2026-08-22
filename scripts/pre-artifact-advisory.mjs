@@ -9,6 +9,7 @@
 //
 // Usage (wired in .claude/settings.json): node scripts/pre-artifact-advisory.mjs
 
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -42,8 +43,22 @@ const markerPath = (key) =>
 		`pfdsl-pre-artifact-${createHash("sha256").update(key).digest("hex").slice(0, 32)}`,
 	);
 
+// The cycle's branch, standing in for the cycle itself (see advisoryKey).
+// `git` is spawned rather than the branch read from the payload because the
+// payload carries no such field; a detached HEAD or a failure here returns
+// null and the scope widens to the session.
+const currentBranch = () => {
+	const { status, stdout } = spawnSync(
+		"git",
+		["-C", root, "symbolic-ref", "--quiet", "--short", "HEAD"],
+		{ encoding: "utf8" },
+	);
+	return status === 0 ? stdout.trim() || null : null;
+};
+
 const { shouldOutput, output } = runPreArtifactAdvisory(await readStdinText(), {
 	root,
+	cycleId: currentBranch,
 	loadReminders: () =>
 		buildPreArtifactReminders(
 			loadPatternCatalogOrThrow(resolve(root, PATTERN_DIR_RELATIVE), {

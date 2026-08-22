@@ -156,6 +156,38 @@ describe("advisoryKey", () => {
 		}
 	});
 
+	it("gives a second cycle of one session its own fire", () => {
+		assert.notEqual(
+			advisoryKey({ session_id: "s" }, "cycle-1"),
+			advisoryKey({ session_id: "s" }, "cycle-2"),
+		);
+	});
+
+	it("keeps one cycle's scope stable across writes", () => {
+		assert.equal(
+			advisoryKey({ session_id: "s" }, "cycle-1"),
+			advisoryKey({ session_id: "s" }, "cycle-1"),
+		);
+	});
+
+	it("still separates caller and delegate within one cycle", () => {
+		assert.notEqual(
+			advisoryKey({ session_id: "s" }, "cycle-1"),
+			advisoryKey({ session_id: "s", agent_id: "a" }, "cycle-1"),
+		);
+	});
+
+	it("falls back to a session-wide scope when the cycle cannot be identified", () => {
+		assert.equal(
+			advisoryKey({ session_id: "s" }, null),
+			advisoryKey({ session_id: "s" }, null),
+		);
+		assert.notEqual(
+			advisoryKey({ session_id: "s" }, null),
+			advisoryKey({ session_id: "s" }, "cycle-1"),
+		);
+	});
+
 	it("returns null when there is no session to scope to", () => {
 		assert.equal(advisoryKey({ agent_id: "a" }), null);
 		assert.equal(advisoryKey({ session_id: "" }), null);
@@ -183,7 +215,12 @@ describe("runPreArtifactAdvisory", () => {
 		const s = store();
 		const { shouldOutput, output } = runPreArtifactAdvisory(
 			JSON.stringify(payload()),
-			{ root: ROOT, loadReminders: () => REMINDERS, ...s },
+			{
+				root: ROOT,
+				cycleId: () => "cycle-1",
+				loadReminders: () => REMINDERS,
+				...s,
+			},
 		);
 		assert.equal(shouldOutput, true);
 		assert.match(
@@ -194,7 +231,12 @@ describe("runPreArtifactAdvisory", () => {
 
 	it("marks the session so the second write stays quiet", () => {
 		const s = store();
-		const io = { root: ROOT, loadReminders: () => REMINDERS, ...s };
+		const io = {
+			root: ROOT,
+			cycleId: () => "cycle-1",
+			loadReminders: () => REMINDERS,
+			...s,
+		};
 		runPreArtifactAdvisory(JSON.stringify(payload()), io);
 		const second = runPreArtifactAdvisory(JSON.stringify(payload()), io);
 		assert.equal(second.shouldOutput, false);
@@ -202,7 +244,12 @@ describe("runPreArtifactAdvisory", () => {
 
 	it("gives a delegate its own fire, since parent and subagent share session_id", () => {
 		const s = store();
-		const io = { root: ROOT, loadReminders: () => REMINDERS, ...s };
+		const io = {
+			root: ROOT,
+			cycleId: () => "cycle-1",
+			loadReminders: () => REMINDERS,
+			...s,
+		};
 		runPreArtifactAdvisory(JSON.stringify(payload()), io);
 		const delegate = runPreArtifactAdvisory(
 			JSON.stringify(payload({ agent_id: "agent-1" })),
@@ -213,7 +260,12 @@ describe("runPreArtifactAdvisory", () => {
 
 	it("still fires only once for a given delegate", () => {
 		const s = store();
-		const io = { root: ROOT, loadReminders: () => REMINDERS, ...s };
+		const io = {
+			root: ROOT,
+			cycleId: () => "cycle-1",
+			loadReminders: () => REMINDERS,
+			...s,
+		};
 		const withAgent = JSON.stringify(payload({ agent_id: "agent-1" }));
 		runPreArtifactAdvisory(withAgent, io);
 		assert.equal(runPreArtifactAdvisory(withAgent, io).shouldOutput, false);
@@ -221,7 +273,12 @@ describe("runPreArtifactAdvisory", () => {
 
 	it("keeps two delegates of one session apart", () => {
 		const s = store();
-		const io = { root: ROOT, loadReminders: () => REMINDERS, ...s };
+		const io = {
+			root: ROOT,
+			cycleId: () => "cycle-1",
+			loadReminders: () => REMINDERS,
+			...s,
+		};
 		runPreArtifactAdvisory(
 			JSON.stringify(payload({ agent_id: "agent-1" })),
 			io,
@@ -233,9 +290,44 @@ describe("runPreArtifactAdvisory", () => {
 		assert.equal(other.shouldOutput, true);
 	});
 
+	it("fires again for the next cycle of the same session", () => {
+		const s = store();
+		let cycle = "cycle-1";
+		const io = {
+			root: ROOT,
+			cycleId: () => cycle,
+			loadReminders: () => REMINDERS,
+			...s,
+		};
+		runPreArtifactAdvisory(JSON.stringify(payload()), io);
+		cycle = "cycle-2";
+		assert.equal(
+			runPreArtifactAdvisory(JSON.stringify(payload()), io).shouldOutput,
+			true,
+		);
+	});
+
+	it("still speaks when the cycle cannot be read, rather than letting the write throw", () => {
+		const s = store();
+		const { shouldOutput } = runPreArtifactAdvisory(JSON.stringify(payload()), {
+			root: ROOT,
+			cycleId: () => {
+				throw new Error("not a git repository");
+			},
+			loadReminders: () => REMINDERS,
+			...s,
+		});
+		assert.equal(shouldOutput, true);
+	});
+
 	it("keys the mark per session, so a different session still gets it", () => {
 		const s = store();
-		const io = { root: ROOT, loadReminders: () => REMINDERS, ...s };
+		const io = {
+			root: ROOT,
+			cycleId: () => "cycle-1",
+			loadReminders: () => REMINDERS,
+			...s,
+		};
 		runPreArtifactAdvisory(JSON.stringify(payload()), io);
 		const other = runPreArtifactAdvisory(
 			JSON.stringify(payload({ session_id: "s2" })),
@@ -248,7 +340,12 @@ describe("runPreArtifactAdvisory", () => {
 		const s = store();
 		const { shouldOutput } = runPreArtifactAdvisory(
 			JSON.stringify(payload({ session_id: undefined })),
-			{ root: ROOT, loadReminders: () => REMINDERS, ...s },
+			{
+				root: ROOT,
+				cycleId: () => "cycle-1",
+				loadReminders: () => REMINDERS,
+				...s,
+			},
 		);
 		assert.equal(shouldOutput, false);
 	});
@@ -257,6 +354,7 @@ describe("runPreArtifactAdvisory", () => {
 		const s = store();
 		const { shouldOutput } = runPreArtifactAdvisory(JSON.stringify(payload()), {
 			root: ROOT,
+			cycleId: () => "cycle-1",
 			loadReminders: () => [],
 			...s,
 		});
@@ -268,6 +366,7 @@ describe("runPreArtifactAdvisory", () => {
 		const s = store();
 		const { shouldOutput } = runPreArtifactAdvisory(JSON.stringify(payload()), {
 			root: ROOT,
+			cycleId: () => "cycle-1",
 			loadReminders: () => {
 				throw new Error("no catalog");
 			},
@@ -280,6 +379,7 @@ describe("runPreArtifactAdvisory", () => {
 		const s = store();
 		const { shouldOutput } = runPreArtifactAdvisory(JSON.stringify(payload()), {
 			root: ROOT,
+			cycleId: () => "cycle-1",
 			loadReminders: () => REMINDERS,
 			...s,
 			markFired: () => {

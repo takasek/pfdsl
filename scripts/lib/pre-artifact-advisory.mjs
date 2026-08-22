@@ -17,8 +17,9 @@
 // whether a given line takes that shape is not decidable from the diff — the
 // runner gets the patterns, not a verdict.
 //
-// Once per writer — the caller, and each delegate separately (see
-// advisoryKey) — because the scope that makes this reach code (every write
+// Once per writer per cycle — the caller and each delegate separately, and
+// again when the next cycle starts (see advisoryKey) — because the scope that
+// makes this reach code (every write
 // under packages/ and scripts/) is also what would make an unconditional
 // advisory fire dozens of times a cycle. companion-prose-advisory, the closest
 // existing hook, needs no such state only because `.pfdsl/*.md` is narrow
@@ -96,15 +97,32 @@ export function formatPreArtifactAdvisory(reminders) {
  * delegate collide with session `"a"` delegate `"b"` — two unrelated scopes
  * sharing one mark, so one of them never sees the advisory at all. The
  * encoding only has to be unambiguous; the wrapper hashes whatever comes back.
+ *
+ * `cycleId` is in the key because a session outlives a cycle. work-cycle.md
+ * 手順1 requires each cycle to cut its own branch, including when the next one
+ * starts in the same session — so without it the second cycle inherits the
+ * first's mark and its first implementation write says nothing. The branch is
+ * what the wrapper passes, standing in for the cycle on the strength of that
+ * same rule. A null `cycleId` (the branch could not be read) degrades to a
+ * session-wide scope rather than firing on every write.
+ *
+ * The branch is a proxy, not the cycle itself, and it is the proxy
+ * `record-timing-anchor-vs-work-unit` warns about: a second work item stacked
+ * onto an existing branch shares its predecessor's scope and gets no advisory.
+ * That state already fails the design-record gate for the same reason, and the
+ * pattern's own countermeasure is to split the branch — so this key is correct
+ * exactly where the convention holds, and silent where it is already broken.
  * @param {object} payload PostToolUse hook payload
+ * @param {string | null} cycleId identifier for the cycle in progress
  * @returns {string | null}
  */
-export function advisoryKey(payload) {
+export function advisoryKey(payload, cycleId) {
 	const session = payload?.session_id;
 	if (typeof session !== "string" || session === "") return null;
 	const agent = payload?.agent_id;
 	const delegate = typeof agent === "string" && agent !== "" ? agent : null;
-	return JSON.stringify([session, delegate]);
+	const cycle = typeof cycleId === "string" && cycleId !== "" ? cycleId : null;
+	return JSON.stringify([session, delegate, cycle]);
 }
 
 /**
@@ -123,17 +141,25 @@ export function advisoryKey(payload) {
  * here — never disturbing the tool call it observes. The cost of losing the
  * mark is that the advisory repeats; the cost of throwing is a broken write.
  * @param {string} inputText raw stdin payload
- * @param {{root: string, loadReminders: () => {name: string, path: string}[], hasFired: (key: string) => boolean, markFired: (key: string) => void}} io
+ * @param {{root: string, cycleId: () => string | null, loadReminders: () => {name: string, path: string}[], hasFired: (key: string) => boolean, markFired: (key: string) => void}} io
  * @returns {{shouldOutput: boolean, output?: object}}
  */
 export function runPreArtifactAdvisory(
 	inputText,
-	{ root, loadReminders, hasFired, markFired },
+	{ root, cycleId, loadReminders, hasFired, markFired },
 ) {
 	const payload = parseHookPayload(inputText);
 	if (!payload || !isImplementationArtifactWrite(payload, root))
 		return { shouldOutput: false };
-	const key = advisoryKey(payload);
+	let cycle;
+	try {
+		cycle = cycleId();
+	} catch {
+		// Reading the branch shells out; a failure narrows the scope to the
+		// session, it does not silence the advisory.
+		cycle = null;
+	}
+	const key = advisoryKey(payload, cycle);
 	if (key === null) return { shouldOutput: false };
 	let fired;
 	try {
