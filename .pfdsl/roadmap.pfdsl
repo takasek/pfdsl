@@ -591,8 +591,8 @@ process:
     label: W002 criteria 階層化実装
     location: https://github.com/takasek/pfdsl/issues/272
   i273_implement_blocked_by:
-    label: blockedBy フィールド実装
-    description: "blockedBy: フィールドの spec 統合と CLI 対応"
+    label: blocked 理由の機械可読化
+    description: "issue #273 の blockedBy: フィールド案を検討し、最終決定の status: waiting / suspended 分割を spec と CLI へ統合する"
     location: https://github.com/takasek/pfdsl/issues/273
   i356_implement_explain_cmd:
     label: explain コマンド実装

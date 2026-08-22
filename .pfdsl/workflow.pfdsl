@@ -291,7 +291,7 @@ artifact:
     tags: [ distilled_skill ]
   review_perspectives:
     label: レビュー観点集
-    description: "PFD を問い詰める A/B 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd-retro はポインタ参照"
+    description: "PFD と normative 仕様を問い詰める A/B/C 監査カタログの一次情報。pfdsl スキルに references として同梱され、pfd-retro はポインタ参照"
     criteria: make gen-skill が差分なしで完了し、check-review-perspectives-scale が分割閾値の通知を出さない
     location: ../docs/review-perspectives.md
     group: generation

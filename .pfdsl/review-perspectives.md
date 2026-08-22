@@ -4,9 +4,9 @@
 
 ## A. 図 vs 現実
 
-- **エッジ実在性**: README はサンプル描画物から書かれず、リンクのみ
+- **エッジ実在性**: README はサンプル描画物から書かれず、リンクのみ。roadmap の `i273_implement_blocked_by` は却下された `blockedBy:` フィールド統合を説明したまま、実際の出力は最終決定の `status: waiting / suspended` 分割だったため、プロセス説明を最終変換へ合わせた（2026-08-23）
 - **駆動源**: issue 起票の駆動源は対話で、レビュー知見は `>>?`
-- **名前の一般化水準**: roadmap の `cli_tool` → 実際は `packages/` 全体 = toolchain（#783 で `toolchain` へ改名し `location` を `../packages/` へ広げ、workflow.pfdsl の同名ノードと粒度を揃えた）
+- **名前の一般化水準**: roadmap の `cli_tool` → 実際は `packages/` 全体 = toolchain（#783 で `toolchain` へ改名し `location` を `../packages/` へ広げ、workflow.pfdsl の同名ノードと粒度を揃えた）。workflow の `review_perspectives` は A/B 監査カタログと記した一方、実体は normative 仕様を問う C も含む A/B/C カタログだったため description を広げた（2026-08-23）
 - **偽の不変性**: 仕様書は実装知見の issue 経由で改訂される → maintain プロセスが要る。同型で、スキル成果物のうち一部だけが `distill_ops` の出力として更新経路を持ち他は open input のまま残る非対称が起きる（`pfd_lens_agent`）。`status: done` の external input が実際には進み続けている場合、後続が依存するのは版でなく存在であることと現行版の一次情報の所在を description に書いて解消する（`adrs` / `toolchain`）
 - **入力充足**: 修正開発に `base_code`・PoC が欠落、ADR 起草に参照図が欠落 → ID 捏造が発生。プロセスの description が集約対象として名指しする素材が artifact 化されておらず入力エッジに現れない形も同型（`gen_plugin` の `.claude/commands/pfd-*.md`・`.claude/agents/pfd-lens.md`）。description が既存出力の読み返しを述べるのに入力エッジが無い場合、通常入力は循環になるため `>>?` で表す（`deploy_install_layer` の `installed_l3_layer`）
 - **status 単調性**: `check` の W003 が機械検出する
@@ -15,7 +15,7 @@
 ## B. 粒度・型
 
 - **万能成果物**: `dialogue` → お題・提案・判断の3型に分割
-- **プロセス実在性（双方向）**: `payoff_log` 追記は対話の終端動作。逆に、ADR 起草は突合検証を固有入力に持つと委譲失敗で判明。計画時に分けたリリースが1回の公開にまとまると、publish プロセスと release artifact が現実にない公開イベントを主張したまま残る — 版番号を書いて初めて同一版を指す兄弟として現れる（`cli_release_grill_tolerance` と `cli_release_query_tools` がともに npm 0.0.21 で、`cli_release_tolerance_query` へ統合。規約は `.pfdsl/roadmap.md`「1公開イベント = 1 リリース artifact」）
+- **プロセス実在性（双方向）**: `payoff_log` 追記は対話の終端動作。逆に、ADR 起草は突合検証を固有入力に持つと委譲失敗で判明。計画時に分けたリリースが1回の公開にまとまると、publish プロセスと release artifact が現実にない公開イベントを主張したまま残る — 版番号を書いて初めて同一版を指す兄弟として現れる（`cli_release_grill_tolerance` と `cli_release_query_tools` がともに npm 0.0.21 で、`cli_release_tolerance_query` へ統合。規約は `.pfdsl/roadmap.md`「1公開イベント = 1 リリース artifact」）。逆に、CLI・libraries・VSIX の3公開イベントを単一 `release_tag` と `publish_packages` へ束ねると、各 tag が別種の公開物を生成する偽依存と、同時には生じない複数出力が現れる（#978、2026-08-23）
 - **自動化は description**: 自動 publish は `publish_cli` の description、close 時 flow 同期は `map_deps` の description に記す
 - **並列主張への挑戦**: ADR-0004 基準3
 
