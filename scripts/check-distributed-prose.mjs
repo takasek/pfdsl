@@ -25,12 +25,19 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findRepoSpecificProse } from "./lib/distributed-prose.mjs";
-import { canonicalSourceOf, inScope } from "./lib/distribution-review.mjs";
+import {
+	canonicalSourceOf,
+	DISTRIBUTION_ROOTS,
+	inScope,
+} from "./lib/distribution-review.mjs";
 import { gitLsFiles } from "./lib/run-exec.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const paths = gitLsFiles(["plugin/pfdsl/**/*.md"], { cwd: root })
+const paths = gitLsFiles(
+	DISTRIBUTION_ROOTS.map((directory) => `${directory}/**/*.md`),
+	{ cwd: root },
+)
 	.filter(inScope)
 	.map(canonicalSourceOf)
 	.sort();

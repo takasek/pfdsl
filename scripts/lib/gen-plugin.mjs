@@ -410,6 +410,30 @@ function restoreAssemblyDestination(backup, destination, deps) {
 	}
 }
 
+function snapshotPluginRoot(pluginRoot, deps, runId) {
+	const backup = temporaryAssemblySibling(pluginRoot, "prev", runId);
+	deps.rmSync(backup, { recursive: true, force: true });
+	const hadDestination = deps.existsSync(pluginRoot);
+	try {
+		if (hadDestination) deps.cpSync(pluginRoot, backup, { recursive: true });
+	} catch (error) {
+		removeAssemblyArtifact(backup, deps);
+		throw error;
+	}
+	return { backup, hadDestination };
+}
+
+function restorePluginRootSnapshot(pluginRoot, snapshot, deps) {
+	removeAssemblyArtifact(pluginRoot, deps);
+	if (!snapshot.hadDestination) return true;
+	try {
+		deps.renameSync(snapshot.backup, pluginRoot);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 // All outputs are staged before replacing any final destination. During the
 // replacement phase, preserve prior destinations as siblings and restore them
 // if an individual rename fails. This keeps a failed generation from exposing
@@ -672,82 +696,100 @@ export function assemblePluginDistIndependent({
 		assembleCodexAssets,
 	},
 }) {
-	deps.genInstall(root);
-	console.log(
-		".claude/skills/pfd-ops/install ← repo-root sources (gen-install)",
+	const pluginSnapshot = snapshotPluginRoot(
+		pluginRoot,
+		deps,
+		deps.newRunId?.() ?? randomUUID(),
 	);
+	let preserveSnapshot = false;
+	try {
+		deps.genInstall(root);
+		console.log(
+			".claude/skills/pfd-ops/install ← repo-root sources (gen-install)",
+		);
 
-	for (const mirror of PLUGIN_MIRRORS) {
-		if (mirror.whole) {
-			// The source directory is copied entire, so its name is the bundle
-			// root's name and the mirror runs from the repo root.
-			deps.mirrorDir(mirror.dest, root, pluginRoot);
-			console.log(`plugin/pfdsl/${mirror.dest} ← ${mirror.src}`);
-		} else if (mirror.trees) {
-			for (const name of mirror.trees) {
-				deps.mirrorDir(
-					name,
+		for (const mirror of PLUGIN_MIRRORS) {
+			if (mirror.whole) {
+				// The source directory is copied entire, so its name is the bundle
+				// root's name and the mirror runs from the repo root.
+				deps.mirrorDir(mirror.dest, root, pluginRoot);
+				console.log(`plugin/pfdsl/${mirror.dest} ← ${mirror.src}`);
+			} else if (mirror.trees) {
+				for (const name of mirror.trees) {
+					deps.mirrorDir(
+						name,
+						resolve(root, mirror.src),
+						resolve(pluginRoot, mirror.dest),
+					);
+					console.log(
+						`plugin/pfdsl/${mirror.dest}/${name} ← ${mirror.src}/${name}`,
+					);
+				}
+			} else {
+				deps.mirrorFiles(
+					mirror.files,
 					resolve(root, mirror.src),
 					resolve(pluginRoot, mirror.dest),
 				);
-				console.log(
-					`plugin/pfdsl/${mirror.dest}/${name} ← ${mirror.src}/${name}`,
-				);
-			}
-		} else {
-			deps.mirrorFiles(
-				mirror.files,
-				resolve(root, mirror.src),
-				resolve(pluginRoot, mirror.dest),
-			);
-			for (const file of mirror.files) {
-				console.log(
-					`plugin/pfdsl/${mirror.dest}/${file} ← ${mirror.src}/${file}`,
-				);
+				for (const file of mirror.files) {
+					console.log(
+						`plugin/pfdsl/${mirror.dest}/${file} ← ${mirror.src}/${file}`,
+					);
+				}
 			}
 		}
+
+		const cliVersion = JSON.parse(
+			deps.readFileSync(resolve(root, "packages/cli/package.json"), "utf-8"),
+		).version;
+		const manifest = buildPluginManifest({ cliVersion });
+		const pluginManifestDir = resolve(pluginRoot, ".claude-plugin");
+		deps.mkdirSync(pluginManifestDir, { recursive: true });
+		deps.writeFileSync(
+			resolve(pluginManifestDir, "plugin.json"),
+			`${JSON.stringify(manifest, null, "\t")}\n`,
+		);
+		console.log(
+			"plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version",
+		);
+
+		// The repo-root marketplace listing duplicates the per-plugin description
+		// (a separate file so /plugin marketplace can list plugins without
+		// fetching each one's own manifest) — keep it derived from the same bundle
+		// contents as plugin.json instead of hand-edited, so it can't drift the
+		// way it had (#685). Only the description is touched; $schema, the
+		// marketplace-level description, owner, and the plugin's source (pinned
+		// separately by scripts/lib/release-config.mjs at release time) pass
+		// through unchanged.
+		const marketplacePath = resolve(root, ".claude-plugin/marketplace.json");
+		const marketplace = JSON.parse(deps.readFileSync(marketplacePath, "utf-8"));
+		marketplace.plugins[0].description = manifest.description;
+		deps.writeFileSync(
+			marketplacePath,
+			`${JSON.stringify(marketplace, null, "\t")}\n`,
+		);
+		console.log(
+			".claude-plugin/marketplace.json ← plugin manifest description",
+		);
+
+		deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));
+
+		// Last inside the Claude root: the recorded hash covers every other file in the bundle.
+		// Recording it before Codex assembly means a manifest failure rolls back this root before the other transaction begins.
+		deps.writeBundleManifest(pluginRoot);
+		console.log(
+			`plugin/pfdsl/${BUNDLE_MANIFEST_RELATIVE_PATH} ← content hash of the assembled bundle`,
+		);
+
+		deps.assembleCodexAssets({ root, pluginRoot, codexPluginRoot, deps });
+	} catch (error) {
+		if (!restorePluginRootSnapshot(pluginRoot, pluginSnapshot, deps)) {
+			preserveSnapshot = true;
+			if (error && typeof error === "object")
+				error.rollbackBackup = pluginSnapshot.backup;
+		}
+		throw error;
+	} finally {
+		if (!preserveSnapshot) removeAssemblyArtifact(pluginSnapshot.backup, deps);
 	}
-
-	const cliVersion = JSON.parse(
-		deps.readFileSync(resolve(root, "packages/cli/package.json"), "utf-8"),
-	).version;
-	const manifest = buildPluginManifest({ cliVersion });
-	const pluginManifestDir = resolve(pluginRoot, ".claude-plugin");
-	deps.mkdirSync(pluginManifestDir, { recursive: true });
-	deps.writeFileSync(
-		resolve(pluginManifestDir, "plugin.json"),
-		`${JSON.stringify(manifest, null, "\t")}\n`,
-	);
-	console.log(
-		"plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version",
-	);
-
-	// The repo-root marketplace listing duplicates the per-plugin description
-	// (a separate file so /plugin marketplace can list plugins without
-	// fetching each one's own manifest) — keep it derived from the same bundle
-	// contents as plugin.json instead of hand-edited, so it can't drift the
-	// way it had (#685). Only the description is touched; $schema, the
-	// marketplace-level description, owner, and the plugin's source (pinned
-	// separately by scripts/lib/release-config.mjs at release time) pass
-	// through unchanged.
-	const marketplacePath = resolve(root, ".claude-plugin/marketplace.json");
-	const marketplace = JSON.parse(deps.readFileSync(marketplacePath, "utf-8"));
-	marketplace.plugins[0].description = manifest.description;
-	deps.writeFileSync(
-		marketplacePath,
-		`${JSON.stringify(marketplace, null, "\t")}\n`,
-	);
-	console.log(".claude-plugin/marketplace.json ← plugin manifest description");
-
-	deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));
-	deps.assembleCodexAssets({ root, pluginRoot, codexPluginRoot, deps });
-
-	// Last: the recorded hash covers every other file in the bundle, so anything
-	// written after this point would leave it describing a bundle that is no
-	// longer on disk. The manifest excludes itself, which is what keeps a second
-	// run byte-identical (and the gen-plugin-bulk drift gate green).
-	deps.writeBundleManifest(pluginRoot);
-	console.log(
-		`plugin/pfdsl/${BUNDLE_MANIFEST_RELATIVE_PATH} ← content hash of the assembled bundle`,
-	);
 }

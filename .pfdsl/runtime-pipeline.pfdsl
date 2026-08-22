@@ -250,10 +250,10 @@ artifact:
     tags: [ gen ]
   codex_adapter_output:
     label: Codex plugin adapter 出力
-    description: "共有inventoryからCodex plugin manifestとcommand由来skillを生成する。Codex plugin manifest の capabilities は Skills のみだが、plugin/pfdsl/hooks/hooks.json は既定のhook discoveryで公開され、Codex runtime が互換環境変数 CLAUDE_PLUGIN_ROOT を与えて実行する。Codex native agentはpluginではなくリポジトリ開発資産として別に生成する"
-    criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がCodex plugin manifest・command skill・hookの未再生成を検出し、scripts/lib/gen-plugin.test.mjs がコピー済みplugin hookを CLAUDE_PLUGIN_ROOT 互換環境で実行して、pre-commitとCIで失敗する
+    description: "共有inventoryからCodex plugin manifest、native skill tree、command由来skill、hookを専用rootへ生成する。公式Codex validator/runtimeがplugin rootのskills/を固定するため、Claude Code rootとは分離する。manifestのcapabilitiesはSkillsのみだが、hooks/hooks.jsonは既定discoveryで公開され、Codex runtimeが互換環境変数CLAUDE_PLUGIN_ROOTを与えて実行する。Codex native agentはpluginではなくリポジトリ開発資産として別に生成する"
+    criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がCodex plugin rootのmanifest・skill・hookの未再生成をClaude rootと同時に検出し、scripts/lib/gen-plugin.test.mjs がコピー済みplugin hookをCLAUDE_PLUGIN_ROOT互換環境で実行して、pre-commitとCIで失敗する
     externalStakeholders: [ Codex plugin利用者 ]
-    location: [ ../plugin/pfdsl/.codex-plugin/plugin.json, ../plugin/pfdsl/.codex-plugin/codex-command-skills.json, ../plugin/pfdsl/skills/pfd-cycle/, ../plugin/pfdsl/skills/pfd-init/, ../plugin/pfdsl/skills/source-command-pfd-retro/, ../plugin/pfdsl/hooks/ ]
+    location: [ ../plugin/pfdsl-codex/.codex-plugin/plugin.json, ../plugin/pfdsl-codex/.codex-plugin/codex-command-skills.json, ../plugin/pfdsl-codex/skills/, ../plugin/pfdsl-codex/hooks/ ]
     group: repo_generated
     tags: [ gen ]
   codex_repo_assets:
@@ -265,10 +265,10 @@ artifact:
     group: repo_generated
     tags: [ gen ]
   plugin_dist:
-    label: 両ハーネス対応の配布プラグイン
-    description: "make gen-plugin が組み立てる plugin/pfdsl/（コミット対象、git-subdir marketplace source）。Claude Code用とCodex用のmanifest・資産を同居させる単一配布ルートであり、各adapter出力をまとめて配布する。canonical スキル群との identity は check-gen-plugin.yml が CI 強制する"
-    criteria: pnpm -r build && make gen-plugin が差分なしで完了し、Claude CodeとCodexの生成出力を含む check-gen-plugin.yml が通過する
-    location: ../plugin/pfdsl/
+    label: 両ハーネス対応の配布plugin roots
+    description: "make gen-plugin が組み立てるClaude Code rootのplugin/pfdsl/とCodex native rootのplugin/pfdsl-codex/。公式validator/runtimeのskills固定というroot境界を守るため同居させない。両rootは共有inventoryから導出し、結合drift gateが一緒に検査する"
+    criteria: pnpm -r build && make gen-plugin が差分なしで完了し、Claude rootとCodex rootを比較するcheck-gen-plugin.ymlが通過する
+    location: [ ../plugin/pfdsl/, ../plugin/pfdsl-codex/ ]
     group: repo_generated
     tags: [ gen ]
     parts: [ claude_adapter_output, codex_adapter_output ]
@@ -418,10 +418,22 @@ process:
     location: ../scripts/lib/install-templates.mjs
     tags: [ gen, g ]
   gen_plugin:
-    label: 両ハーネス用プラグイン組み立て
-    description: "gen-skillの後、assemblePluginDistIndependent が共有inventoryからClaude Code plugin資産をmirrorし、assembleCodexAssets がCodex native資産を変換する。Codex command名が同名skillと衝突すると source-command- 接頭辞を付ける。plugin rootには両adapterの出力を同居させ、Codex repository資産はatomicに置換する。その後、Claude bundleのmanifest自身を除く全ファイルの内容ハッシュを.claude-plugin/bundle-manifest.jsonへ記録する。plugin.jsonのversionはCLI releaseでしか動かないため、リリース間のbundle内容差を識別する（#971）"
+    label: Claude Code plugin root 組み立て
+    description: "make gen-pluginの共有入口。共有inventoryから既存のClaude Code skill tree、Markdown command、Markdown agent、hooks、manifest、marketplace記述をplugin/pfdsl/へidentity互換に組み立てる。全Claude root writeの後、manifest自身を除く全bundleファイルの内容ハッシュを.claude-plugin/bundle-manifest.jsonへ記録する（#971）。この生成済みClaude rootを別processのCodex adapterへ渡し、二重root配布を完成させる"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
+    tags: [ gen, g ]
+  assemble_codex_plugin:
+    label: Codex plugin root 組み立て
+    description: "共有inventoryと生成済みClaude rootを入力に、Codex native skill tree、command由来skill、hooks、manifestをplugin/pfdsl-codex/へ生成する。Codex command名が同名skillと衝突するとsource-command-接頭辞を付ける。repository Codex assetsもatomicに置換する"
+    command: make gen-plugin
+    location: ../scripts/lib/gen-plugin.mjs
+    tags: [ gen, g ]
+  check_plugin_drift:
+    label: 両plugin rootのdrift検査
+    description: "dist非依存の再生成でClaude root、Codex root、repository Codex assetsをまとめて比較し、どちらか一方の更新漏れと手編集をpre-commitとCIで失敗させる。dist依存のClaude pfdsl SKILL.mdは別gateで検査する"
+    command: node scripts/gen-plugin-dist-independent.mjs
+    location: ../scripts/lib/drift-gates.mjs
     tags: [ gen, g ]
   gen_readme_cli:
     label: README CLI 節生成
@@ -500,7 +512,11 @@ dot_graph >> export_image -> rendered_image
 
 ops_install_sources >> gen_install -> ops_install_templates
 
-[claude_harness_sources, ecosystem_skill, feature_samples, grill_skill, harness_inventory, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_reminder_hook, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> [claude_adapter_output, codex_adapter_output, codex_repo_assets, plugin_dist]
+[claude_harness_sources, ecosystem_skill, feature_samples, grill_skill, harness_inventory, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_reminder_hook, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> claude_adapter_output
+
+[claude_adapter_output, claude_harness_sources, harness_inventory, toolchain] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
+
+[claude_adapter_output, codex_adapter_output, codex_repo_assets] >> check_plugin_drift -> plugin_dist
 
 [feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
 

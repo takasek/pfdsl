@@ -1,5 +1,7 @@
 # Claude Code / Codex Dual-Harness Distribution Implementation Plan
 
+> **Implementation record (2026-08-22):** This plan's task structure is retained as the historical implementation sequence. The original single-root assumption was invalid because the official Codex validator/runtime fixes skills at a plugin root's `skills/` directory. Commit `09d2425` therefore preserves `plugin/pfdsl/` as the Claude Code root and generates a separate native Codex root at `plugin/pfdsl-codex/`. References below use the implemented two-root topology.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Generate deterministic Claude Code and native Codex repository/plugin assets from one maintained distribution inventory without requiring Codex users to install or import Claude Code.
@@ -34,7 +36,7 @@
 - Modify `scripts/lib/gen-plugin-trigger.mjs` and its test — include Codex generator/output paths in drift triggers.
 - Modify `scripts/lib/drift-gates.mjs` — compare tracked Codex outputs during the dist-independent plugin gate.
 - Modify `scripts/lib/intentional-duplication.test.mjs` — account for project agents through the shared inventory.
-- Generate `AGENTS.md`, `.agents/skills/**`, `.codex/agents/*.toml`, `.codex/hooks.json`, `plugin/pfdsl/.codex-plugin/plugin.json`, and `plugin/pfdsl/skills/pfd-{cycle,init,retro}/SKILL.md`.
+- Generate `AGENTS.md`, `.agents/skills/**`, `.codex/agents/*.toml`, `.codex/hooks.json`, `plugin/pfdsl-codex/.codex-plugin/plugin.json`, and `plugin/pfdsl-codex/skills/pfd-{cycle,init,retro}/SKILL.md`.
 - Modify `.pfdsl/workflow.pfdsl`, `.pfdsl/workflow.md`, `.pfdsl/runtime-pipeline.pfdsl`, and `.pfdsl/runtime-pipeline.md` — model the dual adapters, outputs, and maintenance procedure.
 
 ---
@@ -200,10 +202,10 @@ git commit -m "feat(codex): add native asset adapters" -m "Review: tool=design"
 - Create/Generate: `.agents/skills/**`
 - Create/Generate: `.codex/agents/*.toml`
 - Create/Generate: `.codex/hooks.json`
-- Create/Generate: `plugin/pfdsl/.codex-plugin/plugin.json`
-- Create/Generate: `plugin/pfdsl/skills/pfd-cycle/SKILL.md`
-- Create/Generate: `plugin/pfdsl/skills/pfd-init/SKILL.md`
-- Create/Generate: `plugin/pfdsl/skills/pfd-retro/SKILL.md`
+- Create/Generate: `plugin/pfdsl-codex/.codex-plugin/plugin.json`
+- Create/Generate: `plugin/pfdsl-codex/skills/pfd-cycle/SKILL.md`
+- Create/Generate: `plugin/pfdsl-codex/skills/pfd-init/SKILL.md`
+- Create/Generate: `plugin/pfdsl-codex/skills/pfd-retro/SKILL.md`
 
 **Interfaces:**
 - Consumes: Task 1 inventory and Task 2 pure adapters.
@@ -217,10 +219,10 @@ Inject filesystem dependencies as `assemblePluginDistIndependent` already does. 
 [
   "AGENTS.md",
   ".codex/hooks.json",
-  "plugin/pfdsl/.codex-plugin/plugin.json",
-  "plugin/pfdsl/skills/pfd-cycle/SKILL.md",
-  "plugin/pfdsl/skills/pfd-init/SKILL.md",
-  "plugin/pfdsl/skills/pfd-retro/SKILL.md",
+  "plugin/pfdsl-codex/.codex-plugin/plugin.json",
+  "plugin/pfdsl-codex/skills/pfd-cycle/SKILL.md",
+  "plugin/pfdsl-codex/skills/pfd-init/SKILL.md",
+  "plugin/pfdsl-codex/skills/pfd-retro/SKILL.md",
 ]
 ```
 
@@ -255,7 +257,7 @@ Expected: exit 0.
 - [ ] **Step 5: Commit source and generated outputs together**
 
 ```bash
-git add scripts/gen-codex-assets.mjs scripts/lib/gen-plugin.mjs scripts/lib/gen-plugin.test.mjs AGENTS.md .agents .codex plugin/pfdsl
+git add scripts/gen-codex-assets.mjs scripts/lib/gen-plugin.mjs scripts/lib/gen-plugin.test.mjs AGENTS.md .agents .codex plugin/pfdsl-codex
 git commit -m "feat(codex): generate repository and plugin assets" -m "Review: tool=design" -m "Review: tool=experience"
 ```
 
@@ -284,7 +286,7 @@ for (const path of [
   ".agents/skills/pfd-ops/SKILL.md",
   ".codex/agents/pfd-implementer.toml",
   ".codex/hooks.json",
-  "plugin/pfdsl/.codex-plugin/plugin.json",
+  "plugin/pfdsl-codex/.codex-plugin/plugin.json",
 ]) assert.equal(GEN_PLUGIN_TRIGGER.test(path), true, path);
 ```
 
@@ -296,7 +298,7 @@ Expected: failures for unrecognized Codex paths and missing compare targets.
 
 - [ ] **Step 3: Extend the trigger and bulk drift target**
 
-Derive source alternations from the Task 1 inventory. Add generated Codex roots to `GEN_PLUGIN_TRIGGER_PATTERN`. Extend the `gen-plugin-bulk` compare paths to include `AGENTS.md`, `.agents`, and `.codex` while retaining the existing exclusion for the dist-dependent pfdsl `SKILL.md`.
+Derive source alternations from the Task 1 inventory. Add the generated Codex root to `GEN_PLUGIN_TRIGGER_PATTERN`. Extend the `gen-plugin-bulk` compare paths to include `plugin/pfdsl-codex/`, `AGENTS.md`, `.agents`, and `.codex` while retaining the existing exclusion for the dist-dependent Claude `plugin/pfdsl/skills/pfdsl/SKILL.md`.
 
 Update the gate hint to name both Claude and Codex outputs and keep `node scripts/gen-plugin-dist-independent.mjs` as the corrective command.
 
@@ -342,7 +344,7 @@ Use the command output as the edge source of truth for Step 2; do not infer prod
 
 - [ ] **Step 2: Update PFD nodes and edges**
 
-Represent maintained harness inventory, Claude adapter output, Codex adapter output, repository Codex assets, and the combined plugin distribution. Use the implemented paths in `location:` fields. Do not add `status:` to workflow or runtime-pipeline artifacts.
+Represent maintained harness inventory, Claude adapter output at `plugin/pfdsl/`, Codex adapter output at `plugin/pfdsl-codex/`, repository Codex assets, and the combined drift gate. Use the implemented paths in `location:` fields. Do not add `status:` to workflow or runtime-pipeline artifacts.
 
 Keep generation mechanics in `runtime-pipeline.pfdsl`; keep maintainer decisions and knowledge externalization in `workflow.pfdsl`. Run `fmt --write` after each file edit.
 
@@ -411,7 +413,7 @@ Expected: all commands exit 0.
 
 - [ ] **Step 3: Perform native-consumer scenario checks**
 
-Inspect `plugin/pfdsl/.codex-plugin/plugin.json`, resolve every relative path, and verify each referenced skill/hook exists inside `plugin/pfdsl`. Start a fresh Codex task against the repository and confirm `pfd-ops`, `pfd-cycle`, and `pfd-retro` are discoverable without reading `.claude`; record observed tool/skill discovery rather than inferring it from files.
+Inspect `plugin/pfdsl-codex/.codex-plugin/plugin.json`, resolve every relative path, and verify each referenced skill/hook exists inside `plugin/pfdsl-codex/`. Start a fresh Codex task against the repository and confirm `pfd-ops`, `pfd-cycle`, and `pfd-retro` are discoverable without reading `.claude`; record observed tool/skill discovery rather than inferring it from files.
 
 - [ ] **Step 4: Run required review perspectives**
 

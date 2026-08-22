@@ -31,6 +31,12 @@ Codex adapter は同じ能力から Codex skill、TOML subagent、Codex hooks、
 共通の Markdown 本文や references はコピーで済ませ、frontmatter、tool 宣言、変数、パス、command invocation のようにハーネス意味論が異なる箇所だけを明示的な変換関数で扱う。
 文字列置換の連鎖や、Codex の Claude Code import 実装をビルド依存にしない。
 
+### Separate official plugin roots
+
+公式 Codex validator/runtime は plugin root の `skills/` を固定して検証・実行するため、単一 root の `skills/` には Claude Code と Codex の異なる skill tree を共存させられない。
+したがって、既存の `plugin/pfdsl/` は Claude Code root として変更せず、Codex native output は `plugin/pfdsl-codex/` を独立した公式 root として生成する。
+両 root は同じ inventory から導出し、単一の drift gate が Claude root、Codex root、repository Codex assets をまとめて再生成・比較する。
+
 ### Repository development assets
 
 リポジトリ開発用には root `AGENTS.md`、`.agents/skills`、`.codex/agents`、`.codex/hooks.json` を生成する。
@@ -39,7 +45,7 @@ Codex adapter は同じ能力から Codex skill、TOML subagent、Codex hooks、
 
 ### Consumer distribution
 
-`plugin/pfdsl` は Claude Code と Codex の両方が認識できる manifest とハーネス別資産を持つ単一の配布ルートにする。
+`plugin/pfdsl/` は既存の Claude Code 配布 root として維持し、`plugin/pfdsl-codex/` は Codex native 配布 root とする。
 Codex 利用者は Claude Code をインストールせず、Codex の plugin または skill 導入面だけで利用できることを受け入れ条件にする。
 Claude Code 利用者の既存 marketplace 経路は維持する。
 公開操作は本 issue の対象外とし、生成物が公開可能であることまでを実装・検査する。
@@ -48,8 +54,8 @@ Claude Code 利用者の既存 marketplace 経路は維持する。
 
 1. Maintainer が canonical input を編集する。
 2. Harness-neutral inventory が配布対象と変換種別を列挙する。
-3. Claude Code adapter と Codex adapter がそれぞれ repository assets と plugin assets を生成する。
-4. Identity checks が生成し直した結果と追跡済み生成物を比較する。
+3. Claude Code adapter が `plugin/pfdsl/` を、Codex adapter が `plugin/pfdsl-codex/` と repository Codex assets を生成する。
+4. 結合 drift gate が両 plugin root と repository Codex assets を再生成し、追跡済み生成物と比較する。
 5. Pre-commit と CI がどちらか一方だけの更新、未登録資産、変換不能な harness-specific construct を拒否する。
 
 ## Failure handling
@@ -62,8 +68,8 @@ Codex で未対応の能力がある場合は、その能力だけを除外す�
 
 生成器の変更は t-wada 流 TDD で進める。
 単体テストは inventory から両ハーネスの出力集合が導出されること、agent と command の変換、unsupported construct の fail-closed、既存 Claude Code identity を検証する。
-統合テストは repository assets と `plugin/pfdsl` を一時ディレクトリへ生成し、追跡済み成果物と一致することを検証する。
-文書・PFD検査は `workflow.pfdsl` と `runtime-pipeline.pfdsl` が canonical input、両 adapter、両出力、drift check の変換関係を表すことを確認する。
+統合テストは repository assets、`plugin/pfdsl/`、`plugin/pfdsl-codex/` を一時ディレクトリへ生成し、追跡済み成果物と一致することを検証する。
+文書・PFD検査は `workflow.pfdsl` と `runtime-pipeline.pfdsl` が canonical input、両 adapter、二つの plugin root、結合 drift gate の変換関係を表すことを確認する。
 最終検証は build、test、typecheck、lint、docs checks、変更した PFD の strict check を含む。
 
 ## Migration path
@@ -78,4 +84,3 @@ Codex で未対応の能力がある場合は、その能力だけを除外す�
 - Claude Code 対応を削除または縮小すること。
 - Codex の import 機能を配布経路として採用すること。
 - plugin、CLI、VS Code extension を公開すること。
-

@@ -377,6 +377,8 @@ describe("assemblePluginDistIndependent", () => {
 		return {
 			calls,
 			deps: {
+				cpSync: () => {},
+				existsSync: () => false,
 				genInstall: (root) => calls.push(["genInstall", root]),
 				mirrorDir: (name, srcRoot, destRoot) =>
 					calls.push(["mirrorDir", name, srcRoot, destRoot]),
@@ -393,6 +395,9 @@ describe("assemblePluginDistIndependent", () => {
 				mkdirSync: (path) => calls.push(["mkdirSync", path]),
 				writeBundleManifest: (bundleRoot) =>
 					calls.push(["writeBundleManifest", bundleRoot]),
+				newRunId: () => "fake-run",
+				renameSync: () => {},
+				rmSync: () => {},
 				assembleCodexAssets: (options) =>
 					calls.push(["assembleCodexAssets", options]),
 				...overrides,
@@ -534,13 +539,229 @@ describe("assemblePluginDistIndependent", () => {
 			pluginRoot: "/repo/plugin/pfdsl",
 			deps,
 		});
-		// Last, not merely present: the hash covers the bundle's own files, so a
-		// write that lands after it (writeSkillRefs was the previous final step)
-		// leaves the recorded value describing a bundle that no longer exists.
-		assert.deepEqual(calls.at(-1), [
+		const refs = calls.findIndex((call) => call[0] === "writeSkillRefs");
+		const bundleManifest = calls.findIndex(
+			(call) => call[0] === "writeBundleManifest",
+		);
+		const codex = calls.findIndex((call) => call[0] === "assembleCodexAssets");
+		assert.ok(refs < bundleManifest);
+		assert.ok(bundleManifest < codex);
+		assert.deepEqual(calls[bundleManifest], [
 			"writeBundleManifest",
 			"/repo/plugin/pfdsl",
 		]);
+	});
+
+	it("restores both plugin roots when the later Codex assembly fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const codexPluginRoot = "/repo/plugin/pfdsl-codex";
+		const files = new Map([
+			[pluginRoot, "directory"],
+			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
+			[codexPluginRoot, "directory"],
+			[`${codexPluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Codex skill"],
+		]);
+		const before = new Map(files);
+		const remove = (path) => {
+			for (const existing of [...files.keys()]) {
+				if (existing === path || existing.startsWith(`${path}/`))
+					files.delete(existing);
+			}
+		};
+		const move = (from, to) => {
+			const moving = [...files.entries()].filter(
+				([path]) => path === from || path.startsWith(`${from}/`),
+			);
+			remove(to);
+			for (const [path, content] of moving) {
+				files.delete(path);
+				files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+		const copy = (from, to) => {
+			for (const [path, content] of [...files]) {
+				if (path === from || path.startsWith(`${from}/`))
+					files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+		const { deps } = fakeDeps({
+			cpSync: (from, to) => copy(from, to),
+			existsSync: (path) => files.has(path),
+			mirrorDir: (name, _source, destination) =>
+				files.set(`${destination}/${name}/SKILL.md`, "new Claude skill"),
+			mirrorFiles: (_names, _source, destination) =>
+				files.set(`${destination}/generated.md`, "new Claude file"),
+			mkdirSync: () => {},
+			newRunId: () => "rollback-test",
+			renameSync: move,
+			rmSync: remove,
+			writeFileSync: (path, content) => files.set(path, content),
+			assembleCodexAssets: () => {
+				throw new Error("Codex assembly failed");
+			},
+		});
+
+		assert.throws(
+			() =>
+				assemblePluginDistIndependent({
+					root: "/repo",
+					pluginRoot,
+					codexPluginRoot,
+					deps,
+				}),
+			/Codex assembly failed/,
+		);
+		const pluginFiles = (source) =>
+			new Map(
+				[...source].filter(
+					([path]) =>
+						path.startsWith(pluginRoot) || path.startsWith(codexPluginRoot),
+				),
+			);
+		assert.deepEqual(pluginFiles(files), pluginFiles(before));
+		assert.equal(
+			[...files.keys()].some((path) =>
+				path.includes(".codex-prev-rollback-test"),
+			),
+			false,
+		);
+	});
+
+	it("restores the Claude plugin root when an early mirror fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const files = new Map([
+			[pluginRoot, "directory"],
+			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
+		]);
+		const before = new Map(files);
+		const remove = (path) => {
+			for (const existing of [...files.keys()]) {
+				if (existing === path || existing.startsWith(`${path}/`))
+					files.delete(existing);
+			}
+		};
+		const move = (from, to) => {
+			const moving = [...files.entries()].filter(
+				([path]) => path === from || path.startsWith(`${from}/`),
+			);
+			remove(to);
+			for (const [path, content] of moving) {
+				files.delete(path);
+				files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+		const copy = (from, to) => {
+			for (const [path, content] of [...files]) {
+				if (path === from || path.startsWith(`${from}/`))
+					files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+		let mirrors = 0;
+		const { deps } = fakeDeps({
+			cpSync: copy,
+			existsSync: (path) => files.has(path),
+			mirrorDir: (name, _source, destination) => {
+				files.set(`${destination}/${name}/SKILL.md`, "new Claude skill");
+				mirrors += 1;
+				if (mirrors === 2) throw new Error("mirror failed");
+			},
+			mkdirSync: () => {},
+			newRunId: () => "early-failure-test",
+			renameSync: move,
+			rmSync: remove,
+			writeFileSync: (path, content) => files.set(path, content),
+		});
+
+		assert.throws(
+			() => assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps }),
+			/mirror failed/,
+		);
+		assert.deepEqual(files, before);
+		assert.equal(
+			[...files.keys()].some((path) =>
+				path.includes(".codex-prev-early-failure-test"),
+			),
+			false,
+		);
+	});
+
+	it("cleans a partial snapshot when its copy fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const backup = `${pluginRoot}.codex-prev-snapshot-failure-test`;
+		const files = new Map([
+			[pluginRoot, "directory"],
+			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
+		]);
+		const before = new Map(files);
+		const remove = (path) => {
+			for (const existing of [...files.keys()]) {
+				if (existing === path || existing.startsWith(`${path}/`))
+					files.delete(existing);
+			}
+		};
+		const { deps } = fakeDeps({
+			cpSync: (_from, destination) => {
+				files.set(destination, "partial backup");
+				throw new Error("snapshot copy failed");
+			},
+			existsSync: (path) => files.has(path),
+			newRunId: () => "snapshot-failure-test",
+			rmSync: remove,
+		});
+
+		assert.throws(
+			() => assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps }),
+			/snapshot copy failed/,
+		);
+		assert.deepEqual(files, before);
+		assert.equal(files.has(backup), false);
+	});
+
+	it("keeps the snapshot when rollback restoration fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const backup = `${pluginRoot}.codex-prev-restore-failure-test`;
+		const files = new Map([
+			[pluginRoot, "directory"],
+			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
+		]);
+		const remove = (path) => {
+			for (const existing of [...files.keys()]) {
+				if (existing === path || existing.startsWith(`${path}/`))
+					files.delete(existing);
+			}
+		};
+		const copy = (from, to) => {
+			for (const [path, content] of [...files]) {
+				if (path === from || path.startsWith(`${from}/`))
+					files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+		const { deps } = fakeDeps({
+			cpSync: copy,
+			existsSync: (path) => files.has(path),
+			mirrorDir: (name, _source, destination) =>
+				files.set(`${destination}/${name}/SKILL.md`, "new Claude skill"),
+			mkdirSync: () => {},
+			newRunId: () => "restore-failure-test",
+			renameSync: (from, to) => {
+				if (from === backup && to === pluginRoot)
+					throw new Error("restore rename failed");
+			},
+			rmSync: remove,
+			writeFileSync: (path, content) => files.set(path, content),
+			assembleCodexAssets: () => {
+				throw new Error("Codex assembly failed");
+			},
+		});
+
+		assert.throws(
+			() => assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps }),
+			/Codex assembly failed/,
+		);
+		assert.equal(
+			files.get(`${backup}/skills/pfd-ops/SKILL.md`),
+			"legacy Claude skill",
+		);
 	});
 });
 

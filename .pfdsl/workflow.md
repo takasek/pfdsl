@@ -95,13 +95,13 @@ proposal 起草での「既存構造」は対象 spec の現行 frontmatter キ�
 
 現在のcanonical inputは、`scripts/lib/harness-inventory.mjs` が選ぶ手書きの`.claude/skills`・`.claude/commands`・`.claude/agents`配布対象と、`CLAUDE.md`・`.claude/settings.json`・`hooks/`である。Claude CodeとCodexのadapterは同じinventoryを消費する。`.claude/skills/pfdsl` は `plugin/pfdsl/skills/pfdsl` への生成symlinkであり、canonical inputでも編集先でもない。
 
-これらの入力、またはgen-skillの入力を変更したら、`pnpm -r build && make gen-plugin` を実行する。これはClaude Code用のmirrorとmanifest、Codex用のplugin manifest・command skill、リポジトリの`AGENTS.md`・`.agents/`・`.codex/`を同時に再生成する。生成先は手編集しない。編集元を直して同じコマンドで再生成する。distが無い、または鮮度確認だけを行う場合は `node scripts/gen-plugin-dist-independent.mjs` を使えるが、`plugin/pfdsl/skills/pfdsl/SKILL.md` は含まれない。
+これらの入力、またはgen-skillの入力を変更したら、`pnpm -r build && make gen-plugin` を実行する。これはClaude Code rootの`plugin/pfdsl/`とCodex native rootの`plugin/pfdsl-codex/`、リポジトリの`AGENTS.md`・`.agents/`・`.codex/`を同時に再生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、異なるClaude Code/Codex skill treeを単一rootに同居させない。生成先は手編集しない。編集元を直して同じコマンドで再生成する。distが無い、または鮮度確認だけを行う場合は`node scripts/gen-plugin-dist-independent.mjs`を使えるが、Claude rootの`plugin/pfdsl/skills/pfdsl/SKILL.md`は含まれない。
 
-Codex pluginのmanifestは現在 `Skills` capabilityのみを表すが、hookはtop-level manifest fieldではなくplugin同梱の`hooks/hooks.json`を既定discoveryして公開する。Codex runtimeはhook commandへ`CLAUDE_PLUGIN_ROOT`互換環境を与えるため、Claude Codeと同一のhook textを使う。Codex native agentはリポジトリ側の`.codex/agents/`へ生成し、`.codex/hooks.json`はrepo-local hook設定として残す。Codexではcommandとskillが同じplugin skill名前空間を共有するため、同名の場合は生成器がcommand側を`source-command-<name>`へ改名する。
+Codex pluginのmanifestは`plugin/pfdsl-codex/.codex-plugin/plugin.json`にあり、現在`Skills` capabilityのみを表す。hookはtop-level manifest fieldではなくplugin同梱の`plugin/pfdsl-codex/hooks/hooks.json`を既定discoveryして公開する。Codex runtimeはhook commandへ`CLAUDE_PLUGIN_ROOT`互換環境を与えるため、Claude Codeと同一のhook textを使う。Codex native agentはリポジトリ側の`.codex/agents/`へ生成し、`.codex/hooks.json`はrepo-local hook設定として残す。Codexではcommandとskillが同じplugin skill名前空間を共有するため、同名の場合は生成器がcommand側を`source-command-<name>`へ改名する。
 
 中立canonical sourceへの移行は今回の対象外である。将来はinventoryのsource pathと共通本文の置場を差し替え、Claude CodeとCodexのadapter出力契約とidentity検査を維持する。
 
-再生成漏れは機械的に検出されるため手動チェックは不要である。gen-skill / gen-plugin の identity はpre-commit（各々の入力 staged 時）とCI（check-gen-plugin.yml）、`.dot` / README のドリフトはgraphviz-exporterのvitestテスト、`.svg` のドリフトはpreview-engineのvitestテスト（いずれもpre-commitの`docs/samples/` staged時とCI test）、README `## CLI` セクションのドリフトは`make check-readme-cli`（pre-commitの`packages/cli/src/` / `README.md` staged時とCI test.yml）が検査する。`references/*.md` を含むpluginのdist非依存部分は `scripts/gen-plugin-dist-independent.mjs` が生成し、pre-commit はdist必須のSKILL.md検査とは別のcheck_driftでこれを常時検査する。distがstaleでgen-skill / gen-pluginのSKILL.md部分の検査がskipされても、このドリフトはここで止まる（#593。前身は#586のreferences専用検査で、粒度拡張の経緯は`scripts/pre-commit`の当該コメントが一次情報）。
+再生成漏れは機械的に検出されるため手動チェックは不要である。gen-skill / gen-plugin の identity はpre-commit（各々の入力 staged 時）とCI（check-gen-plugin.yml）、`.dot` / README のドリフトはgraphviz-exporterのvitestテスト、`.svg` のドリフトはpreview-engineのvitestテスト（いずれもpre-commitの`docs/samples/` staged時とCI test）、README `## CLI` セクションのドリフトは`make check-readme-cli`（pre-commitの`packages/cli/src/` / `README.md` staged時とCI test.yml）が検査する。`references/*.md`を含むpluginのdist非依存部分は`scripts/gen-plugin-dist-independent.mjs`が生成し、pre-commitの結合`gen-plugin-bulk` gateはClaude rootの`plugin/pfdsl/`、Codex rootの`plugin/pfdsl-codex/`、`AGENTS.md`、`.agents/`、`.codex/`を同時に比較する。distがstaleでClaude pfdsl SKILL.md部分の検査がskipされても、このdriftはここで止まる（#593。前身は#586のreferences専用検査で、粒度拡張の経緯は`scripts/pre-commit`の当該コメントが一次情報）。
 
 **dist 鮮度の機械検査**: pre-commit の drift 検査（README `## CLI` セクション・gen-skill の SKILL.md 部分・gen-plugin）は対象 dist（`packages/cli/dist/cli.js` 等）を実行または import して出力を取得する。`scripts/lib/dist-freshness.mjs` が dist の mtime を sibling `src/` の最新 mtime と比較し、dist が存在しない場合と同様に古い場合も検査を skip して「run 'pnpm -r build'」を促す（#450/#452）。skip は「検査対象が信頼できないので判定を CI に委ねる」意味であり、ローカルで検査 PASS しなかったからといって drift が無いとは限らない — コミット前に `pnpm -r build` を済ませて skip を解消してから判断する。gen-skill の `references/*.md` 部分と gen-plugin の SKILL.md 以外の部分は dist に触れないため、この skip の影響を受けない（#586 / #593）。
 
@@ -115,9 +115,9 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 テンプレートのソースを変更したコミットは再ステージが2往復必要になる（1回目で `install/`、2回目で `plugin/`）。
 2ホップの生成チェーンに「直して exit 1」の流儀を適用した結果であり、意図した挙動である。
 
-**生成物 drift 検査はコミット分割を制約する**: 規則は配布層（pfd-ops `references/work-cycle.md` のコミット粒度ゲート）が一次情報。このリポで該当する検査は `gen-plugin`（inventoryが選ぶ手書き入力と `CLAUDE.md`・settings・hooks → Claude Code / Codexの生成物）と `gen-install`。
+**生成物 drift 検査はコミット分割を制約する**: 規則は配布層（pfd-ops `references/work-cycle.md` のコミット粒度ゲート）が一次情報。このリポで該当する検査は`gen-plugin`（inventoryが選ぶ手書き入力と`CLAUDE.md`・settings・hooksからClaude root、Codex root、repository Codex assetsを同時に導出する結合gate）と`gen-install`。
 
-**出力抑制**: `make gen-samples` / `make gen-skill` はpnpm全パッケージbuild + 全サンプルcheckのwarningを毎回出力するため数百行に及ぶ。実行後は `git status --short docs/samples/ plugin/pfdsl/ AGENTS.md .agents/ .codex/` で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
+**出力抑制**: `make gen-samples` / `make gen-skill` はpnpm全パッケージbuild + 全サンプルcheckのwarningを毎回出力するため数百行に及ぶ。実行後は`git status --short docs/samples/ plugin/pfdsl/ plugin/pfdsl-codex/ AGENTS.md .agents/ .codex/`で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
 **配布スキルの新規追加時の横断照合**: `scripts/check-skill-wiring.mjs`（`make check-docs` 経由で CI も実行）が機械的に検査する（#699）。同梱スキル・agent の artifact が `workflow.pfdsl` の `distill_ops` 出力エッジ（一次情報としての生産）と `runtime-pipeline.pfdsl` の `gen_plugin` 入力エッジ（同梱素材としての消費）の両方に在るかを見て、欠けていれば file:line で報告する。以前は目視追随であり、#481 で `grill_skill` 追加時に3箇所を見落として pfd-retro の A層監査が事後に拾った。
 
@@ -127,7 +127,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が `decide_release` になり素材列挙を持たなくなり、`runtime-pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
 
-**判断軸による分担（ADR-0035）**: 判断を含まない生成・公開の変換は `runtime-pipeline.pfdsl` が持つ。`make gen-skill` / `make gen-install` / `make gen-plugin` / `make gen-samples` と、タグ push 以降の npm publish・vsix 生成・marketplace アップロードがそちらにある。この図に残るのは「リリースするか・どの版で切るか」の判断（`decide_release`）までである。生成コマンドの手続き・drift 検査の話はこの companion が引き続き一次情報として持つ（グラフで運べない散文のため）。
+**判断軸による分担（ADR-0035）**: 判断を含まない生成・公開の変換は `runtime-pipeline.pfdsl` が持つ。`make gen-skill` / `make gen-install` / `make gen-plugin` / `make gen-samples` と、タグ push 以降の npm publish・vsix 生成・marketplace アップロードがそちらにある。`make gen-plugin` はClaude root、Codex root、repository Codex assetsを組み立て、結合drift gateがまとめて検査する。この図に残るのは「リリースするか・どの版で切るか」の判断（`decide_release`）までである。生成コマンドの手続き・drift 検査の話はこの companion が引き続き一次情報として持つ（グラフで運べない散文のため）。
 
 **生成の一次ソースは `graph io` の終端に出る（ADR-0035 の副作用）**: `gen_skill` / `gen_plugin` / `publish_packages` / `package_vsix` が消費する生成の一次ソースは、この図では消費者を持たない終端 artifact として報告される。消費側のエッジは `runtime-pipeline.pfdsl` に実在するが、`graph io` はファイル単位で走るため参照できない。該当する artifact をここに列挙しない — 一次情報は消費側のエッジであり、現在の集合は下記の機械振り分けが `.pfdsl/` を横断して毎回そこから取り直す。
 

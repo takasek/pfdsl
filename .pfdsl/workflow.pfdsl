@@ -63,9 +63,9 @@ artifact:
     location: ../plugin/pfdsl/skills/pfdsl/
     group: generation
   plugin_dist:
-    label: 両ハーネス対応の配布プラグイン
-    description: "runtime-pipeline.pfdsl の gen_plugin が生産する。Claude Codeの既存marketplace経路を保ちながら、Codex native manifestとskillを含む単一の配布ルートである。この図ではREADME更新と配布レビューの入力に現れる"
-    location: ../plugin/pfdsl/
+    label: 両ハーネス対応の配布plugin roots
+    description: "runtime-pipeline.pfdsl の両root組み立てと結合drift検査が生産する。Claude Codeの既存marketplace経路を保つplugin/pfdsl/と、公式Codex validator/runtimeのskills固定に従うnative rootのplugin/pfdsl-codex/を分離する。この図ではREADME更新と配布レビューの入力に現れる"
+    location: [ ../plugin/pfdsl/, ../plugin/pfdsl-codex/ ]
     group: release
   distribution_review_perspectives:
     label: 配布レビュー観点集

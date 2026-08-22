@@ -37,6 +37,7 @@ export { diffBase, EMPTY_TREE };
 const CLAUDE_PLUGIN_ROOT = "plugin/pfdsl/";
 const CODEX_PLUGIN_ROOT = "plugin/pfdsl-codex/";
 const DIST_ROOTS = [CLAUDE_PLUGIN_ROOT, CODEX_PLUGIN_ROOT];
+export const DISTRIBUTION_ROOTS = DIST_ROOTS.map((root) => root.slice(0, -1));
 const CLAUDE_SKILLS_ROOT = `${CLAUDE_PLUGIN_ROOT}skills/`;
 const CODEX_SKILLS_ROOT = `${CODEX_PLUGIN_ROOT}skills/`;
 
@@ -55,6 +56,12 @@ export const SCOPE_EXCLUSIONS = {
 		"worked .pfdsl examples, generated from docs/examples/",
 	"plugin/pfdsl/skills/pfdsl/references/samples.md":
 		"sample .pfdsl catalogue, generated from docs/samples/",
+	"plugin/pfdsl-codex/skills/pfdsl/references/spec.md":
+		"the transformed Codex copy of the DSL grammar generated from docs/spec/spec.md",
+	"plugin/pfdsl-codex/skills/pfdsl/references/examples.md":
+		"the transformed Codex copy of worked .pfdsl examples generated from docs/examples/",
+	"plugin/pfdsl-codex/skills/pfdsl/references/samples.md":
+		"the transformed Codex copy of the sample .pfdsl catalogue generated from docs/samples/",
 };
 
 // Bundled files that are rendered rather than mirrored: the copy in the bundle
@@ -225,7 +232,9 @@ export function repoDeps(root) {
 		// comparison that decides whether it still holds has to be against one
 		// too. A release refuses to run on a dirty tree anyway (release.mjs).
 		changedSince: (base) =>
-			gitDiffNames([base, "HEAD", "--", "plugin/pfdsl"], { cwd: root }),
+			gitDiffNames([base, "HEAD", "--", ...DISTRIBUTION_ROOTS], {
+				cwd: root,
+			}),
 	};
 }
 
