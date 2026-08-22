@@ -7,21 +7,46 @@ import {
 	runDelegationGuard,
 } from "./delegation-guard.mjs";
 
-function payload({ agentType, command, toolName = "Bash" }) {
+// A real subagent payload carries both fields. agent_id is the discriminator;
+// agent_type only names the agent (#932). `withAgentId: false` builds the one
+// shape where they come apart: a caller session started with `claude --agent`.
+function payload({
+	agentType,
+	command,
+	toolName = "Bash",
+	withAgentId = true,
+}) {
 	const p = {
 		hook_event_name: "PreToolUse",
 		tool_name: toolName,
 		tool_input: { command },
 	};
-	if (agentType) p.agent_type = agentType;
+	if (agentType) {
+		p.agent_type = agentType;
+		if (withAgentId) p.agent_id = `agent_${agentType}`;
+	}
 	return p;
 }
 
 describe("evaluateDelegationGuard — caller identity", () => {
-	it("allows the main thread, which has no agent_type", () => {
+	it("allows the main thread, which has no agent_id", () => {
 		// The main thread is the reviewer/caller; it must keep push and PR rights.
 		const result = evaluateDelegationGuard(
 			payload({ command: "git push -u origin topic" }),
+		);
+		assert.equal(result.decision, "allow");
+	});
+
+	it("allows a `claude --agent` parent session, which has no agent_id", () => {
+		// agent_type is present whenever the session was started with --agent, so
+		// it cannot tell a caller apart from a subagent. Such a session is still
+		// the caller and owns publishing.
+		const result = evaluateDelegationGuard(
+			payload({
+				agentType: "general-purpose",
+				command: "git push -u origin topic",
+				withAgentId: false,
+			}),
 		);
 		assert.equal(result.decision, "allow");
 	});
@@ -59,6 +84,7 @@ describe("evaluateDelegationGuard — caller identity", () => {
 			hook_event_name: "PreToolUse",
 			tool_name: "Read",
 			agent_type: "general-purpose",
+			agent_id: "agent_general-purpose",
 			tool_input: { file_path: "/tmp/x" },
 		});
 		assert.equal(result.decision, "allow");

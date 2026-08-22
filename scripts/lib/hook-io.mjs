@@ -56,9 +56,14 @@ export function buildPermissionOutput(result) {
 
 /**
  * Build the PostToolUse hook response for an advisory. additionalContext is
- * what reaches the model. The advisory hooks are PostToolUse because their
- * subject only exists after the tool ran (a written file, a created issue),
- * not because PostToolUse is the only event that can carry the field.
+ * what reaches the model. The advisory hooks are PostToolUse because an
+ * advisory by definition does not block, so it cannot act on the call itself;
+ * all it can do is speak about the subject the call produced — a written file,
+ * a created issue, a command's output — and that subject does not exist until
+ * the tool has run. Do not restate this as a list of which events accept the
+ * field or under which decision they drop it: that list is the host's to
+ * change, and rewriting it each time it turns out false books the next false
+ * version (#929).
  * @param {string} advisory
  */
 export function buildAdvisoryOutput(advisory) {

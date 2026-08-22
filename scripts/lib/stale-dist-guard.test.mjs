@@ -130,14 +130,6 @@ describe("runStaleDistGuard", () => {
 		assert.match(output.hookSpecificOutput.additionalContext, /@pfdsl\/core/);
 	});
 
-	it("writes to stderr before the command runs, where the model cannot be reached", () => {
-		const result = runStaleDistGuard(staleInput("PreToolUse"), {
-			findStale: () => ["@pfdsl/core"],
-		});
-		assert.equal(result.shouldOutput, false);
-		assert.match(result.stderr, /@pfdsl\/core/);
-	});
-
 	it("says nothing when nothing is stale", () => {
 		assert.deepEqual(
 			runStaleDistGuard(staleInput("PostToolUse"), { findStale: () => [] }),
@@ -150,7 +142,7 @@ describe("runStaleDistGuard", () => {
 	it("does not go near the filesystem for a command that does not read the build", () => {
 		let called = false;
 		const input = JSON.stringify({
-			hook_event_name: "PreToolUse",
+			hook_event_name: "PostToolUse",
 			tool_name: "Bash",
 			tool_input: { command: "git status" },
 		});
