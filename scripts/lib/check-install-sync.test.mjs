@@ -19,10 +19,14 @@ import { fileURLToPath } from "node:url";
 
 import {
 	checkInstallSync,
+	classifyTarget,
 	deployInstall,
 	listInstallFiles,
 	parseArgs,
+	UPSTREAM_MARKERS,
 } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
+
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 let tmp;
 
@@ -439,6 +443,154 @@ describe("deployInstall", () => {
 	});
 });
 
+describe("classifyTarget", () => {
+	// A repo root is where .git sits, so every fixture that stands for a real
+	// repository gets one — that is also what lets a subdirectory target be
+	// classified by the repo that contains it.
+	function makeRepo(name, { markers = [], git = true } = {}) {
+		const root = join(tmp, name);
+		mkdirSync(root, { recursive: true });
+		if (git) writeFile(root, ".git", "gitdir: elsewhere\n");
+		for (const marker of markers) {
+			writeFile(root, marker.path, `prelude\n${marker.mustContain}\n`);
+		}
+		return root;
+	}
+
+	function externalSkillRoot() {
+		const skillRoot = join(tmp, "plugin-cache/skills/pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		return skillRoot;
+	}
+
+	it("classifies a repo carrying every upstream marker as upstream", () => {
+		const target = makeRepo("upstream-repo", { markers: UPSTREAM_MARKERS });
+		assert.equal(classifyTarget(externalSkillRoot(), target).kind, "upstream");
+	});
+
+	it("classifies a repo carrying no upstream marker as adopter", () => {
+		const target = makeRepo("adopter-repo");
+		assert.equal(classifyTarget(externalSkillRoot(), target).kind, "adopter");
+	});
+
+	it("ignores a marker path whose content is unrelated to pfd-ops", () => {
+		// "scripts/gen-install.mjs" is an ordinary name. An adopting repo that
+		// happens to own that path would otherwise be called ambiguous and lose
+		// the ability to adopt at all — the primary flow, blocked by a filename
+		// collision. Matching on what the file says removes that class entirely.
+		const target = makeRepo("coincidental-name");
+		writeFile(target, "scripts/gen-install.mjs", "// an unrelated generator\n");
+		assert.equal(classifyTarget(externalSkillRoot(), target).kind, "adopter");
+	});
+
+	it("classifies a partial marker set as ambiguous rather than adopter", () => {
+		// Sparse checkouts, half-finished vendoring and old branches all show up
+		// as some-but-not-all. Treating a missing marker as proof of "not
+		// upstream" is what would let a deploy overwrite a generator's sources.
+		const target = makeRepo("partial-repo", {
+			markers: UPSTREAM_MARKERS.slice(0, 1),
+		});
+		assert.equal(classifyTarget(externalSkillRoot(), target).kind, "ambiguous");
+	});
+
+	it("names every marker it found and every one it missed", () => {
+		// The report has to let a reader check the verdict against their own
+		// tree, so both halves are reported rather than just the count.
+		const target = makeRepo("partial-report", {
+			markers: UPSTREAM_MARKERS.slice(0, 1),
+		});
+		const result = classifyTarget(externalSkillRoot(), target);
+		assert.deepEqual(result.presentMarkers, [UPSTREAM_MARKERS[0].path]);
+		assert.deepEqual(
+			result.missingMarkers,
+			UPSTREAM_MARKERS.slice(1).map((m) => m.path),
+		);
+	});
+
+	it("classifies an external skill root over a repo-local pfd-ops install/ as ambiguous", () => {
+		const target = makeRepo("vendored-repo");
+		writeFile(
+			target,
+			".claude/skills/pfd-ops/install/a.txt",
+			"repo-local canonical\n",
+		);
+		const result = classifyTarget(externalSkillRoot(), target);
+		assert.equal(result.kind, "ambiguous");
+		assert.match(result.competingCanonical, /\.claude\/skills\/pfd-ops$/);
+	});
+
+	it("keeps a repo-local run over its own vendored copy an adopter", () => {
+		// Same two entities as above, except this time the running script is the
+		// repo-local one — there is no second claimant, only one seen twice.
+		const target = makeRepo("self-hosted-repo");
+		writeFile(
+			target,
+			".claude/skills/pfd-ops/install/a.txt",
+			"repo-local canonical\n",
+		);
+		const skillRoot = join(target, ".claude/skills/pfd-ops");
+		assert.equal(classifyTarget(skillRoot, target).kind, "adopter");
+	});
+
+	it("finds the markers from a subdirectory target by ascending to the repo root", () => {
+		// --target defaults to cwd, so a run started anywhere below the repo root
+		// would otherwise see no markers and classify the upstream repo as an
+		// adopter — a bypass of the very stop this classification exists for.
+		const repo = makeRepo("upstream-subdir", { markers: UPSTREAM_MARKERS });
+		const sub = join(repo, "packages/cli");
+		mkdirSync(sub, { recursive: true });
+		assert.equal(classifyTarget(externalSkillRoot(), sub).kind, "upstream");
+	});
+
+	it("falls back to the target itself when no .git ancestor exists", () => {
+		const target = makeRepo("no-git", { git: false });
+		assert.equal(classifyTarget(externalSkillRoot(), target).kind, "adopter");
+	});
+
+	it("does not mistake a sibling directory whose path shares a prefix for a containing one", () => {
+		// "/x/repo-a".startsWith("/x/repo") is true, so a string-prefix
+		// containment test would call this skill root repo-local and skip the
+		// competing-canonical check.
+		const target = makeRepo("repo");
+		writeFile(
+			target,
+			".claude/skills/pfd-ops/install/a.txt",
+			"repo-local canonical\n",
+		);
+		const sibling = join(tmp, "repo-a/.claude/skills/pfd-ops");
+		mkdirSync(sibling, { recursive: true });
+		assert.equal(classifyTarget(sibling, target).kind, "ambiguous");
+	});
+});
+
+describe("UPSTREAM_MARKERS against this repo", () => {
+	// The list is hardcoded inside a distributed script that may not import
+	// anything outside its own skill tree, so it cannot be derived from
+	// scripts/lib/gen-install-trigger.mjs, which names the same paths for its
+	// own purpose. Nothing else would notice the two drifting apart: renaming
+	// the generator would leave the markers pointing at a path that no longer
+	// exists, and this repo would silently classify as an adopter — the exact
+	// misclassification the markers exist to prevent. This test is the join.
+	it("every marker matches in this repo, which is the upstream one", () => {
+		for (const marker of UPSTREAM_MARKERS) {
+			const full = join(repoRoot, ...marker.path.split("/"));
+			assert.ok(
+				existsSync(full),
+				`${marker.path} no longer exists in this repo`,
+			);
+			assert.ok(
+				readFileSync(full, "utf-8").includes(marker.mustContain),
+				`${marker.path} no longer contains ${marker.mustContain}`,
+			);
+		}
+	});
+
+	it("classifies this repo's own root as upstream", () => {
+		const skillRoot = join(repoRoot, ".claude/skills/pfd-ops");
+		assert.equal(classifyTarget(skillRoot, repoRoot).kind, "upstream");
+	});
+});
+
 describe("CLI output", () => {
 	const scriptPath = fileURLToPath(
 		new URL(
@@ -471,6 +623,162 @@ describe("CLI output", () => {
 			},
 		);
 	}
+
+	// The #971 reproduction: an old plugin cache pointed at the repo that
+	// generates its install/ tree. Canonical runs the other way there, so every
+	// --deploy this tool could suggest would regress the sources.
+	function makeUpstreamTarget(name, markers = UPSTREAM_MARKERS) {
+		const target = join(tmp, name);
+		mkdirSync(target, { recursive: true });
+		writeFile(target, ".git", "gitdir: elsewhere\n");
+		for (const marker of markers) {
+			writeFile(target, marker.path, `prelude\n${marker.mustContain}\n`);
+		}
+		return target;
+	}
+
+	it("does not offer adoption when the target is the upstream repo", () => {
+		const skillRoot = join(tmp, "skill-upstream-adopt");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/lib/fixture-tool.mjs",
+			"cached\n",
+		);
+		const target = makeUpstreamTarget("target-upstream-adopt");
+
+		const { stdout } = runCli(skillRoot, target);
+		assert.doesNotMatch(stdout, /To adopt it/);
+		assert.match(stdout, /upstream/i);
+	});
+
+	it("does not offer a refresh deploy when the target is the upstream repo", () => {
+		const skillRoot = join(tmp, "skill-upstream-drift");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/lib/fixture-tool.mjs",
+			"cached\n",
+		);
+		const target = makeUpstreamTarget("target-upstream-drift");
+		writeFile(target, "scripts/lib/fixture-tool.mjs", "newer than the cache\n");
+
+		const { stdout } = runCli(skillRoot, target);
+		assert.doesNotMatch(stdout, /--deploy/);
+		// What the reader can actually do instead.
+		assert.match(stdout, /repo-local|update the plugin/i);
+	});
+
+	it("refuses an explicit --deploy into the upstream repo without writing anything", () => {
+		const skillRoot = join(tmp, "skill-upstream-deploy");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/lib/fixture-tool.mjs",
+			"cached\n",
+		);
+		const target = makeUpstreamTarget("target-upstream-deploy");
+		writeFile(target, "scripts/lib/fixture-tool.mjs", "newer than the cache\n");
+
+		for (const extra of [
+			[],
+			["--overwrite-local-edits"],
+			["--delete-edited-orphans"],
+		]) {
+			const result = runCli(skillRoot, target, ["--deploy", ...extra]);
+			assert.notEqual(result.status, 0);
+			assert.equal(
+				readFileSync(join(target, "scripts/lib/fixture-tool.mjs"), "utf-8"),
+				"newer than the cache\n",
+			);
+			assert.equal(
+				existsSync(join(target, ".claude/pfd-ops-install-manifest.json")),
+				false,
+			);
+		}
+	});
+
+	it("refuses to deploy and names both claimants when canonical is ambiguous", () => {
+		const skillRoot = join(tmp, "skill-ambiguous");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/lib/fixture-tool.mjs",
+			"cached\n",
+		);
+		const target = makeUpstreamTarget(
+			"target-ambiguous",
+			UPSTREAM_MARKERS.slice(0, 1),
+		);
+
+		const checked = runCli(skillRoot, target);
+		assert.match(checked.stdout, /ambiguous/i);
+		assert.doesNotMatch(checked.stdout, /--deploy/);
+
+		const deployed = runCli(skillRoot, target, ["--deploy"]);
+		assert.notEqual(deployed.status, 0);
+		assert.equal(
+			existsSync(join(target, "scripts/lib/fixture-tool.mjs")),
+			false,
+		);
+	});
+
+	it("points a repo-local run in the upstream repo at the generator, not at the plugin", () => {
+		// In the upstream repo the comparison still says something useful — it is
+		// the gen-install drift check — but the fix is to regenerate the mirror,
+		// not to update or re-run some other copy of this script.
+		const target = makeUpstreamTarget("target-upstream-local");
+		const skillRoot = join(target, ".claude/skills/pfd-ops");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/lib/fixture-tool.mjs",
+			"mirror\n",
+		);
+		writeFile(
+			target,
+			"scripts/lib/fixture-tool.mjs",
+			"source edited since gen-install\n",
+		);
+
+		const { stdout } = runCli(skillRoot, target);
+		assert.doesNotMatch(stdout, /--deploy/);
+		assert.match(stdout, /gen-install/);
+		assert.doesNotMatch(stdout, /update the plugin/i);
+	});
+
+	it("exits zero for a repo-local upstream run whose mirror is in sync", () => {
+		const target = makeUpstreamTarget("target-upstream-local-clean");
+		const skillRoot = join(target, ".claude/skills/pfd-ops");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/lib/fixture-tool.mjs",
+			"mirror\n",
+		);
+		writeFile(target, "scripts/lib/fixture-tool.mjs", "mirror\n");
+
+		const { status, stdout } = runCli(skillRoot, target);
+		assert.equal(status, 0);
+		assert.match(stdout, /in sync/);
+	});
+
+	it("still deploys into an ordinary adopting repo", () => {
+		// The guard has to leave the case it was never about untouched.
+		const skillRoot = join(tmp, "skill-adopter-still-works");
+		writeFile(
+			join(skillRoot, "install"),
+			"scripts/lib/fixture-tool.mjs",
+			"canonical\n",
+		);
+		const target = join(tmp, "target-adopter-still-works");
+		mkdirSync(target, { recursive: true });
+		writeFile(target, ".git", "gitdir: elsewhere\n");
+
+		const first = runCli(skillRoot, target);
+		assert.match(first.stdout, /To adopt it/);
+
+		const deployed = runCli(skillRoot, target, ["--deploy"]);
+		assert.equal(deployed.status, 0);
+		assert.equal(
+			readFileSync(join(target, "scripts/lib/fixture-tool.mjs"), "utf-8"),
+			"canonical\n",
+		);
+	});
 
 	it("surfaces rename candidates on --deploy, not just on a bare check", () => {
 		// The #603 report: --deploy printed nothing pointing the old path's

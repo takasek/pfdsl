@@ -23,7 +23,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs as parseNodeArgs } from "node:util";
 import { checkUpstreamVersion } from "./plugin-version-check.mjs";
@@ -155,6 +155,108 @@ function detectRenameCandidates(installDir, missing, orphanEntries) {
 		}
 	}
 	return candidates;
+}
+
+// What tells an upstream repo (the one that *generates* this skill's install/
+// tree) apart from a repo that merely adopted it. install/ is a generated
+// mirror there, so canonical runs the other way: deploying into it overwrites
+// the generator's own sources with an older snapshot (#971).
+//
+// The set is required to be complete, never merely non-empty. A sparse
+// checkout, a half-finished vendoring, or an old branch shows one or two of
+// these, and reading a missing marker as proof of "not upstream" is exactly
+// the misclassification that lets a deploy regress the sources.
+//
+// Each marker matches on content, not just on its path. "scripts/gen-install.mjs"
+// is an ordinary name that an unrelated adopting repo can own by coincidence,
+// and a path-only match would call that repo ambiguous — costing it the ability
+// to adopt at all, which is the primary flow this tool exists for.
+export const UPSTREAM_MARKERS = [
+	{ path: "scripts/gen-install.mjs", mustContain: ".claude/skills/pfd-ops/install" },
+	{ path: "scripts/lib/install-templates.mjs", mustContain: ".claude/skills/pfd-ops/install" },
+	{ path: "plugin/pfdsl/.claude-plugin/plugin.json", mustContain: '"name": "pfdsl"' },
+];
+
+const REPO_LOCAL_SKILL_RELATIVE_PATH = ".claude/skills/pfd-ops";
+
+// realpath before comparing, and compare by path segments rather than string
+// prefix: "/x/repo-a".startsWith("/x/repo") is true, and a symlinked or
+// ..-bearing path resolves elsewhere than it reads. Same reason the entrypoint
+// check at the bottom of this file realpaths before comparing.
+function realpathOrSelf(path) {
+	try {
+		return realpathSync(path);
+	} catch {
+		return resolve(path);
+	}
+}
+
+function fileContains(path, needle) {
+	try {
+		return readFileSync(path, "utf-8").includes(needle);
+	} catch {
+		// Absent, unreadable, or a directory: all mean "this marker is not here".
+		return false;
+	}
+}
+
+function contains(ancestor, descendant) {
+	const rel = relative(realpathOrSelf(ancestor), realpathOrSelf(descendant));
+	return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+// Markers live at the repo root, but --target defaults to cwd and may be any
+// directory inside the repo. Without this ascent, running from a subdirectory
+// sees no markers at all and the upstream repo classifies as an adopter.
+function findRepoRoot(targetRoot) {
+	let dir = resolve(targetRoot);
+	for (;;) {
+		if (existsSync(join(dir, ".git"))) return dir;
+		const parent = dirname(dir);
+		if (parent === dir) return resolve(targetRoot);
+		dir = parent;
+	}
+}
+
+/**
+ * Decide which side of this comparison owns canonical, so that all three
+ * places that speak about --deploy (the adoption hint, the refresh hint, and
+ * the deploy itself) answer from one judgement rather than three.
+ *
+ * "upstream": every marker matches — canonical is the target's own sources.
+ * "ambiguous": some markers match but not all, or the target carries a
+ * repo-local pfd-ops install/ that this script is not (note that the second
+ * arm needs no marker at all, so zero markers does not imply "adopter").
+ * "adopter": neither — the ordinary case, where canonical is the install/ tree
+ * shipped alongside this script. Only "adopter" may be deployed into.
+ * @param {string} skillRoot
+ * @param {string} targetRoot
+ * @returns {{ kind: "upstream"|"ambiguous"|"adopter", repoRoot: string, repoLocalRun: boolean, presentMarkers: string[], missingMarkers: string[], competingCanonical: string|null }}
+ */
+export function classifyTarget(skillRoot, targetRoot) {
+	const repoRoot = findRepoRoot(targetRoot);
+	const repoLocalRun = contains(repoRoot, skillRoot);
+	const present = UPSTREAM_MARKERS.filter((marker) =>
+		fileContains(join(repoRoot, ...marker.path.split("/")), marker.mustContain),
+	);
+	const presentMarkers = present.map((marker) => marker.path);
+	const missingMarkers = UPSTREAM_MARKERS.filter((marker) => !present.includes(marker)).map(
+		(marker) => marker.path,
+	);
+
+	// A repo-local skill tree only competes when the running script is not it:
+	// a repo-local run over its own vendored copy is one entity seen twice.
+	const repoLocalSkill = join(repoRoot, ...REPO_LOCAL_SKILL_RELATIVE_PATH.split("/"));
+	const competingCanonical =
+		!repoLocalRun && existsSync(join(repoLocalSkill, "install")) ? repoLocalSkill : null;
+
+	const kind =
+		missingMarkers.length === 0
+			? "upstream"
+			: presentMarkers.length > 0 || competingCanonical !== null
+				? "ambiguous"
+				: "adopter";
+	return { kind, repoRoot, repoLocalRun, presentMarkers, missingMarkers, competingCanonical };
 }
 
 /**
@@ -329,6 +431,57 @@ function printRenameCandidates(candidates) {
 	);
 }
 
+/**
+ * Report a target this tool must not deploy into, and say what the reader can
+ * do instead. The differing files are still listed — they are real information
+ * about which side is older — but no --deploy appears anywhere in the output,
+ * including when one was explicitly asked for.
+ * @param {ReturnType<typeof classifyTarget>} role
+ * @param {string} skillRoot
+ * @param {string} targetRoot
+ * @param {boolean} deployRequested
+ * @returns {boolean} whether any deployed file differs from this copy's install/
+ */
+function reportNonDeployableTarget(role, skillRoot, targetRoot, deployRequested) {
+	if (role.kind === "upstream") {
+		console.log(
+			`This target is the upstream repo that generates pfd-ops' install/ tree (${role.repoRoot}).\n` +
+				"There, install/ is a generated mirror and the repo's own sources are canonical, so this copy must not write into it.",
+		);
+	} else {
+		console.log(
+			`Canonical is ambiguous for this target (${role.repoRoot}) — two entities claim it and nothing here can settle which:\n` +
+				`  this copy's install/: ${resolve(skillRoot, "install")}\n` +
+				`  in the target:        ${role.competingCanonical ?? "partial upstream markers"}\n` +
+				`  upstream markers present: ${role.presentMarkers.join(", ") || "(none)"}\n` +
+				`  upstream markers missing: ${role.missingMarkers.join(", ") || "(none)"}`,
+		);
+	}
+
+	const { results } = checkInstallSync(skillRoot, targetRoot);
+	const issues = results.filter((r) => r.status !== "ok");
+	if (issues.length === 0) {
+		console.log("pfd-ops install/ files are in sync with the deployed copies.");
+	} else {
+		console.log("Files that differ from this copy's install/:");
+		for (const r of issues) console.log(`  ${r.status}: ${r.path}`);
+	}
+	// A repo-local run in the upstream repo is reading its own generated mirror,
+	// so any difference above is gen-install drift and the fix is to regenerate.
+	// Naming the plugin there would send the reader to a copy that is not
+	// involved (and, in the drift direction that matters, is the stale one).
+	// Only when something actually differs: a remedy printed for a difference
+	// that is not there reads as an instruction to go change something.
+	const remedy =
+		issues.length === 0
+			? ""
+			: role.kind === "upstream" && role.repoLocalRun
+				? " install/ is generated from the repo's own sources — reconcile the difference in those sources, then run 'node scripts/gen-install.mjs' to regenerate the mirror (regenerating first discards any edit made directly to install/)."
+				: " If this copy is the older snapshot, update the plugin or re-run the check from the repo-local copy instead.";
+	console.log(deployRequested ? `Refusing to deploy.${remedy}` : `Nothing to deploy from here.${remedy}`);
+	return issues.length > 0;
+}
+
 async function main() {
 	let args;
 	try {
@@ -342,7 +495,18 @@ async function main() {
 
 	let exitCode = 0;
 
-	if (args.deploy) {
+	// Decided once, then answered from in all three places that speak about
+	// --deploy. Asking separately per branch is how they drift apart, and the
+	// two that only print text would keep pointing at the one that writes.
+	const role = classifyTarget(skillRoot, targetRoot);
+	const deployable = role.kind === "adopter";
+	if (!deployable) {
+		const drifted = reportNonDeployableTarget(role, skillRoot, targetRoot, args.deploy);
+		// 3, not the 2 a malformed argv exits with: the argv was well-formed and
+		// this refusal is about the target, so a caller reading only the code can
+		// still tell "you typed it wrong" from "I will not write there".
+		exitCode = args.deploy ? 3 : drifted ? 1 : 0;
+	} else if (args.deploy) {
 		// Read the pre-deploy state: deployInstall rewrites the manifest and may
 		// delete the very orphans a rename is inferred from.
 		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
@@ -391,7 +555,12 @@ async function main() {
 					// in their repo root while this script lives in a plugin
 					// cache outside it, so a bare name — or a relative one —
 					// makes them reconstruct the path the caller just used.
-					`To adopt it, run: node ${fileURLToPath(import.meta.url)} --deploy`,
+					// --target is spelled out for the same reason it is resolved
+					// rather than echoed verbatim: it defaults to the cwd, so a
+					// reader who copies this line from a different directory
+					// deploys into that other directory instead of the repo the
+					// line was printed about.
+					`To adopt it, run: node ${fileURLToPath(import.meta.url)} --target ${targetRoot} --deploy`,
 			);
 		} else {
 			const issues = results.filter((r) => r.status !== "ok");
