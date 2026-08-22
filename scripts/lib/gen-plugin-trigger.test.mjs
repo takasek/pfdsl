@@ -4,8 +4,8 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { collectModuleClosure } from "./check-script-imports.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
-import { PLUGIN_AGENT_FILES } from "./gen-plugin.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
+import { DISTRIBUTED_AGENTS } from "./harness-inventory.mjs";
 
 describe("GEN_PLUGIN_TRIGGER", () => {
 	it("matches everything GEN_SKILL_TRIGGER matches (docs/ path)", () => {
@@ -84,11 +84,11 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		);
 	});
 
-	// Whether PLUGIN_AGENT_FILES itself lists every agent that should ship is a
+	// Whether DISTRIBUTED_AGENTS itself lists every agent that should ship is a
 	// different question, checked against .claude/agents/ in
 	// intentional-duplication.test.mjs (#613).
-	it("matches each agent file PLUGIN_AGENT_FILES names", () => {
-		for (const file of PLUGIN_AGENT_FILES) {
+	it("matches each agent file DISTRIBUTED_AGENTS names", () => {
+		for (const file of DISTRIBUTED_AGENTS) {
 			assert.equal(GEN_PLUGIN_TRIGGER.test(`.claude/agents/${file}`), true);
 		}
 	});

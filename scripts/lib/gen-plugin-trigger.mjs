@@ -1,11 +1,9 @@
 // Single source of truth for the gen-plugin drift trigger pattern, imported as
 // a RegExp by scripts/gate-check.mjs and scripts/check-drift-gates.mjs.
 //
-// Superset of GEN_SKILL_TRIGGER: gen-plugin.mjs re-runs gen-skill.mjs
-// internally (see scripts/gen-plugin.mjs), plus bundles pfd-grill/
-// pfd-ops/pfd-retro/pfd-ecosystem/pfd-cycle/pfd-init plus the bundled agents
-// (PLUGIN_AGENT_FILES), and derives plugin.json's version from the CLI
-// package.json.
+// Superset of GEN_SKILL_TRIGGER: gen-plugin.mjs re-runs gen-skill.mjs internally (see scripts/gen-plugin.mjs).
+// It also bundles pfd-grill/pfd-ops/pfd-retro/pfd-ecosystem/pfd-cycle/pfd-init.
+// The harness-neutral inventory lists bundled agents. plugin.json's version derives from packages/cli/package.json.
 //
 // Includes scripts/gen-plugin-dist-independent.mjs (#593, split rationale
 // in scripts/lib/gen-plugin.mjs's assemblePluginDistIndependent): a change
@@ -20,24 +18,24 @@
 // regenerated and re-staged too — and that staged install/ path itself
 // matches this pattern's `\.claude/skills/pfd-ops/` alternative.
 
-import {
-	PLUGIN_AGENT_FILES,
-	PLUGIN_COMMAND_FILES,
-	PLUGIN_SKILL_DIRS,
-} from "./gen-plugin.mjs";
 import { GEN_SKILL_TRIGGER_PATTERN } from "./gen-skill-trigger.mjs";
+import {
+	DISTRIBUTED_AGENTS,
+	DISTRIBUTED_COMMANDS,
+	DISTRIBUTED_SKILLS,
+} from "./harness-inventory.mjs";
 
 // All three alternations are derived from the same lists gen-plugin bundles
 // from, so adding a skill, command or agent cannot land in the assembly and be
 // forgotten in the drift trigger.
 const escapeDots = (name) => name.replace(/\./g, "\\.");
-const AGENT_PATTERNS = PLUGIN_AGENT_FILES.map(
+const AGENT_PATTERNS = DISTRIBUTED_AGENTS.map(
 	(file) => `\\.claude/agents/${escapeDots(file)}`,
 ).join("|");
-const SKILL_PATTERNS = PLUGIN_SKILL_DIRS.map(
+const SKILL_PATTERNS = DISTRIBUTED_SKILLS.map(
 	(dir) => `\\.claude/skills/${escapeDots(dir)}/`,
 ).join("|");
-const COMMAND_PATTERNS = PLUGIN_COMMAND_FILES.map(
+const COMMAND_PATTERNS = DISTRIBUTED_COMMANDS.map(
 	(file) => `\\.claude/commands/${escapeDots(file)}`,
 ).join("|");
 
