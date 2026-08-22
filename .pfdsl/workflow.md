@@ -206,7 +206,7 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 ## hook の artifact 登録基準（#854）
 
-一般形（登録するのは図の変換の参加者だけで、参加者性の代理を基準に据えない）は pfd-ops SKILL.md プロトコル5が一次情報。
+一般形は上の「workflow.pfdsl に登録する agent の範囲」と同じく、pfd-ops SKILL.md プロトコル5が一次情報。
 このリポでの適用対象は `.claude/settings.json` に配線された hook 全般（PreToolUse ガードと PostToolUse advisory の双方）で、登録先は `externalize_bindings` の出力としての `workflow.pfdsl`。
 節の名前を PreToolUse に限っていた頃に PostToolUse advisory（`companion-prose-advisory`）が現れ、判定の宛先が無いように読める状態になったため、対象を hook 全般へ広げてある。
 登録しない側に当たるのは `stale-dist-guard` / `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` / `companion-prose-advisory` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
