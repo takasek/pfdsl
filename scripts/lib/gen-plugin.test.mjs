@@ -1110,21 +1110,40 @@ describe("assembleCodexAssets", () => {
 		assert.equal(lockHeld, false);
 	});
 
-	it("surfaces a lock-release error after successful publication", () => {
-		const { deps } = statefulCodexDeps({
-			failRemove: (path) =>
-				String(path).endsWith(".codex-assets-assembly.lock"),
+	it("removes its assembly lock after successful publication", () => {
+		const { deps, files } = statefulCodexDeps();
+
+		assembleCodexAssets({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
 		});
 
-		assert.throws(
-			() =>
-				assembleCodexAssets({
-					root: "/repo",
-					pluginRoot: "/repo/plugin/pfdsl",
-					deps,
-				}),
-			/cleanup failed/,
+		assert.equal(files.has("/repo/.codex-assets-assembly.lock"), false);
+	});
+
+	it("keeps committed Codex outputs when backup or lock cleanup fails", () => {
+		let agentBackupRemovals = 0;
+		const { deps, files } = statefulCodexDeps({
+			failRemove: (path) => {
+				const normalized = String(path);
+				if (normalized.startsWith("/repo/AGENTS.md.codex-prev")) {
+					agentBackupRemovals += 1;
+					return agentBackupRemovals === 2;
+				}
+				return normalized.endsWith(".codex-assets-assembly.lock");
+			},
+		});
+
+		assert.doesNotThrow(() =>
+			assembleCodexAssets({
+				root: "/repo",
+				pluginRoot: "/repo/plugin/pfdsl",
+				deps,
+			}),
 		);
+		assert.equal(files.has("/repo/AGENTS.md/prior.txt"), false);
+		assert.equal(files.get("/repo/AGENTS.md"), "Read AGENTS.md.\n");
 	});
 
 	it("keeps a staging error when lock release also fails", () => {

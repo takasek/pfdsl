@@ -510,7 +510,7 @@ function publishStaged(staged, deps, runId) {
 	}
 	for (const entry of backups) {
 		if (entry.hadDestination) {
-			deps.rmSync(entry.backup, { recursive: true, force: true });
+			removeAssemblyArtifact(entry.backup, deps);
 		}
 	}
 }
@@ -531,7 +531,7 @@ function acquireCodexAssemblyLock(root, deps) {
 }
 
 function releaseCodexAssemblyLock(lockPath, deps) {
-	deps.rmSync(lockPath, { recursive: true, force: true });
+	removeAssemblyArtifact(lockPath, deps);
 }
 
 function commandSkillManifestPath(pluginRoot) {
@@ -705,11 +705,7 @@ export function assembleCodexAssets({
 		primaryError = error;
 		removeStagedArtifacts(staged, deps);
 	}
-	try {
-		releaseCodexAssemblyLock(lockPath, deps);
-	} catch (error) {
-		if (!primaryError) throw error;
-	}
+	releaseCodexAssemblyLock(lockPath, deps);
 	if (primaryError) throw primaryError;
 }
 
