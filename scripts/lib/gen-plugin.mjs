@@ -10,6 +10,10 @@ import {
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+	BUNDLE_MANIFEST_RELATIVE_PATH,
+	writeBundleManifest,
+} from "./bundle-manifest.mjs";
 import { genInstall } from "./gen-install.mjs";
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
 
@@ -255,6 +259,7 @@ export function assemblePluginDistIndependent({
 		readFileSync,
 		writeFileSync,
 		mkdirSync,
+		writeBundleManifest,
 	},
 }) {
 	deps.genInstall(root);
@@ -325,4 +330,13 @@ export function assemblePluginDistIndependent({
 	console.log(".claude-plugin/marketplace.json ← plugin manifest description");
 
 	deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));
+
+	// Last: the recorded hash covers every other file in the bundle, so anything
+	// written after this point would leave it describing a bundle that is no
+	// longer on disk. The manifest excludes itself, which is what keeps a second
+	// run byte-identical (and the gen-plugin-bulk drift gate green).
+	deps.writeBundleManifest(pluginRoot);
+	console.log(
+		`plugin/pfdsl/${BUNDLE_MANIFEST_RELATIVE_PATH} ← content hash of the assembled bundle`,
+	);
 }

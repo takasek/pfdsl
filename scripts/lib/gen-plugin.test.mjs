@@ -347,6 +347,8 @@ describe("assemblePluginDistIndependent", () => {
 				writeFileSync: (path, content) =>
 					calls.push(["writeFileSync", path, content]),
 				mkdirSync: (path) => calls.push(["mkdirSync", path]),
+				writeBundleManifest: (bundleRoot) =>
+					calls.push(["writeBundleManifest", bundleRoot]),
 				...overrides,
 			},
 		};
@@ -459,6 +461,22 @@ describe("assemblePluginDistIndependent", () => {
 			calls.filter((c) => c[0] === "writeSkillRefs"),
 			[["writeSkillRefs", "/repo", "/repo/plugin/pfdsl/skills/pfdsl"]],
 		);
+	});
+
+	it("records the bundle content hash last, after every other bundled file is final", () => {
+		const { calls, deps } = fakeDeps();
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+		// Last, not merely present: the hash covers the bundle's own files, so a
+		// write that lands after it (writeSkillRefs was the previous final step)
+		// leaves the recorded value describing a bundle that no longer exists.
+		assert.deepEqual(calls.at(-1), [
+			"writeBundleManifest",
+			"/repo/plugin/pfdsl",
+		]);
 	});
 });
 
