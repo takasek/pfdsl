@@ -39,9 +39,12 @@ Codex adapter は同じ能力から Codex skill、TOML subagent、Codex hooks、
 
 ### Repository development assets
 
-リポジトリ開発用には root `AGENTS.md`、`.agents/skills`、`.codex/agents`、`.codex/hooks.json` を生成する。
+リポジトリ開発用には root `AGENTS.md`、`.agents/skills`、`.codex/config.toml`、`.codex/agents`、`.codex/hooks.json` を生成する。
 `CLAUDE.md` と `.claude` の内容を手で複製せず、配布 inventory と同じ adapter を利用する。
 生成された Codex 資産は手編集禁止とし、生成元・生成先・再生成コマンドをファイルまたは隣接ドキュメントに明記する。
+
+`.codex/config.toml` は trusted project に限定して `workspace-write`、`on-request` approval、sandbox内network accessを有効化する。
+Codexの`workspace-write`はwritable root配下でも`.git` pointerと解決後のgitdirをread-onlyに保護するため、親agentが承認済みの昇格でfetch・stage・commitを担当し、subagentはworktree内ファイルの編集と検査だけを担当する。
 
 ### Consumer distribution
 

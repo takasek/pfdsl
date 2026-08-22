@@ -97,7 +97,7 @@ proposal 起草での「既存構造」は対象 spec の現行 frontmatter キ�
 
 これらの入力、またはgen-skillの入力を変更したら、`pnpm -r build && make gen-plugin` を実行する。これはClaude Code rootの`plugin/pfdsl/`とCodex native rootの`plugin/pfdsl-codex/`、リポジトリの`AGENTS.md`・`.agents/`・`.codex/`を同時に再生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、異なるClaude Code/Codex skill treeを単一rootに同居させない。生成先は手編集しない。編集元を直して同じコマンドで再生成する。distが無い、または鮮度確認だけを行う場合は`node scripts/gen-plugin-dist-independent.mjs`を使えるが、Claude rootの`plugin/pfdsl/skills/pfdsl/SKILL.md`は含まれない。
 
-Codex pluginのmanifestは`plugin/pfdsl-codex/.codex-plugin/plugin.json`にあり、現在`Skills` capabilityのみを表す。hookはtop-level manifest fieldではなくplugin同梱の`plugin/pfdsl-codex/hooks/hooks.json`を既定discoveryして公開する。Codex runtimeはhook commandへ`CLAUDE_PLUGIN_ROOT`互換環境を与えるため、Claude Codeと同一のhook textを使う。Codex native agentはリポジトリ側の`.codex/agents/`へ生成し、`.codex/hooks.json`はrepo-local hook設定として残す。Codexではcommandとskillが同じplugin skill名前空間を共有するため、同名の場合は生成器がcommand側を`source-command-<name>`へ改名する。
+Codex pluginのmanifestは`plugin/pfdsl-codex/.codex-plugin/plugin.json`にあり、現在`Skills` capabilityのみを表す。hookはtop-level manifest fieldではなくplugin同梱の`plugin/pfdsl-codex/hooks/hooks.json`を既定discoveryして公開する。Codex runtimeはhook commandへ`CLAUDE_PLUGIN_ROOT`互換環境を与えるため、Claude Codeと同一のhook textを使う。Codex native agentはリポジトリ側の`.codex/agents/`へ生成し、`.codex/hooks.json`はrepo-local hook設定として残す。`.codex/config.toml`はtrusted projectの`workspace-write`と`on-request` approvalを維持しながらsandbox内network accessを有効にする。Codexではcommandとskillが同じplugin skill名前空間を共有するため、同名の場合は生成器がcommand側を`source-command-<name>`へ改名する。
 
 中立canonical sourceへの移行は今回の対象外である。将来はinventoryのsource pathと共通本文の置場を差し替え、Claude CodeとCodexのadapter出力契約とidentity検査を維持する。
 

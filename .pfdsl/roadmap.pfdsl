@@ -446,7 +446,7 @@ artifact:
   dual_harness_assets:
     label: Claude Code / Codex 両対応配布資産
     description: "Claude Code の既存経路を維持しつつ、同じ maintained source から Codex ネイティブな開発・plugin・skill 資産を生成する。短期の canonical input は .claude のまま保ち、中立正本への将来移行点を harness adapter として分離する"
-    status: wip
+    status: done
     criteria: "同じ maintained source から Claude Code と Codex のリポジトリ開発資産および plugin 資産が決定論的に生成され、Codex 利用者が Claude Code の導入または import なしに plugin・skill を利用でき、両出力の drift 検査が通過する"
     location: ../docs/superpowers/specs/2026-08-22-codex-dual-harness-design.md
 process:
