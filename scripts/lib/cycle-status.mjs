@@ -225,7 +225,7 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
  */
 export function buildReviewRecordTemplate() {
 	return {
-		note: `着手前（ブランチ最初のコミットより前）にレビューを実施し、実施のたび commit message の trailer へ記録する。後から追記できない — push 済みなら trailer の追加は履歴の作り直しになる。tool は ${REVIEW_TOOLS.join(" / ")} のいずれか。ゲート充足に数えるのは ${GATE_TOOLS.join(" / ")}（\`code-review\` は有効な trailer 値だが数えない）。${CODE_PATH_LABEL} に変更のある回はさらに ${CORRECTNESS_TOOLS.join(" または ")} を最低1本要する。`,
+		note: `着手前（ブランチ最初のコミットより前）にレビューを実施し、実施のたび commit message の trailer へ記録する。後から追記できない — push 済みなら trailer の追加は履歴の作り直しになる。tool は ${REVIEW_TOOLS.join(" / ")} のいずれか。ゲート充足に数えるのは ${GATE_TOOLS.join(" / ")}（\`code-review\` は有効な trailer 値だが数えない）。${CODE_PATH_LABEL} に変更のある回はさらに ${CORRECTNESS_TOOLS.join(" または ")} を最低1本要する。行が記録するのは委譲したレビューであり、diff の規模に合わせて委譲せず自分で読んだだけの回は書かない — その場合は落とした観点の名前と落とした理由を PR 本文へ書く。`,
 		line: "Review: tool=<tool-name>",
 	};
 }

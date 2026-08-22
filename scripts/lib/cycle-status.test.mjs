@@ -684,6 +684,21 @@ describe("buildReviewRecordTemplate", () => {
 		assert.match(note, /前.*コミット/);
 	});
 
+	// #909: the note used to describe when to write the trailer and which
+	// values it takes, but not what the trailer records — a delegated pass.
+	// A reader who reviewed a small diff themselves, correctly, then read this
+	// note, had nothing to tell them the row was not theirs to write.
+	it("states that the trailer records a delegated pass, not a self-read one", () => {
+		const { note } = buildReviewRecordTemplate();
+		assert.match(note, /委譲/);
+		assert.match(note, /自分で読んだ/);
+	});
+
+	it("names the PR body as where the reason for a lightened perspective goes", () => {
+		const { note } = buildReviewRecordTemplate();
+		assert.match(note, /PR 本文/);
+	});
+
 	// #809: named from CODE_PATH's own alternation rather than restated, so a
 	// path added to the checker's trigger cannot go unmentioned here.
 	it("names every path prefix the correctness-review trigger actually checks", () => {

@@ -958,6 +958,20 @@ describe("classifyDesignRecordTiming", () => {
 		assert.equal(result.status, "PASS");
 	});
 
+	// #950: the commit side of the comparison is an author date, which the
+	// runner sets (`git commit --date=`, `GIT_AUTHOR_DATE`, a rebase over the
+	// first commit). A bare PASS reads as proof; the caveat travels with the
+	// verdict so the reader of the gate output learns what it does not cover.
+	it("carries the runner-settable caveat on PASS", () => {
+		const result = classifyDesignRecordTiming(
+			"2026-07-30T00:00:00Z",
+			"2026-07-30T12:00:00Z",
+		);
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /author date/);
+		assert.match(result.detail, /runner/);
+	});
+
 	it("FAILs when the record was posted after the first commit", () => {
 		const result = classifyDesignRecordTiming(
 			"2026-07-30T12:00:00Z",

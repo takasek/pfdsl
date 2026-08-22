@@ -70,7 +70,7 @@ artifact:
   distribution_review_perspectives:
     label: 配布レビュー観点集
     description: "配布 bundle の散文を利用側の読み手として問い詰める観点の一次情報。review_perspectives（配布レンズ）側には置かない — あれは利用側にも同梱されるため、実施先の無い観点を配ることになる。回ごとの実行記録から一般化できた型だけを昇格して育てる"
-    criteria: 「観点」節の各項目について、由来する欠陥が docs/distribution-review/ の実行記録に見つかり、機械検査ルール（bundle-path・issue-ref）で決定可能な分との境界が本文に書かれている
+    criteria: 「観点」節の各項目について、由来する欠陥への参照（docs/distribution-review/ の実行記録・issue・PR のいずれか）が本文にあり、機械検査ルール（一次情報は scripts/lib/distributed-prose.mjs の RULES）で決定可能な分との境界が本文に書かれている
     location: ../docs/distribution-review.md
     group: generation
   distribution_review_skill:

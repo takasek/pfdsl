@@ -21,7 +21,11 @@
  * substance. No detector is added to close this, on purpose: the only trace
  * of a tool invocation lives in the runner's own session, which the runner
  * can edit, so a check would rest on one more self-reported layer instead of
- * on the tamper-proof timestamps classifyDesignRecordTiming stands on.
+ * on the server-recorded comment timestamps classifyDesignRecordTiming stands
+ * on. Those are only one of that check's two sides — its commit side is a git
+ * author date the runner sets (#950) — so the contrast here is between a
+ * wholly self-reported trace and a partly server-recorded one, not between
+ * self-report and tamper-proof evidence.
  *
  * Process/git I/O lives in the caller scripts; this module stays testable.
  */
