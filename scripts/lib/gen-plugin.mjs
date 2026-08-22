@@ -391,8 +391,10 @@ function stageRemoval(destination) {
 function removeAssemblyArtifact(path, deps) {
 	try {
 		deps.rmSync(path, { recursive: true, force: true });
+		return true;
 	} catch {
 		// Preserve the primary assembly error.
+		return false;
 	}
 }
 
@@ -530,8 +532,19 @@ function acquireCodexAssemblyLock(root, deps) {
 	return lockPath;
 }
 
-function releaseCodexAssemblyLock(lockPath, deps) {
-	removeAssemblyArtifact(lockPath, deps);
+function releaseCodexAssemblyLock(lockPath, deps, runId) {
+	if (removeAssemblyArtifact(lockPath, deps)) return;
+	const stalePath = `${lockPath}.stale-${runId}`;
+	try {
+		deps.renameSync(lockPath, stalePath);
+		console.warn(
+			`Codex assembly lock cleanup failed; quarantined recovery path: ${stalePath}`,
+		);
+	} catch {
+		console.warn(
+			`Codex assembly lock cleanup failed; recovery path: ${lockPath}`,
+		);
+	}
 }
 
 function commandSkillManifestPath(pluginRoot) {
@@ -610,10 +623,10 @@ export function assembleCodexAssets({
 	},
 }) {
 	const staged = [];
+	const runId = deps.newRunId?.() ?? randomUUID();
 	const lockPath = acquireCodexAssemblyLock(root, deps);
 	let primaryError;
 	try {
-		const runId = deps.newRunId?.() ?? randomUUID();
 		const read = (path) => deps.readFileSync(path, "utf-8");
 		const cliVersion = JSON.parse(
 			read(resolve(root, "packages/cli/package.json")),
@@ -705,7 +718,7 @@ export function assembleCodexAssets({
 		primaryError = error;
 		removeStagedArtifacts(staged, deps);
 	}
-	releaseCodexAssemblyLock(lockPath, deps);
+	releaseCodexAssemblyLock(lockPath, deps, runId);
 	if (primaryError) throw primaryError;
 }
 

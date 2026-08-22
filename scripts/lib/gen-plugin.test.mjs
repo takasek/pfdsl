@@ -1134,16 +1134,77 @@ describe("assembleCodexAssets", () => {
 				return normalized.endsWith(".codex-assets-assembly.lock");
 			},
 		});
+		const warnings = [];
+		const originalWarn = console.warn;
+		console.warn = (message) => warnings.push(message);
+		try {
+			assert.doesNotThrow(() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			);
+		} finally {
+			console.warn = originalWarn;
+		}
 
-		assert.doesNotThrow(() =>
-			assembleCodexAssets({
-				root: "/repo",
-				pluginRoot: "/repo/plugin/pfdsl",
-				deps,
-			}),
+		assert.equal(files.has("/repo/.codex-assets-assembly.lock"), false);
+		assert.equal(
+			files.has("/repo/.codex-assets-assembly.lock.stale-stateful-run"),
+			true,
+		);
+		assert.match(
+			warnings.join("\n"),
+			/\.codex-assets-assembly\.lock\.stale-stateful-run/,
 		);
 		assert.equal(files.has("/repo/AGENTS.md/prior.txt"), false);
 		assert.equal(files.get("/repo/AGENTS.md"), "Read AGENTS.md.\n");
+		console.warn = () => {};
+		try {
+			assert.doesNotThrow(() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			);
+		} finally {
+			console.warn = originalWarn;
+		}
+	});
+
+	it("warns with the canonical lock path when stale-lock quarantine fails", () => {
+		const { deps, files } = statefulCodexDeps({
+			failRemove: (path) =>
+				String(path).endsWith(".codex-assets-assembly.lock"),
+		});
+		const originalRename = deps.renameSync;
+		deps.renameSync = (from, to) => {
+			if (
+				String(from).endsWith(".codex-assets-assembly.lock") &&
+				String(to).includes(".stale-")
+			)
+				throw new Error("quarantine rename failed");
+			return originalRename(from, to);
+		};
+		const warnings = [];
+		const originalWarn = console.warn;
+		console.warn = (message) => warnings.push(message);
+		try {
+			assert.doesNotThrow(() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			);
+		} finally {
+			console.warn = originalWarn;
+		}
+
+		assert.equal(files.has("/repo/.codex-assets-assembly.lock"), true);
+		assert.match(warnings.join("\n"), /\.codex-assets-assembly\.lock/);
 	});
 
 	it("keeps a staging error when lock release also fails", () => {
