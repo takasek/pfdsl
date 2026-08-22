@@ -31,24 +31,27 @@ export function runSkillWiringCheck({
 	locate,
 	mirrors = PLUGIN_MIRRORS,
 }) {
-	const workflowText = readFile(WORKFLOW);
-	const workflow = analyzeFile(workflowText);
-	const pipeline = analyzeFile(readFile(PIPELINE));
+	/** What `locate` needs to anchor a finding in the file it was declared in. */
+	const readGraph = (path) => {
+		const text = readFile(path);
+		return { ...analyzeFile(text), text, path };
+	};
+	const workflow = readGraph(WORKFLOW);
+	const pipeline = readGraph(PIPELINE);
 
 	const findings = findUnwiredSkills({
-		artifacts: workflow.frontmatter.artifact ?? {},
+		workflowArtifacts: workflow.frontmatter.artifact ?? {},
+		pipelineArtifacts: pipeline.frontmatter.artifact ?? {},
 		workflowEdges: workflow.edges,
 		pipelineEdges: pipeline.edges,
 		mirrors,
 	});
 
 	// The other direction (#930): both graphs' artifacts are pooled, since
-	// bundled material is modelled wherever its artifact was declared. That is a
-	// wider universe than findUnwiredSkills works over above — that one asks
-	// where an artifact sits on the graph, which is a question about
-	// workflow.pfdsl. `pfd_commands` exists only in runtime-pipeline.pfdsl
-	// (#780), so pooling is what keeps the commands mirror from reading as
-	// unmodelled here while staying out of the wiring check there.
+	// bundled material is modelled wherever its artifact was declared. `pfd_commands`
+	// exists only in runtime-pipeline.pfdsl (#780) — findUnwiredSkills now scans
+	// both graphs too (#944), so pooling here just keeps the two checks over the
+	// same universe rather than being what makes the commands mirror visible.
 	const unmodeled = findUnmodeledMirrors({
 		artifacts: {
 			...(pipeline.frontmatter.artifact ?? {}),
@@ -66,24 +69,33 @@ export function runSkillWiringCheck({
 	}
 
 	const stderrLines = findings.map((finding) => {
+		const graph = finding.declaredIn === "pipeline" ? pipeline : workflow;
 		const line = locate(
-			workflow.document,
-			workflowText,
+			graph.document,
+			graph.text,
 			finding.id,
 			"artifact",
 		).declarationLine;
-		const anchor = line === null ? WORKFLOW : `${WORKFLOW}:${line}`;
+		const anchor = line === null ? graph.path : `${graph.path}:${line}`;
 		const location = Array.isArray(finding.location)
 			? finding.location.join(", ")
 			: finding.location;
 		return `${anchor}: '${finding.id}' is bundled (${location}) but missing from ${finding.missing.join(" and ")}`;
 	});
-	if (findings.length > 0) {
-		stderrLines.push(
-			"",
-			`Add it to \`distill_ops -> [...]\` in ${WORKFLOW} (it is produced there) and to`,
-			`\`[...] >> gen_plugin\` in ${PIPELINE} (it is bundled material).`,
-		);
+	// Only the edges some finding is actually missing: a pipeline-declared
+	// artifact is never eligible for distill_ops outputs (#944), so naming that
+	// edge for it sends the reader to write one the check goes on rejecting.
+	const missingEdges = new Set(findings.flatMap((finding) => finding.missing));
+	if (missingEdges.size > 0) {
+		stderrLines.push("");
+		if (missingEdges.has("distill_ops outputs"))
+			stderrLines.push(
+				`Add it to \`distill_ops -> [...]\` in ${WORKFLOW} (it is produced there).`,
+			);
+		if (missingEdges.has("gen_plugin inputs"))
+			stderrLines.push(
+				`Add it to \`[...] >> gen_plugin\` in ${PIPELINE} (it is bundled material).`,
+			);
 	}
 	for (const mirror of unmodeled) {
 		stderrLines.push(

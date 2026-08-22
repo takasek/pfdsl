@@ -27,29 +27,17 @@ export function repoRelative(location) {
 }
 
 /**
- * Whether gen-plugin mirrors this source path into the bundle, per its own
- * manifest: the mirror whose `src` the path sits under must also list the
- * member (a directory for `trees`, a file for `files`; `whole` takes all).
- * @param {string} sourcePath repo-relative
- * @param {Array<{src: string, trees?: string[], files?: string[], whole?: boolean}>} mirrors
+ * Whether two repo-relative paths sit in a bundled relationship: one names the
+ * other, sits inside it, or contains it. A single direction is not enough —
+ * an artifact may point at a whole directory that a manifest entry lists
+ * several members of (`pfd_commands` covers three command files this way,
+ * #780), or at one file deep inside a member.
+ * @param {string} a repo-relative, trailing slash already stripped
+ * @param {string} b repo-relative, trailing slash already stripped
  * @returns {boolean}
  */
-export function isBundledSource(sourcePath, mirrors) {
-	const path = sourcePath.replace(/\/$/, "");
-	for (const mirror of mirrors) {
-		// A `whole` mirror carries its source directory itself, so an artifact
-		// that models the directory (rather than a file inside it) points at the
-		// bundled thing too. `trees` / `files` mirrors bundle only their listed
-		// members, so their own directory is not bundled.
-		if (mirror.whole && path === mirror.src) return true;
-		const prefix = `${mirror.src}/`;
-		if (!path.startsWith(prefix)) continue;
-		if (mirror.whole) return true;
-		const rest = path.slice(prefix.length);
-		if (mirror.trees) return mirror.trees.includes(rest.split("/")[0]);
-		return (mirror.files ?? []).includes(rest);
-	}
-	return false;
+function pathsOverlap(a, b) {
+	return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
 
 /**
@@ -65,6 +53,20 @@ function mirrorMembers(mirror) {
 }
 
 /**
+ * Whether gen-plugin mirrors this source path into the bundle, per its own
+ * manifest: the path must overlap some mirror member, per `pathsOverlap`.
+ * @param {string} sourcePath repo-relative
+ * @param {Array<{src: string, trees?: string[], files?: string[], whole?: boolean}>} mirrors
+ * @returns {boolean}
+ */
+export function isBundledSource(sourcePath, mirrors) {
+	const path = sourcePath.replace(/\/$/, "");
+	return mirrors.some((mirror) =>
+		mirrorMembers(mirror).some((member) => pathsOverlap(path, member)),
+	);
+}
+
+/**
  * The bundled material no artifact models. `isBundledSource` answers "is this
  * artifact's location bundled?", which only ever runs over artifacts that
  * already exist — a bundled source with no artifact is never asked about, so
@@ -76,10 +78,8 @@ function mirrorMembers(mirror) {
  * goes silent for the rest of its members as soon as one of them has an
  * artifact — a whole skill tree can then drop out of both graphs unreported.
  *
- * A member counts as modelled when some artifact's location is that member,
- * sits inside it, or contains it: one artifact may legitimately model several
- * members from their shared directory (`pfd_commands` covers three command
- * files, #780), and another may point at a single file deep inside a tree.
+ * A member counts as modelled when some artifact's location overlaps it, per
+ * `pathsOverlap`.
  * @param {{
  *   artifacts: Record<string, {location?: string | string[]}>,
  *   mirrors: Array<{dest: string, src: string, trees?: string[], files?: string[], whole?: boolean}>,
@@ -100,12 +100,7 @@ export function findUnmodeledMirrors({ artifacts, mirrors }) {
 	const findings = [];
 	for (const mirror of mirrors) {
 		for (const member of mirrorMembers(mirror)) {
-			const covered = paths.some(
-				(path) =>
-					path === member ||
-					path.startsWith(`${member}/`) ||
-					member.startsWith(`${path}/`),
-			);
+			const covered = paths.some((path) => pathsOverlap(path, member));
 			if (!covered) findings.push({ dest: mirror.dest, member });
 		}
 	}
@@ -136,16 +131,26 @@ export function edgeMembers(edges, { kind, process }) {
  * that model them. `location` may be a scalar path or (per spec.md §15.8) an
  * array of them — an artifact counts as bundled if any one of its locations
  * is, since a single bundled entry is enough to need the wiring this checks.
+ *
+ * Scans both graphs' artifacts, since bundled material may be declared in
+ * either (`pfd_commands` exists only in runtime-pipeline.pfdsl, #780/#944).
+ * The two edges are not symmetric, though: `gen_plugin inputs` is required of
+ * every bundled artifact regardless of where it is declared, but
+ * `distill_ops outputs` only makes sense for an artifact workflow.pfdsl
+ * actually declares — asking a pipeline-only artifact to appear on a
+ * workflow.pfdsl edge it was never eligible for would be a false positive.
  * @param {{
- *   artifacts: Record<string, {location?: string | string[]}>,
+ *   workflowArtifacts: Record<string, {location?: string | string[]}>,
+ *   pipelineArtifacts: Record<string, {location?: string | string[]}>,
  *   workflowEdges: Array<{kind: string, artifact: string, process: string}>,
  *   pipelineEdges: Array<{kind: string, artifact: string, process: string}>,
  *   mirrors: Array<object>,
  * }} input
- * @returns {Array<{id: string, location: string | string[], missing: string[]}>}
+ * @returns {Array<{id: string, location: string | string[], missing: string[], declaredIn: "workflow" | "pipeline"}>}
  */
 export function findUnwiredSkills({
-	artifacts,
+	workflowArtifacts,
+	pipelineArtifacts,
 	workflowEdges,
 	pipelineEdges,
 	mirrors,
@@ -161,7 +166,17 @@ export function findUnwiredSkills({
 	const generated = edgeMembers(pipelineEdges, { kind: "output" });
 
 	const findings = [];
-	for (const [id, meta] of Object.entries(artifacts)) {
+	// Keyed by id, so an artifact both graphs declare — which every bundled one
+	// but pfd_commands is — yields one finding rather than one per declaration.
+	// workflow.pfdsl wins the tie: it owns the content, and it is the graph whose
+	// distill_ops edge the artifact is then held to.
+	const universe = new Map();
+	for (const [id, meta] of Object.entries(pipelineArtifacts))
+		universe.set(id, { meta, declaredIn: "pipeline" });
+	for (const [id, meta] of Object.entries(workflowArtifacts))
+		universe.set(id, { meta, declaredIn: "workflow" });
+
+	for (const [id, { meta, declaredIn }] of universe) {
 		if (!meta?.location) continue;
 		const locations = Array.isArray(meta.location)
 			? meta.location
@@ -171,10 +186,11 @@ export function findUnwiredSkills({
 		if (generated.has(id)) continue;
 
 		const missing = [];
-		if (!distillOutputs.has(id)) missing.push("distill_ops outputs");
+		if (declaredIn === "workflow" && !distillOutputs.has(id))
+			missing.push("distill_ops outputs");
 		if (!genPluginInputs.has(id)) missing.push("gen_plugin inputs");
 		if (missing.length > 0)
-			findings.push({ id, location: meta.location, missing });
+			findings.push({ id, location: meta.location, missing, declaredIn });
 	}
 	return findings;
 }

@@ -39,6 +39,19 @@ const PIPELINE = {
 	edges: [{ kind: "input", artifact: "retro_skill", process: "gen_plugin" }],
 };
 
+const PIPELINE_TEXT = `artifact:
+  pfd_commands:
+    label: commands
+    location: ../.claude/commands/
+`;
+
+const PIPELINE_COMMANDS = {
+	frontmatter: {
+		artifact: { pfd_commands: { location: "../.claude/commands/" } },
+	},
+	edges: [{ kind: "input", artifact: "retro_skill", process: "gen_plugin" }],
+};
+
 /** Stands in for @pfdsl/core's locateNode: a frontmatter section key's line, by text search. */
 function fakeLocate(_document, source, id) {
 	const lines = source.split("\n");
@@ -49,11 +62,12 @@ function fakeLocate(_document, source, id) {
 function deps({
 	workflow = WORKFLOW,
 	pipeline = PIPELINE,
+	pipelineText = PIPELINE_TEXT,
 	locate = fakeLocate,
 } = {}) {
 	return {
 		readFile: (file) =>
-			file.includes("runtime-pipeline") ? "" : WORKFLOW_TEXT,
+			file.includes("runtime-pipeline") ? pipelineText : WORKFLOW_TEXT,
 		analyzeFile: (text) => (text === WORKFLOW_TEXT ? workflow : pipeline),
 		locate,
 		mirrors: MIRRORS,
@@ -119,11 +133,31 @@ describe("runSkillWiringCheck", () => {
 	});
 
 	it("tells the reader where to add the missing edges", () => {
+		const workflow = {
+			frontmatter: WORKFLOW.frontmatter,
+			edges: [],
+		};
 		const result = runSkillWiringCheck(
-			deps({ pipeline: { frontmatter: {}, edges: [] } }),
+			deps({ workflow, pipeline: { frontmatter: {}, edges: [] } }),
 		);
 		assert.match(result.stderrLines.join("\n"), /distill_ops -> \[\.\.\.\]/);
 		assert.match(result.stderrLines.join("\n"), /\[\.\.\.\] >> gen_plugin/);
+	});
+
+	it("names only the edges the findings are actually missing", () => {
+		// A pipeline-only artifact is never eligible for distill_ops outputs
+		// (#944), so telling its reader to add one — and that the artifact "is
+		// produced there" — sends them to write an edge the check rejects.
+		const mirrors = [
+			{ dest: "commands", src: ".claude/commands", files: ["pfd-cycle.md"] },
+		];
+		const result = runSkillWiringCheck({
+			...deps({ pipeline: PIPELINE_COMMANDS }),
+			mirrors,
+		});
+		const stderr = result.stderrLines.join("\n");
+		assert.match(stderr, /\[\.\.\.\] >> gen_plugin/);
+		assert.doesNotMatch(stderr, /distill_ops -> \[\.\.\.\]/);
 	});
 
 	it("fails when the manifest carries an entry no artifact models", () => {
@@ -139,10 +173,38 @@ describe("runSkillWiringCheck", () => {
 			frontmatter: {
 				artifact: { retro_reminder_hook: { location: "../hooks/" } },
 			},
-			edges: PIPELINE.edges,
+			// A pipeline-only bundled artifact still needs its own gen_plugin
+			// inputs edge (#944) — only distill_ops outputs is exempt for it.
+			edges: [
+				...PIPELINE.edges,
+				{
+					kind: "input",
+					artifact: "retro_reminder_hook",
+					process: "gen_plugin",
+				},
+			],
 		};
 		const result = runSkillWiringCheck({ ...deps({ pipeline }), mirrors });
 		assert.equal(result.exitCode, 0);
+	});
+
+	it("anchors a pipeline-only bundled artifact's finding at runtime-pipeline.pfdsl, not workflow.pfdsl (#944)", () => {
+		const mirrors = [
+			{
+				dest: "commands",
+				src: ".claude/commands",
+				files: ["pfd-cycle.md"],
+			},
+		];
+		const result = runSkillWiringCheck({
+			...deps({ pipeline: PIPELINE_COMMANDS }),
+			mirrors,
+		});
+		assert.equal(result.exitCode, 1);
+		assert.match(result.stderrLines[0], /runtime-pipeline\.pfdsl:2:/);
+		assert.match(result.stderrLines[0], /pfd_commands/);
+		assert.match(result.stderrLines[0], /gen_plugin inputs/);
+		assert.doesNotMatch(result.stderrLines[0], /distill_ops outputs/);
 	});
 
 	it("lists every location when an array-location artifact is reported", () => {
