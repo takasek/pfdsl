@@ -177,10 +177,7 @@ frontmatter に新フィールドを追加する develop では、対応する `
 `PLUGIN_AGENT_FILES`（plugin 同梱物）への所属は出発点として使ってよいが、基準ではない。
 同梱は参加者性の代理であり、基準として閉じると参加者でありながら同梱されていない agent が機械的に落ちる。
 
-現在登録済みの2件はこの基準に該当する。
-
-- `implementer_agent` — `references/work-cycle.md` 手順2「委譲先の外向き操作の制御」の層1（agent の選択）が実装専用 agent を要求しており、`distill_ops` の出力として生まれる
-- `pfd_lens_agent` — `retro_skill` の A・B 層が監査をオフロードする先で（#357）、同じく `distill_ops` の出力
+登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の `distill_ops` 出力と artifact 定義が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl distill_ops` で出力集合を引き、agent artifact の定義を参照する。
 
 repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）はいずれも、要求している図のプロセスも、生産・消費している図の成果物も名指しできない。
 この結果が現状 `PLUGIN_AGENT_FILES` の内外と一致しているのは観測であって、判定規則ではない。
@@ -214,9 +211,9 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 節の名前を PreToolUse に限っていた頃に PostToolUse advisory（`companion-prose-advisory`）が現れ、判定の宛先が無いように読める状態になったため、対象を hook 全般へ広げてある。
 登録しない側に当たるのは `stale-dist-guard` / `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` / `companion-prose-advisory` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
 
-現在 artifact 登録済みの3件はこの基準に該当する: `delegation_guard`（`references/work-cycle.md` 手順2「委譲先の外向き操作の制御」が要求する機構であり、`externalize_bindings` の出力として生まれる）・`main_branch_guard`（同手順2冒頭「main 直コミットしない」・CLAUDE.md「コミット粒度」節が要求する機構で、同じく `externalize_bindings` の出力）・`pre_artifact_advisory`（同手順2 の参照点 P3 が「書く瞬間に発火する機構」として名指し、その置き場を companion に委ねている。#964）。
-`pre_artifact_advisory` が PostToolUse advisory でありながら登録側に来るのは、advisory か guard かが判定軸でないことによる — 上の列挙で登録しない側に並ぶ `companion-prose-advisory` との違いは、要求元の手順を名指しできるかどうかだけである。
-**issue 番号に紐づくことは非参加者の判定根拠にならない** — `main_branch_guard` 自身が #650 由来である。区別は出自の issue でなく、運用手順がその機構を要求しているか（＝図のプロセスの出力として生まれるか）で付ける。
+artifact 登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の `externalize_bindings` 出力と artifact 定義が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl externalize_bindings` で出力集合を引き、hook artifact の定義を参照する。
+PostToolUse advisory であっても、要求元の手順を名指しできれば登録側になる。advisory か guard かは判定軸ではなく、上の列挙で登録しない側に並ぶ `companion-prose-advisory` との違いも、要求元の手順を名指しできるかどうかだけである。
+**issue 番号に紐づくことは非参加者の判定根拠にならない** — 既存の登録 artifact にも issue 由来の機構がある。区別は出自の issue でなく、運用手順がその機構を要求しているか（＝図のプロセスの出力として生まれるか）で付ける。
 
 判定に迷う新規 hook は、その hook を要求している図のプロセスを名指しできるかで振り分ける。
 `externalize_bindings` の出力だと言えることは根拠にならない — 同 description が「PreToolUse ガード機構へ外化する」と書いているため、登録しない側も等しくそう言える。
