@@ -16,3 +16,8 @@
 
 対象ごとに専用のスキルが手順を持つ。`SWEEP_TARGETS` の各要素の `skill` フィールドがそれを指す。
 `node scripts/check-asset-sweep.mjs` が、いまどの対象が閾値を超えているかを印字する。
+
+## 記録の確定
+
+各対象のスキルが指定する変更と実行記録の `.md` を先に1コミットへまとめ、その40桁 sha を対象の `<target-id>.json` に `{ commit, date, log }` として書く。`commit` は sweep 済みの状態を指す値であり、json 自身を含むコミットを指すと自己言及になるため、json は必ず2つ目のコミットに分ける。
+2つ目のコミットは対象資産を触らない。コミット前に `node scripts/check-asset-sweep.mjs` を実行し、作業ツリーの json が記録した sha 以降に対象追加がなく exit 0 になることを確認する。

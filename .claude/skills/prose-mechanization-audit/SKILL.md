@@ -62,8 +62,6 @@ git diff --name-only <前回 sweep commit> HEAD -- .claude/skills/ .claude/comma
 
 記録が無い（初回）場合は工程2〜5 でこの絞り込みが効かず、対象は散文資産の全件になる。
 
-記録が無い（初回）場合はこの絞り込みが効かないので、全件を対象にする。
-
 ## 1. hook / check 台帳を実測で列挙する
 
 一次情報は `.claude/settings.json` の配線と `scripts/` の実体のみ。
@@ -132,14 +130,7 @@ make check-docs
 結果を `docs/asset-sweep/<YYYY-MM-DD>-prose-mechanization.md` に書く。
 何を削除・ポインタ化・修正したか、判定に迷ったが手を付けなかった項目とその理由を含める。
 
-記録は2コミットに分ける。
-
-1. 工程1〜5 の散文変更と実行記録の `.md` をコミットする。
-2. `docs/asset-sweep/prose-mechanization.json` に `commit`（1 のコミットの40桁 sha）・`date`（`YYYY-MM-DD`）・`log`（実行記録の `.md` のファイル名）を書き、これを2つ目のコミットにする（`docs/distribution-review/reviewed.json` と同じ形。初回はファイルごと新規作成する）。
-
-`commit` に書くのは sweep 済みの状態を指す sha であり、それを書いているコミット自身ではない — 自己言及になるため分けている。
-2つ目のコミットは `scripts/`・`hooks/` を触らないので、記録した sha 以降に機構の追加は発生せず、ゲートは緑のままになる。
-2 をコミットする前に `node scripts/check-asset-sweep.mjs` が exit 0 を返すことを確認する（このスクリプトは作業ツリーの json を読み、記録した sha から HEAD までの追加を数えるため、json を書いた時点で判定できる）。
+記録の2コミット手順は `docs/asset-sweep/README.md`「記録の確定」が一次情報。1コミット目には工程1〜5 の散文変更と実行記録を含め、2コミット目で `docs/asset-sweep/prose-mechanization.json` を確定する。
 
 実行記録の冒頭に、前回の記録の `date` からの日数・その間に追加された機構の件数・本回の findings 件数を書く。
 閾値 20 は「1回の sweep で期待 findings ≒ 1.2件」を根拠に置いた値だが、その歩留まりを実測し直す工程は他にどこにも無い — ここで残さないと閾値は一度も見直されないまま回り続ける。
