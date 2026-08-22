@@ -37,6 +37,7 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 			"AGENTS.md",
 			".agents/skills/pfd-ops/SKILL.md",
 			".codex/agents/pfd-implementer.toml",
+			".codex/config.toml",
 			".codex/hooks.json",
 			"plugin/pfdsl-codex/.codex-plugin/plugin.json",
 		]) {

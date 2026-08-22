@@ -52,6 +52,13 @@ function requiredDescription(sourcePath, frontmatter) {
 	return frontmatter.description;
 }
 
+function requiredName(sourcePath, frontmatter) {
+	if (typeof frontmatter.name !== "string" || !frontmatter.name.trim()) {
+		throw new Error(`${sourcePath}: name must be a non-empty string.`);
+	}
+	return frontmatter.name;
+}
+
 function tomlString(value) {
 	return JSON.stringify(value);
 }
@@ -143,6 +150,68 @@ export function claudeInstructionsToAgents(source) {
 		.replaceAll(".claude/settings.json", ".codex/hooks.json");
 }
 
+const CODEX_WORKTREE_METADATA_INSTRUCTIONS = [
+	"",
+	"## Codex の worktree と git metadata",
+	"",
+	"親 agent が `git fetch`、stage、commit を担当する。",
+	"subagent へ git metadata 操作を委譲しない。",
+	"subagent は worktree 内のファイル編集と検査だけを担当する。",
+	"subagent の権限エラーはユーザーへ直接継続を求めず、親 agent へ引き上げる。",
+	"",
+].join("\n");
+
+export function claudeRootInstructionsToAgents(source) {
+	return `${claudeInstructionsToAgents(source)}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`;
+}
+
+function codexPfdImplementerDescription() {
+	return "設計が確定済みの実装を委譲する。指定された worktree 内で t-wada 流 TDD によりファイルを編集し、検査する。git metadata 操作は親 agent が担当する。";
+}
+
+function pfdImplementerInstructions(source) {
+	return `${claudeInstructionsToAgents(source)
+		.replace(
+			"設計が確定した実装を、指定ブランチ上のコミットとして仕上げる agent。",
+			"設計が確定した実装を、指定された worktree 内のファイル編集と検査として仕上げる agent。",
+		)
+		.replace(
+			"やること: テストを先に書き、実装し、論理単位でコミットする。検証コマンドを実行し、結果を verbatim で報告する。",
+			"やること: テストを先に書き、実装し、検証コマンドを実行して結果を verbatim で報告する。",
+		)
+		.replace(
+			"やらないこと: `git push`、PR の作成・更新、issue の作成・クローズ・コメント、worktree の作成、リリース操作。",
+			"やらないこと: `git fetch`、stage、commit、`git push`、PR の作成・更新、issue の作成・クローズ・コメント、worktree の作成、リリース操作。",
+		)
+		.replace(
+			"リポジトリの `AGENTS.md` に従う（TDD、Conventional Commits、コミット粒度、文字列の言語）",
+			"リポジトリの `AGENTS.md` に従う（TDD と文字列の言語）",
+		)}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`;
+}
+
+function codexAgentDescription(sourcePath, description) {
+	return sourcePath === "pfd-implementer.md"
+		? codexPfdImplementerDescription()
+		: description;
+}
+
+function codexAgentInstructions(sourcePath, body) {
+	return sourcePath === "pfd-implementer.md"
+		? pfdImplementerInstructions(body)
+		: claudeInstructionsToAgents(body);
+}
+
+export function buildCodexProjectConfig() {
+	return [
+		'sandbox_mode = "workspace-write"',
+		'approval_policy = "on-request"',
+		"",
+		"[sandbox_workspace_write]",
+		"network_access = true",
+		"",
+	].join("\n");
+}
+
 export function agentToCodexToml(sourcePath, source) {
 	const { body, frontmatter } = parseFrontmatter(sourcePath, source);
 	for (const key of Object.keys(frontmatter)) {
@@ -152,14 +221,21 @@ export function agentToCodexToml(sourcePath, source) {
 			);
 		}
 	}
-	const description = requiredDescription(sourcePath, frontmatter);
+	const name = requiredName(sourcePath, frontmatter);
+	const description = codexAgentDescription(
+		sourcePath,
+		requiredDescription(sourcePath, frontmatter),
+	);
 	if (frontmatter.model !== "sonnet") {
 		throw new Error(`${sourcePath}: unsupported model.`);
 	}
 	const sandbox = sandboxMode(sourcePath, frontmatter.tools);
-	const instructions = tomlMultilineString(claudeInstructionsToAgents(body));
+	const instructions = tomlMultilineString(
+		codexAgentInstructions(sourcePath, body),
+	);
 
 	return [
+		`name = ${tomlString(name)}`,
 		`description = ${tomlString(description)}`,
 		`sandbox_mode = ${tomlString(sandbox)}`,
 		`developer_instructions = """${instructions}"""`,

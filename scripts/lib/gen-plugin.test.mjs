@@ -834,6 +834,7 @@ describe("assembleCodexAssets", () => {
 		const files = new Map();
 		const destinations = [
 			"/repo/AGENTS.md",
+			"/repo/.codex/config.toml",
 			"/repo/.codex/hooks.json",
 			"/repo/plugin/pfdsl/.codex-plugin/plugin.json",
 			"/repo/.agents/skills",
@@ -1159,7 +1160,11 @@ describe("assembleCodexAssets", () => {
 			/\.codex-assets-assembly\.lock\.stale-stateful-run/,
 		);
 		assert.equal(files.has("/repo/AGENTS.md/prior.txt"), false);
-		assert.equal(files.get("/repo/AGENTS.md"), "Read AGENTS.md.\n");
+		assert.match(files.get("/repo/AGENTS.md"), /^Read AGENTS\.md\.$/m);
+		assert.match(
+			files.get("/repo/AGENTS.md"),
+			/親 agent が `git fetch`、stage、commit を担当する。/,
+		);
 		console.warn = () => {};
 		try {
 			assert.doesNotThrow(() =>
@@ -1242,6 +1247,7 @@ describe("assembleCodexAssets", () => {
 				"/repo/AGENTS.md",
 				"/repo/.agents/skills",
 				"/repo/.codex/agents",
+				"/repo/.codex/config.toml",
 				"/repo/.codex/hooks.json",
 				"/repo/plugin/pfdsl-codex/.codex-plugin/codex-command-skills.json",
 				"/repo/plugin/pfdsl-codex/.codex-plugin/plugin.json",
@@ -1289,6 +1295,13 @@ describe("assembleCodexAssets", () => {
 			path.endsWith("pfdsl-codex/.codex-plugin/plugin.json.codex-tmp-test-run"),
 		);
 		assert.equal(Object.hasOwn(JSON.parse(manifest), "hooks"), false);
+		const [, , config] = staged.find(([, path]) =>
+			path.endsWith(".codex/config.toml.codex-tmp-test-run"),
+		);
+		assert.equal(
+			config,
+			'sandbox_mode = "workspace-write"\napproval_policy = "on-request"\n\n[sandbox_workspace_write]\nnetwork_access = true\n',
+		);
 		const [, , ownership] = staged.find(([, path]) =>
 			path.endsWith(
 				"pfdsl-codex/.codex-plugin/codex-command-skills.json.codex-tmp-test-run",

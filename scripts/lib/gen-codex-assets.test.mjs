@@ -7,8 +7,10 @@ import { fileURLToPath } from "node:url";
 import {
 	agentToCodexToml,
 	buildCodexPluginManifest,
+	buildCodexProjectConfig,
 	claudeHooksToCodexHooks,
 	claudeInstructionsToAgents,
+	claudeRootInstructionsToAgents,
 	commandToCodexSkill,
 } from "./gen-codex-assets.mjs";
 import { DISTRIBUTED_COMMANDS } from "./harness-inventory.mjs";
@@ -155,6 +157,7 @@ describe("agentToCodexToml", () => {
 		const output = agentToCodexToml("pfd-lens.md", source);
 
 		assert.match(output, /^description = /m);
+		assert.match(output, /^name = "pfd-lens"$/m);
 		assert.match(output, /^sandbox_mode = "read-only"$/m);
 		assert.doesNotMatch(output, /^model = /m);
 		assert.match(output, /^developer_instructions = """/m);
@@ -171,6 +174,28 @@ describe("agentToCodexToml", () => {
 
 		assert.match(output, /^sandbox_mode = "workspace-write"$/m);
 		assert.match(output, /`AGENTS\.md`/);
+		assert.match(output, /親 agent が `git fetch`、stage、commit を担当する。/);
+		assert.match(
+			output,
+			/権限エラーはユーザーへ直接継続を求めず、親 agent へ引き上げる。/,
+		);
+		assert.doesNotMatch(output, /指定ブランチ上のコミットとして仕上げる/);
+		assert.doesNotMatch(output, /Conventional Commits|コミット粒度/);
+	});
+
+	it("rejects an absent or blank agent name", () => {
+		for (const name of [undefined, "   "]) {
+			const nameLine = name === undefined ? "" : `name: ${name}\n`;
+			const source =
+				"---\n" +
+				nameLine +
+				"description: x\ntools: Read, Grep, Bash\nmodel: sonnet\n---\n\nbody\n";
+
+			assert.throws(
+				() => agentToCodexToml("pfd.md", source),
+				/pfd\.md.*name.*non-empty string/,
+			);
+		}
 	});
 
 	it("preserves the transformed body through TOML multiline string parsing", () => {
@@ -251,6 +276,25 @@ describe("claudeInstructionsToAgents", () => {
 				".codex/hooks.json\n" +
 				".codex/hooks.json\n" +
 				"unchanged\n",
+		);
+	});
+});
+
+describe("claudeRootInstructionsToAgents", () => {
+	it("adds Codex-only parent ownership for git metadata operations", () => {
+		const output = claudeRootInstructionsToAgents("Read CLAUDE.md.\n");
+
+		assert.match(output, /^Read AGENTS\.md\.$/m);
+		assert.match(output, /親 agent が `git fetch`、stage、commit を担当する。/);
+		assert.match(output, /subagent へ git metadata 操作を委譲しない。/);
+	});
+});
+
+describe("buildCodexProjectConfig", () => {
+	it("uses the least-privilege trusted-project sandbox and registry network access", () => {
+		assert.equal(
+			buildCodexProjectConfig(),
+			'sandbox_mode = "workspace-write"\napproval_policy = "on-request"\n\n[sandbox_workspace_write]\nnetwork_access = true\n',
 		);
 	});
 });

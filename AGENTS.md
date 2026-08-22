@@ -38,3 +38,10 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 コミットメッセージは**英語**。
 
 直近の履歴 (`git log --oneline`) を参考にスタイルを合わせる。
+
+## Codex の worktree と git metadata
+
+親 agent が `git fetch`、stage、commit を担当する。
+subagent へ git metadata 操作を委譲しない。
+subagent は worktree 内のファイル編集と検査だけを担当する。
+subagent の権限エラーはユーザーへ直接継続を求めず、親 agent へ引き上げる。

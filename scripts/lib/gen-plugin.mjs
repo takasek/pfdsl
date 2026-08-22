@@ -19,8 +19,10 @@ import {
 import {
 	agentToCodexToml,
 	buildCodexPluginManifest,
+	buildCodexProjectConfig,
 	claudeHooksToCodexHooks,
 	claudeInstructionsToAgents,
+	claudeRootInstructionsToAgents,
 	commandToCodexSkill,
 } from "./gen-codex-assets.mjs";
 import { genInstall } from "./gen-install.mjs";
@@ -645,7 +647,15 @@ export function assembleCodexAssets({
 		staged.push(
 			stageFile(
 				resolve(root, "AGENTS.md"),
-				claudeInstructionsToAgents(read(resolve(root, "CLAUDE.md"))),
+				claudeRootInstructionsToAgents(read(resolve(root, "CLAUDE.md"))),
+				deps,
+				runId,
+			),
+		);
+		staged.push(
+			stageFile(
+				resolve(root, ".codex/config.toml"),
+				buildCodexProjectConfig(),
 				deps,
 				runId,
 			),
