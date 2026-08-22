@@ -59,13 +59,13 @@ artifact:
     group: generation
   pfdsl_skill:
     label: AI agent スキル（リポ内）
-    description: "runtime-pipeline.pfdsl の gen_skill が生産する（判断を含まない生成のため、ADR-0035 でそちらへ移した）。実体は plugin/pfdsl/skills/pfdsl で、リポ内の .claude/skills/pfdsl はそこへの symlink（#714）。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる"
+    description: "runtime-pipeline.pfdsl の gen_skill が生産する（判断を含まない生成のため、ADR-0035 でそちらへ移した）。実体は plugin/pfdsl/skills/pfdsl で、リポ内の .claude/skills/pfdsl はそこへの生成symlinkであり、正本入力でも編集先でもない（#714）。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる"
     location: ../plugin/pfdsl/skills/pfdsl/
     group: generation
   plugin_dist:
-    label: marketplace 配布プラグイン
-    description: "runtime-pipeline.pfdsl の gen_plugin が生産する（同上）。/plugin marketplace add takasek/pfdsl + /plugin install pfdsl@pfdsl で外部ユーザーが導入する Claude Code プラグイン。この図では README 更新と配布レビューの入力に現れる"
-    location: ../plugin/pfdsl/
+    label: 両ハーネス対応の配布plugin roots
+    description: "runtime-pipeline.pfdsl の両root組み立てと結合drift検査が生産する。Claude Codeの既存marketplace経路を保つplugin/pfdsl/と、公式Codex validator/runtimeのskills固定に従うnative rootのplugin/pfdsl-codex/を分離する。この図ではREADME更新と配布レビューの入力に現れる"
+    location: [ ../plugin/pfdsl/, ../plugin/pfdsl-codex/ ]
     group: release
   distribution_review_perspectives:
     label: 配布レビュー観点集
@@ -225,8 +225,8 @@ artifact:
     group: generation
   retro_reminder_hook:
     label: retroリマインダhook
-    description: "roadmap.pfdsl へ status: done を追加するコミットの後、pfd-retro の起動を促す advisory reminder を返す PostToolUse(Bash) フック。pfd-ops references/work-cycle.md 手順5 がプロトコル7(a) のバックストップとして要求する（セッション記憶が抜けても done 付与コミットの tool result 経由で気付ける）。delegation_guard・main_branch_guard と違いリポ固有ではなく plugin 同梱物で、gen_plugin が hooks/ をディレクトリごとミラーする"
-    criteria: hooks/hooks.json が PostToolUse へ配線され、plugin 同梱物に含まれ、採用リポで設置作業なしに done 付与コミットの tool result へ reminder が現れる
+    description: "roadmap.pfdsl へ status: done を追加するコミットの後、pfd-retro の起動を促す advisory reminder を返す PostToolUse(Bash) フック。pfd-ops references/work-cycle.md 手順5 がプロトコル7(a) のバックストップとして要求する（セッション記憶が抜けても done 付与コミットの tool result 経由で気付ける）。delegation_guard・main_branch_guard と違いリポ固有ではなく plugin 同梱物で、gen_plugin が hooks/ をディレクトリごとミラーし、Claude CodeとCodex plugin hostは既定の hooks/hooks.json discoveryで公開する"
+    criteria: hooks/hooks.json が PostToolUse へ配線され、plugin 同梱物に含まれ、Codex runtime の CLAUDE_PLUGIN_ROOT 互換環境でcommandが解決し、採用リポで設置作業なしに done 付与コミットの tool result へ reminder が現れる
     location: ../hooks/
     group: generation
   delegation_guard:

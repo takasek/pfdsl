@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
 	canonicalSourceOf,
+	DISTRIBUTION_ROOTS,
 	diffBase,
 	EMPTY_TREE,
 	formatGateFailure,
@@ -14,11 +15,19 @@ import {
 	SCOPE_EXCLUSIONS,
 	unreviewedFiles,
 } from "./distribution-review.mjs";
+import { codexCommandSkillName, PLUGIN_COMMAND_FILES } from "./gen-plugin.mjs";
 import { git } from "./run-exec.mjs";
 
 describe("inScope", () => {
+	it("declares both plugin roots as the review diff boundary", () => {
+		assert.deepEqual(DISTRIBUTION_ROOTS, [
+			"plugin/pfdsl",
+			"plugin/pfdsl-codex",
+		]);
+	});
 	it("takes a distributed prompt", () => {
 		assert.equal(inScope("plugin/pfdsl/skills/pfd-ops/SKILL.md"), true);
+		assert.equal(inScope("plugin/pfdsl-codex/skills/pfd-ops/SKILL.md"), true);
 		assert.equal(inScope("plugin/pfdsl/commands/pfd-cycle.md"), true);
 		assert.equal(inScope("plugin/pfdsl/agents/pfd-lens.md"), true);
 	});
@@ -79,10 +88,19 @@ describe("canonicalSourceOf", () => {
 		],
 		["plugin/pfdsl/skills/pfdsl/references/examples.md", "docs/examples/"],
 		["plugin/pfdsl/skills/pfdsl/references/samples.md", "docs/samples/"],
+		["plugin/pfdsl-codex/GENERATED.md", "scripts/lib/gen-plugin.mjs"],
 	];
 
 	for (const [dist, canonical] of PAIRS) {
 		it(`maps ${dist} to ${canonical}`, () => {
+			assert.equal(canonicalSourceOf(dist), canonical);
+		});
+	}
+
+	for (const source of PLUGIN_COMMAND_FILES) {
+		const dist = `plugin/pfdsl-codex/skills/${codexCommandSkillName(source)}/SKILL.md`;
+		const canonical = `.claude/commands/${source}`;
+		it(`maps generated Codex command skill ${dist} to ${canonical}`, () => {
 			assert.equal(canonicalSourceOf(dist), canonical);
 		});
 	}
@@ -100,10 +118,21 @@ describe("canonicalSourceOf", () => {
 
 describe("the map against the bundle that actually ships", () => {
 	const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-	const bundled = git(["ls-files", "plugin/pfdsl/**/*.md"], { cwd: root })
+	const bundled = git(
+		["ls-files", "plugin/pfdsl/**/*.md", "plugin/pfdsl-codex/**/*.md"],
+		{ cwd: root },
+	)
 		.trim()
 		.split("\n")
 		.filter(Boolean);
+	const codexMarkdown = (directory, relative = "") =>
+		readdirSync(resolve(directory, relative), { withFileTypes: true }).flatMap(
+			(entry) => {
+				const path = `${relative}${entry.name}`;
+				if (entry.isDirectory()) return codexMarkdown(directory, `${path}/`);
+				return path.endsWith(".md") ? [path] : [];
+			},
+		);
 
 	it("finds markdown in the bundle to check against", () => {
 		assert.ok(bundled.length > 0);
@@ -111,6 +140,17 @@ describe("the map against the bundle that actually ships", () => {
 
 	it("resolves every bundled markdown file to a canonical source that exists", () => {
 		for (const path of bundled) {
+			const canonical = canonicalSourceOf(path);
+			assert.ok(
+				existsSync(resolve(root, canonical)),
+				`${path} → ${canonical} does not exist`,
+			);
+		}
+	});
+
+	it("resolves every generated Codex markdown file to a canonical source", () => {
+		for (const relative of codexMarkdown(resolve(root, "plugin/pfdsl-codex"))) {
+			const path = `plugin/pfdsl-codex/${relative}`;
 			const canonical = canonicalSourceOf(path);
 			assert.ok(
 				existsSync(resolve(root, canonical)),

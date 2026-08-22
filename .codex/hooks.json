@@ -1,0 +1,105 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/delegation-guard.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/main-commit-guard.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/command-usage-guard.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/verification-tree-guard.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/closes-create-guard.mjs",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/worktree-write-guard.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/roadmap-publish-guard.mjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/md-write-check.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/companion-prose-advisory.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/pre-artifact-advisory.mjs",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/stale-dist-guard.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/managed-issue-reminder.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/cwd-drift-log.mjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ ! -d node_modules ]; then echo '[pfdsl] node_modules not found in this worktree - running make setup'; make setup; fi",
+            "timeout": 300,
+            "statusMessage": "pfdsl: checking setup (make setup if this worktree is new)"
+          }
+        ]
+      }
+    ]
+  }
+}

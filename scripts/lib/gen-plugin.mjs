@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import {
 	cpSync,
 	existsSync,
 	mkdirSync,
+	readdirSync,
 	readFileSync,
 	renameSync,
 	rmSync,
@@ -14,34 +16,57 @@ import {
 	BUNDLE_MANIFEST_RELATIVE_PATH,
 	writeBundleManifest,
 } from "./bundle-manifest.mjs";
+import { canonicalPluginSkillSource } from "./distribution-sources.mjs";
+import {
+	addGeneratedMarkdownNotice,
+	addGeneratedSourceComment,
+	agentToCodexToml,
+	buildCodexPluginManifest,
+	buildCodexProjectConfig,
+	claudeHooksToCodexHooks,
+	claudeInstructionsToAgents,
+	claudeRootInstructionsToAgents,
+	commandToCodexSkill,
+} from "./gen-codex-assets.mjs";
 import { genInstall } from "./gen-install.mjs";
 import { writeSkillRefs } from "./gen-skill-refs.mjs";
+import {
+	AGENT_EXCLUSIONS,
+	CLAUDE_PLUGIN_MIRRORS,
+	DISTRIBUTED_AGENTS,
+	DISTRIBUTED_COMMANDS,
+	DISTRIBUTED_SKILLS,
+	GENERATED_SKILLS,
+} from "./harness-inventory.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const CODEX_ASSEMBLY_LOCK_DIRECTORY = ".codex-assets-assembly.lock";
+const CODEX_COMMAND_SKILLS_MANIFEST = "codex-command-skills.json";
+const CODEX_SKILLS_ROOT = "skills";
 
 // The agents bundled into plugin/pfdsl/agents/, as .claude/agents/-relative
-// filenames. Single source of truth: gen-plugin.mjs mirrors this list, and
-// gen-plugin-trigger.mjs derives its drift-trigger alternation from it, so
-// adding an agent cannot land in one place and be forgotten in the other.
-export const PLUGIN_AGENT_FILES = ["pfd-lens.md", "pfd-implementer.md"];
+// filenames. The harness inventory is the single source of truth, and
+// gen-plugin-trigger.mjs derives its drift-trigger alternation from this
+// legacy alias, so adding an agent cannot land in one place and be forgotten
+// in the other.
+export const PLUGIN_AGENT_FILES = DISTRIBUTED_AGENTS;
 
-// The skill trees mirrored into plugin/pfdsl/skills/ from .claude/skills/, and
-// the commands mirrored into plugin/pfdsl/commands/. Named here for the same
-// reason as PLUGIN_AGENT_FILES: assemblePluginDistIndependent bundles exactly
-// these, and scripts/lib/distribution-review.mjs maps a bundled file back to
-// the source a reviewer edits, so the two cannot disagree about what ships.
+// Legacy names for the skill trees mirrored into plugin/pfdsl/skills/ from
+// .claude/skills/ and the commands mirrored into plugin/pfdsl/commands/.
+// assemblePluginDistIndependent bundles exactly these, and
+// scripts/lib/distribution-review.mjs maps a bundled file back to the source a
+// reviewer edits, so the two cannot disagree about what ships.
 // The pfdsl skill is absent because it is rendered, not mirrored (gen-skill).
-export const PLUGIN_SKILL_DIRS = [
-	"pfd-grill",
-	"pfd-ops",
-	"pfd-retro",
-	"pfd-ecosystem",
-];
-export const PLUGIN_COMMAND_FILES = [
-	"pfd-cycle.md",
-	"pfd-init.md",
-	"pfd-retro.md",
-];
+export const PLUGIN_SKILL_DIRS = DISTRIBUTED_SKILLS;
+export const PLUGIN_COMMAND_FILES = DISTRIBUTED_COMMANDS;
+
+// Commands and skills share Codex's plugin/skills namespace. Derive a
+// command's output name from the maintained inventory so a newly overlapping
+// name cannot replace an existing distributed skill at generation time.
+export function codexCommandSkillName(source) {
+	const name = source.replace(/\.md$/, "");
+	return DISTRIBUTED_SKILLS.includes(name) ? `source-command-${name}` : name;
+}
 
 /**
  * What the bundle is made of, as data: where each bundled subtree comes from,
@@ -55,23 +80,13 @@ export const PLUGIN_COMMAND_FILES = [
  * renaming a bundle root or adding a mirrored source can no longer land in the
  * assembly while the reverse map keeps pointing at the old layout.
  */
-export const PLUGIN_MIRRORS = [
-	{ dest: "skills", src: ".claude/skills", trees: PLUGIN_SKILL_DIRS },
-	{ dest: "commands", src: ".claude/commands", files: PLUGIN_COMMAND_FILES },
-	{ dest: "agents", src: ".claude/agents", files: PLUGIN_AGENT_FILES },
-	{ dest: "hooks", src: "hooks", whole: true },
-];
+export const PLUGIN_MIRRORS = CLAUDE_PLUGIN_MIRRORS;
 
 // Agents that stay out of the bundle, with why — an adopting repo gets the
 // pfd-* ones because they operate on the .pfdsl files it now has, and nothing
 // else. Named rather than merely absent so a drift test can require every file
 // in .claude/agents/ to be either bundled or listed here (#613).
-export const PLUGIN_AGENT_EXCLUSIONS = {
-	"ci-triage.md": "reads this repo's GitHub Actions logs",
-	"issue-worker.md": "encodes this repo's worktree and PR conventions",
-	"local-check-triage.md": "triages this repo's make/pre-commit/test failures",
-	"vscode-ext-debugger.md": "debugs the extension this repo builds",
-};
+export const PLUGIN_AGENT_EXCLUSIONS = AGENT_EXCLUSIONS;
 
 function requireExists(path) {
 	if (!existsSync(path)) {
@@ -240,103 +255,728 @@ export function buildPluginManifest({
 	};
 }
 
-// Assembles everything gen-plugin.mjs bundles into plugin/pfdsl/ except
-// plugin/pfdsl/skills/pfdsl/SKILL.md (which embeds `pfdsl help` output and
-// therefore needs packages/cli/dist — see scripts/gen-skill.mjs). None of
-// this touches dist or spawns a child process, so scripts/pre-commit can
-// drift-check it even when dist is missing/stale (#593, same split
-// rationale as writeSkillRefs in #586). deps defaults to the real
-// implementations; tests inject fakes to assert the wiring without touching
-// the filesystem.
+function temporaryAssemblySibling(destination, kind, runId) {
+	return `${destination}.codex-${kind}-${runId}`;
+}
+
+function stageFile(destination, content, deps, runId) {
+	const temporary = temporaryAssemblySibling(destination, "tmp", runId);
+	try {
+		deps.rmSync(temporary, { force: true });
+		deps.mkdirSync(dirname(temporary), { recursive: true });
+		deps.writeFileSync(temporary, content);
+	} catch (error) {
+		removeAssemblyArtifact(temporary, deps);
+		throw error;
+	}
+	return { destination, temporary };
+}
+
+function stageDirectory(destination, files, deps, runId) {
+	const temporary = temporaryAssemblySibling(destination, "tmp", runId);
+	try {
+		deps.rmSync(temporary, { recursive: true, force: true });
+		deps.mkdirSync(temporary, { recursive: true });
+		for (const { path, content } of files) {
+			const output = resolve(temporary, path);
+			deps.mkdirSync(dirname(output), { recursive: true });
+			deps.writeFileSync(output, content);
+		}
+	} catch (error) {
+		removeAssemblyArtifact(temporary, deps);
+		throw error;
+	}
+	return { destination, temporary };
+}
+
+function normalizeCodexMarkdownTree(
+	directory,
+	canonicalSource,
+	deps,
+	relative = "",
+) {
+	if (!deps.readdirSync) return;
+	for (const entry of deps.readdirSync(directory, { withFileTypes: true })) {
+		const path = resolve(directory, entry.name);
+		const sourcePath = relative ? `${relative}/${entry.name}` : entry.name;
+		if (entry.isDirectory()) {
+			normalizeCodexMarkdownTree(path, canonicalSource, deps, sourcePath);
+			continue;
+		}
+		if (!entry.isFile() || !path.endsWith(".md")) continue;
+		const source = deps.readFileSync(path, "utf-8");
+		const normalized = addGeneratedMarkdownNotice(
+			claudeInstructionsToAgents(source).replace(/(?:\r?\n){2,}$/, "\n"),
+			canonicalSource(sourcePath),
+		);
+		if (normalized !== source) deps.writeFileSync(path, normalized);
+	}
+}
+
+function normalizeCodexJavascriptTree(
+	directory,
+	canonicalSource,
+	deps,
+	relative = "",
+) {
+	if (!deps.readdirSync) return;
+	for (const entry of deps.readdirSync(directory, { withFileTypes: true })) {
+		const path = resolve(directory, entry.name);
+		const sourcePath = relative ? `${relative}/${entry.name}` : entry.name;
+		if (entry.isDirectory()) {
+			normalizeCodexJavascriptTree(path, canonicalSource, deps, sourcePath);
+			continue;
+		}
+		if (!entry.isFile() || !path.endsWith(".mjs")) continue;
+		const source = deps.readFileSync(path, "utf-8");
+		const normalized = addGeneratedSourceComment(
+			source,
+			canonicalSource(sourcePath),
+		);
+		if (normalized !== source) deps.writeFileSync(path, normalized);
+	}
+}
+
+function stageCodexSkillTrees(root, deps, runId) {
+	const destination = resolve(root, ".agents/skills");
+	const temporary = temporaryAssemblySibling(destination, "tmp", runId);
+	try {
+		deps.rmSync(temporary, { recursive: true, force: true });
+		deps.mkdirSync(temporary, { recursive: true });
+		for (const name of DISTRIBUTED_SKILLS) {
+			const source = resolve(root, ".claude/skills", name);
+			const output = resolve(temporary, name);
+			deps.cpSync(source, output, {
+				recursive: true,
+				filter: excludeSkillRootClaudeMd(source),
+			});
+		}
+		for (const [name, classification] of Object.entries(GENERATED_SKILLS)) {
+			const source = resolve(root, classification.target);
+			const output = resolve(temporary, name);
+			deps.cpSync(source, output, {
+				recursive: true,
+				filter: excludeSkillRootClaudeMd(source),
+			});
+		}
+		normalizeCodexMarkdownTree(temporary, canonicalPluginSkillSource, deps);
+		normalizeCodexJavascriptTree(temporary, canonicalPluginSkillSource, deps);
+	} catch (error) {
+		removeAssemblyArtifact(temporary, deps);
+		throw error;
+	}
+	return { destination, temporary };
+}
+
+// The native tree starts from the complete Claude plugin skill distribution,
+// so rendered pfdsl references and every nested asset travel together. Markdown
+// and JavaScript receive harness ownership notices; other assets stay byte-for-byte.
+function stageCodexPluginSkillTrees(
+	claudePluginRoot,
+	codexPluginRoot,
+	commands,
+	legacyOwnedNames,
+	protectedSkillDirectories,
+	deps,
+	runId,
+) {
+	const destination = resolve(codexPluginRoot, CODEX_SKILLS_ROOT);
+	const temporary = temporaryAssemblySibling(destination, "tmp", runId);
+	try {
+		deps.rmSync(temporary, { recursive: true, force: true });
+		deps.cpSync(resolve(claudePluginRoot, "skills"), temporary, {
+			recursive: true,
+		});
+		for (const name of legacyOwnedNames) {
+			if (protectedSkillDirectories.has(name)) continue;
+			deps.rmSync(resolve(temporary, name), { recursive: true, force: true });
+		}
+		normalizeCodexMarkdownTree(temporary, canonicalPluginSkillSource, deps);
+		normalizeCodexJavascriptTree(temporary, canonicalPluginSkillSource, deps);
+		for (const { name, sourcePath, source } of commands) {
+			const output = resolve(temporary, name, "SKILL.md");
+			deps.mkdirSync(dirname(output), { recursive: true });
+			deps.writeFileSync(output, commandToCodexSkill(sourcePath, source, name));
+		}
+	} catch (error) {
+		removeAssemblyArtifact(temporary, deps);
+		throw error;
+	}
+	return { destination, temporary };
+}
+
+function stageCodexPluginHooks(root, codexPluginRoot, deps, runId) {
+	const destination = resolve(codexPluginRoot, "hooks");
+	const temporary = temporaryAssemblySibling(destination, "tmp", runId);
+	try {
+		deps.rmSync(temporary, { recursive: true, force: true });
+		deps.cpSync(resolve(root, "hooks"), temporary, { recursive: true });
+		normalizeCodexJavascriptTree(
+			temporary,
+			(relativePath) => `hooks/${relativePath}`,
+			deps,
+		);
+	} catch (error) {
+		removeAssemblyArtifact(temporary, deps);
+		throw error;
+	}
+	return { destination, temporary };
+}
+
+function stageRemoval(destination) {
+	return { destination, remove: true };
+}
+
+// Cleanup is best effort because an I/O error while removing a temporary
+// sibling must not replace the staging or publication error that triggered it.
+function removeAssemblyArtifact(path, deps) {
+	try {
+		deps.rmSync(path, { recursive: true, force: true });
+		return true;
+	} catch {
+		// Preserve the primary assembly error.
+		return false;
+	}
+}
+
+function removeStagedArtifacts(staged, deps) {
+	for (const { temporary } of staged) {
+		if (temporary) removeAssemblyArtifact(temporary, deps);
+	}
+}
+
+function restoreAssemblyDestination(backup, destination, deps) {
+	try {
+		deps.renameSync(backup, destination);
+	} catch {
+		// Preserve the primary assembly error.
+	}
+}
+
+function snapshotAssemblyDestination(destination, backup, deps) {
+	deps.rmSync(backup, { recursive: true, force: true });
+	const hadDestination = deps.existsSync(destination);
+	try {
+		if (hadDestination) {
+			deps.mkdirSync(dirname(backup), { recursive: true });
+			deps.cpSync(destination, backup, { recursive: true });
+		}
+	} catch (error) {
+		removeAssemblyArtifact(backup, deps);
+		throw error;
+	}
+	return { backup, hadDestination };
+}
+
+function snapshotPluginGeneration(root, pluginRoot, deps, runId) {
+	const transactionRoot = resolve(
+		dirname(pluginRoot),
+		`.pfdsl-gen-txn-${runId}`,
+	);
+	deps.rmSync(transactionRoot, { recursive: true, force: true });
+	try {
+		const snapshots = [
+			[
+				pluginRoot,
+				snapshotAssemblyDestination(
+					pluginRoot,
+					resolve(transactionRoot, "plugin-root"),
+					deps,
+				),
+			],
+			[
+				resolve(root, ".claude-plugin/marketplace.json"),
+				snapshotAssemblyDestination(
+					resolve(root, ".claude-plugin/marketplace.json"),
+					resolve(transactionRoot, "marketplace.json"),
+					deps,
+				),
+			],
+			[
+				resolve(root, ".claude/skills/pfd-ops/install"),
+				snapshotAssemblyDestination(
+					resolve(root, ".claude/skills/pfd-ops/install"),
+					resolve(transactionRoot, "install"),
+					deps,
+				),
+			],
+		];
+		return { transactionRoot, snapshots };
+	} catch (error) {
+		removeAssemblyArtifact(transactionRoot, deps);
+		throw error;
+	}
+}
+
+function restoreAssemblySnapshot(destination, snapshot, deps) {
+	removeAssemblyArtifact(destination, deps);
+	if (!snapshot.hadDestination) return true;
+	try {
+		deps.renameSync(snapshot.backup, destination);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+// All outputs are staged before replacing any final destination. During the
+// replacement phase, preserve prior destinations as siblings and restore them
+// if an individual rename fails. This keeps a failed generation from exposing
+// a mixed old/new Codex surface or a half-written generated tree.
+function publishStaged(staged, deps, runId) {
+	const published = [];
+	const backups = [];
+	try {
+		for (const entry of staged) {
+			const backup = temporaryAssemblySibling(entry.destination, "prev", runId);
+			deps.rmSync(backup, { recursive: true, force: true });
+			const hadDestination = deps.existsSync(entry.destination);
+			if (hadDestination) deps.renameSync(entry.destination, backup);
+			backups.push({ ...entry, backup, hadDestination });
+		}
+		for (const entry of backups) {
+			if (!entry.remove) {
+				deps.renameSync(entry.temporary, entry.destination);
+				published.push(entry);
+			}
+		}
+	} catch (error) {
+		for (const entry of published.reverse()) {
+			removeAssemblyArtifact(entry.destination, deps);
+		}
+		for (const entry of backups.reverse()) {
+			if (entry.hadDestination)
+				restoreAssemblyDestination(entry.backup, entry.destination, deps);
+		}
+		removeStagedArtifacts(staged, deps);
+		throw error;
+	}
+	for (const entry of backups) {
+		if (entry.hadDestination) {
+			removeAssemblyArtifact(entry.backup, deps);
+		}
+	}
+}
+
+function acquireCodexAssemblyLock(root, deps) {
+	const lockPath = resolve(root, CODEX_ASSEMBLY_LOCK_DIRECTORY);
+	try {
+		deps.mkdirSync(lockPath);
+	} catch (error) {
+		if (error?.code === "EEXIST") {
+			throw new Error(
+				`Codex asset assembly lock is held at ${lockPath}; retry after the active generator completes.`,
+			);
+		}
+		throw error;
+	}
+	return lockPath;
+}
+
+function releaseCodexAssemblyLock(lockPath, deps, runId) {
+	if (removeAssemblyArtifact(lockPath, deps)) return;
+	const stalePath = `${lockPath}.stale-${runId}`;
+	try {
+		deps.renameSync(lockPath, stalePath);
+		console.warn(
+			`Codex assembly lock cleanup failed; quarantined recovery path: ${stalePath}`,
+		);
+	} catch {
+		console.warn(
+			`Codex assembly lock cleanup failed; recovery path: ${lockPath}`,
+		);
+	}
+}
+
+function commandSkillManifestPath(pluginRoot) {
+	return resolve(pluginRoot, ".codex-plugin", CODEX_COMMAND_SKILLS_MANIFEST);
+}
+
+function repositoryCodexOwnershipGuide() {
+	return [
+		"<!-- DO NOT EDIT. Authoritative source: scripts/lib/gen-plugin.mjs. -->",
+		"",
+		"# Generated Codex assets",
+		"",
+		"This directory is generated by `scripts/gen-codex-assets.mjs`.",
+		"`hooks.json` is JSON and cannot contain comments. Its authoritative source is `.claude/settings.json`.",
+		"",
+	].join("\n");
+}
+
+function pluginCodexOwnershipGuide() {
+	return [
+		"<!-- DO NOT EDIT. Authoritative source: scripts/lib/gen-plugin.mjs. -->",
+		"",
+		"# Generated Codex plugin assets",
+		"",
+		"This directory is generated by `scripts/gen-plugin.mjs`.",
+		"`.codex-plugin/plugin.json` is JSON and cannot contain comments. Its authoritative source is `scripts/lib/gen-plugin.mjs`.",
+		"`.codex-plugin/codex-command-skills.json` is JSON and cannot contain comments. Its authoritative source is `scripts/lib/gen-plugin.mjs`.",
+		"`hooks/hooks.json` is JSON and cannot contain comments. Its authoritative source is `hooks/hooks.json`.",
+		"",
+	].join("\n");
+}
+
+function validOwnedSkillDirectories(path, owned) {
+	if (
+		!Array.isArray(owned) ||
+		new Set(owned).size !== owned.length ||
+		owned.some(
+			(name) => typeof name !== "string" || !/^[a-z0-9][a-z0-9-]*$/.test(name),
+		)
+	) {
+		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
+	}
+	return owned;
+}
+
+function commandSkillNames() {
+	const names = DISTRIBUTED_COMMANDS.map(codexCommandSkillName);
+	if (new Set(names).size !== names.length) {
+		throw new Error("Codex command skill names must be unique.");
+	}
+	return names;
+}
+
+function readOwnedCommandSkillDirectories(pluginRoot, deps) {
+	const path = commandSkillManifestPath(pluginRoot);
+	if (!deps.existsSync(path)) return { codex: [], legacy: [] };
+	let manifest;
+	try {
+		manifest = JSON.parse(deps.readFileSync(path, "utf-8"));
+	} catch {
+		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
+	}
+	if (!manifest || typeof manifest !== "object") {
+		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
+	}
+	const owned = validOwnedSkillDirectories(
+		path,
+		manifest.ownedSkillDirectories,
+	);
+	if (
+		manifest.skillRoot === undefined ||
+		manifest.skillRoot === "codex/skills"
+	) {
+		return { codex: [], legacy: owned };
+	}
+	if (manifest.skillRoot !== CODEX_SKILLS_ROOT) {
+		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
+	}
+	return { codex: owned, legacy: [] };
+}
+
+function legacyClaudeCleanupDestinations(
+	pluginRoot,
+	legacyOwnedNames,
+	protectedSkillDirectories,
+) {
+	return [
+		...legacyOwnedNames
+			.filter((name) => !protectedSkillDirectories.has(name))
+			.map((name) => resolve(pluginRoot, "skills", name)),
+		resolve(pluginRoot, ".codex-plugin"),
+		resolve(pluginRoot, "codex"),
+	];
+}
+
+/**
+ * Generates the Codex repository and plugin assets from the maintained
+ * Claude sources. Each output is first written to a temporary sibling; only
+ * after every write succeeds are the destinations replaced together.
+ * @param {{root: string, pluginRoot: string, codexPluginRoot?: string, legacyOwned?: {codex: string[], legacy: string[]}, cleanupLegacyClaudeRoot?: boolean, deps?: object}} options
+ */
+export function assembleCodexAssets({
+	root,
+	pluginRoot,
+	codexPluginRoot = resolve(root, "plugin/pfdsl-codex"),
+	legacyOwned: suppliedLegacyOwned,
+	cleanupLegacyClaudeRoot = true,
+	deps = {
+		cpSync,
+		existsSync,
+		mkdirSync,
+		newRunId: randomUUID,
+		readdirSync,
+		readFileSync,
+		renameSync,
+		rmSync,
+		writeFileSync,
+	},
+}) {
+	const staged = [];
+	const runId = deps.newRunId?.() ?? randomUUID();
+	const lockPath = acquireCodexAssemblyLock(root, deps);
+	let primaryError;
+	try {
+		const read = (path) => deps.readFileSync(path, "utf-8");
+		const cliVersion = JSON.parse(
+			read(resolve(root, "packages/cli/package.json")),
+		).version;
+		const description = buildPluginDescription({
+			root,
+			readFileSync: deps.readFileSync,
+		});
+		const names = commandSkillNames();
+		readOwnedCommandSkillDirectories(codexPluginRoot, deps);
+		const legacyOwned =
+			suppliedLegacyOwned ?? readOwnedCommandSkillDirectories(pluginRoot, deps);
+		const protectedSkillDirectories = new Set([
+			...DISTRIBUTED_SKILLS,
+			...Object.keys(GENERATED_SKILLS),
+		]);
+		staged.push(
+			stageFile(
+				resolve(root, "AGENTS.md"),
+				claudeRootInstructionsToAgents(read(resolve(root, "CLAUDE.md"))),
+				deps,
+				runId,
+			),
+		);
+		staged.push(
+			stageFile(
+				resolve(root, ".codex/config.toml"),
+				buildCodexProjectConfig(),
+				deps,
+				runId,
+			),
+		);
+		staged.push(
+			stageFile(
+				resolve(root, ".codex/hooks.json"),
+				claudeHooksToCodexHooks(read(resolve(root, ".claude/settings.json"))),
+				deps,
+				runId,
+			),
+		);
+		staged.push(
+			stageFile(
+				resolve(root, ".codex/GENERATED.md"),
+				repositoryCodexOwnershipGuide(),
+				deps,
+				runId,
+			),
+		);
+		staged.push(
+			stageFile(
+				resolve(codexPluginRoot, ".codex-plugin/plugin.json"),
+				`${JSON.stringify(buildCodexPluginManifest({ version: cliVersion, description }), null, 2)}\n`,
+				deps,
+				runId,
+			),
+		);
+		staged.push(
+			stageFile(
+				resolve(codexPluginRoot, "GENERATED.md"),
+				pluginCodexOwnershipGuide(),
+				deps,
+				runId,
+			),
+		);
+		staged.push(stageCodexSkillTrees(root, deps, runId));
+		const commandSkills = DISTRIBUTED_COMMANDS.map((source, index) => ({
+			name: names[index],
+			sourcePath: source,
+			source: read(resolve(root, ".claude/commands", source)),
+		}));
+		staged.push(
+			stageCodexPluginSkillTrees(
+				pluginRoot,
+				codexPluginRoot,
+				commandSkills,
+				legacyOwned.legacy,
+				protectedSkillDirectories,
+				deps,
+				runId,
+			),
+		);
+		staged.push(stageCodexPluginHooks(root, codexPluginRoot, deps, runId));
+		staged.push(
+			stageDirectory(
+				resolve(root, ".codex/agents"),
+				DISTRIBUTED_AGENTS.map((source) => ({
+					path: source.replace(/\.md$/, ".toml"),
+					content: agentToCodexToml(
+						source,
+						read(resolve(root, ".claude/agents", source)),
+					),
+				})),
+				deps,
+				runId,
+			),
+		);
+		staged.push(
+			stageFile(
+				commandSkillManifestPath(codexPluginRoot),
+				`${JSON.stringify({ skillRoot: CODEX_SKILLS_ROOT, ownedSkillDirectories: names }, null, 2)}\n`,
+				deps,
+				runId,
+			),
+		);
+		if (cleanupLegacyClaudeRoot) {
+			for (const destination of legacyClaudeCleanupDestinations(
+				pluginRoot,
+				legacyOwned.legacy,
+				protectedSkillDirectories,
+			)) {
+				staged.push(stageRemoval(destination));
+			}
+		}
+
+		publishStaged(staged, deps, runId);
+	} catch (error) {
+		primaryError = error;
+		removeStagedArtifacts(staged, deps);
+	}
+	releaseCodexAssemblyLock(lockPath, deps, runId);
+	if (primaryError) throw primaryError;
+}
+
+// Assembles the Claude and Codex plugin roots except plugin/pfdsl/skills/pfdsl/SKILL.md, which embeds `pfdsl help` output and therefore needs packages/cli/dist — see scripts/gen-skill.mjs.
+// None of this touches dist or spawns a child process, so scripts/pre-commit can drift-check it even when dist is missing/stale (#593, same split rationale as writeSkillRefs in #586).
+// deps defaults to the real implementations; tests inject fakes to assert the wiring without touching the filesystem.
 export function assemblePluginDistIndependent({
 	root,
 	pluginRoot,
+	codexPluginRoot = resolve(root, "plugin/pfdsl-codex"),
 	deps = {
+		cpSync,
 		genInstall,
 		mirrorDir,
 		mirrorFiles,
 		writeSkillRefs,
+		existsSync,
+		readdirSync,
 		readFileSync,
+		renameSync,
+		rmSync,
 		writeFileSync,
 		mkdirSync,
 		writeBundleManifest,
+		newRunId: randomUUID,
+		assembleCodexAssets,
 	},
 }) {
-	deps.genInstall(root);
-	console.log(
-		".claude/skills/pfd-ops/install ← repo-root sources (gen-install)",
-	);
+	const runId = deps.newRunId?.() ?? randomUUID();
+	const transaction = snapshotPluginGeneration(root, pluginRoot, deps, runId);
+	let preserveTransaction = false;
+	try {
+		deps.genInstall(root);
+		console.log(
+			".claude/skills/pfd-ops/install ← repo-root sources (gen-install)",
+		);
 
-	for (const mirror of PLUGIN_MIRRORS) {
-		if (mirror.whole) {
-			// The source directory is copied entire, so its name is the bundle
-			// root's name and the mirror runs from the repo root.
-			deps.mirrorDir(mirror.dest, root, pluginRoot);
-			console.log(`plugin/pfdsl/${mirror.dest} ← ${mirror.src}`);
-		} else if (mirror.trees) {
-			for (const name of mirror.trees) {
-				deps.mirrorDir(
-					name,
+		for (const mirror of PLUGIN_MIRRORS) {
+			if (mirror.whole) {
+				// The source directory is copied entire, so its name is the bundle
+				// root's name and the mirror runs from the repo root.
+				deps.mirrorDir(mirror.dest, root, pluginRoot);
+				console.log(`plugin/pfdsl/${mirror.dest} ← ${mirror.src}`);
+			} else if (mirror.trees) {
+				for (const name of mirror.trees) {
+					deps.mirrorDir(
+						name,
+						resolve(root, mirror.src),
+						resolve(pluginRoot, mirror.dest),
+					);
+					console.log(
+						`plugin/pfdsl/${mirror.dest}/${name} ← ${mirror.src}/${name}`,
+					);
+				}
+			} else {
+				deps.mirrorFiles(
+					mirror.files,
 					resolve(root, mirror.src),
 					resolve(pluginRoot, mirror.dest),
 				);
-				console.log(
-					`plugin/pfdsl/${mirror.dest}/${name} ← ${mirror.src}/${name}`,
-				);
-			}
-		} else {
-			deps.mirrorFiles(
-				mirror.files,
-				resolve(root, mirror.src),
-				resolve(pluginRoot, mirror.dest),
-			);
-			for (const file of mirror.files) {
-				console.log(
-					`plugin/pfdsl/${mirror.dest}/${file} ← ${mirror.src}/${file}`,
-				);
+				for (const file of mirror.files) {
+					console.log(
+						`plugin/pfdsl/${mirror.dest}/${file} ← ${mirror.src}/${file}`,
+					);
+				}
 			}
 		}
+
+		const cliVersion = JSON.parse(
+			deps.readFileSync(resolve(root, "packages/cli/package.json"), "utf-8"),
+		).version;
+		const manifest = buildPluginManifest({ cliVersion });
+		const pluginManifestDir = resolve(pluginRoot, ".claude-plugin");
+		deps.mkdirSync(pluginManifestDir, { recursive: true });
+		deps.writeFileSync(
+			resolve(pluginManifestDir, "plugin.json"),
+			`${JSON.stringify(manifest, null, "\t")}\n`,
+		);
+		console.log(
+			"plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version",
+		);
+
+		// The repo-root marketplace listing duplicates the per-plugin description
+		// (a separate file so /plugin marketplace can list plugins without
+		// fetching each one's own manifest) — keep it derived from the same bundle
+		// contents as plugin.json instead of hand-edited, so it can't drift the
+		// way it had (#685). Only the description is touched; $schema, the
+		// marketplace-level description, owner, and the plugin's source (pinned
+		// separately by scripts/lib/release-config.mjs at release time) pass
+		// through unchanged.
+		const marketplacePath = resolve(root, ".claude-plugin/marketplace.json");
+		const marketplace = JSON.parse(deps.readFileSync(marketplacePath, "utf-8"));
+		marketplace.plugins[0].description = manifest.description;
+		deps.writeFileSync(
+			marketplacePath,
+			`${JSON.stringify(marketplace, null, "\t")}\n`,
+		);
+		console.log(
+			".claude-plugin/marketplace.json ← plugin manifest description",
+		);
+
+		deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));
+		const legacyOwned = readOwnedCommandSkillDirectories(pluginRoot, deps);
+		const protectedSkillDirectories = new Set([
+			...DISTRIBUTED_SKILLS,
+			...Object.keys(GENERATED_SKILLS),
+		]);
+		for (const destination of legacyClaudeCleanupDestinations(
+			pluginRoot,
+			legacyOwned.legacy,
+			protectedSkillDirectories,
+		)) {
+			deps.rmSync(destination, { recursive: true, force: true });
+		}
+
+		// Last inside the Claude root: the recorded hash covers every other file in the bundle.
+		// Recording it before Codex assembly means a manifest failure rolls back this root before the other transaction begins.
+		deps.writeBundleManifest(pluginRoot);
+		console.log(
+			`plugin/pfdsl/${BUNDLE_MANIFEST_RELATIVE_PATH} ← content hash of the assembled bundle`,
+		);
+
+		deps.assembleCodexAssets({
+			root,
+			pluginRoot,
+			codexPluginRoot,
+			legacyOwned,
+			cleanupLegacyClaudeRoot: false,
+			deps,
+		});
+	} catch (error) {
+		for (const [destination, snapshot] of [
+			...transaction.snapshots,
+		].reverse()) {
+			if (!restoreAssemblySnapshot(destination, snapshot, deps)) {
+				preserveTransaction = true;
+			}
+		}
+		if (preserveTransaction && error && typeof error === "object") {
+			error.rollbackBackup = transaction.transactionRoot;
+			error.rollbackBackups = transaction.snapshots.map(
+				([, snapshot]) => snapshot.backup,
+			);
+		}
+		throw error;
+	} finally {
+		if (!preserveTransaction)
+			removeAssemblyArtifact(transaction.transactionRoot, deps);
 	}
-
-	const cliVersion = JSON.parse(
-		deps.readFileSync(resolve(root, "packages/cli/package.json"), "utf-8"),
-	).version;
-	const manifest = buildPluginManifest({ cliVersion });
-	const pluginManifestDir = resolve(pluginRoot, ".claude-plugin");
-	deps.mkdirSync(pluginManifestDir, { recursive: true });
-	deps.writeFileSync(
-		resolve(pluginManifestDir, "plugin.json"),
-		`${JSON.stringify(manifest, null, "\t")}\n`,
-	);
-	console.log(
-		"plugin/pfdsl/.claude-plugin/plugin.json ← packages/cli/package.json version",
-	);
-
-	// The repo-root marketplace listing duplicates the per-plugin description
-	// (a separate file so /plugin marketplace can list plugins without
-	// fetching each one's own manifest) — keep it derived from the same bundle
-	// contents as plugin.json instead of hand-edited, so it can't drift the
-	// way it had (#685). Only the description is touched; $schema, the
-	// marketplace-level description, owner, and the plugin's source (pinned
-	// separately by scripts/lib/release-config.mjs at release time) pass
-	// through unchanged.
-	const marketplacePath = resolve(root, ".claude-plugin/marketplace.json");
-	const marketplace = JSON.parse(deps.readFileSync(marketplacePath, "utf-8"));
-	marketplace.plugins[0].description = manifest.description;
-	deps.writeFileSync(
-		marketplacePath,
-		`${JSON.stringify(marketplace, null, "\t")}\n`,
-	);
-	console.log(".claude-plugin/marketplace.json ← plugin manifest description");
-
-	deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));
-
-	// Last: the recorded hash covers every other file in the bundle, so anything
-	// written after this point would leave it describing a bundle that is no
-	// longer on disk. The manifest excludes itself, which is what keeps a second
-	// run byte-identical (and the gen-plugin-bulk drift gate green).
-	deps.writeBundleManifest(pluginRoot);
-	console.log(
-		`plugin/pfdsl/${BUNDLE_MANIFEST_RELATIVE_PATH} ← content hash of the assembled bundle`,
-	);
 }

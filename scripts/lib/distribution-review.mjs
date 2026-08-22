@@ -16,7 +16,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { PLUGIN_MIRRORS } from "./gen-plugin.mjs";
+import { GENERATED_DISTRIBUTION_SOURCES } from "./distribution-sources.mjs";
+import {
+	codexCommandSkillName,
+	PLUGIN_COMMAND_FILES,
+	PLUGIN_MIRRORS,
+} from "./gen-plugin.mjs";
 import {
 	diffBase,
 	EMPTY_TREE,
@@ -30,7 +35,12 @@ import { gitDiffNames, tryGit } from "./run-exec.mjs";
 // shared with asset-sweep.mjs.
 export { diffBase, EMPTY_TREE };
 
-const DIST_ROOT = "plugin/pfdsl/";
+const CLAUDE_PLUGIN_ROOT = "plugin/pfdsl/";
+const CODEX_PLUGIN_ROOT = "plugin/pfdsl-codex/";
+const DIST_ROOTS = [CLAUDE_PLUGIN_ROOT, CODEX_PLUGIN_ROOT];
+export const DISTRIBUTION_ROOTS = DIST_ROOTS.map((root) => root.slice(0, -1));
+const CLAUDE_SKILLS_ROOT = `${CLAUDE_PLUGIN_ROOT}skills/`;
+const CODEX_SKILLS_ROOT = `${CODEX_PLUGIN_ROOT}skills/`;
 
 /**
  * Bundled markdown held out of review, each with why. These three are
@@ -47,21 +57,12 @@ export const SCOPE_EXCLUSIONS = {
 		"worked .pfdsl examples, generated from docs/examples/",
 	"plugin/pfdsl/skills/pfdsl/references/samples.md":
 		"sample .pfdsl catalogue, generated from docs/samples/",
-};
-
-// Bundled files that are rendered rather than mirrored: the copy in the bundle
-// is output, and editing it is editing something `make gen-plugin` overwrites.
-const GENERATED_SOURCES = {
-	"plugin/pfdsl/skills/pfdsl/SKILL.md": "scripts/skill-template/SKILL.md",
-	"plugin/pfdsl/skills/pfdsl/references/spec.md": "docs/spec/spec.md",
-	"plugin/pfdsl/skills/pfdsl/references/quality-guide.md":
-		"docs/quality-guide.md",
-	"plugin/pfdsl/skills/pfdsl/references/review-perspectives.md":
-		"docs/review-perspectives.md",
-	// Aggregated from many files, so the pointer is the directory: no single
-	// source file answers "where does this line come from".
-	"plugin/pfdsl/skills/pfdsl/references/examples.md": "docs/examples/",
-	"plugin/pfdsl/skills/pfdsl/references/samples.md": "docs/samples/",
+	"plugin/pfdsl-codex/skills/pfdsl/references/spec.md":
+		"the transformed Codex copy of the DSL grammar generated from docs/spec/spec.md",
+	"plugin/pfdsl-codex/skills/pfdsl/references/examples.md":
+		"the transformed Codex copy of worked .pfdsl examples generated from docs/examples/",
+	"plugin/pfdsl-codex/skills/pfdsl/references/samples.md":
+		"the transformed Codex copy of the sample .pfdsl catalogue generated from docs/samples/",
 };
 
 /** Where the reviewed-state record lives, relative to the repo root. */
@@ -69,7 +70,7 @@ export const RECORD_PATH = "docs/distribution-review/reviewed.json";
 
 /** Is this path a distributed prompt that a review is answerable for? */
 export function inScope(path) {
-	if (!path.startsWith(DIST_ROOT)) return false;
+	if (!DIST_ROOTS.some((root) => path.startsWith(root))) return false;
 	if (!path.endsWith(".md")) return false;
 	return !(path in SCOPE_EXCLUSIONS);
 }
@@ -84,14 +85,36 @@ export function inScope(path) {
  * fix at the next `make gen-plugin`.
  */
 export function canonicalSourceOf(distPath) {
-	const generated = GENERATED_SOURCES[distPath];
+	const generated = GENERATED_DISTRIBUTION_SOURCES[distPath];
 	if (generated) return generated;
+
+	const commandSource = PLUGIN_COMMAND_FILES.find(
+		(source) =>
+			distPath ===
+			`${CODEX_SKILLS_ROOT}${codexCommandSkillName(source)}/SKILL.md`,
+	);
+	if (commandSource) return `.claude/commands/${commandSource}`;
+	// Pre-native bundles placed generated Codex command skills below the Claude
+	// tree. The generator removes those owned directories during migration, but
+	// retain their source mapping while a staged deletion is still visible to
+	// the distribution-review gate.
+	const legacyCommandSource = PLUGIN_COMMAND_FILES.find(
+		(source) =>
+			distPath ===
+			`${CLAUDE_SKILLS_ROOT}${codexCommandSkillName(source)}/SKILL.md`,
+	);
+	if (legacyCommandSource) return `.claude/commands/${legacyCommandSource}`;
+	if (distPath.startsWith(CODEX_SKILLS_ROOT)) {
+		return canonicalSourceOf(
+			`${CLAUDE_SKILLS_ROOT}${distPath.slice(CODEX_SKILLS_ROOT.length)}`,
+		);
+	}
 
 	// The inverse of the assembly's own manifest: find the bundle root this
 	// path sits under, check the file is one gen-plugin actually copies there,
 	// and swap the root back. Nothing about the layout is restated here.
-	if (distPath.startsWith(DIST_ROOT)) {
-		const [dir, ...tail] = distPath.slice(DIST_ROOT.length).split("/");
+	if (distPath.startsWith(CLAUDE_PLUGIN_ROOT)) {
+		const [dir, ...tail] = distPath.slice(CLAUDE_PLUGIN_ROOT.length).split("/");
 		const mirror = PLUGIN_MIRRORS.find((m) => m.dest === dir);
 		const relative = tail.join("/");
 		if (mirror && relative) {
@@ -195,7 +218,9 @@ export function repoDeps(root) {
 		// comparison that decides whether it still holds has to be against one
 		// too. A release refuses to run on a dirty tree anyway (release.mjs).
 		changedSince: (base) =>
-			gitDiffNames([base, "HEAD", "--", "plugin/pfdsl"], { cwd: root }),
+			gitDiffNames([base, "HEAD", "--", ...DISTRIBUTION_ROOTS], {
+				cwd: root,
+			}),
 	};
 }
 

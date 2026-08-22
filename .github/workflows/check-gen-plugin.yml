@@ -30,15 +30,13 @@ jobs:
       # bootstrap-pfdsl-skill; the link replaced that target, so name it here.
       - run: pnpm -r build
 
-      - name: Regenerate plugin dir and assert no drift
+      - name: Regenerate Claude and Codex assets and assert no drift
         run: |
           make gen-plugin
-          if ! git diff --exit-code plugin .claude-plugin/marketplace.json; then
+          if ! git diff --exit-code plugin .claude-plugin/marketplace.json AGENTS.md .agents .codex; then
             echo ""
-            echo "ERROR: plugin/pfdsl or .claude-plugin/marketplace.json is stale (this also catches a"
-            echo "plugin.json version left behind after a CLI release, and a marketplace.json"
-            echo "description left behind after a bundled skill/command change)."
+            echo "ERROR: generated Claude or Codex assets are stale."
             echo "Run 'make gen-plugin' and commit the result."
             exit 1
           fi
-          echo "gen-plugin identity in sync."
+          echo "Claude and Codex generated assets are in sync."
