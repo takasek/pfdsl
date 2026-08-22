@@ -140,14 +140,19 @@ describe("selectScannedFiles", () => {
 });
 
 describe("per-rule exemptions", () => {
-	const SYNC = ".claude/skills/pfd-ops/scripts/check-install-sync.mjs";
+	const CHECK_INSTALL_SYNC_MIRRORS = [
+		".claude/skills/pfd-ops/scripts/check-install-sync.mjs",
+		".agents/skills/pfd-ops/scripts/check-install-sync.mjs",
+	];
 
 	// Its lookup decides what the error says, not what the script does: the
 	// hint has to run ahead of the strict parse or --force reads as a plain
 	// unknown option and the pointer to its replacements is lost (#631).
-	it("lets check-install-sync keep its pre-parse deprecation hint", () => {
+	it("lets both check-install-sync mirrors keep the pre-parse deprecation hint", () => {
 		const source = `if (argv.some((arg) => arg === "--force" || arg.startsWith("--force="))) {`;
-		assert.deepEqual(findCliConventionViolations(source, SYNC), []);
+		for (const file of CHECK_INSTALL_SYNC_MIRRORS) {
+			assert.deepEqual(findCliConventionViolations(source, file), []);
+		}
 		assert.equal(
 			findCliConventionViolations(source, "scripts/other.mjs").length,
 			1,
@@ -160,6 +165,8 @@ describe("per-rule exemptions", () => {
 		const source =
 			// biome-ignore lint/suspicious/noTemplateCurlyInString: fixture source under test, not an interpolation
 			"if (import.meta.url === `file://${process.argv[1]}`) main();";
-		assert.equal(findCliConventionViolations(source, SYNC).length, 1);
+		for (const file of CHECK_INSTALL_SYNC_MIRRORS) {
+			assert.equal(findCliConventionViolations(source, file).length, 1);
+		}
 	});
 });

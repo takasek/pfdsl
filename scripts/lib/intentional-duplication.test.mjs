@@ -20,7 +20,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { detectDoneAddition as detectInHook } from "../../hooks/retro-reminder-post-tool-use.mjs";
 import { isDistStale } from "./dist-freshness.mjs";
-import { PLUGIN_AGENT_EXCLUSIONS, PLUGIN_AGENT_FILES } from "./gen-plugin.mjs";
+import { AGENT_EXCLUSIONS, DISTRIBUTED_AGENTS } from "./harness-inventory.mjs";
 import { detectDoneAddition as detectInPreCommit } from "./retro-reminder-check.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -134,21 +134,21 @@ describe("dist-freshness: the tooling check and the cli-smoke copy", () => {
 	});
 });
 
-describe("PLUGIN_AGENT_FILES: the bundled list and .claude/agents/", () => {
+describe("DISTRIBUTED_AGENTS: the bundled list and .claude/agents/", () => {
 	const onDisk = readdirSync(resolve(root, ".claude/agents"))
 		.filter((f) => f.endsWith(".md"))
 		.sort();
 
 	it("accounts for every agent on disk, as either bundled or deliberately excluded", () => {
 		const accounted = [
-			...PLUGIN_AGENT_FILES,
-			...Object.keys(PLUGIN_AGENT_EXCLUSIONS),
+			...DISTRIBUTED_AGENTS,
+			...Object.keys(AGENT_EXCLUSIONS),
 		].sort();
 		assert.deepEqual(accounted, onDisk);
 	});
 
 	it("bundles only agents that exist", () => {
-		for (const file of PLUGIN_AGENT_FILES) {
+		for (const file of DISTRIBUTED_AGENTS) {
 			assert.ok(
 				onDisk.includes(file),
 				`${file} is bundled but not in .claude/agents/`,
@@ -157,7 +157,7 @@ describe("PLUGIN_AGENT_FILES: the bundled list and .claude/agents/", () => {
 	});
 
 	it("gives a reason for each exclusion, so 'not bundled' is a decision and not an oversight", () => {
-		for (const [file, reason] of Object.entries(PLUGIN_AGENT_EXCLUSIONS)) {
+		for (const [file, reason] of Object.entries(AGENT_EXCLUSIONS)) {
 			assert.ok(reason.length > 0, `${file} is excluded without a reason`);
 		}
 	});

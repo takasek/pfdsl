@@ -1,3 +1,12 @@
 # Generated skill files — excluded from language stats and collapsed in PR diffs
 .claude/skills/pfdsl/** linguist-generated=true
 plugin/pfdsl/** linguist-generated=true
+
+# Codex harness outputs — maintained through scripts/gen-codex-assets.mjs.
+AGENTS.md linguist-generated=true
+.agents/** linguist-generated=true
+.codex/agents/** linguist-generated=true
+.codex/config.toml linguist-generated=true
+.codex/GENERATED.md linguist-generated=true
+.codex/hooks.json linguist-generated=true
+plugin/pfdsl-codex/** linguist-generated=true

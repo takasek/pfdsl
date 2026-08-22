@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
-// Assembles the pfdsl Claude Code plugin at plugin/pfdsl/ for marketplace
-// distribution. Run: node scripts/gen-plugin.mjs
+// Assembles the pfdsl Claude Code plugin at plugin/pfdsl/ and the Codex plugin at plugin/pfdsl-codex/. Run: node scripts/gen-plugin.mjs
 //
 // plugin/pfdsl/ is a dedicated subdirectory (not the repo root) so that a
 // git-subdir marketplace source only materializes this plugin's content —
@@ -18,6 +17,7 @@ import { assemblePluginDistIndependent } from "./lib/gen-plugin.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const pluginRoot = resolve(root, "plugin/pfdsl");
+const codexPluginRoot = resolve(root, "plugin/pfdsl-codex");
 
 function assemble() {
 	// --- 1. Generate the pfdsl skill directly into plugin/pfdsl/skills/pfdsl ---
@@ -38,15 +38,13 @@ function assemble() {
 		},
 	);
 
-	// --- 1b-6. Everything else: install/ mirror, static skills, commands,
-	// agents, hooks, plugin.json, and skills/pfdsl/references. Shared with
-	// scripts/gen-plugin-dist-independent.mjs, which pre-commit drift-checks
-	// even when dist is missing/stale (#593).
+	// --- 1b-6. Everything else: install/ mirror, static skills, commands, agents, hooks, plugin.json, Codex-native skills, and skills/pfdsl/references.
+	// Shared with scripts/gen-plugin-dist-independent.mjs, which pre-commit drift-checks even when dist is missing/stale (#593).
 
-	assemblePluginDistIndependent({ root, pluginRoot });
+	assemblePluginDistIndependent({ root, pluginRoot, codexPluginRoot });
 
 	console.log(
-		"\nPlugin assembled at plugin/pfdsl/. Verify locally with: claude --plugin-dir plugin/pfdsl",
+		"\nPlugins assembled at plugin/pfdsl/ (Claude Code) and plugin/pfdsl-codex/ (Codex). Verify Claude locally with: claude --plugin-dir plugin/pfdsl",
 	);
 }
 

@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import {
 	chmodSync,
+	cpSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -17,16 +20,77 @@ import {
 	findDistDependentFiles,
 } from "./check-script-imports.mjs";
 import {
+	claudeInstructionsToAgents,
+	generatedMarkdownNoticeCount,
+	generatedSourceCommentCount,
+} from "./gen-codex-assets.mjs";
+import {
+	assembleCodexAssets,
 	assemblePluginDistIndependent,
 	buildPluginDescription,
 	buildPluginManifest,
+	codexCommandSkillName,
 	mirrorDir,
 	mirrorFiles,
 	PLUGIN_AGENT_FILES,
 } from "./gen-plugin.mjs";
+import { GENERATED_SKILLS } from "./harness-inventory.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../..");
+
+function markdownFiles(directory, relative = "") {
+	return readdirSync(directory, { withFileTypes: true })
+		.sort((left, right) => left.name.localeCompare(right.name))
+		.flatMap((entry) => {
+			const path = join(directory, entry.name);
+			const entryRelative = join(relative, entry.name);
+			if (entry.isDirectory()) return markdownFiles(path, entryRelative);
+			return entry.isFile() && entry.name.endsWith(".md")
+				? [entryRelative]
+				: [];
+		});
+}
+
+function treeFiles(directory, relative = "") {
+	return readdirSync(directory, { withFileTypes: true })
+		.sort((left, right) => left.name.localeCompare(right.name))
+		.flatMap((entry) => {
+			const path = join(directory, entry.name);
+			const entryRelative = join(relative, entry.name);
+			if (entry.isDirectory()) return treeFiles(path, entryRelative);
+			return entry.isFile() ? [entryRelative] : [];
+		});
+}
+
+function codexMarkdownSource(root, relativePath) {
+	const [skillName, ...path] = relativePath.split("/");
+	const generated = GENERATED_SKILLS[skillName];
+	const skillRoot = generated
+		? join(root, generated.target)
+		: join(root, ".claude/skills", skillName);
+	return join(skillRoot, ...path);
+}
+
+function expectedCodexMarkdown(source) {
+	return claudeInstructionsToAgents(source).replace(/(?:\r?\n){2,}$/, "\n");
+}
+
+function removeGeneratedMarkdownNotice(source) {
+	return source
+		.replace(
+			/^(---\r?\n[\s\S]*?\r?\n---\r?\n)<!-- DO NOT EDIT\. Authoritative source: .*? -->\r?\n\r?\n/,
+			"$1\n",
+		)
+		.replace(/^<!-- DO NOT EDIT\. Authoritative source: .*? -->\r?\n\r?\n/, "");
+}
+
+function removeGeneratedSourceComment(source) {
+	return source.replace(
+		/^(#![^\r\n]*\r?\n)?\/\/ DO NOT EDIT\. Authoritative source: .*?\.\r?\n/,
+		"$1",
+	);
+}
 
 describe("buildPluginManifest", () => {
 	it("uses the CLI version as the plugin version", () => {
@@ -333,6 +397,8 @@ describe("assemblePluginDistIndependent", () => {
 		return {
 			calls,
 			deps: {
+				cpSync: () => {},
+				existsSync: () => false,
 				genInstall: (root) => calls.push(["genInstall", root]),
 				mirrorDir: (name, srcRoot, destRoot) =>
 					calls.push(["mirrorDir", name, srcRoot, destRoot]),
@@ -349,6 +415,11 @@ describe("assemblePluginDistIndependent", () => {
 				mkdirSync: (path) => calls.push(["mkdirSync", path]),
 				writeBundleManifest: (bundleRoot) =>
 					calls.push(["writeBundleManifest", bundleRoot]),
+				newRunId: () => "fake-run",
+				renameSync: () => {},
+				rmSync: () => {},
+				assembleCodexAssets: (options) =>
+					calls.push(["assembleCodexAssets", options]),
 				...overrides,
 			},
 		};
@@ -463,6 +534,26 @@ describe("assemblePluginDistIndependent", () => {
 		);
 	});
 
+	it("assembles Codex assets after the Claude plugin output", () => {
+		const { calls, deps } = fakeDeps();
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+		const codex = calls.findIndex((call) => call[0] === "assembleCodexAssets");
+		const refs = calls.findIndex((call) => call[0] === "writeSkillRefs");
+		assert.ok(codex > refs);
+		assert.deepEqual(calls[codex][1], {
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			codexPluginRoot: "/repo/plugin/pfdsl-codex",
+			legacyOwned: { codex: [], legacy: [] },
+			cleanupLegacyClaudeRoot: false,
+			deps,
+		});
+	});
+
 	it("records the bundle content hash last, after every other bundled file is final", () => {
 		const { calls, deps } = fakeDeps();
 		assemblePluginDistIndependent({
@@ -470,13 +561,1330 @@ describe("assemblePluginDistIndependent", () => {
 			pluginRoot: "/repo/plugin/pfdsl",
 			deps,
 		});
-		// Last, not merely present: the hash covers the bundle's own files, so a
-		// write that lands after it (writeSkillRefs was the previous final step)
-		// leaves the recorded value describing a bundle that no longer exists.
-		assert.deepEqual(calls.at(-1), [
+		const refs = calls.findIndex((call) => call[0] === "writeSkillRefs");
+		const bundleManifest = calls.findIndex(
+			(call) => call[0] === "writeBundleManifest",
+		);
+		const codex = calls.findIndex((call) => call[0] === "assembleCodexAssets");
+		assert.ok(refs < bundleManifest);
+		assert.ok(bundleManifest < codex);
+		assert.deepEqual(calls[bundleManifest], [
 			"writeBundleManifest",
 			"/repo/plugin/pfdsl",
 		]);
+	});
+
+	it("removes migrated Claude-root outputs before recording the bundle content hash", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const legacyOwnershipManifest = `${pluginRoot}/.codex-plugin/codex-command-skills.json`;
+		const legacyOutputs = [
+			`${pluginRoot}/skills/pfd-cycle`,
+			`${pluginRoot}/.codex-plugin`,
+			`${pluginRoot}/codex`,
+		];
+		const { calls, deps } = fakeDeps({
+			existsSync: (path) => path === legacyOwnershipManifest,
+			readFileSync: (path) => {
+				if (path === legacyOwnershipManifest) {
+					return JSON.stringify({
+						skillRoot: "codex/skills",
+						ownedSkillDirectories: ["pfd-cycle"],
+					});
+				}
+				return String(path).endsWith("marketplace.json")
+					? JSON.stringify(fakeMarketplace)
+					: JSON.stringify({ version: "1.2.3" });
+			},
+			rmSync: (path) => calls.push(["rmSync", path]),
+		});
+
+		assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps });
+
+		const bundleManifest = calls.findIndex(
+			(call) => call[0] === "writeBundleManifest",
+		);
+		for (const output of legacyOutputs) {
+			const cleanup = calls.findIndex(
+				(call) => call[0] === "rmSync" && call[1] === output,
+			);
+			assert.ok(
+				cleanup >= 0 && cleanup < bundleManifest,
+				`${output} must be removed before recording the bundle content hash`,
+			);
+		}
+	});
+
+	it("restores the Claude snapshot and skips publication when legacy cleanup fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const transactionRoot = "/repo/plugin/.pfdsl-gen-txn-cleanup-failure-test";
+		const legacySkill = `${pluginRoot}/skills/pfd-cycle`;
+		const legacyOwnershipManifest = `${pluginRoot}/.codex-plugin/codex-command-skills.json`;
+		const { calls, deps } = fakeDeps({
+			cpSync: (from, to) => calls.push(["cpSync", from, to]),
+			existsSync: (path) =>
+				path === pluginRoot || path === legacyOwnershipManifest,
+			newRunId: () => "cleanup-failure-test",
+			readFileSync: (path) => {
+				if (path === legacyOwnershipManifest) {
+					return JSON.stringify({
+						skillRoot: "codex/skills",
+						ownedSkillDirectories: ["pfd-cycle"],
+					});
+				}
+				return String(path).endsWith("marketplace.json")
+					? JSON.stringify(fakeMarketplace)
+					: JSON.stringify({ version: "1.2.3" });
+			},
+			renameSync: (from, to) => calls.push(["renameSync", from, to]),
+			rmSync: (path) => {
+				calls.push(["rmSync", path]);
+				if (path === legacySkill) throw new Error("legacy cleanup failed");
+			},
+		});
+
+		assert.throws(
+			() => assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps }),
+			/legacy cleanup failed/,
+		);
+		assert.equal(
+			calls.some((call) => call[0] === "writeBundleManifest"),
+			false,
+		);
+		assert.equal(
+			calls.some((call) => call[0] === "assembleCodexAssets"),
+			false,
+		);
+		assert.ok(
+			calls.some(
+				(call) =>
+					call[0] === "renameSync" &&
+					call[1] === `${transactionRoot}/plugin-root` &&
+					call[2] === pluginRoot,
+			),
+		);
+	});
+
+	it("restores both plugin roots when the later Codex assembly fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const codexPluginRoot = "/repo/plugin/pfdsl-codex";
+		const marketplacePath = "/repo/.claude-plugin/marketplace.json";
+		const installRoot = "/repo/.claude/skills/pfd-ops/install";
+		const files = new Map([
+			[pluginRoot, "directory"],
+			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
+			[codexPluginRoot, "directory"],
+			[`${codexPluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Codex skill"],
+			[marketplacePath, "legacy marketplace"],
+			[installRoot, "directory"],
+			[`${installRoot}/install.md`, "legacy install"],
+		]);
+		const before = new Map(files);
+		const remove = (path) => {
+			for (const existing of [...files.keys()]) {
+				if (existing === path || existing.startsWith(`${path}/`))
+					files.delete(existing);
+			}
+		};
+		const move = (from, to) => {
+			const moving = [...files.entries()].filter(
+				([path]) => path === from || path.startsWith(`${from}/`),
+			);
+			remove(to);
+			for (const [path, content] of moving) {
+				files.delete(path);
+				files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+		const copy = (from, to) => {
+			for (const [path, content] of [...files]) {
+				if (path === from || path.startsWith(`${from}/`))
+					files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+		const { deps } = fakeDeps({
+			cpSync: (from, to) => copy(from, to),
+			existsSync: (path) => files.has(path),
+			genInstall: () => files.set(`${installRoot}/install.md`, "new install"),
+			mirrorDir: (name, _source, destination) =>
+				files.set(`${destination}/${name}/SKILL.md`, "new Claude skill"),
+			mirrorFiles: (_names, _source, destination) =>
+				files.set(`${destination}/generated.md`, "new Claude file"),
+			mkdirSync: () => {},
+			newRunId: () => "rollback-test",
+			renameSync: move,
+			rmSync: remove,
+			writeFileSync: (path, content) => files.set(path, content),
+			assembleCodexAssets: () => {
+				throw new Error("Codex assembly failed");
+			},
+		});
+
+		assert.throws(
+			() =>
+				assemblePluginDistIndependent({
+					root: "/repo",
+					pluginRoot,
+					codexPluginRoot,
+					deps,
+				}),
+			/Codex assembly failed/,
+		);
+		const pluginFiles = (source) =>
+			new Map(
+				[...source].filter(
+					([path]) =>
+						path.startsWith(pluginRoot) ||
+						path.startsWith(codexPluginRoot) ||
+						path === marketplacePath ||
+						path.startsWith(`${installRoot}/`) ||
+						path === installRoot,
+				),
+			);
+		assert.deepEqual(pluginFiles(files), pluginFiles(before));
+		assert.equal(
+			[...files.keys()].some((path) =>
+				path.includes(".pfdsl-gen-txn-rollback-test"),
+			),
+			false,
+		);
+	});
+
+	it("restores the Claude plugin root when an early mirror fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const marketplacePath = "/repo/.claude-plugin/marketplace.json";
+		const installRoot = "/repo/.claude/skills/pfd-ops/install";
+		const files = new Map([
+			[pluginRoot, "directory"],
+			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
+			[marketplacePath, "legacy marketplace"],
+			[installRoot, "directory"],
+			[`${installRoot}/install.md`, "legacy install"],
+		]);
+		const before = new Map(files);
+		const remove = (path) => {
+			for (const existing of [...files.keys()]) {
+				if (existing === path || existing.startsWith(`${path}/`))
+					files.delete(existing);
+			}
+		};
+		const move = (from, to) => {
+			const moving = [...files.entries()].filter(
+				([path]) => path === from || path.startsWith(`${from}/`),
+			);
+			remove(to);
+			for (const [path, content] of moving) {
+				files.delete(path);
+				files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+		const copy = (from, to) => {
+			for (const [path, content] of [...files]) {
+				if (path === from || path.startsWith(`${from}/`))
+					files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+		let mirrors = 0;
+		const { deps } = fakeDeps({
+			cpSync: copy,
+			existsSync: (path) => files.has(path),
+			genInstall: () => files.set(`${installRoot}/install.md`, "new install"),
+			mirrorDir: (name, _source, destination) => {
+				files.set(`${destination}/${name}/SKILL.md`, "new Claude skill");
+				mirrors += 1;
+				if (mirrors === 2) throw new Error("mirror failed");
+			},
+			mkdirSync: () => {},
+			newRunId: () => "early-failure-test",
+			renameSync: move,
+			rmSync: remove,
+			writeFileSync: (path, content) => files.set(path, content),
+		});
+
+		assert.throws(
+			() => assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps }),
+			/mirror failed/,
+		);
+		assert.deepEqual(files, before);
+		assert.equal(
+			[...files.keys()].some((path) =>
+				path.includes(".pfdsl-gen-txn-early-failure-test"),
+			),
+			false,
+		);
+	});
+
+	it("cleans a partial snapshot when its copy fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const transactionRoot = "/repo/plugin/.pfdsl-gen-txn-snapshot-failure-test";
+		const files = new Map([
+			[pluginRoot, "directory"],
+			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
+		]);
+		const before = new Map(files);
+		const remove = (path) => {
+			for (const existing of [...files.keys()]) {
+				if (existing === path || existing.startsWith(`${path}/`))
+					files.delete(existing);
+			}
+		};
+		const { deps } = fakeDeps({
+			cpSync: (_from, destination) => {
+				files.set(destination, "partial backup");
+				throw new Error("snapshot copy failed");
+			},
+			existsSync: (path) => files.has(path),
+			newRunId: () => "snapshot-failure-test",
+			rmSync: remove,
+		});
+
+		assert.throws(
+			() => assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps }),
+			/snapshot copy failed/,
+		);
+		assert.deepEqual(files, before);
+		assert.equal(files.has(transactionRoot), false);
+	});
+
+	it("keeps the snapshot when rollback restoration fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const transactionRoot = "/repo/plugin/.pfdsl-gen-txn-restore-failure-test";
+		const backup = `${transactionRoot}/plugin-root`;
+		const files = new Map([
+			[pluginRoot, "directory"],
+			[`${pluginRoot}/skills/pfd-ops/SKILL.md`, "legacy Claude skill"],
+		]);
+		const remove = (path) => {
+			for (const existing of [...files.keys()]) {
+				if (existing === path || existing.startsWith(`${path}/`))
+					files.delete(existing);
+			}
+		};
+		const copy = (from, to) => {
+			for (const [path, content] of [...files]) {
+				if (path === from || path.startsWith(`${from}/`))
+					files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+		const { deps } = fakeDeps({
+			cpSync: copy,
+			existsSync: (path) => files.has(path),
+			mirrorDir: (name, _source, destination) =>
+				files.set(`${destination}/${name}/SKILL.md`, "new Claude skill"),
+			mkdirSync: () => {},
+			newRunId: () => "restore-failure-test",
+			renameSync: (from, to) => {
+				if (from === backup && to === pluginRoot)
+					throw new Error("restore rename failed");
+			},
+			rmSync: remove,
+			writeFileSync: (path, content) => files.set(path, content),
+			assembleCodexAssets: () => {
+				throw new Error("Codex assembly failed");
+			},
+		});
+
+		let error;
+		try {
+			assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps });
+		} catch (caught) {
+			error = caught;
+		}
+		assert.match(error.message, /Codex assembly failed/);
+		assert.equal(error.rollbackBackup, transactionRoot);
+		assert.equal(
+			files.get(`${backup}/skills/pfd-ops/SKILL.md`),
+			"legacy Claude skill",
+		);
+	});
+});
+
+describe("assembleCodexAssets", () => {
+	it("keeps non-colliding command names and prefixes names that collide with distributed skills", () => {
+		assert.equal(codexCommandSkillName("pfd-cycle.md"), "pfd-cycle");
+		assert.equal(
+			codexCommandSkillName("pfd-retro.md"),
+			"source-command-pfd-retro",
+		);
+	});
+
+	function fakeCodexDeps(overrides = {}) {
+		const calls = [];
+		const skillSource =
+			"---\nname: skill\nsummary: generated skill\ndescription: |\n  generated skill\n---\nbody\n";
+		return {
+			calls,
+			deps: {
+				cpSync: (source, destination, options) =>
+					calls.push(["cpSync", source, destination, options]),
+				existsSync: () => false,
+				mkdirSync: (path) => calls.push(["mkdirSync", path]),
+				newRunId: () => "test-run",
+				readFileSync: (path) => {
+					const normalized = String(path);
+					if (normalized.endsWith("CLAUDE.md")) return "Read CLAUDE.md.\n";
+					if (normalized.endsWith("settings.json"))
+						return JSON.stringify({ hooks: { PreToolUse: [] } });
+					if (normalized.endsWith("package.json"))
+						return JSON.stringify({ version: "1.2.3" });
+					if (normalized.endsWith(".md") && normalized.includes("commands"))
+						return "---\ndescription: generated command\n---\n\ncommand body\n";
+					if (normalized.endsWith(".md") && normalized.includes("agents"))
+						return "---\nname: generated\ndescription: generated agent\ntools: Read, Grep, Bash\nmodel: sonnet\n---\n\nRead CLAUDE.md.\n";
+					return skillSource;
+				},
+				renameSync: (from, to) => calls.push(["renameSync", from, to]),
+				rmSync: (path) => calls.push(["rmSync", path]),
+				writeFileSync: (path, content) =>
+					calls.push(["writeFileSync", path, content]),
+				...overrides,
+			},
+		};
+	}
+
+	function statefulCodexDeps({ failRemove, failWrite, failPublish } = {}) {
+		const { calls, deps: sourceDeps } = fakeCodexDeps();
+		const files = new Map();
+		const destinations = [
+			"/repo/AGENTS.md",
+			"/repo/.codex/config.toml",
+			"/repo/.codex/hooks.json",
+			"/repo/plugin/pfdsl/.codex-plugin/plugin.json",
+			"/repo/.agents/skills",
+			"/repo/.codex/agents",
+			"/repo/plugin/pfdsl/skills/pfd-cycle",
+			"/repo/plugin/pfdsl/skills/pfd-init",
+			"/repo/plugin/pfdsl/skills/source-command-pfd-retro",
+		];
+		for (const destination of destinations) {
+			files.set(destination, "directory");
+			files.set(`${destination}/prior.txt`, `prior ${destination}`);
+		}
+		const before = new Map(files);
+		let publishCount = 0;
+
+		const remove = (path) => {
+			for (const existing of [...files.keys()]) {
+				if (existing === path || existing.startsWith(`${path}/`)) {
+					files.delete(existing);
+				}
+			}
+		};
+		const move = (from, to) => {
+			const moving = [...files.entries()].filter(
+				([path]) => path === from || path.startsWith(`${from}/`),
+			);
+			remove(to);
+			for (const [path, content] of moving) {
+				files.delete(path);
+				files.set(`${to}${path.slice(from.length)}`, content);
+			}
+		};
+
+		return {
+			calls,
+			before,
+			files,
+			deps: {
+				...sourceDeps,
+				cpSync: (source, destination, options) => {
+					calls.push(["cpSync", source, destination, options]);
+					files.set(destination, "directory");
+				},
+				existsSync: (path) => files.has(path),
+				mkdirSync: (path) => {
+					calls.push(["mkdirSync", path]);
+					files.set(path, "directory");
+				},
+				rmSync: (path) => {
+					calls.push(["rmSync", path]);
+					if (failRemove?.(path)) throw new Error("cleanup failed");
+					remove(path);
+				},
+				readFileSync: (path) => {
+					if (files.has(path) && typeof files.get(path) === "string") {
+						return files.get(path);
+					}
+					return sourceDeps.readFileSync(path);
+				},
+				newRunId: () => "stateful-run",
+				writeFileSync: (path, content) => {
+					calls.push(["writeFileSync", path, content]);
+					files.set(path, content);
+					if (failWrite?.(path)) throw new Error("staging write failed");
+				},
+				renameSync: (from, to) => {
+					calls.push(["renameSync", from, to]);
+					if (from.includes(".codex-tmp")) {
+						publishCount += 1;
+						if (failPublish?.(publishCount, from, to)) {
+							throw new Error("publication rename failed");
+						}
+					}
+					move(from, to);
+				},
+			},
+		};
+	}
+
+	function assertNoAssemblyArtifacts(files) {
+		assert.equal(
+			[...files.keys()].some(
+				(path) => path.includes(".codex-tmp") || path.includes(".codex-prev"),
+			),
+			false,
+		);
+	}
+
+	function assertPriorDestinationsRestored(files, before) {
+		for (const [path, content] of before) {
+			assert.equal(files.get(path), content, path);
+		}
+	}
+
+	it("uses a unique staging sibling for each assembly run", () => {
+		const { calls, deps } = fakeCodexDeps({
+			newRunId: () => "unique-run",
+		});
+		assembleCodexAssets({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+
+		assert.equal(
+			calls.some(
+				([kind, path]) =>
+					kind === "writeFileSync" &&
+					String(path).includes(".codex-tmp-unique-run"),
+			),
+			true,
+		);
+	});
+
+	it("rejects a concurrent assembly before it can publish a destination", () => {
+		const { calls, deps } = fakeCodexDeps();
+		const originalMkdir = deps.mkdirSync;
+		const originalRemove = deps.rmSync;
+		const originalRename = deps.renameSync;
+		const originalWrite = deps.writeFileSync;
+		let lockHeld = false;
+		let reentrant = false;
+		let reentrantPublish = false;
+		let attempted = false;
+
+		deps.mkdirSync = (path, ...args) => {
+			if (String(path).endsWith(".codex-assets-assembly.lock")) {
+				if (lockHeld) {
+					const error = new Error("assembly lock is held");
+					error.code = "EEXIST";
+					throw error;
+				}
+				lockHeld = true;
+			}
+			return originalMkdir(path, ...args);
+		};
+		deps.rmSync = (path, ...args) => {
+			if (String(path).endsWith(".codex-assets-assembly.lock")) {
+				lockHeld = false;
+			}
+			return originalRemove(path, ...args);
+		};
+		deps.renameSync = (from, to) => {
+			if (reentrant) reentrantPublish = true;
+			return originalRename(from, to);
+		};
+		deps.writeFileSync = (path, content) => {
+			originalWrite(path, content);
+			if (attempted) return;
+			attempted = true;
+			reentrant = true;
+			assert.throws(
+				() =>
+					assembleCodexAssets({
+						root: "/repo",
+						pluginRoot: "/repo/plugin/pfdsl",
+						deps,
+					}),
+				/assembly lock/,
+			);
+			reentrant = false;
+		};
+
+		assembleCodexAssets({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+
+		assert.equal(reentrantPublish, false);
+		assert.equal(lockHeld, false);
+		assert.ok(
+			calls.some(
+				([kind, path]) =>
+					kind === "mkdirSync" &&
+					String(path).endsWith(".codex-assets-assembly.lock"),
+			),
+		);
+	});
+
+	it("removes stale owned command skills while preserving a new collision target", () => {
+		const { deps, files } = statefulCodexDeps();
+		const skillsRoot = "/repo/plugin/pfdsl/skills";
+		const codexSkillsRoot = "/repo/plugin/pfdsl-codex/skills";
+		const manifestPath =
+			"/repo/plugin/pfdsl/.codex-plugin/codex-command-skills.json";
+		const codexManifestPath =
+			"/repo/plugin/pfdsl-codex/.codex-plugin/codex-command-skills.json";
+		files.set(
+			manifestPath,
+			JSON.stringify({
+				ownedSkillDirectories: ["removed-command", "pfd-retro"],
+			}),
+		);
+		files.set("/repo/plugin/pfdsl/.codex-plugin", "directory");
+		files.set(`${skillsRoot}/removed-command`, "directory");
+		files.set(`${skillsRoot}/removed-command/SKILL.md`, "obsolete command");
+		files.set(`${skillsRoot}/pfd-retro`, "directory");
+		files.set(`${skillsRoot}/pfd-retro/SKILL.md`, "mirrored pfd-retro skill");
+		files.set(`${codexSkillsRoot}/removed-command`, "directory");
+		files.set(
+			`${codexSkillsRoot}/removed-command/SKILL.md`,
+			"obsolete command",
+		);
+
+		assembleCodexAssets({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+
+		assert.equal(files.has(`${skillsRoot}/removed-command`), false);
+		assert.equal(files.has(`${codexSkillsRoot}/removed-command`), false);
+		assert.equal(
+			files.get(`${skillsRoot}/pfd-retro/SKILL.md`),
+			"mirrored pfd-retro skill",
+		);
+		assert.equal(files.has(manifestPath), false);
+		assert.deepEqual(JSON.parse(files.get(codexManifestPath)), {
+			skillRoot: "skills",
+			ownedSkillDirectories: [
+				"pfd-cycle",
+				"pfd-init",
+				"source-command-pfd-retro",
+			],
+		});
+	});
+
+	it("fails closed when a prior command ownership manifest is malformed", () => {
+		const { deps, files } = statefulCodexDeps();
+		const manifestPath =
+			"/repo/plugin/pfdsl/.codex-plugin/codex-command-skills.json";
+		files.set(manifestPath, "{}");
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/codex-command-skills\.json: invalid Codex command skill ownership manifest/,
+		);
+		assert.equal(files.get(manifestPath), "{}");
+		assertNoAssemblyArtifacts(files);
+	});
+
+	it("releases its assembly lock after staging fails", () => {
+		const { deps } = statefulCodexDeps({
+			failWrite: (path) => path.includes("pfd-init"),
+		});
+		let lockHeld = false;
+		const originalMkdir = deps.mkdirSync;
+		const originalRemove = deps.rmSync;
+		deps.mkdirSync = (path, ...args) => {
+			if (String(path).endsWith(".codex-assets-assembly.lock")) lockHeld = true;
+			return originalMkdir(path, ...args);
+		};
+		deps.rmSync = (path, ...args) => {
+			if (String(path).endsWith(".codex-assets-assembly.lock"))
+				lockHeld = false;
+			return originalRemove(path, ...args);
+		};
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/staging write failed/,
+		);
+		assert.equal(lockHeld, false);
+	});
+
+	it("removes its assembly lock after successful publication", () => {
+		const { deps, files } = statefulCodexDeps();
+
+		assembleCodexAssets({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+
+		assert.equal(files.has("/repo/.codex-assets-assembly.lock"), false);
+	});
+
+	it("keeps committed Codex outputs when backup or lock cleanup fails", () => {
+		let agentBackupRemovals = 0;
+		const { deps, files } = statefulCodexDeps({
+			failRemove: (path) => {
+				const normalized = String(path);
+				if (normalized.startsWith("/repo/AGENTS.md.codex-prev")) {
+					agentBackupRemovals += 1;
+					return agentBackupRemovals === 2;
+				}
+				return normalized.endsWith(".codex-assets-assembly.lock");
+			},
+		});
+		const warnings = [];
+		const originalWarn = console.warn;
+		console.warn = (message) => warnings.push(message);
+		try {
+			assert.doesNotThrow(() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			);
+		} finally {
+			console.warn = originalWarn;
+		}
+
+		assert.equal(files.has("/repo/.codex-assets-assembly.lock"), false);
+		assert.equal(
+			files.has("/repo/.codex-assets-assembly.lock.stale-stateful-run"),
+			true,
+		);
+		assert.match(
+			warnings.join("\n"),
+			/\.codex-assets-assembly\.lock\.stale-stateful-run/,
+		);
+		assert.equal(files.has("/repo/AGENTS.md/prior.txt"), false);
+		assert.match(
+			files.get("/repo/AGENTS.md"),
+			/^<!-- DO NOT EDIT\. Authoritative source: CLAUDE\.md\. -->$/m,
+		);
+		assert.match(
+			files.get("/repo/AGENTS.md"),
+			/親 agent が `git fetch`、stage、commit、`git push`、PR の作成・更新、issue の作成・クローズ・コメントを担当する。/,
+		);
+		console.warn = () => {};
+		try {
+			assert.doesNotThrow(() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			);
+		} finally {
+			console.warn = originalWarn;
+		}
+	});
+
+	it("warns with the canonical lock path when stale-lock quarantine fails", () => {
+		const { deps, files } = statefulCodexDeps({
+			failRemove: (path) =>
+				String(path).endsWith(".codex-assets-assembly.lock"),
+		});
+		const originalRename = deps.renameSync;
+		deps.renameSync = (from, to) => {
+			if (
+				String(from).endsWith(".codex-assets-assembly.lock") &&
+				String(to).includes(".stale-")
+			)
+				throw new Error("quarantine rename failed");
+			return originalRename(from, to);
+		};
+		const warnings = [];
+		const originalWarn = console.warn;
+		console.warn = (message) => warnings.push(message);
+		try {
+			assert.doesNotThrow(() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			);
+		} finally {
+			console.warn = originalWarn;
+		}
+
+		assert.equal(files.has("/repo/.codex-assets-assembly.lock"), true);
+		assert.match(warnings.join("\n"), /\.codex-assets-assembly\.lock/);
+	});
+
+	it("keeps a staging error when lock release also fails", () => {
+		const { deps } = statefulCodexDeps({
+			failRemove: (path) =>
+				String(path).endsWith(".codex-assets-assembly.lock"),
+			failWrite: (path) => path.includes("pfd-init"),
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/staging write failed/,
+		);
+	});
+
+	it("stages and atomically publishes every Codex output", () => {
+		const { calls, deps } = fakeCodexDeps();
+		assembleCodexAssets({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+
+		const published = calls
+			.filter(([kind]) => kind === "renameSync")
+			.map(([, , to]) => to);
+		assert.deepEqual(
+			published.sort(),
+			[
+				"/repo/AGENTS.md",
+				"/repo/.agents/skills",
+				"/repo/.codex/agents",
+				"/repo/.codex/config.toml",
+				"/repo/.codex/GENERATED.md",
+				"/repo/.codex/hooks.json",
+				"/repo/plugin/pfdsl-codex/GENERATED.md",
+				"/repo/plugin/pfdsl-codex/.codex-plugin/codex-command-skills.json",
+				"/repo/plugin/pfdsl-codex/.codex-plugin/plugin.json",
+				"/repo/plugin/pfdsl-codex/hooks",
+				"/repo/plugin/pfdsl-codex/skills",
+			].sort(),
+		);
+
+		const copied = calls.filter(([kind]) => kind === "cpSync");
+		assert.equal(
+			copied.some(([, , path]) =>
+				path.includes(".agents/skills.codex-tmp-test-run/pfd-grill"),
+			),
+			true,
+		);
+		assert.equal(
+			copied.some(([, , path]) =>
+				path.includes(".agents/skills.codex-tmp-test-run/pfd-ops"),
+			),
+			true,
+		);
+		const staged = calls.filter(([kind]) => kind === "writeFileSync");
+		assert.equal(
+			staged.some(([, path]) =>
+				path.includes(".codex/agents.codex-tmp-test-run/pfd-lens.toml"),
+			),
+			true,
+		);
+		assert.equal(
+			staged.some(([, path]) =>
+				path.includes(".codex/agents.codex-tmp-test-run/pfd-implementer.toml"),
+			),
+			true,
+		);
+		assert.equal(
+			staged.some(([, path]) =>
+				path.includes(
+					"pfdsl-codex/skills.codex-tmp-test-run/source-command-pfd-retro/SKILL.md",
+				),
+			),
+			true,
+		);
+
+		const [, , manifest] = staged.find(([, path]) =>
+			path.endsWith("pfdsl-codex/.codex-plugin/plugin.json.codex-tmp-test-run"),
+		);
+		assert.equal(Object.hasOwn(JSON.parse(manifest), "hooks"), false);
+		const [, , config] = staged.find(([, path]) =>
+			path.endsWith(".codex/config.toml.codex-tmp-test-run"),
+		);
+		assert.equal(
+			config,
+			'# DO NOT EDIT. Authoritative source: scripts/lib/gen-codex-assets.mjs.\n\nsandbox_mode = "workspace-write"\napproval_policy = "on-request"\n\n[sandbox_workspace_write]\nnetwork_access = true\n',
+		);
+		const [, , ownership] = staged.find(([, path]) =>
+			path.endsWith(
+				"pfdsl-codex/.codex-plugin/codex-command-skills.json.codex-tmp-test-run",
+			),
+		);
+		assert.deepEqual(JSON.parse(ownership), {
+			skillRoot: "skills",
+			ownedSkillDirectories: [
+				"pfd-cycle",
+				"pfd-init",
+				"source-command-pfd-retro",
+			],
+		});
+	});
+
+	it("leaves stale destinations untouched when staging a Codex output fails", () => {
+		const { calls, deps } = fakeCodexDeps({
+			writeFileSync: (path, content) => {
+				calls.push(["writeFileSync", path, content]);
+				if (String(path).includes("pfd-init")) throw new Error("write failed");
+			},
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/write failed/,
+		);
+		assert.deepEqual(
+			calls.filter(([kind]) => kind === "renameSync"),
+			[],
+		);
+	});
+
+	it("removes every staged sibling and keeps prior destinations when staging fails midway", () => {
+		const { before, deps, files } = statefulCodexDeps({
+			failWrite: (path) =>
+				path.includes("codex/skills.codex-tmp") && path.includes("pfd-init"),
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/staging write failed/,
+		);
+		assertPriorDestinationsRestored(files, before);
+		assertNoAssemblyArtifacts(files);
+	});
+
+	it("restores every prior destination and removes staging siblings when publication fails", () => {
+		const { before, deps, files } = statefulCodexDeps({
+			failPublish: (count) => count === 2,
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/publication rename failed/,
+		);
+		assertPriorDestinationsRestored(files, before);
+		assertNoAssemblyArtifacts(files);
+	});
+
+	it("keeps the publication error when rollback cleanup also fails", () => {
+		const { deps } = statefulCodexDeps({
+			failPublish: (count) => count === 2,
+			failRemove: (path) => path === "/repo/AGENTS.md",
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/publication rename failed/,
+		);
+	});
+});
+
+describe("Codex generated consumers", () => {
+	it("ships a self-contained native skill tree without mutating the Claude tree", () => {
+		const pluginRoot = join(repoRoot, "plugin/pfdsl");
+		const codexPluginRoot = join(repoRoot, "plugin/pfdsl-codex");
+		assemblePluginDistIndependent({
+			root: repoRoot,
+			pluginRoot,
+			codexPluginRoot,
+		});
+		const claudeBefore = treeFiles(pluginRoot).map((relativePath) => [
+			relativePath,
+			readFileSync(join(pluginRoot, relativePath)).toString("base64"),
+		]);
+		assemblePluginDistIndependent({
+			root: repoRoot,
+			pluginRoot,
+			codexPluginRoot,
+		});
+		assert.deepEqual(
+			treeFiles(pluginRoot).map((relativePath) => [
+				relativePath,
+				readFileSync(join(pluginRoot, relativePath)).toString("base64"),
+			]),
+			claudeBefore,
+		);
+		assert.equal(
+			readdirSync(join(repoRoot, "plugin")).some((entry) =>
+				entry.startsWith(".pfdsl-gen-txn-"),
+			),
+			false,
+		);
+
+		const consumer = mkdtempSync(join(tmpdir(), "codex-plugin-consumer-"));
+		try {
+			const pluginCopy = join(consumer, "plugin-cache/pfdsl-codex");
+			cpSync(codexPluginRoot, pluginCopy, { recursive: true });
+			const manifest = JSON.parse(
+				readFileSync(join(pluginCopy, ".codex-plugin/plugin.json"), "utf-8"),
+			);
+			assert.equal(manifest.skills, "./skills/");
+			const skillsRoot = resolve(pluginCopy, manifest.skills);
+			assert.equal(existsSync(join(skillsRoot, "pfd-ops/SKILL.md")), true);
+			assert.equal(
+				existsSync(join(pluginCopy, "skills/pfd-cycle/SKILL.md")),
+				true,
+			);
+			const legacyFiles = treeFiles(join(pluginRoot, "skills"));
+			const nativeFiles = treeFiles(skillsRoot);
+			assert.deepEqual(
+				nativeFiles.sort(),
+				[
+					...legacyFiles,
+					"pfd-cycle/SKILL.md",
+					"pfd-init/SKILL.md",
+					"source-command-pfd-retro/SKILL.md",
+				].sort(),
+			);
+			for (const relativePath of legacyFiles) {
+				const legacy = readFileSync(join(pluginRoot, "skills", relativePath));
+				const native = readFileSync(join(skillsRoot, relativePath));
+				if (relativePath.endsWith(".md")) {
+					assert.equal(
+						generatedMarkdownNoticeCount(native.toString("utf-8")),
+						1,
+						relativePath,
+					);
+					assert.equal(
+						removeGeneratedMarkdownNotice(native.toString("utf-8")),
+						expectedCodexMarkdown(legacy.toString("utf-8")),
+						relativePath,
+					);
+				} else if (relativePath.endsWith(".mjs")) {
+					assert.equal(
+						generatedSourceCommentCount(native.toString("utf-8")),
+						1,
+						relativePath,
+					);
+					assert.equal(
+						removeGeneratedSourceComment(native.toString("utf-8")),
+						legacy.toString("utf-8"),
+						relativePath,
+					);
+				} else {
+					assert.deepEqual(native, legacy, relativePath);
+				}
+			}
+			const nativePfdOpsSkill = readFileSync(
+				join(skillsRoot, "pfd-ops/SKILL.md"),
+				"utf-8",
+			);
+			assert.match(
+				nativePfdOpsSkill,
+				/DO NOT EDIT\. Authoritative source: \.claude\/skills\/pfd-ops\/SKILL\.md\./,
+			);
+			const nativeScript = readFileSync(
+				join(skillsRoot, "pfd-ops/scripts/check-install-sync.mjs"),
+				"utf-8",
+			);
+			assert.match(
+				nativeScript,
+				/DO NOT EDIT\. Authoritative source: \.claude\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs\./,
+			);
+			assert.equal(
+				removeGeneratedSourceComment(nativeScript),
+				readFileSync(
+					join(pluginRoot, "skills/pfd-ops/scripts/check-install-sync.mjs"),
+					"utf-8",
+				),
+			);
+			const nativePfdslSkill = readFileSync(
+				join(skillsRoot, "pfdsl/SKILL.md"),
+				"utf-8",
+			);
+			assert.match(
+				nativePfdslSkill,
+				/# DO NOT EDIT — generated by scripts\/gen-skill\.mjs\. Authoritative source: https:\/\/github\.com\/takasek\/pfdsl\/blob\/main\/scripts\/skill-template\/SKILL\.md/,
+			);
+			const nativePfdslQualityGuide = readFileSync(
+				join(skillsRoot, "pfdsl/references/quality-guide.md"),
+				"utf-8",
+			);
+			assert.match(
+				nativePfdslQualityGuide,
+				/<!-- DO NOT EDIT — snapshot distributed with pfdsl skill\. Authoritative source: https:\/\/github\.com\/takasek\/pfdsl\/blob\/main\/docs\/quality-guide\.md -->/,
+			);
+
+			const legacyBefore = JSON.stringify(
+				markdownFiles(join(pluginRoot, "skills")).map((relativePath) => [
+					relativePath,
+					readFileSync(join(pluginRoot, "skills", relativePath), "utf-8"),
+				]),
+			);
+			const markdown = markdownFiles(skillsRoot);
+			assert.ok(markdown.length > 0);
+			for (const relativePath of markdown) {
+				const output = readFileSync(join(skillsRoot, relativePath), "utf-8");
+				const transformed = removeGeneratedMarkdownNotice(output);
+				assert.doesNotMatch(transformed, /\.claude\/skills\//, relativePath);
+				assert.doesNotMatch(
+					transformed,
+					/\$\{CLAUDE_PLUGIN_ROOT\}/,
+					relativePath,
+				);
+				assert.doesNotMatch(
+					transformed,
+					/CLAUDE_PLUGIN_ROOT|Claude 向け|Claude へ|1つの Claude Code plugin|Claude Code プラットフォーム側/,
+					relativePath,
+				);
+			}
+
+			const output = execFileSync(
+				process.execPath,
+				[join(skillsRoot, "pfd-ops/scripts/check-install-sync.mjs")],
+				{ cwd: consumer, encoding: "utf-8" },
+			);
+			assert.match(output, /not adopted/);
+			const pfdslHelp = execFileSync(
+				process.execPath,
+				[join(repoRoot, "packages/cli/dist/cli.js"), "--help"],
+				{ cwd: consumer, encoding: "utf-8" },
+			);
+			assert.match(pfdslHelp, /^pfdsl <command>/);
+			assert.equal(
+				JSON.stringify(
+					markdownFiles(join(pluginRoot, "skills")).map((relativePath) => [
+						relativePath,
+						readFileSync(join(pluginRoot, "skills", relativePath), "utf-8"),
+					]),
+				),
+				legacyBefore,
+			);
+		} finally {
+			rmSync(consumer, { recursive: true, force: true });
+		}
+	});
+
+	it("transforms every Markdown file in Codex skill trees and preserves scripts", () => {
+		const pluginRoot = join(repoRoot, "plugin/pfdsl");
+		const codexPluginRoot = join(repoRoot, "plugin/pfdsl-codex");
+		assemblePluginDistIndependent({
+			root: repoRoot,
+			pluginRoot,
+			codexPluginRoot,
+		});
+
+		const consumer = mkdtempSync(join(tmpdir(), "codex-agents-consumer-"));
+		try {
+			cpSync(join(repoRoot, ".agents"), join(consumer, ".agents"), {
+				recursive: true,
+			});
+			assert.equal(existsSync(join(consumer, ".claude")), false);
+			const agentScript = readFileSync(
+				join(consumer, ".agents/skills/pfd-ops/scripts/check-install-sync.mjs"),
+				"utf-8",
+			);
+			assert.match(
+				agentScript,
+				/DO NOT EDIT\. Authoritative source: \.claude\/skills\/pfd-ops\/scripts\/check-install-sync\.mjs\./,
+			);
+			assert.equal(generatedSourceCommentCount(agentScript), 1);
+			assert.equal(
+				removeGeneratedSourceComment(agentScript),
+				readFileSync(
+					join(
+						repoRoot,
+						".claude/skills/pfd-ops/scripts/check-install-sync.mjs",
+					),
+					"utf-8",
+				),
+			);
+			const script = readFileSync(
+				join(consumer, ".agents/skills/pfd-ops/scripts/check-install-sync.mjs"),
+				"utf-8",
+			);
+			assert.match(script, /\.claude\/pfd-ops-install-manifest\.json/);
+
+			const markdown = markdownFiles(join(consumer, ".agents/skills"));
+			assert.ok(markdown.length > 0);
+			for (const relativePath of markdown) {
+				const output = readFileSync(
+					join(consumer, ".agents/skills", relativePath),
+					"utf-8",
+				);
+				const source = readFileSync(
+					codexMarkdownSource(repoRoot, relativePath),
+					"utf-8",
+				);
+				assert.equal(generatedMarkdownNoticeCount(output), 1, relativePath);
+				if (!relativePath.startsWith("pfdsl/")) {
+					assert.match(
+						output,
+						new RegExp(
+							`DO NOT EDIT\\. Authoritative source: \\.claude/skills/${relativePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.`,
+						),
+						relativePath,
+					);
+				}
+				assert.equal(
+					removeGeneratedMarkdownNotice(output),
+					expectedCodexMarkdown(source),
+					relativePath,
+				);
+				const transformed = removeGeneratedMarkdownNotice(output);
+				assert.doesNotMatch(transformed, /\.claude\/skills\//, relativePath);
+				assert.doesNotMatch(
+					transformed,
+					/\$\{CLAUDE_PLUGIN_ROOT\}/,
+					relativePath,
+				);
+				assert.doesNotMatch(
+					transformed,
+					/CLAUDE_PLUGIN_ROOT|Claude 向け|Claude へ|1つの Claude Code plugin|Claude Code プラットフォーム側/,
+					relativePath,
+				);
+			}
+			const agentPfdslSkill = readFileSync(
+				join(consumer, ".agents/skills/pfdsl/SKILL.md"),
+				"utf-8",
+			);
+			assert.match(
+				agentPfdslSkill,
+				/# DO NOT EDIT — generated by scripts\/gen-skill\.mjs\. Authoritative source: https:\/\/github\.com\/takasek\/pfdsl\/blob\/main\/scripts\/skill-template\/SKILL\.md/,
+			);
+			const agentPfdslQualityGuide = readFileSync(
+				join(consumer, ".agents/skills/pfdsl/references/quality-guide.md"),
+				"utf-8",
+			);
+			assert.match(
+				agentPfdslQualityGuide,
+				/<!-- DO NOT EDIT — snapshot distributed with pfdsl skill\. Authoritative source: https:\/\/github\.com\/takasek\/pfdsl\/blob\/main\/docs\/quality-guide\.md -->/,
+			);
+
+			const architecture = readFileSync(
+				join(consumer, ".agents/skills/pfd-ops/references/architecture.md"),
+				"utf-8",
+			);
+			assert.match(architecture, /\$\{PLUGIN_ROOT\}\/skills\/pfd-ops/);
+			assert.match(architecture, /\.agents\/skills\/pfd-ops/);
+			const scaffold = readFileSync(
+				join(consumer, ".agents/skills/pfd-ops/references/scaffold/roadmap.md"),
+				"utf-8",
+			);
+			assert.match(scaffold, /\$\{PLUGIN_ROOT\}\/skills\/pfd-ops/);
+			assert.match(scaffold, /\.agents\/skills\/pfd-ops/);
+
+			const output = execFileSync(
+				process.execPath,
+				[
+					join(
+						consumer,
+						".agents/skills/pfd-ops/scripts/check-install-sync.mjs",
+					),
+				],
+				{ cwd: consumer, encoding: "utf-8" },
+			);
+			assert.match(output, /not adopted/);
+		} finally {
+			rmSync(consumer, { recursive: true, force: true });
+		}
+	});
+
+	it("runs the generated plugin hook through Codex's compatibility environment", () => {
+		const pluginRoot = join(repoRoot, "plugin/pfdsl");
+		const codexPluginRoot = join(repoRoot, "plugin/pfdsl-codex");
+		assemblePluginDistIndependent({
+			root: repoRoot,
+			pluginRoot,
+			codexPluginRoot,
+		});
+
+		const consumer = mkdtempSync(join(tmpdir(), "codex-hook-consumer-"));
+		try {
+			const pluginCopy = join(consumer, "plugin-cache/pfdsl-codex");
+			cpSync(codexPluginRoot, pluginCopy, { recursive: true });
+			assert.equal(existsSync(join(consumer, ".claude")), false);
+
+			const roadmap = join(consumer, ".pfdsl/roadmap.pfdsl");
+			mkdirSync(dirname(roadmap), { recursive: true });
+			writeFileSync(roadmap, "artifact:\n  delivery:\n    status: wip\n");
+			execFileSync("git", ["init", "-q"], { cwd: consumer });
+			execFileSync("git", ["add", ".pfdsl/roadmap.pfdsl"], { cwd: consumer });
+			execFileSync(
+				"git",
+				[
+					"-c",
+					"user.name=Codex Test",
+					"-c",
+					"user.email=codex-test@example.invalid",
+					"commit",
+					"-qm",
+					"baseline",
+				],
+				{ cwd: consumer },
+			);
+			writeFileSync(roadmap, "artifact:\n  delivery:\n    status: done\n");
+			execFileSync("git", ["add", ".pfdsl/roadmap.pfdsl"], { cwd: consumer });
+			execFileSync(
+				"git",
+				[
+					"-c",
+					"user.name=Codex Test",
+					"-c",
+					"user.email=codex-test@example.invalid",
+					"commit",
+					"-qm",
+					"mark delivery done",
+				],
+				{ cwd: consumer },
+			);
+
+			const hookConfig = JSON.parse(
+				readFileSync(join(pluginCopy, "hooks/hooks.json"), "utf-8"),
+			);
+			const command = hookConfig.hooks.PostToolUse[0].hooks[0].command;
+			const output = execFileSync("/bin/sh", ["-c", command], {
+				cwd: consumer,
+				encoding: "utf-8",
+				env: { ...process.env, CLAUDE_PLUGIN_ROOT: pluginCopy },
+				input: JSON.stringify({
+					cwd: consumer,
+					tool_input: { command: "git commit -m mark-delivery-done" },
+				}),
+			});
+			assert.deepEqual(JSON.parse(output), {
+				hookSpecificOutput: {
+					hookEventName: "PostToolUse",
+					additionalContext:
+						"note: this commit marks a roadmap artifact done — run pfd-retro if warranted.",
+				},
+			});
+		} finally {
+			rmSync(consumer, { recursive: true, force: true });
+		}
 	});
 });
 
