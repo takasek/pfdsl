@@ -1,6 +1,6 @@
 # review-perspectives.md — instance seed
 
-配布レンズ = pfdsl スキルの `references/review-perspectives.md`（plugin なら `${CLAUDE_PLUGIN_ROOT}/skills/pfdsl/references/`、repo-local なら `.claude/skills/pfdsl/references/`）。
+配布レンズ = pfdsl スキルの `references/review-perspectives.md`（plugin なら `${PLUGIN_ROOT}/skills/pfdsl/references/`、repo-local なら `.agents/skills/pfdsl/references/`）。
 その観点を当リポに適用した実例をここに蓄積する。
 retro で検出した具体例を追記して育てる（初期は空）。C は自リポで normative 仕様文書を保守する場合のみ。
 

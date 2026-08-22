@@ -34,7 +34,7 @@ grep -q 'に置き換える)' .pfdsl/roadmap.pfdsl && echo "scaffold のまま"
 node ${PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
 ```
 
-CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${PLUGIN_ROOT}` の形でのみ置換対象 — この説明文中の表記のように波括弧を外せば置換されない）。上のコマンド行がパス置換されず変数名のまま見えている場合は plugin 外（repo-local）ロード — `node .agents/skills/pfd-ops/scripts/check-install-sync.mjs --upstream` を使う。**どちらも解決しない場合**（変数名のまま見えており、かつ repo-local の `.agents/skills/pfd-ops/` も存在しない）は、いま読んでいるこのファイル自身の所在を skill root とみなして相対で辿る — このファイルが読めている以上その所在は判明しており、それが3つ目の分岐になる。この状態は skill 本文をファイルとして直接読んだときに起きる（置換はプロンプトへの取り込み時に行われるため、ファイルの中身は常に変数名のまま）。
+PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数（`${PLUGIN_ROOT}` の形でのみ置換対象 — この説明文中の表記のように波括弧を外せば置換されない）。上のコマンド行がパス置換されず変数名のまま見えている場合は plugin 外（repo-local）ロード — `node .agents/skills/pfd-ops/scripts/check-install-sync.mjs --upstream` を使う。**どちらも解決しない場合**（変数名のまま見えており、かつ repo-local の `.agents/skills/pfd-ops/` も存在しない）は、いま読んでいるこのファイル自身の所在を skill root とみなして相対で辿る — このファイルが読めている以上その所在は判明しており、それが3つ目の分岐になる。この状態は skill 本文をファイルとして直接読んだときに起きる（置換はプロンプトへの取り込み時に行われるため、ファイルの中身は常に変数名のまま）。
 GitHub Issues バックエンド未採用のリポでは何も出ない。
 **警告が出たら対応する**: 対応は出力の末尾行が名指しする。スクリプトは実行のたび target の役割を分類し、`--deploy` が正しい向きになる場合にだけそれを案内する — **drift を見て反射的に `--deploy` を打たない**。
 以下は `--deploy` が案内された場合のフラグの意味である。**ローカル編集が無いファイルのコピーと、ローカル編集が無い旧ファイルの削除は、追加フラグ無しで行われる**。追加フラグが決めるのは「途中に立ちはだかるローカル編集を捨てるか」だけで、`--overwrite-local-edits` は生き残るパスの編集を canonical で潰し、`--delete-edited-orphans` は消えるパスの編集ごと削除する。したがって旧ファイルの掃除が目的ならまず素の `--deploy` を実行し、編集済みとして残ったものだけを見て後者の要否を判断する。両方の意味を兼ねる単一フラグは、捨てるつもりのなかった編集まで巻き込む。
@@ -62,7 +62,7 @@ plugin バージョンの上流差分警告は plugin の更新をユーザー�
 - **知見の振り分け先・運用手続き**: `.pfdsl/workflow.pfdsl` の知識系成果物と、その sibling companion `.md`
 - **変換境界の定義と変更手続き**: `.pfdsl/runtime-pipeline.pfdsl`（採用時）とその sibling companion `.md`
 - **issue バックエンド規約**: companion が指す references（例: `references/github-issues-backend.md`）
-- **Claude 向け指示の置き場**: pfd-ops 運用に紐づく恒常指示（PR 本文規約等）は `.pfdsl/bindings/pfd-ops.md` が存在すれば読んで従う（命名規則は `references/architecture.md` 参照）。ファイルが無ければ該当なしとみなす。サイクル外でも常時届けたい指示は、root `AGENTS.md` から当該ファイルへポインタを張ることを推奨する。project AGENTS.md はこのリポでのみ有効な設定のみ、global AGENTS.md は全リポ横断の設定のみ
+- **Codex 向け指示の置き場**: pfd-ops 運用に紐づく恒常指示（PR 本文規約等）は `.pfdsl/bindings/pfd-ops.md` が存在すれば読んで従う（命名規則は `references/architecture.md` 参照）。ファイルが無ければ該当なしとみなす。サイクル外でも常時届けたい指示は、root `AGENTS.md` から当該ファイルへポインタを張ることを推奨する。project AGENTS.md はこのリポでのみ有効な設定のみ、global AGENTS.md は全リポ横断の設定のみ
 - **companion への書き分けルール**（どの companion に何を書くか）: `references/architecture.md` の「companion への書き分けルール」表が一次情報
 
 ## 運用プロトコル

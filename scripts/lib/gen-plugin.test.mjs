@@ -6,6 +6,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readdirSync,
 	readFileSync,
 	rmSync,
 	writeFileSync,
@@ -18,6 +19,7 @@ import {
 	collectModuleClosure,
 	findDistDependentFiles,
 } from "./check-script-imports.mjs";
+import { claudeInstructionsToAgents } from "./gen-codex-assets.mjs";
 import {
 	assembleCodexAssets,
 	assemblePluginDistIndependent,
@@ -28,9 +30,36 @@ import {
 	mirrorFiles,
 	PLUGIN_AGENT_FILES,
 } from "./gen-plugin.mjs";
+import { GENERATED_SKILLS } from "./harness-inventory.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../..");
+
+function markdownFiles(directory, relative = "") {
+	return readdirSync(directory, { withFileTypes: true })
+		.sort((left, right) => left.name.localeCompare(right.name))
+		.flatMap((entry) => {
+			const path = join(directory, entry.name);
+			const entryRelative = join(relative, entry.name);
+			if (entry.isDirectory()) return markdownFiles(path, entryRelative);
+			return entry.isFile() && entry.name.endsWith(".md")
+				? [entryRelative]
+				: [];
+		});
+}
+
+function codexMarkdownSource(root, relativePath) {
+	const [skillName, ...path] = relativePath.split("/");
+	const generated = GENERATED_SKILLS[skillName];
+	const skillRoot = generated
+		? join(root, generated.target)
+		: join(root, ".claude/skills", skillName);
+	return join(skillRoot, ...path);
+}
+
+function expectedCodexMarkdown(source) {
+	return claudeInstructionsToAgents(source).replace(/(?:\r?\n){2,}$/, "\n");
+}
 
 describe("buildPluginManifest", () => {
 	it("uses the CLI version as the plugin version", () => {
@@ -876,19 +905,20 @@ describe("assembleCodexAssets", () => {
 			].sort(),
 		);
 
+		const copied = calls.filter(([kind]) => kind === "cpSync");
+		assert.equal(
+			copied.some(([, , path]) =>
+				path.includes(".agents/skills.codex-tmp-test-run/pfd-grill"),
+			),
+			true,
+		);
+		assert.equal(
+			copied.some(([, , path]) =>
+				path.includes(".agents/skills.codex-tmp-test-run/pfd-ops"),
+			),
+			true,
+		);
 		const staged = calls.filter(([kind]) => kind === "writeFileSync");
-		assert.equal(
-			staged.some(([, path]) =>
-				path.includes(".agents/skills.codex-tmp-test-run/pfd-grill/SKILL.md"),
-			),
-			true,
-		);
-		assert.equal(
-			staged.some(([, path]) =>
-				path.includes(".agents/skills.codex-tmp-test-run/pfd-ops/SKILL.md"),
-			),
-			true,
-		);
 		assert.equal(
 			staged.some(([, path]) =>
 				path.includes(".codex/agents.codex-tmp-test-run/pfd-lens.toml"),
@@ -1006,7 +1036,7 @@ describe("assembleCodexAssets", () => {
 });
 
 describe("Codex generated consumers", () => {
-	it("mirrors complete skills and lets a .agents-only consumer run the pfd-ops self-check", () => {
+	it("transforms every Markdown file in Codex skill trees and preserves scripts", () => {
 		const pluginRoot = join(repoRoot, "plugin/pfdsl");
 		assemblePluginDistIndependent({ root: repoRoot, pluginRoot });
 
@@ -1032,34 +1062,45 @@ describe("Codex generated consumers", () => {
 					"utf-8",
 				),
 			);
-			assert.equal(
-				readFileSync(
-					join(consumer, ".agents/skills/pfd-ops/references/work-cycle.md"),
-					"utf-8",
-				),
-				readFileSync(
-					join(repoRoot, ".claude/skills/pfd-ops/references/work-cycle.md"),
-					"utf-8",
-				),
-			);
-			assert.equal(
-				existsSync(
-					join(consumer, ".agents/skills/pfdsl/references/quality-guide.md"),
-				),
-				true,
-			);
-			const sourcePfdslSpec = readFileSync(
-				join(pluginRoot, "skills/pfdsl/references/spec.md"),
+			const script = readFileSync(
+				join(consumer, ".agents/skills/pfd-ops/scripts/check-install-sync.mjs"),
 				"utf-8",
 			);
-			assert.equal(
-				readFileSync(
-					join(consumer, ".agents/skills/pfdsl/references/spec.md"),
+			assert.match(script, /\.claude\/pfd-ops-install-manifest\.json/);
+
+			const markdown = markdownFiles(join(consumer, ".agents/skills"));
+			assert.ok(markdown.length > 0);
+			for (const relativePath of markdown) {
+				const output = readFileSync(
+					join(consumer, ".agents/skills", relativePath),
 					"utf-8",
-				),
-				sourcePfdslSpec.replace(/\n+$/, "\n"),
-				"Codex copies preserve reference content while canonicalizing only EOF blank lines",
+				);
+				const source = readFileSync(
+					codexMarkdownSource(repoRoot, relativePath),
+					"utf-8",
+				);
+				assert.equal(output, expectedCodexMarkdown(source), relativePath);
+				assert.doesNotMatch(output, /\.claude\/skills\//, relativePath);
+				assert.doesNotMatch(output, /\$\{CLAUDE_PLUGIN_ROOT\}/, relativePath);
+				assert.doesNotMatch(
+					output,
+					/CLAUDE_PLUGIN_ROOT|Claude 向け|Claude へ|1つの Claude Code plugin|Claude Code プラットフォーム側/,
+					relativePath,
+				);
+			}
+
+			const architecture = readFileSync(
+				join(consumer, ".agents/skills/pfd-ops/references/architecture.md"),
+				"utf-8",
 			);
+			assert.match(architecture, /\$\{PLUGIN_ROOT\}\/skills\/pfd-ops/);
+			assert.match(architecture, /\.agents\/skills\/pfd-ops/);
+			const scaffold = readFileSync(
+				join(consumer, ".agents/skills/pfd-ops/references/scaffold/roadmap.md"),
+				"utf-8",
+			);
+			assert.match(scaffold, /\$\{PLUGIN_ROOT\}\/skills\/pfd-ops/);
+			assert.match(scaffold, /\.agents\/skills\/pfd-ops/);
 
 			const output = execFileSync(
 				process.execPath,

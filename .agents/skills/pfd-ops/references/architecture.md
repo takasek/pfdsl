@@ -34,7 +34,7 @@ findings やゲート項目を companion に書くとき、**どの companion �
 | issue 固有ゲート・issue 管理バインディング・自動生成 PR 規約・issue バックエンド手続き | `roadmap.md` |
 | 繰り返し手続き・知見振り分けルール・`develop` プロセスの運用規約・retro 宛先バインディング | `workflow.md` |
 | 変換コンポーネントの追加・削除・境界変更に関する手続き | `runtime-pipeline.md` |
-| Claude 向け追加指示（PR 本文規約等）| `.pfdsl/bindings/pfd-ops.md` |
+| Codex 向け追加指示（PR 本文規約等）| `.pfdsl/bindings/pfd-ops.md` |
 
 この表が一次情報。`pfd-ops SKILL.md` の L2 ディスパッチ・`pfd-retro` の出力振り分け・`.pfdsl/bindings/pfd-retro.md` はすべてここを参照する。
 
@@ -75,9 +75,9 @@ bundle 同梱スキル全数ではない — 自分の binding を読まない�
 
 ### 配布単位
 
-pfdsl / pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem の5スキルツリー・pfd-* コマンド群・pfd-lens agent は、1つの Claude Code plugin（`plugin/pfdsl/`、`make gen-plugin` で組み立て）として marketplace 配布される（ADR-0028。旧 `pfdsl skill sync` は廃止）。
+pfdsl / pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem の5スキルツリー・pfd-* コマンド群・pfd-lens agent は、Claude Code と Codex の両方で使える plugin（`plugin/pfdsl/`、`make gen-plugin` で組み立て）として marketplace 配布される（ADR-0028。旧 `pfdsl skill sync` は廃止）。
 スキル間の相互参照（pfd-retro → pfdsl の review-perspectives、pfd-ecosystem → pfd-ops の scaffold、コマンド → 各スキル）はこの bundle 配布が担保する。
-`hooks/`（PostToolUse retro リマインダ等）も同じ bundle に同梱される。plugin hook はインストール/有効化の同意機構を Claude Code プラットフォーム側に委ねる（`install/` + `check-install-sync.mjs --deploy` の配線を pfd-ops が自前で持たずに済む代替経路）。
+`hooks/`（PostToolUse retro リマインダ等）も同じ bundle に同梱される。plugin hook はインストール/有効化の同意機構を各ハーネスのプラットフォーム側に委ねる（`install/` + `check-install-sync.mjs --deploy` の配線を pfd-ops が自前で持たずに済む代替経路）。
 
 L3 を採用するには `install/` テンプレートをリポルートへ実配置する（`/pfd-init` のステップ 3.5 が実行する）:
 
@@ -111,7 +111,7 @@ pfdsl 開発リポ固有の例:
 ## `install/` ディレクトリの役割
 
 ```
-<pfd-ops skill root>/            ← plugin: ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops、repo-local: .claude/skills/pfd-ops
+<pfd-ops skill root>/            ← plugin: ${PLUGIN_ROOT}/skills/pfd-ops、repo-local: .agents/skills/pfd-ops
   SKILL.md                     ← L1 + L2
   references/
     architecture.md            ← このファイル

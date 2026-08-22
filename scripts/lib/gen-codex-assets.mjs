@@ -124,6 +124,21 @@ export function claudeInstructionsToAgents(source) {
 		.replaceAll("CLAUDE.md", "AGENTS.md")
 		.replaceAll(".claude/skills/", ".agents/skills/")
 		.replaceAll(`\${CLAUDE_PLUGIN_ROOT}`, `\${PLUGIN_ROOT}`)
+		.replaceAll("CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT")
+		.replaceAll(
+			"を Claude Code プラットフォーム側",
+			"を各ハーネスのプラットフォーム側",
+		)
+		.replaceAll(
+			"Claude Code プラットフォーム側",
+			"各ハーネスのプラットフォーム側",
+		)
+		.replaceAll(
+			"1つの Claude Code plugin",
+			"Claude Code と Codex の両方で使える plugin",
+		)
+		.replaceAll("Claude 向け", "Codex 向け")
+		.replaceAll("Claude へ", "Codex へ")
 		.replaceAll(".Codex/settings.json", ".codex/hooks.json")
 		.replaceAll(".claude/settings.json", ".codex/hooks.json");
 }

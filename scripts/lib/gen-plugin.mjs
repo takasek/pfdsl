@@ -293,7 +293,10 @@ function normalizeCodexMarkdownTree(directory, deps) {
 		}
 		if (!entry.isFile() || !path.endsWith(".md")) continue;
 		const source = deps.readFileSync(path, "utf-8");
-		const normalized = source.replace(/(?:\r?\n){2,}$/, "\n");
+		const normalized = claudeInstructionsToAgents(source).replace(
+			/(?:\r?\n){2,}$/,
+			"\n",
+		);
 		if (normalized !== source) deps.writeFileSync(path, normalized);
 	}
 }
@@ -311,12 +314,6 @@ function stageCodexSkillTrees(root, deps, runId) {
 				recursive: true,
 				filter: excludeSkillRootClaudeMd(source),
 			});
-			deps.writeFileSync(
-				resolve(output, "SKILL.md"),
-				claudeInstructionsToAgents(
-					deps.readFileSync(resolve(source, "SKILL.md"), "utf-8"),
-				),
-			);
 		}
 		for (const [name, classification] of Object.entries(GENERATED_SKILLS)) {
 			const source = resolve(root, classification.target);
@@ -325,12 +322,6 @@ function stageCodexSkillTrees(root, deps, runId) {
 				recursive: true,
 				filter: excludeSkillRootClaudeMd(source),
 			});
-			deps.writeFileSync(
-				resolve(output, "SKILL.md"),
-				claudeInstructionsToAgents(
-					deps.readFileSync(resolve(source, "SKILL.md"), "utf-8"),
-				),
-			);
 		}
 		normalizeCodexMarkdownTree(temporary, deps);
 	} catch (error) {

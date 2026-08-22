@@ -224,11 +224,16 @@ describe("agentToCodexToml", () => {
 });
 
 describe("claudeInstructionsToAgents", () => {
-	it("replaces only the approved repository instruction paths", () => {
+	it("replaces the approved repository paths and Codex-specific instructions", () => {
 		const source =
 			"CLAUDE.md\n" +
+			"CLAUDE_PLUGIN_ROOT\n" +
 			".claude/skills/pfd-ops/SKILL.md\n" +
 			`\${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/SKILL.md\n` +
+			"Claude 向け指示\n" +
+			"Claude へ恒常的に届ける\n" +
+			"1つの Claude Code plugin\n" +
+			"を Claude Code プラットフォーム側\n" +
 			".Codex/settings.json\n" +
 			".claude/settings.json\n" +
 			"unchanged\n";
@@ -236,8 +241,13 @@ describe("claudeInstructionsToAgents", () => {
 		assert.equal(
 			claudeInstructionsToAgents(source),
 			"AGENTS.md\n" +
+				"PLUGIN_ROOT\n" +
 				".agents/skills/pfd-ops/SKILL.md\n" +
 				`\${PLUGIN_ROOT}/skills/pfd-ops/SKILL.md\n` +
+				"Codex 向け指示\n" +
+				"Codex へ恒常的に届ける\n" +
+				"Claude Code と Codex の両方で使える plugin\n" +
+				"を各ハーネスのプラットフォーム側\n" +
 				".codex/hooks.json\n" +
 				".codex/hooks.json\n" +
 				"unchanged\n",
