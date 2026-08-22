@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import {
 	chmodSync,
+	cpSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
@@ -517,8 +519,11 @@ describe("assembleCodexAssets", () => {
 		return {
 			calls,
 			deps: {
+				cpSync: (source, destination, options) =>
+					calls.push(["cpSync", source, destination, options]),
 				existsSync: () => false,
 				mkdirSync: (path) => calls.push(["mkdirSync", path]),
+				newRunId: () => "test-run",
 				readFileSync: (path) => {
 					const normalized = String(path);
 					if (normalized.endsWith("CLAUDE.md")) return "Read CLAUDE.md.\n";
@@ -585,6 +590,10 @@ describe("assembleCodexAssets", () => {
 			files,
 			deps: {
 				...sourceDeps,
+				cpSync: (source, destination, options) => {
+					calls.push(["cpSync", source, destination, options]);
+					files.set(destination, "directory");
+				},
 				existsSync: (path) => files.has(path),
 				mkdirSync: (path) => {
 					calls.push(["mkdirSync", path]);
@@ -595,6 +604,13 @@ describe("assembleCodexAssets", () => {
 					if (failRemove?.(path)) throw new Error("cleanup failed");
 					remove(path);
 				},
+				readFileSync: (path) => {
+					if (files.has(path) && typeof files.get(path) === "string") {
+						return files.get(path);
+					}
+					return sourceDeps.readFileSync(path);
+				},
+				newRunId: () => "stateful-run",
 				writeFileSync: (path, content) => {
 					calls.push(["writeFileSync", path, content]);
 					files.set(path, content);
@@ -602,7 +618,7 @@ describe("assembleCodexAssets", () => {
 				},
 				renameSync: (from, to) => {
 					calls.push(["renameSync", from, to]);
-					if (from.endsWith(".codex-tmp")) {
+					if (from.includes(".codex-tmp")) {
 						publishCount += 1;
 						if (failPublish?.(publishCount, from, to)) {
 							throw new Error("publication rename failed");
@@ -629,6 +645,211 @@ describe("assembleCodexAssets", () => {
 		}
 	}
 
+	it("uses a unique staging sibling for each assembly run", () => {
+		const { calls, deps } = fakeCodexDeps({
+			newRunId: () => "unique-run",
+		});
+		assembleCodexAssets({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+
+		assert.equal(
+			calls.some(
+				([kind, path]) =>
+					kind === "writeFileSync" &&
+					String(path).includes(".codex-tmp-unique-run"),
+			),
+			true,
+		);
+	});
+
+	it("rejects a concurrent assembly before it can publish a destination", () => {
+		const { calls, deps } = fakeCodexDeps();
+		const originalMkdir = deps.mkdirSync;
+		const originalRemove = deps.rmSync;
+		const originalRename = deps.renameSync;
+		const originalWrite = deps.writeFileSync;
+		let lockHeld = false;
+		let reentrant = false;
+		let reentrantPublish = false;
+		let attempted = false;
+
+		deps.mkdirSync = (path, ...args) => {
+			if (String(path).endsWith(".codex-assets-assembly.lock")) {
+				if (lockHeld) {
+					const error = new Error("assembly lock is held");
+					error.code = "EEXIST";
+					throw error;
+				}
+				lockHeld = true;
+			}
+			return originalMkdir(path, ...args);
+		};
+		deps.rmSync = (path, ...args) => {
+			if (String(path).endsWith(".codex-assets-assembly.lock")) {
+				lockHeld = false;
+			}
+			return originalRemove(path, ...args);
+		};
+		deps.renameSync = (from, to) => {
+			if (reentrant) reentrantPublish = true;
+			return originalRename(from, to);
+		};
+		deps.writeFileSync = (path, content) => {
+			originalWrite(path, content);
+			if (attempted) return;
+			attempted = true;
+			reentrant = true;
+			assert.throws(
+				() =>
+					assembleCodexAssets({
+						root: "/repo",
+						pluginRoot: "/repo/plugin/pfdsl",
+						deps,
+					}),
+				/assembly lock/,
+			);
+			reentrant = false;
+		};
+
+		assembleCodexAssets({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+
+		assert.equal(reentrantPublish, false);
+		assert.equal(lockHeld, false);
+		assert.ok(
+			calls.some(
+				([kind, path]) =>
+					kind === "mkdirSync" &&
+					String(path).endsWith(".codex-assets-assembly.lock"),
+			),
+		);
+	});
+
+	it("removes stale owned command skills while preserving a new collision target", () => {
+		const { deps, files } = statefulCodexDeps();
+		const skillsRoot = "/repo/plugin/pfdsl/skills";
+		const manifestPath =
+			"/repo/plugin/pfdsl/.codex-plugin/codex-command-skills.json";
+		files.set(
+			manifestPath,
+			JSON.stringify({
+				ownedSkillDirectories: ["removed-command", "pfd-retro"],
+			}),
+		);
+		files.set(`${skillsRoot}/removed-command`, "directory");
+		files.set(`${skillsRoot}/removed-command/SKILL.md`, "obsolete command");
+		files.set(`${skillsRoot}/pfd-retro`, "directory");
+		files.set(`${skillsRoot}/pfd-retro/SKILL.md`, "mirrored pfd-retro skill");
+
+		assembleCodexAssets({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+
+		assert.equal(files.has(`${skillsRoot}/removed-command`), false);
+		assert.equal(
+			files.get(`${skillsRoot}/pfd-retro/SKILL.md`),
+			"mirrored pfd-retro skill",
+		);
+		assert.deepEqual(JSON.parse(files.get(manifestPath)), {
+			ownedSkillDirectories: [
+				"pfd-cycle",
+				"pfd-init",
+				"source-command-pfd-retro",
+			],
+		});
+	});
+
+	it("fails closed when a prior command ownership manifest is malformed", () => {
+		const { deps, files } = statefulCodexDeps();
+		const manifestPath =
+			"/repo/plugin/pfdsl/.codex-plugin/codex-command-skills.json";
+		files.set(manifestPath, "{}");
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/codex-command-skills\.json: invalid Codex command skill ownership manifest/,
+		);
+		assert.equal(files.get(manifestPath), "{}");
+		assertNoAssemblyArtifacts(files);
+	});
+
+	it("releases its assembly lock after staging fails", () => {
+		const { deps } = statefulCodexDeps({
+			failWrite: (path) => path.includes("pfd-init"),
+		});
+		let lockHeld = false;
+		const originalMkdir = deps.mkdirSync;
+		const originalRemove = deps.rmSync;
+		deps.mkdirSync = (path, ...args) => {
+			if (String(path).endsWith(".codex-assets-assembly.lock")) lockHeld = true;
+			return originalMkdir(path, ...args);
+		};
+		deps.rmSync = (path, ...args) => {
+			if (String(path).endsWith(".codex-assets-assembly.lock"))
+				lockHeld = false;
+			return originalRemove(path, ...args);
+		};
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/staging write failed/,
+		);
+		assert.equal(lockHeld, false);
+	});
+
+	it("surfaces a lock-release error after successful publication", () => {
+		const { deps } = statefulCodexDeps({
+			failRemove: (path) =>
+				String(path).endsWith(".codex-assets-assembly.lock"),
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/cleanup failed/,
+		);
+	});
+
+	it("keeps a staging error when lock release also fails", () => {
+		const { deps } = statefulCodexDeps({
+			failRemove: (path) =>
+				String(path).endsWith(".codex-assets-assembly.lock"),
+			failWrite: (path) => path.includes("pfd-init"),
+		});
+
+		assert.throws(
+			() =>
+				assembleCodexAssets({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					deps,
+				}),
+			/staging write failed/,
+		);
+	});
+
 	it("stages and atomically publishes every Codex output", () => {
 		const { calls, deps } = fakeCodexDeps();
 		assembleCodexAssets({
@@ -647,6 +868,7 @@ describe("assembleCodexAssets", () => {
 				"/repo/.agents/skills",
 				"/repo/.codex/agents",
 				"/repo/.codex/hooks.json",
+				"/repo/plugin/pfdsl/.codex-plugin/codex-command-skills.json",
 				"/repo/plugin/pfdsl/.codex-plugin/plugin.json",
 				"/repo/plugin/pfdsl/skills/pfd-cycle",
 				"/repo/plugin/pfdsl/skills/pfd-init",
@@ -657,39 +879,53 @@ describe("assembleCodexAssets", () => {
 		const staged = calls.filter(([kind]) => kind === "writeFileSync");
 		assert.equal(
 			staged.some(([, path]) =>
-				path.includes(".agents/skills.codex-tmp/pfd-grill/SKILL.md"),
+				path.includes(".agents/skills.codex-tmp-test-run/pfd-grill/SKILL.md"),
 			),
 			true,
 		);
 		assert.equal(
 			staged.some(([, path]) =>
-				path.includes(".agents/skills.codex-tmp/pfd-ops/SKILL.md"),
+				path.includes(".agents/skills.codex-tmp-test-run/pfd-ops/SKILL.md"),
 			),
 			true,
 		);
 		assert.equal(
 			staged.some(([, path]) =>
-				path.includes(".codex/agents.codex-tmp/pfd-lens.toml"),
+				path.includes(".codex/agents.codex-tmp-test-run/pfd-lens.toml"),
 			),
 			true,
 		);
 		assert.equal(
 			staged.some(([, path]) =>
-				path.includes(".codex/agents.codex-tmp/pfd-implementer.toml"),
+				path.includes(".codex/agents.codex-tmp-test-run/pfd-implementer.toml"),
 			),
 			true,
 		);
 		assert.equal(
 			staged.some(([, path]) =>
-				path.includes("skills/source-command-pfd-retro.codex-tmp/SKILL.md"),
+				path.includes(
+					"skills/source-command-pfd-retro.codex-tmp-test-run/SKILL.md",
+				),
 			),
 			true,
 		);
 
 		const [, , manifest] = staged.find(([, path]) =>
-			path.endsWith(".codex-plugin/plugin.json.codex-tmp"),
+			path.endsWith(".codex-plugin/plugin.json.codex-tmp-test-run"),
 		);
 		assert.equal(Object.hasOwn(JSON.parse(manifest), "hooks"), false);
+		const [, , ownership] = staged.find(([, path]) =>
+			path.endsWith(
+				".codex-plugin/codex-command-skills.json.codex-tmp-test-run",
+			),
+		);
+		assert.deepEqual(JSON.parse(ownership), {
+			ownedSkillDirectories: [
+				"pfd-cycle",
+				"pfd-init",
+				"source-command-pfd-retro",
+			],
+		});
 	});
 
 	it("leaves stale destinations untouched when staging a Codex output fails", () => {
@@ -766,6 +1002,148 @@ describe("assembleCodexAssets", () => {
 				}),
 			/publication rename failed/,
 		);
+	});
+});
+
+describe("Codex generated consumers", () => {
+	it("mirrors complete skills and lets a .agents-only consumer run the pfd-ops self-check", () => {
+		const pluginRoot = join(repoRoot, "plugin/pfdsl");
+		assemblePluginDistIndependent({ root: repoRoot, pluginRoot });
+
+		const consumer = mkdtempSync(join(tmpdir(), "codex-agents-consumer-"));
+		try {
+			cpSync(join(repoRoot, ".agents"), join(consumer, ".agents"), {
+				recursive: true,
+			});
+			assert.equal(existsSync(join(consumer, ".claude")), false);
+			assert.equal(
+				readFileSync(
+					join(
+						consumer,
+						".agents/skills/pfd-ops/scripts/check-install-sync.mjs",
+					),
+					"utf-8",
+				),
+				readFileSync(
+					join(
+						repoRoot,
+						".claude/skills/pfd-ops/scripts/check-install-sync.mjs",
+					),
+					"utf-8",
+				),
+			);
+			assert.equal(
+				readFileSync(
+					join(consumer, ".agents/skills/pfd-ops/references/work-cycle.md"),
+					"utf-8",
+				),
+				readFileSync(
+					join(repoRoot, ".claude/skills/pfd-ops/references/work-cycle.md"),
+					"utf-8",
+				),
+			);
+			assert.equal(
+				existsSync(
+					join(consumer, ".agents/skills/pfdsl/references/quality-guide.md"),
+				),
+				true,
+			);
+			const sourcePfdslSpec = readFileSync(
+				join(pluginRoot, "skills/pfdsl/references/spec.md"),
+				"utf-8",
+			);
+			assert.equal(
+				readFileSync(
+					join(consumer, ".agents/skills/pfdsl/references/spec.md"),
+					"utf-8",
+				),
+				sourcePfdslSpec.replace(/\n+$/, "\n"),
+				"Codex copies preserve reference content while canonicalizing only EOF blank lines",
+			);
+
+			const output = execFileSync(
+				process.execPath,
+				[
+					join(
+						consumer,
+						".agents/skills/pfd-ops/scripts/check-install-sync.mjs",
+					),
+				],
+				{ cwd: consumer, encoding: "utf-8" },
+			);
+			assert.match(output, /not adopted/);
+		} finally {
+			rmSync(consumer, { recursive: true, force: true });
+		}
+	});
+
+	it("runs the generated plugin hook through Codex's compatibility environment", () => {
+		const pluginRoot = join(repoRoot, "plugin/pfdsl");
+		assemblePluginDistIndependent({ root: repoRoot, pluginRoot });
+
+		const consumer = mkdtempSync(join(tmpdir(), "codex-hook-consumer-"));
+		try {
+			const pluginCopy = join(consumer, "plugin-cache/pfdsl");
+			cpSync(pluginRoot, pluginCopy, { recursive: true });
+			assert.equal(existsSync(join(consumer, ".claude")), false);
+
+			const roadmap = join(consumer, ".pfdsl/roadmap.pfdsl");
+			mkdirSync(dirname(roadmap), { recursive: true });
+			writeFileSync(roadmap, "artifact:\n  delivery:\n    status: wip\n");
+			execFileSync("git", ["init", "-q"], { cwd: consumer });
+			execFileSync("git", ["add", ".pfdsl/roadmap.pfdsl"], { cwd: consumer });
+			execFileSync(
+				"git",
+				[
+					"-c",
+					"user.name=Codex Test",
+					"-c",
+					"user.email=codex-test@example.invalid",
+					"commit",
+					"-qm",
+					"baseline",
+				],
+				{ cwd: consumer },
+			);
+			writeFileSync(roadmap, "artifact:\n  delivery:\n    status: done\n");
+			execFileSync("git", ["add", ".pfdsl/roadmap.pfdsl"], { cwd: consumer });
+			execFileSync(
+				"git",
+				[
+					"-c",
+					"user.name=Codex Test",
+					"-c",
+					"user.email=codex-test@example.invalid",
+					"commit",
+					"-qm",
+					"mark delivery done",
+				],
+				{ cwd: consumer },
+			);
+
+			const hookConfig = JSON.parse(
+				readFileSync(join(pluginCopy, "hooks/hooks.json"), "utf-8"),
+			);
+			const command = hookConfig.hooks.PostToolUse[0].hooks[0].command;
+			const output = execFileSync("/bin/sh", ["-c", command], {
+				cwd: consumer,
+				encoding: "utf-8",
+				env: { ...process.env, CLAUDE_PLUGIN_ROOT: pluginCopy },
+				input: JSON.stringify({
+					cwd: consumer,
+					tool_input: { command: "git commit -m mark-delivery-done" },
+				}),
+			});
+			assert.deepEqual(JSON.parse(output), {
+				hookSpecificOutput: {
+					hookEventName: "PostToolUse",
+					additionalContext:
+						"note: this commit marks a roadmap artifact done — run pfd-retro if warranted.",
+				},
+			});
+		} finally {
+			rmSync(consumer, { recursive: true, force: true });
+		}
 	});
 });
 

@@ -14,7 +14,7 @@
 
 - `.claude/skills`, `.claude/agents`, and `.claude/commands` remain canonical inputs in this change.
 - Existing Claude Code plugin outputs remain identity-compatible.
-- Codex plugin consumers receive native skills and hooks through `.codex-plugin/plugin.json`; Codex project subagents remain repository-scoped under `.codex/agents` because the Codex plugin manifest has no subagent component field.
+- Codex plugin consumers receive native skills through `.codex-plugin/plugin.json` and hooks through default `hooks/hooks.json` discovery with the `CLAUDE_PLUGIN_ROOT` compatibility environment; Codex project subagents remain repository-scoped under `.codex/agents` because the Codex plugin manifest has no subagent component field.
 - Generated Codex outputs are not hand-edited.
 - Unsupported source constructs fail with the source path and construct name instead of being silently omitted.
 - No plugin, CLI package, or extension is published in this issue.

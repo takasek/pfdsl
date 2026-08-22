@@ -11,11 +11,6 @@
           },
           {
             "type": "command",
-            "command": "node scripts/stale-dist-guard.mjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "node scripts/main-commit-guard.mjs",
             "timeout": 10
           },
@@ -64,6 +59,11 @@
           {
             "type": "command",
             "command": "node scripts/companion-prose-advisory.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/pre-artifact-advisory.mjs",
             "timeout": 10
           }
         ]

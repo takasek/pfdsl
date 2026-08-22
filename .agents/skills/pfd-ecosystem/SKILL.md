@@ -39,10 +39,10 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 �
 ステップ 2 で Yes になった種別のテンプレートを `.pfdsl/` にコピーする。
 テンプレートは pfd-ops スキルの `references/scaffold/` にある。所在はロード元で異なる（ADR-0028）:
 
-- plugin 経由（通常）: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/references/scaffold/`
-- repo-local: `.claude/skills/pfd-ops/references/scaffold/`
+- plugin 経由（通常）: `${PLUGIN_ROOT}/skills/pfd-ops/references/scaffold/`
+- repo-local: `.agents/skills/pfd-ops/references/scaffold/`
 
-どちらのロード元かの判定（`${CLAUDE_PLUGIN_ROOT}` が置換されず変数名のまま見える場合の扱い）と、どちらも解決しない場合の3つ目の分岐は、pfd-ops SKILL.md「配置ファイルの鮮度セルフチェック」の変数解決規則が一次情報 — ここには複製しない。
+どちらのロード元かの判定（`${PLUGIN_ROOT}` が置換されず変数名のまま見える場合の扱い）と、どちらも解決しない場合の3つ目の分岐は、pfd-ops SKILL.md「配置ファイルの鮮度セルフチェック」の変数解決規則が一次情報 — ここには複製しない。
 
 ```
 <scaffold>/roadmap.pfdsl
@@ -73,7 +73,7 @@ companion をどの言語で書くかは pfd-ops スキルの `references/archit
 node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 ```
 
-`<pfd-ops skill root>` はステップ 3 と同じ規則で解決する（plugin: `${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops`、repo-local: `.claude/skills/pfd-ops`）。
+`<pfd-ops skill root>` はステップ 3 と同じ規則で解決する（plugin: `${PLUGIN_ROOT}/skills/pfd-ops`、repo-local: `.agents/skills/pfd-ops`）。
 既導入リポでは同じコマンドが refresh になる — ローカル編集されたファイルは上書きせず警告するので、編集を捨てて上書きする場合のみユーザーに確認して `--overwrite-local-edits` を付ける（編集を抱えた旧ファイルを編集ごと削除するのは別フラグ `--delete-edited-orphans`。編集の無い旧ファイルはフラグ無しで削除される）。
 バックエンド規約の詳細は pfd-ops スキルの `references/github-issues-backend.md`。
 

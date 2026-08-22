@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import {
 	cpSync,
 	existsSync,
 	mkdirSync,
+	readdirSync,
 	readFileSync,
 	renameSync,
 	rmSync,
@@ -29,9 +31,12 @@ import {
 	DISTRIBUTED_AGENTS,
 	DISTRIBUTED_COMMANDS,
 	DISTRIBUTED_SKILLS,
+	GENERATED_SKILLS,
 } from "./harness-inventory.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const CODEX_ASSEMBLY_LOCK_DIRECTORY = ".codex-assets-assembly.lock";
+const CODEX_COMMAND_SKILLS_MANIFEST = "codex-command-skills.json";
 
 // The agents bundled into plugin/pfdsl/agents/, as .claude/agents/-relative
 // filenames. The harness inventory is the single source of truth, and
@@ -244,8 +249,12 @@ export function buildPluginManifest({
 	};
 }
 
-function stageFile(destination, content, deps) {
-	const temporary = `${destination}.codex-tmp`;
+function temporaryAssemblySibling(destination, kind, runId) {
+	return `${destination}.codex-${kind}-${runId}`;
+}
+
+function stageFile(destination, content, deps, runId) {
+	const temporary = temporaryAssemblySibling(destination, "tmp", runId);
 	try {
 		deps.rmSync(temporary, { force: true });
 		deps.mkdirSync(dirname(temporary), { recursive: true });
@@ -257,8 +266,8 @@ function stageFile(destination, content, deps) {
 	return { destination, temporary };
 }
 
-function stageDirectory(destination, files, deps) {
-	const temporary = `${destination}.codex-tmp`;
+function stageDirectory(destination, files, deps, runId) {
+	const temporary = temporaryAssemblySibling(destination, "tmp", runId);
 	try {
 		deps.rmSync(temporary, { recursive: true, force: true });
 		deps.mkdirSync(temporary, { recursive: true });
@@ -274,6 +283,67 @@ function stageDirectory(destination, files, deps) {
 	return { destination, temporary };
 }
 
+function normalizeCodexMarkdownTree(directory, deps) {
+	if (!deps.readdirSync) return;
+	for (const entry of deps.readdirSync(directory, { withFileTypes: true })) {
+		const path = resolve(directory, entry.name);
+		if (entry.isDirectory()) {
+			normalizeCodexMarkdownTree(path, deps);
+			continue;
+		}
+		if (!entry.isFile() || !path.endsWith(".md")) continue;
+		const source = deps.readFileSync(path, "utf-8");
+		const normalized = source.replace(/(?:\r?\n){2,}$/, "\n");
+		if (normalized !== source) deps.writeFileSync(path, normalized);
+	}
+}
+
+function stageCodexSkillTrees(root, deps, runId) {
+	const destination = resolve(root, ".agents/skills");
+	const temporary = temporaryAssemblySibling(destination, "tmp", runId);
+	try {
+		deps.rmSync(temporary, { recursive: true, force: true });
+		deps.mkdirSync(temporary, { recursive: true });
+		for (const name of DISTRIBUTED_SKILLS) {
+			const source = resolve(root, ".claude/skills", name);
+			const output = resolve(temporary, name);
+			deps.cpSync(source, output, {
+				recursive: true,
+				filter: excludeSkillRootClaudeMd(source),
+			});
+			deps.writeFileSync(
+				resolve(output, "SKILL.md"),
+				claudeInstructionsToAgents(
+					deps.readFileSync(resolve(source, "SKILL.md"), "utf-8"),
+				),
+			);
+		}
+		for (const [name, classification] of Object.entries(GENERATED_SKILLS)) {
+			const source = resolve(root, classification.target);
+			const output = resolve(temporary, name);
+			deps.cpSync(source, output, {
+				recursive: true,
+				filter: excludeSkillRootClaudeMd(source),
+			});
+			deps.writeFileSync(
+				resolve(output, "SKILL.md"),
+				claudeInstructionsToAgents(
+					deps.readFileSync(resolve(source, "SKILL.md"), "utf-8"),
+				),
+			);
+		}
+		normalizeCodexMarkdownTree(temporary, deps);
+	} catch (error) {
+		removeAssemblyArtifact(temporary, deps);
+		throw error;
+	}
+	return { destination, temporary };
+}
+
+function stageRemoval(destination) {
+	return { destination, remove: true };
+}
+
 // Cleanup is best effort because an I/O error while removing a temporary
 // sibling must not replace the staging or publication error that triggered it.
 function removeAssemblyArtifact(path, deps) {
@@ -286,7 +356,7 @@ function removeAssemblyArtifact(path, deps) {
 
 function removeStagedArtifacts(staged, deps) {
 	for (const { temporary } of staged) {
-		removeAssemblyArtifact(temporary, deps);
+		if (temporary) removeAssemblyArtifact(temporary, deps);
 	}
 }
 
@@ -302,20 +372,22 @@ function restoreAssemblyDestination(backup, destination, deps) {
 // replacement phase, preserve prior destinations as siblings and restore them
 // if an individual rename fails. This keeps a failed generation from exposing
 // a mixed old/new Codex surface or a half-written generated tree.
-function publishStaged(staged, deps) {
+function publishStaged(staged, deps, runId) {
 	const published = [];
 	const backups = [];
 	try {
 		for (const entry of staged) {
-			const backup = `${entry.destination}.codex-prev`;
+			const backup = temporaryAssemblySibling(entry.destination, "prev", runId);
 			deps.rmSync(backup, { recursive: true, force: true });
 			const hadDestination = deps.existsSync(entry.destination);
 			if (hadDestination) deps.renameSync(entry.destination, backup);
 			backups.push({ ...entry, backup, hadDestination });
 		}
 		for (const entry of backups) {
-			deps.renameSync(entry.temporary, entry.destination);
-			published.push(entry);
+			if (!entry.remove) {
+				deps.renameSync(entry.temporary, entry.destination);
+				published.push(entry);
+			}
 		}
 	} catch (error) {
 		for (const entry of published.reverse()) {
@@ -335,6 +407,65 @@ function publishStaged(staged, deps) {
 	}
 }
 
+function acquireCodexAssemblyLock(root, deps) {
+	const lockPath = resolve(root, CODEX_ASSEMBLY_LOCK_DIRECTORY);
+	try {
+		deps.mkdirSync(lockPath);
+	} catch (error) {
+		if (error?.code === "EEXIST") {
+			throw new Error(
+				`Codex asset assembly lock is held at ${lockPath}; retry after the active generator completes.`,
+			);
+		}
+		throw error;
+	}
+	return lockPath;
+}
+
+function releaseCodexAssemblyLock(lockPath, deps) {
+	deps.rmSync(lockPath, { recursive: true, force: true });
+}
+
+function commandSkillManifestPath(pluginRoot) {
+	return resolve(pluginRoot, ".codex-plugin", CODEX_COMMAND_SKILLS_MANIFEST);
+}
+
+function commandSkillNames() {
+	const names = DISTRIBUTED_COMMANDS.map(codexCommandSkillName);
+	if (new Set(names).size !== names.length) {
+		throw new Error("Codex command skill names must be unique.");
+	}
+	return names;
+}
+
+function readOwnedCommandSkillDirectories(pluginRoot, deps) {
+	const path = commandSkillManifestPath(pluginRoot);
+	if (!deps.existsSync(path)) return [];
+	let manifest;
+	try {
+		manifest = JSON.parse(deps.readFileSync(path, "utf-8"));
+	} catch {
+		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
+	}
+	if (
+		!manifest ||
+		typeof manifest !== "object" ||
+		!Array.isArray(manifest.ownedSkillDirectories)
+	) {
+		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
+	}
+	const owned = manifest.ownedSkillDirectories;
+	if (
+		new Set(owned).size !== owned.length ||
+		owned.some(
+			(name) => typeof name !== "string" || !/^[a-z0-9][a-z0-9-]*$/.test(name),
+		)
+	) {
+		throw new Error(`${path}: invalid Codex command skill ownership manifest.`);
+	}
+	return owned;
+}
+
 /**
  * Generates the Codex repository and plugin assets from the maintained
  * Claude sources. Each output is first written to a temporary sibling; only
@@ -345,29 +476,42 @@ export function assembleCodexAssets({
 	root,
 	pluginRoot,
 	deps = {
+		cpSync,
 		existsSync,
 		mkdirSync,
+		newRunId: randomUUID,
+		readdirSync,
 		readFileSync,
 		renameSync,
 		rmSync,
 		writeFileSync,
 	},
 }) {
-	const read = (path) => deps.readFileSync(path, "utf-8");
-	const cliVersion = JSON.parse(
-		read(resolve(root, "packages/cli/package.json")),
-	).version;
-	const description = buildPluginDescription({
-		root,
-		readFileSync: deps.readFileSync,
-	});
 	const staged = [];
+	const lockPath = acquireCodexAssemblyLock(root, deps);
+	let primaryError;
 	try {
+		const runId = deps.newRunId?.() ?? randomUUID();
+		const read = (path) => deps.readFileSync(path, "utf-8");
+		const cliVersion = JSON.parse(
+			read(resolve(root, "packages/cli/package.json")),
+		).version;
+		const description = buildPluginDescription({
+			root,
+			readFileSync: deps.readFileSync,
+		});
+		const names = commandSkillNames();
+		const ownedNames = readOwnedCommandSkillDirectories(pluginRoot, deps);
+		const protectedSkillDirectories = new Set([
+			...DISTRIBUTED_SKILLS,
+			...Object.keys(GENERATED_SKILLS),
+		]);
 		staged.push(
 			stageFile(
 				resolve(root, "AGENTS.md"),
 				claudeInstructionsToAgents(read(resolve(root, "CLAUDE.md"))),
 				deps,
+				runId,
 			),
 		);
 		staged.push(
@@ -375,6 +519,7 @@ export function assembleCodexAssets({
 				resolve(root, ".codex/hooks.json"),
 				claudeHooksToCodexHooks(read(resolve(root, ".claude/settings.json"))),
 				deps,
+				runId,
 			),
 		);
 		staged.push(
@@ -382,18 +527,10 @@ export function assembleCodexAssets({
 				resolve(pluginRoot, ".codex-plugin/plugin.json"),
 				`${JSON.stringify(buildCodexPluginManifest({ version: cliVersion, description }), null, 2)}\n`,
 				deps,
+				runId,
 			),
 		);
-		staged.push(
-			stageDirectory(
-				resolve(root, ".agents/skills"),
-				DISTRIBUTED_SKILLS.map((name) => ({
-					path: `${name}/SKILL.md`,
-					content: read(resolve(root, `.claude/skills/${name}/SKILL.md`)),
-				})),
-				deps,
-			),
-		);
+		staged.push(stageCodexSkillTrees(root, deps, runId));
 		staged.push(
 			stageDirectory(
 				resolve(root, ".codex/agents"),
@@ -405,10 +542,19 @@ export function assembleCodexAssets({
 					),
 				})),
 				deps,
+				runId,
 			),
 		);
-		for (const source of DISTRIBUTED_COMMANDS) {
-			const name = codexCommandSkillName(source);
+		staged.push(
+			stageFile(
+				commandSkillManifestPath(pluginRoot),
+				`${JSON.stringify({ ownedSkillDirectories: names }, null, 2)}\n`,
+				deps,
+				runId,
+			),
+		);
+		for (const [index, source] of DISTRIBUTED_COMMANDS.entries()) {
+			const name = names[index];
 			staged.push(
 				stageDirectory(
 					resolve(pluginRoot, "skills", name),
@@ -423,15 +569,26 @@ export function assembleCodexAssets({
 						},
 					],
 					deps,
+					runId,
 				),
 			);
 		}
+		for (const name of ownedNames) {
+			if (names.includes(name) || protectedSkillDirectories.has(name)) continue;
+			staged.push(stageRemoval(resolve(pluginRoot, "skills", name)));
+		}
 
-		publishStaged(staged, deps);
+		publishStaged(staged, deps, runId);
 	} catch (error) {
+		primaryError = error;
 		removeStagedArtifacts(staged, deps);
-		throw error;
 	}
+	try {
+		releaseCodexAssemblyLock(lockPath, deps);
+	} catch (error) {
+		if (!primaryError) throw error;
+	}
+	if (primaryError) throw primaryError;
 }
 
 // Assembles everything gen-plugin.mjs bundles into plugin/pfdsl/ except
@@ -446,17 +603,20 @@ export function assemblePluginDistIndependent({
 	root,
 	pluginRoot,
 	deps = {
+		cpSync,
 		genInstall,
 		mirrorDir,
 		mirrorFiles,
 		writeSkillRefs,
 		existsSync,
+		readdirSync,
 		readFileSync,
 		renameSync,
 		rmSync,
 		writeFileSync,
 		mkdirSync,
 		writeBundleManifest,
+		newRunId: randomUUID,
 		assembleCodexAssets,
 	},
 }) {

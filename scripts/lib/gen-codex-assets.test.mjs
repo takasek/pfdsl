@@ -11,6 +11,7 @@ import {
 	claudeInstructionsToAgents,
 	commandToCodexSkill,
 } from "./gen-codex-assets.mjs";
+import { DISTRIBUTED_COMMANDS } from "./harness-inventory.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -54,6 +55,49 @@ describe("buildCodexPluginManifest", () => {
 });
 
 describe("commandToCodexSkill", () => {
+	it("converts every maintained command argument clause without leaving a Claude placeholder", () => {
+		const expectedInstructions = new Map([
+			[
+				"pfd-cycle.md",
+				"ユーザーがスキル呼び出しとともに指定した内容があれば、作業選択の指定として扱う。",
+			],
+			[
+				"pfd-init.md",
+				"ユーザーがスキル呼び出しとともに指定した内容があれば、引数として扱う。",
+			],
+			[
+				"pfd-retro.md",
+				"ユーザーがスキル呼び出しとともに指定した内容があれば、監査対象範囲の指定として扱う。",
+			],
+		]);
+
+		for (const sourcePath of DISTRIBUTED_COMMANDS) {
+			const output = commandToCodexSkill(
+				sourcePath,
+				readFileSync(resolve(root, ".claude/commands", sourcePath), "utf-8"),
+			);
+			assert.doesNotMatch(output, /\$ARGUMENTS/, sourcePath);
+			assert.match(
+				output,
+				new RegExp(expectedInstructions.get(sourcePath)),
+				sourcePath,
+			);
+		}
+	});
+
+	it("rejects an unrecognized Claude argument construct with its source path", () => {
+		const source =
+			"---\n" +
+			"description: x\n" +
+			"---\n\n" +
+			"Unsupported argument form: $ARGUMENTS\n";
+
+		assert.throws(
+			() => commandToCodexSkill("pfd-unknown.md", source),
+			/pfd-unknown\.md.*\$ARGUMENTS/,
+		);
+	});
+
 	it("preserves the command body except for the Codex argument instruction", () => {
 		const source =
 			"---\n" +

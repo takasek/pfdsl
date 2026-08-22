@@ -18,12 +18,43 @@ export const DISTRIBUTED_AGENTS = Object.freeze([
 	"pfd-implementer.md",
 ]);
 
-export const AGENT_EXCLUSIONS = Object.freeze({
-	"ci-triage.md": "reads this repo's GitHub Actions logs",
-	"issue-worker.md": "encodes this repo's worktree and PR conventions",
-	"local-check-triage.md": "triages this repo's make/pre-commit/test failures",
-	"vscode-ext-debugger.md": "debugs the extension this repo builds",
+export const SOURCE_EXCLUSIONS = Object.freeze({
+	skills: Object.freeze({
+		"distribution-review": "maintainer-only review workflow for this bundle",
+		"prose-mechanization-audit": "audits this repository's prose assets",
+		"retro-pattern-sweep": "audits this repository's retro pattern ledger",
+		"spec-history-finalize": "finalizes this repository's release history",
+		"spec-stress-test": "hardens this repository's normative specification",
+		"vscode-ext-debug": "debugs the extension this repository builds",
+	}),
+	commands: Object.freeze({}),
+	agents: Object.freeze({
+		"ci-triage.md": "reads this repo's GitHub Actions logs",
+		"issue-worker.md": "encodes this repo's worktree and PR conventions",
+		"local-check-triage.md":
+			"triages this repo's make/pre-commit/test failures",
+		"vscode-ext-debugger.md": "debugs the extension this repo builds",
+	}),
 });
+
+export const GENERATED_SOURCES = Object.freeze({
+	skills: Object.freeze({
+		pfdsl: Object.freeze({
+			reason: "generated symlink to the rendered plugin skill tree",
+			source: ".claude/skills/pfdsl",
+			target: "plugin/pfdsl/skills/pfdsl",
+		}),
+	}),
+	commands: Object.freeze({}),
+	agents: Object.freeze({}),
+});
+
+export const SKILL_EXCLUSIONS = SOURCE_EXCLUSIONS.skills;
+export const COMMAND_EXCLUSIONS = SOURCE_EXCLUSIONS.commands;
+export const AGENT_EXCLUSIONS = SOURCE_EXCLUSIONS.agents;
+export const GENERATED_SKILLS = GENERATED_SOURCES.skills;
+export const GENERATED_COMMANDS = GENERATED_SOURCES.commands;
+export const GENERATED_AGENTS = GENERATED_SOURCES.agents;
 
 export const CLAUDE_PLUGIN_MIRRORS = Object.freeze([
 	Object.freeze({

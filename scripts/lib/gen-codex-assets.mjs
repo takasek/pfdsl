@@ -9,6 +9,20 @@ const AGENT_FRONTMATTER_KEYS = new Set([
 ]);
 const READ_ONLY_TOOLS = "Read, Grep, Bash";
 const WORKSPACE_WRITE_TOOLS = "Bash, Read, Edit, Write, Grep, Glob, Skill";
+const CODEX_ARGUMENT_INSTRUCTIONS = new Map([
+	[
+		"引数（あれば作業選択の指定として扱う）: $ARGUMENTS",
+		"ユーザーがスキル呼び出しとともに指定した内容があれば、作業選択の指定として扱う。",
+	],
+	[
+		"引数（あれば）: $ARGUMENTS",
+		"ユーザーがスキル呼び出しとともに指定した内容があれば、引数として扱う。",
+	],
+	[
+		"対象範囲の指定（あれば）: $ARGUMENTS",
+		"ユーザーがスキル呼び出しとともに指定した内容があれば、監査対象範囲の指定として扱う。",
+	],
+]);
 
 function parseFrontmatter(sourcePath, source) {
 	const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
@@ -82,10 +96,19 @@ export function commandToCodexSkill(
 		}
 	}
 	const description = requiredDescription(sourcePath, frontmatter);
-	const codexBody = body.replace(
-		"引数（あれば作業選択の指定として扱う）: $ARGUMENTS",
-		"ユーザーがスキル呼び出しとともに指定した内容があれば、作業選択の指定として扱う。",
-	);
+	let codexBody = body;
+	for (const [
+		claudeInstruction,
+		codexInstruction,
+	] of CODEX_ARGUMENT_INSTRUCTIONS) {
+		codexBody = codexBody.replaceAll(claudeInstruction, codexInstruction);
+	}
+	const unsupportedArgument = codexBody.match(/^.*\$ARGUMENTS.*$/m);
+	if (unsupportedArgument) {
+		throw new Error(
+			`${sourcePath}: unsupported $ARGUMENTS construct ${JSON.stringify(unsupportedArgument[0])}.`,
+		);
+	}
 
 	return `---\nname: ${outputName}\ndescription: ${description}\n---\n${codexBody}`;
 }

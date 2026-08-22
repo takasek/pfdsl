@@ -171,7 +171,7 @@ artifact:
     group: skill_sources
   harness_inventory:
     label: ハーネス中立の配布inventory
-    description: "配布するskill・command・agent・hookの集合とClaude Code plugin mirrorを一元化する。Claude CodeとCodexのadapterは同じinventoryを読むため、ハーネス別allowlistを重複して持たない"
+    description: "配布するskill・command・agent・hookの集合、明示除外、生成分類、Claude Code plugin mirrorを一元化する。Claude CodeとCodexのadapterは同じinventoryを読むため、ハーネス別allowlistを重複して持たない"
     location: ../scripts/lib/harness-inventory.mjs
     group: skill_sources
   release_tag:
@@ -250,15 +250,15 @@ artifact:
     tags: [ gen ]
   codex_adapter_output:
     label: Codex plugin adapter 出力
-    description: "共有inventoryからCodex plugin manifestとcommand由来skillを生成する。Codex plugin manifest の capabilities は Skills のみで、Codex native agent とhooksはpluginではなくリポジトリ開発資産として別に生成する"
-    criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がCodex plugin manifestまたはcommand skillの未再生成を検出し、pre-commitとCIで失敗する
+    description: "共有inventoryからCodex plugin manifestとcommand由来skillを生成する。Codex plugin manifest の capabilities は Skills のみだが、plugin/pfdsl/hooks/hooks.json は既定のhook discoveryで公開され、Codex runtime が互換環境変数 CLAUDE_PLUGIN_ROOT を与えて実行する。Codex native agentはpluginではなくリポジトリ開発資産として別に生成する"
+    criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がCodex plugin manifest・command skill・hookの未再生成を検出し、scripts/lib/gen-plugin.test.mjs がコピー済みplugin hookを CLAUDE_PLUGIN_ROOT 互換環境で実行して、pre-commitとCIで失敗する
     externalStakeholders: [ Codex plugin利用者 ]
-    location: [ ../plugin/pfdsl/.codex-plugin/plugin.json, ../plugin/pfdsl/skills/pfd-cycle/, ../plugin/pfdsl/skills/pfd-init/, ../plugin/pfdsl/skills/pfd-retro/ ]
+    location: [ ../plugin/pfdsl/.codex-plugin/plugin.json, ../plugin/pfdsl/.codex-plugin/codex-command-skills.json, ../plugin/pfdsl/skills/pfd-cycle/, ../plugin/pfdsl/skills/pfd-init/, ../plugin/pfdsl/skills/source-command-pfd-retro/, ../plugin/pfdsl/hooks/ ]
     group: repo_generated
     tags: [ gen ]
   codex_repo_assets:
     label: Codexリポジトリ開発資産
-    description: "CLAUDE.md・.claude/settings.json・共有inventoryをCodex向けに変換したAGENTS.md、.agents/skills、.codex/agents、.codex/hooks.json。adapterは全出力を一時siblingへ書き、成功後にまとめて置換するため半生成状態を公開しない"
+    description: "CLAUDE.md・.claude/settings.json・共有inventoryをCodex向けに変換したAGENTS.md、配布skill tree全体と生成済みpfdsl skill bridgeを含む .agents/skills、.codex/agents、.codex/hooks.json。adapterはrunごとの一時siblingへ書き、rootのassembly lock下で成功後にまとめて置換するため半生成状態を公開しない"
     criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がAGENTS.md、.agents、.codexの未再生成を検出し、pre-commitとCIで失敗する
     externalStakeholders: [ このリポのCodex利用者 ]
     location: [ ../AGENTS.md, ../.agents/skills/, ../.codex/agents/, ../.codex/hooks.json ]

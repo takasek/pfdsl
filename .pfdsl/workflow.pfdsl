@@ -225,8 +225,8 @@ artifact:
     group: generation
   retro_reminder_hook:
     label: retroリマインダhook
-    description: "roadmap.pfdsl へ status: done を追加するコミットの後、pfd-retro の起動を促す advisory reminder を返す PostToolUse(Bash) フック。pfd-ops references/work-cycle.md 手順5 がプロトコル7(a) のバックストップとして要求する（セッション記憶が抜けても done 付与コミットの tool result 経由で気付ける）。delegation_guard・main_branch_guard と違いリポ固有ではなく plugin 同梱物で、gen_plugin が hooks/ をディレクトリごとミラーする"
-    criteria: hooks/hooks.json が PostToolUse へ配線され、plugin 同梱物に含まれ、採用リポで設置作業なしに done 付与コミットの tool result へ reminder が現れる
+    description: "roadmap.pfdsl へ status: done を追加するコミットの後、pfd-retro の起動を促す advisory reminder を返す PostToolUse(Bash) フック。pfd-ops references/work-cycle.md 手順5 がプロトコル7(a) のバックストップとして要求する（セッション記憶が抜けても done 付与コミットの tool result 経由で気付ける）。delegation_guard・main_branch_guard と違いリポ固有ではなく plugin 同梱物で、gen_plugin が hooks/ をディレクトリごとミラーし、Claude CodeとCodex plugin hostは既定の hooks/hooks.json discoveryで公開する"
+    criteria: hooks/hooks.json が PostToolUse へ配線され、plugin 同梱物に含まれ、Codex runtime の CLAUDE_PLUGIN_ROOT 互換環境でcommandが解決し、採用リポで設置作業なしに done 付与コミットの tool result へ reminder が現れる
     location: ../hooks/
     group: generation
   delegation_guard:
