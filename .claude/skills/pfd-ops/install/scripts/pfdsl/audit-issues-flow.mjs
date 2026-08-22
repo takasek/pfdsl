@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Audits sync between GitHub issues and .pfdsl/roadmap.pfdsl.
-// Usage: node scripts/pfdsl/audit-issues-flow.mjs [--fix]
+// Usage: node scripts/pfdsl/audit-issues-flow.mjs [--fix] [--enforce-issue <n> ...]
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -33,14 +33,28 @@ const root = resolve(__dirname, "../..");
 // into .claude/skills/pfd-ops/install/ and runs in adopting repos, which have
 // no scripts/lib/.
 let fix;
+/** @type {number[]} issues whose missing_process must fail rather than advise */
+let enforcedIssues = [];
 try {
 	const { values } = parseArgs({
 		args: process.argv.slice(2),
-		options: { fix: { type: "boolean" } },
+		options: {
+			fix: { type: "boolean" },
+			"enforce-issue": { type: "string", multiple: true },
+		},
 		strict: true,
 		allowPositionals: false,
 	});
 	fix = values.fix === true;
+	enforcedIssues = (values["enforce-issue"] ?? []).map((value) => {
+		const n = Number(value);
+		if (!Number.isInteger(n) || n <= 0) {
+			throw new TypeError(
+				`--enforce-issue expects an issue number, got '${value}'`,
+			);
+		}
+		return n;
+	});
 } catch (err) {
 	console.error(`audit-issues-flow: ${err.message}`);
 	process.exit(2);
@@ -213,7 +227,7 @@ let findings = computeFindings(entries, issues);
 // Returns the partition it printed, so callers deciding the exit code do not
 // walk the same findings again.
 function printFindings(findings) {
-	const parts = partitionFindings(findings);
+	const parts = partitionFindings(findings, { enforcedIssues });
 	const { fixable, manual, advisory } = parts;
 
 	function fmtFinding(f) {
@@ -284,7 +298,7 @@ if (docAfter !== docBefore || newBody !== body) {
 }
 
 // 4. Report remaining manual findings
-const remaining = partitionFindings(findings).manual;
+const remaining = partitionFindings(findings, { enforcedIssues }).manual;
 if (remaining.length > 0) {
 	console.log("remaining manual findings:");
 	printFindings(remaining);

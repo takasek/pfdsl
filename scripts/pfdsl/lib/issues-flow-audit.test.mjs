@@ -1421,4 +1421,22 @@ describe("partitionFindings", () => {
 		assert.deepEqual(parts.manual, []);
 		assert.equal(parts.advisory.length, 1);
 	});
+
+	it("promotes an advisory finding to manual when its issue is enforced", () => {
+		const parts = partitionFindings([advisory], { enforcedIssues: [3] });
+		assert.deepEqual(parts.manual, [advisory]);
+		assert.deepEqual(parts.advisory, []);
+	});
+
+	it("leaves advisory findings for issues outside the enforced set alone", () => {
+		const parts = partitionFindings([advisory], { enforcedIssues: [999] });
+		assert.deepEqual(parts.manual, []);
+		assert.deepEqual(parts.advisory, [advisory]);
+	});
+
+	it("does not promote fixable findings, which --fix still owns", () => {
+		const parts = partitionFindings([fixable], { enforcedIssues: [1] });
+		assert.deepEqual(parts.fixable, [fixable]);
+		assert.deepEqual(parts.manual, []);
+	});
 });

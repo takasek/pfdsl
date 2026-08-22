@@ -1,0 +1,31 @@
+name: check roadmap registration
+
+on:
+  # Before merge, not on close: a PR that closes a flow:managed issue without
+  # registering it has to be caught while it can still be changed (#963).
+  # `edited` is here for the same reason check-closes-reference.yml carries it
+  # — the check reads the set of issues GitHub derives from the PR body, and a
+  # body edit is the only event that reports a change to it.
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - .pfdsl/roadmap.pfdsl
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install yaml
+        run: npm install --no-save yaml
+
+      - name: Check that this PR registers the issues it closes
+        run: node scripts/check-roadmap-registration.mjs --pr "$PR_NUMBER"
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}

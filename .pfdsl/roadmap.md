@@ -40,6 +40,11 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 このリポでは issue close 時に `pfdsl-flow-on-issue-close.yml` が `flow-sync/*` ブランチで flow-sync PR を自動起票する。サイクル開始時に `flow-sync/*` ブランチの PR が open のものがあれば CI が green であることを確認してマージ先行（コンフリクトがある場合は手動解消してからマージ）。それ以外の open PR（機能追加・バグ修正等）は「今回の着手作業に競合するか」を判断軸としてケースバイケースで確認する。`node scripts/cycle-status.mjs` の `openFlowSyncPRs` / `otherOpenPRs` フィールドが手動 `gh pr list` の代替になる。
 
+`.pfdsl/roadmap.pfdsl` を編集する PR には `check-roadmap-registration.yml` が付く（#963）。
+`node scripts/check-roadmap-registration.mjs --pr <n>` が PR の `closingIssuesReferences` から issue を導き、`audit-issues-flow.mjs --enforce-issue <n>` でその issue の `missing_process` だけを FAIL へ昇格させる。
+対象集合を PR 自身から導くのは、実行主体が渡すフラグに依存させないため。
+`edited` を trigger に含めるのは `check-closes-reference.yml` と同じ理由で、PR 本文の編集が対象集合を変えるからである。
+
 **flow-sync PR の CI が `pending`/`action_required` のまま動かない場合**: `github-actions[bot]` が起票した PR は workflow run が承認待ち（`action_required`）で止まり、放置すると CI が green にならないまま preflight が詰まる。GitHub MCP の `actions_list`（`list_workflow_runs`, branch でフィルタ）で該当 run の `conclusion` を確認し、`action_required` なら `actions_run_trigger`（`method: rerun_workflow_run`）で明示的に再実行する。
 
 **`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`gh-exec.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では REST fallback へ落ちる（#489）。fallback が答えられる argv の形は `gh-compat.mjs` の `planGhRestCall` が持つものだけで、それ以外は `gh` 不在のエラーがそのまま出る。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、issue 本文の design-unsettled 判定は `issue_read`（`get`）で本文を読んで手動判定、`audit-issues-flow` 相当は対象 issue の `location:`・`updated_at:` を roadmap.pfdsl の記載と手動突合する。

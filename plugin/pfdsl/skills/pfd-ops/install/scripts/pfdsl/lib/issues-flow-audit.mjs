@@ -225,14 +225,22 @@ export function computeFindings(entries, issues) {
  * repairs, `manual` ones a human resolves and the audit fails on, and
  * `advisory` ones that are reported but never fail (see the `missing_process`
  * comment above for why that class exists).
- * @param {{fixVia?: string, advisory?: boolean}[]} findings
+ *
+ * `enforcedIssues` names the issues for which advisory is too weak — the
+ * caller is in a position to close the gap for those and nothing else. A PR
+ * that edits the roadmap is such a caller: the issues it closes are the ones
+ * it can register, and the rest belong to branches it cannot reach.
+ * @param {{issueNumber?: number, fixVia?: string, advisory?: boolean}[]} findings
+ * @param {{enforcedIssues?: number[]}} [options]
  * @returns {{fixable: object[], manual: object[], advisory: object[]}}
  */
-export function partitionFindings(findings) {
+export function partitionFindings(findings, { enforcedIssues = [] } = {}) {
+	const enforced = new Set(enforcedIssues);
+	const blocking = (f) => !f.advisory || enforced.has(f.issueNumber);
 	return {
 		fixable: findings.filter((f) => f.fixVia),
-		manual: findings.filter((f) => !f.fixVia && !f.advisory),
-		advisory: findings.filter((f) => !f.fixVia && f.advisory),
+		manual: findings.filter((f) => !f.fixVia && blocking(f)),
+		advisory: findings.filter((f) => !f.fixVia && !blocking(f)),
 	};
 }
 
