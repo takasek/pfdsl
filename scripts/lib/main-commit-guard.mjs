@@ -1,8 +1,8 @@
-// Blocks git commands that change the working tree or index while the current
-// branch is main (#650, widened in #777). CLAUDE.md and work-cycle.md both say
-// "main への直接コミットをしない" — the ecosystem's develop → PR → merge_pr
-// path is the only one that runs gate-check and review. Nothing has broken
-// this yet, but what has enforced it so far is attention alone.
+// Blocks or asks about git commands that change the working tree or index when
+// the target is main (#650, widened in #777) or another worktree in the same
+// repository (#784). CLAUDE.md and work-cycle.md require each session to keep
+// its work inside its own worktree so gate-check and review see one coherent
+// change set.
 //
 // Commits were the whole of it until a worktree session's shell cwd reverted
 // to the main checkout and staged two files there (#777). The commit itself
@@ -192,39 +192,56 @@ export function resolveCommandCwd(command, hookCwd) {
 }
 
 /**
+ * Whether a command targets another worktree of the session's own repository.
+ * @param {{worktreeRoot: string, commonDir: string} | null} sessionRoots
+ * @param {{worktreeRoot: string, commonDir: string} | null} targetRoots
+ */
+export function crossesWorktree(sessionRoots, targetRoots) {
+	if (!sessionRoots || !targetRoots) return false;
+	return (
+		sessionRoots.commonDir === targetRoots.commonDir &&
+		sessionRoots.worktreeRoot !== targetRoots.worktreeRoot
+	);
+}
+
+/**
  * Decide whether a PreToolUse Bash invocation may proceed.
  * @param {object} payload PreToolUse hook payload
- * @param {{currentBranch: string | undefined, mainBranch?: string}} context
+ * @param {{currentBranch: string | undefined, mainBranch?: string, crossesWorktree?: boolean}} context
  * @returns {{decision: "allow"} | {decision: "deny" | "ask", reason: string}}
  */
 export function evaluateMainCommitGuard(
 	payload,
-	{ currentBranch, mainBranch = "main" } = {},
+	{ currentBranch, mainBranch = "main", crossesWorktree = false } = {},
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
 	const guarded = classifyGitCommand(payload?.tool_input?.command);
 	if (!guarded) return { decision: "allow" };
-	if (!currentBranch || currentBranch !== mainBranch)
-		return { decision: "allow" };
+	const targetsDefaultBranch = currentBranch === mainBranch;
+	if (!targetsDefaultBranch && !crossesWorktree) return { decision: "allow" };
 
 	const command = `git ${guarded.subcommand}`;
 	if (guarded.decision === "deny") {
 		return {
 			decision: "deny",
 			reason:
-				`Blocked '${command}' on '${mainBranch}': this repo's ecosystem requires develop → PR → merge_pr, ` +
-				"and the main checkout's index is shared by every session, so anything staged here rides along on " +
-				"the next commit made there. Create or switch to a feature branch first (e.g. via the worktree " +
-				"skill), then run it there.",
+				crossesWorktree && !targetsDefaultBranch
+					? `Blocked '${command}' in a sibling worktree: this session must only change its own worktree. Switch the session's active directory to the target worktree before running it there.`
+					: `Blocked '${command}' on '${mainBranch}': this repo's ecosystem requires develop → PR → merge_pr, ` +
+						"and the main checkout's index is shared by every session, so anything staged here rides along on " +
+						"the next commit made there. Create or switch to a feature branch first (e.g. via the worktree " +
+						"skill), then run it there.",
 		};
 	}
 	return {
 		decision: "ask",
 		reason:
-			`'${command}' on '${mainBranch}' would change the main checkout's working tree, which every session ` +
-			"shares — it can discard another session's uncommitted edits. It is also how CLAUDE.md says to repair " +
-			"a tree that was written to by mistake, and this hook cannot tell the two apart. Confirm only if this " +
-			"is the repair.",
+			crossesWorktree && !targetsDefaultBranch
+				? `'${command}' would change a sibling worktree, which can discard another session's uncommitted edits. Confirm only if this session intentionally owns that target worktree.`
+				: `'${command}' on '${mainBranch}' would change the main checkout's working tree, which every session ` +
+					"shares — it can discard another session's uncommitted edits. It is also how CLAUDE.md says to repair " +
+					"a tree that was written to by mistake, and this hook cannot tell the two apart. Confirm only if this " +
+					"is the repair.",
 	};
 }
 
@@ -238,7 +255,7 @@ export function evaluateMainCommitGuard(
  * version repeated the tool_name/classify check there and carried a comment
  * asking the next reader to keep the two copies in sync by hand.
  * @param {string} inputText raw stdin payload
- * @param {{resolveBranches: (payload: object) => {currentBranch?: string, mainBranch?: string}}} io
+ * @param {{resolveBranches: (payload: object) => {currentBranch?: string, mainBranch?: string, crossesWorktree?: boolean}}} io
  * @returns {{shouldOutput: boolean, output?: object}}
  */
 export function runMainCommitGuard(inputText, { resolveBranches }) {

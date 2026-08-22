@@ -9,6 +9,7 @@ import {
 	git,
 	gitDiffNames,
 	gitLsFiles,
+	resolveGitRoots,
 	run,
 	tryGit,
 	tryRun,
@@ -17,6 +18,32 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("run-exec", () => {
+	it("resolves a linked worktree and its shared repository roots", () => {
+		const calls = [];
+		const roots = resolveGitRoots("/repo/.claude/worktrees/topic", {
+			exec: (args, opts) => {
+				calls.push([args, opts]);
+				if (args.includes("--show-toplevel")) {
+					return { ok: true, out: "/repo/.claude/worktrees/topic\n" };
+				}
+				return { ok: true, out: "../../../.git\n" };
+			},
+		});
+
+		assert.deepEqual(roots, {
+			worktreeRoot: "/repo/.claude/worktrees/topic",
+			commonDir: "/repo/.git",
+			mainRoot: "/repo",
+		});
+		assert.deepEqual(
+			calls.map(([args, opts]) => [args, opts.cwd]),
+			[
+				[["rev-parse", "--show-toplevel"], "/repo/.claude/worktrees/topic"],
+				[["rev-parse", "--git-common-dir"], "/repo/.claude/worktrees/topic"],
+			],
+		);
+	});
+
 	it("passes an argument containing shell metacharacters through verbatim", () => {
 		const marker = resolve(tmpdir(), `run-exec-injection-${process.pid}`);
 		rmSync(marker, { force: true });

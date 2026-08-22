@@ -11,6 +11,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { dirname, resolve } from "node:path";
 
 const MAX_BUFFER = 32 * 1024 * 1024;
 
@@ -66,6 +67,25 @@ export function git(args, opts = {}) {
 /** `tryRun` bound to git. */
 export function tryGit(args, opts = {}) {
 	return tryRun("git", args, opts);
+}
+
+/**
+ * Resolve the current worktree and shared repository roots for `cwd`.
+ * @param {string} cwd
+ * @param {{exec?: (args: string[], opts: {cwd: string}) => {ok: boolean, out: string}}} [opts]
+ * @returns {{worktreeRoot: string, commonDir: string, mainRoot: string} | null}
+ */
+export function resolveGitRoots(cwd, { exec = tryGit } = {}) {
+	const toplevel = exec(["rev-parse", "--show-toplevel"], { cwd });
+	const common = exec(["rev-parse", "--git-common-dir"], { cwd });
+	if (!toplevel.ok || !common.ok) return null;
+
+	const commonDir = resolve(cwd, common.out.trim());
+	return {
+		worktreeRoot: toplevel.out.trim(),
+		commonDir,
+		mainRoot: dirname(commonDir),
+	};
 }
 
 /**

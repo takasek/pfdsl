@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
 	classifyGitCommand,
+	crossesWorktree,
 	evaluateMainCommitGuard,
 	resolveCommandCwd,
 	runMainCommitGuard,
@@ -201,6 +202,30 @@ describe("resolveCommandCwd", () => {
 });
 
 describe("evaluateMainCommitGuard", () => {
+	it("recognizes a different worktree only when both roots share one repository", () => {
+		const session = {
+			worktreeRoot: "/repo/.claude/worktrees/a",
+			commonDir: "/repo/.git",
+			mainRoot: "/repo",
+		};
+		assert.equal(
+			crossesWorktree(session, {
+				...session,
+				worktreeRoot: "/repo/.claude/worktrees/b",
+			}),
+			true,
+		);
+		assert.equal(crossesWorktree(session, session), false);
+		assert.equal(
+			crossesWorktree(session, {
+				worktreeRoot: "/other/worktree",
+				commonDir: "/other/.git",
+				mainRoot: "/other",
+			}),
+			false,
+		);
+	});
+
 	it("ignores tools other than Bash", () => {
 		const result = evaluateMainCommitGuard(
 			{
@@ -242,6 +267,27 @@ describe("evaluateMainCommitGuard", () => {
 			currentBranch: "feature/x",
 		});
 		assert.equal(result.decision, "allow");
+	});
+
+	it("denies staging when a feature-branch session targets a sibling worktree (#784)", () => {
+		const result = evaluateMainCommitGuard(payload({ command: "git add -A" }), {
+			currentBranch: "feature/other",
+			crossesWorktree: true,
+		});
+		assert.equal(result.decision, "deny");
+		assert.match(result.reason, /sibling worktree/);
+	});
+
+	it("asks before restoring files in a sibling worktree (#784)", () => {
+		const result = evaluateMainCommitGuard(
+			payload({ command: "git restore src/x.ts" }),
+			{
+				currentBranch: "feature/other",
+				crossesWorktree: true,
+			},
+		);
+		assert.equal(result.decision, "ask");
+		assert.match(result.reason, /sibling worktree/);
 	});
 
 	it("allows a commit on a feature branch", () => {

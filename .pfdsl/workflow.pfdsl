@@ -237,8 +237,8 @@ artifact:
     group: generation
   main_branch_guard:
     label: mainブランチ操作ガード
-    description: "main ブランチ上でツリー・インデックスを変える git コマンドを止める PreToolUse(Bash) フック（#650、#777 で commit 以外へ拡張）。develop→PR→merge_pr を正規経路にする規約を、指示でなく権限として強制する。delegation_guard と同じくリポ固有で配布対象外。実体のファイル名は commit のみを見ていた頃のもので、リネームすると起動中セッションが持つ settings.json の配線が消えたパスを指すため据え置いている"
-    criteria: main 上の変更系 git コマンドが deny または ask になり、読み取り系と feature branch 上の操作は影響を受けないことが scripts/lib/main-commit-guard.test.mjs のテストで検証されている
+    description: "main ブランチ上または同一リポジトリの別 worktree 上でツリー・インデックスを変える git コマンドを止める PreToolUse(Bash) フック（#650、#777 で commit 以外へ拡張、#784 で worktree 間越境へ拡張）。develop→PR→merge_pr とセッションごとの worktree 分離を、指示でなく権限として強制する。delegation_guard と同じくリポ固有で配布対象外。実体のファイル名は commit のみを見ていた頃のもので、リネームすると起動中セッションが持つ settings.json の配線が消えたパスを指すため据え置いている"
+    criteria: main 上または CLAUDE_PROJECT_DIR と異なる同一リポジトリの worktree 上の変更系 git コマンドが deny または ask になり、読み取り系とセッション自身の feature branch 上の操作は影響を受けないことが scripts/lib/main-commit-guard.test.mjs のテストで検証されている
     location: ../scripts/main-commit-guard.mjs
     group: generation
   ecosystem_skill:
