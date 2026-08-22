@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Checks whether a dist file (e.g. packages/cli/dist/cli.js) is stale
 // relative to its sibling src/ directory (packages/cli/src/), so the drift
 // gates in scripts/check-drift-gates.mjs can skip instead of trusting a
@@ -7,8 +6,7 @@
 // had checks of its own that asked the same question in sh; they moved into
 // the drift gates script (#755, #759).
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
-import { isCliEntrypoint } from "./cli-entrypoint.mjs";
+import { dirname, isAbsolute, join } from "node:path";
 
 function newestMtimeUnder(dir) {
 	let newest = 0;
@@ -42,23 +40,4 @@ export function isDistStale(distFile) {
 	const srcDir = join(dirname(dirname(distFile)), "src");
 	if (!existsSync(srcDir)) return false;
 	return statSync(distFile).mtimeMs < newestMtimeUnder(srcDir);
-}
-
-// CLI mode: exit 0 if fresh, 1 if stale/absent, 2 if asked without a path.
-// The third case has to be its own exit code because a caller reads "stale" as
-// "skip this drift check and say so", so one that dropped its argument would
-// silently turn the check off (#648). The sh caller that rule was written for
-// is gone (see the header) and both remaining callers import isDistStale
-// directly, so what exercises this mode now is
-// scripts/lib/script-argv.test.mjs. The exit codes stay as the contract for
-// the next caller: the failure they guard against is the silent kind.
-if (isCliEntrypoint(import.meta.url, process.argv[1])) {
-	const distFile = process.argv[2];
-	if (!distFile) {
-		console.error("Usage: node scripts/lib/dist-freshness.mjs <distFile>");
-		process.exit(2);
-	}
-	// Argv paths stay cwd-relative, as a command line's paths are — the
-	// resolution happens here, at the boundary, rather than inside the rule.
-	process.exit(isDistStale(resolve(process.cwd(), distFile)) ? 1 : 0);
 }
