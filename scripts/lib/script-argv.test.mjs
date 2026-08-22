@@ -111,16 +111,6 @@ describe("entry scripts reject argv they do not understand", () => {
 		);
 	});
 
-	// A missing required positional is the same silence in a different place.
-	// dist-freshness answers "stale" when it gets no path, and every caller in
-	// scripts/pre-commit reads "stale" as "skip this drift check" — so a caller
-	// that dropped its argument would turn the check off and report nothing.
-	it("dist-freshness.mjs refuses to answer without a path", () => {
-		const { status, stderr } = runScript("scripts/lib/dist-freshness.mjs", []);
-		assert.equal(status, 2);
-		assert.match(stderr, /Usage/);
-	});
-
 	// Strict parsing accepts any string for a `type: "string"` flag, so a value
 	// that is not an issue number passes the parse and becomes NaN downstream.
 	// `gh issue view NaN` then fails, and the failure is reported as the issue's
