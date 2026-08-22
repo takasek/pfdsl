@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+	advisoryKey,
 	formatPreArtifactAdvisory,
 	isImplementationArtifactWrite,
 	runPreArtifactAdvisory,
@@ -130,6 +131,35 @@ describe("isImplementationArtifactWrite", () => {
 			),
 			false,
 		);
+	});
+});
+
+describe("advisoryKey", () => {
+	it("scopes a delegate apart from its caller", () => {
+		assert.notEqual(
+			advisoryKey({ session_id: "s" }),
+			advisoryKey({ session_id: "s", agent_id: "a" }),
+		);
+	});
+
+	it("does not let a separator inside an id alias two scopes", () => {
+		assert.notEqual(
+			advisoryKey({ session_id: "a:b" }),
+			advisoryKey({ session_id: "a", agent_id: "b" }),
+		);
+	});
+
+	it("treats an agent_id that is not a usable string as the caller", () => {
+		const caller = advisoryKey({ session_id: "s" });
+		for (const agent_id of ["", null, 7, {}, undefined]) {
+			assert.equal(advisoryKey({ session_id: "s", agent_id }), caller);
+		}
+	});
+
+	it("returns null when there is no session to scope to", () => {
+		assert.equal(advisoryKey({ agent_id: "a" }), null);
+		assert.equal(advisoryKey({ session_id: "" }), null);
+		assert.equal(advisoryKey({}), null);
 	});
 });
 

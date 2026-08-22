@@ -90,6 +90,12 @@ export function formatPreArtifactAdvisory(reminders) {
  * implementation as an ordinary path, the actor that misses out would
  * routinely be the one actually writing the code. Each delegate gets its own
  * scope instead, and so does the caller.
+ *
+ * The pair is JSON-encoded rather than joined on a separator. Nothing
+ * documents the id formats, and joining on `:` makes session `"a:b"` with no
+ * delegate collide with session `"a"` delegate `"b"` — two unrelated scopes
+ * sharing one mark, so one of them never sees the advisory at all. The
+ * encoding only has to be unambiguous; the wrapper hashes whatever comes back.
  * @param {object} payload PostToolUse hook payload
  * @returns {string | null}
  */
@@ -97,9 +103,8 @@ export function advisoryKey(payload) {
 	const session = payload?.session_id;
 	if (typeof session !== "string" || session === "") return null;
 	const agent = payload?.agent_id;
-	return typeof agent === "string" && agent !== ""
-		? `${session}:${agent}`
-		: session;
+	const delegate = typeof agent === "string" && agent !== "" ? agent : null;
+	return JSON.stringify([session, delegate]);
 }
 
 /**
