@@ -548,6 +548,8 @@ describe("assemblePluginDistIndependent", () => {
 			root: "/repo",
 			pluginRoot: "/repo/plugin/pfdsl",
 			codexPluginRoot: "/repo/plugin/pfdsl-codex",
+			legacyOwned: { codex: [], legacy: [] },
+			cleanupLegacyClaudeRoot: false,
 			deps,
 		});
 	});
@@ -570,6 +572,96 @@ describe("assemblePluginDistIndependent", () => {
 			"writeBundleManifest",
 			"/repo/plugin/pfdsl",
 		]);
+	});
+
+	it("removes migrated Claude-root outputs before recording the bundle content hash", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const legacyOwnershipManifest = `${pluginRoot}/.codex-plugin/codex-command-skills.json`;
+		const legacyOutputs = [
+			`${pluginRoot}/skills/pfd-cycle`,
+			`${pluginRoot}/.codex-plugin`,
+			`${pluginRoot}/codex`,
+		];
+		const { calls, deps } = fakeDeps({
+			existsSync: (path) => path === legacyOwnershipManifest,
+			readFileSync: (path) => {
+				if (path === legacyOwnershipManifest) {
+					return JSON.stringify({
+						skillRoot: "codex/skills",
+						ownedSkillDirectories: ["pfd-cycle"],
+					});
+				}
+				return String(path).endsWith("marketplace.json")
+					? JSON.stringify(fakeMarketplace)
+					: JSON.stringify({ version: "1.2.3" });
+			},
+			rmSync: (path) => calls.push(["rmSync", path]),
+		});
+
+		assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps });
+
+		const bundleManifest = calls.findIndex(
+			(call) => call[0] === "writeBundleManifest",
+		);
+		for (const output of legacyOutputs) {
+			const cleanup = calls.findIndex(
+				(call) => call[0] === "rmSync" && call[1] === output,
+			);
+			assert.ok(
+				cleanup >= 0 && cleanup < bundleManifest,
+				`${output} must be removed before recording the bundle content hash`,
+			);
+		}
+	});
+
+	it("restores the Claude snapshot and skips publication when legacy cleanup fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const transactionRoot = "/repo/plugin/.pfdsl-gen-txn-cleanup-failure-test";
+		const legacySkill = `${pluginRoot}/skills/pfd-cycle`;
+		const legacyOwnershipManifest = `${pluginRoot}/.codex-plugin/codex-command-skills.json`;
+		const { calls, deps } = fakeDeps({
+			cpSync: (from, to) => calls.push(["cpSync", from, to]),
+			existsSync: (path) =>
+				path === pluginRoot || path === legacyOwnershipManifest,
+			newRunId: () => "cleanup-failure-test",
+			readFileSync: (path) => {
+				if (path === legacyOwnershipManifest) {
+					return JSON.stringify({
+						skillRoot: "codex/skills",
+						ownedSkillDirectories: ["pfd-cycle"],
+					});
+				}
+				return String(path).endsWith("marketplace.json")
+					? JSON.stringify(fakeMarketplace)
+					: JSON.stringify({ version: "1.2.3" });
+			},
+			renameSync: (from, to) => calls.push(["renameSync", from, to]),
+			rmSync: (path) => {
+				calls.push(["rmSync", path]);
+				if (path === legacySkill) throw new Error("legacy cleanup failed");
+			},
+		});
+
+		assert.throws(
+			() => assemblePluginDistIndependent({ root: "/repo", pluginRoot, deps }),
+			/legacy cleanup failed/,
+		);
+		assert.equal(
+			calls.some((call) => call[0] === "writeBundleManifest"),
+			false,
+		);
+		assert.equal(
+			calls.some((call) => call[0] === "assembleCodexAssets"),
+			false,
+		);
+		assert.ok(
+			calls.some(
+				(call) =>
+					call[0] === "renameSync" &&
+					call[1] === `${transactionRoot}/plugin-root` &&
+					call[2] === pluginRoot,
+			),
+		);
 	});
 
 	it("restores both plugin roots when the later Codex assembly fails", () => {

@@ -12,11 +12,11 @@ import {
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { canonicalPluginSkillSource } from "./distribution-sources.mjs";
 import {
 	BUNDLE_MANIFEST_RELATIVE_PATH,
 	writeBundleManifest,
 } from "./bundle-manifest.mjs";
+import { canonicalPluginSkillSource } from "./distribution-sources.mjs";
 import {
 	addGeneratedMarkdownNotice,
 	addGeneratedSourceComment,
@@ -667,16 +667,32 @@ function readOwnedCommandSkillDirectories(pluginRoot, deps) {
 	return { codex: owned, legacy: [] };
 }
 
+function legacyClaudeCleanupDestinations(
+	pluginRoot,
+	legacyOwnedNames,
+	protectedSkillDirectories,
+) {
+	return [
+		...legacyOwnedNames
+			.filter((name) => !protectedSkillDirectories.has(name))
+			.map((name) => resolve(pluginRoot, "skills", name)),
+		resolve(pluginRoot, ".codex-plugin"),
+		resolve(pluginRoot, "codex"),
+	];
+}
+
 /**
  * Generates the Codex repository and plugin assets from the maintained
  * Claude sources. Each output is first written to a temporary sibling; only
  * after every write succeeds are the destinations replaced together.
- * @param {{root: string, pluginRoot: string, codexPluginRoot?: string, deps?: object}} options
+ * @param {{root: string, pluginRoot: string, codexPluginRoot?: string, legacyOwned?: {codex: string[], legacy: string[]}, cleanupLegacyClaudeRoot?: boolean, deps?: object}} options
  */
 export function assembleCodexAssets({
 	root,
 	pluginRoot,
 	codexPluginRoot = resolve(root, "plugin/pfdsl-codex"),
+	legacyOwned: suppliedLegacyOwned,
+	cleanupLegacyClaudeRoot = true,
 	deps = {
 		cpSync,
 		existsSync,
@@ -704,7 +720,8 @@ export function assembleCodexAssets({
 		});
 		const names = commandSkillNames();
 		readOwnedCommandSkillDirectories(codexPluginRoot, deps);
-		const legacyOwned = readOwnedCommandSkillDirectories(pluginRoot, deps);
+		const legacyOwned =
+			suppliedLegacyOwned ?? readOwnedCommandSkillDirectories(pluginRoot, deps);
 		const protectedSkillDirectories = new Set([
 			...DISTRIBUTED_SKILLS,
 			...Object.keys(GENERATED_SKILLS),
@@ -797,12 +814,15 @@ export function assembleCodexAssets({
 				runId,
 			),
 		);
-		for (const name of legacyOwned.legacy) {
-			if (protectedSkillDirectories.has(name)) continue;
-			staged.push(stageRemoval(resolve(pluginRoot, "skills", name)));
+		if (cleanupLegacyClaudeRoot) {
+			for (const destination of legacyClaudeCleanupDestinations(
+				pluginRoot,
+				legacyOwned.legacy,
+				protectedSkillDirectories,
+			)) {
+				staged.push(stageRemoval(destination));
+			}
 		}
-		staged.push(stageRemoval(resolve(pluginRoot, ".codex-plugin")));
-		staged.push(stageRemoval(resolve(pluginRoot, "codex")));
 
 		publishStaged(staged, deps, runId);
 	} catch (error) {
@@ -912,6 +932,18 @@ export function assemblePluginDistIndependent({
 		);
 
 		deps.writeSkillRefs(root, resolve(pluginRoot, "skills/pfdsl"));
+		const legacyOwned = readOwnedCommandSkillDirectories(pluginRoot, deps);
+		const protectedSkillDirectories = new Set([
+			...DISTRIBUTED_SKILLS,
+			...Object.keys(GENERATED_SKILLS),
+		]);
+		for (const destination of legacyClaudeCleanupDestinations(
+			pluginRoot,
+			legacyOwned.legacy,
+			protectedSkillDirectories,
+		)) {
+			deps.rmSync(destination, { recursive: true, force: true });
+		}
 
 		// Last inside the Claude root: the recorded hash covers every other file in the bundle.
 		// Recording it before Codex assembly means a manifest failure rolls back this root before the other transaction begins.
@@ -920,7 +952,14 @@ export function assemblePluginDistIndependent({
 			`plugin/pfdsl/${BUNDLE_MANIFEST_RELATIVE_PATH} ← content hash of the assembled bundle`,
 		);
 
-		deps.assembleCodexAssets({ root, pluginRoot, codexPluginRoot, deps });
+		deps.assembleCodexAssets({
+			root,
+			pluginRoot,
+			codexPluginRoot,
+			legacyOwned,
+			cleanupLegacyClaudeRoot: false,
+			deps,
+		});
 	} catch (error) {
 		for (const [destination, snapshot] of [
 			...transaction.snapshots,
