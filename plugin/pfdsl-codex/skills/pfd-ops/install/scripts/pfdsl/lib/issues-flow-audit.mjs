@@ -270,6 +270,7 @@ export function computeFindings(entries, issues) {
 				issueNumber: iss.number,
 				processId: undefined,
 				artifactId: undefined,
+				advisory: true,
 				detail: `open issue has no tracked process and no flow label`,
 			});
 		}

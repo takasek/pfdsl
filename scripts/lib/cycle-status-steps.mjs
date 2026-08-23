@@ -316,6 +316,8 @@ export async function runCycleStatus({
 	let artifactKey = null;
 	/** @type {number[]} target issues labelled flow:managed with no process yet */
 	const unregisteredManagedIssues = [];
+	/** @type {number[]} target issues with no flow label and no process yet */
+	const untriagedTargetIssues = [];
 	if (targetIssues.length > 0) {
 		if (roadmapText === null) {
 			try {
@@ -348,6 +350,13 @@ export async function runCycleStatus({
 				if (labels === undefined) continue;
 				if (isUnregisteredManagedIssue(labels, processId)) {
 					unregisteredManagedIssues.push(issue);
+				}
+				if (
+					processId === null &&
+					!labels.includes("flow:managed") &&
+					!labels.includes("flow:exempt")
+				) {
+					untriagedTargetIssues.push(issue);
 				}
 			}
 			const resolvedProcessIds = new Set(
@@ -430,6 +439,7 @@ export async function runCycleStatus({
 		reviewRecordTemplate: buildReviewRecordTemplate(),
 		gateCheckCommand,
 		unregisteredManagedIssues,
+		untriagedTargetIssues,
 		preArtifactPatterns,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;

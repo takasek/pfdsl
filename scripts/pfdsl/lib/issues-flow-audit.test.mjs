@@ -377,10 +377,10 @@ describe("computeFindings", () => {
 		assert.ok(f);
 		assert.equal(f.issueNumber, 99);
 		assert.equal(f.fixVia, undefined);
-		assert.notEqual(
+		assert.equal(
 			f.advisory,
 			true,
-			"untriaged stays blocking: an unlabelled issue is a triage the cycle owns",
+			"untriaged must not block unrelated branches: the target cycle enforces its own issue separately",
 		);
 	});
 
@@ -1526,6 +1526,16 @@ describe("partitionFindings", () => {
 		const parts = partitionFindings([advisory], { enforcedIssues: [999] });
 		assert.deepEqual(parts.manual, []);
 		assert.deepEqual(parts.advisory, [advisory]);
+	});
+
+	it("enforces only the target issue while unrelated untriaged issues stay advisory", () => {
+		const target = { type: "untriaged", issueNumber: 3, advisory: true };
+		const unrelated = { type: "untriaged", issueNumber: 4, advisory: true };
+		const parts = partitionFindings([target, unrelated], {
+			enforcedIssues: [3],
+		});
+		assert.deepEqual(parts.manual, [target]);
+		assert.deepEqual(parts.advisory, [unrelated]);
 	});
 
 	it("does not promote fixable findings, which --fix still owns", () => {
