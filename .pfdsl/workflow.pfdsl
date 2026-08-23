@@ -81,13 +81,13 @@ artifact:
     group: generation
   distribution_review_record:
     label: 配布レビュー記録
-    description: "承認済み commit hash（reviewed.json）と回ごとの実行記録。hash を進めるのは差分モードだけで、全文モードは記録だけを残す。check-distribution-review.mjs が記録と配布ツリーの齟齬を判定し、decide_release の pre-tag checks で release を止める"
+    description: "承認済み commit hash（reviewed.json）と回ごとの実行記録。hash を進めるのは差分モードだけで、全文モードは記録だけを残す。check-distribution-review.mjs が記録と配布ツリーの齟齬を判定し、各 release 判断の pre-tag checks で release を止める"
     criteria: reviewed.json の commit と HEAD の間に、レビュー対象スコープの差分が無い
     location: ../docs/distribution-review/
     group: release
   retro_pattern_sweep_record:
     label: retroパターン棚卸し記録
-    description: "retro-patterns 対象の棚卸し済み commit hash（docs/asset-sweep/retro-patterns.json）と回ごとの実行記録。check-asset-sweep.mjs が、前回の記録以降にカタログへ追加されたファイル数を SWEEP_TARGETS の閾値と比べ、超えていれば decide_release の pre-tag checks で release を止める。prose_mechanization_sweep_record と別ノードなのは記録を対象ごとに分けているからで、分ける理由は scripts/lib/asset-sweep.mjs の SWEEP_TARGETS の JSDoc が一次情報"
+    description: "retro-patterns 対象の棚卸し済み commit hash（docs/asset-sweep/retro-patterns.json）と回ごとの実行記録。check-asset-sweep.mjs が、前回の記録以降にカタログへ追加されたファイル数を SWEEP_TARGETS の閾値と比べ、超えていれば各 release 判断の pre-tag checks で release を止める。prose_mechanization_sweep_record と別ノードなのは記録を対象ごとに分けているからで、分ける理由は scripts/lib/asset-sweep.mjs の SWEEP_TARGETS の JSDoc が一次情報"
     criteria: retro-patterns.json が指す commit と HEAD の間で、.pfdsl/bindings/pfd-retro-patterns/ に追加されたファイル数が閾値未満
     location: ../docs/asset-sweep/
     group: release
@@ -97,10 +97,20 @@ artifact:
     criteria: prose-mechanization.json が指す commit と HEAD の間で、scripts/・hooks/ 直下に追加されたエントリポイント数が閾値未満
     location: ../docs/asset-sweep/
     group: release
-  release_tag:
-    label: リリースタグ
-    description: "decide_release が push する v* / lib-v* / vscode-v* タグ。判断の終端であり、これ以降の npm publish・vsix 生成・marketplace アップロードは判断を含まないため runtime-pipeline.pfdsl が持つ"
-    criteria: make release-status で behind でないことを確認したうえで打たれたタグが push 済み
+  cli_release_request:
+    label: CLIリリース要求
+    description: "make release-status の @pfdsl/cli 欄を材料に、公開する版と make release を実行する判断を外化した入力。runtime-pipeline.pfdsl が v* tag と npm 公開へ変換する"
+    criteria: "@pfdsl/cli の公開要否と版が決まり、make release VERSION=<VERSION> を実行できる"
+    group: release
+  libraries_release_request:
+    label: ライブラリリリース要求
+    description: "make release-status の3ライブラリ欄を材料に、公開する版と make release-libs を実行する判断を外化した入力。runtime-pipeline.pfdsl が lib-v* tag と npm 公開へ変換する"
+    criteria: 3ライブラリの公開要否と共通版が決まり、make release-libs VERSION=<VERSION> を実行できる
+    group: release
+  vscode_release_request:
+    label: VSCode拡張リリース要求
+    description: "make release-status の takasek.pfdsl 欄を材料に、パッケージする版と make vscode-package を実行する判断を外化した入力。runtime-pipeline.pfdsl の単一変換が .vsix を生成した後に vscode-v* tag を push する"
+    criteria: VSCode拡張のパッケージ要否と版が決まり、make vscode-package VERSION=<VERSION> を実行できる
     group: release
   user_intent:
     label: ユーザーの関心・意図
@@ -169,13 +179,13 @@ artifact:
     group: planning
   published_cli:
     label: npm 公開 CLI
-    description: "runtime-pipeline.pfdsl の publish_packages が生産する。toolchain の CLI 部分または plugin 同梱物（配布スキル群と pfd-* コマンド・agents）が変更されたら公開が必要という判定は decide_release が担う。この図では README 更新の入力に現れる"
+    description: "runtime-pipeline.pfdsl の publish_cli が生産する。toolchain の CLI 部分または plugin 同梱物（配布スキル群と pfd-* コマンド・agents）が変更されたら公開が必要という判定は decide_cli_release が担う。この図では README 更新の入力に現れる"
     criteria: npm view @pfdsl/cli versions に packages/cli/package.json の version が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
     group: release
   published_libraries:
     label: npm 公開ライブラリ群
-    description: "runtime-pipeline.pfdsl の publish_packages が生産する。toolchain のライブラリ部分が変更されたら公開が必要という判定は decide_release が担う。この図では README 更新の入力に現れる"
+    description: "runtime-pipeline.pfdsl の publish_libraries が生産する。toolchain のライブラリ部分が変更されたら公開が必要という判定は decide_libraries_release が担う。この図では README 更新の入力に現れる"
     criteria: make release-libs が公開する各パッケージについて、npm view <pkg> versions に当該 package.json の version が含まれる
     location: https://www.npmjs.com/package/@pfdsl/core
     group: release
@@ -428,10 +438,20 @@ process:
     description: "PR をレビューし main へ統合する。成果物はマージで正本になり、進捗・issue 更新もここで確定する。location はこのプロセスのうち機械化されている部分を指す — pr_diagrams の生成・配送がそれにあたり、その location（外部リポの URL）からは実装へ辿れないため、実装パスはこちらが持つ"
     location: ../.github/workflows/pr-diff-images.yml
     group: planning
-  decide_release:
-    label: リリース判断・タグ打ち
-    description: "事前に make release-status で behind を確認し、公開するか・どの版で切るかを判断してタグを push する。旧 publish_cli / publish_libraries / publish_ext のうち判断を含む部分がこれ（ADR-0035）。タグ以降の npm publish・vsix 生成・marketplace アップロードは判断を含まないため runtime-pipeline.pfdsl が持つ。make release 完了後、roadmap の publish_cli_* プロセスのうち ready になったものの出力 artifact を自動 done 化してコミット・push する（#278）。バージョン番号からの artifact ID 逆算はしない — ready 判定はグラフの入力充足のみで行うため、計画外リリースでも整合する。手作業は make release のみ"
-    command: "make release VERSION=<VERSION>"
+  decide_cli_release:
+    label: CLIリリース判断
+    description: "make release-status で @pfdsl/cli と plugin 同梱物の behind を確認し、公開するか・どの版で切るかを判断する。判断後の v* tag push・npm publish は runtime-pipeline.pfdsl が持つ。make release 完了後、roadmap の publish_cli_* プロセスのうち ready になったものの出力 artifact を自動 done 化してコミット・push する（#278）。バージョン番号からの artifact ID 逆算はしない"
+    command: "make release-status"
+    group: release
+  decide_libraries_release:
+    label: ライブラリリリース判断
+    description: "make release-status で core・graphviz-exporter・preview-engine の behind を確認し、3ライブラリを公開するか・どの共通版で切るかを判断する。判断後の lib-v* tag push・npm publish は runtime-pipeline.pfdsl が持つ"
+    command: "make release-status"
+    group: release
+  decide_vscode_release:
+    label: VSCode拡張リリース判断
+    description: "make release-status で takasek.pfdsl の behind を確認し、拡張をパッケージするか・どの版で切るかを判断する。判断後の .vsix 生成・vscode-v* tag push・marketplace アップロードは runtime-pipeline.pfdsl が持つ"
+    command: "make release-status"
     group: release
   review_distribution:
     label: 配布プロンプトのレビュー
@@ -573,4 +593,8 @@ prose_mechanization_sweep_record >>? externalize_bindings
 retro_pattern_sweep_record >>? externalize_bindings
 retro_pattern_sweep_skill >>? sweep_retro_patterns
 
-[distribution_review_record, prose_mechanization_sweep_record, retro_pattern_sweep_record, toolchain] >> decide_release -> release_tag
+[distribution_review_record, prose_mechanization_sweep_record, retro_pattern_sweep_record, toolchain] >> decide_cli_release -> cli_release_request
+
+[distribution_review_record, prose_mechanization_sweep_record, retro_pattern_sweep_record, toolchain] >> decide_libraries_release -> libraries_release_request
+
+[distribution_review_record, prose_mechanization_sweep_record, retro_pattern_sweep_record, toolchain] >> decide_vscode_release -> vscode_release_request

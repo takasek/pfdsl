@@ -144,3 +144,9 @@ PFD が効果を発揮した局面の事例ログ。体感した時点で追記�
 - 効果: セッション文脈（会話履歴・作業中の issue・直前の編集内容）を一切持たない agent が、カタログのフォールバックチェーン（binding → 一次情報 → instance）だけを頼りに、実在する構造欠陥6件を file:line アンカー付きで検出した（#390）。「実測できるかどうかのデモ」のつもりが、そのまま dogfood の実 finding を生んだ。反実仮想: main thread（セッション文脈込み）で同じ監査をしていたら、直前の #357/#386 作業に注意が引かれ `workflow.pfdsl` 自体の unrelated な構造欠陥は見落とされていた可能性が高い — 「セッション文脈が無いこと」自体が独立した視点として機能した
 - 学習: A/B 層の main thread からの隔離（#357 の設計動機）は「context 節約」だけでなく「作業中の思考に引きずられないレビュー」という副次効果を持つ。実測要件（criteria の「実測1回」）を書き換えて緩和せず実際に踏んだ（#384 での criteria 書き換えは差し戻され、本ラウンドで正規の実測に置き換わった）ことで、この効果が確認できた
 - 参照: #357、#384（初回実装・criteria 差し戻し）、#386（実測issue）、#390（今回検出した findings）、`.claude/agents/pfd-lens.md`
+
+## 2026-08-23 入力反実仮想が時間順の偽依存を除去
+
+- 局面: issue #978 の release pipeline 再設計で、VSCode release の `.vsix` 生成後に tag push が失敗する部分成功をどうモデル化するか独立設計レビューと再検証した
+- 効果: 「tag 処理は `.vsix` を読むか」という入力反実仮想により、時間順を `vsix_package >> create_tag` という偽依存へ変える案を撤回できた。正常完了時の未検証 `.vsix` と remote tag は単一 process の複数出力、candidate を実際に読むローカル検証は独立 process とし、途中失敗の残存物は companion の例外記述へ分離した。実装にない recovery path と制御 token をグラフへ持ち込まず、検証済み package の criteria も生産経路へ一致させられた
+- 参照: issue #978、PR #989、`docs/quality-guide.md`「複数出力は正常完了時の成果物を表す」

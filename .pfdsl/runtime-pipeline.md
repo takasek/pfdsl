@@ -24,7 +24,7 @@
 - **b（処理系）**: `tags: [b]` の process 群。実体は `@pfdsl/core` + `graphviz-exporter` + `preview-engine` + `metadata-exporter` の4パッケージ（各 process の `location` 参照）
 - **c（PFD読み書き分析skill）**: `pfdsl_skill`。bのホストとしては図外（次節）だが、`gen_skill` の生成物であり `gen_plugin` の同梱素材でもあるため、その2つの役では図に現れる
 - **d（VSCode拡張）**: `packages/vscode-extension/`。図に現れない — bのホストであり、データを供給も保管もしないため（次節）
-- **e（a,bの配布）**: `publish_packages`（タグ起点の npm publish）と `package_vsix` / `upload_vsix`。ADR-0035 までは workflow.pfdsl 側にあったが、タグが押された後の公開変換に判断は入らないためこちらへ移した。リリース可否・版数の判断は workflow.pfdsl の `decide_release` が持ち、この図はその出力 `release_tag` を入力として受ける
+- **e（a,bの配布）**: `push_cli_release_tag` / `publish_cli`、`push_libraries_release_tag` / `publish_libraries`、`package_vscode_release` / `verify_vsix` / `upload_vsix`。ADR-0035 までは workflow.pfdsl 側にあったが、release request 以降の変換に判断は入らないためこちらへ移した。リリース可否・版数の判断は workflow.pfdsl の3種の decide process が持ち、この図は kind ごとの release request を入力として受ける
 - **f（PFD運用フレームワーク）**: `tags: [f1]`（L1+L2 汎用層）/ `tags: [f2]`（L3 GitHub Issues バックエンド層）。f2 は規約本文（`ops_skill_l3`）と採用テンプレート（`ops_install_templates`）の2 artifact に分かれる — 前者は手書き、後者は `gen_install` の生成物であり、生成経路も ADR-0035 でこの図へ移った（`ops_install_sources` → `gen_install` → `ops_install_templates`）。内容・retro フィードバックの一次情報は workflow.pfdsl の `ops_skill_general` / `ops_skill_l3`
 - **g（fの配布）**: `tags: [g]` の process 群。make gen-plugin（Claude Code / Codex両対応の組み立て）・Claude Code plugin marketplace（既存のインストール経路）・check-install-sync.mjs（実配置とランタイム照合）が実装。`gen_plugin` と `gen_install` は生成でもあるため `gen` タグも併せ持つ
 
@@ -63,15 +63,16 @@ dist 非依存の手動再生成は `scripts/gen-plugin-dist-independent.mjs` �
 - **gen_install（`scripts/lib/install-templates.mjs` の明示リスト）**: repo ルートの配布ソースから `install/` ミラーを一方向で再生成する。生成の向きは repo ルート → `install/` → `plugin/` の一本のみ（#547 で双方向 sync を廃止）
 - **plugin root assembly（`scripts/gen-plugin.mjs`）**: `pnpm -r build && make gen-plugin` が、共有inventory（`scripts/lib/harness-inventory.mjs`）の手書き`.claude/skills`・`.claude/commands`・`.claude/agents`配布対象、`CLAUDE.md`、`.claude/settings.json`、hooksから両ハーネスの出力を生成する。`.claude/skills/pfdsl` は `plugin/pfdsl/skills/pfdsl` への生成symlinkなので、このcanonical inputに含めず手編集しない。Claude Code adapterは既存のplugin tree・manifest・marketplace記述を`plugin/pfdsl/`へidentity互換に組み立てる。Codex adapterはrepositoryの`AGENTS.md`・`.agents/`・`.codex/`と、native skill tree・manifest・hooksを`plugin/pfdsl-codex/`へ生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、二つのrootを混在させない。内部でgen_installを実行するため、pluginが古い`install/`から組まれることはない
 - **render_previews（`make gen-samples`）**: 機能カタログとロードマップを dot/svg に描画する。`.dot` / README は graphviz-exporter、`.svg` は preview-engine の wasm graphviz で生成され、いずれも決定論的（#588）
-- **publish_packages**: `v*` タグで `@pfdsl/cli`、`lib-v*` タグでライブラリ群を GitHub Actions が npm publish する（Trusted Publishing / OIDC）。ライブラリは core → graphviz-exporter → preview-engine の順
-- **package_vsix / upload_vsix**: `make vscode-package` が `.vsix` を生成し、人が marketplace.visualstudio.com へアップロードする
+- **push_cli_release_tag / publish_cli**: `make release` が `v*` tag を push し、その tag だけを起動条件として `publish-cli.yml` が `@pfdsl/cli` を npm publish する（Trusted Publishing / OIDC）
+- **push_libraries_release_tag / publish_libraries**: `make release-libs` が `lib-v*` tag を push し、その tag だけを起動条件として `publish-libraries.yml` が core → graphviz-exporter → preview-engine の順で npm publish する
+- **package_vscode_release / verify_vsix / upload_vsix**: `make vscode-package` は未検証 `.vsix` を生成し、成功後に `vscode-v*` tag を push する。1回の実行が正常完了したときの `.vsix` candidate と remote tag を同じ process の複数出力とし、tag に対応する publish workflow は置かない。人が candidate をローカルインストールして拡張の起動を確認した後、検証済み `.vsix` を marketplace.visualstudio.com へアップロードする
 
-**判断の境界は `release_tag` にある。** リリースするか・どの版で切るかは workflow.pfdsl の `decide_release` が判断し、タグが押された後の変換に判断は入らない。
+**判断の境界は kind ごとの release request にある。** リリースするか・どの版で切るかは workflow.pfdsl の `decide_cli_release` / `decide_libraries_release` / `decide_vscode_release` が判断し、request 以降の変換に判断は入らない。CLI と libraries は tag が対応する publish workflow をゲートする。VSCode拡張は `scripts/release.mjs` の実行順どおり `.vsix` 生成後に tag を push するが、tag 処理は `.vsix` ファイルを読まないため両者をデータ依存の別 process にせず、同じ process の必須出力として順序を description に記す。ローカル検証は candidate を実際に読む別 process であり、検証済み package だけを upload へ渡す。
 そのため公開チェーン全体がこの図の収録対象になる。
 
-**`upload_vsix` はこの図で唯一の人手ノードである。** 判断を含まないため、実行主体が人であってもこちらに置く（ADR-0035）。
-機械の変換チェーンの中で1ノードだけ浮く構図が、そのまま自動化候補の指摘になっている。
-marketplace の発行 API を使う経路を整えればこのノードは消える。
+**`verify_vsix` と `upload_vsix` はこの図の2つの人手ノードである。** どちらも判断を含まないため、実行主体が人であってもこちらに置く（ADR-0035）。
+機械の変換チェーンに残る人手境界が、そのまま自動化候補の指摘になっている。
+ローカルインストールの smoke test と marketplace の発行 API を使う経路を整えれば、それぞれのノードは消える。
 
 ## plugin 配布チェーンの依存
 
@@ -88,6 +89,7 @@ marketplace の発行 API を使う経路を整えればこのノードは消え
 
 ## エラー・例外処理
 
+- `package_vscode_release` は正常完了時の出力をモデル化する。`.vsix` 生成後に tag 作成または push が失敗すると `.vsix` やローカル tag が残ることがあるが、remote に tag が無い限り release は未完了であり、それらの残存物を正常成果物とは扱わない。`verify_vsix` が失敗した場合は remote tag が残る一方、検証済み `vsix_package` は生産されず `upload_vsix` がブロックされる
 - 診断は `severity: "error" | "warning"` を持つ。`check --strict` は一部の警告（例: V011 フィードバック検証）をエラー昇格させる
 - `svgToBinary`（PDF/PNG化）は `puppeteer` が未インストールだと例外を投げる（メッセージ本文は `packages/graphviz-exporter/src/index.ts` が一次情報）。SVG化（wasm 経路）はこの依存を必要としない
 - primary graph（`>>` / `->`）の循環は `check` が V010 error として検出する（`>>?` は対象外）。循環する構造は `>>?` か改版 artifact で表現する — pfdsl skill の品質ガイド参照
