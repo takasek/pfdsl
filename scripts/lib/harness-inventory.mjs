@@ -16,6 +16,41 @@ function mapping(target, disposition, outputs, probe) {
 	});
 }
 
+const SKILL_SOURCE_FILES = Object.freeze({
+	"pfd-ecosystem": Object.freeze(["SKILL.md", "references/kind-taxonomy.md"]),
+	"pfd-grill": Object.freeze(["SKILL.md"]),
+	"pfd-ops": Object.freeze([
+		"SKILL.md",
+		"install/.github/workflows/pfdsl-flow-on-issue-close.yml",
+		"install/scripts/pfdsl/audit-issues-flow.mjs",
+		"install/scripts/pfdsl/lib/gh-compat.mjs",
+		"install/scripts/pfdsl/lib/gh-exec.mjs",
+		"install/scripts/pfdsl/lib/github-rest.mjs",
+		"install/scripts/pfdsl/lib/issues-flow-audit.mjs",
+		"install/scripts/pfdsl/lib/proxy-fetch-worker.mjs",
+		"install/scripts/pfdsl/lib/proxy-fetch.mjs",
+		"install/scripts/pfdsl/lib/yaml-require.mjs",
+		"install/scripts/pfdsl/normalize-pfdsl.mjs",
+		"references/architecture.md",
+		"references/file-based-tracker-backend.md",
+		"references/github-issues-backend.md",
+		"references/scaffold/bindings/pfd-ops.md",
+		"references/scaffold/bindings/pfd-retro-patterns/sample-pattern.md",
+		"references/scaffold/bindings/pfd-retro.md",
+		"references/scaffold/review-perspectives.md",
+		"references/scaffold/roadmap.md",
+		"references/scaffold/roadmap.pfdsl",
+		"references/scaffold/runtime-pipeline.md",
+		"references/scaffold/runtime-pipeline.pfdsl",
+		"references/scaffold/workflow.md",
+		"references/scaffold/workflow.pfdsl",
+		"references/work-cycle.md",
+		"scripts/check-install-sync.mjs",
+		"scripts/plugin-version-check.mjs",
+	]),
+	"pfd-retro": Object.freeze(["SKILL.md"]),
+});
+
 function exclusion(target, reason, impact) {
 	return Object.freeze({
 		target,
@@ -49,12 +84,14 @@ function capability(id, kind, source, mappings) {
 }
 
 function skillCapability(name, source = {}) {
+	const files = SKILL_SOURCE_FILES[name];
 	return capability(
 		`skill:${name}`,
 		"skill",
 		{
 			encoding: "claude-skill",
 			path: `.claude/skills/${name}`,
+			...(files ? { files } : {}),
 			...source,
 		},
 		fourTargetMappings(
@@ -251,7 +288,16 @@ export const HARNESS_CAPABILITY_CONTRACT = Object.freeze([
 	capability(
 		"plugin-metadata",
 		"plugin-metadata",
-		{ encoding: "cli-package-metadata", path: "packages/cli/package.json" },
+		{
+			encoding: "cli-package-metadata",
+			path: "packages/cli/package.json",
+			identity: Object.freeze({
+				name: "pfdsl",
+				author: Object.freeze({ name: "takasek" }),
+				homepage: "https://github.com/takasek/pfdsl",
+				license: "MIT",
+			}),
+		},
 		fourTargetMappings(
 			exclusion(
 				"claude-repository",
@@ -319,6 +365,10 @@ export const DISTRIBUTED_AGENTS = Object.freeze(
 );
 
 export const SOURCE_EXCLUSIONS = Object.freeze({
+	root: Object.freeze({
+		"pfd-ops-install-manifest.json":
+			"install provenance for the repository-local pfd-ops skill",
+	}),
 	skills: Object.freeze({
 		"distribution-review": "maintainer-only review workflow for this bundle",
 		"prose-mechanization-audit": "audits this repository's prose assets",
