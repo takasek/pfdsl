@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+	artifactReachesProcess,
 	edgeMembers,
 	findUnmodeledMirrors,
 	findUnwiredSkills,
@@ -160,6 +161,25 @@ describe("edgeMembers", () => {
 	});
 });
 
+describe("artifactReachesProcess", () => {
+	it("does not count feedback as primary delivery", () => {
+		const edges = [
+			{ kind: "feedback", artifact: "source", process: "decoder" },
+			{ kind: "output", artifact: "model", process: "decoder" },
+			{ kind: "input", artifact: "model", process: "gen_plugin" },
+		];
+		assert.equal(artifactReachesProcess(edges, "source", "gen_plugin"), false);
+	});
+
+	it("rejects a source that reaches only an unrelated process", () => {
+		const edges = [
+			{ kind: "input", artifact: "source", process: "unrelated" },
+			{ kind: "output", artifact: "other", process: "unrelated" },
+		];
+		assert.equal(artifactReachesProcess(edges, "source", "gen_plugin"), false);
+	});
+});
+
 describe("findUnmodeledMirrors", () => {
 	const run = (overrides = {}) =>
 		findUnmodeledMirrors({
@@ -265,7 +285,7 @@ describe("findUnwiredSkills", () => {
 			{
 				id: "newcomer_skill",
 				location: "../.claude/skills/pfd-ops/",
-				missing: ["distill_ops outputs", "gen_plugin inputs"],
+				missing: ["distill_ops outputs", "reach gen_plugin"],
 				declaredIn: "workflow",
 			},
 		]);
@@ -278,7 +298,7 @@ describe("findUnwiredSkills", () => {
 		const found = run({ pipelineEdges });
 		assert.equal(found.length, 1);
 		assert.equal(found[0].id, "grill_skill");
-		assert.deepEqual(found[0].missing, ["gen_plugin inputs"]);
+		assert.deepEqual(found[0].missing, ["reach gen_plugin"]);
 	});
 
 	it("ignores a skill the bundle manifest does not mirror", () => {
@@ -322,7 +342,7 @@ describe("findUnwiredSkills", () => {
 			{
 				id: "multi_location_skill",
 				location: ["../docs/samples/", "../.claude/skills/pfd-ops/"],
-				missing: ["distill_ops outputs", "gen_plugin inputs"],
+				missing: ["distill_ops outputs", "reach gen_plugin"],
 				declaredIn: "workflow",
 			},
 		]);
@@ -353,7 +373,7 @@ describe("findUnwiredSkills", () => {
 			{
 				id: "newcomer_skill",
 				location: "../.claude/skills/pfd-ops/",
-				missing: ["distill_ops outputs", "gen_plugin inputs"],
+				missing: ["distill_ops outputs", "reach gen_plugin"],
 				declaredIn: "workflow",
 			},
 		]);
@@ -372,13 +392,13 @@ describe("findUnwiredSkills", () => {
 			{
 				id: "retro_skill",
 				location: "../.claude/skills/pfd-retro/",
-				missing: ["gen_plugin inputs"],
+				missing: ["reach gen_plugin"],
 				declaredIn: "workflow",
 			},
 		]);
 	});
 
-	it("requires only gen_plugin inputs of a pipeline-only bundled artifact, the pfd_commands case (#944)", () => {
+	it("requires only gen_plugin reachability of a pipeline-only bundled artifact, the pfd_commands case (#944)", () => {
 		const pipelineArtifacts = {
 			pfd_commands: { location: "../.claude/commands/" },
 		};
@@ -398,13 +418,13 @@ describe("findUnwiredSkills", () => {
 			{
 				id: "pfd_commands",
 				location: "../.claude/commands/",
-				missing: ["gen_plugin inputs"],
+				missing: ["reach gen_plugin"],
 				declaredIn: "pipeline",
 			},
 		]);
 	});
 
-	it("reports nothing for a pipeline-only bundled artifact once gen_plugin inputs carries it", () => {
+	it("reports nothing for a pipeline-only bundled artifact once it reaches gen_plugin", () => {
 		const pipelineArtifacts = {
 			pfd_commands: { location: "../.claude/commands/" },
 		};
@@ -422,6 +442,107 @@ describe("findUnwiredSkills", () => {
 		assert.equal(
 			found.some((f) => f.id === "pfd_commands"),
 			false,
+		);
+	});
+
+	it("accepts bundled sources that reach gen_plugin through the harness decoder and model", () => {
+		const workflowArtifacts = {
+			retro_skill: {
+				location: "../.claude/skills/pfd-retro/",
+			},
+		};
+		const workflowEdges = [
+			{
+				kind: "output",
+				artifact: "retro_skill",
+				process: "distill_ops",
+			},
+		];
+		const pipelineArtifacts = {
+			claude_harness_sources: { location: "../.claude/skills/" },
+		};
+		const pipelineEdges = [
+			{
+				kind: "input",
+				artifact: "claude_harness_sources",
+				process: "decode_harness_capabilities",
+			},
+			{
+				kind: "input",
+				artifact: "harness_inventory",
+				process: "decode_harness_capabilities",
+			},
+			{
+				kind: "input",
+				artifact: "toolchain",
+				process: "decode_harness_capabilities",
+			},
+			{
+				kind: "output",
+				artifact: "harness_capability_model",
+				process: "decode_harness_capabilities",
+			},
+			{
+				kind: "input",
+				artifact: "harness_capability_model",
+				process: "gen_plugin",
+			},
+		];
+
+		assert.deepEqual(
+			run({
+				workflowArtifacts,
+				workflowEdges,
+				pipelineArtifacts,
+				pipelineEdges,
+			}),
+			[],
+		);
+	});
+
+	it("rejects a bundled source when the reachable aggregate does not overlap its location", () => {
+		const workflowArtifacts = {
+			retro_skill: { location: "../.claude/skills/pfd-retro/" },
+		};
+		const workflowEdges = [
+			{ kind: "output", artifact: "retro_skill", process: "distill_ops" },
+		];
+		const pipelineArtifacts = {
+			claude_harness_sources: { location: "../.claude/agents/" },
+		};
+		const pipelineEdges = [
+			{
+				kind: "input",
+				artifact: "claude_harness_sources",
+				process: "decode_harness_capabilities",
+			},
+			{
+				kind: "output",
+				artifact: "harness_capability_model",
+				process: "decode_harness_capabilities",
+			},
+			{
+				kind: "input",
+				artifact: "harness_capability_model",
+				process: "gen_plugin",
+			},
+		];
+
+		assert.deepEqual(
+			run({
+				workflowArtifacts,
+				workflowEdges,
+				pipelineArtifacts,
+				pipelineEdges,
+			}),
+			[
+				{
+					id: "retro_skill",
+					location: "../.claude/skills/pfd-retro/",
+					missing: ["reach gen_plugin"],
+					declaredIn: "workflow",
+				},
+			],
 		);
 	});
 });

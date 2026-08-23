@@ -166,14 +166,19 @@ artifact:
     group: gen_sources
   claude_harness_sources:
     label: 現行のClaude Code手書き入力
-    description: "短期の maintained source は CLAUDE.md、.claude/settings.json、およびharness_inventoryが選ぶ .claude/skills・commands・agents の配布対象である。hooks/ は distributed_advisory_hooks が別artifactとして持つ。.claude/skills/pfdsl は plugin/pfdsl/skills/pfdsl への生成symlinkであり、正本入力でも編集先でもない。将来の中立正本移行では、この入力側だけを差し替え、inventory と各adapterの出力契約を維持する"
-    location: [ ../CLAUDE.md, ../.claude/settings.json, ../.claude/commands/, ../.claude/agents/ ]
+    description: "短期のmaintained sourceはCLAUDE.md、.claude/settings.json、harness_inventoryが選ぶ.claude/skills・commands・agentsの配布対象、およびhooksである。.claude/skills/pfdslはgenerated/skills/pfdslへの生成symlinkであり、正本入力でも編集先でもない。将来の中立正本移行では、この入力側だけを差し替え、capability ID・四target mapping・各adapterの出力契約を維持する"
+    location: [ ../CLAUDE.md, ../.claude/settings.json, ../.claude/skills/, ../.claude/commands/, ../.claude/agents/, ../hooks/ ]
     group: skill_sources
   harness_inventory:
     label: ハーネス中立の配布inventory
-    description: "配布するskill・command・agent・hookの集合、明示除外、生成分類、Claude Code plugin mirrorを一元化する。Claude CodeとCodexのadapterは同じinventoryを読むため、ハーネス別allowlistを重複して持たない"
+    description: "配布するskill・command・agent・hookの集合と生成分類を一元化し、各capabilityのclaude-repository・claude-plugin・codex-repository・codex-plugin mappingを宣言する。各targetの処分はnative・transform・intentional exclusionのいずれか一つであり、ハーネス別allowlistを重複して持たない"
     location: ../scripts/lib/harness-inventory.mjs
     group: skill_sources
+  harness_capability_model:
+    label: ハーネス中立capabilityモデル
+    description: "Claude Code固有のsource topologyとschemaをdecoderで閉じ込め、capability ID・kind・意味データ・source encoding・四targetのdelivery mappingを保持する、decode済みかつcontract検証済みのsemantic record集合。両adapterはこの同一objectを兄弟入力として消費し、相手方の生成rootやmanifestを入力にしない"
+    criteria: node --test scripts/lib/harness-capability-contract.test.mjs scripts/lib/harness-source-decoder.test.mjs scripts/lib/harness-inventory.test.mjs が、四target mappingの一意性とsource topology/schema closureを検証して成功する
+    group: gen_sources
   cli_release_request:
     label: CLIリリース要求
     description: "workflow.pfdsl の decide_cli_release が生産する、公開版を選択済みの CLI release 入力"
@@ -201,59 +206,12 @@ artifact:
     description: "make vscode-package が .vsix 生成の成功後に push する vscode-v* tag。対応する publish workflow は無い"
     criteria: git ls-remote --tags origin refs/tags/vscode-v<VERSION> が ref を返す
     group: gen_sources
-  ops_skill_general:
-    label: PFD運用フレームワーク 汎用層
-    description: "pfd-opsのL1（汎用手順）+L2（ディスパッチ）。SKILL.md本文で配布。L4（リポ固有）は配布対象外でpfd-ops自体に含まれない。内容の一次情報はworkflow.pfdslのops_skill_general"
-    location: ../.claude/skills/pfd-ops/SKILL.md
-    group: skill_sources
-    tags: [ f1 ]
-  ops_skill_l3:
-    label: PFD運用フレームワーク GitHub Issuesバックエンド層
-    description: "pfd-opsのL3プリセットの規約本文。内容の一次情報はworkflow.pfdslのops_skill_l3。採用リポが配置するテンプレート本体はops_install_templates"
-    location: ../.claude/skills/pfd-ops/references/github-issues-backend.md
-    group: skill_sources
-    tags: [ f2 ]
-  retro_skill:
-    label: ふりかえり監査スキル
-    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う"
-    location: ../.claude/skills/pfd-retro/
-    group: skill_sources
-  ecosystem_skill:
-    label: PFDセット構築スキル
-    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う"
-    location: ../.claude/skills/pfd-ecosystem/
-    group: skill_sources
-  grill_skill:
-    label: 後ろ向き対話構築スキル
-    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う"
-    location: ../.claude/skills/pfd-grill/
-    group: skill_sources
-  pfd_commands:
-    label: pfd-*スラッシュコマンド
-    description: "/pfd-cycle・/pfd-init・/pfd-retro の起動口となるコマンド定義。対応するスキル本体（ops_skill_general・ecosystem_skill・retro_skill）とは別ファイルであり、同梱対象としても別に扱われる。手書き、生成対象外。ここではplugin_distへの同梱対象としてのみ扱う。内容の一次情報はworkflow.pfdslだが、そちらではコマンド定義がスキル本体のartifactのdescriptionへ畳まれており専用artifactを持たない。gen_pluginが両者を別パスから集めるため、この図では意図的に別artifactへ割ってある（#780で案Bを採用し、粒度差を解消せず意図として明記する側に倒した）"
-    location: ../.claude/commands/
-    group: skill_sources
-  pfd_lens_agent:
-    label: pfd-lens agent
-    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
-    location: ../.claude/agents/pfd-lens.md
-    group: skill_sources
-  distributed_advisory_hooks:
-    label: plugin配布advisory hooks
-    description: "内容の意味は workflow.pfdsl が一次情報。ここでは gen_plugin と assemble_codex_plugin が消費する hooks/ ディレクトリ全体の入力としてのみ扱い、ファイル単位の列挙は持たない"
-    location: ../hooks/
-    group: skill_sources
-  implementer_agent:
-    label: 実装委譲agent
-    description: "agent定義はplugin同梱対象。留保指定を強制するPreToolUseガードは別のartifact（workflow.pfdslのdelegation_guard、実体はscripts/delegation-guard.mjs）であり、リポ固有のため配布せずこの図には現れない（内容の一次情報はworkflow.pfdsl）。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
-    location: ../.claude/agents/pfd-implementer.md
-    group: skill_sources
   pfdsl_skill:
     label: PFD読み書き分析skill（リポ内）
-    description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。make gen-skillで再生成し手編集禁止。実体は plugin/pfdsl/skills/pfdsl（追跡対象の配布コピー）であり、リポ内の .claude/skills/pfdsl はそこへの生成symlinkであって、canonical inputでも編集先でもない（#714）。以前は同じ一次ソースから独立再生成される別コピーだったが、ブランチ切替で古い版が残りエージェントが旧ブランチの規約を読む経路になっていた。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため図には現れない"
-    criteria: make gen-skill が差分なしで完了し、.claude/skills/pfdsl が生成先への symlink である
+    description: "AIエージェントに.pfdsl操作（check/fmt/render/diff/meta sort等のCLIコマンド）を指示するスキル。make gen-skillで中立なgenerated/skills/pfdslへ再生成し手編集禁止。Claude CodeとCodexのadapterはこの正本を各plugin rootへ別々にコピーし、リポ内の .claude/skills/pfdsl は中立正本への生成symlinkである。bの呼び出し元（ホスト）でもあるが、その関係はデータフローではないため図には現れない"
+    criteria: make gen-skill が差分なしで完了し、.claude/skills/pfdsl が generated/skills/pfdsl への symlink である
     externalStakeholders: [ このリポのAIエージェント ]
-    location: ../plugin/pfdsl/skills/pfdsl/
+    location: ../generated/skills/pfdsl/
     group: repo_generated
     tags: [ c, gen ]
   ops_install_templates:
@@ -265,24 +223,24 @@ artifact:
     tags: [ f2, gen ]
   claude_adapter_output:
     label: Claude Code adapter 出力
-    description: "共有inventoryに従い、Claude Codeが読むskill tree・Markdown command・Markdown agent・hooks・Claude plugin manifestとmarketplace記述を生成する。既存のClaude Code marketplace導入経路はidentity互換のまま維持する"
-    criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がClaude plugin出力の未再生成を検出し、pre-commitとCIで失敗する
+    description: "harness_capability_modelのclaude-repository・claude-plugin mappingに従い、Claude Codeが読むskill tree・Markdown command・Markdown agent・hooks・Claude plugin manifestとmarketplace記述を生成する。出力closureとClaude target-local consumer probeを通し、既存のClaude Code marketplace導入経路はidentity互換のまま維持する"
+    criteria: scripts/lib/gen-plugin.test.mjs のClaude target-local consumer probeとoutput closureが成功し、scripts/lib/drift-gates.mjs の gen-plugin-bulk がClaude plugin出力の未再生成をpre-commitとCIで検出する
     externalStakeholders: [ Claude Code利用者 ]
     location: [ ../plugin/pfdsl/skills/pfdsl/, ../plugin/pfdsl/skills/pfd-ecosystem/, ../plugin/pfdsl/skills/pfd-grill/, ../plugin/pfdsl/skills/pfd-ops/, ../plugin/pfdsl/skills/pfd-retro/, ../plugin/pfdsl/commands/, ../plugin/pfdsl/agents/, ../plugin/pfdsl/hooks/, ../plugin/pfdsl/.claude-plugin/plugin.json, ../.claude-plugin/marketplace.json ]
     group: repo_generated
     tags: [ gen ]
   codex_adapter_output:
     label: Codex plugin adapter 出力
-    description: "共有inventoryからCodex plugin manifest、native skill tree、command由来skill、hookを専用rootへ生成する。公式Codex validator/runtimeがplugin rootのskills/を固定するため、Claude Code rootとは分離する。manifestのcapabilitiesはSkillsのみだが、hooks/hooks.jsonは既定discoveryで公開され、Codex runtimeが互換環境変数CLAUDE_PLUGIN_ROOTを与えて実行する。Codex native agentはpluginではなくリポジトリ開発資産として別に生成する"
-    criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がCodex plugin rootのmanifest・skill・hookの未再生成をClaude rootと同時に検出し、scripts/lib/gen-plugin.test.mjs がコピー済みplugin hookをCLAUDE_PLUGIN_ROOT互換環境で実行して、pre-commitとCIで失敗する
+    description: "harness_capability_modelのcodex-plugin mappingからCodex plugin manifest、native skill tree、command由来skill、hookを専用rootへ生成する。公式Codex validator/runtimeがplugin rootのskills/を固定するため、Claude Code rootとは分離する。manifestのcapabilitiesはSkillsのみだが、hooks/hooks.jsonは既定discoveryで公開され、Codex runtimeが互換環境変数CLAUDE_PLUGIN_ROOTを与えて実行する。Codex native agentはpluginではなくリポジトリ開発資産として別に生成する"
+    criteria: scripts/lib/gen-plugin.test.mjs のCodex plugin target-local consumer probeとoutput closureが成功し、scripts/lib/drift-gates.mjs の gen-plugin-bulk がCodex plugin rootのmanifest・skill・hookの未再生成をClaude rootと同時に検出する
     externalStakeholders: [ Codex plugin利用者 ]
     location: [ ../plugin/pfdsl-codex/.codex-plugin/plugin.json, ../plugin/pfdsl-codex/.codex-plugin/codex-command-skills.json, ../plugin/pfdsl-codex/skills/, ../plugin/pfdsl-codex/hooks/ ]
     group: repo_generated
     tags: [ gen ]
   codex_repo_assets:
     label: Codexリポジトリ開発資産
-    description: "CLAUDE.md・.claude/settings.json・共有inventoryをCodex向けに変換したAGENTS.md、配布skill tree全体と生成済みpfdsl skill bridgeを含む .agents/skills、.codex/config.toml、.codex/agents、.codex/hooks.json。生成されたMarkdown・TOML・JavaScriptは正本path付きの手編集禁止noticeを持ち、コメントを持てないJSONは隣接GENERATED.md guideで正本を示す。root .gitattributesはCodex生成経路をlinguist-generatedに分類する。adapterはrunごとの一時siblingへ書き、rootのassembly lock下で成功後にまとめて置換するため半生成状態を公開しない"
-    criteria: scripts/lib/drift-gates.mjs の gen-plugin-bulk がAGENTS.md、.agents、.codexの未再生成を検出し、pre-commitとCIで失敗する
+    description: "harness_capability_modelのcodex-repository mappingから生成するAGENTS.md、配布skill tree全体と中立生成済みpfdsl skill bridgeを含む .agents/skills、.codex/config.toml、.codex/agents、.codex/hooks.json。生成されたMarkdown・TOML・JavaScriptは正本path付きの手編集禁止noticeを持ち、コメントを持てないJSONは隣接GENERATED.md guideで正本を示す。root .gitattributesはCodex生成経路をlinguist-generatedに分類する。adapterはrunごとの一時siblingへ書き、rootのassembly lock下で成功後にまとめて置換するため半生成状態を公開しない"
+    criteria: scripts/lib/gen-plugin.test.mjs のCodex repository target-local consumer probeとoutput closureが成功し、scripts/lib/drift-gates.mjs の gen-plugin-bulk がAGENTS.md、.agents、.codexの未再生成をpre-commitとCIで検出する
     externalStakeholders: [ このリポのCodex利用者 ]
     location: [ ../AGENTS.md, ../.agents/skills/, ../.codex/config.toml, ../.codex/agents/, ../.codex/hooks.json, ../.codex/GENERATED.md, ../plugin/pfdsl-codex/GENERATED.md, ../.gitattributes ]
     group: repo_generated
@@ -446,21 +404,27 @@ process:
     command: make gen-install
     location: ../scripts/lib/install-templates.mjs
     tags: [ gen, g ]
+  decode_harness_capabilities:
+    label: ハーネスsource decode・contract検証
+    description: "claude_harness_sourcesのsource rootとschemaをharness_inventoryに照らして全件分類し、plugin metadataをtoolchainから読み、Claude Code固有の表現をハーネス中立semantic recordへdecodeする。未知topology・未知schema・四target mappingの欠落や重複をadapter出力前に拒否する"
+    command: node --test scripts/lib/harness-capability-contract.test.mjs scripts/lib/harness-source-decoder.test.mjs scripts/lib/harness-inventory.test.mjs
+    location: ../scripts/lib/harness-source-decoder.mjs
+    tags: [ gen, g ]
   gen_plugin:
     label: Claude Code plugin root 組み立て
-    description: "make gen-pluginの共有入口。共有inventoryから既存のClaude Code skill tree、Markdown command、Markdown agent、hooks、manifest、marketplace記述をplugin/pfdsl/へidentity互換に組み立てる。全Claude root writeの後、manifest自身を除く全bundleファイルの内容ハッシュを.claude-plugin/bundle-manifest.jsonへ記録する（#971）。この生成済みClaude rootを別processのCodex adapterへ渡し、二重root配布を完成させる"
+    description: "make gen-pluginのClaude Code adapter。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirror、toolchain metadataから、Claude Code skill tree、Markdown command、Markdown agent、hooks、manifest、marketplace記述をplugin/pfdsl/へidentity互換に組み立てる。全Claude root writeの後、manifest自身を除く全bundleファイルの内容ハッシュを.claude-plugin/bundle-manifest.jsonへ記録する（#971）"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
     tags: [ gen, g ]
   assemble_codex_plugin:
     label: Codex plugin root 組み立て
-    description: "共有inventoryと生成済みClaude rootを入力に、Codex native skill tree、command由来skill、hooks、manifestをplugin/pfdsl-codex/へ生成する。Codex command名が同名skillと衝突するとsource-command-接頭辞を付ける。repository Codex assetsもatomicに置換する"
+    description: "make gen-pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、toolchain metadataだけを入力に、Codex native skill tree、command由来skill、hooks、manifestをplugin/pfdsl-codex/へ生成する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource-command-接頭辞を付け、repository Codex assetsとともにatomicに置換する"
     command: make gen-plugin
     location: ../scripts/lib/gen-plugin.mjs
     tags: [ gen, g ]
   check_plugin_drift:
     label: 両plugin rootのdrift検査
-    description: "dist非依存の再生成後にClaude root、Codex root、repository Codex assetsの追跡済み差分と対象pathspec内の未追跡ファイルをまとめて検査し、どちらか一方の更新漏れと手編集をpre-commitとCIで失敗させる。dist依存のClaude pfdsl SKILL.mdは別gateで検査する"
+    description: "兄弟成果物であるClaude adapter出力、Codex adapter出力、repository Codex assetsが唯一合流する検査。dist非依存の再生成後に三者の追跡済み差分と対象pathspec内の未追跡ファイルをまとめて検査し、どちらか一方の更新漏れと手編集をpre-commitとCIで失敗させる。dist依存のpfdsl SKILL.mdは別gateで検査する"
     command: node scripts/gen-plugin-dist-independent.mjs
     location: ../scripts/lib/drift-gates.mjs
     tags: [ gen, g ]
@@ -564,9 +528,11 @@ dot_graph >> export_image -> rendered_image
 
 ops_install_sources >> gen_install -> ops_install_templates
 
-[claude_harness_sources, distributed_advisory_hooks, ecosystem_skill, feature_samples, grill_skill, harness_inventory, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> claude_adapter_output
+[claude_harness_sources, harness_inventory, toolchain] >> decode_harness_capabilities -> harness_capability_model
 
-[claude_adapter_output, claude_harness_sources, distributed_advisory_hooks, harness_inventory, toolchain] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
+[harness_capability_model, ops_install_templates, pfdsl_skill, toolchain] >> gen_plugin -> claude_adapter_output
+
+[harness_capability_model, pfdsl_skill, toolchain] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
 
 [claude_adapter_output, codex_adapter_output, codex_repo_assets] >> check_plugin_drift -> plugin_dist
 

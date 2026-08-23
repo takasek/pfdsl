@@ -127,6 +127,41 @@ export function edgeMembers(edges, { kind, process }) {
 }
 
 /**
+ * Whether an artifact reaches a process through primary data-flow edges.
+ * Input edges move artifact -> process and output edges move process -> artifact;
+ * feedback edges are intentionally excluded because they do not deliver the
+ * primary bundled source to the adapter.
+ * @param {Array<{kind: string, artifact: string, process: string}>} edges analyze().edges
+ * @param {string} sourceArtifact
+ * @param {string} targetProcess
+ * @returns {boolean}
+ */
+export function artifactReachesProcess(edges, sourceArtifact, targetProcess) {
+	const pendingArtifacts = [sourceArtifact];
+	const visitedArtifacts = new Set();
+	const visitedProcesses = new Set();
+
+	while (pendingArtifacts.length > 0) {
+		const artifact = pendingArtifacts.shift();
+		if (visitedArtifacts.has(artifact)) continue;
+		visitedArtifacts.add(artifact);
+
+		for (const input of edges) {
+			if (input.kind !== "input" || input.artifact !== artifact) continue;
+			if (input.process === targetProcess) return true;
+			if (visitedProcesses.has(input.process)) continue;
+			visitedProcesses.add(input.process);
+			for (const output of edges) {
+				if (output.kind === "output" && output.process === input.process)
+					pendingArtifacts.push(output.artifact);
+			}
+		}
+	}
+
+	return false;
+}
+
+/**
  * The distributed hand-written artifacts missing from one or both of the edges
  * that model them. `location` may be a scalar path or (per spec.md §15.8) an
  * array of them — an artifact counts as bundled if any one of its locations
@@ -134,8 +169,8 @@ export function edgeMembers(edges, { kind, process }) {
  *
  * Scans both graphs' artifacts, since bundled material may be declared in
  * either (`pfd_commands` exists only in runtime-pipeline.pfdsl, #780/#944).
- * The two edges are not symmetric, though: `gen_plugin inputs` is required of
- * every bundled artifact regardless of where it is declared, but
+ * The two requirements are not symmetric, though: reaching `gen_plugin` is
+ * required of every bundled artifact regardless of where it is declared, but
  * `distill_ops outputs` only makes sense for an artifact workflow.pfdsl
  * actually declares — asking a pipeline-only artifact to appear on a
  * workflow.pfdsl edge it was never eligible for would be a false positive.
@@ -158,10 +193,6 @@ export function findUnwiredSkills({
 	const distillOutputs = edgeMembers(workflowEdges, {
 		kind: "output",
 		process: "distill_ops",
-	});
-	const genPluginInputs = edgeMembers(pipelineEdges, {
-		kind: "input",
-		process: "gen_plugin",
 	});
 	const generated = edgeMembers(pipelineEdges, { kind: "output" });
 
@@ -188,7 +219,36 @@ export function findUnwiredSkills({
 		const missing = [];
 		if (declaredIn === "workflow" && !distillOutputs.has(id))
 			missing.push("distill_ops outputs");
-		if (!genPluginInputs.has(id)) missing.push("gen_plugin inputs");
+		const sourcePaths = locations.map((location) =>
+			repoRelative(location).replace(/\/$/, ""),
+		);
+		const deliveryArtifacts = new Set([id]);
+		for (const [pipelineId, pipelineMeta] of Object.entries(
+			pipelineArtifacts,
+		)) {
+			if (!pipelineMeta?.location) continue;
+			const pipelineLocations = Array.isArray(pipelineMeta.location)
+				? pipelineMeta.location
+				: [pipelineMeta.location];
+			if (
+				pipelineLocations.some((pipelineLocation) => {
+					const pipelinePath = repoRelative(pipelineLocation).replace(
+						/\/$/,
+						"",
+					);
+					return sourcePaths.some((sourcePath) =>
+						pathsOverlap(sourcePath, pipelinePath),
+					);
+				})
+			)
+				deliveryArtifacts.add(pipelineId);
+		}
+		if (
+			![...deliveryArtifacts].some((artifact) =>
+				artifactReachesProcess(pipelineEdges, artifact, "gen_plugin"),
+			)
+		)
+			missing.push("reach gen_plugin");
 		if (missing.length > 0)
 			findings.push({ id, location: meta.location, missing, declaredIn });
 	}
