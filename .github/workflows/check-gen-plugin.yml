@@ -33,7 +33,7 @@ jobs:
       - name: Regenerate Claude and Codex assets and assert no drift
         run: |
           make gen-plugin
-          if ! git diff --exit-code plugin .claude-plugin/marketplace.json AGENTS.md .agents .codex; then
+          if ! node scripts/check-generated-drift.mjs -- plugin .claude-plugin/marketplace.json AGENTS.md .agents .codex; then
             echo ""
             echo "ERROR: generated Claude or Codex assets are stale."
             echo "Run 'make gen-plugin' and commit the result."

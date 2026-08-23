@@ -48,7 +48,7 @@ jobs:
       - name: Check pfd-ops/install was generated from its repo-root sources
         run: |
           node scripts/gen-install.mjs
-          if ! git diff --exit-code -- .claude/skills/pfd-ops/install; then
+          if ! node scripts/check-generated-drift.mjs -- .claude/skills/pfd-ops/install; then
             echo ""
             echo "Fix: .claude/skills/pfd-ops/install/ is generated. Edit the repo-root source and run 'make gen-install'."
             exit 1

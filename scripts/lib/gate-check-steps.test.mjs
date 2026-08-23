@@ -65,11 +65,15 @@ describe("genPluginIdentityStep", () => {
 		});
 		assert.equal(result.status, "PASS");
 		assert.ok(calls.some((c) => c.includes("gen-plugin.mjs")));
-		assert.ok(calls.some((c) => c.startsWith("git diff --exit-code")));
+		assert.ok(
+			calls.some((c) => c.startsWith("scripts/check-generated-drift.mjs")),
+		);
 	});
 
 	it("fails when regeneration produces a diff in the generated trees", () => {
-		const { exec } = fakeExec({ "git diff --exit-code": { ok: false } });
+		const { exec } = fakeExec({
+			"scripts/check-generated-drift.mjs": { ok: false },
+		});
 		const result = genPluginIdentityStep({
 			exec,
 			node: exec,
@@ -78,7 +82,7 @@ describe("genPluginIdentityStep", () => {
 		assert.equal(result.status, "FAIL");
 	});
 
-	it("fails when the generator itself fails, without asking git about the diff", () => {
+	it("fails when the generator itself fails, without checking generated drift", () => {
 		const { exec, calls } = fakeExec();
 		const node = () => ({ ok: false, out: "boom" });
 		const result = genPluginIdentityStep({
@@ -88,7 +92,7 @@ describe("genPluginIdentityStep", () => {
 		});
 		assert.equal(result.status, "FAIL");
 		assert.deepEqual(
-			calls.filter((c) => c.startsWith("git diff")),
+			calls.filter((c) => c.startsWith("scripts/check-generated-drift.mjs")),
 			[],
 		);
 	});
