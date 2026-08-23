@@ -317,6 +317,8 @@ export async function runCycleStatus({
 	let gateCheckCommandError = null;
 	/** @type {number[]} target issues labelled flow:managed with no process yet */
 	const unregisteredManagedIssues = [];
+	/** @type {number[]} target issues with no flow label and no process yet */
+	const untriagedTargetIssues = [];
 	if (targetIssues.length > 0) {
 		if (roadmapText === null) {
 			try {
@@ -355,6 +357,9 @@ export async function runCycleStatus({
 					unregisteredManagedIssues.push(issue);
 				}
 				if (processId === null && !labels.includes("flow:exempt")) {
+					if (!labels.includes("flow:managed")) {
+						untriagedTargetIssues.push(issue);
+					}
 					gateCheckCommandError = labels.includes("flow:managed")
 						? `issue ${issue} is flow:managed but has no process in .pfdsl/roadmap.pfdsl`
 						: `issue ${issue} has no process in .pfdsl/roadmap.pfdsl and is not flow:exempt`;
@@ -454,6 +459,7 @@ export async function runCycleStatus({
 		reviewRecordTemplate: buildReviewRecordTemplate(),
 		gateCheckCommand,
 		unregisteredManagedIssues,
+		untriagedTargetIssues,
 		preArtifactPatterns,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;

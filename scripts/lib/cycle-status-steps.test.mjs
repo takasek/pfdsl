@@ -992,6 +992,68 @@ describe("runCycleStatus — unregistered flow:managed target issue (#963)", () 
 	});
 });
 
+describe("runCycleStatus — untriaged target issue (#983)", () => {
+	const issueJsonWithLabels = (labels) =>
+		JSON.stringify({ body: "普通の説明文。", comments: [], labels });
+
+	it("names a target issue with no flow labels and no tracked process", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [983],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJsonWithLabels([]);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.untriagedTargetIssues, [983]);
+	});
+
+	for (const label of ["flow:managed", "flow:exempt"]) {
+		it(`stays quiet for a target issue labelled ${label}`, async () => {
+			const result = await runCycleStatus(
+				baseDeps({
+					issueNumbers: [983],
+					sh: (_file, args) => {
+						if (args.includes(CLI_PATH)) return readyJsonOk(null);
+						return "";
+					},
+					readFileSync: () => roadmapWithIssue("proc_a", 42),
+					execGh: async (args) => {
+						if (args[0] === "issue")
+							return issueJsonWithLabels([{ name: label }]);
+						return JSON.stringify([]);
+					},
+				}),
+			);
+			assert.deepEqual(result.untriagedTargetIssues, []);
+		});
+	}
+
+	it("stays quiet when the target issue already has a tracked process", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJsonWithLabels([]);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.untriagedTargetIssues, []);
+	});
+});
+
 describe("runCycleStatus — issue lookup failure and unregisteredManagedIssues", () => {
 	it("excludes an issue whose label lookup failed, and says so via designUnsettledError", async () => {
 		const result = await runCycleStatus(
@@ -1011,6 +1073,7 @@ describe("runCycleStatus — issue lookup failure and unregisteredManagedIssues"
 		// Reporting it as unregistered would be a false positive (its labels are
 		// unknown); reporting nothing at all would hide that the check never ran.
 		assert.deepEqual(result.unregisteredManagedIssues, []);
+		assert.deepEqual(result.untriagedTargetIssues, []);
 		assert.match(result.designUnsettledError, /network unreachable/);
 	});
 });
