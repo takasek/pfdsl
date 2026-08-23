@@ -94,6 +94,19 @@ describe("createsManagedIssue", () => {
 		);
 	});
 
+	it("allows escaped shell metacharacters in an unquoted argument", () => {
+		const titles = ["x\\;y", "x\\|y", "x\\&y", "x\\(y\\)"];
+		for (const title of titles) {
+			assert.equal(
+				createsManagedIssue(
+					`gh issue create -lflow:managed --title ${title} && git status`,
+				),
+				true,
+				title,
+			);
+		}
+	});
+
 	it("rejects every ambiguous command form", () => {
 		const cases = [
 			[

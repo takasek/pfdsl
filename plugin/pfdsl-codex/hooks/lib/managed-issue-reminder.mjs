@@ -30,6 +30,11 @@ function splitCommandChain(command) {
 			current += ch;
 			continue;
 		}
+		if (ch === "\\") {
+			current += ch + (command[i + 1] ?? "");
+			i++;
+			continue;
+		}
 		const two = command.slice(i, i + 2);
 		if (two === "&&" || two === "||") {
 			push(two);
