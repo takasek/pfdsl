@@ -311,10 +311,16 @@ artifact:
     location: [ ../README.md, ../packages/cli/README.md ]
     group: repo_generated
     tags: [ gen ]
+  vsix_candidate:
+    label: 未検証 .vsix パッケージ
+    description: "make vscode-package が生成する、ローカルインストール未検証の VS Code 拡張配布アーカイブ。verify_vsix の検証素材"
+    criteria: make vscode-package が正常完了し、選択済み版の .vsix が存在する
+    group: repo_generated
+    tags: [ gen ]
   vsix_package:
-    label: .vsix パッケージ
-    description: "make vscode-package が生成する VS Code 拡張の配布アーカイブ。marketplace へのアップロード素材"
-    criteria: make vscode-package が .vsix を生成し、ローカルインストールで動作確認済み
+    label: 検証済み .vsix パッケージ
+    description: "verify_vsix がローカルインストールでの動作を確認した VS Code 拡張配布アーカイブ。marketplace へのアップロード素材"
+    criteria: vsix_candidate をローカルインストールし、拡張の起動を確認済み
     group: repo_generated
     tags: [ gen ]
   published_cli:
@@ -494,10 +500,15 @@ process:
     tags: [ gen ]
   package_vscode_release:
     label: VSIX生成・タグpush
-    description: "選択済み版の vscode-extension を .vsix へパッケージングし、その生成が成功した後で vscode-v* tag を push する。1回の make vscode-package が正常完了したときの両成果物を単一変換の複数出力として扱い、内部順序はこの description が持つ"
+    description: "選択済み版の vscode-extension を未検証 .vsix へパッケージングし、その生成が成功した後で vscode-v* tag を push する。1回の make vscode-package が正常完了したときの両成果物を単一変換の複数出力として扱い、内部順序はこの description が持つ"
     command: "make vscode-package VERSION=<VERSION>"
     location: ../scripts/release.mjs
     tags: [ gen ]
+  verify_vsix:
+    label: VSIXローカル検証
+    description: "未検証 .vsix をローカルインストールし、拡張が起動することを確認して marketplace へのアップロード素材にする。release driver はこの手動検証より前に tag を push するため、検証は vscode_release_tag をゲートしない"
+    owner: takasek
+    tags: [ manual_no_judgment ]
   upload_vsix:
     label: marketplace へ手動アップロード
     description: "生成済み .vsix を marketplace.visualstudio.com へ人が手でアップロードする。判断は不要で、発行APIを使う経路を整えていないという境界の問題だけが理由。この図で唯一の人手ノードであり自動化候補（ADR-0035の判定基準により、判断がないためworkflowでなくこちらに置く）"
@@ -571,7 +582,9 @@ toolchain >> gen_readme_cli -> readme_cli_blocks
 
 [libraries_release_tag, toolchain] >> publish_libraries -> published_libraries
 
-[toolchain, vscode_release_request] >> package_vscode_release -> [vscode_release_tag, vsix_package]
+[toolchain, vscode_release_request] >> package_vscode_release -> [vscode_release_tag, vsix_candidate]
+
+vsix_candidate >> verify_vsix -> vsix_package
 
 vsix_package >> upload_vsix -> published_ext
 
