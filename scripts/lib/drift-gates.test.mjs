@@ -35,6 +35,24 @@ describe("buildGates", () => {
 		]);
 	});
 
+	it("checks tracked and untracked output for every regenerate-then-check gate", () => {
+		const generated = gates({}).filter((gate) => gate.commands.length === 2);
+		const identities = generated.filter((gate) =>
+			gate.commands.some(([, args]) =>
+				args.includes("scripts/check-generated-drift.mjs"),
+			),
+		);
+		const expected = [
+			"pfdsl-snapshots",
+			"gen-install",
+			"gen-plugin-skill-md",
+			"gen-plugin-bulk",
+			"readme-cli",
+		];
+		assert.deepEqual(ids(generated), expected);
+		assert.deepEqual(ids(identities), expected);
+	});
+
 	it("keeps the generator gates in their load-bearing declaration order", () => {
 		const built = ids(gates({}));
 		assert.ok(
@@ -68,8 +86,13 @@ describe("buildGates", () => {
 		const gate = gates({ staged: [] }).find((g) => g.id === "readme-cli");
 		assert.ok(gate.trigger.test("packages/cli/README.md"));
 		assert.deepEqual(gate.commands.at(-1), [
-			"git",
-			["diff", "--quiet", "--", "README.md", "packages/cli/README.md"],
+			"node",
+			[
+				"scripts/check-generated-drift.mjs",
+				"--",
+				"README.md",
+				"packages/cli/README.md",
+			],
 		]);
 	});
 

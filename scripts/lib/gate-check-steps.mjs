@@ -150,7 +150,7 @@ export function commitMessagesSince({ exec, base }) {
  * plugin/ churn. gen-plugin.mjs runs gen-install internally, so one
  * regeneration covers both hops — hence both output trees are diffed.
  */
-export function genPluginIdentityStep({ exec, node, changedFiles }) {
+export function genPluginIdentityStep({ node, changedFiles }) {
 	const name = "gen-plugin identity";
 	if (
 		!matchesTrigger(changedFiles, GEN_PLUGIN_TRIGGER) &&
@@ -165,9 +165,8 @@ export function genPluginIdentityStep({ exec, node, changedFiles }) {
 	const regenerated = node(["scripts/gen-plugin.mjs"]);
 	const clean =
 		regenerated.ok &&
-		exec("git", [
-			"diff",
-			"--exit-code",
+		node([
+			"scripts/check-generated-drift.mjs",
 			"--",
 			"plugin",
 			".claude/skills/pfd-ops/install",

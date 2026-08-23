@@ -24,16 +24,18 @@ const CLI_DIST = "packages/cli/dist/cli.js";
 const OPS_PFDSL = /^\.pfdsl\/.*\.pfdsl$/;
 
 /**
- * The shape four of these gates share: run the generator, then ask git whether
- * it wrote anything. Spelled once so a gate cannot be added with the diff step
- * mis-typed — `git diff` without `--quiet` exits 0 whatever it finds, which
- * would leave the gate permanently, silently green.
+ * The shape five of these gates share: run the generator, then ask git whether
+ * it changed a tracked output or added an untracked one. Spelled once so a gate
+ * cannot omit either half of that identity check.
  * @param {[string, string[]]} regenerate
- * @param {string[]} diffPaths - pathspecs, as `git diff -- <paths>` takes them
+ * @param {string[]} diffPaths - pathspecs checked for tracked and untracked drift
  * @returns {[string, string[]][]}
  */
-function regenerateThenDiff(regenerate, diffPaths) {
-	return [regenerate, ["git", ["diff", "--quiet", "--", ...diffPaths]]];
+function regenerateThenCheck(regenerate, diffPaths) {
+	return [
+		regenerate,
+		["node", ["scripts/check-generated-drift.mjs", "--", ...diffPaths]],
+	];
 }
 
 /**
@@ -61,7 +63,7 @@ export function buildGates({ stagedPresent }) {
 			// fixture changes the snapshot as surely as an edited one does.
 			trigger: /\.pfdsl$/,
 			requireDist: [],
-			commands: regenerateThenDiff(
+			commands: regenerateThenCheck(
 				["pnpm", ["--filter", "@pfdsl/core", "exec", "vitest", "run", "-u"]],
 				["packages/core/src/__snapshots__/"],
 			),
@@ -121,7 +123,7 @@ export function buildGates({ stagedPresent }) {
 			// direction only. Needs no build output, unlike the gen-plugin gates.
 			trigger: GEN_INSTALL_TRIGGER,
 			requireDist: [],
-			commands: regenerateThenDiff(
+			commands: regenerateThenCheck(
 				["node", ["scripts/gen-install.mjs"]],
 				[".claude/skills/pfd-ops/install"],
 			),
@@ -136,7 +138,7 @@ export function buildGates({ stagedPresent }) {
 			// must re-stamp SKILL.md too.
 			trigger: GEN_PLUGIN_TRIGGER,
 			requireDist: [CLI_DIST],
-			commands: regenerateThenDiff(
+			commands: regenerateThenCheck(
 				[
 					"node",
 					["scripts/gen-skill.mjs", "--out", "plugin/pfdsl/skills/pfdsl"],
@@ -153,7 +155,7 @@ export function buildGates({ stagedPresent }) {
 			// rather than `make gen-plugin`, which would fail on the SKILL.md step.
 			trigger: GEN_PLUGIN_TRIGGER,
 			requireDist: [],
-			commands: regenerateThenDiff(
+			commands: regenerateThenCheck(
 				["node", ["scripts/gen-plugin-dist-independent.mjs"]],
 				[
 					"plugin",
@@ -217,7 +219,7 @@ export function buildGates({ stagedPresent }) {
 			// README's raw block and packages/cli/README.md's tables (#850).
 			trigger: /^(packages\/cli\/src\/|packages\/cli\/README\.md|README\.md)/,
 			requireDist: [CLI_DIST],
-			commands: regenerateThenDiff(
+			commands: regenerateThenCheck(
 				["node", ["scripts/gen-readme-cli.mjs"]],
 				["README.md", "packages/cli/README.md"],
 			),

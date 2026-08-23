@@ -460,7 +460,7 @@ process:
     tags: [ gen, g ]
   check_plugin_drift:
     label: 両plugin rootのdrift検査
-    description: "dist非依存の再生成でClaude root、Codex root、repository Codex assetsをまとめて比較し、どちらか一方の更新漏れと手編集をpre-commitとCIで失敗させる。dist依存のClaude pfdsl SKILL.mdは別gateで検査する"
+    description: "dist非依存の再生成後にClaude root、Codex root、repository Codex assetsの追跡済み差分と対象pathspec内の未追跡ファイルをまとめて検査し、どちらか一方の更新漏れと手編集をpre-commitとCIで失敗させる。dist依存のClaude pfdsl SKILL.mdは別gateで検査する"
     command: node scripts/gen-plugin-dist-independent.mjs
     location: ../scripts/lib/drift-gates.mjs
     tags: [ gen, g ]

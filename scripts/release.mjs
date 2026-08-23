@@ -161,12 +161,16 @@ run("make", ["gen-plugin"]);
 // make gen-plugin regenerates plugin/pfdsl/ (the marketplace distribution
 // copy) fresh — it does not check that the regeneration matches what's
 // committed. Mirror what CI's check-gen-plugin.yml does: regenerate, then
-// diff against the committed tree.
+// check tracked and untracked output against the committed tree.
 try {
-	execFileSync("git", ["diff", "--exit-code", "plugin"], {
-		cwd: root,
-		stdio: "ignore",
-	});
+	execFileSync(
+		process.execPath,
+		[resolve(root, "scripts/check-generated-drift.mjs"), "--", "plugin"],
+		{
+			cwd: root,
+			stdio: "ignore",
+		},
+	);
 } catch (err) {
 	if (err.status === undefined) throw err; // execFileSync itself failed to spawn
 	fail(
