@@ -285,8 +285,8 @@ describe("runCycleStatus", () => {
 		assert.equal(result.best, null);
 	});
 
-	const issueJson = ({ body, comments = [] }) =>
-		JSON.stringify({ body, comments });
+	const issueJson = ({ body, comments = [], labels = [] }) =>
+		JSON.stringify({ body, comments, labels });
 
 	it("resolves the target issue from --issue when given, ignoring any best process", async () => {
 		const calls = [];
@@ -559,6 +559,22 @@ describe("runCycleStatus", () => {
 		);
 	});
 
+	it("preserves a best-process roadmap read failure as the gate-command error", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => {
+					throw new Error("roadmap unreadable");
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(result.gateCheckCommandError, "roadmap unreadable");
+	});
+
 	it("returns a null designUnsettledFor with the gh error when the gh issue lookup throws", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
@@ -571,6 +587,11 @@ describe("runCycleStatus", () => {
 		);
 		assert.deepEqual(result.designUnsettledFor, []);
 		assert.equal(result.designUnsettledError, "gh: issue not found");
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"cannot determine whether issue 669 is flow:exempt because its labels could not be fetched: gh: issue not found",
+		);
 	});
 
 	// #794: the artifact named in the gate-check command comes from the process
@@ -662,12 +683,19 @@ describe("runCycleStatus", () => {
 				issueNumbers: [800],
 				readFileSync: () => roadmapWithIssue("proc_x", 42),
 				execGh: async (args) => {
-					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					if (args[0] === "issue")
+						return issueJson({
+							body: "普通の説明文。",
+							labels: [{ name: "flow:exempt" }],
+						});
 					return JSON.stringify([]);
 				},
 			}),
 		);
-		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --no-artifact --issue 800",
+		);
 	});
 
 	it("uses the shared process's artifact when every --issue resolves to the same process", async () => {
@@ -716,12 +744,84 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommand,
+			"node scripts/gate-check.mjs --base main --no-artifact --issue 667 --issue 668",
+		);
 	});
 
 	it("returns a null gate-check command when there is no best process", async () => {
 		const result = await runCycleStatus(baseDeps());
 		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"no --issue given and no best process to resolve a gate-check command",
+		);
+	});
+
+	it("reports why a managed process output cannot be resolved", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [969],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) throw new Error("broken neighbors");
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_x", 969),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"failed to resolve the output artifact for process 'proc_x': broken neighbors",
+		);
+	});
+
+	it("reports that the built CLI is required to resolve a managed process output", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [969],
+				existsSync: () => false,
+				readFileSync: () => roadmapWithIssue("proc_x", 969),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"failed to resolve the output artifact for process 'proc_x': packages/cli/dist/cli.js not built; run 'pnpm -r build' first",
+		);
+	});
+
+	it("reports when graph neighbors has no primary output artifact", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [969],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) return neighborsJsonOk([]);
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_x", 969),
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: "普通の説明文。" });
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"failed to resolve the output artifact for process 'proc_x': graph neighbors returned no primary successor",
+		);
 	});
 });
 
@@ -822,6 +922,11 @@ describe("runCycleStatus — unregistered flow:managed target issue (#963)", () 
 			}),
 		);
 		assert.deepEqual(result.unregisteredManagedIssues, [956]);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"issue 956 is flow:managed but has no process in .pfdsl/roadmap.pfdsl",
+		);
 	});
 
 	it("stays quiet for a flow:exempt target issue", async () => {
@@ -841,6 +946,30 @@ describe("runCycleStatus — unregistered flow:managed target issue (#963)", () 
 			}),
 		);
 		assert.deepEqual(result.unregisteredManagedIssues, []);
+	});
+
+	it("does not attach a resolved artifact to a mixed set containing an unregistered managed issue", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [42, 956],
+				sh: (_file, args) => {
+					if (args.includes("neighbors")) throw new Error("should not resolve");
+					if (args.includes(CLI_PATH)) return readyJsonOk(null);
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] !== "issue") return JSON.stringify([]);
+					const labels = args[2] === "956" ? [{ name: "flow:managed" }] : [];
+					return issueJsonWithLabels(labels);
+				},
+			}),
+		);
+		assert.equal(result.gateCheckCommand, null);
+		assert.equal(
+			result.gateCheckCommandError,
+			"issue 956 is flow:managed but has no process in .pfdsl/roadmap.pfdsl",
+		);
 	});
 
 	it("stays quiet when the managed issue already has a tracked process", async () => {

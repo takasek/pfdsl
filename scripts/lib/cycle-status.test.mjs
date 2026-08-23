@@ -512,8 +512,11 @@ describe("buildGateCheckCommand", () => {
 		);
 	});
 
-	it("returns null when artifactKey is missing", () => {
-		assert.equal(buildGateCheckCommand(null, "main"), null);
+	it("builds the explicit no-artifact command when artifactKey is missing", () => {
+		assert.equal(
+			buildGateCheckCommand(null, "main", [969]),
+			"node scripts/gate-check.mjs --base main --no-artifact --issue 969",
+		);
 	});
 });
 
