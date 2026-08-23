@@ -26,6 +26,12 @@ jobs:
       - name: Install audit dependency (yaml)
         run: npm install --no-save yaml
 
+      - name: Check closed issue registration before flow sync
+        id: registration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/pfdsl/audit-issues-flow.mjs --check-closed-registration ${{ github.event.issue.number }}
+
       - name: Apply flow sync (audit --fix)
         id: audit
         continue-on-error: true

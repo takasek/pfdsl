@@ -218,7 +218,14 @@ const ISSUE_VIEW_FIELDS = {
 	body: (issue) => issue.body ?? "",
 	createdAt: (issue) => issue.created_at,
 	number: (issue) => issue.number,
-	state: (issue) => issue.state,
+	state: (issue) => String(issue.state).toUpperCase(),
+	stateReason: (issue) =>
+		issue.state_reason ? String(issue.state_reason).toUpperCase() : null,
+	labels: (issue) =>
+		(issue.labels ?? []).map((l) => ({
+			name: typeof l === "string" ? l : l.name,
+		})),
+	updatedAt: (issue) => issue.updated_at,
 	title: (issue) => issue.title,
 	url: (issue) => issue.html_url,
 };

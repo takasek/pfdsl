@@ -83,6 +83,31 @@ describe("entry scripts reject argv they do not understand", () => {
 		assert.match(stderr, /--fix/);
 	});
 
+	for (const conflictingArgs of [
+		["--check-closed-registration", "959", "--fix"],
+		["--check-closed-registration", "959", "--enforce-issue", "959"],
+	]) {
+		it(`audit-issues-flow.mjs rejects conflicting targeted mode: ${conflictingArgs.join(" ")}`, () => {
+			const { status, stderr } = runScript(
+				"scripts/pfdsl/audit-issues-flow.mjs",
+				conflictingArgs,
+			);
+			assert.equal(status, 2);
+			assert.match(stderr, /mutually exclusive/);
+		});
+	}
+
+	for (const value of ["0", "1.5", "abc"]) {
+		it(`audit-issues-flow.mjs rejects invalid --check-closed-registration ${JSON.stringify(value)}`, () => {
+			const { status, stderr } = runScript(
+				"scripts/pfdsl/audit-issues-flow.mjs",
+				["--check-closed-registration", value],
+			);
+			assert.equal(status, 2);
+			assert.match(stderr, /--check-closed-registration/);
+		});
+	}
+
 	// The inline form of a value-taking flag has to reach the script, not be
 	// skipped: indexOf("--artifact") does not see "--artifact=k", so the
 	// conflict with --no-artifact goes unreported and the gate scopes itself
