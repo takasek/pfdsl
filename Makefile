@@ -1,8 +1,5 @@
-# link-repo-skill.mjs points .claude/skills/pfdsl (gitignored, #348) at the
-# tracked bundle copy: a symlink, so a branch switch synchronises the skill an
-# agent reads through git (#714). It used to be a separately generated
-# directory, which needed a built CLI to bootstrap and silently kept the
-# previous branch's version until someone re-ran the generator.
+# link-repo-skill.mjs points .claude/skills/pfdsl (gitignored, #348) at the tracked generated copy, a symlink that lets a branch switch synchronise the skill an agent reads through git (#714).
+# It used to be a separately generated directory, which needed a built CLI to bootstrap and silently kept the previous branch's version until someone re-ran the generator.
 .PHONY: setup
 setup:
 	pnpm install
@@ -167,7 +164,7 @@ check-docs:
 
 .PHONY: gen-skill
 gen-skill: check-docs
-	node scripts/gen-skill.mjs --out plugin/pfdsl/skills/pfdsl
+	node scripts/gen-skill.mjs --out generated/skills/pfdsl
 
 .PHONY: gen-install
 gen-install:

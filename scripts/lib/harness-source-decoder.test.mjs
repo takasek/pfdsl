@@ -29,7 +29,7 @@ const CONTRACT = [
 	source("skill:pfdsl", "skill", "claude-skill", ".claude/skills/pfdsl", {
 		generated: {
 			reason: "generated symlink",
-			target: "plugin/pfdsl/skills/pfdsl",
+			target: "generated/skills/pfdsl",
 		},
 	}),
 	source(

@@ -206,9 +206,9 @@ describe("harness distribution inventory", () => {
 
 	it("classifies the generated pfdsl source outside the distributed collision set", () => {
 		assert.deepEqual(GENERATED_SKILLS.pfdsl, {
-			reason: "generated symlink to the rendered plugin skill tree",
+			reason: "generated symlink to the neutral rendered skill tree",
 			source: ".claude/skills/pfdsl",
-			target: "plugin/pfdsl/skills/pfdsl",
+			target: "generated/skills/pfdsl",
 		});
 		assert.equal(DISTRIBUTED_SKILLS.includes("pfdsl"), false);
 	});

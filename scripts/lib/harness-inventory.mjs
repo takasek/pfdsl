@@ -199,8 +199,8 @@ export const HARNESS_CAPABILITY_CONTRACT = Object.freeze([
 	skillCapability("pfd-ecosystem"),
 	skillCapability("pfdsl", {
 		generated: Object.freeze({
-			reason: "generated symlink to the rendered plugin skill tree",
-			target: "plugin/pfdsl/skills/pfdsl",
+			reason: "generated symlink to the neutral rendered skill tree",
+			target: "generated/skills/pfdsl",
 		}),
 	}),
 	commandCapability("pfd-cycle"),

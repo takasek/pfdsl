@@ -1,24 +1,121 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
 	addGeneratedMarkdownNotice,
 	addGeneratedSourceComment,
-	agentToCodexToml,
+	agentCapabilityToCodexToml,
 	buildCodexPluginManifest,
 	buildCodexProjectConfig,
-	claudeHooksToCodexHooks,
 	claudeInstructionsToAgents,
 	claudeRootInstructionsToAgents,
-	commandToCodexSkill,
+	commandCapabilityToCodexSkill,
+	hookCapabilityToCodexHooks,
 } from "./gen-codex-assets.mjs";
-import { DISTRIBUTED_COMMANDS } from "./harness-inventory.mjs";
+import { validateCapabilityContract } from "./harness-capability-contract.mjs";
+import { PROBE_FIXTURES } from "./harness-capability-probes.test-helper.mjs";
+import { HARNESS_CAPABILITY_CONTRACT } from "./harness-inventory.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+
+function commandRecord({
+	name = "pfd-cycle",
+	description = "Choose the next PFD task.",
+	body = "\nKeep this body verbatim.\n",
+} = {}) {
+	return {
+		id: `command:${name}`,
+		kind: "command",
+		source: {
+			encoding: "claude-command",
+			path: `.claude/commands/${name}.md`,
+		},
+		mappings: [],
+		semantic: { description, body },
+	};
+}
+
+function agentRecord({
+	name = "pfd-lens",
+	description = "Inspect a graph.",
+	tools = "Read, Grep, Bash",
+	model = "sonnet",
+	body = "\nagent body\n",
+} = {}) {
+	return {
+		id: `agent:${name}`,
+		kind: "agent",
+		source: { encoding: "claude-agent", path: `.claude/agents/${name}.md` },
+		mappings: [],
+		semantic: { name, description, tools, model, body },
+	};
+}
+
+function hookRecord(hooks) {
+	return {
+		id: "plugin-hooks",
+		kind: "hook",
+		source: { encoding: "plugin-hooks", path: "hooks/hooks.json" },
+		mappings: [],
+		semantic: { hooks },
+	};
+}
+
+function pluginMetadataRecord() {
+	const mapping = HARNESS_CAPABILITY_CONTRACT.find(
+		({ id }) => id === "plugin-metadata",
+	).mappings.find(({ target }) => target === "codex-plugin");
+	return {
+		id: "plugin-metadata",
+		kind: "plugin-metadata",
+		source: {
+			encoding: "cli-package-metadata",
+			path: "packages/cli/package.json",
+		},
+		mappings: [mapping],
+		semantic: {
+			version: "1.2.3",
+			identity: {
+				name: "pfdsl",
+				author: { name: "takasek" },
+				homepage: "https://github.com/takasek/pfdsl",
+				license: "MIT",
+			},
+		},
+	};
+}
+
+function assertCodexPluginAgentExclusions(capabilities) {
+	for (const id of ["agent:pfd-lens", "agent:pfd-implementer"]) {
+		const capability = capabilities.find((record) => record.id === id);
+		const mapping = capability.mappings.find(
+			({ target }) => target === "codex-plugin",
+		);
+		assert.equal(mapping.disposition, "intentional-exclusion", id);
+		assert.match(mapping.reason, /\S/, id);
+		assert.match(mapping.impact, /\S/, id);
+		assert.equal(Object.hasOwn(mapping, "outputs"), false, id);
+		assert.throws(
+			() =>
+				validateCapabilityContract(
+					[
+						{
+							...capability,
+							mappings: capability.mappings.filter(
+								({ target }) => target !== "codex-plugin",
+							),
+						},
+					],
+					{ probeKinds: PROBE_FIXTURES },
+				),
+			/missing mapping for codex-plugin/,
+		);
+	}
+}
 
 function parseTomlDeveloperInstructions(source) {
 	const match = source.match(/^developer_instructions = """([\s\S]*)"""\n$/m);
@@ -34,8 +131,14 @@ function parseTomlDeveloperInstructions(source) {
 
 describe("buildCodexPluginManifest", () => {
 	it("emits the native Codex manifest shape without a hooks field", () => {
+		const metadata = pluginMetadataRecord();
+		const mapping = metadata.mappings[0];
 		assert.deepEqual(
-			buildCodexPluginManifest({ version: "1.2.3", description: "x" }),
+			buildCodexPluginManifest({
+				metadata: metadata.semantic,
+				mapping,
+				description: "x",
+			}),
 			{
 				name: "pfdsl",
 				version: "1.2.3",
@@ -55,6 +158,23 @@ describe("buildCodexPluginManifest", () => {
 					defaultPrompt: ["Use pfd-ops to operate this project."],
 				},
 			},
+		);
+	});
+
+	it("emits only manifest fields declared by the Codex mapping", () => {
+		const metadata = pluginMetadataRecord();
+		assert.deepEqual(
+			buildCodexPluginManifest({
+				metadata: metadata.semantic,
+				mapping: {
+					outputs: [
+						"manifest:.codex-plugin/plugin.json:name",
+						"manifest:.codex-plugin/plugin.json:version",
+					],
+				},
+				description: "x",
+			}),
+			{ name: "pfdsl", version: "1.2.3" },
 		);
 	});
 });
@@ -126,60 +246,54 @@ describe("generated ownership notices", () => {
 	});
 });
 
-describe("commandToCodexSkill", () => {
-	it("converts every maintained command argument clause without leaving a Claude placeholder", () => {
-		const expectedInstructions = new Map([
+describe("commandCapabilityToCodexSkill", () => {
+	it("converts each maintained command argument clause without leaving a Claude placeholder", () => {
+		const cases = [
 			[
-				"pfd-cycle.md",
-				"ユーザーがスキル呼び出しとともに指定した内容があれば、作業選択の指定として扱う。",
+				"pfd-cycle",
+				"引数（あれば作業選択の指定として扱う）: $ARGUMENTS",
+				"作業選択の指定として扱う。",
 			],
+			["pfd-init", "引数（あれば）: $ARGUMENTS", "引数として扱う。"],
 			[
-				"pfd-init.md",
-				"ユーザーがスキル呼び出しとともに指定した内容があれば、引数として扱う。",
+				"pfd-retro",
+				"対象範囲の指定（あれば）: $ARGUMENTS",
+				"監査対象範囲の指定として扱う。",
 			],
-			[
-				"pfd-retro.md",
-				"ユーザーがスキル呼び出しとともに指定した内容があれば、監査対象範囲の指定として扱う。",
-			],
-		]);
+		];
 
-		for (const sourcePath of DISTRIBUTED_COMMANDS) {
-			const output = commandToCodexSkill(
-				sourcePath,
-				readFileSync(resolve(root, ".claude/commands", sourcePath), "utf-8"),
+		for (const [name, clause, expected] of cases) {
+			const output = commandCapabilityToCodexSkill(
+				commandRecord({ name, body: `\n${clause}\n` }),
+				name === "pfd-retro" ? "source-command-pfd-retro" : name,
 			);
-			assert.doesNotMatch(output, /\$ARGUMENTS/, sourcePath);
-			assert.match(
-				output,
-				new RegExp(expectedInstructions.get(sourcePath)),
-				sourcePath,
-			);
+			assert.doesNotMatch(output, /\$ARGUMENTS/, name);
+			assert.match(output, new RegExp(expected), name);
 		}
 	});
 
-	it("rejects an unrecognized Claude argument construct with its source path", () => {
-		const source =
-			"---\n" +
-			"description: x\n" +
-			"---\n\n" +
-			"Unsupported argument form: $ARGUMENTS\n";
-
+	it("rejects an unrecognized argument construct with its source path", () => {
 		assert.throws(
-			() => commandToCodexSkill("pfd-unknown.md", source),
-			/pfd-unknown\.md.*\$ARGUMENTS/,
+			() =>
+				commandCapabilityToCodexSkill(
+					commandRecord({
+						name: "pfd-unknown",
+						body: "\nUnsupported argument form: $ARGUMENTS\n",
+					}),
+					"pfd-unknown",
+				),
+			/\.claude\/commands\/pfd-unknown\.md.*\$ARGUMENTS/,
 		);
 	});
 
 	it("preserves the command body except for the Codex argument instruction", () => {
-		const source =
-			"---\n" +
-			"description: Choose the next PFD task.\n" +
-			"---\n\n" +
-			"Keep this body verbatim.\n\n" +
-			"引数（あれば作業選択の指定として扱う）: $ARGUMENTS\n";
-
 		assert.equal(
-			commandToCodexSkill("pfd-cycle.md", source),
+			commandCapabilityToCodexSkill(
+				commandRecord({
+					body: "\nKeep this body verbatim.\n\n引数（あれば作業選択の指定として扱う）: $ARGUMENTS\n",
+				}),
+				"pfd-cycle",
+			),
 			"---\n" +
 				"name: pfd-cycle\n" +
 				"description: Choose the next PFD task.\n" +
@@ -191,41 +305,45 @@ describe("commandToCodexSkill", () => {
 	});
 
 	it("uses an assembly-supplied non-colliding output name while retaining the real source path for errors", () => {
-		const source = "---\ndescription: Run the retrospective.\n---\n\nbody\n";
+		const record = commandRecord({
+			name: "pfd-retro",
+			description: "Run the retrospective.",
+			body: "\nbody\n",
+		});
 
 		assert.match(
-			commandToCodexSkill("pfd-retro.md", source, "source-command-pfd-retro"),
+			commandCapabilityToCodexSkill(record, "source-command-pfd-retro"),
 			/^name: source-command-pfd-retro$/m,
 		);
-
 		assert.throws(
 			() =>
-				commandToCodexSkill(
-					"pfd-retro.md",
-					"---\nextra: unsupported\n---\n\nbody\n",
+				commandCapabilityToCodexSkill(
+					{ ...record, semantic: { description: 42, body: "\nbody\n" } },
 					"source-command-pfd-retro",
 				),
-			/pfd-retro\.md.*extra/,
+			/\.claude\/commands\/pfd-retro\.md.*description/,
 		);
 	});
 
-	it("rejects unknown command frontmatter with its source path and key", () => {
-		const source = "---\ndescription: x\nextra: y\n---\n\nbody\n";
-
+	it("rejects an unsupported semantic body with its source path", () => {
 		assert.throws(
-			() => commandToCodexSkill("pfd-cycle.md", source),
-			/pfd-cycle\.md.*extra/,
+			() =>
+				commandCapabilityToCodexSkill(
+					{ ...commandRecord(), semantic: { description: "x", body: 42 } },
+					"pfd-cycle",
+				),
+			/\.claude\/commands\/pfd-cycle\.md.*body/,
 		);
 	});
 });
 
-describe("agentToCodexToml", () => {
+describe("agentCapabilityToCodexToml", () => {
 	it("maps pfd-lens's known read-only tools without selecting a Codex model", () => {
-		const source = readFileSync(
-			resolve(root, ".claude/agents/pfd-lens.md"),
-			"utf-8",
+		const output = agentCapabilityToCodexToml(
+			agentRecord({
+				body: String.raw`\n.agents/skills/pfd-retro/SKILL.md\n\${PLUGIN_ROOT}\n`,
+			}),
 		);
-		const output = agentToCodexToml("pfd-lens.md", source);
 
 		assert.match(output, /^description = /m);
 		assert.match(output, /^name = "pfd-lens"$/m);
@@ -237,11 +355,13 @@ describe("agentToCodexToml", () => {
 	});
 
 	it("maps pfd-implementer's known write tools and repository instructions", () => {
-		const source = readFileSync(
-			resolve(root, ".claude/agents/pfd-implementer.md"),
-			"utf-8",
+		const output = agentCapabilityToCodexToml(
+			agentRecord({
+				name: "pfd-implementer",
+				tools: "Bash, Read, Edit, Write, Grep, Glob, Skill",
+				body: "\nRead `CLAUDE.md`.\n",
+			}),
 		);
-		const output = agentToCodexToml("pfd-implementer.md", source);
 
 		assert.match(output, /^sandbox_mode = "workspace-write"$/m);
 		assert.match(
@@ -261,16 +381,13 @@ describe("agentToCodexToml", () => {
 	});
 
 	it("keeps the Codex-only git boundary when Claude's pfd-implementer wording changes", () => {
-		const source =
-			"---\n" +
-			"name: pfd-implementer\n" +
-			"description: Delegate settled implementation work.\n" +
-			"tools: Bash, Read, Edit, Write, Grep, Glob, Skill\n" +
-			"model: sonnet\n" +
-			"---\n\n" +
-			"The upstream wording may change without changing this Codex boundary.\n";
-
-		const output = agentToCodexToml("pfd-implementer.md", source);
+		const output = agentCapabilityToCodexToml(
+			agentRecord({
+				name: "pfd-implementer",
+				body: "\nThe upstream wording may change without changing this Codex boundary.\n",
+				tools: "Bash, Read, Edit, Write, Grep, Glob, Skill",
+			}),
+		);
 
 		assert.match(
 			output,
@@ -284,15 +401,11 @@ describe("agentToCodexToml", () => {
 
 	it("rejects an absent or blank agent name", () => {
 		for (const name of [undefined, "   "]) {
-			const nameLine = name === undefined ? "" : `name: ${name}\n`;
-			const source =
-				"---\n" +
-				nameLine +
-				"description: x\ntools: Read, Grep, Bash\nmodel: sonnet\n---\n\nbody\n";
-
+			const record = agentRecord({ name: "pfd", body: "\nbody\n" });
+			record.semantic.name = name;
 			assert.throws(
-				() => agentToCodexToml("pfd.md", source),
-				/pfd\.md.*name.*non-empty string/,
+				() => agentCapabilityToCodexToml(record),
+				/\.claude\/agents\/pfd\.md.*name.*non-empty string/,
 			);
 		}
 	});
@@ -305,45 +418,45 @@ describe("agentToCodexToml", () => {
 			'quotes " and triple """',
 			"",
 		].join("\n");
-		const source =
-			"---\n" +
-			"name: pfd\n" +
-			"description: x\n" +
-			"tools: Read, Grep, Bash\n" +
-			"model: sonnet\n" +
-			"---\n" +
-			body;
-
-		const output = agentToCodexToml("pfd.md", source);
+		const output = agentCapabilityToCodexToml(
+			agentRecord({ name: "pfd", body }),
+		);
 
 		assert.equal(parseTomlDeveloperInstructions(output), body);
 	});
 
 	it("rejects an unsupported model with its source path and key", () => {
-		const source =
-			"---\nname: pfd\ndescription: x\ntools: Read, Grep, Bash\nmodel: opus\n---\n\nbody\n";
-
-		assert.throws(() => agentToCodexToml("pfd.md", source), /pfd\.md.*model/);
+		assert.throws(
+			() =>
+				agentCapabilityToCodexToml(agentRecord({ name: "pfd", model: "opus" })),
+			/\.claude\/agents\/pfd\.md.*model/,
+		);
 	});
 
 	it("rejects an unsupported tools list with its source path and key", () => {
-		const source =
-			"---\nname: pfd\ndescription: x\ntools: Read\nmodel: sonnet\n---\n\nbody\n";
-
-		assert.throws(() => agentToCodexToml("pfd.md", source), /pfd\.md.*tools/);
+		assert.throws(
+			() =>
+				agentCapabilityToCodexToml(agentRecord({ name: "pfd", tools: "Read" })),
+			/\.claude\/agents\/pfd\.md.*tools/,
+		);
 	});
 
-	it("rejects unknown agent frontmatter with its source path and key", () => {
-		const source =
-			"---\n" +
-			"name: pfd\n" +
-			"description: x\n" +
-			"tools: Read, Grep, Bash\n" +
-			"model: sonnet\n" +
-			"extra: y\n" +
-			"---\n\nbody\n";
+	it("rejects an unsupported semantic body with its source path and key", () => {
+		assert.throws(
+			() =>
+				agentCapabilityToCodexToml({
+					...agentRecord({ name: "pfd" }),
+					semantic: { ...agentRecord().semantic, body: 42, name: "pfd" },
+				}),
+			/\.claude\/agents\/pfd\.md.*body/,
+		);
+	});
+});
 
-		assert.throws(() => agentToCodexToml("pfd.md", source), /pfd\.md.*extra/);
+describe("Codex plugin intentional exclusions", () => {
+	it("keeps agent mappings excluded with no Codex plugin output", () => {
+		assertCodexPluginAgentExclusions(HARNESS_CAPABILITY_CONTRACT);
+		assert.equal(existsSync(join(root, "plugin/pfdsl-codex/agents")), false);
 	});
 });
 
@@ -462,15 +575,25 @@ describe("Codex generated-file attributes", () => {
 	});
 });
 
-describe("claudeHooksToCodexHooks", () => {
+describe("hookCapabilityToCodexHooks", () => {
 	it("copies only the hooks object", () => {
-		const settings = JSON.stringify({
-			permissions: { allow: ["Bash(node scripts/*)"] },
-			hooks: { PreToolUse: [{ matcher: "Bash", hooks: [] }] },
+		const record = hookRecord({
+			PreToolUse: [{ matcher: "Bash", hooks: [] }],
 		});
 
-		assert.deepEqual(JSON.parse(claudeHooksToCodexHooks(settings)), {
+		assert.deepEqual(JSON.parse(hookCapabilityToCodexHooks(record)), {
 			hooks: { PreToolUse: [{ matcher: "Bash", hooks: [] }] },
 		});
+	});
+
+	it("rejects an unsupported semantic hook value with its source path", () => {
+		assert.throws(
+			() =>
+				hookCapabilityToCodexHooks({
+					...hookRecord(null),
+					semantic: { hooks: [] },
+				}),
+			/hooks\.json.*hooks.*object/,
+		);
 	});
 });

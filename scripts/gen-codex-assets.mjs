@@ -10,11 +10,10 @@ import { fileURLToPath } from "node:url";
 import { assembleCodexAssets } from "./lib/gen-plugin.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const pluginRoot = resolve(root, "plugin/pfdsl");
 const codexPluginRoot = resolve(root, "plugin/pfdsl-codex");
 
 try {
-	assembleCodexAssets({ root, pluginRoot, codexPluginRoot });
+	assembleCodexAssets({ root, codexPluginRoot });
 	console.log("Codex repository and plugin assets generated.");
 } catch (error) {
 	console.error(error instanceof Error ? error.message : String(error));

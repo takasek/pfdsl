@@ -27,9 +27,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # .claude/skills/pfdsl is gitignored (#348) and absent on a fresh
-      # checkout — link it to the tracked bundle copy the way `make setup`
-      # does (#714).
+      # .claude/skills/pfdsl is gitignored (#348) and absent on a fresh checkout, so link it to the tracked generated copy the way `make setup` does (#714).
       - run: node scripts/link-repo-skill.mjs
 
       - run: pnpm --filter "@pfdsl/cli..." build

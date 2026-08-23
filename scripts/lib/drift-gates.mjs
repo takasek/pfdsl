@@ -131,7 +131,7 @@ export function buildGates({ stagedPresent }) {
 		},
 		{
 			id: "gen-plugin-skill-md",
-			// The only part of plugin/ that needs the CLI dist: SKILL.md embeds
+			// The only generated skill source that needs the CLI dist: SKILL.md embeds
 			// `pfdsl help` output and the CLI version. Scoped to that one file so a
 			// stale dist doesn't also skip the dist-independent bulk below (#593).
 			// Uses the plugin trigger, not the narrower skill one — a CLI version bump
@@ -139,13 +139,10 @@ export function buildGates({ stagedPresent }) {
 			trigger: GEN_PLUGIN_TRIGGER,
 			requireDist: [CLI_DIST],
 			commands: regenerateThenCheck(
-				[
-					"node",
-					["scripts/gen-skill.mjs", "--out", "plugin/pfdsl/skills/pfdsl"],
-				],
-				["plugin/pfdsl/skills/pfdsl/SKILL.md"],
+				["node", ["scripts/gen-skill.mjs", "--out", "generated/skills/pfdsl"]],
+				["generated/skills/pfdsl/SKILL.md"],
 			),
-			hint: "plugin/pfdsl/skills/pfdsl/SKILL.md is stale. Run 'make gen-plugin' and re-stage the plugin files.",
+			hint: "generated/skills/pfdsl/SKILL.md is stale. Run 'make gen-plugin' and re-stage generated and harness files.",
 		},
 		{
 			id: "gen-plugin-bulk",
@@ -158,15 +155,16 @@ export function buildGates({ stagedPresent }) {
 			commands: regenerateThenCheck(
 				["node", ["scripts/gen-plugin-dist-independent.mjs"]],
 				[
+					"generated",
 					"plugin",
-					":(exclude)plugin/pfdsl/skills/pfdsl/SKILL.md",
+					":(exclude)generated/skills/pfdsl/SKILL.md",
 					".claude-plugin/marketplace.json",
 					"AGENTS.md",
 					".agents",
 					".codex",
 				],
 			),
-			hint: "Claude and Codex outputs are stale (plugin/pfdsl, plugin/pfdsl-codex, .claude-plugin/marketplace.json, AGENTS.md, .agents, or .codex; SKILL.md checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the Claude and Codex outputs, or 'pnpm -r build && make gen-plugin' to regenerate everything.",
+			hint: "Claude and Codex outputs are stale (generated skill references, plugin/pfdsl, plugin/pfdsl-codex, .claude-plugin/marketplace.json, AGENTS.md, .agents, or .codex; SKILL.md checked above). Run 'node scripts/gen-plugin-dist-independent.mjs' (dist-free) and re-stage the harness outputs, or 'pnpm -r build && make gen-plugin' to regenerate everything.",
 		},
 		{
 			id: "samples-dot",

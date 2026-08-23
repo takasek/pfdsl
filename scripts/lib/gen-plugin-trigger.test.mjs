@@ -31,6 +31,8 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		for (const path of [
 			"CLAUDE.md",
 			".claude/settings.json",
+			"scripts/lib/harness-capability-contract.mjs",
+			"scripts/lib/harness-source-decoder.mjs",
 			"scripts/lib/harness-inventory.mjs",
 			"scripts/lib/gen-codex-assets.mjs",
 			"scripts/gen-codex-assets.mjs",
@@ -129,6 +131,10 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 		);
 		assert.equal(
 			GEN_PLUGIN_TRIGGER.test("plugin/pfdsl/.claude-plugin/plugin.json"),
+			true,
+		);
+		assert.equal(
+			GEN_PLUGIN_TRIGGER.test("generated/skills/pfdsl/SKILL.md"),
 			true,
 		);
 	});
