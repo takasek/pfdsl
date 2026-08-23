@@ -1108,6 +1108,22 @@ describe("classifyDesignRecordContent", () => {
 		});
 	});
 
+	it("does not count the required 却下理由 line head as a disposition", () => {
+		const record = ["前提: x", "否定案: y", "却下理由: z"].join("\n");
+		const result = classifyDesignRecordContent(record, 1);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /found 0 time\(s\)/);
+	});
+
+	it("still counts a disposition word written in the body of a required line", () => {
+		const record = ["前提: x", "否定案: y", "却下理由: 案Bは却下する。"].join(
+			"\n",
+		);
+		assert.deepEqual(classifyDesignRecordContent(record, 1), {
+			status: "PASS",
+		});
+	});
+
 	it("PASSes when the same option's disposition word appears twice, as ordinary prose", () => {
 		const record = [
 			"前提: x",
