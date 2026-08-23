@@ -64,13 +64,13 @@ Closes #<issue番号>
 
 ## 自動同期（flow-on-issue-close）
 
-issue が close されると `.github/workflows/pfdsl-flow-on-issue-close.yml` が起動し、`scripts/pfdsl/audit-issues-flow.mjs --fix` を実行して `roadmap.pfdsl` を機械修復し PR を作成する。実体スクリプトは `scripts/pfdsl/` 配下に集約し、由来を明示する（配布物の境界設計は ADR-0032 参照）。
+issue が close されると `.github/workflows/pfdsl-flow-on-issue-close.yml` が起動し、まず `scripts/pfdsl/audit-issues-flow.mjs --check-closed-registration <n>` が close event の issue だけを `gh issue view` で取得して pre-fix `roadmap.pfdsl` の登録を確認する。`flow:managed`・`CLOSED`・`COMPLETED` で未登録の場合、対象不在や OPEN など event 契約に反する場合は FAIL して `--fix` を実行しない。登録済み・`NOT_PLANNED`・`flow:exempt`・非 managed は PASS とし、その後 `scripts/pfdsl/audit-issues-flow.mjs --fix` を実行して `roadmap.pfdsl` を機械修復し PR を作成する。実体スクリプトは `scripts/pfdsl/` 配下に集約し、由来を明示する（配布物の境界設計は ADR-0032 参照）。
 
 PR マージ時に issue が自動 close されるには、PR 本文に `Closes #<issue番号>` を含める必要がある（「PR 本文規約」参照）。
 
 ## 同期監査
 
-`scripts/pfdsl/audit-issues-flow.mjs` が GitHub issues と `roadmap.pfdsl` の同期を機械監査する（ラベル・updatedAt・priority 突合）。`--fix` で機械的修復。
+`scripts/pfdsl/audit-issues-flow.mjs` が GitHub issues と `roadmap.pfdsl` の同期を機械監査する（ラベル・updatedAt・priority 突合）。`--fix` で機械的修復し、`--check-closed-registration <n>` は close event の対象 issue と pre-fix roadmap だけを検査する。
 
 findings は3クラスに分かれ、出力の見出しがそれを名乗る。`fixable:` は `--fix` が直すもので、`--fix` なしでは監査を落とす。`manual:` は人が直すもので監査を落とし、`advisory:` だけなら監査を落とさない。
 `flow:managed` なのに process を持たない issue（`missing_process`）が advisory なのは、その登録が実装ブランチに乗るためである — そのブランチが統合されるまで他の作業ツリーからは常に欠落して見える。
@@ -79,7 +79,7 @@ findings は3クラスに分かれ、出力の見出しがそれを名乗る。`
 この欠落に行動できるのは、その issue を自分のものとして扱っている側だけなので、検査点はそこへ寄せる。
 着手時点では、プリフライト集約スクリプトを持つリポがそのサイクルの issue について報告する（登録漏れは依存関係を変えうるので、roadmap に着手する前に知りたい）。
 マージ前の時点では、roadmap を編集する PR について、その PR が閉じる issue の分だけを FAIL にする — 対象集合を PR 自身から導けるため、実行主体が渡すフラグに依存しない。
-後者の時点は close 契機に置かない。close 後に気付いても、その PR はもう変えられない。
+後者の時点は PR の close 契機に置かない。close 後に気付いても、その PR はもう変えられない。ただし close event では `--fix` 前の roadmap を対象限定で検査し、`flow:managed` の COMPLETED close が未登録なら flow sync を止める。
 
 ## 採用手順
 

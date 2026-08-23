@@ -419,7 +419,7 @@ process:
     group: planning
   map_deps:
     label: 依存整理
-    description: "issue 間の依存を PFD 化し着手順を導出する。issue との同期は scripts/pfdsl/audit-issues-flow.mjs で機械監査（flow:managed ラベル・updated_at・priority 突合）。flow:managed なのに process が無い issue は advisory として報告するだけで監査を落とさない — 登録は実装ブランチに乗るため、マージまで他セッションからは常に欠落して見える。登録漏れを名指すのは着手時点の cycle-status.mjs（unregisteredManagedIssues）で、対象はそのサイクルが着手する issue に限る。issue close 時は GitHub Action（pfdsl-flow-on-issue-close）が --fix した flow-sync PR を自動起票し、人がレビューして merge する。COMPLETED close は closed_in_flow（終端削除 or done 降格）、NOT_PLANNED close は closed_not_planned（終端は自動削除、下流ありは手動対応 finding）として区別する"
+    description: "issue 間の依存を PFD 化し着手順を導出する。issue との同期は scripts/pfdsl/audit-issues-flow.mjs で機械監査（flow:managed ラベル・updated_at・priority 突合）。flow:managed なのに process が無い issue は advisory として報告するだけで監査を落とさない — 登録は実装ブランチに乗るため、マージまで他セッションからは常に欠落して見える。登録漏れを名指すのは着手時点の cycle-status.mjs（unregisteredManagedIssues）で、対象はそのサイクルが着手する issue に限る。issue close 時は GitHub Action（pfdsl-flow-on-issue-close）が --fix より前に --check-closed-registration <n> で対象 issue の pre-fix roadmap 登録を確認し、flow:managed・CLOSED・COMPLETED の未登録だけを FAIL にしてから --fix した flow-sync PR を自動起票し、人がレビューして merge する。この PR 起票・レビュー・merge は map_deps 内部の手順であり、roadmap_pfdsl 出力は merge 後の正本を表す。対象不在や OPEN は event 契約違反として FAIL、登録済み・NOT_PLANNED・flow:exempt・非 managed は PASS とする。COMPLETED close は closed_in_flow（終端削除 or done 降格）、NOT_PLANNED close は closed_not_planned（終端は自動削除、下流ありは手動対応 finding）として区別する"
     command: node scripts/pfdsl/audit-issues-flow.mjs
   map_workflow:
     label: ワークフロー整理
@@ -542,6 +542,8 @@ proposals >> file_issues -> gh_issues
 findings >>? file_issues
 
 gh_issues >> map_deps -> [roadmap_md, roadmap_pfdsl]
+
+roadmap_pfdsl >>? map_deps
 
 toolchain >> map_transform_boundaries -> [runtime_pipeline_md, runtime_pipeline_pfdsl]
 
