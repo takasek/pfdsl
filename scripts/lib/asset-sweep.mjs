@@ -89,8 +89,7 @@ export const SWEEP_TARGETS = [
 		// nine days they would have inflated 14 additions into 59.
 		//
 		// Every entry point counts, not just check-*.mjs and *-guard.mjs.
-		// Those two names do not cover the wired hooks (md-write-check.mjs,
-		// cwd-drift-log.mjs are neither), and the sweep reads more than
+		// Those two names do not cover wired hooks such as md-write-check.mjs, and the sweep reads more than
 		// guards anyway: one of its five steps looks for prose re-explaining
 		// what a script prints, which any entry point can provoke. The cost
 		// is that a generator or a setup helper counts too — one of the 14

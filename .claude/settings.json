@@ -101,11 +101,6 @@
             "type": "command",
             "command": "node hooks/managed-issue-reminder-post-tool-use.mjs",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node scripts/cwd-drift-log.mjs",
-            "timeout": 10
           }
         ]
       }
