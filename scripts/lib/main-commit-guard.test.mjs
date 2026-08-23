@@ -494,13 +494,38 @@ describe("main-commit-guard wrapper", () => {
 		rmSync(root, { recursive: true, force: true });
 	});
 
-	function runWrapper(command) {
+	function runWrapper(
+		command,
+		{ payloadCwd = session, claudeProjectDir = session } = {},
+	) {
+		const env = { ...process.env };
+		if (claudeProjectDir === null) delete env.CLAUDE_PROJECT_DIR;
+		else env.CLAUDE_PROJECT_DIR = claudeProjectDir;
 		return execFileSync(process.execPath, [script], {
 			encoding: "utf8",
-			env: { ...process.env, CLAUDE_PROJECT_DIR: session },
-			input: JSON.stringify(payload({ command, cwd: session })),
+			env,
+			input: JSON.stringify(payload({ command, cwd: payloadCwd })),
 		}).trim();
 	}
+
+	it("uses the payload cwd as the session worktree in Codex (#784)", () => {
+		const output = runWrapper(`git -C ${sibling} add -A`, {
+			claudeProjectDir: null,
+		});
+		assert.notEqual(output, "");
+		assert.equal(
+			JSON.parse(output).hookSpecificOutput.permissionDecision,
+			"deny",
+		);
+	});
+
+	it("keeps CLAUDE_PROJECT_DIR authoritative over the payload cwd", () => {
+		const output = runWrapper(`git -C ${session} add -A`, {
+			payloadCwd: sibling,
+			claudeProjectDir: session,
+		});
+		assert.equal(output, "");
+	});
 
 	it("denies compound and repeated-C sibling mutations end to end (#784)", () => {
 		for (const command of [

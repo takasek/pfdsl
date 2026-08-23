@@ -9,10 +9,11 @@
 // Both branch names come from git rather than being assumed: the current one
 // from `git branch --show-current`, the default one from `origin/HEAD`. A repo
 // whose default branch is `trunk` or `master` was previously guarded against a
-// branch name it does not have. Worktree ownership is anchored to the fixed
-// CLAUDE_PROJECT_DIR and compared with the command target's git roots. None of
-// these are read unless the command turns out to be guarded — the lib calls
-// resolveBranches only then.
+// branch name it does not have. Worktree ownership is anchored to the harness
+// session root and compared with the command target's git roots:
+// CLAUDE_PROJECT_DIR remains authoritative in Claude Code, while Codex falls
+// back to the PreToolUse payload cwd. None of these are read unless the command
+// turns out to be guarded — the lib calls resolveBranches only then.
 //
 // Always exits 0 — a crash here, or a `git` failure, must not wedge every Bash
 // call.
@@ -31,13 +32,19 @@ import { resolveGitRoots, tryGit } from "./lib/run-exec.mjs";
  * @param {string} targetCwd resolved cwd of one guarded Git segment
  * @returns {{currentBranch: string | undefined, mainBranch: string, crossesWorktree: boolean}}
  */
-function resolveBranches(_payload, targetCwd) {
+function resolveBranches(payload, targetCwd) {
 	// Each guarded segment supplies its own target, so a compound command that
 	// changes cwd is checked against every worktree it reaches (#751, #784).
 	const targetRoots = resolveGitRoots(targetCwd);
 	const projectDir = process.env.CLAUDE_PROJECT_DIR;
-	const sessionRoots =
-		typeof projectDir === "string" ? resolveGitRoots(projectDir) : null;
+	const payloadCwd = payload?.cwd;
+	const sessionDir =
+		typeof projectDir === "string" && projectDir !== ""
+			? projectDir
+			: typeof payloadCwd === "string" && payloadCwd !== ""
+				? payloadCwd
+				: null;
+	const sessionRoots = sessionDir === null ? null : resolveGitRoots(sessionDir);
 	const current = tryGit(["branch", "--show-current"], { cwd: targetCwd });
 	const head = tryGit(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], {
 		cwd: targetCwd,
