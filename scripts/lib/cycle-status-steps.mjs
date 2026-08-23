@@ -314,6 +314,7 @@ export async function runCycleStatus({
 	// back to null rather than guessing; buildGateCheckCommand turns that into
 	// the --no-artifact equivalent.
 	let artifactKey = null;
+	let gateCheckCommandError = null;
 	/** @type {number[]} target issues labelled flow:managed with no process yet */
 	const unregisteredManagedIssues = [];
 	if (targetIssues.length > 0) {
@@ -323,8 +324,9 @@ export async function runCycleStatus({
 					resolve(root, ".pfdsl/roadmap.pfdsl"),
 					"utf-8",
 				);
-			} catch {
+			} catch (e) {
 				roadmapText = null;
+				gateCheckCommandError = `failed to read .pfdsl/roadmap.pfdsl: ${e.message}`;
 			}
 		}
 		if (roadmapText !== null) {
@@ -338,22 +340,37 @@ export async function runCycleStatus({
 			// cycle is starting this issue, so its inputs and outputs are in hand.
 			// audit-issues-flow reports the same gap for every open issue, but only
 			// as advisory — see isUnregisteredManagedIssue.
-			// Only issues whose labels were actually fetched are judged. An issue
-			// whose `gh issue view` threw has unknown labels: calling it
-			// unregistered would be a false positive, and the failure itself is
-			// already reported loudly through designUnsettledError, so silence
-			// here is not silence overall.
+			// Only issues whose labels were actually fetched are judged as managed.
+			// When both the process and labels are unknown, however, the command must
+			// fail closed: `--no-artifact` is valid only for a confirmed exempt issue.
 			for (const [issue, processId] of processIdByIssue) {
 				const labels = labelsByIssue.get(issue);
-				if (labels === undefined) continue;
+				if (labels === undefined) {
+					if (processId === null) {
+						gateCheckCommandError = `cannot determine whether issue ${issue} is flow:exempt because its labels could not be fetched: ${designUnsettledError}`;
+					}
+					continue;
+				}
 				if (isUnregisteredManagedIssue(labels, processId)) {
 					unregisteredManagedIssues.push(issue);
+				}
+				if (processId === null && !labels.includes("flow:exempt")) {
+					gateCheckCommandError = labels.includes("flow:managed")
+						? `issue ${issue} is flow:managed but has no process in .pfdsl/roadmap.pfdsl`
+						: `issue ${issue} has no process in .pfdsl/roadmap.pfdsl and is not flow:exempt`;
 				}
 			}
 			const resolvedProcessIds = new Set(
 				[...processIdByIssue.values()].filter((id) => id !== null),
 			);
-			if (resolvedProcessIds.size === 1 && existsSync(cliPath)) {
+			if (
+				!gateCheckCommandError &&
+				resolvedProcessIds.size === 1 &&
+				!existsSync(cliPath)
+			) {
+				const [processId] = resolvedProcessIds;
+				gateCheckCommandError = `failed to resolve the output artifact for process '${processId}': packages/cli/dist/cli.js not built; run 'pnpm -r build' first`;
+			} else if (!gateCheckCommandError && resolvedProcessIds.size === 1) {
 				const [processId] = resolvedProcessIds;
 				try {
 					const neighborsJson = JSON.parse(
@@ -376,17 +393,24 @@ export async function runCycleStatus({
 					artifactKey =
 						neighborsJson?.successors?.find((n) => n?.kind === "primary")?.id ??
 						null;
-				} catch {
+					if (!artifactKey) {
+						gateCheckCommandError = `failed to resolve the output artifact for process '${processId}': graph neighbors returned no primary successor`;
+					}
+				} catch (e) {
 					artifactKey = null;
+					gateCheckCommandError = `failed to resolve the output artifact for process '${processId}': ${e.message}`;
 				}
 			}
 		}
+	} else {
+		gateCheckCommandError =
+			best && designUnsettledError
+				? designUnsettledError
+				: "no --issue given and no best process to resolve a gate-check command";
 	}
-	const gateCheckCommand = buildGateCheckCommand(
-		artifactKey,
-		base,
-		targetIssues,
-	);
+	const gateCheckCommand = gateCheckCommandError
+		? null
+		: buildGateCheckCommand(artifactKey, base, targetIssues);
 
 	// The catalog's own reminder that referencing it at retro is too late for
 	// patterns whose countermeasure has to land before this cycle's commit
@@ -439,6 +463,8 @@ export async function runCycleStatus({
 	if (releasePendingError) result.releasePendingError = releasePendingError;
 	if (readyError) result.readyError = readyError;
 	if (designUnsettledError) result.designUnsettledError = designUnsettledError;
+	if (gateCheckCommandError)
+		result.gateCheckCommandError = gateCheckCommandError;
 	if (preArtifactPatternsError)
 		result.preArtifactPatternsError = preArtifactPatternsError;
 	return result;
