@@ -30,9 +30,13 @@ describe("createsManagedIssue", () => {
 		);
 	});
 
-	it("flags the short flag, the = form, and a comma-separated label list", () => {
+	it("flags separated and attached short flags, the = form, and a comma-separated label list", () => {
 		assert.equal(
 			createsManagedIssue("gh issue create -l flow:managed -t x"),
+			true,
+		);
+		assert.equal(
+			createsManagedIssue("gh issue create -lflow:managed -t x"),
 			true,
 		);
 		assert.equal(
@@ -68,6 +72,75 @@ describe("createsManagedIssue", () => {
 		);
 	});
 
+	it("allows a managed create followed only by && commands or a trailing separator", () => {
+		assert.equal(
+			createsManagedIssue(
+				"gh issue create -lflow:managed --title x && git status",
+			),
+			true,
+		);
+		assert.equal(
+			createsManagedIssue("gh issue create -lflow:managed --title x;   "),
+			true,
+		);
+	});
+
+	it("allows an escaped greater-than in an unquoted argument", () => {
+		assert.equal(
+			createsManagedIssue(
+				"gh issue create -lflow:managed --title x\\>y && git status",
+			),
+			true,
+		);
+	});
+
+	it("rejects every ambiguous command form", () => {
+		const cases = [
+			[
+				"a fallback URL after ||",
+				"gh issue create -lflow:managed --title x || printf https://github.com/takasek/pfdsl/issues/671",
+			],
+			["a pipe", "gh issue create -lflow:managed --title x | cat"],
+			[
+				"a background command",
+				"gh issue create -lflow:managed --title x & printf https://github.com/takasek/pfdsl/issues/671",
+			],
+			[
+				"an independent semicolon command",
+				"gh issue create -lflow:managed --title x ; printf https://github.com/takasek/pfdsl/issues/671",
+			],
+			[
+				"an independent newline command",
+				"gh issue create -lflow:managed --title x\nprintf https://github.com/takasek/pfdsl/issues/671",
+			],
+			[
+				"a subshell",
+				"(gh issue create -lflow:managed --title x)",
+			],
+			[
+				"a preceding command",
+				"printf https://github.com/takasek/pfdsl/issues/671 && gh issue create -lflow:managed --title x",
+			],
+			[
+				"create output redirection",
+				"gh issue create -lflow:managed --title x > issue-url && printf https://github.com/takasek/pfdsl/issues/671",
+			],
+		];
+		for (const [name, command] of cases) {
+			assert.equal(createsManagedIssue(command), false, name);
+			assert.equal(formatManagedIssueAdvisory(payload({ command })), undefined, name);
+		}
+	});
+
+	it("does not flag a managed create preceded by another command", () => {
+		assert.equal(
+			createsManagedIssue(
+				"printf https://github.com/takasek/pfdsl/issues/671 && gh issue create -lflow:managed --title x",
+			),
+			false,
+		);
+	});
+
 	it("does not read a label out of some other flag's value", () => {
 		assert.equal(
 			createsManagedIssue('gh issue create --title "flow:managed" --label bug'),
@@ -75,7 +148,7 @@ describe("createsManagedIssue", () => {
 		);
 	});
 
-	it("does not treat a stray 'create' in a flag value as the verb", () => {
+	it("does not treat a stray create in a flag value as the verb", () => {
 		assert.equal(
 			createsManagedIssue(
 				"gh issue edit 650 --title create --add-label flow:managed",
@@ -179,6 +252,7 @@ describe("runManagedIssueReminder", () => {
 		);
 		const { shouldOutput, output } = runManagedIssueReminder(input);
 		assert.equal(shouldOutput, true);
+		assert.equal(output.hookSpecificOutput.hookEventName, "PostToolUse");
 		assert.match(output.hookSpecificOutput.additionalContext, /#671/);
 	});
 

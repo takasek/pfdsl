@@ -17,7 +17,7 @@ build:
 .PHONY: test
 test:
 	pnpm -r test
-	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs"
+	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs"
 	node scripts/check-script-imports.mjs
 	node scripts/check-no-shell-strings.mjs
 	node scripts/check-cli-conventions.mjs

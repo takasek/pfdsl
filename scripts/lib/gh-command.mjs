@@ -1,5 +1,5 @@
 // Locates the group and verb of a `gh` call, for the guards that decide on one
-// (delegation-guard, command-usage-guard, managed-issue-reminder).
+// (delegation-guard and command-usage-guard).
 //
 // Reading `tokens[1]` as the group is wrong as soon as a global flag comes
 // first: `gh -R owner/repo pr create` has "-R" there, and every guard that
