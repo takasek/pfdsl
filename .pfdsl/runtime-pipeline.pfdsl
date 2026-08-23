@@ -174,9 +174,32 @@ artifact:
     description: "配布するskill・command・agent・hookの集合、明示除外、生成分類、Claude Code plugin mirrorを一元化する。Claude CodeとCodexのadapterは同じinventoryを読むため、ハーネス別allowlistを重複して持たない"
     location: ../scripts/lib/harness-inventory.mjs
     group: skill_sources
-  release_tag:
-    label: リリースタグ
-    description: "workflow.pfdsl の decide_release が生産する v* / lib-v* / vscode-v* タグ。判断の終端であり、ここから先の公開変換は判断を含まない"
+  cli_release_request:
+    label: CLIリリース要求
+    description: "workflow.pfdsl の decide_cli_release が生産する、公開版を選択済みの CLI release 入力"
+    group: gen_sources
+  libraries_release_request:
+    label: ライブラリリリース要求
+    description: "workflow.pfdsl の decide_libraries_release が生産する、共通公開版を選択済みの libraries release 入力"
+    group: gen_sources
+  vscode_release_request:
+    label: VSCode拡張リリース要求
+    description: "workflow.pfdsl の decide_vscode_release が生産する、パッケージ版を選択済みの VSCode extension release 入力"
+    group: gen_sources
+  cli_release_tag:
+    label: CLIリリースタグ
+    description: "make release が push する v* tag。publish-cli.yml だけを起動する"
+    criteria: git ls-remote --tags origin refs/tags/v<VERSION> が ref を返す
+    group: gen_sources
+  libraries_release_tag:
+    label: ライブラリリリースタグ
+    description: "make release-libs が push する lib-v* tag。publish-libraries.yml だけを起動する"
+    criteria: git ls-remote --tags origin refs/tags/lib-v<VERSION> が ref を返す
+    group: gen_sources
+  vscode_release_tag:
+    label: VSCode拡張リリースタグ
+    description: "make vscode-package が .vsix 生成の成功後に push する vscode-v* tag。対応する publish workflow は無い"
+    criteria: git ls-remote --tags origin refs/tags/vscode-v<VERSION> が ref を返す
     group: gen_sources
   ops_skill_general:
     label: PFD運用フレームワーク 汎用層
@@ -447,15 +470,33 @@ process:
     command: make gen-samples
     location: ../scripts/gen-samples.mjs
     tags: [ gen ]
-  publish_packages:
-    label: タグ起点の自動公開
-    description: "v* tag push で @pfdsl/cli、lib-v* tag push でライブラリ群を GitHub Actions が npm publish する（Trusted Publishing / OIDC）。リリースするか・どの版で切るかの判断はworkflow.pfdslのdecide_releaseが持ち、タグが押された後この変換に判断は入らない"
-    location: [ ../.github/workflows/publish-cli.yml, ../.github/workflows/publish-libraries.yml ]
+  push_cli_release_tag:
+    label: CLIタグ生成・push
+    description: "make release が選択済み版で pre-tag checks を実行し、v* tag を push する。tag push 後の npm publish は publish_cli が持つ"
+    command: "make release VERSION=<VERSION>"
+    location: ../scripts/release.mjs
     tags: [ gen ]
-  package_vsix:
-    label: vsix 生成
-    description: "vscode-extension を .vsix へパッケージングする。vscode-v* タグと同じ版で切る"
+  publish_cli:
+    label: CLI自動公開
+    description: "v* tag push だけを起動条件として publish-cli.yml が @pfdsl/cli を npm publish する（Trusted Publishing / OIDC）"
+    location: ../.github/workflows/publish-cli.yml
+    tags: [ gen ]
+  push_libraries_release_tag:
+    label: ライブラリタグ生成・push
+    description: "make release-libs が選択済み共通版で pre-tag checks を実行し、lib-v* tag を push する。tag push 後の npm publish は publish_libraries が持つ"
+    command: "make release-libs VERSION=<VERSION>"
+    location: ../scripts/release.mjs
+    tags: [ gen ]
+  publish_libraries:
+    label: ライブラリ自動公開
+    description: "lib-v* tag push だけを起動条件として publish-libraries.yml が core・graphviz-exporter・preview-engine を順に npm publish する（Trusted Publishing / OIDC）"
+    location: ../.github/workflows/publish-libraries.yml
+    tags: [ gen ]
+  package_vscode_release:
+    label: VSIX生成・タグpush
+    description: "選択済み版の vscode-extension を .vsix へパッケージングし、その生成が成功した後で vscode-v* tag を push する。1回の make vscode-package が正常完了したときの両成果物を単一変換の複数出力として扱い、内部順序はこの description が持つ"
     command: "make vscode-package VERSION=<VERSION>"
+    location: ../scripts/release.mjs
     tags: [ gen ]
   upload_vsix:
     label: marketplace へ手動アップロード
@@ -522,9 +563,15 @@ ops_install_sources >> gen_install -> ops_install_templates
 
 toolchain >> gen_readme_cli -> readme_cli_blocks
 
-[release_tag, toolchain] >> publish_packages -> [published_cli, published_libraries]
+[cli_release_request, toolchain] >> push_cli_release_tag -> cli_release_tag
 
-[release_tag, toolchain] >> package_vsix -> vsix_package
+[cli_release_tag, toolchain] >> publish_cli -> published_cli
+
+[libraries_release_request, toolchain] >> push_libraries_release_tag -> libraries_release_tag
+
+[libraries_release_tag, toolchain] >> publish_libraries -> published_libraries
+
+[toolchain, vscode_release_request] >> package_vscode_release -> [vscode_release_tag, vsix_package]
 
 vsix_package >> upload_vsix -> published_ext
 

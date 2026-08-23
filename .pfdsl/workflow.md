@@ -125,11 +125,11 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 **2つのエッジは要求範囲が異なる（#944）**: `gen_plugin` 入力エッジは同梱される全ての手書き artifact に要求するが、`distill_ops` 出力エッジは `workflow.pfdsl` が宣言している artifact にのみ要求する。`pfd_commands` は `runtime-pipeline.pfdsl` にしか宣言が無く（#780）、そもそも `workflow.pfdsl` のエッジに載る資格を持たないため、両方を要求すると偽陽性になる。非対称は id の手列挙でなく「どちらの図が宣言しているか」から導出する。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
 
-照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が `decide_release` になり素材列挙を持たなくなり、`runtime-pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
+照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が3種の release 判断になり素材列挙を持たなくなり、`runtime-pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
 
-**判断軸による分担（ADR-0035）**: 判断を含まない生成・公開の変換は `runtime-pipeline.pfdsl` が持つ。`make gen-skill` / `make gen-install` / `make gen-plugin` / `make gen-samples` と、タグ push 以降の npm publish・vsix 生成・marketplace アップロードがそちらにある。`make gen-plugin` はClaude root、Codex root、repository Codex assetsを組み立て、結合drift gateがまとめて検査する。この図に残るのは「リリースするか・どの版で切るか」の判断（`decide_release`）までである。生成コマンドの手続き・drift 検査の話はこの companion が引き続き一次情報として持つ（グラフで運べない散文のため）。
+**判断軸による分担（ADR-0035）**: 判断を含まない生成・公開の変換は `runtime-pipeline.pfdsl` が持つ。`make gen-skill` / `make gen-install` / `make gen-plugin` / `make gen-samples` と、release request 以降の tag push・npm publish・vsix 生成・marketplace アップロードがそちらにある。`make gen-plugin` はClaude root、Codex root、repository Codex assetsを組み立て、結合drift gateがまとめて検査する。この図に残るのは「release kind ごとに公開するか・どの版で切るか」の判断（`decide_cli_release` / `decide_libraries_release` / `decide_vscode_release`）までであり、判断出力は3種の release request として runtime-pipeline.pfdsl へ渡す。生成コマンドの手続き・drift 検査の話はこの companion が引き続き一次情報として持つ（グラフで運べない散文のため）。
 
-**生成の一次ソースは `graph io` の終端に出る（ADR-0035 の副作用）**: `gen_skill` / `gen_plugin` / `publish_packages` / `package_vsix` が消費する生成の一次ソースは、この図では消費者を持たない終端 artifact として報告される。消費側のエッジは `runtime-pipeline.pfdsl` に実在するが、`graph io` はファイル単位で走るため参照できない。該当する artifact をここに列挙しない — 一次情報は消費側のエッジであり、現在の集合は下記の機械振り分けが `.pfdsl/` を横断して毎回そこから取り直す。
+**生成の一次ソースは `graph io` の終端に出る（ADR-0035 の副作用）**: `gen_skill` / `gen_plugin` / `push_cli_release_tag` / `push_libraries_release_tag` / `package_vscode_release` が消費する生成の一次ソースは、この図では消費者を持たない終端 artifact として報告される。消費側のエッジは `runtime-pipeline.pfdsl` に実在するが、`graph io` はファイル単位で走るため参照できない。該当する artifact をここに列挙しない — 一次情報は消費側のエッジであり、現在の集合は下記の機械振り分けが `.pfdsl/` を横断して毎回そこから取り直す。
 
 **これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。終端ゲートのプロトコル5(b) 判定では「消費者は sibling の `runtime-pipeline.pfdsl` に在る」と記録して該当なしとする。
 
