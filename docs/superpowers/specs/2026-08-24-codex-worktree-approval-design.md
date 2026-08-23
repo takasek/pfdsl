@@ -18,7 +18,9 @@ Codexのshell呼出しは、コマンド文字列を固定したまま `exec_com
 
 workdir指定を持たないharnessでは従来どおり `git -C <absolute-worktree>`、`make -C <absolute-worktree>`、絶対script pathを使い、誤tree操作の防止を弱めない。
 
-Codexのprefix ruleと一致させる必要があるroutine commandはRTKで包まず、`git fetch origin`、`git worktree add ...`、`make setup`、`pnpm -r build`、`pnpm test`の正規形を使う。
+Codexのprefix ruleと一致させる必要があるroutine commandはRTKで包まず、`git fetch origin`、`git worktree add ...`、`make setup`、`pnpm -r build`、`pnpm test`、`pnpm typecheck`の正規形を使う。
+
+両harnessのSessionStart hookが `node_modules` のないworktreeで `make setup` を自動実行するため、agentは通常sessionで同じsetupを再実行しない。session開始後に手動作成したworktreeなどhook未実行の場合だけ1回実行する。
 
 失敗後でも、既知の前提工程、同じ公式手順の次工程、同じ検証の再実行、同一ツールの引数訂正は追加確認なしで続ける。
 

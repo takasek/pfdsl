@@ -28,6 +28,8 @@ The existing #981 generator worktree and generated assets are out of scope.
 - Modify: `/Users/m5/.codex/AGENTS.md`
 - Modify: `/Users/m5/.codex/RTK.md`
 - Modify: `/Users/m5/.codex/rules/default.rules`
+- Modify: `CLAUDE.md`
+- Regenerate: `AGENTS.md`
 
 **Interfaces:**
 - Consumes: Codex `exec_command.workdir` and user-level `prefix_rule` matching.
@@ -47,7 +49,11 @@ Document that commands relying on Codex prefix rules run in their original canon
 
 - [ ] **Step 4: Add safe routine prefixes**
 
-Add allow rules for `git worktree add`, `pnpm -r build`, and `pnpm test`, with negative examples proving the patterns do not match deletion, publish, or push commands.
+Add allow rules for `git worktree add`, `pnpm -r build`, `pnpm test`, and `pnpm typecheck`, with negative examples proving the patterns do not match deletion, publish, or push commands.
+
+- [ ] **Step 5: Avoid duplicate worktree setup**
+
+Document the shared SessionStart `make setup` behavior in `CLAUDE.md`, regenerate `AGENTS.md`, and retain manual setup only for worktrees created after session start or otherwise missed by the hook.
 
 ### Task 2: Add Codex session-root regression coverage
 

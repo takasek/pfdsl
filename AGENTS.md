@@ -6,7 +6,7 @@
 
 ## セットアップ
 
-クローン直後・新規 worktree では最初に `make setup` を実行する。依存インストールに加え pre-commit hook のシム（`scripts/hooks/pre-commit-shim`）を `.git/hooks/` に導入する。シムはコミット実行 worktree の `scripts/pre-commit` を都度 exec するため、hook の版とブランチのツリー内容が常に一致する（#411）。実体（`scripts/pre-commit`）はコミット時に staged ファイルの biome 検査（整形・lint・構文）と `.pfdsl` スナップショット鮮度を自動検査する。biome の指摘は自動修正しない — 落ちたら `make format` を実行して再 stage する。これを飛ばすとローカルコミットが検査をすり抜け、CI で初めて失敗に気付くことになる。
+Claude CodeとCodexのSessionStart hookは、クローン直後・新規 worktreeで `node_modules` がなければ `make setup` を自動実行する。hook実行後にagentが同じsetupを重ねて実行しない。session開始後にworktreeを手動作成した場合など、hookがそのworktreeで未実行かつ `node_modules` がない場合だけ `make setup` を1回実行する。依存インストールに加え pre-commit hook のシム（`scripts/hooks/pre-commit-shim`）を `.git/hooks/` に導入する。シムはコミット実行 worktree の `scripts/pre-commit` を都度 exec するため、hook の版とブランチのツリー内容が常に一致する（#411）。実体（`scripts/pre-commit`）はコミット時に staged ファイルの biome 検査（整形・lint・構文）と `.pfdsl` スナップショット鮮度を自動検査する。biome の指摘は自動修正しない — 落ちたら `make format` を実行して再 stage する。これを飛ばすとローカルコミットが検査をすり抜け、CI で初めて失敗に気付くことになる。
 
 ## 文字列の言語
 
