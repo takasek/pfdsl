@@ -166,8 +166,8 @@ artifact:
     group: gen_sources
   claude_harness_sources:
     label: 現行のClaude Code手書き入力
-    description: "短期の maintained source は CLAUDE.md、.claude/settings.json、hooks/、およびharness_inventoryが選ぶ .claude/skills・commands・agents の配布対象である。.claude/skills/pfdsl は plugin/pfdsl/skills/pfdsl への生成symlinkであり、正本入力でも編集先でもない。将来の中立正本移行では、この入力側だけを差し替え、inventory と各adapterの出力契約を維持する"
-    location: [ ../CLAUDE.md, ../.claude/settings.json, ../.claude/commands/, ../.claude/agents/, ../hooks/ ]
+    description: "短期の maintained source は CLAUDE.md、.claude/settings.json、およびharness_inventoryが選ぶ .claude/skills・commands・agents の配布対象である。hooks/ は distributed_advisory_hooks が別artifactとして持つ。.claude/skills/pfdsl は plugin/pfdsl/skills/pfdsl への生成symlinkであり、正本入力でも編集先でもない。将来の中立正本移行では、この入力側だけを差し替え、inventory と各adapterの出力契約を維持する"
+    location: [ ../CLAUDE.md, ../.claude/settings.json, ../.claude/commands/, ../.claude/agents/ ]
     group: skill_sources
   harness_inventory:
     label: ハーネス中立の配布inventory
@@ -238,9 +238,9 @@ artifact:
     description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う。旧版ではassemble_pluginの入力に列挙されておらず、二重モデル化による乖離だった（ADR-0035で解消）"
     location: ../.claude/agents/pfd-lens.md
     group: skill_sources
-  retro_reminder_hook:
-    label: retroリマインダhook
-    description: "内容の一次情報はworkflow.pfdsl。ここではplugin_distへの同梱対象としてのみ扱う。gen_pluginはこれをディレクトリごとミラーする唯一の同梱対象で、ファイル単位の列挙を持たない"
+  distributed_advisory_hooks:
+    label: plugin配布advisory hooks
+    description: "内容の意味は workflow.pfdsl が一次情報。ここでは gen_plugin と assemble_codex_plugin が消費する hooks/ ディレクトリ全体の入力としてのみ扱い、ファイル単位の列挙は持たない"
     location: ../hooks/
     group: skill_sources
   implementer_agent:
@@ -564,9 +564,9 @@ dot_graph >> export_image -> rendered_image
 
 ops_install_sources >> gen_install -> ops_install_templates
 
-[claude_harness_sources, ecosystem_skill, feature_samples, grill_skill, harness_inventory, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_reminder_hook, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> claude_adapter_output
+[claude_harness_sources, distributed_advisory_hooks, ecosystem_skill, feature_samples, grill_skill, harness_inventory, implementer_agent, ops_install_templates, ops_skill_general, ops_skill_l3, pfd_commands, pfd_lens_agent, quality_guide, retro_skill, review_perspectives, skill_template, spec, toolchain] >> gen_plugin -> claude_adapter_output
 
-[claude_adapter_output, claude_harness_sources, harness_inventory, toolchain] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
+[claude_adapter_output, claude_harness_sources, distributed_advisory_hooks, harness_inventory, toolchain] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
 
 [claude_adapter_output, codex_adapter_output, codex_repo_assets] >> check_plugin_drift -> plugin_dist
 

@@ -38,6 +38,7 @@ import { GENERATED_SKILLS } from "./harness-inventory.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../..");
+const hookHostEnvironment = { PATH: process.env.PATH };
 
 function markdownFiles(directory, relative = "") {
 	return readdirSync(directory, { withFileTypes: true })
@@ -1813,7 +1814,7 @@ describe("Codex generated consumers", () => {
 		}
 	});
 
-	it("runs the generated plugin hook through Codex's compatibility environment", () => {
+	it("runs both configured reminders from each generated plugin consumer", () => {
 		const pluginRoot = join(repoRoot, "plugin/pfdsl");
 		const codexPluginRoot = join(repoRoot, "plugin/pfdsl-codex");
 		assemblePluginDistIndependent({
@@ -1822,12 +1823,8 @@ describe("Codex generated consumers", () => {
 			codexPluginRoot,
 		});
 
-		const consumer = mkdtempSync(join(tmpdir(), "codex-hook-consumer-"));
+		const consumer = mkdtempSync(join(tmpdir(), "generated-hook-consumer-"));
 		try {
-			const pluginCopy = join(consumer, "plugin-cache/pfdsl-codex");
-			cpSync(codexPluginRoot, pluginCopy, { recursive: true });
-			assert.equal(existsSync(join(consumer, ".claude")), false);
-
 			const roadmap = join(consumer, ".pfdsl/roadmap.pfdsl");
 			mkdirSync(dirname(roadmap), { recursive: true });
 			writeFileSync(roadmap, "artifact:\n  delivery:\n    status: wip\n");
@@ -1837,9 +1834,9 @@ describe("Codex generated consumers", () => {
 				"git",
 				[
 					"-c",
-					"user.name=Codex Test",
+					"user.name=Hook Test",
 					"-c",
-					"user.email=codex-test@example.invalid",
+					"user.email=hook-test@example.invalid",
 					"commit",
 					"-qm",
 					"baseline",
@@ -1852,9 +1849,9 @@ describe("Codex generated consumers", () => {
 				"git",
 				[
 					"-c",
-					"user.name=Codex Test",
+					"user.name=Hook Test",
 					"-c",
-					"user.email=codex-test@example.invalid",
+					"user.email=hook-test@example.invalid",
 					"commit",
 					"-qm",
 					"mark delivery done",
@@ -1862,26 +1859,116 @@ describe("Codex generated consumers", () => {
 				{ cwd: consumer },
 			);
 
-			const hookConfig = JSON.parse(
-				readFileSync(join(pluginCopy, "hooks/hooks.json"), "utf-8"),
-			);
-			const command = hookConfig.hooks.PostToolUse[0].hooks[0].command;
-			const output = execFileSync("/bin/sh", ["-c", command], {
-				cwd: consumer,
-				encoding: "utf-8",
-				env: { ...process.env, CLAUDE_PLUGIN_ROOT: pluginCopy },
-				input: JSON.stringify({
+			for (const [plugin, consumerName] of [
+				[pluginRoot, "Claude"],
+				[codexPluginRoot, "Codex"],
+			]) {
+				const pluginCopy = join(consumer, consumerName);
+				cpSync(plugin, pluginCopy, { recursive: true });
+				assert.equal(existsSync(join(consumer, ".claude")), false);
+				const hookConfig = JSON.parse(
+					readFileSync(join(pluginCopy, "hooks/hooks.json"), "utf-8"),
+				);
+				const commands = hookConfig.hooks.PostToolUse[0].hooks;
+				const managedIssueCommand = commands.find((hook) =>
+					hook.command.includes("managed-issue-reminder-post-tool-use.mjs"),
+				)?.command;
+				const retroCommand = commands.find((hook) =>
+					hook.command.includes("retro-reminder-post-tool-use.mjs"),
+				)?.command;
+				assert.ok(
+					managedIssueCommand,
+					`${consumerName} has a managed-issue hook`,
+				);
+				assert.ok(retroCommand, `${consumerName} has a retro hook`);
+				for (const command of [managedIssueCommand, retroCommand]) {
+					assert.match(command, /\$\{CLAUDE_PLUGIN_ROOT\}/, consumerName);
+					assert.doesNotMatch(command, /\$\{PLUGIN_ROOT\}/, consumerName);
+				}
+				const managedIssueOutput = execFileSync(
+					"/bin/sh",
+					["-c", managedIssueCommand],
+					{
+						cwd: consumer,
+						encoding: "utf-8",
+						env: {
+							...hookHostEnvironment,
+							CLAUDE_PLUGIN_ROOT: pluginCopy,
+						},
+						input: JSON.stringify({
+							tool_name: "Bash",
+							tool_input: {
+								command: "gh issue create --label flow:managed --title example",
+							},
+							tool_response: {
+								stdout: "https://github.com/takasek/pfdsl/issues/654\\n",
+								stderr: "",
+							},
+						}),
+					},
+				);
+				const parsedOutput = JSON.parse(managedIssueOutput);
+				assert.equal(
+					parsedOutput.hookSpecificOutput.hookEventName,
+					"PostToolUse",
+				);
+				assert.match(
+					parsedOutput.hookSpecificOutput.additionalContext,
+					/#654.*roadmap\.pfdsl/,
+				);
+				for (const input of [
+					JSON.stringify({
+						tool_name: "Bash",
+						tool_input: {
+							command: "gh issue create --label flow:managed --title example",
+						},
+						tool_response: { stdout: "", stderr: "HTTP 422" },
+					}),
+					"not json{{{",
+					JSON.stringify({
+						tool_name: "Bash",
+						tool_input: { command: "gh issue list --label flow:managed" },
+						tool_response: {
+							stdout: "https://github.com/takasek/pfdsl/issues/654\\n",
+							stderr: "",
+						},
+					}),
+				]) {
+					assert.equal(
+						execFileSync("/bin/sh", ["-c", managedIssueCommand], {
+							cwd: consumer,
+							encoding: "utf-8",
+							env: {
+								...hookHostEnvironment,
+								CLAUDE_PLUGIN_ROOT: pluginCopy,
+							},
+							input,
+						}),
+						"",
+						consumerName,
+					);
+				}
+
+				const retroOutput = execFileSync("/bin/sh", ["-c", retroCommand], {
 					cwd: consumer,
-					tool_input: { command: "git commit -m mark-delivery-done" },
-				}),
-			});
-			assert.deepEqual(JSON.parse(output), {
-				hookSpecificOutput: {
-					hookEventName: "PostToolUse",
-					additionalContext:
-						"note: this commit marks a roadmap artifact done — run pfd-retro if warranted.",
-				},
-			});
+					encoding: "utf-8",
+					env: {
+						...hookHostEnvironment,
+						CLAUDE_PLUGIN_ROOT: pluginCopy,
+					},
+					input: JSON.stringify({
+						cwd: consumer,
+						tool_input: { command: "git commit -m mark-delivery-done" },
+					}),
+				});
+				assert.deepEqual(JSON.parse(retroOutput), {
+					hookSpecificOutput: {
+						hookEventName: "PostToolUse",
+						additionalContext:
+							"note: this commit marks a roadmap artifact done — run pfd-retro if warranted.",
+					},
+				});
+			}
 		} finally {
 			rmSync(consumer, { recursive: true, force: true });
 		}

@@ -233,10 +233,10 @@ artifact:
     criteria: make gen-plugin が差分なしで完了して plugin/pfdsl/agents/pfd-implementer.md が実在し、採用リポで plugin を入れただけで pfd-implementer が起動でき、その tools 列に外向きツール面（GitHub MCP）が無い
     location: ../.claude/agents/pfd-implementer.md
     group: generation
-  retro_reminder_hook:
-    label: retroリマインダhook
-    description: "roadmap.pfdsl へ status: done を追加するコミットの後、pfd-retro の起動を促す advisory reminder を返す PostToolUse(Bash) フック。pfd-ops references/work-cycle.md 手順5 がプロトコル7(a) のバックストップとして要求する（セッション記憶が抜けても done 付与コミットの tool result 経由で気付ける）。delegation_guard・main_branch_guard と違いリポ固有ではなく plugin 同梱物で、gen_plugin が hooks/ をディレクトリごとミラーし、Claude CodeとCodex plugin hostは既定の hooks/hooks.json discoveryで公開する"
-    criteria: hooks/hooks.json が PostToolUse へ配線され、plugin 同梱物に含まれ、Codex runtime の CLAUDE_PLUGIN_ROOT 互換環境でcommandが解決し、採用リポで設置作業なしに done 付与コミットの tool result へ reminder が現れる
+  distributed_advisory_hooks:
+    label: plugin配布advisory hooks
+    description: "pfd-ops 運用が要求する非ブロッキングな PostToolUse(Bash) advisory 群。hooks/ は retro の done-status reminder と、成功した flow:managed issue-create の roadmap reminder を含み、gen_plugin がディレクトリ全体をミラーして Claude Code と Codex の plugin host へ配布する"
+    criteria: "正本の hooks/hooks.json が各 PostToolUse(Bash) advisory を配線し、make gen-plugin が Claude Code plugin root と Codex plugin root の hooks/ へ取り込み、scripts/lib/gen-plugin.test.mjs が生成済み両 consumer を採用リポに追加インストールなしで実行して retro と flow:managed issue-create の各 reminder の command 解決、PostToolUse 出力、非ブロッキング（exit 0）を検証する"
     location: ../hooks/
     group: generation
   delegation_guard:
@@ -522,7 +522,7 @@ pfdsl_skill >>? review_examples
 retro_skill >>? review_examples
 toolchain >>? review_examples
 
-[adrs, decisions, payoff_log] >> distill_ops -> [ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_reminder_hook, retro_skill, review_perspectives]
+[adrs, decisions, payoff_log] >> distill_ops -> [distributed_advisory_hooks, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives]
 
 [adrs, decisions] >> distill_local_skills -> [distribution_review_perspectives, distribution_review_skill, prose_mechanization_audit_skill, retro_pattern_sweep_skill, spec_stress_skill, vscode_ext_debug_skill]
 

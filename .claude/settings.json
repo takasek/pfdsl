@@ -99,7 +99,7 @@
           },
           {
             "type": "command",
-            "command": "node scripts/managed-issue-reminder.mjs",
+            "command": "node hooks/managed-issue-reminder-post-tool-use.mjs",
             "timeout": 10
           },
           {
