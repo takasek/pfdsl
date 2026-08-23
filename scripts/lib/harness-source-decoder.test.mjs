@@ -112,8 +112,15 @@ function fixture() {
 		"---\nname: pfd-lens\ndescription: Inspect a graph.\ntools: Read, Grep, Bash\nmodel: sonnet\n---\n\nagent body\n",
 	);
 	addDirectory(".claude/skills/pfd-ops");
-	addFile(".claude/skills/pfd-ops/SKILL.md", "# pfd-ops\n");
+	addFile(
+		".claude/skills/pfd-ops/SKILL.md",
+		"---\nname: pfd-ops\nsummary: fixture operations\ndescription: fixture\n---\nbody\n",
+	);
 	addSymlink(".claude/skills/pfdsl");
+	addFile(
+		".claude/skills/pfdsl/SKILL.md",
+		"---\nname: pfdsl\nsummary: fixture syntax\ndescription: fixture\n---\nbody\n",
+	);
 	addFile(".claude/pfd-ops-install-manifest.json", '{"files": []}\n');
 	addFile(
 		".claude/settings.json",
@@ -438,6 +445,7 @@ describe("harness source decoder", () => {
 
 		assert.deepEqual(recordFor(records, "skill:pfd-ops").semantic, {
 			files: ["SKILL.md"],
+			summary: "fixture operations",
 		});
 		assert.deepEqual(recordFor(records, "command:pfd-cycle").semantic, {
 			description: "Run the cycle.",
@@ -483,6 +491,20 @@ describe("harness source decoder", () => {
 				license: "MIT",
 			},
 		});
+	});
+
+	it("fails closed when a skill summary is absent or unsupported", () => {
+		for (const summaryLine of ["", "summary:\n  - unsupported"]) {
+			const subject = fixture();
+			subject.addFile(
+				".claude/skills/pfd-ops/SKILL.md",
+				`---\nname: pfd-ops\n${summaryLine}\ndescription: fixture\n---\nbody\n`,
+			);
+			assert.throws(
+				() => decodeFixture({ root: ROOT, contract: CONTRACT, fs: subject.fs }),
+				/source-schema: claude-skill: .*SKILL\.md: .*summary/,
+			);
+		}
 	});
 
 	it("decodes the real maintained sources into contract-valid semantic records", () => {

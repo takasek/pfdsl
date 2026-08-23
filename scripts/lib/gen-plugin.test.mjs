@@ -36,6 +36,8 @@ import {
 	mirrorDir,
 	mirrorFiles,
 	PLUGIN_AGENT_FILES,
+	PLUGIN_COMMAND_FILES,
+	PLUGIN_SKILL_DIRS,
 } from "./gen-plugin.mjs";
 import {
 	assertTargetOutputClosure as assertOutputClosure,
@@ -72,6 +74,15 @@ function pluginMetadataRecord(version = "0.0.18") {
 			},
 		},
 	};
+}
+
+function decodedPluginManifest(version = "0.0.18") {
+	return buildPluginManifest({
+		record: pluginMetadataRecord(version),
+		description: buildPluginDescription({
+			capabilities: decodedHarnessCapabilities,
+		}),
+	});
 }
 
 function targetOutputEntries(capabilities, target) {
@@ -142,70 +153,103 @@ function removeGeneratedSourceComment(source) {
 
 describe("buildPluginManifest", () => {
 	it("uses decoded plugin metadata as the plugin version", () => {
-		const manifest = buildPluginManifest({ record: pluginMetadataRecord() });
+		const manifest = decodedPluginManifest();
 		assert.equal(manifest.version, "0.0.18");
 	});
 
 	it("names the plugin pfdsl", () => {
-		const manifest = buildPluginManifest({ record: pluginMetadataRecord() });
+		const manifest = decodedPluginManifest();
 		assert.equal(manifest.name, "pfdsl");
 	});
 
 	it("declares the MIT license", () => {
-		const manifest = buildPluginManifest({ record: pluginMetadataRecord() });
+		const manifest = decodedPluginManifest();
 		assert.equal(manifest.license, "MIT");
 	});
 
 	it("mentions the pfd-ops skill in the description", () => {
-		const manifest = buildPluginManifest({ record: pluginMetadataRecord() });
+		const manifest = decodedPluginManifest();
 		assert.match(manifest.description, /pfd-ops/);
 	});
 
-	it("reads skill blurbs through the injected root and readFileSync, not the real filesystem", () => {
+	it("keeps both adapter descriptions derived from one frozen record set after source mutation", () => {
 		const root = mkdtempSync(join(tmpdir(), "gen-plugin-manifest-"));
 		try {
-			const skillDir = join(root, ".claude/skills/pfd-ops");
-			mkdirSync(skillDir, { recursive: true });
-			writeFileSync(
-				join(skillDir, "SKILL.md"),
-				"---\nname: pfd-ops\nsummary: injected-root blurb\ndescription: |\n  long form\n---\nbody\n",
-			);
-			const pfdslDir = join(root, "scripts/skill-template");
-			mkdirSync(pfdslDir, { recursive: true });
-			writeFileSync(
-				join(pfdslDir, "SKILL.md"),
-				"---\nname: pfdsl\nsummary: injected-root pfdsl blurb\ndescription: |\n  long form\n---\nbody\n",
-			);
-
-			const manifest = buildPluginManifest({
-				record: pluginMetadataRecord(),
-				root,
-				skillDirs: ["pfdsl", "pfd-ops"],
-				commandFiles: [],
+			cpSync(join(repoRoot, ".claude"), join(root, ".claude"), {
+				recursive: true,
 			});
-
-			assert.match(manifest.description, /injected-root blurb/);
+			const records = decodedHarnessCapabilities;
+			writeFileSync(
+				join(root, ".claude/skills/pfd-ops/SKILL.md"),
+				"---\nname: pfd-ops\nsummary: mutated after decode\ndescription: changed\n---\n",
+			);
+			const claudeDescription = buildPluginDescription({
+				capabilities: records,
+			});
+			const codexDescription = buildPluginDescription({
+				capabilities: records,
+			});
+			assert.equal(claudeDescription, codexDescription);
+			assert.doesNotMatch(claudeDescription, /mutated after decode/);
+			assert.match(claudeDescription, /project operations/);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
 	it("mentions the pfd-grill skill in the description", () => {
-		const manifest = buildPluginManifest({ record: pluginMetadataRecord() });
+		const manifest = decodedPluginManifest();
 		assert.match(manifest.description, /pfd-grill/);
 	});
 
 	it("mentions the /pfd-retro command in the description, not just the pfd-retro skill", () => {
-		const manifest = buildPluginManifest({ record: pluginMetadataRecord() });
+		const manifest = decodedPluginManifest();
 		assert.match(manifest.description, /\/pfd-retro/);
 	});
 });
 
 describe("buildPluginDescription", () => {
+	it("preserves the legacy pfdsl-first skill and inventory command ordering from contract-ordered records", () => {
+		const description = buildPluginDescription({
+			capabilities: decodedHarnessCapabilities,
+		});
+		const orderedNames = [
+			"pfdsl skill",
+			...PLUGIN_SKILL_DIRS.map((name) => `${name} skill`),
+			...PLUGIN_COMMAND_FILES.map((file) => `/${file.replace(/\.md$/, "")}`),
+		];
+		let prior = -1;
+		for (const name of orderedNames) {
+			const index = description.indexOf(name);
+			assert.ok(index > prior, `${name} must follow the legacy identity order`);
+			prior = index;
+		}
+	});
+
+	it("fails closed when decoded plugin description records are missing or extra", () => {
+		const missing = structuredClone(decodedHarnessCapabilities).filter(
+			({ id }) => id !== "skill:pfdsl",
+		);
+		assert.throws(
+			() => buildPluginDescription({ capabilities: missing }),
+			/missing decoded plugin description record skill:pfdsl/,
+		);
+
+		const extra = structuredClone(decodedHarnessCapabilities);
+		const source = structuredClone(
+			extra.find(({ id }) => id === "skill:pfd-grill"),
+		);
+		source.id = "skill:unexpected";
+		extra.push(source);
+		assert.throws(
+			() => buildPluginDescription({ capabilities: extra }),
+			/unexpected decoded plugin description record skill:unexpected/,
+		);
+	});
+
 	it("mentions every bundled skill and every bundled command", () => {
 		const description = buildPluginDescription({
-			skillDirs: ["pfdsl", "pfd-grill"],
-			commandFiles: ["pfd-cycle.md", "pfd-retro.md"],
+			capabilities: decodedHarnessCapabilities,
 		});
 		assert.match(description, /pfdsl skill/);
 		assert.match(description, /pfd-grill skill/);
@@ -213,68 +257,22 @@ describe("buildPluginDescription", () => {
 		assert.match(description, /\/pfd-retro/);
 	});
 
-	it("throws when a bundled skill has no description blurb, instead of silently omitting it", () => {
+	it("throws when a bundled skill record has no summary, instead of silently omitting it", () => {
+		const capabilities = structuredClone(decodedHarnessCapabilities);
+		delete capabilities.find(({ id }) => id === "skill:pfd-ops").semantic
+			.summary;
 		assert.throws(
-			() =>
-				buildPluginDescription({
-					skillDirs: ["not-a-real-skill"],
-					commandFiles: [],
-				}),
-			/not-a-real-skill/,
+			() => buildPluginDescription({ capabilities }),
+			/skill:pfd-ops.*summary/,
 		);
 	});
 
-	it("derives a command's blurb from its filename, so no table can drift from PLUGIN_COMMAND_FILES", () => {
+	it("derives each command blurb from the compatibility filename order", () => {
 		const description = buildPluginDescription({
-			skillDirs: [],
-			commandFiles: ["brand-new-command.md"],
+			capabilities: decodedHarnessCapabilities,
 		});
-		assert.match(description, /\/brand-new-command\b/);
-	});
-
-	it("reads a skill's blurb from its SKILL.md summary frontmatter field, not a hand-maintained table", () => {
-		const root = mkdtempSync(join(tmpdir(), "gen-plugin-desc-"));
-		try {
-			const skillDir = join(root, ".claude/skills/pfd-ops");
-			mkdirSync(skillDir, { recursive: true });
-			writeFileSync(
-				join(skillDir, "SKILL.md"),
-				"---\nname: pfd-ops\nsummary: a totally new blurb never in any table\ndescription: |\n  long form\n---\nbody\n",
-			);
-
-			const description = buildPluginDescription({
-				skillDirs: ["pfd-ops"],
-				commandFiles: [],
-				root,
-			});
-
-			assert.match(description, /a totally new blurb never in any table/);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
-	});
-
-	it("throws naming the missing frontmatter field when a bundled skill's SKILL.md has no summary", () => {
-		const root = mkdtempSync(join(tmpdir(), "gen-plugin-desc-"));
-		try {
-			const skillDir = join(root, ".claude/skills/pfd-ops");
-			mkdirSync(skillDir, { recursive: true });
-			writeFileSync(
-				join(skillDir, "SKILL.md"),
-				"---\nname: pfd-ops\ndescription: |\n  long form\n---\nbody\n",
-			);
-
-			assert.throws(
-				() =>
-					buildPluginDescription({
-						skillDirs: ["pfd-ops"],
-						commandFiles: [],
-						root,
-					}),
-				/summary/,
-			);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
+		for (const file of PLUGIN_COMMAND_FILES) {
+			assert.match(description, new RegExp(`/${file.replace(/\.md$/, "")}\\b`));
 		}
 	});
 });
@@ -817,6 +815,180 @@ describe("assemblePluginDistIndependent", () => {
 				),
 			);
 		}
+	});
+
+	it("detects an undeclared concrete adapter write without an observe call and rolls back", () => {
+		const capabilities = decodedHarnessCapabilities;
+		const removals = [];
+		const { deps } = fakeDeps({
+			rmSync: (path) => removals.push(path),
+			assembleClaudeAssets: () => ({
+				observed: {
+					"claude-repository": targetOutputEntries(
+						capabilities,
+						"claude-repository",
+					),
+					"claude-plugin": targetOutputEntries(capabilities, "claude-plugin"),
+				},
+			}),
+			assembleCodexAssets: ({ codexPluginRoot, deps: adapterDeps }) => {
+				adapterDeps.writeFileSync(
+					`${codexPluginRoot}/evil.txt`,
+					"undeclared\n",
+				);
+				return {
+					observed: {
+						"codex-repository": targetOutputEntries(
+							capabilities,
+							"codex-repository",
+						),
+						"codex-plugin": targetOutputEntries(capabilities, "codex-plugin"),
+					},
+				};
+			},
+		});
+
+		assert.throws(
+			() =>
+				assemblePluginDistIndependent({
+					root: "/repo",
+					pluginRoot: "/repo/plugin/pfdsl",
+					codexPluginRoot: "/repo/plugin/pfdsl-codex",
+					deps,
+				}),
+			/output closure codex-plugin.*evil\.txt/,
+		);
+		assert.ok(
+			removals.includes("/repo/plugin/pfdsl-codex"),
+			"closure failure must restore the Codex plugin snapshot",
+		);
+	});
+
+	it("detects undeclared mirror and publish destinations at adapter operation boundaries", () => {
+		for (const fixture of [
+			{
+				name: "mirrorDir",
+				target: "claude-plugin",
+				surface: "evil-mirror",
+				write({ adapterDeps, pluginRoot }) {
+					adapterDeps.mirrorDir("evil-mirror", "/source", pluginRoot);
+				},
+			},
+			{
+				name: "publish rename",
+				target: "codex-plugin",
+				surface: "evil-renamed",
+				write({ adapterDeps, codexPluginRoot }) {
+					adapterDeps.renameSync(
+						"/staged/evil",
+						`${codexPluginRoot}/evil-renamed`,
+					);
+				},
+			},
+		]) {
+			const removals = [];
+			const pluginRoot = "/repo/plugin/pfdsl";
+			const codexPluginRoot = "/repo/plugin/pfdsl-codex";
+			const observed = {
+				"claude-repository": targetOutputEntries(
+					decodedHarnessCapabilities,
+					"claude-repository",
+				),
+				"claude-plugin": targetOutputEntries(
+					decodedHarnessCapabilities,
+					"claude-plugin",
+				),
+				"codex-repository": targetOutputEntries(
+					decodedHarnessCapabilities,
+					"codex-repository",
+				),
+				"codex-plugin": targetOutputEntries(
+					decodedHarnessCapabilities,
+					"codex-plugin",
+				),
+			};
+			const { deps } = fakeDeps({
+				rmSync: (path) => removals.push(path),
+				assembleClaudeAssets: ({ deps: adapterDeps }) => {
+					if (fixture.target === "claude-plugin") {
+						fixture.write({ adapterDeps, pluginRoot, codexPluginRoot });
+					}
+					return {
+						observed: {
+							"claude-repository": observed["claude-repository"],
+							"claude-plugin": observed["claude-plugin"],
+						},
+					};
+				},
+				assembleCodexAssets: ({ deps: adapterDeps }) => {
+					if (fixture.target === "codex-plugin") {
+						fixture.write({ adapterDeps, pluginRoot, codexPluginRoot });
+					}
+					return {
+						observed: {
+							"codex-repository": observed["codex-repository"],
+							"codex-plugin": observed["codex-plugin"],
+						},
+					};
+				},
+			});
+
+			assert.throws(
+				() =>
+					assemblePluginDistIndependent({
+						root: "/repo",
+						pluginRoot,
+						codexPluginRoot,
+						deps,
+					}),
+				new RegExp(`output closure ${fixture.target}.*${fixture.surface}`),
+				fixture.name,
+			);
+			assert.ok(
+				removals.includes(
+					fixture.target === "claude-plugin" ? pluginRoot : codexPluginRoot,
+				),
+				`${fixture.name} closure failure must roll back its target root`,
+			);
+		}
+	});
+
+	it("treats an adapter operation at the exact target root as a benign container", () => {
+		const capabilities = decodedHarnessCapabilities;
+		const pluginRoot = "/repo/plugin/pfdsl";
+		const codexPluginRoot = "/repo/plugin/pfdsl-codex";
+		const { deps } = fakeDeps({
+			assembleClaudeAssets: () => ({
+				observed: {
+					"claude-repository": targetOutputEntries(
+						capabilities,
+						"claude-repository",
+					),
+					"claude-plugin": targetOutputEntries(capabilities, "claude-plugin"),
+				},
+			}),
+			assembleCodexAssets: ({ deps: adapterDeps }) => {
+				adapterDeps.mkdirSync(codexPluginRoot, { recursive: true });
+				return {
+					observed: {
+						"codex-repository": targetOutputEntries(
+							capabilities,
+							"codex-repository",
+						),
+						"codex-plugin": targetOutputEntries(capabilities, "codex-plugin"),
+					},
+				};
+			},
+		});
+
+		assert.doesNotThrow(() =>
+			assemblePluginDistIndependent({
+				root: "/repo",
+				pluginRoot,
+				codexPluginRoot,
+				deps,
+			}),
+		);
 	});
 
 	it("restores provisional adapter outputs after every target closure failure", () => {
@@ -2081,6 +2253,73 @@ describe("assembleCodexAssets", () => {
 });
 
 describe("target-local consumer probes", () => {
+	it("observes undeclared file and directory siblings beside a lone declared top-level directory", () => {
+		const fixture = PROBE_FIXTURES["codex-plugin-consumer"];
+		const consumer = mkdtempSync(join(tmpdir(), "codex-plugin-lone-root-"));
+		try {
+			const pluginRoot = join(consumer, "plugin");
+			mkdirSync(join(pluginRoot, "hooks"), { recursive: true });
+			writeFileSync(join(pluginRoot, "hooks/hooks.json"), "{}\n");
+			mkdirSync(join(pluginRoot, "evil"));
+			writeFileSync(join(pluginRoot, "evil.txt"), "evil\n");
+			const capabilities = [
+				{
+					id: "plugin-hooks",
+					kind: "hook",
+					mappings: {
+						"codex-plugin": {
+							disposition: "native",
+							outputs: ["hooks"],
+							probe: { kind: "codex-plugin-consumer" },
+						},
+					},
+				},
+			];
+			const result = runTargetConsumerProbe(fixture, consumer, capabilities);
+
+			assert.deepEqual(
+				result.observed
+					.filter(
+						({ capabilityId }) => capabilityId === "consumer:unclassified",
+					)
+					.map(({ surface }) => surface)
+					.sort(),
+				["evil", "evil.txt"],
+			);
+		} finally {
+			rmSync(consumer, { recursive: true, force: true });
+		}
+	});
+
+	it("observes an undeclared Codex repository entry beside a declared container ancestor", () => {
+		const fixture = PROBE_FIXTURES["codex-repository-consumer"];
+		const consumer = mkdtempSync(join(tmpdir(), "codex-repository-container-"));
+		try {
+			fixture.prepare(repoRoot, consumer);
+			writeFileSync(join(consumer, ".agents/evil"), "evil\n");
+			const result = runTargetConsumerProbe(
+				fixture,
+				consumer,
+				decodedHarnessCapabilities,
+			);
+
+			assert.throws(
+				() =>
+					assertOutputClosure({
+						target: fixture.target,
+						declared: targetOutputEntries(
+							decodedHarnessCapabilities,
+							fixture.target,
+						),
+						observed: result.observed,
+					}),
+				/undeclared surface \.agents\/evil/,
+			);
+		} finally {
+			rmSync(consumer, { recursive: true, force: true });
+		}
+	});
+
 	it("observes an undeclared logical consumer surface instead of copying declarations", () => {
 		const fixture = PROBE_FIXTURES["codex-plugin-consumer"];
 		const consumer = mkdtempSync(join(tmpdir(), "codex-plugin-extra-"));

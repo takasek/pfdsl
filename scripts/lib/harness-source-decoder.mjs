@@ -273,6 +273,12 @@ function validateCommand(path, frontmatter) {
 	);
 }
 
+function validateSkill(path, frontmatter) {
+	if (typeof frontmatter.summary !== "string" || !frontmatter.summary.trim()) {
+		sourceSchemaError(path, "claude-skill", "summary", "required string for");
+	}
+}
+
 function validateAgent(path, frontmatter) {
 	assertKnownKeys(frontmatter, AGENT_FRONTMATTER_KEYS, path, "claude-agent");
 }
@@ -298,7 +304,16 @@ function readAndValidateDeclaredSources(root, contract, fs) {
 	for (const capability of contract) {
 		const path = pathFor(root, capability.source.path);
 		const source = capability.source;
-		if (source.encoding === "claude-command") {
+		if (source.encoding === "claude-skill") {
+			const skillPath = resolve(path, "SKILL.md");
+			const parsed = parseFrontmatter(
+				skillPath,
+				"claude-skill",
+				fs.readFileSync(skillPath, "utf-8"),
+			);
+			validateSkill(skillPath, parsed.frontmatter);
+			decoded.set(capability.id, parsed);
+		} else if (source.encoding === "claude-command") {
 			const parsed = parseFrontmatter(
 				path,
 				"claude-command",
@@ -362,7 +377,10 @@ function deepFreeze(value) {
 function decodeSemanticRecord(capability, source) {
 	switch (capability.source.encoding) {
 		case "claude-skill":
-			return { files: clone(capability.source.files ?? []) };
+			return {
+				files: clone(capability.source.files ?? []),
+				summary: source.frontmatter.summary.trim(),
+			};
 		case "claude-command":
 			return { description: source.frontmatter.description, body: source.body };
 		case "claude-agent":

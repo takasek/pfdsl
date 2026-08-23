@@ -140,15 +140,15 @@ function probeMappingOutputs({
 			readProbeTree(path, readPaths, targetRoot, resolvePath);
 			addObserved(observed, surface, capabilityId);
 			const siblings = directoryRoots.get(dirname(surface)) ?? [];
-			if (siblings.length < 2) continue;
 			for (const entry of readdirSync(join(targetRoot, dirname(surface)), {
 				withFileTypes: true,
 			})) {
-				if (!entry.isDirectory()) continue;
 				const siblingSurface = join(dirname(surface), entry.name);
+				if (entry.name === "GENERATED.md") continue;
 				const declared = siblings.find(
 					({ surface: declaredSurface }) => declaredSurface === siblingSurface,
 				);
+				if (declared?.containerOnly) continue;
 				addObserved(
 					observed,
 					siblingSurface,
@@ -211,8 +211,38 @@ export function runTargetConsumerProbe(
 	for (const record of capabilitiesForTarget(capabilities, target)) {
 		if (record.mapping.disposition === "intentional-exclusion") continue;
 		for (const surface of record.mapping.outputs) {
-			if (surface.startsWith("manifest:")) continue;
+			if (surface.startsWith("manifest:")) {
+				const [, manifestPath] = surface.match(/^manifest:(.+):([^:]+)$/);
+				const container = dirname(manifestPath);
+				const parent = dirname(container);
+				const roots = directoryRoots.get(parent) ?? [];
+				if (!roots.some(({ surface: candidate }) => candidate === container)) {
+					roots.push({
+						surface: container,
+						capabilityId: record.id,
+						containerOnly: true,
+					});
+				}
+				directoryRoots.set(parent, roots);
+				continue;
+			}
 			const parent = dirname(surface);
+			let container = parent;
+			while (container !== ".") {
+				const containerParent = dirname(container);
+				const containers = directoryRoots.get(containerParent) ?? [];
+				if (
+					!containers.some(({ surface: candidate }) => candidate === container)
+				) {
+					containers.push({
+						surface: container,
+						capabilityId: record.id,
+						containerOnly: true,
+					});
+				}
+				directoryRoots.set(containerParent, containers);
+				container = containerParent;
+			}
 			const roots = directoryRoots.get(parent) ?? [];
 			roots.push({ surface, capabilityId: record.id });
 			directoryRoots.set(parent, roots);
@@ -235,6 +265,26 @@ export function runTargetConsumerProbe(
 			directoryRoots,
 			resolvePath,
 		});
+	}
+	for (const [parent, declaredEntries] of directoryRoots) {
+		const parentPath = join(targetRoot, parent);
+		if (!existsSync(parentPath)) continue;
+		assertReadPathWithin(targetRoot, parentPath, resolvePath);
+		for (const entry of readdirSync(parentPath, { withFileTypes: true })) {
+			const surface = join(parent, entry.name);
+			if (entry.name === "GENERATED.md") continue;
+			const path = join(parentPath, entry.name);
+			assertReadPathWithin(targetRoot, path, resolvePath);
+			const declared = declaredEntries.find(
+				({ surface: candidate }) => candidate === surface,
+			);
+			if (declared?.containerOnly) continue;
+			addObserved(
+				observed,
+				surface,
+				declared?.capabilityId ?? "consumer:unclassified",
+			);
+		}
 	}
 	return {
 		observed: [...observed.values()],

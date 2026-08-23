@@ -10,7 +10,6 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
 	BUNDLE_MANIFEST_RELATIVE_PATH,
@@ -45,7 +44,6 @@ import {
 } from "./harness-inventory.mjs";
 import { decodeHarnessSources } from "./harness-source-decoder.mjs";
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const CODEX_ASSEMBLY_LOCK_DIRECTORY = ".codex-assets-assembly.lock";
 const CODEX_COMMAND_SKILLS_MANIFEST = "codex-command-skills.json";
 const CODEX_SKILLS_ROOT = "skills";
@@ -110,6 +108,75 @@ function targetOutputEntries(capabilities, target) {
 						capabilityId: id,
 					})),
 	);
+}
+
+function addConcreteAdapterWrites({
+	actualWrites,
+	capabilities,
+	root,
+	pluginRoot,
+	codexPluginRoot,
+	observedByTarget,
+}) {
+	const roots = [
+		["codex-plugin", codexPluginRoot],
+		["claude-plugin", pluginRoot],
+		["codex-repository", root],
+	];
+	for (const path of actualWrites) {
+		if (path.includes(".codex-tmp-") || path.includes(".codex-prev-")) continue;
+		let target;
+		let targetRoot;
+		for (const [candidate, candidateRoot] of roots) {
+			if (path === candidateRoot || path.startsWith(`${candidateRoot}/`)) {
+				target = candidate;
+				targetRoot = candidateRoot;
+				break;
+			}
+		}
+		if (!target) continue;
+		const surface = path.slice(targetRoot.length).replace(/^\//, "");
+		if (!surface) continue;
+		if (target === "codex-repository") {
+			if (
+				!surface.startsWith(".codex/") &&
+				!surface.startsWith(".agents/") &&
+				surface !== "AGENTS.md"
+			) {
+				continue;
+			}
+		}
+		if (
+			[
+				".codex/GENERATED.md",
+				".codex-plugin/codex-command-skills.json",
+				BUNDLE_MANIFEST_RELATIVE_PATH,
+				"GENERATED.md",
+			].includes(surface)
+		) {
+			continue;
+		}
+		const declared = targetOutputEntries(capabilities, target);
+		const owner = declared.find(({ surface: declaredSurface }) => {
+			if (declaredSurface.startsWith("manifest:")) {
+				const manifestPath = declaredSurface.split(":")[1];
+				return (
+					manifestPath === surface || manifestPath.startsWith(`${surface}/`)
+				);
+			}
+			return (
+				surface === declaredSurface ||
+				surface.startsWith(`${declaredSurface}/`) ||
+				declaredSurface.startsWith(`${surface}/`)
+			);
+		});
+		if (!owner) {
+			observedByTarget[target].push({
+				surface,
+				capabilityId: "adapter:unclassified",
+			});
+		}
+	}
 }
 
 function observeRecordOutputs(observed, record) {
@@ -220,78 +287,49 @@ export function mirrorFiles(names, srcDir, destDir) {
 	renameSync(tempDestDir, destDir);
 }
 
-// Where each bundled skill's source SKILL.md lives, keyed the same way as
-// PLUGIN_SKILL_DIRS. "pfdsl" points at the template (scripts/skill-template/)
-// rather than .claude/skills/pfdsl/SKILL.md because the latter is generated
-// output (DO NOT EDIT) — the template is what a human actually maintains.
-const SKILL_SOURCE_DIRS = {
-	pfdsl: "scripts/skill-template",
-	...Object.fromEntries(
-		PLUGIN_SKILL_DIRS.map((name) => [name, `.claude/skills/${name}`]),
-	),
-};
-
-/** Extract a single-line scalar frontmatter field from SKILL.md source. */
-function extractFrontmatterField(source, field) {
-	const m = source.match(new RegExp(`^${field}:[ \\t]*(.+)$`, "m"));
-	return m?.[1]?.trim();
-}
-
-// Reads a bundled skill's one-line manifest blurb from its own SKILL.md
-// frontmatter ("summary:", next to "description:") instead of a
-// hand-maintained table (#696): editing a skill's role no longer requires
-// remembering a second file, because there is no second file to remember.
-function summaryFor(
-	name,
-	kind,
-	{ root = REPO_ROOT, readFileSync: readFile = readFileSync } = {},
-) {
-	const dir = SKILL_SOURCE_DIRS[name];
-	if (!dir) {
-		throw new Error(
-			`No manifest description summary for bundled ${kind} "${name}". Register its source dir in SKILL_SOURCE_DIRS in scripts/lib/gen-plugin.mjs.`,
-		);
+// Builds both plugin manifest descriptions solely from the frozen semantic
+// records produced by the decoder. Adapters never reopen a maintained source.
+export function buildPluginDescription({ capabilities }) {
+	if (!Array.isArray(capabilities)) {
+		throw new TypeError("plugin description capabilities must be an array.");
 	}
-	const path = resolve(root, dir, "SKILL.md");
-	let source;
-	try {
-		source = readFile(path, "utf-8");
-	} catch {
-		throw new Error(
-			`No manifest description summary for bundled ${kind} "${name}": ${path} not found.`,
-		);
-	}
-	const summary = extractFrontmatterField(source, "summary");
-	if (!summary) {
-		throw new Error(
-			`${path} has no "summary:" frontmatter field for the plugin manifest description. Add one alongside "description:".`,
-		);
-	}
-	return summary;
-}
-
-// Builds the plugin/marketplace manifest description from what's actually
-// bundled (skillDirs, commandFiles), rather than a hand-maintained sentence
-// that can drift from PLUGIN_SKILL_DIRS/PLUGIN_COMMAND_FILES as skills and
-// commands are added or removed. A skill needs a "summary:" frontmatter
-// field (see summaryFor) — one with none throws instead of being silently
-// dropped from the description. Commands need no table: their blurb is the
-// slash form of the filename, so there is nothing that could drift from
-// PLUGIN_COMMAND_FILES independently.
-// @param {{skillDirs?: string[], commandFiles?: string[], root?: string, readFileSync?: Function}} [options]
-export function buildPluginDescription({
-	skillDirs = ["pfdsl", ...PLUGIN_SKILL_DIRS],
-	commandFiles = PLUGIN_COMMAND_FILES,
-	root,
-	readFileSync: readFile,
-} = {}) {
-	const skillParts = skillDirs.map(
-		(name) =>
-			`${summaryFor(name, "skill", { root, readFileSync: readFile })} (${name} skill)`,
+	const records = capabilitiesForTarget(capabilities, "claude-plugin").filter(
+		({ kind, mapping }) =>
+			(kind === "skill" || kind === "command") &&
+			mapping.disposition !== "intentional-exclusion",
 	);
-	const commandParts = commandFiles.map(
-		(file) => `/${file.replace(/\.md$/, "")}`,
-	);
+	const expectedIds = [
+		...["pfdsl", ...PLUGIN_SKILL_DIRS].map((name) => `skill:${name}`),
+		...PLUGIN_COMMAND_FILES.map(
+			(file) => `command:${file.replace(/\.md$/, "")}`,
+		),
+	];
+	const recordsById = new Map(records.map((record) => [record.id, record]));
+	for (const id of expectedIds) {
+		if (!recordsById.has(id)) {
+			throw new Error(`missing decoded plugin description record ${id}`);
+		}
+	}
+	for (const { id } of records) {
+		if (!expectedIds.includes(id)) {
+			throw new Error(`unexpected decoded plugin description record ${id}`);
+		}
+	}
+	const orderedRecords = expectedIds.map((id) => recordsById.get(id));
+	const skillParts = orderedRecords
+		.filter(({ kind }) => kind === "skill")
+		.map((record) => {
+			if (
+				typeof record.semantic?.summary !== "string" ||
+				!record.semantic.summary.trim()
+			) {
+				throw new Error(`${record.id}: missing decoded skill summary.`);
+			}
+			return `${record.semantic.summary} (${record.id.slice("skill:".length)} skill)`;
+		});
+	const commandParts = orderedRecords
+		.filter(({ kind }) => kind === "command")
+		.map(({ id }) => `/${id.slice("command:".length)}`);
 	return `PFD-DSL authoring toolkit: ${skillParts.join(", ")}, and ${commandParts.join(", ")} commands.`;
 }
 
@@ -300,14 +338,7 @@ export function buildPluginDescription({
 // description is derived from the actual bundle contents (buildPluginDescription)
 // so it can't drift from what plugin/pfdsl/ ships. Used by scripts/gen-plugin.mjs.
 
-export function buildPluginManifest({
-	record,
-	description,
-	root,
-	readFileSync: readFile,
-	skillDirs,
-	commandFiles,
-}) {
+export function buildPluginManifest({ record, description }) {
 	const semantic = record?.semantic;
 	if (!semantic || Array.isArray(semantic) || typeof semantic !== "object") {
 		throw new Error("plugin metadata semantic record must be an object.");
@@ -321,14 +352,7 @@ export function buildPluginManifest({
 	}
 	return {
 		name: identity.name,
-		description:
-			description ??
-			buildPluginDescription({
-				skillDirs,
-				commandFiles,
-				root,
-				readFileSync: readFile,
-			}),
+		description,
 		version: semantic.version,
 		author: identity.author,
 		homepage: identity.homepage,
@@ -827,10 +851,7 @@ export function assembleCodexAssets({
 		const codexPluginManifest = buildCodexPluginManifest({
 			record: metadata,
 			mapping: pluginMetadata.mapping,
-			description: buildPluginDescription({
-				root,
-				readFileSync: deps.readFileSync,
-			}),
+			description: buildPluginDescription({ capabilities }),
 		});
 		readOwnedCommandSkillDirectories(codexPluginRoot, deps);
 		staged.push(
@@ -1046,10 +1067,7 @@ export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
 	const metadata = capabilityRecord(capabilities, "plugin-metadata");
 	const manifest = buildPluginManifest({
 		record: metadata,
-		description: buildPluginDescription({
-			root,
-			readFileSync: deps.readFileSync,
-		}),
+		description: buildPluginDescription({ capabilities }),
 	});
 	const pluginManifestDir = resolve(pluginRoot, ".claude-plugin");
 	deps.mkdirSync(pluginManifestDir, { recursive: true });
@@ -1160,6 +1178,50 @@ export function assemblePluginDistIndependent({
 	);
 	let preserveTransaction = false;
 	try {
+		const actualWrites = new Set();
+		const trackedDeps = {
+			...deps,
+			genInstall(installRoot, ...args) {
+				actualWrites.add(
+					resolve(installRoot, ".claude/skills/pfd-ops/install"),
+				);
+				return deps.genInstall(installRoot, ...args);
+			},
+			mkdirSync(path, ...args) {
+				actualWrites.add(path);
+				return deps.mkdirSync(path, ...args);
+			},
+			mirrorDir(name, sourceRoot, destinationRoot, ...args) {
+				actualWrites.add(resolve(destinationRoot, name));
+				return deps.mirrorDir(name, sourceRoot, destinationRoot, ...args);
+			},
+			mirrorFiles(names, sourceRoot, destinationRoot, ...args) {
+				for (const name of names) {
+					actualWrites.add(resolve(destinationRoot, name));
+				}
+				return deps.mirrorFiles(names, sourceRoot, destinationRoot, ...args);
+			},
+			renameSync(from, to, ...args) {
+				actualWrites.add(to);
+				return deps.renameSync(from, to, ...args);
+			},
+			writeBundleManifest(bundleRoot, ...args) {
+				actualWrites.add(resolve(bundleRoot, BUNDLE_MANIFEST_RELATIVE_PATH));
+				return deps.writeBundleManifest(bundleRoot, ...args);
+			},
+			writeFileSync(path, ...args) {
+				actualWrites.add(path);
+				return deps.writeFileSync(path, ...args);
+			},
+			writeSkillRefs(skillRoot, outputRoot, ...args) {
+				actualWrites.add(outputRoot);
+				return deps.writeSkillRefs(skillRoot, outputRoot, ...args);
+			},
+			cpSync(from, to, ...args) {
+				actualWrites.add(to);
+				return deps.cpSync(from, to, ...args);
+			},
+		};
 		const capabilities = (
 			deps.decodeHarnessCapabilities ?? decodeHarnessCapabilities
 		)({
@@ -1171,18 +1233,27 @@ export function assemblePluginDistIndependent({
 			root,
 			pluginRoot,
 			capabilities,
-			deps,
+			deps: trackedDeps,
 		});
 		const codex = deps.assembleCodexAssets({
 			root,
 			codexPluginRoot,
 			capabilities,
-			deps,
+			deps: trackedDeps,
 		});
-		for (const [target, observed] of Object.entries({
+		const observedByTarget = {
 			...claude.observed,
 			...codex.observed,
-		})) {
+		};
+		addConcreteAdapterWrites({
+			actualWrites,
+			capabilities,
+			root,
+			pluginRoot,
+			codexPluginRoot,
+			observedByTarget,
+		});
+		for (const [target, observed] of Object.entries(observedByTarget)) {
 			assertClosure({
 				target,
 				declared: targetOutputEntries(capabilities, target),
