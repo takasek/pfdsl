@@ -356,12 +356,14 @@ export function classifyDesignSettlement({ body, createdAt, comments }) {
  * @param {string | null} artifactKey
  * @param {string} base
  * @param {number[]} [issueNumbers]
- * @returns {string | null}
+ * @returns {string}
  */
 export function buildGateCheckCommand(artifactKey, base, issueNumbers = []) {
-	if (!artifactKey) return null;
 	const issueFlags = issueNumbers.map((n) => ` --issue ${n}`).join("");
-	return `node scripts/gate-check.mjs --base ${base} --artifact ${artifactKey}${issueFlags}`;
+	const artifactFlag = artifactKey
+		? `--artifact ${artifactKey}`
+		: "--no-artifact";
+	return `node scripts/gate-check.mjs --base ${base} ${artifactFlag}${issueFlags}`;
 }
 
 const DESIGN_UNSETTLED_PATTERNS = [/design TBD/i, /設計未確定/, /設計未合意/];
