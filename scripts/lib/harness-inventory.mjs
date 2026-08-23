@@ -1,22 +1,322 @@
 // The maintained product inventory is harness-neutral; adapters decide how
 // each source entry is rendered for their target harness.
-export const DISTRIBUTED_SKILLS = Object.freeze([
-	"pfd-grill",
-	"pfd-ops",
-	"pfd-retro",
-	"pfd-ecosystem",
+const PROBES = Object.freeze({
+	claudeRepository: "claude-repository-consumer",
+	claudePlugin: "claude-plugin-consumer",
+	codexRepository: "codex-repository-consumer",
+	codexPlugin: "codex-plugin-consumer",
+});
+
+function mapping(target, disposition, outputs, probe) {
+	return Object.freeze({
+		target,
+		disposition,
+		outputs: Object.freeze(outputs),
+		probe: Object.freeze({ kind: probe }),
+	});
+}
+
+function exclusion(target, reason, impact) {
+	return Object.freeze({
+		target,
+		disposition: "intentional-exclusion",
+		reason,
+		impact,
+	});
+}
+
+function fourTargetMappings(
+	claudeRepository,
+	claudePlugin,
+	codexRepository,
+	codexPlugin,
+) {
+	return Object.freeze([
+		claudeRepository,
+		claudePlugin,
+		codexRepository,
+		codexPlugin,
+	]);
+}
+
+function capability(id, kind, source, mappings) {
+	return Object.freeze({
+		id,
+		kind,
+		source: Object.freeze(source),
+		mappings,
+	});
+}
+
+function skillCapability(name, source = {}) {
+	return capability(
+		`skill:${name}`,
+		"skill",
+		{
+			encoding: "claude-skill",
+			path: `.claude/skills/${name}`,
+			...source,
+		},
+		fourTargetMappings(
+			mapping(
+				"claude-repository",
+				"native",
+				[`.claude/skills/${name}`],
+				PROBES.claudeRepository,
+			),
+			mapping(
+				"claude-plugin",
+				"native",
+				[`skills/${name}`],
+				PROBES.claudePlugin,
+			),
+			mapping(
+				"codex-repository",
+				"transform",
+				[`.agents/skills/${name}`],
+				PROBES.codexRepository,
+			),
+			mapping(
+				"codex-plugin",
+				"transform",
+				[`skills/${name}`],
+				PROBES.codexPlugin,
+			),
+		),
+	);
+}
+
+function commandCapability(name) {
+	const codexSkillName =
+		name === "pfd-retro" ? "source-command-pfd-retro" : name;
+	return capability(
+		`command:${name}`,
+		"command",
+		{ encoding: "claude-command", path: `.claude/commands/${name}.md` },
+		fourTargetMappings(
+			mapping(
+				"claude-repository",
+				"native",
+				[`.claude/commands/${name}.md`],
+				PROBES.claudeRepository,
+			),
+			mapping(
+				"claude-plugin",
+				"native",
+				[`commands/${name}.md`],
+				PROBES.claudePlugin,
+			),
+			mapping(
+				"codex-repository",
+				"transform",
+				[`.agents/skills/${codexSkillName}`],
+				PROBES.codexRepository,
+			),
+			mapping(
+				"codex-plugin",
+				"transform",
+				[`skills/${codexSkillName}`],
+				PROBES.codexPlugin,
+			),
+		),
+	);
+}
+
+function agentCapability(name) {
+	return capability(
+		`agent:${name}`,
+		"agent",
+		{ encoding: "claude-agent", path: `.claude/agents/${name}.md` },
+		fourTargetMappings(
+			mapping(
+				"claude-repository",
+				"native",
+				[`.claude/agents/${name}.md`],
+				PROBES.claudeRepository,
+			),
+			mapping(
+				"claude-plugin",
+				"native",
+				[`agents/${name}.md`],
+				PROBES.claudePlugin,
+			),
+			mapping(
+				"codex-repository",
+				"transform",
+				[`.codex/agents/${name}.toml`],
+				PROBES.codexRepository,
+			),
+			exclusion(
+				"codex-plugin",
+				"Codex plugin manifests do not support subagent declarations.",
+				"Codex plugin users cannot invoke the repository's pfd subagents.",
+			),
+		),
+	);
+}
+
+export const HARNESS_CAPABILITY_CONTRACT = Object.freeze([
+	skillCapability("pfd-grill"),
+	skillCapability("pfd-ops"),
+	skillCapability("pfd-retro"),
+	skillCapability("pfd-ecosystem"),
+	skillCapability("pfdsl", {
+		generated: Object.freeze({
+			reason: "generated symlink to the rendered plugin skill tree",
+			target: "plugin/pfdsl/skills/pfdsl",
+		}),
+	}),
+	commandCapability("pfd-cycle"),
+	commandCapability("pfd-init"),
+	commandCapability("pfd-retro"),
+	agentCapability("pfd-lens"),
+	agentCapability("pfd-implementer"),
+	capability(
+		"repository-instructions",
+		"repository-instructions",
+		{ encoding: "claude-root-instructions", path: "CLAUDE.md" },
+		fourTargetMappings(
+			mapping(
+				"claude-repository",
+				"native",
+				["CLAUDE.md"],
+				PROBES.claudeRepository,
+			),
+			exclusion(
+				"claude-plugin",
+				"Repository instructions are not bundled with a Claude plugin.",
+				"Claude plugin users do not receive repository maintainer instructions.",
+			),
+			mapping(
+				"codex-repository",
+				"transform",
+				["AGENTS.md"],
+				PROBES.codexRepository,
+			),
+			exclusion(
+				"codex-plugin",
+				"Repository instructions are not bundled with a Codex plugin.",
+				"Codex plugin users do not receive repository maintainer instructions.",
+			),
+		),
+	),
+	capability(
+		"repository-hooks",
+		"repository-hooks",
+		{ encoding: "claude-settings", path: ".claude/settings.json" },
+		fourTargetMappings(
+			mapping(
+				"claude-repository",
+				"native",
+				[".claude/settings.json"],
+				PROBES.claudeRepository,
+			),
+			exclusion(
+				"claude-plugin",
+				"Claude plugin hooks are declared by the plugin hook capability.",
+				"Claude plugin users receive only plugin-scoped hook registration.",
+			),
+			mapping(
+				"codex-repository",
+				"transform",
+				[".codex/config.toml", ".codex/hooks.json"],
+				PROBES.codexRepository,
+			),
+			exclusion(
+				"codex-plugin",
+				"Repository hook settings are not bundled with a Codex plugin.",
+				"Codex plugin users receive only plugin-scoped hook registration.",
+			),
+		),
+	),
+	capability(
+		"plugin-hooks",
+		"hook",
+		{ encoding: "plugin-hooks", path: "hooks/hooks.json" },
+		fourTargetMappings(
+			exclusion(
+				"claude-repository",
+				"Plugin hooks are not installed as repository hooks.",
+				"Repository users receive only the repository hook capability.",
+			),
+			mapping("claude-plugin", "native", ["hooks"], PROBES.claudePlugin),
+			exclusion(
+				"codex-repository",
+				"Plugin hooks are not installed as repository hooks.",
+				"Repository users receive only the repository hook capability.",
+			),
+			mapping("codex-plugin", "transform", ["hooks"], PROBES.codexPlugin),
+		),
+	),
+	capability(
+		"plugin-metadata",
+		"plugin-metadata",
+		{ encoding: "cli-package-metadata", path: "packages/cli/package.json" },
+		fourTargetMappings(
+			exclusion(
+				"claude-repository",
+				"Plugin metadata is not installed in a Claude repository.",
+				"Claude repository users do not receive a plugin manifest.",
+			),
+			mapping(
+				"claude-plugin",
+				"transform",
+				[
+					"manifest:.claude-plugin/plugin.json:name",
+					"manifest:.claude-plugin/plugin.json:description",
+					"manifest:.claude-plugin/plugin.json:version",
+					"manifest:.claude-plugin/plugin.json:author",
+					"manifest:.claude-plugin/plugin.json:homepage",
+					"manifest:.claude-plugin/plugin.json:license",
+				],
+				PROBES.claudePlugin,
+			),
+			exclusion(
+				"codex-repository",
+				"Plugin metadata is not installed in a Codex repository.",
+				"Codex repository users do not receive a plugin manifest.",
+			),
+			mapping(
+				"codex-plugin",
+				"transform",
+				[
+					"manifest:.codex-plugin/plugin.json:name",
+					"manifest:.codex-plugin/plugin.json:version",
+					"manifest:.codex-plugin/plugin.json:description",
+					"manifest:.codex-plugin/plugin.json:author",
+					"manifest:.codex-plugin/plugin.json:homepage",
+					"manifest:.codex-plugin/plugin.json:repository",
+					"manifest:.codex-plugin/plugin.json:license",
+					"manifest:.codex-plugin/plugin.json:skills",
+					"manifest:.codex-plugin/plugin.json:interface",
+				],
+				PROBES.codexPlugin,
+			),
+		),
+	),
 ]);
 
-export const DISTRIBUTED_COMMANDS = Object.freeze([
-	"pfd-cycle.md",
-	"pfd-init.md",
-	"pfd-retro.md",
-]);
+function sourceName({ source }) {
+	return source.path.slice(source.path.lastIndexOf("/") + 1);
+}
 
-export const DISTRIBUTED_AGENTS = Object.freeze([
-	"pfd-lens.md",
-	"pfd-implementer.md",
-]);
+function distributedCapabilities(kind) {
+	return HARNESS_CAPABILITY_CONTRACT.filter(
+		(capability) => capability.kind === kind && !capability.source.generated,
+	);
+}
+
+export const DISTRIBUTED_SKILLS = Object.freeze(
+	distributedCapabilities("skill").map(sourceName),
+);
+
+export const DISTRIBUTED_COMMANDS = Object.freeze(
+	distributedCapabilities("command").map(sourceName),
+);
+
+export const DISTRIBUTED_AGENTS = Object.freeze(
+	distributedCapabilities("agent").map(sourceName),
+);
 
 export const SOURCE_EXCLUSIONS = Object.freeze({
 	skills: Object.freeze({
@@ -38,13 +338,21 @@ export const SOURCE_EXCLUSIONS = Object.freeze({
 });
 
 export const GENERATED_SOURCES = Object.freeze({
-	skills: Object.freeze({
-		pfdsl: Object.freeze({
-			reason: "generated symlink to the rendered plugin skill tree",
-			source: ".claude/skills/pfdsl",
-			target: "plugin/pfdsl/skills/pfdsl",
-		}),
-	}),
+	skills: Object.freeze(
+		Object.fromEntries(
+			HARNESS_CAPABILITY_CONTRACT.filter(
+				(capability) =>
+					capability.kind === "skill" && capability.source.generated,
+			).map((capability) => [
+				sourceName(capability),
+				Object.freeze({
+					reason: capability.source.generated.reason,
+					source: capability.source.path,
+					target: capability.source.generated.target,
+				}),
+			]),
+		),
+	),
 	commands: Object.freeze({}),
 	agents: Object.freeze({}),
 });
@@ -56,21 +364,43 @@ export const GENERATED_SKILLS = GENERATED_SOURCES.skills;
 export const GENERATED_COMMANDS = GENERATED_SOURCES.commands;
 export const GENERATED_AGENTS = GENERATED_SOURCES.agents;
 
+function claudePluginEntries(kind, prefix) {
+	return distributedCapabilities(kind).map((capability) => {
+		const mapping = capability.mappings.find(
+			({ target }) => target === "claude-plugin",
+		);
+		const output = mapping.outputs.find((surface) =>
+			surface.startsWith(prefix),
+		);
+		return output.slice(prefix.length);
+	});
+}
+
 export const CLAUDE_PLUGIN_MIRRORS = Object.freeze([
 	Object.freeze({
 		dest: "skills",
 		src: ".claude/skills",
-		trees: DISTRIBUTED_SKILLS,
+		trees: Object.freeze(claudePluginEntries("skill", "skills/")),
 	}),
 	Object.freeze({
 		dest: "commands",
 		src: ".claude/commands",
-		files: DISTRIBUTED_COMMANDS,
+		files: Object.freeze(claudePluginEntries("command", "commands/")),
 	}),
 	Object.freeze({
 		dest: "agents",
 		src: ".claude/agents",
-		files: DISTRIBUTED_AGENTS,
+		files: Object.freeze(claudePluginEntries("agent", "agents/")),
 	}),
-	Object.freeze({ dest: "hooks", src: "hooks", whole: true }),
+	Object.freeze({
+		dest: "hooks",
+		src: "hooks",
+		whole: HARNESS_CAPABILITY_CONTRACT.find(
+			(capability) => capability.id === "plugin-hooks",
+		).mappings.some(
+			(mapping) =>
+				mapping.target === "claude-plugin" &&
+				mapping.outputs?.includes("hooks"),
+		),
+	}),
 ]);
