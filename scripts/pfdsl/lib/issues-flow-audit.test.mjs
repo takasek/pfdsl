@@ -5,6 +5,7 @@ import {
 	applyClosedInFlowFixes,
 	applyFixes,
 	buildProcessOutputs,
+	classifyClosedIssueRegistration,
 	computeFindings,
 	computeLabelFindings,
 	normalizeBody,
@@ -12,6 +13,99 @@ import {
 	partitionFindings,
 } from "./issues-flow-audit.mjs";
 import { parseDocument } from "./yaml-require.mjs";
+
+// ---------------------------------------------------------------------------
+// classifyClosedIssueRegistration
+// ---------------------------------------------------------------------------
+
+describe("classifyClosedIssueRegistration", () => {
+	const entry = { issueNumber: 959 };
+
+	it("fails a managed COMPLETED issue absent from the pre-fix roadmap", () => {
+		const result = classifyClosedIssueRegistration(
+			{
+				number: 959,
+				state: "CLOSED",
+				stateReason: "COMPLETED",
+				labels: ["flow:managed"],
+			},
+			[],
+		);
+		assert.equal(result.status, "FAIL");
+		assert.equal(result.reason, "managed_completed_unregistered");
+	});
+
+	it("passes a managed COMPLETED issue already registered", () => {
+		const result = classifyClosedIssueRegistration(
+			{
+				number: 959,
+				state: "CLOSED",
+				stateReason: "COMPLETED",
+				labels: ["flow:managed"],
+			},
+			[entry],
+		);
+		assert.equal(result.status, "PASS");
+	});
+
+	it("passes a registered managed closed issue with an unknown close reason", () => {
+		for (const stateReason of [null, "UNKNOWN_REASON"]) {
+			const result = classifyClosedIssueRegistration(
+				{
+					number: 959,
+					state: "CLOSED",
+					stateReason,
+					labels: ["flow:managed"],
+				},
+				[entry],
+			);
+			assert.equal(result.status, "PASS");
+		}
+	});
+
+	it("passes a managed NOT_PLANNED issue without a roadmap entry", () => {
+		const result = classifyClosedIssueRegistration(
+			{
+				number: 959,
+				state: "CLOSED",
+				stateReason: "NOT_PLANNED",
+				labels: ["flow:managed"],
+			},
+			[],
+		);
+		assert.equal(result.status, "PASS");
+	});
+
+	it("passes a closed exempt or non-managed issue", () => {
+		for (const labels of [["flow:exempt"], ["bug"]]) {
+			const result = classifyClosedIssueRegistration(
+				{
+					number: 959,
+					state: "CLOSED",
+					stateReason: "COMPLETED",
+					labels,
+				},
+				[],
+			);
+			assert.equal(result.status, "PASS");
+		}
+	});
+
+	it("fails when the target issue is missing or still open", () => {
+		for (const issue of [
+			undefined,
+			{
+				number: 959,
+				state: "OPEN",
+				stateReason: null,
+				labels: ["flow:managed"],
+			},
+		]) {
+			const result = classifyClosedIssueRegistration(issue, []);
+			assert.equal(result.status, "FAIL");
+		}
+	});
+});
 
 // ---------------------------------------------------------------------------
 // parseIssueProcesses

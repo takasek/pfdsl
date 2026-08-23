@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs.
 // Audits sync between GitHub issues and .pfdsl/roadmap.pfdsl.
-// Usage: node scripts/pfdsl/audit-issues-flow.mjs [--fix] [--enforce-issue <n> ...]
+// Usage: node scripts/pfdsl/audit-issues-flow.mjs [--fix] [--enforce-issue <n> ...] [--check-closed-registration <n>]
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -16,6 +16,7 @@ import {
 	applyClosedInFlowFixes,
 	applyFixes,
 	buildProcessOutputs,
+	classifyClosedIssueRegistration,
 	computeFindings,
 	computeLabelFindings,
 	FLOW_LABELS,
@@ -36,12 +37,15 @@ const root = resolve(__dirname, "../..");
 let fix;
 /** @type {number[]} issues whose missing_process must fail rather than advise */
 let enforcedIssues = [];
+/** @type {number|undefined} issue delivered by the close event */
+let checkClosedRegistration;
 try {
 	const { values } = parseArgs({
 		args: process.argv.slice(2),
 		options: {
 			fix: { type: "boolean" },
 			"enforce-issue": { type: "string", multiple: true },
+			"check-closed-registration": { type: "string" },
 		},
 		strict: true,
 		allowPositionals: false,
@@ -56,6 +60,24 @@ try {
 		}
 		return n;
 	});
+	const checkValue = values["check-closed-registration"];
+	if (checkValue !== undefined) {
+		const n = Number(checkValue);
+		if (!Number.isInteger(n) || n <= 0) {
+			throw new TypeError(
+				`--check-closed-registration expects an issue number, got '${checkValue}'`,
+			);
+		}
+		checkClosedRegistration = n;
+	}
+	if (
+		checkClosedRegistration !== undefined &&
+		(fix || enforcedIssues.length > 0)
+	) {
+		throw new TypeError(
+			"--check-closed-registration is mutually exclusive with --fix and --enforce-issue",
+		);
+	}
 } catch (err) {
 	console.error(`audit-issues-flow: ${err.message}`);
 	process.exit(2);
@@ -110,13 +132,36 @@ async function fetchIssues() {
 		"--limit",
 		"500",
 	]);
-	return JSON.parse(out).map((i) => ({
+	return JSON.parse(out).map(normalizeIssue);
+}
+
+function normalizeIssue(i) {
+	return {
 		number: i.number,
 		state: i.state,
 		stateReason: i.stateReason ?? null,
 		labels: i.labels.map((l) => l.name),
 		updatedAt: i.updatedAt,
-	}));
+	};
+}
+
+async function fetchClosedIssue(number) {
+	try {
+		const out = await execGh([
+			"issue",
+			"view",
+			String(number),
+			"--json",
+			"number,state,stateReason,labels,updatedAt",
+		]);
+		return normalizeIssue(JSON.parse(out));
+	} catch (e) {
+		const detail = `${e?.stderr ?? ""} ${e?.message ?? ""}`;
+		if (/could not (?:resolve|find)|not found|no issue/i.test(detail)) {
+			return undefined;
+		}
+		throw e;
+	}
 }
 
 // --- Parse frontmatter ---
@@ -167,6 +212,21 @@ for (const proc of processes) {
 			});
 		}
 	}
+}
+
+if (checkClosedRegistration !== undefined) {
+	let issue;
+	try {
+		issue = await fetchClosedIssue(checkClosedRegistration);
+	} catch (e) {
+		if (isGhUnavailableError(e)) exitGhUnavailable();
+		throw e;
+	}
+	const result = classifyClosedIssueRegistration(issue, entries);
+	console.log(
+		`closed-registration: ${result.status} #${checkClosedRegistration} ${result.detail}`,
+	);
+	process.exit(result.status === "PASS" ? 0 : 1);
 }
 
 // --- Check labels ---

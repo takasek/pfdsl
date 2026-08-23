@@ -63,6 +63,66 @@ export function parseIssueProcesses(frontmatter) {
 }
 
 /**
+ * Classifies the issue-close event against the roadmap snapshot read before flow sync can mutate it.
+ * This is intentionally target-scoped: it does not inspect any other issue or decide whether the close itself was correct.
+ * @param {{ number: number, state: "OPEN"|"CLOSED", stateReason?: string|null, labels: string[] }|undefined} issue
+ * @param {{ issueNumber: number }[]} entries
+ * @returns {{ status: "PASS"|"FAIL", reason: string, detail: string }}
+ */
+export function classifyClosedIssueRegistration(issue, entries) {
+	if (!issue) {
+		return {
+			status: "FAIL",
+			reason: "target_issue_missing",
+			detail: "target issue was not found",
+		};
+	}
+	if (issue.state !== "CLOSED") {
+		return {
+			status: "FAIL",
+			reason: "target_issue_not_closed",
+			detail: `target issue is ${issue.state.toLowerCase()}, not closed`,
+		};
+	}
+
+	const hasManaged = issue.labels.includes("flow:managed");
+	const hasExempt = issue.labels.includes("flow:exempt");
+	if (hasExempt || !hasManaged) {
+		return {
+			status: "PASS",
+			reason: hasExempt ? "exempt" : "non_managed",
+			detail: "closed issue is outside managed flow scope",
+		};
+	}
+	if (entries.some((entry) => entry.issueNumber === issue.number)) {
+		return {
+			status: "PASS",
+			reason: "registered",
+			detail: "managed closed issue is registered in the roadmap",
+		};
+	}
+	if (issue.stateReason === "NOT_PLANNED") {
+		return {
+			status: "PASS",
+			reason: "not_planned",
+			detail: "issue was closed as not planned",
+		};
+	}
+	if (issue.stateReason !== "COMPLETED") {
+		return {
+			status: "FAIL",
+			reason: "target_issue_invalid_close_reason",
+			detail: `closed issue has unsupported state reason ${issue.stateReason ?? "(none)"}`,
+		};
+	}
+	return {
+		status: "FAIL",
+		reason: "managed_completed_unregistered",
+		detail: "managed completed issue has no process in the roadmap",
+	};
+}
+
+/**
  * @param {{ processId: string, issueNumber: number, artifactId: string, status: string|undefined, hasDownstream: boolean, updatedAt: string|undefined, priorities: string[] }[]} entries - priorities must be pre-sorted
  * @param {{ number: number, state: "OPEN"|"CLOSED", stateReason?: string|null, labels: string[], updatedAt: string }[]} issues
  * @returns {{ type: string, issueNumber: number, processId: string|undefined, artifactId: string|undefined, detail: string, fixVia?: "file"|"github"|"flow", hasDownstream?: boolean }[]}

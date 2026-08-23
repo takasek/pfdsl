@@ -452,6 +452,32 @@ describe("fetchIssueView", () => {
 		assert.deepEqual(result, { body: "design TBD" });
 	});
 
+	it("maps issue list fields to gh shape for the close-registration audit", async () => {
+		const fetchImpl = async () =>
+			jsonResponse({
+				number: 959,
+				state: "closed",
+				state_reason: "completed",
+				labels: [{ name: "flow:managed" }, "bug"],
+				updated_at: "2026-08-23T00:00:00Z",
+			});
+		const result = await fetchIssueView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			959,
+			["number", "state", "stateReason", "labels", "updatedAt"],
+			fetchImpl,
+		);
+		assert.deepEqual(result, {
+			number: 959,
+			state: "CLOSED",
+			stateReason: "COMPLETED",
+			labels: [{ name: "flow:managed" }, { name: "bug" }],
+			updatedAt: "2026-08-23T00:00:00Z",
+		});
+	});
+
 	it("fetches comments from their own endpoint and maps them to gh's shape", async () => {
 		const urls = [];
 		const fetchImpl = async (url) => {
