@@ -20,25 +20,23 @@ const pluginRoot = resolve(root, "plugin/pfdsl");
 const codexPluginRoot = resolve(root, "plugin/pfdsl-codex");
 
 function assemble() {
-	// --- 1. Generate the pfdsl skill directly into plugin/pfdsl/skills/pfdsl ---
-	// (reuses gen-skill.mjs rather than copying skills/pfdsl, so this stays in
-	// sync even if the two ever diverge in generation logic). This is the only
-	// step that needs packages/cli/dist (it embeds `pfdsl help` output into
-	// SKILL.md) — everything else is dist-independent (#593).
+	// --- 1. Generate the pfdsl skill into the neutral source tree ---
+	// This reuses gen-skill.mjs rather than copying skills/pfdsl, so it stays in sync even if the two ever diverge in generation logic.
+	// This is the only step that needs packages/cli/dist because it embeds `pfdsl help` output into SKILL.md; everything else is dist-independent (#593).
 
 	execFileSync(
 		process.execPath,
 		[
 			resolve(__dirname, "gen-skill.mjs"),
 			"--out",
-			resolve(pluginRoot, "skills/pfdsl"),
+			resolve(root, "generated/skills/pfdsl"),
 		],
 		{
 			stdio: "inherit",
 		},
 	);
 
-	// --- 1b-6. Everything else: install/ mirror, static skills, commands, agents, hooks, plugin.json, Codex-native skills, and skills/pfdsl/references.
+	// --- 1b-6. Everything else: install/ mirror, static skills, commands, agents, hooks, plugin.json, Codex-native skills, and harness copies of the generated pfdsl skill.
 	// Shared with scripts/gen-plugin-dist-independent.mjs, which pre-commit drift-checks even when dist is missing/stale (#593).
 
 	assemblePluginDistIndependent({ root, pluginRoot, codexPluginRoot });

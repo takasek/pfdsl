@@ -20,10 +20,8 @@
  * Left as-is — no functional difference, and converging them isn't worth the
  * churn (see #265).
  *
- * The .claude/skills/pfdsl dev copy has no gate of its own: it is a symlink to
- * plugin/pfdsl/skills/pfdsl (#714), so the tracked-copy gates cover the same
- * bytes. Its trigger pattern (scripts/lib/gen-skill-trigger.mjs) is still used
- * by gate-check.mjs.
+ * The .claude/skills/pfdsl dev copy has no gate of its own because it is a symlink to generated/skills/pfdsl (#714), so the tracked-copy gates cover the same bytes.
+ * Its trigger pattern (scripts/lib/gen-skill-trigger.mjs) is still used by gate-check.mjs.
  *
  * Usage: node scripts/check-drift-gates.mjs
  */

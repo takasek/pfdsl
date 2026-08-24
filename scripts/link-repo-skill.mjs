@@ -1,7 +1,5 @@
 #!/usr/bin/env node
-// Points .claude/skills/pfdsl at the tracked bundle copy
-// (plugin/pfdsl/skills/pfdsl) so a branch switch synchronises it through git
-// instead of leaving the previous branch's generated copy in place (#714).
+// Points .claude/skills/pfdsl at the tracked neutral generated copy (generated/skills/pfdsl), so a branch switch synchronises it through git instead of leaving the previous branch's generated copy in place (#714).
 //
 // Run: node scripts/link-repo-skill.mjs   (wired into `make setup`)
 //

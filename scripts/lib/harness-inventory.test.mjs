@@ -12,12 +12,118 @@ import {
 	DISTRIBUTED_SKILLS,
 	GENERATED_COMMANDS,
 	GENERATED_SKILLS,
+	HARNESS_CAPABILITY_CONTRACT,
 	SKILL_EXCLUSIONS,
 } from "./harness-inventory.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("harness distribution inventory", () => {
+	it("declares every current capability family with a stable unique ID", () => {
+		const expectedIds = [
+			"skill:pfd-grill",
+			"skill:pfd-ops",
+			"skill:pfd-retro",
+			"skill:pfd-ecosystem",
+			"skill:pfdsl",
+			"command:pfd-cycle",
+			"command:pfd-init",
+			"command:pfd-retro",
+			"agent:pfd-lens",
+			"agent:pfd-implementer",
+			"repository-instructions",
+			"repository-hooks",
+			"plugin-hooks",
+			"plugin-metadata",
+		];
+		const actualIds = HARNESS_CAPABILITY_CONTRACT.map(({ id }) => id);
+
+		assert.deepEqual(actualIds, expectedIds);
+		assert.equal(new Set(actualIds).size, actualIds.length);
+	});
+
+	it("declares all four target mappings without target defaults", () => {
+		const targets = [
+			"claude-repository",
+			"claude-plugin",
+			"codex-repository",
+			"codex-plugin",
+		];
+
+		for (const capability of HARNESS_CAPABILITY_CONTRACT) {
+			assert.deepEqual(
+				capability.mappings.map(({ target }) => target),
+				targets,
+				capability.id,
+			);
+		}
+	});
+
+	it("keeps command and agent target dispositions explicit", () => {
+		const dispositionsFor = (id) =>
+			HARNESS_CAPABILITY_CONTRACT.find(
+				(capability) => capability.id === id,
+			).mappings.map(({ disposition }) => disposition);
+
+		for (const id of [
+			"command:pfd-cycle",
+			"command:pfd-init",
+			"command:pfd-retro",
+		]) {
+			assert.deepEqual(dispositionsFor(id), [
+				"native",
+				"native",
+				"transform",
+				"transform",
+			]);
+		}
+		for (const id of ["agent:pfd-lens", "agent:pfd-implementer"]) {
+			assert.deepEqual(dispositionsFor(id), [
+				"native",
+				"native",
+				"transform",
+				"intentional-exclusion",
+			]);
+		}
+	});
+
+	it("keeps declared source paths and target output surfaces unique", () => {
+		const sourcePaths = HARNESS_CAPABILITY_CONTRACT.map(
+			({ source }) => source.path,
+		);
+		assert.equal(new Set(sourcePaths).size, sourcePaths.length);
+
+		for (const target of [
+			"claude-repository",
+			"claude-plugin",
+			"codex-repository",
+			"codex-plugin",
+		]) {
+			const outputs = HARNESS_CAPABILITY_CONTRACT.flatMap((capability) =>
+				capability.mappings
+					.filter((mapping) => mapping.target === target)
+					.flatMap((mapping) => mapping.outputs ?? []),
+			);
+			assert.equal(
+				new Set(outputs).size,
+				outputs.length,
+				`${target} output surfaces`,
+			);
+		}
+	});
+
+	it("freezes the contract declaration and its mappings", () => {
+		assert.equal(Object.isFrozen(HARNESS_CAPABILITY_CONTRACT), true);
+		for (const capability of HARNESS_CAPABILITY_CONTRACT) {
+			assert.equal(Object.isFrozen(capability), true, capability.id);
+			assert.equal(Object.isFrozen(capability.source), true, capability.id);
+			assert.equal(Object.isFrozen(capability.mappings), true, capability.id);
+			for (const mapping of capability.mappings) {
+				assert.equal(Object.isFrozen(mapping), true, capability.id);
+			}
+		}
+	});
+
 	it("lists the maintained skills exactly", () => {
 		assert.deepEqual(DISTRIBUTED_SKILLS, [
 			"pfd-grill",
@@ -100,9 +206,9 @@ describe("harness distribution inventory", () => {
 
 	it("classifies the generated pfdsl source outside the distributed collision set", () => {
 		assert.deepEqual(GENERATED_SKILLS.pfdsl, {
-			reason: "generated symlink to the rendered plugin skill tree",
+			reason: "generated symlink to the neutral rendered skill tree",
 			source: ".claude/skills/pfdsl",
-			target: "plugin/pfdsl/skills/pfdsl",
+			target: "generated/skills/pfdsl",
 		});
 		assert.equal(DISTRIBUTED_SKILLS.includes("pfdsl"), false);
 	});

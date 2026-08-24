@@ -39,13 +39,10 @@ const COMMAND_PATTERNS = DISTRIBUTED_COMMANDS.map(
 	(file) => `\\.claude/commands/${escapeDots(file)}`,
 ).join("|");
 
-// `^plugin/` covers the generated side, mirroring what GEN_INSTALL_TRIGGER
-// already does for install/: a hand-edit there is about to be overwritten by
-// the next assembly, and the drift gate is what tells the author so instead of
-// letting the edit ship and then vanish (#666, same shape as #579).
+// `^generated/` and `^plugin/` cover the generated source and distribution sides, mirroring what GEN_INSTALL_TRIGGER already does for install/: a hand-edit there is about to be overwritten by the next assembly, and the drift gate is what tells the author so instead of letting the edit ship and then vanish (#666, same shape as #579).
 // `.claude-plugin/marketplace\.json` joins it for the same reason: its
 // per-plugin description is generated (assemblePluginDistIndependent, #685)
 // even though the file lives outside plugin/pfdsl/.
-const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/lib/bundle-manifest\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|scripts/gen-codex-assets\\.mjs|scripts/lib/gen-codex-assets\\.mjs|scripts/lib/distribution-sources\\.mjs|scripts/lib/harness-inventory\\.mjs|${SKILL_PATTERNS}|${COMMAND_PATTERNS}|${AGENT_PATTERNS}|^CLAUDE\\.md$|^\\.claude/settings\\.json$|^hooks/|^plugin/|^AGENTS\\.md$|^\\.agents/|^\\.codex/|packages/cli/package\\.json|^\\.claude-plugin/marketplace\\.json`;
+const GEN_PLUGIN_TRIGGER_PATTERN = `${GEN_SKILL_TRIGGER_PATTERN}|scripts/gen-plugin\\.mjs|scripts/lib/gen-plugin\\.mjs|scripts/lib/bundle-manifest\\.mjs|scripts/gen-plugin-dist-independent\\.mjs|scripts/gen-codex-assets\\.mjs|scripts/lib/gen-codex-assets\\.mjs|scripts/lib/distribution-sources\\.mjs|scripts/lib/harness-capability-contract\\.mjs|scripts/lib/harness-source-decoder\\.mjs|scripts/lib/harness-inventory\\.mjs|${SKILL_PATTERNS}|${COMMAND_PATTERNS}|${AGENT_PATTERNS}|^CLAUDE\\.md$|^\\.claude/settings\\.json$|^hooks/|^generated/|^plugin/|^AGENTS\\.md$|^\\.agents/|^\\.codex/|packages/cli/package\\.json|^\\.claude-plugin/marketplace\\.json`;
 
 export const GEN_PLUGIN_TRIGGER = new RegExp(GEN_PLUGIN_TRIGGER_PATTERN);

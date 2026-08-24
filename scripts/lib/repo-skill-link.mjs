@@ -1,17 +1,17 @@
 /**
- * Decides how to point the repo-local skill path at the tracked bundle copy.
+ * Decides how to point the repo-local skill path at the tracked generated copy.
  *
  * `.claude/skills/pfdsl` used to be its own generated, gitignored directory.
  * Nothing regenerated it on a branch switch, so an agent could read the
  * conventions of whichever branch last ran the generator (#714). Pointing it at
- * the tracked `plugin/pfdsl/skills/pfdsl` hands that synchronisation to git.
+ * the tracked `generated/skills/pfdsl` hands that synchronisation to git.
  *
  * Kept separate from the filesystem work so the state machine — including the
  * migration from the old real directory — is testable without a fixture tree.
  */
 
 /** Where .claude/skills/pfdsl points, relative to its own directory. */
-export const SKILL_LINK_TARGET = "../../plugin/pfdsl/skills/pfdsl";
+export const SKILL_LINK_TARGET = "../../generated/skills/pfdsl";
 
 /**
  * @param {{present: boolean, isSymlink?: boolean, linkTarget?: string}} state

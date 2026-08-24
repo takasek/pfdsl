@@ -20,9 +20,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # .claude/skills/pfdsl is gitignored (#348), so it doesn't exist on a
-      # fresh checkout — link it to the tracked bundle copy the way `make
-      # setup` does (#714).
+      # .claude/skills/pfdsl is gitignored (#348), so a fresh checkout links it to the tracked generated copy the way `make setup` does (#714).
       - run: node scripts/link-repo-skill.mjs
 
       # gen-plugin renders SKILL.md from `pfdsl help` and runs check-docs, both
@@ -33,7 +31,7 @@ jobs:
       - name: Regenerate Claude and Codex assets and assert no drift
         run: |
           make gen-plugin
-          if ! node scripts/check-generated-drift.mjs -- plugin .claude-plugin/marketplace.json AGENTS.md .agents .codex; then
+          if ! node scripts/check-generated-drift.mjs -- generated plugin .claude-plugin/marketplace.json AGENTS.md .agents .codex; then
             echo ""
             echo "ERROR: generated Claude or Codex assets are stale."
             echo "Run 'make gen-plugin' and commit the result."

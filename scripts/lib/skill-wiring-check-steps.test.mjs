@@ -89,7 +89,7 @@ describe("runSkillWiringCheck", () => {
 		assert.equal(result.exitCode, 1);
 		assert.match(result.stderrLines[0], /workflow\.pfdsl:2:/);
 		assert.match(result.stderrLines[0], /retro_skill/);
-		assert.match(result.stderrLines[0], /gen_plugin inputs/);
+		assert.match(result.stderrLines[0], /reach gen_plugin/);
 	});
 
 	it("locates the declaration line by delegating to the injected locate function", () => {
@@ -132,7 +132,7 @@ describe("runSkillWiringCheck", () => {
 		);
 	});
 
-	it("tells the reader where to add the missing edges", () => {
+	it("tells the reader how to satisfy the missing wiring", () => {
 		const workflow = {
 			frontmatter: WORKFLOW.frontmatter,
 			edges: [],
@@ -141,7 +141,10 @@ describe("runSkillWiringCheck", () => {
 			deps({ workflow, pipeline: { frontmatter: {}, edges: [] } }),
 		);
 		assert.match(result.stderrLines.join("\n"), /distill_ops -> \[\.\.\.\]/);
-		assert.match(result.stderrLines.join("\n"), /\[\.\.\.\] >> gen_plugin/);
+		assert.match(
+			result.stderrLines.join("\n"),
+			/Make it reach `gen_plugin` through primary input\/output edges/,
+		);
 	});
 
 	it("names only the edges the findings are actually missing", () => {
@@ -156,7 +159,10 @@ describe("runSkillWiringCheck", () => {
 			mirrors,
 		});
 		const stderr = result.stderrLines.join("\n");
-		assert.match(stderr, /\[\.\.\.\] >> gen_plugin/);
+		assert.match(
+			stderr,
+			/Make it reach `gen_plugin` through primary input\/output edges/,
+		);
 		assert.doesNotMatch(stderr, /distill_ops -> \[\.\.\.\]/);
 	});
 
@@ -203,7 +209,7 @@ describe("runSkillWiringCheck", () => {
 		assert.equal(result.exitCode, 1);
 		assert.match(result.stderrLines[0], /runtime-pipeline\.pfdsl:2:/);
 		assert.match(result.stderrLines[0], /pfd_commands/);
-		assert.match(result.stderrLines[0], /gen_plugin inputs/);
+		assert.match(result.stderrLines[0], /reach gen_plugin/);
 		assert.doesNotMatch(result.stderrLines[0], /distill_ops outputs/);
 	});
 

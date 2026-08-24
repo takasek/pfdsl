@@ -80,7 +80,12 @@ export function runSkillWiringCheck({
 		const location = Array.isArray(finding.location)
 			? finding.location.join(", ")
 			: finding.location;
-		return `${anchor}: '${finding.id}' is bundled (${location}) but missing from ${finding.missing.join(" and ")}`;
+		const problems = finding.missing.map((missing) =>
+			missing === "reach gen_plugin"
+				? "does not reach gen_plugin"
+				: `is missing from ${missing}`,
+		);
+		return `${anchor}: '${finding.id}' is bundled (${location}) but ${problems.join(" and ")}`;
 	});
 	// Only the edges some finding is actually missing: a pipeline-declared
 	// artifact is never eligible for distill_ops outputs (#944), so naming that
@@ -92,9 +97,9 @@ export function runSkillWiringCheck({
 			stderrLines.push(
 				`Add it to \`distill_ops -> [...]\` in ${WORKFLOW} (it is produced there).`,
 			);
-		if (missingEdges.has("gen_plugin inputs"))
+		if (missingEdges.has("reach gen_plugin"))
 			stderrLines.push(
-				`Add it to \`[...] >> gen_plugin\` in ${PIPELINE} (it is bundled material).`,
+				`Make it reach \`gen_plugin\` through primary input/output edges in ${PIPELINE} (it is bundled material).`,
 			);
 	}
 	for (const mirror of unmodeled) {

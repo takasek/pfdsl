@@ -3,9 +3,10 @@
  * check-skill-wiring.mjs
  *
  * Verifies that every distributed hand-written skill/agent appears on both PFD
- * edges that model it: `distill_ops -> [...]` in .pfdsl/workflow.pfdsl (where it
- * is produced) and `[...] >> gen_plugin` in .pfdsl/runtime-pipeline.pfdsl (where
- * it is consumed as bundled material). See scripts/lib/skill-wiring-check.mjs
+ * wiring that models it: `distill_ops -> [...]` in .pfdsl/workflow.pfdsl (where
+ * it is produced) and a primary input/output path that reaches `gen_plugin` in
+ * .pfdsl/runtime-pipeline.pfdsl (where it is consumed as bundled material).
+ * See scripts/lib/skill-wiring-check.mjs
  * for how scope is derived without a hand-maintained list of skill names (#699).
  *
  * Reads the graphs through @pfdsl/core's analyze() rather than by matching

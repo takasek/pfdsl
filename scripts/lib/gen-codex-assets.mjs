@@ -1,12 +1,3 @@
-import { parse } from "yaml";
-
-const COMMAND_FRONTMATTER_KEYS = new Set(["description"]);
-const AGENT_FRONTMATTER_KEYS = new Set([
-	"name",
-	"description",
-	"tools",
-	"model",
-]);
 const READ_ONLY_TOOLS = "Read, Grep, Bash";
 const WORKSPACE_WRITE_TOOLS = "Bash, Read, Edit, Write, Grep, Glob, Skill";
 const MARKDOWN_GENERATED_NOTICE =
@@ -27,41 +18,6 @@ const CODEX_ARGUMENT_INSTRUCTIONS = new Map([
 		"ユーザーがスキル呼び出しとともに指定した内容があれば、監査対象範囲の指定として扱う。",
 	],
 ]);
-
-function parseFrontmatter(sourcePath, source) {
-	const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
-	if (!match) {
-		throw new Error(`${sourcePath}: frontmatter is required.`);
-	}
-
-	const frontmatter = parse(match[1]);
-	if (
-		!frontmatter ||
-		Array.isArray(frontmatter) ||
-		typeof frontmatter !== "object"
-	) {
-		throw new Error(`${sourcePath}: frontmatter must be an object.`);
-	}
-
-	return { body: source.slice(match[0].length), frontmatter };
-}
-
-function requiredDescription(sourcePath, frontmatter) {
-	if (
-		typeof frontmatter.description !== "string" ||
-		!frontmatter.description.trim()
-	) {
-		throw new Error(`${sourcePath}: description must be a non-empty string.`);
-	}
-	return frontmatter.description;
-}
-
-function requiredName(sourcePath, frontmatter) {
-	if (typeof frontmatter.name !== "string" || !frontmatter.name.trim()) {
-		throw new Error(`${sourcePath}: name must be a non-empty string.`);
-	}
-	return frontmatter.name;
-}
 
 function tomlString(value) {
 	return JSON.stringify(value);
@@ -103,42 +59,128 @@ export function addGeneratedSourceComment(source, authoritativeSource) {
 	return `${shebang[0]}${comment}${source.slice(shebang[0].length)}`;
 }
 
-export function buildCodexPluginManifest({ version, description }) {
-	return {
-		name: "pfdsl",
+function capabilitySourcePath(record) {
+	return record?.source?.path ?? "<unknown-source>";
+}
+
+function semanticRecord(record, kind) {
+	const sourcePath = capabilitySourcePath(record);
+	const semantic = record?.semantic;
+	if (!semantic || Array.isArray(semantic) || typeof semantic !== "object") {
+		throw new Error(
+			`${sourcePath}: ${kind} semantic record must be an object.`,
+		);
+	}
+	return semantic;
+}
+
+function requiredSemanticString(
+	record,
+	semantic,
+	field,
+	{ nonEmpty = true } = {},
+) {
+	const sourcePath = capabilitySourcePath(record);
+	const value = semantic[field];
+	if (typeof value !== "string" || (nonEmpty && !value.trim())) {
+		const qualifier = nonEmpty ? "non-empty string" : "string";
+		throw new Error(`${sourcePath}: ${field} must be a ${qualifier}.`);
+	}
+	return value;
+}
+
+function manifestSurfaceFields(mapping, sourcePath) {
+	const outputs = Array.isArray(mapping) ? mapping : mapping?.outputs;
+	if (!Array.isArray(outputs)) {
+		throw new Error(
+			`${sourcePath}: codex-plugin manifest mapping outputs must be an array.`,
+		);
+	}
+	if (outputs.some((surface) => typeof surface !== "string")) {
+		throw new Error(
+			`${sourcePath}: codex-plugin manifest mapping outputs must be strings.`,
+		);
+	}
+	const prefix = "manifest:.codex-plugin/plugin.json:";
+	const fields = outputs
+		.filter((surface) => surface.startsWith(prefix))
+		.map((surface) => surface.slice(prefix.length));
+	if (fields.length === 0 || fields.some((field) => !field)) {
+		throw new Error(
+			`${sourcePath}: codex-plugin manifest fields are required.`,
+		);
+	}
+	return new Set(fields);
+}
+
+export function buildCodexPluginManifest({
+	metadata,
+	record,
+	mapping,
+	description,
+}) {
+	const sourcePath = capabilitySourcePath(record);
+	const semantic = metadata ?? record?.semantic;
+	if (!semantic || Array.isArray(semantic) || typeof semantic !== "object") {
+		throw new Error(`${sourcePath}: plugin metadata must be an object.`);
+	}
+	const identity = semantic.identity;
+	if (!identity || Array.isArray(identity) || typeof identity !== "object") {
+		throw new Error(
+			`${sourcePath}: plugin metadata identity must be an object.`,
+		);
+	}
+	const version = requiredSemanticString(
+		record ?? { source: { path: sourcePath }, semantic },
+		semantic,
+		"version",
+	);
+	if (typeof description !== "string" || !description.trim()) {
+		throw new Error(`${sourcePath}: description must be a non-empty string.`);
+	}
+	const fields = manifestSurfaceFields(mapping, sourcePath);
+	const values = {
+		name: identity.name,
 		version,
 		description,
-		author: { name: "takasek" },
-		homepage: "https://github.com/takasek/pfdsl",
+		author: identity.author,
+		homepage: identity.homepage,
 		repository: "https://github.com/takasek/pfdsl",
-		license: "MIT",
+		license: identity.license,
 		skills: "./skills/",
 		interface: {
-			displayName: "pfdsl",
+			displayName: identity.name,
 			shortDescription: description,
 			longDescription: description,
-			developerName: "takasek",
+			developerName: identity.author?.name,
 			category: "Developer Tools",
 			capabilities: ["Skills"],
 			defaultPrompt: ["Use pfd-ops to operate this project."],
 		},
 	};
-}
-
-export function commandToCodexSkill(
-	sourcePath,
-	source,
-	outputName = sourcePath.replace(/\.md$/, ""),
-) {
-	const { body, frontmatter } = parseFrontmatter(sourcePath, source);
-	for (const key of Object.keys(frontmatter)) {
-		if (!COMMAND_FRONTMATTER_KEYS.has(key)) {
+	for (const field of fields) {
+		if (!Object.hasOwn(values, field)) {
 			throw new Error(
-				`${sourcePath}: unsupported command frontmatter key ${key}.`,
+				`${sourcePath}: unsupported Codex manifest field ${field}.`,
 			);
 		}
 	}
-	const description = requiredDescription(sourcePath, frontmatter);
+	return Object.fromEntries(
+		Object.entries(values).filter(([field]) => fields.has(field)),
+	);
+}
+
+export function commandCapabilityToCodexSkill(record, outputName) {
+	const sourcePath = capabilitySourcePath(record);
+	const semantic = semanticRecord(record, "command");
+	const description = requiredSemanticString(record, semantic, "description");
+	const body = requiredSemanticString(record, semantic, "body", {
+		nonEmpty: false,
+	});
+	const name = outputName ?? sourcePath.split("/").pop().replace(/\.md$/, "");
+	if (typeof name !== "string" || !name.trim()) {
+		throw new Error(`${sourcePath}: output name must be a non-empty string.`);
+	}
 	let codexBody = body;
 	for (const [
 		claudeInstruction,
@@ -154,8 +196,8 @@ export function commandToCodexSkill(
 	}
 
 	return addGeneratedMarkdownNotice(
-		`---\nname: ${outputName}\ndescription: ${description}\n---\n${codexBody}`,
-		`.claude/commands/${sourcePath}`,
+		`---\nname: ${name}\ndescription: ${description}\n---\n${codexBody}`,
+		sourcePath,
 	);
 }
 
@@ -241,30 +283,28 @@ export function buildCodexProjectConfig() {
 	].join("\n");
 }
 
-export function agentToCodexToml(sourcePath, source) {
-	const { body, frontmatter } = parseFrontmatter(sourcePath, source);
-	for (const key of Object.keys(frontmatter)) {
-		if (!AGENT_FRONTMATTER_KEYS.has(key)) {
-			throw new Error(
-				`${sourcePath}: unsupported agent frontmatter key ${key}.`,
-			);
-		}
-	}
-	const name = requiredName(sourcePath, frontmatter);
+export function agentCapabilityToCodexToml(record) {
+	const sourcePath = capabilitySourcePath(record);
+	const semantic = semanticRecord(record, "agent");
+	const sourceName = sourcePath.split("/").pop();
+	const name = requiredSemanticString(record, semantic, "name");
 	const description = codexAgentDescription(
-		sourcePath,
-		requiredDescription(sourcePath, frontmatter),
+		sourceName,
+		requiredSemanticString(record, semantic, "description"),
 	);
-	if (frontmatter.model !== "sonnet") {
+	if (semantic.model !== "sonnet") {
 		throw new Error(`${sourcePath}: unsupported model.`);
 	}
-	const sandbox = sandboxMode(sourcePath, frontmatter.tools);
+	const sandbox = sandboxMode(sourcePath, semantic.tools);
+	const body = requiredSemanticString(record, semantic, "body", {
+		nonEmpty: false,
+	});
 	const instructions = tomlMultilineString(
-		codexAgentInstructions(sourcePath, body),
+		codexAgentInstructions(sourceName, body),
 	);
 
 	return [
-		`# ${generatedNotice(`.claude/agents/${sourcePath}`)}`,
+		`# ${generatedNotice(sourcePath)}`,
 		`name = ${tomlString(name)}`,
 		`description = ${tomlString(description)}`,
 		`sandbox_mode = ${tomlString(sandbox)}`,
@@ -273,7 +313,15 @@ export function agentToCodexToml(sourcePath, source) {
 	].join("\n");
 }
 
-export function claudeHooksToCodexHooks(source) {
-	const { hooks } = JSON.parse(source);
-	return `${JSON.stringify({ hooks }, null, 2)}\n`;
+export function hookCapabilityToCodexHooks(record) {
+	const sourcePath = capabilitySourcePath(record);
+	const semantic = semanticRecord(record, "hook");
+	if (
+		!semantic.hooks ||
+		Array.isArray(semantic.hooks) ||
+		typeof semantic.hooks !== "object"
+	) {
+		throw new Error(`${sourcePath}: hooks must be an object.`);
+	}
+	return `${JSON.stringify({ hooks: semantic.hooks }, null, 2)}\n`;
 }

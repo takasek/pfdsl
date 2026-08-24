@@ -43,13 +43,13 @@ describe("check-gen-plugin workflow", () => {
 			"scripts/check-generated-drift.mjs",
 			"--",
 		]);
-		const skillMdExclusion = ":(exclude)plugin/pfdsl/skills/pfdsl/SKILL.md";
+		const skillMdExclusion = ":(exclude)generated/skills/pfdsl/SKILL.md";
 		const preCommitPathspecs = args
 			.slice(2)
 			.filter((pathspec) => pathspec !== skillMdExclusion);
 
 		// Pre-commit checks SKILL.md in its separate dist-dependent gate. CI runs
-		// the complete generator after building dist, so its broad `plugin`
+		// the complete generator after building dist, so its broad `generated`
 		// pathspec intentionally covers SKILL.md instead of excluding it.
 		assert.deepEqual(pathspecs, preCommitPathspecs);
 	});
