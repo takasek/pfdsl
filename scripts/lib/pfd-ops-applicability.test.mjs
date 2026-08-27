@@ -6,6 +6,12 @@ const read = (path) => readFileSync(path, "utf8");
 
 const skill = read(".claude/skills/pfd-ops/SKILL.md");
 const workCycle = read(".claude/skills/pfd-ops/references/work-cycle.md");
+const githubBackend = read(
+	".claude/skills/pfd-ops/references/github-issues-backend.md",
+);
+const fileBackend = read(
+	".claude/skills/pfd-ops/references/file-based-tracker-backend.md",
+);
 const roadmapScaffold = read(
 	".claude/skills/pfd-ops/references/scaffold/roadmap.md",
 );
@@ -21,8 +27,20 @@ describe("pfd-ops applicability contract", () => {
 	});
 
 	it("keeps the generic work cycle independent of the selected backend", () => {
-		assert.match(workCycle, /作業項目の本文とコメント/);
-		assert.doesNotMatch(workCycle, /gh issue view/);
+		assert.match(workCycle, /一次記録と設計判断履歴/);
+		assert.match(workCycle, /記録を確定/);
+		assert.match(workCycle, /L3 が PR による完了契約を定義する場合/);
+		assert.doesNotMatch(
+			workCycle,
+			/gh issue view|作業項目の本文とコメント|作業項目コメント|コメントの投稿時刻|作業項目を閉じるキーワード/,
+		);
+	});
+
+	it("assigns concrete record and ordering evidence to each backend", () => {
+		assert.match(githubBackend, /本文とコメント/);
+		assert.match(githubBackend, /投稿時刻/);
+		assert.match(fileBackend, /当該項目に追記/);
+		assert.match(fileBackend, /コミット順/);
 	});
 
 	it("makes roadmap adoption distinct from other GitHub Issues usage", () => {
