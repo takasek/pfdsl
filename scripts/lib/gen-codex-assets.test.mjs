@@ -21,6 +21,8 @@ import { PROBE_FIXTURES } from "./harness-capability-probes.test-helper.mjs";
 import { HARNESS_CAPABILITY_CONTRACT } from "./harness-inventory.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const PFD_LENS_BASH_RESTRICTION =
+	"Bash は `pfdsl check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。";
 
 function commandRecord({
 	name = "pfd-cycle",
@@ -341,7 +343,11 @@ describe("agentCapabilityToCodexToml", () => {
 	it("maps pfd-lens's known read-only tools without selecting a Codex model", () => {
 		const output = agentCapabilityToCodexToml(
 			agentRecord({
-				body: String.raw`\n.agents/skills/pfd-retro/SKILL.md\n\${PLUGIN_ROOT}\n`,
+				body:
+					`\n${PFD_LENS_BASH_RESTRICTION}\n` +
+					String.raw`.agents/skills/pfd-retro/SKILL.md
+\${PLUGIN_ROOT}
+`,
 			}),
 		);
 
@@ -352,6 +358,36 @@ describe("agentCapabilityToCodexToml", () => {
 		assert.match(output, /^developer_instructions = """/m);
 		assert.match(output, /\.agents\/skills\/pfd-retro\/SKILL\.md/);
 		assert.match(output, /\$\{PLUGIN_ROOT\}/);
+	});
+
+	it("permits read-only shell inspection for pfd-lens catalog and target PFD reads", () => {
+		const output = agentCapabilityToCodexToml(
+			agentRecord({
+				body:
+					`\n${PFD_LENS_BASH_RESTRICTION}\n` +
+					"カタログを読み込み、対象 `.pfdsl` ファイルを Read する。\n",
+			}),
+		);
+		const instructions = parseTomlDeveloperInstructions(output);
+
+		assert.match(
+			instructions,
+			/`rg` と `sed` を観点カタログと対象 `\.pfdsl` ファイルの読取に使用してよい。/,
+		);
+		assert.equal(instructions.includes(PFD_LENS_BASH_RESTRICTION), false);
+		assert.match(output, /^sandbox_mode = "read-only"$/m);
+	});
+
+	it("rejects pfd-lens when its expected Bash restriction clause changes", () => {
+		for (const body of [
+			"\nBash は `pfdsl delete <file>` のみ許可される。\n",
+			`\n${PFD_LENS_BASH_RESTRICTION}\n${PFD_LENS_BASH_RESTRICTION}\n`,
+		]) {
+			assert.throws(
+				() => agentCapabilityToCodexToml(agentRecord({ body })),
+				/\.claude\/agents\/pfd-lens\.md.*Bash restriction clause/,
+			);
+		}
 	});
 
 	it("maps pfd-implementer's known write tools and repository instructions", () => {
