@@ -1018,10 +1018,10 @@ describe("classifyDesignRecordContent", () => {
 		"前提: 実行主体が判定語を自分に有利に解釈できることを機械照合で塞ぐ。",
 		"否定案: D のみ（機械検査を足さず撤回経路だけ新設する）。",
 		"却下理由: designUnsettled が別プロセス用の判定である点は出力の誤りであり撤回経路では塞げない。",
-		"決定: 案A を採用する。",
+		"案の処分 1: 採用 — 案Aを実装する。",
 	].join("\n");
 
-	it("PASSes a record with all required prefixes and enough disposition tokens", () => {
+	it("PASSes a record with every numbered option disposition", () => {
 		assert.deepEqual(classifyDesignRecordContent(validRecord, 1), {
 			status: "PASS",
 		});
@@ -1093,10 +1093,10 @@ describe("classifyDesignRecordContent", () => {
 		assert.match(result.detail, /前提:/);
 	});
 
-	it("FAILs when disposition tokens appear fewer times than the enumerated option count", () => {
+	it("FAILs when a numbered disposition is missing", () => {
 		const result = classifyDesignRecordContent(validRecord, 3);
 		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /disposition tokens/);
+		assert.match(result.detail, /1\.\.3/);
 	});
 
 	it("does not require disposition-token coverage when optionCount is 0", () => {
@@ -1112,24 +1112,124 @@ describe("classifyDesignRecordContent", () => {
 		const record = ["前提: x", "否定案: y", "却下理由: z"].join("\n");
 		const result = classifyDesignRecordContent(record, 1);
 		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /found 0 time\(s\)/);
+		assert.match(result.detail, /numbered disposition/);
 	});
 
-	it("still counts a disposition word written in the body of a required line", () => {
+	it("does not count disposition words outside a numbered 案の処分 line", () => {
 		const record = ["前提: x", "否定案: y", "却下理由: 案Bは却下する。"].join(
 			"\n",
 		);
+		const result = classifyDesignRecordContent(record, 1);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /numbered disposition/);
+	});
+
+	it("rejects duplicate numbered dispositions", () => {
+		const record = [
+			"前提: x",
+			"否定案: y",
+			"却下理由: z",
+			"案の処分 1: 採用 — 案1。",
+			"案の処分 1: 却下 — 案1の重複。",
+		].join("\n");
+		const result = classifyDesignRecordContent(record, 2);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /duplicate/);
+	});
+
+	it("rejects a disposition number outside 1..N", () => {
+		const record = [
+			"前提: x",
+			"否定案: y",
+			"却下理由: z",
+			"案の処分 1: 採用 — 案1。",
+			"案の処分 2: 保留 — 案2。",
+			"案の処分 3: 却下 — 範囲外。",
+		].join("\n");
+		const result = classifyDesignRecordContent(record, 2);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /outside 1\.\.2/);
+	});
+
+	it("ignores disposition words in prose around numbered declarations", () => {
+		const record = [
+			"前提: 採用案は実装可能である。",
+			"否定案: 案2は却下候補である。",
+			"却下理由: 案2を却下する理由は費用である。",
+			"案の処分 1: 採用 — 案1。理由では保留案にも触れる。",
+		].join("\n");
+		const result = classifyDesignRecordContent(record, 2);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /1\.\.2/);
+	});
+
+	it("requires a disposition token boundary at the declaration position", () => {
+		const record = [
+			"前提: x",
+			"否定案: y",
+			"却下理由: z",
+			"案の処分 1: 採用候補 — 案1。",
+		].join("\n");
+		const result = classifyDesignRecordContent(record, 1);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /採用\/却下\/保留/);
+	});
+
+	it("rejects conflicting disposition tokens at the declaration position", () => {
+		const record = [
+			"前提: x",
+			"否定案: y",
+			"却下理由: z",
+			"案の処分 1: 採用 却下 — 案1。",
+		].join("\n");
+		const result = classifyDesignRecordContent(record, 1);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /exactly one/);
+	});
+
+	it("rejects a declaration without the em dash delimiter", () => {
+		const record = [
+			"前提: x",
+			"否定案: y",
+			"却下理由: z",
+			"案の処分 1: 採用 案1。",
+		].join("\n");
+		const result = classifyDesignRecordContent(record, 1);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /—/);
+	});
+
+	it("rejects slash-separated placeholder tokens before the delimiter", () => {
+		const record = [
+			"前提: x",
+			"否定案: y",
+			"却下理由: z",
+			"案の処分 1: 採用 / 却下 / 保留のいずれか — 案1。",
+		].join("\n");
+		const result = classifyDesignRecordContent(record, 1);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /exactly one/);
+	});
+
+	it("accepts another disposition token in prose after the option text", () => {
+		const record = [
+			"前提: x",
+			"否定案: y",
+			"却下理由: z",
+			"案の処分 1: 採用 — 案1, 理由では却下案；保留案にも触れる。",
+		].join("\n");
 		assert.deepEqual(classifyDesignRecordContent(record, 1), {
 			status: "PASS",
 		});
 	});
 
-	it("PASSes when the same option's disposition word appears twice, as ordinary prose", () => {
+	it("accepts decorated numbered declarations with a full-width colon", () => {
 		const record = [
 			"前提: x",
 			"否定案: 案2",
-			"却下理由: 案2は却下する。却下理由はここに書く通り。",
-			"決定: 案1を採用する。",
+			"却下理由: 費用が高い。",
+			"> - **案の処分 1**： 採用 — 案1。",
+			"## 案の処分 2： 却下 — 案2。",
 		].join("\n");
 		assert.deepEqual(classifyDesignRecordContent(record, 2), {
 			status: "PASS",

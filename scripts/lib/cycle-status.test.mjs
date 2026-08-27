@@ -622,11 +622,31 @@ describe("buildDesignRecordTemplate", () => {
 		assert.equal(selectDesignRecord(entries)?.author, "runner");
 	});
 
-	it("adds a disposition line naming the enumerated option count", () => {
+	it("adds one unfilled numbered disposition row per enumerated option", () => {
 		const { lines } = buildDesignRecordTemplate({ optionCount: 3 });
-		const dispositionLine = lines.find((l) => l.includes("処分"));
-		assert.ok(dispositionLine, "expected a disposition line");
-		assert.match(dispositionLine, /3/);
+		assert.deepEqual(
+			lines.filter((line) => line.startsWith("案の処分 ")),
+			[
+				"案の処分 1: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
+				"案の処分 2: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
+				"案の処分 3: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
+			],
+		);
+		assert.ok(
+			lines.some((line) => /採用 \/ 却下 \/ 保留/.test(line)),
+			"expected visible disposition vocabulary",
+		);
+	});
+
+	it("keeps untouched enumerated-option templates failing the content check", () => {
+		for (const optionCount of [1, 2, 3]) {
+			const { lines } = buildDesignRecordTemplate({ optionCount });
+			assert.equal(
+				classifyDesignRecordContent(lines.join("\n"), optionCount).status,
+				"FAIL",
+				`optionCount ${optionCount}`,
+			);
+		}
 	});
 
 	it("omits the disposition line when the issue enumerates no options", () => {

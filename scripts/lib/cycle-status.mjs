@@ -216,11 +216,16 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
 	];
 	if (optionCount > 0) {
 		lines.push(
-			`案の処分: 列挙された ${optionCount} 件それぞれに ${DISPOSITION_TOKENS.join(" / ")} のいずれかを書く`,
+			`処分に使える語（各案にいずれかを書く）: ${DISPOSITION_TOKENS.join(" / ")}`,
+			...Array.from(
+				{ length: optionCount },
+				(_, index) =>
+					`案の処分 ${index + 1}: <${DISPOSITION_TOKENS.join(" / ")}のいずれか> — <対象案と理由>`,
+			),
 		);
 	}
 	return {
-		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 雛形のまま投稿しても形式は通るが、記録としては何も残らない。実装しないと判断した回のみ、記録に \`${NO_IMPLEMENTATION_TOKEN} <理由>\` を行頭から書く行を追加する — timing 判定が SKIP になり、コミットとの前後関係を照合しない。他の行の前提・否定案・却下理由の中でこの語に触れるだけでは宣言にならない — \`Size-Intent: shrink\` と同じ行頭一致で判定する。`,
+		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 候補列挙がある場合は雛形のままでは形式も通らず、候補列挙がなくても記録としては何も残らない。実装しないと判断した回のみ、記録に \`${NO_IMPLEMENTATION_TOKEN} <理由>\` を行頭から書く行を追加する — timing 判定が SKIP になり、コミットとの前後関係を照合しない。他の行の前提・否定案・却下理由の中でこの語に触れるだけでは宣言にならない — \`Size-Intent: shrink\` と同じ行頭一致で判定する。`,
 		lines,
 	};
 }

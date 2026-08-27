@@ -497,10 +497,16 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		const dispositionLine = result.designRecordTemplate.lines.find((l) =>
-			l.includes("処分"),
+		assert.deepEqual(
+			result.designRecordTemplate.lines.filter((line) =>
+				line.startsWith("案の処分 "),
+			),
+			[
+				"案の処分 1: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
+				"案の処分 2: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
+				"案の処分 3: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
+			],
 		);
-		assert.match(dispositionLine, /3/);
 	});
 
 	it("emits the design-record template even when no issue could be resolved", async () => {

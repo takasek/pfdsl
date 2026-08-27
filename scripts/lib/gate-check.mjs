@@ -923,46 +923,37 @@ export function selectDesignRecord(entries) {
 	return best;
 }
 
-const REQUIRED_LINE_HEAD_PATTERNS =
-	DESIGN_RECORD_REQUIRED_PREFIXES.map(lineHeadPattern);
+const NUMBERED_DISPOSITION_LINE_PATTERN = new RegExp(
+	`^案の処分\\s+(\\d+)\\s*[:：]\\s*(${DISPOSITION_TOKENS.join("|")})\\s+—\\s+\\S`,
+);
+const NUMBERED_DISPOSITION_HEAD_PATTERN = /^案の処分\s+(\d+)\s*[:：]/;
 
 /**
- * The record with its required line heads removed, ready to be counted over.
- *
- * `却下理由:` contains `却下`, so a plain substring count over the whole body
- * hands every conforming record one disposition token for free — a token that
- * names no option's disposition, which made the count a complete no-op at
- * optionCount 1 (#949). Only the matched label is dropped, not the line: a
- * 却下理由 line's own prose routinely disposes of the option it is about
- * (「案Bは却下する」), and dropping the whole line loses that. Measured over
- * this repo's 128 records carrying all three required heads, the two differ on
- * 56 of them, always in that direction.
+ * Explicit numbered option-disposition declarations. The shared line-head
+ * normalization keeps Markdown decoration and colon forms consistent with the
+ * required-prefix checks. The em dash separates the single declaration token
+ * from unrestricted option-and-reason prose.
  * @param {string} body
- * @returns {string}
+ * @returns {Array<{number: number, validToken: boolean}>}
  */
-function stripRequiredLineHeads(body) {
-	return body
-		.split("\n")
-		.map((line) => {
-			const normalized = normalizeRecordLine(line);
-			for (const pattern of REQUIRED_LINE_HEAD_PATTERNS) {
-				const match = normalized.match(pattern);
-				if (match) return normalized.slice(match[0].length);
-			}
-			return normalized;
-		})
-		.join("\n");
+function numberedDispositionDeclarations(body) {
+	return body.split("\n").flatMap((line) => {
+		const normalized = normalizeRecordLine(line);
+		const head = normalized.match(NUMBERED_DISPOSITION_HEAD_PATTERN);
+		if (!head) return [];
+		return [
+			{
+				number: Number(head[1]),
+				validToken: NUMBERED_DISPOSITION_LINE_PATTERN.test(normalized),
+			},
+		];
+	});
 }
 
 /**
  * Classify the content of a design-selection record. Two independent checks:
- * required line-head tokens are present, and every enumerated option got a
- * disposition word somewhere in the record.
- *
- * The disposition-token count is checked as "at least optionCount", not an
- * exact match, because ordinary prose can name the same option's disposition
- * more than once (e.g. "案2は却下する。却下理由は…") — an exact-match check
- * would FAIL a correct record for that.
+ * required line-head tokens are present, and the numbered disposition lines
+ * form the exact set 1..optionCount with one declaration token apiece.
  * @param {string} recordBody
  * @param {number} optionCount
  * @returns {{status: 'PASS'|'FAIL', detail?: string}}
@@ -979,16 +970,42 @@ export function classifyDesignRecordContent(recordBody, optionCount) {
 		problems.push(`missing required line(s): ${missing.join(", ")}`);
 
 	if (optionCount > 0) {
-		const countable = stripRequiredLineHeads(body);
-		const dispositionCount = DISPOSITION_TOKENS.reduce(
-			(sum, token) => sum + (countable.split(token).length - 1),
-			0,
+		const declarations = numberedDispositionDeclarations(body);
+		const numbers = declarations.map((declaration) => declaration.number);
+		const duplicateNumbers = [
+			...new Set(numbers.filter((n, i) => numbers.indexOf(n) !== i)),
+		];
+		const outsideNumbers = [
+			...new Set(numbers.filter((n) => n < 1 || n > optionCount)),
+		];
+		const validNumbers = new Set(
+			declarations
+				.filter((declaration) => declaration.validToken)
+				.map((declaration) => declaration.number),
 		);
-		if (dispositionCount < optionCount) {
+		const missingNumbers = Array.from(
+			{ length: optionCount },
+			(_, index) => index + 1,
+		).filter((number) => !validNumbers.has(number));
+		const invalidTokenNumbers = declarations
+			.filter((declaration) => !declaration.validToken)
+			.map((declaration) => declaration.number);
+		if (duplicateNumbers.length > 0)
 			problems.push(
-				`disposition tokens (${DISPOSITION_TOKENS.join("/")}) found ${dispositionCount} time(s), fewer than ${optionCount} enumerated option(s)`,
+				`duplicate numbered disposition(s): ${duplicateNumbers.join(", ")}`,
 			);
-		}
+		if (outsideNumbers.length > 0)
+			problems.push(
+				`numbered disposition(s) outside 1..${optionCount}: ${outsideNumbers.join(", ")}`,
+			);
+		if (invalidTokenNumbers.length > 0)
+			problems.push(
+				`numbered disposition(s) ${invalidTokenNumbers.join(", ")} must declare exactly one of ${DISPOSITION_TOKENS.join("/")} followed by — and option/reason prose`,
+			);
+		if (missingNumbers.length > 0)
+			problems.push(
+				`numbered dispositions must cover exactly 1..${optionCount}; missing: ${missingNumbers.join(", ")}`,
+			);
 	}
 
 	if (problems.length > 0)
