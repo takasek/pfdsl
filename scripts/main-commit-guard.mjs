@@ -18,7 +18,7 @@
 // Always exits 0 — a crash here, or a `git` failure, must not wedge every Bash
 // call.
 //
-// Usage (wired in .claude/settings.json): node scripts/main-commit-guard.mjs
+// Usage (wired in .claude/settings.json and .codex/hooks.json): node scripts/main-commit-guard.mjs
 
 import { readStdinText } from "./lib/hook-io.mjs";
 import {
@@ -39,9 +39,9 @@ function resolveBranches(payload, targetCwd) {
 	const projectDir = process.env.CLAUDE_PROJECT_DIR;
 	const payloadCwd = payload?.cwd;
 	const sessionDir =
-		typeof projectDir === "string" && projectDir !== ""
+		typeof projectDir === "string" && projectDir.trim() !== ""
 			? projectDir
-			: typeof payloadCwd === "string" && payloadCwd !== ""
+			: typeof payloadCwd === "string" && payloadCwd.trim() !== ""
 				? payloadCwd
 				: null;
 	const sessionRoots = sessionDir === null ? null : resolveGitRoots(sessionDir);

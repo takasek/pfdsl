@@ -192,22 +192,34 @@ describe("resolveCommandCwd", () => {
 		);
 	});
 
-	it("falls back to the hook cwd when the path is not statically known", () => {
+	it("leaves the cwd unresolved when the path is not statically known", () => {
 		assert.equal(
 			resolveCommandCwd("cd $WORKTREE && git commit -m 'x'", HOOK_CWD),
-			HOOK_CWD,
+			null,
 		);
 		assert.equal(
 			resolveCommandCwd("cd ~/works/x && git commit -m 'x'", HOOK_CWD),
-			HOOK_CWD,
+			null,
+		);
+		assert.equal(
+			resolveCommandCwd("cd \"$WORKTREE\" && git commit -m 'x'", HOOK_CWD),
+			null,
 		);
 	});
 
-	it("falls back for a bare cd, which means the home directory", () => {
+	it("follows cd with an end-of-options marker or a redirection", () => {
 		assert.equal(
-			resolveCommandCwd("cd && git commit -m 'x'", HOOK_CWD),
-			HOOK_CWD,
+			resolveCommandCwd("cd -- /elsewhere/w && git add -A", HOOK_CWD),
+			"/elsewhere/w",
 		);
+		assert.equal(
+			resolveCommandCwd("cd /elsewhere/w >/dev/null && git add -A", HOOK_CWD),
+			"/elsewhere/w",
+		);
+	});
+
+	it("leaves the cwd unresolved for a bare cd, which means the home directory", () => {
+		assert.equal(resolveCommandCwd("cd && git commit -m 'x'", HOOK_CWD), null);
 	});
 
 	it("ignores a cd inside a quoted string", () => {
@@ -293,6 +305,10 @@ describe("evaluateMainCommitGuard", () => {
 		});
 		assert.equal(result.decision, "deny");
 		assert.match(result.reason, /sibling worktree/);
+		assert.match(
+			result.reason,
+			/requires starting or reopening a session whose project root is that worktree/,
+		);
 	});
 
 	it("asks before restoring files in a sibling worktree (#784)", () => {
@@ -324,6 +340,10 @@ describe("evaluateMainCommitGuard", () => {
 		);
 		assert.equal(result.decision, "deny");
 		assert.match(result.reason, /main/);
+		assert.match(
+			result.reason,
+			/shared by processes and sessions targeting that checkout/,
+		);
 	});
 
 	it("respects a configured default branch other than main", () => {
@@ -527,9 +547,29 @@ describe("main-commit-guard wrapper", () => {
 		assert.equal(output, "");
 	});
 
+	it("treats whitespace-only session roots as absent", () => {
+		const fallbackToPayload = runWrapper(`git -C ${sibling} add -A`, {
+			payloadCwd: session,
+			claudeProjectDir: " \t ",
+		});
+		assert.notEqual(fallbackToPayload, "");
+		assert.equal(
+			JSON.parse(fallbackToPayload).hookSpecificOutput.permissionDecision,
+			"deny",
+		);
+
+		const claudeStillWins = runWrapper(`git -C ${session} add -A`, {
+			payloadCwd: " \n ",
+			claudeProjectDir: session,
+		});
+		assert.equal(claudeStillWins, "");
+	});
+
 	it("denies compound and repeated-C sibling mutations end to end (#784)", () => {
 		for (const command of [
 			`git add -A && cd ${sibling} && git add -A`,
+			`cd -- ${sibling} && git add -A`,
+			`cd ${sibling} >/dev/null && git add -A`,
 			`git add -A && git -C ${sibling} add -A`,
 			`git -C ${session} -C ../sibling add -A`,
 		]) {
@@ -538,6 +578,23 @@ describe("main-commit-guard wrapper", () => {
 			assert.equal(
 				JSON.parse(output).hookSpecificOutput.permissionDecision,
 				"deny",
+				command,
+			);
+		}
+	});
+
+	it("fails closed when cd requires shell expansion", () => {
+		for (const [command, decision] of [
+			[`SIBLING=${sibling}; cd "$SIBLING" && git add -A`, "deny"],
+			[`SIBLING=${sibling}; cd "$SIBLING" && git restore tracked.txt`, "ask"],
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			const result = JSON.parse(output).hookSpecificOutput;
+			assert.equal(result.permissionDecision, decision, command);
+			assert.match(
+				result.permissionDecisionReason,
+				/literal path or harness workdir/,
 				command,
 			);
 		}
