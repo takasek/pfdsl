@@ -5,6 +5,7 @@ import {
 	evaluateDelegationGuard,
 	findOutwardCommand,
 	runDelegationGuard,
+	tokenize,
 } from "./delegation-guard.mjs";
 
 // A real subagent payload carries both fields. agent_id is the discriminator;
@@ -27,6 +28,22 @@ function payload({
 	}
 	return p;
 }
+
+describe("tokenize", () => {
+	it("retains the type of a wholly quoted token without changing quoted", () => {
+		const [single, double] = tokenize("'$SIBLING' \"$SIBLING\"");
+		assert.deepEqual(single, {
+			value: "$SIBLING",
+			quoted: true,
+			quote: "'",
+		});
+		assert.deepEqual(double, {
+			value: "$SIBLING",
+			quoted: true,
+			quote: '"',
+		});
+	});
+});
 
 describe("evaluateDelegationGuard — caller identity", () => {
 	it("allows the main thread, which has no agent_id", () => {

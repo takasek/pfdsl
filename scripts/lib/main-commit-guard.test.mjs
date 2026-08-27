@@ -192,6 +192,17 @@ describe("resolveCommandCwd", () => {
 		);
 	});
 
+	it("keeps shell syntax literal inside single-quoted cd paths", () => {
+		assert.equal(
+			resolveCommandCwd("cd '$SIBLING' && git commit -m 'x'", HOOK_CWD),
+			"/repo/$SIBLING",
+		);
+		assert.equal(
+			resolveCommandCwd("cd -- '/tmp/`literal`' && git add -A", HOOK_CWD),
+			"/tmp/`literal`",
+		);
+	});
+
 	it("leaves the cwd unresolved when the path is not statically known", () => {
 		assert.equal(
 			resolveCommandCwd("cd $WORKTREE && git commit -m 'x'", HOOK_CWD),

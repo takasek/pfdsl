@@ -110,10 +110,19 @@ export function tokenize(segment) {
 	let current = "";
 	let quote = null;
 	let quoted = false;
+	let tokenQuote;
+	let hasUnquotedText = false;
 	const flush = () => {
-		if (current !== "" || quoted) tokens.push({ value: current, quoted });
+		if (current !== "" || quoted) {
+			const token = { value: current, quoted };
+			if (tokenQuote !== undefined && !hasUnquotedText)
+				token.quote = tokenQuote;
+			tokens.push(token);
+		}
 		current = "";
 		quoted = false;
+		tokenQuote = undefined;
+		hasUnquotedText = false;
 	};
 	for (let i = 0; i < segment.length; i++) {
 		const ch = segment[i];
@@ -128,6 +137,8 @@ export function tokenize(segment) {
 		if (ch === '"' || ch === "'") {
 			quote = ch;
 			quoted = true;
+			if (tokenQuote === undefined) tokenQuote = ch;
+			else if (tokenQuote !== ch) tokenQuote = null;
 			continue;
 		}
 		if (/\s/.test(ch)) {
@@ -135,6 +146,7 @@ export function tokenize(segment) {
 			continue;
 		}
 		current += ch;
+		hasUnquotedText = true;
 	}
 	flush();
 	return tokens;

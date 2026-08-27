@@ -130,7 +130,10 @@ export function classifyGitCommand(command) {
 /** A path this layer can resolve without running a shell. */
 function staticPath(token) {
 	if (!token) return null;
-	if (token.quoted) return /[$`]/.test(token.value) ? null : token.value;
+	if (token.quoted)
+		return token.quote === "'" || !/[$`]/.test(token.value)
+			? token.value
+			: null;
 	return /[$~*?`]/.test(token.value) ? null : token.value;
 }
 
