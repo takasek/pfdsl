@@ -24,14 +24,16 @@
 // executing, so nothing it adds can precede the very call it would have
 // reshaped. That closes off the pre-execution hook on the write itself.
 //
-// It does not close off channels that fire before any tool call exists — #974
-// measured one of those arriving ahead of the model's first inference. Those
-// are unused here for a reach reason rather than an ordering one: they are
-// scoped to a turn, and a cycle runs for many turns without a new one, so they
-// cannot be aimed at the cycle's first write. What does create a boundary at
-// the write is a decision that stops it, which is a gate rather than an
-// advisory — one #974 measured losing the write outright on the runs where the
-// model read the denial reason as an injected instruction. Hence PostToolUse.
+// It does not close off delivery points earlier than the write; #974 measured
+// one arriving ahead of the model's first inference. Those went unused for
+// reach rather than ordering: none of the ones compared there got closer to the
+// first implementation write than the cycle preflight already is, and the
+// preflight prints this same catalog with the countermeasure lines this hook
+// has to drop for length (formatPreArtifactAdvisory below). What does create a
+// boundary at the write is a decision that stops it, which is a gate rather
+// than an advisory — one #974 measured losing the write outright on the runs
+// where the model read the denial reason as an injected instruction. Hence
+// PostToolUse.
 //
 // The reach is also bounded by the tool surface it watches. Writes that arrive
 // through Bash, a generator, or any tool other than Write/Edit are not seen,
