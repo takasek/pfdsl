@@ -624,9 +624,25 @@ describe("buildDesignRecordTemplate", () => {
 
 	it("adds a disposition line naming the enumerated option count", () => {
 		const { lines } = buildDesignRecordTemplate({ optionCount: 3 });
-		const dispositionLine = lines.find((l) => l.includes("処分"));
+		const dispositionLine = lines.find((l) => l.startsWith("案の処分:"));
 		assert.ok(dispositionLine, "expected a disposition line");
 		assert.match(dispositionLine, /3/);
+		assert.doesNotMatch(dispositionLine, /採用|却下|保留/);
+		assert.ok(
+			lines.some((line) => /採用 \/ 却下 \/ 保留/.test(line)),
+			"expected disposition vocabulary guidance outside the declaration",
+		);
+	});
+
+	it("keeps untouched enumerated-option templates failing the content check", () => {
+		for (const optionCount of [1, 2, 3]) {
+			const { lines } = buildDesignRecordTemplate({ optionCount });
+			assert.equal(
+				classifyDesignRecordContent(lines.join("\n"), optionCount).status,
+				"FAIL",
+				`optionCount ${optionCount}`,
+			);
+		}
 	});
 
 	it("omits the disposition line when the issue enumerates no options", () => {
