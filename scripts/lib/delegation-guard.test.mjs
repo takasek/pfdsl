@@ -127,6 +127,16 @@ describe("findOutwardCommand — git", () => {
 		);
 	});
 
+	it("flags quoted Git argv and env-prefixed pushes", () => {
+		for (const command of [
+			'git "push" origin main',
+			'"git" push origin main',
+			"env -i git push origin main",
+		]) {
+			assert.equal(findOutwardCommand(command), "git push", command);
+		}
+	});
+
 	it("flags a push in a compound command", () => {
 		assert.equal(
 			findOutwardCommand("pnpm test && git push -u origin topic"),

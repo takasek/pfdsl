@@ -14,7 +14,7 @@
 // payload does not carry it — the hook wrapper resolves it once via `git
 // branch --show-current` and this stays a pure function.
 
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import {
 	gitSubcommand,
 	gitSubcommandIndex,
@@ -73,6 +73,17 @@ const READ_ONLY_APPLY_FLAGS = new Set([
 	"--summary",
 ]);
 
+const CODEX_ROUTINE_MUTATIONS = new Map([
+	["stage-all", "add"],
+	["commit", "commit"],
+	["branch-rename", "branch"],
+]);
+
+function codexRoutineSubcommand(tokens) {
+	if (basename(tokens[0]?.value ?? "") !== "codex-git-routine.mjs") return null;
+	return CODEX_ROUTINE_MUTATIONS.get(tokens[1]?.value) ?? null;
+}
+
 /**
  * The guarded git subcommand one already-tokenized segment runs, or null.
  * @param {{value: string, quoted: boolean}[]} tokens
@@ -81,14 +92,17 @@ const READ_ONLY_APPLY_FLAGS = new Set([
 function classifySegment(tokens) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
-	if (head.quoted || head.value !== "git") return null;
+	if (head.value !== "git") {
+		const subcommand = codexRoutineSubcommand(tokens);
+		return subcommand === null ? null : { subcommand, decision: "deny" };
+	}
 
 	const sub = gitSubcommand(tokens);
 	if (!sub) return null;
 	if (DENIED_SUBCOMMANDS.has(sub)) {
 		if (
 			sub === "apply" &&
-			tokens.some((t) => !t.quoted && READ_ONLY_APPLY_FLAGS.has(t.value))
+			tokens.some((t) => READ_ONLY_APPLY_FLAGS.has(t.value))
 		)
 			return null;
 		return { subcommand: sub, decision: "deny" };
@@ -98,7 +112,7 @@ function classifySegment(tokens) {
 	// same reader finds it — including its refusal to read a quoted token,
 	// which leaves `git stash "list"` classified as the bare push it may be.
 	if (sub === "stash") {
-		const at = tokens.findIndex((t) => !t.quoted && t.value === "stash");
+		const at = tokens.findIndex((t) => t.value === "stash");
 		if (READ_ONLY_STASH_VERBS.has(gitSubcommand(tokens.slice(at)) ?? ""))
 			return null;
 	}
@@ -158,7 +172,7 @@ function resolveGitCwd(tokens, shellCwd) {
 	let cwd = shellCwd;
 	for (let i = 1; i < subcommandAt; i++) {
 		const token = tokens[i];
-		if (token.quoted || token.value !== "-C") continue;
+		if (token.value !== "-C") continue;
 		const target = staticPath(tokens[i + 1]);
 		if (target === null) cwd = null;
 		else if (target.startsWith("/")) cwd = resolve(target);
@@ -166,6 +180,11 @@ function resolveGitCwd(tokens, shellCwd) {
 		i++;
 	}
 	return cwd;
+}
+
+function resolveCodexRoutineCwd(tokens) {
+	const target = staticPath(tokens[2]);
+	return target === null ? null : resolve(target);
 }
 
 /**
@@ -184,7 +203,7 @@ function analyzeCommand(command, hookCwd) {
 
 	for (const segment of splitSegments(command)) {
 		const tokens = stripLeadingNoise(tokenize(segment));
-		if (tokens.length === 0 || tokens[0].quoted) continue;
+		if (tokens.length === 0) continue;
 		const head = tokens[0].value;
 
 		if (
@@ -206,10 +225,15 @@ function analyzeCommand(command, hookCwd) {
 			continue;
 		}
 
-		if (head !== "git") continue;
 		const guarded = classifySegment(tokens);
 		if (!guarded) continue;
-		targets.push({ ...guarded, cwd: resolveGitCwd(tokens, cwd) });
+		targets.push({
+			...guarded,
+			cwd:
+				head === "git"
+					? resolveGitCwd(tokens, cwd)
+					: resolveCodexRoutineCwd(tokens),
+		});
 	}
 	return { targets, finalCwd: cwd };
 }
@@ -316,7 +340,10 @@ function evaluateUnresolvedCwd(guarded) {
  * @param {{resolveBranches: (payload: object, targetCwd: string) => {currentBranch?: string, mainBranch?: string, crossesWorktree?: boolean}}} io
  * @returns {{shouldOutput: boolean, output?: object}}
  */
-export function runMainCommitGuard(inputText, { resolveBranches }) {
+export function runMainCommitGuard(
+	inputText,
+	{ resolveBranches, supportsAsk = true },
+) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 	if (payload?.tool_name !== "Bash") return { shouldOutput: false };
@@ -340,7 +367,14 @@ export function runMainCommitGuard(inputText, { resolveBranches }) {
 		if (result.decision === "deny") {
 			return { shouldOutput: true, output: buildPermissionOutput(result) };
 		}
-		if (result.decision === "ask") asked ??= result;
+		if (result.decision === "ask") {
+			asked ??= supportsAsk
+				? result
+				: {
+						decision: "deny",
+						reason: `${result.reason} Codex PreToolUse's ask decision is unsupported, so this command is denied instead of failing open.`,
+					};
+		}
 	}
 	return asked === null
 		? { shouldOutput: false }

@@ -62,6 +62,9 @@ function resolveBranches(payload, targetCwd) {
 
 const { shouldOutput, output } = runMainCommitGuard(await readStdinText(), {
 	resolveBranches,
+	supportsAsk:
+		typeof process.env.CLAUDE_PROJECT_DIR === "string" &&
+		process.env.CLAUDE_PROJECT_DIR.trim() !== "",
 });
 if (shouldOutput) {
 	console.log(JSON.stringify(output));

@@ -152,21 +152,64 @@ export function tokenize(segment) {
 	return tokens;
 }
 
-// `FOO=bar cmd` and `sudo cmd` still run cmd.
+const ENV_FLAGS_WITH_VALUE = new Set([
+	"-u",
+	"--unset",
+	"-C",
+	"--chdir",
+	"-S",
+	"--split-string",
+]);
+
+function stripEnvArguments(tokens, start) {
+	let i = start;
+	while (i < tokens.length) {
+		const value = tokens[i].value;
+		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+			i++;
+			continue;
+		}
+		if (value === "--") return i + 1;
+		if (ENV_FLAGS_WITH_VALUE.has(value)) {
+			i += 2;
+			continue;
+		}
+		if (
+			value === "-i" ||
+			value === "--ignore-environment" ||
+			value === "-0" ||
+			value === "--null" ||
+			value === "-v" ||
+			value === "--debug" ||
+			/^-(?:u|C|S).+/.test(value) ||
+			/^--(?:unset|chdir|split-string)=/.test(value)
+		) {
+			i++;
+			continue;
+		}
+		break;
+	}
+	return i;
+}
+
+// `FOO=bar cmd` and executable command prefixes still run cmd.
 export function stripLeadingNoise(tokens) {
 	let i = 0;
 	while (i < tokens.length) {
 		const value = tokens[i].value;
-		if (!tokens[i].quoted && /^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
 			i++;
+			continue;
+		}
+		if (value === "env") {
+			i = stripEnvArguments(tokens, i + 1);
 			continue;
 		}
 		if (
 			value === "sudo" ||
 			value === "command" ||
 			value === "nohup" ||
-			value === "time" ||
-			value === "env"
+			value === "time"
 		) {
 			i++;
 			continue;
@@ -178,8 +221,7 @@ export function stripLeadingNoise(tokens) {
 
 export function gitSubcommandIndex(tokens) {
 	for (let i = 1; i < tokens.length; i++) {
-		const { value, quoted } = tokens[i];
-		if (quoted) return null;
+		const { value } = tokens[i];
 		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value)) {
 			i++;
 			continue;
@@ -213,7 +255,6 @@ export function findOutwardCommand(command) {
 		const tokens = stripLeadingNoise(tokenize(segment));
 		if (tokens.length === 0) continue;
 		const head = tokens[0];
-		if (head.quoted) continue;
 
 		if (head.value === "git") {
 			const sub = gitSubcommand(tokens);

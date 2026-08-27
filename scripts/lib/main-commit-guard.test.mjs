@@ -63,6 +63,55 @@ describe("classifyGitCommand", () => {
 		});
 	});
 
+	it("classifies quoted executables and subcommands as the argv Git receives", () => {
+		for (const command of ['git "add" -A', '"git" commit -m x']) {
+			assert.deepEqual(
+				classifyGitCommand(command),
+				{
+					subcommand: command.includes("add") ? "add" : "commit",
+					decision: "deny",
+				},
+				command,
+			);
+		}
+	});
+
+	it("classifies Git behind executable shell prefixes with options", () => {
+		for (const command of ["env -i git add -A", "env -- git commit -m x"]) {
+			assert.deepEqual(
+				classifyGitCommand(command),
+				{
+					subcommand: command.includes("add") ? "add" : "commit",
+					decision: "deny",
+				},
+				command,
+			);
+		}
+	});
+
+	it("classifies the targeted Codex routine wrapper as its Git mutation", () => {
+		for (const [command, subcommand] of [
+			[
+				"/Users/example/.codex/bin/codex-git-routine.mjs stage-all /repo/worktree topic",
+				"add",
+			],
+			[
+				"/Users/example/.codex/bin/codex-git-routine.mjs commit /repo/worktree topic message",
+				"commit",
+			],
+			[
+				"/Users/example/.codex/bin/codex-git-routine.mjs branch-rename /repo/worktree old new",
+				"branch",
+			],
+		]) {
+			assert.deepEqual(
+				classifyGitCommand(command),
+				{ subcommand, decision: "deny" },
+				command,
+			);
+		}
+	});
+
 	it("prefers the denied subcommand over an asked one in a compound", () => {
 		assert.deepEqual(classifyGitCommand("git checkout main && git add -A"), {
 			subcommand: "add",
@@ -143,6 +192,16 @@ describe("resolveCommandCwd", () => {
 		assert.equal(
 			resolveCommandCwd("git -C /elsewhere/w commit -m 'x'", HOOK_CWD),
 			"/elsewhere/w",
+		);
+	});
+
+	it("reads the explicit target carried by the Codex routine wrapper", () => {
+		assert.equal(
+			resolveCommandCwd(
+				"/Users/example/.codex/bin/codex-git-routine.mjs stage-all /repo/sibling sibling",
+				HOOK_CWD,
+			),
+			"/repo/sibling",
 		);
 	});
 
@@ -547,6 +606,43 @@ describe("main-commit-guard wrapper", () => {
 		assert.equal(
 			JSON.parse(output).hookSpecificOutput.permissionDecision,
 			"deny",
+		);
+	});
+
+	it("guards the explicit wrapper target instead of invisible exec workdir", () => {
+		const routine = "/Users/example/.codex/bin/codex-git-routine.mjs";
+		for (const [target, branch, expected] of [
+			[sibling, "sibling", "deny"],
+			[repo, "main", "deny"],
+			[session, "session", null],
+		]) {
+			const output = runWrapper(`${routine} stage-all ${target} ${branch}`, {
+				claudeProjectDir: null,
+			});
+			if (expected === null) assert.equal(output, "");
+			else
+				assert.equal(
+					JSON.parse(output).hookSpecificOutput.permissionDecision,
+					expected,
+					target,
+				);
+		}
+	});
+
+	it("converts an unsupported Codex ask into a fail-closed deny", () => {
+		const output = runWrapper(`git -C ${sibling} restore tracked.txt`, {
+			claudeProjectDir: null,
+		});
+		const result = JSON.parse(output).hookSpecificOutput;
+		assert.equal(result.permissionDecision, "deny");
+		assert.match(result.permissionDecisionReason, /Codex.*ask.*unsupported/i);
+	});
+
+	it("keeps the Claude permission prompt for the same recovery command", () => {
+		const output = runWrapper(`git -C ${sibling} restore tracked.txt`);
+		assert.equal(
+			JSON.parse(output).hookSpecificOutput.permissionDecision,
+			"ask",
 		);
 	});
 
