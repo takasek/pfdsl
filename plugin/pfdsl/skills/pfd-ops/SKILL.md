@@ -22,7 +22,7 @@ description: |
 grep -q 'に置き換える)' .pfdsl/roadmap.pfdsl && echo "scaffold のまま"
 ```
 
-カレントプロジェクトに `.pfdsl/roadmap.pfdsl` が存在しない場合、本スキルは非適用として呼び出し元の通常フローへ戻る。bare GitHub Issue 番号や一般的な issue 作業の依頼だけを根拠に PFD の初期構築を提案したり、作業を終了したりしない。ユーザーが明示的に PFD の導入を依頼した場合に限り、pfd-ecosystem スキル（`/pfd-init`）を案内する。上記コマンドが「scaffold のまま」を出す場合は、既存の PFD を実データへ育てる依頼かを確認し、該当する場合だけ pfd-ecosystem スキルへ引き継ぐ。
+カレントプロジェクトに `.pfdsl/roadmap.pfdsl` が存在しない場合、または上記コマンドが「scaffold のまま」を出す場合、本スキルは非適用として呼び出し元の通常フローへ戻る。bare GitHub Issue 番号や一般的な issue 作業の依頼だけを根拠に PFD の初期構築を提案したり、作業を終了したりしない。ユーザーが明示的に PFD の導入または既存 scaffold の実データ化を依頼した場合に限り、pfd-ecosystem スキル（`/pfd-init`）を案内する。
 
 ## 配置ファイルの鮮度セルフチェック（ADR-0028）
 
