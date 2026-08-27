@@ -4,7 +4,7 @@
 
 **Goal:** Reduce routine Codex worktree approval prompts without weakening pfdsl's main and sibling-worktree guards.
 
-**Architecture:** User-level instructions stabilize command prefixes by carrying the target in `exec_command.workdir`, while pfdsl's shared hook wrapper resolves the session root from a harness-specific adapter. Claude Code keeps `CLAUDE_PROJECT_DIR`; Codex falls back to the documented hook payload `cwd`.
+**Architecture:** Read-only and build commands use `exec_command.workdir`, while approval-sensitive mutations use an exact-operation wrapper that carries the absolute worktree and expected branch in argv. The wrapper validates cwd, target, non-main ownership, branch, and arity; pfdsl's guard reads the same explicit target. Claude Code keeps `CLAUDE_PROJECT_DIR` and ask decisions; Codex falls back to payload `cwd` and converts unsupported asks to denies.
 
 **Tech Stack:** Markdown agent instructions, Codex prefix rules, Node.js ESM, `node:test`, Git worktrees.
 
@@ -35,15 +35,15 @@ The existing #981 generator worktree and generated assets are out of scope.
 - Consumes: Codex `exec_command.workdir` and user-level `prefix_rule` matching.
 - Produces: Fixed routine command prefixes and a narrow stop boundary.
 
-- [ ] **Step 1: Replace the Bash worktree workaround**
+- [x] **Step 1: Replace the Bash worktree workaround**
 
 Specify that every Codex shell call sets `workdir` to the exact worktree and uses a canonical relative command, while harnesses without a workdir field retain absolute `-C` or script paths.
 
-- [ ] **Step 2: Narrow the post-failure stop trigger**
+- [x] **Step 2: Narrow the post-failure stop trigger**
 
 Exclude known prerequisite steps, the next step of the same documented workflow, same-verification reruns, and one same-tool argument correction from the no-lateral-move rule.
 
-- [ ] **Step 3: Preserve prefix identity across RTK**
+- [x] **Step 3: Preserve prefix identity across RTK**
 
 Document that commands relying on Codex prefix rules run in their original canonical form rather than behind `rtk`.
 
@@ -51,7 +51,7 @@ Document that commands relying on Codex prefix rules run in their original canon
 
 Add allow rules for the exact-arity Git routine wrapper, `pnpm -r build`, `pnpm test`, and `pnpm typecheck`. The wrapper rejects suffixes that a prefix-only rule cannot express, while negative examples prove unrelated deletion, publish, or push commands do not match.
 
-- [ ] **Step 5: Avoid duplicate worktree setup**
+- [x] **Step 5: Avoid duplicate worktree setup**
 
 Document the shared SessionStart `make setup` behavior in `CLAUDE.md`, regenerate `AGENTS.md`, and retain manual setup only for worktrees created after session start or otherwise missed by the hook.
 
@@ -64,15 +64,15 @@ Document the shared SessionStart `make setup` behavior in `CLAUDE.md`, regenerat
 - Consumes: Wrapper stdin payload with `cwd` and an environment that may omit `CLAUDE_PROJECT_DIR`.
 - Produces: End-to-end assertions for Codex and Claude session-root selection.
 
-- [ ] **Step 1: Write the failing Codex fixture**
+- [x] **Step 1: Write the failing Codex fixture**
 
 Run the wrapper without `CLAUDE_PROJECT_DIR`, pass the session worktree in payload `cwd`, target the sibling with `git -C`, and expect `permissionDecision: "deny"`.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run `node --test scripts/lib/main-commit-guard.test.mjs` and confirm the Codex fixture fails because the current wrapper creates no session roots without `CLAUDE_PROJECT_DIR`.
 
-- [ ] **Step 3: Add the Claude precedence fixture**
+- [x] **Step 3: Add the Claude precedence fixture**
 
 Pass `CLAUDE_PROJECT_DIR=session`, set payload `cwd=sibling`, run `git add -A`, and assert it is allowed because the Claude environment remains authoritative.
 
@@ -85,15 +85,15 @@ Pass `CLAUDE_PROJECT_DIR=session`, set payload `cwd=sibling`, run `git add -A`, 
 - Consumes: `payload.cwd` and `process.env.CLAUDE_PROJECT_DIR`.
 - Produces: A session root path selected as `CLAUDE_PROJECT_DIR ?? payload.cwd` before Git-root resolution.
 
-- [ ] **Step 1: Implement the minimal fallback**
+- [x] **Step 1: Implement the minimal fallback**
 
 Change `resolveBranches(_payload, targetCwd)` to read `payload`, select a non-empty Claude project directory first, otherwise a non-empty payload `cwd`, and resolve roots only for that selected path.
 
-- [ ] **Step 2: Verify GREEN**
+- [x] **Step 2: Verify GREEN**
 
 Run `node --test scripts/lib/main-commit-guard.test.mjs` and confirm the Codex sibling fixture and all existing Claude fixtures pass.
 
-- [ ] **Step 3: Refactor comments only after GREEN**
+- [x] **Step 3: Refactor comments only after GREEN**
 
 Update the wrapper comment to describe the harness-neutral session-root adapter without changing decisions.
 
@@ -170,3 +170,21 @@ Report the local branch and commits; do not push a new branch or create a PR unt
 - [x] Update `main_branch_guard` metadata through the local pfdsl CLI and validate links and graph structure.
 - [ ] Run focused tests, typecheck, full repository tests, generated-drift checks, and the terminal gate.
 - [ ] Record simplify, correctness, and experience reviews in a logical commit, push the requested branch normally, and create the requested PR without merging it.
+
+### Task 9: Close the adversarial host-contract findings
+
+**Files:**
+- Modify: `scripts/lib/delegation-guard.mjs`
+- Modify: `scripts/lib/main-commit-guard.mjs`
+- Modify: `scripts/main-commit-guard.mjs`
+- Modify: `scripts/setup-completion.mjs`
+- Modify: `scripts/lib/setup-completion.test.mjs`
+- Modify: the user-level wrapper, rules, AGENTS, and RTK companion files
+
+- [x] Convert Claude-compatible ask decisions to deny when the host is Codex, whose PreToolUse contract does not support ask.
+- [x] Parse quoted Git argv and `env` options without confusing quoted prose for an executable command.
+- [x] Carry mutation targets explicitly through the user wrapper and teach the repository guard to compare them with the session root.
+- [x] Derive the main repository root from `--git-common-dir`, and reject main, mismatched workdir, mismatched branch, extra argv, and unsafe worktree destinations before mutation.
+- [x] Replace raw Git allow prefixes with wrapper-only prefixes, including exact setup and full-test targets.
+- [x] Fingerprint setup inputs so a marker becomes stale when a branch changes the setup contract.
+- [ ] Re-run the full verification matrix and an adversarial review against all six original findings.

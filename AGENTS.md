@@ -33,7 +33,7 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 ただし事後的な分割（先に一括で変更してから複数コミットへ割り直す）が中間ファイル再構成等でトークン効率を著しく損なう場合は、論理単位の純度より作業順=コミット順を優先してよい。
 
 変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook、`.codex/hooks.json` で配線）が main ブランチ上でツリー・インデックスを変える git コマンドを機械的に止める（#650・#777）。
-ブランチ上に新しい状態を作る操作は deny（「worktree で同じことをする」が等価な代替になるため）、既存の状態を壊す・戻す操作は ask（事故と main ツリー復旧手順を payload から区別できないため人間に渡す）。
+ブランチ上に新しい状態を作る操作は deny（「worktree で同じことをする」が等価な代替になるため）。既存の状態を壊す・戻す操作はClaude Codeでは ask（事故と main ツリー復旧手順を payload から区別できないため人間に渡す）だが、Codex PreToolUseはaskをサポートせずhook failure後に実行を続けるためdenyへ変換する。Codexで永続allowするroutine Gitは、実際のworkdirがhook payloadに現れない境界を避けるため、`codex-git-routine.mjs` の明示target付きsubcommandだけを使う。guardはwrapperの `stage-all`・`commit`・`branch-rename` をGit変更として認識し、コマンド文字列中のtargetをsession rootと比較する。
 読み取り系は素通しする。
 どのサブコマンドがどちらに入るかは `scripts/lib/main-commit-guard.mjs` の `DENIED_SUBCOMMANDS` / `ASKED_SUBCOMMANDS` が一次情報 — ここには列挙しない。
 
