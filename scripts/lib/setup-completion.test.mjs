@@ -40,7 +40,7 @@ function fixture() {
 
 	for (const [name, source] of Object.entries({
 		pnpm: '#!/bin/sh\nprintf \'pnpm\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = pnpm ] && exit 1\nmkdir -p node_modules\n',
-		git: "#!/bin/sh\nprintf 'git\\n' >> \"$SETUP_LOG\"\nprintf '.git-common\\n'\n",
+		git: "#!/bin/sh\nprintf 'git\\n' >> \"$SETUP_LOG\"\n[ \"$SETUP_FAIL_STAGE\" = git ] && exit 1\nprintf '.git-common\\n'\n",
 		cp: '#!/bin/sh\nprintf \'cp\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = cp ] && exit 1\nexec "$REAL_CP" "$@"\n',
 		chmod:
 			'#!/bin/sh\nprintf \'chmod\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = chmod ] && exit 1\nexec "$REAL_CHMOD" "$@"\n',
@@ -101,7 +101,7 @@ describe("setup completion sentinel", () => {
 				`${path} should run setup without a marker`,
 			);
 			const log = readFileSync(context.log, "utf8");
-			assert.equal(log, "pnpm\ngit\ncp\ngit\nchmod\nnode\n");
+			assert.equal(log, "pnpm\ngit\ncp\nchmod\nnode\n");
 			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
 			assert.equal(
 				readFileSync(context.log, "utf8"),
@@ -112,7 +112,7 @@ describe("setup completion sentinel", () => {
 	});
 
 	it("removes a stale marker when any setup stage fails and restores it only after a successful retry", () => {
-		for (const failureStage of ["pnpm", "cp", "chmod", "node"]) {
+		for (const failureStage of ["pnpm", "git", "cp", "chmod", "node"]) {
 			const context = fixture();
 			assert.notEqual(
 				runSetup(context, failureStage).status,
@@ -124,6 +124,12 @@ describe("setup completion sentinel", () => {
 				false,
 				`${failureStage} failure should not create a marker`,
 			);
+			if (failureStage === "git")
+				assert.equal(
+					readFileSync(context.log, "utf8"),
+					"pnpm\ngit\n",
+					"git failure should stop before hook installation",
+				);
 			assertSucceeded(runSetup(context));
 			assert.equal(
 				existsSync(context.marker),
