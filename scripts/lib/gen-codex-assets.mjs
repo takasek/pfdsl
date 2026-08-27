@@ -258,16 +258,32 @@ function pfdImplementerInstructions(source) {
 	return `${claudeInstructionsToAgents(source)}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`;
 }
 
+function pfdLensInstructions(sourcePath, source) {
+	const bashRestriction = "Bash は `pfdsl";
+	if (!source.includes(bashRestriction)) {
+		throw new Error(`${sourcePath}: expected Bash restriction clause.`);
+	}
+	const instructions = claudeInstructionsToAgents(source).replace(
+		bashRestriction,
+		"pfdsl CLI の実行は `pfdsl",
+	);
+	return `Codex では read-only shell command の \`rg\` と \`sed\` を観点カタログと対象 \`.pfdsl\` ファイルの読取に使用してよい。\n${instructions}`;
+}
+
 function codexAgentDescription(sourcePath, description) {
 	return sourcePath === "pfd-implementer.md"
 		? codexPfdImplementerDescription()
 		: description;
 }
 
-function codexAgentInstructions(sourcePath, body) {
-	return sourcePath === "pfd-implementer.md"
-		? pfdImplementerInstructions(body)
-		: claudeInstructionsToAgents(body);
+function codexAgentInstructions(sourcePath, sourceName, body) {
+	if (sourceName === "pfd-implementer.md") {
+		return pfdImplementerInstructions(body);
+	}
+	if (sourceName === "pfd-lens.md") {
+		return pfdLensInstructions(sourcePath, body);
+	}
+	return claudeInstructionsToAgents(body);
 }
 
 export function buildCodexProjectConfig() {
@@ -300,7 +316,7 @@ export function agentCapabilityToCodexToml(record) {
 		nonEmpty: false,
 	});
 	const instructions = tomlMultilineString(
-		codexAgentInstructions(sourceName, body),
+		codexAgentInstructions(sourcePath, sourceName, body),
 	);
 
 	return [

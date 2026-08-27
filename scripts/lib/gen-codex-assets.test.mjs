@@ -341,7 +341,11 @@ describe("agentCapabilityToCodexToml", () => {
 	it("maps pfd-lens's known read-only tools without selecting a Codex model", () => {
 		const output = agentCapabilityToCodexToml(
 			agentRecord({
-				body: String.raw`\n.agents/skills/pfd-retro/SKILL.md\n\${PLUGIN_ROOT}\n`,
+				body:
+					"\nBash は `pfdsl check <file>` のみ許可される。\n" +
+					String.raw`.agents/skills/pfd-retro/SKILL.md
+\${PLUGIN_ROOT}
+`,
 			}),
 		);
 
@@ -352,6 +356,39 @@ describe("agentCapabilityToCodexToml", () => {
 		assert.match(output, /^developer_instructions = """/m);
 		assert.match(output, /\.agents\/skills\/pfd-retro\/SKILL\.md/);
 		assert.match(output, /\$\{PLUGIN_ROOT\}/);
+	});
+
+	it("permits read-only shell inspection for pfd-lens catalog and target PFD reads", () => {
+		const output = agentCapabilityToCodexToml(
+			agentRecord({
+				body:
+					"\nBash は `pfdsl check <file>` と読み取り専用クエリのみ許可される。\n" +
+					"カタログを読み込み、対象 `.pfdsl` ファイルを Read する。\n",
+			}),
+		);
+		const instructions = parseTomlDeveloperInstructions(output);
+
+		assert.match(
+			instructions,
+			/`rg` と `sed` を観点カタログと対象 `\.pfdsl` ファイルの読取に使用してよい。/,
+		);
+		assert.doesNotMatch(
+			instructions,
+			/Bash は `pfdsl check <file>` と読み取り専用クエリのみ許可される。/,
+		);
+		assert.match(output, /^sandbox_mode = "read-only"$/m);
+	});
+
+	it("rejects pfd-lens when its expected Bash restriction clause changes", () => {
+		assert.throws(
+			() =>
+				agentCapabilityToCodexToml(
+					agentRecord({
+						body: "\nShell は読み取り専用クエリのみ許可される。\n",
+					}),
+				),
+			/\.claude\/agents\/pfd-lens\.md.*Bash restriction clause/,
+		);
 	});
 
 	it("maps pfd-implementer's known write tools and repository instructions", () => {
