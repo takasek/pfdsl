@@ -168,7 +168,7 @@ Report the local branch and commits; do not push a new branch or create a PR unt
 - Verify: generated assets and all changed code
 
 - [x] Update `main_branch_guard` metadata through the local pfdsl CLI and validate links and graph structure.
-- [ ] Run focused tests, typecheck, full repository tests, generated-drift checks, and the terminal gate.
+- [x] Run focused tests, typecheck, full repository tests, generated-drift checks, and the terminal gate.
 - [ ] Record simplify, correctness, and experience reviews in a logical commit, push the requested branch normally, and create the requested PR without merging it.
 
 ### Task 9: Close the adversarial host-contract findings
@@ -190,4 +190,4 @@ Report the local branch and commits; do not push a new branch or create a PR unt
 - [x] Track `env` cwd changes and fail closed on repository-target Git flags and unresolved shell prefixes.
 - [x] Serialize setup, recheck the marker after lock acquisition, and replace the marker atomically.
 - [x] Restrict every globally allowed wrapper routine to the realpath-verified pfdsl trusted root and remove raw package-script allow rules.
-- [ ] Re-run the full verification matrix and an adversarial review against all six original findings.
+- [x] Re-run the full verification matrix and an adversarial review against all six original findings.
