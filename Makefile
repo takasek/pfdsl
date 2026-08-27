@@ -2,6 +2,7 @@
 # It used to be a separately generated directory, which needed a built CLI to bootstrap and silently kept the previous branch's version until someone re-ran the generator.
 .PHONY: setup
 setup:
+	rm -f node_modules/.pfdsl-setup-complete
 	pnpm install
 	cp scripts/hooks/pre-commit-shim $$(git rev-parse --git-common-dir)/hooks/pre-commit
 	chmod +x $$(git rev-parse --git-common-dir)/hooks/pre-commit
