@@ -59,7 +59,13 @@ export function hasExemptionDeclaration(body) {
  *   - baseRef: the branch this PR merges into.
  *   - defaultBranch: the repo's default branch.
  *   - closingIssueCount: how many issues GitHub reads the PR as closing.
- *   - body: the PR body, consulted only for the hotfix declaration.
+ *   - body: the PR body, consulted only for exemption declarations.
+ *
+ * The two exemptions are self-reported. This function checks only that the PR
+ * author wrote `hotfix:` or a non-empty `no-issue:` reason; it cannot prove
+ * that the diff is truly a hotfix or needs no issue. No detector is added for
+ * that semantic classification: the declaration and diff are both visible to
+ * the human reviewer who owns the exemption decision (#910).
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail: string}}
  */
 export function classifyClosesReference({
