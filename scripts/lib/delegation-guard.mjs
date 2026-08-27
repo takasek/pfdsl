@@ -164,15 +164,36 @@ const ENV_FLAGS_WITH_VALUE = new Set([
 	"-P",
 ]);
 
-function stripEnvArguments(tokens, start) {
-	let i = start;
+export function parseEnvPrefix(tokens, start = 0) {
+	if (basename(tokens[start]?.value ?? "") !== "env") return null;
+	let i = start + 1;
+	let chdir;
+	let malformed = false;
 	while (i < tokens.length) {
 		const value = tokens[i].value;
 		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
 			i++;
 			continue;
 		}
-		if (value === "--") return i + 1;
+		if (value === "--") return { end: i + 1, chdir, malformed };
+		if (value === "-C" || value === "--chdir") {
+			if (!tokens[i + 1]) malformed = true;
+			else chdir = tokens[i + 1];
+			i += 2;
+			continue;
+		}
+		if (value.startsWith("--chdir=")) {
+			const target = value.slice("--chdir=".length);
+			if (target === "") malformed = true;
+			else chdir = { ...tokens[i], value: target };
+			i++;
+			continue;
+		}
+		if (value.startsWith("-C") && value.length > 2) {
+			chdir = { ...tokens[i], value: value.slice(2) };
+			i++;
+			continue;
+		}
 		if (ENV_FLAGS_WITH_VALUE.has(value)) {
 			i += 2;
 			continue;
@@ -192,35 +213,176 @@ function stripEnvArguments(tokens, start) {
 		}
 		break;
 	}
-	return i;
+	return { end: i, chdir, malformed };
 }
 
-// `FOO=bar cmd` and executable command prefixes still run cmd.
-export function stripLeadingNoise(tokens) {
-	let i = 0;
+function leadingRedirectionLength(tokens, start) {
+	const value = tokens[start]?.value ?? "";
+	if (/^(?:[0-9]*>>?|&>>?|<<<|<<).+/.test(value)) return 1;
+	if (/^(?:[0-9]*>>?|&>>?|<<<|<<)$/.test(value) && tokens[start + 1]) return 2;
+	return 0;
+}
+
+const SUDO_FLAGS_WITH_VALUE = new Set([
+	"-u",
+	"--user",
+	"-g",
+	"--group",
+	"-h",
+	"--host",
+	"-p",
+	"--prompt",
+	"-C",
+	"--close-from",
+	"-R",
+	"--chroot",
+	"-T",
+	"--command-timeout",
+]);
+
+const TIME_FLAGS_WITH_VALUE = new Set(["-o", "--output", "-f", "--format"]);
+
+function parseSudoPrefix(tokens, start) {
+	if (basename(tokens[start]?.value ?? "") !== "sudo") return null;
+	let i = start + 1;
+	let unresolved = false;
 	while (i < tokens.length) {
 		const value = tokens[i].value;
-		const executable = basename(value);
-		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
-			i++;
-			continue;
-		}
-		if (executable === "env") {
-			i = stripEnvArguments(tokens, i + 1);
+		if (value === "--") return { end: i + 1, unresolved };
+		if (SUDO_FLAGS_WITH_VALUE.has(value)) {
+			if (!tokens[i + 1]) unresolved = true;
+			if (value === "-R" || value === "--chroot") unresolved = true;
+			i += 2;
 			continue;
 		}
 		if (
-			executable === "sudo" ||
-			executable === "command" ||
-			executable === "nohup" ||
-			executable === "time"
+			/^--(?:user|group|host|prompt|close-from|command-timeout)=/.test(value)
 		) {
+			i++;
+			continue;
+		}
+		if (value.startsWith("--chroot=")) {
+			unresolved = true;
+			i++;
+			continue;
+		}
+		if (/^-(?:u|g|h|p|C|T).+/.test(value)) {
+			i++;
+			continue;
+		}
+		if (value.startsWith("-R") && value.length > 2) {
+			unresolved = true;
+			i++;
+			continue;
+		}
+		if (
+			value === "-n" ||
+			value === "--non-interactive" ||
+			value === "-b" ||
+			value === "-E"
+		) {
+			i++;
+			continue;
+		}
+		if (value.startsWith("-")) {
+			unresolved = true;
 			i++;
 			continue;
 		}
 		break;
 	}
-	return tokens.slice(i);
+	return { end: i, unresolved };
+}
+
+function parseTimePrefix(tokens, start) {
+	if (basename(tokens[start]?.value ?? "") !== "time") return null;
+	let i = start + 1;
+	let unresolved = false;
+	while (i < tokens.length) {
+		const value = tokens[i].value;
+		if (value === "--") return { end: i + 1, unresolved };
+		if (TIME_FLAGS_WITH_VALUE.has(value)) {
+			if (!tokens[i + 1]) unresolved = true;
+			i += 2;
+			continue;
+		}
+		if (/^--(?:output|format)=/.test(value) || /^-(?:o|f).+/.test(value)) {
+			i++;
+			continue;
+		}
+		if (
+			value === "-a" ||
+			value === "--append" ||
+			value === "-p" ||
+			value === "--portability" ||
+			value === "-v" ||
+			value === "--verbose"
+		) {
+			i++;
+			continue;
+		}
+		if (value.startsWith("-")) {
+			unresolved = true;
+			i++;
+			continue;
+		}
+		break;
+	}
+	return { end: i, unresolved };
+}
+
+export function parseLeadingShellPrefix(tokens) {
+	let i = 0;
+	let unresolved = false;
+	const envs = [];
+	while (i < tokens.length) {
+		const value = tokens[i].value;
+		const executable = basename(value);
+		const redirection = leadingRedirectionLength(tokens, i);
+		if (redirection > 0) {
+			i += redirection;
+			continue;
+		}
+		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+			i++;
+			continue;
+		}
+		if (executable === "env") {
+			const env = parseEnvPrefix(tokens, i);
+			envs.push(env);
+			unresolved ||= env.malformed;
+			i = env.end;
+			continue;
+		}
+		if (executable === "command") {
+			i++;
+			if (tokens[i]?.value === "--") i++;
+			continue;
+		}
+		const sudo = parseSudoPrefix(tokens, i);
+		if (sudo !== null) {
+			unresolved ||= sudo.unresolved;
+			i = sudo.end;
+			continue;
+		}
+		const time = parseTimePrefix(tokens, i);
+		if (time !== null) {
+			unresolved ||= time.unresolved;
+			i = time.end;
+			continue;
+		}
+		if (executable === "nohup") {
+			i++;
+			continue;
+		}
+		break;
+	}
+	return { end: i, envs, unresolved };
+}
+
+// `FOO=bar cmd` and executable command prefixes still run cmd.
+export function stripLeadingNoise(tokens) {
+	return tokens.slice(parseLeadingShellPrefix(tokens).end);
 }
 
 export function gitSubcommandIndex(tokens) {

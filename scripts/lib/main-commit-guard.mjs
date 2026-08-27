@@ -18,6 +18,7 @@ import { basename, resolve } from "node:path";
 import {
 	gitSubcommand,
 	gitSubcommandIndex,
+	parseLeadingShellPrefix,
 	splitSegments,
 	stripLeadingNoise,
 	tokenize,
@@ -172,6 +173,13 @@ function resolveGitCwd(tokens, shellCwd) {
 	let cwd = shellCwd;
 	for (let i = 1; i < subcommandAt; i++) {
 		const token = tokens[i];
+		if (
+			token.value === "--git-dir" ||
+			token.value === "--work-tree" ||
+			token.value.startsWith("--git-dir=") ||
+			token.value.startsWith("--work-tree=")
+		)
+			return null;
 		if (token.value !== "-C") continue;
 		const target = staticPath(tokens[i + 1]);
 		if (target === null) cwd = null;
@@ -182,9 +190,32 @@ function resolveGitCwd(tokens, shellCwd) {
 	return cwd;
 }
 
+function resolveEnvCwd(tokens, shellCwd) {
+	let cwd = shellCwd;
+	const prefix = parseLeadingShellPrefix(tokens);
+	if (prefix.unresolved) return null;
+	for (const env of prefix.envs) {
+		if (env.chdir !== undefined) {
+			const target = staticPath(env.chdir);
+			if (target === null) cwd = null;
+			else if (target.startsWith("/")) cwd = resolve(target);
+			else if (cwd !== null) cwd = resolve(cwd, target);
+		}
+	}
+	return cwd;
+}
+
 function resolveCodexRoutineCwd(tokens) {
 	const target = staticPath(tokens[2]);
 	return target === null ? null : resolve(target);
+}
+
+function guardedSuffix(tokens) {
+	for (let i = 0; i < tokens.length; i++) {
+		const guarded = classifySegment(tokens.slice(i));
+		if (guarded) return guarded;
+	}
+	return null;
 }
 
 /**
@@ -202,7 +233,10 @@ function analyzeCommand(command, hookCwd) {
 	const targets = [];
 
 	for (const segment of splitSegments(command)) {
-		const tokens = stripLeadingNoise(tokenize(segment));
+		const rawTokens = tokenize(segment);
+		const prefix = parseLeadingShellPrefix(rawTokens);
+		const envCwd = resolveEnvCwd(rawTokens, cwd);
+		const tokens = rawTokens.slice(prefix.end);
 		if (tokens.length === 0) continue;
 		const head = basename(tokens[0].value);
 
@@ -225,13 +259,16 @@ function analyzeCommand(command, hookCwd) {
 			continue;
 		}
 
-		const guarded = classifySegment(tokens);
+		const guarded =
+			classifySegment(tokens) ??
+			(prefix.unresolved ? guardedSuffix(tokens) : null);
 		if (!guarded) continue;
 		targets.push({
 			...guarded,
-			cwd:
-				head === "git"
-					? resolveGitCwd(tokens, cwd)
+			cwd: prefix.unresolved
+				? null
+				: head === "git"
+					? resolveGitCwd(tokens, envCwd)
 					: resolveCodexRoutineCwd(tokens),
 		});
 	}

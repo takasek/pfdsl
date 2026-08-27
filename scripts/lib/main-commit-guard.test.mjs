@@ -728,4 +728,86 @@ describe("main-commit-guard wrapper", () => {
 			);
 		}
 	});
+
+	it("tracks env chdir prefixes and fails closed for unresolved forms", () => {
+		for (const command of [
+			`env -C ${repo} git add -A`,
+			`env --chdir=${sibling} git add -A`,
+			'WORKTREE=/somewhere; env -C "$WORKTREE" git add -A',
+			"env --chdir= git add -A",
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("does not let Git repository-target flags or shell prefixes bypass sibling checks", () => {
+		for (const command of [
+			`git --git-dir=${join(repo, ".git")} add -A`,
+			`git --work-tree=${repo} add -A`,
+			`command -- git -C ${sibling} add -A`,
+			`sudo -n git -C ${sibling} add -A`,
+			`>/dev/null git -C ${sibling} add -A`,
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("tracks env chdir after leading assignments and redirections", () => {
+		for (const command of [
+			`FOO=x env -C ${repo} git add -A`,
+			`>/dev/null env -C ${repo} git add -A`,
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("skips value-taking sudo and time options before guarded Git", () => {
+		for (const command of [
+			`sudo -u root git -C ${sibling} add -A`,
+			`sudo --user=root git -C ${sibling} add -A`,
+			"sudo -R /jail git add -A",
+			`time -o /tmp/time-output git -C ${sibling} add -A`,
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("fails closed when unknown shell-prefix options may hide guarded Git", () => {
+		for (const command of [
+			`sudo --unknown value git -C ${sibling} add -A`,
+			`time --unknown value git -C ${sibling} add -A`,
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
 });
