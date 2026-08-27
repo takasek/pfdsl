@@ -259,13 +259,14 @@ function pfdImplementerInstructions(source) {
 }
 
 function pfdLensInstructions(sourcePath, source) {
-	const bashRestriction = "Bash は `pfdsl";
-	if (!source.includes(bashRestriction)) {
+	const bashRestriction =
+		"Bash は `pfdsl check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。";
+	if (source.split(bashRestriction).length !== 2) {
 		throw new Error(`${sourcePath}: expected Bash restriction clause.`);
 	}
 	const instructions = claudeInstructionsToAgents(source).replace(
 		bashRestriction,
-		"pfdsl CLI の実行は `pfdsl",
+		"pfdsl CLI の実行は `pfdsl check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。",
 	);
 	return `Codex では read-only shell command の \`rg\` と \`sed\` を観点カタログと対象 \`.pfdsl\` ファイルの読取に使用してよい。\n${instructions}`;
 }

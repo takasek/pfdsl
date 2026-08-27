@@ -21,6 +21,8 @@ import { PROBE_FIXTURES } from "./harness-capability-probes.test-helper.mjs";
 import { HARNESS_CAPABILITY_CONTRACT } from "./harness-inventory.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const PFD_LENS_BASH_RESTRICTION =
+	"Bash は `pfdsl check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。";
 
 function commandRecord({
 	name = "pfd-cycle",
@@ -342,7 +344,7 @@ describe("agentCapabilityToCodexToml", () => {
 		const output = agentCapabilityToCodexToml(
 			agentRecord({
 				body:
-					"\nBash は `pfdsl check <file>` のみ許可される。\n" +
+					`\n${PFD_LENS_BASH_RESTRICTION}\n` +
 					String.raw`.agents/skills/pfd-retro/SKILL.md
 \${PLUGIN_ROOT}
 `,
@@ -362,7 +364,7 @@ describe("agentCapabilityToCodexToml", () => {
 		const output = agentCapabilityToCodexToml(
 			agentRecord({
 				body:
-					"\nBash は `pfdsl check <file>` と読み取り専用クエリのみ許可される。\n" +
+					`\n${PFD_LENS_BASH_RESTRICTION}\n` +
 					"カタログを読み込み、対象 `.pfdsl` ファイルを Read する。\n",
 			}),
 		);
@@ -372,23 +374,20 @@ describe("agentCapabilityToCodexToml", () => {
 			instructions,
 			/`rg` と `sed` を観点カタログと対象 `\.pfdsl` ファイルの読取に使用してよい。/,
 		);
-		assert.doesNotMatch(
-			instructions,
-			/Bash は `pfdsl check <file>` と読み取り専用クエリのみ許可される。/,
-		);
+		assert.equal(instructions.includes(PFD_LENS_BASH_RESTRICTION), false);
 		assert.match(output, /^sandbox_mode = "read-only"$/m);
 	});
 
 	it("rejects pfd-lens when its expected Bash restriction clause changes", () => {
-		assert.throws(
-			() =>
-				agentCapabilityToCodexToml(
-					agentRecord({
-						body: "\nShell は読み取り専用クエリのみ許可される。\n",
-					}),
-				),
-			/\.claude\/agents\/pfd-lens\.md.*Bash restriction clause/,
-		);
+		for (const body of [
+			"\nBash は `pfdsl delete <file>` のみ許可される。\n",
+			`\n${PFD_LENS_BASH_RESTRICTION}\n${PFD_LENS_BASH_RESTRICTION}\n`,
+		]) {
+			assert.throws(
+				() => agentCapabilityToCodexToml(agentRecord({ body })),
+				/\.claude\/agents\/pfd-lens\.md.*Bash restriction clause/,
+			);
+		}
 	});
 
 	it("maps pfd-implementer's known write tools and repository instructions", () => {
