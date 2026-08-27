@@ -1018,7 +1018,7 @@ describe("classifyDesignRecordContent", () => {
 		"前提: 実行主体が判定語を自分に有利に解釈できることを機械照合で塞ぐ。",
 		"否定案: D のみ（機械検査を足さず撤回経路だけ新設する）。",
 		"却下理由: designUnsettled が別プロセス用の判定である点は出力の誤りであり撤回経路では塞げない。",
-		"決定: 案A を採用する。",
+		"案の処分: 案A を採用する。",
 	].join("\n");
 
 	it("PASSes a record with all required prefixes and enough disposition tokens", () => {
@@ -1115,21 +1115,33 @@ describe("classifyDesignRecordContent", () => {
 		assert.match(result.detail, /found 0 time\(s\)/);
 	});
 
-	it("still counts a disposition word written in the body of a required line", () => {
+	it("does not count disposition words outside an 案の処分 line", () => {
 		const record = ["前提: x", "否定案: y", "却下理由: 案Bは却下する。"].join(
 			"\n",
 		);
-		assert.deepEqual(classifyDesignRecordContent(record, 1), {
-			status: "PASS",
-		});
+		const result = classifyDesignRecordContent(record, 1);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /found 0 time\(s\)/);
 	});
 
-	it("PASSes when the same option's disposition word appears twice, as ordinary prose", () => {
+	it("does not let prose disposition words hide a missing option disposition", () => {
+		const record = [
+			"前提: 採用案は実装可能である。",
+			"否定案: 案2は却下候補である。",
+			"却下理由: 案2を却下する理由は費用である。",
+			"案の処分: 案1を採用する。",
+		].join("\n");
+		const result = classifyDesignRecordContent(record, 2);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /found 1 time\(s\)/);
+	});
+
+	it("counts disposition words in a decorated 案の処分 line", () => {
 		const record = [
 			"前提: x",
 			"否定案: 案2",
-			"却下理由: 案2は却下する。却下理由はここに書く通り。",
-			"決定: 案1を採用する。",
+			"却下理由: 費用が高い。",
+			"> - **案の処分**： 案1を採用し、案2を却下する。",
 		].join("\n");
 		assert.deepEqual(classifyDesignRecordContent(record, 2), {
 			status: "PASS",

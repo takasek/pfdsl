@@ -923,33 +923,24 @@ export function selectDesignRecord(entries) {
 	return best;
 }
 
-const REQUIRED_LINE_HEAD_PATTERNS =
-	DESIGN_RECORD_REQUIRED_PREFIXES.map(lineHeadPattern);
+const DISPOSITION_LINE_HEAD_PATTERN = lineHeadPattern("案の処分:");
 
 /**
- * The record with its required line heads removed, ready to be counted over.
- *
- * `却下理由:` contains `却下`, so a plain substring count over the whole body
- * hands every conforming record one disposition token for free — a token that
- * names no option's disposition, which made the count a complete no-op at
- * optionCount 1 (#949). Only the matched label is dropped, not the line: a
- * 却下理由 line's own prose routinely disposes of the option it is about
- * (「案Bは却下する」), and dropping the whole line loses that. Measured over
- * this repo's 128 records carrying all three required heads, the two differ on
- * 56 of them, always in that direction.
+ * The bodies of explicit option-disposition lines, ready to be counted over.
+ * Other structured lines and free prose may discuss 採用/却下/保留 without
+ * disposing of an enumerated option, so only `案の処分:` declarations count.
+ * The shared line-head normalization keeps Markdown decoration and colon forms
+ * consistent with the required-prefix checks.
  * @param {string} body
  * @returns {string}
  */
-function stripRequiredLineHeads(body) {
+function dispositionLineBodies(body) {
 	return body
 		.split("\n")
-		.map((line) => {
+		.flatMap((line) => {
 			const normalized = normalizeRecordLine(line);
-			for (const pattern of REQUIRED_LINE_HEAD_PATTERNS) {
-				const match = normalized.match(pattern);
-				if (match) return normalized.slice(match[0].length);
-			}
-			return normalized;
+			const match = normalized.match(DISPOSITION_LINE_HEAD_PATTERN);
+			return match ? [normalized.slice(match[0].length)] : [];
 		})
 		.join("\n");
 }
@@ -957,12 +948,11 @@ function stripRequiredLineHeads(body) {
 /**
  * Classify the content of a design-selection record. Two independent checks:
  * required line-head tokens are present, and every enumerated option got a
- * disposition word somewhere in the record.
+ * disposition word in an explicit `案の処分:` line.
  *
  * The disposition-token count is checked as "at least optionCount", not an
- * exact match, because ordinary prose can name the same option's disposition
- * more than once (e.g. "案2は却下する。却下理由は…") — an exact-match check
- * would FAIL a correct record for that.
+ * exact match, because a disposition line can legitimately name a disposition
+ * more than once — an exact-match check would FAIL a correct record for that.
  * @param {string} recordBody
  * @param {number} optionCount
  * @returns {{status: 'PASS'|'FAIL', detail?: string}}
@@ -979,7 +969,7 @@ export function classifyDesignRecordContent(recordBody, optionCount) {
 		problems.push(`missing required line(s): ${missing.join(", ")}`);
 
 	if (optionCount > 0) {
-		const countable = stripRequiredLineHeads(body);
+		const countable = dispositionLineBodies(body);
 		const dispositionCount = DISPOSITION_TOKENS.reduce(
 			(sum, token) => sum + (countable.split(token).length - 1),
 			0,
