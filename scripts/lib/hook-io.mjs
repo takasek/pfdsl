@@ -36,12 +36,21 @@ export function parseHookPayload(text) {
  * Build the PreToolUse hook response for a permission decision.
  *
  * "ask" exists because an advisory cannot stand in for a decision when the harm
- * is the execution itself. PreToolUse does carry `additionalContext`, but the
- * docs place it next to the tool result — so it lands after the command has
- * run, which is too late for a rule whose point is that the command should not
- * run unexamined. (stderr on exit 0 is not fed back either.) So a PreToolUse
- * rule that should not hard-block (command-usage-guard's npx case,
- * roadmap-publish-guard) routes through the permission prompt.
+ * is the execution itself. What rules that out is an ordering, not a missing
+ * channel. By the time a PreToolUse hook runs, the call's content is already
+ * fixed — the model settled it before the hook was invoked — and no model
+ * inference happens between the hook returning and the tool executing. So
+ * anything that only adds context reaches the model no earlier than the call it
+ * was meant to reshape, and only a decision that stops the execution puts an
+ * inference boundary before the first successful write. That ordering holds
+ * whatever fields the event turns out to carry. Do not rewrite this as which
+ * events accept which field, or under which decision the field is dropped: that
+ * enumeration has already been false more than once, and the form is the defect
+ * rather than the contents (#929). It was measured in #974 — the runs and the
+ * transcript evidence live in that issue's comments, not here.
+ *
+ * So a PreToolUse rule that should not hard-block (command-usage-guard's npx
+ * case, roadmap-publish-guard) routes through the permission prompt.
  * @param {{decision: "deny" | "ask", reason: string}} result
  */
 export function buildPermissionOutput(result) {
