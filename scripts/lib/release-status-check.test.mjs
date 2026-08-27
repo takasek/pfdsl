@@ -330,6 +330,17 @@ describe("needsAction", () => {
 		);
 	});
 
+	it("is true when a normalized release gate omits its verdict", () => {
+		assert.equal(
+			needsAction({
+				results: [],
+				skillBundleCommits: 0,
+				gates: [{ id: "future-gate", lines: ["missing verdict"] }],
+			}),
+			true,
+		);
+	});
+
 	const current = {
 		results: [
 			{ name: "@pfdsl/cli", status: "equal", commitsAhead: 0 },

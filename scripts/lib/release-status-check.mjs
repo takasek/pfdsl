@@ -172,6 +172,6 @@ export function needsAction({ results, skillBundleCommits, gates }) {
 				r.commitsAhead > 0,
 		) ||
 		skillBundleCommits > 0 ||
-		gates.some((gate) => gate.ok === false)
+		gates.some((gate) => gate.ok !== true)
 	);
 }
