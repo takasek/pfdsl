@@ -187,6 +187,16 @@ function analyzeCommand(command, hookCwd) {
 		if (tokens.length === 0 || tokens[0].quoted) continue;
 		const head = tokens[0].value;
 
+		if (
+			(head === "builtin" &&
+				["cd", "pushd", "popd"].includes(tokens[1]?.value)) ||
+			head === "pushd" ||
+			head === "popd"
+		) {
+			cwd = null;
+			continue;
+		}
+
 		if (head === "cd") {
 			const target = cdPath(tokens);
 			if (target === null) cwd = null;

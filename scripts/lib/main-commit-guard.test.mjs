@@ -610,4 +610,21 @@ describe("main-commit-guard wrapper", () => {
 			);
 		}
 	});
+
+	it("fails closed for cwd-changing shell builtins the parser cannot model", () => {
+		for (const [command, decision] of [
+			[`builtin cd "${sibling}" && git add -A`, "deny"],
+			[`command cd "${sibling}" && git add -A`, "deny"],
+			[`pushd "${sibling}" && git add -A`, "deny"],
+			["popd && git restore tracked.txt", "ask"],
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				decision,
+				command,
+			);
+		}
+	});
 });
