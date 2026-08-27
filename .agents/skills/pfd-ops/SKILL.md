@@ -2,14 +2,12 @@
 name: pfd-ops
 summary: project operations
 description: |
-  Use when operating a project with PFDs — prioritizing or accepting issues,
-  updating progress status after completing work, adding new artifacts or
-  documents to the repo, or deciding where session learnings should be
-  recorded. Also fires when the user asks to work on a bare issue or
-  work-item number (e.g. `#123`) — route it through the work cycle even if
-  the item is not managed in the roadmap. Complements the pfdsl skill
-  (notation and quality of .pfdsl files); this skill covers how to run the
-  project on top of them.
+  Use when operating a project that has adopted PFDs — prioritizing or
+  accepting work items, updating progress status after completing work,
+  adding new artifacts or documents to the repo, or deciding where session
+  learnings should be recorded. Also use when the user explicitly asks for a
+  PFD operation. Complements the pfdsl skill (notation and quality of .pfdsl
+  files); this skill covers how to run the project on top of them.
 ---
 <!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/SKILL.md. -->
 
@@ -25,7 +23,7 @@ description: |
 grep -q 'に置き換える)' .pfdsl/roadmap.pfdsl && echo "scaffold のまま"
 ```
 
-カレントプロジェクトに `.pfdsl/` が無い場合、または上記コマンドが「scaffold のまま」を出す場合は、運用プロトコルを実行せず pfd-ecosystem スキル（`/pfd-init`）で PFD セットを初期構築 / 実データへ育てるようユーザーに案内してセッションを終了する。
+カレントプロジェクトに `.pfdsl/roadmap.pfdsl` が存在しない場合、本スキルは非適用として呼び出し元の通常フローへ戻る。bare GitHub Issue 番号や一般的な issue 作業の依頼だけを根拠に PFD の初期構築を提案したり、作業を終了したりしない。ユーザーが明示的に PFD の導入を依頼した場合に限り、pfd-ecosystem スキル（`/pfd-init`）を案内する。上記コマンドが「scaffold のまま」を出す場合は、既存の PFD を実データへ育てる依頼かを確認し、該当する場合だけ pfd-ecosystem スキルへ引き継ぐ。
 
 ## 配置ファイルの鮮度セルフチェック（ADR-0028）
 
@@ -62,7 +60,7 @@ plugin バージョンの上流差分警告は plugin の更新をユーザー�
 - **作業項目の一次情報と同期手段**: `.pfdsl/roadmap.pfdsl` とその sibling `.pfdsl/roadmap.md` に従う
 - **知見の振り分け先・運用手続き**: `.pfdsl/workflow.pfdsl` の知識系成果物と、その sibling companion `.md`
 - **変換境界の定義と変更手続き**: `.pfdsl/runtime-pipeline.pfdsl`（採用時）とその sibling companion `.md`
-- **issue バックエンド規約**: companion が指す references（例: `references/github-issues-backend.md`）
+- **作業項目バックエンド規約**: companion が指す references（例: `references/github-issues-backend.md`）
 - **Codex 向け指示の置き場**: pfd-ops 運用に紐づく恒常指示（PR 本文規約等）は `.pfdsl/bindings/pfd-ops.md` が存在すれば読んで従う（命名規則は `references/architecture.md` 参照）。ファイルが無ければ該当なしとみなす。サイクル外でも常時届けたい指示は、root `AGENTS.md` から当該ファイルへポインタを張ることを推奨する。project AGENTS.md はこのリポでのみ有効な設定のみ、global AGENTS.md は全リポ横断の設定のみ
 - **companion への書き分けルール**（どの companion に何を書くか）: `references/architecture.md` の「companion への書き分けルール」表が一次情報
 
@@ -71,7 +69,7 @@ plugin バージョンの上流差分警告は plugin の更新をユーザー�
 1. **着手判断**: 入力 artifact が全て done のプロセス = 着手可能。並列着手集合は `pfdsl status ready <roadmap.pfdsl> --best --json` で機械的に導出する（roadmap 全文 Read で手動判定しない。優先順位の議論より先にまず列挙）。**作業項目に着手する回は、この判断を下す前に下の「ワークサイクル」節へ入り、その4手順に従う** — 着手判断はその手順1の一部であり、単独では完結しない。どの起動口から来たかは問わない
 2. **新規作業の受け入れ**: 作業項目を起票（手段は roadmap.md）。その作業が**成果物を生み他作業の着手をゲートするものだけ**依存グラフに1チェーン追加する（他作業をゲートしない保守・基盤・修正 — バグ修正・CI/ビルド/tooling・図や doc の bookkeeping 等 — は roadmap に載せない。ラベル運用などバックエンド固有の判定手続きは採用バックエンドの L3 reference に従う）→ 並列性・接点・合流点を確定させてから着手する
 3. **依存レビュー**: 「並列でいける」という直感は図に書いて初めてレビュー可能になる。決定が往復で形成される相互依存が見つかったら分割せず統合する。判定テスト: 上流方針の合否基準を下流作業なしで書けるか（書けなければ上流方針は入力でなく出力 = 相互依存の証拠）
-4. **進捗更新**: 着手時に出力 artifact を todo→wip に更新する（着手と同時。PR 作成・マージを待たない）。作業完了 = 出力 artifact の status 更新。コミットと同時に行う。done の根拠が言えない場合は出力成果物の定義を疑う。**criteria 未達を criteria 文言の書き換えで done に帳尻合わせしない** — criteria は元の作業項目（issue 等一次情報）の完了基準を反映するものであり、達成できなかった基準を後から緩めて達成済みに見せかける行為は、成果物の定義でなく成果物の状態を偽る。未達のまま状態を進めたい場合は wip を維持し、未達部分を独立した後続作業として切り出す。**基準そのものが達成不能だと実測で判明した場合に限り差し替えてよいが、人間の承認を得てから行う** — (a) 不能の根拠を実測で示し（「やってみたら別の理由で失敗した」ではなく、その基準が原理的に満たせないことの証拠）、(b) 差し替え後の基準が元の意図を別の手段で満たすことを述べ、(c) 承認を得る。この3つを欠いた差し替えは、上の帳尻合わせと外形上まったく区別がつかない — 差し替える側は常に「これは正当な変更だ」と考えているので、区別は自己申告でなく手続きに担保させる
+4. **進捗更新**: 着手時に出力 artifact を todo→wip に更新する（着手と同時。PR 作成・マージを待たない）。作業完了 = 出力 artifact の status 更新。コミットと同時に行う。done の根拠が言えない場合は出力成果物の定義を疑う。**criteria 未達を criteria 文言の書き換えで done に帳尻合わせしない** — criteria は元の作業項目の一次情報にある完了基準を反映するものであり、達成できなかった基準を後から緩めて達成済みに見せかける行為は、成果物の定義でなく成果物の状態を偽る。未達のまま状態を進めたい場合は wip を維持し、未達部分を独立した後続作業として切り出す。**基準そのものが達成不能だと実測で判明した場合に限り差し替えてよいが、人間の承認を得てから行う** — (a) 不能の根拠を実測で示し（「やってみたら別の理由で失敗した」ではなく、その基準が原理的に満たせないことの証拠）、(b) 差し替え後の基準が元の意図を別の手段で満たすことを述べ、(c) 承認を得る。この3つを欠いた差し替えは、上の帳尻合わせと外形上まったく区別がつかない — 差し替える側は常に「これは正当な変更だ」と考えているので、区別は自己申告でなく手続きに担保させる
 5. **成果物の門番（双方向、ADR-0018）**: 終端監査は両向きに行う
    - **(a) 消費者側**: 消費者を書けない成果物は作らない
    - **(b) 後続側**: 終端を名乗れるのは真の納品物（公開物・外部提出物・運用される成果物）のみ。**手段成果物（仕様・設計・計画・提案）は終端たりえない**。それを出力・計画した時点で、消費する後続プロセスをプレースホルダ（todo）でもグラフに登録する。明らかに必要な後続が欠けた終端 artifact は門番違反（例: `spec_vN` に実装プロセスが繋がっていない）。終端 artifact 一覧は `pfdsl graph io <file> --json` で機械列挙できる（全文 Read での目視に頼らない。`externalTerminals` の別枠に artifact が入る条件と見方は pfdsl スキルの「読解と点検」が一次情報 — そちらも見る。手順の詳細は `references/work-cycle.md`）
@@ -85,7 +83,7 @@ plugin バージョンの上流差分警告は plugin の更新をユーザー�
    - **hook の決定を選ぶ軸は、防ぎたい害がどこにあるかである**: 害が実行そのものにあるなら advisory は選べない — advisory は実行を止めないので、届いた時点で害は既に起きている。この理由は「その event が advisory チャネルを持つか」とは独立で、持っていても代替にならない。選ぶのは `deny`（対処法をメッセージに書けば1回の retry で自己修復する。対処済みかがルール側から見えるものに限る）か `ask`（人間に判断を渡す。対処済みかが payload から見えないルールはこちら — deny にすると retry も同じく止まって抜け道が無くなる）。害が結果の読み違いだけなら advisory で足りる（書き込み後の lint・起票直後の登録促しがこの形）。**どの event がどの決定・どのチャネルを持つかは、この規則の側で列挙しない** — harness の版で動くため、列挙を書くとそれ自体が陳腐化して偽になる。実装の前にその版の仕様を一次情報で確かめる
 7. **定期監査**: `/pfd-cycle` コマンド経由のセッションには pfd-retro 起動条件が2つある。両方を独立に確認する（一方の非該当がもう一方の免除にならない）:
    - **(a) done 付与時の自動起動**: 対象プロセスの出力 artifact に done が付与された時点（プロトコル4）で pfd-retro を自動実行する。直接 pfd-ops を呼ぶ対話セッションで `/pfd-cycle` を起動していない場合、done イベントという基準点が存在しないため (a) は適用対象外
-   - **(b) サイクル終結時の能動的確認**: `/pfd-cycle` を起動した対話セッションでは、結論がまとまったタイミングでユーザーに「そろそろサイクルを締めるか」を確認する（ユーザーの気付きを待たず AI から能動的に問う）。**done の有無に関わらず必須** — (a) が不成立（exempt issue 等で done 付与がない）でも (b) は免除されない。
+   - **(b) サイクル終結時の能動的確認**: `/pfd-cycle` を起動した対話セッションでは、結論がまとまったタイミングでユーザーに「そろそろサイクルを締めるか」を確認する（ユーザーの気付きを待たず AI から能動的に問う）。**done の有無に関わらず必須** — (a) が不成立（roadmap 非管理の作業項目等で done 付与がない）でも (b) は免除されない。
    findings はプロトコル6の経路で振り分ける
 
 ## ワークサイクル（選択・実行・終端ゲート・報告）

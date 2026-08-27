@@ -4,7 +4,7 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 
 ## 規約
 
-- **一次情報**: GitHub issue 本体。`roadmap.pfdsl` は依存構造のみ管理する
+- **一次情報**: GitHub Issue 本体。着手時は `gh issue view <number> --json body,comments` で本文とコメントを両方取得する。`roadmap.pfdsl` は依存構造のみ管理する
 - **id 規約**: issue に対応する作業の process id は `iN_` prefix（N = issue 番号）。**恒久** — issue close 後も剥がさない。同一 process が複数 issue に対応する場合は `i40_i41_do_work` のように連結する。対応する出力 artifact の id は最初から plain（prefix なし）。**まだ issue が無いプロセスは plain の id で置く** — 成果物の門番（プロトコル5(b)）が要求するプレースホルダ後続プロセスは、起票より先にグラフへ入る。採番できない番号を捏造せず、起票時に `iN_` を付けてリネームする。この状態は `check` を通ってしまい機械検出されないので、逸脱として `roadmap.md` に書き残す
 - **ラベル**: roadmap 登録 issue は `flow:managed`、対象外は `flow:exempt`（判定は「ラベル判定基準」節）
 - **updated_at**: 同期時点の GitHub `updatedAt` スナップショット
