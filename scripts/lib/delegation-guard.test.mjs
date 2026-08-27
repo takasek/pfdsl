@@ -132,6 +132,8 @@ describe("findOutwardCommand — git", () => {
 			'git "push" origin main',
 			'"git" push origin main',
 			"env -i git push origin main",
+			"/usr/bin/git push origin main",
+			"/usr/bin/env -P /usr/bin /usr/bin/git push origin main",
 		]) {
 			assert.equal(findOutwardCommand(command), "git push", command);
 		}

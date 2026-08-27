@@ -92,7 +92,7 @@ function codexRoutineSubcommand(tokens) {
 function classifySegment(tokens) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
-	if (head.value !== "git") {
+	if (basename(head.value) !== "git") {
 		const subcommand = codexRoutineSubcommand(tokens);
 		return subcommand === null ? null : { subcommand, decision: "deny" };
 	}
@@ -204,7 +204,7 @@ function analyzeCommand(command, hookCwd) {
 	for (const segment of splitSegments(command)) {
 		const tokens = stripLeadingNoise(tokenize(segment));
 		if (tokens.length === 0) continue;
-		const head = tokens[0].value;
+		const head = basename(tokens[0].value);
 
 		if (
 			(head === "builtin" &&

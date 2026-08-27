@@ -77,7 +77,12 @@ describe("classifyGitCommand", () => {
 	});
 
 	it("classifies Git behind executable shell prefixes with options", () => {
-		for (const command of ["env -i git add -A", "env -- git commit -m x"]) {
+		for (const command of [
+			"env -i git add -A",
+			"env -- git commit -m x",
+			"/usr/bin/git add -A",
+			"/usr/bin/env -P /usr/bin /usr/bin/git add -A",
+		]) {
 			assert.deepEqual(
 				classifyGitCommand(command),
 				{

@@ -23,6 +23,8 @@
 // caller re-checking `git log origin/<branch>..HEAD` and the PR list when the
 // delegation returns.
 
+import { basename } from "node:path";
+
 import { flagValues, parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
@@ -159,6 +161,7 @@ const ENV_FLAGS_WITH_VALUE = new Set([
 	"--chdir",
 	"-S",
 	"--split-string",
+	"-P",
 ]);
 
 function stripEnvArguments(tokens, start) {
@@ -181,7 +184,7 @@ function stripEnvArguments(tokens, start) {
 			value === "--null" ||
 			value === "-v" ||
 			value === "--debug" ||
-			/^-(?:u|C|S).+/.test(value) ||
+			/^-(?:u|C|S|P).+/.test(value) ||
 			/^--(?:unset|chdir|split-string)=/.test(value)
 		) {
 			i++;
@@ -197,19 +200,20 @@ export function stripLeadingNoise(tokens) {
 	let i = 0;
 	while (i < tokens.length) {
 		const value = tokens[i].value;
+		const executable = basename(value);
 		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
 			i++;
 			continue;
 		}
-		if (value === "env") {
+		if (executable === "env") {
 			i = stripEnvArguments(tokens, i + 1);
 			continue;
 		}
 		if (
-			value === "sudo" ||
-			value === "command" ||
-			value === "nohup" ||
-			value === "time"
+			executable === "sudo" ||
+			executable === "command" ||
+			executable === "nohup" ||
+			executable === "time"
 		) {
 			i++;
 			continue;
@@ -255,14 +259,15 @@ export function findOutwardCommand(command) {
 		const tokens = stripLeadingNoise(tokenize(segment));
 		if (tokens.length === 0) continue;
 		const head = tokens[0];
+		const executable = basename(head.value);
 
-		if (head.value === "git") {
+		if (executable === "git") {
 			const sub = gitSubcommand(tokens);
 			if (sub && OUTWARD_GIT_SUBCOMMANDS.has(sub)) return `git ${sub}`;
 			continue;
 		}
 
-		if (head.value === "gh") {
+		if (executable === "gh") {
 			// The group is not necessarily tokens[1] — a global flag can come
 			// first, and reading the flag as the group made this guard fail open
 			// on `gh -R owner/repo pr create` (review finding, #650).
