@@ -1,16 +1,16 @@
 <!-- DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/references/scaffold/roadmap.md. -->
 
-# roadmap.md — issue 管理バインディング（roadmap.pfdsl の companion）
+# roadmap.md — 作業項目管理バインディング（roadmap.pfdsl の companion）
 
-`roadmap.pfdsl` は issue 依存構造のみ管理する。issue の一次情報と同期手段はここに書く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
+`roadmap.pfdsl` は作業項目の依存構造のみ管理する。作業項目の一次情報と同期手段はここに書く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
 
 ## バックエンド
 
-(採用するバックエンドを記載する。GitHub Issues を使う場合は `<pfd-ops skill root>/references/github-issues-backend.md` を、リポ内 markdown ファイルで管理する場合は `<pfd-ops skill root>/references/file-based-tracker-backend.md` を参照。`<pfd-ops skill root>` は plugin 経由なら `${PLUGIN_ROOT}/skills/pfd-ops`。上のパスが置換されず変数名のまま見えている場合は repo-local `.agents/skills/pfd-ops` を使い、それも無ければ pfd-ops の SKILL.md を読んでいる位置から相対で辿る。)
+(roadmap の作業項目バックエンドとしての採否を記載する。GitHub Issues を使う場合は `<pfd-ops skill root>/references/github-issues-backend.md` を、リポ内 markdown ファイルで管理する場合は `<pfd-ops skill root>/references/file-based-tracker-backend.md` を参照する。GitHub Issues を作業項目バックエンドに採用しない場合でも、roadmap 管理外の gap 記録などに利用しているなら、その用途と参照先を別に明記する。`<pfd-ops skill root>` は plugin 経由なら `${PLUGIN_ROOT}/skills/pfd-ops`。上のパスが置換されず変数名のまま見えている場合は repo-local `.agents/skills/pfd-ops` を使い、それも無ければ pfd-ops の SKILL.md を読んでいる位置から相対で辿る。)
 
 ## このリポのインスタンス値
 
-- 一次情報: (issue 管理先の URL)
+- 一次情報: (作業項目の管理先 URL またはファイルパス)
 - 同期監査スクリプト: (採用する場合は `scripts/pfdsl/audit-issues-flow.mjs` のパス)
 - 監査対象: (このファイルが対応する `.pfdsl` のパス)
 
@@ -22,8 +22,8 @@
 
 ## 自動生成 PR（ワークサイクル選択前に確認）
 
-(issue close 等で自動生成される PR がある場合はここに記載する。なければ「なし」と明記する。)
+(作業項目の完了等で自動生成される PR がある場合はここに記載する。なければ「なし」と明記する。)
 
-## 終端ゲート追加項目（issue 固有）
+## 終端ゲート追加項目（作業項目固有）
 
 (汎用ゲートに加えて、このプロジェクト固有に確認すべき項目を記載する。)
