@@ -17,11 +17,18 @@ const roadmapScaffold = read(
 );
 
 describe("pfd-ops applicability contract", () => {
-	it("leaves ordinary issue work alone when the repository has not adopted PFDs", () => {
-		assert.match(skill, /\.pfdsl\/roadmap\.pfdsl[^\n]+存在しない[^\n]+非適用/);
-		assert.match(skill, /scaffold[^\n]+非適用/);
-		assert.match(skill, /明示的に PFD の導入[^\n]+依頼/);
-		assert.doesNotMatch(skill, /scaffold[^\n]+依頼かを確認/);
+	it("scopes the roadmap prerequisite to the work cycle", () => {
+		assert.match(skill, /操作に対応する採用済み PFD/);
+		assert.match(
+			skill,
+			/roadmap\.pfdsl[^\n]+存在しなくても[^\n]+workflow\.pfdsl/,
+		);
+		assert.doesNotMatch(skill, /本スキルは非適用/);
+		assert.match(
+			workCycle,
+			/\.pfdsl\/roadmap\.pfdsl[^\n]+存在しない[^\n]+本ワークサイクルは非適用/,
+		);
+		assert.match(workCycle, /scaffold[^\n]+本ワークサイクルは非適用/);
 		assert.doesNotMatch(
 			skill,
 			/bare issue or\s+work-item number[\s\S]+route it through the work cycle/,
