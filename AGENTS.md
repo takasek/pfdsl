@@ -6,7 +6,7 @@
 
 ## セットアップ
 
-Claude CodeとCodexのSessionStart hookは、クローン直後・新規 worktreeで `node_modules/.pfdsl-setup-complete` がなければ `make setup` を自動実行する。`node_modules` の存在だけは setup 完了を表さない。hook の呼び出し自体ではなく、setup が成功して作る完了 marker が重複 setup を防ぐ。session開始後にworktreeを手動作成した場合など、marker がなく SessionStart hook が完了しなかった場合だけ `make setup` を1回手動実行する。依存インストールに加え pre-commit hook のシム（`scripts/hooks/pre-commit-shim`）を `.git/hooks/` に導入する。シムはコミット実行 worktree の `scripts/pre-commit` を都度 exec するため、hook の版とブランチのツリー内容が常に一致する（#411）。実体（`scripts/pre-commit`）はコミット時に staged ファイルの biome 検査（整形・lint・構文）と `.pfdsl` スナップショット鮮度を自動検査する。biome の指摘は自動修正しない — 落ちたら `make format` を実行して再 stage する。これを飛ばすとローカルコミットが検査をすり抜け、CI で初めて失敗に気付くことになる。
+Claude CodeとCodexのSessionStart hookは、クローン直後・新規 worktreeで `node scripts/setup-completion.mjs check` が失敗すれば `make setup` を自動実行する。`node_modules` やmarkerの存在だけは setup 完了を表さない。markerはlockfile、workspace定義、setup recipe、hook shim、repo skill linker、fingerprint実装のSHA-256を記録し、branch switch等で入力が変わればstaleとしてsetupを再実行する。session開始後にworktreeを手動作成した場合など、SessionStart hook が完了しなかった場合だけ `make setup` を1回手動実行する。依存インストールに加え pre-commit hook のシム（`scripts/hooks/pre-commit-shim`）を `.git/hooks/` に導入する。シムはコミット実行 worktree の `scripts/pre-commit` を都度 exec するため、hook の版とブランチのツリー内容が常に一致する（#411）。実体（`scripts/pre-commit`）はコミット時に staged ファイルの biome 検査（整形・lint・構文）と `.pfdsl` スナップショット鮮度を自動検査する。biome の指摘は自動修正しない — 落ちたら `make format` を実行して再 stage する。これを飛ばすとローカルコミットが検査をすり抜け、CI で初めて失敗に気付くことになる。
 
 ## 文字列の言語
 

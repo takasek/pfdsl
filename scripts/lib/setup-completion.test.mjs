@@ -15,6 +15,12 @@ import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import {
+	isSetupCurrent,
+	SETUP_INPUTS,
+	writeSetupMarker,
+} from "../setup-completion.mjs";
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const makefile = join(root, "Makefile");
 const sentinel = "node_modules/.pfdsl-setup-complete";
@@ -37,6 +43,14 @@ function fixture() {
 	mkdirSync(bin);
 	symlinkSync(makefile, join(cwd, "Makefile"));
 	writeFileSync(join(cwd, "scripts/hooks/pre-commit-shim"), "#!/bin/sh\n");
+	writeFileSync(join(cwd, "scripts/link-repo-skill.mjs"), "// fixture\n");
+	writeFileSync(
+		join(cwd, "scripts/setup-completion.mjs"),
+		readFileSync(join(root, "scripts/setup-completion.mjs")),
+	);
+	writeFileSync(join(cwd, "package.json"), "{}\n");
+	writeFileSync(join(cwd, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+	writeFileSync(join(cwd, "pnpm-workspace.yaml"), "packages: []\n");
 
 	for (const [name, source] of Object.entries({
 		pnpm: '#!/bin/sh\nprintf \'pnpm\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = pnpm ] && exit 1\nmkdir -p node_modules\n',
@@ -44,7 +58,7 @@ function fixture() {
 		cp: '#!/bin/sh\nprintf \'cp\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = cp ] && exit 1\nexec "$REAL_CP" "$@"\n',
 		chmod:
 			'#!/bin/sh\nprintf \'chmod\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = chmod ] && exit 1\nexec "$REAL_CHMOD" "$@"\n',
-		node: '#!/bin/sh\nprintf \'node\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = node ] && exit 1\nexit 0\n',
+		node: '#!/bin/sh\nif [ "$1" = scripts/setup-completion.mjs ]; then exec "$REAL_NODE" "$@"; fi\nprintf \'node\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = node ] && exit 1\nexit 0\n',
 	})) {
 		const command = join(bin, name);
 		writeFileSync(command, source);
@@ -60,6 +74,7 @@ function environment(context, failureStage = "") {
 		PATH: `${context.bin}:${process.env.PATH}`,
 		REAL_CHMOD: chmod,
 		REAL_CP: cp,
+		REAL_NODE: process.execPath,
 		SETUP_FAIL_STAGE: failureStage,
 		SETUP_LOG: context.log,
 	};
@@ -91,8 +106,23 @@ afterEach(() => {
 });
 
 describe("setup completion sentinel", () => {
+	it("identifies the exact setup inputs represented by a marker", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "setup-fingerprint-"));
+		fixtures.push(cwd);
+		for (const path of SETUP_INPUTS) {
+			mkdirSync(dirname(join(cwd, path)), { recursive: true });
+			writeFileSync(join(cwd, path), `${path}\n`);
+		}
+
+		writeSetupMarker(cwd);
+		assert.equal(isSetupCurrent(cwd), true);
+		writeFileSync(join(cwd, "pnpm-lock.yaml"), "changed\n");
+		assert.equal(isSetupCurrent(cwd), false);
+	});
+
 	it("runs each SessionStart hook only until setup completes", () => {
 		for (const path of [".claude/settings.json", ".codex/hooks.json"]) {
+			assert.match(sessionStartCommand(path), /setup-completion\.mjs check/);
 			const context = fixture();
 			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
 			assert.equal(
@@ -107,6 +137,13 @@ describe("setup completion sentinel", () => {
 				readFileSync(context.log, "utf8"),
 				log,
 				`${path} should skip setup with a marker`,
+			);
+			writeFileSync(join(context.cwd, "pnpm-lock.yaml"), "changed\n");
+			assertSucceeded(runSessionStart(context, sessionStartCommand(path)));
+			assert.notEqual(
+				readFileSync(context.log, "utf8"),
+				log,
+				`${path} should rerun setup when an input changes`,
 			);
 		}
 	});

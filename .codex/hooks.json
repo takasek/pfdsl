@@ -89,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ ! -f node_modules/.pfdsl-setup-complete ]; then echo '[pfdsl] setup completion marker not found in this worktree - running make setup'; make setup; fi",
+            "command": "if ! node scripts/setup-completion.mjs check; then echo '[pfdsl] setup completion marker is missing or stale in this worktree - running make setup'; make setup; fi",
             "timeout": 300,
             "statusMessage": "pfdsl: checking setup completion (make setup when marker is absent)"
           }

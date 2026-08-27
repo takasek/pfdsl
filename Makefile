@@ -5,10 +5,10 @@ setup:
 	rm -f node_modules/.pfdsl-setup-complete
 	pnpm install
 	@git_common_dir=$$(git rev-parse --git-common-dir) && \
-		cp scripts/hooks/pre-commit-shim "$$git_common_dir/hooks/pre-commit" && \
-		chmod +x "$$git_common_dir/hooks/pre-commit" && \
-		node scripts/link-repo-skill.mjs && \
-		touch node_modules/.pfdsl-setup-complete
+			cp scripts/hooks/pre-commit-shim "$$git_common_dir/hooks/pre-commit" && \
+			chmod +x "$$git_common_dir/hooks/pre-commit" && \
+			node scripts/link-repo-skill.mjs && \
+			node scripts/setup-completion.mjs write
 
 .PHONY: build
 build:
