@@ -2,8 +2,8 @@
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
+import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 
 export const SETUP_INPUTS = [
 	"Makefile",
@@ -55,10 +55,7 @@ function main(args) {
 	writeSetupMarker();
 }
 
-if (
-	process.argv[1] &&
-	import.meta.url === pathToFileURL(resolve(process.argv[1])).href
-) {
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	try {
 		main(process.argv.slice(2));
 	} catch (error) {

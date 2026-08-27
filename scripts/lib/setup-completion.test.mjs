@@ -39,6 +39,7 @@ function fixture() {
 	const bin = join(cwd, "bin");
 	const log = join(cwd, "setup.log");
 	mkdirSync(join(cwd, "scripts/hooks"), { recursive: true });
+	mkdirSync(join(cwd, "scripts/lib"), { recursive: true });
 	mkdirSync(join(cwd, ".git-common/hooks"), { recursive: true });
 	mkdirSync(bin);
 	symlinkSync(makefile, join(cwd, "Makefile"));
@@ -47,6 +48,10 @@ function fixture() {
 	writeFileSync(
 		join(cwd, "scripts/setup-completion.mjs"),
 		readFileSync(join(root, "scripts/setup-completion.mjs")),
+	);
+	writeFileSync(
+		join(cwd, "scripts/lib/cli-entrypoint.mjs"),
+		readFileSync(join(root, "scripts/lib/cli-entrypoint.mjs")),
 	);
 	writeFileSync(join(cwd, "package.json"), "{}\n");
 	writeFileSync(join(cwd, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
