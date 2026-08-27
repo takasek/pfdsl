@@ -17,9 +17,23 @@
 // file produced in one Write is finished before the first word reaches the
 // runner. What it buys is the artifacts after that one, plus the prompt to
 // re-read the one just written while it is still the thing being worked on.
-// Whether some non-blocking event could instead reach the runner *before* the
-// first write is not settled here and is not claimed either way — this says
-// only what this implementation does.
+// Whether some non-blocking path could instead reach the runner *before* the
+// first write was settled in #974, and narrowly. A hook invoked as part of a
+// tool call takes that call as its input: the content is fixed before the hook
+// runs, and no inference happens between the hook returning and the tool
+// executing, so nothing it adds can precede the very call it would have
+// reshaped. That closes off the pre-execution hook on the write itself.
+//
+// It does not close off delivery points earlier than the write; #974 measured
+// one arriving ahead of the model's first inference. Those went unused for
+// reach rather than ordering: none of the ones compared there got closer to the
+// first implementation write than the cycle preflight already is, and the
+// preflight prints this same catalog with the countermeasure lines this hook
+// has to drop for length (formatPreArtifactAdvisory below). What does create a
+// boundary at the write is a decision that stops it, which is a gate rather
+// than an advisory — one #974 measured losing the write outright on the runs
+// where the model read the denial reason as an injected instruction. Hence
+// PostToolUse.
 //
 // The reach is also bounded by the tool surface it watches. Writes that arrive
 // through Bash, a generator, or any tool other than Write/Edit are not seen,
