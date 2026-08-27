@@ -193,7 +193,7 @@ function resolveGitCwd(tokens, shellCwd) {
 function resolveEnvCwd(tokens, shellCwd) {
 	let cwd = shellCwd;
 	const prefix = parseLeadingShellPrefix(tokens);
-	if (prefix.unresolved) return null;
+	if (prefix.unresolved || prefix.gitTargetOverride) return null;
 	for (const env of prefix.envs) {
 		if (env.chdir !== undefined) {
 			const target = staticPath(env.chdir);

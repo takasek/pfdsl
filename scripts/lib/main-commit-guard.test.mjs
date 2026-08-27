@@ -746,6 +746,31 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
+	it("fails closed when Git environment variables override the target", () => {
+		for (const variable of [
+			"GIT_DIR",
+			"GIT_WORK_TREE",
+			"GIT_INDEX_FILE",
+			"GIT_COMMON_DIR",
+			"GIT_OBJECT_DIRECTORY",
+			"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+			"GIT_NAMESPACE",
+		]) {
+			for (const command of [
+				`${variable}=/override git add -A`,
+				`env ${variable}=/override git add -A`,
+			]) {
+				const output = runWrapper(command);
+				assert.notEqual(output, "", command);
+				assert.equal(
+					JSON.parse(output).hookSpecificOutput.permissionDecision,
+					"deny",
+					command,
+				);
+			}
+		}
+	});
+
 	it("does not let Git repository-target flags or shell prefixes bypass sibling checks", () => {
 		for (const command of [
 			`git --git-dir=${join(repo, ".git")} add -A`,
@@ -768,6 +793,12 @@ describe("main-commit-guard wrapper", () => {
 		for (const command of [
 			`FOO=x env -C ${repo} git add -A`,
 			`>/dev/null env -C ${repo} git add -A`,
+			`< /dev/null env -C ${repo} git add -A`,
+			`</dev/null env -C ${repo} git add -A`,
+			`<& 0 env -C ${repo} git add -A`,
+			`<&0 env -C ${repo} git add -A`,
+			`<> /dev/null env -C ${repo} git add -A`,
+			`<>/dev/null env -C ${repo} git add -A`,
 		]) {
 			const output = runWrapper(command);
 			assert.notEqual(output, "", command);
@@ -776,6 +807,22 @@ describe("main-commit-guard wrapper", () => {
 				"deny",
 				command,
 			);
+		}
+	});
+
+	it("distinguishes command execution from command path queries", () => {
+		const execution = runWrapper(`command -p git -C ${sibling} add -A`);
+		assert.notEqual(execution, "");
+		assert.equal(
+			JSON.parse(execution).hookSpecificOutput.permissionDecision,
+			"deny",
+		);
+
+		for (const query of [
+			"command -v git -C /somewhere add -A",
+			"command -V git -C /somewhere add -A",
+		]) {
+			assert.equal(runWrapper(query), "", query);
 		}
 	});
 

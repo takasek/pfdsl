@@ -89,6 +89,10 @@ export function splitSegments(command) {
 			i++;
 			continue;
 		}
+		if (ch === "&" && (command[i - 1] === "<" || command[i - 1] === ">")) {
+			current += ch;
+			continue;
+		}
 		if (ch === ";" || ch === "|" || ch === "&" || ch === "\n") {
 			segments.push(current);
 			current = "";
@@ -164,18 +168,36 @@ const ENV_FLAGS_WITH_VALUE = new Set([
 	"-P",
 ]);
 
+const GIT_TARGET_VARIABLES = new Set([
+	"GIT_DIR",
+	"GIT_WORK_TREE",
+	"GIT_INDEX_FILE",
+	"GIT_COMMON_DIR",
+	"GIT_OBJECT_DIRECTORY",
+	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	"GIT_NAMESPACE",
+]);
+
+function isGitTargetAssignment(value) {
+	const equals = value.indexOf("=");
+	return equals !== -1 && GIT_TARGET_VARIABLES.has(value.slice(0, equals));
+}
+
 export function parseEnvPrefix(tokens, start = 0) {
 	if (basename(tokens[start]?.value ?? "") !== "env") return null;
 	let i = start + 1;
 	let chdir;
 	let malformed = false;
+	let gitTargetOverride = false;
 	while (i < tokens.length) {
 		const value = tokens[i].value;
 		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+			gitTargetOverride ||= isGitTargetAssignment(value);
 			i++;
 			continue;
 		}
-		if (value === "--") return { end: i + 1, chdir, malformed };
+		if (value === "--")
+			return { end: i + 1, chdir, malformed, gitTargetOverride };
 		if (value === "-C" || value === "--chdir") {
 			if (!tokens[i + 1]) malformed = true;
 			else chdir = tokens[i + 1];
@@ -213,13 +235,17 @@ export function parseEnvPrefix(tokens, start = 0) {
 		}
 		break;
 	}
-	return { end: i, chdir, malformed };
+	return { end: i, chdir, malformed, gitTargetOverride };
 }
+
+const LEADING_REDIRECTION = /^(?:[0-9]*(?:<<<|<<|<>|<&|>&|>>?|<)|&>>?)/;
 
 function leadingRedirectionLength(tokens, start) {
 	const value = tokens[start]?.value ?? "";
-	if (/^(?:[0-9]*>>?|&>>?|<<<|<<).+/.test(value)) return 1;
-	if (/^(?:[0-9]*>>?|&>>?|<<<|<<)$/.test(value) && tokens[start + 1]) return 2;
+	const operator = value.match(LEADING_REDIRECTION)?.[0];
+	if (!operator) return 0;
+	if (operator.length < value.length) return 1;
+	if (tokens[start + 1]) return 2;
 	return 0;
 }
 
@@ -331,9 +357,33 @@ function parseTimePrefix(tokens, start) {
 	return { end: i, unresolved };
 }
 
+function parseCommandPrefix(tokens, start) {
+	if (basename(tokens[start]?.value ?? "") !== "command") return null;
+	let i = start + 1;
+	let query = false;
+	let unresolved = false;
+	while (i < tokens.length) {
+		const value = tokens[i].value;
+		if (value === "--") return { end: i + 1, query, unresolved };
+		if (/^-[pVv]+$/.test(value)) {
+			query ||= /[Vv]/.test(value);
+			i++;
+			continue;
+		}
+		if (value.startsWith("-")) {
+			unresolved = true;
+			i++;
+			continue;
+		}
+		break;
+	}
+	return { end: i, query, unresolved };
+}
+
 export function parseLeadingShellPrefix(tokens) {
 	let i = 0;
 	let unresolved = false;
+	let gitTargetOverride = false;
 	const envs = [];
 	while (i < tokens.length) {
 		const value = tokens[i].value;
@@ -344,6 +394,7 @@ export function parseLeadingShellPrefix(tokens) {
 			continue;
 		}
 		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+			gitTargetOverride ||= isGitTargetAssignment(value);
 			i++;
 			continue;
 		}
@@ -351,12 +402,16 @@ export function parseLeadingShellPrefix(tokens) {
 			const env = parseEnvPrefix(tokens, i);
 			envs.push(env);
 			unresolved ||= env.malformed;
+			gitTargetOverride ||= env.gitTargetOverride;
 			i = env.end;
 			continue;
 		}
-		if (executable === "command") {
-			i++;
-			if (tokens[i]?.value === "--") i++;
+		const command = parseCommandPrefix(tokens, i);
+		if (command !== null) {
+			unresolved ||= command.unresolved;
+			if (command.query)
+				return { end: tokens.length, envs, unresolved, gitTargetOverride };
+			i = command.end;
 			continue;
 		}
 		const sudo = parseSudoPrefix(tokens, i);
@@ -377,7 +432,7 @@ export function parseLeadingShellPrefix(tokens) {
 		}
 		break;
 	}
-	return { end: i, envs, unresolved };
+	return { end: i, envs, unresolved, gitTargetOverride };
 }
 
 // `FOO=bar cmd` and executable command prefixes still run cmd.
