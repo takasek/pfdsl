@@ -6,6 +6,7 @@ setup:
 	cp scripts/hooks/pre-commit-shim $$(git rev-parse --git-common-dir)/hooks/pre-commit
 	chmod +x $$(git rev-parse --git-common-dir)/hooks/pre-commit
 	node scripts/link-repo-skill.mjs
+	touch node_modules/.pfdsl-setup-complete
 
 .PHONY: build
 build:

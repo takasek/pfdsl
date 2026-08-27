@@ -89,9 +89,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ ! -d node_modules ]; then echo '[pfdsl] node_modules not found in this worktree - running make setup'; make setup; fi",
+            "command": "if [ ! -f node_modules/.pfdsl-setup-complete ]; then echo '[pfdsl] setup completion marker not found in this worktree - running make setup'; make setup; fi",
             "timeout": 300,
-            "statusMessage": "pfdsl: checking setup (make setup if this worktree is new)"
+            "statusMessage": "pfdsl: checking setup completion (make setup when marker is absent)"
           }
         ]
       }
