@@ -313,15 +313,45 @@ describe("formatFullReviewStatus", () => {
 });
 
 describe("needsAction", () => {
+	it("is true when a normalized release gate is not current", () => {
+		assert.equal(
+			needsAction({
+				results: [],
+				skillBundleCommits: 0,
+				gates: [
+					{
+						id: "asset-sweep",
+						ok: false,
+						lines: ["The following asset sweeps are overdue:"],
+					},
+				],
+			}),
+			true,
+		);
+	});
+
+	it("is true when a normalized release gate omits its verdict", () => {
+		assert.equal(
+			needsAction({
+				results: [],
+				skillBundleCommits: 0,
+				gates: [{ id: "future-gate", lines: ["missing verdict"] }],
+			}),
+			true,
+		);
+	});
+
 	const current = {
 		results: [
 			{ name: "@pfdsl/cli", status: "equal", commitsAhead: 0 },
 			{ name: "@pfdsl/core", status: "equal", commitsAhead: 0 },
 		],
 		skillBundleCommits: 0,
-		distributionReview: { unreviewedCount: 0, blockedReason: null },
-		assetSweep: { ok: true },
-		specHistory: { ok: true },
+		gates: [
+			{ id: "distribution-review", ok: true, lines: [] },
+			{ id: "asset-sweep", ok: true, lines: [] },
+			{ id: "spec-history", ok: true, lines: [] },
+		],
 	};
 
 	it("is false when every gate reads current", () => {
@@ -368,7 +398,7 @@ describe("needsAction", () => {
 		assert.equal(
 			needsAction({
 				...current,
-				distributionReview: { unreviewedCount: 12, blockedReason: null },
+				gates: [{ id: "distribution-review", ok: false, lines: [] }],
 			}),
 			true,
 		);
@@ -380,22 +410,31 @@ describe("needsAction", () => {
 		assert.equal(
 			needsAction({
 				...current,
-				distributionReview: {
-					unreviewedCount: undefined,
-					blockedReason: "reviewed commit f41fe18 is not reachable",
-				},
+				gates: [{ id: "distribution-review", ok: false, lines: [] }],
 			}),
 			true,
 		);
 	});
 
 	it("is true when spec-history does not document the current spec version", () => {
-		assert.equal(needsAction({ ...current, specHistory: { ok: false } }), true);
+		assert.equal(
+			needsAction({
+				...current,
+				gates: [{ id: "spec-history", ok: false, lines: [] }],
+			}),
+			true,
+		);
 	});
 
 	it("is true when a registered asset sweep is overdue", () => {
 		// `make release` refuses here (check-asset-sweep.mjs), and this gate
 		// runs nowhere else — CI is not wired to it, same as distributionReview.
-		assert.equal(needsAction({ ...current, assetSweep: { ok: false } }), true);
+		assert.equal(
+			needsAction({
+				...current,
+				gates: [{ id: "asset-sweep", ok: false, lines: [] }],
+			}),
+			true,
+		);
 	});
 });

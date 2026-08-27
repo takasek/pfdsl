@@ -6,7 +6,7 @@
 // Exit 1 if anything is left to do before the next publication — see
 // needsAction in lib/release-status-check.mjs for what that covers.
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { git as rawGit } from "./lib/run-exec.mjs";
@@ -15,30 +15,13 @@ import { git as rawGit } from "./lib/run-exec.mjs";
 // so their stderr is captured rather than printed as if something broke.
 const git = (args) => rawGit(args, { captureStderr: true });
 
-import {
-	repoDeps as assetSweepRepoDeps,
-	runAssetSweepCheck,
-} from "./lib/asset-sweep.mjs";
-import {
-	RECORD_PATH,
-	repoDeps,
-	runDistributionReviewCheck,
-} from "./lib/distribution-review.mjs";
+import { runReleaseGates } from "./lib/release-gates.mjs";
 import {
 	compareVersions,
-	formatAssetSweepStatus,
-	formatDistributionReviewStatus,
-	formatFullReviewStatus,
 	formatResults,
 	formatSkillBundleStatus,
-	formatSpecHistoryStatus,
-	latestFullReviewDate,
 	needsAction,
 } from "./lib/release-status-check.mjs";
-import {
-	runSpecHistoryCheck,
-	repoDeps as specHistoryRepoDeps,
-} from "./lib/spec-history-check.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -248,52 +231,19 @@ function countSkillBundleCommits(sinceTag) {
 const skillBundleTag = findLatestCliTag();
 const skillBundleCommits = countSkillBundleCommits(skillBundleTag);
 
-// The distribution review's state, reported but not enforced here. `make
-// release` blocks on the same reading (scripts/check-distribution-review.mjs);
-// showing it at status time is what keeps that refusal from arriving as a
-// surprise mid-release.
-function readDistributionReview() {
-	const deps = repoDeps(root);
-	const result = runDistributionReviewCheck(deps);
-	const logDir = resolve(root, dirname(RECORD_PATH));
-	return {
-		record: deps.readRecord() ?? { commit: null },
-		// An unreachable reviewed commit yields no file list; reporting it as
-		// "0 unreviewed" would say current where the release gate refuses.
-		unreviewedCount: result.files?.length,
-		blockedReason: result.files === undefined ? result.message : null,
-		lastFullReview: latestFullReviewDate(
-			existsSync(logDir) ? readdirSync(logDir) : [],
-		),
-	};
+const gates = runReleaseGates(root, { mode: "status" });
+for (const gate of gates) {
+	for (const warning of gate.warnings ?? []) console.warn(warning);
 }
-
-const distributionReview = readDistributionReview();
-if (distributionReview.blockedReason)
-	console.warn(`warn: ${distributionReview.blockedReason}`);
-
-// `make release` blocks on the same reading (scripts/check-asset-sweep.mjs),
-// through the same repoDeps as check-asset-sweep.mjs itself calls — so the
-// blocking check and this status line cannot disagree.
-const assetSweepResult = runAssetSweepCheck(assetSweepRepoDeps(root));
-
-// `make release` blocks on the same reading (scripts/check-spec-history.mjs);
-// showing it here keeps that refusal from arriving as a surprise mid-release.
-const specHistory = runSpecHistoryCheck(specHistoryRepoDeps(root));
 
 console.log("release-status:");
 console.log(formatResults(results));
 console.log(formatSkillBundleStatus(skillBundleCommits, skillBundleTag));
-console.log(formatDistributionReviewStatus(distributionReview));
-console.log(formatFullReviewStatus(distributionReview.lastFullReview));
-console.log(formatAssetSweepStatus(assetSweepResult.evaluations));
-console.log(formatSpecHistoryStatus(specHistory));
+for (const gate of gates) console.log(gate.lines.join("\n"));
 
 const pending = needsAction({
 	results,
 	skillBundleCommits,
-	distributionReview,
-	assetSweep: { ok: assetSweepResult.ok },
-	specHistory,
+	gates,
 });
 if (pending) process.exit(1);
