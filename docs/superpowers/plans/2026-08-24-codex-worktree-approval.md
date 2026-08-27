@@ -47,9 +47,9 @@ Exclude known prerequisite steps, the next step of the same documented workflow,
 
 Document that commands relying on Codex prefix rules run in their original canonical form rather than behind `rtk`.
 
-- [ ] **Step 4: Add safe routine prefixes**
+- [x] **Step 4: Add safe routine prefixes**
 
-Add allow rules for `git worktree add`, `pnpm -r build`, `pnpm test`, and `pnpm typecheck`, with negative examples proving the patterns do not match deletion, publish, or push commands.
+Add allow rules for the exact-arity Git routine wrapper, `pnpm -r build`, `pnpm test`, and `pnpm typecheck`. The wrapper rejects suffixes that a prefix-only rule cannot express, while negative examples prove unrelated deletion, publish, or push commands do not match.
 
 - [ ] **Step 5: Avoid duplicate worktree setup**
 
@@ -122,3 +122,51 @@ Commit the design record separately from the tested hook behavior, using English
 - [ ] **Step 4: Stop before public creation**
 
 Report the local branch and commits; do not push a new branch or create a PR until the user explicitly authorizes that new public destination.
+
+### Task 5: Harden compound-command session-root resolution
+
+**Files:**
+- Modify: `scripts/lib/main-commit-guard.test.mjs`
+- Modify: `scripts/main-commit-guard.mjs`
+
+- [x] Add failing coverage for whitespace-only session roots, `cd -- <path>`, redirected literal `cd`, and unresolved dynamic `cd` values.
+- [x] Treat whitespace-only roots as absent, preserve valid Claude precedence, resolve supported literal `cd` forms, and fail closed when the effective cwd cannot be resolved.
+- [x] Re-run the focused guard suite and review the behavior and messages.
+
+### Task 6: Make worktree setup completion explicit
+
+**Files:**
+- Add: `scripts/lib/setup-completion.test.mjs`
+- Modify: `Makefile`
+- Modify: `.claude/settings.json`
+- Modify: `CLAUDE.md`
+- Regenerate: `.codex/hooks.json`
+- Regenerate: `AGENTS.md`
+
+- [x] Add a failing behavioral contract for `node_modules/.pfdsl-setup-complete`.
+- [x] Touch the marker only after install, hook installation, and repository-skill linking all succeed; SessionStart checks the marker rather than `node_modules`.
+- [x] Regenerate Codex assets and run the focused setup contract.
+
+### Task 7: Constrain routine Git approvals with a strict user wrapper
+
+**Files:**
+- Add: `/Users/m5/.codex/bin/codex-git-routine.mjs`
+- Add: temporary wrapper tests outside the repository
+- Modify: `/Users/m5/.codex/rules/default.rules`
+- Modify: `/Users/m5/.codex/AGENTS.md`
+- Modify: `/Users/m5/.codex/RTK.md`
+
+- [x] Test exact `fetch-origin` and `worktree-add` arity plus rejection of suffixes, refspecs, traversal, absolute paths, symlink ancestors, and `--force`.
+- [x] Execute Git with fixed argv arrays only after repository-relative path, symlink, branch, and canonical remote-ref validation.
+- [x] Replace direct raw Git allow rules with wrapper-subcommand prefixes and validate positive and negative examples through Codex execpolicy.
+
+### Task 8: Synchronize the model, records, reviews, and PR
+
+**Files:**
+- Modify: `.pfdsl/workflow.pfdsl`
+- Modify: the design and implementation plan
+- Verify: generated assets and all changed code
+
+- [x] Update `main_branch_guard` metadata through the local pfdsl CLI and validate links and graph structure.
+- [ ] Run focused tests, typecheck, full repository tests, generated-drift checks, and the terminal gate.
+- [ ] Record simplify, correctness, and experience reviews in a logical commit, push the requested branch normally, and create the requested PR without merging it.
