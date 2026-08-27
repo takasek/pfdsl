@@ -1118,6 +1118,14 @@ export function formatSizeDelta(d) {
  * written" versus "the override could not be read" — belonged to a PR-body
  * lookup that no longer happens, so both it and the SKIP/FAIL line it drew are
  * gone (#775).
+ *
+ * Both declarations are self-reported: the issue filer opts into the direction
+ * check with `Size-Intent: shrink`, and the runner can accept measured growth
+ * with a `Size-Override:` trailer. This classifier evaluates the supplied
+ * measured deltas, not whether either declaration reflects its author's real
+ * intent. No detector is added for that semantic claim: the deltas are reported
+ * with or without the declarations, leaving their justification visible to
+ * human review (#910).
  * @param {{issueBody?: string, deltas: SizeDelta[], overrideDeclared?: boolean}} params
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
