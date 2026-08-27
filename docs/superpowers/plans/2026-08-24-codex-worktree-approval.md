@@ -187,4 +187,7 @@ Report the local branch and commits; do not push a new branch or create a PR unt
 - [x] Derive the main repository root from `--git-common-dir`, and reject main, mismatched workdir, mismatched branch, extra argv, and unsafe worktree destinations before mutation.
 - [x] Replace raw Git allow prefixes with wrapper-only prefixes, including exact setup and full-test targets.
 - [x] Fingerprint setup inputs so a marker becomes stale when a branch changes the setup contract.
+- [x] Track `env` cwd changes and fail closed on repository-target Git flags and unresolved shell prefixes.
+- [x] Serialize setup, recheck the marker after lock acquisition, and replace the marker atomically.
+- [x] Restrict every globally allowed wrapper routine to the realpath-verified pfdsl trusted root and remove raw package-script allow rules.
 - [ ] Re-run the full verification matrix and an adversarial review against all six original findings.
