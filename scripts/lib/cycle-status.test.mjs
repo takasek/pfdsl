@@ -622,15 +622,19 @@ describe("buildDesignRecordTemplate", () => {
 		assert.equal(selectDesignRecord(entries)?.author, "runner");
 	});
 
-	it("adds a disposition line naming the enumerated option count", () => {
+	it("adds one unfilled numbered disposition row per enumerated option", () => {
 		const { lines } = buildDesignRecordTemplate({ optionCount: 3 });
-		const dispositionLine = lines.find((l) => l.startsWith("案の処分:"));
-		assert.ok(dispositionLine, "expected a disposition line");
-		assert.match(dispositionLine, /3/);
-		assert.doesNotMatch(dispositionLine, /採用|却下|保留/);
+		assert.deepEqual(
+			lines.filter((line) => line.startsWith("案の処分 ")),
+			[
+				"案の処分 1: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
+				"案の処分 2: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
+				"案の処分 3: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
+			],
+		);
 		assert.ok(
 			lines.some((line) => /採用 \/ 却下 \/ 保留/.test(line)),
-			"expected disposition vocabulary guidance outside the declaration",
+			"expected visible disposition vocabulary",
 		);
 	});
 

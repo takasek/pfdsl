@@ -217,7 +217,11 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
 	if (optionCount > 0) {
 		lines.push(
 			`処分に使える語（各案にいずれかを書く）: ${DISPOSITION_TOKENS.join(" / ")}`,
-			`案の処分: 列挙された ${optionCount} 件それぞれの結論を書く`,
+			...Array.from(
+				{ length: optionCount },
+				(_, index) =>
+					`案の処分 ${index + 1}: <${DISPOSITION_TOKENS.join(" / ")}のいずれか> — <対象案と理由>`,
+			),
 		);
 	}
 	return {
