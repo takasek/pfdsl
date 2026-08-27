@@ -169,7 +169,7 @@ Report the local branch and commits; do not push a new branch or create a PR unt
 
 - [x] Update `main_branch_guard` metadata through the local pfdsl CLI and validate links and graph structure.
 - [x] Run focused tests, typecheck, full repository tests, generated-drift checks, and the terminal gate.
-- [ ] Record simplify, correctness, and experience reviews in a logical commit, push the requested branch normally, and create the requested PR without merging it.
+- [x] Record simplify, correctness, and experience reviews in a logical commit, push the requested branch normally, and create the requested PR without merging it.
 
 ### Task 9: Close the adversarial host-contract findings
 
