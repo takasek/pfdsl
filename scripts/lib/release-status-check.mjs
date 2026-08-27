@@ -154,24 +154,16 @@ export function formatFullReviewStatus(date) {
  * exit code, and what `cycle-status.mjs` re-exports as
  * `releasePending.needsAction`.
  *
- * The distribution review, asset sweep, and spec-history readings count here
- * because those gates run nowhere else: `make release` refuses on them and
- * none is wired into CI or the pre-commit hook (all three scripts say so in
- * their own headers). `release.mjs`'s other pre-tag checks — build, test,
+ * The release-only gate results count here because those gates run nowhere
+ * else: `make release` refuses on them and none is wired into CI or the
+ * pre-commit hook. `release.mjs`'s other pre-tag checks — build, test,
  * check-docs, gen-plugin identity — are covered continuously by test.yml and
  * check-gen-plugin.yml, so a failure there is ordinary breakage rather than
- * publishing work left pending, and folding them in would make this a slow
- * dry-run of the release for no reading it does not already have (#880).
- * @param {{results: Array<{status: string, commitsAhead?: number}>, skillBundleCommits: number, distributionReview: {unreviewedCount: number|undefined, blockedReason: string|null}, assetSweep: {ok: boolean}, specHistory: {ok: boolean}}} args
+ * publishing work left pending (#880).
+ * @param {{results: Array<{status: string, commitsAhead?: number}>, skillBundleCommits: number, gates: Array<{ok: boolean}>}} args
  * @returns {boolean}
  */
-export function needsAction({
-	results,
-	skillBundleCommits,
-	distributionReview,
-	assetSweep,
-	specHistory,
-}) {
+export function needsAction({ results, skillBundleCommits, gates }) {
 	return (
 		results.some(
 			(r) =>
@@ -180,11 +172,6 @@ export function needsAction({
 				r.commitsAhead > 0,
 		) ||
 		skillBundleCommits > 0 ||
-		// undefined means the gate could not read the recorded commit at all,
-		// which is the state `make release` refuses on rather than a zero.
-		distributionReview.blockedReason !== null ||
-		distributionReview.unreviewedCount > 0 ||
-		assetSweep.ok === false ||
-		specHistory.ok === false
+		gates.some((gate) => gate.ok === false)
 	);
 }

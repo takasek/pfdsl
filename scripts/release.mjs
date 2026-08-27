@@ -28,10 +28,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import {
-	repoDeps as assetSweepRepoDeps,
-	runAssetSweepCheck,
-} from "./lib/asset-sweep.mjs";
-import {
 	bumpVersionInPackageJson,
 	filesToCommitForBump,
 	pinMarketplaceSourceToTag,
@@ -39,11 +35,7 @@ import {
 	releaseMilestoneArtifactIds,
 	tagName,
 } from "./lib/release-config.mjs";
-import { tryRun } from "./lib/run-exec.mjs";
-import {
-	runSpecHistoryCheck,
-	repoDeps as specHistoryRepoDeps,
-} from "./lib/spec-history-check.mjs";
+import { runReleaseGates } from "./lib/release-gates.mjs";
 import { parseHost } from "./pfdsl/lib/github-rest.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -178,39 +170,13 @@ try {
 	);
 }
 
-// Has anyone read what the bundle now says, as someone who is not sitting in
-// this repository? Runs after the identity check above, so the prompts it
-// judges are the ones this tag will actually ship. No override: a release is
-// the only moment an adopter is handed this prose, and an escape hatch used
-// once under deadline becomes the way the gate is passed.
-// The child prints the file list and what to do about it, so this only has to
-// stop the release — restating the reason here would double-report it.
-const reviewCheck = tryRun(
-	process.execPath,
-	[resolve(root, "scripts/check-distribution-review.mjs")],
-	{ cwd: root },
-);
-if (!reviewCheck.ok) process.exit(1);
-console.log(reviewCheck.out.trim());
-
-// Has any registered accumulating catalog (scripts/lib/asset-sweep.mjs's
-// SWEEP_TARGETS) gone unswept past its threshold? In-process, like the
-// spec-history check below: a fixed set of file reads and diffs, not a
-// generated bundle to build first.
-const sweepCheck = runAssetSweepCheck(assetSweepRepoDeps(root));
-console[sweepCheck.ok ? "log" : "error"](sweepCheck.message);
-if (!sweepCheck.ok) process.exit(1);
-
-// A spec.md version bump with no matching docs/spec/spec-history.md entry —
-// the coupling splitting the changelog into its own file (#692) traded away
-// physical proximity for. Gated here, not per-commit: a title-line bump made
-// mid-development doesn't need its changelog entry until the release that
-// ships it. In-process (unlike the distribution review check above, which
-// shells out): just two file reads and a regex, and release-status.mjs
-// already calls it the same way, so the two can't drift on how they invoke it.
-const specHistoryResult = runSpecHistoryCheck(specHistoryRepoDeps(root));
-console[specHistoryResult.ok ? "log" : "error"](specHistoryResult.message);
-if (!specHistoryResult.ok) process.exit(1);
+for (const gate of runReleaseGates(root, {
+	mode: "release",
+	stopOnFailure: true,
+})) {
+	console[gate.ok ? "log" : "error"](gate.lines.join("\n"));
+	if (!gate.ok) process.exit(1);
+}
 
 // --- 7. bump + commit (only if --version was given) ---
 
