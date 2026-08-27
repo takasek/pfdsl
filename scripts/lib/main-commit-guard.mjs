@@ -19,6 +19,7 @@ import {
 	gitSubcommand,
 	gitSubcommandIndex,
 	parseLeadingShellPrefix,
+	persistsGitTargetOverride,
 	splitSegments,
 	stripLeadingNoise,
 	tokenize,
@@ -230,10 +231,12 @@ function analyzeCommand(command, hookCwd) {
 
 	/** Where the shell stands, or null once a `cd` moved it somewhere unknown. */
 	let cwd = hookCwd;
+	let gitTargetOverride = false;
 	const targets = [];
 
 	for (const segment of splitSegments(command)) {
 		const rawTokens = tokenize(segment);
+		gitTargetOverride ||= persistsGitTargetOverride(rawTokens);
 		const prefix = parseLeadingShellPrefix(rawTokens);
 		const envCwd = resolveEnvCwd(rawTokens, cwd);
 		const tokens = rawTokens.slice(prefix.end);
@@ -265,11 +268,12 @@ function analyzeCommand(command, hookCwd) {
 		if (!guarded) continue;
 		targets.push({
 			...guarded,
-			cwd: prefix.unresolved
-				? null
-				: head === "git"
-					? resolveGitCwd(tokens, envCwd)
-					: resolveCodexRoutineCwd(tokens),
+			cwd:
+				prefix.unresolved || gitTargetOverride
+					? null
+					: head === "git"
+						? resolveGitCwd(tokens, envCwd)
+						: resolveCodexRoutineCwd(tokens),
 		});
 	}
 	return { targets, finalCwd: cwd };

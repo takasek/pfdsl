@@ -771,6 +771,27 @@ describe("main-commit-guard wrapper", () => {
 		}
 	});
 
+	it("fails closed after a shell builtin persists a Git target override", () => {
+		for (const command of [
+			`export GIT_INDEX_FILE=${join(repo, ".git", "index")}; git add -A`,
+			`export GIT_DIR=${join(repo, ".git")} GIT_WORK_TREE=${repo}; git add -A`,
+			"readonly GIT_COMMON_DIR=/override; git add -A",
+			"typeset GIT_OBJECT_DIRECTORY=/override; git add -A",
+			"declare GIT_NAMESPACE=guard-test; git add -A",
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+
+		assert.equal(runWrapper("export FOO=x; git add -A"), "");
+		assert.equal(runWrapper("export GIT_INDEX_FILE=/override; git status"), "");
+	});
+
 	it("does not let Git repository-target flags or shell prefixes bypass sibling checks", () => {
 		for (const command of [
 			`git --git-dir=${join(repo, ".git")} add -A`,
