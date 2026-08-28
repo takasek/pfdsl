@@ -10,6 +10,11 @@ import {
 	parseTransform,
 	removeRunDirectory,
 } from "./harness.mjs";
+import {
+	assertVisibleCount,
+	resolveVSCodeExecutablePath,
+	waitForWorkbenchPage,
+} from "./run.mjs";
 
 test("makeLaunchArgs isolates the run and opens the fixture", () => {
 	assert.deepEqual(
@@ -41,7 +46,7 @@ test("parseTransform reads the webview translate and scale", () => {
 	});
 });
 
-test("findWebviewFrame selects the content frame", async () => {
+test("findWebviewFrame ignores the outer and fake-empty frames", async () => {
 	const frames = [
 		{ url: () => "workbench.html", locator: () => ({ count: async () => 0 }) },
 		{
@@ -49,11 +54,49 @@ test("findWebviewFrame selects the content frame", async () => {
 			locator: () => ({ count: async () => 0 }),
 		},
 		{
-			url: () => "vscode-webview://one/content.html",
+			url: () => "vscode-webview://one/fake.html",
 			locator: () => ({ count: async () => 1 }),
 		},
 	];
 	assert.equal(await findWebviewFrame({ frames: () => frames }), frames[2]);
+});
+
+test("assertVisibleCount rejects an invisible preview element", async () => {
+	const locator = {
+		count: async () => 1,
+		nth: () => ({ isVisible: async () => false }),
+	};
+	await assert.rejects(
+		assertVisibleCount(locator, 1, "preview SVG"),
+		/preview SVG: expected 1 visible element, observed 0/,
+	);
+});
+
+test("resolveVSCodeExecutablePath handles recent macOS Code bundles", () => {
+	const electronPath = "/tmp/Visual Studio Code.app/Contents/MacOS/Electron";
+	const codePath = "/tmp/Visual Studio Code.app/Contents/MacOS/Code";
+	assert.equal(
+		resolveVSCodeExecutablePath(electronPath, {
+			platform: "darwin",
+			exists: (path) => path === codePath,
+		}),
+		codePath,
+	);
+});
+
+test("waitForWorkbenchPage waits for the CDP workbench page", async () => {
+	const page = { url: () => "workbench.html" };
+	let reads = 0;
+	const browser = {
+		contexts: () => [{ pages: () => (reads++ === 0 ? [] : [page]) }],
+	};
+	assert.equal(
+		await waitForWorkbenchPage(browser, {
+			delay: async () => {},
+			timeoutMs: 1_000,
+		}),
+		page,
+	);
 });
 
 test("removeRunDirectory refuses an unissued lookalike path", async () => {
