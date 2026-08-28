@@ -412,13 +412,13 @@ process:
     tags: [ gen, g ]
   gen_plugin:
     label: Claude Code plugin root 組み立て
-    description: "make gen-pluginのClaude Code adapter。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirror、toolchain metadataから、Claude Code skill tree、Markdown command、Markdown agent、hooks、manifest、marketplace記述をplugin/pfdsl/へidentity互換に組み立てる。全Claude root writeの後、manifest自身を除く全bundleファイルの内容ハッシュを.claude-plugin/bundle-manifest.jsonへ記録する（#971）"
+    description: "make gen-pluginのClaude Code adapter。contract検証済みのharness_capability_modelと中立生成済みpfdsl skill、install mirrorから、Claude Code skill tree、Markdown command、Markdown agent、hooks、manifest、marketplace記述をplugin/pfdsl/へidentity互換に組み立てる。全Claude root writeの後、manifest自身を除く全bundleファイルの内容ハッシュを.claude-plugin/bundle-manifest.jsonへ記録する（#971）"
     command: make gen-plugin
     location: ../scripts/gen-plugin.mjs
     tags: [ gen, g ]
   assemble_codex_plugin:
     label: Codex plugin root 組み立て
-    description: "make gen-pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、toolchain metadataだけを入力に、Codex native skill tree、command由来skill、hooks、manifestをplugin/pfdsl-codex/へ生成する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource-command-接頭辞を付け、repository Codex assetsとともにatomicに置換する"
+    description: "make gen-pluginのCodex adapter。Claude adapterと同一objectのharness_capability_modelと中立生成済みpfdsl skillを入力に、Codex native skill tree、command由来skill、hooks、manifestをplugin/pfdsl-codex/へ生成する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource-command-接頭辞を付け、repository Codex assetsとともにatomicに置換する"
     command: make gen-plugin
     location: ../scripts/lib/gen-plugin.mjs
     tags: [ gen, g ]
@@ -530,9 +530,9 @@ ops_install_sources >> gen_install -> ops_install_templates
 
 [claude_harness_sources, harness_inventory, toolchain] >> decode_harness_capabilities -> harness_capability_model
 
-[harness_capability_model, ops_install_templates, pfdsl_skill, toolchain] >> gen_plugin -> claude_adapter_output
+[harness_capability_model, ops_install_templates, pfdsl_skill] >> gen_plugin -> claude_adapter_output
 
-[harness_capability_model, pfdsl_skill, toolchain] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
+[harness_capability_model, pfdsl_skill] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
 
 [claude_adapter_output, codex_adapter_output, codex_repo_assets] >> check_plugin_drift -> plugin_dist
 
