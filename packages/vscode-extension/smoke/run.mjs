@@ -234,17 +234,78 @@ export async function waitForVisibleCount(locator, expected, label, options) {
 }
 
 const geometryTolerance = 1;
+const scaleTolerance = 0.000_001;
 
-function isWithinTolerance(actual, expected) {
+function isWithinGeometryTolerance(actual, expected) {
 	return Math.abs(actual - expected) <= geometryTolerance;
+}
+
+export function isWithinScaleTolerance(actual, expected) {
+	return Math.abs(actual - expected) <= scaleTolerance;
 }
 
 function transformsMatch(actual, expected) {
 	return (
-		isWithinTolerance(actual.panX, expected.panX) &&
-		isWithinTolerance(actual.panY, expected.panY) &&
-		isWithinTolerance(actual.scale, expected.scale)
+		isWithinGeometryTolerance(actual.panX, expected.panX) &&
+		isWithinGeometryTolerance(actual.panY, expected.panY) &&
+		isWithinScaleTolerance(actual.scale, expected.scale)
 	);
+}
+
+export function findTextEndPosition(text, needle) {
+	if (needle.length === 0)
+		throw new Error("Expected a non-empty fixture node ID");
+	const start = text.indexOf(needle);
+	if (start === -1)
+		throw new Error(`Fixture does not contain node ID: ${needle}`);
+	const prefix = text.slice(0, start + needle.length);
+	const lines = prefix.split("\n");
+	return { line: lines.length, column: lines.at(-1).length + 1 };
+}
+
+export function parseStatusCursorPosition(statusText) {
+	const match = /Ln (\d+), Col (\d+)(?: \(\d+ selected\))?\b/.exec(statusText);
+	if (!match) {
+		throw new Error(
+			`Status bar does not report a cursor position: ${statusText}`,
+		);
+	}
+	return { line: Number(match[1]), column: Number(match[2]) };
+}
+
+function cursorPositionsMatch(actual, expected) {
+	return actual.line === expected.line && actual.column === expected.column;
+}
+
+export function isCursorNavigationTransition(before, after, expected) {
+	return (
+		!cursorPositionsMatch(before, expected) &&
+		cursorPositionsMatch(after, expected)
+	);
+}
+
+async function readStatusText(page) {
+	const status = page.getByRole("status");
+	const count = await status.count();
+	if (count !== 1) {
+		throw new Error(
+			`VS Code status bar: expected 1 element, observed ${count}`,
+		);
+	}
+	return status.textContent();
+}
+
+async function readStatusCursorPosition(page) {
+	return parseStatusCursorPosition(await readStatusText(page));
+}
+
+async function waitForStatusCursorPosition(page, label) {
+	const statusText = await expectEventually(
+		label,
+		() => readStatusText(page),
+		(text) => /Ln \d+, Col \d+\b/.test(text),
+	);
+	return parseStatusCursorPosition(statusText);
 }
 
 async function readBoundingBox(locator, label) {
@@ -318,10 +379,10 @@ function expectedMinimapViewport(geometry, transform) {
 function minimapViewportMatches(geometry, transform) {
 	const expected = expectedMinimapViewport(geometry, transform);
 	return (
-		isWithinTolerance(geometry.viewport.left, expected.left) &&
-		isWithinTolerance(geometry.viewport.top, expected.top) &&
-		isWithinTolerance(geometry.viewport.width, expected.width) &&
-		isWithinTolerance(geometry.viewport.height, expected.height)
+		isWithinGeometryTolerance(geometry.viewport.left, expected.left) &&
+		isWithinGeometryTolerance(geometry.viewport.top, expected.top) &&
+		isWithinGeometryTolerance(geometry.viewport.width, expected.width) &&
+		isWithinGeometryTolerance(geometry.viewport.height, expected.height)
 	);
 }
 
@@ -382,8 +443,8 @@ async function assertPreviewInteractions(session) {
 			};
 		},
 		({ nodeCenter }) =>
-			isWithinTolerance(nodeCenter.x, cursor.x) &&
-			isWithinTolerance(nodeCenter.y, cursor.y),
+			isWithinGeometryTolerance(nodeCenter.x, cursor.x) &&
+			isWithinGeometryTolerance(nodeCenter.y, cursor.y),
 	);
 
 	const rootBox = await readBoundingBox(root, "preview root");
@@ -397,8 +458,8 @@ async function assertPreviewInteractions(session) {
 		"graph pan follows the drag distance",
 		() => readTransform(frame),
 		(transform) =>
-			isWithinTolerance(transform.panX, beforePan.panX + 40) &&
-			isWithinTolerance(transform.panY, beforePan.panY + 25),
+			isWithinGeometryTolerance(transform.panX, beforePan.panX + 40) &&
+			isWithinGeometryTolerance(transform.panY, beforePan.panY + 25),
 	);
 
 	const releaseStart = await findEmptyRootPoint(frame, rootBox);
@@ -406,20 +467,21 @@ async function assertPreviewInteractions(session) {
 	await page.mouse.move(releaseStart.x, releaseStart.y);
 	await page.mouse.down();
 	await page.mouse.move(releaseStart.x + 10, releaseStart.y + 8);
-	const whileDragging = await expectEventually(
+	await expectEventually(
 		"outside release starts a second graph drag",
 		() => readTransform(frame),
 		(transform) =>
 			!transformsMatch(transform, beforeOutsideRelease) &&
-			isWithinTolerance(transform.scale, beforeOutsideRelease.scale),
+			isWithinScaleTolerance(transform.scale, beforeOutsideRelease.scale),
 	);
 	await page.mouse.move(rootBox.x - 20, rootBox.y - 20);
 	await page.mouse.up();
+	const afterOutsideRelease = await readTransform(frame);
 	await page.mouse.move(releaseStart.x + 20, releaseStart.y + 20);
 	await expectEventually(
 		"outside release prevents further graph pan",
 		() => readTransform(frame),
-		(transform) => transformsMatch(transform, whileDragging),
+		(transform) => transformsMatch(transform, afterOutsideRelease),
 	);
 
 	await expectEventually(
@@ -447,49 +509,41 @@ async function assertPreviewInteractions(session) {
 		"minimap drag changes preview pan without zooming",
 		() => readTransform(frame),
 		(transform) =>
-			!isWithinTolerance(transform.panX, beforeMinimapDrag.panX) &&
-			!isWithinTolerance(transform.panY, beforeMinimapDrag.panY) &&
-			isWithinTolerance(transform.scale, beforeMinimapDrag.scale),
+			!isWithinGeometryTolerance(transform.panX, beforeMinimapDrag.panX) &&
+			!isWithinGeometryTolerance(transform.panY, beforeMinimapDrag.panY) &&
+			isWithinScaleTolerance(transform.scale, beforeMinimapDrag.scale),
 	);
 
 	const fixtureText = await readFile(session.fixturePath, "utf8");
-	const designLine = fixtureText
-		.split("\n")
-		.find((line) => line.includes("design"));
-	assert.ok(designLine, "smoke fixture must contain a design node");
-	const designOccurrence = designLine.match(/\bdesign\b/)?.[0];
+	const designOccurrence = fixtureText.match(/\bdesign\b/)?.[0];
 	assert.ok(designOccurrence, "smoke fixture must name the design node");
-	const sourceEditor = page.getByRole("code").filter({ hasText: designLine });
+	const expectedCursorPosition = findTextEndPosition(
+		fixtureText,
+		designOccurrence,
+	);
 	const sourceTab = page.getByRole("tab", {
-		name: /^01-simple-chain\.pfdsl, Editor Group \d+$/,
+		name: /^01-simple-chain\.pfdsl(?:, Editor Group \d+)?$/,
 	});
+	await sourceTab.click();
+	const cursorBeforeNavigation = await waitForStatusCursorPosition(
+		page,
+		"source editor reports its cursor position",
+	);
+	assert.notDeepEqual(
+		cursorBeforeNavigation,
+		expectedCursorPosition,
+		"node navigation must start away from the fixture selection endpoint",
+	);
 	await frame.locator('#inner g.node[data-node-id="design"]').dblclick();
 	await expectEventually(
-		"node double-click navigates to design in the source editor",
-		async () => {
-			// VS Code 1.132.1 does not expose selection state through an accessibility role, so this fallback observes the visible selection highlight under the semantic source-editor role.
-			const selection = await sourceEditor
-				.locator(".selected-text")
-				.evaluateAll((elements) =>
-					elements.map((element) => {
-						const rect = element.getBoundingClientRect();
-						return { width: rect.width, height: rect.height };
-					}),
-				);
-			const sourceTabCount = await sourceTab.count();
-			const documentTitleVisible =
-				sourceTabCount === 1 && (await sourceTab.isVisible());
-			return {
-				documentTitleVisible,
-				line: await sourceEditor.textContent(),
-				selection,
-				sourceTabCount,
-			};
-		},
-		({ documentTitleVisible, line, selection }) =>
-			documentTitleVisible &&
-			line?.includes(designOccurrence) &&
-			selection.some((rect) => rect.width > 0 && rect.height > 0),
+		"node double-click moves the source cursor to design",
+		() => readStatusCursorPosition(page),
+		(cursorAfterNavigation) =>
+			isCursorNavigationTransition(
+				cursorBeforeNavigation,
+				cursorAfterNavigation,
+				expectedCursorPosition,
+			),
 	);
 
 	assert.ok(afterZoom.scale > beforeZoom.scale, "zoom scale must increase");

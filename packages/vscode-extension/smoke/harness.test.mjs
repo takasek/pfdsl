@@ -16,6 +16,10 @@ import {
 	appendCleanupDiagnostics,
 	assertVisibleCount,
 	cleanupSmokeSession,
+	findTextEndPosition,
+	isCursorNavigationTransition,
+	isWithinScaleTolerance,
+	parseStatusCursorPosition,
 	resolveVSCodeExecutablePath,
 	waitForVisibleCount,
 	waitForWorkbenchPage,
@@ -49,6 +53,36 @@ test("parseTransform reads the webview translate and scale", () => {
 		panY: -8,
 		scale: 1.1,
 	});
+});
+
+test("isWithinScaleTolerance rejects visible scale drift", () => {
+	assert.equal(isWithinScaleTolerance(1, 1 + 0.000_000_5), true);
+	assert.equal(isWithinScaleTolerance(1, 1 + 0.000_01), false);
+});
+
+test("findTextEndPosition derives the first node selection endpoint", () => {
+	assert.deepEqual(
+		findTextEndPosition("requirements >> design -> spec", "design"),
+		{ line: 1, column: 23 },
+	);
+});
+
+test("isCursorNavigationTransition requires movement to the fixture endpoint", () => {
+	const expected = { line: 1, column: 23 };
+	assert.equal(
+		isCursorNavigationTransition(
+			parseStatusCursorPosition("Ln 1, Col 1"),
+			parseStatusCursorPosition(
+				"PFDSLLFUTF-8Spaces: 4Ln 1, Col 23 (6 selected)",
+			),
+			expected,
+		),
+		true,
+	);
+	assert.equal(
+		isCursorNavigationTransition(expected, expected, expected),
+		false,
+	);
 });
 
 test("expectEventually reports the last observed value", async () => {
