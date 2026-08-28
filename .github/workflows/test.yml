@@ -31,6 +31,9 @@ jobs:
 
       - run: pnpm -r test
 
+      - name: Test VS Code webview smoke scenarios
+        run: xvfb-run --auto-servernum make test-vscode-smoke
+
       - run: node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs"
 
       - run: node scripts/check-script-imports.mjs
