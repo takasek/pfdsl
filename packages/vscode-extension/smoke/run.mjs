@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,10 @@ const vscodeVersion = "1.132.1";
 const cdpTimeoutMs = 30_000;
 export const coldRenderTimeoutMs = 30_000;
 const interactionTimeoutMs = 1_000;
+const extensionHostLogFilePattern = /^exthost.*\.log$/i;
+const maxExtensionHostLogFiles = 4;
+const maxExtensionHostLogEntries = 200;
+const maxExtensionHostLogTailBytes = 4_096;
 
 export function resolveVSCodeExecutablePath(
 	vscodeExecutablePath,
@@ -81,6 +85,66 @@ export function appendCleanupDiagnostics(primaryError, cleanupErrors) {
 			),
 		},
 	);
+}
+
+async function findExtensionHostLogPaths(profileDir) {
+	const directories = [profileDir];
+	const paths = [];
+	let entriesRead = 0;
+	while (directories.length > 0 && paths.length < maxExtensionHostLogFiles) {
+		const directory = directories.pop();
+		let entries;
+		try {
+			entries = await readdir(directory, { withFileTypes: true });
+		} catch (error) {
+			if (error?.code === "ENOENT") continue;
+			throw error;
+		}
+		for (const entry of entries) {
+			entriesRead += 1;
+			if (entriesRead > maxExtensionHostLogEntries) return paths;
+			const path = join(directory, entry.name);
+			if (entry.isDirectory()) {
+				directories.push(path);
+			} else if (
+				entry.isFile() &&
+				extensionHostLogFilePattern.test(entry.name)
+			) {
+				paths.push(path);
+				if (paths.length === maxExtensionHostLogFiles) return paths;
+			}
+		}
+	}
+	return paths;
+}
+
+function tailLog(text) {
+	return text.length > maxExtensionHostLogTailBytes
+		? text.slice(-maxExtensionHostLogTailBytes)
+		: text;
+}
+
+export async function appendExtensionHostLogDiagnostics(
+	primaryError,
+	profileDir,
+) {
+	try {
+		const paths = await findExtensionHostLogPaths(profileDir);
+		const logs = await Promise.all(
+			paths.map(
+				async (path) => `${path}:\n${tailLog(await readFile(path, "utf8"))}`,
+			),
+		);
+		return new Error(
+			`${primaryError.message}\nExtension host logs:\n${logs.join("\n") || "none found"}`,
+			{ cause: primaryError },
+		);
+	} catch (error) {
+		return new Error(
+			`${primaryError.message}\nExtension host logs: unavailable (${error.message})`,
+			{ cause: primaryError },
+		);
+	}
 }
 
 function delay(milliseconds) {
@@ -416,6 +480,14 @@ export function minimapDragChangesPan(afterMouseDown, afterMouseMove) {
 	);
 }
 
+export function minimapClickChangesPan(beforeClick, afterClick) {
+	return (
+		(!isWithinGeometryTolerance(afterClick.panX, beforeClick.panX) ||
+			!isWithinGeometryTolerance(afterClick.panY, beforeClick.panY)) &&
+		isWithinScaleTolerance(afterClick.scale, beforeClick.scale)
+	);
+}
+
 export async function collectWebviewFailureSnapshot(frame) {
 	const snapshot = await frame.locator("#root").evaluate((root) => {
 		const rect = (element) => {
@@ -578,6 +650,18 @@ async function assertPreviewInteractions(session) {
 	);
 	const minimap = frame.locator("#minimap");
 	const minimapBox = await readBoundingBox(minimap, "minimap");
+	const beforeMinimapClick = await readTransform(frame);
+	await page.mouse.move(
+		minimapBox.x + minimapBox.width * 0.25,
+		minimapBox.y + minimapBox.height * 0.75,
+	);
+	await page.mouse.down();
+	await page.mouse.up();
+	const afterMinimapClick = await waitForInteraction(
+		"minimap click changes preview pan without changing scale",
+		() => readTransform(frame),
+		(transform) => minimapClickChangesPan(beforeMinimapClick, transform),
+	);
 	await page.mouse.move(
 		minimapBox.x + minimapBox.width * 0.25,
 		minimapBox.y + minimapBox.height * 0.75,
@@ -587,6 +671,10 @@ async function assertPreviewInteractions(session) {
 	await page.mouse.move(
 		minimapBox.x + minimapBox.width * 0.75,
 		minimapBox.y + minimapBox.height * 0.25,
+	);
+	assert.ok(
+		minimapClickChangesPan(beforeMinimapClick, afterMinimapClick),
+		"minimap click must pan without changing preview scale",
 	);
 	await page.mouse.up();
 	await waitForInteraction(
@@ -632,6 +720,7 @@ async function assertPreviewInteractions(session) {
 
 export async function launchSmokeSession() {
 	const runDir = await createRunDirectory();
+	const profileDir = join(runDir, "profile");
 	let browser;
 	let page;
 	let processError;
@@ -662,7 +751,7 @@ export async function launchSmokeSession() {
 			vscodeExecutablePath,
 			makeLaunchArgs({
 				repoRoot,
-				profileDir: join(runDir, "profile"),
+				profileDir,
 				extensionsDir: join(runDir, "extensions"),
 				port,
 				fixturePath,
@@ -690,6 +779,7 @@ export async function launchSmokeSession() {
 			page,
 			frame,
 			fixturePath,
+			profileDir,
 			vscodeProcess,
 			runDir,
 			output,
@@ -702,7 +792,10 @@ export async function launchSmokeSession() {
 			vscodeProcess,
 			output,
 		});
-		const primaryError = new Error(diagnostic, { cause: error });
+		const primaryError = await appendExtensionHostLogDiagnostics(
+			new Error(diagnostic, { cause: error }),
+			profileDir,
+		);
 		const cleanupErrors = await cleanupSmokeSession({
 			browser,
 			runDir,
@@ -760,6 +853,10 @@ async function main() {
 					{ cause: error },
 				),
 				session.frame,
+			);
+			failure = await appendExtensionHostLogDiagnostics(
+				failure,
+				session.profileDir,
 			);
 		}
 	} finally {

@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+	access,
+	mkdir,
+	mkdtemp,
+	readFile,
+	rm,
+	utimes,
+	writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
+	cacheLockWaitTimeoutMs,
 	createRunDirectory,
 	expectEventually,
 	findWebviewFrame,
@@ -18,6 +27,7 @@ import {
 } from "./harness.mjs";
 import {
 	appendCleanupDiagnostics,
+	appendExtensionHostLogDiagnostics,
 	appendWebviewFailureSnapshot,
 	assertVisibleCount,
 	cleanupSmokeSession,
@@ -26,6 +36,7 @@ import {
 	findTextEndPosition,
 	isCursorNavigationTransition,
 	isWithinScaleTolerance,
+	minimapClickChangesPan,
 	minimapDragChangesPan,
 	parseStatusCursorPosition,
 	resolveVSCodeExecutablePath,
@@ -34,6 +45,15 @@ import {
 	waitForVisibleCount,
 	waitForWorkbenchPage,
 } from "./run.mjs";
+
+function minimumNodeMajor(engineRange) {
+	const match = /^>=\s*(\d+)(?:\.\d+\.\d+)?$/.exec(engineRange);
+	assert.ok(
+		match,
+		`expected a simple minimum Node engine range, got ${engineRange}`,
+	);
+	return Number(match[1]);
+}
 
 test("makeLaunchArgs isolates the run and opens the fixture", () => {
 	assert.deepEqual(
@@ -55,6 +75,26 @@ test("makeLaunchArgs isolates the run and opens the fixture", () => {
 			"/repo/docs/samples/01-simple-chain.pfdsl",
 		],
 	);
+});
+
+test("executable smoke dependencies support the extension's declared Node version", async () => {
+	const extensionPackage = JSON.parse(
+		await readFile(new URL("../package.json", import.meta.url), "utf8"),
+	);
+	const supportedNodeMajor = minimumNodeMajor(extensionPackage.engines.node);
+	for (const dependency of ["@vscode/test-electron", "playwright-core"]) {
+		const dependencyPackage = JSON.parse(
+			await readFile(
+				new URL(`../node_modules/${dependency}/package.json`, import.meta.url),
+				"utf8",
+			),
+		);
+		assert.equal(
+			minimumNodeMajor(dependencyPackage.engines.node) <= supportedNodeMajor,
+			true,
+			`${dependency} requires ${dependencyPackage.engines.node}, but the extension supports ${extensionPackage.engines.node}`,
+		);
+	}
 });
 
 test("makeVSCodeCachePath keeps a stable worktree-specific cache outside the repository", () => {
@@ -205,6 +245,110 @@ test("populateVSCodeCache reports stale and timed-out locks", async () => {
 	}
 });
 
+test("populateVSCodeCache lets a healthy heartbeat outlive the former one-minute wait", async () => {
+	const temporaryDirectory = await mkdtemp(
+		join(tmpdir(), "pfdsl-vscode-cache-test-"),
+	);
+	try {
+		const cachePath = await prepareVSCodeCachePath("/repo/.worktrees/one", {
+			temporaryDirectory,
+		});
+		let clock = 1_000_000;
+		let populateCalls = 0;
+		let releasePopulation;
+		let heartbeat;
+		let cleared = false;
+		const first = populateVSCodeCache(
+			cachePath,
+			"1.132.1",
+			async () => {
+				populateCalls += 1;
+				await new Promise((resolvePopulation) => {
+					releasePopulation = resolvePopulation;
+				});
+				return "first";
+			},
+			{
+				clearIntervalFn: () => {
+					cleared = true;
+				},
+				now: () => clock,
+				setIntervalFn: (callback) => {
+					heartbeat = callback;
+					return "heartbeat";
+				},
+			},
+		);
+		await expectEventually(
+			"cache population starts",
+			async () => populateCalls,
+			(value) => value === 1,
+			{ retryIntervalMs: 0, timeoutMs: 100 },
+		);
+		assert.deepEqual(
+			JSON.parse(
+				await readFile(
+					join(makeVSCodeCacheLockPath(cachePath), "owner.json"),
+					"utf8",
+				),
+			),
+			{ pid: process.pid, startedAt: clock },
+		);
+		let waits = 0;
+		const second = populateVSCodeCache(
+			cachePath,
+			"1.132.1",
+			async () => {
+				populateCalls += 1;
+				return "second";
+			},
+			{
+				now: () => clock,
+				retryIntervalMs: 0,
+				staleLockMs: 30_000,
+				wait: async () => {
+					clock += 20_000;
+					await heartbeat();
+					waits += 1;
+					if (waits === 4) releasePopulation();
+				},
+			},
+		);
+		assert.equal(await first, "first");
+		assert.equal(await second, null);
+		assert.equal(populateCalls, 1);
+		assert.equal(clock - 1_000_000 > 60_000, true);
+		assert.equal(cacheLockWaitTimeoutMs, 8 * 60_000);
+		assert.equal(cleared, true);
+	} finally {
+		await rm(temporaryDirectory, { recursive: true, force: true });
+	}
+});
+
+test("populateVSCodeCache fails closed when a lock has no fresh heartbeat", async () => {
+	const temporaryDirectory = await mkdtemp(
+		join(tmpdir(), "pfdsl-vscode-cache-test-"),
+	);
+	try {
+		const cachePath = await prepareVSCodeCachePath("/repo/.worktrees/one", {
+			temporaryDirectory,
+		});
+		const lockPath = makeVSCodeCacheLockPath(cachePath);
+		await mkdir(lockPath);
+		await writeFile(join(lockPath, "owner.json"), '{"pid":1}\n');
+		await utimes(lockPath, new Date(1_000), new Date(1_000));
+		await assert.rejects(
+			populateVSCodeCache(cachePath, "1.132.1", async () => "unreachable", {
+				now: () => 31_000,
+				staleLockMs: 30_000,
+			}),
+			/stale VS Code cache lock/,
+		);
+	} finally {
+		await rm(temporaryDirectory, { recursive: true, force: true });
+	}
+});
+
 test("parseTransform reads the webview translate and scale", () => {
 	assert.deepEqual(parseTransform("translate(12.5px, -8px) scale(1.1)"), {
 		panX: 12.5,
@@ -327,6 +471,19 @@ test("waitForColdRender gives initial webview rendering at least thirty seconds"
 	assert.equal(calls[0][3].timeoutMs, coldRenderTimeoutMs);
 });
 
+test("minimap click changes pan without changing scale", () => {
+	const beforeClick = { panX: 20, panY: 10, scale: 1.1 };
+	assert.equal(minimapClickChangesPan(beforeClick, beforeClick), false);
+	assert.equal(
+		minimapClickChangesPan(beforeClick, { panX: 40, panY: 30, scale: 1.1 }),
+		true,
+	);
+	assert.equal(
+		minimapClickChangesPan(beforeClick, { panX: 40, panY: 30, scale: 1.2 }),
+		false,
+	);
+});
+
 test("minimap drag requires movement after mouse down", () => {
 	const afterMouseDown = { panX: 20, panY: 10, scale: 1.1 };
 	assert.equal(minimapDragChangesPan(afterMouseDown, afterMouseDown), false);
@@ -434,6 +591,53 @@ test("appendWebviewFailureSnapshot appends the selected frame diagnostic", async
 	assert.match(error.message, /preview interaction failed/);
 	assert.match(error.message, /Webview snapshot/);
 	assert.match(error.message, /vscode-webview:\/\/webview\/fake.html/);
+});
+
+test("primary failures retain extension-host logs, semantic snapshots, and cleanup failures", async () => {
+	const runDir = await createRunDirectory();
+	const profileDir = join(runDir, "profile");
+	try {
+		const logPath = join(profileDir, "logs", "window1", "exthost1.log");
+		await mkdir(join(profileDir, "logs", "window1"), { recursive: true });
+		await writeFile(
+			logPath,
+			`discarded extension output\n${"x".repeat(6_000)}extension host tail`,
+		);
+		await writeFile(
+			join(profileDir, "logs", "window1", "other.log"),
+			"ignore me",
+		);
+		const root = {
+			getBoundingClientRect: () => ({ left: 1, top: 2, width: 3, height: 4 }),
+			querySelector: () => null,
+			querySelectorAll: () => [],
+			ownerDocument: { querySelectorAll: () => [] },
+		};
+		const frame = {
+			url: () => "vscode-webview://webview/fake.html",
+			locator: () => ({ evaluate: async (read) => read(root) }),
+		};
+		const withSnapshot = await appendWebviewFailureSnapshot(
+			new Error("primary preview failure"),
+			frame,
+		);
+		const withLogs = await appendExtensionHostLogDiagnostics(
+			withSnapshot,
+			profileDir,
+		);
+		const combined = appendCleanupDiagnostics(withLogs, [
+			new Error("cleanup profile failure"),
+		]);
+		assert.match(combined.message, /primary preview failure/);
+		assert.match(combined.message, /Webview snapshot/);
+		assert.match(combined.message, /exthost1\.log/);
+		assert.match(combined.message, /extension host tail/);
+		assert.doesNotMatch(combined.message, /discarded extension output/);
+		assert.doesNotMatch(combined.message, /ignore me/);
+		assert.match(combined.message, /cleanup profile failure/);
+	} finally {
+		await removeRunDirectory(runDir);
+	}
 });
 
 test("resolveVSCodeExecutablePath handles recent macOS Code bundles", () => {

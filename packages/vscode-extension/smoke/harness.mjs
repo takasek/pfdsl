@@ -1,11 +1,20 @@
-import { access, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import {
+	access,
+	mkdir,
+	mkdtemp,
+	rm,
+	stat,
+	utimes,
+	writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve, sep } from "node:path";
 
 const runDirectoryPrefix = `${resolve(tmpdir())}${sep}pfdsl-vscode-smoke-`;
 const issuedRunDirectories = new Set();
 const cacheLockName = ".pfdsl-vscode-smoke-download.lock";
-const defaultCacheLockTimeoutMs = 60_000;
+export const cacheLockWaitTimeoutMs = 8 * 60_000;
+const cacheLockHeartbeatIntervalMs = 5_000;
 const defaultStaleCacheLockMs = 15 * 60_000;
 
 export function makeVSCodeCachePath(
@@ -52,10 +61,13 @@ export async function populateVSCodeCache(
 	version,
 	populate,
 	{
+		clearIntervalFn = clearInterval,
+		heartbeatIntervalMs = cacheLockHeartbeatIntervalMs,
 		now = () => Date.now(),
 		retryIntervalMs = 100,
+		setIntervalFn = setInterval,
 		staleLockMs = defaultStaleCacheLockMs,
-		timeoutMs = defaultCacheLockTimeoutMs,
+		timeoutMs = cacheLockWaitTimeoutMs,
 		wait = delay,
 	} = {},
 ) {
@@ -91,12 +103,28 @@ export async function populateVSCodeCache(
 			await wait(retryIntervalMs);
 		}
 	}
+	const heartbeat = async () => {
+		try {
+			const timestamp = new Date(now());
+			await utimes(lockPath, timestamp, timestamp);
+		} catch {
+			// A missing or unwritable lock stops refreshing and lets waiters fail closed.
+		}
+	};
+	let heartbeatTimer;
 	try {
+		await writeFile(
+			join(lockPath, "owner.json"),
+			`${JSON.stringify({ pid: process.pid, startedAt: now() })}\n`,
+		);
+		await heartbeat();
+		heartbeatTimer = setIntervalFn(heartbeat, heartbeatIntervalMs);
 		if (await cacheMarkerExists(markerPath)) return null;
 		const result = await populate();
 		await writeFile(markerPath, `${version}\n`);
 		return result;
 	} finally {
+		if (heartbeatTimer !== undefined) clearIntervalFn(heartbeatTimer);
 		await rm(lockPath, { recursive: true, force: true });
 	}
 }
