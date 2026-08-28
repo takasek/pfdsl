@@ -10,6 +10,7 @@ export default mergeConfig(
 		test: {
 			include: ["src/**/*.test.ts"],
 			coverage: {
+				include: ["src/**/*.ts"],
 				// 宿主 API 直結層 — 実行環境（vscode extension host、または
 				// webview の document）に依存し、unit test から import した時点で
 				// 成立しないファイル。判断・算術はいずれも対応する *-logic.ts か

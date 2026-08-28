@@ -1,8 +1,15 @@
-import { rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, sep } from "node:path";
 
 const runDirectoryPrefix = `${resolve(tmpdir())}${sep}pfdsl-vscode-smoke-`;
+const issuedRunDirectories = new Set();
+
+export async function createRunDirectory() {
+	const runDirectory = await mkdtemp(runDirectoryPrefix);
+	issuedRunDirectories.add(resolve(runDirectory));
+	return runDirectory;
+}
 
 export function makeLaunchArgs({
 	repoRoot,
@@ -50,8 +57,9 @@ export function parseTransform(value) {
 
 export async function removeRunDirectory(path) {
 	const target = resolve(path);
-	if (!target.startsWith(runDirectoryPrefix)) {
+	if (!issuedRunDirectories.has(target)) {
 		throw new Error(`Refusing to remove non-run directory: ${path}`);
 	}
 	await rm(target, { recursive: true, force: true });
+	issuedRunDirectories.delete(target);
 }

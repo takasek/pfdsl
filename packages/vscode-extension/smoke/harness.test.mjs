@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { makeLaunchArgs, parseTransform } from "./harness.mjs";
+import {
+	createRunDirectory,
+	findWebviewFrame,
+	makeLaunchArgs,
+	parseTransform,
+	removeRunDirectory,
+} from "./harness.mjs";
 
 test("makeLaunchArgs isolates the run and opens the fixture", () => {
 	assert.deepEqual(
@@ -30,4 +39,34 @@ test("parseTransform reads the webview translate and scale", () => {
 		panY: -8,
 		scale: 1.1,
 	});
+});
+
+test("findWebviewFrame selects the content frame", async () => {
+	const frames = [
+		{ url: () => "workbench.html", locator: () => ({ count: async () => 0 }) },
+		{
+			url: () => "vscode-webview://one/index.html",
+			locator: () => ({ count: async () => 0 }),
+		},
+		{
+			url: () => "vscode-webview://one/content.html",
+			locator: () => ({ count: async () => 1 }),
+		},
+	];
+	assert.equal(await findWebviewFrame({ frames: () => frames }), frames[2]);
+});
+
+test("removeRunDirectory refuses an unissued lookalike path", async () => {
+	const lookalike = await mkdtemp(join(tmpdir(), "pfdsl-vscode-smoke-"));
+	await writeFile(join(lookalike, "keep.txt"), "keep");
+	await assert.rejects(removeRunDirectory(lookalike), /non-run directory/);
+	await access(join(lookalike, "keep.txt"));
+	await rm(lookalike, { recursive: true, force: true });
+});
+
+test("removeRunDirectory removes an issued run directory", async () => {
+	const runDirectory = await createRunDirectory();
+	await writeFile(join(runDirectory, "owned.txt"), "owned");
+	await removeRunDirectory(runDirectory);
+	await assert.rejects(access(runDirectory), { code: "ENOENT" });
 });

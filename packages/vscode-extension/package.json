@@ -137,7 +137,7 @@
 		"@types/node": "^20.0.0",
 		"@types/vscode": "^1.85.0",
 		"@vitest/coverage-v8": "^1.6.0",
-		"@vscode/test-electron": "^3.1.0",
+		"@vscode/test-electron": "^2.5.2",
 		"esbuild": "^0.21.0",
 		"jsdom": "^24.0.0",
 		"playwright-core": "^1.62.1",
