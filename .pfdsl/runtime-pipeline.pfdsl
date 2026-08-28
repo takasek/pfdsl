@@ -418,7 +418,7 @@ process:
     tags: [ gen, g ]
   assemble_codex_plugin:
     label: Codex plugin root 組み立て
-    description: "make gen-pluginのCodex adapter。Claude adapterと同一objectのharness_capability_modelと中立生成済みpfdsl skillを入力に、Codex native skill tree、command由来skill、hooks、manifestをplugin/pfdsl-codex/へ生成する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource-command-接頭辞を付け、repository Codex assetsとともにatomicに置換する"
+    description: "make gen-pluginのCodex adapter。Claude adapterと同一objectのharness_capability_model、中立生成済みpfdsl skill、install mirrorを入力に、stageTargetSkillTreeが.claude/skills/pfd-opsを再帰コピーしてinstall/を含むCodex native skill treeをrepositoryとpluginへ生成し、command由来skill、hooks、manifestもplugin/pfdsl-codex/へ生成する。生成済みClaude rootとmanifestは読まない。Codex command名が同名skillと衝突するとsource-command-接頭辞を付け、repository Codex assetsとともにatomicに置換する"
     command: make gen-plugin
     location: ../scripts/lib/gen-plugin.mjs
     tags: [ gen, g ]
@@ -532,7 +532,7 @@ ops_install_sources >> gen_install -> ops_install_templates
 
 [harness_capability_model, ops_install_templates, pfdsl_skill] >> gen_plugin -> claude_adapter_output
 
-[harness_capability_model, pfdsl_skill] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
+[harness_capability_model, ops_install_templates, pfdsl_skill] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
 
 [claude_adapter_output, codex_adapter_output, codex_repo_assets] >> check_plugin_drift -> plugin_dist
 
