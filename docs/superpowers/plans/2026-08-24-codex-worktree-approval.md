@@ -191,3 +191,6 @@ Report the local branch and commits; do not push a new branch or create a PR unt
 - [x] Serialize setup, recheck the marker after lock acquisition, and replace the marker atomically.
 - [x] Restrict every globally allowed wrapper routine to the realpath-verified pfdsl trusted root and remove raw package-script allow rules.
 - [x] Re-run the full verification matrix and an adversarial review against all six original findings.
+- [x] Remove ambient Git target variables from hook identity subprocesses and fail closed when a guarded mutation inherits them.
+- [x] Treat nonempty ambient or command-state CDPATH as unresolved for relative cd while preserving absolute and definitely empty forms.
+- [x] Remove all seven Git target variables from the user wrapper's Git and Make child processes and verify the installed companion.
