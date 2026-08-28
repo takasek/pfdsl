@@ -1,26 +1,27 @@
 #!/usr/bin/env node
 
-// PreToolUse(Bash) hook: asks before a command whose target tree is implicit
-// in cwd runs while this shell's cwd has drifted from its linked worktree
-// back to the main checkout (#840). See scripts/lib/verification-tree-guard.mjs
-// for the detection logic (which commands qualify and why) and why this is
-// `ask`, not `deny`.
+// PreToolUse(Bash) hook: intervenes before a command whose target tree is
+// implicit in cwd runs while this shell's cwd has drifted from its linked
+// worktree back to the main checkout (#840). See
+// scripts/lib/verification-tree-guard.mjs for the detection logic (which
+// commands qualify and why) and the harness-specific decision.
 //
-// Reads the hook payload on stdin. Prints an ask decision only when the cwd
-// resolves to the main checkout, at least one linked worktree exists
-// elsewhere in the repo, and the command contains a cwd-implicit segment;
-// stays silent otherwise. Always exits 0 — a crash in this guard must not
-// wedge every Bash call.
+// Reads the hook payload on stdin. Prints an ask decision for Claude Code or a
+// deny decision for Codex only when the cwd resolves to the main checkout, at
+// least one linked worktree exists elsewhere in the repo, and the command
+// contains a cwd-implicit segment; stays silent otherwise. Codex cannot handle
+// PreToolUse ask and would fail open, so deny tells it to retry with the linked
+// worktree as harness workdir (#1013). Always exits 0 — a crash in this guard
+// must not wedge every Bash call.
 //
 // Usage (wired in .claude/settings.json): node scripts/verification-tree-guard.mjs
 
-import {
-	buildPermissionOutput,
-	parseHookPayload,
-	readStdinText,
-} from "./lib/hook-io.mjs";
+import { readStdinText } from "./lib/hook-io.mjs";
 import { resolveGitRoots, tryGit } from "./lib/run-exec.mjs";
-import { evaluateVerificationTreeGuard } from "./lib/verification-tree-guard.mjs";
+import {
+	runVerificationTreeGuard,
+	supportsPermissionAsk,
+} from "./lib/verification-tree-guard.mjs";
 
 /**
  * @param {string} cwd
@@ -47,14 +48,14 @@ function resolveRoots(cwd) {
 	};
 }
 
-const payload = parseHookPayload(await readStdinText());
-if (!payload) process.exit(0);
-
-const cwd = payload?.cwd;
-const roots = typeof cwd === "string" ? resolveRoots(cwd) : null;
-
-const result = evaluateVerificationTreeGuard(payload, roots);
-if (result.decision === "ask") {
-	console.log(JSON.stringify(buildPermissionOutput(result)));
+const { shouldOutput, output } = runVerificationTreeGuard(
+	await readStdinText(),
+	{
+		resolveRoots,
+		supportsAsk: supportsPermissionAsk(),
+	},
+);
+if (shouldOutput) {
+	console.log(JSON.stringify(output));
 }
 process.exit(0);
