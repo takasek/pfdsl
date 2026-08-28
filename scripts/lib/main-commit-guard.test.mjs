@@ -770,6 +770,158 @@ describe("main-commit-guard wrapper", () => {
 		assert.equal(runWrapper("git add -A; false || echo later"), "");
 	});
 
+	it("decodes literal escapes and fails closed for dynamic protected setters", () => {
+		for (const command of [
+			`g\\it -C ${repo} add -A`,
+			`GIT\\_DIR=${join(repo, ".git")} g\\it add -A`,
+			'export "$d=/override"; git add -A',
+			'printf -v "$d" %s /override; git add -A',
+			'read "$n"; git add -A',
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("parses read options before deciding which operands set state", () => {
+		assert.equal(runWrapper("read -p CDPATH REPLY; git add -A"), "");
+		for (const command of ["read -p; git add -A", 'read "$n"; git add -A']) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("does not unexport ambient Git targets after export option termination", () => {
+		const output = runWrapper(
+			"export -- -n GIT_DIR GIT_WORK_TREE; git add -A",
+			{
+				environment: {
+					GIT_DIR: join(sibling, ".git"),
+					GIT_WORK_TREE: sibling,
+				},
+			},
+		);
+		assert.notEqual(output, "");
+		assert.equal(
+			JSON.parse(output).hookSpecificOutput.permissionDecision,
+			"deny",
+		);
+	});
+
+	it("treats read array output variables as protected setters", () => {
+		for (const command of [
+			"read -a CDPATH <<< x; cd sibling; git add -A",
+			"read -aCDPATH <<< x; cd sibling; git add -A",
+			'read -a"$name" <<< x; cd sibling; git add -A',
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("does not clear protected state through conflicting unset or export options", () => {
+		for (const command of [
+			`CDPATH=${root}; unset -f -v CDPATH; cd sibling; git add -A`,
+			`export GIT_NAMESPACE; export -n -f GIT_NAMESPACE; printf -v GIT_NAMESPACE %s /override; git add -A`,
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("fails closed after brace and reserved compounds", () => {
+		for (const command of [
+			`{ cd ${session}; }; git add -A`,
+			`if true; then cd ${session}; fi; git add -A`,
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+	});
+
+	it("only treats reserved words in command position as compounds", () => {
+		assert.equal(runWrapper("git commit -m if"), "");
+		assert.equal(runWrapper("echo if; git add -A"), "");
+	});
+
+	it("parses clustered read options before protected variable operands", () => {
+		for (const command of [
+			"read -rp CDPATH REPLY <<< x; cd .; git add -A",
+			"read -pCDPATH REPLY <<< x; cd .; git add -A",
+		]) {
+			assert.equal(runWrapper(command), "", command);
+		}
+	});
+
+	it("recognizes printf setters only in its option phase", () => {
+		for (const command of [
+			"export GIT_NAMESPACE; printf -- -v GIT_NAMESPACE; git add -A",
+			"export GIT_NAMESPACE; printf %s -v GIT_NAMESPACE; git add -A",
+		]) {
+			assert.equal(runWrapper(command), "", command);
+		}
+	});
+
+	it("removes unquoted backslash-newline continuations", () => {
+		const command = `g\\${"\n"}it -C ${repo} add -A`;
+		const output = runWrapper(command);
+		assert.notEqual(output, "");
+		assert.equal(
+			JSON.parse(output).hookSpecificOutput.permissionDecision,
+			"deny",
+		);
+	});
+
+	it("removes double-quoted backslash-newline continuations", () => {
+		const command = `"g\\${"\n"}it" -C ${repo} add -A`;
+		const output = runWrapper(command);
+		assert.notEqual(output, "");
+		assert.equal(
+			JSON.parse(output).hookSpecificOutput.permissionDecision,
+			"deny",
+		);
+	});
+
+	it("preserves Git export state across assignment-only segments", () => {
+		assert.equal(runWrapper("GIT_NAMESPACE=/override; git add -A"), "");
+		assert.equal(runWrapper("GIT_NAMESPACE= git add -A"), "");
+	});
+
+	it("does not taint control flow without target-affecting commands", () => {
+		for (const command of [
+			"printf x | cat; git add -A",
+			"test -f package.json && printf ok; git add -A",
+			`printf x | cat; cd ${session}; git add -A`,
+		]) {
+			assert.equal(runWrapper(command), "", command);
+		}
+	});
+
 	it("fails closed when read makes CDPATH dynamically unknown", () => {
 		const output = runWrapper(
 			`read -r CDPATH <<< ${root}; cd sibling; git add -A`,

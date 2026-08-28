@@ -223,6 +223,27 @@ function guardedSuffix(tokens) {
 	return null;
 }
 
+const COMPOUND_TOKENS = new Set([
+	"{",
+	"}",
+	"if",
+	"then",
+	"elif",
+	"else",
+	"fi",
+	"for",
+	"while",
+	"until",
+	"case",
+	"esac",
+	"do",
+	"done",
+	"select",
+	"function",
+	"coproc",
+	"!",
+]);
+
 /**
  * Track the shell cwd and retain each guarded Git segment with its own target.
  * A PreToolUse hook fires before the shell does, so `payload.cwd` does not yet
@@ -244,29 +265,42 @@ function analyzeCommand(
 		ambientGitTargetOverride,
 	});
 	let unresolvedControlFlow = false;
-	let andList = false;
+	let andListAffects = false;
+	let previousAffects = false;
 	const targets = [];
 
 	for (const { command: segment, separatorBefore } of splitCommandFlow(
 		command,
 	)) {
-		if (separatorBefore === "&&") andList = true;
+		if (separatorBefore === "&&") andListAffects ||= previousAffects;
 		else if (separatorBefore === ";" || separatorBefore === "\n") {
-			unresolvedControlFlow ||= andList;
-			andList = false;
-		} else if (["||", "|", "&", "(", ")"].includes(separatorBefore)) {
+			unresolvedControlFlow ||= andListAffects;
+			andListAffects = false;
+		} else if (["(", ")"].includes(separatorBefore)) {
 			unresolvedControlFlow = true;
-			andList = false;
+			andListAffects = false;
+		} else if (["||", "|", "&"].includes(separatorBefore)) {
+			unresolvedControlFlow ||= previousAffects;
+			andListAffects = false;
 		}
 		const rawTokens = tokenize(segment);
 		const prefix = parseLeadingShellPrefix(rawTokens);
 		const envCwd = resolveEnvCwd(rawTokens, cwd);
 		const tokens = rawTokens.slice(prefix.end);
+		const finish = (cwdAffects = false) => {
+			const affects =
+				cwdAffects || updateProtectedShellState(protectedState, rawTokens);
+			if (separatorBefore === "&&") andListAffects ||= affects;
+			if (["||", "|", "&"].includes(separatorBefore))
+				unresolvedControlFlow ||= affects;
+			previousAffects = affects;
+		};
 		if (tokens.length === 0) {
-			updateProtectedShellState(protectedState, rawTokens);
+			finish();
 			continue;
 		}
 		const head = basename(tokens[0].value);
+		if (COMPOUND_TOKENS.has(head)) unresolvedControlFlow = true;
 
 		if (
 			(head === "builtin" &&
@@ -275,7 +309,7 @@ function analyzeCommand(
 			head === "popd"
 		) {
 			cwd = null;
-			updateProtectedShellState(protectedState, rawTokens);
+			finish(true);
 			continue;
 		}
 
@@ -290,7 +324,7 @@ function analyzeCommand(
 			)
 				cwd = null;
 			else if (cwd !== null) cwd = resolve(cwd, target);
-			updateProtectedShellState(protectedState, rawTokens);
+			finish(true);
 			continue;
 		}
 
@@ -298,7 +332,7 @@ function analyzeCommand(
 			classifySegment(tokens) ??
 			(prefix.unresolved ? guardedSuffix(tokens) : null);
 		if (!guarded) {
-			updateProtectedShellState(protectedState, rawTokens);
+			finish();
 			continue;
 		}
 		targets.push({
@@ -313,7 +347,7 @@ function analyzeCommand(
 						? resolveGitCwd(tokens, envCwd)
 						: resolveCodexRoutineCwd(tokens),
 		});
-		updateProtectedShellState(protectedState, rawTokens);
+		finish();
 	}
 	return { targets, finalCwd: cwd };
 }

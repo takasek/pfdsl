@@ -28,7 +28,9 @@ wrapperの `worktree-add` は `git rev-parse --path-format=absolute --git-common
 
 認証、権限、ネットワーク、必須tool不在、破壊的操作、新しい公開先、 materially different な代替方式が必要な場合だけ停止してユーザー判断を求める。
 
-pfdslのshared guardは空白でない `CLAUDE_PROJECT_DIR` が存在すれば従来どおりそれを優先し、存在しない場合だけ空白でないPreToolUse payloadの `cwd` をsession worktreeの根として使う。literalな `cd`、inputを含む先頭redirection、`git -C`、`env -C/--chdir`、Codex wrapperの明示targetを実行順に解決する。`--git-dir`・`--work-tree`、Gitのrepository・index・object・ref namespaceを変える非空のcommand内またはambient環境変数、shell展開、cwdを変えるbuiltin、未知または不完全なcommand/sudo/time prefix等でeffective cwdを確定できない変更系commandは元のcwdへfallbackせずfail closedする。identity取得用Git subprocessは7種類のGit target環境変数を除去し、明示cwdからrootとbranchを解決する。protected shell stateはGit target変数ごとの値・export状態とshellが直接読むCDPATHを分けて追跡する。literalな空代入・`unset`・Git target変数の `export -n` は安全状態を回復するが、`unset -f` は変数を消したものとして扱わない。`read`・`printf -v`・`source`・`.`・`eval` による動的変更と、`||`・pipeline・background・subshell・後続の無条件commandへ複数状態を残すAND-listは変更系Gitをfail closedする。ambientまたはcommand stateに非空 `CDPATH` があるrelative `cd` も到達先不明としてfail closedするが、絶対 `cd`、確実に空の `CDPATH`、単純なsuccess-pathの `cd <target> && git <mutation>`、変更系Gitより後ろにだけ現れるcontrol flowは静的解決を維持する。quoted/absolute executableと既知prefix optionを実行形どおり認識し、`command -p` は実行prefix、`command -v/-V` はpath queryとして区別する。
+pfdslのshared guardは空白でない `CLAUDE_PROJECT_DIR` が存在すれば従来どおりそれを優先し、存在しない場合だけ空白でないPreToolUse payloadの `cwd` をsession worktreeの根として使う。これは任意のBashを完全に解釈するsecurity boundaryではなく、両harnessで直接記述された既知形を止める事故防止guardである。quotedまたはescaped literal argv、literalな `cd`、inputを含む先頭redirection、`git -C`、`env -C/--chdir`、Codex wrapperの明示targetを実行順に解決する。`--git-dir`・`--work-tree`、Gitのrepository・index・object・ref namespaceを変える非空のcommand内またはambient環境変数、shell展開、cwdを変えるbuiltin、未知または不完全なcommand/sudo/time prefix等でeffective cwdを確定できない変更系commandは元のcwdへfallbackせずfail closedする。identity取得用Git subprocessは7種類のGit target環境変数を除去し、明示cwdからrootとbranchを解決する。protected shell stateはGit target変数ごとの値・export状態とshellが直接読むCDPATHを分けて追跡する。literalな空代入・有効な変数 `unset`・Git target変数の `export -n` は安全状態を回復するが、function optionやoption terminator後のinvalid operandを変数解除として扱わない。対応する `read` output、`printf -v`、`source`・`.`・`eval` の動的書込先と、targetに影響する `||`・pipeline・background・subshell・AND-listは変更系Gitをfail closedする。ambientまたはcommand stateに非空 `CDPATH` があるrelative `cd` も到達先不明としてfail closedするが、絶対 `cd`、確実に空の `CDPATH`、単純なsuccess-pathの `cd <target> && git <mutation>`、targetに影響しないpipeline・AND-list、変更系Gitより後ろにだけ現れるcontrol flowは静的解決を維持する。対応外のcompound構文は無害でもfail closedしうるため、raw変更系Gitは単純commandへ分ける。`command -p` は実行prefix、`command -v/-V` はpath queryとして区別する。
+
+Codexで承認なしに通す機械的安全境界はshared guard単体ではなく、trusted-rootと登録worktree identityを検証するuser-level wrapper、raw Git変更を永続allowしないexecpolicy、sandboxの組合せである。Claude CodeにはCodex専用user-level wrapperを前提化せず、同じrepo hookの事故防止と通常の権限境界を維持する。この非対称性を隠して両harnessが同じsecurity guaranteeを持つとは主張しない。
 
 `.claude/settings.json` と `.codex/hooks.json` は同一wrapperを呼ぶ。Claude Codeでは復旧系のaskを維持するが、Codexではunsupportedなaskをdenyへ変換し、hook failure後のfail-openを防ぐ。
 
@@ -36,6 +38,7 @@ pfdslのshared guardは空白でない `CLAUDE_PROJECT_DIR` が存在すれば�
 
 - Claude Codeでは `CLAUDE_PROJECT_DIR` がpayloadの `cwd` より優先される。
 - Codexでは `CLAUDE_PROJECT_DIR` がなくてもpayloadの `cwd` とcommand targetのGit common dirを比較できる。
+- shared guardは両harnessで同じ直接形を判定するが、任意のBashに対する完全なsecurity boundaryではない。Codexの永続allowはtrusted wrapperだけに限定し、Claude CodeにCodex専用wrapperを要求しない。
 - Codexのroutine allow ruleはtrusted-rootと登録worktree identityの検証付きwrapper subcommandだけに一致し、raw Git変更とraw package scriptsには一致しない。prefixに余分なargvが続いた場合、registry外のrepo、trusted common-dirだけを借りた未登録directoryは子process起動前に拒否する。
 - wrapperのGitとMake子processは7種類のGit target環境変数を継承せず、明示cwd・target・branchに対する検証と操作を維持する。
 - 自worktree内の通常git変更は許可される。
@@ -44,12 +47,14 @@ pfdslのshared guardは空白でない `CLAUDE_PROJECT_DIR` が存在すれば�
 - wrapperはlinked worktreeからの `worktree-add` をmain repository直下へ作り、routine mutationではmain checkout、workdir不一致、branch不一致をGit起動前に拒否する。
 - setup markerはinstall入力fingerprintが一致する場合だけcurrentであり、branch switch等による入力変更後のSessionStartはsetupを再実行する。同一inputsの同時runnerはsetup bodyを1回だけ実行し、partial failureはcurrent markerを残さない。
 - malformed payloadやGit解決失敗で全Bash呼出しを停止させない既存の外側のfail-open境界は維持するが、変更系command内でeffective cwdだけを解決できない場合はdenyまたはaskへfail closedする。
-- hook processが非空のGit target環境変数を継承した変更系command、非空CDPATHがrelative cdを変えうる変更系command、動的なprotected-state setter、静的に一つの実targetへ畳めないcontrol flowはfail closedする。読み取り系Git・絶対cd・literalな空代入または変数unsetで安全へ戻した状態・単純なsuccess-pathのAND-listは影響を受けない。
+- hook processが非空のGit target環境変数を継承した変更系command、非空CDPATHがrelative cdを変えうる変更系command、対応するdynamic protected-state setter、静的に一つの実targetへ畳めないcontrol flowはfail closedする。読み取り系Git・絶対cd・literalな空代入または有効な変数unsetで安全へ戻した状態・単純なsuccess-pathのAND-listは影響を受けない。対応外のcompound構文は安全側に誤拒否しうる。
 
 ## Non-goals
 
 通常pushとforce-pushを同じprefix ruleで無審査にする変更は行わない。
 
 merge、issue close、publish、branch deletion、新しいPRや公開branchの作成に対する明示確認は削除しない。
+
+任意のBash source・展開・関数・別scriptをrepo hookの独自parserだけで完全に判定する変更は行わない。
 
 #981で進行中の中立capability modelとgenerator再編には触れない。

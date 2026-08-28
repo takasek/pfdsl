@@ -75,6 +75,10 @@ export function splitCommandFlow(command) {
 		const ch = command[i];
 		if (quote) {
 			if (ch === "\\" && quote === '"') {
+				if (command[i + 1] === "\n") {
+					i++;
+					continue;
+				}
 				current += ch + (command[i + 1] ?? "");
 				i++;
 				continue;
@@ -86,6 +90,15 @@ export function splitCommandFlow(command) {
 		if (ch === '"' || ch === "'") {
 			quote = ch;
 			current += ch;
+			continue;
+		}
+		if (ch === "\\") {
+			if (command[i + 1] === "\n") {
+				i++;
+				continue;
+			}
+			current += ch;
+			if (command[i + 1] !== undefined) current += command[++i];
 			continue;
 		}
 		const two = command.slice(i, i + 2);
@@ -140,6 +153,10 @@ export function tokenize(segment) {
 	for (let i = 0; i < segment.length; i++) {
 		const ch = segment[i];
 		if (quote) {
+			if (ch === "\\" && quote === '"' && segment[i + 1] === "\n") {
+				i++;
+				continue;
+			}
 			if (ch === quote) {
 				quote = null;
 				continue;
@@ -152,6 +169,16 @@ export function tokenize(segment) {
 			quoted = true;
 			if (tokenQuote === undefined) tokenQuote = ch;
 			else if (tokenQuote !== ch) tokenQuote = null;
+			continue;
+		}
+		if (ch === "\\") {
+			if (segment[i + 1] === "\n") {
+				i++;
+				continue;
+			}
+			if (segment[i + 1] === undefined) current += ch;
+			else current += segment[++i];
+			hasUnquotedText = true;
 			continue;
 		}
 		if (/\s/.test(ch)) {
@@ -203,7 +230,11 @@ function protectedAssignment(value) {
 
 function isGitTargetAssignment(value) {
 	const assignment = protectedAssignment(value);
-	return assignment !== null && GIT_TARGET_VARIABLES.has(assignment.name);
+	return (
+		assignment !== null &&
+		assignment.value !== "" &&
+		GIT_TARGET_VARIABLES.has(assignment.name)
+	);
 }
 
 function isNonemptyCdPathAssignment(value) {
@@ -289,6 +320,19 @@ function setProtectedUnknown(state, name) {
 	if (target) target.value = "unknown";
 }
 
+function setAllProtectedUnknown(state) {
+	state.cdPath = "unknown";
+	for (const name of GIT_TARGET_VARIABLES)
+		setProtectedValue(state, name, "unknown", true);
+}
+
+function isDynamicSetterName(token) {
+	return (
+		(token.quote !== "'" && /[$`]/.test(token.value)) ||
+		/\[|\]/.test(token.value)
+	);
+}
+
 function unsetProtectedValue(state, name) {
 	if (name === "CDPATH") {
 		state.cdPath = "safe";
@@ -305,31 +349,63 @@ function protectedName(value) {
 }
 
 function applyAssignments(state, tokens, exported) {
+	let changed = false;
 	for (const token of tokens) {
 		const assignment = protectedAssignment(token.value);
-		if (assignment)
+		if (assignment) {
 			setProtectedValue(state, assignment.name, assignment.value, exported);
+			changed = true;
+		}
 	}
+	return changed;
 }
 
 function applyExport(state, tokens) {
 	let unexport = false;
-	for (const { value } of tokens) {
-		if (value === "--") continue;
-		if (value === "-n") {
-			unexport = true;
+	let functionMode = false;
+	let valid = true;
+	let options = true;
+	for (const token of tokens) {
+		const { value } = token;
+		if (options && value === "--") {
+			options = false;
 			continue;
 		}
-		if (value.startsWith("-")) continue;
+		if (options && value.startsWith("-")) {
+			for (const option of value.slice(1)) {
+				if (option === "n") unexport = true;
+				else if (option === "f") functionMode = true;
+				else valid = false;
+			}
+			continue;
+		}
+		if (isDynamicSetterName(token)) {
+			setAllProtectedUnknown(state);
+			return true;
+		}
+	}
+	if (!valid || functionMode) return false;
+	let changed = false;
+	options = true;
+	for (const { value } of tokens) {
+		if (options && value === "--") {
+			options = false;
+			continue;
+		}
+		if (options && value.startsWith("-")) continue;
 		const assignment = protectedAssignment(value);
 		if (assignment) {
 			setProtectedValue(state, assignment.name, assignment.value, !unexport);
+			changed = true;
 			continue;
 		}
 		const name = protectedName(value);
-		if (name && name !== "CDPATH")
+		if (name && name !== "CDPATH") {
 			state.gitTargets.get(name).exported = !unexport;
+			changed = true;
+		}
 	}
+	return changed;
 }
 
 function applyUnset(state, tokens) {
@@ -341,27 +417,82 @@ function applyUnset(state, tokens) {
 			continue;
 		}
 		if (options && value.startsWith("-")) {
-			variables = value === "-v";
+			variables &&= value === "-v";
 			continue;
 		}
 		if (!variables) continue;
 		const name = protectedName(value);
 		if (name) unsetProtectedValue(state, name);
 	}
+	return variables;
+}
+
+function readProtectedNames(tokens) {
+	const valueOptions = new Set(["a", "d", "i", "n", "N", "p", "t", "u"]);
+	const flagOptions = new Set(["e", "r", "s"]);
+	const names = [];
+	let options = true;
+	for (let i = 0; i < tokens.length; i++) {
+		const token = tokens[i];
+		if (options && token.value === "--") {
+			options = false;
+			continue;
+		}
+		if (options && token.value.startsWith("-") && token.value !== "-") {
+			const cluster = token.value.slice(1);
+			for (let index = 0; index < cluster.length; index++) {
+				const option = cluster[index];
+				if (flagOptions.has(option)) continue;
+				if (!valueOptions.has(option)) return { names, unknown: true };
+				const value =
+					index + 1 < cluster.length
+						? { ...token, value: cluster.slice(index + 1) }
+						: tokens[++i];
+				if (!value) return { names, unknown: true };
+				if (option === "a") {
+					if (isDynamicSetterName(value)) return { names, unknown: true };
+					const name = protectedName(value.value);
+					if (name) names.push(name);
+				}
+				break;
+			}
+			continue;
+		}
+		if (isDynamicSetterName(token)) return { names, unknown: true };
+		const name = protectedName(token.value);
+		if (name) names.push(name);
+	}
+	return { names, unknown: false };
 }
 
 function dynamicallyWrittenProtectedNames(head, tokens) {
-	if (head === "read")
-		return tokens.map(({ value }) => protectedName(value)).filter(Boolean);
-	if (head !== "printf") return [];
+	if (head === "read") return readProtectedNames(tokens);
+	if (head !== "printf") return { names: [], unknown: false };
+	let options = true;
 	for (let i = 0; i < tokens.length; i++) {
-		const value = tokens[i].value;
-		if (value === "-v")
-			return [protectedName(tokens[i + 1]?.value)].filter(Boolean);
-		if (value.startsWith("-v"))
-			return [protectedName(value.slice(2))].filter(Boolean);
+		const token = tokens[i];
+		if (options && token.value === "--") {
+			options = false;
+			continue;
+		}
+		if (!options || !token.value.startsWith("-") || token.value === "-")
+			return { names: [], unknown: false };
+		if (token.value === "-v") {
+			const name = tokens[i + 1];
+			if (!name || isDynamicSetterName(name))
+				return { names: [], unknown: true };
+			return {
+				names: [protectedName(name.value)].filter(Boolean),
+				unknown: false,
+			};
+		}
+		if (token.value.startsWith("-v"))
+			return {
+				names: [protectedName(token.value.slice(2))].filter(Boolean),
+				unknown: false,
+			};
 	}
-	return [];
+	return { names: [], unknown: false };
 }
 
 /** Update state after one shell command segment has run. */
@@ -370,30 +501,26 @@ export function updateProtectedShellState(state, tokens) {
 	const head = basename(tokens[prefix.end]?.value ?? "");
 	const arguments_ = tokens.slice(prefix.end + 1);
 	const assignments = tokens.slice(0, prefix.end);
-	if (prefix.end === tokens.length) applyAssignments(state, assignments, true);
+	if (prefix.end === tokens.length) return applyAssignments(state, assignments);
 	else if (STATEFUL_ASSIGNMENT_BUILTINS.has(head))
 		applyAssignments(state, assignments, true);
 
 	if (head === "source" || head === "." || head === "eval") {
-		state.cdPath = "unknown";
-		for (const name of GIT_TARGET_VARIABLES)
-			setProtectedValue(state, name, "unknown", true);
-		return;
+		setAllProtectedUnknown(state);
+		return true;
 	}
-	if (head === "unset") {
-		applyUnset(state, arguments_);
-		return;
-	}
-	if (head === "export") {
-		applyExport(state, arguments_);
-		return;
-	}
+	if (head === "unset") return applyUnset(state, arguments_);
+	if (head === "export") return applyExport(state, arguments_);
 	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) {
-		applyAssignments(state, arguments_, true);
-		return;
+		return applyAssignments(state, arguments_, true);
 	}
-	for (const name of dynamicallyWrittenProtectedNames(head, arguments_))
-		setProtectedUnknown(state, name);
+	const { names, unknown } = dynamicallyWrittenProtectedNames(head, arguments_);
+	if (unknown) {
+		setAllProtectedUnknown(state);
+		return true;
+	}
+	for (const name of names) setProtectedUnknown(state, name);
+	return names.length > 0;
 }
 
 export function parseEnvPrefix(tokens, start = 0) {
