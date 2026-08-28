@@ -3242,6 +3242,25 @@ req -> spec
 		expect(r.stdout).toBe("spec.label: \nspec.owner: (unset)\n");
 	});
 
+	it("renders an empty array as (empty) in text while preserving [] in JSON", async () => {
+		const f = join(dir, "get-empty-array.pfdsl");
+		writeFileSync(
+			f,
+			"---\nartifact:\n  spec:\n    tags: []\n---\nreq -> spec\n",
+		);
+
+		const textResult = await run(["meta", "get", f, "spec", "tags"]);
+		expect(textResult.exitCode).toBe(0);
+		expect(textResult.stdout).toBe("spec.tags: (empty)\n");
+
+		const jsonResult = await run(["meta", "get", f, "spec", "tags", "--json"]);
+		expect(jsonResult.exitCode).toBe(0);
+		expect(JSON.parse(jsonResult.stdout)).toEqual({
+			ok: true,
+			values: { spec: { tags: [] } },
+		});
+	});
+
 	it("emits JSON with raw location plus derived location.resolved when --json is passed", async () => {
 		const f = join(dir, "get-json.pfdsl");
 		writeFileSync(f, base);
@@ -3520,6 +3539,40 @@ spec >> write -> docs
 		expect(JSON.parse(r.stdout)).toEqual({
 			ok: true,
 			values: { code: { status: "todo" }, spec: { status: "done" } },
+		});
+	});
+
+	it("renders an empty array as (empty) in text while preserving [] in JSON", async () => {
+		const f = join(dir, "list-empty-array-value.pfdsl");
+		writeFileSync(
+			f,
+			"---\nartifact:\n  spec:\n    tags: []\n    group: core\n---\nreq -> spec\n",
+		);
+
+		const textResult = await run([
+			"meta",
+			"list",
+			f,
+			"--group",
+			"core",
+			"tags",
+		]);
+		expect(textResult.exitCode).toBe(0);
+		expect(textResult.stdout).toBe("spec.tags: (empty)\n");
+
+		const jsonResult = await run([
+			"meta",
+			"list",
+			f,
+			"--group",
+			"core",
+			"tags",
+			"--json",
+		]);
+		expect(jsonResult.exitCode).toBe(0);
+		expect(JSON.parse(jsonResult.stdout)).toEqual({
+			ok: true,
+			values: { spec: { tags: [] } },
 		});
 	});
 
