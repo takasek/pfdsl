@@ -591,9 +591,9 @@ describe("main-commit-guard wrapper", () => {
 
 	function runWrapper(
 		command,
-		{ payloadCwd = session, claudeProjectDir = session } = {},
+		{ payloadCwd = session, claudeProjectDir = session, environment = {} } = {},
 	) {
-		const env = { ...process.env };
+		const env = { ...process.env, ...environment };
 		if (claudeProjectDir === null) delete env.CLAUDE_PROJECT_DIR;
 		else env.CLAUDE_PROJECT_DIR = claudeProjectDir;
 		return execFileSync(process.execPath, [script], {
@@ -675,6 +675,57 @@ describe("main-commit-guard wrapper", () => {
 			claudeProjectDir: session,
 		});
 		assert.equal(claudeStillWins, "");
+	});
+
+	it("denies a guarded mutation when ambient Git target variables point at a sibling", () => {
+		const output = runWrapper("git add -A", {
+			environment: {
+				GIT_DIR: git(sibling, ["rev-parse", "--git-dir"]),
+				GIT_WORK_TREE: sibling,
+			},
+		});
+		assert.notEqual(output, "");
+		assert.equal(
+			JSON.parse(output).hookSpecificOutput.permissionDecision,
+			"deny",
+		);
+
+		assert.equal(
+			runWrapper("git status", {
+				environment: { GIT_DIR: git(sibling, ["rev-parse", "--git-dir"]) },
+			}),
+			"",
+		);
+	});
+
+	it("fails closed when CDPATH can redirect a relative cd", () => {
+		for (const command of [
+			`CDPATH=${root} cd sibling && git add -A`,
+			`export CDPATH=${root}; cd sibling && git add -A`,
+		]) {
+			const output = runWrapper(command);
+			assert.notEqual(output, "", command);
+			assert.equal(
+				JSON.parse(output).hookSpecificOutput.permissionDecision,
+				"deny",
+				command,
+			);
+		}
+
+		const ambient = runWrapper("cd sibling && git add -A", {
+			environment: { CDPATH: root },
+		});
+		assert.equal(
+			JSON.parse(ambient).hookSpecificOutput.permissionDecision,
+			"deny",
+		);
+
+		assert.equal(runWrapper(`CDPATH=${root} cd ${session} && git add -A`), "");
+		assert.equal(runWrapper("CDPATH= cd sibling && git add -A"), "");
+		assert.equal(
+			runWrapper("cd sibling && git status", { environment: { CDPATH: root } }),
+			"",
+		);
 	});
 
 	it("denies compound and repeated-C sibling mutations end to end (#784)", () => {

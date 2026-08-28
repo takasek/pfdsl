@@ -18,6 +18,40 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("run-exec", () => {
+	it("removes Git target variables from identity subprocesses without changing the source environment", () => {
+		const source = {
+			PATH: "/bin",
+			GIT_DIR: "/git-dir",
+			GIT_WORK_TREE: "/work-tree",
+			GIT_INDEX_FILE: "/index",
+			GIT_COMMON_DIR: "/common",
+			GIT_OBJECT_DIRECTORY: "/objects",
+			GIT_ALTERNATE_OBJECT_DIRECTORIES: "/alternate-objects",
+			GIT_NAMESPACE: "namespace",
+		};
+		const before = { ...source };
+		const processBefore = { ...process.env };
+		const calls = [];
+
+		resolveGitRoots("/repo", {
+			environment: source,
+			exec: (_args, opts) => {
+				calls.push(opts);
+				return {
+					ok: true,
+					out: _args.includes("--show-toplevel") ? "/repo\n" : ".git\n",
+				};
+			},
+		});
+
+		assert.deepEqual(source, before);
+		assert.deepEqual({ ...process.env }, processBefore);
+		assert.deepEqual(
+			calls.map(({ env }) => env),
+			[{ PATH: "/bin" }, { PATH: "/bin" }],
+		);
+	});
+
 	it("resolves a linked worktree and its shared repository roots", () => {
 		const calls = [];
 		const roots = resolveGitRoots("/repo/.claude/worktrees/topic", {

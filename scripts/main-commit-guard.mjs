@@ -25,7 +25,12 @@ import {
 	crossesWorktree,
 	runMainCommitGuard,
 } from "./lib/main-commit-guard.mjs";
-import { resolveGitRoots, tryGit } from "./lib/run-exec.mjs";
+import {
+	hasGitTargetEnvironment,
+	resolveGitRoots,
+	tryGit,
+	withoutGitTargetEnvironment,
+} from "./lib/run-exec.mjs";
 
 /**
  * @param {object} payload PreToolUse hook payload
@@ -45,9 +50,14 @@ function resolveBranches(payload, targetCwd) {
 				? payloadCwd
 				: null;
 	const sessionRoots = sessionDir === null ? null : resolveGitRoots(sessionDir);
-	const current = tryGit(["branch", "--show-current"], { cwd: targetCwd });
+	const identityEnv = withoutGitTargetEnvironment();
+	const current = tryGit(["branch", "--show-current"], {
+		cwd: targetCwd,
+		env: identityEnv,
+	});
 	const head = tryGit(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], {
 		cwd: targetCwd,
+		env: identityEnv,
 	});
 	// `origin/main` -> `main`. Falling back to "main" keeps the guard working in
 	// a clone whose origin/HEAD was never set. An undefined current branch
@@ -62,6 +72,9 @@ function resolveBranches(payload, targetCwd) {
 
 const { shouldOutput, output } = runMainCommitGuard(await readStdinText(), {
 	resolveBranches,
+	ambientGitTargetOverride: hasGitTargetEnvironment(),
+	ambientCdPath:
+		typeof process.env.CDPATH === "string" && process.env.CDPATH !== "",
 	supportsAsk:
 		typeof process.env.CLAUDE_PROJECT_DIR === "string" &&
 		process.env.CLAUDE_PROJECT_DIR.trim() !== "",

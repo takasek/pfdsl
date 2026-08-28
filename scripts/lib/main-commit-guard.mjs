@@ -19,6 +19,7 @@ import {
 	gitSubcommand,
 	gitSubcommandIndex,
 	parseLeadingShellPrefix,
+	persistsCdPathOverride,
 	persistsGitTargetOverride,
 	splitSegments,
 	stripLeadingNoise,
@@ -226,17 +227,19 @@ function guardedSuffix(tokens) {
  * also necessary because one Bash invocation can move between worktrees
  * before running another guarded Git command (#784).
  */
-function analyzeCommand(command, hookCwd) {
+function analyzeCommand(command, hookCwd, { ambientCdPath = false } = {}) {
 	if (typeof command !== "string") return { targets: [], finalCwd: hookCwd };
 
 	/** Where the shell stands, or null once a `cd` moved it somewhere unknown. */
 	let cwd = hookCwd;
 	let gitTargetOverride = false;
+	let cdPathOverride = ambientCdPath;
 	const targets = [];
 
 	for (const segment of splitSegments(command)) {
 		const rawTokens = tokenize(segment);
 		gitTargetOverride ||= persistsGitTargetOverride(rawTokens);
+		cdPathOverride ||= persistsCdPathOverride(rawTokens);
 		const prefix = parseLeadingShellPrefix(rawTokens);
 		const envCwd = resolveEnvCwd(rawTokens, cwd);
 		const tokens = rawTokens.slice(prefix.end);
@@ -258,6 +261,7 @@ function analyzeCommand(command, hookCwd) {
 			if (target === null) cwd = null;
 			// An absolute target restores a trail lost to an unresolvable earlier cd.
 			else if (target.startsWith("/")) cwd = resolve(target);
+			else if (cdPathOverride || prefix.cdPathOverride) cwd = null;
 			else if (cwd !== null) cwd = resolve(cwd, target);
 			continue;
 		}
@@ -280,16 +284,16 @@ function analyzeCommand(command, hookCwd) {
 }
 
 /** Every guarded Git segment with the cwd in which Git will run it. */
-export function resolveGuardedGitCommands(command, hookCwd) {
-	return analyzeCommand(command, hookCwd).targets;
+export function resolveGuardedGitCommands(command, hookCwd, options) {
+	return analyzeCommand(command, hookCwd, options).targets;
 }
 
 /**
  * The directory the first guarded Git command runs in, retained for callers
  * that inspect one command. The hook itself evaluates every resolved target.
  */
-export function resolveCommandCwd(command, hookCwd) {
-	const analysis = analyzeCommand(command, hookCwd);
+export function resolveCommandCwd(command, hookCwd, options) {
+	const analysis = analyzeCommand(command, hookCwd, options);
 	return analysis.targets[0]?.cwd ?? analysis.finalCwd;
 }
 
@@ -383,7 +387,12 @@ function evaluateUnresolvedCwd(guarded) {
  */
 export function runMainCommitGuard(
 	inputText,
-	{ resolveBranches, supportsAsk = true },
+	{
+		resolveBranches,
+		supportsAsk = true,
+		ambientGitTargetOverride = false,
+		ambientCdPath = false,
+	},
 ) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
@@ -396,13 +405,14 @@ export function runMainCommitGuard(
 	const targets = resolveGuardedGitCommands(
 		payload?.tool_input?.command,
 		hookCwd,
+		{ ambientCdPath },
 	);
 	if (targets.length === 0) return { shouldOutput: false };
 
 	let asked = null;
 	for (const target of targets) {
 		const result =
-			target.cwd === null
+			target.cwd === null || ambientGitTargetOverride
 				? evaluateUnresolvedCwd(target)
 				: evaluateGuardedCommand(target, resolveBranches(payload, target.cwd));
 		if (result.decision === "deny") {

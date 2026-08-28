@@ -177,7 +177,7 @@ const GIT_TARGET_VARIABLES = new Set([
 	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
 	"GIT_NAMESPACE",
 ]);
-const GIT_TARGET_STATE_BUILTINS = new Set([
+const STATEFUL_ASSIGNMENT_BUILTINS = new Set([
 	"export",
 	"readonly",
 	"typeset",
@@ -190,13 +190,26 @@ function isGitTargetAssignment(value) {
 	return equals !== -1 && GIT_TARGET_VARIABLES.has(value.slice(0, equals));
 }
 
-/** Whether a segment changes a Git target variable for later shell commands. */
-export function persistsGitTargetOverride(tokens) {
+function isNonemptyCdPathAssignment(value) {
+	return value.startsWith("CDPATH=") && value.slice("CDPATH=".length) !== "";
+}
+
+function persistsShellAssignment(tokens, isAssignment) {
 	const prefix = parseLeadingShellPrefix(tokens);
 	const head = basename(tokens[prefix.end]?.value ?? "");
-	const assignment = tokens.some(({ value }) => isGitTargetAssignment(value));
-	if (GIT_TARGET_STATE_BUILTINS.has(head)) return assignment;
+	const assignment = tokens.some(({ value }) => isAssignment(value));
+	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) return assignment;
 	return prefix.end === tokens.length && assignment;
+}
+
+/** Whether a segment changes a Git target variable for later shell commands. */
+export function persistsGitTargetOverride(tokens) {
+	return persistsShellAssignment(tokens, isGitTargetAssignment);
+}
+
+/** Whether a segment gives later relative `cd` calls a nonempty CDPATH. */
+export function persistsCdPathOverride(tokens) {
+	return persistsShellAssignment(tokens, isNonemptyCdPathAssignment);
 }
 
 export function parseEnvPrefix(tokens, start = 0) {
@@ -400,6 +413,7 @@ export function parseLeadingShellPrefix(tokens) {
 	let i = 0;
 	let unresolved = false;
 	let gitTargetOverride = false;
+	let cdPathOverride = false;
 	const envs = [];
 	while (i < tokens.length) {
 		const value = tokens[i].value;
@@ -411,6 +425,7 @@ export function parseLeadingShellPrefix(tokens) {
 		}
 		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
 			gitTargetOverride ||= isGitTargetAssignment(value);
+			cdPathOverride ||= isNonemptyCdPathAssignment(value);
 			i++;
 			continue;
 		}
@@ -426,7 +441,13 @@ export function parseLeadingShellPrefix(tokens) {
 		if (command !== null) {
 			unresolved ||= command.unresolved;
 			if (command.query)
-				return { end: tokens.length, envs, unresolved, gitTargetOverride };
+				return {
+					end: tokens.length,
+					envs,
+					unresolved,
+					gitTargetOverride,
+					cdPathOverride,
+				};
 			i = command.end;
 			continue;
 		}
@@ -448,7 +469,7 @@ export function parseLeadingShellPrefix(tokens) {
 		}
 		break;
 	}
-	return { end: i, envs, unresolved, gitTargetOverride };
+	return { end: i, envs, unresolved, gitTargetOverride, cdPathOverride };
 }
 
 // `FOO=bar cmd` and executable command prefixes still run cmd.
