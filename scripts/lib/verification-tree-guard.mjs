@@ -259,8 +259,9 @@ export function runVerificationTreeGuard(
 		: {
 				decision: "deny",
 				reason:
-					`${verificationRiskReason(roots.mainRoot)} Codex PreToolUse's ask decision is unsupported, so this command is denied instead of failing open. ` +
-					"Retry with the harness workdir set to the linked worktree that owns the changes, or make the intended tree explicit with an absolute path or supported -C option.",
+					`This Bash call starts from the main checkout ('${roots.mainRoot}'), and the hook payload cannot prove that its cwd-implicit command targets the linked worktree that owns the changes. ` +
+					"Codex PreToolUse's ask decision is unsupported, so this command is denied instead of failing open. " +
+					"Retry with the harness workdir set to that linked worktree.",
 			};
 	return { shouldOutput: true, output: buildPermissionOutput(adapted) };
 }

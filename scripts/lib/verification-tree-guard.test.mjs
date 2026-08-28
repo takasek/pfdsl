@@ -272,8 +272,29 @@ describe("evaluateVerificationTreeGuard", () => {
 		assert.equal(output.permissionDecision, "deny");
 		assert.match(output.permissionDecisionReason, /Codex.*ask.*unsupported/i);
 		assert.match(output.permissionDecisionReason, /workdir/i);
-		assert.match(output.permissionDecisionReason, /absolute path.*-C/i);
+		assert.match(output.permissionDecisionReason, /cannot prove/i);
+		assert.doesNotMatch(output.permissionDecisionReason, /absolute path.*-C/i);
 		assert.doesNotMatch(output.permissionDecisionReason, /confirm to proceed/i);
+	});
+
+	it("does not claim a compound command actually targets the main tree", () => {
+		const result = runVerificationTreeGuard(
+			JSON.stringify({
+				...payload({ command: `cd ${WORKTREE_ROOT} && make test` }),
+				cwd: MAIN_ROOT,
+			}),
+			{
+				resolveRoots: () => ({
+					worktreeRoot: MAIN_ROOT,
+					mainRoot: MAIN_ROOT,
+					hasLinkedWorktrees: true,
+				}),
+				supportsAsk: false,
+			},
+		);
+		const reason = result.output.hookSpecificOutput.permissionDecisionReason;
+		assert.match(reason, /cannot prove/i);
+		assert.doesNotMatch(reason, /That tree does not contain/i);
 	});
 
 	it("preserves the Claude ask at the orchestration boundary", () => {
