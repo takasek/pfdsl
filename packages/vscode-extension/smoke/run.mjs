@@ -13,13 +13,15 @@ import {
 	expectEventually,
 	findWebviewFrame,
 	makeLaunchArgs,
+	prepareVSCodeCachePath,
 	readTransform,
 	removeRunDirectory,
 } from "./harness.mjs";
 
 const vscodeVersion = "1.132.1";
 const cdpTimeoutMs = 30_000;
-const outputBySession = new WeakMap();
+export const coldRenderTimeoutMs = 30_000;
+const interactionTimeoutMs = 1_000;
 
 export function resolveVSCodeExecutablePath(
 	vscodeExecutablePath,
@@ -233,6 +235,25 @@ export async function waitForVisibleCount(locator, expected, label, options) {
 	);
 }
 
+export async function waitForColdRender(
+	locator,
+	expected,
+	label,
+	{ waitForVisible = waitForVisibleCount, ...options } = {},
+) {
+	return waitForVisible(locator, expected, label, {
+		...options,
+		timeoutMs: coldRenderTimeoutMs,
+	});
+}
+
+function waitForInteraction(label, read, predicate, options) {
+	return expectEventually(label, read, predicate, {
+		timeoutMs: interactionTimeoutMs,
+		...options,
+	});
+}
+
 const geometryTolerance = 1;
 const scaleTolerance = 0.000_001;
 
@@ -265,16 +286,16 @@ export function findTextEndPosition(text, needle) {
 
 export function parseStatusCursorPosition(statusText) {
 	const match = /Ln (\d+), Col (\d+)(?: \(\d+ selected\))?\b/.exec(statusText);
-	if (!match) {
-		throw new Error(
-			`Status bar does not report a cursor position: ${statusText}`,
-		);
-	}
+	if (!match) return null;
 	return { line: Number(match[1]), column: Number(match[2]) };
 }
 
 function cursorPositionsMatch(actual, expected) {
-	return actual.line === expected.line && actual.column === expected.column;
+	return (
+		actual !== null &&
+		actual.line === expected.line &&
+		actual.column === expected.column
+	);
 }
 
 export function isCursorNavigationTransition(before, after, expected) {
@@ -299,13 +320,13 @@ async function readStatusCursorPosition(page) {
 	return parseStatusCursorPosition(await readStatusText(page));
 }
 
-async function waitForStatusCursorPosition(page, label) {
-	const statusText = await expectEventually(
+export async function waitForStatusCursorPosition(page, label, options) {
+	return waitForInteraction(
 		label,
-		() => readStatusText(page),
-		(text) => /Ln \d+, Col \d+\b/.test(text),
+		() => readStatusCursorPosition(page),
+		(position) => position !== null,
+		options,
 	);
-	return parseStatusCursorPosition(statusText);
 }
 
 async function readBoundingBox(locator, label) {
@@ -386,6 +407,61 @@ function minimapViewportMatches(geometry, transform) {
 	);
 }
 
+export function minimapDragChangesPan(afterMouseDown, afterMouseMove) {
+	return (
+		!isWithinGeometryTolerance(afterMouseMove.panX, afterMouseDown.panX) &&
+		!isWithinGeometryTolerance(afterMouseMove.panY, afterMouseDown.panY) &&
+		isWithinScaleTolerance(afterMouseMove.scale, afterMouseDown.scale)
+	);
+}
+
+export async function collectWebviewFailureSnapshot(frame) {
+	const snapshot = await frame.locator("#root").evaluate((root) => {
+		const rect = (element) => {
+			if (!element) return null;
+			const value = element.getBoundingClientRect();
+			return {
+				left: value.left,
+				top: value.top,
+				width: value.width,
+				height: value.height,
+			};
+		};
+		const inner = root.querySelector("#inner");
+		return {
+			root: rect(root),
+			svg: rect(root.querySelector("#inner svg")),
+			minimap: rect(root.querySelector("#minimap")),
+			minimapViewport: rect(root.querySelector("#minimap-vp")),
+			transform: inner?.style.transform ?? null,
+			nodeIds: Array.from(
+				root.querySelectorAll("#inner g.node[data-node-id]"),
+				(node) => node.getAttribute("data-node-id"),
+			).filter(Boolean),
+			scriptSrcs: Array.from(
+				root.ownerDocument.querySelectorAll("script[src]"),
+				(script) => script.src,
+			),
+		};
+	});
+	return { frameUrl: frame.url(), ...snapshot };
+}
+
+export async function appendWebviewFailureSnapshot(primaryError, frame) {
+	try {
+		const snapshot = await collectWebviewFailureSnapshot(frame);
+		return new Error(
+			`${primaryError.message}\nWebview snapshot:\n${JSON.stringify(snapshot)}`,
+			{ cause: primaryError },
+		);
+	} catch (snapshotError) {
+		return new Error(
+			`${primaryError.message}\nWebview snapshot: unavailable (${snapshotError.message})`,
+			{ cause: primaryError },
+		);
+	}
+}
+
 async function findEmptyRootPoint(frame, rootBox) {
 	const nodes = frame.locator("#inner g.node[data-node-id]");
 	const boxes = await Promise.all(
@@ -425,12 +501,12 @@ async function assertPreviewInteractions(session) {
 	};
 	await page.mouse.move(cursor.x, cursor.y);
 	await page.mouse.wheel(0, -120);
-	const afterZoom = await expectEventually(
+	const afterZoom = await waitForInteraction(
 		"zoom increases preview scale",
 		() => readTransform(frame),
 		(transform) => transform.scale > beforeZoom.scale,
 	);
-	await expectEventually(
+	await waitForInteraction(
 		"zoom keeps the cursor anchor stable",
 		async () => {
 			const node = await readBoundingBox(firstNode, "zoomed first sample node");
@@ -454,7 +530,7 @@ async function assertPreviewInteractions(session) {
 	await page.mouse.down();
 	await page.mouse.move(panStart.x + 40, panStart.y + 25);
 	await page.mouse.up();
-	await expectEventually(
+	await waitForInteraction(
 		"graph pan follows the drag distance",
 		() => readTransform(frame),
 		(transform) =>
@@ -467,7 +543,7 @@ async function assertPreviewInteractions(session) {
 	await page.mouse.move(releaseStart.x, releaseStart.y);
 	await page.mouse.down();
 	await page.mouse.move(releaseStart.x + 10, releaseStart.y + 8);
-	await expectEventually(
+	await waitForInteraction(
 		"outside release starts a second graph drag",
 		() => readTransform(frame),
 		(transform) =>
@@ -478,7 +554,7 @@ async function assertPreviewInteractions(session) {
 	await page.mouse.up();
 	const afterOutsideRelease = await readTransform(frame);
 	await page.mouse.move(releaseStart.x + 20, releaseStart.y + 20);
-	await expectEventually(
+	await waitForInteraction(
 		"outside release prevents further graph pan",
 		() => readTransform(frame),
 		(transform) => transformsMatch(transform, afterOutsideRelease),
@@ -494,24 +570,21 @@ async function assertPreviewInteractions(session) {
 	);
 	const minimap = frame.locator("#minimap");
 	const minimapBox = await readBoundingBox(minimap, "minimap");
-	const beforeMinimapDrag = await readTransform(frame);
 	await page.mouse.move(
 		minimapBox.x + minimapBox.width * 0.25,
 		minimapBox.y + minimapBox.height * 0.75,
 	);
 	await page.mouse.down();
+	const afterMinimapMouseDown = await readTransform(frame);
 	await page.mouse.move(
 		minimapBox.x + minimapBox.width * 0.75,
 		minimapBox.y + minimapBox.height * 0.25,
 	);
 	await page.mouse.up();
-	await expectEventually(
-		"minimap drag changes preview pan without zooming",
+	await waitForInteraction(
+		"minimap drag changes preview pan after pointer movement",
 		() => readTransform(frame),
-		(transform) =>
-			!isWithinGeometryTolerance(transform.panX, beforeMinimapDrag.panX) &&
-			!isWithinGeometryTolerance(transform.panY, beforeMinimapDrag.panY) &&
-			isWithinScaleTolerance(transform.scale, beforeMinimapDrag.scale),
+		(transform) => minimapDragChangesPan(afterMinimapMouseDown, transform),
 	);
 
 	const fixtureText = await readFile(session.fixturePath, "utf8");
@@ -535,7 +608,7 @@ async function assertPreviewInteractions(session) {
 		"node navigation must start away from the fixture selection endpoint",
 	);
 	await frame.locator('#inner g.node[data-node-id="design"]').dblclick();
-	await expectEventually(
+	await waitForInteraction(
 		"node double-click moves the source cursor to design",
 		() => readStatusCursorPosition(page),
 		(cursorAfterNavigation) =>
@@ -563,7 +636,10 @@ export async function launchSmokeSession() {
 		);
 		const port = await reservePort();
 		const vscodeExecutablePath = resolveVSCodeExecutablePath(
-			await downloadAndUnzipVSCode(vscodeVersion),
+			await downloadAndUnzipVSCode({
+				version: vscodeVersion,
+				cachePath: await prepareVSCodeCachePath(repoRoot),
+			}),
 		);
 		const fixturePath = join(repoRoot, "docs/samples/01-simple-chain.pfdsl");
 		vscodeProcess = spawn(
@@ -600,8 +676,8 @@ export async function launchSmokeSession() {
 			fixturePath,
 			vscodeProcess,
 			runDir,
+			output,
 		};
-		outputBySession.set(session, output);
 		return session;
 	} catch (error) {
 		const diagnostic = formatDiagnostic(error.message, {
@@ -627,13 +703,9 @@ async function main() {
 		session = await launchSmokeSession();
 		console.log(`VS Code version: ${vscodeVersion}`);
 		console.log(`frame URL: ${session.frame.url()}`);
-		await waitForVisibleCount(
-			session.frame.locator("#root"),
-			1,
-			"preview root",
-		);
+		await waitForColdRender(session.frame.locator("#root"), 1, "preview root");
 		await assertVisibleCount(session.frame.locator("#root"), 1, "preview root");
-		await waitForVisibleCount(
+		await waitForColdRender(
 			session.frame.locator("#inner svg"),
 			1,
 			"preview SVG",
@@ -643,18 +715,14 @@ async function main() {
 			1,
 			"preview SVG",
 		);
-		await waitForVisibleCount(
+		await waitForColdRender(
 			session.frame.locator("#inner g.node"),
 			3,
 			"preview graph nodes",
 		);
-		await waitForVisibleCount(session.frame.locator("#minimap"), 1, "minimap");
+		await waitForColdRender(session.frame.locator("#minimap"), 1, "minimap");
 		await assertVisibleCount(session.frame.locator("#minimap"), 1, "minimap");
-		await waitForVisibleCount(
-			session.frame.locator("g.node"),
-			6,
-			"sample nodes",
-		);
+		await waitForColdRender(session.frame.locator("g.node"), 6, "sample nodes");
 		const nodeCount = await assertVisibleCount(
 			session.frame.locator("g.node"),
 			6,
@@ -666,13 +734,16 @@ async function main() {
 		if (!session) {
 			failure = error;
 		} else {
-			failure = new Error(
-				formatDiagnostic(error.message, {
-					page: session.page,
-					vscodeProcess: session.vscodeProcess,
-					output: outputBySession.get(session),
-				}),
-				{ cause: error },
+			failure = await appendWebviewFailureSnapshot(
+				new Error(
+					formatDiagnostic(error.message, {
+						page: session.page,
+						vscodeProcess: session.vscodeProcess,
+						output: session.output,
+					}),
+					{ cause: error },
+				),
+				session.frame,
 			);
 		}
 	} finally {

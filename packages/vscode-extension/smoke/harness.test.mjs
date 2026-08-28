@@ -8,19 +8,27 @@ import {
 	expectEventually,
 	findWebviewFrame,
 	makeLaunchArgs,
+	makeVSCodeCachePath,
 	parseTransform,
+	prepareVSCodeCachePath,
 	readTransform,
 	removeRunDirectory,
 } from "./harness.mjs";
 import {
 	appendCleanupDiagnostics,
+	appendWebviewFailureSnapshot,
 	assertVisibleCount,
 	cleanupSmokeSession,
+	coldRenderTimeoutMs,
+	collectWebviewFailureSnapshot,
 	findTextEndPosition,
 	isCursorNavigationTransition,
 	isWithinScaleTolerance,
+	minimapDragChangesPan,
 	parseStatusCursorPosition,
 	resolveVSCodeExecutablePath,
+	waitForColdRender,
+	waitForStatusCursorPosition,
 	waitForVisibleCount,
 	waitForWorkbenchPage,
 } from "./run.mjs";
@@ -45,6 +53,40 @@ test("makeLaunchArgs isolates the run and opens the fixture", () => {
 			"/repo/docs/samples/01-simple-chain.pfdsl",
 		],
 	);
+});
+
+test("makeVSCodeCachePath keeps a stable worktree-specific cache outside the repository", () => {
+	const first = makeVSCodeCachePath("/repo/.worktrees/one", {
+		temporaryDirectory: "/tmp",
+	});
+	assert.equal(
+		first,
+		makeVSCodeCachePath("/repo/.worktrees/one", {
+			temporaryDirectory: "/tmp",
+		}),
+	);
+	assert.notEqual(
+		first,
+		makeVSCodeCachePath("/repo/.worktrees/two", {
+			temporaryDirectory: "/tmp",
+		}),
+	);
+	assert.match(first, /^\/tmp\/pfdsl-vscode-smoke-cache\//);
+	assert.doesNotMatch(first, /^\/repo\//);
+});
+
+test("prepareVSCodeCachePath creates the stable external cache directory", async () => {
+	const temporaryDirectory = await mkdtemp(
+		join(tmpdir(), "pfdsl-vscode-cache-test-"),
+	);
+	try {
+		const cachePath = await prepareVSCodeCachePath("/repo/.worktrees/one", {
+			temporaryDirectory,
+		});
+		await access(cachePath);
+	} finally {
+		await rm(temporaryDirectory, { recursive: true, force: true });
+	}
 });
 
 test("parseTransform reads the webview translate and scale", () => {
@@ -155,6 +197,115 @@ test("waitForVisibleCount waits for the preview to render", async () => {
 		}),
 		1,
 	);
+});
+
+test("waitForColdRender gives initial webview rendering at least thirty seconds", async () => {
+	const calls = [];
+	await waitForColdRender({}, 1, "preview SVG", {
+		waitForVisible: async (...args) => {
+			calls.push(args);
+			return 1;
+		},
+	});
+	assert.equal(coldRenderTimeoutMs >= 30_000, true);
+	assert.equal(calls[0][3].timeoutMs, coldRenderTimeoutMs);
+});
+
+test("minimap drag requires movement after mouse down", () => {
+	const afterMouseDown = { panX: 20, panY: 10, scale: 1.1 };
+	assert.equal(minimapDragChangesPan(afterMouseDown, afterMouseDown), false);
+	assert.equal(
+		minimapDragChangesPan(afterMouseDown, { panX: 40, panY: 30, scale: 1.1 }),
+		true,
+	);
+});
+
+test("waitForStatusCursorPosition retries a transient missing cursor observation", async () => {
+	const observations = ["Loading preview", "Ln 1, Col 23"];
+	const page = {
+		getByRole: () => ({
+			count: async () => 1,
+			textContent: async () => observations.shift(),
+		}),
+	};
+	assert.deepEqual(
+		await waitForStatusCursorPosition(page, "source cursor", {
+			retryIntervalMs: 0,
+			timeoutMs: 100,
+		}),
+		{ line: 1, column: 23 },
+	);
+});
+
+test("collectWebviewFailureSnapshot reports semantic webview state", async () => {
+	const rectangle = (left, top, width, height) => ({
+		getBoundingClientRect: () => ({ left, top, width, height }),
+	});
+	const inner = {
+		...rectangle(10, 20, 300, 200),
+		style: { transform: "translate(12px, -8px) scale(1.1)" },
+	};
+	const root = {
+		...rectangle(1, 2, 640, 480),
+		querySelector: (selector) =>
+			({
+				"#inner": inner,
+				"#inner svg": rectangle(10, 20, 300, 200),
+				"#minimap": rectangle(500, 20, 120, 90),
+				"#minimap-vp": rectangle(510, 30, 60, 45),
+			})[selector] ?? null,
+		querySelectorAll: (selector) => {
+			if (selector === "#inner g.node[data-node-id]")
+				return [
+					{ getAttribute: () => "design" },
+					{ getAttribute: () => "spec" },
+				];
+			return [];
+		},
+		ownerDocument: {
+			querySelectorAll: (selector) => {
+				assert.equal(selector, "script[src]");
+				return [{ src: "vscode-webview://webview/webview.js" }];
+			},
+		},
+	};
+	const frame = {
+		url: () => "vscode-webview://webview/fake.html",
+		locator: (selector) => {
+			assert.equal(selector, "#root");
+			return { evaluate: async (read) => read(root) };
+		},
+	};
+	assert.deepEqual(await collectWebviewFailureSnapshot(frame), {
+		frameUrl: "vscode-webview://webview/fake.html",
+		root: { left: 1, top: 2, width: 640, height: 480 },
+		svg: { left: 10, top: 20, width: 300, height: 200 },
+		minimap: { left: 500, top: 20, width: 120, height: 90 },
+		minimapViewport: { left: 510, top: 30, width: 60, height: 45 },
+		transform: "translate(12px, -8px) scale(1.1)",
+		nodeIds: ["design", "spec"],
+		scriptSrcs: ["vscode-webview://webview/webview.js"],
+	});
+});
+
+test("appendWebviewFailureSnapshot appends the selected frame diagnostic", async () => {
+	const root = {
+		getBoundingClientRect: () => ({ left: 1, top: 2, width: 3, height: 4 }),
+		querySelector: () => null,
+		querySelectorAll: () => [],
+		ownerDocument: { querySelectorAll: () => [] },
+	};
+	const frame = {
+		url: () => "vscode-webview://webview/fake.html",
+		locator: () => ({ evaluate: async (read) => read(root) }),
+	};
+	const error = await appendWebviewFailureSnapshot(
+		new Error("preview interaction failed"),
+		frame,
+	);
+	assert.match(error.message, /preview interaction failed/);
+	assert.match(error.message, /Webview snapshot/);
+	assert.match(error.message, /vscode-webview:\/\/webview\/fake.html/);
 });
 
 test("resolveVSCodeExecutablePath handles recent macOS Code bundles", () => {

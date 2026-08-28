@@ -43,5 +43,5 @@ If F5 does nothing, you almost certainly opened a folder other than `packages/vs
 
 Run `make test-vscode-smoke` from the repository worktree root.
 The command downloads the pinned VS Code test binary on first use, starts it with an isolated profile, and verifies preview rendering, zoom, pan, minimap interaction, outside release, and node navigation through the real webview.
-Failures report the VS Code version, process stdout and stderr, webview frame URLs, and last observed geometry.
+Failures report the VS Code version, process stdout and stderr, webview frame URLs, last observed readiness data, and selected-frame semantic DOM state.
 The smoke test does not compare screenshots or cover OS-native dialogs, IME input, or the Marketplace-installed extension.

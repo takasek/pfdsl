@@ -1,9 +1,31 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { resolve, sep } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 const runDirectoryPrefix = `${resolve(tmpdir())}${sep}pfdsl-vscode-smoke-`;
 const issuedRunDirectories = new Set();
+
+export function makeVSCodeCachePath(
+	repoRoot,
+	{ temporaryDirectory = tmpdir() } = {},
+) {
+	const worktreeHash = createHash("sha256")
+		.update(resolve(repoRoot))
+		.digest("hex")
+		.slice(0, 16);
+	return join(
+		resolve(temporaryDirectory),
+		"pfdsl-vscode-smoke-cache",
+		worktreeHash,
+	);
+}
+
+export async function prepareVSCodeCachePath(repoRoot, options) {
+	const cachePath = makeVSCodeCachePath(repoRoot, options);
+	await mkdir(cachePath, { recursive: true });
+	return cachePath;
+}
 
 export async function createRunDirectory() {
 	const runDirectory = await mkdtemp(runDirectoryPrefix);
