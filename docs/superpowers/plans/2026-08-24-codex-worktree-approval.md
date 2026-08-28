@@ -194,3 +194,6 @@ Report the local branch and commits; do not push a new branch or create a PR unt
 - [x] Remove ambient Git target variables from hook identity subprocesses and fail closed when a guarded mutation inherits them.
 - [x] Treat nonempty ambient or command-state CDPATH as unresolved for relative cd while preserving absolute and definitely empty forms.
 - [x] Remove all seven Git target variables from the user wrapper's Git and Make child processes and verify the installed companion.
+- [x] Track protected Git and CDPATH state through dynamic shell setters, and restore known-safe state only after literal emptying, variable unset, or removal of a Git variable's export attribute.
+- [x] Fail closed for mutation targets hidden by OR-lists, pipelines, background commands, subshells, and conditional lists with divergent continuation state while preserving direct success-path AND-lists and later unrelated control flow.
+- [x] Reproduce the adversarial commands against the real hook, run the focused guard suites, and synchronize the design, workflow PFD, and generated harness guidance.

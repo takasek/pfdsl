@@ -9,6 +9,7 @@ import {
 	git,
 	gitDiffNames,
 	gitLsFiles,
+	hasGitTargetEnvironment,
 	resolveGitRoots,
 	run,
 	tryGit,
@@ -18,6 +19,13 @@ import {
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("run-exec", () => {
+	it("does not treat empty Git target variables as target overrides", () => {
+		assert.equal(
+			hasGitTargetEnvironment({ GIT_DIR: "", GIT_WORK_TREE: "" }),
+			false,
+		);
+	});
+
 	it("removes Git target variables from identity subprocesses without changing the source environment", () => {
 		const source = {
 			PATH: "/bin",

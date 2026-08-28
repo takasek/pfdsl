@@ -16,14 +16,17 @@
 
 import { basename, resolve } from "node:path";
 import {
+	createProtectedShellState,
 	gitSubcommand,
 	gitSubcommandIndex,
+	hasProtectedCdPathOverride,
+	hasProtectedGitTargetOverride,
 	parseLeadingShellPrefix,
-	persistsCdPathOverride,
-	persistsGitTargetOverride,
+	splitCommandFlow,
 	splitSegments,
 	stripLeadingNoise,
 	tokenize,
+	updateProtectedShellState,
 } from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
@@ -227,23 +230,42 @@ function guardedSuffix(tokens) {
  * also necessary because one Bash invocation can move between worktrees
  * before running another guarded Git command (#784).
  */
-function analyzeCommand(command, hookCwd, { ambientCdPath = false } = {}) {
+function analyzeCommand(
+	command,
+	hookCwd,
+	{ ambientCdPath = false, ambientGitTargetOverride = false } = {},
+) {
 	if (typeof command !== "string") return { targets: [], finalCwd: hookCwd };
 
 	/** Where the shell stands, or null once a `cd` moved it somewhere unknown. */
 	let cwd = hookCwd;
-	let gitTargetOverride = false;
-	let cdPathOverride = ambientCdPath;
+	const protectedState = createProtectedShellState({
+		ambientCdPath,
+		ambientGitTargetOverride,
+	});
+	let unresolvedControlFlow = false;
+	let andList = false;
 	const targets = [];
 
-	for (const segment of splitSegments(command)) {
+	for (const { command: segment, separatorBefore } of splitCommandFlow(
+		command,
+	)) {
+		if (separatorBefore === "&&") andList = true;
+		else if (separatorBefore === ";" || separatorBefore === "\n") {
+			unresolvedControlFlow ||= andList;
+			andList = false;
+		} else if (["||", "|", "&", "(", ")"].includes(separatorBefore)) {
+			unresolvedControlFlow = true;
+			andList = false;
+		}
 		const rawTokens = tokenize(segment);
-		gitTargetOverride ||= persistsGitTargetOverride(rawTokens);
-		cdPathOverride ||= persistsCdPathOverride(rawTokens);
 		const prefix = parseLeadingShellPrefix(rawTokens);
 		const envCwd = resolveEnvCwd(rawTokens, cwd);
 		const tokens = rawTokens.slice(prefix.end);
-		if (tokens.length === 0) continue;
+		if (tokens.length === 0) {
+			updateProtectedShellState(protectedState, rawTokens);
+			continue;
+		}
 		const head = basename(tokens[0].value);
 
 		if (
@@ -253,6 +275,7 @@ function analyzeCommand(command, hookCwd, { ambientCdPath = false } = {}) {
 			head === "popd"
 		) {
 			cwd = null;
+			updateProtectedShellState(protectedState, rawTokens);
 			continue;
 		}
 
@@ -261,24 +284,36 @@ function analyzeCommand(command, hookCwd, { ambientCdPath = false } = {}) {
 			if (target === null) cwd = null;
 			// An absolute target restores a trail lost to an unresolvable earlier cd.
 			else if (target.startsWith("/")) cwd = resolve(target);
-			else if (cdPathOverride || prefix.cdPathOverride) cwd = null;
+			else if (
+				hasProtectedCdPathOverride(protectedState) ||
+				prefix.cdPathOverride
+			)
+				cwd = null;
 			else if (cwd !== null) cwd = resolve(cwd, target);
+			updateProtectedShellState(protectedState, rawTokens);
 			continue;
 		}
 
 		const guarded =
 			classifySegment(tokens) ??
 			(prefix.unresolved ? guardedSuffix(tokens) : null);
-		if (!guarded) continue;
+		if (!guarded) {
+			updateProtectedShellState(protectedState, rawTokens);
+			continue;
+		}
 		targets.push({
 			...guarded,
 			cwd:
-				prefix.unresolved || gitTargetOverride
+				unresolvedControlFlow ||
+				prefix.unresolved ||
+				hasProtectedGitTargetOverride(protectedState) ||
+				prefix.gitTargetOverride
 					? null
 					: head === "git"
 						? resolveGitCwd(tokens, envCwd)
 						: resolveCodexRoutineCwd(tokens),
 		});
+		updateProtectedShellState(protectedState, rawTokens);
 	}
 	return { targets, finalCwd: cwd };
 }
@@ -405,14 +440,14 @@ export function runMainCommitGuard(
 	const targets = resolveGuardedGitCommands(
 		payload?.tool_input?.command,
 		hookCwd,
-		{ ambientCdPath },
+		{ ambientCdPath, ambientGitTargetOverride },
 	);
 	if (targets.length === 0) return { shouldOutput: false };
 
 	let asked = null;
 	for (const target of targets) {
 		const result =
-			target.cwd === null || ambientGitTargetOverride
+			target.cwd === null
 				? evaluateUnresolvedCwd(target)
 				: evaluateGuardedCommand(target, resolveBranches(payload, target.cwd));
 		if (result.decision === "deny") {

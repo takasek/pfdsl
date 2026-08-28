@@ -61,10 +61,16 @@ const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 //
 // Exported so other command-inspecting guards (main-commit-guard.mjs) reuse
 // this parsing instead of re-implementing quote/segment handling.
-export function splitSegments(command) {
+export function splitCommandFlow(command) {
 	const segments = [];
 	let current = "";
 	let quote = null;
+	let separatorBefore = null;
+	const split = (separator) => {
+		segments.push({ command: current, separatorBefore });
+		current = "";
+		separatorBefore = separator;
+	};
 	for (let i = 0; i < command.length; i++) {
 		const ch = command[i];
 		if (quote) {
@@ -84,8 +90,7 @@ export function splitSegments(command) {
 		}
 		const two = command.slice(i, i + 2);
 		if (two === "&&" || two === "||") {
-			segments.push(current);
-			current = "";
+			split(two);
 			i++;
 			continue;
 		}
@@ -94,19 +99,21 @@ export function splitSegments(command) {
 			continue;
 		}
 		if (ch === ";" || ch === "|" || ch === "&" || ch === "\n") {
-			segments.push(current);
-			current = "";
+			split(ch);
 			continue;
 		}
 		if (ch === "(" || ch === ")") {
-			segments.push(current);
-			current = "";
+			split(ch);
 			continue;
 		}
 		current += ch;
 	}
-	segments.push(current);
+	segments.push({ command: current, separatorBefore });
 	return segments;
+}
+
+export function splitSegments(command) {
+	return splitCommandFlow(command).map(({ command: segment }) => segment);
 }
 
 // Tokens are only inspected when unquoted, so a quoted argument can never be
@@ -185,9 +192,18 @@ const STATEFUL_ASSIGNMENT_BUILTINS = new Set([
 	"local",
 ]);
 
-function isGitTargetAssignment(value) {
+function protectedAssignment(value) {
 	const equals = value.indexOf("=");
-	return equals !== -1 && GIT_TARGET_VARIABLES.has(value.slice(0, equals));
+	if (equals === -1) return null;
+	const name = value.slice(0, equals);
+	if (name === "CDPATH" || GIT_TARGET_VARIABLES.has(name))
+		return { name, value: value.slice(equals + 1) };
+	return null;
+}
+
+function isGitTargetAssignment(value) {
+	const assignment = protectedAssignment(value);
+	return assignment !== null && GIT_TARGET_VARIABLES.has(assignment.name);
 }
 
 function isNonemptyCdPathAssignment(value) {
@@ -210,6 +226,174 @@ export function persistsGitTargetOverride(tokens) {
 /** Whether a segment gives later relative `cd` calls a nonempty CDPATH. */
 export function persistsCdPathOverride(tokens) {
 	return persistsShellAssignment(tokens, isNonemptyCdPathAssignment);
+}
+
+/** State that matters to commands guarded for cross-worktree mutations. */
+export function createProtectedShellState({
+	ambientGitTargetOverride = false,
+	ambientGitTargetVariables,
+	ambientCdPath = false,
+} = {}) {
+	const ambientGitTargets =
+		ambientGitTargetVariables ??
+		(ambientGitTargetOverride
+			? [...GIT_TARGET_VARIABLES].filter(
+					(name) => process.env[name] !== undefined && process.env[name] !== "",
+				)
+			: []);
+	const fallbackGitTargets =
+		ambientGitTargetOverride && ambientGitTargets.length === 0
+			? GIT_TARGET_VARIABLES
+			: new Set(ambientGitTargets);
+	return {
+		cdPath: ambientCdPath ? "unknown" : "safe",
+		gitTargets: new Map(
+			[...GIT_TARGET_VARIABLES].map((name) => [
+				name,
+				{
+					exported: fallbackGitTargets.has(name),
+					value: fallbackGitTargets.has(name) ? "unknown" : "safe",
+				},
+			]),
+		),
+	};
+}
+
+export function hasProtectedGitTargetOverride(state) {
+	return [...state.gitTargets.values()].some(
+		({ exported, value }) => exported && value !== "safe",
+	);
+}
+
+export function hasProtectedCdPathOverride(state) {
+	return state.cdPath !== "safe";
+}
+
+function setProtectedValue(state, name, value, exported) {
+	if (name === "CDPATH") {
+		state.cdPath = value === "" ? "safe" : "unknown";
+		return;
+	}
+	const target = state.gitTargets.get(name);
+	if (!target) return;
+	target.value = value === "" ? "safe" : "unknown";
+	if (exported !== undefined) target.exported = exported;
+}
+
+function setProtectedUnknown(state, name) {
+	if (name === "CDPATH") {
+		state.cdPath = "unknown";
+		return;
+	}
+	const target = state.gitTargets.get(name);
+	if (target) target.value = "unknown";
+}
+
+function unsetProtectedValue(state, name) {
+	if (name === "CDPATH") {
+		state.cdPath = "safe";
+		return;
+	}
+	const target = state.gitTargets.get(name);
+	if (!target) return;
+	target.value = "safe";
+	target.exported = false;
+}
+
+function protectedName(value) {
+	return value === "CDPATH" || GIT_TARGET_VARIABLES.has(value) ? value : null;
+}
+
+function applyAssignments(state, tokens, exported) {
+	for (const token of tokens) {
+		const assignment = protectedAssignment(token.value);
+		if (assignment)
+			setProtectedValue(state, assignment.name, assignment.value, exported);
+	}
+}
+
+function applyExport(state, tokens) {
+	let unexport = false;
+	for (const { value } of tokens) {
+		if (value === "--") continue;
+		if (value === "-n") {
+			unexport = true;
+			continue;
+		}
+		if (value.startsWith("-")) continue;
+		const assignment = protectedAssignment(value);
+		if (assignment) {
+			setProtectedValue(state, assignment.name, assignment.value, !unexport);
+			continue;
+		}
+		const name = protectedName(value);
+		if (name && name !== "CDPATH")
+			state.gitTargets.get(name).exported = !unexport;
+	}
+}
+
+function applyUnset(state, tokens) {
+	let variables = true;
+	let options = true;
+	for (const { value } of tokens) {
+		if (options && value === "--") {
+			options = false;
+			continue;
+		}
+		if (options && value.startsWith("-")) {
+			variables = value === "-v";
+			continue;
+		}
+		if (!variables) continue;
+		const name = protectedName(value);
+		if (name) unsetProtectedValue(state, name);
+	}
+}
+
+function dynamicallyWrittenProtectedNames(head, tokens) {
+	if (head === "read")
+		return tokens.map(({ value }) => protectedName(value)).filter(Boolean);
+	if (head !== "printf") return [];
+	for (let i = 0; i < tokens.length; i++) {
+		const value = tokens[i].value;
+		if (value === "-v")
+			return [protectedName(tokens[i + 1]?.value)].filter(Boolean);
+		if (value.startsWith("-v"))
+			return [protectedName(value.slice(2))].filter(Boolean);
+	}
+	return [];
+}
+
+/** Update state after one shell command segment has run. */
+export function updateProtectedShellState(state, tokens) {
+	const prefix = parseLeadingShellPrefix(tokens);
+	const head = basename(tokens[prefix.end]?.value ?? "");
+	const arguments_ = tokens.slice(prefix.end + 1);
+	const assignments = tokens.slice(0, prefix.end);
+	if (prefix.end === tokens.length) applyAssignments(state, assignments, true);
+	else if (STATEFUL_ASSIGNMENT_BUILTINS.has(head))
+		applyAssignments(state, assignments, true);
+
+	if (head === "source" || head === "." || head === "eval") {
+		state.cdPath = "unknown";
+		for (const name of GIT_TARGET_VARIABLES)
+			setProtectedValue(state, name, "unknown", true);
+		return;
+	}
+	if (head === "unset") {
+		applyUnset(state, arguments_);
+		return;
+	}
+	if (head === "export") {
+		applyExport(state, arguments_);
+		return;
+	}
+	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) {
+		applyAssignments(state, arguments_, true);
+		return;
+	}
+	for (const name of dynamicallyWrittenProtectedNames(head, arguments_))
+		setProtectedUnknown(state, name);
 }
 
 export function parseEnvPrefix(tokens, start = 0) {

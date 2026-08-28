@@ -28,7 +28,7 @@ wrapperの `worktree-add` は `git rev-parse --path-format=absolute --git-common
 
 認証、権限、ネットワーク、必須tool不在、破壊的操作、新しい公開先、 materially different な代替方式が必要な場合だけ停止してユーザー判断を求める。
 
-pfdslのshared guardは空白でない `CLAUDE_PROJECT_DIR` が存在すれば従来どおりそれを優先し、存在しない場合だけ空白でないPreToolUse payloadの `cwd` をsession worktreeの根として使う。literalな `cd`、inputを含む先頭redirection、`git -C`、`env -C/--chdir`、Codex wrapperの明示targetを実行順に解決する。`--git-dir`・`--work-tree`、Gitのrepository・index・object・ref namespaceを変えるcommand内またはambientの環境変数とそれを後続segmentへ残すstateful shell builtin、shell展開、cwdを変えるbuiltin、未知または不完全なcommand/sudo/time prefix等でeffective cwdを確定できない変更系commandは元のcwdへfallbackせずfail closedする。identity取得用Git subprocessは7種類のGit target環境変数を除去し、明示cwdからrootとbranchを解決する。ambientまたはcommand stateに非空 `CDPATH` があるrelative `cd` も到達先不明としてfail closedするが、絶対 `cd` と確実に空の `CDPATH` は静的解決を維持する。quoted/absolute executableと既知prefix optionを実行形どおり認識し、`command -p` は実行prefix、`command -v/-V` はpath queryとして区別する。
+pfdslのshared guardは空白でない `CLAUDE_PROJECT_DIR` が存在すれば従来どおりそれを優先し、存在しない場合だけ空白でないPreToolUse payloadの `cwd` をsession worktreeの根として使う。literalな `cd`、inputを含む先頭redirection、`git -C`、`env -C/--chdir`、Codex wrapperの明示targetを実行順に解決する。`--git-dir`・`--work-tree`、Gitのrepository・index・object・ref namespaceを変える非空のcommand内またはambient環境変数、shell展開、cwdを変えるbuiltin、未知または不完全なcommand/sudo/time prefix等でeffective cwdを確定できない変更系commandは元のcwdへfallbackせずfail closedする。identity取得用Git subprocessは7種類のGit target環境変数を除去し、明示cwdからrootとbranchを解決する。protected shell stateはGit target変数ごとの値・export状態とshellが直接読むCDPATHを分けて追跡する。literalな空代入・`unset`・Git target変数の `export -n` は安全状態を回復するが、`unset -f` は変数を消したものとして扱わない。`read`・`printf -v`・`source`・`.`・`eval` による動的変更と、`||`・pipeline・background・subshell・後続の無条件commandへ複数状態を残すAND-listは変更系Gitをfail closedする。ambientまたはcommand stateに非空 `CDPATH` があるrelative `cd` も到達先不明としてfail closedするが、絶対 `cd`、確実に空の `CDPATH`、単純なsuccess-pathの `cd <target> && git <mutation>`、変更系Gitより後ろにだけ現れるcontrol flowは静的解決を維持する。quoted/absolute executableと既知prefix optionを実行形どおり認識し、`command -p` は実行prefix、`command -v/-V` はpath queryとして区別する。
 
 `.claude/settings.json` と `.codex/hooks.json` は同一wrapperを呼ぶ。Claude Codeでは復旧系のaskを維持するが、Codexではunsupportedなaskをdenyへ変換し、hook failure後のfail-openを防ぐ。
 
@@ -44,7 +44,7 @@ pfdslのshared guardは空白でない `CLAUDE_PROJECT_DIR` が存在すれば�
 - wrapperはlinked worktreeからの `worktree-add` をmain repository直下へ作り、routine mutationではmain checkout、workdir不一致、branch不一致をGit起動前に拒否する。
 - setup markerはinstall入力fingerprintが一致する場合だけcurrentであり、branch switch等による入力変更後のSessionStartはsetupを再実行する。同一inputsの同時runnerはsetup bodyを1回だけ実行し、partial failureはcurrent markerを残さない。
 - malformed payloadやGit解決失敗で全Bash呼出しを停止させない既存の外側のfail-open境界は維持するが、変更系command内でeffective cwdだけを解決できない場合はdenyまたはaskへfail closedする。
-- hook processがGit target環境変数を継承した変更系commandと、非空CDPATHがrelative cdを変えうる変更系commandはfail closedし、読み取り系Git・絶対cd・確実に空のCDPATHは影響を受けない。
+- hook processが非空のGit target環境変数を継承した変更系command、非空CDPATHがrelative cdを変えうる変更系command、動的なprotected-state setter、静的に一つの実targetへ畳めないcontrol flowはfail closedする。読み取り系Git・絶対cd・literalな空代入または変数unsetで安全へ戻した状態・単純なsuccess-pathのAND-listは影響を受けない。
 
 ## Non-goals
 

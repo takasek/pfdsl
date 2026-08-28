@@ -35,8 +35,9 @@ export function withoutGitTargetEnvironment(environment = process.env) {
 
 /** Whether an inherited Git target override makes a guarded mutation ambiguous. */
 export function hasGitTargetEnvironment(environment = process.env) {
-	return GIT_TARGET_ENVIRONMENT_VARIABLES.some((variable) =>
-		Object.hasOwn(environment, variable),
+	return GIT_TARGET_ENVIRONMENT_VARIABLES.some(
+		(variable) =>
+			Object.hasOwn(environment, variable) && environment[variable] !== "",
 	);
 }
 
