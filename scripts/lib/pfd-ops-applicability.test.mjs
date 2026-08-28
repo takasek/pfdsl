@@ -6,6 +6,7 @@ const read = (path) => readFileSync(path, "utf8");
 
 const skill = read(".claude/skills/pfd-ops/SKILL.md");
 const workCycle = read(".claude/skills/pfd-ops/references/work-cycle.md");
+const retro = read(".claude/skills/pfd-retro/SKILL.md");
 const githubBackend = read(
 	".claude/skills/pfd-ops/references/github-issues-backend.md",
 );
@@ -32,6 +33,20 @@ describe("pfd-ops applicability contract", () => {
 		assert.doesNotMatch(
 			skill,
 			/bare issue or\s+work-item number[\s\S]+route it through the work cycle/,
+		);
+	});
+
+	it("does not derive session-created items from the current open set", () => {
+		const openIssueList = /gh\s+issue\s+list\b[^\n`]*--state(?:=|\s+)open\b/;
+		assert.doesNotMatch(retro, openIssueList);
+
+		const issueView = retro.match(
+			/gh\s+issue\s+view\s+<number>\s+--json\s+([^\s`]+)/,
+		);
+		assert.ok(issueView);
+		assert.deepEqual(
+			new Set(issueView[1].split(",")),
+			new Set(["number", "state", "labels", "createdAt"]),
 		);
 	});
 
