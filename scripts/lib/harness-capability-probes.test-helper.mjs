@@ -10,7 +10,11 @@ import {
 } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { capabilitiesForTarget } from "./harness-capability-contract.mjs";
-import { AGENT_EXCLUSIONS, SKILL_EXCLUSIONS } from "./harness-inventory.mjs";
+import {
+	AGENT_EXCLUSIONS,
+	LOCAL_CLAUDE_ROOT_ENTRIES,
+	SKILL_EXCLUSIONS,
+} from "./harness-inventory.mjs";
 
 function copyClaudeRepositoryFixture(sourceRoot, consumerRoot) {
 	cpSync(join(sourceRoot, "CLAUDE.md"), join(consumerRoot, "CLAUDE.md"));
@@ -18,6 +22,14 @@ function copyClaudeRepositoryFixture(sourceRoot, consumerRoot) {
 		recursive: true,
 		dereference: true,
 	});
+	// The copy above takes `.claude/` whole, so a maintainer's local entries ride
+	// along into the fixture and read as undeclared output surfaces.
+	for (const name of Object.keys(LOCAL_CLAUDE_ROOT_ENTRIES)) {
+		rmSync(join(consumerRoot, ".claude", name), {
+			recursive: true,
+			force: true,
+		});
+	}
 	rmSync(join(consumerRoot, ".claude/skills/pfdsl"), {
 		recursive: true,
 		force: true,
