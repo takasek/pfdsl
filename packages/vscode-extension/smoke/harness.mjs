@@ -55,6 +55,32 @@ export function parseTransform(value) {
 	};
 }
 
+export async function readTransform(frame) {
+	return parseTransform(
+		await frame.locator("#inner").evaluate((inner) => inner.style.transform),
+	);
+}
+
+export async function expectEventually(
+	label,
+	read,
+	predicate,
+	{ timeoutMs = 1_000, retryIntervalMs = 20 } = {},
+) {
+	const deadline = performance.now() + timeoutMs;
+	let lastObserved;
+	do {
+		lastObserved = await read();
+		if (predicate(lastObserved)) return lastObserved;
+		await new Promise((resolveTimer) =>
+			setTimeout(resolveTimer, retryIntervalMs),
+		);
+	} while (performance.now() < deadline);
+	throw new Error(
+		`${label}: condition was not met; last observed: ${JSON.stringify(lastObserved)}`,
+	);
+}
+
 export async function removeRunDirectory(path) {
 	const target = resolve(path);
 	if (!issuedRunDirectories.has(target)) {

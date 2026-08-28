@@ -5,9 +5,11 @@ import { join } from "node:path";
 import test from "node:test";
 import {
 	createRunDirectory,
+	expectEventually,
 	findWebviewFrame,
 	makeLaunchArgs,
 	parseTransform,
+	readTransform,
 	removeRunDirectory,
 } from "./harness.mjs";
 import {
@@ -15,6 +17,7 @@ import {
 	assertVisibleCount,
 	cleanupSmokeSession,
 	resolveVSCodeExecutablePath,
+	waitForVisibleCount,
 	waitForWorkbenchPage,
 } from "./run.mjs";
 
@@ -48,6 +51,37 @@ test("parseTransform reads the webview translate and scale", () => {
 	});
 });
 
+test("expectEventually reports the last observed value", async () => {
+	await assert.rejects(
+		expectEventually(
+			"scale changes",
+			async () => 1,
+			(value) => value > 1,
+			{
+				timeoutMs: 10,
+			},
+		),
+		/scale changes.*last observed: 1/,
+	);
+});
+
+test("readTransform reads the inline preview transform", async () => {
+	const frame = {
+		locator: (selector) => {
+			assert.equal(selector, "#inner");
+			return {
+				evaluate: async (read) =>
+					read({ style: { transform: "translate(12.5px, -8px) scale(1.1)" } }),
+			};
+		},
+	};
+	assert.deepEqual(await readTransform(frame), {
+		panX: 12.5,
+		panY: -8,
+		scale: 1.1,
+	});
+});
+
 test("findWebviewFrame ignores the outer and fake-empty frames", async () => {
 	const frames = [
 		{ url: () => "workbench.html", locator: () => ({ count: async () => 0 }) },
@@ -71,6 +105,21 @@ test("assertVisibleCount rejects an invisible preview element", async () => {
 	await assert.rejects(
 		assertVisibleCount(locator, 1, "preview SVG"),
 		/preview SVG: expected 1 visible element, observed 0/,
+	);
+});
+
+test("waitForVisibleCount waits for the preview to render", async () => {
+	let reads = 0;
+	const locator = {
+		count: async () => 1,
+		nth: () => ({ isVisible: async () => reads++ > 0 }),
+	};
+	assert.equal(
+		await waitForVisibleCount(locator, 1, "preview SVG", {
+			retryIntervalMs: 0,
+			timeoutMs: 100,
+		}),
+		1,
 	);
 });
 

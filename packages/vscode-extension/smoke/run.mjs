@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,8 +10,10 @@ import { chromium } from "playwright-core";
 import { isCliEntrypoint } from "../../../scripts/lib/cli-entrypoint.mjs";
 import {
 	createRunDirectory,
+	expectEventually,
 	findWebviewFrame,
 	makeLaunchArgs,
+	readTransform,
 	removeRunDirectory,
 } from "./harness.mjs";
 
@@ -213,6 +216,285 @@ export async function assertVisibleCount(locator, expected, label) {
 	return visibleCount;
 }
 
+export async function waitForVisibleCount(locator, expected, label, options) {
+	return expectEventually(
+		label,
+		async () => {
+			const count = await locator.count();
+			const visibility = await Promise.all(
+				Array.from({ length: count }, (_, index) =>
+					locator.nth(index).isVisible(),
+				),
+			);
+			return visibility.filter(Boolean).length;
+		},
+		(visibleCount) => visibleCount === expected,
+		options,
+	);
+}
+
+const geometryTolerance = 1;
+
+function isWithinTolerance(actual, expected) {
+	return Math.abs(actual - expected) <= geometryTolerance;
+}
+
+function transformsMatch(actual, expected) {
+	return (
+		isWithinTolerance(actual.panX, expected.panX) &&
+		isWithinTolerance(actual.panY, expected.panY) &&
+		isWithinTolerance(actual.scale, expected.scale)
+	);
+}
+
+async function readBoundingBox(locator, label) {
+	const box = await locator.boundingBox();
+	if (!box) throw new Error(`${label}: expected a visible bounding box`);
+	return box;
+}
+
+async function readRect(frame, selector) {
+	return frame.locator(selector).evaluate((element) => {
+		const rect = element.getBoundingClientRect();
+		const style = getComputedStyle(element);
+		return {
+			left: rect.left,
+			top: rect.top,
+			width: rect.width,
+			height: rect.height,
+			borderLeft: Number.parseFloat(style.borderLeftWidth),
+			borderRight: Number.parseFloat(style.borderRightWidth),
+			borderTop: Number.parseFloat(style.borderTopWidth),
+			borderBottom: Number.parseFloat(style.borderBottomWidth),
+		};
+	});
+}
+
+async function readMinimapGeometry(frame) {
+	const [root, svg, minimap, viewport] = await Promise.all([
+		readRect(frame, "#root"),
+		readRect(frame, "#inner svg"),
+		readRect(frame, "#minimap"),
+		readRect(frame, "#minimap-vp"),
+	]);
+	return { root, svg, minimap, viewport };
+}
+
+function expectedMinimapViewport(geometry, transform) {
+	const naturalSvgWidth = geometry.svg.width / transform.scale;
+	const naturalSvgHeight = geometry.svg.height / transform.scale;
+	const minimapContentWidth =
+		geometry.minimap.width -
+		geometry.minimap.borderLeft -
+		geometry.minimap.borderRight;
+	const minimapContentHeight =
+		geometry.minimap.height -
+		geometry.minimap.borderTop -
+		geometry.minimap.borderBottom;
+	const minimapScale = Math.min(
+		minimapContentWidth / naturalSvgWidth,
+		minimapContentHeight / naturalSvgHeight,
+	);
+	return {
+		left:
+			geometry.minimap.left +
+			geometry.minimap.borderLeft +
+			(-transform.panX / transform.scale) * minimapScale,
+		top:
+			geometry.minimap.top +
+			geometry.minimap.borderTop +
+			(-transform.panY / transform.scale) * minimapScale,
+		width:
+			(geometry.root.width / transform.scale) * minimapScale +
+			geometry.viewport.borderLeft +
+			geometry.viewport.borderRight,
+		height:
+			(geometry.root.height / transform.scale) * minimapScale +
+			geometry.viewport.borderTop +
+			geometry.viewport.borderBottom,
+	};
+}
+
+function minimapViewportMatches(geometry, transform) {
+	const expected = expectedMinimapViewport(geometry, transform);
+	return (
+		isWithinTolerance(geometry.viewport.left, expected.left) &&
+		isWithinTolerance(geometry.viewport.top, expected.top) &&
+		isWithinTolerance(geometry.viewport.width, expected.width) &&
+		isWithinTolerance(geometry.viewport.height, expected.height)
+	);
+}
+
+async function findEmptyRootPoint(frame, rootBox) {
+	const nodes = frame.locator("#inner g.node[data-node-id]");
+	const boxes = await Promise.all(
+		Array.from({ length: await nodes.count() }, (_, index) =>
+			readBoundingBox(nodes.nth(index), `sample node ${index + 1}`),
+		),
+	);
+	const candidates = [
+		{ x: rootBox.x + 20, y: rootBox.y + 20 },
+		{ x: rootBox.x + rootBox.width - 20, y: rootBox.y + 20 },
+		{ x: rootBox.x + 20, y: rootBox.y + rootBox.height - 20 },
+	];
+	const point = candidates.find(
+		(candidate) =>
+			!boxes.some(
+				(box) =>
+					candidate.x >= box.x &&
+					candidate.x <= box.x + box.width &&
+					candidate.y >= box.y &&
+					candidate.y <= box.y + box.height,
+			),
+	);
+	if (!point)
+		throw new Error("preview root: unable to find an empty drag point");
+	return point;
+}
+
+async function assertPreviewInteractions(session) {
+	const { frame, page } = session;
+	const root = frame.locator("#root");
+	const firstNode = frame.locator("#inner g.node[data-node-id]").first();
+	const beforeZoom = await readTransform(frame);
+	const nodeBeforeZoom = await readBoundingBox(firstNode, "first sample node");
+	const cursor = {
+		x: nodeBeforeZoom.x + nodeBeforeZoom.width / 2,
+		y: nodeBeforeZoom.y + nodeBeforeZoom.height / 2,
+	};
+	await page.mouse.move(cursor.x, cursor.y);
+	await page.mouse.wheel(0, -120);
+	const afterZoom = await expectEventually(
+		"zoom increases preview scale",
+		() => readTransform(frame),
+		(transform) => transform.scale > beforeZoom.scale,
+	);
+	await expectEventually(
+		"zoom keeps the cursor anchor stable",
+		async () => {
+			const node = await readBoundingBox(firstNode, "zoomed first sample node");
+			return {
+				cursor,
+				nodeCenter: {
+					x: node.x + node.width / 2,
+					y: node.y + node.height / 2,
+				},
+			};
+		},
+		({ nodeCenter }) =>
+			isWithinTolerance(nodeCenter.x, cursor.x) &&
+			isWithinTolerance(nodeCenter.y, cursor.y),
+	);
+
+	const rootBox = await readBoundingBox(root, "preview root");
+	const panStart = await findEmptyRootPoint(frame, rootBox);
+	const beforePan = await readTransform(frame);
+	await page.mouse.move(panStart.x, panStart.y);
+	await page.mouse.down();
+	await page.mouse.move(panStart.x + 40, panStart.y + 25);
+	await page.mouse.up();
+	await expectEventually(
+		"graph pan follows the drag distance",
+		() => readTransform(frame),
+		(transform) =>
+			isWithinTolerance(transform.panX, beforePan.panX + 40) &&
+			isWithinTolerance(transform.panY, beforePan.panY + 25),
+	);
+
+	const releaseStart = await findEmptyRootPoint(frame, rootBox);
+	const beforeOutsideRelease = await readTransform(frame);
+	await page.mouse.move(releaseStart.x, releaseStart.y);
+	await page.mouse.down();
+	await page.mouse.move(releaseStart.x + 10, releaseStart.y + 8);
+	const whileDragging = await expectEventually(
+		"outside release starts a second graph drag",
+		() => readTransform(frame),
+		(transform) =>
+			!transformsMatch(transform, beforeOutsideRelease) &&
+			isWithinTolerance(transform.scale, beforeOutsideRelease.scale),
+	);
+	await page.mouse.move(rootBox.x - 20, rootBox.y - 20);
+	await page.mouse.up();
+	await page.mouse.move(releaseStart.x + 20, releaseStart.y + 20);
+	await expectEventually(
+		"outside release prevents further graph pan",
+		() => readTransform(frame),
+		(transform) => transformsMatch(transform, whileDragging),
+	);
+
+	await expectEventually(
+		"minimap viewport matches preview geometry",
+		async () => ({
+			geometry: await readMinimapGeometry(frame),
+			transform: await readTransform(frame),
+		}),
+		({ geometry, transform }) => minimapViewportMatches(geometry, transform),
+	);
+	const minimap = frame.locator("#minimap");
+	const minimapBox = await readBoundingBox(minimap, "minimap");
+	const beforeMinimapDrag = await readTransform(frame);
+	await page.mouse.move(
+		minimapBox.x + minimapBox.width * 0.25,
+		minimapBox.y + minimapBox.height * 0.75,
+	);
+	await page.mouse.down();
+	await page.mouse.move(
+		minimapBox.x + minimapBox.width * 0.75,
+		minimapBox.y + minimapBox.height * 0.25,
+	);
+	await page.mouse.up();
+	await expectEventually(
+		"minimap drag changes preview pan without zooming",
+		() => readTransform(frame),
+		(transform) =>
+			!isWithinTolerance(transform.panX, beforeMinimapDrag.panX) &&
+			!isWithinTolerance(transform.panY, beforeMinimapDrag.panY) &&
+			isWithinTolerance(transform.scale, beforeMinimapDrag.scale),
+	);
+
+	const fixtureText = await readFile(session.fixturePath, "utf8");
+	const designLine = fixtureText
+		.split("\n")
+		.find((line) => line.includes("design"));
+	assert.ok(designLine, "smoke fixture must contain a design node");
+	const designOccurrence = designLine.match(/\bdesign\b/)?.[0];
+	assert.ok(designOccurrence, "smoke fixture must name the design node");
+	const sourceEditor = page.getByRole("code").filter({ hasText: designLine });
+	const sourceTab = page.getByRole("tab", {
+		name: /^01-simple-chain\.pfdsl, Editor Group \d+$/,
+	});
+	await frame.locator('#inner g.node[data-node-id="design"]').dblclick();
+	await expectEventually(
+		"node double-click navigates to design in the source editor",
+		async () => {
+			// VS Code 1.132.1 does not expose selection state through an accessibility role, so this fallback observes the visible selection highlight under the semantic source-editor role.
+			const selection = await sourceEditor
+				.locator(".selected-text")
+				.evaluateAll((elements) =>
+					elements.map((element) => {
+						const rect = element.getBoundingClientRect();
+						return { width: rect.width, height: rect.height };
+					}),
+				);
+			const sourceTabCount = await sourceTab.count();
+			const documentTitleVisible =
+				sourceTabCount === 1 && (await sourceTab.isVisible());
+			return {
+				documentTitleVisible,
+				line: await sourceEditor.textContent(),
+				selection,
+				sourceTabCount,
+			};
+		},
+		({ documentTitleVisible, line, selection }) =>
+			documentTitleVisible &&
+			line?.includes(designOccurrence) &&
+			selection.some((rect) => rect.width > 0 && rect.height > 0),
+	);
+
+	assert.ok(afterZoom.scale > beforeZoom.scale, "zoom scale must increase");
+}
+
 export async function launchSmokeSession() {
 	const runDir = await createRunDirectory();
 	let browser;
@@ -229,6 +511,7 @@ export async function launchSmokeSession() {
 		const vscodeExecutablePath = resolveVSCodeExecutablePath(
 			await downloadAndUnzipVSCode(vscodeVersion),
 		);
+		const fixturePath = join(repoRoot, "docs/samples/01-simple-chain.pfdsl");
 		vscodeProcess = spawn(
 			vscodeExecutablePath,
 			makeLaunchArgs({
@@ -236,7 +519,7 @@ export async function launchSmokeSession() {
 				profileDir: join(runDir, "profile"),
 				extensionsDir: join(runDir, "extensions"),
 				port,
-				fixturePath: join(repoRoot, "docs/samples/01-simple-chain.pfdsl"),
+				fixturePath,
 			}),
 			{ stdio: ["ignore", "pipe", "pipe"] },
 		);
@@ -256,7 +539,14 @@ export async function launchSmokeSession() {
 		page = await waitForWorkbenchPage(browser);
 		await page.getByLabel("PFDSL: Open Preview to the Side").click();
 		const frame = await findWebviewFrame(page);
-		const session = { browser, page, frame, vscodeProcess, runDir };
+		const session = {
+			browser,
+			page,
+			frame,
+			fixturePath,
+			vscodeProcess,
+			runDir,
+		};
 		outputBySession.set(session, output);
 		return session;
 	} catch (error) {
@@ -283,11 +573,33 @@ async function main() {
 		session = await launchSmokeSession();
 		console.log(`VS Code version: ${vscodeVersion}`);
 		console.log(`frame URL: ${session.frame.url()}`);
+		await waitForVisibleCount(
+			session.frame.locator("#root"),
+			1,
+			"preview root",
+		);
 		await assertVisibleCount(session.frame.locator("#root"), 1, "preview root");
+		await waitForVisibleCount(
+			session.frame.locator("#inner svg"),
+			1,
+			"preview SVG",
+		);
 		await assertVisibleCount(
 			session.frame.locator("#inner svg"),
 			1,
 			"preview SVG",
+		);
+		await waitForVisibleCount(
+			session.frame.locator("#inner g.node"),
+			3,
+			"preview graph nodes",
+		);
+		await waitForVisibleCount(session.frame.locator("#minimap"), 1, "minimap");
+		await assertVisibleCount(session.frame.locator("#minimap"), 1, "minimap");
+		await waitForVisibleCount(
+			session.frame.locator("g.node"),
+			6,
+			"sample nodes",
 		);
 		const nodeCount = await assertVisibleCount(
 			session.frame.locator("g.node"),
@@ -295,7 +607,7 @@ async function main() {
 			"sample nodes",
 		);
 		console.log(`sample nodes: ${nodeCount}`);
-		await assertVisibleCount(session.frame.locator("#minimap"), 1, "minimap");
+		await assertPreviewInteractions(session);
 	} catch (error) {
 		if (!session) {
 			failure = error;
