@@ -15,6 +15,7 @@ import {
 	classifyIssueLookupFailure,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
+	collectManualItems,
 	collectModeledLocations,
 	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
@@ -23,6 +24,7 @@ import {
 	diffNewTerminals,
 	diffReadySets,
 	extractGateChecklist,
+	extractRepoGateChecklist,
 	formatGateTable,
 	formatRunTreeLine,
 	formatSizeDelta,
@@ -40,6 +42,7 @@ import {
 	parseInputConsumedArtifacts,
 	partitionManualItemsByPhase,
 	partitionNewTerminals,
+	REPO_GATE_CHECKLIST_SOURCE_PATH,
 	resolveRecordEditedAt,
 	SIZE_INTENT_PATTERN,
 	SIZE_OVERRIDE_PATTERN,
@@ -691,6 +694,99 @@ describe("extractGateChecklist", () => {
 	});
 });
 
+describe("extractRepoGateChecklist", () => {
+	it("extracts checkboxes from the repo-specific terminal-gate section", () => {
+		const roadmapMd = [
+			"## 終端ゲート追加項目（issue 固有）",
+			"",
+			"### PR 作成前の追加項目",
+			"",
+			"説明。",
+			"",
+			"- [ ] ADR-0014 の反実仮想テストを適用した",
+			"",
+			"### 次の節",
+			"",
+			"- [ ] 対象外",
+		].join("\n");
+
+		assert.deepEqual(extractRepoGateChecklist(roadmapMd), [
+			"ADR-0014 の反実仮想テストを適用した",
+		]);
+	});
+
+	it("ignores a same-named subsection outside the repo-specific parent", () => {
+		const roadmapMd = [
+			"## 別の節",
+			"### PR 作成前の追加項目",
+			"- [ ] 対象外",
+			"## 終端ゲート追加項目（issue 固有）",
+			"### PR 作成前の追加項目",
+			"- [ ] payoff reminder",
+			"### その他の追加項目",
+		].join("\n");
+
+		assert.deepEqual(extractRepoGateChecklist(roadmapMd), ["payoff reminder"]);
+	});
+
+	it("fails closed when a top-level heading ends the parent first", () => {
+		const roadmapMd = [
+			"## 終端ゲート追加項目（issue 固有）",
+			"# 別の節",
+			"### PR 作成前の追加項目",
+			"- [ ] 対象外",
+		].join("\n");
+
+		assert.throws(
+			() => extractRepoGateChecklist(roadmapMd),
+			/missing repo-local pre-PR gate section/,
+		);
+	});
+
+	it("tolerates line-ending and trailing-space differences in headings", () => {
+		const roadmapMd = [
+			"## 終端ゲート追加項目（issue 固有） ",
+			"### PR 作成前の追加項目 ",
+			"- [ ] payoff reminder",
+			"### その他の追加項目",
+		].join("\r\n");
+
+		assert.deepEqual(extractRepoGateChecklist(roadmapMd), ["payoff reminder"]);
+	});
+
+	it("fails closed when the repo-specific parent loses its pre-PR subsection", () => {
+		assert.throws(
+			() =>
+				extractRepoGateChecklist(
+					"## 終端ゲート追加項目（issue 固有）\n- [ ] merge-time item\n",
+				),
+			/missing repo-local pre-PR gate section/,
+		);
+	});
+});
+
+describe("collectManualItems", () => {
+	it("wires the generic and repo-local checklist into the final manual list", () => {
+		const skillMd = [
+			"3. **反映 — 終端ゲート**:",
+			"- [ ] 知見を振り分けた",
+			"4. **報告**:",
+		].join("\n");
+		const roadmapMd = [
+			"## 終端ゲート追加項目（issue 固有）",
+			"### PR 作成前の追加項目",
+			"- [ ] payoff reminder",
+			"### その他の追加項目",
+			"- [ ] merge-time item",
+		].join("\n");
+
+		assert.deepEqual(collectManualItems(skillMd, roadmapMd), [
+			"知見を振り分けた",
+			"payoff reminder",
+		]);
+	});
+});
+
 describe("deriveManualItems", () => {
 	it("drops items already covered by gate-check's mechanized checks", () => {
 		const items = [
@@ -728,6 +824,18 @@ describe("GATE_CHECKLIST_SOURCE_PATH", () => {
 			items.length > 0,
 			"expected at least one MANUAL checklist item from the deployed source file",
 		);
+	});
+});
+
+describe("REPO_GATE_CHECKLIST_SOURCE_PATH", () => {
+	it("points at the repo-local payoff reminder", () => {
+		const text = readFileSync(
+			resolve(root, REPO_GATE_CHECKLIST_SOURCE_PATH),
+			"utf-8",
+		);
+		assert.deepEqual(extractRepoGateChecklist(text), [
+			"ADR-0014 の反実仮想テスト「依存グラフ／プロセス分解がなければ、この判断・作業は違っていたか」を適用し、Yes かつ違いを1行で引用できる局面を `docs/pfd_payoff_log.md` に追記した。該当しない場合は追記しない",
+		]);
 	});
 });
 
