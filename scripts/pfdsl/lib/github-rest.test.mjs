@@ -7,6 +7,7 @@ import {
 	fetchCurrentPrView,
 	fetchIssueView,
 	fetchOpenPrsWithCi,
+	fetchPullRequestView,
 	mapCheckRunsToRollup,
 	mapIssuesResponse,
 	mapLabelsResponse,
@@ -694,5 +695,56 @@ describe("fetchCurrentPrView", () => {
 			),
 			/reviewDecision/,
 		);
+	});
+});
+
+describe("fetchPullRequestView", () => {
+	it("maps a numbered PR body and closing issue references to gh fields", async () => {
+		const result = await fetchPullRequestView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			12,
+			["body", "closingIssuesReferences"],
+			async (url) => {
+				assert.match(url, /\/pulls\/12$/);
+				return jsonResponse({ body: "Closes #99" });
+			},
+		);
+		assert.deepEqual(result, {
+			body: "Closes #99",
+			closingIssuesReferences: [{ number: 99 }],
+		});
+	});
+
+	it("refuses an unmappable numbered PR field", async () => {
+		await assert.rejects(
+			fetchPullRequestView(
+				"takasek",
+				"pfdsl",
+				"tok",
+				12,
+				["reviewDecision"],
+				async () => jsonResponse({}),
+			),
+			/reviewDecision/,
+		);
+	});
+
+	it("derives closing issue references from an ordinary REST PR body", async () => {
+		const result = await fetchPullRequestView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			12,
+			["closingIssuesReferences"],
+			async () =>
+				jsonResponse({
+					body: "Closes #99\nCloses: #103\nCloses other/repo#100\n\n```\nCloses #101\n```\n> Fixes #102",
+				}),
+		);
+		assert.deepEqual(result, {
+			closingIssuesReferences: [{ number: 99 }, { number: 103 }],
+		});
 	});
 });

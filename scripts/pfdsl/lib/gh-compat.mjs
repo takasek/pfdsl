@@ -108,10 +108,12 @@ export function planGhRestCall(args) {
 		return { op: "listOpenPrsWithCi" };
 	}
 	if (cmd === "pr" && sub === "view") {
-		// Only the no-argument form, which asks about the current branch's PR.
-		// A numbered `pr view` is a different question, and the REST side
-		// resolves the branch rather than a number (#749).
-		if (rest[0] !== undefined && !rest[0].startsWith("-")) return null;
+		if (rest[0] !== undefined && !rest[0].startsWith("-")) {
+			const view = planView(rest.slice(1));
+			const number = Number(rest[0]);
+			if (!Number.isInteger(number) || number < 1) return null;
+			return view && { op: "viewPr", number, ...view };
+		}
 		const view = planView(rest);
 		return view && { op: "viewCurrentPr", ...view };
 	}
