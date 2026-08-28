@@ -11,7 +11,9 @@ import {
 	removeRunDirectory,
 } from "./harness.mjs";
 import {
+	appendCleanupDiagnostics,
 	assertVisibleCount,
+	cleanupSmokeSession,
 	resolveVSCodeExecutablePath,
 	waitForWorkbenchPage,
 } from "./run.mjs";
@@ -85,7 +87,10 @@ test("resolveVSCodeExecutablePath handles recent macOS Code bundles", () => {
 });
 
 test("waitForWorkbenchPage waits for the CDP workbench page", async () => {
-	const page = { url: () => "workbench.html" };
+	const page = {
+		url: () =>
+			"vscode-file://vscode-app/out/vs/code/electron-browser/workbench/workbench.html",
+	};
 	let reads = 0;
 	const browser = {
 		contexts: () => [{ pages: () => (reads++ === 0 ? [] : [page]) }],
@@ -97,6 +102,65 @@ test("waitForWorkbenchPage waits for the CDP workbench page", async () => {
 		}),
 		page,
 	);
+});
+
+test("waitForWorkbenchPage ignores a non-workbench first page", async () => {
+	const workbenchPage = {
+		url: () =>
+			"vscode-file://vscode-app/out/vs/code/electron-browser/workbench/workbench.html",
+	};
+	const browser = {
+		contexts: () => [
+			{
+				pages: () => [
+					{ url: () => "devtools://devtools/bundled/inspector.html" },
+					workbenchPage,
+				],
+			},
+		],
+	};
+	assert.equal(await waitForWorkbenchPage(browser), workbenchPage);
+});
+
+test("appendCleanupDiagnostics preserves the rendering diagnostic", () => {
+	const primary = new Error(
+		"preview SVG: expected 1 visible element, observed 0\nframe URLs: vscode-webview://preview\nstdout:\nextension host",
+	);
+	const combined = appendCleanupDiagnostics(primary, [
+		new Error("remove run directory failed"),
+	]);
+	assert.match(combined.message, /preview SVG/);
+	assert.match(combined.message, /vscode-webview:\/\/preview/);
+	assert.match(combined.message, /remove run directory failed/);
+});
+
+test("cleanupSmokeSession removes the run directory after a browser cleanup failure", async () => {
+	const runDir = await createRunDirectory();
+	let closed;
+	let killed = false;
+	const vscodeProcess = {
+		exitCode: null,
+		signalCode: null,
+		kill: () => {
+			killed = true;
+			vscodeProcess.exitCode = 0;
+			closed();
+		},
+		once: (_event, callback) => {
+			closed = callback;
+		},
+	};
+	const errors = await cleanupSmokeSession({
+		browser: {
+			close: async () => Promise.reject(new Error("browser close failed")),
+		},
+		runDir,
+		vscodeProcess,
+	});
+	assert.equal(errors.length, 1);
+	assert.match(errors[0].message, /browser close failed/);
+	assert.equal(killed, true);
+	await assert.rejects(access(runDir), { code: "ENOENT" });
 });
 
 test("removeRunDirectory refuses an unissued lookalike path", async () => {

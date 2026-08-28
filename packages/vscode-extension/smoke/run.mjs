@@ -63,6 +63,20 @@ function formatDiagnostic(
 	].join("\n");
 }
 
+export function appendCleanupDiagnostics(primaryError, cleanupErrors) {
+	if (cleanupErrors.length === 0) return primaryError;
+	const cleanupSummary = cleanupErrors.map((error) => error.message).join("\n");
+	return new Error(
+		`${primaryError.message}\nCleanup failures:\n${cleanupSummary}`,
+		{
+			cause: new AggregateError(
+				[primaryError, ...cleanupErrors],
+				"Smoke test failed and cleanup failed",
+			),
+		},
+	);
+}
+
 function delay(milliseconds) {
 	return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
 }
@@ -73,8 +87,11 @@ export async function waitForWorkbenchPage(
 ) {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
-		const page = browser.contexts()[0]?.pages()[0];
-		if (page) return page;
+		for (const context of browser.contexts()) {
+			for (const page of context.pages()) {
+				if (page.url().includes("/workbench/workbench.html")) return page;
+			}
+		}
 		await wait(100);
 	}
 	throw new Error("Timed out waiting for the VS Code workbench page");
@@ -162,24 +179,24 @@ async function stopVSCode(vscodeProcess) {
 	await exited;
 }
 
-async function cleanupSmokeSession({ browser, runDir, vscodeProcess }) {
-	let cleanupError;
+export async function cleanupSmokeSession({ browser, runDir, vscodeProcess }) {
+	const cleanupErrors = [];
 	try {
 		await browser?.close();
 	} catch (error) {
-		cleanupError = error;
+		cleanupErrors.push(error);
 	}
 	try {
 		await stopVSCode(vscodeProcess);
 	} catch (error) {
-		cleanupError ??= error;
+		cleanupErrors.push(error);
 	}
 	try {
 		await removeRunDirectory(runDir);
 	} catch (error) {
-		cleanupError ??= error;
+		cleanupErrors.push(error);
 	}
-	if (cleanupError) throw cleanupError;
+	return cleanupErrors;
 }
 
 export async function assertVisibleCount(locator, expected, label) {
@@ -249,13 +266,19 @@ export async function launchSmokeSession() {
 			vscodeProcess,
 			output,
 		});
-		await cleanupSmokeSession({ browser, runDir, vscodeProcess });
-		throw new Error(diagnostic, { cause: error });
+		const primaryError = new Error(diagnostic, { cause: error });
+		const cleanupErrors = await cleanupSmokeSession({
+			browser,
+			runDir,
+			vscodeProcess,
+		});
+		throw appendCleanupDiagnostics(primaryError, cleanupErrors);
 	}
 }
 
 async function main() {
 	let session;
+	let failure;
 	try {
 		session = await launchSmokeSession();
 		console.log(`VS Code version: ${vscodeVersion}`);
@@ -274,21 +297,32 @@ async function main() {
 		console.log(`sample nodes: ${nodeCount}`);
 		await assertVisibleCount(session.frame.locator("#minimap"), 1, "minimap");
 	} catch (error) {
-		if (!session) throw error;
-		throw new Error(
-			formatDiagnostic(error.message, {
-				page: session.page,
-				vscodeProcess: session.vscodeProcess,
-				output: outputBySession.get(session),
-			}),
-			{ cause: error },
-		);
+		if (!session) {
+			failure = error;
+		} else {
+			failure = new Error(
+				formatDiagnostic(error.message, {
+					page: session.page,
+					vscodeProcess: session.vscodeProcess,
+					output: outputBySession.get(session),
+				}),
+				{ cause: error },
+			);
+		}
 	} finally {
 		if (session) {
-			await cleanupSmokeSession(session);
-			console.log(`cleanup confirmed: ${session.runDir}`);
+			const cleanupErrors = await cleanupSmokeSession(session);
+			if (cleanupErrors.length > 0) {
+				failure = appendCleanupDiagnostics(
+					failure ?? new Error("Smoke session completed but cleanup failed"),
+					cleanupErrors,
+				);
+			} else {
+				console.log(`cleanup confirmed: ${session.runDir}`);
+			}
 		}
 	}
+	if (failure) throw failure;
 }
 
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
