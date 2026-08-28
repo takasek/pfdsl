@@ -5,6 +5,7 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 ## 規約
 
 - **一次情報**: GitHub Issue 本体。着手時は `gh issue view <number> --json body,comments` で本文とコメントを両方取得する。`roadmap.pfdsl` は依存構造のみ管理する
+- **複数行本文の外部書込み**: issue 本文の作成・編集、issue コメント、PR 本文の作成・編集のように複数行本文を GitHub へ送るたび、セッション固有名を持つ body file にその時点の正本を書き、`--body-file` 等の file 入力で渡す。実行直後に、**その write が返した stable identifier や URL が指す対象そのもの**を取り直し、GitHub 側の persisted `body` が改行を含めてその正本と完全一致することを確認する。本文に `Closes #...` のような必須行や参照がある場合は、その構造も同じ readback 結果で確認し、後続の本文編集でも毎回保たれていることを確認する。issue の `body,comments` 一覧を広く読み、似た本文を見つけて代用しない。コマンドの成功表示や返された URL は persisted body の証拠にならない
 - **id 規約**: issue に対応する作業の process id は `iN_` prefix（N = issue 番号）。**恒久** — issue close 後も剥がさない。同一 process が複数 issue に対応する場合は `i40_i41_do_work` のように連結する。対応する出力 artifact の id は最初から plain（prefix なし）。**まだ issue が無いプロセスは plain の id で置く** — 成果物の門番（プロトコル5(b)）が要求するプレースホルダ後続プロセスは、起票より先にグラフへ入る。採番できない番号を捏造せず、起票時に `iN_` を付けてリネームする。この状態は `check` を通ってしまい機械検出されないので、逸脱として `roadmap.md` に書き残す
 - **ラベル**: roadmap 登録 issue は `flow:managed`、対象外は `flow:exempt`（判定は「ラベル判定基準」節）
 - **updated_at**: 同期時点の GitHub `updatedAt` スナップショット
@@ -25,6 +26,7 @@ roadmap は「製品の成果物を生み、他作業の着手をゲートする
 
 対応方針の候補を2件以上列挙した issue は、実行主体が着手前（ブランチの初コミットより前）に投稿する設計選択記録（前提・否定案・却下理由。work-cycle 手順1 適用点1 が定義する）があるまで設計未確定として扱う。**投稿先は当該 issue のコメントに限る** で、前後は記録の投稿時刻（`createdAt`）と初コミットの authorDate を機械照合する。
 issue 本文は記録の投稿先にならない。本文は起票時に書かれるので、その `createdAt` は当の issue を閉じるブランチのどのコミットよりも古く、上の機械照合が記録の書かれた順序と無関係に通ってしまう。本文を投稿先として認めていた間、照合は「着手前に書かれた」でなく「issue が先に立てられた」を確かめていた。
+複数行の設計選択記録は上の「複数行本文の外部書込み」規約に従い、投稿に使った body file と、その write が返した stable identifier や URL で同定した persisted `body` の完全一致確認までを初コミットより前に完了する。issue の `body,comments` 一覧から古い comment を拾う読み方、コメント作成の成功表示、返された URL だけでは、この順序証拠の入力として採用しない。
 コメントの編集時刻も取得し、着手後に書き換えられた記録を着手前の証拠として扱わない。ただし比較対象の authorDate は実行主体がコミット時のオプション・環境変数・初コミットに届く rebase で操作できる。committerDate は rebase のたびに全コミットが書き換わりサイクルの窓が消えるため代替にならない。この順序証拠の真正性は機械保証でなく人間レビューが担う。
 
 **拡張点**: 実行主体と人間が別 GitHub identity（bot トークン等）で動く環境では、この記録の author を検査する形の捏造耐性を追加で導入しうる。実行主体と人間が同一 identity で `gh` を実行するこのリポを含む環境では author 照合が原理的に判別子にならないため、既定では持たない。
