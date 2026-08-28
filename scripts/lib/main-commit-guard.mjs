@@ -14,13 +14,19 @@
 // payload does not carry it — the hook wrapper resolves it once via `git
 // branch --show-current` and this stays a pure function.
 
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import {
+	createProtectedShellState,
 	gitSubcommand,
 	gitSubcommandIndex,
+	hasProtectedCdPathOverride,
+	hasProtectedGitTargetOverride,
+	parseLeadingShellPrefix,
+	splitCommandFlow,
 	splitSegments,
 	stripLeadingNoise,
 	tokenize,
+	updateProtectedShellState,
 } from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
@@ -73,6 +79,17 @@ const READ_ONLY_APPLY_FLAGS = new Set([
 	"--summary",
 ]);
 
+const CODEX_ROUTINE_MUTATIONS = new Map([
+	["stage-all", "add"],
+	["commit", "commit"],
+	["branch-rename", "branch"],
+]);
+
+function codexRoutineSubcommand(tokens) {
+	if (basename(tokens[0]?.value ?? "") !== "codex-git-routine.mjs") return null;
+	return CODEX_ROUTINE_MUTATIONS.get(tokens[1]?.value) ?? null;
+}
+
 /**
  * The guarded git subcommand one already-tokenized segment runs, or null.
  * @param {{value: string, quoted: boolean}[]} tokens
@@ -81,14 +98,17 @@ const READ_ONLY_APPLY_FLAGS = new Set([
 function classifySegment(tokens) {
 	if (tokens.length === 0) return null;
 	const head = tokens[0];
-	if (head.quoted || head.value !== "git") return null;
+	if (basename(head.value) !== "git") {
+		const subcommand = codexRoutineSubcommand(tokens);
+		return subcommand === null ? null : { subcommand, decision: "deny" };
+	}
 
 	const sub = gitSubcommand(tokens);
 	if (!sub) return null;
 	if (DENIED_SUBCOMMANDS.has(sub)) {
 		if (
 			sub === "apply" &&
-			tokens.some((t) => !t.quoted && READ_ONLY_APPLY_FLAGS.has(t.value))
+			tokens.some((t) => READ_ONLY_APPLY_FLAGS.has(t.value))
 		)
 			return null;
 		return { subcommand: sub, decision: "deny" };
@@ -98,7 +118,7 @@ function classifySegment(tokens) {
 	// same reader finds it — including its refusal to read a quoted token,
 	// which leaves `git stash "list"` classified as the bare push it may be.
 	if (sub === "stash") {
-		const at = tokens.findIndex((t) => !t.quoted && t.value === "stash");
+		const at = tokens.findIndex((t) => t.value === "stash");
 		if (READ_ONLY_STASH_VERBS.has(gitSubcommand(tokens.slice(at)) ?? ""))
 			return null;
 	}
@@ -130,27 +150,99 @@ export function classifyGitCommand(command) {
 /** A path this layer can resolve without running a shell. */
 function staticPath(token) {
 	if (!token) return null;
-	if (token.quoted) return token.value;
+	if (token.quoted)
+		return token.quote === "'" || !/[$`]/.test(token.value)
+			? token.value
+			: null;
 	return /[$~*?`]/.test(token.value) ? null : token.value;
 }
 
+/** A literal target from the supported `cd` forms, or null when it is dynamic. */
+function cdPath(tokens) {
+	let targetAt = 1;
+	if (!tokens[targetAt]?.quoted && tokens[targetAt]?.value === "--") targetAt++;
+	const target = staticPath(tokens[targetAt]);
+	if (target === null) return null;
+	return tokens
+		.slice(targetAt + 1)
+		.every((token) => !token.quoted && /^(?:[0-9]*>>?|&>>?)/.test(token.value))
+		? target
+		: null;
+}
+
 /** Resolve every pre-subcommand `git -C` in the order Git applies them. */
-function resolveGitCwd(tokens, shellCwd, hookCwd) {
+function resolveGitCwd(tokens, shellCwd) {
 	const subcommandAt = gitSubcommandIndex(tokens);
-	if (subcommandAt === null) return shellCwd ?? hookCwd;
+	if (subcommandAt === null) return shellCwd;
 
 	let cwd = shellCwd;
 	for (let i = 1; i < subcommandAt; i++) {
 		const token = tokens[i];
-		if (token.quoted || token.value !== "-C") continue;
+		if (
+			token.value === "--git-dir" ||
+			token.value === "--work-tree" ||
+			token.value.startsWith("--git-dir=") ||
+			token.value.startsWith("--work-tree=")
+		)
+			return null;
+		if (token.value !== "-C") continue;
 		const target = staticPath(tokens[i + 1]);
 		if (target === null) cwd = null;
 		else if (target.startsWith("/")) cwd = resolve(target);
 		else if (cwd !== null) cwd = resolve(cwd, target);
 		i++;
 	}
-	return cwd ?? hookCwd;
+	return cwd;
 }
+
+function resolveEnvCwd(tokens, shellCwd) {
+	let cwd = shellCwd;
+	const prefix = parseLeadingShellPrefix(tokens);
+	if (prefix.unresolved || prefix.gitTargetOverride) return null;
+	for (const env of prefix.envs) {
+		if (env.chdir !== undefined) {
+			const target = staticPath(env.chdir);
+			if (target === null) cwd = null;
+			else if (target.startsWith("/")) cwd = resolve(target);
+			else if (cwd !== null) cwd = resolve(cwd, target);
+		}
+	}
+	return cwd;
+}
+
+function resolveCodexRoutineCwd(tokens) {
+	const target = staticPath(tokens[2]);
+	return target === null ? null : resolve(target);
+}
+
+function guardedSuffix(tokens) {
+	for (let i = 0; i < tokens.length; i++) {
+		const guarded = classifySegment(tokens.slice(i));
+		if (guarded) return guarded;
+	}
+	return null;
+}
+
+const COMPOUND_TOKENS = new Set([
+	"{",
+	"}",
+	"if",
+	"then",
+	"elif",
+	"else",
+	"fi",
+	"for",
+	"while",
+	"until",
+	"case",
+	"esac",
+	"do",
+	"done",
+	"select",
+	"function",
+	"coproc",
+	"!",
+]);
 
 /**
  * Track the shell cwd and retain each guarded Git segment with its own target.
@@ -159,46 +251,118 @@ function resolveGitCwd(tokens, shellCwd, hookCwd) {
  * also necessary because one Bash invocation can move between worktrees
  * before running another guarded Git command (#784).
  */
-function analyzeCommand(command, hookCwd) {
+function analyzeCommand(
+	command,
+	hookCwd,
+	{ ambientCdPath = false, ambientGitTargetOverride = false } = {},
+) {
 	if (typeof command !== "string") return { targets: [], finalCwd: hookCwd };
 
 	/** Where the shell stands, or null once a `cd` moved it somewhere unknown. */
 	let cwd = hookCwd;
+	const protectedState = createProtectedShellState({
+		ambientCdPath,
+		ambientGitTargetOverride,
+	});
+	let unresolvedControlFlow = false;
+	let andListAffects = false;
+	let previousAffects = false;
 	const targets = [];
 
-	for (const segment of splitSegments(command)) {
-		const tokens = stripLeadingNoise(tokenize(segment));
-		if (tokens.length === 0 || tokens[0].quoted) continue;
-		const head = tokens[0].value;
+	for (const { command: segment, separatorBefore } of splitCommandFlow(
+		command,
+	)) {
+		if (separatorBefore === "&&") andListAffects ||= previousAffects;
+		else if (separatorBefore === ";" || separatorBefore === "\n") {
+			unresolvedControlFlow ||= andListAffects;
+			andListAffects = false;
+		} else if (["(", ")"].includes(separatorBefore)) {
+			unresolvedControlFlow = true;
+			andListAffects = false;
+		} else if (["||", "|", "&"].includes(separatorBefore)) {
+			unresolvedControlFlow ||= previousAffects;
+			andListAffects = false;
+		}
+		const rawTokens = tokenize(segment);
+		const prefix = parseLeadingShellPrefix(rawTokens);
+		const envCwd = resolveEnvCwd(rawTokens, cwd);
+		const tokens = rawTokens.slice(prefix.end);
+		const finish = (cwdAffects = false) => {
+			const affects =
+				cwdAffects || updateProtectedShellState(protectedState, rawTokens);
+			if (separatorBefore === "&&") andListAffects ||= affects;
+			if (["||", "|", "&"].includes(separatorBefore))
+				unresolvedControlFlow ||= affects;
+			previousAffects = affects;
+		};
+		if (tokens.length === 0) {
+			finish();
+			continue;
+		}
+		const head = basename(tokens[0].value);
+		if (COMPOUND_TOKENS.has(head)) unresolvedControlFlow = true;
 
-		if (head === "cd") {
-			const target = tokens.length === 2 ? staticPath(tokens[1]) : null;
-			if (target === null) cwd = null;
-			// An absolute target restores a trail lost to an unresolvable earlier cd.
-			else if (target.startsWith("/")) cwd = resolve(target);
-			else if (cwd !== null) cwd = resolve(cwd, target);
+		if (
+			(head === "builtin" &&
+				["cd", "pushd", "popd"].includes(tokens[1]?.value)) ||
+			head === "pushd" ||
+			head === "popd"
+		) {
+			cwd = null;
+			finish(true);
 			continue;
 		}
 
-		if (head !== "git") continue;
-		const guarded = classifySegment(tokens);
-		if (!guarded) continue;
-		targets.push({ ...guarded, cwd: resolveGitCwd(tokens, cwd, hookCwd) });
+		if (head === "cd") {
+			const target = cdPath(tokens);
+			if (target === null) cwd = null;
+			// An absolute target restores a trail lost to an unresolvable earlier cd.
+			else if (target.startsWith("/")) cwd = resolve(target);
+			else if (
+				hasProtectedCdPathOverride(protectedState) ||
+				prefix.cdPathOverride
+			)
+				cwd = null;
+			else if (cwd !== null) cwd = resolve(cwd, target);
+			finish(true);
+			continue;
+		}
+
+		const guarded =
+			classifySegment(tokens) ??
+			(prefix.unresolved ? guardedSuffix(tokens) : null);
+		if (!guarded) {
+			finish();
+			continue;
+		}
+		targets.push({
+			...guarded,
+			cwd:
+				unresolvedControlFlow ||
+				prefix.unresolved ||
+				hasProtectedGitTargetOverride(protectedState) ||
+				prefix.gitTargetOverride
+					? null
+					: head === "git"
+						? resolveGitCwd(tokens, envCwd)
+						: resolveCodexRoutineCwd(tokens),
+		});
+		finish();
 	}
-	return { targets, finalCwd: cwd ?? hookCwd };
+	return { targets, finalCwd: cwd };
 }
 
 /** Every guarded Git segment with the cwd in which Git will run it. */
-export function resolveGuardedGitCommands(command, hookCwd) {
-	return analyzeCommand(command, hookCwd).targets;
+export function resolveGuardedGitCommands(command, hookCwd, options) {
+	return analyzeCommand(command, hookCwd, options).targets;
 }
 
 /**
  * The directory the first guarded Git command runs in, retained for callers
  * that inspect one command. The hook itself evaluates every resolved target.
  */
-export function resolveCommandCwd(command, hookCwd) {
-	const analysis = analyzeCommand(command, hookCwd);
+export function resolveCommandCwd(command, hookCwd, options) {
+	const analysis = analyzeCommand(command, hookCwd, options);
 	return analysis.targets[0]?.cwd ?? analysis.finalCwd;
 }
 
@@ -248,9 +412,9 @@ function evaluateGuardedCommand(
 			decision: "deny",
 			reason:
 				crossesWorktree && !targetsDefaultBranch
-					? `Blocked '${command}' in a sibling worktree: this session must only change its own worktree. Switch the session's active directory to the target worktree before running it there.`
+					? `Blocked '${command}' in a sibling worktree: this requires starting or reopening a session whose project root is that worktree before running it there.`
 					: `Blocked '${command}' on '${mainBranch}': this repo's ecosystem requires develop → PR → merge_pr, ` +
-						"and the main checkout's index is shared by every session, so anything staged here rides along on " +
+						"and the main checkout's index is shared by processes and sessions targeting that checkout, so anything staged here rides along on " +
 						"the next commit made there. Create or switch to a feature branch first (e.g. via the worktree " +
 						"skill), then run it there.",
 		};
@@ -267,6 +431,16 @@ function evaluateGuardedCommand(
 	};
 }
 
+function evaluateUnresolvedCwd(guarded) {
+	const command = `git ${guarded.subcommand}`;
+	return {
+		decision: guarded.decision,
+		reason:
+			`Blocked '${command}': its effective cwd cannot be resolved without shell expansion. ` +
+			"Use a literal path or harness workdir.",
+	};
+}
+
 /**
  * Orchestrates the hook's stdin payload into a print-or-not decision, the way
  * runDelegationGuard does (#645).
@@ -280,26 +454,47 @@ function evaluateGuardedCommand(
  * @param {{resolveBranches: (payload: object, targetCwd: string) => {currentBranch?: string, mainBranch?: string, crossesWorktree?: boolean}}} io
  * @returns {{shouldOutput: boolean, output?: object}}
  */
-export function runMainCommitGuard(inputText, { resolveBranches }) {
+export function runMainCommitGuard(
+	inputText,
+	{
+		resolveBranches,
+		supportsAsk = true,
+		ambientGitTargetOverride = false,
+		ambientCdPath = false,
+	},
+) {
 	const payload = parseHookPayload(inputText);
 	if (!payload) return { shouldOutput: false };
 	if (payload?.tool_name !== "Bash") return { shouldOutput: false };
+	const payloadCwd = payload?.cwd;
+	const hookCwd =
+		typeof payloadCwd === "string" && payloadCwd.trim() !== ""
+			? payloadCwd
+			: process.cwd();
 	const targets = resolveGuardedGitCommands(
 		payload?.tool_input?.command,
-		payload?.cwd ?? process.cwd(),
+		hookCwd,
+		{ ambientCdPath, ambientGitTargetOverride },
 	);
 	if (targets.length === 0) return { shouldOutput: false };
 
 	let asked = null;
 	for (const target of targets) {
-		const result = evaluateGuardedCommand(
-			target,
-			resolveBranches(payload, target.cwd),
-		);
+		const result =
+			target.cwd === null
+				? evaluateUnresolvedCwd(target)
+				: evaluateGuardedCommand(target, resolveBranches(payload, target.cwd));
 		if (result.decision === "deny") {
 			return { shouldOutput: true, output: buildPermissionOutput(result) };
 		}
-		if (result.decision === "ask") asked ??= result;
+		if (result.decision === "ask") {
+			asked ??= supportsAsk
+				? result
+				: {
+						decision: "deny",
+						reason: `${result.reason} Codex PreToolUse's ask decision is unsupported, so this command is denied instead of failing open.`,
+					};
+		}
 	}
 	return asked === null
 		? { shouldOutput: false }

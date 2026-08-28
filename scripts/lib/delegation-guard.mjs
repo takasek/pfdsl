@@ -23,6 +23,8 @@
 // caller re-checking `git log origin/<branch>..HEAD` and the PR list when the
 // delegation returns.
 
+import { basename } from "node:path";
+
 import { flagValues, parseGhCommand } from "./gh-command.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
@@ -59,14 +61,24 @@ const GIT_GLOBAL_FLAGS_WITH_VALUE = new Set([
 //
 // Exported so other command-inspecting guards (main-commit-guard.mjs) reuse
 // this parsing instead of re-implementing quote/segment handling.
-export function splitSegments(command) {
+export function splitCommandFlow(command) {
 	const segments = [];
 	let current = "";
 	let quote = null;
+	let separatorBefore = null;
+	const split = (separator) => {
+		segments.push({ command: current, separatorBefore });
+		current = "";
+		separatorBefore = separator;
+	};
 	for (let i = 0; i < command.length; i++) {
 		const ch = command[i];
 		if (quote) {
 			if (ch === "\\" && quote === '"') {
+				if (command[i + 1] === "\n") {
+					i++;
+					continue;
+				}
 				current += ch + (command[i + 1] ?? "");
 				i++;
 				continue;
@@ -80,27 +92,41 @@ export function splitSegments(command) {
 			current += ch;
 			continue;
 		}
+		if (ch === "\\") {
+			if (command[i + 1] === "\n") {
+				i++;
+				continue;
+			}
+			current += ch;
+			if (command[i + 1] !== undefined) current += command[++i];
+			continue;
+		}
 		const two = command.slice(i, i + 2);
 		if (two === "&&" || two === "||") {
-			segments.push(current);
-			current = "";
+			split(two);
 			i++;
 			continue;
 		}
+		if (ch === "&" && (command[i - 1] === "<" || command[i - 1] === ">")) {
+			current += ch;
+			continue;
+		}
 		if (ch === ";" || ch === "|" || ch === "&" || ch === "\n") {
-			segments.push(current);
-			current = "";
+			split(ch);
 			continue;
 		}
 		if (ch === "(" || ch === ")") {
-			segments.push(current);
-			current = "";
+			split(ch);
 			continue;
 		}
 		current += ch;
 	}
-	segments.push(current);
+	segments.push({ command: current, separatorBefore });
 	return segments;
+}
+
+export function splitSegments(command) {
+	return splitCommandFlow(command).map(({ command: segment }) => segment);
 }
 
 // Tokens are only inspected when unquoted, so a quoted argument can never be
@@ -110,14 +136,27 @@ export function tokenize(segment) {
 	let current = "";
 	let quote = null;
 	let quoted = false;
+	let tokenQuote;
+	let hasUnquotedText = false;
 	const flush = () => {
-		if (current !== "" || quoted) tokens.push({ value: current, quoted });
+		if (current !== "" || quoted) {
+			const token = { value: current, quoted };
+			if (tokenQuote !== undefined && !hasUnquotedText)
+				token.quote = tokenQuote;
+			tokens.push(token);
+		}
 		current = "";
 		quoted = false;
+		tokenQuote = undefined;
+		hasUnquotedText = false;
 	};
 	for (let i = 0; i < segment.length; i++) {
 		const ch = segment[i];
 		if (quote) {
+			if (ch === "\\" && quote === '"' && segment[i + 1] === "\n") {
+				i++;
+				continue;
+			}
 			if (ch === quote) {
 				quote = null;
 				continue;
@@ -128,6 +167,18 @@ export function tokenize(segment) {
 		if (ch === '"' || ch === "'") {
 			quote = ch;
 			quoted = true;
+			if (tokenQuote === undefined) tokenQuote = ch;
+			else if (tokenQuote !== ch) tokenQuote = null;
+			continue;
+		}
+		if (ch === "\\") {
+			if (segment[i + 1] === "\n") {
+				i++;
+				continue;
+			}
+			if (segment[i + 1] === undefined) current += ch;
+			else current += segment[++i];
+			hasUnquotedText = true;
 			continue;
 		}
 		if (/\s/.test(ch)) {
@@ -135,39 +186,611 @@ export function tokenize(segment) {
 			continue;
 		}
 		current += ch;
+		hasUnquotedText = true;
 	}
 	flush();
 	return tokens;
 }
 
-// `FOO=bar cmd` and `sudo cmd` still run cmd.
-export function stripLeadingNoise(tokens) {
-	let i = 0;
+const ENV_FLAGS_WITH_VALUE = new Set([
+	"-u",
+	"--unset",
+	"-C",
+	"--chdir",
+	"-S",
+	"--split-string",
+	"-P",
+]);
+
+const GIT_TARGET_VARIABLES = new Set([
+	"GIT_DIR",
+	"GIT_WORK_TREE",
+	"GIT_INDEX_FILE",
+	"GIT_COMMON_DIR",
+	"GIT_OBJECT_DIRECTORY",
+	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	"GIT_NAMESPACE",
+]);
+const STATEFUL_ASSIGNMENT_BUILTINS = new Set([
+	"export",
+	"readonly",
+	"typeset",
+	"declare",
+	"local",
+]);
+
+function protectedAssignment(value) {
+	const equals = value.indexOf("=");
+	if (equals === -1) return null;
+	const name = value.slice(0, equals);
+	if (name === "CDPATH" || GIT_TARGET_VARIABLES.has(name))
+		return { name, value: value.slice(equals + 1) };
+	return null;
+}
+
+function isGitTargetAssignment(value) {
+	const assignment = protectedAssignment(value);
+	return (
+		assignment !== null &&
+		assignment.value !== "" &&
+		GIT_TARGET_VARIABLES.has(assignment.name)
+	);
+}
+
+function isNonemptyCdPathAssignment(value) {
+	return value.startsWith("CDPATH=") && value.slice("CDPATH=".length) !== "";
+}
+
+function persistsShellAssignment(tokens, isAssignment) {
+	const prefix = parseLeadingShellPrefix(tokens);
+	const head = basename(tokens[prefix.end]?.value ?? "");
+	const assignment = tokens.some(({ value }) => isAssignment(value));
+	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) return assignment;
+	return prefix.end === tokens.length && assignment;
+}
+
+/** Whether a segment changes a Git target variable for later shell commands. */
+export function persistsGitTargetOverride(tokens) {
+	return persistsShellAssignment(tokens, isGitTargetAssignment);
+}
+
+/** Whether a segment gives later relative `cd` calls a nonempty CDPATH. */
+export function persistsCdPathOverride(tokens) {
+	return persistsShellAssignment(tokens, isNonemptyCdPathAssignment);
+}
+
+/** State that matters to commands guarded for cross-worktree mutations. */
+export function createProtectedShellState({
+	ambientGitTargetOverride = false,
+	ambientGitTargetVariables,
+	ambientCdPath = false,
+} = {}) {
+	const ambientGitTargets =
+		ambientGitTargetVariables ??
+		(ambientGitTargetOverride
+			? [...GIT_TARGET_VARIABLES].filter(
+					(name) => process.env[name] !== undefined && process.env[name] !== "",
+				)
+			: []);
+	const fallbackGitTargets =
+		ambientGitTargetOverride && ambientGitTargets.length === 0
+			? GIT_TARGET_VARIABLES
+			: new Set(ambientGitTargets);
+	return {
+		cdPath: ambientCdPath ? "unknown" : "safe",
+		gitTargets: new Map(
+			[...GIT_TARGET_VARIABLES].map((name) => [
+				name,
+				{
+					exported: fallbackGitTargets.has(name),
+					value: fallbackGitTargets.has(name) ? "unknown" : "safe",
+				},
+			]),
+		),
+	};
+}
+
+export function hasProtectedGitTargetOverride(state) {
+	return [...state.gitTargets.values()].some(
+		({ exported, value }) => exported && value !== "safe",
+	);
+}
+
+export function hasProtectedCdPathOverride(state) {
+	return state.cdPath !== "safe";
+}
+
+function setProtectedValue(state, name, value, exported) {
+	if (name === "CDPATH") {
+		state.cdPath = value === "" ? "safe" : "unknown";
+		return;
+	}
+	const target = state.gitTargets.get(name);
+	if (!target) return;
+	target.value = value === "" ? "safe" : "unknown";
+	if (exported !== undefined) target.exported = exported;
+}
+
+function setProtectedUnknown(state, name) {
+	if (name === "CDPATH") {
+		state.cdPath = "unknown";
+		return;
+	}
+	const target = state.gitTargets.get(name);
+	if (target) target.value = "unknown";
+}
+
+function setAllProtectedUnknown(state) {
+	state.cdPath = "unknown";
+	for (const name of GIT_TARGET_VARIABLES)
+		setProtectedValue(state, name, "unknown", true);
+}
+
+function isDynamicSetterName(token) {
+	return (
+		(token.quote !== "'" && /[$`]/.test(token.value)) ||
+		/\[|\]/.test(token.value)
+	);
+}
+
+function unsetProtectedValue(state, name) {
+	if (name === "CDPATH") {
+		state.cdPath = "safe";
+		return;
+	}
+	const target = state.gitTargets.get(name);
+	if (!target) return;
+	target.value = "safe";
+	target.exported = false;
+}
+
+function protectedName(value) {
+	return value === "CDPATH" || GIT_TARGET_VARIABLES.has(value) ? value : null;
+}
+
+function applyAssignments(state, tokens, exported) {
+	let changed = false;
+	for (const token of tokens) {
+		const assignment = protectedAssignment(token.value);
+		if (assignment) {
+			setProtectedValue(state, assignment.name, assignment.value, exported);
+			changed = true;
+		}
+	}
+	return changed;
+}
+
+function applyExport(state, tokens) {
+	let unexport = false;
+	let functionMode = false;
+	let valid = true;
+	let options = true;
+	for (const token of tokens) {
+		const { value } = token;
+		if (options && value === "--") {
+			options = false;
+			continue;
+		}
+		if (options && value.startsWith("-")) {
+			for (const option of value.slice(1)) {
+				if (option === "n") unexport = true;
+				else if (option === "f") functionMode = true;
+				else valid = false;
+			}
+			continue;
+		}
+		if (isDynamicSetterName(token)) {
+			setAllProtectedUnknown(state);
+			return true;
+		}
+	}
+	if (!valid || functionMode) return false;
+	let changed = false;
+	options = true;
+	for (const { value } of tokens) {
+		if (options && value === "--") {
+			options = false;
+			continue;
+		}
+		if (options && value.startsWith("-")) continue;
+		const assignment = protectedAssignment(value);
+		if (assignment) {
+			setProtectedValue(state, assignment.name, assignment.value, !unexport);
+			changed = true;
+			continue;
+		}
+		const name = protectedName(value);
+		if (name && name !== "CDPATH") {
+			state.gitTargets.get(name).exported = !unexport;
+			changed = true;
+		}
+	}
+	return changed;
+}
+
+function applyUnset(state, tokens) {
+	let variables = true;
+	let options = true;
+	for (const { value } of tokens) {
+		if (options && value === "--") {
+			options = false;
+			continue;
+		}
+		if (options && value.startsWith("-")) {
+			variables &&= value === "-v";
+			continue;
+		}
+		if (!variables) continue;
+		const name = protectedName(value);
+		if (name) unsetProtectedValue(state, name);
+	}
+	return variables;
+}
+
+function readProtectedNames(tokens) {
+	const valueOptions = new Set(["a", "d", "i", "n", "N", "p", "t", "u"]);
+	const flagOptions = new Set(["e", "r", "s"]);
+	const names = [];
+	let options = true;
+	for (let i = 0; i < tokens.length; i++) {
+		const token = tokens[i];
+		if (options && token.value === "--") {
+			options = false;
+			continue;
+		}
+		if (options && token.value.startsWith("-") && token.value !== "-") {
+			const cluster = token.value.slice(1);
+			for (let index = 0; index < cluster.length; index++) {
+				const option = cluster[index];
+				if (flagOptions.has(option)) continue;
+				if (!valueOptions.has(option)) return { names, unknown: true };
+				const value =
+					index + 1 < cluster.length
+						? { ...token, value: cluster.slice(index + 1) }
+						: tokens[++i];
+				if (!value) return { names, unknown: true };
+				if (option === "a") {
+					if (isDynamicSetterName(value)) return { names, unknown: true };
+					const name = protectedName(value.value);
+					if (name) names.push(name);
+				}
+				break;
+			}
+			continue;
+		}
+		if (isDynamicSetterName(token)) return { names, unknown: true };
+		const name = protectedName(token.value);
+		if (name) names.push(name);
+	}
+	return { names, unknown: false };
+}
+
+function dynamicallyWrittenProtectedNames(head, tokens) {
+	if (head === "read") return readProtectedNames(tokens);
+	if (head !== "printf") return { names: [], unknown: false };
+	let options = true;
+	for (let i = 0; i < tokens.length; i++) {
+		const token = tokens[i];
+		if (options && token.value === "--") {
+			options = false;
+			continue;
+		}
+		if (!options || !token.value.startsWith("-") || token.value === "-")
+			return { names: [], unknown: false };
+		if (token.value === "-v") {
+			const name = tokens[i + 1];
+			if (!name || isDynamicSetterName(name))
+				return { names: [], unknown: true };
+			return {
+				names: [protectedName(name.value)].filter(Boolean),
+				unknown: false,
+			};
+		}
+		if (token.value.startsWith("-v"))
+			return {
+				names: [protectedName(token.value.slice(2))].filter(Boolean),
+				unknown: false,
+			};
+	}
+	return { names: [], unknown: false };
+}
+
+/** Update state after one shell command segment has run. */
+export function updateProtectedShellState(state, tokens) {
+	const prefix = parseLeadingShellPrefix(tokens);
+	const head = basename(tokens[prefix.end]?.value ?? "");
+	const arguments_ = tokens.slice(prefix.end + 1);
+	const assignments = tokens.slice(0, prefix.end);
+	if (prefix.end === tokens.length) return applyAssignments(state, assignments);
+	else if (STATEFUL_ASSIGNMENT_BUILTINS.has(head))
+		applyAssignments(state, assignments, true);
+
+	if (head === "source" || head === "." || head === "eval") {
+		setAllProtectedUnknown(state);
+		return true;
+	}
+	if (head === "unset") return applyUnset(state, arguments_);
+	if (head === "export") return applyExport(state, arguments_);
+	if (STATEFUL_ASSIGNMENT_BUILTINS.has(head)) {
+		return applyAssignments(state, arguments_, true);
+	}
+	const { names, unknown } = dynamicallyWrittenProtectedNames(head, arguments_);
+	if (unknown) {
+		setAllProtectedUnknown(state);
+		return true;
+	}
+	for (const name of names) setProtectedUnknown(state, name);
+	return names.length > 0;
+}
+
+export function parseEnvPrefix(tokens, start = 0) {
+	if (basename(tokens[start]?.value ?? "") !== "env") return null;
+	let i = start + 1;
+	let chdir;
+	let malformed = false;
+	let gitTargetOverride = false;
 	while (i < tokens.length) {
 		const value = tokens[i].value;
-		if (!tokens[i].quoted && /^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+			gitTargetOverride ||= isGitTargetAssignment(value);
 			i++;
 			continue;
 		}
+		if (value === "--")
+			return { end: i + 1, chdir, malformed, gitTargetOverride };
+		if (value === "-C" || value === "--chdir") {
+			if (!tokens[i + 1]) malformed = true;
+			else chdir = tokens[i + 1];
+			i += 2;
+			continue;
+		}
+		if (value.startsWith("--chdir=")) {
+			const target = value.slice("--chdir=".length);
+			if (target === "") malformed = true;
+			else chdir = { ...tokens[i], value: target };
+			i++;
+			continue;
+		}
+		if (value.startsWith("-C") && value.length > 2) {
+			chdir = { ...tokens[i], value: value.slice(2) };
+			i++;
+			continue;
+		}
+		if (ENV_FLAGS_WITH_VALUE.has(value)) {
+			i += 2;
+			continue;
+		}
 		if (
-			value === "sudo" ||
-			value === "command" ||
-			value === "nohup" ||
-			value === "time" ||
-			value === "env"
+			value === "-i" ||
+			value === "--ignore-environment" ||
+			value === "-0" ||
+			value === "--null" ||
+			value === "-v" ||
+			value === "--debug" ||
+			/^-(?:u|C|S|P).+/.test(value) ||
+			/^--(?:unset|chdir|split-string)=/.test(value)
 		) {
 			i++;
 			continue;
 		}
 		break;
 	}
-	return tokens.slice(i);
+	return { end: i, chdir, malformed, gitTargetOverride };
+}
+
+const LEADING_REDIRECTION = /^(?:[0-9]*(?:<<<|<<|<>|<&|>&|>>?|<)|&>>?)/;
+
+function leadingRedirectionLength(tokens, start) {
+	const value = tokens[start]?.value ?? "";
+	const operator = value.match(LEADING_REDIRECTION)?.[0];
+	if (!operator) return 0;
+	if (operator.length < value.length) return 1;
+	if (tokens[start + 1]) return 2;
+	return 0;
+}
+
+const SUDO_FLAGS_WITH_VALUE = new Set([
+	"-u",
+	"--user",
+	"-g",
+	"--group",
+	"-h",
+	"--host",
+	"-p",
+	"--prompt",
+	"-C",
+	"--close-from",
+	"-R",
+	"--chroot",
+	"-T",
+	"--command-timeout",
+]);
+
+const TIME_FLAGS_WITH_VALUE = new Set(["-o", "--output", "-f", "--format"]);
+
+function parseSudoPrefix(tokens, start) {
+	if (basename(tokens[start]?.value ?? "") !== "sudo") return null;
+	let i = start + 1;
+	let unresolved = false;
+	while (i < tokens.length) {
+		const value = tokens[i].value;
+		if (value === "--") return { end: i + 1, unresolved };
+		if (SUDO_FLAGS_WITH_VALUE.has(value)) {
+			if (!tokens[i + 1]) unresolved = true;
+			if (value === "-R" || value === "--chroot") unresolved = true;
+			i += 2;
+			continue;
+		}
+		if (
+			/^--(?:user|group|host|prompt|close-from|command-timeout)=/.test(value)
+		) {
+			i++;
+			continue;
+		}
+		if (value.startsWith("--chroot=")) {
+			unresolved = true;
+			i++;
+			continue;
+		}
+		if (/^-(?:u|g|h|p|C|T).+/.test(value)) {
+			i++;
+			continue;
+		}
+		if (value.startsWith("-R") && value.length > 2) {
+			unresolved = true;
+			i++;
+			continue;
+		}
+		if (
+			value === "-n" ||
+			value === "--non-interactive" ||
+			value === "-b" ||
+			value === "-E"
+		) {
+			i++;
+			continue;
+		}
+		if (value.startsWith("-")) {
+			unresolved = true;
+			i++;
+			continue;
+		}
+		break;
+	}
+	return { end: i, unresolved };
+}
+
+function parseTimePrefix(tokens, start) {
+	if (basename(tokens[start]?.value ?? "") !== "time") return null;
+	let i = start + 1;
+	let unresolved = false;
+	while (i < tokens.length) {
+		const value = tokens[i].value;
+		if (value === "--") return { end: i + 1, unresolved };
+		if (TIME_FLAGS_WITH_VALUE.has(value)) {
+			if (!tokens[i + 1]) unresolved = true;
+			i += 2;
+			continue;
+		}
+		if (/^--(?:output|format)=/.test(value) || /^-(?:o|f).+/.test(value)) {
+			i++;
+			continue;
+		}
+		if (
+			value === "-a" ||
+			value === "--append" ||
+			value === "-p" ||
+			value === "--portability" ||
+			value === "-v" ||
+			value === "--verbose"
+		) {
+			i++;
+			continue;
+		}
+		if (value.startsWith("-")) {
+			unresolved = true;
+			i++;
+			continue;
+		}
+		break;
+	}
+	return { end: i, unresolved };
+}
+
+function parseCommandPrefix(tokens, start) {
+	if (basename(tokens[start]?.value ?? "") !== "command") return null;
+	let i = start + 1;
+	let query = false;
+	let unresolved = false;
+	while (i < tokens.length) {
+		const value = tokens[i].value;
+		if (value === "--") return { end: i + 1, query, unresolved };
+		if (/^-[pVv]+$/.test(value)) {
+			query ||= /[Vv]/.test(value);
+			i++;
+			continue;
+		}
+		if (value.startsWith("-")) {
+			unresolved = true;
+			i++;
+			continue;
+		}
+		break;
+	}
+	return { end: i, query, unresolved };
+}
+
+export function parseLeadingShellPrefix(tokens) {
+	let i = 0;
+	let unresolved = false;
+	let gitTargetOverride = false;
+	let cdPathOverride = false;
+	const envs = [];
+	while (i < tokens.length) {
+		const value = tokens[i].value;
+		const executable = basename(value);
+		const redirection = leadingRedirectionLength(tokens, i);
+		if (redirection > 0) {
+			i += redirection;
+			continue;
+		}
+		if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(value)) {
+			gitTargetOverride ||= isGitTargetAssignment(value);
+			cdPathOverride ||= isNonemptyCdPathAssignment(value);
+			i++;
+			continue;
+		}
+		if (executable === "env") {
+			const env = parseEnvPrefix(tokens, i);
+			envs.push(env);
+			unresolved ||= env.malformed;
+			gitTargetOverride ||= env.gitTargetOverride;
+			i = env.end;
+			continue;
+		}
+		const command = parseCommandPrefix(tokens, i);
+		if (command !== null) {
+			unresolved ||= command.unresolved;
+			if (command.query)
+				return {
+					end: tokens.length,
+					envs,
+					unresolved,
+					gitTargetOverride,
+					cdPathOverride,
+				};
+			i = command.end;
+			continue;
+		}
+		const sudo = parseSudoPrefix(tokens, i);
+		if (sudo !== null) {
+			unresolved ||= sudo.unresolved;
+			i = sudo.end;
+			continue;
+		}
+		const time = parseTimePrefix(tokens, i);
+		if (time !== null) {
+			unresolved ||= time.unresolved;
+			i = time.end;
+			continue;
+		}
+		if (executable === "nohup") {
+			i++;
+			continue;
+		}
+		break;
+	}
+	return { end: i, envs, unresolved, gitTargetOverride, cdPathOverride };
+}
+
+// `FOO=bar cmd` and executable command prefixes still run cmd.
+export function stripLeadingNoise(tokens) {
+	return tokens.slice(parseLeadingShellPrefix(tokens).end);
 }
 
 export function gitSubcommandIndex(tokens) {
 	for (let i = 1; i < tokens.length; i++) {
-		const { value, quoted } = tokens[i];
-		if (quoted) return null;
+		const { value } = tokens[i];
 		if (GIT_GLOBAL_FLAGS_WITH_VALUE.has(value)) {
 			i++;
 			continue;
@@ -201,15 +824,15 @@ export function findOutwardCommand(command) {
 		const tokens = stripLeadingNoise(tokenize(segment));
 		if (tokens.length === 0) continue;
 		const head = tokens[0];
-		if (head.quoted) continue;
+		const executable = basename(head.value);
 
-		if (head.value === "git") {
+		if (executable === "git") {
 			const sub = gitSubcommand(tokens);
 			if (sub && OUTWARD_GIT_SUBCOMMANDS.has(sub)) return `git ${sub}`;
 			continue;
 		}
 
-		if (head.value === "gh") {
+		if (executable === "gh") {
 			// The group is not necessarily tokens[1] — a global flag can come
 			// first, and reading the flag as the group made this guard fail open
 			// on `gh -R owner/repo pr create` (review finding, #650).

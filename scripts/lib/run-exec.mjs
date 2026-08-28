@@ -14,14 +14,44 @@ import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 
 const MAX_BUFFER = 32 * 1024 * 1024;
+const GIT_TARGET_ENVIRONMENT_VARIABLES = [
+	"GIT_DIR",
+	"GIT_WORK_TREE",
+	"GIT_INDEX_FILE",
+	"GIT_COMMON_DIR",
+	"GIT_OBJECT_DIRECTORY",
+	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	"GIT_NAMESPACE",
+];
+
+/** Copy an environment without variables that redirect Git's repository state. */
+export function withoutGitTargetEnvironment(environment = process.env) {
+	const sanitized = { ...environment };
+	for (const variable of GIT_TARGET_ENVIRONMENT_VARIABLES) {
+		delete sanitized[variable];
+	}
+	return sanitized;
+}
+
+/** Whether an inherited Git target override makes a guarded mutation ambiguous. */
+export function hasGitTargetEnvironment(environment = process.env) {
+	return GIT_TARGET_ENVIRONMENT_VARIABLES.some(
+		(variable) =>
+			Object.hasOwn(environment, variable) && environment[variable] !== "",
+	);
+}
 
 /**
  * Run a command, returning stdout. Throws on a non-zero exit.
  * @param {string} file - executable name, never a command line
  * @param {string[]} args
- * @param {{cwd: string, input?: string}} opts
+ * @param {{cwd: string, input?: string, env?: object}} opts
  */
-export function run(file, args, { cwd, input, captureStderr = false } = {}) {
+export function run(
+	file,
+	args,
+	{ cwd, input, env, captureStderr = false } = {},
+) {
 	// Node echoes a child's stderr to the parent unless stdio is given, and the
 	// callers here relied on that: gate-check's pnpm builds stream progress while
 	// they run. Inheriting stays the default so this stays a change of how the
@@ -37,6 +67,7 @@ export function run(file, args, { cwd, input, captureStderr = false } = {}) {
 		maxBuffer: MAX_BUFFER,
 		...(captureStderr ? { stdio: ["pipe", "pipe", "pipe"] } : {}),
 		...(input === undefined ? {} : { input }),
+		...(env === undefined ? {} : { env }),
 	});
 }
 
@@ -72,12 +103,16 @@ export function tryGit(args, opts = {}) {
 /**
  * Resolve the current worktree and shared repository roots for `cwd`.
  * @param {string} cwd
- * @param {{exec?: (args: string[], opts: {cwd: string}) => {ok: boolean, out: string}}} [opts]
+ * @param {{exec?: (args: string[], opts: {cwd: string, env: object}) => {ok: boolean, out: string}, environment?: object}} [opts]
  * @returns {{worktreeRoot: string, commonDir: string, mainRoot: string} | null}
  */
-export function resolveGitRoots(cwd, { exec = tryGit } = {}) {
-	const toplevel = exec(["rev-parse", "--show-toplevel"], { cwd });
-	const common = exec(["rev-parse", "--git-common-dir"], { cwd });
+export function resolveGitRoots(
+	cwd,
+	{ exec = tryGit, environment = process.env } = {},
+) {
+	const env = withoutGitTargetEnvironment(environment);
+	const toplevel = exec(["rev-parse", "--show-toplevel"], { cwd, env });
+	const common = exec(["rev-parse", "--git-common-dir"], { cwd, env });
 	if (!toplevel.ok || !common.ok) return null;
 
 	const commonDir = resolve(cwd, common.out.trim());

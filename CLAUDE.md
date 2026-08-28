@@ -4,7 +4,7 @@
 
 ## セットアップ
 
-クローン直後・新規 worktree では最初に `make setup` を実行する。依存インストールに加え pre-commit hook のシム（`scripts/hooks/pre-commit-shim`）を `.git/hooks/` に導入する。シムはコミット実行 worktree の `scripts/pre-commit` を都度 exec するため、hook の版とブランチのツリー内容が常に一致する（#411）。実体（`scripts/pre-commit`）はコミット時に staged ファイルの biome 検査（整形・lint・構文）と `.pfdsl` スナップショット鮮度を自動検査する。biome の指摘は自動修正しない — 落ちたら `make format` を実行して再 stage する。これを飛ばすとローカルコミットが検査をすり抜け、CI で初めて失敗に気付くことになる。
+Claude CodeとCodexのSessionStart hookは、クローン直後・新規worktreeで `node scripts/setup-completion.mjs check` が失敗すれば `make setup` を自動実行する。`node_modules` やmarkerの存在だけはsetup完了を表さない。markerはrootとworkspaceのpackage manifests、lockfile、workspace定義、`.npmrc`、`.pnpmfile.cjs`、setup recipe、hook shim、repo skill linker、fingerprint runtimeのSHA-256を記録し、branch switch等で入力が変わればstaleになる。setup全体はworktree単位のlockで直列化され、同じinputsを待っていたrunnerはlock取得後の再checkでbodyをskipする。markerは全工程成功後に同一directory内の一時fileからatomic renameされる。session開始後にworktreeを手動作成した場合など、SessionStart hookが完了しなかった場合だけ `make setup` を1回手動実行する。依存installに加えpre-commit hookのshim（`scripts/hooks/pre-commit-shim`）を `.git/hooks/` に導入する。shimはcommit実行worktreeの `scripts/pre-commit` を都度execするため、hookの版とbranchのtree内容が常に一致する（#411）。実体はcommit時にstaged filesのBiome検査と `.pfdsl` snapshot freshnessを自動検査する。Biomeの指摘は自動修正しない。落ちたら `make format` を実行して再stageする。
 
 ## 文字列の言語
 
@@ -30,8 +30,8 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 ただし事後的な分割（先に一括で変更してから複数コミットへ割り直す）が中間ファイル再構成等でトークン効率を著しく損なう場合は、論理単位の純度より作業順=コミット順を優先してよい。
 
-変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook、`.claude/settings.json` で配線）が main ブランチ上でツリー・インデックスを変える git コマンドを機械的に止める（#650・#777）。
-ブランチ上に新しい状態を作る操作は deny（「worktree で同じことをする」が等価な代替になるため）、既存の状態を壊す・戻す操作は ask（事故と main ツリー復旧手順を payload から区別できないため人間に渡す）。
+変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook、`.claude/settings.json` で配線）は、直接記述された既知のshell形についてmainブランチまたはsibling worktreeのツリー・インデックスを変えるgitコマンドを止める事故防止guardである（#650・#777・#784）。任意のBash source・展開・関数・別scriptを完全に解釈するsecurity boundaryではない。
+ブランチ上に新しい状態を作る操作はdenyにする。既存の状態を壊す・戻す操作はClaude Codeではaskだが、Codex PreToolUseはaskをサポートせずhook failure後に実行を続けるためdenyへ変換する。両harnessのrepo hookは同じ直接形の安全サブセットを扱うが、Codexで低摩擦な機械的境界を担うのはtrusted-root検証付き `codex-git-routine.mjs`、raw Gitを永続allowしないexecpolicy、sandboxの組合せであり、Claude Codeにこのuser-level wrapperは前提化しない。Codexで永続allowするroutine Gitは、実際のworkdirがhook payloadに現れない境界を避けるため、wrapperの明示target付きsubcommandだけを使う。wrapperはGitとMakeの子processからGitのrepository・index・object・ref namespaceを変える7種類の環境変数を除去する。guardはwrapperの `stage-all`・`commit`・`branch-rename` をGit変更として認識し、コマンド文字列中のtargetをsession rootと比較する。raw commandではquotedまたはescaped literal argv、literal `cd`、`git -C`、`env -C/--chdir`、既知のcommand/sudo/time prefixを順に解決する。`--git-dir`・`--work-tree`、command内またはhook processから継承した非空のGit target環境変数、非空のambientまたはcommand-state CDPATHによるrelative cd、inputを含む先頭redirection、dynamic cwd、未知または不完全なprefix、列挙済みprotected-state setter、対応外のcompound構文等で実targetを確定できなければfail closedする。protected shell stateは変数ごとに追跡し、literalな空代入・有効な変数 `unset`・Git変数の `export -n` で安全な状態へ戻せる一方、動的な書込先、`source`・`.`・`eval`、targetに影響する `||`・pipeline・background・subshell・AND-listは変更系Gitをfail closedする。対応外のraw compoundは無害でも拒否しうるため、変更系Gitは単純commandまたは正規wrapperへ分ける。読み取り系Git、単純なsuccess-pathの `cd <target> && git <mutation>`、targetに影響しないpipeline・AND-list、変更系Gitより後ろにだけ現れるcontrol flowは影響を受けない。identity取得用Git subprocessはGit target環境変数を除去して明示cwdからrootとbranchを解決する。
 読み取り系は素通しする。
 どのサブコマンドがどちらに入るかは `scripts/lib/main-commit-guard.mjs` の `DENIED_SUBCOMMANDS` / `ASKED_SUBCOMMANDS` が一次情報 — ここには列挙しない。
 

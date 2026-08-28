@@ -9,38 +9,55 @@
 // Both branch names come from git rather than being assumed: the current one
 // from `git branch --show-current`, the default one from `origin/HEAD`. A repo
 // whose default branch is `trunk` or `master` was previously guarded against a
-// branch name it does not have. Worktree ownership is anchored to the fixed
-// CLAUDE_PROJECT_DIR and compared with the command target's git roots. None of
-// these are read unless the command turns out to be guarded — the lib calls
-// resolveBranches only then.
+// branch name it does not have. Worktree ownership is anchored to the harness
+// session root and compared with the command target's git roots:
+// CLAUDE_PROJECT_DIR remains authoritative in Claude Code, while Codex falls
+// back to the PreToolUse payload cwd. None of these are read unless the command
+// turns out to be guarded — the lib calls resolveBranches only then.
 //
 // Always exits 0 — a crash here, or a `git` failure, must not wedge every Bash
 // call.
 //
-// Usage (wired in .claude/settings.json): node scripts/main-commit-guard.mjs
+// Usage (wired in .claude/settings.json and .codex/hooks.json): node scripts/main-commit-guard.mjs
 
 import { readStdinText } from "./lib/hook-io.mjs";
 import {
 	crossesWorktree,
 	runMainCommitGuard,
 } from "./lib/main-commit-guard.mjs";
-import { resolveGitRoots, tryGit } from "./lib/run-exec.mjs";
+import {
+	hasGitTargetEnvironment,
+	resolveGitRoots,
+	tryGit,
+	withoutGitTargetEnvironment,
+} from "./lib/run-exec.mjs";
 
 /**
  * @param {object} payload PreToolUse hook payload
  * @param {string} targetCwd resolved cwd of one guarded Git segment
  * @returns {{currentBranch: string | undefined, mainBranch: string, crossesWorktree: boolean}}
  */
-function resolveBranches(_payload, targetCwd) {
+function resolveBranches(payload, targetCwd) {
 	// Each guarded segment supplies its own target, so a compound command that
 	// changes cwd is checked against every worktree it reaches (#751, #784).
 	const targetRoots = resolveGitRoots(targetCwd);
 	const projectDir = process.env.CLAUDE_PROJECT_DIR;
-	const sessionRoots =
-		typeof projectDir === "string" ? resolveGitRoots(projectDir) : null;
-	const current = tryGit(["branch", "--show-current"], { cwd: targetCwd });
+	const payloadCwd = payload?.cwd;
+	const sessionDir =
+		typeof projectDir === "string" && projectDir.trim() !== ""
+			? projectDir
+			: typeof payloadCwd === "string" && payloadCwd.trim() !== ""
+				? payloadCwd
+				: null;
+	const sessionRoots = sessionDir === null ? null : resolveGitRoots(sessionDir);
+	const identityEnv = withoutGitTargetEnvironment();
+	const current = tryGit(["branch", "--show-current"], {
+		cwd: targetCwd,
+		env: identityEnv,
+	});
 	const head = tryGit(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], {
 		cwd: targetCwd,
+		env: identityEnv,
 	});
 	// `origin/main` -> `main`. Falling back to "main" keeps the guard working in
 	// a clone whose origin/HEAD was never set. An undefined current branch
@@ -55,6 +72,12 @@ function resolveBranches(_payload, targetCwd) {
 
 const { shouldOutput, output } = runMainCommitGuard(await readStdinText(), {
 	resolveBranches,
+	ambientGitTargetOverride: hasGitTargetEnvironment(),
+	ambientCdPath:
+		typeof process.env.CDPATH === "string" && process.env.CDPATH !== "",
+	supportsAsk:
+		typeof process.env.CLAUDE_PROJECT_DIR === "string" &&
+		process.env.CLAUDE_PROJECT_DIR.trim() !== "",
 });
 if (shouldOutput) {
 	console.log(JSON.stringify(output));

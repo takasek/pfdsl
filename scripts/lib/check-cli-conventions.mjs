@@ -14,7 +14,7 @@
  *   - flag lookup: a `"--name"` literal handed to indexOf/includes/startsWith.
  *     Not "is this array process.argv" — that needs dataflow. One file in the
  *     repo legitimately matches (it parses other commands' arguments) and is
- *     excluded by name below.
+ *     exempted by name below.
  *   - entrypoint: `import.meta.url` compared against something holding
  *     `process.argv[1]` with no realpath in sight. The correct forms are a
  *     call (isCliEntrypoint) or a comparison that names realpath, so neither
@@ -41,6 +41,10 @@ const COMMENT_LINE = /^(?:\/\/|\/?\*)/;
 const CHECK_INSTALL_SYNC_RELATIVE_PATH =
 	"pfd-ops/scripts/check-install-sync.mjs";
 const SKILL_MIRROR_ROOTS = [".claude/skills", ".agents/skills"];
+const FOREIGN_ARGV_GUARDS = new Set([
+	"scripts/lib/delegation-guard.mjs",
+	"scripts/lib/main-commit-guard.mjs",
+]);
 
 // Its one flag-name lookup is the --force deprecation hint that #631 put
 // deliberately *ahead* of its strict parse, so the message survives instead
@@ -52,6 +56,13 @@ function isCheckInstallSyncMirror(file) {
 	);
 }
 
+// These guards parse the argv of other commands, rather than their own. As
+// command-usage-guard.mjs already documents, determining whose argv an array
+// holds needs dataflow, so retain an explicit flag-lookup-only exception.
+function isFlagLookupExempt(file) {
+	return isCheckInstallSyncMirror(file) || FOREIGN_ARGV_GUARDS.has(file);
+}
+
 /**
  * @param {string} source
  * @param {string} [file] - repo-relative path, for the per-rule exemptions
@@ -59,7 +70,7 @@ function isCheckInstallSyncMirror(file) {
  */
 export function findCliConventionViolations(source, file = "") {
 	const findings = [];
-	const flagLookupApplies = !isCheckInstallSyncMirror(file);
+	const flagLookupApplies = !isFlagLookupExempt(file);
 	source.split("\n").forEach((text, i) => {
 		if (COMMENT_LINE.test(text.trim())) return;
 		if (flagLookupApplies && FLAG_LOOKUP.test(text)) {

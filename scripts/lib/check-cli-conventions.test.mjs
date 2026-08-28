@@ -144,6 +144,10 @@ describe("per-rule exemptions", () => {
 		".claude/skills/pfd-ops/scripts/check-install-sync.mjs",
 		".agents/skills/pfd-ops/scripts/check-install-sync.mjs",
 	];
+	const FOREIGN_ARGV_GUARDS = [
+		"scripts/lib/delegation-guard.mjs",
+		"scripts/lib/main-commit-guard.mjs",
+	];
 
 	// Its lookup decides what the error says, not what the script does: the
 	// hint has to run ahead of the strict parse or --force reads as a plain
@@ -167,6 +171,17 @@ describe("per-rule exemptions", () => {
 			"if (import.meta.url === `file://${process.argv[1]}`) main();";
 		for (const file of CHECK_INSTALL_SYNC_MIRRORS) {
 			assert.equal(findCliConventionViolations(source, file).length, 1);
+		}
+	});
+
+	it("exempts foreign-argv guard flag lookups without exempting entrypoints", () => {
+		const flagLookup = `if (token.startsWith("--work-tree=")) {}`;
+		const entrypoint =
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: fixture source under test, not an interpolation
+			"if (import.meta.url === `file://${process.argv[1]}`) main();";
+		for (const file of FOREIGN_ARGV_GUARDS) {
+			assert.deepEqual(findCliConventionViolations(flagLookup, file), []);
+			assert.equal(findCliConventionViolations(entrypoint, file).length, 1);
 		}
 	});
 });
