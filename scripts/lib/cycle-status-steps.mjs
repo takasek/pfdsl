@@ -273,10 +273,8 @@ export async function runCycleStatus({
 					targetIssue,
 					(issueJson.labels ?? []).map((l) => l?.name).filter(Boolean),
 				);
-				recordOptionCount = Math.max(
-					recordOptionCount,
-					detectEnumeratedOptions(issueJson.body).count,
-				);
+				const optionCount = detectEnumeratedOptions(issueJson.body).count;
+				recordOptionCount = Math.max(recordOptionCount, optionCount);
 				const classification = classifyDesignSettlement({
 					body: issueJson.body,
 					createdAt: issueJson.createdAt,
@@ -456,7 +454,9 @@ export async function runCycleStatus({
 		designRecordTemplate: buildDesignRecordTemplate({
 			optionCount: recordOptionCount,
 		}),
-		reviewRecordTemplate: buildReviewRecordTemplate(),
+		reviewRecordTemplate: buildReviewRecordTemplate({
+			optionCount: recordOptionCount,
+		}),
 		gateCheckCommand,
 		unregisteredManagedIssues,
 		untriagedTargetIssues,

@@ -236,20 +236,24 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
  * own constants rather than restated in prose, so a template that drifts
  * from the checker cannot happen silently.
  *
- * Unlike the design record, this is not a copy-pasteable literal — the
- * runner substitutes a real tool name after actually running a review, so
- * `line` keeps a placeholder rather than a fabricated tool value.
+ * Unlike the design record, this is not a copy-pasteable literal. The runner substitutes a real tool name after actually running a review, so `line` keeps a placeholder rather than a fabricated tool value. A multi-option issue additionally exposes its required design trailer as `requiredLine`.
  *
  * Emitted on every cycle, not only ones that turn out to touch packages/ or
  * scripts/: whether this cycle will is undecidable at preflight time (the
  * diff doesn't exist yet), and the failure this closes is exactly a runner
  * who never saw the format until the terminal gate FAILed on it.
- * @returns {{note: string, line: string}}
+ * @param {{optionCount?: number}} [params]
+ * @returns {{note: string, line: string, requiredLine: string | null}}
  */
-export function buildReviewRecordTemplate() {
+export function buildReviewRecordTemplate({ optionCount = 0 } = {}) {
+	const requiresDesignReview = optionCount >= 2;
+	const designReviewRequirement = requiresDesignReview
+		? `複数案の issue では、${CODE_PATH_LABEL} に変更がある回に限り Review: tool=design を必須とする。`
+		: "";
 	return {
-		note: `着手前（ブランチ最初のコミットより前）にレビューを実施し、実施のたび commit message の trailer へ記録する。後から追記できない — push 済みなら trailer の追加は履歴の作り直しになる。tool は ${REVIEW_TOOLS.join(" / ")} のいずれか。ゲート充足に数えるのは ${GATE_TOOLS.join(" / ")}（\`code-review\` は有効な trailer 値だが数えない）。${CODE_PATH_LABEL} に変更のある回はさらに ${CORRECTNESS_TOOLS.join(" または ")} を最低1本要する。行が記録するのは委譲したレビューであり、diff の規模に合わせて委譲せず自分で読んだだけの回は書かない — その場合は落とした観点の名前と落とした理由を PR 本文へ書く。`,
+		note: `着手前（ブランチ最初のコミットより前）にレビューを実施し、実施のたび commit message の trailer へ記録する。後から追記できない — push 済みなら trailer の追加は履歴の作り直しになる。tool は ${REVIEW_TOOLS.join(" / ")} のいずれか。ゲート充足に数えるのは ${GATE_TOOLS.join(" / ")}（\`code-review\` は有効な trailer 値だが数えない）。${designReviewRequirement}${CODE_PATH_LABEL} に変更のある回はさらに ${CORRECTNESS_TOOLS.join(" または ")} を最低1本要する。行が記録するのは委譲したレビューであり、diff の規模に合わせて委譲せず自分で読んだだけの回は書かない — その場合は落とした観点の名前と落とした理由を PR 本文へ書く。`,
 		line: "Review: tool=<tool-name>",
+		requiredLine: requiresDesignReview ? "Review: tool=design" : null,
 	};
 }
 

@@ -679,6 +679,26 @@ describe("buildDesignRecordTemplate", () => {
 });
 
 describe("buildReviewRecordTemplate", () => {
+	it("requires a design review when the issue enumerates multiple options", () => {
+		const { line, requiredLine, note } = buildReviewRecordTemplate({
+			optionCount: 2,
+		});
+		assert.equal(line, "Review: tool=<tool-name>");
+		assert.equal(requiredLine, "Review: tool=design");
+		assert.match(
+			note,
+			/複数案.*packages\/.*scripts\/.*Review: tool=design.*必須/,
+		);
+	});
+
+	it("keeps the ordinary review placeholder when the issue has at most one option", () => {
+		for (const optionCount of [0, 1]) {
+			const template = buildReviewRecordTemplate({ optionCount });
+			assert.equal(template.line, "Review: tool=<tool-name>");
+			assert.equal(template.requiredLine, null);
+		}
+	});
+
 	it("emits a line the checker's own parser accepts once a real tool is substituted", () => {
 		const { line } = buildReviewRecordTemplate();
 		const filled = line.replace("<tool-name>", "simplify");
