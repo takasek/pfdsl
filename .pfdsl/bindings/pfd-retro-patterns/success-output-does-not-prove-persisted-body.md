@@ -15,3 +15,4 @@ phase: pre-artifact
   実行直後に GitHub 側の persisted `body` を取得し、改行を含めて正本と完全一致するかを比較する。
   `Closes #...` のような必須行や参照を持つ本文は、その構造も同じ readback で確認し、後続の edit ごとに崩れていないかを確認する。
   設計選択記録のように着手前でなければ意味が変わる本文では、この readback 完了自体を初コミットより前の条件として扱う。
+  後段の checker が必須行頭や時刻を comment 一覧から検査しても、直前の write identifier を入力に持たないなら exact-write readback の代替にはならない。
