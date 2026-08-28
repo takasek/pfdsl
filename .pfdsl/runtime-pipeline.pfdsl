@@ -156,7 +156,7 @@ artifact:
     group: gen_sources
   toolchain:
     label: ツールチェーン
-    description: "workflow.pfdsl の merge_pr が生産する。plugin.json の version 由来であり、公開・パッケージングの素材でもある"
+    description: "workflow.pfdsl の project_toolchain が integrated_repository から packages/ の現行状態を射影して生産する。plugin.json の version 由来であり、公開・パッケージングの素材でもある"
     location: ../packages/
     group: gen_sources
   ops_install_sources:

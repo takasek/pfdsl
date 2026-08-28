@@ -171,10 +171,16 @@ artifact:
     criteria: check がエラーなし、audit-issues-flow.mjs が差分なし。
     location: roadmap.pfdsl
     group: planning
+  integrated_repository:
+    label: 統合済みリポジトリ
+    description: "PR を main に統合した後のリポジトリ全体の現行状態"
+    criteria: 対象 PR が merged で、その merge commit が main の HEAD の祖先であり、.github/workflows/test.yml の test job がその commit に対して成功している
+    location: ../
+    group: planning
   toolchain:
     label: ツールチェーン
-    description: "packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）。実装の本質成果物。CLI に限らず develop の対象すべて"
-    criteria: 対象 issue の受け入れ基準を満たす実装が packages/ に入り、make check が通過し、PR がレビュー通過済み
+    description: "integrated_repository の packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）の現行状態。runtime-pipeline.pfdsl の release 判定と変換境界の入力"
+    criteria: gh pr view <PR番号> --json mergeCommit --jq '.mergeCommit.oid' で merge commit C を得て、git rev-parse origin/main:packages と git rev-parse C:packages が同じ tree object ID を返す
     location: ../packages/
     group: planning
   published_cli:
@@ -438,6 +444,10 @@ process:
     description: "PR をレビューし main へ統合する。成果物はマージで正本になり、進捗・issue 更新もここで確定する。location はこのプロセスのうち機械化されている部分を指す — pr_diagrams の生成・配送がそれにあたり、その location（外部リポの URL）からは実装へ辿れないため、実装パスはこちらが持つ"
     location: ../.github/workflows/pr-diff-images.yml
     group: planning
+  project_toolchain:
+    label: ツールチェーン射影
+    description: "integrated_repository から packages/ の現行状態を射影し、runtime-pipeline.pfdsl の consumer が扱う toolchain として確定する"
+    group: planning
   decide_cli_release:
     label: CLIリリース判断
     description: "make release-status で @pfdsl/cli と plugin 同梱物の behind を確認し、公開するか・どの版で切るかを判断する。判断後の v* tag push・npm publish は runtime-pipeline.pfdsl が持つ。make release 完了後、roadmap の publish_cli_* プロセスのうち ready になったものの出力 artifact を自動 done 化してコミット・push する（#278）。バージョン番号からの artifact ID 逆算はしない"
@@ -551,7 +561,9 @@ toolchain >> map_transform_boundaries -> [runtime_pipeline_md, runtime_pipeline_
 
 [gh_issues, roadmap_pfdsl, spec] >> develop -> pull_request
 
-pull_request >> merge_pr -> [issue_updates, pr_diagrams, toolchain]
+pull_request >> merge_pr -> [integrated_repository, issue_updates, pr_diagrams]
+
+integrated_repository >> project_toolchain -> toolchain
 
 bindings_pfd_ops >>? develop
 bindings_pfd_retro >>? develop
