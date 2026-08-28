@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { RECORD_SEP } from "./commit-trailers.mjs";
+import { deriveDesignReviewRequirement } from "./cycle-status.mjs";
 import {
 	analyzeAdoptedPfdsl,
 	checkDocsStep,
@@ -1173,6 +1174,27 @@ describe("reviewRecordStep", () => {
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /#943/);
 		assert.match(result.detail, /tool=design/);
+	});
+
+	it("uses the shared requirement derivation for a later multi-option issue", () => {
+		const issue = { number: 1008, body: "## 対応案\n1. 案A\n2. 案B" };
+		const requirement = deriveDesignReviewRequirement({
+			issue: issue.number,
+			body: issue.body,
+		});
+		assert.deepEqual(requirement, {
+			issue: issue.number,
+			tool: "design",
+			when: "code-path-changed",
+		});
+		assert.equal(
+			reviewRecordStep({
+				commitMessages: messages("subject\n\nReview: tool=design\n"),
+				changedFiles: ["scripts/lib/cycle-status.mjs"],
+				issues: [{ number: 1009, issue: { body: "## 対応案\n1. 案A" } }, issue],
+			}).status,
+			"PASS",
+		);
 	});
 
 	it("PASSes a design review when a supplied issue enumerates multiple options", () => {

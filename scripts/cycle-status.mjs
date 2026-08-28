@@ -7,7 +7,10 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { runCycleStatus } from "./lib/cycle-status-steps.mjs";
+import {
+	cycleStatusExitCode,
+	runCycleStatus,
+} from "./lib/cycle-status-steps.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
 import { run, tryRun } from "./lib/run-exec.mjs";
 import { execGh } from "./pfdsl/lib/gh-exec.mjs";
@@ -73,4 +76,5 @@ console.log(JSON.stringify(result, null, 2));
 // Non-zero so a caller that only reads the exit status still stops: the payload
 // carries no judgments in either case, and such a preflight is exactly the
 // output a reader mistakes for "checked, nothing wrong" (#716, #744).
-if (result.staleTree || result.dirtyTree) process.exit(1);
+const exitCode = cycleStatusExitCode(result);
+if (exitCode !== 0) process.exit(exitCode);

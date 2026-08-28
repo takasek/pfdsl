@@ -196,6 +196,17 @@ export function detectEnumeratedOptions(body) {
 }
 
 /**
+ * Derive the review requirement shared by preflight and the terminal gate.
+ * @param {{issue: number, body?: string | null}} params
+ * @returns {{issue: number, tool: "design", when: "code-path-changed"} | null}
+ */
+export function deriveDesignReviewRequirement({ issue, body }) {
+	return detectEnumeratedOptions(body).enumerated
+		? { issue, tool: "design", when: "code-path-changed" }
+		: null;
+}
+
+/**
  * The design-selection record, pre-shaped so the runner never has to know the
  * format to satisfy it. Every line head here is the one the terminal gate
  * matches on, taken from the gate's own constants rather than restated — a
@@ -242,11 +253,13 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
  * scripts/: whether this cycle will is undecidable at preflight time (the
  * diff doesn't exist yet), and the failure this closes is exactly a runner
  * who never saw the format until the terminal gate FAILed on it.
- * @param {{optionCount?: number}} [params]
+ * @param {{requirements?: Array<{issue: number, tool: "design", when: "code-path-changed"}>}} [params]
  * @returns {{note: string, line: string, requiredLine: string | null}}
  */
-export function buildReviewRecordTemplate({ optionCount = 0 } = {}) {
-	const requiresDesignReview = optionCount >= 2;
+export function buildReviewRecordTemplate({ requirements = [] } = {}) {
+	const requiresDesignReview = requirements.some(
+		({ tool, when }) => tool === "design" && when === "code-path-changed",
+	);
 	const designReviewRequirement = requiresDesignReview
 		? `複数案の issue では、${CODE_PATH_LABEL} に変更がある回に限り Review: tool=design を必須とする。`
 		: "";

@@ -15,7 +15,10 @@
 
 import { parseOwnerRepo } from "../pfdsl/lib/github-rest.mjs";
 import { RECORD_SEP } from "./commit-trailers.mjs";
-import { detectEnumeratedOptions } from "./cycle-status.mjs";
+import {
+	deriveDesignReviewRequirement,
+	detectEnumeratedOptions,
+} from "./cycle-status.mjs";
 import {
 	buildDesignRecordEditQuery,
 	classifyDesignRecordContent,
@@ -614,9 +617,13 @@ export function reviewRecordStep({
 	issues = [],
 }) {
 	const name = "Review record";
-	const designReviewIssueNumbers = issues.flatMap(({ number, issue }) =>
-		detectEnumeratedOptions(issue?.body ?? "").count >= 2 ? [number] : [],
-	);
+	const designReviewIssueNumbers = issues.flatMap(({ number, issue }) => {
+		const requirement = deriveDesignReviewRequirement({
+			issue: number,
+			body: issue?.body ?? "",
+		});
+		return requirement ? [requirement.issue] : [];
+	});
 	const designReviewIssues = designReviewIssueNumbers
 		.map((number) => `#${number}`)
 		.join(", ");

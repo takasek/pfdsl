@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { runCycleStatus } from "./cycle-status-steps.mjs";
+import { cycleStatusExitCode, runCycleStatus } from "./cycle-status-steps.mjs";
 import { reviewRecordStep } from "./gate-check-steps.mjs";
 
 const ROOT = "/repo";
@@ -53,6 +53,12 @@ function baseDeps(overrides = {}) {
 }
 
 describe("runCycleStatus", () => {
+	it("uses a non-zero exit code for blocking lookup failures only", () => {
+		assert.equal(cycleStatusExitCode({ blocking: true }), 1);
+		assert.equal(cycleStatusExitCode({ blocking: false }), 0);
+		assert.equal(cycleStatusExitCode({}), 0);
+	});
+
 	it("reports fetched:false when git fetch throws, without aborting the rest", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
@@ -564,6 +570,9 @@ describe("runCycleStatus", () => {
 			1008: "## 対応案\n1. 案A\n2. 案B\n",
 		};
 		const result = await runForIssueBodies([1009, 1010, 1008], bodies);
+		assert.deepEqual(result.designReviewRequirements, [
+			{ issue: 1008, tool: "design", when: "code-path-changed" },
+		]);
 		assert.equal(result.reviewRecordTemplate.line, "Review: tool=<tool-name>");
 		assert.equal(
 			result.reviewRecordTemplate.requiredLine,
@@ -1174,6 +1183,26 @@ describe("runCycleStatus — untriaged target issue (#983)", () => {
 });
 
 describe("runCycleStatus — issue lookup failure and unregisteredManagedIssues", () => {
+	it("retains every issue lookup failure in the blocking display reason", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [956, 957],
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						throw new Error(`lookup failed for ${args[2]}`);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.issueLookupFailures, [
+			{ issue: 956, error: "lookup failed for 956" },
+			{ issue: 957, error: "lookup failed for 957" },
+		]);
+		assert.match(result.designUnsettledError, /956.*lookup failed for 956/);
+		assert.match(result.designUnsettledError, /957.*lookup failed for 957/);
+		assert.equal(result.blocking, true);
+	});
+
 	it("excludes an issue whose label lookup failed, and says so via designUnsettledError", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
@@ -1194,5 +1223,9 @@ describe("runCycleStatus — issue lookup failure and unregisteredManagedIssues"
 		assert.deepEqual(result.unregisteredManagedIssues, []);
 		assert.deepEqual(result.untriagedTargetIssues, []);
 		assert.match(result.designUnsettledError, /network unreachable/);
+		assert.deepEqual(result.issueLookupFailures, [
+			{ issue: 956, error: "gh: network unreachable" },
+		]);
+		assert.equal(result.blocking, true);
 	});
 });

@@ -22,6 +22,7 @@ import {
 	classifyDesignSettlement,
 	classifyPRs,
 	countBehind,
+	deriveDesignReviewRequirement,
 	detectEnumeratedOptions,
 	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
@@ -31,6 +32,15 @@ import {
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
 import { loadPatternCatalog, PATTERN_DIR_RELATIVE } from "./retro-patterns.mjs";
+
+/**
+ * Return the CLI exit code for a preflight result.
+ * @param {{blocking?: boolean, staleTree?: unknown, dirtyTree?: unknown}} result
+ * @returns {0 | 1}
+ */
+export function cycleStatusExitCode(result) {
+	return result.staleTree || result.dirtyTree || result.blocking ? 1 : 0;
+}
 
 /**
  * @param {{
@@ -254,6 +264,8 @@ export async function runCycleStatus({
 	// The count shown is the largest across the cycle's issues: a record is owed
 	// on each one separately, and the template is written once.
 	let recordOptionCount = 0;
+	const designReviewRequirements = [];
+	const issueLookupFailures = [];
 	/** @type {Map<number, string[]>} label names of each issue actually fetched */
 	const labelsByIssue = new Map();
 
@@ -275,6 +287,11 @@ export async function runCycleStatus({
 				);
 				const optionCount = detectEnumeratedOptions(issueJson.body).count;
 				recordOptionCount = Math.max(recordOptionCount, optionCount);
+				const reviewRequirement = deriveDesignReviewRequirement({
+					issue: targetIssue,
+					body: issueJson.body,
+				});
+				if (reviewRequirement) designReviewRequirements.push(reviewRequirement);
 				const classification = classifyDesignSettlement({
 					body: issueJson.body,
 					createdAt: issueJson.createdAt,
@@ -295,8 +312,19 @@ export async function runCycleStatus({
 					recordRequired: classification.recordRequired,
 				});
 			} catch (e) {
-				designUnsettledError = e.message;
+				issueLookupFailures.push({ issue: targetIssue, error: e.message });
 			}
+		}
+		if (issueLookupFailures.length > 0) {
+			const lookupError =
+				issueLookupFailures.length === 1
+					? issueLookupFailures[0].error
+					: issueLookupFailures
+							.map(({ issue, error }) => `issue ${issue}: ${error}`)
+							.join("; ");
+			designUnsettledError = designUnsettledError
+				? `${designUnsettledError}; ${lookupError}`
+				: lookupError;
 		}
 	} else if (!designUnsettledError) {
 		designUnsettledError =
@@ -451,11 +479,14 @@ export async function runCycleStatus({
 		ready,
 		best,
 		designUnsettledFor,
+		designReviewRequirements,
+		issueLookupFailures,
+		blocking: issueLookupFailures.length > 0,
 		designRecordTemplate: buildDesignRecordTemplate({
 			optionCount: recordOptionCount,
 		}),
 		reviewRecordTemplate: buildReviewRecordTemplate({
-			optionCount: recordOptionCount,
+			requirements: designReviewRequirements,
 		}),
 		gateCheckCommand,
 		unregisteredManagedIssues,
