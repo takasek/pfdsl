@@ -264,6 +264,32 @@ describe("harness source decoder", () => {
 		}
 	});
 
+	it("tolerates the developer-local entries under .claude/, present or absent", () => {
+		// These are gitignored, so they are neither a distributed source nor a
+		// maintained artifact, and a checkout may or may not have them. Listing
+		// them in SOURCE_EXCLUSIONS.root would not do: that loop asserts each entry
+		// exists, and asserts it is a file — which rules out `worktrees/`.
+		const outcome = (subject) => {
+			try {
+				decodeFixture({ root: ROOT, contract: CONTRACT, fs: subject.fs });
+				return "ok";
+			} catch (error) {
+				return error.message;
+			}
+		};
+
+		const present = fixture();
+		present.addFile(".claude/settings.local.json", "{}\n");
+		// A directory, which is why the file-typed exclusion set cannot hold it.
+		present.addDirectory(".claude/worktrees/scratch");
+		const absent = fixture();
+
+		// Both decode, so the file is invisible rather than merely failing the same
+		// way twice — asserting only equality would pass on two identical failures.
+		assert.equal(outcome(absent), "ok");
+		assert.equal(outcome(present), "ok");
+	});
+
 	it("rejects an unknown maintained skill descendant instead of silently shipping it", () => {
 		const subject = fixture();
 		subject.addFile(

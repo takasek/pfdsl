@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { parse } from "yaml";
 import {
 	HARNESS_CAPABILITY_CONTRACT,
+	LOCAL_CLAUDE_ROOT_ENTRIES,
 	SOURCE_EXCLUSIONS,
 } from "./harness-inventory.mjs";
 
@@ -140,6 +141,7 @@ function assertClaudeTopology(root, contract, sourceExclusions, fs) {
 	assertType(fs, claudeRoot, "directory");
 	const knownRootEntries = new Set([
 		...CLAUDE_ROOT_FILES,
+		...Object.keys(LOCAL_CLAUDE_ROOT_ENTRIES),
 		...CLAUDE_ROOT_DIRECTORIES,
 		...Object.keys(sourceExclusions.root),
 	]);

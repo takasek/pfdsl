@@ -364,6 +364,21 @@ export const DISTRIBUTED_AGENTS = Object.freeze(
 	distributedCapabilities("agent").map(sourceName),
 );
 
+/**
+ * Developer-local entries under `.claude/` that this repo gitignores. They are
+ * neither a distributed source nor a maintained artifact, and a checkout may or
+ * may not have them — so every surface that enumerates `.claude/` has to pass
+ * over them rather than classify them.
+ *
+ * They cannot go in `SOURCE_EXCLUSIONS.root`: entries there are asserted to
+ * exist, and as files, which would move the failure to every checkout lacking
+ * one and could not hold a directory at all.
+ */
+export const LOCAL_CLAUDE_ROOT_ENTRIES = Object.freeze({
+	"settings.local.json": "per-developer harness settings overlay",
+	worktrees: "per-developer git worktrees",
+});
+
 export const SOURCE_EXCLUSIONS = Object.freeze({
 	root: Object.freeze({
 		"pfd-ops-install-manifest.json":
