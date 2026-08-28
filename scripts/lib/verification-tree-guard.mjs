@@ -16,13 +16,14 @@
 // what the command does. worktree-write-guard.mjs closes the equivalent gap
 // for Edit/Write; this closes it for commands whose tree is cwd-implicit.
 //
-// Ask, not deny: a deliberate check of the main checkout itself (e.g. before
-// a release) is a legitimate reason to run these commands there, and denying
-// would remove the only way to do that. An advisory is not the alternative
-// either: what these commands do in the main checkout is write to it, so a
-// note delivered next to the result arrives after the tree has already
-// changed (see hook-io.mjs). `ask` is what surfaces the choice before that,
-// the same reasoning main-commit-guard.mjs applies to its ASKED_SUBCOMMANDS.
+// Claude Code asks rather than denies: a deliberate check of the main checkout
+// itself (e.g. before a release) is a legitimate reason to run these commands
+// there. Codex does not support PreToolUse ask and continues after the hook
+// failure, so the same decision is converted to deny there (#1013). Retrying
+// with the linked worktree as harness workdir is visible to the guard and
+// allows the command. An advisory is not the alternative: what these commands
+// do in the main checkout is write to it, so a note delivered next to the
+// result arrives after the tree has already changed (see hook-io.mjs).
 //
 // The tree this reads is the payload's cwd, which is where the command
 // starts, not where it ends up: a `cd <dir> && make test` is judged on the
@@ -37,6 +38,7 @@ import {
 	stripLeadingNoise,
 	tokenize,
 } from "./delegation-guard.mjs";
+import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
 /** `-C`/`--directory` forms that make `make`'s cwd explicit, so drift cannot
  * affect it. */
@@ -184,6 +186,15 @@ export function findVerificationSegments(command) {
 		.map((segment) => segment.trim());
 }
 
+function verificationRiskReason(mainRoot) {
+	return (
+		`This shell's cwd is the main checkout ('${mainRoot}'), not the linked worktree ` +
+		"a session normally runs verification from. That tree does not contain the linked worktree's " +
+		"branch changes, so a green result here can be misread as confirmation that those changes pass " +
+		"— it looks identical to a genuine run."
+	);
+}
+
 /**
  * Decide whether a PreToolUse Bash invocation may proceed.
  * @param {object} payload PreToolUse hook payload
@@ -212,10 +223,44 @@ export function evaluateVerificationTreeGuard(payload, roots) {
 	return {
 		decision: "ask",
 		reason:
-			`This shell's cwd is the main checkout ('${roots.mainRoot}'), not the linked worktree ` +
-			"a session normally runs verification from. That tree does not contain the linked worktree's " +
-			"branch changes, so a green result here can be misread as confirmation that those changes pass " +
-			"— it looks identical to a genuine run. If this is an intentional check of the main checkout " +
+			`${verificationRiskReason(roots.mainRoot)} If this is an intentional check of the main checkout ` +
 			"itself (e.g. a release check), confirm to proceed.",
 	};
+}
+
+/** Whether the current harness supports a PreToolUse ask decision. */
+export function supportsPermissionAsk(environment = process.env) {
+	return (
+		typeof environment.CLAUDE_PROJECT_DIR === "string" &&
+		environment.CLAUDE_PROJECT_DIR.trim() !== ""
+	);
+}
+
+/**
+ * Orchestrate one hook payload while keeping harness adaptation outside the
+ * semantic guard decision. Codex cannot represent ask, so convert it to a
+ * retryable deny instead of letting the command execute after hook failure.
+ * @param {string} inputText
+ * @param {{resolveRoots: (cwd: string) => {worktreeRoot: string, mainRoot: string, hasLinkedWorktrees: boolean} | null, supportsAsk?: boolean}} io
+ * @returns {{shouldOutput: boolean, output?: object}}
+ */
+export function runVerificationTreeGuard(
+	inputText,
+	{ resolveRoots, supportsAsk = true },
+) {
+	const payload = parseHookPayload(inputText);
+	if (!payload) return { shouldOutput: false };
+	const cwd = payload?.cwd;
+	const roots = typeof cwd === "string" ? resolveRoots(cwd) : null;
+	const result = evaluateVerificationTreeGuard(payload, roots);
+	if (result.decision === "allow") return { shouldOutput: false };
+	const adapted = supportsAsk
+		? result
+		: {
+				decision: "deny",
+				reason:
+					`${verificationRiskReason(roots.mainRoot)} Codex PreToolUse's ask decision is unsupported, so this command is denied instead of failing open. ` +
+					"Retry with the harness workdir set to the linked worktree that owns the changes, or make the intended tree explicit with an absolute path or supported -C option.",
+			};
+	return { shouldOutput: true, output: buildPermissionOutput(adapted) };
 }

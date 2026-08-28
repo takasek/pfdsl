@@ -4,6 +4,8 @@ import { describe, it } from "node:test";
 import {
 	evaluateVerificationTreeGuard,
 	findVerificationSegments,
+	runVerificationTreeGuard,
+	supportsPermissionAsk,
 } from "./verification-tree-guard.mjs";
 
 const WORKTREE_ROOT = "/Users/m5/works/pfdsl/.claude/worktrees/some-branch";
@@ -252,6 +254,72 @@ describe("evaluateVerificationTreeGuard", () => {
 			},
 		);
 		assert.equal(result.decision, "ask");
+	});
+
+	it("converts the unsupported Codex ask into a fail-closed deny (#1013)", () => {
+		const result = runVerificationTreeGuard(
+			JSON.stringify({ ...payload({ command: "make test" }), cwd: MAIN_ROOT }),
+			{
+				resolveRoots: () => ({
+					worktreeRoot: MAIN_ROOT,
+					mainRoot: MAIN_ROOT,
+					hasLinkedWorktrees: true,
+				}),
+				supportsAsk: false,
+			},
+		);
+		const output = result.output.hookSpecificOutput;
+		assert.equal(output.permissionDecision, "deny");
+		assert.match(output.permissionDecisionReason, /Codex.*ask.*unsupported/i);
+		assert.match(output.permissionDecisionReason, /workdir/i);
+		assert.match(output.permissionDecisionReason, /absolute path.*-C/i);
+		assert.doesNotMatch(output.permissionDecisionReason, /confirm to proceed/i);
+	});
+
+	it("preserves the Claude ask at the orchestration boundary", () => {
+		const result = runVerificationTreeGuard(
+			JSON.stringify({ ...payload({ command: "make test" }), cwd: MAIN_ROOT }),
+			{
+				resolveRoots: () => ({
+					worktreeRoot: MAIN_ROOT,
+					mainRoot: MAIN_ROOT,
+					hasLinkedWorktrees: true,
+				}),
+				supportsAsk: true,
+			},
+		);
+		assert.equal(result.output.hookSpecificOutput.permissionDecision, "ask");
+	});
+
+	it("treats an absent or blank Claude project root as Codex", () => {
+		assert.equal(supportsPermissionAsk({}), false);
+		assert.equal(supportsPermissionAsk({ CLAUDE_PROJECT_DIR: " \t " }), false);
+		assert.equal(
+			supportsPermissionAsk({ CLAUDE_PROJECT_DIR: WORKTREE_ROOT }),
+			true,
+		);
+	});
+
+	it("keeps malformed and unrelated payloads silent in either harness", () => {
+		const resolveRoots = () => {
+			throw new Error("allow paths must not resolve Git roots");
+		};
+		assert.deepEqual(
+			runVerificationTreeGuard("not json{{{", {
+				resolveRoots,
+				supportsAsk: false,
+			}),
+			{ shouldOutput: false },
+		);
+		for (const supportsAsk of [false, true]) {
+			assert.deepEqual(
+				runVerificationTreeGuard(
+					JSON.stringify(payload({ command: "git status" })),
+					{ resolveRoots: () => null, supportsAsk },
+				),
+				{ shouldOutput: false },
+			);
+		}
 	});
 
 	it("allows `make -C <path> test` even from the main checkout (explicit cwd)", () => {
