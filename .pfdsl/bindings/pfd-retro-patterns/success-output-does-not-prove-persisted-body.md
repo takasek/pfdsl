@@ -5,14 +5,16 @@ phase: pre-artifact
 
 - **成功表示や返されたURLを、保存済み本文の同一性確認の代わりに読むtrap**: 外部コマンドで issue 本文・issue コメント・PR 本文のような複数行本文を書いたとき、コマンドが成功し URL が返れば本文もそのまま保存されたと読んでしまう。
   外部コマンドの成功は「要求を受け付けた」ことしか示さず、GitHub 側に persisted した `body` が意図どおりの改行・必須行・参照を保ったことまでは示さない。
-  問いの形: 「この外部書込みで確認したのは成功表示だけか、それとも persisted `body` か。readback はその write が返した stable identifier や URL に結び付いた対象を読んだか。本文に必須行や参照があるなら、その構造も readback 結果で確認したか」。
+  問いの形: 「この外部書込みで確認したのは成功表示だけか、それとも persisted `body` か。readback は編集対象の番号または新規 write response の stable identifier / URL に結び付いた対象を読んだか。本文に必須行や参照があるなら、その構造も readback 結果で確認したか」。
   具体例: issue #994 の設計選択記録を issue コメントとして投稿した回で、ローカル草案は複数行だったが、GitHub 側には改行でなく文字列 `\\n` を含む1行コメントとして保存された。
   投稿コマンドは成功し、返った URL も正しかったため、その場では「設計記録を着手前に投稿した」と読まれた。
   persisted `body` を取り直すまで、順序証拠に使うべき記録本文が壊れていることに気付かなかった。
   具体例: PR #992 の作成コマンドは成功し PR URL も返ったが、GitHub 側の PR 本文は空だった。
   その後の手順は URL を根拠に進み、`Closes #...` のような構造行が保存されているかは別途 readback するまで未確認のまま残った。後から PR 本文を編集しても、その edit 後の persisted `body` を取り直さなければ同じ欠落を見逃す。
-  対策: 複数行本文はセッション固有名を持つ body file に正本を書き、その file を入力として渡す。
+  対策: 複数行本文はセッション固有名を持つ body file に正本を書く。file 入力を持つ transport にはその file を直接渡し、body 入力しか持たない transport には正本ファイルを読んだ値を手で再構成せずに渡す。
   実行直後に GitHub 側の persisted `body` を取得し、改行を含めて正本と完全一致するかを比較する。
   `Closes #...` のような必須行や参照を持つ本文は、その構造も同じ readback で確認し、後続の edit ごとに崩れていないかを確認する。
   設計選択記録のように着手前でなければ意味が変わる本文では、この readback 完了自体を初コミットより前の条件として扱う。
   後段の checker が必須行頭や時刻を comment 一覧から検査しても、直前の write identifier を入力に持たないなら exact-write readback の代替にはならない。
+  write と exact readback の両方を提供する transport が無い場合は、代替手段で確認を弱めず前提条件の不足として停止する。
+  新規対象を作る操作が identifier を返す契約を持たない場合は、一覧から似た本文を探さず、identifier を返す backend API や transport を write 前に選ぶ。
