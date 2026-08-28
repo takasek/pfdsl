@@ -66,6 +66,11 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/pfdsl-vscode-smoke-cache/pfdsl
+          key: vscode-smoke-${{ runner.os }}-vscode-1.132.1-test-electron-${{ hashFiles('pnpm-lock.yaml') }}
+
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm -r build

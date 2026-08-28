@@ -1,23 +1,21 @@
-import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { basename, join, resolve, sep } from "node:path";
 
 const runDirectoryPrefix = `${resolve(tmpdir())}${sep}pfdsl-vscode-smoke-`;
 const issuedRunDirectories = new Set();
+const cacheLockName = ".pfdsl-vscode-smoke-download.lock";
+const defaultCacheLockTimeoutMs = 60_000;
+const defaultStaleCacheLockMs = 15 * 60_000;
 
 export function makeVSCodeCachePath(
 	repoRoot,
 	{ temporaryDirectory = tmpdir() } = {},
 ) {
-	const worktreeHash = createHash("sha256")
-		.update(resolve(repoRoot))
-		.digest("hex")
-		.slice(0, 16);
 	return join(
 		resolve(temporaryDirectory),
 		"pfdsl-vscode-smoke-cache",
-		worktreeHash,
+		basename(resolve(repoRoot)),
 	);
 }
 
@@ -25,6 +23,82 @@ export async function prepareVSCodeCachePath(repoRoot, options) {
 	const cachePath = makeVSCodeCachePath(repoRoot, options);
 	await mkdir(cachePath, { recursive: true });
 	return cachePath;
+}
+
+export function makeVSCodeCacheLockPath(cachePath) {
+	return join(cachePath, cacheLockName);
+}
+
+function makeVSCodeCacheMarkerPath(cachePath, version) {
+	return join(cachePath, `.pfdsl-vscode-smoke-${version}.complete`);
+}
+
+async function cacheMarkerExists(markerPath) {
+	try {
+		await access(markerPath);
+		return true;
+	} catch (error) {
+		if (error?.code === "ENOENT") return false;
+		throw error;
+	}
+}
+
+function delay(milliseconds) {
+	return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+}
+
+export async function populateVSCodeCache(
+	cachePath,
+	version,
+	populate,
+	{
+		now = () => Date.now(),
+		retryIntervalMs = 100,
+		staleLockMs = defaultStaleCacheLockMs,
+		timeoutMs = defaultCacheLockTimeoutMs,
+		wait = delay,
+	} = {},
+) {
+	await mkdir(cachePath, { recursive: true });
+	const markerPath = makeVSCodeCacheMarkerPath(cachePath, version);
+	if (await cacheMarkerExists(markerPath)) return null;
+	const lockPath = makeVSCodeCacheLockPath(cachePath);
+	const startedAt = now();
+	while (true) {
+		try {
+			await mkdir(lockPath);
+			break;
+		} catch (error) {
+			if (error?.code !== "EEXIST") throw error;
+			let lockStatus;
+			try {
+				lockStatus = await stat(lockPath);
+			} catch (statError) {
+				if (statError?.code === "ENOENT") continue;
+				throw statError;
+			}
+			const ageMs = now() - lockStatus.mtimeMs;
+			if (ageMs >= staleLockMs) {
+				throw new Error(
+					`stale VS Code cache lock at ${lockPath}: ${Math.floor(ageMs)}ms old`,
+				);
+			}
+			if (now() - startedAt >= timeoutMs) {
+				throw new Error(
+					`timed out waiting for VS Code cache lock at ${lockPath}`,
+				);
+			}
+			await wait(retryIntervalMs);
+		}
+	}
+	try {
+		if (await cacheMarkerExists(markerPath)) return null;
+		const result = await populate();
+		await writeFile(markerPath, `${version}\n`);
+		return result;
+	} finally {
+		await rm(lockPath, { recursive: true, force: true });
+	}
 }
 
 export async function createRunDirectory() {

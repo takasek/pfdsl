@@ -13,6 +13,7 @@ import {
 	expectEventually,
 	findWebviewFrame,
 	makeLaunchArgs,
+	populateVSCodeCache,
 	prepareVSCodeCachePath,
 	readTransform,
 	removeRunDirectory,
@@ -433,6 +434,13 @@ export async function collectWebviewFailureSnapshot(frame) {
 			svg: rect(root.querySelector("#inner svg")),
 			minimap: rect(root.querySelector("#minimap")),
 			minimapViewport: rect(root.querySelector("#minimap-vp")),
+			err: (() => {
+				const error = root.querySelector(".err");
+				return {
+					visible: error ? error.getClientRects().length > 0 : false,
+					text: error?.textContent ?? null,
+				};
+			})(),
 			transform: inner?.style.transform ?? null,
 			nodeIds: Array.from(
 				root.querySelectorAll("#inner g.node[data-node-id]"),
@@ -635,11 +643,19 @@ export async function launchSmokeSession() {
 			"../../..",
 		);
 		const port = await reservePort();
+		const cachePath = await prepareVSCodeCachePath(repoRoot);
+		const cachedExecutablePath = await populateVSCodeCache(
+			cachePath,
+			vscodeVersion,
+			() =>
+				downloadAndUnzipVSCode({
+					version: vscodeVersion,
+					cachePath,
+				}),
+		);
 		const vscodeExecutablePath = resolveVSCodeExecutablePath(
-			await downloadAndUnzipVSCode({
-				version: vscodeVersion,
-				cachePath: await prepareVSCodeCachePath(repoRoot),
-			}),
+			cachedExecutablePath ??
+				(await downloadAndUnzipVSCode({ version: vscodeVersion, cachePath })),
 		);
 		const fixturePath = join(repoRoot, "docs/samples/01-simple-chain.pfdsl");
 		vscodeProcess = spawn(

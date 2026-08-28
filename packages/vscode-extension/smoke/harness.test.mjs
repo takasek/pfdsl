@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -8,8 +8,10 @@ import {
 	expectEventually,
 	findWebviewFrame,
 	makeLaunchArgs,
+	makeVSCodeCacheLockPath,
 	makeVSCodeCachePath,
 	parseTransform,
+	populateVSCodeCache,
 	prepareVSCodeCachePath,
 	readTransform,
 	removeRunDirectory,
@@ -73,6 +75,12 @@ test("makeVSCodeCachePath keeps a stable worktree-specific cache outside the rep
 	);
 	assert.match(first, /^\/tmp\/pfdsl-vscode-smoke-cache\//);
 	assert.doesNotMatch(first, /^\/repo\//);
+	assert.equal(
+		makeVSCodeCachePath("/home/runner/work/pfdsl/pfdsl", {
+			temporaryDirectory: "/tmp",
+		}),
+		"/tmp/pfdsl-vscode-smoke-cache/pfdsl",
+	);
 });
 
 test("prepareVSCodeCachePath creates the stable external cache directory", async () => {
@@ -84,6 +92,114 @@ test("prepareVSCodeCachePath creates the stable external cache directory", async
 			temporaryDirectory,
 		});
 		await access(cachePath);
+	} finally {
+		await rm(temporaryDirectory, { recursive: true, force: true });
+	}
+});
+
+test("populateVSCodeCache lets a second caller wait without concurrent population", async () => {
+	const temporaryDirectory = await mkdtemp(
+		join(tmpdir(), "pfdsl-vscode-cache-test-"),
+	);
+	try {
+		const cachePath = await prepareVSCodeCachePath("/repo/.worktrees/one", {
+			temporaryDirectory,
+		});
+		let populateCalls = 0;
+		let releasePopulation;
+		const first = populateVSCodeCache(
+			cachePath,
+			"1.132.1",
+			async () => {
+				populateCalls += 1;
+				await new Promise((resolvePopulation) => {
+					releasePopulation = resolvePopulation;
+				});
+				return "first";
+			},
+			{ retryIntervalMs: 1, timeoutMs: 100 },
+		);
+		await expectEventually(
+			"first cache population starts",
+			async () => populateCalls,
+			(value) => value === 1,
+			{ retryIntervalMs: 0, timeoutMs: 100 },
+		);
+		let secondResolved = false;
+		const second = populateVSCodeCache(
+			cachePath,
+			"1.132.1",
+			async () => {
+				populateCalls += 1;
+				return "second";
+			},
+			{ retryIntervalMs: 1, timeoutMs: 100 },
+		).then((value) => {
+			secondResolved = true;
+			return value;
+		});
+		await new Promise((resolveDelay) => setTimeout(resolveDelay, 20));
+		assert.equal(populateCalls, 1);
+		assert.equal(secondResolved, false);
+		releasePopulation();
+		assert.equal(await first, "first");
+		assert.equal(await second, null);
+	} finally {
+		await rm(temporaryDirectory, { recursive: true, force: true });
+	}
+});
+
+test("populateVSCodeCache releases its lock when population fails", async () => {
+	const temporaryDirectory = await mkdtemp(
+		join(tmpdir(), "pfdsl-vscode-cache-test-"),
+	);
+	try {
+		const cachePath = await prepareVSCodeCachePath("/repo/.worktrees/one", {
+			temporaryDirectory,
+		});
+		await assert.rejects(
+			populateVSCodeCache(cachePath, "1.132.1", async () => {
+				throw new Error("download failed");
+			}),
+			/download failed/,
+		);
+		assert.equal(
+			await populateVSCodeCache(cachePath, "1.132.1", async () => "recovered"),
+			"recovered",
+		);
+	} finally {
+		await rm(temporaryDirectory, { recursive: true, force: true });
+	}
+});
+
+test("populateVSCodeCache reports stale and timed-out locks", async () => {
+	const temporaryDirectory = await mkdtemp(
+		join(tmpdir(), "pfdsl-vscode-cache-test-"),
+	);
+	try {
+		const cachePath = await prepareVSCodeCachePath("/repo/.worktrees/one", {
+			temporaryDirectory,
+		});
+		await mkdir(makeVSCodeCacheLockPath(cachePath));
+		await assert.rejects(
+			populateVSCodeCache(cachePath, "1.132.1", async () => "unreachable", {
+				staleLockMs: 0,
+			}),
+			/stale VS Code cache lock/,
+		);
+		await rm(makeVSCodeCacheLockPath(cachePath), {
+			recursive: true,
+			force: true,
+		});
+		await mkdir(makeVSCodeCacheLockPath(cachePath));
+		await assert.rejects(
+			populateVSCodeCache(cachePath, "1.132.1", async () => "unreachable", {
+				retryIntervalMs: 0,
+				staleLockMs: 1_000,
+				timeoutMs: 5,
+			}),
+			/timed out waiting for VS Code cache lock/,
+		);
 	} finally {
 		await rm(temporaryDirectory, { recursive: true, force: true });
 	}
@@ -269,6 +385,17 @@ test("collectWebviewFailureSnapshot reports semantic webview state", async () =>
 			},
 		},
 	};
+	root.querySelector = (selector) =>
+		({
+			"#inner": inner,
+			"#inner svg": rectangle(10, 20, 300, 200),
+			"#minimap": rectangle(500, 20, 120, 90),
+			"#minimap-vp": rectangle(510, 30, 60, 45),
+			".err": {
+				getClientRects: () => [{ width: 1 }],
+				textContent: "Invalid edge",
+			},
+		})[selector] ?? null;
 	const frame = {
 		url: () => "vscode-webview://webview/fake.html",
 		locator: (selector) => {
@@ -285,6 +412,7 @@ test("collectWebviewFailureSnapshot reports semantic webview state", async () =>
 		transform: "translate(12px, -8px) scale(1.1)",
 		nodeIds: ["design", "spec"],
 		scriptSrcs: ["vscode-webview://webview/webview.js"],
+		err: { visible: true, text: "Invalid edge" },
 	});
 });
 
