@@ -536,7 +536,6 @@ export function diffReadySets(beforeIds, afterIds) {
  */
 export const GATE_CHECKLIST_SOURCE_PATH =
 	".claude/skills/pfd-ops/references/work-cycle.md";
-export const REPO_GATE_CHECKLIST_SOURCE_PATH = ".pfdsl/roadmap.md";
 
 /**
  * Parse the terminal-gate checklist (workcycle step 3) into raw item strings.
@@ -558,55 +557,6 @@ export function extractGateChecklist(skillMdText) {
 		if (m) items.push(m[1].trim());
 	}
 	return items;
-}
-
-/**
- * Parse the repo-local pre-PR terminal-gate additions from roadmap.md.
- * Keeping a distinct heading avoids pulling merge-time checkboxes into the
- * pre-PR MANUAL list.
- * @param {string} roadmapMdText
- * @returns {string[]}
- */
-export function extractRepoGateChecklist(roadmapMdText) {
-	const lines = roadmapMdText.split("\n").map((line) => line.trimEnd());
-	const items = [];
-	let inParent = false;
-	let inChecklist = false;
-	for (const line of lines) {
-		if (line === "## 終端ゲート追加項目（issue 固有）") {
-			inParent = true;
-			continue;
-		}
-		if (inParent && !inChecklist && /^#{1,2} /.test(line)) {
-			throw new Error("missing repo-local pre-PR gate section");
-		}
-		if (inParent && line === "### PR 作成前の追加項目") {
-			inChecklist = true;
-			continue;
-		}
-		if (inChecklist && /^#{1,3} /.test(line)) break;
-		if (!inChecklist) continue;
-		const match = line.match(/^\s*-\s\[ \]\s(.+)$/);
-		if (match) items.push(match[1].trim());
-	}
-	if (inParent && !inChecklist) {
-		throw new Error("missing repo-local pre-PR gate section");
-	}
-	return items;
-}
-
-/**
- * Build the final MANUAL list from the distributed checklist and this repo's
- * companion additions.
- * @param {string} skillMdText
- * @param {string} roadmapMdText
- * @returns {string[]}
- */
-export function collectManualItems(skillMdText, roadmapMdText) {
-	return deriveManualItems([
-		...extractGateChecklist(skillMdText),
-		...extractRepoGateChecklist(roadmapMdText),
-	]);
 }
 
 // Checklist items already covered by gate-check's own mechanized checks,

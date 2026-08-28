@@ -16,11 +16,12 @@ import {
 	classifyAuditIssuesFlowResult,
 	classifyChangedFilesByModeling,
 	classifyIssueLookupFailure,
-	collectManualItems,
 	collectModeledLocations,
+	deriveManualItems,
 	derivePackageLayers,
 	diffNewTerminals,
 	diffReadySets,
+	extractGateChecklist,
 	formatGateTable,
 	formatRunTreeLine,
 	formatSizeDelta,
@@ -32,7 +33,6 @@ import {
 	parseInputConsumedArtifacts,
 	partitionManualItemsByPhase,
 	partitionNewTerminals,
-	REPO_GATE_CHECKLIST_SOURCE_PATH,
 	sharesSiblingIdNamespace,
 	VSCODE_EXT_TRIGGER,
 } from "./lib/gate-check.mjs";
@@ -335,10 +335,8 @@ results.push(
 );
 
 const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
-const repoChecklistPath = resolve(root, REPO_GATE_CHECKLIST_SOURCE_PATH);
-const manualItems = collectManualItems(
-	readFileSync(skillMdPath, "utf-8"),
-	readFileSync(repoChecklistPath, "utf-8"),
+const manualItems = deriveManualItems(
+	extractGateChecklist(readFileSync(skillMdPath, "utf-8")),
 );
 
 // `root` here is this script's own location (resolved from import.meta.url
