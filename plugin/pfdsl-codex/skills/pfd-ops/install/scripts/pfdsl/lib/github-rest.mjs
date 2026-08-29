@@ -298,12 +298,76 @@ export async function fetchIssueView(
  */
 const PR_VIEW_FIELDS = {
 	body: (pr) => pr.body ?? "",
+	closingIssuesReferences: (pr, owner, repo) =>
+		closingIssueReferences(pr, owner, repo),
 	headRefName: (pr) => pr.head?.ref,
 	number: (pr) => pr.number,
 	state: (pr) => pr.state,
 	title: (pr) => pr.title,
 	url: (pr) => pr.html_url,
 };
+
+/**
+ * REST pull-request payloads do not include GraphQL's
+ * `closingIssuesReferences`. Reproduce the subset needed by the scripts from
+ * closing-keyword lines, while ignoring quoted and fenced examples.
+ * @param {{body?: string}} pr
+ * @param {string} owner
+ * @param {string} repo
+ * @returns {{number: number}[]}
+ */
+function closingIssueReferences(pr, owner, repo) {
+	const references = [];
+	let fenced = false;
+	for (const line of String(pr.body ?? "").split("\n")) {
+		if (/^\s*```/.test(line)) {
+			fenced = !fenced;
+			continue;
+		}
+		if (fenced || /^\s*>/.test(line)) continue;
+		for (const match of line.matchAll(
+			/\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+(?:(\w[\w.-]*)\/(\w[\w.-]*)\s*)?#(\d+)\b/gi,
+		)) {
+			if ((match[1] || match[2]) && (match[1] !== owner || match[2] !== repo))
+				continue;
+			const number = Number(match[3]);
+			if (!references.some((ref) => ref.number === number))
+				references.push({ number });
+		}
+	}
+	return references;
+}
+
+/**
+ * The REST equivalent of `gh pr view <n> --json <fields>`.
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} token
+ * @param {number} number
+ * @param {string[]} fields gh's --json field names
+ * @param {typeof fetch} [fetchImpl]
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export async function fetchPullRequestView(
+	owner,
+	repo,
+	token,
+	number,
+	fields,
+	fetchImpl = proxyAwareFetch,
+) {
+	requireMappableFields("pr view", fields, PR_VIEW_FIELDS);
+	const pr = await request(
+		fetchImpl,
+		`${API_ROOT}/repos/${owner}/${repo}/pulls/${number}`,
+		{ headers: authHeaders({ token }) },
+	).then((res) => res.json());
+
+	const result = {};
+	for (const field of fields)
+		result[field] = PR_VIEW_FIELDS[field](pr, owner, repo);
+	return result;
+}
 
 /**
  * The REST equivalent of `gh pr view --json <fields>` with no PR named — the

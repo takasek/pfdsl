@@ -62,10 +62,15 @@ artifact:
     description: "runtime-pipeline.pfdsl の gen_skill が生産する（判断を含まない生成のため、ADR-0035 でそちらへ移した）。実体は plugin/pfdsl/skills/pfdsl で、リポ内の .claude/skills/pfdsl はそこへの生成symlinkであり、正本入力でも編集先でもない（#714）。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる"
     location: ../plugin/pfdsl/skills/pfdsl/
     group: generation
-  plugin_dist:
-    label: 両ハーネス対応の配布plugin roots
-    description: "runtime-pipeline.pfdsl の両root組み立てと結合drift検査が生産する。Claude Codeの既存marketplace経路を保つplugin/pfdsl/と、公式Codex validator/runtimeのskills固定に従うnative rootのplugin/pfdsl-codex/を分離する。この図ではREADME更新と配布レビューの入力に現れる"
-    location: [ ../plugin/pfdsl/, ../plugin/pfdsl-codex/ ]
+  claude_plugin_dist:
+    label: Claude Code配布plugin root
+    description: "runtime-pipeline.pfdsl のClaude Code root組み立てと結合drift検査が生産する。既存marketplace経路を保つplugin/pfdsl/で、この図ではREADME更新と配布レビューの入力に現れる"
+    location: ../plugin/pfdsl/
+    group: release
+  codex_plugin_dist:
+    label: Codex配布plugin root
+    description: "runtime-pipeline.pfdsl のCodex root組み立てと結合drift検査が生産する。公式Codex validator/runtimeのskills固定に従うnative rootのplugin/pfdsl-codex/で、この図ではREADME更新と配布レビューの入力に現れる"
+    location: ../plugin/pfdsl-codex/
     group: release
   distribution_review_perspectives:
     label: 配布レビュー観点集
@@ -588,9 +593,9 @@ issue_updates >>? file_issues
 
 
 
-[plugin_dist, published_cli, published_libraries] >> update_readme -> readme
+[claude_plugin_dist, codex_plugin_dist, published_cli, published_libraries] >> update_readme -> readme
 
-[distribution_review_perspectives, plugin_dist] >> review_distribution -> distribution_review_record
+[claude_plugin_dist, codex_plugin_dist, distribution_review_perspectives] >> review_distribution -> distribution_review_record
 
 distribution_review_record >>? distill_local_skills
 distribution_review_record >>? distill_ops

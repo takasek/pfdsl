@@ -20,6 +20,7 @@ import {
 	fetchCurrentPrView,
 	fetchIssueView,
 	fetchOpenPrsWithCi,
+	fetchPullRequestView,
 	parseHost,
 	parseOwnerRepo,
 } from "./github-rest.mjs";
@@ -114,6 +115,16 @@ async function runGhRestPlan(plan, cwd, token) {
 				repo,
 				token,
 				branch,
+				plan.fields,
+			);
+			return plan.jqField ? String(view[plan.jqField]) : JSON.stringify(view);
+		}
+		case "viewPr": {
+			const view = await fetchPullRequestView(
+				owner,
+				repo,
+				token,
+				plan.number,
 				plan.fields,
 			);
 			return plan.jqField ? String(view[plan.jqField]) : JSON.stringify(view);

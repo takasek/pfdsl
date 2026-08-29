@@ -189,8 +189,26 @@ describe("planGhRestCall", () => {
 		});
 	});
 
-	it("pr view naming an explicit PR is not the current-branch question", () => {
-		assert.equal(planGhRestCall(["pr", "view", "12", "--json", "body"]), null);
+	it("pr view names an explicit PR and keeps its requested fields", () => {
+		assert.deepEqual(planGhRestCall(["pr", "view", "12", "--json", "body"]), {
+			op: "viewPr",
+			number: 12,
+			fields: ["body"],
+		});
+	});
+
+	it("pr view names an explicit PR with closing issue references", () => {
+		assert.deepEqual(
+			planGhRestCall(["pr", "view", "12", "--json", "closingIssuesReferences"]),
+			{ op: "viewPr", number: 12, fields: ["closingIssuesReferences"] },
+		);
+	});
+
+	it("rejects an explicit PR identifier that is not numeric", () => {
+		assert.equal(
+			planGhRestCall(["pr", "view", "not-a-number", "--json", "body"]),
+			null,
+		);
 	});
 
 	it("pr view with a --jq this layer cannot evaluate is unanswerable", () => {

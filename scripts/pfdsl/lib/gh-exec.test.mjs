@@ -6,7 +6,13 @@ import { dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { planGhRestCall } from "./gh-compat.mjs";
 import { execGh } from "./gh-exec.mjs";
+import {
+	assertFallbackPlansCoverShapes,
+	discoverLiteralExecGhShapes,
+	discoverProductionLiteralExecGhShapes,
+} from "./gh-fallback-coverage.mjs";
 
 // A real `gh` binary may live anywhere on PATH depending on the environment
 // (absent on this maintainer's Mac, but preinstalled at /usr/bin/gh on
@@ -258,6 +264,198 @@ describe("execGh", () => {
 				[],
 			);
 		});
+	});
+});
+
+describe("production fallback coverage discovery", () => {
+	let originalPath;
+	let originalGhToken;
+	let originalFetch;
+	let ghlessPath;
+
+	beforeEach(() => {
+		originalPath = process.env.PATH;
+		originalGhToken = process.env.GH_TOKEN;
+		originalFetch = globalThis.fetch;
+		ghlessPath = ghlessPathWithGit();
+		process.env.PATH = ghlessPath;
+		process.env.GH_TOKEN = "tok";
+	});
+
+	afterEach(() => {
+		process.env.PATH = originalPath;
+		if (originalGhToken === undefined) delete process.env.GH_TOKEN;
+		else process.env.GH_TOKEN = originalGhToken;
+		globalThis.fetch = originalFetch;
+		rmSync(ghlessPath, { recursive: true, force: true });
+	});
+
+	it("keeps current-branch and numbered PR selectors as distinct identities", () => {
+		const shapes = discoverLiteralExecGhShapes({
+			sources: [
+				{
+					file: "synthetic-pr-selectors.mjs",
+					text: [
+						'await execGh(["pr", "view", "--json", "body"]);',
+						'await execGh(["pr", "view", String(number), "--json", "body"]);',
+					].join("\n"),
+				},
+			],
+		});
+
+		assert.equal(shapes.length, 2);
+		assert.notEqual(shapes[0].identity, shapes[1].identity);
+	});
+	it("normalizes dynamic values while retaining injected call sites", () => {
+		const shapes = discoverLiteralExecGhShapes({
+			sources: [
+				{
+					file: "synthetic-steps.mjs",
+					text: [
+						"const run = (execGh, args) => execGh(args);",
+						'await execGh(["issue", "view", String(number), "--json", "body"]);',
+						'await execGh(["issue", "view", String(issueNumber), "--json", "body"]);',
+					].join("\n"),
+				},
+			],
+		});
+
+		assert.equal(shapes.length, 2);
+		assert.equal(shapes[0].args[2], "612");
+		assert.equal(shapes[0].identity, shapes[1].identity);
+	});
+
+	it("fails when a newly added literal production shape has no REST plan", () => {
+		const shapes = discoverLiteralExecGhShapes({
+			sources: [
+				{
+					file: "synthetic-production.mjs",
+					text: 'await execGh(["repo", "view"]);',
+				},
+			],
+		});
+
+		assert.throws(
+			() => assertFallbackPlansCoverShapes(shapes),
+			/has no REST fallback plan/,
+		);
+	});
+
+	it("executes every discovered production shape through the REST fallback", async () => {
+		const shapes = discoverProductionLiteralExecGhShapes(
+			resolve(dirname(fileURLToPath(import.meta.url)), "../../.."),
+		);
+		assert.ok(shapes.length > 0);
+		assertFallbackPlansCoverShapes(shapes);
+
+		const uniqueShapes = [
+			...new Map(shapes.map((shape) => [shape.identity, shape])).values(),
+		];
+		for (const shape of uniqueShapes) {
+			const plan = planGhRestCall(shape.args);
+			globalThis.fetch = async (url) => {
+				let body;
+				if (url.includes("/comments?")) body = [];
+				else if (url.includes("/check-runs?")) body = { check_runs: [] };
+				else if (plan.op === "listLabels")
+					body = [{ name: "flow:exempt", description: "not tracked" }];
+				else if (plan.op === "listIssues")
+					body = [
+						{
+							number: 612,
+							title: "representative",
+							state: "open",
+							labels: [],
+							updated_at: "2026-01-01T00:00:00Z",
+						},
+					];
+				else if (/\/pulls\/\d+$/.test(url))
+					body = {
+						number: 612,
+						body: "Closes #612",
+						state: "open",
+						title: "representative",
+						html_url: "https://example.invalid/pr/612",
+					};
+				else if (
+					plan.op === "listOpenPrsWithCi" ||
+					plan.op === "viewCurrentPr" ||
+					url.includes("/pulls/")
+				)
+					body = [
+						{
+							number: 612,
+							body: "",
+							head: { ref: "representative" },
+							sha: "representative-sha",
+							state: "open",
+							title: "representative",
+							html_url: "https://example.invalid/pr/612",
+						},
+					];
+				else
+					body = {
+						number: 612,
+						body: "",
+						state: "open",
+						state_reason: null,
+						labels: [],
+						user: { login: "representative" },
+						created_at: "2026-01-01T00:00:00Z",
+						updated_at: "2026-01-01T00:00:00Z",
+						title: "representative",
+						html_url: "https://example.invalid/issue/612",
+					};
+				return {
+					ok: true,
+					status: 200,
+					headers: { get: () => null },
+					json: async () => body,
+					text: async () => JSON.stringify(body),
+				};
+			};
+
+			const out = await execGh(shape.args);
+			if (plan.op.startsWith("list") || plan.op.startsWith("view")) {
+				const value = JSON.parse(out);
+				if (plan.op === "listLabels")
+					assert.deepEqual(value[0], {
+						name: "flow:exempt",
+						description: "not tracked",
+					});
+				if (plan.op === "listIssues") {
+					assert.equal(value[0].number, 612);
+					assert.ok("state" in value[0]);
+					assert.ok("stateReason" in value[0]);
+				}
+				if (plan.op === "listOpenPrsWithCi") {
+					assert.equal(value[0].number, 612);
+					assert.equal(value[0].headRefName, "representative");
+					assert.ok(Array.isArray(value[0].statusCheckRollup));
+				}
+				if (
+					plan.op === "viewIssue" ||
+					plan.op === "viewCurrentPr" ||
+					plan.op === "viewPr"
+				)
+					for (const field of plan.fields)
+						assert.ok(field in value, `${shape.file}:${shape.line} ${field}`);
+				if (plan.op === "viewPr") {
+					if (plan.fields.includes("body"))
+						assert.equal(
+							value.body,
+							"Closes #612",
+							`${shape.file}:${shape.line}`,
+						);
+					if (plan.fields.includes("closingIssuesReferences"))
+						assert.deepEqual(
+							value.closingIssuesReferences,
+							[{ number: 612 }],
+							`${shape.file}:${shape.line}`,
+						);
+				}
+			}
+		}
 	});
 });
 
