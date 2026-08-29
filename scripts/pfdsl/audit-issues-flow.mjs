@@ -10,7 +10,7 @@ import {
 	GH_UNAVAILABLE_EXIT_CODE,
 	isGhUnavailableError,
 } from "./lib/gh-compat.mjs";
-import { execGh } from "./lib/gh-exec.mjs";
+import { createGitHubOps } from "./lib/github-ops.mjs";
 import {
 	applyClosedInFlowFixes,
 	applyFixes,
@@ -26,6 +26,7 @@ import { parseDocument } from "./lib/yaml-require.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "../..");
+const githubOps = createGitHubOps({ cwd: root });
 
 // strict parsing, not includes("--fix"): --fix is the one irreversible thing
 // this script does, and includes() answers false for --fix=true — the audit
@@ -104,34 +105,13 @@ const body = lines.slice(fmEnd + 1).join("\n");
 // --- Fetch labels from GitHub ---
 
 async function fetchLabels() {
-	const out = await execGh([
-		"label",
-		"list",
-		"--json",
-		"name,description",
-		"--limit",
-		"100",
-	]);
-	return JSON.parse(out).map((l) => ({
-		name: l.name,
-		description: l.description ?? "",
-	}));
+	return await githubOps.listLabels();
 }
 
 // --- Fetch issues from GitHub ---
 
 async function fetchIssues() {
-	const out = await execGh([
-		"issue",
-		"list",
-		"--state",
-		"all",
-		"--json",
-		"number,state,stateReason,labels,updatedAt",
-		"--limit",
-		"500",
-	]);
-	return JSON.parse(out).map(normalizeIssue);
+	return (await githubOps.listIssues()).map(normalizeIssue);
 }
 
 function normalizeIssue(i) {
@@ -146,14 +126,11 @@ function normalizeIssue(i) {
 
 async function fetchClosedIssue(number) {
 	try {
-		const out = await execGh([
-			"issue",
-			"view",
-			String(number),
-			"--json",
-			"number,state,stateReason,labels,updatedAt",
-		]);
-		return normalizeIssue(JSON.parse(out));
+		const issue = await githubOps.viewIssue({
+			number,
+			fields: ["number", "state", "stateReason", "labels", "updatedAt"],
+		});
+		return normalizeIssue(issue);
 	} catch (e) {
 		const detail = `${e?.stderr ?? ""} ${e?.message ?? ""}`;
 		if (/could not (?:resolve|find)|not found|no issue/i.test(detail)) {
@@ -254,17 +231,16 @@ if (labelFindings.length > 0) {
 	if (fix) {
 		for (const f of labelFindings) {
 			if (f.type === "label_missing") {
-				await execGh([
-					"label",
-					"create",
-					f.name,
-					"--description",
-					f.description,
-					"--color",
-					"ededed",
-				]);
+				await githubOps.createLabel({
+					name: f.name,
+					description: f.description,
+					color: "ededed",
+				});
 			} else if (f.type === "label_description_mismatch") {
-				await execGh(["label", "edit", f.name, "--description", f.description]);
+				await githubOps.editLabel({
+					name: f.name,
+					description: f.description,
+				});
 			}
 		}
 		console.log("fixed label findings");
@@ -331,13 +307,10 @@ if (!fix) {
 // 1. Add flow:managed label to issues missing it
 const missingLabel = findings.filter((f) => f.fixVia === "github");
 for (const f of missingLabel) {
-	await execGh([
-		"issue",
-		"edit",
-		String(f.issueNumber),
-		"--add-label",
-		"flow:managed",
-	]);
+	await githubOps.addIssueLabel({
+		number: f.issueNumber,
+		label: "flow:managed",
+	});
 }
 
 // 2. Re-fetch issues (labeling changes updatedAt), recompute

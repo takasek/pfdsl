@@ -13,11 +13,9 @@
  * and report failure as `{ ok: false, out }`.
  */
 
-import { parseOwnerRepo } from "../pfdsl/lib/github-rest.mjs";
 import { RECORD_SEP } from "./commit-trailers.mjs";
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
-	buildDesignRecordEditQuery,
 	classifyDesignRecordContent,
 	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
@@ -29,7 +27,6 @@ import {
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
 	parseCommitLogLines,
-	parseDesignRecordEditResponse,
 	resolveRecordEditedAt,
 	SIZE_TRACKED_PATTERNS,
 	selectDesignRecord,
@@ -294,27 +291,13 @@ function missingIssueRow(issueFailure) {
 
 /**
  * The GraphQL edit-history fetch for one issue's design-selection record
- * candidates (#737 案2): owner/repo come from the git remote (the same
- * lookup gh-exec.mjs's own REST fallback does internally, repeated here
- * because that one is not exported), the query itself from
- * buildDesignRecordEditQuery.
- * @param {{exec: Function, execGh: (args: string[], opts: {cwd: string}) => Promise<string>, cwd: string, number: number}} params
+ * candidates (#737 案2). Owner/repo resolution and the query itself are
+ * github-ops.mjs's responsibility now (designRecordEditInfo).
+ * @param {{githubOps: {designRecordEditInfo: (params: {number: number}) => Promise<any>}, number: number}} params
  * @returns {Promise<{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}>}
  */
-export async function fetchDesignRecordEditInfo({ exec, execGh, cwd, number }) {
-	const remote = exec("git", ["remote", "get-url", "origin"]);
-	if (!remote.ok)
-		throw new Error(remote.out.trim() || "git remote get-url origin failed");
-	const ownerRepo = parseOwnerRepo(remote.out.trim());
-	if (!ownerRepo)
-		throw new Error(
-			`could not determine owner/repo from git remote: ${remote.out.trim()}`,
-		);
-	const out = await execGh(
-		buildDesignRecordEditQuery({ ...ownerRepo, number }),
-		{ cwd },
-	);
-	return parseDesignRecordEditResponse(out);
+export async function fetchDesignRecordEditInfo({ githubOps, number }) {
+	return await githubOps.designRecordEditInfo({ number });
 }
 
 /**

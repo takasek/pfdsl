@@ -3,9 +3,9 @@
  * independent I/O calls (git fetch, git log, gh pr list, the built CLI's
  * `status ready`, and a conditional gh issue lookup) into one JSON payload.
  * None of this branch wiring was covered — only the pure helpers in
- * cycle-status.mjs were (#645). `sh`/`execGh`/`existsSync`/`readFileSync` are
- * injected so a test can supply canned I/O and assert which error field gets
- * set for which failure, without a real git/gh/filesystem in play.
+ * cycle-status.mjs were (#645). `sh`/`githubOps`/`existsSync`/`readFileSync`
+ * are injected so a test can supply canned I/O and assert which error field
+ * gets set for which failure, without a real git/gh/filesystem in play.
  *
  * `sh` has the shape of lib/run-exec.mjs' `run`: it throws on failure (unlike
  * `tryRun`), matching how the top-level script already calls it. `shTry` is
@@ -45,7 +45,7 @@ export function cycleStatusExitCode(result) {
  * @param {{
  *   sh: (file: string, args: string[]) => string,
  *   shTry: (file: string, args: string[]) => {ok: boolean, out: string, status: number|null},
- *   execGh: (args: string[]) => Promise<string>,
+ *   githubOps: {listOpenPrs: () => Promise<any[]>, viewIssue: (params: {number: number, fields: string[]}) => Promise<any>},
  *   existsSync: (path: string) => boolean,
  *   readFileSync: (path: string, encoding: string) => string,
  *   readdirSync: (path: string) => string[],
@@ -57,7 +57,7 @@ export function cycleStatusExitCode(result) {
 export async function runCycleStatus({
 	sh,
 	shTry,
-	execGh,
+	githubOps,
 	existsSync,
 	readFileSync,
 	readdirSync,
@@ -155,16 +155,7 @@ export async function runCycleStatus({
 	let otherOpenPRs = [];
 	let prError = null;
 	try {
-		const prJson = JSON.parse(
-			await execGh([
-				"pr",
-				"list",
-				"--state",
-				"open",
-				"--json",
-				"number,title,headRefName,statusCheckRollup",
-			]),
-		);
+		const prJson = await githubOps.listOpenPrs();
 		({ openFlowSyncPRs, otherOpenPRs } = classifyPRs(prJson));
 	} catch (e) {
 		prError = e.message;
@@ -270,15 +261,10 @@ export async function runCycleStatus({
 	if (targetIssues.length > 0) {
 		for (const targetIssue of targetIssues) {
 			try {
-				const issueJson = JSON.parse(
-					await execGh([
-						"issue",
-						"view",
-						String(targetIssue),
-						"--json",
-						"body,comments,createdAt,labels",
-					]),
-				);
+				const issueJson = await githubOps.viewIssue({
+					number: targetIssue,
+					fields: ["body", "comments", "createdAt", "labels"],
+				});
 				labelsByIssue.set(
 					targetIssue,
 					(issueJson.labels ?? []).map((l) => l?.name).filter(Boolean),
