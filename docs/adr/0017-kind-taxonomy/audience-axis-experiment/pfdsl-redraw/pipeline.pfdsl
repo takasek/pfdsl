@@ -1,6 +1,6 @@
 ---
 title: pfdsl 変換パイプライン（判断軸で描き直し）
-type: runtime-pipeline
+type: pipeline
 description: "判断を含まない決定的変換をすべて収める。既存 runtime-pipeline.pfdsl のb層（処理系）とg層（配布）に加え、workflow.pfdsl から gen_skill・gen_install・gen_plugin・render_previews と公開の自動部分が移ってきた。人手だが判断のない upload_vsix もここに置く（自動化候補として機械チェーン内で際立たせるため）"
 layout:
   direction: LR

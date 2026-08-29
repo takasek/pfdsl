@@ -1,6 +1,6 @@
 ---
 title: Polaris 開発者側パイプライン（変種B・読み手軸）
-type: runtime-pipeline
+type: pipeline
 description: "読み手が開発者（プラットフォームチーム）である変換。社内で完結し、まだ消費チームの手に渡らない段階までを収める。配布境界をどこに引くかが争点になる"
 layout:
   direction: LR
