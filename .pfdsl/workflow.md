@@ -6,7 +6,7 @@
 
 実践・レビューで得た知見は3経路に振り分ける:
 
-1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を直接改訂する（`maintain_template` プロセス）。ローカル skill・配布 skill・binding・companion・guard は、削除済みの集約プロセスでなく対象 artifact の分類として扱う。独立して整備する一群を列挙するときは `knowledge_maintenance` tag のプロセスを問い合わせ、1つの正本 asset の整備プロセスを調べるときはその artifact の producer を問い合わせる。人間の `decisions` が変更対象を指名し、採用した `retro_findings` の具体的観察を全 `knowledge_maintenance` プロセスが feedback evidence として対象固有の文言・規則・機構へ反映する。スキル改善は issue を通さず対話から直接行う
+1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を直接改訂する（`maintain_template` プロセス）。ローカル skill・配布 skill・binding・companion・guard は、削除済みの集約プロセスでなく対象 artifact の分類として扱う。独立して整備する一群を列挙するときは `knowledge_maintenance` tag のプロセスを問い合わせ、1つの正本 asset の整備プロセスを調べるときはその artifact の producer を問い合わせる。人間の `decisions` が変更対象を指名し、採用した `retro_findings` の具体的観察を全 `knowledge_maintenance` プロセスが feedback evidence として対象固有の文言・規則・機構へ反映する。各プロセスは自身の現行正本も feedback の改版基準として読み、既存内容を保った差分改訂を行う。現行正本は変更権限ではなく、通常入力の `decisions` だけが改訂を駆動する。スキル改善は issue を通さず対話から直接行う
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
