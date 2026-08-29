@@ -127,22 +127,32 @@ CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数�
 投稿は pfd-ops の `references/github-issues-backend.md`「複数行本文の外部書込み」規約に従う。
 新規起票と既存 issue へのコメントで、write と readback の対象が違う。
 
-共通の1手目は、セッション固有名を持つ body file に正本を書くことである。
-以下ではそのパスを `$body_path`、readback の保存先を `$readback_path` と書く。
+まず一時パスを2つ用意する。
+`mktemp` が一意な名前を作るので、並行セッションと衝突しない。
 
-**山括弧のプレースホルダをそのままシェルへ貼らない。**
-`> <readback.json>` は `<` が入力リダイレクトとして解釈されて parse error になり、引用のないパスは空白・glob・先頭 `-` を含むと argv が壊れる。
-実際の値は変数へ入れ、`"$var"` の形で渡す。
+```bash
+body_path="$(mktemp)"
+readback_path="$(mktemp)"
+```
+
+承認された本文を `"$body_path"` へ書き、タイトルを `title` へ入れる。
+**山括弧のプレースホルダをそのままシェルへ貼らない** — `> <readback.json>` は `<` が入力リダイレクトとして解釈されて parse error になり、引用のないパスは空白・glob・先頭 `-` を含むと argv が壊れる。
 
 新規起票:
 
-1. `gh issue create --repo takasek/pfdsl --title "$title" --body-file "$body_path"` で正本を直接渡す
-2. 返された URL から issue 番号を取り、`gh issue view "$issue_number" --repo takasek/pfdsl --json body,url > "$readback_path"` でその issue を取り直す
+```bash
+issue_url="$(gh issue create --repo takasek/pfdsl --title "$title" --body-file "$body_path")"
+issue_number="${issue_url##*/}"
+gh issue view "$issue_number" --repo takasek/pfdsl --json body,url > "$readback_path"
+```
 
-既存 issue へのコメント:
+既存 issue へのコメント（`issue_number` は工程5で同定した issue の番号）:
 
-1. `gh issue comment "$issue_number" --repo takasek/pfdsl --body-file "$body_path"` で正本を直接渡す
-2. 返された comment URL の `#issuecomment-<id>` から id を取り、`gh api "repos/takasek/pfdsl/issues/comments/$comment_id" > "$readback_path"` でそのコメント自体を取り直す
+```bash
+comment_url="$(gh issue comment "$issue_number" --repo takasek/pfdsl --body-file "$body_path")"
+comment_id="${comment_url##*issuecomment-}"
+gh api "repos/takasek/pfdsl/issues/comments/$comment_id" > "$readback_path"
+```
 
 **`gh issue view --json comments` の一覧から似た本文を拾って代用しない。**
 規約はこの読み方を明示的に禁じている。
