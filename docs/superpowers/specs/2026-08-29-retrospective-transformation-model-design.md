@@ -45,6 +45,8 @@ retro_skill >>? run_retro
 
 `retro_plan` records, for every event in the frozen inventory, whether the event participates in this retrospective and why. Classification is non-exclusive. `retro_subject_snapshot` contains the resolved contents of the concrete PFDs, session evidence, and knowledge artifacts selected by that plan, frozen at the same cutoff; it is not merely a list of references. `plan_retro` produces both artifacts because classification determines the selected subjects and the repository has no independent resume or consumer boundary between classification and subject resolution.
 
+The repository contents reach `plan_retro` through `integrated_repository` rather than one edge per canonical artifact because the retrospective subject set is selected anew by each `retro_plan` and may span the whole repository. The existing sweep processes correctly enumerate their fixed, bounded subject sets directly; applying that pattern here would freeze a dynamic audit boundary into the graph and require an edge migration whenever a new canonical artifact becomes eligible for retrospective inspection.
+
 `retro_skill` remains the audit capability. Its edges into collection, planning, and execution are feedback because ADR-0011 requires a capability artifact used upstream of its own maintenance chain to be represented as the previous-generation snapshot. `retro_findings` is the result of applying that capability to one resolved plan and its frozen subject contents. Each finding carries the run identifier and the evidence needed by later human judgment. The old feedback edges from `retro_skill` to discussion and maintenance processes are removed.
 
 ## Decision collection and human gate
