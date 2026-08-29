@@ -461,3 +461,29 @@ The contract must distinguish same-task compaction, repository-only read-only de
 - [ ] **Step 3: Re-run the pressure scenario and repository verification**
 
 Dispatch a fresh read-only pfd-lens agent with only the frozen repository snapshot. GREEN means the delegation proceeds without a public checkpoint, the agent receives no transient session inventory, and its file:line findings can be merged with the main-thread C/D audit. Then regenerate mirrors and run documentation, strict PFD, and full repository checks.
+
+---
+
+### Task 6: Model each current canonical asset as its maintenance baseline
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-08-29-retrospective-transformation-model-design.md`
+- Modify: `.pfdsl/workflow.pfdsl`
+- Modify: `.pfdsl/workflow.md`
+- Regenerate: PR input-edge matrix
+
+**Interfaces:**
+- Consumes: the pfd-lens finding that all 21 revision processes lacked the current asset they edit.
+- Produces: exactly one current-canonical-artifact feedback edge per `knowledge_maintenance` process and matrix coverage that fails when any baseline is absent or mistyped.
+
+- [ ] **Step 1: Make the matrix comparator fail for missing baselines**
+
+For every `knowledge_maintenance` process, derive its sole output artifact from the canonical graph and require a `yes` / `feedback` row for that same artifact. Against the pre-fix graph, the comparator must report 21 missing baseline rows.
+
+- [ ] **Step 2: Add the 21 feedback baselines and companion rule**
+
+Add `<current canonical artifact> >>? <its maintenance process>` for every process. State in the companion that the target's current version is a revision baseline, not change authority; `decisions` remains the sole normal driver.
+
+- [ ] **Step 3: Regenerate and compare the matrix**
+
+Add 21 target-specific rows explaining that changing the current asset while holding the decision and evidence fixed changes the revised output. Export fresh graph JSON and require zero matrix-only, graph-only, validation, and kind-mismatch entries.
