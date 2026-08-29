@@ -32,7 +32,7 @@ A・B 層はセッション文脈不要 — 任意の PFD のレビューに単�
 3. 各 finding に実行 ID と証拠参照を付ける。下記の宛先への振り分けは変更権限ではなく、通常の意思決定経路による人間の disposition だけがリポジトリ保守を許可する。必須情報源の coverage が complete で、選んだ適用層をすべて監査した場合に限り「特になし」と報告できる。
 4. 必要な全消費者が同じ task record へアクセスできるなら、inventory、計画、対象 snapshot はセッション出力のままでよい。ホストが同じ task record を保持する compaction は checkpoint の契機にしない。凍結したリポジトリ snapshot だけを読む read-only subagent へ A・B 監査を委譲するときは transient な C・D evidence を渡さず、公開済み commit または対象ファイルだけを渡すため、session inventory の checkpoint は不要である。実行ごとの恒久的なリポジトリ ledger は作らない。
 5. 受け手が必要な transient evidence へアクセスできない handoff の前だけ、cutoff、情報源別 coverage、受け手の可視性境界で安全な event identifier、未解決 findings の最小 checkpoint を、意図した受け手だけが読める既存の保存先へ置く。内部 session ID、tool metadata、private evidence は public issue・PR へ書かない。public issue・PR を使う場合は、外部書き込みの直前に正確な内容と宛先を人間へ提示し、その書き込み自体の明示承認を得る。retrospective の実行承認を checkpoint の公開承認とみなさない。
-6. 可視性に適合する保存先が無い、または必要な外部書き込みの承認が得られない場合は handoff を停止する。必要な checkpoint 前に task record を失った場合、その実行を放棄し、新しい実行 ID と cutoff ですべての情報源を再収集する。放棄した実行との同一性を主張しない。
+6. 可視性に適合する保存先が無い、または必要な外部書き込みの承認が得られない場合は handoff せず、同じ task・session で監査を完結させる。必要な checkpoint 前に task record を失った場合、その実行を放棄し、新しい実行 ID と cutoff ですべての情報源を再収集する。放棄した実行との同一性を主張しない。
 
 ## A・B. 図の監査（任意の PFD レビューに適用可）
 
