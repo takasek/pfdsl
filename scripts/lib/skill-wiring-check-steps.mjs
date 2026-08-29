@@ -80,23 +80,25 @@ export function runSkillWiringCheck({
 		const location = Array.isArray(finding.location)
 			? finding.location.join(", ")
 			: finding.location;
-		const problems = finding.missing.map((missing) =>
-			missing === "reach gen_plugin"
-				? "does not reach gen_plugin"
-				: `is missing from ${missing}`,
-		);
+		const problems = finding.missing.map((missing) => {
+			if (missing === "workflow producer") return "has no workflow producer";
+			if (missing === "unique workflow producer")
+				return `has multiple workflow producers: ${finding.producers.join(", ")}`;
+			return "does not reach gen_plugin";
+		});
 		return `${anchor}: '${finding.id}' is bundled (${location}) but ${problems.join(" and ")}`;
 	});
 	// Only the edges some finding is actually missing: a pipeline-declared
-	// artifact is never eligible for distill_ops outputs (#944), so naming that
+	// artifact is never eligible for workflow production (#944), so naming that
 	// edge for it sends the reader to write one the check goes on rejecting.
 	const missingEdges = new Set(findings.flatMap((finding) => finding.missing));
 	if (missingEdges.size > 0) {
 		stderrLines.push("");
-		if (missingEdges.has("distill_ops outputs"))
-			stderrLines.push(
-				`Add it to \`distill_ops -> [...]\` in ${WORKFLOW} (it is produced there).`,
-			);
+		if (
+			missingEdges.has("workflow producer") ||
+			missingEdges.has("unique workflow producer")
+		)
+			stderrLines.push(`Add exactly one output edge for it in ${WORKFLOW}.`);
 		if (missingEdges.has("reach gen_plugin"))
 			stderrLines.push(
 				`Make it reach \`gen_plugin\` through primary input/output edges in ${PIPELINE} (it is bundled material).`,

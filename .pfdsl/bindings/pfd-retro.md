@@ -71,6 +71,29 @@ prefix も値も宣言されておらず、新しいものを弾く機構も無�
 - **廃止の方法はファイルごと削除する。** tombstone ファイル（廃止の記録だけを残す空ファイル）は作らない。廃止の記録は git 履歴とそのコミットメッセージに残る。カタログは「いま効く問い」の集合であって、効かなくなった問いの記念碑ではない
 - **上の3項目が取りこぼした分は、集合としての棚卸しが拾う。** 統合は追記の時点にしか働かず、廃止は機械化したサイクルが気付いた分にしか働かないので、どちらの契機も来ないまま残るものがある。その棚卸しの手順は `retro-pattern-sweep` スキルが、起動の引き金は `scripts/lib/asset-sweep.mjs` の `SWEEP_TARGETS` が持つ（閾値も発火条件もそちらが一次情報）
 
+### 変更時の意味レビュー
+
+カタログの意味に影響する変更はすべて、書式検査とは別に diff-scoped な意味レビューを行う。
+対象には新規追加・削除・rename・統合・分割に加え、定義文・`問いの形:`・`具体例:`・`対策:`・frontmatter・タグ・`phase:` の変更を含む。
+まず次の2コマンドの和集合で、base から working tree までの追加・変更・削除・rename と untracked の新規ファイルを列挙する。
+
+```bash
+git diff -C --find-copies-harder --name-status -z --diff-filter=ACMRD origin/<base> -- .pfdsl/bindings/pfd-retro-patterns/
+git ls-files -z --others --exclude-standard -- .pfdsl/bindings/pfd-retro-patterns/
+```
+
+tracked 側は NUL 区切りの status とパスとして読み、rename / copy の status では直後の旧パス・新パスの組を保持し、それ以外では直後の1パスを保持する。
+`-C --find-copies-harder` は、source が base から変更されず destination だけが追加・変更された通常の copy も旧パス・新パスの組として検出するために必要である。
+untracked 側も NUL 区切りの各パスとして読む。改行区切りの行解析へ変換せず、空白・改行・非 ASCII 文字を含むパスをそのまま扱える parser または同等の Git 対応ツールへ渡す。
+
+列挙した各対象について `retro-pattern-sweep` スキルを起動し、「6. 所属と内部論理を監査する」を正準とする9観点をすべて適用する。削除対象は base 側の本文、rename 対象は変更前後の本文を含めて判定する。
+観点表と各問いはここへ複製せず、変更時レビューでも同スキルの正準表を参照する。
+
+変更者とは独立した reviewer に対象 diff を渡し、finding ごとに再現可能な concrete failure scenario と `file:line` の根拠を必須とする。
+finding を修正した後は同じ reviewer が同じ観点で再検証し、解消または残存を報告する。
+`node scripts/retro-patterns.mjs check` が証明するのは解析可能性・ファイル名・タグ有無・往復一致等の構造だけであり、所属や論理的一貫性の合格ではない。
+`near` 等の語彙類似は近傍を開く補助には使えるが、意味分類を自動決定してはならない。
+
 ## 配布物への finding 反映
 
 誰が配布層を編集できるかの一般ルールは pfd-retro SKILL.md「出力」節の「上流変更ルール」が一次情報（ADR-0028）。

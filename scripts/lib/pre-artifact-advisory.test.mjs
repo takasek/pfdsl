@@ -12,9 +12,9 @@ const ROOT = "/repo";
 
 const REMINDERS = [
 	{
-		name: "偽と分かった主張を、同じ形のまま中身だけ差し替える trap",
-		path: ".pfdsl/bindings/pfd-retro-patterns/claim-form-invites-restaleness.md",
-		countermeasure: "外部の能力に依存する規則は、その能力を列挙しない。",
+		name: "委譲ブリーフが未検証のデータ構造を前提にする trap",
+		path: ".pfdsl/bindings/pfd-retro-patterns/brief-assumes-unverified-data-shape.md",
+		countermeasure: "COUNTERMEASURE_SENTINEL",
 	},
 ];
 
@@ -198,8 +198,8 @@ describe("advisoryKey", () => {
 describe("formatPreArtifactAdvisory", () => {
 	it("names every reminder and its file", () => {
 		const text = formatPreArtifactAdvisory(REMINDERS);
-		assert.match(text, /claim-form-invites-restaleness\.md/);
-		assert.match(text, /同じ形のまま中身だけ差し替える/);
+		assert.match(text, /brief-assumes-unverified-data-shape\.md/);
+		assert.match(text, /委譲ブリーフが未検証のデータ構造を前提にする/);
 	});
 
 	it("tells the runner the artifact already landed, rather than claiming to precede it", () => {
@@ -212,7 +212,7 @@ describe("formatPreArtifactAdvisory", () => {
 	it("leaves the countermeasure to the preflight, which can afford the length", () => {
 		assert.doesNotMatch(
 			formatPreArtifactAdvisory(REMINDERS),
-			/外部の能力に依存する規則/,
+			/COUNTERMEASURE_SENTINEL/,
 		);
 	});
 });
@@ -232,7 +232,7 @@ describe("runPreArtifactAdvisory", () => {
 		assert.equal(shouldOutput, true);
 		assert.match(
 			output.hookSpecificOutput.additionalContext,
-			/claim-form-invites-restaleness/,
+			/brief-assumes-unverified-data-shape/,
 		);
 	});
 

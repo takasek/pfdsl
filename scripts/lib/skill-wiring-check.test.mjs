@@ -35,7 +35,7 @@ const ARTIFACTS = {
 };
 
 const WORKFLOW_EDGES = [
-	{ kind: "output", artifact: "retro_skill", process: "distill_ops" },
+	{ kind: "output", artifact: "retro_skill", process: "maintain_retro_skill" },
 	{ kind: "output", artifact: "grill_skill", process: "distill_ops" },
 	{ kind: "output", artifact: "ops_skill_l3", process: "distill_ops" },
 	{ kind: "output", artifact: "pfd_lens_agent", process: "distill_ops" },
@@ -275,6 +275,61 @@ describe("findUnwiredSkills", () => {
 		assert.deepEqual(run(), []);
 	});
 
+	it("reports a bundled workflow artifact with no producer", () => {
+		const findings = findUnwiredSkills({
+			workflowArtifacts: ARTIFACTS,
+			pipelineArtifacts: {},
+			workflowEdges: WORKFLOW_EDGES.filter(
+				(edge) => !(edge.kind === "output" && edge.artifact === "retro_skill"),
+			),
+			pipelineEdges: PIPELINE_EDGES,
+			mirrors: MIRRORS,
+		});
+		assert.deepEqual(
+			findings.find(({ id }) => id === "retro_skill")?.producers,
+			[],
+		);
+	});
+
+	it("reports every producer when a bundled workflow artifact has duplicates", () => {
+		const findings = findUnwiredSkills({
+			workflowArtifacts: ARTIFACTS,
+			pipelineArtifacts: {},
+			workflowEdges: [
+				...WORKFLOW_EDGES,
+				{
+					kind: "output",
+					artifact: "retro_skill",
+					process: "other_retro_maintainer",
+				},
+			],
+			pipelineEdges: PIPELINE_EDGES,
+			mirrors: MIRRORS,
+		});
+		assert.deepEqual(
+			findings.find(({ id }) => id === "retro_skill")?.producers.sort(),
+			["maintain_retro_skill", "other_retro_maintainer"],
+		);
+	});
+
+	it("accepts a unique producer with an arbitrary process name", () => {
+		const findings = findUnwiredSkills({
+			workflowArtifacts: ARTIFACTS,
+			pipelineArtifacts: {},
+			workflowEdges: WORKFLOW_EDGES.map((edge) =>
+				edge.kind === "output" && edge.artifact === "retro_skill"
+					? { ...edge, process: "renamed_retro_maintainer" }
+					: edge,
+			),
+			pipelineEdges: PIPELINE_EDGES,
+			mirrors: MIRRORS,
+		});
+		assert.equal(
+			findings.some(({ id }) => id === "retro_skill"),
+			false,
+		);
+	});
+
 	it("reports an artifact missing from both edges — the #481 case", () => {
 		const artifacts = {
 			...ARTIFACTS,
@@ -285,7 +340,8 @@ describe("findUnwiredSkills", () => {
 			{
 				id: "newcomer_skill",
 				location: "../.claude/skills/pfd-ops/",
-				missing: ["distill_ops outputs", "reach gen_plugin"],
+				missing: ["workflow producer", "reach gen_plugin"],
+				producers: [],
 				declaredIn: "workflow",
 			},
 		]);
@@ -342,7 +398,8 @@ describe("findUnwiredSkills", () => {
 			{
 				id: "multi_location_skill",
 				location: ["../docs/samples/", "../.claude/skills/pfd-ops/"],
-				missing: ["distill_ops outputs", "reach gen_plugin"],
+				missing: ["workflow producer", "reach gen_plugin"],
+				producers: [],
 				declaredIn: "workflow",
 			},
 		]);
@@ -373,7 +430,8 @@ describe("findUnwiredSkills", () => {
 			{
 				id: "newcomer_skill",
 				location: "../.claude/skills/pfd-ops/",
-				missing: ["distill_ops outputs", "reach gen_plugin"],
+				missing: ["workflow producer", "reach gen_plugin"],
+				producers: [],
 				declaredIn: "workflow",
 			},
 		]);
@@ -393,6 +451,7 @@ describe("findUnwiredSkills", () => {
 				id: "retro_skill",
 				location: "../.claude/skills/pfd-retro/",
 				missing: ["reach gen_plugin"],
+				producers: ["maintain_retro_skill"],
 				declaredIn: "workflow",
 			},
 		]);
@@ -540,6 +599,7 @@ describe("findUnwiredSkills", () => {
 					id: "retro_skill",
 					location: "../.claude/skills/pfd-retro/",
 					missing: ["reach gen_plugin"],
+					producers: ["distill_ops"],
 					declaredIn: "workflow",
 				},
 			],

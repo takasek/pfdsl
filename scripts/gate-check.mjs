@@ -302,7 +302,7 @@ for (const number of issueNumbers) {
 
 // 8b. Review record: judged before the PR, because the trailer lives in a
 // commit message and cannot be added afterwards (#698).
-results.push(reviewRecordStep({ commitMessages, changedFiles, issues }));
+results.push(reviewRecordStep({ commitMessages, changedFiles }));
 
 // 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(

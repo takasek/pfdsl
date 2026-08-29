@@ -17,7 +17,13 @@ const WORKFLOW = {
 	frontmatter: {
 		artifact: { retro_skill: { location: "../.claude/skills/pfd-retro/" } },
 	},
-	edges: [{ kind: "output", artifact: "retro_skill", process: "distill_ops" }],
+	edges: [
+		{
+			kind: "output",
+			artifact: "retro_skill",
+			process: "maintain_retro_skill",
+		},
+	],
 };
 
 const WORKFLOW_MULTI_LOCATION = {
@@ -31,7 +37,13 @@ const WORKFLOW_MULTI_LOCATION = {
 			},
 		},
 	},
-	edges: [{ kind: "output", artifact: "retro_skill", process: "distill_ops" }],
+	edges: [
+		{
+			kind: "output",
+			artifact: "retro_skill",
+			process: "maintain_retro_skill",
+		},
+	],
 };
 
 const PIPELINE = {
@@ -75,7 +87,7 @@ function deps({
 }
 
 describe("runSkillWiringCheck", () => {
-	it("passes and says so when both edges carry the artifact", () => {
+	it("accepts a uniquely renamed producer and says so when both edges carry the artifact", () => {
 		const result = runSkillWiringCheck(deps());
 		assert.equal(result.exitCode, 0);
 		assert.deepEqual(result.stdoutLines, ["check-skill-wiring: OK"]);
@@ -132,7 +144,7 @@ describe("runSkillWiringCheck", () => {
 		);
 	});
 
-	it("tells the reader how to satisfy the missing wiring", () => {
+	it("tells the reader how to add a missing workflow producer", () => {
 		const workflow = {
 			frontmatter: WORKFLOW.frontmatter,
 			edges: [],
@@ -140,15 +152,43 @@ describe("runSkillWiringCheck", () => {
 		const result = runSkillWiringCheck(
 			deps({ workflow, pipeline: { frontmatter: {}, edges: [] } }),
 		);
-		assert.match(result.stderrLines.join("\n"), /distill_ops -> \[\.\.\.\]/);
+		assert.match(
+			result.stderrLines.join("\n"),
+			/'retro_skill' is bundled \(\.\.\/\.claude\/skills\/pfd-retro\/\) but has no workflow producer/,
+		);
+		assert.match(
+			result.stderrLines.join("\n"),
+			/Add exactly one output edge for it in \.pfdsl\/workflow\.pfdsl\./,
+		);
+		assert.doesNotMatch(result.stderrLines.join("\n"), /distill_ops/);
 		assert.match(
 			result.stderrLines.join("\n"),
 			/Make it reach `gen_plugin` through primary input\/output edges/,
 		);
 	});
 
+	it("names every conflicting workflow producer", () => {
+		const workflow = {
+			frontmatter: WORKFLOW.frontmatter,
+			edges: [
+				...WORKFLOW.edges,
+				{
+					kind: "output",
+					artifact: "retro_skill",
+					process: "other_retro_maintainer",
+				},
+			],
+		};
+		const result = runSkillWiringCheck(deps({ workflow }));
+		assert.equal(result.exitCode, 1);
+		assert.match(
+			result.stderrLines.join("\n"),
+			/'retro_skill' is bundled \(\.\.\/\.claude\/skills\/pfd-retro\/\) but has multiple workflow producers: maintain_retro_skill, other_retro_maintainer/,
+		);
+	});
+
 	it("names only the edges the findings are actually missing", () => {
-		// A pipeline-only artifact is never eligible for distill_ops outputs
+		// A pipeline-only artifact is never eligible for workflow production
 		// (#944), so telling its reader to add one — and that the artifact "is
 		// produced there" — sends them to write an edge the check rejects.
 		const mirrors = [
@@ -180,7 +220,7 @@ describe("runSkillWiringCheck", () => {
 				artifact: { retro_reminder_hook: { location: "../hooks/" } },
 			},
 			// A pipeline-only bundled artifact still needs its own gen_plugin
-			// inputs edge (#944) — only distill_ops outputs is exempt for it.
+			// inputs edge (#944) — only workflow production is exempt for it.
 			edges: [
 				...PIPELINE.edges,
 				{
