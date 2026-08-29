@@ -36,11 +36,15 @@ remote だけを根拠にしない。
 
 ### `gh` の前提確認
 
-モード判定と同じ工程で、`gh auth status` が成功することを確かめる。
+モード判定と同じ工程で、`gh auth status --hostname github.com` が成功することを確かめる。
+**ホストを省かない。**
+素の `gh auth status` は設定済みの全ホストを検査するため、github.com が未認証でも別ホストの認証が通っていれば成功し、逆に github.com が正常でも無関係なホストの壊れた認証で失敗する。
+報告の宛先は github.com に固定されているので、確かめるべきもそのホストだけである。
+
 工程5の重複確認も工程6の投稿も `gh` に依存しており、**本文を組み立ててから使えないと分かるのが最も無駄が大きい**。
 
-`gh` が存在しない、または未認証の場合はここで止め、何が足りないかをユーザーへ報告する。
-本文の起草だけ進めて手渡す形にしてもよいが、その場合も重複確認を経ていないことを明示する。
+`gh` が存在しない、または github.com が未認証の場合はここで止め、何が足りないかをユーザーへ報告する。
+本文の起草へ進まない。
 別経路（ブラウザ・REST を直接叩く等）へ自分で切り替えない。
 
 自リポモードでも起票する。
@@ -111,6 +115,10 @@ CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数�
 同一と判断された場合は新規起票ではなく既存 issue へのコメントとする。
 コメントも本文の承認と、工程6の readback の対象になる。
 
+検索自体が失敗した場合（ネットワーク不通・レート制限・read 権限の不足）は、**重複確認を省いて起票へ進まない。**
+何が失敗したかを報告して止まる。
+重複の有無が分からないまま起票すると、既存 issue の分岐を増やす。
+
 ## 工程6: 承認と投稿
 
 本文の全文を提示し、明示の承認を待つ。
@@ -124,20 +132,30 @@ CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数�
 新規起票:
 
 1. `gh issue create --repo takasek/pfdsl --title <title> --body-file <path>` で正本を直接渡す
-2. 返された URL から issue 番号を取り、`gh issue view <number> --repo takasek/pfdsl --json body,url` でその issue を取り直す
-3. persisted `body` が改行を含めて正本と完全一致することを確認する
+2. 返された URL から issue 番号を取り、`gh issue view <number> --repo takasek/pfdsl --json body,url > <readback.json>` でその issue を取り直す
 
 既存 issue へのコメント:
 
 1. `gh issue comment <number> --repo takasek/pfdsl --body-file <path>` で正本を直接渡す
-2. 返された comment URL の `#issuecomment-<id>` から id を取り、`gh api repos/takasek/pfdsl/issues/comments/<id> --jq .body` でそのコメント自体を取り直す
-3. persisted body が改行を含めて正本と完全一致することを確認する
+2. 返された comment URL の `#issuecomment-<id>` から id を取り、`gh api repos/takasek/pfdsl/issues/comments/<id> > <readback.json>` でそのコメント自体を取り直す
 
 **`gh issue view --json comments` の一覧から似た本文を拾って代用しない。**
 規約はこの読み方を明示的に禁じている。
 一覧は自分が今書いたコメントを同定できず、他の誰かの似た本文を通してしまう。
 
-どちらの経路でも、一致しなければ成功として扱わず停止する。
+どちらの経路でも、最後に JSON の `body` を decode して正本ファイルと比較する。
+
+```bash
+node -e 'const fs=require("node:fs");const persisted=JSON.parse(fs.readFileSync(process.argv[1],"utf8")).body;const canonical=fs.readFileSync(process.argv[2],"utf8");if(persisted!==canonical){console.error("readback mismatch");process.exit(1)}' <readback.json> <body-file>
+```
+
+**`--jq .body` でシェルへ取り出して比較しない。**
+`--jq` は本文を端末向けテキストとして出力し終端に改行を足すため、body 自身の末尾改行と出力の区切りを区別できない。
+コマンド置換で受けると今度は末尾改行がすべて剥がれる。
+どちらも「改行を含めて完全一致」を確かめられない。
+JSON のまま保存して decode する経路だけが、改行を保ったまま比較できる。
+
+一致しなければ成功として扱わず停止する。
 **コマンドの成功表示や返された URL は persisted body の証拠にならない。**
 
 ラベルは外部報告モードでは付けない。
