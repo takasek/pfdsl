@@ -181,6 +181,43 @@ describe("collectReportEnvironment", () => {
 		assert.match(failure.reason, /could not be parsed/);
 	});
 
+	it("rejects a manifest value that parses but is not an identifier", () => {
+		const skillRoot = join(tmp, "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "" });
+		writeJson(join(tmp, ".claude-plugin", "bundle-manifest.json"), {
+			contentHash: 42,
+		});
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.pluginVersion, null);
+		assert.equal(env.bundleContentHash, null);
+		assert.deepEqual(unavailableFields(env), [
+			"bundleContentHash",
+			"cliVersion",
+			"installProvenance",
+			"pluginVersion",
+			"repoCommit",
+		]);
+	});
+
+	it("rejects install provenance that is not an object", () => {
+		const repoRoot = join(tmp, "adopter");
+		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		mkdirSync(join(repoRoot, ".git"), { recursive: true });
+		writeJson(join(repoRoot, "pfd-ops-install-manifest.json"), ["0.4.2"]);
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.installProvenance, null);
+		assert.ok(
+			env.unavailable.some(({ field }) => field === "installProvenance"),
+			"installProvenance should be recorded as unavailable",
+		);
+	});
+
 	it("records a repo-local install whose provenance file is absent", () => {
 		const repoRoot = join(tmp, "adopter");
 		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");

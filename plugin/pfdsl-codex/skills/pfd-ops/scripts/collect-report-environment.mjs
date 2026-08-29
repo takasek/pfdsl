@@ -16,6 +16,22 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// A manifest that parses can still hold something unusable in an identifier's
+// place — an empty string, a number, an array. Those are collection failures,
+// not values: reporting them would put a bare `42` where the reader expects a
+// version.
+/** @param {unknown} value */
+function asIdentifier(value) {
+	return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/** @param {unknown} value */
+function asRecord(value) {
+	return value !== null && typeof value === "object" && !Array.isArray(value)
+		? value
+		: null;
+}
+
 /** @param {string} path */
 function readJsonOrNull(path) {
 	if (!existsSync(path)) return null;
@@ -143,44 +159,45 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 	let installProvenance = null;
 
 	if (installation === "claude-plugin") {
-		pluginVersion =
-			readJsonOrNull(resolve(bundleRoot, ".claude-plugin/plugin.json"))
-				?.version ?? null;
+		pluginVersion = asIdentifier(
+			readJsonOrNull(resolve(bundleRoot, ".claude-plugin/plugin.json"))?.version,
+		);
 		if (pluginVersion === null) {
 			recordFailure(
 				"pluginVersion",
-				"The plugin manifest could not be parsed, or carried no version. Its absence is not reachable here: the installation shape is classified by that manifest existing.",
+				"The plugin manifest could not be parsed, or carried no usable version. Its absence is not reachable here: the installation shape is classified by that manifest existing.",
 			);
 		}
-		bundleContentHash =
+		bundleContentHash = asIdentifier(
 			readJsonOrNull(resolve(bundleRoot, ".claude-plugin/bundle-manifest.json"))
-				?.contentHash ?? null;
+				?.contentHash,
+		);
 		if (bundleContentHash === null) {
 			recordFailure(
 				"bundleContentHash",
-				"The bundle manifest could not be read, or carried no content hash.",
+				"The bundle manifest could not be read, or carried no usable content hash.",
 			);
 		}
 	}
 	if (installation === "codex-plugin") {
-		pluginVersion =
-			readJsonOrNull(resolve(bundleRoot, ".codex-plugin/plugin.json"))
-				?.version ?? null;
+		pluginVersion = asIdentifier(
+			readJsonOrNull(resolve(bundleRoot, ".codex-plugin/plugin.json"))?.version,
+		);
 		if (pluginVersion === null) {
 			recordFailure(
 				"pluginVersion",
-				"The plugin manifest could not be parsed, or carried no version. Its absence is not reachable here: the installation shape is classified by that manifest existing.",
+				"The plugin manifest could not be parsed, or carried no usable version. Its absence is not reachable here: the installation shape is classified by that manifest existing.",
 			);
 		}
 	}
 	if (installation === "repo-local") {
-		installProvenance = readJsonOrNull(
-			resolve(repoRoot, "pfd-ops-install-manifest.json"),
+		installProvenance = asRecord(
+			readJsonOrNull(resolve(repoRoot, "pfd-ops-install-manifest.json")),
 		);
 		if (installProvenance === null) {
 			recordFailure(
 				"installProvenance",
-				"The install provenance file could not be read, or is absent.",
+				"The install provenance file is absent, could not be read, or did not hold an object.",
 			);
 		}
 	}
