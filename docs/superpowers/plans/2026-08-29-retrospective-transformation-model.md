@@ -487,3 +487,34 @@ Add `<current canonical artifact> >>? <its maintenance process>` for every proce
 - [ ] **Step 3: Regenerate and compare the matrix**
 
 Add 21 target-specific rows explaining that changing the current asset while holding the decision and evidence fixed changes the revised output. Export fresh graph JSON and require zero matrix-only, graph-only, validation, and kind-mismatch entries.
+
+---
+
+### Task 7: Complete revision baselines outside the maintenance family
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-08-29-retrospective-transformation-model-design.md`
+- Modify: `.pfdsl/workflow.pfdsl`
+- Modify: `.pfdsl/workflow.md`
+- Modify: `.claude/skills/pfd-retro/SKILL.md`
+- Regenerate: distributed pfd-retro skill mirrors and PR input-edge matrix
+
+**Interfaces:**
+- Consumes: the full-output counterfactual audit showing missing baselines in seven existing revision processes, including one sibling output omitted from `map_deps`.
+- Produces: feedback baselines for the nine missing process-artifact pairs, auditable exclusions for one-off delivery and already represented external state, and a same-session fallback when no visibility-compatible checkpoint destination exists.
+
+- [ ] **Step 1: Make all missing process-artifact pairs fail the comparator**
+
+Extend the matrix and comparator with every actual input of the seven revision processes and explicit expected feedback for `quality_guide`, `skill_template`, `feature_samples`, `workflow_pfdsl`, `runtime_pipeline_md`, `runtime_pipeline_pfdsl`, `readme`, `adrs`, and `roadmap_md`. Against the pre-fix graph, the comparator must report exactly those nine matrix-only feedback edges.
+
+- [ ] **Step 2: Add the feedback baselines and document the boundary**
+
+Add the nine feedback edges while preserving the existing `roadmap_pfdsl >>? map_deps` edge. State that `article` is excluded because it is a one-off deliverable without an in-diagram revision cycle. Record that `issue_updates >>? file_issues` already represents issue state and `integrated_repository >> project_toolchain -> toolchain >>? develop` already represents repository state around the merge/develop cycle, so direct self-baselines would duplicate those paths.
+
+- [ ] **Step 3: Close the checkpoint fallback and regenerate mirrors**
+
+When no visibility-compatible destination exists, require the audit to avoid handoff and finish in the same task and session. Change only the canonical pfd-retro skill, regenerate its mirrors, and run the distribution checks.
+
+- [ ] **Step 4: Regenerate and compare the complete matrix**
+
+Include all actual normal and feedback inputs for the newly covered processes and absent rows for `article >>? write_article`, `gh_issues >>? file_issues`, and `integrated_repository >>? merge_pr`. Export fresh graph JSON and require zero matrix-only, graph-only, validation, and kind-mismatch entries.

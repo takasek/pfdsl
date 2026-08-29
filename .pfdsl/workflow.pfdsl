@@ -672,6 +672,7 @@ decision_trigger >> decide -> decisions
 
 decisions >> draft_adrs -> adrs
 
+adrs >>? draft_adrs
 toolchain >>? draft_adrs
 
 gh_issues >> draft_proposals -> spec_proposals
@@ -686,6 +687,9 @@ spec >> maintain_samples -> feature_samples
 
 adrs >>? maintain_template
 findings >>? maintain_template
+quality_guide >>? maintain_template
+skill_template >>? maintain_template
+feature_samples >>? maintain_samples
 
 
 
@@ -810,10 +814,14 @@ findings >>? file_issues
 
 gh_issues >> map_deps -> [roadmap_md, roadmap_pfdsl]
 
+roadmap_md >>? map_deps
 roadmap_pfdsl >>? map_deps
 
+runtime_pipeline_md >>? map_transform_boundaries
+runtime_pipeline_pfdsl >>? map_transform_boundaries
 toolchain >> map_transform_boundaries -> [runtime_pipeline_md, runtime_pipeline_pfdsl]
 
+workflow_pfdsl >>? map_workflow
 [adrs, decisions] >> map_workflow -> workflow_pfdsl
 
 [gh_issues, roadmap_pfdsl, spec] >> develop -> pull_request
@@ -845,6 +853,7 @@ issue_updates >>? file_issues
 
 
 
+readme >>? update_readme
 [claude_plugin_dist, codex_plugin_dist, published_cli, published_libraries] >> update_readme -> readme
 
 [claude_plugin_dist, codex_plugin_dist, distribution_review_perspectives] >> review_distribution -> distribution_review_record
