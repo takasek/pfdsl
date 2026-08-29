@@ -247,7 +247,7 @@ artifact:
     tags: [ gen ]
   claude_plugin_dist:
     label: drift検査済みのClaude Code plugin root
-    description: "check_plugin_drift が、gen_pluginの生成済みClaude Code root（plugin/pfdsl/）を正本と照合済みにした配布状態。Claude Code marketplaceの導入・更新経路が消費する"
+    description: "check_plugin_drift が、gen_pluginの生成済みClaude Code root（plugin/pfdsl/）を正本と照合済みにした配布状態。release tagへpinするpublished_claude_pluginの検証済み入力であり、公開後の導入はpublished artifactを消費する"
     criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のClaude Code rootの差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
     location: ../plugin/pfdsl/
     group: repo_generated
@@ -255,8 +255,9 @@ artifact:
     parts: [ claude_adapter_output ]
   codex_plugin_dist:
     label: drift検査済みのCodex plugin root
-    description: "check_plugin_drift が、assemble_codex_pluginの生成済みCodex native root（plugin/pfdsl-codex/）を正本と照合済みにした配布状態。Claude Code marketplace専用のinstall_pluginには渡さない"
+    description: "check_plugin_drift が、assemble_codex_pluginの生成済みCodex native root（plugin/pfdsl-codex/）を正本と照合済みにした配布状態。repo-owned native marketplace/install pathには渡さず、現在のCodex互換導入でも使わない。外部のCodex marketplace構築者が自身のnative sourceとして扱うための検証済みhandoff surfaceである"
     criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のCodex rootの差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
+    externalStakeholders: [ 外部のCodex marketplace構築者 ]
     location: ../plugin/pfdsl-codex/
     group: repo_generated
     tags: [ gen ]
@@ -299,10 +300,17 @@ artifact:
     tags: [ gen ]
   published_cli:
     label: npm 公開 CLI
-    description: "外部利用者向け配布物。v* tag push で GitHub Actions が自動 publish する（Trusted Publishing / OIDC）。plugin_dist の marketplace.json も同じ v* タグへ pin される"
+    description: "外部利用者向け配布物。v* tag push で GitHub Actions が自動 publish する（Trusted Publishing / OIDC）"
     criteria: npm view @pfdsl/cli versions に packages/cli/package.json の version が含まれる
     externalStakeholders: [ 外部CLIユーザー, CI ]
     location: https://www.npmjs.com/package/@pfdsl/cli
+    group: published
+  published_claude_plugin:
+    label: 公開済みClaude互換plugin artifact
+    description: "push_cli_release_tag が公開する v* tag 上のClaude-compatible plugin artifact。.claude-plugin/marketplace.json の git-subdir source が plugin/pfdsl/ と同じ v* tag の ref に pin され、Claude Code marketplace と現在のCodex互換導入がこの公開snapshotを消費する"
+    criteria: "公開済み v* tag の .claude-plugin/marketplace.json で plugins[0].source が source=git-subdir、url=https://github.com/takasek/pfdsl.git、path=plugin/pfdsl、ref=v<VERSION> を持つ"
+    externalStakeholders: [ Claude Code利用者, Codex利用者 ]
+    location: https://github.com/takasek/pfdsl/tree/v<VERSION>/plugin/pfdsl
     group: published
   published_libraries:
     label: npm 公開ライブラリ群
@@ -458,7 +466,7 @@ process:
     tags: [ gen ]
   push_cli_release_tag:
     label: CLIタグ生成・push
-    description: "make release が選択済み版で pre-tag checks を実行し、v* tag を push する。tag push 後の npm publish は publish_cli が持つ"
+    description: "make release がClaude Code rootのdrift検査を含むpre-tag checksを実行し、.claude-plugin/marketplace.json のClaude-compatible git-subdir sourceを同じ v* tagへpinしてから、そのtagをpushする。正常完了時のtagはcli_release_tagとpublished_claude_pluginになり、tag push後のnpm publishはpublish_cliが持つ"
     command: "make release VERSION=<VERSION>"
     location: ../scripts/release.mjs
     tags: [ gen ]
@@ -496,7 +504,7 @@ process:
     tags: [ manual_no_judgment ]
   install_plugin:
     label: プラグインインストール
-    description: "外部ユーザーがClaude Codeのmarketplace機構で導入・更新する（/plugin install、更新は/plugin marketplace update）。リポ内コミットを伴わない"
+    description: "外部ユーザーがClaude Codeのmarketplace機構でpublished_claude_pluginを導入・更新する（/plugin install、更新は/plugin marketplace update）。現在のCodexもnative marketplace rootではなく、.claude-plugin/marketplace.json互換経路から同じClaude-compatible published artifactを消費する。codex_plugin_distはこの導入経路に渡さない"
     tags: [ g ]
   deploy_install_layer:
     label: L3レイヤー実配置
@@ -556,7 +564,7 @@ ops_install_sources >> gen_install -> ops_install_templates
 
 toolchain >> gen_readme_cli -> readme_cli_blocks
 
-[cli_release_request, toolchain] >> push_cli_release_tag -> cli_release_tag
+[claude_plugin_dist, cli_release_request, toolchain] >> push_cli_release_tag -> [cli_release_tag, published_claude_plugin]
 
 [cli_release_tag, toolchain] >> publish_cli -> published_cli
 
@@ -570,7 +578,7 @@ vsix_candidate >> verify_vsix -> vsix_package
 
 vsix_package >> upload_vsix -> published_ext
 
-claude_plugin_dist >> install_plugin -> installed_plugin
+published_claude_plugin >> install_plugin -> installed_plugin
 
 installed_plugin >> deploy_install_layer -> installed_l3_layer
 

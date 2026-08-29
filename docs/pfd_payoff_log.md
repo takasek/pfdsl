@@ -170,3 +170,10 @@ PFD が効果を発揮した局面の事例ログ。体感した時点で追記�
 - 効果: コード・全テスト・CIはgreenだったが、A「到達性（出力側）」が `.pfdsl/workflow.pfdsl` の `integrated_repository.criteria` は従来の `test` jobだけを要求し、新設した`vscode-smoke` jobを要求していない片肺更新を検出した。図のcriteriaを両jobの成功へ同期し、webview smokeが失敗したcommitを統合済みリポジトリとして扱う経路を閉じた。
 - 学習: 既存CIへ独立jobを追加する変更は、workflowファイルだけでなく、統合済み状態を定義するPFD artifactのcriteriaも変える。コード差分にPFDが無くても、A/B監査は新しいゲートと成果物定義の不一致を検出できる。
 - 参照: issue #891、PR #1033、`.pfdsl/workflow.pfdsl` の `integrated_repository`、`.pfdsl/bindings/pfd-retro-patterns/implicit-environment-assumption.md`
+
+## 2026-08-29 Codex native handoff を外部境界として明示
+
+- 局面: issue #1026 の runtime pipeline delivery boundary 修正で、初稿は `codex_plugin_dist` を内部 install へ接続しないだけで、未消費の means terminal として残した
+- 効果: pfd-lens A/B の終端監査がこの状態を検出し、repo-owned native marketplace を捏造せず、実在する外部 Codex marketplace 構築者を `externalStakeholders` に追加して verified handoff surface へ修正した
+- 反実仮想: graph io / 終端監査がなければ、「接続しない」という正しい否定だけで consumer 不在の理由が正本に残らなかった
+- 参照: issue #1026、commit d1f5098d、`.pfdsl/runtime-pipeline.pfdsl`、pfd-lens A/B
