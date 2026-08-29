@@ -14,8 +14,7 @@ const REMINDERS = [
 	{
 		name: "委譲ブリーフが未検証のデータ構造を前提にする trap",
 		path: ".pfdsl/bindings/pfd-retro-patterns/brief-assumes-unverified-data-shape.md",
-		countermeasure:
-			"**差し戻し条件は、委譲先が食い違いに気付ける場合にしか効かない。** 上の #794 は実ファイルを開けば分かる形だったので止まったが、#902 は「ブリーフの数値」と「受け入れ基準が見る範囲」が両方とも誤りを通したため、委譲先からは正常な完了と区別できなかった。ブリーフに数値仕様を書くときは、その値を出した実測コマンドと出力をブリーフに併記し、受け入れ基準がその数値を実際に判定するかを渡す前に確かめる（一般形は work-cycle.md 適用点2 の「流用する既存機構の作用域を実測で確認する」）。",
+		countermeasure: "COUNTERMEASURE_SENTINEL",
 	},
 ];
 
@@ -213,7 +212,7 @@ describe("formatPreArtifactAdvisory", () => {
 	it("leaves the countermeasure to the preflight, which can afford the length", () => {
 		assert.doesNotMatch(
 			formatPreArtifactAdvisory(REMINDERS),
-			/差し戻し条件は、委譲先が食い違いに気付ける場合にしか効かない/,
+			/COUNTERMEASURE_SENTINEL/,
 		);
 	});
 });

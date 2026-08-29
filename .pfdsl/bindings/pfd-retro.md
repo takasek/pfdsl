@@ -81,8 +81,8 @@ git diff --name-only --diff-filter=ACMRD origin/<base> -- .pfdsl/bindings/pfd-re
 git ls-files --others --exclude-standard -- .pfdsl/bindings/pfd-retro-patterns/
 ```
 
-各対象について、定義文が1つの trap を述べるか、`問いの形:` がその trap を検出するか、`具体例:` がその定義へ所属するか、`対策:` が原因へ作用するか、近接パターンとの境界を説明できるか、タグが発火条件を表すか、`phase: pre-artifact` が対策の時点と一致するか、断定が証拠の範囲を超えないかを判定する。
-具体例の追記・統合・分割では、複数の独立した失敗型を1ファイルへ抱え込む肥大が起きていないかも判定する。
+列挙した各対象について `retro-pattern-sweep` スキルを起動し、「6. 所属と内部論理を監査する」を正準とする9観点をすべて適用する。
+観点表と各問いはここへ複製せず、変更時レビューでも同スキルの正準表を参照する。
 
 変更者とは独立した reviewer に対象 diff を渡し、finding ごとに再現可能な concrete failure scenario と `file:line` の根拠を必須とする。
 finding を修正した後は同じ reviewer が同じ観点で再検証し、解消または残存を報告する。
