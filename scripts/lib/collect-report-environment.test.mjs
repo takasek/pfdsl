@@ -178,7 +178,7 @@ describe("collectReportEnvironment", () => {
 			({ field }) => field === "pluginVersion",
 		);
 		assert.ok(failure, "pluginVersion should be recorded as unavailable");
-		assert.match(failure.reason, /could not be read/);
+		assert.match(failure.reason, /could not be parsed/);
 	});
 
 	it("records a repo-local install whose provenance file is absent", () => {

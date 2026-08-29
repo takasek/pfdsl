@@ -148,7 +148,7 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		if (pluginVersion === null) {
 			recordFailure(
 				"pluginVersion",
-				"The plugin manifest could not be read, or carried no version.",
+				"The plugin manifest could not be parsed, or carried no version. Its absence is not reachable here: the installation shape is classified by that manifest existing.",
 			);
 		}
 		bundleContentHash =
@@ -168,7 +168,7 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		if (pluginVersion === null) {
 			recordFailure(
 				"pluginVersion",
-				"The plugin manifest could not be read, or carried no version.",
+				"The plugin manifest could not be parsed, or carried no version. Its absence is not reachable here: the installation shape is classified by that manifest existing.",
 			);
 		}
 	}
