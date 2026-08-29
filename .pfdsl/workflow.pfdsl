@@ -59,17 +59,17 @@ artifact:
     group: generation
   pfdsl_skill:
     label: AI agent スキル（リポ内）
-    description: "runtime-pipeline.pfdsl の gen_skill が生産する（判断を含まない生成のため、ADR-0035 でそちらへ移した）。実体は plugin/pfdsl/skills/pfdsl で、リポ内の .claude/skills/pfdsl はそこへの生成symlinkであり、正本入力でも編集先でもない（#714）。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる"
+    description: "pipeline.pfdsl の gen_skill が生産する（判断を含まない生成のため、ADR-0035 でそちらへ移した）。実体は plugin/pfdsl/skills/pfdsl で、リポ内の .claude/skills/pfdsl はそこへの生成symlinkであり、正本入力でも編集先でもない（#714）。この図では全 .pfdsl 作業の起点として実践・レビューへの還流入力に現れる"
     location: ../plugin/pfdsl/skills/pfdsl/
     group: generation
   claude_plugin_dist:
     label: Claude Code配布plugin root
-    description: "runtime-pipeline.pfdsl のClaude Code root組み立てと結合drift検査が生産する。既存marketplace経路を保つplugin/pfdsl/で、この図ではREADME更新と配布レビューの入力に現れる"
+    description: "pipeline.pfdsl のClaude Code root組み立てと結合drift検査が生産する。既存marketplace経路を保つplugin/pfdsl/で、この図ではREADME更新と配布レビューの入力に現れる"
     location: ../plugin/pfdsl/
     group: release
   codex_plugin_dist:
     label: Codex配布plugin root
-    description: "runtime-pipeline.pfdsl のCodex root組み立てと結合drift検査が生産する。公式Codex validator/runtimeのskills固定に従うnative rootのplugin/pfdsl-codex/で、この図ではREADME更新と配布レビューの入力に現れる"
+    description: "pipeline.pfdsl のCodex root組み立てと結合drift検査が生産する。公式Codex validator/runtimeのskills固定に従うnative rootのplugin/pfdsl-codex/で、この図ではREADME更新と配布レビューの入力に現れる"
     location: ../plugin/pfdsl-codex/
     group: release
   distribution_review_perspectives:
@@ -104,17 +104,17 @@ artifact:
     group: release
   cli_release_request:
     label: CLIリリース要求
-    description: "make release-status の @pfdsl/cli 欄を材料に、公開する版と make release を実行する判断を外化した入力。runtime-pipeline.pfdsl が v* tag と npm 公開へ変換する"
+    description: "make release-status の @pfdsl/cli 欄を材料に、公開する版と make release を実行する判断を外化した入力。pipeline.pfdsl が v* tag と npm 公開へ変換する"
     criteria: "@pfdsl/cli の公開要否と版が決まり、make release VERSION=<VERSION> を実行できる"
     group: release
   libraries_release_request:
     label: ライブラリリリース要求
-    description: "make release-status の3ライブラリ欄を材料に、公開する版と make release-libs を実行する判断を外化した入力。runtime-pipeline.pfdsl が lib-v* tag と npm 公開へ変換する"
+    description: "make release-status の3ライブラリ欄を材料に、公開する版と make release-libs を実行する判断を外化した入力。pipeline.pfdsl が lib-v* tag と npm 公開へ変換する"
     criteria: 3ライブラリの公開要否と共通版が決まり、make release-libs VERSION=<VERSION> を実行できる
     group: release
   vscode_release_request:
     label: VSCode拡張リリース要求
-    description: "make release-status の takasek.pfdsl 欄を材料に、パッケージする版と make vscode-package を実行する判断を外化した入力。runtime-pipeline.pfdsl の単一変換が .vsix を生成した後に vscode-v* tag を push する"
+    description: "make release-status の takasek.pfdsl 欄を材料に、パッケージする版と make vscode-package を実行する判断を外化した入力。pipeline.pfdsl の単一変換が .vsix を生成した後に vscode-v* tag を push する"
     criteria: VSCode拡張のパッケージ要否と版が決まり、make vscode-package VERSION=<VERSION> を実行できる
     group: release
   user_intent:
@@ -224,19 +224,19 @@ artifact:
     group: planning
   toolchain:
     label: ツールチェーン
-    description: "integrated_repository の packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）の現行状態。runtime-pipeline.pfdsl の release 判定と変換境界の入力"
+    description: "integrated_repository の packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）の現行状態。pipeline.pfdsl の release 判定と変換境界の入力"
     criteria: gh pr view <PR番号> --json mergeCommit --jq '.mergeCommit.oid' で merge commit C を得て、git rev-parse origin/main:packages と git rev-parse C:packages が同じ tree object ID を返す
     location: ../packages/
     group: planning
   published_cli:
     label: npm 公開 CLI
-    description: "runtime-pipeline.pfdsl の publish_cli が生産する。toolchain の CLI 部分または plugin 同梱物（配布スキル群と pfd-* コマンド・agents）が変更されたら公開が必要という判定は decide_cli_release が担う。この図では README 更新の入力に現れる"
+    description: "pipeline.pfdsl の publish_cli が生産する。toolchain の CLI 部分または plugin 同梱物（配布スキル群と pfd-* コマンド・agents）が変更されたら公開が必要という判定は decide_cli_release が担う。この図では README 更新の入力に現れる"
     criteria: npm view @pfdsl/cli versions に packages/cli/package.json の version が含まれる
     location: https://www.npmjs.com/package/@pfdsl/cli
     group: release
   published_libraries:
     label: npm 公開ライブラリ群
-    description: "runtime-pipeline.pfdsl の publish_libraries が生産する。toolchain のライブラリ部分が変更されたら公開が必要という判定は decide_libraries_release が担う。この図では README 更新の入力に現れる"
+    description: "pipeline.pfdsl の publish_libraries が生産する。toolchain のライブラリ部分が変更されたら公開が必要という判定は decide_libraries_release が担う。この図では README 更新の入力に現れる"
     criteria: make release-libs が公開する各パッケージについて、npm view <pkg> versions に当該 package.json の version が含まれる
     location: https://www.npmjs.com/package/@pfdsl/core
     group: release
@@ -310,7 +310,7 @@ artifact:
     group: generation
   ecosystem_skill:
     label: PFDセット構築スキル
-    description: "/pfd-init コマンド。PFD セット（roadmap / workflow / runtime-pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
+    description: "/pfd-init コマンド。PFD セット（roadmap / workflow / pipeline）の対話的初期構築・再構築。PFDファイル種別の定義と問診リスト（ADR-0017）の一次情報ホスト。手書き、生成対象外"
     criteria: /pfd-init を .pfdsl/ の無いリポで起動すると PFD セットの scaffold が生成される。make gen-plugin が差分なしで完了する
     location: ../.claude/skills/pfd-ecosystem/
     group: generation
@@ -398,21 +398,21 @@ artifact:
     group: planning
   workflow_pfdsl:
     label: ワークフロー図
-    description: "この図そのもの。対話から公開までのサイクル全体を変換グラフとして持つ。roadmap_pfdsl（issue 依存）・runtime_pipeline_pfdsl（変換境界）と並ぶ3つ目の運用 PFD で、3つとも専用の整理プロセスが生産する。自分の companion（workflow_md）だけが artifact で図が無い状態を解消した（#904）"
+    description: "この図そのもの。対話から公開までのサイクル全体を変換グラフとして持つ。roadmap_pfdsl（issue 依存）・pipeline_pfdsl（変換境界）と並ぶ3つ目の運用 PFD で、3つとも専用の整理プロセスが生産する。自分の companion（workflow_md）だけが artifact で図が無い状態を解消した（#904）"
     criteria: check がエラーなし、meta check-links が通過する。workflow_md が名指すノード・エッジを graph describe で引いて食い違いがない
     location: workflow.pfdsl
     group: planning
-  runtime_pipeline_pfdsl:
+  pipeline_pfdsl:
     label: 変換パイプライン図
     description: "pfdslツールチェーンの実行時データ変換境界（source→AST→正規化グラフ→check/fmt/graph/metadata 出力）。toolchain の変換コンポーネント追加・変更・削除時に更新（ADR-0018 門番）"
-    criteria: check がエラーなし、meta check-links が通過する。toolchain の各変換段が runtime-pipeline.pfdsl のノードとして現れる
-    location: runtime-pipeline.pfdsl
+    criteria: check がエラーなし、meta check-links が通過する。toolchain の各変換段が pipeline.pfdsl のノードとして現れる
+    location: pipeline.pfdsl
     group: planning
-  runtime_pipeline_md:
+  pipeline_md:
     label: 変換境界 companion
-    description: "runtime-pipeline.pfdsl の sibling。グラフで運べない変換境界の定義・エラー処理方針"
-    criteria: check-companion-bindings が参照パスの実在を通す。散文が名指す runtime-pipeline.pfdsl のノード・エッジを graph describe で引いて食い違いがない
-    location: runtime-pipeline.md
+    description: "pipeline.pfdsl の sibling。グラフで運べない変換境界の定義・エラー処理方針"
+    criteria: check-companion-bindings が参照パスの実在を通す。散文が名指す pipeline.pfdsl のノード・エッジを graph describe で引いて食い違いがない
+    location: pipeline.md
     group: planning
 
 process:
@@ -591,7 +591,7 @@ process:
     command: node scripts/pfdsl/audit-issues-flow.mjs
   map_workflow:
     label: ワークフロー整理
-    description: "開発サイクルの営み（対話・整備・実践・実装・公開）を PFD 化する。roadmap_pfdsl を map_deps が、runtime_pipeline_pfdsl を map_transform_boundaries が担うのと同じ位置づけで、この図自身の維持を担う。方法論判断と ADR が改訂を駆動する"
+    description: "開発サイクルの営み（対話・整備・実践・実装・公開）を PFD 化する。roadmap_pfdsl を map_deps が、pipeline_pfdsl を map_transform_boundaries が担うのと同じ位置づけで、この図自身の維持を担う。方法論判断と ADR が改訂を駆動する"
     group: planning
   map_transform_boundaries:
     label: 変換境界整理
@@ -608,21 +608,21 @@ process:
     group: planning
   project_toolchain:
     label: ツールチェーン射影
-    description: "integrated_repository から packages/ の現行状態を射影し、runtime-pipeline.pfdsl の consumer が扱う toolchain として確定する"
+    description: "integrated_repository から packages/ の現行状態を射影し、pipeline.pfdsl の consumer が扱う toolchain として確定する"
     group: planning
   decide_cli_release:
     label: CLIリリース判断
-    description: "make release-status で @pfdsl/cli と plugin 同梱物の behind を確認し、公開するか・どの版で切るかを判断する。判断後の v* tag push・npm publish は runtime-pipeline.pfdsl が持つ。make release 完了後、roadmap の publish_cli_* プロセスのうち ready になったものの出力 artifact を自動 done 化してコミット・push する（#278）。バージョン番号からの artifact ID 逆算はしない"
+    description: "make release-status で @pfdsl/cli と plugin 同梱物の behind を確認し、公開するか・どの版で切るかを判断する。判断後の v* tag push・npm publish は pipeline.pfdsl が持つ。make release 完了後、roadmap の publish_cli_* プロセスのうち ready になったものの出力 artifact を自動 done 化してコミット・push する（#278）。バージョン番号からの artifact ID 逆算はしない"
     command: "make release-status"
     group: release
   decide_libraries_release:
     label: ライブラリリリース判断
-    description: "make release-status で core・graphviz-exporter・preview-engine の behind を確認し、3ライブラリを公開するか・どの共通版で切るかを判断する。判断後の lib-v* tag push・npm publish は runtime-pipeline.pfdsl が持つ"
+    description: "make release-status で core・graphviz-exporter・preview-engine の behind を確認し、3ライブラリを公開するか・どの共通版で切るかを判断する。判断後の lib-v* tag push・npm publish は pipeline.pfdsl が持つ"
     command: "make release-status"
     group: release
   decide_vscode_release:
     label: VSCode拡張リリース判断
-    description: "make release-status で takasek.pfdsl の behind を確認し、拡張をパッケージするか・どの版で切るかを判断する。判断後の .vsix 生成・vscode-v* tag push・marketplace アップロードは runtime-pipeline.pfdsl が持つ"
+    description: "make release-status で takasek.pfdsl の behind を確認し、拡張をパッケージするか・どの版で切るかを判断する。判断後の .vsix 生成・vscode-v* tag push・marketplace アップロードは pipeline.pfdsl が持つ"
     command: "make release-status"
     group: release
   review_distribution:
@@ -817,9 +817,9 @@ gh_issues >> map_deps -> [roadmap_md, roadmap_pfdsl]
 roadmap_md >>? map_deps
 roadmap_pfdsl >>? map_deps
 
-runtime_pipeline_md >>? map_transform_boundaries
-runtime_pipeline_pfdsl >>? map_transform_boundaries
-toolchain >> map_transform_boundaries -> [runtime_pipeline_md, runtime_pipeline_pfdsl]
+pipeline_md >>? map_transform_boundaries
+pipeline_pfdsl >>? map_transform_boundaries
+toolchain >> map_transform_boundaries -> [pipeline_md, pipeline_pfdsl]
 
 workflow_pfdsl >>? map_workflow
 [adrs, decisions] >> map_workflow -> workflow_pfdsl
@@ -834,8 +834,8 @@ bindings_pfd_ops >>? develop
 bindings_pfd_retro >>? develop
 ops_skill_general >>? develop
 ops_skill_l3 >>? develop
+pipeline_pfdsl >>? develop
 roadmap_md >>? develop
-runtime_pipeline_pfdsl >>? develop
 
 toolchain >>? develop
 vscode_ext_debug_skill >>? develop

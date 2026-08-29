@@ -1,7 +1,7 @@
 ---
 title: pfdsl 変換パイプライン
-type: runtime-pipeline
-description: "判断を含まない決定的変換を収める（ADR-0035）。3本の独立チェーンを持つ: .pfdslドキュメント変換（b: 処理系）・生成（一次ソース→スキル・plugin・描画物）・配布（plugin→採用リポ）。判断を含む営みはworkflow.pfdsl側。処理系の呼び出し元（c: pfdsl skill / d: VSCode拡張）はパイプラインを実行するホストでありデータではないため図には現れない。a-g層との対応と設計判断はsibling runtime-pipeline.md参照"
+type: pipeline
+description: "判断を含まない決定的変換を収める（ADR-0035）。3本の独立チェーンを持つ: .pfdslドキュメント変換（b: 処理系）・生成（一次ソース→スキル・plugin・描画物）・配布（plugin→採用リポ）。判断を含む営みはworkflow.pfdsl側。処理系の呼び出し元（c: pfdsl skill / d: VSCode拡張）はパイプラインを実行するホストでありデータではないため図には現れない。a-g層との対応と設計判断はsibling pipeline.md参照"
 layout:
   direction: LR
   maxWidth: 160
