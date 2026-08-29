@@ -418,115 +418,115 @@ artifact:
 process:
   maintain_distributed_advisory_hooks:
     label: 配布advisory hook整備
-    description: "decisions が指名した distributed_advisory_hooks を改訂し、distribution_review_record の配布先で観測した advisory の詰まりを根拠にする"
+    description: "decisions が指名した distributed_advisory_hooks を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の unsafe-action failure を警告と安全な次手へ反映する"
     command: node --test scripts/lib/gen-plugin.test.mjs
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_ecosystem_skill:
     label: ecosystemスキル整備
-    description: "decisions が指名した ecosystem_skill を改訂し、distribution_review_record の配布先で観測した scaffold 手順の詰まりを根拠にする"
+    description: "decisions が指名した ecosystem_skill を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の bootstrap failure を scaffold 手順へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_grill_skill:
     label: grillスキル整備
-    description: "decisions が指名した grill_skill を改訂し、distribution_review_record の配布先で観測した後ろ向き対話の詰まりを根拠にする"
+    description: "decisions が指名した grill_skill を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の対話破綻を prompt と成果物 framing へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_implementer_agent:
     label: implementer agent整備
-    description: "decisions が指名した implementer_agent を改訂し、distribution_review_record の配布先で観測した委譲手順の詰まりを根拠にする"
+    description: "decisions が指名した implementer_agent を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の委譲・handoff failure を編集・検査契約へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_ops_skill_general:
     label: pfd-ops一般層整備
-    description: "decisions が指名した ops_skill_general を改訂し、distribution_review_record の配布先で観測した PFD 運用手順の詰まりを根拠にする"
+    description: "decisions が指名した ops_skill_general を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の運用 failure を優先付け・受け入れ・完了手順へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_ops_skill_github_backend:
     label: pfd-ops GitHub backend整備
-    description: "decisions が指名した ops_skill_l3 を改訂し、distribution_review_record の配布先で観測した GitHub Issues backend の詰まりを根拠にする"
+    description: "decisions が指名した ops_skill_l3 を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の GitHub Issues・永続本文 failure を backend 手順と readback 検査へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_pfd_lens_agent:
     label: pfd-lens agent整備
-    description: "decisions が指名した pfd_lens_agent を改訂し、distribution_review_record の配布先で観測した read-only 監査の詰まりを根拠にする"
+    description: "decisions が指名した pfd_lens_agent を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の見逃した graph defect を監査質問と evidence 境界へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_retro_skill:
     label: retroスキル整備
-    description: "decisions が指名した retro_skill を改訂し、distribution_review_record の配布先で観測した retrospective audit の詰まりを根拠にする"
+    description: "decisions が指名した retro_skill を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の収集・計画・監査 failure を evidence 選定と failure behavior へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_review_perspectives:
     label: レビュー観点整備
-    description: "decisions が指名した review_perspectives を改訂し、distribution_review_record の配布先で観測した監査観点の詰まりを根拠にする"
+    description: "decisions が指名した review_perspectives を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の見逃した review concern を質問と判定基準へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_ops_binding:
     label: pfd-ops binding整備
-    description: "decisions が指名した bindings_pfd_ops を改訂し、prose_mechanization_sweep_record が示す binding 散文と機構の矛盾を根拠にする"
+    description: "decisions が指名した bindings_pfd_ops を改訂し、prose_mechanization_sweep_record の散文・機構矛盾と retro_findings の運用実態との不一致を binding 手順へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_retro_binding:
     label: pfd-retro binding整備
-    description: "decisions が指名した bindings_pfd_retro を改訂し、prose_mechanization_sweep_record の散文矛盾と retro_pattern_sweep_record のパターン滞留を根拠にする"
+    description: "decisions が指名した bindings_pfd_retro を改訂し、prose_mechanization_sweep_record の散文矛盾、retro_pattern_sweep_record の滞留、retro_findings の具体的パターンを binding 文言と routing 規則へ反映する"
     command: node scripts/retro-patterns.mjs check
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_delegation_guard:
     label: 委譲guard整備
-    description: "decisions が指名した delegation_guard を改訂し、prose_mechanization_sweep_record が示す委譲規約と PreToolUse guard の矛盾を根拠にする"
+    description: "decisions が指名した delegation_guard を改訂し、prose_mechanization_sweep_record の規約・機構矛盾と retro_findings の delegated-write escape・false rejection を guard 規則へ反映する"
     command: node --test scripts/lib/delegation-guard.test.mjs
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_main_branch_guard:
     label: main branch guard整備
-    description: "decisions が指名した main_branch_guard を改訂し、prose_mechanization_sweep_record が示す Git 規約と guard の矛盾を根拠にする"
+    description: "decisions が指名した main_branch_guard を改訂し、prose_mechanization_sweep_record の Git 規約・guard 矛盾と retro_findings の unblocked mutation・false block を操作分類へ反映する"
     command: node --test scripts/lib/main-commit-guard.test.mjs
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_pre_artifact_advisory:
     label: pre-artifact advisory整備
-    description: "decisions が指名した pre_artifact_advisory を改訂し、prose_mechanization_sweep_record が示す P3 散文と advisory の矛盾を根拠にする"
+    description: "decisions が指名した pre_artifact_advisory を改訂し、prose_mechanization_sweep_record の P3 散文矛盾と retro_findings の pre-artifact mistake を警告と recovery guidance へ反映する"
     command: node --test scripts/lib/pre-artifact-advisory.test.mjs
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_workflow_companion:
     label: workflow companion整備
-    description: "decisions が指名した workflow_md を改訂し、prose_mechanization_sweep_record が示す companion 散文と workflow graph の矛盾を根拠にする"
+    description: "decisions が指名した workflow_md を改訂し、prose_mechanization_sweep_record の companion・graph 矛盾と retro_findings の routing・ownership misunderstanding を説明へ反映する"
     command: node scripts/check-companion-bindings.mjs
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_distribution_review_perspectives:
     label: 配布レビュー観点整備
-    description: "decisions が指名した distribution_review_perspectives を改訂し、distribution_review_record の実行記録から一般化した配布欠陥を根拠にする"
+    description: "decisions が指名した distribution_review_perspectives を改訂し、distribution_review_record の配布欠陥と retro_findings の recurring bundle-reader defect を review question へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_distribution_review_skill:
     label: 配布レビュースキル整備
-    description: "decisions が指名した distribution_review_skill を改訂し、distribution_review_record の配布先で観測した手順上の詰まりを根拠にする"
+    description: "decisions が指名した distribution_review_skill を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の review-session failure を収集・分類・修正手順へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_prose_mechanization_audit_skill:
     label: 散文機械化監査スキル整備
-    description: "decisions が指名した prose_mechanization_audit_skill を改訂する。対象固有の実行手順は decisions の具体的な変更指示で決まり、別の evidence artifact は必須入力にしない"
+    description: "decisions が指名した prose_mechanization_audit_skill を改訂し、retro_findings の見逃した prose・mechanism divergence を対象固有の監査手順へ反映する"
     command: node scripts/check-asset-sweep.mjs
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_retro_pattern_sweep_skill:
     label: retroパターン棚卸しスキル整備
-    description: "decisions が指名した retro_pattern_sweep_skill を改訂する。対象固有の実行手順は decisions の具体的な変更指示で決まり、別の evidence artifact は必須入力にしない"
+    description: "decisions が指名した retro_pattern_sweep_skill を改訂し、retro_findings の見逃した stale・overlapping pattern を catalog sweep 手順へ反映する"
     command: node scripts/check-asset-sweep.mjs
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_spec_stress_skill:
     label: spec stressスキル整備
-    description: "decisions が指名した spec_stress_skill を改訂する。対象固有の実行手順は decisions の具体的な変更指示で決まり、別の evidence artifact は必須入力にしない"
+    description: "decisions が指名した spec_stress_skill を改訂し、retro_findings の見逃した specification failure を反証対象の仮定と adversarial case へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_vscode_ext_debug_skill:
     label: VSCode拡張デバッグスキル整備
-    description: "decisions が指名した vscode_ext_debug_skill を改訂する。対象固有の実行手順は decisions の具体的な変更指示で決まり、別の evidence artifact は必須入力にしない"
+    description: "decisions が指名した vscode_ext_debug_skill を改訂し、retro_findings の extension failure を再現・診断手順へ反映する"
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_template:
@@ -722,6 +722,28 @@ decisions >> maintain_review_perspectives -> review_perspectives
 decisions >> maintain_spec_stress_skill -> spec_stress_skill
 decisions >> maintain_vscode_ext_debug_skill -> vscode_ext_debug_skill
 decisions >> maintain_workflow_companion -> workflow_md
+
+retro_findings >>? maintain_delegation_guard
+retro_findings >>? maintain_distributed_advisory_hooks
+retro_findings >>? maintain_distribution_review_perspectives
+retro_findings >>? maintain_distribution_review_skill
+retro_findings >>? maintain_ecosystem_skill
+retro_findings >>? maintain_grill_skill
+retro_findings >>? maintain_implementer_agent
+retro_findings >>? maintain_main_branch_guard
+retro_findings >>? maintain_ops_binding
+retro_findings >>? maintain_ops_skill_general
+retro_findings >>? maintain_ops_skill_github_backend
+retro_findings >>? maintain_pfd_lens_agent
+retro_findings >>? maintain_pre_artifact_advisory
+retro_findings >>? maintain_prose_mechanization_audit_skill
+retro_findings >>? maintain_retro_binding
+retro_findings >>? maintain_retro_pattern_sweep_skill
+retro_findings >>? maintain_retro_skill
+retro_findings >>? maintain_review_perspectives
+retro_findings >>? maintain_spec_stress_skill
+retro_findings >>? maintain_vscode_ext_debug_skill
+retro_findings >>? maintain_workflow_companion
 
 distribution_review_record >>? maintain_distributed_advisory_hooks
 distribution_review_record >>? maintain_distribution_review_perspectives
