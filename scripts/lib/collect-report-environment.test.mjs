@@ -38,4 +38,21 @@ describe("collectReportEnvironment", () => {
 		assert.equal(env.pluginVersion, "0.4.2");
 		assert.equal(env.bundleContentHash, "abc123");
 	});
+
+	it("reports the Codex plugin version and records the missing bundle hash", () => {
+		const skillRoot = join(tmp, "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		writeJson(join(tmp, ".codex-plugin", "plugin.json"), { version: "0.4.2" });
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.installation, "codex-plugin");
+		assert.equal(env.pluginVersion, "0.4.2");
+		assert.equal(env.bundleContentHash, null);
+		assert.deepEqual(
+			env.unavailable.map(({ field }) => field),
+			["bundleContentHash"],
+		);
+		assert.match(env.unavailable[0].reason, /Codex/);
+	});
 });

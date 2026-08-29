@@ -24,23 +24,51 @@ function readJsonOrNull(path) {
 	}
 }
 
+/** @param {string} skillRoot */
+function detectInstallation(skillRoot) {
+	const bundleRoot = resolve(skillRoot, "../..");
+	if (existsSync(resolve(bundleRoot, ".claude-plugin/plugin.json"))) {
+		return { installation: "claude-plugin", bundleRoot };
+	}
+	if (existsSync(resolve(bundleRoot, ".codex-plugin/plugin.json"))) {
+		return { installation: "codex-plugin", bundleRoot };
+	}
+	return { installation: "unknown", bundleRoot };
+}
+
 /**
  * @param {string} skillRoot
  * @param {{ runCommand?: (command: string, args: string[]) => string | null }} [options]
  */
 export function collectReportEnvironment(skillRoot, options = {}) {
-	const bundleRoot = resolve(skillRoot, "../..");
+	const { installation, bundleRoot } = detectInstallation(skillRoot);
 	const unavailable = [];
-	const claudeManifest = readJsonOrNull(
-		resolve(bundleRoot, ".claude-plugin/plugin.json"),
-	);
-	const bundleManifest = readJsonOrNull(
-		resolve(bundleRoot, ".claude-plugin/bundle-manifest.json"),
-	);
+	let pluginVersion = null;
+	let bundleContentHash = null;
+
+	if (installation === "claude-plugin") {
+		pluginVersion =
+			readJsonOrNull(resolve(bundleRoot, ".claude-plugin/plugin.json"))
+				?.version ?? null;
+		bundleContentHash =
+			readJsonOrNull(resolve(bundleRoot, ".claude-plugin/bundle-manifest.json"))
+				?.contentHash ?? null;
+	}
+	if (installation === "codex-plugin") {
+		pluginVersion =
+			readJsonOrNull(resolve(bundleRoot, ".codex-plugin/plugin.json"))
+				?.version ?? null;
+		unavailable.push({
+			field: "bundleContentHash",
+			reason:
+				"Codex plugin bundles do not carry a bundle manifest, so the content hash cannot be read.",
+		});
+	}
+
 	return {
-		installation: "claude-plugin",
-		pluginVersion: claudeManifest?.version ?? null,
-		bundleContentHash: bundleManifest?.contentHash ?? null,
+		installation,
+		pluginVersion,
+		bundleContentHash,
 		cliVersion: null,
 		repoCommit: null,
 		installProvenance: null,
