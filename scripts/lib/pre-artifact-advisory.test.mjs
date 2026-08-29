@@ -12,9 +12,10 @@ const ROOT = "/repo";
 
 const REMINDERS = [
 	{
-		name: "偽と分かった主張を、同じ形のまま中身だけ差し替える trap",
-		path: ".pfdsl/bindings/pfd-retro-patterns/claim-form-invites-restaleness.md",
-		countermeasure: "外部の能力に依存する規則は、その能力を列挙しない。",
+		name: "委譲ブリーフが未検証のデータ構造を前提にする trap",
+		path: ".pfdsl/bindings/pfd-retro-patterns/brief-assumes-unverified-data-shape.md",
+		countermeasure:
+			"**差し戻し条件は、委譲先が食い違いに気付ける場合にしか効かない。** 上の #794 は実ファイルを開けば分かる形だったので止まったが、#902 は「ブリーフの数値」と「受け入れ基準が見る範囲」が両方とも誤りを通したため、委譲先からは正常な完了と区別できなかった。ブリーフに数値仕様を書くときは、その値を出した実測コマンドと出力をブリーフに併記し、受け入れ基準がその数値を実際に判定するかを渡す前に確かめる（一般形は work-cycle.md 適用点2 の「流用する既存機構の作用域を実測で確認する」）。",
 	},
 ];
 
@@ -198,8 +199,8 @@ describe("advisoryKey", () => {
 describe("formatPreArtifactAdvisory", () => {
 	it("names every reminder and its file", () => {
 		const text = formatPreArtifactAdvisory(REMINDERS);
-		assert.match(text, /claim-form-invites-restaleness\.md/);
-		assert.match(text, /同じ形のまま中身だけ差し替える/);
+		assert.match(text, /brief-assumes-unverified-data-shape\.md/);
+		assert.match(text, /委譲ブリーフが未検証のデータ構造を前提にする/);
 	});
 
 	it("tells the runner the artifact already landed, rather than claiming to precede it", () => {
@@ -212,7 +213,7 @@ describe("formatPreArtifactAdvisory", () => {
 	it("leaves the countermeasure to the preflight, which can afford the length", () => {
 		assert.doesNotMatch(
 			formatPreArtifactAdvisory(REMINDERS),
-			/外部の能力に依存する規則/,
+			/差し戻し条件は、委譲先が食い違いに気付ける場合にしか効かない/,
 		);
 	});
 });
@@ -232,7 +233,7 @@ describe("runPreArtifactAdvisory", () => {
 		assert.equal(shouldOutput, true);
 		assert.match(
 			output.hookSpecificOutput.additionalContext,
-			/claim-form-invites-restaleness/,
+			/brief-assumes-unverified-data-shape/,
 		);
 	});
 

@@ -71,6 +71,24 @@ prefix も値も宣言されておらず、新しいものを弾く機構も無�
 - **廃止の方法はファイルごと削除する。** tombstone ファイル（廃止の記録だけを残す空ファイル）は作らない。廃止の記録は git 履歴とそのコミットメッセージに残る。カタログは「いま効く問い」の集合であって、効かなくなった問いの記念碑ではない
 - **上の3項目が取りこぼした分は、集合としての棚卸しが拾う。** 統合は追記の時点にしか働かず、廃止は機械化したサイクルが気付いた分にしか働かないので、どちらの契機も来ないまま残るものがある。その棚卸しの手順は `retro-pattern-sweep` スキルが、起動の引き金は `scripts/lib/asset-sweep.mjs` の `SWEEP_TARGETS` が持つ（閾値も発火条件もそちらが一次情報）
 
+### 変更時の意味レビュー
+
+新規パターン、既存パターンへの `具体例:` の追記、パターンの統合・分割は、書式検査とは別に diff-scoped な意味レビューを行う。
+まず次の2コマンドの和集合で、base から working tree までの追加・変更・削除・rename と untracked の新規ファイルを列挙する。
+
+```bash
+git diff --name-only --diff-filter=ACMRD origin/<base> -- .pfdsl/bindings/pfd-retro-patterns/
+git ls-files --others --exclude-standard -- .pfdsl/bindings/pfd-retro-patterns/
+```
+
+各対象について、定義文が1つの trap を述べるか、`問いの形:` がその trap を検出するか、`具体例:` がその定義へ所属するか、`対策:` が原因へ作用するか、近接パターンとの境界を説明できるか、タグが発火条件を表すか、`phase: pre-artifact` が対策の時点と一致するか、断定が証拠の範囲を超えないかを判定する。
+具体例の追記・統合・分割では、複数の独立した失敗型を1ファイルへ抱え込む肥大が起きていないかも判定する。
+
+変更者とは独立した reviewer に対象 diff を渡し、finding ごとに再現可能な concrete failure scenario と `file:line` の根拠を必須とする。
+finding を修正した後は同じ reviewer が同じ観点で再検証し、解消または残存を報告する。
+`node scripts/retro-patterns.mjs check` が証明するのは解析可能性・ファイル名・タグ有無・往復一致等の構造だけであり、所属や論理的一貫性の合格ではない。
+`near` 等の語彙類似は近傍を開く補助には使えるが、意味分類を自動決定してはならない。
+
 ## 配布物への finding 反映
 
 誰が配布層を編集できるかの一般ルールは pfd-retro SKILL.md「出力」節の「上流変更ルール」が一次情報（ADR-0028）。
