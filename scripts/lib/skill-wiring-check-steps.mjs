@@ -14,7 +14,7 @@ import {
 } from "./skill-wiring-check.mjs";
 
 const WORKFLOW = ".pfdsl/workflow.pfdsl";
-const PIPELINE = ".pfdsl/runtime-pipeline.pfdsl";
+const PIPELINE = ".pfdsl/pipeline.pfdsl";
 
 /**
  * @param {{
@@ -49,7 +49,7 @@ export function runSkillWiringCheck({
 
 	// The other direction (#930): both graphs' artifacts are pooled, since
 	// bundled material is modelled wherever its artifact was declared. `pfd_commands`
-	// exists only in runtime-pipeline.pfdsl (#780) — findUnwiredSkills now scans
+	// exists only in pipeline.pfdsl (#780) — findUnwiredSkills now scans
 	// both graphs too (#944), so pooling here just keeps the two checks over the
 	// same universe rather than being what makes the commands mirror visible.
 	const unmodeled = findUnmodeledMirrors({

@@ -1494,7 +1494,7 @@ describe("SIZE_INTENT_PATTERN / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", 
 		for (const path of [
 			".pfdsl/roadmap.md",
 			".pfdsl/workflow.md",
-			".pfdsl/runtime-pipeline.md",
+			".pfdsl/pipeline.md",
 			".pfdsl/review-perspectives.md",
 		]) {
 			assert.ok(
@@ -1796,14 +1796,14 @@ describe("classifyChangedFilesByModeling", () => {
 				...modeled,
 				{
 					path: "docs/spec/spec.md",
-					file: ".pfdsl/runtime-pipeline.pfdsl",
+					file: ".pfdsl/pipeline.pfdsl",
 					id: "spec",
 				},
 			],
 		);
 		assert.deepEqual(result.modeled[0].models, [
 			{ file: ".pfdsl/workflow.pfdsl", id: "spec" },
-			{ file: ".pfdsl/runtime-pipeline.pfdsl", id: "spec" },
+			{ file: ".pfdsl/pipeline.pfdsl", id: "spec" },
 		]);
 	});
 });

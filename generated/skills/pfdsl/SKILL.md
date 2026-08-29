@@ -29,7 +29,7 @@ description: |
 
 ```yaml
 title: ...
-type: roadmap     # roadmap | workflow | runtime-pipeline（§2.10）。`ready` は roadmap のみ対象。省略可
+type: roadmap     # roadmap | workflow | pipeline（§2.10）。`ready` は roadmap のみ対象。省略可
 extends: presets.yaml   # 表示系キー（statusStyles 等）のプリセット継承（§2.9.4）
 basePath: ../     # location:/command: の解決基準ディレクトリ。省略時はこの .pfdsl のディレクトリ
 layout:

@@ -4,7 +4,7 @@
  *
  * Verifies that every distributed hand-written skill/agent has exactly one
  * workflow output producer in .pfdsl/workflow.pfdsl and a primary input/output
- * path that reaches `gen_plugin` in .pfdsl/runtime-pipeline.pfdsl (where it is
+ * path that reaches `gen_plugin` in .pfdsl/pipeline.pfdsl (where it is
  * consumed as bundled material).
  * See scripts/lib/skill-wiring-check.mjs
  * for how scope is derived without a hand-maintained list of skill names (#699).

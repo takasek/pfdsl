@@ -79,7 +79,7 @@ function deps({
 } = {}) {
 	return {
 		readFile: (file) =>
-			file.includes("runtime-pipeline") ? pipelineText : WORKFLOW_TEXT,
+			file.includes("pipeline") ? pipelineText : WORKFLOW_TEXT,
 		analyzeFile: (text) => (text === WORKFLOW_TEXT ? workflow : pipeline),
 		locate,
 		mirrors: MIRRORS,
@@ -234,7 +234,7 @@ describe("runSkillWiringCheck", () => {
 		assert.equal(result.exitCode, 0);
 	});
 
-	it("anchors a pipeline-only bundled artifact's finding at runtime-pipeline.pfdsl, not workflow.pfdsl (#944)", () => {
+	it("anchors a pipeline-only bundled artifact's finding at pipeline.pfdsl, not workflow.pfdsl (#944)", () => {
 		const mirrors = [
 			{
 				dest: "commands",
@@ -247,7 +247,7 @@ describe("runSkillWiringCheck", () => {
 			mirrors,
 		});
 		assert.equal(result.exitCode, 1);
-		assert.match(result.stderrLines[0], /runtime-pipeline\.pfdsl:2:/);
+		assert.match(result.stderrLines[0], /pipeline\.pfdsl:2:/);
 		assert.match(result.stderrLines[0], /pfd_commands/);
 		assert.match(result.stderrLines[0], /reach gen_plugin/);
 		assert.doesNotMatch(result.stderrLines[0], /distill_ops outputs/);

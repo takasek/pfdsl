@@ -378,7 +378,7 @@ console.log(formatGateTable(results));
 		// the sets here rather than in the CLI is deliberate — spec §2.9.1 keeps
 		// ids file-local and forbids a flattened cross-file view, so "same id
 		// means the same artifact" is a local convention of this repo's .pfdsl/,
-		// which runtime-pipeline.md already declares out of modeling scope. Which
+		// which pipeline.md already declares out of modeling scope. Which
 		// directories that convention covers is SIBLING_ID_NAMESPACE_DIRS' job;
 		// this function only does the git + CLI I/O around it.
 		const siblingConsumedByDir = new Map();
