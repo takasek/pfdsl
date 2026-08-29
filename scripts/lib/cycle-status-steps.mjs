@@ -22,7 +22,6 @@ import {
 	classifyDesignSettlement,
 	classifyPRs,
 	countBehind,
-	deriveDesignReviewRequirement,
 	detectEnumeratedOptions,
 	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
@@ -264,7 +263,6 @@ export async function runCycleStatus({
 	// The count shown is the largest across the cycle's issues: a record is owed
 	// on each one separately, and the template is written once.
 	let recordOptionCount = 0;
-	const designReviewRequirements = [];
 	const issueLookupFailures = [];
 	/** @type {Map<number, string[]>} label names of each issue actually fetched */
 	const labelsByIssue = new Map();
@@ -287,11 +285,6 @@ export async function runCycleStatus({
 				);
 				const optionCount = detectEnumeratedOptions(issueJson.body).count;
 				recordOptionCount = Math.max(recordOptionCount, optionCount);
-				const reviewRequirement = deriveDesignReviewRequirement({
-					issue: targetIssue,
-					body: issueJson.body,
-				});
-				if (reviewRequirement) designReviewRequirements.push(reviewRequirement);
 				const classification = classifyDesignSettlement({
 					body: issueJson.body,
 					createdAt: issueJson.createdAt,
@@ -479,15 +472,12 @@ export async function runCycleStatus({
 		ready,
 		best,
 		designUnsettledFor,
-		designReviewRequirements,
 		issueLookupFailures,
 		blocking: issueLookupFailures.length > 0,
 		designRecordTemplate: buildDesignRecordTemplate({
 			optionCount: recordOptionCount,
 		}),
-		reviewRecordTemplate: buildReviewRecordTemplate({
-			requirements: designReviewRequirements,
-		}),
+		reviewRecordTemplate: buildReviewRecordTemplate(),
 		gateCheckCommand,
 		unregisteredManagedIssues,
 		untriagedTargetIssues,

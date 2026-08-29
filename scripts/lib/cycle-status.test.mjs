@@ -8,7 +8,6 @@ import {
 	classifyDesignSettlement,
 	classifyPRs,
 	countBehind,
-	deriveDesignReviewRequirement,
 	detectDesignUnsettled,
 	detectEnumeratedOptions,
 	findIssueNumberForProcess,
@@ -291,27 +290,6 @@ describe("detectEnumeratedOptions", () => {
 			count: 0,
 			headings: [],
 		});
-	});
-});
-
-describe("deriveDesignReviewRequirement", () => {
-	it("derives the code-path design requirement from the shared option count", () => {
-		for (const [issue, body] of [
-			[1008, "## 対応案\n1. 案A\n2. 案B\n"],
-			[1009, "普通の説明文。"],
-		]) {
-			const requirement = deriveDesignReviewRequirement({ issue, body });
-			assert.equal(
-				Boolean(requirement),
-				detectEnumeratedOptions(body).enumerated,
-			);
-			assert.deepEqual(
-				requirement,
-				issue === 1008
-					? { issue, tool: "design", when: "code-path-changed" }
-					: null,
-			);
-		}
 	});
 });
 
@@ -701,32 +679,12 @@ describe("buildDesignRecordTemplate", () => {
 });
 
 describe("buildReviewRecordTemplate", () => {
-	it("requires a design review when the issue enumerates multiple options", () => {
-		const { line, requiredLine, note } = buildReviewRecordTemplate({
-			requirements: [
-				{ issue: 1008, tool: "design", when: "code-path-changed" },
-			],
-		});
+	it("exposes only the general review trailer contract", () => {
+		const template = buildReviewRecordTemplate();
+		const { line, note } = template;
 		assert.equal(line, "Review: tool=<tool-name>");
-		assert.equal(requiredLine, "Review: tool=design");
-		assert.match(
-			note,
-			/複数案.*packages\/.*scripts\/.*Review: tool=design.*必須/,
-		);
-	});
-
-	it("keeps the ordinary review placeholder when the issue has at most one option", () => {
-		const template = buildReviewRecordTemplate({ requirements: [] });
-		assert.equal(template.line, "Review: tool=<tool-name>");
-		assert.equal(template.requiredLine, null);
-	});
-
-	it("does not infer a requirement from unrelated option-count input", () => {
-		const template = buildReviewRecordTemplate({
-			optionCount: 2,
-			requirements: [],
-		});
-		assert.equal(template.requiredLine, null);
+		assert.equal("requiredLine" in template, false);
+		assert.doesNotMatch(note, /複数案/);
 	});
 
 	it("emits a line the checker's own parser accepts once a real tool is substituted", () => {
