@@ -57,10 +57,21 @@ function findRepoRoot(from) {
 // the reader of the issue needs is "not available in this shape" versus
 // "collection failed", so every shape declares its own reason rather than
 // letting the field drop out of the report silently.
+const NOT_A_CHECKOUT =
+	"A plugin installation is not a git checkout, so there is no commit to report.";
+const PROVENANCE_IS_REPO_LOCAL_ONLY =
+	"Install provenance is written only by a repo-local install.";
+
 const MISSING_IDENTIFIERS = Object.freeze({
+	"claude-plugin": Object.freeze({
+		repoCommit: NOT_A_CHECKOUT,
+		installProvenance: PROVENANCE_IS_REPO_LOCAL_ONLY,
+	}),
 	"codex-plugin": Object.freeze({
 		bundleContentHash:
 			"Codex plugin bundles do not carry a bundle manifest, so the content hash cannot be read.",
+		repoCommit: NOT_A_CHECKOUT,
+		installProvenance: PROVENANCE_IS_REPO_LOCAL_ONLY,
 	}),
 	"repo-local": Object.freeze({
 		pluginVersion:
@@ -73,12 +84,16 @@ const MISSING_IDENTIFIERS = Object.freeze({
 			"The upstream checkout is the distribution source itself; the reported commit identifies it instead.",
 		bundleContentHash:
 			"The upstream checkout is the distribution source itself; the reported commit identifies it instead.",
+		installProvenance: PROVENANCE_IS_REPO_LOCAL_ONLY,
 	}),
 	unknown: Object.freeze({
 		pluginVersion:
 			"The installation shape could not be determined, so no plugin manifest was read.",
 		bundleContentHash:
 			"The installation shape could not be determined, so no bundle manifest was read.",
+		repoCommit:
+			"No git checkout was found above the skill root, so there is no commit to report.",
+		installProvenance: PROVENANCE_IS_REPO_LOCAL_ONLY,
 	}),
 });
 

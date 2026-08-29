@@ -38,6 +38,10 @@ function writeJson(path, value) {
 
 const noCommands = () => null;
 
+function unavailableFields(env) {
+	return env.unavailable.map(({ field }) => field).sort();
+}
+
 describe("collectReportEnvironment", () => {
 	it("reports version and bundle hash for a Claude plugin installation", () => {
 		const skillRoot = join(tmp, "skills", "pfd-ops");
@@ -141,23 +145,23 @@ describe("collectReportEnvironment", () => {
 		);
 	});
 
-	it("records both bundle identifiers a repo-local install cannot carry", () => {
+	it("accounts for every identifier a repo-local install lacks", () => {
 		const repoRoot = join(tmp, "adopter");
 		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
 		mkdirSync(skillRoot, { recursive: true });
 		mkdirSync(join(repoRoot, ".git"), { recursive: true });
+		writeJson(join(repoRoot, "pfd-ops-install-manifest.json"), {
+			version: "0.4.2",
+		});
 
 		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
 
-		const fields = env.unavailable.map(({ field }) => field);
-		assert.ok(
-			fields.includes("pluginVersion"),
-			"pluginVersion should be recorded as unavailable",
-		);
-		assert.ok(
-			fields.includes("bundleContentHash"),
-			"bundleContentHash should be recorded as unavailable",
-		);
+		assert.deepEqual(unavailableFields(env), [
+			"bundleContentHash",
+			"cliVersion",
+			"pluginVersion",
+			"repoCommit",
+		]);
 	});
 
 	it("distinguishes an unreadable Claude manifest from a shape that has none", () => {
@@ -229,7 +233,7 @@ describe("collectReportEnvironment", () => {
 		assert.equal(parsed.installation, "upstream-checkout");
 	});
 
-	it("records the identifiers an upstream checkout does not carry", () => {
+	it("accounts for every identifier an upstream checkout lacks", () => {
 		const repoRoot = join(tmp, "pfdsl");
 		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
 		mkdirSync(skillRoot, { recursive: true });
@@ -242,14 +246,45 @@ describe("collectReportEnvironment", () => {
 
 		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
 
-		const fields = env.unavailable.map(({ field }) => field);
-		assert.ok(
-			fields.includes("pluginVersion"),
-			"pluginVersion should be recorded as unavailable",
-		);
-		assert.ok(
-			fields.includes("bundleContentHash"),
-			"bundleContentHash should be recorded as unavailable",
-		);
+		assert.deepEqual(unavailableFields(env), [
+			"bundleContentHash",
+			"cliVersion",
+			"installProvenance",
+			"pluginVersion",
+			"repoCommit",
+		]);
+	});
+
+	it("accounts for every identifier a Claude plugin lacks", () => {
+		const skillRoot = join(tmp, "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "0.4.2" });
+		writeJson(join(tmp, ".claude-plugin", "bundle-manifest.json"), {
+			contentHash: "abc123",
+		});
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.deepEqual(unavailableFields(env), [
+			"cliVersion",
+			"installProvenance",
+			"repoCommit",
+		]);
+	});
+
+	it("accounts for every identifier an unrecognized shape lacks", () => {
+		const skillRoot = join(tmp, "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.installation, "unknown");
+		assert.deepEqual(unavailableFields(env), [
+			"bundleContentHash",
+			"cliVersion",
+			"installProvenance",
+			"pluginVersion",
+			"repoCommit",
+		]);
 	});
 });
