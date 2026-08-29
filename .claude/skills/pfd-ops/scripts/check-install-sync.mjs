@@ -91,7 +91,7 @@ function isValidManifestEntry(entry) {
 // change reading an old manifest) are dropped rather than crashing every
 // caller downstream — an entry this tool can't make sense of is exactly
 // equivalent to it never having been recorded.
-function readManifest(targetRoot) {
+export function readManifest(targetRoot) {
 	const manifestPath = join(targetRoot, MANIFEST_RELATIVE_PATH);
 	if (!existsSync(manifestPath)) return [];
 	try {

@@ -2,8 +2,8 @@
 // Collects the environment block of an upstream report (pfd-upstream-report).
 //
 // This file ships inside the pfd-ops skill and travels with the whole skill
-// tree into every plugin bundle, so it must not import anything outside
-// itself — Node stdlib only.
+// tree into every plugin bundle, so it must not import anything outside that
+// tree — Node stdlib and its own siblings only.
 //
 // Unlike plugin-version-check.mjs, which returns null and stays silent when a
 // manifest is missing, this reports what it could not obtain. A reader of the
@@ -15,10 +15,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// The install provenance check-install-sync.mjs writes, at the path it uses.
-// Both are read from there rather than guessed: a report that names the wrong
-// path would say "no provenance" for every repo-local install that has one.
-const PROVENANCE_RELATIVE_PATH = ".claude/pfd-ops-install-manifest.json";
+import { readManifest } from "./check-install-sync.mjs";
 
 // A manifest that parses can still hold something unusable in an identifier's
 // place — an empty string, whitespace, a number, an array. Those are collection
@@ -27,14 +24,6 @@ const PROVENANCE_RELATIVE_PATH = ".claude/pfd-ops-install-manifest.json";
 /** @param {unknown} value */
 function asIdentifier(value) {
 	return typeof value === "string" && value.trim().length > 0 ? value : null;
-}
-
-/** @param {unknown} value */
-function asProvenance(value) {
-	if (value === null || typeof value !== "object" || Array.isArray(value)) {
-		return null;
-	}
-	return Array.isArray(value.files) ? value : null;
 }
 
 /** @param {string} path */
@@ -205,9 +194,13 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		}
 	}
 	if (installation === "repo-local") {
-		installProvenance = asProvenance(
-			readJsonOrNull(resolve(repoRoot, PROVENANCE_RELATIVE_PATH)),
-		);
+		// The manifest's path and its per-entry schema both live in
+		// check-install-sync.mjs, which writes the file. Reading it through that
+		// module keeps this collector from carrying a second copy of either —
+		// a copy that would drift into reporting "no provenance" for installs
+		// that have one.
+		const entries = readManifest(repoRoot);
+		installProvenance = entries.length > 0 ? entries : null;
 		if (installProvenance === null) {
 			recordFailure(
 				"installProvenance",

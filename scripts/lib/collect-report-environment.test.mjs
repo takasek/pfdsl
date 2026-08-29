@@ -101,7 +101,7 @@ describe("collectReportEnvironment", () => {
 
 		assert.equal(env.installation, "repo-local");
 		assert.equal(env.pluginVersion, null);
-		assert.deepEqual(env.installProvenance, provenance);
+		assert.deepEqual(env.installProvenance, provenance.files);
 	});
 
 	it("classifies the upstream checkout by its own distribution sources", () => {
@@ -210,8 +210,13 @@ describe("collectReportEnvironment", () => {
 		]);
 	});
 
-	it("rejects install provenance that does not hold a file list", () => {
-		for (const invalid of [["0.4.2"], {}, { files: "wrong" }]) {
+	it("rejects install provenance that holds no usable entry", () => {
+		for (const invalid of [
+			["0.4.2"],
+			{},
+			{ files: "wrong" },
+			{ files: [null, {}, { path: 42, hash: [] }] },
+		]) {
 			const repoRoot = join(tmp, `adopter-${JSON.stringify(invalid).length}`);
 			const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
 			mkdirSync(skillRoot, { recursive: true });
