@@ -29,6 +29,7 @@
 **Files:**
 - Create: `.claude/skills/pfd-ops/scripts/collect-report-environment.mjs`
 - Test: `scripts/lib/collect-report-environment.test.mjs`
+- Modify: `scripts/lib/harness-inventory.mjs`（`SKILL_SOURCE_FILES` の `pfd-ops` エントリ）
 
 **Interfaces:**
 - Consumes: なし
@@ -147,10 +148,32 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 Run: `node --test scripts/lib/collect-report-environment.test.mjs`
 Expected: PASS（1 test）
 
-- [ ] **Step 5: コミット**
+- [ ] **Step 5: 配布経路へ登録する**
+
+`.claude/skills/pfd-ops/` 配下に `SKILL_SOURCE_FILES` へ列挙されていないファイルが1つでもあると、`scripts/lib/harness-source-decoder.mjs` の `decodeHarnessSources` が `source-topology: ...: unclassified ...` で生成そのものを拒否する。
+pre-commit の drift ゲートはこの再生成を呼ぶため、登録前のコミットは失敗する。
+したがって登録を後続タスクへ先送りできない。
+
+`scripts/lib/harness-inventory.mjs` の `SKILL_SOURCE_FILES` の `pfd-ops` 配列で、`"references/work-cycle.md",` と `"scripts/check-install-sync.mjs",` の間へ挿入する（配列は文字列のソート順に並んでいる）:
+
+```js
+		"scripts/collect-report-environment.mjs",
+```
+
+- [ ] **Step 6: 配布物を再生成する**
+
+Run: `node scripts/gen-plugin-dist-independent.mjs`
+Expected: exit 0。末尾に `Dist-independent Claude and Codex plugin outputs assembled.` が出る
+
+- [ ] **Step 7: 4ターゲットへ出力されたことを確認する**
+
+Run: `git status --short | grep -c 'collect-report-environment'`
+Expected: 3 以上（一次ソース・`plugin/pfdsl/skills/pfd-ops/scripts/`・`.agents/skills/pfd-ops/scripts/` に現れる）
+
+- [ ] **Step 8: コミット**
 
 ```bash
-git add .claude/skills/pfd-ops/scripts/collect-report-environment.mjs scripts/lib/collect-report-environment.test.mjs && git commit -m "feat(pfd-ops): resolve the Claude plugin report environment"
+git add -A && git commit -m "feat(pfd-ops): resolve the Claude plugin report environment"
 ```
 
 ---
@@ -256,10 +279,15 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 Run: `node --test scripts/lib/collect-report-environment.test.mjs`
 Expected: PASS（2 tests）
 
-- [ ] **Step 5: コミット**
+- [ ] **Step 5: 配布物を再生成する**
+
+Run: `node scripts/gen-plugin-dist-independent.mjs`
+Expected: exit 0
+
+- [ ] **Step 6: コミット**
 
 ```bash
-git add .claude/skills/pfd-ops/scripts/collect-report-environment.mjs scripts/lib/collect-report-environment.test.mjs && git commit -m "feat(pfd-ops): report the Codex plugin's missing bundle hash"
+git add -A && git commit -m "feat(pfd-ops): report the Codex plugin's missing bundle hash"
 ```
 
 ---
@@ -383,10 +411,15 @@ function detectInstallation(skillRoot) {
 Run: `node --test scripts/lib/collect-report-environment.test.mjs`
 Expected: PASS（4 tests）
 
-- [ ] **Step 5: コミット**
+- [ ] **Step 5: 配布物を再生成する**
+
+Run: `node scripts/gen-plugin-dist-independent.mjs`
+Expected: exit 0
+
+- [ ] **Step 6: コミット**
 
 ```bash
-git add .claude/skills/pfd-ops/scripts/collect-report-environment.mjs scripts/lib/collect-report-environment.test.mjs && git commit -m "feat(pfd-ops): separate repo-local installs from the upstream checkout"
+git add -A && git commit -m "feat(pfd-ops): separate repo-local installs from the upstream checkout"
 ```
 
 ---
@@ -486,67 +519,62 @@ function defaultRunCommand(command, args) {
 
 返り値の `cliVersion: null` と `repoCommit: null` を採取した値へ変える。
 
-- [ ] **Step 4: テストを実行して通過を確認する**
+- [ ] **Step 4: Task 2 のアサーションを意図に合わせて緩める**
+
+`cliVersion` の採取は導入形態に関わらず走るため、`runCommand` が `null` を返すテストでは `unavailable` に `cliVersion` も入る。
+Task 2 のテストは `unavailable` の配列全体が `["bundleContentHash"]` と一致することを要求していて、これが壊れる。
+そのテストが確かめたいのは「Codex plugin では bundleContentHash が取得できないと記録される」であり、`unavailable` に他の項目が入らないことではない。
+アサーションを意図に合わせる。
+
+`scripts/lib/collect-report-environment.test.mjs` の `"reports the Codex plugin version and records the missing bundle hash"` で、次の2つのアサーションを差し替える:
+
+```js
+		assert.deepEqual(
+			env.unavailable.map(({ field }) => field),
+			["bundleContentHash"],
+		);
+		assert.match(env.unavailable[0].reason, /Codex/);
+```
+
+差し替え後:
+
+```js
+		const missingHash = env.unavailable.find(
+			({ field }) => field === "bundleContentHash",
+		);
+		assert.ok(missingHash, "bundleContentHash should be recorded as unavailable");
+		assert.match(missingHash.reason, /Codex/);
+```
+
+コミット済みの Task 2 を amend しない。
+この差し替えは Task 4 の変更が要求したものなので、Task 4 のコミットへ含める。
+
+- [ ] **Step 5: テストを実行して通過を確認する**
 
 Run: `node --test scripts/lib/collect-report-environment.test.mjs`
 Expected: PASS（6 tests）
 
-- [ ] **Step 5: コミット**
-
-```bash
-git add .claude/skills/pfd-ops/scripts/collect-report-environment.mjs scripts/lib/collect-report-environment.test.mjs && git commit -m "feat(pfd-ops): collect the CLI version and repository commit"
-```
-
----
-
-### Task 5: 環境採取スクリプトを配布経路へ登録する
-
-**Files:**
-- Modify: `scripts/lib/harness-inventory.mjs`（`SKILL_SOURCE_FILES` の `pfd-ops` エントリ）
-
-**Interfaces:**
-- Consumes: Task 4 完成の `collect-report-environment.mjs`
-- Produces: なし（配布経路の登録のみ）
-
-`SKILL_SOURCE_FILES` の `pfd-ops` 配列は 21 行目から始まり、`scripts/check-install-sync.mjs` と `scripts/plugin-version-check.mjs` を末尾に持つ。
-配列は文字列のソート順に並んでいる。
-
-- [ ] **Step 1: 登録を追加する**
-
-`scripts/lib/harness-inventory.mjs` の `pfd-ops` 配列で、`"scripts/check-install-sync.mjs",` の直前へ挿入する:
-
-```js
-		"scripts/collect-report-environment.mjs",
-```
-
-挿入位置はソート順を保つため `"references/work-cycle.md",` と `"scripts/check-install-sync.mjs",` の間になる。
-
-- [ ] **Step 2: 配布物を再生成する**
+- [ ] **Step 6: 配布物を再生成する**
 
 Run: `node scripts/gen-plugin-dist-independent.mjs`
-Expected: exit 0。末尾に `Dist-independent Claude and Codex plugin outputs assembled.` が出る
+Expected: exit 0
 
-- [ ] **Step 3: 生成物に反映されたことを確認する**
-
-Run: `git status --short`
-Expected: `plugin/pfdsl/skills/pfd-ops/scripts/collect-report-environment.mjs` と `.agents/skills/pfd-ops/scripts/collect-report-environment.mjs` を含む生成物が変更として現れる
-
-- [ ] **Step 4: コミット**
+- [ ] **Step 7: コミット**
 
 ```bash
-git add -A && git commit -m "chore(dist): ship the report environment collector"
+git add -A && git commit -m "feat(pfd-ops): collect the CLI version and repository commit"
 ```
 
 ---
 
-### Task 6: pfd-upstream-report スキル本体
+### Task 5: pfd-upstream-report スキル本体
 
 **Files:**
 - Create: `.claude/skills/pfd-upstream-report/SKILL.md`
 - Modify: `scripts/lib/harness-inventory.mjs`（`SKILL_SOURCE_FILES` と `HARNESS_CAPABILITY_CONTRACT`）
 
 **Interfaces:**
-- Consumes: Task 5 で配布された `collect-report-environment.mjs`（スキル本文が呼び出す）
+- Consumes: Task 1 で配布された `collect-report-environment.mjs`（スキル本文が呼び出す）
 - Produces: `skill:pfd-upstream-report` capability
 
 - [ ] **Step 1: SKILL.md を書く**
@@ -609,13 +637,13 @@ git add -A && git commit -m "feat(skills): add the pfd-upstream-report skill"
 
 ---
 
-### Task 7: pfd-retro の上流変更ルールを新スキルへ接続する
+### Task 6: pfd-retro の上流変更ルールを新スキルへ接続する
 
 **Files:**
 - Modify: `.claude/skills/pfd-retro/SKILL.md`（「上流変更ルール」節）
 
 **Interfaces:**
-- Consumes: Task 6 の `pfd-upstream-report` スキル
+- Consumes: Task 5 の `pfd-upstream-report` スキル
 - Produces: なし
 
 現行の該当文は次の一文で、採用リポ自身の issue バックエンドと上流リポへの起票が同居しており、どちらへ立てるのかが読み取れない。
@@ -649,13 +677,13 @@ git add -A && git commit -m "docs(pfd-retro): route upstream findings to the rep
 
 ---
 
-### Task 8: 全体検査と配布レビュー
+### Task 7: 全体検査と配布レビュー
 
 **Files:**
 - Modify: なし（検査と、指摘に応じた修正）
 
 **Interfaces:**
-- Consumes: Task 7 までの全成果物
+- Consumes: Task 6 までの全成果物
 - Produces: distribution-review のレビュー記録
 
 - [ ] **Step 1: テストを実行する**
