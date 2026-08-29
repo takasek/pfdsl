@@ -205,7 +205,7 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		if (installProvenance === null) {
 			recordFailure(
 				"installProvenance",
-				"The install provenance file is absent, could not be read, or did not hold a file list.",
+				"The install provenance file is absent, could not be read, or held no entry the installer recognises.",
 			);
 		}
 	}

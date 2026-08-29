@@ -77,10 +77,16 @@ pfd-retro の宛先表も「未着手作業の発見」を作業項目バック�
 
 - Claude plugin: plugin version と bundle contentHash（`<skillRoot>/../../.claude-plugin/plugin.json` と、同ディレクトリの `bundle-manifest.json`）
 - Codex plugin: `.codex-plugin/plugin.json` の version のみ。contentHash は配布物に含まれないため原理的に取得できない
-- repo-local install: plugin manifest を持たない。install provenance（`.claude/pfd-ops-install-manifest.json` — パスと `{files: [...]}` という形式は `check-install-sync.mjs` が一次情報）と、取得できれば git commit
+- repo-local install: plugin manifest を持たない。install provenance と、取得できれば git commit
 - 上流 checkout: リポの git commit
 
 CLI version は導入形態と独立に `pfdsl --version` で取る。
+
+install provenance は `check-install-sync.mjs` の `readManifest` を通して読む。
+パス（`.claude/pfd-ops-install-manifest.json`）と entry の妥当性条件はその module が一次情報で、採取側に複製しない。
+報告する値は installer が有効と認めた entry の配列とし、0件なら採取失敗として扱う。
+manifest 全体でなく entry 配列にするのは、installer が「解釈できない entry は記録されなかったのと等価」として扱うためである。
+その意味論に揃えておけば、採取側が installer より甘い判定で壊れた provenance を報告することがない。
 
 種別ごとの追加項目。
 

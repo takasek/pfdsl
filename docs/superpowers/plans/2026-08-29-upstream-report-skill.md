@@ -300,7 +300,7 @@ git add -A && git commit -m "feat(pfd-ops): report the Codex plugin's missing bu
 
 **Interfaces:**
 - Consumes: Task 2 の `detectInstallation`
-- Produces: `installation` が `"repo-local"` と `"upstream-checkout"` を取りうる。`installProvenance` に `pfd-ops-install-manifest.json` の内容が入る
+- Produces: `installation` が `"repo-local"` と `"upstream-checkout"` を取りうる。`installProvenance` に install provenance が入る（読み方と型は「実装後の逸脱」節が最終形を示す）
 
 上流判定に `git remote` を使わない。
 採用リポが参照用に pfdsl の remote を登録しているだけでも条件を満たし、その誤判定は一般化のスキップを通じて採用リポの固有名詞の公開へ直結する。
@@ -715,3 +715,17 @@ git push -u origin feat/upstream-report-skill
 
 PR 本文には設計文書と本計画へのリンクを含める。
 レビューとマージは人間の作業であり、この計画には含まれない。
+
+---
+
+## 実装後の逸脱
+
+各タスクのコード片は着手時点の姿であり、実装後の敵対的検証で次を変えた。
+最終形は成果物そのものと設計文書を見ること。
+
+- **環境ブロックの欠落報告**: 形態が原理的に持たない項目（`MISSING_IDENTIFIERS`）と、読めるはずが読めなかった項目（`recordFailure`）を別々に記録する。全形態 × 全識別項目を埋め、テストは field 集合の完全一致で検査する
+- **値の妥当性**: `asIdentifier` が非空（trim 後）の文字列だけを通す。空文字・空白・数値・配列は採取失敗として記録される
+- **install provenance**: パスと entry の妥当性条件を複製せず、`check-install-sync.mjs` の `readManifest` を通して読む。値は installer が有効と認めた entry の配列で、0件なら採取失敗
+- **CLI エントリ**: `process.argv[1]` を `realpathSync` で比較する。symlink 経由の起動でも出力する
+- **リポルート解決**: `options.findRepoRoot` で注入できる。`unknown` 形態のテストが TMPDIR の祖先に依存しないようにするため
+- **投稿と readback**: 新規起票とコメントで対象が違うことを明示し、`--jq` を禁止して JSON を decode して比較する。コマンドは変数へ代入して閉じ、`gh` の preflight を工程1へ置いた
