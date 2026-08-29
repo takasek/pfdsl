@@ -179,7 +179,7 @@ artifact:
   integrated_repository:
     label: 統合済みリポジトリ
     description: "PR を main に統合した後のリポジトリ全体の現行状態"
-    criteria: 対象 PR が merged で、その merge commit が main の HEAD の祖先であり、.github/workflows/test.yml の test job がその commit に対して成功している
+    criteria: 対象 PR が merged で、その merge commit が main の HEAD の祖先であり、.github/workflows/test.yml の test job と vscode-smoke job がその commit に対して成功している
     location: ../
     group: planning
   toolchain:

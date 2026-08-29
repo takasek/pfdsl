@@ -157,3 +157,10 @@ PFD が効果を発揮した局面の事例ログ。体感した時点で追記�
 - 効果: 設計記録は必須3行と時点照合を満たしていたが、否定案が「注記する」に対する「注記しない」で、採用した配置手段の対立仮説になっていないことを MANUAL 項目が検出した。公開前だったため、ユーザー承認を得て別クラスの配置案を再記録し、未公開コミットを作り直してから PR #1000 を作成できた。ゲートが無ければ、比較対象を生成した外形だけを持つ無効な設計記録が正本として残った
 - 学習: 内容を守る規則は検出できるだけでは足りず、対象成果物を書き直せる時点に置く必要がある。否定案の競合性は新規記録の生成時と既存記録の選択時に検査し、終端確認は取りこぼしを止める安全網にする
 - 参照: issue #910、PR #1000、ADR-0033、`.pfdsl/bindings/pfd-retro-patterns/catalog-consulted-after-the-artifact.md`
+
+## 2026-08-29 A/B監査が独立CI jobのcriteria反映漏れを検出
+
+- 局面: issue #891 で VS Code webview smoke test を独立した `vscode-smoke` job として追加し、Ubuntu固有のElectron sandbox失敗を修正した後にpfd-retroを実行した。
+- 効果: コード・全テスト・CIはgreenだったが、A「到達性（出力側）」が `.pfdsl/workflow.pfdsl` の `integrated_repository.criteria` は従来の `test` jobだけを要求し、新設した`vscode-smoke` jobを要求していない片肺更新を検出した。図のcriteriaを両jobの成功へ同期し、webview smokeが失敗したcommitを統合済みリポジトリとして扱う経路を閉じた。
+- 学習: 既存CIへ独立jobを追加する変更は、workflowファイルだけでなく、統合済み状態を定義するPFD artifactのcriteriaも変える。コード差分にPFDが無くても、A/B監査は新しいゲートと成果物定義の不一致を検出できる。
+- 参照: issue #891、PR #1033、`.pfdsl/workflow.pfdsl` の `integrated_repository`、`.pfdsl/bindings/pfd-retro-patterns/implicit-environment-assumption.md`
