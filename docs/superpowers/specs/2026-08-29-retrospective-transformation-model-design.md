@@ -19,10 +19,10 @@ This design models the complete path from observable activity through retrospect
 
 The retrospective side uses two execution inputs:
 
-- `retro_request` records the time cutoff and the complete set of authoritative sources required for this run.
-- `activity_sources` provides the reachable session, Git, GitHub, and scheduler records named by the request.
+- `retro_request` instantiates the exact required source set and time cutoff for one run according to the selection and validation rules in `retro_skill`.
+- `activity_sources` provides the reachable snapshot or stable handles for the source set instantiated by the request.
 
-The audit layers, source requirements, and failure behavior remain rules of `retro_skill`. They are not copied into a second policy artifact. `retro_request` and `activity_sources` are execution-time inputs rather than repository-maintained capabilities.
+The audit layers, source-set selection and validation rules, and failure behavior remain normative rules of `retro_skill`. They are not copied into a second policy artifact. `retro_request` and `activity_sources` are execution-time inputs rather than repository-maintained capabilities.
 
 The flow is:
 
@@ -40,7 +40,7 @@ retro_plan >> run_retro -> retro_findings
 retro_skill >>? run_retro
 ```
 
-`pre_retro_inventory` is frozen at the policy cutoff. It records each source query, cutoff, retrieval result, coverage status, and stable event identifiers. It does not record audit or decision dispositions. If a required source is unavailable, the artifact remains incomplete and neither `plan_retro` nor an empty-findings conclusion is permitted.
+`pre_retro_inventory` is frozen at the `retro_request` cutoff. It records each source query, cutoff, retrieval result, coverage status, and stable event identifiers. It does not record audit or decision dispositions. If a required source is unavailable, the artifact remains incomplete and neither `plan_retro` nor an empty-findings conclusion is permitted.
 
 `retro_plan` records, for every event in the frozen inventory, whether the event participates in this retrospective and why. Classification is non-exclusive. The plan also resolves the concrete PFDs, session evidence, and knowledge artifacts to inspect and records that each subject is reachable. Trigger classification and subject resolution are a single process because the repository has no independent resume or consumer boundary between those operations.
 
@@ -53,14 +53,16 @@ The existing `discuss` process remains the entry point for user-driven dialogue.
 ```pfdsl
 user_intent >> discuss -> [decision_trigger, payoff_log, proposals, topics]
 
-[findings, retro_findings, adrs, payoff_log] >>? discuss
+[findings, retro_findings, adrs] >>? discuss
 
 decision_trigger >> decide -> decisions
 ```
 
-`decision_trigger` records the alternatives that require human judgment and their evidence references. It does not decide their disposition. `decisions` is the sole artifact that records adoption, rejection, or deferral, together with the human decision maker and a sufficiently concrete change instruction for downstream maintenance.
+`decision_trigger` records the alternatives that require human judgment and their evidence references. It does not decide their disposition. `decisions` is the sole artifact that records adoption, rejection, or deferral, together with the human decision maker, the target canonical artifact or artifacts, and a sufficiently concrete change instruction for downstream maintenance. Its fan-out to the maintenance processes is therefore dispatch by named target rather than one untyped decision corpus driving every output.
 
-`retro_findings` is feedback into `discuss`, not a normal input. It is produced downstream of the same organizational-learning cycle and returns evidence to its upstream dialogue, matching the existing `findings >>? discuss` pattern and the quality guide. The normal driving path is `user_intent >> discuss -> decision_trigger >> decide -> decisions`. This means an automated retrospective may produce findings, but repository maintenance begins only after a human expresses the intent to disposition them.
+`retro_findings` is a nonconnected auxiliary evidence input to `discuss`, so it uses feedback under specification section 15.3 rather than being presented as downstream of `discuss`. The counterfactual normal driver is `user_intent`: `discuss` can produce a `decision_trigger` without a retrospective run, while making `retro_findings` normal would falsely make retrospective evidence a required gate for every discussion. The normal driving path is `user_intent >> discuss -> decision_trigger >> decide -> decisions`. This means an automated retrospective may produce findings, but repository maintenance begins only after a human expresses the intent to disposition them.
+
+`discuss` and `decide` remain separate because ownership changes at their boundary. Agent-assisted dialogue organizes alternatives and evidence into `decision_trigger`; the human decision maker then owns the adoption, rejection, or deferral recorded in `decisions`. This is the quality guide's handoff point where responsibility changes, even when the two processes occur consecutively in one conversation.
 
 The separate decision activity inventory and collector are removed from the design. The repository's actual decision path is dialogue or asynchronous issue and PR review, both represented by `discuss` followed by `decide`; there is no independent decision-event collection operation to model.
 
@@ -112,7 +114,7 @@ The broad `distill_ops`, `distill_local_skills`, and `externalize_bindings` proc
 | `maintain_spec_stress_skill` | `spec_stress_skill` |
 | `maintain_vscode_ext_debug_skill` | `vscode_ext_debug_skill` |
 
-Every maintenance process has `decisions` as its normal driving input. Inputs of the three removed aggregate processes are not mechanically copied to every replacement process. ADRs, payoff records, review findings, retrospective findings, and sweep records receive normal or feedback edges only when the target artifact definition and its real maintenance procedure show that removing or changing that evidence can change the output. The target output, actual evidence inputs, and validation command are stated in each process description and criteria.
+Every maintenance process has `decisions` as its normal driving input. Each decision names the canonical artifact or artifacts it dispatches to, so a process ignores decisions targeted elsewhere. Inputs of the three removed aggregate processes are not mechanically copied to every replacement process. ADRs, payoff records, review findings, retrospective findings, and sweep records receive normal or feedback edges only when the target artifact definition and its real maintenance procedure show that removing or changing that evidence can change the output. The target output, actual evidence inputs, and validation command are stated in each process description and criteria.
 
 This rule applies the quality guide's counterfactual input test independently after the split. For example, an exact-readback decision can change `ops_skill_l3` without a payoff record, and a concrete retrospective pattern can change `bindings_pfd_retro` without an ADR. Neither absent corpus becomes a false required input merely because its former aggregate process consumed that corpus for a different output.
 
@@ -138,13 +140,14 @@ The implementation is complete only when all of the following hold:
 1. `pfdsl check .pfdsl/workflow.pfdsl --no-color` passes.
 2. The removed process ID set is exactly `distill_ops`, `distill_local_skills`, and `externalize_bindings`; the added maintenance process ID set is exactly the 21 IDs listed above.
 3. The added retrospective and decision artifacts are exactly `retro_request`, `activity_sources`, `pre_retro_inventory`, `retro_plan`, `retro_findings`, and `decision_trigger`; the added execution processes are exactly `collect_activity`, `plan_retro`, `run_retro`, and `decide`.
-4. `user_intent >> discuss`, `discuss -> decision_trigger`, and `decision_trigger >> decide -> decisions` are normal edges. `retro_findings >>? discuss` and the three `retro_skill` edges into collection, planning, and execution are feedback edges. No second producer of `decisions` exists.
+4. `user_intent >> discuss`, `discuss -> decision_trigger`, and `decision_trigger >> decide -> decisions` are normal edges. `retro_findings >>? discuss` and the three `retro_skill` edges into collection, planning, and execution are feedback edges. No second producer of `decisions` exists. The `decide` description and criteria name the human decision maker as the sole disposition authority, and the `decisions` criteria require that human authority to be recorded.
 5. Paths exist from `decisions` to `ops_skill_l3` and `bindings_pfd_retro`.
 6. No old feedback path treats `retro_skill` as a finding or decision input.
 7. Every one of the 21 maintained artifacts has a producer; V001 independently rejects duplicate producers.
 8. Checker tests fail for missing and duplicate producers and pass for renamed valid producers.
 9. Companion prose, tag descriptions, and graph structure name the same responsibilities.
 10. `graph orphans`, `graph io`, `graph edges`, and `graph stats` match the declared node and edge migration above, and `make check-docs` plus the relevant script tests pass.
+11. The pull request body contains an evidence-edge matrix covering all 21 maintenance processes. For each candidate evidence artifact named by this design, the matrix records whether an edge is present or absent, records the edge kind when present, and gives a one-line counterfactual reason tied to the target artifact and its actual maintenance procedure. The matrix cells must match the canonical edge set returned by `pfdsl graph edges .pfdsl/workflow.pfdsl --json`; any unlisted candidate edge, matrix-only edge, graph-only edge, or edge-kind mismatch fails validation. Review of the matched matrix must show at least one justified evidence edge and reject both mechanical replication of aggregate inputs and omission of every evidence edge.
 
 ## Scope boundaries
 
