@@ -670,7 +670,6 @@ process:
     label: PFD種別名 pipeline への改名
     description: "runtime の限定が種別の判定基準（判断を含むか）と矛盾するため改名する。Polaris の sdk-build-pipeline がビルド時であって実行時でないのに runtime-pipeline に分類される、という審査済み設計との齟齬が根拠。導出は docs/adr/0017-kind-taxonomy/audience-axis-experiment/"
     location: https://github.com/takasek/pfdsl/issues/670
-    updated_at: 2026-08-29T14:29:56Z
   publish_cli_pipeline_kind:
     label: CLI 種別名改名公開
 
