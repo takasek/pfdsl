@@ -12,7 +12,7 @@
 // from "collection failed".
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -206,8 +206,22 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 // Run as a command, this prints the report's environment block as JSON. The
 // skill that files the report invokes it this way, so it resolves its own
 // skill root rather than asking the caller for one.
+//
+// The entry path is compared through realpath: Node resolves symlinks before
+// setting `import.meta.url`, so a bundle reached through a linked skill tree
+// would otherwise compare a link against its own target and print nothing.
 const selfPath = fileURLToPath(import.meta.url);
-if (process.argv[1] && resolve(process.argv[1]) === selfPath) {
+
+/** @param {string} entry */
+function isDirectInvocation(entry) {
+	try {
+		return realpathSync(entry) === realpathSync(selfPath);
+	} catch {
+		return resolve(entry) === selfPath;
+	}
+}
+
+if (process.argv[1] && isDirectInvocation(process.argv[1])) {
 	const skillRoot = resolve(dirname(selfPath), "..");
 	process.stdout.write(
 		`${JSON.stringify(collectReportEnvironment(skillRoot), null, 2)}\n`,

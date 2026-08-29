@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -210,6 +216,17 @@ describe("collectReportEnvironment", () => {
 		const parsed = JSON.parse(result.stdout);
 		assert.equal(parsed.installation, "upstream-checkout");
 		assert.ok(Array.isArray(parsed.unavailable));
+	});
+
+	it("prints the environment when invoked through a symlink", () => {
+		const link = join(tmp, "collect-report-environment.mjs");
+		symlinkSync(scriptPath, link);
+
+		const result = spawnSync(process.execPath, [link], { encoding: "utf-8" });
+
+		assert.equal(result.status, 0, result.stderr);
+		const parsed = JSON.parse(result.stdout);
+		assert.equal(parsed.installation, "upstream-checkout");
 	});
 
 	it("records the identifiers an upstream checkout does not carry", () => {
