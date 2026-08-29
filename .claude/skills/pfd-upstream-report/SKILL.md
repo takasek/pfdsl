@@ -34,6 +34,15 @@ remote だけを根拠にしない。
 
 モードの差分は工程4と工程6にだけ現れる。
 
+### `gh` の前提確認
+
+モード判定と同じ工程で、`gh auth status` が成功することを確かめる。
+工程5の重複確認も工程6の投稿も `gh` に依存しており、**本文を組み立ててから使えないと分かるのが最も無駄が大きい**。
+
+`gh` が存在しない、または未認証の場合はここで止め、何が足りないかをユーザーへ報告する。
+本文の起草だけ進めて手渡す形にしてもよいが、その場合も重複確認を経ていないことを明示する。
+別経路（ブラウザ・REST を直接叩く等）へ自分で切り替えない。
+
 自リポモードでも起票する。
 配布層の欠陥をその場で直すと、いま回しているサイクルのスコープが膨らむ。
 issue へ切り出してコンテキストを区切るほうが健全である。
@@ -108,15 +117,28 @@ CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数�
 承認なしに投稿しない。
 
 投稿は pfd-ops の `references/github-issues-backend.md`「複数行本文の外部書込み」規約に従う。
+新規起票と既存 issue へのコメントで、write と readback の対象が違う。
 
-1. セッション固有名を持つ body file に正本を書く
-2. `gh issue create --repo takasek/pfdsl --title <title> --body-file <path>` で正本を直接渡す
-3. write response が返した stable identifier で対象を取り直す（`gh issue view <number> --repo takasek/pfdsl --json body,url`）
-4. persisted body が改行を含めて正本と完全一致することを確認する
-5. 一致しなければ成功として扱わず停止する
+共通の1手目は、セッション固有名を持つ body file に正本を書くことである。
 
+新規起票:
+
+1. `gh issue create --repo takasek/pfdsl --title <title> --body-file <path>` で正本を直接渡す
+2. 返された URL から issue 番号を取り、`gh issue view <number> --repo takasek/pfdsl --json body,url` でその issue を取り直す
+3. persisted `body` が改行を含めて正本と完全一致することを確認する
+
+既存 issue へのコメント:
+
+1. `gh issue comment <number> --repo takasek/pfdsl --body-file <path>` で正本を直接渡す
+2. 返された comment URL の `#issuecomment-<id>` から id を取り、`gh api repos/takasek/pfdsl/issues/comments/<id> --jq .body` でそのコメント自体を取り直す
+3. persisted body が改行を含めて正本と完全一致することを確認する
+
+**`gh issue view --json comments` の一覧から似た本文を拾って代用しない。**
+規約はこの読み方を明示的に禁じている。
+一覧は自分が今書いたコメントを同定できず、他の誰かの似た本文を通してしまう。
+
+どちらの経路でも、一致しなければ成功として扱わず停止する。
 **コマンドの成功表示や返された URL は persisted body の証拠にならない。**
-既存 issue へのコメントも同じ5手順を踏む。
 
 ラベルは外部報告モードでは付けない。
 外部利用者に write 権限がなく、付与を試みれば失敗する。
@@ -125,7 +147,8 @@ CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数�
 自リポモードの起票後処理は pfd-ops の GitHub Issues バックエンドへ委譲する。
 ラベル判定基準・判定タイミング・roadmap 追加の要否・ラベル付与の確認要否はいずれも `github-issues-backend.md` が規定しており、ここには複製しない。
 
-`gh` が未認証、または権限不足で失敗した場合は、本文ファイルのパスと手動投稿コマンドを提示して停止する。
+工程1の前提確認を通っていても、投稿の時点で失敗することがある（write 権限の不足、レート制限、issue が無効化されたリポ）。
+その場合は本文ファイルのパスと手動投稿コマンドを提示して停止する。
 **別経路への迂回を自分で決めない。**
 
 ## issue 本文の形式
