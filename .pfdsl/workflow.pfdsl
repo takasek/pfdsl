@@ -723,6 +723,28 @@ decisions >> maintain_spec_stress_skill -> spec_stress_skill
 decisions >> maintain_vscode_ext_debug_skill -> vscode_ext_debug_skill
 decisions >> maintain_workflow_companion -> workflow_md
 
+bindings_pfd_ops >>? maintain_ops_binding
+bindings_pfd_retro >>? maintain_retro_binding
+delegation_guard >>? maintain_delegation_guard
+distributed_advisory_hooks >>? maintain_distributed_advisory_hooks
+distribution_review_perspectives >>? maintain_distribution_review_perspectives
+distribution_review_skill >>? maintain_distribution_review_skill
+ecosystem_skill >>? maintain_ecosystem_skill
+grill_skill >>? maintain_grill_skill
+implementer_agent >>? maintain_implementer_agent
+main_branch_guard >>? maintain_main_branch_guard
+ops_skill_general >>? maintain_ops_skill_general
+ops_skill_l3 >>? maintain_ops_skill_github_backend
+pfd_lens_agent >>? maintain_pfd_lens_agent
+pre_artifact_advisory >>? maintain_pre_artifact_advisory
+prose_mechanization_audit_skill >>? maintain_prose_mechanization_audit_skill
+retro_pattern_sweep_skill >>? maintain_retro_pattern_sweep_skill
+retro_skill >>? maintain_retro_skill
+review_perspectives >>? maintain_review_perspectives
+spec_stress_skill >>? maintain_spec_stress_skill
+vscode_ext_debug_skill >>? maintain_vscode_ext_debug_skill
+workflow_md >>? maintain_workflow_companion
+
 retro_findings >>? maintain_delegation_guard
 retro_findings >>? maintain_distributed_advisory_hooks
 retro_findings >>? maintain_distribution_review_perspectives
