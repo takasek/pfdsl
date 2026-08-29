@@ -128,8 +128,8 @@ artifact:
     group: dialogue
   proposals:
     label: 作業・仕様提案
-    description: "対話で生まれた作業項目・仕様変更案。正式化は必ず file_issues を通る — 仕様変更が issue を経由する唯一の入口"
-    criteria: file_issues が起票判断できる粒度の作業項目が、gh issue view <該当issue> --comments または gh pr view <該当PR> で読める、そのサイクルのコメント・本文に記述されている
+    description: "対話で生まれた作業項目・仕様変更案と、既存 issue の実装方針・scope 改訂案。新規起票・既存 issue 改訂とも、正式化は file_issues を通る"
+    criteria: file_issues が新規起票または既存 issue 改訂を判断できる粒度の案が、そのサイクルのセッションログに記述されている
     group: dialogue
   decisions:
     label: 方法論判断
@@ -167,7 +167,7 @@ artifact:
   gh_issues:
     label: GitHub issues
     description: "作業項目の一次情報"
-    criteria: 起票・クローズ・ラベル付けが完了し、node scripts/pfdsl/audit-issues-flow.mjs が差分なしで通過する
+    criteria: 起票・クローズ・ラベル付けが完了し、既存 issue の実装方針・scope を改訂した場合はその内容が対象 issue の本文またはコメントから読め、node scripts/pfdsl/audit-issues-flow.mjs が差分なしで通過する
     location: https://github.com/takasek/pfdsl/issues
     group: planning
   roadmap_pfdsl:
@@ -202,8 +202,8 @@ artifact:
     group: release
   pull_request:
     label: Pull Request
-    description: "ブランチ上の変更束のレビュー・統合単位。レビュー指摘はブランチ上の修正で解消してからマージする"
-    criteria: "レビュー指摘（PR の review comment）が解消済みで、.github/workflows/test.yml の test job が green になっており、merge_pr が実行可能な状態"
+    description: "ブランチ上のリポジトリ変更束のレビュー・統合単位。レビュー指摘はブランチ上の修正で解消してからマージする"
+    criteria: "変更束が対象 issue の実装方針・scope と一致し、レビュー指摘（PR の review comment）が解消済みで、.github/workflows/test.yml の test job が green になっており、merge_pr が実行可能な状態"
     location: https://github.com/takasek/pfdsl/pulls
     group: planning
   issue_updates:
@@ -426,7 +426,7 @@ process:
     group: decision
   file_issues:
     label: issue 管理
-    description: "起票・更新・クローズ。基本は対話から起票し、レビュー知見と develop の完了報告を還流として反映、roadmap_pfdsl と同期する。`flow:managed` の issue は起票と同時に roadmap_pfdsl への artifact/process/edge 追加を行う（後回し禁止 — 依存グラフが stale になり気付き依存に戻る）。`flow:exempt`（保守・基盤・修正）は roadmap に載せない — カテゴリ列挙と判定基準は references/github-issues-backend.md が一次情報"
+    description: "起票・更新・クローズ。対話から生まれた新規提案を起票し、既存 issue の実装方針・scope 改訂は develop の着手前に gh_issues へ反映する。レビュー知見と develop の完了報告を還流として反映し、roadmap_pfdsl と同期する。`flow:managed` の issue は起票と同時に roadmap_pfdsl への artifact/process/edge 追加を行う（後回し禁止 — 依存グラフが stale になり気付き依存に戻る）。`flow:exempt`（保守・基盤・修正）は roadmap に載せない — カテゴリ列挙と判定基準は references/github-issues-backend.md が一次情報"
     group: planning
   map_deps:
     label: 依存整理
@@ -441,8 +441,8 @@ process:
     description: "toolchain の実装（parse/normalize/validate/format/render/export 等）から実行時データ変換の境界を PFD 化する。変換コンポーネントの追加・変更・削除時に手動更新（ADR-0018 門番、pfd-ops プロトコル5）"
     group: planning
   develop:
-    label: ツールチェーン開発
-    description: "着手可能 issue をブランチ上で実装し PR にまとめる。対象パッケージ層（core / cli / graphviz-exporter 等）は gate-check が diff から導出して報告材料として印字する — 明記を求める規定は3度忘れられたうえ、PR body に書く時点では層違いの延期コストを避ける契機を過ぎている（#801）"
+    label: リポジトリ開発
+    description: "着手可能 issue をブランチ上で実装し、packages/ や scripts/ を含みうるリポジトリ変更束を PR にまとめる。対象パッケージ層（core / cli / graphviz-exporter 等）は gate-check が diff から導出して報告材料として印字する — 明記を求める規定は3度忘れられたうえ、PR body に書く時点では層違いの延期コストを避ける契機を過ぎている（#801）"
     group: planning
   merge_pr:
     label: レビュー・マージ
