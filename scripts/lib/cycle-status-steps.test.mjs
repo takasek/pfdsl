@@ -525,24 +525,22 @@ describe("runCycleStatus", () => {
 		);
 	});
 
-	it("requires design review in preflight when the issue enumerates multiple options", async () => {
+	it("does not claim design review is required when an issue enumerates ordinary steps", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				issueNumbers: [1008],
 				execGh: async (args) => {
 					if (args[0] === "issue")
 						return issueJson({
-							body: "## 対応案\n- A: 最小案\n- B: 拡張案\n",
+							body: "## 実装手順\n1. 準備する\n2. 実行する\n",
 						});
 					return JSON.stringify([]);
 				},
 			}),
 		);
 		assert.equal(result.reviewRecordTemplate.line, "Review: tool=<tool-name>");
-		assert.equal(
-			result.reviewRecordTemplate.requiredLine,
-			"Review: tool=design",
-		);
+		assert.equal("requiredLine" in result.reviewRecordTemplate, false);
+		assert.equal("designReviewRequirements" in result, false);
 	});
 
 	it("keeps ordinary review guidance in preflight for a single or absent option", async () => {
@@ -563,21 +561,16 @@ describe("runCycleStatus", () => {
 			);
 	});
 
-	it("aggregates a later multi-option issue for preflight and the review gate", async () => {
+	it("keeps later Markdown enumeration advisory instead of turning it into a review gate", async () => {
 		const bodies = {
 			1009: "## 対応案\n1. 案A\n",
 			1010: "普通の説明文。",
 			1008: "## 対応案\n1. 案A\n2. 案B\n",
 		};
 		const result = await runForIssueBodies([1009, 1010, 1008], bodies);
-		assert.deepEqual(result.designReviewRequirements, [
-			{ issue: 1008, tool: "design", when: "code-path-changed" },
-		]);
 		assert.equal(result.reviewRecordTemplate.line, "Review: tool=<tool-name>");
-		assert.equal(
-			result.reviewRecordTemplate.requiredLine,
-			"Review: tool=design",
-		);
+		assert.equal("requiredLine" in result.reviewRecordTemplate, false);
+		assert.equal("designReviewRequirements" in result, false);
 
 		const issues = Object.entries(bodies).map(([number, body]) => ({
 			number: Number(number),
@@ -602,8 +595,7 @@ describe("runCycleStatus", () => {
 			changedFiles: ["scripts/lib/cycle-status.mjs"],
 			issues,
 		});
-		assert.equal(correctnessOnly.status, "FAIL");
-		assert.match(correctnessOnly.detail, /#1008/);
+		assert.equal(correctnessOnly.status, "PASS");
 	});
 
 	it("keeps ordinary fallback for a multi-issue set without multiple options", async () => {
@@ -613,7 +605,7 @@ describe("runCycleStatus", () => {
 		};
 		const result = await runForIssueBodies([1009, 1010], bodies);
 		assert.equal(result.reviewRecordTemplate.line, "Review: tool=<tool-name>");
-		assert.equal(result.reviewRecordTemplate.requiredLine, null);
+		assert.equal("requiredLine" in result.reviewRecordTemplate, false);
 		const issues = Object.entries(bodies).map(([number, body]) => ({
 			number: Number(number),
 			issue: { body },

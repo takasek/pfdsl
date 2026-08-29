@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { RECORD_SEP } from "./commit-trailers.mjs";
-import { deriveDesignReviewRequirement } from "./cycle-status.mjs";
 import {
 	analyzeAdoptedPfdsl,
 	checkDocsStep,
@@ -1159,115 +1158,19 @@ describe("checkDocsStep", () => {
 describe("reviewRecordStep", () => {
 	const trailer = "Review: tool=simplify";
 	const messages = (text) => ({ ok: true, text });
-	const issue = (number, body, comments = []) => ({
-		number,
-		issue: { body, comments },
-	});
-	const multipleOptions = "## 対応案\n1. 案A\n2. 案B";
 
-	it("FAILs correctness-only review when a supplied issue enumerates multiple options", () => {
+	it("PASSes a correctness review for a code-touching branch", () => {
 		const result = reviewRecordStep({
 			commitMessages: messages("subject\n\nReview: tool=correctness\n"),
 			changedFiles: ["scripts/lib/x.mjs"],
-			issues: [issue(943, multipleOptions)],
 		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /#943/);
-		assert.match(result.detail, /tool=design/);
+		assert.equal(result.status, "PASS");
 	});
 
-	it("uses the shared requirement derivation for a later multi-option issue", () => {
-		const issue = { number: 1008, body: "## 対応案\n1. 案A\n2. 案B" };
-		const requirement = deriveDesignReviewRequirement({
-			issue: issue.number,
-			body: issue.body,
-		});
-		assert.deepEqual(requirement, {
-			issue: issue.number,
-			tool: "design",
-			when: "code-path-changed",
-		});
-		assert.equal(
-			reviewRecordStep({
-				commitMessages: messages("subject\n\nReview: tool=design\n"),
-				changedFiles: ["scripts/lib/cycle-status.mjs"],
-				issues: [{ number: 1009, issue: { body: "## 対応案\n1. 案A" } }, issue],
-			}).status,
-			"PASS",
-		);
-	});
-
-	it("PASSes a design review when a supplied issue enumerates multiple options", () => {
+	it("PASSes a design review for a code-touching branch", () => {
 		const result = reviewRecordStep({
 			commitMessages: messages("subject\n\nReview: tool=design\n"),
 			changedFiles: ["scripts/lib/x.mjs"],
-			issues: [issue(943, multipleOptions)],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("does not require design for a one-option issue whose timely record contains 否定案:", () => {
-		const singleOptionIssue = issue("943", "## 対応案\n1. 案A", [
-			{
-				body: "前提: x\n否定案: y\n却下理由: z",
-				createdAt: "2026-07-01T00:00:00Z",
-			},
-		]);
-		const { exec } = fakeExec({
-			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
-		});
-		assert.equal(
-			designRecordStep({
-				exec,
-				base: "main",
-				issue: singleOptionIssue.issue,
-			}).status,
-			"PASS",
-		);
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nReview: tool=correctness\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-			issues: [singleOptionIssue],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("does not require design for an enumerated issue on a prose-only branch", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("docs: x\n\nbody\n"),
-			changedFiles: ["docs/adr/0001-x.md"],
-			issues: [issue(943, multipleOptions)],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("retains every later triggering issue in the aggregate failure", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nReview: tool=correctness\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-			issues: [
-				issue(941, "## 対応案\n1. 案A"),
-				issue(943, multipleOptions),
-				issue(944, multipleOptions),
-			],
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /#943/);
-		assert.match(result.detail, /#944/);
-		assert.doesNotMatch(result.detail, /#941/);
-	});
-
-	it("preserves correctness-only behavior for an unavailable issue", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nReview: tool=correctness\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-			issues: [
-				{
-					number: 943,
-					issue: null,
-					issueFailure: { status: "SKIP", detail: "gh CLI unavailable" },
-				},
-			],
 		});
 		assert.equal(result.status, "PASS");
 	});
@@ -1277,14 +1180,6 @@ describe("reviewRecordStep", () => {
 			commitMessages: messages(
 				`subject\n\n${trailer}\nReview: tool=correctness\n`,
 			),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("PASSes on a single design record, which subsumes both requirements", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nReview: tool=design\n"),
 			changedFiles: ["scripts/lib/x.mjs"],
 		});
 		assert.equal(result.status, "PASS");
