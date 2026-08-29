@@ -12,7 +12,7 @@
 // from "collection failed".
 
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 /** @param {string} path */
 function readJsonOrNull(path) {
@@ -24,16 +24,37 @@ function readJsonOrNull(path) {
 	}
 }
 
+/** @param {string} from */
+function findRepoRoot(from) {
+	let current = resolve(from);
+	for (;;) {
+		if (existsSync(resolve(current, ".git"))) return current;
+		const parent = dirname(current);
+		if (parent === current) return null;
+		current = parent;
+	}
+}
+
 /** @param {string} skillRoot */
 function detectInstallation(skillRoot) {
 	const bundleRoot = resolve(skillRoot, "../..");
 	if (existsSync(resolve(bundleRoot, ".claude-plugin/plugin.json"))) {
-		return { installation: "claude-plugin", bundleRoot };
+		return { installation: "claude-plugin", bundleRoot, repoRoot: null };
 	}
 	if (existsSync(resolve(bundleRoot, ".codex-plugin/plugin.json"))) {
-		return { installation: "codex-plugin", bundleRoot };
+		return { installation: "codex-plugin", bundleRoot, repoRoot: null };
 	}
-	return { installation: "unknown", bundleRoot };
+	const repoRoot = findRepoRoot(skillRoot);
+	if (repoRoot === null) {
+		return { installation: "unknown", bundleRoot, repoRoot: null };
+	}
+	if (
+		existsSync(resolve(repoRoot, "plugin/pfdsl/.claude-plugin/plugin.json")) &&
+		existsSync(resolve(repoRoot, "scripts/lib/harness-inventory.mjs"))
+	) {
+		return { installation: "upstream-checkout", bundleRoot, repoRoot };
+	}
+	return { installation: "repo-local", bundleRoot, repoRoot };
 }
 
 /**
@@ -41,10 +62,11 @@ function detectInstallation(skillRoot) {
  * @param {{ runCommand?: (command: string, args: string[]) => string | null }} [options]
  */
 export function collectReportEnvironment(skillRoot, options = {}) {
-	const { installation, bundleRoot } = detectInstallation(skillRoot);
+	const { installation, bundleRoot, repoRoot } = detectInstallation(skillRoot);
 	const unavailable = [];
 	let pluginVersion = null;
 	let bundleContentHash = null;
+	let installProvenance = null;
 
 	if (installation === "claude-plugin") {
 		pluginVersion =
@@ -64,6 +86,16 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 				"Codex plugin bundles do not carry a bundle manifest, so the content hash cannot be read.",
 		});
 	}
+	if (installation === "repo-local") {
+		installProvenance = readJsonOrNull(
+			resolve(repoRoot, "pfd-ops-install-manifest.json"),
+		);
+		unavailable.push({
+			field: "pluginVersion",
+			reason:
+				"A repo-local install carries no plugin manifest; the install provenance identifies the bundle instead.",
+		});
+	}
 
 	return {
 		installation,
@@ -71,7 +103,7 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		bundleContentHash,
 		cliVersion: null,
 		repoCommit: null,
-		installProvenance: null,
+		installProvenance,
 		unavailable,
 	};
 }

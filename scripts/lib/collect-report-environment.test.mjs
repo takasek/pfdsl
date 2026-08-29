@@ -55,4 +55,36 @@ describe("collectReportEnvironment", () => {
 		);
 		assert.match(env.unavailable[0].reason, /Codex/);
 	});
+
+	it("classifies a repo-local install and carries its provenance", () => {
+		const repoRoot = join(tmp, "adopter");
+		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		mkdirSync(join(repoRoot, ".git"), { recursive: true });
+		writeJson(join(repoRoot, "pfd-ops-install-manifest.json"), {
+			version: "0.4.2",
+		});
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.installation, "repo-local");
+		assert.equal(env.pluginVersion, null);
+		assert.deepEqual(env.installProvenance, { version: "0.4.2" });
+	});
+
+	it("classifies the upstream checkout by its own distribution sources", () => {
+		const repoRoot = join(tmp, "pfdsl");
+		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		mkdirSync(join(repoRoot, ".git"), { recursive: true });
+		writeJson(join(repoRoot, "plugin/pfdsl/.claude-plugin/plugin.json"), {
+			version: "0.4.2",
+		});
+		mkdirSync(join(repoRoot, "scripts", "lib"), { recursive: true });
+		writeFileSync(join(repoRoot, "scripts/lib/harness-inventory.mjs"), "");
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.installation, "upstream-checkout");
+	});
 });
