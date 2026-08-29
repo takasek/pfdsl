@@ -1,7 +1,7 @@
 {
   "name": "pfdsl",
   "version": "0.0.25",
-  "description": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), and /pfd-cycle, /pfd-init, /pfd-retro commands.",
+  "description": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), upstream defect report (pfd-upstream-report skill), and /pfd-cycle, /pfd-init, /pfd-retro commands.",
   "author": {
     "name": "takasek"
   },
@@ -11,8 +11,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "pfdsl",
-    "shortDescription": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), and /pfd-cycle, /pfd-init, /pfd-retro commands.",
-    "longDescription": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), and /pfd-cycle, /pfd-init, /pfd-retro commands.",
+    "shortDescription": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), upstream defect report (pfd-upstream-report skill), and /pfd-cycle, /pfd-init, /pfd-retro commands.",
+    "longDescription": "PFD-DSL authoring toolkit: syntax/CLI reference (pfdsl skill), backward-dialogue diagram construction (pfd-grill skill), project operations (pfd-ops skill), retrospective audit (pfd-retro skill), ecosystem bootstrap (pfd-ecosystem skill), upstream defect report (pfd-upstream-report skill), and /pfd-cycle, /pfd-init, /pfd-retro commands.",
     "developerName": "takasek",
     "category": "Developer Tools",
     "capabilities": [

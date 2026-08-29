@@ -25,6 +25,7 @@ describe("harness distribution inventory", () => {
 			"skill:pfd-ops",
 			"skill:pfd-retro",
 			"skill:pfd-ecosystem",
+			"skill:pfd-upstream-report",
 			"skill:pfdsl",
 			"command:pfd-cycle",
 			"command:pfd-init",
@@ -130,6 +131,7 @@ describe("harness distribution inventory", () => {
 			"pfd-ops",
 			"pfd-retro",
 			"pfd-ecosystem",
+			"pfd-upstream-report",
 		]);
 	});
 

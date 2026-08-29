@@ -514,6 +514,7 @@ describe("assemblePluginDistIndependent", () => {
 				"pfd-grill",
 				"pfd-ops",
 				"pfd-retro",
+				"pfd-upstream-report",
 				"pfdsl",
 			].sort(),
 		);

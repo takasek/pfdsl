@@ -16,7 +16,7 @@ const UPSTREAM_PLUGIN_JSON_URL = `${UPSTREAM_RAW_BASE}/plugin.json`;
 const UPSTREAM_BUNDLE_MANIFEST_URL = `${UPSTREAM_RAW_BASE}/bundle-manifest.json`;
 
 /** @param {string} path */
-function readJsonOrNull(path) {
+export function readJsonOrNull(path) {
 	if (!existsSync(path)) return null;
 	try {
 		return JSON.parse(readFileSync(path, "utf-8"));

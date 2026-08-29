@@ -46,9 +46,11 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"references/scaffold/workflow.pfdsl",
 		"references/work-cycle.md",
 		"scripts/check-install-sync.mjs",
+		"scripts/collect-report-environment.mjs",
 		"scripts/plugin-version-check.mjs",
 	]),
 	"pfd-retro": Object.freeze(["SKILL.md"]),
+	"pfd-upstream-report": Object.freeze(["SKILL.md"]),
 });
 
 function exclusion(target, reason, impact) {
@@ -197,6 +199,7 @@ export const HARNESS_CAPABILITY_CONTRACT = Object.freeze([
 	skillCapability("pfd-ops"),
 	skillCapability("pfd-retro"),
 	skillCapability("pfd-ecosystem"),
+	skillCapability("pfd-upstream-report"),
 	skillCapability("pfdsl", {
 		generated: Object.freeze({
 			reason: "generated symlink to the neutral rendered skill tree",
