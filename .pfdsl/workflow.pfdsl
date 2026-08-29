@@ -331,8 +331,8 @@ artifact:
     tags: [ distilled_skill ]
   retro_pattern_sweep_skill:
     label: retroパターン棚卸しスキル
-    description: "監査パターンカタログを集合として洗い直す手順（機械化済み対策の廃止・近接ペアの統合・具体例が指す機構の実在確認・phase 宣言漏れ・タグ語彙の drift）。追記時の規約では処理されない滞留を刈る工程で、読む範囲は前回棚卸し以降の追加分に絞る。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポはこのカタログを持たず、手順の実施先が存在しない）"
-    criteria: 起動すると5工程が実行され、記録が docs/asset-sweep/ に残り check-asset-sweep.mjs が exit 0 を返す
+    description: "監査パターンカタログを集合として洗い直す手順（機械化済み対策の廃止・近接ペアの統合・具体例が指す機構の実在確認・phase 宣言漏れ・タグ語彙の drift・所属と内部論理の意味監査）。通常は前回棚卸し以降の追加分を起点とし、明示的な全件意味監査では全パターンを9観点で判定する。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポはこのカタログを持たず、手順の実施先が存在しない）"
+    criteria: 起動すると6工程が実行され、意味監査の finding と保留理由を含む記録が docs/asset-sweep/ に残り check-asset-sweep.mjs が exit 0 を返す
     location: ../.claude/skills/retro-pattern-sweep/
     group: generation
     tags: [ distilled_skill ]
@@ -632,7 +632,7 @@ process:
     group: release
   sweep_retro_patterns:
     label: retroパターンカタログの棚卸し
-    description: "追記でしか触られないカタログを集合として洗い、廃止・統合・修正を行って棚卸し済み commit を進める。毎サイクルには重すぎ、やらないと溜まるため、引き金は release という稀な時点に置き、そこで前回以降の追加件数を閾値と比べる。追記時の書式・タグ・往復一致は retro-patterns.mjs check が毎 CI で先に潰しており、このプロセスが見るのは書式でなく集合としての妥当性"
+    description: "追記でしか触られないカタログを集合として6工程で洗い、廃止・統合・修正と所属・内部論理の意味監査を行って棚卸し済み commit を進める。通常は release 時に前回以降の追加件数を閾値と比べ、明示的な全件意味監査では全パターンを9観点で判定する。retro-patterns.mjs check が先に潰す構造違反と、人手で判定する意味上の妥当性を混同しない"
     command: "/retro-pattern-sweep"
     group: release
   sweep_prose_mechanization:

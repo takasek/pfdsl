@@ -1,5 +1,5 @@
 ---
-tags: [method:sweep, context:dual-copy]
+tags: [method:sweep, method:delegate, context:dual-copy]
 ---
 
 - **確認の観測範囲が症状を映さない trap**: 同型の他箇所を「確認した」と記録していても、そのとき見た指標が症状の出る場所を映していなければ、掃いていないのに掃いたことになる。
