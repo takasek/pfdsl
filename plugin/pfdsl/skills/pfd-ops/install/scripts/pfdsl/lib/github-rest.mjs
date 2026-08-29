@@ -297,8 +297,6 @@ export async function fetchIssueView(
  */
 const PR_VIEW_FIELDS = {
 	body: (pr) => pr.body ?? "",
-	closingIssuesReferences: (pr, owner, repo) =>
-		closingIssueReferences(pr, owner, repo),
 	headRefName: (pr) => pr.head?.ref,
 	number: (pr) => pr.number,
 	state: (pr) => pr.state,
@@ -307,34 +305,109 @@ const PR_VIEW_FIELDS = {
 };
 
 /**
- * REST pull-request payloads do not include GraphQL's
- * `closingIssuesReferences`. Reproduce the subset needed by the scripts from
- * closing-keyword lines, while ignoring quoted and fenced examples.
- * @param {{body?: string}} pr
+ * The one `pr view --json` field that is answerable but lives outside
+ * PR_VIEW_FIELDS, because the REST pull-request payload does not carry it —
+ * see fetchClosingIssueReferences.
+ */
+const CLOSING_ISSUES_FIELD = "closingIssuesReferences";
+
+/**
+ * Assemble a `pr view --json` object from the two sources its fields come
+ * from, so both PR selectors (by number, and by the current branch) merge them
+ * the same way.
+ * @param {string[]} fields gh's --json field names
+ * @param {Record<string, unknown> | null} pr the REST pull-request payload
+ * @param {{number: number}[] | null} closing
+ * @returns {Record<string, unknown>}
+ */
+function buildPrView(fields, pr, closing) {
+	const result = {};
+	for (const field of fields)
+		result[field] =
+			field === CLOSING_ISSUES_FIELD ? closing : PR_VIEW_FIELDS[field](pr);
+	return result;
+}
+
+/**
+ * Ask GraphQL for the issues GitHub itself reads this PR as closing.
+ *
+ * There is no REST equivalent, and the closing-keyword regex this replaced was
+ * not one: `PullRequest.closingIssuesReferences` also covers issues linked by
+ * hand through the Development sidebar, which appear nowhere in the PR body.
+ * Those PRs read as closing nothing, and check-closes-reference.mjs failed
+ * them for it (#1043). Reconstructing the link set here would mean
+ * reimplementing GitHub's own reading — the very thing
+ * scripts/lib/closes-reference.mjs's contract says not to do.
+ *
+ * A failed lookup throws, never returns []: callers turn "closes no issue"
+ * into a FAIL verdict, so the two must stay distinguishable (#745).
+ *
  * @param {string} owner
  * @param {string} repo
- * @returns {{number: number}[]}
+ * @param {string} token
+ * @param {number} number
+ * @param {typeof fetch} [fetchImpl]
+ * @returns {Promise<{number: number}[]>}
  */
-function closingIssueReferences(pr, owner, repo) {
+export async function fetchClosingIssueReferences(
+	owner,
+	repo,
+	token,
+	number,
+	fetchImpl = proxyAwareFetch,
+) {
+	const query = `query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      closingIssuesReferences(first: ${PER_PAGE}, after: $cursor) {
+        nodes { number }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}`;
+
 	const references = [];
-	let fenced = false;
-	for (const line of String(pr.body ?? "").split("\n")) {
-		if (/^\s*```/.test(line)) {
-			fenced = !fenced;
-			continue;
-		}
-		if (fenced || /^\s*>/.test(line)) continue;
-		for (const match of line.matchAll(
-			/\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+(?:(\w[\w.-]*)\/(\w[\w.-]*)\s*)?#(\d+)\b/gi,
-		)) {
-			if ((match[1] || match[2]) && (match[1] !== owner || match[2] !== repo))
-				continue;
-			const number = Number(match[3]);
-			if (!references.some((ref) => ref.number === number))
-				references.push({ number });
-		}
+	let cursor = null;
+	// Same stopping rule as fetchAllPages, on the connection's own cursor: the
+	// walk ends when GitHub says there is no next page, and a layer that never
+	// advances the cursor throws instead of returning a truncated list.
+	for (let page = 1; page <= MAX_PAGES; page++) {
+		const res = await request(fetchImpl, `${API_ROOT}/graphql`, {
+			method: "POST",
+			headers: {
+				...authHeaders({ token }),
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				query,
+				variables: { owner, repo, number, cursor },
+			}),
+		});
+		const payload = await res.json();
+		// GraphQL reports a missing PR as HTTP 200 with `errors` set and the node
+		// null, so the errors have to be read before the data is believed.
+		if (payload.errors?.length)
+			throw new Error(
+				`GitHub GraphQL API error for ${owner}/${repo}#${number}: ${payload.errors
+					.map((e) => e.message)
+					.join("; ")}`,
+			);
+		const connection =
+			payload.data?.repository?.pullRequest?.closingIssuesReferences;
+		if (!connection)
+			throw new Error(
+				`GitHub GraphQL API returned no closing issue references for ${owner}/${repo}#${number}`,
+			);
+		references.push(
+			...(connection.nodes ?? []).map((node) => ({ number: node.number })),
+		);
+		if (!connection.pageInfo?.hasNextPage) return references;
+		cursor = connection.pageInfo.endCursor;
 	}
-	return references;
+	throw new Error(
+		`GitHub GraphQL pagination exceeded ${MAX_PAGES} pages for closing issue references of ${owner}/${repo}#${number}`,
+	);
 }
 
 /**
@@ -355,17 +428,27 @@ export async function fetchPullRequestView(
 	fields,
 	fetchImpl = proxyAwareFetch,
 ) {
-	requireMappableFields("pr view", fields, PR_VIEW_FIELDS);
-	const pr = await request(
-		fetchImpl,
-		`${API_ROOT}/repos/${owner}/${repo}/pulls/${number}`,
-		{ headers: authHeaders({ token }) },
-	).then((res) => res.json());
+	requireMappableFields("pr view", fields, PR_VIEW_FIELDS, [
+		CLOSING_ISSUES_FIELD,
+	]);
 
-	const result = {};
-	for (const field of fields)
-		result[field] = PR_VIEW_FIELDS[field](pr, owner, repo);
-	return result;
+	// The REST payload is only worth a request when a field outside the GraphQL
+	// one was asked for; the two endpoints are independent.
+	const wantsRest = fields.some((f) => f !== CLOSING_ISSUES_FIELD);
+	const [pr, closing] = await Promise.all([
+		wantsRest
+			? request(
+					fetchImpl,
+					`${API_ROOT}/repos/${owner}/${repo}/pulls/${number}`,
+					{ headers: authHeaders({ token }) },
+				).then((res) => res.json())
+			: null,
+		fields.includes(CLOSING_ISSUES_FIELD)
+			? fetchClosingIssueReferences(owner, repo, token, number, fetchImpl)
+			: null,
+	]);
+
+	return buildPrView(fields, pr, closing);
 }
 
 /**
@@ -393,7 +476,9 @@ export async function fetchCurrentPrView(
 	fields,
 	fetchImpl = proxyAwareFetch,
 ) {
-	requireMappableFields("pr view", fields, PR_VIEW_FIELDS);
+	requireMappableFields("pr view", fields, PR_VIEW_FIELDS, [
+		CLOSING_ISSUES_FIELD,
+	]);
 
 	const head = encodeURIComponent(`${owner}:${branch}`);
 	const prs = await request(
@@ -405,9 +490,20 @@ export async function fetchCurrentPrView(
 	const [pr] = prs;
 	if (!pr) throw new Error(`no open pull request for branch '${branch}'`);
 
-	const result = {};
-	for (const field of fields) result[field] = PR_VIEW_FIELDS[field](pr);
-	return result;
+	// The branch lookup already supplies the number the GraphQL query keys on,
+	// so this form answers closing references on the same terms as the numbered
+	// one rather than refusing a field the fallback can reach.
+	const closing = fields.includes(CLOSING_ISSUES_FIELD)
+		? await fetchClosingIssueReferences(
+				owner,
+				repo,
+				token,
+				pr.number,
+				fetchImpl,
+			)
+		: null;
+
+	return buildPrView(fields, pr, closing);
 }
 
 /**
