@@ -59,4 +59,8 @@ describe("coverage exclusions", () => {
 	it("finds the entries at all, so a rename of the array cannot pass silently", () => {
 		expect(excluded.length).toBeGreaterThan(0);
 	});
+
+	it("limits the coverage floor to TypeScript production sources", () => {
+		expect(configText).toMatch(/include:\s*\["src\/\*\*\/\*\.ts"\]/);
+	});
 });

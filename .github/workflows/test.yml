@@ -31,7 +31,7 @@ jobs:
 
       - run: pnpm -r test
 
-      - run: node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs"
+      - run: node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs" "packages/vscode-extension/smoke/*.test.mjs"
 
       - run: node scripts/check-script-imports.mjs
 
@@ -52,3 +52,27 @@ jobs:
         run: |
           pnpm --filter @pfdsl/core exec vitest run -u
           node scripts/check-generated-drift.mjs -- packages/core/src/__snapshots__/
+
+  vscode-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/pfdsl-vscode-smoke-cache/pfdsl
+          key: vscode-smoke-${{ runner.os }}-vscode-1.132.1-test-electron-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm -r build
+
+      - run: xvfb-run --auto-servernum make test-vscode-smoke

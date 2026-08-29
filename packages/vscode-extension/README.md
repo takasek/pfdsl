@@ -38,3 +38,10 @@ While `make vscode-dev` keeps running, edit a source file and reload the Dev Hos
 To verify a change in the Dev Host: open a `.pfdsl` file, then run **PFDSL: Open Preview to the Side** (the PFDSL preview, not VS Code's Markdown preview). When inspecting the webview console, filter by `takasek.pfdsl` to cut out unrelated extension noise.
 
 If F5 does nothing, you almost certainly opened a folder other than `packages/vscode-extension` — VS Code only reads `.vscode/launch.json` from the workspace root.
+
+## Webview smoke tests
+
+Run `make test-vscode-smoke` from the repository worktree root.
+The command downloads the pinned VS Code test binary on first use, starts it with an isolated profile, and verifies preview rendering, zoom, pan, minimap interaction, outside release, and node navigation through the real webview.
+Failures report the VS Code version, process stdout and stderr, bounded extension-host log tails from the isolated profile, webview frame URLs, last observed readiness data, and selected-frame semantic DOM state.
+The smoke test does not compare screenshots or cover OS-native dialogs, IME input, or the Marketplace-installed extension.

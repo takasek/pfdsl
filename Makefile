@@ -20,7 +20,7 @@ build:
 .PHONY: test
 test:
 	pnpm -r test
-	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs"
+	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs" "packages/vscode-extension/smoke/*.test.mjs"
 	node scripts/check-script-imports.mjs
 	node scripts/check-no-shell-strings.mjs
 	node scripts/check-cli-conventions.mjs
@@ -52,6 +52,10 @@ build-deps:
 .PHONY: vscode-build
 vscode-build: build-deps
 	pnpm --filter pfdsl build
+
+.PHONY: test-vscode-smoke
+test-vscode-smoke: vscode-build
+	pnpm --filter pfdsl test:smoke
 
 # One command to start a dev session: build, open the extension window, then
 # watch for changes in the foreground (Ctrl+C to stop).
