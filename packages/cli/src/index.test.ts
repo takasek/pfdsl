@@ -1797,8 +1797,8 @@ describe("status ready", () => {
 		expect(r.stdout).toBe("");
 	});
 
-	it("rejects file with type: runtime-pipeline (exit 2)", async () => {
-		const f = withStatus("---\ntype: runtime-pipeline\n---\nA >> P -> B\n");
+	it("rejects file with type: pipeline (exit 2)", async () => {
+		const f = withStatus("---\ntype: pipeline\n---\nA >> P -> B\n");
 		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toContain("type: roadmap");
@@ -1953,7 +1953,7 @@ req >> design -> spec
 
 	it.each([
 		"workflow",
-		"runtime-pipeline",
+		"pipeline",
 	])("refuses to set status in a %s file and leaves it untouched", async (type) => {
 		const f = join(dir, `set-status-${type}.pfdsl`);
 		writeFileSync(f, flowBase(type));
@@ -2840,7 +2840,7 @@ describe("status gaps", () => {
 		);
 		writeFileSync(
 			fl2,
-			`---\ntype: runtime-pipeline\nartifact:\n  gap_only:\n${TRACKED}---\n`,
+			`---\ntype: pipeline\nartifact:\n  gap_only:\n${TRACKED}---\n`,
 		);
 		const r = await run(["status", "gaps", rm, fl1, fl2, "--json"]);
 		expect(r.exitCode).toBe(1);
@@ -4484,7 +4484,7 @@ p3 -> d
 		});
 
 		// Groups never carry edges, so counting them made every group in a file
-		// an orphan — five of the five rows this repo's runtime-pipeline.pfdsl
+		// an orphan — five of the five rows this repo's pipeline.pfdsl
 		// reported were groups, leaving zero real findings among them (#676).
 		it("does not report a group", async () => {
 			const f = join(dir, "orphans-group.pfdsl");

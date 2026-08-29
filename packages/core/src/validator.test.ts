@@ -1004,8 +1004,8 @@ a >> design -> b
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});
 
-		it("no W005 when type is runtime-pipeline", () => {
-			const fm: Frontmatter = { type: "runtime-pipeline" };
+		it("no W005 when type is pipeline", () => {
+			const fm: Frontmatter = { type: "pipeline" };
 			expect(codes("A >> P -> B", fm)).not.toContain("W005");
 		});
 
