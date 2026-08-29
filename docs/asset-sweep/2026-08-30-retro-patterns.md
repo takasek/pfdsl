@@ -45,63 +45,64 @@ guard や gate が一部経路を塞ぐパターンは残るが、許可分岐�
 
 ## 工程6 — 所属と内部論理
 
-| 旧対象 | finding | 処置 |
-|---|---|---|
-| `brief-assumes-unverified-data-shape` | 未検証のブリーフ仕様と、集合拡張時の A∩B 未検証が混在 | 後者を `expanded-input-set-skips-overlap-case` へ分離 |
-| `cross-issue-enumeration-drift` | 具体例がなく観測済み知見か判定不能 | 一次記録にも実際の drift がないため廃止 |
-| `catalog-consulted-after-the-artifact` | タグが発火条件でなく具体例由来 | `always` へ変更 |
-| `claim-form-invites-restaleness` | retro で修正可能なのに pre-artifact | phase を削除 |
-| `duplicate-name-not-a-discriminator` / `duplicate-self-check-tool` | 同一問いの重複と、空間・時間の3 failure 混在 | 空間軸を統合し時間軸を2件へ分割 |
-| `flag-scope-bundling` | フラグ束ねと target 撤去時の隠れた役目が混在 | 後者を `removing-target-drops-hidden-role` へ分離 |
-| `parallel-delegation-seam` | unit 接合と単独の記法衝突が混在 | `independent-units-fail-at-seam` と `embedded-example-breaks-container-syntax` へ分離 |
-| `unmatched-vocabulary-defaults-to-pass` | catch-all の既定と減算表示の情報消失が混在 | 後者を `subtracted-count-hides-its-minuend` へ分離 |
-| `unusable-named-means` | 起動不能、条件付き許可、外部 write 権限、成功したが無効が混在 | 元を委譲固有担保へ限定し、残り3 failure を独立化 |
-| `verification-scope-misses-symptom` | 委譲例へ発火するタグがない | `method:delegate` を追加 |
+| 旧対象 | 該当観点 | finding | 処置 |
+|---|---|---|---|
+| `brief-assumes-unverified-data-shape` | 所属・肥大 | 未検証のブリーフ仕様と、集合拡張時の A∩B 未検証が混在 | 後者を `expanded-input-set-skips-overlap-case` へ分離 |
+| `cross-issue-enumeration-drift` | 証拠 | 具体例がなく観測済み知見か判定不能 | 一次記録にも実際の drift がないため廃止 |
+| `catalog-consulted-after-the-artifact` | タグ | タグが発火条件でなく具体例由来 | `always` へ変更 |
+| `claim-form-invites-restaleness` | 時点 | retro で修正可能なのに pre-artifact | phase を削除 |
+| `duplicate-name-not-a-discriminator` / `duplicate-self-check-tool` | 所属・境界・時点・肥大 | 同一問いの重複と、空間・時間の3 failure 混在 | 空間軸を統合し時間軸を2件へ分割し、終盤の base 確認から phase を外した |
+| `flag-scope-bundling` | 所属・肥大 | フラグ束ねと target 撤去時の隠れた役目が混在 | 後者を `removing-target-drops-hidden-role` へ分離 |
+| `parallel-delegation-seam` | 所属・肥大 | unit 接合と単独の記法衝突が混在 | `independent-units-fail-at-seam` と `embedded-example-breaks-container-syntax` へ分離 |
+| `unmatched-vocabulary-defaults-to-pass` | 所属・肥大 | catch-all の既定と減算表示の情報消失が混在 | 後者を `subtracted-count-hides-its-minuend` へ分離 |
+| `unusable-named-means` | 所属・肥大 | 起動不能、条件付き許可、外部 write 権限、成功したが無効が混在 | 元を委譲固有担保へ限定し、残り3 failure を独立化 |
+| `verification-scope-misses-symptom` | タグ | 委譲例へ発火するタグがない | `method:delegate` を追加 |
 
 `absence-search-scope`、`meta-item-hides-subitems` など長いパターンは、追加された各例が同じ検出質問と対策へ戻ることを確認し、肥大だけを理由に分割しなかった。
 
 ## 全件判定表
 
-表の各列は工程6の9観点に対応し、「妥当」は finding なし、「修正後妥当」は本回の finding を処置した後に再検証したことを表す。
+表の各列は工程6の9観点に対応し、「妥当」は finding なし、「修正後妥当」は上の表でその観点に記録した finding を処置した後に再検証したことを表す。
+分割・統合では旧対象の finding を、その観点の処置に関与した現行パターンへ引き継いで記録し、影響しなかった観点は「妥当」とする。
 
 | pattern | 定義 | 所属 | 検出 | 対策 | 境界 | タグ | 時点 | 証拠 | 肥大 |
 |---|---|---|---|---|---|---|---|---|---|
 | `absence-search-scope.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `autostage-collateral-sweep.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `base-advance-stales-late-checker.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
-| `brief-assumes-unverified-data-shape.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `base-advance-stales-late-checker.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 修正後妥当 | 妥当 | 修正後妥当 | 妥当 | 修正後妥当 |
+| `brief-assumes-unverified-data-shape.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `canonical-record-frozen-at-draft.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `catalog-consulted-after-the-artifact.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `catalog-consulted-after-the-artifact.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 |
 | `check-input-outside-its-rerun-trigger.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `check-materials-cannot-make-the-distinction.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `chronic-false-positive-silencing.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `claim-form-invites-restaleness.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
-| `conditional-permission-misread-as-prohibition.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `claim-form-invites-restaleness.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 | 妥当 | 妥当 |
+| `conditional-permission-misread-as-prohibition.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `convention-order-inverts-under-delegation.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `correct-finding-unverified-fix.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `declaration-content-vs-its-container.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `deletion-leaves-prose-orphaned.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `detection-covers-one-path-only.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `divergent-safety-across-isomorphic-commands.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `duplicate-name-not-a-discriminator.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
-| `embedded-example-breaks-container-syntax.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `duplicate-name-not-a-discriminator.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
+| `embedded-example-breaks-container-syntax.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `entry-path-reads-as-out-of-scope.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `environment-classification-hides-recurrence.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `executor-chosen-check-target.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `existential-aggregation-hides-partial-absence.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `expanded-input-set-skips-overlap-case.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
-| `external-write-authority-boundary.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `expanded-input-set-skips-overlap-case.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
+| `external-write-authority-boundary.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `filter-meaning-shifts-under-tool-inference.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `findings-split-below-triage-unit.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `firing-condition-conflated-with-weight.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `flag-scope-bundling.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `flag-scope-bundling.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `gate-identification-vs-convention-mismatch.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `generalization-drops-the-qualifier.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `implementation-diverges-from-approved-option.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `implicit-environment-assumption.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `incidental-resolution-open-issue.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `independent-solve-brief-points-at-the-answer.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `independent-units-fail-at-seam.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `independent-units-fail-at-seam.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `indirect-test-input-bias.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `inherited-solution-space.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `interface-schema-does-not-prove-target-reachability.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
@@ -112,7 +113,7 @@ guard や gate が一部経路を塞ぐパターンは残るが、許可分岐�
 | `isomorph-count-unit-mismatch.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `manual-enumeration-check-target.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `meta-item-hides-subitems.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `named-remedy-does-not-produce-effect.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `named-remedy-does-not-produce-effect.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `observation-frame-beyond-the-reporter-tools.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `observed-symptom-vs-inferred-cause.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `one-sided-delegation-brief.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
@@ -123,26 +124,26 @@ guard や gate が一部経路を塞ぐパターンは残るが、許可分岐�
 | `promoted-rule-invalidates-a-feature.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `rationale-cites-unverified-mechanism.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `record-timing-anchor-vs-work-unit.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `removing-target-drops-hidden-role.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `removing-target-drops-hidden-role.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `review-baseline-drifts-to-branch-interior.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `rule-exempts-its-own-counterexamples.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `self-referential-check.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `shared-helper-filter-set-by-first-consumer.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `shared-worktree-interference.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `shipping-with-surviving-rejected-option.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `stale-checkout-runs-old-checker.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `stale-checkout-runs-old-checker.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `stale-root-cause-diagnosis.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `stale-window-external-artifact-survives-rebase.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `subtracted-count-hides-its-minuend.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `subtracted-count-hides-its-minuend.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `success-output-does-not-prove-persisted-body.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `symmetrization-duplicates-defect.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `type-width-vs-consumer-assumption.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `unmatched-vocabulary-defaults-to-pass.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
-| `unusable-named-means.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `unmatched-vocabulary-defaults-to-pass.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
+| `unusable-named-means.md` | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 |
 | `unverified-input-schema-yields-valid-empty-result.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `unverified-precedent-style.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
 | `verification-ran-in-another-tree.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 |
-| `verification-scope-misses-symptom.md` | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 | 修正後妥当 |
+| `verification-scope-misses-symptom.md` | 妥当 | 妥当 | 妥当 | 妥当 | 妥当 | 修正後妥当 | 妥当 | 妥当 | 妥当 |
 
 ## 検査と責務境界
 

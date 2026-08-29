@@ -73,15 +73,19 @@ prefix も値も宣言されておらず、新しいものを弾く機構も無�
 
 ### 変更時の意味レビュー
 
-新規パターン、既存パターンへの `具体例:` の追記、パターンの統合・分割は、書式検査とは別に diff-scoped な意味レビューを行う。
+カタログの意味に影響する変更はすべて、書式検査とは別に diff-scoped な意味レビューを行う。
+対象には新規追加・削除・rename・統合・分割に加え、定義文・`問いの形:`・`具体例:`・`対策:`・frontmatter・タグ・`phase:` の変更を含む。
 まず次の2コマンドの和集合で、base から working tree までの追加・変更・削除・rename と untracked の新規ファイルを列挙する。
 
 ```bash
-git diff --name-only --diff-filter=ACMRD origin/<base> -- .pfdsl/bindings/pfd-retro-patterns/
-git ls-files --others --exclude-standard -- .pfdsl/bindings/pfd-retro-patterns/
+git diff --name-status -z --diff-filter=ACMRD origin/<base> -- .pfdsl/bindings/pfd-retro-patterns/
+git ls-files -z --others --exclude-standard -- .pfdsl/bindings/pfd-retro-patterns/
 ```
 
-列挙した各対象について `retro-pattern-sweep` スキルを起動し、「6. 所属と内部論理を監査する」を正準とする9観点をすべて適用する。
+tracked 側は NUL 区切りの status とパスとして読み、rename / copy の status では直後の旧パス・新パスの組を保持し、それ以外では直後の1パスを保持する。
+untracked 側も NUL 区切りの各パスとして読む。改行区切りの行解析へ変換せず、空白・改行・非 ASCII 文字を含むパスをそのまま扱える parser または同等の Git 対応ツールへ渡す。
+
+列挙した各対象について `retro-pattern-sweep` スキルを起動し、「6. 所属と内部論理を監査する」を正準とする9観点をすべて適用する。削除対象は base 側の本文、rename 対象は変更前後の本文を含めて判定する。
 観点表と各問いはここへ複製せず、変更時レビューでも同スキルの正準表を参照する。
 
 変更者とは独立した reviewer に対象 diff を渡し、finding ごとに再現可能な concrete failure scenario と `file:line` の根拠を必須とする。
