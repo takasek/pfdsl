@@ -14,6 +14,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** @param {string} path */
 function readJsonOrNull(path) {
@@ -160,4 +161,15 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		installProvenance,
 		unavailable,
 	};
+}
+
+// Run as a command, this prints the report's environment block as JSON. The
+// skill that files the report invokes it this way, so it resolves its own
+// skill root rather than asking the caller for one.
+const selfPath = fileURLToPath(import.meta.url);
+if (process.argv[1] && resolve(process.argv[1]) === selfPath) {
+	const skillRoot = resolve(dirname(selfPath), "..");
+	process.stdout.write(
+		`${JSON.stringify(collectReportEnvironment(skillRoot), null, 2)}\n`,
+	);
 }

@@ -1,10 +1,19 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { collectReportEnvironment } from "../../.claude/skills/pfd-ops/scripts/collect-report-environment.mjs";
+
+const scriptPath = fileURLToPath(
+	new URL(
+		"../../.claude/skills/pfd-ops/scripts/collect-report-environment.mjs",
+		import.meta.url,
+	),
+);
 
 let tmp;
 
@@ -143,6 +152,17 @@ describe("collectReportEnvironment", () => {
 			fields.includes("bundleContentHash"),
 			"bundleContentHash should be recorded as unavailable",
 		);
+	});
+
+	it("prints the environment as JSON when run as a command", () => {
+		const result = spawnSync(process.execPath, [scriptPath], {
+			encoding: "utf-8",
+		});
+
+		assert.equal(result.status, 0, result.stderr);
+		const parsed = JSON.parse(result.stdout);
+		assert.equal(parsed.installation, "upstream-checkout");
+		assert.ok(Array.isArray(parsed.unavailable));
 	});
 
 	it("records the identifiers an upstream checkout does not carry", () => {
