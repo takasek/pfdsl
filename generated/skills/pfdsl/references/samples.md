@@ -351,7 +351,7 @@ source >> build -> output
 
 ## 17-type — type field
 
-`type:` declares the PFD kind (`roadmap`, `workflow`, `runtime-pipeline`). Values outside the enum cause an error (V031). `pfdsl status ready` rejects any explicit non-`roadmap` type; omitting `type:` is treated as `roadmap` and allowed, with a warning (W006). Status belongs to the roadmap: an artifact carrying `status:` under an explicit non-`roadmap` type is a warning (W007), and `pfdsl meta set` refuses to write one.
+`type:` declares the PFD kind (`roadmap`, `workflow`, `pipeline`). Values outside the enum cause an error (V031). `pfdsl status ready` rejects any explicit non-`roadmap` type; omitting `type:` is treated as `roadmap` and allowed, with a warning (W006). Status belongs to the roadmap: an artifact carrying `status:` under an explicit non-`roadmap` type is a warning (W007), and `pfdsl meta set` refuses to write one.
 
 ```pfdsl
 ---

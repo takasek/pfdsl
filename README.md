@@ -175,7 +175,7 @@ The script copies `docs/spec/spec.md` and `docs/samples/` into `references/` alo
 
 ## pfd-cycle suite (cross-project)
 
-A suite of Claude Code skills and commands for **PFD-driven project operations**: issue prioritization, progress tracking, artifact management, and session-learning routing across `roadmap` / `workflow` / `runtime-pipeline` PFDs.
+A suite of Claude Code skills and commands for **PFD-driven project operations**: issue prioritization, progress tracking, artifact management, and session-learning routing across `roadmap` / `workflow` / `pipeline` PFDs.
 
 Adopt it in any repo through the plugin:
 
