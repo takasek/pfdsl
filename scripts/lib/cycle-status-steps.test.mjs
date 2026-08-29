@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-
-import { runCycleStatus } from "./cycle-status-steps.mjs";
+import { cycleStatusExitCode, runCycleStatus } from "./cycle-status-steps.mjs";
+import { reviewRecordStep } from "./gate-check-steps.mjs";
 
 const ROOT = "/repo";
 const CLI_PATH = "/repo/packages/cli/dist/cli.js";
@@ -53,6 +53,12 @@ function baseDeps(overrides = {}) {
 }
 
 describe("runCycleStatus", () => {
+	it("uses a non-zero exit code for blocking lookup failures only", () => {
+		assert.equal(cycleStatusExitCode({ blocking: true }), 1);
+		assert.equal(cycleStatusExitCode({ blocking: false }), 0);
+		assert.equal(cycleStatusExitCode({}), 0);
+	});
+
 	it("reports fetched:false when git fetch throws, without aborting the rest", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
@@ -287,6 +293,16 @@ describe("runCycleStatus", () => {
 
 	const issueJson = ({ body, comments = [], labels = [] }) =>
 		JSON.stringify({ body, comments, labels });
+	const runForIssueBodies = (issueNumbers, bodies) =>
+		runCycleStatus(
+			baseDeps({
+				issueNumbers,
+				execGh: async (args) => {
+					if (args[0] === "issue") return issueJson({ body: bodies[args[2]] });
+					return JSON.stringify([]);
+				},
+			}),
+		);
 
 	it("resolves the target issue from --issue when given, ignoring any best process", async () => {
 		const calls = [];
@@ -506,6 +522,112 @@ describe("runCycleStatus", () => {
 				"案の処分 2: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
 				"案の処分 3: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
 			],
+		);
+	});
+
+	it("requires design review in preflight when the issue enumerates multiple options", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [1008],
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({
+							body: "## 対応案\n- A: 最小案\n- B: 拡張案\n",
+						});
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.reviewRecordTemplate.line, "Review: tool=<tool-name>");
+		assert.equal(
+			result.reviewRecordTemplate.requiredLine,
+			"Review: tool=design",
+		);
+	});
+
+	it("keeps ordinary review guidance in preflight for a single or absent option", async () => {
+		for (const body of ["## 対応案\n1. 案A\n", "普通の説明文。"])
+			assert.equal(
+				(
+					await runCycleStatus(
+						baseDeps({
+							issueNumbers: [1008],
+							execGh: async (args) => {
+								if (args[0] === "issue") return issueJson({ body });
+								return JSON.stringify([]);
+							},
+						}),
+					)
+				).reviewRecordTemplate.line,
+				"Review: tool=<tool-name>",
+			);
+	});
+
+	it("aggregates a later multi-option issue for preflight and the review gate", async () => {
+		const bodies = {
+			1009: "## 対応案\n1. 案A\n",
+			1010: "普通の説明文。",
+			1008: "## 対応案\n1. 案A\n2. 案B\n",
+		};
+		const result = await runForIssueBodies([1009, 1010, 1008], bodies);
+		assert.deepEqual(result.designReviewRequirements, [
+			{ issue: 1008, tool: "design", when: "code-path-changed" },
+		]);
+		assert.equal(result.reviewRecordTemplate.line, "Review: tool=<tool-name>");
+		assert.equal(
+			result.reviewRecordTemplate.requiredLine,
+			"Review: tool=design",
+		);
+
+		const issues = Object.entries(bodies).map(([number, body]) => ({
+			number: Number(number),
+			issue: { body },
+		}));
+		assert.equal(
+			reviewRecordStep({
+				commitMessages: {
+					ok: true,
+					text: "subject\n\nReview: tool=design\n",
+				},
+				changedFiles: ["scripts/lib/cycle-status.mjs"],
+				issues,
+			}).status,
+			"PASS",
+		);
+		const correctnessOnly = reviewRecordStep({
+			commitMessages: {
+				ok: true,
+				text: "subject\n\nReview: tool=correctness\n",
+			},
+			changedFiles: ["scripts/lib/cycle-status.mjs"],
+			issues,
+		});
+		assert.equal(correctnessOnly.status, "FAIL");
+		assert.match(correctnessOnly.detail, /#1008/);
+	});
+
+	it("keeps ordinary fallback for a multi-issue set without multiple options", async () => {
+		const bodies = {
+			1009: "## 対応案\n1. 案A\n",
+			1010: "普通の説明文。",
+		};
+		const result = await runForIssueBodies([1009, 1010], bodies);
+		assert.equal(result.reviewRecordTemplate.line, "Review: tool=<tool-name>");
+		assert.equal(result.reviewRecordTemplate.requiredLine, null);
+		const issues = Object.entries(bodies).map(([number, body]) => ({
+			number: Number(number),
+			issue: { body },
+		}));
+		assert.equal(
+			reviewRecordStep({
+				commitMessages: {
+					ok: true,
+					text: "subject\n\nReview: tool=correctness\n",
+				},
+				changedFiles: ["scripts/lib/cycle-status.mjs"],
+				issues,
+			}).status,
+			"PASS",
 		);
 	});
 
@@ -1061,6 +1183,26 @@ describe("runCycleStatus — untriaged target issue (#983)", () => {
 });
 
 describe("runCycleStatus — issue lookup failure and unregisteredManagedIssues", () => {
+	it("retains every issue lookup failure in the blocking display reason", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [956, 957],
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						throw new Error(`lookup failed for ${args[2]}`);
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.deepEqual(result.issueLookupFailures, [
+			{ issue: 956, error: "lookup failed for 956" },
+			{ issue: 957, error: "lookup failed for 957" },
+		]);
+		assert.match(result.designUnsettledError, /956.*lookup failed for 956/);
+		assert.match(result.designUnsettledError, /957.*lookup failed for 957/);
+		assert.equal(result.blocking, true);
+	});
+
 	it("excludes an issue whose label lookup failed, and says so via designUnsettledError", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
@@ -1081,5 +1223,9 @@ describe("runCycleStatus — issue lookup failure and unregisteredManagedIssues"
 		assert.deepEqual(result.unregisteredManagedIssues, []);
 		assert.deepEqual(result.untriagedTargetIssues, []);
 		assert.match(result.designUnsettledError, /network unreachable/);
+		assert.deepEqual(result.issueLookupFailures, [
+			{ issue: 956, error: "gh: network unreachable" },
+		]);
+		assert.equal(result.blocking, true);
 	});
 });
