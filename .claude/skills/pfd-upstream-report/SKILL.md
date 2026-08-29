@@ -128,16 +128,21 @@ CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数�
 新規起票と既存 issue へのコメントで、write と readback の対象が違う。
 
 共通の1手目は、セッション固有名を持つ body file に正本を書くことである。
+以下ではそのパスを `$body_path`、readback の保存先を `$readback_path` と書く。
+
+**山括弧のプレースホルダをそのままシェルへ貼らない。**
+`> <readback.json>` は `<` が入力リダイレクトとして解釈されて parse error になり、引用のないパスは空白・glob・先頭 `-` を含むと argv が壊れる。
+実際の値は変数へ入れ、`"$var"` の形で渡す。
 
 新規起票:
 
-1. `gh issue create --repo takasek/pfdsl --title <title> --body-file <path>` で正本を直接渡す
-2. 返された URL から issue 番号を取り、`gh issue view <number> --repo takasek/pfdsl --json body,url > <readback.json>` でその issue を取り直す
+1. `gh issue create --repo takasek/pfdsl --title "$title" --body-file "$body_path"` で正本を直接渡す
+2. 返された URL から issue 番号を取り、`gh issue view "$issue_number" --repo takasek/pfdsl --json body,url > "$readback_path"` でその issue を取り直す
 
 既存 issue へのコメント:
 
-1. `gh issue comment <number> --repo takasek/pfdsl --body-file <path>` で正本を直接渡す
-2. 返された comment URL の `#issuecomment-<id>` から id を取り、`gh api repos/takasek/pfdsl/issues/comments/<id> > <readback.json>` でそのコメント自体を取り直す
+1. `gh issue comment "$issue_number" --repo takasek/pfdsl --body-file "$body_path"` で正本を直接渡す
+2. 返された comment URL の `#issuecomment-<id>` から id を取り、`gh api "repos/takasek/pfdsl/issues/comments/$comment_id" > "$readback_path"` でそのコメント自体を取り直す
 
 **`gh issue view --json comments` の一覧から似た本文を拾って代用しない。**
 規約はこの読み方を明示的に禁じている。
@@ -146,7 +151,7 @@ CLAUDE_PLUGIN_ROOT は plugin ロード時に実パスへ置換される変数�
 どちらの経路でも、最後に JSON の `body` を decode して正本ファイルと比較する。
 
 ```bash
-node -e 'const fs=require("node:fs");const persisted=JSON.parse(fs.readFileSync(process.argv[1],"utf8")).body;const canonical=fs.readFileSync(process.argv[2],"utf8");if(persisted!==canonical){console.error("readback mismatch");process.exit(1)}' <readback.json> <body-file>
+node -e 'const fs=require("node:fs");const persisted=JSON.parse(fs.readFileSync(process.argv[1],"utf8")).body;const canonical=fs.readFileSync(process.argv[2],"utf8");if(persisted!==canonical){console.error("readback mismatch");process.exit(1)}' "$readback_path" "$body_path"
 ```
 
 **`--jq .body` でシェルへ取り出して比較しない。**
