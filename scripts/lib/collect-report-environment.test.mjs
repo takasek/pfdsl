@@ -49,11 +49,14 @@ describe("collectReportEnvironment", () => {
 		assert.equal(env.installation, "codex-plugin");
 		assert.equal(env.pluginVersion, "0.4.2");
 		assert.equal(env.bundleContentHash, null);
-		assert.deepEqual(
-			env.unavailable.map(({ field }) => field),
-			["bundleContentHash"],
+		const missingHash = env.unavailable.find(
+			({ field }) => field === "bundleContentHash",
 		);
-		assert.match(env.unavailable[0].reason, /Codex/);
+		assert.ok(
+			missingHash,
+			"bundleContentHash should be recorded as unavailable",
+		);
+		assert.match(missingHash.reason, /Codex/);
 	});
 
 	it("classifies a repo-local install and carries its provenance", () => {
@@ -86,5 +89,40 @@ describe("collectReportEnvironment", () => {
 		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
 
 		assert.equal(env.installation, "upstream-checkout");
+	});
+
+	it("collects the CLI version and the repository commit through runCommand", () => {
+		const repoRoot = join(tmp, "adopter");
+		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		mkdirSync(join(repoRoot, ".git"), { recursive: true });
+
+		const calls = [];
+		const runCommand = (command, args) => {
+			calls.push([command, ...args]);
+			if (command === "pfdsl") return "0.4.2";
+			if (command === "git") return "0123456789abcdef";
+			return null;
+		};
+
+		const env = collectReportEnvironment(skillRoot, { runCommand });
+
+		assert.equal(env.cliVersion, "0.4.2");
+		assert.equal(env.repoCommit, "0123456789abcdef");
+		assert.deepEqual(calls[0], ["pfdsl", "--version"]);
+	});
+
+	it("records the CLI version as unavailable when the command fails", () => {
+		const skillRoot = join(tmp, "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "0.4.2" });
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.cliVersion, null);
+		assert.ok(
+			env.unavailable.some(({ field }) => field === "cliVersion"),
+			"cliVersion should be recorded as unavailable",
+		);
 	});
 });

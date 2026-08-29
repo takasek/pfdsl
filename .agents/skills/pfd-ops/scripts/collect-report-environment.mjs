@@ -11,6 +11,7 @@
 // issue has to be able to tell "not available in this installation shape"
 // from "collection failed".
 
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
@@ -19,6 +20,22 @@ function readJsonOrNull(path) {
 	if (!existsSync(path)) return null;
 	try {
 		return JSON.parse(readFileSync(path, "utf-8"));
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * @param {string} command
+ * @param {string[]} args
+ * @returns {string | null}
+ */
+function defaultRunCommand(command, args) {
+	try {
+		const result = spawnSync(command, args, { encoding: "utf-8" });
+		if (result.status !== 0) return null;
+		const out = result.stdout?.trim();
+		return out ? out : null;
 	} catch {
 		return null;
 	}
@@ -97,12 +114,25 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		});
 	}
 
+	const runCommand = options.runCommand ?? defaultRunCommand;
+	const cliVersion = runCommand("pfdsl", ["--version"]);
+	if (cliVersion === null) {
+		unavailable.push({
+			field: "cliVersion",
+			reason: "`pfdsl --version` did not run or returned no output.",
+		});
+	}
+	const repoCommit =
+		repoRoot === null
+			? null
+			: runCommand("git", ["-C", repoRoot, "rev-parse", "HEAD"]);
+
 	return {
 		installation,
 		pluginVersion,
 		bundleContentHash,
-		cliVersion: null,
-		repoCommit: null,
+		cliVersion,
+		repoCommit,
 		installProvenance,
 		unavailable,
 	};
