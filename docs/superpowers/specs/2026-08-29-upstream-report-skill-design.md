@@ -55,7 +55,10 @@ remote だけを根拠にしない理由は、採用リポが参照用に pfdsl 
 
 同じ工程で `gh` の前提も確認する。
 工程5の重複確認も工程6の投稿も `gh` に依存しており、本文を組み立ててから使えないと分かるのが最も無駄が大きい。
-`gh` が存在しない、または未認証なら、ここで止めて何が足りないかを報告する。
+確認は `gh auth status --hostname github.com` とし、ホストを省かない。
+素の `gh auth status` は設定済みの全ホストを検査するため、宛先ホストの認証状態と一致しない（別ホストの認証で成功し、別ホストの破損で失敗する）。
+`gh` が存在しない、または github.com が未認証なら、ここで止めて何が足りないかを報告する。
+本文の起草へも進まない。
 
 自リポモードでも起票する。
 retro 中に見つけた配布層の欠陥をその場で直すと retro のスコープが膨らむため、issue へ切り出してコンテキストを区切るほうが健全である。
@@ -128,6 +131,9 @@ CLI のソースが採用リポの node_modules に常にあるとも限らな�
 同一と判断された場合は新規起票ではなく既存 issue へのコメントとする。
 コメントも本文の承認と、工程6の readback の対象になる。
 
+検索そのものが失敗した場合（ネットワーク不通・レート制限・read 権限の不足）は、重複確認を省いて起票へ進まず、報告して止まる。
+重複の有無が分からないまま起票すると、既存 issue の分岐を増やす。
+
 ### 6. 承認と投稿
 
 本文の全文を提示し、明示の承認を待つ。
@@ -135,11 +141,15 @@ CLI のソースが採用リポの node_modules に常にあるとも限らな�
 投稿は `github-issues-backend.md` の「複数行本文の外部書込み」規約に従う。
 共通の1手目はセッション固有名を持つ body file に正本を書くことで、その先は新規起票とコメントで write と readback の対象が違う。
 
-新規起票は `gh issue create --body-file` で正本を渡し、返された URL の issue 番号で `gh issue view <number> --json body,url` を引いて persisted `body` と照合する。
-コメントは `gh issue comment <number> --body-file` で正本を渡し、返された comment URL の `#issuecomment-<id>` から `gh api repos/takasek/pfdsl/issues/comments/<id> --jq .body` を引いてそのコメント自体と照合する。
+新規起票は `gh issue create --body-file` で正本を渡し、返された URL の issue 番号で `gh issue view <number> --json body,url` を引く。
+コメントは `gh issue comment <number> --body-file` で正本を渡し、返された comment URL の `#issuecomment-<id>` から `gh api repos/takasek/pfdsl/issues/comments/<id>` を引いてそのコメント自体を取り直す。
 `gh issue view --json comments` の一覧から似た本文を拾う読み方は規約が禁じている。
 
-どちらの経路でも、改行を含めた完全一致を確認し、一致しなければ成功として扱わず停止する。
+照合は、取り直した JSON をファイルへ保存し、その `body` を decode して正本ファイルと比較する形で行う。
+`--jq .body` でシェルへ取り出す経路を採らない — `--jq` は出力の終端に改行を足すため body 自身の末尾改行と区別できず、コマンド置換で受ければ今度は末尾改行が剥がれる。
+どちらも「改行を含めて完全一致」を確かめられないので、規約の要求を満たすのは JSON のまま保存して decode する経路だけである。
+
+どちらの経路でも、一致しなければ成功として扱わず停止する。
 同規約は、コマンドの成功表示や返された URL は persisted body の証拠にならないと明記している。
 
 ラベルは外部報告モードでは付けない。
