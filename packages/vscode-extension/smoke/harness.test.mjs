@@ -63,6 +63,7 @@ test("makeLaunchArgs isolates the run and opens the fixture", () => {
 			extensionsDir: "/tmp/extensions",
 			port: 9337,
 			fixturePath: "/repo/docs/samples/01-simple-chain.pfdsl",
+			platform: "darwin",
 		}),
 		[
 			"--new-window",
@@ -74,6 +75,20 @@ test("makeLaunchArgs isolates the run and opens the fixture", () => {
 			"--extensionDevelopmentPath=/repo/packages/vscode-extension",
 			"/repo/docs/samples/01-simple-chain.pfdsl",
 		],
+	);
+});
+
+test("makeLaunchArgs disables the Chromium sandbox on Linux", () => {
+	assert.equal(
+		makeLaunchArgs({
+			repoRoot: "/repo",
+			profileDir: "/tmp/profile",
+			extensionsDir: "/tmp/extensions",
+			port: 9337,
+			fixturePath: "/repo/docs/samples/01-simple-chain.pfdsl",
+			platform: "linux",
+		}).includes("--no-sandbox"),
+		true,
 	);
 });
 
