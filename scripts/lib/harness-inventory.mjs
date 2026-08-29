@@ -45,6 +45,7 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"references/scaffold/workflow.md",
 		"references/scaffold/workflow.pfdsl",
 		"references/work-cycle.md",
+		"scripts/collect-report-environment.mjs",
 		"scripts/check-install-sync.mjs",
 		"scripts/plugin-version-check.mjs",
 	]),
