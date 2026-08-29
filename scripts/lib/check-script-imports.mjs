@@ -130,6 +130,37 @@ function stripComments(source) {
 }
 
 /**
+ * Flags a file that reaches gh-exec.mjs through a relative import while not
+ * being on the allow-list, enforcing the import boundary #1044 introduced:
+ * production code must reach the gh CLI only through github-ops.mjs's named
+ * operations, never through gh-exec.mjs's execGh directly.
+ *
+ * Reuses extractRelativeImports rather than a dedicated parser — a second
+ * import-statement grammar would drift from the one findBrokenImports
+ * already maintains.
+ * @param {string[]} files - absolute paths to .mjs files to check
+ * @param {{ghExecPath: string, allowed: string[]}} opts - ghExecPath is
+ *   gh-exec.mjs's absolute path; allowed is the absolute paths permitted to
+ *   import it
+ * @returns {Array<{file: string, specifier: string}>}
+ */
+export function findGhExecImportBoundaryViolations(
+	files,
+	{ ghExecPath, allowed },
+) {
+	const violations = [];
+	for (const file of files) {
+		if (allowed.includes(file)) continue;
+		const source = readFileSync(file, "utf-8");
+		for (const specifier of extractRelativeImports(source)) {
+			const resolved = resolve(dirname(file), specifier);
+			if (resolved === ghExecPath) violations.push({ file, specifier });
+		}
+	}
+	return violations;
+}
+
+/**
  * Flags files that import node:child_process or reference packages/cli/dist
  * outside of a comment — the two ways a "dist-independent" script could
  * secretly gain a build dependency (either by spawning the CLI, or by
