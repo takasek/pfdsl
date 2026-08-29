@@ -25,6 +25,7 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"install/scripts/pfdsl/audit-issues-flow.mjs",
 		"install/scripts/pfdsl/lib/gh-compat.mjs",
 		"install/scripts/pfdsl/lib/gh-exec.mjs",
+		"install/scripts/pfdsl/lib/github-ops.mjs",
 		"install/scripts/pfdsl/lib/github-rest.mjs",
 		"install/scripts/pfdsl/lib/issues-flow-audit.mjs",
 		"install/scripts/pfdsl/lib/proxy-fetch-worker.mjs",
