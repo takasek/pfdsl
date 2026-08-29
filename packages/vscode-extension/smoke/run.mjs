@@ -88,7 +88,7 @@ export function appendCleanupDiagnostics(primaryError, cleanupErrors) {
 }
 
 async function findExtensionHostLogPaths(profileDir) {
-	const directories = [profileDir];
+	const directories = [join(profileDir, "logs")];
 	const paths = [];
 	let entriesRead = 0;
 	while (directories.length > 0 && paths.length < maxExtensionHostLogFiles) {

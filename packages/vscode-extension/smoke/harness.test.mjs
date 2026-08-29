@@ -640,6 +640,34 @@ test("primary failures retain extension-host logs, semantic snapshots, and clean
 	}
 });
 
+test("extension-host diagnostics ignore noisy profile siblings", async () => {
+	const runDir = await createRunDirectory();
+	const profileDir = join(runDir, "profile");
+	try {
+		await Promise.all(
+			Array.from({ length: 201 }, (_, index) =>
+				mkdir(join(profileDir, `noise-${index}`), { recursive: true }),
+			),
+		);
+		const logDir = join(profileDir, "logs", "window1");
+		await mkdir(logDir, { recursive: true });
+		await writeFile(
+			join(logDir, "exthost1.log"),
+			"extension host survived noise",
+		);
+
+		const error = await appendExtensionHostLogDiagnostics(
+			new Error("preview failed"),
+			profileDir,
+		);
+
+		assert.match(error.message, /exthost1\.log/);
+		assert.match(error.message, /extension host survived noise/);
+	} finally {
+		await removeRunDirectory(runDir);
+	}
+});
+
 test("resolveVSCodeExecutablePath handles recent macOS Code bundles", () => {
 	const electronPath = "/tmp/Visual Studio Code.app/Contents/MacOS/Electron";
 	const codePath = "/tmp/Visual Studio Code.app/Contents/MacOS/Code";
