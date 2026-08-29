@@ -436,3 +436,28 @@ git log --oneline origin/main..HEAD
 ```
 
 Expected: no uncommitted files; separate commits exist for design, workflow structure, companion prose, and checker plus tests. Stop without push and without PR creation.
+
+---
+
+### Task 5: Correct the retrospective checkpoint visibility boundary
+
+**Files:**
+- Modify: `docs/superpowers/specs/2026-08-29-retrospective-transformation-model-design.md`
+- Modify: `.claude/skills/pfd-retro/SKILL.md`
+- Regenerate: distributed pfd-retro skill mirrors
+
+**Interfaces:**
+- Consumes: the observed failure where the current contract attempted to copy an internal session identifier into a public PR before read-only subagent handoff.
+- Produces: a checkpoint contract that persists only evidence a recipient would otherwise lose, preserves the evidence visibility boundary, and requires exact human approval before any public checkpoint write.
+
+- [ ] **Step 1: Record the failing pressure scenario**
+
+Use the actual pfd-retro invocation against PR #1036 as RED evidence: a read-only A/B handoff must not require publishing the session inventory, while a cross-session handoff that would lose transient evidence must either use a visibility-compatible checkpoint or stop.
+
+- [ ] **Step 2: Revise the canonical execution contract and regenerate mirrors**
+
+The contract must distinguish same-task compaction, repository-only read-only delegation, and evidence-bearing handoff. It must forbid public disclosure of internal identifiers and require approval of exact content and destination before an issue or PR write.
+
+- [ ] **Step 3: Re-run the pressure scenario and repository verification**
+
+Dispatch a fresh read-only pfd-lens agent with only the frozen repository snapshot. GREEN means the delegation proceeds without a public checkpoint, the agent receives no transient session inventory, and its file:line findings can be merged with the main-thread C/D audit. Then regenerate mirrors and run documentation, strict PFD, and full repository checks.

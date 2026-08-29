@@ -13,7 +13,7 @@ This design models the complete path from observable activity through retrospect
 3. Completeness is relative to an explicit time window and source set. Missing required sources stop the flow rather than producing an empty-success result.
 4. Automated collection and auditing may produce findings, but only a human-confirmed decision may drive repository maintenance.
 5. Each maintenance process has one independently changeable canonical output. Shared generation and verification commands are downstream delivery concerns, not evidence that canonical artifacts share a producer.
-6. Transient audit artifacts do not become an ever-growing repository corpus. A cross-session handoff uses an existing issue or PR as a checkpoint.
+6. Transient audit artifacts do not become an ever-growing repository corpus. A checkpoint is required only when a consumer would otherwise lose required transient evidence, and its destination must preserve the evidence's visibility boundary.
 
 ## Retrospective collection and execution
 
@@ -71,9 +71,9 @@ The separate decision activity inventory and collector are removed from the desi
 
 ## Persistence and restart contract
 
-Inventory and plan artifacts may remain structured session outputs only while all consumers finish in the same session and the host guarantees access to that session record. No per-run repository file is added.
+Inventory and plan artifacts may remain structured session outputs while every consumer that needs them has guaranteed access to the same task record. Compaction does not require a checkpoint when the host preserves that record. A read-only subagent that audits a frozen repository snapshot without consuming transient session evidence receives the public commit or file snapshot it needs and does not trigger persistence of the session inventory. No per-run repository file is added.
 
-Before a handoff to another session or subagent, the current retrospective snapshot is persisted in the existing issue or PR. The checkpoint includes the cutoff, source coverage, stable event identifiers, and unresolved findings. If the session is lost before that checkpoint, the old run is abandoned. A replacement run collects all sources again at a new cutoff and does not claim identity with the abandoned run. Human decision checkpoints use the existing `decision_trigger` and `decisions` records in the issue or PR rather than a second inventory format.
+Before a handoff whose recipient lacks guaranteed access to required transient evidence, the minimum checkpoint is persisted to a destination visible only to its intended consumers. The checkpoint includes the cutoff, source coverage, public or destination-safe event identifiers, and unresolved findings. Internal session identifiers, tool metadata, and private evidence are never copied into a public issue or PR. A public issue or PR may be used only after the exact content and destination have been shown to the human and explicitly approved; approval of the retrospective itself is not approval of that external write. If no visibility-compatible destination exists or approval is withheld, the handoff stops. If the task record is lost before a required checkpoint, the old run is abandoned. A replacement run collects all sources again at a new cutoff and does not claim identity with the abandoned run. Human decision checkpoints use the existing `decision_trigger` and `decisions` records in the issue or PR rather than a second inventory format.
 
 Once human decisions have been applied to durable repository artifacts, intermediate inventories need not be retained permanently.
 
