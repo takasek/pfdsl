@@ -162,7 +162,7 @@ artifact:
   gh_issues:
     label: GitHub issues
     description: "作業項目の一次情報"
-    criteria: 起票・クローズ・ラベル付けが完了し、node scripts/pfdsl/audit-issues-flow.mjs が差分なしで通過する
+    criteria: 起票・クローズ・ラベル付けが完了し、既存 issue の実装方針・scope を改訂した場合はその内容が対象 issue の本文またはコメントから読め、node scripts/pfdsl/audit-issues-flow.mjs が差分なしで通過する
     location: https://github.com/takasek/pfdsl/issues
     group: planning
   roadmap_pfdsl:
