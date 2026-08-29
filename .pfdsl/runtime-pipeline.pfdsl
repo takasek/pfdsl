@@ -245,14 +245,30 @@ artifact:
     location: [ ../AGENTS.md, ../.agents/skills/, ../.codex/config.toml, ../.codex/agents/, ../.codex/hooks.json, ../.codex/GENERATED.md, ../plugin/pfdsl-codex/GENERATED.md, ../.gitattributes ]
     group: repo_generated
     tags: [ gen ]
-  plugin_dist:
-    label: drift検査済みの両ハーネス配布状態
-    description: "check_plugin_drift が、gen_pluginとassemble_codex_pluginの生成済みClaude Code root（plugin/pfdsl/）・Codex native root（plugin/pfdsl-codex/）・Codexリポジトリ開発資産を正本と照合済みにした状態。これはroot自体ではなく検査済み状態であり、rootの生成は各adapter processが担う。公式validator/runtimeのskills固定というroot境界を守るため、両rootは同居させない"
-    criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のClaude root・Codex root・Codexリポジトリ開発資産の差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
-    location: [ ../plugin/pfdsl/, ../plugin/pfdsl-codex/, ../AGENTS.md, ../.agents/skills/, ../.codex/config.toml, ../.codex/agents/, ../.codex/hooks.json, ../.codex/GENERATED.md, ../plugin/pfdsl-codex/GENERATED.md, ../.gitattributes ]
+  claude_plugin_dist:
+    label: drift検査済みのClaude Code plugin root
+    description: "check_plugin_drift が、gen_pluginの生成済みClaude Code root（plugin/pfdsl/）を正本と照合済みにした配布状態。Claude Code marketplaceの導入・更新経路が消費する"
+    criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のClaude Code rootの差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
+    location: ../plugin/pfdsl/
     group: repo_generated
     tags: [ gen ]
-    parts: [ claude_adapter_output, codex_adapter_output, codex_repo_assets ]
+    parts: [ claude_adapter_output ]
+  codex_plugin_dist:
+    label: drift検査済みのCodex plugin root
+    description: "check_plugin_drift が、assemble_codex_pluginの生成済みCodex native root（plugin/pfdsl-codex/）を正本と照合済みにした配布状態。Claude Code marketplace専用のinstall_pluginには渡さない"
+    criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のCodex rootの差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
+    location: ../plugin/pfdsl-codex/
+    group: repo_generated
+    tags: [ gen ]
+    parts: [ codex_adapter_output ]
+  verified_codex_repo_assets:
+    label: drift検査済みのCodexリポジトリ開発資産
+    description: "check_plugin_drift が、assemble_codex_pluginの生成済みCodexリポジトリ開発資産を正本と照合済みにした状態。pluginのインストール対象ではなく、このリポジトリでCodexが使う生成資産の鮮度を表す"
+    criteria: gen-plugin-bulk がnode scripts/gen-plugin-dist-independent.mjsによる再生成後のCodexリポジトリ開発資産の差分をpre-commitで拒否し、check-gen-plugin.ymlがpnpm -r build && make gen-plugin後の同じ範囲の差分をCIで拒否する
+    location: [ ../AGENTS.md, ../.agents/skills/, ../.codex/config.toml, ../.codex/agents/, ../.codex/hooks.json, ../.codex/GENERATED.md, ../plugin/pfdsl-codex/GENERATED.md, ../.gitattributes ]
+    group: repo_generated
+    tags: [ gen ]
+    parts: [ codex_repo_assets ]
   sample_previews:
     label: サンプル描画物
     description: "docs/samples/*.dot,*.svg と実装ロードマップの描画。make gen-samplesで再生成。.dot / README は graphviz-exporter、.svg は preview-engine の vitest が pre-commit と CI でドリフト検知する。GitHub 上の閲覧用終端成果物"
@@ -534,7 +550,7 @@ ops_install_sources >> gen_install -> ops_install_templates
 
 [harness_capability_model, ops_install_templates, pfdsl_skill] >> assemble_codex_plugin -> [codex_adapter_output, codex_repo_assets]
 
-[claude_adapter_output, codex_adapter_output, codex_repo_assets] >> check_plugin_drift -> plugin_dist
+[claude_adapter_output, codex_adapter_output, codex_repo_assets] >> check_plugin_drift -> [claude_plugin_dist, codex_plugin_dist, verified_codex_repo_assets]
 
 [feature_samples, roadmap_pfdsl] >> render_previews -> sample_previews
 
@@ -554,7 +570,7 @@ vsix_candidate >> verify_vsix -> vsix_package
 
 vsix_package >> upload_vsix -> published_ext
 
-plugin_dist >> install_plugin -> installed_plugin
+claude_plugin_dist >> install_plugin -> installed_plugin
 
 installed_plugin >> deploy_install_layer -> installed_l3_layer
 
