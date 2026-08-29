@@ -614,6 +614,7 @@ type: roadmap   # または workflow / pipeline
 * 列挙値: `roadmap` | `workflow` | `pipeline`（ADR-0017 の種別定義に対応）
 * 省略可能。省略時は種別を問わない操作（check / fmt / render 等）を実行する
 * 列挙外の値は error (V031、§15.14)
+* 第3種別は v0.0.20 以前 `runtime-pipeline` という名称だった。v0.0.21 で `pipeline` へ改名し、旧値は列挙外の値として扱う — 互換受理も deprecated 警告も設けないため、旧値を書いたファイルは V031 で error になる
 * `pfdsl status ready` / `pfdsl meta set`（status 設定時）/ `pfdsl status gaps`（roadmap引数）は `type: roadmap` 以外の値を明示指定したファイルに対して error を出力する。省略時は `roadmap` として扱い実行を許可するが、warning (W006、§15.14) を出す
 
 ---
