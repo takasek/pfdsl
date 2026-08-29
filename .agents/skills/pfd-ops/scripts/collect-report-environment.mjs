@@ -111,6 +111,18 @@ function detectInstallation(skillRoot) {
 export function collectReportEnvironment(skillRoot, options = {}) {
 	const { installation, bundleRoot, repoRoot } = detectInstallation(skillRoot);
 	const unavailable = [];
+	const missing = MISSING_IDENTIFIERS[installation] ?? {};
+
+	// Records a field this installation shape was expected to carry but could
+	// not be read. Shapes that never carry the field declare their own reason
+	// through MISSING_IDENTIFIERS, so those are left to the loop below —
+	// otherwise the same field would be reported twice with conflicting
+	// explanations.
+	function recordFailure(field, reason) {
+		if (field in missing) return;
+		unavailable.push({ field, reason });
+	}
+
 	let pluginVersion = null;
 	let bundleContentHash = null;
 	let installProvenance = null;
@@ -119,38 +131,66 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		pluginVersion =
 			readJsonOrNull(resolve(bundleRoot, ".claude-plugin/plugin.json"))
 				?.version ?? null;
+		if (pluginVersion === null) {
+			recordFailure(
+				"pluginVersion",
+				"The plugin manifest could not be read, or carried no version.",
+			);
+		}
 		bundleContentHash =
 			readJsonOrNull(resolve(bundleRoot, ".claude-plugin/bundle-manifest.json"))
 				?.contentHash ?? null;
+		if (bundleContentHash === null) {
+			recordFailure(
+				"bundleContentHash",
+				"The bundle manifest could not be read, or carried no content hash.",
+			);
+		}
 	}
 	if (installation === "codex-plugin") {
 		pluginVersion =
 			readJsonOrNull(resolve(bundleRoot, ".codex-plugin/plugin.json"))
 				?.version ?? null;
+		if (pluginVersion === null) {
+			recordFailure(
+				"pluginVersion",
+				"The plugin manifest could not be read, or carried no version.",
+			);
+		}
 	}
 	if (installation === "repo-local") {
 		installProvenance = readJsonOrNull(
 			resolve(repoRoot, "pfd-ops-install-manifest.json"),
 		);
+		if (installProvenance === null) {
+			recordFailure(
+				"installProvenance",
+				"The install provenance file could not be read, or is absent.",
+			);
+		}
 	}
-	for (const [field, reason] of Object.entries(
-		MISSING_IDENTIFIERS[installation] ?? {},
-	)) {
+	for (const [field, reason] of Object.entries(missing)) {
 		unavailable.push({ field, reason });
 	}
 
 	const runCommand = options.runCommand ?? defaultRunCommand;
 	const cliVersion = runCommand("pfdsl", ["--version"]);
 	if (cliVersion === null) {
-		unavailable.push({
-			field: "cliVersion",
-			reason: "`pfdsl --version` did not run or returned no output.",
-		});
+		recordFailure(
+			"cliVersion",
+			"`pfdsl --version` did not run, or returned no output.",
+		);
 	}
 	const repoCommit =
 		repoRoot === null
 			? null
 			: runCommand("git", ["-C", repoRoot, "rev-parse", "HEAD"]);
+	if (repoRoot !== null && repoCommit === null) {
+		recordFailure(
+			"repoCommit",
+			"`git rev-parse HEAD` did not run, or returned no output.",
+		);
+	}
 
 	return {
 		installation,

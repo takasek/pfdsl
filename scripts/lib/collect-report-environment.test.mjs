@@ -154,6 +154,53 @@ describe("collectReportEnvironment", () => {
 		);
 	});
 
+	it("distinguishes an unreadable Claude manifest from a shape that has none", () => {
+		const skillRoot = join(tmp, "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		mkdirSync(join(tmp, ".claude-plugin"), { recursive: true });
+		writeFileSync(join(tmp, ".claude-plugin", "plugin.json"), "{ broken");
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.installation, "claude-plugin");
+		assert.equal(env.pluginVersion, null);
+		const failure = env.unavailable.find(
+			({ field }) => field === "pluginVersion",
+		);
+		assert.ok(failure, "pluginVersion should be recorded as unavailable");
+		assert.match(failure.reason, /could not be read/);
+	});
+
+	it("records a repo-local install whose provenance file is absent", () => {
+		const repoRoot = join(tmp, "adopter");
+		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		mkdirSync(join(repoRoot, ".git"), { recursive: true });
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.installProvenance, null);
+		assert.ok(
+			env.unavailable.some(({ field }) => field === "installProvenance"),
+			"installProvenance should be recorded as unavailable",
+		);
+	});
+
+	it("records the repository commit as unavailable when git fails", () => {
+		const repoRoot = join(tmp, "adopter");
+		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		mkdirSync(join(repoRoot, ".git"), { recursive: true });
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		assert.equal(env.repoCommit, null);
+		assert.ok(
+			env.unavailable.some(({ field }) => field === "repoCommit"),
+			"repoCommit should be recorded as unavailable",
+		);
+	});
+
 	it("prints the environment as JSON when run as a command", () => {
 		const result = spawnSync(process.execPath, [scriptPath], {
 			encoding: "utf-8",
