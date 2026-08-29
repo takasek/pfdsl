@@ -2,7 +2,7 @@
 // PFD edges that model it (#699).
 //
 // `.pfdsl/workflow.md` said outright that these edges are "check で強制されず
-// 目視追随に依存する": distill_ops's outputs in workflow.pfdsl and gen_plugin's
+// 目視追随に依存する": each workflow artifact's unique output producer and gen_plugin's
 // inputs in runtime-pipeline.pfdsl. #481 added grill_skill and missed three
 // references; a retro audit found it afterwards.
 //
@@ -127,6 +127,19 @@ export function edgeMembers(edges, { kind, process }) {
 }
 
 /**
+ * The workflow processes that produce an artifact, in stable order.
+ * @param {Array<{kind: string, artifact: string, process: string}>} edges analyze().edges
+ * @param {string} artifact
+ * @returns {string[]}
+ */
+export function artifactProducers(edges, artifact) {
+	return edges
+		.filter((edge) => edge.kind === "output" && edge.artifact === artifact)
+		.map((edge) => edge.process)
+		.sort();
+}
+
+/**
  * Whether an artifact reaches a process through primary data-flow edges.
  * Input edges move artifact -> process and output edges move process -> artifact;
  * feedback edges are intentionally excluded because they do not deliver the
@@ -171,7 +184,7 @@ export function artifactReachesProcess(edges, sourceArtifact, targetProcess) {
  * either (`pfd_commands` exists only in runtime-pipeline.pfdsl, #780/#944).
  * The two requirements are not symmetric, though: reaching `gen_plugin` is
  * required of every bundled artifact regardless of where it is declared, but
- * `distill_ops outputs` only makes sense for an artifact workflow.pfdsl
+ * unique workflow production only makes sense for an artifact workflow.pfdsl
  * actually declares — asking a pipeline-only artifact to appear on a
  * workflow.pfdsl edge it was never eligible for would be a false positive.
  * @param {{
@@ -181,7 +194,7 @@ export function artifactReachesProcess(edges, sourceArtifact, targetProcess) {
  *   pipelineEdges: Array<{kind: string, artifact: string, process: string}>,
  *   mirrors: Array<object>,
  * }} input
- * @returns {Array<{id: string, location: string | string[], missing: string[], declaredIn: "workflow" | "pipeline"}>}
+ * @returns {Array<{id: string, location: string | string[], missing: string[], producers?: string[], declaredIn: "workflow" | "pipeline"}>}
  */
 export function findUnwiredSkills({
 	workflowArtifacts,
@@ -190,17 +203,13 @@ export function findUnwiredSkills({
 	pipelineEdges,
 	mirrors,
 }) {
-	const distillOutputs = edgeMembers(workflowEdges, {
-		kind: "output",
-		process: "distill_ops",
-	});
 	const generated = edgeMembers(pipelineEdges, { kind: "output" });
 
 	const findings = [];
 	// Keyed by id, so an artifact both graphs declare — which every bundled one
 	// but pfd_commands is — yields one finding rather than one per declaration.
 	// workflow.pfdsl wins the tie: it owns the content, and it is the graph whose
-	// distill_ops edge the artifact is then held to.
+	// producer edge the artifact is then held to.
 	const universe = new Map();
 	for (const [id, meta] of Object.entries(pipelineArtifacts))
 		universe.set(id, { meta, declaredIn: "pipeline" });
@@ -217,8 +226,13 @@ export function findUnwiredSkills({
 		if (generated.has(id)) continue;
 
 		const missing = [];
-		if (declaredIn === "workflow" && !distillOutputs.has(id))
-			missing.push("distill_ops outputs");
+		const producers =
+			declaredIn === "workflow"
+				? artifactProducers(workflowEdges, id)
+				: undefined;
+		if (producers?.length === 0) missing.push("workflow producer");
+		if (producers && producers.length > 1)
+			missing.push("unique workflow producer");
 		const sourcePaths = locations.map((location) =>
 			repoRelative(location).replace(/\/$/, ""),
 		);
@@ -250,7 +264,13 @@ export function findUnwiredSkills({
 		)
 			missing.push("reach gen_plugin");
 		if (missing.length > 0)
-			findings.push({ id, location: meta.location, missing, declaredIn });
+			findings.push({
+				id,
+				location: meta.location,
+				missing,
+				...(producers === undefined ? {} : { producers }),
+				declaredIn,
+			});
 	}
 	return findings;
 }

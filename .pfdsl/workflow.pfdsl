@@ -133,9 +133,49 @@ artifact:
     group: dialogue
   decisions:
     label: 方法論判断
-    description: "対話で確定した方法論・運用の判断。品質ガイド即時反映（maintain_template）とADR 起草（draft_adrs）の2経路で消費 — スキル改善は issue を通さない。実体はセッションログと反映先コミットで検証可能"
-    criteria: draft_adrs または maintain_template が反映判断できる確定判断が、gh issue view <該当issue> --comments や gh pr view <該当PR> で読めるコメント・本文、または ADR 草稿ファイルに記述されている
+    description: "人間の意思決定者だけが採用・却下・保留を確定する判断記録。対象の正本 artifact と下流整備へ渡す具体的な変更指示を持ち、指名された整備プロセスだけを駆動する"
+    criteria: 人間の意思決定者、採用・却下・保留、対象の正本 artifact、具体的な変更指示が gh issue view <該当issue> --comments または gh pr view <該当PR> で読める記録にそろっている
+    group: decision
+  decision_trigger:
+    label: 判断トリガー
+    description: "人間の判断を要する選択肢とその証拠参照を整理した対話の出力。採用・却下・保留の disposition 自体は記録しない"
+    criteria: 人間の disposition を要する各選択肢と証拠参照が、次の decide で判断できる形で記録されている
     group: dialogue
+  retro_request:
+    label: ふりかえり要求
+    description: "retro_skill の選別・検証規則に従い、一回のふりかえりで必要な source set と時点固定 cutoff を指定する実行時入力"
+    criteria: 実行ごとに必要 source set と cutoff が明示され、同じ cutoff で activity を収集できる
+    group: decision
+  session_records:
+    label: セッション記録
+    description: "既存 workflow artifact にないセッション由来の activity evidence だけを渡す実行時入力"
+    criteria: retro_request が要求するセッション evidence を、安定した event identifier とともに収集できる
+    group: decision
+  scheduler_records:
+    label: scheduler記録
+    description: "既存 workflow artifact にない scheduler 由来の activity evidence だけを渡す実行時入力"
+    criteria: retro_request が要求する scheduler evidence を、安定した event identifier とともに収集できる
+    group: decision
+  pre_retro_inventory:
+    label: ふりかえり事前目録
+    description: "retro_request の cutoff で凍結した source query、取得結果、coverage status、安定した event identifier の目録。監査や判断の disposition は記録しない"
+    criteria: 必要 source ごとの query、cutoff、取得結果、coverage status、event identifier がそろう。不足 source があれば incomplete のまま plan_retro を開始しない
+    group: decision
+  retro_plan:
+    label: ふりかえり計画
+    description: "凍結された事前目録の各 event について、今回のふりかえり対象にするかと理由を非排他的に記録する選別結果"
+    criteria: 事前目録の全 event に参加有無と理由が記録され、複数 trigger への同時分類を失わない
+    group: decision
+  retro_subject_snapshot:
+    label: ふりかえり対象スナップショット
+    description: "retro_plan が選んだ具体的な PFD、session evidence、knowledge artifact の内容を同じ cutoff で凍結した解決済み snapshot。参照先の一覧だけではない"
+    criteria: 選別済み subject の実内容が同じ cutoff で固定され、選択された正本 artifact の変更が snapshot と retro_findings を変えうる
+    group: decision
+  retro_findings:
+    label: ふりかえり知見
+    description: "一回の retrospective execution が凍結した計画と subject snapshot に audit capability を適用して得る結果。各 finding は run identifier と人間判断に必要な証拠を持つ"
+    criteria: 各 finding に run identifier、根拠 evidence、振り分け候補が記録され、欠落 source から空の成功結論を出していない
+    group: decision
   examples:
     label: 実践例
     description: "品質ガイドの実証とレビュー素材。スキル参照への採録候補"
@@ -155,7 +195,7 @@ artifact:
     group: decision
   payoff_log:
     label: 効果局面ログ
-    description: "PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材（write_article）と配布スキル蒸留の入力（distill_ops）。追記条件は ADR-0014 反実仮想テスト（冒頭規約参照）"
+    description: "PFD が効いた局面の事例集。記事 (#12) の具体エピソード素材（write_article）。追記条件は ADR-0014 反実仮想テスト（冒頭規約参照）"
     criteria: ADR-0014 反実仮想テストを通過した事例が追記済み
     location: ../docs/pfd_payoff_log.md
     group: decision
@@ -376,26 +416,143 @@ artifact:
     group: planning
 
 process:
-  distill_ops:
-    label: 配布スキル蒸留
-    description: "対話の判断・ADR・効果局面ログから配布物（スキル・agent・同梱 hook）の規約本文と機構を蒸留する。スキル改善は issue を通さず対話から直接行う（知見振り分け経路1）。リポローカルスキルは distill_local_skills、リポ固有規約・機構は externalize_bindings が持つ（#672 で分割）— 分割の軸は配布されるかどうかで、機構であることは externalize_bindings 側の根拠にならない"
+  maintain_distributed_advisory_hooks:
+    label: 配布advisory hook整備
+    description: "decisions が指名した distributed_advisory_hooks を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の unsafe-action failure を警告と安全な次手へ反映する"
+    command: node --test scripts/lib/gen-plugin.test.mjs
     group: generation
-  distill_local_skills:
-    label: リポローカルスキル蒸留
-    description: "このリポ専用の開発スキル・観点集（spec stress-test・VS Code 拡張デバッグ・配布レビュー）を対話の判断・ADR から蒸留する。配布対象外 — 読み手はこのリポの開発セッションのみ（#672 で distill_ops から分割）"
+    tags: [ knowledge_maintenance ]
+  maintain_ecosystem_skill:
+    label: ecosystemスキル整備
+    description: "decisions が指名した ecosystem_skill を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の bootstrap failure を scaffold 手順へ反映する"
     group: generation
-  externalize_bindings:
-    label: リポ固有規約の外化
-    description: "リポ固有の運用規約を binding・companion 散文と PreToolUse ガード機構へ外化する。散文と hook は同一変換の媒体違い（companion 冒頭「散文として書く前に機械化を検討する」）。配布対象外（#672 で distill_ops から分割）"
+    tags: [ knowledge_maintenance ]
+  maintain_grill_skill:
+    label: grillスキル整備
+    description: "decisions が指名した grill_skill を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の対話破綻を prompt と成果物 framing へ反映する"
     group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_implementer_agent:
+    label: implementer agent整備
+    description: "decisions が指名した implementer_agent を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の委譲・handoff failure を編集・検査契約へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_ops_skill_general:
+    label: pfd-ops一般層整備
+    description: "decisions が指名した ops_skill_general を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の運用 failure を優先付け・受け入れ・完了手順へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_ops_skill_github_backend:
+    label: pfd-ops GitHub backend整備
+    description: "decisions が指名した ops_skill_l3 を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の GitHub Issues・永続本文 failure を backend 手順と readback 検査へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_pfd_lens_agent:
+    label: pfd-lens agent整備
+    description: "decisions が指名した pfd_lens_agent を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の見逃した graph defect を監査質問と evidence 境界へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_retro_skill:
+    label: retroスキル整備
+    description: "decisions が指名した retro_skill を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の収集・計画・監査 failure を evidence 選定と failure behavior へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_review_perspectives:
+    label: レビュー観点整備
+    description: "decisions が指名した review_perspectives を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の見逃した review concern を質問と判定基準へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_ops_binding:
+    label: pfd-ops binding整備
+    description: "decisions が指名した bindings_pfd_ops を改訂し、prose_mechanization_sweep_record の散文・機構矛盾と retro_findings の運用実態との不一致を binding 手順へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_retro_binding:
+    label: pfd-retro binding整備
+    description: "decisions が指名した bindings_pfd_retro を改訂し、prose_mechanization_sweep_record の散文矛盾、retro_pattern_sweep_record の滞留、retro_findings の具体的パターンを binding 文言と routing 規則へ反映する"
+    command: node scripts/retro-patterns.mjs check
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_delegation_guard:
+    label: 委譲guard整備
+    description: "decisions が指名した delegation_guard を改訂し、prose_mechanization_sweep_record の規約・機構矛盾と retro_findings の delegated-write escape・false rejection を guard 規則へ反映する"
+    command: node --test scripts/lib/delegation-guard.test.mjs
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_main_branch_guard:
+    label: main branch guard整備
+    description: "decisions が指名した main_branch_guard を改訂し、prose_mechanization_sweep_record の Git 規約・guard 矛盾と retro_findings の unblocked mutation・false block を操作分類へ反映する"
+    command: node --test scripts/lib/main-commit-guard.test.mjs
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_pre_artifact_advisory:
+    label: pre-artifact advisory整備
+    description: "decisions が指名した pre_artifact_advisory を改訂し、prose_mechanization_sweep_record の P3 散文矛盾と retro_findings の pre-artifact mistake を警告と recovery guidance へ反映する"
+    command: node --test scripts/lib/pre-artifact-advisory.test.mjs
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_workflow_companion:
+    label: workflow companion整備
+    description: "decisions が指名した workflow_md を改訂し、prose_mechanization_sweep_record の companion・graph 矛盾と retro_findings の routing・ownership misunderstanding を説明へ反映する"
+    command: node scripts/check-companion-bindings.mjs
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_distribution_review_perspectives:
+    label: 配布レビュー観点整備
+    description: "decisions が指名した distribution_review_perspectives を改訂し、distribution_review_record の配布欠陥と retro_findings の recurring bundle-reader defect を review question へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_distribution_review_skill:
+    label: 配布レビュースキル整備
+    description: "decisions が指名した distribution_review_skill を改訂し、distribution_review_record の配布先で観測した詰まりと retro_findings の review-session failure を収集・分類・修正手順へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_prose_mechanization_audit_skill:
+    label: 散文機械化監査スキル整備
+    description: "decisions が指名した prose_mechanization_audit_skill を改訂し、retro_findings の見逃した prose・mechanism divergence を対象固有の監査手順へ反映する"
+    command: node scripts/check-asset-sweep.mjs
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_retro_pattern_sweep_skill:
+    label: retroパターン棚卸しスキル整備
+    description: "decisions が指名した retro_pattern_sweep_skill を改訂し、retro_findings の見逃した stale・overlapping pattern を catalog sweep 手順へ反映する"
+    command: node scripts/check-asset-sweep.mjs
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_spec_stress_skill:
+    label: spec stressスキル整備
+    description: "decisions が指名した spec_stress_skill を改訂し、retro_findings の見逃した specification failure を反証対象の仮定と adversarial case へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
+  maintain_vscode_ext_debug_skill:
+    label: VSCode拡張デバッグスキル整備
+    description: "decisions が指名した vscode_ext_debug_skill を改訂し、retro_findings の extension failure を再現・診断手順へ反映する"
+    group: generation
+    tags: [ knowledge_maintenance ]
   maintain_template:
     label: テンプレート整備
     description: "仕様変更・対話の判断・レビュー知見・ADR 決定を品質ガイドへ反映する。スキル改善は issue を通さず対話から直接行う"
     group: generation
   discuss:
     label: 設計対話
-    description: "ユーザーの関心・意図を起点に議論し、お題・提案・判断を確定させる。効果局面ログへの追記（数行の事実記録）までは対話の終端動作。レビュー知見は次の対話への還流"
+    description: "ユーザーの関心・意図を起点に議論し、お題・提案・人間判断が必要な選択肢を decision_trigger として整理する。効果局面ログへの追記までは対話の終端動作。レビュー知見と retrospective finding は次の対話への還流"
     group: dialogue
+  decide:
+    label: 人間判断
+    description: "decision_trigger の選択肢と証拠を、人間の意思決定者が採用・却下・保留に disposition し、対象の正本 artifact と具体的な変更指示を decisions に記録する唯一の工程"
+    group: decision
+  collect_activity:
+    label: 活動収集
+    description: "retro_request が指定した source set と cutoff で既存の GitHub・Git evidence、session_records、scheduler_records を収集し、coverage を判定した凍結前目録を作る"
+    group: decision
+  plan_retro:
+    label: ふりかえり計画
+    description: "complete な pre_retro_inventory と integrated_repository から event の非排他的な対象分類と、選別した具体的 subject の同一 cutoff snapshot を同時に作る"
+    group: decision
+  run_retro:
+    label: ふりかえり実行
+    description: "凍結された retro_plan と retro_subject_snapshot に前世代の retro_skill を適用し、run identifier と人間判断用 evidence を持つ retro_findings を作る"
+    group: decision
   draft_adrs:
     label: ADR 起草
     description: "対話で確定した判断を ADR 文書に起草する。委譲可能な独立作業 — 参照する図・成果物の実物と突合して ID・経路を検証する（突合を欠くと捏造が発生することが実証済み）。ファイル作成と同じコミットで docs/adr/README.md の一覧に追記する"
@@ -489,12 +646,15 @@ process:
     group: release
 
 tag:
+  knowledge_maintenance:
+    label: 知識正本整備
+    description: 独立して所有される正本 artifact を、指名された decisions と対象固有の evidence から整備する transformation の分類
   distilled_skill:
     label: 蒸留スキル系成果物
-    description: 蒸留プロセス（distill_ops・distill_local_skills）が生成する skill 形態の成果物
+    description: skill、agent、hook として利用・配布できる形態の成果物
   distilled_doc:
     label: 蒸留ドキュメント系成果物
-    description: distill_ops・externalize_bindings が生成する散文・カタログ形態の成果物
+    description: 散文、binding、companion、カタログとして参照される形態の成果物
 
 statusStyles:
   todo:
@@ -502,13 +662,18 @@ statusStyles:
     style: filled
 ---
 
-user_intent >> discuss -> [decisions, payoff_log, proposals, topics]
+user_intent >> discuss -> [decision_trigger, payoff_log, proposals, topics]
+
+adrs >>? discuss
+findings >>? discuss
+retro_findings >>? discuss
+
+decision_trigger >> decide -> decisions
 
 decisions >> draft_adrs -> adrs
 
+adrs >>? draft_adrs
 toolchain >>? draft_adrs
-
-findings >>? discuss
 
 gh_issues >> draft_proposals -> spec_proposals
 
@@ -522,6 +687,9 @@ spec >> maintain_samples -> feature_samples
 
 adrs >>? maintain_template
 findings >>? maintain_template
+quality_guide >>? maintain_template
+skill_template >>? maintain_template
+feature_samples >>? maintain_samples
 
 
 
@@ -537,18 +705,106 @@ pfdsl_skill >>? review_examples
 retro_skill >>? review_examples
 toolchain >>? review_examples
 
-[adrs, decisions, payoff_log] >> distill_ops -> [distributed_advisory_hooks, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives]
+decisions >> maintain_delegation_guard -> delegation_guard
+decisions >> maintain_distributed_advisory_hooks -> distributed_advisory_hooks
+decisions >> maintain_distribution_review_perspectives -> distribution_review_perspectives
+decisions >> maintain_distribution_review_skill -> distribution_review_skill
+decisions >> maintain_ecosystem_skill -> ecosystem_skill
+decisions >> maintain_grill_skill -> grill_skill
+decisions >> maintain_implementer_agent -> implementer_agent
+decisions >> maintain_main_branch_guard -> main_branch_guard
+decisions >> maintain_ops_binding -> bindings_pfd_ops
+decisions >> maintain_ops_skill_general -> ops_skill_general
+decisions >> maintain_ops_skill_github_backend -> ops_skill_l3
+decisions >> maintain_pfd_lens_agent -> pfd_lens_agent
+decisions >> maintain_pre_artifact_advisory -> pre_artifact_advisory
+decisions >> maintain_prose_mechanization_audit_skill -> prose_mechanization_audit_skill
+decisions >> maintain_retro_binding -> bindings_pfd_retro
+decisions >> maintain_retro_pattern_sweep_skill -> retro_pattern_sweep_skill
+decisions >> maintain_retro_skill -> retro_skill
+decisions >> maintain_review_perspectives -> review_perspectives
+decisions >> maintain_spec_stress_skill -> spec_stress_skill
+decisions >> maintain_vscode_ext_debug_skill -> vscode_ext_debug_skill
+decisions >> maintain_workflow_companion -> workflow_md
 
-[adrs, decisions] >> distill_local_skills -> [distribution_review_perspectives, distribution_review_skill, prose_mechanization_audit_skill, retro_pattern_sweep_skill, spec_stress_skill, vscode_ext_debug_skill]
+bindings_pfd_ops >>? maintain_ops_binding
+bindings_pfd_retro >>? maintain_retro_binding
+delegation_guard >>? maintain_delegation_guard
+distributed_advisory_hooks >>? maintain_distributed_advisory_hooks
+distribution_review_perspectives >>? maintain_distribution_review_perspectives
+distribution_review_skill >>? maintain_distribution_review_skill
+ecosystem_skill >>? maintain_ecosystem_skill
+grill_skill >>? maintain_grill_skill
+implementer_agent >>? maintain_implementer_agent
+main_branch_guard >>? maintain_main_branch_guard
+ops_skill_general >>? maintain_ops_skill_general
+ops_skill_l3 >>? maintain_ops_skill_github_backend
+pfd_lens_agent >>? maintain_pfd_lens_agent
+pre_artifact_advisory >>? maintain_pre_artifact_advisory
+prose_mechanization_audit_skill >>? maintain_prose_mechanization_audit_skill
+retro_pattern_sweep_skill >>? maintain_retro_pattern_sweep_skill
+retro_skill >>? maintain_retro_skill
+review_perspectives >>? maintain_review_perspectives
+spec_stress_skill >>? maintain_spec_stress_skill
+vscode_ext_debug_skill >>? maintain_vscode_ext_debug_skill
+workflow_md >>? maintain_workflow_companion
 
-[adrs, decisions] >> externalize_bindings -> [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, pre_artifact_advisory, workflow_md]
+retro_findings >>? maintain_delegation_guard
+retro_findings >>? maintain_distributed_advisory_hooks
+retro_findings >>? maintain_distribution_review_perspectives
+retro_findings >>? maintain_distribution_review_skill
+retro_findings >>? maintain_ecosystem_skill
+retro_findings >>? maintain_grill_skill
+retro_findings >>? maintain_implementer_agent
+retro_findings >>? maintain_main_branch_guard
+retro_findings >>? maintain_ops_binding
+retro_findings >>? maintain_ops_skill_general
+retro_findings >>? maintain_ops_skill_github_backend
+retro_findings >>? maintain_pfd_lens_agent
+retro_findings >>? maintain_pre_artifact_advisory
+retro_findings >>? maintain_prose_mechanization_audit_skill
+retro_findings >>? maintain_retro_binding
+retro_findings >>? maintain_retro_pattern_sweep_skill
+retro_findings >>? maintain_retro_skill
+retro_findings >>? maintain_review_perspectives
+retro_findings >>? maintain_spec_stress_skill
+retro_findings >>? maintain_vscode_ext_debug_skill
+retro_findings >>? maintain_workflow_companion
+
+distribution_review_record >>? maintain_distributed_advisory_hooks
+distribution_review_record >>? maintain_distribution_review_perspectives
+distribution_review_record >>? maintain_distribution_review_skill
+distribution_review_record >>? maintain_ecosystem_skill
+distribution_review_record >>? maintain_grill_skill
+distribution_review_record >>? maintain_implementer_agent
+distribution_review_record >>? maintain_ops_skill_general
+distribution_review_record >>? maintain_ops_skill_github_backend
+distribution_review_record >>? maintain_pfd_lens_agent
+distribution_review_record >>? maintain_retro_skill
+distribution_review_record >>? maintain_review_perspectives
+
+prose_mechanization_sweep_record >>? maintain_delegation_guard
+prose_mechanization_sweep_record >>? maintain_main_branch_guard
+prose_mechanization_sweep_record >>? maintain_ops_binding
+prose_mechanization_sweep_record >>? maintain_pre_artifact_advisory
+prose_mechanization_sweep_record >>? maintain_retro_binding
+prose_mechanization_sweep_record >>? maintain_workflow_companion
+
+retro_pattern_sweep_record >>? maintain_retro_binding
 
 spec_stress_skill >>? maintain_spec
 
-retro_skill >>? discuss
+[gh_issues, integrated_repository, issue_updates, pull_request, retro_request, scheduler_records, session_records] >> collect_activity -> pre_retro_inventory
 
-retro_skill >>? distill_ops
-retro_skill >>? externalize_bindings
+retro_skill >>? collect_activity
+
+[integrated_repository, pre_retro_inventory] >> plan_retro -> [retro_plan, retro_subject_snapshot]
+
+retro_skill >>? plan_retro
+
+[retro_plan, retro_subject_snapshot] >> run_retro -> retro_findings
+
+retro_skill >>? run_retro
 
 [adrs, payoff_log] >> write_article -> article
 
@@ -558,10 +814,14 @@ findings >>? file_issues
 
 gh_issues >> map_deps -> [roadmap_md, roadmap_pfdsl]
 
+roadmap_md >>? map_deps
 roadmap_pfdsl >>? map_deps
 
+runtime_pipeline_md >>? map_transform_boundaries
+runtime_pipeline_pfdsl >>? map_transform_boundaries
 toolchain >> map_transform_boundaries -> [runtime_pipeline_md, runtime_pipeline_pfdsl]
 
+workflow_pfdsl >>? map_workflow
 [adrs, decisions] >> map_workflow -> workflow_pfdsl
 
 [gh_issues, roadmap_pfdsl, spec] >> develop -> pull_request
@@ -593,12 +853,11 @@ issue_updates >>? file_issues
 
 
 
+readme >>? update_readme
 [claude_plugin_dist, codex_plugin_dist, published_cli, published_libraries] >> update_readme -> readme
 
 [claude_plugin_dist, codex_plugin_dist, distribution_review_perspectives] >> review_distribution -> distribution_review_record
 
-distribution_review_record >>? distill_local_skills
-distribution_review_record >>? distill_ops
 distribution_review_skill >>? review_distribution
 
 bindings_pfd_retro >> sweep_retro_patterns -> retro_pattern_sweep_record
@@ -606,8 +865,6 @@ bindings_pfd_retro >> sweep_retro_patterns -> retro_pattern_sweep_record
 [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, pre_artifact_advisory, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
 
 prose_mechanization_audit_skill >>? sweep_prose_mechanization
-prose_mechanization_sweep_record >>? externalize_bindings
-retro_pattern_sweep_record >>? externalize_bindings
 retro_pattern_sweep_skill >>? sweep_retro_patterns
 
 [distribution_review_record, prose_mechanization_sweep_record, retro_pattern_sweep_record, toolchain] >> decide_cli_release -> cli_release_request

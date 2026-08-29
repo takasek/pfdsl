@@ -6,7 +6,7 @@
 
 実践・レビューで得た知見は3経路に振り分ける:
 
-1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を直接改訂する（`maintain_template` プロセス）。pfd-grill / pfd-ops / pfd-retro / pfd-ecosystem は `.claude/skills/` 配下の SKILL.md・references を直接改訂する（`distill_ops` プロセス。リポローカルスキルは `distill_local_skills`、bindings・companion・ガード機構は `externalize_bindings` — #672 で分割）。スキル改善は issue を通さず対話から直接行う
+1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を直接改訂する（`maintain_template` プロセス）。ローカル skill・配布 skill・binding・companion・guard は、削除済みの集約プロセスでなく対象 artifact の分類として扱う。独立して整備する一群を列挙するときは `knowledge_maintenance` tag のプロセスを問い合わせ、1つの正本 asset の整備プロセスを調べるときはその artifact の producer を問い合わせる。人間の `decisions` が変更対象を指名し、採用した `retro_findings` の具体的観察を全 `knowledge_maintenance` プロセスが feedback evidence として対象固有の文言・規則・機構へ反映する。知識正本・仕様・サンプル・ADR・PFD・companion・README を改版する工程は自身の現行出力も feedback の改版基準として読み、既存内容を保った差分改訂を行う。現行出力は変更権限ではなく、各工程の通常入力だけが改訂を駆動する。単発納品物の `article` は改版サイクルを持たず、issue と repository の外部状態は既存の `issue_updates` および toolchain 還流で表すため、自己 baseline を重ねない。スキル改善は issue を通さず対話から直接行う
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
@@ -119,11 +119,11 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 **出力抑制**: `make gen-samples` / `make gen-skill` はpnpm全パッケージbuild + 全サンプルcheckのwarningを毎回出力するため数百行に及ぶ。実行後は`git status --short docs/samples/ plugin/pfdsl/ plugin/pfdsl-codex/ AGENTS.md .agents/ .codex/`で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
-**配布スキルの新規追加時の横断照合**: `scripts/check-skill-wiring.mjs`（`make check-docs` 経由で CI も実行）が機械的に検査する（#699）。同梱スキル・agent の artifact が `workflow.pfdsl` の `distill_ops` 出力エッジ（一次情報としての生産）と `runtime-pipeline.pfdsl` の `gen_plugin` 入力エッジ（同梱素材としての消費）の両方に在るかを見て、欠けていれば file:line で報告する。以前は目視追随であり、#481 で `grill_skill` 追加時に3箇所を見落として pfd-retro の A層監査が事後に拾った。
+**配布スキルの新規追加時の横断照合**: `scripts/check-skill-wiring.mjs`（`make check-docs` 経由で CI も実行）が機械的に検査する（#699）。同梱スキル・agent の artifact について、`workflow.pfdsl` での一意な producer 関係と `runtime-pipeline.pfdsl` の `gen_plugin` 入力エッジへの到達可能性を別々に要求し、欠けていれば file:line で報告する。以前は目視追随であり、#481 で `grill_skill` 追加時に3箇所を見落として pfd-retro の A層監査が事後に拾った。
 
 検査対象は手書きリストでなく既存データから導く（列挙を持つとそれ自体が追随漏れの対象になる）。同梱されるかは `scripts/lib/gen-plugin.mjs` の `PLUGIN_MIRRORS`（組み立てと `distribution-review` の逆写像が既に読んでいる同梱マニフェスト）が答え、artifact の `location:` とエッジは `@pfdsl/core` の `analyze()` から取る。`pfdsl_skill` はマニフェストが「rendered, not mirrored」として除外するため特別扱いが要らない。
 
-**2つのエッジは要求範囲が異なる（#944）**: `gen_plugin` 入力エッジは同梱される全ての手書き artifact に要求するが、`distill_ops` 出力エッジは `workflow.pfdsl` が宣言している artifact にのみ要求する。`pfd_commands` は `runtime-pipeline.pfdsl` にしか宣言が無く（#780）、そもそも `workflow.pfdsl` のエッジに載る資格を持たないため、両方を要求すると偽陽性になる。非対称は id の手列挙でなく「どちらの図が宣言しているか」から導出する。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
+**2つの要件は要求範囲が異なる（#944）**: `gen_plugin` 入力エッジは同梱される全ての手書き artifact に要求するが、workflow 側の一意な producer 関係は `workflow.pfdsl` が宣言している artifact にのみ要求する。`pfd_commands` は `runtime-pipeline.pfdsl` にしか宣言が無く（#780）、そもそも `workflow.pfdsl` の producer 関係を持つ資格がないため、両方を要求すると偽陽性になる。非対称は id の手列挙でなく「どちらの図が宣言しているか」から導出する。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
 
 照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が3種の release 判断になり素材列挙を持たなくなり、`runtime-pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
 
@@ -155,7 +155,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 修正は先にコミットし、`reviewed.json` の更新は別コミットにする。
 
 **`distribution_review_skill` は終端 artifact として報告される。**
-`distill_local_skills` が生産し、`review_distribution` へは `>>?` でしか入らないため、primary の消費エッジを持たない。
+`maintain_distribution_review_skill` が生産し、`review_distribution` へは `>>?` でしか入らないため、primary の消費エッジを持たない。
 能力成果物が世代をまたいで還流する形（ADR-0011）の帰結であって欠陥ではない。
 `pfdsl_skill` と違い消費者は sibling の `runtime-pipeline.pfdsl` に**無い** — このスキルは配布されないので `gen_plugin` の入力にならない。
 終端ゲートのプロトコル5(b) 判定では、手段（能力成果物）であり後続門番を要さないものとして扱う。
@@ -163,7 +163,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 **この手順は配布しない。**
 `.claude/skills/distribution-review/` は repo-local であり、上の「配布スキルの新規追加時の横断照合」の対象外である（`runtime-pipeline.pfdsl` の `gen_plugin` 入力エッジに足さない）。
 利用側リポには配布という行為自体が無く、この手順の実施先が存在しない。
-`spec_stress_skill` / `vscode_ext_debug_skill` と同じ扱いで、`distill_local_skills` の出力にだけ現れる。
+`spec_stress_skill` / `vscode_ext_debug_skill` と同じ扱いで、各 artifact の producer 関係にだけ現れる。
 
 ## 新 frontmatter フィールド追加時の sample 追加
 
@@ -187,7 +187,7 @@ frontmatter に新フィールドを追加する develop では、対応する `
 `PLUGIN_AGENT_FILES`（plugin 同梱物）への所属は出発点として使ってよいが、基準ではない。
 同梱は参加者性の代理であり、基準として閉じると参加者でありながら同梱されていない agent が機械的に落ちる。
 
-登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の `distill_ops` 出力と artifact 定義が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl distill_ops` で出力集合を引き、agent artifact の定義を参照する。
+登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の artifact 定義と各 artifact の producer 関係が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl <agent artifact ID>` で対象 agent artifact の producer を引き、artifact 定義を参照する。
 
 repo scope の agent（`ci-triage` 等、このリポの開発都合の道具）はいずれも、要求している図のプロセスも、生産・消費している図の成果物も名指しできない。
 この結果が現状 `PLUGIN_AGENT_FILES` の内外と一致しているのは観測であって、判定規則ではない。
@@ -217,16 +217,16 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 ## hook の artifact 登録基準（#854）
 
 一般形は上の「workflow.pfdsl に登録する agent の範囲」と同じく、pfd-ops SKILL.md プロトコル5が一次情報。
-このリポでの適用対象は `.claude/settings.json` に配線された hook 全般（PreToolUse ガードと PostToolUse advisory の双方）で、登録先は `externalize_bindings` の出力としての `workflow.pfdsl`。
+このリポでの適用対象は `.claude/settings.json` に配線された hook 全般（PreToolUse ガードと PostToolUse advisory の双方）で、登録先は対象 artifact の分類と producer 関係を記録する `workflow.pfdsl`。
 節の名前を PreToolUse に限っていた頃に PostToolUse advisory（`companion-prose-advisory`）が現れ、判定の宛先が無いように読める状態になったため、対象を hook 全般へ広げてある。
 登録しない側に当たるのは `stale-dist-guard` / `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` / `companion-prose-advisory` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
 
-artifact 登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の `externalize_bindings` 出力と artifact 定義が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl externalize_bindings` で出力集合を引き、hook artifact の定義を参照する。
+artifact 登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の artifact 定義と各 artifact の producer 関係が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl <hook artifact ID>` で対象 hook artifact の producer を引き、artifact 定義を参照する。
 PostToolUse advisory であっても、要求元の手順を名指しできれば登録側になる。advisory か guard かは判定軸ではなく、上の列挙で登録しない側に並ぶ `companion-prose-advisory` との違いも、要求元の手順を名指しできるかどうかだけである。
 **issue 番号に紐づくことは非参加者の判定根拠にならない** — 既存の登録 artifact にも issue 由来の機構がある。区別は出自の issue でなく、運用手順がその機構を要求しているか（＝図のプロセスの出力として生まれるか）で付ける。
 
 判定に迷う新規 hook は、その hook を要求している図のプロセスを名指しできるかで振り分ける。
-`externalize_bindings` の出力だと言えることは根拠にならない — 同 description が「PreToolUse ガード機構へ外化する」と書いているため、登録しない側も等しくそう言える。
+binding・companion・guard の分類に当たることは根拠にならない — 同じ分類には登録しない側も含まれうる。要求している図のプロセスを名指しできることが根拠になる。
 
 ## flow:exempt issue の roadmap 追加除外
 
