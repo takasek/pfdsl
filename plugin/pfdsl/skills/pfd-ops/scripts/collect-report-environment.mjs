@@ -11,11 +11,12 @@
 // from "collection failed".
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readManifest } from "./check-install-sync.mjs";
+import { readJsonOrNull } from "./plugin-version-check.mjs";
 
 // A manifest that parses can still hold something unusable in an identifier's
 // place — an empty string, whitespace, a number, an array. Those are collection
@@ -24,16 +25,6 @@ import { readManifest } from "./check-install-sync.mjs";
 /** @param {unknown} value */
 function asIdentifier(value) {
 	return typeof value === "string" && value.trim().length > 0 ? value : null;
-}
-
-/** @param {string} path */
-function readJsonOrNull(path) {
-	if (!existsSync(path)) return null;
-	try {
-		return JSON.parse(readFileSync(path, "utf-8"));
-	} catch {
-		return null;
-	}
 }
 
 /**
@@ -52,8 +43,13 @@ function defaultRunCommand(command, args) {
 	}
 }
 
+// check-install-sync.mjs has an ascent of its own, but it falls back to the
+// directory it started from when no marker turns up. That is right for a
+// --target that is assumed to be inside a repo, and wrong here: this collector
+// needs "no checkout above the skill root" to stay distinguishable, since that
+// is what makes the installation shape unknown.
 /** @param {string} from */
-function findRepoRoot(from) {
+function findRepoRootOrNull(from) {
 	let current = resolve(from);
 	for (;;) {
 		if (existsSync(resolve(current, ".git"))) return current;
@@ -136,13 +132,13 @@ function detectInstallation(skillRoot, resolveRepoRoot) {
  * @param {string} skillRoot
  * @param {{
  *   runCommand?: (command: string, args: string[]) => string | null,
- *   findRepoRoot?: (from: string) => string | null,
+ *   findRepoRootOrNull?: (from: string) => string | null,
  * }} [options]
  */
 export function collectReportEnvironment(skillRoot, options = {}) {
 	const { installation, bundleRoot, repoRoot } = detectInstallation(
 		skillRoot,
-		options.findRepoRoot ?? findRepoRoot,
+		options.findRepoRootOrNull ?? findRepoRootOrNull,
 	);
 	const unavailable = [];
 	const missing = MISSING_IDENTIFIERS[installation] ?? {};

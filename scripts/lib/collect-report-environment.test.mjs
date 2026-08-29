@@ -348,7 +348,7 @@ describe("collectReportEnvironment", () => {
 
 		const env = collectReportEnvironment(skillRoot, {
 			runCommand: noCommands,
-			findRepoRoot: () => elsewhere,
+			findRepoRootOrNull: () => elsewhere,
 		});
 
 		assert.equal(env.installation, "repo-local");
@@ -364,7 +364,7 @@ describe("collectReportEnvironment", () => {
 		// suite happens to run.
 		const env = collectReportEnvironment(skillRoot, {
 			runCommand: noCommands,
-			findRepoRoot: () => null,
+			findRepoRootOrNull: () => null,
 		});
 
 		assert.equal(env.installation, "unknown");
