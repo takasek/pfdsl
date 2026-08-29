@@ -52,6 +52,35 @@ function findRepoRoot(from) {
 	}
 }
 
+// Identifiers a given installation shape cannot carry at all. The distinction
+// the reader of the issue needs is "not available in this shape" versus
+// "collection failed", so every shape declares its own reason rather than
+// letting the field drop out of the report silently.
+const MISSING_IDENTIFIERS = Object.freeze({
+	"codex-plugin": Object.freeze({
+		bundleContentHash:
+			"Codex plugin bundles do not carry a bundle manifest, so the content hash cannot be read.",
+	}),
+	"repo-local": Object.freeze({
+		pluginVersion:
+			"A repo-local install carries no plugin manifest; the install provenance identifies the bundle instead.",
+		bundleContentHash:
+			"A repo-local install carries no bundle manifest; the install provenance identifies the bundle instead.",
+	}),
+	"upstream-checkout": Object.freeze({
+		pluginVersion:
+			"The upstream checkout is the distribution source itself; the reported commit identifies it instead.",
+		bundleContentHash:
+			"The upstream checkout is the distribution source itself; the reported commit identifies it instead.",
+	}),
+	unknown: Object.freeze({
+		pluginVersion:
+			"The installation shape could not be determined, so no plugin manifest was read.",
+		bundleContentHash:
+			"The installation shape could not be determined, so no bundle manifest was read.",
+	}),
+});
+
 /** @param {string} skillRoot */
 function detectInstallation(skillRoot) {
 	const bundleRoot = resolve(skillRoot, "../..");
@@ -97,21 +126,16 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		pluginVersion =
 			readJsonOrNull(resolve(bundleRoot, ".codex-plugin/plugin.json"))
 				?.version ?? null;
-		unavailable.push({
-			field: "bundleContentHash",
-			reason:
-				"Codex plugin bundles do not carry a bundle manifest, so the content hash cannot be read.",
-		});
 	}
 	if (installation === "repo-local") {
 		installProvenance = readJsonOrNull(
 			resolve(repoRoot, "pfd-ops-install-manifest.json"),
 		);
-		unavailable.push({
-			field: "pluginVersion",
-			reason:
-				"A repo-local install carries no plugin manifest; the install provenance identifies the bundle instead.",
-		});
+	}
+	for (const [field, reason] of Object.entries(
+		MISSING_IDENTIFIERS[installation] ?? {},
+	)) {
+		unavailable.push({ field, reason });
 	}
 
 	const runCommand = options.runCommand ?? defaultRunCommand;

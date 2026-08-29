@@ -125,4 +125,47 @@ describe("collectReportEnvironment", () => {
 			"cliVersion should be recorded as unavailable",
 		);
 	});
+
+	it("records both bundle identifiers a repo-local install cannot carry", () => {
+		const repoRoot = join(tmp, "adopter");
+		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		mkdirSync(join(repoRoot, ".git"), { recursive: true });
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		const fields = env.unavailable.map(({ field }) => field);
+		assert.ok(
+			fields.includes("pluginVersion"),
+			"pluginVersion should be recorded as unavailable",
+		);
+		assert.ok(
+			fields.includes("bundleContentHash"),
+			"bundleContentHash should be recorded as unavailable",
+		);
+	});
+
+	it("records the identifiers an upstream checkout does not carry", () => {
+		const repoRoot = join(tmp, "pfdsl");
+		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+		mkdirSync(skillRoot, { recursive: true });
+		mkdirSync(join(repoRoot, ".git"), { recursive: true });
+		writeJson(join(repoRoot, "plugin/pfdsl/.claude-plugin/plugin.json"), {
+			version: "0.4.2",
+		});
+		mkdirSync(join(repoRoot, "scripts", "lib"), { recursive: true });
+		writeFileSync(join(repoRoot, "scripts/lib/harness-inventory.mjs"), "");
+
+		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+
+		const fields = env.unavailable.map(({ field }) => field);
+		assert.ok(
+			fields.includes("pluginVersion"),
+			"pluginVersion should be recorded as unavailable",
+		);
+		assert.ok(
+			fields.includes("bundleContentHash"),
+			"bundleContentHash should be recorded as unavailable",
+		);
+	});
 });
