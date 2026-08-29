@@ -29,7 +29,7 @@ description: |
 
 ```yaml
 title: ...
-type: roadmap     # roadmap | workflow | runtime-pipeline（§2.10）。`ready` は roadmap のみ対象。省略可
+type: roadmap     # roadmap | workflow | pipeline（§2.10）。`ready` は roadmap のみ対象。省略可
 extends: presets.yaml   # 表示系キー（statusStyles 等）のプリセット継承（§2.9.4）
 basePath: ../     # location:/command: の解決基準ディレクトリ。省略時はこの .pfdsl のディレクトリ
 layout:
@@ -158,4 +158,4 @@ Sets the status in place and validates in one step — always prefer it over han
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
 | PFD のレビュー・監査 | `references/review-perspectives.md`（A/B/C カタログ。A/B は図、C は normative 仕様文書（自リポ保守の仕様がある場合）の監査。書くルールは `references/quality-guide.md`、問い詰めはこちら） |
 
-`references/spec.md` は full spec v0.0.20（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
+`references/spec.md` は full spec v0.0.21（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。

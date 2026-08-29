@@ -1,6 +1,6 @@
 ---
 title: Polaris SDK 変換パイプライン（変種A・主語軸）
-type: runtime-pipeline
+type: pipeline
 description: "主語が機械の変換のみを収める。入力が揃えば決定的に同じ出力を出す変換が対象。プローブ2件（LLM起草・人の転記）を含み、この軸での置き場所の妥当性を検証する"
 layout:
   direction: LR

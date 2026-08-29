@@ -3,7 +3,7 @@ name: pfd-ecosystem
 summary: ecosystem bootstrap
 description: |
   Use when bootstrapping or restructuring a project's PFD set (roadmap /
-  workflow / runtime-pipeline) — initializing .pfdsl/ in a new repo, when
+  workflow / pipeline) — initializing .pfdsl/ in a new repo, when
   .pfdsl/ is still scaffold, choosing which PFD kinds a project needs, or
   redesigning the kind structure. Interviews the user to pick needed kinds,
   prunes artifacts interactively, and grows the graphs. Prerequisite step
@@ -14,7 +14,7 @@ description: |
 
 # pfd-ecosystem: プロジェクト PFD セット対話的構築
 
-roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 プロジェクトの `.pfdsl/` セットを scaffold から実際のグラフに育てる。
+roadmap / workflow / pipeline の3種別（ADR-0017）に基づき、 プロジェクトの `.pfdsl/` セットを scaffold から実際のグラフに育てる。
 **いきなり全部書かない** — 問診で必要な種別を絞り、ユーザーと対話しながら剪定する。
 
 ## ステップ 0: pfdsl スキルを起動する
@@ -50,8 +50,8 @@ roadmap / workflow / runtime-pipeline の3種別（ADR-0017）に基づき、 �
 <scaffold>/roadmap.md
 <scaffold>/workflow.pfdsl
 <scaffold>/workflow.md
-<scaffold>/runtime-pipeline.pfdsl
-<scaffold>/runtime-pipeline.md
+<scaffold>/pipeline.pfdsl
+<scaffold>/pipeline.md
 <scaffold>/bindings/pfd-retro.md
 <scaffold>/bindings/pfd-retro-patterns/sample-pattern.md
 <scaffold>/bindings/pfd-ops.md

@@ -25,7 +25,7 @@ PFD の概念だけで導ける手順。固有名詞なし。
 
 `.md` companion の機構（「sibling を読め」という規約）は L2 に属し SKILL.md に記載する。companion の中身は L4（リポ固有）に属す。
 
-`.pfdsl/bindings/<スキル名>.md` はスキル固有の恒常指示を置く独立ファイルで、companion ではない（対応する `.pfdsl` グラフを持たず、sibling 規約の対象外）。スキルが自分の SKILL.md から直接参照する（詳細は次項）。sibling companion（`roadmap.md`・`workflow.md`・`runtime-pipeline.md`）に混ぜないのは、読み込み契機（PFD グラフを扱うタイミング）とスキル発火のタイミングが一致しないため。
+`.pfdsl/bindings/<スキル名>.md` はスキル固有の恒常指示を置く独立ファイルで、companion ではない（対応する `.pfdsl` グラフを持たず、sibling 規約の対象外）。スキルが自分の SKILL.md から直接参照する（詳細は次項）。sibling companion（`roadmap.md`・`workflow.md`・`pipeline.md`）に混ぜないのは、読み込み契機（PFD グラフを扱うタイミング）とスキル発火のタイミングが一致しないため。
 
 ### companion への書き分けルール（一次情報）
 
@@ -35,7 +35,7 @@ findings やゲート項目を companion に書くとき、**どの companion �
 |---|---|
 | issue 固有ゲート・issue 管理バインディング・自動生成 PR 規約・issue バックエンド手続き | `roadmap.md` |
 | 繰り返し手続き・知見振り分けルール・`develop` プロセスの運用規約・retro 宛先バインディング | `workflow.md` |
-| 変換コンポーネントの追加・削除・境界変更に関する手続き | `runtime-pipeline.md` |
+| 変換コンポーネントの追加・削除・境界変更に関する手続き | `pipeline.md` |
 | Codex 向け追加指示（PR 本文規約等）| `.pfdsl/bindings/pfd-ops.md` |
 
 この表が一次情報。`pfd-ops SKILL.md` の L2 ディスパッチ・`pfd-retro` の出力振り分け・`.pfdsl/bindings/pfd-retro.md` はすべてここを参照する。

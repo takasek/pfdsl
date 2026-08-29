@@ -2274,7 +2274,7 @@ export function runStatusGaps(
 		// while an omitted type is left alone (it is not claiming to be one).
 		if (flowFm?.type === "roadmap") {
 			return fail(
-				`status gaps: flow file must be workflow or runtime-pipeline, not roadmap: ${flowFile}\n`,
+				`status gaps: flow file must be workflow or pipeline, not roadmap: ${flowFile}\n`,
 				2,
 			);
 		}
@@ -3008,7 +3008,7 @@ Exit codes:
 
 const HELP_STATUS_GAPS = `usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json] [--no-color]
 
-Cross-check roadmap-tracked artifacts in workflow/runtime-pipeline files against
+Cross-check roadmap-tracked artifacts in workflow/pipeline files against
 the roadmap. Reports flow artifacts whose tags include roadmap-tracked and that
 no process in the roadmap produces, indicating a build chain is missing. An id
 the roadmap only consumes is an external input there, so it counts as missing.
@@ -3021,7 +3021,7 @@ If nothing carries the tag, this check has no target and says so rather than
 reporting a pass.
 
   <roadmap>  path to a .pfdsl file with type: roadmap
-  <flow>     one or more .pfdsl files with type: workflow or runtime-pipeline
+  <flow>     one or more .pfdsl files with type: workflow or pipeline
 
 Options:
   --json      output as JSON ({ ok, gaps: [{file, artifactId, label}], trackedArtifactCount, warnings? })

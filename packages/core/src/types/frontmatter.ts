@@ -9,11 +9,7 @@ export const STATUS_VALUES = [
 ] as const;
 export type Status = (typeof STATUS_VALUES)[number];
 
-export const PFD_TYPE_VALUES = [
-	"roadmap",
-	"workflow",
-	"runtime-pipeline",
-] as const;
+export const PFD_TYPE_VALUES = ["roadmap", "workflow", "pipeline"] as const;
 export type PfdType = (typeof PFD_TYPE_VALUES)[number];
 
 /**
@@ -105,7 +101,7 @@ export interface Frontmatter {
 	extends?: string | string[];
 	/** Relative path from the .pfdsl file used as base for location: and command: resolution. Default: .pfdsl file's directory. */
 	basePath?: string;
-	/** PFD kind: roadmap | workflow | runtime-pipeline. Controls which commands apply. */
+	/** PFD kind: roadmap | workflow | pipeline. Controls which commands apply. */
 	type?: PfdType;
 	[key: string]: unknown;
 }

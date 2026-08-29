@@ -3,7 +3,7 @@
 //
 // `.pfdsl/workflow.md` said outright that these edges are "check で強制されず
 // 目視追随に依存する": each workflow artifact's unique output producer and gen_plugin's
-// inputs in runtime-pipeline.pfdsl. #481 added grill_skill and missed three
+// inputs in pipeline.pfdsl. #481 added grill_skill and missed three
 // references; a retro audit found it afterwards.
 //
 // Everything this decides comes from data someone else already owns, so no
@@ -181,7 +181,7 @@ export function artifactReachesProcess(edges, sourceArtifact, targetProcess) {
  * is, since a single bundled entry is enough to need the wiring this checks.
  *
  * Scans both graphs' artifacts, since bundled material may be declared in
- * either (`pfd_commands` exists only in runtime-pipeline.pfdsl, #780/#944).
+ * either (`pfd_commands` exists only in pipeline.pfdsl, #780/#944).
  * The two requirements are not symmetric, though: reaching `gen_plugin` is
  * required of every bundled artifact regardless of where it is declared, but
  * unique workflow production only makes sense for an artifact workflow.pfdsl

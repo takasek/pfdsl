@@ -257,7 +257,7 @@ describe("computeOrphans", () => {
 
 	// A group is a container for artifacts and processes and never carries an
 	// edge, so counting it as a node makes every group in the file an orphan.
-	// Measured before the fix: runtime-pipeline.pfdsl reported 5 orphans, all 5
+	// Measured before the fix: pipeline.pfdsl reported 5 orphans, all 5
 	// of them groups (#676).
 	it("never reports a group, which by construction has no edges", () => {
 		const withGroup = buildGraph(

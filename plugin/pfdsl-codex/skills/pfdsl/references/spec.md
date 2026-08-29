@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->
 
-# PFDSL仕様書 v0.0.20
+# PFDSL仕様書 v0.0.21
 
 ## 1. 目的
 
@@ -75,7 +75,7 @@ process:
 | tag          | タグ定義（label / description / style、§2.7.4参照） |
 | statusStyles | status → DOT属性 マッピング（§2.7参照）              |
 | extends      | 継承するプリセットファイルへの相対パス（文字列または文字列の配列、§2.9.4参照） |
-| type         | PFD の種別（roadmap \| workflow \| runtime-pipeline、§2.10参照） |
+| type         | PFD の種別（roadmap \| workflow \| pipeline、§2.10参照） |
 
 未定義キーを含んでもよい。処理系は無視してよい。
 
@@ -608,12 +608,13 @@ group:
 フロントマターのトップレベルに `type:` フィールドを指定することで、PFD ファイルの種別を自己記述できる。
 
 ```yaml
-type: roadmap   # または workflow / runtime-pipeline
+type: roadmap   # または workflow / pipeline
 ```
 
-* 列挙値: `roadmap` | `workflow` | `runtime-pipeline`（ADR-0017 の種別定義に対応）
+* 列挙値: `roadmap` | `workflow` | `pipeline`（ADR-0017 の種別定義に対応）
 * 省略可能。省略時は種別を問わない操作（check / fmt / render 等）を実行する
 * 列挙外の値は error (V031、§15.14)
+* 第3種別は v0.0.20 以前 `runtime-pipeline` という名称だった。v0.0.21 で `pipeline` へ改名し、旧値は列挙外の値として扱う — 互換受理も deprecated 警告も設けないため、旧値を書いたファイルは V031 で error になる
 * `pfdsl status ready` / `pfdsl meta set`（status 設定時）/ `pfdsl status gaps`（roadmap引数）は `type: roadmap` 以外の値を明示指定したファイルに対して error を出力する。省略時は `roadmap` として扱い実行を許可するが、warning (W006、§15.14) を出す
 
 ---
@@ -826,7 +827,7 @@ A >> P
 この edge が主張するのは「P が出力を作るには A が要る」という変換の形であって、A が生成される頻度ではない。
 したがって「A は毎回できるわけではない」ことは `>>` を避ける理由にならない。
 生成の頻度が他と異なる依存を区別したい場合は、§9.2 のフィードバック入力へ逃がすのではなく、その依存を別の Artifact として分割する。
-`status:`（§2.7）は roadmap 種別のファイルでしか使えないため（§15.16）、workflow / runtime-pipeline でこの目的に用いることはできない。
+`status:`（§2.7）は roadmap 種別のファイルでしか使えないため（§15.16）、workflow / pipeline でこの目的に用いることはできない。
 
 ### 9.2 フィードバック入力
 
@@ -1139,7 +1140,7 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 
 * `type: roadmap` のファイルにおいて、**produced artifact**（少なくとも1つのプロセスの出力として登録されているもの）に `status:` が未設定の場合: warning (W005; strict mode では error)
 * **source artifact**（いかなるプロセスの出力でもないもの）は W005 の対象外とする
-* `type:` が `roadmap` 以外（`workflow` / `runtime-pipeline`）または省略されているファイルは W005 の対象外とする
+* `type:` が `roadmap` 以外（`workflow` / `pipeline`）または省略されているファイルは W005 の対象外とする
 
 ### 15.16 非 roadmap ファイルの status 禁止
 

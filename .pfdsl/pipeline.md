@@ -1,6 +1,6 @@
-# runtime-pipeline.md — 変換境界の補足（runtime-pipeline.pfdsl の companion）
+# pipeline.md — 変換境界の補足（pipeline.pfdsl の companion）
 
-`runtime-pipeline.pfdsl` のグラフが運べない、変換境界に関する補足をここに置く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
+`pipeline.pfdsl` のグラフが運べない、変換境界に関する補足をここに置く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
 
 この図は「システムが動くとき、データは何に変換されるか。変換の境界はどこか」だけに答える。
 収録範囲は**判断を含まない決定的変換**である（ADR-0035）。

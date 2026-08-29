@@ -297,7 +297,7 @@ artifact:
     criteria: Obsidian で .pfdsl ファイルを開くとプレビューペインに図が描画され、テキストを編集すると再描画される
   type_field:
     label: "type フィールド追加 (#268)"
-    description: "frontmatter に type: roadmap|workflow|runtime-pipeline を追加し、ready を roadmap 型にゲート"
+    description: "frontmatter に type: roadmap|workflow|pipeline を追加し、ready を roadmap 型にゲート"
     status: done
     criteria: "docs/spec/spec.md に type: フィールドの定義節が存在し、pfdsl status ready を roadmap 型以外のファイルに実行すると error になる（exit code 2）"
   w002_hierarchy:
@@ -436,7 +436,7 @@ artifact:
   pipeline_kind_rename:
     label: "PFD種別名 pipeline への改名 (#670)"
     description: "type: 列挙値 runtime-pipeline を pipeline へ改名する破壊的変更。spec §2.10・core の列挙・ADR-0017・kind-taxonomy.md・scaffold・サンプルを一括更新し、旧値の扱い（deprecated 警告かエラーか）を決める"
-    status: todo
+    status: done
     criteria: "type: pipeline が check を通り、旧値 runtime-pipeline の扱いが docs/spec/spec.md に明記され、scaffold とサンプルが新名に揃っている"
   cli_release_pipeline_kind:
     label: "CLIリリース: PFD種別名 pipeline 改名（破壊的変更）"

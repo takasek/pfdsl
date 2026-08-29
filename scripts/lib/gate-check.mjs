@@ -491,7 +491,7 @@ export function buildSiblingConsumedMap(perFileConsumed) {
 /**
  * Split new terminal artifacts by whether a sibling graph consumes them
  * (#671). Splitting the report is the whole point: ADR-0035 moved the
- * generation chain into `runtime-pipeline.pfdsl`, so a generation source
+ * generation chain into `pipeline.pfdsl`, so a generation source
  * declared in `workflow.pfdsl` is terminal *in its own file* while its real
  * consumer sits next door. Reporting those together with genuinely
  * unconsumed artifacts buries real gatekeeper violations among known-benign

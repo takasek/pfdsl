@@ -1,6 +1,6 @@
 ---
 title: Polaris 利用者側パイプライン（変種B・読み手軸・第5のPFD）
-type: runtime-pipeline
+type: pipeline
 description: "読み手が利用者（消費チーム）である変換。公開以降、消費チームの環境で起きる決定的変換を収める。実行主体はプラットフォームチームでも読み手は利用者という節が混在する"
 layout:
   direction: LR

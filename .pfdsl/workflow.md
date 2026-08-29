@@ -119,23 +119,23 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 **出力抑制**: `make gen-samples` / `make gen-skill` はpnpm全パッケージbuild + 全サンプルcheckのwarningを毎回出力するため数百行に及ぶ。実行後は`git status --short docs/samples/ plugin/pfdsl/ plugin/pfdsl-codex/ AGENTS.md .agents/ .codex/`で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
-**配布スキルの新規追加時の横断照合**: `scripts/check-skill-wiring.mjs`（`make check-docs` 経由で CI も実行）が機械的に検査する（#699）。同梱スキル・agent の artifact について、`workflow.pfdsl` での一意な producer 関係と `runtime-pipeline.pfdsl` の `gen_plugin` 入力エッジへの到達可能性を別々に要求し、欠けていれば file:line で報告する。以前は目視追随であり、#481 で `grill_skill` 追加時に3箇所を見落として pfd-retro の A層監査が事後に拾った。
+**配布スキルの新規追加時の横断照合**: `scripts/check-skill-wiring.mjs`（`make check-docs` 経由で CI も実行）が機械的に検査する（#699）。同梱スキル・agent の artifact について、`workflow.pfdsl` での一意な producer 関係と `pipeline.pfdsl` の `gen_plugin` 入力エッジへの到達可能性を別々に要求し、欠けていれば file:line で報告する。以前は目視追随であり、#481 で `grill_skill` 追加時に3箇所を見落として pfd-retro の A層監査が事後に拾った。
 
 検査対象は手書きリストでなく既存データから導く（列挙を持つとそれ自体が追随漏れの対象になる）。同梱されるかは `scripts/lib/gen-plugin.mjs` の `PLUGIN_MIRRORS`（組み立てと `distribution-review` の逆写像が既に読んでいる同梱マニフェスト）が答え、artifact の `location:` とエッジは `@pfdsl/core` の `analyze()` から取る。`pfdsl_skill` はマニフェストが「rendered, not mirrored」として除外するため特別扱いが要らない。
 
-**2つの要件は要求範囲が異なる（#944）**: `gen_plugin` 入力エッジは同梱される全ての手書き artifact に要求するが、workflow 側の一意な producer 関係は `workflow.pfdsl` が宣言している artifact にのみ要求する。`pfd_commands` は `runtime-pipeline.pfdsl` にしか宣言が無く（#780）、そもそも `workflow.pfdsl` の producer 関係を持つ資格がないため、両方を要求すると偽陽性になる。非対称は id の手列挙でなく「どちらの図が宣言しているか」から導出する。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
+**2つの要件は要求範囲が異なる（#944）**: `gen_plugin` 入力エッジは同梱される全ての手書き artifact に要求するが、workflow 側の一意な producer 関係は `workflow.pfdsl` が宣言している artifact にのみ要求する。`pfd_commands` は `pipeline.pfdsl` にしか宣言が無く（#780）、そもそも `workflow.pfdsl` の producer 関係を持つ資格がないため、両方を要求すると偽陽性になる。非対称は id の手列挙でなく「どちらの図が宣言しているか」から導出する。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
 
-照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が3種の release 判断になり素材列挙を持たなくなり、`runtime-pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
+照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が3種の release 判断になり素材列挙を持たなくなり、`pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
 
-**判断軸による分担（ADR-0035）**: 判断を含まない生成・公開の変換は `runtime-pipeline.pfdsl` が持つ。`make gen-skill` / `make gen-install` / `make gen-plugin` / `make gen-samples` と、release request 以降の tag push・npm publish・vsix 生成・marketplace アップロードがそちらにある。`make gen-plugin` はClaude root、Codex root、repository Codex assetsを組み立て、結合drift gateがまとめて検査する。この図に残るのは「release kind ごとに公開するか・どの版で切るか」の判断（`decide_cli_release` / `decide_libraries_release` / `decide_vscode_release`）までであり、判断出力は3種の release request として runtime-pipeline.pfdsl へ渡す。生成コマンドの手続き・drift 検査の話はこの companion が引き続き一次情報として持つ（グラフで運べない散文のため）。
+**判断軸による分担（ADR-0035）**: 判断を含まない生成・公開の変換は `pipeline.pfdsl` が持つ。`make gen-skill` / `make gen-install` / `make gen-plugin` / `make gen-samples` と、release request 以降の tag push・npm publish・vsix 生成・marketplace アップロードがそちらにある。`make gen-plugin` はClaude root、Codex root、repository Codex assetsを組み立て、結合drift gateがまとめて検査する。この図に残るのは「release kind ごとに公開するか・どの版で切るか」の判断（`decide_cli_release` / `decide_libraries_release` / `decide_vscode_release`）までであり、判断出力は3種の release request として pipeline.pfdsl へ渡す。生成コマンドの手続き・drift 検査の話はこの companion が引き続き一次情報として持つ（グラフで運べない散文のため）。
 
-**生成の一次ソースは `graph io` の終端に出る（ADR-0035 の副作用）**: `gen_skill` / `gen_plugin` / `push_cli_release_tag` / `push_libraries_release_tag` / `package_vscode_release` が消費する生成の一次ソースは、この図では消費者を持たない終端 artifact として報告される。消費側のエッジは `runtime-pipeline.pfdsl` に実在するが、`graph io` はファイル単位で走るため参照できない。該当する artifact をここに列挙しない — 一次情報は消費側のエッジであり、現在の集合は下記の機械振り分けが `.pfdsl/` を横断して毎回そこから取り直す。
+**生成の一次ソースは `graph io` の終端に出る（ADR-0035 の副作用）**: `gen_skill` / `gen_plugin` / `push_cli_release_tag` / `push_libraries_release_tag` / `package_vscode_release` が消費する生成の一次ソースは、この図では消費者を持たない終端 artifact として報告される。消費側のエッジは `pipeline.pfdsl` に実在するが、`graph io` はファイル単位で走るため参照できない。該当する artifact をここに列挙しない — 一次情報は消費側のエッジであり、現在の集合は下記の機械振り分けが `.pfdsl/` を横断して毎回そこから取り直す。
 
-**これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。終端ゲートのプロトコル5(b) 判定では「消費者は sibling の `runtime-pipeline.pfdsl` に在る」と記録して該当なしとする。
+**これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。終端ゲートのプロトコル5(b) 判定では「消費者は sibling の `pipeline.pfdsl` に在る」と記録して該当なしとする。
 
 **この振り分けは `gate-check.mjs` が機械的に行う（#671）**: 新規終端の報告は、`.pfdsl/` 内の他の `.pfdsl` を `graph edges --json` で読み、`>>` 入力エッジで消費されているものを別見出し「New terminal artifacts consumed in a sibling graph」へ分ける。ただし振り分けは PASS/FAIL でなく報告材料であり、手段か納品物かの分類は MANUAL のまま残る。sibling 見出しに出た artifact は、該当なしと記録する前に消費側のエッジを実際に確認する。
 
-**本来の見出しに残ったことは、それだけでは門番違反の確定ではない。** sibling が構文エラー等で `graph edges --json` に落ちた場合、その図の消費エッジは黙って読み飛ばされ、消費者は0件として扱われる（読めなかった側に倒すと本物の違反を沈黙させるため、見に行けと言う側に倒してある）。門番違反と言えるのは、sibling が読めたうえで消費者が無いときである。判定時は `.pfdsl/runtime-pipeline.pfdsl` を単体で `graph edges` に通し、パースが通ることを確かめてから結論する。
+**本来の見出しに残ったことは、それだけでは門番違反の確定ではない。** sibling が構文エラー等で `graph edges --json` に落ちた場合、その図の消費エッジは黙って読み飛ばされ、消費者は0件として扱われる（読めなかった側に倒すと本物の違反を沈黙させるため、見に行けと言う側に倒してある）。門番違反と言えるのは、sibling が読めたうえで消費者が無いときである。判定時は `.pfdsl/pipeline.pfdsl` を単体で `graph edges` に通し、パースが通ることを確かめてから結論する。
 
 合成を CLI でなく `gate-check.mjs` に置いたのは spec §2.9.1 が ID をファイルローカルに保ち、複数ファイルを跨いだ平坦化ビューの構成を禁じているためである。「同名 ID は同じ成果物」はこのリポの `.pfdsl/` のローカルな慣行であり、規範ではない。慣行が及ぶ範囲は `scripts/lib/gate-check.mjs` の `SIBLING_ID_NAMESPACE_DIRS` が持ち、`.pfdsl/` だけを列挙する — `docs/samples/` は互いに無関係なチュートリアル図が `spec` / `code` を使い回しており、同一ディレクトリという理由だけで合成すると本物の門番違反が sibling 見出しへ落ちる。`>>?` フィードバック消費も合成の対象に入れない — `graph io` の `terminals` は spec §15.11 の audit-terminal でフィードバック消費を無視するため、sibling 側だけフィードバックを数えると同じ artifact が消費者の置き場所次第で別分類になる。
 
@@ -157,11 +157,11 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 **`distribution_review_skill` は終端 artifact として報告される。**
 `maintain_distribution_review_skill` が生産し、`review_distribution` へは `>>?` でしか入らないため、primary の消費エッジを持たない。
 能力成果物が世代をまたいで還流する形（ADR-0011）の帰結であって欠陥ではない。
-`pfdsl_skill` と違い消費者は sibling の `runtime-pipeline.pfdsl` に**無い** — このスキルは配布されないので `gen_plugin` の入力にならない。
+`pfdsl_skill` と違い消費者は sibling の `pipeline.pfdsl` に**無い** — このスキルは配布されないので `gen_plugin` の入力にならない。
 終端ゲートのプロトコル5(b) 判定では、手段（能力成果物）であり後続門番を要さないものとして扱う。
 
 **この手順は配布しない。**
-`.claude/skills/distribution-review/` は repo-local であり、上の「配布スキルの新規追加時の横断照合」の対象外である（`runtime-pipeline.pfdsl` の `gen_plugin` 入力エッジに足さない）。
+`.claude/skills/distribution-review/` は repo-local であり、上の「配布スキルの新規追加時の横断照合」の対象外である（`pipeline.pfdsl` の `gen_plugin` 入力エッジに足さない）。
 利用側リポには配布という行為自体が無く、この手順の実施先が存在しない。
 `spec_stress_skill` / `vscode_ext_debug_skill` と同じ扱いで、各 artifact の producer 関係にだけ現れる。
 
