@@ -15,20 +15,26 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// The install provenance check-install-sync.mjs writes, at the path it uses.
+// Both are read from there rather than guessed: a report that names the wrong
+// path would say "no provenance" for every repo-local install that has one.
+const PROVENANCE_RELATIVE_PATH = ".claude/pfd-ops-install-manifest.json";
+
 // A manifest that parses can still hold something unusable in an identifier's
-// place — an empty string, a number, an array. Those are collection failures,
-// not values: reporting them would put a bare `42` where the reader expects a
-// version.
+// place — an empty string, whitespace, a number, an array. Those are collection
+// failures, not values: reporting them would put a bare `42` where the reader
+// expects a version.
 /** @param {unknown} value */
 function asIdentifier(value) {
-	return typeof value === "string" && value.length > 0 ? value : null;
+	return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
 /** @param {unknown} value */
-function asRecord(value) {
-	return value !== null && typeof value === "object" && !Array.isArray(value)
-		? value
-		: null;
+function asProvenance(value) {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) {
+		return null;
+	}
+	return Array.isArray(value.files) ? value : null;
 }
 
 /** @param {string} path */
@@ -199,13 +205,13 @@ export function collectReportEnvironment(skillRoot, options = {}) {
 		}
 	}
 	if (installation === "repo-local") {
-		installProvenance = asRecord(
-			readJsonOrNull(resolve(repoRoot, "pfd-ops-install-manifest.json")),
+		installProvenance = asProvenance(
+			readJsonOrNull(resolve(repoRoot, PROVENANCE_RELATIVE_PATH)),
 		);
 		if (installProvenance === null) {
 			recordFailure(
 				"installProvenance",
-				"The install provenance file is absent, could not be read, or did not hold an object.",
+				"The install provenance file is absent, could not be read, or did not hold a file list.",
 			);
 		}
 	}

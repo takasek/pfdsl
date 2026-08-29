@@ -42,6 +42,16 @@ function unavailableFields(env) {
 	return env.unavailable.map(({ field }) => field).sort();
 }
 
+// The shape check-install-sync.mjs writes and reads, at the path it uses.
+const PROVENANCE_RELATIVE_PATH = ".claude/pfd-ops-install-manifest.json";
+const provenance = {
+	files: [{ path: "scripts/pfdsl/audit-issues-flow.mjs", hash: "abc123" }],
+};
+
+function writeProvenance(repoRoot, value = provenance) {
+	writeJson(join(repoRoot, PROVENANCE_RELATIVE_PATH), value);
+}
+
 describe("collectReportEnvironment", () => {
 	it("reports version and bundle hash for a Claude plugin installation", () => {
 		const skillRoot = join(tmp, "skills", "pfd-ops");
@@ -85,15 +95,13 @@ describe("collectReportEnvironment", () => {
 		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
 		mkdirSync(skillRoot, { recursive: true });
 		mkdirSync(join(repoRoot, ".git"), { recursive: true });
-		writeJson(join(repoRoot, "pfd-ops-install-manifest.json"), {
-			version: "0.4.2",
-		});
+		writeProvenance(repoRoot);
 
 		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
 
 		assert.equal(env.installation, "repo-local");
 		assert.equal(env.pluginVersion, null);
-		assert.deepEqual(env.installProvenance, { version: "0.4.2" });
+		assert.deepEqual(env.installProvenance, provenance);
 	});
 
 	it("classifies the upstream checkout by its own distribution sources", () => {
@@ -152,9 +160,7 @@ describe("collectReportEnvironment", () => {
 		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
 		mkdirSync(skillRoot, { recursive: true });
 		mkdirSync(join(repoRoot, ".git"), { recursive: true });
-		writeJson(join(repoRoot, "pfd-ops-install-manifest.json"), {
-			version: "0.4.2",
-		});
+		writeProvenance(repoRoot);
 
 		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
 
@@ -204,19 +210,37 @@ describe("collectReportEnvironment", () => {
 		]);
 	});
 
-	it("rejects install provenance that is not an object", () => {
-		const repoRoot = join(tmp, "adopter");
-		const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+	it("rejects install provenance that does not hold a file list", () => {
+		for (const invalid of [["0.4.2"], {}, { files: "wrong" }]) {
+			const repoRoot = join(tmp, `adopter-${JSON.stringify(invalid).length}`);
+			const skillRoot = join(repoRoot, ".claude", "skills", "pfd-ops");
+			mkdirSync(skillRoot, { recursive: true });
+			mkdirSync(join(repoRoot, ".git"), { recursive: true });
+			writeProvenance(repoRoot, invalid);
+
+			const env = collectReportEnvironment(skillRoot, {
+				runCommand: noCommands,
+			});
+
+			assert.equal(env.installProvenance, null, JSON.stringify(invalid));
+			assert.ok(
+				env.unavailable.some(({ field }) => field === "installProvenance"),
+				`installProvenance should be unavailable for ${JSON.stringify(invalid)}`,
+			);
+		}
+	});
+
+	it("rejects a manifest identifier that holds only whitespace", () => {
+		const skillRoot = join(tmp, "skills", "pfd-ops");
 		mkdirSync(skillRoot, { recursive: true });
-		mkdirSync(join(repoRoot, ".git"), { recursive: true });
-		writeJson(join(repoRoot, "pfd-ops-install-manifest.json"), ["0.4.2"]);
+		writeJson(join(tmp, ".claude-plugin", "plugin.json"), { version: "  " });
 
 		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
 
-		assert.equal(env.installProvenance, null);
+		assert.equal(env.pluginVersion, null);
 		assert.ok(
-			env.unavailable.some(({ field }) => field === "installProvenance"),
-			"installProvenance should be recorded as unavailable",
+			env.unavailable.some(({ field }) => field === "pluginVersion"),
+			"pluginVersion should be recorded as unavailable",
 		);
 	});
 
