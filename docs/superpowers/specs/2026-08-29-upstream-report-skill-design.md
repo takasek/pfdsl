@@ -77,7 +77,7 @@ pfd-retro の宛先表も「未着手作業の発見」を作業項目バック�
 
 - Claude plugin: plugin version と bundle contentHash（`<skillRoot>/../../.claude-plugin/plugin.json` と、同ディレクトリの `bundle-manifest.json`）
 - Codex plugin: `.codex-plugin/plugin.json` の version のみ。contentHash は配布物に含まれないため原理的に取得できない
-- repo-local install: plugin manifest を持たない。install provenance（`pfd-ops-install-manifest.json`）と、取得できれば git commit
+- repo-local install: plugin manifest を持たない。install provenance（`.claude/pfd-ops-install-manifest.json` — パスと `{files: [...]}` という形式は `check-install-sync.mjs` が一次情報）と、取得できれば git commit
 - 上流 checkout: リポの git commit
 
 CLI version は導入形態と独立に `pfdsl --version` で取る。
