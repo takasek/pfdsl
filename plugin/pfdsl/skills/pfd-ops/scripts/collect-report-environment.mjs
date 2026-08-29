@@ -112,8 +112,11 @@ const MISSING_IDENTIFIERS = Object.freeze({
 	}),
 });
 
-/** @param {string} skillRoot */
-function detectInstallation(skillRoot) {
+/**
+ * @param {string} skillRoot
+ * @param {(from: string) => string | null} resolveRepoRoot
+ */
+function detectInstallation(skillRoot, resolveRepoRoot) {
 	const bundleRoot = resolve(skillRoot, "../..");
 	if (existsSync(resolve(bundleRoot, ".claude-plugin/plugin.json"))) {
 		return { installation: "claude-plugin", bundleRoot, repoRoot: null };
@@ -121,7 +124,7 @@ function detectInstallation(skillRoot) {
 	if (existsSync(resolve(bundleRoot, ".codex-plugin/plugin.json"))) {
 		return { installation: "codex-plugin", bundleRoot, repoRoot: null };
 	}
-	const repoRoot = findRepoRoot(skillRoot);
+	const repoRoot = resolveRepoRoot(skillRoot);
 	if (repoRoot === null) {
 		return { installation: "unknown", bundleRoot, repoRoot: null };
 	}
@@ -136,10 +139,16 @@ function detectInstallation(skillRoot) {
 
 /**
  * @param {string} skillRoot
- * @param {{ runCommand?: (command: string, args: string[]) => string | null }} [options]
+ * @param {{
+ *   runCommand?: (command: string, args: string[]) => string | null,
+ *   findRepoRoot?: (from: string) => string | null,
+ * }} [options]
  */
 export function collectReportEnvironment(skillRoot, options = {}) {
-	const { installation, bundleRoot, repoRoot } = detectInstallation(skillRoot);
+	const { installation, bundleRoot, repoRoot } = detectInstallation(
+		skillRoot,
+		options.findRepoRoot ?? findRepoRoot,
+	);
 	const unavailable = [];
 	const missing = MISSING_IDENTIFIERS[installation] ?? {};
 

@@ -68,12 +68,14 @@ describe("collectReportEnvironment", () => {
 		assert.equal(env.installation, "codex-plugin");
 		assert.equal(env.pluginVersion, "0.4.2");
 		assert.equal(env.bundleContentHash, null);
+		assert.deepEqual(unavailableFields(env), [
+			"bundleContentHash",
+			"cliVersion",
+			"installProvenance",
+			"repoCommit",
+		]);
 		const missingHash = env.unavailable.find(
 			({ field }) => field === "bundleContentHash",
-		);
-		assert.ok(
-			missingHash,
-			"bundleContentHash should be recorded as unavailable",
 		);
 		assert.match(missingHash.reason, /Codex/);
 	});
@@ -309,11 +311,32 @@ describe("collectReportEnvironment", () => {
 		]);
 	});
 
+	it("resolves the repository root through the injected resolver", () => {
+		const skillRoot = join(tmp, "skills", "pfd-ops");
+		const elsewhere = join(tmp, "elsewhere");
+		mkdirSync(skillRoot, { recursive: true });
+		mkdirSync(elsewhere, { recursive: true });
+
+		const env = collectReportEnvironment(skillRoot, {
+			runCommand: noCommands,
+			findRepoRoot: () => elsewhere,
+		});
+
+		assert.equal(env.installation, "repo-local");
+	});
+
 	it("accounts for every identifier an unrecognized shape lacks", () => {
 		const skillRoot = join(tmp, "skills", "pfd-ops");
 		mkdirSync(skillRoot, { recursive: true });
 
-		const env = collectReportEnvironment(skillRoot, { runCommand: noCommands });
+		// The resolver is injected rather than left to walk up from a temp
+		// directory: a checkout anywhere above TMPDIR would otherwise classify
+		// this fixture as repo-local and the assertion would depend on where the
+		// suite happens to run.
+		const env = collectReportEnvironment(skillRoot, {
+			runCommand: noCommands,
+			findRepoRoot: () => null,
+		});
 
 		assert.equal(env.installation, "unknown");
 		assert.deepEqual(unavailableFields(env), [
