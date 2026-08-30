@@ -67,13 +67,18 @@ jobs:
           DIAGRAMS_REPO_TOKEN: ${{ secrets.DIAGRAMS_REPO_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          if [[ ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Invalid PR_NUMBER: $PR_NUMBER" >&2
+            exit 1
+          fi
           git clone --depth=1 "https://x-access-token:${DIAGRAMS_REPO_TOKEN}@github.com/takasek/ci-image-store.git" /tmp/ci-image-store
+          rm -rf -- "/tmp/ci-image-store/pfdsl/pr-${PR_NUMBER}"
           mkdir -p "/tmp/ci-image-store/pfdsl/pr-${PR_NUMBER}"
           cp -r "docs/diagrams/pr-${PR_NUMBER}/." "/tmp/ci-image-store/pfdsl/pr-${PR_NUMBER}/"
           cd /tmp/ci-image-store
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "pfdsl/pr-${PR_NUMBER}"
+          git add -A -- "pfdsl/pr-${PR_NUMBER}"
           if ! git diff --cached --quiet; then
             git commit -m "pfdsl: add diff images for pfdsl PR #${PR_NUMBER}"
             git push origin HEAD
