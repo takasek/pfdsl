@@ -321,6 +321,42 @@ describe("classifyDesignSettlement", () => {
 		assert.equal(result.recordRequired, false);
 	});
 
+	it("reports settled for a post-cutoff reader-first record", () => {
+		const result = classifyDesignSettlement({
+			body: "## 対応案\n1. 案A\n2. 案B\n",
+			comments: [
+				{
+					body: "提案: x\n理由: y\n前提を外した対案: z\n対案を採らない理由: w",
+					createdAt: "2026-08-30T09:32:50Z",
+				},
+			],
+		});
+		assert.equal(result.unsettled, false);
+		assert.equal(result.reason, "record-posted");
+		assert.equal(result.recordRequired, false);
+	});
+
+	it("reports reader-first prefixes missing from a post-cutoff legacy record", () => {
+		const result = classifyDesignSettlement({
+			body: "## 対応案\n1. 案A\n2. 案B\n",
+			comments: [
+				{
+					body: "前提: x\n否定案: y\n却下理由: z",
+					createdAt: "2026-08-30T09:32:50Z",
+				},
+			],
+		});
+		assert.equal(result.unsettled, true);
+		assert.equal(result.reason, "record-incomplete");
+		assert.deepEqual(result.missingPrefixes, [
+			"提案:",
+			"理由:",
+			"前提を外した対案:",
+			"対案を採らない理由:",
+		]);
+		assert.equal(result.recordRequired, true);
+	});
+
 	// #927: the record is posted as a comment, so a body carrying all three
 	// line heads is a discussion of the same shape, not the record. Electing it
 	// would also pass the terminal gate's timing check unconditionally — an
@@ -606,6 +642,16 @@ describe("parsePorcelainPaths", () => {
 });
 
 describe("buildDesignRecordTemplate", () => {
+	it("starts with the reader-first record contract in canonical order", () => {
+		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
+		assert.deepEqual(lines.slice(0, 4), [
+			"提案: <採用する変更>",
+			"理由: <目的と採用案の対応>",
+			"前提を外した対案: <列挙済みの集合外も検査する競合案>",
+			"対案を採らない理由: <外部制約または所有者に帰着する理由>",
+		]);
+	});
+
 	it("emits a skeleton that the terminal gate's own content check accepts", () => {
 		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
 		assert.deepEqual(classifyDesignRecordContent(lines.join("\n"), 0), {

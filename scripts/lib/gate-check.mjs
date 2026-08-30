@@ -906,12 +906,10 @@ export function toDesignRecordEntries({ comments }) {
  * Identified by its own required line heads rather than by any external
  * marker — nothing else has to agree on which entry the record is.
  *
- * Reader-first candidates take precedence over grandfathered legacy candidates.
- * Within either format, most matches wins rather than first match. Measured over
- * this repo's issues, bodies carry a stray required line head often enough that
- * a first-match search would elect the body and never examine the real record in
- * a comment — a check aimed at the wrong text, which reads exactly like a check
- * that ran.
+ * Reader-first candidates take precedence over legacy-shaped candidates.
+ * A post-cutoff legacy-shaped candidate remains selectable so classification can report its missing reader-first prefixes.
+ * Within either format, most matches wins rather than first match.
+ * Measured over this repo's issues, bodies carry a stray required line head often enough that a first-match search would elect the body and never examine the real record in a comment — a check aimed at the wrong text, which reads exactly like a check that ran.
  * @param {Array<{author?: string, body?: string, createdAt?: string}>} entries
  */
 export function selectDesignRecord(entries) {
@@ -920,16 +918,22 @@ export function selectDesignRecord(entries) {
 	let legacyBest;
 	let legacyBestCount = 0;
 	for (const entry of entries ?? []) {
-		const requiredPrefixes = resolveDesignRecordRequiredPrefixes(entry);
-		const count = presentPrefixes(entry.body, requiredPrefixes).length;
-		if (requiredPrefixes === READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES) {
-			if (count > readerFirstBestCount) {
+		const readerFirstCount = presentPrefixes(
+			entry.body,
+			READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+		).length;
+		const legacyCount = presentPrefixes(
+			entry.body,
+			LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES,
+		).length;
+		if (readerFirstCount > 0) {
+			if (readerFirstCount > readerFirstBestCount) {
 				readerFirstBest = entry;
-				readerFirstBestCount = count;
+				readerFirstBestCount = readerFirstCount;
 			}
-		} else if (count > legacyBestCount) {
+		} else if (legacyCount > legacyBestCount) {
 			legacyBest = entry;
-			legacyBestCount = count;
+			legacyBestCount = legacyCount;
 		}
 	}
 	return readerFirstBest ?? legacyBest;

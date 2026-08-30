@@ -1289,6 +1289,34 @@ describe("versioned design-record format", () => {
 		assert.equal(selected?.body, incompleteReaderFirst);
 	});
 
+	it("selects a post-cutoff legacy-shaped record so reader-first missing prefixes are reported", () => {
+		const selected = selectDesignRecord([
+			{ body: legacy, createdAt: DESIGN_RECORD_FORMAT_CUTOFF },
+		]);
+		assert.equal(selected?.body, legacy);
+		const result = classifyDesignRecordContent(
+			selected?.body,
+			0,
+			selected?.createdAt,
+		);
+		assert.equal(result.status, "FAIL");
+		for (const prefix of READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES) {
+			assert.match(result.detail, new RegExp(prefix));
+		}
+	});
+
+	it("does not select an unrelated post-cutoff comment", () => {
+		assert.equal(
+			selectDesignRecord([
+				{
+					body: "実装の進捗を共有します。",
+					createdAt: DESIGN_RECORD_FORMAT_CUTOFF,
+				},
+			]),
+			undefined,
+		);
+	});
+
 	it("exposes the versioned prefix and disposition vocabularies", () => {
 		assert.deepEqual(LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES, [
 			"前提:",

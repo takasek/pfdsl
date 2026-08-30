@@ -4,10 +4,11 @@
  */
 
 import {
-	DESIGN_RECORD_REQUIRED_PREFIXES,
 	DISPOSITION_TOKENS,
 	NO_IMPLEMENTATION_TOKEN,
 	presentRequiredPrefixes,
+	READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+	resolveDesignRecordRequiredPrefixes,
 	selectDesignRecord,
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
@@ -210,9 +211,10 @@ export function detectEnumeratedOptions(body) {
  */
 export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
 	const lines = [
-		`${DESIGN_RECORD_REQUIRED_PREFIXES[0]} 本案は〈○○という状態が存在し続けること〉を前提にする`,
-		`${DESIGN_RECORD_REQUIRED_PREFIXES[1]} 上の前提を否定した案（起票者が挙げていなくても作る）`,
-		`${DESIGN_RECORD_REQUIRED_PREFIXES[2]} 外部制約か所有者に帰着させる（「手間がかかる」「スコープ外」は無効）`,
+		`${READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES[0]} <採用する変更>`,
+		`${READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES[1]} <目的と採用案の対応>`,
+		`${READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES[2]} <列挙済みの集合外も検査する競合案>`,
+		`${READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES[3]} <外部制約または所有者に帰着する理由>`,
 	];
 	if (optionCount > 0) {
 		lines.push(
@@ -225,7 +227,7 @@ export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
 		);
 	}
 	return {
-		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 候補列挙がある場合は雛形のままでは形式も通らず、候補列挙がなくても記録としては何も残らない。実装しないと判断した回のみ、記録に \`${NO_IMPLEMENTATION_TOKEN} <理由>\` を行頭から書く行を追加する — timing 判定が SKIP になり、コミットとの前後関係を照合しない。他の行の前提・否定案・却下理由の中でこの語に触れるだけでは宣言にならない — \`Size-Intent: shrink\` と同じ行頭一致で判定する。`,
+		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 候補列挙がある場合は雛形のままでは形式も通らず、候補列挙がなくても記録としては何も残らない。実装しないと判断した回のみ、記録に \`${NO_IMPLEMENTATION_TOKEN} <理由>\` を行頭から書く行を追加する — timing 判定が SKIP になり、コミットとの前後関係を照合しない。他の行の提案・理由・前提を外した対案・対案を採らない理由の中でこの語に触れるだけでは宣言にならない — \`Size-Intent: shrink\` と同じ行頭一致で判定する。`,
 		lines,
 	};
 }
@@ -311,8 +313,8 @@ export function classifyDesignSettlement({ body, createdAt, comments }) {
 		toDesignRecordEntries({ body, createdAt, comments }),
 	);
 	if (record) {
-		const present = presentRequiredPrefixes(record.body);
-		const missingPrefixes = DESIGN_RECORD_REQUIRED_PREFIXES.filter(
+		const present = presentRequiredPrefixes(record.body, record.createdAt);
+		const missingPrefixes = resolveDesignRecordRequiredPrefixes(record).filter(
 			(prefix) => !present.includes(prefix),
 		);
 		if (missingPrefixes.length === 0) {

@@ -409,6 +409,39 @@ describe("runCycleStatus", () => {
 		]);
 	});
 
+	it("reports reader-first prefixes missing from a post-cutoff legacy record", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({
+							body: "普通の説明文。",
+							comments: [
+								{
+									body: "前提: x\n否定案: y\n却下理由: z",
+									createdAt: "2026-08-30T09:32:50Z",
+								},
+							],
+						});
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
+		assert.deepEqual(result.designUnsettledFor[0].missingPrefixes, [
+			"提案:",
+			"理由:",
+			"前提を外した対案:",
+			"対案を採らない理由:",
+		]);
+	});
+
 	it("resolves the target issue from the best process when --issue is absent", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
