@@ -1219,6 +1219,23 @@ describe("versioned design-record format", () => {
 		);
 	});
 
+	it("keeps timestamp-free pure-function calls legacy-compatible", () => {
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({ body: legacy }),
+			LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+	});
+
+	it("fails closed to reader-first requirements for an invalid timestamp", () => {
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({
+				body: legacy,
+				createdAt: "not-an-iso-timestamp",
+			}),
+			READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+	});
+
 	it("uses reader-first requirements for complete and incomplete reader-first records", () => {
 		assert.deepEqual(
 			resolveDesignRecordRequiredPrefixes({
