@@ -2,9 +2,11 @@
 
 ## Purpose
 
-`workflow.pfdsl` currently uses the retrospective skill artifact itself as feedback to maintenance processes. This conflates an audit capability with the findings produced by one execution. The same diagram also groups 21 independently maintained outputs under three broad processes, hiding which decision changes which artifact.
+`workflow.pfdsl` used the retrospective skill artifact itself as feedback to maintenance processes, conflating an audit capability with the findings produced by one execution. The same diagram grouped independently maintained outputs under processes that hid which decision changes which artifact.
 
 This design models the complete path from observable activity through retrospective planning and human decisions to independently maintained knowledge artifacts. It permits manual and automated audit triggers while retaining human authority over every repository change.
+
+Its maintenance and retrospective-collection sections were revised by #1046 after the first implementation: the per-asset process split and the seven required activity sources both stated in the graph something that is not true of a single run. Sections below carry the current model; the superseded shapes are described where the reasoning needs them.
 
 ## Design principles
 
@@ -12,7 +14,7 @@ This design models the complete path from observable activity through retrospect
 2. Trigger classes are non-exclusive. One activity event may participate in multiple retrospective or decision triggers.
 3. Completeness is relative to an explicit time window and source set. Missing required sources stop the flow rather than producing an empty-success result.
 4. Automated collection and auditing may produce findings, but only a human-confirmed decision may drive repository maintenance.
-5. Each maintenance process has one independently changeable canonical output. Shared generation and verification commands are downstream delivery concerns, not evidence that canonical artifacts share a producer.
+5. Maintenance processes are split where the revision and validation procedure differs, not once per canonical output. A per-output split whose processes all take the same single normal input states the same transformation repeatedly and leaves target routing outside the graph. Shared generation and delivery commands remain downstream concerns and are not evidence of a shared producer.
 6. Transient audit artifacts do not become an ever-growing repository corpus. A checkpoint is required only when a consumer would otherwise lose required transient evidence, and its destination must preserve the evidence's visibility boundary.
 
 ## Retrospective collection and execution
@@ -20,15 +22,16 @@ This design models the complete path from observable activity through retrospect
 The retrospective side combines existing workflow artifacts with two external execution inputs:
 
 - `retro_request` instantiates the exact required source set and time cutoff for one run according to the selection and validation rules in `retro_skill`.
-- `gh_issues`, `issue_updates`, `pull_request`, and `integrated_repository` retain their existing meanings and provide the GitHub and Git evidence already represented by the workflow.
-- `session_records` and `scheduler_records` provide only the session and scheduler evidence that has no existing workflow artifact.
+- `retro_evidence_snapshot` is the run-scoped envelope of the evidence actually retrieved for that request, frozen at its cutoff together with its provenance. Its candidate source classes are the GitHub issue, issue-update and pull-request records, the integrated repository, session records, and scheduler records, but which of them appear varies per run.
 
-The audit layers, source-set selection and validation rules, and failure behavior remain normative rules of `retro_skill`. They are not copied into a second policy artifact. `retro_request`, `session_records`, and `scheduler_records` are execution-time inputs rather than repository-maintained capabilities. No aggregate `activity_sources` artifact is introduced because it would duplicate the existing GitHub and Git artifacts under a second identity.
+The audit layers, source-set selection and validation rules, and failure behavior remain normative rules of `retro_skill`. They are not copied into a second policy artifact. `retro_request` and `retro_evidence_snapshot` are execution-time inputs rather than repository-maintained capabilities.
+
+An earlier revision made all seven source artifacts normal inputs of `collect_activity`. That made sources required which a given run never selects, so a GitHub-only run and a session-only run could not both be read from the same diagram. Feedback edges are not the remedy: specification §9.1 states that `>>` does not guarantee `A` exists on every execution, so "`A` is not produced every time" is not a reason to avoid it, and §15.3 limits `>>?` to re-entry, improvement, and auxiliary inputs — a selected source is a primary input of that run, not an auxiliary one. The single per-run envelope keeps the selected evidence a normal input while leaving retrieval detail to runtime. `session_records` and `scheduler_records` disappear as separate artifacts because their content is carried by the envelope. No aggregate `activity_sources` artifact is introduced: the envelope is one run's frozen retrieval result, not a second permanent identity for the GitHub and Git artifacts.
 
 The flow is:
 
 ```pfdsl
-[retro_request, gh_issues, issue_updates, pull_request, integrated_repository, session_records, scheduler_records] >> collect_activity -> pre_retro_inventory
+[retro_request, retro_evidence_snapshot] >> collect_activity -> pre_retro_inventory
 
 retro_skill >>? collect_activity
 
@@ -77,55 +80,31 @@ Before a handoff whose recipient lacks guaranteed access to required transient e
 
 Once human decisions have been applied to durable repository artifacts, intermediate inventories need not be retained permanently.
 
-## Independent maintenance processes
+## Knowledge maintenance processes
 
-The broad `distill_ops`, `distill_local_skills`, and `externalize_bindings` processes are removed. Their outputs have independent canonical locations, edit operations, and validation boundaries, so they become 21 maintenance processes.
+The broad `distill_ops`, `distill_local_skills`, and `externalize_bindings` processes are removed. An earlier revision of this design replaced them with 21 per-asset maintenance processes, one for each canonical output. That split did not hold: every one of the 21 had `decisions` as its only normal input, so no process had a statically visible target-specific driver, and the routing of a decision to its target existed only as prose telling each process to ignore decisions aimed elsewhere. A graph whose 21 causal edges are all identical does not model dispatch; it models one transformation drawn 21 times, and its node list doubles as a copy of the plugin's distribution membership.
 
-### Distributed PFD assets
+The maintenance side is therefore modeled by the boundary that actually exists: a human-authorized change instruction revises a canonical asset. Three processes carry it, split where the revision and validation procedure genuinely differs:
 
-| Process | Output |
+| Process | Outputs |
 |---|---|
-| `maintain_distributed_advisory_hooks` | `distributed_advisory_hooks` |
-| `maintain_ecosystem_skill` | `ecosystem_skill` |
-| `maintain_grill_skill` | `grill_skill` |
-| `maintain_implementer_agent` | `implementer_agent` |
-| `maintain_ops_skill_general` | `ops_skill_general` |
-| `maintain_ops_skill_github_backend` | `ops_skill_l3` |
-| `maintain_pfd_lens_agent` | `pfd_lens_agent` |
-| `maintain_retro_skill` | `retro_skill` |
-| `maintain_review_perspectives` | `review_perspectives` |
+| `maintain_distributed_prompt_assets` | `distributed_advisory_hooks`, `ecosystem_skill`, `grill_skill`, `implementer_agent`, `ops_skill_general`, `ops_skill_l3`, `pfd_lens_agent`, `retro_skill`, `review_perspectives` |
+| `maintain_repo_bindings` | `bindings_pfd_ops`, `bindings_pfd_retro`, `delegation_guard`, `main_branch_guard`, `pre_artifact_advisory`, `workflow_md` |
+| `maintain_repo_local_capabilities` | `distribution_review_perspectives`, `distribution_review_skill`, `prose_mechanization_audit_skill`, `retro_pattern_sweep_skill`, `spec_stress_skill`, `vscode_ext_debug_skill` |
 
-### Repository bindings and guards
+Collapsing further, into a single `maintain_knowledge_asset`, is rejected by the quality guide's universal-process test: splitting its outputs into the guard group and the distributed group yields groups producible from a proper subset of the inputs, which is the signature of a false bundle. Splitting further, back toward one process per asset, is rejected by the same test read the other way — no candidate split produces a group whose normal inputs are a proper subset, because every group's normal input is exactly `decisions`.
 
-| Process | Output |
-|---|---|
-| `maintain_ops_binding` | `bindings_pfd_ops` |
-| `maintain_retro_binding` | `bindings_pfd_retro` |
-| `maintain_delegation_guard` | `delegation_guard` |
-| `maintain_main_branch_guard` | `main_branch_guard` |
-| `maintain_pre_artifact_advisory` | `pre_artifact_advisory` |
-| `maintain_workflow_companion` | `workflow_md` |
+The test is applied to normal inputs only, and that restriction is load-bearing rather than incidental. Every output carries its own revision baseline as feedback, so counting feedback edges makes any group of two or more outputs splittable by construction, and the test would mandate exactly the per-asset split whose failure is recorded above. A revision baseline is not a driver of the transformation; it is the artifact being edited. Reading the test over drivers is what keeps it answering the question it exists to answer — whether the process bundles two transformations — rather than restating that the outputs are distinct artifacts, which is already known.
 
-### Repository-local skills and perspectives
+The distribution axis in the first group's name is a consequence of its maintenance procedure, not membership leaking back into the workflow. What that group shares is that its revision is evidenced by `distribution_review_record` — a record that exists only because the asset is read by an adopting repository. If an asset stops being bundled, its available evidence changes with it, and moving it to another producer is the correct consequence rather than a bookkeeping cost. What stays outside this diagram is the list itself: no node or edge here answers which files `make gen-plugin` copies, and adding an asset to the bundle does not require an edge migration until its maintenance procedure actually changes.
 
-| Process | Output |
-|---|---|
-| `maintain_distribution_review_perspectives` | `distribution_review_perspectives` |
-| `maintain_distribution_review_skill` | `distribution_review_skill` |
-| `maintain_prose_mechanization_audit_skill` | `prose_mechanization_audit_skill` |
-| `maintain_retro_pattern_sweep_skill` | `retro_pattern_sweep_skill` |
-| `maintain_spec_stress_skill` | `spec_stress_skill` |
-| `maintain_vscode_ext_debug_skill` | `vscode_ext_debug_skill` |
+The 21 artifact nodes are retained individually. Node granularity follows independent canonical location, independent revision and validation, and ownership boundary; the presence or absence of an in-graph consumer is corroborating evidence rather than the criterion, since consumers are added and removed without the asset's ownership changing. What moves out of the workflow is not the nodes but the claim they were implicitly making: which assets ship in the plugin is stated by the gen-plugin manifest and `runtime_pipeline_pfdsl`, and the workflow's nodes carry maintenance responsibility only.
 
-Every maintenance process has `decisions` as its normal driving input. Each decision names the canonical artifact or artifacts it dispatches to, so a process ignores decisions targeted elsewhere. Each process also receives its own current canonical output as feedback: holding the decision and evidence fixed, changing the current text, rule, guard, or procedure changes the revised output because maintenance edits the existing asset rather than recreating it from the decision alone. Feedback expresses same-artifact revision without adding a primary cycle, matching the existing `spec >>? maintain_spec` pattern. Inputs of the three removed aggregate processes are not mechanically copied to every replacement process. ADRs, payoff records, review findings, retrospective findings, and sweep records receive normal or feedback edges only when the target artifact definition and its real maintenance procedure show that removing or changing that evidence can change the output. The target output, current canonical artifact, actual evidence inputs, and validation command are stated in each process description and criteria.
+Each of the three processes has `decisions` as its normal driving input. Each output is also fed back into its own process: holding the decision and evidence fixed, changing the current text, rule, guard, or procedure changes the revised output, because maintenance edits the existing asset rather than recreating it from the decision alone. Feedback expresses same-artifact revision without adding a primary cycle, matching the existing `spec >>? maintain_spec` pattern. Target-specific evidence enters as feedback where the target's real maintenance procedure reads it: `distribution_review_record` into the distributed and repo-local capability processes, `prose_mechanization_sweep_record` and `retro_pattern_sweep_record` into the bindings process, and `retro_findings` into all three. `decisions` remains the sole normal input and the finding supplies the target-specific evidence used to realize the authorized change; the required routes `retro_findings` → `ops_skill_l3` and `retro_findings` → `bindings_pfd_retro` hold through their respective processes with the correctly typed retrospective result rather than the old `retro_skill` capability snapshot.
 
-The same revision-baseline counterfactual applies outside the new `knowledge_maintenance` family wherever a process edits an existing durable artifact. It therefore also covers both outputs of `maintain_template`, `feature_samples` in `maintain_samples`, `workflow_pfdsl` in `map_workflow`, both runtime-pipeline documents in `map_transform_boundaries`, `readme` in `update_readme`, `adrs` in `draft_adrs`, and both roadmap outputs in `map_deps`; `roadmap_pfdsl` already had this feedback edge, while `roadmap_md` completes its sibling baseline. `write_article` is excluded because `article` is a one-off deliverable without an in-diagram revision cycle, not because it is terminal. `gh_issues >>? file_issues` would duplicate the external issue-state feedback already carried by `issue_updates >>? file_issues`. `integrated_repository >>? merge_pr` would duplicate repository state already returned through `integrated_repository >> project_toolchain -> toolchain >>? develop` around the merge and development cycle.
+The same revision-baseline counterfactual applies outside the `knowledge_maintenance` family wherever a process edits an existing durable artifact. It therefore also covers both outputs of `maintain_template`, `feature_samples` in `maintain_samples`, `workflow_pfdsl` in `map_workflow`, both runtime-pipeline documents in `map_transform_boundaries`, `readme` in `update_readme`, `adrs` in `draft_adrs`, and both roadmap outputs in `map_deps`; `roadmap_pfdsl` already had this feedback edge, while `roadmap_md` completes its sibling baseline. `write_article` is excluded because `article` is a one-off deliverable without an in-diagram revision cycle, not because it is terminal. `gh_issues >>? file_issues` would duplicate the external issue-state feedback already carried by `issue_updates >>? file_issues`. `integrated_repository >>? merge_pr` would duplicate repository state already returned through `integrated_repository >> project_toolchain -> toolchain >>? develop` around the merge and development cycle.
 
-Applying that counterfactual independently to `retro_findings` yields feedback inputs to all 21 maintenance processes: while holding the human target and disposition in `decisions` fixed, changing a finding's concrete observation changes the target's resulting wording, rule, guard behavior, review question, or diagnostic procedure. This does not transfer change authority to the finding; `decisions` remains the sole normal input and the finding supplies the target-specific evidence used to realize the authorized change. In particular, it restores the issue-required routes `retro_findings >>? maintain_ops_skill_github_backend -> ops_skill_l3` and `retro_findings >>? maintain_retro_binding -> bindings_pfd_retro` with the correctly typed retrospective result rather than the old `retro_skill` capability snapshot.
-
-This rule applies the quality guide's counterfactual input test independently after the split. For example, an exact-readback decision can change `ops_skill_l3` without a payoff record, and a concrete retrospective pattern can change `bindings_pfd_retro` without an ADR. Neither absent corpus becomes a false required input merely because its former aggregate process consumed that corpus for a different output.
-
-All 21 processes receive a new `knowledge_maintenance` process tag, following ADR-0019's rule that structurally related process families are grouped by tags rather than a false shared process. The existing `distilled_skill` and `distilled_doc` artifact tags remain, but their descriptions are rewritten as intrinsic artifact classifications and no longer name the removed producer processes.
+The three processes carry the `knowledge_maintenance` process tag, following ADR-0019's rule that structurally related process families are grouped by tags rather than a false shared process. The existing `distilled_skill` and `distilled_doc` artifact tags remain as intrinsic artifact classifications and do not name producer processes.
 
 Shared `make gen-plugin` execution remains represented by the runtime pipeline. It assembles canonical inputs into distributed mirrors and does not merge their maintenance responsibilities.
 
@@ -133,10 +112,10 @@ Shared `make gen-plugin` execution remains represented by the runtime pipeline. 
 
 The process split changes existing process-name contracts and therefore must update them in the same pull request:
 
-- `.pfdsl/workflow.md` must replace the three broad process names in its knowledge-routing rules and agent/hook inventory instructions.
-- `scripts/check-skill-wiring.mjs` must stop treating a `distill_ops` output edge as production evidence. It must instead verify that every required distributed skill or agent artifact has exactly one producer in `workflow.pfdsl` and retains the required runtime-pipeline consumption edge.
+- `.pfdsl/workflow.md` must name the current maintenance process IDs in its knowledge-routing rules and agent/hook inventory instructions, and must state that distribution membership is owned by the gen-plugin manifest and `runtime_pipeline_pfdsl` rather than by the workflow's artifact nodes.
+- `scripts/check-skill-wiring.mjs` must not treat any particular producer process name as production evidence. It must instead verify that every required distributed skill or agent artifact has exactly one producer in `workflow.pfdsl` and retains the required runtime-pipeline consumption edge.
 - Tests must distinguish a missing producer, duplicate producers, and a valid producer whose name is not hard-coded by the checker.
-- References to `externalize_bindings` and neighbor queries based on that process must be replaced with artifact-driven producer queries or an existing authoritative artifact classification.
+- Prose elsewhere in the repository that names a removed process as an artifact's producer must be repointed at the current producer or rewritten to be producer-agnostic.
 - The `distilled_skill` and `distilled_doc` tag descriptions must stop naming the removed processes, and process-family queries must use `knowledge_maintenance` rather than a former aggregate producer.
 - The old process declarations and edges must be removed completely rather than retained as checker compatibility aliases.
 
@@ -144,18 +123,18 @@ The process split changes existing process-name contracts and therefore must upd
 
 The implementation is complete only when all of the following hold:
 
-1. `pfdsl check .pfdsl/workflow.pfdsl --no-color` passes.
-2. The removed process ID set is exactly `distill_ops`, `distill_local_skills`, and `externalize_bindings`; the added maintenance process ID set is exactly the 21 IDs listed above.
-3. The added retrospective and decision artifacts are exactly `retro_request`, `session_records`, `scheduler_records`, `pre_retro_inventory`, `retro_plan`, `retro_subject_snapshot`, `retro_findings`, and `decision_trigger`; the added execution processes are exactly `collect_activity`, `plan_retro`, `run_retro`, and `decide`. No aggregate `activity_sources` artifact exists.
-4. The retrospective normal edges match the flow declared above, including the existing GitHub and Git artifacts into `collect_activity`, `integrated_repository` into `plan_retro`, and both `retro_plan` and `retro_subject_snapshot` into `run_retro`. Changing a selected canonical artifact in `integrated_repository` must be able to change `retro_subject_snapshot` and `retro_findings` without changing `retro_plan` references.
-5. `user_intent >> discuss`, `discuss -> decision_trigger`, and `decision_trigger >> decide -> decisions` are normal edges. `retro_findings >>? discuss`, `retro_findings` into every one of the 21 maintenance processes, each maintenance process's current canonical output back into that process, the additional revision baselines enumerated above, and the three `retro_skill` edges into collection, planning, and execution are feedback edges. No second producer of `decisions` exists. The `decide` description and criteria name the human decision maker as the sole disposition authority, and the `decisions` criteria require both that human authority and the target canonical artifact or artifacts to be recorded.
-6. Paths exist from `decisions` and `retro_findings` to both `ops_skill_l3` and `bindings_pfd_retro`; the `retro_findings` paths use feedback edges into their respective maintenance processes.
+1. `pfdsl check .pfdsl/workflow.pfdsl --strict --no-color` passes.
+2. The removed process ID set is exactly `distill_ops`, `distill_local_skills`, `externalize_bindings`, and the 21 per-asset `maintain_*` IDs of the earlier revision; the maintenance process ID set is exactly `maintain_distributed_prompt_assets`, `maintain_repo_bindings`, and `maintain_repo_local_capabilities`, each carrying the `knowledge_maintenance` tag, and their combined outputs are exactly the 21 canonical artifacts listed above with no artifact produced twice.
+3. The retrospective and decision artifacts are exactly `retro_request`, `retro_evidence_snapshot`, `pre_retro_inventory`, `retro_plan`, `retro_subject_snapshot`, `retro_findings`, and `decision_trigger`; the execution processes are exactly `collect_activity`, `plan_retro`, `run_retro`, and `decide`. No `session_records`, `scheduler_records`, or aggregate `activity_sources` artifact exists.
+4. The retrospective normal edges match the flow declared above: `retro_request` and `retro_evidence_snapshot` into `collect_activity`, `integrated_repository` and `pre_retro_inventory` into `plan_retro`, and both `retro_plan` and `retro_subject_snapshot` into `run_retro`. No GitHub or Git source artifact is a direct input of `collect_activity` in either edge kind. A run whose request selects only GitHub sources and a run whose request selects only session evidence are both readable from these edges without a diagram change. Changing a selected canonical artifact in `integrated_repository` must be able to change `retro_subject_snapshot` and `retro_findings` without changing `retro_plan` references.
+5. `user_intent >> discuss`, `discuss -> decision_trigger`, and `decision_trigger >> decide -> decisions` are normal edges, and `decisions` is the only normal input of each maintenance process. `retro_findings >>? discuss`, `retro_findings` into each of the three maintenance processes, each canonical output back into the process that produces it, the additional revision baselines enumerated above, the target-specific sweep and review records into the processes whose procedure reads them, and the three `retro_skill` edges into collection, planning, and execution are feedback edges. No second producer of `decisions` exists. The `decide` description and criteria name the human decision maker as the sole disposition authority, and the `decisions` criteria require both that human authority and the target canonical artifact or artifacts to be recorded.
+6. Paths exist from `decisions` and `retro_findings` to both `ops_skill_l3` and `bindings_pfd_retro`; the `retro_findings` paths use feedback edges into the maintenance processes that produce those artifacts.
 7. No old feedback path treats `retro_skill` as a finding or decision input.
-8. Every durable artifact identified as a revision baseline above has a producer and exactly one feedback edge into that producer. The matrix comparator derives and checks the expected process-artifact pairs, including both outputs of multi-output revision processes; V001 independently rejects duplicate producers.
-9. Checker tests fail for missing and duplicate producers and pass for renamed valid producers.
-10. Companion prose, tag descriptions, and graph structure name the same responsibilities.
+8. Every durable artifact identified as a revision baseline above has a producer and exactly one feedback edge into that producer, including every output of a multi-output process; V001 independently rejects duplicate producers.
+9. Checker tests fail for missing and duplicate producers and pass for renamed valid producers, and no test asserts a specific producer process name as evidence of production.
+10. Companion prose, tag descriptions, and graph structure name the same responsibilities, and no prose in `.pfdsl/` or `docs/` names a removed process as a current producer.
 11. `graph orphans`, `graph io`, `graph edges`, and `graph stats` match the declared node and edge migration above, and `make check-docs` plus the relevant script tests pass.
-12. The pull request body contains an input-edge matrix covering all 21 maintenance processes, the retrospective and decision processes, every additional revision process enumerated above, and the three explicitly excluded candidates. For every candidate input named by this design, the matrix records whether an edge is present or absent, records the edge kind when present, and gives a one-line counterfactual reason tied to the process's actual procedure. Each `retro_findings` row for a maintenance process and each required current-output baseline row must be `yes` / `feedback`; the former explains how changing the finding changes the authorized edit while the decision stays fixed, and the latter explains how changing the existing asset changes the revised output while other inputs stay fixed. The matrix records `article`, `gh_issues`, and `integrated_repository` as absent candidates for `write_article`, `file_issues`, and `merge_pr` respectively, with the exclusion reasons above. The matrix cells must match the canonical edge set returned by `pfdsl graph edges .pfdsl/workflow.pfdsl --json`; any unlisted candidate edge, matrix-only edge, graph-only edge, or edge-kind mismatch fails validation. Review of the matched matrix must reject mechanical replication of aggregate inputs, omission of every evidence edge or revision baseline, failure to inspect every output of a multi-output process, and any process whose declared inputs are insufficient to produce its output.
+12. The pull request body contains an input-edge matrix covering the three maintenance processes, the retrospective and decision processes, every additional revision process enumerated above, and the three explicitly excluded candidates. For every candidate input named by this design, the matrix records whether an edge is present or absent, records the edge kind when present, and gives a one-line counterfactual reason tied to the process's actual procedure. Each `retro_findings` row for a maintenance process and each required current-output baseline row must be `yes` / `feedback`; the former explains how changing the finding changes the authorized edit while the decision stays fixed, and the latter explains how changing the existing asset changes the revised output while other inputs stay fixed. The matrix records `article`, `gh_issues`, and `integrated_repository` as absent candidates for `write_article`, `file_issues`, and `merge_pr` respectively, with the exclusion reasons above. The matrix cells must match the canonical edge set returned by `pfdsl graph edges .pfdsl/workflow.pfdsl --json`; any unlisted candidate edge, matrix-only edge, graph-only edge, or edge-kind mismatch fails validation. Review of the matched matrix must reject mechanical replication of aggregate inputs, omission of every evidence edge or revision baseline, failure to inspect every output of a multi-output process, and any process whose declared inputs are insufficient to produce its output.
 
 ## Scope boundaries
 
