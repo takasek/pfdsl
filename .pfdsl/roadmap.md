@@ -48,8 +48,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **flow-sync PR の CI が `pending`/`action_required` のまま動かない場合**: `github-actions[bot]` が起票した PR は workflow run が承認待ち（`action_required`）で止まり、放置すると CI が green にならないまま preflight が詰まる。GitHub MCP の `actions_list`（`list_workflow_runs`, branch でフィルタ）で該当 run の `conclusion` を確認し、`action_required` なら `actions_run_trigger`（`method: rerun_workflow_run`）で明示的に再実行する。
 
-**`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`gh-exec.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では REST fallback へ落ちる（#489）。fallback が答えられる argv の形は `gh-compat.mjs` の `planGhRestCall` が持つものだけで、それ以外は `gh` 不在のエラーがそのまま出る。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、issue 本文の design-unsettled 判定は `issue_read`（`get`）で本文を読んで手動判定、`audit-issues-flow` 相当は対象 issue の `location:`・`updated_at:` を roadmap.pfdsl の記載と手動突合する。
-`gh-exec.mjs` の REST fallback は上のリポ内スクリプトが実際に出す限定的な argv の互換層であり、issue コメントや PR 本文の作成・編集を代行する汎用 GitHub write adapter ではない。
+**`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`github-ops.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では HTTP backend へ落ちる（#489・#1044）。答えられるのは HTTP backend を持つ operation だけで、持たない `designRecordEditInfo` は operation 名を挙げて失敗する。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、issue 本文の design-unsettled 判定は `issue_read`（`get`）で本文を読んで手動判定、`audit-issues-flow` 相当は対象 issue の `location:`・`updated_at:` を roadmap.pfdsl の記載と手動突合する。
+`github-ops.mjs` の HTTP backend は上のリポ内スクリプトが必要とする operation の互換層であり、issue コメントや PR 本文の作成・編集を代行する汎用 GitHub write adapter ではない。
 fallback の transport は REST だけではない — `closingIssuesReferences` は REST の pull request payload に存在せず、GraphQL へ直接問い合わせる（#1043）。
 GitHub 側にしか無い読みを本文の正規表現で再構成すると、Development sidebar で手動リンクされた PR が「closing issue 0件」に見える。
 
