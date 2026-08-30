@@ -15,7 +15,7 @@ import {
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
 	collectModeledLocations,
-	DESIGN_RECORD_REQUIRED_PREFIXES,
+	DESIGN_RECORD_FORMAT_CUTOFF,
 	DISPOSITION_TOKENS,
 	deriveManualItems,
 	derivePackageLayers,
@@ -29,6 +29,7 @@ import {
 	hasNoImplementationDisposition,
 	hasSizeOverride,
 	hasStatusChange,
+	LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES,
 	lintCommitSubjects,
 	matchesTrigger,
 	NO_IMPLEMENTATION_TOKEN,
@@ -38,10 +39,13 @@ import {
 	parseInputConsumedArtifacts,
 	partitionManualItemsByPhase,
 	partitionNewTerminals,
+	READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+	resolveDesignRecordRequiredPrefixes,
 	resolveRecordEditedAt,
 	SIZE_INTENT_PATTERN,
 	SIZE_OVERRIDE_PATTERN,
 	SIZE_TRACKED_PATTERNS,
+	selectDesignRecord,
 	sharesSiblingIdNamespace,
 	statusChangedForArtifact,
 	toDesignRecordEntries,
@@ -981,7 +985,7 @@ describe("classifyDesignRecordContent", () => {
 
 	it("FAILs and lists the missing required-prefix line(s)", () => {
 		const missingRejection = [
-			`${DESIGN_RECORD_REQUIRED_PREFIXES[0]} x`,
+			`${LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES[0]} x`,
 			"決定: 案A を採用する。",
 		].join("\n");
 		const result = classifyDesignRecordContent(missingRejection, 0);
@@ -1052,9 +1056,9 @@ describe("classifyDesignRecordContent", () => {
 	});
 
 	it("does not require disposition-token coverage when optionCount is 0", () => {
-		const record = DESIGN_RECORD_REQUIRED_PREFIXES.map((p) => `${p} x`).join(
-			"\n",
-		);
+		const record = LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES.map(
+			(p) => `${p} x`,
+		).join("\n");
 		assert.deepEqual(classifyDesignRecordContent(record, 0), {
 			status: "PASS",
 		});
@@ -1189,12 +1193,96 @@ describe("classifyDesignRecordContent", () => {
 	});
 });
 
-describe("DESIGN_RECORD_REQUIRED_PREFIXES / DISPOSITION_TOKENS", () => {
-	it("exposes the expected prefix and disposition vocabularies", () => {
-		assert.deepEqual(DESIGN_RECORD_REQUIRED_PREFIXES, [
+describe("versioned design-record format", () => {
+	const readerFirst = [
+		"提案: x",
+		"理由: y",
+		"前提を外した対案: z",
+		"対案を採らない理由: owner constraint",
+	].join("\n");
+	const legacy = ["前提: x", "否定案: y", "却下理由: z"].join("\n");
+
+	it("uses the legacy format only before the exact cutoff", () => {
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({
+				body: legacy,
+				createdAt: "2026-08-30T09:32:49Z",
+			}),
+			LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({
+				body: legacy,
+				createdAt: DESIGN_RECORD_FORMAT_CUTOFF,
+			}),
+			READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+	});
+
+	it("uses reader-first requirements for complete and incomplete reader-first records", () => {
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({
+				body: readerFirst,
+				createdAt: "2026-08-30T09:32:51Z",
+			}),
+			READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({
+				body: "提案: x\n理由: y",
+				createdAt: "2026-08-30T09:32:51Z",
+			}),
+			READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+		assert.equal(
+			classifyDesignRecordContent(readerFirst, 0, "2026-08-30T09:32:51Z")
+				.status,
+			"PASS",
+		);
+		assert.equal(
+			classifyDesignRecordContent("提案: x\n理由: y", 0, "2026-08-30T09:32:51Z")
+				.status,
+			"FAIL",
+		);
+	});
+
+	it("rejects a complete legacy record at the cutoff", () => {
+		assert.equal(
+			classifyDesignRecordContent(legacy, 0, "2026-08-30T09:32:49Z").status,
+			"PASS",
+		);
+		const result = classifyDesignRecordContent(
+			legacy,
+			0,
+			DESIGN_RECORD_FORMAT_CUTOFF,
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /提案:/);
+	});
+
+	it("selects a reader-first candidate over a legacy candidate", () => {
+		const incompleteReaderFirst = "提案: x";
+		const selected = selectDesignRecord([
+			{ body: legacy, createdAt: "2026-08-30T09:32:49Z" },
+			{
+				body: incompleteReaderFirst,
+				createdAt: "2026-08-30T09:32:51Z",
+			},
+		]);
+		assert.equal(selected?.body, incompleteReaderFirst);
+	});
+
+	it("exposes the versioned prefix and disposition vocabularies", () => {
+		assert.deepEqual(LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES, [
 			"前提:",
 			"否定案:",
 			"却下理由:",
+		]);
+		assert.deepEqual(READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES, [
+			"提案:",
+			"理由:",
+			"前提を外した対案:",
+			"対案を採らない理由:",
 		]);
 		assert.deepEqual(DISPOSITION_TOKENS, ["採用", "却下", "保留"]);
 	});

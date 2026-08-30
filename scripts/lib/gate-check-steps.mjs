@@ -351,7 +351,11 @@ export function designRecordStep({
 	// for content, against timing's 3 true / 0 false. classifyDesignRecordContent
 	// still runs every time and its finding still prints, prefixed WARN so a
 	// reader can tell it apart from a timing detail sharing the same line.
-	const content = classifyDesignRecordContent(record.body, optionCount);
+	const content = classifyDesignRecordContent(
+		record.body,
+		optionCount,
+		record.createdAt,
+	);
 	const contentDetail =
 		content.status === "FAIL" ? `WARN: ${content.detail}` : undefined;
 	// The edit note is only worth printing once timing actually reached the

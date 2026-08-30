@@ -713,11 +713,21 @@ export function classifyDesignRecordTiming(
 	return { status: "PASS", detail: TIMING_ANCHOR_CAVEAT };
 }
 
-export const DESIGN_RECORD_REQUIRED_PREFIXES = [
+export const DESIGN_RECORD_FORMAT_CUTOFF = "2026-08-30T09:32:50Z";
+export const READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES = [
+	"提案:",
+	"理由:",
+	"前提を外した対案:",
+	"対案を採らない理由:",
+];
+export const LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES = [
 	"前提:",
 	"否定案:",
 	"却下理由:",
 ];
+// Kept for callers that build a legacy record without its comment timestamp.
+export const DESIGN_RECORD_REQUIRED_PREFIXES =
+	LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES;
 export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
 
 // #768: a design-selection record can settle on not implementing at all (the
@@ -790,14 +800,52 @@ export function lineHeadPattern(prefix) {
  * Serves both the content verdict and the record's identification, so the two
  * cannot disagree about what counts as a required line.
  * @param {string} recordBody
- * @returns {string[]} a subset of DESIGN_RECORD_REQUIRED_PREFIXES
+ * @param {string[]} requiredPrefixes
+ * @returns {string[]} a subset of requiredPrefixes
  */
-export function presentRequiredPrefixes(recordBody) {
+function presentPrefixes(recordBody, requiredPrefixes) {
 	const lines = (recordBody ?? "").split("\n").map(normalizeRecordLine);
-	return DESIGN_RECORD_REQUIRED_PREFIXES.filter((prefix) => {
+	return requiredPrefixes.filter((prefix) => {
 		const pattern = lineHeadPattern(prefix);
 		return lines.some((line) => pattern.test(line));
 	});
+}
+
+/**
+ * Required line heads for a comment. A reader-first line is always reader-first;
+ * legacy-only records are accepted only when their server timestamp predates the
+ * format cutoff. A missing timestamp preserves the legacy pure-function caller
+ * contract; comment entries always carry their timestamp.
+ * @param {{body?: string, createdAt?: string}} record
+ * @returns {string[]}
+ */
+export function resolveDesignRecordRequiredPrefixes({ body, createdAt }) {
+	if (
+		presentPrefixes(body, READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES).length >
+		0
+	)
+		return READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES;
+	if (
+		!createdAt ||
+		new Date(createdAt).getTime() <
+			new Date(DESIGN_RECORD_FORMAT_CUTOFF).getTime()
+	)
+		return LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES;
+	return READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES;
+}
+
+/**
+ * Which of this record's required line heads it carries, in canonical order.
+ * @param {string} recordBody
+ * @param {string} [createdAt]
+ * @returns {string[]}
+ */
+export function presentRequiredPrefixes(recordBody, createdAt) {
+	const requiredPrefixes = resolveDesignRecordRequiredPrefixes({
+		body: recordBody,
+		createdAt,
+	});
+	return presentPrefixes(recordBody, requiredPrefixes);
 }
 
 const NO_IMPLEMENTATION_LINE_HEAD_PATTERN = lineHeadPattern(
@@ -858,23 +906,33 @@ export function toDesignRecordEntries({ comments }) {
  * Identified by its own required line heads rather than by any external
  * marker — nothing else has to agree on which entry the record is.
  *
- * Most matches wins rather than first match. Measured over this repo's issues,
- * bodies carry a stray required line head often enough that a first-match
- * search would elect the body and never examine the real record in a comment —
- * a check aimed at the wrong text, which reads exactly like a check that ran.
+ * Reader-first candidates take precedence over grandfathered legacy candidates.
+ * Within either format, most matches wins rather than first match. Measured over
+ * this repo's issues, bodies carry a stray required line head often enough that
+ * a first-match search would elect the body and never examine the real record in
+ * a comment — a check aimed at the wrong text, which reads exactly like a check
+ * that ran.
  * @param {Array<{author?: string, body?: string, createdAt?: string}>} entries
  */
 export function selectDesignRecord(entries) {
-	let best;
-	let bestCount = 0;
+	let readerFirstBest;
+	let readerFirstBestCount = 0;
+	let legacyBest;
+	let legacyBestCount = 0;
 	for (const entry of entries ?? []) {
-		const count = presentRequiredPrefixes(entry.body).length;
-		if (count > bestCount) {
-			best = entry;
-			bestCount = count;
+		const requiredPrefixes = resolveDesignRecordRequiredPrefixes(entry);
+		const count = presentPrefixes(entry.body, requiredPrefixes).length;
+		if (requiredPrefixes === READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES) {
+			if (count > readerFirstBestCount) {
+				readerFirstBest = entry;
+				readerFirstBestCount = count;
+			}
+		} else if (count > legacyBestCount) {
+			legacyBest = entry;
+			legacyBestCount = count;
 		}
 	}
-	return best;
+	return readerFirstBest ?? legacyBest;
 }
 
 const NUMBERED_DISPOSITION_LINE_PATTERN = new RegExp(
@@ -912,10 +970,18 @@ function numberedDispositionDeclarations(body) {
  * @param {number} optionCount
  * @returns {{status: 'PASS'|'FAIL', detail?: string}}
  */
-export function classifyDesignRecordContent(recordBody, optionCount) {
+export function classifyDesignRecordContent(
+	recordBody,
+	optionCount,
+	createdAt,
+) {
 	const body = recordBody ?? "";
-	const present = presentRequiredPrefixes(body);
-	const missing = DESIGN_RECORD_REQUIRED_PREFIXES.filter(
+	const requiredPrefixes = resolveDesignRecordRequiredPrefixes({
+		body,
+		createdAt,
+	});
+	const present = presentPrefixes(body, requiredPrefixes);
+	const missing = requiredPrefixes.filter(
 		(prefix) => !present.includes(prefix),
 	);
 

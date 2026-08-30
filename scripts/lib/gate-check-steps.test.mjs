@@ -373,6 +373,12 @@ describe("designRecordStep", () => {
 		"却下理由: z",
 		"決定: 案A を採用する。",
 	].join("\n");
+	const readerFirstRecordBody = [
+		"提案: x",
+		"理由: y",
+		"前提を外した対案: z",
+		"対案を採らない理由: owner constraint",
+	].join("\n");
 
 	it("SKIPs when no --issue given", () => {
 		const { exec, calls } = fakeExec();
@@ -481,6 +487,31 @@ describe("designRecordStep", () => {
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /after the first commit/);
+	});
+
+	it("uses the selected reader-first record timestamp for timing over a legacy record", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-08-30T09:32:50Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				body: "普通の説明文。",
+				comments: [
+					{
+						body: validRecordBody,
+						createdAt: "2026-08-30T09:32:49Z",
+					},
+					{
+						body: readerFirstRecordBody,
+						createdAt: "2026-08-30T09:32:51Z",
+					},
+				],
+			}),
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /2026-08-30T09:32:51Z/);
 	});
 
 	// #737 案1: content deficiency no longer decides the row — only timing
