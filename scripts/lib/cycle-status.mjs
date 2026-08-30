@@ -4,7 +4,9 @@
  */
 
 import {
+	classifyDesignRecordRequiredFormat,
 	DISPOSITION_TOKENS,
+	isValidDesignRecordTimestamp,
 	NO_IMPLEMENTATION_TOKEN,
 	presentRequiredPrefixes,
 	READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
@@ -317,7 +319,14 @@ export function classifyDesignSettlement({ body, createdAt, comments }) {
 		const missingPrefixes = resolveDesignRecordRequiredPrefixes(record).filter(
 			(prefix) => !present.includes(prefix),
 		);
-		if (missingPrefixes.length === 0) {
+		const requiredFormat = classifyDesignRecordRequiredFormat(
+			record.body,
+			record.createdAt,
+		);
+		if (
+			isValidDesignRecordTimestamp(record.createdAt) &&
+			requiredFormat.status === "PASS"
+		) {
 			return {
 				unsettled: false,
 				reason: "record-posted",

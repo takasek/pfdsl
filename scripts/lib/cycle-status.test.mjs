@@ -336,6 +336,57 @@ describe("classifyDesignSettlement", () => {
 		assert.equal(result.recordRequired, false);
 	});
 
+	it("reports reader-first required lines in reverse order as incomplete", () => {
+		const result = classifyDesignSettlement({
+			body: "普通の説明文。",
+			comments: [
+				{
+					body: "対案を採らない理由: w\n前提を外した対案: z\n理由: y\n提案: x",
+					createdAt: "2026-08-30T09:32:50Z",
+				},
+			],
+		});
+		assert.equal(result.unsettled, true);
+		assert.equal(result.reason, "record-incomplete");
+		assert.equal(result.recordRequired, true);
+	});
+
+	it("keeps a complete grandfathered record settled when a later reader-first fragment exists", () => {
+		const result = classifyDesignSettlement({
+			body: "普通の説明文。",
+			comments: [
+				{
+					body: "前提: x\n否定案: y\n却下理由: z",
+					createdAt: "2026-08-30T09:32:49Z",
+				},
+				{ body: "理由: progress", createdAt: "2026-08-30T09:32:51Z" },
+			],
+		});
+		assert.equal(result.unsettled, false);
+		assert.equal(result.reason, "record-posted");
+		assert.deepEqual(result.record, { createdAt: "2026-08-30T09:32:49Z" });
+	});
+
+	for (const [label, createdAt] of [
+		["missing", undefined],
+		["malformed", "not-an-iso-timestamp"],
+	]) {
+		it(`reports a complete comment with a ${label} timestamp as incomplete`, () => {
+			const result = classifyDesignSettlement({
+				body: "普通の説明文。",
+				comments: [
+					{
+						body: "提案: x\n理由: y\n前提を外した対案: z\n対案を採らない理由: w",
+						createdAt,
+					},
+				],
+			});
+			assert.equal(result.unsettled, true);
+			assert.equal(result.reason, "record-incomplete");
+			assert.equal(result.recordRequired, true);
+		});
+	}
+
 	it("reports reader-first prefixes missing from a post-cutoff legacy record", () => {
 		const result = classifyDesignSettlement({
 			body: "## 対応案\n1. 案A\n2. 案B\n",

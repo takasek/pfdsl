@@ -660,7 +660,7 @@ export function resolveRecordEditedAt(record, editInfo) {
  * the "機械が守らない範囲" human review already owns.
  * @param {string | null | undefined} recordIso - createdAt of the record comment.
  * @param {string | null | undefined} firstCommitIso - authorDate of the range's first commit.
- * @param {{editedAtIso?: string | null, noImplementation?: boolean}} [options]
+ * @param {{editedAtIso?: string | null, noImplementation?: boolean, recordPresent?: boolean}} [options]
  *   - editedAtIso: the record's own lastEditedAt (#737 案2), or null/undefined
  *     when it was never edited or edit history could not be read.
  *   - noImplementation: the record itself declared no implementation (#768) —
@@ -673,15 +673,28 @@ export function resolveRecordEditedAt(record, editInfo) {
  *     retroactive record, and #824's forgeability tradeoff for this
  *     disposition assumes a reviewer can see that evidence rather than have
  *     it silently dropped (review A-1).
+ *   - recordPresent: distinguishes an elected comment with a missing createdAt
+ *     from the ordinary no-record call, while leaving the timestamp-free pure
+ *     function API backward-compatible.
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
 export function classifyDesignRecordTiming(
 	recordIso,
 	firstCommitIso,
-	{ editedAtIso, noImplementation } = {},
+	{ editedAtIso, noImplementation, recordPresent = false } = {},
 ) {
 	if (!recordIso)
-		return { status: "FAIL", detail: "no design-selection record found" };
+		return recordPresent
+			? {
+					status: "FAIL",
+					detail: "missing design-selection record timestamp",
+				}
+			: { status: "FAIL", detail: "no design-selection record found" };
+	if (!isValidDesignRecordTimestamp(recordIso))
+		return {
+			status: "FAIL",
+			detail: `invalid design-selection record timestamp: ${recordIso}`,
+		};
 	if (noImplementation) {
 		const postedAfterFirstCommit =
 			firstCommitIso &&
@@ -729,6 +742,21 @@ export const LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES = [
 export const DESIGN_RECORD_REQUIRED_PREFIXES =
 	LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES;
 export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
+
+/**
+ * Whether a comment timestamp can safely decide both migration format and
+ * record/commit ordering. GitHub supplies ISO timestamps, but finite parsing is
+ * the actual property every comparison below relies on.
+ * @param {unknown} timestamp
+ * @returns {boolean}
+ */
+export function isValidDesignRecordTimestamp(timestamp) {
+	return (
+		typeof timestamp === "string" &&
+		timestamp.length > 0 &&
+		Number.isFinite(new Date(timestamp).getTime())
+	);
+}
 
 // #768: a design-selection record can settle on not implementing at all (the
 // #757 shape — the decision led elsewhere, and any commits later found in
@@ -812,6 +840,21 @@ function presentPrefixes(recordBody, requiredPrefixes) {
 }
 
 /**
+ * The normalized first line index of every required prefix. First occurrences
+ * matter because a misplaced declaration is not repaired by repeating it later.
+ * @param {string} recordBody
+ * @param {string[]} requiredPrefixes
+ * @returns {number[]}
+ */
+function firstPrefixIndexes(recordBody, requiredPrefixes) {
+	const lines = (recordBody ?? "").split("\n").map(normalizeRecordLine);
+	return requiredPrefixes.map((prefix) => {
+		const pattern = lineHeadPattern(prefix);
+		return lines.findIndex((line) => pattern.test(line));
+	});
+}
+
+/**
  * Required line heads for a comment. A reader-first line is always reader-first;
  * legacy-only records are accepted only when their server timestamp predates the
  * format cutoff. A missing timestamp preserves the legacy pure-function caller
@@ -846,6 +889,40 @@ export function presentRequiredPrefixes(recordBody, createdAt) {
 		createdAt,
 	});
 	return presentPrefixes(recordBody, requiredPrefixes);
+}
+
+/**
+ * Classify only the required record format. Disposition semantics stay in
+ * classifyDesignRecordContent so the terminal step can keep those advisory
+ * without weakening format recognition.
+ * @param {string} recordBody
+ * @param {string} [createdAt]
+ * @returns {{status: 'PASS'|'FAIL', detail?: string}}
+ */
+export function classifyDesignRecordRequiredFormat(recordBody, createdAt) {
+	const body = recordBody ?? "";
+	const requiredPrefixes = resolveDesignRecordRequiredPrefixes({
+		body,
+		createdAt,
+	});
+	const indexes = firstPrefixIndexes(body, requiredPrefixes);
+	const missing = requiredPrefixes.filter((_, index) => indexes[index] < 0);
+	const problems = [];
+	if (missing.length > 0)
+		problems.push(`missing required line(s): ${missing.join(", ")}`);
+	if (
+		missing.length === 0 &&
+		requiredPrefixes === READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES &&
+		indexes.some(
+			(index, position) => position > 0 && index <= indexes[position - 1],
+		)
+	)
+		problems.push(
+			`required lines must appear in canonical order: ${requiredPrefixes.join(" ")}`,
+		);
+	return problems.length > 0
+		? { status: "FAIL", detail: problems.join("; ") }
+		: { status: "PASS" };
 }
 
 const NO_IMPLEMENTATION_LINE_HEAD_PATTERN = lineHeadPattern(
@@ -906,13 +983,17 @@ export function toDesignRecordEntries({ comments }) {
  * Identified by its own required line heads rather than by any external
  * marker — nothing else has to agree on which entry the record is.
  *
- * Reader-first candidates take precedence over legacy-shaped candidates.
- * A post-cutoff legacy-shaped candidate remains selectable so classification can report its missing reader-first prefixes.
- * Within either format, most matches wins rather than first match.
+ * A complete, ordered reader-first record takes precedence over a complete
+ * grandfathered legacy record. Incomplete or timestamp-invalid fragments are
+ * considered only when neither valid record exists, so they remain selectable
+ * for diagnostics without shadowing a valid record. Within either diagnostic
+ * format, most matches wins rather than first match.
  * Measured over this repo's issues, bodies carry a stray required line head often enough that a first-match search would elect the body and never examine the real record in a comment — a check aimed at the wrong text, which reads exactly like a check that ran.
  * @param {Array<{author?: string, body?: string, createdAt?: string}>} entries
  */
 export function selectDesignRecord(entries) {
+	let completeReaderFirst;
+	let completeLegacy;
 	let readerFirstBest;
 	let readerFirstBestCount = 0;
 	let legacyBest;
@@ -926,6 +1007,25 @@ export function selectDesignRecord(entries) {
 			entry.body,
 			LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES,
 		).length;
+		const timestampValid = isValidDesignRecordTimestamp(entry.createdAt);
+		if (
+			!completeReaderFirst &&
+			timestampValid &&
+			readerFirstCount ===
+				READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES.length &&
+			classifyDesignRecordRequiredFormat(entry.body, entry.createdAt).status ===
+				"PASS"
+		)
+			completeReaderFirst = entry;
+		if (
+			!completeLegacy &&
+			timestampValid &&
+			readerFirstCount === 0 &&
+			legacyCount === LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES.length &&
+			new Date(entry.createdAt).getTime() <
+				new Date(DESIGN_RECORD_FORMAT_CUTOFF).getTime()
+		)
+			completeLegacy = entry;
 		if (readerFirstCount > 0) {
 			if (readerFirstCount > readerFirstBestCount) {
 				readerFirstBest = entry;
@@ -936,7 +1036,7 @@ export function selectDesignRecord(entries) {
 			legacyBestCount = legacyCount;
 		}
 	}
-	return readerFirstBest ?? legacyBest;
+	return completeReaderFirst ?? completeLegacy ?? readerFirstBest ?? legacyBest;
 }
 
 const NUMBERED_DISPOSITION_LINE_PATTERN = new RegExp(
@@ -980,18 +1080,9 @@ export function classifyDesignRecordContent(
 	createdAt,
 ) {
 	const body = recordBody ?? "";
-	const requiredPrefixes = resolveDesignRecordRequiredPrefixes({
-		body,
-		createdAt,
-	});
-	const present = presentPrefixes(body, requiredPrefixes);
-	const missing = requiredPrefixes.filter(
-		(prefix) => !present.includes(prefix),
-	);
-
 	const problems = [];
-	if (missing.length > 0)
-		problems.push(`missing required line(s): ${missing.join(", ")}`);
+	const requiredFormat = classifyDesignRecordRequiredFormat(body, createdAt);
+	if (requiredFormat.status === "FAIL") problems.push(requiredFormat.detail);
 
 	if (optionCount > 0) {
 		const declarations = numberedDispositionDeclarations(body);

@@ -967,6 +967,15 @@ describe("classifyDesignRecordTiming", () => {
 		);
 		assert.equal(result.status, "PASS");
 	});
+
+	it("FAILs when the record timestamp is malformed", () => {
+		const result = classifyDesignRecordTiming(
+			"not-an-iso-timestamp",
+			"2026-07-30T12:00:00Z",
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /invalid design-selection record timestamp/);
+	});
 });
 
 describe("classifyDesignRecordContent", () => {
@@ -1263,6 +1272,22 @@ describe("versioned design-record format", () => {
 		);
 	});
 
+	it("rejects reader-first required lines whose normalized first occurrences are out of order", () => {
+		const reversed = [
+			"対案を採らない理由: owner constraint",
+			"前提を外した対案: z",
+			"理由: y",
+			"提案: x",
+		].join("\n");
+		const result = classifyDesignRecordContent(
+			reversed,
+			0,
+			"2026-08-30T09:32:51Z",
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /canonical order/);
+	});
+
 	it("rejects a complete legacy record at the cutoff", () => {
 		assert.equal(
 			classifyDesignRecordContent(legacy, 0, "2026-08-30T09:32:49Z").status,
@@ -1277,7 +1302,7 @@ describe("versioned design-record format", () => {
 		assert.match(result.detail, /提案:/);
 	});
 
-	it("selects a reader-first candidate over a legacy candidate", () => {
+	it("does not let an incomplete reader-first fragment shadow a complete grandfathered record", () => {
 		const incompleteReaderFirst = "提案: x";
 		const selected = selectDesignRecord([
 			{ body: legacy, createdAt: "2026-08-30T09:32:49Z" },
@@ -1286,7 +1311,7 @@ describe("versioned design-record format", () => {
 				createdAt: "2026-08-30T09:32:51Z",
 			},
 		]);
-		assert.equal(selected?.body, incompleteReaderFirst);
+		assert.equal(selected?.body, legacy);
 	});
 
 	it("selects a post-cutoff legacy-shaped record so reader-first missing prefixes are reported", () => {

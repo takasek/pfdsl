@@ -17,6 +17,7 @@ import { RECORD_SEP } from "./commit-trailers.mjs";
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
 	classifyDesignRecordContent,
+	classifyDesignRecordRequiredFormat,
 	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
@@ -344,20 +345,24 @@ export function designRecordStep({
 	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso, {
 		editedAtIso,
 		noImplementation,
+		recordPresent: true,
 	});
-	// #737 案1: content structure (required line heads, disposition-token
-	// coverage) is report material, not a judge — only timing decides the row.
-	// Real repro over this repo's history: 0 true positives, 3 false positives
-	// for content, against timing's 3 true / 0 false. classifyDesignRecordContent
-	// still runs every time and its finding still prints, prefixed WARN so a
-	// reader can tell it apart from a timing detail sharing the same line.
+	const requiredFormat = classifyDesignRecordRequiredFormat(
+		record.body,
+		record.createdAt,
+	);
+	// #737 案1 remains advisory for disposition semantics. Required line
+	// completeness and reader-first order define whether the comment is a record
+	// at all, so those format failures block independently of timing.
 	const content = classifyDesignRecordContent(
 		record.body,
 		optionCount,
 		record.createdAt,
 	);
 	const contentDetail =
-		content.status === "FAIL" ? `WARN: ${content.detail}` : undefined;
+		requiredFormat.status === "PASS" && content.status === "FAIL"
+			? `WARN: ${content.detail}`
+			: undefined;
 	// The edit note is only worth printing once timing actually reached the
 	// stage where an edit could have mattered — a SKIP already means nothing
 	// was compared, so noting missing edit history there would read as a
@@ -366,11 +371,16 @@ export function designRecordStep({
 		[
 			timing.detail,
 			timing.status === "SKIP" ? undefined : editNote,
+			requiredFormat.status === "FAIL" ? requiredFormat.detail : undefined,
 			contentDetail,
 		]
 			.filter(Boolean)
 			.join("; ") || undefined;
-	return { name, status: timing.status, detail };
+	return {
+		name,
+		status: requiredFormat.status === "FAIL" ? "FAIL" : timing.status,
+		detail,
+	};
 }
 
 /**

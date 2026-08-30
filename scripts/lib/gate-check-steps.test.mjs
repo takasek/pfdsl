@@ -514,13 +514,33 @@ describe("designRecordStep", () => {
 		assert.match(result.detail, /2026-08-30T09:32:51Z/);
 	});
 
-	// #737 案1: content deficiency no longer decides the row — only timing
-	// does. A content-deficient record still PASSes when its timing is clean,
-	// with the deficiency printed as a WARN so it stays legible, distinct from
-	// a timing FAIL sharing the same detail string.
-	it("PASSes a content-deficient record whose timing is clean, with the deficiency reported as WARN", () => {
+	// #737 案1 remains advisory for semantic/disposition deficiencies. Required
+	// format completeness is a separate recognition contract and blocks below.
+	it("PASSes a disposition-deficient record whose timing and required format are valid, with the deficiency reported as WARN", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				body: "## 対応案\n1. 案A\n2. 案B\n",
+				comments: [
+					{
+						author: { login: "owner" },
+						body: validRecordBody,
+						createdAt: "2026-07-01T00:00:00Z",
+					},
+				],
+			}),
+		});
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /WARN:.*numbered disposition/);
+	});
+
+	it("FAILs an incomplete post-cutoff reader-first record even when its timing is clean", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-08-30T10:00:00Z\n" },
 		});
 		const result = designRecordStep({
 			exec,
@@ -529,16 +549,57 @@ describe("designRecordStep", () => {
 				body: "普通の説明文。",
 				comments: [
 					{
-						author: { login: "owner" },
-						body: "前提: x",
-						createdAt: "2026-07-01T00:00:00Z",
+						body: "提案: x",
+						createdAt: "2026-08-30T09:32:51Z",
 					},
 				],
 			}),
 		});
-		assert.equal(result.status, "PASS");
-		assert.match(result.detail, /WARN:.*missing required line/);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /missing required line/);
 	});
+
+	it("FAILs a post-cutoff reader-first record whose required lines are reversed", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-08-30T10:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue({
+				body: "普通の説明文。",
+				comments: [
+					{
+						body: readerFirstRecordBody.split("\n").reverse().join("\n"),
+						createdAt: "2026-08-30T09:32:51Z",
+					},
+				],
+			}),
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /canonical order/);
+	});
+
+	for (const [label, createdAt] of [
+		["missing", undefined],
+		["malformed", "not-an-iso-timestamp"],
+	]) {
+		it(`FAILs a complete comment with a ${label} timestamp`, () => {
+			const { exec } = fakeExec({
+				"git log --format=%aI": { out: "2026-08-30T10:00:00Z\n" },
+			});
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				issue: issue({
+					body: "普通の説明文。",
+					comments: [{ body: readerFirstRecordBody, createdAt }],
+				}),
+			});
+			assert.equal(result.status, "FAIL");
+			assert.match(result.detail, /design-selection record timestamp/);
+		});
+	}
 
 	it("identifies the record by its required line heads, with no 決定 line present", () => {
 		const { exec } = fakeExec({

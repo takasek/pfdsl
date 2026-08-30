@@ -442,6 +442,62 @@ describe("runCycleStatus", () => {
 		]);
 	});
 
+	it("keeps reversed reader-first lines unsettled in the reported classification", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({
+							body: "普通の説明文。",
+							comments: [
+								{
+									body: "対案を採らない理由: w\n前提を外した対案: z\n理由: y\n提案: x",
+									createdAt: "2026-08-30T09:32:50Z",
+								},
+							],
+						});
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
+		assert.equal(result.designUnsettledFor[0].recordRequired, true);
+	});
+
+	it("keeps a malformed comment timestamp unsettled in the reported classification", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({
+							body: "普通の説明文。",
+							comments: [
+								{
+									body: "提案: x\n理由: y\n前提を外した対案: z\n対案を採らない理由: w",
+									createdAt: "not-an-iso-timestamp",
+								},
+							],
+						});
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
+		assert.equal(result.designUnsettledFor[0].recordRequired, true);
+	});
+
 	it("resolves the target issue from the best process when --issue is absent", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
