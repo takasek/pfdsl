@@ -146,7 +146,7 @@ artifact:
     group: gen_sources
   review_perspectives:
     label: レビュー観点集
-    description: "workflow.pfdsl の distill_ops が生産する。pfdsl スキルに references として同梱される"
+    description: "workflow.pfdsl の maintain_review_perspectives が生産する。pfdsl スキルに references として同梱される"
     location: ../docs/review-perspectives.md
     group: gen_sources
   roadmap_pfdsl:
@@ -216,7 +216,7 @@ artifact:
     tags: [ c, gen ]
   ops_install_templates:
     label: pfd-ops 採用テンプレート（install/）
-    description: "採用リポへ配置されるテンプレート一式。make gen-installがrepoルートのソースから一方向で再生成する生成物であり手編集しない。内容の一次情報はworkflow.pfdslのops_install_sources"
+    description: "採用リポへ配置されるテンプレート一式。make gen-installがrepoルートのソースから一方向で再生成する生成物であり手編集しない。内容の一次情報はpipeline.pfdslのops_install_sources"
     criteria: repo ルートのソースから make gen-install で再生成でき、check-pfd-ops-sync.yml が生成物一致と identity の両方で通過する
     location: ../.claude/skills/pfd-ops/install/
     group: repo_generated
