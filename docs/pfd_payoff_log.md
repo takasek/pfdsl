@@ -4,6 +4,12 @@ PFD が効果を発揮した局面の事例ログ。体感した時点で追記�
 
 追記の判定（ADR-0014）: 反実仮想テスト「依存グラフ／プロセス分解がなければこの判断・作業は違っていたか」を満たし、違いを1行で引用できる時のみ書く。引用できなければ書かない（後付けの捏造を排除する）。
 
+## 2026-08-30 PFD の location 対応が workflow 契約の同期漏れを防ぐ
+
+- 局面: PR #1077 の終端ゲートが `.github/workflows/pr-diff-images.yml` を `workflow.pfdsl` の `merge_pr` に対応付け、`pr_diagrams` の契約更新を同じ PR に要求した
+- 効果: コードと workflow だけなら base 非互換時の部分生成と同一 PR 再実行時の置換を PFD に反映しないまま完了していた。ADR-0014 反実仮想: `location:` による変換コンポーネントの対応がなければ、終端ゲートは構造同期の対象を示せず、retro で見つかった criteria と到達情報の不足も監査対象にならなかった
+- 参照: PR #1077、issue #1066、`workflow.pfdsl` の `merge_pr` / `pr_diagrams`
+
 ## 2026-08-29 A/B 監査が plugin 配送経路の不一致を後続作業へ変換
 
 - 局面: PR #1025 の pfd-retro で runtime-pipeline PFD を A/B 観点から監査し、plugin 配送経路のモデルと実体の不一致を検出した
