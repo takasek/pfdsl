@@ -425,7 +425,7 @@ process:
     group: generation
     tags: [ knowledge_maintenance ]
   maintain_repo_bindings:
-    label: repo binding・guard整備
+    label: repo binding・guard・companion整備
     description: >
       decisions が指名した repo-local な binding・guard・companion の正本を改訂する。
       prose_mechanization_sweep_record の散文・機構矛盾、retro_pattern_sweep_record の滞留、retro_findings の運用実態との不一致を binding 文言・guard 規則・説明へ反映する。

@@ -84,7 +84,7 @@ Once human decisions have been applied to durable repository artifacts, intermed
 
 The broad `distill_ops`, `distill_local_skills`, and `externalize_bindings` processes are removed. An earlier revision of this design replaced them with 21 per-asset maintenance processes, one for each canonical output. That split did not hold: every one of the 21 had `decisions` as its only normal input, so no process had a statically visible target-specific driver, and the routing of a decision to its target existed only as prose telling each process to ignore decisions aimed elsewhere. A graph whose 21 causal edges are all identical does not model dispatch; it models one transformation drawn 21 times, and its node list doubles as a copy of the plugin's distribution membership.
 
-The maintenance side is therefore modeled by the boundary that actually exists: a human-authorized change instruction revises a canonical asset. Three processes carry it, split where the revision and validation procedure genuinely differs:
+The maintenance side is therefore modeled by the boundary that actually exists: a human-authorized change instruction revises a canonical asset. Three processes carry it, split where the revision and validation procedure genuinely differs. The table below states the intended split; the current membership of each process is read from `workflow.pfdsl`, which is its primary source.
 
 | Process | Outputs |
 |---|---|
