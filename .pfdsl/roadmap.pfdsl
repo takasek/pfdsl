@@ -346,7 +346,7 @@ artifact:
   reader_first_design_records:
     label: 採用案から読める設計選択記録 (#1076)
     description: pfd-ops の対話と公開記録を提案・理由・前提を外した対案・対案を採らない理由の順に揃え、旧形式の既存記録を移行互換で読める状態
-    status: wip
+    status: done
     criteria: cycle-status が reader-first な記録テンプレートを出力し、gate-check が移行後の新形式と移行前の旧形式を時点で区別して検査するテストが通る
     location: [ ../.claude/skills/pfd-ops/references/work-cycle.md, ../scripts/lib/cycle-status.mjs, ../scripts/lib/gate-check.mjs ]
   mint_check_tool:
@@ -641,7 +641,7 @@ process:
     label: 設計選択記録を reader-first 化
     description: 比較対象を生成する規律と着手前の公開記録を維持したまま、対話・tracker 記録・機械 gate の項目と順序を reader-first な契約へ移行する
     location: https://github.com/takasek/pfdsl/issues/1076
-    updated_at: 2026-08-30T09:25:32Z
+    updated_at: 2026-08-30T09:32:49Z
   i480_relax_incomplete_graph:
     label: 書き途中許容実装
     location: https://github.com/takasek/pfdsl/issues/480
