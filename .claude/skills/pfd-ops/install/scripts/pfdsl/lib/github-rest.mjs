@@ -636,6 +636,7 @@ async function fetchCiRollupForSha(
  * @param {string} repo
  * @param {string} token
  * @param {typeof fetch} [fetchImpl]
+ * @param {number} [limit]
  * @returns {Promise<Array<{number: number, title: string, headRefName: string, statusCheckRollup: {conclusion: string|null}[]}>>}
  */
 export async function fetchOpenPrsWithCi(
@@ -643,13 +644,16 @@ export async function fetchOpenPrsWithCi(
 	repo,
 	token,
 	fetchImpl = proxyAwareFetch,
+	limit = Number.POSITIVE_INFINITY,
 ) {
-	const prs = await fetchAllPages(
-		fetchImpl,
-		(page) =>
-			`${API_ROOT}/repos/${owner}/${repo}/pulls?state=open&per_page=${PER_PAGE}&page=${page}`,
-		token,
-	);
+	const prs = (
+		await fetchAllPages(
+			fetchImpl,
+			(page) =>
+				`${API_ROOT}/repos/${owner}/${repo}/pulls?state=open&per_page=${PER_PAGE}&page=${page}`,
+			token,
+		)
+	).slice(0, limit);
 	return Promise.all(
 		prs.map(async (pr) => ({
 			number: pr.number,

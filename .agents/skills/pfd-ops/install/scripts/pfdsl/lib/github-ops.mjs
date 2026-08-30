@@ -1,9 +1,12 @@
 // DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/lib/github-ops.mjs.
 /**
- * Named GitHub operations: the sole entry point production scripts use to
- * reach GitHub. Each operation has a gh-CLI implementation and an HTTP
- * (REST/GraphQL) implementation, and both return the same parsed JS value —
- * callers never JSON.parse the result themselves.
+ * Named GitHub operations: the sole entry point for production calls that
+ * promise gh/HTTP fallback parity. Each fallback-supported operation has a
+ * gh-CLI implementation and an HTTP (REST/GraphQL) implementation, and both
+ * return the same parsed JS value — callers never JSON.parse the result
+ * themselves. Operations that enter through this module but cannot fall back
+ * fail under their own name. Production calls that intentionally require gh
+ * and make no fallback promise remain outside this module.
  *
  * Backend selection keeps the discipline execGh (gh-exec.mjs) always had:
  * try gh first; when it's missing (ENOENT) and a GH_TOKEN/GITHUB_TOKEN is
@@ -37,6 +40,7 @@ import { proxyAwareFetch } from "./proxy-fetch.mjs";
 // about a repo past the limit while the parity claim above still stood.
 const LABEL_LIST_LIMIT = 100;
 const ISSUE_LIST_LIMIT = 500;
+const PR_LIST_LIMIT = 30;
 
 /**
  * @param {string} cwd
@@ -252,11 +256,13 @@ export function createGitHubOps({
 						"open",
 						"--json",
 						"number,title,headRefName,statusCheckRollup",
+						"--limit",
+						String(PR_LIST_LIMIT),
 					]);
 					return JSON.parse(out);
 				},
 				({ owner, repo, token }) =>
-					fetchOpenPrsWithCi(owner, repo, token, fetchImpl),
+					fetchOpenPrsWithCi(owner, repo, token, fetchImpl, PR_LIST_LIMIT),
 			),
 
 		/**

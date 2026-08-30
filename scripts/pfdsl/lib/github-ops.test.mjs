@@ -241,6 +241,34 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		assert.deepEqual(ghResult, httpResult);
 	});
 
+	it("listOpenPrs: both backends stop at the same explicit limit", async () => {
+		const pr = (number) => ({
+			number,
+			title: `PR ${number}`,
+			headRefName: `branch-${number}`,
+			statusCheckRollup: [],
+		});
+		const ghRows = Array.from({ length: 30 }, (_, i) => pr(i + 1));
+		const restRows = Array.from({ length: 31 }, (_, i) => ({
+			number: i + 1,
+			title: `PR ${i + 1}`,
+			head: { ref: `branch-${i + 1}`, sha: `sha-${i + 1}` },
+		}));
+		const ghExec = stubExecGh({ "pr list": JSON.stringify(ghRows) });
+		const ghOps = createGitHubOps({ execGhImpl: ghExec });
+		const httpOps = createGitHubOps({
+			execGhImpl: stubExecGh({ "pr list": new Error("ENOENT") }),
+			fetchImpl: stubPagedFetch([restRows]),
+		});
+		const [ghResult, httpResult] = await Promise.all([
+			ghOps.listOpenPrs(),
+			httpOps.listOpenPrs(),
+		]);
+		assert.deepEqual(ghExec.calls[0].slice(-2), ["--limit", "30"]);
+		assert.equal(ghResult.length, 30);
+		assert.deepEqual(ghResult, httpResult);
+	});
+
 	it("addIssueLabel: both backends make the same call and return void", async () => {
 		const ghOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "issue edit": "" }),
