@@ -419,7 +419,7 @@ process:
     label: 配布プロンプト資産整備
     description: >
       decisions が指名した配布プロンプト資産の正本を改訂する。
-      どの正本が plugin に同梱されるかの一次情報は gen-plugin manifest と runtime_pipeline_pfdsl 側にあり、この工程が持つのは正本の整備責任だけである。
+      どの正本が plugin に同梱されるかの一次情報は gen-plugin manifest と pipeline_pfdsl 側にあり、この工程が持つのは正本の整備責任だけである。
       distribution_review_record の配布先で観測した詰まりと、retro_findings の対象固有の failure を各正本の文言・手順へ反映する。
       検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。
     group: generation
