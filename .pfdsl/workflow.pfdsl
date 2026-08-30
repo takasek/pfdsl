@@ -359,8 +359,8 @@ artifact:
     tags: [ distilled_doc ]
   pr_diagrams:
     label: PR差分ダイアグラム
-    description: "merged PR が .pfdsl を変更した際に CI（pr-diff-images.yml）が before/after/diff SVG を自動生成し takasek/ci-image-store へ push する。base revision を現行 CLI が受理できない場合は before/diff を省略し、after と診断コード・要約の注記を PR description に残す。PR ごとに蓄積し、同じ PR の再実行ではその PR の成果物一式を置換する"
-    criteria: PR マージ後に .github/workflows/pr-diff-images.yml が生成可能な SVG を ci-image-store へ push し、base revision が現行 CLI で受理されない場合も after SVG とサニタイズ済み診断注記が PR description に表示される
+    description: "merged PR が .pfdsl を変更した際に CI（pr-diff-images.yml）が before/after/diff SVG を自動生成し takasek/ci-image-store へ push する。base revision を現行 CLI が受理できない場合は before/diff を省略し、after と診断コード・要約の注記を PR description に残す。画像と診断 sidecar は pfdsl/pr-<PR番号>/<元の .pfdsl パスから拡張子を除いた相対パス>.{before.svg,after.svg,diff.svg,before-unavailable.txt} に置き、注記は対応する GitHub PR の pfdsl-diff-images marker 内に置く。PR ごとに蓄積し、同じ PR の再実行ではその PR の成果物一式を置換する"
+    criteria: PR マージ後に .github/workflows/pr-diff-images.yml が生成可能な SVG を ci-image-store へ push する。同じ PR の再実行では pfdsl/pr-<PR番号> の内容が今回の生成結果だけに置換され、不要になった before/diff が残らない。base revision が現行 CLI で受理されない場合も after SVG と before-unavailable.txt が push され、対応する PR description にサニタイズ済み診断注記が表示される
     location: https://github.com/takasek/ci-image-store
     group: release
   readme:
