@@ -50,6 +50,8 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 **`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`gh-exec.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では REST fallback へ落ちる（#489）。fallback が答えられる argv の形は `gh-compat.mjs` の `planGhRestCall` が持つものだけで、それ以外は `gh` 不在のエラーがそのまま出る。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、issue 本文の design-unsettled 判定は `issue_read`（`get`）で本文を読んで手動判定、`audit-issues-flow` 相当は対象 issue の `location:`・`updated_at:` を roadmap.pfdsl の記載と手動突合する。
 `gh-exec.mjs` の REST fallback は上のリポ内スクリプトが実際に出す限定的な argv の互換層であり、issue コメントや PR 本文の作成・編集を代行する汎用 GitHub write adapter ではない。
+fallback の transport は REST だけではない — `closingIssuesReferences` は REST の pull request payload に存在せず、GraphQL へ直接問い合わせる（#1043）。
+GitHub 側にしか無い読みを本文の正規表現で再構成すると、Development sidebar で手動リンクされた PR が「closing issue 0件」に見える。
 
 `gate-check.mjs` の per-issue 行が SKIP になるのは `gh` バイナリ不在のときだけで、それ以外の lookup 失敗（存在しない issue 番号・認証・ネットワーク・fallback の戻り形不一致）は実エラーを detail に出して FAIL する（#745）。「gh CLI unavailable」と出ていない SKIP は無い — 検査が走らなかった行を環境のせいと読み違える余地を残さないため。
 

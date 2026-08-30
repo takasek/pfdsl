@@ -355,7 +355,22 @@ describe("production fallback coverage discovery", () => {
 			const plan = planGhRestCall(shape.args);
 			globalThis.fetch = async (url) => {
 				let body;
-				if (url.includes("/comments?")) body = [];
+				// closingIssuesReferences has no REST endpoint — the fallback asks
+				// GraphQL for it (#1043), so the stub answers that endpoint too.
+				if (url.endsWith("/graphql"))
+					body = {
+						data: {
+							repository: {
+								pullRequest: {
+									closingIssuesReferences: {
+										nodes: [{ number: 612 }],
+										pageInfo: { hasNextPage: false, endCursor: null },
+									},
+								},
+							},
+						},
+					};
+				else if (url.includes("/comments?")) body = [];
 				else if (url.includes("/check-runs?")) body = { check_runs: [] };
 				else if (plan.op === "listLabels")
 					body = [{ name: "flow:exempt", description: "not tracked" }];

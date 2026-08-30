@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
 	fetchAllIssues,
 	fetchAllLabels,
+	fetchClosingIssueReferences,
 	fetchCurrentPrView,
 	fetchIssueView,
 	fetchOpenPrsWithCi,
@@ -696,20 +697,166 @@ describe("fetchCurrentPrView", () => {
 			/reviewDecision/,
 		);
 	});
+
+	// The branch lookup is what supplies the PR number the GraphQL query needs,
+	// so this form answers closing references too rather than refusing them.
+	it("answers closing issue references for the branch's PR", async () => {
+		const { fetchImpl, bodies } = graphqlStub([closingIssuesPage([99])], () =>
+			jsonResponse([prApi]),
+		);
+		const result = await fetchCurrentPrView(
+			"takasek",
+			"pfdsl",
+			"tok",
+			"feat/x",
+			["closingIssuesReferences"],
+			fetchImpl,
+		);
+		assert.deepEqual(result, { closingIssuesReferences: [{ number: 99 }] });
+		assert.equal(bodies[0].variables.number, 77);
+	});
+});
+
+/**
+ * A stub for the GraphQL endpoint: `pages` is the list of connection payloads
+ * to return in order, so a single-page answer is one entry. Any REST URL is
+ * delegated to `rest`, which defaults to refusing — a test that expects only
+ * GraphQL should fail loudly if a REST call sneaks in.
+ */
+function graphqlStub(pages, rest = undefined) {
+	const bodies = [];
+	const fetchImpl = async (url, init) => {
+		if (url.endsWith("/graphql")) {
+			bodies.push(JSON.parse(init.body));
+			const page = pages[bodies.length - 1];
+			if (!page) throw new Error(`unexpected extra GraphQL page request`);
+			return jsonResponse(page);
+		}
+		if (rest) return rest(url);
+		throw new Error(`unexpected REST url: ${url}`);
+	};
+	return { fetchImpl, bodies };
+}
+
+/** Wraps closing-issue numbers in the GraphQL connection payload's shape. */
+function closingIssuesPage(
+	numbers,
+	{ hasNextPage = false, endCursor = null } = {},
+) {
+	return {
+		data: {
+			repository: {
+				pullRequest: {
+					closingIssuesReferences: {
+						nodes: numbers.map((number) => ({ number })),
+						pageInfo: { hasNextPage, endCursor },
+					},
+				},
+			},
+		},
+	};
+}
+
+// GitHub's `PullRequest.closingIssuesReferences` includes issues linked by hand
+// through the Development sidebar, which appear nowhere in the PR body. The
+// body-regex reconstruction this replaced returned [] for those, and
+// check-closes-reference.mjs read that as "closes no issue" (#1043).
+describe("fetchClosingIssueReferences", () => {
+	it("returns the links GitHub reports for a PR whose body has no closing keyword", async () => {
+		const { fetchImpl, bodies } = graphqlStub([closingIssuesPage([99])]);
+		const refs = await fetchClosingIssueReferences(
+			"takasek",
+			"pfdsl",
+			"tok",
+			12,
+			fetchImpl,
+		);
+		assert.deepEqual(refs, [{ number: 99 }]);
+		assert.deepEqual(bodies[0].variables, {
+			owner: "takasek",
+			repo: "pfdsl",
+			number: 12,
+			cursor: null,
+		});
+	});
+
+	it("returns an empty list for a PR GitHub reports no links for", async () => {
+		const { fetchImpl } = graphqlStub([closingIssuesPage([])]);
+		assert.deepEqual(
+			await fetchClosingIssueReferences(
+				"takasek",
+				"pfdsl",
+				"tok",
+				12,
+				fetchImpl,
+			),
+			[],
+		);
+	});
+
+	it("follows the connection cursor to the last page", async () => {
+		const { fetchImpl, bodies } = graphqlStub([
+			closingIssuesPage([99], { hasNextPage: true, endCursor: "cur1" }),
+			closingIssuesPage([103]),
+		]);
+		assert.deepEqual(
+			await fetchClosingIssueReferences(
+				"takasek",
+				"pfdsl",
+				"tok",
+				12,
+				fetchImpl,
+			),
+			[{ number: 99 }, { number: 103 }],
+		);
+		assert.equal(bodies[1].variables.cursor, "cur1");
+	});
+
+	// A lookup that ran and failed must not read as "closes no issue" — that is
+	// the same #745 split every gh-backed lookup here draws.
+	// The observed shape for an unknown PR number: HTTP 200, `data` present,
+	// `pullRequest` null, and the reason only in `errors`.
+	it("throws on a GraphQL errors payload rather than reporting no links", async () => {
+		const { fetchImpl } = graphqlStub([
+			{
+				data: { repository: { pullRequest: null } },
+				errors: [
+					{
+						type: "NOT_FOUND",
+						message:
+							"Could not resolve to a PullRequest with the number of 12.",
+					},
+				],
+			},
+		]);
+		await assert.rejects(
+			fetchClosingIssueReferences("takasek", "pfdsl", "tok", 12, fetchImpl),
+			/Could not resolve to a PullRequest/,
+		);
+	});
+
+	it("throws when the response carries no pull request and no errors", async () => {
+		const { fetchImpl } = graphqlStub([{ data: { repository: null } }]);
+		await assert.rejects(
+			fetchClosingIssueReferences("takasek", "pfdsl", "tok", 12, fetchImpl),
+			/takasek\/pfdsl#12/,
+		);
+	});
 });
 
 describe("fetchPullRequestView", () => {
 	it("maps a numbered PR body and closing issue references to gh fields", async () => {
+		const { fetchImpl } = graphqlStub([closingIssuesPage([99])], (url) => {
+			assert.match(url, /\/pulls\/12$/);
+			return jsonResponse({ body: "Closes #99" });
+		});
 		const result = await fetchPullRequestView(
 			"takasek",
 			"pfdsl",
 			"tok",
 			12,
 			["body", "closingIssuesReferences"],
-			async (url) => {
-				assert.match(url, /\/pulls\/12$/);
-				return jsonResponse({ body: "Closes #99" });
-			},
+			fetchImpl,
 		);
 		assert.deepEqual(result, {
 			body: "Closes #99",
@@ -730,21 +877,52 @@ describe("fetchPullRequestView", () => {
 			/reviewDecision/,
 		);
 	});
+});
 
-	it("derives closing issue references from an ordinary REST PR body", async () => {
-		const result = await fetchPullRequestView(
-			"takasek",
-			"pfdsl",
-			"tok",
-			12,
-			["closingIssuesReferences"],
-			async () =>
-				jsonResponse({
-					body: "Closes #99\nCloses: #103\nCloses other/repo#100\n\n```\nCloses #101\n```\n> Fixes #102",
-				}),
-		);
-		assert.deepEqual(result, {
-			closingIssuesReferences: [{ number: 99 }, { number: 103 }],
+// Parity between the two backends, over the three ways a PR can be linked.
+// `gh pr view --json closingIssuesReferences` prints
+// `PullRequest.closingIssuesReferences` verbatim, so what parity asks of the
+// gh-less path is that it return the same field unaltered — the body it
+// happens to carry must not change the answer in either direction. The body
+// of each case is chosen to disagree with GitHub's reading, so a fallback
+// that consulted the body would produce a different count here (#1043).
+describe("closing-issue parity between the gh CLI and gh-less backends", () => {
+	const cases = [
+		{
+			name: "a closing keyword in the body",
+			body: "Closes #99\n> Fixes #102\n\n```\nCloses #101\n```",
+			github: [99],
+		},
+		{
+			name: "a manual link made through the Development sidebar",
+			body: "No closing keyword anywhere in this body.",
+			github: [99],
+		},
+		{
+			name: "no link at all",
+			body: "Closes #101 — but only inside this sentence, not as a link.",
+			github: [],
+		},
+	];
+
+	for (const { name, body, github } of cases) {
+		it(`reports GitHub's own count for ${name}`, async () => {
+			const { fetchImpl } = graphqlStub([closingIssuesPage(github)], () =>
+				jsonResponse({ body }),
+			);
+			const result = await fetchPullRequestView(
+				"takasek",
+				"pfdsl",
+				"tok",
+				12,
+				["body", "closingIssuesReferences"],
+				fetchImpl,
+			);
+			assert.deepEqual(
+				result.closingIssuesReferences,
+				github.map((number) => ({ number })),
+			);
+			assert.equal(result.body, body);
 		});
-	});
+	}
 });
