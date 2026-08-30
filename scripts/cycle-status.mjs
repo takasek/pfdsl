@@ -13,7 +13,7 @@ import {
 } from "./lib/cycle-status-steps.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
 import { run, tryRun } from "./lib/run-exec.mjs";
-import { execGh } from "./pfdsl/lib/gh-exec.mjs";
+import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -62,7 +62,7 @@ const shTry = (file, args) => tryRun(file, args, { cwd: root });
 const result = await runCycleStatus({
 	sh,
 	shTry,
-	execGh: (execArgs) => execGh(execArgs, { cwd: root }),
+	githubOps: createGitHubOps({ cwd: root }),
 	existsSync,
 	readFileSync,
 	readdirSync,

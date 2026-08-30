@@ -600,52 +600,6 @@ export function partitionManualItemsByPhase(manualItems) {
 }
 
 /**
- * The GraphQL query that reads a design-selection record's edit history
- * (#737 案2): the issue's own `lastEditedAt`, and every comment's, in one
- * round trip. REST's `updated_at` is not used — it moves on new comments
- * alone, so it is not evidence the record's own text changed. `gh issue view
- * --json comments` doesn't carry `lastEditedAt` at all (verified against a
- * live issue), which is why this goes through `gh api graphql` instead.
- * @param {{owner: string, repo: string, number: number}} params
- * @returns {string[]} argv for execGh
- */
-export function buildDesignRecordEditQuery({ owner, repo, number }) {
-	return [
-		"api",
-		"graphql",
-		"-F",
-		`owner=${owner}`,
-		"-F",
-		`repo=${repo}`,
-		"-F",
-		`number=${number}`,
-		"-f",
-		"query=query($owner:String!,$repo:String!,$number:Int!){ repository(owner:$owner,name:$repo){ issue(number:$number){ lastEditedAt comments(first:100){ totalCount nodes { id lastEditedAt } } } } } ",
-	];
-}
-
-/**
- * Parse `buildDesignRecordEditQuery`'s response into the shape
- * resolveRecordEditedAt reads.
- * @param {string} jsonText - execGh's stdout for the graphql call
- * @returns {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}}
- */
-export function parseDesignRecordEditResponse(jsonText) {
-	const issueData = JSON.parse(jsonText)?.data?.repository?.issue;
-	if (!issueData)
-		throw new Error(
-			"unexpected GraphQL response shape for design-record edit info",
-		);
-	return {
-		issueLastEditedAt: issueData.lastEditedAt ?? null,
-		comments: {
-			totalCount: issueData.comments.totalCount,
-			nodes: issueData.comments.nodes,
-		},
-	};
-}
-
-/**
  * The selected design-selection record's own `lastEditedAt` (#737 案2),
  * matched by id rather than by array position — `gh` and GraphQL are not
  * guaranteed to return comments in the same order, and a position-based

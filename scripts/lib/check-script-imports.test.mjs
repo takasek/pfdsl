@@ -10,6 +10,7 @@ import {
 	extractRelativeImports,
 	findBrokenImports,
 	findDistDependentFiles,
+	findGhExecImportBoundaryViolations,
 } from "./check-script-imports.mjs";
 
 describe("extractRelativeImports", () => {
@@ -319,5 +320,92 @@ describe("findDistDependentFiles", () => {
 			'import { readFileSync } from "node:fs";\nexport const x = 1;\n',
 		);
 		assert.deepEqual(findDistDependentFiles([f]), []);
+	});
+});
+
+describe("findGhExecImportBoundaryViolations", () => {
+	let tmp;
+
+	beforeEach(() => {
+		tmp = mkdtempSync(join(tmpdir(), "check-script-imports-ghexec-"));
+	});
+
+	afterEach(() => {
+		rmSync(tmp, { recursive: true, force: true });
+	});
+
+	function write(relPath, content) {
+		const full = join(tmp, ...relPath.split("/"));
+		mkdirSync(join(full, ".."), { recursive: true });
+		writeFileSync(full, content);
+		return full;
+	}
+
+	it("flags a file outside the allow-list that imports gh-exec.mjs relatively", () => {
+		const ghExecPath = write(
+			"lib/gh-exec.mjs",
+			"export const execGh = () => {};\n",
+		);
+		const violator = write(
+			"check-something.mjs",
+			'import { execGh } from "./lib/gh-exec.mjs";\n',
+		);
+		const violations = findGhExecImportBoundaryViolations([violator], {
+			ghExecPath,
+			allowed: [],
+		});
+		assert.deepEqual(violations, [
+			{ file: violator, specifier: "./lib/gh-exec.mjs" },
+		]);
+	});
+
+	it("does not flag the allow-listed importer", () => {
+		const ghExecPath = write(
+			"lib/gh-exec.mjs",
+			"export const execGh = () => {};\n",
+		);
+		const githubOps = write(
+			"lib/github-ops.mjs",
+			'import { execGh } from "./gh-exec.mjs";\n',
+		);
+		const violations = findGhExecImportBoundaryViolations([githubOps], {
+			ghExecPath,
+			allowed: [githubOps],
+		});
+		assert.deepEqual(violations, []);
+	});
+
+	it("does not flag a file with no gh-exec.mjs import at all", () => {
+		const ghExecPath = write(
+			"lib/gh-exec.mjs",
+			"export const execGh = () => {};\n",
+		);
+		const clean = write(
+			"clean.mjs",
+			'import { readFileSync } from "node:fs";\nexport const x = 1;\n',
+		);
+		assert.deepEqual(
+			findGhExecImportBoundaryViolations([clean], { ghExecPath, allowed: [] }),
+			[],
+		);
+	});
+
+	it("does not confuse a same-named file elsewhere in the tree with gh-exec.mjs itself", () => {
+		const ghExecPath = write(
+			"lib/gh-exec.mjs",
+			"export const execGh = () => {};\n",
+		);
+		write("other/gh-exec.mjs", "export const notTheRealOne = () => {};\n");
+		const importer = write(
+			"other/uses-local.mjs",
+			'import { notTheRealOne } from "./gh-exec.mjs";\n',
+		);
+		assert.deepEqual(
+			findGhExecImportBoundaryViolations([importer], {
+				ghExecPath,
+				allowed: [],
+			}),
+			[],
+		);
 	});
 });

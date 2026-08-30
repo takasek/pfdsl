@@ -56,10 +56,11 @@ import {
 } from "./lib/gate-check-steps.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
-import { execGh } from "./pfdsl/lib/gh-exec.mjs";
+import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
+const githubOps = createGitHubOps({ cwd: root });
 
 // strict parsing, not an indexOf sweep: a hand-rolled lookup drops the
 // --artifact=key form and any typo'd flag, and this script's response to a
@@ -265,7 +266,7 @@ results.push(commitSubjectStep({ exec, base }));
 const commitMessages = commitMessagesSince({ exec, base });
 
 // The linked issues, fetched once each for the two checks that read them.
-// execGh keeps the REST fallback that a bare `gh` call would lose in
+// githubOps keeps the REST fallback that a bare `gh` call would lose in
 // environments without the binary (#489/#492). Only that environment degrades
 // the issue's checks to SKIP — every other failure FAILs, because the check did
 // not run and a SKIP row is one nobody acts on (#745). Either way the other
@@ -273,20 +274,16 @@ const commitMessages = commitMessagesSince({ exec, base });
 const issues = [];
 for (const number of issueNumbers) {
 	try {
-		const issue = JSON.parse(
-			await execGh(
-				["issue", "view", String(number), "--json", "body,comments,createdAt"],
-				{ cwd: root },
-			),
-		);
+		const issue = await githubOps.viewIssue({
+			number,
+			fields: ["body", "comments", "createdAt"],
+		});
 		// The edit-history fetch (#737 案2) is a separate lookup from the one
 		// above and fails independently: a failure here only costs edit
 		// detection, never the row itself — timing still judges on createdAt
 		// alone, same as before this check existed.
 		const editInfo = await fetchDesignRecordEditInfo({
-			exec,
-			execGh,
-			cwd: root,
+			githubOps,
 			number,
 		}).catch(() => null);
 		issues.push({ number, issue, editInfo });

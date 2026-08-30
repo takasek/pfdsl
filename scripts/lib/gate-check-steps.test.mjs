@@ -321,95 +321,36 @@ describe("wipTransitionStep", () => {
 });
 
 describe("fetchDesignRecordEditInfo", () => {
-	const graphqlResponse = (overrides = {}) =>
-		JSON.stringify({
-			data: {
-				repository: {
-					issue: {
-						lastEditedAt: null,
-						comments: {
-							totalCount: 1,
-							nodes: [{ id: "c1", lastEditedAt: null }],
-							...overrides.comments,
-						},
-						...overrides.issue,
-					},
-				},
-			},
-		});
-
-	it("resolves owner/repo from the git remote and queries via execGh", async () => {
-		const { exec } = fakeExec({
-			"git remote get-url origin": {
-				out: "https://github.com/takasek/pfdsl.git\n",
-			},
-		});
-		/** @type {unknown[]} */
+	it("delegates to githubOps.designRecordEditInfo with the issue number", async () => {
 		const calls = [];
-		const execGh = async (args, opts) => {
-			calls.push({ args, opts });
-			return graphqlResponse();
+		const githubOps = {
+			designRecordEditInfo: async (params) => {
+				calls.push(params);
+				return {
+					issueLastEditedAt: null,
+					comments: {
+						totalCount: 1,
+						nodes: [{ id: "c1", lastEditedAt: null }],
+					},
+				};
+			},
 		};
-		const result = await fetchDesignRecordEditInfo({
-			exec,
-			execGh,
-			cwd: "/repo",
-			number: 737,
-		});
+		const result = await fetchDesignRecordEditInfo({ githubOps, number: 737 });
 		assert.deepEqual(result, {
 			issueLastEditedAt: null,
 			comments: { totalCount: 1, nodes: [{ id: "c1", lastEditedAt: null }] },
 		});
-		assert.equal(calls.length, 1);
-		assert.deepEqual(calls[0].opts, { cwd: "/repo" });
-		assert.ok(calls[0].args.includes("owner=takasek"));
-		assert.ok(calls[0].args.includes("repo=pfdsl"));
-		assert.ok(calls[0].args.includes("number=737"));
+		assert.deepEqual(calls, [{ number: 737 }]);
 	});
 
-	it("throws when the git remote cannot be read", async () => {
-		const { exec } = fakeExec({
-			"git remote get-url origin": { ok: false, out: "fatal: no remote" },
-		});
-		await assert.rejects(
-			fetchDesignRecordEditInfo({
-				exec,
-				execGh: async () => graphqlResponse(),
-				cwd: "/repo",
-				number: 737,
-			}),
-		);
-	});
-
-	it("throws when the remote URL carries no owner/repo", async () => {
-		const { exec } = fakeExec({
-			"git remote get-url origin": { out: "not-a-url\n" },
-		});
-		await assert.rejects(
-			fetchDesignRecordEditInfo({
-				exec,
-				execGh: async () => graphqlResponse(),
-				cwd: "/repo",
-				number: 737,
-			}),
-		);
-	});
-
-	it("propagates a rejection from execGh (gh unavailable, GraphQL error, ...)", async () => {
-		const { exec } = fakeExec({
-			"git remote get-url origin": {
-				out: "https://github.com/takasek/pfdsl.git\n",
+	it("propagates a rejection from githubOps.designRecordEditInfo", async () => {
+		const githubOps = {
+			designRecordEditInfo: async () => {
+				throw new Error("boom");
 			},
-		});
+		};
 		await assert.rejects(
-			fetchDesignRecordEditInfo({
-				exec,
-				execGh: async () => {
-					throw new Error("boom");
-				},
-				cwd: "/repo",
-				number: 737,
-			}),
+			fetchDesignRecordEditInfo({ githubOps, number: 737 }),
 			/boom/,
 		);
 	});

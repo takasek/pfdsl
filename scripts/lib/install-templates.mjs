@@ -14,6 +14,7 @@ export const INSTALL_TEMPLATE_PATHS = [
 	"scripts/pfdsl/normalize-pfdsl.mjs",
 	"scripts/pfdsl/lib/gh-compat.mjs",
 	"scripts/pfdsl/lib/gh-exec.mjs",
+	"scripts/pfdsl/lib/github-ops.mjs",
 	"scripts/pfdsl/lib/github-rest.mjs",
 	"scripts/pfdsl/lib/issues-flow-audit.mjs",
 	"scripts/pfdsl/lib/proxy-fetch-worker.mjs",

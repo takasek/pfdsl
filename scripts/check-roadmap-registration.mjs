@@ -20,9 +20,10 @@ import {
 } from "./lib/roadmap-registration.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 import { isGhUnavailableError } from "./pfdsl/lib/gh-compat.mjs";
-import { execGh } from "./pfdsl/lib/gh-exec.mjs";
+import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const githubOps = createGitHubOps({ cwd: root });
 
 let values;
 try {
@@ -44,14 +45,10 @@ if (!values.pr) {
 
 let pr;
 try {
-	pr = JSON.parse(
-		await execGh(
-			["pr", "view", values.pr, "--json", "closingIssuesReferences"],
-			{
-				cwd: root,
-			},
-		),
-	);
+	pr = await githubOps.viewPr({
+		number: Number(values.pr),
+		fields: ["closingIssuesReferences"],
+	});
 } catch (err) {
 	// Same split as check-closes-reference (#745): only a missing binary is the
 	// environment's doing. A lookup that ran and failed has to fail the job.

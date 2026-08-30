@@ -18,9 +18,10 @@ import { parseArgs } from "node:util";
 
 import { classifyClosesReference } from "./lib/closes-reference.mjs";
 import { isGhUnavailableError } from "./pfdsl/lib/gh-compat.mjs";
-import { execGh } from "./pfdsl/lib/gh-exec.mjs";
+import { createGitHubOps } from "./pfdsl/lib/github-ops.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const githubOps = createGitHubOps({ cwd: root });
 
 let values;
 try {
@@ -51,12 +52,10 @@ for (const flag of ["pr", "base", "default-branch"]) {
 
 let pr;
 try {
-	pr = JSON.parse(
-		await execGh(
-			["pr", "view", values.pr, "--json", "body,closingIssuesReferences"],
-			{ cwd: root },
-		),
-	);
+	pr = await githubOps.viewPr({
+		number: Number(values.pr),
+		fields: ["body", "closingIssuesReferences"],
+	});
 } catch (err) {
 	// The same split every gh-backed lookup here draws (#745): only a missing
 	// binary is the environment's doing and degrades to SKIP. A lookup that ran

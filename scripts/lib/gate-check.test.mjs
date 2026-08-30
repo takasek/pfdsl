@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
-	buildDesignRecordEditQuery,
 	buildSiblingConsumedMap,
 	classifyAuditIssuesFlowResult,
 	classifyChangedFilesByModeling,
@@ -36,7 +35,6 @@ import {
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
 	parseCommitLogLines,
-	parseDesignRecordEditResponse,
 	parseInputConsumedArtifacts,
 	partitionManualItemsByPhase,
 	partitionNewTerminals,
@@ -853,52 +851,6 @@ describe("resolveRecordEditedAt", () => {
 		assert.equal(result.editedAtIso, null);
 		assert.match(result.note, /id/);
 		assert.match(result.note, /detection/);
-	});
-});
-
-describe("buildDesignRecordEditQuery", () => {
-	it("names the owner, repo and issue number as GraphQL variables", () => {
-		const args = buildDesignRecordEditQuery({
-			owner: "takasek",
-			repo: "pfdsl",
-			number: 737,
-		});
-		assert.deepEqual(args.slice(0, 2), ["api", "graphql"]);
-		assert.ok(args.includes("owner=takasek"));
-		assert.ok(args.includes("repo=pfdsl"));
-		assert.ok(args.includes("number=737"));
-		const queryArg = args[args.length - 1];
-		assert.match(queryArg, /lastEditedAt/);
-		assert.match(queryArg, /comments\(first:100\)/);
-	});
-});
-
-describe("parseDesignRecordEditResponse", () => {
-	it("reads the issue's own lastEditedAt and each comment's, keyed by id", () => {
-		const json = JSON.stringify({
-			data: {
-				repository: {
-					issue: {
-						lastEditedAt: null,
-						comments: {
-							totalCount: 1,
-							nodes: [{ id: "c1", lastEditedAt: "2026-07-05T00:00:00Z" }],
-						},
-					},
-				},
-			},
-		});
-		assert.deepEqual(parseDesignRecordEditResponse(json), {
-			issueLastEditedAt: null,
-			comments: {
-				totalCount: 1,
-				nodes: [{ id: "c1", lastEditedAt: "2026-07-05T00:00:00Z" }],
-			},
-		});
-	});
-
-	it("throws on a response shape it does not recognize", () => {
-		assert.throws(() => parseDesignRecordEditResponse(JSON.stringify({})));
 	});
 });
 

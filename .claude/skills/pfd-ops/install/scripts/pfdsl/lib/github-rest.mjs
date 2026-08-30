@@ -1,9 +1,10 @@
 /**
- * GitHub REST API fallback for the small subset of `gh` operations this
- * repo's scripts use. Used by gh-exec.mjs's execGh when the `gh` binary is
- * missing but a GH_TOKEN/GITHUB_TOKEN is available (Claude Code Remote
- * sessions: no `gh` binary, but the GitHub MCP server's token is exported
- * into the environment). See #489, #492.
+ * GitHub API fallback for the small subset of `gh` operations this repo's
+ * scripts use. Used by github-ops.mjs's createGitHubOps as each named
+ * operation's HTTP backend, chosen when the `gh` binary is missing but a
+ * GH_TOKEN/GITHUB_TOKEN is available (Claude Code Remote sessions: no `gh`
+ * binary, but the GitHub MCP server's token is exported into the
+ * environment). See #489, #492, #1044.
  *
  * Response-mapping functions below are pure (testable without network); the
  * fetch* functions accept a fetchImpl for injection in tests.
@@ -452,61 +453,6 @@ export async function fetchPullRequestView(
 }
 
 /**
- * The REST equivalent of `gh pr view --json <fields>` with no PR named — the
- * form that asks about the current branch's open PR.
- *
- * gh resolves the branch itself; over REST the branch has to be handed in and
- * looked up as a head ref. A branch with no open PR throws, matching gh's own
- * non-zero exit: the terminal gate distinguishes "no Size-Override written"
- * from "the body could not be read", and an empty body for the second case is
- * what collapsed them (#749).
- * @param {string} owner
- * @param {string} repo
- * @param {string} token
- * @param {string} branch head ref of the PR to find
- * @param {string[]} fields gh's --json field names
- * @param {typeof fetch} [fetchImpl]
- * @returns {Promise<Record<string, unknown>>}
- */
-export async function fetchCurrentPrView(
-	owner,
-	repo,
-	token,
-	branch,
-	fields,
-	fetchImpl = proxyAwareFetch,
-) {
-	requireMappableFields("pr view", fields, PR_VIEW_FIELDS, [
-		CLOSING_ISSUES_FIELD,
-	]);
-
-	const head = encodeURIComponent(`${owner}:${branch}`);
-	const prs = await request(
-		fetchImpl,
-		`${API_ROOT}/repos/${owner}/${repo}/pulls?head=${head}&state=open`,
-		{ headers: authHeaders({ token }) },
-	).then((res) => res.json());
-
-	const [pr] = prs;
-	if (!pr) throw new Error(`no open pull request for branch '${branch}'`);
-
-	// The branch lookup already supplies the number the GraphQL query keys on,
-	// so this form answers closing references on the same terms as the numbered
-	// one rather than refusing a field the fallback can reach.
-	const closing = fields.includes(CLOSING_ISSUES_FIELD)
-		? await fetchClosingIssueReferences(
-				owner,
-				repo,
-				token,
-				pr.number,
-				fetchImpl,
-			)
-		: null;
-
-	return buildPrView(fields, pr, closing);
-}
-
-/**
  * @param {string} owner
  * @param {string} repo
  * @param {string} token
@@ -690,6 +636,7 @@ async function fetchCiRollupForSha(
  * @param {string} repo
  * @param {string} token
  * @param {typeof fetch} [fetchImpl]
+ * @param {number} [limit]
  * @returns {Promise<Array<{number: number, title: string, headRefName: string, statusCheckRollup: {conclusion: string|null}[]}>>}
  */
 export async function fetchOpenPrsWithCi(
@@ -697,13 +644,16 @@ export async function fetchOpenPrsWithCi(
 	repo,
 	token,
 	fetchImpl = proxyAwareFetch,
+	limit = Number.POSITIVE_INFINITY,
 ) {
-	const prs = await fetchAllPages(
-		fetchImpl,
-		(page) =>
-			`${API_ROOT}/repos/${owner}/${repo}/pulls?state=open&per_page=${PER_PAGE}&page=${page}`,
-		token,
-	);
+	const prs = (
+		await fetchAllPages(
+			fetchImpl,
+			(page) =>
+				`${API_ROOT}/repos/${owner}/${repo}/pulls?state=open&per_page=${PER_PAGE}&page=${page}`,
+			token,
+		)
+	).slice(0, limit);
 	return Promise.all(
 		prs.map(async (pr) => ({
 			number: pr.number,

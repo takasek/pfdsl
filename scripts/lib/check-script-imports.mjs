@@ -67,23 +67,31 @@ export function countUnanalyzableImports(source) {
 }
 
 /**
+ * Every relative import edge in `files`, each resolved against its own file's
+ * directory. The checks below differ only in which edges they keep, so the
+ * read-and-resolve half lives here once.
+ * @param {string[]} files - absolute paths to .mjs files
+ * @returns {Generator<{file: string, specifier: string, resolved: string}>}
+ */
+function* relativeImportEdges(files) {
+	for (const file of files) {
+		const source = readFileSync(file, "utf-8");
+		for (const specifier of extractRelativeImports(source)) {
+			yield { file, specifier, resolved: resolve(dirname(file), specifier) };
+		}
+	}
+}
+
+/**
  * For each file, resolve every relative import specifier against that
  * file's own directory and report the ones that don't exist on disk.
  * @param {string[]} files - absolute paths to .mjs files
  * @returns {Array<{file: string, specifier: string, resolved: string}>}
  */
 export function findBrokenImports(files) {
-	const broken = [];
-	for (const file of files) {
-		const source = readFileSync(file, "utf-8");
-		for (const specifier of extractRelativeImports(source)) {
-			const resolved = resolve(dirname(file), specifier);
-			if (!existsSync(resolved)) {
-				broken.push({ file, specifier, resolved });
-			}
-		}
-	}
-	return broken;
+	return [...relativeImportEdges(files)].filter(
+		({ resolved }) => !existsSync(resolved),
+	);
 }
 
 /**
@@ -127,6 +135,43 @@ export function collectModuleClosure(entryFile) {
 // without that explanation itself tripping the check.
 function stripComments(source) {
 	return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+}
+
+/**
+ * Flags a file that reaches gh-exec.mjs through a relative import while not
+ * being on the allow-list, enforcing the import boundary #1044 introduced:
+ * production code must reach the gh CLI only through github-ops.mjs's named
+ * operations, never through gh-exec.mjs's execGh directly.
+ *
+ * Reuses extractRelativeImports rather than a dedicated parser — a second
+ * import-statement grammar would drift from the one findBrokenImports
+ * already maintains.
+ *
+ * Scope: static specifiers only. A dynamic `import()` built from a variable
+ * reaches gh-exec.mjs without being seen here. collectModuleClosure refuses
+ * to return in that situation, but the same fail-closed rule cannot be
+ * borrowed for this check: 7 of the production scripts this runs over already
+ * carry such an import (`countUnanalyzableImports` over the same file set as
+ * scripts/check-script-imports.mjs, 2026-08-30), so failing closed would emit
+ * 7 standing false positives and the check would be read as noise rather than
+ * as a boundary. The boundary is a discipline aid against the ordinary way of
+ * reaching gh — writing `execGh` at a call site — not a containment barrier.
+ * @param {string[]} files - absolute paths to .mjs files to check
+ * @param {{ghExecPath: string, allowed: string[]}} opts - ghExecPath is
+ *   gh-exec.mjs's absolute path; allowed is the absolute paths permitted to
+ *   import it
+ * @returns {Array<{file: string, specifier: string}>}
+ */
+export function findGhExecImportBoundaryViolations(
+	files,
+	{ ghExecPath, allowed },
+) {
+	return [...relativeImportEdges(files)]
+		.filter(
+			({ file, resolved }) =>
+				resolved === ghExecPath && !allowed.includes(file),
+		)
+		.map(({ file, specifier }) => ({ file, specifier }));
 }
 
 /**

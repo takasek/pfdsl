@@ -38,17 +38,53 @@ const neighborsJsonOk = (successors) =>
 		successors: successors.map((id) => ({ id, kind: "primary" })),
 	});
 
+// A stand-in for createGitHubOps in these tests, which predate the named-op
+// API and assert against raw `gh` argv shapes (#1044). Adapts each test's
+// `execGh`-shaped fake (an (args: string[]) => Promise<string>, matching what
+// gh-exec.mjs's execGh used to be called with directly) into the two
+// operations runCycleStatus now calls through githubOps, so every existing
+// test body — including the ones asserting on the raw argv it recorded —
+// keeps working unchanged.
+function githubOpsFromExecGh(execGh) {
+	return {
+		listOpenPrs: async () =>
+			JSON.parse(
+				await execGh([
+					"pr",
+					"list",
+					"--state",
+					"open",
+					"--json",
+					"number,title,headRefName,statusCheckRollup",
+				]),
+			),
+		viewIssue: async ({ number, fields }) =>
+			JSON.parse(
+				await execGh([
+					"issue",
+					"view",
+					String(number),
+					"--json",
+					fields.join(","),
+				]),
+			),
+	};
+}
+
 function baseDeps(overrides = {}) {
+	const { execGh, githubOps, ...rest } = overrides;
 	return {
 		sh: () => "",
 		shTry: () => ({ ok: true, out: "", status: 0 }),
-		execGh: async () => JSON.stringify([]),
+		githubOps:
+			githubOps ??
+			githubOpsFromExecGh(execGh ?? (async () => JSON.stringify([]))),
 		existsSync: () => true,
 		readFileSync: () => "",
 		readdirSync: () => [],
 		root: ROOT,
 		base: "main",
-		...overrides,
+		...rest,
 	};
 }
 

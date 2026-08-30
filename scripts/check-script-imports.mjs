@@ -21,7 +21,10 @@
 
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { findBrokenImports } from "./lib/check-script-imports.mjs";
+import {
+	findBrokenImports,
+	findGhExecImportBoundaryViolations,
+} from "./lib/check-script-imports.mjs";
 import { gitLsFiles } from "./lib/run-exec.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -43,18 +46,43 @@ const files = gitLsFiles(["scripts/*.mjs", "scripts/**/*.mjs"], {
 
 const broken = findBrokenImports(files);
 
-if (broken.length === 0) {
+// gh-exec.mjs's execGh is the gh-CLI backend detail github-ops.mjs's named
+// operations own — production code must reach it only there (#1044).
+const ghExecPath = resolve(root, "scripts/pfdsl/lib/gh-exec.mjs");
+const ghExecAllowed = [resolve(root, "scripts/pfdsl/lib/github-ops.mjs")];
+const ghExecViolations = findGhExecImportBoundaryViolations(files, {
+	ghExecPath,
+	allowed: ghExecAllowed,
+});
+
+if (broken.length === 0 && ghExecViolations.length === 0) {
 	console.log(
 		`check-script-imports: all ${files.length} script(s) resolve cleanly`,
 	);
 	process.exit(0);
 }
 
-console.log("check-script-imports: broken relative import(s) found:");
-for (const { file, specifier } of broken) {
-	console.log(`  ${relPath(file)}: "${specifier}" does not resolve`);
+if (broken.length > 0) {
+	console.log("check-script-imports: broken relative import(s) found:");
+	for (const { file, specifier } of broken) {
+		console.log(`  ${relPath(file)}: "${specifier}" does not resolve`);
+	}
 }
-console.log(`\ncheck-script-imports: ${broken.length} error(s)`);
+
+if (ghExecViolations.length > 0) {
+	console.log(
+		"check-script-imports: gh-exec.mjs imported outside github-ops.mjs:",
+	);
+	for (const { file, specifier } of ghExecViolations) {
+		console.log(
+			`  ${relPath(file)}: "${specifier}" — reach gh through github-ops.mjs's named operations instead`,
+		);
+	}
+}
+
+console.log(
+	`\ncheck-script-imports: ${broken.length + ghExecViolations.length} error(s)`,
+);
 process.exit(1);
 
 function relPath(absPath) {
