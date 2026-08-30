@@ -61,7 +61,32 @@ function stubFetch(body) {
 	return impl;
 }
 
+/** Answers successive calls from `pages`, so a paginated walk sees a real end
+ * (the last page shorter than a full one). */
+function stubPagedFetch(pages) {
+	let index = 0;
+	return async () => {
+		const body = pages[Math.min(index++, pages.length - 1)];
+		return {
+			ok: true,
+			status: 200,
+			headers: { get: () => null },
+			json: async () => body,
+			text: async () => JSON.stringify(body),
+		};
+	};
+}
+
 describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
+	// Every parity case drives the HTTP backend, which only answers with a
+	// token present.
+	beforeEach(() => {
+		process.env.GH_TOKEN = "tok";
+	});
+	afterEach(() => {
+		delete process.env.GH_TOKEN;
+	});
+
 	it("listLabels: both backends normalize a null description to an empty string", async () => {
 		const ghOps = createGitHubOps({
 			execGhImpl: stubExecGh({
@@ -74,17 +99,35 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 			execGhImpl: stubExecGh({ "label list": new Error("ENOENT") }),
 			fetchImpl: stubFetch([{ name: "flow:managed", description: null }]),
 		});
-		process.env.GH_TOKEN = "tok";
-		try {
-			const [ghResult, httpResult] = await Promise.all([
-				ghOps.listLabels(),
-				httpOps.listLabels(),
-			]);
-			assert.deepEqual(ghResult, [{ name: "flow:managed", description: "" }]);
-			assert.deepEqual(ghResult, httpResult);
-		} finally {
-			delete process.env.GH_TOKEN;
-		}
+		const [ghResult, httpResult] = await Promise.all([
+			ghOps.listLabels(),
+			httpOps.listLabels(),
+		]);
+		assert.deepEqual(ghResult, [{ name: "flow:managed", description: "" }]);
+		assert.deepEqual(ghResult, httpResult);
+	});
+
+	// The gh argv carries `--limit`, so gh stops at that many labels. The HTTP
+	// backend walks every page, and nothing capped it — a repo past the limit
+	// got a longer list from one backend than the other while the parity claim
+	// stood (found by the independent design review of #1044).
+	it("listLabels: both backends stop at the same limit", async () => {
+		const label = (i) => ({ name: `label-${i}`, description: null });
+		const page1 = Array.from({ length: 100 }, (_, i) => label(i));
+		const page2 = Array.from({ length: 50 }, (_, i) => label(100 + i));
+		const ghOps = createGitHubOps({
+			execGhImpl: stubExecGh({ "label list": JSON.stringify(page1) }),
+		});
+		const httpOps = createGitHubOps({
+			execGhImpl: stubExecGh({ "label list": new Error("ENOENT") }),
+			fetchImpl: stubPagedFetch([page1, page2]),
+		});
+		const [ghResult, httpResult] = await Promise.all([
+			ghOps.listLabels(),
+			httpOps.listLabels(),
+		]);
+		assert.equal(ghResult.length, 100);
+		assert.deepEqual(ghResult, httpResult);
 	});
 
 	it("listIssues: both backends return the same shape", async () => {
@@ -100,7 +143,6 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		const ghOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "issue list": JSON.stringify(raw) }),
 		});
-		process.env.GH_TOKEN = "tok";
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "issue list": new Error("ENOENT") }),
 			fetchImpl: stubFetch([
@@ -113,16 +155,12 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 				},
 			]),
 		});
-		try {
-			const [ghResult, httpResult] = await Promise.all([
-				ghOps.listIssues(),
-				httpOps.listIssues(),
-			]);
-			assert.deepEqual(ghResult, raw);
-			assert.deepEqual(ghResult, httpResult);
-		} finally {
-			delete process.env.GH_TOKEN;
-		}
+		const [ghResult, httpResult] = await Promise.all([
+			ghOps.listIssues(),
+			httpOps.listIssues(),
+		]);
+		assert.deepEqual(ghResult, raw);
+		assert.deepEqual(ghResult, httpResult);
 	});
 
 	it("viewIssue: both backends answer the requested fields alone", async () => {
@@ -131,21 +169,16 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 				"issue view": JSON.stringify({ number: 612, body: "hello" }),
 			}),
 		});
-		process.env.GH_TOKEN = "tok";
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "issue view": new Error("ENOENT") }),
 			fetchImpl: stubFetch({ number: 612, body: "hello" }),
 		});
-		try {
-			const [ghResult, httpResult] = await Promise.all([
-				ghOps.viewIssue({ number: 612, fields: ["number", "body"] }),
-				httpOps.viewIssue({ number: 612, fields: ["number", "body"] }),
-			]);
-			assert.deepEqual(ghResult, { number: 612, body: "hello" });
-			assert.deepEqual(ghResult, httpResult);
-		} finally {
-			delete process.env.GH_TOKEN;
-		}
+		const [ghResult, httpResult] = await Promise.all([
+			ghOps.viewIssue({ number: 612, fields: ["number", "body"] }),
+			httpOps.viewIssue({ number: 612, fields: ["number", "body"] }),
+		]);
+		assert.deepEqual(ghResult, { number: 612, body: "hello" });
+		assert.deepEqual(ghResult, httpResult);
 	});
 
 	it("viewPr: both backends answer the requested fields alone", async () => {
@@ -154,21 +187,16 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 				"pr view": JSON.stringify({ number: 5, body: "closes #1" }),
 			}),
 		});
-		process.env.GH_TOKEN = "tok";
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "pr view": new Error("ENOENT") }),
 			fetchImpl: stubFetch({ number: 5, body: "closes #1", html_url: "x" }),
 		});
-		try {
-			const [ghResult, httpResult] = await Promise.all([
-				ghOps.viewPr({ number: 5, fields: ["number", "body"] }),
-				httpOps.viewPr({ number: 5, fields: ["number", "body"] }),
-			]);
-			assert.deepEqual(ghResult, { number: 5, body: "closes #1" });
-			assert.deepEqual(ghResult, httpResult);
-		} finally {
-			delete process.env.GH_TOKEN;
-		}
+		const [ghResult, httpResult] = await Promise.all([
+			ghOps.viewPr({ number: 5, fields: ["number", "body"] }),
+			httpOps.viewPr({ number: 5, fields: ["number", "body"] }),
+		]);
+		assert.deepEqual(ghResult, { number: 5, body: "closes #1" });
+		assert.deepEqual(ghResult, httpResult);
 	});
 
 	it("listOpenPrs: both backends return the same shape", async () => {
@@ -183,7 +211,6 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		const ghOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "pr list": JSON.stringify(raw) }),
 		});
-		process.env.GH_TOKEN = "tok";
 		const fetchCalls = [];
 		const fetchImpl = async (url) => {
 			fetchCalls.push(String(url));
@@ -206,93 +233,74 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 			execGhImpl: stubExecGh({ "pr list": new Error("ENOENT") }),
 			fetchImpl,
 		});
-		try {
-			const [ghResult, httpResult] = await Promise.all([
-				ghOps.listOpenPrs(),
-				httpOps.listOpenPrs(),
-			]);
-			assert.deepEqual(ghResult, raw);
-			assert.deepEqual(ghResult, httpResult);
-		} finally {
-			delete process.env.GH_TOKEN;
-		}
+		const [ghResult, httpResult] = await Promise.all([
+			ghOps.listOpenPrs(),
+			httpOps.listOpenPrs(),
+		]);
+		assert.deepEqual(ghResult, raw);
+		assert.deepEqual(ghResult, httpResult);
 	});
 
 	it("addIssueLabel: both backends make the same call and return void", async () => {
 		const ghOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "issue edit": "" }),
 		});
-		process.env.GH_TOKEN = "tok";
 		const fetch = stubFetch({});
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "issue edit": new Error("ENOENT") }),
 			fetchImpl: fetch,
 		});
-		try {
-			assert.equal(
-				await ghOps.addIssueLabel({ number: 612, label: "flow:exempt" }),
-				undefined,
-			);
-			assert.equal(
-				await httpOps.addIssueLabel({ number: 612, label: "flow:exempt" }),
-				undefined,
-			);
-			assert.match(fetch.calls[0].url, /\/issues\/612\/labels$/);
-		} finally {
-			delete process.env.GH_TOKEN;
-		}
+		assert.equal(
+			await ghOps.addIssueLabel({ number: 612, label: "flow:exempt" }),
+			undefined,
+		);
+		assert.equal(
+			await httpOps.addIssueLabel({ number: 612, label: "flow:exempt" }),
+			undefined,
+		);
+		assert.match(fetch.calls[0].url, /\/issues\/612\/labels$/);
 	});
 
 	it("createLabel: both backends make the same call and return void", async () => {
 		const ghOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "label create": "" }),
 		});
-		process.env.GH_TOKEN = "tok";
 		const fetch = stubFetch({});
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "label create": new Error("ENOENT") }),
 			fetchImpl: fetch,
 		});
-		try {
-			await ghOps.createLabel({
-				name: "flow:exempt",
-				description: "not tracked",
-				color: "ededed",
-			});
-			await httpOps.createLabel({
-				name: "flow:exempt",
-				description: "not tracked",
-				color: "ededed",
-			});
-			assert.deepEqual(JSON.parse(fetch.calls[0].init.body), {
-				name: "flow:exempt",
-				description: "not tracked",
-				color: "ededed",
-			});
-		} finally {
-			delete process.env.GH_TOKEN;
-		}
+		await ghOps.createLabel({
+			name: "flow:exempt",
+			description: "not tracked",
+			color: "ededed",
+		});
+		await httpOps.createLabel({
+			name: "flow:exempt",
+			description: "not tracked",
+			color: "ededed",
+		});
+		assert.deepEqual(JSON.parse(fetch.calls[0].init.body), {
+			name: "flow:exempt",
+			description: "not tracked",
+			color: "ededed",
+		});
 	});
 
 	it("editLabel: both backends make the same call and return void", async () => {
 		const ghOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "label edit": "" }),
 		});
-		process.env.GH_TOKEN = "tok";
 		const fetch = stubFetch({});
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "label edit": new Error("ENOENT") }),
 			fetchImpl: fetch,
 		});
-		try {
-			await ghOps.editLabel({ name: "flow:exempt", description: "reworded" });
-			await httpOps.editLabel({ name: "flow:exempt", description: "reworded" });
-			assert.deepEqual(JSON.parse(fetch.calls[0].init.body), {
-				description: "reworded",
-			});
-		} finally {
-			delete process.env.GH_TOKEN;
-		}
+		await ghOps.editLabel({ name: "flow:exempt", description: "reworded" });
+		await httpOps.editLabel({ name: "flow:exempt", description: "reworded" });
+		assert.deepEqual(JSON.parse(fetch.calls[0].init.body), {
+			description: "reworded",
+		});
 	});
 });
 

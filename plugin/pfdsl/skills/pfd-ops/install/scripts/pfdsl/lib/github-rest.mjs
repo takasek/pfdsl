@@ -1,9 +1,10 @@
 /**
- * GitHub REST API fallback for the small subset of `gh` operations this
- * repo's scripts use. Used by gh-exec.mjs's execGh when the `gh` binary is
- * missing but a GH_TOKEN/GITHUB_TOKEN is available (Claude Code Remote
- * sessions: no `gh` binary, but the GitHub MCP server's token is exported
- * into the environment). See #489, #492.
+ * GitHub API fallback for the small subset of `gh` operations this repo's
+ * scripts use. Used by github-ops.mjs's createGitHubOps as each named
+ * operation's HTTP backend, chosen when the `gh` binary is missing but a
+ * GH_TOKEN/GITHUB_TOKEN is available (Claude Code Remote sessions: no `gh`
+ * binary, but the GitHub MCP server's token is exported into the
+ * environment). See #489, #492, #1044.
  *
  * Response-mapping functions below are pure (testable without network); the
  * fetch* functions accept a fetchImpl for injection in tests.

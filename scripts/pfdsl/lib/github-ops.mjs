@@ -22,12 +22,20 @@ import {
 	fetchIssueView,
 	fetchOpenPrsWithCi,
 	fetchPullRequestView,
+	mapLabelsResponse,
 	parseOwnerRepo,
 	addIssueLabel as restAddIssueLabel,
 	createLabel as restCreateLabel,
 	editLabel as restEditLabel,
 } from "./github-rest.mjs";
 import { proxyAwareFetch } from "./proxy-fetch.mjs";
+
+// How many entries the list operations return. Each one is a single value
+// used by both backends — gh reads it as `--limit`, HTTP truncates its own
+// walk to it. Two separately written caps is what let the backends disagree
+// about a repo past the limit while the parity claim above still stood.
+const LABEL_LIST_LIMIT = 100;
+const ISSUE_LIST_LIMIT = 500;
 
 /**
  * @param {string} cwd
@@ -93,17 +101,6 @@ export function parseDesignRecordEditResponse(jsonText) {
 }
 
 /**
- * @param {{name: string, description?: string|null}[]} rawLabels
- * @returns {{name: string, description: string}[]}
- */
-function normalizeLabels(rawLabels) {
-	return rawLabels.map((l) => ({
-		name: l.name,
-		description: l.description ?? "",
-	}));
-}
-
-/**
  * @param {object} opts
  * @param {string} [opts.cwd]
  * @param {(args: string[], opts: {cwd: string}) => Promise<string>} [opts.execGhImpl]
@@ -116,6 +113,13 @@ export function createGitHubOps({
 	fetchImpl = proxyAwareFetch,
 } = {}) {
 	const runGh = (args) => execGhImpl(args, { cwd });
+
+	// `cwd` is fixed for this instance, so the repo it names is too. Resolving
+	// it once keeps a gate-check run that walks several issues from spawning
+	// `git remote get-url origin` per operation.
+	/** @type {{owner: string, repo: string} | undefined} */
+	let ownerRepoCache;
+	const ownerRepo = () => (ownerRepoCache ??= ownerRepoFromGitRemote(cwd));
 
 	/**
 	 * Runs `ghCall`, and on a genuine gh-unavailable ENOENT with a token
@@ -142,7 +146,7 @@ export function createGitHubOps({
 				throw new Error(
 					`github-ops: '${operation}' has no HTTP backend implementation; the gh CLI is required for this operation`,
 				);
-			const { owner, repo } = ownerRepoFromGitRemote(cwd);
+			const { owner, repo } = ownerRepo();
 			return await httpCall({ owner, repo, token });
 		}
 	}
@@ -159,12 +163,17 @@ export function createGitHubOps({
 						"--json",
 						"name,description",
 						"--limit",
-						"100",
+						String(LABEL_LIST_LIMIT),
 					]);
-					return normalizeLabels(JSON.parse(out));
+					// gh's `--json name,description` and the REST labels payload
+					// carry the same two fields, so one mapping serves both.
+					return mapLabelsResponse(JSON.parse(out));
 				},
-				({ owner, repo, token }) =>
-					fetchAllLabels(owner, repo, token, fetchImpl),
+				async ({ owner, repo, token }) =>
+					(await fetchAllLabels(owner, repo, token, fetchImpl)).slice(
+						0,
+						LABEL_LIST_LIMIT,
+					),
 			),
 
 		/** @returns {Promise<Array<{number: number, state: string, stateReason: string|null, labels: {name:string}[], updatedAt: string}>>} */
@@ -180,12 +189,12 @@ export function createGitHubOps({
 						"--json",
 						"number,state,stateReason,labels,updatedAt",
 						"--limit",
-						"500",
+						String(ISSUE_LIST_LIMIT),
 					]);
 					return JSON.parse(out);
 				},
 				({ owner, repo, token }) =>
-					fetchAllIssues(owner, repo, token, fetchImpl),
+					fetchAllIssues(owner, repo, token, fetchImpl, ISSUE_LIST_LIMIT),
 			),
 
 		/**
@@ -319,7 +328,7 @@ export function createGitHubOps({
 			withFallback(
 				"designRecordEditInfo",
 				async () => {
-					const { owner, repo } = ownerRepoFromGitRemote(cwd);
+					const { owner, repo } = ownerRepo();
 					const out = await runGh(
 						buildDesignRecordEditQuery({ owner, repo, number }),
 					);
