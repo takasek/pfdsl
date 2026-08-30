@@ -9,6 +9,7 @@ import {
 
 const CLAUDE_ROOT_FILES = new Set(["settings.json"]);
 const CLAUDE_ROOT_DIRECTORIES = new Set(["agents", "commands", "skills"]);
+const OS_GENERATED_ENTRY_NAMES = new Set([".DS_Store"]);
 const COMMAND_FRONTMATTER_KEYS = new Set(["description"]);
 const AGENT_FRONTMATTER_KEYS = new Set([
 	"name",
@@ -82,6 +83,7 @@ function assertEntryClosure(fs, path, entries, exclusions, sourceType) {
 		}
 	}
 	for (const name of fs.readdirSync(path)) {
+		if (OS_GENERATED_ENTRY_NAMES.has(name)) continue;
 		if (!entries.has(name) && !Object.hasOwn(exclusions, name)) {
 			sourceTopologyError(resolve(path, name), name);
 		}
@@ -107,6 +109,7 @@ function assertSkillTreeClosure(fs, path, capability) {
 
 	function visit(directory, relativePath = "") {
 		for (const name of fs.readdirSync(directory)) {
+			if (OS_GENERATED_ENTRY_NAMES.has(name)) continue;
 			const entryPath = resolve(directory, name);
 			const entryRelativePath = relativePath ? `${relativePath}/${name}` : name;
 			const stats = fs.lstatSync(entryPath);
@@ -146,6 +149,7 @@ function assertClaudeTopology(root, contract, sourceExclusions, fs) {
 		...Object.keys(sourceExclusions.root),
 	]);
 	for (const name of fs.readdirSync(claudeRoot)) {
+		if (OS_GENERATED_ENTRY_NAMES.has(name)) continue;
 		if (!knownRootEntries.has(name)) {
 			sourceTopologyError(resolve(claudeRoot, name), name);
 		}
