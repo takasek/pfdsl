@@ -152,7 +152,8 @@ artifact:
       retro_request が選んだ source だけを実際に取得し、その内容と provenance を cutoff で時点固定した実行時 envelope。
       候補となる source 種別は GitHub の issue・issue 更新・pull request、Git の統合済みリポジトリ、セッション記録、scheduler 記録だが、どれが含まれるかは run ごとに変わる。
       GitHub のみの run、セッションのみの run、複合 run のいずれも同じ envelope の別の中身として表せるため、選ばれていない source の不在は停止理由にならない。
-      取得手順そのものは runtime 側の関心で、この図は envelope の存在と時点固定だけを主張する。
+      取得手順そのものはふりかえり実行時の振る舞いであり、この図の変換でも pipeline_pfdsl の変換でもない。
+      生成元を持たないため仕様上は外部入力成果物であり、そう扱うのは取得工程を隠しているからではなく、run ごとに変わる source 選択を静的なエッジへ焼かないためである。
     criteria: 取得できた evidence が provenance と安定した event identifier つきで cutoff に固定され、source ごとに非選択・取得失敗（理由つき）・取得できて空のどれであるかが区別できる。必要 source 集合との突き合わせと停止判断は行わず、pre_retro_inventory に委ねる
     group: decision
   pre_retro_inventory:
