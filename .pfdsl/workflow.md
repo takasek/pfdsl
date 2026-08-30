@@ -6,7 +6,7 @@
 
 実践・レビューで得た知見は3経路に振り分ける:
 
-1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を直接改訂する（`maintain_template` プロセス）。ローカル skill・配布 skill・binding・companion・guard は、削除済みの集約プロセスでなく対象 artifact の分類として扱う。独立して整備する一群を列挙するときは `knowledge_maintenance` tag のプロセスを問い合わせ、1つの正本 asset の整備プロセスを調べるときはその artifact の producer を問い合わせる。人間の `decisions` が変更対象を指名し、採用した `retro_findings` の具体的観察を全 `knowledge_maintenance` プロセスが feedback evidence として対象固有の文言・規則・機構へ反映する。知識正本・仕様・サンプル・ADR・PFD・companion・README を改版する工程は自身の現行出力も feedback の改版基準として読み、既存内容を保った差分改訂を行う。現行出力は変更権限ではなく、各工程の通常入力だけが改訂を駆動する。単発納品物の `article` は改版サイクルを持たず、issue と repository の外部状態は既存の `issue_updates` および toolchain 還流で表すため、自己 baseline を重ねない。スキル改善は issue を通さず対話から直接行う
+1. **即時ルール化** — 配布スキル群の直接改訂。pfdsl スキルの品質ガイドは `quality_guide` artifact（= docs/quality-guide.md）を、スキル本文は `skill_template` artifact（= scripts/skill-template/SKILL.md）を直接改訂する（`maintain_template` プロセス）。知識正本の整備工程は `knowledge_maintenance` tag の3つで、改訂・検証手順が実際に違うところで分かれる。1つの正本 asset の整備工程を調べるときはその artifact の producer を問い合わせる。どの正本が plugin に同梱されるかは gen-plugin manifest と `pipeline_pfdsl` が一次情報で、この図の artifact ノードが持つのは配送 membership でなく整備責任である。人間の `decisions` が変更対象を指名し、採用した `retro_findings` の具体的観察を全 `knowledge_maintenance` プロセスが feedback evidence として対象固有の文言・規則・機構へ反映する。知識正本・仕様・サンプル・ADR・PFD・companion・README を改版する工程は自身の現行出力も feedback の改版基準として読み、既存内容を保った差分改訂を行う。現行出力は変更権限ではなく、各工程の通常入力だけが改訂を駆動する。単発納品物の `article` は改版サイクルを持たず、issue と repository の外部状態は既存の `issue_updates` および toolchain 還流で表すため、自己 baseline を重ねない。スキル改善は issue を通さず対話から直接行う
 2. **設計決定** — ADR 起草（`docs/adr/`）。ADR 化した判断は適用ルールのガイド蒸留要否も判定する
 3. **作業項目** — issue 起票 + 依存グラフ更新（`roadmap.pfdsl`。手段は roadmap.md 参照）
 
@@ -155,7 +155,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 修正は先にコミットし、`reviewed.json` の更新は別コミットにする。
 
 **`distribution_review_skill` は終端 artifact として報告される。**
-`maintain_distribution_review_skill` が生産し、`review_distribution` へは `>>?` でしか入らないため、primary の消費エッジを持たない。
+`maintain_repo_local_capabilities` が生産し、`review_distribution` へは `>>?` でしか入らないため、primary の消費エッジを持たない。
 能力成果物が世代をまたいで還流する形（ADR-0011）の帰結であって欠陥ではない。
 `pfdsl_skill` と違い消費者は sibling の `pipeline.pfdsl` に**無い** — このスキルは配布されないので `gen_plugin` の入力にならない。
 終端ゲートのプロトコル5(b) 判定では、手段（能力成果物）であり後続門番を要さないものとして扱う。

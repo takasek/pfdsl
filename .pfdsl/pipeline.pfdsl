@@ -146,7 +146,7 @@ artifact:
     group: gen_sources
   review_perspectives:
     label: レビュー観点集
-    description: "workflow.pfdsl の maintain_review_perspectives が生産する。pfdsl スキルに references として同梱される"
+    description: "workflow.pfdsl の maintain_distributed_prompt_assets が生産する。pfdsl スキルに references として同梱される"
     location: ../docs/review-perspectives.md
     group: gen_sources
   roadmap_pfdsl:

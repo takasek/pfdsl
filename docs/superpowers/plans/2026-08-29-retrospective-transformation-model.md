@@ -1,5 +1,7 @@
 # Retrospective Transformation Model Implementation Plan
 
+> **Superseded in part by #1046.** This plan was executed as written. Its 21 per-asset maintenance processes and its seven required activity sources were then replaced by three maintenance processes and a single per-run evidence envelope. Do not resume implementation from this file — the design document linked below carries the current model.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace capability-as-finding feedback and three aggregate maintenance processes with an explicit retrospective execution pipeline, a human decision gate, and 21 independently owned maintenance transformations.
