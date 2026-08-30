@@ -430,7 +430,7 @@ process:
     tags: [ gen, g ]
   decode_harness_capabilities:
     label: ハーネスsource decode・contract検証
-    description: "claude_harness_sourcesのsource rootとschemaをharness_inventoryに照らして全件分類し、plugin metadataをtoolchainから読み、Claude Code固有の表現をハーネス中立semantic recordへdecodeする。未知topology・未知schema・四target mappingの欠落や重複をadapter出力前に拒否する"
+    description: "claude_harness_sourcesのsource rootとschemaをharness_inventoryに照らして全件分類し、plugin metadataをtoolchainから読み、Claude Code固有の表現をハーネス中立semantic recordへdecodeする。OS生成の既知の非source entryは全階層で分類対象から除き、それ以外の未知topology・未知schema・四target mappingの欠落や重複をadapter出力前に拒否する"
     command: node --test scripts/lib/harness-capability-contract.test.mjs scripts/lib/harness-source-decoder.test.mjs scripts/lib/harness-inventory.test.mjs
     location: ../scripts/lib/harness-source-decoder.mjs
     tags: [ gen, g ]

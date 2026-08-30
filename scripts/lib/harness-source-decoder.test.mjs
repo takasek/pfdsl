@@ -290,6 +290,39 @@ describe("harness source decoder", () => {
 		assert.equal(outcome(present), "ok");
 	});
 
+	it("tolerates OS-generated .DS_Store files throughout maintained source topology", () => {
+		const paths = [
+			".claude/.DS_Store",
+			".claude/skills/.DS_Store",
+			".claude/commands/.DS_Store",
+			".claude/agents/.DS_Store",
+			".claude/skills/pfd-ops/.DS_Store",
+		];
+
+		for (const path of paths) {
+			const subject = fixture();
+			subject.addFile(path, "Finder metadata\n");
+			assert.doesNotThrow(
+				() => decodeFixture({ root: ROOT, contract: CONTRACT, fs: subject.fs }),
+				path,
+			);
+		}
+	});
+
+	it("rejects .DS_Store near misses in maintained source topology", () => {
+		const subject = fixture();
+		subject.addFile(
+			".claude/skills/pfd-ops/.DS_Store.backup",
+			"maintained content\n",
+		);
+
+		expectTopologyFailure(
+			{ root: ROOT, contract: CONTRACT, fs: subject.fs },
+			".claude/skills/pfd-ops/.DS_Store.backup",
+			".DS_Store.backup",
+		);
+	});
+
 	it("rejects an unknown maintained skill descendant instead of silently shipping it", () => {
 		const subject = fixture();
 		subject.addFile(
