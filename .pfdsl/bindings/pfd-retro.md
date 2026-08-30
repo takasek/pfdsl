@@ -78,10 +78,11 @@ prefix も値も宣言されておらず、新しいものを弾く機構も無�
 まず次の2コマンドの和集合で、base から working tree までの追加・変更・削除・rename と untracked の新規ファイルを列挙する。
 
 ```bash
-git diff -C --find-copies-harder --name-status -z --diff-filter=ACMRD origin/<base> -- .pfdsl/bindings/pfd-retro-patterns/
+git diff -C --find-copies-harder --name-status -z --diff-filter=ACMRD origin/<base>...HEAD -- .pfdsl/bindings/pfd-retro-patterns/
 git ls-files -z --others --exclude-standard -- .pfdsl/bindings/pfd-retro-patterns/
 ```
 
+三点である。二点で取ると base がサイクル途中で進んだぶんが自分の変更として並び、他人が足した行が自分の削除に見える（#1044 のサイクルで実際に1件出た）。
 tracked 側は NUL 区切りの status とパスとして読み、rename / copy の status では直後の旧パス・新パスの組を保持し、それ以外では直後の1パスを保持する。
 `-C --find-copies-harder` は、source が base から変更されず destination だけが追加・変更された通常の copy も旧パス・新パスの組として検出するために必要である。
 untracked 側も NUL 区切りの各パスとして読む。改行区切りの行解析へ変換せず、空白・改行・非 ASCII 文字を含むパスをそのまま扱える parser または同等の Git 対応ツールへ渡す。
