@@ -95,7 +95,11 @@ findings は3クラスに分かれ、出力の見出しがそれを名乗る。`
 ## 依存（pfdsl-flow-on-issue-close.yml 実行環境）
 
 - Node.js 24 以上
-- `gh` CLI（GitHub Actions ランナーにはプリインストール済み）
+- `gh` CLI、または `GH_TOKEN` / `GITHUB_TOKEN`（GitHub Actions ランナーには `gh` がプリインストール済みで、workflow は `GH_TOKEN: ${{ github.token }}` も設定する）
 - npm パッケージ `yaml`（`audit-issues-flow.mjs` の唯一の外部依存。workflow が `npm install --no-save yaml` で都度導入するため事前インストール不要）
+
+`audit-issues-flow.mjs` が使う named operation はすべて HTTP backend を持つ。`gh` が存在しない（ENOENT）場合も、`GH_TOKEN` または `GITHUB_TOKEN` があれば HTTP backend へ切り替わるため、token のみの環境で監査と `--fix` を実行できる。`gh` が実行されて認証・通信・引数エラーになった場合は HTTP へ切り替えず、そのエラーを報告する。
+
+例外は設計選択記録の編集履歴を取得する `designRecordEditInfo` で、HTTP backend を持たない。この operation は `gate-check.mjs` が設計選択記録の投稿後編集を検査するときに使うため、`gh` の無い環境で token だけを与えてもその検査は完走せず、operation 名と `gh` が必要であることを示すエラーになる。
 
 workflow は pnpm 等の特定パッケージマネージャを前提としない（`npm install --no-save yaml` のみで完結）。リポ固有の追加処理（スナップショット再生成等）が必要な場合は `scripts/flow-sync-local-hook.mjs` を置くと、存在すれば workflow が自動実行する。
