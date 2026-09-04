@@ -19,11 +19,6 @@ import {
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
 import {
-	classifyDesignRecordContent,
-	NO_IMPLEMENTATION_TOKEN,
-	selectDesignRecord,
-} from "./gate-check.mjs";
-import {
 	CODE_PATH,
 	CORRECTNESS_TOOLS,
 	GATE_TOOLS,
@@ -294,6 +289,27 @@ describe("detectEnumeratedOptions", () => {
 });
 
 describe("classifyDesignSettlement", () => {
+	const format1 = "前提: x\n否定案: y\n却下理由: z";
+	const format2 =
+		"提案: x\n理由: y\n前提を外した対案: z\n対案を採らない理由: owner constraint";
+	const format3 = [
+		"設計記録形式: 3",
+		"決定:",
+		"- 保存方式（実装）: Aを段階導入する",
+		"理由:",
+		"- 保存方式: 障害範囲を限定できる",
+		"案の処分:",
+		"- 採用 — 元候補「A」— 今回採用する",
+		"前提検査 P1:",
+		"対象: 保存方式 / A",
+		"前提: 保存方式と通知方式を同時に変える必要がある",
+		"前提を外した案: 保存方式だけを段階導入する",
+		"既存候補との差分: 元候補は両方式を一組としていた",
+		"検査案の処分 P1: 採用 — 今回の決定に含める",
+		"改訂履歴:",
+		"- なし",
+	].join("\n");
+
 	it("reports unsettled by phrase before checking for a posted record", () => {
 		const result = classifyDesignSettlement({
 			body: "設計未確定な点がある。",
@@ -334,6 +350,73 @@ describe("classifyDesignSettlement", () => {
 		assert.equal(result.unsettled, false);
 		assert.equal(result.reason, "record-posted");
 		assert.equal(result.recordRequired, false);
+	});
+
+	it("settles complete records from all three migration periods", () => {
+		for (const [record, createdAt] of [
+			[format1, "2026-08-30T09:32:49Z"],
+			[format2, "2026-08-30T09:32:50Z"],
+			[format3, "2026-08-31T01:30:24Z"],
+		]) {
+			const result = classifyDesignSettlement({
+				body: "普通の説明文。",
+				comments: [{ body: record, createdAt }],
+			});
+			assert.equal(result.unsettled, false, createdAt);
+			assert.equal(result.reason, "record-posted", createdAt);
+		}
+	});
+
+	it("keeps a format 2 record posted after the format 3 cutoff unsettled", () => {
+		const result = classifyDesignSettlement({
+			body: "普通の説明文。",
+			comments: [{ body: format2, createdAt: "2026-08-31T01:30:24Z" }],
+		});
+		assert.equal(result.unsettled, true);
+		assert.equal(result.reason, "record-incomplete");
+	});
+
+	it("reports incomplete format 3 structure as an unsettled record", () => {
+		const result = classifyDesignSettlement({
+			body: "普通の説明文。",
+			comments: [
+				{ body: "設計記録形式: 3", createdAt: "2026-08-31T01:30:24Z" },
+			],
+		});
+		assert.equal(result.unsettled, true);
+		assert.equal(result.reason, "record-incomplete");
+		assert.ok(result.problems.some((problem) => problem.includes("決定:")));
+	});
+
+	it("reports multiple complete format 3 records as ambiguous", () => {
+		const result = classifyDesignSettlement({
+			body: "普通の説明文。",
+			comments: [
+				{ body: format3, createdAt: "2026-08-31T01:30:24Z" },
+				{ body: format3, createdAt: "2026-09-01T00:00:00Z" },
+			],
+		});
+		assert.equal(result.unsettled, true);
+		assert.equal(result.reason, "record-ambiguous");
+		assert.ok(result.problems.some((problem) => problem.includes("multiple")));
+	});
+
+	it("reports format 3 records with mismatched decision and rationale axes as incomplete", () => {
+		const result = classifyDesignSettlement({
+			body: "普通の説明文。",
+			comments: [
+				{
+					body: format3.replace(
+						"- 保存方式: 障害範囲を限定できる",
+						"- 通知方式: 障害範囲を限定できる",
+					),
+					createdAt: "2026-08-31T01:30:24Z",
+				},
+			],
+		});
+		assert.equal(result.unsettled, true);
+		assert.equal(result.reason, "record-incomplete");
+		assert.ok(result.problems.some((problem) => problem.includes("axis")));
 	});
 
 	it("reports reader-first required lines in reverse order as incomplete", () => {
@@ -693,85 +776,50 @@ describe("parsePorcelainPaths", () => {
 });
 
 describe("buildDesignRecordTemplate", () => {
-	it("starts with the reader-first record contract in canonical order", () => {
-		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
-		assert.deepEqual(lines.slice(0, 4), [
-			"提案: <採用する変更>",
-			"理由: <目的と採用案の対応>",
-			"前提を外した対案: <列挙済みの集合外も検査する競合案>",
-			"対案を採らない理由: <外部制約または所有者に帰着する理由>",
-		]);
-	});
-
-	it("emits a skeleton that the terminal gate's own content check accepts", () => {
-		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
-		assert.deepEqual(classifyDesignRecordContent(lines.join("\n"), 0), {
-			status: "PASS",
-		});
-	});
-
-	it("emits a skeleton the gate identifies as the selection record", () => {
-		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
-		const entries = [
-			{ author: "filer", body: "普通の説明文。" },
-			{ author: "runner", body: lines.join("\n") },
+	it("emits the complete format 3 record independently of option count", () => {
+		const expected = [
+			"設計記録形式: 3",
+			"",
+			"決定:",
+			"- <軸名>（<実装 | 調査のみ | 待機 | 実装しない>）: <今回確定した範囲>",
+			"",
+			"理由:",
+			"- <軸名>: <目的との対応>",
+			"",
+			"案の処分:",
+			"- <採用 | 部分採用 | 保留 | 却下> — 元候補「<候補名>」— <理由または条件>",
+			"",
+			"前提検査 P1:",
+			"対象: <軸名、決定、または元候補名>",
+			"前提: <候補群が共有する前提>",
+			"前提を外した案: <前提が成立しない場合の検査案>",
+			"既存候補との差分: <一致、包含、組合せを含む具体的な差分>",
+			"検査案の処分 P1: <採用 | 部分採用 | 保留 | 却下> — <理由または条件>",
+			"",
+			"改訂履歴:",
+			"- なし",
 		];
-		assert.equal(selectDesignRecord(entries)?.author, "runner");
-	});
-
-	it("adds one unfilled numbered disposition row per enumerated option", () => {
-		const { lines } = buildDesignRecordTemplate({ optionCount: 3 });
 		assert.deepEqual(
-			lines.filter((line) => line.startsWith("案の処分 ")),
-			[
-				"案の処分 1: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
-				"案の処分 2: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
-				"案の処分 3: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
-			],
+			buildDesignRecordTemplate({ optionCount: 0 }).lines,
+			expected,
 		);
-		assert.ok(
-			lines.some((line) => /採用 \/ 却下 \/ 保留/.test(line)),
-			"expected visible disposition vocabulary",
+		assert.deepEqual(
+			buildDesignRecordTemplate({ optionCount: 3 }).lines,
+			expected,
 		);
-	});
-
-	it("keeps untouched enumerated-option templates failing the content check", () => {
-		for (const optionCount of [1, 2, 3]) {
-			const { lines } = buildDesignRecordTemplate({ optionCount });
-			assert.equal(
-				classifyDesignRecordContent(lines.join("\n"), optionCount).status,
-				"FAIL",
-				`optionCount ${optionCount}`,
-			);
-		}
-	});
-
-	it("omits the disposition line when the issue enumerates no options", () => {
-		const { lines } = buildDesignRecordTemplate({ optionCount: 0 });
-		assert.equal(
-			lines.some((l) => l.includes("処分")),
-			false,
+		assert.deepEqual(
+			buildDesignRecordTemplate({ optionCount: 3 }).lines.filter((line) =>
+				line.startsWith("案の処分 "),
+			),
+			[],
 		);
 	});
 
-	it("carries a note explaining that the line heads are machine-matched", () => {
-		const { note } = buildDesignRecordTemplate({ optionCount: 0 });
-		assert.match(note, /gate-check/);
-	});
-
-	// #768: the template has to name the actual token, not a paraphrase of
-	// it — a paraphrase can drift from what gate-check.mjs actually matches.
-	it("names the no-implementation token gate-check.mjs actually matches", () => {
-		const { note } = buildDesignRecordTemplate({ optionCount: 0 });
-		assert.ok(note.includes(NO_IMPLEMENTATION_TOKEN));
-	});
-
-	// #768 実害の再現: 「どこかに含める」と読める旧文言は、記録の一文がこの語を
-	// 主題として言及しただけの回を誤って SKIP させた。雛形は行頭宣言でなければ
-	// 判定されないことを明示する。
-	it("clarifies that merely mentioning the token elsewhere is not the declaration", () => {
-		const { note } = buildDesignRecordTemplate({ optionCount: 0 });
-		assert.match(note, /宣言にならない/);
+	it("leaves candidate completeness and semantic consistency to human review", () => {
+		const { note } = buildDesignRecordTemplate();
+		assert.match(note, /候補.*網羅/);
+		assert.match(note, /意味的.*整合/);
+		assert.match(note, /人間レビュー/);
 	});
 });
 

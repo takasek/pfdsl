@@ -624,7 +624,7 @@ describe("runCycleStatus", () => {
 		assert.equal(result.headStateError, "fatal: not a git repository");
 	});
 
-	it("emits the design-record template with the issue's enumerated option count", async () => {
+	it("keeps the format 3 design-record template independent of enumerated option count", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				issueNumbers: [721],
@@ -638,15 +638,12 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
+		assert.equal(result.designRecordTemplate.lines[0], "設計記録形式: 3");
 		assert.deepEqual(
 			result.designRecordTemplate.lines.filter((line) =>
 				line.startsWith("案の処分 "),
 			),
-			[
-				"案の処分 1: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
-				"案の処分 2: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
-				"案の処分 3: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
-			],
+			[],
 		);
 	});
 
@@ -752,10 +749,7 @@ describe("runCycleStatus", () => {
 		const result = await runCycleStatus(baseDeps({}));
 		assert.deepEqual(result.designUnsettledFor, []);
 		assert.ok(result.designRecordTemplate.lines.length > 0);
-		assert.equal(
-			result.designRecordTemplate.lines.some((l) => l.includes("処分")),
-			false,
-		);
+		assert.ok(result.designRecordTemplate.lines.includes("案の処分:"));
 	});
 
 	// #809: unconditional, same posture as designRecordTemplate — whether this
