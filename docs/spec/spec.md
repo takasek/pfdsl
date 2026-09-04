@@ -28,7 +28,7 @@ PFDSL は以下を目的とする。
 
 front matter が存在しないファイルも有効とする。
 front matter はファイル先頭にのみ記述できる。
-プレーンスカラー値の同一行に空白に続く `#` が現れると、YAML では以降がコメントとして扱われる。この形は FM003 として警告し、strict mode では error とする。意図した値に `#` を含める場合は値を引用符で囲むか block scalar を使用する。
+mapping key ではない YAML プレーンスカラー値の同一行に空白に続く `#` が現れると、YAML では以降がコメントとして扱われる。block sequence 要素と flow collection 内の scalar 値も対象とし、quoted scalar・block scalar・collection 自体の後の comment・空値または comment-only 値は除く。この形は FM003 として警告し、strict mode では error とする。意図した値に `#` を含める場合は値を引用符で囲むか block scalar を使用する。
 
 ---
 

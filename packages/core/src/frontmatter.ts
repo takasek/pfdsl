@@ -1,11 +1,4 @@
-import {
-	isMap,
-	isScalar,
-	isSeq,
-	parseDocument,
-	parse as parseYaml,
-	visit,
-} from "yaml";
+import { isPair, parseDocument, parse as parseYaml, visit } from "yaml";
 import { detectChildIndent } from "./frontmatter-text.js";
 import type {
 	Diagnostic,
@@ -141,15 +134,14 @@ export function loadFrontmatter(
 	}
 
 	visit(parseDocument(yamlText), {
-		Pair(_key, pair, path) {
+		Scalar(_key, scalar, path) {
 			if (
-				!isScalar(pair.value) ||
-				pair.value.type !== "PLAIN" ||
-				!pair.value.range ||
-				path.some((step) => Boolean((isMap(step) || isSeq(step)) && step.flow))
+				scalar.type !== "PLAIN" ||
+				!scalar.range ||
+				path.some((step) => isPair(step) && step.key === scalar)
 			)
 				return;
-			const valueEnd = pair.value.range[1];
+			const valueEnd = scalar.range[1];
 			const comment = /^[ \t]+#/.exec(yamlText.slice(valueEnd));
 			if (!comment) return;
 			const markerOffset = valueEnd + comment[0].length - 1;

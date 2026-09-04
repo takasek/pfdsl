@@ -82,6 +82,12 @@ artifact:
     criteria: node packages/cli/dist/cli.js fmt --write が実装され動作確認済み
     externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
     group: run_outputs
+  format_diagnostics:
+    label: 整形時診断
+    description: fmt が整形済みソースとともに報告する警告・エラー一覧
+    criteria: node packages/cli/dist/cli.js fmt が FM003 を標準エラーへ報告する
+    externalStakeholders: [ CLIユーザー ]
+    group: run_outputs
   dot_graph:
     label: DOTグラフ
     description: Graphviz DOT形式テキスト（renderコマンドのデフォルト出力）
@@ -532,7 +538,7 @@ parsed_doc >> normalize -> normalized_graph
 
 [normalized_graph, parsed_doc] >> validate -> diagnostics_report
 
-pfdsl_source >> format -> formatted_source
+pfdsl_source >> format -> [format_diagnostics, formatted_source]
 
 pfdsl_source >> sort_meta -> sorted_source
 
