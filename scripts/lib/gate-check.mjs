@@ -942,6 +942,8 @@ export function parseFormat3DesignRecord(body) {
 			problems.push("案の処分: contains an invalid disposition");
 			continue;
 		}
+		if (match[2].trim().length === 0)
+			problems.push("案の処分: contains an empty original candidate");
 		if (match[1] === "部分採用") {
 			const partial =
 				/採用部分\s*[:：]\s*([^;；—]+)[;；]\s*残部\s*[:：]\s*(却下|保留)\s+—\s*(.+)$/.test(
@@ -955,6 +957,16 @@ export function parseFormat3DesignRecord(body) {
 	}
 
 	const premiseNumbers = premiseHeaders.map(({ number }) => number);
+	if (
+		dispositionIndex !== undefined &&
+		historyIndex !== undefined &&
+		premiseHeaders.some(
+			({ index }) => index <= dispositionIndex || index >= historyIndex,
+		)
+	)
+		problems.push(
+			"前提検査 Pn: blocks must appear after 案の処分: and before 改訂履歴:",
+		);
 	if (new Set(premiseNumbers).size !== premiseNumbers.length)
 		problems.push("duplicate premise-test number");
 	if (

@@ -2103,6 +2103,32 @@ describe("format 3 design records", () => {
 		});
 	}
 
+	it("rejects a whitespace-only original candidate name", () => {
+		const result = parseFormat3DesignRecord(
+			format3Record().replace("元候補「A」", "元候補「 \t 」"),
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.problems.join("\n"), /original candidate/);
+	});
+
+	it("rejects a complete premise-test block before the rationale section", () => {
+		const premise = [
+			"前提検査 P1:",
+			"対象: 保存方式 / A",
+			"前提: 保存方式と通知方式を同時に変える必要がある",
+			"前提を外した案: 保存方式だけを段階導入する",
+			"既存候補との差分: 元候補は両方式を一組としていた",
+			"検査案の処分 P1: 採用 — 今回の決定に含める",
+		].join("\n");
+		const result = parseFormat3DesignRecord(
+			format3Record()
+				.replace(`${premise}\n`, "")
+				.replace("理由:", `${premise}\n理由:`),
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.problems.join("\n"), /前提検査 Pn/);
+	});
+
 	it("exposes the format 3 vocabulary", () => {
 		assert.equal(FORMAT_3_MARKER, "設計記録形式: 3");
 		assert.deepEqual(FORMAT_3_DECISION_KINDS, [
