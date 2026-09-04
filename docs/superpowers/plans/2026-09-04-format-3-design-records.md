@@ -297,7 +297,7 @@ node scripts/check-generated-drift.mjs -- .claude/skills/pfd-ops/install
 
 Expected: PASS with no drift.
 
-- [x] **Step 3: Run fresh-context pressure scenarios**
+- [ ] **Step 3: Run fresh-context pressure scenarios**
 
 Run five samples each for a bounded single-axis change, a two-axis mixed `実装` and `待機` decision, and a partial-adoption decision.
 Use only the updated canonical `work-cycle.md` as operational context.
@@ -306,7 +306,7 @@ Expected: all 15 responses present every decision axis before candidate disposit
 
 These 15 samples are shape coverage, not before/after evidence.
 
-- [x] **Step 3a: Run a controlled same-prompt comparison**
+- [ ] **Step 3a: Run a controlled same-prompt comparison**
 
 Reconstruct one bounded-change prompt only from facts common to all five historical responses, because the retained historical task payload is encrypted and cannot be reused as a direct comparator.
 Use one prompt, the stated runtime conditions, the identified old and new contract revisions and hashes, and one explicit order classifier for five fresh contexts per contract.
