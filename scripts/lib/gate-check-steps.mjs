@@ -523,6 +523,40 @@ export function collectCycleWindow({ exec, base }) {
 }
 
 /**
+ * Format the cycle window without presenting a stale origin ref as current.
+ * The fetch is report material, not a verdict: its failure changes how the window is labelled but does not make the terminal gate fail.
+ * @param {{fetchResult: {ok: boolean, out: string}, window: {ok: boolean, entries?: {sha: string, subject: string}[], error?: string, note?: string}}} params
+ * @returns {string[]}
+ */
+export function formatCycleWindowReport({ fetchResult, window }) {
+	if (!fetchResult.ok) {
+		const lines = [
+			`origin freshness could not be established: ${fetchResult.out.trim()}`,
+		];
+		if (!window.ok) {
+			lines.push(
+				`unverified cycle window could not be measured: ${window.error}`,
+			);
+		} else if (window.entries.length > 0) {
+			lines.push("unverified entries from the existing origin ref:");
+			for (const { sha, subject } of window.entries) {
+				lines.push(`  ${sha} ${subject}`);
+			}
+		}
+		if (window.note) lines.push(`(${window.note})`);
+		return lines;
+	}
+
+	if (!window.ok) return [`could not be measured: ${window.error}`];
+	const lines =
+		window.entries.length === 0
+			? ["(none)"]
+			: window.entries.map(({ sha, subject }) => `${sha} ${subject}`);
+	if (window.note) lines.push(`(${window.note})`);
+	return lines;
+}
+
+/**
  * knowledge-artifact size direction: did tracked knowledge artifacts
  * (bindings, ADRs, SKILL.md) grow without an explicit override, on a cycle
  * whose linked issue declares `Size-Intent: shrink` (issue #669's protection
