@@ -13,6 +13,7 @@ import {
 	designRecordStep,
 	fetchDesignRecordEditInfo,
 	firstCommitAuthorDate,
+	formatCycleWindowReport,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
@@ -1411,6 +1412,54 @@ describe("collectCycleWindow", () => {
 		assert.equal(result.ok, true);
 		assert.deepEqual(result.entries, [{ sha: "aaa1111", subject: "fix: b" }]);
 		assert.match(result.note ?? "", /could not/);
+	});
+});
+
+describe("formatCycleWindowReport", () => {
+	it("does not report a confirmed empty window when fetch failed", () => {
+		const lines = formatCycleWindowReport({
+			fetchResult: {
+				ok: false,
+				out: "fatal: could not open FETCH_HEAD",
+			},
+			window: { ok: true, entries: [] },
+		});
+		assert.deepEqual(lines, [
+			"origin freshness could not be established: fatal: could not open FETCH_HEAD",
+		]);
+	});
+
+	it("preserves the confirmed window when fetch succeeded", () => {
+		const lines = formatCycleWindowReport({
+			fetchResult: { ok: true, out: "" },
+			window: {
+				ok: true,
+				entries: [{ sha: "aaa1111", subject: "fix: base" }],
+			},
+		});
+		assert.deepEqual(lines, ["aaa1111 fix: base"]);
+		assert.deepEqual(
+			formatCycleWindowReport({
+				fetchResult: { ok: true, out: "" },
+				window: { ok: true, entries: [] },
+			}),
+			["(none)"],
+		);
+	});
+
+	it("labels entries from the existing origin ref as unverified after fetch failure", () => {
+		const lines = formatCycleWindowReport({
+			fetchResult: { ok: false, out: "fatal: fetch denied" },
+			window: {
+				ok: true,
+				entries: [{ sha: "aaa1111", subject: "fix: base" }],
+			},
+		});
+		assert.deepEqual(lines, [
+			"origin freshness could not be established: fatal: fetch denied",
+			"unverified entries from the existing origin ref:",
+			"  aaa1111 fix: base",
+		]);
 	});
 });
 

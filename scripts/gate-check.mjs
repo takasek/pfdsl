@@ -47,6 +47,7 @@ import {
 	deletedFilesSince,
 	designRecordStep,
 	fetchDesignRecordEditInfo,
+	formatCycleWindowReport,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
@@ -119,8 +120,8 @@ const exec = (file, execArgs, input) =>
 	});
 const node = (execArgs, input) => exec(process.execPath, execArgs, input);
 
-// Best-effort — a stale/missing origin ref surfaces as a clear diff failure below.
-exec("git", ["fetch", "origin"]);
+// Best-effort — a stale/missing origin ref surfaces as a clear diff failure below, while a usable existing ref is labelled unverified in the cycle window.
+const fetchResult = exec("git", ["fetch", "origin"]);
 
 const diff = changedFilesSince({ exec, base });
 if (!diff.ok) {
@@ -539,16 +540,9 @@ if (sizeDeltas.length > 0) {
 	console.log(
 		"\nCycle window (base commits this tree lacked, or that landed after its first commit):",
 	);
-	if (!window.ok) {
-		console.log(`  could not be measured: ${window.error}`);
-	} else if (window.entries.length === 0) {
-		console.log("  (none)");
-	} else {
-		for (const { sha, subject } of window.entries) {
-			console.log(`  ${sha} ${subject}`);
-		}
+	for (const line of formatCycleWindowReport({ fetchResult, window })) {
+		console.log(`  ${line}`);
 	}
-	if (window.note) console.log(`  (${window.note})`);
 }
 
 // Report material: the package layers the diff touched, for the PR body. Not a
