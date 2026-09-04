@@ -12,7 +12,7 @@
  * Usage:
  *   node scripts/check-diag-registry.mjs
  *
- * Exit 0 = spec and registry agree, Exit 1 = drift found.
+ * Exit 0 = spec and registry agree. Exit 1 = dist is stale or drift found.
  */
 
 import { readFileSync } from "node:fs";
@@ -23,14 +23,24 @@ import {
 	evaluateDiagRegistryDiff,
 	parseSpecDiagTable,
 } from "./lib/diag-registry-check.mjs";
+import { isDistStale } from "./lib/dist-freshness.mjs";
 import { emitLinesAndExit } from "./lib/emit-lines.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
+const coreDist = resolve(root, "packages/core/dist/index.js");
 
-const { DIAGNOSTIC_REGISTRY } = await import(
-	resolve(root, "packages/core/dist/index.js")
-);
+if (isDistStale(coreDist)) {
+	emitLinesAndExit({
+		exitCode: 1,
+		stdoutLines: [],
+		stderrLines: [
+			"Core dist is missing or stale. Run `pnpm -r build` before check-diag-registry.",
+		],
+	});
+}
+
+const { DIAGNOSTIC_REGISTRY } = await import(coreDist);
 
 const specText = readFileSync(resolve(root, "docs/spec/spec.md"), "utf8");
 const specCodes = parseSpecDiagTable(specText);
