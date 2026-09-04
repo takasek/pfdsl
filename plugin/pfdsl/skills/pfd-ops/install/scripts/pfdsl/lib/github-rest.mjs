@@ -19,6 +19,47 @@ const PER_PAGE = 100;
 // `page` parameter isn't advancing, not that the repo got big.
 const MAX_PAGES = 100;
 
+export const DESIGN_RECORD_EDIT_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    issue(number: $number) {
+      lastEditedAt
+      comments(first:100) { totalCount nodes { id lastEditedAt } }
+    }
+  }
+}`;
+
+const UNEXPECTED_DESIGN_RECORD_SHAPE_ERROR =
+	"unexpected GraphQL response shape for design-record edit info";
+
+/**
+ * Normalize a GraphQL response into the design-record edit-info contract.
+ * @param {unknown} payload
+ * @returns {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}}
+ */
+export function normalizeDesignRecordEditResponse(payload) {
+	const issueData = payload?.data?.repository?.issue;
+	const nodes = issueData?.comments?.nodes;
+	const validTimestamp = (value) => value === null || typeof value === "string";
+	if (
+		!issueData ||
+		!validTimestamp(issueData.lastEditedAt) ||
+		typeof issueData.comments?.totalCount !== "number" ||
+		!Array.isArray(nodes) ||
+		!nodes.every(
+			(node) =>
+				typeof node?.id === "string" && validTimestamp(node.lastEditedAt),
+		)
+	)
+		throw new Error(UNEXPECTED_DESIGN_RECORD_SHAPE_ERROR);
+	return {
+		issueLastEditedAt: issueData.lastEditedAt,
+		comments: {
+			totalCount: issueData.comments.totalCount,
+			nodes,
+		},
+	};
+}
+
 /**
  * Extract {owner, repo} from a git remote URL. Handles https, git@ scp-like,
  * and reverse-proxied remotes (this environment's origin is rewritten to a
@@ -282,6 +323,7 @@ export async function fetchIssueView(
 	}
 	if (comments) {
 		result.comments = comments.map((c) => ({
+			id: c.node_id,
 			author: { login: c.user?.login },
 			body: c.body ?? "",
 			createdAt: c.created_at,
@@ -289,6 +331,45 @@ export async function fetchIssueView(
 	}
 
 	return result;
+}
+
+/**
+ * Ask GraphQL for an issue and its comments' edit timestamps. REST's
+ * `updated_at` also changes when a comment is added, so it cannot establish
+ * whether the design record itself was edited.
+ * @param {string} owner
+ * @param {string} repo
+ * @param {string} token
+ * @param {number} number
+ * @param {typeof fetch} [fetchImpl]
+ * @returns {Promise<{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}>}
+ */
+export async function fetchDesignRecordEditInfo(
+	owner,
+	repo,
+	token,
+	number,
+	fetchImpl = proxyAwareFetch,
+) {
+	const res = await request(fetchImpl, `${API_ROOT}/graphql`, {
+		method: "POST",
+		headers: {
+			...authHeaders({ token }),
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			query: DESIGN_RECORD_EDIT_QUERY,
+			variables: { owner, repo, number },
+		}),
+	});
+	const payload = await res.json();
+	if (payload.errors?.length)
+		throw new Error(
+			`GitHub GraphQL API error for ${owner}/${repo}#${number}: ${payload.errors
+				.map((e) => e.message)
+				.join("; ")}`,
+		);
+	return normalizeDesignRecordEditResponse(payload);
 }
 
 /**

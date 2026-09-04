@@ -486,6 +486,7 @@ describe("fetchIssueView", () => {
 			if (url.includes("/comments"))
 				return jsonResponse([
 					{
+						node_id: "IC_kwDOCommentNodeId",
 						body: "前提: ...",
 						user: { login: "takasek" },
 						created_at: "2026-08-02T00:00:00Z",
@@ -504,6 +505,7 @@ describe("fetchIssueView", () => {
 		assert.deepEqual(result, {
 			comments: [
 				{
+					id: "IC_kwDOCommentNodeId",
 					author: { login: "takasek" },
 					body: "前提: ...",
 					createdAt: "2026-08-02T00:00:00Z",

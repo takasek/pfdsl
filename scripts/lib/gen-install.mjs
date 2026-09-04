@@ -15,10 +15,11 @@ import {
 	rmSync,
 	statSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, posix } from "node:path";
 
 import { listInstallFiles } from "../../.claude/skills/pfd-ops/scripts/check-install-sync.mjs";
 import { INSTALL_TEMPLATE_PATHS } from "./install-templates.mjs";
+import { extractRelativeImports } from "./relative-imports.mjs";
 
 export const INSTALL_DIR_RELATIVE = ".claude/skills/pfd-ops/install";
 
@@ -48,6 +49,22 @@ export function genInstall(root, templatePaths = INSTALL_TEMPLATE_PATHS) {
 		}
 	}
 
+	const templateSet = new Set(templatePaths);
+	for (const rel of templatePaths) {
+		if (!rel.endsWith(".mjs")) continue;
+		const source = readFileSync(join(root, rel), "utf-8");
+		for (const specifier of extractRelativeImports(source)) {
+			const importedRel = posix.normalize(
+				posix.join(posix.dirname(rel), specifier),
+			);
+			if (!templateSet.has(importedRel)) {
+				throw new Error(
+					`gen-install: relative import is not included in template paths: ${rel} imports ${specifier} (${importedRel})`,
+				);
+			}
+		}
+	}
+
 	const changed = [];
 	const unchanged = [];
 	for (const rel of templatePaths) {
@@ -66,7 +83,6 @@ export function genInstall(root, templatePaths = INSTALL_TEMPLATE_PATHS) {
 
 	// Anything under install/ that isn't a listed template is stale — remove
 	// it so dropping a template from the list actually deletes its mirror.
-	const templateSet = new Set(templatePaths);
 	const removed = [];
 	if (existsSync(installDir)) {
 		for (const rel of listInstallFiles(installDir)) {

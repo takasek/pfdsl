@@ -105,6 +105,46 @@ describe("genInstall", () => {
 		assert.equal(existsSync(installPath(tmp, "present.txt")), false);
 	});
 
+	it("rejects an unlisted relative import before changing the existing mirror", () => {
+		writeFile(tmp, "scripts/main.mjs", 'import "./helper.mjs";\n');
+		writeFile(tmp, "scripts/helper.mjs", "export const value = 1;\n");
+		writeFile(
+			tmp,
+			".claude/skills/pfd-ops/install/scripts/main.mjs",
+			"previous mirror content\n",
+		);
+		writeFile(
+			tmp,
+			".claude/skills/pfd-ops/install/stale.txt",
+			"existing stale file\n",
+		);
+
+		assert.throws(
+			() => genInstall(tmp, ["scripts/main.mjs"]),
+			/gen-install: relative import is not included in template paths: scripts\/main\.mjs imports \.\/helper\.mjs \(scripts\/helper\.mjs\)/,
+		);
+		assert.equal(
+			readFileSync(installPath(tmp, "scripts/main.mjs"), "utf-8"),
+			"previous mirror content\n",
+		);
+		assert.equal(
+			readFileSync(installPath(tmp, "stale.txt"), "utf-8"),
+			"existing stale file\n",
+		);
+	});
+
+	it("copies a relative import when both modules are listed", () => {
+		writeFile(tmp, "scripts/main.mjs", 'import "./helper.mjs";\n');
+		writeFile(tmp, "scripts/helper.mjs", "export const value = 1;\n");
+
+		genInstall(tmp, ["scripts/main.mjs", "scripts/helper.mjs"]);
+
+		assert.equal(
+			readFileSync(installPath(tmp, "scripts/helper.mjs"), "utf-8"),
+			"export const value = 1;\n",
+		);
+	});
+
 	it("is idempotent: running twice produces no second-run changes", () => {
 		writeFile(tmp, "a.txt", "hello");
 		writeFile(tmp, "sub/b.txt", "world");
