@@ -22,7 +22,17 @@ import { HARNESS_CAPABILITY_CONTRACT } from "./harness-inventory.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const PFD_LENS_BASH_RESTRICTION =
-	"Bash は `pfdsl check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。";
+	"Bash は CLI 実体を解決するための `test -f package.json` と `test -f packages/cli/package.json` と `test -f packages/cli/dist/cli.js`、解決した CLI による `check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。";
+const PFD_LENS_CLI_RESOLUTION = `
+## CLI 実体の解決
+
+監査コマンドを実行する前に、リポジトリルートで \`test -f package.json\` と \`test -f packages/cli/package.json\` を実行し、存在する manifest だけを Read して CLI 実体を1回だけ解決する。
+root \`package.json\` の \`name\` が \`pfdsl\` かつ \`private\` が \`true\` であり、\`packages/cli/package.json\` の \`name\` が \`@pfdsl/cli\` かつ \`bin.pfdsl\` が \`./dist/cli.js\` なら upstream repository と判定する。upstream repository では \`test -f packages/cli/dist/cli.js\` を実行し、存在すればこの監査中の CLI 実体を \`node packages/cli/dist/cli.js\` とする。存在しなければ \`packages/cli/dist/cli.js not built; run 'pnpm -r build' first\` と報告して停止し、公開 CLI へ fallback しない。
+どちらかの manifest が存在しない場合や、いずれかの identity が一致しない場合は採用リポと判定し、この監査中の CLI 実体を導入済みの \`pfdsl\` とする。
+以下の \`<resolved-cli>\` はここで1回だけ選んだ同じ CLI 実体を表す。\`<resolved-cli> check <file>\`、\`<resolved-cli> graph describe <file> <id>\`、その他すべての \`<resolved-cli> graph ...\` を、途中で実体を解決し直さずに使う。
+
+対象として明示された .pfdsl ファイル以外は読まない。ただし CLI 実体の解決に使うリポジトリルートの \`package.json\` と \`packages/cli/package.json\`、カタログの読込手順が指定する観点カタログはこの読取境界の例外とする。
+`;
 
 function commandRecord({
 	name = "pfd-cycle",
@@ -378,9 +388,45 @@ describe("agentCapabilityToCodexToml", () => {
 		assert.match(output, /^sandbox_mode = "read-only"$/m);
 	});
 
+	it("preserves one blank-context CLI resolution for check, graph describe, and other graph queries", () => {
+		const output = agentCapabilityToCodexToml(
+			agentRecord({
+				body: `\n${PFD_LENS_BASH_RESTRICTION}\n${PFD_LENS_CLI_RESOLUTION}`,
+			}),
+		);
+		const instructions = parseTomlDeveloperInstructions(output);
+
+		assert.match(
+			instructions,
+			/root `package\.json` の `name` が `pfdsl` かつ `private` が `true`/,
+		);
+		assert.match(
+			instructions,
+			/`packages\/cli\/package\.json` の `name` が `@pfdsl\/cli` かつ `bin\.pfdsl` が `.\/dist\/cli\.js`/,
+		);
+		assert.match(
+			instructions,
+			/どちらかの manifest が存在しない場合や、いずれかの identity が一致しない場合は採用リポと判定し/,
+		);
+		assert.match(
+			instructions,
+			/packages\/cli\/dist\/cli\.js not built; run 'pnpm -r build' first/,
+		);
+		assert.match(instructions, /公開 CLI へ fallback しない/);
+		assert.match(instructions, /`<resolved-cli> check <file>`/);
+		assert.match(instructions, /`<resolved-cli> graph describe <file> <id>`/);
+		assert.match(instructions, /その他すべての `<resolved-cli> graph \.\.\.`/);
+		assert.match(instructions, /途中で実体を解決し直さずに使う/);
+		assert.match(
+			instructions,
+			/`package\.json` と `packages\/cli\/package\.json`、カタログの読込手順が指定する観点カタログはこの読取境界の例外/,
+		);
+	});
+
 	it("rejects pfd-lens when its expected Bash restriction clause changes", () => {
 		for (const body of [
 			"\nBash は `pfdsl delete <file>` のみ許可される。\n",
+			`\n${PFD_LENS_BASH_RESTRICTION} Bash は \`pfdsl fmt --write\` も許可される。\n`,
 			`\n${PFD_LENS_BASH_RESTRICTION}\n${PFD_LENS_BASH_RESTRICTION}\n`,
 		]) {
 			assert.throws(
