@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make pfd-ops design dialogue and persisted selection records start with the proposal and rationale while preserving premise-negation review and legacy records.
+**Goal:** Replace the single-proposal reader-first record with a versioned format that presents every decided axis first and records original-option dispositions, premise tests, and pre-implementation revisions without claiming semantic guarantees from structural checks.
 
-**Architecture:** `scripts/lib/gate-check.mjs` owns the new and legacy prefix sets, the fixed migration cutoff, format selection, and content classification. `scripts/lib/cycle-status.mjs` consumes those contracts to emit only the new reader-first template, while canonical pfd-ops references define the human-facing order and generators project the change to every Claude/Codex mirror.
+**Architecture:** `scripts/lib/gate-check.mjs` remains the source of truth for the three format generations, parses format 3 into a small structural result, rejects ambiguous format 3 records, and keeps semantic review outside the blocking verdict. `scripts/lib/cycle-status.mjs` emits the format 3 template from the shared contract, while canonical pfd-ops references define the dialogue order and human-review boundary before generators project them to every Claude and Codex mirror.
 
 **Tech Stack:** Node.js ESM, `node:test`, Markdown skills, pfdsl CLI, repository generation scripts.
 
@@ -12,77 +12,133 @@
 
 ## Global Constraints
 
-- Migration cutoff is exactly `2026-08-30T09:32:50Z`.
-- Records created before the cutoff may use the old `前提:` / `否定案:` / `却下理由:` contract.
-- Records created at or after the cutoff must use `提案:` / `理由:` / `前提を外した対案:` / `対案を採らない理由:`.
-- A new-format candidate outranks a legacy candidate when both exist.
-- `案の処分 N:` and `実装しない:` retain their current semantics.
+- Format 1 cutoff is exactly `2026-08-30T09:32:50Z`.
+- Format 2 is valid from `2026-08-30T09:32:50Z` through `2026-08-31T01:30:23Z`.
+- Format 3 cutoff is exactly `2026-08-31T01:30:24Z`.
+- Records created at or after the format 3 cutoff must contain `設計記録形式: 3` and the complete format 3 structure.
+- The only normative decision text is the list under `決定:`; every later section is rationale or audit evidence.
+- Format 3 uses the display kinds `実装`, `調査のみ`, `待機`, and `実装しない`, but no kind grants authority or permission.
+- Original options occur only under `案の処分:`; premise-test alternatives occur only in their `前提検査 Pn` block.
+- Format 3 does not use issue-derived `optionCount` as a blocking completeness claim.
+- Multiple complete format 3 comments fail closed; replacement by a second comment is outside this change.
+- Machine checks report structural conformance, not design validity.
 - Edit canonical sources only, then regenerate all delivery mirrors.
 
 ---
 
-### Task 1: Version the machine-readable design-record contract
+### Task 1: Parse and select format 3 records
 
 **Files:**
+- Modify: `.pfdsl/roadmap.pfdsl`
 - Modify: `scripts/lib/gate-check.mjs`
 - Modify: `scripts/lib/gate-check.test.mjs`
 - Modify: `scripts/lib/gate-check-steps.mjs`
 - Modify: `scripts/lib/gate-check-steps.test.mjs`
 
 **Interfaces:**
-- Produces: `READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES`, `LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES`, `DESIGN_RECORD_FORMAT_CUTOFF`, and a helper that resolves the required prefix set from `{body, createdAt}`.
-- Preserves: `selectDesignRecord(entries)`, `classifyDesignRecordContent(...)`, timing validation, numbered dispositions, and no-implementation detection.
+- Produces: `DESIGN_RECORD_V2_CUTOFF`, `DESIGN_RECORD_V3_CUTOFF`, `FORMAT_3_MARKER`, `FORMAT_3_DECISION_KINDS`, and `FORMAT_3_DISPOSITIONS`.
+- Produces: `parseFormat3DesignRecord(body)` returning `{status: "PASS", axes: string[], allNoImplementation: boolean}` or `{status: "FAIL", problems: string[]}`.
+- Produces: `resolveDesignRecord(entries)` returning `{status: "selected", record}`, `{status: "invalid", record, problems}`, `{status: "none"}`, or `{status: "ambiguous", detail}`.
+- Preserves: format 1 and format 2 grandfathering, Markdown line-head normalization, record edit-history lookup, and the rule that incomplete newer fragments do not shadow a complete older record.
 
-- [ ] **Step 1: Add failing cutoff and precedence tests**
+- [ ] **Step 1: Reopen the roadmap artifact before implementation**
 
-Add tests covering a complete legacy comment at `2026-08-30T09:32:49Z`, the same legacy body at `2026-08-30T09:32:50Z`, a complete reader-first body after the cutoff, an incomplete reader-first body, and a reader-first candidate competing with a legacy candidate.
+Run:
 
-```js
-const readerFirst = [
-	"提案: x",
-	"理由: y",
-	"前提を外した対案: z",
-	"対案を採らない理由: owner constraint",
-].join("\n");
-const legacy = ["前提: x", "否定案: y", "却下理由: z"].join("\n");
+```bash
+node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl reader_first_design_records status wip
 ```
 
-- [ ] **Step 2: Run targeted tests and verify RED**
+Update the artifact description and criteria so they name the version 3 decision-first structure, three-generation migration, and structural-only gate verdict.
 
-Run: `node --test scripts/lib/gate-check.test.mjs scripts/lib/gate-check-steps.test.mjs`
+- [ ] **Step 2: Add failing parser tests**
 
-Expected: FAIL because the new constants and cutoff-aware classification do not exist and post-cutoff legacy records still pass.
-
-- [ ] **Step 3: Implement the minimal versioned contract**
-
-Define the exact cutoff and both prefix arrays, make record selection prefer any reader-first candidate, grandfather legacy-only candidates only before the cutoff, and pass the selected record timestamp into content classification.
+Add a `format3Record()` test helper that returns this smallest complete record:
 
 ```js
-export const DESIGN_RECORD_FORMAT_CUTOFF = "2026-08-30T09:32:50Z";
-export const READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES = [
-	"提案:",
-	"理由:",
-	"前提を外した対案:",
-	"対案を採らない理由:",
-];
-export const LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES = [
-	"前提:",
-	"否定案:",
-	"却下理由:",
-];
+function format3Record() {
+	return [
+		"設計記録形式: 3",
+		"決定:",
+		"- 保存方式（実装）: Aを段階導入する",
+		"理由:",
+		"- 保存方式: 障害範囲を限定できる",
+		"案の処分:",
+		"- 部分採用 — 元候補「A」— 採用部分: 索引; 残部: 保留 — 負荷計測後に再検討",
+		"前提検査 P1:",
+		"対象: 保存方式 / A",
+		"前提: 保存方式と通知方式を同時に変える必要がある",
+		"前提を外した案: 保存方式だけを段階導入する",
+		"既存候補との差分: 元候補は両方式を一組としていた",
+		"検査案の処分 P1: 採用 — 今回の決定に含める",
+		"改訂履歴:",
+		"- なし",
+	].join("\n");
+}
 ```
 
-- [ ] **Step 4: Run targeted tests and verify GREEN**
+Test a valid single-axis record, multiple decision axes, every display kind, every disposition, a partial adoption missing its remainder, mismatched decision and rationale axis sets, duplicate axes, missing and out-of-order sections, empty values, missing and duplicate premise-test numbers, template placeholders, and conflicting initial and revised history rows.
 
-Run: `node --test scripts/lib/gate-check.test.mjs scripts/lib/gate-check-steps.test.mjs`
+- [ ] **Step 3: Add failing generation-selection tests**
 
-Expected: PASS with cutoff boundary, precedence, timing, disposition, and Markdown normalization tests green.
+Cover the format 1 cutoff, both edges of the format 2 interval, the format 3 cutoff, coexistence of one complete format 3 record with complete older records, an incomplete format 3 fragment beside a complete format 2 record, an invalid timestamp, and two complete format 3 comments.
 
-- [ ] **Step 5: Commit the machine contract**
+Assert that two complete format 3 comments return:
 
-Commit subject: `feat(pfd-ops): version design record format`
+```js
+{
+	status: "ambiguous",
+	detail: "multiple complete format 3 design records",
+}
+```
 
-### Task 2: Emit the reader-first template
+- [ ] **Step 4: Run targeted tests and verify RED**
+
+Run:
+
+```bash
+node --test scripts/lib/gate-check.test.mjs scripts/lib/gate-check-steps.test.mjs
+```
+
+Expected: FAIL because the format 3 constants, parser, and ambiguity result do not exist.
+
+- [ ] **Step 5: Implement the minimal structural parser**
+
+Add constants with the exact cutoff and vocabulary from the spec.
+Parse line heads and section boundaries without interpreting rationale prose, candidate identity, or semantic consistency.
+Require exact decision and rationale axis-set equality because both sets come from explicit format 3 labels.
+For `部分採用`, require non-empty `採用部分:` and `残部: 却下|保留` segments, but leave their adequacy to human review.
+
+```js
+export const DESIGN_RECORD_V2_CUTOFF = "2026-08-30T09:32:50Z";
+export const DESIGN_RECORD_V3_CUTOFF = "2026-08-31T01:30:24Z";
+export const FORMAT_3_MARKER = "設計記録形式: 3";
+export const FORMAT_3_DECISION_KINDS = ["実装", "調査のみ", "待機", "実装しない"];
+export const FORMAT_3_DISPOSITIONS = ["採用", "部分採用", "保留", "却下"];
+```
+
+- [ ] **Step 6: Implement fail-closed selection and effective timing**
+
+Implement `resolveDesignRecord(entries)` so exactly one complete format 3 record outranks complete format 2 and format 1 records, while two complete format 3 records return `ambiguous`.
+Keep incomplete or timestamp-invalid records available for diagnostics only when no complete valid generation exists.
+In `designRecordStep`, treat ambiguity as FAIL and compare the first implementation commit with the later of the selected comment's valid `createdAt` and resolved `lastEditedAt`.
+Only let format 3 skip the no-implementation timing path when every decision axis has kind `実装しない`.
+
+- [ ] **Step 7: Run targeted tests and verify GREEN**
+
+Run:
+
+```bash
+node --test scripts/lib/gate-check.test.mjs scripts/lib/gate-check-steps.test.mjs
+```
+
+Expected: PASS for all three generations, format 3 structure, ambiguity handling, edit timing, and all-no-implementation behavior.
+
+- [ ] **Step 8: Commit the machine contract**
+
+Commit subject: `feat(pfd-ops): validate format 3 design records`
+
+### Task 2: Emit and classify the format 3 template
 
 **Files:**
 - Modify: `scripts/lib/cycle-status.mjs`
@@ -90,103 +146,196 @@ Commit subject: `feat(pfd-ops): version design record format`
 - Modify: `scripts/lib/cycle-status-steps.test.mjs`
 
 **Interfaces:**
-- Consumes: `READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES` and cutoff-aware record helpers from Task 1.
-- Produces: `buildDesignRecordTemplate()` whose first four lines are the reader-first contract in canonical order.
+- Consumes: `FORMAT_3_MARKER`, `FORMAT_3_DECISION_KINDS`, `FORMAT_3_DISPOSITIONS`, `parseFormat3DesignRecord`, and `resolveDesignRecord` from Task 1.
+- Produces: `buildDesignRecordTemplate()` with one copyable format 3 record and no generated `案の処分 N:` rows.
+- Preserves: unsettled-phrase detection and fail-closed behavior when the issue does not expose an enumerated-options structure.
 
-- [ ] **Step 1: Add failing template and classification tests**
+- [ ] **Step 1: Add failing template tests**
 
-Assert that `buildDesignRecordTemplate().lines.slice(0, 4)` equals the four new reader-first labels and that settlement accepts a pre-cutoff legacy record but reports the new missing prefixes for a post-cutoff legacy record.
+Assert that `buildDesignRecordTemplate().lines` equals a complete single-axis format 3 template, including `改訂履歴:\n- なし`, and does not change when `optionCount` changes.
+Assert that its note says candidate completeness and semantic consistency remain human-review responsibilities.
 
-- [ ] **Step 2: Run targeted tests and verify RED**
+- [ ] **Step 2: Add failing settlement tests**
 
-Run: `node --test scripts/lib/cycle-status.test.mjs scripts/lib/cycle-status-steps.test.mjs`
+Test complete format 1, format 2, and format 3 records at their valid timestamps; a post-cutoff format 2 record; incomplete format 3; two complete format 3 comments; and a format 3 record whose decision and rationale axes differ.
+Require ambiguity and structural invalidity to report `unsettled: true` with distinct reasons.
 
-Expected: FAIL because the template begins with `前提:` and settlement has no cutoff-aware contract.
+- [ ] **Step 3: Run targeted tests and verify RED**
 
-- [ ] **Step 3: Implement the minimal template and classification changes**
+Run:
 
-Build the four lines from the Task 1 constant, keep numbered disposition lines unchanged, and update the note so it names the reader-first meanings without reintroducing the old display order.
+```bash
+node --test scripts/lib/cycle-status.test.mjs scripts/lib/cycle-status-steps.test.mjs
+```
 
-- [ ] **Step 4: Run targeted tests and verify GREEN**
+Expected: FAIL because cycle-status still emits the four-line format 2 record and cannot report format 3 ambiguity.
 
-Run: `node --test scripts/lib/cycle-status.test.mjs scripts/lib/cycle-status-steps.test.mjs`
+- [ ] **Step 4: Emit the format 3 template from shared constants**
 
-Expected: PASS for new template, legacy grandfathering, new-format settlement, and incomplete-record reporting.
+Make the generated lines start exactly as follows and include the remaining premise-test and revision fields from the spec:
 
-- [ ] **Step 5: Commit the template change**
+```js
+const lines = [
+	FORMAT_3_MARKER,
+	"",
+	"決定:",
+	`- <軸名>（<${FORMAT_3_DECISION_KINDS.join(" | ")}>）: <今回確定した範囲>`,
+	"",
+	"理由:",
+	"- <軸名>: <目的との対応>",
+];
+```
 
-Commit subject: `feat(pfd-ops): emit reader-first design template`
+Remove numbered disposition generation based on `optionCount`.
+Retain option enumeration only as diagnostic context and explain that the operator must dispose every actual original candidate by name.
 
-### Task 3: Change the canonical human-facing skill contract
+- [ ] **Step 5: Use the shared resolver for settlement**
+
+Update `classifyDesignSettlement` to consume `resolveDesignRecord` and the format-specific structural verdict.
+Return `record-ambiguous` for multiple complete format 3 comments and `record-incomplete` with structural problems for invalid format 3.
+
+- [ ] **Step 6: Run targeted tests and verify GREEN**
+
+Run:
+
+```bash
+node --test scripts/lib/cycle-status.test.mjs scripts/lib/cycle-status-steps.test.mjs
+```
+
+Expected: PASS for the emitted template, three-generation settlement, ambiguity, incomplete structure, and option-count independence.
+
+- [ ] **Step 7: Commit the template change**
+
+Commit subject: `feat(pfd-ops): emit format 3 design template`
+
+### Task 3: Replace the canonical human-facing contract
 
 **Files:**
 - Modify: `.claude/skills/pfd-ops/references/work-cycle.md`
 - Modify: `.claude/skills/pfd-ops/references/github-issues-backend.md`
 - Modify: `.claude/skills/pfd-ops/references/file-based-tracker-backend.md`
+- Test: `scripts/lib/pfd-ops-applicability.test.mjs`
 
 **Interfaces:**
-- Consumes: the exact four reader-first labels and cutoff defined by Tasks 1 and 2.
-- Produces: dialogue guidance that starts with proposal and rationale and persistence guidance that records the same meanings in public.
+- Consumes: the exact format 3 vocabulary, cutoff, and structural versus human-review boundary from Tasks 1 and 2.
+- Produces: dialogue guidance that presents every decision axis and rationale first, then records original-option dispositions and premise tests without claiming semantic machine proof.
 
-- [ ] **Step 1: Use the recorded five-sample baseline as RED**
+- [ ] **Step 1: Add failing contract tests**
 
-Confirm the design spec records the baseline result `4/5 premise-first, 1/5 proposal-first` before editing any canonical skill file.
+Extend `pfd-ops-applicability.test.mjs` to require `設計記録形式: 3`, the decision-first ordering, named original-option dispositions, `前提検査 Pn`, the human-review boundary, and the prohibition on second-comment replacement.
+Require the old mandatory four-line format 2 wording to be absent from the active post-cutoff instructions while remaining documented as migration history.
 
-- [ ] **Step 2: Write the positive output recipe**
+- [ ] **Step 2: Run the contract test and verify RED**
 
-State what the design presentation is, in order: proposal, rationale, premise-negating alternative, rejection rationale, approval request. Keep the existing semantic tests for generating the alternative, validating rejection reasons, and disposing every enumerated option.
+Run:
 
-- [ ] **Step 3: Update tracker persistence and migration language**
+```bash
+node --test scripts/lib/pfd-ops-applicability.test.mjs
+```
 
-Replace old three-prefix descriptions with the new four-prefix contract and document that old comments before `2026-08-30T09:32:50Z` remain valid.
+Expected: FAIL because canonical references still require format 2.
 
-- [ ] **Step 4: Run Markdown checks**
+- [ ] **Step 3: Rewrite the canonical work-cycle contract**
 
-Run: `node scripts/check-md-linebreaks.mjs .claude/skills/pfd-ops/references/work-cycle.md .claude/skills/pfd-ops/references/github-issues-backend.md .claude/skills/pfd-ops/references/file-based-tracker-backend.md`
+Keep the existing premise-negation reasoning discipline, empirical evidence requirements, and invalid-rejection-reason rules.
+Replace the persisted record recipe and terminal checklist with the format 3 structure.
+State explicitly that the machine checks structure only and enumerate the human checks from the spec.
+State that candidate names are written directly, generated test alternatives live only in their premise-test block, and `optionCount` is not evidence of completeness.
+
+- [ ] **Step 4: Update both tracker backends**
+
+For the GitHub backend, document the three generation intervals, format 3 persistence, same-comment pre-commit revision rule, last-edit timing, and fail-closed handling of multiple complete format 3 comments.
+For the file backend, require format 3 for every newly written record and retain its commit-based persistence boundary without introducing GitHub comment timestamps or edit semantics.
+
+- [ ] **Step 5: Run Markdown and contract checks**
+
+Run:
+
+```bash
+node scripts/check-md-linebreaks.mjs .claude/skills/pfd-ops/references/work-cycle.md .claude/skills/pfd-ops/references/github-issues-backend.md .claude/skills/pfd-ops/references/file-based-tracker-backend.md
+node --test scripts/lib/pfd-ops-applicability.test.mjs
+```
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the canonical skill contract**
+- [ ] **Step 6: Commit the canonical contract**
 
-Commit subject: `docs(pfd-ops): make design presentation reader-first`
+Commit subject: `docs(pfd-ops): generalize reader-first decisions`
 
-### Task 4: Regenerate delivery mirrors and verify behavior
+### Task 4: Regenerate, pressure-test, and complete the artifact
 
 **Files:**
 - Regenerate: `.agents/skills/pfd-ops/**`
 - Regenerate: `plugin/pfdsl/skills/pfd-ops/**`
 - Regenerate: `plugin/pfdsl-codex/skills/pfd-ops/**`
-- Regenerate: `.claude/skills/pfd-ops/install/**` when generator identity requires it.
-- Modify: `.pfdsl/roadmap.pfdsl` status for `reader_first_design_records` from `wip` to `done` after all criteria pass.
+- Regenerate: `plugin/pfdsl/.claude-plugin/bundle-manifest.json`
+- Regenerate: `.claude/skills/pfd-ops/install/**` only when the canonical generator changes it.
+- Modify: `.pfdsl/roadmap.pfdsl` status for `reader_first_design_records` from `wip` to `done` after every criterion passes.
 
 **Interfaces:**
-- Consumes: canonical skill references and machine contract from Tasks 1-3.
-- Produces: byte-consistent Claude/Codex delivery boundaries and a completed roadmap artifact.
+- Consumes: canonical references and machine contracts from Tasks 1 through 3.
+- Produces: byte-consistent delivery mirrors, evidence that the decision-first order survives representative decision shapes, and a completed roadmap artifact.
 
 - [ ] **Step 1: Regenerate canonical projections**
 
-Run: `make gen-plugin`
+Run:
 
-Expected: generated mirrors change only where the canonical pfd-ops contract projects them.
+```bash
+make gen-plugin
+```
 
-- [ ] **Step 2: Run five fresh-context GREEN samples**
+Expected: generated mirrors change only where the canonical pfd-ops contract and bundle manifest project them.
 
-Use the same bounded one-line documentation scenario and the updated canonical `work-cycle.md`.
+- [ ] **Step 2: Verify generation identity**
 
-Expected: all five user-facing messages start with the proposal and rationale before the premise-negating alternative.
+Run:
 
-- [ ] **Step 3: Run repository verification**
+```bash
+node scripts/check-generated-drift.mjs -- generated plugin .claude-plugin/marketplace.json AGENTS.md .agents .codex
+node scripts/check-generated-drift.mjs -- .claude/skills/pfd-ops/install
+```
 
-Run targeted tests, `pnpm -r test`, `make check-docs`, install/plugin identity checks, and `node scripts/gate-check.mjs --base main --artifact reader_first_design_records --issue 1076`.
+Expected: PASS with no drift.
 
-Expected: all machine checks pass and the gate recognizes #1076's pre-cutoff legacy record.
+- [ ] **Step 3: Run fresh-context pressure scenarios**
 
-- [ ] **Step 4: Mark the roadmap artifact done**
+Run five samples each for a bounded single-axis change, a two-axis mixed `実装` and `待機` decision, and a partial-adoption decision.
+Use only the updated canonical `work-cycle.md` as operational context.
 
-Run: `node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl reader_first_design_records status done`.
+Expected: all 15 responses present every decision axis before candidate dispositions or premise tests, preserve the selected and remaining portions of partial adoption, and do not describe structural conformance as design validity.
 
-Expected: the artifact is done only after template, gate, mirrors, and five-sample convergence all satisfy its criteria.
+- [ ] **Step 4: Run targeted and repository-wide verification**
 
-- [ ] **Step 5: Review, commit, push, and create the PR**
+Run:
 
-Commit generated mirrors and the done transition with the canonical source when generator freshness requires the same commit. Push `codex/issue-1076-reader-first-design`, create a PR to `main`, include `Closes #1076`, and reread the persisted PR body exactly.
+```bash
+node --test scripts/lib/gate-check.test.mjs scripts/lib/gate-check-steps.test.mjs scripts/lib/cycle-status.test.mjs scripts/lib/cycle-status-steps.test.mjs scripts/lib/pfd-ops-applicability.test.mjs
+pnpm -r test
+make check-docs
+node scripts/gate-check.mjs --base main --artifact reader_first_design_records --issue 1076
+```
+
+Expected: all tests and gates pass; issue #1076's pre-format-2 legacy record remains valid and incomplete newer fragments cannot shadow it.
+
+- [ ] **Step 5: Perform the human semantic review**
+
+Review the format 3 fixtures and generated template for original-candidate coverage, decision-disposition consistency, partial-adoption boundaries, executable reconsideration conditions, valid rejection reasons, premise scope, same-granularity alternatives, and truthful revision history.
+
+Expected: no fixture relies on the machine verdict as proof of semantic validity.
+
+- [ ] **Step 6: Mark the roadmap artifact done**
+
+Run:
+
+```bash
+node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl reader_first_design_records status done
+```
+
+Expected: the artifact becomes done only after template, gate, mirrors, pressure scenarios, and human semantic review satisfy the updated criteria.
+
+- [ ] **Step 7: Commit and push the completion unit**
+
+Commit subject: `chore(pfd-ops): complete format 3 rollout`
+
+Push `codex/issue-1076-reader-first-design` to update PR #1078.
+Prepare the exact revised PR body for approval before changing the public PR description, then reread the persisted body after any approved update.
