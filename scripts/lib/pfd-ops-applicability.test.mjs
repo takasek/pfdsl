@@ -106,6 +106,11 @@ describe("pfd-ops applicability contract", () => {
 		);
 		assert.match(workCycle, /optionCount.*完全性.*証明/);
 		assert.doesNotMatch(workCycle, format2Tokens);
+		assert.match(workCycle, /バックエンドの移行契約が選択する形式/);
+		assert.match(workCycle, /2026-08-31T01:30:24Z/);
+		assert.match(workCycle, /以降の新規記録は完全な Format 3/);
+		assert.match(workCycle, /既存の有効な旧形式記録を書き換えない/);
+		assert.match(workCycle, /人間による意味的な再検査/);
 
 		assert.match(githubBackend, /2026-08-30T09:32:50Z/);
 		assert.match(githubBackend, /2026-08-31T01:30:24Z/);
