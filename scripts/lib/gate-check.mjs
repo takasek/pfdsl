@@ -530,74 +530,23 @@ export function diffReadySets(beforeIds, afterIds) {
 	};
 }
 
-/**
- * Repo-relative path to the terminal-gate checklist (workcycle step 3). This
- * file is the single source of truth for wording — gate-check derives its
- * MANUAL: list from it instead of duplicating the text.
- */
-export const GATE_CHECKLIST_SOURCE_PATH =
-	".claude/skills/pfd-ops/references/work-cycle.md";
-
-/**
- * Parse the terminal-gate checklist (workcycle step 3) into raw item strings.
- * @param {string} skillMdText
- * @returns {string[]}
- */
-export function extractGateChecklist(skillMdText) {
-	const lines = skillMdText.split("\n");
-	const items = [];
-	let inChecklist = false;
-	for (const line of lines) {
-		if (/^3\. \*\*反映/.test(line)) {
-			inChecklist = true;
-			continue;
-		}
-		if (inChecklist && /^4\. \*\*報告/.test(line)) break;
-		if (!inChecklist) continue;
-		const m = line.match(/^\s*-\s\[ \]\s(.+)$/);
-		if (m) items.push(m[1].trim());
-	}
-	return items;
-}
-
-// Checklist items already covered by gate-check's own mechanized checks,
-// matched by substring since the checklist source file's wording is the
-// source of truth.
-const COVERED_BY_GATE_CHECK = [
-	"出力 artifact の status を更新した",
-	"変更した全 .pfdsl が",
-	"Conventional Commits 形式に従う",
+export const MANUAL_GUIDANCE_LINES = [
+	"MANUAL: Before creating the PR, review `3. 反映 — 終端ゲート` in `.claude/skills/pfd-ops/references/work-cycle.md`.",
+	"MANUAL: After creating the PR, review the `PR 作成後` items in the same section.",
 ];
 
 /**
- * @param {string[]} checklistItems
- * @returns {string[]}
+ * Print the final manual-check directions before applying the gate exit code.
+ * @param {Array<{status: string}>} results
+ * @param {{log?: (line: string) => void, exit?: (code: number) => void}} io
  */
-export function deriveManualItems(checklistItems) {
-	return checklistItems.filter(
-		(item) => !COVERED_BY_GATE_CHECK.some((kw) => item.includes(kw)),
-	);
-}
-
-// The checklist's own mark for an item that can only be done once the PR
-// exists (#816). Matched at the item's head, not anywhere in it: an item that
-// merely mentions the phrase is still an item to do before the PR.
-const AFTER_PR_MARKER = /^\*\*PR 作成後\*\*/;
-
-/**
- * Split the MANUAL items into the ones to walk before creating the PR and the
- * ones that can only be done after (#816). Printing them as one flat list puts
- * "write this into the PR body" in front of a reader who has no PR yet, which
- * is the timing defect the checklist's ordering was rearranged to fix — an
- * ordering no reader can act on if the list that reaches them is flat.
- * @param {string[]} manualItems
- * @returns {{beforePr: string[], afterPr: string[]}}
- */
-export function partitionManualItemsByPhase(manualItems) {
-	return {
-		beforePr: manualItems.filter((item) => !AFTER_PR_MARKER.test(item)),
-		afterPr: manualItems.filter((item) => AFTER_PR_MARKER.test(item)),
-	};
+export function finishGateCheck(
+	results,
+	{ log = console.log, exit = process.exit } = {},
+) {
+	log("\nManual checks:");
+	for (const line of MANUAL_GUIDANCE_LINES) log(`  ${line}`);
+	if (results.some((result) => result.status === "FAIL")) exit(1);
 }
 
 /**

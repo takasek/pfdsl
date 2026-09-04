@@ -4,6 +4,7 @@ import { dirname, posix, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { RECORD_SEP } from "./commit-trailers.mjs";
+import * as gateCheck from "./gate-check.mjs";
 import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
 	buildSiblingConsumedMap,
@@ -19,18 +20,15 @@ import {
 	DESIGN_RECORD_V2_CUTOFF,
 	DESIGN_RECORD_V3_CUTOFF,
 	DISPOSITION_TOKENS,
-	deriveManualItems,
 	derivePackageLayers,
 	diffNewTerminals,
 	diffReadySets,
-	extractGateChecklist,
 	FORMAT_3_DECISION_KINDS,
 	FORMAT_3_DISPOSITIONS,
 	FORMAT_3_MARKER,
 	formatGateTable,
 	formatRunTreeLine,
 	formatSizeDelta,
-	GATE_CHECKLIST_SOURCE_PATH,
 	hasNoImplementationDisposition,
 	hasSizeOverride,
 	hasStatusChange,
@@ -43,7 +41,6 @@ import {
 	parseCommitLogLines,
 	parseFormat3DesignRecord,
 	parseInputConsumedArtifacts,
-	partitionManualItemsByPhase,
 	partitionNewTerminals,
 	READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
 	resolveDesignRecord,
@@ -60,6 +57,8 @@ import {
 	VSCODE_EXT_TRIGGER,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("classifyAuditIssuesFlowResult", () => {
 	it("PASS when ok", () => {
@@ -177,8 +176,6 @@ describe("VSCODE_EXT_TRIGGER", () => {
 		);
 	});
 });
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 describe("matchesTrigger", () => {
 	it("matches when any file hits the pattern", () => {
@@ -675,68 +672,41 @@ describe("diffReadySets", () => {
 	});
 });
 
-describe("extractGateChecklist", () => {
-	const sampleSkillMd = [
-		"1. foo",
-		"2. bar",
-		"3. **反映 — 終端ゲート**:",
-		"   - **companion がゲート集約チェッカーを指す場合**、まずそれを実行する",
-		"   - [ ] 出力 artifact の status を更新した",
-		"   - [ ] 知見を振り分けた",
-		"   - [ ] 変更した全 .pfdsl が `check` を通過する",
-		"4. **報告**: 完了したプロセス",
-	].join("\n");
-
-	it("extracts only the checkbox items between step 3 and step 4", () => {
-		assert.deepEqual(extractGateChecklist(sampleSkillMd), [
-			"出力 artifact の status を更新した",
-			"知見を振り分けた",
-			"変更した全 .pfdsl が `check` を通過する",
+describe("manual gate guidance", () => {
+	it("points readers to the canonical pre-PR and post-PR checklist sections", () => {
+		assert.deepEqual(gateCheck.MANUAL_GUIDANCE_LINES, [
+			"MANUAL: Before creating the PR, review `3. 反映 — 終端ゲート` in `.claude/skills/pfd-ops/references/work-cycle.md`.",
+			"MANUAL: After creating the PR, review the `PR 作成後` items in the same section.",
 		]);
 	});
 
-	it("returns an empty array when no checklist section is present", () => {
-		assert.deepEqual(extractGateChecklist("1. foo\n2. bar\n"), []);
-	});
-});
-
-describe("deriveManualItems", () => {
-	it("drops items already covered by gate-check's mechanized checks", () => {
-		const items = [
-			"出力 artifact の status を更新した",
-			"知見を振り分けた",
-			"変更した全 .pfdsl が `check` を通過する",
-		];
-		assert.deepEqual(deriveManualItems(items), ["知見を振り分けた"]);
+	it("does not export the retired prose parser or classifiers", () => {
+		assert.equal("extractGateChecklist" in gateCheck, false);
+		assert.equal("deriveManualItems" in gateCheck, false);
+		assert.equal("partitionManualItemsByPhase" in gateCheck, false);
 	});
 
-	it("keeps everything when nothing matches the covered keywords", () => {
-		const items = ["知見を振り分けた", "PR にまとめた"];
-		assert.deepEqual(deriveManualItems(items), items);
-	});
-
-	it("drops the Conventional Commits subject-format item, keeps the granularity item", () => {
-		const items = [
-			"コミット粒度が規約に従っている",
-			"コミット subject が Conventional Commits 形式に従う",
-		];
-		assert.deepEqual(deriveManualItems(items), [
-			"コミット粒度が規約に従っている",
-		]);
-	});
-});
-
-describe("GATE_CHECKLIST_SOURCE_PATH", () => {
-	it("points at a file whose checklist section yields MANUAL items", () => {
-		const text = readFileSync(
-			resolve(root, GATE_CHECKLIST_SOURCE_PATH),
+	it("keeps the CLI wired to the shared finalizer exactly once", () => {
+		const source = readFileSync(
+			resolve(root, "scripts/gate-check.mjs"),
 			"utf-8",
 		);
-		const items = deriveManualItems(extractGateChecklist(text));
-		assert.ok(
-			items.length > 0,
-			"expected at least one MANUAL checklist item from the deployed source file",
-		);
+		assert.equal(source.match(/^finishGateCheck\(results\);$/gm)?.length, 1);
+	});
+
+	it("prints the heading and both guidance lines once before exiting on FAIL", () => {
+		assert.equal(typeof gateCheck.finishGateCheck, "function");
+		const lines = [];
+		const exitCodes = [];
+		gateCheck.finishGateCheck([{ name: "mechanical check", status: "FAIL" }], {
+			log: (line) => lines.push(line),
+			exit: (code) => exitCodes.push(code),
+		});
+		assert.deepEqual(lines, [
+			"\nManual checks:",
+			...gateCheck.MANUAL_GUIDANCE_LINES.map((line) => `  ${line}`),
+		]);
+		assert.deepEqual(exitCodes, [1]);
 	});
 });
 
@@ -1978,39 +1948,6 @@ describe("classifyChangedFilesByModeling", () => {
 			{ file: ".pfdsl/workflow.pfdsl", id: "spec" },
 			{ file: ".pfdsl/pipeline.pfdsl", id: "spec" },
 		]);
-	});
-});
-
-describe("partitionManualItemsByPhase", () => {
-	it("splits the list at the first post-PR item, keeping order on both sides", () => {
-		const items = [
-			"知見を振り分けた",
-			"変更束を PR にまとめた",
-			"**PR 作成後**: 指標の数値を PR 本文に書いた",
-			"**PR 作成後**: 割れない理由を PR 本文に書いた",
-		];
-		assert.deepEqual(partitionManualItemsByPhase(items), {
-			beforePr: ["知見を振り分けた", "変更束を PR にまとめた"],
-			afterPr: [
-				"**PR 作成後**: 指標の数値を PR 本文に書いた",
-				"**PR 作成後**: 割れない理由を PR 本文に書いた",
-			],
-		});
-	});
-
-	it("puts everything in the first phase when no item is marked", () => {
-		const items = ["a", "b"];
-		assert.deepEqual(partitionManualItemsByPhase(items), {
-			beforePr: ["a", "b"],
-			afterPr: [],
-		});
-	});
-
-	// The marker is a line head, not a substring: an item that merely mentions
-	// the phrase must not be pulled out of its place in the walk.
-	it("does not move an item that only mentions the phrase mid-sentence", () => {
-		const items = ["push し忘れを **PR 作成後** に確認する"];
-		assert.deepEqual(partitionManualItemsByPhase(items).afterPr, []);
 	});
 });
 

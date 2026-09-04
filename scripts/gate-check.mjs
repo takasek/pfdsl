@@ -3,8 +3,7 @@
 // from pfd-ops step 3 (check / audit-issues-flow / check-md-linebreaks /
 // gen-plugin identity / snapshot freshness / output-artifact status update)
 // against the diff from origin/<base> to HEAD, then prints the remaining
-// checklist items (extracted from the work-cycle checklist itself) as
-// MANUAL: lines.
+// canonical manual checklist locations as fixed guidance.
 // Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n> ...]
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -17,21 +16,18 @@ import {
 	classifyChangedFilesByModeling,
 	classifyIssueLookupFailure,
 	collectModeledLocations,
-	deriveManualItems,
 	derivePackageLayers,
 	diffNewTerminals,
 	diffReadySets,
-	extractGateChecklist,
+	finishGateCheck,
 	formatGateTable,
 	formatRunTreeLine,
 	formatSizeDelta,
-	GATE_CHECKLIST_SOURCE_PATH,
 	hasSizeOverride,
 	matchesTrigger,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
 	parseInputConsumedArtifacts,
-	partitionManualItemsByPhase,
 	partitionNewTerminals,
 	sharesSiblingIdNamespace,
 	VSCODE_EXT_TRIGGER,
@@ -332,11 +328,6 @@ results.push(
 	}),
 );
 
-const skillMdPath = resolve(root, GATE_CHECKLIST_SOURCE_PATH);
-const manualItems = deriveManualItems(
-	extractGateChecklist(readFileSync(skillMdPath, "utf-8")),
-);
-
 // `root` here is this script's own location (resolved from import.meta.url
 // above), not the shell's cwd. gate-check's PreToolUse guard
 // (verification-tree-guard.mjs) already stops most cwd-drifted runs before
@@ -610,15 +601,4 @@ if (sizeDeltas.length > 0) {
 	}
 }
 
-{
-	const { beforePr, afterPr } = partitionManualItemsByPhase(manualItems);
-	console.log("\nMANUAL (judge and confirm each):");
-	for (const item of beforePr) console.log(`  MANUAL: ${item}`);
-	if (afterPr.length > 0) {
-		console.log("\nMANUAL, after the PR exists (its body is the destination):");
-		for (const item of afterPr) console.log(`  MANUAL: ${item}`);
-	}
-}
-
-const hasFail = results.some((r) => r.status === "FAIL");
-if (hasFail) process.exit(1);
+finishGateCheck(results);
