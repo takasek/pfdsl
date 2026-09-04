@@ -275,7 +275,7 @@ artifact:
   pfd_lens_agent:
     label: pfd-lens agent
     description: "retro_skill の A・B 層委譲先。大きい図・複数図の監査を read-only agent へオフロードする（#357）。手書き、生成対象外"
-    criteria: pfd-lens を起動すると A・B 観点の findings が file:line アンカー付きで返る。make gen-plugin が差分なしで完了する
+    criteria: pfd-lens は upstream identity を確認した場合に checkout-local CLI を選び、全監査 query を同じ解決済み CLI で実行して、A・B 観点の findings を file:line アンカー付きで返す。make gen-plugin が差分なしで完了する
     location: ../.claude/agents/pfd-lens.md
     group: generation
   implementer_agent:
