@@ -2,7 +2,11 @@
 
 ## Replacement evidence acceptance contract
 
-This report contains the authoritative fifteen-context corpus and the verification evidence used before `reader_first_design_records` transitioned from `wip` to `done`.
+This report contains the authoritative fifteen-context shape-coverage corpus and the verification evidence used before `reader_first_design_records` transitioned from `wip` to `done`.
+
+These 15 independent samples verify representative Format 3 expression shapes and do not constitute a before/after comparison.
+The controlled same-prompt ordering comparison is recorded separately in `docs/superpowers/reports/2026-09-05-format-3-controlled-comparison.md`.
+That comparison is retrospective remediation assembled after this artifact transitioned to `done`; it was not evidence for the earlier transition or the resulting downstream readiness.
 
 The source-declaration acceptance rule permits a semantically equivalent declaration when it unambiguously limits inputs to the canonical work-cycle and supplied prompt and confirms no writes. It does not relax any other evidence requirement.
 

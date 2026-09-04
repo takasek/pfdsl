@@ -274,7 +274,7 @@ Commit subject: `docs(pfd-ops): generalize reader-first decisions`
 
 **Interfaces:**
 - Consumes: canonical references and machine contracts from Tasks 1 through 3.
-- Produces: byte-consistent delivery mirrors, evidence that the decision-first order survives representative decision shapes, and a completed roadmap artifact.
+- Produces: byte-consistent delivery mirrors, controlled same-prompt evidence for the before/after ordering change, independent evidence that the decision-first order survives representative decision shapes, and a completed roadmap artifact.
 
 - [ ] **Step 1: Regenerate canonical projections**
 
@@ -303,6 +303,17 @@ Run five samples each for a bounded single-axis change, a two-axis mixed `実装
 Use only the updated canonical `work-cycle.md` as operational context.
 
 Expected: all 15 responses present every decision axis before candidate dispositions or premise tests, preserve the selected and remaining portions of partial adoption, and do not describe structural conformance as design validity.
+
+These 15 samples are shape coverage, not before/after evidence.
+
+- [ ] **Step 3a: Run a controlled same-prompt comparison**
+
+Reconstruct one bounded-change prompt only from facts common to all five historical responses, because the retained historical task payload is encrypted and cannot be reused as a direct comparator.
+Use one prompt, the stated runtime conditions, the identified old and new contract revisions and hashes, and one explicit order classifier for five fresh contexts per contract.
+Preserve every input, complete response, and reproducible classification in `docs/superpowers/reports/2026-09-05-format-3-controlled-comparison.md`, while noting that the report was assembled afterward and does not independently prove preregistration or timing.
+
+Result: the newly controlled old cohort is decision-first in 1/5 responses and the newly controlled current cohort is decision-first in 5/5 responses; the historical 1/5 remains provenance-limited reference evidence only.
+This controlled comparison is retrospective remediation and did not gate the earlier transition of `reader_first_design_records` to `done` or its downstream readiness.
 
 - [ ] **Step 4: Run targeted and repository-wide verification**
 
