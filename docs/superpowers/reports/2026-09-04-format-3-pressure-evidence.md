@@ -315,7 +315,15 @@ Read only canonical work-cycle and this scenario; no writes. Return Format 3 wit
 ### P1R prompt
 
 ```text
-Fresh isolated P1R retry. You may read only /Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md once; do not call any other tool or read/write any other file. Return only this parser-compatible Format 3 record skeleton filled exactly, no fences/commentary. P1 field lines MUST NOT begin with `-`. Use exactly `対象: 監査履歴`, exactly `前提: 本案は〈監査履歴が保存される状態が存在し続けること〉を前提にする`, exactly `前提を外した案: 監査履歴を保持せず、各変更を手動で認証する`, exactly `既存候補との差分: 既存候補は監査履歴を保持する点で共通するが、本案は保持を廃し変更ごとの手動認証へ置き換える`, exactly `検査案の処分 P1: 保留 — compliance owner approves the manual-certification contract`. Closed candidates A `immutable audit log`, B `retention expansion`, C `omit audit history`; audit owner requires A; B requires retention-owner approval; compliance owner prohibits C. Decision is one 実装 bullet. Original A must be exactly partial adoption with `採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required`. Reject B only for owner approval; reject C only for compliance prohibition. History `- なし`.
+Fresh P1R. Read only the canonical work-cycle and this prompt; do not write. Return one parser-compatible Format 3 record only. Closed candidates: A `immutable audit log plus retention expansion`, B `mutable audit log`, C `external archive`. A is composite. Partially adopt A exactly with selected `immutable audit log` and remainder `保留 — retention expansion — retention owner approval required`. Audit owner requires immutable audit log and retention owner has not approved retention expansion. Reject B only because storage owner has not approved mutable audit storage. Reject C only because audit owner requires immediately retrievable audit evidence. Exact premise: `本案は〈監査履歴が保存される状態が存在し続けること〉を前提にする`. P1 alternative: do not retain audit history and manually certify each change; hold until compliance owner approves its manual-certification contract. History is none. P1 fields must be single inline lines.
+```
+
+### P1R accepted retry prompt
+
+Task identity: `sixth_p1_retry` (`fork_turns: none`).
+
+```text
+Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- 監査履歴（実装）: immutable audit log\n理由:\n- 監査履歴: audit owner requires immutable audit log\n案の処分:\n- 部分採用 — 元候補「A immutable audit log plus retention expansion」— 採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required\n- 却下 — 元候補「B mutable audit log」— storage owner has not approved mutable audit storage\n- 却下 — 元候補「C external archive」— audit owner requires immediately retrievable audit evidence\n前提検査 P1:\n対象: 監査履歴\n前提: 本案は〈監査履歴が保存される状態が存在し続けること〉を前提にする\n前提を外した案: manually certify each change without retaining audit history\n既存候補との差分: A、B、C は監査履歴を扱うが、この案は監査履歴を保持しない\n検査案の処分 P1: 保留 — compliance owner manual-certification contract required\n改訂履歴:\n- なし`
 ```
 
 ### P1R response
@@ -327,15 +335,15 @@ Fresh isolated P1R retry. You may read only /Users/m5/.codex/worktrees/c98c/pfds
 理由:
 - 監査履歴: audit owner requires immutable audit log
 案の処分:
-- 部分採用 — 元候補「immutable audit log」— 採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required
-- 却下 — 元候補「retention expansion」— retention owner approval required
-- 却下 — 元候補「omit audit history」— compliance owner prohibits C
+- 部分採用 — 元候補「A immutable audit log plus retention expansion」— 採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required
+- 却下 — 元候補「B mutable audit log」— storage owner has not approved mutable audit storage
+- 却下 — 元候補「C external archive」— audit owner requires immediately retrievable audit evidence
 前提検査 P1:
 対象: 監査履歴
 前提: 本案は〈監査履歴が保存される状態が存在し続けること〉を前提にする
-前提を外した案: 監査履歴を保持せず、各変更を手動で認証する
-既存候補との差分: 既存候補は監査履歴を保持する点で共通するが、本案は保持を廃し変更ごとの手動認証へ置き換える
-検査案の処分 P1: 保留 — compliance owner approves the manual-certification contract
+前提を外した案: manually certify each change without retaining audit history
+既存候補との差分: A、B、C は監査履歴を扱うが、この案は監査履歴を保持しない
+検査案の処分 P1: 保留 — compliance owner manual-certification contract required
 改訂履歴:
 - なし
 ```
@@ -343,7 +351,15 @@ Fresh isolated P1R retry. You may read only /Users/m5/.codex/worktrees/c98c/pfds
 ### P2R prompt
 
 ```text
-Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed A ingress validation, B pre-storage worker validation, C review queue. Interface owner requires ingress validation; queue owner has not approved queue. Exact premise `本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする`; P1 post-storage repair held by persistence-owner contract. A must be original partial adoption exactly `- 部分採用 — 元候補「A」— 採用部分: ingress validation; 残部: 保留 — metrics enrichment — interface owner approval required`. B interface reject; C queue reject; history none.
+Fresh P2R. Read only the canonical work-cycle and this prompt; do not write. Return one parser-compatible Format 3 record only. Closed candidates: A `ingress validation plus metrics enrichment`, B `pre-storage worker validation`, C `manual review queue`. A is composite. Partially adopt A exactly with selected `ingress validation` and remainder `保留 — metrics enrichment — interface owner approval required`. Interface owner requires ingress validation and has not approved metrics enrichment. Reject B only because interface owner requires ingress validation. Reject C only because queue owner has not approved the manual review queue. Exact premise: `本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする`. P1 alternative: post-storage repair; hold until persistence owner approves its contract. History is none. P1 fields must be single inline lines.
+```
+
+### P2R accepted retry prompt
+
+Task identity: `sixth_p2_retry` (`fork_turns: none`).
+
+```text
+Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- スキーマ保証（実装）: ingress validation\n理由:\n- スキーマ保証: interface owner requires ingress validation\n案の処分:\n- 部分採用 — 元候補「A ingress validation plus metrics enrichment」— 採用部分: ingress validation; 残部: 保留 — metrics enrichment — interface owner approval required\n- 却下 — 元候補「B pre-storage worker validation」— interface owner requires ingress validation\n- 却下 — 元候補「C manual review queue」— queue owner has not approved the manual review queue\n前提検査 P1:\n対象: 保存前のスキーマ保証\n前提: 本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする\n前提を外した案: post-storage repair\n既存候補との差分: A、B、C は保存前に保証するが、この案は保存後に修復する\n検査案の処分 P1: 保留 — persistence owner contract required\n改訂履歴:\n- なし`
 ```
 
 ### P2R response
@@ -351,21 +367,19 @@ Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed 
 ```text
 設計記録形式: 3
 決定:
-- ingress validation（実装）: validate all payloads at ingress
-- metrics enrichment（待機）: wait for interface owner approval
+- スキーマ保証（実装）: ingress validation
 理由:
-- ingress validation: interface owner requires ingress validation
-- metrics enrichment: interface owner approval is required
+- スキーマ保証: interface owner requires ingress validation
 案の処分:
-- 部分採用 — 元候補「A」— 採用部分: ingress validation; 残部: 保留 — metrics enrichment — interface owner approval required
-- 却下 — 元候補「B」— interface owner requires ingress validation
-- 却下 — 元候補「C」— queue owner has not approved the review queue
+- 部分採用 — 元候補「A ingress validation plus metrics enrichment」— 採用部分: ingress validation; 残部: 保留 — metrics enrichment — interface owner approval required
+- 却下 — 元候補「B pre-storage worker validation」— interface owner requires ingress validation
+- 却下 — 元候補「C manual review queue」— queue owner has not approved the manual review queue
 前提検査 P1:
 対象: 保存前のスキーマ保証
 前提: 本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする
 前提を外した案: 未検証のペイロードを保存し、保存後に修復する
-既存候補との差分: 元候補 A、B、C は保存前にスキーマ保証を適用するが、この案は保存後の修復に置き換える
-検査案の処分 P1: 保留 — post-storage repair — persistence owner contract required
+既存候補との差分: A、B、C は保存前に保証するが、この案は保存後に修復する
+検査案の処分 P1: 保留 — persistence owner contract required
 改訂履歴:
 - なし
 ```
@@ -373,7 +387,15 @@ Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed 
 ### P3R prompt
 
 ```text
-Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed A managed key with approved recovery, B customer key with approved recovery, C offline key without managed control. Security owner requires managed key; customer-key owner unapproved. Exact premise `本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする`; P1 no persistence held by data-owner policy. A must be original partial adoption exactly `- 部分採用 — 元候補「A」— 採用部分: managed key encryption; 残部: 保留 — recovery rotation — security owner approval required`. B customer-owner reject; C security-owner reject; history none.
+Fresh P3R. Read only the canonical work-cycle and this prompt; do not write. Return one parser-compatible Format 3 record only. Closed candidates: A `managed key encryption plus recovery rotation`, B `customer-managed key encryption`, C `unencrypted offline key`. A is composite. Partially adopt A exactly with selected `managed key encryption` and remainder `保留 — recovery rotation — security owner approval required`. Security owner requires managed-key encryption and has not approved recovery rotation. Reject B only because customer-key owner has not approved customer-managed keys. Reject C only because security owner requires managed-key encryption. Exact premise: `本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする`. P1 alternative: no persistence; hold until data owner approves its policy. History is none. P1 fields must be single inline lines.
+```
+
+### P3R accepted retry prompt
+
+Task identity: `sixth_p3_retry` (`fork_turns: none`).
+
+```text
+Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- 保存データ暗号化（実装）: managed key encryption\n理由:\n- 保存データ暗号化: security owner requires managed key encryption\n案の処分:\n- 部分採用 — 元候補「A managed key encryption plus recovery rotation」— 採用部分: managed key encryption; 残部: 保留 — recovery rotation — security owner approval required\n- 却下 — 元候補「B customer-managed key encryption」— customer-key owner has not approved customer-managed keys\n- 却下 — 元候補「C unencrypted offline key」— security owner requires managed key encryption\n前提検査 P1:\n対象: 保存データの暗号化\n前提: 本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする\n前提を外した案: no persistence\n既存候補との差分: A、B、C は暗号化したデータを保存するが、この案は保存しない\n検査案の処分 P1: 保留 — data owner policy required\n改訂履歴:\n- なし`
 ```
 
 ### P3R response
@@ -381,21 +403,19 @@ Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed 
 ```text
 設計記録形式: 3
 決定:
-- managed key encryption（実装）: encrypt stored data with a managed key
-- recovery rotation（待機）: wait for security owner approval
+- 保存データ暗号化（実装）: managed key encryption
 理由:
-- managed key encryption: security owner requires a managed key
-- recovery rotation: security owner approval is required
+- 保存データ暗号化: security owner requires managed key encryption
 案の処分:
-- 部分採用 — 元候補「A」— 採用部分: managed key encryption; 残部: 保留 — recovery rotation — security owner approval required
-- 却下 — 元候補「B」— customer-key owner has not approved the customer key
-- 却下 — 元候補「C」— security owner requires managed key control
+- 部分採用 — 元候補「A managed key encryption plus recovery rotation」— 採用部分: managed key encryption; 残部: 保留 — recovery rotation — security owner approval required
+- 却下 — 元候補「B customer-managed key encryption」— customer-key owner has not approved customer-managed keys
+- 却下 — 元候補「C unencrypted offline key」— security owner requires managed key encryption
 前提検査 P1:
 対象: 保存データの暗号化
 前提: 本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする
-前提を外した案: データを永続化しない
-既存候補との差分: 元候補 A、B、C は暗号化したデータを保存するが、この案はデータを永続化しない
-検査案の処分 P1: 保留 — no persistence — data owner policy required
+前提を外した案: no persistence
+既存候補との差分: A、B、C は暗号化したデータを保存するが、この案は保存しない
+検査案の処分 P1: 保留 — data owner policy required
 改訂履歴:
 - なし
 ```
@@ -403,7 +423,15 @@ Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed 
 ### P4R prompt
 
 ```text
-Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed A weekly report, B daily report, C monthly report. Reporting owner requires weekly. Exact premise `本案は〈定期報告が公開される状態が存在し続けること〉を前提にする`; P1 on-demand endpoint held API contract. A must be original partial adoption exactly `- 部分採用 — 元候補「A」— 採用部分: weekly publication; 残部: 保留 — report enrichment — reporting owner approval required`. B/C reject reporting owner. History none.
+Fresh P4R. Read only the canonical work-cycle and this prompt; do not write. Return one parser-compatible Format 3 record only. Closed candidates: A `weekly publication plus report enrichment`, B `daily publication`, C `monthly publication`. A is composite. Partially adopt A exactly with selected `weekly publication` and remainder `保留 — report enrichment — reporting owner approval required`. Reporting owner requires weekly publication and has not approved report enrichment. Reject B only because reporting owner requires weekly publication. Reject C only because reporting owner requires weekly publication. Exact premise: `本案は〈定期報告が公開される状態が存在し続けること〉を前提にする`. P1 alternative: on-demand endpoint; hold until API owner approves its contract. History is none. P1 fields must be single inline lines.
+```
+
+### P4R accepted retry prompt
+
+Task identity: `sixth_p4_retry` (`fork_turns: none`).
+
+```text
+Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- 定期報告（実装）: weekly publication\n理由:\n- 定期報告: reporting owner requires weekly publication\n案の処分:\n- 部分採用 — 元候補「A weekly publication plus report enrichment」— 採用部分: weekly publication; 残部: 保留 — report enrichment — reporting owner approval required\n- 却下 — 元候補「B daily publication」— reporting owner requires weekly publication\n- 却下 — 元候補「C monthly publication」— reporting owner requires weekly publication\n前提検査 P1:\n対象: 定期報告の公開\n前提: 本案は〈定期報告が公開される状態が存在し続けること〉を前提にする\n前提を外した案: on-demand endpoint\n既存候補との差分: A、B、C は定期報告を公開するが、この案は要求時に提供する\n検査案の処分 P1: 保留 — API owner contract required\n改訂履歴:\n- なし`
 ```
 
 ### P4R response
@@ -411,21 +439,19 @@ Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed 
 ```text
 設計記録形式: 3
 決定:
-- 報告頻度（実装）: weekly publication
-- report enrichment（待機）: reporting owner approval required
+- 定期報告（実装）: weekly publication
 理由:
-- 報告頻度: reporting owner requires weekly publication
-- report enrichment: reporting owner approval required before enrichment
+- 定期報告: reporting owner requires weekly publication
 案の処分:
-- 部分採用 — 元候補「A」— 採用部分: weekly publication; 残部: 保留 — report enrichment — reporting owner approval required
-- 却下 — 元候補「B」— reporting owner requires weekly publication
-- 却下 — 元候補「C」— reporting owner requires weekly publication
+- 部分採用 — 元候補「A weekly publication plus report enrichment」— 採用部分: weekly publication; 残部: 保留 — report enrichment — reporting owner approval required
+- 却下 — 元候補「B daily publication」— reporting owner requires weekly publication
+- 却下 — 元候補「C monthly publication」— reporting owner requires weekly publication
 前提検査 P1:
-対象: 元候補 A、B、C が共有する定期報告の公開
+対象: 定期報告の公開
 前提: 本案は〈定期報告が公開される状態が存在し続けること〉を前提にする
-前提を外した案: 定期報告を公開せず、on-demand endpoint から要求時に報告を取得する
-既存候補との差分: 元候補 A、B、C は定期報告を公開するが、この案は on-demand endpoint で要求時にのみ報告を提供する
-検査案の処分 P1: 保留 — on-demand endpoint の API contract が未確定であるため
+前提を外した案: on-demand endpoint
+既存候補との差分: A、B、C は定期報告を公開するが、この案は要求時に提供する
+検査案の処分 P1: 保留 — API owner contract required
 改訂履歴:
 - なし
 ```
@@ -433,7 +459,15 @@ Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed 
 ### P5R prompt
 
 ```text
-Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed A signed receipt immediately, B unsigned receipt immediately, C signed delayed receipt. Compliance owner requires signature; delivery owner has not approved delayed flow. Exact premise `本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする`; P1 portal polling held API contract. A must be original partial adoption exactly `- 部分採用 — 元候補「A」— 採用部分: signed immediate receipt; 残部: 保留 — receipt metadata enrichment — compliance owner approval required`. B compliance reject; C delivery reject. Revision exactly `- B unsigned receipt immediately → A signed receipt immediately — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42`.
+Fresh P5R. Read only the canonical work-cycle and this prompt; do not write. Return one parser-compatible Format 3 record only. Closed candidates: A `signed immediate receipt plus receipt metadata enrichment`, B `unsigned immediate receipt`, C `signed delayed receipt`. A is composite. Partially adopt A exactly with selected `signed immediate receipt` and remainder `保留 — receipt metadata enrichment — compliance owner approval required`. Compliance owner requires signature and has not approved metadata enrichment. Reject B only because compliance owner requires a signature. Reject C only because delivery owner has not approved delayed delivery. Exact premise: `本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする`. P1 alternative: portal polling; hold until API owner approves its contract. The only revision is exactly `- B unsigned immediate receipt → A signed immediate receipt plus receipt metadata enrichment — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42`. P1 fields must be single inline lines.
+```
+
+### P5R accepted retry prompt
+
+Task identity: `sixth_p5_retry` (`fork_turns: none`).
+
+```text
+Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- 受領証配送（実装）: signed immediate receipt\n理由:\n- 受領証配送: compliance owner requires a signature\n案の処分:\n- 部分採用 — 元候補「A signed immediate receipt plus receipt metadata enrichment」— 採用部分: signed immediate receipt; 残部: 保留 — receipt metadata enrichment — compliance owner approval required\n- 却下 — 元候補「B unsigned immediate receipt」— compliance owner requires a signature\n- 却下 — 元候補「C signed delayed receipt」— delivery owner has not approved delayed delivery\n前提検査 P1:\n対象: 受領証配送\n前提: 本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする\n前提を外した案: portal polling\n既存候補との差分: A、B、C は受領証を配送するが、この案は顧客が取得する\n検査案の処分 P1: 保留 — API owner contract required\n改訂履歴:\n- B unsigned immediate receipt → A signed immediate receipt plus receipt metadata enrichment — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42`
 ```
 
 ### P5R response
@@ -441,23 +475,21 @@ Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed 
 ```text
 設計記録形式: 3
 決定:
-- 受領証配送（実装）: signed receipt immediately
-- receipt metadata enrichment（待機）: compliance owner approval required
+- 受領証配送（実装）: signed immediate receipt
 理由:
-- 受領証配送: compliance owner の署名要件を満たし、未承認の遅延配送を避けるため。
-- receipt metadata enrichment: compliance owner の承認が得られていないため。
+- 受領証配送: compliance owner requires a signature
 案の処分:
-- 部分採用 — 元候補「A」— 採用部分: signed immediate receipt; 残部: 保留 — receipt metadata enrichment — compliance owner approval required
-- 却下 — 元候補「B」— compliance owner が署名を要求しているため
-- 却下 — 元候補「C」— delivery owner が遅延配送を承認していないため
+- 部分採用 — 元候補「A signed immediate receipt plus receipt metadata enrichment」— 採用部分: signed immediate receipt; 残部: 保留 — receipt metadata enrichment — compliance owner approval required
+- 却下 — 元候補「B unsigned immediate receipt」— compliance owner requires a signature
+- 却下 — 元候補「C signed delayed receipt」— delivery owner has not approved delayed delivery
 前提検査 P1:
 対象: 受領証配送
 前提: 本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする
 前提を外した案: portal polling
-既存候補との差分: A、B、C は受領証を顧客へ配送するが、portal polling は顧客が portal から受領証を取得する。
-検査案の処分 P1: 保留 — API contract の承認後に再検討する。
+既存候補との差分: A、B、C は受領証を配送するが、この案は顧客が取得する
+検査案の処分 P1: 保留 — API owner contract required
 改訂履歴:
-- B unsigned receipt immediately → A signed receipt immediately — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42
+- B unsigned immediate receipt → A signed immediate receipt plus receipt metadata enrichment — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42
 ```
 
 ## Final human semantic audit — accepted corpus only
@@ -468,8 +500,8 @@ The accepted corpus is S1F, S2F, S3, S4F, S5F, M1R–M5R, and P1R–P5R.
 | --- | --- | --- |
 | Single-axis | S1F, S2F, S3, S4F, S5F | Each has exactly one implementation decision axis and matching rationale. |
 | Implementation plus wait | M1R–M5R | Each has exactly one `(実装)` and one `(待機)` decision axis, matching rationale axes, and a supplied executable owner approval wait condition. |
-| Original partial adoption | P1R–P5R | Each has exactly one original `部分採用` row with nonempty `採用部分` and `残部: 保留`, preserved selected/remainder text, and two owner-grounded original rejections. |
-| Revision truth | P5R | The non-`なし` B→A row contains the supplied REC-42 reason and exact approval URL. |
+| Original partial adoption | P1R–P5R | Each partially adopts one composite original A: its selected component is adopted and its remaining component has one `保留` disposition. B and C are distinct alternatives, each rejected once with an owner-grounded reason. |
+| Revision truth | P5R | The non-`なし` B→composite-A row contains the supplied REC-42 reason and exact approval URL. |
 | Prompt provenance | All 15 | Every accepted sample has an exact persisted prompt and full response. Each task identity is distinct. |
 
 Ten dimensions: candidate coverage, decision/disposition consistency, partial boundaries, executable reconsideration, valid owner-grounded rejections, shared canonical premise, same-granularity P1 alternative, truthful revision history, machine/human boundary, and distinct-context provenance are PASS subject to the supplied facts remaining human-verifiable.
@@ -490,11 +522,11 @@ The extractor selects only the fenced block immediately after each accepted `res
 | M3R | PASS | 1, 11, 95, 183, 323, 522 |
 | M4R | PASS | 1, 11, 99, 170, 295, 550 |
 | M5R | PASS | 1, 11, 110, 211, 360, 612 |
-| P1R | PASS | 1, 11, 47, 100, 361, 579 |
-| P2R | PASS | 1, 11, 134, 263, 496, 731 |
-| P3R | PASS | 1, 11, 142, 267, 509, 702 |
-| P4R | PASS | 1, 11, 105, 234, 464, 720 |
-| P5R | PASS | 1, 11, 125, 244, 464, 656 |
+| P1R | PASS | 1, 11, 47, 100, 438, 676 |
+| P2R | PASS | 1, 11, 48, 106, 439, 637 |
+| P3R | PASS | 1, 11, 54, 117, 469, 640 |
+| P4R | PASS | 1, 11, 46, 102, 412, 583 |
+| P5R | PASS | 1, 11, 53, 104, 458, 623 |
 
 | Partial-adoption ID | Selected text | Remainder text |
 | --- | --- | --- |
