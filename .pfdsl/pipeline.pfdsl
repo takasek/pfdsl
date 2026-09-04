@@ -447,7 +447,7 @@ process:
     location: ../scripts/lib/gen-plugin.mjs
     tags: [ gen, g ]
   check_plugin_drift:
-    label: 両plugin rootのdrift検査
+    label: Claude/Codex plugin・repository Codex assetsのdrift検査
     description: "兄弟成果物であるClaude adapter出力、Codex adapter出力、repository Codex assetsが唯一合流する検査。dist非依存の再生成後に三者の追跡済み差分と対象pathspec内の未追跡ファイルをまとめて検査し、どちらか一方の更新漏れと手編集をpre-commitとCIで失敗させる。dist依存のpfdsl SKILL.mdは別gateで検査する"
     command: node scripts/gen-plugin-dist-independent.mjs
     location: ../scripts/lib/drift-gates.mjs
