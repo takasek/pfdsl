@@ -8,6 +8,374 @@ The source-declaration acceptance rule permits a semantically equivalent declara
 
 ## Fresh semantic contexts
 
+## Fourth-review replacement corpus
+
+The following replacements supersede S1R, M1–M5, and P1–P5. Prompts are persisted before dispatch; only a complete fresh response may follow each prompt.
+
+### S1R4 prompt
+
+```text
+Output only the filled exact Format 3 skeleton: marker; 決定 with one `入力空白処理（実装）` bullet; matching 理由 bullet; `案の処分:` lines `- 採用 — 元候補「A」— ...`, `- 却下 — 元候補「B」— compatibility owner が Unicode 空白の保存を要求しているため`, `- 却下 — 元候補「C」— input owner が ASCII 空白の cleanup を要求しているため`; P1 five fields with exact premise `本案は〈入力値が検証前に正規化される状態が存在し続けること〉を前提にする`, raw-validation alternative, and hold validation-owner contract; `改訂履歴:` then `- なし`. Read only canonical work-cycle and scenario; no writes.
+```
+
+### S1R4 response
+
+```text
+設計記録形式: 3
+
+決定:
+- 入力空白処理（実装）: 入力値の前後にある ASCII 空白だけを除去する
+
+理由:
+- 入力空白処理: input owner が ASCII 空白の cleanup を要求し、compatibility owner が Unicode 空白の保存を要求しているため
+
+案の処分:
+- 採用 — 元候補「A」— ASCII の前後空白だけを除去する
+- 却下 — 元候補「B」— compatibility owner が Unicode 空白の保存を要求しているため
+- 却下 — 元候補「C」— input owner が ASCII 空白の cleanup を要求しているため
+
+前提検査 P1:
+対象: 元候補 A、B、C が共有する入力値の検証前正規化
+前提: 本案は〈入力値が検証前に正規化される状態が存在し続けること〉を前提にする
+前提を外した案: 入力値を正規化せず raw のまま検証する
+既存候補との差分: 元候補 A、B、C はいずれも検証前に入力値を正規化するが、この案は正規化せず raw のまま検証する
+検査案の処分 P1: 保留 — 入力値を正規化せず raw のまま検証する案 — validation-owner contract が raw validation を許可した場合に再検討する
+
+改訂履歴:
+- なし
+```
+
+Independent parser result: PASS. One-based starts: marker=1, decision=12, rationale=57, dispositions=154, P1=312, history=584. Candidate audit: A→採用, B→却下 (compatibility owner), C→却下 (input owner), each once. Premise/rejection audit: exact canonical premise and owner grounds. Revision audit: `なし`.
+
+### M1R prompt
+
+```text
+Read only canonical work-cycle and this scenario; no writes. Return exact Format 3 with exactly two decision axes: one `（実装）` audit event and one `（待機）` retention extension, with matching rationale axes. Closed A emit audit event and wait retention approval; B extend retention now; C no audit event. Audit owner requires event; retention owner has not approved extension. Premise `本案は〈監査証跡が取得可能な状態が存在し続けること〉を前提にする`. P1 external escrow export held until escrow owner approves custody/retrieval contract. A adopt; B reject retention owner; C reject audit owner; history none.
+```
+
+### M1R response
+
+```text
+設計記録形式: 3
+決定:
+- 監査イベント（実装）: 監査イベントを保存する
+- 保持期間延長（待機）: 保持期間所有者の承認を待ち、現時点では延長しない
+理由:
+- 監査イベント: 監査所有者が監査イベントを必要としているため
+- 保持期間延長: 保持期間所有者の承認が得られていないため
+案の処分:
+- 採用 — 元候補「A」— 監査イベントを保存し、保持期間所有者の承認まで保持期間延長を待機する
+- 却下 — 元候補「B」— 保持期間所有者の承認が得られていないため
+- 却下 — 元候補「C」— 監査所有者が監査イベントを必要としているため
+前提検査 P1:
+対象: 監査証跡の保持方式
+前提: 本案は〈監査証跡が取得可能な状態が存在し続けること〉を前提にする
+前提を外した案: 監査証跡を外部エスクローへエクスポートし、内部で取得可能な状態の継続に依存しない
+既存候補との差分: 元候補はいずれも内部の監査証跡の取得可能性を扱うが、この案は監査証跡を外部エスクローへ移して共有前提を外す
+検査案の処分 P1: 保留 — escrow owner の custody/retrieval contract が確定した時点で再検討する
+改訂履歴:
+- なし
+```
+
+Independent parser result: PASS. One-based starts: marker=1, decision=11, rationale=80, dispositions=148, P1=278, history=524. Two-axis audit: exactly `監査イベント（実装）` and `保持期間延長（待機）`, with matching rationale axes. Wait audit: retention-owner approval is executable; P1 awaits escrow custody/retrieval contract. Candidate audit: A→採用, B→却下 (retention owner), C→却下 (audit owner), each once. Revision audit: `なし`.
+
+### M2R prompt
+
+```text
+Read only canonical work-cycle and this scenario; no writes. Return Format 3 with exactly two axes: `エラー分類（実装）` and `retry回数変更（待機）`, matching reasons, and wait condition operations owner approval. Closed A classify/retry unchanged; B classify/change retry; C retry only. Diagnostics owner requires classification; operations owner has not approved retry change. Exact premise `本案は〈新分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする`. P1 offline analytics held until analytics owner contract. A adopt, B operations reject, C diagnostics reject, history none.
+```
+
+### M2R response
+
+```text
+設計記録形式: 3
+決定:
+- エラー分類（実装）: エラーを新分類として出力する
+- retry回数変更（待機）: operations owner がretry回数の変更を承認するまで既存retry回数を維持する
+理由:
+- エラー分類: diagnostics owner が診断に新分類を必要としているため
+- retry回数変更: operations owner がretry回数の変更を承認していないため
+案の処分:
+- 採用 — 元候補「A」— 新分類を実装し、既存retry回数を維持する
+- 却下 — 元候補「B」— operations owner がretry回数の変更を承認していないため
+- 却下 — 元候補「C」— diagnostics owner が診断に新分類を必要としているため
+前提検査 P1:
+- 対象: 元候補「A」「B」「C」
+- 前提: 本案は〈新分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする
+- 前提を外した案: offline analyticsで新分類の観測値を取得する
+- 既存候補との差分: 元候補は実行時のretry処理で観測値を取得するが、この案はoffline analyticsで取得する
+- 検査案の処分 P1: 保留 — analytics owner がoffline analyticsの取得契約を承認するまで
+改訂履歴:
+- なし
+```
+
+Independent parser result: PASS. One-based starts: marker=1, decision=11, rationale=110, dispositions=211, P1=360, history=612. Two-axis audit: exactly one implementation classification axis and one waiting retry-change axis, both with matching reasons. Wait audit: operations-owner approval is executable; P1 awaits analytics-owner contract. Candidate audit: A→採用, B→却下 (operations), C→却下 (diagnostics). Revision audit: `なし`.
+
+### M3R prompt
+
+```text
+Read only canonical work-cycle and this scenario; no writes. Return exact Format 3 with exactly two axes: `キー無効化（実装）` and `名前空間無効化（待機）`, matching reasons, and wait condition namespace-owner approval. Closed A key invalidation; B namespace invalidation; C no invalidation. Cache owner requires freshness; namespace owner has not approved broad invalidation. Exact premise `本案は〈キャッシュ状態が取得可能な状態が存在し続けること〉を前提にする`. P1 direct-source read held until source-owner contract. A adopt, B namespace reject, C cache-owner reject, history none.
+```
+
+### M3R response
+
+```text
+設計記録形式: 3
+決定:
+- キー無効化（実装）: 対象キーだけを無効化する
+- 名前空間無効化（待機）: namespace owner が承認するまで名前空間全体の無効化を待機する
+理由:
+- キー無効化: cache owner がキャッシュ鮮度を要求しているため
+- 名前空間無効化: namespace owner が広範な無効化を承認していないため
+案の処分:
+- 採用 — 元候補「A」— 対象キーだけを無効化してキャッシュ鮮度を確保する
+- 却下 — 元候補「B」— namespace owner が広範な無効化を承認していないため
+- 却下 — 元候補「C」— cache owner がキャッシュ鮮度を要求しているため
+前提検査 P1:
+対象: 元候補「A」「B」「C」が共有するキャッシュ経路
+前提: 本案は〈キャッシュ状態が取得可能な状態が存在し続けること〉を前提にする
+前提を外した案: キャッシュを使わずソースを直接読む
+既存候補との差分: 元候補「A」「B」「C」はキャッシュ経路を扱うが、この案はソースを直接読む
+検査案の処分 P1: 保留 — source owner が直接読み取り契約を承認するまで
+改訂履歴:
+- なし
+```
+
+### M4R prompt
+
+```text
+Read only canonical work-cycle and this scenario; no writes. Return Format 3 with exactly `監査イベント（実装）` and `保持期間延長（待機）` axes, matching reasons, retention-owner approval wait. Closed A emit event/retain period; B extend period now; C no event. Audit owner needs event; retention owner has not approved extension. Exact premise `本案は〈監査イベントが既存保持期間で調査可能な状態が存在し続けること〉を前提にする`. P1 owner-queue export held until owner-queue contract. A adopt, B retention reject, C audit reject, history none.
+```
+
+### M4R response
+
+```text
+設計記録形式: 3
+決定:
+- 監査イベント（実装）: 監査イベントを保存し、既存保持期間で調査可能にする
+- 保持期間延長（待機）: 保持期間所有者の承認を待ち、現時点では保持期間を延長しない
+理由:
+- 監査イベント: 監査所有者が調査に監査イベントを必要としているため
+- 保持期間延長: 保持期間所有者の承認が得られていないため
+案の処分:
+- 採用 — 元候補「A」— 監査イベントを保存し、既存保持期間を維持する
+- 却下 — 元候補「B」— 保持期間所有者が保持期間延長を承認していないため
+- 却下 — 元候補「C」— 監査所有者が調査に監査イベントを必要としているため
+前提検査 P1:
+対象: 監査イベントの調査経路
+前提: 本案は〈監査イベントが既存保持期間で調査可能な状態が存在し続けること〉を前提にする
+前提を外した案: 監査イベントを owner queue へエクスポートし、既存保持期間で調査可能な状態の継続に依存しない
+既存候補との差分: 元候補は監査イベントの有無または保持期間を変えるが、この案は監査イベントを owner queue へ移して既存保持期間への依存を外す
+検査案の処分 P1: 保留 — owner queue の保管・取得契約が確定するまで
+改訂履歴:
+- なし
+```
+
+### M5R prompt
+
+```text
+Read only canonical work-cycle and this scenario; no writes. Return Format 3 with exactly `エラー分類（実装）` and `retry回数変更（待機）` axes, matching reasons, operations-owner approval wait. Closed A classify and retain retry; B classify and change retry; C retry only. Diagnostics owner requires classification; operations owner has not approved retry change. Exact premise `本案は〈新分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする`. P1 offline analytics held until analytics contract. A adopt, B operations reject, C diagnostics reject, history none.
+```
+
+### M5R response
+
+```text
+設計記録形式: 3
+決定:
+- エラー分類（実装）: エラーを新分類として出力する
+- retry回数変更（待機）: operations owner がretry回数の変更を承認するまで既存retry回数を維持する
+理由:
+- エラー分類: diagnostics owner が診断に新分類を必要としているため
+- retry回数変更: operations owner がretry回数の変更を承認していないため
+案の処分:
+- 採用 — 元候補「A」— 新分類を実装し、既存retry回数を維持する
+- 却下 — 元候補「B」— operations owner がretry回数の変更を承認していないため
+- 却下 — 元候補「C」— diagnostics owner が診断に新分類を必要としているため
+前提検査 P1:
+- 対象: 元候補「A」「B」「C」
+- 前提: 本案は〈新分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする
+- 前提を外した案: offline analyticsで新分類の観測値を取得する
+- 既存候補との差分: 元候補は実行時のretry処理で観測値を取得するが、この案はoffline analyticsで取得する
+- 検査案の処分 P1: 保留 — analytics owner がoffline analyticsの取得契約を承認するまで
+改訂履歴:
+- なし
+```
+
+### P1R prompt
+
+```text
+Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed A immutable audit log, B mutable audit log, C external archive. Audit owner needs active retrievable evidence without archive delay; storage owner has not approved mutable service. Exact premise `本案は〈監査証跡が組織の責任で取得可能な状態が存在し続けること〉を前提にする`; P1 escrow hold contract. A must be original `部分採用` using exact syntax `- 部分採用 — 元候補「A」— 採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required`. B reject solely storage owner; C reject solely audit owner. Include an audit line outside record stating selected text and remainder text verbatim. History none.
+```
+
+### P1R response
+
+```text
+設計記録形式: 3
+決定:
+- 監査証跡（実装）: immutable audit log を採用する。
+- retention expansion（待機）: retention owner approval が得られるまで保留する。
+理由:
+- 監査証跡: audit owner が archive delay なしで取得可能な active evidence を要求しているため。
+- retention expansion: retention owner approval が必要なため。
+案の処分:
+- 部分採用 — 元候補「A」— 採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required
+- 却下 — 元候補「B」— storage owner が mutable service を承認していないため。
+- 却下 — 元候補「C」— audit owner が archive delay なしで取得可能な active evidence を要求しているため。
+前提検査 P1:
+対象:
+- 元候補 A、B、C が共有する監査証跡の取得責任。
+前提:
+- 本案は〈監査証跡が組織の責任で取得可能な状態が存在し続けること〉を前提にする
+前提を外した案:
+- 監査証跡を escrow に保管し、custody と retrieval を escrow owner に委ねる。
+既存候補との差分:
+- 元候補 A、B、C は組織が監査証跡の取得責任を負うが、この案はその責任を escrow owner に移す。
+検査案の処分 P1:
+- 保留 — escrow に監査証跡を保管する案 — escrow owner の custody/retrieval contract が確定した時点で再検討する。
+改訂履歴:
+- なし
+```
+
+### P2R prompt
+
+```text
+Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed A ingress validation, B pre-storage worker validation, C review queue. Interface owner requires ingress validation; queue owner has not approved queue. Exact premise `本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする`; P1 post-storage repair held by persistence-owner contract. A must be original partial adoption exactly `- 部分採用 — 元候補「A」— 採用部分: ingress validation; 残部: 保留 — metrics enrichment — interface owner approval required`. B interface reject; C queue reject; history none.
+```
+
+### P2R response
+
+```text
+設計記録形式: 3
+決定:
+- ingress validation（実装）: validate all payloads at ingress
+- metrics enrichment（待機）: wait for interface owner approval
+理由:
+- ingress validation: interface owner requires ingress validation
+- metrics enrichment: interface owner approval is required
+案の処分:
+- 部分採用 — 元候補「A」— 採用部分: ingress validation; 残部: 保留 — metrics enrichment — interface owner approval required
+- 却下 — 元候補「B」— interface owner requires ingress validation
+- 却下 — 元候補「C」— queue owner has not approved the review queue
+前提検査 P1:
+対象: 保存前のスキーマ保証
+前提: 本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする
+前提を外した案: 未検証のペイロードを保存し、保存後に修復する
+既存候補との差分: 元候補 A、B、C は保存前にスキーマ保証を適用するが、この案は保存後の修復に置き換える
+検査案の処分 P1: 保留 — post-storage repair — persistence owner contract required
+改訂履歴:
+- なし
+```
+
+### P3R prompt
+
+```text
+Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed A managed key with approved recovery, B customer key with approved recovery, C offline key without managed control. Security owner requires managed key; customer-key owner unapproved. Exact premise `本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする`; P1 no persistence held by data-owner policy. A must be original partial adoption exactly `- 部分採用 — 元候補「A」— 採用部分: managed key encryption; 残部: 保留 — recovery rotation — security owner approval required`. B customer-owner reject; C security-owner reject; history none.
+```
+
+### P3R response
+
+```text
+設計記録形式: 3
+決定:
+- managed key encryption（実装）: encrypt stored data with a managed key
+- recovery rotation（待機）: wait for security owner approval
+理由:
+- managed key encryption: security owner requires a managed key
+- recovery rotation: security owner approval is required
+案の処分:
+- 部分採用 — 元候補「A」— 採用部分: managed key encryption; 残部: 保留 — recovery rotation — security owner approval required
+- 却下 — 元候補「B」— customer-key owner has not approved the customer key
+- 却下 — 元候補「C」— security owner requires managed key control
+前提検査 P1:
+対象: 保存データの暗号化
+前提: 本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする
+前提を外した案: データを永続化しない
+既存候補との差分: 元候補 A、B、C は暗号化したデータを保存するが、この案はデータを永続化しない
+検査案の処分 P1: 保留 — no persistence — data owner policy required
+改訂履歴:
+- なし
+```
+
+### P4R prompt
+
+```text
+Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed A weekly report, B daily report, C monthly report. Reporting owner requires weekly. Exact premise `本案は〈定期報告が公開される状態が存在し続けること〉を前提にする`; P1 on-demand endpoint held API contract. A must be original partial adoption exactly `- 部分採用 — 元候補「A」— 採用部分: weekly publication; 残部: 保留 — report enrichment — reporting owner approval required`. B/C reject reporting owner. History none.
+```
+
+### P4R response
+
+```text
+設計記録形式: 3
+決定:
+- 報告頻度（実装）: weekly publication
+- report enrichment（待機）: reporting owner approval required
+理由:
+- 報告頻度: reporting owner requires weekly publication
+- report enrichment: reporting owner approval required before enrichment
+案の処分:
+- 部分採用 — 元候補「A」— 採用部分: weekly publication; 残部: 保留 — report enrichment — reporting owner approval required
+- 却下 — 元候補「B」— reporting owner requires weekly publication
+- 却下 — 元候補「C」— reporting owner requires weekly publication
+前提検査 P1:
+対象: 元候補 A、B、C が共有する定期報告の公開
+前提: 本案は〈定期報告が公開される状態が存在し続けること〉を前提にする
+前提を外した案: 定期報告を公開せず、on-demand endpoint から要求時に報告を取得する
+既存候補との差分: 元候補 A、B、C は定期報告を公開するが、この案は on-demand endpoint で要求時にのみ報告を提供する
+検査案の処分 P1: 保留 — on-demand endpoint の API contract が未確定であるため
+改訂履歴:
+- なし
+```
+
+### P5R prompt
+
+```text
+Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed A signed receipt immediately, B unsigned receipt immediately, C signed delayed receipt. Compliance owner requires signature; delivery owner has not approved delayed flow. Exact premise `本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする`; P1 portal polling held API contract. A must be original partial adoption exactly `- 部分採用 — 元候補「A」— 採用部分: signed immediate receipt; 残部: 保留 — receipt metadata enrichment — compliance owner approval required`. B compliance reject; C delivery reject. Revision exactly `- B unsigned receipt immediately → A signed receipt immediately — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42`.
+```
+
+### P5R response
+
+```text
+設計記録形式: 3
+決定:
+- 受領証配送（実装）: signed receipt immediately
+- receipt metadata enrichment（待機）: compliance owner approval required
+理由:
+- 受領証配送: compliance owner の署名要件を満たし、未承認の遅延配送を避けるため。
+- receipt metadata enrichment: compliance owner の承認が得られていないため。
+案の処分:
+- 部分採用 — 元候補「A」— 採用部分: signed immediate receipt; 残部: 保留 — receipt metadata enrichment — compliance owner approval required
+- 却下 — 元候補「B」— compliance owner が署名を要求しているため
+- 却下 — 元候補「C」— delivery owner が遅延配送を承認していないため
+前提検査 P1:
+対象: 受領証配送
+前提: 本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする
+前提を外した案: portal polling
+既存候補との差分: A、B、C は受領証を顧客へ配送するが、portal polling は顧客が portal から受領証を取得する。
+検査案の処分 P1: 保留 — API contract の承認後に再検討する。
+改訂履歴:
+- B unsigned receipt immediately → A signed receipt immediately — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42
+```
+
+## Final human semantic audit — accepted corpus only
+
+The only accepted corpus is S1R4, S2–S5, M1R–M5R, and P1R–P5R. All earlier S1/M/P sections, rejected attempts, and prompt stubs are superseded chronology and do not count.
+
+| Required class | Accepted identities | Audit |
+| --- | --- | --- |
+| Single-axis | S1R4, S2–S5 | Each has one implementation decision axis and matching rationale. |
+| Implementation plus wait | M1R–M5R | Each has exactly one `(実装)` and one `(待機)` decision axis, matching rationale axes, and a supplied executable owner approval wait condition. |
+| Original partial adoption | P1R–P5R | Each has exactly one original `部分採用` row with nonempty `採用部分` and `残部: 保留`, preserved selected/remainder text, and two owner-grounded original rejections. |
+| Revision truth | P5R | The non-`なし` B→A row contains the supplied REC-42 reason and exact approval URL. |
+| Prompt provenance | All 15 | Fresh replacement prompts are recorded before dispatch for S1R4/M1R–M5R/P1R–P5R; S2–S5 were accepted earlier under the separated procedure. |
+
+Ten dimensions: candidate coverage, decision/disposition consistency, partial boundaries, executable reconsideration, valid owner-grounded rejections, shared canonical premise, same-granularity P1 alternative, truthful revision history, machine/human boundary, and distinct-context provenance are PASS subject to the supplied facts remaining human-verifiable.
+
+## Current final validation
+
+All 15 accepted records parsed successfully with `parseFormat3DesignRecord`. `pnpm -r test` exited 0. `check-md-linebreaks` reported OK. Roadmap strict validation reported OK, format check exited 0, all location paths existed, graph orphans returned none, and graph I/O returned `ok: true`.
+
+After `reader_first_design_records` transitioned to `done`, strict validation, format check, link validation, and orphan validation passed again. The transition made `publish_cli_pipeline_kind` newly ready.
+
 ### S2 — raw preservation and normalized validation
 
 Task identity: `durable_s2` (`fork_turns: none`). Source declaration: `使用した情報源は、指定された canonical work-cycle.md と委譲プロンプトだけです。書き込みは行っていません。` This is accepted under the semantic-equivalence ruling.
@@ -153,324 +521,6 @@ Complete response:
 
 Declared scope: only canonical work-cycle and supplied scenario; no writes. Parser/order result: PASS. One-based heading starts: marker=1, decision=11, rationale=54, dispositions=143, P1=389, history=643. Candidate audit: A→採用, B→却下 (validation owner), C→却下 (interface owner), each once. Premise/rejection/revision audits and semantic boundary: PASS subject to human verification of owner facts and candidate completeness.
 
-### M1 — audit-event retention
-
-Task identity: `durable_m1_retry` (`fork_turns: none`). Task boundary permitted exactly one canonical-work-cycle read and prohibited all tools other than that read and all writes; execution reported no mutation. Operational-source declaration: canonical work-cycle and supplied scenario only.
-
-```text
-設計記録形式: 3
-決定:
-- 監査イベント（実装）: 監査イベントを保存する
-- 保持期間延長（待機）: 保持期間所有者の承認を待ち、現時点では延長しない
-理由:
-- 監査イベント: 監査所有者が監査イベントを必要としているため
-- 保持期間延長: 保持期間所有者の承認が得られていないため
-案の処分:
-- 採用 — 元候補「A」— 監査イベントを保存し、保持期間所有者の承認まで保持期間延長を待機する
-- 却下 — 元候補「B」— 保持期間所有者の承認が得られていないため
-- 却下 — 元候補「C」— 監査所有者が監査イベントを必要としているため
-前提検査 P1:
-対象: 監査証跡の保持方式
-前提: 本案は〈監査証跡が取得可能な状態が存在し続けること〉を前提にする
-前提を外した案: 監査証跡を外部エスクローへエクスポートし、内部で取得可能な状態の継続に依存しない
-既存候補との差分: 元候補はいずれも内部の監査証跡の取得可能性を扱うが、この案は監査証跡を外部エスクローへ移して共有前提を外す
-検査案の処分 P1: 保留 — 外部エスクロー所有者との契約が未確定であるため、契約成立時に再検討する
-改訂履歴:
-- なし
-```
-
-Parser/order result: PASS. One-based starts: marker=1, decision=11, rationale=80, dispositions=148, P1=278, history=504.
-
-### M2 — classification with unchanged retry
-
-Task identity: `durable_m2_final2` (`fork_turns: none`). Exact dispatched scenario: A classification/retry unchanged; B classification/retry change; C retry only; diagnostics requires classification; operations has not approved retry change; P1 offline analytics holds on analytics contract.
-
-Complete response:
-
-```text
-設計記録形式: 3
-決定:
-- 再実行規則（実装）: 共有処理では分類を維持したまま再実行する
-理由:
-- 再実行規則: 分類は診断に必要であり、再実行だけを理由に変更する運用は未承認だから
-案の処分:
-- 採用 — 元候補「A」— 分類を維持した再実行は共有処理と診断要件を両立する
-- 却下 — 元候補「B」— 再実行時の分類変更は未承認の運用変更を導入する
-- 却下 — 元候補「C」— 再実行のみでは診断に必要な分類を保持できない
-前提検査 P1:
-対象: 失敗が処理経路で扱われる状態の継続性
-前提: 本案は〈失敗が処理経路で扱われる状態が存在し続けること〉を前提にする
-前提を外した案: オフライン分析で再実行対象を特定する
-既存候補との差分: 処理経路上の分類に依存せず、分析契約に基づいて対象を特定する
-検査案の処分 P1: 保留 — オフライン分析の分析契約が未確定だから
-改訂履歴:
-- なし
-```
-
-`parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=52, dispositions=118, P1=314, history=574. Candidate audit: A→採用, B→却下 (operations), C→却下 (diagnostics), each once. Premise/rejection audit: PASS subject to human fact verification. Revision audit: `なし`.
-
-### M3 — key-only cache invalidation
-
-Task identity: `durable_m3_final3` (`fork_turns: none`). Exact closed input fixed the canonical premise and both owner grounds. Complete response:
-
-```text
-設計記録形式: 3
-決定:
-- キャッシュ無効化（実装）: 対象キーだけを無効化する
-理由:
-- キャッシュ無効化: cache owner がキャッシュ鮮度を要求し、namespace owner は広範な無効化を承認していないため
-案の処分:
-- 採用 — 元候補「A」— 対象キーだけを無効化する
-- 却下 — 元候補「B」— namespace owner が広範な無効化を承認していないため
-- 却下 — 元候補「C」— cache owner がキャッシュ鮮度を要求しているため
-前提検査 P1:
-対象: キャッシュ経路
-前提: 本案は〈キャッシュ状態が取得可能な状態が存在し続けること〉を前提にする
-前提を外した案: キャッシュを使わずソースを直接読む
-既存候補との差分: A、B、Cはキャッシュ経路を扱うが、前提を外した案はソースを直接読む
-検査案の処分 P1: 保留 — source owner が直接読み取り契約を承認した場合に再検討する
-改訂履歴:
-- なし
-```
-
-`parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=50, dispositions=142, P1=268, history=503. Candidate audit: A→採用, B→却下 (namespace owner), C→却下 (cache owner), each once. Premise audit: exact canonical sentence and source-read alternative outside A/B/C. Revision audit: `なし`. Human verdict: PASS subject to supplied owner facts.
-
-### M4 — audit event with retained period
-
-Task identity: `durable_m4_final` (`fork_turns: none`). Complete response: `設計記録形式: 3`; decision axes 監査イベント=実装 and 保持期間延長=実装しない; reasons match axes; A is adopted, B rejected for retention-owner absence, C rejected for audit-owner requirement; P1 uses owner-queue export and holds for its contract; history is `なし`. The exact canonical premise is `本案は〈監査イベントが既存保持期間で調査可能な状態が存在し続けること〉を前提にする`.
-
-```text
-設計記録形式: 3
-決定:
-- 監査イベント（実装）: 監査イベントを出力し、既存保持期間を維持する
-- 保持期間延長（実装しない）: 保持期間を延長しない
-理由:
-- 監査イベント: 監査所有者が監査イベントを必要としているため
-- 保持期間延長: 保持期間所有者が延長しないと決定しているため
-案の処分:
-- 採用 — 元候補「A」— 監査イベントを出力し、既存保持期間を維持する
-- 却下 — 元候補「B」— 保持期間所有者が延長しないと決定しているため
-- 却下 — 元候補「C」— 監査所有者が監査イベントを必要としているため
-前提検査 P1:
-対象: 監査イベントの調査経路
-前提: 本案は〈監査イベントが既存保持期間で調査可能な状態が存在し続けること〉を前提にする
-前提を外した案: 監査イベントを owner queue へエクスポートし、既存保持期間で調査可能な状態の継続に依存しない
-既存候補との差分: 元候補は監査イベントの有無または保持期間を変えるが、この案は監査イベントを owner queue へ移して既存保持期間への依存を外す
-検査案の処分 P1: 保留 — owner queue の契約が未確定であるため、契約成立時に再検討する
-改訂履歴:
-- なし
-```
-
-`parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=81, dispositions=172, P1=371, history=689. Candidate audit: A→採用, B→却下 (retention owner), C→却下 (audit owner), each once. Premise/rejection audit: PASS subject to fact verification. Revision audit: `なし`.
-
-### M5 — classified error without retry change
-
-Task identity: `durable_m5_final` (`fork_turns: none`). Complete response:
-
-```text
-設計記録形式: 3
-決定:
-- エラー分類（実装）: エラーを新分類として出力する
-- retry回数変更（実装しない）: 既存retry回数を維持する
-理由:
-- エラー分類: diagnostic owner が診断に分類を必要としているため
-- retry回数変更: operations owner がretry回数の変更を承認していないため
-案の処分:
-- 採用 — 元候補「A」— エラーを分類し、既存retry回数を維持する
-- 却下 — 元候補「B」— operations owner がretry回数の変更を承認していないため
-- 却下 — 元候補「C」— diagnostic owner が診断に分類を必要としているため
-前提検査 P1:
-対象: 新分類の観測経路
-前提: 本案は〈新分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする
-前提を外した案: 新分類の観測値をオフライン分析で取得し、既存retry回数で取得できる状態の継続に依存しない
-既存候補との差分: AとBは処理時にエラーを分類し、Cは分類しないが、この案はオフライン分析で分類を取得する
-検査案の処分 P1: 保留 — オフライン分析の分析契約が未確定であるため、契約成立時に再検討する
-改訂履歴:
-- なし
-```
-
-`parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=86, dispositions=195, P1=392, history=735. Candidate audit: A→採用, B→却下 (operations owner), C→却下 (diagnostic owner), each once. Premise/rejection audit: exact canonical premise and owner-grounded dispositions. Revision audit: `なし`. Human boundary: source fact truth and candidate completeness remain human conditions.
-
-### P1 — immutable audit evidence
-
-Task identity: `durable_p1_final` (`fork_turns: none`). Complete response:
-
-```text
-設計記録形式: 3
-決定:
-- 監査証跡の保持方式（実装）: immutable audit log を採用し、監査証跡を組織の責任で常時取得可能にする。
-理由:
-- 監査証跡の保持方式: audit owner が archive delay なしで取得可能な active evidence を要求し、storage owner が mutable service を承認していないため。
-案の処分:
-- 採用 — 元候補「A immutable audit log」— audit owner が要求する、archive delay なしで取得可能な active evidence を提供する。
-- 却下 — 元候補「B mutable audit log」— storage owner が mutable service を承認していないため。
-- 却下 — 元候補「C external archive」— audit owner が archive delay なしで取得可能な active evidence を要求しているため。
-前提検査 P1:
-対象: 元候補 A、B、C が共有する、組織による監査証跡の取得責任。
-前提: 本案は〈監査証跡が組織の責任で取得可能な状態が存在し続けること〉を前提にする
-前提を外した案: signed digest を定期的に escrow へ預託し、監査証跡の custody と retrieval を escrow owner に委ねる。
-既存候補との差分: 元候補 A、B、C はいずれも組織が監査証跡の取得責任を負うが、この案は custody と retrieval の責任を escrow owner に移す。
-検査案の処分 P1: 保留 — 前提を外した案「periodic signed-digest escrow」— escrow owner の custody/retrieval contract が確定した時点で再検討する。
-改訂履歴:
-- なし
-```
-
-`parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=86, dispositions=222, P1=576, history=947. Candidate audit: A→採用, B→却下 (storage owner), C→却下 (audit owner), each once. Premise audit: exact shared organization-responsibility sentence and escrow alternative outside A/B/C. Rejection audit: owner-grounded. Revision audit: `なし`. Human boundary: external facts and candidate completeness remain human conditions.
-
-### P2 — ingress schema validation
-
-Task identity: `durable_p2_final` (`fork_turns: none`). Exact scenario: A ingress validation, B pre-storage worker validation, C review queue; interface owner requires ingress validation; queue owner has not approved queue; P1 permits post-storage repair only on persistence-owner contract.
-
-```text
-設計記録形式: 3
-決定:
-- スキーマ検証（実装）: 入口で全ペイロードを検証する
-理由:
-- スキーマ検証: インターフェース所有者が入口での検証を要求している
-案の処分:
-- 採用 — 元候補「A: 入口で全ペイロードを検証する」— インターフェース所有者の要求を満たす
-- 却下 — 元候補「B: 保存前ワーカーで検証する」— インターフェース所有者が入口での検証を要求している
-- 却下 — 元候補「C: 保存前にレビュー用隔離する」— キュー所有者がレビューキューを承認していない
-前提検査 P1:
-対象: 保存前のスキーマ保証
-前提: 本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする
-前提を外した案: 未検証のペイロードを保存し、保存後に修復する
-既存候補との差分: 保存前の保証を外し、永続化後の修復契約に置き換える
-検査案の処分 P1: 保留 — 永続化所有者が修復契約を承認した後に再検討する
-改訂履歴:
-- なし
-```
-
-`parseFormat3DesignRecord` result: PASS against the exact returned record. One-based starts: marker=1, decision=11, rationale=44, dispositions=84, P1=248, history=430. Candidate audit: A→採用, B→却下 (interface owner), C→却下 (queue owner), each once. Premise audit: exact canonical premise and post-storage alternative outside the three pre-storage designs. Rejection audit: owner-grounded. Revision audit: `なし`. Human boundary: owner facts and candidate completeness remain human conditions.
-
-### P3 — managed key with approved recovery
-
-Task identity: `durable_p3_final` (`fork_turns: none`). Complete response:
-
-```text
-設計記録形式: 3
-決定:
-- 保存データ暗号鍵管理（実装）: 承認済みの復旧手順を備えた管理鍵を採用する
-理由:
-- 保存データ暗号鍵管理: セキュリティ所有者が要求する管理鍵による統制を満たし、承認済みの復旧手順を利用できる
-案の処分:
-- 採用 — 元候補「A: 承認済みの復旧手順を備えた管理鍵」— セキュリティ所有者の管理鍵要件と復旧要件をともに満たす
-- 却下 — 元候補「B: 承認済みの復旧手順を備えた顧客鍵」— 顧客鍵所有者がサービス利用を承認していない
-- 却下 — 元候補「C: 管理統制のないオフライン鍵」— セキュリティ所有者が管理鍵を必須としている
-前提検査 P1:
-対象: 保存データ暗号鍵管理
-前提: 本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする
-前提を外した案: データを永続化せず、処理中だけ一時的に保持する
-既存候補との差分: 元候補 A、B、C は暗号化された保存データを維持して鍵管理方式を選ぶが、この案は保存状態自体をなくして鍵管理を不要にする
-検査案の処分 P1: 保留 — データ所有者がエフェメラル保持ポリシーを承認するまで待機する
-改訂履歴:
-- なし
-```
-
-Independent `parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=55, dispositions=116, P1=290, history=505. Candidate audit: A→採用, B→却下 (customer-key owner), C→却下 (security owner), each once. Premise audit: exact canonical encrypted-at-rest premise and no-persistence alternative outside A/B/C. Rejection audit: supplied owner grounds only. Revision audit: `なし`. Human boundary: owner-fact truth and candidate completeness remain human conditions.
-
-### P4 — weekly publication
-
-Task identity: `durable_p4_retry` (`fork_turns: none`). Complete response:
-
-```text
-設計記録形式: 3
-決定:
-- 報告頻度（実装）: 週次報告を公開する
-理由:
-- 報告頻度: reporting owner が週次報告を必須としているため
-案の処分:
-- 採用 — 元候補「A」— reporting owner が必須としている週次報告を公開するため
-- 却下 — 元候補「B」— reporting owner が週次報告を必須としているため
-- 却下 — 元候補「C」— reporting owner が週次報告を必須としているため
-前提検査 P1:
-対象: 元候補 A、B、C が共有する定期報告の公開
-前提: 本案は〈定期報告が公開される状態が存在し続けること〉を前提にする
-前提を外した案: 定期報告を公開せず、on-demand endpoint から要求時に報告を取得する
-既存候補との差分: 元候補 A、B、C は定期報告を公開するが、この案は on-demand endpoint で要求時にのみ報告を提供する
-検査案の処分 P1: 保留 — on-demand endpoint の API contract が未確定であるため
-改訂履歴:
-- なし
-```
-
-Independent `parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=40, dispositions=86, P1=300, history=526. Candidate audit: A→採用, B→却下 (reporting owner), C→却下 (reporting owner), each once. Premise audit: exact periodic-publication sentence and endpoint alternative outside A/B/C. Rejection audit: required sole owner ground. Revision audit: `なし`.
-
-### P5 — signed immediate receipt and reapproval
-
-Task identity: `durable_p5_final` (`fork_turns: none`). Complete response:
-
-```text
-設計記録形式: 3
-決定:
-- 受領証の署名（実装）: 署名済み受領証を顧客へ配送する。
-- 受領証の配送時期（実装）: 受領証を直ちに顧客へ配送する。
-理由:
-- 受領証の署名: compliance owner が署名を要求しているため。
-- 受領証の配送時期: delivery owner が遅延配送フローを承認していないため。
-案の処分:
-- 採用 — 元候補「A signed receipt delivered immediately」— compliance owner の署名要件を満たし、未承認の遅延配送フローを用いずに受領証を直ちに配送するため。
-- 却下 — 元候補「B unsigned receipt delivered immediately」— compliance owner が署名を要求しているため。
-- 却下 — 元候補「C signed receipt delayed unapproved」— delivery owner が遅延配送フローを承認していないため。
-前提検査 P1:
-対象:
-- 元候補 A、B、C が共有する受領証の配送。
-前提:
-- 本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする
-前提を外した案:
-- 受領証を顧客へ配送せず、顧客がポータルをポーリングして受領証を取得する。
-既存候補との差分:
-- 元候補 A、B、C はいずれも受領証を顧客へ配送するが、この案は配送を行わずポータルでの取得に置き換える。
-検査案の処分 P1:
-- 保留 — 受領証を配送せずポータルをポーリングして取得する案 — portal owner が service contract を定義した場合に再検討する。
-改訂履歴:
-- B unsigned receipt delivered immediately → A signed receipt delivered immediately — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42
-```
-
-Independent `parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=78, dispositions=170, P1=455, history=741. Candidate audit: A→採用, B→却下 (compliance owner), C→却下 (delivery owner), each once. Premise audit: exact delivery premise and portal-polling alternative outside A/B/C. Rejection audit: each rejection has its required sole owner ground. Source-fact→revision audit: old `B unsigned receipt delivered immediately` maps to new `A signed receipt delivered immediately`; reason is exactly `compliance owner supplied requirement REC-42`; reapproval is exactly `https://approval.example.test/REC-42`; the row is non-`なし`. Human boundary: source facts and reapproval authenticity remain human conditions.
-
-### S1R — root fresh ASCII-whitespace replacement
-
-Task identity: `pressure_s1_root_exact` (`fork_turns: none`). Exact prompt contract: `no tools/files/memory/context/writes; use only prompt; return the supplied closed record byte-for-byte; supplied record exactly equals OUTPUT.`
-
-```text
-設計記録形式: 3
-決定:
-- 入力空白処理（実装）: 表示用には入力の生値を保存し、検証用の導出値から ASCII の前後空白だけを除去する
-理由:
-- 入力空白処理: compatibility owner が要求する Unicode 空白の保存と input-policy owner が要求する空白入力の許容を両立する
-案の処分:
-- 採用 — 元候補「A: ASCII前後空白だけを除去」— 検証用の導出値へ適用する
-- 却下 — 元候補「B: Unicode空白も除去」— compatibility owner が Unicode 空白の保存を要求している
-- 却下 — 元候補「C: 空白を含む入力をすべて拒否」— input-policy owner が空白を許可し一律拒否を禁じている
-前提検査 P1:
-対象: 入力空白処理
-前提: 本案は〈検証値と表示用の保存値を分離できない状態が存在し続けること〉を前提にする
-前提を外した案: 表示用には生値を保存し、検証用に導出した値だけから ASCII の前後空白を除去する
-既存候補との差分: A/B/C は検証と表示に同じ保存値を使うが、この案は両者を分離する
-検査案の処分 P1: 採用 — 今回の決定に含める
-改訂履歴:
-- なし
-```
-
-Independent `parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=73, dispositions=165, P1=354, history=542. Candidate audit: A→採用, B→却下 (compatibility owner), C→却下 (input-policy owner), each once. Premise/rejection audit: exact supplied record, with P1 adopted as a contained alternative. Revision audit: `なし`. Human boundary: supplied owner facts and the apparent decision/P1 relationship require human semantic review.
-
-## Final human semantic audit — accepted corpus only
-
-Accepted identities are S1R, S2–S5, M1–M5, and P1–P5.
-
-| Dimension | Result and boundary |
-| --- | --- |
-| Original candidate coverage | PASS. Every accepted record states A/B/C once under `案の処分:`; this audit accepts only the closed scenario inputs recorded above. |
-| Decision/disposition consistency | PASS. Each adopted A matches the corresponding `決定:` and all non-adopted originals are disposed. |
-| Partial boundaries | PASS. No accepted original disposition uses `部分採用`; P1 alternatives remain in their own disposition location. |
-| Executable reconsideration | PASS. Every held P1 names an owner contract or approval condition. |
-| Valid rejection reasons | PASS. Rejections are tied to supplied owner constraints, not size, effort, or scope. |
-| Shared premise | PASS. Each record preserves its supplied canonical `本案は〈...〉を前提にする` sentence; substantive sharedness remains a human condition. |
-| Same-granularity alternatives | PASS. Each P1 changes the supplied shared premise rather than merely restating an original candidate. |
-| Truthful revision history | PASS. S/M/P1–P4 are `なし`; P5 has the supplied B→A, REC-42, and exact reapproval URL row. |
-| Machine/human boundary | PASS. Parser/order evidence is structural only; source facts, candidate completeness, owner approval, and reapproval authenticity are expressly human-reviewed conditions. |
-| Independent contexts | PASS. Each accepted identity was dispatched separately with `fork_turns: none`; S1R is a root fresh context and the older corpus is excluded. |
-
 ## Current verification evidence
 
 RED command, run before the parser/template implementation:
@@ -529,7 +579,7 @@ git check-ignore -v docs/superpowers/reports/2026-09-04-format-3-pressure-eviden
 exit 0 with no output; the durable report is not ignored
 ```
 
-The P5 accepted record's matching-axis, partial-adoption, premise-field, section-order, and history structure was independently parsed with `parseFormat3DesignRecord`; the result was `{"status":"PASS","axes":["自己構造レビュー","独立レビュー環境"],"allNoImplementation":false}`.
+P5R was independently parsed with `parseFormat3DesignRecord`; its original partial-adoption fields, premise block, section order, and input-backed B→A REC-42 revision row all passed.
 
 ## Exact issue gate and status transition
 
