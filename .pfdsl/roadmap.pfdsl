@@ -347,8 +347,8 @@ artifact:
     label: 採用案から読める設計選択記録 (#1076)
     description: pfd-ops の対話と公開記録を形式3の決定・理由・案の処分・前提検査の decision-first 構造へ移し、形式1・形式2・形式3を時点で移行互換に読む状態
     status: done
-    criteria: cycle-status が形式3の decision-first 記録テンプレートを出力し、gate-check が形式1・形式2・形式3を時点で区別して構造だけをblocking判定する。canonical・配布mirror・bundle manifest の内容hash一致、入力・完全記録・順序index・選択部分/残部・意味境界・人間判定を備えた独立15件の圧力標本、exact issue gate、形式の意味的妥当性を確認する人間semantic review がすべて通過してから後続をreadyにする
-    location: [ ../.claude/skills/pfd-ops/references/work-cycle.md, ../.agents/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl-codex/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl/.claude-plugin/bundle-manifest.json, ../scripts/lib/cycle-status.mjs, ../scripts/lib/gate-check.mjs, ../docs/superpowers/reports/2026-09-04-format-3-pressure-evidence.md ]
+    criteria: 現在の完了根拠は、cycle-status の形式3 decision-first 記録テンプレート、形式1・形式2・形式3を時点で区別して構造だけをblocking判定する gate-check、canonical・配布mirror・bundle manifest の内容hash一致、形式の表現形状を確認する独立15件の圧力標本、exact issue gate、形式の意味的妥当性を確認する人間semantic review が通過したことである。同一prompt・記載runtime・契約版hash・入力・完全応答・明示した順序判定を保存した変更前5件と変更後5件の統制比較は、done移行後に追加した事後是正の証拠であり、以前のdone移行や後続ready化をゲートしたとは扱わない
+    location: [ ../.claude/skills/pfd-ops/references/work-cycle.md, ../.agents/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl-codex/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl/.claude-plugin/bundle-manifest.json, ../scripts/lib/cycle-status.mjs, ../scripts/lib/gate-check.mjs, ../docs/superpowers/reports/2026-09-04-format-3-pressure-evidence.md, ../docs/superpowers/reports/2026-09-05-format-3-controlled-comparison.md ]
   mint_check_tool:
     label: "mint-check ツール (#405)"
     description: "採番前に slug の既出（定義・strict 参照・forward-ref）を列挙する scripts ツール。既存 forward-ref の slug を別概念で採番する silent 衝突の防止が主目的。tombstone 次元は初 ID 削除まで据え置き（spec_id_tombstones へ）"
