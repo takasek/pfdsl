@@ -343,6 +343,12 @@ artifact:
     description: "pfd-ops の L1/L2/L3（SKILL.md 本文・references/github-issues-backend.md・install/）を plugin/pfdsl/ に同梱し、install/ の実配置を /pfd-init（check-install-sync.mjs --deploy）へ移管、pfdsl skill sync（CLI コマンド）は削除（ADR-0028）"
     status: done
     criteria: "issue #404 の未解決論点が docs/adr/0028-plugin-first-pfd-ops-distribution.md に決定として記録されており、plugin 経由で導入したリポで /pfd-init を実行すると install/ 相当のファイルが配置される"
+  reader_first_design_records:
+    label: 採用案から読める設計選択記録 (#1076)
+    description: pfd-ops の対話と公開記録を形式3の決定・理由・案の処分・前提検査の decision-first 構造へ移し、形式1・形式2・形式3を時点で移行互換に読む状態
+    status: done
+    criteria: cycle-status が形式3の decision-first 記録テンプレートを出力し、gate-check が形式1・形式2・形式3を時点で区別して構造だけをblocking判定する。canonical・配布mirror・bundle manifest の内容hash一致、入力・完全記録・順序index・選択部分/残部・意味境界・人間判定を備えた独立15件の圧力標本、exact issue gate、形式の意味的妥当性を確認する人間semantic review がすべて通過してから後続をreadyにする
+    location: [ ../.claude/skills/pfd-ops/references/work-cycle.md, ../.agents/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl-codex/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl/.claude-plugin/bundle-manifest.json, ../scripts/lib/cycle-status.mjs, ../scripts/lib/gate-check.mjs, ../docs/superpowers/reports/2026-09-04-format-3-pressure-evidence.md ]
   mint_check_tool:
     label: "mint-check ツール (#405)"
     description: "採番前に slug の既出（定義・strict 参照・forward-ref）を列挙する scripts ツール。既存 forward-ref の slug を別概念で採番する silent 衝突の防止が主目的。tombstone 次元は初 ID 削除まで据え置き（spec_id_tombstones へ）"
@@ -631,6 +637,11 @@ process:
     label: pfd-ops plugin 統合・skill sync 廃止検討
     description: "設計は ADR-0028 で確定・実装済み（plugin 同梱・/pfd-init 実配置・skill sync 削除）"
     location: https://github.com/takasek/pfdsl/issues/404
+  i1076_make_design_records_reader_first:
+    label: 設計選択記録を reader-first 化
+    description: 比較対象を生成する規律と着手前の公開記録を維持したまま、対話・tracker 記録・機械 gate の項目と順序を reader-first な契約へ移行する
+    location: https://github.com/takasek/pfdsl/issues/1076
+    updated_at: 2026-08-30T09:32:49Z
   i480_relax_incomplete_graph:
     label: 書き途中許容実装
     location: https://github.com/takasek/pfdsl/issues/480
@@ -786,6 +797,7 @@ spec_id_syntax >> i405_implement_mint_check -> mint_check_tool
 skill_gen >> i366_distribute_marketplace -> marketplace_dist
 
 marketplace_dist >> i404_integrate_pfd_ops_plugin -> pfd_ops_plugin_dist
+pfd_ops_plugin_dist >> i1076_make_design_records_reader_first -> reader_first_design_records
 
 cli_release_explain_lens >> i435_implement_ansi_color -> ansi_color
 ansi_color >> publish_cli_ansi_color -> cli_release_ansi_color
@@ -806,4 +818,4 @@ editor_connector >> i483_implement_preview_connector -> preview_connector
 [def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
 
 [spec_v0011, type_field] >> i670_rename_pipeline_kind -> pipeline_kind_rename
-pipeline_kind_rename >> publish_cli_pipeline_kind -> cli_release_pipeline_kind
+[reader_first_design_records, pipeline_kind_rename] >> publish_cli_pipeline_kind -> cli_release_pipeline_kind

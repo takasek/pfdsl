@@ -4,11 +4,14 @@
  */
 
 import {
-	DESIGN_RECORD_REQUIRED_PREFIXES,
-	DISPOSITION_TOKENS,
-	NO_IMPLEMENTATION_TOKEN,
+	FORMAT_3_DECISION_KINDS,
+	FORMAT_3_DISPOSITIONS,
+	FORMAT_3_MARKER,
+	normalizeRecordLine,
+	parseFormat3DesignRecord,
 	presentRequiredPrefixes,
-	selectDesignRecord,
+	resolveDesignRecord,
+	resolveDesignRecordRequiredPrefixes,
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
 import { counterLineOf } from "./retro-patterns.mjs";
@@ -196,36 +199,39 @@ export function detectEnumeratedOptions(body) {
 }
 
 /**
- * The design-selection record, pre-shaped so the runner never has to know the
- * format to satisfy it. Every line head here is the one the terminal gate
- * matches on, taken from the gate's own constants rather than restated — a
- * template that drifts from the checker is worse than none, because it is
- * trusted.
+ * The design-selection record, pre-shaped from the terminal gate's format 3
+ * vocabulary so the runner never repeats that contract.
  *
  * Emitted on every cycle, not only when the issue enumerates options: the gate
  * FAILs a missing record regardless of the option count, so a record is owed
  * whenever the cycle names an issue at all.
- * @param {{optionCount?: number}} [params]
  * @returns {{note: string, lines: string[]}}
  */
-export function buildDesignRecordTemplate({ optionCount = 0 } = {}) {
+export function buildDesignRecordTemplate() {
 	const lines = [
-		`${DESIGN_RECORD_REQUIRED_PREFIXES[0]} 本案は〈○○という状態が存在し続けること〉を前提にする`,
-		`${DESIGN_RECORD_REQUIRED_PREFIXES[1]} 上の前提を否定した案（起票者が挙げていなくても作る）`,
-		`${DESIGN_RECORD_REQUIRED_PREFIXES[2]} 外部制約か所有者に帰着させる（「手間がかかる」「スコープ外」は無効）`,
+		FORMAT_3_MARKER,
+		"",
+		"決定:",
+		`- <軸名>（<${FORMAT_3_DECISION_KINDS.join(" | ")}>）: <今回確定した範囲>`,
+		"",
+		"理由:",
+		"- <軸名>: <目的との対応>",
+		"",
+		"案の処分:",
+		`- <${FORMAT_3_DISPOSITIONS.join(" | ")}> — 元候補「<候補名>」— <理由または条件>`,
+		"",
+		"前提検査 P1:",
+		"対象: <軸名、決定、または元候補名>",
+		"前提: <候補群が共有する前提>",
+		"前提を外した案: <前提が成立しない場合の検査案>",
+		"既存候補との差分: <一致、包含、組合せを含む具体的な差分>",
+		`検査案の処分 P1: <${FORMAT_3_DISPOSITIONS.join(" | ")}> — <理由または条件>`,
+		"",
+		"改訂履歴:",
+		"- なし",
 	];
-	if (optionCount > 0) {
-		lines.push(
-			`処分に使える語（各案にいずれかを書く）: ${DISPOSITION_TOKENS.join(" / ")}`,
-			...Array.from(
-				{ length: optionCount },
-				(_, index) =>
-					`案の処分 ${index + 1}: <${DISPOSITION_TOKENS.join(" / ")}のいずれか> — <対象案と理由>`,
-			),
-		);
-	}
 	return {
-		note: `着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。行頭の語は gate-check.mjs の定数と同一で、書き換えると design-selection record が FAIL する。各行の内容は必ず埋める — 候補列挙がある場合は雛形のままでは形式も通らず、候補列挙がなくても記録としては何も残らない。実装しないと判断した回のみ、記録に \`${NO_IMPLEMENTATION_TOKEN} <理由>\` を行頭から書く行を追加する — timing 判定が SKIP になり、コミットとの前後関係を照合しない。他の行の前提・否定案・却下理由の中でこの語に触れるだけでは宣言にならない — \`Size-Intent: shrink\` と同じ行頭一致で判定する。`,
+		note: "着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。角括弧の雛形を具体的な内容へ置き換え、issue 由来の候補をすべて実名で案の処分へ記録する。案の処分と検査案の処分 Pn の部分採用は、空でない採用部分と、理由を伴う残部: 却下|保留 を書く。候補の網羅性と決定・理由・処分の意味的整合は人間レビューの責務であり、機械検査は保証しない。",
 		lines,
 	};
 }
@@ -254,49 +260,31 @@ export function buildReviewRecordTemplate() {
 /**
  * issue の設計確定状態を分類する。判定順（前段がヒットしたら後段は評価しない）:
  * 1. 既存の「設計未確定」フレーズがヒット → unsettled (reason: "phrase")
- * 2. `selectDesignRecord` が記録を同定でき、必須行頭が全て揃っている
+ * 2. `resolveDesignRecord` が完全な記録を一意に同定できる
  *    → settled (reason: "record-posted")
- * 3. 同定できたが必須行頭が欠けている → unsettled (reason: "record-incomplete")
- * 4. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
- * 5. それ以外 → unsettled (reason: "no-enumerated-options")。
+ * 3. 複数の完全な形式3記録がある → unsettled (reason: "record-ambiguous")
+ * 4. 構造不正な記録がある → unsettled (reason: "record-incomplete")
+ * 5. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
+ * 6. それ以外 → unsettled (reason: "no-enumerated-options")。
  *    列挙構造を検出できなかった回を「対話省略可」の既定にする（fail-open）と、
  *    散文中に紛れた選択肢が検出をすり抜けたまま既定で通過してしまう（#833・#829）。
  *
- * 記録の同定は終端ゲート（gate-check.mjs）と同じ `selectDesignRecord`
+ * 記録の同定は終端ゲート（gate-check.mjs）と同じ `resolveDesignRecord`
  * （と、それに entries を渡す `toDesignRecordEntries`）を使う。プリフライトと
  * 終端ゲートが別々の同定ロジックを持つと、どちらかが記録だと見なした文章を
  * もう一方が見なさない、という食い違いが生まれるため。
- *
- * 同定は最大一致数で選ぶ粗いままにしてある。締めたのは同定でなくこの分類の
- * 側で、record-posted を名乗る条件を「必須行頭が全て揃っている」に上げた
- * （#927）。同定側に下限を置くと、行頭が1つ欠けた記録が「記録なし」に落ちて、
- * 終端ゲートが「どの行が欠けているか」を言えなくなる。
- *
- * この閾値は終端ゲートに合わせたものではない。終端ゲートの行を決めるのは
- * 時点照合だけで、内容検査（`classifyDesignRecordContent`）の FAIL は
- * `WARN:` 付きの報告材料へ降格されている（#737 案1。実測で content は
- * true 0 / false 3、timing は true 3 / false 0 だった）。上げた理由は
- * この分類が答える問いが終端ゲートの問いと違うことにある — こちらは
- * 「いま設計対話が要るか」を答えるので、前提・否定案・却下理由のどれかを
- * 欠く文章は、対話がまだ済んでいない証拠として読むのが正しい。
- * #737 の false positive を持ち込まないことは実測で確かめた: 直近の設計記録
- * 12件に行頭のみの基準を当てて欠落 0 件（複合検査の3件は処分トークン側から
- * 出ていた）。
- *
- * 意図された非対称は時点照合の側だけである（着手前に投稿された完全な記録が、
- * 着手後の編集で FAIL することはある）。
  *
  * `unsettled` は「設計対話が必要か」を表すだけで、記録投稿の要否とは別軸
  * である。roadmap.md の規約上、design-selection record は列挙構造の有無に
  * 関わらず全サイクル必須で、`unsettled: false` を「記録不要」と読むのは
  * 誤読になる（#809）。そのため戻り値には `recordRequired` を独立して持たせる
  * — `record-posted` のときだけ false、それ以外は常に true（#868）。
- * @param {{body: string, createdAt?: string, comments?: Array<{body: string, createdAt?: string}>}} params
+ * @param {{body: string, comments?: Array<{body: string, createdAt?: string}>}} params
  * @returns {{unsettled: boolean, reason: string, matchedLines?: string[], optionCount?: number,
- *            missingPrefixes?: string[],
+ *            missingPrefixes?: string[], problems?: string[],
  *            record?: {createdAt?: string} | null, recordRequired: boolean}}
  */
-export function classifyDesignSettlement({ body, createdAt, comments }) {
+export function classifyDesignSettlement({ body, comments }) {
 	const phrase = detectDesignUnsettled(body);
 	if (phrase.designUnsettled) {
 		return {
@@ -307,27 +295,41 @@ export function classifyDesignSettlement({ body, createdAt, comments }) {
 		};
 	}
 
-	const record = selectDesignRecord(
-		toDesignRecordEntries({ body, createdAt, comments }),
-	);
-	if (record) {
-		const present = presentRequiredPrefixes(record.body);
-		const missingPrefixes = DESIGN_RECORD_REQUIRED_PREFIXES.filter(
-			(prefix) => !present.includes(prefix),
-		);
-		if (missingPrefixes.length === 0) {
-			return {
-				unsettled: false,
-				reason: "record-posted",
-				record: { createdAt: record.createdAt },
-				recordRequired: false,
-			};
-		}
+	const resolved = resolveDesignRecord(toDesignRecordEntries({ comments }));
+	if (resolved.status === "selected") {
+		return {
+			unsettled: false,
+			reason: "record-posted",
+			record: { createdAt: resolved.record.createdAt },
+			recordRequired: false,
+		};
+	}
+	if (resolved.status === "ambiguous")
+		return {
+			unsettled: true,
+			reason: "record-ambiguous",
+			problems: [resolved.detail],
+			recordRequired: true,
+		};
+	if (resolved.status === "invalid") {
+		const parsedFormat3 = parseFormat3DesignRecord(resolved.record.body);
+		const isFormat3 = resolved.record.body
+			.split("\n")
+			.some((line) => normalizeRecordLine(line) === FORMAT_3_MARKER);
 		return {
 			unsettled: true,
 			reason: "record-incomplete",
-			missingPrefixes,
-			record: { createdAt: record.createdAt },
+			missingPrefixes: isFormat3
+				? []
+				: resolveDesignRecordRequiredPrefixes(resolved.record).filter(
+						(prefix) =>
+							!presentRequiredPrefixes(
+								resolved.record.body,
+								resolved.record.createdAt,
+							).includes(prefix),
+					),
+			problems: isFormat3 ? parsedFormat3.problems : resolved.problems,
+			record: { createdAt: resolved.record.createdAt },
 			recordRequired: true,
 		};
 	}

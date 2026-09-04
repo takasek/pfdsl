@@ -409,6 +409,149 @@ describe("runCycleStatus", () => {
 		]);
 	});
 
+	it("carries incomplete format 3 problems without legacy repair prefixes", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) =>
+					args.includes(CLI_PATH) ? readyJsonOk("proc_a") : "",
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) =>
+					args[0] === "issue"
+						? issueJson({
+								body: "普通の説明文。",
+								comments: [
+									{
+										body: "設計記録形式: 3",
+										createdAt: "2026-08-31T01:30:24Z",
+									},
+								],
+							})
+						: JSON.stringify([]),
+			}),
+		);
+		const payload = result.designUnsettledFor[0];
+		assert.equal(payload.reason, "record-incomplete");
+		assert.deepEqual(payload.missingPrefixes, []);
+		assert.ok(payload.problems.some((problem) => problem.includes("決定:")));
+	});
+
+	it("recognizes a decorated format 3 marker before computing repair prefixes", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) =>
+					args.includes(CLI_PATH) ? readyJsonOk("proc_a") : "",
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) =>
+					args[0] === "issue"
+						? issueJson({
+								body: "普通の説明文。",
+								comments: [
+									{
+										body: "> 設計記録形式: 3",
+										createdAt: "2026-08-31T01:30:24Z",
+									},
+								],
+							})
+						: JSON.stringify([]),
+			}),
+		);
+		const payload = result.designUnsettledFor[0];
+		assert.equal(payload.reason, "record-incomplete");
+		assert.deepEqual(payload.missingPrefixes, []);
+		assert.ok(payload.problems.some((problem) => problem.includes("決定:")));
+	});
+
+	it("reports reader-first prefixes missing from a post-cutoff legacy record", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({
+							body: "普通の説明文。",
+							comments: [
+								{
+									body: "前提: x\n否定案: y\n却下理由: z",
+									createdAt: "2026-08-30T09:32:50Z",
+								},
+							],
+						});
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
+		assert.deepEqual(result.designUnsettledFor[0].missingPrefixes, [
+			"提案:",
+			"理由:",
+			"前提を外した対案:",
+			"対案を採らない理由:",
+		]);
+	});
+
+	it("keeps reversed reader-first lines unsettled in the reported classification", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({
+							body: "普通の説明文。",
+							comments: [
+								{
+									body: "対案を採らない理由: w\n前提を外した対案: z\n理由: y\n提案: x",
+									createdAt: "2026-08-30T09:32:50Z",
+								},
+							],
+						});
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
+		assert.equal(result.designUnsettledFor[0].recordRequired, true);
+	});
+
+	it("keeps a malformed comment timestamp unsettled in the reported classification", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) => {
+					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
+					return "";
+				},
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return issueJson({
+							body: "普通の説明文。",
+							comments: [
+								{
+									body: "提案: x\n理由: y\n前提を外した対案: z\n対案を採らない理由: w",
+									createdAt: "not-an-iso-timestamp",
+								},
+							],
+						});
+					return JSON.stringify([]);
+				},
+			}),
+		);
+		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
+		assert.equal(result.designUnsettledFor[0].recordRequired, true);
+	});
+
 	it("resolves the target issue from the best process when --issue is absent", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
@@ -535,7 +678,7 @@ describe("runCycleStatus", () => {
 		assert.equal(result.headStateError, "fatal: not a git repository");
 	});
 
-	it("emits the design-record template with the issue's enumerated option count", async () => {
+	it("keeps the format 3 design-record template independent of enumerated option count", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				issueNumbers: [721],
@@ -549,15 +692,12 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
+		assert.equal(result.designRecordTemplate.lines[0], "設計記録形式: 3");
 		assert.deepEqual(
 			result.designRecordTemplate.lines.filter((line) =>
 				line.startsWith("案の処分 "),
 			),
-			[
-				"案の処分 1: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
-				"案の処分 2: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
-				"案の処分 3: <採用 / 却下 / 保留のいずれか> — <対象案と理由>",
-			],
+			[],
 		);
 	});
 
@@ -663,10 +803,7 @@ describe("runCycleStatus", () => {
 		const result = await runCycleStatus(baseDeps({}));
 		assert.deepEqual(result.designUnsettledFor, []);
 		assert.ok(result.designRecordTemplate.lines.length > 0);
-		assert.equal(
-			result.designRecordTemplate.lines.some((l) => l.includes("処分")),
-			false,
-		);
+		assert.ok(result.designRecordTemplate.lines.includes("案の処分:"));
 	});
 
 	// #809: unconditional, same posture as designRecordTemplate — whether this

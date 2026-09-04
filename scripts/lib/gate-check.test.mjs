@@ -15,13 +15,18 @@ import {
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
 	collectModeledLocations,
-	DESIGN_RECORD_REQUIRED_PREFIXES,
+	DESIGN_RECORD_FORMAT_CUTOFF,
+	DESIGN_RECORD_V2_CUTOFF,
+	DESIGN_RECORD_V3_CUTOFF,
 	DISPOSITION_TOKENS,
 	deriveManualItems,
 	derivePackageLayers,
 	diffNewTerminals,
 	diffReadySets,
 	extractGateChecklist,
+	FORMAT_3_DECISION_KINDS,
+	FORMAT_3_DISPOSITIONS,
+	FORMAT_3_MARKER,
 	formatGateTable,
 	formatRunTreeLine,
 	formatSizeDelta,
@@ -29,19 +34,25 @@ import {
 	hasNoImplementationDisposition,
 	hasSizeOverride,
 	hasStatusChange,
+	LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES,
 	lintCommitSubjects,
 	matchesTrigger,
 	NO_IMPLEMENTATION_TOKEN,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
 	parseCommitLogLines,
+	parseFormat3DesignRecord,
 	parseInputConsumedArtifacts,
 	partitionManualItemsByPhase,
 	partitionNewTerminals,
+	READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+	resolveDesignRecord,
+	resolveDesignRecordRequiredPrefixes,
 	resolveRecordEditedAt,
 	SIZE_INTENT_PATTERN,
 	SIZE_OVERRIDE_PATTERN,
 	SIZE_TRACKED_PATTERNS,
+	selectDesignRecord,
 	sharesSiblingIdNamespace,
 	statusChangedForArtifact,
 	toDesignRecordEntries,
@@ -963,6 +974,15 @@ describe("classifyDesignRecordTiming", () => {
 		);
 		assert.equal(result.status, "PASS");
 	});
+
+	it("FAILs when the record timestamp is malformed", () => {
+		const result = classifyDesignRecordTiming(
+			"not-an-iso-timestamp",
+			"2026-07-30T12:00:00Z",
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /invalid design-selection record timestamp/);
+	});
 });
 
 describe("classifyDesignRecordContent", () => {
@@ -981,7 +1001,7 @@ describe("classifyDesignRecordContent", () => {
 
 	it("FAILs and lists the missing required-prefix line(s)", () => {
 		const missingRejection = [
-			`${DESIGN_RECORD_REQUIRED_PREFIXES[0]} x`,
+			`${LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES[0]} x`,
 			"決定: 案A を採用する。",
 		].join("\n");
 		const result = classifyDesignRecordContent(missingRejection, 0);
@@ -1052,9 +1072,9 @@ describe("classifyDesignRecordContent", () => {
 	});
 
 	it("does not require disposition-token coverage when optionCount is 0", () => {
-		const record = DESIGN_RECORD_REQUIRED_PREFIXES.map((p) => `${p} x`).join(
-			"\n",
-		);
+		const record = LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES.map(
+			(p) => `${p} x`,
+		).join("\n");
 		assert.deepEqual(classifyDesignRecordContent(record, 0), {
 			status: "PASS",
 		});
@@ -1189,12 +1209,157 @@ describe("classifyDesignRecordContent", () => {
 	});
 });
 
-describe("DESIGN_RECORD_REQUIRED_PREFIXES / DISPOSITION_TOKENS", () => {
-	it("exposes the expected prefix and disposition vocabularies", () => {
-		assert.deepEqual(DESIGN_RECORD_REQUIRED_PREFIXES, [
+describe("versioned design-record format", () => {
+	const readerFirst = [
+		"提案: x",
+		"理由: y",
+		"前提を外した対案: z",
+		"対案を採らない理由: owner constraint",
+	].join("\n");
+	const legacy = ["前提: x", "否定案: y", "却下理由: z"].join("\n");
+
+	it("uses the legacy format only before the exact cutoff", () => {
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({
+				body: legacy,
+				createdAt: "2026-08-30T09:32:49Z",
+			}),
+			LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({
+				body: legacy,
+				createdAt: DESIGN_RECORD_FORMAT_CUTOFF,
+			}),
+			READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+	});
+
+	it("keeps timestamp-free pure-function calls legacy-compatible", () => {
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({ body: legacy }),
+			LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+	});
+
+	it("fails closed to reader-first requirements for an invalid timestamp", () => {
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({
+				body: legacy,
+				createdAt: "not-an-iso-timestamp",
+			}),
+			READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+	});
+
+	it("uses reader-first requirements for complete and incomplete reader-first records", () => {
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({
+				body: readerFirst,
+				createdAt: "2026-08-30T09:32:51Z",
+			}),
+			READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+		assert.deepEqual(
+			resolveDesignRecordRequiredPrefixes({
+				body: "提案: x\n理由: y",
+				createdAt: "2026-08-30T09:32:51Z",
+			}),
+			READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
+		);
+		assert.equal(
+			classifyDesignRecordContent(readerFirst, 0, "2026-08-30T09:32:51Z")
+				.status,
+			"PASS",
+		);
+		assert.equal(
+			classifyDesignRecordContent("提案: x\n理由: y", 0, "2026-08-30T09:32:51Z")
+				.status,
+			"FAIL",
+		);
+	});
+
+	it("rejects reader-first required lines whose normalized first occurrences are out of order", () => {
+		const reversed = [
+			"対案を採らない理由: owner constraint",
+			"前提を外した対案: z",
+			"理由: y",
+			"提案: x",
+		].join("\n");
+		const result = classifyDesignRecordContent(
+			reversed,
+			0,
+			"2026-08-30T09:32:51Z",
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /canonical order/);
+	});
+
+	it("rejects a complete legacy record at the cutoff", () => {
+		assert.equal(
+			classifyDesignRecordContent(legacy, 0, "2026-08-30T09:32:49Z").status,
+			"PASS",
+		);
+		const result = classifyDesignRecordContent(
+			legacy,
+			0,
+			DESIGN_RECORD_FORMAT_CUTOFF,
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /提案:/);
+	});
+
+	it("does not let an incomplete reader-first fragment shadow a complete grandfathered record", () => {
+		const incompleteReaderFirst = "提案: x";
+		const selected = selectDesignRecord([
+			{ body: legacy, createdAt: "2026-08-30T09:32:49Z" },
+			{
+				body: incompleteReaderFirst,
+				createdAt: "2026-08-30T09:32:51Z",
+			},
+		]);
+		assert.equal(selected?.body, legacy);
+	});
+
+	it("selects a post-cutoff legacy-shaped record so reader-first missing prefixes are reported", () => {
+		const selected = selectDesignRecord([
+			{ body: legacy, createdAt: DESIGN_RECORD_FORMAT_CUTOFF },
+		]);
+		assert.equal(selected?.body, legacy);
+		const result = classifyDesignRecordContent(
+			selected?.body,
+			0,
+			selected?.createdAt,
+		);
+		assert.equal(result.status, "FAIL");
+		for (const prefix of READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES) {
+			assert.match(result.detail, new RegExp(prefix));
+		}
+	});
+
+	it("does not select an unrelated post-cutoff comment", () => {
+		assert.equal(
+			selectDesignRecord([
+				{
+					body: "実装の進捗を共有します。",
+					createdAt: DESIGN_RECORD_FORMAT_CUTOFF,
+				},
+			]),
+			undefined,
+		);
+	});
+
+	it("exposes the versioned prefix and disposition vocabularies", () => {
+		assert.deepEqual(LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES, [
 			"前提:",
 			"否定案:",
 			"却下理由:",
+		]);
+		assert.deepEqual(READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES, [
+			"提案:",
+			"理由:",
+			"前提を外した対案:",
+			"対案を採らない理由:",
 		]);
 		assert.deepEqual(DISPOSITION_TOKENS, ["採用", "却下", "保留"]);
 	});
@@ -1790,5 +1955,440 @@ describe("partitionManualItemsByPhase", () => {
 	it("does not move an item that only mentions the phrase mid-sentence", () => {
 		const items = ["push し忘れを **PR 作成後** に確認する"];
 		assert.deepEqual(partitionManualItemsByPhase(items).afterPr, []);
+	});
+});
+
+function format3Record() {
+	return [
+		"設計記録形式: 3",
+		"決定:",
+		"- 保存方式（実装）: Aを段階導入する",
+		"理由:",
+		"- 保存方式: 障害範囲を限定できる",
+		"案の処分:",
+		"- 部分採用 — 元候補「A」— 採用部分: 索引; 残部: 保留 — 負荷計測後に再検討",
+		"前提検査 P1:",
+		"対象: 保存方式 / A",
+		"前提: 保存方式と通知方式を同時に変える必要がある",
+		"前提を外した案: 保存方式だけを段階導入する",
+		"既存候補との差分: 元候補は両方式を一組としていた",
+		"検査案の処分 P1: 採用 — 今回の決定に含める",
+		"改訂履歴:",
+		"- なし",
+	].join("\n");
+}
+
+describe("format 3 design records", () => {
+	it("parses the smallest complete decision-first record", () => {
+		assert.deepEqual(parseFormat3DesignRecord(format3Record()), {
+			status: "PASS",
+			axes: ["保存方式"],
+			allNoImplementation: false,
+		});
+	});
+
+	it("accepts multiple decision axes and every display kind", () => {
+		const record = format3Record()
+			.replace(
+				"- 保存方式（実装）: Aを段階導入する",
+				[
+					"- 保存方式（実装）: Aを段階導入する",
+					"- 通知方式（調査のみ）: 負荷を測定する",
+					"- 移行順序（待機）: 依存が揃うまで待つ",
+					"- 廃止機能（実装しない）: 今回は触れない",
+				].join("\n"),
+			)
+			.replace(
+				"- 保存方式: 障害範囲を限定できる",
+				[
+					"- 保存方式: 障害範囲を限定できる",
+					"- 通知方式: 調査結果を残せる",
+					"- 移行順序: 依存を待てる",
+					"- 廃止機能: 範囲外である",
+				].join("\n"),
+			);
+		assert.deepEqual(parseFormat3DesignRecord(record), {
+			status: "PASS",
+			axes: ["保存方式", "通知方式", "移行順序", "廃止機能"],
+			allNoImplementation: false,
+		});
+	});
+
+	it("accepts every disposition", () => {
+		for (const line of [
+			"- 採用 — 元候補「A」— 今回採用する",
+			"- 部分採用 — 元候補「A」— 採用部分: 索引; 残部: 保留 — 負荷計測後に再検討",
+			"- 保留 — 元候補「A」— 計測後に再検討する",
+			"- 却下 — 元候補「A」— 目的に合わない",
+		]) {
+			assert.equal(
+				parseFormat3DesignRecord(
+					format3Record().replace(
+						"- 部分採用 — 元候補「A」— 採用部分: 索引; 残部: 保留 — 負荷計測後に再検討",
+						line,
+					),
+				).status,
+				"PASS",
+			);
+		}
+	});
+
+	it("accepts legitimate generic and HTML prose", () => {
+		const record = format3Record()
+			.replace("Aを段階導入する", "Array<T> を HTML 要素へ渡す")
+			.replace("障害範囲を限定できる", "HTML<HTMLElement> を保持する");
+		assert.equal(parseFormat3DesignRecord(record).status, "PASS");
+	});
+
+	it("rejects an incomplete known template placeholder", () => {
+		const record = format3Record().replace(
+			"Aを段階導入する",
+			"<今回確定した範囲",
+		);
+		assert.equal(parseFormat3DesignRecord(record).status, "FAIL");
+	});
+
+	for (const placeholder of [
+		"<軸名>",
+		"<実装 | 調査のみ | 待機 | 実装しない>",
+		"<今回確定した範囲>",
+		"<目的との対応>",
+		"<候補名>",
+		"<理由または条件>",
+		"<軸名、決定、または元候補名>",
+		"<候補群が共有する前提>",
+		"<前提が成立しない場合の検査案>",
+		"<一致、包含、組合せを含む具体的な差分>",
+		"<採用 | 部分採用 | 保留 | 却下>",
+		"<旧決定>",
+		"<新決定>",
+		"<変更理由>",
+		"<URL>",
+	]) {
+		it(`rejects the format 3 template placeholder ${placeholder}`, () => {
+			const record = format3Record()
+				.replace("Aを段階導入する", placeholder)
+				.replace(
+					"- なし",
+					`- ${placeholder} → 新しい決定 — 変更理由 — 再承認: https://example.test/approval`,
+				);
+			const result = parseFormat3DesignRecord(record);
+			assert.equal(result.status, "FAIL");
+			assert.match(result.problems.join("\n"), /template placeholder remains/);
+		});
+	}
+
+	it("accepts punctuation in original and premise partial-adoption selections", () => {
+		const record = format3Record()
+			.replace("採用部分: 索引", "採用部分: API — v2; fallback")
+			.replace(
+				"検査案の処分 P1: 採用 — 今回の決定に含める",
+				"検査案の処分 P1: 部分採用 — 採用部分: HTML; Array<T> — v2; 残部: 保留 — 負荷計測後に再検討",
+			);
+		assert.equal(parseFormat3DesignRecord(record).status, "PASS");
+	});
+
+	for (const [name, record, problem] of [
+		[
+			"a partial adoption without a remainder",
+			format3Record().replace("残部: 保留 — 負荷計測後に再検討", ""),
+			"残部",
+		],
+		[
+			"mismatched decision and rationale axes",
+			format3Record().replace(
+				"- 保存方式: 障害範囲を限定できる",
+				"- 通知方式: 障害範囲を限定できる",
+			),
+			"axis",
+		],
+		[
+			"duplicate decision axes",
+			format3Record().replace("理由:", "- 保存方式（待機）: 条件を待つ\n理由:"),
+			"duplicate",
+		],
+		[
+			"a missing section",
+			format3Record().replace("案の処分:\n", ""),
+			"案の処分",
+		],
+		[
+			"out-of-order sections",
+			format3Record().replace("理由:", "改訂履歴:\n- なし\n理由:"),
+			"order",
+		],
+		[
+			"an empty value",
+			format3Record().replace("対象: 保存方式 / A", "対象: "),
+			"対象",
+		],
+		[
+			"a missing premise-test number",
+			format3Record()
+				.replace("前提検査 P1:", "前提検査 P2:")
+				.replace("検査案の処分 P1:", "検査案の処分 P2:"),
+			"P1",
+		],
+		[
+			"a duplicate premise-test number",
+			format3Record().replace(
+				"改訂履歴:",
+				"前提検査 P1:\n対象: x\n前提: y\n前提を外した案: z\n既存候補との差分: w\n検査案の処分 P1: 保留 — 条件待ち\n改訂履歴:",
+			),
+			"duplicate",
+		],
+		[
+			"a template placeholder",
+			format3Record().replace("Aを段階導入する", "<今回確定した範囲>"),
+			"placeholder",
+		],
+		[
+			"conflicting initial and revised history rows",
+			format3Record().replace(
+				"- なし",
+				"- なし\n- A → B — 変更理由 — 再承認: https://example.test/approval",
+			),
+			"改訂履歴",
+		],
+	]) {
+		it(`rejects ${name}`, () => {
+			const result = parseFormat3DesignRecord(record);
+			assert.equal(result.status, "FAIL");
+			assert.match(result.problems.join("\n"), new RegExp(problem, "i"));
+		});
+	}
+
+	it("rejects a whitespace-only original candidate name", () => {
+		const result = parseFormat3DesignRecord(
+			format3Record().replace("元候補「A」", "元候補「 \t 」"),
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.problems.join("\n"), /original candidate/);
+	});
+
+	for (const [name, replacement] of [
+		[
+			"original partial-adoption selected part",
+			"採用部分: \t ; 残部: 保留 — 負荷計測後に再検討",
+		],
+		[
+			"original partial-adoption remainder kind",
+			"採用部分: 索引; 残部: \t — 負荷計測後に再検討",
+		],
+		[
+			"original partial-adoption remainder reason",
+			"採用部分: 索引; 残部: 保留 — \t ",
+		],
+	]) {
+		it(`rejects a whitespace-only ${name}`, () => {
+			const result = parseFormat3DesignRecord(
+				format3Record().replace(
+					"採用部分: 索引; 残部: 保留 — 負荷計測後に再検討",
+					replacement,
+				),
+			);
+			assert.equal(result.status, "FAIL");
+			assert.match(result.problems.join("\n"), /部分採用/);
+		});
+	}
+
+	it("accepts a complete premise partial-adoption disposition", () => {
+		const result = parseFormat3DesignRecord(
+			format3Record().replace(
+				"検査案の処分 P1: 採用 — 今回の決定に含める",
+				"検査案の処分 P1: 部分採用 — 採用部分: 索引; 残部: 保留 — 負荷計測後に再検討",
+			),
+		);
+		assert.equal(result.status, "PASS");
+	});
+
+	for (const [name, replacement] of [
+		[
+			"selected part",
+			"検査案の処分 P1: 部分採用 — 採用部分: \t ; 残部: 保留 — 負荷計測後に再検討",
+		],
+		[
+			"remainder kind",
+			"検査案の処分 P1: 部分採用 — 採用部分: 索引; 残部: \t — 負荷計測後に再検討",
+		],
+		[
+			"remainder reason",
+			"検査案の処分 P1: 部分採用 — 採用部分: 索引; 残部: 保留 — \t ",
+		],
+	]) {
+		it(`rejects a premise partial-adoption with a whitespace-only ${name}`, () => {
+			const result = parseFormat3DesignRecord(
+				format3Record().replace(
+					"検査案の処分 P1: 採用 — 今回の決定に含める",
+					replacement,
+				),
+			);
+			assert.equal(result.status, "FAIL");
+			assert.match(result.problems.join("\n"), /部分採用/);
+		});
+	}
+
+	for (const [name, replacement] of [
+		[
+			"old decision",
+			"\t → B — 変更理由 — 再承認: https://example.test/approval",
+		],
+		[
+			"new decision",
+			"A → \t — 変更理由 — 再承認: https://example.test/approval",
+		],
+		["reason", "A → B — \t — 再承認: https://example.test/approval"],
+		["reapproval", "A → B — 変更理由 — 再承認: \t"],
+	]) {
+		it(`rejects a revision with a whitespace-only ${name}`, () => {
+			const result = parseFormat3DesignRecord(
+				format3Record().replace("- なし", `- ${replacement}`),
+			);
+			assert.equal(result.status, "FAIL");
+			assert.match(result.problems.join("\n"), /改訂履歴/);
+		});
+	}
+
+	it("rejects a complete premise-test block before the rationale section", () => {
+		const premise = [
+			"前提検査 P1:",
+			"対象: 保存方式 / A",
+			"前提: 保存方式と通知方式を同時に変える必要がある",
+			"前提を外した案: 保存方式だけを段階導入する",
+			"既存候補との差分: 元候補は両方式を一組としていた",
+			"検査案の処分 P1: 採用 — 今回の決定に含める",
+		].join("\n");
+		const result = parseFormat3DesignRecord(
+			format3Record()
+				.replace(`${premise}\n`, "")
+				.replace("理由:", `${premise}\n理由:`),
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.problems.join("\n"), /前提検査 Pn/);
+	});
+
+	it("exposes the format 3 vocabulary", () => {
+		assert.equal(FORMAT_3_MARKER, "設計記録形式: 3");
+		assert.deepEqual(FORMAT_3_DECISION_KINDS, [
+			"実装",
+			"調査のみ",
+			"待機",
+			"実装しない",
+		]);
+		assert.deepEqual(FORMAT_3_DISPOSITIONS, [
+			"採用",
+			"部分採用",
+			"保留",
+			"却下",
+		]);
+	});
+});
+
+describe("format 3 design-record selection", () => {
+	const format1 = "前提: x\n否定案: y\n却下理由: z";
+	const format2 =
+		"提案: x\n理由: y\n前提を外した対案: z\n対案を採らない理由: owner constraint";
+
+	it("uses the three migration cutoffs at their exact boundaries", () => {
+		assert.equal(DESIGN_RECORD_V2_CUTOFF, "2026-08-30T09:32:50Z");
+		assert.equal(DESIGN_RECORD_V3_CUTOFF, "2026-08-31T01:30:24Z");
+		assert.equal(
+			resolveDesignRecord([
+				{ body: format1, createdAt: "2026-08-30T09:32:49Z" },
+			]).record.body,
+			format1,
+		);
+		assert.equal(
+			resolveDesignRecord([
+				{ body: format2, createdAt: DESIGN_RECORD_V2_CUTOFF },
+			]).record.body,
+			format2,
+		);
+		assert.equal(
+			resolveDesignRecord([
+				{ body: format2, createdAt: "2026-08-31T01:30:23Z" },
+			]).record.body,
+			format2,
+		);
+		assert.equal(
+			resolveDesignRecord([
+				{ body: format3Record(), createdAt: DESIGN_RECORD_V3_CUTOFF },
+			]).record.body,
+			format3Record(),
+		);
+	});
+
+	it("does not accept a format 3 record before the format 3 cutoff", () => {
+		const result = resolveDesignRecord([
+			{ body: format3Record(), createdAt: "2026-08-31T01:30:23Z" },
+		]);
+		assert.equal(result.status, "invalid");
+	});
+
+	it("selects one complete format 3 record over complete older records", () => {
+		const result = resolveDesignRecord([
+			{ body: format1, createdAt: "2026-08-30T09:32:49Z" },
+			{ body: format2, createdAt: DESIGN_RECORD_V2_CUTOFF },
+			{ body: format3Record(), createdAt: DESIGN_RECORD_V3_CUTOFF },
+		]);
+		assert.deepEqual(result, {
+			status: "selected",
+			record: { body: format3Record(), createdAt: DESIGN_RECORD_V3_CUTOFF },
+		});
+	});
+
+	it("selects format 3 generic and HTML prose over a complete format 2 record", () => {
+		const format3 = format3Record()
+			.replace("Aを段階導入する", "Array<T> を HTML 要素へ渡す")
+			.replace("障害範囲を限定できる", "HTML<HTMLElement> を保持する");
+		const result = resolveDesignRecord([
+			{ body: format2, createdAt: DESIGN_RECORD_V2_CUTOFF },
+			{ body: format3, createdAt: DESIGN_RECORD_V3_CUTOFF },
+		]);
+		assert.equal(result.status, "selected");
+		assert.equal(result.record.body, format3);
+	});
+
+	it("selects format 3 punctuation partial adoption over a legacy record", () => {
+		const format3 = format3Record().replace(
+			"採用部分: 索引",
+			"採用部分: API — v2; fallback",
+		);
+		const result = resolveDesignRecord([
+			{ body: format1, createdAt: "2026-08-30T09:32:49Z" },
+			{ body: format3, createdAt: DESIGN_RECORD_V3_CUTOFF },
+		]);
+		assert.equal(result.status, "selected");
+		assert.equal(result.record.body, format3);
+	});
+
+	it("does not let an incomplete format 3 fragment shadow a complete format 2 record", () => {
+		const result = resolveDesignRecord([
+			{ body: format2, createdAt: DESIGN_RECORD_V2_CUTOFF },
+			{ body: FORMAT_3_MARKER, createdAt: DESIGN_RECORD_V3_CUTOFF },
+		]);
+		assert.equal(result.status, "selected");
+		assert.equal(result.record.body, format2);
+	});
+
+	it("keeps an invalid timestamp as diagnostics when no valid record exists", () => {
+		const result = resolveDesignRecord([
+			{ body: format3Record(), createdAt: "not-a-timestamp" },
+		]);
+		assert.equal(result.status, "invalid");
+		assert.match(result.problems.join("\n"), /timestamp/);
+	});
+
+	it("fails closed when two complete format 3 records coexist", () => {
+		assert.deepEqual(
+			resolveDesignRecord([
+				{ body: format3Record(), createdAt: DESIGN_RECORD_V3_CUTOFF },
+				{ body: format3Record(), createdAt: "2026-09-01T00:00:00Z" },
+			]),
+			{
+				status: "ambiguous",
+				detail: "multiple complete format 3 design records",
+			},
+		);
 	});
 });

@@ -17,19 +17,20 @@ import { RECORD_SEP } from "./commit-trailers.mjs";
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
 	classifyDesignRecordContent,
+	classifyDesignRecordRequiredFormat,
 	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
-	hasNoImplementationDisposition,
 	hasStatusChange,
 	lintCommitSubjects,
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
 	parseCommitLogLines,
+	parseFormat3DesignRecord,
+	resolveDesignRecord,
 	resolveRecordEditedAt,
 	SIZE_TRACKED_PATTERNS,
-	selectDesignRecord,
 	statusChangedForArtifact,
 	toDesignRecordEntries,
 	unionCommitLogEntries,
@@ -324,11 +325,20 @@ export function designRecordStep({
 	// the timing check passed by construction for anything the body won. What
 	// looked like one entry among the rest was the one entry the check could not
 	// fail.
-	const record = selectDesignRecord(toDesignRecordEntries(issue));
+	const resolution = resolveDesignRecord(toDesignRecordEntries(issue));
 
-	if (!record) {
+	if (resolution.status === "none") {
 		return { name, ...classifyDesignRecordTiming(undefined, null) };
 	}
+	if (resolution.status === "ambiguous")
+		return { name, status: "FAIL", detail: resolution.detail };
+	if (resolution.status === "invalid")
+		return {
+			name,
+			status: "FAIL",
+			detail: resolution.problems.join("; "),
+		};
+	const record = resolution.record;
 
 	const firstCommitIso = firstCommitAuthorDate({ exec, base }).iso;
 
@@ -340,20 +350,29 @@ export function designRecordStep({
 		editInfo ?? null,
 	);
 
-	const noImplementation = hasNoImplementationDisposition(record.body);
+	const parsedFormat3 = parseFormat3DesignRecord(record.body);
+	const noImplementation =
+		parsedFormat3.status === "PASS" && parsedFormat3.allNoImplementation;
 	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso, {
 		editedAtIso,
 		noImplementation,
+		recordPresent: true,
 	});
-	// #737 案1: content structure (required line heads, disposition-token
-	// coverage) is report material, not a judge — only timing decides the row.
-	// Real repro over this repo's history: 0 true positives, 3 false positives
-	// for content, against timing's 3 true / 0 false. classifyDesignRecordContent
-	// still runs every time and its finding still prints, prefixed WARN so a
-	// reader can tell it apart from a timing detail sharing the same line.
-	const content = classifyDesignRecordContent(record.body, optionCount);
+	const requiredFormat = classifyDesignRecordRequiredFormat(
+		record.body,
+		record.createdAt,
+	);
+	// Format 3's parser owns a structural verdict. Earlier generations retain
+	// their advisory disposition-content detail for migration compatibility.
+	const content = classifyDesignRecordContent(
+		record.body,
+		optionCount,
+		record.createdAt,
+	);
 	const contentDetail =
-		content.status === "FAIL" ? `WARN: ${content.detail}` : undefined;
+		requiredFormat.status === "PASS" && content.status === "FAIL"
+			? `WARN: ${content.detail}`
+			: undefined;
 	// The edit note is only worth printing once timing actually reached the
 	// stage where an edit could have mattered — a SKIP already means nothing
 	// was compared, so noting missing edit history there would read as a
@@ -362,11 +381,23 @@ export function designRecordStep({
 		[
 			timing.detail,
 			timing.status === "SKIP" ? undefined : editNote,
+			requiredFormat.status === "FAIL" ? requiredFormat.detail : undefined,
 			contentDetail,
 		]
 			.filter(Boolean)
 			.join("; ") || undefined;
-	return { name, status: timing.status, detail };
+	return {
+		name,
+		status:
+			requiredFormat.status === "FAIL" ||
+			(parsedFormat3.status === "FAIL" &&
+				record.body
+					.split("\n")
+					.some((line) => line.includes("設計記録形式: 3")))
+				? "FAIL"
+				: timing.status,
+		detail,
+	};
 }
 
 /**
