@@ -12,40 +12,151 @@ The source-declaration acceptance rule permits a semantically equivalent declara
 
 The following replacements supersede S1R, M1–M5, and P1–P5. Prompts are persisted before dispatch; only a complete fresh response may follow each prompt.
 
-### S1R4 prompt
+## Fifth-review S replacements
+
+### S1F prompt
 
 ```text
-Output only the filled exact Format 3 skeleton: marker; 決定 with one `入力空白処理（実装）` bullet; matching 理由 bullet; `案の処分:` lines `- 採用 — 元候補「A」— ...`, `- 却下 — 元候補「B」— compatibility owner が Unicode 空白の保存を要求しているため`, `- 却下 — 元候補「C」— input owner が ASCII 空白の cleanup を要求しているため`; P1 five fields with exact premise `本案は〈入力値が検証前に正規化される状態が存在し続けること〉を前提にする`, raw-validation alternative, and hold validation-owner contract; `改訂履歴:` then `- なし`. Read only canonical work-cycle and scenario; no writes.
+Read only the canonical work-cycle and this complete scenario. Do not write files. Return exactly one parser-compatible Format 3 record. Closed original candidates are A `trim ASCII outer whitespace`, B `trim all Unicode whitespace`, and C `reject every input containing whitespace`. The input-policy owner requires ASCII outer-whitespace cleanup. The compatibility owner requires Unicode whitespace preservation. The exact canonical premise sentence is `本案は〈入力値が検証前に正規化される状態が存在し続けること〉を前提にする`. The exact P1 alternative is `validate the raw input without normalization`; its disposition is `保留` until the validation owner approves the raw-validation contract. Adopt A. Reject B only because the compatibility owner requires Unicode whitespace preservation. Reject C only because the input-policy owner requires ASCII outer-whitespace cleanup. History is none. The record has exactly one `（実装）` decision bullet and exactly one matching rationale bullet. Do not put the P1 alternative in `決定:`.
 ```
 
-### S1R4 response
+### S1F response
 
 ```text
 設計記録形式: 3
-
 決定:
-- 入力空白処理（実装）: 入力値の前後にある ASCII 空白だけを除去する
-
+- 入力空白処理（実装）: trim ASCII outer whitespace
 理由:
-- 入力空白処理: input owner が ASCII 空白の cleanup を要求し、compatibility owner が Unicode 空白の保存を要求しているため
-
+- 入力空白処理: input-policy owner の ASCII cleanup 要求と compatibility owner の Unicode preserve 要求をともに満たすため
 案の処分:
-- 採用 — 元候補「A」— ASCII の前後空白だけを除去する
-- 却下 — 元候補「B」— compatibility owner が Unicode 空白の保存を要求しているため
-- 却下 — 元候補「C」— input owner が ASCII 空白の cleanup を要求しているため
-
+- 採用 — 元候補「A」— trim ASCII outer whitespace
+- 却下 — 元候補「B」— compatibility owner が Unicode whitespace の preserve を要求しているため
+- 却下 — 元候補「C」— input-policy owner が ASCII whitespace の cleanup を要求しているため
 前提検査 P1:
-対象: 元候補 A、B、C が共有する入力値の検証前正規化
+対象: 元候補 A、B、C の検証前入力処理
 前提: 本案は〈入力値が検証前に正規化される状態が存在し続けること〉を前提にする
-前提を外した案: 入力値を正規化せず raw のまま検証する
-既存候補との差分: 元候補 A、B、C はいずれも検証前に入力値を正規化するが、この案は正規化せず raw のまま検証する
-検査案の処分 P1: 保留 — 入力値を正規化せず raw のまま検証する案 — validation-owner contract が raw validation を許可した場合に再検討する
-
+前提を外した案: validate the raw input without normalization
+既存候補との差分: 元候補 A、B、C は検証前の正規化を前提とするが、この案は raw input を正規化せず検証する
+検査案の処分 P1: 保留 — validation owner が raw-validation contract を承認するまで
 改訂履歴:
 - なし
 ```
 
-Independent parser result: PASS. One-based starts: marker=1, decision=12, rationale=57, dispositions=154, P1=312, history=584. Candidate audit: A→採用, B→却下 (compatibility owner), C→却下 (input owner), each once. Premise/rejection audit: exact canonical premise and owner grounds. Revision audit: `なし`.
+### S2F prompt
+
+```text
+Read only canonical work-cycle and this complete scenario. Do not write files. Return exactly one parser-compatible Format 3 record with exactly one `（実装）` decision bullet and one matching rationale bullet. Closed candidates are A `preserve raw input and validate normalized derivative`, B `persist normalized input`, and C `validate raw input without normalization`. The audit owner requires raw-input preservation. The validation owner requires normalized validation. The exact premise sentence is `本案は〈入力値が検証経路へ渡される状態が存在し続けること〉を前提にする`. The P1 alternative is `remove the validation path and manually review input`; it is `保留` until the review owner approves the manual-review contract. Adopt A. Reject B only for the audit-owner requirement. Reject C only for the validation-owner requirement. History is none. Do not put the P1 alternative in `決定:`.
+```
+
+### S2F response
+
+```text
+設計記録形式: 3
+決定:
+- 入力値の保存と検証（実装）: 監査用には入力値を加工せず保存し、検証には入力値から正規化した派生値を渡す。
+理由:
+- 入力値の保存と検証: 監査では受領した生入力を保全しつつ、検証では正規化済みの表現を一貫して評価できるため。
+案の処分:
+- 採用 — 元候補「案A: 生入力を保存し、正規化した派生値を検証する」— 監査用の生入力保存と正規化済み派生値による検証を両立する。
+- 却下 — 元候補「案B: 正規化後の値を保存する」— 監査契約が求める受領時の生入力を保存できないため。
+- 却下 — 元候補「案C: 生入力を検証する」— 検証契約が求める正規化済み表現による評価を満たさないため。
+前提検査 P1:
+対象: 案Aの検証経路
+前提: 本案は〈入力値が検証経路へ渡される状態が存在し続けること〉を前提にする
+前提を外した案: 自動検証を廃止し、生入力を保存したうえで手動レビューにより妥当性を確認する。
+既存候補との差分: 案A・案B・案Cはいずれも自動検証経路を維持するが、この案は検証経路を廃止して手動レビューへ置き換える。
+検査案の処分 P1: 保留 — 手動レビューの判定基準・責任者・完了証跡を定めたレビュー契約が成立し、現行検証と同等の不正入力検出を確認できた場合に再検討する。
+改訂履歴:
+- なし
+```
+
+### S4F prompt
+
+```text
+Read only the canonical work-cycle and this complete scenario. Do not write files. Return one parser-compatible Format 3 record with exactly one `（実装）` decision bullet and one matching rationale bullet. Closed candidates are A `emit error code and preserve message`, B `emit code only`, and C `preserve message only`. The diagnostic owner requires an error code. The support owner requires a message. The exact canonical premise is `本案は〈失敗時に呼出元へ応答が返る状態が存在し続けること〉を前提にする`. The P1 alternative is `send error information to an asynchronous incident channel instead of returning it to the caller`; it is `保留` until the operations owner approves a notification contract. Adopt A. Reject B only because the support owner requires a message. Reject C only because the diagnostic owner requires an error code. History is none. Do not promote P1 to `決定:`.
+```
+
+### S4F response
+
+```text
+設計記録形式: 3
+決定:
+- 失敗応答内容（実装）: エラーコードを出力し、メッセージを保持する。
+理由:
+- 失敗応答内容: 診断責任者が必要とするエラーコードと、サポート責任者が必要とするメッセージをともに提供する。
+案の処分:
+- 採用 — 元候補「A code+message」— 診断責任者のコード要件とサポート責任者のメッセージ要件をともに満たす。
+- 却下 — 元候補「B code only」— サポート責任者がメッセージを必要としているため。
+- 却下 — 元候補「C message only」— 診断責任者がエラーコードを必要としているため。
+前提検査 P1:
+対象: 元候補A、元候補B、元候補C
+前提: 本案は〈失敗時に呼出元へ応答が返る状態が存在し続けること〉を前提にする
+前提を外した案: 呼出元へ応答せず、エラーコードとメッセージを非同期インシデントチャネルへ送る。
+既存候補との差分: 元候補はいずれも失敗時に呼出元へ応答するが、この案は呼出元への応答を非同期インシデントチャネルへの通知に置き換える。
+検査案の処分 P1: 保留 — 運用責任者が通知契約を承認するまで。
+改訂履歴:
+- なし
+```
+
+### S5F prompt
+
+```text
+Read only canonical work-cycle and this complete scenario. Do not write files. Return one parser-compatible Format 3 record with exactly one `（実装）` decision bullet and one matching rationale bullet. Closed candidates are A `accept valid normalized value`, B `accept unnormalized value`, and C `reject all values`. The validation owner requires normalized acceptance. The interface owner requires valid input acceptance. The exact canonical premise is `本案は〈入力値が妥当性判定を受ける状態が存在し続けること〉を前提にする`. The P1 alternative is `operator approval instead of validation`; it is `保留` until the compliance owner approves the operator-approval contract. Adopt A. Reject B only for the validation-owner requirement. Reject C only for the interface-owner requirement. History is none. Do not put P1 in `決定:`.
+```
+
+### S5F response
+
+```text
+設計記録形式: 3
+決定:
+- 入力値の受理（実装）: accept valid normalized value
+理由:
+- 入力値の受理: validation owner の normalized acceptance 要求と interface owner の valid input acceptance 要求をともに満たすため
+案の処分:
+- 採用 — 元候補「A」— accept valid normalized value
+- 却下 — 元候補「B」— validation owner が normalized acceptance を要求しているため
+- 却下 — 元候補「C」— interface owner が valid input acceptance を要求しているため
+前提検査 P1:
+対象: 元候補 A、B、C の入力値の妥当性判定
+前提: 本案は〈入力値が妥当性判定を受ける状態が存在し続けること〉を前提にする
+前提を外した案: operator approval instead of validation
+既存候補との差分: 元候補 A、B、C は入力値の妥当性判定を行うが、この案は validation を operator approval に置き換える
+検査案の処分 P1: 保留 — compliance owner が operator-approval contract を承認するまで
+改訂履歴:
+- なし
+```
+
+### S3 accepted response
+
+Task identity: `repair_s3_record` (`fork_turns: none`). The fresh task boundary permitted one canonical-work-cycle read and prohibited every other tool, repository read, and write.
+
+Exact prompt/input:
+
+```text
+Fresh isolated pressure sample S3. You may read only /Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md once; do not call any other tool or read/write any other file. Return only one complete parser-compatible Format 3 record, no fences/commentary. Closed candidates: A `reject empty-after-trim`, B `persist empty`, C `replace with default`. Data owner requires rejection of empty-after-trim. Schema owner forbids default replacement. All share processing of post-trim value before persistence. Adopt A; reject B only grounded in data-owner requirement; reject C only grounded in schema-owner requirement. Canonical premise exactly: `本案は〈trim後の値が保存前に処理される状態が存在し続けること〉を前提にする`. P1 alternative: do not process the post-trim value and instead manually review input before persistence; its P1 disposition is 保留 until data steward approval. History is none. Use the P1 fields as single inline `対象:`, `前提:`, `前提を外した案:`, `既存候補との差分:`, `検査案の処分 P1:` lines.
+```
+
+Complete record:
+
+```text
+設計記録形式: 3
+決定:
+- trim後の空値（実装）: 空値を拒否する。
+理由:
+- trim後の空値: データ所有者が空値を拒否することを要求している。
+案の処分:
+- 採用 — 元候補「A `reject empty-after-trim`」— データ所有者の空値拒否要件を満たす。
+- 却下 — 元候補「B `persist empty`」— データ所有者が空値を拒否することを要求している。
+- 却下 — 元候補「C `replace with default`」— スキーマ所有者が既定値への置換を禁止している。
+前提検査 P1:
+対象: trim後の空値
+前提: 本案は〈trim後の値が保存前に処理される状態が存在し続けること〉を前提にする
+前提を外した案: trim後の値を処理せず、保存前に入力を手動レビューする。
+既存候補との差分: A、B、Cはいずれもtrim後の値を保存前に処理するのに対し、この案はその処理を行わず手動レビューへ委ねる。
+検査案の処分 P1: 保留 — データスチュワードの承認が得られるまで採用しない。
+改訂履歴:
+- なし
+```
 
 ### M1R prompt
 
@@ -204,7 +315,7 @@ Read only canonical work-cycle and this scenario; no writes. Return Format 3 wit
 ### P1R prompt
 
 ```text
-Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed A immutable audit log, B mutable audit log, C external archive. Audit owner needs active retrievable evidence without archive delay; storage owner has not approved mutable service. Exact premise `本案は〈監査証跡が組織の責任で取得可能な状態が存在し続けること〉を前提にする`; P1 escrow hold contract. A must be original `部分採用` using exact syntax `- 部分採用 — 元候補「A」— 採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required`. B reject solely storage owner; C reject solely audit owner. Include an audit line outside record stating selected text and remainder text verbatim. History none.
+Fresh isolated P1R retry. You may read only /Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md once; do not call any other tool or read/write any other file. Return only this parser-compatible Format 3 record skeleton filled exactly, no fences/commentary. P1 field lines MUST NOT begin with `-`. Use exactly `対象: 監査履歴`, exactly `前提: 本案は〈監査履歴が保存される状態が存在し続けること〉を前提にする`, exactly `前提を外した案: 監査履歴を保持せず、各変更を手動で認証する`, exactly `既存候補との差分: 既存候補は監査履歴を保持する点で共通するが、本案は保持を廃し変更ごとの手動認証へ置き換える`, exactly `検査案の処分 P1: 保留 — compliance owner approves the manual-certification contract`. Closed candidates A `immutable audit log`, B `retention expansion`, C `omit audit history`; audit owner requires A; B requires retention-owner approval; compliance owner prohibits C. Decision is one 実装 bullet. Original A must be exactly partial adoption with `採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required`. Reject B only for owner approval; reject C only for compliance prohibition. History `- なし`.
 ```
 
 ### P1R response
@@ -212,26 +323,19 @@ Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed 
 ```text
 設計記録形式: 3
 決定:
-- 監査証跡（実装）: immutable audit log を採用する。
-- retention expansion（待機）: retention owner approval が得られるまで保留する。
+- 監査履歴（実装）: immutable audit log
 理由:
-- 監査証跡: audit owner が archive delay なしで取得可能な active evidence を要求しているため。
-- retention expansion: retention owner approval が必要なため。
+- 監査履歴: audit owner requires immutable audit log
 案の処分:
-- 部分採用 — 元候補「A」— 採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required
-- 却下 — 元候補「B」— storage owner が mutable service を承認していないため。
-- 却下 — 元候補「C」— audit owner が archive delay なしで取得可能な active evidence を要求しているため。
+- 部分採用 — 元候補「immutable audit log」— 採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required
+- 却下 — 元候補「retention expansion」— retention owner approval required
+- 却下 — 元候補「omit audit history」— compliance owner prohibits C
 前提検査 P1:
-対象:
-- 元候補 A、B、C が共有する監査証跡の取得責任。
-前提:
-- 本案は〈監査証跡が組織の責任で取得可能な状態が存在し続けること〉を前提にする
-前提を外した案:
-- 監査証跡を escrow に保管し、custody と retrieval を escrow owner に委ねる。
-既存候補との差分:
-- 元候補 A、B、C は組織が監査証跡の取得責任を負うが、この案はその責任を escrow owner に移す。
-検査案の処分 P1:
-- 保留 — escrow に監査証跡を保管する案 — escrow owner の custody/retrieval contract が確定した時点で再検討する。
+対象: 監査履歴
+前提: 本案は〈監査履歴が保存される状態が存在し続けること〉を前提にする
+前提を外した案: 監査履歴を保持せず、各変更を手動で認証する
+既存候補との差分: 既存候補は監査履歴を保持する点で共通するが、本案は保持を廃し変更ごとの手動認証へ置き換える
+検査案の処分 P1: 保留 — compliance owner approves the manual-certification contract
 改訂履歴:
 - なし
 ```
@@ -358,168 +462,53 @@ Read only canonical work-cycle and scenario; no writes. Return Format 3. Closed 
 
 ## Final human semantic audit — accepted corpus only
 
-The only accepted corpus is S1R4, S2–S5, M1R–M5R, and P1R–P5R. All earlier S1/M/P sections, rejected attempts, and prompt stubs are superseded chronology and do not count.
+The accepted corpus is S1F, S2F, S3, S4F, S5F, M1R–M5R, and P1R–P5R.
 
 | Required class | Accepted identities | Audit |
 | --- | --- | --- |
-| Single-axis | S1R4, S2–S5 | Each has one implementation decision axis and matching rationale. |
+| Single-axis | S1F, S2F, S3, S4F, S5F | Each has exactly one implementation decision axis and matching rationale. |
 | Implementation plus wait | M1R–M5R | Each has exactly one `(実装)` and one `(待機)` decision axis, matching rationale axes, and a supplied executable owner approval wait condition. |
 | Original partial adoption | P1R–P5R | Each has exactly one original `部分採用` row with nonempty `採用部分` and `残部: 保留`, preserved selected/remainder text, and two owner-grounded original rejections. |
 | Revision truth | P5R | The non-`なし` B→A row contains the supplied REC-42 reason and exact approval URL. |
-| Prompt provenance | All 15 | Fresh replacement prompts are recorded before dispatch for S1R4/M1R–M5R/P1R–P5R; S2–S5 were accepted earlier under the separated procedure. |
+| Prompt provenance | All 15 | Every accepted sample has an exact persisted prompt and full response. Each task identity is distinct. |
 
 Ten dimensions: candidate coverage, decision/disposition consistency, partial boundaries, executable reconsideration, valid owner-grounded rejections, shared canonical premise, same-granularity P1 alternative, truthful revision history, machine/human boundary, and distinct-context provenance are PASS subject to the supplied facts remaining human-verifiable.
+
+### Per-ID parser and offset extraction
+
+The extractor selects only the fenced block immediately after each accepted `response` label or S3's `Complete record:` label. Starts are one-based character offsets within that fenced record: marker, decision, rationale, dispositions, P1, history.
+
+| ID | Parser | Starts |
+| --- | --- | --- |
+| S1F | PASS | 1, 11, 57, 161, 360, 616 |
+| S2F | PASS | 1, 11, 71, 132, 318, 571 |
+| S3 | PASS | 1, 11, 40, 81, 265, 477 |
+| S4F | PASS | 1, 11, 52, 113, 285, 506 |
+| S5F | PASS | 1, 11, 59, 171, 354, 625 |
+| M1R | PASS | 1, 11, 80, 148, 278, 524 |
+| M2R | PASS | 1, 11, 110, 211, 360, 612 |
+| M3R | PASS | 1, 11, 95, 183, 323, 522 |
+| M4R | PASS | 1, 11, 99, 170, 295, 550 |
+| M5R | PASS | 1, 11, 110, 211, 360, 612 |
+| P1R | PASS | 1, 11, 47, 100, 361, 579 |
+| P2R | PASS | 1, 11, 134, 263, 496, 731 |
+| P3R | PASS | 1, 11, 142, 267, 509, 702 |
+| P4R | PASS | 1, 11, 105, 234, 464, 720 |
+| P5R | PASS | 1, 11, 125, 244, 464, 656 |
+
+| Partial-adoption ID | Selected text | Remainder text |
+| --- | --- | --- |
+| P1R | `immutable audit log` | `保留 — retention expansion — retention owner approval required` |
+| P2R | `ingress validation` | `保留 — metrics enrichment — interface owner approval required` |
+| P3R | `managed key encryption` | `保留 — recovery rotation — security owner approval required` |
+| P4R | `weekly publication` | `保留 — report enrichment — reporting owner approval required` |
+| P5R | `signed immediate receipt` | `保留 — receipt metadata enrichment — compliance owner approval required` |
 
 ## Current final validation
 
 All 15 accepted records parsed successfully with `parseFormat3DesignRecord`. `pnpm -r test` exited 0. `check-md-linebreaks` reported OK. Roadmap strict validation reported OK, format check exited 0, all location paths existed, graph orphans returned none, and graph I/O returned `ok: true`.
 
 After `reader_first_design_records` transitioned to `done`, strict validation, format check, link validation, and orphan validation passed again. The transition made `publish_cli_pipeline_kind` newly ready.
-
-### S2 — raw preservation and normalized validation
-
-Task identity: `durable_s2` (`fork_turns: none`). Source declaration: `使用した情報源は、指定された canonical work-cycle.md と委譲プロンプトだけです。書き込みは行っていません。` This is accepted under the semantic-equivalence ruling.
-
-Exact prompt/input:
-
-```text
-Fresh S2. Read only canonical work-cycle /Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md and supplied prompt, no writes. Begin source declaration saying only those inputs and no writes. Echo this full prompt under Exact prompt/input. Full fenced Format3 then six one-based codepoint starts and candidate/premise/rejection/boundary/human audits. Scenario closed #1076: A preserve raw input and use normalized validation value; B persist normalized input; C validate raw without normalization. Audit owner requires raw preservation; validation owner requires normalized validation. Shared premise input remains available to validation. Exact premise `本案は〈入力値が検証経路へ渡される状態が存在し続けること〉を前提にする`. P1 alternative remove validation path and manually review, hold review owner approval. A adopt B reject audit owner C reject validation owner. history none.
-```
-
-Complete record:
-
-```text
-設計記録形式: 3
-決定:
-- 保存値（実装）: raw input を保存する。
-- 検証値（実装）: normalized validation value を検証に用いる。
-- 検証経路（実装）: 入力値を検証経路へ渡す。
-理由:
-- 保存値: audit owner が raw preservation を要求しているため。
-- 検証値: validation owner が normalized validation を要求しているため。
-- 検証経路: 保存と検証の両要件を満たすため。
-案の処分:
-- 採用 — 元候補「A preserve raw input and use normalized validation value」— raw input を保存し、normalized validation value を検証に用いるため。
-- 却下 — 元候補「B persist normalized input」— audit owner が raw preservation を要求しているため。
-- 却下 — 元候補「C validate raw without normalization」— validation owner が normalized validation を要求しているため。
-前提検査 P1:
-対象:
-- 元候補 A、B、C が共有する検証経路。
-前提:
-- 本案は〈入力値が検証経路へ渡される状態が存在し続けること〉を前提にする
-前提を外した案:
-- 検証経路を削除し、入力を手動レビューする。
-既存候補との差分:
-- 元候補 A、B、C はいずれも検証経路を残すが、この案は検証経路を削除する。
-検査案の処分 P1:
-- 保留 — 検証経路を削除して入力を手動レビューする案 — review owner approval が得られた場合に再検討する。
-改訂履歴:
-- なし
-```
-
-Parser/order result: PASS. One-based starts: marker=1, decision=11, rationale=116, dispositions=253, P1=567, history=808. Candidate audit: A→採用, B→却下 (audit owner), C→却下 (validation owner), each once. Premise audit: the canonical premise exactly matches and P1 removes the shared validation path. Rejection audit: owner-grounded. Semantic boundary and human verdict: structural conformance does not prove owner-fact truth or candidate-set completeness; PASS with those conditions retained for human review. Revision audit: `なし` matches the supplied history.
-
-### S3 — empty-after-trim handling
-
-Task identity: `durable_s3` (`fork_turns: none`). Source declaration: `使用した情報源は、canonical work-cycle と提示されたプロンプトだけです。書き込みは行っていません。`
-
-Exact prompt/input:
-
-```text
-Fresh S3, only workcycle path plus prompt/no writes. Give sole-source/no-write declaration, exact prompt echo, fenced format3, one-based starts/audits. closed #1076 A reject empty-after-trim B persist empty C replace with default. data owner requires reject empty, schema owner forbids default. all share post-trim value handling. premise `本案は〈trim後の値が保存前に処理される状態が存在し続けること〉を前提にする`. P1 manual review before persistence held data steward approval. A adopted, B reject data owner, C schema owner. history none.
-```
-
-Complete record:
-
-```text
-設計記録形式: 3
-決定:
-- 空値処理（実装）: trim 後に空となる値を保存前に拒否する。
-理由:
-- 空値処理: data owner が空値の拒否を要求し、schema owner が default への置換を禁じているため。
-案の処分:
-- 採用 — 元候補「A reject empty-after-trim」— data owner が trim 後の空値を拒否することを要求しているため。
-- 却下 — 元候補「B persist empty」— data owner が空値の拒否を要求しているため。
-- 却下 — 元候補「C replace with default」— schema owner が default への置換を禁じているため。
-前提検査 P1:
-対象:
-- 元候補 A、B、C が共有する、trim 後の値の保存前処理。
-前提:
-- 本案は〈trim後の値が保存前に処理される状態が存在し続けること〉を前提にする
-前提を外した案:
-- trim 後の値を処理対象にせず、入力を保存前に手動レビューする。
-既存候補との差分:
-- 元候補 A、B、C は trim 後の値を保存前に処理するが、この案は trim 後の値を処理せず手動レビューする。
-検査案の処分 P1:
-- 保留 — 保存前に手動レビューする案 — data steward approval が得られた場合に再検討する。
-改訂履歴:
-- なし
-```
-
-Parser/order result: PASS. One-based starts: marker=1, decision=11, rationale=50, dispositions=121, P1=336, history=616. Candidate audit: A→採用, B→却下 (data owner), C→却下 (schema owner), each once. Premise audit: exact canonical premise; P1 removes shared pre-persistence handling. Rejection audit: owner-grounded and P1 is held for data-steward approval. Revision audit: `なし`. Semantic boundary: fact truth, candidate completeness, and owner approval require human review. Human verdict: PASS.
-
-### S4 — caller error response
-
-Task identity: `durable_s4_final` (`fork_turns: none`). Exact dispatched prompt and response scope: only canonical work-cycle and the following closed input, with no writes.
-
-```text
-closed #1076 candidates A emit error code and preserve message; B emit code only; C preserve message only. Diagnostic owner requires code; support owner requires message. All share response to caller on failure. Exact premise `本案は〈失敗時に呼出元へ応答が返る状態が存在し続けること〉を前提にする`. Outside P1 alternative async incident channel, hold until operations owner defines contract. A adopt; B reject only support owner; C reject only diagnostic owner; history none.
-```
-
-Complete response:
-
-```text
-設計記録形式: 3
-決定:
-- 失敗応答内容（実装）: エラーコードを出力し、メッセージを保持する。
-- 代替障害通知経路（待機）: 非同期インシデントチャネルは、運用責任者が契約を定義するまで実装しない。
-理由:
-- 失敗応答内容: 診断責任者が必要とするエラーコードと、サポート責任者が必要とするメッセージをともに提供する。
-- 代替障害通知経路: 非同期インシデントチャネルの契約は運用責任者の所有事項であり、現時点では定義されていない。
-案の処分:
-- 採用 — 元候補「A emit error code and preserve message」— 診断責任者のコード要件とサポート責任者のメッセージ要件をともに満たす。
-- 却下 — 元候補「B emit code only」— サポート責任者が必要とするメッセージを保持しない。
-- 却下 — 元候補「C preserve message only」— 診断責任者が必要とするエラーコードを出力しない。
-前提検査 P1:
-対象: 候補A、候補B、候補C
-前提: 本案は〈失敗時に呼出元へ応答が返る状態が存在し続けること〉を前提にする
-前提を外した案: 呼出元への失敗応答に代えて、非同期インシデントチャネルへエラーコードとメッセージを通知する。
-既存候補との差分: 既存候補はいずれも失敗時に呼出元へ応答するが、この案は呼出元への応答を前提とせず、別の非同期経路へ障害情報を送る。
-検査案の処分 P1:
-- 保留 — 前提を外した案「非同期インシデントチャネル」— 運用責任者が通知先、配送保証、障害情報、停止条件を含む契約を定義した時点で再検討する。
-改訂履歴:
-- なし
-```
-
-Deterministic parser/order result: PASS. One-based heading starts: marker=1, decision=11, rationale=105, dispositions=224, P1=436, history=711. Candidate audit: A→採用, B→却下 (support owner), C→却下 (diagnostic owner), each once. Premise audit: exact canonical form and P1 outside A/B/C. Rejection audit: owner-grounded; P1 holds on a concrete operations contract. Revision audit: `なし`. Semantic boundary: owner-fact truth and candidate completeness require human review. Human verdict: PASS.
-
-### S5 — normalized-value acceptance
-
-Task identity: `durable_s5_final` (`fork_turns: none`). Exact closed input: A accept valid normalized value; B accept unnormalized value; C reject all values; validation owner requires normalized acceptance; interface owner requires valid input acceptance; P1 uses operator approval and awaits compliance-owner approval; history none.
-
-Complete response:
-
-```text
-設計記録形式: 3
-決定:
-- 入力値の受理方針（実装）: 妥当な正規化済み値を受理する案Aを採用する。
-理由:
-- 入力値の受理方針: validation owner が要求する正規化済み値の受理と、interface owner が要求する妥当な入力の受理をともに満たすため。
-案の処分:
-- 採用 — 元候補「A accept valid normalized value」— validation owner と interface owner の双方の要求を満たす。
-- 却下 — 元候補「B accept unnormalized value」— validation owner が正規化済み値の受理を要求しているため。
-- 却下 — 元候補「C reject all values」— interface owner が妥当な入力の受理を要求しているため。
-前提検査 P1:
-対象: 案A、案B、案Cが共有する妥当性判定結果への依存。
-前提: 本案は〈入力値が妥当性判定を受ける状態が存在し続けること〉を前提にする
-前提を外した案: 妥当性判定を用いず、operator の承認によって入力値の受理を決める。
-既存候補との差分: 案A、案B、案Cはいずれも妥当性判定結果を共有するが、この案は妥当性判定を受理判断から外して operator の承認へ置き換える。
-検査案の処分 P1: 保留 — compliance owner の承認が得られた場合に再検討する。
-改訂履歴:
-- なし
-```
-
-Declared scope: only canonical work-cycle and supplied scenario; no writes. Parser/order result: PASS. One-based heading starts: marker=1, decision=11, rationale=54, dispositions=143, P1=389, history=643. Candidate audit: A→採用, B→却下 (validation owner), C→却下 (interface owner), each once. Premise/rejection/revision audits and semantic boundary: PASS subject to human verification of owner facts and candidate completeness.
 
 ## Current verification evidence
 
@@ -740,6 +729,8 @@ successors (process): publish_cli_pipeline_kind
 ```
 
 ## Post-transition PFD and snapshot validation
+
+Current post-transition validation: the immediate-fenced-block extractor returned `PASS` for S1F, S2F, S3, S4F, S5F, M1R–M5R, and P1R–P5R. `check-md-linebreaks` returned `OK`; roadmap strict check returned `OK`; format check passed; location links existed; graph orphans returned `(none)`; and `reader_first_design_records.status` read back as `done`.
 
 ```text
 node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl reader_first_design_records status done
