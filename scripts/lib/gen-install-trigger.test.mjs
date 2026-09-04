@@ -25,6 +25,13 @@ describe("GEN_INSTALL_TRIGGER", () => {
 		assert.equal(GEN_INSTALL_TRIGGER.test("scripts/lib/gen-install.mjs"), true);
 	});
 
+	it("matches scripts/lib/relative-imports.mjs", () => {
+		assert.equal(
+			GEN_INSTALL_TRIGGER.test("scripts/lib/relative-imports.mjs"),
+			true,
+		);
+	});
+
 	it("matches scripts/gen-install.mjs", () => {
 		assert.equal(GEN_INSTALL_TRIGGER.test("scripts/gen-install.mjs"), true);
 	});

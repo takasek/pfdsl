@@ -14,6 +14,7 @@ const GEN_INSTALL_TRIGGER_PATTERN = [
 	...INSTALL_TEMPLATE_PATHS.map(escapeDots),
 	"scripts/lib/install-templates\\.mjs",
 	"scripts/lib/gen-install\\.mjs",
+	"scripts/lib/relative-imports\\.mjs",
 	"scripts/gen-install\\.mjs",
 	"^\\.claude/skills/pfd-ops/install/",
 ].join("|");
