@@ -314,12 +314,6 @@ Read only canonical work-cycle and this scenario; no writes. Return Format 3 wit
 
 ### P1R prompt
 
-```text
-Fresh P1R. Read only the canonical work-cycle and this prompt; do not write. Return one parser-compatible Format 3 record only. Closed candidates: A `immutable audit log plus retention expansion`, B `mutable audit log`, C `external archive`. A is composite. Partially adopt A exactly with selected `immutable audit log` and remainder `保留 — retention expansion — retention owner approval required`. Audit owner requires immutable audit log and retention owner has not approved retention expansion. Reject B only because storage owner has not approved mutable audit storage. Reject C only because audit owner requires immediately retrievable audit evidence. Exact premise: `本案は〈監査履歴が保存される状態が存在し続けること〉を前提にする`. P1 alternative: do not retain audit history and manually certify each change; hold until compliance owner approves its manual-certification contract. History is none. P1 fields must be single inline lines.
-```
-
-### P1R accepted retry prompt
-
 Task identity: `sixth_p1_retry` (`fork_turns: none`).
 
 ```text
@@ -349,12 +343,6 @@ Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed s
 ```
 
 ### P2R prompt
-
-```text
-Fresh P2R. Read only the canonical work-cycle and this prompt; do not write. Return one parser-compatible Format 3 record only. Closed candidates: A `ingress validation plus metrics enrichment`, B `pre-storage worker validation`, C `manual review queue`. A is composite. Partially adopt A exactly with selected `ingress validation` and remainder `保留 — metrics enrichment — interface owner approval required`. Interface owner requires ingress validation and has not approved metrics enrichment. Reject B only because interface owner requires ingress validation. Reject C only because queue owner has not approved the manual review queue. Exact premise: `本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする`. P1 alternative: post-storage repair; hold until persistence owner approves its contract. History is none. P1 fields must be single inline lines.
-```
-
-### P2R accepted retry prompt
 
 Task identity: `sixth_p2_retry` (`fork_turns: none`).
 
@@ -386,12 +374,6 @@ Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed s
 
 ### P3R prompt
 
-```text
-Fresh P3R. Read only the canonical work-cycle and this prompt; do not write. Return one parser-compatible Format 3 record only. Closed candidates: A `managed key encryption plus recovery rotation`, B `customer-managed key encryption`, C `unencrypted offline key`. A is composite. Partially adopt A exactly with selected `managed key encryption` and remainder `保留 — recovery rotation — security owner approval required`. Security owner requires managed-key encryption and has not approved recovery rotation. Reject B only because customer-key owner has not approved customer-managed keys. Reject C only because security owner requires managed-key encryption. Exact premise: `本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする`. P1 alternative: no persistence; hold until data owner approves its policy. History is none. P1 fields must be single inline lines.
-```
-
-### P3R accepted retry prompt
-
 Task identity: `sixth_p3_retry` (`fork_turns: none`).
 
 ```text
@@ -422,12 +404,6 @@ Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed s
 
 ### P4R prompt
 
-```text
-Fresh P4R. Read only the canonical work-cycle and this prompt; do not write. Return one parser-compatible Format 3 record only. Closed candidates: A `weekly publication plus report enrichment`, B `daily publication`, C `monthly publication`. A is composite. Partially adopt A exactly with selected `weekly publication` and remainder `保留 — report enrichment — reporting owner approval required`. Reporting owner requires weekly publication and has not approved report enrichment. Reject B only because reporting owner requires weekly publication. Reject C only because reporting owner requires weekly publication. Exact premise: `本案は〈定期報告が公開される状態が存在し続けること〉を前提にする`. P1 alternative: on-demand endpoint; hold until API owner approves its contract. History is none. P1 fields must be single inline lines.
-```
-
-### P4R accepted retry prompt
-
 Task identity: `sixth_p4_retry` (`fork_turns: none`).
 
 ```text
@@ -457,12 +433,6 @@ Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed s
 ```
 
 ### P5R prompt
-
-```text
-Fresh P5R. Read only the canonical work-cycle and this prompt; do not write. Return one parser-compatible Format 3 record only. Closed candidates: A `signed immediate receipt plus receipt metadata enrichment`, B `unsigned immediate receipt`, C `signed delayed receipt`. A is composite. Partially adopt A exactly with selected `signed immediate receipt` and remainder `保留 — receipt metadata enrichment — compliance owner approval required`. Compliance owner requires signature and has not approved metadata enrichment. Reject B only because compliance owner requires a signature. Reject C only because delivery owner has not approved delayed delivery. Exact premise: `本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする`. P1 alternative: portal polling; hold until API owner approves its contract. The only revision is exactly `- B unsigned immediate receipt → A signed immediate receipt plus receipt metadata enrichment — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42`. P1 fields must be single inline lines.
-```
-
-### P5R accepted retry prompt
 
 Task identity: `sixth_p5_retry` (`fork_turns: none`).
 
