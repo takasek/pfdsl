@@ -5,6 +5,7 @@
 
 import { isGhUnavailableError } from "../pfdsl/lib/gh-compat.mjs";
 import { trailerLines } from "./commit-trailers.mjs";
+import { PATTERN_DIR_RELATIVE } from "./retro-patterns.mjs";
 
 /**
  * Every repo-relative path an adopted PFD claims to model, via the `location:`
@@ -1479,7 +1480,6 @@ export const SIZE_TRACKED_PATTERNS = [
 	/^docs\/adr\//,
 	/(^|\/)SKILL\.md$/,
 ];
-const RETRO_PATTERN_CATALOG_PREFIX = ".pfdsl/bindings/pfd-retro-patterns/";
 export const SIZE_OVERRIDE_PATTERN = /^Size-Override:\s*\S/m;
 
 /**
@@ -1594,10 +1594,10 @@ export function classifySizeDirection({ issueBody, deltas, overrideDeclared }) {
 	if (grown.length === 0) return { status: "PASS" };
 
 	const retroGrowth = grown.filter((d) =>
-		d.path.startsWith(RETRO_PATTERN_CATALOG_PREFIX),
+		d.path.startsWith(`${PATTERN_DIR_RELATIVE}/`),
 	);
 	const gatedGrowth = grown.filter(
-		(d) => !d.path.startsWith(RETRO_PATTERN_CATALOG_PREFIX),
+		(d) => !d.path.startsWith(`${PATTERN_DIR_RELATIVE}/`),
 	);
 	const retroDetail =
 		retroGrowth.length > 0
