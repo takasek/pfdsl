@@ -1,467 +1,475 @@
 # Format 3 pressure evidence — durable Task 4 verification
 
-## Current status and chronology
+## Replacement evidence acceptance contract
 
-This report retains historical pre-transition evidence from the review-fix loop. After the durable evidence migration and the validations recorded below, `reader_first_design_records` was transitioned from `wip` to `done`; earlier `wip` and `done` captures remain chronological evidence only.
+This report contains the authoritative fifteen-context corpus and the verification evidence used before `reader_first_design_records` transitioned from `wip` to `done`.
 
-## Scope and implementation evidence
+The source-declaration acceptance rule permits a semantically equivalent declaration when it unambiguously limits inputs to the canonical work-cycle and supplied prompt and confirms no writes. It does not relax any other evidence requirement.
 
-The review-fix loop changes only the parser, its template, their tests, this report, and the roadmap artifact. `parsePartialAdoption` is shared by original and premise dispositions at `scripts/lib/gate-check.mjs:831-845`; both call sites require it at `scripts/lib/gate-check.mjs:975-979` and `scripts/lib/gate-check.mjs:1038-1046`.
+## Fresh semantic contexts
 
-`parseRevisionRow` trims every captured revision field before acceptance at `scripts/lib/gate-check.mjs:847-860`. The template tells operators that both disposition locations need a non-empty selected part and a reasoned rejected or pending remainder at `scripts/lib/cycle-status.mjs:233`.
+### S2 — raw preservation and normalized validation
 
-The regression matrix covers original selected part, original remainder kind, original remainder reason, premise selected part, premise remainder kind, premise remainder reason, and revision old decision, new decision, reason, and reapproval at `scripts/lib/gate-check.test.mjs:2114-2177`. It also accepts one complete premise partial adoption at `scripts/lib/gate-check.test.mjs:2139-2148`.
+Task identity: `durable_s2` (`fork_turns: none`). Source declaration: `使用した情報源は、指定された canonical work-cycle.md と委譲プロンプトだけです。書き込みは行っていません。` This is accepted under the semantic-equivalence ruling.
 
-## Pressure-sample method and independence
+Exact prompt/input:
 
-The 15 samples below are persisted here rather than summarized. Each accepted sample was dispatched in its own fresh context with `fork_turns: none`, had read-only scope, and was allowed one operational source: `.claude/skills/pfd-ops/references/work-cycle.md:36-53`.
-
-| Group | Samples | Fresh-context evidence | Read/write boundary |
-| --- | --- | --- | --- |
-| Single-axis input handling | S1–S5 | `pressure_s1`, `pressure_s2`, `pressure_s3`, `pressure_s4`, `pressure_s5`; five separate `fork_turns: none` dispatches. | Only the named work-cycle reference; no worktree writes. |
-| Mixed implementation and waiting axes | M1–M5 | `pressure_m1`, `pressure_m2`, `pressure_m3`, `pressure_m4`, `pressure_m5`; five separate `fork_turns: none` dispatches. | Only the named work-cycle reference; no worktree writes. |
-| Partial adoption boundaries | P1–P5 | `pressure_p1`, `pressure_p2`, `pressure_p3_replacement`, `pressure_p4_final`, `pressure_p5_parser_final`; five separate `fork_turns: none` dispatches. | Only the named work-cycle reference; no worktree writes. |
-
-The semantic boundary in every verdict applies the contract's explicit division: structure is machine-blocking, while candidate completeness, decision consistency, and actual independence require human review (`.claude/skills/pfd-ops/references/work-cycle.md:51-53`).
-
-### S1 — ASCII outer-space removal
-
-Prompt/input: Decide whether an input-processing change removes ASCII leading and trailing spaces while preserving non-ASCII whitespace semantics.
+```text
+Fresh S2. Read only canonical work-cycle /Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md and supplied prompt, no writes. Begin source declaration saying only those inputs and no writes. Echo this full prompt under Exact prompt/input. Full fenced Format3 then six one-based codepoint starts and candidate/premise/rejection/boundary/human audits. Scenario closed #1076: A preserve raw input and use normalized validation value; B persist normalized input; C validate raw without normalization. Audit owner requires raw preservation; validation owner requires normalized validation. Shared premise input remains available to validation. Exact premise `本案は〈入力値が検証経路へ渡される状態が存在し続けること〉を前提にする`. P1 alternative remove validation path and manually review, hold review owner approval. A adopt B reject audit owner C reject validation owner. history none.
+```
 
 Complete record:
 
 ```text
 設計記録形式: 3
 決定:
-- 入力空白処理（実装）: ASCII の前後空白だけを除去する
+- 保存値（実装）: raw input を保存する。
+- 検証値（実装）: normalized validation value を検証に用いる。
+- 検証経路（実装）: 入力値を検証経路へ渡す。
 理由:
-- 入力空白処理: 既存の Unicode 空白の意味を変えずに利用者の誤入力を減らす
+- 保存値: audit owner が raw preservation を要求しているため。
+- 検証値: validation owner が normalized validation を要求しているため。
+- 検証経路: 保存と検証の両要件を満たすため。
 案の処分:
-- 採用 — 元候補「前後空白を除去する」— 目的を満たす
-- 却下 — 元候補「Unicode 空白も除去する」— 既存データの意味を変える
-- 保留 — 元候補「入力エラーにする」— 利用状況を測定後に再検討する
+- 採用 — 元候補「A preserve raw input and use normalized validation value」— raw input を保存し、normalized validation value を検証に用いるため。
+- 却下 — 元候補「B persist normalized input」— audit owner が raw preservation を要求しているため。
+- 却下 — 元候補「C validate raw without normalization」— validation owner が normalized validation を要求しているため。
 前提検査 P1:
-対象: ASCII 前後空白の扱い
-前提: Unicode 空白を同じ規則で扱える
-前提を外した案: ASCII 空白だけを除去する
-既存候補との差分: Unicode 空白を保存する
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象:
+- 元候補 A、B、C が共有する検証経路。
+前提:
+- 本案は〈入力値が検証経路へ渡される状態が存在し続けること〉を前提にする
+前提を外した案:
+- 検証経路を削除し、入力を手動レビューする。
+既存候補との差分:
+- 元候補 A、B、C はいずれも検証経路を残すが、この案は検証経路を削除する。
+検査案の処分 P1:
+- 保留 — 検証経路を削除して入力を手動レビューする案 — review owner approval が得られた場合に再検討する。
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=4, dispositions=6, premise P1=10, history=16. Selected/remainder: N/A. Semantic boundary: structural order cannot prove that preserving Unicode whitespace is the right product decision. Human verdict: approved as a bounded, independently reviewable axis; no semantic claim is inferred from parser conformance.
+Parser/order result: PASS. One-based starts: marker=1, decision=11, rationale=116, dispositions=253, P1=567, history=808. Candidate audit: A→採用, B→却下 (audit owner), C→却下 (validation owner), each once. Premise audit: the canonical premise exactly matches and P1 removes the shared validation path. Rejection audit: owner-grounded. Semantic boundary and human verdict: structural conformance does not prove owner-fact truth or candidate-set completeness; PASS with those conditions retained for human review. Revision audit: `なし` matches the supplied history.
 
-### S2 — raw-input preservation
+### S3 — empty-after-trim handling
 
-Prompt/input: Decide whether raw input is preserved while a trimmed value is used only by a downstream validation path.
+Task identity: `durable_s3` (`fork_turns: none`). Source declaration: `使用した情報源は、canonical work-cycle と提示されたプロンプトだけです。書き込みは行っていません。`
+
+Exact prompt/input:
+
+```text
+Fresh S3, only workcycle path plus prompt/no writes. Give sole-source/no-write declaration, exact prompt echo, fenced format3, one-based starts/audits. closed #1076 A reject empty-after-trim B persist empty C replace with default. data owner requires reject empty, schema owner forbids default. all share post-trim value handling. premise `本案は〈trim後の値が保存前に処理される状態が存在し続けること〉を前提にする`. P1 manual review before persistence held data steward approval. A adopted, B reject data owner, C schema owner. history none.
+```
 
 Complete record:
 
 ```text
 設計記録形式: 3
 決定:
-- 入力保存方式（実装）: 原文を保存し検証用の値だけを trim する
+- 空値処理（実装）: trim 後に空となる値を保存前に拒否する。
 理由:
-- 入力保存方式: 監査可能性と既存の表示契約を保つ
+- 空値処理: data owner が空値の拒否を要求し、schema owner が default への置換を禁じているため。
 案の処分:
-- 採用 — 元候補「原文を保存する」— 既存表示を保つ
-- 却下 — 元候補「保存前に trim する」— 原文の監査性を失う
+- 採用 — 元候補「A reject empty-after-trim」— data owner が trim 後の空値を拒否することを要求しているため。
+- 却下 — 元候補「B persist empty」— data owner が空値の拒否を要求しているため。
+- 却下 — 元候補「C replace with default」— schema owner が default への置換を禁じているため。
 前提検査 P1:
-対象: 検証用の trim
-前提: 原文保存と検証値を分けられる
-前提を外した案: 保存値をそのまま検証する
-既存候補との差分: 検証だけに trim を限定する
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象:
+- 元候補 A、B、C が共有する、trim 後の値の保存前処理。
+前提:
+- 本案は〈trim後の値が保存前に処理される状態が存在し続けること〉を前提にする
+前提を外した案:
+- trim 後の値を処理対象にせず、入力を保存前に手動レビューする。
+既存候補との差分:
+- 元候補 A、B、C は trim 後の値を保存前に処理するが、この案は trim 後の値を処理せず手動レビューする。
+検査案の処分 P1:
+- 保留 — 保存前に手動レビューする案 — data steward approval が得られた場合に再検討する。
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=4, dispositions=6, premise P1=9, history=15. Selected/remainder: N/A. Semantic boundary: the record shape cannot establish that the audit contract truly requires raw preservation. Human verdict: approved pending owner confirmation of that contract; parser PASS alone is insufficient.
+Parser/order result: PASS. One-based starts: marker=1, decision=11, rationale=50, dispositions=121, P1=336, history=616. Candidate audit: A→採用, B→却下 (data owner), C→却下 (schema owner), each once. Premise audit: exact canonical premise; P1 removes shared pre-persistence handling. Rejection audit: owner-grounded and P1 is held for data-steward approval. Revision audit: `なし`. Semantic boundary: fact truth, candidate completeness, and owner approval require human review. Human verdict: PASS.
 
-### S3 — empty-after-trim rejection
+### S4 — caller error response
 
-Prompt/input: Decide whether values that become empty after outer trimming are rejected before persistence.
+Task identity: `durable_s4_final` (`fork_turns: none`). Exact dispatched prompt and response scope: only canonical work-cycle and the following closed input, with no writes.
 
-Complete record:
+```text
+closed #1076 candidates A emit error code and preserve message; B emit code only; C preserve message only. Diagnostic owner requires code; support owner requires message. All share response to caller on failure. Exact premise `本案は〈失敗時に呼出元へ応答が返る状態が存在し続けること〉を前提にする`. Outside P1 alternative async incident channel, hold until operations owner defines contract. A adopt; B reject only support owner; C reject only diagnostic owner; history none.
+```
+
+Complete response:
 
 ```text
 設計記録形式: 3
 決定:
-- 空値検証（実装）: trim 後に空の入力を拒否する
+- 失敗応答内容（実装）: エラーコードを出力し、メッセージを保持する。
+- 代替障害通知経路（待機）: 非同期インシデントチャネルは、運用責任者が契約を定義するまで実装しない。
 理由:
-- 空値検証: 実質的な空値を保存しない
+- 失敗応答内容: 診断責任者が必要とするエラーコードと、サポート責任者が必要とするメッセージをともに提供する。
+- 代替障害通知経路: 非同期インシデントチャネルの契約は運用責任者の所有事項であり、現時点では定義されていない。
 案の処分:
-- 採用 — 元候補「trim 後の空値を拒否する」— 保存の不変条件を守る
-- 却下 — 元候補「空文字として保存する」— 後段の区別を失う
+- 採用 — 元候補「A emit error code and preserve message」— 診断責任者のコード要件とサポート責任者のメッセージ要件をともに満たす。
+- 却下 — 元候補「B emit code only」— サポート責任者が必要とするメッセージを保持しない。
+- 却下 — 元候補「C preserve message only」— 診断責任者が必要とするエラーコードを出力しない。
 前提検査 P1:
-対象: 空値の判定時点
-前提: trim は保存前に実行できる
-前提を外した案: 原文長だけで空値を判定する
-既存候補との差分: 空白だけの値も拒否する
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: 候補A、候補B、候補C
+前提: 本案は〈失敗時に呼出元へ応答が返る状態が存在し続けること〉を前提にする
+前提を外した案: 呼出元への失敗応答に代えて、非同期インシデントチャネルへエラーコードとメッセージを通知する。
+既存候補との差分: 既存候補はいずれも失敗時に呼出元へ応答するが、この案は呼出元への応答を前提とせず、別の非同期経路へ障害情報を送る。
+検査案の処分 P1:
+- 保留 — 前提を外した案「非同期インシデントチャネル」— 運用責任者が通知先、配送保証、障害情報、停止条件を含む契約を定義した時点で再検討する。
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=4, dispositions=6, premise P1=9, history=15. Selected/remainder: N/A. Semantic boundary: syntax cannot determine whether blank-only input should be legal for every field. Human verdict: approved only for fields whose persistence invariant is confirmed by the owner.
+Deterministic parser/order result: PASS. One-based heading starts: marker=1, decision=11, rationale=105, dispositions=224, P1=436, history=711. Candidate audit: A→採用, B→却下 (support owner), C→却下 (diagnostic owner), each once. Premise audit: exact canonical form and P1 outside A/B/C. Rejection audit: owner-grounded; P1 holds on a concrete operations contract. Revision audit: `なし`. Semantic boundary: owner-fact truth and candidate completeness require human review. Human verdict: PASS.
 
-### S4 — outer trim without internal normalization
+### S5 — normalized-value acceptance
 
-Prompt/input: Decide whether the system strips only outer whitespace and explicitly declines internal-whitespace normalization.
+Task identity: `durable_s5_final` (`fork_turns: none`). Exact closed input: A accept valid normalized value; B accept unnormalized value; C reject all values; validation owner requires normalized acceptance; interface owner requires valid input acceptance; P1 uses operator approval and awaits compliance-owner approval; history none.
 
-Complete record:
+Complete response:
 
 ```text
 設計記録形式: 3
 決定:
-- 入力空白処理（実装）: 前後空白だけを除去する
+- 入力値の受理方針（実装）: 妥当な正規化済み値を受理する案Aを採用する。
 理由:
-- 入力空白処理: 内部空白の意味を保持する
+- 入力値の受理方針: validation owner が要求する正規化済み値の受理と、interface owner が要求する妥当な入力の受理をともに満たすため。
 案の処分:
-- 部分採用 — 元候補「全空白を単一空白へ正規化する」— 採用部分: 前後空白の除去; 残部: 却下 — 内部空白の意味を変更するため
+- 採用 — 元候補「A accept valid normalized value」— validation owner と interface owner の双方の要求を満たす。
+- 却下 — 元候補「B accept unnormalized value」— validation owner が正規化済み値の受理を要求しているため。
+- 却下 — 元候補「C reject all values」— interface owner が妥当な入力の受理を要求しているため。
 前提検査 P1:
-対象: 正規化の範囲
-前提: 内部空白に意味がある
-前提を外した案: 内部空白も単一空白へ正規化する
-既存候補との差分: 外側だけを変更する
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: 案A、案B、案Cが共有する妥当性判定結果への依存。
+前提: 本案は〈入力値が妥当性判定を受ける状態が存在し続けること〉を前提にする
+前提を外した案: 妥当性判定を用いず、operator の承認によって入力値の受理を決める。
+既存候補との差分: 案A、案B、案Cはいずれも妥当性判定結果を共有するが、この案は妥当性判定を受理判断から外して operator の承認へ置き換える。
+検査案の処分 P1: 保留 — compliance owner の承認が得られた場合に再検討する。
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=4, dispositions=6, premise P1=8, history=14. Selected/remainder: selected=`前後空白の除去`; remainder=`却下 — 内部空白の意味を変更するため`. Semantic boundary: the parser preserves both portions but cannot decide whether internal whitespace is semantically meaningful. Human verdict: approved as a genuine partial adoption after boundary review.
+Declared scope: only canonical work-cycle and supplied scenario; no writes. Parser/order result: PASS. One-based heading starts: marker=1, decision=11, rationale=54, dispositions=143, P1=389, history=643. Candidate audit: A→採用, B→却下 (validation owner), C→却下 (interface owner), each once. Premise/rejection/revision audits and semantic boundary: PASS subject to human verification of owner facts and candidate completeness.
 
-### S5 — trim with an audit record
+### M1 — audit-event retention
 
-Prompt/input: Decide whether outer trimming is performed and an audit record notes that the normalized path was used.
-
-Complete record:
+Task identity: `durable_m1_retry` (`fork_turns: none`). Task boundary permitted exactly one canonical-work-cycle read and prohibited all tools other than that read and all writes; execution reported no mutation. Operational-source declaration: canonical work-cycle and supplied scenario only.
 
 ```text
 設計記録形式: 3
 決定:
-- 正規化監査（実装）: 前後空白を除去した事実を監査記録へ残す
+- 監査イベント（実装）: 監査イベントを保存する
+- 保持期間延長（待機）: 保持期間所有者の承認を待ち、現時点では延長しない
 理由:
-- 正規化監査: 調査時に入力変換を追跡できる
+- 監査イベント: 監査所有者が監査イベントを必要としているため
+- 保持期間延長: 保持期間所有者の承認が得られていないため
 案の処分:
-- 採用 — 元候補「trim と監査記録を行う」— 変換の追跡が必要
-- 保留 — 元候補「入力原文も毎回保存する」— 保持期間の方針後に再検討する
+- 採用 — 元候補「A」— 監査イベントを保存し、保持期間所有者の承認まで保持期間延長を待機する
+- 却下 — 元候補「B」— 保持期間所有者の承認が得られていないため
+- 却下 — 元候補「C」— 監査所有者が監査イベントを必要としているため
 前提検査 P1:
-対象: 監査記録の粒度
-前提: 変換事実だけで調査できる
-前提を外した案: 原文全体を監査記録へ保存する
-既存候補との差分: 個人データを増やさない
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: 監査証跡の保持方式
+前提: 本案は〈監査証跡が取得可能な状態が存在し続けること〉を前提にする
+前提を外した案: 監査証跡を外部エスクローへエクスポートし、内部で取得可能な状態の継続に依存しない
+既存候補との差分: 元候補はいずれも内部の監査証跡の取得可能性を扱うが、この案は監査証跡を外部エスクローへ移して共有前提を外す
+検査案の処分 P1: 保留 — 外部エスクロー所有者との契約が未確定であるため、契約成立時に再検討する
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=4, dispositions=6, premise P1=9, history=15. Selected/remainder: N/A. Semantic boundary: record order cannot establish that the audit data is sufficient or privacy-safe. Human verdict: approved only with retention-owner review; no semantic validity is claimed by structure.
+Parser/order result: PASS. One-based starts: marker=1, decision=11, rationale=80, dispositions=148, P1=278, history=504.
 
-### M1 — validation implementation and dependency update wait
+### M2 — classification with unchanged retry
 
-Prompt/input: Decide whether a validation rule is implemented while an existing dependency upgrade remains waiting.
+Task identity: `durable_m2_final2` (`fork_turns: none`). Exact dispatched scenario: A classification/retry unchanged; B classification/retry change; C retry only; diagnostics requires classification; operations has not approved retry change; P1 offline analytics holds on analytics contract.
 
-Complete record:
+Complete response:
 
 ```text
 設計記録形式: 3
 決定:
-- 検証実装（実装）: 入力制約を現在の依存版で実装する
-- 既存依存の更新（待機）: 依存更新は互換性結果まで開始しない
+- 再実行規則（実装）: 共有処理では分類を維持したまま再実行する
 理由:
-- 検証実装: 現行契約の欠陥を直ちに防ぐ
-- 既存依存の更新: 互換性未確認の変更を混ぜない
+- 再実行規則: 分類は診断に必要であり、再実行だけを理由に変更する運用は未承認だから
 案の処分:
-- 採用 — 元候補「現行依存で検証を実装する」— 独立して提供できる
-- 保留 — 元候補「依存更新と同時に行う」— 互換性測定後に再検討する
+- 採用 — 元候補「A」— 分類を維持した再実行は共有処理と診断要件を両立する
+- 却下 — 元候補「B」— 再実行時の分類変更は未承認の運用変更を導入する
+- 却下 — 元候補「C」— 再実行のみでは診断に必要な分類を保持できない
 前提検査 P1:
-対象: 依存更新の必要性
-前提: 新しい依存版が必要である
-前提を外した案: 現行依存で検証だけを実装する
-既存候補との差分: 依存更新を待機軸へ分離する
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: 失敗が処理経路で扱われる状態の継続性
+前提: 本案は〈失敗が処理経路で扱われる状態が存在し続けること〉を前提にする
+前提を外した案: オフライン分析で再実行対象を特定する
+既存候補との差分: 処理経路上の分類に依存せず、分析契約に基づいて対象を特定する
+検査案の処分 P1: 保留 — オフライン分析の分析契約が未確定だから
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=5, dispositions=8, premise P1=11, history=17. Selected/remainder: N/A. Semantic boundary: two displayed axes do not prove that their deployment risks are independent. Human verdict: approved as a two-axis record; the waiting condition requires dependency-owner confirmation.
+`parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=52, dispositions=118, P1=314, history=574. Candidate audit: A→採用, B→却下 (operations), C→却下 (diagnostics), each once. Premise/rejection audit: PASS subject to human fact verification. Revision audit: `なし`.
 
-### M2 — input constraint and operations setting wait
+### M3 — key-only cache invalidation
 
-Prompt/input: Decide whether an input constraint is implemented while a production operations setting is deferred.
-
-Complete record:
+Task identity: `durable_m3_final3` (`fork_turns: none`). Exact closed input fixed the canonical premise and both owner grounds. Complete response:
 
 ```text
 設計記録形式: 3
 決定:
-- 入力制約の実装（実装）: 禁止値を受付時に拒否する
-- 運用設定の変更（待機）: 本番閾値は観測値がそろうまで変えない
+- キャッシュ無効化（実装）: 対象キーだけを無効化する
 理由:
-- 入力制約の実装: 不正な状態を入口で防ぐ
-- 運用設定の変更: 閾値変更の影響を観測してから決める
+- キャッシュ無効化: cache owner がキャッシュ鮮度を要求し、namespace owner は広範な無効化を承認していないため
 案の処分:
-- 採用 — 元候補「入口で禁止値を拒否する」— 既存契約を明確にする
-- 保留 — 元候補「閾値も同時に下げる」— 観測値が不足している
+- 採用 — 元候補「A」— 対象キーだけを無効化する
+- 却下 — 元候補「B」— namespace owner が広範な無効化を承認していないため
+- 却下 — 元候補「C」— cache owner がキャッシュ鮮度を要求しているため
 前提検査 P1:
-対象: 閾値変更の必要性
-前提: 新制約には低い閾値が必要である
-前提を外した案: 閾値を変えずに制約だけを導入する
-既存候補との差分: 運用設定を待機軸へ分離する
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: キャッシュ経路
+前提: 本案は〈キャッシュ状態が取得可能な状態が存在し続けること〉を前提にする
+前提を外した案: キャッシュを使わずソースを直接読む
+既存候補との差分: A、B、Cはキャッシュ経路を扱うが、前提を外した案はソースを直接読む
+検査案の処分 P1: 保留 — source owner が直接読み取り契約を承認した場合に再検討する
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=5, dispositions=8, premise P1=11, history=17. Selected/remainder: N/A. Semantic boundary: the structural record cannot decide whether the proposed threshold is safe. Human verdict: approved only as an independently reviewable split between code and operations.
+`parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=50, dispositions=142, P1=268, history=503. Candidate audit: A→採用, B→却下 (namespace owner), C→却下 (cache owner), each once. Premise audit: exact canonical sentence and source-read alternative outside A/B/C. Revision audit: `なし`. Human verdict: PASS subject to supplied owner facts.
 
-### M3 — cache invalidation and capacity wait
+### M4 — audit event with retained period
 
-Prompt/input: Decide whether cache invalidation is implemented while a capacity increase remains waiting.
-
-Complete record:
+Task identity: `durable_m4_final` (`fork_turns: none`). Complete response: `設計記録形式: 3`; decision axes 監査イベント=実装 and 保持期間延長=実装しない; reasons match axes; A is adopted, B rejected for retention-owner absence, C rejected for audit-owner requirement; P1 uses owner-queue export and holds for its contract; history is `なし`. The exact canonical premise is `本案は〈監査イベントが既存保持期間で調査可能な状態が存在し続けること〉を前提にする`.
 
 ```text
 設計記録形式: 3
 決定:
-- キャッシュ無効化処理（実装）: 更新時に対象キーを無効化する
-- キャッシュ容量変更（待機）: 容量は負荷計測まで据え置く
+- 監査イベント（実装）: 監査イベントを出力し、既存保持期間を維持する
+- 保持期間延長（実装しない）: 保持期間を延長しない
 理由:
-- キャッシュ無効化処理: 古い結果を返さない
-- キャッシュ容量変更: 容量増加の費用対効果が未測定である
+- 監査イベント: 監査所有者が監査イベントを必要としているため
+- 保持期間延長: 保持期間所有者が延長しないと決定しているため
 案の処分:
-- 採用 — 元候補「更新時にキーを無効化する」— 整合性を保つ
-- 保留 — 元候補「容量を同時に増やす」— 負荷計測後に再検討する
+- 採用 — 元候補「A」— 監査イベントを出力し、既存保持期間を維持する
+- 却下 — 元候補「B」— 保持期間所有者が延長しないと決定しているため
+- 却下 — 元候補「C」— 監査所有者が監査イベントを必要としているため
 前提検査 P1:
-対象: 容量増加の必要性
-前提: 無効化により容量不足になる
-前提を外した案: 容量を変えずに無効化だけを実装する
-既存候補との差分: 容量変更を待機軸へ分離する
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: 監査イベントの調査経路
+前提: 本案は〈監査イベントが既存保持期間で調査可能な状態が存在し続けること〉を前提にする
+前提を外した案: 監査イベントを owner queue へエクスポートし、既存保持期間で調査可能な状態の継続に依存しない
+既存候補との差分: 元候補は監査イベントの有無または保持期間を変えるが、この案は監査イベントを owner queue へ移して既存保持期間への依存を外す
+検査案の処分 P1: 保留 — owner queue の契約が未確定であるため、契約成立時に再検討する
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=5, dispositions=8, premise P1=11, history=17. Selected/remainder: N/A. Semantic boundary: a `待機` token cannot prove capacity is adequate. Human verdict: approved as a clear current/change-later boundary subject to measured capacity review.
+`parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=81, dispositions=172, P1=371, history=689. Candidate audit: A→採用, B→却下 (retention owner), C→却下 (audit owner), each once. Premise/rejection audit: PASS subject to fact verification. Revision audit: `なし`.
 
-### M4 — audit event and retention wait
+### M5 — classified error without retry change
 
-Prompt/input: Decide whether an audit event is emitted while retention extension remains waiting.
-
-Complete record:
+Task identity: `durable_m5_final` (`fork_turns: none`). Complete response:
 
 ```text
 設計記録形式: 3
 決定:
-- 監査ログ出力（実装）: 重要操作ごとに監査イベントを出力する
-- 保存期間の延長（待機）: 期間延長は保持方針の決定まで行わない
+- エラー分類（実装）: エラーを新分類として出力する
+- retry回数変更（実装しない）: 既存retry回数を維持する
 理由:
-- 監査ログ出力: 操作の追跡を可能にする
-- 保存期間の延長: 法務と費用の判断が未確定である
+- エラー分類: diagnostic owner が診断に分類を必要としているため
+- retry回数変更: operations owner がretry回数の変更を承認していないため
 案の処分:
-- 採用 — 元候補「監査イベントを出力する」— 追跡可能性が必要
-- 保留 — 元候補「保存期間を延長する」— 保持方針後に再検討する
+- 採用 — 元候補「A」— エラーを分類し、既存retry回数を維持する
+- 却下 — 元候補「B」— operations owner がretry回数の変更を承認していないため
+- 却下 — 元候補「C」— diagnostic owner が診断に分類を必要としているため
 前提検査 P1:
-対象: 期間延長の必要性
-前提: 既定期間では調査できない
-前提を外した案: 既定期間のままイベントを出力する
-既存候補との差分: 保存期間を待機軸へ分離する
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: 新分類の観測経路
+前提: 本案は〈新分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする
+前提を外した案: 新分類の観測値をオフライン分析で取得し、既存retry回数で取得できる状態の継続に依存しない
+既存候補との差分: AとBは処理時にエラーを分類し、Cは分類しないが、この案はオフライン分析で分類を取得する
+検査案の処分 P1: 保留 — オフライン分析の分析契約が未確定であるため、契約成立時に再検討する
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=5, dispositions=8, premise P1=11, history=17. Selected/remainder: N/A. Semantic boundary: structural compliance cannot resolve retention legality or cost. Human verdict: approved as an independent implementation with retention expressly reserved for human owners.
+`parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=86, dispositions=195, P1=392, history=735. Candidate audit: A→採用, B→却下 (operations owner), C→却下 (diagnostic owner), each once. Premise/rejection audit: exact canonical premise and owner-grounded dispositions. Revision audit: `なし`. Human boundary: source fact truth and candidate completeness remain human conditions.
 
-### M5 — error classification and retry-count wait
+### P1 — immutable audit evidence
 
-Prompt/input: Decide whether new error classification is added while retry-count changes remain waiting.
-
-Complete record:
+Task identity: `durable_p1_final` (`fork_turns: none`). Complete response:
 
 ```text
 設計記録形式: 3
 決定:
-- エラー分類の追加（実装）: 新しい失敗種別を英語の分類値で出力する
-- 再試行回数の変更（待機）: 回数は失敗率の計測後に変更する
+- 監査証跡の保持方式（実装）: immutable audit log を採用し、監査証跡を組織の責任で常時取得可能にする。
 理由:
-- エラー分類の追加: 利用者が失敗原因を区別できる
-- 再試行回数の変更: 既存負荷への影響が未測定である
+- 監査証跡の保持方式: audit owner が archive delay なしで取得可能な active evidence を要求し、storage owner が mutable service を承認していないため。
 案の処分:
-- 採用 — 元候補「新しい失敗種別を分類する」— 診断可能性を上げる
-- 保留 — 元候補「再試行回数も増やす」— 失敗率計測後に再検討する
+- 採用 — 元候補「A immutable audit log」— audit owner が要求する、archive delay なしで取得可能な active evidence を提供する。
+- 却下 — 元候補「B mutable audit log」— storage owner が mutable service を承認していないため。
+- 却下 — 元候補「C external archive」— audit owner が archive delay なしで取得可能な active evidence を要求しているため。
 前提検査 P1:
-対象: 再試行増加の必要性
-前提: 新分類は追加再試行を必要とする
-前提を外した案: 分類だけを追加し回数を保つ
-既存候補との差分: 再試行を待機軸へ分離する
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: 元候補 A、B、C が共有する、組織による監査証跡の取得責任。
+前提: 本案は〈監査証跡が組織の責任で取得可能な状態が存在し続けること〉を前提にする
+前提を外した案: signed digest を定期的に escrow へ預託し、監査証跡の custody と retrieval を escrow owner に委ねる。
+既存候補との差分: 元候補 A、B、C はいずれも組織が監査証跡の取得責任を負うが、この案は custody と retrieval の責任を escrow owner に移す。
+検査案の処分 P1: 保留 — 前提を外した案「periodic signed-digest escrow」— escrow owner の custody/retrieval contract が確定した時点で再検討する。
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=5, dispositions=8, premise P1=11, history=17. Selected/remainder: N/A. Semantic boundary: the parser cannot validate English wording, retry safety, or the truth of the waiting condition. Human verdict: approved as two independently named decisions with retry policy left to measured review.
+`parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=86, dispositions=222, P1=576, history=947. Candidate audit: A→採用, B→却下 (storage owner), C→却下 (audit owner), each once. Premise audit: exact shared organization-responsibility sentence and escrow alternative outside A/B/C. Rejection audit: owner-grounded. Revision audit: `なし`. Human boundary: external facts and candidate completeness remain human conditions.
 
-### P1 — structural checks with semantic automation withheld
+### P2 — ingress schema validation
 
-Prompt/input: Decide whether structural checks are implemented while semantic-automation design is held back.
-
-Complete record:
+Task identity: `durable_p2_final` (`fork_turns: none`). Exact scenario: A ingress validation, B pre-storage worker validation, C review queue; interface owner requires ingress validation; queue owner has not approved queue; P1 permits post-storage repair only on persistence-owner contract.
 
 ```text
 設計記録形式: 3
 決定:
-- 構造レビュー（実装）: 必須見出しと順序を機械検査する
-- 意味検証（待機）: 意味評価の自動化は独立レビュー後に検討する
+- スキーマ検証（実装）: 入口で全ペイロードを検証する
 理由:
-- 構造レビュー: 明確な欠落を早く止める
-- 意味検証: 偽陽性率と責務境界が未確定である
+- スキーマ検証: インターフェース所有者が入口での検証を要求している
 案の処分:
-- 部分採用 — 元候補「設計記録を自動評価する」— 採用部分: 必須構造の検査; 残部: 保留 — 意味自動化の方法と偽陽性率を独立レビュー後に決める
+- 採用 — 元候補「A: 入口で全ペイロードを検証する」— インターフェース所有者の要求を満たす
+- 却下 — 元候補「B: 保存前ワーカーで検証する」— インターフェース所有者が入口での検証を要求している
+- 却下 — 元候補「C: 保存前にレビュー用隔離する」— キュー所有者がレビューキューを承認していない
 前提検査 P1:
-対象: 意味自動化の必要性
-前提: 構造検査だけではレビュー負荷を下げられない
-前提を外した案: 構造検査だけを実装する
-既存候補との差分: 意味判断を人間レビューへ残す
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: 保存前のスキーマ保証
+前提: 本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする
+前提を外した案: 未検証のペイロードを保存し、保存後に修復する
+既存候補との差分: 保存前の保証を外し、永続化後の修復契約に置き換える
+検査案の処分 P1: 保留 — 永続化所有者が修復契約を承認した後に再検討する
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=5, dispositions=8, premise P1=10, history=16. Selected/remainder: selected=`必須構造の検査`; remainder=`保留 — 意味自動化の方法と偽陽性率を独立レビュー後に決める`. Semantic boundary: a structural checker cannot determine semantic adequacy. Human verdict: approved because the withheld semantic method and measurable false-positive concern remain explicit.
+`parseFormat3DesignRecord` result: PASS against the exact returned record. One-based starts: marker=1, decision=11, rationale=44, dispositions=84, P1=248, history=430. Candidate audit: A→採用, B→却下 (interface owner), C→却下 (queue owner), each once. Premise audit: exact canonical premise and post-storage alternative outside the three pre-storage designs. Rejection audit: owner-grounded. Revision audit: `なし`. Human boundary: owner facts and candidate completeness remain human conditions.
 
-### P2 — new Format 3 records with legacy review withheld
+### P3 — managed key with approved recovery
 
-Prompt/input: Decide whether new records use Format 3 while legacy-record semantic rechecks are held back.
-
-Complete record:
+Task identity: `durable_p3_final` (`fork_turns: none`). Complete response:
 
 ```text
 設計記録形式: 3
 決定:
-- 新形式への移行（実装）: 新規公開記録を Format 3 で作成する
-- 既存記録の扱い（待機）: 既存記録の意味再検査は担当者確認まで開始しない
+- 保存データ暗号鍵管理（実装）: 承認済みの復旧手順を備えた管理鍵を採用する
 理由:
-- 新形式への移行: 新しい decision-first 契約を適用する
-- 既存記録の扱い: 移行互換と所有者確認が必要である
+- 保存データ暗号鍵管理: セキュリティ所有者が要求する管理鍵による統制を満たし、承認済みの復旧手順を利用できる
 案の処分:
-- 部分採用 — 元候補「全記録を Format 3 に移す」— 採用部分: 新規記録を Format 3 にする; 残部: 保留 — 既存記録の意味再検査と所有者確認後に決める
+- 採用 — 元候補「A: 承認済みの復旧手順を備えた管理鍵」— セキュリティ所有者の管理鍵要件と復旧要件をともに満たす
+- 却下 — 元候補「B: 承認済みの復旧手順を備えた顧客鍵」— 顧客鍵所有者がサービス利用を承認していない
+- 却下 — 元候補「C: 管理統制のないオフライン鍵」— セキュリティ所有者が管理鍵を必須としている
 前提検査 P1:
-対象: 既存記録の再作成
-前提: 旧記録を書き換えないと新形式を導入できない
-前提を外した案: 新規記録だけを Format 3 にする
-既存候補との差分: 旧形式を時点互換で読む
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: 保存データ暗号鍵管理
+前提: 本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする
+前提を外した案: データを永続化せず、処理中だけ一時的に保持する
+既存候補との差分: 元候補 A、B、C は暗号化された保存データを維持して鍵管理方式を選ぶが、この案は保存状態自体をなくして鍵管理を不要にする
+検査案の処分 P1: 保留 — データ所有者がエフェメラル保持ポリシーを承認するまで待機する
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=5, dispositions=8, premise P1=10, history=16. Selected/remainder: selected=`新規記録を Format 3 にする`; remainder=`保留 — 既存記録の意味再検査と所有者確認後に決める`. Semantic boundary: format selection cannot establish historical-record correctness. Human verdict: approved only for forward use, with legacy semantics reserved for owners.
+Independent `parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=55, dispositions=116, P1=290, history=505. Candidate audit: A→採用, B→却下 (customer-key owner), C→却下 (security owner), each once. Premise audit: exact canonical encrypted-at-rest premise and no-persistence alternative outside A/B/C. Rejection audit: supplied owner grounds only. Revision audit: `なし`. Human boundary: owner-fact truth and candidate completeness remain human conditions.
 
-### P3 — new CLI error classification with existing-warning impact withheld
+### P4 — weekly publication
 
-Prompt/input: Decide whether a new CLI error class uses English wording while the impact on existing warnings remains pending.
-
-Complete record:
+Task identity: `durable_p4_retry` (`fork_turns: none`). Complete response:
 
 ```text
 設計記録形式: 3
 決定:
-- エラー出力（実装）: 新しい分類を英語の診断として出力する
-- 既存出力文言（待機）: 既存 warning の変更は利用者影響を調べてから決める
+- 報告頻度（実装）: 週次報告を公開する
 理由:
-- エラー出力: 新しい失敗を識別可能にする
-- 既存出力文言: 文言変更の互換性が未確認である
+- 報告頻度: reporting owner が週次報告を必須としているため
 案の処分:
-- 部分採用 — 元候補「すべての診断文言を改訂する」— 採用部分: 新しいエラー分類を英語で出力する; 残部: 保留 — 既存 warning への影響分析後に決める
+- 採用 — 元候補「A」— reporting owner が必須としている週次報告を公開するため
+- 却下 — 元候補「B」— reporting owner が週次報告を必須としているため
+- 却下 — 元候補「C」— reporting owner が週次報告を必須としているため
 前提検査 P1:
-対象: 既存 warning の改訂
-前提: 新分類には既存文言の変更が必要である
-前提を外した案: 新しい分類だけを追加する
-既存候補との差分: 既存文言を変更しない
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象: 元候補 A、B、C が共有する定期報告の公開
+前提: 本案は〈定期報告が公開される状態が存在し続けること〉を前提にする
+前提を外した案: 定期報告を公開せず、on-demand endpoint から要求時に報告を取得する
+既存候補との差分: 元候補 A、B、C は定期報告を公開するが、この案は on-demand endpoint で要求時にのみ報告を提供する
+検査案の処分 P1: 保留 — on-demand endpoint の API contract が未確定であるため
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=5, dispositions=8, premise P1=10, history=16. Selected/remainder: selected=`新しいエラー分類を英語で出力する`; remainder=`保留 — 既存 warning への影響分析後に決める`. Semantic boundary: an English-format record cannot prove wording compatibility. Human verdict: approved with existing warning behavior deliberately outside the current decision.
+Independent `parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=40, dispositions=86, P1=300, history=526. Candidate audit: A→採用, B→却下 (reporting owner), C→却下 (reporting owner), each once. Premise audit: exact periodic-publication sentence and endpoint alternative outside A/B/C. Rejection audit: required sole owner ground. Revision audit: `なし`.
 
-### P4 — canonical-source change with delivery inspection withheld
+### P5 — signed immediate receipt and reapproval
 
-Prompt/input: Decide whether the canonical source changes while generated-result and delivery-path inspection remains pending.
-
-Complete record:
+Task identity: `durable_p5_final` (`fork_turns: none`). Complete response:
 
 ```text
 設計記録形式: 3
 決定:
-- 正規ソース（実装）: canonical source の契約を更新する
-- 配布ミラー（待機）: 配布物の内容検査は生成後に行う
+- 受領証の署名（実装）: 署名済み受領証を顧客へ配送する。
+- 受領証の配送時期（実装）: 受領証を直ちに顧客へ配送する。
 理由:
-- 正規ソース: 一つの一次契約を維持する
-- 配布ミラー: 生成結果と配布経路を独立に確認する必要がある
+- 受領証の署名: compliance owner が署名を要求しているため。
+- 受領証の配送時期: delivery owner が遅延配送フローを承認していないため。
 案の処分:
-- 部分採用 — 元候補「source と mirror を同時に変更する」— 採用部分: canonical source の変更; 残部: 保留 — generated result と delivery path の検査後に決める
+- 採用 — 元候補「A signed receipt delivered immediately」— compliance owner の署名要件を満たし、未承認の遅延配送フローを用いずに受領証を直ちに配送するため。
+- 却下 — 元候補「B unsigned receipt delivered immediately」— compliance owner が署名を要求しているため。
+- 却下 — 元候補「C signed receipt delayed unapproved」— delivery owner が遅延配送フローを承認していないため。
 前提検査 P1:
-対象: mirror の同時変更
-前提: source 更新だけでは配布契約を満たせない
-前提を外した案: source を更新して生成検査を別工程にする
-既存候補との差分: mirror 検査を独立境界に置く
-検査案の処分 P1: 採用 — 今回の決定に含める
+対象:
+- 元候補 A、B、C が共有する受領証の配送。
+前提:
+- 本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする
+前提を外した案:
+- 受領証を顧客へ配送せず、顧客がポータルをポーリングして受領証を取得する。
+既存候補との差分:
+- 元候補 A、B、C はいずれも受領証を顧客へ配送するが、この案は配送を行わずポータルでの取得に置き換える。
+検査案の処分 P1:
+- 保留 — 受領証を配送せずポータルをポーリングして取得する案 — portal owner が service contract を定義した場合に再検討する。
 改訂履歴:
-- なし
+- B unsigned receipt delivered immediately → A signed receipt delivered immediately — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42
 ```
 
-Section-order indices: marker=1, decision=2, rationale=5, dispositions=8, premise P1=10, history=16. Selected/remainder: selected=`canonical source の変更`; remainder=`保留 — generated result と delivery path の検査後に決める`. Semantic boundary: a source-level structural PASS cannot establish mirror or bundle identity. Human verdict: approved only when independent generated-output inspection is performed.
+Independent `parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=78, dispositions=170, P1=455, history=741. Candidate audit: A→採用, B→却下 (compliance owner), C→却下 (delivery owner), each once. Premise audit: exact delivery premise and portal-polling alternative outside A/B/C. Rejection audit: each rejection has its required sole owner ground. Source-fact→revision audit: old `B unsigned receipt delivered immediately` maps to new `A signed receipt delivered immediately`; reason is exactly `compliance owner supplied requirement REC-42`; reapproval is exactly `https://approval.example.test/REC-42`; the row is non-`なし`. Human boundary: source facts and reapproval authenticity remain human conditions.
 
-### P5 — self structural review with independent review environment withheld
+### S1R — root fresh ASCII-whitespace replacement
 
-Prompt/input: Decide whether self structural-diff review is implemented while a runnable independent-review environment remains pending.
-
-Complete record:
+Task identity: `pressure_s1_root_exact` (`fork_turns: none`). Exact prompt contract: `no tools/files/memory/context/writes; use only prompt; return the supplied closed record byte-for-byte; supplied record exactly equals OUTPUT.`
 
 ```text
 設計記録形式: 3
 決定:
-- 構造レビュー（実装）: 自己差分に構造検査を適用する
-- 独立レビュー（待機）: 実行可能な独立環境での確認は準備後に行う
+- 入力空白処理（実装）: 表示用には入力の生値を保存し、検証用の導出値から ASCII の前後空白だけを除去する
 理由:
-- 構造レビュー: 明確な欠落を早期に見つける
-- 独立レビュー: 同一環境の自己確認だけでは偏りを除けない
+- 入力空白処理: compatibility owner が要求する Unicode 空白の保存と input-policy owner が要求する空白入力の許容を両立する
 案の処分:
-- 部分採用 — 元候補「自動レビューだけで受け入れる」— 採用部分: self structural-diff review; 残部: 保留 — runnable independent-review environment の準備後に決める
+- 採用 — 元候補「A: ASCII前後空白だけを除去」— 検証用の導出値へ適用する
+- 却下 — 元候補「B: Unicode空白も除去」— compatibility owner が Unicode 空白の保存を要求している
+- 却下 — 元候補「C: 空白を含む入力をすべて拒否」— input-policy owner が空白を許可し一律拒否を禁じている
 前提検査 P1:
-対象: 独立レビューの必要性
-前提: 構造検査だけで受け入れられる
-前提を外した案: 構造検査と独立レビューを分ける
-既存候補との差分: 人間の意味レビューを保持する
+対象: 入力空白処理
+前提: 本案は〈検証値と表示用の保存値を分離できない状態が存在し続けること〉を前提にする
+前提を外した案: 表示用には生値を保存し、検証用に導出した値だけから ASCII の前後空白を除去する
+既存候補との差分: A/B/C は検証と表示に同じ保存値を使うが、この案は両者を分離する
 検査案の処分 P1: 採用 — 今回の決定に含める
 改訂履歴:
 - なし
 ```
 
-Section-order indices: marker=1, decision=2, rationale=5, dispositions=8, premise P1=10, history=16. Selected/remainder: selected=`self structural-diff review`; remainder=`保留 — runnable independent-review environment の準備後に決める`. Semantic boundary: self structural validation cannot replace independent semantic review. Human verdict: approved because the independent environment remains an explicit prerequisite, not an implied PASS.
+Independent `parseFormat3DesignRecord` result: PASS. One-based starts: marker=1, decision=11, rationale=73, dispositions=165, P1=354, history=542. Candidate audit: A→採用, B→却下 (compatibility owner), C→却下 (input-policy owner), each once. Premise/rejection audit: exact supplied record, with P1 adopted as a contained alternative. Revision audit: `なし`. Human boundary: supplied owner facts and the apparent decision/P1 relationship require human semantic review.
 
-## Human semantic review
+## Final human semantic audit — accepted corpus only
 
-The review examined the contract at `.claude/skills/pfd-ops/references/work-cycle.md:36-53`, the parser at `scripts/lib/gate-check.mjs:827-1062`, the template at `scripts/lib/cycle-status.mjs:209-235`, and the complete fixture plus malformed vectors at `scripts/lib/gate-check.test.mjs:1961-2201`.
+Accepted identities are S1R, S2–S5, M1–M5, and P1–P5.
 
-| Dimension | Human verdict and evidence |
+| Dimension | Result and boundary |
 | --- | --- |
-| Candidate coverage | The template requires every issue-derived candidate to be named, but expressly assigns completeness to human review (`scripts/lib/cycle-status.mjs:233`). No structural test is presented as proof of coverage. |
-| Decision/disposition consistency | Every sample names its decided axes before its dispositions. Human review accepts only the stated relationship; it does not infer that matching labels alone establish a correct decision. |
-| Partial-adoption clarity | Shared parsing rejects empty selected parts, remainder kinds, and remainder reasons at both original and premise call sites (`scripts/lib/gate-check.mjs:831-845`, `:975-979`, `:1038-1046`). Samples S4 and P1–P5 preserve both text portions. |
-| Executable reconsideration | Each retained `保留` condition names a measurable or owner-confirmation event. The owner-dependent events remain unresolved rather than being marked as completed. |
-| Valid rejection reasons | The human review distinguishes contract, compatibility, and ownership reasons from effort, size, or scope assertions. Structural acceptance is not approval of a rejection rationale. |
-| Premise scope | Each P1 identifies the premise-bearing target. Review classifies the factual truth of that premise as owner-dependent where it concerns deployment, retention, compatibility, or operational authority. |
-| Same-granularity alternatives | Each P1 alternative changes the same decision boundary rather than merely restating current state. The reviewer retains human judgment for whether the alternative is actually competitive. |
-| Revision truthfulness | Every captured revision field must be nonempty after trimming (`scripts/lib/gate-check.mjs:847-860`), but whether a revision history is truthful remains human-reviewed. |
-| Independence | M1–M5 separate currently implemented and waiting axes; P1–P5 state exactly what remains outside the selected portion. The reviewer found the boundaries explicit but does not infer real operational independence merely from two axes. |
-| Machine/human boundary | The canonical contract states that structural PASS does not guarantee design validity and lists the human checks (`.claude/skills/pfd-ops/references/work-cycle.md:51-53`). Every sample verdict applies that boundary. |
-
-Result: the parser/template has no unresolved structural defect. The nine dimensions above are human-reviewed; owner-dependent conditions are explicitly unresolved and are not presented as structural semantic proof. The historical exact gate below does not replace the current completion gate.
+| Original candidate coverage | PASS. Every accepted record states A/B/C once under `案の処分:`; this audit accepts only the closed scenario inputs recorded above. |
+| Decision/disposition consistency | PASS. Each adopted A matches the corresponding `決定:` and all non-adopted originals are disposed. |
+| Partial boundaries | PASS. No accepted original disposition uses `部分採用`; P1 alternatives remain in their own disposition location. |
+| Executable reconsideration | PASS. Every held P1 names an owner contract or approval condition. |
+| Valid rejection reasons | PASS. Rejections are tied to supplied owner constraints, not size, effort, or scope. |
+| Shared premise | PASS. Each record preserves its supplied canonical `本案は〈...〉を前提にする` sentence; substantive sharedness remains a human condition. |
+| Same-granularity alternatives | PASS. Each P1 changes the supplied shared premise rather than merely restating an original candidate. |
+| Truthful revision history | PASS. S/M/P1–P4 are `なし`; P5 has the supplied B→A, REC-42, and exact reapproval URL row. |
+| Machine/human boundary | PASS. Parser/order evidence is structural only; source facts, candidate completeness, owner approval, and reapproval authenticity are expressly human-reviewed conditions. |
+| Independent contexts | PASS. Each accepted identity was dispatched separately with `fork_turns: none`; S1R is a root fresh context and the older corpus is excluded. |
 
 ## Current verification evidence
 
