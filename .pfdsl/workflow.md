@@ -12,7 +12,7 @@
 
 このリポが pfdsl スキルの上流であるため経路1（品質ガイド改訂）が成立する。配布先リポでは経路1は存在しない場合がある。
 
-散文として書く前の機械化の検討と、hook で機械化する場合に決定を選ぶ軸（防ぎたい害が実行そのものか、結果の読み違いか）は、pfd-ops SKILL.md のプロトコル6が一次情報。
+散文として書く前の機械化の検討と、hook で機械化する場合に decision を選ぶ軸（防ぎたい害が実行そのものか、結果の読み違いか）は、pfd-ops の `references/work-cycle.md`「知見と機械化」が一次情報。
 このリポの既存機構は pre-commit・`gate-check.mjs`・CI であり、例外 (b)（重複になる）の判定はこの3つに対して行う。
 #650 本文の3条件は、機械判定できる候補が複数出揃った状況でどれに着手するかを絞り込む AND フィルタであり、書く前の毎回の判断にそのまま持ち込むと機械化優先の原則が弱まる。
 
@@ -131,7 +131,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 **生成の一次ソースは `graph io` の終端に出る（ADR-0035 の副作用）**: `gen_skill` / `gen_plugin` / `push_cli_release_tag` / `push_libraries_release_tag` / `package_vscode_release` が消費する生成の一次ソースは、この図では消費者を持たない終端 artifact として報告される。消費側のエッジは `pipeline.pfdsl` に実在するが、`graph io` はファイル単位で走るため参照できない。該当する artifact をここに列挙しない — 一次情報は消費側のエッジであり、現在の集合は下記の機械振り分けが `.pfdsl/` を横断して毎回そこから取り直す。
 
-**これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。終端ゲートのプロトコル5(b) 判定では「消費者は sibling の `pipeline.pfdsl` に在る」と記録して該当なしとする。
+**これらに `todo` プレースホルダの消費者を立てない。** 立てると ADR-0035 が解消した二重モデル化（同一変換を2ファイルが別ノードIDで持つ状態）を作り直すことになる。`references/work-cycle.md`「成果物の門番」の後続側判定では「消費者は sibling の `pipeline.pfdsl` に在る」と記録して該当なしとする。
 
 **この振り分けは `gate-check.mjs` が機械的に行う（#671）**: 新規終端の報告は、`.pfdsl/` 内の他の `.pfdsl` を `graph edges --json` で読み、`>>` 入力エッジで消費されているものを別見出し「New terminal artifacts consumed in a sibling graph」へ分ける。ただし振り分けは PASS/FAIL でなく報告材料であり、手段か納品物かの分類は MANUAL のまま残る。sibling 見出しに出た artifact は、該当なしと記録する前に消費側のエッジを実際に確認する。
 
@@ -158,7 +158,7 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 `maintain_repo_local_capabilities` が生産し、`review_distribution` へは `>>?` でしか入らないため、primary の消費エッジを持たない。
 能力成果物が世代をまたいで還流する形（ADR-0011）の帰結であって欠陥ではない。
 `pfdsl_skill` と違い消費者は sibling の `pipeline.pfdsl` に**無い** — このスキルは配布されないので `gen_plugin` の入力にならない。
-終端ゲートのプロトコル5(b) 判定では、手段（能力成果物）であり後続門番を要さないものとして扱う。
+`references/work-cycle.md`「成果物の門番」の後続側判定では、手段（能力成果物）であり後続門番を要さないものとして扱う。
 
 **この手順は配布しない。**
 `.claude/skills/distribution-review/` は repo-local であり、上の「配布スキルの新規追加時の横断照合」の対象外である（`pipeline.pfdsl` の `gen_plugin` 入力エッジに足さない）。
@@ -181,7 +181,7 @@ frontmatter に新フィールドを追加する develop では、対応する `
 
 ## workflow.pfdsl に登録する agent の範囲
 
-一般形（登録するのは図の変換の参加者だけで、参加者性の代理を基準に据えない）は pfd-ops SKILL.md プロトコル5が一次情報。
+一般形（登録するのは図の変換の参加者だけで、参加者性の代理を基準に据えない）は pfd-ops の `references/work-cycle.md`「成果物の門番」が一次情報。
 判定はその一般形どおり2節で行う — その agent を要求している図のプロセスを名指しできるか、または生産・消費している図の成果物を名指しできるか。
 下の PreToolUse ガードの節が前者しか書いていないのは、そこで扱う機構がいずれも前者で決着したためで、判定を1節に狭める規定ではない。
 `PLUGIN_AGENT_FILES`（plugin 同梱物）への所属は出発点として使ってよいが、基準ではない。
@@ -216,7 +216,7 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 ## hook の artifact 登録基準（#854）
 
-一般形は上の「workflow.pfdsl に登録する agent の範囲」と同じく、pfd-ops SKILL.md プロトコル5が一次情報。
+一般形は上の「workflow.pfdsl に登録する agent の範囲」と同じく、pfd-ops の `references/work-cycle.md`「成果物の門番」が一次情報。
 このリポでの適用対象は `.claude/settings.json` に配線された hook 全般（PreToolUse ガードと PostToolUse advisory の双方）で、登録先は対象 artifact の分類と producer 関係を記録する `workflow.pfdsl`。
 節の名前を PreToolUse に限っていた頃に PostToolUse advisory（`companion-prose-advisory`）が現れ、判定の宛先が無いように読める状態になったため、対象を hook 全般へ広げてある。
 登録しない側に当たるのは `stale-dist-guard` / `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` / `companion-prose-advisory` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
@@ -234,7 +234,7 @@ binding・companion・guard の分類に当たることは根拠にならない 
 
 ## develop 着手時の artifact status 更新
 
-汎用ルール（着手時 todo→wip、PR を待たない）は pfd-ops プロトコル「進捗更新」が一次情報。このリポでは flow-sync が merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
+汎用ルール（着手時 todo→wip、PR を待たない）は pfd-ops の `references/work-cycle.md`「進捗と完了根拠」が一次情報。このリポでは flow-sync が merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
 
 ## workflow.pfdsl に status を書かない
 
@@ -242,7 +242,7 @@ binding・companion・guard の分類に当たることは根拠にならない 
 
 ## release milestone artifact の作成規約
 
-roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョン番号の事前予約ではない。**下流作業がそれを入力として要求する時点**でのみ作成する（pfd-ops プロトコル2・5の適用）。バージョン番号は roadmap 本体に書かず、done 後の label/criteria に事実として付記するのみ — 番号を先に書いて後から実態と合わせる運用（#278 導入前の運用）は廃止した。
+roadmap の CLI release milestone（`cli_release_<slug>` 等）はバージョン番号の事前予約ではない。**下流作業がそれを入力として要求する時点**でのみ作成する（pfd-ops の `references/work-cycle.md`「着手可能性と受け入れ」と「成果物の門番」を適用）。バージョン番号は roadmap 本体に書かず、done 後の label/criteria に事実として付記するのみ — 番号を先に書いて後から実態と合わせる運用（#278 導入前の運用）は廃止した。
 
 複数の実装 issue を1つの PR/リリースに束ねる場合も、milestone ノードは束ねた内容を表す1つの slug で作成すればよい。「中間バージョンをスキップ/統合するか」という判断自体が発生しない — バージョン番号を roadmap に書かないため、スキップ対象になるバージョン番号付きノードが最初から存在しない。
 
