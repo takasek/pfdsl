@@ -409,6 +409,60 @@ describe("runCycleStatus", () => {
 		]);
 	});
 
+	it("carries incomplete format 3 problems without legacy repair prefixes", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) =>
+					args.includes(CLI_PATH) ? readyJsonOk("proc_a") : "",
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) =>
+					args[0] === "issue"
+						? issueJson({
+								body: "普通の説明文。",
+								comments: [
+									{
+										body: "設計記録形式: 3",
+										createdAt: "2026-08-31T01:30:24Z",
+									},
+								],
+							})
+						: JSON.stringify([]),
+			}),
+		);
+		const payload = result.designUnsettledFor[0];
+		assert.equal(payload.reason, "record-incomplete");
+		assert.deepEqual(payload.missingPrefixes, []);
+		assert.ok(payload.problems.some((problem) => problem.includes("決定:")));
+	});
+
+	it("recognizes a decorated format 3 marker before computing repair prefixes", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [669],
+				sh: (_file, args) =>
+					args.includes(CLI_PATH) ? readyJsonOk("proc_a") : "",
+				readFileSync: () => roadmapWithIssue("proc_a", 42),
+				execGh: async (args) =>
+					args[0] === "issue"
+						? issueJson({
+								body: "普通の説明文。",
+								comments: [
+									{
+										body: "> 設計記録形式: 3",
+										createdAt: "2026-08-31T01:30:24Z",
+									},
+								],
+							})
+						: JSON.stringify([]),
+			}),
+		);
+		const payload = result.designUnsettledFor[0];
+		assert.equal(payload.reason, "record-incomplete");
+		assert.deepEqual(payload.missingPrefixes, []);
+		assert.ok(payload.problems.some((problem) => problem.includes("決定:")));
+	});
+
 	it("reports reader-first prefixes missing from a post-cutoff legacy record", async () => {
 		const result = await runCycleStatus(
 			baseDeps({

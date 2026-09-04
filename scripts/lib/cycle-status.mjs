@@ -7,6 +7,7 @@ import {
 	FORMAT_3_DECISION_KINDS,
 	FORMAT_3_DISPOSITIONS,
 	FORMAT_3_MARKER,
+	normalizeRecordLine,
 	parseFormat3DesignRecord,
 	presentRequiredPrefixes,
 	resolveDesignRecord,
@@ -314,19 +315,19 @@ export function classifyDesignSettlement({ body, comments }) {
 		const parsedFormat3 = parseFormat3DesignRecord(resolved.record.body);
 		const isFormat3 = resolved.record.body
 			.split("\n")
-			.some((line) => line.trim() === FORMAT_3_MARKER);
+			.some((line) => normalizeRecordLine(line) === FORMAT_3_MARKER);
 		return {
 			unsettled: true,
 			reason: "record-incomplete",
-			missingPrefixes: resolveDesignRecordRequiredPrefixes(
-				resolved.record,
-			).filter(
-				(prefix) =>
-					!presentRequiredPrefixes(
-						resolved.record.body,
-						resolved.record.createdAt,
-					).includes(prefix),
-			),
+			missingPrefixes: isFormat3
+				? []
+				: resolveDesignRecordRequiredPrefixes(resolved.record).filter(
+						(prefix) =>
+							!presentRequiredPrefixes(
+								resolved.record.body,
+								resolved.record.createdAt,
+							).includes(prefix),
+					),
 			problems: isFormat3 ? parsedFormat3.problems : resolved.problems,
 			record: { createdAt: resolved.record.createdAt },
 			recordRequired: true,

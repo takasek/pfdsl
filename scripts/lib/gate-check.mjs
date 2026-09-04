@@ -826,11 +826,30 @@ export function normalizeRecordLine(line) {
 
 const FORMAT_3_SECTION_HEADS = ["決定:", "理由:", "案の処分:", "改訂履歴:"];
 const FORMAT_3_PREMISE_HEAD = /^前提検査\s+P(\d+)\s*[:：]$/;
-const FORMAT_3_PLACEHOLDER = /[<＜][^>＞]+[>＞]/;
+const FORMAT_3_PLACEHOLDER_VOCABULARY = [
+	"軸名",
+	"実装 | 調査のみ | 待機 | 実装しない",
+	"今回確定した範囲",
+	"目的との対応",
+	"候補名",
+	"理由または条件",
+	"軸名、決定、または元候補名",
+	"候補群が共有する前提",
+	"前提が成立しない場合の検査案",
+	"一致、包含、組合せを含む具体的な差分",
+	"採用 | 部分採用 | 保留 | 却下",
+	"旧決定",
+	"新決定",
+	"変更理由",
+	"URL",
+];
+const FORMAT_3_PLACEHOLDER = new RegExp(
+	`[<＜]\\s*(?:${FORMAT_3_PLACEHOLDER_VOCABULARY.map((word) => word.replaceAll("|", "\\|")).join("|")})(?:\\s*[>＞]|$)`,
+);
 
 function parsePartialAdoption(value) {
 	const match = value.match(
-		/^採用部分\s*[:：]\s*([^;；—]+)[;；]\s*残部\s*[:：]\s*(却下|保留)\s+—\s*(.+)$/,
+		/^採用部分\s*[:：]\s*(.+?)[;；]\s*残部\s*[:：]\s*(却下|保留)\s+—\s*(.+)$/,
 	);
 	if (!match) return null;
 	const [, adoptedPart, remainderKind, remainderReason] = match;

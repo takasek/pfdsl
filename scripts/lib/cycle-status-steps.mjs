@@ -287,6 +287,9 @@ export async function runCycleStatus({
 					// line to add. Dropping it here would leave a reason value with
 					// nothing to act on.
 					missingPrefixes: classification.missingPrefixes ?? [],
+					...(classification.problems
+						? { problems: classification.problems }
+						: {}),
 					record: classification.record ?? null,
 					recordRequired: classification.recordRequired,
 				});

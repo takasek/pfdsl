@@ -2033,6 +2033,61 @@ describe("format 3 design records", () => {
 		}
 	});
 
+	it("accepts legitimate generic and HTML prose", () => {
+		const record = format3Record()
+			.replace("Aを段階導入する", "Array<T> を HTML 要素へ渡す")
+			.replace("障害範囲を限定できる", "HTML<HTMLElement> を保持する");
+		assert.equal(parseFormat3DesignRecord(record).status, "PASS");
+	});
+
+	it("rejects an incomplete known template placeholder", () => {
+		const record = format3Record().replace(
+			"Aを段階導入する",
+			"<今回確定した範囲",
+		);
+		assert.equal(parseFormat3DesignRecord(record).status, "FAIL");
+	});
+
+	for (const placeholder of [
+		"<軸名>",
+		"<実装 | 調査のみ | 待機 | 実装しない>",
+		"<今回確定した範囲>",
+		"<目的との対応>",
+		"<候補名>",
+		"<理由または条件>",
+		"<軸名、決定、または元候補名>",
+		"<候補群が共有する前提>",
+		"<前提が成立しない場合の検査案>",
+		"<一致、包含、組合せを含む具体的な差分>",
+		"<採用 | 部分採用 | 保留 | 却下>",
+		"<旧決定>",
+		"<新決定>",
+		"<変更理由>",
+		"<URL>",
+	]) {
+		it(`rejects the format 3 template placeholder ${placeholder}`, () => {
+			const record = format3Record()
+				.replace("Aを段階導入する", placeholder)
+				.replace(
+					"- なし",
+					`- ${placeholder} → 新しい決定 — 変更理由 — 再承認: https://example.test/approval`,
+				);
+			const result = parseFormat3DesignRecord(record);
+			assert.equal(result.status, "FAIL");
+			assert.match(result.problems.join("\n"), /template placeholder remains/);
+		});
+	}
+
+	it("accepts punctuation in original and premise partial-adoption selections", () => {
+		const record = format3Record()
+			.replace("採用部分: 索引", "採用部分: API — v2; fallback")
+			.replace(
+				"検査案の処分 P1: 採用 — 今回の決定に含める",
+				"検査案の処分 P1: 部分採用 — 採用部分: HTML; Array<T> — v2; 残部: 保留 — 負荷計測後に再検討",
+			);
+		assert.equal(parseFormat3DesignRecord(record).status, "PASS");
+	});
+
 	for (const [name, record, problem] of [
 		[
 			"a partial adoption without a remainder",
@@ -2280,6 +2335,31 @@ describe("format 3 design-record selection", () => {
 			status: "selected",
 			record: { body: format3Record(), createdAt: DESIGN_RECORD_V3_CUTOFF },
 		});
+	});
+
+	it("selects format 3 generic and HTML prose over a complete format 2 record", () => {
+		const format3 = format3Record()
+			.replace("Aを段階導入する", "Array<T> を HTML 要素へ渡す")
+			.replace("障害範囲を限定できる", "HTML<HTMLElement> を保持する");
+		const result = resolveDesignRecord([
+			{ body: format2, createdAt: DESIGN_RECORD_V2_CUTOFF },
+			{ body: format3, createdAt: DESIGN_RECORD_V3_CUTOFF },
+		]);
+		assert.equal(result.status, "selected");
+		assert.equal(result.record.body, format3);
+	});
+
+	it("selects format 3 punctuation partial adoption over a legacy record", () => {
+		const format3 = format3Record().replace(
+			"採用部分: 索引",
+			"採用部分: API — v2; fallback",
+		);
+		const result = resolveDesignRecord([
+			{ body: format1, createdAt: "2026-08-30T09:32:49Z" },
+			{ body: format3, createdAt: DESIGN_RECORD_V3_CUTOFF },
+		]);
+		assert.equal(result.status, "selected");
+		assert.equal(result.record.body, format3);
 	});
 
 	it("does not let an incomplete format 3 fragment shadow a complete format 2 record", () => {

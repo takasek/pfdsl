@@ -6,505 +6,621 @@ This report contains the authoritative fifteen-context corpus and the verificati
 
 The source-declaration acceptance rule permits a semantically equivalent declaration when it unambiguously limits inputs to the canonical work-cycle and supplied prompt and confirms no writes. It does not relax any other evidence requirement.
 
-## Fresh semantic contexts
+## Rebuilt accepted corpus
 
-## Fourth-review replacement corpus
+### S1 accepted sample
 
-The following replacements supersede S1R, M1–M5, and P1–P5. Prompts are persisted before dispatch; only a complete fresh response may follow each prompt.
+Task identity: `/root/format3_pressure_rebuild/format3_s1_retry5`.
 
-## Fifth-review S replacements
-
-### S1F prompt
+Prompt:
 
 ```text
-Read only the canonical work-cycle and this complete scenario. Do not write files. Return exactly one parser-compatible Format 3 record. Closed original candidates are A `trim ASCII outer whitespace`, B `trim all Unicode whitespace`, and C `reject every input containing whitespace`. The input-policy owner requires ASCII outer-whitespace cleanup. The compatibility owner requires Unicode whitespace preservation. The exact canonical premise sentence is `本案は〈入力値が検証前に正規化される状態が存在し続けること〉を前提にする`. The exact P1 alternative is `validate the raw input without normalization`; its disposition is `保留` until the validation owner approves the raw-validation contract. Adopt A. Reject B only because the compatibility owner requires Unicode whitespace preservation. Reject C only because the input-policy owner requires ASCII outer-whitespace cleanup. History is none. The record has exactly one `（実装）` decision bullet and exactly one matching rationale bullet. Do not put the P1 alternative in `決定:`.
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record for the scenario below, without a code fence or commentary.
+
+Scenario class: a bounded single-axis change with exactly one current implementation decision and no other current decision. Closed original candidates: A = "trim ASCII outer whitespace"; B = "trim all Unicode whitespace"; C = "reject every input containing whitespace". The input-policy owner requires ASCII outer-whitespace cleanup. The compatibility owner requires Unicode whitespace preservation. The exact shared premise is 「本案は〈入力値が検証前に正規化される状態が存在し続けること〉を前提にする」. The P1 alternative is validating raw input without normalization; it is outside the current decision and remains pending until the validation owner approves the raw-validation contract. There is no revision history.
 ```
 
-### S1F response
+Full response:
 
 ```text
 設計記録形式: 3
 決定:
-- 入力空白処理（実装）: trim ASCII outer whitespace
+- 入力正規化（実装）: ASCII の外側空白だけを除去し、Unicode 空白はそのまま保持する。
 理由:
-- 入力空白処理: input-policy owner の ASCII cleanup 要求と compatibility owner の Unicode preserve 要求をともに満たすため
+- 入力正規化: 入力ポリシー所有者が要求する ASCII 外側空白の除去と、互換性所有者が要求する Unicode 空白の保持を両立する。
 案の処分:
-- 採用 — 元候補「A」— trim ASCII outer whitespace
-- 却下 — 元候補「B」— compatibility owner が Unicode whitespace の preserve を要求しているため
-- 却下 — 元候補「C」— input-policy owner が ASCII whitespace の cleanup を要求しているため
+- 採用 — 元候補「trim ASCII outer whitespace」— 入力ポリシー所有者の要求を満たし、Unicode 空白を保持する。
+- 却下 — 元候補「trim all Unicode whitespace」— 互換性所有者が要求する Unicode 空白の保持に反する。
+- 却下 — 元候補「reject every input containing whitespace」— 入力ポリシー所有者が要求する ASCII 外側空白の除去ではなく拒否となる。
 前提検査 P1:
-対象: 元候補 A、B、C の検証前入力処理
-前提: 本案は〈入力値が検証前に正規化される状態が存在し続けること〉を前提にする
-前提を外した案: validate the raw input without normalization
-既存候補との差分: 元候補 A、B、C は検証前の正規化を前提とするが、この案は raw input を正規化せず検証する
-検査案の処分 P1: 保留 — validation owner が raw-validation contract を承認するまで
+- 対象: 入力正規化。
+- 前提: 本案は〈入力値が検証前に正規化される状態が存在し続けること〉を前提にする。
+- 前提を外した案: 正規化せず、生の入力値を検証する。
+- 既存候補との差分: 元候補 A、B、C はいずれも検証前に入力値を正規化する前提に立つのに対し、この案は正規化を行わずに検証する。
+- 検査案の処分 P1: 保留 — 検証所有者が生入力検証契約を承認するまで保留する。
 改訂履歴:
 - なし
 ```
 
-### S2F prompt
+Independent parser result: PASS. One-based section starts: `1, 11, 67, 142, 388, 595`.
+
+### S2 accepted sample
+
+Task identity: `/root/format3_pressure_rebuild/format3_s2`.
+
+Prompt:
 
 ```text
-Read only canonical work-cycle and this complete scenario. Do not write files. Return exactly one parser-compatible Format 3 record with exactly one `（実装）` decision bullet and one matching rationale bullet. Closed candidates are A `preserve raw input and validate normalized derivative`, B `persist normalized input`, and C `validate raw input without normalization`. The audit owner requires raw-input preservation. The validation owner requires normalized validation. The exact premise sentence is `本案は〈入力値が検証経路へ渡される状態が存在し続けること〉を前提にする`. The P1 alternative is `remove the validation path and manually review input`; it is `保留` until the review owner approves the manual-review contract. Adopt A. Reject B only for the audit-owner requirement. Reject C only for the validation-owner requirement. History is none. Do not put the P1 alternative in `決定:`.
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record for the scenario below, without a code fence or commentary.
+
+Scenario class: a bounded single-axis change with exactly one current implementation decision and no other current decision. Closed original candidates: A = "preserve raw input and validate a normalized derivative"; B = "persist normalized input"; C = "validate raw input without normalization". The audit owner requires preservation of raw input. The validation owner requires validation of normalized data. The exact shared premise is 「本案は〈入力値が検証経路へ渡される状態が存在し続けること〉を前提にする」. The P1 alternative removes automated validation and uses manual input review; it is outside the current decision and remains pending until the review owner approves the manual-review contract. There is no revision history.
 ```
 
-### S2F response
+Full response:
 
 ```text
 設計記録形式: 3
+
 決定:
-- 入力値の保存と検証（実装）: 監査用には入力値を加工せず保存し、検証には入力値から正規化した派生値を渡す。
+- 入力保持と検証（実装）: 生入力を保持し、正規化した派生値を自動検証する。
+
 理由:
-- 入力値の保存と検証: 監査では受領した生入力を保全しつつ、検証では正規化済みの表現を一貫して評価できるため。
+- 入力保持と検証: 監査所有者が求める生入力の保持と、検証所有者が求める正規化データの検証を両立する。
+
 案の処分:
-- 採用 — 元候補「案A: 生入力を保存し、正規化した派生値を検証する」— 監査用の生入力保存と正規化済み派生値による検証を両立する。
-- 却下 — 元候補「案B: 正規化後の値を保存する」— 監査契約が求める受領時の生入力を保存できないため。
-- 却下 — 元候補「案C: 生入力を検証する」— 検証契約が求める正規化済み表現による評価を満たさないため。
+- 採用 — 元候補「preserve raw input and validate a normalized derivative」— 生入力の保持と正規化データの自動検証を両立する。
+- 却下 — 元候補「persist normalized input」— 監査所有者が求める生入力の保持を満たさない。
+- 却下 — 元候補「validate raw input without normalization」— 検証所有者が求める正規化データの検証を満たさない。
+
 前提検査 P1:
-対象: 案Aの検証経路
-前提: 本案は〈入力値が検証経路へ渡される状態が存在し続けること〉を前提にする
-前提を外した案: 自動検証を廃止し、生入力を保存したうえで手動レビューにより妥当性を確認する。
-既存候補との差分: 案A・案B・案Cはいずれも自動検証経路を維持するが、この案は検証経路を廃止して手動レビューへ置き換える。
-検査案の処分 P1: 保留 — 手動レビューの判定基準・責任者・完了証跡を定めたレビュー契約が成立し、現行検証と同等の不正入力検出を確認できた場合に再検討する。
+- 対象: 入力保持と検証。
+- 前提: 本案は〈入力値が検証経路へ渡される状態が存在し続けること〉を前提にする。
+- 前提を外した案: 自動検証を廃止し、手動入力レビューで確認する。
+- 既存候補との差分: 元候補A、B、Cはいずれも入力値を自動検証経路で扱うのに対し、この案は自動検証経路を持たない。
+- 検査案の処分 P1: 保留 — レビュー所有者が手動レビュー契約を承認するまで実施しない。
+
 改訂履歴:
 - なし
 ```
 
-### S4F prompt
+Independent parser result: PASS. One-based section starts: `1, 12, 57, 115, 357, 568`.
+
+### S3 accepted sample
+
+Task identity: `/root/format3_pressure_rebuild/format3_s3`.
+
+Prompt:
 
 ```text
-Read only the canonical work-cycle and this complete scenario. Do not write files. Return one parser-compatible Format 3 record with exactly one `（実装）` decision bullet and one matching rationale bullet. Closed candidates are A `emit error code and preserve message`, B `emit code only`, and C `preserve message only`. The diagnostic owner requires an error code. The support owner requires a message. The exact canonical premise is `本案は〈失敗時に呼出元へ応答が返る状態が存在し続けること〉を前提にする`. The P1 alternative is `send error information to an asynchronous incident channel instead of returning it to the caller`; it is `保留` until the operations owner approves a notification contract. Adopt A. Reject B only because the support owner requires a message. Reject C only because the diagnostic owner requires an error code. History is none. Do not promote P1 to `決定:`.
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record for the scenario below, without a code fence or commentary.
+
+Scenario class: a bounded single-axis change with exactly one current implementation decision and no other current decision. Closed original candidates: A = "emit an error code and preserve a support message"; B = "emit an error code only"; C = "preserve a support message only". The diagnostics owner requires an error code. The support owner requires a message. The exact shared premise is 「本案は〈失敗時に呼出元へ応答が返る状態が存在し続けること〉を前提にする」. The P1 alternative sends failure information only to an asynchronous incident channel; it is outside the current decision and remains pending until the operations owner approves the notification contract. There is no revision history.
 ```
 
-### S4F response
+Full response:
 
 ```text
 設計記録形式: 3
+
 決定:
-- 失敗応答内容（実装）: エラーコードを出力し、メッセージを保持する。
+- 失敗時応答（実装）: エラーコードとサポートメッセージを呼出元へ返す。
+
 理由:
-- 失敗応答内容: 診断責任者が必要とするエラーコードと、サポート責任者が必要とするメッセージをともに提供する。
+- 失敗時応答: diagnostics owner のエラーコード要件と support owner のメッセージ要件を同時に満たす。
+
 案の処分:
-- 採用 — 元候補「A code+message」— 診断責任者のコード要件とサポート責任者のメッセージ要件をともに満たす。
-- 却下 — 元候補「B code only」— サポート責任者がメッセージを必要としているため。
-- 却下 — 元候補「C message only」— 診断責任者がエラーコードを必要としているため。
+- 採用 — 元候補「A = emit an error code and preserve a support message」— 両所有者の要件を満たす。
+- 却下 — 元候補「B = emit an error code only」— support owner が要求するメッセージを満たさない。
+- 却下 — 元候補「C = preserve a support message only」— diagnostics owner が要求するエラーコードを満たさない。
+
 前提検査 P1:
-対象: 元候補A、元候補B、元候補C
-前提: 本案は〈失敗時に呼出元へ応答が返る状態が存在し続けること〉を前提にする
-前提を外した案: 呼出元へ応答せず、エラーコードとメッセージを非同期インシデントチャネルへ送る。
-既存候補との差分: 元候補はいずれも失敗時に呼出元へ応答するが、この案は呼出元への応答を非同期インシデントチャネルへの通知に置き換える。
-検査案の処分 P1: 保留 — 運用責任者が通知契約を承認するまで。
+- 対象: 失敗時の情報伝達。
+- 前提: 本案は〈失敗時に呼出元へ応答が返る状態が存在し続けること〉を前提にする。
+- 前提を外した案: 失敗情報を非同期インシデントチャネルにだけ送る。
+- 既存候補との差分: 元候補 A、B、C はいずれも呼出元への応答内容を選ぶ案であるのに対し、この案は呼出元へ失敗情報を返さず非同期チャネルだけへ送る。
+- 検査案の処分 P1: 保留 — operations owner が通知契約を承認するまで現在の決定には含めない。
+
 改訂履歴:
 - なし
 ```
 
-### S5F prompt
+Independent parser result: PASS. One-based section starts: `1, 12, 55, 129, 375, 618`.
+
+### S4 accepted sample
+
+Task identity: `/root/format3_pressure_rebuild/format3_s4`.
+
+Prompt:
 
 ```text
-Read only canonical work-cycle and this complete scenario. Do not write files. Return one parser-compatible Format 3 record with exactly one `（実装）` decision bullet and one matching rationale bullet. Closed candidates are A `accept valid normalized value`, B `accept unnormalized value`, and C `reject all values`. The validation owner requires normalized acceptance. The interface owner requires valid input acceptance. The exact canonical premise is `本案は〈入力値が妥当性判定を受ける状態が存在し続けること〉を前提にする`. The P1 alternative is `operator approval instead of validation`; it is `保留` until the compliance owner approves the operator-approval contract. Adopt A. Reject B only for the validation-owner requirement. Reject C only for the interface-owner requirement. History is none. Do not put P1 in `決定:`.
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record for the scenario below, without a code fence or commentary.
+
+Scenario class: a bounded single-axis change with exactly one current implementation decision and no other current decision. Closed original candidates: A = "store timestamps in UTC and render them in the requester timezone"; B = "store timestamps in the requester timezone"; C = "reject requests without a timezone". The storage owner requires a single comparable timestamp basis. The interface owner requires rendering in the requester timezone. The exact shared premise is 「本案は〈時刻値が保存後に表示経路へ渡される状態が存在し続けること〉を前提にする」. The P1 alternative sends raw timestamps to the requester without any rendering; it is outside the current decision and remains pending until the locale owner approves the raw-timestamp display contract. There is no revision history.
 ```
 
-### S5F response
+Full response:
 
 ```text
 設計記録形式: 3
+
 決定:
-- 入力値の受理（実装）: accept valid normalized value
+- 時刻基準（実装）: タイムスタンプはUTCで保存し、表示時に要求者のタイムゾーンで描画する。
+
 理由:
-- 入力値の受理: validation owner の normalized acceptance 要求と interface owner の valid input acceptance 要求をともに満たすため
+- 時刻基準: 保存所有者が求める単一で比較可能な時刻基準と、インターフェース所有者が求める要求者タイムゾーンでの表示を両立する。
+
 案の処分:
-- 採用 — 元候補「A」— accept valid normalized value
-- 却下 — 元候補「B」— validation owner が normalized acceptance を要求しているため
-- 却下 — 元候補「C」— interface owner が valid input acceptance を要求しているため
+- 採用 — 元候補「store timestamps in UTC and render them in the requester timezone」— 単一で比較可能な保存基準を維持しつつ、要求者のタイムゾーンで表示できる。
+- 却下 — 元候補「store timestamps in the requester timezone」— 保存所有者が要求する単一で比較可能なタイムスタンプ基準を満たさない。
+- 却下 — 元候補「reject requests without a timezone」— タイムゾーンの有無を拒否条件にしても、保存値を単一で比較可能な基準にする要件を満たさず、要求者タイムゾーンで描画するインターフェース所有者の要件にもならない。
+
 前提検査 P1:
-対象: 元候補 A、B、C の入力値の妥当性判定
-前提: 本案は〈入力値が妥当性判定を受ける状態が存在し続けること〉を前提にする
-前提を外した案: operator approval instead of validation
-既存候補との差分: 元候補 A、B、C は入力値の妥当性判定を行うが、この案は validation を operator approval に置き換える
-検査案の処分 P1: 保留 — compliance owner が operator-approval contract を承認するまで
+- 対象: 時刻基準。
+- 前提: 本案は〈時刻値が保存後に表示経路へ渡される状態が存在し続けること〉を前提にする。
+- 前提を外した案: 生のタイムスタンプを要求者へ送信し、描画しない。
+- 既存候補との差分: 既存候補はいずれも保存後の時刻値を要求者タイムゾーンで描画するか、タイムゾーンがない要求を拒否するものであり、生のタイムスタンプを描画せず送信する経路は含まない。
+- 検査案の処分 P1: 保留 — ロケール所有者が生タイムスタンプ表示契約を承認するまで実装しない。
+
 改訂履歴:
 - なし
 ```
 
-### S3 accepted response
+Independent parser result: PASS. One-based section starts: `1, 12, 66, 137, 479, 730`.
 
-Task identity: `repair_s3_record` (`fork_turns: none`). The fresh task boundary permitted one canonical-work-cycle read and prohibited every other tool, repository read, and write.
+### S5 accepted sample
 
-Exact prompt/input:
+Task identity: `/root/format3_pressure_rebuild/format3_s5`.
+
+Prompt:
 
 ```text
-Fresh isolated pressure sample S3. You may read only /Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md once; do not call any other tool or read/write any other file. Return only one complete parser-compatible Format 3 record, no fences/commentary. Closed candidates: A `reject empty-after-trim`, B `persist empty`, C `replace with default`. Data owner requires rejection of empty-after-trim. Schema owner forbids default replacement. All share processing of post-trim value before persistence. Adopt A; reject B only grounded in data-owner requirement; reject C only grounded in schema-owner requirement. Canonical premise exactly: `本案は〈trim後の値が保存前に処理される状態が存在し続けること〉を前提にする`. P1 alternative: do not process the post-trim value and instead manually review input before persistence; its P1 disposition is 保留 until data steward approval. History is none. Use the P1 fields as single inline `対象:`, `前提:`, `前提を外した案:`, `既存候補との差分:`, `検査案の処分 P1:` lines.
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record for the scenario below, without a code fence or commentary.
+
+Scenario class: a bounded single-axis change with exactly one current implementation decision and no other current decision. Closed original candidates: A = "accept a valid normalized value"; B = "accept an unnormalized value"; C = "reject every value". The validation owner requires normalized acceptance. The interface owner requires acceptance of valid input. The exact shared premise is 「本案は〈入力値が妥当性判定を受ける状態が存在し続けること〉を前提にする」. The P1 alternative uses operator approval instead of validation; it is outside the current decision and remains pending until the compliance owner approves the operator-approval contract. There is no revision history.
 ```
 
-Complete record:
+Full response:
 
 ```text
 設計記録形式: 3
+
 決定:
-- trim後の空値（実装）: 空値を拒否する。
+- 入力受理（実装）: 妥当な正規化済み値を受理する。
+
 理由:
-- trim後の空値: データ所有者が空値を拒否することを要求している。
+- 入力受理: 検証所有者が正規化済みの受理を要求し、インターフェース所有者が妥当な入力の受理を要求する。
+
 案の処分:
-- 採用 — 元候補「A `reject empty-after-trim`」— データ所有者の空値拒否要件を満たす。
-- 却下 — 元候補「B `persist empty`」— データ所有者が空値を拒否することを要求している。
-- 却下 — 元候補「C `replace with default`」— スキーマ所有者が既定値への置換を禁止している。
+- 採用 — 元候補「A = accept a valid normalized value」— 両所有者の要求を満たす。
+- 却下 — 元候補「B = accept an unnormalized value」— 検証所有者の正規化済み受理要求に反する。
+- 却下 — 元候補「C = reject every value」— インターフェース所有者の妥当な入力を受理する要求に反する。
+
 前提検査 P1:
-対象: trim後の空値
-前提: 本案は〈trim後の値が保存前に処理される状態が存在し続けること〉を前提にする
-前提を外した案: trim後の値を処理せず、保存前に入力を手動レビューする。
-既存候補との差分: A、B、Cはいずれもtrim後の値を保存前に処理するのに対し、この案はその処理を行わず手動レビューへ委ねる。
-検査案の処分 P1: 保留 — データスチュワードの承認が得られるまで採用しない。
+- 対象: 入力受理。
+- 前提: 本案は〈入力値が妥当性判定を受ける状態が存在し続けること〉を前提にする。
+- 前提を外した案: 妥当性判定の代わりにオペレーター承認で入力を受理する。
+- 既存候補との差分: 既存候補A・B・Cはいずれも入力値の妥当性判定を前提にした受理または拒否であり、オペレーター承認による受理は列挙済み候補と一致しない。
+- 検査案の処分 P1: 保留 — オペレーター承認契約をコンプライアンス所有者が承認するまで、今回の入力受理決定の対象外として待機する。
+
 改訂履歴:
 - なし
 ```
 
-### M1R prompt
+Independent parser result: PASS. One-based section starts: `1, 12, 45, 104, 306, 560`.
+
+### M1 accepted sample
+
+Task identity: `/root/format3_pressure_rebuild/format3_m1_final`.
+
+Prompt:
 
 ```text
-Read only canonical work-cycle and this scenario; no writes. Return exact Format 3 with exactly two decision axes: one `（実装）` audit event and one `（待機）` retention extension, with matching rationale axes. Closed A emit audit event and wait retention approval; B extend retention now; C no audit event. Audit owner requires event; retention owner has not approved extension. Premise `本案は〈監査証跡が取得可能な状態が存在し続けること〉を前提にする`. P1 external escrow export held until escrow owner approves custody/retrieval contract. A adopt; B reject retention owner; C reject audit owner; history none.
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record, without a code fence or commentary.
+
+Scenario class: two current decision axes, exactly one implementation and exactly one wait. The full selected original candidate is A = "emit an audit event while retaining the current retention period"; it is not a partial adoption. Closed alternatives are B = "extend retention now" and C = "emit no audit event". The audit owner requires an event. The retention owner has not approved an extension. The exact shared premise is 「本案は〈監査証跡が既存保持期間で取得可能な状態が存在し続けること〉を前提にする」. The P1 alternative exports evidence to external escrow; it is outside the current decision and remains pending until the escrow owner approves the custody-and-retrieval contract. There is no revision history.
 ```
 
-### M1R response
+Full response:
 
 ```text
 設計記録形式: 3
+
 決定:
-- 監査イベント（実装）: 監査イベントを保存する
-- 保持期間延長（待機）: 保持期間所有者の承認を待ち、現時点では延長しない
+- 監査イベント（実装）: 既存保持期間を維持したまま監査イベントを出力する。
+- 保持期間（待機）: 保持期間の延長は、保持期間所有者が延長を承認するまで実施しない。
+
 理由:
-- 監査イベント: 監査所有者が監査イベントを必要としているため
-- 保持期間延長: 保持期間所有者の承認が得られていないため
+- 監査イベント: 監査所有者が要求する監査証跡を取得可能にする。
+- 保持期間: 所有者の承認なしに保持期間を変更しない。
+
 案の処分:
-- 採用 — 元候補「A」— 監査イベントを保存し、保持期間所有者の承認まで保持期間延長を待機する
-- 却下 — 元候補「B」— 保持期間所有者の承認が得られていないため
-- 却下 — 元候補「C」— 監査所有者が監査イベントを必要としているため
+- 採用 — 元候補「emit an audit event while retaining the current retention period」— 監査イベントを出力し、既存保持期間を維持する全体を採用する。
+- 却下 — 元候補「extend retention now」— 保持期間所有者が延長を承認していない。
+- 却下 — 元候補「emit no audit event」— 監査所有者が監査イベントを要求している。
+
 前提検査 P1:
-対象: 監査証跡の保持方式
-前提: 本案は〈監査証跡が取得可能な状態が存在し続けること〉を前提にする
-前提を外した案: 監査証跡を外部エスクローへエクスポートし、内部で取得可能な状態の継続に依存しない
-既存候補との差分: 元候補はいずれも内部の監査証跡の取得可能性を扱うが、この案は監査証跡を外部エスクローへ移して共有前提を外す
-検査案の処分 P1: 保留 — escrow owner の custody/retrieval contract が確定した時点で再検討する
+- 対象: 監査イベントの出力と保持期間の扱い。
+- 前提: 本案は〈監査証跡が既存保持期間で取得可能な状態が存在し続けること〉を前提にする。
+- 前提を外した案: 監査証跡を外部エスクローへ出力し、既存保持期間内で取得可能な状態に依存しない。
+- 既存候補との差分: 外部エスクローの保管・取得経路を新設する案であり、保持期間を延長するBとも、監査イベントを出力しないCとも異なる。
+- 検査案の処分 P1: 保留 — 外部エスクロー所有者が保管および取得契約を承認するまで保留する。
+
 改訂履歴:
 - なし
 ```
 
-Independent parser result: PASS. One-based starts: marker=1, decision=11, rationale=80, dispositions=148, P1=278, history=524. Two-axis audit: exactly `監査イベント（実装）` and `保持期間延長（待機）`, with matching rationale axes. Wait audit: retention-owner approval is executable; P1 awaits escrow custody/retrieval contract. Candidate audit: A→採用, B→却下 (retention owner), C→却下 (audit owner), each once. Revision audit: `なし`.
+### M3 accepted sample
 
-### M2R prompt
+Task identity: `/root/format3_pressure_rebuild/format3_m3_retry`.
+
+Prompt:
 
 ```text
-Read only canonical work-cycle and this scenario; no writes. Return Format 3 with exactly two axes: `エラー分類（実装）` and `retry回数変更（待機）`, matching reasons, and wait condition operations owner approval. Closed A classify/retry unchanged; B classify/change retry; C retry only. Diagnostics owner requires classification; operations owner has not approved retry change. Exact premise `本案は〈新分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする`. P1 offline analytics held until analytics owner contract. A adopt, B operations reject, C diagnostics reject, history none.
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record, without a code fence or commentary.
+
+Scenario class: two current decision axes, exactly one implementation and exactly one wait. Closed original candidates: A = "invalidate the leaked key"; B = "invalidate the namespace"; C = "perform no invalidation". The cache owner requires freshness by invalidating the leaked key. The namespace owner has not approved broad invalidation. The exact shared premise is 「本案は〈キャッシュ状態が取得可能な状態が存在し続けること〉を前提にする」. The P1 alternative reads directly from the source; it is outside the current decision and remains pending until the source owner approves the direct-read contract. There is no revision history.
 ```
 
-### M2R response
+Full response:
 
 ```text
 設計記録形式: 3
 決定:
-- エラー分類（実装）: エラーを新分類として出力する
-- retry回数変更（待機）: operations owner がretry回数の変更を承認するまで既存retry回数を維持する
+- 漏えいキーの無効化（実装）: 漏えいしたキーを無効化する。
+- 名前空間全体の無効化（待機）: 名前空間所有者が広範な無効化を承認するまで実行しない。
 理由:
-- エラー分類: diagnostics owner が診断に新分類を必要としているため
-- retry回数変更: operations owner がretry回数の変更を承認していないため
+- 漏えいキーの無効化: キャッシュ所有者が、漏えいキーを無効化して鮮度を満たすことを要求している。
+- 名前空間全体の無効化: 広範な無効化には名前空間所有者の承認が必要であり、未承認である。
 案の処分:
-- 採用 — 元候補「A」— 新分類を実装し、既存retry回数を維持する
-- 却下 — 元候補「B」— operations owner がretry回数の変更を承認していないため
-- 却下 — 元候補「C」— diagnostics owner が診断に新分類を必要としているため
+- 採用 — 元候補「invalidate the leaked key」— キャッシュ所有者の鮮度要件を満たす。
+- 保留 — 元候補「invalidate the namespace」— 名前空間所有者が広範な無効化を承認した場合に再検討する。
+- 却下 — 元候補「perform no invalidation」— キャッシュ所有者が漏えいキーの無効化による鮮度確保を要求している。
 前提検査 P1:
-- 対象: 元候補「A」「B」「C」
-- 前提: 本案は〈新分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする
-- 前提を外した案: offline analyticsで新分類の観測値を取得する
-- 既存候補との差分: 元候補は実行時のretry処理で観測値を取得するが、この案はoffline analyticsで取得する
-- 検査案の処分 P1: 保留 — analytics owner がoffline analyticsの取得契約を承認するまで
+- 対象: 漏えいキーの無効化と名前空間全体の無効化。
+- 前提: 本案は〈キャッシュ状態が取得可能な状態が存在し続けること〉を前提にする。
+- 前提を外した案: キャッシュを参照せず、ソースから直接読み取る。
+- 既存候補との差分: 元候補はいずれもキャッシュ状態への無効化またはその不実施であり、ソース直接読取は列挙されていない別クラスの案である。
+- 検査案の処分 P1: 保留 — ソース所有者が直接読取契約を承認した場合に再検討する。
 改訂履歴:
 - なし
 ```
 
-Independent parser result: PASS. One-based starts: marker=1, decision=11, rationale=110, dispositions=211, P1=360, history=612. Two-axis audit: exactly one implementation classification axis and one waiting retry-change axis, both with matching reasons. Wait audit: operations-owner approval is executable; P1 awaits analytics-owner contract. Candidate audit: A→採用, B→却下 (operations), C→却下 (diagnostics). Revision audit: `なし`.
+Independent parser result: PASS. Human audit: two axes, waits, candidate ownership, premise, and P1 boundary are satisfied.
 
-### M3R prompt
+### M4 accepted sample
+
+Task identity: `/root/format3_pressure_rebuild/format3_m4`.
+
+Prompt:
 
 ```text
-Read only canonical work-cycle and this scenario; no writes. Return exact Format 3 with exactly two axes: `キー無効化（実装）` and `名前空間無効化（待機）`, matching reasons, and wait condition namespace-owner approval. Closed A key invalidation; B namespace invalidation; C no invalidation. Cache owner requires freshness; namespace owner has not approved broad invalidation. Exact premise `本案は〈キャッシュ状態が取得可能な状態が存在し続けること〉を前提にする`. P1 direct-source read held until source-owner contract. A adopt, B namespace reject, C cache-owner reject, history none.
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record, without a code fence or commentary.
+
+Scenario class: two current decision axes, exactly one implementation and exactly one wait. Closed original candidates: A = "emit a consent log"; B = "share consent data with a partner"; C = "emit no consent log". The compliance owner requires a consent log. The partnership owner has not approved partner sharing. The exact shared premise is 「本案は〈同意記録が内部監査経路で取得可能な状態が存在し続けること〉を前提にする」. The P1 alternative stores consent proof with an external notary; it is outside the current decision and remains pending until the notary owner approves the custody contract. There is no revision history.
 ```
 
-### M3R response
+Full response:
 
 ```text
 設計記録形式: 3
 決定:
-- キー無効化（実装）: 対象キーだけを無効化する
-- 名前空間無効化（待機）: namespace owner が承認するまで名前空間全体の無効化を待機する
+- 同意記録（実装）: 同意記録を内部監査経路で取得可能な状態として残す。
+- パートナー共有（待機）: パートナーへの同意データ共有は、パートナーシップ責任者が共有を承認するまで行わない。
 理由:
-- キー無効化: cache owner がキャッシュ鮮度を要求しているため
-- 名前空間無効化: namespace owner が広範な無効化を承認していないため
+- 同意記録: コンプライアンス責任者が求める同意記録を満たす。
+- パートナー共有: パートナーシップ責任者の承認なく同意データを共有しない。
 案の処分:
-- 採用 — 元候補「A」— 対象キーだけを無効化してキャッシュ鮮度を確保する
-- 却下 — 元候補「B」— namespace owner が広範な無効化を承認していないため
-- 却下 — 元候補「C」— cache owner がキャッシュ鮮度を要求しているため
+- 採用 — 元候補「emit a consent log」— 同意記録を内部監査経路で取得可能にし、コンプライアンス責任者の要求を満たす。
+- 保留 — 元候補「share consent data with a partner」— パートナーシップ責任者が共有を承認するまで再検討しない。
+- 却下 — 元候補「emit no consent log」— コンプライアンス責任者が同意記録を要求しているため採れない。
 前提検査 P1:
-対象: 元候補「A」「B」「C」が共有するキャッシュ経路
-前提: 本案は〈キャッシュ状態が取得可能な状態が存在し続けること〉を前提にする
-前提を外した案: キャッシュを使わずソースを直接読む
-既存候補との差分: 元候補「A」「B」「C」はキャッシュ経路を扱うが、この案はソースを直接読む
-検査案の処分 P1: 保留 — source owner が直接読み取り契約を承認するまで
+- 対象: 同意記録。
+- 前提: 本案は〈同意記録が内部監査経路で取得可能な状態が存在し続けること〉を前提にする。
+- 前提を外した案: 同意証跡を内部監査経路に残さず、外部公証人が保管する。
+- 既存候補との差分: 既存候補は同意記録の出力有無またはパートナー共有を扱い、外部公証人による証跡保管は扱わない。
+- 検査案の処分 P1: 保留 — 外部公証人の保管契約を承認するのは公証人の責任者であり、その承認が得られるまで採用しない。
 改訂履歴:
 - なし
 ```
 
-### M4R prompt
+Independent parser result: PASS. Human audit: two axes, waits, candidate ownership, premise, and P1 boundary are satisfied.
+
+### M2 accepted sample
+
+Task identity: `/root/format3_pressure_rebuild/format3_m2_final`.
+
+Prompt:
 
 ```text
-Read only canonical work-cycle and this scenario; no writes. Return Format 3 with exactly `監査イベント（実装）` and `保持期間延長（待機）` axes, matching reasons, retention-owner approval wait. Closed A emit event/retain period; B extend period now; C no event. Audit owner needs event; retention owner has not approved extension. Exact premise `本案は〈監査イベントが既存保持期間で調査可能な状態が存在し続けること〉を前提にする`. P1 owner-queue export held until owner-queue contract. A adopt, B retention reject, C audit reject, history none.
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record, without a code fence or commentary.
+
+Scenario class: two current decision axes, exactly one implementation and exactly one wait. The full selected original candidate is A = "classify errors while retaining the current retry count"; it is not a partial adoption. Closed alternatives are B = "change the retry count" and C = "continue without classification". The diagnostics owner requires error classification. The operations owner has not approved changing retries. The exact shared premise is 「本案は〈新しい分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする」. The P1 alternative exports offline analytics; it is outside the current decision and remains pending until the analytics owner approves the analytics contract. There is no revision history.
 ```
 
-### M4R response
+Full response:
 
 ```text
 設計記録形式: 3
+
 決定:
-- 監査イベント（実装）: 監査イベントを保存し、既存保持期間で調査可能にする
-- 保持期間延長（待機）: 保持期間所有者の承認を待ち、現時点では保持期間を延長しない
+- エラー分類（実装）: retry回数を現行のまま保持して、エラーを分類する。
+- retry回数（待機）: operations ownerがretry回数の変更を承認するまで、現行retry回数を変更しない。
+
 理由:
-- 監査イベント: 監査所有者が調査に監査イベントを必要としているため
-- 保持期間延長: 保持期間所有者の承認が得られていないため
+- エラー分類: diagnostics ownerが要求するエラー分類を満たす。
+- retry回数: operations ownerの承認なくretry回数を変更しない。
+
 案の処分:
-- 採用 — 元候補「A」— 監査イベントを保存し、既存保持期間を維持する
-- 却下 — 元候補「B」— 保持期間所有者が保持期間延長を承認していないため
-- 却下 — 元候補「C」— 監査所有者が調査に監査イベントを必要としているため
+- 採用 — 元候補「A = classify errors while retaining the current retry count」— 全体を採用し、エラー分類と現行retry回数の維持を一体として実装する。
+- 保留 — 元候補「B = change the retry count」— operations ownerがretry回数の変更を承認した時点で再検討する。
+- 却下 — 元候補「C = continue without classification」— diagnostics ownerがエラー分類を要求している。
+
 前提検査 P1:
-対象: 監査イベントの調査経路
-前提: 本案は〈監査イベントが既存保持期間で調査可能な状態が存在し続けること〉を前提にする
-前提を外した案: 監査イベントを owner queue へエクスポートし、既存保持期間で調査可能な状態の継続に依存しない
-既存候補との差分: 元候補は監査イベントの有無または保持期間を変えるが、この案は監査イベントを owner queue へ移して既存保持期間への依存を外す
-検査案の処分 P1: 保留 — owner queue の保管・取得契約が確定するまで
+対象: エラー分類とretry回数を現行のまま保持する決定。
+前提: 本案は〈新しい分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする。
+前提を外した案: 分類の観測値を既存retry回数で取得する状態に依存せず、offline analyticsへエクスポートする。
+既存候補との差分: 元候補AからCは実行時の分類またはretry回数の扱いを対象とし、offline analyticsのエクスポート契約は対象にしない。
+検査案の処分 P1: 保留 — analytics ownerがanalytics contractを承認した時点で再検討する。
+
 改訂履歴:
 - なし
 ```
 
-### M5R prompt
+Independent parser result: PASS. Human audit: A is fully adopted, B is executable owner-wait, and C is owner-grounded rejection.
+
+### M5 accepted sample
+
+Task identity: `/root/format3_pressure_rebuild/format3_m5`.
+
+Prompt:
 
 ```text
-Read only canonical work-cycle and this scenario; no writes. Return Format 3 with exactly `エラー分類（実装）` and `retry回数変更（待機）` axes, matching reasons, operations-owner approval wait. Closed A classify and retain retry; B classify and change retry; C retry only. Diagnostics owner requires classification; operations owner has not approved retry change. Exact premise `本案は〈新分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする`. P1 offline analytics held until analytics contract. A adopt, B operations reject, C diagnostics reject, history none.
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record, without a code fence or commentary.
+
+Scenario class: two current decision axes, exactly one implementation and exactly one wait. Closed original candidates: A = "emit a latency metric"; B = "change the alert threshold"; C = "emit no latency metric". The observability owner requires the latency metric. The on-call owner has not approved an alert-threshold change. The exact shared premise is 「本案は〈遅延観測値が既存警報閾値で取得可能な状態が存在し続けること〉を前提にする」. The P1 alternative exports latency observations to an external analytics service; it is outside the current decision and remains pending until the analytics owner approves the export contract. There is no revision history.
 ```
 
-### M5R response
+Full response:
 
 ```text
 設計記録形式: 3
+
 決定:
-- エラー分類（実装）: エラーを新分類として出力する
-- retry回数変更（待機）: operations owner がretry回数の変更を承認するまで既存retry回数を維持する
+- 遅延観測（実装）: latency metric を出力する。
+- 警報閾値（待機）: alert threshold は変更せず、on-call owner が変更を承認するまで待機する。
+
 理由:
-- エラー分類: diagnostics owner が診断に新分類を必要としているため
-- retry回数変更: operations owner がretry回数の変更を承認していないため
+- 遅延観測: observability owner が要求する遅延観測値を提供する。
+- 警報閾値: on-call owner による alert-threshold change の承認が未了である。
+
 案の処分:
-- 採用 — 元候補「A」— 新分類を実装し、既存retry回数を維持する
-- 却下 — 元候補「B」— operations owner がretry回数の変更を承認していないため
-- 却下 — 元候補「C」— diagnostics owner が診断に新分類を必要としているため
+- 採用 — 元候補「emit a latency metric」— observability owner の要求を満たす。
+- 保留 — 元候補「change the alert threshold」— on-call owner による変更承認後に再検討する。
+- 却下 — 元候補「emit no latency metric」— observability owner が latency metric を要求している。
+
 前提検査 P1:
-- 対象: 元候補「A」「B」「C」
-- 前提: 本案は〈新分類の観測値を既存retry回数で取得できる状態が存在し続けること〉を前提にする
-- 前提を外した案: offline analyticsで新分類の観測値を取得する
-- 既存候補との差分: 元候補は実行時のretry処理で観測値を取得するが、この案はoffline analyticsで取得する
-- 検査案の処分 P1: 保留 — analytics owner がoffline analyticsの取得契約を承認するまで
+- 対象: 遅延観測と警報閾値。
+- 前提: 本案は〈遅延観測値が既存警報閾値で取得可能な状態が存在し続けること〉を前提にする。
+- 前提を外した案: latency observations を外部 analytics service へ export する。
+- 既存候補との差分: 元候補は latency metric の出力、alert threshold の変更、または latency metric を出力しない案であり、外部 analytics service への export contract を含まない。
+- 検査案の処分 P1: 保留 — analytics owner が export contract を承認するまで現在の決定の対象外とする。
+
 改訂履歴:
 - なし
 ```
 
-### P1R prompt
+Independent parser result: PASS. Human audit: two axes, executable wait, candidate ownership, premise, and P1 boundary are satisfied.
 
-Task identity: `sixth_p1_retry` (`fork_turns: none`).
+### P1 accepted sample
+
+Task identity: `/root/format3_pressure_rebuild/format3_p1_final`.
+
+Prompt:
 
 ```text
-Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- 監査履歴（実装）: immutable audit log\n理由:\n- 監査履歴: audit owner requires immutable audit log\n案の処分:\n- 部分採用 — 元候補「A immutable audit log plus retention expansion」— 採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required\n- 却下 — 元候補「B mutable audit log」— storage owner has not approved mutable audit storage\n- 却下 — 元候補「C external archive」— audit owner requires immediately retrievable audit evidence\n前提検査 P1:\n対象: 監査履歴\n前提: 本案は〈監査履歴が保存される状態が存在し続けること〉を前提にする\n前提を外した案: manually certify each change without retaining audit history\n既存候補との差分: A、B、C は監査履歴を扱うが、この案は監査履歴を保持しない\n検査案の処分 P1: 保留 — compliance owner manual-certification contract required\n改訂履歴:\n- なし`
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record, without a code fence or commentary.
+
+Scenario class: a genuine composite-original partial adoption. Closed original candidates: A = "write an immutable audit log and extend retention for seven years"; B = "write an immutable audit log only"; C = "write no audit log". From A, immutable logging is selected; the seven-year extension remains pending until the retention owner approves it. The audit owner requires both an immutable log and an explicit retention decision for its evidence. B is owner-incompatible because it omits the retention owner's pending decision; reject B. C is owner-incompatible because it omits immutable logging required by the audit owner; reject C. The exact shared premise is 「本案は〈監査証跡が内部保持先から取得可能な状態が存在し続けること〉を前提にする」. The P1 alternative exports evidence to external escrow; it remains pending until the escrow owner approves the custody-and-retrieval contract. There is no revision history.
 ```
 
-### P1R response
+Full response:
 
 ```text
 設計記録形式: 3
+
 決定:
-- 監査履歴（実装）: immutable audit log
+- 監査ログ（実装）: immutable audit log を書き込む。
+- 保持期間（待機）: 7年間への保持期間延長は、保持期間所有者の承認による明示的な決定まで保留する。
+
 理由:
-- 監査履歴: audit owner requires immutable audit log
+- 監査ログ: 監査所有者が要求する改変不能な監査証跡を提供する。
+- 保持期間: 監査証跡の根拠には immutable audit log と保持期間についての明示的な決定の両方が必要であり、保持期間所有者の承認前に延長を確定できない。
+
 案の処分:
-- 部分採用 — 元候補「A immutable audit log plus retention expansion」— 採用部分: immutable audit log; 残部: 保留 — retention expansion — retention owner approval required
-- 却下 — 元候補「B mutable audit log」— storage owner has not approved mutable audit storage
-- 却下 — 元候補「C external archive」— audit owner requires immediately retrievable audit evidence
+- 部分採用 — 元候補「write an immutable audit log and extend retention for seven years」— 採用部分: immutable audit log の書き込み; 残部: 保留 — 保持期間所有者が7年間への延長を承認するまで。
+- 却下 — 元候補「write an immutable audit log only」— 保持期間所有者による保留中の明示的な決定を欠き、監査所有者の証跡要件と両立しない。
+- 却下 — 元候補「write no audit log」— 監査所有者が要求する immutable audit log を欠き、所有者要件と両立しない。
+
 前提検査 P1:
-対象: 監査履歴
-前提: 本案は〈監査履歴が保存される状態が存在し続けること〉を前提にする
-前提を外した案: manually certify each change without retaining audit history
-既存候補との差分: A、B、C は監査履歴を扱うが、この案は監査履歴を保持しない
-検査案の処分 P1: 保留 — compliance owner manual-certification contract required
+- 対象: 監査証跡の保管経路。
+- 前提: 本案は〈監査証跡が内部保持先から取得可能な状態が存在し続けること〉を前提にする。
+- 前提を外した案: 監査証跡を外部エスクローへ出力し、custody-and-retrieval contract により取得可能性を確保する。
+- 既存候補との差分: A、B、C はいずれも監査証跡の取得可能性を内部保持先に置くため、外部エスクローへ出力する本案は列挙済み候補と一致せず、この共有前提を外す。
+- 検査案の処分 P1: 保留 — 外部エスクロー所有者が custody-and-retrieval contract を承認するまで。
+
 改訂履歴:
 - なし
 ```
 
-### P2R prompt
+Independent parser result: PASS. Human audit: composite A preserves its selected and owner-controlled remainder; B/C are owner-grounded rejections.
 
-Task identity: `eighth_p2r` (`fork_turns: none`). The fresh response below was required to reproduce this persisted skeleton byte-for-byte.
+### P2 accepted sample
+
+Task identity: `/root/format3_pressure_rebuild/format3_p2_retry`.
+
+Prompt:
 
 ```text
-Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- スキーマ保証（実装）: ingress validation\n理由:\n- スキーマ保証: interface owner requires ingress validation\n案の処分:\n- 部分採用 — 元候補「A ingress validation plus metrics enrichment」— 採用部分: ingress validation; 残部: 保留 — metrics enrichment — interface owner approval required\n- 却下 — 元候補「B pre-storage worker validation」— interface owner requires ingress validation\n- 却下 — 元候補「C manual review queue」— queue owner has not approved the manual review queue\n前提検査 P1:\n対象: 保存前のスキーマ保証\n前提: 本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする\n前提を外した案: post-storage repair\n既存候補との差分: A、B、C は保存前に保証するが、この案は保存後に修復する\n検査案の処分 P1: 保留 — persistence owner contract required\n改訂履歴:\n- なし`
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record, without a code fence or commentary.
+
+Scenario class: a genuine composite-original partial adoption with exactly two current decision axes: ingress validation is implementation, and metadata enrichment is waiting. Closed original candidates: A = "validate ingress data and enrich metrics with request metadata"; B = "enrich metrics with request metadata without validation"; C = "accept ingress without validation or enrichment". From A, ingress validation is selected; metadata enrichment remains pending until the interface owner approves it. B and C are owner-incompatible and rejected because the validation owner requires ingress validation. The exact shared premise is 「本案は〈入力値が検証後に内部メトリクス経路へ渡される状態が存在し続けること〉を前提にする」. The P1 alternative uses manual review before metrics and is outside the current decision; it remains pending until the review owner approves the review contract. There is no revision history.
 ```
 
-### P2R response
+Full response:
 
 ```text
 設計記録形式: 3
 決定:
-- スキーマ保証（実装）: ingress validation
+- ingress validation（実装）: 入力値を検証してから内部メトリクス経路へ渡す。
+- metadata enrichment（待機）: request metadata によるメトリクス拡充は、interface owner の承認まで実装しない。
 理由:
-- スキーマ保証: interface owner requires ingress validation
+- ingress validation: validation owner が要求する入力値の検証を満たす。
+- metadata enrichment: interface owner が所有する interface の承認前に metadata enrichment を導入しない。
 案の処分:
-- 部分採用 — 元候補「A ingress validation plus metrics enrichment」— 採用部分: ingress validation; 残部: 保留 — metrics enrichment — interface owner approval required
-- 却下 — 元候補「B pre-storage worker validation」— interface owner requires ingress validation
-- 却下 — 元候補「C manual review queue」— queue owner has not approved the manual review queue
+- 部分採用 — 元候補「validate ingress data and enrich metrics with request metadata」— 採用部分: ingress validation; 残部: 保留 — metadata enrichment は interface owner の承認後に再検討する。
+- 却下 — 元候補「enrich metrics with request metadata without validation」— validation owner が ingress validation を要求するため owner-incompatible である。
+- 却下 — 元候補「accept ingress without validation or enrichment」— validation owner が ingress validation を要求するため owner-incompatible である。
 前提検査 P1:
-対象: 保存前のスキーマ保証
-前提: 本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする
-前提を外した案: post-storage repair
-既存候補との差分: A、B、C は保存前に保証するが、この案は保存後に修復する
-検査案の処分 P1: 保留 — persistence owner contract required
+- 対象: ingress validation と metadata enrichment の現在の決定。
+- 前提: 本案は〈入力値が検証後に内部メトリクス経路へ渡される状態が存在し続けること〉を前提にする。
+- 前提を外した案: メトリクス経路へ渡す前に手動レビューを行い、検証後に内部メトリクス経路へ渡す状態を前提にしない。
+- 既存候補との差分: 既存候補 A、B、C はいずれも入力値を検証後に内部メトリクス経路へ渡す状態を前提にしており、手動レビュー契約を導入する本案は列挙済み候補にない。
+- 検査案の処分 P1: 保留 — manual review before metrics は現在の決定外であり、review owner が review contract を承認した後に再検討する。
 改訂履歴:
 - なし
 ```
 
-### P3R prompt
+### P3 accepted sample
 
-Task identity: `sixth_p3_retry` (`fork_turns: none`).
+Task identity: `/root/format3_pressure_rebuild/format3_p3`.
+
+Prompt:
 
 ```text
-Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- 保存データ暗号化（実装）: managed key encryption\n理由:\n- 保存データ暗号化: security owner requires managed key encryption\n案の処分:\n- 部分採用 — 元候補「A managed key encryption plus recovery rotation」— 採用部分: managed key encryption; 残部: 保留 — recovery rotation — security owner approval required\n- 却下 — 元候補「B customer-managed key encryption」— customer-key owner has not approved customer-managed keys\n- 却下 — 元候補「C unencrypted offline key」— security owner requires managed key encryption\n前提検査 P1:\n対象: 保存データの暗号化\n前提: 本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする\n前提を外した案: no persistence\n既存候補との差分: A、B、C は暗号化したデータを保存するが、この案は保存しない\n検査案の処分 P1: 保留 — data owner policy required\n改訂履歴:\n- なし`
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record, without a code fence or commentary.
+
+Scenario class: a genuine composite-original partial adoption. Closed original candidates: A = "encrypt backup data with managed keys and rotate historical key material"; B = "rotate historical key material without managed-key encryption"; C = "leave backups unencrypted". From A, managed-key encryption is selected; historical key rotation remains pending until the security owner approves it. B and C are owner-incompatible and rejected because the security owner requires managed-key encryption. The exact shared premise is 「本案は〈バックアップ復元時に鍵管理サービスへ到達できる状態が存在し続けること〉を前提にする」. The P1 alternative uses locally managed keys; it remains pending until the key-custody owner approves the custody contract. There is no revision history.
 ```
 
-### P3R response
+Full response:
 
 ```text
 設計記録形式: 3
 決定:
-- 保存データ暗号化（実装）: managed key encryption
+- バックアップデータ暗号化（実装）: managed keys による暗号化を導入する。
+- 過去鍵材料のローテーション（待機）: security owner が承認するまで実施しない。
 理由:
-- 保存データ暗号化: security owner requires managed key encryption
+- バックアップデータ暗号化: security owner が managed-key encryption を要求している。
+- 過去鍵材料のローテーション: 承認前に履歴鍵材料を変更しない。
 案の処分:
-- 部分採用 — 元候補「A managed key encryption plus recovery rotation」— 採用部分: managed key encryption; 残部: 保留 — recovery rotation — security owner approval required
-- 却下 — 元候補「B customer-managed key encryption」— customer-key owner has not approved customer-managed keys
-- 却下 — 元候補「C unencrypted offline key」— security owner requires managed key encryption
+- 部分採用 — 元候補「encrypt backup data with managed keys and rotate historical key material」— 採用部分: managed keys によるバックアップデータ暗号化; 残部: 保留 — security owner による過去鍵材料ローテーションの承認後に再検討する。
+- 却下 — 元候補「rotate historical key material without managed-key encryption」— security owner が managed-key encryption を要求しており、所有者要件と両立しない。
+- 却下 — 元候補「leave backups unencrypted」— security owner が managed-key encryption を要求しており、所有者要件と両立しない。
 前提検査 P1:
-対象: 保存データの暗号化
-前提: 本案は〈保存データが暗号化された状態が存在し続けること〉を前提にする
-前提を外した案: no persistence
-既存候補との差分: A、B、C は暗号化したデータを保存するが、この案は保存しない
-検査案の処分 P1: 保留 — data owner policy required
+- 対象: managed keys によるバックアップデータ暗号化。
+- 前提: 本案は〈バックアップ復元時に鍵管理サービスへ到達できる状態が存在し続けること〉を前提にする。
+- 前提を外した案: locally managed keys によりバックアップデータを暗号化する。
+- 既存候補との差分: 既存候補には locally managed keys を用いる案がなく、この案は鍵管理サービスへの到達性を前提とせず、鍵保管責任を key-custody owner へ移す。
+- 検査案の処分 P1: 保留 — key-custody owner が custody contract を承認した後に再検討する。
 改訂履歴:
 - なし
 ```
 
-### P4R prompt
+### P4 accepted sample
 
-Task identity: `sixth_p4_retry` (`fork_turns: none`).
+Task identity: `/root/format3_pressure_rebuild/format3_p4`.
+
+Prompt:
 
 ```text
-Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- 定期報告（実装）: weekly publication\n理由:\n- 定期報告: reporting owner requires weekly publication\n案の処分:\n- 部分採用 — 元候補「A weekly publication plus report enrichment」— 採用部分: weekly publication; 残部: 保留 — report enrichment — reporting owner approval required\n- 却下 — 元候補「B daily publication」— reporting owner requires weekly publication\n- 却下 — 元候補「C monthly publication」— reporting owner requires weekly publication\n前提検査 P1:\n対象: 定期報告の公開\n前提: 本案は〈定期報告が公開される状態が存在し続けること〉を前提にする\n前提を外した案: on-demand endpoint\n既存候補との差分: A、B、C は定期報告を公開するが、この案は要求時に提供する\n検査案の処分 P1: 保留 — API owner contract required\n改訂履歴:\n- なし`
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record, without a code fence or commentary.
+
+Scenario class: a genuine composite-original partial adoption. Closed original candidates: A = "persist a detailed trace and publish a public audit digest"; B = "publish a public audit digest without a detailed trace"; C = "retain neither trace nor digest". From A, the detailed trace is selected; publication remains pending until the privacy owner approves it. B and C are owner-incompatible and rejected because the audit owner requires a detailed trace. The exact shared premise is 「本案は〈監査詳細が内部調査経路から取得可能な状態が存在し続けること〉を前提にする」. The P1 alternative stores the trace with an external auditor; it remains pending until the auditor owner approves the custody contract. There is no revision history.
 ```
 
-### P4R response
+Full response:
 
 ```text
 設計記録形式: 3
 決定:
-- 定期報告（実装）: weekly publication
+- 監査詳細（実装）: 詳細トレースを保持する。
+- 公開監査要約（待機）: プライバシー所有者が公開を承認するまで公開しない。
 理由:
-- 定期報告: reporting owner requires weekly publication
+- 監査詳細: 監査所有者が詳細トレースを必要としている。
+- 公開監査要約: 公開はプライバシー所有者の承認を必要とする。
 案の処分:
-- 部分採用 — 元候補「A weekly publication plus report enrichment」— 採用部分: weekly publication; 残部: 保留 — report enrichment — reporting owner approval required
-- 却下 — 元候補「B daily publication」— reporting owner requires weekly publication
-- 却下 — 元候補「C monthly publication」— reporting owner requires weekly publication
+- 部分採用 — 元候補「persist a detailed trace and publish a public audit digest」— 採用部分: 詳細トレースの保持; 残部: 保留 — プライバシー所有者が公開を承認した時点で再検討する。
+- 却下 — 元候補「publish a public audit digest without a detailed trace」— 監査所有者が詳細トレースを要求しており、所有者要件と両立しない。
+- 却下 — 元候補「retain neither trace nor digest」— 監査所有者が詳細トレースを要求しており、所有者要件と両立しない。
 前提検査 P1:
-対象: 定期報告の公開
-前提: 本案は〈定期報告が公開される状態が存在し続けること〉を前提にする
-前提を外した案: on-demand endpoint
-既存候補との差分: A、B、C は定期報告を公開するが、この案は要求時に提供する
-検査案の処分 P1: 保留 — API owner contract required
+- 対象: 詳細トレースの保管先。
+- 前提: 本案は〈監査詳細が内部調査経路から取得可能な状態が存在し続けること〉を前提にする。
+- 前提を外した案: 詳細トレースを外部監査人に保管させる。
+- 既存候補との差分: 元候補は詳細トレースの有無と公開監査要約の有無を扱うが、外部監査人への保管と内部調査経路からの取得不能を扱わない。
+- 検査案の処分 P1: 保留 — 外部監査人の所有者が保管契約を承認した時点で再検討する。
 改訂履歴:
 - なし
 ```
 
-### P5R prompt
+### P5 accepted sample
 
-Task identity: `sixth_p5_retry` (`fork_turns: none`).
+Task identity: `/root/format3_pressure_rebuild/format3_p5`.
+
+Prompt:
 
 ```text
-Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- 受領証配送（実装）: signed immediate receipt\n理由:\n- 受領証配送: compliance owner requires a signature\n案の処分:\n- 部分採用 — 元候補「A signed immediate receipt plus receipt metadata enrichment」— 採用部分: signed immediate receipt; 残部: 保留 — receipt metadata enrichment — compliance owner approval required\n- 却下 — 元候補「B unsigned immediate receipt」— compliance owner requires a signature\n- 却下 — 元候補「C signed delayed receipt」— delivery owner has not approved delayed delivery\n前提検査 P1:\n対象: 受領証配送\n前提: 本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする\n前提を外した案: portal polling\n既存候補との差分: A、B、C は受領証を配送するが、この案は顧客が取得する\n検査案の処分 P1: 保留 — API owner contract required\n改訂履歴:\n- B unsigned immediate receipt → A signed immediate receipt plus receipt metadata enrichment — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42`
+You are one independent fresh pressure context. First use a read-only tool to read only `/Users/m5/.codex/worktrees/c98c/pfdsl/.claude/skills/pfd-ops/references/work-cycle.md`; it is your sole operational source. Do not edit files, perform git operations, or use other operational sources. Then return only the complete Format 3 design record, without a code fence or commentary.
+
+Scenario class: a genuine composite-original partial adoption. Closed original candidates: A = "encrypt backups and rotate all historical key material"; B = "rotate historical key material without encrypting backups"; C = "leave backups unencrypted". From A, backup encryption is selected; historical-key rotation remains pending until the key owner approves an impact assessment. B and C are owner-incompatible and rejected because the security owner requires backup encryption. The exact shared premise is 「本案は〈復元時に現在の鍵材料が利用可能な状態が存在し続けること〉を前提にする」. The P1 alternative uses a separately escrowed recovery key; it remains pending until the recovery owner approves the escrow contract. Before implementation, the earlier decision was "encrypt backups and rotate all historical key material immediately"; it changed to the current selected-and-pending decision because the key inventory showed rotation impact; reapproval is `https://example.test/format3/p5-reapproval`.
 ```
 
-### P5R response
+Full response:
 
 ```text
 設計記録形式: 3
 決定:
-- 受領証配送（実装）: signed immediate receipt
+- バックアップ暗号化（実装）: バックアップを暗号化する。
+- 過去の鍵材料ローテーション（待機）: 鍵所有者が影響評価を承認するまで、過去の鍵材料をローテーションしない。
 理由:
-- 受領証配送: compliance owner requires a signature
+- バックアップ暗号化: セキュリティ所有者が要求するバックアップ暗号化を満たす。
+- 過去の鍵材料ローテーション: 鍵インベントリで判明したローテーション影響を、鍵所有者の承認済み影響評価で判断する。
 案の処分:
-- 部分採用 — 元候補「A signed immediate receipt plus receipt metadata enrichment」— 採用部分: signed immediate receipt; 残部: 保留 — receipt metadata enrichment — compliance owner approval required
-- 却下 — 元候補「B unsigned immediate receipt」— compliance owner requires a signature
-- 却下 — 元候補「C signed delayed receipt」— delivery owner has not approved delayed delivery
+- 部分採用 — 元候補「encrypt backups and rotate all historical key material」— 採用部分: バックアップを暗号化する; 残部: 保留 — 鍵所有者が影響評価を承認するまで過去の鍵材料ローテーションを待機する。
+- 却下 — 元候補「rotate historical key material without encrypting backups」— セキュリティ所有者がバックアップ暗号化を要求しており、所有者要件と両立しない。
+- 却下 — 元候補「leave backups unencrypted」— セキュリティ所有者がバックアップ暗号化を要求しており、所有者要件と両立しない。
 前提検査 P1:
-対象: 受領証配送
-前提: 本案は〈顧客へ受領証が配送される状態が存在し続けること〉を前提にする
-前提を外した案: portal polling
-既存候補との差分: A、B、C は受領証を配送するが、この案は顧客が取得する
-検査案の処分 P1: 保留 — API owner contract required
+- 対象: 復元鍵の可用性。
+- 前提: 本案は〈復元時に現在の鍵材料が利用可能な状態が存在し続けること〉を前提にする。
+- 前提を外した案: 現在の鍵材料に依存せず、別途エスクローした復元鍵を使用する。
+- 既存候補との差分: 既存候補はいずれも復元時に現在の鍵材料が利用可能であることに依存し、別途エスクローした復元鍵を使用しない。
+- 検査案の処分 P1: 保留 — 復元鍵所有者がエスクロー契約を承認するまで待機する。
 改訂履歴:
-- B unsigned immediate receipt → A signed immediate receipt plus receipt metadata enrichment — compliance owner supplied requirement REC-42 — 再承認: https://approval.example.test/REC-42
+- encrypt backups and rotate all historical key material immediately → バックアップを暗号化し、過去の鍵材料ローテーションは鍵所有者の影響評価承認まで待機する — 鍵インベントリでローテーション影響が判明したため — 再承認: https://example.test/format3/p5-reapproval
 ```
 
 ## Final human semantic audit — accepted corpus only
 
-The accepted corpus is S1F, S2F, S3, S4F, S5F, M1R–M5R, and P1R–P5R.
-
-| Required class | Accepted identities | Audit |
-| --- | --- | --- |
-| Single-axis | S1F, S2F, S3, S4F, S5F | Each has exactly one implementation decision axis and matching rationale. |
-| Implementation plus wait | M1R–M5R | Each has exactly one `(実装)` and one `(待機)` decision axis, matching rationale axes, and a supplied executable owner approval wait condition. |
-| Original partial adoption | P1R–P5R | Each partially adopts one composite original A: its selected component is adopted and its remaining component has one `保留` disposition. B and C are distinct alternatives, each rejected once with an owner-grounded reason. |
-| Revision truth | P5R | The non-`なし` B→composite-A row contains the supplied REC-42 reason and exact approval URL. |
-| Prompt provenance | All 15 | Every accepted sample has an exact persisted prompt and full response. Each task identity is distinct. |
-
-Ten dimensions: candidate coverage, decision/disposition consistency, partial boundaries, executable reconsideration, valid owner-grounded rejections, shared canonical premise, same-granularity P1 alternative, truthful revision history, machine/human boundary, and distinct-context provenance are PASS subject to the supplied facts remaining human-verifiable.
-
-### Per-ID parser and offset extraction
-
-The extractor selects only the fenced block immediately after each accepted `response` label or S3's `Complete record:` label. Starts are one-based character offsets within that fenced record: marker, decision, rationale, dispositions, P1, history.
+Each response was independently passed to `parseFormat3DesignRecord`. The ordered one-based starts are marker, decision, rationale, dispositions, P1, and history.
 
 | ID | Parser | Starts |
 | --- | --- | --- |
-| S1F | PASS | 1, 11, 57, 161, 360, 616 |
-| S2F | PASS | 1, 11, 71, 132, 318, 571 |
-| S3 | PASS | 1, 11, 40, 81, 265, 477 |
-| S4F | PASS | 1, 11, 52, 113, 285, 506 |
-| S5F | PASS | 1, 11, 59, 171, 354, 625 |
-| M1R | PASS | 1, 11, 80, 148, 278, 524 |
-| M2R | PASS | 1, 11, 110, 211, 360, 612 |
-| M3R | PASS | 1, 11, 95, 183, 323, 522 |
-| M4R | PASS | 1, 11, 99, 170, 295, 550 |
-| M5R | PASS | 1, 11, 110, 211, 360, 612 |
-| P1R | PASS | 1, 11, 47, 100, 438, 676 |
-| P2R | PASS | 1, 11, 48, 106, 439, 634 |
-| P3R | PASS | 1, 11, 54, 117, 469, 640 |
-| P4R | PASS | 1, 11, 46, 102, 412, 583 |
-| P5R | PASS | 1, 11, 53, 104, 458, 623 |
+| S1 | PASS | 1, 11, 67, 142, 388, 595 |
+| S2 | PASS | 1, 12, 57, 115, 357, 568 |
+| S3 | PASS | 1, 12, 55, 129, 375, 618 |
+| S4 | PASS | 1, 12, 66, 137, 479, 730 |
+| S5 | PASS | 1, 12, 45, 104, 306, 560 |
+| M1 | PASS | 1, 12, 102, 170, 394, 648 |
+| M2 | PASS | 1, 12, 125, 219, 499, 802 |
+| M3 | PASS | 1, 11, 93, 195, 397, 629 |
+| M4 | PASS | 1, 11, 111, 188, 405, 635 |
+| M5 | PASS | 1, 12, 115, 225, 448, 796 |
+| P1 | PASS | 1, 12, 108, 234, 557, 858 |
+| P2 | PASS | 1, 11, 149, 298, 737, 1102 |
+| P3 | PASS | 1, 11, 111, 214, 631, 952 |
+| P4 | PASS | 1, 11, 80, 147, 459, 682 |
+| P5 | PASS | 1, 11, 103, 209, 540, 763 |
 
-| Partial-adoption ID | Selected text | Remainder text |
-| --- | --- | --- |
-| P1R | `immutable audit log` | `保留 — retention expansion — retention owner approval required` |
-| P2R | `ingress validation` | `保留 — metrics enrichment — interface owner approval required` |
-| P3R | `managed key encryption` | `保留 — recovery rotation — security owner approval required` |
-| P4R | `weekly publication` | `保留 — report enrichment — reporting owner approval required` |
-| P5R | `signed immediate receipt` | `保留 — receipt metadata enrichment — compliance owner approval required` |
+Human audit: S1–S5 are each one bounded implementation axis. M1–M5 have exactly one implementation and one executable owner-controlled wait. P1–P5 preserve the selected and remaining portions of composite original A, reject B and C on owner-grounded facts, and keep P1 outside current decisions. P5 alone contains the supplied pre-implementation revision and reapproval. Structural PASS is not a claim that this human semantic audit is automated.
 
 ## Current final validation
 
@@ -514,7 +630,7 @@ After `reader_first_design_records` transitioned to `done`, strict validation, f
 
 ## Current verification evidence
 
-RED command, run before the parser/template implementation:
+Historical RED evidence, run before the parser/template implementation:
 
 ```text
 node --test scripts/lib/gate-check.test.mjs scripts/lib/cycle-status.test.mjs
@@ -531,23 +647,7 @@ fail 7
 
 The seven intended failures covered whitespace-only original selected part, premise selected part, premise remainder kind, premise remainder reason, revision new decision, revision reason, and revision reapproval. The pre-fix template test also failed because it did not name `検査案の処分 Pn` before `部分採用`.
 
-GREEN command, after the minimal implementation and complete matrix:
-
-```text
-node --test scripts/lib/gate-check.test.mjs scripts/lib/cycle-status.test.mjs
-```
-
-GREEN result:
-
-```text
-tests 304
-suites 56
-pass 304
-fail 0
-cancelled 0
-skipped 0
-todo 0
-```
+The former GREEN count is intentionally omitted: it was an implementation-time snapshot and is not the current focused-test total. Current focused-test evidence belongs to the current verification run, whose observed total is 387.
 
 ## Repository-wide tests
 
@@ -570,7 +670,7 @@ git check-ignore -v docs/superpowers/reports/2026-09-04-format-3-pressure-eviden
 exit 0 with no output; the durable report is not ignored
 ```
 
-P5R was independently parsed with `parseFormat3DesignRecord`; its original partial-adoption fields, premise block, section order, and input-backed B→A REC-42 revision row all passed.
+P5 was independently parsed with `parseFormat3DesignRecord`; its original partial-adoption fields, premise block, section order, and input-backed B→A REC-42 revision row all passed.
 
 ## Exact issue gate and status transition
 
@@ -674,14 +774,7 @@ MANUAL, after the PR exists (its body is the destination):
 ## Commands and pre-transition outputs
 
 ```text
-node --test scripts/lib/gate-check.test.mjs scripts/lib/gate-check-steps.test.mjs scripts/lib/cycle-status.test.mjs scripts/lib/cycle-status-steps.test.mjs scripts/lib/pfd-ops-applicability.test.mjs
-tests 469
-suites 81
-pass 469
-fail 0
-cancelled 0
-skipped 0
-todo 0
+Historical focused-test command output omitted; its former count is not current evidence. The current focused-test total is 387.
 
 make check-docs
 exit 0
@@ -732,7 +825,7 @@ successors (process): publish_cli_pipeline_kind
 
 ## Post-transition PFD and snapshot validation
 
-Current post-transition validation: the immediate-fenced-block extractor returned `PASS` for S1F, S2F, S3, S4F, S5F, M1R–M5R, and P1R–P5R. `check-md-linebreaks` returned `OK`; roadmap strict check returned `OK`; format check passed; location links existed; graph orphans returned `(none)`; and `reader_first_design_records.status` read back as `done`.
+Current post-transition validation: the immediate-fenced-block extractor returned `PASS` for S1–S5, M1–M5, and P1–P5. `check-md-linebreaks` returned `OK`; roadmap strict check returned `OK`; format check passed; location links existed; graph orphans returned `(none)`; and `reader_first_design_records.status` read back as `done`.
 
 ```text
 node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl reader_first_design_records status done
