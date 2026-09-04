@@ -74,4 +74,30 @@ describe("pfd-ops applicability contract", () => {
 		assert.match(roadmapScaffold, /roadmap の作業項目バックエンドとしての採否/);
 		assert.match(roadmapScaffold, /roadmap 管理外/);
 	});
+
+	it("uses the format 3 decision-first contract without claiming semantic machine proof", () => {
+		assert.match(workCycle, /設計記録形式: 3/);
+		assert.ok(
+			workCycle.indexOf("決定:") < workCycle.indexOf("理由:") &&
+				workCycle.indexOf("理由:") < workCycle.indexOf("案の処分:") &&
+				workCycle.indexOf("案の処分:") < workCycle.indexOf("前提検査 Pn:"),
+		);
+		assert.match(workCycle, /元候補「<候補名>」/);
+		assert.match(workCycle, /機械検査は構造だけを blocking にする/);
+		assert.match(workCycle, /人間.*レビュー/);
+		assert.match(workCycle, /optionCount.*完全性.*証明/);
+
+		assert.match(githubBackend, /2026-08-30T09:32:50Z/);
+		assert.match(githubBackend, /2026-08-31T01:30:24Z/);
+		assert.match(githubBackend, /設計記録形式: 3/);
+		assert.match(githubBackend, /同じコメントを編集/);
+		assert.match(githubBackend, /別コメント.*置換してはならない/);
+		assert.match(githubBackend, /複数.*完全な形式3コメント.*fail-close/);
+
+		assert.match(fileBackend, /設計記録形式: 3/);
+		assert.match(fileBackend, /当該項目に追記/);
+		assert.match(fileBackend, /コミット順/);
+		assert.doesNotMatch(fileBackend, /投稿時刻|コメント.*編集|createdAt/);
+		assert.match(fileBackend, /移行履歴.*形式2/);
+	});
 });
