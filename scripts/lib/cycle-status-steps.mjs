@@ -424,6 +424,9 @@ export async function runCycleStatus({
 	const gateCheckCommand = gateCheckCommandError
 		? null
 		: buildGateCheckCommand(artifactKey, base, targetIssues);
+	const wipUpdateCommand = artifactKey
+		? `node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl ${artifactKey} status wip`
+		: undefined;
 
 	// The catalog's own reminder that referencing it at retro is too late for
 	// patterns whose countermeasure has to land before this cycle's commit
@@ -467,6 +470,7 @@ export async function runCycleStatus({
 			optionCount: recordOptionCount,
 		}),
 		reviewRecordTemplate: buildReviewRecordTemplate(),
+		wipUpdateCommand,
 		gateCheckCommand,
 		unregisteredManagedIssues,
 		untriagedTargetIssues,

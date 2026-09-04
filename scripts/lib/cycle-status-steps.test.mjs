@@ -966,6 +966,10 @@ describe("runCycleStatus", () => {
 			result.gateCheckCommand,
 			"node scripts/gate-check.mjs --base main --artifact art_x --issue 669",
 		);
+		assert.equal(
+			result.wipUpdateCommand,
+			"node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl art_x status wip",
+		);
 	});
 
 	// This is the actual shape of #800/#772/#794 themselves: all three are
@@ -989,6 +993,7 @@ describe("runCycleStatus", () => {
 			result.gateCheckCommand,
 			"node scripts/gate-check.mjs --base main --no-artifact --issue 800",
 		);
+		assert.equal(result.wipUpdateCommand, undefined);
 	});
 
 	it("uses the shared process's artifact when every --issue resolves to the same process", async () => {
