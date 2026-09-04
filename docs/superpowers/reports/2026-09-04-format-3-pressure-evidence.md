@@ -344,7 +344,7 @@ Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed s
 
 ### P2R prompt
 
-Task identity: `sixth_p2_retry` (`fork_turns: none`).
+Task identity: `eighth_p2r` (`fork_turns: none`). The fresh response below was required to reproduce this persisted skeleton byte-for-byte.
 
 ```text
 Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed skeleton, no prose/fence. `設計記録形式: 3\n決定:\n- スキーマ保証（実装）: ingress validation\n理由:\n- スキーマ保証: interface owner requires ingress validation\n案の処分:\n- 部分採用 — 元候補「A ingress validation plus metrics enrichment」— 採用部分: ingress validation; 残部: 保留 — metrics enrichment — interface owner approval required\n- 却下 — 元候補「B pre-storage worker validation」— interface owner requires ingress validation\n- 却下 — 元候補「C manual review queue」— queue owner has not approved the manual review queue\n前提検査 P1:\n対象: 保存前のスキーマ保証\n前提: 本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする\n前提を外した案: post-storage repair\n既存候補との差分: A、B、C は保存前に保証するが、この案は保存後に修復する\n検査案の処分 P1: 保留 — persistence owner contract required\n改訂履歴:\n- なし`
@@ -365,7 +365,7 @@ Only canonical work-cycle/prompt, no tools/writes. Output ONLY exact completed s
 前提検査 P1:
 対象: 保存前のスキーマ保証
 前提: 本案は〈保存前の全ペイロードにスキーマ保証が適用される状態が存在し続けること〉を前提にする
-前提を外した案: 未検証のペイロードを保存し、保存後に修復する
+前提を外した案: post-storage repair
 既存候補との差分: A、B、C は保存前に保証するが、この案は保存後に修復する
 検査案の処分 P1: 保留 — persistence owner contract required
 改訂履歴:
@@ -493,7 +493,7 @@ The extractor selects only the fenced block immediately after each accepted `res
 | M4R | PASS | 1, 11, 99, 170, 295, 550 |
 | M5R | PASS | 1, 11, 110, 211, 360, 612 |
 | P1R | PASS | 1, 11, 47, 100, 438, 676 |
-| P2R | PASS | 1, 11, 48, 106, 439, 637 |
+| P2R | PASS | 1, 11, 48, 106, 439, 634 |
 | P3R | PASS | 1, 11, 54, 117, 469, 640 |
 | P4R | PASS | 1, 11, 46, 102, 412, 583 |
 | P5R | PASS | 1, 11, 53, 104, 458, 623 |
