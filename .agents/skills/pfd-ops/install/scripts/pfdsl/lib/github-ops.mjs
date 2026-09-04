@@ -12,21 +12,22 @@
  * try gh first; when it's missing (ENOENT) and a GH_TOKEN/GITHUB_TOKEN is
  * available, fall back to HTTP; otherwise rethrow the original ENOENT so a
  * caller's isGhUnavailableError(e) still recognizes "truly unavailable" and
- * can degrade gracefully (#489, #492). An operation with no HTTP
- * implementation (designRecordEditInfo) throws a named error instead of
- * falling back silently or rethrowing the ENOENT — see designRecordEditInfo.
+ * can degrade gracefully (#489, #492).
  */
 
 import { execFileSync } from "node:child_process";
 import { isGhUnavailableError } from "./gh-compat.mjs";
 import { execGh } from "./gh-exec.mjs";
 import {
+	DESIGN_RECORD_EDIT_QUERY,
 	fetchAllIssues,
 	fetchAllLabels,
+	fetchDesignRecordEditInfo,
 	fetchIssueView,
 	fetchOpenPrsWithCi,
 	fetchPullRequestView,
 	mapLabelsResponse,
+	normalizeDesignRecordEditResponse,
 	parseOwnerRepo,
 	addIssueLabel as restAddIssueLabel,
 	createLabel as restCreateLabel,
@@ -80,7 +81,7 @@ export function buildDesignRecordEditQuery({ owner, repo, number }) {
 		"-F",
 		`number=${number}`,
 		"-f",
-		"query=query($owner:String!,$repo:String!,$number:Int!){ repository(owner:$owner,name:$repo){ issue(number:$number){ lastEditedAt comments(first:100){ totalCount nodes { id lastEditedAt } } } } } ",
+		`query=${DESIGN_RECORD_EDIT_QUERY}`,
 	];
 }
 
@@ -91,18 +92,7 @@ export function buildDesignRecordEditQuery({ owner, repo, number }) {
  * @returns {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}}
  */
 export function parseDesignRecordEditResponse(jsonText) {
-	const issueData = JSON.parse(jsonText)?.data?.repository?.issue;
-	if (!issueData)
-		throw new Error(
-			"unexpected GraphQL response shape for design-record edit info",
-		);
-	return {
-		issueLastEditedAt: issueData.lastEditedAt ?? null,
-		comments: {
-			totalCount: issueData.comments.totalCount,
-			nodes: issueData.comments.nodes,
-		},
-	};
+	return normalizeDesignRecordEditResponse(JSON.parse(jsonText));
 }
 
 /**
@@ -324,10 +314,7 @@ export function createGitHubOps({
 			),
 
 		/**
-		 * The selected design-selection record's edit history (#737 案2). No HTTP
-		 * implementation: `gh api graphql` has no REST equivalent worth
-		 * reproducing for this one call site, so falling back here throws a named
-		 * error instead of silently answering nothing (see withFallback).
+		 * The selected design-selection record's edit history (#737 案2).
 		 * @param {{number: number}} params
 		 * @returns {Promise<{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}>}
 		 */
@@ -341,7 +328,8 @@ export function createGitHubOps({
 					);
 					return parseDesignRecordEditResponse(out);
 				},
-				undefined,
+				({ owner, repo, token }) =>
+					fetchDesignRecordEditInfo(owner, repo, token, number, fetchImpl),
 			),
 	};
 }

@@ -163,21 +163,48 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		assert.deepEqual(ghResult, httpResult);
 	});
 
-	it("viewIssue: both backends answer the requested fields alone", async () => {
+	it("viewIssue: both backends return matching comment node IDs and fields", async () => {
+		const comment = {
+			id: "IC_kwDOCommentNodeId",
+			body: "hello from a comment",
+			createdAt: "2026-09-05T00:00:00Z",
+			author: { login: "takasek" },
+		};
 		const ghOps = createGitHubOps({
 			execGhImpl: stubExecGh({
-				"issue view": JSON.stringify({ number: 612, body: "hello" }),
+				"issue view": JSON.stringify({
+					number: 612,
+					body: "hello",
+					comments: [comment],
+				}),
 			}),
 		});
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "issue view": new Error("ENOENT") }),
-			fetchImpl: stubFetch({ number: 612, body: "hello" }),
+			fetchImpl: async (url) =>
+				String(url).includes("/comments")
+					? stubFetch([
+							{
+								node_id: comment.id,
+								body: comment.body,
+								created_at: comment.createdAt,
+								user: { login: comment.author.login },
+							},
+						])(url)
+					: stubFetch({ number: 612, body: "hello" })(url),
 		});
 		const [ghResult, httpResult] = await Promise.all([
-			ghOps.viewIssue({ number: 612, fields: ["number", "body"] }),
-			httpOps.viewIssue({ number: 612, fields: ["number", "body"] }),
+			ghOps.viewIssue({ number: 612, fields: ["number", "body", "comments"] }),
+			httpOps.viewIssue({
+				number: 612,
+				fields: ["number", "body", "comments"],
+			}),
 		]);
-		assert.deepEqual(ghResult, { number: 612, body: "hello" });
+		assert.deepEqual(ghResult, {
+			number: 612,
+			body: "hello",
+			comments: [comment],
+		});
 		assert.deepEqual(ghResult, httpResult);
 	});
 
@@ -332,7 +359,7 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 	});
 });
 
-describe("createGitHubOps: designRecordEditInfo has no HTTP backend", () => {
+describe("createGitHubOps: designRecordEditInfo", () => {
 	it("fetches via gh's graphql call and parses the response", async () => {
 		const raw = {
 			data: {
@@ -361,20 +388,101 @@ describe("createGitHubOps: designRecordEditInfo has no HTTP backend", () => {
 		assert.equal(ghExec.calls[0][1], "graphql");
 	});
 
-	it("throws an operation-named error rather than the raw ENOENT once it would fall back to HTTP", async () => {
+	it("falls back to a direct GraphQL POST and returns the same shape", async () => {
+		process.env.GH_TOKEN = "tok";
+		try {
+			const raw = {
+				data: {
+					repository: {
+						issue: {
+							lastEditedAt: "2026-09-05T01:00:00Z",
+							comments: {
+								totalCount: 1,
+								nodes: [
+									{
+										id: "IC_kwDOCommentNodeId",
+										lastEditedAt: null,
+									},
+								],
+							},
+						},
+					},
+				},
+			};
+			const fetch = stubFetch(raw);
+			const ops = createGitHubOps({
+				execGhImpl: stubExecGh({ "api graphql": new Error("ENOENT") }),
+				fetchImpl: fetch,
+			});
+			assert.deepEqual(await ops.designRecordEditInfo({ number: 737 }), {
+				issueLastEditedAt: "2026-09-05T01:00:00Z",
+				comments: raw.data.repository.issue.comments,
+			});
+			assert.equal(fetch.calls.length, 1);
+			assert.match(fetch.calls[0].url, /\/graphql$/);
+			assert.equal(fetch.calls[0].init.method, "POST");
+			const body = JSON.parse(fetch.calls[0].init.body);
+			assert.match(body.query, /lastEditedAt/);
+			assert.deepEqual(body.variables, {
+				owner: "takasek",
+				repo: "pfdsl",
+				number: 737,
+			});
+		} finally {
+			delete process.env.GH_TOKEN;
+		}
+	});
+
+	it("rejects a missing GraphQL issue shape explicitly", async () => {
 		process.env.GH_TOKEN = "tok";
 		try {
 			const ops = createGitHubOps({
 				execGhImpl: stubExecGh({ "api graphql": new Error("ENOENT") }),
+				fetchImpl: stubFetch({ data: { repository: { issue: null } } }),
 			});
 			await assert.rejects(
 				() => ops.designRecordEditInfo({ number: 737 }),
-				(e) => {
-					assert.match(e.message, /designRecordEditInfo/);
-					assert.match(e.message, /HTTP/);
-					return true;
-				},
+				/unexpected GraphQL response shape for design-record edit info/,
 			);
+		} finally {
+			delete process.env.GH_TOKEN;
+		}
+	});
+
+	it("rejects the same malformed comments shape explicitly in both backends", async () => {
+		process.env.GH_TOKEN = "tok";
+		try {
+			const malformed = {
+				data: {
+					repository: {
+						issue: { lastEditedAt: null, comments: { totalCount: 1 } },
+					},
+				},
+			};
+			const ghOps = createGitHubOps({
+				execGhImpl: stubExecGh({
+					"api graphql": JSON.stringify(malformed),
+				}),
+			});
+			const httpOps = createGitHubOps({
+				execGhImpl: stubExecGh({ "api graphql": new Error("ENOENT") }),
+				fetchImpl: stubFetch(malformed),
+			});
+			const errors = await Promise.all(
+				[ghOps, httpOps].map(async (ops) => {
+					try {
+						await ops.designRecordEditInfo({ number: 737 });
+						assert.fail("expected malformed response to be rejected");
+					} catch (error) {
+						return error;
+					}
+				}),
+			);
+			assert.equal(
+				errors[0].message,
+				"unexpected GraphQL response shape for design-record edit info",
+			);
+			assert.equal(errors[1].message, errors[0].message);
 		} finally {
 			delete process.env.GH_TOKEN;
 		}
@@ -468,6 +576,8 @@ describe("buildDesignRecordEditQuery", () => {
 		const queryArg = args[args.length - 1];
 		assert.match(queryArg, /lastEditedAt/);
 		assert.match(queryArg, /comments\(first:100\)/);
+		assert.match(queryArg, /totalCount/);
+		assert.match(queryArg, /nodes\s*\{\s*id\s+lastEditedAt\s*\}/);
 	});
 });
 
