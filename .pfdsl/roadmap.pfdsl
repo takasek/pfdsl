@@ -345,9 +345,9 @@ artifact:
     criteria: "issue #404 の未解決論点が docs/adr/0028-plugin-first-pfd-ops-distribution.md に決定として記録されており、plugin 経由で導入したリポで /pfd-init を実行すると install/ 相当のファイルが配置される"
   reader_first_design_records:
     label: 採用案から読める設計選択記録 (#1076)
-    description: pfd-ops の対話と公開記録を提案・理由・前提を外した対案・対案を採らない理由の順に揃え、旧形式の既存記録を移行互換で読める状態
-    status: done
-    criteria: cycle-status が reader-first な記録テンプレートを出力し、gate-check が移行後の新形式と移行前の旧形式を時点で区別して検査するテストが通る
+    description: pfd-ops の対話と公開記録を形式3の決定・理由・案の処分・前提検査の decision-first 構造へ移し、形式1・形式2・形式3を時点で移行互換に読む状態
+    status: wip
+    criteria: cycle-status が形式3の decision-first 記録テンプレートを出力し、gate-check が形式1・形式2・形式3を時点で区別して構造だけをblocking判定するテストが通る
     location: [ ../.claude/skills/pfd-ops/references/work-cycle.md, ../scripts/lib/cycle-status.mjs, ../scripts/lib/gate-check.mjs ]
   mint_check_tool:
     label: "mint-check ツール (#405)"

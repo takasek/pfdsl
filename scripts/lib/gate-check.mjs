@@ -695,38 +695,56 @@ export function classifyDesignRecordTiming(
 			status: "FAIL",
 			detail: `invalid design-selection record timestamp: ${recordIso}`,
 		};
+	if (editedAtIso && !isValidDesignRecordTimestamp(editedAtIso))
+		return {
+			status: "FAIL",
+			detail: `invalid design-selection record edit timestamp: ${editedAtIso}`,
+		};
+	const effectiveRecordIso =
+		editedAtIso &&
+		new Date(editedAtIso).getTime() > new Date(recordIso).getTime()
+			? editedAtIso
+			: recordIso;
 	if (noImplementation) {
 		const postedAfterFirstCommit =
 			firstCommitIso &&
-			new Date(recordIso).getTime() > new Date(firstCommitIso).getTime();
+			new Date(effectiveRecordIso).getTime() >
+				new Date(firstCommitIso).getTime();
 		return {
 			status: "SKIP",
 			detail: postedAfterFirstCommit
-				? `${NO_IMPLEMENTATION_COMMITS_DETAIL}; WARN: record posted at ${recordIso}, after the first commit at ${firstCommitIso}`
+				? `${NO_IMPLEMENTATION_COMMITS_DETAIL}; WARN: record ${effectiveRecordIso === recordIso ? "posted" : "edited"} at ${effectiveRecordIso}, after the first commit at ${firstCommitIso}`
 				: NO_IMPLEMENTATION_COMMITS_DETAIL,
 		};
 	}
 	if (!firstCommitIso)
 		return { status: "SKIP", detail: NO_IMPLEMENTATION_COMMITS_DETAIL };
-	if (new Date(recordIso).getTime() > new Date(firstCommitIso).getTime()) {
-		return {
-			status: "FAIL",
-			detail: `record posted at ${recordIso}, after the first commit at ${firstCommitIso}`,
-		};
-	}
 	if (
-		editedAtIso &&
-		new Date(editedAtIso).getTime() > new Date(firstCommitIso).getTime()
+		new Date(effectiveRecordIso).getTime() > new Date(firstCommitIso).getTime()
 	) {
 		return {
 			status: "FAIL",
-			detail: `record edited at ${editedAtIso}, after the first commit at ${firstCommitIso}`,
+			detail:
+				effectiveRecordIso === editedAtIso
+					? `record edited at ${editedAtIso}, after the first commit at ${firstCommitIso}`
+					: `record posted at ${recordIso}, after the first commit at ${firstCommitIso}`,
 		};
 	}
 	return { status: "PASS", detail: TIMING_ANCHOR_CAVEAT };
 }
 
-export const DESIGN_RECORD_FORMAT_CUTOFF = "2026-08-30T09:32:50Z";
+export const DESIGN_RECORD_V2_CUTOFF = "2026-08-30T09:32:50Z";
+export const DESIGN_RECORD_V3_CUTOFF = "2026-08-31T01:30:24Z";
+export const FORMAT_3_MARKER = "設計記録形式: 3";
+export const FORMAT_3_DECISION_KINDS = [
+	"実装",
+	"調査のみ",
+	"待機",
+	"実装しない",
+];
+export const FORMAT_3_DISPOSITIONS = ["採用", "部分採用", "保留", "却下"];
+// Kept for callers that still name the format 1-to-2 migration boundary.
+export const DESIGN_RECORD_FORMAT_CUTOFF = DESIGN_RECORD_V2_CUTOFF;
 export const READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES = [
 	"提案:",
 	"理由:",
@@ -804,6 +822,214 @@ export function normalizeRecordLine(line) {
 		stripped = stripped.replace(LINE_HEAD_DECORATION, "");
 	}
 	return stripped.trim();
+}
+
+const FORMAT_3_SECTION_HEADS = ["決定:", "理由:", "案の処分:", "改訂履歴:"];
+const FORMAT_3_PREMISE_HEAD = /^前提検査\s+P(\d+)\s*[:：]$/;
+const FORMAT_3_PLACEHOLDER = /[<＜][^>＞]+[>＞]/;
+
+/**
+ * Validate only the structural parts of a format 3 design record. Its prose
+ * stays opaque: the parser never infers candidate identity, rationale quality,
+ * or whether a decision and a disposition make semantic sense.
+ * @param {string | undefined | null} body
+ * @returns {{status: "PASS", axes: string[], allNoImplementation: boolean}|{status: "FAIL", problems: string[]}}
+ */
+export function parseFormat3DesignRecord(body) {
+	const lines = (body ?? "").split("\n").map(normalizeRecordLine);
+	const problems = [];
+	const markerIndexes = lines
+		.map((line, index) => (line === FORMAT_3_MARKER ? index : -1))
+		.filter((index) => index >= 0);
+	if (markerIndexes.length !== 1)
+		problems.push("format 3 marker must appear exactly once");
+	const sectionIndexes = Object.fromEntries(
+		FORMAT_3_SECTION_HEADS.map((head) => [
+			head,
+			lines
+				.map((line, index) => (line === head ? index : -1))
+				.filter((index) => index >= 0),
+		]),
+	);
+	for (const head of FORMAT_3_SECTION_HEADS) {
+		if (sectionIndexes[head].length !== 1)
+			problems.push(`${head} must appear exactly once`);
+	}
+	const decisionIndex = sectionIndexes["決定:"][0];
+	const rationaleIndex = sectionIndexes["理由:"][0];
+	const dispositionIndex = sectionIndexes["案の処分:"][0];
+	const historyIndex = sectionIndexes["改訂履歴:"][0];
+	if (
+		markerIndexes.length === 1 &&
+		decisionIndex !== undefined &&
+		lines.some(
+			(line, index) =>
+				index > markerIndexes[0] && index < decisionIndex && line.length > 0,
+		)
+	)
+		problems.push("決定: must be the first content section");
+	if (
+		decisionIndex !== undefined &&
+		rationaleIndex !== undefined &&
+		dispositionIndex !== undefined &&
+		historyIndex !== undefined &&
+		!(
+			decisionIndex < rationaleIndex &&
+			rationaleIndex < dispositionIndex &&
+			dispositionIndex < historyIndex
+		)
+	)
+		problems.push("sections must appear in canonical order");
+
+	const premiseHeaders = lines
+		.map((line, index) => {
+			const match = line.match(FORMAT_3_PREMISE_HEAD);
+			return match ? { index, number: Number(match[1]) } : null;
+		})
+		.filter(Boolean);
+	const sectionBoundaryIndexes = [
+		...FORMAT_3_SECTION_HEADS.flatMap((head) => sectionIndexes[head]),
+		...premiseHeaders.map(({ index }) => index),
+	];
+	const nextBoundary = (index) =>
+		sectionBoundaryIndexes
+			.filter((candidate) => candidate > index)
+			.sort((a, b) => a - b)[0] ?? lines.length;
+	const sectionLines = (index) =>
+		index === undefined
+			? []
+			: lines.slice(index + 1, nextBoundary(index)).filter(Boolean);
+
+	const decisionLines = sectionLines(decisionIndex);
+	const decisionPattern = new RegExp(
+		`^(.+?)\\s*（(${FORMAT_3_DECISION_KINDS.join("|")})）\\s*[:：]\\s*(.+)$`,
+	);
+	const decisions = decisionLines.map((line) => line.match(decisionPattern));
+	if (decisionLines.length === 0)
+		problems.push("決定: must contain a decision");
+	if (decisions.some((decision) => !decision))
+		problems.push("決定: contains an invalid decision line");
+	const axes = decisions.filter(Boolean).map((decision) => decision[1].trim());
+	if (new Set(axes).size !== axes.length)
+		problems.push("duplicate decision axis");
+
+	const rationaleLines = sectionLines(rationaleIndex);
+	const rationalePattern = /^(.+?)\s*[:：]\s*(.+)$/;
+	const rationales = rationaleLines.map((line) => line.match(rationalePattern));
+	if (rationaleLines.length === 0)
+		problems.push("理由: must contain a rationale");
+	if (rationales.some((rationale) => !rationale))
+		problems.push("理由: contains an invalid rationale line");
+	const rationaleAxes = new Set(
+		rationales.filter(Boolean).map((rationale) => rationale[1].trim()),
+	);
+	if (
+		axes.length > 0 &&
+		(axes.length !== rationaleAxes.size ||
+			axes.some((axis) => !rationaleAxes.has(axis)))
+	)
+		problems.push("decision and rationale axis sets must match");
+
+	const dispositionLines = sectionLines(dispositionIndex);
+	const dispositionPattern = new RegExp(
+		`^(${FORMAT_3_DISPOSITIONS.join("|")})\\s+—\\s+元候補「([^」]+)」\\s*—\\s*(.+)$`,
+	);
+	if (dispositionLines.length === 0)
+		problems.push("案の処分: must contain a disposition");
+	for (const line of dispositionLines) {
+		const match = line.match(dispositionPattern);
+		if (!match) {
+			problems.push("案の処分: contains an invalid disposition");
+			continue;
+		}
+		if (match[1] === "部分採用") {
+			const partial =
+				/採用部分\s*[:：]\s*([^;；—]+)[;；]\s*残部\s*[:：]\s*(却下|保留)\s+—\s*(.+)$/.test(
+					match[3],
+				);
+			if (!partial)
+				problems.push(
+					"部分採用 requires non-empty 採用部分 and 残部: 却下|保留",
+				);
+		}
+	}
+
+	const premiseNumbers = premiseHeaders.map(({ number }) => number);
+	if (new Set(premiseNumbers).size !== premiseNumbers.length)
+		problems.push("duplicate premise-test number");
+	if (
+		premiseNumbers.some((number, index) => number !== index + 1) ||
+		premiseNumbers.length === 0
+	)
+		problems.push("premise-test numbers must be consecutive from P1");
+	const premiseFieldHeads = [
+		"対象:",
+		"前提:",
+		"前提を外した案:",
+		"既存候補との差分:",
+	];
+	for (const premise of premiseHeaders) {
+		const premiseLines = sectionLines(premise.index);
+		const dispositionHead = `検査案の処分 P${premise.number}:`;
+		const expectedHeads = [...premiseFieldHeads, dispositionHead];
+		const fields = premiseLines.map((line) => {
+			const head = expectedHeads.find((candidate) =>
+				lineHeadPattern(candidate).test(line),
+			);
+			if (!head) return null;
+			const value = line.replace(lineHeadPattern(head), "").trim();
+			return { head, value };
+		});
+		if (fields.some((field) => !field)) {
+			problems.push(`前提検査 P${premise.number}: contains an invalid field`);
+			continue;
+		}
+		if (
+			fields.length !== expectedHeads.length ||
+			fields.some((field, index) => field.head !== expectedHeads[index])
+		)
+			problems.push(
+				`前提検査 P${premise.number}: fields must appear once in canonical order`,
+			);
+		for (const field of fields.filter((field) => field.value.length === 0))
+			problems.push(`${field.head} contains an empty value`);
+		const disposition = fields
+			.at(-1)
+			?.value.match(
+				new RegExp(`^(${FORMAT_3_DISPOSITIONS.join("|")})\\s+—\\s+(.+)$`),
+			);
+		if (!disposition)
+			problems.push(
+				`検査案の処分 P${premise.number}: must declare a disposition and reason`,
+			);
+	}
+
+	const historyLines = sectionLines(historyIndex);
+	const hasNone = historyLines.includes("なし");
+	const revisionRows = historyLines.filter((line) => line !== "なし");
+	if (historyLines.length === 0 || (hasNone && revisionRows.length > 0))
+		problems.push(
+			"改訂履歴: must contain either - なし or revision rows, not both",
+		);
+	if (!hasNone) {
+		const revisionPattern =
+			/^(.+)\s+→\s+(.+)\s+—\s+(.+)\s+—\s+再承認\s*[:：]\s*(.+)$/;
+		if (revisionRows.some((line) => !revisionPattern.test(line)))
+			problems.push(
+				"改訂履歴: revision rows need old decision, new decision, reason, and 再承認",
+			);
+	}
+	if (lines.some((line) => FORMAT_3_PLACEHOLDER.test(line)))
+		problems.push("template placeholder remains");
+	if (problems.length > 0)
+		return { status: "FAIL", problems: [...new Set(problems)] };
+	return {
+		status: "PASS",
+		axes,
+		allNoImplementation: decisions.every(
+			(decision) => decision[2] === "実装しない",
+		),
+	};
 }
 
 const REGEXP_METACHARS = /[.*+?^${}()|[\]\\]/g;
@@ -901,6 +1127,15 @@ export function presentRequiredPrefixes(recordBody, createdAt) {
  */
 export function classifyDesignRecordRequiredFormat(recordBody, createdAt) {
 	const body = recordBody ?? "";
+	if (
+		isValidDesignRecordTimestamp(createdAt) &&
+		new Date(createdAt).getTime() >= new Date(DESIGN_RECORD_V3_CUTOFF).getTime()
+	) {
+		const parsed = parseFormat3DesignRecord(body);
+		return parsed.status === "PASS"
+			? { status: "PASS" }
+			: { status: "FAIL", detail: parsed.problems.join("; ") };
+	}
 	const requiredPrefixes = resolveDesignRecordRequiredPrefixes({
 		body,
 		createdAt,
@@ -991,52 +1226,85 @@ export function toDesignRecordEntries({ comments }) {
  * Measured over this repo's issues, bodies carry a stray required line head often enough that a first-match search would elect the body and never examine the real record in a comment — a check aimed at the wrong text, which reads exactly like a check that ran.
  * @param {Array<{author?: string, body?: string, createdAt?: string}>} entries
  */
-export function selectDesignRecord(entries) {
-	let completeReaderFirst;
-	let completeLegacy;
-	let readerFirstBest;
-	let readerFirstBestCount = 0;
-	let legacyBest;
-	let legacyBestCount = 0;
+/**
+ * Resolve a comment list through the three generation windows. Invalid new
+ * fragments remain inspectable only when no complete timestamped record won.
+ * @param {Array<{body?: string, createdAt?: string}>} entries
+ * @returns {{status: "selected", record: object}|{status: "invalid", record: object, problems: string[]}|{status: "none"}|{status: "ambiguous", detail: string}}
+ */
+export function resolveDesignRecord(entries) {
+	const complete = { 1: [], 2: [], 3: [] };
+	const invalid = [];
 	for (const entry of entries ?? []) {
+		const body = entry.body ?? "";
+		const normalized = body.split("\n").map(normalizeRecordLine);
+		const hasFormat3Marker = normalized.includes(FORMAT_3_MARKER);
 		const readerFirstCount = presentPrefixes(
-			entry.body,
+			body,
 			READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
 		).length;
 		const legacyCount = presentPrefixes(
-			entry.body,
+			body,
 			LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES,
 		).length;
-		const timestampValid = isValidDesignRecordTimestamp(entry.createdAt);
-		if (
-			!completeReaderFirst &&
-			timestampValid &&
-			readerFirstCount ===
-				READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES.length &&
-			classifyDesignRecordRequiredFormat(entry.body, entry.createdAt).status ===
-				"PASS"
-		)
-			completeReaderFirst = entry;
-		if (
-			!completeLegacy &&
-			timestampValid &&
-			readerFirstCount === 0 &&
-			legacyCount === LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES.length &&
-			new Date(entry.createdAt).getTime() <
-				new Date(DESIGN_RECORD_FORMAT_CUTOFF).getTime()
-		)
-			completeLegacy = entry;
-		if (readerFirstCount > 0) {
-			if (readerFirstCount > readerFirstBestCount) {
-				readerFirstBest = entry;
-				readerFirstBestCount = readerFirstCount;
-			}
-		} else if (legacyCount > legacyBestCount) {
-			legacyBest = entry;
-			legacyBestCount = legacyCount;
+		const looksLikeRecord =
+			hasFormat3Marker || readerFirstCount > 0 || legacyCount > 0;
+		if (!looksLikeRecord) continue;
+		if (!isValidDesignRecordTimestamp(entry.createdAt)) {
+			invalid.push({
+				record: entry,
+				problems: [
+					`invalid design-selection record timestamp: ${entry.createdAt ?? "missing"}`,
+				],
+			});
+			continue;
 		}
+		const timestamp = new Date(entry.createdAt).getTime();
+		if (timestamp >= new Date(DESIGN_RECORD_V3_CUTOFF).getTime()) {
+			const parsed = parseFormat3DesignRecord(body);
+			if (parsed.status === "PASS") complete[3].push(entry);
+			else invalid.push({ record: entry, problems: parsed.problems });
+			continue;
+		}
+		if (timestamp >= new Date(DESIGN_RECORD_V2_CUTOFF).getTime()) {
+			const result = classifyDesignRecordRequiredFormat(body, entry.createdAt);
+			if (result.status === "PASS") complete[2].push(entry);
+			else invalid.push({ record: entry, problems: [result.detail] });
+			continue;
+		}
+		const result = classifyDesignRecordRequiredFormat(body, entry.createdAt);
+		if (result.status === "PASS") complete[1].push(entry);
+		else invalid.push({ record: entry, problems: [result.detail] });
 	}
-	return completeReaderFirst ?? completeLegacy ?? readerFirstBest ?? legacyBest;
+	if (complete[3].length > 1)
+		return {
+			status: "ambiguous",
+			detail: "multiple complete format 3 design records",
+		};
+	for (const format of [3, 2, 1]) {
+		if (complete[format].length > 0)
+			return { status: "selected", record: complete[format][0] };
+	}
+	if (invalid.length > 0)
+		return {
+			status: "invalid",
+			record: invalid[0].record,
+			problems: invalid[0].problems.filter(Boolean),
+		};
+	return { status: "none" };
+}
+
+/**
+ * Compatibility wrapper for callers that only need the selected entry. The
+ * diagnostic candidate remains returned so existing format-detail consumers
+ * can continue to print why it failed.
+ * @param {Array<{body?: string, createdAt?: string}>} entries
+ */
+export function selectDesignRecord(entries) {
+	const result = resolveDesignRecord(entries);
+	return result.status === "selected" || result.status === "invalid"
+		? result.record
+		: undefined;
 }
 
 const NUMBERED_DISPOSITION_LINE_PATTERN = new RegExp(
@@ -1080,6 +1348,15 @@ export function classifyDesignRecordContent(
 	createdAt,
 ) {
 	const body = recordBody ?? "";
+	if (
+		isValidDesignRecordTimestamp(createdAt) &&
+		new Date(createdAt).getTime() >= new Date(DESIGN_RECORD_V3_CUTOFF).getTime()
+	) {
+		const parsed = parseFormat3DesignRecord(body);
+		return parsed.status === "PASS"
+			? { status: "PASS" }
+			: { status: "FAIL", detail: parsed.problems.join("; ") };
+	}
 	const problems = [];
 	const requiredFormat = classifyDesignRecordRequiredFormat(body, createdAt);
 	if (requiredFormat.status === "FAIL") problems.push(requiredFormat.detail);

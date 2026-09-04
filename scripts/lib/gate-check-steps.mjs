@@ -21,16 +21,16 @@ import {
 	classifyDesignRecordTiming,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
-	hasNoImplementationDisposition,
 	hasStatusChange,
 	lintCommitSubjects,
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
 	parseCommitLogLines,
+	parseFormat3DesignRecord,
+	resolveDesignRecord,
 	resolveRecordEditedAt,
 	SIZE_TRACKED_PATTERNS,
-	selectDesignRecord,
 	statusChangedForArtifact,
 	toDesignRecordEntries,
 	unionCommitLogEntries,
@@ -325,11 +325,20 @@ export function designRecordStep({
 	// the timing check passed by construction for anything the body won. What
 	// looked like one entry among the rest was the one entry the check could not
 	// fail.
-	const record = selectDesignRecord(toDesignRecordEntries(issue));
+	const resolution = resolveDesignRecord(toDesignRecordEntries(issue));
 
-	if (!record) {
+	if (resolution.status === "none") {
 		return { name, ...classifyDesignRecordTiming(undefined, null) };
 	}
+	if (resolution.status === "ambiguous")
+		return { name, status: "FAIL", detail: resolution.detail };
+	if (resolution.status === "invalid")
+		return {
+			name,
+			status: "FAIL",
+			detail: resolution.problems.join("; "),
+		};
+	const record = resolution.record;
 
 	const firstCommitIso = firstCommitAuthorDate({ exec, base }).iso;
 
@@ -341,7 +350,9 @@ export function designRecordStep({
 		editInfo ?? null,
 	);
 
-	const noImplementation = hasNoImplementationDisposition(record.body);
+	const parsedFormat3 = parseFormat3DesignRecord(record.body);
+	const noImplementation =
+		parsedFormat3.status === "PASS" && parsedFormat3.allNoImplementation;
 	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso, {
 		editedAtIso,
 		noImplementation,
@@ -351,9 +362,8 @@ export function designRecordStep({
 		record.body,
 		record.createdAt,
 	);
-	// #737 案1 remains advisory for disposition semantics. Required line
-	// completeness and reader-first order define whether the comment is a record
-	// at all, so those format failures block independently of timing.
+	// Format 3's parser owns a structural verdict. Earlier generations retain
+	// their advisory disposition-content detail for migration compatibility.
 	const content = classifyDesignRecordContent(
 		record.body,
 		optionCount,
@@ -378,7 +388,14 @@ export function designRecordStep({
 			.join("; ") || undefined;
 	return {
 		name,
-		status: requiredFormat.status === "FAIL" ? "FAIL" : timing.status,
+		status:
+			requiredFormat.status === "FAIL" ||
+			(parsedFormat3.status === "FAIL" &&
+				record.body
+					.split("\n")
+					.some((line) => line.includes("設計記録形式: 3")))
+				? "FAIL"
+				: timing.status,
 		detail,
 	};
 }

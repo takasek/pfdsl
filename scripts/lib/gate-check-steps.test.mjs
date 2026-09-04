@@ -698,11 +698,7 @@ describe("designRecordStep", () => {
 		assert.doesNotMatch(result.detail ?? "", /id not found/);
 	});
 
-	// #768: the #757 shape — the decision led to not implementing, and a
-	// later, unrelated PR happens to be what closes this issue's range. The
-	// range is not empty, so the no-commit SKIP above never fires; the record
-	// itself has to carry the signal instead.
-	it("SKIPs a commit-bearing range when the record's own line head declares no implementation", () => {
+	it("does not skip a legacy record merely because it has an 実装しない line", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
 		});
@@ -720,8 +716,7 @@ describe("designRecordStep", () => {
 				],
 			}),
 		});
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /no implementation commits/);
+		assert.equal(result.status, "PASS");
 	});
 
 	// #768 実害の再現: 実際に踏んだ形。前提の一文がこの語を主題として言及しているだけで、
@@ -1481,5 +1476,110 @@ describe("deletedFilesSince", () => {
 	it("returns nothing rather than throwing when git fails", () => {
 		const { exec } = fakeExec({ "git diff --diff-filter=D": { ok: false } });
 		assert.deepEqual(deletedFilesSince({ exec, base: "main" }), []);
+	});
+});
+
+function format3Record() {
+	return [
+		"設計記録形式: 3",
+		"決定:",
+		"- 保存方式（実装）: Aを段階導入する",
+		"理由:",
+		"- 保存方式: 障害範囲を限定できる",
+		"案の処分:",
+		"- 部分採用 — 元候補「A」— 採用部分: 索引; 残部: 保留 — 負荷計測後に再検討",
+		"前提検査 P1:",
+		"対象: 保存方式 / A",
+		"前提: 保存方式と通知方式を同時に変える必要がある",
+		"前提を外した案: 保存方式だけを段階導入する",
+		"既存候補との差分: 元候補は両方式を一組としていた",
+		"検査案の処分 P1: 採用 — 今回の決定に含める",
+		"改訂履歴:",
+		"- なし",
+	].join("\n");
+}
+
+describe("format 3 designRecordStep", () => {
+	const issue = (comments) => ({ body: "通常のissue本文。", comments });
+
+	it("FAILs rather than electing one of two complete format 3 comments", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-09-02T00:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue([
+				{ body: format3Record(), createdAt: "2026-09-01T00:00:00Z" },
+				{ body: format3Record(), createdAt: "2026-09-01T01:00:00Z" },
+			]),
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /multiple complete format 3 design records/);
+	});
+
+	it("uses the later format 3 edit time for the implementation timing check", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-09-02T00:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue([
+				{
+					id: "format3",
+					body: format3Record(),
+					createdAt: "2026-09-01T00:00:00Z",
+				},
+			]),
+			editInfo: {
+				issueLastEditedAt: null,
+				comments: {
+					totalCount: 1,
+					nodes: [{ id: "format3", lastEditedAt: "2026-09-03T00:00:00Z" }],
+				},
+			},
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /edited at 2026-09-03T00:00:00Z/);
+	});
+
+	it("SKIPs timing only when every format 3 decision says not to implement", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-09-02T00:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue([
+				{
+					body: format3Record().replace(
+						"保存方式（実装）",
+						"保存方式（実装しない）",
+					),
+					createdAt: "2026-09-01T00:00:00Z",
+				},
+			]),
+		});
+		assert.equal(result.status, "SKIP");
+		assert.match(result.detail, /no implementation commits/);
+	});
+
+	it("keeps a complete format 2 record selected beside an incomplete format 3 fragment", () => {
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-09-02T00:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			issue: issue([
+				{
+					body: "提案: x\n理由: y\n前提を外した対案: z\n対案を採らない理由: owner constraint",
+					createdAt: "2026-08-30T09:32:50Z",
+				},
+				{ body: "設計記録形式: 3", createdAt: "2026-09-01T00:00:00Z" },
+			]),
+		});
+		assert.equal(result.status, "PASS");
 	});
 });
