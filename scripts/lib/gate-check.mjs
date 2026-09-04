@@ -828,6 +828,34 @@ const FORMAT_3_SECTION_HEADS = ["決定:", "理由:", "案の処分:", "改訂�
 const FORMAT_3_PREMISE_HEAD = /^前提検査\s+P(\d+)\s*[:：]$/;
 const FORMAT_3_PLACEHOLDER = /[<＜][^>＞]+[>＞]/;
 
+function parsePartialAdoption(value) {
+	const match = value.match(
+		/^採用部分\s*[:：]\s*([^;；—]+)[;；]\s*残部\s*[:：]\s*(却下|保留)\s+—\s*(.+)$/,
+	);
+	if (!match) return null;
+	const [, adoptedPart, remainderKind, remainderReason] = match;
+	if (
+		[adoptedPart, remainderKind, remainderReason].some(
+			(part) => part.trim().length === 0,
+		)
+	)
+		return null;
+	return { adoptedPart, remainderKind, remainderReason };
+}
+
+function parseRevisionRow(line) {
+	const match = line.match(
+		/^(.+)\s+→\s+(.+)\s+—\s+(.+)\s+—\s+再承認\s*[:：]\s*(.+)$/,
+	);
+	if (!match) return null;
+	const [, oldDecision, newDecision, reason, reapproval] = match;
+	return [oldDecision, newDecision, reason, reapproval].every(
+		(field) => field.trim().length > 0,
+	)
+		? { oldDecision, newDecision, reason, reapproval }
+		: null;
+}
+
 /**
  * Validate only the structural parts of a format 3 design record. Its prose
  * stays opaque: the parser never infers candidate identity, rationale quality,
@@ -944,16 +972,8 @@ export function parseFormat3DesignRecord(body) {
 		}
 		if (match[2].trim().length === 0)
 			problems.push("案の処分: contains an empty original candidate");
-		if (match[1] === "部分採用") {
-			const partial =
-				/採用部分\s*[:：]\s*([^;；—]+)[;；]\s*残部\s*[:：]\s*(却下|保留)\s+—\s*(.+)$/.test(
-					match[3],
-				);
-			if (!partial)
-				problems.push(
-					"部分採用 requires non-empty 採用部分 and 残部: 却下|保留",
-				);
-		}
+		if (match[1] === "部分採用" && !parsePartialAdoption(match[3]))
+			problems.push("部分採用 requires non-empty 採用部分 and 残部: 却下|保留");
 	}
 
 	const premiseNumbers = premiseHeaders.map(({ number }) => number);
@@ -1014,6 +1034,13 @@ export function parseFormat3DesignRecord(body) {
 			problems.push(
 				`検査案の処分 P${premise.number}: must declare a disposition and reason`,
 			);
+		else if (
+			disposition[1] === "部分採用" &&
+			!parsePartialAdoption(disposition[2])
+		)
+			problems.push(
+				`検査案の処分 P${premise.number}: 部分採用 requires non-empty 採用部分 and 残部: 却下|保留`,
+			);
 	}
 
 	const historyLines = sectionLines(historyIndex);
@@ -1024,9 +1051,7 @@ export function parseFormat3DesignRecord(body) {
 			"改訂履歴: must contain either - なし or revision rows, not both",
 		);
 	if (!hasNone) {
-		const revisionPattern =
-			/^(.+)\s+→\s+(.+)\s+—\s+(.+)\s+—\s+再承認\s*[:：]\s*(.+)$/;
-		if (revisionRows.some((line) => !revisionPattern.test(line)))
+		if (revisionRows.some((line) => !parseRevisionRow(line)))
 			problems.push(
 				"改訂履歴: revision rows need old decision, new decision, reason, and 再承認",
 			);

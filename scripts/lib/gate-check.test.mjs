@@ -2111,6 +2111,89 @@ describe("format 3 design records", () => {
 		assert.match(result.problems.join("\n"), /original candidate/);
 	});
 
+	for (const [name, replacement] of [
+		[
+			"original partial-adoption selected part",
+			"採用部分: \t ; 残部: 保留 — 負荷計測後に再検討",
+		],
+		[
+			"original partial-adoption remainder kind",
+			"採用部分: 索引; 残部: \t — 負荷計測後に再検討",
+		],
+		[
+			"original partial-adoption remainder reason",
+			"採用部分: 索引; 残部: 保留 — \t ",
+		],
+	]) {
+		it(`rejects a whitespace-only ${name}`, () => {
+			const result = parseFormat3DesignRecord(
+				format3Record().replace(
+					"採用部分: 索引; 残部: 保留 — 負荷計測後に再検討",
+					replacement,
+				),
+			);
+			assert.equal(result.status, "FAIL");
+			assert.match(result.problems.join("\n"), /部分採用/);
+		});
+	}
+
+	it("accepts a complete premise partial-adoption disposition", () => {
+		const result = parseFormat3DesignRecord(
+			format3Record().replace(
+				"検査案の処分 P1: 採用 — 今回の決定に含める",
+				"検査案の処分 P1: 部分採用 — 採用部分: 索引; 残部: 保留 — 負荷計測後に再検討",
+			),
+		);
+		assert.equal(result.status, "PASS");
+	});
+
+	for (const [name, replacement] of [
+		[
+			"selected part",
+			"検査案の処分 P1: 部分採用 — 採用部分: \t ; 残部: 保留 — 負荷計測後に再検討",
+		],
+		[
+			"remainder kind",
+			"検査案の処分 P1: 部分採用 — 採用部分: 索引; 残部: \t — 負荷計測後に再検討",
+		],
+		[
+			"remainder reason",
+			"検査案の処分 P1: 部分採用 — 採用部分: 索引; 残部: 保留 — \t ",
+		],
+	]) {
+		it(`rejects a premise partial-adoption with a whitespace-only ${name}`, () => {
+			const result = parseFormat3DesignRecord(
+				format3Record().replace(
+					"検査案の処分 P1: 採用 — 今回の決定に含める",
+					replacement,
+				),
+			);
+			assert.equal(result.status, "FAIL");
+			assert.match(result.problems.join("\n"), /部分採用/);
+		});
+	}
+
+	for (const [name, replacement] of [
+		[
+			"old decision",
+			"\t → B — 変更理由 — 再承認: https://example.test/approval",
+		],
+		[
+			"new decision",
+			"A → \t — 変更理由 — 再承認: https://example.test/approval",
+		],
+		["reason", "A → B — \t — 再承認: https://example.test/approval"],
+		["reapproval", "A → B — 変更理由 — 再承認: \t"],
+	]) {
+		it(`rejects a revision with a whitespace-only ${name}`, () => {
+			const result = parseFormat3DesignRecord(
+				format3Record().replace("- なし", `- ${replacement}`),
+			);
+			assert.equal(result.status, "FAIL");
+			assert.match(result.problems.join("\n"), /改訂履歴/);
+		});
+	}
+
 	it("rejects a complete premise-test block before the rationale section", () => {
 		const premise = [
 			"前提検査 P1:",

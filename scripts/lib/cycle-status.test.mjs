@@ -821,6 +821,12 @@ describe("buildDesignRecordTemplate", () => {
 		assert.match(note, /意味的.*整合/);
 		assert.match(note, /人間レビュー/);
 	});
+
+	it("guides partial adoption for original and premise dispositions", () => {
+		const { note } = buildDesignRecordTemplate();
+		assert.match(note, /部分採用.*採用部分.*残部/);
+		assert.match(note, /検査案の処分 Pn.*部分採用/);
+	});
 });
 
 describe("buildReviewRecordTemplate", () => {
