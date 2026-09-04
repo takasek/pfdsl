@@ -1459,6 +1459,62 @@ describe("classifySizeDirection", () => {
 		assert.match(result.detail, /\+5 lines/);
 	});
 
+	it("PASSes retro catalogue growth while keeping its delta visible", () => {
+		const result = classifySizeDirection({
+			issueBody: declared,
+			deltas: [
+				{
+					...grownDelta,
+					path: ".pfdsl/bindings/pfd-retro-patterns/entries.pfdsl",
+				},
+			],
+			overrideDeclared: false,
+		});
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /excluded retro output/);
+		assert.match(result.detail, /pfd-retro-patterns\/entries\.pfdsl/);
+		assert.match(result.detail, /\+50 bytes/);
+	});
+
+	it("keeps retro output separate from non-retro growth accepted by Size-Override", () => {
+		const result = classifySizeDirection({
+			issueBody: declared,
+			deltas: [
+				{
+					...grownDelta,
+					path: ".pfdsl/bindings/pfd-retro-patterns/entries.pfdsl",
+				},
+				{ ...grownDelta, path: "docs/adr/0002-growth.md" },
+			],
+			overrideDeclared: true,
+		});
+		assert.equal(result.status, "PASS");
+		assert.match(
+			result.detail,
+			/^excluded retro output: .*pfd-retro-patterns\/entries\.pfdsl.*; growth accepted via Size-Override: .*docs\/adr\/0002-growth\.md.*$/,
+		);
+	});
+
+	it("FAILs ordinary growth without an override while retaining mixed growth details", () => {
+		const result = classifySizeDirection({
+			issueBody: declared,
+			deltas: [
+				{
+					...grownDelta,
+					path: ".pfdsl/bindings/pfd-retro-patterns/catalogue.md",
+				},
+				{ ...grownDelta, path: "docs/adr/0002-growth.md" },
+			],
+			overrideDeclared: false,
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(
+			result.detail,
+			/^excluded retro output: .*pfd-retro-patterns\/catalogue\.md: \+50 bytes \/ \+5 lines.*; docs\/adr\/0002-growth\.md: \+50 bytes \/ \+5 lines.*$/,
+		);
+		assert.doesNotMatch(result.detail, /growth accepted via Size-Override/);
+	});
+
 	it("PASSes growth that a commit trailer declared", () => {
 		const result = classifySizeDirection({
 			issueBody: declared,

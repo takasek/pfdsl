@@ -1479,6 +1479,7 @@ export const SIZE_TRACKED_PATTERNS = [
 	/^docs\/adr\//,
 	/(^|\/)SKILL\.md$/,
 ];
+const RETRO_PATTERN_CATALOG_PREFIX = ".pfdsl/bindings/pfd-retro-patterns/";
 export const SIZE_OVERRIDE_PATTERN = /^Size-Override:\s*\S/m;
 
 /**
@@ -1568,12 +1569,13 @@ export function formatSizeDelta(d) {
  * gone (#775).
  *
  * Both declarations are self-reported: the issue filer opts into the direction
- * check with `Size-Intent: shrink`, and the runner can accept measured growth
- * with a `Size-Override:` trailer. This classifier evaluates the supplied
- * measured deltas, not whether either declaration reflects its author's real
- * intent. No detector is added for that semantic claim: the deltas are reported
- * with or without the declarations, leaving their justification visible to
- * human review (#910).
+ * check with `Size-Intent: shrink`, and the runner can accept non-retro growth
+ * with a `Size-Override:` trailer. Retro pattern-catalogue growth remains in
+ * detail but is excluded from the verdict because pfd-retro itself produces it.
+ * This classifier evaluates the supplied measured deltas, not whether either
+ * declaration reflects its author's real intent. No detector is added for that
+ * semantic claim: the deltas are reported with or without the declarations,
+ * leaving their justification visible to human review (#910).
  * @param {{issueBody?: string, deltas: SizeDelta[], overrideDeclared?: boolean}} params
  * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
  */
@@ -1591,14 +1593,33 @@ export function classifySizeDirection({ issueBody, deltas, overrideDeclared }) {
 	const grown = deltas.filter((d) => d.afterBytes > d.beforeBytes);
 	if (grown.length === 0) return { status: "PASS" };
 
-	const list = grown.map(formatSizeDelta).join(", ");
+	const retroGrowth = grown.filter((d) =>
+		d.path.startsWith(RETRO_PATTERN_CATALOG_PREFIX),
+	);
+	const gatedGrowth = grown.filter(
+		(d) => !d.path.startsWith(RETRO_PATTERN_CATALOG_PREFIX),
+	);
+	const retroDetail =
+		retroGrowth.length > 0
+			? `excluded retro output: ${retroGrowth.map(formatSizeDelta).join(", ")}`
+			: null;
+	if (gatedGrowth.length === 0) {
+		return { status: "PASS", detail: retroDetail };
+	}
+
+	const list = gatedGrowth.map(formatSizeDelta).join(", ");
 	if (overrideDeclared) {
 		return {
 			status: "PASS",
-			detail: `growth accepted via Size-Override: ${list}`,
+			detail: [retroDetail, `growth accepted via Size-Override: ${list}`]
+				.filter(Boolean)
+				.join("; "),
 		};
 	}
-	return { status: "FAIL", detail: list };
+	return {
+		status: "FAIL",
+		detail: [retroDetail, list].filter(Boolean).join("; "),
+	};
 }
 
 /**
