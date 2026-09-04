@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parseFrontmatterCst } from "./frontmatter-cst.js";
 import {
+	analyze,
 	format,
 	normalizeDocument,
 	parse,
@@ -18,6 +19,121 @@ const samplePath = resolve(__dirname, "__fixtures__/pipeline-scale.pfdsl");
 const sampleSource = readFileSync(samplePath, "utf-8");
 
 describe("public API", () => {
+	it("analyze: warns when a plain frontmatter scalar is truncated by an inline comment", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    criteria: Details are in issue #123\n---\nspec >> P -> output\n";
+
+		expect(analyze(src).diagnostics).toContainEqual({
+			severity: "warning",
+			code: "FM003",
+			message:
+				"Inline comment may truncate an intended plain-scalar value; quote the value or use a block scalar.",
+			range: {
+				start: { line: 4, column: 36, offset: 57 },
+				end: { line: 4, column: 37, offset: 58 },
+			},
+		});
+	});
+
+	it("analyze: locates an inline-comment warning in LF and CRLF frontmatter", () => {
+		for (const [newline, offset] of [
+			["\n", 57],
+			["\r\n", 60],
+		] as const) {
+			const src = [
+				"---",
+				"artifact:",
+				"  spec:",
+				"    criteria: Details are in issue #123",
+				"---",
+				"spec >> P -> output",
+				"",
+			].join(newline);
+			const diagnostic = analyze(src).diagnostics.find(
+				(d) => d.code === "FM003",
+			);
+			expect(diagnostic?.range).toEqual({
+				start: { line: 4, column: 36, offset },
+				end: { line: 4, column: 37, offset: offset + 1 },
+			});
+		}
+	});
+
+	it("analyze: excludes quoted, block, flow, comment-only, and empty scalar values", () => {
+		const src =
+			'---\nartifact:\n  quoted:\n    label: "Quoted # value"\n  quoted_with_comment:\n    label: "value" # comment\n  multiline_quoted:\n    description: "first line\n      example: value # quoted text"\n  single:\n    label: \'Single # value\'\n  single_with_comment:\n    label: \'value\' # comment\n  folded:\n    description: >\n      example: value # folded text\n  folded_with_comment:\n    description: > # comment\n      value\n  literal:\n    description: |\n      example: value # literal text\n  literal_with_comment:\n    description: | # comment\n      value\n  flow_with_comment:\n    tags: [value] # comment\n  map_with_comment:\n    style: {key: value} # comment\n  empty:\n    label: # only a comment\n# standalone comment\n---\nquoted >> P -> output\n';
+
+		expect(analyze(src).diagnostics.map((d) => d.code)).not.toContain("FM003");
+	});
+
+	it("analyze: excludes mapping keys, scalar styles, collection comments, and hashes without a separator", () => {
+		const src =
+			'---\n? key # comment\n: value\nquoted: "value" # comment\nblock: > # comment\n  value\nflow: [value] # comment\nno_separator: value#123\n---\ninput >> P -> output\n';
+
+		expect(parse(src).frontmatter).toEqual({
+			key: "value",
+			quoted: "value",
+			block: "value\n",
+			flow: ["value"],
+			no_separator: "value#123",
+		});
+		expect(analyze(src).diagnostics.map((d) => d.code)).not.toContain("FM003");
+	});
+
+	it("analyze: detects an inline plain-scalar comment for an unknown field", () => {
+		const src = "---\ncustom: intended value #123\n---\ninput >> P -> output\n";
+
+		expect(analyze(src).diagnostics.map((d) => d.code)).toContain("FM003");
+	});
+
+	it("analyze: warns for a block sequence plain scalar followed by a comment (regression: Pair-only CST traversal)", () => {
+		const src =
+			"---\nartifact:\n  steps:\n    - intended value #123\n---\nstep >> P -> output\n";
+
+		expect(parse(src).frontmatter).toEqual({
+			artifact: { steps: ["intended value"] },
+		});
+		expect(analyze(src).diagnostics).toContainEqual({
+			severity: "warning",
+			code: "FM003",
+			message:
+				"Inline comment may truncate an intended plain-scalar value; quote the value or use a block scalar.",
+			range: {
+				start: { line: 4, column: 22, offset: 44 },
+				end: { line: 4, column: 23, offset: 45 },
+			},
+		});
+	});
+
+	it("analyze: warns for a flow collection plain scalar followed by a comment (regression: flow-path exclusion)", () => {
+		const src =
+			"---\ntags: [one, intended value # comment\n]\n---\ninput >> P -> output\n";
+
+		expect(parse(src).frontmatter).toEqual({
+			tags: ["one", "intended value"],
+		});
+		expect(analyze(src).diagnostics).toContainEqual({
+			severity: "warning",
+			code: "FM003",
+			message:
+				"Inline comment may truncate an intended plain-scalar value; quote the value or use a block scalar.",
+			range: {
+				start: { line: 2, column: 28, offset: 31 },
+				end: { line: 2, column: 29, offset: 32 },
+			},
+		});
+	});
+
+	it("analyze: promotes the inline-comment diagnostic in strict mode", () => {
+		const src =
+			"---\nartifact:\n  spec:\n    criteria: Details are in issue #123\n---\nspec >> P -> output\n";
+
+		expect(
+			analyze(src, { strict: true }).diagnostics.find((d) => d.code === "FM003")
+				?.severity,
+		).toBe("error");
+	});
+
 	it("parse: parses the sample .pfdsl file without syntax errors", () => {
 		const result = parse(sampleSource);
 		const errors = result.diagnostics.filter((d) => d.severity === "error");

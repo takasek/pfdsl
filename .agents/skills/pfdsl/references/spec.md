@@ -30,6 +30,7 @@ PFDSL は以下を目的とする。
 
 front matter が存在しないファイルも有効とする。
 front matter はファイル先頭にのみ記述できる。
+mapping key ではない YAML プレーンスカラー値の同一行に空白に続く `#` が現れると、YAML では以降がコメントとして扱われる。block sequence 要素と flow collection 内の scalar 値も対象とし、quoted scalar・block scalar・collection 自体の後の comment・空値または comment-only 値は除く。この形は FM003 として警告し、strict mode では error とする。意図した値に `#` を含める場合は値を引用符で囲むか block scalar を使用する。
 
 ---
 
@@ -1159,6 +1160,7 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 |---|---|---|---|
 | FM001 | error | §2.1 | front matter の閉じ `---` がない |
 | FM002 | error | §2.1 | front matter の YAML が不正 |
+| FM003 | warning (--strict: error) | §2.1 | プレーンスカラー値の inline comment により意図した値が切り詰められる可能性がある |
 | P001 | error | §8 | 構文不正（汎用トークンエラー） |
 | P002 | error | §11 | artifact 集合内で識別子が期待される位置に無い |
 | P003 | error | §11 | artifact 集合内でカンマの後に識別子が無い |

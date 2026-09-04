@@ -27,6 +27,8 @@ const warningOnly =
 	"---\nartifact:\n  bundle:\n    parts: [orphan]\n---\nreq >> design -> bundle\n"; // W001: orphan has no edges
 // V002 (process with no inputs): a warning by default, an error under --strict.
 const incomplete = "P -> B\n";
+const inlineComment =
+	"---\nartifact:\n  spec:\n    criteria: Details are in issue #123\n---\nspec >> P -> output\n";
 
 beforeAll(() => {
 	dir = mkdtempSync(join(tmpdir(), "pfdsl-cli-"));
@@ -35,6 +37,7 @@ beforeAll(() => {
 	writeFileSync(join(dir, "invalid.pfdsl"), invalid);
 	writeFileSync(join(dir, "warning-only.pfdsl"), warningOnly);
 	writeFileSync(join(dir, "incomplete.pfdsl"), incomplete);
+	writeFileSync(join(dir, "inline-comment.pfdsl"), inlineComment);
 });
 
 afterAll(() => {
@@ -83,6 +86,20 @@ describe("check", () => {
 		const r = await run(["check", join(dir, "valid.pfdsl"), "--strict"]);
 		expect(r.exitCode).toBe(0);
 	});
+	it("reports FM003 as a warning for an inline plain-scalar comment", async () => {
+		const r = await run(["check", join(dir, "inline-comment.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("FM003");
+	});
+	it("promotes FM003 to an error under --strict", async () => {
+		const r = await run([
+			"check",
+			join(dir, "inline-comment.pfdsl"),
+			"--strict",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("FM003");
+	});
 	it("returns 1 with readable message for missing file, no stack trace", async () => {
 		const r = await run(["check", join(dir, "nonexistent.pfdsl")]);
 		expect(r.exitCode).toBe(1);
@@ -99,6 +116,20 @@ describe("check", () => {
 });
 
 describe("fmt", () => {
+	it("surfaces FM003 without changing the inline plain-scalar value", async () => {
+		const r = await run(["fmt", join(dir, "inline-comment.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("    criteria: Details are in issue #123\n");
+		expect(r.stderr).toContain("FM003");
+		expect(r.stderr).not.toMatch(/\n\n$/);
+	});
+
+	it("does not surface existing non-FM003 warnings", async () => {
+		const r = await run(["fmt", join(dir, "warning-only.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stderr).toBe("");
+	});
+
 	it("prints flows formatted output to stdout (default)", async () => {
 		const r = await run(["fmt", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(0);
@@ -1412,6 +1443,15 @@ describe("shouldColorize (#435)", () => {
 });
 
 describe("--json output (#181)", () => {
+	it("check --json includes the FM003 warning", async () => {
+		const r = await run(["check", join(dir, "inline-comment.pfdsl"), "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.diagnostics).toContainEqual(
+			expect.objectContaining({ code: "FM003", severity: "warning" }),
+		);
+	});
+
 	it("check --json returns { ok: true, diagnostics: [] } for valid file", async () => {
 		const r = await run([
 			"check",

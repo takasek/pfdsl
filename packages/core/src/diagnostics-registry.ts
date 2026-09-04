@@ -2,8 +2,8 @@ import type { DiagnosticSeverity } from "./types/index.js";
 
 export interface DiagnosticRegistryEntry {
 	/** Severities this code can be emitted with. Usually one entry; two for
-	 * codes whose severity depends on `options?.strict` (V002, V003, V020,
-	 * W002, W005). */
+	 * codes whose severity depends on `options?.strict` (FM003, V002, V003,
+	 * V020, W002, W005). */
 	severities: readonly DiagnosticSeverity[];
 	/** Spec section number (without the `§` prefix) that normatively defines
 	 * the condition this code checks, e.g. "15.11". Matches spec.md §16's
@@ -40,6 +40,11 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		severities: ["error"],
 		section: "2.1",
 		summary: "front matter YAML is malformed",
+	},
+	FM003: {
+		severities: ["warning", "error"],
+		section: "2.1",
+		summary: "an inline comment may truncate an intended plain-scalar value",
 	},
 
 	P001: {
