@@ -131,13 +131,16 @@ interface ParsedBody extends ParseDocResult {
  * format() continues on from here with normalize/validate/segment work that
  * parse() doesn't need.
  */
-function parseBody(source: string): ParsedBody {
+function parseBody(
+	source: string,
+	frontmatterOptions?: { strict?: boolean },
+): ParsedBody {
 	const {
 		frontmatter,
 		body,
 		diagnostics: fmDiags,
 		bodyStartLine,
-	} = loadFrontmatter(source);
+	} = loadFrontmatter(source, frontmatterOptions);
 	const { tokens: rawTokens, diagnostics: lexDiags } = lex(body);
 	const lineOffset = bodyStartLine - 1;
 	const tokens =
@@ -212,7 +215,7 @@ export function analyze(
 		frontmatter,
 		bodyStartLine,
 		diagnostics: parseDiags,
-	} = parse(source);
+	} = parseBody(source, opts.strict ? { strict: true } : undefined);
 	const {
 		edges,
 		nodeKinds,

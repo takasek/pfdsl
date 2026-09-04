@@ -1,4 +1,11 @@
-import { parse as parseYaml } from "yaml";
+import {
+	isMap,
+	isScalar,
+	isSeq,
+	parseDocument,
+	parse as parseYaml,
+	visit,
+} from "yaml";
 import { detectChildIndent } from "./frontmatter-text.js";
 import type {
 	Diagnostic,
@@ -48,7 +55,10 @@ export function findFrontmatterNodeRanges(source: string): Map<string, Range> {
 	return result;
 }
 
-export function loadFrontmatter(source: string): LoadResult {
+export function loadFrontmatter(
+	source: string,
+	options?: { strict?: boolean },
+): LoadResult {
 	if (!source.startsWith("---")) {
 		return {
 			frontmatter: null,
@@ -129,6 +139,36 @@ export function loadFrontmatter(source: string): LoadResult {
 			},
 		});
 	}
+
+	visit(parseDocument(yamlText), {
+		Pair(_key, pair, path) {
+			if (
+				!isScalar(pair.value) ||
+				pair.value.type !== "PLAIN" ||
+				!pair.value.range ||
+				path.some((step) => Boolean((isMap(step) || isSeq(step)) && step.flow))
+			)
+				return;
+			const valueEnd = pair.value.range[1];
+			const comment = /^[ \t]+#/.exec(yamlText.slice(valueEnd));
+			if (!comment) return;
+			const markerOffset = valueEnd + comment[0].length - 1;
+			const sourceOffset = firstNl + 1 + markerOffset;
+			const beforeMarker = yamlText.slice(0, markerOffset);
+			const line = beforeMarker.split("\n").length + 1;
+			const column = markerOffset - beforeMarker.lastIndexOf("\n");
+			diagnostics.push({
+				severity: options?.strict ? "error" : "warning",
+				code: "FM003",
+				message:
+					"Inline comment may truncate an intended plain-scalar value; quote the value or use a block scalar.",
+				range: {
+					start: { line, column, offset: sourceOffset },
+					end: { line, column: column + 1, offset: sourceOffset + 1 },
+				},
+			});
+		},
+	});
 
 	return { frontmatter, body, bodyStartLine, diagnostics };
 }

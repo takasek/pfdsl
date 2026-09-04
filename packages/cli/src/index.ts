@@ -376,19 +376,23 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 	const { output, diagnostics } = format(source, { style: "flows" });
 	const failed = failIfErrors(diagnostics, file, undefined, opts.color);
 	if (failed) return failed;
+	const inlineCommentWarnings = diagnostics.filter((d) => d.code === "FM003");
+	const warningText = inlineCommentWarnings.length
+		? diagText(inlineCommentWarnings, file, opts.color)
+		: "";
 	if (opts.check) {
 		const changed = output !== source;
 		return {
 			stdout: changed ? "not formatted\n" : "",
-			stderr: "",
+			stderr: warningText,
 			exitCode: changed ? 1 : 0,
 		};
 	}
 	if (opts.write) {
 		writeFileSync(file, output, "utf-8");
-		return ok();
+		return { stdout: "", stderr: warningText, exitCode: 0 };
 	}
-	return ok(output);
+	return { stdout: output, stderr: warningText, exitCode: 0 };
 }
 
 export interface ReindexOptions {
