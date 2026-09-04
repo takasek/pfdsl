@@ -259,14 +259,16 @@ function pfdImplementerInstructions(source) {
 }
 
 function pfdLensInstructions(sourcePath, source) {
-	const bashRestriction =
-		"Bash は `pfdsl check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。";
-	if (source.split(bashRestriction).length !== 2) {
+	const localCliPath = ["packages", "cli", "dist", "cli.js"].join("/");
+	const bashRestriction = `Bash は CLI 実体を解決するための \`test -f package.json\` と \`test -f packages/cli/package.json\` と \`test -f ${localCliPath}\`、解決した CLI による \`check <file>\` と読み取り専用クエリ（\`graph\` グループ全体、\`meta get\` / \`meta list\` / \`meta check-links\`、\`status\` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。`;
+	if (
+		source.split("\n").filter((line) => line === bashRestriction).length !== 1
+	) {
 		throw new Error(`${sourcePath}: expected Bash restriction clause.`);
 	}
 	const instructions = claudeInstructionsToAgents(source).replace(
 		bashRestriction,
-		"pfdsl CLI の実行は `pfdsl check <file>` と読み取り専用クエリ（`graph` グループ全体、`meta get` / `meta list` / `meta check-links`、`status` グループ全体）のみ許可される — 図やリポジトリの他の状態を書き換えない。",
+		bashRestriction.replace("解決した CLI", "解決した pfdsl CLI"),
 	);
 	return `Codex では read-only shell command の \`rg\` と \`sed\` を観点カタログと対象 \`.pfdsl\` ファイルの読取に使用してよい。\n${instructions}`;
 }
