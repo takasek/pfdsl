@@ -3,6 +3,7 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
+	existsSync,
 	mkdirSync,
 	readdirSync,
 	readFileSync,
@@ -12,7 +13,7 @@ import {
 	utimesSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 
 export const SETUP_INPUTS = [
@@ -71,10 +72,76 @@ export function setupFingerprint(
 	return hash.digest("hex");
 }
 
+function hasDeclaredDependencyLinks(root, inputs = setupInputs(root)) {
+	for (const manifestPath of inputs.filter((path) =>
+		path.endsWith("package.json"),
+	)) {
+		let manifest;
+		try {
+			manifest = JSON.parse(readFileSync(join(root, manifestPath), "utf8"));
+		} catch {
+			// A manifest that cannot be read or parsed says nothing about the
+			// installed tree; the fingerprint already covers its content.
+			continue;
+		}
+		const dependencyNames = [
+			...Object.keys(manifest.dependencies ?? {}),
+			...Object.keys(manifest.devDependencies ?? {}),
+		];
+		const manifestDirectory = join(root, dirname(manifestPath));
+		for (const name of dependencyNames) {
+			const dependencyDirectory = join(manifestDirectory, "node_modules", name);
+			if (!existsSync(dependencyDirectory)) return false;
+
+			let dependency;
+			try {
+				dependency = JSON.parse(
+					readFileSync(join(dependencyDirectory, "package.json"), "utf8"),
+				);
+			} catch {
+				return false;
+			}
+
+			const binNames = dependencyBinNames(name, dependency);
+			if (
+				binNames.some(
+					(binName) =>
+						!isExecutableShim(
+							join(manifestDirectory, "node_modules", ".bin", binName),
+						),
+				)
+			)
+				return false;
+		}
+	}
+	return true;
+}
+
+function dependencyBinNames(dependencyName, dependency) {
+	const bin = dependency?.bin;
+	if (typeof bin === "string")
+		return [basename(dependency?.name ?? dependencyName)];
+	if (bin !== null && typeof bin === "object" && !Array.isArray(bin))
+		return Object.keys(bin).map((binName) => basename(binName));
+	return [];
+}
+
+function isExecutableShim(path) {
+	try {
+		const stats = statSync(path);
+		return stats.isFile() && (stats.mode & 0o111) !== 0;
+	} catch {
+		return false;
+	}
+}
+
 export function isSetupCurrent(root = process.cwd()) {
 	try {
+		const inputs = setupInputs(root);
 		return (
-			readFileSync(join(root, MARKER), "utf8").trim() === setupFingerprint(root)
+			readFileSync(join(root, MARKER), "utf8").trim() ===
+				setupFingerprint(root, inputs) &&
+			hasDeclaredDependencyLinks(root, inputs)
 		);
 	} catch {
 		return false;

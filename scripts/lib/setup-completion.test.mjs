@@ -63,7 +63,7 @@ function fixture() {
 	writeFileSync(join(cwd, "pnpm-workspace.yaml"), "packages: []\n");
 
 	for (const [name, source] of Object.entries({
-		pnpm: '#!/bin/sh\nprintf \'pnpm\\n\' >> "$SETUP_LOG"\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 97\n[ -n "$SETUP_READY_FILE" ] && : > "$SETUP_READY_FILE"\nif [ -n "$SETUP_RELEASE_FILE" ]; then while [ ! -f "$SETUP_RELEASE_FILE" ]; do /bin/sleep 0.02; done; fi\n[ "$SETUP_FAIL_STAGE" = pnpm ] && exit 1\nmkdir -p node_modules\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 98\n',
+		pnpm: '#!/bin/sh\nprintf \'pnpm\\n\' >> "$SETUP_LOG"\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 97\n[ -n "$SETUP_READY_FILE" ] && : > "$SETUP_READY_FILE"\nif [ -n "$SETUP_RELEASE_FILE" ]; then while [ ! -f "$SETUP_RELEASE_FILE" ]; do /bin/sleep 0.02; done; fi\n[ "$SETUP_FAIL_STAGE" = pnpm ] && exit 1\nmkdir -p node_modules\nif [ -n "$SETUP_LINK_PATH" ]; then mkdir -p "$SETUP_LINK_PATH"; printf "%s\\n" "{\\"bin\\":{\\"fixture-command\\":\\"cli.js\\"}}" > "$SETUP_LINK_PATH/package.json"; mkdir -p "$(dirname "$SETUP_LINK_PATH")/.bin"; : > "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; "$REAL_CHMOD" 755 "$(dirname "$SETUP_LINK_PATH")/.bin/fixture-command"; fi\n[ -d "$SETUP_EXPECT_LOCK" ] || exit 98\n',
 		git: "#!/bin/sh\nprintf 'git\\n' >> \"$SETUP_LOG\"\n[ \"$SETUP_FAIL_STAGE\" = git ] && exit 1\nprintf '.git-common\\n'\n",
 		cp: '#!/bin/sh\nprintf \'cp\\n\' >> "$SETUP_LOG"\n[ "$SETUP_FAIL_STAGE" = cp ] && exit 1\nexec "$REAL_CP" "$@"\n',
 		chmod:
@@ -76,6 +76,29 @@ function fixture() {
 	}
 
 	return { cwd, bin, log, marker: join(cwd, sentinel) };
+}
+
+function writeInstalledDependency(
+	context,
+	name,
+	packageJson,
+	shimNames = [],
+	shimMode = 0o755,
+) {
+	const dependencyDirectory = join(context.cwd, "node_modules", name);
+	mkdirSync(dependencyDirectory, { recursive: true });
+	writeFileSync(
+		join(dependencyDirectory, "package.json"),
+		`${JSON.stringify(packageJson)}\n`,
+	);
+	if (shimNames.length > 0)
+		mkdirSync(join(context.cwd, "node_modules/.bin"), { recursive: true });
+	for (const shimName of shimNames) {
+		const shimPath = join(context.cwd, "node_modules/.bin", shimName);
+		mkdirSync(dirname(shimPath), { recursive: true });
+		writeFileSync(shimPath, "");
+		chmodSync(shimPath, shimMode);
+	}
 }
 
 function environment(context, failureStage = "", extra = {}) {
@@ -98,6 +121,18 @@ function runSetup(context, failureStage, extra) {
 		encoding: "utf8",
 		env: environment(context, failureStage, extra),
 	});
+}
+
+function runCheck(context) {
+	return spawnSync(
+		process.execPath,
+		[join(context.cwd, "scripts/setup-completion.mjs"), "check"],
+		{
+			cwd: context.cwd,
+			encoding: "utf8",
+			env: environment(context),
+		},
+	);
 }
 
 function startSetup(context, failureStage, extra) {
@@ -159,7 +194,10 @@ describe("setup completion sentinel", () => {
 			"packages/alpha/package.json",
 		]) {
 			mkdirSync(dirname(join(cwd, path)), { recursive: true });
-			writeFileSync(join(cwd, path), `${path}\n`);
+			writeFileSync(
+				join(cwd, path),
+				path.endsWith("package.json") ? "{}\n" : `${path}\n`,
+			);
 		}
 
 		const inputs = setupInputs(cwd);
@@ -188,7 +226,12 @@ describe("setup completion sentinel", () => {
 			"packages/alpha/package.json",
 			"scripts/lib/cli-entrypoint.mjs",
 		]) {
-			writeFileSync(join(cwd, path), `changed ${path}\n`);
+			writeFileSync(
+				join(cwd, path),
+				path.endsWith("package.json")
+					? `{"changed":"${path}"}\n`
+					: `changed ${path}\n`,
+			);
 			assert.equal(isSetupCurrent(cwd), false, path);
 			writeSetupMarker(cwd);
 		}
@@ -203,6 +246,223 @@ describe("setup completion sentinel", () => {
 		mkdirSync(join(cwd, "config"));
 		writeFileSync(join(cwd, inputs[0]), "");
 		assert.notEqual(setupFingerprint(cwd, inputs), missing);
+	});
+
+	it("fails check when a current marker lacks a declared root dependency link", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"devDependencies":{"fixture-dependency":"1.0.0"}}\n',
+		);
+		writeSetupMarker(context.cwd);
+
+		const result = runCheck(context);
+		assert.notEqual(result.status, 0);
+	});
+
+	it("fails check when a current marker lacks a declared workspace dependency link", () => {
+		const context = fixture();
+		const manifest = join(context.cwd, "packages/core/package.json");
+		mkdirSync(dirname(manifest), { recursive: true });
+		writeFileSync(
+			manifest,
+			'{"dependencies":{"workspace-dependency":"1.0.0"}}\n',
+		);
+		writeSetupMarker(context.cwd);
+
+		const result = runCheck(context);
+		assert.notEqual(result.status, 0);
+	});
+
+	it("fails check when a string-bin dependency lacks its package-name shim", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"dependencies":{"@fixture/command-package":"1.0.0"}}\n',
+		);
+		writeInstalledDependency(context, "@fixture/command-package", {
+			bin: "cli.js",
+		});
+		writeSetupMarker(context.cwd);
+
+		const result = runCheck(context);
+		assert.notEqual(result.status, 0);
+	});
+
+	it("fails check when an object-bin dependency lacks a declared shim", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"dependencies":{"fixture-dependency":"1.0.0"}}\n',
+		);
+		writeInstalledDependency(context, "fixture-dependency", {
+			bin: { "fixture-command": "cli.js" },
+		});
+		writeSetupMarker(context.cwd);
+
+		const result = runCheck(context);
+		assert.notEqual(result.status, 0);
+	});
+
+	it("uses the aliased dependency package name for a string-bin shim", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"dependencies":{"cli-alias":"npm:@scope/real-cli@1"}}\n',
+		);
+		writeInstalledDependency(
+			context,
+			"cli-alias",
+			{ name: "@scope/real-cli", bin: "cli.js" },
+			["cli-alias"],
+		);
+		writeSetupMarker(context.cwd);
+
+		assert.notEqual(runCheck(context).status, 0);
+	});
+
+	it("normalizes a scoped object-bin key before checking its shim", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"dependencies":{"fixture-dependency":"1.0.0"}}\n',
+		);
+		writeInstalledDependency(
+			context,
+			"fixture-dependency",
+			{ bin: { "@scope/cli": "cli.js" } },
+			["@scope/cli"],
+		);
+		writeSetupMarker(context.cwd);
+
+		assert.notEqual(runCheck(context).status, 0);
+	});
+
+	it("fails check when a required shim has no execute bit", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"dependencies":{"fixture-dependency":"1.0.0"}}\n',
+		);
+		writeInstalledDependency(
+			context,
+			"fixture-dependency",
+			{ bin: { "fixture-command": "cli.js" } },
+			["fixture-command"],
+			0o644,
+		);
+		writeSetupMarker(context.cwd);
+
+		assert.notEqual(runCheck(context).status, 0);
+	});
+
+	it("fails check when a declared dependency has no readable package manifest", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"dependencies":{"fixture-dependency":"1.0.0"}}\n',
+		);
+		mkdirSync(join(context.cwd, "node_modules/fixture-dependency"), {
+			recursive: true,
+		});
+		writeSetupMarker(context.cwd);
+
+		const result = runCheck(context);
+		assert.notEqual(result.status, 0);
+	});
+
+	it("fails check when a declared dependency has an invalid package manifest", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"dependencies":{"fixture-dependency":"1.0.0"}}\n',
+		);
+		const dependencyDirectory = join(
+			context.cwd,
+			"node_modules/fixture-dependency",
+		);
+		mkdirSync(dependencyDirectory, { recursive: true });
+		writeFileSync(join(dependencyDirectory, "package.json"), "not json\n");
+		writeSetupMarker(context.cwd);
+
+		const result = runCheck(context);
+		assert.notEqual(result.status, 0);
+	});
+
+	it("accepts a declared dependency that does not declare a bin", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"dependencies":{"fixture-dependency":"1.0.0"}}\n',
+		);
+		writeInstalledDependency(context, "fixture-dependency", {
+			name: "fixture-dependency",
+			version: "1.0.0",
+		});
+		writeSetupMarker(context.cwd);
+
+		const result = runCheck(context);
+		assertSucceeded(result);
+	});
+
+	it("reruns setup when a current marker lacks a declared dependency link", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"devDependencies":{"fixture-dependency":"1.0.0"}}\n',
+		);
+		writeSetupMarker(context.cwd);
+
+		assertSucceeded(
+			runSetup(context, "", {
+				SETUP_LINK_PATH: join(context.cwd, "node_modules/fixture-dependency"),
+			}),
+		);
+		assert.equal(
+			readFileSync(context.log, "utf8"),
+			"pnpm\ngit\ncp\nchmod\nnode\n",
+		);
+		assert.equal(isSetupCurrent(context.cwd), true);
+	});
+
+	it("skips setup when the marker and declared dependency links are current", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"devDependencies":{"fixture-dependency":"1.0.0"}}\n',
+		);
+		writeInstalledDependency(
+			context,
+			"fixture-dependency",
+			{ bin: { "fixture-command": "cli.js" } },
+			["fixture-command"],
+		);
+		writeSetupMarker(context.cwd);
+
+		assertSucceeded(runSetup(context));
+		assert.equal(existsSync(context.log), false);
+		assert.equal(isSetupCurrent(context.cwd), true);
+	});
+
+	it("ignores a packages entry that carries no readable manifest", () => {
+		const context = fixture();
+		writeFileSync(
+			join(context.cwd, "package.json"),
+			'{"devDependencies":{"fixture-dependency":"1.0.0"}}\n',
+		);
+		writeInstalledDependency(
+			context,
+			"fixture-dependency",
+			{ bin: { "fixture-command": "cli.js" } },
+			["fixture-command"],
+		);
+		mkdirSync(join(context.cwd, "packages/scratch"), { recursive: true });
+		writeSetupMarker(context.cwd);
+
+		assert.equal(isSetupCurrent(context.cwd), true);
+
+		assertSucceeded(runSetup(context));
+		assert.equal(existsSync(context.log), false);
 	});
 
 	it("keeps the previous marker and removes its temporary file when atomic replacement fails", () => {
