@@ -1,4 +1,3 @@
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/lib/gh-compat.mjs.
 /**
  * Pure logic for the gh-CLI compatibility layer: detecting a missing `gh`
  * binary. Zero I/O — the gh spawn lives in gh-exec.mjs, and the REST/GraphQL

@@ -1,4 +1,3 @@
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/lib/github-rest.mjs.
 /**
  * GitHub API fallback for the small subset of `gh` operations this repo's
  * scripts use. Used by github-ops.mjs's createGitHubOps as each named

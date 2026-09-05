@@ -1,4 +1,3 @@
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/lib/gh-exec.mjs.
 /**
  * Thin wrapper around `execFileSync("gh", args)`: the gh-CLI backend
  * github-ops.mjs's named operations run against (#1044). GH_HOST is pinned

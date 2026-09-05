@@ -1,4 +1,3 @@
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/lib/github-ops.mjs.
 /**
  * Named GitHub operations: the sole entry point for production calls that
  * promise gh/HTTP fallback parity. Each fallback-supported operation has a

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/normalize-pfdsl.mjs.
 // Collapses consecutive blank lines in a .pfdsl file body.
 // Usage: node scripts/pfdsl/normalize-pfdsl.mjs [path] (default: .pfdsl/roadmap.pfdsl)
 

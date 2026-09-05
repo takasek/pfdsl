@@ -394,18 +394,32 @@ function stageDirectory(destination, files, deps, runId) {
 	return { destination, temporary };
 }
 
+function isPfdOpsInstallPath(relative) {
+	return (
+		relative === "pfd-ops/install" || relative.startsWith("pfd-ops/install/")
+	);
+}
+
 function normalizeCodexMarkdownTree(
 	directory,
 	canonicalSource,
 	deps,
 	relative = "",
+	skipPfdOpsInstall = false,
 ) {
 	if (!deps.readdirSync) return;
 	for (const entry of deps.readdirSync(directory, { withFileTypes: true })) {
 		const path = resolve(directory, entry.name);
 		const sourcePath = relative ? `${relative}/${entry.name}` : entry.name;
+		if (skipPfdOpsInstall && isPfdOpsInstallPath(sourcePath)) continue;
 		if (entry.isDirectory()) {
-			normalizeCodexMarkdownTree(path, canonicalSource, deps, sourcePath);
+			normalizeCodexMarkdownTree(
+				path,
+				canonicalSource,
+				deps,
+				sourcePath,
+				skipPfdOpsInstall,
+			);
 			continue;
 		}
 		if (!entry.isFile() || !path.endsWith(".md")) continue;
@@ -423,13 +437,21 @@ function normalizeCodexJavascriptTree(
 	canonicalSource,
 	deps,
 	relative = "",
+	skipPfdOpsInstall = false,
 ) {
 	if (!deps.readdirSync) return;
 	for (const entry of deps.readdirSync(directory, { withFileTypes: true })) {
 		const path = resolve(directory, entry.name);
 		const sourcePath = relative ? `${relative}/${entry.name}` : entry.name;
+		if (skipPfdOpsInstall && isPfdOpsInstallPath(sourcePath)) continue;
 		if (entry.isDirectory()) {
-			normalizeCodexJavascriptTree(path, canonicalSource, deps, sourcePath);
+			normalizeCodexJavascriptTree(
+				path,
+				canonicalSource,
+				deps,
+				sourcePath,
+				skipPfdOpsInstall,
+			);
 			continue;
 		}
 		if (!entry.isFile() || !path.endsWith(".mjs")) continue;
@@ -488,8 +510,20 @@ function stageTargetSkillTree({
 			);
 			observeRecordOutputs(observed, record);
 		}
-		normalizeCodexMarkdownTree(temporary, canonicalPluginSkillSource, deps);
-		normalizeCodexJavascriptTree(temporary, canonicalPluginSkillSource, deps);
+		normalizeCodexMarkdownTree(
+			temporary,
+			canonicalPluginSkillSource,
+			deps,
+			"",
+			true,
+		);
+		normalizeCodexJavascriptTree(
+			temporary,
+			canonicalPluginSkillSource,
+			deps,
+			"",
+			true,
+		);
 	} catch (error) {
 		removeAssemblyArtifact(temporary, deps);
 		throw error;

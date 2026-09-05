@@ -1,4 +1,3 @@
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/lib/issues-flow-audit.mjs.
 // Pure logic for auditing sync between GitHub issues and .pfdsl/roadmap.pfdsl.
 // Zero I/O. No imports.
 
