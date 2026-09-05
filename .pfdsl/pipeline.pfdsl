@@ -245,7 +245,7 @@ artifact:
     tags: [ gen ]
   codex_repo_assets:
     label: Codexリポジトリ開発資産
-    description: "harness_capability_modelのcodex-repository mappingから生成するAGENTS.md、配布skill tree全体と中立生成済みpfdsl skill bridgeを含む .agents/skills、.codex/config.toml、.codex/agents、.codex/hooks.json。生成されたMarkdown・TOML・JavaScriptは正本path付きの手編集禁止noticeを持ち、コメントを持てないJSONは隣接GENERATED.md guideで正本を示す。root .gitattributesはCodex生成経路をlinguist-generatedに分類する。adapterはrunごとの一時siblingへ書き、rootのassembly lock下で成功後にまとめて置換するため半生成状態を公開しない"
+    description: "harness_capability_modelのcodex-repository mappingから生成するAGENTS.md、配布skill tree全体と中立生成済みpfdsl skill bridgeを含む .agents/skills、.codex/config.toml、.codex/agents、.codex/hooks.json。生成されたMarkdown・TOML・JavaScriptは正本path付きの手編集禁止noticeを持ち、コメントを持てないJSONは隣接GENERATED.md guideで正本を示す。例外はpfd-ops skillのinstall/で、そこは採用リポの作業ツリーへverbatim配置されるpayloadでありエージェントが読むpromptではないため、noticeを注入せず正本とbyte一致させる。同一性はskill同梱のcheck-install-syncがrepo sourceと比較して検査するので、noticeを持つと1行差がcontent driftとして誤報される。root .gitattributesはCodex生成経路をlinguist-generatedに分類する。adapterはrunごとの一時siblingへ書き、rootのassembly lock下で成功後にまとめて置換するため半生成状態を公開しない"
     criteria: scripts/lib/gen-plugin.test.mjs のCodex repository target-local consumer probeとoutput closureが成功し、scripts/lib/drift-gates.mjs の gen-plugin-bulk がAGENTS.md、.agents、.codexの未再生成をpre-commitとCIで検出する
     externalStakeholders: [ このリポのCodex利用者 ]
     location: [ ../AGENTS.md, ../.agents/skills/, ../.codex/config.toml, ../.codex/agents/, ../.codex/hooks.json, ../.codex/GENERATED.md, ../plugin/pfdsl-codex/GENERATED.md, ../.gitattributes ]
