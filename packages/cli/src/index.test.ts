@@ -59,6 +59,352 @@ describe("parseArgs", () => {
 			flags: { format: "svg" },
 		});
 	});
+	it("parses --format=svg", () => {
+		expect(parseArgs(["render", "a.pfdsl", "--format=svg"])).toEqual({
+			command: "render",
+			positional: ["a.pfdsl"],
+			flags: { format: "svg" },
+		});
+	});
+});
+
+describe("command metadata parse surface (#1050)", () => {
+	const legacyUsageByCommand: Record<string, string> = {
+		check:
+			"usage: pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]",
+		"graph summary":
+			"usage: pfdsl graph summary <file|-> [--json] [--no-color]",
+		"graph io": "usage: pfdsl graph io <file|-> [--json] [--no-color]",
+		fmt: "usage: pfdsl fmt <file|-> [--write] [--check] [--no-color]",
+		"meta reindex":
+			"usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json] [--no-color]",
+		"meta sort":
+			"usage: pfdsl meta sort <file|-> --by <keys> [--write] [--check] [--no-color]",
+		"graph edges": "usage: pfdsl graph edges <file|-> [--json] [--no-color]",
+		render:
+			"usage: pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]",
+		diff: "usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]",
+		"status ready":
+			"usage: pfdsl status ready <file|-> [--best] [--json] [--no-color]",
+		"status list":
+			"usage: pfdsl status list <file|-> --status <status[,status...]> [--json] [--no-color]",
+		"status blocked":
+			"usage: pfdsl status blocked <file|-> [--json] [--no-color]",
+		"meta set":
+			"usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json] [--no-color]",
+		"meta check-links":
+			"usage: pfdsl meta check-links <file> [--json] [--no-color]",
+		"meta get":
+			"usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--json] [--no-color]",
+		"meta list":
+			"usage: pfdsl meta list <file|-> [--tag <t[,t...]>] [--group <g>] [--producer <p>] [field[,field...]] [--json] [--no-color]",
+		"meta values":
+			"usage: pfdsl meta values <file|-> <field[,field...]> [--json] [--no-color]",
+		"graph neighbors":
+			"usage: pfdsl graph neighbors <file|-> <id> [--json] [--no-color]",
+		"graph locate":
+			"usage: pfdsl graph locate <file|-> <id> [--field <name[,name...]>] [--json] [--no-color]",
+		"graph describe":
+			"usage: pfdsl graph describe <file|-> <id> [--json] [--no-color]",
+		"graph impact":
+			"usage: pfdsl graph impact <file|-> <id> [--json] [--no-color]",
+		"graph depends-on":
+			"usage: pfdsl graph depends-on <file|-> <id> [--json] [--no-color]",
+		"graph path":
+			"usage: pfdsl graph path <file|-> <from> <to> [--limit <n>] [--json] [--no-color]",
+		"graph stats":
+			"usage: pfdsl graph stats <file|-> [--limit <n>] [--json] [--no-color]",
+		"graph orphans":
+			"usage: pfdsl graph orphans <file|-> [--json] [--no-color]",
+		"status gaps":
+			"usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json] [--no-color]",
+		explain: "usage: pfdsl explain <code>",
+	};
+
+	const commandTargets = [
+		...TOP_LEVEL_COMMANDS.map((entry) => ({
+			label: entry.name,
+			argv: [entry.name] as const,
+			legacyUsage: legacyUsageByCommand[entry.name],
+			entry,
+		})),
+		...COMMAND_GROUPS.flatMap((group) =>
+			group.commands.map((entry) => ({
+				label: `${group.name} ${entry.name}`,
+				argv: [group.name, entry.name] as const,
+				legacyUsage: legacyUsageByCommand[`${group.name} ${entry.name}`],
+				entry,
+			})),
+		),
+	];
+
+	const groupTargets = COMMAND_GROUPS.map((group) => ({
+		label: group.name,
+		argv: [group.name] as const,
+		group,
+	}));
+	const legacyGroupListingLines: Record<string, string[]> = {
+		graph: [
+			"  summary <file|->            Print artifact/process/edge counts",
+			"  io <file|->                 Print external inputs and terminal artifacts",
+			"  stats <file|-> [--limit]    Rank nodes by primary degree, feedback degree apart",
+			"  neighbors <file|-> <id>     Direct predecessors/successors of a node, feedback included",
+			"  locate <file|-> <id>        Frontmatter declaration line and body edge lines of a node",
+			"  describe <file|-> <id>      Kind, fields, neighbors, and locate lines of a node, in one call",
+			"  impact <file|-> <id>        Full downstream closure of a node",
+			"  depends-on <file|-> <id>    Full upstream closure of a node",
+			"  path <file|-> <from> <to> [--limit]",
+			"  edges <file|->              Canonical edge list",
+			"  orphans <file|->            Nodes with neither predecessor nor successor",
+		],
+		meta: [
+			"  get <file|-> <id[,id...]> [field[,field...]]   Print field values",
+			"  list <file|-> [--tag|--group|--producer] [field[,field...]]",
+			"  values <file|-> <field[,field...]>             Print a field's values in use, with counts",
+			"  set <file> <id> <field> <value>                Set a field value in place",
+			"  sort <file|-> --by <keys>                      Sort node definitions",
+			"  reindex <file|->                               Assign topological index: values",
+			"  check-links <file>                             Verify location: file paths exist",
+		],
+		status: [
+			"  ready <file|-> [--best]           List ready-to-start processes",
+			"  blocked <file|->                  List not-ready processes and their blocking inputs",
+			"  list <file|-> --status <s[,s...]> List artifacts by status",
+			"  gaps <roadmap> <flow> [<flow>...] Find todo artifacts missing from the roadmap",
+		],
+	};
+	const usageFlagNames = (usageLine: string) =>
+		new Set(usageLine.match(/--[a-z-]+/g) ?? []);
+
+	const expectedUsageFlagNames = (entry: {
+		options: Record<string, unknown>;
+	}) => new Set(Object.keys(entry.options).map((name) => `--${name}`));
+
+	it("covers exactly 27 dispatchable command entries", () => {
+		expect(commandTargets).toHaveLength(27);
+	});
+
+	it.each(
+		commandTargets,
+	)("$label rejects an unknown option with command help", async ({
+		label,
+		argv,
+	}) => {
+		const r = await run([...argv, "--definitely-not-a-flag"]);
+		const help = (await run([...argv, "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(
+			`${label}: unknown option --definitely-not-a-flag\n${help}`,
+		);
+	});
+
+	it("meta sort --by without a value reports a command-formatted error", async () => {
+		const f = join(dir, "sort-missing-by.pfdsl");
+		writeFileSync(f, "z >> p -> a\n");
+		const r = await run(["meta", "sort", f, "--by"]);
+		const help = (await run(["meta", "sort", "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(`meta sort: option --by requires a value\n${help}`);
+	});
+
+	it("graph path --limit without a value reports a command-formatted error", async () => {
+		const f = join(dir, "path-missing-limit.pfdsl");
+		writeFileSync(f, "req >> design -> spec\n");
+		const r = await run(["graph", "path", f, "req", "spec", "--limit"]);
+		const help = (await run(["graph", "path", "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(
+			`graph path: option --limit requires a value\n${help}`,
+		);
+	});
+
+	it("meta sort repeats --by as a comma-joined string (#1050)", async () => {
+		const f = join(dir, "sort-repeat-by.pfdsl");
+		writeFileSync(f, "z >> p -> a\n");
+		const repeated = await run(["meta", "sort", f, "--by", "a", "--by", "b"]);
+		const joined = await run(["meta", "sort", f, "--by", "a,b"]);
+		expect(repeated.exitCode).toBe(joined.exitCode);
+		expect(repeated.stdout).toBe(joined.stdout);
+		expect(repeated.stderr).toBe(joined.stderr);
+	});
+
+	it("graph --bogus reports the unknown group flag", async () => {
+		const r = await run(["graph", "--bogus"]);
+		const help = (await run(["graph", "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(`graph: unknown option --bogus\n${help}`);
+	});
+
+	it.each([
+		{ label: "help", argv: ["help"] },
+		{ label: "--version", argv: ["--version"] },
+		{ label: "-V", argv: ["-V"] },
+		{ label: "-h", argv: ["-h"] },
+		{ label: "--help", argv: ["--help"] },
+	])("$label rejects an unknown option", async ({ label, argv }) => {
+		const r = await run([...argv, "--bogus"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain(`${label}: unknown option --bogus`);
+	});
+
+	it.each([
+		["help"],
+		["--version"],
+		["-V"],
+		["-h"],
+		["--help"],
+	])("%s remains a successful standalone pseudo command", async (word) => {
+		const r = await run([word]);
+		expect(r.exitCode).toBe(0);
+	});
+
+	it.each([
+		{
+			label: "graph stats",
+			argv: ["graph", "stats", "valid.pfdsl"],
+		},
+		{
+			label: "graph path",
+			argv: ["graph", "path", "valid.pfdsl", "req", "spec"],
+		},
+	])("$label names a missing value option when another flag follows", async ({
+		label,
+		argv,
+	}) => {
+		const r = await run([...argv, "--limit", "--json"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain(`${label}: option --limit requires a value`);
+	});
+
+	it.each(
+		groupTargets,
+	)("$label rejects an unknown option before subcommand resolution", async ({
+		label,
+		argv,
+	}) => {
+		const r = await run([...argv, "--definitely-not-a-flag"]);
+		const help = (await run([...argv, "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(
+			`${label}: unknown option --definitely-not-a-flag\n${help}`,
+		);
+	});
+
+	it.each(commandTargets)("$label help keeps the legacy usage line", async ({
+		argv,
+		legacyUsage,
+	}) => {
+		const r = await run([...argv, "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout.split("\n")[0]).toBe(legacyUsage);
+	});
+
+	it.each(
+		commandTargets,
+	)("$label help usage flags stay in sync with metadata", async ({
+		argv,
+		entry,
+	}) => {
+		const r = await run([...argv, "--help"]);
+		expect(r.exitCode).toBe(0);
+		const usageLine = r.stdout.split("\n")[0] ?? "";
+		expect(usageFlagNames(usageLine)).toEqual(expectedUsageFlagNames(entry));
+	});
+
+	it.each(groupTargets)("$label group help stays wired to dispatch", async ({
+		argv,
+	}) => {
+		const r = await run([...argv, "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain(`usage: pfdsl ${argv[0]} <subcommand> ...`);
+	});
+
+	it.each(
+		groupTargets,
+	)("$label group help preserves its compact legacy listing", async ({
+		argv,
+	}) => {
+		const r = await run([...argv, "--help"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout.split("\n")).toEqual(
+			expect.arrayContaining(legacyGroupListingLines[argv[0]] ?? []),
+		);
+		expect(r.stdout).toContain("All subcommands accept --json and --no-color.");
+	});
+
+	it.each([
+		{ label: "fmt", argv: ["fmt", "placeholder.pfdsl"] },
+		{ label: "explain", argv: ["explain", "V001"] },
+		{ label: "render", argv: ["render", "placeholder.pfdsl"] },
+	])("$label rejects an unconsumed --json flag", async ({ label, argv }) => {
+		const r = await run([...argv, "--json"]);
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toContain(`${label}: unknown option --json`);
+	});
+
+	it("formats a command parse error with its own help", async () => {
+		const r = await run(["check", "placeholder.pfdsl", "--bogus"]);
+		const help = (await run(["check", "--help"])).stdout;
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe(`check: unknown option --bogus\n${help}`);
+		expect(r.stderr).not.toContain("To specify a positional argument");
+	});
+
+	it.each([
+		{
+			label: "fmt",
+			name: "fmt",
+			expected: ["write", "check", "no-color"],
+		},
+		{ label: "explain", name: "explain", expected: [] },
+		{ label: "render", name: "render", expected: ["format", "no-color"] },
+		{
+			label: "diff",
+			name: "diff",
+			expected: ["format", "json", "no-color"],
+		},
+	])("$label declares the flags its handler reads", ({ name, expected }) => {
+		const entry = TOP_LEVEL_COMMANDS.find(
+			(candidate) => candidate.name === name,
+		);
+		expect(entry).toBeDefined();
+		expect(Object.keys(entry?.options ?? {})).toEqual(expected);
+	});
+
+	// #1050 design decision: strict second parsing intentionally accepts --flag=value.
+	it("render accepts --format=svg", async () => {
+		const r = await run(["render", join(dir, "valid.pfdsl"), "--format=svg"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toContain("<svg");
+	});
+
+	// #1050 design decision: boolean flags do not consume following positionals.
+	it("check accepts --json before the file", async () => {
+		const r = await run(["check", "--json", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toMatchObject({ ok: true });
+	});
+
+	// #1050 design decision: boolean flags do not consume following positionals.
+	it("graph io accepts --json before the file", async () => {
+		const r = await run(["graph", "io", "--json", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toMatchObject({
+			ok: true,
+			externalInputs: ["req"],
+			externalTerminals: [],
+		});
+	});
+
+	it("handler exceptions still escape parseArgs dispatch (#1050)", async () => {
+		await expect(
+			run(["check", "-"], {
+				readStdin: () => {
+					throw new TypeError("boom");
+				},
+			}),
+		).rejects.toThrow(TypeError);
+	});
 });
 
 describe("check", () => {

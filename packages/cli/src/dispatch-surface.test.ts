@@ -67,6 +67,152 @@ function derivedCandidates(known: Iterable<string>): string[] {
 	return [...words];
 }
 
+/** Finds a delimiter's matching close while ignoring strings and comments. */
+function findClosingDelimiter(
+	source: string,
+	openingIndex: number,
+	opening: string,
+	closing: string,
+): number {
+	let depth = 0;
+	let quote: "'" | '"' | "`" | undefined;
+	let lineComment = false;
+	let blockComment = false;
+	for (let i = openingIndex; i < source.length; i++) {
+		const character = source[i];
+		const next = source[i + 1];
+		if (lineComment) {
+			if (character === "\n") lineComment = false;
+			continue;
+		}
+		if (blockComment) {
+			if (character === "*" && next === "/") {
+				blockComment = false;
+				i++;
+			}
+			continue;
+		}
+		if (quote) {
+			if (character === "\\") i++;
+			else if (character === quote) quote = undefined;
+			continue;
+		}
+		if (character === "/" && next === "/") {
+			lineComment = true;
+			i++;
+			continue;
+		}
+		if (character === "/" && next === "*") {
+			blockComment = true;
+			i++;
+			continue;
+		}
+		if (character === "'" || character === '"' || character === "`") {
+			quote = character;
+			continue;
+		}
+		if (character === opening) depth++;
+		if (character === closing && --depth === 0) return i;
+	}
+	throw new Error(`Unclosed ${opening} in source`);
+}
+
+function sourceArray(tableName: string): string {
+	const declarationIndex = SOURCE.indexOf(`const ${tableName}:`);
+	if (declarationIndex < 0) throw new Error(`Missing ${tableName} declaration`);
+	const assignmentIndex = SOURCE.indexOf("=", declarationIndex);
+	const openingIndex = SOURCE.indexOf("[", assignmentIndex);
+	const closingIndex = findClosingDelimiter(SOURCE, openingIndex, "[", "]");
+	return SOURCE.slice(openingIndex, closingIndex + 1);
+}
+
+function sourceCommandEntry(tableName: string, commandName: string): string {
+	const table = sourceArray(tableName);
+	const nameIndex = table.indexOf(`name: "${commandName}"`);
+	if (nameIndex < 0)
+		throw new Error(`${tableName} has no ${commandName} entry`);
+	const openingIndex = table.lastIndexOf("{", nameIndex);
+	const closingIndex = findClosingDelimiter(table, openingIndex, "{", "}");
+	return table.slice(openingIndex, closingIndex + 1);
+}
+
+function sourceFunctionBody(functionName: string): string | undefined {
+	const declarationIndex = SOURCE.indexOf(`function ${functionName}(`);
+	if (declarationIndex < 0) return undefined;
+	const openingIndex = SOURCE.indexOf("{", declarationIndex);
+	const closingIndex = findClosingDelimiter(SOURCE, openingIndex, "{", "}");
+	return SOURCE.slice(openingIndex, closingIndex + 1);
+}
+
+function directFlagReads(source: string): Set<string> {
+	const reads = new Set<string>();
+	for (const match of source.matchAll(/\bflags\.([A-Za-z_$][\w$]*)/g)) {
+		const name = match[1];
+		if (name) reads.add(name);
+	}
+	for (const match of source.matchAll(/\bflags\[['"]([^'"]+)['"]\]/g)) {
+		const name = match[1];
+		if (name) reads.add(name);
+	}
+	return reads;
+}
+
+function handlerFlagReads(tableName: string, commandName: string): Set<string> {
+	const entry = sourceCommandEntry(tableName, commandName);
+	const runIndex = entry.indexOf("run:");
+	const arrowIndex = entry.indexOf("=>", runIndex);
+	const openingIndex = entry.indexOf("{", arrowIndex);
+	const closingIndex = findClosingDelimiter(entry, openingIndex, "{", "}");
+	const body = entry.slice(openingIndex, closingIndex + 1);
+	const reads = directFlagReads(body);
+	for (const match of body.matchAll(/\b([A-Za-z_$][\w$]*)\(\s*flags\b/g)) {
+		const helperBody = sourceFunctionBody(match[1] ?? "");
+		if (!helperBody) continue;
+		for (const name of directFlagReads(helperBody)) reads.add(name);
+	}
+	return reads;
+}
+
+// This is a lexical check, not full TypeScript data-flow analysis.
+// It follows direct flags.property/bracket reads and same-source function calls that receive flags.
+// Dynamic keys, aliases, imported helpers, and helpers without a named function declaration are not covered.
+const DISPATCHABLE_COMMANDS = [
+	...TOP_LEVEL_COMMANDS.map((entry) => ({
+		label: entry.name,
+		tableName: "TOP_LEVEL_COMMANDS",
+		entry,
+	})),
+	...COMMAND_GROUPS.flatMap((group) =>
+		group.commands.map((entry) => ({
+			label: `${group.name} ${entry.name}`,
+			tableName: `${group.name.toUpperCase()}_COMMANDS`,
+			entry,
+		})),
+	),
+];
+
+function setDifference(left: Set<string>, right: Set<string>): string[] {
+	return [...left].filter((name) => !right.has(name)).sort();
+}
+
+describe("declared command options", () => {
+	it("matches every table entry with the flags its handler reads", () => {
+		expect(DISPATCHABLE_COMMANDS).toHaveLength(27);
+		const mismatches = DISPATCHABLE_COMMANDS.flatMap(
+			({ label, tableName, entry }) => {
+				const declared = new Set(Object.keys(entry.options));
+				const read = handlerFlagReads(tableName, entry.name);
+				const undeclared = setDifference(read, declared);
+				const unread = setDifference(declared, read);
+				return undeclared.length > 0 || unread.length > 0
+					? [{ label, undeclared, unread }]
+					: [];
+			},
+		);
+		expect(mismatches).toEqual([]);
+	});
+});
+
 /** One dispatch surface: the argv prefix that reaches it, and what it legitimately accepts. */
 interface Surface {
 	label: string;
