@@ -827,6 +827,11 @@ describe("buildDesignRecordTemplate", () => {
 		assert.match(note, /部分採用.*採用部分.*残部/);
 		assert.match(note, /検査案の処分 Pn.*部分採用/);
 	});
+
+	it("guides draft validation before posting", () => {
+		const { note } = buildDesignRecordTemplate();
+		assert.match(note, /node scripts\/check-design-record\.mjs --file <path>/);
+	});
 });
 
 describe("buildReviewRecordTemplate", () => {
