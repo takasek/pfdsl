@@ -1,6 +1,6 @@
 # roadmap.md — issue 管理バインディング（roadmap.pfdsl の companion）
 
-この companion を読んだ後、pfd-ops スキルが未ロードならロードして運用プロトコル（サイクル手順・終端ゲート・知見振り分け手続き等）を確認すること（ロード済みなら再ロード不要）。
+この companion を読んだ後、pfd-ops スキルが未ロードならロードし、`references/work-cycle.md` の運用契約とサイクル手順を確認すること（ロード済みなら再ロード不要）。
 
 `roadmap.pfdsl` は issue 依存構造のみ管理する。issue の一次情報と同期手段はここに書く。pfd-ops skill の L2 ディスパッチがこのファイルを参照する。
 
@@ -59,7 +59,7 @@ GitHub 側にしか無い読みを本文の正規表現で再構成すると、D
 
 - [ ] ADR-0014 の反実仮想テスト「依存グラフ／プロセス分解がなければ、この判断・作業は違っていたか」を適用し、Yes かつ違いを1行で引用できる局面を `docs/pfd_payoff_log.md` に追記した。該当しない場合は追記しない
 
-**タイミング規約**: issue クローズと flow 確定（下記「マージ時のみ」の2項目）は **main への PR マージ時**に行う（生態系図 merge_pr: 進捗・issue 更新はマージで正本になる）。PR 作成時点では行わない — PR がレビューで変わる/却下される可能性があるため。サイクルが PR 作成で終わる場合、この2項目は「マージ時に実施」と記録して未了のまま閉じてよい。**feature branch への中間 PR では `closes #xxx` を使わない**（理由と規約は L3 reference「PR 本文規約」が一次情報）。**出力 artifact の status done 更新はこれに含まれない** — develop 完了時点（PR 作成前）で criteria 達成が言えるなら done にしてよい（プロトコル4のデフォルト通り）。
+**タイミング規約**: issue クローズと flow 確定（下記「マージ時のみ」の2項目）は **main への PR マージ時**に行う（生態系図 merge_pr: 進捗・issue 更新はマージで正本になる）。PR 作成時点では行わない — PR がレビューで変わる/却下される可能性があるため。サイクルが PR 作成で終わる場合、この2項目は「マージ時に実施」と記録して未了のまま閉じてよい。**feature branch への中間 PR では `closes #xxx` を使わない**（理由と規約は L3 reference「PR 本文規約」が一次情報）。**出力 artifact の status done 更新はこれに含まれない** — develop 完了時点（PR 作成前）で criteria 達成が言えるなら done にしてよい（pfd-ops の `references/work-cycle.md`「進捗と完了根拠」のデフォルト通り）。
 
 **着手時**: develop ブランチを切った時点で、実装対象の出力 artifact を `todo → wip` に更新する（規則の一次情報は workflow.md「develop 着手時の artifact status 更新」）。
 
@@ -170,7 +170,7 @@ worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cyc
 - [ ] `flow:managed` の issue がすべて roadmap.pfdsl の artifact として登録済みか確認した（exempt は登録しない）
 - [ ] `node scripts/pfdsl/audit-issues-flow.mjs` が差分なしで通過した（手動追記した `updated_at` のズレを機械的に検出する。`gate-check.mjs` 実行時はその一部として自動実行される）
 
-**バージョン artifact を起こす契機と criteria の形**: 規定の一般形は `.claude/skills/pfd-ops/SKILL.md` の「運用プロトコル」5（成果物の門番）にある2項目「版 artifact を起こす契機」「版 artifact の criteria は版一覧への包含で書く」が一次情報（#729 で昇格）。
+**バージョン artifact を起こす契機と criteria の形**: 規定の一般形は `.claude/skills/pfd-ops/references/work-cycle.md` の「成果物の門番」が一次情報（#729 で昇格）。
 ここにはこのリポのインスタンス値だけを置く。
 
 - 対象ノード: `spec_vXXX` / `cli_release_*` / `ext_vXXXX`

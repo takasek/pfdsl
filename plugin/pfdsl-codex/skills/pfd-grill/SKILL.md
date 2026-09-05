@@ -56,4 +56,4 @@ description: |
 - 完成した `.pfdsl` が `pfdsl check <file> --strict` を通ること
 - `pfdsl fmt <file> --check` が通ること。`check` は書式を見ないため、手で書いたインライン配列（`[a, b]`）や集合の要素順は `--strict` を通ったまま未整形で残る。落ちたら `pfdsl fmt <file> --write` を当てる
 - 対象 `.pfdsl` に sibling companion `.md` がある場合、図に載らない補足（変換境界の契約・例外処理等）のプレースホルダを埋めるか、埋めない理由を1行書く。図だけ完成して companion が雛形のまま残るのが既定の落ち方
-- **roadmap.pfdsl を採用している場合のみ**: 構築した図が roadmap の artifact として登録されているか確認する（成果物の門番、pfd-ops プロトコル5）
+- **roadmap.pfdsl を採用している場合のみ**: 構築した図が roadmap の artifact として登録されているか確認する（pfd-ops の `references/work-cycle.md`「成果物の門番」）
