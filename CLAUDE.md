@@ -30,10 +30,9 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 ただし事後的な分割（先に一括で変更してから複数コミットへ割り直す）が中間ファイル再構成等でトークン効率を著しく損なう場合は、論理単位の純度より作業順=コミット順を優先してよい。
 
-変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook、`.claude/settings.json` で配線）は、直接記述された既知のshell形についてmainブランチまたはsibling worktreeのツリー・インデックスを変えるgitコマンドを止める事故防止guardである（#650・#777・#784）。任意のBash source・展開・関数・別scriptを完全に解釈するsecurity boundaryではない。
-ブランチ上に新しい状態を作る操作はdenyにする。既存の状態を壊す・戻す操作はClaude Codeではaskだが、Codex PreToolUseはaskをサポートせずhook failure後に実行を続けるためdenyへ変換する。両harnessのrepo hookは同じ直接形の安全サブセットを扱うが、Codexで低摩擦な機械的境界を担うのはtrusted-root検証付き `codex-git-routine.mjs`、raw Gitを永続allowしないexecpolicy、sandboxの組合せであり、Claude Codeにこのuser-level wrapperは前提化しない。Codexで永続allowするroutine Gitは、実際のworkdirがhook payloadに現れない境界を避けるため、wrapperの明示target付きsubcommandだけを使う。wrapperはGitとMakeの子processからGitのrepository・index・object・ref namespaceを変える7種類の環境変数を除去する。guardはwrapperの `stage-all`・`commit`・`branch-rename` をGit変更として認識し、コマンド文字列中のtargetをsession rootと比較する。raw commandではquotedまたはescaped literal argv、literal `cd`、`git -C`、`env -C/--chdir`、既知のcommand/sudo/time prefixを順に解決する。`--git-dir`・`--work-tree`、command内またはhook processから継承した非空のGit target環境変数、非空のambientまたはcommand-state CDPATHによるrelative cd、inputを含む先頭redirection、dynamic cwd、未知または不完全なprefix、列挙済みprotected-state setter、対応外のcompound構文等で実targetを確定できなければfail closedする。protected shell stateは変数ごとに追跡し、literalな空代入・有効な変数 `unset`・Git変数の `export -n` で安全な状態へ戻せる一方、動的な書込先、`source`・`.`・`eval`、targetに影響する `||`・pipeline・background・subshell・AND-listは変更系Gitをfail closedする。対応外のraw compoundは無害でも拒否しうるため、変更系Gitは単純commandまたは正規wrapperへ分ける。読み取り系Git、単純なsuccess-pathの `cd <target> && git <mutation>`、targetに影響しないpipeline・AND-list、変更系Gitより後ろにだけ現れるcontrol flowは影響を受けない。identity取得用Git subprocessはGit target環境変数を除去して明示cwdからrootとbranchを解決する。
-読み取り系は素通しする。
-どのサブコマンドがどちらに入るかは `scripts/lib/main-commit-guard.mjs` の `DENIED_SUBCOMMANDS` / `ASKED_SUBCOMMANDS` が一次情報 — ここには列挙しない。
+変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook）は、mainまたはsibling worktreeを対象にする変更系Gitを保護する。ツールに渡すパスと実行worktreeを一致させる。
+新しい状態を作る操作はdenyとし、破壊・復元操作はClaude Codeでask、askを表現できないCodexでfail-closed denyとする。変更系Gitの実効targetをshell構文から確定できない場合もfail closedとする。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` とする。
+リポジトリのCodexでroutine Gitを実行するときは、trusted-root検証付き `codex-git-routine.mjs` の明示target付きsubcommandを使う。raw Gitは永続allowしない。Claude Codeにはこのuser-level wrapperを前提としない。
 
 コミットメッセージは**英語**。
 
