@@ -39,8 +39,20 @@ import { proxyAwareFetch } from "./proxy-fetch.mjs";
 // walk to it. Two separately written caps is what let the backends disagree
 // about a repo past the limit while the parity claim above still stood.
 const LABEL_LIST_LIMIT = 100;
-const ISSUE_LIST_LIMIT = 500;
-const PR_LIST_LIMIT = 30;
+const ISSUE_LIST_LIMIT = 1000;
+const PR_LIST_LIMIT = 100;
+
+async function rejectSaturatedList(operation, limit, itemsPromise) {
+	// A result with exactly `limit` entries may be the complete list or a
+	// cap-truncated list; neither backend reports which one it is. Rejecting
+	// both cases keeps a cap-bound result from being mistaken for a full list.
+	const items = await itemsPromise;
+	if (items.length >= limit)
+		throw new Error(
+			`github-ops: ${operation} hit its list limit of ${limit}; refusing a possibly truncated result`,
+		);
+	return items;
+}
 
 /**
  * @param {string} cwd
@@ -145,11 +157,20 @@ export function createGitHubOps({
 		}
 	}
 
+	function withListFallback(operation, limit, ghCall, httpCall) {
+		return rejectSaturatedList(
+			operation,
+			limit,
+			withFallback(operation, ghCall, httpCall),
+		);
+	}
+
 	return {
 		/** @returns {Promise<{name: string, description: string}[]>} */
 		listLabels: () =>
-			withFallback(
+			withListFallback(
 				"listLabels",
+				LABEL_LIST_LIMIT,
 				async () => {
 					const out = await runGh([
 						"label",
@@ -172,8 +193,9 @@ export function createGitHubOps({
 
 		/** @returns {Promise<Array<{number: number, state: string, stateReason: string|null, labels: {name:string}[], updatedAt: string}>>} */
 		listIssues: () =>
-			withFallback(
+			withListFallback(
 				"listIssues",
+				ISSUE_LIST_LIMIT,
 				async () => {
 					const out = await runGh([
 						"issue",
@@ -235,8 +257,9 @@ export function createGitHubOps({
 
 		/** @returns {Promise<Array<{number: number, title: string, headRefName: string, statusCheckRollup: {conclusion: string|null}[]}>>} */
 		listOpenPrs: () =>
-			withFallback(
+			withListFallback(
 				"listOpenPrs",
+				PR_LIST_LIMIT,
 				async () => {
 					const out = await runGh([
 						"pr",
