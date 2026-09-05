@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
 	chmodSync,
 	cpSync,
@@ -2419,6 +2419,139 @@ describe("target-local consumer probes", () => {
 });
 
 describe("Codex generated consumers", () => {
+	it("normalizes generated Codex skill and hook consumers by path", () => {
+		const fixtureRoot = mkdtempSync(join(tmpdir(), "codex-assembly-"));
+		try {
+			cpSync(join(repoRoot, ".claude"), join(fixtureRoot, ".claude"), {
+				recursive: true,
+			});
+			cpSync(
+				join(repoRoot, "generated/skills/pfdsl"),
+				join(fixtureRoot, "generated/skills/pfdsl"),
+				{ recursive: true },
+			);
+			cpSync(join(repoRoot, "hooks"), join(fixtureRoot, "hooks"), {
+				recursive: true,
+			});
+			cpSync(join(repoRoot, "AGENTS.md"), join(fixtureRoot, "AGENTS.md"));
+			const installRoot = join(fixtureRoot, ".claude/skills/pfd-ops/install");
+			writeFileSync(join(installRoot, "README.md"), "# Install\n");
+			const futureHook = join(fixtureRoot, "hooks/pfd-ops/install/future.mjs");
+			mkdirSync(dirname(futureHook), { recursive: true });
+			writeFileSync(futureHook, "export default {};\n");
+
+			const capabilities = structuredClone(decodedHarnessCapabilities);
+			const pfdOps = capabilities.find(
+				(record) => record.id === "skill:pfd-ops",
+			);
+			pfdOps.source.files.push("install/README.md");
+			const codexPluginRoot = join(fixtureRoot, "plugin/pfdsl-codex");
+			assembleCodexAssets({
+				root: fixtureRoot,
+				codexPluginRoot,
+				capabilities,
+			});
+
+			for (const skillsRoot of [
+				join(fixtureRoot, ".agents/skills"),
+				join(codexPluginRoot, "skills"),
+			]) {
+				assert.equal(
+					generatedSourceCommentCount(
+						readFileSync(
+							join(
+								skillsRoot,
+								"pfd-ops/install/scripts/pfdsl/audit-issues-flow.mjs",
+							),
+							"utf-8",
+						),
+					),
+					0,
+					`${skillsRoot}: install mjs`,
+				);
+				assert.equal(
+					generatedMarkdownNoticeCount(
+						readFileSync(
+							join(skillsRoot, "pfd-ops/install/README.md"),
+							"utf-8",
+						),
+					),
+					0,
+					`${skillsRoot}: install markdown`,
+				);
+				assert.equal(
+					generatedMarkdownNoticeCount(
+						readFileSync(join(skillsRoot, "pfd-ops/SKILL.md"), "utf-8"),
+					),
+					1,
+					`${skillsRoot}: prompt skill`,
+				);
+			}
+			assert.equal(
+				generatedSourceCommentCount(
+					readFileSync(
+						join(codexPluginRoot, "hooks/pfd-ops/install/future.mjs"),
+						"utf-8",
+					),
+				),
+				1,
+				`${codexPluginRoot}: hook install mjs`,
+			);
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	it("routes an upstream .agents check to canonical repo-root install sources", () => {
+		const fixture = PROBE_FIXTURES["codex-repository-consumer"];
+		const consumer = mkdtempSync(join(tmpdir(), "codex-upstream-routing-"));
+		const sourcePath = ".github/workflows/pfdsl-flow-on-issue-close.yml";
+		try {
+			fixture.prepare(repoRoot, consumer);
+			writeFileSync(join(consumer, ".git"), "gitdir: elsewhere\n");
+			mkdirSync(join(consumer, "scripts/lib"), { recursive: true });
+			writeFileSync(
+				join(consumer, "scripts/gen-install.mjs"),
+				".claude/skills/pfd-ops/install\n",
+			);
+			writeFileSync(
+				join(consumer, "scripts/lib/install-templates.mjs"),
+				".claude/skills/pfd-ops/install\n",
+			);
+			mkdirSync(join(consumer, "plugin/pfdsl/.claude-plugin"), {
+				recursive: true,
+			});
+			writeFileSync(
+				join(consumer, "plugin/pfdsl/.claude-plugin/plugin.json"),
+				'{"name": "pfdsl"}\n',
+			);
+			const source = readFileSync(join(repoRoot, sourcePath));
+			mkdirSync(dirname(join(consumer, sourcePath)), { recursive: true });
+			writeFileSync(join(consumer, sourcePath), `${source}\nsource mutation\n`);
+
+			const result = spawnSync(
+				process.execPath,
+				[
+					join(
+						consumer,
+						".agents/skills/pfd-ops/scripts/check-install-sync.mjs",
+					),
+					"--upstream",
+				],
+				{ cwd: consumer, encoding: "utf-8" },
+			);
+			assert.equal(result.status, 1, result.stderr);
+			assert.match(
+				result.stdout,
+				new RegExp(
+					`modified: ${sourcePath.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}`,
+				),
+			);
+		} finally {
+			rmSync(consumer, { recursive: true, force: true });
+		}
+	});
+
 	it("ships a self-contained native skill tree without mutating the Claude tree", () => {
 		const pluginRoot = join(repoRoot, "plugin/pfdsl");
 		const codexPluginRoot = join(repoRoot, "plugin/pfdsl-codex");
@@ -2461,7 +2594,9 @@ describe("Codex generated consumers", () => {
 			for (const relativePath of legacyFiles) {
 				const legacy = readFileSync(join(pluginRoot, "skills", relativePath));
 				const native = readFileSync(join(skillsRoot, relativePath));
-				if (relativePath.endsWith(".md")) {
+				if (relativePath.startsWith("pfd-ops/install/")) {
+					assert.deepEqual(native, legacy, relativePath);
+				} else if (relativePath.endsWith(".md")) {
 					assert.equal(
 						generatedMarkdownNoticeCount(native.toString("utf-8")),
 						1,
@@ -2645,8 +2780,13 @@ describe("Codex generated consumers", () => {
 					codexMarkdownSource(repoRoot, relativePath),
 					"utf-8",
 				);
-				assert.equal(generatedMarkdownNoticeCount(output), 1, relativePath);
-				if (!relativePath.startsWith("pfdsl/")) {
+				const isInstallPath = relativePath.startsWith("pfd-ops/install/");
+				assert.equal(
+					generatedMarkdownNoticeCount(output),
+					isInstallPath ? 0 : 1,
+					relativePath,
+				);
+				if (!isInstallPath && !relativePath.startsWith("pfdsl/")) {
 					assert.match(
 						output,
 						new RegExp(

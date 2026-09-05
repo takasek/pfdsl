@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// DO NOT EDIT. Authoritative source: .claude/skills/pfd-ops/install/scripts/pfdsl/lib/proxy-fetch-worker.mjs.
 // One-shot HTTP request, run with --use-env-proxy so Node's built-in fetch
 // honors HTTPS_PROXY (it doesn't by default — see /root/.ccr/README.md).
 // Reads a {url, method, headers, body} JSON request from stdin, writes
