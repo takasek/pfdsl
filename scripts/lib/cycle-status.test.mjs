@@ -832,6 +832,14 @@ describe("buildDesignRecordTemplate", () => {
 		const { note } = buildDesignRecordTemplate();
 		assert.match(note, /node scripts\/check-design-record\.mjs --file <path>/);
 	});
+
+	// The draft lives outside the worktree, so the isolation that keeps parallel
+	// sessions apart does not reach it: a fixed name is one shared file.
+	it("warns that the draft path is shared with parallel sessions", () => {
+		const { note } = buildDesignRecordTemplate();
+		assert.match(note, /並行セッションと共有/);
+		assert.match(note, /セッション固有の名前/);
+	});
 });
 
 describe("buildReviewRecordTemplate", () => {
