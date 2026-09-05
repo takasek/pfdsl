@@ -507,7 +507,7 @@ process:
     group: planning
   map_transform_boundaries:
     label: 変換境界整理
-    description: "toolchain の実装（parse/normalize/validate/format/render/export 等）から実行時データ変換の境界を PFD 化する。変換コンポーネントの追加・変更・削除時に手動更新（ADR-0018 門番、pfd-ops プロトコル5）"
+    description: "toolchain の実装（parse/normalize/validate/format/render/export 等）から実行時データ変換の境界を PFD 化する。変換コンポーネントの追加・変更・削除時に手動更新（ADR-0018 門番、pfd-ops references/work-cycle.md「成果物の門番」）"
     group: planning
   develop:
     label: リポジトリ開発

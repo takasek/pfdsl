@@ -14,7 +14,7 @@ pfd-ops スキルは4層で構成される。各層の「配布可能性」が�
 ## L1: 汎用プロトコル（SKILL.md 本文）
 
 PFD の概念だけで導ける手順。固有名詞なし。
-項目の内容は SKILL.md 本文（「運用プロトコル」「ワークサイクル」）が一次情報 — ここには複製しない（列挙ドリフト防止）。
+項目の内容は `references/work-cycle.md` の「運用契約」と4手順が一次情報 — ここには複製しない（列挙ドリフト防止）。
 
 ## L2: ディスパッチ（SKILL.md 本文）
 
@@ -22,6 +22,8 @@ PFD の概念だけで導ける手順。固有名詞なし。
 ディスパッチ先の一覧は SKILL.md 本文「運用ファイルの所在（L2 ディスパッチ）」が一次情報 — ここには複製しない。
 
 `.md` companion の機構（「sibling を読め」という規約）は L2 に属し SKILL.md に記載する。companion の中身は L4（リポ固有）に属す。
+
+PFD の種別は「この PFD が答える問い」で区別し、定義表・問診・1種別1ファイル原則は pfd-ecosystem スキルの `references/kind-taxonomy.md` を一次情報とする。変換グラフに参加しない外部提出先や最終消費者は artifact または process の `externalStakeholders` に列挙し、組織を出力ノードとして扱わない。組織境界をまたぐ引き継ぎは独立種別にせず、workflow または pipeline に吸収して内部責任者を `owner` で表す。
 
 `.pfdsl/bindings/<スキル名>.md` はスキル固有の恒常指示を置く独立ファイルで、companion ではない（対応する `.pfdsl` グラフを持たず、sibling 規約の対象外）。スキルが自分の SKILL.md から直接参照する（詳細は次項）。sibling companion（`roadmap.md`・`workflow.md`・`pipeline.md`）に混ぜないのは、読み込み契機（PFD グラフを扱うタイミング）とスキル発火のタイミングが一致しないため。
 
@@ -127,7 +129,17 @@ pfdsl 開発リポ固有の例:
 ```
 
 `install/` の canonical は plugin に同梱され、リポルートへの実配置・更新は `check-install-sync.mjs --deploy`（`/pfd-init` ステップ 3.5）が行う。
-配置済みファイルと同梱 canonical の乖離は、pfd-ops 発火時のランタイムセルフチェック（SKILL.md「配置ファイルの鮮度セルフチェック」）が hash 照合で警告する。
+配置済みファイルと同梱 canonical の乖離は、pfd-ops 発火時の必須セルフチェックが hash 照合で警告する。
+
+### 配置ファイルの鮮度セルフチェック
+
+チェックの出力末尾が対応を名指しするため、その指示に従う。スクリプトは target の役割を分類し、`--deploy` が正しい向きの場合だけ案内するので、drift だけを根拠に反射的に deploy しない。GitHub Issues バックエンド未採用のリポでは何も出ない。
+
+素の `--deploy` はローカル編集がないファイルをコピーし、ローカル編集がない orphan を削除する。`--overwrite-local-edits` は残るパスのローカル編集を canonical で上書きし、`--delete-edited-orphans` は消えるパスのローカル編集ごと削除する。旧ファイルの掃除ではまず素の deploy を実行し、編集済みとして残ったパスだけについて追加 flag の要否を判断する。
+
+`Possible renames` は canonical 側の rename が新旧パスの `missing` と `orphaned` に分かれて見えている状態を表す。新パスを信用する前に旧パスのローカル編集を引き継ぐ。
+
+plugin version の上流差分警告は更新をユーザーに案内する。同じ version で bundle 内容だけが異なる場合は更新先 release がまだ存在しないため、その差分だけを報告する。
 
 ## 「採用」とは
 
