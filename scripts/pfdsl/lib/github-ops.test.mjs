@@ -77,6 +77,14 @@ function stubPagedFetch(pages) {
 	};
 }
 
+async function assertListSaturation(promise, operation, limit) {
+	await assert.rejects(promise, (error) => {
+		assert.match(error.message, new RegExp(operation));
+		assert.match(error.message, new RegExp(`limit of ${limit}`));
+		return true;
+	});
+}
+
 describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 	// Every parity case drives the HTTP backend, which only answers with a
 	// token present.
@@ -87,50 +95,50 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		delete process.env.GH_TOKEN;
 	});
 
-	it("listLabels: both backends normalize a null description to an empty string", async () => {
+	it("listLabels: both backends return the same list below the limit", async () => {
 		const ghOps = createGitHubOps({
 			execGhImpl: stubExecGh({
 				"label list": JSON.stringify([
 					{ name: "flow:managed", description: null },
+					{ name: "flow:exempt", description: "not tracked" },
 				]),
 			}),
 		});
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "label list": new Error("ENOENT") }),
-			fetchImpl: stubFetch([{ name: "flow:managed", description: null }]),
+			fetchImpl: stubFetch([
+				{ name: "flow:managed", description: null },
+				{ name: "flow:exempt", description: "not tracked" },
+			]),
 		});
 		const [ghResult, httpResult] = await Promise.all([
 			ghOps.listLabels(),
 			httpOps.listLabels(),
 		]);
-		assert.deepEqual(ghResult, [{ name: "flow:managed", description: "" }]);
+		assert.deepEqual(ghResult, [
+			{ name: "flow:managed", description: "" },
+			{ name: "flow:exempt", description: "not tracked" },
+		]);
 		assert.deepEqual(ghResult, httpResult);
 	});
 
-	// The gh argv carries `--limit`, so gh stops at that many labels. The HTTP
-	// backend walks every page, and nothing capped it — a repo past the limit
-	// got a longer list from one backend than the other while the parity claim
-	// stood (found by the independent design review of #1044).
-	it("listLabels: both backends stop at the same limit", async () => {
+	it("listLabels: both backends reject a saturated list", async () => {
 		const label = (i) => ({ name: `label-${i}`, description: null });
 		const page1 = Array.from({ length: 100 }, (_, i) => label(i));
-		const page2 = Array.from({ length: 50 }, (_, i) => label(100 + i));
 		const ghOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "label list": JSON.stringify(page1) }),
 		});
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "label list": new Error("ENOENT") }),
-			fetchImpl: stubPagedFetch([page1, page2]),
+			fetchImpl: stubPagedFetch([page1, []]),
 		});
-		const [ghResult, httpResult] = await Promise.all([
-			ghOps.listLabels(),
-			httpOps.listLabels(),
+		await Promise.all([
+			assertListSaturation(ghOps.listLabels(), "listLabels", 100),
+			assertListSaturation(httpOps.listLabels(), "listLabels", 100),
 		]);
-		assert.equal(ghResult.length, 100);
-		assert.deepEqual(ghResult, httpResult);
 	});
 
-	it("listIssues: both backends return the same shape", async () => {
+	it("listIssues: both backends return the same list below the limit", async () => {
 		const raw = [
 			{
 				number: 1,
@@ -138,6 +146,13 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 				stateReason: null,
 				labels: [{ name: "flow:managed" }],
 				updatedAt: "2026-01-01T00:00:00Z",
+			},
+			{
+				number: 2,
+				state: "CLOSED",
+				stateReason: "COMPLETED",
+				labels: [],
+				updatedAt: "2026-01-02T00:00:00Z",
 			},
 		];
 		const ghOps = createGitHubOps({
@@ -153,6 +168,13 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 					labels: [{ name: "flow:managed" }],
 					updated_at: "2026-01-01T00:00:00Z",
 				},
+				{
+					number: 2,
+					state: "closed",
+					state_reason: "completed",
+					labels: [],
+					updated_at: "2026-01-02T00:00:00Z",
+				},
 			]),
 		});
 		const [ghResult, httpResult] = await Promise.all([
@@ -161,6 +183,47 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		]);
 		assert.deepEqual(ghResult, raw);
 		assert.deepEqual(ghResult, httpResult);
+	});
+
+	it("listIssues: the raised cap admits an issue beyond the old cap", async () => {
+		const allIssues = [
+			...Array.from({ length: 501 }, (_, i) => ({ number: 1001 - i })),
+			{ number: 3 },
+		];
+		const ghExec = async (args) => {
+			return JSON.stringify(allIssues.slice(0, Number(args.at(-1))));
+		};
+		const ops = createGitHubOps({ execGhImpl: ghExec });
+
+		const result = await ops.listIssues();
+
+		assert.equal(result.length, 502);
+		assert.equal(result.at(-1).number, 3);
+	});
+
+	it("listIssues: both backends reject a saturated list", async () => {
+		const issue = (number) => ({
+			number,
+			state: "OPEN",
+			state_reason: null,
+			labels: [],
+			updated_at: "2026-01-01T00:00:00Z",
+		});
+		const page = Array.from({ length: 1000 }, (_, i) => issue(i + 1));
+		const ghOps = createGitHubOps({
+			execGhImpl: stubExecGh({
+				"issue list": JSON.stringify(page),
+			}),
+		});
+		const httpOps = createGitHubOps({
+			execGhImpl: stubExecGh({ "issue list": new Error("ENOENT") }),
+			fetchImpl: stubPagedFetch([page, []]),
+		});
+
+		await Promise.all([
+			assertListSaturation(ghOps.listIssues(), "listIssues", 1000),
+			assertListSaturation(httpOps.listIssues(), "listIssues", 1000),
+		]);
 	});
 
 	it("viewIssue: both backends return matching comment node IDs and fields", async () => {
@@ -226,12 +289,18 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		assert.deepEqual(ghResult, httpResult);
 	});
 
-	it("listOpenPrs: both backends return the same shape", async () => {
+	it("listOpenPrs: both backends return the same list below the limit", async () => {
 		const raw = [
 			{
 				number: 5,
 				title: "x",
 				headRefName: "feature",
+				statusCheckRollup: [{ conclusion: "SUCCESS" }],
+			},
+			{
+				number: 6,
+				title: "y",
+				headRefName: "feature-two",
 				statusCheckRollup: [{ conclusion: "SUCCESS" }],
 			},
 		];
@@ -246,6 +315,11 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 					ok: true,
 					json: async () => [
 						{ number: 5, title: "x", head: { ref: "feature", sha: "abc" } },
+						{
+							number: 6,
+							title: "y",
+							head: { ref: "feature-two", sha: "def" },
+						},
 					],
 				};
 			}
@@ -268,15 +342,15 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		assert.deepEqual(ghResult, httpResult);
 	});
 
-	it("listOpenPrs: both backends stop at the same explicit limit", async () => {
+	it("listOpenPrs: both backends reject a saturated list", async () => {
 		const pr = (number) => ({
 			number,
 			title: `PR ${number}`,
 			headRefName: `branch-${number}`,
 			statusCheckRollup: [],
 		});
-		const ghRows = Array.from({ length: 30 }, (_, i) => pr(i + 1));
-		const restRows = Array.from({ length: 31 }, (_, i) => ({
+		const ghRows = Array.from({ length: 100 }, (_, i) => pr(i + 1));
+		const restRows = Array.from({ length: 100 }, (_, i) => ({
 			number: i + 1,
 			title: `PR ${i + 1}`,
 			head: { ref: `branch-${i + 1}`, sha: `sha-${i + 1}` },
@@ -285,15 +359,13 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		const ghOps = createGitHubOps({ execGhImpl: ghExec });
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "pr list": new Error("ENOENT") }),
-			fetchImpl: stubPagedFetch([restRows]),
+			fetchImpl: stubPagedFetch([restRows, []]),
 		});
-		const [ghResult, httpResult] = await Promise.all([
-			ghOps.listOpenPrs(),
-			httpOps.listOpenPrs(),
+		await Promise.all([
+			assertListSaturation(ghOps.listOpenPrs(), "listOpenPrs", 100),
+			assertListSaturation(httpOps.listOpenPrs(), "listOpenPrs", 100),
 		]);
-		assert.deepEqual(ghExec.calls[0].slice(-2), ["--limit", "30"]);
-		assert.equal(ghResult.length, 30);
-		assert.deepEqual(ghResult, httpResult);
+		assert.deepEqual(ghExec.calls[0].slice(-2), ["--limit", "100"]);
 	});
 
 	it("addIssueLabel: both backends make the same call and return void", async () => {
