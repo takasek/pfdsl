@@ -13,6 +13,7 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
   - **COMPLETED**（`Close as completed`）: 実装済みとして扱う。終端はチェーンごと削除（`closed_in_flow`）。下流入力が残るものは process 側の `tags`/`updated_at` を削除するのみ — `iN_` prefix は恒久のため剥がさず、`status` も強制しない（マージ時に既に `done` になっている）
   - **NOT_PLANNED**（`Close as not planned`）: 未実装のまま廃止。終端は自動削除（`closed_not_planned`）、下流入力が残るものは手動対応 finding — 下流 artifact も廃止するか代替を用意するかを人が判断する
   - **チェーンの定義**: 削除対象の「チェーン」= 当該 artifact + それを唯一生産する process + 関連 edge。process を残すと出力なき孤児 process になる（`check` が検出する。入力だけ残った process は V003、入力も出力も持たない宣言済み process は V020。エッジを一切失ったノードは `graph orphans` でも一覧できる）
+  - **終端でなかったチェーンの回収**: 上の close 時削除は close の瞬間に終端だったチェーンしか対象にしない。下流が後から全て完了したチェーンはどの close イベントからも見えないまま残るため、放置すると roadmap は完了履歴の台帳へ育つ。roadmap が持ってよいのは、(a) done でない artifact を出力する process と、(b) その入出力として edge に現れる artifact だけである。(b) に入る done artifact は ready/blocked 判定の入力として参照されるから残るのであって、完了の記録として残るのではない。完了履歴は closed issue・git 履歴・決定記録・公開レジストリが持ち、roadmap に写しを置かない — 削除したノードを指す `revises:` 等の参照も一緒に外す。回収の導出は2コマンドを要する。`status list <file> --status todo,wip,waiting,suspended` で done でない artifact を列挙し、その各々の生産 process を `graph neighbors <file> <artifact-id>` の `predecessors` で引くと (a) が出る。続けて (a) の各 process へ `graph neighbors` を当て、`predecessors` と `successors` に現れる artifact を集めると (b) が出る。その外側が削除対象になる。削除の前後で `status ready` / `status blocked` の結果が変わらないことが、判定に要るノードを削っていないことの検査になる
 
 ## ラベル判定基準
 
