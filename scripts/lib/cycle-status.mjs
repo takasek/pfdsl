@@ -536,11 +536,36 @@ const TOKEN_SEPARATOR = /[^A-Za-z0-9_.-]+/;
  * part of how the issue writes the term rather than part of the term. */
 const TOKEN_EDGE = /^[^A-Za-z0-9_]+|[^A-Za-z0-9_]+$/g;
 
+/** A fenced code block's opening or closing line. */
+const FENCE_LINE = /^\s*(?:`{3,}|~{3,})/;
+
+/**
+ * The lines outside every fenced code block.
+ *
+ * A fence holds material the issue is quoting rather than terms it is naming —
+ * a pasted diff, an example issue body, a command's output — and its inline
+ * spans belong to whatever was pasted. Taking them would inject narrowing
+ * words the filer never chose, in the widening direction this whole function
+ * exists to fight. An unclosed fence swallows the rest of the text, which is
+ * how a markdown renderer reads it too.
+ * @param {string} text
+ * @returns {string[]}
+ */
+function linesOutsideFences(text) {
+	let inFence = false;
+	return text.split("\n").filter((line) => {
+		if (!FENCE_LINE.test(line)) return !inFence;
+		inFence = !inFence;
+		return false;
+	});
+}
+
 /**
  * The words to narrow the pre-artifact reminders with, taken from the target
  * issue's own text (#1118).
  *
- * Only code spans, not the prose around them. `.pfdsl/bindings/pfd-retro.md`
+ * Only code spans outside fenced blocks, not the prose around them.
+ * `.pfdsl/bindings/pfd-retro.md`
  * asks `--word` for this cycle's concrete terms — changed filenames, touched
  * flags, error strings — and measures the alternative: a draft narrowed to 4
  * patterns by its own identifiers spread to 16, its true neighbour sinking to
@@ -561,7 +586,9 @@ export function preArtifactQueryWords(text) {
 	if (typeof text !== "string") return [];
 	/** @type {Set<string>} */
 	const words = new Set();
-	for (const [, span] of text.matchAll(CODE_SPAN)) {
+	for (const [, span] of linesOutsideFences(text)
+		.join("\n")
+		.matchAll(CODE_SPAN)) {
 		for (const raw of span.split(TOKEN_SEPARATOR)) {
 			const token = raw.replace(TOKEN_EDGE, "");
 			if (token.length >= 4 && /[A-Za-z]/.test(token)) words.add(token);

@@ -496,11 +496,16 @@ export async function runCycleStatus({
 	// says so — the same reading as an issue that wrote no code spans.
 	const PATTERN_DIR = resolve(root, PATTERN_DIR_RELATIVE);
 	let preArtifactPatterns = [];
+	// The value that survives the catch below, so an empty reminder list from a
+	// directory that could not be read never reads as one from an issue that
+	// wrote no code spans — those call for different actions, and only the
+	// second is about this cycle at all.
 	let preArtifactSelection = {
 		words: [],
+		reach: [],
 		pool: 0,
 		unselective: true,
-		reason: "no-words",
+		reason: "catalog-unreadable",
 	};
 	let preArtifactPatternsError = null;
 	try {

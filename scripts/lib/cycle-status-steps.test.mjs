@@ -1428,6 +1428,19 @@ describe("runCycleStatus preArtifactPatterns", () => {
 		);
 	});
 
+	it("does not report an unreadable catalog as an issue with no code spans", async () => {
+		const result = await runCycleStatus(
+			baseDeps({
+				readdirSync: () => {
+					throw new Error("ENOENT: no such directory");
+				},
+			}),
+		);
+		assert.match(result.preArtifactPatternsError, /ENOENT/);
+		assert.equal(result.preArtifactSelection.reason, "catalog-unreadable");
+		assert.equal(result.preArtifactSelection.pool, 0);
+	});
+
 	it("reports no words when the cycle resolved no target issue", async () => {
 		const result = await runCycleStatus(
 			baseDeps({

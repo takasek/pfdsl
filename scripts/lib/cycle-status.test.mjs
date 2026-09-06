@@ -1076,6 +1076,33 @@ describe("preArtifactQueryWords", () => {
 	it("returns nothing when the text carries no code span", () => {
 		assert.deepEqual(preArtifactQueryWords("コードスパンのない散文。"), []);
 	});
+
+	it("ignores spans inside a fenced code block", () => {
+		assert.deepEqual(
+			preArtifactQueryWords(
+				["`kept` は拾う。", "```", "例: `illustration` を貼る", "```"].join(
+					"\n",
+				),
+			),
+			["kept"],
+		);
+	});
+
+	it("ignores a tilde fence, and resumes after the fence closes", () => {
+		assert.deepEqual(
+			preArtifactQueryWords(
+				["~~~", "`illustration`", "~~~", "`resumed` は拾う。"].join("\n"),
+			),
+			["resumed"],
+		);
+	});
+
+	it("treats an unclosed fence as running to the end of the text", () => {
+		assert.deepEqual(
+			preArtifactQueryWords(["```", "`illustration`"].join("\n")),
+			[],
+		);
+	});
 });
 
 describe("narrowPreArtifactReminders", () => {
