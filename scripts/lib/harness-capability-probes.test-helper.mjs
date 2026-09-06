@@ -34,6 +34,17 @@ import { tryGit } from "./run-exec.mjs";
  * its own subtree; walking into it from an ancestor mapping would attribute
  * its files to the wrong source path, and `git check-ignore` refuses a
  * pathspec that reaches through a symlink.
+ *
+ * A directory symlink encountered anywhere else is refused outright rather
+ * than dereferenced: `runTargetConsumerProbe`'s probing side (readProbeTree,
+ * probeMappingOutputs) does dereference and walk through such a symlink, so
+ * silently treating it as a leaf here — the way a file is treated — would
+ * leave whatever sits beyond it unpruned, and any git-ignored file there
+ * would reproduce the exact undeclared-surface failure this function exists
+ * to prevent. Dereferencing and recursing into it here instead is not an
+ * option either: querying `git check-ignore` with a path that reaches
+ * through a symlink in `sourceRoot` fails outright (the same wall
+ * `.claude/skills/pfdsl` hits, handled above via its own mapping).
  */
 function collectFixtureEntries(
 	consumerPath,
@@ -43,6 +54,12 @@ function collectFixtureEntries(
 ) {
 	if (!existsSync(consumerPath)) return;
 	const stats = lstatSync(consumerPath);
+	if (stats.isSymbolicLink() && statSync(consumerPath).isDirectory()) {
+		throw new Error(
+			`fixture entry ${consumerPath} (source ${sourceRelativeRoot}) is a symlink to a directory; ` +
+				"declare this subtree as its own mapping with the real source path instead of letting pruneGitIgnoredFixtureEntries walk through the symlink",
+		);
+	}
 	if (stats.isDirectory()) {
 		// The trailing "/" tells `check-ignore` this queried path is a
 		// directory even when it happens not to physically exist at that path
