@@ -7,280 +7,28 @@ layout:
   maxWidth: 130
 
 artifact:
-  spec_v006:
-    label: 仕様書 v0.0.6
-    status: done
-    criteria: check/fmt/graph が全サンプルにエラーなし
-    location: ../docs/spec/spec.md
-  findings_r12:
-    label: 実践ラウンド1/2レビュー知見
-    description: docs/examples の執筆・レビューで得た品質知見
-    status: done
-    criteria: 各知見が docs/quality-guide.md の規則または docs/adr/ の決定（ラウンド1/2 の分は ADR-0006・ADR-0011）として記述されていることを、両者を読んで確認できる
   toolchain:
     label: ツールチェーン実装（現行）
     description: packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）全体。後続プロセスが前提にするのは「実装が存在すること」であって特定の版ではない。現行版は cli_release_* チェーンを経て進み続けており、公開版の一次情報は npm レジストリ（ここに版数を書かない — ドリフトするため）。名前と粒度は workflow.pfdsl の toolchain に揃えてある（#783）
     status: done
     criteria: check/fmt/graph が全サンプルに対してエラーなし、npm view @pfdsl/cli versions で公開済みバージョンが1件以上確認できる
     location: ../packages/
-  skill_gen:
-    label: スキル生成系（現行）
-    description: scripts/gen-skill.mjs と docs/samples 構成。identity は check-gen-plugin.yml が CI 強制
-    status: done
-    criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
-  spec_v007:
-    label: 仕様書 v0.0.7（統合）
-    status: done
-    criteria: check/fmt/graph が全サンプルにエラーなし、docs/spec/spec.md に v0.0.7 で追加されたフィールド（criteria/location/revises/command 等）の定義節が存在する
-    location: ../docs/spec/spec.md
-    revises: spec_v006
-  spec_v008:
-    label: 仕様書 v0.0.8（マルチファイル統合）
-    status: done
-    criteria: check/fmt/graph が全サンプルにエラーなし
-    location: ../docs/spec/spec.md
-    revises: spec_v007
-  multifile_toolchain:
-    label: "spec v0.0.8 実装済みツールチェーン (#148)"
-    description: "subflow:/extends: の checker 実装（V021-V028）。renderer は spec v0.0.8 の対象外（§2.9.3 はビューリンクのみ定義）。VS Code subflow ナビゲーションは #147。後続門番のプレースホルダ（ADR-0018）"
-    status: done
-    criteria: subflow/extends の checker が @pfdsl/core に実装され check コマンドで V021-V028 が動作確認済み（renderer は対象外）
-  cli_release_bootstrap:
-    label: "CLIリリース: 初回公開ベースライン（npm v0.0.9）"
-    description: "後続実装群の入力ベースとなる最初の公開版"
-    status: done
-    criteria: npm view @pfdsl/cli versions に 0.0.9 が含まれる
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_release_ux_flags:
-    label: "CLIリリース: DXフラグ群（npm v0.0.10）"
-    description: "#172 --version / #177 per-command --help / #178 stdin / #180 --no-color / #181 --json 対応を含む"
-    status: done
-    criteria: npm view @pfdsl/cli versions に 0.0.10 が含まれる
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_release_index_sort:
-    label: "CLIリリース: index/reindex + node sort（npm v0.0.11）"
-    description: "#219 W002 診断行番号修正 / #221 index+reindex / #236 node sort を含む（#216-218 hover jump 等は extension 側 ext_v0014 への出力）"
-    status: done
-    criteria: npm view @pfdsl/cli versions に 0.0.11 が含まれる
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  spec_v009:
-    label: 仕様書 v0.0.9（index:統合）
-    status: done
-    criteria: "docs/spec/spec.md に index: フィールドの定義節が存在する"
-    location: ../docs/spec/spec.md
-    revises: spec_v008
-  ext_v0014:
-    label: "extension v0.0.14（公開済み）"
-    description: "現在コミット先行中の vscode-extension 変更を含む次期 Marketplace リリース"
-    status: done
-    criteria: npx @vscode/vsce show takasek.pfdsl --json の versions に 0.0.14 が含まれる
-    location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
-  multifile_policy:
-    label: マルチファイル意味論方針
-    description: "共同起草で確定した ID スコープ・継承解決順・ファイル間参照の決定記録。ファイル横断機能（#8 実装等）と仕様統合の前提資料"
-    status: done
-    criteria: location の提案ファイル（meta check-links が実在を通す）を開くと、ID スコープ・継承解決順・ファイル間参照の3点の決定が読める
-    location: ../docs/spec/proposals/multifile-policy.md
   adrs:
     label: "ADR 群 (docs/adr)"
     description: 方法論の設計決定記録。一覧と本数は docs/adr/README.md が一次情報（ここに数を書かない — ドリフトするため）
     status: done
     criteria: 対象判断が文書化され docs/adr/README.md の一覧に追記済み
     location: ../docs/adr/
-  lint_checker:
-    label: "lint拡張checker (#4)"
-    description: "lint 候補の完全リストは issue #4 が一次情報（本文+コメント）。ここに列挙しない — 列挙は同期漏れで腐るため"
-    status: done
-    criteria: "issue #4 の対象 lint がすべて実装され、check コマンドで動作確認済み"
-  audit_distribution:
-    label: "L3資産の階層化配布 (#43)"
-    description: "audit コア + flow-sync action を skill 同梱・配布可能化。scripts/lib/issues-flow-audit.mjs を #37 と共有するため着手順を調整。実配布フローは #11"
-    status: done
-    criteria: .claude/skills/pfd-ops/install/ に配布ファイルが実在し、check-pfd-ops-sync.yml の配置先一致（identity）と生成物一致の両検査を通過する
-  criteria_spec:
-    label: "合否基準仕様案 (#7)"
-    status: done
-    criteria: location の提案ファイルが実在する（meta check-links が通過する）
-    location: ../docs/spec/proposals/i7-criteria.md
-  revises_spec:
-    label: "改版チェーン仕様案 (#8)"
-    status: done
-    criteria: location の提案ファイルが実在する（meta check-links が通過する）
-    location: ../docs/spec/proposals/i8-revises.md
-  design_notes:
-    label: "設計判断ノート・分岐なし方針 (#9)"
-    status: done
-    criteria: location の提案ファイルが実在する（meta check-links が通過する）
-    location: ../docs/spec/proposals/i9-no-branching.md
-  location_spec:
-    label: "location/command 仕様案 (#13)"
-    description: ノードと実ファイル・実行手順を結ぶメタデータ。パス解決規則のみ multifile 方針と接点
-    status: done
-    criteria: location の提案ファイルが実在する（meta check-links が通過する）
-    location: ../docs/spec/proposals/i13-location.md
-  restructured_gen:
-    label: "再構成済みスキル生成系 (#10)"
-    status: done
-    criteria: make gen-skill が差分なしで完了し、skill と gh_skill_dist が一致
-  marketplace_dist:
-    label: "marketplace 配布 pfdsl skill 群 (#366)"
-    description: "pfdsl + pfd-ecosystem/retro/cycle を1プラグインに束ね Claude plugin marketplace 配布。gen-skill の出力先を plugin ディレクトリへ向ける。生成層は温存し配布層のみ /plugin 化。pfd-ops はリポジトリ成果物を運べないため cp -r 維持"
-    status: done
-    criteria: "/plugin marketplace add takasek/pfdsl に続けて /plugin install pfdsl@pfdsl を実行すると pfdsl skill が発火し references 生成物が届き、.github/workflows/check-gen-plugin.yml が spec/CLI version と plugin.json version の連動を CI で強制する"
-  featured_toolchain:
-    label: "spec v0.0.7 実装済みツールチェーン (#52)"
-    status: done
-    criteria: "docs/spec/spec-history.md の「v0.0.6 からの主な変更点（v0.0.7）」に列挙された機能が実装され、check/fmt/graph がエラーなしで動作"
-  external_stakeholders_spec:
-    label: "externalStakeholders フィールド仕様案 (#97)"
-    description: "artifact / process に外部消費者を列挙するフィールド。owner と対称。終端監査（#37）で消費者として扱う。ecosystem 廃止（ADR-0017）の代替手段。v0.0.7 スコープ"
-    status: done
-    criteria: docs/spec/spec.md に externalStakeholders フィールドの定義節が存在する
-  hierarchy_spec:
-    label: "階層PFD仕様案 (#5)"
-    status: done
-    criteria: location の提案ファイルが実在する（meta check-links が通過する）
-    location: ../docs/spec/proposals/i5-hierarchy.md
-  presets_spec:
-    label: "共有プリセット仕様案 (#6)"
-    status: done
-    criteria: location の提案ファイルが実在する（meta check-links が通過する）
-    location: ../docs/spec/proposals/i6-presets.md
-  version_cmd:
-    label: "CLI --version コマンド (#172)"
-    description: "pfdsl --version / -V でバージョン番号を出力する。ビルド時に package.json から tsup define で埋め込む"
-    status: done
-    criteria: "pfdsl --version が semver 文字列を stdout に出力して exit 0、テスト通過"
-  subcommand_help:
-    label: "CLI per-command --help (#177)"
-    description: "pfdsl check --help など各サブコマンドでコマンド固有の usage を表示する"
-    status: done
-    criteria: "全サブコマンドで --help が exit 0、引数なし呼び出しで同内容を exit 2、テスト通過"
-  stdin:
-    label: "CLI stdin 対応 (#178)"
-    description: "check/fmt/normalize/graph でファイル引数に - を渡すと stdin から読む。fmt --write - は禁止"
-    status: done
-    criteria: "echo 'a >> P -> b' | pfdsl check - が exit 0、fmt --write - が exit 2、テスト通過"
-  no_color:
-    label: "CLI --no-color / NO_COLOR 対応 (#180)"
-    description: "--no-color フラグまたは NO_COLOR 環境変数で ANSI カラー出力を無効化する。no-color.org 準拠"
-    status: done
-    criteria: "NO_COLOR=1 pfdsl check <file> および --no-color で ANSI コードを含まない出力、テスト通過"
-  json_output:
-    label: "CLI --json 出力対応 (#181)"
-    description: "check / normalize で --json フラグを渡すと診断結果またはエッジ一覧を JSON で返す。CI・外部ツール連携向け"
-    status: done
-    criteria: "pfdsl check <file> --json が { ok, diagnostics } JSON を stdout に出力して exit code は現行と同じ、テスト通過"
-  w002_line:
-    label: "W002 診断行番号修正 (#219)"
-    description: "W002 warning の指摘行をファイル先頭でなく artifact 定義行に修正"
-    status: done
-    criteria: criteria 未設定の produced artifact を含むファイルに対する pfdsl check の W002 診断が、その artifact の frontmatter 定義行を指す（ファイル先頭でない）
-  index_reindex:
-    label: "index フィールド + reindex コマンド (#221)"
-    description: "オプショナル整数フィールド index: と pfdsl reindex コマンドを追加。pfd-tools の P#/D# 採番に対応"
-    status: done
-    criteria: "docs/spec/spec.md に index: フィールドの定義節が存在し、pfdsl meta reindex コマンドがトポロジ順に index: を採番することを --check で検証できる（--renumber で全ノード再採番）"
-  node_sort:
-    label: "node 定義の並べ替え (#236)"
-    description: "frontmatter の artifact/process node 定義を index/topological/group 等のキーで並べ替える pfdsl sort コマンド。index 採番(#221)と frontmatter 編集基盤の上に乗る"
-    status: done
-    criteria: "pfdsl sort が --by index|topological|group|id で node 定義を並べ替え、--check で検証できる"
   spec_v0011:
     label: 仕様書 v0.0.11（waiting/suspended/type統合）
     status: done
     criteria: "docs/spec/spec.md に waiting/suspended status 分割・type フィールド・W002 source artifact 免除の定義節が存在する"
     location: ../docs/spec/spec.md
-    revises: spec_v009
-  ready_cmd:
-    label: "pfdsl ready コマンド (PR #267)"
-    description: "着手可能プロセスを機械的に列挙する ready コマンド。--best で合流点優先の推薦、--json で機械可読出力。pfd-ops スキルの step 1 計算を代替する"
-    status: done
-    criteria: "pfdsl ready <file> が ready プロセス一覧を出力し、--best/--json が動作確認済み、テスト通過"
-  pfd_ops_skill_ready:
-    label: "pfd-ops スキル ready コマンド対応"
-    description: "pfd-ops SKILL.md のワークサイクル step 1 を pfdsl ready CLI 呼び出しに書き換える。スキル利用者が手動計算しなくて済むようになる"
-    status: done
-    criteria: "pfd-ops SKILL.md の着手判断ステップが pfdsl ready CLI を参照し、~/.claude/skills/pfd-ops/ に反映済み"
-  cli_release_basepath:
-    label: "CLIリリース: basePath対応（npm v0.0.12）"
-    description: "#261 basePath フィールド対応を含む"
-    status: done
-    criteria: npm view @pfdsl/cli versions に 0.0.12 が含まれる
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_release_ready_cmd:
-    label: "CLIリリース: readyコマンド（npm v0.0.13）"
-    description: "ready コマンド (#267) を含む"
-    status: done
-    criteria: npm view @pfdsl/cli versions に 0.0.13 が含まれる
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_release_status_lifecycle:
-    label: "CLIリリース: statusライフサイクル機能群（npm v0.0.14）"
-    description: "#268 type フィールド / #269 audit-sync / #272 W002 階層化 / #273 waiting・suspended 分割 / #277 status-set を含む"
-    status: done
-    criteria: npm view @pfdsl/cli versions に 0.0.14 が含まれる
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  cli_release_statusset_impact:
-    label: "CLIリリース: status-set影響レポート（npm v0.0.15）"
-    description: "#291 status-set 解放プロセス報告 / #292 audit 同種対称性ヒントを含む"
-    status: done
-    criteria: npm view @pfdsl/cli versions に 0.0.15 が含まれる
-    location: https://www.npmjs.com/package/@pfdsl/cli
   ext_v0015:
     label: "extension v0.0.15（次期）"
     status: done
     criteria: npx @vscode/vsce show takasek.pfdsl --json の versions に 0.0.15 が含まれる
     location: https://marketplace.visualstudio.com/items?itemName=takasek.pfdsl
-  hover_jump:
-    label: "hover/quickpick jump (#216)"
-    description: "location/subflow/command フィールドから hover・quickpick でジャンプ"
-    status: done
-    criteria: "location/subflow フィールドの値を cmd+click すると対象ファイルが開き（ディレクトリの場合は quickpick から選択）、ノード ID 上の hover に表示される「→ Go to definition」リンクをクリックすると frontmatter 定義行にジャンプする"
-  run_command:
-    label: "process command 実行 (#217)"
-    description: "vscode-extension でプロセスの command フィールドを統合ターミナルで実行"
-    status: done
-    criteria: "process ノードの hover に表示される command: フィールドの [▶ run] リンクをクリックすると、統合ターミナルでそのコマンドが実行される（basePath 解決済みの cwd で起動）"
-  group_hover:
-    label: "group hover メンバー一覧 (#218)"
-    description: "vscode-extension でグループノードの hover にメンバー一覧を表示"
-    status: done
-    criteria: group ノードの hover にメンバー一覧が表示される
-  basepath:
-    label: "basePath フィールド実装 (#261)"
-    description: "frontmatter トップレベルに basePath: フィールドを追加。command:/location: の相対パス解決基準を変更できる。未指定時は .pfdsl ファイルのディレクトリをデフォルトとして後方互換を保つ"
-    status: done
-    criteria: "docs/samples/16-basepath.pfdsl が実在し pfdsl check でエラーなしに通過し、basePath 解決が packages/core/src/location-path.test.ts 等 CLI/core/vscode-extension 各パッケージのテストで検証されている"
-  status_set:
-    label: "status-set コマンド (#277)"
-    description: "pfdsl status-set <file> <artifact-id> <status> で artifact status を CLI から更新する"
-    status: done
-    criteria: "pfdsl status-set が対象 artifact の status フィールドを書き換え、不正 status は exit 2"
-  audit_sync:
-    label: "workflow/roadmap 同期監査コマンド (#269)"
-    description: "workflow/pipeline の todo ノードと roadmap の構築チェーンを突合する audit-sync コマンド。#268 type フィールドが前提"
-    status: done
-    criteria: "pfdsl audit-sync が workflow/pipeline の todo ノードと roadmap の対応チェーンを突合し差分を報告する"
-  statusset_impact:
-    label: "status-set 解放プロセス報告 (#291)"
-    description: "status 変更後に newly-ready プロセスの差分を出力へ追加。/pfd-cycle 報告ステップの機械化"
-    status: done
-    criteria: "status-set が変更後の newly-ready プロセスを text/JSON 出力に含め、テスト通過"
-  symmetry_hint:
-    label: "check --audit 同種対称性ヒント (#292)"
-    description: "同 group 内 artifact の下流消費者集合の非対称を情報表示。retro プロンプト A の機械化（spec 変更なし）"
-    status: done
-    criteria: "check --audit が同 group 消費者非対称の hint 行を出力し、テスト通過"
-  boundary_feedback:
-    label: "open input の feedback 除外 (#298)"
-    description: "spec v0.0.11 レビュー F1。open input 定義を terminal と対称にし、feedback ループを跨ぐ subflow 化を可能にする。spec v0.0.12 統合を含む"
-    status: done
-    criteria: "生成元なし・feedback のみ消費の artifact は open input / terminal のいずれにも数えないと docs/spec/spec.md に定義されており（境界照合の対象外）、packages/core/src/multifile.test.ts の computeOpenInputs テストで検証されている"
-  recode:
-    label: "V025 二重割当解消 (#297)"
-    description: "subflow 境界違反系に専用コードを再採番し group 循環 V025 との衝突を解消する。#299 レジストリ固定の前提"
-    status: done
-    criteria: "subflow 境界違反（V021-V024）と group parent 循環（V025）が別々の診断コードとして packages/core/src/validator.test.ts のテストで区別されている"
   published_extension:
     label: "Marketplace 公開済み extension (#119)"
     description: "VS Marketplace は OIDC/Trusted Publishing 非対応のため PAT が必要。VSCE_PAT 環境変数を設定して `make release-extension` でローカル実行する"
@@ -295,37 +43,6 @@ artifact:
     label: "Obsidian プラグイン (#3)"
     status: todo
     criteria: Obsidian で .pfdsl ファイルを開くとプレビューペインに図が描画され、テキストを編集すると再描画される
-  type_field:
-    label: "type フィールド追加 (#268)"
-    description: "frontmatter に type: roadmap|workflow|pipeline を追加し、ready を roadmap 型にゲート"
-    status: done
-    criteria: "docs/spec/spec.md に type: フィールドの定義節が存在し、pfdsl status ready を roadmap 型以外のファイルに実行すると error になる（exit code 2）"
-  w002_hierarchy:
-    label: "W002 criteria 階層化 (#272)"
-    description: "producer を持たない source artifact は W002 対象外にするか低階層 warning に落とす"
-    status: done
-    criteria: "criteria 未設定の source artifact（producer なし）を含むファイルに対する pfdsl check で W002 が発生しないことが packages/core/src/validator.test.ts の『no W002 for source artifact』テストで検証されている"
-  blocked_by:
-    label: "blocked 分割: waiting/suspended (#273)"
-    description: "status: blocked を waiting（外部待ち）と suspended（自主停止）に分割。破壊的変更として即 V007/V008 エラー化"
-    status: done
-    criteria: "packages/core/src/types/frontmatter.ts の STATUS_VALUES に waiting/suspended が含まれ、status: blocked を含む .pfdsl に対する pfdsl check が V007 エラーを、statusStyles の blocked キーには V008 エラーを出す。docs/spec/spec.md に waiting/suspended の定義節がある"
-  explain_cmd:
-    label: "pfdsl explain コマンド (#356)"
-    description: "診断コード → 定義節・summary の一発引き。#299 のレジストリを消費する。check エラー対処の spec grep 手順を代替"
-    status: done
-    criteria: "pfdsl explain <code> が全診断コードで summary と spec 節を返し（例: pfdsl explain V021）、node scripts/check-diag-registry.mjs（make check-docs 経由で CI 実行）が docs/spec/spec.md の診断コード表とレジストリの整合を検査して exit 0 を返す"
-  pfd_lens_agent:
-    label: "pfd-lens agent + agents 配布 (#357)"
-    description: "A/B 図監査を隔離 subagent 化し、skill sync の配布対象に .claude/agents/pfd-*.md を追加する。pfd-retro の description 二重人格を解消"
-    status: done
-    criteria: ".claude/agents/pfd-lens.md の frontmatter に tools 制限と description が定義されており、.claude/skills/pfd-retro/SKILL.md の A・B 節が pfd-lens agent への委譲手順として記述されている。#386 でのライブ subagent 呼び出しによる実監査1回が完了している"
-  cli_release_explain_lens:
-    label: "CLIリリース: explain + pfd-lens agent（npm v0.0.18）"
-    description: "#356 explain コマンド / #357 pfd-lens agent 配布 / #404 pfd-ops plugin 統合を含む"
-    status: done
-    criteria: npm view @pfdsl/cli versions に 0.0.18 が含まれる
-    location: https://www.npmjs.com/package/@pfdsl/cli
   spec_id_syntax:
     label: "仕様ID構文 ADR + 最小lint (#328)"
     description: "spec.md 相互参照の仕様ID方式。構文・レンジ規則の詳細と移行方針は issue #328 が一次情報。汎用ツール化の検討記録は issue コメント参照"
@@ -338,11 +55,6 @@ artifact:
     status: done
     location: ../scripts/get-spec-id.mjs
     criteria: "見出し・list item・table 行・paragraph の4種別の範囲取得が scripts/lib/spec-id-range.test.mjs で検証され、node scripts/get-spec-id.mjs SPEC_id_syntax docs/adr/0027-spec-id-cross-references.md が実データからブロック全体を返すことで動作確認できる"
-  pfd_ops_plugin_dist:
-    label: "pfd-ops 統合済み plugin 配布 (#404)"
-    description: "pfd-ops の L1/L2/L3（SKILL.md 本文・references/github-issues-backend.md・install/）を plugin/pfdsl/ に同梱し、install/ の実配置を /pfd-init（check-install-sync.mjs --deploy）へ移管、pfdsl skill sync（CLI コマンド）は削除（ADR-0028）"
-    status: done
-    criteria: "issue #404 の未解決論点が docs/adr/0028-plugin-first-pfd-ops-distribution.md に決定として記録されており、plugin 経由で導入したリポで /pfd-init を実行すると install/ 相当のファイルが配置される"
   reader_first_design_records:
     label: 採用案から読める設計選択記録 (#1076)
     description: pfd-ops の対話と公開記録を形式3の決定・理由・案の処分・前提検査の decision-first 構造へ移し、形式1・形式2・形式3を時点で移行互換に読む状態
@@ -366,27 +78,6 @@ artifact:
     description: "廃止済み仕様IDの tombstone リスト実体・再定義禁止 lint・mint-check への tombstone 次元追加。初の ID 削除が発生した時点で駆動（ADR-0027 §ID性質、#405 で据え置き）。後続門番のプレースホルダ（ADR-0018）"
     status: todo
     criteria: tombstone リストが記録形式付きで導入され、tombstone 済み ID の再定義が make check-docs 経由のチェックでエラーになり、scripts/mint-check.mjs が tombstone を第4の出現種別として列挙する
-  ansi_color:
-    label: "CLI 診断 ANSI カラー出力 (#435)"
-    description: "check 診断の severity 色付け。#180 で予約済みの --no-color / NO_COLOR の口を実装で活かす。TTY かつ NO_COLOR 未設定かつ --no-color なしのときのみ色付け"
-    status: done
-    criteria: "TTY で severity 別に色付き、--no-color / NO_COLOR / 非 TTY で ANSI 不含、既存 no-color テストが実効化されテスト通過"
-  cli_release_ansi_color:
-    label: "CLIリリース: 診断ANSIカラー出力（npm v0.0.20）"
-    description: "#435 診断 ANSI カラー出力を含む"
-    status: done
-    criteria: npm view @pfdsl/cli versions に 0.0.20 が含まれる
-    location: https://www.npmjs.com/package/@pfdsl/cli
-  incomplete_tolerance:
-    label: "書き途中グラフ非strict許容 (#480)"
-    description: "V020/V002/V003 を非 strict で warning に降格し --strict で error 維持。spec 次版統合を含む。grill スキル (#481) の書き途中の途中反映を可能にする前提"
-    status: done
-    criteria: "非 strict の check で V020/V002/V003 が warning、--strict で error になり、docs/spec/spec.md §16 の診断表が更新済み、テスト通過"
-  grill_skill:
-    label: "pfd-grill スキル (#481)"
-    description: "最終成果物からの後ろ向き対話構築スキル。名前確定→criteria→プロセス導出→入力導出の再帰。plugin 同梱で配布"
-    status: done
-    criteria: "pfd-grill が plugin 経由で発火し、サンプル図を後ろ向き対話でフルスクラッチ構築するライブ実行1回を検証済み"
   editor_connector:
     label: "エディタ コネクタ編集支援 (#482)"
     description: "ノード前後への新規追加・既存接続の code action/コマンド。edge 挿入ロジックはロジック層に分離し Preview UI (#483) と共用"
@@ -402,43 +93,11 @@ artifact:
     description: "edge にのみ現れる未定義ノードへ artifact/process 定義スケルトンを挿入する"
     status: done
     criteria: "edge にのみ現れる未定義ノード上で Quick Fix『Insert {kind} definition』を実行すると frontmatter に artifact/process 定義が挿入されることが packages/vscode-extension/src/def-insertion-logic.test.ts のテストで検証されている"
-  field_get_cmd:
-    label: "ノード フィールド値取得コマンド (#476)"
-    description: "id と field を指定してノードのフィールド値を取得する get コマンド。複数 id/field 指定可、location は basePath 解決後の値を返す。エージェントの grep/Read 代替"
-    status: done
-    criteria: "pfdsl get <file> --id <ids> --field <fields> が値を返し、location が basePath 解決済みで出力される、テスト通過"
-  v011_semantics:
-    label: "V011 strict 意味論の緩和 (#478)"
-    description: "strict mode の feedback 到達性検査（V011）が非連結な別系統からの正当な補助入力を誤検出する欠陥を緩和する。真の逆循環のみ検出へ絞るか warning 降格。方針は issue #478 の (a)/(b)/(c) から着手前に選択。spec 次版統合を含む"
-    status: done
-    criteria: "非連結な別系統からの >>? 補助入力が V011 error にならず、真の逆循環は検出され、spec §15.3 の変更が統合済み、テスト通過"
-  graph_analysis:
-    label: "graph-analysis サブコマンド群 (#479)"
-    description: "neighbors / impact / depends-on / path / hubs / group-graph / rollup 等の分析サブコマンド。完全リストと優先度は issue #479 が一次情報。着手時に段階を切り分ける"
-    status: done
-    criteria: "issue #479 の分析サブコマンドが pfdsl graph neighbors/impact/depends-on/path/stats として実装され、packages/cli/src/index.test.ts のテストで検証されている"
-  cli_release_tolerance_query:
-    label: "CLIリリース: 診断緩和 + pfd-grill + クエリツール（npm v0.0.21）"
-    description: "#480 warning 降格 / #478 V011 緩和 / #481 pfd-grill スキル同梱 / #476 get コマンド / #479 graph-analysis サブコマンド群を含む。計画では診断緩和系とクエリツール系の2リリースだったが、実際には 0.0.21 の1回で公開された"
-    status: done
-    criteria: "npm view @pfdsl/cli versions に 0.0.21 が含まれる"
-    location: https://www.npmjs.com/package/@pfdsl/cli
   ext_editing_release:
     label: "extension 編集支援リリース"
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
     status: todo
     criteria: "npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する"
-  frontmatter_cst_impl:
-    label: frontmatter CST 化実装済みコード
-    description: "ADR-0034 (#578/#592) の実装。fmt/meta set/sort/reindex/insert-definition が yaml Document ベースで frontmatter を読み書きする"
-    status: done
-    criteria: "4コマンド + fmt が CST 経由で frontmatter を読み書きし、frontmatter-text.ts の手術用ヘルパーが削除され、既存テストが更新済みで green"
-  cli_release_frontmatter_cst:
-    label: "CLIリリース: frontmatter CST 化（破壊的変更、npm v0.0.24）"
-    description: "#592 frontmatter の CST ベース読み書きを含む。既存 .pfdsl の再整形を伴う破壊的変更"
-    status: done
-    criteria: "npm view @pfdsl/cli versions に 0.0.24 が含まれる"
-    location: https://www.npmjs.com/package/@pfdsl/cli
   pipeline_kind_rename:
     label: "PFD種別名 pipeline への改名 (#670)"
     description: "type: 列挙値 runtime-pipeline を pipeline へ改名する破壊的変更。spec §2.10・core の列挙・ADR-0017・kind-taxonomy.md・scaffold・サンプルを一括更新し、旧値の扱い（deprecated 警告かエラーか）を決める"
@@ -450,133 +109,6 @@ artifact:
     status: todo
     criteria: "npm view @pfdsl/cli versions に packages/cli/package.json の version が含まれ、その公開版が type: pipeline を受理し、旧値 runtime-pipeline へ docs/spec/spec.md の規定どおりの応答を返す"
 process:
-  implement_version_cmd:
-    label: --version コマンド実装
-    location: https://github.com/takasek/pfdsl/issues/172
-  draft_multifile_specs:
-    label: 階層・プリセット共同起草
-    description: "#5 と #6 は決定が往復で形成される相互依存のため分割せず共同設計する。共有決定は方針記録として外化"
-    location: [ https://github.com/takasek/pfdsl/issues/5, https://github.com/takasek/pfdsl/issues/6 ]
-  draft_criteria:
-    label: 合否基準仕様起草
-    location: https://github.com/takasek/pfdsl/issues/7
-  draft_revises:
-    label: 改版チェーン仕様起草
-    location: https://github.com/takasek/pfdsl/issues/8
-  draft_location:
-    label: location/command 起草
-    location: https://github.com/takasek/pfdsl/issues/13
-  write_design_notes:
-    label: 設計ノート執筆
-    location: https://github.com/takasek/pfdsl/issues/9
-  integrate_spec:
-    label: 仕様統合
-  implement_lints:
-    label: lint実装
-    location: https://github.com/takasek/pfdsl/issues/4
-  implement_spec_features:
-    label: 新仕様実装
-    location: https://github.com/takasek/pfdsl/issues/52
-  integrate_multifile:
-    label: マルチファイル仕様統合
-  restructure_skillgen:
-    label: 生成系再構成
-    location: https://github.com/takasek/pfdsl/issues/10
-  publish_cli_bootstrap:
-    label: CLI初回公開
-  draft_external_stakeholders:
-    label: externalStakeholders仕様起草
-    description: "artifact / process の externalStakeholders フィールドを spec に定義する。型・終端監査との連携（#37）・サンプル反映を含む"
-    location: https://github.com/takasek/pfdsl/issues/97
-  layer_audit_assets:
-    label: L3資産階層化
-    location: https://github.com/takasek/pfdsl/issues/43
-  implement_multifile:
-    label: マルチファイル機能実装
-    description: "spec v0.0.8 subflow/extends checker 実装（V021-V028）。renderer・VS Code extension は対象外。issue: https://github.com/takasek/pfdsl/issues/148"
-    location: https://github.com/takasek/pfdsl/issues/148
-  implement_subcommand_help:
-    label: per-command --help実装
-    location: https://github.com/takasek/pfdsl/issues/177
-  implement_stdin:
-    label: stdin対応実装
-    location: https://github.com/takasek/pfdsl/issues/178
-  implement_no_color:
-    label: --no-color / NO_COLOR実装
-    location: https://github.com/takasek/pfdsl/issues/180
-  implement_json_output:
-    label: --json出力実装
-    location: https://github.com/takasek/pfdsl/issues/181
-  publish_cli_ux_flags:
-    label: CLI DXフラグ群公開
-  implement_index_reindex:
-    label: index フィールド + reindex 実装
-    location: https://github.com/takasek/pfdsl/issues/221
-  implement_hover_jump:
-    label: hover/quickpick ジャンプ実装
-    location: https://github.com/takasek/pfdsl/issues/216
-  implement_run_command:
-    label: process command 実行実装
-    location: https://github.com/takasek/pfdsl/issues/217
-  implement_group_hover:
-    label: group hover メンバー一覧実装
-    location: https://github.com/takasek/pfdsl/issues/218
-  fix_w002_line:
-    label: W002 診断行番号修正
-    location: https://github.com/takasek/pfdsl/issues/219
-  publish_cli_index_sort:
-    label: CLI index/reindex + node sort公開
-  implement_node_sort:
-    label: node 並べ替え実装
-    location: https://github.com/takasek/pfdsl/issues/236
-  publish_ext_v0014:
-    label: extension v0.0.14リリース
-  integrate_spec_v009:
-    label: 仕様書 v0.0.9統合
-  implement_basepath:
-    label: basePath フィールド実装
-    description: "spec, CLI/core, vscode-extension に basePath: フィールド対応を実装する。新フロントマターフィールド追加・location/command パス解決変更・拡張コマンド実行 cwd 変更・feature sample 追加を含む"
-    location: https://github.com/takasek/pfdsl/issues/261
-  implement_ready_cmd:
-    label: ready コマンド実装
-    description: "pfd-ops スキルのステップ1計算を CLI に移す。--best/--json を含む"
-    location: https://github.com/takasek/pfdsl/pull/267
-  update_pfd_ops_skill:
-    label: pfd-ops スキル更新
-    description: "SKILL.md ワークサイクル step 1 を pfdsl ready CLI 参照に書き換え、~/.claude/skills/pfd-ops/ に反映する"
-  publish_cli_basepath:
-    label: CLI basePath対応公開
-  publish_cli_ready_cmd:
-    label: CLI readyコマンド公開
-  publish_cli_status_lifecycle:
-    label: CLI statusライフサイクル機能群公開
-  publish_ext_v0015:
-    label: extension v0.0.15リリース
-  implement_audit_sync:
-    label: audit-sync コマンド実装
-    description: "workflow/pipeline の todo ノードと roadmap 構築チェーンを突合するコマンド"
-    location: https://github.com/takasek/pfdsl/issues/269
-  implement_status_set:
-    label: status-set コマンド実装
-    location: https://github.com/takasek/pfdsl/issues/277
-  implement_statusset_impact:
-    label: status-set 解放プロセス報告実装
-    location: https://github.com/takasek/pfdsl/issues/291
-  implement_symmetry_hint:
-    label: audit 同種対称性ヒント実装
-    location: https://github.com/takasek/pfdsl/issues/292
-  publish_cli_statusset_impact:
-    label: CLI status-set影響レポート公開
-  integrate_spec_v0011:
-    label: 仕様書 v0.0.11統合
-    description: "waiting/suspended status 分割・type フィールド・W002 source artifact 免除を spec 本文に統合する"
-  recode_boundary_diags:
-    label: 境界診断コード再採番
-    location: https://github.com/takasek/pfdsl/issues/297
-  implement_boundary_feedback:
-    label: open input feedback 除外実装
-    description: "computeOpenInputs の修正と spec v0.0.12 統合（proposal 経由）。発見経緯は docs/adr/0020-spec-stress-testing/"
-    location: https://github.com/takasek/pfdsl/issues/298
   i119_publish_extension:
     label: extension自動公開実装
     location: https://github.com/takasek/pfdsl/issues/119
@@ -589,39 +121,6 @@ process:
     label: Obsidianプラグイン実装
     location: https://github.com/takasek/pfdsl/issues/3
     updated_at: 2026-06-12T08:18:35Z
-  i268_implement_type_field:
-    label: type フィールド実装
-    description: "frontmatter type: フィールドと ready コマンドのロードマップ型ゲートを実装する"
-    location: https://github.com/takasek/pfdsl/issues/268
-  i272_implement_w002_hierarchy:
-    label: W002 criteria 階層化実装
-    location: https://github.com/takasek/pfdsl/issues/272
-  i273_implement_blocked_by:
-    label: blocked 理由の機械可読化
-    description: "issue #273 の blockedBy: フィールド案を検討し、最終決定の status: waiting / suspended 分割を spec と CLI へ統合する"
-    location: https://github.com/takasek/pfdsl/issues/273
-  i356_implement_explain_cmd:
-    label: explain コマンド実装
-    location: https://github.com/takasek/pfdsl/issues/356
-  i357_define_pfd_lens_agent:
-    label: pfd-lens agent 定義 + 配布実装
-    location: https://github.com/takasek/pfdsl/issues/357
-  publish_cli_explain_lens:
-    label: CLI explain + pfd-lens agent公開
-  i328_design_spec_ids:
-    label: 仕様ID構文設計・最小lint実装
-    location: https://github.com/takasek/pfdsl/issues/328
-  i402_implement_get_by_id:
-    label: get-by-ID ツール実装
-    location: https://github.com/takasek/pfdsl/issues/402
-  i405_implement_mint_check:
-    label: mint-check ツール実装
-    location: https://github.com/takasek/pfdsl/issues/405
-  i435_implement_ansi_color:
-    label: 診断 ANSI カラー実装
-    location: https://github.com/takasek/pfdsl/issues/435
-  publish_cli_ansi_color:
-    label: CLI ANSIカラー公開
   i542_migrate_spec_id_refs:
     label: spec.md 仕様ID参照移行
     description: "spec.md の節番号相互参照を仕様ID参照へ段階移行する。クラスタ単位の段階計画（§15 制約 → §2.x 意味論 → 残り）は #542 が一次情報"
@@ -630,23 +129,6 @@ process:
   introduce_tombstones:
     label: tombstone 機構導入
     description: "初の ID 削除が発生した時点で起票・着手する。tombstone リスト実体・再定義禁止 lint・mint-check への tombstone 次元追加を含む"
-  i366_distribute_marketplace:
-    label: marketplace 配布移行
-    location: https://github.com/takasek/pfdsl/issues/366
-  i404_integrate_pfd_ops_plugin:
-    label: pfd-ops plugin 統合・skill sync 廃止検討
-    description: "設計は ADR-0028 で確定・実装済み（plugin 同梱・/pfd-init 実配置・skill sync 削除）"
-    location: https://github.com/takasek/pfdsl/issues/404
-  i1076_make_design_records_reader_first:
-    label: 設計選択記録を reader-first 化
-    description: 比較対象を生成する規律と着手前の公開記録を維持したまま、対話・tracker 記録・機械 gate の項目と順序を reader-first な契約へ移行する
-    location: https://github.com/takasek/pfdsl/issues/1076
-  i480_relax_incomplete_graph:
-    label: 書き途中許容実装
-    location: https://github.com/takasek/pfdsl/issues/480
-  i481_create_grill_skill:
-    label: pfd-grill スキル作成
-    location: https://github.com/takasek/pfdsl/issues/481
   i482_implement_editor_connector:
     label: エディタ コネクタ編集実装
     location: https://github.com/takasek/pfdsl/issues/482
@@ -654,32 +136,8 @@ process:
     label: Preview コネクタ UI 実装
     location: https://github.com/takasek/pfdsl/issues/483
     updated_at: 2026-07-18T00:33:46Z
-  i484_implement_def_insertion:
-    label: 定義挿入 code action 実装
-    location: https://github.com/takasek/pfdsl/issues/484
-  publish_cli_tolerance_query:
-    label: CLI 診断緩和 + grill + クエリツール公開
   publish_ext_editing:
     label: extension 編集支援リリース
-  i476_implement_field_get:
-    label: フィールド値取得コマンド実装
-    location: https://github.com/takasek/pfdsl/issues/476
-  i478_relax_v011:
-    label: V011 意味論緩和実装
-    location: https://github.com/takasek/pfdsl/issues/478
-  i479_implement_graph_analysis:
-    label: graph-analysis サブコマンド実装
-    location: https://github.com/takasek/pfdsl/issues/479
-  i592_cst_frontmatter:
-    label: frontmatter CST 化実装
-    description: "ADR-0034 の決定を実装する。fmt/meta set/sort/reindex/insert-definition の frontmatter 読み書きを yaml Document ベースに統一し、frontmatter-text.ts の手術用ヘルパーを削除する"
-    location: https://github.com/takasek/pfdsl/issues/592
-  publish_cli_frontmatter_cst:
-    label: CLI frontmatter CST 化公開
-  i670_rename_pipeline_kind:
-    label: PFD種別名 pipeline への改名
-    description: "runtime の限定が種別の判定基準（判断を含むか）と矛盾するため改名する。Polaris の sdk-build-pipeline がビルド時であって実行時でないのに runtime-pipeline に分類される、という審査済み設計との齟齬が根拠。導出は docs/adr/0017-kind-taxonomy/audience-axis-experiment/"
-    location: https://github.com/takasek/pfdsl/issues/670
   publish_cli_pipeline_kind:
     label: CLI 種別名改名公開
 
@@ -694,127 +152,20 @@ statusStyles:
   suspended: { fillcolor: "#e2e3e5", style: filled }
 ---
 
-spec_v006 >> draft_multifile_specs -> [hierarchy_spec, multifile_policy, presets_spec]
-
-spec_v006 >> draft_criteria -> criteria_spec
-
-spec_v006 >> draft_revises -> revises_spec
-
-spec_v006 >> draft_location -> location_spec
-
-spec_v006 >> write_design_notes -> design_notes
-
-[criteria_spec, design_notes, external_stakeholders_spec, location_spec, revises_spec] >> integrate_spec -> spec_v007
-
-[findings_r12, spec_v006, toolchain] >> implement_lints -> lint_checker
-
-[lint_checker, spec_v007] >> implement_spec_features -> featured_toolchain
-
-[featured_toolchain, hierarchy_spec, multifile_policy, presets_spec] >> integrate_multifile -> spec_v008
-
-[featured_toolchain, spec_v008] >> implement_multifile -> multifile_toolchain
-
-skill_gen >> restructure_skillgen -> restructured_gen
-
-toolchain >> publish_cli_bootstrap -> cli_release_bootstrap
-
-toolchain >> layer_audit_assets -> audit_distribution
-
 adrs >> i12_write_article -> article
 
 toolchain >> i3_build_obsidian_plugin -> obsidian_plugin
 
-spec_v006 >> draft_external_stakeholders -> external_stakeholders_spec
-
 toolchain >> i119_publish_extension -> published_extension
-
-cli_release_bootstrap >> implement_json_output -> json_output
-cli_release_bootstrap >> implement_no_color -> no_color
-cli_release_bootstrap >> implement_stdin -> stdin
-cli_release_bootstrap >> implement_subcommand_help -> subcommand_help
-cli_release_bootstrap >> implement_version_cmd -> version_cmd
-
-[json_output, no_color, stdin, subcommand_help, version_cmd] >> publish_cli_ux_flags -> cli_release_ux_flags
-
-cli_release_bootstrap >> fix_w002_line -> w002_line
-cli_release_bootstrap >> implement_group_hover -> group_hover
-cli_release_bootstrap >> implement_hover_jump -> hover_jump
-cli_release_bootstrap >> implement_run_command -> run_command
-
-cli_release_bootstrap >> implement_index_reindex -> index_reindex
-
-cli_release_bootstrap >> implement_node_sort -> node_sort
-
-[cli_release_ux_flags, index_reindex, node_sort, w002_line] >> publish_cli_index_sort -> cli_release_index_sort
-
-index_reindex >> integrate_spec_v009 -> spec_v009
-
-[group_hover, hover_jump, run_command] >> publish_ext_v0014 -> ext_v0014
-
-[cli_release_index_sort, spec_v009] >> implement_basepath -> basepath
-cli_release_index_sort >> implement_ready_cmd -> ready_cmd
-basepath >> publish_cli_basepath -> cli_release_basepath
-[ext_v0014, basepath] >> publish_ext_v0015 -> ext_v0015
-[ready_cmd, cli_release_basepath] >> publish_cli_ready_cmd -> cli_release_ready_cmd
-
-cli_release_ready_cmd >> update_pfd_ops_skill -> pfd_ops_skill_ready
-
-cli_release_ready_cmd >> i268_implement_type_field -> type_field
-cli_release_ready_cmd >> i272_implement_w002_hierarchy -> w002_hierarchy
-cli_release_ready_cmd >> i273_implement_blocked_by -> blocked_by
-cli_release_ready_cmd >> implement_status_set -> status_set
-type_field >> implement_audit_sync -> audit_sync
-
-[audit_sync, blocked_by, cli_release_ready_cmd, status_set, type_field, w002_hierarchy] >> publish_cli_status_lifecycle -> cli_release_status_lifecycle
-
-cli_release_status_lifecycle >> implement_statusset_impact -> statusset_impact
-
-cli_release_status_lifecycle >> implement_symmetry_hint -> symmetry_hint
-
-[cli_release_status_lifecycle, statusset_impact, symmetry_hint] >> publish_cli_statusset_impact -> cli_release_statusset_impact
-
-[blocked_by, type_field, w002_hierarchy] >> integrate_spec_v0011 -> spec_v0011
-
-multifile_toolchain >> recode_boundary_diags -> recode
-
-[multifile_toolchain, spec_v0011] >> implement_boundary_feedback -> boundary_feedback
-
-cli_release_statusset_impact >> i356_implement_explain_cmd -> explain_cmd
-cli_release_statusset_impact >> i357_define_pfd_lens_agent -> pfd_lens_agent
-
-[explain_cmd, pfd_lens_agent, pfd_ops_plugin_dist] >> publish_cli_explain_lens -> cli_release_explain_lens
-spec_v0011 >> i328_design_spec_ids -> spec_id_syntax
-
-spec_id_syntax >> i402_implement_get_by_id -> get_by_id_tool
-
-spec_id_syntax >> i405_implement_mint_check -> mint_check_tool
 
 [get_by_id_tool, mint_check_tool, spec_id_syntax, spec_v0011] >> i542_migrate_spec_id_refs -> spec_id_refs
 
 [mint_check_tool, spec_id_syntax] >> introduce_tombstones -> spec_id_tombstones
 
-skill_gen >> i366_distribute_marketplace -> marketplace_dist
-
-marketplace_dist >> i404_integrate_pfd_ops_plugin -> pfd_ops_plugin_dist
-pfd_ops_plugin_dist >> i1076_make_design_records_reader_first -> reader_first_design_records
-
-cli_release_explain_lens >> i435_implement_ansi_color -> ansi_color
-ansi_color >> publish_cli_ansi_color -> cli_release_ansi_color
-
-cli_release_ansi_color >> i476_implement_field_get -> field_get_cmd
-cli_release_ansi_color >> i478_relax_v011 -> v011_semantics
-cli_release_ansi_color >> i479_implement_graph_analysis -> graph_analysis
-cli_release_ansi_color >> i480_relax_incomplete_graph -> incomplete_tolerance
-incomplete_tolerance >> i481_create_grill_skill -> grill_skill
-[field_get_cmd, graph_analysis, incomplete_tolerance, v011_semantics, grill_skill] >> publish_cli_tolerance_query -> cli_release_tolerance_query
-
-toolchain >> i592_cst_frontmatter -> frontmatter_cst_impl
-frontmatter_cst_impl >> publish_cli_frontmatter_cst -> cli_release_frontmatter_cst
-
 ext_v0015 >> i482_implement_editor_connector -> editor_connector
-ext_v0015 >> i484_implement_def_insertion -> def_insertion
+
 editor_connector >> i483_implement_preview_connector -> preview_connector
+
 [def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
 
-[spec_v0011, type_field] >> i670_rename_pipeline_kind -> pipeline_kind_rename
-[reader_first_design_records, pipeline_kind_rename] >> publish_cli_pipeline_kind -> cli_release_pipeline_kind
+[pipeline_kind_rename, reader_first_design_records] >> publish_cli_pipeline_kind -> cli_release_pipeline_kind

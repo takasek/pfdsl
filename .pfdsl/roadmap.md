@@ -20,6 +20,9 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 - `.pfdsl/roadmap.pfdsl` — オープン issue の依存グラフ
 
+**保持範囲**: 規則は L3 reference「終端でなかったチェーンの回収」が一次情報。
+このリポで完了履歴を持つ一次情報は closed issue・git 履歴・`docs/adr/`・`docs/spec/spec-history.md`・npm レジストリ・VS Code Marketplace で、#1052 の一括回収でこれらへの写しを roadmap から落とした。
+
 ## プリフライト・ゲート集約スクリプト（#354）
 
 - **選択フェーズ（pfd-ops 手順1）**: `GH_HOST=github.com node scripts/cycle-status.mjs` — fetch 実行・base への遅れコミット数・flow-sync PR / その他 open PR の一覧・`status ready --best` の結果を1回の JSON 出力に集約する。`--base <branch>` で対象ブランチを変更可能（デフォルト `main`）。加えて次の3点を出力する（#461）:
@@ -186,7 +189,8 @@ worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cyc
 
 **spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact（spec_v007 / spec_v008 / spec_v009 等）は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
 
-**spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際は、前バージョンの spec artifact への `revises:` を新バージョン artifact に設定する（例: `spec_v0011.revises: spec_v009`）。
+**spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際、前バージョンの spec artifact が上の保持範囲でグラフに残っていれば、新バージョン artifact に `revises:` を設定する。
+残っていなければ設定しない — 版の前後関係の一次情報は `docs/spec/spec-history.md` で、参照先のないフィールドを書いても `check` が dangling として落とすだけである。
 起こしていない版を飛ばして繋いでよい（#725 で `spec_v0010` を削除した結果が現にこの形）。`>>?` フィードバック入力は使わない — V011（strict mode の feedback 到達性検査）は `>>?` を前方到達可能な修正ループとして検査するが、版の前後関係はそれに当たらず誤検出になる（#480 で `spec_v006 >>? integrate_spec` 等を `revises:` に置き換えて解消）。
 
 **`integrate_spec_vXXX` の入力列挙**: `integrate_spec_vXXX` の通常入力には、そのバージョンで spec に統合される全ての変更を引き起こした artifact を列挙する。「実装が完了した artifact のうち、未統合のもの」を漏らさず書く（例: blocked_by と type_field と w002_hierarchy の3つが v0.0.11 の変更点なら `[blocked_by, type_field, w002_hierarchy] >> integrate_spec_v0011`）。
