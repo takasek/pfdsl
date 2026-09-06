@@ -40,30 +40,29 @@ function collectFixtureEntries(
 	sourceRelativeRoot,
 	entries,
 	ownedRoots,
-	ownRoot,
 ) {
 	if (!existsSync(consumerPath)) return;
 	const stats = lstatSync(consumerPath);
 	if (stats.isDirectory()) {
-		entries.push({
-			consumerPath,
-			sourceRelativePath: sourceRelativeRoot,
-			isDirectory: true,
-		});
+		// The trailing "/" tells `check-ignore` this queried path is a
+		// directory even when it happens not to physically exist at that path
+		// in `sourceRoot` — without the hint, a trailing-slash-only
+		// `.gitignore` rule (e.g. `dist/`) only matches files already known to
+		// sit inside such a directory, not the directory path queried alone.
+		entries.push({ consumerPath, queryPath: `${sourceRelativeRoot}/` });
 		for (const entry of readdirSync(consumerPath, { withFileTypes: true })) {
 			const childPath = join(consumerPath, entry.name);
-			if (childPath !== ownRoot && ownedRoots.has(childPath)) continue;
+			if (ownedRoots.has(childPath)) continue;
 			collectFixtureEntries(
 				childPath,
 				join(sourceRelativeRoot, entry.name),
 				entries,
 				ownedRoots,
-				ownRoot,
 			);
 		}
 		return;
 	}
-	entries.push({ consumerPath, sourceRelativePath: sourceRelativeRoot });
+	entries.push({ consumerPath, queryPath: sourceRelativeRoot });
 }
 
 /**
@@ -86,29 +85,12 @@ export function pruneGitIgnoredFixtureEntries(sourceRoot, mappings) {
 	const ownedRoots = new Set(mappings.map(({ consumerPath }) => consumerPath));
 	const entries = [];
 	for (const { sourceRelative, consumerPath } of mappings) {
-		collectFixtureEntries(
-			consumerPath,
-			sourceRelative,
-			entries,
-			ownedRoots,
-			consumerPath,
-		);
+		collectFixtureEntries(consumerPath, sourceRelative, entries, ownedRoots);
 	}
 	if (entries.length === 0) return;
-	// A directory query is suffixed with "/" so `check-ignore` treats it as a
-	// directory even when it happens not to physically exist at that path in
-	// `sourceRoot` — without the hint, a trailing-slash-only `.gitignore` rule
-	// (e.g. `dist/`) only matches files already known to sit inside such a
-	// directory, not the directory path queried on its own.
 	const result = tryGit(["check-ignore", "--stdin"], {
 		cwd: sourceRoot,
-		input: entries
-			.map((entry) =>
-				entry.isDirectory
-					? `${entry.sourceRelativePath}/`
-					: entry.sourceRelativePath,
-			)
-			.join("\n"),
+		input: entries.map((entry) => entry.queryPath).join("\n"),
 	});
 	// `check-ignore` exits 1 when none of the paths are ignored — that is a
 	// normal result, not a failure, and its stdout is empty. `tryRun` fills
@@ -120,18 +102,13 @@ export function pruneGitIgnoredFixtureEntries(sourceRoot, mappings) {
 		throw new Error(`git check-ignore failed: ${result.out}`);
 	}
 	const ignored = new Set(
-		result.status === 1
-			? []
-			: result.out
-					.split("\n")
-					.filter(Boolean)
-					.map((line) => (line.endsWith("/") ? line.slice(0, -1) : line)),
+		result.status === 1 ? [] : result.out.split("\n").filter(Boolean),
 	);
 	// Directories are entries too (see collectFixtureEntries): removing one
 	// recursively also disposes of any of its already-collected children, so
 	// no separate pass is needed to avoid re-descending into it.
 	for (const entry of entries) {
-		if (ignored.has(entry.sourceRelativePath)) {
+		if (ignored.has(entry.queryPath)) {
 			rmSync(entry.consumerPath, { recursive: true, force: true });
 		}
 	}
