@@ -5,6 +5,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -77,6 +78,31 @@ describe("pruneGitIgnoredFixtureEntries", () => {
 				existsSync(join(consumerRoot, ".claude", "keep.json")),
 				true,
 			);
+		} finally {
+			rmSync(sourceRoot, { recursive: true, force: true });
+			rmSync(consumerRoot, { recursive: true, force: true });
+		}
+	});
+
+	it("throws on a directory symlink instead of silently missing what's beyond it", () => {
+		const sourceRoot = makeSourceRepo();
+		const consumerRoot = mkdtempSync(
+			join(tmpdir(), "prune-git-ignored-consumer-"),
+		);
+		try {
+			mkdirSync(join(consumerRoot, ".claude"), { recursive: true });
+			const realDir = join(consumerRoot, "real-target");
+			mkdirSync(realDir, { recursive: true });
+			symlinkSync(realDir, join(consumerRoot, ".claude", "linked"), "dir");
+
+			assert.throws(() => {
+				pruneGitIgnoredFixtureEntries(sourceRoot, [
+					{
+						sourceRelative: ".claude",
+						consumerPath: join(consumerRoot, ".claude"),
+					},
+				]);
+			}, /symlink/);
 		} finally {
 			rmSync(sourceRoot, { recursive: true, force: true });
 			rmSync(consumerRoot, { recursive: true, force: true });
