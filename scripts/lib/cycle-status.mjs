@@ -480,15 +480,29 @@ export function buildPreArtifactReminders(patterns) {
  * reference point that prints the countermeasure lines (the PostToolUse
  * advisory drops them for length), so a silent zero here would cost the
  * runner every countermeasure in exchange for a narrowing that did not happen.
+ *
+ * `reach` counts each word's hits on its own, which is what turns "this is not
+ * a narrowing" into something to act on: the words come from whatever the issue
+ * happened to put in backticks, and a quoted path contributes its directory
+ * names, which are general vocabulary by construction. Measured on this issue:
+ * 18 words returned the whole pool of 37, and `issue` (15) and `pfdsl` (13)
+ * were where that came from. `select` reports the same field for the same
+ * reason — a word with no hits in the result reads as one signal when it is
+ * really two.
  * @param {{name: string, path: string, body: string, phase?: string}[]} patterns
  * @param {string[]} words
- * @returns {{reminders: {name: string, path: string, countermeasure: string | undefined}[], words: string[], pool: number, unselective: boolean, reason: "no-words" | "no-hits" | "over-half" | null}}
+ * @returns {{reminders: {name: string, path: string, countermeasure: string | undefined}[], words: string[], reach: {word: string, count: number}[], pool: number, unselective: boolean, reason: "no-words" | "no-hits" | "over-half" | null}}
  */
 export function narrowPreArtifactReminders(patterns, words) {
 	const pool = patterns.filter((p) => p.phase === "pre-artifact");
+	const reach = words.map((word) => ({
+		word,
+		count: hitsFor(pool, [word]).length,
+	}));
 	const whole = (reason) => ({
 		reminders: buildPreArtifactReminders(pool),
 		words,
+		reach,
 		pool: pool.length,
 		unselective: true,
 		reason,
@@ -505,6 +519,7 @@ export function narrowPreArtifactReminders(patterns, words) {
 	return {
 		reminders: buildPreArtifactReminders(hit),
 		words,
+		reach,
 		pool: pool.length,
 		unselective: false,
 		reason: null,

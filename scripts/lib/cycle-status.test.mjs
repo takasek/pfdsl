@@ -1160,6 +1160,21 @@ describe("narrowPreArtifactReminders", () => {
 			"advisory",
 		]);
 	});
+
+	it("counts each word's reach, so an unnarrowed run names what widened it", () => {
+		const result = narrowPreArtifactReminders(patterns, ["冒頭", "advisory"]);
+		assert.equal(result.reason, "over-half");
+		assert.deepEqual(result.reach, [
+			{ word: "冒頭", count: 4 },
+			{ word: "advisory", count: 1 },
+		]);
+	});
+
+	it("counts reach on a run that did narrow, too", () => {
+		assert.deepEqual(narrowPreArtifactReminders(patterns, ["advisory"]).reach, [
+			{ word: "advisory", count: 1 },
+		]);
+	});
 });
 
 // ---------------------------------------------------------------------------
