@@ -191,7 +191,7 @@ worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cyc
 
 **spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際、前バージョンの spec artifact が上の保持範囲でグラフに残っていれば、新バージョン artifact に `revises:` を設定する。
 残っていなければ設定しない — 版の前後関係の一次情報は `docs/spec/spec-history.md` で、参照先のないフィールドを書いても `check` が dangling として落とすだけである。
-起こしていない版を飛ばして繋いでよい（#725 で `spec_v0010` を削除した結果が現にこの形）。`>>?` フィードバック入力は使わない — V011（strict mode の feedback 到達性検査）は `>>?` を前方到達可能な修正ループとして検査するが、版の前後関係はそれに当たらず誤検出になる（#480 で `spec_v006 >>? integrate_spec` 等を `revises:` に置き換えて解消）。
+起こしていない版を飛ばして繋いでよい（#725 で `spec_v0010` を削除した結果が現にこの形）。`>>?` フィードバック入力は使わない — V011（strict mode の feedback 到達性検査）は `>>?` を前方到達可能な修正ループとして検査するが、版の前後関係はそれに当たらず誤検出になる（#480 で `>>?` を `revises:` に置き換えて解消）。
 
 **`integrate_spec_vXXX` の入力列挙**: `integrate_spec_vXXX` の通常入力には、そのバージョンで spec に統合される全ての変更を引き起こした artifact を列挙する。「実装が完了した artifact のうち、未統合のもの」を漏らさず書く。
 
