@@ -18,9 +18,14 @@ import {
 import { tryGit } from "./run-exec.mjs";
 
 /**
- * Collect every file under `consumerPath` (a fixture directory copied from
+ * Collect every path under `consumerPath` (a fixture directory copied from
  * `sourceRelativeRoot` in the source repo) paired with the path it came from,
  * relative to the source repo root — the form `git check-ignore` expects.
+ * Directories are collected alongside files (not just their leaves): `git
+ * check-ignore` reports a directory itself as ignored (e.g. `dist` for a
+ * `.gitignore` rule of `dist/`), and pruning has to remove that directory as
+ * a whole rather than emptying it and leaving the shell behind for the
+ * output closure check to trip over as an undeclared surface.
  *
  * `ownedRoots` holds every mapping's `consumerPath` in the current call to
  * `pruneGitIgnoredFixtureEntries`. A nested mapping (e.g.
@@ -40,6 +45,11 @@ function collectFixtureEntries(
 	if (!existsSync(consumerPath)) return;
 	const stats = lstatSync(consumerPath);
 	if (stats.isDirectory()) {
+		entries.push({
+			consumerPath,
+			sourceRelativePath: sourceRelativeRoot,
+			isDirectory: true,
+		});
 		for (const entry of readdirSync(consumerPath, { withFileTypes: true })) {
 			const childPath = join(consumerPath, entry.name);
 			if (childPath !== ownRoot && ownedRoots.has(childPath)) continue;
@@ -85,20 +95,44 @@ export function pruneGitIgnoredFixtureEntries(sourceRoot, mappings) {
 		);
 	}
 	if (entries.length === 0) return;
+	// A directory query is suffixed with "/" so `check-ignore` treats it as a
+	// directory even when it happens not to physically exist at that path in
+	// `sourceRoot` — without the hint, a trailing-slash-only `.gitignore` rule
+	// (e.g. `dist/`) only matches files already known to sit inside such a
+	// directory, not the directory path queried on its own.
 	const result = tryGit(["check-ignore", "--stdin"], {
 		cwd: sourceRoot,
-		input: entries.map((entry) => entry.sourceRelativePath).join("\n"),
+		input: entries
+			.map((entry) =>
+				entry.isDirectory
+					? `${entry.sourceRelativePath}/`
+					: entry.sourceRelativePath,
+			)
+			.join("\n"),
 	});
 	// `check-ignore` exits 1 when none of the paths are ignored — that is a
-	// normal result, not a failure. Any other non-zero exit (e.g. `sourceRoot`
-	// is not a Git repository) must not be swallowed as "nothing ignored".
+	// normal result, not a failure, and its stdout is empty. `tryRun` fills
+	// `out` with its own failure message in that case (`Command failed: ...`),
+	// which must not be parsed as a line of ignored paths. Any other non-zero
+	// exit (e.g. `sourceRoot` is not a Git repository) must not be swallowed
+	// as "nothing ignored" either.
 	if (!result.ok && result.status !== 1) {
 		throw new Error(`git check-ignore failed: ${result.out}`);
 	}
-	const ignored = new Set(result.out.split("\n").filter(Boolean));
+	const ignored = new Set(
+		result.status === 1
+			? []
+			: result.out
+					.split("\n")
+					.filter(Boolean)
+					.map((line) => (line.endsWith("/") ? line.slice(0, -1) : line)),
+	);
+	// Directories are entries too (see collectFixtureEntries): removing one
+	// recursively also disposes of any of its already-collected children, so
+	// no separate pass is needed to avoid re-descending into it.
 	for (const entry of entries) {
 		if (ignored.has(entry.sourceRelativePath)) {
-			rmSync(entry.consumerPath, { force: true });
+			rmSync(entry.consumerPath, { recursive: true, force: true });
 		}
 	}
 }
