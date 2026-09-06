@@ -458,6 +458,50 @@ export function buildPreArtifactReminders(patterns) {
 		}));
 }
 
+/** A markdown inline code span, without its backticks. */
+const CODE_SPAN = /`([^`\n]+)`/g;
+
+/** Inside a span, what an identifier cannot hold — the split points. */
+const TOKEN_SEPARATOR = /[^A-Za-z0-9_.-]+/;
+
+/** A token's leading and trailing punctuation (`--word`, `mjs:`), which is
+ * part of how the issue writes the term rather than part of the term. */
+const TOKEN_EDGE = /^[^A-Za-z0-9_]+|[^A-Za-z0-9_]+$/g;
+
+/**
+ * The words to narrow the pre-artifact reminders with, taken from the target
+ * issue's own text (#1118).
+ *
+ * Only code spans, not the prose around them. `.pfdsl/bindings/pfd-retro.md`
+ * asks `--word` for this cycle's concrete terms — changed filenames, touched
+ * flags, error strings — and measures the alternative: a draft narrowed to 4
+ * patterns by its own identifiers spread to 16, its true neighbour sinking to
+ * 9th, when general vocabulary was passed instead. Backticks are where this
+ * repo's issues put the concrete terms, and a Japanese sentence has no
+ * whitespace to tokenise on anyway, so prose would supply exactly the general
+ * vocabulary that measurement rules out.
+ *
+ * A token needs a letter and four characters. Line ranges and issue numbers
+ * (`424-431`, `#1114`) name where something was read, not what it is, and
+ * nothing in the catalog carries them; short fragments (`lib`, `tag`) hit on
+ * substring alone. Both only widen the result, which is the direction this
+ * function exists to fight.
+ * @param {string} text issue title and body
+ * @returns {string[]} distinct words, in first-seen order
+ */
+export function preArtifactQueryWords(text) {
+	if (typeof text !== "string") return [];
+	/** @type {Set<string>} */
+	const words = new Set();
+	for (const [, span] of text.matchAll(CODE_SPAN)) {
+		for (const raw of span.split(TOKEN_SEPARATOR)) {
+			const token = raw.replace(TOKEN_EDGE, "");
+			if (token.length >= 4 && /[A-Za-z]/.test(token)) words.add(token);
+		}
+	}
+	return [...words];
+}
+
 /**
  * The publishing backlog as material, from a `scripts/release-status.mjs` run
  * (#814). That script exits 1 whenever something is unpublished, which is the

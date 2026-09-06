@@ -15,6 +15,7 @@ import {
 	isUnregisteredManagedIssue,
 	parsePorcelainPaths,
 	parseReadyOutput,
+	preArtifactQueryWords,
 	summarizeCiStatus,
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
@@ -1038,6 +1039,41 @@ describe("buildPreArtifactReminders", () => {
 
 	it("returns nothing when no pattern carries the phase", () => {
 		assert.deepEqual(buildPreArtifactReminders([patterns[1]]), []);
+	});
+});
+
+describe("preArtifactQueryWords", () => {
+	it("takes the identifiers out of the issue text's code spans", () => {
+		assert.deepEqual(
+			preArtifactQueryWords(
+				"`buildPreArtifactReminders` は全件返す。散文の delegation は拾わない。",
+			),
+			["buildPreArtifactReminders"],
+		);
+	});
+
+	it("splits a span on the characters an identifier cannot hold", () => {
+		assert.deepEqual(
+			preArtifactQueryWords("`scripts/lib/cycle-status.mjs:424-431`"),
+			["scripts", "cycle-status.mjs"],
+		);
+	});
+
+	it("drops tokens too short to narrow anything, and line numbers", () => {
+		assert.deepEqual(preArtifactQueryWords("`--tag` と `--word` と `#1114`"), [
+			"word",
+		]);
+	});
+
+	it("keeps the first occurrence of a repeated token", () => {
+		assert.deepEqual(preArtifactQueryWords("`phase` `phase: pre-artifact`"), [
+			"phase",
+			"pre-artifact",
+		]);
+	});
+
+	it("returns nothing when the text carries no code span", () => {
+		assert.deepEqual(preArtifactQueryWords("コードスパンのない散文。"), []);
 	});
 });
 
