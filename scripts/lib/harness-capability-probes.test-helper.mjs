@@ -15,6 +15,93 @@ import {
 	LOCAL_CLAUDE_ROOT_ENTRIES,
 	SKILL_EXCLUSIONS,
 } from "./harness-inventory.mjs";
+import { tryGit } from "./run-exec.mjs";
+
+/**
+ * Collect every file under `consumerPath` (a fixture directory copied from
+ * `sourceRelativeRoot` in the source repo) paired with the path it came from,
+ * relative to the source repo root — the form `git check-ignore` expects.
+ *
+ * `ownedRoots` holds every mapping's `consumerPath` in the current call to
+ * `pruneGitIgnoredFixtureEntries`. A nested mapping (e.g.
+ * `.claude/skills/pfdsl`, copied from `plugin/pfdsl/skills/pfdsl` rather than
+ * from `.claude/skills/pfdsl`, which is a symlink in the source repo) owns
+ * its own subtree; walking into it from an ancestor mapping would attribute
+ * its files to the wrong source path, and `git check-ignore` refuses a
+ * pathspec that reaches through a symlink.
+ */
+function collectFixtureEntries(
+	consumerPath,
+	sourceRelativeRoot,
+	entries,
+	ownedRoots,
+	ownRoot,
+) {
+	if (!existsSync(consumerPath)) return;
+	const stats = lstatSync(consumerPath);
+	if (stats.isDirectory()) {
+		for (const entry of readdirSync(consumerPath, { withFileTypes: true })) {
+			const childPath = join(consumerPath, entry.name);
+			if (childPath !== ownRoot && ownedRoots.has(childPath)) continue;
+			collectFixtureEntries(
+				childPath,
+				join(sourceRelativeRoot, entry.name),
+				entries,
+				ownedRoots,
+				ownRoot,
+			);
+		}
+		return;
+	}
+	entries.push({ consumerPath, sourceRelativePath: sourceRelativeRoot });
+}
+
+/**
+ * Remove fixture entries the source repo's Git ignores.
+ *
+ * `mappings` pairs each fixture path copied into the consumer tree with the
+ * path it was copied from in `sourceRoot` — the two differ when a fixture
+ * renames its copy (e.g. `plugin/pfdsl` -> `plugin`) or substitutes a
+ * different source subtree for a symlink (see `collectFixtureEntries`).
+ * Consumer fixtures are built by `cpSync`-ing the working tree whole, so
+ * untracked-but-ignored files (a stray `.DS_Store`, an editor swap file)
+ * ride along and read as undeclared output surfaces to the closure check.
+ * `git check-ignore` is the source of truth here, not
+ * `git ls-files -o -i --exclude-standard`, which misses ignored symlinks
+ * such as `.claude/skills/pfdsl`.
+ * @param {string} sourceRoot
+ * @param {{sourceRelative: string, consumerPath: string}[]} mappings
+ */
+export function pruneGitIgnoredFixtureEntries(sourceRoot, mappings) {
+	const ownedRoots = new Set(mappings.map(({ consumerPath }) => consumerPath));
+	const entries = [];
+	for (const { sourceRelative, consumerPath } of mappings) {
+		collectFixtureEntries(
+			consumerPath,
+			sourceRelative,
+			entries,
+			ownedRoots,
+			consumerPath,
+		);
+	}
+	if (entries.length === 0) return;
+	const result = tryGit(["check-ignore", "--stdin"], {
+		cwd: sourceRoot,
+		input: entries.map((entry) => entry.sourceRelativePath).join("\n"),
+	});
+	// `check-ignore` exits 1 when none of the paths are ignored — that is a
+	// normal result, not a failure. Any other non-zero exit (e.g. `sourceRoot`
+	// is not a Git repository) must not be swallowed as "nothing ignored".
+	if (!result.ok && result.status !== 1) {
+		throw new Error(`git check-ignore failed: ${result.out}`);
+	}
+	const ignored = new Set(result.out.split("\n").filter(Boolean));
+	for (const entry of entries) {
+		if (ignored.has(entry.sourceRelativePath)) {
+			rmSync(entry.consumerPath, { force: true });
+		}
+	}
+}
 
 function copyClaudeRepositoryFixture(sourceRoot, consumerRoot) {
 	cpSync(join(sourceRoot, "CLAUDE.md"), join(consumerRoot, "CLAUDE.md"));
@@ -53,12 +140,30 @@ function copyClaudeRepositoryFixture(sourceRoot, consumerRoot) {
 	rmSync(join(consumerRoot, ".claude/pfd-ops-install-manifest.json"), {
 		force: true,
 	});
+	// Runs last so it prunes the swapped-in .claude/skills/pfdsl (copied from
+	// plugin/pfdsl/skills/pfdsl above) rather than the maintainer's local
+	// symlink this fixture already replaced. The two mappings below tell
+	// pruneGitIgnoredFixtureEntries about that swap so it attributes
+	// .claude/skills/pfdsl's files to their real source.
+	pruneGitIgnoredFixtureEntries(sourceRoot, [
+		{ sourceRelative: ".claude", consumerPath: join(consumerRoot, ".claude") },
+		{
+			sourceRelative: "plugin/pfdsl/skills/pfdsl",
+			consumerPath: join(consumerRoot, ".claude/skills/pfdsl"),
+		},
+	]);
 }
 
 function copyClaudePluginFixture(sourceRoot, consumerRoot) {
 	cpSync(join(sourceRoot, "plugin/pfdsl"), join(consumerRoot, "plugin"), {
 		recursive: true,
 	});
+	pruneGitIgnoredFixtureEntries(sourceRoot, [
+		{
+			sourceRelative: "plugin/pfdsl",
+			consumerPath: join(consumerRoot, "plugin"),
+		},
+	]);
 }
 
 function copyCodexRepositoryFixture(sourceRoot, consumerRoot) {
@@ -67,12 +172,25 @@ function copyCodexRepositoryFixture(sourceRoot, consumerRoot) {
 			recursive: true,
 		});
 	}
+	pruneGitIgnoredFixtureEntries(
+		sourceRoot,
+		["AGENTS.md", ".agents", ".codex"].map((relativePath) => ({
+			sourceRelative: relativePath,
+			consumerPath: join(consumerRoot, relativePath),
+		})),
+	);
 }
 
 function copyCodexPluginFixture(sourceRoot, consumerRoot) {
 	cpSync(join(sourceRoot, "plugin/pfdsl-codex"), join(consumerRoot, "plugin"), {
 		recursive: true,
 	});
+	pruneGitIgnoredFixtureEntries(sourceRoot, [
+		{
+			sourceRelative: "plugin/pfdsl-codex",
+			consumerPath: join(consumerRoot, "plugin"),
+		},
+	]);
 }
 
 function assertReadPathWithin(targetRoot, path, resolvePath) {
