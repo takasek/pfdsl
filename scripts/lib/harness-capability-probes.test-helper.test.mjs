@@ -14,10 +14,10 @@ import { describe, it } from "node:test";
 import { pruneGitIgnoredFixtureEntries } from "./harness-capability-probes.test-helper.mjs";
 
 /** A throwaway git repository with a `.gitignore`, for exercising `check-ignore`. */
-function makeSourceRepo() {
+function makeSourceRepo({ gitignore = ".DS_Store\n" } = {}) {
 	const root = mkdtempSync(join(tmpdir(), "prune-git-ignored-source-"));
 	execFileSync("git", ["init", "-q"], { cwd: root });
-	writeFileSync(join(root, ".gitignore"), ".DS_Store\n");
+	writeFileSync(join(root, ".gitignore"), gitignore);
 	mkdirSync(join(root, ".claude"), { recursive: true });
 	writeFileSync(join(root, ".claude", "settings.json"), "{}");
 	return root;
@@ -47,6 +47,34 @@ describe("pruneGitIgnoredFixtureEntries", () => {
 			);
 			assert.equal(
 				existsSync(join(consumerRoot, ".claude", "settings.json")),
+				true,
+			);
+		} finally {
+			rmSync(sourceRoot, { recursive: true, force: true });
+			rmSync(consumerRoot, { recursive: true, force: true });
+		}
+	});
+
+	it("removes an ignored directory as a whole, not just the files inside it", () => {
+		const sourceRoot = makeSourceRepo({ gitignore: "dist/\n" });
+		const consumerRoot = mkdtempSync(
+			join(tmpdir(), "prune-git-ignored-consumer-"),
+		);
+		try {
+			mkdirSync(join(consumerRoot, ".claude", "dist"), { recursive: true });
+			writeFileSync(join(consumerRoot, ".claude", "dist", "x.txt"), "junk");
+			writeFileSync(join(consumerRoot, ".claude", "keep.json"), "{}");
+
+			pruneGitIgnoredFixtureEntries(sourceRoot, [
+				{
+					sourceRelative: ".claude",
+					consumerPath: join(consumerRoot, ".claude"),
+				},
+			]);
+
+			assert.equal(existsSync(join(consumerRoot, ".claude", "dist")), false);
+			assert.equal(
+				existsSync(join(consumerRoot, ".claude", "keep.json")),
 				true,
 			);
 		} finally {
