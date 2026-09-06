@@ -182,18 +182,18 @@ worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cyc
 - 版履歴の一次情報: spec は `docs/spec/spec-history.md`（`scripts/check-spec-history.mjs` が release 前に機械検査する）、npm は npm レジストリ、extension は Marketplace
 - criteria の具体形: npm は `npm view @pfdsl/cli versions に 0.0.11 が含まれる`、extension は `npx @vscode/vsce show takasek.pfdsl --json の versions に 0.0.14 が含まれる`
 - 契機2 の除外: npm・Marketplace の公開版でも、roadmap 管理下の実装 artifact を含まない版（`flow:exempt` の修正のみで出た版等）は起こさない
-- artifact の `criteria` が図に存在しない版番号に言及していてもよい（例: `boundary_feedback` の「spec v0.0.12 に統合済み」）。その版番号は上の一次情報を指す外部参照として読む
+- artifact の `criteria` が図に存在しない版番号に言及していてもよい。その版番号は上の一次情報を指す外部参照として読む
 
 このリポで最新1件しか返さない手段に当たるのは `npm show @pfdsl/cli version` と「Marketplace の takasek.pfdsl version」で、どちらも dist-tag `latest` を返す（#724）。それを criteria の判定手段に据えると何が起きるかは品質ガイド「criteria は判定できる形で書く」が一次情報。
 `scripts/release-status.mjs` が使う gallery API 呼び出しは `flags: 514` + `pageSize: 1` で最新1件しか返さない — 同じ Marketplace を引く呼び方でも作用域が違うので、criteria の検証手段に流用しない。
 
-**spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact（spec_v007 / spec_v008 / spec_v009 等）は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
+**spec バージョン artifact の issue 管理**: `spec_vXXX` 系の artifact は GH issue 管理対象外。「完了した issue をクローズ」ゲートは NA とする（artifact の criteria 達成のみで完了を判断する）。
 
 **spec 統合プロセスの前バージョン入力**: 新しい `integrate_spec_vXXX` プロセスを roadmap に追加する際、前バージョンの spec artifact が上の保持範囲でグラフに残っていれば、新バージョン artifact に `revises:` を設定する。
 残っていなければ設定しない — 版の前後関係の一次情報は `docs/spec/spec-history.md` で、参照先のないフィールドを書いても `check` が dangling として落とすだけである。
 起こしていない版を飛ばして繋いでよい（#725 で `spec_v0010` を削除した結果が現にこの形）。`>>?` フィードバック入力は使わない — V011（strict mode の feedback 到達性検査）は `>>?` を前方到達可能な修正ループとして検査するが、版の前後関係はそれに当たらず誤検出になる（#480 で `spec_v006 >>? integrate_spec` 等を `revises:` に置き換えて解消）。
 
-**`integrate_spec_vXXX` の入力列挙**: `integrate_spec_vXXX` の通常入力には、そのバージョンで spec に統合される全ての変更を引き起こした artifact を列挙する。「実装が完了した artifact のうち、未統合のもの」を漏らさず書く（例: blocked_by と type_field と w002_hierarchy の3つが v0.0.11 の変更点なら `[blocked_by, type_field, w002_hierarchy] >> integrate_spec_v0011`）。
+**`integrate_spec_vXXX` の入力列挙**: `integrate_spec_vXXX` の通常入力には、そのバージョンで spec に統合される全ての変更を引き起こした artifact を列挙する。「実装が完了した artifact のうち、未統合のもの」を漏らさず書く。
 
 **publish_cli_vXXXX の入力列挙**: そのバージョンに含まれる全実装 artifact を入力として列挙する。実装 artifact の追加と同一サイクルで publish の入力集合も更新する（後回しにすると artifact が publish チェーンから切れる）。
 
