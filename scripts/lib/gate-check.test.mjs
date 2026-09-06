@@ -11,12 +11,15 @@ import {
 	classifyAuditIssuesFlowResult,
 	classifyChangedFilesByModeling,
 	classifyDesignRecordContent,
+	classifyDesignRecordReapprovals,
 	classifyDesignRecordTiming,
+	classifyFormat3DesignRecord,
 	classifyIssueLookupFailure,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
 	collectModeledLocations,
 	DESIGN_RECORD_FORMAT_CUTOFF,
+	DESIGN_RECORD_REAPPROVAL_CUTOFF,
 	DESIGN_RECORD_V2_CUTOFF,
 	DESIGN_RECORD_V3_CUTOFF,
 	DISPOSITION_TOKENS,
@@ -40,7 +43,9 @@ import {
 	parseAuditTerminals,
 	parseCommitLogLines,
 	parseFormat3DesignRecord,
+	parseFormat3DesignRecordStructure,
 	parseInputConsumedArtifacts,
+	parseReapprovalReference,
 	partitionNewTerminals,
 	READER_FIRST_DESIGN_RECORD_REQUIRED_PREFIXES,
 	resolveDesignRecord,
@@ -59,6 +64,11 @@ import {
 } from "./gate-check.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const TARGET_REPOSITORY = {
+	host: "github.com",
+	owner: "takasek",
+	repo: "pfdsl",
+};
 
 describe("classifyAuditIssuesFlowResult", () => {
 	it("PASS when ok", () => {
@@ -724,13 +734,15 @@ describe("toDesignRecordEntries", () => {
 		assert.deepEqual(entries, []);
 	});
 
-	it("carries each comment's body, createdAt and id, dropping everything else", () => {
+	it("carries each comment's identifiers, body and createdAt", () => {
 		const entries = toDesignRecordEntries({
 			body: "普通の説明文。",
 			createdAt: "2026-07-01T00:00:00Z",
 			comments: [
 				{
 					id: "IC_kwDOSYTJ888AAAABOCVvqQ",
+					databaseId: 123,
+					url: "https://github.com/takasek/pfdsl/issues/737#issuecomment-123",
 					author: { login: "runner" },
 					body: "前提: x\n否定案: y\n却下理由: z",
 					createdAt: "2026-07-02T00:00:00Z",
@@ -740,6 +752,8 @@ describe("toDesignRecordEntries", () => {
 		assert.deepEqual(entries, [
 			{
 				id: "IC_kwDOSYTJ888AAAABOCVvqQ",
+				databaseId: 123,
+				url: "https://github.com/takasek/pfdsl/issues/737#issuecomment-123",
 				body: "前提: x\n否定案: y\n却下理由: z",
 				createdAt: "2026-07-02T00:00:00Z",
 			},
@@ -753,85 +767,40 @@ describe("toDesignRecordEntries", () => {
 });
 
 describe("resolveRecordEditedAt", () => {
-	const editInfo = (overrides = {}) => ({
-		issueLastEditedAt: null,
-		comments: { totalCount: 1, nodes: [{ id: "c1", lastEditedAt: null }] },
-		...overrides,
-	});
-
-	// #927 removed the issue body from the candidate list, so a record without a
-	// comment id is no longer the body case — it is a comment whose id the
-	// lookup did not carry. Falling back to the issue's own lastEditedAt there
-	// would attribute an unrelated edit to the record.
-	it("reports an id-less record as unverifiable rather than reading the issue's lastEditedAt", () => {
-		const result = resolveRecordEditedAt(
-			{ body: "前提: x" },
-			editInfo({ issueLastEditedAt: "2026-07-01T00:00:00Z" }),
-		);
-		assert.equal(result.editedAtIso, null);
-		assert.match(result.note, /edit/);
-	});
-
-	it("matches a comment-selected record by id, not by array position", () => {
-		const result = resolveRecordEditedAt(
-			{ id: "c2", body: "前提: x" },
-			editInfo({
-				comments: {
-					totalCount: 2,
-					nodes: [
-						{ id: "c1", lastEditedAt: "2026-01-01T00:00:00Z" },
-						{ id: "c2", lastEditedAt: "2026-07-05T00:00:00Z" },
-					],
-				},
-			}),
-		);
-		assert.deepEqual(result, { editedAtIso: "2026-07-05T00:00:00Z" });
-	});
-
-	it("reads null as unedited for the matched comment", () => {
+	it("returns edited and its selected comment timestamp", () => {
 		const result = resolveRecordEditedAt(
 			{ id: "c1", body: "前提: x" },
-			editInfo(),
+			{ status: "edited", editedAtIso: "2026-07-05T00:00:00Z" },
 		);
-		assert.deepEqual(result, { editedAtIso: null });
+		assert.deepEqual(result, {
+			status: "edited",
+			editedAtIso: "2026-07-05T00:00:00Z",
+		});
+	});
+
+	it("returns unedited when the selected comment has never been edited", () => {
+		const result = resolveRecordEditedAt(
+			{ id: "c1", body: "前提: x" },
+			{ status: "unedited", editedAtIso: null },
+		);
+		assert.deepEqual(result, { status: "unedited", editedAtIso: null });
 	});
 
 	it("notes edit history as unavailable when the GraphQL lookup failed", () => {
 		const result = resolveRecordEditedAt({ id: "c1", body: "前提: x" }, null);
+		assert.equal(result.status, "unavailable");
 		assert.equal(result.editedAtIso, null);
 		assert.match(result.note, /unavailable/);
 	});
 
-	it("skips edit detection and notes it when totalCount exceeds the fetched nodes", () => {
+	it("treats an unknown edit-info status as unavailable", () => {
 		const result = resolveRecordEditedAt(
 			{ id: "c1", body: "前提: x" },
-			editInfo({
-				comments: {
-					totalCount: 101,
-					nodes: [{ id: "c1", lastEditedAt: null }],
-				},
-			}),
+			{ status: "unexpected", editedAtIso: null },
 		);
+		assert.equal(result.status, "unavailable");
 		assert.equal(result.editedAtIso, null);
-		assert.match(result.note, /detection/);
-	});
-
-	// Review A-3: without a note, "record id not found among the fetched
-	// nodes" was indistinguishable from "confirmed unedited" — both returned
-	// { editedAtIso: null } with nothing else. The two mean different things.
-	it("notes when the record's id has no match among the fetched comment nodes", () => {
-		const result = resolveRecordEditedAt(
-			{ id: "c-not-fetched", body: "前提: x" },
-			editInfo({
-				comments: {
-					totalCount: 1,
-					nodes: [{ id: "c1", lastEditedAt: null }],
-				},
-			}),
-		);
-		assert.equal(result.editedAtIso, null);
-		assert.match(result.note, /id/);
-		assert.match(result.note, /detection/);
+		assert.match(result.note, /unavailable/);
 	});
 });
 
@@ -1971,13 +1940,109 @@ function format3Record() {
 	].join("\n");
 }
 
+describe("parseReapprovalReference", () => {
+	const target = { ...TARGET_REPOSITORY, issueNumber: 1098 };
+
+	it("parses a canonical comment URL and a strict dialogue timestamp", () => {
+		assert.deepEqual(
+			parseReapprovalReference(
+				"https://github.com/takasek/pfdsl/issues/1098#issuecomment-123",
+				target,
+			),
+			{
+				kind: "comment-url",
+				issueNumber: 1098,
+				numericId: 123,
+				url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-123",
+			},
+		);
+		assert.deepEqual(
+			parseReapprovalReference("対話 2026-09-05T15:30:00.123Z", target),
+			{ kind: "dialogue", timestamp: "2026-09-05T15:30:00.123Z" },
+		);
+	});
+
+	it("accepts an uppercase HTTPS scheme through URL protocol parsing", () => {
+		assert.equal(
+			parseReapprovalReference(
+				"HTTPS://github.com/takasek/pfdsl/issues/1098#issuecomment-123",
+				target,
+			)?.kind,
+			"comment-url",
+		);
+	});
+
+	it("rejects URLs outside the target host, owner, repo, or issue", () => {
+		for (const value of [
+			"https://evil.example.com/takasek/pfdsl/issues/1098#issuecomment-123",
+			"https://github.com/someone/pfdsl/issues/1098#issuecomment-123",
+			"https://github.com/takasek/other-repo/issues/1098#issuecomment-123",
+			"https://github.com/takasek/pfdsl/issues/999#issuecomment-123",
+		]) {
+			assert.equal(parseReapprovalReference(value, target), null, value);
+		}
+	});
+
+	it("rejects non-canonical URL authority and path spellings", () => {
+		for (const value of [
+			"https://user:pw@github.com/takasek/pfdsl/issues/1098#issuecomment-123",
+			"https://github.com:443/takasek/pfdsl/issues/1098#issuecomment-123",
+			"https://github.com/takasek/pfdsl/issues/01098#issuecomment-123",
+			"https://github.com/takasek/pfdsl/issues/1098/#issuecomment-123",
+		]) {
+			assert.equal(parseReapprovalReference(value, target), null, value);
+		}
+	});
+
+	it("rejects dialogue spellings outside the one strict UTC lexeme", () => {
+		for (const value of [
+			"対話 2026-09-05T15:30:00+00:00",
+			"対話 20260905T153000Z",
+			"対話 2026-09-05T15:30:00Z（Slack で確認）",
+			"対話　2026-09-05T15:30:00Z",
+		]) {
+			assert.equal(parseReapprovalReference(value, target), null, value);
+		}
+	});
+});
+
 describe("format 3 design records", () => {
 	it("parses the smallest complete decision-first record", () => {
 		assert.deepEqual(parseFormat3DesignRecord(format3Record()), {
 			status: "PASS",
 			axes: ["保存方式"],
 			allNoImplementation: false,
+			revisions: [],
 		});
+	});
+
+	it("returns structured revision rows", () => {
+		const record = format3Record().replace(
+			"- なし",
+			"- A → B — 変更理由 — 再承認: 任意の既存記録",
+		);
+		const result = parseFormat3DesignRecordStructure(record);
+		assert.equal(result.status, "PASS");
+		assert.deepEqual(result.revisions, [
+			{
+				oldDecision: "A",
+				newDecision: "B",
+				reason: "変更理由",
+				reapproval: "任意の既存記録",
+			},
+		]);
+	});
+
+	it("rejects a free-form reapproval reference", () => {
+		const record = format3Record().replace(
+			"- なし",
+			"- A → B — 変更理由 — 再承認: このコメント直前のユーザー承認",
+		);
+		const result = parseFormat3DesignRecord(record);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.problems.join("\n"), /再承認/);
+		assert.match(result.problems.join("\n"), /YYYY-MM-DDTHH:MM:SS/);
+		assert.match(result.problems.join("\n"), /trailing text/);
 	});
 
 	it("accepts multiple decision axes and every display kind", () => {
@@ -2004,6 +2069,7 @@ describe("format 3 design records", () => {
 			status: "PASS",
 			axes: ["保存方式", "通知方式", "移行順序", "廃止機能"],
 			allNoImplementation: false,
+			revisions: [],
 		});
 	});
 
@@ -2057,6 +2123,8 @@ describe("format 3 design records", () => {
 		"<新決定>",
 		"<変更理由>",
 		"<URL>",
+		"<canonical comment URL>",
+		"<ISO8601 UTC>",
 	]) {
 		it(`rejects the format 3 template placeholder ${placeholder}`, () => {
 			const record = format3Record()
@@ -2281,10 +2349,55 @@ describe("format 3 design-record selection", () => {
 	const format1 = "前提: x\n否定案: y\n却下理由: z";
 	const format2 =
 		"提案: x\n理由: y\n前提を外した対案: z\n対案を採らない理由: owner constraint";
+	const revisedFormat3 = format3Record().replace(
+		"- なし",
+		"- A → B — 変更理由 — 再承認: このコメント直前のユーザー承認",
+	);
+
+	it("grandfathers an old free-form reapproval reference", () => {
+		const result = classifyFormat3DesignRecord(
+			revisedFormat3,
+			"2026-09-05T14:07:15Z",
+		);
+		assert.equal(result.status, "PASS");
+		assert.equal(result.strictReapprovalRequired, false);
+	});
+
+	it("requires strict reapproval vocabulary at the cutoff", () => {
+		const result = classifyFormat3DesignRecord(
+			revisedFormat3,
+			DESIGN_RECORD_REAPPROVAL_CUTOFF,
+		);
+		assert.equal(result.status, "FAIL");
+	});
+
+	it("accepts the two strict reapproval reference forms after the cutoff", () => {
+		for (const reference of [
+			"https://github.com/takasek/pfdsl/issues/1098#issuecomment-123",
+			"対話 2026-09-05T14:07:16Z",
+		]) {
+			const result = classifyFormat3DesignRecord(
+				revisedFormat3.replace("このコメント直前のユーザー承認", reference),
+				"2026-09-05T14:07:17Z",
+			);
+			assert.equal(result.status, "PASS", reference);
+		}
+	});
+
+	it("requires strict reapproval only once the reapproval cutoff is reached", () => {
+		assert.equal(
+			classifyFormat3DesignRecord(
+				revisedFormat3,
+				DESIGN_RECORD_REAPPROVAL_CUTOFF,
+			).strictReapprovalRequired,
+			true,
+		);
+	});
 
 	it("uses the three migration cutoffs at their exact boundaries", () => {
 		assert.equal(DESIGN_RECORD_V2_CUTOFF, "2026-08-30T09:32:50Z");
 		assert.equal(DESIGN_RECORD_V3_CUTOFF, "2026-08-31T01:30:24Z");
+		assert.equal(DESIGN_RECORD_REAPPROVAL_CUTOFF, "2026-09-05T14:07:16Z");
 		assert.equal(
 			resolveDesignRecord([
 				{ body: format1, createdAt: "2026-08-30T09:32:49Z" },
@@ -2364,6 +2477,15 @@ describe("format 3 design-record selection", () => {
 		assert.equal(result.record.body, format2);
 	});
 
+	it("selects a structurally complete format 3 record when strict vocabulary fails", () => {
+		const result = resolveDesignRecord([
+			{ body: format2, createdAt: DESIGN_RECORD_V2_CUTOFF },
+			{ body: revisedFormat3, createdAt: DESIGN_RECORD_V3_CUTOFF },
+		]);
+		assert.equal(result.status, "selected");
+		assert.equal(result.record.body, revisedFormat3);
+	});
+
 	it("keeps an invalid timestamp as diagnostics when no valid record exists", () => {
 		const result = resolveDesignRecord([
 			{ body: format3Record(), createdAt: "not-a-timestamp" },
@@ -2383,5 +2505,182 @@ describe("format 3 design-record selection", () => {
 				detail: "multiple complete format 3 design records",
 			},
 		);
+	});
+});
+
+describe("format 3 reapproval context", () => {
+	const issueNumber = 1098;
+	const createdAt = "2026-09-05T15:00:00Z";
+	const editedAtIso = "2026-09-05T16:00:00Z";
+	const record = (reference, overrides = {}) => ({
+		id: "IC_record",
+		body: format3Record().replace(
+			"- なし",
+			`- A → B — 変更理由 — 再承認: ${reference}`,
+		),
+		createdAt,
+		...overrides,
+	});
+	const comments = (approvalCreatedAt = "2026-09-05T15:30:00Z") => [
+		{
+			id: "IC_record",
+			databaseId: 10,
+			url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-10",
+			createdAt,
+		},
+		{
+			id: "IC_approval",
+			databaseId: 20,
+			url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+			createdAt: approvalCreatedAt,
+		},
+	];
+	const editedInfo = { status: "edited", editedAtIso };
+	const classifyReapprovals = (params) =>
+		classifyDesignRecordReapprovals({
+			repository: TARGET_REPOSITORY,
+			...params,
+		});
+
+	it("passes a same-issue comment URL and reports server-time evidence", () => {
+		const result = classifyReapprovals({
+			record: record(
+				"https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+			),
+			comments: comments(),
+			issueNumber,
+			editInfo: editedInfo,
+		});
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /server-recorded/);
+		assert.match(result.detail, /createdAt/);
+	});
+
+	it("fails closed when the target repository identity is unavailable", () => {
+		const result = classifyDesignRecordReapprovals({
+			record: record(
+				"https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+			),
+			comments: comments(),
+			issueNumber,
+			editInfo: editedInfo,
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /target repository|repository identity/i);
+	});
+
+	it("passes a dialogue timestamp and exposes its self-reported evidence", () => {
+		const result = classifyReapprovals({
+			record: record("対話 2026-09-05T15:30:00Z"),
+			comments: comments(),
+			issueNumber,
+			editInfo: editedInfo,
+		});
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /self-reported/);
+		assert.match(result.detail, /human review/);
+	});
+
+	it("accepts reapproval timestamps at both closed-window boundaries", () => {
+		for (const [reference, approvalCreatedAt] of [
+			[
+				"https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+				createdAt,
+			],
+			[
+				"https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+				editedAtIso,
+			],
+			["対話 2026-09-05T15:00:00Z", "2026-09-05T15:30:00Z"],
+			["対話 2026-09-05T16:00:00Z", "2026-09-05T15:30:00Z"],
+		]) {
+			const result = classifyReapprovals({
+				record: record(reference),
+				comments: comments(approvalCreatedAt),
+				issueNumber,
+				editInfo: editedInfo,
+			});
+			assert.equal(result.status, "PASS", reference);
+		}
+	});
+
+	it("rejects a reapproval timestamp outside the edit window", () => {
+		for (const reference of [
+			"https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+			"対話 2026-09-05T14:59:59Z",
+			"対話 2026-09-05T16:00:01Z",
+		]) {
+			const result = classifyReapprovals({
+				record: record(reference),
+				comments: comments(
+					reference.startsWith("https")
+						? "2026-09-05T16:00:01Z"
+						: "2026-09-05T15:30:00Z",
+				),
+				issueNumber,
+				editInfo: editedInfo,
+			});
+			assert.equal(result.status, "FAIL", reference);
+			assert.match(result.detail, /window/);
+		}
+	});
+
+	it("rejects unresolved, other-issue and self-referencing comment URLs", () => {
+		for (const reference of [
+			"https://github.com/takasek/pfdsl/issues/1098#issuecomment-999",
+			"https://github.com/takasek/pfdsl/issues/999#issuecomment-20",
+			"HTTPS://github.com/takasek/pfdsl/issues/1098#issuecomment-10",
+		]) {
+			const result = classifyReapprovals({
+				record: record(reference),
+				comments: comments(),
+				issueNumber,
+				editInfo: editedInfo,
+			});
+			assert.equal(result.status, "FAIL", reference);
+			assert.match(result.detail, /comment|issue|self/i);
+		}
+	});
+
+	it("rejects revised records that are unedited or unavailable", () => {
+		for (const editInfo of [
+			{ status: "unedited", editedAtIso: null },
+			{ status: "unavailable", editedAtIso: null },
+		]) {
+			const result = classifyReapprovals({
+				record: record("対話 2026-09-05T15:30:00Z"),
+				comments: comments(),
+				issueNumber,
+				editInfo,
+			});
+			assert.equal(result.status, "FAIL");
+			assert.match(result.detail, /edit|edited|unavailable/);
+		}
+	});
+
+	it("does not fail a no-history record when edit info is unavailable", () => {
+		const result = classifyReapprovals({
+			record: {
+				id: "IC_record",
+				body: format3Record(),
+				createdAt,
+			},
+			comments: comments(),
+			issueNumber,
+			editInfo: { status: "unavailable", editedAtIso: null },
+		});
+		assert.deepEqual(result, { status: "SKIP" });
+	});
+
+	it("grandfathers an old free-form reapproval without edit info", () => {
+		const result = classifyReapprovals({
+			record: record("このコメント直前のユーザー承認", {
+				createdAt: "2026-09-05T14:07:15Z",
+			}),
+			comments: comments(),
+			issueNumber,
+			editInfo: { status: "unavailable", editedAtIso: null },
+		});
+		assert.deepEqual(result, { status: "SKIP" });
 	});
 });

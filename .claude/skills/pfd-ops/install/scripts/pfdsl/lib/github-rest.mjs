@@ -19,12 +19,9 @@ const PER_PAGE = 100;
 // `page` parameter isn't advancing, not that the repo got big.
 const MAX_PAGES = 100;
 
-export const DESIGN_RECORD_EDIT_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
-  repository(owner: $owner, name: $repo) {
-    issue(number: $number) {
-      lastEditedAt
-      comments(first:100) { totalCount nodes { id lastEditedAt } }
-    }
+export const DESIGN_RECORD_EDIT_QUERY = `query($nodeId: ID!) {
+  node(id: $nodeId) {
+    ... on IssueComment { lastEditedAt }
   }
 }`;
 
@@ -32,31 +29,20 @@ const UNEXPECTED_DESIGN_RECORD_SHAPE_ERROR =
 	"unexpected GraphQL response shape for design-record edit info";
 
 /**
- * Normalize a GraphQL response into the design-record edit-info contract.
+ * Normalize a GraphQL response into the selected design-record comment edit-info contract.
  * @param {unknown} payload
- * @returns {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}}
+ * @returns {{status: "edited" | "unedited", editedAtIso: string | null}}
  */
 export function normalizeDesignRecordEditResponse(payload) {
-	const issueData = payload?.data?.repository?.issue;
-	const nodes = issueData?.comments?.nodes;
-	const validTimestamp = (value) => value === null || typeof value === "string";
+	const node = payload?.data?.node;
 	if (
-		!issueData ||
-		!validTimestamp(issueData.lastEditedAt) ||
-		typeof issueData.comments?.totalCount !== "number" ||
-		!Array.isArray(nodes) ||
-		!nodes.every(
-			(node) =>
-				typeof node?.id === "string" && validTimestamp(node.lastEditedAt),
-		)
+		!node ||
+		(node.lastEditedAt !== null && typeof node.lastEditedAt !== "string")
 	)
 		throw new Error(UNEXPECTED_DESIGN_RECORD_SHAPE_ERROR);
 	return {
-		issueLastEditedAt: issueData.lastEditedAt,
-		comments: {
-			totalCount: issueData.comments.totalCount,
-			nodes,
-		},
+		status: node.lastEditedAt === null ? "unedited" : "edited",
+		editedAtIso: node.lastEditedAt,
 	};
 }
 
@@ -324,9 +310,11 @@ export async function fetchIssueView(
 	if (comments) {
 		result.comments = comments.map((c) => ({
 			id: c.node_id,
+			databaseId: c.id,
 			author: { login: c.user?.login },
 			body: c.body ?? "",
 			createdAt: c.created_at,
+			url: c.html_url,
 		}));
 	}
 
@@ -334,21 +322,17 @@ export async function fetchIssueView(
 }
 
 /**
- * Ask GraphQL for an issue and its comments' edit timestamps. REST's
- * `updated_at` also changes when a comment is added, so it cannot establish
- * whether the design record itself was edited.
- * @param {string} owner
- * @param {string} repo
+ * Ask GraphQL for the selected design-record comment's edit timestamp.
+ * REST's `updated_at` also changes when a comment is added, so it cannot
+ * establish whether the design record itself was edited.
+ * @param {string} nodeId
  * @param {string} token
- * @param {number} number
  * @param {typeof fetch} [fetchImpl]
- * @returns {Promise<{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}>}
+ * @returns {Promise<{status: "edited" | "unedited", editedAtIso: string | null}>}
  */
 export async function fetchDesignRecordEditInfo(
-	owner,
-	repo,
+	nodeId,
 	token,
-	number,
 	fetchImpl = proxyAwareFetch,
 ) {
 	const res = await request(fetchImpl, `${API_ROOT}/graphql`, {
@@ -359,13 +343,13 @@ export async function fetchDesignRecordEditInfo(
 		},
 		body: JSON.stringify({
 			query: DESIGN_RECORD_EDIT_QUERY,
-			variables: { owner, repo, number },
+			variables: { nodeId },
 		}),
 	});
 	const payload = await res.json();
 	if (payload.errors?.length)
 		throw new Error(
-			`GitHub GraphQL API error for ${owner}/${repo}#${number}: ${payload.errors
+			`GitHub GraphQL API error for comment ${nodeId}: ${payload.errors
 				.map((e) => e.message)
 				.join("; ")}`,
 		);

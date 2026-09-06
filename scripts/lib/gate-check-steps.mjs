@@ -17,8 +17,10 @@ import { RECORD_SEP } from "./commit-trailers.mjs";
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
 	classifyDesignRecordContent,
+	classifyDesignRecordReapprovals,
 	classifyDesignRecordRequiredFormat,
 	classifyDesignRecordTiming,
+	classifyFormat3DesignRecord,
 	classifyOutputArtifactStatus,
 	classifySizeDirection,
 	hasStatusChange,
@@ -27,7 +29,6 @@ import {
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
 	parseCommitLogLines,
-	parseFormat3DesignRecord,
 	resolveDesignRecord,
 	resolveRecordEditedAt,
 	SIZE_TRACKED_PATTERNS,
@@ -291,14 +292,14 @@ function missingIssueRow(issueFailure) {
 }
 
 /**
- * The GraphQL edit-history fetch for one issue's design-selection record
- * candidates (#737 案2). Owner/repo resolution and the query itself are
- * github-ops.mjs's responsibility now (designRecordEditInfo).
- * @param {{githubOps: {designRecordEditInfo: (params: {number: number}) => Promise<any>}, number: number}} params
- * @returns {Promise<{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}>}
+ * The GraphQL edit-history fetch for the selected design-selection record
+ * comment. Owner/repo resolution and the query itself are github-ops.mjs's
+ * responsibility now (designRecordEditInfo).
+ * @param {{githubOps: {designRecordEditInfo: (params: {nodeId: string}) => Promise<any>}, nodeId: string}} params
+ * @returns {Promise<{status: 'edited'|'unedited', editedAtIso: string | null}>}
  */
-export async function fetchDesignRecordEditInfo({ githubOps, number }) {
-	return await githubOps.designRecordEditInfo({ number });
+export async function fetchDesignRecordEditInfo({ githubOps, nodeId }) {
+	return await githubOps.designRecordEditInfo({ nodeId });
 }
 
 /**
@@ -309,8 +310,10 @@ export async function fetchDesignRecordEditInfo({ githubOps, number }) {
 export function designRecordStep({
 	exec,
 	base,
+	number,
 	issue,
 	issueFailure,
+	repository,
 	editInfo,
 }) {
 	const name = "design-selection record";
@@ -350,7 +353,10 @@ export function designRecordStep({
 		editInfo ?? null,
 	);
 
-	const parsedFormat3 = parseFormat3DesignRecord(record.body);
+	const parsedFormat3 = classifyFormat3DesignRecord(
+		record.body,
+		record.createdAt,
+	);
 	const noImplementation =
 		parsedFormat3.status === "PASS" && parsedFormat3.allNoImplementation;
 	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso, {
@@ -373,6 +379,13 @@ export function designRecordStep({
 		requiredFormat.status === "PASS" && content.status === "FAIL"
 			? `WARN: ${content.detail}`
 			: undefined;
+	const reapproval = classifyDesignRecordReapprovals({
+		record,
+		comments: toDesignRecordEntries(issue),
+		issueNumber: number,
+		repository,
+		editInfo,
+	});
 	// The edit note is only worth printing once timing actually reached the
 	// stage where an edit could have mattered — a SKIP already means nothing
 	// was compared, so noting missing edit history there would read as a
@@ -383,6 +396,7 @@ export function designRecordStep({
 			timing.status === "SKIP" ? undefined : editNote,
 			requiredFormat.status === "FAIL" ? requiredFormat.detail : undefined,
 			contentDetail,
+			reapproval.detail,
 		]
 			.filter(Boolean)
 			.join("; ") || undefined;
@@ -390,6 +404,7 @@ export function designRecordStep({
 		name,
 		status:
 			requiredFormat.status === "FAIL" ||
+			reapproval.status === "FAIL" ||
 			(parsedFormat3.status === "FAIL" &&
 				record.body
 					.split("\n")
@@ -413,13 +428,21 @@ export function designRecordStep({
  * @param {(args: object) => import("./gate-check.mjs").GateResult} step
  * @param {{number: number, issue?: object|null,
  *          issueFailure?: {status: 'SKIP'|'FAIL', detail: string}|null,
+ *          repository?: {host?: string, owner?: string, repo?: string},
  *          editInfo?: object|null}[]} issues
  * @param {object} [args] arguments shared by every call (exec, base, deltas, …)
  */
 export function perIssueSteps(step, issues, args = {}) {
 	if (issues.length === 0) return [step(args)];
-	return issues.map(({ number, issue, issueFailure, editInfo }) => {
-		const result = step({ ...args, issue, issueFailure, editInfo });
+	return issues.map(({ number, issue, issueFailure, repository, editInfo }) => {
+		const result = step({
+			...args,
+			number,
+			issue,
+			issueFailure,
+			repository,
+			editInfo,
+		});
 		return { ...result, name: `${result.name} (#${number})` };
 	});
 }

@@ -18,6 +18,7 @@ import {
 	summarizeCiStatus,
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
+import { parseFormat3DesignRecord } from "./gate-check.mjs";
 import {
 	CODE_PATH,
 	CORRECTNESS_TOOLS,
@@ -25,6 +26,12 @@ import {
 	parseReviewTrailer,
 	REVIEW_TOOLS,
 } from "./review-record.mjs";
+
+const TARGET_REPOSITORY = {
+	host: "github.com",
+	owner: "takasek",
+	repo: "pfdsl",
+};
 
 describe("summarizeCiStatus", () => {
 	it("returns NONE for empty/missing rollup", () => {
@@ -309,6 +316,10 @@ describe("classifyDesignSettlement", () => {
 		"改訂履歴:",
 		"- なし",
 	].join("\n");
+	const revisedFormat3 = format3.replace(
+		"- なし",
+		"- A → B — 変更理由 — 再承認: https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+	);
 
 	it("reports unsettled by phrase before checking for a posted record", () => {
 		const result = classifyDesignSettlement({
@@ -335,6 +346,83 @@ describe("classifyDesignSettlement", () => {
 		assert.equal(result.reason, "record-posted");
 		assert.deepEqual(result.record, { createdAt: "2026-01-01T00:00:00Z" });
 		assert.equal(result.recordRequired, false);
+	});
+
+	it("settles a strict revised record with the same evidence detail as the gate", () => {
+		const result = classifyDesignSettlement({
+			body: "普通の説明文。",
+			issueNumber: 1098,
+			repository: TARGET_REPOSITORY,
+			editInfo: { status: "edited", editedAtIso: "2026-09-05T16:00:00Z" },
+			comments: [
+				{
+					id: "IC_record",
+					databaseId: 10,
+					body: revisedFormat3,
+					createdAt: "2026-09-05T15:00:00Z",
+					url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-10",
+				},
+				{
+					id: "IC_approval",
+					databaseId: 20,
+					createdAt: "2026-09-05T15:30:00Z",
+					url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+				},
+			],
+		});
+		assert.equal(result.unsettled, false);
+		assert.equal(result.reason, "record-posted");
+		assert.match(result.detail, /server-recorded/);
+		assert.equal(result.recordRequired, false);
+	});
+
+	it("keeps a strict revised record unsettled when edit info is unavailable", () => {
+		const result = classifyDesignSettlement({
+			body: "普通の説明文。",
+			issueNumber: 1098,
+			editInfo: { status: "unavailable", editedAtIso: null },
+			comments: [
+				{
+					id: "IC_record",
+					body: revisedFormat3,
+					createdAt: "2026-09-05T15:00:00Z",
+				},
+			],
+		});
+		assert.equal(result.unsettled, true);
+		assert.equal(result.reason, "record-incomplete");
+		assert.ok(result.problems.some((problem) => /edit history/.test(problem)));
+	});
+
+	it("does not require edit info for a strict record with no revision history", () => {
+		const result = classifyDesignSettlement({
+			body: "普通の説明文。",
+			issueNumber: 1098,
+			editInfo: { status: "unavailable", editedAtIso: null },
+			comments: [{ body: format3, createdAt: "2026-09-05T15:00:00Z" }],
+		});
+		assert.equal(result.unsettled, false);
+		assert.equal(result.reason, "record-posted");
+	});
+
+	it("settles a grandfathered free-form format 3 record through preflight", () => {
+		const result = classifyDesignSettlement({
+			body: "普通の説明文。",
+			issueNumber: 1098,
+			editInfo: { status: "unavailable", editedAtIso: null },
+			comments: [
+				{
+					id: "IC_record",
+					body: format3.replace(
+						"- なし",
+						"- A → B — 変更理由 — 再承認: このコメント直前のユーザー承認",
+					),
+					createdAt: "2026-09-05T14:07:15Z",
+				},
+			],
+		});
+		assert.equal(result.unsettled, false);
+		assert.equal(result.reason, "record-posted");
 	});
 
 	it("reports settled for a post-cutoff reader-first record", () => {
@@ -813,6 +901,18 @@ describe("buildDesignRecordTemplate", () => {
 			),
 			[],
 		);
+		assert.doesNotMatch(
+			buildDesignRecordTemplate().lines.join("\n"),
+			/2026-\d{2}-\d{2}T/,
+		);
+	});
+
+	it("rejects an unfilled format 3 template when passed to the strict parser", () => {
+		const result = parseFormat3DesignRecord(
+			buildDesignRecordTemplate().lines.join("\n"),
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.problems.join("\n"), /template placeholder remains/);
 	});
 
 	it("leaves candidate completeness and semantic consistency to human review", () => {

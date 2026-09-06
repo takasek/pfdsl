@@ -96,7 +96,7 @@ describe("pfd-ops applicability contract", () => {
 		);
 		assert.match(
 			workCycle,
-			/- <旧決定> → <新決定> — <変更理由> — 再承認: <URL>/,
+			/改訂行を `-`、旧決定、`→`、新決定、`—`、変更理由、`— 再承認:`、再承認参照の順で書く/,
 		);
 		assert.match(workCycle, /軸分割が実際の独立性を反映/);
 		assert.match(workCycle, /保留の再検討条件が実行可能/);
@@ -107,13 +107,20 @@ describe("pfd-ops applicability contract", () => {
 		assert.match(workCycle, /optionCount.*完全性.*証明/);
 		assert.doesNotMatch(workCycle, format2Tokens);
 		assert.match(workCycle, /バックエンドの移行契約が選択する形式/);
-		assert.match(workCycle, /2026-08-31T01:30:24Z/);
+		assert.match(workCycle, /移行境界は各バックエンドの L3 reference が定める/);
+		assert.doesNotMatch(workCycle, /issuecomment|canonical comment URL|対話 /);
+		assert.doesNotMatch(workCycle, /2026-08-31T01:30:24Z/);
 		assert.match(workCycle, /以降の新規記録は完全な Format 3/);
 		assert.match(workCycle, /既存の有効な旧形式記録を書き換えない/);
 		assert.match(workCycle, /人間による意味的な再検査/);
 
 		assert.match(githubBackend, /2026-08-30T09:32:50Z/);
 		assert.match(githubBackend, /2026-08-31T01:30:24Z/);
+		assert.match(githubBackend, /2026-09-05T14:07:16Z/);
+		assert.match(githubBackend, /host.*owner.*repo/);
+		assert.match(githubBackend, /YYYY-MM-DDTHH:MM:SS/);
+		assert.match(githubBackend, /半角スペース/);
+		assert.match(githubBackend, /comments.*pagination|pagination.*comments/);
 		assert.match(githubBackend, /設計記録形式: 3/);
 		assert.match(githubBackend, /同じコメントを編集/);
 		assert.match(githubBackend, /別コメント.*置換してはならない/);
@@ -131,5 +138,9 @@ describe("pfd-ops applicability contract", () => {
 		assert.doesNotMatch(fileBackend, /投稿時刻|コメント.*編集|createdAt/);
 		assert.match(fileBackend, /移行履歴.*形式2/);
 		assert.doesNotMatch(fileBackend, format2Tokens);
+		assert.match(fileBackend, /コミット <40桁SHA>/);
+		assert.match(fileBackend, /承認.*コミット.*記録.*コミット/);
+		assert.match(fileBackend, /解決器が無い/);
+		assert.doesNotMatch(fileBackend, /機械.*検証/);
 	});
 });

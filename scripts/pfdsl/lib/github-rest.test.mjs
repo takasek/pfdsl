@@ -486,10 +486,13 @@ describe("fetchIssueView", () => {
 			if (url.includes("/comments"))
 				return jsonResponse([
 					{
+						id: 123,
 						node_id: "IC_kwDOCommentNodeId",
 						body: "前提: ...",
 						user: { login: "takasek" },
 						created_at: "2026-08-02T00:00:00Z",
+						html_url:
+							"https://github.com/takasek/pfdsl/issues/42#issuecomment-123",
 					},
 				]);
 			return jsonResponse(issueApi);
@@ -506,9 +509,11 @@ describe("fetchIssueView", () => {
 			comments: [
 				{
 					id: "IC_kwDOCommentNodeId",
+					databaseId: 123,
 					author: { login: "takasek" },
 					body: "前提: ...",
 					createdAt: "2026-08-02T00:00:00Z",
+					url: "https://github.com/takasek/pfdsl/issues/42#issuecomment-123",
 				},
 			],
 		});

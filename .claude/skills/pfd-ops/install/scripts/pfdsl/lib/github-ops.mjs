@@ -27,6 +27,7 @@ import {
 	fetchPullRequestView,
 	mapLabelsResponse,
 	normalizeDesignRecordEditResponse,
+	parseHost,
 	parseOwnerRepo,
 	addIssueLabel as restAddIssueLabel,
 	createLabel as restCreateLabel,
@@ -54,43 +55,64 @@ async function rejectSaturatedList(operation, limit, itemsPromise) {
 	return items;
 }
 
+function commentDatabaseIdFromUrl(url) {
+	const match = typeof url === "string" && url.match(/#issuecomment-(\d+)$/);
+	if (!match) return undefined;
+	const databaseId = Number(match[1]);
+	return Number.isSafeInteger(databaseId) ? databaseId : undefined;
+}
+
+function normalizeIssueViewComments(issue) {
+	if (!Array.isArray(issue?.comments)) return issue;
+	return {
+		...issue,
+		comments: issue.comments.map((comment) => {
+			const normalized = {
+				id: comment.id,
+				databaseId: comment.databaseId ?? commentDatabaseIdFromUrl(comment.url),
+				author: comment.author,
+				body: comment.body ?? "",
+				createdAt: comment.createdAt,
+				url: comment.url,
+			};
+			return Object.fromEntries(
+				Object.entries(normalized).filter(([, value]) => value !== undefined),
+			);
+		}),
+	};
+}
+
 /**
  * @param {string} cwd
- * @returns {{owner: string, repo: string}}
+ * @returns {{host: string, owner: string, repo: string}}
  */
-function ownerRepoFromGitRemote(cwd) {
+function repositoryFromGitRemote(cwd) {
 	const remoteUrl = execFileSync("git", ["remote", "get-url", "origin"], {
 		cwd,
 		encoding: "utf-8",
 	}).trim();
 	const ownerRepo = parseOwnerRepo(remoteUrl);
-	if (!ownerRepo)
+	const host = parseHost(remoteUrl);
+	if (!ownerRepo || !host)
 		throw new Error(
-			`could not determine owner/repo from git remote: ${remoteUrl}`,
+			`could not determine host/owner/repo from git remote: ${remoteUrl}`,
 		);
-	return ownerRepo;
+	return { host, ...ownerRepo };
 }
 
 /**
- * The GraphQL query that reads a design-selection record's edit history
- * (#737 案2): the issue's own `lastEditedAt`, and every comment's, in one
- * round trip. REST's `updated_at` is not used — it moves on new comments
- * alone, so it is not evidence the record's own text changed. `gh issue view
- * --json comments` doesn't carry `lastEditedAt` at all (verified against a
- * live issue), which is why this goes through `gh api graphql` instead.
- * @param {{owner: string, repo: string, number: number}} params
+ * The GraphQL query that reads the selected design-selection record comment's
+ * edit timestamp. REST's `updated_at` is not used because it also changes
+ * when a comment is added.
+ * @param {{nodeId: string}} params
  * @returns {string[]} argv for execGh
  */
-export function buildDesignRecordEditQuery({ owner, repo, number }) {
+export function buildDesignRecordEditQuery({ nodeId }) {
 	return [
 		"api",
 		"graphql",
 		"-F",
-		`owner=${owner}`,
-		"-F",
-		`repo=${repo}`,
-		"-F",
-		`number=${number}`,
+		`nodeId=${nodeId}`,
 		"-f",
 		`query=${DESIGN_RECORD_EDIT_QUERY}`,
 	];
@@ -100,7 +122,7 @@ export function buildDesignRecordEditQuery({ owner, repo, number }) {
  * Parse buildDesignRecordEditQuery's response into the shape
  * designRecordEditInfo returns.
  * @param {string} jsonText - execGh's stdout for the graphql call
- * @returns {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}}
+ * @returns {{status: "edited" | "unedited", editedAtIso: string | null}}
  */
 export function parseDesignRecordEditResponse(jsonText) {
 	return normalizeDesignRecordEditResponse(JSON.parse(jsonText));
@@ -123,13 +145,18 @@ export function createGitHubOps({
 	// `cwd` is fixed for this instance, so the repo it names is too. Resolving
 	// it once keeps a gate-check run that walks several issues from spawning
 	// `git remote get-url origin` per operation.
-	/** @type {{owner: string, repo: string} | undefined} */
-	let ownerRepoCache;
-	const ownerRepo = () => (ownerRepoCache ??= ownerRepoFromGitRemote(cwd));
+	/** @type {{host: string, owner: string, repo: string} | undefined} */
+	let repositoryCache;
+	const repository = () => (repositoryCache ??= repositoryFromGitRemote(cwd));
+	const ownerRepo = () => {
+		const { owner, repo } = repository();
+		return { owner, repo };
+	};
 
 	/**
 	 * Runs `ghCall`, and on a genuine gh-unavailable ENOENT with a token
-	 * present, resolves this repo's owner/repo and runs `httpCall` with it.
+	 * present, resolves this repo's owner/repo unless the operation is already
+	 * addressed by an opaque identifier, then runs `httpCall` with it.
 	 * Every other case (no ENOENT, or ENOENT with no token) rethrows the
 	 * original error unchanged, so isGhUnavailableError keeps working for
 	 * callers. `httpCall` undefined means this operation has no HTTP
@@ -139,9 +166,15 @@ export function createGitHubOps({
 	 * misleading original ENOENT.
 	 * @param {string} operation
 	 * @param {() => Promise<any>} ghCall
-	 * @param {((ctx: {owner: string, repo: string, token: string}) => Promise<any>) | undefined} httpCall
+	 * @param {((ctx: {owner?: string, repo?: string, token: string}) => Promise<any>) | undefined} httpCall
+	 * @param {{resolveOwnerRepo?: boolean}} [options]
 	 */
-	async function withFallback(operation, ghCall, httpCall) {
+	async function withFallback(
+		operation,
+		ghCall,
+		httpCall,
+		{ resolveOwnerRepo = true } = {},
+	) {
 		try {
 			return await ghCall();
 		} catch (e) {
@@ -152,8 +185,8 @@ export function createGitHubOps({
 				throw new Error(
 					`github-ops: '${operation}' has no HTTP backend implementation; the gh CLI is required for this operation`,
 				);
-			const { owner, repo } = ownerRepo();
-			return await httpCall({ owner, repo, token });
+			const context = resolveOwnerRepo ? ownerRepo() : {};
+			return await httpCall({ ...context, token });
 		}
 	}
 
@@ -228,11 +261,14 @@ export function createGitHubOps({
 						"--json",
 						fields.join(","),
 					]);
-					return JSON.parse(out);
+					return normalizeIssueViewComments(JSON.parse(out));
 				},
 				({ owner, repo, token }) =>
 					fetchIssueView(owner, repo, token, number, fields, fetchImpl),
 			),
+
+		/** @returns {{host: string, owner: string, repo: string}} */
+		repository,
 
 		/**
 		 * @param {{number: number, fields: string[]}} params
@@ -336,22 +372,19 @@ export function createGitHubOps({
 			),
 
 		/**
-		 * The selected design-selection record's edit history (#737 案2).
-		 * @param {{number: number}} params
-		 * @returns {Promise<{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}}>}
+		 * The selected design-selection record comment's edit history.
+		 * @param {{nodeId: string}} params
+		 * @returns {Promise<{status: "edited" | "unedited", editedAtIso: string | null}>}
 		 */
-		designRecordEditInfo: ({ number }) =>
+		designRecordEditInfo: ({ nodeId }) =>
 			withFallback(
 				"designRecordEditInfo",
 				async () => {
-					const { owner, repo } = ownerRepo();
-					const out = await runGh(
-						buildDesignRecordEditQuery({ owner, repo, number }),
-					);
+					const out = await runGh(buildDesignRecordEditQuery({ nodeId }));
 					return parseDesignRecordEditResponse(out);
 				},
-				({ owner, repo, token }) =>
-					fetchDesignRecordEditInfo(owner, repo, token, number, fetchImpl),
+				({ token }) => fetchDesignRecordEditInfo(nodeId, token, fetchImpl),
+				{ resolveOwnerRepo: false },
 			),
 	};
 }
