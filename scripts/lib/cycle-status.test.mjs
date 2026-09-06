@@ -13,6 +13,7 @@ import {
 	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
 	isUnregisteredManagedIssue,
+	narrowPreArtifactReminders,
 	parsePorcelainPaths,
 	parseReadyOutput,
 	preArtifactQueryWords,
@@ -1074,6 +1075,90 @@ describe("preArtifactQueryWords", () => {
 
 	it("returns nothing when the text carries no code span", () => {
 		assert.deepEqual(preArtifactQueryWords("コードスパンのない散文。"), []);
+	});
+});
+
+describe("narrowPreArtifactReminders", () => {
+	/** Four pre-artifact patterns, so a result of two is a real narrowing and
+	 * a result of three is not. */
+	const patterns = [
+		{
+			name: "A",
+			path: "a.md",
+			phase: "pre-artifact",
+			body: "- **A**: 冒頭。\n  具体例: `preflight` が全件返す。\n  対策: 書く前に確認する。",
+		},
+		{
+			name: "B",
+			path: "b.md",
+			phase: "pre-artifact",
+			body: "- **B**: 冒頭。\n  具体例: `preflight` と `advisory`。\n  対策: 着手前に読み直す。",
+		},
+		{
+			name: "C",
+			path: "c.md",
+			phase: "pre-artifact",
+			body: "- **C**: 冒頭。\n  対策: 委譲前に列挙する。",
+		},
+		{
+			name: "D",
+			path: "d.md",
+			phase: "pre-artifact",
+			body: "- **D**: 冒頭。\n  対策: 起票前に数える。",
+		},
+		{
+			name: "E",
+			path: "e.md",
+			body: "- **E**: 冒頭。\n  対策: いつでも効く。",
+		},
+	];
+
+	it("keeps only the patterns the words reach, most hits first", () => {
+		const result = narrowPreArtifactReminders(patterns, [
+			"preflight",
+			"advisory",
+		]);
+		assert.deepEqual(
+			result.reminders.map((r) => r.name),
+			["B", "A"],
+		);
+		assert.equal(result.pool, 4);
+		assert.equal(result.unselective, false);
+		assert.equal(result.reason, null);
+	});
+
+	it("carries the countermeasure of each pattern it kept", () => {
+		const result = narrowPreArtifactReminders(patterns, ["advisory"]);
+		assert.deepEqual(result.reminders, [
+			{ name: "B", path: "b.md", countermeasure: "着手前に読み直す。" },
+		]);
+	});
+
+	it("says a result over half the pool is not a narrowing", () => {
+		const result = narrowPreArtifactReminders(patterns, ["冒頭"]);
+		assert.equal(result.reminders.length, 4);
+		assert.equal(result.unselective, true);
+		assert.equal(result.reason, "over-half");
+	});
+
+	it("returns the whole pool, named as unnarrowed, when no word is given", () => {
+		const result = narrowPreArtifactReminders(patterns, []);
+		assert.equal(result.reminders.length, 4);
+		assert.equal(result.unselective, true);
+		assert.equal(result.reason, "no-words");
+	});
+
+	it("returns the whole pool, named as unnarrowed, when the words reach nothing", () => {
+		const result = narrowPreArtifactReminders(patterns, ["該当しない語"]);
+		assert.equal(result.reminders.length, 4);
+		assert.equal(result.unselective, true);
+		assert.equal(result.reason, "no-hits");
+	});
+
+	it("reports the words it searched with", () => {
+		assert.deepEqual(narrowPreArtifactReminders(patterns, ["advisory"]).words, [
+			"advisory",
+		]);
 	});
 });
 

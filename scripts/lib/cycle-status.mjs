@@ -15,7 +15,7 @@ import {
 	resolveDesignRecordRequiredPrefixes,
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
-import { counterLineOf } from "./retro-patterns.mjs";
+import { counterLineOf, hitsFor } from "./retro-patterns.mjs";
 import {
 	CODE_PATH,
 	CORRECTNESS_TOOLS,
@@ -456,6 +456,59 @@ export function buildPreArtifactReminders(patterns) {
 			path: p.path,
 			countermeasure: counterLineOf(p.body),
 		}));
+}
+
+/**
+ * The pre-artifact reminders for this cycle, narrowed by the target issue's
+ * own words, with the verdict on whether that narrowed anything (#1118).
+ *
+ * The verdict is `select`'s: a result holding more than half the pool has
+ * removed less than half of what reading the whole set would cost, which is
+ * not a narrowing. Stating it is the point rather than a footnote — the
+ * failure this reminder exists to catch is a reader who stops at "narrowed,
+ * read, done", and a list of 20 looks exactly like a list of 4 until it is
+ * compared to the pool. The binding's measurement says which side this will
+ * usually land on: deleting the largest tag outright moved one real cycle's
+ * result from 38 to 31.
+ *
+ * Two cases hand back the whole pool rather than a shorter list, and they are
+ * told apart because they call for different actions: `no-words` means the
+ * issue wrote no code spans to search with, and `no-hits` means it wrote some
+ * and none of them reached the catalog — the second is a reading on the
+ * catalog's vocabulary, the first is one on how the issue was written. Neither
+ * returns the empty list its literal search produced. This is the only
+ * reference point that prints the countermeasure lines (the PostToolUse
+ * advisory drops them for length), so a silent zero here would cost the
+ * runner every countermeasure in exchange for a narrowing that did not happen.
+ * @param {{name: string, path: string, body: string, phase?: string}[]} patterns
+ * @param {string[]} words
+ * @returns {{reminders: {name: string, path: string, countermeasure: string | undefined}[], words: string[], pool: number, unselective: boolean, reason: "no-words" | "no-hits" | "over-half" | null}}
+ */
+export function narrowPreArtifactReminders(patterns, words) {
+	const pool = patterns.filter((p) => p.phase === "pre-artifact");
+	const whole = (reason) => ({
+		reminders: buildPreArtifactReminders(pool),
+		words,
+		pool: pool.length,
+		unselective: true,
+		reason,
+	});
+	if (words.length === 0) return whole("no-words");
+	// Ranked by how many of the words reached each pattern, ties keeping
+	// catalog order — the same ordering `select` gives, and for the same
+	// reason: ranking is what a reader gets when the list cannot be short.
+	const hit = hitsFor(pool, words)
+		.sort((a, b) => b.hits.length - a.hits.length)
+		.map((m) => m.pattern);
+	if (hit.length === 0) return whole("no-hits");
+	if (hit.length > pool.length / 2) return whole("over-half");
+	return {
+		reminders: buildPreArtifactReminders(hit),
+		words,
+		pool: pool.length,
+		unselective: false,
+		reason: null,
+	};
 }
 
 /** A markdown inline code span, without its backticks. */
