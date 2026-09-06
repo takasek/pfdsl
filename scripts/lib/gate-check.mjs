@@ -550,48 +550,36 @@ export function finishGateCheck(
 }
 
 /**
- * The selected design-selection record's own `lastEditedAt` (#737 案2),
- * matched by id rather than by array position — `gh` and GraphQL are not
- * guaranteed to return comments in the same order, and a position-based
- * match could silently attribute one comment's edit to another's.
- *
- * Three conditions make edit detection impossible rather than merely absent,
- * and all three are reported as a note rather than folded into `editedAtIso`
- * (which stays a plain timestamp-or-null so classifyDesignRecordTiming does
- * not have to parse a sentinel out of it): the GraphQL lookup itself failing
- * (`editInfo` is null), the issue carrying more comments than the single
- * page fetched (`totalCount` exceeds the fetched `nodes`), and the selected
- * record's own id having no match among the fetched nodes — without a note
- * this last case is indistinguishable from "confirmed unedited", when it is
- * actually "could not be checked".
- *
- * A record with no id at all falls into that last case rather than reading the
- * issue's own `lastEditedAt`. It used to mean "the body was elected", which
- * made the issue's edit history the right history to read; since #927 the body
- * is not a candidate, so an id-less record is a comment whose id the lookup did
- * not carry, and the issue's edit history is somebody else's.
- * @param {{id?: string}} record - selectDesignRecord's return value
- * @param {{issueLastEditedAt: string | null, comments: {totalCount: number, nodes: Array<{id: string, lastEditedAt: string | null}>}} | null} editInfo
- * @returns {{editedAtIso: string | null, note?: string}}
+ * Normalize the edit lookup result for the already-selected design record.
+ * The lookup is scoped to that record's GraphQL node ID before this function
+ * runs, so an unavailable lookup must not be treated as confirmation that the
+ * comment was unedited.
+ * @param {unknown} _record - retained as the first argument for the existing caller contract
+ * @param {{status?: string, editedAtIso?: string | null, note?: string} | null} editInfo
+ * @returns {{status: 'edited'|'unedited'|'unavailable', editedAtIso: string | null, note?: string}}
  */
-export function resolveRecordEditedAt(record, editInfo) {
-	if (!editInfo) return { editedAtIso: null, note: "edit history unavailable" };
-	if (editInfo.comments.totalCount > editInfo.comments.nodes.length) {
+export function resolveRecordEditedAt(_record, editInfo) {
+	if (
+		editInfo?.status === "edited" &&
+		typeof editInfo.editedAtIso === "string"
+	) {
+		return { status: "edited", editedAtIso: editInfo.editedAtIso };
+	}
+	if (editInfo?.status === "unedited" && editInfo.editedAtIso === null) {
+		return { status: "unedited", editedAtIso: null };
+	}
+	if (editInfo?.status === "unavailable") {
 		return {
+			status: "unavailable",
 			editedAtIso: null,
-			note: "more comments than fetched; edit detection skipped",
+			note: editInfo.note ?? "edit history unavailable",
 		};
 	}
-	const match = record.id
-		? editInfo.comments.nodes.find((c) => c.id === record.id)
-		: undefined;
-	if (!match) {
-		return {
-			editedAtIso: null,
-			note: "record id not found among fetched comments; edit detection skipped",
-		};
-	}
-	return { editedAtIso: match.lastEditedAt };
+	return {
+		status: "unavailable",
+		editedAtIso: null,
+		note: "edit history unavailable",
+	};
 }
 
 /**
@@ -792,6 +780,8 @@ const FORMAT_3_PLACEHOLDER_VOCABULARY = [
 	"新決定",
 	"変更理由",
 	"URL",
+	"canonical comment URL",
+	"ISO8601 UTC",
 ];
 const FORMAT_3_PLACEHOLDER = new RegExp(
 	`[<＜]\\s*(?:${FORMAT_3_PLACEHOLDER_VOCABULARY.map((word) => word.replaceAll("|", "\\|")).join("|")})(?:\\s*[>＞]|$)`,
@@ -812,6 +802,82 @@ function parsePartialAdoption(value) {
 	return { adoptedPart, remainderKind, remainderReason };
 }
 
+const STRICT_UTC_TIMESTAMP_PATTERN =
+	/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z$/;
+const STRICT_REAPPROVAL_REFERENCE_DETAIL =
+	"改訂履歴: 再承認 must be either https://<host>/<owner>/<repo>/issues/<issue-number>#issuecomment-<numeric-id> or 対話 YYYY-MM-DDTHH:MM:SS[.fraction]Z; use one half-width space, a final Z for UTC, at most 3 fractional-second digits, and no trailing text";
+
+/**
+ * Parse the two GitHub Issues reapproval reference forms without resolving a
+ * comment or deciding whether an approval actually happened.
+ * @param {string} value
+ * @param {{host?: string, owner?: string, repo?: string, issueNumber?: number}} [expectedRepository]
+ * @returns {{kind: "comment-url", issueNumber: number, numericId: number, url: string}|{kind: "dialogue", timestamp: string}|null}
+ */
+export function parseReapprovalReference(value, expectedRepository) {
+	if (typeof value !== "string") return null;
+	const dialogue = value.match(/^対話 (.+)$/);
+	if (dialogue && isStrictUtcTimestamp(dialogue[1]))
+		return { kind: "dialogue", timestamp: dialogue[1] };
+	const canonicalPath = value.match(
+		/^https:\/\/([^/]+)\/([^/]+)\/([^/]+)\/issues\/([1-9]\d*)#issuecomment-([1-9]\d*)$/i,
+	);
+	if (!canonicalPath) return null;
+	const [, authority, owner, repo, issueNumberText, numericIdText] =
+		canonicalPath;
+	if (authority.includes(":") || authority.includes("@")) return null;
+	let url;
+	try {
+		url = new URL(value);
+	} catch {
+		return null;
+	}
+	if (
+		url.protocol !== "https:" ||
+		url.username ||
+		url.password ||
+		url.port ||
+		url.search ||
+		url.hostname.toLowerCase() !== authority.toLowerCase()
+	)
+		return null;
+	const issueNumber = Number(issueNumberText);
+	const numericId = Number(numericIdText);
+	if (!Number.isSafeInteger(issueNumber) || !Number.isSafeInteger(numericId))
+		return null;
+	if (expectedRepository) {
+		if (
+			typeof expectedRepository.host !== "string" ||
+			typeof expectedRepository.owner !== "string" ||
+			typeof expectedRepository.repo !== "string" ||
+			url.host !== expectedRepository.host.toLowerCase() ||
+			owner !== expectedRepository.owner ||
+			repo !== expectedRepository.repo ||
+			(expectedRepository.issueNumber !== undefined &&
+				issueNumber !== expectedRepository.issueNumber)
+		)
+			return null;
+	}
+	return { kind: "comment-url", issueNumber, numericId, url: value };
+}
+
+function isStrictUtcTimestamp(value) {
+	const match = value.match(STRICT_UTC_TIMESTAMP_PATTERN);
+	if (!match) return false;
+	const date = new Date(value);
+	if (!Number.isFinite(date.getTime())) return false;
+	const [, year, month, day, hour, minute, second, fraction = ""] = match;
+	return (
+		date.getUTCFullYear() === Number(year) &&
+		date.getUTCMonth() + 1 === Number(month) &&
+		date.getUTCDate() === Number(day) &&
+		date.getUTCHours() === Number(hour) &&
+		date.getUTCMinutes() === Number(minute) &&
+		date.getUTCSeconds() === Number(second) &&
+		date.getUTCMilliseconds() === Number(fraction.padEnd(3, "0") || 0)
+	);
+}
+
 function parseRevisionRow(line) {
 	const match = line.match(
 		/^(.+)\s+→\s+(.+)\s+—\s+(.+)\s+—\s+再承認\s*[:：]\s*(.+)$/,
@@ -830,9 +896,9 @@ function parseRevisionRow(line) {
  * stays opaque: the parser never infers candidate identity, rationale quality,
  * or whether a decision and a disposition make semantic sense.
  * @param {string | undefined | null} body
- * @returns {{status: "PASS", axes: string[], allNoImplementation: boolean}|{status: "FAIL", problems: string[]}}
+ * @returns {{status: "PASS", axes: string[], allNoImplementation: boolean, revisions: Array<{oldDecision: string, newDecision: string, reason: string, reapproval: string}>}|{status: "FAIL", problems: string[]}}
  */
-export function parseFormat3DesignRecord(body) {
+export function parseFormat3DesignRecordStructure(body) {
 	const lines = (body ?? "").split("\n").map(normalizeRecordLine);
 	const problems = [];
 	const markerIndexes = lines
@@ -1035,7 +1101,169 @@ export function parseFormat3DesignRecord(body) {
 		allNoImplementation: decisions.every(
 			(decision) => decision[2] === "実装しない",
 		),
+		revisions: hasNone ? [] : revisionRows.map(parseRevisionRow),
 	};
+}
+
+/**
+ * Parse a format 3 design record using the strict reapproval vocabulary.
+ * @param {string | undefined | null} body
+ * @returns {{status: "PASS", axes: string[], allNoImplementation: boolean, revisions: Array<{oldDecision: string, newDecision: string, reason: string, reapproval: string}>}|{status: "FAIL", problems: string[]}}
+ */
+export function parseFormat3DesignRecord(body) {
+	const parsed = parseFormat3DesignRecordStructure(body);
+	if (parsed.status === "FAIL") return parsed;
+	if (
+		parsed.revisions.every((revision) =>
+			parseReapprovalReference(revision.reapproval),
+		)
+	)
+		return parsed;
+	return {
+		status: "FAIL",
+		problems: [STRICT_REAPPROVAL_REFERENCE_DETAIL],
+	};
+}
+
+export const DESIGN_RECORD_REAPPROVAL_CUTOFF = "2026-09-05T14:07:16Z";
+
+/**
+ * Apply the reapproval vocabulary only to records created at or after its
+ * migration boundary. Older format 3 records retain structural compatibility.
+ * @param {string | undefined | null} body
+ * @param {string | undefined | null} createdAt
+ */
+export function classifyFormat3DesignRecord(body, createdAt) {
+	const structural = parseFormat3DesignRecordStructure(body);
+	if (structural.status === "FAIL") return structural;
+	const strictReapprovalRequired =
+		isValidDesignRecordTimestamp(createdAt) &&
+		new Date(createdAt).getTime() >=
+			new Date(DESIGN_RECORD_REAPPROVAL_CUTOFF).getTime();
+	if (!strictReapprovalRequired)
+		return { ...structural, strictReapprovalRequired: false };
+	const strict = parseFormat3DesignRecord(body);
+	return { ...strict, strictReapprovalRequired: true };
+}
+
+/**
+ * Validate strict format 3 reapproval references against the selected record's
+ * edit window. This checks reference resolution, timestamp ordering and the
+ * evidence kind; it does not assert that a human approval actually occurred.
+ * @param {{record: {id?: string, body?: string, createdAt?: string}, comments?: Array<{id?: string, databaseId?: number, url?: string, createdAt?: string}>, issueNumber?: number, repository?: {host?: string, owner?: string, repo?: string}, editInfo?: {status?: string, editedAtIso?: string | null}}} params
+ * @returns {{status: "PASS"|"FAIL"|"SKIP", detail?: string}}
+ */
+export function classifyDesignRecordReapprovals({
+	record,
+	comments = [],
+	issueNumber,
+	repository,
+	editInfo,
+}) {
+	const body = record?.body ?? "";
+	if (!body.split("\n").map(normalizeRecordLine).includes(FORMAT_3_MARKER))
+		return { status: "SKIP" };
+	if (!isValidDesignRecordTimestamp(record?.createdAt))
+		return { status: "FAIL", detail: "missing or invalid record timestamp" };
+	const parsed = classifyFormat3DesignRecord(body, record.createdAt);
+	if (parsed.status === "FAIL")
+		return { status: "FAIL", detail: parsed.problems.join("; ") };
+	if (!parsed.strictReapprovalRequired) return { status: "SKIP" };
+	if (parsed.revisions.length === 0) return { status: "SKIP" };
+	if (editInfo?.status === "unedited")
+		return {
+			status: "FAIL",
+			detail:
+				"revised record has no edit timestamp; selected record is unedited",
+		};
+	if (editInfo?.status !== "edited")
+		return {
+			status: "FAIL",
+			detail: "revised record edit history unavailable",
+		};
+	if (!isValidDesignRecordTimestamp(editInfo.editedAtIso))
+		return {
+			status: "FAIL",
+			detail: "invalid revised record edit timestamp",
+		};
+
+	const recordTime = new Date(record.createdAt).getTime();
+	const editedTime = new Date(editInfo.editedAtIso).getTime();
+	if (editedTime < recordTime)
+		return {
+			status: "FAIL",
+			detail: "record edit window has an invalid order",
+		};
+	const evidence = new Set();
+	for (const revision of parsed.revisions) {
+		const syntacticReference = parseReapprovalReference(revision.reapproval);
+		if (!syntacticReference)
+			return {
+				status: "FAIL",
+				detail: "reapproval reference could not be parsed",
+			};
+		let reference = syntacticReference;
+		if (syntacticReference.kind === "comment-url") {
+			if (!repository || !Number.isSafeInteger(issueNumber))
+				return {
+					status: "FAIL",
+					detail:
+						"target repository identity or issue number unavailable; reapproval comment URL cannot be validated",
+				};
+			reference = parseReapprovalReference(revision.reapproval, {
+				...repository,
+				issueNumber,
+			});
+			if (!reference)
+				return {
+					status: "FAIL",
+					detail:
+						"reapproval comment URL does not match the target host, owner, repo, issue, or canonical URL form",
+				};
+		}
+		let referenceTime;
+		if (reference.kind === "comment-url") {
+			const comment = comments.find(
+				(candidate) => candidate.databaseId === reference.numericId,
+			);
+			if (!comment)
+				return {
+					status: "FAIL",
+					detail: "reapproval comment URL could not be resolved",
+				};
+			if (record.id && comment.id === record.id)
+				return {
+					status: "FAIL",
+					detail: "reapproval comment URL cannot reference the record itself",
+				};
+			if (!isValidDesignRecordTimestamp(comment.createdAt))
+				return {
+					status: "FAIL",
+					detail: "resolved reapproval comment has an invalid createdAt",
+				};
+			referenceTime = new Date(comment.createdAt).getTime();
+			evidence.add("url");
+		} else {
+			referenceTime = new Date(reference.timestamp).getTime();
+			evidence.add("dialogue");
+		}
+		if (referenceTime < recordTime || referenceTime > editedTime)
+			return {
+				status: "FAIL",
+				detail: "reapproval timestamp is outside the record edit window",
+			};
+	}
+
+	const details = [];
+	if (evidence.has("url"))
+		details.push(
+			"same-issue comment URL references use server-recorded createdAt timestamps checked against the record edit window",
+		);
+	if (evidence.has("dialogue"))
+		details.push(
+			"dialogue timestamps are self-reported; only format and ordering were checked, and human review must assess whether approval occurred",
+		);
+	return { status: "PASS", detail: details.join("; ") };
 }
 
 const REGEXP_METACHARS = /[.*+?^${}()|[\]\\]/g;
@@ -1137,7 +1365,7 @@ export function classifyDesignRecordRequiredFormat(recordBody, createdAt) {
 		isValidDesignRecordTimestamp(createdAt) &&
 		new Date(createdAt).getTime() >= new Date(DESIGN_RECORD_V3_CUTOFF).getTime()
 	) {
-		const parsed = parseFormat3DesignRecord(body);
+		const parsed = classifyFormat3DesignRecord(body, createdAt);
 		return parsed.status === "PASS"
 			? { status: "PASS" }
 			: { status: "FAIL", detail: parsed.problems.join("; ") };
@@ -1203,16 +1431,17 @@ export function hasNoImplementationDisposition(recordBody) {
  * the branch that closes it, so "posted before the first commit" was true by
  * construction rather than by the record having been written first.
  *
- * A comment entry carries `id` — the GraphQL node id `gh issue view` already
- * returns on every comment — so resolveRecordEditedAt can match the selected
- * record to its GraphQL edit-info node without depending on array order
- * (#737 案2).
- * @param {{body?: string, createdAt?: string, comments?: Array<{id?: string, body?: string, createdAt?: string}>}} issue
- * @returns {Array<{id?: string, body?: string, createdAt?: string}>}
+ * A comment entry carries its GraphQL node id, numeric database id and
+ * canonical URL, so contextual reapproval validation can resolve the selected
+ * comment without depending on array order.
+ * @param {{body?: string, createdAt?: string, comments?: Array<{id?: string, databaseId?: number, url?: string, body?: string, createdAt?: string}>}} issue
+ * @returns {Array<{id?: string, databaseId?: number, url?: string, body?: string, createdAt?: string}>}
  */
 export function toDesignRecordEntries({ comments }) {
 	return (comments ?? []).map((c) => ({
 		id: c.id,
+		...(c.databaseId === undefined ? {} : { databaseId: c.databaseId }),
+		...(c.url === undefined ? {} : { url: c.url }),
 		body: c.body,
 		createdAt: c.createdAt,
 	}));
@@ -1267,7 +1496,11 @@ export function resolveDesignRecord(entries) {
 		}
 		const timestamp = new Date(entry.createdAt).getTime();
 		if (timestamp >= new Date(DESIGN_RECORD_V3_CUTOFF).getTime()) {
-			const parsed = parseFormat3DesignRecord(body);
+			// Selection is structural. Strict vocabulary and cutoff-aware
+			// reapproval failures belong to the selected record's later verdict;
+			// treating them as fragments would let an older complete record hide
+			// the failure.
+			const parsed = parseFormat3DesignRecordStructure(body);
 			if (parsed.status === "PASS") complete[3].push(entry);
 			else invalid.push({ record: entry, problems: parsed.problems });
 			continue;
@@ -1358,7 +1591,7 @@ export function classifyDesignRecordContent(
 		isValidDesignRecordTimestamp(createdAt) &&
 		new Date(createdAt).getTime() >= new Date(DESIGN_RECORD_V3_CUTOFF).getTime()
 	) {
-		const parsed = parseFormat3DesignRecord(body);
+		const parsed = classifyFormat3DesignRecord(body, createdAt);
 		return parsed.status === "PASS"
 			? { status: "PASS" }
 			: { status: "FAIL", detail: parsed.problems.join("; ") };

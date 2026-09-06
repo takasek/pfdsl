@@ -43,6 +43,11 @@ function fakeExec(responses = {}) {
 }
 
 const ROADMAP = ".pfdsl/roadmap.pfdsl";
+const TARGET_REPOSITORY = {
+	host: "github.com",
+	owner: "takasek",
+	repo: "pfdsl",
+};
 
 describe("genPluginIdentityStep", () => {
 	it("skips when no skill, plugin or install-source path changed", () => {
@@ -322,26 +327,26 @@ describe("wipTransitionStep", () => {
 });
 
 describe("fetchDesignRecordEditInfo", () => {
-	it("delegates to githubOps.designRecordEditInfo with the issue number", async () => {
+	it("delegates to githubOps.designRecordEditInfo with the selected comment node ID", async () => {
 		const calls = [];
 		const githubOps = {
 			designRecordEditInfo: async (params) => {
 				calls.push(params);
 				return {
-					issueLastEditedAt: null,
-					comments: {
-						totalCount: 1,
-						nodes: [{ id: "c1", lastEditedAt: null }],
-					},
+					status: "edited",
+					editedAtIso: "2026-07-05T00:00:00Z",
 				};
 			},
 		};
-		const result = await fetchDesignRecordEditInfo({ githubOps, number: 737 });
-		assert.deepEqual(result, {
-			issueLastEditedAt: null,
-			comments: { totalCount: 1, nodes: [{ id: "c1", lastEditedAt: null }] },
+		const result = await fetchDesignRecordEditInfo({
+			githubOps,
+			nodeId: "IC_kwDOCommentNodeId",
 		});
-		assert.deepEqual(calls, [{ number: 737 }]);
+		assert.deepEqual(result, {
+			status: "edited",
+			editedAtIso: "2026-07-05T00:00:00Z",
+		});
+		assert.deepEqual(calls, [{ nodeId: "IC_kwDOCommentNodeId" }]);
 	});
 
 	it("propagates a rejection from githubOps.designRecordEditInfo", async () => {
@@ -351,7 +356,10 @@ describe("fetchDesignRecordEditInfo", () => {
 			},
 		};
 		await assert.rejects(
-			fetchDesignRecordEditInfo({ githubOps, number: 737 }),
+			fetchDesignRecordEditInfo({
+				githubOps,
+				nodeId: "IC_kwDOCommentNodeId",
+			}),
 			/boom/,
 		);
 	});
@@ -785,11 +793,8 @@ describe("designRecordStep", () => {
 				base: "main",
 				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
 				editInfo: {
-					issueLastEditedAt: null,
-					comments: {
-						totalCount: 1,
-						nodes: [{ id: "c1", lastEditedAt: null }],
-					},
+					status: "unedited",
+					editedAtIso: null,
 				},
 			});
 			assert.equal(result.status, "PASS");
@@ -802,11 +807,8 @@ describe("designRecordStep", () => {
 				base: "main",
 				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
 				editInfo: {
-					issueLastEditedAt: null,
-					comments: {
-						totalCount: 1,
-						nodes: [{ id: "c1", lastEditedAt: "2026-07-03T00:00:00Z" }],
-					},
+					status: "edited",
+					editedAtIso: "2026-07-03T00:00:00Z",
 				},
 			});
 			assert.equal(result.status, "FAIL");
@@ -820,11 +822,8 @@ describe("designRecordStep", () => {
 				base: "main",
 				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
 				editInfo: {
-					issueLastEditedAt: null,
-					comments: {
-						totalCount: 1,
-						nodes: [{ id: "c1", lastEditedAt: "2026-07-01T12:00:00Z" }],
-					},
+					status: "edited",
+					editedAtIso: "2026-07-01T12:00:00Z",
 				},
 			});
 			assert.equal(result.status, "PASS");
@@ -842,22 +841,20 @@ describe("designRecordStep", () => {
 			assert.match(result.detail, /unavailable/);
 		});
 
-		it("skips edit detection and notes it when totalCount exceeds the fetched comments", () => {
+		it("treats an unavailable edit lookup as a non-blocking note for legacy records", () => {
 			const { exec } = fakeExec(firstCommit);
 			const result = designRecordStep({
 				exec,
 				base: "main",
 				issue: issue({ body: "普通の説明文。", comments: [recordComment()] }),
 				editInfo: {
-					issueLastEditedAt: null,
-					comments: {
-						totalCount: 101,
-						nodes: [{ id: "c1", lastEditedAt: null }],
-					},
+					status: "unavailable",
+					editedAtIso: null,
+					note: "edit history unavailable",
 				},
 			});
 			assert.equal(result.status, "PASS");
-			assert.match(result.detail, /detection/);
+			assert.match(result.detail, /unavailable/);
 		});
 
 		// #927 removed the body from the candidate list, so there is no longer a
@@ -873,10 +870,7 @@ describe("designRecordStep", () => {
 					body: validRecordBody,
 					createdAt: "2026-07-01T00:00:00Z",
 				}),
-				editInfo: {
-					issueLastEditedAt: "2026-07-03T00:00:00Z",
-					comments: { totalCount: 0, nodes: [] },
-				},
+				editInfo: { status: "edited", editedAtIso: "2026-07-03T00:00:00Z" },
 			});
 			assert.equal(result.status, "FAIL");
 			assert.match(result.detail, /no design-selection record found/);
@@ -1582,15 +1576,100 @@ describe("format 3 designRecordStep", () => {
 				},
 			]),
 			editInfo: {
-				issueLastEditedAt: null,
-				comments: {
-					totalCount: 1,
-					nodes: [{ id: "format3", lastEditedAt: "2026-09-03T00:00:00Z" }],
-				},
+				status: "edited",
+				editedAtIso: "2026-09-03T00:00:00Z",
 			},
 		});
 		assert.equal(result.status, "FAIL");
 		assert.match(result.detail, /edited at 2026-09-03T00:00:00Z/);
+	});
+
+	it("checks a strict reapproval reference in the selected record context", () => {
+		const recordBody = format3Record().replace(
+			"- なし",
+			"- A → B — 変更理由 — 再承認: https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+		);
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-09-05T17:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			number: 1098,
+			issue: issue([
+				{
+					id: "IC_record",
+					body: recordBody,
+					createdAt: "2026-09-05T15:00:00Z",
+					databaseId: 10,
+					url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-10",
+				},
+				{
+					id: "IC_approval",
+					databaseId: 20,
+					url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+					createdAt: "2026-09-05T15:30:00Z",
+				},
+			]),
+			repository: TARGET_REPOSITORY,
+			editInfo: {
+				status: "edited",
+				editedAtIso: "2026-09-05T16:00:00Z",
+			},
+		});
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /server-recorded/);
+	});
+
+	it("passes a grandfathered free-form reapproval through the gate path", () => {
+		const recordBody = format3Record().replace(
+			"- なし",
+			"- A → B — 変更理由 — 再承認: このコメント直前のユーザー承認",
+		);
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-09-05T17:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			number: 1098,
+			issue: issue([
+				{
+					body: recordBody,
+					createdAt: "2026-09-05T14:07:15Z",
+				},
+			]),
+			editInfo: { status: "unavailable", editedAtIso: null },
+		});
+		assert.equal(result.status, "PASS");
+	});
+
+	it("FAILs a revised record when its selected edit time is unavailable", () => {
+		const recordBody = format3Record().replace(
+			"- なし",
+			"- A → B — 変更理由 — 再承認: 対話 2026-09-05T15:30:00Z",
+		);
+		const { exec } = fakeExec({
+			"git log --format=%aI": { out: "2026-09-05T17:00:00Z\n" },
+		});
+		const result = designRecordStep({
+			exec,
+			base: "main",
+			number: 1098,
+			issue: issue([
+				{
+					id: "IC_record",
+					body: recordBody,
+					createdAt: "2026-09-05T15:00:00Z",
+				},
+			]),
+			editInfo: {
+				status: "unavailable",
+				editedAtIso: null,
+			},
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /edit history unavailable/);
 	});
 
 	it("SKIPs timing only when every format 3 decision says not to implement", () => {

@@ -4,11 +4,12 @@
  */
 
 import {
+	classifyDesignRecordReapprovals,
+	classifyFormat3DesignRecord,
 	FORMAT_3_DECISION_KINDS,
 	FORMAT_3_DISPOSITIONS,
 	FORMAT_3_MARKER,
 	normalizeRecordLine,
-	parseFormat3DesignRecord,
 	presentRequiredPrefixes,
 	resolveDesignRecord,
 	resolveDesignRecordRequiredPrefixes,
@@ -279,12 +280,18 @@ export function buildReviewRecordTemplate() {
  * 関わらず全サイクル必須で、`unsettled: false` を「記録不要」と読むのは
  * 誤読になる（#809）。そのため戻り値には `recordRequired` を独立して持たせる
  * — `record-posted` のときだけ false、それ以外は常に true（#868）。
- * @param {{body: string, comments?: Array<{body: string, createdAt?: string}>}} params
+ * @param {{body: string, comments?: Array<{id?: string, databaseId?: number, url?: string, body: string, createdAt?: string}>, issueNumber?: number, repository?: {host?: string, owner?: string, repo?: string}, editInfo?: {status?: string, editedAtIso?: string | null}}} params
  * @returns {{unsettled: boolean, reason: string, matchedLines?: string[], optionCount?: number,
  *            missingPrefixes?: string[], problems?: string[],
- *            record?: {createdAt?: string} | null, recordRequired: boolean}}
+ *            record?: {createdAt?: string} | null, detail?: string, recordRequired: boolean}}
  */
-export function classifyDesignSettlement({ body, comments }) {
+export function classifyDesignSettlement({
+	body,
+	comments,
+	issueNumber,
+	repository,
+	editInfo,
+}) {
 	const phrase = detectDesignUnsettled(body);
 	if (phrase.designUnsettled) {
 		return {
@@ -295,12 +302,29 @@ export function classifyDesignSettlement({ body, comments }) {
 		};
 	}
 
-	const resolved = resolveDesignRecord(toDesignRecordEntries({ comments }));
+	const entries = toDesignRecordEntries({ comments });
+	const resolved = resolveDesignRecord(entries);
 	if (resolved.status === "selected") {
+		const reapproval = classifyDesignRecordReapprovals({
+			record: resolved.record,
+			comments: entries,
+			issueNumber,
+			repository,
+			editInfo,
+		});
+		if (reapproval.status === "FAIL")
+			return {
+				unsettled: true,
+				reason: "record-incomplete",
+				problems: [reapproval.detail],
+				record: { createdAt: resolved.record.createdAt },
+				recordRequired: true,
+			};
 		return {
 			unsettled: false,
 			reason: "record-posted",
 			record: { createdAt: resolved.record.createdAt },
+			...(reapproval.detail ? { detail: reapproval.detail } : {}),
 			recordRequired: false,
 		};
 	}
@@ -312,7 +336,10 @@ export function classifyDesignSettlement({ body, comments }) {
 			recordRequired: true,
 		};
 	if (resolved.status === "invalid") {
-		const parsedFormat3 = parseFormat3DesignRecord(resolved.record.body);
+		const parsedFormat3 = classifyFormat3DesignRecord(
+			resolved.record.body,
+			resolved.record.createdAt,
+		);
 		const isFormat3 = resolved.record.body
 			.split("\n")
 			.some((line) => normalizeRecordLine(line) === FORMAT_3_MARKER);

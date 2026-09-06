@@ -5,6 +5,11 @@ import { reviewRecordStep } from "./gate-check-steps.mjs";
 
 const ROOT = "/repo";
 const CLI_PATH = "/repo/packages/cli/dist/cli.js";
+const TARGET_REPOSITORY = {
+	host: "github.com",
+	owner: "takasek",
+	repo: "pfdsl",
+};
 
 const readyJsonOk = (best) =>
 	JSON.stringify({
@@ -68,6 +73,7 @@ function githubOpsFromExecGh(execGh) {
 					fields.join(","),
 				]),
 			),
+		repository: () => TARGET_REPOSITORY,
 	};
 }
 
@@ -598,6 +604,173 @@ describe("runCycleStatus", () => {
 				[668, true],
 			],
 		);
+	});
+
+	it("fetches revised-record edit info by node ID and exposes evidence detail", async () => {
+		const editCalls = [];
+		const recordBody = [
+			"設計記録形式: 3",
+			"決定:",
+			"- 保存方式（実装）: Aを段階導入する",
+			"理由:",
+			"- 保存方式: 障害範囲を限定できる",
+			"案の処分:",
+			"- 採用 — 元候補「A」— 今回採用する",
+			"前提検査 P1:",
+			"対象: 保存方式 / A",
+			"前提: 保存方式と通知方式を同時に変える必要がある",
+			"前提を外した案: 保存方式だけを段階導入する",
+			"既存候補との差分: 元候補は両方式を一組としていた",
+			"検査案の処分 P1: 採用 — 今回の決定に含める",
+			"改訂履歴:",
+			"- A → B — 変更理由 — 再承認: https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+		].join("\n");
+		const comments = [
+			{
+				id: "IC_record",
+				databaseId: 10,
+				body: recordBody,
+				createdAt: "2026-09-05T15:00:00Z",
+				url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-10",
+			},
+			{
+				id: "IC_approval",
+				databaseId: 20,
+				createdAt: "2026-09-05T15:30:00Z",
+				url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+			},
+		];
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [1098],
+				githubOps: {
+					listOpenPrs: async () => [],
+					repository: () => TARGET_REPOSITORY,
+					viewIssue: async () => ({
+						body: "普通の説明文。",
+						comments,
+						labels: [],
+					}),
+					designRecordEditInfo: async (params) => {
+						editCalls.push(params);
+						return {
+							status: "edited",
+							editedAtIso: "2026-09-05T16:00:00Z",
+						};
+					},
+				},
+			}),
+		);
+		assert.deepEqual(editCalls, [{ nodeId: "IC_record" }]);
+		assert.equal(result.designUnsettledFor[0].unsettled, false);
+		assert.equal(result.designUnsettledFor[0].reason, "record-posted");
+		assert.match(result.designUnsettledFor[0].detail, /server-recorded/);
+	});
+
+	it("resolves a selected record's edit time when the issue has more than 100 comments", async () => {
+		const editCalls = [];
+		const recordBody = [
+			"設計記録形式: 3",
+			"決定:",
+			"- 保存方式（実装）: Aを段階導入する",
+			"理由:",
+			"- 保存方式: 障害範囲を限定できる",
+			"案の処分:",
+			"- 採用 — 元候補「A」— 今回採用する",
+			"前提検査 P1:",
+			"対象: 保存方式 / A",
+			"前提: 保存方式と通知方式を同時に変える必要がある",
+			"前提を外した案: 保存方式だけを段階導入する",
+			"既存候補との差分: 元候補は両方式を一組としていた",
+			"検査案の処分 P1: 採用 — 今回の決定に含める",
+			"改訂履歴:",
+			"- A → B — 変更理由 — 再承認: https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+		].join("\n");
+		const comments = [
+			{
+				id: "IC_record",
+				databaseId: 10,
+				body: recordBody,
+				createdAt: "2026-09-05T15:00:00Z",
+				url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-10",
+			},
+			{
+				id: "IC_approval",
+				databaseId: 20,
+				createdAt: "2026-09-05T15:30:00Z",
+				url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
+			},
+			...Array.from({ length: 99 }, (_, index) => ({
+				id: `IC_noise_${index}`,
+				body: "通常のコメント。",
+				createdAt: "2026-09-05T15:31:00Z",
+			})),
+		];
+		assert.equal(comments.length, 101);
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [1098],
+				githubOps: {
+					listOpenPrs: async () => [],
+					repository: () => TARGET_REPOSITORY,
+					viewIssue: async () => ({
+						body: "普通の説明文。",
+						comments,
+						labels: [],
+					}),
+					designRecordEditInfo: async (params) => {
+						editCalls.push(params);
+						return {
+							status: "edited",
+							editedAtIso: "2026-09-05T16:00:00Z",
+						};
+					},
+				},
+			}),
+		);
+		assert.deepEqual(editCalls, [{ nodeId: "IC_record" }]);
+		assert.equal(result.designUnsettledFor[0].unsettled, false);
+	});
+
+	it("keeps a grandfathered free-form format 3 record settled through the step", async () => {
+		const recordBody = [
+			"設計記録形式: 3",
+			"決定:",
+			"- 保存方式（実装）: Aを段階導入する",
+			"理由:",
+			"- 保存方式: 障害範囲を限定できる",
+			"案の処分:",
+			"- 採用 — 元候補「A」— 今回採用する",
+			"前提検査 P1:",
+			"対象: 保存方式 / A",
+			"前提: 保存方式と通知方式を同時に変える必要がある",
+			"前提を外した案: 保存方式だけを段階導入する",
+			"既存候補との差分: 元候補は両方式を一組としていた",
+			"検査案の処分 P1: 採用 — 今回の決定に含める",
+			"改訂履歴:",
+			"- A → B — 変更理由 — 再承認: このコメント直前のユーザー承認",
+		].join("\n");
+		const result = await runCycleStatus(
+			baseDeps({
+				issueNumbers: [1098],
+				githubOps: {
+					listOpenPrs: async () => [],
+					viewIssue: async () => ({
+						body: "普通の説明文。",
+						comments: [
+							{
+								id: "IC_record",
+								body: recordBody,
+								createdAt: "2026-09-05T14:07:15Z",
+							},
+						],
+						labels: [],
+					}),
+				},
+			}),
+		);
+		assert.equal(result.designUnsettledFor[0].unsettled, false);
+		assert.equal(result.designUnsettledFor[0].reason, "record-posted");
 	});
 
 	it("keeps the issues it could read when one lookup throws", async () => {

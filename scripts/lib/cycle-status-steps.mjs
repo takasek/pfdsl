@@ -30,6 +30,11 @@ import {
 	parseReadyOutput,
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
+import {
+	classifyFormat3DesignRecord,
+	resolveDesignRecord,
+	toDesignRecordEntries,
+} from "./gate-check.mjs";
 import { loadPatternCatalog, PATTERN_DIR_RELATIVE } from "./retro-patterns.mjs";
 
 /**
@@ -45,7 +50,7 @@ export function cycleStatusExitCode(result) {
  * @param {{
  *   sh: (file: string, args: string[]) => string,
  *   shTry: (file: string, args: string[]) => {ok: boolean, out: string, status: number|null},
- *   githubOps: {listOpenPrs: () => Promise<any[]>, viewIssue: (params: {number: number, fields: string[]}) => Promise<any>},
+ *   githubOps: {listOpenPrs: () => Promise<any[]>, viewIssue: (params: {number: number, fields: string[]}) => Promise<any>, repository?: () => {host: string, owner: string, repo: string}, designRecordEditInfo?: (params: {nodeId: string}) => Promise<any>},
  *   existsSync: (path: string) => boolean,
  *   readFileSync: (path: string, encoding: string) => string,
  *   readdirSync: (path: string) => string[],
@@ -259,6 +264,13 @@ export async function runCycleStatus({
 	const labelsByIssue = new Map();
 
 	if (targetIssues.length > 0) {
+		let repository;
+		try {
+			repository = githubOps.repository?.();
+		} catch {
+			// URL-shaped reapproval references fail closed when the target identity
+			// cannot be derived from the worktree remote.
+		}
 		for (const targetIssue of targetIssues) {
 			try {
 				const issueJson = await githubOps.viewIssue({
@@ -271,10 +283,44 @@ export async function runCycleStatus({
 				);
 				const optionCount = detectEnumeratedOptions(issueJson.body).count;
 				recordOptionCount = Math.max(recordOptionCount, optionCount);
+				const entries = toDesignRecordEntries(issueJson);
+				const resolved = resolveDesignRecord(entries);
+				let editInfo;
+				if (resolved.status === "selected") {
+					const parsedFormat3 = classifyFormat3DesignRecord(
+						resolved.record.body,
+						resolved.record.createdAt,
+					);
+					if (
+						parsedFormat3.status === "PASS" &&
+						parsedFormat3.revisions.length > 0
+					) {
+						if (
+							resolved.record.id &&
+							typeof githubOps.designRecordEditInfo === "function"
+						) {
+							editInfo = await githubOps
+								.designRecordEditInfo({ nodeId: resolved.record.id })
+								.catch(() => ({
+									status: "unavailable",
+									editedAtIso: null,
+									note: "edit history unavailable",
+								}));
+						} else {
+							editInfo = {
+								status: "unavailable",
+								editedAtIso: null,
+								note: "edit history unavailable",
+							};
+						}
+					}
+				}
 				const classification = classifyDesignSettlement({
 					body: issueJson.body,
-					createdAt: issueJson.createdAt,
 					comments: issueJson.comments,
+					issueNumber: targetIssue,
+					repository,
+					editInfo,
 				});
 				designUnsettledFor.push({
 					issue: targetIssue,
@@ -290,6 +336,7 @@ export async function runCycleStatus({
 					...(classification.problems
 						? { problems: classification.problems }
 						: {}),
+					...(classification.detail ? { detail: classification.detail } : {}),
 					record: classification.record ?? null,
 					recordRequired: classification.recordRequired,
 				});
