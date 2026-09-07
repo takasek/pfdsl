@@ -56,6 +56,32 @@ describe("pruneGitIgnoredFixtureEntries", () => {
 		}
 	});
 
+	for (const name of [
+		"日本語.tmp",
+		"line\nbreak.tmp",
+		'quote".tmp',
+		"space name.tmp",
+	]) {
+		it(`prunes ignored paths without corrupting ${JSON.stringify(name)}`, () => {
+			const sourceRoot = makeSourceRepo({ gitignore: "*.tmp\n" });
+			const consumerRoot = mkdtempSync(join(tmpdir(), "prune-path-encoding-"));
+			try {
+				const copiedRoot = join(consumerRoot, ".claude");
+				mkdirSync(copiedRoot);
+				writeFileSync(join(copiedRoot, name), "ignored");
+				writeFileSync(join(copiedRoot, "keep.json"), "{}");
+				pruneGitIgnoredFixtureEntries(sourceRoot, [
+					{ sourceRelative: ".claude", consumerPath: copiedRoot },
+				]);
+				assert.equal(existsSync(join(copiedRoot, name)), false);
+				assert.equal(existsSync(join(copiedRoot, "keep.json")), true);
+			} finally {
+				rmSync(sourceRoot, { recursive: true, force: true });
+				rmSync(consumerRoot, { recursive: true, force: true });
+			}
+		});
+	}
+
 	it("removes an ignored directory as a whole, not just the files inside it", () => {
 		const sourceRoot = makeSourceRepo({ gitignore: "dist/\n" });
 		const consumerRoot = mkdtempSync(

@@ -15,7 +15,7 @@ import {
 	LOCAL_CLAUDE_ROOT_ENTRIES,
 	SKILL_EXCLUSIONS,
 } from "./harness-inventory.mjs";
-import { tryGit } from "./run-exec.mjs";
+import { splitNulSeparated, tryGit } from "./run-exec.mjs";
 
 /**
  * Collect every path under `consumerPath` (a fixture directory copied from
@@ -105,9 +105,9 @@ export function pruneGitIgnoredFixtureEntries(sourceRoot, mappings) {
 		collectFixtureEntries(consumerPath, sourceRelative, entries, ownedRoots);
 	}
 	if (entries.length === 0) return;
-	const result = tryGit(["check-ignore", "--stdin"], {
+	const result = tryGit(["check-ignore", "--stdin", "-z"], {
 		cwd: sourceRoot,
-		input: entries.map((entry) => entry.queryPath).join("\n"),
+		input: `${entries.map((entry) => entry.queryPath).join("\0")}\0`,
 	});
 	// `check-ignore` exits 1 when none of the paths are ignored — that is a
 	// normal result, not a failure, and its stdout is empty. `tryRun` fills
@@ -119,7 +119,7 @@ export function pruneGitIgnoredFixtureEntries(sourceRoot, mappings) {
 		throw new Error(`git check-ignore failed: ${result.out}`);
 	}
 	const ignored = new Set(
-		result.status === 1 ? [] : result.out.split("\n").filter(Boolean),
+		result.status === 1 ? [] : splitNulSeparated(result.out),
 	);
 	// Directories are entries too (see collectFixtureEntries): removing one
 	// recursively also disposes of any of its already-collected children, so
