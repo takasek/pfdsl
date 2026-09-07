@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseArgs as parseNodeArgs } from "node:util";
 import {
 	analyze,
 	auditGraph,
@@ -58,6 +59,204 @@ export interface CommandResult {
 	exitCode: number;
 	binaryOutput?: Buffer;
 }
+
+type OptionSpec = {
+	type: "boolean" | "string";
+	multiple?: true;
+	placeholder?: string;
+	required?: true;
+};
+
+const BOOLEAN_OPTION = { type: "boolean" } as const;
+const COMMON_OPTIONS: Record<string, OptionSpec> = {
+	help: BOOLEAN_OPTION,
+};
+const NO_OPTIONS: Record<string, OptionSpec> = {};
+
+function formatSynopsisFlag(name: string, spec: OptionSpec): string {
+	if (spec.type === "boolean")
+		return spec.required ? `--${name}` : `[--${name}]`;
+	const placeholder = spec.placeholder ?? name;
+	const value = placeholder.includes("|") ? placeholder : `<${placeholder}>`;
+	const option = `--${name} ${value}`;
+	return spec.required ? option : `[${option}]`;
+}
+
+function formatSynopsisFlags(
+	options: Record<string, OptionSpec>,
+	positionalSuffix = "",
+): string {
+	const entries = Object.entries(options).map(([name, spec]) =>
+		formatSynopsisFlag(name, spec),
+	);
+	if (positionalSuffix) {
+		const outputOptionIndex = Object.keys(options).findIndex(
+			(name) => name === "json" || name === "no-color",
+		);
+		entries.splice(
+			outputOptionIndex === -1 ? entries.length : outputOptionIndex,
+			0,
+			positionalSuffix,
+		);
+	}
+	return entries.length > 0 ? ` ${entries.join(" ")}` : "";
+}
+
+function commandSynopsis(
+	path: string,
+	positional: string,
+	options: Record<string, OptionSpec>,
+	positionalSuffix = "",
+): string {
+	const parts = [
+		path,
+		positional,
+		formatSynopsisFlags(options, positionalSuffix),
+	]
+		.map((part) => part.trim())
+		.filter((part) => part.length > 0);
+	return parts.join(" ");
+}
+
+function helpUsage(
+	path: string,
+	positional: string,
+	options: Record<string, OptionSpec>,
+	positionalSuffix = "",
+): string {
+	return `usage: pfdsl ${commandSynopsis(path, positional, options, positionalSuffix)}`;
+}
+
+const GRAPH_SUMMARY_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_IO_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_STATS_OPTIONS = {
+	limit: { type: "string", multiple: true, placeholder: "n" },
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const GRAPH_NEIGHBORS_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_LOCATE_OPTIONS = {
+	field: { type: "string", multiple: true, placeholder: "name[,name...]" },
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const GRAPH_DESCRIBE_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_IMPACT_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_DEPENDS_ON_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_PATH_OPTIONS = {
+	limit: { type: "string", multiple: true, placeholder: "n" },
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const GRAPH_EDGES_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const GRAPH_ORPHANS_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+
+const META_GET_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_LIST_OPTIONS = {
+	tag: { type: "string", multiple: true, placeholder: "t[,t...]" },
+	group: { type: "string", multiple: true, placeholder: "g" },
+	producer: { type: "string", multiple: true, placeholder: "p" },
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const META_VALUES_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_SET_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_SORT_OPTIONS = {
+	by: { type: "string", multiple: true, placeholder: "keys", required: true },
+	write: BOOLEAN_OPTION,
+	check: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const META_REINDEX_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	check: BOOLEAN_OPTION,
+	renumber: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const META_CHECK_LINKS_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+
+const STATUS_READY_OPTIONS = {
+	best: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const STATUS_BLOCKED_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const STATUS_LIST_OPTIONS = {
+	status: {
+		type: "string",
+		multiple: true,
+		placeholder: "status[,status...]",
+		required: true,
+	},
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const STATUS_GAPS_OPTIONS = {
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+
+const CHECK_OPTIONS = {
+	strict: BOOLEAN_OPTION,
+	hints: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const EXPLAIN_OPTIONS = NO_OPTIONS;
+const FMT_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	check: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const RENDER_OPTIONS = {
+	format: { type: "string", multiple: true, placeholder: "dot|svg|pdf|png" },
+	"no-color": BOOLEAN_OPTION,
+} as const;
+const DIFF_OPTIONS = {
+	format: { type: "string", multiple: true, placeholder: "text|dot|svg" },
+	json: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+} as const;
 
 function ok(stdout = "", stderr = ""): CommandResult {
 	return { stdout, stderr, exitCode: 0 };
@@ -2454,7 +2653,7 @@ export async function runDiff(
 
 declare const __PFDSL_VERSION__: string;
 
-const HELP_CHECK = `usage: pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]
+const HELP_CHECK = `${helpUsage("check", "<file|->", CHECK_OPTIONS)}
 
 Validate a .pfdsl file. Use - to read from stdin.
 
@@ -2468,7 +2667,11 @@ For topology queries (terminal artifacts, external inputs, counts) see
 \`pfdsl graph io\` and \`pfdsl graph summary\`.
 `;
 
-const HELP_GRAPH_SUMMARY = `usage: pfdsl graph summary <file|-> [--json] [--no-color]
+const HELP_GRAPH_SUMMARY = `${helpUsage(
+	"graph summary",
+	"<file|->",
+	GRAPH_SUMMARY_OPTIONS,
+)}
 
 Print aggregate counts for the graph: artifacts, processes, primary edges,
 external inputs, and terminal artifacts. Use - to read from stdin.
@@ -2483,7 +2686,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_GRAPH_IO = `usage: pfdsl graph io <file|-> [--json] [--no-color]
+const HELP_GRAPH_IO = `${helpUsage("graph io", "<file|->", GRAPH_IO_OPTIONS)}
 
 Print the graph's boundary: external inputs (artifacts consumed but never
 produced — where the flow starts) and terminal artifacts (produced but never
@@ -2504,7 +2707,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_FMT = `usage: pfdsl fmt <file|-> [--write] [--check] [--no-color]
+const HELP_FMT = `${helpUsage("fmt", "<file|->", FMT_OPTIONS)}
 
 Format a .pfdsl file, grouping each process with its inputs and outputs.
 Use - to read from stdin (--write not allowed with stdin; --check is allowed).
@@ -2516,7 +2719,11 @@ Options:
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_REINDEX = `usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json] [--no-color]
+const HELP_REINDEX = `${helpUsage(
+	"meta reindex",
+	"<file|->",
+	META_REINDEX_OPTIONS,
+)}
 
 Assign integer index: values to nodes in topological order. Processes and
 artifacts are numbered with independent counters. Use - to read from stdin.
@@ -2536,7 +2743,7 @@ Options:
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_SORT = `usage: pfdsl meta sort <file|-> --by <keys> [--write] [--check] [--no-color]
+const HELP_SORT = `${helpUsage("meta sort", "<file|->", META_SORT_OPTIONS)}
 
 Sort artifact and process node definitions within each frontmatter section.
 Each section is sorted independently. Use - to read from stdin.
@@ -2549,7 +2756,7 @@ Options:
   --no-color    disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_GRAPH_EDGES = `usage: pfdsl graph edges <file|-> [--json] [--no-color]
+const HELP_GRAPH_EDGES = `${helpUsage("graph edges", "<file|->", GRAPH_EDGES_OPTIONS)}
 
 Print canonical edge list. Use - to read from stdin.
 
@@ -2559,7 +2766,7 @@ Options:
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_RENDER = `usage: pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]
+const HELP_RENDER = `${helpUsage("render", "<file|->", RENDER_OPTIONS)}
 
 Print a Graphviz representation. Use - to read from stdin.
 
@@ -2574,7 +2781,7 @@ puppeteer is only needed for --format pdf and png, and must live in the same Nod
 Under a version manager (nvm/nodenv/volta), a mismatched Node version's global install is not resolved — e.g. \`nodenv exec npm install -g puppeteer\`.
 `;
 
-const HELP_DIFF = `usage: pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]
+const HELP_DIFF = `${helpUsage("diff", "<a> <b>", DIFF_OPTIONS)}
 
 Show structural differences between two .pfdsl files. Either side may be -
 to read from stdin, e.g. \`git show HEAD:f.pfdsl | pfdsl diff - f.pfdsl\`.
@@ -2590,7 +2797,7 @@ Options:
   --no-color     disable ANSI color codes for diagnostics (also: NO_COLOR env var)
 `;
 
-const HELP_READY = `usage: pfdsl status ready <file|-> [--best] [--json] [--no-color]
+const HELP_READY = `${helpUsage("status ready", "<file|->", STATUS_READY_OPTIONS)}
 
 List processes whose every input artifact has status: done (or no status set).
 Only applies to roadmap files (type: roadmap). Use - to read from stdin.
@@ -2604,7 +2811,7 @@ Options:
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
-const HELP_STATUS_LIST = `usage: pfdsl status list <file|-> --status <status[,status...]> [--json] [--no-color]
+const HELP_STATUS_LIST = `${helpUsage("status list", "<file|->", STATUS_LIST_OPTIONS)}
 
 List artifacts whose status matches one of the given values. Use - to read
 from stdin.
@@ -2621,7 +2828,11 @@ Exit codes:
   2  invalid usage (missing/unknown --status)
 `;
 
-const HELP_STATUS_BLOCKED = `usage: pfdsl status blocked <file|-> [--json] [--no-color]
+const HELP_STATUS_BLOCKED = `${helpUsage(
+	"status blocked",
+	"<file|->",
+	STATUS_BLOCKED_OPTIONS,
+)}
 
 List processes that are not ready: for each, the input artifacts whose
 status is not done (or unset). Only applies to roadmap files (type:
@@ -2638,7 +2849,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_META_SET = `usage: pfdsl meta set <file> <id[,id...]> <field> <value> [--json] [--no-color]
+const HELP_META_SET = `${helpUsage("meta set", "<file> <id[,id...]> <field> <value>", META_SET_OPTIONS)}
 
 Set a scalar frontmatter field on one or more nodes, rewriting the file in
 place. The frontmatter is re-emitted in canonical form, except that a folded
@@ -2672,7 +2883,7 @@ Exit codes:
   2  invalid usage (missing argument, invalid field or value)
 `;
 
-const HELP_CHECK_LINKS = `usage: pfdsl meta check-links <file> [--json] [--no-color]
+const HELP_CHECK_LINKS = `${helpUsage("meta check-links", "<file>", META_CHECK_LINKS_OPTIONS)}
 
 Verify that every artifact/process \`location:\` file path exists on disk
 (dead-link detection). Each location element is classified per spec §15.8:
@@ -2692,7 +2903,7 @@ Exit codes:
   2  invalid usage (stdin)
 `;
 
-const HELP_GET = `usage: pfdsl meta get <file|-> <id[,id...]> [field[,field...]] [--json] [--no-color]
+const HELP_GET = `${helpUsage("meta get", "<file|-> <id[,id...]> [field[,field...]]", META_GET_OPTIONS)}
 
 Print field values for one or more artifact/process/group ids.
 
@@ -2743,7 +2954,12 @@ Exit codes:
   2  invalid usage (missing id, or too many positional arguments)
 `;
 
-const HELP_META_LIST = `usage: pfdsl meta list <file|-> [--tag <t[,t...]>] [--group <g>] [--producer <p>] [field[,field...]] [--json] [--no-color]
+const HELP_META_LIST = `${helpUsage(
+	"meta list",
+	"<file|->",
+	META_LIST_OPTIONS,
+	"[field[,field...]]",
+)}
 
 Print field values for every artifact/process node matching the given
 selectors — a supply-side counterpart to \`meta get\`'s explicit id list.
@@ -2788,7 +3004,11 @@ Exit codes:
   2  invalid usage (no selector given, or an empty field positional)
 `;
 
-const HELP_META_VALUES = `usage: pfdsl meta values <file|-> <field[,field...]> [--json] [--no-color]
+const HELP_META_VALUES = `${helpUsage(
+	"meta values",
+	"<file|-> <field[,field...]>",
+	META_VALUES_OPTIONS,
+)}
 
 Print the vocabulary of a field: every value in use across the file's nodes,
 with the number of nodes using it. Answers "which values can I pass to
@@ -2825,7 +3045,7 @@ Exit codes:
   2  invalid usage (missing or empty field argument)
 `;
 
-const HELP_NEIGHBORS = `usage: pfdsl graph neighbors <file|-> <id> [--json] [--no-color]
+const HELP_NEIGHBORS = `${helpUsage("graph neighbors", "<file|-> <id>", GRAPH_NEIGHBORS_OPTIONS)}
 
 Print the direct predecessors (in-edges) and successors (out-edges) of a
 node — its immediate producer(s)/consumer(s) only, not the full closure.
@@ -2852,7 +3072,11 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_GRAPH_LOCATE = `usage: pfdsl graph locate <file|-> <id> [--field <name[,name...]>] [--json] [--no-color]
+const HELP_GRAPH_LOCATE = `${helpUsage(
+	"graph locate",
+	"<file|-> <id>",
+	GRAPH_LOCATE_OPTIONS,
+)}
 
 Print every place <id> appears in the file: its frontmatter declaration key
 line (\`declaration\`), and every body line naming it (\`edge\`) — whether in
@@ -2885,7 +3109,11 @@ Exit codes:
   2  invalid usage (missing id, or --field given with no value)
 `;
 
-const HELP_GRAPH_DESCRIBE = `usage: pfdsl graph describe <file|-> <id> [--json] [--no-color]
+const HELP_GRAPH_DESCRIBE = `${helpUsage(
+	"graph describe",
+	"<file|-> <id>",
+	GRAPH_DESCRIBE_OPTIONS,
+)}
 
 Print a single node's full picture in one call: its kind (artifact/process/
 group), every frontmatter field (same rendering as \`meta get\`/\`meta list\`),
@@ -2914,7 +3142,7 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_IMPACT = `usage: pfdsl graph impact <file|-> <id> [--json] [--no-color]
+const HELP_IMPACT = `${helpUsage("graph impact", "<file|-> <id>", GRAPH_IMPACT_OPTIONS)}
 
 Print the full downstream closure reachable from <id> via primary edges
 (everything <id> unblocks, transitively), excluding <id> itself. Text mode
@@ -2930,7 +3158,11 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_DEPENDS_ON = `usage: pfdsl graph depends-on <file|-> <id> [--json] [--no-color]
+const HELP_DEPENDS_ON = `${helpUsage(
+	"graph depends-on",
+	"<file|-> <id>",
+	GRAPH_DEPENDS_ON_OPTIONS,
+)}
 
 Print the full upstream closure <id> depends on via primary edges
 (everything that must exist for <id> to exist), excluding <id> itself. Text
@@ -2946,7 +3178,7 @@ Exit codes:
   2  invalid usage (missing id)
 `;
 
-const HELP_PATH = `usage: pfdsl graph path <file|-> <from> <to> [--limit <n>] [--json] [--no-color]
+const HELP_PATH = `${helpUsage("graph path", "<file|-> <from> <to>", GRAPH_PATH_OPTIONS)}
 
 Print all simple paths from <from> to <to> via primary edges (empty if
 none exist). Answers "is <from> a prerequisite of <to>, and how". Text mode
@@ -2964,7 +3196,7 @@ Exit codes:
   2  invalid usage (missing from/to, or invalid --limit)
 `;
 
-const HELP_STATS = `usage: pfdsl graph stats <file|-> [--limit <n>] [--json] [--no-color]
+const HELP_STATS = `${helpUsage("graph stats", "<file|->", GRAPH_STATS_OPTIONS)}
 
 Print fan-in/fan-out per node, ranked by total degree descending (hubs
 first) then id ascending.
@@ -2992,7 +3224,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_GRAPH_ORPHANS = `usage: pfdsl graph orphans <file|-> [--json] [--no-color]
+const HELP_GRAPH_ORPHANS = `${helpUsage("graph orphans", "<file|->", GRAPH_ORPHANS_OPTIONS)}
 
 Print nodes wired to nothing — no primary edge and no \`>>?\` feedback edge,
 so fully disconnected from the graph. Groups are containers that never
@@ -3010,7 +3242,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_STATUS_GAPS = `usage: pfdsl status gaps <roadmap> <flow> [<flow>...] [--json] [--no-color]
+const HELP_STATUS_GAPS = `${helpUsage("status gaps", "<roadmap> <flow> [<flow>...]", STATUS_GAPS_OPTIONS)}
 
 Cross-check roadmap-tracked artifacts in workflow/pipeline files against
 the roadmap. Reports flow artifacts whose tags include roadmap-tracked and that
@@ -3038,7 +3270,7 @@ Exit codes:
   2  invalid usage
 `;
 
-const HELP_EXPLAIN = `usage: pfdsl explain <code>
+const HELP_EXPLAIN = `${helpUsage("explain", "<code>", EXPLAIN_OPTIONS)}
 
 Print the one-line summary and spec section for a diagnostic code (e.g. V021).
 Codes come from the FM/L/N/P/V/W families reported by \`pfdsl check\`.
@@ -3081,34 +3313,153 @@ export interface CliArgs {
 	flags: Record<string, string | boolean>;
 }
 
-export function parseArgs(argv: readonly string[]): CliArgs {
-	const [command = "help", ...rest] = argv;
-	const positional: string[] = [];
+function normalizeValues(
+	values: Record<string, string | string[] | boolean | undefined>,
+): Record<string, string | boolean> {
 	const flags: Record<string, string | boolean> = {};
-	for (let i = 0; i < rest.length; i++) {
-		const a = rest[i]!;
-		if (a.startsWith("--")) {
-			const key = a.slice(2);
-			const next = rest[i + 1];
-			if (next !== undefined && !next.startsWith("--")) {
-				const prev = flags[key];
-				// Repeated string flag: join with comma so --by a --by b ≡ --by a,b
-				flags[key] = typeof prev === "string" ? `${prev},${next}` : next;
-				i++;
-			} else {
-				flags[key] = true;
+	for (const [key, value] of Object.entries(values)) {
+		if (value === undefined) continue;
+		flags[key] = Array.isArray(value) ? value.join(",") : value;
+	}
+	return flags;
+}
+
+function parseNodeParseArgs(
+	args: readonly string[],
+	options: Record<string, OptionSpec>,
+	strict: boolean,
+): Omit<CliArgs, "command"> {
+	const { positionals, values } = parseNodeArgs({
+		args: [...args],
+		options,
+		allowPositionals: true,
+		strict,
+	});
+	return {
+		positional: positionals,
+		flags: normalizeValues(
+			values as Record<string, string | string[] | boolean | undefined>,
+		),
+	};
+}
+
+function parseFallbackArgs(args: readonly string[]): Omit<CliArgs, "command"> {
+	return parseNodeParseArgs(args, COMMON_OPTIONS, false);
+}
+
+function parseStrictArgs(
+	args: readonly string[],
+	options: Record<string, OptionSpec>,
+): Omit<CliArgs, "command"> {
+	return parseNodeParseArgs(args, { ...COMMON_OPTIONS, ...options }, true);
+}
+
+function extractParseArgsOption(message: string): string | undefined {
+	const unknownOption = /^Unknown option '([^']+)'/.exec(message);
+	if (unknownOption) {
+		const option = unknownOption[1];
+		if (typeof option === "string") return option;
+	}
+	const option = /^Option '([^']+)'/.exec(message);
+	if (!option) return undefined;
+	const value = option[1];
+	if (typeof value !== "string") return undefined;
+	return value.replace(/[ <].*$/, "");
+}
+
+function hasRemovedFmtMode(argv: readonly string[]): boolean {
+	if (argv[0] !== "fmt") return false;
+	return argv
+		.slice(1)
+		.some((arg) => arg === "--mode" || arg.startsWith("--mode="));
+}
+
+function parseArgsErrorResult(
+	error: unknown,
+	context: { label: string; help: string },
+): CommandResult {
+	if (error && typeof error === "object") {
+		const message =
+			"message" in error ? String((error as { message: string }).message) : "";
+		const code =
+			"code" in error ? String((error as { code: string }).code) : "";
+		// The option name still comes from the error message on a best-effort basis; if that parse fails, we fall back to invalid usage.
+		switch (code) {
+			case "ERR_PARSE_ARGS_UNKNOWN_OPTION": {
+				const option = extractParseArgsOption(message);
+				if (option) {
+					return fail(
+						`${context.label}: unknown option ${option}\n${context.help}`,
+						2,
+					);
+				}
+				return fail(
+					`${context.label}: invalid option usage\n${context.help}`,
+					2,
+				);
 			}
-		} else {
-			positional.push(a);
+			case "ERR_PARSE_ARGS_INVALID_OPTION_VALUE":
+			case "ERR_PARSE_ARGS_MISSING_OPTION_VALUE": {
+				const option = extractParseArgsOption(message);
+				if (option) {
+					return fail(
+						`${context.label}: option ${option} requires a value\n${context.help}`,
+						2,
+					);
+				}
+				return fail(
+					`${context.label}: invalid option usage\n${context.help}`,
+					2,
+				);
+			}
+			default:
+				return fail(
+					`${context.label}: invalid option usage\n${context.help}`,
+					2,
+				);
 		}
 	}
-	return { command, positional, flags };
+	throw error;
+}
+
+export function parseArgs(argv: readonly string[]): CliArgs {
+	const [command = "help", ...rest] = argv;
+	if (VERSION_WORDS.has(command) || HELP_WORDS.has(command)) {
+		const parsed = parseStrictArgs(rest, NO_OPTIONS);
+		return { command, positional: parsed.positional, flags: parsed.flags };
+	}
+	const group = COMMAND_GROUPS.find((g) => g.name === command);
+	if (group) {
+		const subcommand = rest[0];
+		if (subcommand !== undefined && !subcommand.startsWith("-")) {
+			const entry = group.commands.find((c) => c.name === subcommand);
+			if (entry) {
+				const parsed = parseStrictArgs(rest.slice(1), entry.options);
+				return {
+					command,
+					positional: [subcommand, ...parsed.positional],
+					flags: parsed.flags,
+				};
+			}
+		}
+		const parsed = parseStrictArgs(rest, NO_OPTIONS);
+		return { command, positional: parsed.positional, flags: parsed.flags };
+	}
+	const entry = TOP_LEVEL_COMMANDS.find((c) => c.name === command);
+	if (!entry) {
+		const parsed = parseFallbackArgs(rest);
+		return { command, positional: parsed.positional, flags: parsed.flags };
+	}
+	const parsed = parseStrictArgs(rest, entry.options);
+	return { command, positional: parsed.positional, flags: parsed.flags };
 }
 
 /**
  * Parse the optional --limit flag shared by graph path/stats: undefined when
- * absent, the parsed non-negative integer, or a usage-error CommandResult
- * (including a bare --limit with no value, which parseArgs yields as `true`).
+ * absent, the parsed non-negative integer, or a usage-error CommandResult when
+ * the value is not a non-negative integer. A bare --limit with no value no
+ * longer arrives here — the strict parse rejects it before dispatch (#1050) —
+ * so the `true` case remains only for callers that build `flags` themselves.
  */
 function parseLimitFlag(
 	flags: Record<string, string | boolean>,
@@ -3144,6 +3495,7 @@ interface CommandEntry {
 	synopsis: string;
 	description: readonly string[];
 	help: string;
+	options: Record<string, OptionSpec>;
 	run: (
 		positional: string[],
 		flags: Record<string, string | boolean>,
@@ -3205,6 +3557,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "summary <file|->",
 		description: ["Print artifact/process/edge counts"],
 		help: HELP_GRAPH_SUMMARY,
+		options: GRAPH_SUMMARY_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_SUMMARY, 2);
@@ -3219,6 +3572,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "io <file|->",
 		description: ["Print external inputs and terminal artifacts"],
 		help: HELP_GRAPH_IO,
+		options: GRAPH_IO_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_IO, 2);
@@ -3233,6 +3587,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "stats <file|-> [--limit]",
 		description: ["Rank nodes by primary degree, feedback degree apart"],
 		help: HELP_STATS,
+		options: GRAPH_STATS_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_STATS, 2);
@@ -3252,6 +3607,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 			"Direct predecessors/successors of a node, feedback included",
 		],
 		help: HELP_NEIGHBORS,
+		options: GRAPH_NEIGHBORS_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_NEIGHBORS, 2);
@@ -3266,6 +3622,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "locate <file|-> <id>",
 		description: ["Frontmatter declaration line and body edge lines of a node"],
 		help: HELP_GRAPH_LOCATE,
+		options: GRAPH_LOCATE_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_GRAPH_LOCATE, 2);
@@ -3285,6 +3642,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 			"Kind, fields, neighbors, and locate lines of a node, in one call",
 		],
 		help: HELP_GRAPH_DESCRIBE,
+		options: GRAPH_DESCRIBE_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_GRAPH_DESCRIBE, 2);
@@ -3299,6 +3657,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "impact <file|-> <id>",
 		description: ["Full downstream closure of a node"],
 		help: HELP_IMPACT,
+		options: GRAPH_IMPACT_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_IMPACT, 2);
@@ -3313,6 +3672,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "depends-on <file|-> <id>",
 		description: ["Full upstream closure of a node"],
 		help: HELP_DEPENDS_ON,
+		options: GRAPH_DEPENDS_ON_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id] = rest;
 			if (!f || !id) return fail(HELP_DEPENDS_ON, 2);
@@ -3327,6 +3687,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "path <file|-> <from> <to> [--limit]",
 		description: ["All simple paths between two nodes"],
 		help: HELP_PATH,
+		options: GRAPH_PATH_OPTIONS,
 		run: (rest, flags) => {
 			const [f, from, to] = rest;
 			if (!f || !from || !to) return fail(HELP_PATH, 2);
@@ -3344,6 +3705,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "edges <file|->",
 		description: ["Canonical edge list"],
 		help: HELP_GRAPH_EDGES,
+		options: GRAPH_EDGES_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_EDGES, 2);
@@ -3358,6 +3720,7 @@ const GRAPH_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "orphans <file|->",
 		description: ["Nodes with neither predecessor nor successor"],
 		help: HELP_GRAPH_ORPHANS,
+		options: GRAPH_ORPHANS_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_GRAPH_ORPHANS, 2);
@@ -3375,6 +3738,7 @@ const META_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "get <file|-> <id[,id...]> [field[,field...]]",
 		description: ["Print field values"],
 		help: HELP_GET,
+		options: META_GET_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id, field, ...extra] = rest;
 			if (!f || !id) return fail(HELP_GET, 2);
@@ -3392,16 +3756,18 @@ const META_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "list <file|-> [--tag|--group|--producer] [field[,field...]]",
 		description: ["Print field values for nodes matching selectors"],
 		help: HELP_META_LIST,
+		options: META_LIST_OPTIONS,
 		run: (rest, flags) => {
 			const [f, field, ...extra] = rest;
 			if (!f) return fail(HELP_META_LIST, 2);
 			if (extra.length > 0) return fail(HELP_META_LIST, 2);
+			// No `=== true` guard on the three: a value-taking option that was
+			// given no value never reaches `run`, because the strict parse
+			// rejects it first (#1050). Before that parse existed, a bare
+			// `--tag` arrived here as `true` and had to be caught by hand.
 			const tagVal = flags.tag;
 			const groupVal = flags.group;
 			const producerVal = flags.producer;
-			if (tagVal === true || groupVal === true || producerVal === true) {
-				return fail(HELP_META_LIST, 2);
-			}
 			return runMetaList(f, {
 				...(typeof tagVal === "string" ? { tag: tagVal } : {}),
 				...(typeof groupVal === "string" ? { group: groupVal } : {}),
@@ -3417,6 +3783,7 @@ const META_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "values <file|-> <field[,field...]>",
 		description: ["Print a field's values in use, with counts"],
 		help: HELP_META_VALUES,
+		options: META_VALUES_OPTIONS,
 		run: (rest, flags) => {
 			const [f, field, ...extra] = rest;
 			if (!f || field === undefined) return fail(HELP_META_VALUES, 2);
@@ -3432,6 +3799,7 @@ const META_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "set <file> <id> <field> <value>",
 		description: ["Set a field value in place"],
 		help: HELP_META_SET,
+		options: META_SET_OPTIONS,
 		run: (rest, flags) => {
 			const [f, id, field, value, ...extra] = rest;
 			if (!f || !id || !field || value === undefined)
@@ -3453,6 +3821,7 @@ const META_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "sort <file|-> --by <keys>",
 		description: ["Sort node definitions"],
 		help: HELP_SORT,
+		options: META_SORT_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_SORT, 2);
@@ -3471,6 +3840,7 @@ const META_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "reindex <file|->",
 		description: ["Assign topological index: values"],
 		help: HELP_REINDEX,
+		options: META_REINDEX_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_REINDEX, 2);
@@ -3488,6 +3858,7 @@ const META_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "check-links <file>",
 		description: ["Verify location: file paths exist"],
 		help: HELP_CHECK_LINKS,
+		options: META_CHECK_LINKS_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_CHECK_LINKS, 2);
@@ -3505,6 +3876,7 @@ const STATUS_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "ready <file|-> [--best]",
 		description: ["List ready-to-start processes"],
 		help: HELP_READY,
+		options: STATUS_READY_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_READY, 2);
@@ -3520,6 +3892,7 @@ const STATUS_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "blocked <file|->",
 		description: ["List not-ready processes and their blocking inputs"],
 		help: HELP_STATUS_BLOCKED,
+		options: STATUS_BLOCKED_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_STATUS_BLOCKED, 2);
@@ -3534,6 +3907,7 @@ const STATUS_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "list <file|-> --status <s[,s...]>",
 		description: ["List artifacts by status"],
 		help: HELP_STATUS_LIST,
+		options: STATUS_LIST_OPTIONS,
 		run: (rest, flags) => {
 			const f = rest[0];
 			if (!f) return fail(HELP_STATUS_LIST, 2);
@@ -3551,6 +3925,7 @@ const STATUS_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "gaps <roadmap> <flow> [<flow>...]",
 		description: ["Find todo artifacts missing from the roadmap"],
 		help: HELP_STATUS_GAPS,
+		options: STATUS_GAPS_OPTIONS,
 		run: (rest, flags) => {
 			const [roadmapFile, ...flowFiles] = rest;
 			if (!roadmapFile || flowFiles.length === 0)
@@ -3607,6 +3982,7 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "check <file|-> [--strict] [--hints] [--json] [--no-color]",
 		description: ["Validate a .pfdsl file (- = stdin)"],
 		help: HELP_CHECK,
+		options: CHECK_OPTIONS,
 		run: (positional, flags) => {
 			const f = positional[0];
 			if (!f) return fail(HELP_CHECK, 2);
@@ -3625,6 +4001,7 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 			"Print the summary and spec section for a diagnostic code (e.g. V021)",
 		],
 		help: HELP_EXPLAIN,
+		options: EXPLAIN_OPTIONS,
 		run: (positional) => {
 			const code = positional[0];
 			if (!code) return fail(HELP_EXPLAIN, 2);
@@ -3636,15 +4013,14 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "fmt <file|-> [--write] [--check] [--no-color]",
 		description: ["Format a .pfdsl file (- = stdin)"],
 		help: HELP_FMT,
+		options: FMT_OPTIONS,
+		// The removed `--mode` is answered by `hasRemovedFmtMode` in `dispatch`,
+		// ahead of the strict parse that would otherwise reject it as an unknown
+		// option and flatten its message (#631's "the lookup decides what to say,
+		// not what to do"). A second check here would never run.
 		run: (positional, flags) => {
 			const f = positional[0];
 			if (!f) return fail(HELP_FMT, 2);
-			if (flags.mode !== undefined) {
-				return fail(
-					"fmt: --mode was removed; fmt always formats in flows style\n",
-					2,
-				);
-			}
 			return runFmt(f, {
 				write: flags.write === true,
 				check: flags.check === true,
@@ -3660,6 +4036,7 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 			"PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)",
 		],
 		help: HELP_RENDER,
+		options: RENDER_OPTIONS,
 		run: (positional, flags) => {
 			const f = positional[0];
 			if (!f) return fail(HELP_RENDER, 2);
@@ -3684,6 +4061,7 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 		synopsis: "diff <a> <b> [--format text|dot|svg] [--json] [--no-color]",
 		description: ["Structural diff (text), or visual diff DOT/SVG"],
 		help: HELP_DIFF,
+		options: DIFF_OPTIONS,
 		run: async (positional, flags) => {
 			const [a, b] = positional;
 			if (!a || !b) return fail(HELP_DIFF, 2);
@@ -3750,6 +4128,31 @@ Exit codes:
 `;
 })();
 
+function parseErrorContext(argv: readonly string[]): {
+	label: string;
+	help: string;
+} {
+	const command = argv[0] ?? "help";
+	const topLevelEntry = TOP_LEVEL_COMMANDS.find(
+		(entry) => entry.name === command,
+	);
+	if (topLevelEntry) {
+		return { label: topLevelEntry.name, help: topLevelEntry.help };
+	}
+	const group = COMMAND_GROUPS.find((entry) => entry.name === command);
+	if (group) {
+		const subcommand = argv[1];
+		const entry =
+			subcommand && !subcommand.startsWith("-")
+				? group.commands.find((candidate) => candidate.name === subcommand)
+				: undefined;
+		if (entry)
+			return { label: `${group.name} ${entry.name}`, help: entry.help };
+		return { label: group.name, help: renderGroupHelp(group) };
+	}
+	return { label: command, help: HELP };
+}
+
 /**
  * Dispatches `positional`/`flags` within one group: no subcommand falls back
  * to the group's own help (ok on `--help`, usage-error fail otherwise), an
@@ -3802,7 +4205,20 @@ export async function run(
 }
 
 async function dispatch(argv: readonly string[]): Promise<CommandResult> {
-	const { command, positional, flags } = parseArgs(argv);
+	if (hasRemovedFmtMode(argv)) {
+		return fail(
+			"fmt: --mode was removed; fmt always formats in flows style\n",
+			2,
+		);
+	}
+	const errorContext = parseErrorContext(argv);
+	let parsed: CliArgs;
+	try {
+		parsed = parseArgs(argv);
+	} catch (error) {
+		return parseArgsErrorResult(error, errorContext);
+	}
+	const { command, positional, flags } = parsed;
 	if (VERSION_WORDS.has(command)) return ok(`${__PFDSL_VERSION__}\n`);
 	if (HELP_WORDS.has(command)) return ok(HELP);
 	// Group names are read off COMMAND_GROUPS rather than written out here:
