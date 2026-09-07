@@ -17,7 +17,6 @@ import { relative, resolve } from "node:path";
 import {
 	buildDesignRecordTemplate,
 	buildGateCheckCommand,
-	buildPreArtifactReminders,
 	buildReviewRecordTemplate,
 	classifyDesignSettlement,
 	classifyPRs,
@@ -26,8 +25,10 @@ import {
 	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
 	isUnregisteredManagedIssue,
+	narrowPreArtifactReminders,
 	parsePorcelainPaths,
 	parseReadyOutput,
+	preArtifactQueryWords,
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
 import {
@@ -262,6 +263,11 @@ export async function runCycleStatus({
 	const issueLookupFailures = [];
 	/** @type {Map<number, string[]>} label names of each issue actually fetched */
 	const labelsByIssue = new Map();
+	/** Title and body of each issue fetched, the material the pre-artifact
+	 * reminder is narrowed with (#1118). Comments are left out: the design
+	 * record posted below is itself a comment, so including them would let this
+	 * cycle's own record steer which patterns it is then reminded of. */
+	const issueTexts = [];
 
 	if (targetIssues.length > 0) {
 		let repository;
@@ -275,8 +281,9 @@ export async function runCycleStatus({
 			try {
 				const issueJson = await githubOps.viewIssue({
 					number: targetIssue,
-					fields: ["body", "comments", "createdAt", "labels"],
+					fields: ["title", "body", "comments", "createdAt", "labels"],
 				});
+				issueTexts.push(issueJson.title ?? "", issueJson.body ?? "");
 				labelsByIssue.set(
 					targetIssue,
 					(issueJson.labels ?? []).map((l) => l?.name).filter(Boolean),
@@ -482,8 +489,24 @@ export async function runCycleStatus({
 	// every branch above — it names nothing about this cycle's git state, so a
 	// failure here (a malformed pattern file) is reported and does not
 	// withhold the rest of the preflight.
+	//
+	// Narrowed by the target issue's own words, with the verdict on whether
+	// that narrowed anything (#1118). The words come from the issues already
+	// fetched above, so a cycle with no resolvable issue narrows by nothing and
+	// says so — the same reading as an issue that wrote no code spans.
 	const PATTERN_DIR = resolve(root, PATTERN_DIR_RELATIVE);
 	let preArtifactPatterns = [];
+	// The value that survives the catch below, so an empty reminder list from a
+	// directory that could not be read never reads as one from an issue that
+	// wrote no code spans — those call for different actions, and only the
+	// second is about this cycle at all.
+	let preArtifactSelection = {
+		words: [],
+		reach: [],
+		pool: 0,
+		unselective: true,
+		reason: "catalog-unreadable",
+	};
 	let preArtifactPatternsError = null;
 	try {
 		const { patterns, errors } = loadPatternCatalog(PATTERN_DIR, {
@@ -491,7 +514,12 @@ export async function runCycleStatus({
 			readFileSync,
 			displayPath: (path) => relative(root, path),
 		});
-		preArtifactPatterns = buildPreArtifactReminders(patterns);
+		const { reminders, ...selection } = narrowPreArtifactReminders(
+			patterns,
+			preArtifactQueryWords(issueTexts.join("\n")),
+		);
+		preArtifactPatterns = reminders;
+		preArtifactSelection = selection;
 		if (errors.length > 0) preArtifactPatternsError = errors.join("; ");
 	} catch (e) {
 		// The directory itself is missing or unreadable: no catalog to remind
@@ -522,6 +550,7 @@ export async function runCycleStatus({
 		unregisteredManagedIssues,
 		untriagedTargetIssues,
 		preArtifactPatterns,
+		preArtifactSelection,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;
 	if (dirtyTreeError) result.dirtyTreeError = dirtyTreeError;

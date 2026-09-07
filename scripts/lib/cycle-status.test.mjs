@@ -13,8 +13,10 @@ import {
 	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
 	isUnregisteredManagedIssue,
+	narrowPreArtifactReminders,
 	parsePorcelainPaths,
 	parseReadyOutput,
+	preArtifactQueryWords,
 	summarizeCiStatus,
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
@@ -1038,6 +1040,210 @@ describe("buildPreArtifactReminders", () => {
 
 	it("returns nothing when no pattern carries the phase", () => {
 		assert.deepEqual(buildPreArtifactReminders([patterns[1]]), []);
+	});
+});
+
+describe("preArtifactQueryWords", () => {
+	it("takes the identifiers out of the issue text's code spans", () => {
+		assert.deepEqual(
+			preArtifactQueryWords(
+				"`buildPreArtifactReminders` は全件返す。散文の delegation は拾わない。",
+			),
+			["buildPreArtifactReminders"],
+		);
+	});
+
+	it("splits a span on the characters an identifier cannot hold", () => {
+		assert.deepEqual(
+			preArtifactQueryWords("`scripts/lib/cycle-status.mjs:424-431`"),
+			["scripts", "cycle-status.mjs"],
+		);
+	});
+
+	it("drops tokens too short to narrow anything, and line numbers", () => {
+		assert.deepEqual(preArtifactQueryWords("`--tag` と `--word` と `#1114`"), [
+			"word",
+		]);
+	});
+
+	it("keeps the first occurrence of a repeated token", () => {
+		assert.deepEqual(preArtifactQueryWords("`phase` `phase: pre-artifact`"), [
+			"phase",
+			"pre-artifact",
+		]);
+	});
+
+	it("returns nothing when the text carries no code span", () => {
+		assert.deepEqual(preArtifactQueryWords("コードスパンのない散文。"), []);
+	});
+
+	it("ignores spans inside a fenced code block", () => {
+		assert.deepEqual(
+			preArtifactQueryWords(
+				["`kept` は拾う。", "```", "例: `illustration` を貼る", "```"].join(
+					"\n",
+				),
+			),
+			["kept"],
+		);
+	});
+
+	it("ignores a tilde fence, and resumes after the fence closes", () => {
+		assert.deepEqual(
+			preArtifactQueryWords(
+				["~~~", "`illustration`", "~~~", "`resumed` は拾う。"].join("\n"),
+			),
+			["resumed"],
+		);
+	});
+
+	it("treats an unclosed fence as running to the end of the text", () => {
+		assert.deepEqual(
+			preArtifactQueryWords(["```", "`illustration`"].join("\n")),
+			[],
+		);
+	});
+});
+
+describe("narrowPreArtifactReminders", () => {
+	/** Four pre-artifact patterns, so a result of two is a real narrowing and
+	 * a result of three is not. */
+	const patterns = [
+		{
+			name: "A",
+			path: "a.md",
+			phase: "pre-artifact",
+			body: "- **A**: 冒頭。\n  具体例: `preflight` が全件返す。\n  対策: 書く前に確認する。",
+		},
+		{
+			name: "B",
+			path: "b.md",
+			phase: "pre-artifact",
+			body: "- **B**: 冒頭。\n  具体例: `preflight` と `advisory`。\n  対策: 着手前に読み直す。",
+		},
+		{
+			name: "C",
+			path: "c.md",
+			phase: "pre-artifact",
+			body: "- **C**: 冒頭。\n  対策: 委譲前に列挙する。",
+		},
+		{
+			name: "D",
+			path: "d.md",
+			phase: "pre-artifact",
+			body: "- **D**: 冒頭。\n  対策: 起票前に数える。",
+		},
+		{
+			name: "E",
+			path: "e.md",
+			body: "- **E**: 冒頭。\n  対策: いつでも効く。",
+		},
+	];
+
+	it("keeps only the patterns the words reach, most hits first", () => {
+		const result = narrowPreArtifactReminders(patterns, [
+			"preflight",
+			"advisory",
+		]);
+		assert.deepEqual(
+			result.reminders.map((r) => r.name),
+			["B", "A"],
+		);
+		assert.equal(result.pool, 4);
+		assert.equal(result.unselective, false);
+		assert.equal(result.reason, null);
+	});
+
+	it("carries the countermeasure of each pattern it kept", () => {
+		const result = narrowPreArtifactReminders(patterns, ["advisory"]);
+		assert.deepEqual(result.reminders, [
+			{ name: "B", path: "b.md", countermeasure: "着手前に読み直す。" },
+		]);
+	});
+
+	it("says a result over half the pool is not a narrowing", () => {
+		const result = narrowPreArtifactReminders(patterns, ["冒頭"]);
+		assert.equal(result.reminders.length, 4);
+		assert.equal(result.unselective, true);
+		assert.equal(result.reason, "over-half");
+	});
+
+	it("returns the whole pool, named as unnarrowed, when no word is given", () => {
+		const result = narrowPreArtifactReminders(patterns, []);
+		assert.equal(result.reminders.length, 4);
+		assert.equal(result.unselective, true);
+		assert.equal(result.reason, "no-words");
+	});
+
+	it("returns the whole pool, named as unnarrowed, when the words reach nothing", () => {
+		const result = narrowPreArtifactReminders(patterns, ["該当しない語"]);
+		assert.equal(result.reminders.length, 4);
+		assert.equal(result.unselective, true);
+		assert.equal(result.reason, "no-hits");
+	});
+
+	it("reports the words it searched with", () => {
+		assert.deepEqual(narrowPreArtifactReminders(patterns, ["advisory"]).words, [
+			"advisory",
+		]);
+	});
+
+	it("counts each word's reach, so an unnarrowed run names what widened it", () => {
+		const result = narrowPreArtifactReminders(patterns, ["冒頭", "advisory"]);
+		assert.equal(result.reason, "over-half");
+		assert.deepEqual(result.reach, [
+			{ word: "冒頭", count: 4 },
+			{ word: "advisory", count: 1 },
+		]);
+	});
+
+	it("counts reach on a run that did narrow, too", () => {
+		assert.deepEqual(narrowPreArtifactReminders(patterns, ["advisory"]).reach, [
+			{ word: "advisory", count: 1 },
+		]);
+	});
+
+	// An `always`-tagged pattern is one the catalog says every cycle reads, so
+	// it sits outside the narrowing rather than competing in it — the same
+	// split `select` makes.
+	const withAlways = [
+		{
+			name: "ALWAYS",
+			path: "always.md",
+			phase: "pre-artifact",
+			tags: ["always"],
+			body: "- **ALWAYS**: 冒頭。\n  対策: 毎回読む。",
+		},
+		...patterns,
+	];
+
+	it("keeps an always-tagged pattern that no word reached, at the head", () => {
+		const result = narrowPreArtifactReminders(withAlways, ["advisory"]);
+		assert.deepEqual(
+			result.reminders.map((r) => r.name),
+			["ALWAYS", "B"],
+		);
+		assert.equal(result.unselective, false);
+	});
+
+	it("leaves always-tagged patterns out of the pool the verdict divides", () => {
+		const result = narrowPreArtifactReminders(withAlways, ["advisory"]);
+		assert.equal(result.pool, 4);
+	});
+
+	it("keeps an always-tagged pattern on a run that narrowed nothing", () => {
+		const result = narrowPreArtifactReminders(withAlways, []);
+		assert.deepEqual(
+			result.reminders.map((r) => r.name),
+			["ALWAYS", "A", "B", "C", "D"],
+		);
+		assert.equal(result.reason, "no-words");
+	});
+
+	it("counts reach across always-tagged patterns too", () => {
+		assert.deepEqual(narrowPreArtifactReminders(withAlways, ["毎回"]).reach, [
+			{ word: "毎回", count: 1 },
+		]);
 	});
 });
 

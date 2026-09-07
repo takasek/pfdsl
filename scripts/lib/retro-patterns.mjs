@@ -396,7 +396,7 @@ function wordHits({ body }, words) {
  * @param {string[]} words
  * @returns {{pattern: T, hits: {word: string, line: number, text: string}[]}[]}
  */
-function hitsFor(patterns, words) {
+export function hitsFor(patterns, words) {
 	return patterns
 		.map((pattern) => ({ pattern, hits: wordHits(pattern, words) }))
 		.filter((m) => m.hits.length > 0);

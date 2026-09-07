@@ -385,7 +385,7 @@ artifact:
     tags: [ distilled_doc ]
   bindings_pfd_retro:
     label: pfd-retro バインディング
-    description: "pfd-retro が読むカタログ参照・配布物への finding 反映手続き・パターン追記の書式・改訂と統合と廃止の規約。sibling companion でなく独立ファイル（理由は bindings_pfd_ops と同じ）。このリポで検出した監査パターンの本体は持たず bindings/pfd-retro-patterns/ に1件1ファイルで置き、pfd-retro skill はこのファイルを全読せず scripts/retro-patterns.mjs で引く。タグ語彙の正準リストは持たない — tags サブコマンドの出力が語彙の実体。対策が成果物を書く前に効くパターンは frontmatter の phase で宣言し、それらは retro より前（プリフライト）でも引かれる"
+    description: "pfd-retro が読むカタログ参照・配布物への finding 反映手続き・パターン追記の書式・改訂と統合と廃止の規約。sibling companion でなく独立ファイル（理由は bindings_pfd_ops と同じ）。このリポで検出した監査パターンの本体は持たず bindings/pfd-retro-patterns/ に1件1ファイルで置き、pfd-retro skill はこのファイルを全読せず scripts/retro-patterns.mjs で引く。タグ語彙の正準リストは持たない — tags サブコマンドの出力が語彙の実体。対策が成果物を書く前に効くパターンは frontmatter の phase で宣言し、それらは retro より前（プリフライト）でも引かれる。phase はファイル単位の主張で、複数軸のうち1軸でも該当すれば付ける。プリフライトは対象 issue のコードスパン由来の語でその集合を絞り、絞れなかった回は出力自身が語ごとの reach とともにそう述べる"
     criteria: retro-patterns.mjs check が違反なしで通過し、check-companion-bindings が必須見出しの存在を通す。記載内容は pfd-retro SKILL.md の現行記述に突き合わせて矛盾がない
     location: [ bindings/pfd-retro.md, bindings/pfd-retro-patterns/ ]
     group: generation
