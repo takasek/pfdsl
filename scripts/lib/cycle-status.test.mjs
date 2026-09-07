@@ -1202,6 +1202,49 @@ describe("narrowPreArtifactReminders", () => {
 			{ word: "advisory", count: 1 },
 		]);
 	});
+
+	// An `always`-tagged pattern is one the catalog says every cycle reads, so
+	// it sits outside the narrowing rather than competing in it — the same
+	// split `select` makes.
+	const withAlways = [
+		{
+			name: "ALWAYS",
+			path: "always.md",
+			phase: "pre-artifact",
+			tags: ["always"],
+			body: "- **ALWAYS**: 冒頭。\n  対策: 毎回読む。",
+		},
+		...patterns,
+	];
+
+	it("keeps an always-tagged pattern that no word reached, at the head", () => {
+		const result = narrowPreArtifactReminders(withAlways, ["advisory"]);
+		assert.deepEqual(
+			result.reminders.map((r) => r.name),
+			["ALWAYS", "B"],
+		);
+		assert.equal(result.unselective, false);
+	});
+
+	it("leaves always-tagged patterns out of the pool the verdict divides", () => {
+		const result = narrowPreArtifactReminders(withAlways, ["advisory"]);
+		assert.equal(result.pool, 4);
+	});
+
+	it("keeps an always-tagged pattern on a run that narrowed nothing", () => {
+		const result = narrowPreArtifactReminders(withAlways, []);
+		assert.deepEqual(
+			result.reminders.map((r) => r.name),
+			["ALWAYS", "A", "B", "C", "D"],
+		);
+		assert.equal(result.reason, "no-words");
+	});
+
+	it("counts reach across always-tagged patterns too", () => {
+		assert.deepEqual(narrowPreArtifactReminders(withAlways, ["毎回"]).reach, [
+			{ word: "毎回", count: 1 },
+		]);
+	});
 });
 
 // ---------------------------------------------------------------------------

@@ -15,7 +15,7 @@ import {
 	resolveDesignRecordRequiredPrefixes,
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
-import { counterLineOf, hitsFor } from "./retro-patterns.mjs";
+import { ALWAYS_TAG, counterLineOf, hitsFor } from "./retro-patterns.mjs";
 import {
 	CODE_PATH,
 	CORRECTNESS_TOOLS,
@@ -462,6 +462,14 @@ export function buildPreArtifactReminders(patterns) {
  * The pre-artifact reminders for this cycle, narrowed by the target issue's
  * own words, with the verdict on whether that narrowed anything (#1118).
  *
+ * An `always`-tagged pattern sits outside the narrowing entirely — kept
+ * whatever the words did, at the head, and left out of the pool the verdict
+ * divides. `select` makes the same split, and here it is load-bearing rather
+ * than cosmetic: `catalog-consulted-after-the-artifact` carries both the tag
+ * and the phase, and it is the pattern whose countermeasure this reference
+ * point *is*. Narrowing it away on the cycles where narrowing works would
+ * remove the reminder exactly when the mechanism is doing its job.
+ *
  * The verdict is `select`'s: a result holding more than half the pool has
  * removed less than half of what reading the whole set would cost, which is
  * not a narrowing. Stating it is the point rather than a footnote — the
@@ -494,19 +502,23 @@ export function buildPreArtifactReminders(patterns) {
  * @returns {{reminders: {name: string, path: string, countermeasure: string | undefined}[], words: string[], reach: {word: string, count: number}[], pool: number, unselective: boolean, reason: "no-words" | "no-hits" | "over-half" | null}}
  */
 export function narrowPreArtifactReminders(patterns, words) {
-	const pool = patterns.filter((p) => p.phase === "pre-artifact");
+	const phased = patterns.filter((p) => p.phase === "pre-artifact");
+	const isAlways = (p) => (p.tags ?? []).includes(ALWAYS_TAG);
+	const always = phased.filter(isAlways);
+	const pool = phased.filter((p) => !isAlways(p));
 	const reach = words.map((word) => ({
 		word,
-		count: hitsFor(pool, [word]).length,
+		count: hitsFor(phased, [word]).length,
 	}));
-	const whole = (reason) => ({
-		reminders: buildPreArtifactReminders(pool),
+	const result = (kept, unselective, reason) => ({
+		reminders: buildPreArtifactReminders([...always, ...kept]),
 		words,
 		reach,
 		pool: pool.length,
-		unselective: true,
+		unselective,
 		reason,
 	});
+	const whole = (reason) => result(pool, true, reason);
 	if (words.length === 0) return whole("no-words");
 	// Ranked by how many of the words reached each pattern, ties keeping
 	// catalog order — the same ordering `select` gives, and for the same
@@ -516,14 +528,7 @@ export function narrowPreArtifactReminders(patterns, words) {
 		.map((m) => m.pattern);
 	if (hit.length === 0) return whole("no-hits");
 	if (hit.length > pool.length / 2) return whole("over-half");
-	return {
-		reminders: buildPreArtifactReminders(hit),
-		words,
-		reach,
-		pool: pool.length,
-		unselective: false,
-		reason: null,
-	};
+	return result(hit, false, null);
 }
 
 /** A markdown inline code span, without its backticks. */
