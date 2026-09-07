@@ -183,3 +183,11 @@ PFD が効果を発揮した局面の事例ログ。体感した時点で追記�
 - 効果: pfd-lens A/B の終端監査がこの状態を検出し、repo-owned native marketplace を捏造せず、実在する外部 Codex marketplace 構築者を `externalStakeholders` に追加して verified handoff surface へ修正した
 - 反実仮想: graph io / 終端監査がなければ、「接続しない」という正しい否定だけで consumer 不在の理由が正本に残らなかった
 - 参照: issue #1026、commit d1f5098d、`.pfdsl/runtime-pipeline.pfdsl`、pfd-lens A/B
+
+## 2026-09-06 依存グラフが「消してよい完了ノード」の境界を機械的に決めた
+
+- 局面: issue #1052 で `.pfdsl/roadmap.pfdsl`（161ノード・200エッジ、artifact の 73/83 が done）から完了済みチェーンを一括削除する
+- 効果: 削除対象を「done 履歴かどうか」でなく「open process の入出力として edge に現れるか」で決められた。`status ready` / `status blocked` / `graph neighbors` が残すべき done artifact 10件を名指ししたため、完了済みでも判定入力として生きているノードを取り違えずに 161→28 ノードへ落とせた。削除の前後で ready/blocked の結果が一致することが、判定に要るノードを削っていないことの検査になった
+- 反実仮想: 依存グラフが無ければ削除の単位は「closed issue に対応するノード」しか取れず、`spec_v0011` や `def_insertion` のように close 済みでも open process の入力である artifact を巻き込むか、逆に安全側に倒して削除自体を諦めていた
+- 学習: close イベント駆動の降格規則は「その瞬間に終端だったチェーン」しか見ないので、下流が後から完了したチェーンは誰の視界にも入らない。イベント駆動の掃除には、状態から対象を導く定期的な回収が対になる
+- 参照: issue #1052、`.claude/skills/pfd-ops/references/github-issues-backend.md`「終端でなかったチェーンの回収」、`.pfdsl/workflow.pfdsl` の `map_deps`
