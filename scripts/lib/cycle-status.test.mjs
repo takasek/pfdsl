@@ -1162,22 +1162,35 @@ describe("narrowPreArtifactReminders", () => {
 	});
 
 	it("says a result over half the pool is not a narrowing", () => {
-		const result = narrowPreArtifactReminders(patterns, ["冒頭"]);
-		assert.equal(result.reminders.length, 4);
+		const overHalfPatterns = [
+			...patterns,
+			{
+				name: "E",
+				path: "e.md",
+				phase: "pre-artifact",
+				body: "- **E**: 別の導入。\n  対策: 別に確認する。",
+			},
+		];
+		const result = narrowPreArtifactReminders(overHalfPatterns, ["冒頭"]);
+		assert.deepEqual(
+			result.reminders.map((r) => r.name),
+			["A", "B", "C", "D"],
+		);
+		assert.equal(result.pool, 5);
 		assert.equal(result.unselective, true);
 		assert.equal(result.reason, "over-half");
 	});
 
-	it("returns the whole pool, named as unnarrowed, when no word is given", () => {
+	it("keeps only always-tagged patterns when no word is given", () => {
 		const result = narrowPreArtifactReminders(patterns, []);
-		assert.equal(result.reminders.length, 4);
+		assert.deepEqual(result.reminders, []);
 		assert.equal(result.unselective, true);
 		assert.equal(result.reason, "no-words");
 	});
 
-	it("returns the whole pool, named as unnarrowed, when the words reach nothing", () => {
+	it("keeps only always-tagged patterns when the words reach nothing", () => {
 		const result = narrowPreArtifactReminders(patterns, ["該当しない語"]);
-		assert.equal(result.reminders.length, 4);
+		assert.deepEqual(result.reminders, []);
 		assert.equal(result.unselective, true);
 		assert.equal(result.reason, "no-hits");
 	});
@@ -1235,9 +1248,46 @@ describe("narrowPreArtifactReminders", () => {
 		const result = narrowPreArtifactReminders(withAlways, []);
 		assert.deepEqual(
 			result.reminders.map((r) => r.name),
-			["ALWAYS", "A", "B", "C", "D"],
+			["ALWAYS"],
 		);
 		assert.equal(result.reason, "no-words");
+	});
+
+	it("keeps only always-tagged patterns when no word reaches the catalog", () => {
+		const result = narrowPreArtifactReminders(withAlways, ["該当しない語"]);
+		assert.deepEqual(
+			result.reminders.map((r) => r.name),
+			["ALWAYS"],
+		);
+		assert.equal(result.unselective, true);
+		assert.equal(result.reason, "no-hits");
+	});
+
+	it("keeps always and actual hits when the hit set is over half", () => {
+		const overHalfWithAlways = [
+			{
+				name: "ALWAYS",
+				path: "always.md",
+				phase: "pre-artifact",
+				tags: ["always"],
+				body: "- **ALWAYS**: 常に読む。\n  対策: 毎回読む。",
+			},
+			...patterns,
+			{
+				name: "E",
+				path: "e.md",
+				phase: "pre-artifact",
+				body: "- **E**: 別の導入。\n  対策: 別に確認する。",
+			},
+		];
+		const result = narrowPreArtifactReminders(overHalfWithAlways, ["冒頭"]);
+		assert.deepEqual(
+			result.reminders.map((r) => r.name),
+			["ALWAYS", "A", "B", "C", "D"],
+		);
+		assert.equal(result.pool, 5);
+		assert.equal(result.unselective, true);
+		assert.equal(result.reason, "over-half");
 	});
 
 	it("counts reach across always-tagged patterns too", () => {

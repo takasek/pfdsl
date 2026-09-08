@@ -196,6 +196,17 @@ describe("advisoryKey", () => {
 });
 
 describe("formatPreArtifactAdvisory", () => {
+	const narrowSelection = {
+		words: ["scripts", "thing.mjs"],
+		reach: [
+			{ word: "scripts", count: 2 },
+			{ word: "thing.mjs", count: 1 },
+		],
+		pool: 35,
+		unselective: false,
+		reason: null,
+	};
+
 	it("names every reminder and its file", () => {
 		const text = formatPreArtifactAdvisory(REMINDERS);
 		assert.match(text, /brief-assumes-unverified-data-shape\.md/);
@@ -215,24 +226,119 @@ describe("formatPreArtifactAdvisory", () => {
 			/COUNTERMEASURE_SENTINEL/,
 		);
 	});
+
+	it("names the query words used to narrow the advisory", () => {
+		assert.match(
+			formatPreArtifactAdvisory(REMINDERS, narrowSelection),
+			/selection: write-path query words scripts, thing\.mjs/,
+		);
+	});
+
+	it("gives a short reselection instruction for no-hits without calling them unrelated", () => {
+		const text = formatPreArtifactAdvisory(REMINDERS, {
+			...narrowSelection,
+			words: ["unmatched"],
+			reach: [{ word: "unmatched", count: 0 }],
+			unselective: true,
+			reason: "no-hits",
+		});
+		assert.match(text, /no catalog pattern matched/);
+		assert.match(text, /re-select/i);
+		assert.match(text, /does not show that.*unrelated/i);
+	});
+
+	it("gives a short reselection instruction when no query words exist", () => {
+		const text = formatPreArtifactAdvisory(REMINDERS, {
+			...narrowSelection,
+			words: [],
+			reach: [],
+			unselective: true,
+			reason: "no-words",
+		});
+		assert.match(text, /no query words/);
+		assert.match(text, /add a concrete .* and re-select/i);
+	});
+
+	it("admits when over-half candidates are broad", () => {
+		const text = formatPreArtifactAdvisory(REMINDERS, {
+			...narrowSelection,
+			unselective: true,
+			reason: "over-half",
+		});
+		assert.match(text, /more than half.*broad/i);
+	});
 });
 
 describe("runPreArtifactAdvisory", () => {
 	it("fires on the first implementation write of a session", () => {
+		const s = store();
+		const paths = [];
+		const { shouldOutput, output } = runPreArtifactAdvisory(
+			JSON.stringify(payload()),
+			{
+				root: ROOT,
+				cycleId: () => "cycle-1",
+				loadReminders: (filePath) => {
+					paths.push(filePath);
+					return REMINDERS;
+				},
+				...s,
+			},
+		);
+		assert.equal(shouldOutput, true);
+		assert.deepEqual(paths, ["scripts/lib/thing.mjs"]);
+		assert.match(
+			output.hookSpecificOutput.additionalContext,
+			/brief-assumes-unverified-data-shape/,
+		);
+	});
+
+	it("passes the flat narrowing result into the advisory", () => {
+		const s = store();
+		const { output } = runPreArtifactAdvisory(JSON.stringify(payload()), {
+			root: ROOT,
+			cycleId: () => "cycle-1",
+			loadReminders: () => ({
+				reminders: REMINDERS,
+				words: ["scripts", "thing.mjs"],
+				reach: [
+					{ word: "scripts", count: 2 },
+					{ word: "thing.mjs", count: 1 },
+				],
+				pool: 35,
+				unselective: false,
+				reason: null,
+			}),
+			...s,
+		});
+		assert.match(
+			output.hookSpecificOutput.additionalContext,
+			/selection: write-path query words scripts, thing\.mjs/,
+		);
+	});
+
+	it("prints reselection guidance when a nonempty pool has no candidates", () => {
 		const s = store();
 		const { shouldOutput, output } = runPreArtifactAdvisory(
 			JSON.stringify(payload()),
 			{
 				root: ROOT,
 				cycleId: () => "cycle-1",
-				loadReminders: () => REMINDERS,
+				loadReminders: () => ({
+					reminders: [],
+					words: ["unmatched"],
+					reach: [{ word: "unmatched", count: 0 }],
+					pool: 1,
+					unselective: true,
+					reason: "no-hits",
+				}),
 				...s,
 			},
 		);
 		assert.equal(shouldOutput, true);
 		assert.match(
 			output.hookSpecificOutput.additionalContext,
-			/brief-assumes-unverified-data-shape/,
+			/no catalog pattern matched/,
 		);
 	});
 

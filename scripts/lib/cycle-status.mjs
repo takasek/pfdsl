@@ -479,15 +479,15 @@ export function buildPreArtifactReminders(patterns) {
  * usually land on: deleting the largest tag outright moved one real cycle's
  * result from 38 to 31.
  *
- * Two cases hand back the whole pool rather than a shorter list, and they are
- * told apart because they call for different actions: `no-words` means the
- * issue wrote no code spans to search with, and `no-hits` means it wrote some
- * and none of them reached the catalog — the second is a reading on the
- * catalog's vocabulary, the first is one on how the issue was written. Neither
- * returns the empty list its literal search produced. This is the only
- * reference point that prints the countermeasure lines (the PostToolUse
- * advisory drops them for length), so a silent zero here would cost the
- * runner every countermeasure in exchange for a narrowing that did not happen.
+ * Two cases keep only the always-tagged patterns rather than a shorter hit
+ * list: `no-words` means the issue wrote no code spans to search with, and
+ * `no-hits` means it wrote some and none of them reached the catalog — the
+ * second is a reading on the catalog's vocabulary, the first is one on how the
+ * issue was written. The selection remains marked unselective so the runner
+ * gets a short prompt to choose better terms instead of mistaking an empty
+ * candidate list for evidence that nothing applies. An over-half hit set keeps
+ * its actual candidates while retaining the unselective verdict: the output
+ * may still be long, and the verdict says so.
  *
  * `reach` counts each word's hits on its own, which is what turns "this is not
  * a narrowing" into something to act on: the words come from whatever the issue
@@ -518,16 +518,16 @@ export function narrowPreArtifactReminders(patterns, words) {
 		unselective,
 		reason,
 	});
-	const whole = (reason) => result(pool, true, reason);
-	if (words.length === 0) return whole("no-words");
+	const noCandidates = (reason) => result([], true, reason);
+	if (words.length === 0) return noCandidates("no-words");
 	// Ranked by how many of the words reached each pattern, ties keeping
 	// catalog order — the same ordering `select` gives, and for the same
 	// reason: ranking is what a reader gets when the list cannot be short.
 	const hit = hitsFor(pool, words)
 		.sort((a, b) => b.hits.length - a.hits.length)
 		.map((m) => m.pattern);
-	if (hit.length === 0) return whole("no-hits");
-	if (hit.length > pool.length / 2) return whole("over-half");
+	if (hit.length === 0) return noCandidates("no-hits");
+	if (hit.length > pool.length / 2) return result(hit, true, "over-half");
 	return result(hit, false, null);
 }
 

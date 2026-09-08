@@ -98,11 +98,33 @@ export function isImplementationArtifactWrite(payload, root) {
  * which is the reference point that can afford the length. The path is how to
  * read further for the one that matches.
  * @param {{name: string, path: string}[]} reminders
+ * @param {{words: string[], pool: number, unselective: boolean, reason: "no-words" | "no-hits" | "over-half" | null} | undefined} [selection]
  * @returns {string}
  */
-export function formatPreArtifactAdvisory(reminders) {
+export function formatPreArtifactAdvisory(reminders, selection) {
+	const selectionLines = [];
+	if (selection) {
+		selectionLines.push(
+			selection.words.length > 0
+				? `selection: write-path query words ${selection.words.join(", ")}`
+				: "selection: no query words were available from the write path",
+		);
+		if (selection.reason === "no-words")
+			selectionLines.push(
+				"selection: add a concrete changed path or identifier and re-select.",
+			);
+		else if (selection.reason === "no-hits")
+			selectionLines.push(
+				"selection: no catalog pattern matched these words; this does not show that the patterns are unrelated. Add a concrete catalog term and re-select.",
+			);
+		else if (selection.reason === "over-half")
+			selectionLines.push(
+				"selection: more than half of the candidate pool matched, so this is a broad candidate set; review it before acting.",
+			);
+	}
 	return [
-		"note: this cycle just wrote its first implementation artifact — it is already on disk, so this arrives too late to have shaped it. Re-read what you just wrote against the retro catalog's `phase: pre-artifact` patterns, fix it if one of them reserves the shape it took, and apply them to the artifacts still ahead (the terminal gate asks again, but only once the PR body is being written):",
+		"note: this cycle just wrote its first implementation artifact — it is already on disk, so this arrives too late to have shaped it. Re-read what you just wrote against the retro catalog's `phase: pre-artifact` candidate patterns, apply only the relevant countermeasures, and carry those checks into the artifacts still ahead (the terminal gate asks again, but only once the PR body is being written):",
+		...selectionLines,
 		...reminders.map((r) => `  - ${r.name} (${r.path})`),
 	].join("\n");
 }
@@ -168,7 +190,7 @@ export function advisoryKey(payload, cycleId) {
  * here — never disturbing the tool call it observes. The cost of losing the
  * mark is that the advisory repeats; the cost of throwing is a broken write.
  * @param {string} inputText raw stdin payload
- * @param {{root: string, cycleId: () => string | null, loadReminders: () => {name: string, path: string}[], hasFired: (key: string) => boolean, markFired: (key: string) => void}} io
+ * @param {{root: string, cycleId: () => string | null, loadReminders: (filePath: string) => {name: string, path: string}[] | {reminders: {name: string, path: string}[], words: string[], reach: {word: string, count: number}[], pool: number, unselective: boolean, reason: "no-words" | "no-hits" | "over-half" | null}, hasFired: (key: string) => boolean, markFired: (key: string) => void}} io
  * @returns {{shouldOutput: boolean, output?: object}}
  */
 export function runPreArtifactAdvisory(
@@ -196,12 +218,26 @@ export function runPreArtifactAdvisory(
 	}
 	if (fired) return { shouldOutput: false };
 	let reminders;
+	let selection;
 	try {
-		reminders = loadReminders();
+		const loaded = loadReminders(relative(root, payload.tool_input.file_path));
+		if (Array.isArray(loaded)) {
+			reminders = loaded;
+		} else {
+			reminders = loaded?.reminders;
+			selection = loaded;
+		}
 	} catch {
 		return { shouldOutput: false };
 	}
-	if (reminders.length === 0) return { shouldOutput: false };
+	const needsReselection =
+		selection?.pool > 0 &&
+		(selection.reason === "no-words" || selection.reason === "no-hits");
+	if (
+		!Array.isArray(reminders) ||
+		(reminders.length === 0 && !needsReselection)
+	)
+		return { shouldOutput: false };
 	try {
 		markFired(key);
 	} catch {
@@ -209,6 +245,8 @@ export function runPreArtifactAdvisory(
 	}
 	return {
 		shouldOutput: true,
-		output: buildAdvisoryOutput(formatPreArtifactAdvisory(reminders)),
+		output: buildAdvisoryOutput(
+			formatPreArtifactAdvisory(reminders, selection),
+		),
 	};
 }
