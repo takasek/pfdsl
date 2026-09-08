@@ -6,9 +6,8 @@ import {
 	fetchAllLabels,
 	fetchClosingIssueReferences,
 	fetchIssueView,
-	fetchOpenPrsWithCi,
+	fetchOpenPrs,
 	fetchPullRequestView,
-	mapCheckRunsToRollup,
 	mapIssuesResponse,
 	mapLabelsResponse,
 	parseHost,
@@ -170,22 +169,6 @@ describe("mapIssuesResponse", () => {
 			},
 		]);
 		assert.deepEqual(result[0].labels, [{ name: "flow:managed" }]);
-	});
-});
-
-describe("mapCheckRunsToRollup", () => {
-	it("uppercases conclusion for completed runs", () => {
-		const result = mapCheckRunsToRollup([
-			{ status: "completed", conclusion: "success" },
-		]);
-		assert.deepEqual(result, [{ conclusion: "SUCCESS" }]);
-	});
-
-	it("null conclusion for runs still in progress", () => {
-		const result = mapCheckRunsToRollup([
-			{ status: "in_progress", conclusion: null },
-		]);
-		assert.deepEqual(result, [{ conclusion: null }]);
 	});
 });
 
@@ -555,8 +538,8 @@ describe("fetchIssueView", () => {
 	});
 });
 
-describe("fetchOpenPrsWithCi", () => {
-	it("attaches a statusCheckRollup per PR from its head sha's check-runs", async () => {
+describe("fetchOpenPrs", () => {
+	it("returns number and title without requesting CI data", async () => {
 		const calls = [];
 		const fetchImpl = async (url) => {
 			calls.push(url);
@@ -565,36 +548,20 @@ describe("fetchOpenPrsWithCi", () => {
 					{
 						number: 10,
 						title: "flow sync",
-						head: { ref: "flow-sync/pending", sha: "abc123" },
+						head: { ref: "feature", sha: "abc123" },
 					},
 				]);
 			}
-			if (url.includes("/check-runs")) {
-				return jsonResponse({
-					check_runs: [{ status: "completed", conclusion: "success" }],
-				});
-			}
 			throw new Error(`unexpected url: ${url}`);
 		};
-		const result = await fetchOpenPrsWithCi(
-			"takasek",
-			"pfdsl",
-			"tok",
-			fetchImpl,
-		);
+		const result = await fetchOpenPrs("takasek", "pfdsl", "tok", fetchImpl);
 		assert.deepEqual(result, [
 			{
 				number: 10,
 				title: "flow sync",
-				headRefName: "flow-sync/pending",
-				statusCheckRollup: [{ conclusion: "SUCCESS" }],
 			},
 		]);
-		assert.equal(
-			calls.length,
-			2,
-			"one short page each — no terminator round-trips",
-		);
+		assert.equal(calls.length, 1, "one short page and no CI round-trip");
 	});
 
 	it("paginates open PRs past a full page, terminating on the short one", async () => {
@@ -609,39 +576,12 @@ describe("fetchOpenPrsWithCi", () => {
 		const fetchImpl = async (url) => {
 			if (url.includes("/pulls?"))
 				return jsonResponse(prPages[pageOf(url) - 1] ?? []);
-			if (url.includes("/check-runs")) return jsonResponse({ check_runs: [] });
 			throw new Error(`unexpected url: ${url}`);
 		};
-		const result = await fetchOpenPrsWithCi(
-			"takasek",
-			"pfdsl",
-			"tok",
-			fetchImpl,
-		);
+		const result = await fetchOpenPrs("takasek", "pfdsl", "tok", fetchImpl);
 		assert.equal(result.length, 101);
 		assert.equal(result.at(-1).number, 5);
-	});
-
-	it("paginates a head sha's check-runs past a full page", async () => {
-		const runPages = [
-			Array.from({ length: 100 }, () => ({
-				status: "completed",
-				conclusion: "success",
-			})),
-			[{ status: "completed", conclusion: "failure" }],
-		];
-		const fetchImpl = async (url) => {
-			if (url.includes("/pulls?"))
-				return jsonResponse([
-					{ number: 1, title: "t", head: { ref: "r", sha: "sha1" } },
-				]);
-			if (url.includes("/check-runs"))
-				return jsonResponse({ check_runs: runPages[pageOf(url) - 1] ?? [] });
-			throw new Error(`unexpected url: ${url}`);
-		};
-		const [pr] = await fetchOpenPrsWithCi("takasek", "pfdsl", "tok", fetchImpl);
-		assert.equal(pr.statusCheckRollup.length, 101);
-		assert.equal(pr.statusCheckRollup.at(-1).conclusion, "FAILURE");
+		assert.deepEqual(result[0], { number: 200, title: "a" });
 	});
 });
 

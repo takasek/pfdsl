@@ -2680,7 +2680,7 @@ describe("Codex generated consumers", () => {
 	it("routes an upstream .agents check to canonical repo-root install sources", () => {
 		const fixture = PROBE_FIXTURES["codex-repository-consumer"];
 		const consumer = mkdtempSync(join(tmpdir(), "codex-upstream-routing-"));
-		const sourcePath = ".github/workflows/pfdsl-flow-on-issue-close.yml";
+		const sourcePath = "scripts/pfdsl/audit-issues-flow.mjs";
 		try {
 			fixture.prepare(repoRoot, consumer);
 			writeFileSync(join(consumer, ".git"), "gitdir: elsewhere\n");

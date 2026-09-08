@@ -11,7 +11,9 @@ import {
 	copyFileSync,
 	existsSync,
 	mkdirSync,
+	readdirSync,
 	readFileSync,
+	rmdirSync,
 	rmSync,
 	statSync,
 } from "node:fs";
@@ -25,6 +27,15 @@ export const INSTALL_DIR_RELATIVE = ".claude/skills/pfd-ops/install";
 
 function filesEqual(pathA, pathB) {
 	return readFileSync(pathA).equals(readFileSync(pathB));
+}
+
+function removeEmptyDirectories(directory, keepRoot = true) {
+	for (const entry of readdirSync(directory, { withFileTypes: true })) {
+		if (entry.isDirectory()) {
+			removeEmptyDirectories(join(directory, entry.name), false);
+		}
+	}
+	if (!keepRoot && readdirSync(directory).length === 0) rmdirSync(directory);
 }
 
 /**
@@ -90,6 +101,7 @@ export function genInstall(root, templatePaths = INSTALL_TEMPLATE_PATHS) {
 			rmSync(join(installDir, rel), { force: true });
 			removed.push(rel);
 		}
+		removeEmptyDirectories(installDir);
 	}
 
 	return {

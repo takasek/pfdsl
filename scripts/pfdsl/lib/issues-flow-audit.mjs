@@ -12,7 +12,7 @@ export const FLOW_LABELS = [
 /**
  * @param {{ name: string, description: string }[]} expectedLabels
  * @param {{ name: string, description: string }[]} actualLabels
- * @returns {{ type: string, name: string, description: string, detail: string, fixVia: "github" }[]}
+ * @returns {{ type: string, name: string, description: string, detail: string }[]}
  */
 export function computeLabelFindings(expectedLabels, actualLabels) {
 	const actualByName = new Map(actualLabels.map((l) => [l.name, l]));
@@ -25,7 +25,6 @@ export function computeLabelFindings(expectedLabels, actualLabels) {
 				name: expected.name,
 				description: expected.description,
 				detail: `label "${expected.name}" does not exist`,
-				fixVia: "github",
 			});
 		} else if (actual.description !== expected.description) {
 			findings.push({
@@ -33,7 +32,6 @@ export function computeLabelFindings(expectedLabels, actualLabels) {
 				name: expected.name,
 				description: expected.description,
 				detail: `expected: "${expected.description}", actual: "${actual.description}"`,
-				fixVia: "github",
 			});
 		}
 	}
@@ -62,69 +60,9 @@ export function parseIssueProcesses(frontmatter) {
 }
 
 /**
- * Classifies the issue-close event against the roadmap snapshot read before flow sync can mutate it.
- * This is intentionally target-scoped: it does not inspect any other issue or decide whether the close itself was correct.
- * @param {{ number: number, state: "OPEN"|"CLOSED", stateReason?: string|null, labels: string[] }|undefined} issue
- * @param {{ issueNumber: number }[]} entries
- * @returns {{ status: "PASS"|"FAIL", reason: string, detail: string }}
- */
-export function classifyClosedIssueRegistration(issue, entries) {
-	if (!issue) {
-		return {
-			status: "FAIL",
-			reason: "target_issue_missing",
-			detail: "target issue was not found",
-		};
-	}
-	if (issue.state !== "CLOSED") {
-		return {
-			status: "FAIL",
-			reason: "target_issue_not_closed",
-			detail: `target issue is ${issue.state.toLowerCase()}, not closed`,
-		};
-	}
-
-	const hasManaged = issue.labels.includes("flow:managed");
-	const hasExempt = issue.labels.includes("flow:exempt");
-	if (hasExempt || !hasManaged) {
-		return {
-			status: "PASS",
-			reason: hasExempt ? "exempt" : "non_managed",
-			detail: "closed issue is outside managed flow scope",
-		};
-	}
-	if (entries.some((entry) => entry.issueNumber === issue.number)) {
-		return {
-			status: "PASS",
-			reason: "registered",
-			detail: "managed closed issue is registered in the roadmap",
-		};
-	}
-	if (issue.stateReason === "NOT_PLANNED") {
-		return {
-			status: "PASS",
-			reason: "not_planned",
-			detail: "issue was closed as not planned",
-		};
-	}
-	if (issue.stateReason !== "COMPLETED") {
-		return {
-			status: "FAIL",
-			reason: "target_issue_invalid_close_reason",
-			detail: `closed issue has unsupported state reason ${issue.stateReason ?? "(none)"}`,
-		};
-	}
-	return {
-		status: "FAIL",
-		reason: "managed_completed_unregistered",
-		detail: "managed completed issue has no process in the roadmap",
-	};
-}
-
-/**
- * @param {{ processId: string, issueNumber: number, artifactId: string, status: string|undefined, hasDownstream: boolean, updatedAt: string|undefined, priorities: string[] }[]} entries - priorities must be pre-sorted
- * @param {{ number: number, state: "OPEN"|"CLOSED", stateReason?: string|null, labels: string[], updatedAt: string }[]} issues
- * @returns {{ type: string, issueNumber: number, processId: string|undefined, artifactId: string|undefined, detail: string, fixVia?: "file"|"github"|"flow", hasDownstream?: boolean }[]}
+ * @param {{ processId: string, issueNumber: number, artifactId: string, updatedAt: string|undefined, priorities: string[] }[]} entries - priorities must be pre-sorted
+ * @param {{ number: number, state: "OPEN"|"CLOSED", labels: string[], updatedAt: string }[]} issues
+ * @returns {{ type: string, issueNumber: number, processId: string|undefined, artifactId: string|undefined, detail: string, advisory?: boolean }[]}
  */
 export function computeFindings(entries, issues) {
 	const trackedIssueNumbers = new Set(entries.map((e) => e.issueNumber));
@@ -149,36 +87,9 @@ export function computeFindings(entries, issues) {
 			continue;
 		}
 
-		if (iss.state === "CLOSED") {
-			// Non-terminal (has downstream consumers): demotion only clears the process's
-			// issue-tracking fields (tags/updated_at), it never deletes the entry — so once
-			// both fields are gone, the demotion has already happened and there's nothing
-			// left to fix. `status` is not observed here: "done" does not prove demotion ran,
-			// it's also the normal end-state of this repo's completion-then-close ordering.
-			if (entry.hasDownstream) {
-				const hasTrackingFields =
-					entry.updatedAt !== undefined || entry.priorities.length > 0;
-				if (!hasTrackingFields) {
-					continue;
-				}
-			}
-			const isNotPlanned = iss.stateReason === "NOT_PLANNED";
-			findings.push({
-				type: isNotPlanned ? "closed_not_planned" : "closed_in_flow",
-				issueNumber: entry.issueNumber,
-				processId: entry.processId,
-				artifactId: entry.artifactId,
-				hasDownstream: entry.hasDownstream,
-				detail: isNotPlanned
-					? entry.hasDownstream
-						? `issue closed as not planned but has downstream consumers — remove manually`
-						: `issue closed as not planned — terminal chain will be removed`
-					: `issue is closed — delete the chain if terminal, or clear iN_ issue-tracking fields on the process if downstream processes consume the output`,
-				fixVia: isNotPlanned && entry.hasDownstream ? undefined : "flow",
-			});
-			// skip all freshness checks for closed issues
-			continue;
-		}
+		// Closed issues are historical records. They do not require freshness,
+		// triage, or roadmap cleanup by this read-only audit.
+		if (iss.state === "CLOSED") continue;
 
 		// OPEN issue with a tracked process
 		const hasManaged = iss.labels.includes("flow:managed");
@@ -199,7 +110,6 @@ export function computeFindings(entries, issues) {
 				processId: entry.processId,
 				artifactId: entry.artifactId,
 				detail: `open issue with tracked process is missing "flow:managed" label`,
-				fixVia: "github",
 			});
 		}
 
@@ -212,7 +122,6 @@ export function computeFindings(entries, issues) {
 				processId: entry.processId,
 				artifactId: entry.artifactId,
 				detail: `process: ${val}, issue: ${iss.updatedAt}`,
-				fixVia: "file",
 			});
 		}
 
@@ -227,7 +136,6 @@ export function computeFindings(entries, issues) {
 				processId: entry.processId,
 				artifactId: entry.artifactId,
 				detail: `process: [${entry.priorities.join(", ")}], issue: [${issuePriorities.join(", ")}]`,
-				fixVia: "file",
 			});
 		}
 	}
@@ -282,65 +190,18 @@ export function computeFindings(entries, issues) {
 }
 
 /**
- * Splits findings by how the caller must treat them: `fixable` ones `--fix`
- * repairs, `manual` ones a human resolves and the audit fails on, and
- * `advisory` ones that are reported but never fail (see the `missing_process`
- * comment above for why that class exists).
- *
- * `enforcedIssues` names the issues for which advisory is too weak — the
- * caller is in a position to close the gap for those and nothing else. A PR
- * that edits the roadmap is such a caller: the issues it closes are the ones
- * it can register, and the rest belong to branches it cannot reach.
- * @param {{issueNumber?: number, fixVia?: string, advisory?: boolean}[]} findings
+ * Splits findings into blocking and advisory rows.
+ * @param {{issueNumber?: number, advisory?: boolean}[]} findings
  * @param {{enforcedIssues?: number[]}} [options]
- * @returns {{fixable: object[], manual: object[], advisory: object[]}}
+ * @returns {{blocking: object[], advisory: object[]}}
  */
 export function partitionFindings(findings, { enforcedIssues = [] } = {}) {
 	const enforced = new Set(enforcedIssues);
 	const blocking = (f) => !f.advisory || enforced.has(f.issueNumber);
 	return {
-		fixable: findings.filter((f) => f.fixVia),
-		manual: findings.filter((f) => !f.fixVia && blocking(f)),
-		advisory: findings.filter((f) => !f.fixVia && !blocking(f)),
+		blocking: findings.filter(blocking),
+		advisory: findings.filter((f) => !blocking(f)),
 	};
-}
-
-/**
- * Applies file-fixable findings to the yaml Document in place.
- * @param {import("yaml").Document} doc
- * @param {{ type: string, issueNumber: number, processId: string|undefined, fixVia?: "file"|"github"|"flow" }[]} findings
- * @param {Map<number, { number: number, state: string, labels: string[], updatedAt: string }>} issuesByNumber
- */
-export function applyFixes(doc, findings, issuesByNumber) {
-	for (const finding of findings) {
-		if (finding.fixVia !== "file") continue;
-		const { type, processId, issueNumber } = finding;
-		const issue = issuesByNumber.get(issueNumber);
-		if (!issue) continue;
-
-		if (type === "stale_updated_at") {
-			doc.setIn(["process", processId, "updated_at"], issue.updatedAt);
-		} else if (type === "priority_drift") {
-			// Get existing tags preserving order, remove priority: ones
-			const existingTags = doc.getIn(["process", processId, "tags"]);
-			let nonPriorityTags = [];
-			if (existingTags) {
-				// existingTags may be a yaml Seq node or plain array
-				const arr = existingTags.toJSON ? existingTags.toJSON() : existingTags;
-				nonPriorityTags = arr.filter((t) => !t.startsWith("priority:"));
-			}
-			const issuePriorities = issue.labels
-				.filter((l) => l.startsWith("priority:"))
-				.sort();
-			const newTags = [...nonPriorityTags, ...issuePriorities];
-			if (newTags.length === 0) {
-				doc.deleteIn(["process", processId, "tags"]);
-			} else {
-				doc.setIn(["process", processId, "tags"], newTags);
-			}
-		}
-		// other types: ignore
-	}
 }
 
 /**
@@ -365,15 +226,12 @@ export function buildProcessOutputs(body) {
  * Edge forms:
  *   inputs >> PROCESS -> output
  *   inputs >> PROCESS -> [out1, out2, ...]
- * Returns { raw, prefix, process, outputs: string[], isList }
- * where prefix is everything up to and including ">> PROCESS -> "
  * @param {string} line
- * @returns {{ raw: string, prefix: string, process: string, outputs: string[], isList: boolean }|null}
+ * @returns {{ process: string, outputs: string[] }|null}
  */
 function parseEdgeLine(line) {
 	const m = line.match(/^(.*>>\s*(\w+)\s*->\s*)(\[([^\]]*)\]|(\w+))\s*$/);
 	if (!m) return null;
-	const prefix = m[1];
 	const process = m[2];
 	const isList = m[3].startsWith("[");
 	const outputs = isList
@@ -382,107 +240,5 @@ function parseEdgeLine(line) {
 				.map((s) => s.trim())
 				.filter(Boolean)
 		: [m[5]];
-	return { raw: line, prefix, process, outputs, isList };
-}
-
-/**
- * Collapses 3+ consecutive newlines to 2 and trims trailing blank lines to a single newline.
- * @param {string} body
- * @returns {string}
- */
-export function normalizeBody(body) {
-	return body.replace(/\n{3,}/g, "\n\n").replace(/\n*$/, "\n");
-}
-
-/**
- * Applies closed_in_flow fixes to both the yaml Document (in place) and the flow body string.
- * Returns the (possibly modified) body string.
- *
- * Two cases per finding:
- *   A. hasDownstream === false (terminal): remove artifact from frontmatter. If the producing
- *      process has no other outputs, this would fully retire the process — but only do so once
- *      every issue number embedded in the process id's `iN_iM_..._` prefix is CLOSED (a process
- *      can be tracked by more than one issue; deleting it while a sibling issue is still open
- *      would orphan that issue's tracking). If any tracking issue is still open, skip this
- *      finding entirely and retry on a future run. If the process has other outputs, remove
- *      only this artifact from the output list in the edge (no cross-issue check needed, since
- *      the process itself survives).
- *   B. hasDownstream === true and status !== done (non-terminal): the iN_ prefix on the process
- *      is permanent, so there is nothing to rename. Just clear the process's issue-tracking
- *      fields (tags, updated_at) — status is already correct from the completion commit.
- *
- * @param {import("yaml").Document} doc
- * @param {string} body
- * @param {{ type: string, processId: string, artifactId: string, hasDownstream?: boolean }[]} findings
- * @param {Map<number, { number: number, state: string }>} issuesByNumber
- * @returns {string} new body string
- */
-export function applyClosedInFlowFixes(doc, body, findings, issuesByNumber) {
-	const closedFindings = findings.filter(
-		(f) =>
-			(f.type === "closed_in_flow" || f.type === "closed_not_planned") &&
-			f.fixVia === "flow",
-	);
-	if (closedFindings.length === 0) return body;
-
-	const lines = body.split("\n");
-
-	for (const finding of closedFindings) {
-		const { processId, artifactId, hasDownstream } = finding;
-
-		if (!hasDownstream) {
-			// Case A: terminal. Find the producing edge line for this process first, so we
-			// know whether removing this artifact would fully retire the process.
-			const edgeIdx = lines.findIndex((line) => {
-				const parsed = parseEdgeLine(line);
-				return (
-					parsed &&
-					parsed.process === processId &&
-					parsed.outputs.includes(artifactId)
-				);
-			});
-
-			const remainingOutputs =
-				edgeIdx >= 0
-					? parseEdgeLine(lines[edgeIdx]).outputs.filter(
-							(o) => o !== artifactId,
-						)
-					: null;
-
-			if (remainingOutputs !== null && remainingOutputs.length === 0) {
-				// A1: this would be the process's last output. Only retire the whole process
-				// if every issue tracking it is closed.
-				const prefixMatch = processId.match(/^(?:i\d+_)+/);
-				const issueNumbers = prefixMatch
-					? [...prefixMatch[0].matchAll(/i(\d+)_/g)].map((m) => Number(m[1]))
-					: [];
-				const allClosed = issueNumbers.every(
-					(n) => issuesByNumber.get(n)?.state === "CLOSED",
-				);
-				if (!allClosed) continue;
-
-				doc.deleteIn(["artifact", artifactId]);
-				doc.deleteIn(["process", processId]);
-				lines.splice(edgeIdx, 1);
-			} else {
-				// A2: multi-output (or no edge found) — remove only this artifact.
-				doc.deleteIn(["artifact", artifactId]);
-				if (edgeIdx >= 0) {
-					const parsed = parseEdgeLine(lines[edgeIdx]);
-					if (remainingOutputs.length === 1) {
-						lines[edgeIdx] = `${parsed.prefix}${remainingOutputs[0]}`;
-					} else {
-						lines[edgeIdx] = `${parsed.prefix}[${remainingOutputs.join(", ")}]`;
-					}
-				}
-			}
-		} else {
-			// Case B: non-terminal — iN_ is permanent on the process, nothing to rename.
-			// Only clear the fields that stop being meaningful once the issue is closed.
-			doc.deleteIn(["process", processId, "tags"]);
-			doc.deleteIn(["process", processId, "updated_at"]);
-		}
-	}
-
-	return normalizeBody(lines.join("\n"));
+	return { process, outputs };
 }

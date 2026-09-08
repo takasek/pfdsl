@@ -234,7 +234,7 @@ binding・companion・guard の分類に当たることは根拠にならない 
 
 ## develop 着手時の artifact status 更新
 
-汎用ルール（着手時 todo→wip、PR を待たない）は pfd-ops の `references/work-cycle.md`「進捗と完了根拠」が一次情報。このリポでは flow-sync が merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
+着手時の todo→wip と、完了根拠に基づく done 更新は pfd-ops の `references/work-cycle.md`「進捗と完了根拠」に従う。
 
 ## workflow.pfdsl に status を書かない
 

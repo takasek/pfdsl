@@ -121,22 +121,6 @@ export function mapIssuesResponse(apiIssues) {
 }
 
 /**
- * Maps a GitHub REST check-runs list into gh's statusCheckRollup shape
- * (an array of {conclusion}). Approximates gh's GraphQL rollup — it only
- * considers check-runs (GitHub Actions), not legacy commit statuses.
- * @param {Array<{status: string, conclusion: string|null}>} checkRuns
- * @returns {{conclusion: string|null}[]}
- */
-export function mapCheckRunsToRollup(checkRuns) {
-	return checkRuns.map((run) => ({
-		conclusion:
-			run.status === "completed" && run.conclusion
-				? run.conclusion.toUpperCase()
-				: null,
-	}));
-}
-
-/**
  * @param {{token: string}} auth
  * @returns {Record<string, string>}
  */
@@ -671,40 +655,15 @@ export async function addIssueLabel(
 }
 
 /**
- * @param {string} owner
- * @param {string} repo
- * @param {string} token
- * @param {string} sha
- * @param {typeof fetch} [fetchImpl]
- * @returns {Promise<{conclusion: string|null}[]>}
- */
-async function fetchCiRollupForSha(
-	owner,
-	repo,
-	token,
-	sha,
-	fetchImpl = proxyAwareFetch,
-) {
-	const checkRuns = await fetchAllPages(
-		fetchImpl,
-		(page) =>
-			`${API_ROOT}/repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=${PER_PAGE}&page=${page}`,
-		token,
-		(body) => body.check_runs ?? [],
-	);
-	return mapCheckRunsToRollup(checkRuns);
-}
-
-/**
- * Approximates `gh pr list --state open --json number,title,headRefName,statusCheckRollup`.
+ * The REST equivalent of `gh pr list --state open --json number,title`.
  * @param {string} owner
  * @param {string} repo
  * @param {string} token
  * @param {typeof fetch} [fetchImpl]
  * @param {number} [limit]
- * @returns {Promise<Array<{number: number, title: string, headRefName: string, statusCheckRollup: {conclusion: string|null}[]}>>}
+ * @returns {Promise<Array<{number: number, title: string}>>}
  */
-export async function fetchOpenPrsWithCi(
+export async function fetchOpenPrs(
 	owner,
 	repo,
 	token,
@@ -719,18 +678,5 @@ export async function fetchOpenPrsWithCi(
 			token,
 		)
 	).slice(0, limit);
-	return Promise.all(
-		prs.map(async (pr) => ({
-			number: pr.number,
-			title: pr.title,
-			headRefName: pr.head.ref,
-			statusCheckRollup: await fetchCiRollupForSha(
-				owner,
-				repo,
-				token,
-				pr.head.sha,
-				fetchImpl,
-			),
-		})),
-	);
+	return prs.map((pr) => ({ number: pr.number, title: pr.title }));
 }

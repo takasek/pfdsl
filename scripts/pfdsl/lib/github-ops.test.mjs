@@ -313,19 +313,14 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 			{
 				number: 5,
 				title: "x",
-				headRefName: "feature",
-				statusCheckRollup: [{ conclusion: "SUCCESS" }],
 			},
 			{
 				number: 6,
 				title: "y",
-				headRefName: "feature-two",
-				statusCheckRollup: [{ conclusion: "SUCCESS" }],
 			},
 		];
-		const ghOps = createGitHubOps({
-			execGhImpl: stubExecGh({ "pr list": JSON.stringify(raw) }),
-		});
+		const ghExec = stubExecGh({ "pr list": JSON.stringify(raw) });
+		const ghOps = createGitHubOps({ execGhImpl: ghExec });
 		const fetchCalls = [];
 		const fetchImpl = async (url) => {
 			fetchCalls.push(String(url));
@@ -342,12 +337,7 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 					],
 				};
 			}
-			return {
-				ok: true,
-				json: async () => ({
-					check_runs: [{ status: "completed", conclusion: "success" }],
-				}),
-			};
+			throw new Error(`unexpected URL: ${url}`);
 		};
 		const httpOps = createGitHubOps({
 			execGhImpl: stubExecGh({ "pr list": new Error("ENOENT") }),
@@ -359,14 +349,23 @@ describe("createGitHubOps parity: gh backend vs HTTP backend", () => {
 		]);
 		assert.deepEqual(ghResult, raw);
 		assert.deepEqual(ghResult, httpResult);
+		assert.equal(fetchCalls.length, 1, "HTTP list does not request CI data");
+		assert.deepEqual(ghExec.calls[0], [
+			"pr",
+			"list",
+			"--state",
+			"open",
+			"--json",
+			"number,title",
+			"--limit",
+			"100",
+		]);
 	});
 
 	it("listOpenPrs: both backends reject a saturated list", async () => {
 		const pr = (number) => ({
 			number,
 			title: `PR ${number}`,
-			headRefName: `branch-${number}`,
-			statusCheckRollup: [],
 		});
 		const ghRows = Array.from({ length: 100 }, (_, i) => pr(i + 1));
 		const restRows = Array.from({ length: 100 }, (_, i) => ({
