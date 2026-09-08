@@ -148,7 +148,7 @@ worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cyc
 消えた編集を探すとき `git stash list` を先に見ることも配布層の同じ手順が持つ。
 実際に起きた干渉の症状と復旧手順は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。
 
-**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` も snapshot 更新も失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
+**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` が失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
 `.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する（ビルドは不要）。
 `make setup` が入れる pre-commit hook のシムについては CLAUDE.md「セットアップ」節が一次情報。
 

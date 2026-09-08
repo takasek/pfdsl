@@ -14,7 +14,7 @@ if ! node scripts/check-biome.mjs --staged --no-errors-on-unmatched; then
   exit 1
 fi
 
-# Every remaining gate: snapshot freshness, .pfdsl canonical format, markdown
+# Every remaining gate: .pfdsl canonical format, markdown
 # line breaks, and the "regenerate the derived output, fail if it changed"
 # checks. They live in scripts/check-drift-gates.mjs, which evaluates all of
 # them and reports every failing one at once — the sh versions here exited on
