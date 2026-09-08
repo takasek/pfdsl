@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { dirname, posix, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { RECORD_SEP } from "./commit-trailers.mjs";
 import * as gateCheck from "./gate-check.mjs";
 import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
@@ -16,7 +15,6 @@ import {
 	classifyFormat3DesignRecord,
 	classifyIssueLookupFailure,
 	classifyOutputArtifactStatus,
-	classifySizeDirection,
 	collectModeledLocations,
 	DESIGN_RECORD_FORMAT_CUTOFF,
 	DESIGN_RECORD_REAPPROVAL_CUTOFF,
@@ -33,7 +31,6 @@ import {
 	formatRunTreeLine,
 	formatSizeDelta,
 	hasNoImplementationDisposition,
-	hasSizeOverride,
 	hasStatusChange,
 	LEGACY_DESIGN_RECORD_REQUIRED_PREFIXES,
 	lintCommitSubjects,
@@ -51,8 +48,6 @@ import {
 	resolveDesignRecord,
 	resolveDesignRecordRequiredPrefixes,
 	resolveRecordEditedAt,
-	SIZE_INTENT_PATTERN,
-	SIZE_OVERRIDE_PATTERN,
 	SIZE_TRACKED_PATTERNS,
 	selectDesignRecord,
 	sharesSiblingIdNamespace,
@@ -1312,7 +1307,7 @@ describe("hasNoImplementationDisposition", () => {
 		);
 	});
 
-	it("is true when a line's head declares the token, mirroring Size-Intent's line-head design", () => {
+	it("is true when a line's head declares the token", () => {
 		assert.equal(
 			hasNoImplementationDisposition(
 				`前提: x\n否定案: y\n却下理由: z\n${NO_IMPLEMENTATION_TOKEN} 理由`,
@@ -1342,176 +1337,6 @@ describe("hasNoImplementationDisposition", () => {
 
 	it("is false for a missing body", () => {
 		assert.equal(hasNoImplementationDisposition(undefined), false);
-	});
-});
-
-describe("classifySizeDirection", () => {
-	const grownDelta = {
-		path: ".pfdsl/bindings/x.pfdsl",
-		beforeBytes: 100,
-		afterBytes: 150,
-		beforeLines: 10,
-		afterLines: 15,
-	};
-	const shrunkDelta = {
-		path: "docs/adr/0001-x.md",
-		beforeBytes: 200,
-		afterBytes: 100,
-		beforeLines: 20,
-		afterLines: 10,
-	};
-
-	const declared = "## 症状\n何かが肥大している。\n\nSize-Intent: shrink\n";
-
-	it("SKIPs when the issue declares no size intent", () => {
-		const result = classifySizeDirection({
-			issueBody: "普通の説明。",
-			deltas: [grownDelta],
-		});
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /Size-Intent/);
-	});
-
-	it("SKIPs when the issue merely mentions shrink vocabulary without declaring the intent", () => {
-		const result = classifySizeDirection({
-			issueBody: "#659 の案2（蒸留）を判断する前に入れておく価値がある。",
-			deltas: [grownDelta],
-		});
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /Size-Intent/);
-	});
-
-	it("SKIPs when there are no tracked knowledge-artifact changes", () => {
-		const result = classifySizeDirection({ issueBody: declared, deltas: [] });
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /no tracked knowledge-artifact changes/);
-	});
-
-	it("FAILs when a tracked artifact grew and no commit declares a Size-Override", () => {
-		const result = classifySizeDirection({
-			issueBody: declared,
-			deltas: [grownDelta],
-			overrideDeclared: false,
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /\+50 bytes/);
-		assert.match(result.detail, /\+5 lines/);
-	});
-
-	it("PASSes retro catalogue growth while keeping its delta visible", () => {
-		const result = classifySizeDirection({
-			issueBody: declared,
-			deltas: [
-				{
-					...grownDelta,
-					path: ".pfdsl/bindings/pfd-retro-patterns/entries.pfdsl",
-				},
-			],
-			overrideDeclared: false,
-		});
-		assert.equal(result.status, "PASS");
-		assert.match(result.detail, /excluded retro output/);
-		assert.match(result.detail, /pfd-retro-patterns\/entries\.pfdsl/);
-		assert.match(result.detail, /\+50 bytes/);
-	});
-
-	it("keeps retro output separate from non-retro growth accepted by Size-Override", () => {
-		const result = classifySizeDirection({
-			issueBody: declared,
-			deltas: [
-				{
-					...grownDelta,
-					path: ".pfdsl/bindings/pfd-retro-patterns/entries.pfdsl",
-				},
-				{ ...grownDelta, path: "docs/adr/0002-growth.md" },
-			],
-			overrideDeclared: true,
-		});
-		assert.equal(result.status, "PASS");
-		assert.match(
-			result.detail,
-			/^excluded retro output: .*pfd-retro-patterns\/entries\.pfdsl.*; growth accepted via Size-Override: .*docs\/adr\/0002-growth\.md.*$/,
-		);
-	});
-
-	it("FAILs ordinary growth without an override while retaining mixed growth details", () => {
-		const result = classifySizeDirection({
-			issueBody: declared,
-			deltas: [
-				{
-					...grownDelta,
-					path: ".pfdsl/bindings/pfd-retro-patterns/catalogue.md",
-				},
-				{ ...grownDelta, path: "docs/adr/0002-growth.md" },
-			],
-			overrideDeclared: false,
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(
-			result.detail,
-			/^excluded retro output: .*pfd-retro-patterns\/catalogue\.md: \+50 bytes \/ \+5 lines.*; docs\/adr\/0002-growth\.md: \+50 bytes \/ \+5 lines.*$/,
-		);
-		assert.doesNotMatch(result.detail, /growth accepted via Size-Override/);
-	});
-
-	it("PASSes growth that a commit trailer declared", () => {
-		const result = classifySizeDirection({
-			issueBody: declared,
-			deltas: [grownDelta],
-			overrideDeclared: true,
-		});
-		assert.equal(result.status, "PASS");
-		assert.match(result.detail, /Size-Override/);
-	});
-
-	it("PASSes when no tracked artifact grew", () => {
-		const result = classifySizeDirection({
-			issueBody: declared,
-			deltas: [shrunkDelta],
-		});
-		assert.deepEqual(result, { status: "PASS" });
-	});
-});
-
-// The declaration moved out of the PR body and into a commit trailer (#775):
-// the terminal gate runs before the PR exists, so the body was unreadable in
-// the ordinary case and editable after the fact in every other one.
-describe("hasSizeOverride", () => {
-	it("finds the token in a commit's trailer region", () => {
-		const message = [
-			"docs: grow the catalogue",
-			"",
-			"prose about the change",
-			"",
-			"Size-Override: the pattern catalogue gained an entry",
-		].join("\n");
-		assert.equal(hasSizeOverride(message), true);
-	});
-
-	it("ignores the token quoted in prose, the way the review record does", () => {
-		const message = [
-			"docs: explain the token",
-			"",
-			"A cycle writes Size-Override: <reason> when growth is intended.",
-		].join("\n");
-		assert.equal(hasSizeOverride(message), false);
-	});
-
-	it("requires a reason, so a bare token does not pass", () => {
-		assert.equal(hasSizeOverride("docs: x\n\nprose\n\nSize-Override:"), false);
-	});
-
-	it("scans every commit in the range, not just the last", () => {
-		const blob = [
-			"docs: a\n\nprose\n\nSize-Override: intentional",
-			"docs: b\n\nprose\n\nCo-Authored-By: Someone <s@example.com>",
-		].join(RECORD_SEP);
-		assert.equal(hasSizeOverride(blob), true);
-	});
-
-	it("is false for an empty range", () => {
-		assert.equal(hasSizeOverride(""), false);
-		assert.equal(hasSizeOverride(undefined), false);
 	});
 });
 
@@ -1574,18 +1399,8 @@ describe("formatSizeDelta", () => {
 	});
 });
 
-describe("SIZE_INTENT_PATTERN / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", () => {
-	it("SIZE_INTENT_PATTERN matches a declared shrink intent at line head only", () => {
-		assert.ok(SIZE_INTENT_PATTERN.test("## 症状\nSize-Intent: shrink\n"));
-		assert.ok(
-			!SIZE_INTENT_PATTERN.test(
-				"この issue には Size-Intent: shrink とは書かない",
-			),
-		);
-		assert.ok(!SIZE_INTENT_PATTERN.test("Size-Intent: grow"));
-	});
-
-	it("SIZE_TRACKED_PATTERNS matches bindings, ADRs, and SKILL.md", () => {
+describe("SIZE_TRACKED_PATTERNS", () => {
+	it("matches bindings, ADRs, and SKILL.md", () => {
 		assert.ok(
 			SIZE_TRACKED_PATTERNS.some((p) => p.test(".pfdsl/bindings/x.pfdsl")),
 		);
@@ -1602,7 +1417,7 @@ describe("SIZE_INTENT_PATTERN / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", 
 		);
 	});
 
-	it("SIZE_TRACKED_PATTERNS matches the .pfdsl companions, the largest of them (#732)", () => {
+	it("matches the .pfdsl companions, the largest of them (#732)", () => {
 		for (const path of [
 			".pfdsl/roadmap.md",
 			".pfdsl/workflow.md",
@@ -1616,17 +1431,12 @@ describe("SIZE_INTENT_PATTERN / SIZE_TRACKED_PATTERNS / SIZE_OVERRIDE_PATTERN", 
 		}
 	});
 
-	it("SIZE_TRACKED_PATTERNS leaves the graphs themselves untracked", () => {
+	it("leaves the graphs themselves untracked", () => {
 		// The .pfdsl files are graphs, not prose that accumulates procedure, and
 		// their size moves for reasons the knowledge-artifact audit is not about.
 		assert.ok(
 			!SIZE_TRACKED_PATTERNS.some((p) => p.test(".pfdsl/roadmap.pfdsl")),
 		);
-	});
-
-	it("SIZE_OVERRIDE_PATTERN matches a Size-Override: token line", () => {
-		assert.ok(SIZE_OVERRIDE_PATTERN.test("intro\nSize-Override: reason\nmore"));
-		assert.ok(!SIZE_OVERRIDE_PATTERN.test("no override mentioned here"));
 	});
 });
 

@@ -22,7 +22,6 @@ import {
 	classifyDesignRecordTiming,
 	classifyFormat3DesignRecord,
 	classifyOutputArtifactStatus,
-	classifySizeDirection,
 	hasStatusChange,
 	lintCommitSubjects,
 	matchesTrigger,
@@ -449,9 +448,7 @@ export function perIssueSteps(step, issues, args = {}) {
 
 /**
  * Byte/line deltas for the tracked knowledge artifacts this branch touched.
- * Measured whether or not the issue declares a shrink intent: the numbers are
- * report material in their own right, and gating their collection on the
- * declaration would leave a cycle that forgot the token with nothing to read.
+ * The measured deltas are unconditional report material for human review.
  * @returns {import("./gate-check.mjs").SizeDelta[]}
  */
 export function collectSizeDeltas({ exec, base, changedFiles }) {
@@ -577,31 +574,6 @@ export function formatCycleWindowReport({ fetchResult, window }) {
 			: window.entries.map(({ sha, subject }) => `${sha} ${subject}`);
 	if (window.note) lines.push(`(${window.note})`);
 	return lines;
-}
-
-/**
- * knowledge-artifact size direction: did tracked knowledge artifacts
- * (bindings, ADRs, SKILL.md) grow without an explicit override, on a cycle
- * whose linked issue declares `Size-Intent: shrink` (issue #669's protection
- * against "the countermeasure's effect on size is never measured")?
- */
-export function sizeDirectionStep({
-	issue,
-	issueFailure,
-	deltas,
-	overrideDeclared,
-}) {
-	const name = "knowledge-artifact size direction";
-	if (!issue) return { name, ...missingIssueRow(issueFailure) };
-
-	// The override is read from the branch's commit trailers by the caller, once
-	// for every linked issue. Local git, so unlike the PR body it left (#775)
-	// there is no lookup that can fail and no verdict that means "unreadable".
-	const issueBody = issue.body ?? "";
-	return {
-		name,
-		...classifySizeDirection({ issueBody, deltas, overrideDeclared }),
-	};
 }
 
 /**

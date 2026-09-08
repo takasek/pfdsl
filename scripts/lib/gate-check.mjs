@@ -4,8 +4,6 @@
  */
 
 import { isGhUnavailableError } from "../pfdsl/lib/gh-compat.mjs";
-import { trailerLines } from "./commit-trailers.mjs";
-import { PATTERN_DIR_RELATIVE } from "./retro-patterns.mjs";
 
 /**
  * Every repo-relative path an adopted PFD claims to model, via the `location:`
@@ -716,8 +714,7 @@ export function isValidDesignRecordTimestamp(timestamp) {
 
 // #768: a design-selection record can settle on not implementing at all (the
 // #757 shape — the decision led elsewhere, and any commits later found in
-// range belong to a different, derived PR). A line-head declaration, the
-// same design as `Size-Intent: shrink` (SIZE_INTENT_PATTERN below): the
+// range belong to a different, derived PR). A line-head declaration means the
 // record's prose is free to discuss "not implementing" as a topic — #768's
 // own record did, inside its 前提 line, describing the very rule this token
 // enacts — without that discussion being mistaken for the declaration
@@ -1644,11 +1641,6 @@ export function classifyDesignRecordContent(
 	return { status: "PASS" };
 }
 
-// A declaration, not a reading. Scanning the body for shrink vocabulary fired
-// on issues that merely quoted another issue's option name, which is the same
-// "the machine guesses what the prose meant" failure the other #669 checks
-// replaced with a token the filer writes.
-export const SIZE_INTENT_PATTERN = /^Size-Intent:\s*shrink\b/m;
 // Prose that accumulates procedure, wherever this repo keeps it. #669 named
 // the first three and left the reason for that particular list unwritten; the
 // companions were the gap (#732/#752), and being the largest of the set they
@@ -1662,39 +1654,6 @@ export const SIZE_TRACKED_PATTERNS = [
 	/^docs\/adr\//,
 	/(^|\/)SKILL\.md$/,
 ];
-export const SIZE_OVERRIDE_PATTERN = /^Size-Override:\s*\S/m;
-
-/**
- * Did any commit in the range declare that the growth is intended?
- *
- * The declaration lives in a commit trailer rather than the PR body (#775).
- * The terminal gate runs before the PR is opened, so the body was unreadable
- * in the ordinary case — the check had to carry a whole SKIP-vs-FAIL split
- * (`classifyPrBodyFailure`) just to say so — and a body can be edited after
- * the verdict, which a commit message cannot.
- *
- * Scanning the trailer region rather than every line is what keeps a commit
- * whose prose explains the token from declaring one (#726), and the prefix
- * filter is what keeps the Conventional Commits subject, itself `Key: value`
- * shaped, out of the answer.
- * @param {string | undefined | null} commitMessages - RECORD_SEP between messages
- * @returns {boolean}
- */
-export function hasSizeOverride(commitMessages) {
-	return trailerLines(commitMessages).some((line) =>
-		SIZE_OVERRIDE_PATTERN.test(line),
-	);
-}
-
-/**
- * Does the linked issue declare that something should get smaller?
- * @param {string | undefined | null} issueBody
- * @returns {boolean}
- */
-export function hasShrinkIntent(issueBody) {
-	return SIZE_INTENT_PATTERN.test(issueBody ?? "");
-}
-
 /**
  * The package layers this branch touched, read off the diff.
  *
@@ -1724,9 +1683,7 @@ export function derivePackageLayers(changedFiles) {
  */
 
 /**
- * One line describing a delta, in the one shape both the verdict's detail and
- * the report block use — an operator seeing them back to back reads the same
- * sentence twice, not two wordings of the same numbers.
+ * One line describing a measured delta in the human-review report.
  * @param {SizeDelta} d
  * @returns {string}
  */
@@ -1735,73 +1692,6 @@ export function formatSizeDelta(d) {
 	const bytes = sign(d.afterBytes - d.beforeBytes);
 	const lines = sign(d.afterLines - d.beforeLines);
 	return `${d.path}: ${bytes} bytes / ${lines} lines (${d.beforeBytes} → ${d.afterBytes} bytes)`;
-}
-
-/**
- * Classify whether tracked knowledge artifacts moved in the direction a
- * shrink-intent issue asked for (issue #669's protection against "the
- * countermeasure's effect on size is never measured"). Only the verdict is
- * gated on the declaration — the deltas themselves are reported either way, so
- * a missing declaration costs the numbers nothing.
- *
- * `overrideDeclared` comes from the branch's commit trailers, which are local
- * and always present. The distinction #749 had to draw — "no override was
- * written" versus "the override could not be read" — belonged to a PR-body
- * lookup that no longer happens, so both it and the SKIP/FAIL line it drew are
- * gone (#775).
- *
- * Both declarations are self-reported: the issue filer opts into the direction
- * check with `Size-Intent: shrink`, and the runner can accept non-retro growth
- * with a `Size-Override:` trailer. Retro pattern-catalogue growth remains in
- * detail but is excluded from the verdict because pfd-retro itself produces it.
- * This classifier evaluates the supplied measured deltas, not whether either
- * declaration reflects its author's real intent. No detector is added for that
- * semantic claim: the deltas are reported with or without the declarations,
- * leaving their justification visible to human review (#910).
- * @param {{issueBody?: string, deltas: SizeDelta[], overrideDeclared?: boolean}} params
- * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
- */
-export function classifySizeDirection({ issueBody, deltas, overrideDeclared }) {
-	if (!hasShrinkIntent(issueBody)) {
-		return {
-			status: "SKIP",
-			detail: "linked issue declares no Size-Intent: shrink",
-		};
-	}
-	if (!deltas || deltas.length === 0) {
-		return { status: "SKIP", detail: "no tracked knowledge-artifact changes" };
-	}
-
-	const grown = deltas.filter((d) => d.afterBytes > d.beforeBytes);
-	if (grown.length === 0) return { status: "PASS" };
-
-	const retroGrowth = grown.filter((d) =>
-		d.path.startsWith(`${PATTERN_DIR_RELATIVE}/`),
-	);
-	const gatedGrowth = grown.filter(
-		(d) => !d.path.startsWith(`${PATTERN_DIR_RELATIVE}/`),
-	);
-	const retroDetail =
-		retroGrowth.length > 0
-			? `excluded retro output: ${retroGrowth.map(formatSizeDelta).join(", ")}`
-			: null;
-	if (gatedGrowth.length === 0) {
-		return { status: "PASS", detail: retroDetail };
-	}
-
-	const list = gatedGrowth.map(formatSizeDelta).join(", ");
-	if (overrideDeclared) {
-		return {
-			status: "PASS",
-			detail: [retroDetail, `growth accepted via Size-Override: ${list}`]
-				.filter(Boolean)
-				.join("; "),
-		};
-	}
-	return {
-		status: "FAIL",
-		detail: [retroDetail, list].filter(Boolean).join("; "),
-	};
 }
 
 /**
