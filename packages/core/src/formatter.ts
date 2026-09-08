@@ -5,6 +5,21 @@ export type BodySegment =
 	| { kind: "edges"; text: string }
 	| { kind: "comment"; text: string };
 
+const BARE_ID_RE = /^[\p{L}\p{N}_-]+$/u;
+
+function formatId(id: string): string {
+	if (BARE_ID_RE.test(id)) return id;
+	let escaped = "";
+	for (const char of id) {
+		if (char === "\\") escaped += "\\\\";
+		else if (char === '"') escaped += '\\"';
+		else if (char === "\n") escaped += "\\n";
+		else if (char === "\t") escaped += "\\t";
+		else escaped += char;
+	}
+	return `"${escaped}"`;
+}
+
 export function splitBodyIntoSegments(body: string): BodySegment[] {
 	if (body === "") return [];
 	const lines = body.split("\n");
@@ -35,12 +50,13 @@ export function formatEdges(
 ): string {
 	const lines: string[] = [];
 	for (const e of sortedEdges) {
-		if (e.kind === "input") lines.push(`${e.artifact} >> ${e.process}`);
+		if (e.kind === "input")
+			lines.push(`${formatId(e.artifact)} >> ${formatId(e.process)}`);
 		else if (e.kind === "feedback")
-			lines.push(`${e.artifact} >>? ${e.process}`);
-		else lines.push(`${e.process} -> ${e.artifact}`);
+			lines.push(`${formatId(e.artifact)} >>? ${formatId(e.process)}`);
+		else lines.push(`${formatId(e.process)} -> ${formatId(e.artifact)}`);
 	}
-	for (const id of sortedIsolated) lines.push(id);
+	for (const id of sortedIsolated) lines.push(formatId(id));
 	if (lines.length === 0) return "";
 	return `${lines.join("\n")}\n`;
 }
@@ -96,16 +112,22 @@ export function formatAsFlows(
 	const lines: string[] = [];
 	for (const proc of processOrder) {
 		const { inputs, outputs, feedbacks } = byProcess.get(proc)!;
-		for (const fb of feedbacks) lines.push(`${fb} >>? ${proc}`);
+		for (const fb of feedbacks)
+			lines.push(`${formatId(fb)} >>? ${formatId(proc)}`);
 		if (inputs.length === 0 && outputs.length === 0) continue;
 		const fmtIds = (ids: string[]) =>
-			ids.length === 1 ? ids[0]! : `[${ids.join(", ")}]`;
-		let stmt = inputs.length > 0 ? `${fmtIds(inputs)} >> ${proc}` : proc;
+			ids.length === 1
+				? formatId(ids[0]!)
+				: `[${ids.map((id) => formatId(id)).join(", ")}]`;
+		let stmt =
+			inputs.length > 0
+				? `${fmtIds(inputs)} >> ${formatId(proc)}`
+				: formatId(proc);
 		if (outputs.length > 0) stmt += ` -> ${fmtIds(outputs)}`;
 		lines.push(stmt);
 	}
 
-	for (const id of sortedIsolated) lines.push(id);
+	for (const id of sortedIsolated) lines.push(formatId(id));
 	if (lines.length === 0) return "";
 	return `${lines.join("\n")}\n`;
 }
