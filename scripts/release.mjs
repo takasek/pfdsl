@@ -1,311 +1,39 @@
 #!/usr/bin/env node
-// Shared driver for the release / release-libs / vscode-package Makefile
-// targets. Usage: node scripts/release.mjs <cli|libs|vscode> [--version X.Y.Z]
-//
-// Order (deliberate — see docs/adr or issue #346 for the "why"):
-//   1. branch check
-//   2. fetch + verify local main == origin/main (before touching anything)
-//   3. clean working tree check
-//   4. resolve target version (from --version, or the current package.json)
-//   5. tag-duplicate check (cheap, version is already known)
-//   6. pre-tag checks: build, test, check-docs, gen-plugin identity,
-//      distribution review currency, asset sweep currency, spec-history
-//      currency
-//   7. bump package.json(s) + commit (only if --version was given)
-//   7b. cli only: pin marketplace.json's plugin source to this release's tag
-//   8. push origin main
-//   9. kind-specific pre-tag step (vscode: vsce package)
-//   10. git tag + push tag
-//   11. watch the publish workflow (skipped for vscode, which has none)
-//   12. cli only: mark ready roadmap release milestones done + commit + push
-//
-// Checks run *before* the version bump commit, so a check failure never
-// leaves a dangling local commit to clean up.
 
-import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseArgs } from "node:util";
-import {
-	bumpVersionInPackageJson,
-	filesToCommitForBump,
-	pinMarketplaceSourceToTag,
-	RELEASE_KINDS,
-	releaseMilestoneArtifactIds,
-	tagName,
-} from "./lib/release-config.mjs";
-import { runReleaseGates } from "./lib/release-gates.mjs";
-import { parseHost } from "./pfdsl/lib/github-rest.mjs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "..");
+import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
+import { parseReleaseArgs } from "./lib/release-config.mjs";
+import { prepareRelease, publishRelease } from "./lib/release-runner.mjs";
 
-function run(cmd, args, opts = {}) {
-	execFileSync(cmd, args, { cwd: root, stdio: "inherit", ...opts });
-}
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-function capture(cmd, args, opts = {}) {
-	return execFileSync(cmd, args, {
-		cwd: root,
-		encoding: "utf-8",
-		...opts,
-	}).trim();
-}
-
-// Pin GH_HOST to this repo's own remote host so `gh` doesn't fail under an
-// ambient GH_HOST pointing at a different host (multi-host `gh` login).
-function ghOpts() {
-	let host = null;
+/**
+ * Run one release phase. Argument parsing happens before the runner receives
+ * the repository root, so malformed invocations cannot run Git or a build.
+ * @param {string[]} args
+ * @param {object} [deps]
+ * @returns {number}
+ */
+export function main(args = process.argv.slice(2), deps = {}) {
 	try {
-		host = parseHost(capture("git", ["remote", "get-url", "origin"]));
-	} catch {
-		host = null;
-	}
-	return host ? { env: { ...process.env, GH_HOST: host } } : {};
-}
-
-function fail(message) {
-	console.error(`error: ${message}`);
-	process.exit(1);
-}
-
-// --- Parse args ---
-
-// strict parsing, not an indexOf sweep over the leftovers: a mistyped flag was
-// dropped and the release went ahead on the computed version instead of the
-// one the caller named (#648). Node rejects the unknown flag, the --version=
-// form's missing value, and a stray second positional; none of that has to be
-// spelled out here.
-let parsed;
-try {
-	parsed = parseArgs({
-		args: process.argv.slice(2),
-		options: { version: { type: "string" } },
-		strict: true,
-		allowPositionals: true,
-	});
-} catch (err) {
-	fail(err.message);
-}
-if (parsed.positionals.length > 1) {
-	fail(`expected one release kind, got: ${parsed.positionals.join(", ")}`);
-}
-const kindArg = parsed.positionals[0];
-const explicitVersion = parsed.values.version;
-const kind = RELEASE_KINDS[kindArg];
-if (!kind) {
-	fail(
-		`unknown release kind '${kindArg}' (expected one of: ${Object.keys(RELEASE_KINDS).join(", ")})`,
-	);
-}
-
-// --- 1. branch check ---
-
-const branch = capture("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
-if (branch !== "main") {
-	fail(`must run on main branch (currently on: ${branch})`);
-}
-
-// --- 2. fetch + verify local main == origin/main ---
-
-run("git", ["fetch", "origin", "main", "--quiet"]);
-const localHead = capture("git", ["rev-parse", "HEAD"]);
-const remoteHead = capture("git", ["rev-parse", "origin/main"]);
-if (localHead !== remoteHead) {
-	fail("local main does not match origin/main. Pull (or push) first.");
-}
-
-// --- 3. clean working tree check ---
-
-if (capture("git", ["status", "--porcelain"]) !== "") {
-	fail("working tree has uncommitted changes.");
-}
-
-// --- 4. resolve target version ---
-
-const firstPackagePath = resolve(root, kind.packages[0]);
-const currentVersion = JSON.parse(
-	readFileSync(firstPackagePath, "utf-8"),
-).version;
-const version = explicitVersion ?? currentVersion;
-
-// --- 5. tag-duplicate check ---
-
-const tag = tagName(kind, version);
-try {
-	execFileSync("git", ["rev-parse", tag], { cwd: root, stdio: "ignore" });
-	fail(`tag ${tag} already exists (bump the version).`);
-} catch (err) {
-	if (err.status === undefined) throw err; // execFileSync itself failed to spawn
-	// non-zero exit from `git rev-parse` means the tag doesn't exist — expected.
-}
-
-// --- 6. pre-tag checks ---
-
-console.log(
-	"Running pre-tag checks (build, test, check-docs, gen-plugin identity, distribution review, asset sweep)...",
-);
-run("make", ["build"]);
-run("make", ["test"]);
-run("make", ["check-docs"]);
-run("make", ["gen-plugin"]);
-// make gen-plugin regenerates plugin/pfdsl/ (the marketplace distribution
-// copy) fresh — it does not check that the regeneration matches what's
-// committed. Mirror what CI's check-gen-plugin.yml does: regenerate, then
-// check tracked and untracked output against the committed tree.
-try {
-	execFileSync(
-		process.execPath,
-		[resolve(root, "scripts/check-generated-drift.mjs"), "--", "plugin"],
-		{
-			cwd: root,
-			stdio: "ignore",
-		},
-	);
-} catch (err) {
-	if (err.status === undefined) throw err; // execFileSync itself failed to spawn
-	fail(
-		"generated plugin dir (plugin/pfdsl) is stale — run 'make gen-plugin' and commit the result before releasing.",
-	);
-}
-
-for (const gate of runReleaseGates(root, {
-	mode: "release",
-	stopOnFailure: true,
-})) {
-	console[gate.ok ? "log" : "error"](gate.lines.join("\n"));
-	if (!gate.ok) process.exit(1);
-}
-
-// --- 7. bump + commit (only if --version was given) ---
-
-if (explicitVersion) {
-	for (const pkgPath of kind.packages) {
-		const abs = resolve(root, pkgPath);
-		writeFileSync(
-			abs,
-			bumpVersionInPackageJson(readFileSync(abs, "utf-8"), explicitVersion),
-		);
-	}
-	if (kindArg === "cli") {
-		// The bump above just changed packages/cli/package.json's version, which
-		// gen-plugin.mjs mirrors into plugin/pfdsl/.claude-plugin/plugin.json.
-		// Regenerate now so plugin/pfdsl is committed alongside the bump —
-		// otherwise the pre-commit hook's own regenerate-and-diff check sees the
-		// new cli version and rejects this commit as stale.
-		run("make", ["gen-plugin"]);
-	}
-	run("git", ["add", ...filesToCommitForBump(kindArg, kind)]);
-	run("git", ["commit", "-m", kind.commitMessage(explicitVersion)]);
-}
-
-// --- 7b. cli release: pin the marketplace plugin source to this tag, so
-// /plugin install and /plugin marketplace update fetch this verified
-// snapshot instead of main's current (possibly since-changed) HEAD ---
-
-if (kindArg === "cli") {
-	const marketplacePath = resolve(root, ".claude-plugin/marketplace.json");
-	const before = readFileSync(marketplacePath, "utf-8");
-	const after = pinMarketplaceSourceToTag(before, tag);
-	if (after !== before) {
-		writeFileSync(marketplacePath, after);
-		run("git", ["add", ".claude-plugin/marketplace.json"]);
-		run("git", [
-			"commit",
-			"-m",
-			`chore(plugin): pin marketplace source to ${tag}`,
-		]);
-	}
-}
-
-// --- 8. push origin main ---
-
-run("git", ["push", "origin", "main", "--quiet"]);
-
-// --- 9. kind-specific pre-tag step ---
-
-if (kindArg === "vscode") {
-	run("vsce", ["package", "--no-dependencies"], {
-		cwd: resolve(root, "packages/vscode-extension"),
-	});
-}
-
-// --- 10. tag + push tag ---
-
-console.log(`Tagging ${tag} and pushing (kind: ${kindArg})...`);
-run("git", ["tag", tag]);
-run("git", ["push", "origin", tag]);
-
-// --- 11. watch the publish workflow ---
-
-if (kind.workflow) {
-	console.log("Waiting for GHA run to appear...");
-	execFileSync("sleep", ["8"]);
-	const gh = ghOpts();
-	const runId = capture(
-		"gh",
-		[
-			"run",
-			"list",
-			"--workflow",
-			kind.workflow,
-			"--json",
-			"databaseId,headBranch",
-			"--jq",
-			`.[] | select(.headBranch=="${tag}") | .databaseId`,
-		],
-		gh,
-	).split("\n")[0];
-	if (!runId) {
-		fail(`GHA run not found: gh run list --workflow ${kind.workflow}`);
-	}
-	run("gh", ["run", "watch", runId, "--exit-status"], gh);
-} else {
-	console.log(`${tag} tagged and pushed (no publish workflow for this kind).`);
-}
-
-// --- 12. cli release: mark ready roadmap release milestones done ---
-// No version-number → artifact-ID derivation: whichever publish_cli_*
-// milestones are ready (all inputs satisfied) get marked done, regardless
-// of how this release lines up against roadmap-planned version numbers.
-
-if (kindArg === "cli") {
-	const cliPath = resolve(root, "packages/cli/dist/cli.js");
-	const roadmapPath = resolve(root, ".pfdsl/roadmap.pfdsl");
-	const readyOutput = capture("node", [
-		cliPath,
-		"status",
-		"ready",
-		roadmapPath,
-		"--json",
-	]);
-	const { ready } = JSON.parse(readyOutput);
-	const artifactIds = releaseMilestoneArtifactIds(ready);
-
-	if (artifactIds.length === 0) {
-		console.log(
-			"No roadmap release milestone is ready to mark done (this release ships no planned milestone).",
-		);
-	} else {
-		for (const artifactId of artifactIds) {
-			console.log(`Marking roadmap artifact ${artifactId} as done...`);
-			run("node", [
-				cliPath,
-				"meta",
-				"set",
-				roadmapPath,
-				artifactId,
-				"status",
-				"done",
-			]);
+		const parsed = parseReleaseArgs(args);
+		const options = { root, kindArg: parsed.kindArg, ...deps };
+		if (parsed.phase === "prepare") {
+			prepareRelease({ ...options, version: parsed.version });
+		} else {
+			publishRelease({ ...options, commit: parsed.commit });
 		}
-		run("git", ["add", roadmapPath]);
-		run("git", [
-			"commit",
-			"-m",
-			`chore(roadmap): mark ${artifactIds.join(", ")} as done`,
-		]);
-		run("git", ["push", "origin", "main", "--quiet"]);
+		return 0;
+	} catch (error) {
+		console.error(
+			`error: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return 1;
 	}
+}
+
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
+	process.exitCode = main();
 }

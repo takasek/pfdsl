@@ -75,13 +75,14 @@ vscode-dev: vscode-build
 	@echo "Watching for changes (Ctrl+C to stop)..."
 	pnpm --filter pfdsl watch
 
-# vscode-extension を .vsix にパッケージし vscode-v<version> タグを打って push する。
-# VERSION=x.y.z を渡すと package.json を更新してコミットしてからパッケージする。
-# tag を打つ前に build/test/check-docs/gen-plugin identity/配布レビュー・spec-history の鮮度を検査する (scripts/release.mjs)。
-# 例: make vscode-package VERSION=0.0.13
+# VS Code release preparation leaves the version diff for the normal PR flow.
 .PHONY: vscode-package
 vscode-package: vscode-build
-	node scripts/release.mjs vscode $(if $(VERSION),--version $(VERSION))
+	node scripts/release.mjs vscode publish $(if $(COMMIT),--commit $(COMMIT))
+
+.PHONY: vscode-prepare
+vscode-prepare:
+	node scripts/release.mjs vscode prepare $(if $(VERSION),--version $(VERSION))
 
 .PHONY: gen-samples
 gen-samples: build-deps
@@ -206,21 +207,20 @@ push: check-docs
 release-status:
 	node scripts/release-status.mjs
 
-# @pfdsl/cli を npm 公開する。VERSION= を指定するか packages/cli/package.json の version を使い
-# v<version> タグを打って push し、publish-cli.yml (OIDC) を起動する。
-# VERSION= を指定した場合は package.json を更新してコミットしてからタグを打つ。
-# tag を打つ前に build/test/check-docs/gen-plugin identity/配布レビュー・spec-history の鮮度を検査する (scripts/release.mjs)。
-# 例: make release VERSION=0.0.8
+# Prepare the CLI version diff for a normal PR.
+.PHONY: release-prepare
+release-prepare:
+	node scripts/release.mjs cli prepare $(if $(VERSION),--version $(VERSION))
+
+# Publish the exact merged commit named by COMMIT.
 .PHONY: release
 release:
-	node scripts/release.mjs cli $(if $(VERSION),--version $(VERSION))
+	node scripts/release.mjs cli publish $(if $(COMMIT),--commit $(COMMIT))
 
-# ライブラリ群（core/graphviz-exporter/preview-engine）を npm 公開する。
-# VERSION= を指定するか packages/core/package.json の version を使い
-# lib-v<version> タグを打って push し、publish-libraries.yml (OIDC) を起動する。
-# VERSION= を指定した場合は3パッケージの package.json を同時に更新してコミットしてからタグを打つ。
-# tag を打つ前に build/test/check-docs/gen-plugin identity/配布レビュー・spec-history の鮮度を検査する (scripts/release.mjs)。
-# 例: make release-libs VERSION=0.0.2
+.PHONY: release-libs-prepare
+release-libs-prepare:
+	node scripts/release.mjs libs prepare $(if $(VERSION),--version $(VERSION))
+
 .PHONY: release-libs
 release-libs:
-	node scripts/release.mjs libs $(if $(VERSION),--version $(VERSION))
+	node scripts/release.mjs libs publish $(if $(COMMIT),--commit $(COMMIT))

@@ -105,9 +105,16 @@ artifact:
     criteria: "type: pipeline が check を通り、旧値 runtime-pipeline の扱いが docs/spec/spec.md に明記され、scaffold とサンプルが新名に揃っている"
   cli_release_pipeline_kind:
     label: "CLIリリース: PFD種別名 pipeline 改名（破壊的変更）"
-    description: "#670 の改名を含む次期 npm リリース。採用リポの .pfdsl に書かれた type: 値を変える破壊的変更のため、公開まで通さないと採用リポへ届かない"
+    description: "#670の種別名改名を含むnpm CLIと、同じrelease tagから配布するreader-first plugin資産。npmへの公開とmarketplace参照の反映・取得確認を経て採用リポへ届ける"
     status: todo
-    criteria: "npm view @pfdsl/cli versions に packages/cli/package.json の version が含まれ、その公開版が type: pipeline を受理し、旧値 runtime-pipeline へ docs/spec/spec.md の規定どおりの応答を返す"
+    criteria: >
+      公開した@pfdsl/cliの版を固定して取得し、type: pipelineを受理し、
+      旧値runtime-pipelineへdocs/spec/spec.mdの規定どおりの応答を返す。
+      同じ版のremote v* tagが検証済みcommitを指し、
+      配布確認時のmainの.claude-plugin/marketplace.jsonにあるpfdslのgit-subdir sourceがそのtagとplugin/pfdslを指し、
+      そのmain commitをroadmap同期PRに記録する。
+      その参照から取得したpluginのpfd-ops work-cycle.mdで決定と理由から読めるreader-first構成を確認し、
+      同梱bundle-manifest.jsonの対象content hashが検証済み資産と一致する。
 process:
   i119_publish_extension:
     label: extension自動公開実装

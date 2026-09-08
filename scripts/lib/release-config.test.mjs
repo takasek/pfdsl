@@ -3,12 +3,61 @@ import { test } from "node:test";
 
 import {
 	bumpVersionInPackageJson,
-	filesToCommitForBump,
+	parseReleaseArgs,
 	pinMarketplaceSourceToTag,
 	RELEASE_KINDS,
-	releaseMilestoneArtifactIds,
+	releaseMilestoneCandidateArtifactIds,
 	tagName,
 } from "./release-config.mjs";
+
+test("parseReleaseArgs requires prepare to carry a version", () => {
+	assert.deepEqual(
+		parseReleaseArgs(["cli", "prepare", "--version", "0.0.21"]),
+		{
+			kindArg: "cli",
+			phase: "prepare",
+			version: "0.0.21",
+			commit: undefined,
+		},
+	);
+	assert.throws(
+		() => parseReleaseArgs(["cli", "prepare"]),
+		/--version is required for prepare/,
+	);
+	assert.throws(
+		() => parseReleaseArgs(["cli", "prepare", "--version", ""]),
+		/--version is required for prepare/,
+	);
+});
+
+test("parseReleaseArgs requires publish to carry a full commit and rejects version", () => {
+	const commit = "0123456789abcdef0123456789abcdef01234567";
+	assert.deepEqual(parseReleaseArgs(["libs", "publish", "--commit", commit]), {
+		kindArg: "libs",
+		phase: "publish",
+		version: undefined,
+		commit,
+	});
+	assert.throws(
+		() => parseReleaseArgs(["libs", "publish", "--version", "0.0.21"]),
+		/--version is not allowed for publish/,
+	);
+	assert.throws(
+		() => parseReleaseArgs(["libs", "publish", "--commit", "abc"]),
+		/full 40-character commit SHA is required/,
+	);
+});
+
+test("parseReleaseArgs rejects a missing phase and unknown arguments", () => {
+	assert.throws(
+		() => parseReleaseArgs(["cli"]),
+		/expected release kind and phase/,
+	);
+	assert.throws(
+		() => parseReleaseArgs(["cli", "publish", "--unknown"]),
+		/Unknown option/,
+	);
+});
 
 test("RELEASE_KINDS has the three known kinds with distinct tag prefixes", () => {
 	assert.deepEqual(Object.keys(RELEASE_KINDS).sort(), [
@@ -108,25 +157,7 @@ test("pinMarketplaceSourceToTag preserves tab indentation and trailing newline",
 	assert.match(after, /\t"plugins"/);
 });
 
-test("filesToCommitForBump includes plugin/pfdsl for cli releases, since gen-plugin mirrors packages/cli/package.json's version", () => {
-	assert.deepEqual(filesToCommitForBump("cli", RELEASE_KINDS.cli), [
-		"packages/cli/package.json",
-		"plugin",
-	]);
-});
-
-test("filesToCommitForBump excludes plugin/pfdsl for libs and vscode releases, which don't touch the cli version", () => {
-	assert.deepEqual(
-		filesToCommitForBump("libs", RELEASE_KINDS.libs),
-		RELEASE_KINDS.libs.packages,
-	);
-	assert.deepEqual(
-		filesToCommitForBump("vscode", RELEASE_KINDS.vscode),
-		RELEASE_KINDS.vscode.packages,
-	);
-});
-
-test("releaseMilestoneArtifactIds collects outputs of ready processes whose id starts with the given prefix", () => {
+test("releaseMilestoneCandidateArtifactIds collects outputs of ready processes whose id starts with the given prefix", () => {
 	const ready = [
 		{
 			id: "publish_cli_ansi_color",
@@ -141,12 +172,12 @@ test("releaseMilestoneArtifactIds collects outputs of ready processes whose id s
 			outputs: ["something"],
 		},
 	];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready), [
+	assert.deepEqual(releaseMilestoneCandidateArtifactIds(ready), [
 		"cli_release_ansi_color",
 	]);
 });
 
-test("releaseMilestoneArtifactIds returns an empty array when no ready process matches the prefix", () => {
+test("releaseMilestoneCandidateArtifactIds returns an empty array when no ready process matches the prefix", () => {
 	const ready = [
 		{
 			id: "implement_something",
@@ -155,10 +186,10 @@ test("releaseMilestoneArtifactIds returns an empty array when no ready process m
 			outputs: ["something"],
 		},
 	];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready), []);
+	assert.deepEqual(releaseMilestoneCandidateArtifactIds(ready), []);
 });
 
-test("releaseMilestoneArtifactIds flattens outputs across multiple matching processes", () => {
+test("releaseMilestoneCandidateArtifactIds flattens outputs across multiple matching processes", () => {
 	const ready = [
 		{ id: "publish_cli_a", label: "x", inputs: [], outputs: ["cli_release_a"] },
 		{
@@ -168,18 +199,19 @@ test("releaseMilestoneArtifactIds flattens outputs across multiple matching proc
 			outputs: ["cli_release_b1", "cli_release_b2"],
 		},
 	];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready), [
+	assert.deepEqual(releaseMilestoneCandidateArtifactIds(ready), [
 		"cli_release_a",
 		"cli_release_b1",
 		"cli_release_b2",
 	]);
 });
 
-test("releaseMilestoneArtifactIds respects a custom prefix", () => {
+test("releaseMilestoneCandidateArtifactIds respects a custom prefix", () => {
 	const ready = [
 		{ id: "publish_ext_foo", label: "x", inputs: [], outputs: ["ext_foo"] },
 	];
-	assert.deepEqual(releaseMilestoneArtifactIds(ready, "publish_ext_"), [
-		"ext_foo",
-	]);
+	assert.deepEqual(
+		releaseMilestoneCandidateArtifactIds(ready, "publish_ext_"),
+		["ext_foo"],
+	);
 });

@@ -63,16 +63,57 @@ dist 非依存の手動再生成は `scripts/gen-plugin-dist-independent.mjs` �
 - **gen_install（`scripts/lib/install-templates.mjs` の明示リスト）**: repo ルートの配布ソースから `install/` ミラーを一方向で再生成する。生成の向きは repo ルート → `install/` → `plugin/` の一本のみ（#547 で双方向 sync を廃止）
 - **plugin root assembly（`scripts/gen-plugin.mjs`）**: `pnpm -r build && make gen-plugin` が、手書きのClaude Code source topologyとschemaを中立capability recordへdecodeして四target contractを検証し、その同じrecord objectから両ハーネスの出力を生成する。pfdsl skillの中立な生成正本は`generated/skills/pfdsl`であり、`.claude/skills/pfdsl`はそこへの生成symlinkなので手編集しない。Claude Code adapterはplugin tree・manifest・marketplace記述を`plugin/pfdsl/`へidentity互換に組み立てる。Codex adapterは生成済みClaude rootやmanifestを読まず、repositoryの`AGENTS.md`・`.agents/`・`.codex/`とnative skill tree・manifest・hooksを`plugin/pfdsl-codex/`へ生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、二つのrootを混在させない。内部でgen_installを実行するため、pluginが古い`install/`から組まれることはない
 - **render_previews（`make gen-samples`）**: 機能カタログとロードマップを dot/svg に描画する。`.dot` / README は graphviz-exporter、`.svg` は preview-engine の wasm graphviz で生成され、いずれも決定論的（#588）
-- **push_cli_release_tag / publish_cli**: `make release` はClaude Code rootのdrift検査後に `.claude-plugin/marketplace.json` の `git-subdir` sourceを `plugin/pfdsl` と同じ `v*` tagへpinしてからtagをpushする。このtag上のClaude-compatible published artifactをClaude Code marketplaceと現在のCodex互換経路が消費し、そのtagだけを起動条件として `publish-cli.yml` が `@pfdsl/cli` をnpm publishする（Trusted Publishing / OIDC）
-- **push_libraries_release_tag / publish_libraries**: `make release-libs` が `lib-v*` tag を push し、その tag だけを起動条件として `publish-libraries.yml` が core → graphviz-exporter → preview-engine の順で npm publish する
-- **package_vscode_release / verify_vsix / upload_vsix**: `make vscode-package` は未検証 `.vsix` を生成し、成功後に `vscode-v*` tag を push する。1回の実行が正常完了したときの `.vsix` candidate と remote tag を同じ process の複数出力とし、tag に対応する publish workflow は置かない。人が candidate をローカルインストールして拡張の起動を確認した後、検証済み `.vsix` を marketplace.visualstudio.com へアップロードする
+- **push_cli_release_tag / publish_cli**: `make release COMMIT=<SHA>` は準備PRがmergeされた明示commitを検査し、そのSHAへ`v*` tagを作成・pushする。
+このtag上の`plugin/pfdsl/`が公開snapshotとなり、`publish-cli.yml`が同じtagのcommitから`@pfdsl/cli`をnpm publishする（Trusted Publishing / OIDC）。
+mainへのcommit/push、marketplaceのpin更新、roadmapのdone更新はrunnerの担当に含めない。
+- **pin_plugin_marketplace / install_plugin**: 公開されたCLI版と同じtagのpluginを取得確認した後、通常PRでmainのmarketplace参照を実在tagへ更新する。
+merge後のmainから参照と取得先を確認し、Claude Code marketplaceと現在のCodex互換経路がこの参照から公開snapshotを消費する。
+tag内のmarketplaceは公開前のpinを保持しており、配布先を選ぶ正本はmainの`.claude-plugin/marketplace.json`である。
+- **push_libraries_release_tag / publish_libraries**: `make release-libs COMMIT=<SHA>` が明示commitの`lib-v*` tagをpushし、`publish-libraries.yml`がそのcommitからcore → graphviz-exporter → preview-engineの順でnpm publishする。
+CLI・librariesとも手動再開はrelease tagを指定し、workflowはbranch指定を拒否してeventのSHAをcheckoutする。
+- **package_vscode_release / verify_vsix / upload_vsix**: `make vscode-package COMMIT=<SHA>`は明示commitから未検証`.vsix`を生成し、成功後に`vscode-v*` tagをpushする。
+1回の実行が正常完了したときの`.vsix` candidateとremote tagを同じprocessの複数出力とし、tagに対応するpublish workflowは置かない。
+人がcandidateをローカルインストールして拡張の起動を確認した後、検証済み`.vsix`をmarketplace.visualstudio.comへアップロードする。
+
+### PR経由の公開と公開後同期
+
+release担当が通常branchで`make release-prepare VERSION=<VERSION>`を実行し、版数と生成物の差分を通常PRへまとめる。
+librariesは`make release-libs-prepare`、VS Codeは`make vscode-prepare`を使う。
+prepareは差分だけを残し、commit・push・PR作成は通常の作業手順が担当する。
+人間が準備PRをmergeした後、release担当はcleanなcheckoutで、公開するfull SHAがHEADと最新origin/mainに一致することを確認する。
+そのSHAを`COMMIT`へ渡し、版数変更後の最終commitに既存のbuild・test・文書・生成整合・distribution-review等の検査を適用してtagを公開する。
+実行時には公開操作そのものの承認を得る。
+
+CLI公開後、release担当は公開された`@pfdsl/cli@<VERSION>`を新しく取得し、今回のmilestoneが要求する挙動を確認する。
+`cli_release_pipeline_kind`では`type: pipeline`の受理と旧値`runtime-pipeline`への規定どおりの応答を確認する。
+同じ版のremote tagが検証したSHAを指すことと、そこから取得した`plugin/pfdsl/`のreader-first資産・bundle manifestの整合も確認する。
+このtagを指すmarketplace更新を通常PRとして準備し、人間のmerge後にmainのpfdslエントリの`url`・`path`・`ref`を読み戻し、その参照先からpluginを取得して確認する。
+tagが取得できるだけの段階では、marketplace経由の配布完了とは扱わない。
+この経路はClaude-compatibleな`plugin/pfdsl/`を対象とし、`plugin/pfdsl-codex/`の別marketplace配布を開始しない。
+
+runnerのready表示は候補一覧であり、公開・取得・criteria確認の成功を表さない。
+release担当は公開物確認後、確認済みartifactだけをローカルCLIの`meta set <roadmap> <artifact> status done`で変更し、確認した版・tag/SHA・結果を本文へ記したroadmap同期PRを作る。
+後でmainのpinが進んでも再確認できるよう、配布確認時のmain commitも同じ本文へ残す。
+他のready候補と、公開または確認に失敗したartifactは未完了のまま残し、残作業を既存の追跡issueへ引き継ぐ。
+版数準備PR、marketplace pin PR、確認後のroadmap同期PRの順で進め、review・mergeは人間が行う。
+
+中断後は新しい状態台帳を作らず、準備差分・既存PR・remote tag・workflow・npm版・marketplace参照・artifact statusから再開位置を確認する。
+ローカルtagだけがある場合は対象SHAの一致を確認してpushから再開する。
+remote tagが同じSHAなら再作成や再pushをせず公開結果の確認へ進み、同名tagが別SHAを指す場合は止める。
+公開済みtagの確認は、その後mainが進んだことだけではやり直さない。
+CLIが未ビルド等で候補一覧を取得できなければ、公開workflowの確認結果と候補未確認を分けて表示する。
+CLIをbuildした後、`status ready`で候補を確認して公開物の検証へ続ける。
+VS Codeのremote tagから再開する場合、packageの名前・版に対応する通常ファイルのVSIXが必要である。
+同名ファイルだけでは対象SHAから生成された証拠にならないため、インストール・アップロード前に生成元を確認し、不明なら対象SHAから作り直す。
+workflowの失敗・未検出やnpm版の未取得を成功へ読み替えず、同じtagの確認または対象を明示した再実行から再開する。
+marketplace更新済みでmilestone未確認なら、残る取得確認とroadmap同期から続ける。
 
 **判断の境界は kind ごとの release request にある。** リリースするか・どの版で切るかは workflow.pfdsl の `decide_cli_release` / `decide_libraries_release` / `decide_vscode_release` が判断し、request 以降の変換に判断は入らない。CLI と libraries は tag が対応する publish workflow をゲートする。VSCode拡張は `scripts/release.mjs` の実行順どおり `.vsix` 生成後に tag を push するが、tag 処理は `.vsix` ファイルを読まないため両者をデータ依存の別 process にせず、同じ process の必須出力として順序を description に記す。ローカル検証は candidate を実際に読む別 process であり、検証済み package だけを upload へ渡す。
 そのため公開チェーン全体がこの図の収録対象になる。
 
-**`verify_vsix` と `upload_vsix` はこの図の2つの人手ノードである。** どちらも判断を含まないため、実行主体が人であってもこちらに置く（ADR-0035）。
-機械の変換チェーンに残る人手境界が、そのまま自動化候補の指摘になっている。
-ローカルインストールの smoke test と marketplace の発行 API を使う経路を整えれば、それぞれのノードは消える。
+**`manual_no_judgment`のprocessは、公開するかの判断を終えた後の人手手順を表す。**
+VSIXのローカル検証・アップロードと、公開済みpluginのmarketplace参照更新が該当する。
+実行主体が人でも、入力を消費して公開物や参照を作る変換はこの図に置く（ADR-0035）。
 
 ## plugin 配布チェーンの依存
 
