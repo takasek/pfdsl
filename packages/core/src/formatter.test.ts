@@ -9,6 +9,26 @@ import { normalize } from "./normalizer.js";
 import { parseTokens } from "./parser.js";
 import type { NormalizedEdge } from "./types/index.js";
 
+function assertRoundTrips(
+	formatted: string,
+	expectedEdges: NormalizedEdge[],
+	expectedIsolated: string[] = [],
+) {
+	const lexed = lex(formatted);
+	const parsed = parseTokens(lexed.tokens);
+	const normalized = normalize(parsed.document, null);
+	const errors = [
+		...lexed.diagnostics,
+		...parsed.diagnostics,
+		...normalized.diagnostics,
+	].filter((diagnostic) => diagnostic.severity === "error");
+	expect(errors).toHaveLength(0);
+	expect(normalized.edges.map((edge) => JSON.stringify(edge)).sort()).toEqual(
+		expectedEdges.map((edge) => JSON.stringify(edge)).sort(),
+	);
+	expect([...normalized.isolatedNodes]).toEqual(expectedIsolated);
+}
+
 describe("formatEdges", () => {
 	it("empty list → empty string", () => {
 		expect(formatEdges([])).toBe("");
@@ -43,20 +63,26 @@ describe("formatEdges", () => {
 		expect(formatEdges(edges)).toBe("A >> P\nP -> B\n");
 	});
 
-	it("IDs with spaces use as-is (formatter trusts input — known spec gap; output is not re-parseable as one ID)", () => {
+	it("quotes special IDs so flat output round-trips without errors", () => {
 		const edges: NormalizedEdge[] = [
-			{ kind: "input", artifact: "my artifact", process: "P" },
+			{
+				kind: "input",
+				artifact: 'input space # " \\ newline\n tab\t',
+				process: 'process space # " \\ newline\n tab\t',
+			},
+			{
+				kind: "feedback",
+				artifact: 'feedback space # " \\ newline\n tab\t',
+				process: 'feedback-process space # " \\ newline\n tab\t',
+			},
+			{
+				kind: "output",
+				process: 'output-process space # " \\ newline\n tab\t',
+				artifact: 'output space # " \\ newline\n tab\t',
+			},
 		];
-		const out = formatEdges(edges);
-		expect(out).toBe("my artifact >> P\n");
-		// Document the gap: spaced output is rejected on re-parse (not round-trip safe).
-		const { tokens } = lex(out);
-		const parsed = parseTokens(tokens);
-		const norm = normalize(parsed.document, null);
-		const allErrors = [...parsed.diagnostics, ...norm.diagnostics].filter(
-			(d) => d.severity === "error",
-		);
-		expect(allErrors.length).toBeGreaterThan(0);
+		const isolated = ['isolated space # " \\ newline\n tab\t'];
+		assertRoundTrips(formatEdges(edges, isolated), edges, isolated);
 	});
 
 	it("bare-id edges round-trip through lex/parse/normalize unchanged", () => {
@@ -72,6 +98,31 @@ describe("formatEdges", () => {
 		);
 		expect(allErrors).toHaveLength(0);
 		expect(norm.edges).toEqual(edges);
+	});
+
+	it("keeps Unicode, underscore, and hyphen IDs bare", () => {
+		const edges: NormalizedEdge[] = [
+			{
+				kind: "input",
+				artifact: "日本語１２３_成果物-1",
+				process: "-処理_2",
+			},
+		];
+		expect(formatEdges(edges)).toBe("日本語１２３_成果物-1 >> -処理_2\n");
+	});
+
+	it.each([
+		"A#B",
+		"A B",
+		"A[B]",
+		"A;B",
+		"A,B",
+		"A>>B",
+		"A->B",
+	])("round-trips the ID %s when its only special syntax requires quoting", (artifact) => {
+		const edges: NormalizedEdge[] = [{ kind: "input", artifact, process: "P" }];
+		for (const formatter of [formatEdges, formatAsFlows])
+			assertRoundTrips(formatter(edges), edges);
 	});
 
 	it("isolated nodes output after edges", () => {
@@ -252,5 +303,38 @@ describe("formatAsFlows", () => {
 			{ kind: "output", process: "P", artifact: "B" },
 		];
 		expect(formatAsFlows(edges, ["lone"])).toBe("A >> P -> B\nlone\n");
+	});
+
+	it("quotes special IDs in multi-element flows and preserves every edge kind", () => {
+		const process = 'process space # " \\ newline\n tab\t';
+		const edges: NormalizedEdge[] = [
+			{
+				kind: "input",
+				artifact: 'input-a space # " \\ newline\n tab\t',
+				process,
+			},
+			{
+				kind: "input",
+				artifact: 'input-b space # " \\ newline\n tab\t',
+				process,
+			},
+			{
+				kind: "feedback",
+				artifact: 'feedback space # " \\ newline\n tab\t',
+				process,
+			},
+			{
+				kind: "output",
+				process,
+				artifact: 'output-a space # " \\ newline\n tab\t',
+			},
+			{
+				kind: "output",
+				process,
+				artifact: 'output-b space # " \\ newline\n tab\t',
+			},
+		];
+		const isolated = ['isolated space # " \\ newline\n tab\t'];
+		assertRoundTrips(formatAsFlows(edges, isolated), edges, isolated);
 	});
 });

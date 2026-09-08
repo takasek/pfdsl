@@ -49,6 +49,7 @@ import type {
 	Graph,
 	NodeKind,
 	NormalizedEdge,
+	Token,
 } from "./types/index.js";
 import { validate } from "./validator.js";
 
@@ -123,6 +124,7 @@ export interface AnalyzeResult {
 
 interface ParsedBody extends ParseDocResult {
 	body: string;
+	tokens: Token[];
 }
 
 /**
@@ -157,6 +159,7 @@ function parseBody(
 		frontmatter,
 		bodyStartLine,
 		body,
+		tokens,
 		diagnostics: [...fmDiags, ...lexDiags, ...parseDiags],
 	};
 }
@@ -274,6 +277,7 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 		document,
 		frontmatter,
 		body,
+		tokens,
 		diagnostics: parseDiags,
 	} = parseBody(source);
 	const {
@@ -309,20 +313,76 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 	// only need segEdges — recomputing isolated per segment against the full
 	// file's frontmatter would flag nearly every other node as isolated
 	// relative to that single segment (issue #368).
-	const segments = splitBodyIntoSegments(body);
-	const formattedBody = segments
-		.map((seg) => {
-			if (seg.kind === "comment") return seg.text;
-			const { tokens: segToks } = lex(seg.text);
-			const { document: segDoc } = parseTokens(segToks);
-			const { edges: segEdges } = normalize(segDoc, frontmatter);
-			const segGraph = buildGraph(segEdges, nodeKinds);
-			const segSorted = sortEdges(segEdges, segGraph);
-			return opts.style === "flows"
-				? formatAsFlows(segSorted)
-				: formatEdges(segSorted);
-		})
-		.join("");
+	const formatCanonicalBody = (segmentBody: string): string =>
+		splitBodyIntoSegments(segmentBody)
+			.map((seg) => {
+				if (seg.kind === "comment") return seg.text;
+				const { tokens: segToks } = lex(seg.text);
+				const { document: segDoc } = parseTokens(segToks);
+				const { edges: segEdges } = normalize(segDoc, frontmatter);
+				const segGraph = buildGraph(segEdges, nodeKinds);
+				const segSorted = sortEdges(segEdges, segGraph);
+				return opts.style === "flows"
+					? formatAsFlows(segSorted)
+					: formatEdges(segSorted);
+			})
+			.join("");
+
+	const comments = tokens.filter((token) => token.type === "COMMENT");
+	const rawRanges: { start: number; end: number }[] = [];
+	let commentCursor = 0;
+	for (const statement of document.statements) {
+		while (
+			commentCursor < comments.length &&
+			comments[commentCursor]!.start.offset < statement.start.offset
+		)
+			commentCursor++;
+		const internalComment = comments[commentCursor];
+		if (
+			!internalComment ||
+			internalComment.start.offset >= statement.end.offset
+		)
+			continue;
+
+		let end = statement.end.offset;
+		let trailingCursor = commentCursor + 1;
+		while (
+			trailingCursor < comments.length &&
+			comments[trailingCursor]!.start.offset < end
+		)
+			trailingCursor++;
+		const trailingComment = comments[trailingCursor];
+		if (
+			trailingComment &&
+			trailingComment.start.line === statement.end.line &&
+			/^[ \t\r]*$/.test(body.slice(end, trailingComment.start.offset))
+		)
+			end = trailingComment.end.offset;
+		rawRanges.push({ start: statement.start.offset, end });
+	}
+
+	const consumeRawSeparator = (offset: number): number => {
+		let cursor = offset;
+		while (/[ \t\r]/.test(body[cursor] ?? "")) cursor++;
+		if (body[cursor] === ";") {
+			cursor++;
+			while (/[ \t\r]/.test(body[cursor] ?? "")) cursor++;
+			if (body[cursor] === "\n") cursor++;
+			return cursor;
+		}
+		if (body[cursor] === "\n") return cursor + 1;
+		return offset;
+	};
+
+	const formattedBodyParts: string[] = [];
+	let bodyOffset = 0;
+	for (const { start, end } of rawRanges) {
+		formattedBodyParts.push(formatCanonicalBody(body.slice(bodyOffset, start)));
+		formattedBodyParts.push(body.slice(start, end), "\n");
+		bodyOffset = consumeRawSeparator(end);
+	}
+	formattedBodyParts.push(formatCanonicalBody(body.slice(bodyOffset)));
+	const formattedBody = formattedBodyParts.join("");
 
 	// Isolated nodes are rendered exactly once, as a trailing block at the
 	// very end of the file (after all segments), instead of once per segment.
@@ -334,10 +394,9 @@ export function format(source: string, opts: FormatOptions = {}): FormatResult {
 				? formatAsFlows([], isolatedIds)
 				: formatEdges([], isolatedIds);
 
-	// Both halves are on LF at this point: the body was re-emitted and the
-	// frontmatter was rendered with an explicit LF above. The FM001/FM002
-	// fallback is the one part passed through verbatim from the source, so the
-	// conversion tolerates a \r that is already there rather than doubling it.
+	// Canonical output uses LF, while preserved statements and the FM001/FM002
+	// frontmatter fallback can retain source CRLF. Convert the whole output
+	// without doubling a carriage return that is already present.
 	const output = frontmatterSection + formattedBody + isolatedBlock;
 	return {
 		output:

@@ -18,6 +18,37 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const samplePath = resolve(__dirname, "__fixtures__/pipeline-scale.pfdsl");
 const sampleSource = readFileSync(samplePath, "utf-8");
 
+function semanticSnapshot(source: string) {
+	const result = analyze(source);
+	return {
+		edges: result.edges.map((edge) => JSON.stringify(edge)).sort(),
+		nodeKinds: [...result.nodeKinds.entries()].sort(([a], [b]) =>
+			a.localeCompare(b),
+		),
+		isolatedNodes: [...result.isolatedNodes].sort(),
+	};
+}
+
+function assertFormatPreservesSemantics(
+	source: string,
+	style: "flat" | "flows",
+	expectedOutput: string,
+) {
+	const before = semanticSnapshot(source);
+	const result = format(source, { style });
+	const errors = result.diagnostics.filter(
+		(diagnostic) => diagnostic.severity === "error",
+	);
+	expect(errors).toHaveLength(0);
+	expect(result.output).toBe(expectedOutput);
+	const after = analyze(result.output);
+	expect(
+		after.diagnostics.filter((diagnostic) => diagnostic.severity === "error"),
+	).toHaveLength(0);
+	expect(semanticSnapshot(result.output)).toEqual(before);
+	expect(format(result.output, { style }).output).toBe(result.output);
+}
+
 describe("public API", () => {
 	it("analyze: warns when a plain frontmatter scalar is truncated by an inline comment", () => {
 		const src =
@@ -175,6 +206,57 @@ describe("public API", () => {
 		const src = "# section A\nA >> P\nP -> B\n";
 		const { output } = format(src, { style: "flows" });
 		expect(output).toBe("# section A\nA >> P -> B\n");
+	});
+
+	it("format: preserves a comment inside a chain for flat and flows", () => {
+		const src = "[a,b]\n# note\n>> P -> c\n";
+		for (const style of ["flat", "flows"] as const)
+			assertFormatPreservesSemantics(src, style, src);
+	});
+
+	it("format: keeps an internally commented statement raw beside a normal statement", () => {
+		const src = "Z>>Q; A # keep\n  >>   P\n";
+		const expected = "Z >> Q\nA # keep\n  >>   P\n";
+		for (const style of ["flat", "flows"] as const)
+			assertFormatPreservesSemantics(src, style, expected);
+	});
+
+	it("format: consumes a statement separator after a raw commented statement", () => {
+		for (const src of [
+			"A # keep\n  >>   P; Z   >>   Q\n",
+			"A # keep\n  >>   P;\nZ>>Q\n",
+			"A # keep\n  >>   P;   \nZ>>Q\n",
+		]) {
+			const expected = "A # keep\n  >>   P\nZ >> Q\n";
+			for (const style of ["flat", "flows"] as const)
+				assertFormatPreservesSemantics(src, style, expected);
+		}
+	});
+
+	it("format: preserves an indented internal comment and trailing comment in CRLF", () => {
+		const src = [
+			"---",
+			"title: Demo",
+			"---",
+			"[A,B]",
+			"  # keep",
+			"  >>   P -> C # tail",
+			"",
+		].join("\r\n");
+		for (const style of ["flat", "flows"] as const)
+			assertFormatPreservesSemantics(src, style, src);
+	});
+
+	it("format: does not attach a later same-line statement to an earlier raw statement", () => {
+		const src = "A # keep\n  >> P Q -> B # tail\n";
+		const expected = "A # keep\n  >> P\nQ -> B\n";
+		for (const style of ["flat", "flows"] as const)
+			assertFormatPreservesSemantics(src, style, expected);
+	});
+
+	it("format: does not treat quoted hashes or trailing-only comments as raw triggers", () => {
+		const src = '"A#B"   >>   P\nA >> P # tail\n';
+		expect(format(src, { style: "flat" }).output).toBe('"A#B" >> P\nA >> P\n');
 	});
 
 	it("format: preserves comment between two edge blocks", () => {
