@@ -85,12 +85,6 @@ console.log(
 );
 
 if (verdict.status === "FAIL") {
-	console.error(
-		"\nThe issue this PR closes is labelled flow:managed but has no process in",
-	);
-	console.error(
-		".pfdsl/roadmap.pfdsl. Add the dependency chain in this PR, or relabel the",
-	);
-	console.error("issue flow:exempt if it gates no other work.");
+	console.error("\nSee the audit findings above for details.");
 	process.exit(1);
 }
