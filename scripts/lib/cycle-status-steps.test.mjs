@@ -1304,6 +1304,7 @@ describe("runCycleStatus preArtifactPatterns", () => {
 			"---",
 			"",
 			"- **名前**: 冒頭の一文。",
+			"  具体例: `preflight`。",
 			"  対策: 書く前に確認する。",
 			"",
 		].join("\n");
@@ -1311,11 +1312,22 @@ describe("runCycleStatus preArtifactPatterns", () => {
 	it("loads only the phase: pre-artifact pattern files, name/path/countermeasure each", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
+				issueNumbers: [1118],
 				readdirSync: () => ["a.md", "b.md", "not-a-pattern.txt"],
 				readFileSync: (path) => {
 					if (path.endsWith("a.md")) return patternText("pre-artifact");
 					if (path.endsWith("b.md")) return patternText(undefined);
 					throw new Error(`unexpected read: ${path}`);
+				},
+				execGh: async (args) => {
+					if (args[0] === "issue")
+						return JSON.stringify({
+							title: "",
+							body: "`preflight`",
+							comments: [],
+							labels: [],
+						});
+					return JSON.stringify([]);
 				},
 			}),
 		);
@@ -1401,13 +1413,33 @@ describe("runCycleStatus preArtifactPatterns", () => {
 		]);
 	});
 
-	it("hands back the whole pool, named as unnarrowed, when the issue has no code span", async () => {
+	it("keeps an always-tagged pattern when the issue has no code span", async () => {
 		const result = await runForCatalog(
 			"コードスパンのない本文。",
 			fourPatterns,
 		);
-		assert.equal(result.preArtifactPatterns.length, 4);
+		assert.equal(result.preArtifactPatterns.length, 0);
 		assert.equal(result.preArtifactSelection.unselective, true);
+		assert.equal(result.preArtifactSelection.reason, "no-words");
+	});
+
+	it("keeps only always-tagged patterns when the issue has no code span", async () => {
+		const result = await runForCatalog("コードスパンのない本文。", {
+			"a.md": namedPattern("A", "無関係。"),
+			"always.md": [
+				"---",
+				"tags: [always]\nphase: pre-artifact",
+				"---",
+				"",
+				"- **ALWAYS**: 常に読む。",
+				"  対策: 毎回読む。",
+				"",
+			].join("\n"),
+		});
+		assert.deepEqual(
+			result.preArtifactPatterns.map((p) => p.name),
+			["ALWAYS"],
+		);
 		assert.equal(result.preArtifactSelection.reason, "no-words");
 	});
 
@@ -1452,7 +1484,7 @@ describe("runCycleStatus preArtifactPatterns", () => {
 				},
 			}),
 		);
-		assert.equal(result.preArtifactPatterns.length, 4);
+		assert.equal(result.preArtifactPatterns.length, 0);
 		assert.equal(result.preArtifactSelection.reason, "no-words");
 		assert.deepEqual(result.preArtifactSelection.words, []);
 	});

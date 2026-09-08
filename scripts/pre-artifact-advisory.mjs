@@ -15,7 +15,10 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildPreArtifactReminders } from "./lib/cycle-status.mjs";
+import {
+	narrowPreArtifactReminders,
+	preArtifactQueryWords,
+} from "./lib/cycle-status.mjs";
 import { readStdinText } from "./lib/hook-io.mjs";
 import { runPreArtifactAdvisory } from "./lib/pre-artifact-advisory.mjs";
 import {
@@ -59,13 +62,14 @@ const currentBranch = () => {
 const { shouldOutput, output } = runPreArtifactAdvisory(await readStdinText(), {
 	root,
 	cycleId: currentBranch,
-	loadReminders: () =>
-		buildPreArtifactReminders(
+	loadReminders: (filePath) =>
+		narrowPreArtifactReminders(
 			loadPatternCatalogOrThrow(resolve(root, PATTERN_DIR_RELATIVE), {
 				readdirSync,
 				readFileSync,
 				displayPath: (path) => relative(root, path),
 			}),
+			preArtifactQueryWords(`\`${filePath}\``),
 		),
 	hasFired: (key) => existsSync(markerPath(key)),
 	markFired: (key) => writeFileSync(markerPath(key), ""),
