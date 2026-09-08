@@ -18,7 +18,6 @@ import {
 	outputArtifactStatusStep,
 	perIssueSteps,
 	reviewRecordStep,
-	sizeDirectionStep,
 	wipTransitionStep,
 } from "./gate-check-steps.mjs";
 
@@ -875,77 +874,6 @@ describe("designRecordStep", () => {
 			assert.equal(result.status, "FAIL");
 			assert.match(result.detail, /no design-selection record found/);
 		});
-	});
-});
-
-describe("sizeDirectionStep", () => {
-	it("SKIPs when no --issue given", () => {
-		const { exec, calls } = fakeExec();
-		const result = sizeDirectionStep({ exec });
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /--issue/);
-		assert.deepEqual(calls, []);
-	});
-
-	it("SKIPs when gh CLI is unavailable", () => {
-		const { exec } = fakeExec();
-		const result = sizeDirectionStep({
-			exec,
-			issue: null,
-			issueFailure: { status: "SKIP", detail: "gh CLI unavailable" },
-		});
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /gh CLI unavailable/);
-	});
-
-	it("FAILs when the lookup failed for a reason other than a missing gh", () => {
-		const { exec } = fakeExec();
-		const result = sizeDirectionStep({
-			exec,
-			issue: null,
-			issueFailure: { status: "FAIL", detail: "issue lookup failed: boom" },
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /boom/);
-	});
-
-	const grown = [
-		{
-			path: ".pfdsl/bindings/x.pfdsl",
-			beforeBytes: 3,
-			afterBytes: 7,
-			beforeLines: 2,
-			afterLines: 2,
-		},
-	];
-	const declared = "Size-Intent: shrink\n";
-
-	it("SKIPs when the issue declares no size intent", () => {
-		const result = sizeDirectionStep({
-			issue: { body: "肥大について書いただけ。" },
-			deltas: grown,
-		});
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /Size-Intent/);
-	});
-
-	it("FAILs on growth when no commit declared an override", () => {
-		const result = sizeDirectionStep({
-			issue: { body: declared },
-			deltas: grown,
-			overrideDeclared: false,
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /x\.pfdsl/);
-	});
-
-	it("PASSes growth a commit trailer declared", () => {
-		const result = sizeDirectionStep({
-			issue: { body: declared },
-			deltas: grown,
-			overrideDeclared: true,
-		});
-		assert.equal(result.status, "PASS");
 	});
 });
 

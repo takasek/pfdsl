@@ -6,8 +6,8 @@
  * A commit message is the one place a declaration can be read at the moment
  * the terminal gate runs — the gate normally runs before the PR exists, so a
  * PR body is both unfetchable and, once fetched, editable after the fact.
- * The review record (#698) already lived here; the size override moved here
- * to join it, and the scan had to stop being private to one of them.
+ * The review record (#698) already lived here; other declarations can share
+ * the same generic trailer parser.
  */
 
 /** Separator the callers' `git log --format` invocation puts between messages. */

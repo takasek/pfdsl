@@ -23,7 +23,6 @@ import {
 	formatGateTable,
 	formatRunTreeLine,
 	formatSizeDelta,
-	hasSizeOverride,
 	matchesTrigger,
 	parseAuditExternalTerminals,
 	parseAuditTerminals,
@@ -50,7 +49,6 @@ import {
 	outputArtifactStatusStep,
 	perIssueSteps,
 	reviewRecordStep,
-	sizeDirectionStep,
 	wipTransitionStep,
 } from "./lib/gate-check-steps.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
@@ -329,26 +327,9 @@ results.push(
 // with the required structure (#669)? One row per issue the cycle closes (#734).
 results.push(...perIssueSteps(designRecordStep, issues, { exec, base }));
 
-// 11. knowledge-artifact size direction: did tracked knowledge artifacts grow
-// without an explicit override, on a cycle whose linked issue declares one (#669)?
-// The deltas are collected regardless — they are printed as report material below,
-// so a cycle that never declared an intent still shows its numbers. Collected here
-// rather than inside the step because two consumers need the same measurement; the
-// roadmap-based blocks below still read the file per block, which is the older
-// convention and stays until something needs them shared too.
+// 11. knowledge-artifact size report: collect the measured deltas regardless of
+// issue metadata so the terminal output always shows changed knowledge artifacts.
 const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
-
-// Size-Override rides in a commit trailer (#775). The branch's own messages
-// are always readable here, which is what the PR body never was: the gate runs
-// before the PR exists, so the lookup it replaced spent most of its life
-// reporting that it could not run.
-const overrideDeclared = hasSizeOverride(commitMessages.text);
-results.push(
-	...perIssueSteps(sizeDirectionStep, issues, {
-		deltas: sizeDeltas,
-		overrideDeclared,
-	}),
-);
 
 // `root` here is this script's own location (resolved from import.meta.url
 // above), not the shell's cwd. gate-check's PreToolUse guard
@@ -529,9 +510,7 @@ console.log(formatGateTable(results));
 }
 
 // Report material: the size of every tracked knowledge artifact this branch
-// touched. Printed whether or not the linked issue declared a shrink intent —
-// the verdict is gated on the declaration, the numbers are not, so the cycle
-// that forgot the token still has something to put in the PR body.
+// touched. The numbers are always printed for human review.
 if (sizeDeltas.length > 0) {
 	console.log(`\nKnowledge-artifact size (origin/${base} → HEAD):`);
 	for (const d of sizeDeltas) console.log(`  ${formatSizeDelta(d)}`);

@@ -18,12 +18,12 @@ describe("trailerLines", () => {
 			"",
 			"prose",
 			"",
-			"Size-Override: the catalogue gained a pattern",
+			"Review: tool=simplify",
 			"",
 			"Co-Authored-By: Someone <s@example.com>",
 		].join("\n");
 		assert.deepEqual(trailerLines(message), [
-			"Size-Override: the catalogue gained a pattern",
+			"Review: tool=simplify",
 			"Co-Authored-By: Someone <s@example.com>",
 		]);
 	});
@@ -32,7 +32,7 @@ describe("trailerLines", () => {
 		const message = [
 			"docs: explain the token",
 			"",
-			"A cycle writes Size-Override: <reason> when growth is intended.",
+			"A cycle writes Review: tool=<tool-name> when the review is complete.",
 		].join("\n");
 		assert.deepEqual(trailerLines(message), []);
 	});
