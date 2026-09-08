@@ -8,6 +8,7 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	renameSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
@@ -1385,6 +1386,180 @@ describe("assemblePluginDistIndependent", () => {
 			),
 			false,
 		);
+	});
+
+	it("does not roll back a lock holder when the outer assembly is rejected", () => {
+		const root = mkdtempSync(join(tmpdir(), "gen-plugin-lock-boundary-"));
+		const pluginRoot = join(root, "plugin/pfdsl");
+		const codexPluginRoot = join(root, "plugin/pfdsl-codex");
+		const lockPath = join(root, ".codex-assets-assembly.lock");
+		const holderTransaction = join(root, "plugin/.pfdsl-gen-txn-lock-holder-a");
+		const agentsPath = join(root, "AGENTS.md");
+		mkdirSync(pluginRoot, { recursive: true });
+		mkdirSync(codexPluginRoot, { recursive: true });
+		mkdirSync(lockPath);
+		mkdirSync(holderTransaction, { recursive: true });
+		writeFileSync(join(holderTransaction, "marker"), "holder transaction");
+		writeFileSync(agentsPath, "old");
+		let injected = false;
+		let snapshotCopies = 0;
+		let neutralCalls = 0;
+		try {
+			assert.throws(
+				() =>
+					assemblePluginDistIndependent({
+						root,
+						pluginRoot,
+						codexPluginRoot,
+						deps: {
+							cpSync: (...args) => {
+								snapshotCopies += 1;
+								return cpSync(...args);
+							},
+							existsSync,
+							mkdirSync: (path, ...args) => {
+								if (path === lockPath) {
+									writeFileSync(agentsPath, "published-by-lock-holder-a");
+									injected = true;
+								}
+								return mkdirSync(path, ...args);
+							},
+							readFileSync,
+							renameSync,
+							rmSync,
+							writeFileSync,
+							decodeHarnessCapabilities: () => [],
+							assembleClaudeAssets: () => ({
+								observed: {
+									"claude-repository": [],
+									"claude-plugin": [],
+								},
+							}),
+							assembleCodexAssets,
+							newRunId: () => "contender-b",
+						},
+						generateNeutralSkill: () => {
+							neutralCalls += 1;
+						},
+					}),
+				/Codex asset assembly lock is held/,
+			);
+			assert.equal(injected, true);
+			assert.equal(snapshotCopies, 0);
+			assert.equal(neutralCalls, 0);
+			assert.equal(
+				readFileSync(agentsPath, "utf8"),
+				"published-by-lock-holder-a",
+			);
+			assert.equal(
+				readFileSync(join(holderTransaction, "marker"), "utf8"),
+				"holder transaction",
+			);
+			assert.equal(existsSync(lockPath), true);
+			assert.equal(
+				existsSync(join(root, "plugin/.pfdsl-gen-txn-contender-b")),
+				false,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	for (const failurePhase of ["neutral generation", "later assembly"]) {
+		it(`restores the neutral skill when ${failurePhase} fails`, () => {
+			const root = mkdtempSync(join(tmpdir(), "pfdsl-neutral-rollback-"));
+			const pluginRoot = join(root, "plugin/pfdsl");
+			const skillRoot = join(root, "generated/skills/pfdsl");
+			const skillPath = join(skillRoot, "SKILL.md");
+			const lockPath = join(root, ".codex-assets-assembly.lock");
+			const failure = new Error(`${failurePhase} failed`);
+			let neutralCalls = 0;
+			mkdirSync(skillRoot, { recursive: true });
+			writeFileSync(skillPath, "previous neutral skill");
+			try {
+				assert.throws(
+					() =>
+						assemblePluginDistIndependent({
+							root,
+							pluginRoot,
+							generateNeutralSkill: () => {
+								neutralCalls += 1;
+								assert.equal(existsSync(lockPath), true);
+								writeFileSync(skillPath, "changed neutral skill");
+								if (failurePhase === "neutral generation") throw failure;
+							},
+							deps: {
+								cpSync,
+								existsSync,
+								mkdirSync,
+								renameSync,
+								rmSync,
+								newRunId: () => "neutral-rollback",
+								decodeHarnessCapabilities: () => {
+									throw failure;
+								},
+							},
+						}),
+					(error) => error === failure,
+				);
+				assert.equal(neutralCalls, 1);
+				assert.equal(readFileSync(skillPath, "utf8"), "previous neutral skill");
+				assert.equal(existsSync(lockPath), false);
+				assert.equal(
+					existsSync(join(root, "plugin/.pfdsl-gen-txn-neutral-rollback")),
+					false,
+				);
+			} finally {
+				rmSync(root, { recursive: true, force: true });
+			}
+		});
+	}
+
+	it("releases the outer lock when snapshot creation fails", () => {
+		const pluginRoot = "/repo/plugin/pfdsl";
+		let lockHeld = false;
+		const { deps } = fakeDeps({
+			cpSync: () => {
+				throw new Error("snapshot creation failed");
+			},
+			existsSync: (path) => path === pluginRoot,
+			mkdirSync: (path) => {
+				if (path === "/repo/.codex-assets-assembly.lock") lockHeld = true;
+			},
+			rmSync: (path) => {
+				if (path === "/repo/.codex-assets-assembly.lock") lockHeld = false;
+			},
+		});
+
+		assert.throws(
+			() =>
+				assemblePluginDistIndependent({
+					root: "/repo",
+					pluginRoot,
+					deps,
+				}),
+			/snapshot creation failed/,
+		);
+		assert.equal(lockHeld, false);
+	});
+
+	it("releases the outer lock after a successful full assembly", () => {
+		let lockHeld = false;
+		const { deps } = fakeDeps({
+			mkdirSync: (path) => {
+				if (path === "/repo/.codex-assets-assembly.lock") lockHeld = true;
+			},
+			rmSync: (path) => {
+				if (path === "/repo/.codex-assets-assembly.lock") lockHeld = false;
+			},
+		});
+
+		assemblePluginDistIndependent({
+			root: "/repo",
+			pluginRoot: "/repo/plugin/pfdsl",
+			deps,
+		});
+		assert.equal(lockHeld, false);
 	});
 
 	it("restores the Claude plugin root when an early mirror fails", () => {
