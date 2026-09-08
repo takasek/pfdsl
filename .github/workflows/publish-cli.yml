@@ -5,8 +5,7 @@ on:
     tags:
       - 'v[0-9]*'
   # Manual fallback: tag pushes occasionally fail to trigger this workflow.
-  # Dispatch from the branch/ref whose packages/cli/package.json version
-  # should be published (e.g. main).
+  # Dispatch from the exact release tag only.
   workflow_dispatch:
 
 jobs:
@@ -16,7 +15,20 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Validate release tag ref
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$RELEASE_REF" != "refs/tags/$RELEASE_TAG" ]; then
+            echo "This workflow only publishes an exact release tag ref." >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
 
       - uses: pnpm/action-setup@v6
 
@@ -24,6 +36,13 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify tag and package version
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/check-release-ref.mjs cli
 
       - run: pnpm install --frozen-lockfile
 

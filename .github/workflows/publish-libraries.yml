@@ -13,7 +13,20 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Validate release tag ref
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$RELEASE_REF" != "refs/tags/$RELEASE_TAG" ]; then
+            echo "This workflow only publishes an exact release tag ref." >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
 
       - uses: pnpm/action-setup@v6
 
@@ -21,6 +34,13 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify tag and package versions
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/check-release-ref.mjs libs
 
       - run: pnpm install --frozen-lockfile
 
@@ -38,7 +58,20 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Validate release tag ref
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$RELEASE_REF" != "refs/tags/$RELEASE_TAG" ]; then
+            echo "This workflow only publishes an exact release tag ref." >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
 
       - uses: pnpm/action-setup@v6
 
@@ -46,6 +79,13 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify tag and package versions
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/check-release-ref.mjs libs
 
       - run: pnpm install --frozen-lockfile
 
@@ -63,7 +103,20 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Validate release tag ref
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$RELEASE_REF" != "refs/tags/$RELEASE_TAG" ]; then
+            echo "This workflow only publishes an exact release tag ref." >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
 
       - uses: pnpm/action-setup@v6
 
@@ -71,6 +124,13 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify tag and package versions
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/check-release-ref.mjs libs
 
       - run: pnpm install --frozen-lockfile
 

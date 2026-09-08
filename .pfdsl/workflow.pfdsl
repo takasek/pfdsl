@@ -105,17 +105,17 @@ artifact:
   cli_release_request:
     label: CLIリリース要求
     description: "make release-status の @pfdsl/cli 欄を材料に、公開する版と make release を実行する判断を外化した入力。pipeline.pfdsl が v* tag と npm 公開へ変換する"
-    criteria: "@pfdsl/cli の公開要否と版が決まり、make release VERSION=<VERSION> を実行できる"
+    criteria: "@pfdsl/cliの公開要否と版が決まり、make release-prepare VERSION=<VERSION>の差分を通常PRへまとめ、merge後の明示SHAをmake release COMMIT=<SHA>へ渡せる"
     group: release
   libraries_release_request:
     label: ライブラリリリース要求
     description: "make release-status の3ライブラリ欄を材料に、公開する版と make release-libs を実行する判断を外化した入力。pipeline.pfdsl が lib-v* tag と npm 公開へ変換する"
-    criteria: 3ライブラリの公開要否と共通版が決まり、make release-libs VERSION=<VERSION> を実行できる
+    criteria: 3ライブラリの公開要否と共通版が決まり、make release-libs-prepare VERSION=<VERSION>の差分を通常PRへまとめ、merge後の明示SHAをmake release-libs COMMIT=<SHA>へ渡せる
     group: release
   vscode_release_request:
     label: VSCode拡張リリース要求
     description: "make release-status の takasek.pfdsl 欄を材料に、パッケージする版と make vscode-package を実行する判断を外化した入力。pipeline.pfdsl の単一変換が .vsix を生成した後に vscode-v* tag を push する"
-    criteria: VSCode拡張のパッケージ要否と版が決まり、make vscode-package VERSION=<VERSION> を実行できる
+    criteria: VSCode拡張のパッケージ要否と版が決まり、make vscode-prepare VERSION=<VERSION>の差分を通常PRへまとめ、merge後の明示SHAをmake vscode-package COMMIT=<SHA>へ渡せる
     group: release
   user_intent:
     label: ユーザーの関心・意図
@@ -524,17 +524,17 @@ process:
     group: planning
   decide_cli_release:
     label: CLIリリース判断
-    description: "make release-status で @pfdsl/cli と plugin 同梱物の behind を確認し、公開するか・どの版で切るかを判断する。判断後の v* tag push・npm publish は pipeline.pfdsl が持つ。make release 完了後、roadmap の publish_cli_* プロセスのうち ready になったものの出力 artifact を自動 done 化してコミット・push する（#278）。バージョン番号からの artifact ID 逆算はしない"
+    description: "make release-statusで@pfdsl/cliとplugin同梱物のbehindを確認し、公開するか・どの版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAへのv* tag push・npm publish・marketplace参照更新はpipeline.pfdslが持つ。runnerのready表示は候補に留め、公開物・mainのpin反映・取得を確認したartifactだけをroadmap同期PRでdoneへ更新する"
     command: "make release-status"
     group: release
   decide_libraries_release:
     label: ライブラリリリース判断
-    description: "make release-status で core・graphviz-exporter・preview-engine の behind を確認し、3ライブラリを公開するか・どの共通版で切るかを判断する。判断後の lib-v* tag push・npm publish は pipeline.pfdsl が持つ"
+    description: "make release-statusでcore・graphviz-exporter・preview-engineのbehindを確認し、3ライブラリを公開するか・どの共通版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAへのlib-v* tag push・npm publishはpipeline.pfdslが持つ"
     command: "make release-status"
     group: release
   decide_vscode_release:
     label: VSCode拡張リリース判断
-    description: "make release-status で takasek.pfdsl の behind を確認し、拡張をパッケージするか・どの版で切るかを判断する。判断後の .vsix 生成・vscode-v* tag push・marketplace アップロードは pipeline.pfdsl が持つ"
+    description: "make release-statusでtakasek.pfdslのbehindを確認し、拡張をパッケージするか・どの版で切るかを判断する。版数準備は通常PRで行い、判断後の明示SHAからの.vsix生成・vscode-v* tag push・marketplaceアップロードはpipeline.pfdslが持つ"
     command: "make release-status"
     group: release
   review_distribution:

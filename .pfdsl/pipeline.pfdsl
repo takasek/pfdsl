@@ -313,10 +313,16 @@ artifact:
     group: published
   published_claude_plugin:
     label: 公開済みClaude互換plugin artifact
-    description: "push_cli_release_tag が公開する v* tag 上のClaude-compatible plugin artifact。.claude-plugin/marketplace.json の git-subdir source が plugin/pfdsl/ と同じ v* tag の ref に pin され、Claude Code marketplace と現在のCodex互換導入がこの公開snapshotを消費する"
-    criteria: "公開済み v* tag の .claude-plugin/marketplace.json で plugins[0].source が source=git-subdir、url=https://github.com/takasek/pfdsl.git、path=plugin/pfdsl、ref=v<VERSION> を持つ"
+    description: "push_cli_release_tag が検証済みcommitから公開する v* tag 上の plugin/pfdsl/ snapshot。tag内のmarketplaceは公開前のpinを保持する。公開後にpin_plugin_marketplaceがmainの参照を更新し、Claude Code marketplaceと現在のCodex互換導入へ届ける"
+    criteria: "remoteのv<VERSION> tagが検証済みcommitを指し、そのtagからplugin/pfdsl/のmanifest・skills・commands・hooksを取得できる"
     externalStakeholders: [ Claude Code利用者, Codex利用者 ]
     location: https://github.com/takasek/pfdsl/tree/v<VERSION>/plugin/pfdsl
+    group: published
+  plugin_marketplace_entry:
+    label: 公開tagを指すmarketplace参照
+    description: "公開版の確認後、通常PRを経てmainへ反映されたClaude-compatible pluginの取得先。install_pluginがこの参照のurl・path・refからpublished_claude_pluginを取得する"
+    criteria: "mainの.claude-plugin/marketplace.jsonでpfdslのsourceがgit-subdir、url=https://github.com/takasek/pfdsl.git、path=plugin/pfdsl、ref=v<VERSION>を持ち、そのrefから検証済みpluginを取得できる"
+    location: https://github.com/takasek/pfdsl/blob/main/.claude-plugin/marketplace.json
     group: published
   published_libraries:
     label: npm 公開ライブラリ群
@@ -466,30 +472,30 @@ process:
     tags: [ gen ]
   push_cli_release_tag:
     label: CLIタグ生成・push
-    description: "make release がClaude Code rootのdrift検査を含むpre-tag checksを実行し、.claude-plugin/marketplace.json のClaude-compatible git-subdir sourceを同じ v* tagへpinしてから、そのtagをpushする。正常完了時のtagはcli_release_tagとpublished_claude_pluginになり、tag push後のnpm publishはpublish_cliが持つ"
-    command: "make release VERSION=<VERSION>"
+    description: "準備PRをmergeしたcommitをCOMMITで明示し、make releaseがそのcommitのpre-tag checksを実行して同じSHAへv* tagを作成・pushする。mainへのcommit/pushとmarketplace更新は行わない。正常出力はcli_release_tagとpublished_claude_pluginで、npm公開はpublish_cli、公開後の参照更新はpin_plugin_marketplaceが持つ"
+    command: "make release COMMIT=<SHA>"
     location: ../scripts/release.mjs
     tags: [ gen ]
   publish_cli:
     label: CLI自動公開
-    description: "v* tag push だけを起動条件として publish-cli.yml が @pfdsl/cli を npm publish する（Trusted Publishing / OIDC）"
+    description: "v* tag push、または同じrelease tagを指定した手動再開でpublish-cli.ymlがeventのSHAをcheckoutし、tagとpackage versionを照合して@pfdsl/cliをnpm publishする（Trusted Publishing / OIDC）。branchからの手動公開は拒否する"
     location: ../.github/workflows/publish-cli.yml
     tags: [ gen ]
   push_libraries_release_tag:
     label: ライブラリタグ生成・push
-    description: "make release-libs が選択済み共通版で pre-tag checks を実行し、lib-v* tag を push する。tag push 後の npm publish は publish_libraries が持つ"
-    command: "make release-libs VERSION=<VERSION>"
+    description: "準備PRをmergeした共通版のcommitをCOMMITで明示し、make release-libsがpre-tag checks後に同じSHAのlib-v* tagをpushする。mainへのcommit/pushは行わず、npm公開はpublish_librariesが持つ"
+    command: "make release-libs COMMIT=<SHA>"
     location: ../scripts/release.mjs
     tags: [ gen ]
   publish_libraries:
     label: ライブラリ自動公開
-    description: "lib-v* tag push だけを起動条件として publish-libraries.yml が core・graphviz-exporter・preview-engine を順に npm publish する（Trusted Publishing / OIDC）"
+    description: "lib-v* tag push、または同じrelease tagを指定した手動再開でpublish-libraries.ymlがeventのSHAをcheckoutし、tagと共通package versionを照合してcore・graphviz-exporter・preview-engineを順にnpm publishする（Trusted Publishing / OIDC）。branchからの手動公開は拒否する"
     location: ../.github/workflows/publish-libraries.yml
     tags: [ gen ]
   package_vscode_release:
     label: VSIX生成・タグpush
     description: "選択済み版の vscode-extension を未検証 .vsix へパッケージングし、その生成が成功した後で vscode-v* tag を push する。1回の make vscode-package が正常完了したときの両成果物を単一変換の複数出力として扱い、内部順序はこの description が持つ"
-    command: "make vscode-package VERSION=<VERSION>"
+    command: "make vscode-package COMMIT=<SHA>"
     location: ../scripts/release.mjs
     tags: [ gen ]
   verify_vsix:
@@ -499,12 +505,17 @@ process:
     tags: [ manual_no_judgment ]
   upload_vsix:
     label: marketplace へ手動アップロード
-    description: "生成済み .vsix を marketplace.visualstudio.com へ人が手でアップロードする。判断は不要で、発行APIを使う経路を整えていないという境界の問題だけが理由。この図で唯一の人手ノードであり自動化候補（ADR-0035の判定基準により、判断がないためworkflowでなくこちらに置く）"
+    description: "生成済み .vsix を marketplace.visualstudio.com へ人が手でアップロードする。判断は不要で、発行APIを使う経路を整えていないという境界の問題だけが理由。ADR-0035の判定基準により、判断がないためworkflowでなくこちらに置く"
     owner: takasek
     tags: [ manual_no_judgment ]
+  pin_plugin_marketplace:
+    label: marketplace参照をPRで更新
+    description: "公開されたCLI版と同じtagのpluginを取得確認し、mainのmarketplace参照をその実在tagへ更新する通常PRを作る。merge後のmainから参照と取得先を再確認する。runnerはこの変更を行わず、release担当が差分を準備し人間がreview・mergeする"
+    location: ../.pfdsl/pipeline.md
+    tags: [ g, manual_no_judgment ]
   install_plugin:
     label: プラグインインストール
-    description: "外部ユーザーがClaude Codeのmarketplace機構でpublished_claude_pluginを導入・更新する（/plugin install、更新は/plugin marketplace update）。現在のCodexもnative marketplace rootではなく、.claude-plugin/marketplace.json互換経路から同じClaude-compatible published artifactを消費する。codex_plugin_distはこの導入経路に渡さない"
+    description: "外部ユーザーがmainのplugin_marketplace_entryからpublished_claude_pluginを導入・更新する（/plugin install、更新は/plugin marketplace update）。現在のCodexも.claude-plugin/marketplace.json互換経路から同じClaude-compatible snapshotを消費する。codex_plugin_distはこの導入経路に渡さない"
     tags: [ g ]
   deploy_install_layer:
     label: L3レイヤー実配置
@@ -572,7 +583,11 @@ vsix_candidate >> verify_vsix -> vsix_package
 
 vsix_package >> upload_vsix -> published_ext
 
-published_claude_plugin >> install_plugin -> installed_plugin
+[published_claude_plugin, published_cli] >> pin_plugin_marketplace -> plugin_marketplace_entry
+
+plugin_marketplace_entry >>? pin_plugin_marketplace
+
+[plugin_marketplace_entry, published_claude_plugin] >> install_plugin -> installed_plugin
 
 installed_plugin >> deploy_install_layer -> installed_l3_layer
 

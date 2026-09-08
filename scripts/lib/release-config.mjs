@@ -1,15 +1,15 @@
 /**
- * Pure functions and config for the release targets (release / release-libs /
- * vscode-package). git/gh/pnpm I/O lives in scripts/release.mjs; this module
- * stays testable.
+ * Pure functions and config for the release targets. git/gh/pnpm I/O lives in
+ * scripts/release-runner.mjs; this module stays testable.
  */
+
+import { parseArgs } from "node:util";
 
 /**
  * @typedef {Object} ReleaseKind
  * @property {string[]} packages - package.json paths to bump, repo-root-relative
  * @property {string} tagPrefix
  * @property {string | null} workflow - GHA workflow file name to watch, or null (vscode has none)
- * @property {(version: string) => string} commitMessage
  */
 
 /** @type {Record<string, ReleaseKind>} */
@@ -18,7 +18,6 @@ export const RELEASE_KINDS = {
 		packages: ["packages/cli/package.json"],
 		tagPrefix: "v",
 		workflow: "publish-cli.yml",
-		commitMessage: (v) => `chore(package): bump version to ${v}`,
 	},
 	libs: {
 		packages: [
@@ -28,16 +27,65 @@ export const RELEASE_KINDS = {
 		],
 		tagPrefix: "lib-v",
 		workflow: "publish-libraries.yml",
-		commitMessage: (v) => `chore(libs): bump library versions to ${v}`,
 	},
 	vscode: {
 		packages: ["packages/vscode-extension/package.json"],
 		tagPrefix: "vscode-v",
 		workflow: null,
-		commitMessage: (v) =>
-			`chore(package): bump vscode-extension version to ${v}`,
 	},
 };
+
+/**
+ * Parse the two-phase release entrypoint before any repository command runs.
+ * @param {string[]} args
+ * @returns {{kindArg: string, phase: "prepare" | "publish", version?: string, commit?: string}}
+ */
+export function parseReleaseArgs(args) {
+	let parsed;
+	try {
+		parsed = parseArgs({
+			args,
+			options: {
+				version: { type: "string" },
+				commit: { type: "string" },
+			},
+			strict: true,
+			allowPositionals: true,
+		});
+	} catch (error) {
+		throw new Error(error instanceof Error ? error.message : String(error));
+	}
+
+	if (parsed.positionals.length !== 2) {
+		throw new Error("expected release kind and phase");
+	}
+	const [kindArg, phase] = parsed.positionals;
+	if (!RELEASE_KINDS[kindArg]) {
+		throw new Error(
+			`unknown release kind '${kindArg}' (expected one of: ${Object.keys(RELEASE_KINDS).join(", ")})`,
+		);
+	}
+	if (phase !== "prepare" && phase !== "publish") {
+		throw new Error(
+			`unknown release phase '${phase}' (expected prepare or publish)`,
+		);
+	}
+
+	const { version, commit } = parsed.values;
+	if (phase === "prepare") {
+		if (commit !== undefined)
+			throw new Error("--commit is not allowed for prepare");
+		if (version === undefined || version === "")
+			throw new Error("--version is required for prepare");
+	} else {
+		if (version !== undefined)
+			throw new Error("--version is not allowed for publish");
+		if (commit === undefined || !/^[0-9a-f]{40}$/i.test(commit))
+			throw new Error("a full 40-character commit SHA is required for publish");
+	}
+
+	return { kindArg, phase, version, commit };
+}
 
 /**
  * Rewrites only the "version" field of a package.json source string,
@@ -63,31 +111,13 @@ export function tagName(kind, version) {
 }
 
 /**
- * Paths to `git add` when committing a version bump. gen-plugin.mjs derives
- * plugin/pfdsl/.claude-plugin/plugin.json's version from packages/cli/package.json,
- * so a cli release must re-stage the regenerated plugin dir alongside the
- * bumped package.json — otherwise the pre-commit hook's staleness check
- * (which re-derives plugin/pfdsl and diffs it against the index) rejects
- * the commit.
- * @param {string} kindArg
- * @param {ReleaseKind} kind
- * @returns {string[]}
- */
-export function filesToCommitForBump(kindArg, kind) {
-	return kindArg === "cli" ? [...kind.packages, "plugin"] : [...kind.packages];
-}
-
-/**
- * Picks out the roadmap release-milestone artifact IDs that a `pfdsl status
- * ready --json` run says are actionable right now, restricted to processes whose
- * ID starts with `prefix`. No version-number derivation: whichever release
- * milestones happen to be ready get marked done, regardless of how many
- * versions actually shipped between them.
+ * Picks out candidate artifact IDs from ready release processes. The result is
+ * display-only: the release runner never mutates roadmap state.
  * @param {{id: string, outputs: string[]}[]} readyItems - the `ready` array from `pfdsl status ready --json`
  * @param {string} [prefix]
  * @returns {string[]}
  */
-export function releaseMilestoneArtifactIds(
+export function releaseMilestoneCandidateArtifactIds(
 	readyItems,
 	prefix = "publish_cli_",
 ) {
