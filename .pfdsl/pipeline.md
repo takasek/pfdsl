@@ -93,7 +93,7 @@ Claude outputをCodexの期待値に使わず、Codex outputをClaudeの期待�
 
 ## モデル化対象外のツール
 
-`scripts/gate-check.mjs`・`scripts/pfdsl/audit-issues-flow.mjs`・`scripts/check-scaffold-sync.mjs` 等、PR ゲート・監査目的の開発者向けツールはこの図の対象外とする。pfdsl の実行時変換でも配布物でもなく、このリポ自身の開発フローを検証するメタツールのため。pfd-ops 終端ゲート「変換コンポーネントを追加・変更・削除した場合...」の判定で、この種のツールの新規追加・変更は該当なしと扱ってよい。
+`scripts/gate-check.mjs`・`scripts/check-scaffold-sync.mjs` 等、このリポ自身の開発フローだけを検証するツールはこの図の対象外とする。pfdsl の実行時変換でも配布物でもないため、pfd-ops 終端ゲート「変換コンポーネントを追加・変更・削除した場合...」の判定で、この種のツールの新規追加・変更は該当なしと扱ってよい。採用リポへ配布する `scripts/pfdsl/audit-issues-flow.mjs` は `ops_install_sources` に含める。
 
 ## エラー・例外処理
 

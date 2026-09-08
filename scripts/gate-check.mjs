@@ -162,7 +162,7 @@ if (pfdslFiles.length === 0) {
 	}
 }
 
-// 2. audit-issues-flow (no --fix: fails if manual findings remain)
+// 2. read-only audit-issues-flow (fails if blocking findings remain)
 {
 	const r = node(["scripts/pfdsl/audit-issues-flow.mjs"]);
 	results.push({

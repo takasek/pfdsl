@@ -60,7 +60,7 @@ function githubOpsFromExecGh(execGh) {
 					"--state",
 					"open",
 					"--json",
-					"number,title,headRefName,statusCheckRollup",
+					"number,title",
 				]),
 			),
 		viewIssue: async ({ number, fields }) =>
@@ -255,7 +255,7 @@ describe("runCycleStatus", () => {
 		assert.equal(result.best, "proc_a");
 	});
 
-	it("sets prError and empty PR lists when gh pr list fails", async () => {
+	it("sets prError and an empty PR list when gh pr list fails", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				execGh: async () => {
@@ -263,26 +263,28 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.deepEqual(result.openFlowSyncPRs, []);
-		assert.deepEqual(result.otherOpenPRs, []);
+		assert.deepEqual(result.openPRs, []);
 		assert.equal(result.prError, "gh: not authenticated");
 	});
 
-	it("classifies PRs on success", async () => {
+	it("lists all open PRs without special handling for old flow-sync branches", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				execGh: async (args) => {
 					if (args[0] === "pr") {
 						return JSON.stringify([
 							{ number: 1, title: "sync", headRefName: "flow-sync/x" },
+							{ number: 2, title: "feature", headRefName: "feat/x" },
 						]);
 					}
 					return "";
 				},
 			}),
 		);
-		assert.deepEqual(result.otherOpenPRs, []);
-		assert.equal(result.openFlowSyncPRs.length, 1);
+		assert.deepEqual(result.openPRs, [
+			{ number: 1, title: "sync" },
+			{ number: 2, title: "feature" },
+		]);
 		assert.equal(result.prError, undefined);
 	});
 

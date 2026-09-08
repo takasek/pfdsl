@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Cycle preflight: bundles step-1 mechanical operations (fetch, rebase-behind
-// check, flow-sync PR check, ready listing) into one compact JSON payload.
+// check, open PR listing, ready listing) into one compact JSON payload.
 // Usage: node scripts/cycle-status.mjs [--base main] [--issue <n> ...]
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";

@@ -167,8 +167,8 @@ artifact:
     group: gen_sources
   ops_install_sources:
     label: pfd-ops 配布ソース（repo ルート）
-    description: "採用リポへ配る監査スクリプトと GitHub Actions workflow の一次情報。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install-templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）"
-    location: [ ../scripts/pfdsl/, ../.github/workflows/pfdsl-flow-on-issue-close.yml ]
+    description: "採用リポへ配る読取専用の監査スクリプトの一次情報。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install-templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）"
+    location: ../scripts/pfdsl/
     group: gen_sources
   claude_harness_sources:
     label: 現行のClaude Code手書き入力
@@ -340,15 +340,9 @@ artifact:
     group: adopter_env
   installed_l3_layer:
     label: 導入済みL3レイヤー
-    description: "plugin同梱install/由来ファイル（GitHub Actionsワークフロー・監査スクリプト）の採用リポルートへの実配置結果"
+    description: "plugin同梱install/由来の読取専用監査スクリプトと依存moduleの採用リポルートへの実配置結果"
     criteria: check-install-sync.mjs --deploy が実装され、採用リポへの実配置が動作確認済み
-    externalStakeholders: [ 採用リポのGitHub Actions ]
-    group: adopter_repo
-  gh_labels:
-    label: GitHubラベル整備結果
-    description: "flow:managed / flow:exempt ラベルの存在保証（gh CLI経由）"
-    criteria: audit-issues-flow.mjs --fix によるラベル自動生成が実装され動作確認済み
-    externalStakeholders: [ 採用リポのGitHubリポジトリ ]
+    externalStakeholders: [ 採用リポのメンテナ ]
     group: adopter_repo
   drift_report:
     label: 配置鮮度警告
@@ -524,12 +518,6 @@ process:
     command: node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
     location: ../.claude/skills/pfd-ops/scripts/check-install-sync.mjs
     tags: [ g ]
-  ensure_labels:
-    label: ラベル保証
-    description: "L3採用手順の一部として flow:managed / flow:exempt ラベルの存在を確認・作成する（deployed の audit-issues-flow.mjs --fix が未作成ラベルを自動生成する。旧skill syncのensure機能の移管先）"
-    command: node scripts/pfdsl/audit-issues-flow.mjs --fix
-    location: ../scripts/pfdsl/audit-issues-flow.mjs
-    tags: [ g ]
 ---
 
 pfdsl_source >> parse -> parsed_doc
@@ -591,5 +579,3 @@ installed_plugin >> deploy_install_layer -> installed_l3_layer
 installed_l3_layer >>? deploy_install_layer
 
 [installed_l3_layer, installed_plugin] >> check_install_sync -> drift_report
-
-installed_l3_layer >> ensure_labels -> gh_labels

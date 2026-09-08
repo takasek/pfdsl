@@ -33,46 +33,6 @@ const CODE_PATH_LABEL = CODE_PATH.source
 	.join(" か ");
 
 /**
- * @param {Array<{conclusion?: string|null, status?: string}>} [statusCheckRollup]
- * @returns {"NONE"|"PASS"|"FAIL"|"PENDING"|"UNKNOWN"}
- */
-export function summarizeCiStatus(statusCheckRollup) {
-	if (!statusCheckRollup || statusCheckRollup.length === 0) return "NONE";
-	const conclusions = statusCheckRollup.map((c) => c.conclusion ?? null);
-	if (conclusions.some((c) => c === "FAILURE" || c === "ERROR")) return "FAIL";
-	if (
-		conclusions.some(
-			(c) => c === null || c === "PENDING" || c === "IN_PROGRESS",
-		)
-	)
-		return "PENDING";
-	if (conclusions.every((c) => c === "SUCCESS")) return "PASS";
-	return "UNKNOWN";
-}
-
-/**
- * @param {Array<{number: number, title: string, headRefName: string, statusCheckRollup?: Array}>} prs
- * @param {RegExp} flowSyncPattern
- * @returns {{openFlowSyncPRs: Array<{number: number, title: string, ci: string}>, otherOpenPRs: Array<{number: number, title: string}>}}
- */
-export function classifyPRs(prs, flowSyncPattern = /^flow-sync\//) {
-	const openFlowSyncPRs = [];
-	const otherOpenPRs = [];
-	for (const pr of prs) {
-		if (flowSyncPattern.test(pr.headRefName)) {
-			openFlowSyncPRs.push({
-				number: pr.number,
-				title: pr.title,
-				ci: summarizeCiStatus(pr.statusCheckRollup),
-			});
-		} else {
-			otherOpenPRs.push({ number: pr.number, title: pr.title });
-		}
-	}
-	return { openFlowSyncPRs, otherOpenPRs };
-}
-
-/**
  * @param {unknown} readyJson - output of `pfdsl status ready --best --json`
  * @returns {{ready: string[], best: string | null, bestOutputs: string[]}}
  */

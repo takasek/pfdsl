@@ -80,9 +80,8 @@ console.log(`check-closes-reference: ${result.status} — ${result.detail}`);
 
 if (result.status === "FAIL") {
 	console.error(
-		"\nWithout the link the merge leaves the issue open and never triggers",
+		"\nWithout the link the merge leaves the issue open. Edit the PR body to include:",
 	);
-	console.error("the flow-sync workflow. Edit the PR body to include:");
 	console.error("  Closes #<issue number>");
 	console.error("\nIf this PR has no issue to close, declare why instead:");
 	console.error("  no-issue: <reason>");

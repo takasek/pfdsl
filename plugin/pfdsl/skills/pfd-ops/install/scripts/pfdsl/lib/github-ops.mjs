@@ -23,7 +23,7 @@ import {
 	fetchAllLabels,
 	fetchDesignRecordEditInfo,
 	fetchIssueView,
-	fetchOpenPrsWithCi,
+	fetchOpenPrs,
 	fetchPullRequestView,
 	mapLabelsResponse,
 	normalizeDesignRecordEditResponse,
@@ -291,7 +291,7 @@ export function createGitHubOps({
 					fetchPullRequestView(owner, repo, token, number, fields, fetchImpl),
 			),
 
-		/** @returns {Promise<Array<{number: number, title: string, headRefName: string, statusCheckRollup: {conclusion: string|null}[]}>>} */
+		/** @returns {Promise<Array<{number: number, title: string}>>} */
 		listOpenPrs: () =>
 			withListFallback(
 				"listOpenPrs",
@@ -303,14 +303,14 @@ export function createGitHubOps({
 						"--state",
 						"open",
 						"--json",
-						"number,title,headRefName,statusCheckRollup",
+						"number,title",
 						"--limit",
 						String(PR_LIST_LIMIT),
 					]);
 					return JSON.parse(out);
 				},
 				({ owner, repo, token }) =>
-					fetchOpenPrsWithCi(owner, repo, token, fetchImpl, PR_LIST_LIMIT),
+					fetchOpenPrs(owner, repo, token, fetchImpl, PR_LIST_LIMIT),
 			),
 
 		/**
