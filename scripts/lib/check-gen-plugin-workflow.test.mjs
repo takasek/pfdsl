@@ -54,13 +54,12 @@ describe("check-gen-plugin workflow", () => {
 		assert.deepEqual(pathspecs, preCommitPathspecs);
 	});
 
-	it("checks untracked outputs in the install and snapshot workflows", () => {
+	it("checks untracked outputs in the install workflow", () => {
 		const cases = [
 			[
 				".github/workflows/check-pfd-ops-sync.yml",
 				[".claude/skills/pfd-ops/install"],
 			],
-			[".github/workflows/test.yml", ["packages/core/src/__snapshots__/"]],
 		];
 
 		for (const [workflowPath, expectedPaths] of cases) {

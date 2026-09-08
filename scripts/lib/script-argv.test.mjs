@@ -17,12 +17,12 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
-/** @param {string} script @param {string[]} args */
-function runScript(script, args) {
+/** @param {string} script @param {string[]} args @param {object} [env] */
+function runScript(script, args, env = {}) {
 	const result = spawnSync(process.execPath, [resolve(root, script), ...args], {
 		cwd: root,
 		encoding: "utf8",
-		env: { ...process.env, GH_HOST: "github.com" },
+		env: { ...process.env, GH_HOST: "github.com", ...env },
 		// Before the fix these scripts ignore the bad flag and run their whole
 		// body, network included. The cap keeps a red run bounded; once the
 		// parse rejects, every case returns immediately.
@@ -71,42 +71,25 @@ describe("entry scripts reject argv they do not understand", () => {
 		assert.match(stderr, /--base/);
 	});
 
-	// A boolean flag given an inline value is the form that reads as "I asked
-	// for the fix": includes("--fix") misses "--fix=true" entirely, so the
-	// audit runs read-only while the caller believes it repaired the roadmap.
-	it("audit-issues-flow.mjs rejects --fix=true rather than running read-only", () => {
+	it("audit-issues-flow.mjs rejects removed --fix", () => {
 		const { status, stderr } = runScript(
 			"scripts/pfdsl/audit-issues-flow.mjs",
-			["--fix=true"],
+			["--fix"],
+			{ PATH: "", GH_TOKEN: "", GITHUB_TOKEN: "" },
 		);
-		assert.notEqual(status, 0);
+		assert.equal(status, 2);
 		assert.match(stderr, /--fix/);
 	});
 
-	for (const conflictingArgs of [
-		["--check-closed-registration", "959", "--fix"],
-		["--check-closed-registration", "959", "--enforce-issue", "959"],
-	]) {
-		it(`audit-issues-flow.mjs rejects conflicting targeted mode: ${conflictingArgs.join(" ")}`, () => {
-			const { status, stderr } = runScript(
-				"scripts/pfdsl/audit-issues-flow.mjs",
-				conflictingArgs,
-			);
-			assert.equal(status, 2);
-			assert.match(stderr, /mutually exclusive/);
-		});
-	}
-
-	for (const value of ["0", "1.5", "abc"]) {
-		it(`audit-issues-flow.mjs rejects invalid --check-closed-registration ${JSON.stringify(value)}`, () => {
-			const { status, stderr } = runScript(
-				"scripts/pfdsl/audit-issues-flow.mjs",
-				["--check-closed-registration", value],
-			);
-			assert.equal(status, 2);
-			assert.match(stderr, /--check-closed-registration/);
-		});
-	}
+	it("audit-issues-flow.mjs rejects removed --check-closed-registration", () => {
+		const { status, stderr } = runScript(
+			"scripts/pfdsl/audit-issues-flow.mjs",
+			["--check-closed-registration", "959"],
+			{ PATH: "", GH_TOKEN: "", GITHUB_TOKEN: "" },
+		);
+		assert.equal(status, 2);
+		assert.match(stderr, /--check-closed-registration/);
+	});
 
 	// The inline form of a value-taking flag has to reach the script, not be
 	// skipped: indexOf("--artifact") does not see "--artifact=k", so the

@@ -2,12 +2,12 @@
  * The pre-commit gate list, built from what the commit stages.
  *
  * Six of these gates have the "regenerate the derived output, fail if it
- * changed" shape and were a static array (takasek/pfdsl#755). The three added
- * here — snapshot freshness, .pfdsl canonical format, markdown line breaks —
+ * changed" shape and were a static array (takasek/pfdsl#755). The two added
+ * here — .pfdsl canonical format and markdown line breaks —
  * were still `exit 1` in scripts/pre-commit, so each hid every gate after it
  * and turned one bad commit into as many attempts as it had problems (#759).
  *
- * Two of the three cannot be spelled as a fixed argv: `pfdsl fmt` takes one
+ * Both of these cannot be spelled as a fixed argv: `pfdsl fmt` takes one
  * file, and check-md-linebreaks.mjs takes the staged paths. Rather than teach
  * DriftGate about dynamic arguments — which would also mean teaching the runner
  * to report *which* command in a gate failed, to keep the file name in the hint
@@ -24,7 +24,7 @@ const CLI_DIST = "packages/cli/dist/cli.js";
 const OPS_PFDSL = /^\.pfdsl\/.*\.pfdsl$/;
 
 /**
- * The shape five of these gates share: run the generator, then ask git whether
+ * The shape four of these gates share: run the generator, then ask git whether
  * it changed a tracked output or added an untracked one. Spelled once so a gate
  * cannot omit either half of that identity check.
  * @param {[string, string[]]} regenerate
@@ -57,18 +57,6 @@ export function buildGates({ stagedPresent }) {
 	// that tree into plugin/. Running gen-plugin first would diff plugin/ against
 	// an install/ that is about to change.
 	return [
-		{
-			id: "pfdsl-snapshots",
-			// Triggered by every staged .pfdsl, deletions included — a removed
-			// fixture changes the snapshot as surely as an edited one does.
-			trigger: /\.pfdsl$/,
-			requireDist: [],
-			commands: regenerateThenCheck(
-				["pnpm", ["--filter", "@pfdsl/core", "exec", "vitest", "run", "-u"]],
-				["packages/core/src/__snapshots__/"],
-			),
-			hint: "Snapshots are stale. Run 'pnpm --filter @pfdsl/core exec vitest run -u' and re-stage the snapshot file.",
-		},
 		// One gate per file: DriftGate carries a single hint, and the operator
 		// needs the name of the file that is unformatted, not the news that one of
 		// them is.

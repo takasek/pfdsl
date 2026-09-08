@@ -87,7 +87,7 @@ proposal 起草での「既存構造」は対象 spec の現行 frontmatter キ�
 
 ## .pfdsl 変更後のスナップショット更新
 
-`packages/core/src/__fixtures__/` 内のフィクスチャ `.pfdsl` を変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。pre-commit hook（`.pfdsl` staged 時）と CI の両方で更新漏れを自動検出する。`.pfdsl/roadmap.pfdsl` / `.pfdsl/workflow.pfdsl` 等の運用 PFD を変更してもスナップショットは変化しない（fixture ベースのため）。
+`packages/core/src/__fixtures__/` 内のフィクスチャ `.pfdsl` を変更した場合、`pnpm --filter @pfdsl/core exec vitest run -u` でスナップショットを更新してからコミットする。更新漏れは通常の core test と CI で検出する。`.pfdsl/roadmap.pfdsl` / `.pfdsl/workflow.pfdsl` 等の運用 PFD を変更してもスナップショットは変化しない（fixture ベースのため）。
 
 ## 生成物の再生成と自動ドリフト検査（gen-skill / gen-plugin / gen-samples / gen-readme-cli）
 
@@ -234,7 +234,7 @@ binding・companion・guard の分類に当たることは根拠にならない 
 
 ## develop 着手時の artifact status 更新
 
-汎用ルール（着手時 todo→wip、PR を待たない）は pfd-ops の `references/work-cycle.md`「進捗と完了根拠」が一次情報。このリポでは flow-sync が merge 後に `done` へ自動遷移させるが、`todo` → `wip` は人手のため着手と同時に行う。
+着手時の todo→wip と、完了根拠に基づく done 更新は pfd-ops の `references/work-cycle.md`「進捗と完了根拠」に従う。
 
 ## workflow.pfdsl に status を書かない
 

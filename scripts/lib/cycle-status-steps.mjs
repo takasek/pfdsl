@@ -19,7 +19,6 @@ import {
 	buildGateCheckCommand,
 	buildReviewRecordTemplate,
 	classifyDesignSettlement,
-	classifyPRs,
 	countBehind,
 	detectEnumeratedOptions,
 	findIssueNumberForProcess,
@@ -157,12 +156,11 @@ export async function runCycleStatus({
 		headStateError = e.message;
 	}
 
-	let openFlowSyncPRs = [];
-	let otherOpenPRs = [];
+	let openPRs = [];
 	let prError = null;
 	try {
 		const prJson = await githubOps.listOpenPrs();
-		({ openFlowSyncPRs, otherOpenPRs } = classifyPRs(prJson));
+		openPRs = prJson.map(({ number, title }) => ({ number, title }));
 	} catch (e) {
 		prError = e.message;
 	}
@@ -533,8 +531,7 @@ export async function runCycleStatus({
 		behindBase,
 		currentBranch,
 		commitsAheadOfBase,
-		openFlowSyncPRs,
-		otherOpenPRs,
+		openPRs,
 		releasePending,
 		ready,
 		best,

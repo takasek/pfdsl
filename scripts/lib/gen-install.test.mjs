@@ -94,6 +94,20 @@ describe("genInstall", () => {
 		assert.equal(readFileSync(installPath(tmp, "a.txt"), "utf-8"), "hello");
 	});
 
+	it("removes empty directories left by a retired template without removing retained files", () => {
+		writeFile(tmp, "scripts/a.mjs", "export const a = 1;\n");
+		writeFile(tmp, ".github/workflows/retired.yml", "name: retired\n");
+		genInstall(tmp, ["scripts/a.mjs", ".github/workflows/retired.yml"]);
+
+		genInstall(tmp, ["scripts/a.mjs"]);
+
+		assert.equal(existsSync(installPath(tmp, ".github")), false);
+		assert.equal(
+			readFileSync(installPath(tmp, "scripts/a.mjs"), "utf-8"),
+			"export const a = 1;\n",
+		);
+	});
+
 	it("raises a clear error naming a missing listed source, and does not partially write", () => {
 		writeFile(tmp, "present.txt", "here");
 		// "missing.txt" is intentionally never created.

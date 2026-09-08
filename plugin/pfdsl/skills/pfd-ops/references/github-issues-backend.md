@@ -9,11 +9,8 @@ PFD の作業項目を GitHub Issues で管理する流儀。pfdsl 固有では�
 - **id 規約**: issue に対応する作業の process id は `iN_` prefix（N = issue 番号）。**恒久** — issue close 後も剥がさない。同一 process が複数 issue に対応する場合は `i40_i41_do_work` のように連結する。対応する出力 artifact の id は最初から plain（prefix なし）。**まだ issue が無いプロセスは plain の id で置く** — `work-cycle.md` の成果物の門番が要求するプレースホルダ後続プロセスは、起票より先にグラフへ入る。採番できない番号を捏造せず、起票時に `iN_` を付けてリネームする。この状態は `check` を通ってしまい機械検出されないので、逸脱として `roadmap.md` に書き残す
 - **ラベル**: roadmap 登録 issue は `flow:managed`、対象外は `flow:exempt`（判定は「ラベル判定基準」節）
 - **updated_at**: 同期時点の GitHub `updatedAt` スナップショット
-- **close 時の挙動**: issue の `stateReason` によって異なる。判定起点は process（`iN_` から issue 番号を解決し、body の edge から出力 artifact を逆引きする）
-  - **COMPLETED**（`Close as completed`）: 実装済みとして扱う。終端はチェーンごと削除（`closed_in_flow`）。下流入力が残るものは process 側の `tags`/`updated_at` を削除するのみ — `iN_` prefix は恒久のため剥がさず、`status` も強制しない（マージ時に既に `done` になっている）
-  - **NOT_PLANNED**（`Close as not planned`）: 未実装のまま廃止。終端は自動削除（`closed_not_planned`）、下流入力が残るものは手動対応 finding — 下流 artifact も廃止するか代替を用意するかを人が判断する
-  - **チェーンの定義**: 削除対象の「チェーン」= 当該 artifact + それを唯一生産する process + 関連 edge。process を残すと出力なき孤児 process になる（`check` が検出する。入力だけ残った process は V003、入力も出力も持たない宣言済み process は V020。エッジを一切失ったノードは `graph orphans` でも一覧できる）
-  - **終端でなかったチェーンの回収**: 上の close 時削除は close の瞬間に終端だったチェーンしか対象にしない。下流が後から全て完了したチェーンはどの close イベントからも見えないまま残るため、放置すると roadmap は完了履歴の台帳へ育つ。roadmap が持ってよいのは、(a) done でない artifact を出力する process と、(b) その入出力として edge に現れる artifact だけである。(b) に入る done artifact は ready/blocked 判定の入力として参照されるから残るのであって、完了の記録として残るのではない。完了履歴は closed issue・git 履歴・決定記録・公開レジストリが持ち、roadmap に写しを置かない — 削除したノードを指す `revises:` 等の参照も一緒に外す。回収の導出は2コマンドを要する。`status list <file> --status todo,wip,waiting,suspended` で done でない artifact を列挙し、その各々の生産 process を `graph neighbors <file> <artifact-id>` の `predecessors` で引くと (a) が出る。続けて (a) の各 process へ `graph neighbors` を当て、`predecessors` と `successors` に現れる artifact を集めると (b) が出る。その外側が削除対象になる。検査は `status ready <file> --json` と `status blocked <file> --json` の**出力全体**を削除の前後で突き合わせて行う。id の集合だけを見ると (b) の done artifact を削り落とした回を通す — 入力が1件減っても残りが全て done なら process は ready のままで、集合も `check` も変わらない。差が出るのは各 process の `inputs` を含む JSON の側だけである
+- **issue close と進捗**: close はグラフ書換えの契機にしない。成果物の完了判断と status 更新は `work-cycle.md` の完了根拠に従う。未実装のまま廃止する場合も、未完了作業が必要とする入力を保存し、代替や廃止の判断を依存構造へ反映する
+- **サイクル終了時の完了チェーン回収**: roadmap に残すのは、(a) done でない artifact を出力する process と、(b) その入出力として edge に現れる artifact である。(b) に入る done artifact は ready/blocked 判定の入力として残す。完了履歴は closed issue・git 履歴・決定記録・公開レジストリが持つ。`status list <file> --status todo,wip,waiting,suspended` で done でない artifact を列挙し、各 artifact の `graph neighbors <file> <artifact-id>` の `predecessors` から (a) を求める。続けて各 process の `graph neighbors` の `predecessors` と `successors` から (b) を求め、その外側のノード・edge と残存 `revises:` 参照を整理する。削除前後で `status ready <file> --json` と `status blocked <file> --json` の**出力全体**を比較し、`check` と `graph orphans` を確認する。id 集合だけの比較では、ready のまま入力が減る破損を検出できない
 
 ## ラベル判定基準
 
@@ -53,7 +50,7 @@ issue に対応する PR を作る際、本文に必ず閉じるキーワード�
 Closes #<issue番号>
 ```
 
-複数 issue の場合は1行ずつ列挙する。これにより PR マージ時に GitHub が issue を自動 close し、`flow-on-issue-close` ワークフローが起動する。
+複数 issue の場合は1行ずつ列挙する。これによりデフォルトブランチへの PR マージ時に GitHub が issue を自動 close する。
 
 **中間 PR では使わない**: `Closes` を使うのはデフォルトブランチ（main 等）へ直接マージする PR のみ。feature branch への中間 PR に書くと、feature branch マージ時点で issue が閉じられ、デフォルトブランチ未到達のまま誤 close になる。issue close と flow 確定はデフォルトブランチへのマージ時に行う。
 
@@ -77,42 +74,34 @@ Closes #<issue番号>
 
 複数の `flow:exempt` issue をまとめて記録・順序管理したい場合、GitHub issue 本文にタスクリスト形式で列挙した親トラッカー issue を1つ立ててよい（roadmap.pfdsl には載せず、親issue自体も exempt）。子issueを close した際は、親issueのタスクリスト該当行を手動で `[x]` に更新する — 本文中の手書き `- [ ] #123` 形式は GitHub のネイティブ task-list 連動（相手issueを convert-to-issue した場合のみ働く自動チェック機能）の対象にならず、close しても自動チェックされない。全件完了で親issue自体を close する。
 
-## 自動同期（flow-on-issue-close）
-
-issue が close されると `.github/workflows/pfdsl-flow-on-issue-close.yml` が起動し、まず `scripts/pfdsl/audit-issues-flow.mjs --check-closed-registration <n>` が close event の issue だけを `gh issue view` で取得して pre-fix `roadmap.pfdsl` の登録を確認する。`flow:managed`・`CLOSED`・`COMPLETED` で未登録の場合、対象不在や OPEN など event 契約に反する場合は FAIL して `--fix` を実行しない。登録済み・`NOT_PLANNED`・`flow:exempt`・非 managed は PASS とし、その後 `scripts/pfdsl/audit-issues-flow.mjs --fix` を実行して `roadmap.pfdsl` を機械修復し PR を作成する。実体スクリプトは `scripts/pfdsl/` 配下に集約し、由来を明示する（配布物の境界設計は ADR-0032 参照）。
-
-PR マージ時に issue が自動 close されるには、PR 本文に `Closes #<issue番号>` を含める必要がある（「PR 本文規約」参照）。
-
 ## 同期監査
 
-`scripts/pfdsl/audit-issues-flow.mjs` が GitHub issues と `roadmap.pfdsl` の同期を機械監査する（ラベル・updatedAt・priority 突合）。`--fix` で機械的修復し、`--check-closed-registration <n>` は close event の対象 issue と pre-fix roadmap だけを検査する。
+`scripts/pfdsl/audit-issues-flow.mjs` は GitHub issues と `roadmap.pfdsl` を読取専用で監査する（ラベル・OPEN issue の updatedAt・priority 突合）。閉じた issue がグラフに残ること自体は finding にしない。実体スクリプトは `scripts/pfdsl/` 配下に集約する（配布物の境界設計は ADR-0032 参照）。
 
-findings は3クラスに分かれ、出力の見出しがそれを名乗る。`fixable:` は `--fix` が直すもので、`--fix` なしでは監査を落とす。`manual:` は人が直すもので監査を落とし、`advisory:` だけなら監査を落とさない。
+issue findings の `blocking:` は監査を失敗させ、`advisory:` だけなら失敗させない。
 `flow:managed` なのに process を持たない issue（`missing_process`）が advisory なのは、その登録が実装ブランチに乗るためである — そのブランチが統合されるまで他の作業ツリーからは常に欠落して見える。
 あるサイクルの差分が消せるのは自分が着手する issue の欠落だけで、他の issue の分は消せない。
 落とす設計にすると、原因を作っていないサイクルが毎回赤くなり、赤い行そのものが読まれなくなる。
 この欠落に行動できるのは、その issue を自分のものとして扱っている側だけなので、検査点はそこへ寄せる。
 着手時点では、プリフライト集約スクリプトを持つリポがそのサイクルの issue について報告する（登録漏れは依存関係を変えうるので、roadmap に着手する前に知りたい）。
 マージ前の時点では、roadmap を編集する PR について、その PR が閉じる issue の分だけを FAIL にする — 対象集合を PR 自身から導けるため、実行主体が渡すフラグに依存しない。
-後者の時点は PR の close 契機に置かない。close 後に気付いても、その PR はもう変えられない。ただし close event では `--fix` 前の roadmap を対象限定で検査し、`flow:managed` の COMPLETED close が未登録なら flow sync を止める。
+後者の時点は PR の close 契機に置かない。close 後に気付いても、その PR はもう変えられない。
 
 ## 採用手順
 
 1. pfdsl plugin を導入する（`/plugin marketplace add takasek/pfdsl` + `/plugin install pfdsl@pfdsl`）— pfd-ops スキル本体はリポでなく plugin から供給される
 2. `install/` 以下のファイルをリポルートに実配置する（`/pfd-init` ステップ3.5、または直接 `node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy`）。
    配置ファイルと plugin 同梱 canonical の drift は pfd-ops 発火時のランタイム hash 照合が警告する（設計根拠: ADR-0028）
-3. GitHub に `flow:managed` / `flow:exempt` ラベルを作成する（`scripts/pfdsl/audit-issues-flow.mjs --fix` が未作成ラベルを自動生成する）
+3. GitHub の `flow:managed` / `flow:exempt` ラベルを確認し、不足分は導入時に明示的に作成する
 4. `roadmap.pfdsl` を依存構造のみのグラフとして用意し、issue に対応する process に `iN_` prefix を付ける
 5. リポの `roadmap.md` で本プリセットを指し、リポ URL を記載する
 
-## 依存（pfdsl-flow-on-issue-close.yml 実行環境）
+## 監査スクリプトの実行環境
 
 - Node.js 24 以上
-- `gh` CLI、または `GH_TOKEN` / `GITHUB_TOKEN`（GitHub Actions ランナーには `gh` がプリインストール済みで、workflow は `GH_TOKEN: ${{ github.token }}` も設定する）
-- npm パッケージ `yaml`（`audit-issues-flow.mjs` の唯一の外部依存。workflow が `npm install --no-save yaml` で都度導入するため事前インストール不要）
+- `gh` CLI、または `GH_TOKEN` / `GITHUB_TOKEN`
+- npm パッケージ `yaml`（採用リポの実行環境に用意する）
 
-`audit-issues-flow.mjs` が使う named operation はすべて HTTP backend を持つ。`gh` が存在しない（ENOENT）場合も、`GH_TOKEN` または `GITHUB_TOKEN` があれば HTTP backend へ切り替わるため、token のみの環境で監査と `--fix` を実行できる。`gh` が実行されて認証・通信・引数エラーになった場合は HTTP へ切り替えず、そのエラーを報告する。
+`audit-issues-flow.mjs` が使う named operation はすべて HTTP backend を持つ。`gh` が存在しない（ENOENT）場合も、`GH_TOKEN` または `GITHUB_TOKEN` があれば HTTP backend へ切り替わるため、token のみの環境で監査を実行できる。`gh` が実行されて認証・通信・引数エラーになった場合は HTTP へ切り替えず、そのエラーを報告する。
 
 `designRecordEditInfo` も HTTP backend を持つ。選択済みコメントの GraphQL node ID を指定して対象コメントだけを取得し、`gh` が無い環境では token を使った GraphQL POST へ fallback する。HTTP または GraphQL で取得不能な場合は取得不能として扱い、改訂行のある記録を不受理にする一方、改訂行のない記録を編集時刻だけを理由に不受理にはしない。
-
-workflow は pnpm 等の特定パッケージマネージャを前提としない（`npm install --no-save yaml` のみで完結）。リポ固有の追加処理（スナップショット再生成等）が必要な場合は `scripts/flow-sync-local-hook.mjs` を置くと、存在すれば workflow が自動実行する。

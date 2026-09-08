@@ -25,7 +25,6 @@ describe("buildGates", () => {
 	it("always offers the generator gates, whose own triggers decide relevance", () => {
 		const built = ids(gates({}));
 		assert.deepEqual(built, [
-			"pfdsl-snapshots",
 			"gen-install",
 			"gen-plugin-skill-md",
 			"gen-plugin-bulk",
@@ -43,7 +42,6 @@ describe("buildGates", () => {
 			),
 		);
 		const expected = [
-			"pfdsl-snapshots",
 			"gen-install",
 			"gen-plugin-skill-md",
 			"gen-plugin-bulk",
@@ -195,13 +193,20 @@ describe("buildGates", () => {
 		);
 	});
 
-	it("still runs the snapshot gate when a .pfdsl file is staged for deletion", () => {
+	it("keeps fmt and links gates without triggering snapshot updates", () => {
 		const built = gates({
 			staged: [".pfdsl/roadmap.pfdsl"],
-			stagedPresent: [],
 		});
-		const snapshots = built.find((g) => g.id === "pfdsl-snapshots");
-		assert.ok(snapshots.trigger.test(".pfdsl/roadmap.pfdsl"));
+		assert.equal(
+			built.find((g) => g.id === "pfdsl-snapshots"),
+			undefined,
+		);
+		assert.deepEqual(
+			ids(built).filter(
+				(id) => id.startsWith("pfdsl-fmt:") || id.startsWith("pfdsl-links:"),
+			),
+			["pfdsl-fmt:.pfdsl/roadmap.pfdsl", "pfdsl-links:.pfdsl/roadmap.pfdsl"],
+		);
 	});
 
 	it("makes the fmt gate wait on the CLI dist it reads", () => {

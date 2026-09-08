@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Terminal-gate aggregate checker: runs the mechanically-verifiable items
 // from pfd-ops step 3 (check / audit-issues-flow / check-md-linebreaks /
-// gen-plugin identity / snapshot freshness / output-artifact status update)
+// gen-plugin identity / output-artifact status update)
 // against the diff from origin/<base> to HEAD, then prints the remaining
 // canonical manual checklist locations as fixed guidance.
 // Usage: node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n> ...]
@@ -160,7 +160,7 @@ if (pfdslFiles.length === 0) {
 	}
 }
 
-// 2. audit-issues-flow (no --fix: fails if manual findings remain)
+// 2. read-only audit-issues-flow (fails if blocking findings remain)
 {
 	const r = node(["scripts/pfdsl/audit-issues-flow.mjs"]);
 	results.push({
@@ -189,46 +189,7 @@ results.push(checkDocsStep({ exec }));
 // 4. gen-plugin identity (only when skill/plugin/install-source paths changed)
 results.push(genPluginIdentityStep({ exec, node, changedFiles }));
 
-// 5. snapshot freshness (only when .pfdsl files changed)
-if (pfdslFiles.length === 0) {
-	results.push({
-		name: "snapshot freshness",
-		status: "SKIP",
-		detail: "no .pfdsl changes",
-	});
-} else {
-	const vitestRun = exec("pnpm", [
-		"--filter",
-		"@pfdsl/core",
-		"exec",
-		"vitest",
-		"run",
-		"-u",
-	]);
-	if (!vitestRun.ok) {
-		results.push({
-			name: "snapshot freshness",
-			status: "FAIL",
-			detail: `vitest run failed: ${vitestRun.out.trim().slice(-200)}`,
-		});
-	} else {
-		const r = exec("git", [
-			"diff",
-			"--quiet",
-			"--",
-			"packages/core/src/__snapshots__/",
-		]);
-		results.push({
-			name: "snapshot freshness",
-			status: r.ok ? "PASS" : "FAIL",
-			detail: r.ok
-				? undefined
-				: "snapshots stale; re-stage packages/core/src/__snapshots__/",
-		});
-	}
-}
-
-// 6. output artifact status update in .pfdsl/roadmap.pfdsl
+// 5. output artifact status update in .pfdsl/roadmap.pfdsl
 results.push(
 	outputArtifactStatusStep({
 		exec,
@@ -239,7 +200,7 @@ results.push(
 	}),
 );
 
-// 7. vscode-extension typecheck (only when packages/vscode-extension/ changed)
+// 6. vscode-extension typecheck (only when packages/vscode-extension/ changed)
 if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 	results.push({
 		name: "vscode-extension typecheck",
@@ -255,7 +216,7 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 	});
 }
 
-// 8. commit subject lint (Conventional Commits message format and language;
+// 7. commit subject lint (Conventional Commits message format and language;
 // granularity stays MANUAL)
 results.push(commitSubjectStep({ exec, base }));
 
@@ -314,20 +275,20 @@ for (const number of issueNumbers) {
 	}
 }
 
-// 8b. Review record: judged before the PR, because the trailer lives in a
+// 7b. Review record: judged before the PR, because the trailer lives in a
 // commit message and cannot be added afterwards (#698).
 results.push(reviewRecordStep({ commitMessages, changedFiles }));
 
-// 9. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
+// 8. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(
 	wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }),
 );
 
-// 10. design-selection record: was the design choice recorded before the first commit,
+// 9. design-selection record: was the design choice recorded before the first commit,
 // with the required structure (#669)? One row per issue the cycle closes (#734).
 results.push(...perIssueSteps(designRecordStep, issues, { exec, base }));
 
-// 11. knowledge-artifact size report: collect the measured deltas regardless of
+// 10. knowledge-artifact size report: collect the measured deltas regardless of
 // issue metadata so the terminal output always shows changed knowledge artifacts.
 const sizeDeltas = collectSizeDeltas({ exec, base, changedFiles });
 

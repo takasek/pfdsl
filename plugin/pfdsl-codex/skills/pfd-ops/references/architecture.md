@@ -35,7 +35,7 @@ findings やゲート項目を companion に書くとき、**どの companion �
 
 | 書く内容の種類 | 宛先 companion |
 |---|---|
-| issue 固有ゲート・issue 管理バインディング・自動生成 PR 規約・issue バックエンド手続き | `roadmap.md` |
+| issue 固有ゲート・issue 管理バインディング・open PR 規約・issue バックエンド手続き | `roadmap.md` |
 | 繰り返し手続き・知見振り分けルール・`develop` プロセスの運用規約・retro 宛先バインディング | `workflow.md` |
 | 変換コンポーネントの追加・削除・境界変更に関する手続き | `pipeline.md` |
 | Codex 向け追加指示（PR 本文規約等）| `.pfdsl/bindings/pfd-ops.md` |
@@ -89,14 +89,14 @@ L3 を採用するには `install/` テンプレートをリポルートへ実�
 node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 ```
 
-採用済みかどうかは `install/` 由来のファイル（ワークフロー等）の存在で判定される。
+採用済みかどうかは `install/` 由来の監査スクリプトの存在で判定される。
 
 主な規約:
 - issue が一次情報。`roadmap.pfdsl` は依存構造のみ管理
 - process id は `iN_` prefix（N = issue 番号）。恒久 — issue close 後も剥がさない。出力 artifact id は最初から plain
 - `flow:managed` / `flow:exempt` ラベルで管理対象を分類
-- issue close 時: 終端はチェーンごと削除、下流入力が残るものは process 側の `tags`/`updated_at` のみ削除
-- `audit-issues-flow.mjs` で同期監査・機械修復
+- サイクル終了時に、未完了作業とその入出力を保って完了チェーンを整理する
+- `audit-issues-flow.mjs` で読取専用の同期監査
 
 詳細: [`github-issues-backend.md`](github-issues-backend.md)
 
@@ -126,7 +126,6 @@ pfdsl 開発リポ固有の例:
     check-install-sync.mjs     ← install/ の実配置・鮮度セルフチェック（ADR-0028）
     plugin-version-check.mjs   ← plugin version skew チェック（install/ 同期と無関係、check-install-sync.mjs から呼ばれる）
   install/                     ← L3 採用用テンプレート（リポルートへ実配置）
-    .github/workflows/         ← pfdsl-flow-on-issue-close.yml
     scripts/pfdsl/             ← audit-issues-flow.mjs 等（配布物の由来を示す専用ディレクトリ、ADR-0032）
 ```
 

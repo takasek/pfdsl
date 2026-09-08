@@ -48,11 +48,6 @@ jobs:
 
       - run: make check-readme-cli
 
-      - name: Verify snapshots are up-to-date with .pfdsl files
-        run: |
-          pnpm --filter @pfdsl/core exec vitest run -u
-          node scripts/check-generated-drift.mjs -- packages/core/src/__snapshots__/
-
   vscode-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 10

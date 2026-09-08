@@ -827,32 +827,34 @@ function legacyClaudeCleanupDestinations(
 	];
 }
 
+const DEFAULT_CODEX_ASSEMBLY_DEPS = {
+	cpSync,
+	decodeHarnessCapabilities,
+	existsSync,
+	mkdirSync,
+	newRunId: randomUUID,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+};
+
 /**
  * Generates the Codex repository and plugin assets from the maintained
  * Claude sources. Each output is first written to a temporary sibling; only
  * after every write succeeds are the destinations replaced together.
- * @param {{root: string, codexPluginRoot?: string, capabilities?: object[], deps?: object}} options
+ * @param {{root: string, codexPluginRoot?: string, capabilities?: object[], deps?: object, runId?: string}} options
  */
-export function assembleCodexAssets({
+function assembleCodexAssetsUnlocked({
 	root,
 	codexPluginRoot = resolve(root, "plugin/pfdsl-codex"),
 	capabilities: suppliedCapabilities,
-	deps = {
-		cpSync,
-		decodeHarnessCapabilities,
-		existsSync,
-		mkdirSync,
-		newRunId: randomUUID,
-		readdirSync,
-		readFileSync,
-		renameSync,
-		rmSync,
-		writeFileSync,
-	},
+	deps = DEFAULT_CODEX_ASSEMBLY_DEPS,
+	runId: suppliedRunId,
 }) {
 	const staged = [];
-	const runId = deps.newRunId?.() ?? randomUUID();
-	const lockPath = acquireCodexAssemblyLock(root, deps);
+	const runId = suppliedRunId ?? deps.newRunId?.() ?? randomUUID();
 	let primaryError;
 	let observed;
 	try {
@@ -1020,9 +1022,35 @@ export function assembleCodexAssets({
 		primaryError = error;
 		removeStagedArtifacts(staged, deps);
 	}
-	releaseCodexAssemblyLock(lockPath, deps, runId);
 	if (primaryError) throw primaryError;
 	return { observed };
+}
+
+/**
+ * Generates Codex assets while holding the assembly lock for the standalone
+ * entrypoint. Full plugin assembly uses the private unlocked body so the
+ * outer transaction owns one lock across every generated surface.
+ * @param {{root: string, codexPluginRoot?: string, capabilities?: object[], deps?: object}} options
+ */
+export function assembleCodexAssets({
+	root,
+	codexPluginRoot = resolve(root, "plugin/pfdsl-codex"),
+	capabilities,
+	deps = DEFAULT_CODEX_ASSEMBLY_DEPS,
+}) {
+	const runId = deps.newRunId?.() ?? randomUUID();
+	const lockPath = acquireCodexAssemblyLock(root, deps);
+	try {
+		return assembleCodexAssetsUnlocked({
+			root,
+			codexPluginRoot,
+			capabilities,
+			deps,
+			runId,
+		});
+	} finally {
+		releaseCodexAssemblyLock(lockPath, deps, runId);
+	}
 }
 
 export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
@@ -1176,12 +1204,13 @@ export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
 }
 
 // Assembles the Claude and Codex plugin roots from the generated pfdsl skill tree, whose SKILL.md embeds `pfdsl help` output and therefore needs packages/cli/dist — see scripts/gen-skill.mjs.
-// None of this touches dist or spawns a child process, so scripts/pre-commit can drift-check it even when dist is missing/stale (#593, same split rationale as writeSkillRefs in #586).
+// The default invocation neither touches dist nor spawns a child process, so pre-commit can drift-check it even when dist is missing/stale (#593). Full generation supplies a neutral-skill callback, which runs inside the same lock and transaction.
 // deps defaults to the real implementations; tests inject fakes to assert the wiring without touching the filesystem.
 export function assemblePluginDistIndependent({
 	root,
 	pluginRoot,
 	codexPluginRoot = resolve(root, "plugin/pfdsl-codex"),
+	generateNeutralSkill,
 	deps = {
 		cpSync,
 		decodeHarnessCapabilities,
@@ -1198,20 +1227,23 @@ export function assemblePluginDistIndependent({
 		mkdirSync,
 		writeBundleManifest,
 		newRunId: randomUUID,
-		assembleCodexAssets,
+		assembleCodexAssets: assembleCodexAssetsUnlocked,
 		assembleClaudeAssets,
 	},
 }) {
 	const runId = deps.newRunId?.() ?? randomUUID();
-	const transaction = snapshotPluginGeneration(
-		root,
-		pluginRoot,
-		codexPluginRoot,
-		deps,
-		runId,
-	);
+	const lockPath = acquireCodexAssemblyLock(root, deps);
+	let transaction;
 	let preserveTransaction = false;
 	try {
+		transaction = snapshotPluginGeneration(
+			root,
+			pluginRoot,
+			codexPluginRoot,
+			deps,
+			runId,
+		);
+		generateNeutralSkill?.();
 		const actualWrites = new Set();
 		const trackedDeps = {
 			...deps,
@@ -1269,12 +1301,21 @@ export function assemblePluginDistIndependent({
 			capabilities,
 			deps: trackedDeps,
 		});
-		const codex = deps.assembleCodexAssets({
-			root,
-			codexPluginRoot,
-			capabilities,
-			deps: trackedDeps,
-		});
+		const codex =
+			deps.assembleCodexAssets === assembleCodexAssetsUnlocked
+				? deps.assembleCodexAssets({
+						root,
+						codexPluginRoot,
+						capabilities,
+						deps: trackedDeps,
+						runId,
+					})
+				: deps.assembleCodexAssets({
+						root,
+						codexPluginRoot,
+						capabilities,
+						deps: trackedDeps,
+					});
 		const observedByTarget = {
 			...claude.observed,
 			...codex.observed,
@@ -1295,22 +1336,25 @@ export function assemblePluginDistIndependent({
 			});
 		}
 	} catch (error) {
-		for (const [destination, snapshot] of [
-			...transaction.snapshots,
-		].reverse()) {
-			if (!restoreAssemblySnapshot(destination, snapshot, deps)) {
-				preserveTransaction = true;
+		if (transaction) {
+			for (const [destination, snapshot] of [
+				...transaction.snapshots,
+			].reverse()) {
+				if (!restoreAssemblySnapshot(destination, snapshot, deps)) {
+					preserveTransaction = true;
+				}
 			}
-		}
-		if (preserveTransaction && error && typeof error === "object") {
-			error.rollbackBackup = transaction.transactionRoot;
-			error.rollbackBackups = transaction.snapshots.map(
-				([, snapshot]) => snapshot.backup,
-			);
+			if (preserveTransaction && error && typeof error === "object") {
+				error.rollbackBackup = transaction.transactionRoot;
+				error.rollbackBackups = transaction.snapshots.map(
+					([, snapshot]) => snapshot.backup,
+				);
+			}
 		}
 		throw error;
 	} finally {
-		if (!preserveTransaction)
+		if (transaction && !preserveTransaction)
 			removeAssemblyArtifact(transaction.transactionRoot, deps);
+		releaseCodexAssemblyLock(lockPath, deps, runId);
 	}
 }
