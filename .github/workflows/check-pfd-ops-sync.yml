@@ -6,11 +6,8 @@ on:
       - '.claude/skills/pfd-ops/install/**'
       - '.github/workflows/**'
       - 'scripts/**'
+  # Required checks must report on every PR, including unrelated changes.
   pull_request:
-    paths:
-      - '.claude/skills/pfd-ops/install/**'
-      - '.github/workflows/**'
-      - 'scripts/**'
 
 jobs:
   sync-check:
