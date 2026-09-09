@@ -40,6 +40,8 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 直近の履歴 (`git log --oneline`) を参考にスタイルを合わせる。
 
+<!-- Temporary generated-asset drift probe for issue #1060. -->
+
 ## Codex 固有の責務境界
 
 この節は本文中の git に関する指示より優先する。
