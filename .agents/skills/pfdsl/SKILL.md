@@ -88,10 +88,10 @@ statusStyles:
 
 ## CLI
 
-**Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.0.25**. An older release answers these commands rather than rejecting them, with less in the answer — so skipping this check surfaces as an audit that quietly verified less, never as an error. Run `pfdsl --version` once at the start of the session.
+**Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.0.26**. An older release answers these commands rather than rejecting them, with less in the answer — so skipping this check surfaces as an audit that quietly verified less, never as an error. Run `pfdsl --version` once at the start of the session.
 
 - **`pfdsl` not found?** Check `package.json` first — if the repo already depends on `@pfdsl/cli`, the CLI is there and every command below runs as `npx pfdsl <cmd>`. Confirm with `npx pfdsl --version`. Do not treat a bare `pfdsl` that fails to resolve as "missing" until this branch is ruled out.
-- **Genuinely absent, or below `0.0.25`?** Do **not** run the commands below against it. Substitute a version-pinned `npx @pfdsl/cli@0.0.25 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic. This branch always works and needs nobody's permission, so take it rather than stalling.
+- **Genuinely absent, or below `0.0.26`?** Do **not** run the commands below against it. Substitute a version-pinned `npx @pfdsl/cli@0.0.26 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic. This branch always works and needs nobody's permission, so take it rather than stalling.
 - **Want it fixed properly?** Ask the user to install or update with `npm install -g @pfdsl/cli@latest`. Worth raising, but do not block on it — the pinned `npx` above already lets the session proceed.
 
 ```bash
