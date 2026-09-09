@@ -37,3 +37,5 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 コミットメッセージは**英語**。
 
 直近の履歴 (`git log --oneline`) を参考にスタイルを合わせる。
+
+<!-- Temporary generated-asset drift probe for issue #1060. -->
