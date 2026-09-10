@@ -1137,6 +1137,16 @@ export interface MetaSetOptions {
 	color?: boolean;
 }
 
+/**
+ * Diagnostic codes reporting a document that could not be read rather than one
+ * whose content is wrong: front matter (FM), lexer (L), parser (P), and
+ * normalizer (N). A rewrite cannot cure these and cannot be trusted to land
+ * correctly on top of them, so they gate a mutation before it runs. Validation
+ * codes (V) describe content a mutation may be fixing and are judged on the
+ * result instead.
+ */
+const STRUCTURAL_CODE = /^(?:FM|P|L|N)\d+$/;
+
 /** Fields whose values are arrays/maps — meta set only writes scalars. */
 const NON_SCALAR_FIELDS = new Set([
 	"tags",
@@ -1186,7 +1196,24 @@ export function runMetaSet(
 	if (isCommandResult(src)) return src;
 
 	const { diagnostics, nodeKinds, frontmatter } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	// This gate asks "would this write leave a broken file?", not "is the file
+	// broken now?" (#1125). A `meta set` is often the cure for the very error
+	// a pre-mutation check would trip on — V035 rejects a roadmap artifact
+	// declared without a `status:`, which is the state `meta set <id> status`
+	// exists to close (#415). Judging the original there would make the fix
+	// unreachable, so validation errors are judged on the result instead, by
+	// the post-mutation gate below.
+	//
+	// Structural diagnostics stay here. FM / P / L / N report a document that
+	// could not be read, tokenized, parsed, or normalized, so `frontmatter`
+	// and `nodeKinds` below cannot be trusted to describe it — the type check,
+	// the id lookup, and the field/kind pairing all read them. Those are the
+	// pre-check's unnamed second job, and dropping it wholesale would drop
+	// them with it.
+	const unreadable = diagnostics.filter((d) =>
+		STRUCTURAL_CODE.test(String(d.code)),
+	);
+	const failed = failIfErrors(unreadable, file, opts.json, opts.color);
 	if (failed) return failed;
 
 	// Progress belongs to the roadmap (§15.15), so writing status into a file
@@ -1237,12 +1264,21 @@ export function runMetaSet(
 		newSrc = applied;
 	}
 
-	// Safety net: never write a rewrite that introduces errors the original
-	// didn't have (rewriter bug or unsupported YAML style).
-	if (hasErrors(analyze(newSrc).diagnostics)) {
-		const message = `meta set: refusing to write ${file}: the rewrite would introduce errors`;
-		if (opts.json) return failJson({ error: message });
-		return fail(`${message}\n`);
+	// The gate on the write: the result must be clean. That covers an error the
+	// rewrite introduced (rewriter bug or unsupported YAML style) and one the
+	// original already had and this write did not cure — since the pre-check
+	// above no longer judges the original, both arrive here.
+	const resulting = analyze(newSrc).diagnostics;
+	if (hasErrors(resulting)) {
+		// Report the errors themselves, not just the refusal. This is the only
+		// place a validation error on the input surfaces now, and `meta set`
+		// shares the `{ ok: false, diagnostics: [...] }` failure contract with
+		// every other diagnostic-emitting command (#508). The `error` line
+		// carries what diagnostics cannot: that nothing was written.
+		const errs = resulting.filter((d) => d.severity === "error");
+		const message = `meta set: refusing to write ${file}: the result would have errors`;
+		if (opts.json) return failJson({ error: message, diagnostics: errs });
+		return fail(`${diagText(errs, file, opts.color)}${message}\n`);
 	}
 	writeFileSync(file, newSrc, "utf-8");
 
