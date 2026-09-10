@@ -1,0 +1,57 @@
+import { mkdirSync, writeFileSync, utimesSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+const root='/path/to/pfdsl';
+const out='/tmp/pfdsl-audit/governance';
+const {isDistStale}=await import(`${root}/scripts/lib/dist-freshness.mjs`);
+const {buildGates}=await import(`${root}/scripts/lib/drift-gates.mjs`);
+const {runDriftGates}=await import(`${root}/scripts/lib/pre-commit-drift.mjs`);
+const {runCycleStatus,cycleStatusExitCode}=await import(`${root}/scripts/lib/cycle-status-steps.mjs`);
+const {computeFindings,partitionFindings}=await import(`${root}/scripts/pfdsl/lib/issues-flow-audit.mjs`);
+const {classifyCycle,parseReviewRecords}=await import(`${root}/scripts/lib/review-record.mjs`);
+const {RECORD_SEP}=await import(`${root}/scripts/lib/commit-trailers.mjs`);
+const require=createRequire(`${root}/package.json`);
+const {parse}=require('yaml');
+const workflow=parse(readFileSync(`${root}/.github/workflows/check-roadmap-registration.yml`,'utf8'));
+
+const fakeRoot=`${out}/freshness-fixture`;
+const now=Date.now()/1000;
+for(const pkg of ['core','cli']){
+  mkdirSync(`${fakeRoot}/packages/${pkg}/src`,{recursive:true});
+  mkdirSync(`${fakeRoot}/packages/${pkg}/dist`,{recursive:true});
+  for(const [part,age] of [['src/index.ts',pkg==='core'?1:20],['dist/index.js',10]]){
+    const file=`${fakeRoot}/packages/${pkg}/${part}`;
+    writeFileSync(file,`// ${pkg} ${part}\n`);
+    utimesSync(file,now-age,now-age);
+  }
+}
+const file='.pfdsl/roadmap.pfdsl';
+const gates=buildGates({stagedPresent:[file]});
+const commands=[];
+const gateResult=runDriftGates(gates,{
+  stagedFiles:[file],
+  isDistFresh:p=>!isDistStale(`${fakeRoot}/${p.replace('dist/cli.js','dist/index.js')}`),
+  runCommand:(exe,args)=>{commands.push([exe,args]);return true;},
+});
+const preflightCalls=[];
+const preflight=await runCycleStatus({
+  root,base:'main',
+  sh:(exe,args)=>{preflightCalls.push([exe,args]);if(args[0]==='fetch')return '';if(args[0]==='log')return 'abcdef0 docs: correct an unrelated README typo\n';throw Error('unexpected call');},
+  shTry:()=>{throw Error('unexpected call');},
+  githubOps:{listOpenPrs:()=>{throw Error('must not query any PR');}},
+  existsSync:()=>{throw Error('not reached');},readFileSync:()=>{throw Error('not reached');},readdirSync:()=>{throw Error('not reached');}
+});
+const entries=[1,2].map(number=>({issueNumber:number,processId:`i${number}_work`,artifactId:`out${number}`,status:'todo',updatedAt:'old',priorities:[]}));
+const issues=[{number:1,state:'OPEN',labels:['flow:managed'],updatedAt:'old'},
+{number:2,state:'OPEN',labels:['flow:managed'],updatedAt:'new'}];
+const globalFindings=computeFindings(entries,issues);
+const records=parseReviewRecords(`fix: final change without review\n${RECORD_SEP}fix: earlier change\n\nReview: tool=correctness\n`);
+const result={
+  freshness:{coreStale:isDistStale(`${fakeRoot}/packages/core/dist/index.js`),cliStale:isDistStale(`${fakeRoot}/packages/cli/dist/index.js`)},
+  driftGate:{file,commands,result:gateResult},
+  registrationTrigger:workflow.on,
+  scopedRegistration:{enforcedIssues:[1],findings:globalFindings,partitions:partitionFindings(globalFindings,{enforcedIssues:[1]})},
+  preflight:{calls:preflightCalls,result:preflight,exitCode:cycleStatusExitCode(preflight)},
+  review:{records,lateUnreviewedPackagesChange:classifyCycle({changedFiles:['packages/core/src/new.ts'],records}),hookOnlyNoRecord:classifyCycle({changedFiles:['hooks/retro-reminder-post-tool-use.mjs'],records:[]})},
+};
+writeFileSync(`${out}/gate-results.json`,JSON.stringify(result,null,2)+'\n');
+console.log(JSON.stringify(result,null,2));

@@ -1,0 +1,28 @@
+import {writeFileSync} from 'node:fs';
+const root='/path/to/pfdsl';
+const out='/tmp/pfdsl-audit/governance';
+const {usesLatestOnlyVersionQuery,runCriteriaJudgeabilityCheck}=await import(`${root}/scripts/lib/criteria-judgeability.mjs`);
+const {findShellExecutors}=await import(`${root}/scripts/lib/check-no-shell-strings.mjs`);
+const {findCliConventionViolations}=await import(`${root}/scripts/lib/check-cli-conventions.mjs`);
+const {isGitCommitCommand}=await import(`${root}/hooks/retro-reminder-post-tool-use.mjs`);
+const criteria=['npm view @pfdsl/cli@0.0.25 version returns 0.0.25', 'npm view @pfdsl/cli version returns 0.0.25', 'npm view @pfdsl/cli versions contains 0.0.25'];
+const shellSources=[
+  "import {execSync} from 'node:child_process'; execSync('echo probe');",
+  "import * as cp from 'node:child_process'; cp.execSync('echo probe');",
+  "import cp from 'node:child_process'; cp.execSync('echo probe');",
+];
+// Inspect source text only: never execute these example shell programs.
+const result={
+  criteria:criteria.map(value=>({value,rejectedAsLatestOnly:usesLatestOnlyVersionQuery(value)})),
+  pinnedCriteriaGate:runCriteriaJudgeabilityCheck({listFiles:()=>['fixture.pfdsl'],readFile:()=>'',analyzeFile:()=>({frontmatter:{artifact:{released:{criteria:criteria[0]}}}})}),
+  shellImports:shellSources.map(source=>({source,findings:findShellExecutors(source)})),
+  permissiveArgv:{source:"import {parseArgs} from 'node:util'; const {values}=parseArgs({strict:false});",findings:findCliConventionViolations("import {parseArgs} from 'node:util'; const {values}=parseArgs({strict:false});",'scripts/probe.mjs')},
+  retrospectiveTriggers:[
+    'git commit -m done',
+    'git -C /repo/worktree commit -m done',
+    '/path/to/codex/bin/codex-git-routine.mjs commit /repo/worktree codex/example message',
+    'echo "git commit is the next step"',
+  ].map(command=>({command,detected:isGitCommitCommand(command)})),
+};
+writeFileSync(`${out}/checker-results.json`,JSON.stringify(result,null,2)+'\n');
+console.log(JSON.stringify(result,null,2));

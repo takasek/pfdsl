@@ -1,0 +1,92 @@
+{
+  "edgeDiff": {
+    "diagnosticsA": [],
+    "diagnosticsB": [],
+    "report": {
+      "addedNodes": [],
+      "removedNodes": [],
+      "changedNodes": [],
+      "addedEdges": [
+        "p -> y",
+        "q -> x"
+      ],
+      "removedEdges": [
+        "p -> x",
+        "q -> y"
+      ],
+      "addedFeedback": [],
+      "removedFeedback": []
+    },
+    "dot": "digraph PFDSL {\n  rankdir=LR;\n  newrank=true;\n  label=\"diff\\ngreen = added · red = removed · yellow = changed\";\n  labelloc=\"t\";\n\n  \"_nodiff\" [shape=note, label=\"No structural or metadata changes\"];\n}\n"
+  },
+  "subflow": {
+    "diagnostics": [],
+    "editorTarget": "file:///repo/.pfdsl/child.pfdsl",
+    "previewTarget": "/repo/child.pfdsl"
+  },
+  "locations": {
+    "quotedArray": {
+      "analyzed": [
+        "docs/a.md",
+        "docs/b.md"
+      ],
+      "targets": [
+        "file:///repo/.pfdsl/\"docs/a.md\"",
+        "file:///repo/.pfdsl/\"docs/b.md\""
+      ]
+    },
+    "commaInValue": {
+      "analyzed": [
+        "docs/a,b.md"
+      ],
+      "targets": [
+        "file:///repo/.pfdsl/\"docs/a",
+        "file:///repo/.pfdsl/b.md\""
+      ]
+    },
+    "comment": {
+      "analyzed": "docs/a.md",
+      "targets": [
+        "file:///repo/.pfdsl/docs/a.md # explanation"
+      ]
+    },
+    "scheme": {
+      "analyzed": "ssh://host/path",
+      "targets": [
+        "file:///repo/.pfdsl/ssh:/host/path"
+      ]
+    },
+    "scalarControl": {
+      "analyzed": "docs/a.md",
+      "targets": [
+        "file:///repo/.pfdsl/docs/a.md"
+      ]
+    }
+  },
+  "diffMetadata": {
+    "actual": {
+      "addedNodes": [],
+      "removedNodes": [],
+      "changedNodes": [],
+      "addedEdges": [],
+      "removedEdges": [],
+      "addedFeedback": [],
+      "removedFeedback": []
+    },
+    "expected": {
+      "addedNodes": [],
+      "removedNodes": [],
+      "changedNodes": [
+        "a"
+      ],
+      "addedEdges": [],
+      "removedEdges": [],
+      "addedFeedback": [],
+      "removedFeedback": []
+    }
+  },
+  "staleRender": {
+    "duringError": "<div class=\"err\">CURRENT SOURCE IS INVALID</div>",
+    "afterLoad": "<svg><g class=\"node\" data-node-id=\"old_node\"></g></svg>"
+  }
+}

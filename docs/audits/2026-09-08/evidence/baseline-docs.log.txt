@@ -1,0 +1,285 @@
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:50:3: warning [W002]: Artifact 'parsed_doc' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:54:3: warning [W002]: Artifact 'normalized_graph' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:59:3: warning [W002]: Artifact 'diagnostics_report' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:64:3: warning [W002]: Artifact 'formatted_source' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:69:3: warning [W002]: Artifact 'dot_graph' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:74:3: warning [W002]: Artifact 'rendered_image' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:79:3: warning [W002]: Artifact 'metadata_tsv' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:84:3: warning [W002]: Artifact 'diff_report' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:89:3: warning [W002]: Artifact 'sorted_source' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:134:3: warning [W002]: Artifact 'pfdsl_skill' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:139:3: warning [W002]: Artifact 'ops_install_templates' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:144:3: warning [W002]: Artifact 'plugin_dist' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:149:3: warning [W002]: Artifact 'sample_previews' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:154:3: warning [W002]: Artifact 'vsix_package' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:158:3: warning [W002]: Artifact 'published_cli' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:163:3: warning [W002]: Artifact 'published_libraries' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:168:3: warning [W002]: Artifact 'published_ext' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:173:3: warning [W002]: Artifact 'installed_plugin' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:178:3: warning [W002]: Artifact 'installed_l3_layer' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:183:3: warning [W002]: Artifact 'gh_labels' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/pipeline.pfdsl:188:3: warning [W002]: Artifact 'drift_report' has no 'criteria' field
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/workflow.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/pfdsl-redraw/workflow.pfdsl:117:3: warning [W007]: Artifact 'article' has 'status' set in a 'workflow' file; status belongs to the roadmap
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl:31:3: warning [W002]: Artifact 'api_diff' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl:35:3: warning [W002]: Artifact 'generated_clients' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl:39:3: warning [W002]: Artifact 'conformance_report' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl:43:3: warning [W002]: Artifact 'sdk_packages' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl:47:3: warning [W002]: Artifact 'published_packages' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl:52:3: warning [W002]: Artifact 'sdk_version_table' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl:56:3: warning [W002]: Artifact 'resolved_dependencies' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl:60:3: warning [W002]: Artifact 'service_build' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl:65:3: warning [W002]: Artifact 'migration_guide_draft' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/pipeline.pfdsl:69:3: warning [W002]: Artifact 'portal_page' has no 'criteria' field
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/workflow.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/workflow.pfdsl:38:3: warning [W002]: Artifact 'release_decision' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/workflow.pfdsl:43:3: warning [W002]: Artifact 'approved_migration_guide' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/workflow.pfdsl:49:3: warning [W002]: Artifact 'adoption_decision' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/workflow.pfdsl:54:3: warning [W002]: Artifact 'incident_record' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/workflow.pfdsl:59:3: warning [W002]: Artifact 'feedback_issues' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/workflow.pfdsl:64:3: warning [W002]: Artifact 'usage_report' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-a/workflow.pfdsl:69:3: warning [W002]: Artifact 'retirement_decision' has no 'criteria' field
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-pipeline.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-pipeline.pfdsl:22:3: warning [W002]: Artifact 'api_diff' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-pipeline.pfdsl:26:3: warning [W002]: Artifact 'generated_clients' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-pipeline.pfdsl:30:3: warning [W002]: Artifact 'conformance_report' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-pipeline.pfdsl:34:3: warning [W002]: Artifact 'sdk_packages' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-pipeline.pfdsl:38:3: warning [W002]: Artifact 'migration_guide_draft' has no 'criteria' field
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-workflow.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-workflow.pfdsl:35:3: warning [W002]: Artifact 'release_decision' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-workflow.pfdsl:40:3: warning [W002]: Artifact 'approved_migration_guide' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-workflow.pfdsl:46:3: warning [W002]: Artifact 'usage_report' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/dev-workflow.pfdsl:51:3: warning [W002]: Artifact 'retirement_decision' has no 'criteria' field
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/user-pipeline.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/user-pipeline.pfdsl:25:3: warning [W002]: Artifact 'published_packages' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/user-pipeline.pfdsl:30:3: warning [W002]: Artifact 'sdk_version_table' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/user-pipeline.pfdsl:34:3: warning [W002]: Artifact 'resolved_dependencies' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/user-pipeline.pfdsl:38:3: warning [W002]: Artifact 'service_build' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/user-pipeline.pfdsl:43:3: warning [W002]: Artifact 'portal_page' has no 'criteria' field
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/user-workflow.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/user-workflow.pfdsl:31:3: warning [W002]: Artifact 'adoption_decision' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/user-workflow.pfdsl:36:3: warning [W002]: Artifact 'incident_record' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-b/user-workflow.pfdsl:41:3: warning [W002]: Artifact 'feedback_issues' has no 'criteria' field
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/consumption-workflow.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/consumption-workflow.pfdsl:34:3: warning [W002]: Artifact 'adoption_decision' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/consumption-workflow.pfdsl:40:3: warning [W002]: Artifact 'incident_record' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/consumption-workflow.pfdsl:46:3: warning [W002]: Artifact 'feedback_issues' has no 'criteria' field
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl:31:3: warning [W002]: Artifact 'api_diff' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl:35:3: warning [W002]: Artifact 'generated_clients' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl:39:3: warning [W002]: Artifact 'conformance_report' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl:43:3: warning [W002]: Artifact 'sdk_packages' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl:47:3: warning [W002]: Artifact 'published_packages' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl:52:3: warning [W002]: Artifact 'sdk_version_table' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl:56:3: warning [W002]: Artifact 'resolved_dependencies' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl:60:3: warning [W002]: Artifact 'service_build' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl:65:3: warning [W002]: Artifact 'migration_guide_draft' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/pipeline.pfdsl:69:3: warning [W002]: Artifact 'portal_page' has no 'criteria' field
+check docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/platform-workflow.pfdsl
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/platform-workflow.pfdsl:38:3: warning [W002]: Artifact 'release_decision' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/platform-workflow.pfdsl:44:3: warning [W002]: Artifact 'approved_migration_guide' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/platform-workflow.pfdsl:50:3: warning [W002]: Artifact 'usage_report' has no 'criteria' field
+docs/adr/0017-kind-taxonomy/audience-axis-experiment/variant-c/platform-workflow.pfdsl:55:3: warning [W002]: Artifact 'retirement_decision' has no 'criteria' field
+check docs/examples/book-writing.pfdsl
+docs/examples/book-writing.pfdsl:14:3: warning [W002]: Artifact 'outline' has no 'criteria' field
+docs/examples/book-writing.pfdsl:18:3: warning [W002]: Artifact 'manuscript' has no 'criteria' field
+docs/examples/book-writing.pfdsl:24:3: warning [W002]: Artifact 'ch01' has no 'criteria' field
+docs/examples/book-writing.pfdsl:28:3: warning [W002]: Artifact 'ch02' has no 'criteria' field
+docs/examples/book-writing.pfdsl:32:3: warning [W002]: Artifact 'ch03' has no 'criteria' field
+docs/examples/book-writing.pfdsl:36:3: warning [W002]: Artifact 'ch04' has no 'criteria' field
+docs/examples/book-writing.pfdsl:40:3: warning [W002]: Artifact 'ch05' has no 'criteria' field
+docs/examples/book-writing.pfdsl:44:3: warning [W002]: Artifact 'review_comment' has no 'criteria' field
+docs/examples/book-writing.pfdsl:49:3: warning [W002]: Artifact 'revised_manuscript' has no 'criteria' field
+docs/examples/book-writing.pfdsl:53:3: warning [W002]: Artifact 'copyedited_manuscript' has no 'criteria' field
+docs/examples/book-writing.pfdsl:57:3: warning [W002]: Artifact 'print_ready_pdf' has no 'criteria' field
+check docs/examples/conference-ops.pfdsl
+docs/examples/conference-ops.pfdsl:32:3: warning [W002]: Artifact 'session_proposals' has no 'criteria' field
+docs/examples/conference-ops.pfdsl:38:3: warning [W002]: Artifact 'program' has no 'criteria' field
+docs/examples/conference-ops.pfdsl:43:3: warning [W002]: Artifact 'venue_contract' has no 'criteria' field
+docs/examples/conference-ops.pfdsl:48:3: warning [W002]: Artifact 'sponsor_agreements' has no 'criteria' field
+docs/examples/conference-ops.pfdsl:53:3: warning [W002]: Artifact 'operation_manual' has no 'criteria' field
+docs/examples/conference-ops.pfdsl:58:3: warning [W002]: Artifact 'event_record' has no 'criteria' field
+docs/examples/conference-ops.pfdsl:63:3: warning [W002]: Artifact 'session_videos' has no 'criteria' field
+docs/examples/conference-ops.pfdsl:73:3: warning [W002]: Artifact 'conference_report' has no 'criteria' field
+check docs/examples/contract-negotiation.pfdsl
+docs/examples/contract-negotiation.pfdsl:14:3: warning [W002]: Artifact 'contract_draft' has no 'criteria' field
+docs/examples/contract-negotiation.pfdsl:19:3: warning [W002]: Artifact 'negotiation_memo' has no 'criteria' field
+docs/examples/contract-negotiation.pfdsl:23:3: warning [W002]: Artifact 'revised_draft' has no 'criteria' field
+docs/examples/contract-negotiation.pfdsl:27:3: warning [W002]: Artifact 'orderer_legal_opinion' has no 'criteria' field
+docs/examples/contract-negotiation.pfdsl:31:3: warning [W002]: Artifact 'vendor_legal_opinion' has no 'criteria' field
+docs/examples/contract-negotiation.pfdsl:35:3: warning [W002]: Artifact 'final_contract' has no 'criteria' field
+docs/examples/contract-negotiation.pfdsl:39:3: warning [W002]: Artifact 'signed_contract' has no 'criteria' field
+check docs/examples/etl-pipeline.pfdsl
+docs/examples/etl-pipeline.pfdsl:24:3: warning [W002]: Artifact 'crm_clean' has no 'criteria' field
+docs/examples/etl-pipeline.pfdsl:28:3: warning [W002]: Artifact 'access_summary' has no 'criteria' field
+docs/examples/etl-pipeline.pfdsl:32:3: warning [W002]: Artifact 'sales_fact' has no 'criteria' field
+docs/examples/etl-pipeline.pfdsl:36:3: warning [W002]: Artifact 'mart' has no 'criteria' field
+docs/examples/etl-pipeline.pfdsl:41:3: warning [W002]: Artifact 'dashboard' has no 'criteria' field
+docs/examples/etl-pipeline.pfdsl:45:3: warning [W002]: Artifact 'weekly_report' has no 'criteria' field
+check docs/examples/hiring-process.pfdsl
+docs/examples/hiring-process.pfdsl:19:3: warning [W002]: Artifact 'screening_result' has no 'criteria' field
+docs/examples/hiring-process.pfdsl:24:3: warning [W002]: Artifact 'interview_sheet' has no 'criteria' field
+docs/examples/hiring-process.pfdsl:29:3: warning [W002]: Artifact 'assignment' has no 'criteria' field
+docs/examples/hiring-process.pfdsl:34:3: warning [W002]: Artifact 'technical_result' has no 'criteria' field
+docs/examples/hiring-process.pfdsl:39:3: warning [W002]: Artifact 'final_evaluation' has no 'criteria' field
+docs/examples/hiring-process.pfdsl:44:3: warning [W002]: Artifact 'offer_letter' has no 'criteria' field
+check docs/examples/incident-response.pfdsl
+docs/examples/incident-response.pfdsl:14:3: warning [W002]: Artifact 'triage_record' has no 'criteria' field
+docs/examples/incident-response.pfdsl:19:3: warning [W002]: Artifact 'mitigation_record' has no 'criteria' field
+docs/examples/incident-response.pfdsl:23:3: warning [W002]: Artifact 'service_restored' has no 'criteria' field
+docs/examples/incident-response.pfdsl:27:3: warning [W002]: Artifact 'rca_draft' has no 'criteria' field
+docs/examples/incident-response.pfdsl:31:3: warning [W002]: Artifact 'timeline' has no 'criteria' field
+docs/examples/incident-response.pfdsl:35:3: warning [W002]: Artifact 'postmortem_doc' has no 'criteria' field
+docs/examples/incident-response.pfdsl:39:3: warning [W002]: Artifact 'action_items' has no 'criteria' field
+docs/examples/incident-response.pfdsl:43:3: warning [W002]: Artifact 'runbook' has no 'criteria' field
+check docs/examples/ml-model-dev.pfdsl
+docs/examples/ml-model-dev.pfdsl:19:3: warning [W002]: Artifact 'prepared_dataset' has no 'criteria' field
+docs/examples/ml-model-dev.pfdsl:23:3: warning [W002]: Artifact 'trained_model' has no 'criteria' field
+docs/examples/ml-model-dev.pfdsl:27:3: warning [W002]: Artifact 'eval_report' has no 'criteria' field
+docs/examples/ml-model-dev.pfdsl:31:3: warning [W002]: Artifact 'serving_model' has no 'criteria' field
+docs/examples/ml-model-dev.pfdsl:40:3: warning [W002]: Artifact 'drift_report' has no 'criteria' field
+docs/examples/ml-model-dev.pfdsl:44:3: warning [W002]: Artifact 'retrain_dataset' has no 'criteria' field
+check docs/examples/security-advisory.pfdsl
+docs/examples/security-advisory.pfdsl:29:3: warning [W002]: Artifact 'triage_result' has no 'criteria' field
+docs/examples/security-advisory.pfdsl:35:3: warning [W002]: Artifact 'cveid' has no 'criteria' field
+docs/examples/security-advisory.pfdsl:40:3: warning [W002]: Artifact 'fix_patch' has no 'criteria' field
+docs/examples/security-advisory.pfdsl:45:3: warning [W002]: Artifact 'patch_review_record' has no 'criteria' field
+docs/examples/security-advisory.pfdsl:50:3: warning [W002]: Artifact 'disclosure_plan' has no 'criteria' field
+docs/examples/security-advisory.pfdsl:55:3: warning [W002]: Artifact 'fixed_release' has no 'criteria' field
+docs/examples/security-advisory.pfdsl:60:3: warning [W002]: Artifact 'security_advisory' has no 'criteria' field
+check docs/examples/web-feature-dev.pfdsl
+docs/examples/web-feature-dev.pfdsl:14:3: warning [W002]: Artifact 'design_doc' has no 'criteria' field
+docs/examples/web-feature-dev.pfdsl:19:3: warning [W002]: Artifact 'implementation' has no 'criteria' field
+docs/examples/web-feature-dev.pfdsl:24:3: warning [W002]: Artifact 'review_comment' has no 'criteria' field
+docs/examples/web-feature-dev.pfdsl:29:3: warning [W002]: Artifact 'test_report' has no 'criteria' field
+docs/examples/web-feature-dev.pfdsl:34:3: warning [W002]: Artifact 'bug_ticket' has no 'criteria' field
+docs/examples/web-feature-dev.pfdsl:39:3: warning [W002]: Artifact 'deployed_release' has no 'criteria' field
+docs/examples/web-feature-dev.pfdsl:44:3: warning [W002]: Artifact 'release_note' has no 'criteria' field
+docs/examples/web-feature-dev.pfdsl:53:3: warning [W002]: Artifact 'checklist' has no 'criteria' field
+check docs/examples/xddp-derived-dev.pfdsl
+docs/examples/xddp-derived-dev.pfdsl:14:3: warning [W002]: Artifact 'usdm' has no 'criteria' field
+docs/examples/xddp-derived-dev.pfdsl:24:3: warning [W002]: Artifact 'understanding_doc' has no 'criteria' field
+docs/examples/xddp-derived-dev.pfdsl:29:3: warning [W002]: Artifact 'change_design' has no 'criteria' field
+docs/examples/xddp-derived-dev.pfdsl:34:3: warning [W002]: Artifact 'change_impl' has no 'criteria' field
+docs/examples/xddp-derived-dev.pfdsl:39:3: warning [W002]: Artifact 'change_test_spec' has no 'criteria' field
+docs/examples/xddp-derived-dev.pfdsl:44:3: warning [W002]: Artifact 'test_result' has no 'criteria' field
+docs/examples/xddp-derived-dev.pfdsl:49:3: warning [W002]: Artifact 'defect_report' has no 'criteria' field
+check docs/samples/01-simple-chain.pfdsl
+OK
+check docs/samples/02-feedback.pfdsl
+OK
+check docs/samples/03-set-input.pfdsl
+OK
+check docs/samples/04-set-output.pfdsl
+OK
+check docs/samples/05-label-cjk.pfdsl
+docs/samples/05-label-cjk.pfdsl:4:3: warning [W002]: Artifact 'D2' has no 'criteria' field
+check docs/samples/06-status-styles.pfdsl
+docs/samples/06-status-styles.pfdsl:5:3: warning [W002]: Artifact 'processed' has no 'criteria' field
+docs/samples/06-status-styles.pfdsl:6:3: warning [W002]: Artifact 'report' has no 'criteria' field
+check docs/samples/08-groups.pfdsl
+docs/samples/08-groups.pfdsl:8:3: warning [W002]: Artifact 'migrated' has no 'criteria' field
+docs/samples/08-groups.pfdsl:9:3: warning [W002]: Artifact 'endpoint' has no 'criteria' field
+docs/samples/08-groups.pfdsl:11:3: warning [W002]: Artifact 'component' has no 'criteria' field
+check docs/samples/09-parts.pfdsl
+docs/samples/09-parts.pfdsl:1:1: warning [W001]: Parts member 'D2' of 'D1' has no edges
+docs/samples/09-parts.pfdsl:1:1: warning [W001]: Parts member 'D3' of 'D1' has no edges
+docs/samples/09-parts.pfdsl:1:1: warning [W001]: Parts member 'D4' of 'D1' has no edges
+docs/samples/09-parts.pfdsl:4:3: warning [W002]: Artifact 'D1' has no 'criteria' field
+check docs/samples/10-layout-tb.pfdsl
+OK
+check docs/samples/11-external-stakeholders.pfdsl
+docs/samples/11-external-stakeholders.pfdsl:5:3: warning [W002]: Artifact 'report' has no 'criteria' field
+docs/samples/11-external-stakeholders.pfdsl:8:3: warning [W002]: Artifact 'summary' has no 'criteria' field
+check docs/samples/12-subflow-detail.pfdsl
+docs/samples/12-subflow-detail.pfdsl:6:3: warning [W002]: Artifact 'picked_items' has no 'criteria' field
+docs/samples/12-subflow-detail.pfdsl:8:3: warning [W002]: Artifact 'packed_box' has no 'criteria' field
+docs/samples/12-subflow-detail.pfdsl:10:3: warning [W002]: Artifact 'shipped_order' has no 'criteria' field
+check docs/samples/12-subflow.pfdsl
+docs/samples/12-subflow.pfdsl:5:3: warning [W002]: Artifact 'shipped_order' has no 'criteria' field
+check docs/samples/13-preset-base.pfdsl
+OK
+check docs/samples/13-preset.pfdsl
+docs/samples/13-preset.pfdsl:5:3: warning [W002]: Artifact 'prototype' has no 'criteria' field
+docs/samples/13-preset.pfdsl:6:3: warning [W002]: Artifact 'release' has no 'criteria' field
+check docs/samples/14-boundary-detail.pfdsl
+docs/samples/14-boundary-detail.pfdsl:6:3: warning [W002]: Artifact 'picked' has no 'criteria' field
+docs/samples/14-boundary-detail.pfdsl:8:3: warning [W002]: Artifact 'outgoing_parcel' has no 'criteria' field
+check docs/samples/14-boundary.pfdsl
+docs/samples/14-boundary.pfdsl:5:3: warning [W002]: Artifact 'parcel' has no 'criteria' field
+check docs/samples/15-index.pfdsl
+docs/samples/15-index.pfdsl:4:3: warning [W002]: Artifact 'spec' has no 'criteria' field
+docs/samples/15-index.pfdsl:5:3: warning [W002]: Artifact 'code' has no 'criteria' field
+check docs/samples/16-basepath.pfdsl
+docs/samples/16-basepath.pfdsl:11:3: warning [W002]: Artifact 'output' has no 'criteria' field
+check docs/samples/17-type.pfdsl
+docs/samples/17-type.pfdsl:7:3: warning [W002]: Artifact 'implementation' has no 'criteria' field
+check docs/samples/pfdsl_implementation_flow.pfdsl
+docs/samples/pfdsl_implementation_flow.pfdsl:22:3: warning [W002]: Artifact 'core_architecture' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:25:3: warning [W002]: Artifact 'repo_scaffold' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:28:3: warning [W002]: Artifact 'build_config' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:31:3: warning [W002]: Artifact 'shared_types' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:34:3: warning [W002]: Artifact 'token_spec' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:37:3: warning [W002]: Artifact 'ast_schema' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:40:3: warning [W002]: Artifact 'diagnostic_schema' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:43:3: warning [W002]: Artifact 'graph_schema' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:46:3: warning [W002]: Artifact 'lexer' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:49:3: warning [W002]: Artifact 'frontmatter_loader' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:52:3: warning [W002]: Artifact 'parser' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:55:3: warning [W002]: Artifact 'normalizer' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:58:3: warning [W002]: Artifact 'validator' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:61:3: warning [W002]: Artifact 'canonical_sorter' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:64:3: warning [W002]: Artifact 'formatter' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:67:3: warning [W002]: Artifact 'core_modules' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:71:3: warning [W002]: Artifact 'core_library' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:74:3: warning [W002]: Artifact 'group_types' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:77:3: warning [W002]: Artifact 'group_subgraph_export' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:80:3: warning [W002]: Artifact 'graphviz_exporter' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:83:3: warning [W002]: Artifact 'preview_engine' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:86:3: warning [W002]: Artifact 'vscode_shell' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:89:3: warning [W002]: Artifact 'language_service' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:92:3: warning [W002]: Artifact 'preview_panel' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:95:3: warning [W002]: Artifact 'format_command' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:98:3: warning [W002]: Artifact 'hover_support' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:101:3: warning [W002]: Artifact 'diagnostics_ui' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:104:3: warning [W002]: Artifact 'syntax_highlight' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:107:3: warning [W002]: Artifact 'vscode_extension' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:110:3: warning [W002]: Artifact 'rc_extension' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:113:3: warning [W002]: Artifact 'published_extension' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:116:3: warning [W002]: Artifact 'workflow_usage' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:119:3: warning [W002]: Artifact 'cli_tool' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:122:3: warning [W002]: Artifact 'metadata_exporter' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:125:3: warning [W002]: Artifact 'diff_analyzer' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:128:3: warning [W002]: Artifact 'cli_published' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:132:3: warning [W002]: Artifact 'agent_skill' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:135:3: warning [W002]: Artifact 'pdf_png_export' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:139:3: warning [W002]: Artifact 'group_fill_export' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:143:3: warning [W002]: Artifact 'preview_minimap' has no 'criteria' field
+docs/samples/pfdsl_implementation_flow.pfdsl:147:3: warning [W002]: Artifact 'skill_sync_command' has no 'criteria' field
+check-docs: all passed
+node scripts/check-doc-examples.mjs
+check-doc-examples: checked 13 block(s) across 11 file(s)
+check-doc-examples: OK
+node scripts/check-criteria-judgeability.mjs
+check-criteria-judgeability: all passed
+node scripts/check-diag-registry.mjs
+check-diag-registry: OK (59 codes match)
+node scripts/check-forward-ref-markers.mjs
+check-forward-ref-markers: no resolved forward-ref markers found
+node scripts/retro-patterns.mjs check
+83 pattern file(s), no violations.
+node scripts/check-spec-ids.mjs
+check-spec-ids: no violations found
+node scripts/check-companion-bindings.mjs
+check-companion-bindings: all passed
+node scripts/check-distributed-prose.mjs
+check-distributed-prose: OK (48 file(s))
+node scripts/check-entry-path-headings.mjs
+check-entry-path-headings: OK (333 file(s))
+node scripts/check-skill-wiring.mjs
+check-skill-wiring: OK
+node scripts/check-review-perspectives-scale.mjs
+docs/review-perspectives.md: 7146 bytes, 21 items
+.pfdsl/review-perspectives.md: 7415 bytes, 28 items
