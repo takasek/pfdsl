@@ -3,7 +3,7 @@ import type { DiagnosticSeverity } from "./types/index.js";
 export interface DiagnosticRegistryEntry {
 	/** Severities this code can be emitted with. Usually one entry; two for
 	 * codes whose severity depends on `options?.strict` (FM003, V002, V003,
-	 * V020, W002, W005). */
+	 * V020, W002). */
 	severities: readonly DiagnosticSeverity[];
 	/** Spec section number (without the `§` prefix) that normatively defines
 	 * the condition this code checks, e.g. "15.11". Matches spec.md §16's
@@ -273,9 +273,9 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 	},
 	V035: {
 		severities: ["error"],
-		section: "15.17",
+		section: "15.16",
 		summary:
-			"a roadmap file has an edge-only artifact with no frontmatter declaration (ghost node)",
+			"a roadmap file has an edge artifact with no frontmatter declaration (ghost node), or a declaration with no `status:`",
 	},
 
 	W001: {
@@ -299,11 +299,6 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		section: "15.13",
 		summary: "`index:` is duplicated within the same namespace",
 	},
-	W005: {
-		severities: ["warning", "error"],
-		section: "15.15",
-		summary: "a roadmap file's produced artifact has no `status:` set",
-	},
 	W006: {
 		severities: ["warning"],
 		section: "15.14",
@@ -312,7 +307,7 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 	},
 	W007: {
 		severities: ["warning", "error"],
-		section: "15.16",
+		section: "15.15",
 		summary: "a non-roadmap file's artifact has `status:` set",
 	},
 	W008: {
