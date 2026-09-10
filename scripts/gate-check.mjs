@@ -275,9 +275,8 @@ results.push(
 	wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }),
 );
 
-// 9. design-selection record: was the design choice recorded before the first commit,
-// with the required structure (#669)? One row per issue the cycle closes (#734).
-results.push(...perIssueSteps(designRecordStep, issues, { exec, base }));
+// 9. Design record structure and reapprovals, one row per linked issue.
+results.push(...perIssueSteps(designRecordStep, issues));
 
 // 10. knowledge-artifact size report: collect the measured deltas regardless of
 // issue metadata so the terminal output always shows changed knowledge artifacts.

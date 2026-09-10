@@ -30,7 +30,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
   - `behindBase > 0` のときは判定を一切出さず `staleTree`（`{base, message}`）と `behindBase` だけを返し、終了コード 1 で拒否する（#716）。`origin/<base>` を起点にサイクルのブランチを切ってから実行する（遅れたツリーで古い版が走ること・その拒否は拒否する版でしか起きないことは work-cycle.md 手順1 が一次情報）
   - `currentBranch` と `commitsAheadOfBase`（`origin/<base>..HEAD` の件数）を出力する（#629）。0 でなければ前サイクルのブランチに乗っている可能性を示すが、既存ブランチの意図的な継続もあるためスクリプトは拒否せず判断を残す
   - 作業ツリーに未コミットの変更（追跡外ファイルを含む）があるときは、`behindBase` と同じく判定を一切出さず `uncommittedFiles` と `dirtyTree` だけを返し、終了コード 1 で拒否する（#744）。前サイクルの変更はブランチを切り替えてもツリーに残り、次サイクルの最初のコミットに紛れ込む — `commitsAheadOfBase` が塞ぐのと同じ失敗の型で、経路がコミットでなく作業ツリーであるだけ。`commitsAheadOfBase` と違い判断を残さず拒否するのは、サイクルは clean なツリーから始める前提であり、`git worktree add` がそれを作るため、拒否への答えが「weigh する」でなく「worktree を切る」で済むから。ツリーが base に遅れかつ汚れている場合は遅れの方を返す（走っているスクリプト自身が古い版だという判定が、汚れの判定の信頼性も奪う）
-  - **草案は投稿前に `node scripts/check-design-record.mjs --file <草案のパス>` へ通す（#1114）。** 通さなかった場合に何が起きるかは `.pfdsl/bindings/pfd-retro-patterns/record-timing-anchor-vs-work-unit.md` が一次情報。
+  - **草案は投稿前に `node scripts/check-design-record.mjs --file <草案のパス>` へ通す（#1114）。** 旧時刻ゲートが補修を妨げた経緯は `.pfdsl/bindings/pfd-retro-patterns/record-timing-anchor-vs-work-unit.md` が一次情報。
   - 設計選択記録の雛形を `designRecordTemplate`（`{note, lines}`）で毎回出力する（#720）。行頭の語は `gate-check.mjs` の `DESIGN_RECORD_REQUIRED_PREFIXES` / `DISPOSITION_TOKENS` から引いており、散文に転記していない。対象 issue が候補を列挙している場合はその件数を添えた処分の行が加わる
   - 公開 pending を `releasePending`（`{needsAction, report}`）で出力する（#814）。`scripts/release-status.mjs` をそのまま走らせた結果で、`needsAction` はその終了コード、`report` は印字された行。判定でなく報告材料で、pending は公開直後を除いて常に nonzero になる。`needsAction` が何を畳み込むか、なぜそこで止まるかは `scripts/lib/release-status-check.mjs` の `needsAction` の JSDoc が一次情報 — ここには複製しない（#880）。運用上知っておく必要があるのは、false が「公開までにやるべきことが残っていない」であって「`make release` が成功する」ではないこと、true の理由は `report` の行にしか出ないので読むのは行のほうになること、の2点。台帳へ書き写す運用を置かないのは、値の一次情報が npm レジストリ・Marketplace・git であり、書き写した側は無視されたうえに古くなるため
   - このサイクルが着手する issue のうち、`flow:managed` なのに roadmap に process を持たないものを `unregisteredManagedIssues`、roadmap に process がなく `flow:managed` と `flow:exempt` のどちらも持たないものを `untriagedTargetIssues` で出力する（#963、#983）。`audit-issues-flow.mjs` は同じ欠落を全 open issue について報告するが advisory 止まりで、監査を落とさない — roadmap 登録は実装ブランチに乗るため、そのブランチが main へマージされるまで他セッションからは欠落して見え、未分類 issue は GitHub 上で分類されるまで一時的に全セッションから未分類に見える。あるサイクルの差分が消せるのは自分が着手する issue の欠落だけで、他の issue の分は消せない。行動できるのがその1件だけなので、ここが唯一の検査点になる。どちらかが非空で返ってきたら、着手前に roadmap へ依存チェーンを1本足して `flow:managed` を付けるか、`flow:exempt` へ分類するかのどちらかを済ませる — どちらでもないまま進めた回は、その issue の登録または分類が誰の担当でもないまま残る
@@ -66,8 +66,9 @@ GitHub 側にしか無い読みを本文の正規表現で再構成すると、D
 
 **着手前の選択記録**: 実装着手前に、選んだ方針を issue コメントとして残す。`--issue` を渡す全サイクルが対象で、issue が複数案を列挙しているかどうかは問わない（候補列挙のある回は各案の処分も要る）。選択を記録せず着手すると、issue 本文だけを読んだ第三者が「なぜその方針になったか」を実装差分からしか追えなくなる。
 書式は覚えなくてよい — `cycle-status.mjs` が `designRecordTemplate` として毎回出すので、それを埋めて投稿する。
-投稿した直後、最初のコミットを作る前に `gate-check.mjs --issue <n>` を回して design-selection record の書式判定を通す。
-書式 FAIL はコミットが1つも無い段階でも出る一方、コミット後に記録を直すと編集時刻が初コミットより後になって timing 判定が落ちるため、書式の是正はコミット前にしか無害に行えない。
+投稿した直後に `gate-check.mjs --issue <n>` を回して design-selection record の書式・再承認の判定を通す。
+記録の欠落、形式不備、曖昧な正本、不正な再承認は FAIL にする。記録の投稿・編集と初コミットの時刻比較は行わない。
+記録漏れや書式不備は同じ記録を補修する。決定を変更する場合は必要な再承認と改訂履歴を残し、既存実装との整合を確認して通常の追加コミットで直す。コミットの再作成や日時の変更を回復手順にしない。
 
 汎用ゲート（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、**マージ時にのみ**:
 
