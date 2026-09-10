@@ -23,6 +23,22 @@ const valid = "req >> design -> spec\nspec >> impl -> code\n";
 const validWithStatus =
 	"---\nartifact:\n  spec:\n    status: wip\n    criteria: spec criteria\n  code:\n    status: todo\n    criteria: code criteria\n---\nreq >> design -> spec\nspec >> impl -> code\n";
 const invalid = "req >> design -> spec\nother -> spec\n"; // V001: dual generators (always error)
+// Same V001, but with declarations to write into. `meta set` judges the result
+// of the write rather than the original (#1125), so reaching its failure path
+// takes a file whose mutation actually lands and still leaves the error.
+const invalidDeclared = `---
+type: roadmap
+artifact:
+  spec: { label: Spec, status: todo }
+  req: { label: Req, status: done }
+  other: { label: Other, status: done }
+process:
+  design: { label: Design }
+  build: { label: Build }
+---
+req >> design -> spec
+other >> build -> spec
+`;
 const warningOnly =
 	"---\nartifact:\n  bundle:\n    parts: [orphan]\n---\nreq >> design -> bundle\n"; // W001: orphan has no edges
 // V002 (process with no inputs): a warning by default, an error under --strict.
@@ -35,6 +51,7 @@ beforeAll(() => {
 	writeFileSync(join(dir, "valid.pfdsl"), valid);
 	writeFileSync(join(dir, "valid-with-status.pfdsl"), validWithStatus);
 	writeFileSync(join(dir, "invalid.pfdsl"), invalid);
+	writeFileSync(join(dir, "invalid-declared.pfdsl"), invalidDeclared);
 	writeFileSync(join(dir, "warning-only.pfdsl"), warningOnly);
 	writeFileSync(join(dir, "incomplete.pfdsl"), incomplete);
 	writeFileSync(join(dir, "inline-comment.pfdsl"), inlineComment);
@@ -1465,7 +1482,7 @@ describe("--json failure payload on a file that does not validate", () => {
 			argv: () => [
 				"meta",
 				"set",
-				invalidFile(),
+				join(dir, "invalid-declared.pfdsl"),
 				"spec",
 				"status",
 				"done",
@@ -1609,10 +1626,10 @@ describe("--no-color wired into all diagnostic-emitting commands (#508)", () => 
 			argv: (nc) => [
 				"meta",
 				"set",
-				invalidFile(),
-				"x",
-				"label",
-				"y",
+				join(dir, "invalid-declared.pfdsl"),
+				"spec",
+				"status",
+				"done",
 				...(nc ? ["--no-color"] : []),
 			],
 		},
@@ -2815,6 +2832,49 @@ req >> design -> spec
 		expect(typeof parsed.error).toBe("string");
 		expect(parsed.error).toContain("refusing to write");
 		expect(readFileSync(f, "utf-8")).toBe(selfRevises);
+	});
+
+	// The pre-mutation gate judges the result, not the original (#1125): a
+	// `meta set` that cures every error is allowed through, while one that
+	// leaves an error standing is not. `revises: spec` on `spec` above covers
+	// the third case, a mutation that adds an error.
+	it("refuses to write when the result still carries an unrelated error", async () => {
+		const twoGaps = `---
+type: roadmap
+artifact:
+  req: { label: Req, status: done }
+  spec: { label: Spec }
+  other: { label: Other }
+process:
+  design: { label: Design }
+  build: { label: Build }
+---
+req >> design -> spec
+req >> build -> other
+`;
+		const f = join(dir, "meta-set-residual-error.pfdsl");
+		writeFileSync(f, twoGaps);
+		const r = await run(["meta", "set", f, "spec", "status", "wip"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("refusing to write");
+		expect(readFileSync(f, "utf-8")).toBe(twoGaps);
+	});
+
+	it("still stops before mutating when the front matter cannot be parsed", async () => {
+		const unparseable = `---
+type: roadmap
+artifact:
+  spec: [unclosed
+---
+req >> design -> spec
+`;
+		const f = join(dir, "meta-set-unparseable.pfdsl");
+		writeFileSync(f, unparseable);
+		const r = await run(["meta", "set", f, "spec", "status", "wip"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("FM002");
+		expect(r.stderr).not.toContain("refusing to write");
+		expect(readFileSync(f, "utf-8")).toBe(unparseable);
 	});
 
 	it("rejects a field invalid for the node kind (exit 2)", async () => {
