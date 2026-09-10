@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { ALWAYS_TAG } from "./retro-patterns.mjs";
+import { ALWAYS_TAG, parsePatternFile } from "./retro-patterns.mjs";
 import {
 	checkBindingUsage,
 	parseQuery,
@@ -48,6 +49,27 @@ describe("renderPattern", () => {
 			].join("\n"),
 		);
 	});
+});
+
+describe("historical examples in the repository catalog", () => {
+	for (const [filename, references] of [
+		["convention-order-inverts-under-delegation", ["#944"]],
+		["record-timing-anchor-vs-work-unit", ["#829", "#1050"]],
+	]) {
+		it(`keeps ${filename}'s examples in the standard display`, () => {
+			const path = `.pfdsl/bindings/pfd-retro-patterns/${filename}.md`;
+			const pattern = parsePatternFile(
+				readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"),
+			);
+			const output = renderPattern({ ...pattern, path });
+			for (const reference of references) {
+				assert.ok(
+					output.includes(reference),
+					`${path}: ${reference} is missing`,
+				);
+			}
+		});
+	}
 });
 
 describe("renderTags", () => {
