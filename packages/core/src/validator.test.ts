@@ -1153,14 +1153,21 @@ a >> design -> b
 		// satisfied input.
 
 		it("errors when an edge-only artifact has no frontmatter declaration", () => {
-			const fm: Frontmatter = { type: "roadmap", artifact: { C: {} } };
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { C: { status: "done" } },
+			};
 			expect(codes("[ghost, B] >> P -> C", fm)).toContain("V035");
 		});
 
-		it("does not error when every edge artifact is declared", () => {
+		it("does not error when every edge artifact is declared with a status", () => {
 			const fm: Frontmatter = {
 				type: "roadmap",
-				artifact: { A: {}, B: {}, C: {} },
+				artifact: {
+					A: { status: "done" },
+					B: { status: "done" },
+					C: { status: "todo" },
+				},
 			};
 			expect(codes("[A, B] >> P -> C", fm)).not.toContain("V035");
 		});
@@ -1184,7 +1191,7 @@ a >> design -> b
 			// artifacts — a process's own declaration gap is V020/V003 territory.
 			const fm: Frontmatter = {
 				type: "roadmap",
-				artifact: { A: {}, C: {} },
+				artifact: { A: { status: "done" }, C: { status: "todo" } },
 			};
 			const diags = diagnose("A >> P -> C", fm);
 			expect(
@@ -1193,13 +1200,19 @@ a >> design -> b
 		});
 
 		it("reports one diagnostic per undeclared artifact", () => {
-			const fm: Frontmatter = { type: "roadmap", artifact: { C: {} } };
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { C: { status: "todo" } },
+			};
 			const diags = diagnose("[ghost1, ghost2] >> P -> C", fm);
 			expect(diags.filter((d) => d.code === "V035")).toHaveLength(2);
 		});
 
 		it("is an unconditional error, unaffected by --strict", () => {
-			const fm: Frontmatter = { type: "roadmap", artifact: { C: {} } };
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { C: { status: "todo" } },
+			};
 			const lenient = diagnose("[ghost, B] >> P -> C", fm).find(
 				(d) => d.code === "V035",
 			);
@@ -1211,6 +1224,56 @@ a >> design -> b
 			);
 			expect(lenient?.severity).toBe("error");
 			expect(strict?.severity).toBe("error");
+		});
+
+		// #1125 follow-up: a declaration with no `status:` (including an empty
+		// `id: {}` block) is no longer enough to satisfy V035 — it must also
+		// carry a status. This is the strengthened half of the rule, which now
+		// covers the produced-artifact-missing-status case a separate warning
+		// used to check on its own.
+		it("errors when a declaration exists but has no status (empty block)", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: {} },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V035");
+		});
+
+		it("errors when a declaration exists but has no status (other fields present)", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: { label: "B" } },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V035");
+		});
+
+		it("does not error when the declaration has a status", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: { status: "todo" } },
+			};
+			expect(codes("A >> P -> B", fm)).not.toContain("V035");
+		});
+
+		it("does not flag a missing-status source artifact in a workflow file", () => {
+			const fm: Frontmatter = { type: "workflow", artifact: { B: {} } };
+			expect(codes("A >> P -> B", fm)).not.toContain("V035");
+		});
+
+		it("distinguishes 'no declaration' from 'declared without status' in the message", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: {} },
+			};
+			const diags = diagnose("[ghost, A] >> P -> B", fm);
+			const v035 = diags.filter((d) => d.code === "V035");
+			expect(v035).toHaveLength(2);
+			const ghostMsg = v035.find((d) => d.message.includes("'ghost'"))?.message;
+			const bMsg = v035.find((d) => d.message.includes("'B'"))?.message;
+			expect(ghostMsg).toMatch(/no frontmatter declaration/);
+			expect(bMsg).not.toMatch(/no frontmatter declaration/);
+			expect(bMsg).toMatch(/status/);
+			expect(ghostMsg).not.toBe(bMsg);
 		});
 	});
 });

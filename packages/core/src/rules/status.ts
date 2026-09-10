@@ -93,13 +93,17 @@ export function pfdType(ctx: RuleContext): Diagnostic[] {
 
 /**
  * V035: in a roadmap, every artifact id that appears on an edge must carry a
- * frontmatter declaration (§15.17). `ctx.nodeKinds` is total over both
- * frontmatter declarations and body edges (normalizer.ts infers a kind for
- * every id it sees), so an "artifact" id absent from `artifactMeta` can only
- * be one whose declaration block is gone while an edge referencing it
- * remains — a ghost node with no label, no status, no criteria. `check`,
- * `graph orphans`, and `meta get` all treat it as absent, while `status
- * ready` still reports it as a satisfied input (#1125).
+ * frontmatter declaration, and that declaration must carry a `status:`
+ * (§15.16). `ctx.nodeKinds` is total over both frontmatter declarations and
+ * body edges (normalizer.ts infers a kind for every id it sees), so an
+ * "artifact" id absent from `artifactMeta` can only be one whose declaration
+ * block is gone while an edge referencing it remains — a ghost node with no
+ * label, no status, no criteria. `check`, `graph orphans`, and `meta get`
+ * all treat it as absent, while `status ready` still reports it as a
+ * satisfied input (#1125). A declaration that exists but omits `status:`
+ * (including an empty `id: {}` block) is the milder form of the same gap:
+ * the progress the roadmap is supposed to carry for that artifact is
+ * missing, even though the node itself is not a ghost.
  *
  * Unconditional error, not `ctx.strictly(...)`: `check-scaffold` deliberately
  * runs `--strict` only against the distributed scaffold, exempting
@@ -110,13 +114,23 @@ export function roadmapUndeclaredArtifact(ctx: RuleContext): Diagnostic[] {
 	if (ctx.fm?.type !== "roadmap") return [];
 	const diagnostics: Diagnostic[] = [];
 	for (const [id, kind] of ctx.nodeKinds) {
-		if (kind !== "artifact" || ctx.artifactMeta[id] !== undefined) continue;
-		diagnostics.push({
-			severity: "error",
-			code: "V035",
-			message: `Artifact '${id}' appears on an edge but has no frontmatter declaration`,
-			range: zeroRange(),
-		});
+		if (kind !== "artifact") continue;
+		const meta = ctx.artifactMeta[id];
+		if (meta === undefined) {
+			diagnostics.push({
+				severity: "error",
+				code: "V035",
+				message: `Artifact '${id}' appears on an edge but has no frontmatter declaration`,
+				range: zeroRange(),
+			});
+		} else if (meta.status === undefined) {
+			diagnostics.push({
+				severity: "error",
+				code: "V035",
+				message: `Artifact '${id}' appears on an edge but its frontmatter declaration has no 'status' field`,
+				range: ctx.rangeOf(id),
+			});
+		}
 	}
 	return diagnostics;
 }
