@@ -271,6 +271,12 @@ export const DIAGNOSTIC_REGISTRY: Readonly<
 		summary:
 			"boundary set mismatch (bijection violation between parent I/O and child open input / terminal)",
 	},
+	V035: {
+		severities: ["error"],
+		section: "15.17",
+		summary:
+			"a roadmap file has an edge-only artifact with no frontmatter declaration (ghost node)",
+	},
 
 	W001: {
 		severities: ["warning"],

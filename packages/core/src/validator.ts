@@ -28,6 +28,7 @@ import {
 	pfdType,
 	readyGateTypeOmitted,
 	roadmapStatusPresence,
+	roadmapUndeclaredArtifact,
 	statusMonotonicity,
 } from "./rules/status.js";
 import type {
@@ -65,6 +66,7 @@ export const RULES: readonly Rule[] = [
 	flowStatusAbsence, // W007
 	pfdType, // V031
 	readyGateTypeOmitted, // W006
+	roadmapUndeclaredArtifact, // V035
 ];
 
 export function validate(

@@ -1144,4 +1144,73 @@ a >> design -> b
 			expect(w007?.severity).toBe("error");
 		});
 	});
+
+	describe("V035: undeclared artifact used on an edge (roadmap only, #1125)", () => {
+		// Reproduces the ghost-node scenario: a frontmatter artifact block gets
+		// deleted but the edge line that mentions it survives. Nothing else in
+		// the checker catches this — check passes, graph orphans reports none,
+		// meta get returns {}, and status ready still counts the id as a
+		// satisfied input.
+
+		it("errors when an edge-only artifact has no frontmatter declaration", () => {
+			const fm: Frontmatter = { type: "roadmap", artifact: { C: {} } };
+			expect(codes("[ghost, B] >> P -> C", fm)).toContain("V035");
+		});
+
+		it("does not error when every edge artifact is declared", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: {}, B: {}, C: {} },
+			};
+			expect(codes("[A, B] >> P -> C", fm)).not.toContain("V035");
+		});
+
+		it("does not fire in a workflow file with the same implicit artifact", () => {
+			const fm: Frontmatter = { type: "workflow", artifact: { C: {} } };
+			expect(codes("[ghost, B] >> P -> C", fm)).not.toContain("V035");
+		});
+
+		it("does not fire in a pipeline file with the same implicit artifact", () => {
+			const fm: Frontmatter = { type: "pipeline", artifact: { C: {} } };
+			expect(codes("[ghost, B] >> P -> C", fm)).not.toContain("V035");
+		});
+
+		it("does not fire when type is omitted", () => {
+			expect(codes("[ghost, B] >> P -> C")).not.toContain("V035");
+		});
+
+		it("does not flag process ids, only artifacts", () => {
+			// P has no frontmatter process: entry either, but V035 looks only at
+			// artifacts — a process's own declaration gap is V020/V003 territory.
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: {}, C: {} },
+			};
+			const diags = diagnose("A >> P -> C", fm);
+			expect(
+				diags.filter((d) => d.code === "V035" && d.message.includes("'P'")),
+			).toHaveLength(0);
+		});
+
+		it("reports one diagnostic per undeclared artifact", () => {
+			const fm: Frontmatter = { type: "roadmap", artifact: { C: {} } };
+			const diags = diagnose("[ghost1, ghost2] >> P -> C", fm);
+			expect(diags.filter((d) => d.code === "V035")).toHaveLength(2);
+		});
+
+		it("is an unconditional error, unaffected by --strict", () => {
+			const fm: Frontmatter = { type: "roadmap", artifact: { C: {} } };
+			const lenient = diagnose("[ghost, B] >> P -> C", fm).find(
+				(d) => d.code === "V035",
+			);
+			const { tokens } = lex("[ghost, B] >> P -> C");
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, fm);
+			const strict = validate(edges, nodeKinds, fm, { strict: true }).find(
+				(d) => d.code === "V035",
+			);
+			expect(lenient?.severity).toBe("error");
+			expect(strict?.severity).toBe("error");
+		});
+	});
 });

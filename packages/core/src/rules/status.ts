@@ -92,6 +92,36 @@ export function pfdType(ctx: RuleContext): Diagnostic[] {
 }
 
 /**
+ * V035: in a roadmap, every artifact id that appears on an edge must carry a
+ * frontmatter declaration (§15.17). `ctx.nodeKinds` is total over both
+ * frontmatter declarations and body edges (normalizer.ts infers a kind for
+ * every id it sees), so an "artifact" id absent from `artifactMeta` can only
+ * be one whose declaration block is gone while an edge referencing it
+ * remains — a ghost node with no label, no status, no criteria. `check`,
+ * `graph orphans`, and `meta get` all treat it as absent, while `status
+ * ready` still reports it as a satisfied input (#1125).
+ *
+ * Unconditional error, not `ctx.strictly(...)`: `check-scaffold` deliberately
+ * runs `--strict` only against the distributed scaffold, exempting
+ * operational `.pfdsl/`. A strict-gated severity would stay a warning
+ * exactly where this needs to hold.
+ */
+export function roadmapUndeclaredArtifact(ctx: RuleContext): Diagnostic[] {
+	if (ctx.fm?.type !== "roadmap") return [];
+	const diagnostics: Diagnostic[] = [];
+	for (const [id, kind] of ctx.nodeKinds) {
+		if (kind !== "artifact" || ctx.artifactMeta[id] !== undefined) continue;
+		diagnostics.push({
+			severity: "error",
+			code: "V035",
+			message: `Artifact '${id}' appears on an edge but has no frontmatter declaration`,
+			range: zeroRange(),
+		});
+	}
+	return diagnostics;
+}
+
+/**
  * W006: the ready gate treats a file with no `type:` as a roadmap (§15.14).
  * Say so, rather than acting on an assumption the author never wrote down.
  */
