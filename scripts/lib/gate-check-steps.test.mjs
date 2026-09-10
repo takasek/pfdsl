@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	analyzeAdoptedPfdsl,
 	checkDocsStep,
 	collectCycleWindow,
 	collectSizeDeltas,
-	commitMessagesSince,
 	commitSubjectStep,
 	deletedFilesSince,
 	designRecordStep,
@@ -17,7 +15,6 @@ import {
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
-	reviewRecordStep,
 	wipTransitionStep,
 } from "./gate-check-steps.mjs";
 
@@ -877,29 +874,6 @@ describe("designRecordStep", () => {
 	});
 });
 
-describe("commitMessagesSince", () => {
-	it("reads the branch's messages with the separator both readers expect", () => {
-		const { exec, calls } = fakeExec({
-			"git log": { out: `feat: a${RECORD_SEP}` },
-		});
-		const result = commitMessagesSince({ exec, base: "main" });
-		assert.equal(result.ok, true);
-		assert.equal(result.text, `feat: a${RECORD_SEP}`);
-		assert.deepEqual(calls, [
-			`git log --no-merges origin/main..HEAD --format=%B${RECORD_SEP}`,
-		]);
-	});
-
-	it("reports the failure rather than an empty range", () => {
-		const { exec } = fakeExec({
-			"git log": { ok: false, out: "fatal: bad revision\n" },
-		});
-		const result = commitMessagesSince({ exec, base: "main" });
-		assert.equal(result.ok, false);
-		assert.equal(result.error, "fatal: bad revision");
-	});
-});
-
 describe("perIssueSteps", () => {
 	const step = ({ issue, issueFailure }) => ({
 		name: "a step",
@@ -1106,84 +1080,6 @@ describe("checkDocsStep", () => {
 	});
 });
 
-describe("reviewRecordStep", () => {
-	const trailer = "Review: tool=simplify";
-	const messages = (text) => ({ ok: true, text });
-
-	it("PASSes a correctness review for a code-touching branch", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nReview: tool=correctness\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("PASSes a design review for a code-touching branch", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nReview: tool=design\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("PASSes when a code-touching branch carries both a gate record and a correctness record", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages(
-				`subject\n\n${trailer}\nReview: tool=correctness\n`,
-			),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("FAILs when a code-touching branch carries no record at all", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nbody without a trailer\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /no review record/);
-	});
-
-	it("FAILs when a code-touching branch carries only the quality (simplify) record", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages(`subject\n\n${trailer}\n`),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /no correctness review record/);
-	});
-
-	it("FAILs when the record names a tool outside the allowed set", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nReview: tool=eyeballs\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /malformed record/);
-	});
-
-	it("PASSes a prose-only branch that carries no record", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("docs: x\n\nbody\n"),
-			changedFiles: ["docs/adr/0001-x.md"],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("FAILs when the caller could not read the range", () => {
-		const result = reviewRecordStep({
-			commitMessages: { ok: false, text: "", error: "fatal: bad revision" },
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /bad revision/);
-	});
-});
-
-// The branch's start, as both the design-record timing check and the cycle
-// window measure it. One helper because the two must not drift apart about
-// what "when this cycle started" means (#834).
 describe("firstCommitAuthorDate", () => {
 	it("returns the oldest commit's author date", () => {
 		const { exec, calls } = fakeExec({

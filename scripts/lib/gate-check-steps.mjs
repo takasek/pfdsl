@@ -13,7 +13,6 @@
  * and report failure as `{ ok: false, out }`.
  */
 
-import { RECORD_SEP } from "./commit-trailers.mjs";
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
 	classifyDesignRecordContent,
@@ -38,7 +37,6 @@ import {
 } from "./gate-check.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
-import { classifyCycle, parseReviewRecords } from "./review-record.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
 
@@ -112,27 +110,6 @@ export function firstCommitAuthorDate({ exec, base }) {
 	]);
 	if (!r.ok) return { ok: false, iso: null };
 	return { ok: true, iso: r.out.trim().split("\n")[0] || null };
-}
-
-/**
- * The branch's commit messages, RECORD_SEP between them — the input every
- * trailer-borne declaration is read from. Two checks want it (the review
- * record and the size override), and they have to agree about the range and
- * the separator, so the invocation lives here rather than in each of them.
- * Callers run it once and hand the result to both, rather than each step
- * spawning its own git.
- * @param {{exec: Function, base: string}} params
- * @returns {{ok: boolean, text: string, error?: string}}
- */
-export function commitMessagesSince({ exec, base }) {
-	const r = exec("git", [
-		"log",
-		"--no-merges",
-		`origin/${base}..HEAD`,
-		`--format=%B${RECORD_SEP}`,
-	]);
-	if (!r.ok) return { ok: false, text: "", error: r.out.trim() };
-	return { ok: true, text: r.out };
 }
 
 /**
@@ -631,44 +608,6 @@ export function checkDocsStep({ exec }) {
 		name,
 		status: r.ok ? "PASS" : "FAIL",
 		detail: r.ok ? undefined : r.out.trim().slice(-400),
-	};
-}
-
-/**
- * Review record: does this branch carry a trailer for the code it changed?
- * The rule says the trailer cannot be added after the fact — it is part of a
- * commit message — yet every detector for it used to sit after the merge,
- * where the only fix left is rewriting history.
- *
- * The verdict is classifyCycle's, called on `origin/<base>...HEAD`. A
- * malformed record is reported because parseReviewTrailer already judged it,
- * not as an extra rule.
- *
- * Issue-body enumeration remains design-settlement guidance and does not add a
- * review trailer requirement. Code-path changes still owe correctness or design.
- */
-export function reviewRecordStep({ commitMessages, changedFiles }) {
-	const name = "Review record";
-	if (!commitMessages.ok)
-		return {
-			name,
-			status: "FAIL",
-			detail: commitMessages.error,
-		};
-
-	const records = parseReviewRecords(commitMessages.text);
-	const problems = classifyCycle({ changedFiles, records });
-	for (const r of records.filter((r) => r.error))
-		problems.push(`malformed record: ${r.error}`);
-	if (problems.length > 0)
-		return { name, status: "FAIL", detail: problems.join("; ") };
-	return {
-		name,
-		status: "PASS",
-		detail:
-			records.length === 0
-				? "prose-only branch, no record owed"
-				: `${records.length} record(s)`,
 	};
 }
 

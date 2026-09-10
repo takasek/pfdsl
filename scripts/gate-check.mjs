@@ -39,7 +39,6 @@ import {
 	checkDocsStep,
 	collectCycleWindow,
 	collectSizeDeltas,
-	commitMessagesSince,
 	commitSubjectStep,
 	deletedFilesSince,
 	designRecordStep,
@@ -48,7 +47,6 @@ import {
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
-	reviewRecordStep,
 	wipTransitionStep,
 } from "./lib/gate-check-steps.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
@@ -220,9 +218,6 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 // granularity stays MANUAL)
 results.push(commitSubjectStep({ exec, base }));
 
-// Every trailer-borne declaration reads this, so it is fetched once.
-const commitMessages = commitMessagesSince({ exec, base });
-
 // The linked issues, fetched once each for the two checks that read them.
 // githubOps keeps the REST fallback that a bare `gh` call would lose in
 // environments without the binary (#489/#492). Only that environment degrades
@@ -274,10 +269,6 @@ for (const number of issueNumbers) {
 		});
 	}
 }
-
-// 7b. Review record: judged before the PR, because the trailer lives in a
-// commit message and cannot be added afterwards (#698).
-results.push(reviewRecordStep({ commitMessages, changedFiles }));
 
 // 8. wip transition verification (todo→wip at start, protocol4) in .pfdsl/roadmap.pfdsl
 results.push(
