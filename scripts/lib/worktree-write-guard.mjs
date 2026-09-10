@@ -9,9 +9,13 @@
 //
 // worktreeRoot/mainRoot are resolved by the hook wrapper via `git rev-parse
 // --show-toplevel` / `--git-common-dir` rather than by matching cwd against
-// the `.claude/worktrees/<name>` naming convention here — git's own notion
-// of worktree boundaries also covers a worktree created anywhere else (e.g.
-// a bare `git worktree add ../scratch`), which a path regex would miss.
+// the `.claude/worktrees/<name>` naming convention here. This is about which
+// worktree the session is running from, not about where a write points: git's
+// own notion of worktree boundaries recognizes a session started in a worktree
+// created anywhere else (e.g. a bare `git worktree add ../scratch`), which a
+// path regex over cwd would miss. Such a worktree is still only recognized as
+// the session's own root — as a write target it sits outside mainRoot, which
+// the allow above already covers.
 
 /** Whether `path` is `root` itself or a descendant of it (prefix-safe: no partial-segment match). */
 function isUnder(path, root) {
