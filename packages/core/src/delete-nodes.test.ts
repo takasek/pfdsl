@@ -1,5 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { deleteNodes } from "./delete-nodes.js";
+import { analyze } from "./index.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe("deleteNodes", () => {
 	describe("frontmatter declarations", () => {
@@ -204,6 +210,215 @@ process:
 `;
 			const { output } = deleteNodes(src, ["ghost"]);
 			expect(output).toContain("[a,   b] >> p");
+		});
+
+		it("fuses a surviving multi-segment chain back into one chain statement", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+  c:
+    label: C
+process:
+  p:
+    label: P
+  q:
+    label: Q
+---
+a >> p -> b >> q -> c
+`;
+			// Nothing deleted from this chain at all; still exercises the
+			// multi-segment fuse path via an unrelated deletion elsewhere.
+			const { output } = deleteNodes(`${src}\nghost\n`, ["ghost"]);
+			expect(output).toContain("a >> p -> b >> q -> c");
+		});
+
+		it("splits a multi-segment chain where a middle process is deleted", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+  c:
+    label: C
+process:
+  p:
+    label: P
+  q:
+    label: Q
+---
+a >> p -> b >> q -> c
+`;
+			const { output } = deleteNodes(src, ["q"]);
+			expect(output).toContain("a >> p -> b");
+			expect(output).not.toContain(">> q");
+			expect(output).not.toContain("-> c");
+		});
+	});
+
+	describe("reference fields", () => {
+		it("drops a dangling revises: field", () => {
+			const src = `---
+artifact:
+  old_a:
+    label: Old A
+    status: done
+  a:
+    label: A
+    status: done
+    revises: old_a
+---
+old_a; a
+`;
+			const { output } = deleteNodes(src, ["old_a"]);
+			expect(output).not.toContain("revises");
+			expect(output).toContain("a:\n    label: A");
+		});
+
+		it("trims a deleted id out of parts:, keeping the field when members remain", () => {
+			const src = `---
+artifact:
+  whole:
+    label: Whole
+    parts: [x, y]
+  x:
+    label: X
+  y:
+    label: Y
+---
+whole; x; y
+`;
+			const { output } = deleteNodes(src, ["x"]);
+			expect(output).toContain("parts: [ y ]");
+		});
+
+		it("drops parts: entirely when every member is deleted", () => {
+			const src = `---
+artifact:
+  whole:
+    label: Whole
+    parts: [x]
+  x:
+    label: X
+---
+whole; x
+`;
+			const { output } = deleteNodes(src, ["x"]);
+			expect(output).not.toContain("parts");
+		});
+
+		it("drops a boundary: key that names a deleted artifact, leaving the child-side value alone", () => {
+			const src = `---
+artifact:
+  order:
+    label: Order
+process:
+  order_fulfill:
+    label: Order fulfill
+    subflow: ./child.pfdsl
+    boundary:
+      order: incoming_order
+---
+order >> order_fulfill
+`;
+			const { output } = deleteNodes(src, ["order"]);
+			expect(output).not.toContain("boundary");
+			expect(output).not.toContain("incoming_order");
+		});
+	});
+
+	describe("safety against dangling roadmap references (V035)", () => {
+		it("never leaves a declaration without its edge occurrence, or vice versa", () => {
+			const src = `---
+type: roadmap
+artifact:
+  a:
+    label: A
+    status: done
+  b:
+    label: B
+    status: done
+  c:
+    label: C
+    status: done
+process:
+  p:
+    label: P
+---
+[a, b] >> p -> c
+`;
+			const { output } = deleteNodes(src, ["p", "c"]);
+			const { diagnostics } = analyze(output);
+			const errors = diagnostics.filter((d) => d.severity === "error");
+			expect(errors).toEqual([]);
+		});
+	});
+
+	describe("real roadmap.pfdsl", () => {
+		it("removes the current sweep target with zero errors and unchanged ready/blocked results", () => {
+			const src = readFileSync(
+				resolve(__dirname, "../../../.pfdsl/roadmap.pfdsl"),
+				"utf-8",
+			);
+			const before = analyze(src);
+			expect(before.diagnostics.filter((d) => d.severity === "error")).toEqual(
+				[],
+			);
+
+			const { output, deleted, notFound } = deleteNodes(src, [
+				"publish_cli_pipeline_kind",
+				"pipeline_kind_rename",
+				"reader_first_design_records",
+				"cli_release_pipeline_kind",
+			]);
+			expect(notFound).toEqual([]);
+			expect(deleted.sort()).toEqual(
+				[
+					"cli_release_pipeline_kind",
+					"pipeline_kind_rename",
+					"publish_cli_pipeline_kind",
+					"reader_first_design_records",
+				].sort(),
+			);
+
+			const after = analyze(output);
+			expect(after.diagnostics.filter((d) => d.severity === "error")).toEqual(
+				[],
+			);
+
+			const readyStatus = (
+				result: typeof before,
+			): Map<string, "ready" | "blocked"> => {
+				const map = new Map<string, "ready" | "blocked">();
+				for (const [id, kind] of result.nodeKinds) {
+					if (kind !== "process") continue;
+					const inputs = result.edges.filter(
+						(e) => e.kind !== "output" && e.process === id,
+					);
+					const blocked = inputs.some((e) => {
+						if (e.kind === "feedback") return false;
+						const meta = result.frontmatter?.artifact?.[e.artifact];
+						return meta?.status !== "done";
+					});
+					map.set(id, blocked ? "blocked" : "ready");
+				}
+				return map;
+			};
+
+			const beforeStatus = readyStatus(before);
+			const afterStatus = readyStatus(after);
+			for (const [id, status] of afterStatus) {
+				expect(beforeStatus.get(id)).toBe(status);
+			}
+			// no process disappeared from the ready/blocked computation as a
+			// side effect of unrelated edges losing their frontmatter.
+			expect(afterStatus.size).toBe(
+				beforeStatus.size -
+					(beforeStatus.has("publish_cli_pipeline_kind") ? 1 : 0),
+			);
 		});
 	});
 });
