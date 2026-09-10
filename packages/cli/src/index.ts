@@ -1189,7 +1189,7 @@ export function runMetaSet(
 	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
 	if (failed) return failed;
 
-	// Progress belongs to the roadmap (§15.16), so writing status into a file
+	// Progress belongs to the roadmap (§15.15), so writing status into a file
 	// that declares another kind would have the CLI produce the state W007
 	// reports. An omitted type is read as roadmap, same as the ready gate.
 	if (field === "status") {
@@ -2414,7 +2414,7 @@ export interface StatusGapsResult {
  * The tag a flow artifact carries to say "this one is an individually tracked
  * deliverable, so the roadmap must have a chain that builds it". The selector
  * used to be `status: todo`, but a flow file may not carry status at all
- * (W007, §15.16) — that selector could only match files already in violation.
+ * (W007, §15.15) — that selector could only match files already in violation.
  * An opt-in tag also keeps the check quiet by default: comparing every flow id
  * against the roadmap flags 42 of this repo's own 47 workflow artifacts, which
  * are process byproducts nobody ever meant to track one by one.
@@ -2866,7 +2866,7 @@ cannot be set.
 
 Setting status requires a roadmap file: an explicit type: other than roadmap
 is refused (spec §2.10/§15.14), since progress belongs to the roadmap — a file
-that carries status under another kind is also reported by check (W007, §15.16).
+that carries status under another kind is also reported by check (W007, §15.15).
 Other fields are writable on any kind.
 When setting status on a roadmap file, reports which processes became newly
 ready after the change (once, after all writes).
@@ -3252,7 +3252,7 @@ Omitting type: on the roadmap file is treated as roadmap and allowed, with a war
 The tag is opt-in: tag the flow artifacts that are individually tracked
 deliverables. Comparing every flow artifact id instead would flag the routine
 byproducts a process diagram is mostly made of. Flow files carry no status
-(W007, spec §15.16), so status cannot be the selector here.
+(W007, spec §15.15), so status cannot be the selector here.
 If nothing carries the tag, this check has no target and says so rather than
 reporting a pass.
 

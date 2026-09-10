@@ -35,11 +35,11 @@ export function statusMonotonicity(ctx: RuleContext): Diagnostic[] {
 }
 
 /**
- * W007: outside a roadmap, an artifact carries no progress of its own (§15.16).
+ * W007: outside a roadmap, an artifact carries no progress of its own (§15.15).
  * The same id can appear in several diagrams, so status lives in one of them —
- * a flow file that declares it lets two diagrams claim different states for the
- * same thing. Mirror of W005, which exempts files with no `type:` for the same
- * reason this one does: an omitted kind declares nothing to hold them to.
+ * a flow file that declares it lets two diagrams claim different states for
+ * the same thing. Exempts files with no `type:`: an omitted kind declares
+ * nothing to hold them to.
  */
 export function flowStatusAbsence(ctx: RuleContext): Diagnostic[] {
 	const type = ctx.fm?.type;

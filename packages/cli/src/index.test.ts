@@ -2323,7 +2323,7 @@ req >> design -> spec
 		expect(r.stderr).toContain("stdin");
 	});
 
-	// Status is the roadmap's to carry (§15.14, §15.16). ready / blocked /
+	// Status is the roadmap's to carry (§15.14, §15.15). ready / blocked /
 	// status gaps already refuse an explicit non-roadmap type; meta set did not,
 	// so the CLI itself could write the state W007 reports (#923).
 	const flowBase = (type: string) => `---
