@@ -94,6 +94,19 @@ untracked 側も NUL 区切りの各パスとして読む。改行区切りの�
 変更者とは独立した reviewer に対象 diff を渡し、finding ごとに再現可能な concrete failure scenario と `file:line` の根拠を必須とする。
 finding を修正した後は同じ reviewer が同じ観点で再検証し、解消または残存を報告する。
 `node scripts/retro-patterns.mjs check` が証明するのは解析可能性・ファイル名・タグ有無・往復一致等の構造だけであり、所属や論理的一貫性の合格ではない。
+機械抽出されるラベルや本文を変えた場合は、変更した実カタログを読み込み、入力の種類に対応する出力欄を確認する。変更前後の読取条件と期待値を先に定め、意図した削除以外の欠落を成功と扱わない。
+
+| 変更した入力 | 抽出と確認する出力 |
+|---|---|
+| `問いの形:`・`具体例:` | `scripts/lib/retro-patterns.mjs` の `keyLinesOf` を通る `node scripts/retro-patterns.mjs list` の標準表示行。`select`・`near` を使う場合も、対象が選ばれていることと標準表示行を照合し、別に出る本文ヒット行を代わりに数えない。 |
+| `対策:`（`phase: pre-artifact`） | 同ファイルの `counterLineOf` → `scripts/lib/cycle-status.mjs` の `buildPreArtifactReminders` → preflight（`scripts/cycle-status.mjs`）の `preArtifactPatterns` 内、対象 `path` の `countermeasure`。一覧表示に対策行は出ないため、一覧が不変でもこの値を確認する。`counterLineOf` が拾うのは最初の `対策:` 行だけで、`対策の追加:` のような接尾変種はこの経路にも一覧表示にも出ない（接尾変種を拾う `keyLinesOf` と非対称）。`countermeasure` を持たない状態は、対策行が元から無いパターン（実カタログに実在する）とラベルの欠落で同じ形になるため、変更前の値と照合して切り分ける。 |
+| `phase:` の追加・削除・変更 | `buildPreArtifactReminders` に実カタログを渡し、対象 `path` の包含・除外が意図した変更と一致することを確認する。`phase: pre-artifact` でないパターンはこの経路の対象外であり、不在を本文の抽出・表示の成功とは数えない。 |
+| `tags:`（特に `always`） | `narrowPreArtifactReminders` を通した preflight の `preArtifactPatterns` と `preArtifactSelection`。`keyLinesOf` も `buildPreArtifactReminders` もタグを見ないため、標準表示行と `buildPreArtifactReminders` の結果はタグを変えても不変であり、そこを見ても検出できない。検索語が無い回の候補は `always` タグだけで決まるので、タグの増減は narrow を通した後の出力で照合する。`select --tag` の tagged 欄も同じ入力を使う。 |
+
+preflight はさらに `narrowPreArtifactReminders` で検索語と `always` タグにより候補を絞る。対象が選ばれない回は `preArtifactSelection` と選択条件を確認し、実カタログを読み込んだ `buildPreArtifactReminders` の結果で対策値を切り分ける。選択を通した最終出力まで確認していなければ、その範囲は未確認として残す。
+`scripts/pre-artifact-advisory.mjs` の PostToolUse 案内は名前とパスだけを表示し、対策本文を省くため、対策値の検証には使わない。
+phase を持たないパターンの `対策:` を変更する回は、実ファイルを解析した本文に `counterLineOf` を適用して抽出値を確認し、人が読む本文の意味レビューも行う。preflight への到達確認済みとは記録しない。
+9観点の意味レビューを通過したことは、抽出・表示の動作を確認した根拠にはしない。この確認は pfd-ops `references/work-cycle.md` の実ファイルを用いた検証要件を、このカタログへ適用するものである。
 `near` 等の語彙類似は近傍を開く補助には使えるが、意味分類を自動決定してはならない。
 
 ## 配布物への finding 反映
