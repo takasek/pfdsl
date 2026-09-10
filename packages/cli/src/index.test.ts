@@ -2192,7 +2192,7 @@ describe("status ready", () => {
 
 	it("accepts file with type: roadmap", async () => {
 		const f = withStatus(
-			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n  spec:\n    status: todo\n---\nreq >> design -> spec\n",
 		);
 		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(0);
@@ -2946,6 +2946,8 @@ artifact:
 
   target:
     status: done
+  zz:
+    status: todo
 ---
 target >> p -> zz
 `;
@@ -2990,13 +2992,26 @@ target >> p -> zz
 
 describe("status gaps", () => {
 	// The body decides what the roadmap produces, and producing is what counts
-	// as tracking — a declaration alone leaves the artifact unbuilt.
+	// as tracking — a declaration alone leaves the artifact unbuilt. `req` (the
+	// body's source id) and the body's produced id both need a frontmatter
+	// declaration too (V035, #1125); auto-fill whichever `artifacts` did not
+	// already declare, rather than repeating them at every call site.
 	const roadmapWith = (
 		artifacts: string,
 		body = "req >> build -> output\n",
 	) => {
+		const target = /->\s*(\S+)/.exec(body)?.[1];
+		const declared = (id: string) =>
+			new RegExp(`^  ${id}:`, "m").test(artifacts);
+		const autoDeclare = ["req", target]
+			.filter((id): id is string => id !== undefined && !declared(id))
+			.map((id) => `  ${id}: {}\n`)
+			.join("");
 		const f = join(dir, "as-roadmap.pfdsl");
-		writeFileSync(f, `---\ntype: roadmap\nartifact:\n${artifacts}---\n${body}`);
+		writeFileSync(
+			f,
+			`---\ntype: roadmap\nartifact:\n${autoDeclare}${artifacts}---\n${body}`,
+		);
 		return f;
 	};
 	const flowWith = (artifacts: string) => {
@@ -3069,7 +3084,7 @@ describe("status gaps", () => {
 		const rm = join(dir, "as-roadmap-consumes.pfdsl");
 		writeFileSync(
 			rm,
-			"---\ntype: roadmap\nartifact:\n  built:\n    status: done\n---\nsource_only >> build -> built\n",
+			"---\ntype: roadmap\nartifact:\n  source_only: {}\n  built:\n    status: done\n---\nsource_only >> build -> built\n",
 		);
 		const fl = flowWith(`  source_only:\n${TRACKED}    label: Source\n`);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
@@ -3195,7 +3210,7 @@ describe("status gaps", () => {
 		const anotherRoadmap = join(dir, "as-roadmap2.pfdsl");
 		writeFileSync(
 			anotherRoadmap,
-			"---\ntype: roadmap\nartifact:\n  y:\n    status: todo\n---\nreq >> build -> y\n",
+			"---\ntype: roadmap\nartifact:\n  req: {}\n  y:\n    status: todo\n---\nreq >> build -> y\n",
 		);
 		const r = await run(["status", "gaps", rm, anotherRoadmap]);
 		expect(r.exitCode).toBe(2);
