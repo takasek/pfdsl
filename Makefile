@@ -115,7 +115,7 @@ check-fmt:
 # pfdsl-links ゲートで、そちらは staged 分だけを見る。両方要るのは、他所のファイル
 # 移動で壊れた location: は当の .pfdsl を触らないコミットでは staged に現れないため。
 .PHONY: check-links
-check-links:
+check-links: check-pfdsl
 	@files=$$(find .pfdsl -maxdepth 1 -name "*.pfdsl" -type f | sort); \
 	if [ -z "$$files" ]; then \
 		echo "check-links: no operational .pfdsl found — the scope moved, so this target checks nothing. Fix it before trusting the green."; \
@@ -127,6 +127,21 @@ check-links:
 			{ echo "$$f has a location: that does not resolve. Fix the path or restore the file."; exit 1; }; \
 	done; \
 	echo "check-links: all passed"
+
+# Runs `check` (non-strict) against operational .pfdsl/. Unlike check-scaffold
+# (--strict, distributed scaffold only), operational files carry in-flight
+# status and are deliberately exempt from --strict, so this target has to
+# exist on its own for a rule like V035 (#1125) to ever fire against them —
+# check-scaffold's --strict scope never reaches .pfdsl/, and check-docs
+# scopes to docs/. Wired as a check-links prerequisite so the existing CI
+# step (`make check-links`) runs it too, rather than adding a new CI step.
+.PHONY: check-pfdsl
+check-pfdsl:
+	@find .pfdsl -maxdepth 1 -name "*.pfdsl" -type f | sort | while read f; do \
+		echo "check $$f"; \
+		node packages/cli/dist/cli.js check "$$f" || exit 1; \
+	done
+	@echo "check-pfdsl: all passed"
 
 # The distributed scaffold must pass the check the skills themselves
 # prescribe: pfd-grill gates on `check --strict` and pfd-ecosystem on
