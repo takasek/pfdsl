@@ -1,0 +1,6 @@
+---
+artifact:
+  a:
+    label: Before
+---
+a >> build -> b
