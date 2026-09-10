@@ -1,6 +1,6 @@
 <!-- DO NOT EDIT — snapshot distributed with pfdsl skill. Authoritative source: https://github.com/takasek/pfdsl/blob/main/docs/spec/spec.md -->
 
-# PFDSL仕様書 v0.0.21
+# PFDSL仕様書 v0.0.22
 
 ## 1. 目的
 
@@ -1153,6 +1153,14 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 * `type:` が省略されているファイルは W007 の対象外とする。省略は種別を宣言しないため、種別に紐づくこの制約を課さない（§15.14 の「省略時は roadmap として扱う」は `status ready` / `meta set`（status 設定時）/ `status gaps` に限った例外であり、`check` には及ばない）。W005 も同じ理由で省略ファイルを対象外とする（§15.15）
 * 同一 id が複数のファイルに現れうるため、進捗 status の一次情報は roadmap 側に一元化する。flow 種別のファイルが status を宣言すると、2つの図が同じ対象について異なる状態を主張しうる。status 系検査はファイル単位で閉じる（§2.9.1）ため、W003（status 非単調, §15.6）ではこの形を検出できない
 
+### 15.17 roadmap 内の未宣言 artifact 制約
+
+* `type: roadmap` のファイルにおいて、body の edge に現れる artifact id は、必ず front matter の `artifact:` に宣言を持たなければならない。宣言を持たない場合は error (V035)
+* 対象は artifact id のみ。process id の宣言欠落は既存の V020（§15.10）/ V003（§15.2）が扱うため、V035 の対象外とする
+* `type:` が `roadmap` 以外（`workflow` / `pipeline`）または省略されているファイルは V035 の対象外とする
+* strict mode の有無に関わらず常に error（`ctx.strictly(...)` を経由しない）。`check-scaffold` は運用中の `.pfdsl/` を `--strict` の対象から意図的に除外しているため、strict 依存の severity では運用ファイルで警告に留まり実効性を持たない
+* 宣言ブロックを削除しても body の edge 行が残ると、label も status も criteria も持たない「幽霊ノード」がグラフに残る。既存の W005（§15.15）は produced artifact のみを走査するため、生産されず消費だけされるこの形を素通りさせる。V035 はこの穴を閉じる
+
 ---
 
 ## 16. エラー方針
@@ -1207,6 +1215,7 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 | V032 | error | §15.11 | `boundary:` マップが全単射でない |
 | V033 | error | §15.11 | `boundary:` マップの side 越境（入力↔出力） |
 | V034 | error | §15.11 | 境界集合の不一致（親 I/O と子 open input / terminal の全単射違反） |
+| V035 | error | §15.17 | roadmap ファイルの edge 上の artifact が front matter に宣言を持たない（幽霊ノード） |
 | W001 | warning | §15.5 | parts メンバーが edge に参加していない |
 | W002 | warning (--strict: error) | §15.7 | produced Artifact に `criteria:` が未設定 |
 | W003 | warning | §15.6 | status 非単調（出力 Artifact が `done` なのに、明示 status を持つ入力 Artifact が `done` 未満） |
