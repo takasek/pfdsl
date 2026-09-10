@@ -106,7 +106,7 @@ artifact:
   cli_release_pipeline_kind:
     label: "CLIリリース: PFD種別名 pipeline 改名（破壊的変更）"
     description: "#670の種別名改名を含むnpm CLIと、同じrelease tagから配布するreader-first plugin資産。npmへの公開とmarketplace参照の反映・取得確認を経て採用リポへ届ける"
-    status: todo
+    status: done
     criteria: >
       公開した@pfdsl/cliの版を固定して取得し、type: pipelineを受理し、
       旧値runtime-pipelineへdocs/spec/spec.mdの規定どおりの応答を返す。
