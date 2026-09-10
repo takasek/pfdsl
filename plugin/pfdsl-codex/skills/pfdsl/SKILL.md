@@ -88,11 +88,11 @@ statusStyles:
 
 ## CLI
 
-**Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.0.25**. An older release answers these commands rather than rejecting them, with less in the answer — so skipping this check surfaces as an audit that quietly verified less, never as an error. Run `pfdsl --version` once at the start of the session.
+**Preflight — check the CLI before running any command below.** This skill invokes the CLI as `pfdsl` and targets **`@pfdsl/cli` >= 0.0.26**. Older releases may reject newer commands or diagram types, or return less information for a supported command. Run `pfdsl --version` once at the start of the session.
 
 - **`pfdsl` not found?** Check `package.json` first — if the repo already depends on `@pfdsl/cli`, the CLI is there and every command below runs as `npx pfdsl <cmd>`. Confirm with `npx pfdsl --version`. Do not treat a bare `pfdsl` that fails to resolve as "missing" until this branch is ruled out.
-- **Genuinely absent, or below `0.0.25`?** Do **not** run the commands below against it. Substitute a version-pinned `npx @pfdsl/cli@0.0.25 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic. This branch always works and needs nobody's permission, so take it rather than stalling.
-- **Want it fixed properly?** Ask the user to install or update with `npm install -g @pfdsl/cli@latest`. Worth raising, but do not block on it — the pinned `npx` above already lets the session proceed.
+- **Genuinely absent, or below `0.0.26`?** Do **not** run the commands below against it. Substitute a version-pinned `npx @pfdsl/cli@0.0.26 <cmd>` for each `pfdsl <cmd>` below — pinned, not `@latest`, to keep the version deterministic. If the pinned package cannot be obtained, report the required version and the fetch error; do not continue with an older CLI.
+- **Want a persistent global installation?** The user can install or update with `npm install -g @pfdsl/cli@latest`. A global installation is optional and does not replace the version check above.
 
 ```bash
 pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
