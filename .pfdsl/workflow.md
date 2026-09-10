@@ -31,10 +31,11 @@ waxa CLI（blank-slate, ツール呼び出し不可）では retrieval 有無を
 ## code-review / simplify の実施粒度
 
 原則（diff の規模に review の重さを合わせる）は配布層（pfd-ops `references/work-cycle.md` 手順3）が一次情報。
-ここにはこのリポの基準値のみを書く。
+Codex の作業分担は `AGENTS.md` と roadmap companion の「Codex でのレビュー」に従う。
+以下の基準値は Claude Code（Opus）に適用する。
 
-- 通常は単独で、差分と関係する消費者を確認する。品質と correctness は同じパスで確認してよい
-- 大きい差分でも agent 数を固定しない。独立した調査や別文脈での検証が必要な範囲だけ追加し、指示・待機・統合・戻りの検証を含む負担と比べる
+- 軽い側: 数十行・1〜2ファイル中心。角度を2〜4に絞るか、委譲せず自分で Read/Grep する
+- 重い側: `/code-review` の既定 fan-out（8角度 finder × 候補ごと検証 agent、計10体以上の subagent 起動）は大規模 PR 向け
 
 ## payoff_log 追記条件
 

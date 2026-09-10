@@ -575,6 +575,20 @@ describe("claudeInstructionsToAgents", () => {
 });
 
 describe("claudeRootInstructionsToAgents", () => {
+	it("keeps Codex execution focused and requires a separate review context", () => {
+		const source = "Claude Code ではコード変更に別主体のレビューを行う。\n";
+		const output = claudeRootInstructionsToAgents(source);
+
+		assert.match(output, /^## Codex の作業分担$/m);
+		assert.match(output, /Codex では通常の調査・実装を単独の agent で進める。/);
+		assert.match(
+			output,
+			/レビューは、実装時の会話・推論を引き継がない別 agent に依頼する。/,
+		);
+		assert.ok(output.includes(source));
+		assert.equal(claudeInstructionsToAgents(source), source);
+	});
+
 	it("adds Codex-only parent ownership for git metadata operations", () => {
 		const output = claudeRootInstructionsToAgents("Read CLAUDE.md.\n");
 

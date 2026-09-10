@@ -11,7 +11,7 @@ import {
 	classifyChangedFilesByModeling,
 	classifyDesignRecordContent,
 	classifyDesignRecordReapprovals,
-	classifyDesignRecordTiming,
+	classifyDesignRecordTimestamps,
 	classifyFormat3DesignRecord,
 	classifyIssueLookupFailure,
 	classifyOutputArtifactStatus,
@@ -799,124 +799,25 @@ describe("resolveRecordEditedAt", () => {
 	});
 });
 
-describe("classifyDesignRecordTiming", () => {
-	it("FAILs when there is no record at all", () => {
-		const result = classifyDesignRecordTiming(null, "2026-07-30T00:00:00Z");
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /no design-selection record found/);
-	});
-
-	it("SKIPs when there is no commit in range to compare against", () => {
-		const result = classifyDesignRecordTiming("2026-07-30T00:00:00Z", null);
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /no implementation commits/);
-	});
-
-	// #768: a cycle can settle on not implementing at all, then close on
-	// commits that belong to a different, derived PR (the #757 shape) — those
-	// commits exist, so the no-commit SKIP above never fires, yet their timing
-	// against this record says nothing either. The record itself carries the
-	// signal.
-	it("SKIPs on a commit-bearing range when the record declares no implementation", () => {
-		const result = classifyDesignRecordTiming(
-			"2026-07-30T00:00:00Z",
-			"2026-07-30T12:00:00Z",
-			{ noImplementation: true },
-		);
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /no implementation commits/);
-	});
-
-	// Review A-1: `noImplementation` used to return before the posted-time
-	// comparison ran at all, so a record that both declared no implementation
-	// and was itself posted after the first commit produced no detail
-	// distinguishable from an ordinary, well-timed no-implementation record —
-	// the retroactive-record evidence #824's forgeability tradeoff assumes a
-	// reviewer can see was silently dropped, not merely downgraded. Status
-	// stays SKIP (the design does not change), but the comparison still runs
-	// and its result is folded into detail as a WARN note.
-	it("SKIPs but WARNs when the no-implementation record was itself posted after the first commit", () => {
-		const result = classifyDesignRecordTiming(
-			"2026-07-30T12:00:00Z",
-			"2026-07-30T00:00:00Z",
-			{ noImplementation: true },
-		);
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /no implementation commits/);
-		assert.match(result.detail, /WARN/);
-		assert.match(result.detail, /posted at .*after the first commit/);
-	});
-
-	it("PASSes when the record predates the first commit", () => {
-		const result = classifyDesignRecordTiming(
-			"2026-07-30T00:00:00Z",
-			"2026-07-30T12:00:00Z",
-		);
-		assert.equal(result.status, "PASS");
-	});
-
-	// #950: the commit side of the comparison is an author date, which the
-	// runner sets (`git commit --date=`, `GIT_AUTHOR_DATE`, a rebase over the
-	// first commit). A bare PASS reads as proof; the caveat travels with the
-	// verdict so the reader of the gate output learns what it does not cover.
-	it("carries the runner-settable caveat on PASS", () => {
-		const result = classifyDesignRecordTiming(
-			"2026-07-30T00:00:00Z",
-			"2026-07-30T12:00:00Z",
-		);
-		assert.equal(result.status, "PASS");
-		assert.match(result.detail, /author date/);
-		assert.match(result.detail, /runner/);
-	});
-
-	it("FAILs when the record was posted after the first commit", () => {
-		const result = classifyDesignRecordTiming(
-			"2026-07-30T12:00:00Z",
-			"2026-07-30T00:00:00Z",
-		);
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /after the first commit/);
-	});
-
-	// #737 案2: the record itself can be edited after the fact, which the
-	// createdAt-only check above cannot see — createdAt never moves.
-	it("PASSes an unedited record (lastEditedAt: null)", () => {
-		const result = classifyDesignRecordTiming(
-			"2026-07-30T00:00:00Z",
-			"2026-07-30T12:00:00Z",
-			{ editedAtIso: null },
-		);
-		assert.equal(result.status, "PASS");
-	});
-
-	it("FAILs when the record was edited after the first commit", () => {
-		const result = classifyDesignRecordTiming(
-			"2026-07-30T00:00:00Z",
-			"2026-07-30T06:00:00Z",
-			{ editedAtIso: "2026-07-30T12:00:00Z" },
-		);
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /edited at/);
-		assert.match(result.detail, /after the first commit/);
-	});
-
-	it("PASSes when the record was edited before the first commit", () => {
-		const result = classifyDesignRecordTiming(
-			"2026-07-30T00:00:00Z",
-			"2026-07-30T12:00:00Z",
-			{ editedAtIso: "2026-07-30T01:00:00Z" },
-		);
-		assert.equal(result.status, "PASS");
-	});
-
-	it("FAILs when the record timestamp is malformed", () => {
-		const result = classifyDesignRecordTiming(
-			"not-an-iso-timestamp",
-			"2026-07-30T12:00:00Z",
-		);
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /invalid design-selection record timestamp/);
-	});
+describe("classifyDesignRecordTimestamps", () => {
+	for (const [recordIso, editedAtIso, status, detail] of [
+		[undefined, null, "FAIL", /missing design-selection record timestamp/],
+		["invalid", null, "FAIL", /invalid design-selection record timestamp/],
+		[
+			"2026-09-08T00:00:00Z",
+			"invalid",
+			"FAIL",
+			/invalid design-selection record edit timestamp/,
+		],
+		["2026-09-08T00:00:00Z", null, "PASS", undefined],
+		["2026-09-08T00:00:00Z", "2026-09-09T00:00:00Z", "PASS", undefined],
+	]) {
+		it(`validates record ${recordIso} and edit ${editedAtIso}`, () => {
+			const result = classifyDesignRecordTimestamps(recordIso, editedAtIso);
+			assert.equal(result.status, status);
+			if (detail) assert.match(result.detail, detail);
+		});
+	}
 });
 
 describe("classifyDesignRecordContent", () => {

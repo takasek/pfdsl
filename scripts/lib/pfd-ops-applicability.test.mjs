@@ -60,11 +60,11 @@ describe("pfd-ops applicability contract", () => {
 		);
 	});
 
-	it("assigns concrete record and ordering evidence to each backend", () => {
+	it("assigns record and reapproval evidence without requiring commit chronology", () => {
 		assert.match(githubBackend, /本文とコメント/);
-		assert.match(githubBackend, /投稿時刻/);
+		assert.match(githubBackend, /投稿・編集時刻と初コミットの比較は行わない/);
 		assert.match(fileBackend, /当該項目に追記/);
-		assert.match(fileBackend, /コミット順/);
+		assert.match(fileBackend, /改訂行を書く時点で実在するものを参照/);
 		assert.match(fileBackend, /完了契約/);
 		assert.match(fileBackend, /一次情報[^\n]+status[^\n]+完了/);
 		assert.match(fileBackend, /終端ゲート/);
@@ -89,7 +89,10 @@ describe("pfd-ops applicability contract", () => {
 				workCycle.indexOf("案の処分:") < workCycle.indexOf("前提検査 Pn:"),
 		);
 		assert.match(workCycle, /元候補「<候補名>」/);
-		assert.match(workCycle, /機械検査は構造だけを blocking にする/);
+		assert.match(
+			workCycle,
+			/記録の構造と.*時刻の妥当性・再承認参照を blocking にする/,
+		);
 		assert.match(
 			workCycle,
 			/採用部分: <範囲>; 残部: <却下 \| 保留> — <理由または再検討条件>/,
@@ -134,7 +137,7 @@ describe("pfd-ops applicability contract", () => {
 
 		assert.match(fileBackend, /設計記録形式: 3/);
 		assert.match(fileBackend, /当該項目に追記/);
-		assert.match(fileBackend, /コミット順/);
+		assert.match(fileBackend, /実装の初コミットとの順序は判定しない/);
 		assert.doesNotMatch(fileBackend, /投稿時刻|コメント.*編集|createdAt/);
 		assert.match(fileBackend, /移行履歴.*形式2/);
 		assert.doesNotMatch(fileBackend, format2Tokens);

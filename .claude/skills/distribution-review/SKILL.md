@@ -1,14 +1,13 @@
 ---
 name: distribution-review
 description: |
-  Use before a CLI release, or when explicitly asked to audit the bundle,
-  to review the distributed prompts as an adopting repo's
-  reader would. Simulates that reader with sandboxed subagents given only the
+  Use before a CLI release, after bundle changes in Claude Code, or when
+  explicitly asked to audit the bundle for upstream-only assumptions.
+  Simulates an adopting repo's reader with sandboxed subagents given only the
   bundle, fixes what makes them stall, and records the reviewed commit that
-  `make release` gates on. Invoke when `make release` refuses with "the
-  distributed prompts have changed since their last review", when release-status
-  shows unreviewed files, or when asked to audit the bundle for upstream-only
-  assumptions. Perspectives live in docs/distribution-review.md.
+  `make release` gates on. During release preparation, this handles unreviewed
+  files reported by release-status or a refusal from `make release` because
+  the distributed prompts changed. Perspectives live in docs/distribution-review.md.
 ---
 
 # 配布プロンプトのレビュー
@@ -17,8 +16,9 @@ description: |
 観点カタログは `docs/distribution-review.md`（一次情報）。
 机上で観点を当てるだけでは足りない — このクラスの欠陥は、読み手が実際にその行を頼りに作業して初めて行き止まりとして現れる。
 
-通常の配布文言の編集ごとには起動しない。
-編集時は内容に合った差分レビューと生成・構文検査を行い、利用側の別文脈による実行検証は公開前、またはその検証を明示的に依頼されたときに行う。
+Claude Code では配布層の変更後にも、既存の体験レビューの規約に従って実行する。
+Codex では通常の配布文言の編集ごとには起動せず、内容に合った差分レビューと生成・構文検査を行う。
+Codex で担当する利用側シナリオの模擬実行は、公開前、またはその検証を明示的に依頼されたときに行う。
 未実施の編集回で `reviewed.json` を進めず、公開時の既存ゲートに残す。
 
 ## 2つのモード
@@ -27,7 +27,7 @@ description: |
 |---|---|---|
 | 対象 | 前回承認 commit からの差分 | 配布ツリー全文（22ファイル・約1,000行） |
 | hash | **更新する** | **更新しない** |
-| 起動 | 公開前に `make release` が要求する / 人が差分監査を頼んだとき | 人が全文監査を頼んだときだけ |
+| 起動 | 公開前に `make release` が要求する / Claude Code で配布層を変更した後 / 人が差分監査を頼んだとき | 人が全文監査を頼んだときだけ |
 
 全文モードが hash を進めないのは、全体を見る分ひとつの変更に対する解像度が差分モードに劣るため。
 これで承認済みとすると、差分観点の穴を見逃したまま記録だけが進む。

@@ -16,22 +16,6 @@ import {
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
 import { ALWAYS_TAG, counterLineOf, hitsFor } from "./retro-patterns.mjs";
-import {
-	CODE_PATH,
-	CORRECTNESS_TOOLS,
-	GATE_TOOLS,
-	REVIEW_TOOLS,
-} from "./review-record.mjs";
-
-// The human-readable form of CODE_PATH's alternation (`/^(packages|scripts)\//`),
-// so buildReviewRecordTemplate's note names the same paths the checker actually
-// gates on rather than a restated copy that could drift from it.
-const CODE_PATH_LABEL = CODE_PATH.source
-	.match(/^\^\(([^)]+)\)/)[1]
-	.split("|")
-	.map((prefix) => `${prefix}/`)
-	.join(" か ");
-
 /**
  * @param {unknown} readyJson - output of `pfdsl status ready --best --json`
  * @returns {{ready: string[], best: string | null, bestOutputs: string[]}}
@@ -192,29 +176,8 @@ export function buildDesignRecordTemplate() {
 		"- なし",
 	];
 	return {
-		note: "着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。角括弧の雛形を具体的な内容へ置き換え、issue 由来の候補をすべて実名で案の処分へ記録する。案の処分と検査案の処分 Pn の部分採用は、空でない採用部分と、理由を伴う残部: 却下|保留 を書く。候補の網羅性と決定・理由・処分の意味的整合は人間レビューの責務であり、機械検査は保証しない。下書きは投稿前に `node scripts/check-design-record.mjs --file <path>` で検査し、PASS を確認してから投稿する。下書きの置き場は並行セッションと共有されるため、`/tmp/design-record.md` のような用途だけの固定名を避け、ブランチ名等でセッション固有の名前にする。",
+		note: "方針と必要な承認を実装着手前に確定し、実行主体が issue コメントへ記録する。記録漏れや書式不備は同じ記録を補修し、初コミットとの時刻を揃えるために履歴を作り直さない。決定を変える場合は必要な再承認を得て改訂履歴に残す。角括弧の雛形を具体的な内容へ置き換え、issue 由来の候補をすべて実名で案の処分へ記録する。案の処分と検査案の処分 Pn の部分採用は、空でない採用部分と、理由を伴う残部: 却下|保留 を書く。候補の網羅性と決定・理由・処分の意味的整合は人間レビューの責務であり、機械検査は保証しない。下書きは投稿前に `node scripts/check-design-record.mjs --file <path>` で検査し、PASS を確認してから投稿する。下書きの置き場は並行セッションと共有されるため、`/tmp/design-record.md` のような用途だけの固定名を避け、ブランチ名等でセッション固有の名前にする。",
 		lines,
-	};
-}
-
-/**
- * The review-record trailer template (#809), pre-shaped the same way
- * buildDesignRecordTemplate is: the vocabulary comes from review-record.mjs's
- * own constants rather than restated in prose, so a template that drifts
- * from the checker cannot happen silently.
- *
- * Unlike the design record, this is not a copy-pasteable literal. The runner substitutes a real tool name after actually running a review, so `line` keeps a placeholder rather than a fabricated tool value.
- *
- * Emitted on every cycle, not only ones that turn out to touch packages/ or
- * scripts/: whether this cycle will is undecidable at preflight time (the
- * diff doesn't exist yet), and the failure this closes is exactly a runner
- * who never saw the format until the terminal gate FAILed on it.
- * @returns {{note: string, line: string}}
- */
-export function buildReviewRecordTemplate() {
-	return {
-		note: `コミット前に差分をレビューし、実施方法を commit message の trailer へ記録する。品質と correctness を単独で確認した回は tool=self の1行でよい。tool は ${REVIEW_TOOLS.join(" / ")} のいずれか。ゲート充足に数えるのは ${GATE_TOOLS.join(" / ")}（\`code-review\` は有効な trailer 値だが数えない）。${CODE_PATH_LABEL} に変更のある回は ${CORRECTNESS_TOOLS.join(" または ")} の記録が1つあれば記録要件を満たす。追加レビューは具体的な利点がある場合に選び、委譲や観点ごとの複数パスを一律に要求しない。実施した検証と限界は PR 本文に書く。記録漏れだけを理由に push 済みの履歴を書き換えない。`,
-		line: "Review: tool=<tool-name>",
 	};
 }
 
@@ -227,17 +190,19 @@ export function buildReviewRecordTemplate() {
  * 4. 構造不正な記録がある → unsettled (reason: "record-incomplete")
  * 5. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
  * 6. それ以外 → unsettled (reason: "no-enumerated-options")。
- *    候補の列挙がなくても、設計記録の存在を推定しない。
+ *    列挙構造を検出できなかった回を「対話省略可」の既定にする（fail-open）と、
+ *    散文中に紛れた選択肢が検出をすり抜けたまま既定で通過してしまう（#833・#829）。
  *
  * 記録の同定は終端ゲート（gate-check.mjs）と同じ `resolveDesignRecord`
  * （と、それに entries を渡す `toDesignRecordEntries`）を使う。プリフライトと
  * 終端ゲートが別々の同定ロジックを持つと、どちらかが記録だと見なした文章を
  * もう一方が見なさない、という食い違いが生まれるため。
  *
- * `unsettled` は本文の未確定表現または記録の未確定状態を表し、人間の
- * 追加承認が必要かは判定しない。対話の要否は依頼範囲と未決事項で判断する。
- * 記録投稿の要否は `recordRequired` が示し、`record-posted` のときだけ
- * false、それ以外は true とする（#868）。
+ * `unsettled` は「設計対話が必要か」を表すだけで、記録投稿の要否とは別軸
+ * である。roadmap.md の規約上、design-selection record は列挙構造の有無に
+ * 関わらず全サイクル必須で、`unsettled: false` を「記録不要」と読むのは
+ * 誤読になる（#809）。そのため戻り値には `recordRequired` を独立して持たせる
+ * — `record-posted` のときだけ false、それ以外は常に true（#868）。
  * @param {{body: string, comments?: Array<{id?: string, databaseId?: number, url?: string, body: string, createdAt?: string}>, issueNumber?: number, repository?: {host?: string, owner?: string, repo?: string}, editInfo?: {status?: string, editedAtIso?: string | null}}} params
  * @returns {{unsettled: boolean, reason: string, matchedLines?: string[], optionCount?: number,
  *            missingPrefixes?: string[], problems?: string[],

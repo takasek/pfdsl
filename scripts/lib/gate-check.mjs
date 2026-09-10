@@ -581,51 +581,18 @@ export function resolveRecordEditedAt(_record, editInfo) {
 }
 
 /**
- * Classify the timing of a design-selection record against the branch's
- * first commit (issue #669's protection against "the decision record is
- * written after the fact"). A record posted after work already started
- * documents a choice that was made retroactively, not one that guided it.
- *
- * Only one side of the comparison is server-side: GitHub records the record's
- * `createdAt`/`lastEditedAt`, which the runner cannot forge (#824). The commit
- * side is a git author date, which the runner does set — `git commit --date=`,
- * `GIT_AUTHOR_DATE`, or a rebase reaching the first commit all move it (#950).
- * `%aI` is still the right anchor (`%cI` is rewritten by every rebase, erasing
- * the cycle window), so the asymmetry is not removed here; it is disclosed.
- * PASS therefore carries `TIMING_ANCHOR_CAVEAT`, and the residual belongs to
- * the "機械が守らない範囲" human review already owns.
- * @param {string | null | undefined} recordIso - createdAt of the record comment.
- * @param {string | null | undefined} firstCommitIso - authorDate of the range's first commit.
- * @param {{editedAtIso?: string | null, noImplementation?: boolean, recordPresent?: boolean}} [options]
- *   - editedAtIso: the record's own lastEditedAt (#737 案2), or null/undefined
- *     when it was never edited or edit history could not be read.
- *   - noImplementation: the record itself declared no implementation (#768) —
- *     wins over every other check, since a cycle with no implementation
- *     commits in this range has nothing for timing to compare against, even
- *     when the range is not literally empty (the #757 shape: commits present,
- *     but belonging to a different, derived PR). Status still SKIPs, but the
- *     posted-time comparison still runs: a record that both declares no
- *     implementation and was posted after the first commit is evidence of a
- *     retroactive record, and #824's forgeability tradeoff for this
- *     disposition assumes a reviewer can see that evidence rather than have
- *     it silently dropped (review A-1).
- *   - recordPresent: distinguishes an elected comment with a missing createdAt
- *     from the ordinary no-record call, while leaving the timestamp-free pure
- *     function API backward-compatible.
- * @returns {{status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
+ * Validate timestamps used by record migration and reapproval checks.
+ * Commit dates cannot prove that a decision or review preceded the work.
+ * @param {string | null | undefined} recordIso
+ * @param {string | null | undefined} editedAtIso
+ * @returns {{status: 'PASS'|'FAIL', detail?: string}}
  */
-export function classifyDesignRecordTiming(
-	recordIso,
-	firstCommitIso,
-	{ editedAtIso, noImplementation, recordPresent = false } = {},
-) {
+export function classifyDesignRecordTimestamps(recordIso, editedAtIso) {
 	if (!recordIso)
-		return recordPresent
-			? {
-					status: "FAIL",
-					detail: "missing design-selection record timestamp",
-				}
-			: { status: "FAIL", detail: "no design-selection record found" };
+		return {
+			status: "FAIL",
+			detail: "missing design-selection record timestamp",
+		};
 	if (!isValidDesignRecordTimestamp(recordIso))
 		return {
 			status: "FAIL",
@@ -636,37 +603,7 @@ export function classifyDesignRecordTiming(
 			status: "FAIL",
 			detail: `invalid design-selection record edit timestamp: ${editedAtIso}`,
 		};
-	const effectiveRecordIso =
-		editedAtIso &&
-		new Date(editedAtIso).getTime() > new Date(recordIso).getTime()
-			? editedAtIso
-			: recordIso;
-	if (noImplementation) {
-		const postedAfterFirstCommit =
-			firstCommitIso &&
-			new Date(effectiveRecordIso).getTime() >
-				new Date(firstCommitIso).getTime();
-		return {
-			status: "SKIP",
-			detail: postedAfterFirstCommit
-				? `${NO_IMPLEMENTATION_COMMITS_DETAIL}; WARN: record ${effectiveRecordIso === recordIso ? "posted" : "edited"} at ${effectiveRecordIso}, after the first commit at ${firstCommitIso}`
-				: NO_IMPLEMENTATION_COMMITS_DETAIL,
-		};
-	}
-	if (!firstCommitIso)
-		return { status: "SKIP", detail: NO_IMPLEMENTATION_COMMITS_DETAIL };
-	if (
-		new Date(effectiveRecordIso).getTime() > new Date(firstCommitIso).getTime()
-	) {
-		return {
-			status: "FAIL",
-			detail:
-				effectiveRecordIso === editedAtIso
-					? `record edited at ${editedAtIso}, after the first commit at ${firstCommitIso}`
-					: `record posted at ${recordIso}, after the first commit at ${firstCommitIso}`,
-		};
-	}
-	return { status: "PASS", detail: TIMING_ANCHOR_CAVEAT };
+	return { status: "PASS" };
 }
 
 export const DESIGN_RECORD_V2_CUTOFF = "2026-08-30T09:32:50Z";
@@ -698,8 +635,8 @@ export const DESIGN_RECORD_REQUIRED_PREFIXES =
 export const DISPOSITION_TOKENS = ["採用", "却下", "保留"];
 
 /**
- * Whether a comment timestamp can safely decide both migration format and
- * record/commit ordering. GitHub supplies ISO timestamps, but finite parsing is
+ * Whether a comment timestamp can safely decide migration format and
+ * the reapproval window. GitHub supplies ISO timestamps, but finite parsing is
  * the actual property every comparison below relies on.
  * @param {unknown} timestamp
  * @returns {boolean}
@@ -723,19 +660,6 @@ export function isValidDesignRecordTimestamp(timestamp) {
 // defect); requiring a matched line head, via the same lineHeadPattern /
 // normalizeRecordLine machinery presentRequiredPrefixes uses, can.
 export const NO_IMPLEMENTATION_TOKEN = "実装しない:";
-
-/** Shared by both timing SKIP paths that mean "there is nothing to compare". */
-export const NO_IMPLEMENTATION_COMMITS_DETAIL =
-	"no implementation commits — timing unverifiable";
-
-/**
- * Printed with every timing PASS (#950). The record side is server-recorded,
- * but the commit side is a git author date the runner sets, so a PASS is
- * evidence rather than proof — and a reader who only sees the verdict has no
- * other place to learn that.
- */
-export const TIMING_ANCHOR_CAVEAT =
-	"the commit side is a git author date the runner can set — evidence, not proof";
 
 /** Markdown line-head decoration: blockquote, heading, or list marker. */
 const LINE_HEAD_DECORATION = /^(?:>+|#{1,6}|[-*+]|\d+[.)])\s*/;

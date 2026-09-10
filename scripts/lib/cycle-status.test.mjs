@@ -4,7 +4,6 @@ import {
 	buildDesignRecordTemplate,
 	buildGateCheckCommand,
 	buildPreArtifactReminders,
-	buildReviewRecordTemplate,
 	classifyDesignSettlement,
 	countBehind,
 	detectDesignUnsettled,
@@ -19,13 +18,6 @@ import {
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
 import { parseFormat3DesignRecord } from "./gate-check.mjs";
-import {
-	CODE_PATH,
-	CORRECTNESS_TOOLS,
-	GATE_TOOLS,
-	parseReviewTrailer,
-	REVIEW_TOOLS,
-} from "./review-record.mjs";
 
 const TARGET_REPOSITORY = {
 	host: "github.com",
@@ -862,67 +854,6 @@ describe("buildDesignRecordTemplate", () => {
 		const { note } = buildDesignRecordTemplate();
 		assert.match(note, /並行セッションと共有/);
 		assert.match(note, /セッション固有の名前/);
-	});
-});
-
-describe("buildReviewRecordTemplate", () => {
-	it("exposes only the general review trailer contract", () => {
-		const template = buildReviewRecordTemplate();
-		const { line, note } = template;
-		assert.equal(line, "Review: tool=<tool-name>");
-		assert.equal("requiredLine" in template, false);
-		assert.doesNotMatch(note, /複数案/);
-	});
-
-	it("emits a line the checker's own parser accepts once a real tool is substituted", () => {
-		const { line } = buildReviewRecordTemplate();
-		const filled = line.replace("<tool-name>", "simplify");
-		assert.deepEqual(parseReviewTrailer(filled), { tool: "simplify" });
-	});
-
-	// #809: the vocabulary is read from review-record.mjs's own constants
-	// rather than restated in prose, so a template that drifts from the
-	// checker cannot happen silently.
-	it("names every accepted tool value from the checker's own constant", () => {
-		const { note } = buildReviewRecordTemplate();
-		for (const tool of REVIEW_TOOLS) assert.ok(note.includes(tool));
-	});
-
-	it("distinguishes which tools count toward the gate from those that merely record", () => {
-		const { note } = buildReviewRecordTemplate();
-		for (const tool of GATE_TOOLS) assert.ok(note.includes(tool));
-	});
-
-	it("names the correctness-review requirement for code-changing cycles", () => {
-		const { note } = buildReviewRecordTemplate();
-		for (const tool of CORRECTNESS_TOOLS) assert.ok(note.includes(tool));
-	});
-
-	it("states that review precedes the commit it is recorded in", () => {
-		const { note } = buildReviewRecordTemplate();
-		assert.match(note, /コミット前/);
-	});
-
-	it("describes how a single-agent review satisfies the record requirement", () => {
-		const { note } = buildReviewRecordTemplate();
-		assert.match(note, /品質と correctness を単独で確認した回は.*self/);
-	});
-
-	it("names the PR body as where the reason for a lightened perspective goes", () => {
-		const { note } = buildReviewRecordTemplate();
-		assert.match(note, /PR 本文/);
-	});
-
-	// #809: named from CODE_PATH's own alternation rather than restated, so a
-	// path added to the checker's trigger cannot go unmentioned here.
-	it("names every path prefix the correctness-review trigger actually checks", () => {
-		const { note } = buildReviewRecordTemplate();
-		const alternatives = CODE_PATH.source.match(/^\^\(([^)]+)\)/)[1].split("|");
-		// Each alternative as a directory prefix (trailing slash included), not
-		// merely as a substring — "packages" alone would also match a stray
-		// "packages か scripts/" that dropped the slash on every alternative but
-		// the last (#809 review finding).
-		for (const prefix of alternatives) assert.ok(note.includes(`${prefix}/`));
 	});
 });
 
