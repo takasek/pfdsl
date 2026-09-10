@@ -4,11 +4,11 @@
 // resolves against the wrong root, and lands on the main checkout's working
 // tree instead. Git history shows nothing wrong because the working tree,
 // not a commit, is what changed, so the usual `git status` habit does not
-// catch it either (see CLAUDE.md "worktree でのファイル操作パス").
+// catch it either (see pfd-ops' references/work-cycle.md, step 2).
 //
 // Deny, not advisory: this event surfaces as "the edit silently landed on
-// the wrong branch," which is the "proceeds unnoticed" shape the roadmap.md
-// warning already calls out as the reason advisory would be missed.
+// the wrong branch." See workflow.md "worktree でのサイクル実行" and its
+// reference to pfd-ops' work-cycle.md for the worktree rules.
 //
 // worktreeRoot/mainRoot are resolved by the hook wrapper via `git rev-parse
 // --show-toplevel` / `--git-common-dir` rather than by matching cwd against

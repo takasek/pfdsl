@@ -306,7 +306,7 @@ export function wipTransitionDetected(fileSnapshots, artifactKey) {
 }
 
 /**
- * Path trigger for the vscode-extension typecheck gate (roadmap.md
+ * Path trigger for the vscode-extension typecheck gate (workflow.md
  * "vscode-extension を変更した場合" note). Mirrors GEN_PLUGIN_TRIGGER's
  * trigger-then-run shape.
  */
