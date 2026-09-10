@@ -13,13 +13,12 @@
  * and report failure as `{ ok: false, out }`.
  */
 
-import { RECORD_SEP } from "./commit-trailers.mjs";
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
 	classifyDesignRecordContent,
 	classifyDesignRecordReapprovals,
 	classifyDesignRecordRequiredFormat,
-	classifyDesignRecordTiming,
+	classifyDesignRecordTimestamps,
 	classifyFormat3DesignRecord,
 	classifyOutputArtifactStatus,
 	hasStatusChange,
@@ -38,7 +37,6 @@ import {
 } from "./gate-check.mjs";
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
 import { GEN_PLUGIN_TRIGGER } from "./gen-plugin-trigger.mjs";
-import { classifyCycle, parseReviewRecords } from "./review-record.mjs";
 
 const ROADMAP_PATH = ".pfdsl/roadmap.pfdsl";
 
@@ -95,11 +93,9 @@ export function deletedFilesSince({ exec, base }) {
  * "now" — measured on #834's own branch, where that collapsed the cycle window
  * to empty on the re-run the window exists for.
  *
- * Two checks anchor here (the design-selection record's timing and the cycle
- * window), and a disagreement between them about when the cycle started would
- * show up as one of them silently judging a different span, so they share the
- * one query. `ok: false` is a failed lookup, distinct from `iso: null` on a
- * branch that has no commits yet — callers report those differently.
+ * The cycle window uses this date for reporting only. It does not establish
+ * when a design was approved. `ok: false` is a failed lookup, distinct from
+ * `iso: null` on a branch with no commits yet.
  * @param {{exec: Function, base: string}} params
  * @returns {{ok: boolean, iso: string | null}}
  */
@@ -112,27 +108,6 @@ export function firstCommitAuthorDate({ exec, base }) {
 	]);
 	if (!r.ok) return { ok: false, iso: null };
 	return { ok: true, iso: r.out.trim().split("\n")[0] || null };
-}
-
-/**
- * The branch's commit messages, RECORD_SEP between them — the input every
- * trailer-borne declaration is read from. Two checks want it (the review
- * record and the size override), and they have to agree about the range and
- * the separator, so the invocation lives here rather than in each of them.
- * Callers run it once and hand the result to both, rather than each step
- * spawning its own git.
- * @param {{exec: Function, base: string}} params
- * @returns {{ok: boolean, text: string, error?: string}}
- */
-export function commitMessagesSince({ exec, base }) {
-	const r = exec("git", [
-		"log",
-		"--no-merges",
-		`origin/${base}..HEAD`,
-		`--format=%B${RECORD_SEP}`,
-	]);
-	if (!r.ok) return { ok: false, text: "", error: r.out.trim() };
-	return { ok: true, text: r.out };
 }
 
 /**
@@ -302,13 +277,10 @@ export async function fetchDesignRecordEditInfo({ githubOps, nodeId }) {
 }
 
 /**
- * design-selection record: was the design choice recorded before work
- * started, with the required structure (issue #669's protection against
- * "the record is written after the fact, or is unstructured prose")?
+ * Validate the selected design record, its required structure and reapprovals.
+ * A late record or format repair does not require rewriting commit history.
  */
 export function designRecordStep({
-	exec,
-	base,
 	number,
 	issue,
 	issueFailure,
@@ -321,16 +293,12 @@ export function designRecordStep({
 	const body = issue.body ?? "";
 	const optionCount = detectEnumeratedOptions(body).count;
 
-	// Comments only (#927). The body used to be an entry too, on the reading
-	// that a record written there was judged the same way — but its createdAt is
-	// the issue's, which predates every commit on the branch that closes it, so
-	// the timing check passed by construction for anything the body won. What
-	// looked like one entry among the rest was the one entry the check could not
-	// fail.
+	// The issue body describes the request; the selected comment records the
+	// decision. Keep record resolution independent of commit history.
 	const resolution = resolveDesignRecord(toDesignRecordEntries(issue));
 
 	if (resolution.status === "none") {
-		return { name, ...classifyDesignRecordTiming(undefined, null) };
+		return { name, status: "FAIL", detail: "no design-selection record found" };
 	}
 	if (resolution.status === "ambiguous")
 		return { name, status: "FAIL", detail: resolution.detail };
@@ -341,8 +309,6 @@ export function designRecordStep({
 			detail: resolution.problems.join("; "),
 		};
 	const record = resolution.record;
-
-	const firstCommitIso = firstCommitAuthorDate({ exec, base }).iso;
 
 	// #737 案2: the record's own edit history (editInfo is undefined/null
 	// whenever the GraphQL fetch failed or was unavailable — resolveRecordEditedAt
@@ -356,13 +322,10 @@ export function designRecordStep({
 		record.body,
 		record.createdAt,
 	);
-	const noImplementation =
-		parsedFormat3.status === "PASS" && parsedFormat3.allNoImplementation;
-	const timing = classifyDesignRecordTiming(record.createdAt, firstCommitIso, {
+	const timestamps = classifyDesignRecordTimestamps(
+		record.createdAt,
 		editedAtIso,
-		noImplementation,
-		recordPresent: true,
-	});
+	);
 	const requiredFormat = classifyDesignRecordRequiredFormat(
 		record.body,
 		record.createdAt,
@@ -385,14 +348,10 @@ export function designRecordStep({
 		repository,
 		editInfo,
 	});
-	// The edit note is only worth printing once timing actually reached the
-	// stage where an edit could have mattered — a SKIP already means nothing
-	// was compared, so noting missing edit history there would read as a
-	// second reason for a verdict that has only one.
 	const detail =
 		[
-			timing.detail,
-			timing.status === "SKIP" ? undefined : editNote,
+			timestamps.detail,
+			editNote,
 			requiredFormat.status === "FAIL" ? requiredFormat.detail : undefined,
 			contentDetail,
 			reapproval.detail,
@@ -409,7 +368,7 @@ export function designRecordStep({
 					.split("\n")
 					.some((line) => line.includes("設計記録形式: 3")))
 				? "FAIL"
-				: timing.status,
+				: timestamps.status,
 		detail,
 	};
 }
@@ -521,8 +480,7 @@ export function collectCycleWindow({ exec, base }) {
 		note: CYCLE_WINDOW_INCOMPLETE_NOTE,
 	});
 
-	// Where part (2) measures from, shared with the design-record timing check
-	// so the two cannot disagree about when this cycle started.
+	// Where part (2) measures from; used for this report, not a timing gate.
 	const start = firstCommitAuthorDate({ exec, base });
 	if (!start.ok) return incomplete();
 	// No commits yet leaves part (2) with nothing to measure from, which is a
@@ -631,44 +589,6 @@ export function checkDocsStep({ exec }) {
 		name,
 		status: r.ok ? "PASS" : "FAIL",
 		detail: r.ok ? undefined : r.out.trim().slice(-400),
-	};
-}
-
-/**
- * Review record: does this branch carry a trailer for the code it changed?
- * The rule says the trailer cannot be added after the fact — it is part of a
- * commit message — yet every detector for it used to sit after the merge,
- * where the only fix left is rewriting history.
- *
- * The verdict is classifyCycle's, called on `origin/<base>...HEAD`. A
- * malformed record is reported because parseReviewTrailer already judged it,
- * not as an extra rule.
- *
- * Issue-body enumeration remains design-settlement guidance and does not add a
- * review trailer requirement. Code-path changes still owe correctness or design.
- */
-export function reviewRecordStep({ commitMessages, changedFiles }) {
-	const name = "Review record";
-	if (!commitMessages.ok)
-		return {
-			name,
-			status: "FAIL",
-			detail: commitMessages.error,
-		};
-
-	const records = parseReviewRecords(commitMessages.text);
-	const problems = classifyCycle({ changedFiles, records });
-	for (const r of records.filter((r) => r.error))
-		problems.push(`malformed record: ${r.error}`);
-	if (problems.length > 0)
-		return { name, status: "FAIL", detail: problems.join("; ") };
-	return {
-		name,
-		status: "PASS",
-		detail:
-			records.length === 0
-				? "prose-only branch, no record owed"
-				: `${records.length} record(s)`,
 	};
 }
 

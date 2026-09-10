@@ -30,7 +30,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
   - `behindBase > 0` のときは判定を一切出さず `staleTree`（`{base, message}`）と `behindBase` だけを返し、終了コード 1 で拒否する（#716）。`origin/<base>` を起点にサイクルのブランチを切ってから実行する（遅れたツリーで古い版が走ること・その拒否は拒否する版でしか起きないことは work-cycle.md 手順1 が一次情報）
   - `currentBranch` と `commitsAheadOfBase`（`origin/<base>..HEAD` の件数）を出力する（#629）。0 でなければ前サイクルのブランチに乗っている可能性を示すが、既存ブランチの意図的な継続もあるためスクリプトは拒否せず判断を残す
   - 作業ツリーに未コミットの変更（追跡外ファイルを含む）があるときは、`behindBase` と同じく判定を一切出さず `uncommittedFiles` と `dirtyTree` だけを返し、終了コード 1 で拒否する（#744）。前サイクルの変更はブランチを切り替えてもツリーに残り、次サイクルの最初のコミットに紛れ込む — `commitsAheadOfBase` が塞ぐのと同じ失敗の型で、経路がコミットでなく作業ツリーであるだけ。`commitsAheadOfBase` と違い判断を残さず拒否するのは、サイクルは clean なツリーから始める前提であり、`git worktree add` がそれを作るため、拒否への答えが「weigh する」でなく「worktree を切る」で済むから。ツリーが base に遅れかつ汚れている場合は遅れの方を返す（走っているスクリプト自身が古い版だという判定が、汚れの判定の信頼性も奪う）
-  - **草案は投稿前に `node scripts/check-design-record.mjs --file <草案のパス>` へ通す（#1114）。** 通さなかった場合に何が起きるかは `.pfdsl/bindings/pfd-retro-patterns/record-timing-anchor-vs-work-unit.md` が一次情報。
+  - **草案は投稿前に `node scripts/check-design-record.mjs --file <草案のパス>` へ通す（#1114）。** 旧時刻ゲートが補修を妨げた経緯は `.pfdsl/bindings/pfd-retro-patterns/record-timing-anchor-vs-work-unit.md` が一次情報。
   - 設計選択記録の雛形を `designRecordTemplate`（`{note, lines}`）で毎回出力する（#720）。行頭の語は `gate-check.mjs` の `DESIGN_RECORD_REQUIRED_PREFIXES` / `DISPOSITION_TOKENS` から引いており、散文に転記していない。対象 issue が候補を列挙している場合はその件数を添えた処分の行が加わる
   - 公開 pending を `releasePending`（`{needsAction, report}`）で出力する（#814）。`scripts/release-status.mjs` をそのまま走らせた結果で、`needsAction` はその終了コード、`report` は印字された行。判定でなく報告材料で、pending は公開直後を除いて常に nonzero になる。`needsAction` が何を畳み込むか、なぜそこで止まるかは `scripts/lib/release-status-check.mjs` の `needsAction` の JSDoc が一次情報 — ここには複製しない（#880）。運用上知っておく必要があるのは、false が「公開までにやるべきことが残っていない」であって「`make release` が成功する」ではないこと、true の理由は `report` の行にしか出ないので読むのは行のほうになること、の2点。台帳へ書き写す運用を置かないのは、値の一次情報が npm レジストリ・Marketplace・git であり、書き写した側は無視されたうえに古くなるため
   - このサイクルが着手する issue のうち、`flow:managed` なのに roadmap に process を持たないものを `unregisteredManagedIssues`、roadmap に process がなく `flow:managed` と `flow:exempt` のどちらも持たないものを `untriagedTargetIssues` で出力する（#963、#983）。`audit-issues-flow.mjs` は同じ欠落を全 open issue について報告するが advisory 止まりで、監査を落とさない — roadmap 登録は実装ブランチに乗るため、そのブランチが main へマージされるまで他セッションからは欠落して見え、未分類 issue は GitHub 上で分類されるまで一時的に全セッションから未分類に見える。あるサイクルの差分が消せるのは自分が着手する issue の欠落だけで、他の issue の分は消せない。行動できるのがその1件だけなので、ここが唯一の検査点になる。どちらかが非空で返ってきたら、着手前に roadmap へ依存チェーンを1本足して `flow:managed` を付けるか、`flow:exempt` へ分類するかのどちらかを済ませる — どちらでもないまま進めた回は、その issue の登録または分類が誰の担当でもないまま残る
@@ -66,8 +66,9 @@ GitHub 側にしか無い読みを本文の正規表現で再構成すると、D
 
 **着手前の選択記録**: 実装着手前に、選んだ方針を issue コメントとして残す。`--issue` を渡す全サイクルが対象で、issue が複数案を列挙しているかどうかは問わない（候補列挙のある回は各案の処分も要る）。選択を記録せず着手すると、issue 本文だけを読んだ第三者が「なぜその方針になったか」を実装差分からしか追えなくなる。
 書式は覚えなくてよい — `cycle-status.mjs` が `designRecordTemplate` として毎回出すので、それを埋めて投稿する。
-投稿した直後、最初のコミットを作る前に `gate-check.mjs --issue <n>` を回して design-selection record の書式判定を通す。
-書式 FAIL はコミットが1つも無い段階でも出る一方、コミット後に記録を直すと編集時刻が初コミットより後になって timing 判定が落ちるため、書式の是正はコミット前にしか無害に行えない。
+投稿した直後に `gate-check.mjs --issue <n>` を回して design-selection record の書式・再承認の判定を通す。
+記録の欠落、形式不備、曖昧な正本、不正な再承認は FAIL にする。記録の投稿・編集と初コミットの時刻比較は行わない。
+記録漏れや書式不備は同じ記録を補修する。決定を変更する場合は必要な再承認と改訂履歴を残し、既存実装との整合を確認して通常の追加コミットで直す。コミットの再作成や日時の変更を回復手順にしない。
 
 汎用ゲート（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、**マージ時にのみ**:
 
@@ -77,7 +78,7 @@ GitHub 側にしか無い読みを本文の正規表現で再構成すると、D
 **コード変更のあるサイクルはレビューを省略しない**: `packages/` または `scripts/` に変更があるサイクルでは、終端ゲートの該当チェックリスト項目を省略しない。
 #561 が 48 サイクル（目標 10）を実測し、自己レビューで気付いていなかった指摘が 85% のサイクルで出た（new/adopted 合計 142/119）。
 「どういう条件なら省略してよいか」を条件式として書ける、という前提が実測に支持されなかったため、条件を置かず必須とする。
-散文・PFD のみのサイクルは記録を要さない（レビューの要否は diff の規模で別に判断し、省略する回はその理由を PR 本文に書く）。
+散文・PFD のみのサイクルは、レビューの要否を diff の規模で判断し、省略する回はその理由を PR 本文に書く。
 自己レビュー（差分の読み直し）は実施済みとみなし、それに**加えて**軽い設定のレビューを実施する（角度を絞る。8角度 × 検証 agent の高効度設定は使わない）。
 
 menu を観点で組むこと（手段で組まないこと）は、配布層（`.claude/skills/pfd-ops/references/work-cycle.md` 手順3 のレビュー項目）が一次情報。
@@ -102,35 +103,14 @@ menu を観点で組むこと（手段で組まないこと）は、配布層（
 担保の中核が委譲でしか作れない観点を軽くできないこと・起動できない回はユーザーへ返すこと・起動可否の判断自体を指示の文面で確かめることも、同じ配布層の項目が持つ。
 このリポでそれに当たるのは観点3 で、独立性は解答を含まないツリーで別主体に解かせることでしか成立しない。
 
-`/code-review` は PR 作成後・大 diff の補完レビューへ降格し、**ゲート充足手段からは外す** — trailer はコミット前必須であり、PR 後に走る `/code-review` は構造的にゲートを満たせないためで、これは規約変更でなく役割分離である。
+レビュー手段は、必要な観点と利用可能な起動時点に合わせて選ぶ。PR 作成後に使う `/code-review` も、担保する観点に応じて利用できる。
 `code-reviewer` agent を Agent tool で起動する手段は **導入が前提** — `pr-review-toolkit` / `feature-dev` plugin のいずれかを有効化していないと選べない。
 
 起動可否が harness と plugin の版に依存し、記録された「起動できない」がその時点の観測でしかないことは配布層が一次情報（同上）。このリポで確認する実体フィールドは `disable-model-invocation` で、2026-07-28 時点の `/code-review` は `disable-model-invocation: false`。
 
-記録はコミットの trailer に置き、`tool=` でどれを回したかを書く。
-**1サイクルで複数回レビューしたら、その回数だけ書く** — 自己レビュー → ツール → 指摘対応、と複数パスが走るのが普通で、1本に丸めると何が何を見つけたかが失われる。
-
-```
-Review: tool=simplify
-Review: tool=correctness
-```
-
-許容値と、そのうちゲート充足に数える部分集合は `scripts/lib/review-record.mjs` の `REVIEW_TOOLS` / `GATE_TOOLS` が一次情報。
-値を覚える必要はない — `cycle-status.mjs` が `reviewRecordTemplate` として毎サイクル印字する。
-許容値の外にある値、または `tool=` を欠く行は malformed として FAIL する。
-`design` は観点2 の要件を包含するため、コード変更のある回に要る `correctness` の代替になる。
-diff の規模に合わせて委譲せず自分で読んだだけの回は `Review:` 行を書かない。
-**レビューはコミットの前に回す。** trailer は commit message の一部であり、後から追記できない。
-終端ゲートで気付いた時点で push 済みなら、trailer の追加は履歴の作り直しになる。
-**実装を委譲する回はこの順序が構造的に反転する** — 一般形（両端を同じ主体が持つときにしか成立しないこと・委譲前に相手側の扱いを決めること・痕跡の存在だけを見るゲートが反転を通すこと・順序を見る検査が何をどこまで分けるか）は配布層（pfd-ops `references/work-cycle.md` 手順2 適用点3）が一次情報。
-このリポでの A に当たるのがレビュー、B がコミット、痕跡が `Review:` trailer、それを作業単位で数えるゲートが Review record。
-`classifyCycle` は `{changedFiles, records}` の集合しか受け取らないため、現状は順序を見ていない。
-記録先をファイルにも PR 本文にもしないのは、前者が並列 worktree で追記コンフリクトを起こし（ADR-0026 が同型の記録機構を廃止した理由）、後者は終端ゲート実行時点でまだ存在しないため。
-記録漏れは終端ゲートと CI（`check-review-record.yml`）が判定する。
-どちらも `classifyCycle` を呼び、`packages/` / `scripts/` への変更があるのに記録が無い回、またはコード変更があるのに `correctness`/`design` の記録が無い回を FAIL にする。
-**判定は path だけを見る**（#789）。
-以前は `sample=in` / `sample=out` の二値を手で書き、その値と path 判定の食い違いも検査していたが、`scripts/` 配下の純散文変更では必ず食い違うため撤去した。
-散文だけを変えた回も記録を書く側に倒れる — その回に軽いレビューを1本回すコストは、同じ二値の分類を人と機械の双方に維持させるコストより小さい。
+**レビューは最終差分に対して実施し、指摘があれば通常の追加コミットで修正する。** レビュー後に差分が増えた場合は、追加部分とその影響を確認する。
+レビュー結果と未解決の指摘は PR 本文で人間が確認する。`Review:` trailer の有無・値・件数はゲート条件にしない。
+記録漏れに気付いた場合は実施内容を追記し、未実施ならレビューを行う。記録を整えるために過去コミットを再作成しない。履歴や日時の変更は、過去にレビューした証拠にはならない。
 
 develop 完了時点（PR 作成前、マージを待たない）で:
 

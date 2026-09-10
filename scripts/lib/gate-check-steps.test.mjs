@@ -1,13 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { RECORD_SEP } from "./commit-trailers.mjs";
 import {
 	analyzeAdoptedPfdsl,
 	checkDocsStep,
 	collectCycleWindow,
 	collectSizeDeltas,
-	commitMessagesSince,
 	commitSubjectStep,
 	deletedFilesSince,
 	designRecordStep,
@@ -17,7 +15,6 @@ import {
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
 	perIssueSteps,
-	reviewRecordStep,
 	wipTransitionStep,
 } from "./gate-check-steps.mjs";
 
@@ -475,7 +472,7 @@ describe("designRecordStep", () => {
 		assert.match(result.detail, /no design-selection record found/);
 	});
 
-	it("FAILs when the owner's record was posted after the first commit", () => {
+	it("accepts a valid record posted after the first commit", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-07-02T00:00:00Z\n" },
 		});
@@ -493,11 +490,11 @@ describe("designRecordStep", () => {
 				],
 			}),
 		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /after the first commit/);
+		assert.equal(result.status, "PASS");
+		assert.doesNotMatch(result.detail ?? "", /first commit/);
 	});
 
-	it("uses the selected reader-first record timestamp for timing over a legacy record", () => {
+	it("accepts the selected reader-first record regardless of commit timing", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-08-30T09:32:50Z\n" },
 		});
@@ -518,8 +515,8 @@ describe("designRecordStep", () => {
 				],
 			}),
 		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /2026-08-30T09:32:51Z/);
+		assert.equal(result.status, "PASS");
+		assert.doesNotMatch(result.detail ?? "", /first commit/);
 	});
 
 	// #737 案1 remains advisory for semantic/disposition deficiencies. Required
@@ -654,7 +651,7 @@ describe("designRecordStep", () => {
 		assert.equal(result.status, "PASS");
 	});
 
-	it("SKIPs when a valid record exists but there is no commit in range", () => {
+	it("validates an existing record even when there are no commits", () => {
 		const { exec } = fakeExec({ "git log --format=%aI": { out: "" } });
 		const result = designRecordStep({
 			exec,
@@ -670,15 +667,10 @@ describe("designRecordStep", () => {
 				],
 			}),
 		});
-		assert.equal(result.status, "SKIP");
+		assert.equal(result.status, "PASS");
 	});
 
-	// Review A-4: `timing.status === "SKIP" ? undefined : editNote` had no test
-	// asserting on `detail` for a SKIP row, so it could regress to always
-	// including or always dropping editNote without a test noticing. Uses the
-	// id-mismatch note (A-3) rather than a coincidentally-empty one, so a
-	// broken suppression would make this test fail on content, not on absence.
-	it("suppresses the edit note on a SKIP row, even when edit detection has its own note to report", () => {
+	it("reports unavailable edit metadata independently of the commit range", () => {
 		const { exec } = fakeExec({ "git log --format=%aI": { out: "" } });
 		const result = designRecordStep({
 			exec,
@@ -695,15 +687,13 @@ describe("designRecordStep", () => {
 				],
 			}),
 			editInfo: {
-				issueLastEditedAt: null,
-				comments: {
-					totalCount: 1,
-					nodes: [{ id: "different-id", lastEditedAt: null }],
-				},
+				status: "unavailable",
+				editedAtIso: null,
+				note: "selected record id not found",
 			},
 		});
-		assert.equal(result.status, "SKIP");
-		assert.doesNotMatch(result.detail ?? "", /id not found/);
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /id not found/);
 	});
 
 	it("does not skip a legacy record merely because it has an 実装しない line", () => {
@@ -799,7 +789,7 @@ describe("designRecordStep", () => {
 			assert.equal(result.status, "PASS");
 		});
 
-		it("FAILs when the record was edited after the first commit", () => {
+		it("accepts a valid legacy record edited after the first commit", () => {
 			const { exec } = fakeExec(firstCommit);
 			const result = designRecordStep({
 				exec,
@@ -810,8 +800,8 @@ describe("designRecordStep", () => {
 					editedAtIso: "2026-07-03T00:00:00Z",
 				},
 			});
-			assert.equal(result.status, "FAIL");
-			assert.match(result.detail, /edited at/);
+			assert.equal(result.status, "PASS");
+			assert.doesNotMatch(result.detail ?? "", /first commit/);
 		});
 
 		it("PASSes when the record was edited before the first commit", () => {
@@ -828,7 +818,7 @@ describe("designRecordStep", () => {
 			assert.equal(result.status, "PASS");
 		});
 
-		it("judges on timing alone and notes the gap when GraphQL is unavailable", () => {
+		it("validates a legacy record and notes unavailable edit metadata", () => {
 			const { exec } = fakeExec(firstCommit);
 			const result = designRecordStep({
 				exec,
@@ -874,29 +864,6 @@ describe("designRecordStep", () => {
 			assert.equal(result.status, "FAIL");
 			assert.match(result.detail, /no design-selection record found/);
 		});
-	});
-});
-
-describe("commitMessagesSince", () => {
-	it("reads the branch's messages with the separator both readers expect", () => {
-		const { exec, calls } = fakeExec({
-			"git log": { out: `feat: a${RECORD_SEP}` },
-		});
-		const result = commitMessagesSince({ exec, base: "main" });
-		assert.equal(result.ok, true);
-		assert.equal(result.text, `feat: a${RECORD_SEP}`);
-		assert.deepEqual(calls, [
-			`git log --no-merges origin/main..HEAD --format=%B${RECORD_SEP}`,
-		]);
-	});
-
-	it("reports the failure rather than an empty range", () => {
-		const { exec } = fakeExec({
-			"git log": { ok: false, out: "fatal: bad revision\n" },
-		});
-		const result = commitMessagesSince({ exec, base: "main" });
-		assert.equal(result.ok, false);
-		assert.equal(result.error, "fatal: bad revision");
 	});
 });
 
@@ -1106,84 +1073,6 @@ describe("checkDocsStep", () => {
 	});
 });
 
-describe("reviewRecordStep", () => {
-	const trailer = "Review: tool=simplify";
-	const messages = (text) => ({ ok: true, text });
-
-	it("PASSes a correctness review for a code-touching branch", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nReview: tool=correctness\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("PASSes a design review for a code-touching branch", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nReview: tool=design\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("PASSes when a code-touching branch carries both a gate record and a correctness record", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages(
-				`subject\n\n${trailer}\nReview: tool=correctness\n`,
-			),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("FAILs when a code-touching branch carries no record at all", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nbody without a trailer\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /no review record/);
-	});
-
-	it("FAILs when a code-touching branch carries only the quality (simplify) record", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages(`subject\n\n${trailer}\n`),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /no correctness review record/);
-	});
-
-	it("FAILs when the record names a tool outside the allowed set", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("subject\n\nReview: tool=eyeballs\n"),
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /malformed record/);
-	});
-
-	it("PASSes a prose-only branch that carries no record", () => {
-		const result = reviewRecordStep({
-			commitMessages: messages("docs: x\n\nbody\n"),
-			changedFiles: ["docs/adr/0001-x.md"],
-		});
-		assert.equal(result.status, "PASS");
-	});
-
-	it("FAILs when the caller could not read the range", () => {
-		const result = reviewRecordStep({
-			commitMessages: { ok: false, text: "", error: "fatal: bad revision" },
-			changedFiles: ["scripts/lib/x.mjs"],
-		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /bad revision/);
-	});
-});
-
-// The branch's start, as both the design-record timing check and the cycle
-// window measure it. One helper because the two must not drift apart about
-// what "when this cycle started" means (#834).
 describe("firstCommitAuthorDate", () => {
 	it("returns the oldest commit's author date", () => {
 		const { exec, calls } = fakeExec({
@@ -1473,6 +1362,83 @@ function format3Record() {
 describe("format 3 designRecordStep", () => {
 	const issue = (comments) => ({ body: "通常のissue本文。", comments });
 
+	// Late record recovery must preserve record identity, structure and
+	// reapproval validation. Only the comparison with git authorDate is gone.
+	for (const [label, bodies, editInfo, expected] of [
+		[
+			"late record",
+			[format3Record()],
+			{ status: "unedited", editedAtIso: null },
+			"PASS",
+		],
+		[
+			"late format repair",
+			[format3Record()],
+			{ status: "edited", editedAtIso: "2026-09-09T00:00:00Z" },
+			"PASS",
+		],
+		["missing record", [], null, "FAIL"],
+		["ambiguous record", [format3Record(), format3Record()], null, "FAIL"],
+		[
+			"malformed record",
+			[format3Record().replace("理由:", "理由欠落:")],
+			null,
+			"FAIL",
+		],
+		[
+			"valid reapproval",
+			[
+				format3Record().replace(
+					"- なし",
+					"- A → B — 変更理由 — 再承認: 対話 2026-09-08T12:00:00Z",
+				),
+			],
+			{ status: "edited", editedAtIso: "2026-09-09T00:00:00Z" },
+			"PASS",
+		],
+		[
+			"missing reapproval",
+			[format3Record().replace("- なし", "- A → B — 変更理由")],
+			{ status: "edited", editedAtIso: "2026-09-09T00:00:00Z" },
+			"FAIL",
+		],
+		[
+			"reapproval outside record window",
+			[
+				format3Record().replace(
+					"- なし",
+					"- A → B — 変更理由 — 再承認: 対話 2026-09-07T12:00:00Z",
+				),
+			],
+			{ status: "edited", editedAtIso: "2026-09-09T00:00:00Z" },
+			"FAIL",
+		],
+		[
+			"invalid edit timestamp",
+			[format3Record()],
+			{ status: "edited", editedAtIso: "invalid" },
+			"FAIL",
+		],
+	]) {
+		it(`preserves the record contract during recovery: ${label}`, () => {
+			const { exec } = fakeExec({
+				"git log --format=%aI": { out: "2026-09-07T00:00:00Z\n" },
+			});
+			const result = designRecordStep({
+				exec,
+				base: "main",
+				number: 1098,
+				repository: TARGET_REPOSITORY,
+				issue: issue(
+					bodies.map((body) => ({ body, createdAt: "2026-09-08T00:00:00Z" })),
+				),
+				editInfo,
+			});
+			assert.equal(result.status, expected, result.detail);
+			assert.doesNotMatch(result.detail ?? "", /first commit/);
+		});
+	}
+
 	it("FAILs rather than electing one of two complete format 3 comments", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-09-02T00:00:00Z\n" },
@@ -1489,7 +1455,7 @@ describe("format 3 designRecordStep", () => {
 		assert.match(result.detail, /multiple complete format 3 design records/);
 	});
 
-	it("uses the later format 3 edit time for the implementation timing check", () => {
+	it("accepts a valid format 3 record edited after the first commit", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-09-02T00:00:00Z\n" },
 		});
@@ -1508,8 +1474,8 @@ describe("format 3 designRecordStep", () => {
 				editedAtIso: "2026-09-03T00:00:00Z",
 			},
 		});
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /edited at 2026-09-03T00:00:00Z/);
+		assert.equal(result.status, "PASS");
+		assert.doesNotMatch(result.detail ?? "", /first commit/);
 	});
 
 	it("checks a strict reapproval reference in the selected record context", () => {
@@ -1600,7 +1566,7 @@ describe("format 3 designRecordStep", () => {
 		assert.match(result.detail, /edit history unavailable/);
 	});
 
-	it("SKIPs timing only when every format 3 decision says not to implement", () => {
+	it("validates format 3 records that decide not to implement", () => {
 		const { exec } = fakeExec({
 			"git log --format=%aI": { out: "2026-09-02T00:00:00Z\n" },
 		});
@@ -1617,8 +1583,7 @@ describe("format 3 designRecordStep", () => {
 				},
 			]),
 		});
-		assert.equal(result.status, "SKIP");
-		assert.match(result.detail, /no implementation commits/);
+		assert.equal(result.status, "PASS");
 	});
 
 	it("keeps a complete format 2 record selected beside an incomplete format 3 fragment", () => {

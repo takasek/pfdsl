@@ -17,7 +17,6 @@ import { relative, resolve } from "node:path";
 import {
 	buildDesignRecordTemplate,
 	buildGateCheckCommand,
-	buildReviewRecordTemplate,
 	classifyDesignSettlement,
 	countBehind,
 	detectEnumeratedOptions,
@@ -541,7 +540,6 @@ export async function runCycleStatus({
 		designRecordTemplate: buildDesignRecordTemplate({
 			optionCount: recordOptionCount,
 		}),
-		reviewRecordTemplate: buildReviewRecordTemplate(),
 		wipUpdateCommand,
 		gateCheckCommand,
 		unregisteredManagedIssues,

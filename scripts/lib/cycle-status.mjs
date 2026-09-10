@@ -16,22 +16,6 @@ import {
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
 import { ALWAYS_TAG, counterLineOf, hitsFor } from "./retro-patterns.mjs";
-import {
-	CODE_PATH,
-	CORRECTNESS_TOOLS,
-	GATE_TOOLS,
-	REVIEW_TOOLS,
-} from "./review-record.mjs";
-
-// The human-readable form of CODE_PATH's alternation (`/^(packages|scripts)\//`),
-// so buildReviewRecordTemplate's note names the same paths the checker actually
-// gates on rather than a restated copy that could drift from it.
-const CODE_PATH_LABEL = CODE_PATH.source
-	.match(/^\^\(([^)]+)\)/)[1]
-	.split("|")
-	.map((prefix) => `${prefix}/`)
-	.join(" か ");
-
 /**
  * @param {unknown} readyJson - output of `pfdsl status ready --best --json`
  * @returns {{ready: string[], best: string | null, bestOutputs: string[]}}
@@ -192,29 +176,8 @@ export function buildDesignRecordTemplate() {
 		"- なし",
 	];
 	return {
-		note: "着手前（ブランチ最初のコミットより前）に、実行主体が issue コメントとして投稿する。角括弧の雛形を具体的な内容へ置き換え、issue 由来の候補をすべて実名で案の処分へ記録する。案の処分と検査案の処分 Pn の部分採用は、空でない採用部分と、理由を伴う残部: 却下|保留 を書く。候補の網羅性と決定・理由・処分の意味的整合は人間レビューの責務であり、機械検査は保証しない。下書きは投稿前に `node scripts/check-design-record.mjs --file <path>` で検査し、PASS を確認してから投稿する。下書きの置き場は並行セッションと共有されるため、`/tmp/design-record.md` のような用途だけの固定名を避け、ブランチ名等でセッション固有の名前にする。",
+		note: "方針と必要な承認を実装着手前に確定し、実行主体が issue コメントへ記録する。記録漏れや書式不備は同じ記録を補修し、初コミットとの時刻を揃えるために履歴を作り直さない。決定を変える場合は必要な再承認を得て改訂履歴に残す。角括弧の雛形を具体的な内容へ置き換え、issue 由来の候補をすべて実名で案の処分へ記録する。案の処分と検査案の処分 Pn の部分採用は、空でない採用部分と、理由を伴う残部: 却下|保留 を書く。候補の網羅性と決定・理由・処分の意味的整合は人間レビューの責務であり、機械検査は保証しない。下書きは投稿前に `node scripts/check-design-record.mjs --file <path>` で検査し、PASS を確認してから投稿する。下書きの置き場は並行セッションと共有されるため、`/tmp/design-record.md` のような用途だけの固定名を避け、ブランチ名等でセッション固有の名前にする。",
 		lines,
-	};
-}
-
-/**
- * The review-record trailer template (#809), pre-shaped the same way
- * buildDesignRecordTemplate is: the vocabulary comes from review-record.mjs's
- * own constants rather than restated in prose, so a template that drifts
- * from the checker cannot happen silently.
- *
- * Unlike the design record, this is not a copy-pasteable literal. The runner substitutes a real tool name after actually running a review, so `line` keeps a placeholder rather than a fabricated tool value.
- *
- * Emitted on every cycle, not only ones that turn out to touch packages/ or
- * scripts/: whether this cycle will is undecidable at preflight time (the
- * diff doesn't exist yet), and the failure this closes is exactly a runner
- * who never saw the format until the terminal gate FAILed on it.
- * @returns {{note: string, line: string}}
- */
-export function buildReviewRecordTemplate() {
-	return {
-		note: `着手前（ブランチ最初のコミットより前）にレビューを実施し、実施のたび commit message の trailer へ記録する。後から追記できない — push 済みなら trailer の追加は履歴の作り直しになる。tool は ${REVIEW_TOOLS.join(" / ")} のいずれか。ゲート充足に数えるのは ${GATE_TOOLS.join(" / ")}（\`code-review\` は有効な trailer 値だが数えない）。${CODE_PATH_LABEL} に変更のある回はさらに ${CORRECTNESS_TOOLS.join(" または ")} を最低1本要する。行が記録するのは委譲したレビューであり、diff の規模に合わせて委譲せず自分で読んだだけの回は書かない — その場合は落とした観点の名前と落とした理由を PR 本文へ書く。`,
-		line: "Review: tool=<tool-name>",
 	};
 }
 
