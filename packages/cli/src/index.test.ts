@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { deleteNodes } from "@pfdsl/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
 	COMMAND_GROUPS,
@@ -5458,5 +5459,78 @@ describe("command table / help parity (#902)", () => {
 			groupNames.includes(n),
 		);
 		expect(shadowed).toEqual([]);
+	});
+});
+
+describe("deleteNodes preserves the planning queries (#1125)", () => {
+	// The sweep's own correctness condition, stated the way the backend
+	// reference states it: `status ready` and `status blocked` must be
+	// compared by their whole output, because comparing id sets alone passes
+	// a sweep that leaves a process ready while quietly taking an input away.
+	// Both cases below run against a fixture rather than `.pfdsl/roadmap.pfdsl`
+	// so that sweeping this repo's own roadmap never turns them stale.
+	const roadmap = `---
+type: roadmap
+artifact:
+  tool_a: { label: Tool A, status: done }
+  tool_b: { label: Tool B, status: done }
+  legacy_in: { label: Legacy In, status: done }
+  legacy_out: { label: Legacy Out, status: done }
+  feature: { label: Feature, status: todo }
+process:
+  build_legacy: { label: Build Legacy }
+  build_feature: { label: Build Feature }
+---
+
+legacy_in >> build_legacy -> legacy_out
+
+[tool_a, tool_b] >> build_feature -> feature
+`;
+
+	const planningQueries = async (source: string) => {
+		const f = join(
+			dir,
+			`planning-${Math.random().toString(36).slice(2)}.pfdsl`,
+		);
+		writeFileSync(f, source);
+		const ready = await run(["status", "ready", f, "--json"]);
+		const blocked = await run(["status", "blocked", f, "--json"]);
+		return { ready: ready.stdout, blocked: blocked.stdout, file: f };
+	};
+
+	const readyIds = (stdout: string): string[] =>
+		JSON.parse(stdout).ready.map((r: { id: string }) => r.id);
+
+	it("leaves both queries whole-output identical when a done chain is swept", async () => {
+		// build_legacy's chain is done end to end, so nothing still open reads it.
+		const { output, notFound } = deleteNodes(roadmap, [
+			"build_legacy",
+			"legacy_in",
+			"legacy_out",
+		]);
+		expect(notFound).toEqual([]);
+
+		const before = await planningQueries(roadmap);
+		const after = await planningQueries(output);
+		expect(after.ready).toBe(before.ready);
+		expect(after.blocked).toBe(before.blocked);
+
+		const checked = await run(["check", after.file]);
+		expect(checked.exitCode).toBe(0);
+		const orphans = await run(["graph", "orphans", after.file, "--json"]);
+		expect(JSON.parse(orphans.stdout).orphans).toEqual([]);
+	});
+
+	it("detects an input taken from a process that stays ready", async () => {
+		// The failure the reference names: tool_a is a done input of the ready
+		// build_feature, so dropping it leaves the ready id set untouched. A
+		// check written against ids alone would pass this; the whole-output
+		// comparison above is only worth running because it does not.
+		const { output } = deleteNodes(roadmap, ["tool_a"]);
+		const before = await planningQueries(roadmap);
+		const after = await planningQueries(output);
+
+		expect(readyIds(after.ready)).toEqual(readyIds(before.ready));
+		expect(after.ready).not.toBe(before.ready);
 	});
 });

@@ -638,7 +638,37 @@ process:
 	});
 
 	describe("real roadmap.pfdsl", () => {
-		it("removes the current sweep target with zero errors and unchanged ready/blocked results", () => {
+		// Derived, never hardcoded: the sweep set this repo's roadmap currently
+		// carries is exactly what merging this work removes, so naming those ids
+		// here would make the test fail the first time the sweep runs. The rule is
+		// the backend reference's: keep every process that outputs a not-done
+		// artifact, keep the artifacts on those processes' edges, delete the rest.
+		// An already-swept roadmap yields an empty set and the assertions still
+		// hold. Whether the planning queries survive a sweep is checked where the
+		// real query runs, in the CLI's own suite — reproducing their logic here
+		// would only test this file's copy of it.
+		const sweepSet = (result: ReturnType<typeof analyze>): string[] => {
+			const status = (id: string) => result.frontmatter?.artifact?.[id]?.status;
+			const keepProcesses = new Set(
+				result.edges
+					.filter((e) => e.kind === "output" && status(e.artifact) !== "done")
+					.map((e) => e.process),
+			);
+			const keepArtifacts = new Set(
+				result.edges
+					.filter((e) => keepProcesses.has(e.process))
+					.map((e) => e.artifact),
+			);
+			return [...result.nodeKinds]
+				.filter(([id, kind]) =>
+					kind === "process"
+						? !keepProcesses.has(id)
+						: kind === "artifact" && !keepArtifacts.has(id),
+				)
+				.map(([id]) => id);
+		};
+
+		it("sweeps the derived set out of the real roadmap without leaving errors", () => {
 			const src = readFileSync(
 				resolve(__dirname, "../../../.pfdsl/roadmap.pfdsl"),
 				"utf-8",
@@ -648,57 +678,16 @@ process:
 				[],
 			);
 
-			const { output, deleted, notFound } = deleteNodes(src, [
-				"publish_cli_pipeline_kind",
-				"pipeline_kind_rename",
-				"reader_first_design_records",
-				"cli_release_pipeline_kind",
-			]);
+			const targets = sweepSet(before);
+			const { output, deleted, notFound } = deleteNodes(src, targets);
 			expect(notFound).toEqual([]);
-			expect(deleted.sort()).toEqual(
-				[
-					"cli_release_pipeline_kind",
-					"pipeline_kind_rename",
-					"publish_cli_pipeline_kind",
-					"reader_first_design_records",
-				].sort(),
-			);
+			expect(deleted.sort()).toEqual([...targets].sort());
 
 			const after = analyze(output);
 			expect(after.diagnostics.filter((d) => d.severity === "error")).toEqual(
 				[],
 			);
-
-			const readyStatus = (
-				result: typeof before,
-			): Map<string, "ready" | "blocked"> => {
-				const map = new Map<string, "ready" | "blocked">();
-				for (const [id, kind] of result.nodeKinds) {
-					if (kind !== "process") continue;
-					const inputs = result.edges.filter(
-						(e) => e.kind !== "output" && e.process === id,
-					);
-					const blocked = inputs.some((e) => {
-						if (e.kind === "feedback") return false;
-						const meta = result.frontmatter?.artifact?.[e.artifact];
-						return meta?.status !== "done";
-					});
-					map.set(id, blocked ? "blocked" : "ready");
-				}
-				return map;
-			};
-
-			const beforeStatus = readyStatus(before);
-			const afterStatus = readyStatus(after);
-			for (const [id, status] of afterStatus) {
-				expect(beforeStatus.get(id)).toBe(status);
-			}
-			// no process disappeared from the ready/blocked computation as a
-			// side effect of unrelated edges losing their frontmatter.
-			expect(afterStatus.size).toBe(
-				beforeStatus.size -
-					(beforeStatus.has("publish_cli_pipeline_kind") ? 1 : 0),
-			);
+			for (const id of targets) expect(after.nodeKinds.has(id)).toBe(false);
 		});
 	});
 });
