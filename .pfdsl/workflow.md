@@ -28,10 +28,99 @@
 
 waxa CLI（blank-slate, ツール呼び出し不可）では retrieval 有無を測定できない制約を確認済み — 同種の抽出判断を検証する際は empirical-prompt-tuning（実 Read tool_uses 計測可）を使う。
 
+## worktree でのサイクル実行
+
+**サイクルは worktree で回す**: このリポのルート作業ツリーは `~/works/pfdsl` 直下で、worktree は `.claude/worktrees/<name>/` に置く。
+worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順1 が一次情報。
+消えた編集を探すとき `git stash list` を先に見ることも配布層の同じ手順が持つ。
+実際に起きた干渉の症状と復旧手順は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。
+
+**worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` が失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
+`.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する（ビルドは不要）。
+`make setup` が入れる pre-commit hook のシムについては CLAUDE.md「セットアップ」節が一次情報。
+
+**worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順2 が一次情報）。
+**worktree のパスはシェル変数に入れず literal で書く**。
+`scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）は hook の payload だけを見る静的解析なので `git -C $W commit` の `$W` を解決できず、payload の cwd（cwd が戻っていれば main repo）で判定して deny する。
+`git -C /Users/.../.claude/worktrees/<name> commit` と書けば通る。
+なお deny は Bash 呼び出し全体を止めるため、`git -C $W add … && git -C $W commit …` が弾かれたときは add も実行されていない。
+
+## develop のレビュー
+
+### Codex でのレビュー
+
+レビューは、実装時の会話・推論を引き継がない別 agent に依頼する。
+要件・最終差分・必要な一次資料を渡し、実装側の結論や採用理由を先に与えない。
+レビュー担当は差分と関係する消費者を読み、品質（簡素化・保守性）と correctness（偽になる入力・状態の検査）を確認する。
+変更に応じて設計妥当性と利用シナリオも検証する。
+自己レビューは準備として行い、別文脈のレビューの代替にしない。
+指摘は根拠となる箇所と failure scenario を添えて返し、実装側が一次資料で確認して対応する。
+レビューの結果と未解決の指摘は PR 本文に記録する。
+
+配布プロンプトの利用側シナリオは、公開前または明示的な検証依頼がある場合に、この作業 checkout の `.claude/skills/distribution-review/SKILL.md` を直接読んで模擬実行する。通常の編集では `docs/distribution-review/reviewed.json` を進めず、公開時のゲートに残す。
+
+### Claude Code（Opus）でのレビュー
+
+以下は Claude Code の運用規約であり、Codex の単独実行の既定を適用しない。
+
+**コード変更のあるサイクルはレビューを省略しない**: `packages/` または `scripts/` に変更があるサイクルでは、終端ゲートの該当チェックリスト項目を省略しない。
+#561 が 48 サイクル（目標 10）を実測し、自己レビューで気付いていなかった指摘が 85% のサイクルで出た（new/adopted 合計 142/119）。
+「どういう条件なら省略してよいか」を条件式として書ける、という前提が実測に支持されなかったため、条件を置かず必須とする。
+散文・PFD のみのサイクルは、レビューの要否を diff の規模で判断し、省略する回はその理由を PR 本文に書く。
+機械が読む文書・設定の抽出対象を変える場合は観点2の対象とし、拡張子だけで散文のみと判断しない。
+判定は、変更したパス・フィールドが読み込み処理の入力になり、その値が抽出・選択・生成・判定結果に使われるかで行う。既知の対象は `.pfdsl/bindings/pfd-retro-patterns/` の本文・frontmatter で、読取範囲は `scripts/lib/retro-patterns.mjs` の `PATTERN_DIR_RELATIVE` と `loadPatternCatalog`、出力経路は `.pfdsl/bindings/pfd-retro.md`「変更時の意味レビュー」を参照する。
+この例にない文書・設定も、変更パス・キー・ラベルの参照から読み込み処理と値の利用先を追って判定する。新規・移動・削除では変更前後を調べ、確認した読取経路、または対象外と判断した探索範囲と根拠を、配布層が求める PR 本文のレビュー記録へ含める。既知パスとの不一致だけで対象外にしない。
+自己レビュー（差分の読み直し）は実施済みとみなし、それに**加えて**軽い設定のレビューを実施する（角度を絞る。8角度 × 検証 agent の高効度設定は使わない）。
+
+menu を観点で組むこと（手段で組まないこと）は、配布層（`.claude/skills/pfd-ops/references/work-cycle.md` 手順3 のレビュー項目）が一次情報。
+このリポの実測値は #836 で、`/simplify` 4角度が findings なしだった回に、別レビューが採用案の adoption rationale 不成立と JSDoc の事実誤認の2件を検出した。
+以下はこのリポの観点とブリーフ要件のインスタンス値。
+
+1. **観点1 — 品質（簡素化・保守性）。** `/simplify` を使う。常に使え、PR 作成前でも回せる。角度は4つ固定。`/simplify` は correctness を明示的には探さない — skill 本文が「Do not look for correctness bugs — that is what /code-review is for」と宣言しており、この観点の実施だけをレビュー済みの根拠にしてはならない。
+2. **観点2 — correctness。** コード変更と、機械が読む文書・設定の抽出対象を変えるサイクルで担保する。ブリーフ要件は (a) diff が導入・変更した事実主張（コメント・JSDoc・doc 散文・criteria 文言）を列挙し、各主張の**反証を試みる**こと（真偽判定でなく偽になる入力・状態を構成させる — 追認バイアスを falsification に固定するため）、(b) 変更行の外の消費者（散文を含む）を、配布層の影響先確認と終了判断の要件に従って調べること。条件撤去では `.pfdsl/bindings/` のカタログ・運用文書も探索に含める。軽量 subagent 1本を想定する。
+3. **観点3 — 設計妥当性。** 条件付き発火 — そのサイクルが複数案から採用を選んだ場合のみ、つまり選択記録に否定案がある回に限る。ブリーフ要件は (a) 結論・採用理由を伏せて同じ設計問題を独立に解かせること（採用案を見せて攻めさせると提示解にアンカーされるため、検出機構の本体は敵対的姿勢でなく独立性に置く）、(b) 採用案の adoption rationale を名指しし、実装がそれを満たさない箇所を敵対的に探させること。観点2 の要件を含むため、発火した回は観点2 の別実行を要さない。
+要件 (a) の独立性はツリーで担保する — `git worktree add --detach <path> origin/<base>` で解答を含まないツリーを用意し、ブリーフには「このパスのみを読む」と書く。
+禁止事項の列挙（issue を読むな・`git diff` を見るな）はその補助であって代替にならない。
+問題の説明は変更対象のファイル名を含まざるをえず、そのファイルに実装が適用済みなら、委譲先は禁止された経路を1本も通らずに解答へ到達する。
+この汚染は成果物からは検出できない — 出力は採用案との完全な一致であり、それは設計が正しいときに期待される結果そのものだからである。
+4. **観点4 — 体験（シナリオ実行）。** 条件付き発火 — ユーザー可視の挙動・同梱内容を変える回に限る（終端ゲートの release-status 項目と同じ判定軸を流用し、新しい判定を発明しない）。ブリーフ要件は (a) subagent に成果物（doc・CLI・skill 本文）と現実的シナリオのみ渡し変更内容・意図は渡さないこと、(b) 詰まった箇所・誤読した箇所を、原因となった記述や出力の引用付きで報告させること、(c) 合否判定を伴う場合は実物（checker・実行結果）で採点し自己申告にしないこと、(d) シナリオには変更が壊しうる既存動線を最低1本含めること（作者がシナリオを選ぶと通る道を選びがちなことへのガード）、(e) 原因の説明を求める場合は引用と別の枠に置かせ、その枠の内容を起票時に事実として転写しないこと。
+要件 (a) はこの subagent に実装も変更意図も渡さない — したがって報告に現れる原因はすべて推測であり、引用と地続きに書かれると起票時に観測と区別が付かなくなる。
+実際に #844 は「隣接の種別は id から推測できない」を原因として抱えたまま起票され、実測（555 エッジで同種端点 0 件）で誤りと判明したのは実装着手後だった。`distribution-review`（plugin バンドル読者の模擬）と `spec-stress-test`（spec write-probe）はこの観点のドメイン特化版であり、その領域はそちらへ委ね、観点4 は CLI UX・拡張機能挙動等の未カバー領域へ汎用のブリーフ要件を与える。
+
+**全観点共通**: finding に failure scenario を必須とすることは配布層が一次情報（同上）。
+
+**発火した観点は軽くしてよいが、消してはならない**: この規則そのもの（発火条件と重さが別軸であること・落とした観点の名前と理由を成果物へ書くこと）も配布層が一次情報。
+このリポでのインスタンス: 散文のみのサイクルでも条件付き観点は発火しうる — 配布同梱物の散文変更は観点4 の発火条件を満たす。落とした観点の名前と理由の書き先は PR 本文。
+担保の中核が委譲でしか作れない観点を軽くできないこと・起動できない回はユーザーへ返すこと・起動可否の判断自体を指示の文面で確かめることも、同じ配布層の項目が持つ。
+このリポでそれに当たるのは観点3 で、独立性は解答を含まないツリーで別主体に解かせることでしか成立しない。
+
+レビュー手段は、必要な観点と利用可能な起動時点に合わせて選ぶ。PR 作成後に使う `/code-review` も、担保する観点に応じて利用できる。
+`code-reviewer` agent を Agent tool で起動する手段は **導入が前提** — `pr-review-toolkit` / `feature-dev` plugin のいずれかを有効化していないと選べない。
+
+起動可否が harness と plugin の版に依存し、記録された「起動できない」がその時点の観測でしかないことは配布層が一次情報（同上）。このリポで確認する実体フィールドは `disable-model-invocation` で、2026-07-28 時点の `/code-review` は `disable-model-invocation: false`。
+
+### 共通のレビュー記録
+
+**レビューは最終差分に対して実施し、指摘があれば通常の追加コミットで修正する。** レビュー後に差分が増えた場合は、追加部分とその影響を確認する。
+レビュー結果と未解決の指摘は PR 本文で人間が確認する。`Review:` trailer の有無・値・件数はゲート条件にしない。
+記録漏れに気付いた場合は実施内容を追記し、未実施ならレビューを行う。記録を整えるために過去コミットを再作成しない。履歴や日時の変更は、過去にレビューした証拠にはならない。
+
+## develop 完了時の確認
+
+develop 完了時点（PR 作成前、マージを待たない）で:
+
+- [ ] 変更が公開物の挙動・同梱内容を変える場合（CLI 出力・拡張機能の動作変化に加え、plugin 同梱物 = 配布スキル群・pfd-* コマンド・agents（`make gen-plugin` の対象）の変更を含む — パスでなく挙動と同梱内容で判定）、npm 公開・Marketplace 公開が必要か確認した（`make release-status` で behind を確認。pending をどこかへ書き写す必要はない — 次サイクルのプリフライトが `releasePending` として毎回一次情報から取り直す。#814）
+- [ ] CLIコマンドを追加・変更した場合、コマンド定義テーブル（`packages/cli/src/index.ts` の `COMMAND_GROUPS` / `TOP_LEVEL_COMMANDS`。dispatcher と help 列挙の双方がここから導かれる #902）を更新し、`make gen-readme-cli` で root README と `packages/cli/README.md` の両方を再生成してコミットした（#850 以降、後者も生成物。drift は pre-commit の `readme-cli` ゲートと CI の `make check-readme-cli` が検出する）
+- [ ] 実装を subagent へ委譲した場合、戻り時に `git log origin/<branch>..HEAD` と open PR 一覧を確認し、委譲先がブリーフの留保作業（push・PR 作成・issue 操作）を実行していないか照合した
+- [ ] Claude Code でコード変更のあるサイクルでは、観点1（品質）の記録に加えて観点2（correctness）または観点3（設計妥当性）の記録が入っていることを、コミット直前に確認した。レビュー実施とコミット作成の間に他の作業（PR 作成・push 等）を挟むと記載を失念しやすい — 実施済みで未記載のまま次の作業に進んでいないか、コミット直前に再確認する
+
+**`docs/spec/spec.md` / `docs/samples/` を変更した場合**: 本 companion の「生成物の再生成と自動ドリフト検査」に従う（再生成手続きの一次情報はそちら。ここには複製しない）。
+
 ## code-review / simplify の実施粒度
 
 原則（diff の規模に review の重さを合わせる）は配布層（pfd-ops `references/work-cycle.md` 手順3）が一次情報。
-ここにはこのリポの基準値のみを書く。
+Codex の作業分担は `AGENTS.md` と本 companion の「Codex でのレビュー」に従う。
+以下の基準値は Claude Code（Opus）に適用する。
 
 - 軽い側: 数十行・1〜2ファイル中心。角度を2〜4に絞るか、委譲せず自分で Read/Grep する
 - 重い側: `/code-review` の既定 fan-out（8角度 finder × 候補ごと検証 agent、計10体以上の subagent 起動）は大規模 PR 向け
@@ -39,6 +128,10 @@ waxa CLI（blank-slate, ツール呼び出し不可）では retrieval 有無を
 ## payoff_log 追記条件
 
 PFD の効果を体感した局面は `docs/pfd_payoff_log.md`（`payoff_log` artifact）に **日付・局面・効果・参照** の形式で追記する。pfdsl の効果実証が目的（このリポ固有の動機）。
+
+終端ゲートで確認する:
+
+- [ ] ADR-0014 の反実仮想テスト「依存グラフ／プロセス分解がなければ、この判断・作業は違っていたか」を適用し、Yes かつ違いを1行で引用できる局面を `docs/pfd_payoff_log.md` に追記した。該当しない場合は追記しない
 
 ## spec バージョンの権威
 
@@ -92,6 +185,8 @@ proposal 起草での「既存構造」は対象 spec の現行 frontmatter キ�
 ## 生成物の再生成と自動ドリフト検査（gen-skill / gen-plugin / gen-samples / gen-readme-cli）
 
 `docs/spec/spec.md` / `docs/samples/` を変更したら `make gen-skill`（スキル `references/`）・`make gen-samples`（サンプル `.dot` / README / `.svg`）で生成物を再生成する。`packages/cli/src/` の CLI コマンド定義を変更したら `make gen-readme-cli`（README `## CLI` セクション）で再生成する。
+
+**`make gen-samples` 実行後**: `.dot` / `.svg` / README はいずれも決定論的（純 JS + `@pfdsl/preview-engine` の wasm graphviz）に生成されるため、再生成された全ファイルの差分をそのままステージしてよい（#588）。
 
 現在のcanonical inputは、`scripts/lib/harness-inventory.mjs` が選ぶ手書きの`.claude/skills`・`.claude/commands`・`.claude/agents`配布対象と、`CLAUDE.md`・`.claude/settings.json`・`hooks/`である。Claude CodeとCodexのadapterは同じinventoryを消費する。`.claude/skills/pfdsl` は `plugin/pfdsl/skills/pfdsl` への生成symlinkであり、canonical inputでも編集先でもない。
 
@@ -167,11 +262,13 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 ## 新 frontmatter フィールド追加時の sample 追加
 
-frontmatter に新フィールドを追加する develop では、対応する `docs/samples/` のサンプルファイルを同一 PR で追加する（「フィールドが仕様にあるがサンプルに示されていない」状態を防ぐ設計ルール）。生成物の再生成・ドリフト検査は上記のとおり機械的に強制される。
+**新 frontmatter フィールドを追加した場合**: 対応する feature sample（`docs/samples/`）を同一 PR で追加する（生成物 `.dot` / README / `references/` の再生成・ドリフト検査は pre-commit と CI が強制する）。加えて `packages/core/src/__fixtures__/pipeline-scale.pfdsl` にもそのフィールドを追記する（fixture がスナップショットの入力であり、feature sample とは別に網羅性を担う）。
+
+「フィールドが仕様にあるがサンプルに示されていない」状態を防ぐ設計ルール。
 
 ## VS Code 拡張の UI 動作確認
 
-`vscode-extension` の挙動変更（webview インタラクション・クリック動作等）を含む develop は、PR 作成前に `/vscode-ext-debug` スキルを用いてビルド後の実動作を確認する。確認結果をユーザーから受け取るまでサイクル完了とみなさない（pfd-ops 手順2）。
+**vscode-extension を変更した場合**: `pnpm --filter @pfdsl/vscode-extension typecheck` を実行してエラーがないことを確認してからコミットする。`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes` の strict 設定により、他パッケージの型変更が vscode-extension 側でエラーを起こす場合がある。vscode-extension の挙動変更全体を実動作確認の対象とする。クリック・ホバー等の UI 挙動変更（DocumentLinkProvider・HoverProvider 等）や preview/export の描画内容変更（statusStyles・tag・group 解決ロジック等）はその例である。挙動変更を含む場合は `/vscode-ext-debug` スキルで PR 作成前にビルド後の実動作を確認し、ユーザーの確認結果を受け取るまで完了とみなさない。
 
 ## subagent へ worktree 作成を委譲する場合の安全確認
 
@@ -262,3 +359,9 @@ vscode-extension 等で新しいノード種別をホバー対応する場合、
 ## 終端ゲートの根拠
 
 汎用ゲート項目（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、このリポでは issue 固有項目を合成する。issue 固有項目は `roadmap.md` を参照。
+
+- **終端ゲートの機械項目と報告材料（pfd-ops 手順3・#462）**: `GH_HOST=github.com node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n> ...]` — 内部で `git fetch origin` を試みたうえで `origin/<base>...HEAD` を基準に差分を取る（fetch 失敗時も既存 remote-tracking ref で続行し、ref 自体が無ければ明示エラーで終了する）。**項目名・PASS/FAIL/SKIP の判定・SKIP 条件はここに列挙しない** — スクリプトの出力が自己記述的であり、実行すれば全項目が detail 付きで印字される（#560。列挙をここに置くとスクリプト変更のたび手で追随することになり、追随を保証する機構が無い）。`--artifact <key>` を渡すと status 更新・wip 経由の両方をその artifact に厳密スコープする（省略時はどちらも粗いフォールバック判定になる旨を detail に明示）。出力 artifact を持たないサイクル（`flow:exempt` の bookkeeping 等）は `--no-artifact` で宣言する — `roadmap.pfdsl` を status 以外の理由で触ると、宣言なしでは構造的に FAIL する（#564）。表のほかに報告材料が印字される。**その種類・件数・内容もここに列挙しない** — 同じ理由で、出力が節見出しごと自己記述する（#839）。機械結果に含まれない判断は `.claude/skills/pfd-ops/references/work-cycle.md` の「3. 反映 — 終端ゲート」を直接確認する。スクリプトは本文を解析・再印字せず、PR 作成前の同節とPR 作成後の `PR 作成後` 項目への固定案内だけを表示する
+
+- **そのサイクルが閉じる issue を毎サイクル全て渡す（#669・#734）**: `--issue <n>` は繰り返し指定でき、渡した issue ごとに `design-selection record` を評価する。省略すると対象 issue を推測せず SKIP する。複数 issue を閉じる回で1件しか渡さないと、渡さなかった issue はゲートを通らないまま表が緑になる — 選択記録の保証が必要なのは閉じる N 件すべてである。判定条件はスクリプト出力の detail が自己記述する。`cycle-status.mjs` も `--issue` を繰り返し指定でき、各 issue の判定と全件を含む `gateCheckCommand` を出力する。変更された知識成果物のバイト・行差分は常に報告材料として印字される。
+
+選択記録の記録先と再承認は `roadmap.md`「終端ゲート追加項目（issue 固有）」に従う。

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -575,6 +575,61 @@ describe("claudeInstructionsToAgents", () => {
 });
 
 describe("claudeRootInstructionsToAgents", () => {
+	it("keeps Codex execution focused and requires a separate review context", () => {
+		const source = readFileSync(join(root, "CLAUDE.md"), "utf-8");
+		const output = claudeRootInstructionsToAgents(source);
+		const sharedInstructions = [
+			"ユーザーが許可した範囲の通常作業は、工程が移るたびに再承認を求めない。",
+			"小さな修正や方式が確定した作業に設計承認を追加せず、結果を大きく変える未決事項がある場合と、ユーザーが明示した待機点で確認する。",
+			"この方針はスキルの定型手順にも適用する。公開・破壊的操作・権限の拡張は、利用中のハーネスとユーザーの承認範囲に従う。",
+		].join("\n");
+		const claudeInstructions = [
+			"## Claude Code の作業分担",
+			"",
+			"Claude Code では Opus を中心に作業を進め、調査・実装を必要に応じて委譲する。",
+			"Claude Code のコード変更では自己レビューに加えて別主体のレビューを行い、観点と実施条件は `.pfdsl/workflow.md` の「Claude Code（Opus）でのレビュー」に従う。",
+		].join("\n");
+
+		assert.ok(source.includes(sharedInstructions));
+		assert.ok(source.includes(claudeInstructions));
+		assert.ok(output.includes(sharedInstructions));
+		assert.doesNotMatch(output, /Claude Code の作業分担|Opus/);
+		assert.ok(
+			output.includes(
+				claudeInstructionsToAgents(
+					source.slice(source.indexOf("## セットアップ")),
+				),
+			),
+		);
+		assert.ok(claudeInstructionsToAgents(source).includes(claudeInstructions));
+
+		assert.match(output, /^## Codex の作業分担$/m);
+		assert.match(output, /Codex では通常の調査・実装を単独の agent で進める。/);
+		assert.match(
+			output,
+			/レビューは、実装時の会話・推論を引き継がない別 agent に依頼する。/,
+		);
+	});
+
+	it("excludes the named root section through its next peer, ancestor, or EOF", () => {
+		const claudeSection =
+			"## Claude Code の作業分担\n\nClaude-only guidance.\n\n### Review\n\nMore Claude-only guidance.\n\n";
+		for (const following of [
+			"## Setup\n\nKeep Claude Code setup guidance.\n",
+			"# Other instructions\n\nKeep these instructions.\n",
+			"",
+		]) {
+			const source = `# pfdsl\n\nShared instructions.\n\n${claudeSection}${following}`;
+			const output = claudeRootInstructionsToAgents(source);
+			assert.doesNotMatch(
+				output,
+				/Claude-only|### Review|Claude Code の作業分担/,
+			);
+			assert.ok(output.includes(`Shared instructions.\n\n${following}`));
+			assert.equal(claudeInstructionsToAgents(source), source);
+		}
+	});
+
 	it("adds Codex-only parent ownership for git metadata operations", () => {
 		const output = claudeRootInstructionsToAgents("Read CLAUDE.md.\n");
 
