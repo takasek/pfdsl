@@ -46,6 +46,7 @@ export const CODE_PATH = /^(packages|scripts)\//;
 
 /** The review tools the rule accepts. */
 export const REVIEW_TOOLS = [
+	"self",
 	"code-review",
 	"code-reviewer-agent",
 	"simplify",
@@ -55,7 +56,7 @@ export const REVIEW_TOOLS = [
 ];
 
 /**
- * Tools that can satisfy the "delegated review ran" gate.
+ * Review methods that can satisfy the pre-commit review gate.
  * `code-review` runs after a PR exists, so it structurally cannot satisfy a
  * trailer required before the commit — it stays a valid trailer value (a
  * cycle that ran it still records it, so the record does not read as
@@ -64,11 +65,12 @@ export const REVIEW_TOOLS = [
 export const GATE_TOOLS = REVIEW_TOOLS.filter((tool) => tool !== "code-review");
 
 /**
- * Tools whose brief includes falsifying the diff's factual claims.
+ * Review methods that include falsifying the diff's factual claims.
+ * `self` records a single-agent pass covering quality and correctness.
  * `design` subsumes `correctness`'s brief, so a cycle that ran `design` owes
  * no separate `correctness` pass.
  */
-export const CORRECTNESS_TOOLS = ["correctness", "design"];
+export const CORRECTNESS_TOOLS = ["self", "correctness", "design"];
 
 /**
  * Parse a trailer out of a commit message (subject and body).
@@ -139,7 +141,7 @@ export function classifyCycle({ changedFiles, records }) {
 		);
 	if (!tools.some((tool) => CORRECTNESS_TOOLS.includes(tool)))
 		problems.push(
-			"changed code but carries no correctness review record (tool=correctness or design)",
+			"changed code but carries no correctness review record (tool=self, correctness or design)",
 		);
 	return problems;
 }

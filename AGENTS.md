@@ -4,6 +4,14 @@
 
 成果物管理・進捗更新・ワークフロー運用は pfd-ops スキルに従う。
 
+## 作業量と確認
+
+通常の調査・実装・レビューは単独の agent で進める。
+委譲は独立した並行作業や別文脈での検証に具体的な利点がある場合に限り、固定の orchestrator/worker 構成や観点ごとの fan-out を要求しない。
+ユーザーが許可した範囲の通常作業は、工程が移るたびに再承認を求めない。
+小さな修正や方式が確定した作業に設計承認を追加せず、結果を大きく変える未決事項がある場合と、ユーザーが明示した待機点で確認する。
+この方針はスキルの定型手順にも適用する。公開・破壊的操作・権限の拡張は、利用中のハーネスとユーザーの承認範囲に従う。
+
 ## セットアップ
 
 Claude CodeとCodexのSessionStart hookは、クローン直後・新規worktreeで `node scripts/setup-completion.mjs check` が失敗すれば `make setup` を自動実行する。`check` はmarkerのfingerprint一致に加え、rootのmanifestと、`packages/`直下の各ディレクトリから読み取り・解析できたmanifestが宣言する依存を検査する。各依存の`node_modules/<name>`と依存自身の`package.json`が実在・解析可能であり、`bin`がstringなら依存manifestの`name`（なければ依存キー）、objectなら各キーをpnpmの規則でbasename化して導出したshimが同じmanifestの`node_modules/.bin/`に通常ファイルとして実在し、`0o111`の実行ビットを持つことを確認する。`bin`を宣言しない依存にはshimを要求せず、manifestがない、読み取れない、または解析できない`packages/`直下のディレクトリは検査対象から除外する。markerはrootとworkspaceのpackage manifests、lockfile、workspace定義、`.npmrc`、`.pnpmfile.cjs`、setup recipe、hook shim、repo skill linker、fingerprint runtimeのSHA-256を記録し、branch switch等で入力が変わればstaleになる。setup全体はworktree単位のlockで直列化され、同じinputsを待っていたrunnerはlock取得後の再checkでbodyをskipする。markerは全工程成功後に同一directory内の一時fileからatomic renameされる。session開始後にworktreeを手動作成した場合など、SessionStart hookが完了しなかった場合だけ `make setup` を1回手動実行する。依存installに加えpre-commit hookのshim（`scripts/hooks/pre-commit-shim`）を `.git/hooks/` に導入する。shimはcommit実行worktreeの `scripts/pre-commit` を都度execするため、hookの版とbranchのtree内容が常に一致する（#411）。実体はcommit時にstaged filesのBiome検査を自動実行する。Biomeの指摘は自動修正しない。落ちたら `make format` を実行して再stageする。

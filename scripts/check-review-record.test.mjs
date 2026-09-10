@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
@@ -33,6 +33,34 @@ function git(args, cwd) {
 }
 
 describe("check-review-record", () => {
+	it("accepts a code change with a self-review and rejects one without review", () => {
+		writeFileSync(
+			join(fixture, "scripts/change.mjs"),
+			"export const value = 1;\n",
+		);
+		git(["add", "scripts/change.mjs"], fixture);
+		git(["commit", "-m", "fix: scoped change"], fixture);
+		const check = () =>
+			spawnSync(
+				process.execPath,
+				[join(fixture, "scripts/check-review-record.mjs")],
+				{ cwd: fixture, encoding: "utf8" },
+			);
+		assert.equal(check().status, 1);
+		git(
+			[
+				"commit",
+				"--allow-empty",
+				"-m",
+				"docs: record review\n\nReview: tool=self",
+			],
+			fixture,
+		);
+		const reviewed = check();
+		assert.equal(reviewed.status, 0, reviewed.stderr);
+		assert.match(reviewed.stdout, /check-review-record: PASS/);
+	});
+
 	it("runs without package dependencies", () => {
 		const result = spawnSync(
 			process.execPath,

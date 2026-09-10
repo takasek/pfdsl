@@ -61,16 +61,16 @@ if (result.status === "FAIL") {
 		"\nThe trailer is part of a commit message, so it cannot be appended later.",
 	);
 	console.error(
-		"Run the reviews, then record each pass in the message of the commit you make next.",
+		"Review the change, then record the pass in the message of the commit you make next.",
 	);
 	console.error(
-		"Quality (perspective 1, /simplify or equivalent): Review: tool=simplify",
+		"Single-agent review covering quality and correctness: Review: tool=self",
 	);
 	console.error(
-		"Correctness (perspective 2, required for code changes): Review: tool=correctness",
+		"A correctness-focused review can also use: Review: tool=correctness",
 	);
 	console.error(
-		"(tool=design covers both when the cycle also ran a design-selection review)",
+		"Use tool=design for a design-selection review that also covers correctness. Additional agents are optional.",
 	);
 	process.exit(1);
 }

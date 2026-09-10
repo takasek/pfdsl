@@ -898,19 +898,14 @@ describe("buildReviewRecordTemplate", () => {
 		for (const tool of CORRECTNESS_TOOLS) assert.ok(note.includes(tool));
 	});
 
-	it("states the record must be written before the branch's first commit", () => {
+	it("states that review precedes the commit it is recorded in", () => {
 		const { note } = buildReviewRecordTemplate();
-		assert.match(note, /前.*コミット/);
+		assert.match(note, /コミット前/);
 	});
 
-	// #909: the note used to describe when to write the trailer and which
-	// values it takes, but not what the trailer records — a delegated pass.
-	// A reader who reviewed a small diff themselves, correctly, then read this
-	// note, had nothing to tell them the row was not theirs to write.
-	it("states that the trailer records a delegated pass, not a self-read one", () => {
+	it("describes how a single-agent review satisfies the record requirement", () => {
 		const { note } = buildReviewRecordTemplate();
-		assert.match(note, /委譲/);
-		assert.match(note, /自分で読んだ/);
+		assert.match(note, /品質と correctness を単独で確認した回は.*self/);
 	});
 
 	it("names the PR body as where the reason for a lightened perspective goes", () => {

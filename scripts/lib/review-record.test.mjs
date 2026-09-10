@@ -55,8 +55,8 @@ describe("GATE_TOOLS", () => {
 });
 
 describe("CORRECTNESS_TOOLS", () => {
-	it("is exactly correctness and design, design subsuming correctness's brief", () => {
-		assert.deepEqual(CORRECTNESS_TOOLS, ["correctness", "design"]);
+	it("includes self-review and both correctness-focused review methods", () => {
+		assert.deepEqual(CORRECTNESS_TOOLS, ["self", "correctness", "design"]);
 	});
 });
 
@@ -171,6 +171,17 @@ describe("classifyCycle", () => {
 		);
 	});
 
+	it("accepts a recorded self-review covering quality and correctness", () => {
+		const parsed = parseReviewRecords(
+			"fix: scoped change\n\nReview: tool=self\n",
+		);
+		assert.deepEqual(parsed, [{ tool: "self" }]);
+		assert.deepEqual(
+			classifyCycle({ changedFiles: ["scripts/a.mjs"], records: parsed }),
+			[],
+		);
+	});
+
 	it("reports both problems when a code cycle carries no record at all", () => {
 		assert.deepEqual(
 			classifyCycle({
@@ -179,7 +190,7 @@ describe("classifyCycle", () => {
 			}),
 			[
 				"changed code but carries no review record",
-				"changed code but carries no correctness review record (tool=correctness or design)",
+				"changed code but carries no correctness review record (tool=self, correctness or design)",
 			],
 		);
 	});
@@ -191,7 +202,7 @@ describe("classifyCycle", () => {
 				records: records("simplify"),
 			}),
 			[
-				"changed code but carries no correctness review record (tool=correctness or design)",
+				"changed code but carries no correctness review record (tool=self, correctness or design)",
 			],
 		);
 	});
@@ -204,7 +215,7 @@ describe("classifyCycle", () => {
 			}),
 			[
 				"changed code but carries a review record that counts toward no gate (code-review runs after the PR exists)",
-				"changed code but carries no correctness review record (tool=correctness or design)",
+				"changed code but carries no correctness review record (tool=self, correctness or design)",
 			],
 		);
 	});
@@ -217,7 +228,7 @@ describe("classifyCycle", () => {
 			}),
 			[
 				"changed code but carries no review record",
-				"changed code but carries no correctness review record (tool=correctness or design)",
+				"changed code but carries no correctness review record (tool=self, correctness or design)",
 			],
 		);
 	});
@@ -230,7 +241,7 @@ describe("classifyCycle", () => {
 			}),
 			[
 				"changed code but carries no review record",
-				"changed code but carries no correctness review record (tool=correctness or design)",
+				"changed code but carries no correctness review record (tool=self, correctness or design)",
 			],
 		);
 	});

@@ -213,7 +213,7 @@ export function buildDesignRecordTemplate() {
  */
 export function buildReviewRecordTemplate() {
 	return {
-		note: `着手前（ブランチ最初のコミットより前）にレビューを実施し、実施のたび commit message の trailer へ記録する。後から追記できない — push 済みなら trailer の追加は履歴の作り直しになる。tool は ${REVIEW_TOOLS.join(" / ")} のいずれか。ゲート充足に数えるのは ${GATE_TOOLS.join(" / ")}（\`code-review\` は有効な trailer 値だが数えない）。${CODE_PATH_LABEL} に変更のある回はさらに ${CORRECTNESS_TOOLS.join(" または ")} を最低1本要する。行が記録するのは委譲したレビューであり、diff の規模に合わせて委譲せず自分で読んだだけの回は書かない — その場合は落とした観点の名前と落とした理由を PR 本文へ書く。`,
+		note: `コミット前に差分をレビューし、実施方法を commit message の trailer へ記録する。品質と correctness を単独で確認した回は tool=self の1行でよい。tool は ${REVIEW_TOOLS.join(" / ")} のいずれか。ゲート充足に数えるのは ${GATE_TOOLS.join(" / ")}（\`code-review\` は有効な trailer 値だが数えない）。${CODE_PATH_LABEL} に変更のある回は ${CORRECTNESS_TOOLS.join(" または ")} の記録が1つあれば記録要件を満たす。追加レビューは具体的な利点がある場合に選び、委譲や観点ごとの複数パスを一律に要求しない。実施した検証と限界は PR 本文に書く。記録漏れだけを理由に push 済みの履歴を書き換えない。`,
 		line: "Review: tool=<tool-name>",
 	};
 }
@@ -227,19 +227,17 @@ export function buildReviewRecordTemplate() {
  * 4. 構造不正な記録がある → unsettled (reason: "record-incomplete")
  * 5. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
  * 6. それ以外 → unsettled (reason: "no-enumerated-options")。
- *    列挙構造を検出できなかった回を「対話省略可」の既定にする（fail-open）と、
- *    散文中に紛れた選択肢が検出をすり抜けたまま既定で通過してしまう（#833・#829）。
+ *    候補の列挙がなくても、設計記録の存在を推定しない。
  *
  * 記録の同定は終端ゲート（gate-check.mjs）と同じ `resolveDesignRecord`
  * （と、それに entries を渡す `toDesignRecordEntries`）を使う。プリフライトと
  * 終端ゲートが別々の同定ロジックを持つと、どちらかが記録だと見なした文章を
  * もう一方が見なさない、という食い違いが生まれるため。
  *
- * `unsettled` は「設計対話が必要か」を表すだけで、記録投稿の要否とは別軸
- * である。roadmap.md の規約上、design-selection record は列挙構造の有無に
- * 関わらず全サイクル必須で、`unsettled: false` を「記録不要」と読むのは
- * 誤読になる（#809）。そのため戻り値には `recordRequired` を独立して持たせる
- * — `record-posted` のときだけ false、それ以外は常に true（#868）。
+ * `unsettled` は本文の未確定表現または記録の未確定状態を表し、人間の
+ * 追加承認が必要かは判定しない。対話の要否は依頼範囲と未決事項で判断する。
+ * 記録投稿の要否は `recordRequired` が示し、`record-posted` のときだけ
+ * false、それ以外は true とする（#868）。
  * @param {{body: string, comments?: Array<{id?: string, databaseId?: number, url?: string, body: string, createdAt?: string}>, issueNumber?: number, repository?: {host?: string, owner?: string, repo?: string}, editInfo?: {status?: string, editedAtIso?: string | null}}} params
  * @returns {{unsettled: boolean, reason: string, matchedLines?: string[], optionCount?: number,
  *            missingPrefixes?: string[], problems?: string[],
