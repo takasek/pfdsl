@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { cycleStatusExitCode, runCycleStatus } from "./cycle-status-steps.mjs";
-import { reviewRecordStep } from "./gate-check-steps.mjs";
 
 const ROOT = "/repo";
 const CLI_PATH = "/repo/packages/cli/dist/cli.js";
@@ -889,27 +888,8 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.equal(result.reviewRecordTemplate.line, "Review: tool=<tool-name>");
-		assert.equal("requiredLine" in result.reviewRecordTemplate, false);
+		assert.equal("reviewRecordTemplate" in result, false);
 		assert.equal("designReviewRequirements" in result, false);
-	});
-
-	it("keeps ordinary review guidance in preflight for a single or absent option", async () => {
-		for (const body of ["## 対応案\n1. 案A\n", "普通の説明文。"])
-			assert.equal(
-				(
-					await runCycleStatus(
-						baseDeps({
-							issueNumbers: [1008],
-							execGh: async (args) => {
-								if (args[0] === "issue") return issueJson({ body });
-								return JSON.stringify([]);
-							},
-						}),
-					)
-				).reviewRecordTemplate.line,
-				"Review: tool=<tool-name>",
-			);
 	});
 
 	it("keeps later Markdown enumeration advisory instead of turning it into a review gate", async () => {
@@ -919,34 +899,8 @@ describe("runCycleStatus", () => {
 			1008: "## 対応案\n1. 案A\n2. 案B\n",
 		};
 		const result = await runForIssueBodies([1009, 1010, 1008], bodies);
-		assert.equal(result.reviewRecordTemplate.line, "Review: tool=<tool-name>");
-		assert.equal("requiredLine" in result.reviewRecordTemplate, false);
+		assert.equal("reviewRecordTemplate" in result, false);
 		assert.equal("designReviewRequirements" in result, false);
-
-		const issues = Object.entries(bodies).map(([number, body]) => ({
-			number: Number(number),
-			issue: { body },
-		}));
-		assert.equal(
-			reviewRecordStep({
-				commitMessages: {
-					ok: true,
-					text: "subject\n\nReview: tool=design\n",
-				},
-				changedFiles: ["scripts/lib/cycle-status.mjs"],
-				issues,
-			}).status,
-			"PASS",
-		);
-		const correctnessOnly = reviewRecordStep({
-			commitMessages: {
-				ok: true,
-				text: "subject\n\nReview: tool=correctness\n",
-			},
-			changedFiles: ["scripts/lib/cycle-status.mjs"],
-			issues,
-		});
-		assert.equal(correctnessOnly.status, "PASS");
 	});
 
 	it("keeps ordinary fallback for a multi-issue set without multiple options", async () => {
@@ -955,23 +909,7 @@ describe("runCycleStatus", () => {
 			1010: "普通の説明文。",
 		};
 		const result = await runForIssueBodies([1009, 1010], bodies);
-		assert.equal(result.reviewRecordTemplate.line, "Review: tool=<tool-name>");
-		assert.equal("requiredLine" in result.reviewRecordTemplate, false);
-		const issues = Object.entries(bodies).map(([number, body]) => ({
-			number: Number(number),
-			issue: { body },
-		}));
-		assert.equal(
-			reviewRecordStep({
-				commitMessages: {
-					ok: true,
-					text: "subject\n\nReview: tool=correctness\n",
-				},
-				changedFiles: ["scripts/lib/cycle-status.mjs"],
-				issues,
-			}).status,
-			"PASS",
-		);
+		assert.equal("reviewRecordTemplate" in result, false);
 	});
 
 	it("emits the design-record template even when no issue could be resolved", async () => {
@@ -981,11 +919,10 @@ describe("runCycleStatus", () => {
 		assert.ok(result.designRecordTemplate.lines.includes("案の処分:"));
 	});
 
-	// #809: unconditional, same posture as designRecordTemplate — whether this
-	// cycle will touch packages/ or scripts/ is undecidable at preflight time.
-	it("emits the review-record template even when no issue could be resolved", async () => {
+	it("does not prescribe a review trailer while retaining the design record template", async () => {
 		const result = await runCycleStatus(baseDeps({}));
-		assert.match(result.reviewRecordTemplate.line, /^Review: tool=/);
+		assert.equal("reviewRecordTemplate" in result, false);
+		assert.ok(result.designRecordTemplate.lines.includes("改訂履歴:"));
 	});
 
 	it("returns a null designUnsettledFor with an error when neither --issue nor a best process is available", async () => {

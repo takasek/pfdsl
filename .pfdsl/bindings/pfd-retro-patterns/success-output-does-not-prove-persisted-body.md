@@ -14,7 +14,7 @@ phase: pre-artifact
   対策: 複数行本文はセッション固有名を持つ body file に正本を書く。file 入力を持つ transport にはその file を直接渡し、body 入力しか持たない transport には正本ファイルを読んだ値を手で再構成せずに渡す。
   実行直後に GitHub 側の persisted `body` を取得し、改行を含めて正本と完全一致するかを比較する。
   `Closes #...` のような必須行や参照を持つ本文は、その構造も同じ readback で確認し、後続の edit ごとに崩れていないかを確認する。
-  設計選択記録のように着手前でなければ意味が変わる本文では、この readback 完了自体を初コミットより前の条件として扱う。
+  設計選択記録でも、readback は投稿・編集直後の完了条件として扱う。記録を補修した場合も同じ対象を読み戻し、初コミットとの前後関係を揃えるために履歴を作り直さない。
   後段の checker が必須行頭や時刻を comment 一覧から検査しても、直前の write identifier を入力に持たないなら exact-write readback の代替にはならない。
   write と exact readback の両方を提供する transport が無い場合は、代替手段で確認を弱めず前提条件の不足として停止する。
   新規対象を作る操作が identifier を返す契約を持たない場合は、一覧から似た本文を探さず、identifier を返す backend API や transport を write 前に選ぶ。
