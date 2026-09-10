@@ -1,20 +1,21 @@
-// Detects an Edit/Write whose file_path escapes the worktree the session is
-// running in — the mistake behind #357: a worktree session copies an
-// absolute path from grep/find output or writes with a bare filename that
-// resolves against the wrong root, and lands on the main checkout's working
-// tree instead. Git history shows nothing wrong because the working tree,
-// not a commit, is what changed, so the usual `git status` habit does not
-// catch it either (see CLAUDE.md "worktree でのファイル操作パス").
+// Guards absolute Edit/Write file_path targets from a linked worktree when
+// they point inside the main checkout but outside the active worktree.
+// This covers the main checkout and sibling worktrees located under it.
+// Relative paths, missing roots, calls from the main checkout, and paths
+// outside the main checkout are allowed; those targets are not inspected.
 //
-// Deny, not advisory: this event surfaces as "the edit silently landed on
-// the wrong branch," which is the "proceeds unnoticed" shape the roadmap.md
-// warning already calls out as the reason advisory would be missed.
+// Deny before execution: the write would change another checkout's working
+// tree. An advisory after the write cannot prevent that mutation.
 //
 // worktreeRoot/mainRoot are resolved by the hook wrapper via `git rev-parse
 // --show-toplevel` / `--git-common-dir` rather than by matching cwd against
-// the `.claude/worktrees/<name>` naming convention here — git's own notion
-// of worktree boundaries also covers a worktree created anywhere else (e.g.
-// a bare `git worktree add ../scratch`), which a path regex would miss.
+// the `.claude/worktrees/<name>` naming convention here. This is about which
+// worktree the session is running from, not about where a write points: git's
+// own notion of worktree boundaries recognizes a session started in a worktree
+// created anywhere else (e.g. a bare `git worktree add ../scratch`), which a
+// path regex over cwd would miss. Such a worktree is still only recognized as
+// the session's own root — as a write target it sits outside mainRoot, which
+// the allow above already covers.
 
 /** Whether `path` is `root` itself or a descendant of it (prefix-safe: no partial-segment match). */
 function isUnder(path, root) {

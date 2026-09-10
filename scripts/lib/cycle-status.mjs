@@ -190,7 +190,7 @@ export function buildDesignRecordTemplate() {
  * 4. 構造不正な記録がある → unsettled (reason: "record-incomplete")
  * 5. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
  * 6. それ以外 → unsettled (reason: "no-enumerated-options")。
- *    列挙構造を検出できなかった回を「対話省略可」の既定にする（fail-open）と、
+ *    列挙構造を検出できなかった回を「設計確認不要」の既定にする（fail-open）と、
  *    散文中に紛れた選択肢が検出をすり抜けたまま既定で通過してしまう（#833・#829）。
  *
  * 記録の同定は終端ゲート（gate-check.mjs）と同じ `resolveDesignRecord`
@@ -198,8 +198,12 @@ export function buildDesignRecordTemplate() {
  * 終端ゲートが別々の同定ロジックを持つと、どちらかが記録だと見なした文章を
  * もう一方が見なさない、という食い違いが生まれるため。
  *
- * `unsettled` は「設計対話が必要か」を表すだけで、記録投稿の要否とは別軸
- * である。roadmap.md の規約上、design-selection record は列挙構造の有無に
+ * `unsettled` は設計の未決定や記録不足を着手前に確認するための報告であり、
+ * この値だけでは CLI の終了コードを変えず、追加承認の要否も決めない。
+ * true の場合は reason・一次記録・現行のコードと仕様を照合し、未決定の設計や
+ * 記録不足を解消する。確認手順と承認境界は pfd-ops の references/work-cycle.md
+ * 「選択後の設計確認」に従う。
+ * 記録投稿の要否は別軸である。roadmap.md の規約上、design-selection record は列挙構造の有無に
  * 関わらず全サイクル必須で、`unsettled: false` を「記録不要」と読むのは
  * 誤読になる（#809）。そのため戻り値には `recordRequired` を独立して持たせる
  * — `record-posted` のときだけ false、それ以外は常に true（#868）。
