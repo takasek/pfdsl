@@ -257,6 +257,286 @@ a >> p -> b >> q -> c
 			expect(output).not.toContain(">> q");
 			expect(output).not.toContain("-> c");
 		});
+
+		it("fuses a chain across two continuations when a shared head id is trimmed", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  x:
+    label: X
+  b:
+    label: B
+  c:
+    label: C
+  d:
+    label: D
+process:
+  p:
+    label: P
+  q:
+    label: Q
+  r:
+    label: R
+---
+[a, x] >> p -> b >> q -> c >> r -> d
+`;
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).toContain("[x] >> p -> b >> q -> c >> r -> d");
+		});
+
+		it("keeps a feedback edge (>>?) unaffected, trims one, and drops the whole thing", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+process:
+  p:
+    label: P
+---
+[a, b] >>? p
+`;
+			const trimmed = deleteNodes(src, ["a"]);
+			expect(trimmed.output).toContain("[b] >>? p");
+
+			const droppedProc = deleteNodes(src, ["p"]);
+			expect(droppedProc.output).not.toContain(">>?");
+
+			const unaffected = deleteNodes(src, ["ghost"]);
+			expect(unaffected.output).toContain("[a, b] >>? p");
+		});
+
+		it("trims one of several output artifacts, keeping the statement", () => {
+			const src = `---
+artifact:
+  b:
+    label: B
+  c:
+    label: C
+process:
+  p:
+    label: P
+---
+p -> [b, c]
+`;
+			const { output } = deleteNodes(src, ["b"]);
+			expect(output).toContain("p -> [c]");
+		});
+
+		it("leaves an unaffected output-edge statement byte-for-byte unchanged", () => {
+			const src = `---
+artifact:
+  b:
+    label: B
+  c:
+    label: C
+process:
+  p:
+    label: P
+---
+p -> [b,   c]
+`;
+			const { output } = deleteNodes(src, ["ghost"]);
+			expect(output).toContain("p -> [b,   c]");
+		});
+
+		it("trims one of several ids out of a bare input-edge (no trailing ->)", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+process:
+  p:
+    label: P
+---
+[a, b] >> p
+`;
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).toContain("[b] >> p");
+		});
+
+		it("leaves an unaffected bare-tail chain byte-for-byte unchanged", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+process:
+  p:
+    label: P
+  q:
+    label: Q
+---
+a >> p -> b >> q
+`;
+			const { output } = deleteNodes(src, ["ghost"]);
+			expect(output).toContain("a >> p -> b >> q");
+		});
+
+		it("attaches a trailing same-line comment to the statement it actually follows, not an earlier one on the same line", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+process:
+  p:
+    label: P
+  q:
+    label: Q
+---
+a >> p; b >> q  # trails the second statement
+`;
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).not.toContain("a >> p");
+			expect(output).toContain("b >> q  # trails the second statement");
+		});
+
+		it("closes a fused bare-tail chain segment (no trailing ->) when its input survives", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  x:
+    label: X
+  b:
+    label: B
+process:
+  p:
+    label: P
+  q:
+    label: Q
+---
+[a, x] >> p -> b >> q
+`;
+			// x survives the head trim, b and q are both untouched: the bare
+			// tail "b >> q" fuses onto the rest of the chain.
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).toContain("[x] >> p -> b >> q");
+		});
+
+		it("drops a bare-tail chain segment when the id feeding it is gone", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+process:
+  p:
+    label: P
+  q:
+    label: Q
+---
+a >> p -> b >> q
+`;
+			// b is deleted: the bare tail has nothing left to feed q with.
+			const { output } = deleteNodes(src, ["b"]);
+			expect(output).toContain("a >> p");
+			expect(output).not.toContain(">> q");
+		});
+
+		it("stands a produced artifact up as its own output-edge when the link feeding its process breaks", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+  c:
+    label: C
+process:
+  p:
+    label: P
+---
+[a, b] >> p -> c
+`;
+			// Deleting both input ids severs p's input from this statement, but p
+			// still produces c — that stands alone as "p -> c".
+			const { output } = deleteNodes(src, ["a", "b"]);
+			expect(output).toContain("p -> c");
+			expect(output).not.toContain(">> p ->");
+		});
+
+		it("closes a chain as a bare input-edge when its own output vanishes", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+process:
+  p:
+    label: P
+---
+a >> p -> b
+`;
+			const { output } = deleteNodes(src, ["b"]);
+			expect(output).toContain("a >> p");
+			expect(output).not.toContain("->");
+		});
+
+		it("drops a dropped statement's own trailing same-line comment along with it, and preserves one on a kept statement", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+process:
+  p:
+    label: P
+  q:
+    label: Q
+---
+a >> p  # notice me
+
+toolchain >> q  # unrelated
+`;
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).not.toContain("notice me");
+			expect(output).toContain("toolchain >> q  # unrelated");
+
+			const kept = deleteNodes(src, ["ghost"]);
+			expect(kept.output).toContain("a >> p  # notice me");
+		});
+
+		it("returns the body unchanged when it has no statements at all", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+---
+`;
+			const { output, notFound } = deleteNodes(src, ["ghost"]);
+			expect(output).toBe(src);
+			expect(notFound).toEqual(["ghost"]);
+		});
+	});
+
+	describe("no frontmatter", () => {
+		it("still edits the body when the document has no frontmatter block", () => {
+			const src = "a >> p\n";
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).not.toContain("a >> p");
+		});
+	});
+
+	describe("pre-existing errors", () => {
+		it("returns the source unchanged when it already fails to parse", () => {
+			const src = "[a, >> p\n";
+			const { output, deleted, notFound, diagnostics } = deleteNodes(src, [
+				"a",
+			]);
+			expect(output).toBe(src);
+			expect(deleted).toEqual([]);
+			expect(notFound).toEqual(["a"]);
+			expect(diagnostics.some((d) => d.severity === "error")).toBe(true);
+		});
 	});
 
 	describe("reference fields", () => {
