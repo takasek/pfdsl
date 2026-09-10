@@ -1,14 +1,11 @@
-// Detects an Edit/Write whose file_path escapes the worktree the session is
-// running in — the mistake behind #357: a worktree session copies an
-// absolute path from grep/find output or writes with a bare filename that
-// resolves against the wrong root, and lands on the main checkout's working
-// tree instead. Git history shows nothing wrong because the working tree,
-// not a commit, is what changed, so the usual `git status` habit does not
-// catch it either (see pfd-ops' references/work-cycle.md, step 2).
+// Guards absolute Edit/Write file_path targets from a linked worktree when
+// they point inside the main checkout but outside the active worktree.
+// This covers the main checkout and sibling worktrees located under it.
+// Relative paths, missing roots, calls from the main checkout, and paths
+// outside the main checkout are allowed; those targets are not inspected.
 //
-// Deny, not advisory: this event surfaces as "the edit silently landed on
-// the wrong branch." See workflow.md "worktree でのサイクル実行" and its
-// reference to pfd-ops' work-cycle.md for the worktree rules.
+// Deny before execution: the write would change another checkout's working
+// tree. An advisory after the write cannot prevent that mutation.
 //
 // worktreeRoot/mainRoot are resolved by the hook wrapper via `git rev-parse
 // --show-toplevel` / `--git-common-dir` rather than by matching cwd against

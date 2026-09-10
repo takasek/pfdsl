@@ -1,3 +1,5 @@
+import { headingLevel, headingText } from "./markdown-heading.mjs";
+
 const READ_ONLY_TOOLS = "Read, Grep, Bash";
 const WORKSPACE_WRITE_TOOLS = "Bash, Read, Edit, Write, Grep, Glob, Skill";
 const MARKDOWN_GENERATED_NOTICE =
@@ -256,8 +258,20 @@ const CODEX_WORKTREE_METADATA_INSTRUCTIONS = [
 ].join("\n");
 
 export function claudeRootInstructionsToAgents(source) {
+	let inClaudeSection = false;
+	const sharedInstructions = source
+		.split("\n")
+		.filter((line) => {
+			const level = headingLevel(line);
+			if (level !== null && level <= 2) {
+				inClaudeSection =
+					level === 2 && headingText(line) === "Claude Code の作業分担";
+			}
+			return !inClaudeSection;
+		})
+		.join("\n");
 	return addGeneratedMarkdownNotice(
-		`${claudeInstructionsToAgents(source)}${CODEX_EXECUTION_INSTRUCTIONS}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`,
+		`${claudeInstructionsToAgents(sharedInstructions)}${CODEX_EXECUTION_INSTRUCTIONS}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`,
 		"CLAUDE.md",
 	);
 }

@@ -57,6 +57,8 @@ worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cyc
 指摘は根拠となる箇所と failure scenario を添えて返し、実装側が一次資料で確認して対応する。
 レビューの結果と未解決の指摘は PR 本文に記録する。
 
+配布プロンプトの利用側シナリオは、公開前または明示的な検証依頼がある場合に、この作業 checkout の `.claude/skills/distribution-review/SKILL.md` を直接読んで模擬実行する。通常の編集では `docs/distribution-review/reviewed.json` を進めず、公開時のゲートに残す。
+
 ### Claude Code（Opus）でのレビュー
 
 以下は Claude Code の運用規約であり、Codex の単独実行の既定を適用しない。
@@ -357,4 +359,6 @@ vscode-extension 等で新しいノード種別をホバー対応する場合、
 
 - **終端ゲートの機械項目と報告材料（pfd-ops 手順3・#462）**: `GH_HOST=github.com node scripts/gate-check.mjs [--base main] [--artifact <key> | --no-artifact] [--issue <n> ...]` — 内部で `git fetch origin` を試みたうえで `origin/<base>...HEAD` を基準に差分を取る（fetch 失敗時も既存 remote-tracking ref で続行し、ref 自体が無ければ明示エラーで終了する）。**項目名・PASS/FAIL/SKIP の判定・SKIP 条件はここに列挙しない** — スクリプトの出力が自己記述的であり、実行すれば全項目が detail 付きで印字される（#560。列挙をここに置くとスクリプト変更のたび手で追随することになり、追随を保証する機構が無い）。`--artifact <key>` を渡すと status 更新・wip 経由の両方をその artifact に厳密スコープする（省略時はどちらも粗いフォールバック判定になる旨を detail に明示）。出力 artifact を持たないサイクル（`flow:exempt` の bookkeeping 等）は `--no-artifact` で宣言する — `roadmap.pfdsl` を status 以外の理由で触ると、宣言なしでは構造的に FAIL する（#564）。表のほかに報告材料が印字される。**その種類・件数・内容もここに列挙しない** — 同じ理由で、出力が節見出しごと自己記述する（#839）。機械結果に含まれない判断は `.claude/skills/pfd-ops/references/work-cycle.md` の「3. 反映 — 終端ゲート」を直接確認する。スクリプトは本文を解析・再印字せず、PR 作成前の同節とPR 作成後の `PR 作成後` 項目への固定案内だけを表示する
 
-閉じる issue の指定と選択記録の判定は `roadmap.md`「プリフライト・ゲート集約スクリプト（#354）」に従う。
+- **そのサイクルが閉じる issue を毎サイクル全て渡す（#669・#734）**: `--issue <n>` は繰り返し指定でき、渡した issue ごとに `design-selection record` を評価する。省略すると対象 issue を推測せず SKIP する。複数 issue を閉じる回で1件しか渡さないと、渡さなかった issue はゲートを通らないまま表が緑になる — 選択記録の保証が必要なのは閉じる N 件すべてである。判定条件はスクリプト出力の detail が自己記述する。`cycle-status.mjs` も `--issue` を繰り返し指定でき、各 issue の判定と全件を含む `gateCheckCommand` を出力する。変更された知識成果物のバイト・行差分は常に報告材料として印字される。
+
+選択記録の記録先と再承認は `roadmap.md`「終端ゲート追加項目（issue 固有）」に従う。
