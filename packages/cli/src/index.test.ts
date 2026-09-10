@@ -2223,13 +2223,13 @@ describe("status ready", () => {
 		expect(parsed.warnings?.[0]?.code).toBe("W006");
 	});
 
-	it("does not surface non-W006 warnings (e.g. W005) as ready warnings (#308)", async () => {
+	it("does not surface non-W006 warnings (e.g. W003) as ready warnings (#308)", async () => {
 		const f = withStatus(
-			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n  spec: {}\n---\nreq >> design -> spec\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: wip\n  spec:\n    status: done\n---\nreq >> design -> spec\n",
 		);
 		const r = await run(["status", "ready", f, "--json"]);
 		const parsed = JSON.parse(r.stdout);
-		expect(r.stderr).not.toContain("W005");
+		expect(r.stderr).not.toContain("W003");
 		expect(parsed.warnings).toBeUndefined();
 	});
 
@@ -2466,15 +2466,15 @@ req >> design -> spec
 		expect(r.stderr).toContain("W006");
 	});
 
-	it("does not surface non-W006 warnings (e.g. W005) as meta set warnings (#308)", async () => {
-		const f = join(dir, "status-set-w005.pfdsl");
+	it("does not surface non-W006 warnings (e.g. W003) as meta set warnings (#308)", async () => {
+		const f = join(dir, "status-set-w003.pfdsl");
 		writeFileSync(
 			f,
-			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  spec: {}\n---\nreq >> design -> spec\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  spec:\n    status: done\n  extra:\n    status: wip\n  output_done:\n    status: done\n---\nreq >> design -> spec\nextra >> other -> output_done\n",
 		);
 		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
 		const parsed = JSON.parse(r.stdout);
-		expect(r.stderr).not.toContain("W005");
+		expect(r.stderr).not.toContain("W003");
 		expect(parsed.warnings).toBeUndefined();
 	});
 
@@ -2994,8 +2994,9 @@ describe("status gaps", () => {
 	// The body decides what the roadmap produces, and producing is what counts
 	// as tracking — a declaration alone leaves the artifact unbuilt. `req` (the
 	// body's source id) and the body's produced id both need a frontmatter
-	// declaration too (V035, #1125); auto-fill whichever `artifacts` did not
-	// already declare, rather than repeating them at every call site.
+	// declaration with a `status:` too (V035, #1125); auto-fill whichever
+	// `artifacts` did not already declare, rather than repeating them at every
+	// call site.
 	const roadmapWith = (
 		artifacts: string,
 		body = "req >> build -> output\n",
@@ -3005,7 +3006,7 @@ describe("status gaps", () => {
 			new RegExp(`^  ${id}:`, "m").test(artifacts);
 		const autoDeclare = ["req", target]
 			.filter((id): id is string => id !== undefined && !declared(id))
-			.map((id) => `  ${id}: {}\n`)
+			.map((id) => `  ${id}:\n    status: todo\n`)
 			.join("");
 		const f = join(dir, "as-roadmap.pfdsl");
 		writeFileSync(
@@ -3084,7 +3085,7 @@ describe("status gaps", () => {
 		const rm = join(dir, "as-roadmap-consumes.pfdsl");
 		writeFileSync(
 			rm,
-			"---\ntype: roadmap\nartifact:\n  source_only: {}\n  built:\n    status: done\n---\nsource_only >> build -> built\n",
+			"---\ntype: roadmap\nartifact:\n  source_only:\n    status: todo\n  built:\n    status: done\n---\nsource_only >> build -> built\n",
 		);
 		const fl = flowWith(`  source_only:\n${TRACKED}    label: Source\n`);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
@@ -3210,7 +3211,7 @@ describe("status gaps", () => {
 		const anotherRoadmap = join(dir, "as-roadmap2.pfdsl");
 		writeFileSync(
 			anotherRoadmap,
-			"---\ntype: roadmap\nartifact:\n  req: {}\n  y:\n    status: todo\n---\nreq >> build -> y\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  y:\n    status: todo\n---\nreq >> build -> y\n",
 		);
 		const r = await run(["status", "gaps", rm, anotherRoadmap]);
 		expect(r.exitCode).toBe(2);
