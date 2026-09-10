@@ -35,26 +35,6 @@ export function statusMonotonicity(ctx: RuleContext): Diagnostic[] {
 }
 
 /**
- * W005: in a roadmap, a produced artifact carries the progress, so it needs a
- * status to carry (§15.15). Source artifacts and non-roadmap files are exempt.
- */
-export function roadmapStatusPresence(ctx: RuleContext): Diagnostic[] {
-	if (ctx.fm?.type !== "roadmap") return [];
-	const diagnostics: Diagnostic[] = [];
-	for (const [aid] of ctx.edgeGroups.artifactProducers) {
-		if (ctx.artifactMeta[aid]?.status === undefined) {
-			diagnostics.push({
-				severity: ctx.strictly("warning"),
-				code: "W005",
-				message: `Produced artifact '${aid}' has no 'status' field`,
-				range: ctx.rangeOf(aid),
-			});
-		}
-	}
-	return diagnostics;
-}
-
-/**
  * W007: outside a roadmap, an artifact carries no progress of its own (§15.16).
  * The same id can appear in several diagrams, so status lives in one of them —
  * a flow file that declares it lets two diagrams claim different states for the

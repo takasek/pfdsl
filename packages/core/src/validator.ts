@@ -27,7 +27,6 @@ import {
 	flowStatusAbsence,
 	pfdType,
 	readyGateTypeOmitted,
-	roadmapStatusPresence,
 	roadmapUndeclaredArtifact,
 	statusMonotonicity,
 } from "./rules/status.js";
@@ -62,7 +61,6 @@ export const RULES: readonly Rule[] = [
 	subflowOnArtifact, // V023
 	boundaryWithoutSubflow, // V024
 	groupParentCycle, // V025
-	roadmapStatusPresence, // W005
 	flowStatusAbsence, // W007
 	pfdType, // V031
 	readyGateTypeOmitted, // W006

@@ -980,82 +980,9 @@ a >> design -> b
 		});
 	});
 
-	describe("W005: produced artifact with no status (roadmap files only)", () => {
-		// W005 fires only when type: roadmap and a produced artifact has no status field.
-		// Source artifacts (input-only) and non-roadmap files are exempt.
-
-		it("warns when produced artifact has no status (frontmatter declared)", () => {
-			const fm: Frontmatter = { type: "roadmap", artifact: { B: {} } };
-			expect(codes("A >> P -> B", fm)).toContain("W005");
-		});
-
-		it("warns when produced artifact has no status (not declared in frontmatter)", () => {
-			// B is produced by P but has no frontmatter entry; type: roadmap triggers W005.
-			const fm: Frontmatter = { type: "roadmap" };
-			expect(codes("A >> P -> B", fm)).toContain("W005");
-		});
-
-		it("no W005 when type is absent (non-roadmap intent)", () => {
-			expect(codes("A >> P -> B")).not.toContain("W005");
-		});
-
-		it("no W005 when type is workflow", () => {
-			const fm: Frontmatter = { type: "workflow" };
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when type is pipeline", () => {
-			const fm: Frontmatter = { type: "pipeline" };
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		// W005 asks only whether a status is present, so every member of the
-		// enum must suppress it. Driving the cases off STATUS_VALUES keeps that
-		// claim true for statuses added later, instead of leaving the new one
-		// silently unasserted.
-		it.each(
-			STATUS_VALUES,
-		)("no W005 when produced artifact has status: %s", (status) => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 for source artifact (input-only)", () => {
-			// A is source — no process outputs it, so W005 does not apply to A.
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { A: {}, B: { status: "todo" } },
-			};
-			const diags = diagnose("A >> P -> B", fm);
-			expect(
-				diags.filter((d) => d.code === "W005" && d.message.includes("'A'")),
-			).toHaveLength(0);
-		});
-
-		it("W005 severity is warning in non-strict mode", () => {
-			const fm: Frontmatter = { type: "roadmap" };
-			const diags = diagnose("A >> P -> B", fm);
-			const w005 = diags.find((d) => d.code === "W005");
-			expect(w005?.severity).toBe("warning");
-		});
-
-		it("W005 becomes error in strict mode", () => {
-			const fm: Frontmatter = { type: "roadmap" };
-			const { tokens } = lex("A >> P -> B");
-			const { document } = parseTokens(tokens);
-			const { edges, nodeKinds } = normalize(document, fm);
-			const diags = validate(edges, nodeKinds, fm, { strict: true });
-			const w005 = diags.find((d) => d.code === "W005");
-			expect(w005?.severity).toBe("error");
-		});
-	});
-
 	describe("W007: status declared in a non-roadmap file (#787)", () => {
-		// W007 is the mirror of W005: progress belongs to the roadmap, so a file
-		// that explicitly declares any other kind must not carry status at all.
+		// A flow file that explicitly declares any kind other than roadmap must
+		// not carry status at all — progress belongs to the roadmap.
 
 		// Every explicit kind other than roadmap is a flow kind, so driving the
 		// cases off the enum keeps the claim true for kinds added later.
@@ -1080,8 +1007,8 @@ a >> design -> b
 		});
 
 		it("warns for a source artifact too (input-only)", () => {
-			// Unlike W005, W007 does not exempt source artifacts: the rule is
-			// that a flow file carries no status anywhere.
+			// W007 does not exempt source artifacts: the rule is that a flow
+			// file carries no status anywhere.
 			const fm: Frontmatter = {
 				type: "workflow",
 				artifact: { A: { status: "done" } },
