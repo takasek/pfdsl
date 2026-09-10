@@ -6,8 +6,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 15873,
-      "sha256": "d8742e7826db7dce0148b63b79775d227bd6a87919eeade7c8cf756036e1e91b"
+      "bytes": 16856,
+      "sha256": "6fbaaeadd998954b427d485e0f603be136249dae6f4afb773f3fe04cea4229f8"
     },
     {
       "path": "core-cli.md",
@@ -191,8 +191,8 @@
     },
     {
       "path": "reduction-plan.md",
-      "bytes": 8248,
-      "sha256": "2d5bebfd8f3e77f36ff1c612ea99585a4d4913fd1a2ec9161d63ae5d317c74ed"
+      "bytes": 8258,
+      "sha256": "d35bb80ce7bdb3386563d008ce359818f787358b1db9b7227d91e9a50a17101b"
     },
     {
       "path": "render-editor.md",
