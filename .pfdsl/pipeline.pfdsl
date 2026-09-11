@@ -346,7 +346,7 @@ artifact:
     group: adopter_env
   installed_l3_layer:
     label: 導入済みL3レイヤー
-    description: "plugin同梱install/由来の読取専用監査スクリプト、完了チェーン回収スクリプト、close 駆動 workflow、依存moduleの採用リポルートへの実配置結果"
+    description: "plugin同梱install/由来の読取専用監査スクリプト、完了チェーン回収スクリプト、それをデフォルトブランチへのpushで起動するworkflow、依存moduleの採用リポルートへの実配置結果"
     criteria: check-install-sync.mjs --deploy が実装され、採用リポへの実配置が動作確認済み
     externalStakeholders: [ 採用リポのメンテナ, 採用リポのGitHub Actions ]
     group: adopter_repo
