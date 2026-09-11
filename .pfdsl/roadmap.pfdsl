@@ -76,7 +76,7 @@ artifact:
   spec_id_tombstones:
     label: 仕様ID tombstone 機構
     description: "廃止済み仕様IDの tombstone リスト実体・再定義禁止 lint・mint-check への tombstone 次元追加。初の ID 削除が発生した時点で駆動（ADR-0027 §ID性質、#405 で据え置き）。後続門番のプレースホルダ（ADR-0018）"
-    status: todo
+    status: suspended
     criteria: tombstone リストが記録形式付きで導入され、tombstone 済み ID の再定義が make check-docs 経由のチェックでエラーになり、scripts/mint-check.mjs が tombstone を第4の出現種別として列挙する
   editor_connector:
     label: "エディタ コネクタ編集支援 (#482)"
