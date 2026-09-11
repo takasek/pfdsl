@@ -20,6 +20,61 @@ export function formatId(id: string): string {
 	return `"${escaped}"`;
 }
 
+/**
+ * Splits a comma-separated CLI argument into ids, the parse-side counterpart
+ * of `formatId`: a comma inside a `"..."`-quoted id is part of that one id,
+ * not a separator (#1125 review defect 2 — a naive `split(",")` breaks a
+ * quoted id like `"a,b"` into two ids `"a` and `b"`). Escapes inside the
+ * quotes follow the same set the lexer accepts for a quoted identifier in
+ * the body notation (`\\`, `\"`, `\n`, `\t`; any other escaped character is
+ * kept literally, backslash and all), so a round trip through `formatId`
+ * reproduces the original id exactly.
+ *
+ * Only for arguments that name ids (an id list for `delete`/`get`/`meta
+ * set`). A list of statuses, tags, or field names is never quoted, so those
+ * callers keep using the plain `split(",")` this does not replace.
+ */
+export function parseIdList(raw: string): string[] {
+	const ids: string[] = [];
+	let i = 0;
+	const n = raw.length;
+	while (i < n) {
+		while (i < n && (raw[i] === "," || /\s/.test(raw[i]!))) i++;
+		if (i >= n) break;
+		if (raw[i] === '"') {
+			i++;
+			let value = "";
+			while (i < n && raw[i] !== '"') {
+				if (raw[i] === "\\" && i + 1 < n) {
+					const esc = raw[i + 1];
+					if (esc === '"') value += '"';
+					else if (esc === "\\") value += "\\";
+					else if (esc === "n") value += "\n";
+					else if (esc === "t") value += "\t";
+					else value += `\\${esc}`;
+					i += 2;
+				} else {
+					value += raw[i];
+					i++;
+				}
+			}
+			i++; // skip closing quote (or end of string, if unterminated)
+			ids.push(value);
+		} else {
+			let value = "";
+			while (i < n && raw[i] !== ",") {
+				value += raw[i];
+				i++;
+			}
+			const trimmed = value.trim();
+			if (trimmed.length > 0) ids.push(trimmed);
+		}
+		while (i < n && raw[i] !== ",") i++; // discard trailing junk before the next comma
+		if (i < n) i++; // skip the comma
+	}
+	return ids;
+}
+
 export function splitBodyIntoSegments(body: string): BodySegment[] {
 	if (body === "") return [];
 	const lines = body.split("\n");

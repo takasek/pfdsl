@@ -30,6 +30,9 @@ import {
 	formatEdges,
 	splitBodyIntoSegments,
 } from "./formatter.js";
+
+export { formatId, parseIdList } from "./formatter.js";
+
 import { loadFrontmatter } from "./frontmatter.js";
 import {
 	parseFrontmatterCst,
