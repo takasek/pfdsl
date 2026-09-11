@@ -34,6 +34,7 @@ import {
 	locateNode,
 	type NodeKind,
 	type PfdType,
+	parseIdList,
 	reindex,
 	resolveEffectiveFrontmatter,
 	resolveLocationFsPath,
@@ -623,7 +624,7 @@ export function runDelete(
 	if (file === "-" && opts.write) {
 		return fail("--write cannot be used with stdin (-)\n", 2);
 	}
-	const ids = splitCommaList(idList);
+	const ids = parseIdList(idList);
 	if (ids.length === 0) return fail(HELP_DELETE, 2);
 
 	const source = readSource(file);
@@ -1237,7 +1238,7 @@ export function runMetaSet(
 			2,
 		);
 	}
-	const ids = splitCommaList(idList);
+	const ids = parseIdList(idList);
 	if (ids.length === 0) return fail(HELP_META_SET, 2);
 
 	const src = readSource(file);
@@ -1642,7 +1643,7 @@ function collectNodeFields(
 
 export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	if (!opts.id) return fail(`error: id is required\n\n${HELP_GET}`, 2);
-	const ids = splitCommaList(opts.id);
+	const ids = parseIdList(opts.id);
 	if (ids.length === 0) return fail(`error: id is required\n\n${HELP_GET}`, 2);
 
 	// Omitted field positional means "all set fields"; present-but-empty

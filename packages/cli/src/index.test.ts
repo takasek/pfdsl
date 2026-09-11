@@ -666,6 +666,30 @@ describe("delete", () => {
 		const r = await run(["delete", join(dir, "valid.pfdsl")]);
 		expect(r.exitCode).toBe(2);
 	});
+
+	it("a quoted id containing a comma is treated as a single id, not split (#1125 review defect 2)", async () => {
+		const f = join(dir, "delete-quoted-comma-id.pfdsl");
+		const quotedSrc = `---
+artifact:
+  "a,b":
+    label: A-B
+  c:
+    label: C
+process:
+  p:
+    label: P
+---
+["a,b", c] >> p
+`;
+		writeFileSync(f, quotedSrc);
+		const r = await run(["delete", f, '"a,b"', "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			deleted: ["a,b"],
+			notFound: [],
+		});
+	});
 });
 
 describe("reindex", () => {
