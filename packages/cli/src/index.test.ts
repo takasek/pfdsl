@@ -1,8 +1,10 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { deleteNodes } from "@pfdsl/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readyUnchanged } from "../../../scripts/pfdsl/lib/ready-compare.mjs";
 import {
 	COMMAND_GROUPS,
 	HELP,
@@ -13,6 +15,8 @@ import {
 	shouldColorize,
 	TOP_LEVEL_COMMANDS,
 } from "./index.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /** A stdin the CLI will read for a `-` argument, without touching fd 0. */
 const withStdin = (input: string) => ({ readStdin: () => input });
@@ -5644,5 +5648,41 @@ legacy_in >> build_legacy -> legacy_out
 
 		expect(readyIds(after.ready)).toEqual(readyIds(before.ready));
 		expect(after.ready).not.toBe(before.ready);
+	});
+
+	// scripts/pfdsl/sweep-completed-chains.mjs does not compare
+	// `status ready`'s whole output byte-for-byte (that breaks on every real
+	// sweep, #1125 defect 5 — see ready-compare.mjs's own doc); it compares
+	// via readyUnchanged instead. That relaxation must not reopen the gap the
+	// two tests above exist to close, so this drives readyUnchanged itself
+	// through the same "id set same, an item's declared inputs shrank"
+	// shape — grounded in this repo's own roadmap rather than a hand-built
+	// fixture, so the regression guard is not just checking its own mock.
+	it("readyUnchanged still rejects a real-roadmap corruption that shrinks a ready item's inputs while its id set stays put (#1125 defect 5 regression guard)", async () => {
+		const real = readFileSync(
+			resolve(__dirname, "../../../.pfdsl/roadmap.pfdsl"),
+			"utf-8",
+		);
+		// spec_v0011 is one of four inputs feeding the ready
+		// i542_migrate_spec_id_refs; deleting only it (not the process, not
+		// any of its other inputs) is exactly the "declared input silently
+		// dropped" corruption the comparison exists to catch, not a
+		// legitimate sweep of a completed chain.
+		const { output, notFound } = deleteNodes(real, ["spec_v0011"]);
+		expect(notFound).toEqual([]);
+
+		const before = await planningQueries(real);
+		const after = await planningQueries(output);
+
+		expect(readyIds(after.ready)).toEqual(readyIds(before.ready));
+		const beforeItem = JSON.parse(before.ready).ready.find(
+			(r: { id: string }) => r.id === "i542_migrate_spec_id_refs",
+		);
+		const afterItem = JSON.parse(after.ready).ready.find(
+			(r: { id: string }) => r.id === "i542_migrate_spec_id_refs",
+		);
+		expect(afterItem.inputs.length).toBe(beforeItem.inputs.length - 1);
+
+		expect(readyUnchanged(before.ready, after.ready)).toBe(false);
 	});
 });

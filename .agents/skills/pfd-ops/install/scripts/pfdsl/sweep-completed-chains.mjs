@@ -13,6 +13,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { computeDeleteTargets } from "./lib/chain-sweep.mjs";
+import { readyUnchanged } from "./lib/ready-compare.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "../..");
@@ -215,14 +216,18 @@ try {
 		process.exit(1);
 	}
 
-	// Compared as full output strings, not just id sets: a corruption that
-	// drops an item from `ready`/`blocked` while leaving every remaining id
-	// intact would pass an id-set comparison but not this one.
+	// Compared field-by-field via readyUnchanged, not as full output strings:
+	// a corruption that drops an item from `ready`/`blocked` while leaving
+	// every remaining id intact would pass an id-set comparison but not this
+	// one. The one field readyUnchanged deliberately excludes is
+	// `empty.complete` — the count of completed-chain processes, which a
+	// sweep that found anything to sweep always reduces by design (#1125
+	// defect 5). See ready-compare.mjs for the full rationale.
 	const readyAfter = runCli(["status", "ready", tmpFile, "--json"]);
 	if (readyAfter.status !== 0) {
 		failWith("failed to read post-sweep 'status ready --json'.", readyAfter);
 	}
-	if (readyAfter.stdout !== readyBefore.stdout) {
+	if (!readyUnchanged(readyBefore.stdout, readyAfter.stdout)) {
 		console.error(
 			"sweep-completed-chains: post-sweep 'status ready' output changed; not applying.",
 		);

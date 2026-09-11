@@ -19,6 +19,7 @@ export const INSTALL_TEMPLATE_PATHS = [
 	"scripts/pfdsl/lib/issues-flow-audit.mjs",
 	"scripts/pfdsl/lib/proxy-fetch-worker.mjs",
 	"scripts/pfdsl/lib/proxy-fetch.mjs",
+	"scripts/pfdsl/lib/ready-compare.mjs",
 	"scripts/pfdsl/lib/yaml-require.mjs",
 	"scripts/pfdsl/sweep-completed-chains.mjs",
 ];
