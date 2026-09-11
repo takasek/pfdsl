@@ -223,20 +223,73 @@ function planStatement(
 	}
 }
 
+/** A line consisting only of (optionally indented) a `#` comment, no code. */
+function isCommentOnlyLine(line: string): boolean {
+	return line.trim().startsWith("#");
+}
+
+/**
+ * What a dropped run of statements leaves behind in place of the gaps it
+ * owned: `leadingGap` is the run's own leading gap (gaps[i], unchanged
+ * candidate for the no-comment case), `merged` is the full concatenation of
+ * every gap the run owns — its leading gap, every gap strictly between its
+ * own dropped statements, and (only when a statement survives after it) the
+ * gap right before that survivor.
+ *
+ * An own-line comment inside `merged` is never discarded (#1125 defects 3
+ * and 4): the statement it described may be gone, but the comment's content
+ * is not the deletion's to take. Two shapes follow from that:
+ *
+ *   - A comment that was already the tail of `merged` — nothing, not even a
+ *     blank line, between it and the surviving statement after the run —
+ *     was that statement's own leading comment to begin with (defect 3's
+ *     `# b-chain`). It stays exactly that attached.
+ *   - Any other surviving comment was not the next statement's own (defect
+ *     4's note explained the *deleted* statement). Gluing it directly onto
+ *     whichever statement now happens to follow would misrepresent it as
+ *     that statement's comment, so a blank line is inserted to orphan it
+ *     instead of deleting it — deleting would mean deciding the comment's
+ *     owner from syntactic adjacency alone, which is exactly the unreliable
+ *     signal this whole function exists to not trust for content removal.
+ *
+ * With no comment at all, this reduces to the pre-#1125 behaviour: an
+ * interior/start run keeps its own leading gap unchanged (normally just the
+ * blank line separating it from whatever precedes it); a run that consumes
+ * the rest of the file needs no separator of its own — the file's real
+ * trailing gap, appended separately by the caller, already closes it out.
+ */
+function renderDroppedGap(
+	leadingGap: string,
+	merged: string,
+	{ leading, hasNext }: { leading: boolean; hasNext: boolean },
+): string {
+	const lines = merged.split("\n");
+	const commentLines = lines.filter(isCommentOnlyLine);
+	if (commentLines.length === 0) {
+		return leading || hasNext ? leadingGap : "";
+	}
+
+	const lastLine = lines.at(-1) === "" ? lines.at(-2) : lines.at(-1);
+	const attachedToNext =
+		hasNext && lastLine !== undefined && isCommentOnlyLine(lastLine);
+
+	const prefix = leading ? "" : "\n";
+	const commentBlock = `${commentLines.join("\n")}\n`;
+	const suffix = hasNext && !attachedToNext ? "\n" : "";
+	return prefix + commentBlock + suffix;
+}
+
 /**
  * Rebuild `body` with each statement kept, replaced, or dropped per `plan`.
  *
  * Model the body as gap, statement, gap, statement, ..., gap (n statements,
  * n+1 gaps: the leading gap before the first statement, one between each
  * consecutive pair, and the trailing gap — comments included — after the
- * last). Dropping a maximal run of consecutive statements also drops exactly
- * one of the gaps touching that run, chosen so the two statements now made
- * adjacent (or the file's own leading/trailing whitespace, if the run sits at
- * either end) are separated by exactly the one gap that already sat between
- * them — never zero, never two. A run at the very start keeps the file's
- * leading gap and drops its own trailing one; a run at the very end keeps the
- * trailing gap and drops its own leading one; an interior run keeps its
- * leading gap and drops the rest.
+ * last). Dropping a maximal run of consecutive statements folds every gap
+ * the run owns into one replacement via renderDroppedGap — never a blind
+ * keep-or-drop of the raw text, since an own-line comment can live in any of
+ * those gaps and its content survives regardless of which side of the run it
+ * sat on (see renderDroppedGap's own doc for the two shapes this takes).
  */
 function spliceBody(
 	body: string,
@@ -254,6 +307,7 @@ function spliceBody(
 	gaps.push(body.slice(ends[n - 1]!));
 
 	const removeGap = new Array<boolean>(n + 1).fill(false);
+	const gapOverride = new Array<string | null>(n + 1).fill(null);
 	let i = 0;
 	while (i < n) {
 		if (plan[i]!.kind !== "drop") {
@@ -262,19 +316,26 @@ function spliceBody(
 		}
 		let j = i;
 		while (j < n && plan[j]!.kind === "drop") j++;
-		if (i === 0) {
-			for (let k = 1; k <= j; k++) removeGap[k] = true;
-		} else if (j === n) {
-			for (let k = i; k <= n - 1; k++) removeGap[k] = true;
-		} else {
-			for (let k = i + 1; k <= j; k++) removeGap[k] = true;
-		}
+		const hasNext = j < n;
+
+		let merged = gaps[i]!;
+		for (let k = i + 1; k < j; k++) merged += gaps[k]!;
+		if (hasNext) merged += gaps[j]!;
+		gapOverride[i] = renderDroppedGap(gaps[i]!, merged, {
+			leading: i === 0,
+			hasNext,
+		});
+
+		for (let k = i + 1; k < j; k++) removeGap[k] = true;
+		if (hasNext) removeGap[j] = true;
 		i = j;
 	}
 
 	let out = "";
 	for (let k = 0; k <= n; k++) {
-		if (!removeGap[k]) out += gaps[k];
+		const override = gapOverride[k];
+		if (override !== null) out += override;
+		else if (!removeGap[k]) out += gaps[k];
 		if (k < n) {
 			const action = plan[k]!;
 			if (action.kind === "keep") out += body.slice(starts[k]!, ends[k]!);

@@ -629,6 +629,64 @@ toolchain >> q  # unrelated
 			expect(kept.output).toContain("a >> p  # notice me");
 		});
 
+		it("keeps a comment attached to the statement that survives after it (#1125 defect 3)", () => {
+			// `# b-chain` sits directly above the surviving `b >> q -> y`, not
+			// above the deleted `a >> p -> x`. Losing it along with the deleted
+			// chain's own gap strips the explanation for a statement that is
+			// still there.
+			const src = `---
+artifact:
+  a:
+    label: A
+  x:
+    label: X
+  b:
+    label: B
+  y:
+    label: Y
+process:
+  p:
+    label: P
+  q:
+    label: Q
+---
+a >> p -> x
+
+# b-chain
+b >> q -> y
+`;
+			const { output } = deleteNodes(src, ["a", "p", "x"]);
+			expect(output).toContain("# b-chain\nb >> q -> y");
+			expect(output).not.toContain("a >> p");
+		});
+
+		it("does not let a deleted statement's comment re-attach to the next surviving statement (#1125 defect 4)", () => {
+			// The note describes the now-deleted `a >> p`. Its content must
+			// survive, but it must not end up glued to `b >> q` — that would
+			// misrepresent the note as describing a statement it never did.
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+process:
+  p:
+    label: P
+  q:
+    label: Q
+---
+# this note explains the a-chain
+a >> p
+
+b >> q
+`;
+			const { output } = deleteNodes(src, ["a", "p"]);
+			expect(output).toContain("this note explains the a-chain");
+			expect(output).not.toMatch(/this note explains the a-chain\nb >> q/);
+			expect(output).not.toContain("a >> p");
+		});
+
 		it("returns the body unchanged when it has no statements at all", () => {
 			const src = `---
 artifact:
