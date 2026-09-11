@@ -980,82 +980,9 @@ a >> design -> b
 		});
 	});
 
-	describe("W005: produced artifact with no status (roadmap files only)", () => {
-		// W005 fires only when type: roadmap and a produced artifact has no status field.
-		// Source artifacts (input-only) and non-roadmap files are exempt.
-
-		it("warns when produced artifact has no status (frontmatter declared)", () => {
-			const fm: Frontmatter = { type: "roadmap", artifact: { B: {} } };
-			expect(codes("A >> P -> B", fm)).toContain("W005");
-		});
-
-		it("warns when produced artifact has no status (not declared in frontmatter)", () => {
-			// B is produced by P but has no frontmatter entry; type: roadmap triggers W005.
-			const fm: Frontmatter = { type: "roadmap" };
-			expect(codes("A >> P -> B", fm)).toContain("W005");
-		});
-
-		it("no W005 when type is absent (non-roadmap intent)", () => {
-			expect(codes("A >> P -> B")).not.toContain("W005");
-		});
-
-		it("no W005 when type is workflow", () => {
-			const fm: Frontmatter = { type: "workflow" };
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 when type is pipeline", () => {
-			const fm: Frontmatter = { type: "pipeline" };
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		// W005 asks only whether a status is present, so every member of the
-		// enum must suppress it. Driving the cases off STATUS_VALUES keeps that
-		// claim true for statuses added later, instead of leaving the new one
-		// silently unasserted.
-		it.each(
-			STATUS_VALUES,
-		)("no W005 when produced artifact has status: %s", (status) => {
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { B: { status } },
-			};
-			expect(codes("A >> P -> B", fm)).not.toContain("W005");
-		});
-
-		it("no W005 for source artifact (input-only)", () => {
-			// A is source — no process outputs it, so W005 does not apply to A.
-			const fm: Frontmatter = {
-				type: "roadmap",
-				artifact: { A: {}, B: { status: "todo" } },
-			};
-			const diags = diagnose("A >> P -> B", fm);
-			expect(
-				diags.filter((d) => d.code === "W005" && d.message.includes("'A'")),
-			).toHaveLength(0);
-		});
-
-		it("W005 severity is warning in non-strict mode", () => {
-			const fm: Frontmatter = { type: "roadmap" };
-			const diags = diagnose("A >> P -> B", fm);
-			const w005 = diags.find((d) => d.code === "W005");
-			expect(w005?.severity).toBe("warning");
-		});
-
-		it("W005 becomes error in strict mode", () => {
-			const fm: Frontmatter = { type: "roadmap" };
-			const { tokens } = lex("A >> P -> B");
-			const { document } = parseTokens(tokens);
-			const { edges, nodeKinds } = normalize(document, fm);
-			const diags = validate(edges, nodeKinds, fm, { strict: true });
-			const w005 = diags.find((d) => d.code === "W005");
-			expect(w005?.severity).toBe("error");
-		});
-	});
-
 	describe("W007: status declared in a non-roadmap file (#787)", () => {
-		// W007 is the mirror of W005: progress belongs to the roadmap, so a file
-		// that explicitly declares any other kind must not carry status at all.
+		// A flow file that explicitly declares any kind other than roadmap must
+		// not carry status at all — progress belongs to the roadmap.
 
 		// Every explicit kind other than roadmap is a flow kind, so driving the
 		// cases off the enum keeps the claim true for kinds added later.
@@ -1080,8 +1007,8 @@ a >> design -> b
 		});
 
 		it("warns for a source artifact too (input-only)", () => {
-			// Unlike W005, W007 does not exempt source artifacts: the rule is
-			// that a flow file carries no status anywhere.
+			// W007 does not exempt source artifacts: the rule is that a flow
+			// file carries no status anywhere.
 			const fm: Frontmatter = {
 				type: "workflow",
 				artifact: { A: { status: "done" } },
@@ -1142,6 +1069,154 @@ a >> design -> b
 			const diags = validate(edges, nodeKinds, fm, { strict: true });
 			const w007 = diags.find((d) => d.code === "W007");
 			expect(w007?.severity).toBe("error");
+		});
+	});
+
+	describe("V035: undeclared artifact used on an edge (roadmap only, #1125)", () => {
+		// Reproduces the ghost-node scenario: a frontmatter artifact block gets
+		// deleted but the edge line that mentions it survives. Nothing else in
+		// the checker catches this — check passes, graph orphans reports none,
+		// meta get returns {}, and status ready still counts the id as a
+		// satisfied input.
+
+		it("errors when an edge-only artifact has no frontmatter declaration", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { C: { status: "done" } },
+			};
+			expect(codes("[ghost, B] >> P -> C", fm)).toContain("V035");
+		});
+
+		it("does not error when every edge artifact is declared with a status", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: {
+					A: { status: "done" },
+					B: { status: "done" },
+					C: { status: "todo" },
+				},
+			};
+			expect(codes("[A, B] >> P -> C", fm)).not.toContain("V035");
+		});
+
+		it("does not fire in a workflow file with the same implicit artifact", () => {
+			const fm: Frontmatter = { type: "workflow", artifact: { C: {} } };
+			expect(codes("[ghost, B] >> P -> C", fm)).not.toContain("V035");
+		});
+
+		it("does not fire in a pipeline file with the same implicit artifact", () => {
+			const fm: Frontmatter = { type: "pipeline", artifact: { C: {} } };
+			expect(codes("[ghost, B] >> P -> C", fm)).not.toContain("V035");
+		});
+
+		it("does not fire when type is omitted", () => {
+			expect(codes("[ghost, B] >> P -> C")).not.toContain("V035");
+		});
+
+		it("does not flag process ids, only artifacts", () => {
+			// P has no frontmatter process: entry either, but V035 looks only at
+			// artifacts — a process's own declaration gap is V020/V003 territory.
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, C: { status: "todo" } },
+			};
+			const diags = diagnose("A >> P -> C", fm);
+			expect(
+				diags.filter((d) => d.code === "V035" && d.message.includes("'P'")),
+			).toHaveLength(0);
+		});
+
+		it("reports one diagnostic per undeclared artifact", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { C: { status: "todo" } },
+			};
+			const diags = diagnose("[ghost1, ghost2] >> P -> C", fm);
+			expect(diags.filter((d) => d.code === "V035")).toHaveLength(2);
+		});
+
+		it("is an unconditional error, unaffected by --strict", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { C: { status: "todo" } },
+			};
+			const lenient = diagnose("[ghost, B] >> P -> C", fm).find(
+				(d) => d.code === "V035",
+			);
+			const { tokens } = lex("[ghost, B] >> P -> C");
+			const { document } = parseTokens(tokens);
+			const { edges, nodeKinds } = normalize(document, fm);
+			const strict = validate(edges, nodeKinds, fm, { strict: true }).find(
+				(d) => d.code === "V035",
+			);
+			expect(lenient?.severity).toBe("error");
+			expect(strict?.severity).toBe("error");
+		});
+
+		// #1125 follow-up: a declaration with no `status:` (including an empty
+		// `id: {}` block) is no longer enough to satisfy V035 — it must also
+		// carry a status. This is the strengthened half of the rule, which now
+		// covers the produced-artifact-missing-status case a separate warning
+		// used to check on its own.
+		it("errors when a declaration exists but has no status (empty block)", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: {} },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V035");
+		});
+
+		it("errors when a declaration exists but has no status (other fields present)", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: { label: "B" } },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V035");
+		});
+
+		it("does not error when the declaration has a status", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: { status: "todo" } },
+			};
+			expect(codes("A >> P -> B", fm)).not.toContain("V035");
+		});
+
+		it("does not flag a missing-status source artifact in a workflow file", () => {
+			const fm: Frontmatter = { type: "workflow", artifact: { B: {} } };
+			expect(codes("A >> P -> B", fm)).not.toContain("V035");
+		});
+
+		it("does not fire on a declared artifact that never appears on an edge (#1125 review defect 3)", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { future: {} },
+			};
+			expect(codes("", fm)).not.toContain("V035");
+		});
+
+		it("still fires on a status-less artifact that does appear on an edge, alongside an unconnected declaration", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: {}, future: {} },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V035");
+		});
+
+		it("distinguishes 'no declaration' from 'declared without status' in the message", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: {} },
+			};
+			const diags = diagnose("[ghost, A] >> P -> B", fm);
+			const v035 = diags.filter((d) => d.code === "V035");
+			expect(v035).toHaveLength(2);
+			const ghostMsg = v035.find((d) => d.message.includes("'ghost'"))?.message;
+			const bMsg = v035.find((d) => d.message.includes("'B'"))?.message;
+			expect(ghostMsg).toMatch(/no frontmatter declaration/);
+			expect(bMsg).not.toMatch(/no frontmatter declaration/);
+			expect(bMsg).toMatch(/status/);
+			expect(ghostMsg).not.toBe(bMsg);
 		});
 	});
 });

@@ -1,0 +1,103 @@
+name: sweep completed chains
+
+# A push to the default branch is the only event that can change what the
+# sweep reads: it reads the default branch's roadmap and nothing else, so a
+# chain going fully done is only ever visible there. The sweep only proposes:
+# it opens a PR and a human merges it, so the graph is never rewritten outside
+# a reviewed change. Deciding what is sweepable reads the default branch
+# alone, which cannot see an unmerged branch that still consumes a done
+# artifact — that case surfaces as an undeclared id on an edge when the
+# branch lands, and the checker rejects it there.
+#
+# Triggers on every push (adopting repos don't all name their default branch
+# "main"), then the job itself checks github.ref against
+# github.event.repository.default_branch and no-ops otherwise. A tag push
+# never matches a refs/heads/* ref, so it no-ops the same way without a
+# separate filter.
+on:
+  push:
+
+concurrency:
+  group: flow-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sweep-completed-chains:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # This same template file ships to adopting repos (pfd-ops's install/
+      # mirror), which have no packages/cli of their own — the check below is
+      # what tells this repo's own CI run apart from theirs at runtime, since
+      # both run off one committed workflow file.
+      - name: Detect this repo's own pfdsl workspace
+        id: detect-workspace
+        run: |
+          if [ -f pnpm-workspace.yaml ] && [ -f packages/cli/package.json ]; then
+            echo "in_workspace=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "in_workspace=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # In this repo: build packages/cli from the very source this push
+      # carries, so the sweep checks with the same code its own tests cover —
+      # not a published release that can lag behind, or even predate a
+      # subcommand the sweep script depends on (#1125 review).
+      - name: Build this repo's own @pfdsl/cli from source
+        if: steps.detect-workspace.outputs.in_workspace == 'true'
+        id: build-cli
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm -r build
+          version=$(node -p "require('./packages/cli/package.json').version")
+          echo "Built this repo's own @pfdsl/cli@$version from source"
+          {
+            echo "description=this repo's own from-source build of \`@pfdsl/cli@${version}\`, the same build the rest of this repo's CI uses"
+          } >> "$GITHUB_OUTPUT"
+
+      # In an adopting repo: no packages/cli to build, so fall back to the
+      # last published release, same as before.
+      - name: Install the published @pfdsl/cli
+        if: steps.detect-workspace.outputs.in_workspace != 'true'
+        id: install-cli
+        run: |
+          npm install --no-save @pfdsl/cli
+          version=$(node -p "require('./node_modules/@pfdsl/cli/package.json').version")
+          echo "Resolved @pfdsl/cli version: $version"
+          {
+            echo "description=the published \`@pfdsl/cli@${version}\` (\`npm install --no-save\`, unpinned) — a different release than what this repo's own CI builds and tests from source"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Sweep completed chains out of the roadmap
+        run: node scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write
+
+      - name: Open PR if roadmap.pfdsl changed
+        uses: peter-evans/create-pull-request@v8
+        with:
+          add-paths: .pfdsl/roadmap.pfdsl
+          branch: flow-sync/pending
+          commit-message: "chore(plan): sweep completed chains after a push to the default branch"
+          title: "chore(plan): sweep completed chains"
+          body: |
+            Removes chains whose artifacts are all done from `.pfdsl/roadmap.pfdsl`.
+            What stays is every process that still outputs an unfinished artifact, and the artifacts on those processes' edges — a done artifact is kept when an open process still reads it as an input, not as a record that it finished. Completed history lives in the closed issues, the git history, the decision records and the published registries.
+
+            The sweep applied nothing until `check` passed, `graph orphans` came back empty, `fmt --check` passed, and `status blocked` produced byte-identical output before and after. `status ready` is compared the same way except for one field: `empty.complete` (the count of completed-chain processes, present only when the ready set is empty) is excluded, because a sweep that found anything to remove always reduces it by design. Comparing everything else whole is the point: an id-set comparison alone would pass a sweep that leaves a process ready while quietly taking one of its inputs away.
+
+            A `GITHUB_TOKEN`-authored PR like this one does not trigger this repo's `pull_request` workflow, so none of the repo's own CI (build, tests, `make check-fmt`, etc.) ran against it. The checks above — `check`, `graph orphans`, `fmt --check`, and the ready/blocked comparison — are the only verification this change has received; an absence of failing CI checks on this PR does not mean anything else passed.
+
+            This job used ${{ steps.build-cli.outputs.description || steps.install-cli.outputs.description }} to run the checks above.
+
+            no-issue: mechanical roadmap bookkeeping triggered by a push to the default branch, carrying no work item of its own.

@@ -110,8 +110,8 @@ function writeManifest(targetRoot, entries) {
 	writeFileSync(manifestPath, `${JSON.stringify({ files: sorted }, null, "\t")}\n`);
 }
 
-// A rename that only prefixes the basename (flow-on-issue-close.yml ->
-// pfdsl-flow-on-issue-close.yml) still has to be recognizable. Requiring the
+// A rename that only prefixes the basename (sweep-completed-chains.yml ->
+// pfdsl-sweep-completed-chains.yml) still has to be recognizable. Requiring the
 // added part to end at a separator is what keeps this from pairing files that
 // merely share a word ending (exec.mjs / ghexec.mjs).
 const BASENAME_SEPARATORS = new Set(["-", "_", "."]);

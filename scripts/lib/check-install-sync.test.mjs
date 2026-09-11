@@ -227,16 +227,16 @@ describe("checkInstallSync rename candidates", () => {
 		const targetRoot = join(tmp, "target-rename-suffix");
 		const skillRoot = deployThenRename(
 			targetRoot,
-			".github/workflows/flow-on-issue-close.yml",
-			".github/workflows/pfdsl-flow-on-issue-close.yml",
+			".github/workflows/sweep-completed-chains.yml",
+			".github/workflows/pfdsl-sweep-completed-chains.yml",
 			{ newContent: "canonical-rewritten" },
 		);
 
 		const { renameCandidates } = checkInstallSync(skillRoot, targetRoot);
 		assert.deepEqual(renameCandidates, [
 			{
-				from: ".github/workflows/flow-on-issue-close.yml",
-				to: ".github/workflows/pfdsl-flow-on-issue-close.yml",
+				from: ".github/workflows/sweep-completed-chains.yml",
+				to: ".github/workflows/pfdsl-sweep-completed-chains.yml",
 				reason: "same basename suffix",
 			},
 		]);

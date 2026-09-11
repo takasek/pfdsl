@@ -1,4 +1,4 @@
-# PFDSL仕様書 v0.0.21
+# PFDSL仕様書 v0.0.22
 
 ## 1. 目的
 
@@ -826,7 +826,7 @@ A >> P
 この edge が主張するのは「P が出力を作るには A が要る」という変換の形であって、A が生成される頻度ではない。
 したがって「A は毎回できるわけではない」ことは `>>` を避ける理由にならない。
 生成の頻度が他と異なる依存を区別したい場合は、§9.2 のフィードバック入力へ逃がすのではなく、その依存を別の Artifact として分割する。
-`status:`（§2.7）は roadmap 種別のファイルでしか使えないため（§15.16）、workflow / pipeline でこの目的に用いることはできない。
+`status:`（§2.7）は roadmap 種別のファイルでしか使えないため（§15.15）、workflow / pipeline でこの目的に用いることはできない。
 
 ### 9.2 フィードバック入力
 
@@ -1138,18 +1138,22 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 * `type:` に列挙外の値を指定した場合は error (V031)
 * 省略時は種別を問わない操作（check / fmt / render 等）を実行する。`pfdsl status ready` / `pfdsl meta set`（status 設定時）/ `pfdsl status gaps`（roadmap引数）は例外的に、省略時は `roadmap` として扱い実行を許可するが warning を出す (W006)。`roadmap` 以外の値を明示指定した場合は error
 
-### 15.15 produced artifact の status 制約
-
-* `type: roadmap` のファイルにおいて、**produced artifact**（少なくとも1つのプロセスの出力として登録されているもの）に `status:` が未設定の場合: warning (W005; strict mode では error)
-* **source artifact**（いかなるプロセスの出力でもないもの）は W005 の対象外とする
-* `type:` が `roadmap` 以外（`workflow` / `pipeline`）または省略されているファイルは W005 の対象外とする
-
-### 15.16 非 roadmap ファイルの status 禁止
+### 15.15 非 roadmap ファイルの status 禁止
 
 * `type:` に `roadmap` 以外の値を明示指定したファイルにおいて、artifact に `status:` が設定されている場合: warning (W007; strict mode では error)。列挙外の値（V031 で error になる値）を指定したファイルも対象に入る — 判定は「`roadmap` と明示されているか」だけを見る
 * produced artifact / source artifact を区別しない。当該ファイルのいずれの artifact も対象とする
-* `type:` が省略されているファイルは W007 の対象外とする。省略は種別を宣言しないため、種別に紐づくこの制約を課さない（§15.14 の「省略時は roadmap として扱う」は `status ready` / `meta set`（status 設定時）/ `status gaps` に限った例外であり、`check` には及ばない）。W005 も同じ理由で省略ファイルを対象外とする（§15.15）
+* `type:` が省略されているファイルは W007 の対象外とする。省略は種別を宣言しないため、種別に紐づくこの制約を課さない（§15.14 の「省略時は roadmap として扱う」は `status ready` / `meta set`（status 設定時）/ `status gaps` に限った例外であり、`check` には及ばない）
 * 同一 id が複数のファイルに現れうるため、進捗 status の一次情報は roadmap 側に一元化する。flow 種別のファイルが status を宣言すると、2つの図が同じ対象について異なる状態を主張しうる。status 系検査はファイル単位で閉じる（§2.9.1）ため、W003（status 非単調, §15.6）ではこの形を検出できない
+
+### 15.16 roadmap 内の未宣言 artifact・status 欠落制約
+
+* `type: roadmap` のファイルにおいて、body の edge に現れる artifact id は、必ず front matter の `artifact:` に宣言を持ち、かつその宣言が `status:` を持たなければならない。いずれかを欠く場合は error (V035)
+* 違反は2つの形を区別する。(a) 宣言そのものが無い（宣言ブロックを削除しても body の edge 行が残った場合に生じる「幽霊ノード」）。(b) 宣言はあるが `status:` が無い（空宣言 `id: {}` を含む）。診断メッセージはどちらの形かを読み手が判別できる文言にする。コードはどちらも V035
+* 対象は artifact id のみ。process id の宣言欠落は既存の V020（§15.10）/ V003（§15.2）が扱うため、V035 の対象外とする
+* `type:` が `roadmap` 以外（`workflow` / `pipeline`）または省略されているファイルは V035 の対象外とする
+* strict mode の有無に関わらず常に error（`ctx.strictly(...)` を経由しない）。`check-scaffold` は運用中の `.pfdsl/` を `--strict` の対象から意図的に除外しているため、strict 依存の severity では運用ファイルで警告に留まり実効性を持たない
+* (a) について: 宣言ブロックを削除しても body の edge 行が残ると、label も status も criteria も持たない「幽霊ノード」がグラフに残る
+* v0.0.22 まで V035 は (a) のみを検出し、(b) は別コード W005（roadmap の produced artifact に `status:` が未設定; warning、strict mode では error）が受け持っていた。W005 が見る produced artifact は必ず edge に乗る集合なので (b) の部分集合と一致し、V035 が (b) も検出するようになったことで W005 は単独で発火する余地を失い、同じ違反に warning と error の2つの診断が並立するだけになった。W005 は severity を strict 依存の2値でしか表現できず、この制約が要求する無条件 error を単独では表現できないため、V035 側に統合して廃止した
 
 ---
 
@@ -1205,13 +1209,13 @@ graph body の node-decl で宣言された孤立ノード（edge なし）は �
 | V032 | error | §15.11 | `boundary:` マップが全単射でない |
 | V033 | error | §15.11 | `boundary:` マップの side 越境（入力↔出力） |
 | V034 | error | §15.11 | 境界集合の不一致（親 I/O と子 open input / terminal の全単射違反） |
+| V035 | error | §15.16 | roadmap ファイルの edge 上の artifact が front matter に宣言を持たない（幽霊ノード）、または宣言はあるが `status:` が未設定 |
 | W001 | warning | §15.5 | parts メンバーが edge に参加していない |
 | W002 | warning (--strict: error) | §15.7 | produced Artifact に `criteria:` が未設定 |
 | W003 | warning | §15.6 | status 非単調（出力 Artifact が `done` なのに、明示 status を持つ入力 Artifact が `done` 未満） |
 | W004 | warning | §15.13 | 同一名前空間内で `index:` が重複 |
-| W005 | warning (--strict: error) | §15.15 | roadmap ファイルの produced Artifact に `status:` が未設定 |
 | W006 | warning | §15.14 | ready-gate 文脈（status ready / meta set / status gaps）で `type:` 省略ファイルを roadmap として扱う |
-| W007 | warning (--strict: error) | §15.16 | `roadmap` 以外の種別を明示したファイルの Artifact に `status:` が設定されている |
+| W007 | warning (--strict: error) | §15.15 | `roadmap` 以外の種別を明示したファイルの Artifact に `status:` が設定されている |
 | W008 | warning (--strict: error) | §15.2 | Process が通常入力を持たず、フィードバック入力のみで駆動されている |
 | L001 | error | §4.2 | quoted-id の閉じ `"` がない |
 | L002 | error | §8 | いずれの有効なトークンも開始しない文字 |

@@ -98,6 +98,7 @@ statusStyles:
 pfdsl check <file|-> [--strict] [--hints] [--json] [--no-color]   # Validate a .pfdsl file (- = stdin)
 pfdsl explain <code>   # Print the summary and spec section for a diagnostic code (e.g. V021)
 pfdsl fmt <file|-> [--write] [--check] [--no-color]   # Format a .pfdsl file (- = stdin)
+pfdsl delete <file|-> <id[,id...]> [--write] [--json] [--no-color]   # Remove one or more nodes from a .pfdsl file (- = stdin)
 pfdsl render <file|-> [--format dot|svg|pdf|png] [--no-color]   # Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
 pfdsl diff <a> <b> [--format text|dot|svg] [--json] [--no-color]   # Structural diff (text), or visual diff DOT/SVG
 pfdsl graph summary|io|stats|neighbors|locate|describe|impact|depends-on|path|edges|orphans   # Read-only queries on the graph topology
@@ -158,4 +159,4 @@ Sets the status in place and validates in one step — always prefer it over han
 | フィールドの正確な仕様 | `references/spec.md` §3–5（モデル・識別子・型推論）・§14（正準順序） |
 | PFD のレビュー・監査 | `references/review-perspectives.md`（A/B/C カタログ。A/B は図、C は normative 仕様文書（自リポ保守の仕様がある場合）の監査。書くルールは `references/quality-guide.md`、問い詰めはこちら） |
 
-`references/spec.md` は full spec v0.0.21（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
+`references/spec.md` は full spec v0.0.22（20節・大型）— 全読せず、節見出し（`## N.`）とエラーコードで該当箇所だけ読む。
