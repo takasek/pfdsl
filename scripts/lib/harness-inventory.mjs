@@ -32,6 +32,7 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"install/scripts/pfdsl/lib/proxy-fetch-worker.mjs",
 		"install/scripts/pfdsl/lib/proxy-fetch.mjs",
 		"install/scripts/pfdsl/lib/ready-compare.mjs",
+		"install/scripts/pfdsl/lib/scratch-path.mjs",
 		"install/scripts/pfdsl/lib/yaml-require.mjs",
 		"install/scripts/pfdsl/sweep-completed-chains.mjs",
 		"references/architecture.md",

@@ -7,13 +7,14 @@
 // ./lib/chain-sweep.mjs for the retention rule this derives from.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { randomBytes } from "node:crypto";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { computeDeleteTargets } from "./lib/chain-sweep.mjs";
 import { readyUnchanged } from "./lib/ready-compare.mjs";
+import { scratchPathFor } from "./lib/scratch-path.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "../..");
@@ -180,30 +181,52 @@ if (deleteIds.length === 0) {
 	process.exit(0);
 }
 
-// --- Step 5: apply the deletion to a scratch copy (never the real file) ---
+// --- Step 5: apply the deletion to a scratch file next to the original ---
 //
-// mkdtempSync gives each run its own directory, so concurrent runs (e.g. two
-// CI jobs on different branches) never collide on the scratch path.
-const tmpDir = mkdtempSync(join(tmpdir(), "pfdsl-chain-sweep-"));
-const tmpFile = join(tmpDir, "swept.pfdsl");
+// The scratch file lives beside `file` (scratchPathFor), not under
+// tmpdir(): `pfdsl check` resolves a relative `extends:`/`subflow:` from the
+// file being checked's own directory, so verifying in some other directory
+// can reject a candidate the real location would accept — or the reverse
+// (#1125). The random token in the name avoids colliding with a concurrent
+// run against the same file.
+//
+// Cleanup cannot live in a `finally` around this whole block: several steps
+// below fail by calling process.exit() directly (via failWith), and
+// process.exit() tears down the process without unwinding to a pending
+// finally. So every exit point below calls cleanupScratch() itself, right
+// before it fails or exits — the `finally` here only has to catch the path
+// an unexpected thrown error takes, where normal unwinding still applies.
+const scratchFile = scratchPathFor(file, randomBytes(6).toString("hex"));
+
+function cleanupScratch() {
+	rmSync(scratchFile, { force: true });
+}
+
+function failVerify(message, result) {
+	cleanupScratch();
+	failWith(message, result);
+}
 
 try {
 	const deleteResult = runCli(["delete", file, deleteIds.join(",")]);
 	if (deleteResult.status !== 0) {
-		failWith("'delete' failed.", deleteResult);
+		failVerify("'delete' failed.", deleteResult);
 	}
-	writeFileSync(tmpFile, deleteResult.stdout, "utf-8");
+	writeFileSync(scratchFile, deleteResult.stdout, "utf-8");
 
 	// --- Step 6: verification — nothing here may be skipped or summarized ---
 
-	const verifyCheck = runCli(["check", tmpFile]);
+	const verifyCheck = runCli(["check", scratchFile]);
 	if (verifyCheck.status !== 0) {
-		failWith("post-sweep 'check' reported errors; not applying.", verifyCheck);
+		failVerify(
+			"post-sweep 'check' reported errors; not applying.",
+			verifyCheck,
+		);
 	}
 
-	const orphansRes = runCliJson(["graph", "orphans", tmpFile, "--json"]);
+	const orphansRes = runCliJson(["graph", "orphans", scratchFile, "--json"]);
 	if (!orphansRes.ok) {
-		failWith(
+		failVerify(
 			"failed to read post-sweep 'graph orphans --json'.",
 			orphansRes.result,
 		);
@@ -213,6 +236,7 @@ try {
 			"sweep-completed-chains: post-sweep 'graph orphans' is non-empty; not applying.",
 		);
 		console.error(JSON.stringify(orphansRes.value.orphans, null, 2));
+		cleanupScratch();
 		process.exit(1);
 	}
 
@@ -223,9 +247,9 @@ try {
 	// `empty.complete` — the count of completed-chain processes, which a
 	// sweep that found anything to sweep always reduces by design (#1125
 	// defect 5). See ready-compare.mjs for the full rationale.
-	const readyAfter = runCli(["status", "ready", tmpFile, "--json"]);
+	const readyAfter = runCli(["status", "ready", scratchFile, "--json"]);
 	if (readyAfter.status !== 0) {
-		failWith("failed to read post-sweep 'status ready --json'.", readyAfter);
+		failVerify("failed to read post-sweep 'status ready --json'.", readyAfter);
 	}
 	if (!readyUnchanged(readyBefore.stdout, readyAfter.stdout)) {
 		console.error(
@@ -233,12 +257,13 @@ try {
 		);
 		console.error(`before: ${readyBefore.stdout}`);
 		console.error(`after:  ${readyAfter.stdout}`);
+		cleanupScratch();
 		process.exit(1);
 	}
 
-	const blockedAfter = runCli(["status", "blocked", tmpFile, "--json"]);
+	const blockedAfter = runCli(["status", "blocked", scratchFile, "--json"]);
 	if (blockedAfter.status !== 0) {
-		failWith(
+		failVerify(
 			"failed to read post-sweep 'status blocked --json'.",
 			blockedAfter,
 		);
@@ -249,6 +274,7 @@ try {
 		);
 		console.error(`before: ${blockedBefore.stdout}`);
 		console.error(`after:  ${blockedAfter.stdout}`);
+		cleanupScratch();
 		process.exit(1);
 	}
 
@@ -266,5 +292,5 @@ try {
 		console.log(deleteIds.join(", "));
 	}
 } finally {
-	rmSync(tmpDir, { recursive: true, force: true });
+	cleanupScratch();
 }
