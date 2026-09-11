@@ -1,0 +1,51 @@
+name: flow on issue close
+
+# Closing an issue is the event that can make a chain fully done, and a chain
+# nobody still reads is what the sweep removes. The sweep only proposes: it
+# opens a PR and a human merges it, so the graph is never rewritten outside a
+# reviewed change. Deciding what is sweepable reads the default branch alone,
+# which cannot see an unmerged branch that still consumes a done artifact —
+# that case surfaces as an undeclared id on an edge when the branch lands, and
+# the checker rejects it there.
+on:
+  issues:
+    types: [closed]
+
+concurrency:
+  group: flow-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sweep-completed-chains:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install the pfdsl CLI
+        run: npm install --no-save @pfdsl/cli
+
+      - name: Sweep completed chains out of the roadmap
+        run: node scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write
+
+      - name: Open PR if roadmap.pfdsl changed
+        uses: peter-evans/create-pull-request@v8
+        with:
+          add-paths: .pfdsl/roadmap.pfdsl
+          branch: flow-sync/pending
+          commit-message: "chore(plan): sweep completed chains after issue close"
+          title: "chore(plan): sweep completed chains"
+          body: |
+            Removes chains whose artifacts are all done from `.pfdsl/roadmap.pfdsl`.
+            What stays is every process that still outputs an unfinished artifact, and the artifacts on those processes' edges — a done artifact is kept when an open process still reads it as an input, not as a record that it finished. Completed history lives in the closed issues, the git history, the decision records and the published registries.
+
+            The sweep applied nothing until `check` passed, `graph orphans` came back empty, and `status ready` and `status blocked` produced byte-identical output before and after. Comparing those queries whole is the point: an id-set comparison passes a sweep that leaves a process ready while quietly taking one of its inputs away.
+
+            no-issue: mechanical roadmap bookkeeping triggered by an issue close, carrying no work item of its own.

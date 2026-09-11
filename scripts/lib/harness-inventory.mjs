@@ -21,7 +21,9 @@ const SKILL_SOURCE_FILES = Object.freeze({
 	"pfd-grill": Object.freeze(["SKILL.md"]),
 	"pfd-ops": Object.freeze([
 		"SKILL.md",
+		"install/.github/workflows/pfdsl-flow-on-issue-close.yml",
 		"install/scripts/pfdsl/audit-issues-flow.mjs",
+		"install/scripts/pfdsl/lib/chain-sweep.mjs",
 		"install/scripts/pfdsl/lib/gh-compat.mjs",
 		"install/scripts/pfdsl/lib/gh-exec.mjs",
 		"install/scripts/pfdsl/lib/github-ops.mjs",
@@ -30,6 +32,7 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"install/scripts/pfdsl/lib/proxy-fetch-worker.mjs",
 		"install/scripts/pfdsl/lib/proxy-fetch.mjs",
 		"install/scripts/pfdsl/lib/yaml-require.mjs",
+		"install/scripts/pfdsl/sweep-completed-chains.mjs",
 		"references/architecture.md",
 		"references/file-based-tracker-backend.md",
 		"references/github-issues-backend.md",

@@ -9,7 +9,9 @@
 // scripts/lib/install-templates.test.mjs asserts it stays in sync with what
 // actually exists under .claude/skills/pfd-ops/install/.
 export const INSTALL_TEMPLATE_PATHS = [
+	".github/workflows/pfdsl-flow-on-issue-close.yml",
 	"scripts/pfdsl/audit-issues-flow.mjs",
+	"scripts/pfdsl/lib/chain-sweep.mjs",
 	"scripts/pfdsl/lib/gh-compat.mjs",
 	"scripts/pfdsl/lib/gh-exec.mjs",
 	"scripts/pfdsl/lib/github-ops.mjs",
@@ -18,4 +20,5 @@ export const INSTALL_TEMPLATE_PATHS = [
 	"scripts/pfdsl/lib/proxy-fetch-worker.mjs",
 	"scripts/pfdsl/lib/proxy-fetch.mjs",
 	"scripts/pfdsl/lib/yaml-require.mjs",
+	"scripts/pfdsl/sweep-completed-chains.mjs",
 ];

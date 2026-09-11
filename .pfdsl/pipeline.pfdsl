@@ -167,8 +167,8 @@ artifact:
     group: gen_sources
   ops_install_sources:
     label: pfd-ops 配布ソース（repo ルート）
-    description: "採用リポへ配る読取専用の監査スクリプトの一次情報。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install-templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）"
-    location: ../scripts/pfdsl/
+    description: "採用リポへ配る読取専用の監査スクリプト、完了チェーン回収スクリプト、その起動に使う GitHub Actions workflow の一次情報。手書きで repo ルート側に実体があり、このリポ自身の運用にも同じ実体を使う。配布対象は scripts/lib/install-templates.mjs の明示リストが決める（同居する repo ローカルのテストを配らないため glob でなく明示リスト）"
+    location: [ ../scripts/pfdsl/, ../.github/workflows/pfdsl-flow-on-issue-close.yml ]
     group: gen_sources
   claude_harness_sources:
     label: 現行のClaude Code手書き入力
@@ -346,9 +346,9 @@ artifact:
     group: adopter_env
   installed_l3_layer:
     label: 導入済みL3レイヤー
-    description: "plugin同梱install/由来の読取専用監査スクリプトと依存moduleの採用リポルートへの実配置結果"
+    description: "plugin同梱install/由来の読取専用監査スクリプト、完了チェーン回収スクリプト、close 駆動 workflow、依存moduleの採用リポルートへの実配置結果"
     criteria: check-install-sync.mjs --deploy が実装され、採用リポへの実配置が動作確認済み
-    externalStakeholders: [ 採用リポのメンテナ ]
+    externalStakeholders: [ 採用リポのメンテナ, 採用リポのGitHub Actions ]
     group: adopter_repo
   drift_report:
     label: 配置鮮度警告
