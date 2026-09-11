@@ -1187,6 +1187,22 @@ a >> design -> b
 			expect(codes("A >> P -> B", fm)).not.toContain("V035");
 		});
 
+		it("does not fire on a declared artifact that never appears on an edge (#1125 review defect 3)", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { future: {} },
+			};
+			expect(codes("", fm)).not.toContain("V035");
+		});
+
+		it("still fires on a status-less artifact that does appear on an edge, alongside an unconnected declaration", () => {
+			const fm: Frontmatter = {
+				type: "roadmap",
+				artifact: { A: { status: "done" }, B: {}, future: {} },
+			};
+			expect(codes("A >> P -> B", fm)).toContain("V035");
+		});
+
 		it("distinguishes 'no declaration' from 'declared without status' in the message", () => {
 			const fm: Frontmatter = {
 				type: "roadmap",

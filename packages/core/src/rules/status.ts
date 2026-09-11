@@ -74,16 +74,18 @@ export function pfdType(ctx: RuleContext): Diagnostic[] {
 /**
  * V035: in a roadmap, every artifact id that appears on an edge must carry a
  * frontmatter declaration, and that declaration must carry a `status:`
- * (§15.16). `ctx.nodeKinds` is total over both frontmatter declarations and
- * body edges (normalizer.ts infers a kind for every id it sees), so an
- * "artifact" id absent from `artifactMeta` can only be one whose declaration
- * block is gone while an edge referencing it remains — a ghost node with no
- * label, no status, no criteria. `check`, `graph orphans`, and `meta get`
- * all treat it as absent, while `status ready` still reports it as a
- * satisfied input (#1125). A declaration that exists but omits `status:`
- * (including an empty `id: {}` block) is the milder form of the same gap:
- * the progress the roadmap is supposed to carry for that artifact is
- * missing, even though the node itself is not a ghost.
+ * (§15.16/§15.17). Scoped to `ctx.nodesWithEdges`, not all of `ctx.nodeKinds`
+ * (which also holds ids declared in frontmatter but never used on any edge,
+ * e.g. a `future:` artifact parked for later — those are not this rule's
+ * concern, and the diagnostic's own wording says "appears on an edge"). An
+ * "artifact" id in `nodesWithEdges` absent from `artifactMeta` can only be
+ * one whose declaration block is gone while an edge referencing it remains —
+ * a ghost node with no label, no status, no criteria. `check`, `graph
+ * orphans`, and `meta get` all treat it as absent, while `status ready`
+ * still reports it as a satisfied input (#1125). A declaration that exists
+ * but omits `status:` (including an empty `id: {}` block) is the milder
+ * form of the same gap: the progress the roadmap is supposed to carry for
+ * that artifact is missing, even though the node itself is not a ghost.
  *
  * Unconditional error, not `ctx.strictly(...)`: `check-scaffold` deliberately
  * runs `--strict` only against the distributed scaffold, exempting
@@ -95,6 +97,7 @@ export function roadmapUndeclaredArtifact(ctx: RuleContext): Diagnostic[] {
 	const diagnostics: Diagnostic[] = [];
 	for (const [id, kind] of ctx.nodeKinds) {
 		if (kind !== "artifact") continue;
+		if (!ctx.nodesWithEdges.has(id)) continue;
 		const meta = ctx.artifactMeta[id];
 		if (meta === undefined) {
 			diagnostics.push({
