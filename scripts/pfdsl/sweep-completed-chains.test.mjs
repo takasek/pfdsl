@@ -43,9 +43,9 @@ function runSweep(args) {
 	});
 }
 
-/** Files in `sub` other than the ones the fixture itself put there. */
-function extraFiles(expected) {
-	return readdirSync(sub).filter((name) => !expected.includes(name));
+/** Files in `dirPath` other than the ones the fixture itself put there. */
+function extraFiles(dirPath, expected) {
+	return readdirSync(dirPath).filter((name) => !expected.includes(name));
 }
 
 describe("sweep-completed-chains: scratch verification location (#1125)", () => {
@@ -92,7 +92,7 @@ legacy_in >> build_feature -> feature
 		assert.equal(after.includes("extends: ./preset.pfdsl"), true);
 
 		assert.deepEqual(
-			extraFiles(["roadmap.pfdsl", "preset.pfdsl"]),
+			extraFiles(sub, ["roadmap.pfdsl", "preset.pfdsl"]),
 			[],
 			"no scratch file should remain next to the swept file",
 		);
@@ -105,9 +105,56 @@ legacy_in >> build_feature -> feature
 		assert.equal(readFileSync(roadmapFile, "utf-8"), before);
 
 		assert.deepEqual(
-			extraFiles(["roadmap.pfdsl", "preset.pfdsl"]),
+			extraFiles(sub, ["roadmap.pfdsl", "preset.pfdsl"]),
 			[],
 			"no scratch file should remain next to the swept file after a dry run",
+		);
+	});
+});
+
+describe("sweep-completed-chains: canonical-fmt gate (#1125)", () => {
+	// GITHUB_TOKEN-authored PRs never trigger the pull_request workflow, so
+	// the repo's own `make check-fmt` never runs against this bot's output —
+	// nothing outside the script itself verifies it. This fixture starts
+	// from a structurally valid but not canonically formatted roadmap
+	// (`check` only warns, `fmt --check` fails): the quoting `"123a"`/`"on"`
+	// carry in the body is unnecessary and `fmt` would strip it, but nothing
+	// the delete touches revisits that quoting, so it survives into the
+	// delete output untouched — still non-canonical, still unnoticed by
+	// `check`, `graph orphans`, or the ready/blocked comparison alone.
+	const nonCanonical = `---
+type: roadmap
+artifact:
+  "123a": { label: A, status: done }
+  "on": { label: On, status: done }
+  d: { label: D, status: todo }
+process:
+  p1: { label: P1 }
+  p2: { label: P2 }
+---
+
+"123a" >> p1 -> "on"
+
+"123a" >> p2 -> d
+`;
+
+	let file;
+
+	beforeEach(() => {
+		file = join(dir, "roadmap.pfdsl");
+		writeFileSync(file, nonCanonical);
+	});
+
+	it("refuses to apply a delete candidate that is not canonically formatted, and exits 1", () => {
+		const result = runSweep([file, "--write"]);
+		assert.equal(result.status, 1);
+		assert.match(result.stderr, /not canonically formatted/);
+
+		assert.equal(readFileSync(file, "utf-8"), nonCanonical);
+		assert.deepEqual(
+			extraFiles(dir, ["roadmap.pfdsl"]),
+			[],
+			"no scratch file should remain after a failed fmt check",
 		);
 	});
 });

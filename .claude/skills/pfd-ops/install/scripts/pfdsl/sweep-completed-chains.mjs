@@ -224,6 +224,20 @@ try {
 		);
 	}
 
+	// A GITHUB_TOKEN-authored PR never triggers the pull_request workflow, so
+	// this repo's own `make check-fmt` never runs against this script's
+	// output — nothing outside this gate verifies it stayed canonically
+	// formatted. `delete` only rewrites what it touches, so a non-canonical
+	// input can pass its own `check` (which does not judge formatting) and
+	// still come out non-canonical.
+	const verifyFmt = runCli(["fmt", scratchFile, "--check"]);
+	if (verifyFmt.status !== 0) {
+		failVerify(
+			"post-sweep output is not canonically formatted; not applying.",
+			verifyFmt,
+		);
+	}
+
 	const orphansRes = runCliJson(["graph", "orphans", scratchFile, "--json"]);
 	if (!orphansRes.ok) {
 		failVerify(
