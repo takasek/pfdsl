@@ -30,6 +30,9 @@ import {
 	formatEdges,
 	splitBodyIntoSegments,
 } from "./formatter.js";
+
+export { formatId, parseIdList } from "./formatter.js";
+
 import { loadFrontmatter } from "./frontmatter.js";
 import {
 	parseFrontmatterCst,
@@ -170,6 +173,8 @@ export function parse(source: string): ParseDocResult {
 	return { document, frontmatter, bodyStartLine, diagnostics };
 }
 
+export type { DeleteNodesResult } from "./delete-nodes.js";
+export { deleteNodes } from "./delete-nodes.js";
 export type { InsertDefinitionResult } from "./insert-definition.js";
 export { insertDefinition } from "./insert-definition.js";
 export type {

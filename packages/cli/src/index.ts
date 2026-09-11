@@ -19,6 +19,7 @@ import {
 	type Diagnostic,
 	type DiagnosticRegistryEntry,
 	type DiffReport,
+	deleteNodes,
 	format,
 	formatEdges,
 	type GraphNeighbor,
@@ -33,6 +34,7 @@ import {
 	locateNode,
 	type NodeKind,
 	type PfdType,
+	parseIdList,
 	reindex,
 	resolveEffectiveFrontmatter,
 	resolveLocationFsPath,
@@ -246,6 +248,11 @@ const EXPLAIN_OPTIONS = NO_OPTIONS;
 const FMT_OPTIONS = {
 	write: BOOLEAN_OPTION,
 	check: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const DELETE_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
 const RENDER_OPTIONS = {
@@ -592,6 +599,48 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 		return { stdout: "", stderr: warningText, exitCode: 0 };
 	}
 	return { stdout: output, stderr: warningText, exitCode: 0 };
+}
+
+export interface DeleteOptions {
+	write?: boolean;
+	json?: boolean;
+	color?: boolean;
+}
+
+/**
+ * `deleteNodes` (packages/core) leaves `output` as the untouched original and
+ * fills `notFound` with every requested id when `source` already carries a
+ * parse/validation error (there is nothing safe to rewrite) — that `notFound`
+ * is a side effect of not having processed the document at all, not a report
+ * that the ids are absent, so it is never surfaced. `failIfErrors` covers
+ * both text and --json the same way the rest of the CLI's diagnostic-emitting
+ * commands do (#508), and takes over here before `deleted`/`notFound` are read.
+ */
+export function runDelete(
+	file: string,
+	idList: string,
+	opts: DeleteOptions = {},
+): CommandResult {
+	if (file === "-" && opts.write) {
+		return fail("--write cannot be used with stdin (-)\n", 2);
+	}
+	const ids = parseIdList(idList);
+	if (ids.length === 0) return fail(HELP_DELETE, 2);
+
+	const source = readSource(file);
+	if (isCommandResult(source)) return source;
+
+	const { output, deleted, notFound, diagnostics } = deleteNodes(source, ids);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	if (opts.write) writeFileSync(file, output, "utf-8");
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, deleted, notFound })}\n`);
+	}
+	if (opts.write) return ok("");
+	return ok(output);
 }
 
 export interface ReindexOptions {
@@ -1137,6 +1186,16 @@ export interface MetaSetOptions {
 	color?: boolean;
 }
 
+/**
+ * Diagnostic codes reporting a document that could not be read rather than one
+ * whose content is wrong: front matter (FM), lexer (L), parser (P), and
+ * normalizer (N). A rewrite cannot cure these and cannot be trusted to land
+ * correctly on top of them, so they gate a mutation before it runs. Validation
+ * codes (V) describe content a mutation may be fixing and are judged on the
+ * result instead.
+ */
+const STRUCTURAL_CODE = /^(?:FM|P|L|N)\d+$/;
+
 /** Fields whose values are arrays/maps — meta set only writes scalars. */
 const NON_SCALAR_FIELDS = new Set([
 	"tags",
@@ -1179,17 +1238,34 @@ export function runMetaSet(
 			2,
 		);
 	}
-	const ids = splitCommaList(idList);
+	const ids = parseIdList(idList);
 	if (ids.length === 0) return fail(HELP_META_SET, 2);
 
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 
-	const { diagnostics, nodeKinds, frontmatter } = analyze(src);
-	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
+	// This gate asks "would this write leave a broken file?", not "is the file
+	// broken now?" (#1125). A `meta set` is often the cure for the very error
+	// a pre-mutation check would trip on — V035 rejects a roadmap artifact
+	// declared without a `status:`, which is the state `meta set <id> status`
+	// exists to close (#415). Judging the original there would make the fix
+	// unreachable, so validation errors are judged on the result instead, by
+	// the post-mutation gate below.
+	//
+	// Structural diagnostics stay here. FM / P / L / N report a document that
+	// could not be read, tokenized, parsed, or normalized, so `frontmatter`
+	// and `nodeKinds` below cannot be trusted to describe it — the type check,
+	// the id lookup, and the field/kind pairing all read them. Those are the
+	// pre-check's unnamed second job, and dropping it wholesale would drop
+	// them with it.
+	const unreadable = diagnostics.filter((d) =>
+		STRUCTURAL_CODE.test(String(d.code)),
+	);
+	const failed = failIfErrors(unreadable, file, opts.json, opts.color);
 	if (failed) return failed;
 
-	// Progress belongs to the roadmap (§15.16), so writing status into a file
+	// Progress belongs to the roadmap (§15.15), so writing status into a file
 	// that declares another kind would have the CLI produce the state W007
 	// reports. An omitted type is read as roadmap, same as the ready gate.
 	if (field === "status") {
@@ -1217,8 +1293,24 @@ export function runMetaSet(
 		}
 	}
 
-	// Snapshot ready set before mutation (roadmap only)
-	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
+	// Snapshot ready set before mutation (roadmap only). Computed directly
+	// from the analyze(src) result already gated for structural errors above,
+	// not via computeReadyIds(src) — that helper treats ANY diagnostic-
+	// severity error (not just a structural one) as "not a roadmap" and
+	// returns isRoadmap: false. A validation error like V007 (invalid status
+	// enum value) is exactly the kind of thing `meta set` is often used to
+	// cure (#415's V035 is the same shape), so reading isRoadmap from the
+	// unmutated original would make the post-mutation newlyReady
+	// recomputation below silently skip every such write, even one that
+	// lands cleanly (#1125 defect 6). `frontmatter`/`nodeKinds`/`edges` are
+	// already known safe to read at this point (the structural gate above
+	// covers exactly that), so isRoadmapType + computeReadyIdsCore read them
+	// directly instead.
+	const isRoadmap = isRoadmapType(frontmatter?.type);
+	const beforeIds = isRoadmap
+		? computeReadyIdsCore(edges, nodeKinds, frontmatter?.artifact ?? {})
+				.readyIds
+		: [];
 	const beforeSet = new Set(beforeIds);
 
 	// Quoting for the new value is left to the yaml package's own core-schema
@@ -1237,12 +1329,21 @@ export function runMetaSet(
 		newSrc = applied;
 	}
 
-	// Safety net: never write a rewrite that introduces errors the original
-	// didn't have (rewriter bug or unsupported YAML style).
-	if (hasErrors(analyze(newSrc).diagnostics)) {
-		const message = `meta set: refusing to write ${file}: the rewrite would introduce errors`;
-		if (opts.json) return failJson({ error: message });
-		return fail(`${message}\n`);
+	// The gate on the write: the result must be clean. That covers an error the
+	// rewrite introduced (rewriter bug or unsupported YAML style) and one the
+	// original already had and this write did not cure — since the pre-check
+	// above no longer judges the original, both arrive here.
+	const resulting = analyze(newSrc).diagnostics;
+	if (hasErrors(resulting)) {
+		// Report the errors themselves, not just the refusal. This is the only
+		// place a validation error on the input surfaces now, and `meta set`
+		// shares the `{ ok: false, diagnostics: [...] }` failure contract with
+		// every other diagnostic-emitting command (#508). The `error` line
+		// carries what diagnostics cannot: that nothing was written.
+		const errs = resulting.filter((d) => d.severity === "error");
+		const message = `meta set: refusing to write ${file}: the result would have errors`;
+		if (opts.json) return failJson({ error: message, diagnostics: errs });
+		return fail(`${diagText(errs, file, opts.color)}${message}\n`);
 	}
 	writeFileSync(file, newSrc, "utf-8");
 
@@ -1542,7 +1643,7 @@ function collectNodeFields(
 
 export function runGet(file: string, opts: GetOptions = {}): CommandResult {
 	if (!opts.id) return fail(`error: id is required\n\n${HELP_GET}`, 2);
-	const ids = splitCommaList(opts.id);
+	const ids = parseIdList(opts.id);
 	if (ids.length === 0) return fail(`error: id is required\n\n${HELP_GET}`, 2);
 
 	// Omitted field positional means "all set fields"; present-but-empty
@@ -2414,7 +2515,7 @@ export interface StatusGapsResult {
  * The tag a flow artifact carries to say "this one is an individually tracked
  * deliverable, so the roadmap must have a chain that builds it". The selector
  * used to be `status: todo`, but a flow file may not carry status at all
- * (W007, §15.16) — that selector could only match files already in violation.
+ * (W007, §15.15) — that selector could only match files already in violation.
  * An opt-in tag also keeps the check quiet by default: comparing every flow id
  * against the roadmap flags 42 of this repo's own 47 workflow artifacts, which
  * are process byproducts nobody ever meant to track one by one.
@@ -2719,6 +2820,32 @@ Options:
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
+const HELP_DELETE = `${helpUsage("delete", "<file|-> <id[,id...]>", DELETE_OPTIONS)}
+
+Remove one or more nodes (artifact or process) from a .pfdsl file in a single
+atomic pass: the frontmatter declaration, every body edge occurrence, and
+every surviving node's revises:/parts:/boundary: reference to the deleted id.
+An id that exists nowhere in the file is a no-op, not an error — it is
+reported in notFound rather than failing the call. Use - to read from stdin
+(--write not allowed with stdin).
+
+Output follows the gofmt model: the rewritten file goes to stdout (preview);
+with --write it is written in place instead. Diagnostics go to stderr.
+
+Options:
+  --write     rewrite the file in place (cannot be used with -)
+  --json      emit { ok: true, deleted: [...], notFound: [...] } instead of
+              the rewritten document — same shape whether or not --write is
+              also given
+              on parse/validation failure: { ok: false, diagnostics } (exit 1)
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success (including ids not found — idempotent)
+  1  the file has a parse/validation error; nothing is deleted or written
+  2  invalid usage (missing arguments, or --write combined with stdin)
+`;
+
 const HELP_REINDEX = `${helpUsage(
 	"meta reindex",
 	"<file|->",
@@ -2866,7 +2993,7 @@ cannot be set.
 
 Setting status requires a roadmap file: an explicit type: other than roadmap
 is refused (spec §2.10/§15.14), since progress belongs to the roadmap — a file
-that carries status under another kind is also reported by check (W007, §15.16).
+that carries status under another kind is also reported by check (W007, §15.15).
 Other fields are writable on any kind.
 When setting status on a roadmap file, reports which processes became newly
 ready after the change (once, after all writes).
@@ -3252,7 +3379,7 @@ Omitting type: on the roadmap file is treated as roadmap and allowed, with a war
 The tag is opt-in: tag the flow artifacts that are individually tracked
 deliverables. Comparing every flow artifact id instead would flag the routine
 byproducts a process diagram is mostly made of. Flow files carry no status
-(W007, spec §15.16), so status cannot be the selector here.
+(W007, spec §15.15), so status cannot be the selector here.
 If nothing carries the tag, this check has no target and says so rather than
 reporting a pass.
 
@@ -4024,6 +4151,22 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 			return runFmt(f, {
 				write: flags.write === true,
 				check: flags.check === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "delete",
+		synopsis: "delete <file|-> <id[,id...]> [--write] [--json] [--no-color]",
+		description: ["Remove one or more nodes from a .pfdsl file (- = stdin)"],
+		help: HELP_DELETE,
+		options: DELETE_OPTIONS,
+		run: (positional, flags) => {
+			const [f, idList] = positional;
+			if (!f || !idList) return fail(HELP_DELETE, 2);
+			return runDelete(f, idList, {
+				write: flags.write === true,
+				json: flags.json === true,
 				color: resolveColor(flags),
 			});
 		},

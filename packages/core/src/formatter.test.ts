@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
 	formatAsFlows,
 	formatEdges,
+	formatId,
+	parseIdList,
 	splitBodyIntoSegments,
 } from "./formatter.js";
 import { lex } from "./lexer.js";
@@ -28,6 +30,33 @@ function assertRoundTrips(
 	);
 	expect([...normalized.isolatedNodes]).toEqual(expectedIsolated);
 }
+
+describe("parseIdList (#1125 review defect 2)", () => {
+	it("splits a plain comma-separated list into bare ids", () => {
+		expect(parseIdList("a,b")).toEqual(["a", "b"]);
+	});
+
+	it("trims surrounding whitespace around bare ids", () => {
+		expect(parseIdList(" a , b ")).toEqual(["a", "b"]);
+	});
+
+	it("treats a comma inside a quoted id as part of that single id", () => {
+		expect(parseIdList('"a,b"')).toEqual(["a,b"]);
+	});
+
+	it("splits a quoted id from a following bare id", () => {
+		expect(parseIdList('"a,b",c')).toEqual(["a,b", "c"]);
+	});
+
+	it("unescapes a quoted id the same way formatId escapes it (round trip)", () => {
+		const id = 'has "quotes" and a\nnewline';
+		expect(parseIdList(formatId(id)).at(0)).toBe(id);
+	});
+
+	it("ignores empty segments", () => {
+		expect(parseIdList("a,,b,")).toEqual(["a", "b"]);
+	});
+});
 
 describe("formatEdges", () => {
 	it("empty list → empty string", () => {

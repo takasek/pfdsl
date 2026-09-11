@@ -35,31 +35,11 @@ export function statusMonotonicity(ctx: RuleContext): Diagnostic[] {
 }
 
 /**
- * W005: in a roadmap, a produced artifact carries the progress, so it needs a
- * status to carry (§15.15). Source artifacts and non-roadmap files are exempt.
- */
-export function roadmapStatusPresence(ctx: RuleContext): Diagnostic[] {
-	if (ctx.fm?.type !== "roadmap") return [];
-	const diagnostics: Diagnostic[] = [];
-	for (const [aid] of ctx.edgeGroups.artifactProducers) {
-		if (ctx.artifactMeta[aid]?.status === undefined) {
-			diagnostics.push({
-				severity: ctx.strictly("warning"),
-				code: "W005",
-				message: `Produced artifact '${aid}' has no 'status' field`,
-				range: ctx.rangeOf(aid),
-			});
-		}
-	}
-	return diagnostics;
-}
-
-/**
- * W007: outside a roadmap, an artifact carries no progress of its own (§15.16).
+ * W007: outside a roadmap, an artifact carries no progress of its own (§15.15).
  * The same id can appear in several diagrams, so status lives in one of them —
- * a flow file that declares it lets two diagrams claim different states for the
- * same thing. Mirror of W005, which exempts files with no `type:` for the same
- * reason this one does: an omitted kind declares nothing to hold them to.
+ * a flow file that declares it lets two diagrams claim different states for
+ * the same thing. Exempts files with no `type:`: an omitted kind declares
+ * nothing to hold them to.
  */
 export function flowStatusAbsence(ctx: RuleContext): Diagnostic[] {
 	const type = ctx.fm?.type;
@@ -89,6 +69,53 @@ export function pfdType(ctx: RuleContext): Diagnostic[] {
 			range: zeroRange(),
 		},
 	];
+}
+
+/**
+ * V035: in a roadmap, every artifact id that appears on an edge must carry a
+ * frontmatter declaration, and that declaration must carry a `status:`
+ * (§15.16/§15.17). Scoped to `ctx.nodesWithEdges`, not all of `ctx.nodeKinds`
+ * (which also holds ids declared in frontmatter but never used on any edge,
+ * e.g. a `future:` artifact parked for later — those are not this rule's
+ * concern, and the diagnostic's own wording says "appears on an edge"). An
+ * "artifact" id in `nodesWithEdges` absent from `artifactMeta` can only be
+ * one whose declaration block is gone while an edge referencing it remains —
+ * a ghost node with no label, no status, no criteria. `check`, `graph
+ * orphans`, and `meta get` all treat it as absent, while `status ready`
+ * still reports it as a satisfied input (#1125). A declaration that exists
+ * but omits `status:` (including an empty `id: {}` block) is the milder
+ * form of the same gap: the progress the roadmap is supposed to carry for
+ * that artifact is missing, even though the node itself is not a ghost.
+ *
+ * Unconditional error, not `ctx.strictly(...)`: `check-scaffold` deliberately
+ * runs `--strict` only against the distributed scaffold, exempting
+ * operational `.pfdsl/`. A strict-gated severity would stay a warning
+ * exactly where this needs to hold.
+ */
+export function roadmapUndeclaredArtifact(ctx: RuleContext): Diagnostic[] {
+	if (ctx.fm?.type !== "roadmap") return [];
+	const diagnostics: Diagnostic[] = [];
+	for (const [id, kind] of ctx.nodeKinds) {
+		if (kind !== "artifact") continue;
+		if (!ctx.nodesWithEdges.has(id)) continue;
+		const meta = ctx.artifactMeta[id];
+		if (meta === undefined) {
+			diagnostics.push({
+				severity: "error",
+				code: "V035",
+				message: `Artifact '${id}' appears on an edge but has no frontmatter declaration`,
+				range: zeroRange(),
+			});
+		} else if (meta.status === undefined) {
+			diagnostics.push({
+				severity: "error",
+				code: "V035",
+				message: `Artifact '${id}' appears on an edge but its frontmatter declaration has no 'status' field`,
+				range: ctx.rangeOf(id),
+			});
+		}
+	}
+	return diagnostics;
 }
 
 /**

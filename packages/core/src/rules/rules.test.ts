@@ -8,7 +8,6 @@ import { orphanedProcess, processCompleteness } from "./completeness.js";
 import { buildRuleContext, type ValidateOptions } from "./context.js";
 import { primaryGraphCycle } from "./cycles.js";
 import { artifactOnlyFields } from "./field-placement.js";
-import { roadmapStatusPresence } from "./status.js";
 
 function contextFor(
 	src: string,
@@ -73,12 +72,6 @@ describe("--strict is applied uniformly", () => {
 			rule: artifactOnlyFields,
 			src: "A >> P -> B",
 			fm: { artifact: { B: {} } } as Frontmatter,
-		},
-		{
-			name: "W005",
-			rule: roadmapStatusPresence,
-			src: "A >> P -> B",
-			fm: { type: "roadmap" } as Frontmatter,
 		},
 	])("$name is a warning by default and an error under --strict", ({
 		name,

@@ -1,7 +1,10 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { deleteNodes } from "@pfdsl/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { readyUnchanged } from "../../../scripts/pfdsl/lib/ready-compare.mjs";
 import {
 	COMMAND_GROUPS,
 	HELP,
@@ -13,6 +16,8 @@ import {
 	TOP_LEVEL_COMMANDS,
 } from "./index.js";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 /** A stdin the CLI will read for a `-` argument, without touching fd 0. */
 const withStdin = (input: string) => ({ readStdin: () => input });
 /** Colour is decided from these, so a test states them instead of patching the process. */
@@ -23,6 +28,22 @@ const valid = "req >> design -> spec\nspec >> impl -> code\n";
 const validWithStatus =
 	"---\nartifact:\n  spec:\n    status: wip\n    criteria: spec criteria\n  code:\n    status: todo\n    criteria: code criteria\n---\nreq >> design -> spec\nspec >> impl -> code\n";
 const invalid = "req >> design -> spec\nother -> spec\n"; // V001: dual generators (always error)
+// Same V001, but with declarations to write into. `meta set` judges the result
+// of the write rather than the original (#1125), so reaching its failure path
+// takes a file whose mutation actually lands and still leaves the error.
+const invalidDeclared = `---
+type: roadmap
+artifact:
+  spec: { label: Spec, status: todo }
+  req: { label: Req, status: done }
+  other: { label: Other, status: done }
+process:
+  design: { label: Design }
+  build: { label: Build }
+---
+req >> design -> spec
+other >> build -> spec
+`;
 const warningOnly =
 	"---\nartifact:\n  bundle:\n    parts: [orphan]\n---\nreq >> design -> bundle\n"; // W001: orphan has no edges
 // V002 (process with no inputs): a warning by default, an error under --strict.
@@ -35,6 +56,7 @@ beforeAll(() => {
 	writeFileSync(join(dir, "valid.pfdsl"), valid);
 	writeFileSync(join(dir, "valid-with-status.pfdsl"), validWithStatus);
 	writeFileSync(join(dir, "invalid.pfdsl"), invalid);
+	writeFileSync(join(dir, "invalid-declared.pfdsl"), invalidDeclared);
 	writeFileSync(join(dir, "warning-only.pfdsl"), warningOnly);
 	writeFileSync(join(dir, "incomplete.pfdsl"), incomplete);
 	writeFileSync(join(dir, "inline-comment.pfdsl"), inlineComment);
@@ -76,6 +98,8 @@ describe("command metadata parse surface (#1050)", () => {
 			"usage: pfdsl graph summary <file|-> [--json] [--no-color]",
 		"graph io": "usage: pfdsl graph io <file|-> [--json] [--no-color]",
 		fmt: "usage: pfdsl fmt <file|-> [--write] [--check] [--no-color]",
+		delete:
+			"usage: pfdsl delete <file|-> <id[,id...]> [--write] [--json] [--no-color]",
 		"meta reindex":
 			"usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json] [--no-color]",
 		"meta sort":
@@ -180,8 +204,8 @@ describe("command metadata parse surface (#1050)", () => {
 		options: Record<string, unknown>;
 	}) => new Set(Object.keys(entry.options).map((name) => `--${name}`));
 
-	it("covers exactly 27 dispatchable command entries", () => {
-		expect(commandTargets).toHaveLength(27);
+	it("covers exactly 28 dispatchable command entries", () => {
+		expect(commandTargets).toHaveLength(28);
 	});
 
 	it.each(
@@ -544,6 +568,127 @@ describe("fmt", () => {
 		const r = await run(["fmt", f, "--check", "--write"]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toBe("--check cannot be combined with --write\n");
+	});
+});
+
+describe("delete", () => {
+	const src = "req >> design -> spec\nspec >> impl -> code\n";
+
+	it("prints the document with the id removed to stdout by default, without writing", async () => {
+		const f = join(dir, "delete-default.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["delete", f, "spec"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("req >> design\nimpl -> code\n");
+		expect(readFileSync(f, "utf-8")).toBe(src);
+	});
+
+	it("--write rewrites the file in place", async () => {
+		const f = join(dir, "delete-write.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["delete", f, "spec", "--write"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toBe("req >> design\nimpl -> code\n");
+	});
+
+	it("--write with stdin is rejected (exit 2)", async () => {
+		const r = await run(["delete", "-", "spec", "--write"], withStdin(src));
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe("--write cannot be used with stdin (-)\n");
+	});
+
+	it("--json reports { ok: true, deleted, notFound }, unchanged by --write", async () => {
+		const withoutWrite = join(dir, "delete-json.pfdsl");
+		writeFileSync(withoutWrite, src);
+		const r1 = await run(["delete", withoutWrite, "spec,nope", "--json"]);
+		expect(r1.exitCode).toBe(0);
+		expect(JSON.parse(r1.stdout)).toEqual({
+			ok: true,
+			deleted: ["spec"],
+			notFound: ["nope"],
+		});
+		expect(readFileSync(withoutWrite, "utf-8")).toBe(src);
+
+		const withWrite = join(dir, "delete-json-write.pfdsl");
+		writeFileSync(withWrite, src);
+		const r2 = await run([
+			"delete",
+			withWrite,
+			"spec,nope",
+			"--json",
+			"--write",
+		]);
+		expect(r2.exitCode).toBe(0);
+		expect(JSON.parse(r2.stdout)).toEqual({
+			ok: true,
+			deleted: ["spec"],
+			notFound: ["nope"],
+		});
+		expect(readFileSync(withWrite, "utf-8")).toBe(
+			"req >> design\nimpl -> code\n",
+		);
+	});
+
+	it("a nonexistent id lands in notFound and exits 0 (idempotent)", async () => {
+		const f = join(dir, "delete-notfound.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["delete", f, "nope"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(src);
+		expect(readFileSync(f, "utf-8")).toBe(src);
+	});
+
+	it("a file with a validation error prints diagnostics and exits 1, without reporting notFound", async () => {
+		const r = await run(["delete", join(dir, "invalid.pfdsl"), "spec"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toBe("");
+		expect(r.stderr).toContain("V001");
+		expect(r.stderr).not.toContain("notFound");
+	});
+
+	it("--json on a file with a validation error returns { ok: false, diagnostics } without notFound", async () => {
+		const r = await run([
+			"delete",
+			join(dir, "invalid.pfdsl"),
+			"spec",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(parsed.notFound).toBeUndefined();
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	});
+
+	it("missing id argument prints help (exit 2)", async () => {
+		const r = await run(["delete", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(2);
+	});
+
+	it("a quoted id containing a comma is treated as a single id, not split (#1125 review defect 2)", async () => {
+		const f = join(dir, "delete-quoted-comma-id.pfdsl");
+		const quotedSrc = `---
+artifact:
+  "a,b":
+    label: A-B
+  c:
+    label: C
+process:
+  p:
+    label: P
+---
+["a,b", c] >> p
+`;
+		writeFileSync(f, quotedSrc);
+		const r = await run(["delete", f, '"a,b"', "--json"]);
+		expect(r.exitCode).toBe(0);
+		expect(JSON.parse(r.stdout)).toEqual({
+			ok: true,
+			deleted: ["a,b"],
+			notFound: [],
+		});
 	});
 });
 
@@ -1457,6 +1602,10 @@ describe("--json failure payload on a file that does not validate", () => {
 	const cases: Array<{ name: string; argv: () => string[] }> = [
 		{ name: "check", argv: () => ["check", invalidFile(), "--json"] },
 		{
+			name: "delete",
+			argv: () => ["delete", invalidFile(), "spec", "--json"],
+		},
+		{
 			name: "meta reindex",
 			argv: () => ["meta", "reindex", invalidFile(), "--json"],
 		},
@@ -1465,7 +1614,7 @@ describe("--json failure payload on a file that does not validate", () => {
 			argv: () => [
 				"meta",
 				"set",
-				invalidFile(),
+				join(dir, "invalid-declared.pfdsl"),
 				"spec",
 				"status",
 				"done",
@@ -1547,6 +1696,15 @@ describe("--no-color wired into all diagnostic-emitting commands (#508)", () => 
 			argv: (nc) => ["fmt", invalidFile(), ...(nc ? ["--no-color"] : [])],
 		},
 		{
+			name: "delete",
+			argv: (nc) => [
+				"delete",
+				invalidFile(),
+				"spec",
+				...(nc ? ["--no-color"] : []),
+			],
+		},
+		{
 			name: "meta reindex",
 			argv: (nc) => [
 				"meta",
@@ -1609,10 +1767,10 @@ describe("--no-color wired into all diagnostic-emitting commands (#508)", () => 
 			argv: (nc) => [
 				"meta",
 				"set",
-				invalidFile(),
-				"x",
-				"label",
-				"y",
+				join(dir, "invalid-declared.pfdsl"),
+				"spec",
+				"status",
+				"done",
 				...(nc ? ["--no-color"] : []),
 			],
 		},
@@ -2192,7 +2350,7 @@ describe("status ready", () => {
 
 	it("accepts file with type: roadmap", async () => {
 		const f = withStatus(
-			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n---\nreq >> design -> spec\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n  spec:\n    status: todo\n---\nreq >> design -> spec\n",
 		);
 		const r = await run(["status", "ready", f]);
 		expect(r.exitCode).toBe(0);
@@ -2223,13 +2381,13 @@ describe("status ready", () => {
 		expect(parsed.warnings?.[0]?.code).toBe("W006");
 	});
 
-	it("does not surface non-W006 warnings (e.g. W005) as ready warnings (#308)", async () => {
+	it("does not surface non-W006 warnings (e.g. W003) as ready warnings (#308)", async () => {
 		const f = withStatus(
-			"---\ntype: roadmap\nartifact:\n  req:\n    status: done\n  spec: {}\n---\nreq >> design -> spec\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: wip\n  spec:\n    status: done\n---\nreq >> design -> spec\n",
 		);
 		const r = await run(["status", "ready", f, "--json"]);
 		const parsed = JSON.parse(r.stdout);
-		expect(r.stderr).not.toContain("W005");
+		expect(r.stderr).not.toContain("W003");
 		expect(parsed.warnings).toBeUndefined();
 	});
 
@@ -2323,7 +2481,7 @@ req >> design -> spec
 		expect(r.stderr).toContain("stdin");
 	});
 
-	// Status is the roadmap's to carry (§15.14, §15.16). ready / blocked /
+	// Status is the roadmap's to carry (§15.14, §15.15). ready / blocked /
 	// status gaps already refuse an explicit non-roadmap type; meta set did not,
 	// so the CLI itself could write the state W007 reports (#923).
 	const flowBase = (type: string) => `---
@@ -2466,15 +2624,15 @@ req >> design -> spec
 		expect(r.stderr).toContain("W006");
 	});
 
-	it("does not surface non-W006 warnings (e.g. W005) as meta set warnings (#308)", async () => {
-		const f = join(dir, "status-set-w005.pfdsl");
+	it("does not surface non-W006 warnings (e.g. W003) as meta set warnings (#308)", async () => {
+		const f = join(dir, "status-set-w003.pfdsl");
 		writeFileSync(
 			f,
-			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  spec: {}\n---\nreq >> design -> spec\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  spec:\n    status: done\n  extra:\n    status: wip\n  output_done:\n    status: done\n---\nreq >> design -> spec\nextra >> other -> output_done\n",
 		);
 		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
 		const parsed = JSON.parse(r.stdout);
-		expect(r.stderr).not.toContain("W005");
+		expect(r.stderr).not.toContain("W003");
 		expect(parsed.warnings).toBeUndefined();
 	});
 
@@ -2550,6 +2708,26 @@ req >> design -> spec
 		expect(parsed.ok).toBe(true);
 		expect(parsed.newlyReady).toBeInstanceOf(Array);
 		expect(parsed.newlyReady).toHaveLength(0);
+	});
+
+	// #1125 defect 6: the "before" ready snapshot went through
+	// computeReadyIds(src), which treats ANY diagnostic-severity error on the
+	// original file — not just a structural one — as "not a roadmap" and
+	// returns isRoadmap: false. A V007 (invalid status enum value) is exactly
+	// the kind of error `meta set` is often used to cure, so a write that
+	// fixes it and leaves a clean result still silently skipped the
+	// post-mutation newlyReady recomputation.
+	it("--json still reports newlyReady when the original file had a non-structural error the write cures", async () => {
+		const f = join(dir, "status-set-json-newly-ready-from-error.pfdsl");
+		writeFileSync(
+			f,
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: finished\n  spec:\n    status: todo\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.newlyReady).toContain("design");
 	});
 
 	it("rewrites status in place on 4-space-indented frontmatter (#430)", async () => {
@@ -2817,6 +2995,49 @@ req >> design -> spec
 		expect(readFileSync(f, "utf-8")).toBe(selfRevises);
 	});
 
+	// The pre-mutation gate judges the result, not the original (#1125): a
+	// `meta set` that cures every error is allowed through, while one that
+	// leaves an error standing is not. `revises: spec` on `spec` above covers
+	// the third case, a mutation that adds an error.
+	it("refuses to write when the result still carries an unrelated error", async () => {
+		const twoGaps = `---
+type: roadmap
+artifact:
+  req: { label: Req, status: done }
+  spec: { label: Spec }
+  other: { label: Other }
+process:
+  design: { label: Design }
+  build: { label: Build }
+---
+req >> design -> spec
+req >> build -> other
+`;
+		const f = join(dir, "meta-set-residual-error.pfdsl");
+		writeFileSync(f, twoGaps);
+		const r = await run(["meta", "set", f, "spec", "status", "wip"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("refusing to write");
+		expect(readFileSync(f, "utf-8")).toBe(twoGaps);
+	});
+
+	it("still stops before mutating when the front matter cannot be parsed", async () => {
+		const unparseable = `---
+type: roadmap
+artifact:
+  spec: [unclosed
+---
+req >> design -> spec
+`;
+		const f = join(dir, "meta-set-unparseable.pfdsl");
+		writeFileSync(f, unparseable);
+		const r = await run(["meta", "set", f, "spec", "status", "wip"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toContain("FM002");
+		expect(r.stderr).not.toContain("refusing to write");
+		expect(readFileSync(f, "utf-8")).toBe(unparseable);
+	});
+
 	it("rejects a field invalid for the node kind (exit 2)", async () => {
 		const f = join(dir, "meta-set-badkind.pfdsl");
 		writeFileSync(f, generic);
@@ -2946,6 +3167,8 @@ artifact:
 
   target:
     status: done
+  zz:
+    status: todo
 ---
 target >> p -> zz
 `;
@@ -2990,13 +3213,27 @@ target >> p -> zz
 
 describe("status gaps", () => {
 	// The body decides what the roadmap produces, and producing is what counts
-	// as tracking — a declaration alone leaves the artifact unbuilt.
+	// as tracking — a declaration alone leaves the artifact unbuilt. `req` (the
+	// body's source id) and the body's produced id both need a frontmatter
+	// declaration with a `status:` too (V035, #1125); auto-fill whichever
+	// `artifacts` did not already declare, rather than repeating them at every
+	// call site.
 	const roadmapWith = (
 		artifacts: string,
 		body = "req >> build -> output\n",
 	) => {
+		const target = /->\s*(\S+)/.exec(body)?.[1];
+		const declared = (id: string) =>
+			new RegExp(`^  ${id}:`, "m").test(artifacts);
+		const autoDeclare = ["req", target]
+			.filter((id): id is string => id !== undefined && !declared(id))
+			.map((id) => `  ${id}:\n    status: todo\n`)
+			.join("");
 		const f = join(dir, "as-roadmap.pfdsl");
-		writeFileSync(f, `---\ntype: roadmap\nartifact:\n${artifacts}---\n${body}`);
+		writeFileSync(
+			f,
+			`---\ntype: roadmap\nartifact:\n${autoDeclare}${artifacts}---\n${body}`,
+		);
 		return f;
 	};
 	const flowWith = (artifacts: string) => {
@@ -3069,7 +3306,7 @@ describe("status gaps", () => {
 		const rm = join(dir, "as-roadmap-consumes.pfdsl");
 		writeFileSync(
 			rm,
-			"---\ntype: roadmap\nartifact:\n  built:\n    status: done\n---\nsource_only >> build -> built\n",
+			"---\ntype: roadmap\nartifact:\n  source_only:\n    status: todo\n  built:\n    status: done\n---\nsource_only >> build -> built\n",
 		);
 		const fl = flowWith(`  source_only:\n${TRACKED}    label: Source\n`);
 		const r = await run(["status", "gaps", rm, fl, "--json"]);
@@ -3195,7 +3432,7 @@ describe("status gaps", () => {
 		const anotherRoadmap = join(dir, "as-roadmap2.pfdsl");
 		writeFileSync(
 			anotherRoadmap,
-			"---\ntype: roadmap\nartifact:\n  y:\n    status: todo\n---\nreq >> build -> y\n",
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: todo\n  y:\n    status: todo\n---\nreq >> build -> y\n",
 		);
 		const r = await run(["status", "gaps", rm, anotherRoadmap]);
 		expect(r.exitCode).toBe(2);
@@ -5382,5 +5619,112 @@ describe("command table / help parity (#902)", () => {
 			groupNames.includes(n),
 		);
 		expect(shadowed).toEqual([]);
+	});
+});
+
+describe("deleteNodes preserves the planning queries (#1125)", () => {
+	// The sweep's own correctness condition, stated the way the backend
+	// reference states it: `status ready` and `status blocked` must be
+	// compared by their whole output, because comparing id sets alone passes
+	// a sweep that leaves a process ready while quietly taking an input away.
+	// Both cases below run against a fixture rather than `.pfdsl/roadmap.pfdsl`
+	// so that sweeping this repo's own roadmap never turns them stale.
+	const roadmap = `---
+type: roadmap
+artifact:
+  tool_a: { label: Tool A, status: done }
+  tool_b: { label: Tool B, status: done }
+  legacy_in: { label: Legacy In, status: done }
+  legacy_out: { label: Legacy Out, status: done }
+  feature: { label: Feature, status: todo }
+process:
+  build_legacy: { label: Build Legacy }
+  build_feature: { label: Build Feature }
+---
+
+legacy_in >> build_legacy -> legacy_out
+
+[tool_a, tool_b] >> build_feature -> feature
+`;
+
+	const planningQueries = async (source: string) => {
+		const f = join(
+			dir,
+			`planning-${Math.random().toString(36).slice(2)}.pfdsl`,
+		);
+		writeFileSync(f, source);
+		const ready = await run(["status", "ready", f, "--json"]);
+		const blocked = await run(["status", "blocked", f, "--json"]);
+		return { ready: ready.stdout, blocked: blocked.stdout, file: f };
+	};
+
+	const readyIds = (stdout: string): string[] =>
+		JSON.parse(stdout).ready.map((r: { id: string }) => r.id);
+
+	it("leaves both queries whole-output identical when a done chain is swept", async () => {
+		// build_legacy's chain is done end to end, so nothing still open reads it.
+		const { output, notFound } = deleteNodes(roadmap, [
+			"build_legacy",
+			"legacy_in",
+			"legacy_out",
+		]);
+		expect(notFound).toEqual([]);
+
+		const before = await planningQueries(roadmap);
+		const after = await planningQueries(output);
+		expect(after.ready).toBe(before.ready);
+		expect(after.blocked).toBe(before.blocked);
+
+		const checked = await run(["check", after.file]);
+		expect(checked.exitCode).toBe(0);
+		const orphans = await run(["graph", "orphans", after.file, "--json"]);
+		expect(JSON.parse(orphans.stdout).orphans).toEqual([]);
+	});
+
+	it("detects an input taken from a process that stays ready", async () => {
+		// The failure the reference names: tool_a is a done input of the ready
+		// build_feature, so dropping it leaves the ready id set untouched. A
+		// check written against ids alone would pass this; the whole-output
+		// comparison above is only worth running because it does not.
+		const { output } = deleteNodes(roadmap, ["tool_a"]);
+		const before = await planningQueries(roadmap);
+		const after = await planningQueries(output);
+
+		expect(readyIds(after.ready)).toEqual(readyIds(before.ready));
+		expect(after.ready).not.toBe(before.ready);
+	});
+
+	// scripts/pfdsl/sweep-completed-chains.mjs does not compare
+	// `status ready`'s whole output byte-for-byte (that breaks on every real
+	// sweep, #1125 defect 5 — see ready-compare.mjs's own doc); it compares
+	// via readyUnchanged instead. That relaxation must not reopen the gap the
+	// two tests above exist to close, so this drives readyUnchanged itself
+	// through the same "id set same, an item's declared inputs shrank"
+	// shape — via the same synthetic fixture as the two tests above rather
+	// than a real roadmap.pfdsl node name, so this sweeping that fixture
+	// eventually (this issue's own mechanism) never makes the test stale.
+	it("readyUnchanged still rejects a synthetic corruption that shrinks a ready item's inputs while its id set stays put (#1125 defect 5 regression guard)", async () => {
+		// tool_a is a done input of the ready build_feature; deleting only it
+		// (not the process, not tool_b) is exactly the "declared input
+		// silently dropped" corruption the comparison exists to catch, not a
+		// legitimate sweep of a completed chain — same deletion as the test
+		// above, driven through readyUnchanged itself instead of just the
+		// ready id set.
+		const { output, notFound } = deleteNodes(roadmap, ["tool_a"]);
+		expect(notFound).toEqual([]);
+
+		const before = await planningQueries(roadmap);
+		const after = await planningQueries(output);
+
+		expect(readyIds(after.ready)).toEqual(readyIds(before.ready));
+		const beforeItem = JSON.parse(before.ready).ready.find(
+			(r: { id: string }) => r.id === "build_feature",
+		);
+		const afterItem = JSON.parse(after.ready).ready.find(
+			(r: { id: string }) => r.id === "build_feature",
+		);
+		expect(afterItem.inputs.length).toBe(beforeItem.inputs.length - 1);
+
+		expect(readyUnchanged(before.ready, after.ready)).toBe(false);
 	});
 });

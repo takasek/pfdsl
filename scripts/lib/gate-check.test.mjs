@@ -1510,7 +1510,7 @@ describe("collectModeledLocations", () => {
 					flow_sync: {
 						location: [
 							"../scripts/pfdsl/",
-							"../.github/workflows/pfdsl-flow-on-issue-close.yml",
+							"../.github/workflows/pfdsl-sweep-completed-chains.yml",
 						],
 					},
 				},
@@ -1548,7 +1548,7 @@ describe("collectModeledLocations", () => {
 			.map((m) => m.path);
 		assert.deepEqual(paths, [
 			"scripts/pfdsl/",
-			".github/workflows/pfdsl-flow-on-issue-close.yml",
+			".github/workflows/pfdsl-sweep-completed-chains.yml",
 		]);
 	});
 

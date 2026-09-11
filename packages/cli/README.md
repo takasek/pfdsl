@@ -21,6 +21,7 @@ npm install -g @pfdsl/cli
 | `pfdsl check <file\|-> [--strict] [--hints] [--json] [--no-color]` | Validate a .pfdsl file (- = stdin) |
 | `pfdsl explain <code>` | Print the summary and spec section for a diagnostic code (e.g. V021) |
 | `pfdsl fmt <file\|-> [--write] [--check] [--no-color]` | Format a .pfdsl file (- = stdin) |
+| `pfdsl delete <file\|-> <id[,id...]> [--write] [--json] [--no-color]` | Remove one or more nodes from a .pfdsl file (- = stdin) |
 | `pfdsl render <file\|-> [--format dot\|svg\|pdf\|png] [--no-color]` | Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin) PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer) |
 | `pfdsl diff <a> <b> [--format text\|dot\|svg] [--json] [--no-color]` | Structural diff (text), or visual diff DOT/SVG |
 

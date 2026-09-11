@@ -12,6 +12,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 - 一次情報: github.com/takasek/pfdsl/issues
 - 同期監査スクリプト: `scripts/pfdsl/audit-issues-flow.mjs`（読取専用）
+- 完了チェーン回収スクリプト: `scripts/pfdsl/sweep-completed-chains.mjs`（`--write` なしは列挙のみ。デフォルトブランチへの push で `.github/workflows/pfdsl-sweep-completed-chains.yml` が実行し PR を起票する）
 - 監査対象: `.pfdsl/roadmap.pfdsl`
 
 ## 運用対象の計画 PFD
@@ -20,7 +21,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 - `.pfdsl/roadmap.pfdsl` — オープン issue の依存グラフ
 
-**保持範囲**: 規則は L3 reference「サイクル終了時の完了チェーン回収」が一次情報。
+**保持範囲**: 規則は L3 reference「完了チェーン回収」が一次情報。
 このリポで完了履歴を持つ一次情報は closed issue・git 履歴・`docs/adr/`・`docs/spec/spec-history.md`・npm レジストリ・VS Code Marketplace で、#1052 の一括回収でこれらへの写しを roadmap から落とした。
 
 ## プリフライト・ゲート集約スクリプト（#354）
