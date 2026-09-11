@@ -499,7 +499,7 @@ process:
     group: planning
   map_deps:
     label: 依存整理
-    description: "issue 間の依存を PFD 化し着手順を導出する。scripts/pfdsl/audit-issues-flow.mjs はラベルと OPEN issue の updated_at・priority を読取専用で監査する。flow:managed なのに process が無い issue は、実装ブランチの統合まで他セッションから欠落して見えるため advisory とし、着手時の cycle-status.mjs と roadmap 編集 PR の登録検査はそのサイクルの対象 issue に限定する。閉鎖済みというだけの finding は出さず、close が status を動かすこともない。完了チェーン回収では、未完了 artifact を出力する process とその入出力を残し、削除前後の ready/blocked の出力全体と参照整合を確認する。issue close が pfdsl-flow-on-issue-close workflow 経由で sweep-completed-chains.mjs を起動し、検証を通った差分だけを PR として起票する。マージは人が行うため、グラフはレビューを経ない書換えを受けない。判定はデフォルトブランチだけを読むので、未マージのブランチが done artifact を入力に取る組合せは統合時に未宣言 id として検出される。規則は references/github-issues-backend.md「完了チェーン回収」が一次情報"
+    description: "issue 間の依存を PFD 化し着手順を導出する。scripts/pfdsl/audit-issues-flow.mjs はラベルと OPEN issue の updated_at・priority を読取専用で監査する。flow:managed なのに process が無い issue は、実装ブランチの統合まで他セッションから欠落して見えるため advisory とし、着手時の cycle-status.mjs と roadmap 編集 PR の登録検査はそのサイクルの対象 issue に限定する。閉鎖済みというだけの finding は出さず、close が status を動かすこともない。完了チェーン回収では、未完了 artifact を出力する process とその入出力を残し、削除前後の ready/blocked の出力全体と参照整合を確認する。デフォルトブランチへの push が pfdsl-sweep-completed-chains workflow 経由で sweep-completed-chains.mjs を起動し、検証を通った差分だけを PR として起票する。マージは人が行うため、グラフはレビューを経ない書換えを受けない。判定はデフォルトブランチだけを読むので、未マージのブランチが done artifact を入力に取る組合せは統合時に未宣言 id として検出される。規則は references/github-issues-backend.md「完了チェーン回収」が一次情報"
     command: node scripts/pfdsl/audit-issues-flow.mjs
   map_workflow:
     label: ワークフロー整理

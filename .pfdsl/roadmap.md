@@ -12,7 +12,7 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 
 - 一次情報: github.com/takasek/pfdsl/issues
 - 同期監査スクリプト: `scripts/pfdsl/audit-issues-flow.mjs`（読取専用）
-- 完了チェーン回収スクリプト: `scripts/pfdsl/sweep-completed-chains.mjs`（`--write` なしは列挙のみ。issue close で `.github/workflows/pfdsl-flow-on-issue-close.yml` が実行し PR を起票する）
+- 完了チェーン回収スクリプト: `scripts/pfdsl/sweep-completed-chains.mjs`（`--write` なしは列挙のみ。デフォルトブランチへの push で `.github/workflows/pfdsl-sweep-completed-chains.yml` が実行し PR を起票する）
 - 監査対象: `.pfdsl/roadmap.pfdsl`
 
 ## 運用対象の計画 PFD
