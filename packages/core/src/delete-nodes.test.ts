@@ -860,6 +860,118 @@ process:
 		});
 	});
 
+	describe("a stale delete merged onto a base that grew a consumer (#1125)", () => {
+		// github-issues-backend.md's sweep section: "回収可否の判定はデフォルト
+		// ブランチだけを読む。まだマージされていないブランチが done artifact を
+		// 入力に取る process を足していた場合、その組合せはどちらの側からも
+		// 見えない。統合の時点で「宣言のない id を edge が指す」形になり、
+		// roadmap の不変条件がそこで弾く". This pins that claim to a test.
+		//
+		// Retention rule restated locally, same as the "real roadmap.pfdsl"
+		// describe block's sweepSet: keep every process with an output edge to
+		// a not-done artifact, keep every artifact on a kept process's edges,
+		// delete the rest.
+		const sweepSet = (result: ReturnType<typeof analyze>): string[] => {
+			const status = (id: string) => result.frontmatter?.artifact?.[id]?.status;
+			const keepProcesses = new Set(
+				result.edges
+					.filter((e) => e.kind === "output" && status(e.artifact) !== "done")
+					.map((e) => e.process),
+			);
+			const keepArtifacts = new Set(
+				result.edges
+					.filter((e) => keepProcesses.has(e.process))
+					.map((e) => e.artifact),
+			);
+			return [...result.nodeKinds]
+				.filter(([id, kind]) =>
+					kind === "process"
+						? !keepProcesses.has(id)
+						: kind === "artifact" && !keepArtifacts.has(id),
+				)
+				.map(([id]) => id);
+		};
+
+		// `base` is the roadmap the sweep reads: `x` is done and nothing else
+		// consumes it, so both `p` and `x` are the delete set.
+		const base = `---
+type: roadmap
+artifact:
+  x:
+    status: done
+    criteria: n/a
+process:
+  p:
+    label: P
+---
+p -> x
+`;
+
+		it("control: applying the delete to its own base leaves zero errors", () => {
+			const targets = sweepSet(analyze(base));
+			const { output } = deleteNodes(base, targets);
+			const after = analyze(output);
+			expect(after.diagnostics.filter((d) => d.severity === "error")).toEqual(
+				[],
+			);
+		});
+
+		it("flags a dangling edge when the delete lands on a base that grew a consumer of the deleted artifact", () => {
+			const targets = sweepSet(analyze(base));
+
+			// A concurrent branch merges to the default branch first, adding a
+			// process that consumes `x` as an input before producing its own
+			// artifact — the combination the docs say is invisible to a check
+			// run against either side alone.
+			const grown = `---
+type: roadmap
+artifact:
+  x:
+    status: done
+    criteria: n/a
+  future:
+    status: todo
+    criteria: n/a
+process:
+  p:
+    label: P
+  new_proc:
+    label: NP
+---
+p -> x
+x >> new_proc -> future
+`;
+			expect(
+				analyze(grown).diagnostics.filter((d) => d.severity === "error"),
+			).toEqual([]);
+
+			// A real GitHub merge is a 3-way merge of the sweep branch's full-file
+			// content against `grown`, not a second deleteNodes call against
+			// `grown` — deleteNodes always re-scans the whole document it is
+			// given and would happily strip the new edge too, which the actual
+			// merge cannot do because that edge is outside the sweep's diff
+			// hunks. Reconstructed here as a plain string splice, without a
+			// diff/merge library: `grown`'s additions (the `future`/`new_proc`
+			// declarations and the new edge line) sit outside the diff from
+			// `base` to `deleteNodes(base, targets).output` and survive
+			// untouched, while `x`'s declaration and the `p -> x` line — both
+			// inside that diff — are removed.
+			const staleDelete = deleteNodes(base, targets).output;
+			const merged = staleDelete
+				.replace(
+					"artifact: {}",
+					"artifact:\n  future:\n    status: todo\n    criteria: n/a",
+				)
+				.replace("process: {}", "process:\n  new_proc:\n    label: NP")
+				.concat("x >> new_proc -> future\n");
+
+			const after = analyze(merged);
+			const v035 = after.diagnostics.filter((d) => d.code === "V035");
+			expect(v035).not.toEqual([]);
+			expect(v035.some((d) => d.message.includes("'x'"))).toBe(true);
+		});
+	});
+
 	describe("real roadmap.pfdsl", () => {
 		// Derived, never hardcoded: the sweep set this repo's roadmap currently
 		// carries is exactly what merging this work removes, so naming those ids
