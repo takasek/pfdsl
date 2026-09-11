@@ -10,7 +10,7 @@
  *     status is not "done" (it still has undone work to produce).
  *   - keep artifact: every artifact that appears on any edge — input, output
  *     or feedback — of a keep process.
- *   - delete target: every artifact `status list` returns, plus every
+ *   - delete target: every `done` artifact `status list` returns, plus every
  *     process id that appears anywhere in `graph edges`, minus keep process
  *     and keep artifact.
  *
@@ -19,6 +19,13 @@
  * selected for deletion. This is an intentional gap, not an oversight: such a
  * process is already flagged by the existing V020 validation rule, and this
  * module leaves that case to V020 rather than duplicating the check.
+ *
+ * An artifact with zero edges has the same "invisible to keepArtifacts" gap,
+ * but there the gap is not safe to leave open: sweeping exists to reclaim
+ * completed chains, and an artifact never touched by an edge is an unstarted
+ * plan, not a completed one. Restricting the artifact side of the delete
+ * target to `status === "done"` closes that gap explicitly rather than
+ * relying on it never coming up (#1125 defect 1).
  */
 
 /**
@@ -72,7 +79,11 @@ export function computeDeleteTargets({ edges, artifacts }) {
 
 	const deleteIds = [];
 	for (const artifact of artifacts) {
-		if (!keepArtifacts.has(artifact.id)) deleteIds.push(artifact.id);
+		// status !== "done" guards against sweeping unstarted or in-progress
+		// work that simply has no edges yet (see the module doc above).
+		if (artifact.status === "done" && !keepArtifacts.has(artifact.id)) {
+			deleteIds.push(artifact.id);
+		}
 	}
 	for (const process of processes) {
 		if (!keepProcesses.has(process)) deleteIds.push(process);

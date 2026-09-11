@@ -116,6 +116,28 @@ describe("computeDeleteTargets", () => {
 		assert.deepEqual(result, ["proc_a"]);
 	});
 
+	it("never deletes a not-done artifact that has zero edges (#1125 defect 1)", () => {
+		// `future` never appears on any edge, so it is absent from
+		// keepArtifacts by construction — the same "zero edges" gap the
+		// process-side test above documents as intentional. For an artifact
+		// that gap is not safe: an artifact with no edges yet is an
+		// unstarted plan, not a leftover of a completed chain, and sweeping
+		// it away destroys work that was never done. Only a `done` artifact
+		// may ever be a delete target.
+		const edges = [
+			{ kind: "output", process: "proc_a", artifact: "art_a" },
+			{ kind: "input", process: "proc_b", artifact: "art_a" },
+			{ kind: "output", process: "proc_b", artifact: "art_b" },
+		];
+		const artifacts = [
+			{ id: "art_a", label: "A", status: "done" },
+			{ id: "art_b", label: "B", status: "todo" },
+			{ id: "future", label: "Future", status: "todo" },
+		];
+		const result = computeDeleteTargets({ edges, artifacts });
+		assert.equal(result.includes("future"), false);
+	});
+
 	it("does not delete a process with zero edges (left to V020 instead)", () => {
 		// proc_orphan never appears in `graph edges`, so it is invisible to the
 		// process side of the delete-target union by construction — this is
