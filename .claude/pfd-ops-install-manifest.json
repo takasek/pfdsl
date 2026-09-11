@@ -1,8 +1,8 @@
 {
 	"files": [
 		{
-			"path": ".github/workflows/pfdsl-flow-on-issue-close.yml",
-			"hash": "531e51920646487345b68c8d1cb6e279e2d0ac9718a5569eb3874bf923b458db"
+			"path": ".github/workflows/pfdsl-sweep-completed-chains.yml",
+			"hash": "c6bc45b5c246a431eac4750a30030668fa68f68f727671a274171ca2931e414a"
 		},
 		{
 			"path": "scripts/pfdsl/audit-issues-flow.mjs",

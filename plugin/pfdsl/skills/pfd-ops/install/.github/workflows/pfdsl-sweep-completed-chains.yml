@@ -1,15 +1,21 @@
-name: flow on issue close
+name: sweep completed chains
 
-# Closing an issue is the event that can make a chain fully done, and a chain
-# nobody still reads is what the sweep removes. The sweep only proposes: it
-# opens a PR and a human merges it, so the graph is never rewritten outside a
-# reviewed change. Deciding what is sweepable reads the default branch alone,
-# which cannot see an unmerged branch that still consumes a done artifact —
-# that case surfaces as an undeclared id on an edge when the branch lands, and
-# the checker rejects it there.
+# A push to the default branch is the only event that can change what the
+# sweep reads: it reads the default branch's roadmap and nothing else, so a
+# chain going fully done is only ever visible there. The sweep only proposes:
+# it opens a PR and a human merges it, so the graph is never rewritten outside
+# a reviewed change. Deciding what is sweepable reads the default branch
+# alone, which cannot see an unmerged branch that still consumes a done
+# artifact — that case surfaces as an undeclared id on an edge when the
+# branch lands, and the checker rejects it there.
+#
+# Triggers on every push (adopting repos don't all name their default branch
+# "main"), then the job itself checks github.ref against
+# github.event.repository.default_branch and no-ops otherwise. A tag push
+# never matches a refs/heads/* ref, so it no-ops the same way without a
+# separate filter.
 on:
-  issues:
-    types: [closed]
+  push:
 
 concurrency:
   group: flow-sync
@@ -21,6 +27,7 @@ permissions:
 
 jobs:
   sweep-completed-chains:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -45,7 +52,7 @@ jobs:
         with:
           add-paths: .pfdsl/roadmap.pfdsl
           branch: flow-sync/pending
-          commit-message: "chore(plan): sweep completed chains after issue close"
+          commit-message: "chore(plan): sweep completed chains after a push to the default branch"
           title: "chore(plan): sweep completed chains"
           body: |
             Removes chains whose artifacts are all done from `.pfdsl/roadmap.pfdsl`.
@@ -57,4 +64,4 @@ jobs:
 
             This job installed `@pfdsl/cli@${{ steps.install-cli.outputs.version }}` (`npm install --no-save`, unpinned) to run the checks above, rather than this repo's own from-source build — a different `@pfdsl/cli` release can check differently than what the rest of this repo's CI builds and tests.
 
-            no-issue: mechanical roadmap bookkeeping triggered by an issue close, carrying no work item of its own.
+            no-issue: mechanical roadmap bookkeeping triggered by a push to the default branch, carrying no work item of its own.
