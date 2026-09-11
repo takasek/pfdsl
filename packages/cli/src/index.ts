@@ -19,6 +19,7 @@ import {
 	type Diagnostic,
 	type DiagnosticRegistryEntry,
 	type DiffReport,
+	deleteNodes,
 	format,
 	formatEdges,
 	type GraphNeighbor,
@@ -246,6 +247,11 @@ const EXPLAIN_OPTIONS = NO_OPTIONS;
 const FMT_OPTIONS = {
 	write: BOOLEAN_OPTION,
 	check: BOOLEAN_OPTION,
+	"no-color": BOOLEAN_OPTION,
+};
+const DELETE_OPTIONS = {
+	write: BOOLEAN_OPTION,
+	json: BOOLEAN_OPTION,
 	"no-color": BOOLEAN_OPTION,
 };
 const RENDER_OPTIONS = {
@@ -592,6 +598,48 @@ export function runFmt(file: string, opts: FmtOptions = {}): CommandResult {
 		return { stdout: "", stderr: warningText, exitCode: 0 };
 	}
 	return { stdout: output, stderr: warningText, exitCode: 0 };
+}
+
+export interface DeleteOptions {
+	write?: boolean;
+	json?: boolean;
+	color?: boolean;
+}
+
+/**
+ * `deleteNodes` (packages/core) leaves `output` as the untouched original and
+ * fills `notFound` with every requested id when `source` already carries a
+ * parse/validation error (there is nothing safe to rewrite) — that `notFound`
+ * is a side effect of not having processed the document at all, not a report
+ * that the ids are absent, so it is never surfaced. `failIfErrors` covers
+ * both text and --json the same way the rest of the CLI's diagnostic-emitting
+ * commands do (#508), and takes over here before `deleted`/`notFound` are read.
+ */
+export function runDelete(
+	file: string,
+	idList: string,
+	opts: DeleteOptions = {},
+): CommandResult {
+	if (file === "-" && opts.write) {
+		return fail("--write cannot be used with stdin (-)\n", 2);
+	}
+	const ids = splitCommaList(idList);
+	if (ids.length === 0) return fail(HELP_DELETE, 2);
+
+	const source = readSource(file);
+	if (isCommandResult(source)) return source;
+
+	const { output, deleted, notFound, diagnostics } = deleteNodes(source, ids);
+	const failed = failIfErrors(diagnostics, file, opts.json, opts.color);
+	if (failed) return failed;
+
+	if (opts.write) writeFileSync(file, output, "utf-8");
+
+	if (opts.json) {
+		return ok(`${JSON.stringify({ ok: true, deleted, notFound })}\n`);
+	}
+	if (opts.write) return ok("");
+	return ok(output);
 }
 
 export interface ReindexOptions {
@@ -2755,6 +2803,32 @@ Options:
   --no-color  disable ANSI color codes (also: NO_COLOR env var)
 `;
 
+const HELP_DELETE = `${helpUsage("delete", "<file|-> <id[,id...]>", DELETE_OPTIONS)}
+
+Remove one or more nodes (artifact or process) from a .pfdsl file in a single
+atomic pass: the frontmatter declaration, every body edge occurrence, and
+every surviving node's revises:/parts:/boundary: reference to the deleted id.
+An id that exists nowhere in the file is a no-op, not an error — it is
+reported in notFound rather than failing the call. Use - to read from stdin
+(--write not allowed with stdin).
+
+Output follows the gofmt model: the rewritten file goes to stdout (preview);
+with --write it is written in place instead. Diagnostics go to stderr.
+
+Options:
+  --write     rewrite the file in place (cannot be used with -)
+  --json      emit { ok: true, deleted: [...], notFound: [...] } instead of
+              the rewritten document — same shape whether or not --write is
+              also given
+              on parse/validation failure: { ok: false, diagnostics } (exit 1)
+  --no-color  disable ANSI color codes (also: NO_COLOR env var)
+
+Exit codes:
+  0  success (including ids not found — idempotent)
+  1  the file has a parse/validation error; nothing is deleted or written
+  2  invalid usage (missing arguments, or --write combined with stdin)
+`;
+
 const HELP_REINDEX = `${helpUsage(
 	"meta reindex",
 	"<file|->",
@@ -4060,6 +4134,22 @@ export const TOP_LEVEL_COMMANDS: readonly CommandEntry[] = [
 			return runFmt(f, {
 				write: flags.write === true,
 				check: flags.check === true,
+				color: resolveColor(flags),
+			});
+		},
+	},
+	{
+		name: "delete",
+		synopsis: "delete <file|-> <id[,id...]> [--write] [--json] [--no-color]",
+		description: ["Remove one or more nodes from a .pfdsl file (- = stdin)"],
+		help: HELP_DELETE,
+		options: DELETE_OPTIONS,
+		run: (positional, flags) => {
+			const [f, idList] = positional;
+			if (!f || !idList) return fail(HELP_DELETE, 2);
+			return runDelete(f, idList, {
+				write: flags.write === true,
+				json: flags.json === true,
 				color: resolveColor(flags),
 			});
 		},

@@ -94,6 +94,8 @@ describe("command metadata parse surface (#1050)", () => {
 			"usage: pfdsl graph summary <file|-> [--json] [--no-color]",
 		"graph io": "usage: pfdsl graph io <file|-> [--json] [--no-color]",
 		fmt: "usage: pfdsl fmt <file|-> [--write] [--check] [--no-color]",
+		delete:
+			"usage: pfdsl delete <file|-> <id[,id...]> [--write] [--json] [--no-color]",
 		"meta reindex":
 			"usage: pfdsl meta reindex <file|-> [--write] [--check] [--renumber] [--json] [--no-color]",
 		"meta sort":
@@ -198,8 +200,8 @@ describe("command metadata parse surface (#1050)", () => {
 		options: Record<string, unknown>;
 	}) => new Set(Object.keys(entry.options).map((name) => `--${name}`));
 
-	it("covers exactly 27 dispatchable command entries", () => {
-		expect(commandTargets).toHaveLength(27);
+	it("covers exactly 28 dispatchable command entries", () => {
+		expect(commandTargets).toHaveLength(28);
 	});
 
 	it.each(
@@ -562,6 +564,103 @@ describe("fmt", () => {
 		const r = await run(["fmt", f, "--check", "--write"]);
 		expect(r.exitCode).toBe(2);
 		expect(r.stderr).toBe("--check cannot be combined with --write\n");
+	});
+});
+
+describe("delete", () => {
+	const src = "req >> design -> spec\nspec >> impl -> code\n";
+
+	it("prints the document with the id removed to stdout by default, without writing", async () => {
+		const f = join(dir, "delete-default.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["delete", f, "spec"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe("req >> design\nimpl -> code\n");
+		expect(readFileSync(f, "utf-8")).toBe(src);
+	});
+
+	it("--write rewrites the file in place", async () => {
+		const f = join(dir, "delete-write.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["delete", f, "spec", "--write"]);
+		expect(r.exitCode).toBe(0);
+		expect(readFileSync(f, "utf-8")).toBe("req >> design\nimpl -> code\n");
+	});
+
+	it("--write with stdin is rejected (exit 2)", async () => {
+		const r = await run(["delete", "-", "spec", "--write"], withStdin(src));
+		expect(r.exitCode).toBe(2);
+		expect(r.stderr).toBe("--write cannot be used with stdin (-)\n");
+	});
+
+	it("--json reports { ok: true, deleted, notFound }, unchanged by --write", async () => {
+		const withoutWrite = join(dir, "delete-json.pfdsl");
+		writeFileSync(withoutWrite, src);
+		const r1 = await run(["delete", withoutWrite, "spec,nope", "--json"]);
+		expect(r1.exitCode).toBe(0);
+		expect(JSON.parse(r1.stdout)).toEqual({
+			ok: true,
+			deleted: ["spec"],
+			notFound: ["nope"],
+		});
+		expect(readFileSync(withoutWrite, "utf-8")).toBe(src);
+
+		const withWrite = join(dir, "delete-json-write.pfdsl");
+		writeFileSync(withWrite, src);
+		const r2 = await run([
+			"delete",
+			withWrite,
+			"spec,nope",
+			"--json",
+			"--write",
+		]);
+		expect(r2.exitCode).toBe(0);
+		expect(JSON.parse(r2.stdout)).toEqual({
+			ok: true,
+			deleted: ["spec"],
+			notFound: ["nope"],
+		});
+		expect(readFileSync(withWrite, "utf-8")).toBe(
+			"req >> design\nimpl -> code\n",
+		);
+	});
+
+	it("a nonexistent id lands in notFound and exits 0 (idempotent)", async () => {
+		const f = join(dir, "delete-notfound.pfdsl");
+		writeFileSync(f, src);
+		const r = await run(["delete", f, "nope"]);
+		expect(r.exitCode).toBe(0);
+		expect(r.stdout).toBe(src);
+		expect(readFileSync(f, "utf-8")).toBe(src);
+	});
+
+	it("a file with a validation error prints diagnostics and exits 1, without reporting notFound", async () => {
+		const r = await run(["delete", join(dir, "invalid.pfdsl"), "spec"]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stdout).toBe("");
+		expect(r.stderr).toContain("V001");
+		expect(r.stderr).not.toContain("notFound");
+	});
+
+	it("--json on a file with a validation error returns { ok: false, diagnostics } without notFound", async () => {
+		const r = await run([
+			"delete",
+			join(dir, "invalid.pfdsl"),
+			"spec",
+			"--json",
+		]);
+		expect(r.exitCode).toBe(1);
+		expect(r.stderr).toBe("");
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(false);
+		expect(parsed.notFound).toBeUndefined();
+		expect(Array.isArray(parsed.diagnostics)).toBe(true);
+		expect(parsed.diagnostics.length).toBeGreaterThan(0);
+	});
+
+	it("missing id argument prints help (exit 2)", async () => {
+		const r = await run(["delete", join(dir, "valid.pfdsl")]);
+		expect(r.exitCode).toBe(2);
 	});
 });
 
@@ -1475,6 +1574,10 @@ describe("--json failure payload on a file that does not validate", () => {
 	const cases: Array<{ name: string; argv: () => string[] }> = [
 		{ name: "check", argv: () => ["check", invalidFile(), "--json"] },
 		{
+			name: "delete",
+			argv: () => ["delete", invalidFile(), "spec", "--json"],
+		},
+		{
 			name: "meta reindex",
 			argv: () => ["meta", "reindex", invalidFile(), "--json"],
 		},
@@ -1563,6 +1666,15 @@ describe("--no-color wired into all diagnostic-emitting commands (#508)", () => 
 		{
 			name: "fmt",
 			argv: (nc) => ["fmt", invalidFile(), ...(nc ? ["--no-color"] : [])],
+		},
+		{
+			name: "delete",
+			argv: (nc) => [
+				"delete",
+				invalidFile(),
+				"spec",
+				...(nc ? ["--no-color"] : []),
+			],
 		},
 		{
 			name: "meta reindex",

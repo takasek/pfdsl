@@ -197,7 +197,7 @@ function setDifference(left: Set<string>, right: Set<string>): string[] {
 
 describe("declared command options", () => {
 	it("matches every table entry with the flags its handler reads", () => {
-		expect(DISPATCHABLE_COMMANDS).toHaveLength(27);
+		expect(DISPATCHABLE_COMMANDS).toHaveLength(28);
 		const mismatches = DISPATCHABLE_COMMANDS.flatMap(
 			({ label, tableName, entry }) => {
 				const declared = new Set(Object.keys(entry.options));

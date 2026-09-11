@@ -104,6 +104,8 @@ Commands:
   explain <code>           Print the summary and spec section for a diagnostic code (e.g. V021)
   fmt <file|-> [--write] [--check] [--no-color]
                            Format a .pfdsl file (- = stdin)
+  delete <file|-> <id[,id...]> [--write] [--json] [--no-color]
+                           Remove one or more nodes from a .pfdsl file (- = stdin)
   render <file|-> [--format dot|svg|pdf|png] [--no-color]
                            Render as Graphviz DOT (default), SVG, PDF, or PNG (- = stdin)
                            PDF/PNG requires puppeteer in the CLI's own Node env (npm install puppeteer)
