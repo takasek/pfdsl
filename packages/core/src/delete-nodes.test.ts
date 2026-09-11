@@ -93,7 +93,7 @@ process:
 [a, b] >> p -> c
 `;
 			const { output } = deleteNodes(src, ["a"]);
-			expect(output).toContain("[b] >> p -> c");
+			expect(output).toContain("b >> p -> c");
 		});
 
 		it("drops the whole input-edge statement when the artifact set empties out", () => {
@@ -195,6 +195,52 @@ a; b
 			expect(output).toContain("b");
 		});
 
+		it("renders a role trimmed to one id the way the formatter would", () => {
+			// formatter.ts's fmtIds writes a single id bare and several bracketed.
+			// Bracketing unconditionally leaves `[b]`, which `fmt --check` rejects
+			// — and `make check-fmt` runs that over the operational .pfdsl/, so a
+			// swept roadmap in that shape fails its own PR's checks.
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+  c:
+    label: C
+process:
+  p:
+    label: P
+---
+[a, b] >> p -> c
+`;
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).toContain("b >> p -> c");
+			expect(output).not.toContain("[b]");
+		});
+
+		it("carries a trailing comment across a trimmed statement", () => {
+			// statementEndOffset folds a same-line comment into the statement's
+			// span so a dropped statement takes its comment with it. A replaced
+			// statement has to bring that tail along instead of dropping it.
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+  c:
+    label: C
+process:
+  p:
+    label: P
+---
+[a, b] >> p -> c  # why this edge exists
+`;
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).toContain("b >> p -> c  # why this edge exists");
+		});
+
 		it("leaves an untouched statement byte-for-byte unchanged", () => {
 			const src = `---
 artifact:
@@ -282,7 +328,7 @@ process:
 [a, x] >> p -> b >> q -> c >> r -> d
 `;
 			const { output } = deleteNodes(src, ["a"]);
-			expect(output).toContain("[x] >> p -> b >> q -> c >> r -> d");
+			expect(output).toContain("x >> p -> b >> q -> c >> r -> d");
 		});
 
 		it("keeps a feedback edge (>>?) unaffected, trims one, and drops the whole thing", () => {
@@ -299,7 +345,7 @@ process:
 [a, b] >>? p
 `;
 			const trimmed = deleteNodes(src, ["a"]);
-			expect(trimmed.output).toContain("[b] >>? p");
+			expect(trimmed.output).toContain("b >>? p");
 
 			const droppedProc = deleteNodes(src, ["p"]);
 			expect(droppedProc.output).not.toContain(">>?");
@@ -322,7 +368,7 @@ process:
 p -> [b, c]
 `;
 			const { output } = deleteNodes(src, ["b"]);
-			expect(output).toContain("p -> [c]");
+			expect(output).toContain("p -> c");
 		});
 
 		it("leaves an unaffected output-edge statement byte-for-byte unchanged", () => {
@@ -356,7 +402,7 @@ process:
 [a, b] >> p
 `;
 			const { output } = deleteNodes(src, ["a"]);
-			expect(output).toContain("[b] >> p");
+			expect(output).toContain("b >> p");
 		});
 
 		it("leaves an unaffected bare-tail chain byte-for-byte unchanged", () => {
@@ -418,7 +464,7 @@ process:
 			// x survives the head trim, b and q are both untouched: the bare
 			// tail "b >> q" fuses onto the rest of the chain.
 			const { output } = deleteNodes(src, ["a"]);
-			expect(output).toContain("[x] >> p -> b >> q");
+			expect(output).toContain("x >> p -> b >> q");
 		});
 
 		it("drops a bare-tail chain segment when the id feeding it is gone", () => {

@@ -56,7 +56,12 @@ function resolveCli() {
 	const builtPath = resolve(root, "packages/cli/dist/cli.js");
 	if (existsSync(builtPath)) return builtPath;
 
-	const installedPath = resolve(root, "node_modules/.bin/pfdsl");
+	// The package's own entry point, not `node_modules/.bin/pfdsl`. The CLI is
+	// spawned as `node <path>`, which needs real JavaScript: npm writes that bin
+	// entry as a symlink to this same file, but pnpm writes a `#!/bin/sh`
+	// wrapper, and handing that to node fails with a SyntaxError naming a file
+	// the reader never asked about.
+	const installedPath = resolve(root, "node_modules/@pfdsl/cli/dist/cli.js");
 	if (existsSync(installedPath)) return installedPath;
 
 	return null;

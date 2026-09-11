@@ -29,8 +29,15 @@ export interface DeleteNodesResult {
 	diagnostics: Diagnostic[];
 }
 
+/**
+ * A trimmed role, in the notation the formatter would choose for it: bare for
+ * a single id, bracketed for several (formatter.ts's `fmtIds`). Bracketing
+ * unconditionally would leave `[b]` where canonical is `b`, and `make
+ * check-fmt` runs `fmt --check` over the operational `.pfdsl/`, so a sweep
+ * that trimmed a role would hand its own PR a red check.
+ */
 function renderExpr(ids: string[]): string {
-	return `[${ids.join(", ")}]`;
+	return ids.length === 1 ? ids[0]! : `[${ids.join(", ")}]`;
 }
 
 /**
@@ -263,7 +270,13 @@ function spliceBody(
 		if (k < n) {
 			const action = plan[k]!;
 			if (action.kind === "keep") out += body.slice(starts[k]!, ends[k]!);
-			else if (action.kind === "replace") out += action.text;
+			else if (action.kind === "replace") {
+				// `ends[k]` reaches past a trailing same-line comment so that a
+				// dropped statement takes its comment with it. A replaced one must
+				// carry that tail across instead: the statement is regenerated, but
+				// the author's note on it is not ours to discard.
+				out += action.text + body.slice(statements[k]!.end.offset, ends[k]!);
+			}
 		}
 	}
 	return out;
