@@ -13,6 +13,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { computeDeleteTargets } from "./lib/chain-sweep.mjs";
+import { joinIdsForCliArg } from "./lib/cli-id-arg.mjs";
 import { readyUnchanged } from "./lib/ready-compare.mjs";
 import { scratchPathFor } from "./lib/scratch-path.mjs";
 
@@ -130,6 +131,44 @@ function failWith(message, result) {
 	process.exit(1);
 }
 
+// --- Step 1.5: capability gate — the resolved CLI must have 'delete' ---
+//
+// resolveCli() above only checks that a path exists, not what the binary
+// there can do. A workflow that installs a published release can resolve a
+// build that predates the 'delete' subcommand this script depends on
+// throughout (the published @pfdsl/cli 0.0.26 and every version before it —
+// verified via `npm view @pfdsl/cli version`/`dist-tags`, both 0.0.26, and
+// `node .../cli.js delete --help` on that install reporting "unknown
+// command: delete"). Left unchecked, that surfaces mid-run as an unrelated
+// parse failure the first time a sweep target is found and 'delete' is
+// actually invoked — this probe fails at startup instead, before Step 2 does
+// any work, so it fires the same way whether or not this run has anything to
+// sweep.
+//
+// `delete --help` is the probe because it is answered before the file/id
+// positional arguments are validated (same as every other subcommand's
+// `--help`), so it needs no target file and succeeds on any CLI build that
+// has the command at all.
+//
+// The floor named below is a verified fact (0.0.26 lacks 'delete'), not a
+// guessed "requires >= X.Y.Z": this repo's own packages/cli/package.json has
+// not been bumped past 0.0.26 since 'delete' was added on this branch, so
+// that number cannot be asserted as the next published floor without being
+// wrong the moment someone reads it.
+const deleteHelp = runCli(["delete", "--help"]);
+if (deleteHelp.status !== 0 || /unknown command/.test(deleteHelp.stderr)) {
+	failWith(
+		[
+			`the resolved pfdsl CLI (${cliPath}) has no 'delete' subcommand.`,
+			"  A version of @pfdsl/cli newer than the published 0.0.26 is required",
+			"  (0.0.26 and every version up to it lack 'delete').",
+			"  In this repo: run 'pnpm -r build' so packages/cli/dist/cli.js is used.",
+			"  In an adopting repo: upgrade to a released @pfdsl/cli with 'delete',",
+			"  or set PFDSL_CLI to a build that has it.",
+		].join("\n"),
+	);
+}
+
 // --- Step 2: input sanity — a broken graph is not swept ---
 
 const checkResult = runCli(["check", file]);
@@ -208,7 +247,7 @@ function failVerify(message, result) {
 }
 
 try {
-	const deleteResult = runCli(["delete", file, deleteIds.join(",")]);
+	const deleteResult = runCli(["delete", file, joinIdsForCliArg(deleteIds)]);
 	if (deleteResult.status !== 0) {
 		failVerify("'delete' failed.", deleteResult);
 	}

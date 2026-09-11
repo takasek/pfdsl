@@ -112,7 +112,9 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
 - Node.js 24 以上
 - `gh` CLI、または `GH_TOKEN` / `GITHUB_TOKEN`
 - npm パッケージ `yaml`（採用リポの実行環境に用意する）
-- `@pfdsl/cli`（回収スクリプトが判定・削除・検証のすべてをこの CLI 経由で行う。workflow は `npm install --no-save @pfdsl/cli` で都度導入する）。運用プロトコルの着手判断が既に `status ready` を要求しているので、採用リポにとって新しい前提ではない。回収スクリプトは `PFDSL_CLI`、リポの `packages/cli/dist/cli.js`、`node_modules/@pfdsl/cli/dist/cli.js` の順に CLI を探す
+- `delete` サブコマンドを持つ版の `@pfdsl/cli`（回収スクリプトが判定・削除・検証のすべてをこの CLI 経由で行う）。最低版を数字では断定しない: pfdsl リポ自身の `packages/cli/package.json` は `delete` 追加後もまだ version を上げていないため、その値をそのまま「次の公開版」として読むと誤った版数を書くことになる。回収スクリプトは起動時に解決した CLI が `delete` を持つか確かめ、持たなければ対象の有無にかかわらずその場で停止し、直し方を示す
+  - pfdsl リポ自身の workflow は、checkout したツリーが pfdsl workspace（`pnpm-workspace.yaml` と `packages/cli/package.json` を持つ）なら `pnpm -r build` してそのビルドを使う。採用リポのように workspace でなければ `npm install --no-save @pfdsl/cli` で公開版を導入する（フォールバック時は `delete` を含む公開版以降でないと上の起動時チェックで止まる）。運用プロトコルの着手判断が既に `status ready` を要求しているので、`@pfdsl/cli` の導入自体は採用リポにとって新しい前提ではない
+  - 回収スクリプトは `PFDSL_CLI`、リポの `packages/cli/dist/cli.js`、`node_modules/@pfdsl/cli/dist/cli.js` の順に CLI を探す
 
 `audit-issues-flow.mjs` が使う named operation はすべて HTTP backend を持つ。`gh` が存在しない（ENOENT）場合も、`GH_TOKEN` または `GITHUB_TOKEN` があれば HTTP backend へ切り替わるため、token のみの環境で監査を実行できる。`gh` が実行されて認証・通信・引数エラーになった場合は HTTP へ切り替えず、そのエラーを報告する。
 

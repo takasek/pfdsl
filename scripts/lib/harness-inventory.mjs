@@ -24,6 +24,7 @@ const SKILL_SOURCE_FILES = Object.freeze({
 		"install/.github/workflows/pfdsl-sweep-completed-chains.yml",
 		"install/scripts/pfdsl/audit-issues-flow.mjs",
 		"install/scripts/pfdsl/lib/chain-sweep.mjs",
+		"install/scripts/pfdsl/lib/cli-id-arg.mjs",
 		"install/scripts/pfdsl/lib/gh-compat.mjs",
 		"install/scripts/pfdsl/lib/gh-exec.mjs",
 		"install/scripts/pfdsl/lib/github-ops.mjs",

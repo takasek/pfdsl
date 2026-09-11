@@ -12,6 +12,7 @@ export const INSTALL_TEMPLATE_PATHS = [
 	".github/workflows/pfdsl-sweep-completed-chains.yml",
 	"scripts/pfdsl/audit-issues-flow.mjs",
 	"scripts/pfdsl/lib/chain-sweep.mjs",
+	"scripts/pfdsl/lib/cli-id-arg.mjs",
 	"scripts/pfdsl/lib/gh-compat.mjs",
 	"scripts/pfdsl/lib/gh-exec.mjs",
 	"scripts/pfdsl/lib/github-ops.mjs",

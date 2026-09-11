@@ -32,17 +32,53 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v6
+
       - uses: actions/setup-node@v6
         with:
           node-version: 24
 
-      - name: Install the pfdsl CLI
+      # This same template file ships to adopting repos (pfd-ops's install/
+      # mirror), which have no packages/cli of their own — the check below is
+      # what tells this repo's own CI run apart from theirs at runtime, since
+      # both run off one committed workflow file.
+      - name: Detect this repo's own pfdsl workspace
+        id: detect-workspace
+        run: |
+          if [ -f pnpm-workspace.yaml ] && [ -f packages/cli/package.json ]; then
+            echo "in_workspace=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "in_workspace=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # In this repo: build packages/cli from the very source this push
+      # carries, so the sweep checks with the same code its own tests cover —
+      # not a published release that can lag behind, or even predate a
+      # subcommand the sweep script depends on (#1125 review).
+      - name: Build this repo's own @pfdsl/cli from source
+        if: steps.detect-workspace.outputs.in_workspace == 'true'
+        id: build-cli
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm -r build
+          version=$(node -p "require('./packages/cli/package.json').version")
+          echo "Built this repo's own @pfdsl/cli@$version from source"
+          {
+            echo "description=this repo's own from-source build of \`@pfdsl/cli@${version}\`, the same build the rest of this repo's CI uses"
+          } >> "$GITHUB_OUTPUT"
+
+      # In an adopting repo: no packages/cli to build, so fall back to the
+      # last published release, same as before.
+      - name: Install the published @pfdsl/cli
+        if: steps.detect-workspace.outputs.in_workspace != 'true'
         id: install-cli
         run: |
           npm install --no-save @pfdsl/cli
           version=$(node -p "require('./node_modules/@pfdsl/cli/package.json').version")
           echo "Resolved @pfdsl/cli version: $version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          {
+            echo "description=the published \`@pfdsl/cli@${version}\` (\`npm install --no-save\`, unpinned) — a different release than what this repo's own CI builds and tests from source"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Sweep completed chains out of the roadmap
         run: node scripts/pfdsl/sweep-completed-chains.mjs .pfdsl/roadmap.pfdsl --write
@@ -62,6 +98,6 @@ jobs:
 
             A `GITHUB_TOKEN`-authored PR like this one does not trigger this repo's `pull_request` workflow, so none of the repo's own CI (build, tests, `make check-fmt`, etc.) ran against it. The checks above — `check`, `graph orphans`, `fmt --check`, and the ready/blocked comparison — are the only verification this change has received; an absence of failing CI checks on this PR does not mean anything else passed.
 
-            This job installed `@pfdsl/cli@${{ steps.install-cli.outputs.version }}` (`npm install --no-save`, unpinned) to run the checks above, rather than this repo's own from-source build — a different `@pfdsl/cli` release can check differently than what the rest of this repo's CI builds and tests.
+            This job used ${{ steps.build-cli.outputs.description || steps.install-cli.outputs.description }} to run the checks above.
 
             no-issue: mechanical roadmap bookkeeping triggered by a push to the default branch, carrying no work item of its own.
