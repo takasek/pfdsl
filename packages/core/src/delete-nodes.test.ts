@@ -631,9 +631,50 @@ process:
 [a, b] >> p -> c
 `;
 			const { output } = deleteNodes(src, ["p", "c"]);
-			const { diagnostics } = analyze(output);
-			const errors = diagnostics.filter((d) => d.severity === "error");
-			expect(errors).toEqual([]);
+			const after = analyze(output);
+
+			// Stated directly, not inferred from a clean `check`: `nodeKinds` is
+			// total over frontmatter declarations and body edges alike, so an id
+			// absent from it has lost both. Reading zero errors instead would
+			// only cover one direction — a declaration left without its edge
+			// raises no error at all, and a surviving edge whose declaration went
+			// is the V035 this guards.
+			for (const id of ["p", "c"]) {
+				expect(after.nodeKinds.has(id)).toBe(false);
+				expect(output).not.toMatch(new RegExp(`\\b${id}\\b`));
+			}
+			expect(
+				after.edges.filter((e) => e.process === "p" || e.artifact === "c"),
+			).toEqual([]);
+			expect(after.diagnostics.filter((d) => d.severity === "error")).toEqual(
+				[],
+			);
+		});
+
+		it("catches a declaration removed while its edge survives", () => {
+			// The predicate above is only worth asserting if it separates a clean
+			// delete from a half one. Hand-build the half: drop `a`'s declaration
+			// and keep the edge naming it.
+			const halfDeleted = `---
+type: roadmap
+artifact:
+  b:
+    label: B
+    status: done
+  c:
+    label: C
+    status: done
+process:
+  p:
+    label: P
+---
+[a, b] >> p -> c
+`;
+			const after = analyze(halfDeleted);
+			expect(after.nodeKinds.has("a")).toBe(true);
+			expect(after.diagnostics.filter((d) => d.code === "V035")).not.toEqual(
+				[],
+			);
 		});
 	});
 
