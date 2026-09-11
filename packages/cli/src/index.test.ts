@@ -2686,6 +2686,26 @@ req >> design -> spec
 		expect(parsed.newlyReady).toHaveLength(0);
 	});
 
+	// #1125 defect 6: the "before" ready snapshot went through
+	// computeReadyIds(src), which treats ANY diagnostic-severity error on the
+	// original file — not just a structural one — as "not a roadmap" and
+	// returns isRoadmap: false. A V007 (invalid status enum value) is exactly
+	// the kind of error `meta set` is often used to cure, so a write that
+	// fixes it and leaves a clean result still silently skipped the
+	// post-mutation newlyReady recomputation.
+	it("--json still reports newlyReady when the original file had a non-structural error the write cures", async () => {
+		const f = join(dir, "status-set-json-newly-ready-from-error.pfdsl");
+		writeFileSync(
+			f,
+			"---\ntype: roadmap\nartifact:\n  req:\n    status: finished\n  spec:\n    status: todo\n---\nreq >> design -> spec\n",
+		);
+		const r = await run(["meta", "set", f, "req", "status", "done", "--json"]);
+		expect(r.exitCode).toBe(0);
+		const parsed = JSON.parse(r.stdout);
+		expect(parsed.ok).toBe(true);
+		expect(parsed.newlyReady).toContain("design");
+	});
+
 	it("rewrites status in place on 4-space-indented frontmatter (#430)", async () => {
 		const fourSpace = `---
 artifact:

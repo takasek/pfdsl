@@ -1243,7 +1243,7 @@ export function runMetaSet(
 	const src = readSource(file);
 	if (isCommandResult(src)) return src;
 
-	const { diagnostics, nodeKinds, frontmatter } = analyze(src);
+	const { diagnostics, edges, nodeKinds, frontmatter } = analyze(src);
 	// This gate asks "would this write leave a broken file?", not "is the file
 	// broken now?" (#1125). A `meta set` is often the cure for the very error
 	// a pre-mutation check would trip on — V035 rejects a roadmap artifact
@@ -1292,8 +1292,24 @@ export function runMetaSet(
 		}
 	}
 
-	// Snapshot ready set before mutation (roadmap only)
-	const { readyIds: beforeIds, isRoadmap } = computeReadyIds(src);
+	// Snapshot ready set before mutation (roadmap only). Computed directly
+	// from the analyze(src) result already gated for structural errors above,
+	// not via computeReadyIds(src) — that helper treats ANY diagnostic-
+	// severity error (not just a structural one) as "not a roadmap" and
+	// returns isRoadmap: false. A validation error like V007 (invalid status
+	// enum value) is exactly the kind of thing `meta set` is often used to
+	// cure (#415's V035 is the same shape), so reading isRoadmap from the
+	// unmutated original would make the post-mutation newlyReady
+	// recomputation below silently skip every such write, even one that
+	// lands cleanly (#1125 defect 6). `frontmatter`/`nodeKinds`/`edges` are
+	// already known safe to read at this point (the structural gate above
+	// covers exactly that), so isRoadmapType + computeReadyIdsCore read them
+	// directly instead.
+	const isRoadmap = isRoadmapType(frontmatter?.type);
+	const beforeIds = isRoadmap
+		? computeReadyIdsCore(edges, nodeKinds, frontmatter?.artifact ?? {})
+				.readyIds
+		: [];
 	const beforeSet = new Set(beforeIds);
 
 	// Quoting for the new value is left to the yaml package's own core-schema
