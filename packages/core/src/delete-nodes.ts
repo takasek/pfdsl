@@ -79,6 +79,32 @@ function statementEndOffset(
 	return next.end.offset;
 }
 
+/**
+ * Every `# comment` strictly inside `stmt`'s own span (issue #1125 review
+ * defect 4): a comment on an interior line of a multi-line statement (e.g. a
+ * chain's first line, before a `->` continuation), not the trailing
+ * same-line comment `statementEndOffset` already folds in past the
+ * statement's end. `planStatement`'s `replace` actions regenerate a
+ * statement's text from its surviving ids rather than slicing the original
+ * source, so a comment living inside that span is otherwise silently
+ * dropped — the statement it was written against is still there, just not
+ * verbatim.
+ *
+ * Rendered as one trailing same-line comment block on the regenerated
+ * statement (two spaces, then each comment's own text, newline-joined for
+ * the rare case of more than one) — the same shape a comment that already
+ * trailed the statement gets, since the original interior position has no
+ * equivalent once the statement is rebuilt from scratch.
+ */
+function renderInteriorComments(stmt: Statement, comments: Token[]): string {
+	const interior = comments.filter(
+		(c) =>
+			c.start.offset >= stmt.start.offset && c.start.offset < stmt.end.offset,
+	);
+	if (interior.length === 0) return "";
+	return `  ${interior.map((c) => c.value).join("\n")}`;
+}
+
 interface StatementAction {
 	kind: "keep" | "drop" | "replace";
 	text?: string;
@@ -344,7 +370,20 @@ function spliceBody(
 				// dropped statement takes its comment with it. A replaced one must
 				// carry that tail across instead: the statement is regenerated, but
 				// the author's note on it is not ours to discard.
-				out += action.text + body.slice(statements[k]!.end.offset, ends[k]!);
+				//
+				// A comment strictly *inside* the original span — e.g. one sitting
+				// at the end of a chain's first physical line, before a `->`
+				// continuation on the next — is a second, separate case (#1125
+				// review defect 4): `action.text` is a from-scratch rendering of
+				// the surviving ids, not a slice of the original source, so that
+				// comment has nowhere left to live unless it is carried across
+				// explicitly. Reattached as a trailing same-line comment on the
+				// regenerated statement, the same shape a comment that already
+				// followed the statement gets.
+				out +=
+					action.text +
+					renderInteriorComments(statements[k]!, comments) +
+					body.slice(statements[k]!.end.offset, ends[k]!);
 			}
 		}
 	}

@@ -629,6 +629,31 @@ toolchain >> q  # unrelated
 			expect(kept.output).toContain("a >> p  # notice me");
 		});
 
+		it("keeps a comment that sits inside a surviving statement when a partial delete regenerates it (#1125 defect 4 follow-up)", () => {
+			// `# why these two` sits between `p` and the chain's continuation on
+			// the next line — inside the statement's own span, not after its end.
+			// Deleting `a` regenerates the statement text (only `b` remains in the
+			// role), which must not silently drop that interior comment.
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+  c:
+    label: C
+process:
+  p:
+    label: P
+---
+[a, b] >> p # why these two
+  -> c
+`;
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).not.toContain("a,");
+			expect(output).toContain("why these two");
+		});
+
 		it("keeps a comment attached to the statement that survives after it (#1125 defect 3)", () => {
 			// `# b-chain` sits directly above the surviving `b >> q -> y`, not
 			// above the deleted `a >> p -> x`. Losing it along with the deleted
