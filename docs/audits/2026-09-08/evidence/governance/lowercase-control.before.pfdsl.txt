@@ -1,0 +1,19 @@
+---
+type: roadmap
+artifact:
+  input:
+    status: done
+  product:
+    status: done
+  result:
+    status: todo
+process:
+  i1_build:
+    tags: [ priority:medium ]
+    updated_at: old
+  i2_use:
+    tags: [ priority:medium ]
+    updated_at: now
+---
+input >> i1_build -> product
+product >> i2_use -> result
