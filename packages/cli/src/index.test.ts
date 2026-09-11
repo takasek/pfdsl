@@ -5676,30 +5676,28 @@ legacy_in >> build_legacy -> legacy_out
 	// via readyUnchanged instead. That relaxation must not reopen the gap the
 	// two tests above exist to close, so this drives readyUnchanged itself
 	// through the same "id set same, an item's declared inputs shrank"
-	// shape — grounded in this repo's own roadmap rather than a hand-built
-	// fixture, so the regression guard is not just checking its own mock.
-	it("readyUnchanged still rejects a real-roadmap corruption that shrinks a ready item's inputs while its id set stays put (#1125 defect 5 regression guard)", async () => {
-		const real = readFileSync(
-			resolve(__dirname, "../../../.pfdsl/roadmap.pfdsl"),
-			"utf-8",
-		);
-		// spec_v0011 is one of four inputs feeding the ready
-		// i542_migrate_spec_id_refs; deleting only it (not the process, not
-		// any of its other inputs) is exactly the "declared input silently
-		// dropped" corruption the comparison exists to catch, not a
-		// legitimate sweep of a completed chain.
-		const { output, notFound } = deleteNodes(real, ["spec_v0011"]);
+	// shape — via the same synthetic fixture as the two tests above rather
+	// than a real roadmap.pfdsl node name, so this sweeping that fixture
+	// eventually (this issue's own mechanism) never makes the test stale.
+	it("readyUnchanged still rejects a synthetic corruption that shrinks a ready item's inputs while its id set stays put (#1125 defect 5 regression guard)", async () => {
+		// tool_a is a done input of the ready build_feature; deleting only it
+		// (not the process, not tool_b) is exactly the "declared input
+		// silently dropped" corruption the comparison exists to catch, not a
+		// legitimate sweep of a completed chain — same deletion as the test
+		// above, driven through readyUnchanged itself instead of just the
+		// ready id set.
+		const { output, notFound } = deleteNodes(roadmap, ["tool_a"]);
 		expect(notFound).toEqual([]);
 
-		const before = await planningQueries(real);
+		const before = await planningQueries(roadmap);
 		const after = await planningQueries(output);
 
 		expect(readyIds(after.ready)).toEqual(readyIds(before.ready));
 		const beforeItem = JSON.parse(before.ready).ready.find(
-			(r: { id: string }) => r.id === "i542_migrate_spec_id_refs",
+			(r: { id: string }) => r.id === "build_feature",
 		);
 		const afterItem = JSON.parse(after.ready).ready.find(
-			(r: { id: string }) => r.id === "i542_migrate_spec_id_refs",
+			(r: { id: string }) => r.id === "build_feature",
 		);
 		expect(afterItem.inputs.length).toBe(beforeItem.inputs.length - 1);
 
