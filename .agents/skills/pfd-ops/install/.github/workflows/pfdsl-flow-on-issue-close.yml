@@ -46,6 +46,8 @@ jobs:
             Removes chains whose artifacts are all done from `.pfdsl/roadmap.pfdsl`.
             What stays is every process that still outputs an unfinished artifact, and the artifacts on those processes' edges — a done artifact is kept when an open process still reads it as an input, not as a record that it finished. Completed history lives in the closed issues, the git history, the decision records and the published registries.
 
-            The sweep applied nothing until `check` passed, `graph orphans` came back empty, and `status ready` and `status blocked` produced byte-identical output before and after. Comparing those queries whole is the point: an id-set comparison passes a sweep that leaves a process ready while quietly taking one of its inputs away.
+            The sweep applied nothing until `check` passed, `graph orphans` came back empty, `fmt --check` passed, and `status blocked` produced byte-identical output before and after. `status ready` is compared the same way except for one field: `empty.complete` (the count of completed-chain processes, present only when the ready set is empty) is excluded, because a sweep that found anything to remove always reduces it by design. Comparing everything else whole is the point: an id-set comparison alone would pass a sweep that leaves a process ready while quietly taking one of its inputs away.
+
+            A `GITHUB_TOKEN`-authored PR like this one does not trigger this repo's `pull_request` workflow, so none of the repo's own CI (build, tests, `make check-fmt`, etc.) ran against it. The checks above — `check`, `graph orphans`, `fmt --check`, and the ready/blocked comparison — are the only verification this change has received; an absence of failing CI checks on this PR does not mean anything else passed.
 
             no-issue: mechanical roadmap bookkeeping triggered by an issue close, carrying no work item of its own.
