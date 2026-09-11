@@ -7,7 +7,7 @@ export type BodySegment =
 
 const BARE_ID_RE = /^[\p{L}\p{N}_-]+$/u;
 
-function formatId(id: string): string {
+export function formatId(id: string): string {
 	if (BARE_ID_RE.test(id)) return id;
 	let escaped = "";
 	for (const char of id) {

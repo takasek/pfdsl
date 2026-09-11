@@ -1,4 +1,5 @@
 import { Document, isMap, isScalar, isSeq } from "yaml";
+import { formatId } from "./formatter.js";
 import {
 	parseFrontmatterCst,
 	renderFrontmatterCst,
@@ -35,9 +36,16 @@ export interface DeleteNodesResult {
  * unconditionally would leave `[b]` where canonical is `b`, and `make
  * check-fmt` runs `fmt --check` over the operational `.pfdsl/`, so a sweep
  * that trimmed a role would hand its own PR a red check.
+ *
+ * Each id goes through formatId (the same function formatter.ts uses) rather
+ * than being written raw: an id that needs quoting (spaces, punctuation
+ * outside BARE_ID_RE) must keep its quotes on every re-emission, or the
+ * parser reads its two words as two separate ids and silently forks the edge
+ * in two (#1125 defect 2).
  */
 function renderExpr(ids: string[]): string {
-	return ids.length === 1 ? ids[0]! : `[${ids.join(", ")}]`;
+	const formatted = ids.map(formatId);
+	return formatted.length === 1 ? formatted[0]! : `[${formatted.join(", ")}]`;
 }
 
 /**
@@ -111,7 +119,7 @@ function planStatement(
 			const op = stmt.type === "input-edge" ? ">>" : ">>?";
 			return {
 				kind: "replace",
-				text: `${renderExpr(kept)} ${op} ${stmt.process.value}`,
+				text: `${renderExpr(kept)} ${op} ${formatId(stmt.process.value)}`,
 			};
 		}
 
@@ -126,7 +134,7 @@ function planStatement(
 			if (kept.length === stmt.artifact.ids.length) return { kind: "keep" };
 			return {
 				kind: "replace",
-				text: `${stmt.process.value} -> ${renderExpr(kept)}`,
+				text: `${formatId(stmt.process.value)} -> ${renderExpr(kept)}`,
 			};
 		}
 
@@ -162,8 +170,8 @@ function planStatement(
 			let pendingRole: ArtifactExpr = stmt.head;
 
 			for (const seg of stmt.segments) {
-				const proc = seg.process.value;
-				const procAlive = !deleteSet.has(proc);
+				const proc = formatId(seg.process.value);
+				const procAlive = !deleteSet.has(seg.process.value);
 				const inputAttaches = pendingIds.length > 0 && procAlive;
 
 				if (!inputAttaches) {

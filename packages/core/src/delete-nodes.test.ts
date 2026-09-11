@@ -405,6 +405,84 @@ process:
 			expect(output).toContain("b >> p");
 		});
 
+		it("re-quotes a process id it has to rewrite (#1125 defect 2)", () => {
+			// The process id contains a space, so its declaration and every body
+			// occurrence must stay quoted. Losing the quotes on rewrite turns "p q"
+			// into two bare tokens the parser reads as two separate ids, which
+			// silently forks the edge in two.
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+  c:
+    label: C
+process:
+  "p q":
+    label: PQ
+---
+[a, b] >> "p q" -> c
+`;
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).toContain('b >> "p q" -> c');
+			const after = analyze(output);
+			expect(after.edges).toEqual([
+				{ kind: "input", artifact: "b", process: "p q" },
+				{ kind: "output", process: "p q", artifact: "c" },
+			]);
+		});
+
+		it("re-quotes a trimmed artifact role id that needs quoting (#1125 defect 2)", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  "b c":
+    label: BC
+process:
+  p:
+    label: P
+---
+[a, "b c"] >> p
+`;
+			const { output } = deleteNodes(src, ["a"]);
+			expect(output).toContain('"b c" >> p');
+			const after = analyze(output);
+			expect(after.edges).toEqual([
+				{ kind: "input", artifact: "b c", process: "p" },
+			]);
+		});
+
+		it("re-quotes a process id in a chain segment it has to rewrite (#1125 defect 2)", () => {
+			const src = `---
+artifact:
+  a:
+    label: A
+  b:
+    label: B
+  c:
+    label: C
+process:
+  "p q":
+    label: PQ
+  r:
+    label: R
+---
+a >> "p q" -> b >> r -> c
+`;
+			const { output } = deleteNodes(src, ["r"]);
+			expect(output).toContain('a >> "p q" -> b');
+			const after = analyze(output);
+			expect(after.nodeKinds.has("p q")).toBe(true);
+			expect(after.nodeKinds.has("p")).toBe(false);
+			expect(after.nodeKinds.has("q")).toBe(false);
+			expect(after.edges).toEqual([
+				{ kind: "input", artifact: "a", process: "p q" },
+				{ kind: "output", process: "p q", artifact: "b" },
+			]);
+		});
+
 		it("leaves an unaffected bare-tail chain byte-for-byte unchanged", () => {
 			const src = `---
 artifact:
