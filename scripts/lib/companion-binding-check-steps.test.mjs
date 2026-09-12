@@ -15,6 +15,23 @@ function baseDeps(overrides = {}) {
 }
 
 describe("runCompanionBindingsCheck", () => {
+	it("keeps historical references without exempting current bindings or lookalike paths", () => {
+		for (const [file, expected] of [
+			[".pfdsl/bindings/pfd-retro-patterns/case.md", 0],
+			[".pfdsl/bindings/pfd-retro-patterns/nested/case.md", 0],
+			[".pfdsl/bindings/pfd-retro.md", 1],
+			[".pfdsl/bindings/pfd-retro-patterns-current/case.md", 1],
+		]) {
+			const result = runCompanionBindingsCheck(
+				baseDeps({
+					listFiles: () => [file],
+					readFile: () => "see `scripts/removed-mechanism.mjs`",
+				}),
+			);
+			assert.equal(result.exitCode, expected, file);
+		}
+	});
+
 	it("passes with no companion files and no pfd-retro.md", () => {
 		const result = runCompanionBindingsCheck(baseDeps());
 		assert.equal(result.exitCode, 0);

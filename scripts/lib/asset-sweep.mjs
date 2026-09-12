@@ -1,19 +1,4 @@
-/**
- * Sweep gates for assets a per-cycle discipline keeps adding to but nothing
- * ever revisits as a set. #879 found 4-9 stale entries out of 61 in the retro
- * pattern catalog — near-duplicates never merged, patterns whose trap is now
- * machine-enforced never retired, tag vocabulary drifted. #915 found the same
- * shape in prose: skills and companions that still teach a discipline some
- * hook now enforces, or re-explain what a script already prints.
- *
- * Each registered target reuses evaluateRecordGate (review-record-gate.mjs)
- * with a threshold above 1: a sweep is "current" until enough has
- * accumulated since the last one, not until nothing at all has changed.
- * That is the difference from distribution-review's gate, whose threshold
- * of 1 fires on the first change — a review-worthy prompt edit is
- * consequential on its own, but one added catalog entry is not worth a
- * dedicated sweep.
- */
+/** Release-time currency checks for the maintained prose/mechanization audit. */
 
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -49,25 +34,6 @@ const defineTarget = ({ id, ...rest }) => ({
 
 export const SWEEP_TARGETS = [
 	defineTarget({
-		id: "retro-patterns",
-		label: "retro-pattern sweep (.pfdsl/bindings/pfd-retro-patterns)",
-		prefixes: [".pfdsl/bindings/pfd-retro-patterns/"],
-		matches: /\.md$/,
-		// Unit is added files, not changed files: a single editing pass
-		// through the catalog (e.g. a tag-vocabulary fix) can modify 30+
-		// files in one commit, which would swamp a changed-file threshold
-		// without reflecting any actual accumulation. Measured 2026-08-12,
-		// over the four days since the catalog's split into one-file-per-
-		// pattern, this repo's own edits to the directory were added=22,
-		// modified=18 — modified alone would have already been over a
-		// threshold this size on ordinary maintenance, not accumulation.
-		// 20 is sized to fire roughly every few days at the pace measured
-		// then, or every few weeks at a quieter pace; revisit against the
-		// actual firing interval once one is observed.
-		threshold: 20,
-		skill: "retro-pattern-sweep",
-	}),
-	defineTarget({
 		id: "prose-mechanization",
 		label: "prose-mechanization audit (prose assets vs scripts/ + hooks/)",
 		// The only target so far whose counted scope is not its swept scope.
@@ -76,9 +42,7 @@ export const SWEEP_TARGETS = [
 		// already prints. Prose itself barely moves in a way that measures
 		// that: over the nine days from v0.0.25 (2026-08-04) this repo added 3
 		// prose .md and modified 18, against 14 mechanisms added in the same
-		// window, and the modifications are dominated by sweeping edits that
-		// say nothing about staleness (the same skew that put --diff-filter=A
-		// on the retro-patterns target). Each added mechanism, by contrast, is
+		// window. Prose edits alone say little about staleness. Each added mechanism is
 		// one more chance that some existing prose now describes it — so the
 		// mechanisms are counted and the prose is what the sweep then reads.
 		prefixes: ["scripts/", "hooks/"],
@@ -95,8 +59,7 @@ export const SWEEP_TARGETS = [
 		// is that a generator or a setup helper counts too — one of the 14
 		// measured above.
 		matches: /^(?!.*\.test\.mjs$)[^/]+\.mjs$/,
-		// Sized by yield, not by interval (which is where the retro-patterns
-		// threshold above got its equal-looking 20). The 2026-08-12 audit read
+		// Sized by the yield of the 2026-08-12 audit, which read
 		// a ledger of ~51 entry points and filed three issues (#912 #913
 		// #914), so roughly one finding per 17 mechanisms. 20 puts the
 		// expected yield of a sweep just above one finding; halving it would

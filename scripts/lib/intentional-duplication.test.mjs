@@ -1,7 +1,4 @@
-// Three pairs of code are duplicated on purpose — the hook may not import
-// outside hooks/, and packages/ does not depend on the repo's tooling layer —
-// and each pair had tests on both sides but nothing asserting the two still
-// agree (#613). Tightening one copy would leave the other behind silently.
+// Repository/tooling duplication boundaries are verified against both consumers.
 
 import assert from "node:assert/strict";
 import {
@@ -18,57 +15,11 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { detectDoneAddition as detectInHook } from "../../hooks/retro-reminder-post-tool-use.mjs";
 import { isDistStale } from "./dist-freshness.mjs";
 import { AGENT_EXCLUSIONS, DISTRIBUTED_AGENTS } from "./harness-inventory.mjs";
-import { detectDoneAddition as detectInPreCommit } from "./retro-reminder-check.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (rel) => readFileSync(resolve(root, rel), "utf-8");
-
-/** The `const NAME = /…/;` literal in a source file, as written. */
-function patternSourceOf(fileText, name) {
-	const match = new RegExp(`const ${name} = (/.*/[a-z]*);`).exec(fileText);
-	assert.ok(match, `${name} not found as a regex literal`);
-	return match[1];
-}
-
-describe("retro-reminder: the pre-commit check and the plugin hook", () => {
-	const preCommit = read("scripts/lib/retro-reminder-check.mjs");
-	const hook = read("hooks/retro-reminder-post-tool-use.mjs");
-
-	it("spell the done-addition pattern identically", () => {
-		assert.equal(
-			patternSourceOf(hook, "DONE_ADDITION_PATTERN"),
-			patternSourceOf(preCommit, "DONE_ADDITION_PATTERN"),
-		);
-	});
-
-	// Same inputs through both detectors: the diff shapes the coarse regex is
-	// meant to separate, including the ones its comment calls acceptable.
-	const diffs = [
-		["an added done line", "+    status: done"],
-		[
-			"an added done line among context",
-			" artifact:\n+    status: done\n   label: x",
-		],
-		["a removed done line", "-    status: done"],
-		["an unchanged done line", "     status: done"],
-		[
-			"a file header, which starts with +++",
-			"+++ b/.pfdsl/roadmap.pfdsl\n status: done",
-		],
-		["an added wip line", "+    status: wip"],
-		["done with no space after the colon", "+    status:done"],
-		["an empty diff", ""],
-	];
-
-	for (const [name, diff] of diffs) {
-		it(`agree on ${name}`, () => {
-			assert.equal(detectInHook(diff), detectInPreCommit(diff));
-		});
-	}
-});
 
 describe("dist-freshness: the tooling check and the cli-smoke copy", () => {
 	const smokeText = read("packages/cli/src/cli-smoke.test.ts");

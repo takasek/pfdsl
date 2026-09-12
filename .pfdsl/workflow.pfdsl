@@ -90,15 +90,9 @@ artifact:
     criteria: reviewed.json の commit と HEAD の間に、レビュー対象スコープの差分が無い
     location: ../docs/distribution-review/
     group: release
-  retro_pattern_sweep_record:
-    label: retroパターン棚卸し記録
-    description: "retro-patterns 対象の棚卸し済み commit hash（docs/asset-sweep/retro-patterns.json）と回ごとの実行記録。check-asset-sweep.mjs が、前回の記録以降にカタログへ追加されたファイル数を SWEEP_TARGETS の閾値と比べ、超えていれば各 release 判断の pre-tag checks で release を止める。prose_mechanization_sweep_record と別ノードなのは記録を対象ごとに分けているからで、分ける理由は scripts/lib/asset-sweep.mjs の SWEEP_TARGETS の JSDoc が一次情報"
-    criteria: retro-patterns.json が指す commit と HEAD の間で、.pfdsl/bindings/pfd-retro-patterns/ に追加されたファイル数が閾値未満
-    location: ../docs/asset-sweep/
-    group: release
   prose_mechanization_sweep_record:
     label: 散文機械化棚卸し記録
-    description: "prose-mechanization 対象の棚卸し済み commit hash（docs/asset-sweep/prose-mechanization.json）と回ごとの実行記録。ゲートの読み方は retro_pattern_sweep_record と同一で、閾値を数える単位だけが違う — 監査対象は散文だが、数えるのは scripts/・hooks/ 直下に追加された機構の件数である（#915）"
+    description: "prose-mechanization 対象の棚卸し済み commit hash（docs/asset-sweep/prose-mechanization.json）と回ごとの実行記録。check-asset-sweep.mjs が記録以降に scripts/・hooks/ 直下へ追加された機構の件数を SWEEP_TARGETS の閾値と比較し、超過時は release 判断を止める。監査対象は現行の散文と機構で、歴史資料の事例は含めない"
     criteria: prose-mechanization.json が指す commit と HEAD の間で、scripts/・hooks/ 直下に追加されたエントリポイント数が閾値未満
     location: ../docs/asset-sweep/
     group: release
@@ -286,8 +280,8 @@ artifact:
     group: generation
   distributed_advisory_hooks:
     label: plugin配布advisory hooks
-    description: "pfd-ops 運用が要求する非ブロッキングな PostToolUse(Bash) advisory 群。hooks/ は retro の done-status reminder と、成功した flow:managed issue-create の roadmap reminder を含み、gen_plugin がディレクトリ全体をミラーして Claude Code と Codex の plugin host へ配布する"
-    criteria: "正本の hooks/hooks.json が各 PostToolUse(Bash) advisory を配線し、make gen-plugin が Claude Code plugin root と Codex plugin root の hooks/ へ取り込み、scripts/lib/gen-plugin.test.mjs が生成済み両 consumer を採用リポに追加インストールなしで実行して retro と flow:managed issue-create の各 reminder の command 解決、PostToolUse 出力、非ブロッキング（exit 0）を検証する"
+    description: "pfd-ops 運用が要求する非ブロッキングな PostToolUse(Bash) advisory 群。hooks/ は成功した flow:managed issue-create の roadmap reminder を含み、gen_plugin がディレクトリ全体をミラーして Claude Code と Codex の plugin host へ配布する"
+    criteria: "正本の hooks/hooks.json が各 PostToolUse(Bash) advisory を配線し、make gen-plugin が Claude Code plugin root と Codex plugin root の hooks/ へ取り込み、scripts/lib/gen-plugin.test.mjs が生成済み両 consumer を採用リポに追加インストールなしで実行して flow:managed issue-create の reminder の command 解決、PostToolUse 出力、非ブロッキング（exit 0）を検証する"
     location: ../hooks/
     group: generation
   delegation_guard:
@@ -301,12 +295,6 @@ artifact:
     description: "main ブランチ上または同一リポジトリの別 worktree 上でツリー・インデックスを変える直接記述の git コマンドを止める PreToolUse(Bash) 事故防止フック（#650、#777、#784）。セッション root は Claude Code の空白でない CLAUDE_PROJECT_DIR を優先し、Codex では hook payload cwd へ fallback する。quoted または escaped literal argv、literal cd、git -C、env -C/--chdir、input を含む先頭 redirection、既知 prefix、Codex routine wrapper の明示 target を実行順に解決する。Git target 環境変数、CDPATH、対応する assignment・export・unset・read・printf・source・dot・eval と target に影響する control flow を追跡し、静的 target が確定できない変更系 Git を fail closed する。対応外の compound は無害でも拒否しうるため raw mutation は単純 command へ分ける。この hook は任意 Bash を完全に解釈する security boundary ではない。Codex の承認なし機械的境界は trusted user wrapper、raw Git を永続 allow しない execpolicy、sandbox の組合せであり、Claude Code に Codex 専用 wrapper は前提化しない。復旧系は Claude Code では ask、ask 未対応の Codex では deny に変換する。delegation_guard と同じくリポ固有で配布対象外。実体のファイル名は commit のみを見ていた頃のもので、起動中 session の配線を壊さないため据え置く"
     criteria: main または sibling worktree を直接 target にする変更系 git が拒否され、Claude Code は復旧系を ask、Codex は unsupported ask を deny にする。空白でない CLAUDE_PROJECT_DIR の優先、Codex payload cwd fallback、escaped literal argv、cd --、先頭 redirection、git -C、env chdir、routine wrapper target、既知 prefix、Git target 環境変数、変数ごとの export 状態、CDPATH、assignment・export・unset・read・printf の option semantics、dynamic output name、array output variable、target に影響する OR-list・pipeline・background・subshell・AND-list と unsupported compound の fail-closed が scripts/lib/main-commit-guard.test.mjs で検証される。identity Git subprocess は Git target 環境変数を除去し、読み取り系 Git、絶対 cd、literal 操作で安全へ戻した状態、単純な success-path AND-list、target-neutral pipeline・AND-list、変更系 Git より後ろの control flow、session 自身の feature branch 操作は影響を受けない。shared hook は直接形の事故防止であり任意 Bash の security guarantee は主張せず、Codex の永続 allow は trusted wrapper に限定する
     location: ../scripts/main-commit-guard.mjs
-    group: generation
-  pre_artifact_advisory:
-    label: pre-artifact参照点hook
-    description: "サイクルが最初に packages/・scripts/ 配下へ書いた時点で、retro パターンカタログの `phase: pre-artifact` 宣言を持つものを列挙する PostToolUse(Write|Edit) advisory（#964）。pfd-ops references/work-cycle.md 手順2 の P3 が名指す「書く瞬間に発火する機構」の実体で、散文側の参照点（プリフライトの一覧印字・終端ゲートの項目）がコード成果物に届かない区間を埋める。delegation_guard・main_branch_guard と同じくリポ固有で配布対象外 — 対象パスがこのリポの構成に依存するため、散文側の P3 が採用リポの手当てになる"
-    criteria: セッションごとに1回だけ発火し、リポ外の同名ディレクトリへの書き込みでは発火せず、マーカー書き込みが失敗しても例外を投げないことが scripts/lib/pre-artifact-advisory.test.mjs のテストで検証されている
-    location: ../scripts/pre-artifact-advisory.mjs
     group: generation
   ecosystem_skill:
     label: PFDセット構築スキル
@@ -327,13 +315,6 @@ artifact:
     description: "/vscode-ext-debug コマンド。worktree での VS Code 拡張デバッグ手順（make vscode-dev・F5 起動・PFDSL Preview 検証・webview console フィルタ）。手書き、生成対象外"
     criteria: 手順どおりに make vscode-dev から F5 起動まで進むと拡張がデバッグ実行され、PFDSL Preview が対象 .pfdsl を描画する
     location: ../.claude/skills/vscode-ext-debug/
-    group: generation
-    tags: [ distilled_skill ]
-  retro_pattern_sweep_skill:
-    label: retroパターン棚卸しスキル
-    description: "監査パターンカタログを集合として洗い直す手順（機械化済み対策の廃止・近接ペアの統合・具体例が指す機構の実在確認・phase 宣言漏れ・タグ語彙の drift・所属と内部論理の意味監査）。通常は前回棚卸し以降の追加分を起点とし、明示的な全件意味監査では全パターンを9観点で判定する。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポはこのカタログを持たず、手順の実施先が存在しない）"
-    criteria: 起動すると6工程が実行され、意味監査の finding と保留理由を含む記録が docs/asset-sweep/ に残り check-asset-sweep.mjs が exit 0 を返す
-    location: ../.claude/skills/retro-pattern-sweep/
     group: generation
     tags: [ distilled_skill ]
   prose_mechanization_audit_skill:
@@ -385,8 +366,11 @@ artifact:
     tags: [ distilled_doc ]
   bindings_pfd_retro:
     label: pfd-retro バインディング
-    description: "pfd-retro が読むカタログ参照・配布物への finding 反映手続き・パターン追記の書式・改訂と統合と廃止の規約。sibling companion でなく独立ファイル（理由は bindings_pfd_ops と同じ）。このリポで検出した監査パターンの本体は持たず bindings/pfd-retro-patterns/ に1件1ファイルで置き、pfd-retro skill はこのファイルを全読せず scripts/retro-patterns.mjs で引く。タグ語彙の正準リストは持たない — tags サブコマンドの出力が語彙の実体。対策が成果物を書く前に効くパターンは frontmatter の phase で宣言し、それらは retro より前（プリフライト）でも引かれる。phase はファイル単位の主張で、複数軸のうち1軸でも該当すれば付ける。プリフライトは対象 issue のコードスパン由来の語でその集合を絞り、絞れなかった回は出力自身が語ごとの reach とともにそう述べる"
-    criteria: retro-patterns.mjs check が違反なしで通過し、check-companion-bindings が必須見出しの存在を通す。記載内容は pfd-retro SKILL.md の現行記述に突き合わせて矛盾がない
+    description: >
+      pfd-retro が参照する図・仕様レンズと、検索可能な事例・観察・反例の保存先、運用責任の終了、配布物への finding 反映手続きを持つ。
+      bindings/pfd-retro-patterns/ の当時の本文と証拠を保存し、現行手順の適用点を案内する。
+      カタログの対策抽出・phase・自動選別には依存しない。
+    criteria: check-companion-bindings が必須見出しを確認し、最終差分レビューで事例の証拠保存と現行手順の到達・非依存を確認する
     location: [ bindings/pfd-retro.md, bindings/pfd-retro-patterns/ ]
     group: generation
     tags: [ distilled_doc ]
@@ -429,7 +413,7 @@ process:
     label: repo binding・guard・companion整備
     description: >
       decisions が指名した repo-local な binding・guard・companion の正本を改訂する。
-      prose_mechanization_sweep_record の散文・機構矛盾、retro_pattern_sweep_record の滞留、retro_findings の運用実態との不一致を binding 文言・guard 規則・説明へ反映する。
+      prose_mechanization_sweep_record の散文・機構矛盾、retro_findings の運用実態との不一致を binding 文言・guard 規則・説明へ反映する。
       検証コマンドは正本ごとに異なり、各出力 artifact の criteria が一次情報である。
     group: generation
     tags: [ knowledge_maintenance ]
@@ -542,14 +526,9 @@ process:
     description: "組み上がった bundle の散文を、利用側リポの読み手として問い詰める。観点を当てるだけでは足りないため、sandbox に隔離した subagent に実作業をさせて詰まりを観測し、配布物の欠陥に由来するものを canonical 側で直してから承認済み commit hash を進める。決定可能な部分は check-distributed-prose.mjs が毎 CI で先に潰しており、このプロセスが見るのは語彙でなく主語の問題（ADR-0029 の配布物監査に起動条件を与えたもの）"
     command: "/distribution-review"
     group: release
-  sweep_retro_patterns:
-    label: retroパターンカタログの棚卸し
-    description: "追記でしか触られないカタログを集合として6工程で洗い、廃止・統合・修正と所属・内部論理の意味監査を行って棚卸し済み commit を進める。通常は release 時に前回以降の追加件数を閾値と比べ、明示的な全件意味監査では全パターンを9観点で判定する。retro-patterns.mjs check が先に潰す構造違反と、人手で判定する意味上の妥当性を混同しない"
-    command: "/retro-pattern-sweep"
-    group: release
   sweep_prose_mechanization:
     label: 散文機械化の棚卸し
-    description: "堆積した運用散文を hook・check の台帳と突き合わせ、機械化済み対策を語る散文・スクリプト出力の再説明・層内の同文再掲・散文と機械の矛盾を刈って棚卸し済み commit を進める。sweep_retro_patterns とは引き金の機構だけを共有し、対象物も工程も別なので手順の skill は分ける（#915）。数える単位が散文でなく追加された機構なのは、散文は追記でなく既存ファイルの編集で動くため、その件数が滞留の増分を表さないことによる"
+    description: "堆積した運用散文を hook・check の台帳と突き合わせ、機械化済み対策を語る散文・スクリプト出力の再説明・層内の同文再掲・散文と機械の矛盾を刈って棚卸し済み commit を進める。数える単位が散文でなく追加された機構なのは、散文は追記でなく既存ファイルの編集で動くため、その件数が滞留の増分を表さないことによる"
     command: "/prose-mechanization-audit"
     group: release
   update_readme:
@@ -618,8 +597,8 @@ retro_skill >>? review_examples
 toolchain >>? review_examples
 
 decisions >> maintain_distributed_prompt_assets -> [distributed_advisory_hooks, ecosystem_skill, grill_skill, implementer_agent, ops_skill_general, ops_skill_l3, pfd_lens_agent, retro_skill, review_perspectives]
-decisions >> maintain_repo_bindings -> [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, pre_artifact_advisory, workflow_md]
-decisions >> maintain_repo_local_capabilities -> [distribution_review_perspectives, distribution_review_skill, prose_mechanization_audit_skill, retro_pattern_sweep_skill, spec_stress_skill, vscode_ext_debug_skill]
+decisions >> maintain_repo_bindings -> [bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, workflow_md]
+decisions >> maintain_repo_local_capabilities -> [distribution_review_perspectives, distribution_review_skill, prose_mechanization_audit_skill, spec_stress_skill, vscode_ext_debug_skill]
 
 distributed_advisory_hooks >>? maintain_distributed_prompt_assets
 ecosystem_skill >>? maintain_distributed_prompt_assets
@@ -635,13 +614,11 @@ bindings_pfd_ops >>? maintain_repo_bindings
 bindings_pfd_retro >>? maintain_repo_bindings
 delegation_guard >>? maintain_repo_bindings
 main_branch_guard >>? maintain_repo_bindings
-pre_artifact_advisory >>? maintain_repo_bindings
 workflow_md >>? maintain_repo_bindings
 
 distribution_review_perspectives >>? maintain_repo_local_capabilities
 distribution_review_skill >>? maintain_repo_local_capabilities
 prose_mechanization_audit_skill >>? maintain_repo_local_capabilities
-retro_pattern_sweep_skill >>? maintain_repo_local_capabilities
 spec_stress_skill >>? maintain_repo_local_capabilities
 vscode_ext_debug_skill >>? maintain_repo_local_capabilities
 
@@ -653,7 +630,6 @@ distribution_review_record >>? maintain_distributed_prompt_assets
 distribution_review_record >>? maintain_repo_local_capabilities
 
 prose_mechanization_sweep_record >>? maintain_repo_bindings
-retro_pattern_sweep_record >>? maintain_repo_bindings
 
 spec_stress_skill >>? maintain_spec
 
@@ -707,7 +683,6 @@ workflow_pfdsl >>? develop
 delegation_guard >>? develop
 implementer_agent >>? develop
 main_branch_guard >>? develop
-pre_artifact_advisory >>? develop
 workflow_md >>? develop
 
 issue_updates >>? file_issues
@@ -723,15 +698,13 @@ readme >>? update_readme
 
 distribution_review_skill >>? review_distribution
 
-bindings_pfd_retro >> sweep_retro_patterns -> retro_pattern_sweep_record
 
-[bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, pre_artifact_advisory, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
+[bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
 
 prose_mechanization_audit_skill >>? sweep_prose_mechanization
-retro_pattern_sweep_skill >>? sweep_retro_patterns
 
-[distribution_review_record, prose_mechanization_sweep_record, retro_pattern_sweep_record, toolchain] >> decide_cli_release -> cli_release_request
+[distribution_review_record, prose_mechanization_sweep_record, toolchain] >> decide_cli_release -> cli_release_request
 
-[distribution_review_record, prose_mechanization_sweep_record, retro_pattern_sweep_record, toolchain] >> decide_libraries_release -> libraries_release_request
+[distribution_review_record, prose_mechanization_sweep_record, toolchain] >> decide_libraries_release -> libraries_release_request
 
-[distribution_review_record, prose_mechanization_sweep_record, retro_pattern_sweep_record, toolchain] >> decide_vscode_release -> vscode_release_request
+[distribution_review_record, prose_mechanization_sweep_record, toolchain] >> decide_vscode_release -> vscode_release_request

@@ -1,13 +1,9 @@
 // Shared entrypoint detection for scripts that are both a library (imported by
 // tests and by sibling scripts) and a CLI (`node scripts/…`).
 //
-// Two copies of this logic necessarily live outside this file, because both
-// are distributed and must resolve without scripts/: the PostToolUse hook
-// (hooks/retro-reminder-post-tool-use.mjs, bound by "hooks/ imports nothing
-// outside hooks/") and the pfd-ops skill script
-// (.claude/skills/pfd-ops/scripts/check-install-sync.mjs, which lands in
-// adopting repos that have no scripts/lib/). Each says so at its own call
-// site. Everything under scripts/ imports this one.
+// The pfd-ops check-install-sync script keeps a standalone copy because it
+// lands in adopting repositories without scripts/lib/. Repository scripts
+// share the implementation below.
 
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";

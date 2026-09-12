@@ -1,7 +1,8 @@
 ---
 tags: [target:prose-doc, context:external-dependency]
-phase: pre-artifact
 ---
+
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
 
 - **発見義務と外部write権限を同一視する trap**: 規約が外部systemへの記録を要求しても、発見を遅らせない義務は公開writeの権限を与えず、許可判定を曖昧にすると拒否時は一次情報が欠け、通過時は無断の確定操作になる。
   問いの形: 「要求されているのは発見の報告か外部へのwriteか。writeが拒否されたときの記録先と、許可されたと判断する根拠はそれぞれ決まっているか」。

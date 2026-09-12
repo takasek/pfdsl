@@ -13,7 +13,7 @@
  * than a breakage (release-status, #814).
  */
 
-import { relative, resolve } from "node:path";
+import { resolve } from "node:path";
 import {
 	buildDesignRecordTemplate,
 	buildGateCheckCommand,
@@ -23,10 +23,8 @@ import {
 	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
 	isUnregisteredManagedIssue,
-	narrowPreArtifactReminders,
 	parsePorcelainPaths,
 	parseReadyOutput,
-	preArtifactQueryWords,
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
 import {
@@ -34,7 +32,6 @@ import {
 	resolveDesignRecord,
 	toDesignRecordEntries,
 } from "./gate-check.mjs";
-import { loadPatternCatalog, PATTERN_DIR_RELATIVE } from "./retro-patterns.mjs";
 
 /**
  * Return the CLI exit code for a preflight result.
@@ -52,7 +49,6 @@ export function cycleStatusExitCode(result) {
  *   githubOps: {listOpenPrs: () => Promise<any[]>, viewIssue: (params: {number: number, fields: string[]}) => Promise<any>, repository?: () => {host: string, owner: string, repo: string}, designRecordEditInfo?: (params: {nodeId: string}) => Promise<any>},
  *   existsSync: (path: string) => boolean,
  *   readFileSync: (path: string, encoding: string) => string,
- *   readdirSync: (path: string) => string[],
  *   root: string,
  *   base: string,
  *   issueNumbers?: number[],
@@ -64,7 +60,6 @@ export async function runCycleStatus({
 	githubOps,
 	existsSync,
 	readFileSync,
-	readdirSync,
 	root,
 	base,
 	issueNumbers = [],
@@ -260,11 +255,6 @@ export async function runCycleStatus({
 	const issueLookupFailures = [];
 	/** @type {Map<number, string[]>} label names of each issue actually fetched */
 	const labelsByIssue = new Map();
-	/** Title and body of each issue fetched, the material the pre-artifact
-	 * reminder is narrowed with (#1118). Comments are left out: the design
-	 * record posted below is itself a comment, so including them would let this
-	 * cycle's own record steer which patterns it is then reminded of. */
-	const issueTexts = [];
 
 	if (targetIssues.length > 0) {
 		let repository;
@@ -280,7 +270,6 @@ export async function runCycleStatus({
 					number: targetIssue,
 					fields: ["title", "body", "comments", "createdAt", "labels"],
 				});
-				issueTexts.push(issueJson.title ?? "", issueJson.body ?? "");
 				labelsByIssue.set(
 					targetIssue,
 					(issueJson.labels ?? []).map((l) => l?.name).filter(Boolean),
@@ -479,52 +468,6 @@ export async function runCycleStatus({
 		? `node packages/cli/dist/cli.js meta set .pfdsl/roadmap.pfdsl ${artifactKey} status wip`
 		: undefined;
 
-	// The catalog's own reminder that referencing it at retro is too late for
-	// patterns whose countermeasure has to land before this cycle's commit
-	// messages / issue comments / PR body / delegation briefs exist
-	// (`catalog-consulted-after-the-artifact`, #822). Loaded independently of
-	// every branch above — it names nothing about this cycle's git state, so a
-	// failure here (a malformed pattern file) is reported and does not
-	// withhold the rest of the preflight.
-	//
-	// Narrowed by the target issue's own words, with the verdict on whether
-	// that narrowed anything (#1118). The words come from the issues already
-	// fetched above, so a cycle with no resolvable issue narrows by nothing and
-	// says so — the same reading as an issue that wrote no code spans.
-	const PATTERN_DIR = resolve(root, PATTERN_DIR_RELATIVE);
-	let preArtifactPatterns = [];
-	// The value that survives the catch below, so an empty reminder list from a
-	// directory that could not be read never reads as one from an issue that
-	// wrote no code spans — those call for different actions, and only the
-	// second is about this cycle at all.
-	let preArtifactSelection = {
-		words: [],
-		reach: [],
-		pool: 0,
-		unselective: true,
-		reason: "catalog-unreadable",
-	};
-	let preArtifactPatternsError = null;
-	try {
-		const { patterns, errors } = loadPatternCatalog(PATTERN_DIR, {
-			readdirSync,
-			readFileSync,
-			displayPath: (path) => relative(root, path),
-		});
-		const { reminders, ...selection } = narrowPreArtifactReminders(
-			patterns,
-			preArtifactQueryWords(issueTexts.join("\n")),
-		);
-		preArtifactPatterns = reminders;
-		preArtifactSelection = selection;
-		if (errors.length > 0) preArtifactPatternsError = errors.join("; ");
-	} catch (e) {
-		// The directory itself is missing or unreadable: no catalog to remind
-		// from. Per-file failures never reach here — loadPatternCatalog keeps
-		// them off the patterns that did parse.
-		preArtifactPatternsError = e.message;
-	}
-
 	const result = {
 		fetched,
 		behindBase,
@@ -544,8 +487,6 @@ export async function runCycleStatus({
 		gateCheckCommand,
 		unregisteredManagedIssues,
 		untriagedTargetIssues,
-		preArtifactPatterns,
-		preArtifactSelection,
 	};
 	if (behindBaseError) result.behindBaseError = behindBaseError;
 	if (dirtyTreeError) result.dirtyTreeError = dirtyTreeError;
@@ -556,7 +497,5 @@ export async function runCycleStatus({
 	if (designUnsettledError) result.designUnsettledError = designUnsettledError;
 	if (gateCheckCommandError)
 		result.gateCheckCommandError = gateCheckCommandError;
-	if (preArtifactPatternsError)
-		result.preArtifactPatternsError = preArtifactPatternsError;
 	return result;
 }

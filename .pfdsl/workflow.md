@@ -13,8 +13,7 @@
 このリポが pfdsl スキルの上流であるため経路1（品質ガイド改訂）が成立する。配布先リポでは経路1は存在しない場合がある。
 
 散文として書く前の機械化の検討と、hook で機械化する場合に decision を選ぶ軸（防ぎたい害が実行そのものか、結果の読み違いか）は、pfd-ops の `references/work-cycle.md`「知見と機械化」が一次情報。
-このリポの既存機構は pre-commit・`gate-check.mjs`・CI であり、例外 (b)（重複になる）の判定はこの3つに対して行う。
-#650 本文の3条件は、機械判定できる候補が複数出揃った状況でどれに着手するかを絞り込む AND フィルタであり、書く前の毎回の判断にそのまま持ち込むと機械化優先の原則が弱まる。
+このリポの既存機構は pre-commit・`gate-check.mjs`・CI であり、追加する検査の対象と重複をここに照合する。過去事例の記録は現行規約と分け、運用責任の終了は `.pfdsl/bindings/pfd-retro.md` に従う。
 
 ## 学習ループ
 
@@ -33,7 +32,7 @@ waxa CLI（blank-slate, ツール呼び出し不可）では retrieval 有無を
 **サイクルは worktree で回す**: 対象リポジトリの専用 worktree を使い、作成場所と作成手順は利用中のハーネスまたはマシン側の設定に従う。
 worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順1 が一次情報。
 消えた編集を探すとき `git stash list` を先に見ることも配布層の同じ手順が持つ。
-実際に起きた干渉の症状と復旧手順は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。
+過去の干渉の症状と当時の対応記録は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。現行の復旧は上記の work-cycle 手順1と、この checkout の指示に従う。
 
 **worktree 前提**: 新規 worktree では CLI/core が未ビルドのため `check` が失敗する。ゲート実行前に `pnpm install && pnpm -r build` を済ませる。
 `.claude/skills/pfdsl` は gitignore 済の symlink（#348・#714）のため新規 worktree に存在せず、そのままでは `make check-docs` が companion-bindings の dead path で失敗する — `make setup`（または `node scripts/link-repo-skill.mjs`）を先に実行する（ビルドは不要）。
@@ -51,7 +50,7 @@ worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cyc
 
 レビューは、実装時の会話・推論を引き継がない別 agent に依頼する。
 要件・最終差分・必要な一次資料を渡し、実装側の結論や採用理由を先に与えない。
-レビュー担当は差分と関係する消費者を読み、品質（簡素化・保守性）と correctness（偽になる入力・状態の検査）を確認する。
+レビュー担当は一次資料から目的と scope を確かめ、指定一覧を探索範囲の上限にしない。差分と関係する消費者を読み、品質（簡素化・保守性）と correctness（正常・失敗・非該当の入力で主張の反証を試みる）を確認する。測った版と条件が最終成果へ適用できるかも確認する。
 変更に応じて設計妥当性と利用シナリオも検証する。
 自己レビューは準備として行い、別文脈のレビューの代替にしない。
 指摘は根拠となる箇所と failure scenario を添えて返し、実装側が一次資料で確認して対応する。
@@ -68,8 +67,8 @@ worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cyc
 「どういう条件なら省略してよいか」を条件式として書ける、という前提が実測に支持されなかったため、条件を置かず必須とする。
 散文・PFD のみのサイクルは、レビューの要否を diff の規模で判断し、省略する回はその理由を PR 本文に書く。
 機械が読む文書・設定の抽出対象を変える場合は観点2の対象とし、拡張子だけで散文のみと判断しない。
-判定は、変更したパス・フィールドが読み込み処理の入力になり、その値が抽出・選択・生成・判定結果に使われるかで行う。既知の対象は `.pfdsl/bindings/pfd-retro-patterns/` の本文・frontmatter で、読取範囲は `scripts/lib/retro-patterns.mjs` の `PATTERN_DIR_RELATIVE` と `loadPatternCatalog`、出力経路は `.pfdsl/bindings/pfd-retro.md`「変更時の意味レビュー」を参照する。
-この例にない文書・設定も、変更パス・キー・ラベルの参照から読み込み処理と値の利用先を追って判定する。新規・移動・削除では変更前後を調べ、確認した読取経路、または対象外と判断した探索範囲と根拠を、配布層が求める PR 本文のレビュー記録へ含める。既知パスとの不一致だけで対象外にしない。
+判定は、変更したパス・フィールドが読み込み処理の入力になり、その値が抽出・選択・生成・判定結果に使われるかで行う。過去事例の本文を現行の対策として抽出する経路は持たない。
+文書・設定の変更も、変更パス・キー・ラベルの参照から読み込み処理と値の利用先を追って判定する。新規・移動・削除では変更前後を調べ、確認した読取経路、または対象外と判断した探索範囲と根拠を、配布層が求める PR 本文のレビュー記録へ含める。既知パスとの不一致だけで対象外にしない。
 自己レビュー（差分の読み直し）は実施済みとみなし、それに**加えて**軽い設定のレビューを実施する（角度を絞る。8角度 × 検証 agent の高効度設定は使わない）。
 
 menu を観点で組むこと（手段で組まないこと）は、配布層（`.claude/skills/pfd-ops/references/work-cycle.md` 手順3 のレビュー項目）が一次情報。

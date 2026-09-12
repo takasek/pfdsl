@@ -94,6 +94,24 @@ function baseDeps(overrides = {}) {
 }
 
 describe("runCycleStatus", () => {
+	it("runs preflight without reading or selecting historical cases", async () => {
+		const reads = [];
+		const result = await runCycleStatus(
+			baseDeps({
+				readdirSync: (path) => {
+					reads.push(path);
+					throw new Error("historical cases are unavailable");
+				},
+			}),
+		);
+		assert.deepEqual(reads, []);
+		assert.equal(result.preArtifactPatterns, undefined);
+		assert.equal(result.preArtifactSelection, undefined);
+		assert.equal(result.preArtifactPatternsError, undefined);
+		assert.equal(result.fetched, true);
+		assert.equal(cycleStatusExitCode(result), 0);
+	});
+
 	it("uses a non-zero exit code for blocking lookup failures only", () => {
 		assert.equal(cycleStatusExitCode({ blocking: true }), 1);
 		assert.equal(cycleStatusExitCode({ blocking: false }), 0);
@@ -1232,200 +1250,6 @@ describe("runCycleStatus", () => {
 			result.gateCheckCommandError,
 			"failed to resolve the output artifact for process 'proc_x': graph neighbors returned no primary successor",
 		);
-	});
-});
-
-describe("runCycleStatus preArtifactPatterns", () => {
-	const patternText = (phase) =>
-		[
-			"---",
-			`tags: [target:issue]${phase ? `\nphase: ${phase}` : ""}`,
-			"---",
-			"",
-			"- **名前**: 冒頭の一文。",
-			"  具体例: `preflight`。",
-			"  対策: 書く前に確認する。",
-			"",
-		].join("\n");
-
-	it("loads only the phase: pre-artifact pattern files, name/path/countermeasure each", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [1118],
-				readdirSync: () => ["a.md", "b.md", "not-a-pattern.txt"],
-				readFileSync: (path) => {
-					if (path.endsWith("a.md")) return patternText("pre-artifact");
-					if (path.endsWith("b.md")) return patternText(undefined);
-					throw new Error(`unexpected read: ${path}`);
-				},
-				execGh: async (args) => {
-					if (args[0] === "issue")
-						return JSON.stringify({
-							title: "",
-							body: "`preflight`",
-							comments: [],
-							labels: [],
-						});
-					return JSON.stringify([]);
-				},
-			}),
-		);
-		assert.deepEqual(result.preArtifactPatterns, [
-			{
-				name: "名前",
-				path: ".pfdsl/bindings/pfd-retro-patterns/a.md",
-				countermeasure: "書く前に確認する。",
-			},
-		]);
-	});
-
-	it("returns an empty list rather than omitting the field when nothing carries the phase", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				readdirSync: () => ["a.md"],
-				readFileSync: () => patternText(undefined),
-			}),
-		);
-		assert.deepEqual(result.preArtifactPatterns, []);
-	});
-
-	// #1118: the reminder is narrowed by the target issue's own code spans, and
-	// says so — or says it did not narrow, which the binding's measurement makes
-	// the likelier outcome.
-	const namedPattern = (name, example) =>
-		[
-			"---",
-			"tags: [target:issue]\nphase: pre-artifact",
-			"---",
-			"",
-			`- **${name}**: 冒頭の一文。`,
-			`  具体例: ${example}`,
-			"  対策: 書く前に確認する。",
-			"",
-		].join("\n");
-
-	const runForCatalog = (issueBody, files, title = "コードスパンのない題") =>
-		runCycleStatus(
-			baseDeps({
-				issueNumbers: [1118],
-				readdirSync: () => Object.keys(files),
-				readFileSync: (path) => {
-					const hit = Object.keys(files).find((f) => path.endsWith(f));
-					if (hit) return files[hit];
-					throw new Error(`unexpected read: ${path}`);
-				},
-				execGh: async (args) => {
-					if (args[0] === "issue")
-						return JSON.stringify({
-							title,
-							body: issueBody,
-							comments: [],
-							labels: [],
-						});
-					return JSON.stringify([]);
-				},
-			}),
-		);
-
-	const fourPatterns = {
-		"a.md": namedPattern("A", "`preflight` の話。"),
-		"b.md": namedPattern("B", "`preflight` と `advisory`。"),
-		"c.md": namedPattern("C", "委譲の話。"),
-		"d.md": namedPattern("D", "起票の話。"),
-	};
-
-	it("keeps only the patterns the issue's code spans reach", async () => {
-		const result = await runForCatalog(
-			"`preflight` と `advisory` を直す。",
-			fourPatterns,
-		);
-		assert.deepEqual(
-			result.preArtifactPatterns.map((p) => p.name),
-			["B", "A"],
-		);
-		assert.equal(result.preArtifactSelection.unselective, false);
-		assert.equal(result.preArtifactSelection.reason, null);
-		assert.equal(result.preArtifactSelection.pool, 4);
-		assert.deepEqual(result.preArtifactSelection.words, [
-			"preflight",
-			"advisory",
-		]);
-	});
-
-	it("keeps an always-tagged pattern when the issue has no code span", async () => {
-		const result = await runForCatalog(
-			"コードスパンのない本文。",
-			fourPatterns,
-		);
-		assert.equal(result.preArtifactPatterns.length, 0);
-		assert.equal(result.preArtifactSelection.unselective, true);
-		assert.equal(result.preArtifactSelection.reason, "no-words");
-	});
-
-	it("keeps only always-tagged patterns when the issue has no code span", async () => {
-		const result = await runForCatalog("コードスパンのない本文。", {
-			"a.md": namedPattern("A", "無関係。"),
-			"always.md": [
-				"---",
-				"tags: [always]\nphase: pre-artifact",
-				"---",
-				"",
-				"- **ALWAYS**: 常に読む。",
-				"  対策: 毎回読む。",
-				"",
-			].join("\n"),
-		});
-		assert.deepEqual(
-			result.preArtifactPatterns.map((p) => p.name),
-			["ALWAYS"],
-		);
-		assert.equal(result.preArtifactSelection.reason, "no-words");
-	});
-
-	it("searches the issue title as well as its body", async () => {
-		const result = await runForCatalog(
-			"本文にコードスパンなし。",
-			{
-				"a.md": namedPattern("A", "`cycle-status` の話。"),
-				"b.md": namedPattern("B", "無関係。"),
-				"c.md": namedPattern("C", "無関係。"),
-				"d.md": namedPattern("D", "無関係。"),
-			},
-			"`cycle-status` を直す",
-		);
-		assert.deepEqual(
-			result.preArtifactPatterns.map((p) => p.name),
-			["A"],
-		);
-	});
-
-	it("does not report an unreadable catalog as an issue with no code spans", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				readdirSync: () => {
-					throw new Error("ENOENT: no such directory");
-				},
-			}),
-		);
-		assert.match(result.preArtifactPatternsError, /ENOENT/);
-		assert.equal(result.preArtifactSelection.reason, "catalog-unreadable");
-		assert.equal(result.preArtifactSelection.pool, 0);
-	});
-
-	it("reports no words when the cycle resolved no target issue", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				readdirSync: () => Object.keys(fourPatterns),
-				readFileSync: (path) => {
-					const hit = Object.keys(fourPatterns).find((f) => path.endsWith(f));
-					if (hit) return fourPatterns[hit];
-					throw new Error(`unexpected read: ${path}`);
-				},
-			}),
-		);
-		assert.equal(result.preArtifactPatterns.length, 0);
-		assert.equal(result.preArtifactSelection.reason, "no-words");
-		assert.deepEqual(result.preArtifactSelection.words, []);
 	});
 });
 

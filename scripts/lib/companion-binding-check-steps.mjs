@@ -29,7 +29,11 @@ const PFD_RETRO_BINDING_PATH = ".pfdsl/bindings/pfd-retro.md";
  * @returns {{exitCode: 0|1, stdoutLines: string[], stderrLines: string[]}}
  */
 export function runCompanionBindingsCheck({ listFiles, readFile, exists }) {
-	const files = listFiles();
+	// Historical cases preserve paths and evidence from their original revision.
+	// Their current procedures live in the binding, which is still checked.
+	const files = listFiles().filter(
+		(file) => !file.startsWith(".pfdsl/bindings/pfd-retro-patterns/"),
+	);
 	const stderrLines = [];
 	let errorCount = 0;
 

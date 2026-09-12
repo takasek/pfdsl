@@ -33,6 +33,27 @@ function wiringByCommand() {
 }
 
 describe(".claude/settings.json hook wiring", () => {
+	it("ships the managed issue reminder without inferring commits from commands", () => {
+		const hooks = JSON.parse(
+			readFileSync(resolve(root, "hooks/hooks.json"), "utf8"),
+		);
+		const commands = Object.values(hooks.hooks).flatMap((groups) =>
+			groups.flatMap((group) => group.hooks.map((hook) => hook.command)),
+		);
+		assert.equal(
+			commands.some((command) =>
+				command.includes("retro-reminder-post-tool-use"),
+			),
+			false,
+		);
+		assert.equal(
+			commands.some((command) =>
+				command.includes("managed-issue-reminder-post-tool-use"),
+			),
+			true,
+		);
+	});
+
 	it("wires no command to more than one event", () => {
 		const duplicates = [...wiringByCommand()]
 			.filter(([, events]) => events.length > 1)
@@ -40,10 +61,10 @@ describe(".claude/settings.json hook wiring", () => {
 		assert.deepEqual(duplicates, []);
 	});
 
-	it("wires the pre-artifact advisory to the write events, which is what makes it reach code", () => {
-		assert.deepEqual(
-			wiringByCommand().get("node scripts/pre-artifact-advisory.mjs"),
-			["PostToolUse[Write|Edit]"],
+	it("does not deliver case prescriptions after ordinary writes", () => {
+		assert.equal(
+			wiringByCommand().has("node scripts/pre-artifact-advisory.mjs"),
+			false,
 		);
 	});
 

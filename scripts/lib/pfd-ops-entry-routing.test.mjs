@@ -100,7 +100,6 @@ describe("pfd-ops entry routing", () => {
 			],
 			["事故対処の道具", /個別の事故への対処[^\n]+参加者ではない/],
 			["pipeline 不在", /pipeline\.pfdsl`? が存在しない[^\n]+別の PFD/],
-			["機械化の例外", /例外は2つ[^\n]+\(a\)[^\n]+\(b\)/],
 			["deny retry", /1回の retry[^\n]+対処済み[^\n]+deny/],
 			["ask retry", /payload[^\n]+ask[^\n]+deny[^\n]+retry/],
 		]) {

@@ -1,7 +1,8 @@
 ---
 tags: [target:check-script, context:stale-tool]
-phase: pre-artifact
 ---
+
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
 
 - **古いcheckoutが旧版の検査器を走らせる trap**: ツリー内の検査器をbase追随前に実行すると、旧版に存在しない判定は未発火でなく最初から無かったため、欠けた出力を正常な全結果として受け取る。
   問いの形: 「いま読んでいる出力はどの版のスクリプトが出したものか。`origin/<base>` の版で走らせ直したら同じフィールドと判定が出るか」。

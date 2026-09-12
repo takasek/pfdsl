@@ -1,7 +1,8 @@
 ---
 tags: [method:count, method:sweep, target:issue]
-phase: pre-artifact
 ---
+
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
 
 - **実装の形が同じものを同型と呼ぶ trap**: 対策を横展開する先を探すとき、同じ内部機構を呼んでいる箇所が同型に見える。
   同型かどうかを決めるのは実装の形ではなく、消費者が何を問うているかである。

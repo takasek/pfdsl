@@ -595,8 +595,7 @@ export function checkDocsStep({ exec }) {
 /**
  * Parse every adopted .pfdsl file, for the report material that says which of
  * a cycle's changed files any PFD models (#778). One owner for the directory
- * read and for what a single unparsable file costs — the same reason
- * loadPatternCatalog exists in retro-patterns.mjs rather than at its callers.
+ * read and for what a single unparsable file costs, shared by every consumer.
  *
  * A failing file is named and skipped rather than aborting: the block this
  * feeds is material, and a partial reading whose gap is stated is worth more

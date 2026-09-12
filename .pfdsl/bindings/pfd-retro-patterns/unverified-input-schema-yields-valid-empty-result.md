@@ -1,7 +1,8 @@
 ---
 tags: [target:check-script, method:count]
-phase: pre-artifact
 ---
+
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
 
 - **未検証の入力 schema が有効な空結果を返す trap**: 入力 contract を確認せず推測した property を読むと、JavaScript の `undefined` や false の経路を通って例外ではなく0件を返すことがある。同じ処理の他の集計が成功すると、出力全体が schema に適合しているように見え、誤信が補強される。
   問いの形: 「この系列が読む property は input contract または実データ1件で確認したか。0件は期待した空集合か、それとも存在しない property を読んだ結果か。同じ処理の他系列の成功を、この系列の正しさへ流用していないか」。

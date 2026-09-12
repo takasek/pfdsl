@@ -1,7 +1,8 @@
 ---
 tags: [target:issue, target:pr, context:external-dependency]
-phase: pre-artifact
 ---
+
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
 
 - **成功表示や返されたURLを、保存済み本文の同一性確認の代わりに読むtrap**: 外部コマンドで issue 本文・issue コメント・PR 本文のような複数行本文を書いたとき、コマンドが成功し URL が返れば本文もそのまま保存されたと読んでしまう。
   外部コマンドの成功は「要求を受け付けた」ことしか示さず、GitHub 側に persisted した `body` が意図どおりの改行・必須行・参照を保ったことまでは示さない。

@@ -1,7 +1,8 @@
 ---
 tags: [target:issue, context:parallel-work]
-phase: pre-artifact
 ---
+
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
 
 - **issue クローズ漏れ trap（別 PR 経由の偶発解決）**: あるレビュー対応 PR が別 issue のスコープを偶発的に解決すると、その別 issue 自体は誰も見ていないため open のまま残り続ける。着手前に issue 本文の再現手順を現行コードに当てて「まだ再現するか」を確認しないと、既に解決済みの issue に無駄な実装差分を積みかねない。
   問いの形: 「この issue が指す症状は、現行コードでまだ再現するか（既存の別 PR が偶発的に解決していないか）」。

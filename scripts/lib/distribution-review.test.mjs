@@ -35,7 +35,7 @@ describe("inScope", () => {
 	it("leaves out what is not markdown", () => {
 		assert.equal(inScope("plugin/pfdsl/.claude-plugin/plugin.json"), false);
 		assert.equal(
-			inScope("plugin/pfdsl/hooks/retro-reminder-post-tool-use.mjs"),
+			inScope("plugin/pfdsl/hooks/managed-issue-reminder-post-tool-use.mjs"),
 			false,
 		);
 		assert.equal(
@@ -73,8 +73,8 @@ describe("canonicalSourceOf", () => {
 		["plugin/pfdsl/commands/pfd-cycle.md", ".claude/commands/pfd-cycle.md"],
 		["plugin/pfdsl/agents/pfd-lens.md", ".claude/agents/pfd-lens.md"],
 		[
-			"plugin/pfdsl/hooks/retro-reminder-post-tool-use.mjs",
-			"hooks/retro-reminder-post-tool-use.mjs",
+			"plugin/pfdsl/hooks/managed-issue-reminder-post-tool-use.mjs",
+			"hooks/managed-issue-reminder-post-tool-use.mjs",
 		],
 		["plugin/pfdsl/skills/pfdsl/SKILL.md", "scripts/skill-template/SKILL.md"],
 		["plugin/pfdsl/skills/pfdsl/references/spec.md", "docs/spec/spec.md"],

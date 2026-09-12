@@ -2,6 +2,8 @@
 tags: [method:delegate, method:unify, context:parallel-work]
 ---
 
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
+
 - **独立に正しいunitが接合部で壊れる trap**: 各unitの受け入れ基準を単独で満たしても、一方の出力や操作順を他方が異なる契約で解釈すれば、結合後だけ誤った状態になる。
   問いの形: 「接合する出力・操作は、成功時と失敗時の両方で、相手側の解釈・観測・状態遷移の契約を保っているか。順序を入れ替えたときにも各unitの前提は成立するか」。
   具体例: 並行委譲したADRの構文例引用（double-backtick span）とlintのinline-code除外（当時single-backtickのみ対応）の組で、構文例が実マーカーとして検出され、定義例と参照例が相互解決してlintが偶然PASSした（#328。除外は #398 で backtick run 対応に修正済み）。

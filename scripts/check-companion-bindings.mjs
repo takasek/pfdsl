@@ -7,12 +7,13 @@
  * section heading), and nothing checked those pointers stayed valid as files
  * got renamed or sections got reworded (#344).
  *
- * 1. Scans .pfdsl markdown companions for repo-relative path references
+ * 1. Scans current .pfdsl markdown companions for repo-relative path references
  *    (inline code and markdown links starting with docs/, .claude/,
  *    scripts/, packages/) and verifies each resolves to an existing
  *    file/directory. Assumes the repo is built (e.g. packages/cli/dist
  *    exists) — this runs as part of `make check-docs`, which already
- *    assumes that for other checks.
+ *    assumes that for other checks. Historical pfd-retro-patterns cases retain
+ *    references to their original revisions and are outside this live check.
  * 2. If .pfdsl/bindings/pfd-retro.md exists, verifies it has the "pfd-retro
  *    バインディング" heading pfd-retro's audit protocol depends on being
  *    able to find.
