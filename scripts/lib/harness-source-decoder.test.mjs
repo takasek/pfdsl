@@ -1,16 +1,13 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import {
-	mkdirSync,
-	mkdtempSync,
-	rmSync,
-	symlinkSync,
-	writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { createGitIgnoreOracle } from "./git-ignore-oracle.mjs";
+import {
+	commitEverything,
+	makeGitRepository,
+} from "./git-test-repository.test-helper.mjs";
 import { validateCapabilityContract } from "./harness-capability-contract.mjs";
 import { HARNESS_CAPABILITY_CONTRACT } from "./harness-inventory.mjs";
 import { decodeHarnessSources } from "./harness-source-decoder.mjs";
@@ -217,7 +214,7 @@ function decodeFixture({ root, contract, fs, isIgnored }) {
 		contract,
 		fs,
 		sourceExclusions: FIXTURE_SOURCE_EXCLUSIONS,
-		...(isIgnored === undefined ? {} : { isIgnored }),
+		isIgnored,
 	});
 }
 
@@ -226,10 +223,11 @@ function decodeFixture({ root, contract, fs, isIgnored }) {
  * Git repository, so the default ignore oracle answers from real `git
  * check-ignore` output instead of an injected stub.
  */
-function onDiskFixture({ gitignore = "dist/\n", repository = true } = {}) {
-	const root = mkdtempSync(join(tmpdir(), "harness-source-decoder-"));
-	if (repository) execFileSync("git", ["init", "-q"], { cwd: root });
-	writeFileSync(join(root, ".gitignore"), gitignore);
+function onDiskFixture(options = {}) {
+	const root = makeGitRepository({
+		prefix: "harness-source-decoder-",
+		...options,
+	});
 	for (const [relativePath, content] of Object.entries(FIXTURE_SOURCE_FILES)) {
 		const path = join(root, relativePath);
 		mkdirSync(dirname(path), { recursive: true });
@@ -252,23 +250,6 @@ function decodeOnDisk(root) {
 		contract: CONTRACT,
 		sourceExclusions: FIXTURE_SOURCE_EXCLUSIONS,
 	});
-}
-
-function commitAll(root) {
-	execFileSync("git", ["add", "-A", "-f"], { cwd: root });
-	execFileSync(
-		"git",
-		[
-			"-c",
-			"user.email=t@example.com",
-			"-c",
-			"user.name=t",
-			"commit",
-			"-qm",
-			"f",
-		],
-		{ cwd: root },
-	);
 }
 
 function recordFor(records, id) {
@@ -478,6 +459,30 @@ describe("harness source decoder", () => {
 		}
 	});
 
+	it("asks Git nothing when every entry classifies without it", () => {
+		// The stub-driven test above fixes the call discipline; this one fixes
+		// it on the wiring a real run uses, where the oracle is the default.
+		const root = onDiskFixture();
+		try {
+			const asked = [];
+			decodeHarnessSources({
+				root,
+				contract: CONTRACT,
+				sourceExclusions: FIXTURE_SOURCE_EXCLUSIONS,
+				isIgnored: createGitIgnoreOracle(root, {
+					checkIgnore: (_root, queryPath) => {
+						asked.push(queryPath);
+						return 1;
+					},
+				}),
+			});
+
+			assert.deepEqual(asked, []);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it("reports a tracked entry even when an ignore rule matches its name", () => {
 		// `git check-ignore` consults the index, so a force-added `dist/` reads
 		// as tracked rather than ignored. Without that distinction the oracle
@@ -490,7 +495,7 @@ describe("harness source decoder", () => {
 				join(root, ".claude/skills/pfd-ops/dist/x.txt"),
 				"maintained content\n",
 			);
-			commitAll(root);
+			commitEverything(root);
 
 			assert.throws(() => decodeOnDisk(root), /source-topology: .*dist/);
 		} finally {
