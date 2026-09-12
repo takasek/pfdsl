@@ -321,6 +321,42 @@ describe("findDistDependentFiles", () => {
 		);
 		assert.deepEqual(findDistDependentFiles([f]), []);
 	});
+
+	it("lets an allowed file import node:child_process", () => {
+		const allowed = write(
+			"allowed.mjs",
+			'import { execFileSync } from "node:child_process";\n',
+		);
+		const other = write(
+			"other.mjs",
+			'import { execFileSync } from "node:child_process";\n',
+		);
+
+		const violations = findDistDependentFiles([allowed, other], {
+			allowed: [allowed],
+		});
+
+		assert.deepEqual(
+			violations.map(({ file }) => file),
+			[other],
+		);
+	});
+
+	it("still flags a dist reference in an allowed file", () => {
+		// The exemption covers the spawn rule only: being allowed to run one
+		// fixed command says nothing about reading the CLI build directly.
+		const f = write(
+			"allowed.mjs",
+			'import { execFileSync } from "node:child_process";\nconst p = "packages/cli/dist/cli.js";\n',
+		);
+
+		const violations = findDistDependentFiles([f], { allowed: [f] });
+
+		assert.deepEqual(
+			violations.map(({ reason }) => reason),
+			["references packages/cli/dist"],
+		);
+	});
 });
 
 describe("findGhExecImportBoundaryViolations", () => {
