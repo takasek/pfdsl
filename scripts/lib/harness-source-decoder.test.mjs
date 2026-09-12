@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
-import { dirname, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import {
+	mkdirSync,
+	mkdtempSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { validateCapabilityContract } from "./harness-capability-contract.mjs";
@@ -17,6 +26,25 @@ const FIXTURE_SOURCE_EXCLUSIONS = {
 	commands: {},
 	agents: {},
 };
+
+const FIXTURE_SOURCE_FILES = {
+	"CLAUDE.md": "repository instructions\n",
+	".claude/commands/pfd-cycle.md":
+		"---\ndescription: Run the cycle.\n---\n\ncommand body\n",
+	".claude/agents/pfd-lens.md":
+		"---\nname: pfd-lens\ndescription: Inspect a graph.\ntools: Read, Grep, Bash\nmodel: sonnet\n---\n\nagent body\n",
+	".claude/skills/pfd-ops/SKILL.md":
+		"---\nname: pfd-ops\nsummary: fixture operations\ndescription: fixture\n---\nbody\n",
+	".claude/pfd-ops-install-manifest.json": '{"files": []}\n',
+	".claude/settings.json":
+		'{"permissions":{"allow":["Bash(node scripts/*)"]},"hooks":{"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"node hook.mjs","timeout":10}]}]}}\n',
+	"hooks/hooks.json":
+		'{"hooks":{"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"node hook.mjs","timeout":10}]}]}}\n',
+	"packages/cli/package.json": '{"version":"1.2.3"}\n',
+};
+
+const GENERATED_SKILL_SOURCE =
+	"---\nname: pfdsl\nsummary: fixture syntax\ndescription: fixture\n---\nbody\n";
 
 function source(id, kind, encoding, path, extra = {}) {
 	return { id, kind, source: { encoding, path, ...extra }, mappings: [] };
@@ -102,35 +130,12 @@ function fixture() {
 		nodes.set(path, { type: "symlink" });
 	}
 
-	addFile("CLAUDE.md", "repository instructions\n");
-	addFile(
-		".claude/commands/pfd-cycle.md",
-		"---\ndescription: Run the cycle.\n---\n\ncommand body\n",
-	);
-	addFile(
-		".claude/agents/pfd-lens.md",
-		"---\nname: pfd-lens\ndescription: Inspect a graph.\ntools: Read, Grep, Bash\nmodel: sonnet\n---\n\nagent body\n",
-	);
+	for (const [relativePath, content] of Object.entries(FIXTURE_SOURCE_FILES)) {
+		addFile(relativePath, content);
+	}
 	addDirectory(".claude/skills/pfd-ops");
-	addFile(
-		".claude/skills/pfd-ops/SKILL.md",
-		"---\nname: pfd-ops\nsummary: fixture operations\ndescription: fixture\n---\nbody\n",
-	);
 	addSymlink(".claude/skills/pfdsl");
-	addFile(
-		".claude/skills/pfdsl/SKILL.md",
-		"---\nname: pfdsl\nsummary: fixture syntax\ndescription: fixture\n---\nbody\n",
-	);
-	addFile(".claude/pfd-ops-install-manifest.json", '{"files": []}\n');
-	addFile(
-		".claude/settings.json",
-		'{"permissions":{"allow":["Bash(node scripts/*)"]},"hooks":{"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"node hook.mjs","timeout":10}]}]}}\n',
-	);
-	addFile(
-		"hooks/hooks.json",
-		'{"hooks":{"PostToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"node hook.mjs","timeout":10}]}]}}\n',
-	);
-	addFile("packages/cli/package.json", '{"version":"1.2.3"}\n');
+	addFile(".claude/skills/pfdsl/SKILL.md", GENERATED_SKILL_SOURCE);
 
 	return {
 		addFile,
@@ -206,13 +211,64 @@ function expectSchemaFailure(subject, relativePath, surface, name) {
 	);
 }
 
-function decodeFixture({ root, contract, fs }) {
+function decodeFixture({ root, contract, fs, isIgnored }) {
 	return decodeHarnessSources({
 		root,
 		contract,
 		fs,
 		sourceExclusions: FIXTURE_SOURCE_EXCLUSIONS,
+		...(isIgnored === undefined ? {} : { isIgnored }),
 	});
+}
+
+/**
+ * The same sources `fixture()` describes, written to disk inside a throwaway
+ * Git repository, so the default ignore oracle answers from real `git
+ * check-ignore` output instead of an injected stub.
+ */
+function onDiskFixture({ gitignore = "dist/\n", repository = true } = {}) {
+	const root = mkdtempSync(join(tmpdir(), "harness-source-decoder-"));
+	if (repository) execFileSync("git", ["init", "-q"], { cwd: root });
+	writeFileSync(join(root, ".gitignore"), gitignore);
+	for (const [relativePath, content] of Object.entries(FIXTURE_SOURCE_FILES)) {
+		const path = join(root, relativePath);
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, content);
+	}
+	const generatedSkill = join(root, "generated/skills/pfdsl");
+	mkdirSync(generatedSkill, { recursive: true });
+	writeFileSync(join(generatedSkill, "SKILL.md"), GENERATED_SKILL_SOURCE);
+	symlinkSync(
+		"../../generated/skills/pfdsl",
+		join(root, ".claude/skills/pfdsl"),
+		"dir",
+	);
+	return root;
+}
+
+function decodeOnDisk(root) {
+	return decodeHarnessSources({
+		root,
+		contract: CONTRACT,
+		sourceExclusions: FIXTURE_SOURCE_EXCLUSIONS,
+	});
+}
+
+function commitAll(root) {
+	execFileSync("git", ["add", "-A", "-f"], { cwd: root });
+	execFileSync(
+		"git",
+		[
+			"-c",
+			"user.email=t@example.com",
+			"-c",
+			"user.name=t",
+			"commit",
+			"-qm",
+			"f",
+		],
+		{ cwd: root },
+	);
 }
 
 function recordFor(records, id) {
@@ -321,6 +377,139 @@ describe("harness source decoder", () => {
 			".claude/skills/pfd-ops/.DS_Store.backup",
 			".DS_Store.backup",
 		);
+	});
+
+	it("skips unclassified entries the repository's Git ignores, at every depth", () => {
+		const cases = [
+			{
+				add: (subject) => subject.addDirectory(".claude/dist"),
+				query: ".claude/dist/",
+			},
+			{
+				add: (subject) => subject.addDirectory(".claude/skills/dist"),
+				query: ".claude/skills/dist/",
+			},
+			{
+				add: (subject) => subject.addDirectory(".claude/skills/pfd-ops/dist"),
+				query: ".claude/skills/pfd-ops/dist/",
+			},
+			{
+				add: (subject) =>
+					subject.addFile(".claude/skills/pfd-ops/scratch.log", "scratch\n"),
+				query: ".claude/skills/pfd-ops/scratch.log",
+			},
+			{
+				add: (subject) =>
+					subject.addFile(".claude/commands/scratch.log", "scratch\n"),
+				query: ".claude/commands/scratch.log",
+			},
+			{
+				add: (subject) =>
+					subject.addFile(".claude/agents/scratch.log", "scratch\n"),
+				query: ".claude/agents/scratch.log",
+			},
+			{
+				add: (subject) => subject.addFile(".claude/scratch.log", "scratch\n"),
+				query: ".claude/scratch.log",
+			},
+		];
+
+		for (const testCase of cases) {
+			const subject = fixture();
+			testCase.add(subject);
+			const asked = [];
+			const isIgnored = (queryPath) => {
+				asked.push(queryPath);
+				return queryPath === testCase.query;
+			};
+
+			assert.doesNotThrow(
+				() =>
+					decodeFixture({
+						root: ROOT,
+						contract: CONTRACT,
+						fs: subject.fs,
+						isIgnored,
+					}),
+				testCase.query,
+			);
+			// One question, about the one entry classification could not place:
+			// a tree with nothing stray never reaches Git at all. Directories
+			// carry the trailing "/" that tells `check-ignore` the queried path
+			// is a directory, which is what a directory-only rule (`dist/`) needs
+			// to match the entry itself rather than only files below it.
+			assert.deepEqual(asked, [testCase.query]);
+		}
+	});
+
+	it("reports an unclassified entry the repository does not ignore", () => {
+		const subject = fixture();
+		subject.addDirectory(".claude/skills/pfd-ops/dist");
+
+		expectTopologyFailure(
+			{
+				root: ROOT,
+				contract: CONTRACT,
+				fs: subject.fs,
+				isIgnored: () => false,
+			},
+			".claude/skills/pfd-ops/dist",
+			"dist",
+		);
+	});
+
+	it("asks the real Git which unclassified entries the repository ignores", () => {
+		const root = onDiskFixture();
+		try {
+			mkdirSync(join(root, ".claude/skills/pfd-ops/dist"), { recursive: true });
+			writeFileSync(
+				join(root, ".claude/skills/pfd-ops/dist/x.txt"),
+				"build output\n",
+			);
+			assert.doesNotThrow(() => decodeOnDisk(root));
+
+			writeFileSync(
+				join(root, ".claude/skills/pfd-ops/claude-only.md"),
+				"maintained content\n",
+			);
+			assert.throws(() => decodeOnDisk(root), /source-topology: .*claude-only/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("reports a tracked entry even when an ignore rule matches its name", () => {
+		// `git check-ignore` consults the index, so a force-added `dist/` reads
+		// as tracked rather than ignored. Without that distinction the oracle
+		// would wave through a maintained source whose name happens to collide
+		// with an ignore rule.
+		const root = onDiskFixture();
+		try {
+			mkdirSync(join(root, ".claude/skills/pfd-ops/dist"), { recursive: true });
+			writeFileSync(
+				join(root, ".claude/skills/pfd-ops/dist/x.txt"),
+				"maintained content\n",
+			);
+			commitAll(root);
+
+			assert.throws(() => decodeOnDisk(root), /source-topology: .*dist/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("reports an unclassified entry when Git cannot answer at all", () => {
+		// Outside a repository there is no ignore state to consult, so the entry
+		// stays unclassified rather than passing on an unanswered question.
+		const root = onDiskFixture({ repository: false });
+		try {
+			mkdirSync(join(root, ".claude/skills/pfd-ops/dist"), { recursive: true });
+			writeFileSync(join(root, ".claude/skills/pfd-ops/dist/x.txt"), "junk\n");
+
+			assert.throws(() => decodeOnDisk(root), /source-topology: .*dist/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	it("rejects an unknown maintained skill descendant instead of silently shipping it", () => {

@@ -3200,7 +3200,13 @@ describe("dist independence", () => {
 			"expected the closure to include at least the entry and lib/gen-plugin.mjs",
 		);
 
-		const violations = findDistDependentFiles([...closure]);
+		// The one module allowed to spawn: its executable and subcommand are
+		// fixed at `git check-ignore`, which scripts/lib/git-ignore-oracle.test.mjs
+		// holds there. See findDistDependentFiles for why a runner that takes
+		// the executable as an argument cannot be exempted the same way.
+		const violations = findDistDependentFiles([...closure], {
+			allowed: [resolve(repoRoot, "scripts/lib/git-ignore-oracle.mjs")],
+		});
 		assert.deepEqual(
 			violations,
 			[],

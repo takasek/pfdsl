@@ -150,14 +150,27 @@ export function findGhExecImportBoundaryViolations(
  * outside of a comment — the two ways a "dist-independent" script could
  * secretly gain a build dependency (either by spawning the CLI, or by
  * reading its dist output directly).
+ *
+ * `allowed` exempts a file from the first rule only. The rule's material —
+ * "does this source text mention node:child_process" — cannot tell a module
+ * that spawns one fixed unrelated command from one that spawns the CLI build,
+ * and the second rule catches the latter only where the build path is spelled
+ * literally. So an exemption is worth granting exactly when the module's
+ * executable and subcommand are fixed in its source and held there by its own
+ * test: scripts/lib/git-ignore-oracle.mjs runs `git check-ignore` and nothing
+ * else (takasek/pfdsl#1134). A module that takes the executable as an argument
+ * — scripts/lib/run-exec.mjs and its `run(file, args)` — must not be exempted,
+ * since that reopens the indirect path for every file in the closure.
  * @param {string[]} files - absolute paths
+ * @param {{allowed?: string[]}} [opts] - absolute paths permitted to import
+ *   node:child_process
  * @returns {Array<{file: string, reason: string}>}
  */
-export function findDistDependentFiles(files) {
+export function findDistDependentFiles(files, { allowed = [] } = {}) {
 	const violations = [];
 	for (const file of files) {
 		const code = stripComments(readFileSync(file, "utf-8"));
-		if (/node:child_process/.test(code)) {
+		if (/node:child_process/.test(code) && !allowed.includes(file)) {
 			violations.push({
 				file,
 				reason: "imports node:child_process (that's how CLI dist gets invoked)",

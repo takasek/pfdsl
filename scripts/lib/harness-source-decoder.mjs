@@ -1,6 +1,7 @@
 import { lstatSync, readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { parse } from "yaml";
+import { createGitIgnoreOracle } from "./git-ignore-oracle.mjs";
 import {
 	HARNESS_CAPABILITY_CONTRACT,
 	LOCAL_CLAUDE_ROOT_ENTRIES,
@@ -32,6 +33,30 @@ const SETTINGS_HOOK_EVENTS = new Set([
 	"SessionStart",
 ]);
 const PLUGIN_HOOK_EVENTS = new Set(["PostToolUse"]);
+
+/**
+ * Build the "this entry is not a maintained source" test the topology checks
+ * apply to an entry they could not classify.
+ *
+ * A name allowlist answers "is this entry called `.DS_Store`", which is a
+ * coarser question than "is this entry part of what the repository
+ * maintains": every later build directory, coverage tree or editor dropping
+ * under `.claude/` has to join the list one name at a time, and until it
+ * does, the checkout fails an audit over a path Git already disowned
+ * (takasek/pfdsl#1134). Ignore state answers the question that was meant.
+ *
+ * The trailing "/" on a directory is what makes a directory-only `.gitignore`
+ * rule (`dist/`) match the queried path as the directory it is.
+ */
+function createUnmaintainedEntryTest(root, fs, isIgnored) {
+	return (path) => {
+		if (OS_GENERATED_ENTRY_NAMES.has(entryName(path))) return true;
+		const relativePath = relative(root, path);
+		return isIgnored(
+			fs.lstatSync(path).isDirectory() ? `${relativePath}/` : relativePath,
+		);
+	};
+}
 
 function sourceTopologyError(path, name, detail = "unclassified") {
 	throw new Error(`source-topology: ${path}: ${detail} ${name}.`);
@@ -71,7 +96,14 @@ function sourceEntries(contract, encoding, prefix) {
 	);
 }
 
-function assertEntryClosure(fs, path, entries, exclusions, sourceType) {
+function assertEntryClosure(
+	fs,
+	path,
+	entries,
+	exclusions,
+	sourceType,
+	isUnmaintained,
+) {
 	assertType(fs, path, "directory");
 	for (const name of Object.keys(exclusions)) {
 		if (entries.has(name)) {
@@ -83,10 +115,10 @@ function assertEntryClosure(fs, path, entries, exclusions, sourceType) {
 		}
 	}
 	for (const name of fs.readdirSync(path)) {
-		if (OS_GENERATED_ENTRY_NAMES.has(name)) continue;
-		if (!entries.has(name) && !Object.hasOwn(exclusions, name)) {
-			sourceTopologyError(resolve(path, name), name);
-		}
+		if (entries.has(name) || Object.hasOwn(exclusions, name)) continue;
+		const entryPath = resolve(path, name);
+		if (isUnmaintained(entryPath)) continue;
+		sourceTopologyError(entryPath, name);
 	}
 	for (const [name, capability] of entries) {
 		const sourcePath = resolve(path, name);
@@ -98,7 +130,7 @@ function assertEntryClosure(fs, path, entries, exclusions, sourceType) {
 	}
 }
 
-function assertSkillTreeClosure(fs, path, capability) {
+function assertSkillTreeClosure(fs, path, capability, isUnmaintained) {
 	const files = capability.source.files;
 	if (!Array.isArray(files)) {
 		sourceTopologyError(path, capability.id, "missing declared files for");
@@ -109,16 +141,17 @@ function assertSkillTreeClosure(fs, path, capability) {
 
 	function visit(directory, relativePath = "") {
 		for (const name of fs.readdirSync(directory)) {
-			if (OS_GENERATED_ENTRY_NAMES.has(name)) continue;
 			const entryPath = resolve(directory, name);
 			const entryRelativePath = relativePath ? `${relativePath}/${name}` : name;
 			const stats = fs.lstatSync(entryPath);
 			if (stats.isDirectory()) {
 				if (!expectedDirectory(entryRelativePath)) {
+					if (isUnmaintained(entryPath)) continue;
 					sourceTopologyError(entryPath, entryRelativePath);
 				}
 				visit(entryPath, entryRelativePath);
 			} else if (!stats.isFile() || !expectedFiles.has(entryRelativePath)) {
+				if (isUnmaintained(entryPath)) continue;
 				sourceTopologyError(entryPath, entryRelativePath);
 			}
 		}
@@ -139,7 +172,13 @@ function normalizedSourceExclusions(sourceExclusions) {
 	};
 }
 
-function assertClaudeTopology(root, contract, sourceExclusions, fs) {
+function assertClaudeTopology(
+	root,
+	contract,
+	sourceExclusions,
+	fs,
+	isUnmaintained,
+) {
 	const claudeRoot = pathFor(root, ".claude");
 	assertType(fs, claudeRoot, "directory");
 	const knownRootEntries = new Set([
@@ -149,10 +188,10 @@ function assertClaudeTopology(root, contract, sourceExclusions, fs) {
 		...Object.keys(sourceExclusions.root),
 	]);
 	for (const name of fs.readdirSync(claudeRoot)) {
-		if (OS_GENERATED_ENTRY_NAMES.has(name)) continue;
-		if (!knownRootEntries.has(name)) {
-			sourceTopologyError(resolve(claudeRoot, name), name);
-		}
+		if (knownRootEntries.has(name)) continue;
+		const entryPath = resolve(claudeRoot, name);
+		if (isUnmaintained(entryPath)) continue;
+		sourceTopologyError(entryPath, name);
 	}
 
 	assertEntryClosure(
@@ -161,6 +200,7 @@ function assertClaudeTopology(root, contract, sourceExclusions, fs) {
 		sourceEntries(contract, "claude-skill", ".claude/skills/"),
 		sourceExclusions.skills,
 		"directory",
+		isUnmaintained,
 	);
 	for (const capability of sourceEntries(
 		contract,
@@ -172,6 +212,7 @@ function assertClaudeTopology(root, contract, sourceExclusions, fs) {
 				fs,
 				pathFor(root, capability.source.path),
 				capability,
+				isUnmaintained,
 			);
 		}
 	}
@@ -181,6 +222,7 @@ function assertClaudeTopology(root, contract, sourceExclusions, fs) {
 		sourceEntries(contract, "claude-command", ".claude/commands/"),
 		sourceExclusions.commands,
 		"file",
+		isUnmaintained,
 	);
 	assertEntryClosure(
 		fs,
@@ -188,6 +230,7 @@ function assertClaudeTopology(root, contract, sourceExclusions, fs) {
 		sourceEntries(contract, "claude-agent", ".claude/agents/"),
 		sourceExclusions.agents,
 		"file",
+		isUnmaintained,
 	);
 	assertType(fs, resolve(claudeRoot, "settings.json"), "file");
 	for (const name of Object.keys(sourceExclusions.root)) {
@@ -425,9 +468,16 @@ export function decodeHarnessSources({
 	contract = HARNESS_CAPABILITY_CONTRACT,
 	sourceExclusions = SOURCE_EXCLUSIONS,
 	fs = { lstatSync, readFileSync, readdirSync },
+	isIgnored = createGitIgnoreOracle(root),
 }) {
 	const exclusions = normalizedSourceExclusions(sourceExclusions);
-	assertClaudeTopology(root, contract, exclusions, fs);
+	assertClaudeTopology(
+		root,
+		contract,
+		exclusions,
+		fs,
+		createUnmaintainedEntryTest(root, fs, isIgnored),
+	);
 	assertDeclaredSourceTypes(root, contract, fs);
 	const decodedSources = readAndValidateDeclaredSources(root, contract, fs);
 	return deepFreeze(
