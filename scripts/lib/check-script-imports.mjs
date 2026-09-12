@@ -161,6 +161,13 @@ export function findGhExecImportBoundaryViolations(
  * else (takasek/pfdsl#1134). A module that takes the executable as an argument
  * — scripts/lib/run-exec.mjs and its `run(file, args)` — must not be exempted,
  * since that reopens the indirect path for every file in the closure.
+ *
+ * Scope, in the same sense the gh-exec boundary above states its own: this
+ * check never verifies the property the exemption rests on. An edit to an
+ * exempted file that adds a second, different spawn passes here and is caught
+ * only by that file's own test. Like that boundary, the exemption is a
+ * discipline aid — adding a spawn to this closure takes a deliberate edit to
+ * this list, which a reviewer sees — not a containment barrier.
  * @param {string[]} files - absolute paths
  * @param {{allowed?: string[]}} [opts] - absolute paths permitted to import
  *   node:child_process
