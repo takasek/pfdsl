@@ -51,11 +51,11 @@ build-deps:
 
 .PHONY: vscode-build
 vscode-build: build-deps
-	pnpm --filter pfdsl build
+	pnpm --filter ./packages/vscode-extension build
 
 .PHONY: test-vscode-smoke
 test-vscode-smoke: vscode-build
-	pnpm --filter pfdsl test:smoke
+	pnpm --filter ./packages/vscode-extension test:smoke
 
 # One command to start a dev session: build, open the extension window, then
 # watch for changes in the foreground (Ctrl+C to stop).
