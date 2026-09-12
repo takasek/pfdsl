@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, posix, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { parse as parseYaml } from "yaml";
 import * as gateCheck from "./gate-check.mjs";
 import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
@@ -1495,6 +1496,32 @@ describe("collectModeledLocations", () => {
 			: posix
 					.join(posix.dirname(file), basePath ?? ".", location)
 					.replace(/\/$/, "");
+
+	it("respects the actual workflow's generic and backend layer boundary (#1082)", () => {
+		const file = ".pfdsl/workflow.pfdsl";
+		const source = readFileSync(resolve(root, file), "utf8");
+		const frontmatter = parseYaml(source.split(/^---\s*$/m)[1]);
+		const locations = collectModeledLocations(
+			[{ file, frontmatter }],
+			resolveLocation,
+		);
+		for (const [path, id] of [
+			["references/github-issues-backend.md", "ops_skill_l3"],
+			["SKILL.md", "ops_skill_general"],
+			["references/work-cycle.md", "ops_skill_general"],
+			["references/architecture.md", "ops_skill_general"],
+		]) {
+			const changedPath = `.claude/skills/pfd-ops/${path}`;
+			assert.deepEqual(
+				classifyChangedFilesByModeling([changedPath], locations),
+				{
+					modeled: [{ path: changedPath, models: [{ file, id }] }],
+					unmodeled: [],
+				},
+				path,
+			);
+		}
+	});
 
 	const analyzed = [
 		{
