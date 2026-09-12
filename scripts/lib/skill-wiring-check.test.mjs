@@ -4,7 +4,6 @@ import { describe, it } from "node:test";
 import {
 	artifactReachesProcess,
 	edgeMembers,
-	findUnmodeledMirrors,
 	findUnwiredSkills,
 	isBundledSource,
 	repoRelative,
@@ -111,8 +110,7 @@ describe("isBundledSource", () => {
 
 	it("accepts the parent of a trees/files mirror, which contains its listed members", () => {
 		// The directory contains listed members (pfd-grill, pfd-ops, ...), so it
-		// overlaps them the same way an artifact on the directory covers them in
-		// findUnmodeledMirrors (#780's pfd_commands case, pinned below).
+		// overlaps them (#780's pfd_commands case).
 		assert.equal(isBundledSource(".claude/skills/", MIRRORS), true);
 		assert.equal(isBundledSource(".claude/agents", MIRRORS), true);
 	});
@@ -180,86 +178,6 @@ describe("artifactReachesProcess", () => {
 	});
 });
 
-describe("findUnmodeledMirrors", () => {
-	const run = (overrides = {}) =>
-		findUnmodeledMirrors({
-			artifacts: ARTIFACTS,
-			mirrors: MIRRORS,
-			...overrides,
-		});
-
-	it("reports a manifest member no artifact's location sits under — the hooks case", () => {
-		assert.deepEqual(run(), [{ dest: "hooks", member: "hooks" }]);
-	});
-
-	it("stays silent once one artifact points into the member", () => {
-		const artifacts = {
-			...ARTIFACTS,
-			retro_reminder_hook: { location: "../hooks/" },
-		};
-		assert.deepEqual(run({ artifacts }), []);
-	});
-
-	it("reports a member added to the manifest before its artifact exists", () => {
-		const mirrors = [
-			...MIRRORS,
-			{ dest: "newcomer", src: ".claude/newcomer", whole: true },
-		];
-		const artifacts = {
-			...ARTIFACTS,
-			retro_reminder_hook: { location: "../hooks/" },
-		};
-		assert.deepEqual(run({ artifacts, mirrors }), [
-			{ dest: "newcomer", member: ".claude/newcomer" },
-		]);
-	});
-
-	it("reports one member of a multi-member entry whose artifact is gone, while its siblings stay covered", () => {
-		// The entry-level answer to this is "skills has artifacts, so it is
-		// modelled" — which is how a whole skill tree drops out of both graphs
-		// without a word.
-		const artifacts = {
-			...ARTIFACTS,
-			retro_reminder_hook: { location: "../hooks/" },
-		};
-		delete artifacts.ops_skill_l3;
-		assert.deepEqual(run({ artifacts }), [
-			{ dest: "skills", member: ".claude/skills/pfd-ops" },
-		]);
-	});
-
-	it("counts one artifact on the entry's directory as covering every member under it", () => {
-		// `pfd_commands` models three individually-listed files as one artifact
-		// on the directory (#780). Covering an ancestor covers its members.
-		const mirrors = [
-			{
-				dest: "commands",
-				src: ".claude/commands",
-				files: ["pfd-cycle.md", "pfd-init.md"],
-			},
-		];
-		const artifacts = { pfd_commands: { location: "../.claude/commands/" } };
-		assert.deepEqual(findUnmodeledMirrors({ artifacts, mirrors }), []);
-	});
-
-	it("counts an artifact on a file inside a member as covering that member", () => {
-		// ops_skill_l3 points at one reference file inside the pfd-ops tree.
-		const mirrors = [
-			{ dest: "skills", src: ".claude/skills", trees: ["pfd-ops"] },
-		];
-		const artifacts = { ops_skill_l3: ARTIFACTS.ops_skill_l3 };
-		assert.deepEqual(findUnmodeledMirrors({ artifacts, mirrors }), []);
-	});
-
-	it("counts an array location whose entry sits under the mirror", () => {
-		const artifacts = {
-			...ARTIFACTS,
-			multi: { location: ["../docs/samples/", "../hooks/hooks.json"] },
-		};
-		assert.deepEqual(run({ artifacts }), []);
-	});
-});
-
 describe("findUnwiredSkills", () => {
 	const run = (overrides = {}) =>
 		findUnwiredSkills({
@@ -285,31 +203,9 @@ describe("findUnwiredSkills", () => {
 			pipelineEdges: PIPELINE_EDGES,
 			mirrors: MIRRORS,
 		});
-		assert.deepEqual(
-			findings.find(({ id }) => id === "retro_skill")?.producers,
-			[],
-		);
-	});
-
-	it("reports every producer when a bundled workflow artifact has duplicates", () => {
-		const findings = findUnwiredSkills({
-			workflowArtifacts: ARTIFACTS,
-			pipelineArtifacts: {},
-			workflowEdges: [
-				...WORKFLOW_EDGES,
-				{
-					kind: "output",
-					artifact: "retro_skill",
-					process: "other_retro_maintainer",
-				},
-			],
-			pipelineEdges: PIPELINE_EDGES,
-			mirrors: MIRRORS,
-		});
-		assert.deepEqual(
-			findings.find(({ id }) => id === "retro_skill")?.producers.sort(),
-			["maintain_retro_skill", "other_retro_maintainer"],
-		);
+		assert.deepEqual(findings.find(({ id }) => id === "retro_skill")?.missing, [
+			"workflow producer",
+		]);
 	});
 
 	it("accepts a unique producer with an arbitrary process name", () => {
@@ -341,7 +237,6 @@ describe("findUnwiredSkills", () => {
 				id: "newcomer_skill",
 				location: "../.claude/skills/pfd-ops/",
 				missing: ["workflow producer", "reach gen_plugin"],
-				producers: [],
 				declaredIn: "workflow",
 			},
 		]);
@@ -399,7 +294,6 @@ describe("findUnwiredSkills", () => {
 				id: "multi_location_skill",
 				location: ["../docs/samples/", "../.claude/skills/pfd-ops/"],
 				missing: ["workflow producer", "reach gen_plugin"],
-				producers: [],
 				declaredIn: "workflow",
 			},
 		]);
@@ -431,7 +325,6 @@ describe("findUnwiredSkills", () => {
 				id: "newcomer_skill",
 				location: "../.claude/skills/pfd-ops/",
 				missing: ["workflow producer", "reach gen_plugin"],
-				producers: [],
 				declaredIn: "workflow",
 			},
 		]);
@@ -451,7 +344,6 @@ describe("findUnwiredSkills", () => {
 				id: "retro_skill",
 				location: "../.claude/skills/pfd-retro/",
 				missing: ["reach gen_plugin"],
-				producers: ["maintain_retro_skill"],
 				declaredIn: "workflow",
 			},
 		]);
@@ -599,7 +491,6 @@ describe("findUnwiredSkills", () => {
 					id: "retro_skill",
 					location: "../.claude/skills/pfd-retro/",
 					missing: ["reach gen_plugin"],
-					producers: ["distill_ops"],
 					declaredIn: "workflow",
 				},
 			],
