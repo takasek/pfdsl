@@ -183,7 +183,7 @@ artifact:
   harness_capability_model:
     label: ハーネス中立capabilityモデル
     description: "Claude Code固有のsource topologyとschemaをdecoderで閉じ込め、capability ID・kind・意味データ・source encoding・四targetのdelivery mappingを保持する、decode済みかつcontract検証済みのsemantic record集合。両adapterはこの同一objectを兄弟入力として消費し、相手方の生成rootやmanifestを入力にしない"
-    criteria: node --test scripts/lib/harness-capability-contract.test.mjs scripts/lib/harness-source-decoder.test.mjs scripts/lib/harness-inventory.test.mjs が、四target mappingの一意性とsource topology/schema closureを検証して成功する
+    criteria: node --test scripts/lib/harness-capability-contract.test.mjs scripts/lib/harness-source-decoder.test.mjs scripts/lib/harness-inventory.test.mjs scripts/lib/git-ignore-oracle.test.mjs が、四target mappingの一意性と、source topology/schema closureおよびその未分類entryをignore状態で除く判定を検証して成功する
     group: gen_sources
   cli_release_request:
     label: CLIリリース要求
@@ -436,8 +436,8 @@ process:
     tags: [ gen, g ]
   decode_harness_capabilities:
     label: ハーネスsource decode・contract検証
-    description: "claude_harness_sourcesのsource rootとschemaをharness_inventoryに照らして全件分類し、plugin metadataをtoolchainから読み、Claude Code固有の表現をハーネス中立semantic recordへdecodeする。OS生成の既知の非source entryは全階層で分類対象から除き、それ以外の未知topology・未知schema・四target mappingの欠落や重複をadapter出力前に拒否する"
-    command: node --test scripts/lib/harness-capability-contract.test.mjs scripts/lib/harness-source-decoder.test.mjs scripts/lib/harness-inventory.test.mjs
+    description: "claude_harness_sourcesのsource rootとschemaをharness_inventoryに照らして全件分類し、plugin metadataをtoolchainから読み、Claude Code固有の表現をハーネス中立semantic recordへdecodeする。分類できなかったentryは全階層で、OS生成の既知の名前か、repositoryのGitが無視するpathであれば維持対象外として除く。ignore状態はgit check-ignoreに問い、指定はrepository自身の.gitignoreに限る。git自体が答えられない環境では従来どおり未分類として扱う。除かれなかった未知topology・未知schema・四target mappingの欠落や重複はadapter出力前に拒否する"
+    command: node --test scripts/lib/harness-capability-contract.test.mjs scripts/lib/harness-source-decoder.test.mjs scripts/lib/harness-inventory.test.mjs scripts/lib/git-ignore-oracle.test.mjs
     location: ../scripts/lib/harness-source-decoder.mjs
     tags: [ gen, g ]
   gen_plugin:
