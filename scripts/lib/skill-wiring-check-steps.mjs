@@ -8,10 +8,7 @@
 // tests supply parsed structures directly and need no build.
 
 import { PLUGIN_MIRRORS } from "./gen-plugin.mjs";
-import {
-	findUnmodeledMirrors,
-	findUnwiredSkills,
-} from "./skill-wiring-check.mjs";
+import { findUnwiredSkills } from "./skill-wiring-check.mjs";
 
 const WORKFLOW = ".pfdsl/workflow.pfdsl";
 const PIPELINE = ".pfdsl/pipeline.pfdsl";
@@ -47,20 +44,7 @@ export function runSkillWiringCheck({
 		mirrors,
 	});
 
-	// The other direction (#930): both graphs' artifacts are pooled, since
-	// bundled material is modelled wherever its artifact was declared. `pfd_commands`
-	// exists only in pipeline.pfdsl (#780) — findUnwiredSkills now scans
-	// both graphs too (#944), so pooling here just keeps the two checks over the
-	// same universe rather than being what makes the commands mirror visible.
-	const unmodeled = findUnmodeledMirrors({
-		artifacts: {
-			...(pipeline.frontmatter.artifact ?? {}),
-			...(workflow.frontmatter.artifact ?? {}),
-		},
-		mirrors,
-	});
-
-	if (findings.length === 0 && unmodeled.length === 0) {
+	if (findings.length === 0) {
 		return {
 			exitCode: 0,
 			stdoutLines: ["check-skill-wiring: OK"],
@@ -82,8 +66,6 @@ export function runSkillWiringCheck({
 			: finding.location;
 		const problems = finding.missing.map((missing) => {
 			if (missing === "workflow producer") return "has no workflow producer";
-			if (missing === "unique workflow producer")
-				return `has multiple workflow producers: ${finding.producers.join(", ")}`;
 			return "does not reach gen_plugin";
 		});
 		return `${anchor}: '${finding.id}' is bundled (${location}) but ${problems.join(" and ")}`;
@@ -94,28 +76,12 @@ export function runSkillWiringCheck({
 	const missingEdges = new Set(findings.flatMap((finding) => finding.missing));
 	if (missingEdges.size > 0) {
 		stderrLines.push("");
-		if (
-			missingEdges.has("workflow producer") ||
-			missingEdges.has("unique workflow producer")
-		)
+		if (missingEdges.has("workflow producer"))
 			stderrLines.push(`Add exactly one output edge for it in ${WORKFLOW}.`);
 		if (missingEdges.has("reach gen_plugin"))
 			stderrLines.push(
 				`Make it reach \`gen_plugin\` through primary input/output edges in ${PIPELINE} (it is bundled material).`,
 			);
-	}
-	for (const mirror of unmodeled) {
-		stderrLines.push(
-			`${WORKFLOW}: bundled '${mirror.member}' (${mirror.dest} mirror) has no artifact modelling it`,
-		);
-	}
-	if (unmodeled.length > 0) {
-		stderrLines.push(
-			"",
-			"Declare an artifact whose `location:` points into that source, and wire it the",
-			`same way the other bundled material is wired (produced in ${WORKFLOW},`,
-			`consumed by gen_plugin in ${PIPELINE}).`,
-		);
 	}
 	return { exitCode: 1, stdoutLines: [], stderrLines };
 }

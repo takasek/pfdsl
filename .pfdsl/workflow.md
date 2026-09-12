@@ -213,11 +213,11 @@ drift 検査は pre-commit（`gen-install` の check_drift。他の drift 検査
 
 **出力抑制**: `make gen-samples` / `make gen-skill` はpnpm全パッケージbuild + 全サンプルcheckのwarningを毎回出力するため数百行に及ぶ。実行後は`git status --short docs/samples/ plugin/pfdsl/ plugin/pfdsl-codex/ AGENTS.md .agents/ .codex/`で変更ファイルのみ確認すれば足りる（ビルド自体の成否は非ゼロ終了コードで分かる）。
 
-**配布スキルの新規追加時の横断照合**: `scripts/check-skill-wiring.mjs`（`make check-docs` 経由で CI も実行）が機械的に検査する（#699）。同梱スキル・agent の artifact について、`workflow.pfdsl` での一意な producer 関係と `pipeline.pfdsl` の `gen_plugin` 入力エッジへの到達可能性を別々に要求し、欠けていれば file:line で報告する。以前は目視追随であり、#481 で `grill_skill` 追加時に3箇所を見落として pfd-retro の A層監査が事後に拾った。
+**配布スキルの新規追加時の横断照合**: `scripts/check-skill-wiring.mjs`（`make check-docs` 経由で CI も実行）は、図に宣言された手書きの同梱 artifact の生成元と `pipeline.pfdsl` の `gen_plugin` への配送経路を検査し、欠落を file:line で報告する。producer の重複は native V001 が担い、既存の `make check-fmt` と `make check-links` でも拒否される。manifest への所属だけでは図の参加者になるとは限らず、未宣言の配布資産に artifact 登録を要求しない。図への参加は pfd-ops の成果物の門番の基準で判断する。
 
 検査対象は手書きリストでなく既存データから導く（列挙を持つとそれ自体が追随漏れの対象になる）。同梱されるかは `scripts/lib/gen-plugin.mjs` の `PLUGIN_MIRRORS`（組み立てと `distribution-review` の逆写像が既に読んでいる同梱マニフェスト）が答え、artifact の `location:` とエッジは `@pfdsl/core` の `analyze()` から取る。`pfdsl_skill` はマニフェストが「rendered, not mirrored」として除外するため特別扱いが要らない。
 
-**2つの要件は要求範囲が異なる（#944）**: `gen_plugin` 入力エッジは同梱される全ての手書き artifact に要求するが、workflow 側の一意な producer 関係は `workflow.pfdsl` が宣言している artifact にのみ要求する。`pfd_commands` は `pipeline.pfdsl` にしか宣言が無く（#780）、そもそも `workflow.pfdsl` の producer 関係を持つ資格がないため、両方を要求すると偽陽性になる。非対称は id の手列挙でなく「どちらの図が宣言しているか」から導出する。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
+**2つの要件は要求範囲が異なる（#944）**: `gen_plugin` への到達は図に宣言された同梱の手書き artifact に要求する。workflow 側の producer の存在は `workflow.pfdsl` が整備対象として宣言している artifact にのみ要求する。この図は配送 membership でなく整備責任を持つため、生成元がなければ整備契約が欠ける。`pfd_commands` は `pipeline.pfdsl` にしか宣言が無く（#780）、workflow 側の生成元は要求しない。両図が宣言する artifact は workflow 側の宣言を採り、finding は1件に畳む。
 
 照合先は ADR-0035 の描き直しで4箇所から2箇所に減った。旧 `publish_cli` 入力エッジは判断部分が3種の release 判断になり素材列挙を持たなくなり、`pipeline.pfdsl` の旧 `assemble_plugin` は `workflow.pfdsl` の旧 `gen_plugin` と同一物の二重モデル化だったため統合した。実際にこの二重化は `pfd_lens_agent` / `implementer_agent` が片方の図にしか無いという乖離を生んでいた。
 
