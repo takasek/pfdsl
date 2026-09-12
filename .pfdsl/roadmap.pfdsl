@@ -55,12 +55,6 @@ artifact:
     status: done
     location: ../scripts/get-spec-id.mjs
     criteria: "見出し・list item・table 行・paragraph の4種別の範囲取得が scripts/lib/spec-id-range.test.mjs で検証され、node scripts/get-spec-id.mjs SPEC_id_syntax docs/adr/0027-spec-id-cross-references.md が実データからブロック全体を返すことで動作確認できる"
-  reader_first_design_records:
-    label: 採用案から読める設計選択記録 (#1076)
-    description: pfd-ops の対話と公開記録を形式3の決定・理由・案の処分・前提検査の decision-first 構造へ移し、形式1・形式2・形式3を時点で移行互換に読む状態
-    status: done
-    criteria: 現在の完了根拠は、cycle-status の形式3 decision-first 記録テンプレート、形式1・形式2・形式3を時点で区別して構造だけをblocking判定する gate-check、canonical・配布mirror・bundle manifest の内容hash一致、形式の表現形状を確認する独立15件の圧力標本、exact issue gate、形式の意味的妥当性を確認する人間semantic review が通過したことである。同一prompt・記載runtime・契約版hash・入力・完全応答・明示した順序判定を保存した変更前5件と変更後5件の統制比較は、done移行後に追加した事後是正の証拠であり、以前のdone移行や後続ready化をゲートしたとは扱わない
-    location: [ ../.claude/skills/pfd-ops/references/work-cycle.md, ../.agents/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl-codex/skills/pfd-ops/references/work-cycle.md, ../plugin/pfdsl/.claude-plugin/bundle-manifest.json, ../scripts/lib/cycle-status.mjs, ../scripts/lib/gate-check.mjs, ../docs/superpowers/reports/2026-09-04-format-3-pressure-evidence.md, ../docs/superpowers/reports/2026-09-05-format-3-controlled-comparison.md ]
   mint_check_tool:
     label: "mint-check ツール (#405)"
     description: "採番前に slug の既出（定義・strict 参照・forward-ref）を列挙する scripts ツール。既存 forward-ref の slug を別概念で採番する silent 衝突の防止が主目的。tombstone 次元は初 ID 削除まで据え置き（spec_id_tombstones へ）"
@@ -98,23 +92,6 @@ artifact:
     description: "#482 コネクタ編集 / #483 Preview UI / #484 定義挿入を含む次期 Marketplace リリース"
     status: todo
     criteria: "npx @vscode/vsce show takasek.pfdsl --json の versions に packages/vscode-extension/package.json の version が含まれ、その版でコネクタ編集・Preview 生成 UI・定義挿入が動作する"
-  pipeline_kind_rename:
-    label: "PFD種別名 pipeline への改名 (#670)"
-    description: "type: 列挙値 runtime-pipeline を pipeline へ改名する破壊的変更。spec §2.10・core の列挙・ADR-0017・kind-taxonomy.md・scaffold・サンプルを一括更新し、旧値の扱い（deprecated 警告かエラーか）を決める"
-    status: done
-    criteria: "type: pipeline が check を通り、旧値 runtime-pipeline の扱いが docs/spec/spec.md に明記され、scaffold とサンプルが新名に揃っている"
-  cli_release_pipeline_kind:
-    label: "CLIリリース: PFD種別名 pipeline 改名（破壊的変更）"
-    description: "#670の種別名改名を含むnpm CLIと、同じrelease tagから配布するreader-first plugin資産。npmへの公開とmarketplace参照の反映・取得確認を経て採用リポへ届ける"
-    status: done
-    criteria: >
-      公開した@pfdsl/cliの版を固定して取得し、type: pipelineを受理し、
-      旧値runtime-pipelineへdocs/spec/spec.mdの規定どおりの応答を返す。
-      同じ版のremote v* tagが検証済みcommitを指し、
-      配布確認時のmainの.claude-plugin/marketplace.jsonにあるpfdslのgit-subdir sourceがそのtagとplugin/pfdslを指し、
-      そのmain commitをroadmap同期PRに記録する。
-      その参照から取得したpluginのpfd-ops work-cycle.mdで決定と理由から読めるreader-first構成を確認し、
-      同梱bundle-manifest.jsonの対象content hashが検証済み資産と一致する。
 process:
   i119_publish_extension:
     label: extension自動公開実装
@@ -145,8 +122,6 @@ process:
     updated_at: 2026-07-18T00:33:46Z
   publish_ext_editing:
     label: extension 編集支援リリース
-  publish_cli_pipeline_kind:
-    label: CLI 種別名改名公開
 
 tag:
   "priority:high": { style: { color: "#b60205", penwidth: "2" } }
@@ -174,5 +149,3 @@ ext_v0015 >> i482_implement_editor_connector -> editor_connector
 editor_connector >> i483_implement_preview_connector -> preview_connector
 
 [def_insertion, editor_connector, preview_connector] >> publish_ext_editing -> ext_editing_release
-
-[pipeline_kind_rename, reader_first_design_records] >> publish_cli_pipeline_kind -> cli_release_pipeline_kind
