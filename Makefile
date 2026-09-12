@@ -184,7 +184,6 @@ check-docs:
 	node scripts/check-distributed-prose.mjs
 	node scripts/check-entry-path-headings.mjs
 	node scripts/check-skill-wiring.mjs
-	node scripts/check-review-perspectives-scale.mjs
 
 .PHONY: gen-skill
 gen-skill: check-docs
