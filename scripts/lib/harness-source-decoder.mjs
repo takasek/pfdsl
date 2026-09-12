@@ -45,16 +45,16 @@ const PLUGIN_HOOK_EVENTS = new Set(["PostToolUse"]);
  * does, the checkout fails an audit over a path Git already disowned
  * (takasek/pfdsl#1134). Ignore state answers the question that was meant.
  *
- * The trailing "/" on a directory is what makes a directory-only `.gitignore`
- * rule (`dist/`) match the queried path as the directory it is.
+ * The trailing "/" on a directory is what lets a directory-only `.gitignore`
+ * rule (`dist/`) match the queried path as the directory it is. It does not
+ * make the match unconditional: a directory holding a tracked file at any
+ * depth is reported unignored, and stays an unclassified entry.
  */
 function createUnmaintainedEntryTest(root, fs, isIgnored) {
-	return (path) => {
+	return (path, isDirectory = fs.lstatSync(path).isDirectory()) => {
 		if (OS_GENERATED_ENTRY_NAMES.has(entryName(path))) return true;
 		const relativePath = relative(root, path);
-		return isIgnored(
-			fs.lstatSync(path).isDirectory() ? `${relativePath}/` : relativePath,
-		);
+		return isIgnored(isDirectory ? `${relativePath}/` : relativePath);
 	};
 }
 
@@ -144,14 +144,16 @@ function assertSkillTreeClosure(fs, path, capability, isUnmaintained) {
 			const entryPath = resolve(directory, name);
 			const entryRelativePath = relativePath ? `${relativePath}/${name}` : name;
 			const stats = fs.lstatSync(entryPath);
+			// `stats` already says which kind this entry is, so the test is told
+			// rather than made to stat the path a second time.
 			if (stats.isDirectory()) {
 				if (!expectedDirectory(entryRelativePath)) {
-					if (isUnmaintained(entryPath)) continue;
+					if (isUnmaintained(entryPath, true)) continue;
 					sourceTopologyError(entryPath, entryRelativePath);
 				}
 				visit(entryPath, entryRelativePath);
 			} else if (!stats.isFile() || !expectedFiles.has(entryRelativePath)) {
-				if (isUnmaintained(entryPath)) continue;
+				if (isUnmaintained(entryPath, false)) continue;
 				sourceTopologyError(entryPath, entryRelativePath);
 			}
 		}
