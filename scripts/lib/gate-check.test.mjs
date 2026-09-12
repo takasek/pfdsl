@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, posix, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { parse as parseYaml } from "yaml";
 import * as gateCheck from "./gate-check.mjs";
 import {
 	AUDIT_ISSUES_FLOW_GH_UNAVAILABLE_EXIT_CODE,
@@ -1495,6 +1496,49 @@ describe("collectModeledLocations", () => {
 			: posix
 					.join(posix.dirname(file), basePath ?? ".", location)
 					.replace(/\/$/, "");
+
+	it("respects the actual workflow's generic and backend layer boundary (#1082)", () => {
+		const file = ".pfdsl/workflow.pfdsl";
+		const source = readFileSync(resolve(root, file), "utf8");
+		const frontmatter = parseYaml(source.split(/^---\s*$/m)[1]);
+		const locations = collectModeledLocations(
+			[{ file, frontmatter }],
+			resolveLocation,
+		);
+		const expected = [
+			["references/github-issues-backend.md", "ops_skill_l3"],
+			["SKILL.md", "ops_skill_general"],
+			["references/work-cycle.md", "ops_skill_general"],
+			["references/architecture.md", "ops_skill_general"],
+			// This workflow adopts GitHub Issues, not the alternative file tracker.
+			["references/file-based-tracker-backend.md", null],
+		];
+		const skillRoot = resolve(root, ".claude/skills/pfd-ops");
+		const actualFiles = [
+			...readdirSync(skillRoot).filter((name) => name === "SKILL.md"),
+			...readdirSync(resolve(skillRoot, "references"))
+				.filter((name) => name.endsWith(".md"))
+				.map((name) => `references/${name}`),
+		];
+		assert.deepEqual(
+			actualFiles.sort(),
+			expected.map(([path]) => path).sort(),
+			"Classify every protocol/reference file as generic, backend, or intentionally outside this workflow when adding, moving, or splitting it.",
+		);
+		for (const [path, id] of expected) {
+			const changedPath = `.claude/skills/pfd-ops/${path}`;
+			assert.deepEqual(
+				classifyChangedFilesByModeling([changedPath], locations),
+				id === null
+					? { modeled: [], unmodeled: [changedPath] }
+					: {
+							modeled: [{ path: changedPath, models: [{ file, id }] }],
+							unmodeled: [],
+						},
+				path,
+			);
+		}
+	});
 
 	const analyzed = [
 		{

@@ -249,7 +249,7 @@ artifact:
     label: PFD運用スキル（汎用層）
     description: "pfd-ops スキル本体（起動口は /pfd-cycle に限らない）。PFD によるプロジェクト運用プロトコルとワークサイクル。PFDファイル種別の定義（ADR-0017）は ecosystem_skill が一次情報。汎用プロトコル（L1）+ディスパッチ（L2）= SKILL.md 本文 + バックエンド非依存の references（work-cycle.md のサイクル4手順・architecture.md の層構成。L3 の references は ops_skill_l3 側）。L4（リポ固有、配布対象外）は pfd-ops 自体の一部でなく、各採用リポの .pfdsl sibling .md companion に宿る"
     criteria: /pfd-cycle を起動するとワークサイクルの4手順（選択・実行・終端ゲート・報告）が最後まで走る。make gen-plugin が差分なしで完了する
-    location: ../.claude/skills/pfd-ops/
+    location: [ ../.claude/skills/pfd-ops/SKILL.md, ../.claude/skills/pfd-ops/references/work-cycle.md, ../.claude/skills/pfd-ops/references/architecture.md ]
     group: generation
     tags: [ distilled_skill ]
   ops_skill_l3:
