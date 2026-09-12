@@ -1,26 +1,19 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { createGitIgnoreOracle } from "./git-ignore-oracle.mjs";
+import {
+	commitEverything,
+	makeGitRepository,
+} from "./git-test-repository.test-helper.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-function makeRepository({ gitignore = "dist/\n" } = {}) {
-	const root = mkdtempSync(join(tmpdir(), "git-ignore-oracle-"));
-	execFileSync("git", ["init", "-q"], { cwd: root });
-	writeFileSync(join(root, ".gitignore"), gitignore);
-	return root;
+function makeRepository(options = {}) {
+	return makeGitRepository({ prefix: "git-ignore-oracle-", ...options });
 }
 
 describe("createGitIgnoreOracle", () => {
@@ -45,24 +38,42 @@ describe("createGitIgnoreOracle", () => {
 		try {
 			mkdirSync(join(root, "sub/dist"), { recursive: true });
 			writeFileSync(join(root, "sub/dist/x.txt"), "maintained\n");
-			execFileSync("git", ["add", "-A", "-f"], { cwd: root });
-			execFileSync(
-				"git",
-				[
-					"-c",
-					"user.email=t@example.com",
-					"-c",
-					"user.name=t",
-					"commit",
-					"-qm",
-					"f",
-				],
-				{ cwd: root },
-			);
+			commitEverything(root);
 
 			assert.equal(createGitIgnoreOracle(root)("sub/dist/"), false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it("answers from the repository's own rules, not the caller's global ignore list", () => {
+		// Otherwise whether an undeclared path passes depends on whose machine
+		// asked: a maintainer with the name in ~/.config/git/ignore would see it
+		// wave through where CI reports it.
+		const root = makeRepository();
+		const home = makeGitRepository({
+			prefix: "git-ignore-oracle-home-",
+			repository: false,
+		});
+		const savedGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
+		try {
+			writeFileSync(join(home, "ignore"), "mystery.md\n");
+			writeFileSync(
+				join(home, "gitconfig"),
+				`[core]\n\texcludesFile = ${join(home, "ignore")}\n`,
+			);
+			writeFileSync(join(root, "mystery.md"), "undeclared\n");
+			process.env.GIT_CONFIG_GLOBAL = join(home, "gitconfig");
+
+			assert.equal(createGitIgnoreOracle(root)("mystery.md"), false);
+		} finally {
+			if (savedGlobalConfig === undefined) {
+				delete process.env.GIT_CONFIG_GLOBAL;
+			} else {
+				process.env.GIT_CONFIG_GLOBAL = savedGlobalConfig;
+			}
+			rmSync(root, { recursive: true, force: true });
+			rmSync(home, { recursive: true, force: true });
 		}
 	});
 
@@ -116,6 +127,6 @@ describe("createGitIgnoreOracle", () => {
 		);
 
 		assert.deepEqual(spawns, ['"git"']);
-		assert.match(source, /const CHECK_IGNORE_ARGUMENTS = \["check-ignore"/);
+		assert.match(source, /"check-ignore"/);
 	});
 });

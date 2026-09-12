@@ -18,7 +18,21 @@ import { execFileSync } from "node:child_process";
 
 import { withoutGitTargetEnvironment } from "./git-environment.mjs";
 
-const CHECK_IGNORE_ARGUMENTS = ["check-ignore", "-q", "--"];
+// `core.excludesFile` is pinned to a path that holds no rules so the answer
+// comes from the repository's own tracked .gitignore files and not from the
+// caller's personal global ignore list (or the XDG default the option falls
+// back to). Without the pin, whether an undeclared file passes the audit
+// depends on whose machine ran it: a maintainer with `notes.md` in
+// ~/.config/git/ignore would see it wave through where CI reports it.
+// `.git/info/exclude` still applies and has no such knob — it is per-clone
+// and untracked, so the same non-determinism survives there in principle.
+const CHECK_IGNORE_ARGUMENTS = [
+	"-c",
+	"core.excludesFile=/dev/null",
+	"check-ignore",
+	"-q",
+	"--",
+];
 
 /**
  * `git check-ignore`'s exit status: 0 when the path is ignored, 1 when it is
@@ -28,9 +42,9 @@ const CHECK_IGNORE_ARGUMENTS = ["check-ignore", "-q", "--"];
  */
 function runCheckIgnore(root, queryPath) {
 	try {
-		// GIT_DIR and its siblings are stripped so the answer comes from the
-		// repository `root` sits in — a Git hook exports them, and the decoder
-		// runs from one via scripts/pre-commit.
+		// GIT_DIR and its siblings are stripped so the repository is the one
+		// `root` sits in — a Git hook exports them, and the decoder runs from
+		// one via scripts/pre-commit.
 		execFileSync("git", [...CHECK_IGNORE_ARGUMENTS, queryPath], {
 			cwd: root,
 			env: withoutGitTargetEnvironment(),
@@ -47,10 +61,17 @@ function runCheckIgnore(root, queryPath) {
  * a path the caller knows to be a directory.
  *
  * `check-ignore` consults the index, so it answers "untracked *and* matched by
- * an ignore rule": a force-added `dist/` still reads as maintained. When Git
- * cannot answer at all — no binary, `root` outside a repository — every later
- * query is answered "not ignored" without asking again, which leaves the
- * caller reporting the entry it was already about to report.
+ * an ignore rule": a force-added `dist/` still reads as maintained, and so
+ * does a directory holding a tracked file at any depth below it. Two edges of
+ * that follow. A path removed from the index but not yet committed
+ * (`git rm --cached`) flips to ignored at that moment rather than at the
+ * commit. And a directory is reported unignored on the strength of one
+ * tracked descendant, which the caller then reports by the directory's own
+ * name, saying nothing about which descendant made it maintained.
+ *
+ * When Git cannot answer at all — no binary, `root` outside a repository —
+ * every later query is answered "not ignored" without asking again, which
+ * leaves the caller reporting the entry it was already about to report.
  * @param {string} root
  * @param {{checkIgnore?: (root: string, queryPath: string) => number|null}} [opts]
  * @returns {(queryPath: string) => boolean}
