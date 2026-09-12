@@ -167,7 +167,7 @@ describe("runSkillWiringCheck", () => {
 		);
 	});
 
-	it("names every conflicting workflow producer", () => {
+	it("leaves duplicate producer validation to native V001", () => {
 		const workflow = {
 			frontmatter: WORKFLOW.frontmatter,
 			edges: [
@@ -180,11 +180,7 @@ describe("runSkillWiringCheck", () => {
 			],
 		};
 		const result = runSkillWiringCheck(deps({ workflow }));
-		assert.equal(result.exitCode, 1);
-		assert.match(
-			result.stderrLines.join("\n"),
-			/'retro_skill' is bundled \(\.\.\/\.claude\/skills\/pfd-retro\/\) but has multiple workflow producers: maintain_retro_skill, other_retro_maintainer/,
-		);
+		assert.equal(result.exitCode, 0);
 	});
 
 	it("names only the edges the findings are actually missing", () => {
@@ -206,11 +202,11 @@ describe("runSkillWiringCheck", () => {
 		assert.doesNotMatch(stderr, /distill_ops -> \[\.\.\.\]/);
 	});
 
-	it("fails when the manifest carries an entry no artifact models", () => {
+	it("does not require diagram participation solely because a source is bundled", () => {
 		const mirrors = [...MIRRORS, { dest: "hooks", src: "hooks", whole: true }];
 		const result = runSkillWiringCheck({ ...deps(), mirrors });
-		assert.equal(result.exitCode, 1);
-		assert.match(result.stderrLines.join("\n"), /hooks/);
+		assert.equal(result.exitCode, 0);
+		assert.deepEqual(result.stderrLines, []);
 	});
 
 	it("counts an artifact declared in either graph as modelling the entry", () => {

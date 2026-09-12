@@ -43,7 +43,7 @@ PR #966 は Claude Code 向け正本から Codex 向けの `.agents/`・`.codex/
 | check-forward-ref-markers | 定義済みになった可能性のある permissive spec ref | warning のみ |
 | check-md-linebreaks | Markdown 散文の文中改行 | block と前後行 |
 | check-no-shell-strings | shell 経由の command execution | block と file:line |
-| check-review-perspectives-scale | 2カタログの bytes / item 数と分割閾値 | notice のみ |
+| カタログ規模通知（#1051 で削除） | 2カタログの bytes / item 数と分割閾値 | 監査当時は notice のみ |
 | check-review-record | code diff に必要な delegated review trailer | CI block と不足観点 |
 | check-roadmap-registration | PR が閉じる `flow:managed` issue の process 登録 | CI block と issue |
 | check-scaffold-sync | canonical scaffold と plugin mirror の drift | block と path |
