@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, posix, resolve } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -1505,19 +1505,36 @@ describe("collectModeledLocations", () => {
 			[{ file, frontmatter }],
 			resolveLocation,
 		);
-		for (const [path, id] of [
+		const expected = [
 			["references/github-issues-backend.md", "ops_skill_l3"],
 			["SKILL.md", "ops_skill_general"],
 			["references/work-cycle.md", "ops_skill_general"],
 			["references/architecture.md", "ops_skill_general"],
-		]) {
+			// This workflow adopts GitHub Issues, not the alternative file tracker.
+			["references/file-based-tracker-backend.md", null],
+		];
+		const skillRoot = resolve(root, ".claude/skills/pfd-ops");
+		const actualFiles = [
+			...readdirSync(skillRoot).filter((name) => name === "SKILL.md"),
+			...readdirSync(resolve(skillRoot, "references"))
+				.filter((name) => name.endsWith(".md"))
+				.map((name) => `references/${name}`),
+		];
+		assert.deepEqual(
+			actualFiles.sort(),
+			expected.map(([path]) => path).sort(),
+			"Classify every protocol/reference file as generic, backend, or intentionally outside this workflow when adding, moving, or splitting it.",
+		);
+		for (const [path, id] of expected) {
 			const changedPath = `.claude/skills/pfd-ops/${path}`;
 			assert.deepEqual(
 				classifyChangedFilesByModeling([changedPath], locations),
-				{
-					modeled: [{ path: changedPath, models: [{ file, id }] }],
-					unmodeled: [],
-				},
+				id === null
+					? { modeled: [], unmodeled: [changedPath] }
+					: {
+							modeled: [{ path: changedPath, models: [{ file, id }] }],
+							unmodeled: [],
+						},
 				path,
 			);
 		}
