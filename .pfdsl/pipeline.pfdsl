@@ -59,6 +59,19 @@ artifact:
   pfdsl_source:
     label: .pfdslソースファイル
     description: ユーザーが記述するfrontmatter+bodyのテキスト
+  comparison_source:
+    label: 比較対象の.pfdslソース
+    description: diff の第2引数で指定する、比較対象文書のfrontmatter+bodyのテキスト
+  comparison_parsed_doc:
+    label: 比較対象の構文木・frontmatter
+    description: 比較対象文書を独立に解析して得たdocument構造とfrontmatter。diff_graphs に第2文書のfrontmatterを渡す
+    criteria: packages/cli/src/index.test.ts の diff 検査で、比較対象文書のfrontmatter変更が差分として報告される
+    group: in_memory
+  comparison_normalized_graph:
+    label: 比較対象の正準化グラフ
+    description: 比較対象文書のエッジ・ノード種別を正規化したGraph。diff_graphs に第2グラフを渡す
+    criteria: packages/cli/src/index.test.ts の diff 検査で、比較対象文書のノード追加が差分として報告される
+    group: in_memory
   parsed_doc:
     label: 構文木・frontmatter
     description: frontmatter読込・lex・parseの出力（document構造とfrontmatter）
@@ -108,7 +121,7 @@ artifact:
     group: run_outputs
   diff_report:
     label: 差分レポート
-    description: "2つのグラフ間の構造差分（追加・削除・改名ノード等）。この図は単一ドキュメントの変換を軸にモデル化しているため、比較対象の2つ目のグラフは図上に現れない"
+    description: "元の文書と比較対象文書のグラフ・frontmatterを比較した構造差分（追加・削除・改名ノード等）"
     criteria: node packages/cli/dist/cli.js diff が実装され動作確認済み
     externalStakeholders: [ CLIユーザー, VSCode拡張ユーザー ]
     group: run_outputs
@@ -154,6 +167,11 @@ artifact:
     label: レビュー観点集
     description: "workflow.pfdsl の maintain_distributed_prompt_assets が生産する。pfdsl スキルに references として同梱される"
     location: ../docs/review-perspectives.md
+    group: gen_sources
+  examples:
+    label: 実践例
+    description: "workflow.pfdsl の write_examples が生産する。gen_skill が読み、references/examples.md の索引を生成する"
+    location: ../docs/examples/
     group: gen_sources
   roadmap_pfdsl:
     label: issue 依存グラフ
@@ -369,6 +387,16 @@ process:
     command: node packages/cli/dist/cli.js graph edges
     location: ../packages/core/src/normalizer.ts
     tags: [ b ]
+  parse_comparison:
+    label: 比較対象の構文解析
+    description: diff の第2文書に対する独立した解析。parse と同じfrontmatter読込・lex・parseを比較対象のソースへ適用する
+    location: ../packages/core/src/index.ts
+    tags: [ b ]
+  normalize_comparison:
+    label: 比較対象の正規化
+    description: normalize と同じ正規化処理を比較対象の構文木へ適用し、第2グラフを構築する
+    location: ../packages/core/src/normalizer.ts
+    tags: [ b ]
   validate:
     label: 検証
     description: "正準化グラフとfrontmatterにV/Wルールを適用し診断を生成する。ルールの一次情報docs/spec/spec.md（a層）は設計時にこの実装へ反映されるもので、実行時の入力ではない"
@@ -551,9 +579,13 @@ dot_graph >> export_image -> rendered_image
 
 [normalized_graph, parsed_doc] >> export_metadata -> metadata_tsv
 
-[normalized_graph, parsed_doc] >> diff_graphs -> diff_report
+comparison_source >> parse_comparison -> comparison_parsed_doc
 
-[feature_samples, quality_guide, review_perspectives, skill_template, spec] >> gen_skill -> pfdsl_skill
+comparison_parsed_doc >> normalize_comparison -> comparison_normalized_graph
+
+[comparison_normalized_graph, comparison_parsed_doc, normalized_graph, parsed_doc] >> diff_graphs -> diff_report
+
+[examples, feature_samples, quality_guide, review_perspectives, skill_template, spec] >> gen_skill -> pfdsl_skill
 
 ops_install_sources >> gen_install -> ops_install_templates
 
