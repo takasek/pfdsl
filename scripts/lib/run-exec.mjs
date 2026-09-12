@@ -13,33 +13,14 @@
 import { execFileSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 
+import {
+	hasGitTargetEnvironment,
+	withoutGitTargetEnvironment,
+} from "./git-environment.mjs";
+
+export { hasGitTargetEnvironment, withoutGitTargetEnvironment };
+
 const MAX_BUFFER = 32 * 1024 * 1024;
-const GIT_TARGET_ENVIRONMENT_VARIABLES = [
-	"GIT_DIR",
-	"GIT_WORK_TREE",
-	"GIT_INDEX_FILE",
-	"GIT_COMMON_DIR",
-	"GIT_OBJECT_DIRECTORY",
-	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
-	"GIT_NAMESPACE",
-];
-
-/** Copy an environment without variables that redirect Git's repository state. */
-export function withoutGitTargetEnvironment(environment = process.env) {
-	const sanitized = { ...environment };
-	for (const variable of GIT_TARGET_ENVIRONMENT_VARIABLES) {
-		delete sanitized[variable];
-	}
-	return sanitized;
-}
-
-/** Whether an inherited Git target override makes a guarded mutation ambiguous. */
-export function hasGitTargetEnvironment(environment = process.env) {
-	return GIT_TARGET_ENVIRONMENT_VARIABLES.some(
-		(variable) =>
-			Object.hasOwn(environment, variable) && environment[variable] !== "",
-	);
-}
 
 /**
  * Run a command, returning stdout. Throws on a non-zero exit.
