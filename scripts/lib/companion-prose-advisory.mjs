@@ -18,9 +18,9 @@
 // knowledge-artifact size deltas every cycle, but it prints them after the
 // prose is written, and by then the choice of where to write it has been made.
 //
-// Scope is the top-level companions only. The retro-pattern catalog beside
-// them is a different genre — a trap record with its evidence, not a rule
-// looking for a home — and the graphs move for reasons this is not about.
+// Scope is the top-level companions only. Historical cases retain the
+// observations and evidence of their time; this hook does not treat them
+// as current rules. Graph changes have their own structural checks.
 
 import { buildAdvisoryOutput, parseHookPayload } from "./hook-io.mjs";
 

@@ -1,7 +1,8 @@
 ---
 tags: [target:issue, method:bundle, context:external-dependency]
-phase: pre-artifact
 ---
+
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
 
 - **同意を仰ぐ単位が、findings を束ねた単位を引き継ぐ trap**: 独立した findings を着手単位で1件へ束ねるのは起票側の作法だが（`findings-split-below-triage-unit`）、その束をそのまま1つの可否として同意へ出すと、却下は束に効き、各項目は一度も判断されないまま落ちる。
   束ねる理由は受け手のトリアージ単位に合わせることであり、同意の単位を決める理由ではない。2つの単位が一致するのは偶然で、一致を確かめる工程がどこにも無い。

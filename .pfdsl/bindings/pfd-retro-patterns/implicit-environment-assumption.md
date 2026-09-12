@@ -2,6 +2,8 @@
 tags: [context:external-dependency]
 ---
 
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
+
 - **実行環境の暗黙前提 trap**: リポの運用スクリプトや CI が外部 CLI・配布バイナリ・ホスト機能の存在や権限を暗黙の前提にしていると、別のセッション種別や OS では処理本体へ到達する前に止まる。開発ホストでの成功は、CI runner の実行条件を検証しない。
   問いの形: 「この処理が前提にしている外部実行物とホスト機能は、全ての起動元セッション種別・対象 OS で利用でき、必要な権限と起動モードを満たすか」。
   具体例: `scripts/cycle-status.mjs` / `scripts/gate-check.mjs`（内部の `audit-issues-flow.mjs`）が `gh` に `execSync`/`execFileSync` で依存しており、`gh` 不在の Claude Code Remote セッションで `audit-issues-flow.mjs` が `spawnSync gh ENOENT` でクラッシュし、gate-check の残り項目の出力ごと失われた（#482 セッション、#489 で追跡）。

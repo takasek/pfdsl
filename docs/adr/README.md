@@ -12,6 +12,8 @@
 
 ## 一覧
 
+- **ADR-0038** [retro-patterns を事例記録へ移す](0038-retro-case-migration.md) — 対策の抽出・自動選別を終了し、再発防止を既存の操作手順・入力・道具・テストが所有する。検索できる証拠と毎サイクルの retro、独立レビューを維持する。
+
 - **ADR-0001** [成果物の有形性](0001-tangible-outputs-intangible-inputs.md) — 出力は保管・検証可能なモノのみ、入力はフロー外リソースなら不定形を許可する非対称規則
 - **ADR-0002** [改版の表現](0002-revision-modeling.md) — 単一生成元制約下での改版・ループ・定常サイクルを3形態で使い分ける
 - **ADR-0003** [update 意味論の不採用](0003-no-update-semantics.md) — 可変リソースはスナップショット artifact として表現し、DAG 性と静的解析性を保つ

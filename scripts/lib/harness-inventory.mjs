@@ -395,7 +395,6 @@ export const SOURCE_EXCLUSIONS = Object.freeze({
 	skills: Object.freeze({
 		"distribution-review": "maintainer-only review workflow for this bundle",
 		"prose-mechanization-audit": "audits this repository's prose assets",
-		"retro-pattern-sweep": "audits this repository's retro pattern ledger",
 		"spec-history-finalize": "finalizes this repository's release history",
 		"spec-stress-test": "hardens this repository's normative specification",
 		"vscode-ext-debug": "debugs the extension this repository builds",

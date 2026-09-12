@@ -10,24 +10,9 @@ import {
 } from "./asset-sweep.mjs";
 import { EMPTY_TREE } from "./review-record-gate.mjs";
 
-const RETRO_TARGET = SWEEP_TARGETS.find((t) => t.id === "retro-patterns");
 const PROSE_TARGET = SWEEP_TARGETS.find((t) => t.id === "prose-mechanization");
 
 describe("SWEEP_TARGETS", () => {
-	it("registers the retro-patterns catalog", () => {
-		assert.ok(RETRO_TARGET, "expected a retro-patterns target");
-		assert.equal(
-			RETRO_TARGET.recordPath,
-			"docs/asset-sweep/retro-patterns.json",
-		);
-		assert.deepEqual(RETRO_TARGET.prefixes, [
-			".pfdsl/bindings/pfd-retro-patterns/",
-		]);
-		assert.equal(RETRO_TARGET.threshold, 20);
-		assert.equal(RETRO_TARGET.skill, "retro-pattern-sweep");
-		assert.ok(RETRO_TARGET.label.length > 0);
-	});
-
 	it("registers the prose-mechanization audit against the mechanism ledger", () => {
 		assert.ok(PROSE_TARGET, "expected a prose-mechanization target");
 		assert.equal(
@@ -51,20 +36,9 @@ describe("SWEEP_TARGETS", () => {
 });
 
 describe("inScope", () => {
-	it("takes a markdown file under one of the target's prefixes", () => {
+	it("leaves historical cases outside the maintained audit scope", () => {
 		assert.equal(
-			inScope(RETRO_TARGET, ".pfdsl/bindings/pfd-retro-patterns/foo.md"),
-			true,
-		);
-	});
-
-	it("leaves out a file outside every prefix", () => {
-		assert.equal(inScope(RETRO_TARGET, ".pfdsl/bindings/pfd-retro.md"), false);
-	});
-
-	it("leaves out a non-markdown file under a matching prefix", () => {
-		assert.equal(
-			inScope(RETRO_TARGET, ".pfdsl/bindings/pfd-retro-patterns/foo.pfdsl"),
+			inScope(PROSE_TARGET, ".pfdsl/bindings/pfd-retro-patterns/case.md"),
 			false,
 		);
 	});
@@ -111,6 +85,26 @@ describe("inScope", () => {
 });
 
 describe("runAssetSweepCheck", () => {
+	it("does not require historical case freshness to release", () => {
+		const reads = [];
+		const result = runAssetSweepCheck({
+			readRecord: (target) => {
+				reads.push(target.id);
+				return target.id === "retro-patterns"
+					? null
+					: { commit: "a".repeat(40), date: "2026-08-01" };
+			},
+			commitExists: () => true,
+			changedSince: () =>
+				Array.from(
+					{ length: 100 },
+					(_, i) => `.pfdsl/bindings/pfd-retro-patterns/case-${i}.md`,
+				),
+		});
+		assert.equal(result.ok, true);
+		assert.deepEqual(reads, ["prose-mechanization"]);
+	});
+
 	const deps = ({ record, added = [], reachable = true }) => ({
 		readRecord: () => record,
 		commitExists: () => reachable,
@@ -123,7 +117,7 @@ describe("runAssetSweepCheck", () => {
 				record: { commit: "a".repeat(40), date: "2026-08-01" },
 				added: Array.from(
 					{ length: 5 },
-					(_, i) => `.pfdsl/bindings/pfd-retro-patterns/p${i}.md`,
+					(_, i) => `scripts/mechanism-${i}.mjs`,
 				),
 			}),
 		);
@@ -136,14 +130,14 @@ describe("runAssetSweepCheck", () => {
 				record: { commit: "a".repeat(40), date: "2026-08-01" },
 				added: Array.from(
 					{ length: 20 },
-					(_, i) => `.pfdsl/bindings/pfd-retro-patterns/p${i}.md`,
+					(_, i) => `scripts/mechanism-${i}.mjs`,
 				),
 			}),
 		);
 		assert.equal(result.ok, false);
-		assert.match(result.message, /retro-pattern sweep/);
+		assert.match(result.message, /prose-mechanization audit/);
 		assert.match(result.message, /20/);
-		assert.match(result.message, /retro-pattern-sweep/);
+		assert.match(result.message, /prose-mechanization-audit/);
 	});
 
 	it("fails when no sweep has ever been recorded", () => {
@@ -152,7 +146,7 @@ describe("runAssetSweepCheck", () => {
 				record: null,
 				added: Array.from(
 					{ length: 20 },
-					(_, i) => `.pfdsl/bindings/pfd-retro-patterns/p${i}.md`,
+					(_, i) => `scripts/mechanism-${i}.mjs`,
 				),
 			}),
 		);
@@ -175,10 +169,7 @@ describe("runAssetSweepCheck", () => {
 		const result = runAssetSweepCheck(
 			deps({
 				record: { commit: "a".repeat(40), date: "2026-08-01" },
-				added: [
-					".pfdsl/bindings/pfd-retro-patterns/only-one.md",
-					"scripts/unrelated.mjs",
-				],
+				added: ["scripts/only-one.mjs", "scripts/lib/unrelated.mjs"],
 			}),
 		);
 		assert.equal(result.ok, true);
@@ -189,7 +180,7 @@ describe("formatGateFailure", () => {
 	it("names the count, threshold, last sweep, and skill for an overdue target", () => {
 		const message = formatGateFailure([
 			{
-				target: RETRO_TARGET,
+				target: PROSE_TARGET,
 				record: {
 					commit: "abcdef1234567890abcdef1234567890abcdef12",
 					date: "2026-08-01",
@@ -206,13 +197,13 @@ describe("formatGateFailure", () => {
 		assert.match(message, /20/);
 		assert.match(message, /abcdef1/);
 		assert.match(message, /2026-08-01/);
-		assert.match(message, /retro-pattern-sweep/);
+		assert.match(message, /prose-mechanization-audit/);
 	});
 
 	it("says never swept when there is no record", () => {
 		const message = formatGateFailure([
 			{
-				target: RETRO_TARGET,
+				target: PROSE_TARGET,
 				record: null,
 				result: {
 					ok: false,
@@ -228,7 +219,7 @@ describe("formatGateFailure", () => {
 	it("asks for a fetch when the sweep commit is unreachable", () => {
 		const message = formatGateFailure([
 			{
-				target: RETRO_TARGET,
+				target: PROSE_TARGET,
 				record: { commit: "b".repeat(40) },
 				result: { ok: false, base: "b".repeat(40), unreachable: true },
 			},
@@ -249,20 +240,16 @@ describe("repoDeps", () => {
 	};
 
 	it("counts additions, not edits", () => {
-		assert.ok(captureDiffArgs(RETRO_TARGET).includes("--diff-filter=A"));
+		assert.ok(captureDiffArgs(PROSE_TARGET).includes("--diff-filter=A"));
 	});
 
 	it("turns rename detection off so a deletion cannot cancel an addition", () => {
-		// git pairs a delete with a similar-enough add and reports R, which
-		// --diff-filter=A then drops. The catalog's own files share a template,
-		// and retiring one pattern while adding another is an ordinary cycle
-		// here, so the pairing would silently subtract from the accumulation
-		// the threshold exists to measure.
-		assert.ok(captureDiffArgs(RETRO_TARGET).includes("--no-renames"));
+		// Similar entry points must not cancel each other's additions.
+		assert.ok(captureDiffArgs(PROSE_TARGET).includes("--no-renames"));
 	});
 
 	it("scopes the diff to the target's own prefixes", () => {
-		const args = captureDiffArgs(RETRO_TARGET);
-		assert.deepEqual(args.slice(args.indexOf("--") + 1), RETRO_TARGET.prefixes);
+		const args = captureDiffArgs(PROSE_TARGET);
+		assert.deepEqual(args.slice(args.indexOf("--") + 1), PROSE_TARGET.prefixes);
 	});
 });

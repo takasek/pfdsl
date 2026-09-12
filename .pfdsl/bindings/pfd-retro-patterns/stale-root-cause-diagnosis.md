@@ -1,7 +1,8 @@
 ---
 tags: [target:issue, context:parallel-work]
-phase: pre-artifact
 ---
+
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
 
 - **原因診断の陳腐化 trap**: issue 本文が「症状 → 原因 → 対応案」の形で書かれているとき、症状が現在も再現することを確認しただけで、原因診断まで有効だと受け取ってしまう。
   症状の再現は原因診断の正しさを保証しない。

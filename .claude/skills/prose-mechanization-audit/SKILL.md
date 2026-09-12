@@ -26,7 +26,7 @@ pfd-ops の `references/work-cycle.md`「知見と機械化」にある散文の
 - **散文資産**: `.claude/skills/`・`.claude/commands/`・`.claude/agents/`・`.pfdsl/*.md`・`.pfdsl/bindings/*.md`・`CLAUDE.md`
 - **機械化台帳**: `.claude/settings.json` が配線する hook と `scripts/` の実体
 
-`.pfdsl/bindings/pfd-retro-patterns/` は `retro-pattern-sweep` の担当なので、ここでは扱わない。
+`.pfdsl/bindings/pfd-retro-patterns/` は当時の観測と判断を残す歴史資料なので、現行規約の整理対象には含めない。
 `docs/spec/` は規範であって運用散文ではないため対象外。
 
 ## 読む範囲を絞る
@@ -58,7 +58,7 @@ git diff --name-only <前回 sweep commit> HEAD -- .claude/skills/ .claude/comma
   .pfdsl/ CLAUDE.md ':!.pfdsl/bindings/pfd-retro-patterns'
 ```
 
-除外指定を落とすと、`retro-pattern-sweep` の担当であるカタログ（66件規模）が差分を埋め尽くす。
+除外指定を落とすと、過去事例を現行規約として直す対象へ混ぜてしまう。
 
 記録が無い（初回）場合は工程2〜5 でこの絞り込みが効かず、対象は散文資産の全件になる。
 
@@ -83,7 +83,7 @@ ls scripts/check-*.mjs
 台帳の各機構について、その機構が既に強制している規律を、散文がなお「気をつけて守れ」の形で説明していないか探す。
 判定は**残すか消すかの二択ではない**。機構の出力文言が全情報を運ぶなら散文は削除し、運ばない残余（機構が拾えない範囲・deny された後にどう直すか）だけを残す。
 どちらかを選ぶ前に機構を実際に走らせて出力を読む — 文言を推測したまま「hook が言うから消せる」と判断すると、消した情報がどこにも無くなる。
-`.pfdsl/bindings/pfd-retro-patterns/unverified-precedent-style.md` の問い（先例の形だけを写して、その先例が下した判断を確認していないか）をこの工程に組み込む。
+先例の形を使う場合も、今回の機構が同じ入力・失敗時の扱い・通知・回復情報を持つかを実物から確認する。挙動や条件が異なるなら、先例の書き方だけを理由に説明を消さない。
 
 ## 3. スクリプト出力を再説明する散文を検出する
 
@@ -96,12 +96,7 @@ ls scripts/check-*.mjs
 
 同じ層（スキル本文どうし・companion どうし・binding どうし）に、同じ規律を述べた段落が複数箇所へ写されていないか探す。
 
-```sh
-node scripts/retro-patterns.mjs near --word <固有語>
-```
-
-`near` はパターンカタログ向けだが、渡す語の選び方（草案そのものの固有語を渡す・一般語では順位が沈む）は同じである。
-カタログ外の散文には使えないので、こちらは各層で特徴的な語を `git grep -n` で当てて重複箇所を数える。
+各層で特徴的な語を `git grep -n` で当て、ヒットした本文を開いて重複を確認する。語の一致を意味の一致とはみなさない。
 複数箇所に同じ規律がある場合、**どれが一次情報かを決めてから**残りをポインタへ落とす。
 決めずに1箇所を消すと、残った側が一次情報を主張できないまま参照されることになる。
 
@@ -142,4 +137,4 @@ findings が0件の回が続くなら閾値を上げ、毎回大量に出るな�
 利用側リポは突合の片側である hook・check 台帳を持たない — `scripts/lib/gen-plugin.mjs` が配る `trees` / `files` / `whole` の一覧に `scripts/` も `.claude/settings.json` も入っていない。
 散文の側は事情が違い、`pfd-ops` 等の配布スキル本文は利用側リポにも実体として届く。
 ただしそれらの上流はこのリポであり、利用側で編集する経路が無いので、突合して直す工程はこちら側にしか置けない。
-`scripts/lib/gen-plugin.mjs` の `PLUGIN_SKILL_DIRS` に載せなければ配布されない — `retro-pattern-sweep` / `distribution-review` / `spec-stress-test` / `vscode-ext-debug` と同じ扱い。
+`scripts/lib/gen-plugin.mjs` の `PLUGIN_SKILL_DIRS` に載せなければ配布されない — `distribution-review` / `spec-stress-test` / `vscode-ext-debug` と同じ扱い。

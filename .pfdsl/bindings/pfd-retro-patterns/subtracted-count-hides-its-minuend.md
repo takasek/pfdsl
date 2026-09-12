@@ -2,6 +2,8 @@
 tags: [target:cli-surface, method:count]
 ---
 
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
+
 - **減算後の件数が減算前の母数を隠す trap**: 別経路で拾った分を引いた件数だけを表示すると、元から0だった回と、候補はあったが全件引かれて0になった回が同じ0へ潰れる。
   問いの形: 「この数は何から何を引いた結果か。引く前の数は同じ出力のどこかに出ているか」。
   具体例: `scripts/retro-patterns.mjs select` の word-only 節は、語が当てたパターンからタグが既に選んだ分を引いた件数を出していた。`--tag target:check-script --word allowlist` は語が1件当てても `word-only (0)` を返し、1件も当てない `--word zzznothing` と区別できなかった（#803 検出3）。

@@ -676,7 +676,7 @@ describe("Codex generated-file attributes", () => {
 				"CLAUDE.md",
 				".claude/agents/pfd-implementer.md",
 				".claude/settings.json",
-				"hooks/retro-reminder-post-tool-use.mjs",
+				"hooks/managed-issue-reminder-post-tool-use.mjs",
 			],
 			{ cwd: root, encoding: "utf-8" },
 		);
@@ -705,7 +705,7 @@ describe("Codex generated-file attributes", () => {
 			"CLAUDE.md",
 			".claude/agents/pfd-implementer.md",
 			".claude/settings.json",
-			"hooks/retro-reminder-post-tool-use.mjs",
+			"hooks/managed-issue-reminder-post-tool-use.mjs",
 		]) {
 			assert.equal(attributes.get(path), "unspecified", path);
 		}

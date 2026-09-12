@@ -3034,7 +3034,7 @@ describe("Codex generated consumers", () => {
 		}
 	});
 
-	it("runs both configured reminders from each generated plugin consumer", () => {
+	it("runs the managed issue reminder from each generated plugin consumer", () => {
 		const pluginRoot = join(repoRoot, "plugin/pfdsl");
 		const codexPluginRoot = join(repoRoot, "plugin/pfdsl-codex");
 
@@ -3043,36 +3043,6 @@ describe("Codex generated consumers", () => {
 			const roadmap = join(consumer, ".pfdsl/roadmap.pfdsl");
 			mkdirSync(dirname(roadmap), { recursive: true });
 			writeFileSync(roadmap, "artifact:\n  delivery:\n    status: wip\n");
-			execFileSync("git", ["init", "-q"], { cwd: consumer });
-			execFileSync("git", ["add", ".pfdsl/roadmap.pfdsl"], { cwd: consumer });
-			execFileSync(
-				"git",
-				[
-					"-c",
-					"user.name=Hook Test",
-					"-c",
-					"user.email=hook-test@example.invalid",
-					"commit",
-					"-qm",
-					"baseline",
-				],
-				{ cwd: consumer },
-			);
-			writeFileSync(roadmap, "artifact:\n  delivery:\n    status: done\n");
-			execFileSync("git", ["add", ".pfdsl/roadmap.pfdsl"], { cwd: consumer });
-			execFileSync(
-				"git",
-				[
-					"-c",
-					"user.name=Hook Test",
-					"-c",
-					"user.email=hook-test@example.invalid",
-					"commit",
-					"-qm",
-					"mark delivery done",
-				],
-				{ cwd: consumer },
-			);
 
 			for (const [plugin, consumerName] of [
 				[pluginRoot, "Claude"],
@@ -3095,8 +3065,18 @@ describe("Codex generated consumers", () => {
 					managedIssueCommand,
 					`${consumerName} has a managed-issue hook`,
 				);
-				assert.ok(retroCommand, `${consumerName} has a retro hook`);
-				for (const command of [managedIssueCommand, retroCommand]) {
+				assert.equal(
+					retroCommand,
+					undefined,
+					`${consumerName} has no commit inference hook`,
+				);
+				assert.equal(
+					existsSync(
+						join(pluginCopy, "hooks/retro-reminder-post-tool-use.mjs"),
+					),
+					false,
+				);
+				for (const command of [managedIssueCommand]) {
 					assert.match(command, /\$\{CLAUDE_PLUGIN_ROOT\}/, consumerName);
 					assert.doesNotMatch(command, /\$\{PLUGIN_ROOT\}/, consumerName);
 				}
@@ -3163,26 +3143,6 @@ describe("Codex generated consumers", () => {
 						consumerName,
 					);
 				}
-
-				const retroOutput = execFileSync("/bin/sh", ["-c", retroCommand], {
-					cwd: consumer,
-					encoding: "utf-8",
-					env: {
-						...hookHostEnvironment,
-						CLAUDE_PLUGIN_ROOT: pluginCopy,
-					},
-					input: JSON.stringify({
-						cwd: consumer,
-						tool_input: { command: "git commit -m mark-delivery-done" },
-					}),
-				});
-				assert.deepEqual(JSON.parse(retroOutput), {
-					hookSpecificOutput: {
-						hookEventName: "PostToolUse",
-						additionalContext:
-							"note: this commit marks a roadmap artifact done — run pfd-retro if warranted.",
-					},
-				});
 			}
 		} finally {
 			rmSync(consumer, { recursive: true, force: true });

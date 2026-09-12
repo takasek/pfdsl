@@ -1,7 +1,8 @@
 ---
 tags: [method:remove, context:parallel-work]
-phase: pre-artifact
 ---
+
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
 
 - **削除の妥当性判定を rebase の競合有無に委ねる trap**: 削除してよいかの再検証が rebase の競合有無だけに退化し、base の非競合な変更は判断のやり直しを一度も起こさない。
   呼び出し元ゼロを根拠に死んだコードを消す判断は、その根拠が真であり続ける限り正しい。

@@ -2,6 +2,8 @@
 tags: [target:issue, target:prose-doc, context:parallel-work, context:stale-tool]
 ---
 
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
+
 - **遅れたツリーの間に外部へ出した成果物は rebase で直らない trap**: base がサイクル途中で進むと、遅れに気付くまでの間ツリーは旧版の規約を現行の見本として提示し続ける。
   ツリーそのものは rebase で復旧するが、その窓の間に**リポジトリの外へ出した成果物**（起票した issue の本文、投稿したコメント、PR 本文）は rebase の対象でないため、旧規約の転写を抱えたまま残る。
   検査も CI もブランチのツリーしか見ないので、残った転写を指す機構が1つも無い。

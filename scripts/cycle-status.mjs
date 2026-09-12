@@ -3,7 +3,7 @@
 // check, open PR listing, ready listing) into one compact JSON payload.
 // Usage: node scripts/cycle-status.mjs [--base main] [--issue <n> ...]
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -65,7 +65,6 @@ const result = await runCycleStatus({
 	githubOps: createGitHubOps({ cwd: root }),
 	existsSync,
 	readFileSync,
-	readdirSync,
 	root,
 	base,
 	issueNumbers,

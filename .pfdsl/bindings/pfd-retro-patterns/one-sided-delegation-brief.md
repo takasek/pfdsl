@@ -1,7 +1,8 @@
 ---
 tags: [target:prose-doc, method:delegate]
-phase: pre-artifact
 ---
+
+> 過去事例（保存基準: 33878aeb）。本文の対策・判断は当時の記録であり、現行の指示ではない。現行手順は [pfd-retro binding](../pfd-retro.md) を参照。
 
 - **委譲ブリーフの片肺 trap**: companion `.md` の記述更新を委譲するとき、同じ事実を述べる sibling `.pfdsl` のノード description をブリーフに含めないと、委譲先は指示された `.md` 側だけを直して戻る。
   委譲先に落ち度はない — ブリーフが片肺だったのであり、成果物レビューでも「指示通り」に見える。

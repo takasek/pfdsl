@@ -101,7 +101,7 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 
 	it("matches a hooks/ path", () => {
 		assert.equal(
-			GEN_PLUGIN_TRIGGER.test("hooks/retro-reminder-post-tool-use.mjs"),
+			GEN_PLUGIN_TRIGGER.test("hooks/managed-issue-reminder-post-tool-use.mjs"),
 			true,
 		);
 	});

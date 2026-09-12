@@ -105,8 +105,8 @@ describe("findShellExecutors", () => {
 describe("selectScannedFiles", () => {
 	it("scans a script outside scripts/, which an enumerated glob list would miss", () => {
 		assert.deepEqual(
-			selectScannedFiles(["hooks/retro-reminder-post-tool-use.mjs"]),
-			["hooks/retro-reminder-post-tool-use.mjs"],
+			selectScannedFiles(["hooks/managed-issue-reminder-post-tool-use.mjs"]),
+			["hooks/managed-issue-reminder-post-tool-use.mjs"],
 		);
 	});
 
@@ -137,11 +137,11 @@ describe("selectScannedFiles", () => {
 
 	it("skips the generated plugin mirror, whose sources are scanned and whose identity is gated", () => {
 		const files = [
-			"plugin/pfdsl/hooks/retro-reminder-post-tool-use.mjs",
-			"hooks/retro-reminder-post-tool-use.mjs",
+			"plugin/pfdsl/hooks/managed-issue-reminder-post-tool-use.mjs",
+			"hooks/managed-issue-reminder-post-tool-use.mjs",
 		];
 		assert.deepEqual(selectScannedFiles(files), [
-			"hooks/retro-reminder-post-tool-use.mjs",
+			"hooks/managed-issue-reminder-post-tool-use.mjs",
 		]);
 	});
 
@@ -181,7 +181,7 @@ describe("the repository's own scan set", () => {
 	it("reaches hooks/, which runs on every Bash tool call in an adopting repo", () => {
 		assert.ok(
 			selectScannedFiles(tracked).includes(
-				"hooks/retro-reminder-post-tool-use.mjs",
+				"hooks/managed-issue-reminder-post-tool-use.mjs",
 			),
 		);
 	});
