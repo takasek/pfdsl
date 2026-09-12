@@ -187,7 +187,7 @@ proposal 起草での「既存構造」は対象 spec の現行 frontmatter キ�
 
 **`make gen-samples` 実行後**: `.dot` / `.svg` / README はいずれも決定論的（純 JS + `@pfdsl/preview-engine` の wasm graphviz）に生成されるため、再生成された全ファイルの差分をそのままステージしてよい（#588）。
 
-現在のcanonical inputは、`scripts/lib/harness-inventory.mjs` が選ぶ手書きの`.claude/skills`・`.claude/commands`・`.claude/agents`配布対象と、`CLAUDE.md`・`.claude/settings.json`・`hooks/`である。Claude CodeとCodexのadapterは同じinventoryを消費する。`.claude/skills/pfdsl` は `plugin/pfdsl/skills/pfdsl` への生成symlinkであり、canonical inputでも編集先でもない。
+現在のcanonical inputは、`scripts/lib/harness-inventory.mjs` が選ぶ手書きの`.claude/skills`・`.claude/commands`・`.claude/agents`配布対象と、`CLAUDE.md`・`.claude/settings.json`・`hooks/`である。Claude CodeとCodexのadapterは同じinventoryを消費する。`.claude/skills/pfdsl` は中立生成物 `generated/skills/pfdsl` への生成symlinkであり、canonical inputでも編集先でもない。
 
 これらの入力、またはgen-skillの入力を変更したら、`pnpm -r build && make gen-plugin` を実行する。これはClaude Code rootの`plugin/pfdsl/`とCodex native rootの`plugin/pfdsl-codex/`、リポジトリの`AGENTS.md`・`.agents/`・`.codex/`を同時に再生成する。公式Codex validator/runtimeはplugin rootの`skills/`を固定するため、異なるClaude Code/Codex skill treeを単一rootに同居させない。生成先は手編集しない。編集元を直して同じコマンドで再生成する。distが無い、または鮮度確認だけを行う場合は`node scripts/gen-plugin-dist-independent.mjs`を使えるが、Claude rootの`plugin/pfdsl/skills/pfdsl/SKILL.md`は含まれない。
 
