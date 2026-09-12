@@ -42,23 +42,28 @@ export function generatedSourceCommentCount(source) {
 }
 
 export function addGeneratedMarkdownNotice(source, authoritativeSource) {
-	if (generatedMarkdownNoticeCount(source) > 0) {
+	const frontmatter =
+		source.match(/^---\r?\n(?:[^\r\n]*\r?\n)*?---(?:\r?\n|$)/)?.[0] ?? "";
+	const body = source.slice(frontmatter.length);
+	// Only the document header declares ownership; body examples do not.
+	const header = frontmatter + body.split(/\r?\n/, 1)[0];
+	if (generatedMarkdownNoticeCount(header) > 0) {
 		return source;
 	}
 	const notice = `<!-- ${generatedNotice(authoritativeSource)} -->`;
-	const frontmatter = source.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
 	if (!frontmatter) return `${notice}\n\n${source}`;
-	return `${frontmatter[0]}${notice}\n${source.slice(frontmatter[0].length)}`;
+	const separator = frontmatter.endsWith("\n") ? "" : "\n";
+	return `${frontmatter}${separator}${notice}\n${body}`;
 }
 
 export function addGeneratedSourceComment(source, authoritativeSource) {
-	if (generatedSourceCommentCount(source) > 0) {
+	const shebang = source.match(/^#![^\r\n]*\r?\n/)?.[0] ?? "";
+	const body = source.slice(shebang.length);
+	if (generatedSourceCommentCount(body.split(/\r?\n/, 1)[0]) > 0) {
 		return source;
 	}
 	const comment = `// ${generatedNotice(authoritativeSource)}\n`;
-	const shebang = source.match(/^#![^\r\n]*\r?\n/);
-	if (!shebang) return `${comment}${source}`;
-	return `${shebang[0]}${comment}${source.slice(shebang[0].length)}`;
+	return `${shebang}${comment}${body}`;
 }
 
 function capabilitySourcePath(record) {

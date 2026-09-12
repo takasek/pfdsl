@@ -234,6 +234,120 @@ describe("generated ownership notices", () => {
 		);
 	});
 
+	for (const newline of ["\n", "\r\n"]) {
+		for (const prefix of [
+			"",
+			`---${newline}---${newline}`,
+			`---${newline}name: generated${newline}---${newline}`,
+		]) {
+			for (const example of [
+				"<!-- DO NOT EDIT. Authoritative source: example.md. -->",
+				"# DO NOT EDIT — generated. Authoritative source: example.md",
+			]) {
+				for (const fenced of [false, true]) {
+					it(`adds a Markdown notice despite a ${fenced ? "fenced" : "bare"} ${example.startsWith("<!--") ? "comment" : "heading"} example (${prefix ? (prefix.includes("name:") ? "frontmatter" : "empty frontmatter") : "no frontmatter"}, ${newline === "\n" ? "LF" : "CRLF"})`, () => {
+						const body = [
+							"# Instructions",
+							"",
+							...(fenced ? ["```markdown", example, "```"] : [example]),
+							"",
+							"---",
+							"",
+							"Footer",
+							"",
+						].join(newline);
+						const source = prefix + body;
+						const notice =
+							"<!-- DO NOT EDIT. Authoritative source: canonical.md. -->";
+						const output = addGeneratedMarkdownNotice(source, "canonical.md");
+						assert.equal(
+							output,
+							prefix + notice + (prefix ? "\n" : "\n\n") + body,
+						);
+						assert.equal(
+							addGeneratedMarkdownNotice(output, "intermediate.md"),
+							output,
+						);
+					});
+				}
+			}
+		}
+	}
+
+	it("preserves notices in all Markdown header positions with CRLF", () => {
+		const notice = "<!-- DO NOT EDIT. Authoritative source: canonical.md. -->";
+		for (const lines of [
+			[notice, "", "body"],
+			["---", "name: generated", notice, "---", "body"],
+			["---", "name: generated", "---", notice, "body"],
+		]) {
+			const source = lines.join("\r\n");
+			assert.equal(
+				addGeneratedMarkdownNotice(source, "intermediate.md"),
+				source,
+			);
+		}
+	});
+
+	for (const newline of ["\n", "\r\n"]) {
+		it(`preserves notices with empty or EOF-terminated frontmatter (${JSON.stringify(newline)})`, () => {
+			const notice = "# DO NOT EDIT. Authoritative source: canonical.md.";
+			for (const lines of [
+				["---", "---", notice, "body"],
+				["---", notice, "name: generated", "---"],
+			]) {
+				const source = lines.join(newline);
+				assert.equal(
+					addGeneratedMarkdownNotice(source, "intermediate.md"),
+					source,
+				);
+			}
+		});
+
+		it(`adds a notice after empty or EOF-terminated frontmatter (${JSON.stringify(newline)})`, () => {
+			for (const frontmatter of [
+				["---", "---", ""].join(newline),
+				["---", "---"].join(newline),
+				["---", "name: generated", "---"].join(newline),
+			]) {
+				const separator = frontmatter.endsWith("\n") ? "" : "\n";
+				const expected =
+					frontmatter +
+					separator +
+					"<!-- DO NOT EDIT. Authoritative source: canonical.md. -->\n";
+				assert.equal(
+					addGeneratedMarkdownNotice(frontmatter, "canonical.md"),
+					expected,
+				);
+				assert.equal(
+					addGeneratedMarkdownNotice(expected, "intermediate.md"),
+					expected,
+				);
+			}
+		});
+	}
+
+	it("adds the root instructions notice when the body documents the format", () => {
+		const source =
+			"# pfdsl\n\n```\n<!-- DO NOT EDIT. Authoritative source: example.md. -->\n```\n";
+		assert.ok(
+			claudeRootInstructionsToAgents(source).startsWith(
+				`<!-- DO NOT EDIT. Authoritative source: CLAUDE.md. -->\n\n${source}`,
+			),
+		);
+	});
+
+	it("adds the command skill notice when the body documents the format", () => {
+		const body =
+			"\n# Instructions\n\n<!-- DO NOT EDIT. Authoritative source: example.md. -->\n";
+		assert.equal(
+			commandCapabilityToCodexSkill(commandRecord({ body }), "pfd-cycle"),
+			"---\nname: pfd-cycle\ndescription: Choose the next PFD task.\n---\n" +
+				"<!-- DO NOT EDIT. Authoritative source: .claude/commands/pfd-cycle.md. -->\n" +
+				body,
+		);
+	});
+
 	it("preserves an existing JavaScript notice after a shebang", () => {
 		const source =
 			"#!/usr/bin/env node\n" +
@@ -256,6 +370,34 @@ describe("generated ownership notices", () => {
 			source,
 		);
 	});
+
+	for (const prefix of [
+		"",
+		"#!/usr/bin/env node\n",
+		"#!/usr/bin/env node\r\n",
+	]) {
+		for (const body of [
+			"console.log('body');\n// DO NOT EDIT. Authoritative source: example.mjs.\n",
+			"const example = `\n// DO NOT EDIT. Authoritative source: example.mjs.\n`;\n",
+		]) {
+			it(`adds a JavaScript notice despite a ${body.startsWith("const") ? "template literal" : "body comment"} (${prefix ? "shebang" : "no shebang"}, ${prefix.includes("\r") ? "CRLF" : "LF"})`, () => {
+				const output = addGeneratedSourceComment(
+					prefix + body,
+					"canonical.mjs",
+				);
+				assert.equal(
+					output,
+					prefix +
+						"// DO NOT EDIT. Authoritative source: canonical.mjs.\n" +
+						body,
+				);
+				assert.equal(
+					addGeneratedSourceComment(output, "intermediate.mjs"),
+					output,
+				);
+			});
+		}
+	}
 });
 
 describe("commandCapabilityToCodexSkill", () => {
