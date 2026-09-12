@@ -12,7 +12,11 @@
 
 ## セットアップ
 
-Claude CodeとCodexのSessionStart hookは、クローン直後・新規worktreeで `node scripts/setup-completion.mjs check` が失敗すれば `make setup` を自動実行する。`check` はmarkerのfingerprint一致に加え、rootのmanifestと、`packages/`直下の各ディレクトリから読み取り・解析できたmanifestが宣言する依存を検査する。各依存の`node_modules/<name>`と依存自身の`package.json`が実在・解析可能であり、`bin`がstringなら依存manifestの`name`（なければ依存キー）、objectなら各キーをpnpmの規則でbasename化して導出したshimが同じmanifestの`node_modules/.bin/`に通常ファイルとして実在し、`0o111`の実行ビットを持つことを確認する。`bin`を宣言しない依存にはshimを要求せず、manifestがない、読み取れない、または解析できない`packages/`直下のディレクトリは検査対象から除外する。markerはrootとworkspaceのpackage manifests、lockfile、workspace定義、`.npmrc`、`.pnpmfile.cjs`、setup recipe、hook shim、repo skill linker、fingerprint runtimeのSHA-256を記録し、branch switch等で入力が変わればstaleになる。setup全体はworktree単位のlockで直列化され、同じinputsを待っていたrunnerはlock取得後の再checkでbodyをskipする。markerは全工程成功後に同一directory内の一時fileからatomic renameされる。session開始後にworktreeを手動作成した場合など、SessionStart hookが完了しなかった場合だけ `make setup` を1回手動実行する。依存installに加えpre-commit hookのshim（`scripts/hooks/pre-commit-shim`）を `.git/hooks/` に導入する。shimはcommit実行worktreeの `scripts/pre-commit` を都度execするため、hookの版とbranchのtree内容が常に一致する（#411）。実体はcommit時にstaged filesのBiome検査を自動実行する。Biomeの指摘は自動修正しない。落ちたら `make format` を実行して再stageする。
+Claude CodeとCodexのSessionStart hookが、このworktreeのセットアップを検査し、未完了または古い場合は `make setup` を実行する。
+手動でworktreeを作成した場合など、hookによるセットアップが完了していない場合は `make setup` を実行し、`node scripts/setup-completion.mjs check` の成功を確認してから作業する。
+`make setup` は依存関係とスキルリンクを整え、コミット先worktreeの `scripts/pre-commit` を実行するhook shimを導入する。
+Biomeの指摘は自動修正されないため、失敗時は `make format` を実行して再stageする。
+完了判定・依存検査・並行実行制御の詳細は `scripts/setup-completion.mjs`、セットアップ内容は `Makefile` の `setup` / `setup-unlocked` を参照する。
 
 ## 文字列の言語
 
@@ -40,7 +44,6 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook）は、mainまたはsibling worktreeを対象にする変更系Gitを保護する。ツールに渡すパスと実行worktreeを一致させる。
 新しい状態を作る操作はdenyとし、破壊・復元操作はClaude Codeでask、askを表現できないCodexでfail-closed denyとする。変更系Gitの実効targetをshell構文から確定できない場合もfail closedとする。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` とする。
-リポジトリのCodexでroutine Gitを実行するときは、trusted-root検証付き `codex-git-routine.mjs` の明示target付きsubcommandを使う。raw Gitは永続allowしない。Claude Codeにはこのuser-level wrapperを前提としない。
 
 コミットメッセージは**英語**。
 

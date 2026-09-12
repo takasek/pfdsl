@@ -30,7 +30,7 @@ waxa CLI（blank-slate, ツール呼び出し不可）では retrieval 有無を
 
 ## worktree でのサイクル実行
 
-**サイクルは worktree で回す**: このリポのルート作業ツリーは `~/works/pfdsl` 直下で、worktree は `.claude/worktrees/<name>/` に置く。
+**サイクルは worktree で回す**: 対象リポジトリの専用 worktree を使い、作成場所と作成手順は利用中のハーネスまたはマシン側の設定に従う。
 worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順1 が一次情報。
 消えた編集を探すとき `git stash list` を先に見ることも配布層の同じ手順が持つ。
 実際に起きた干渉の症状と復旧手順は `.pfdsl/bindings/pfd-retro-patterns/shared-worktree-interference.md`。
