@@ -218,7 +218,7 @@ artifact:
     group: planning
   toolchain:
     label: ツールチェーン
-    description: "integrated_repository の packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）の現行状態。pipeline.pfdsl の release 判定と変換境界の入力"
+    description: "integrated_repository の packages/（core / cli / graphviz-exporter / preview-engine / vscode-extension）の現行状態"
     criteria: gh pr view <PR番号> --json mergeCommit --jq '.mergeCommit.oid' で merge commit C を得て、git rev-parse origin/main:packages と git rev-parse C:packages が同じ tree object ID を返す
     location: ../packages/
     group: planning
@@ -388,8 +388,8 @@ artifact:
     group: planning
   pipeline_pfdsl:
     label: 変換パイプライン図
-    description: "pfdslツールチェーンの実行時データ変換境界（source→AST→正規化グラフ→check/fmt/graph/metadata 出力）。toolchain の変換コンポーネント追加・変更・削除時に更新（ADR-0018 門番）"
-    criteria: check がエラーなし、meta check-links が通過する。toolchain の各変換段が pipeline.pfdsl のノードとして現れる
+    description: "integrated_repository の実装にある実行時データ変換と生成・検査・公開処理の境界。変換コンポーネント追加・変更・削除時に更新（ADR-0018 門番）"
+    criteria: check がエラーなし、meta check-links が通過する。対象とする各変換段が integrated_repository の実装に対応したノード・エッジとして現れる
     location: pipeline.pfdsl
     group: planning
   pipeline_md:
@@ -491,7 +491,7 @@ process:
     group: planning
   map_transform_boundaries:
     label: 変換境界整理
-    description: "toolchain の実装（parse/normalize/validate/format/render/export 等）から実行時データ変換の境界を PFD 化する。変換コンポーネントの追加・変更・削除時に手動更新（ADR-0018 門番、pfd-ops references/work-cycle.md「成果物の門番」）"
+    description: "integrated_repository の実装から、pipeline_pfdsl が扱う変換境界を PFD 化する。変換コンポーネントの追加・変更・削除時に手動更新（ADR-0018 門番、pfd-ops references/work-cycle.md「成果物の門番」）"
     group: planning
   develop:
     label: リポジトリ開発
@@ -658,7 +658,7 @@ roadmap_pfdsl >>? map_deps
 
 pipeline_md >>? map_transform_boundaries
 pipeline_pfdsl >>? map_transform_boundaries
-toolchain >> map_transform_boundaries -> [pipeline_md, pipeline_pfdsl]
+integrated_repository >> map_transform_boundaries -> [pipeline_md, pipeline_pfdsl]
 
 workflow_pfdsl >>? map_workflow
 [adrs, decisions] >> map_workflow -> workflow_pfdsl
