@@ -544,9 +544,16 @@ export function formatCycleWindowReport({ fetchResult, window }) {
  * Conventional Commits. Without the exclusion the gate fails on every branch
  * that followed the procedure, and a FAIL the runner is told to ignore is a
  * FAIL they stop reading (#690).
+ *
+ * The verdict itself is checkCommitSubjects', shared with the CI entry point so
+ * the two cannot judge the same commits differently (#1174). `check` is
+ * injected the way `exec` is, and for the same reason a test needs it: without
+ * a seam, an inlined copy of today's logic satisfies every assertion here, and
+ * a later fix to the shared checker would reach CI while the gate kept the
+ * stale copy.
  */
-export function commitSubjectStep({ exec, base }) {
-	return checkCommitSubjects({
+export function commitSubjectStep({ exec, base, check = checkCommitSubjects }) {
+	return check({
 		exec,
 		baseRef: `origin/${base}`,
 		headRef: "HEAD",

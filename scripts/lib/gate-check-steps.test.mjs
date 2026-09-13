@@ -1021,6 +1021,28 @@ describe("commitSubjectStep", () => {
 		);
 	});
 
+	it("delegates to the shared checker rather than holding its own copy", () => {
+		/** @type {unknown[]} */
+		const seen = [];
+		const row = { name: "commit subject lint", status: "PASS" };
+		const result = commitSubjectStep({
+			exec: () => ({ ok: true, out: "" }),
+			base: "main",
+			check: (args) => {
+				seen.push(args);
+				return row;
+			},
+		});
+		assert.equal(seen.length, 1);
+		assert.deepEqual(
+			{ baseRef: seen[0].baseRef, headRef: seen[0].headRef },
+			{ baseRef: "origin/main", headRef: "HEAD" },
+		);
+		// Identity, not deep equality: an inlined copy would return a row that
+		// merely looks the same.
+		assert.equal(result, row);
+	});
+
 	it("returns the shared check's row unchanged", () => {
 		const { exec } = fakeExec({
 			"git log": { out: `${nul}feat(cli): a\n${nul}add a thing\n` },
