@@ -221,6 +221,9 @@ describe("check-commit-subjects workflow", () => {
 		permissions: { contents: "read" },
 		jobs: {
 			check: {
+				// Named: branch protection identifies a required check by the job's
+				// name, and three other workflows here already run a `check`.
+				name: "check commit subjects",
 				// GitHub-hosted: on a persistent runner the PR's code shares a host
 				// that neither of the two settings above protects.
 				"runs-on": "ubuntu-latest",

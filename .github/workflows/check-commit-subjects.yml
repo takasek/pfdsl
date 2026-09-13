@@ -26,6 +26,10 @@ permissions:
 
 jobs:
   check:
+    # Named, because branch protection identifies a required check by the job's
+    # name and three other workflows here already run a job called `check`.
+    # Without this the context this workflow reports cannot be told from theirs.
+    name: check commit subjects
     runs-on: ubuntu-latest
     steps:
       # fetch-depth: 0 because the default depth-1 checkout has no base ref to
