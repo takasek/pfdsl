@@ -258,6 +258,82 @@ describe("check-commit-subjects workflow", () => {
 		},
 	};
 
+	const workflow = (() => {
+		const parsed = parseYaml(
+			readFileSync(
+				resolve(__dirname, "../.github/workflows/check-commit-subjects.yml"),
+				"utf-8",
+			),
+		);
+		// "on:" is the YAML boolean true under some schemas.
+		if (true in parsed) {
+			parsed.on = parsed[true];
+			delete parsed[true];
+		}
+		return parsed;
+	})();
+	const job = workflow.jobs?.check ?? {};
+	const steps = job.steps ?? [];
+	const runSteps = steps.filter((s) => typeof s.run === "string");
+	const lint = runSteps[0] ?? {};
+	const checkouts = steps.filter((s) =>
+		String(s.uses ?? "").startsWith("actions/checkout"),
+	);
+
+	// Stated as invariants, alongside the snapshot above. The snapshot rejects
+	// any property nobody thought to name, but it is satisfied by an edit that
+	// changes the workflow and mirrors the change here in one go. These say
+	// what must hold, so relaxing one means writing down that masking or
+	// skipping is now allowed — visible as intent in the diff rather than as
+	// routine mirroring.
+	it("cannot be skipped or have its failure masked", () => {
+		for (const owner of [lint, job]) {
+			assert.equal(owner.if, undefined);
+			assert.ok(
+				[undefined, false].includes(owner["continue-on-error"]),
+				`continue-on-error must be absent or false, got ${JSON.stringify(owner["continue-on-error"])}`,
+			);
+		}
+		for (const shell of [
+			lint.shell,
+			workflow.defaults?.run?.shell,
+			job.defaults?.run?.shell,
+		].filter(Boolean)) {
+			assert.doesNotMatch(shell, /[|;&]/);
+		}
+	});
+
+	it("runs exactly one command, from published actions, on a hosted runner", () => {
+		assert.equal(runSteps.length, 1);
+		assert.equal(lint.run.trim().replace(/\\\n/g, " ").split("\n").length, 1);
+		assert.deepEqual(steps.map((s) => s.uses).filter(Boolean), [
+			"actions/checkout@v6",
+			"actions/setup-node@v6",
+		]);
+		assert.ok(
+			["ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04"].includes(
+				job["runs-on"],
+			),
+			`unexpected runner: ${job["runs-on"]}`,
+		);
+	});
+
+	it("hands the PR's own code no credentials and no extra environment", () => {
+		assert.equal(checkouts.length, 1);
+		assert.equal(String(checkouts[0]?.with?.["persist-credentials"]), "false");
+		assert.deepEqual(workflow.permissions, { contents: "read" });
+		assert.deepEqual(Object.keys(lint.env ?? {}).sort(), [
+			"BASE_REF",
+			"HEAD_SHA",
+		]);
+		assert.equal(workflow.env, undefined);
+		assert.equal(job.env, undefined);
+	});
+
+	it("judges every pull request, including one that was retargeted", () => {
+		assert.deepEqual(Object.keys(workflow.on.pull_request), ["types"]);
+		assert.ok(workflow.on.pull_request.types.includes("edited"));
+	});
 	it("matches the reviewed document exactly", () => {
 		const workflow = parseYaml(
 			readFileSync(

@@ -1063,6 +1063,12 @@ describe("commitSubjectStep", () => {
 			`${nul}feat(cli): a\n${nul}\n`,
 			`${nul}feat(cli): a\n${nul}fix(cli): b\n`,
 			`${nul}add a thing\n`,
+			// Shaped like a Conventional Commit but not one of the allowed
+			// types: a stale clone carrying a broader matcher agrees with the
+			// shared checker on every subject above and disagrees here.
+			`${nul}wip: something\n`,
+			`${nul}feat!: drop a flag\n`,
+			`${nul}fix(cli): 直す\n`,
 			"",
 		];
 		for (const out of outputs) {
