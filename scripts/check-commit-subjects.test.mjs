@@ -299,7 +299,13 @@ describe("check-commit-subjects workflow", () => {
 			workflow.defaults?.run?.shell,
 			job.defaults?.run?.shell,
 		].filter(Boolean)) {
-			assert.doesNotMatch(shell, /[|;&]/);
+			// A built-in name, never a custom template. `shell: true {0}` holds
+			// no operator and still never runs the script GitHub generates, and
+			// the safe custom spellings buy this job nothing.
+			assert.ok(
+				["bash", "sh", "pwsh", "python", "cmd", "powershell"].includes(shell),
+				`only a built-in shell is allowed here, got: ${shell}`,
+			);
 		}
 		// The command itself, not only the shell it runs under: `; true` after
 		// the checker discards its status just as surely as a shell template
@@ -320,11 +326,24 @@ describe("check-commit-subjects workflow", () => {
 			),
 			`unexpected runner: ${job["runs-on"]}`,
 		);
-		// Which program, and over which range, stated here as well as in the
-		// document above: the checker has to be the thing that actually runs.
-		assert.match(lint.run, /^node \.?\/?scripts\/check-commit-subjects\.mjs\b/);
-		assert.match(lint.run, /--base[= ]"origin\/\$\{?BASE_REF}?"/);
-		assert.match(lint.run, /--head[= ]"\$\{?HEAD_SHA}?"/);
+		// The whole argv, stated here as well as in the document above. Checking
+		// that a correct --base exists is not enough: a second one appended
+		// later wins in parseArgs, and `--base "$HEAD_SHA"` turns the range into
+		// an empty one that SKIPs at exit 0 while the first, correct option is
+		// still there for a regex to find.
+		const tokens = lint.run
+			.trim()
+			.replace(/\\\n/g, " ")
+			.split(/\s+/)
+			.map((t) => t.replace(/["']/g, "").replace(/\$\{(\w+)}/g, "$$$1"));
+		assert.deepEqual(tokens, [
+			"node",
+			"scripts/check-commit-subjects.mjs",
+			"--base",
+			"origin/$BASE_REF",
+			"--head",
+			"$HEAD_SHA",
+		]);
 	});
 
 	it("hands the PR's own code no credentials and no extra environment", () => {
