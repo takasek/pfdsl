@@ -1016,10 +1016,13 @@ describe("commitSubjectStep", () => {
 		// substring assertion would still pass if a traversal-narrowing option
 		// such as --first-parent were added, which drops the side parent's
 		// commits from the range.
-		assert.equal(
-			logCall,
-			`git log --no-merges origin/release..HEAD --format=%x00%s`,
-		);
+		assert.deepEqual(logCall?.split(" ").sort(), [
+			"--format=%x00%s",
+			"--no-merges",
+			"git",
+			"log",
+			"origin/release..HEAD",
+		]);
 	});
 
 	it("delegates to the shared checker rather than holding its own copy", () => {

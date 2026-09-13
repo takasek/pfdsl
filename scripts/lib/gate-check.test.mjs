@@ -326,12 +326,17 @@ describe("checkCommitSubjects", () => {
 			baseRef: "abc123",
 			headRef: "def456",
 		});
-		// Exact: a substring check would still pass if a traversal-narrowing
-		// option such as --first-parent were added, and that silently drops the
-		// commits a merge brings in through its side parent.
-		assert.equal(
-			calls.find((c) => c.startsWith("git log")),
-			"git log --no-merges abc123..def456 --format=%x00%s",
+		// The whole argument set, compared without regard to order: a substring
+		// check would still pass if a traversal-narrowing option such as
+		// --first-parent were added, and that silently drops the commits a merge
+		// brings in through its side parent. Order carries no meaning to git
+		// here, so pinning it would only make a reorder a red test.
+		assert.deepEqual(
+			calls
+				.find((c) => c.startsWith("git log"))
+				?.split(" ")
+				.sort(),
+			["--format=%x00%s", "--no-merges", "abc123..def456", "git", "log"],
 		);
 	});
 

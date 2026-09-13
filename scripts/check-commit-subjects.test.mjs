@@ -212,11 +212,17 @@ describe("check-commit-subjects workflow", () => {
 	// The run step is compared as tokens rather than as text: the folded
 	// scalar's line breaks and the shell quoting around each value are free to
 	// change without changing what runs.
-	const runTokens = lint.run
+	// A literal block scalar keeps its newlines, and a newline that is not
+	// escaped ends a command. Splitting on whitespace would hide that: the
+	// arguments would all still be present while the shell ran the script once
+	// with no --base and then tried to run the options as programs.
+	const runCommands = lint.run
 		.trim()
-		// A literal block scalar may carry shell line continuations; they end a
-		// source line, not an argument.
 		.replace(/\\\n/g, " ")
+		.split("\n")
+		.map((line) => line.trim())
+		.filter(Boolean);
+	const runTokens = (runCommands[0] ?? "")
 		.split(/\s+/)
 		.map((t) => t.replace(/^["']|["']$/g, ""))
 		// `${VAR}` and `$VAR` are the same expansion; only the quoting around
@@ -263,8 +269,17 @@ describe("check-commit-subjects workflow", () => {
 	});
 
 	it("ranges from the live base ref to the head SHA", () => {
+		assert.deepEqual(
+			runCommands.length,
+			1,
+			`the step must run one command, got: ${runCommands.join(" / ")}`,
+		);
 		assert.equal(program, "node");
-		assert.equal(script, "scripts/check-commit-subjects.mjs");
+		// `./scripts/...` resolves to the same file, so only the path matters.
+		assert.equal(
+			script.replace(/^\.\//, ""),
+			"scripts/check-commit-subjects.mjs",
+		);
 		assert.deepEqual(options, {
 			base: "origin/$BASE_REF",
 			head: "$HEAD_SHA",
