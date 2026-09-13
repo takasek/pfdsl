@@ -231,7 +231,10 @@ describe("check-commit-subjects workflow", () => {
 	// Read as a command rather than as a fixed token list: option order and the
 	// --name=value form change nothing about what parseArgs receives, and a
 	// test that rejects them is red for a harmless edit.
-	const unquote = (t) => t.replace(/^["']|["']$/g, "");
+	// Every quote in the token, not only the outer pair: `origin/"$BASE_REF"`
+	// passes the same single argument as `"origin/$BASE_REF"`. Whether the
+	// variable sits inside double quotes at all is asserted on the raw text.
+	const unquote = (t) => t.replace(/["']/g, "");
 	const [program, script, ...argv] = runTokens;
 	const options = {};
 	for (let i = 0; i < argv.length; i++) {
@@ -298,8 +301,8 @@ describe("check-commit-subjects workflow", () => {
 		// quoting itself is asserted here: single quotes keep Bash from
 		// expanding these, and the checker would be handed the literal text.
 		// `${VAR}` is the same expansion as `$VAR`, so both are accepted.
-		assert.match(lint.run, /--base=?\s*"origin\/\$\{?BASE_REF}?"/);
-		assert.match(lint.run, /--head=?\s*"\$\{?HEAD_SHA}?"/);
+		assert.match(lint.run, /"[^"]*\$\{?BASE_REF}?[^"]*"/);
+		assert.match(lint.run, /"[^"]*\$\{?HEAD_SHA}?[^"]*"/);
 	});
 
 	it("lets the checker's failure fail the job", () => {
@@ -311,6 +314,21 @@ describe("check-commit-subjects workflow", () => {
 			assert.equal(owner["continue-on-error"], undefined);
 			assert.equal(owner.if, undefined);
 		}
+	});
+
+	it("keeps no credentials on disk for the PR's own code to reach", () => {
+		// The step runs a script from the pull request's head, and the job needs
+		// no authenticated git after the clone.
+		assert.equal(checkout.with["persist-credentials"], false);
+		assert.deepEqual(workflow.permissions, { contents: "read" });
+	});
+
+	it("runs under the default shell, which cannot swallow the exit code", () => {
+		// `shell: bash {0} || true` is a valid custom shell template and masks
+		// the failure without appearing in the command.
+		assert.equal(lint.shell, undefined);
+		assert.equal(workflow.defaults, undefined);
+		assert.equal(workflow.jobs.check.defaults, undefined);
 	});
 
 	it("lets the checker's exit code decide the job", () => {

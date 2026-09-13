@@ -1054,18 +1054,30 @@ describe("commitSubjectStep", () => {
 		// whose answer depends on the parser rather than on the argv: a lone
 		// empty subject is FAIL under the NUL split and SKIP under the old
 		// newline one.
-		const log = { "git log": { out: `${nul}\n` } };
-		const viaStep = commitSubjectStep({
-			exec: fakeExec(log).exec,
-			base: "main",
-		});
-		const direct = checkCommitSubjects({
-			exec: fakeExec(log).exec,
-			baseRef: "origin/main",
-			headRef: "HEAD",
-		});
-		assert.deepEqual(viaStep, direct);
-		assert.equal(viaStep.status, "FAIL");
+		// A table rather than one case: a copy of today's logic agrees on any
+		// single input, so the wider the set the smaller the window in which a
+		// stale default still looks right.
+		const outputs = [
+			`${nul}\n`,
+			`${nul} feat(cli): indented\n`,
+			`${nul}feat(cli): a\n${nul}\n`,
+			`${nul}feat(cli): a\n${nul}fix(cli): b\n`,
+			`${nul}add a thing\n`,
+			"",
+		];
+		for (const out of outputs) {
+			const log = { "git log": { out } };
+			const viaStep = commitSubjectStep({
+				exec: fakeExec(log).exec,
+				base: "main",
+			});
+			const direct = checkCommitSubjects({
+				exec: fakeExec(log).exec,
+				baseRef: "origin/main",
+				headRef: "HEAD",
+			});
+			assert.deepEqual(viaStep, direct, `disagreed on ${JSON.stringify(out)}`);
+		}
 	});
 
 	it("returns the shared check's row unchanged", () => {
