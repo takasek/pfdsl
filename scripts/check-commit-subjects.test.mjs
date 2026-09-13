@@ -149,6 +149,18 @@ describe("check-commit-subjects CLI", () => {
 		assert.match(r.stdout, /add an untipped thing/);
 	});
 
+	it("honours a --head that is not the current tip", () => {
+		// Every other case names a head that happens to be the tip at the time,
+		// so ignoring --head entirely and always using HEAD passes them all.
+		// Here the tip carries an invalid subject the chosen range excludes.
+		const from = headSha(root);
+		const head = commit(root, "chore: chosen head");
+		commit(root, "not conventional at the tip");
+		const r = runCli(root, ["--base", from, "--head", head]);
+		assert.equal(r.status, 0, r.stdout + r.stderr);
+		assert.match(r.stdout, /PASS/);
+	});
+
 	it("exits 2 when --base is missing", () => {
 		const r = runCli(root, []);
 		assert.equal(r.status, 2, r.stdout + r.stderr);
@@ -179,7 +191,10 @@ describe("check-commit-subjects workflow", () => {
 	const runTokens = lint.run
 		.trim()
 		.split(/\s+/)
-		.map((t) => t.replace(/^["']|["']$/g, ""));
+		.map((t) => t.replace(/^["']|["']$/g, ""))
+		// `${VAR}` and `$VAR` are the same expansion; only the quoting around
+		// them matters, and that is asserted on the raw text.
+		.map((t) => t.replace(/\$\{(\w+)}/g, "$$$1"));
 
 	it("reruns when the base changes, not only when the branch does", () => {
 		assert.deepEqual([...trigger.pull_request.types].sort(), [
@@ -220,8 +235,18 @@ describe("check-commit-subjects workflow", () => {
 		// The tokens above are compared with their quotes stripped, so the
 		// quoting itself is asserted here: single quotes keep Bash from
 		// expanding these, and the checker would be handed the literal text.
-		assert.match(lint.run, /--base "origin\/\$BASE_REF"/);
-		assert.match(lint.run, /--head "\$HEAD_SHA"/);
+		// `${VAR}` is the same expansion as `$VAR`, so both are accepted.
+		assert.match(lint.run, /--base "origin\/\$\{?BASE_REF}?"/);
+		assert.match(lint.run, /--head "\$\{?HEAD_SHA}?"/);
+	});
+
+	it("lets the checker's failure fail the job", () => {
+		// continue-on-error keeps the exit code intact and still reports the
+		// step and the job as successful, and an `if:` can skip the step
+		// outright — neither shows up in the command itself.
+		assert.notEqual(lint["continue-on-error"], true);
+		assert.notEqual(workflow.jobs.check["continue-on-error"], true);
+		assert.equal(lint.if, undefined);
 	});
 
 	it("lets the checker's exit code decide the job", () => {
