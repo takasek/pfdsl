@@ -208,7 +208,13 @@ describe("check-commit-subjects workflow", () => {
 	const checkout = steps.find((s) =>
 		String(s.uses ?? "").startsWith("actions/checkout"),
 	);
-	const lint = steps.find((s) => typeof s.run === "string");
+	const LINT_STEP = "Lint the branch's commit subjects";
+	const runSteps = steps.filter((s) => typeof s.run === "string");
+	// Falls back to an empty step rather than undefined: reading `.run` off
+	// undefined while the describe body evaluates makes node:test drop every
+	// test in this block, so renaming the step would delete the contract
+	// instead of breaking it.
+	const lint = runSteps.find((s) => s.name === LINT_STEP) ?? { run: "" };
 	// The run step is compared as tokens rather than as text: the folded
 	// scalar's line breaks and the shell quoting around each value are free to
 	// change without changing what runs.
@@ -253,6 +259,23 @@ describe("check-commit-subjects workflow", () => {
 			"reopened",
 			"synchronize",
 		]);
+	});
+
+	it("has exactly one run step, so the assertions below cover what runs", () => {
+		// Picking "the first run step" would let a second one added ahead of it
+		// take the assertions while the named step was changed underneath.
+		assert.deepEqual(
+			runSteps.map((s) => s.name),
+			[LINT_STEP],
+		);
+	});
+
+	it("runs on an ephemeral GitHub-hosted runner", () => {
+		// The job executes a script from the pull request's head. On a
+		// self-hosted runner that code shares a persistent host, which neither
+		// contents: read nor persist-credentials: false protects. The label is
+		// not pinned to one image, so a routine bump stays green.
+		assert.match(workflow.jobs.check["runs-on"], /^(ubuntu|windows|macos)-/);
 	});
 
 	it("applies to every pull request, with no path or branch filter", () => {
