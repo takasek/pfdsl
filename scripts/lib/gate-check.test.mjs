@@ -305,9 +305,22 @@ function fakeExec(responses = {}) {
 	return { exec, calls };
 }
 
+/**
+ * What `git log --format=%x00%s` emits: a NUL before each subject, so a commit
+ * with an empty message stays a record instead of vanishing into a newline
+ * split.
+ * @param {string[]} subjects
+ */
+function logOutput(subjects) {
+	const nul = String.fromCharCode(0);
+	return subjects.map((s) => `${nul}${s}\n`).join("");
+}
+
 describe("checkCommitSubjects", () => {
 	it("reads the range the caller names, rather than a fixed origin/<base>..HEAD", () => {
-		const { exec, calls } = fakeExec({ "git log": { out: "feat(cli): a\n" } });
+		const { exec, calls } = fakeExec({
+			"git log": { out: logOutput(["feat(cli): a"]) },
+		});
 		gateCheck.checkCommitSubjects({
 			exec,
 			baseRef: "abc123",
@@ -320,7 +333,9 @@ describe("checkCommitSubjects", () => {
 	});
 
 	it("excludes merge commits so a base merge cannot fail the lint (#690)", () => {
-		const { exec, calls } = fakeExec({ "git log": { out: "feat(cli): a\n" } });
+		const { exec, calls } = fakeExec({
+			"git log": { out: logOutput(["feat(cli): a"]) },
+		});
 		gateCheck.checkCommitSubjects({
 			exec,
 			baseRef: "origin/main",
@@ -334,7 +349,7 @@ describe("checkCommitSubjects", () => {
 	});
 
 	it("SKIPs when the range holds no non-merge commits", () => {
-		const { exec } = fakeExec({ "git log": { out: "\n" } });
+		const { exec } = fakeExec({ "git log": { out: "" } });
 		const result = gateCheck.checkCommitSubjects({
 			exec,
 			baseRef: "origin/main",
@@ -358,7 +373,7 @@ describe("checkCommitSubjects", () => {
 
 	it("PASSes and counts the subjects it linted", () => {
 		const { exec } = fakeExec({
-			"git log": { out: "feat(cli): a\nfix(cli): b\n" },
+			"git log": { out: logOutput(["feat(cli): a", "fix(cli): b"]) },
 		});
 		const result = gateCheck.checkCommitSubjects({
 			exec,
@@ -369,9 +384,35 @@ describe("checkCommitSubjects", () => {
 		assert.match(result.detail, /2 commit/);
 	});
 
+	it("lints an empty subject rather than reading it as an empty range", () => {
+		// `git commit --allow-empty-message` yields a commit whose subject is the
+		// empty string. Splitting the log on newlines drops that record, so the
+		// range looks empty and the run reports SKIP — a commit that fails every
+		// rule passes by disappearing.
+		const { exec, calls } = fakeExec({
+			"git log": { out: logOutput(["feat(cli): a", ""]) },
+		});
+		const result = gateCheck.checkCommitSubjects({
+			exec,
+			baseRef: "origin/main",
+			headRef: "HEAD",
+		});
+		// The record separator is the fix: asking for %s alone makes an empty
+		// subject indistinguishable from the blank line between records, and a
+		// behavioural assertion alone would pass for the wrong reason, because a
+		// NUL left in the subject also breaks the Conventional Commits pattern.
+		const logCall = calls.find((c) => c.startsWith("git log"));
+		assert.ok(
+			logCall?.includes("--format=%x00%s"),
+			`expected a NUL record separator in the log call, got: ${logCall}`,
+		);
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /Conventional/);
+	});
+
 	it("FAILs on an offending subject and names it with its reason", () => {
 		const { exec } = fakeExec({
-			"git log": { out: "feat(cli): ok\nadd a thing\n" },
+			"git log": { out: logOutput(["feat(cli): ok", "add a thing"]) },
 		});
 		const result = gateCheck.checkCommitSubjects({
 			exec,

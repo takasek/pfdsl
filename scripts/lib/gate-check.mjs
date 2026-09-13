@@ -359,6 +359,12 @@ export function lintCommitSubjects(subjects) {
 }
 
 /**
+ * git writes this before each subject when asked for `--format=%x00%s`, so an
+ * empty subject survives the split as its own record.
+ */
+const COMMIT_RECORD_SEPARATOR = String.fromCharCode(0);
+
+/**
  * The whole commit-subject verdict for one range: collect the range, drop the
  * merge commits, lint what is left, and report it as a gate row.
  *
@@ -377,16 +383,24 @@ export function lintCommitSubjects(subjects) {
  */
 export function checkCommitSubjects({ exec, baseRef, headRef }) {
 	const name = "commit subject lint";
+	// %x00%s, not %s: a commit made with --allow-empty-message has an empty
+	// subject, which a newline split cannot tell apart from the separator
+	// between records. Dropped that way, the one commit that violates every
+	// rule is the one the lint never sees. The NUL prefixes each record, so
+	// splitting on it keeps the empty subject as a record of its own.
 	const subjectsOut = exec("git", [
 		"log",
 		"--no-merges",
 		`${baseRef}..${headRef}`,
-		"--format=%s",
+		"--format=%x00%s",
 	]);
 	if (!subjectsOut.ok)
 		return { name, status: "FAIL", detail: subjectsOut.out.trim() };
 
-	const subjects = subjectsOut.out.trim().split("\n").filter(Boolean);
+	const subjects = subjectsOut.out
+		.split(COMMIT_RECORD_SEPARATOR)
+		.slice(1)
+		.map((record) => record.replace(/\n$/, ""));
 	if (subjects.length === 0)
 		return { name, status: "SKIP", detail: "no commits in range" };
 
