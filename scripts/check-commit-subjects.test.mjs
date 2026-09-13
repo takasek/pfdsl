@@ -173,6 +173,13 @@ describe("check-commit-subjects workflow", () => {
 		String(s.uses ?? "").startsWith("actions/checkout"),
 	);
 	const lint = steps.find((s) => typeof s.run === "string");
+	// The run step is compared as tokens rather than as text: the folded
+	// scalar's line breaks and the shell quoting around each value are free to
+	// change without changing what runs.
+	const runTokens = lint.run
+		.trim()
+		.split(/\s+/)
+		.map((t) => t.replace(/^["']|["']$/g, ""));
 
 	it("reruns when the base changes, not only when the branch does", () => {
 		assert.deepEqual([...trigger.pull_request.types].sort(), [
@@ -184,14 +191,37 @@ describe("check-commit-subjects workflow", () => {
 	});
 
 	it("checks out full history at the PR head so a range can be formed", () => {
-		assert.equal(checkout.with["fetch-depth"], 0);
+		// Number(), not a strict compare against 0: `fetch-depth: "0"` is valid
+		// YAML and means the same thing to the action, so a quoting change must
+		// not turn CI red.
+		assert.equal(Number(checkout.with["fetch-depth"]), 0);
 		assert.match(checkout.with.ref, /pull_request\.head\.sha/);
 	});
 
 	it("ranges from the live base ref to the head SHA", () => {
-		assert.match(lint.run, /--base "origin\/\$BASE_REF"/);
-		assert.match(lint.run, /--head "\$HEAD_SHA"/);
+		assert.deepEqual(runTokens, [
+			"node",
+			"scripts/check-commit-subjects.mjs",
+			"--base",
+			"origin/$BASE_REF",
+			"--head",
+			"$HEAD_SHA",
+		]);
 		assert.match(lint.env.BASE_REF, /github\.base_ref/);
 		assert.match(lint.env.HEAD_SHA, /pull_request\.head\.sha/);
+	});
+
+	it("lets the checker's exit code decide the job", () => {
+		// A run step is shell, so the verdict can be discarded in passing: an
+		// appended `|| true`, or a swap to `echo`, keeps every argument in place
+		// while the job reports success on a FAIL. Asserting the exact token
+		// list above already pins the program; this states the reason, and
+		// catches an operator appended anywhere in the line.
+		for (const operator of ["||", "&&", ";", "|"]) {
+			assert.ok(
+				!runTokens.includes(operator),
+				`the run step must not mask the checker's exit code; found ${operator}`,
+			);
+		}
 	});
 });
