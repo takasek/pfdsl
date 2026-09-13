@@ -59,19 +59,21 @@ function runCli(cwd, args) {
 describe("check-commit-subjects CLI", () => {
 	/** @type {string} */
 	let root;
-	/** @type {string} */
-	let base;
 
 	before(() => {
 		root = makeGitRepository({ prefix: "check-commit-subjects-" });
-		base = commit(root, "chore: base");
+		commit(root, "chore: base");
 	});
 
 	after(() => rmSync(root, { recursive: true, force: true }));
 
 	it("exits 0 on a range whose subjects all pass", () => {
+		// The range is taken just before this case's own commit, as everywhere
+		// else here: using the shared starting point would make this the only
+		// case that breaks if another is ever inserted ahead of it.
+		const from = headSha(root);
 		const head = commit(root, "feat(cli): add a thing");
-		const r = runCli(root, ["--base", base, "--head", head]);
+		const r = runCli(root, ["--base", from, "--head", head]);
 		assert.equal(r.status, 0, r.stdout + r.stderr);
 		assert.match(r.stdout, /PASS/);
 	});
@@ -363,17 +365,6 @@ describe("check-commit-subjects workflow", () => {
 		assert.ok(workflow.on.pull_request.types.includes("edited"));
 	});
 	it("matches the reviewed document exactly", () => {
-		const workflow = parseYaml(
-			readFileSync(
-				resolve(__dirname, "../.github/workflows/check-commit-subjects.yml"),
-				"utf-8",
-			),
-		);
-		// "on:" is the YAML boolean true under some schemas.
-		if (true in workflow) {
-			workflow.on = workflow[true];
-			delete workflow[true];
-		}
 		assert.deepEqual(workflow, EXPECTED);
 	});
 });
