@@ -192,230 +192,81 @@ describe("check-commit-subjects CLI", () => {
 });
 
 describe("check-commit-subjects workflow", () => {
-	// The workflow is the only place the range definition and the trigger set
-	// live, and nothing else in this suite reads it: dropping `edited` from the
-	// types, or the checkout depth, breaks the check while every unit test
-	// stays green.
-	const workflow = parseYaml(
-		readFileSync(
-			resolve(__dirname, "../.github/workflows/check-commit-subjects.yml"),
-			"utf-8",
-		),
-	);
-	// `on:` is the YAML boolean true once parsed.
-	const trigger = workflow[true] ?? workflow.on;
-	const steps = workflow.jobs.check.steps;
-	const checkouts = steps.filter((s) =>
-		String(s.uses ?? "").startsWith("actions/checkout"),
-	);
-	const checkout = checkouts[0] ?? { with: {} };
-	const LINT_STEP = "Lint the branch's commit subjects";
-	const runSteps = steps.filter((s) => typeof s.run === "string");
-	// Falls back to an empty step rather than undefined: reading `.run` off
-	// undefined while the describe body evaluates makes node:test drop every
-	// test in this block, so renaming the step would delete the contract
-	// instead of breaking it.
-	const lint = runSteps.find((s) => s.name === LINT_STEP) ?? { run: "" };
-	// The run step is compared as tokens rather than as text: the folded
-	// scalar's line breaks and the shell quoting around each value are free to
-	// change without changing what runs.
-	// A literal block scalar keeps its newlines, and a newline that is not
-	// escaped ends a command. Splitting on whitespace would hide that: the
-	// arguments would all still be present while the shell ran the script once
-	// with no --base and then tried to run the options as programs.
-	const runCommands = lint.run
-		.trim()
-		.replace(/\\\n/g, " ")
-		.split("\n")
-		.map((line) => line.trim())
-		.filter(Boolean);
-	const runTokens = (runCommands[0] ?? "")
-		.split(/\s+/)
-		.map((t) => t.replace(/^["']|["']$/g, ""))
-		// `${VAR}` and `$VAR` are the same expansion; only the quoting around
-		// them matters, and that is asserted on the raw text.
-		.map((t) => t.replace(/\$\{(\w+)}/g, "$$$1"));
-	// Read as a command rather than as a fixed token list: option order and the
-	// --name=value form change nothing about what parseArgs receives, and a
-	// test that rejects them is red for a harmless edit.
-	// Every quote in the token, not only the outer pair: `origin/"$BASE_REF"`
-	// passes the same single argument as `"origin/$BASE_REF"`. Whether the
-	// variable sits inside double quotes at all is asserted on the raw text.
-	const unquote = (t) => t.replace(/["']/g, "");
-	const [program, script, ...argv] = runTokens;
-	const options = {};
-	for (let i = 0; i < argv.length; i++) {
-		// Split before unquoting: `--base="origin/$BASE_REF"` carries its quotes
-		// around the value, not around the whole token.
-		const [name, inlineValue] = argv[i].split(/=(.*)/s);
-		// `?? ""` rather than letting undefined reach unquote: an option left
-		// without a value would throw here, in the describe body, and node:test
-		// would then register none of the tests below — a mutation that looks
-		// like a pass because the failure count never moves.
-		options[unquote(name).replace(/^--/, "")] = unquote(
-			(inlineValue === undefined ? argv[++i] : inlineValue) ?? "",
-		);
-	}
+	// Compared whole, against the document below, rather than property by
+	// property. Enumerating the ways a workflow can stop judging does not
+	// terminate: guarding the step's env leaves the job's and the workflow's,
+	// rejecting shell operators leaves a template that ignores the script
+	// placeholder, and reading the options as a map hides a duplicate whose
+	// value is a command substitution. Each of those runs the pull request's
+	// own code with the checkout already in place, and each is invisible to an
+	// assertion about some other property.
+	//
+	// The cost is that every edit to this file must be mirrored here, including
+	// harmless ones such as spelling out an equivalent shell. For a workflow
+	// that executes PR-controlled code, that is the intended trade: the diff
+	// says what changed, and a reviewer sees it.
+	const EXPECTED = {
+		name: "check commit subjects",
+		on: {
+			// "edited" is not decoration: the default types all track the branch,
+			// so retargeting a PR swaps the range without firing the workflow. No
+			// paths filter either — the check is about the range, so no path's
+			// absence makes it inapplicable.
+			pull_request: {
+				types: ["opened", "synchronize", "reopened", "edited"],
+			},
+		},
+		// Nothing is used after the clone, and the job runs a script from the
+		// pull request's head.
+		permissions: { contents: "read" },
+		jobs: {
+			check: {
+				// GitHub-hosted: on a persistent runner the PR's code shares a host
+				// that neither of the two settings above protects.
+				"runs-on": "ubuntu-latest",
+				steps: [
+					{
+						uses: "actions/checkout@v6",
+						with: {
+							// Full history, at the head rather than the synthetic merge
+							// commit, and no token left on disk.
+							"fetch-depth": 0,
+							// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
+							ref: "${{ github.event.pull_request.head.sha }}",
+							"persist-credentials": false,
+						},
+					},
+					{ uses: "actions/setup-node@v6", with: { "node-version": 24 } },
+					{
+						name: "Lint the branch's commit subjects",
+						// origin/<base_ref>, not the payload's base.sha: that value is
+						// the base tip as of the event and stops matching the gate's
+						// range once the base advances.
+						run: 'node scripts/check-commit-subjects.mjs --base "origin/$BASE_REF" --head "$HEAD_SHA"',
+						env: {
+							// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
+							BASE_REF: "${{ github.base_ref }}",
+							// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
+							HEAD_SHA: "${{ github.event.pull_request.head.sha }}",
+						},
+					},
+				],
+			},
+		},
+	};
 
-	it("reruns when the base changes, not only when the branch does", () => {
-		assert.deepEqual([...trigger.pull_request.types].sort(), [
-			"edited",
-			"opened",
-			"reopened",
-			"synchronize",
-		]);
-	});
-
-	it("has exactly one run step, so the assertions below cover what runs", () => {
-		// Picking "the first run step" would let a second one added ahead of it
-		// take the assertions while the named step was changed underneath.
-		assert.deepEqual(
-			runSteps.map((s) => s.name),
-			[LINT_STEP],
-		);
-	});
-
-	it("runs on an ephemeral GitHub-hosted runner", () => {
-		// The job executes a script from the pull request's head. On a
-		// self-hosted runner that code shares a persistent host, which neither
-		// contents: read nor persist-credentials: false protects. An allowlist
-		// rather than a prefix: a label like `ubuntu-self-hosted` starts the
-		// same way and points at exactly the runner this rules out.
-		assert.ok(
-			["ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04"].includes(
-				workflow.jobs.check["runs-on"],
+	it("matches the reviewed document exactly", () => {
+		const workflow = parseYaml(
+			readFileSync(
+				resolve(__dirname, "../.github/workflows/check-commit-subjects.yml"),
+				"utf-8",
 			),
-			`unexpected runner: ${workflow.jobs.check["runs-on"]}`,
 		);
-	});
-
-	it("uses only the actions this check needs", () => {
-		// A local action would run code the pull request controls, before the
-		// lint step, with the checkout already in place — it could rewrite the
-		// checker itself. Only the two published actions are allowed.
-		assert.deepEqual(steps.map((s) => s.uses).filter(Boolean), [
-			"actions/checkout@v6",
-			"actions/setup-node@v6",
-		]);
-	});
-
-	it("applies to every pull request, with no path or branch filter", () => {
-		// The check is about the commit range, so there is no path whose absence
-		// makes it inapplicable. A `paths:` filter would silently exclude the
-		// PRs that change no workflow — exactly the ones whose commits need
-		// judging — while every other assertion here stayed green.
-		assert.deepEqual(Object.keys(trigger.pull_request), ["types"]);
-	});
-
-	it("checks out full history at the PR head so a range can be formed", () => {
-		// Number(), not a strict compare against 0: `fetch-depth: "0"` is valid
-		// YAML and means the same thing to the action, so a quoting change must
-		// not turn CI red.
-		assert.equal(Number(checkout.with["fetch-depth"]), 0);
-		assert.match(checkout.with.ref, /pull_request\.head\.sha/);
-	});
-
-	it("ranges from the live base ref to the head SHA", () => {
-		assert.deepEqual(
-			runCommands.length,
-			1,
-			`the step must run one command, got: ${runCommands.join(" / ")}`,
-		);
-		assert.equal(program, "node");
-		// `./scripts/...` resolves to the same file, so only the path matters.
-		assert.equal(
-			script.replace(/^\.\//, ""),
-			"scripts/check-commit-subjects.mjs",
-		);
-		assert.deepEqual(options, {
-			base: "origin/$BASE_REF",
-			head: "$HEAD_SHA",
-		});
-		// Exact, not "mentions head.sha": an expression such as
-		// `head.sha && base.sha` names it and still evaluates to the base SHA,
-		// which makes the range empty and every commit SKIP at exit 0.
-		// The whole key set, not only these two values: an added BASH_ENV names
-		// a file the PR controls, which bash sources before the command and can
-		// use to reset the exit status from an EXIT trap.
-		assert.deepEqual(Object.keys(lint.env).sort(), ["BASE_REF", "HEAD_SHA"]);
-		// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
-		assert.equal(lint.env.BASE_REF, "${{ github.base_ref }}");
-		assert.equal(
-			lint.env.HEAD_SHA,
-			// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
-			"${{ github.event.pull_request.head.sha }}",
-		);
-		// The tokens above are compared with their quotes stripped, so the
-		// quoting itself is asserted here: single quotes keep Bash from
-		// expanding these, and the checker would be handed the literal text.
-		// `${VAR}` is the same expansion as `$VAR`, so both are accepted.
-		assert.match(lint.run, /"[^"]*\$\{?BASE_REF}?[^"]*"/);
-		assert.match(lint.run, /"[^"]*\$\{?HEAD_SHA}?[^"]*"/);
-	});
-
-	it("lets the checker's failure fail the job", () => {
-		// Absent, not "not literally true": `continue-on-error: ${{ true }}`
-		// parses as a string here and evaluates to true at GitHub, and an `if:`
-		// on the job skips the only step that judges anything. Neither shows up
-		// in the command itself.
-		for (const owner of [lint, workflow.jobs.check]) {
-			// Absent or the literal false. Spelling out the default is harmless,
-			// but `${{ true }}` parses as a string here and evaluates to true at
-			// GitHub, so anything else is rejected.
-			assert.ok(
-				[undefined, false].includes(owner["continue-on-error"]),
-				`continue-on-error must be absent or false, got ${JSON.stringify(owner["continue-on-error"])}`,
-			);
-			assert.equal(owner.if, undefined);
+		// "on:" is the YAML boolean true under some schemas.
+		if (true in workflow) {
+			workflow.on = workflow[true];
+			delete workflow[true];
 		}
-	});
-
-	it("keeps no credentials on disk for the PR's own code to reach", () => {
-		// One checkout, and it is the guarded one: a second checkout added
-		// before the lint step would write the token into .git/config where the
-		// PR-controlled script can read it, while an assertion on "the first
-		// checkout" kept looking at the safe one.
-		assert.equal(checkouts.length, 1);
-		assert.ok(
-			steps.indexOf(checkout) < steps.indexOf(lint),
-			"the checkout must come before the step that runs the PR's code",
-		);
-		// `"false"` is the same to the action, which only treats TRUE as
-		// enabling, so the value is normalised before comparing.
-		assert.equal(String(checkout.with["persist-credentials"]), "false");
-		assert.deepEqual(workflow.permissions, { contents: "read" });
-	});
-
-	it("runs under a shell that cannot swallow the exit code", () => {
-		// `shell: bash {0} || true` is a valid custom shell template and masks
-		// the failure without appearing in the command. Naming a shell is not
-		// itself the problem, so what is rejected is a template carrying an
-		// operator that can discard the status.
-		const shells = [
-			lint.shell,
-			workflow.defaults?.run?.shell,
-			workflow.jobs.check.defaults?.run?.shell,
-		].filter(Boolean);
-		for (const shell of shells) {
-			assert.doesNotMatch(
-				shell,
-				/[|;&]/,
-				`a shell template must not discard the exit status: ${shell}`,
-			);
-		}
-	});
-
-	it("lets the checker's exit code decide the job", () => {
-		// A run step is shell, so the verdict can be discarded in passing: an
-		// appended `|| true`, or a swap to `echo`, keeps every argument in place
-		// while the job reports success on a FAIL. Asserting the exact token
-		// list above already pins the program; this states the reason, and
-		// catches an operator appended anywhere in the line.
-		for (const operator of ["||", "&&", ";", "|"]) {
-			assert.ok(
-				!runTokens.includes(operator),
-				`the run step must not mask the checker's exit code; found ${operator}`,
-			);
-		}
+		assert.deepEqual(workflow, EXPECTED);
 	});
 });
