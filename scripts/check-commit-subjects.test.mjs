@@ -301,6 +301,10 @@ describe("check-commit-subjects workflow", () => {
 		].filter(Boolean)) {
 			assert.doesNotMatch(shell, /[|;&]/);
 		}
+		// The command itself, not only the shell it runs under: `; true` after
+		// the checker discards its status just as surely as a shell template
+		// that ignores the script.
+		assert.doesNotMatch(lint.run, /[|;&]/);
 	});
 
 	it("runs exactly one command, from published actions, on a hosted runner", () => {
@@ -316,6 +320,11 @@ describe("check-commit-subjects workflow", () => {
 			),
 			`unexpected runner: ${job["runs-on"]}`,
 		);
+		// Which program, and over which range, stated here as well as in the
+		// document above: the checker has to be the thing that actually runs.
+		assert.match(lint.run, /^node \.?\/?scripts\/check-commit-subjects\.mjs\b/);
+		assert.match(lint.run, /--base[= ]"origin\/\$\{?BASE_REF}?"/);
+		assert.match(lint.run, /--head[= ]"\$\{?HEAD_SHA}?"/);
 	});
 
 	it("hands the PR's own code no credentials and no extra environment", () => {
