@@ -205,9 +205,10 @@ describe("check-commit-subjects workflow", () => {
 	// `on:` is the YAML boolean true once parsed.
 	const trigger = workflow[true] ?? workflow.on;
 	const steps = workflow.jobs.check.steps;
-	const checkout = steps.find((s) =>
+	const checkouts = steps.filter((s) =>
 		String(s.uses ?? "").startsWith("actions/checkout"),
 	);
+	const checkout = checkouts[0] ?? { with: {} };
 	const LINT_STEP = "Lint the branch's commit subjects";
 	const runSteps = steps.filter((s) => typeof s.run === "string");
 	// Falls back to an empty step rather than undefined: reading `.run` off
@@ -334,14 +335,27 @@ describe("check-commit-subjects workflow", () => {
 		// on the job skips the only step that judges anything. Neither shows up
 		// in the command itself.
 		for (const owner of [lint, workflow.jobs.check]) {
-			assert.equal(owner["continue-on-error"], undefined);
+			// Absent or the literal false. Spelling out the default is harmless,
+			// but `${{ true }}` parses as a string here and evaluates to true at
+			// GitHub, so anything else is rejected.
+			assert.ok(
+				[undefined, false].includes(owner["continue-on-error"]),
+				`continue-on-error must be absent or false, got ${JSON.stringify(owner["continue-on-error"])}`,
+			);
 			assert.equal(owner.if, undefined);
 		}
 	});
 
 	it("keeps no credentials on disk for the PR's own code to reach", () => {
-		// The step runs a script from the pull request's head, and the job needs
-		// no authenticated git after the clone.
+		// One checkout, and it is the guarded one: a second checkout added
+		// before the lint step would write the token into .git/config where the
+		// PR-controlled script can read it, while an assertion on "the first
+		// checkout" kept looking at the safe one.
+		assert.equal(checkouts.length, 1);
+		assert.ok(
+			steps.indexOf(checkout) < steps.indexOf(lint),
+			"the checkout must come before the step that runs the PR's code",
+		);
 		assert.equal(checkout.with["persist-credentials"], false);
 		assert.deepEqual(workflow.permissions, { contents: "read" });
 	});
