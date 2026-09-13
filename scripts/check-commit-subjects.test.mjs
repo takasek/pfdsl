@@ -248,8 +248,12 @@ describe("check-commit-subjects workflow", () => {
 		// Split before unquoting: `--base="origin/$BASE_REF"` carries its quotes
 		// around the value, not around the whole token.
 		const [name, inlineValue] = argv[i].split(/=(.*)/s);
+		// `?? ""` rather than letting undefined reach unquote: an option left
+		// without a value would throw here, in the describe body, and node:test
+		// would then register none of the tests below — a mutation that looks
+		// like a pass because the failure count never moves.
 		options[unquote(name).replace(/^--/, "")] = unquote(
-			inlineValue === undefined ? argv[++i] : inlineValue,
+			(inlineValue === undefined ? argv[++i] : inlineValue) ?? "",
 		);
 	}
 
@@ -274,9 +278,25 @@ describe("check-commit-subjects workflow", () => {
 	it("runs on an ephemeral GitHub-hosted runner", () => {
 		// The job executes a script from the pull request's head. On a
 		// self-hosted runner that code shares a persistent host, which neither
-		// contents: read nor persist-credentials: false protects. The label is
-		// not pinned to one image, so a routine bump stays green.
-		assert.match(workflow.jobs.check["runs-on"], /^(ubuntu|windows|macos)-/);
+		// contents: read nor persist-credentials: false protects. An allowlist
+		// rather than a prefix: a label like `ubuntu-self-hosted` starts the
+		// same way and points at exactly the runner this rules out.
+		assert.ok(
+			["ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04"].includes(
+				workflow.jobs.check["runs-on"],
+			),
+			`unexpected runner: ${workflow.jobs.check["runs-on"]}`,
+		);
+	});
+
+	it("uses only the actions this check needs", () => {
+		// A local action would run code the pull request controls, before the
+		// lint step, with the checkout already in place — it could rewrite the
+		// checker itself. Only the two published actions are allowed.
+		assert.deepEqual(steps.map((s) => s.uses).filter(Boolean), [
+			"actions/checkout@v6",
+			"actions/setup-node@v6",
+		]);
 	});
 
 	it("applies to every pull request, with no path or branch filter", () => {
@@ -314,6 +334,10 @@ describe("check-commit-subjects workflow", () => {
 		// Exact, not "mentions head.sha": an expression such as
 		// `head.sha && base.sha` names it and still evaluates to the base SHA,
 		// which makes the range empty and every commit SKIP at exit 0.
+		// The whole key set, not only these two values: an added BASH_ENV names
+		// a file the PR controls, which bash sources before the command and can
+		// use to reset the exit status from an EXIT trap.
+		assert.deepEqual(Object.keys(lint.env).sort(), ["BASE_REF", "HEAD_SHA"]);
 		// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
 		assert.equal(lint.env.BASE_REF, "${{ github.base_ref }}");
 		assert.equal(
@@ -356,16 +380,29 @@ describe("check-commit-subjects workflow", () => {
 			steps.indexOf(checkout) < steps.indexOf(lint),
 			"the checkout must come before the step that runs the PR's code",
 		);
-		assert.equal(checkout.with["persist-credentials"], false);
+		// `"false"` is the same to the action, which only treats TRUE as
+		// enabling, so the value is normalised before comparing.
+		assert.equal(String(checkout.with["persist-credentials"]), "false");
 		assert.deepEqual(workflow.permissions, { contents: "read" });
 	});
 
-	it("runs under the default shell, which cannot swallow the exit code", () => {
+	it("runs under a shell that cannot swallow the exit code", () => {
 		// `shell: bash {0} || true` is a valid custom shell template and masks
-		// the failure without appearing in the command.
-		assert.equal(lint.shell, undefined);
-		assert.equal(workflow.defaults, undefined);
-		assert.equal(workflow.jobs.check.defaults, undefined);
+		// the failure without appearing in the command. Naming a shell is not
+		// itself the problem, so what is rejected is a template carrying an
+		// operator that can discard the status.
+		const shells = [
+			lint.shell,
+			workflow.defaults?.run?.shell,
+			workflow.jobs.check.defaults?.run?.shell,
+		].filter(Boolean);
+		for (const shell of shells) {
+			assert.doesNotMatch(
+				shell,
+				/[|;&]/,
+				`a shell template must not discard the exit status: ${shell}`,
+			);
+		}
 	});
 
 	it("lets the checker's exit code decide the job", () => {
