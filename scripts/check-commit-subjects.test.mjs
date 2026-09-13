@@ -9,10 +9,11 @@
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { parse as parseYaml } from "yaml";
 import { makeGitRepository } from "./lib/git-test-repository.test-helper.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -136,8 +137,61 @@ describe("check-commit-subjects CLI", () => {
 		assert.match(r.stderr, /Unknown option/);
 	});
 
+	it("defaults --head to HEAD rather than to some other ref", () => {
+		// Every other case names --head, so changing the default to any resolvable
+		// ref would keep them green while a range that ends somewhere other than
+		// the branch tip was linted — and an invalid subject on the tip would be
+		// reported as an empty range.
+		const from = headSha(root);
+		commit(root, "add an untipped thing");
+		const r = runCli(root, ["--base", from]);
+		assert.equal(r.status, 1, r.stdout + r.stderr);
+		assert.match(r.stdout, /add an untipped thing/);
+	});
+
 	it("exits 2 when --base is missing", () => {
 		const r = runCli(root, []);
 		assert.equal(r.status, 2, r.stdout + r.stderr);
+	});
+});
+
+describe("check-commit-subjects workflow", () => {
+	// The workflow is the only place the range definition and the trigger set
+	// live, and nothing else in this suite reads it: dropping `edited` from the
+	// types, or the checkout depth, breaks the check while every unit test
+	// stays green.
+	const workflow = parseYaml(
+		readFileSync(
+			resolve(__dirname, "../.github/workflows/check-commit-subjects.yml"),
+			"utf-8",
+		),
+	);
+	// `on:` is the YAML boolean true once parsed.
+	const trigger = workflow[true] ?? workflow.on;
+	const steps = workflow.jobs.check.steps;
+	const checkout = steps.find((s) =>
+		String(s.uses ?? "").startsWith("actions/checkout"),
+	);
+	const lint = steps.find((s) => typeof s.run === "string");
+
+	it("reruns when the base changes, not only when the branch does", () => {
+		assert.deepEqual([...trigger.pull_request.types].sort(), [
+			"edited",
+			"opened",
+			"reopened",
+			"synchronize",
+		]);
+	});
+
+	it("checks out full history at the PR head so a range can be formed", () => {
+		assert.equal(checkout.with["fetch-depth"], 0);
+		assert.match(checkout.with.ref, /pull_request\.head\.sha/);
+	});
+
+	it("ranges from the live base ref to the head SHA", () => {
+		assert.match(lint.run, /--base "origin\/\$BASE_REF"/);
+		assert.match(lint.run, /--head "\$HEAD_SHA"/);
+		assert.match(lint.env.BASE_REF, /github\.base_ref/);
+		assert.match(lint.env.HEAD_SHA, /pull_request\.head\.sha/);
 	});
 });
