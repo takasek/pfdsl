@@ -8,8 +8,14 @@ name: check commit subjects
 # pull_request only, and without a paths filter: the check is about the range
 # itself, so there is no path whose absence makes it inapplicable, and a push
 # to the default branch has no base to form a range against.
+#
+# `edited` is in the type list for the same reason check-closes-reference.yml
+# carries it: the default types all track the branch, and retargeting a PR to
+# a different base changes the range without touching a commit. Without it the
+# verdict from the old base stays posted against a range it never judged.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
 
 jobs:
   check:
