@@ -1002,12 +1002,27 @@ describe("commitSubjectStep", () => {
 	// the refs that function takes, and that the row comes back untouched.
 	const nul = String.fromCharCode(0);
 
-	it("asks for origin/<base>..HEAD", () => {
+	it("asks for origin/<base>..HEAD with the shared range options", () => {
 		const { exec, calls } = fakeExec({
 			"git log": { out: `${nul}feat(cli): a\n` },
 		});
 		commitSubjectStep({ exec, base: "release" });
-		assert.ok(calls.some((c) => c.includes("origin/release..HEAD")));
+		const logCall = calls.find((c) => c.startsWith("git log"));
+		// The options are asserted here, not only in the shared function's own
+		// tests: re-inlining the old body in this step would leave those tests
+		// green while the gate and CI went back to judging different things.
+		assert.ok(
+			logCall?.includes("origin/release..HEAD"),
+			`expected the mapped range, got: ${logCall}`,
+		);
+		assert.ok(
+			logCall?.includes("--no-merges"),
+			`expected --no-merges, got: ${logCall}`,
+		);
+		assert.ok(
+			logCall?.includes("--format=%x00%s"),
+			`expected the NUL record separator, got: ${logCall}`,
+		);
 	});
 
 	it("returns the shared check's row unchanged", () => {
