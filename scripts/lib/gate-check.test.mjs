@@ -287,6 +287,103 @@ describe("statusChangedForArtifact", () => {
 	});
 });
 
+/**
+ * Records the command lines a step issues and replies with canned output, so a
+ * test can assert on the range a caller asked git for without running git.
+ */
+function fakeExec(responses = {}) {
+	/** @type {string[]} */
+	const calls = [];
+	const exec = (file, args = []) => {
+		const line = [file, ...args].join(" ");
+		calls.push(line);
+		const hit = Object.entries(responses).find(([prefix]) =>
+			line.startsWith(prefix),
+		);
+		return { ok: hit?.[1].ok ?? true, out: hit?.[1].out ?? "" };
+	};
+	return { exec, calls };
+}
+
+describe("checkCommitSubjects", () => {
+	it("reads the range the caller names, rather than a fixed origin/<base>..HEAD", () => {
+		const { exec, calls } = fakeExec({ "git log": { out: "feat(cli): a\n" } });
+		gateCheck.checkCommitSubjects({
+			exec,
+			baseRef: "abc123",
+			headRef: "def456",
+		});
+		assert.ok(
+			calls.some((c) => c.includes("abc123..def456")),
+			`expected the caller's range in the log call, got: ${calls.join(" | ")}`,
+		);
+	});
+
+	it("excludes merge commits so a base merge cannot fail the lint (#690)", () => {
+		const { exec, calls } = fakeExec({ "git log": { out: "feat(cli): a\n" } });
+		gateCheck.checkCommitSubjects({
+			exec,
+			baseRef: "origin/main",
+			headRef: "HEAD",
+		});
+		const logCall = calls.find((c) => c.startsWith("git log"));
+		assert.ok(
+			logCall?.includes("--no-merges"),
+			`expected --no-merges in the log call, got: ${logCall}`,
+		);
+	});
+
+	it("SKIPs when the range holds no non-merge commits", () => {
+		const { exec } = fakeExec({ "git log": { out: "\n" } });
+		const result = gateCheck.checkCommitSubjects({
+			exec,
+			baseRef: "origin/main",
+			headRef: "HEAD",
+		});
+		assert.equal(result.status, "SKIP");
+	});
+
+	it("FAILs and surfaces git's message when the range cannot be read", () => {
+		const { exec } = fakeExec({
+			"git log": { ok: false, out: "fatal: bad revision" },
+		});
+		const result = gateCheck.checkCommitSubjects({
+			exec,
+			baseRef: "origin/nope",
+			headRef: "HEAD",
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /bad revision/);
+	});
+
+	it("PASSes and counts the subjects it linted", () => {
+		const { exec } = fakeExec({
+			"git log": { out: "feat(cli): a\nfix(cli): b\n" },
+		});
+		const result = gateCheck.checkCommitSubjects({
+			exec,
+			baseRef: "origin/main",
+			headRef: "HEAD",
+		});
+		assert.equal(result.status, "PASS");
+		assert.match(result.detail, /2 commit/);
+	});
+
+	it("FAILs on an offending subject and names it with its reason", () => {
+		const { exec } = fakeExec({
+			"git log": { out: "feat(cli): ok\nadd a thing\n" },
+		});
+		const result = gateCheck.checkCommitSubjects({
+			exec,
+			baseRef: "origin/main",
+			headRef: "HEAD",
+		});
+		assert.equal(result.status, "FAIL");
+		assert.match(result.detail, /add a thing/);
+		assert.match(result.detail, /Conventional/);
+	});
+});
+
 describe("lintCommitSubjects", () => {
 	it("accepts a Conventional Commits subject", () => {
 		const results = lintCommitSubjects(["feat(gate-check): add commit lint"]);
