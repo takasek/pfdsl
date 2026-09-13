@@ -207,8 +207,21 @@ describe("check-commit-subjects workflow", () => {
 			"--head",
 			"$HEAD_SHA",
 		]);
-		assert.match(lint.env.BASE_REF, /github\.base_ref/);
-		assert.match(lint.env.HEAD_SHA, /pull_request\.head\.sha/);
+		// Exact, not "mentions head.sha": an expression such as
+		// `head.sha && base.sha` names it and still evaluates to the base SHA,
+		// which makes the range empty and every commit SKIP at exit 0.
+		// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
+		assert.equal(lint.env.BASE_REF, "${{ github.base_ref }}");
+		assert.equal(
+			lint.env.HEAD_SHA,
+			// biome-ignore lint/suspicious/noTemplateCurlyInString: a GitHub Actions expression, not an interpolation
+			"${{ github.event.pull_request.head.sha }}",
+		);
+		// The tokens above are compared with their quotes stripped, so the
+		// quoting itself is asserted here: single quotes keep Bash from
+		// expanding these, and the checker would be handed the literal text.
+		assert.match(lint.run, /--base "origin\/\$BASE_REF"/);
+		assert.match(lint.run, /--head "\$HEAD_SHA"/);
 	});
 
 	it("lets the checker's exit code decide the job", () => {
