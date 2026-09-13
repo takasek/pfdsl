@@ -85,6 +85,18 @@ describe("check-commit-subjects CLI", () => {
 		assert.match(r.stdout, /add a thing/);
 	});
 
+	it("names only the rule it enforces when a CJK subject fails", () => {
+		// The predicate rejects CJK outside quoted spans and lets other
+		// non-English scripts through, so a message promising English would
+		// send a reader looking for a check that does not exist.
+		const from = headSha(root);
+		const head = commit(root, "fix(cli): 直す");
+		const r = runCli(root, ["--base", from, "--head", head]);
+		assert.equal(r.status, 1, r.stdout + r.stderr);
+		assert.match(r.stderr, /CJK/);
+		assert.doesNotMatch(r.stderr, /English/);
+	});
+
 	it("exits 1 on a commit with an empty subject", () => {
 		const from = headSha(root);
 		const head = commit(root, "");
@@ -195,6 +207,20 @@ describe("check-commit-subjects workflow", () => {
 		// `${VAR}` and `$VAR` are the same expansion; only the quoting around
 		// them matters, and that is asserted on the raw text.
 		.map((t) => t.replace(/\$\{(\w+)}/g, "$$$1"));
+	// Read as a command rather than as a fixed token list: option order and the
+	// --name=value form change nothing about what parseArgs receives, and a
+	// test that rejects them is red for a harmless edit.
+	const unquote = (t) => t.replace(/^["']|["']$/g, "");
+	const [program, script, ...argv] = runTokens;
+	const options = {};
+	for (let i = 0; i < argv.length; i++) {
+		// Split before unquoting: `--base="origin/$BASE_REF"` carries its quotes
+		// around the value, not around the whole token.
+		const [name, inlineValue] = argv[i].split(/=(.*)/s);
+		options[unquote(name).replace(/^--/, "")] = unquote(
+			inlineValue === undefined ? argv[++i] : inlineValue,
+		);
+	}
 
 	it("reruns when the base changes, not only when the branch does", () => {
 		assert.deepEqual([...trigger.pull_request.types].sort(), [
@@ -214,14 +240,12 @@ describe("check-commit-subjects workflow", () => {
 	});
 
 	it("ranges from the live base ref to the head SHA", () => {
-		assert.deepEqual(runTokens, [
-			"node",
-			"scripts/check-commit-subjects.mjs",
-			"--base",
-			"origin/$BASE_REF",
-			"--head",
-			"$HEAD_SHA",
-		]);
+		assert.equal(program, "node");
+		assert.equal(script, "scripts/check-commit-subjects.mjs");
+		assert.deepEqual(options, {
+			base: "origin/$BASE_REF",
+			head: "$HEAD_SHA",
+		});
 		// Exact, not "mentions head.sha": an expression such as
 		// `head.sha && base.sha` names it and still evaluates to the base SHA,
 		// which makes the range empty and every commit SKIP at exit 0.
@@ -236,17 +260,19 @@ describe("check-commit-subjects workflow", () => {
 		// quoting itself is asserted here: single quotes keep Bash from
 		// expanding these, and the checker would be handed the literal text.
 		// `${VAR}` is the same expansion as `$VAR`, so both are accepted.
-		assert.match(lint.run, /--base "origin\/\$\{?BASE_REF}?"/);
-		assert.match(lint.run, /--head "\$\{?HEAD_SHA}?"/);
+		assert.match(lint.run, /--base=?\s*"origin\/\$\{?BASE_REF}?"/);
+		assert.match(lint.run, /--head=?\s*"\$\{?HEAD_SHA}?"/);
 	});
 
 	it("lets the checker's failure fail the job", () => {
-		// continue-on-error keeps the exit code intact and still reports the
-		// step and the job as successful, and an `if:` can skip the step
-		// outright — neither shows up in the command itself.
-		assert.notEqual(lint["continue-on-error"], true);
-		assert.notEqual(workflow.jobs.check["continue-on-error"], true);
-		assert.equal(lint.if, undefined);
+		// Absent, not "not literally true": `continue-on-error: ${{ true }}`
+		// parses as a string here and evaluates to true at GitHub, and an `if:`
+		// on the job skips the only step that judges anything. Neither shows up
+		// in the command itself.
+		for (const owner of [lint, workflow.jobs.check]) {
+			assert.equal(owner["continue-on-error"], undefined);
+			assert.equal(owner.if, undefined);
+		}
 	});
 
 	it("lets the checker's exit code decide the job", () => {
