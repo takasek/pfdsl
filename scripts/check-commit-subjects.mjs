@@ -27,7 +27,7 @@
  */
 
 import { parseArgs } from "node:util";
-import { checkCommitSubjects } from "./lib/gate-check.mjs";
+import { checkCommitSubjects } from "./lib/commit-subjects.mjs";
 import { tryRun } from "./lib/run-exec.mjs";
 
 // strict parsing for the same reason gate-check.mjs uses it: a typo'd flag

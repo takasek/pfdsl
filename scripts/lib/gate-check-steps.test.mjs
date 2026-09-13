@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { checkCommitSubjects } from "./gate-check.mjs";
+import { checkCommitSubjects } from "./commit-subjects.mjs";
 import {
 	analyzeAdoptedPfdsl,
 	checkDocsStep,
@@ -1001,11 +1001,12 @@ describe("commitSubjectStep", () => {
 	// The verdict itself belongs to checkCommitSubjects, which has its own
 	// tests. What is only true here is the mapping from a base branch name to
 	// the refs that function takes, and that the row comes back untouched.
-	const nul = String.fromCharCode(0);
+	const log = (...subjects) =>
+		subjects.map((s, i) => `sha${i}\t${s}\n`).join("");
 
 	it("asks for origin/<base>..HEAD with the shared range options", () => {
 		const { exec, calls } = fakeExec({
-			"git log": { out: `${nul}feat(cli): a\n` },
+			"git log": { out: log("feat(cli): a") },
 		});
 		commitSubjectStep({ exec, base: "release" });
 		const logCall = calls.find((c) => c.startsWith("git log"));
@@ -1017,7 +1018,7 @@ describe("commitSubjectStep", () => {
 		// such as --first-parent were added, which drops the side parent's
 		// commits from the range.
 		assert.deepEqual(logCall?.split(" ").sort(), [
-			"--format=%x00%s",
+			"--format=%h%x09%s",
 			"--no-merges",
 			"git",
 			"log",
@@ -1052,23 +1053,23 @@ describe("commitSubjectStep", () => {
 		// the default binding, and the way it goes stale is a fix landing in
 		// checkCommitSubjects that a copy here never gets — so the case is one
 		// whose answer depends on the parser rather than on the argv: a lone
-		// empty subject is FAIL under the NUL split and SKIP under the old
-		// newline one.
+		// empty subject is FAIL when each record is anchored by its sha and
+		// SKIP under a plain newline split.
 		// A table rather than one case: a copy of today's logic agrees on any
 		// single input, so the wider the set the smaller the window in which a
 		// stale default still looks right.
 		const outputs = [
-			`${nul}\n`,
-			`${nul} feat(cli): indented\n`,
-			`${nul}feat(cli): a\n${nul}\n`,
-			`${nul}feat(cli): a\n${nul}fix(cli): b\n`,
-			`${nul}add a thing\n`,
+			log(""),
+			log(" feat(cli): indented"),
+			log("feat(cli): a", ""),
+			log("feat(cli): a", "fix(cli): b"),
+			log("add a thing"),
 			// Shaped like a Conventional Commit but not one of the allowed
 			// types: a stale clone carrying a broader matcher agrees with the
 			// shared checker on every subject above and disagrees here.
-			`${nul}wip: something\n`,
-			`${nul}feat!: drop a flag\n`,
-			`${nul}fix(cli): 直す\n`,
+			log("wip: something"),
+			log("feat!: drop a flag"),
+			log("fix(cli): 直す"),
 			"",
 		];
 		for (const out of outputs) {
@@ -1088,7 +1089,7 @@ describe("commitSubjectStep", () => {
 
 	it("returns the shared check's row unchanged", () => {
 		const { exec } = fakeExec({
-			"git log": { out: `${nul}feat(cli): a\n${nul}add a thing\n` },
+			"git log": { out: log("feat(cli): a", "add a thing") },
 		});
 		const result = commitSubjectStep({ exec, base: "main" });
 		assert.equal(result.name, "commit subject lint");

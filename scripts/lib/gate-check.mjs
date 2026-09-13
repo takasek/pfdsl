@@ -359,63 +359,6 @@ export function lintCommitSubjects(subjects) {
 }
 
 /**
- * git writes this before each subject when asked for `--format=%x00%s`, so an
- * empty subject survives the split as its own record.
- */
-const COMMIT_RECORD_SEPARATOR = String.fromCharCode(0);
-
-/**
- * The whole commit-subject verdict for one range: collect the range, drop the
- * merge commits, lint what is left, and report it as a gate row.
- *
- * Range acquisition lives here rather than in the caller because the gate and
- * CI must agree on what they judged. Sharing only `lintCommitSubjects` leaves
- * each caller to build its own range and its own exclusion, and the first
- * caller that forgets `--no-merges` starts failing on the synthetic merge
- * subject GitHub writes for a pull request while the other one passes — two
- * verdicts for the same commits, with nothing to say which is right (#1174).
- *
- * `baseRef` and `headRef` are refs, not a base branch name: the gate passes
- * `origin/<base>` and `HEAD`, and CI passes the branch it fetched and the head
- * SHA from the event payload.
- * @param {{exec: (file: string, args: string[]) => {ok: boolean, out: string}, baseRef: string, headRef: string}} params
- * @returns {{name: string, status: 'PASS'|'FAIL'|'SKIP', detail?: string}}
- */
-export function checkCommitSubjects({ exec, baseRef, headRef }) {
-	const name = "commit subject lint";
-	// %x00%s, not %s: a commit made with --allow-empty-message has an empty
-	// subject, which a newline split cannot tell apart from the separator
-	// between records. Dropped that way, the one commit that violates every
-	// rule is the one the lint never sees. The NUL prefixes each record, so
-	// splitting on it keeps the empty subject as a record of its own.
-	const subjectsOut = exec("git", [
-		"log",
-		"--no-merges",
-		`${baseRef}..${headRef}`,
-		"--format=%x00%s",
-	]);
-	if (!subjectsOut.ok)
-		return { name, status: "FAIL", detail: subjectsOut.out.trim() };
-
-	const subjects = subjectsOut.out
-		.split(COMMIT_RECORD_SEPARATOR)
-		.slice(1)
-		.map((record) => record.replace(/\n$/, ""));
-	if (subjects.length === 0)
-		return { name, status: "SKIP", detail: "no commits in range" };
-
-	const failed = lintCommitSubjects(subjects).filter((r) => !r.ok);
-	return {
-		name,
-		status: failed.length === 0 ? "PASS" : "FAIL",
-		detail:
-			failed.length === 0
-				? `${subjects.length} commit(s)`
-				: failed.map((r) => `${r.reason}: ${r.subject}`).join("; "),
-	};
-}
-
-/**
  * Parse a `<label> a, b, c` list line out of `pfdsl graph io` text output.
  * @param {string} auditText
  * @param {string} label line prefix, including its trailing colon

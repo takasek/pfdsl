@@ -13,9 +13,9 @@
  * and report failure as `{ ok: false, out }`.
  */
 
+import { checkCommitSubjects } from "./commit-subjects.mjs";
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
-	checkCommitSubjects,
 	classifyDesignRecordContent,
 	classifyDesignRecordReapprovals,
 	classifyDesignRecordRequiredFormat,
