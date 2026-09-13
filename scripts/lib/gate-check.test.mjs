@@ -326,9 +326,12 @@ describe("checkCommitSubjects", () => {
 			baseRef: "abc123",
 			headRef: "def456",
 		});
-		assert.ok(
-			calls.some((c) => c.includes("abc123..def456")),
-			`expected the caller's range in the log call, got: ${calls.join(" | ")}`,
+		// Exact: a substring check would still pass if a traversal-narrowing
+		// option such as --first-parent were added, and that silently drops the
+		// commits a merge brings in through its side parent.
+		assert.equal(
+			calls.find((c) => c.startsWith("git log")),
+			"git log --no-merges abc123..def456 --format=%x00%s",
 		);
 	});
 

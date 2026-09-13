@@ -18,24 +18,32 @@ import { makeGitRepository } from "./lib/git-test-repository.test-helper.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CLI = resolve(__dirname, "check-commit-subjects.mjs");
 
-/** Commit with an exact subject, identity supplied per command. */
+/**
+ * git with an identity supplied per command: a test machine need not have one
+ * configured, and the throwaway repository's own config stays untouched.
+ */
+function git(root, args) {
+	return execFileSync(
+		"git",
+		["-c", "user.name=test", "-c", "user.email=test@example.com", ...args],
+		{ cwd: root, encoding: "utf-8" },
+	);
+}
+
+function headSha(root) {
+	return git(root, ["rev-parse", "HEAD"]).trim();
+}
+
+/** Commit with an exact subject. */
 function commit(root, subject) {
-	const args = [
-		"-c",
-		"user.name=test",
-		"-c",
-		"user.email=test@example.com",
+	git(root, [
 		"commit",
 		"--allow-empty",
 		"--allow-empty-message",
 		"-m",
 		subject,
-	];
-	execFileSync("git", args, { cwd: root });
-	return execFileSync("git", ["rev-parse", "HEAD"], {
-		cwd: root,
-		encoding: "utf-8",
-	}).trim();
+	]);
+	return headSha(root);
 }
 
 /** @returns {{status: number, stdout: string, stderr: string}} */
@@ -68,10 +76,7 @@ describe("check-commit-subjects CLI", () => {
 	});
 
 	it("exits 1 on a non-Conventional subject", () => {
-		const from = execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: root,
-			encoding: "utf-8",
-		}).trim();
+		const from = headSha(root);
 		const head = commit(root, "add a thing");
 		const r = runCli(root, ["--base", from, "--head", head]);
 		assert.equal(r.status, 1, r.stdout + r.stderr);
@@ -80,10 +85,7 @@ describe("check-commit-subjects CLI", () => {
 	});
 
 	it("exits 1 on a commit with an empty subject", () => {
-		const from = execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: root,
-			encoding: "utf-8",
-		}).trim();
+		const from = headSha(root);
 		const head = commit(root, "");
 		const r = runCli(root, ["--base", from, "--head", head]);
 		assert.equal(r.status, 1, r.stdout + r.stderr);
@@ -95,18 +97,43 @@ describe("check-commit-subjects CLI", () => {
 	});
 
 	it("exits 0 and reports SKIP on an empty range", () => {
-		const head = execFileSync("git", ["rev-parse", "HEAD"], {
-			cwd: root,
-			encoding: "utf-8",
-		}).trim();
+		const head = headSha(root);
 		const r = runCli(root, ["--base", head, "--head", head]);
 		assert.equal(r.status, 0, r.stdout + r.stderr);
 		assert.match(r.stdout, /SKIP/);
 	});
 
-	it("exits 2 on an unknown flag rather than falling back to a default range", () => {
-		const r = runCli(root, ["--nope"]);
+	it("FAILs on a subject reachable only through a merge's side parent", () => {
+		// --no-merges drops the merge commit itself, which git wrote; it must
+		// not drop what the merge brought in. A traversal-narrowing option such
+		// as --first-parent would, and every argv assertion elsewhere is on the
+		// options rather than on the commits that survive them.
+		const from = headSha(root);
+		git(root, ["checkout", "-q", "-b", "side"]);
+		commit(root, "add a side thing");
+		git(root, ["checkout", "-q", "-"]);
+		git(root, ["merge", "--no-ff", "-m", "chore: merge side", "side"]);
+		const r = runCli(root, ["--base", from, "--head", headSha(root)]);
+		assert.equal(r.status, 1, r.stdout + r.stderr);
+		assert.match(r.stdout, /add a side thing/);
+	});
+
+	it("exits 2 on an unknown flag even when the range is complete", () => {
+		// A bare --nope would exit 2 through the missing-base branch too, so
+		// dropping `strict: true` would leave that version of this test green
+		// while a typo'd --head was silently ignored and the default HEAD
+		// linted instead.
+		const head = headSha(root);
+		const r = runCli(root, ["--base", head, "--head", head, "--nope"]);
 		assert.equal(r.status, 2, r.stdout + r.stderr);
+		assert.match(r.stderr, /Unknown option/);
+	});
+
+	it("exits 2 on a misspelled --head rather than linting the default range", () => {
+		const head = headSha(root);
+		const r = runCli(root, ["--base", head, "--hed", head]);
+		assert.equal(r.status, 2, r.stdout + r.stderr);
+		assert.match(r.stderr, /Unknown option/);
 	});
 
 	it("exits 2 when --base is missing", () => {

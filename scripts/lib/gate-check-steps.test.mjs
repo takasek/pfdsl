@@ -1008,20 +1008,16 @@ describe("commitSubjectStep", () => {
 		});
 		commitSubjectStep({ exec, base: "release" });
 		const logCall = calls.find((c) => c.startsWith("git log"));
-		// The options are asserted here, not only in the shared function's own
-		// tests: re-inlining the old body in this step would leave those tests
-		// green while the gate and CI went back to judging different things.
-		assert.ok(
-			logCall?.includes("origin/release..HEAD"),
-			`expected the mapped range, got: ${logCall}`,
-		);
-		assert.ok(
-			logCall?.includes("--no-merges"),
-			`expected --no-merges, got: ${logCall}`,
-		);
-		assert.ok(
-			logCall?.includes("--format=%x00%s"),
-			`expected the NUL record separator, got: ${logCall}`,
+		// Exact, not a set of substring checks. The options are asserted here
+		// rather than only in the shared function's own tests because
+		// re-inlining the old body in this step would leave those green while
+		// the gate and CI went back to judging different things — and a
+		// substring assertion would still pass if a traversal-narrowing option
+		// such as --first-parent were added, which drops the side parent's
+		// commits from the range.
+		assert.equal(
+			logCall,
+			`git log --no-merges origin/release..HEAD --format=%x00%s`,
 		);
 	});
 
