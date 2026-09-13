@@ -97,6 +97,18 @@ describe("check-commit-subjects CLI", () => {
 		assert.doesNotMatch(r.stderr, /English/);
 	});
 
+	it("rejects a subject whose type is preceded by whitespace", () => {
+		// git keeps the leading space, and Conventional Commits does not allow
+		// it. Trimming each record instead of stripping only its terminator
+		// would turn this into a pass, and every other fixture here is clean
+		// enough not to notice.
+		const from = headSha(root);
+		const head = commit(root, " feat(cli): indented");
+		const r = runCli(root, ["--base", from, "--head", head]);
+		assert.equal(r.status, 1, r.stdout + r.stderr);
+		assert.match(r.stdout, /Conventional/);
+	});
+
 	it("exits 1 on a commit with an empty subject", () => {
 		const from = headSha(root);
 		const head = commit(root, "");
@@ -202,6 +214,9 @@ describe("check-commit-subjects workflow", () => {
 	// change without changing what runs.
 	const runTokens = lint.run
 		.trim()
+		// A literal block scalar may carry shell line continuations; they end a
+		// source line, not an argument.
+		.replace(/\\\n/g, " ")
 		.split(/\s+/)
 		.map((t) => t.replace(/^["']|["']$/g, ""))
 		// `${VAR}` and `$VAR` are the same expansion; only the quoting around
@@ -229,6 +244,14 @@ describe("check-commit-subjects workflow", () => {
 			"reopened",
 			"synchronize",
 		]);
+	});
+
+	it("applies to every pull request, with no path or branch filter", () => {
+		// The check is about the commit range, so there is no path whose absence
+		// makes it inapplicable. A `paths:` filter would silently exclude the
+		// PRs that change no workflow — exactly the ones whose commits need
+		// judging — while every other assertion here stayed green.
+		assert.deepEqual(Object.keys(trigger.pull_request), ["types"]);
 	});
 
 	it("checks out full history at the PR head so a range can be formed", () => {
