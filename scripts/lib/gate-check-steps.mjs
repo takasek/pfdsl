@@ -15,6 +15,7 @@
 
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
+	checkCommitSubjects,
 	classifyDesignRecordContent,
 	classifyDesignRecordReapprovals,
 	classifyDesignRecordRequiredFormat,
@@ -22,7 +23,6 @@ import {
 	classifyFormat3DesignRecord,
 	classifyOutputArtifactStatus,
 	hasStatusChange,
-	lintCommitSubjects,
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
@@ -546,29 +546,11 @@ export function formatCycleWindowReport({ fetchResult, window }) {
  * FAIL they stop reading (#690).
  */
 export function commitSubjectStep({ exec, base }) {
-	const name = "commit subject lint";
-	const subjectsOut = exec("git", [
-		"log",
-		"--no-merges",
-		`origin/${base}..HEAD`,
-		"--format=%s",
-	]);
-	if (!subjectsOut.ok)
-		return { name, status: "FAIL", detail: subjectsOut.out.trim() };
-
-	const subjects = subjectsOut.out.trim().split("\n").filter(Boolean);
-	if (subjects.length === 0)
-		return { name, status: "SKIP", detail: "no commits in range" };
-
-	const failed = lintCommitSubjects(subjects).filter((r) => !r.ok);
-	return {
-		name,
-		status: failed.length === 0 ? "PASS" : "FAIL",
-		detail:
-			failed.length === 0
-				? `${subjects.length} commit(s)`
-				: failed.map((r) => `${r.reason}: ${r.subject}`).join("; "),
-	};
+	return checkCommitSubjects({
+		exec,
+		baseRef: `origin/${base}`,
+		headRef: "HEAD",
+	});
 }
 
 /**
