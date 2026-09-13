@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { checkCommitSubjects } from "./gate-check.mjs";
 import {
 	analyzeAdoptedPfdsl,
 	checkDocsStep,
@@ -1041,6 +1042,27 @@ describe("commitSubjectStep", () => {
 		// Identity, not deep equality: an inlined copy would return a row that
 		// merely looks the same.
 		assert.equal(result, row);
+	});
+
+	it("gets the same verdict as the shared checker on the default path", () => {
+		// The spy above only proves the injected path. What production runs is
+		// the default binding, and the way it goes stale is a fix landing in
+		// checkCommitSubjects that a copy here never gets — so the case is one
+		// whose answer depends on the parser rather than on the argv: a lone
+		// empty subject is FAIL under the NUL split and SKIP under the old
+		// newline one.
+		const log = { "git log": { out: `${nul}\n` } };
+		const viaStep = commitSubjectStep({
+			exec: fakeExec(log).exec,
+			base: "main",
+		});
+		const direct = checkCommitSubjects({
+			exec: fakeExec(log).exec,
+			baseRef: "origin/main",
+			headRef: "HEAD",
+		});
+		assert.deepEqual(viaStep, direct);
+		assert.equal(viaStep.status, "FAIL");
 	});
 
 	it("returns the shared check's row unchanged", () => {
