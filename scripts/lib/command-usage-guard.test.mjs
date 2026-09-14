@@ -62,6 +62,40 @@ describe("usesPublishedCli", () => {
 	it("ignores a non-string command", () => {
 		assert.equal(usesPublishedCli(undefined), false);
 	});
+
+	it("flags a bare pfdsl head, which resolves to the global install", () => {
+		assert.equal(
+			usesPublishedCli("pfdsl graph orphans .pfdsl/workflow.pfdsl"),
+			true,
+		);
+		assert.equal(usesPublishedCli("pfdsl check x.pfdsl"), true);
+	});
+
+	it("flags a bare head in a compound command and behind env noise", () => {
+		assert.equal(
+			usesPublishedCli("pnpm -r build && pfdsl check x.pfdsl"),
+			true,
+		);
+		assert.equal(usesPublishedCli("FOO=1 pfdsl check x.pfdsl"), true);
+	});
+
+	it("ignores pfdsl when it is an argument rather than the command", () => {
+		assert.equal(usesPublishedCli("which pfdsl"), false);
+		assert.equal(usesPublishedCli("echo pfdsl check"), false);
+		assert.equal(usesPublishedCli("rg pfdsl docs"), false);
+	});
+
+	it("ignores a bare head inside a quoted string", () => {
+		assert.equal(usesPublishedCli('rg "pfdsl graph" docs'), false);
+	});
+
+	it("ignores a head that merely starts with pfdsl", () => {
+		assert.equal(usesPublishedCli("pfdsl-lint x.pfdsl"), false);
+		assert.equal(
+			usesPublishedCli("node scripts/pfdsl/sweep-completed-chains.mjs"),
+			false,
+		);
+	});
 });
 
 describe("usesBodyDroppingView", () => {

@@ -8,13 +8,19 @@
 // buildPermissionOutput in hook-io.mjs). So the choice is between "ask" and
 // "deny".
 //
-// C — `npx @pfdsl/cli` inside this repo: "ask". The published CLI is a
-// different program from this working tree's build, so a status value or flag
+// C — a published `@pfdsl/cli` inside this repo: "ask". Two forms reach one:
+// a registry runner naming the package (`npx`, `pnpm dlx`), and a bare `pfdsl`
+// head, which resolves through PATH to the global install. The published CLI is
+// a different program from this working tree's build, so a status value or flag
 // added on the current branch comes back as a V008 error and reads as "the fix
-// did not work". Not a deny: exercising the published version on purpose is a
-// real case here (release smoke test, and the adoption probe of ADR-0029 acts
-// as an adopting repo would), and ADR-0031 keeps a pinned `npx` invocation as
-// the documented fallback for environments without a global install.
+// did not work". The quieter half is a file the published version does parse:
+// it then returns findings that are simply wrong, with nothing in the output to
+// mark them as such (#1198 — `graph orphans` reported six phantom groups).
+// Not a deny: exercising the published version on purpose is a real case here
+// (release smoke test, and the adoption probe of ADR-0029 acts as an adopting
+// repo would), and ADR-0031 keeps a pinned `npx` invocation as the documented
+// fallback for environments without a global install. The global install has
+// the same purposeful use, so it lands on the same decision.
 //
 // D — `gh issue view --comments` (same for `gh pr view`): "deny". The flag
 // prints the comments only and omits the body, so an issue whose content is all
@@ -52,9 +58,11 @@ function commandSegments(command) {
 }
 
 /**
- * Whether `command` runs the npm-published `@pfdsl/cli` rather than the local
- * build. Covers `npx` and `pnpm dlx`; `npm install -g` is not an invocation and
- * is left alone.
+ * Whether `command` runs a published `@pfdsl/cli` rather than the local build.
+ * Two forms reach one: a registry runner naming the package (`npx`, `pnpm
+ * dlx`), and a bare `pfdsl` head, which resolves through PATH to whatever is
+ * installed globally. `npm install -g` is not an invocation and is left alone,
+ * and `pfdsl` as an argument (`which pfdsl`) does not run anything.
  * @param {string} command
  * @returns {boolean}
  */
@@ -64,6 +72,7 @@ export function usesPublishedCli(command) {
 	for (const tokens of commandSegments(command)) {
 		const head = tokens[0];
 		if (!head || head.quoted) continue;
+		if (head.value === "pfdsl") return true;
 		const values = tokens.map((token) => token.value);
 		const runsFromRegistry =
 			head.value === "npx" || (head.value === "pnpm" && values.includes("dlx"));
@@ -120,8 +129,9 @@ export function evaluateCommandUsageGuard(payload) {
 		return {
 			decision: "ask",
 			reason:
-				"'npx @pfdsl/cli' runs the npm-published CLI, not this working tree's build, so anything added on this branch " +
-				"(a new status value, a new flag) comes back as an error rather than as the behaviour under test. " +
+				"A bare 'pfdsl' head or 'npx @pfdsl/cli' runs a published CLI, not this working tree's build, so anything added " +
+				"on this branch (a new status value, a new flag) comes back as an error rather than as the behaviour under test — " +
+				"and a file the published version does parse can return findings that are simply wrong. " +
 				"Use 'node packages/cli/dist/cli.js' after 'pnpm -r build'. Approve this only to exercise the published version on purpose.",
 		};
 	}
