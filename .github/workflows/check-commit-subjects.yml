@@ -1,0 +1,60 @@
+name: check commit subjects
+
+# The gate's commit-subject verdict only covers the range that existed when a
+# cycle's runner ran it, and nothing re-derives it when commits land afterwards
+# (#1174). `synchronize` fires on every push to the branch, so this job judges
+# the current range each time.
+#
+# pull_request only, and without a paths filter: the check is about the range
+# itself, so there is no path whose absence makes it inapplicable, and a push
+# to the default branch has no base to form a range against.
+#
+# `edited` is in the type list for the same reason check-closes-reference.yml
+# carries it: the default types all track the branch, and retargeting a PR to
+# a different base changes the range without touching a commit. Without it the
+# verdict from the old base stays posted against a range it never judged.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+# The job reads a commit range and runs a script from the pull request's own
+# head, so it needs nothing beyond the checkout itself: no token is used after
+# the clone, and leaving one on disk would put it within reach of whatever the
+# PR changed.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # Named, because branch protection identifies a required check by the job's
+    # name and three other workflows here already run a job called `check`.
+    # Without this the context this workflow reports cannot be told from theirs.
+    name: check commit subjects
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 because the default depth-1 checkout has no base ref to
+      # form a range against, and `ref` because a pull_request checkout
+      # otherwise lands on the synthetic merge commit GitHub creates, whose
+      # subject is not the author's.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # origin/<base_ref> rather than the payload's base.sha: base.sha is the
+      # base tip as of the event, so it does not follow the base branch
+      # forward, and the range would stop matching the gate's
+      # `origin/<base>..HEAD` once the base advances.
+      - name: Lint the branch's commit subjects
+        run: >-
+          node scripts/check-commit-subjects.mjs
+          --base "origin/$BASE_REF"
+          --head "$HEAD_SHA"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}

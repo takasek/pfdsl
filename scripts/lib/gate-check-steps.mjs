@@ -13,6 +13,7 @@
  * and report failure as `{ ok: false, out }`.
  */
 
+import { checkCommitSubjects } from "./commit-subjects.mjs";
 import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
 	classifyDesignRecordContent,
@@ -22,7 +23,6 @@ import {
 	classifyFormat3DesignRecord,
 	classifyOutputArtifactStatus,
 	hasStatusChange,
-	lintCommitSubjects,
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
 	NO_ISSUE_DETAIL,
@@ -544,31 +544,20 @@ export function formatCycleWindowReport({ fetchResult, window }) {
  * Conventional Commits. Without the exclusion the gate fails on every branch
  * that followed the procedure, and a FAIL the runner is told to ignore is a
  * FAIL they stop reading (#690).
+ *
+ * The verdict itself is checkCommitSubjects', shared with the CI entry point so
+ * the two cannot judge the same commits differently (#1174). `check` is
+ * injected the way `exec` is, and for the same reason a test needs it: without
+ * a seam, an inlined copy of today's logic satisfies every assertion here, and
+ * a later fix to the shared checker would reach CI while the gate kept the
+ * stale copy.
  */
-export function commitSubjectStep({ exec, base }) {
-	const name = "commit subject lint";
-	const subjectsOut = exec("git", [
-		"log",
-		"--no-merges",
-		`origin/${base}..HEAD`,
-		"--format=%s",
-	]);
-	if (!subjectsOut.ok)
-		return { name, status: "FAIL", detail: subjectsOut.out.trim() };
-
-	const subjects = subjectsOut.out.trim().split("\n").filter(Boolean);
-	if (subjects.length === 0)
-		return { name, status: "SKIP", detail: "no commits in range" };
-
-	const failed = lintCommitSubjects(subjects).filter((r) => !r.ok);
-	return {
-		name,
-		status: failed.length === 0 ? "PASS" : "FAIL",
-		detail:
-			failed.length === 0
-				? `${subjects.length} commit(s)`
-				: failed.map((r) => `${r.reason}: ${r.subject}`).join("; "),
-	};
+export function commitSubjectStep({ exec, base, check = checkCommitSubjects }) {
+	return check({
+		exec,
+		baseRef: `origin/${base}`,
+		headRef: "HEAD",
+	});
 }
 
 /**

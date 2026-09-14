@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { checkCommitSubjects } from "./commit-subjects.mjs";
 import {
 	analyzeAdoptedPfdsl,
 	checkDocsStep,
@@ -997,58 +998,103 @@ describe("collectSizeDeltas", () => {
 });
 
 describe("commitSubjectStep", () => {
-	it("excludes merge commits from the collected range (#690)", () => {
+	// The verdict itself belongs to checkCommitSubjects, which has its own
+	// tests. What is only true here is the mapping from a base branch name to
+	// the refs that function takes, and that the row comes back untouched.
+	const log = (...subjects) =>
+		subjects.map((s, i) => `sha${i}\t${s}\n`).join("");
+
+	it("asks for origin/<base>..HEAD with the shared range options", () => {
 		const { exec, calls } = fakeExec({
-			"git log": { out: "feat(cli): add a thing\n" },
+			"git log": { out: log("feat(cli): a") },
 		});
-		const result = commitSubjectStep({ exec, base: "main" });
-		const logCall = calls.find((c) => c.startsWith("git log"));
-		assert.ok(
-			logCall?.includes("--no-merges"),
-			`expected --no-merges in the log call, got: ${logCall}`,
-		);
-		assert.equal(result.status, "PASS");
-	});
-
-	it("reads the range from origin/<base> to HEAD", () => {
-		const { exec, calls } = fakeExec({ "git log": { out: "feat(cli): a\n" } });
 		commitSubjectStep({ exec, base: "release" });
-		assert.ok(calls.some((c) => c.includes("origin/release..HEAD")));
+		const logCall = calls.find((c) => c.startsWith("git log"));
+		// Exact, not a set of substring checks. The options are asserted here
+		// rather than only in the shared function's own tests because
+		// re-inlining the old body in this step would leave those green while
+		// the gate and CI went back to judging different things — and a
+		// substring assertion would still pass if a traversal-narrowing option
+		// such as --first-parent were added, which drops the side parent's
+		// commits from the range.
+		assert.deepEqual(logCall?.split(" ").sort(), [
+			"--format=%h%x09%s",
+			"--no-merges",
+			"git",
+			"log",
+			"origin/release..HEAD",
+		]);
 	});
 
-	it("SKIPs when the range holds no non-merge commits", () => {
-		const { exec } = fakeExec({ "git log": { out: "\n" } });
-		const result = commitSubjectStep({ exec, base: "main" });
-		assert.equal(result.status, "SKIP");
-	});
-
-	it("FAILs when git log fails", () => {
-		const { exec } = fakeExec({
-			"git log": { ok: false, out: "fatal: bad revision" },
-		});
-		const result = commitSubjectStep({ exec, base: "main" });
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /bad revision/);
-	});
-
-	it("FAILs on a non-Conventional subject and names it", () => {
-		const { exec } = fakeExec({
-			"git log": { out: "feat(cli): ok\nadd a thing\n" },
-		});
-		const result = commitSubjectStep({ exec, base: "main" });
-		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /add a thing/);
-	});
-
-	it("FAILs on a subject carrying unquoted Japanese (#595)", () => {
-		const { exec } = fakeExec({
-			"git log": {
-				out: "refactor(scripts): move it into a dist非依存 module\n",
+	it("delegates to the shared checker rather than holding its own copy", () => {
+		/** @type {unknown[]} */
+		const seen = [];
+		const row = { name: "commit subject lint", status: "PASS" };
+		const result = commitSubjectStep({
+			exec: () => ({ ok: true, out: "" }),
+			base: "main",
+			check: (args) => {
+				seen.push(args);
+				return row;
 			},
 		});
+		assert.equal(seen.length, 1);
+		assert.deepEqual(
+			{ baseRef: seen[0].baseRef, headRef: seen[0].headRef },
+			{ baseRef: "origin/main", headRef: "HEAD" },
+		);
+		// Identity, not deep equality: an inlined copy would return a row that
+		// merely looks the same.
+		assert.equal(result, row);
+	});
+
+	it("gets the same verdict as the shared checker on the default path", () => {
+		// The spy above only proves the injected path. What production runs is
+		// the default binding, and the way it goes stale is a fix landing in
+		// checkCommitSubjects that a copy here never gets — so the case is one
+		// whose answer depends on the parser rather than on the argv: a lone
+		// empty subject is FAIL when each record is anchored by its sha and
+		// SKIP under a plain newline split.
+		// A table rather than one case: a copy of today's logic agrees on any
+		// single input, so the wider the set the smaller the window in which a
+		// stale default still looks right.
+		const outputs = [
+			log(""),
+			log(" feat(cli): indented"),
+			log("feat(cli): a", ""),
+			log("feat(cli): a", "fix(cli): b"),
+			log("add a thing"),
+			// Shaped like a Conventional Commit but not one of the allowed
+			// types: a stale clone carrying a broader matcher agrees with the
+			// shared checker on every subject above and disagrees here.
+			log("wip: something"),
+			log("feat!: drop a flag"),
+			log("fix(cli): 直す"),
+			"",
+		];
+		for (const out of outputs) {
+			const log = { "git log": { out } };
+			const viaStep = commitSubjectStep({
+				exec: fakeExec(log).exec,
+				base: "main",
+			});
+			const direct = checkCommitSubjects({
+				exec: fakeExec(log).exec,
+				baseRef: "origin/main",
+				headRef: "HEAD",
+			});
+			assert.deepEqual(viaStep, direct, `disagreed on ${JSON.stringify(out)}`);
+		}
+	});
+
+	it("returns the shared check's row unchanged", () => {
+		const { exec } = fakeExec({
+			"git log": { out: log("feat(cli): a", "add a thing") },
+		});
 		const result = commitSubjectStep({ exec, base: "main" });
+		assert.equal(result.name, "commit subject lint");
 		assert.equal(result.status, "FAIL");
-		assert.match(result.detail, /non-English/);
+		assert.match(result.detail, /add a thing/);
 	});
 });
 
