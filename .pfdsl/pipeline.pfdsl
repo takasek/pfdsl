@@ -190,8 +190,8 @@ artifact:
     group: gen_sources
   claude_harness_sources:
     label: 現行のClaude Code手書き入力
-    description: "短期のmaintained sourceはCLAUDE.md、.claude/settings.json、harness_inventoryが選ぶ.claude/skills・commands・agentsの配布対象、およびhooksである。.claude/skills/pfdslはgenerated/skills/pfdslへの生成symlinkであり、正本入力でも編集先でもない。将来の中立正本移行では、この入力側だけを差し替え、capability ID・四target mapping・各adapterの出力契約を維持する"
-    location: [ ../CLAUDE.md, ../.claude/settings.json, ../.claude/skills/, ../.claude/commands/, ../.claude/agents/, ../hooks/ ]
+    description: "短期のmaintained sourceはscripts/root-instructions-template/INSTRUCTIONS.md、.claude/settings.json、harness_inventoryが選ぶ.claude/skills・commands・agentsの配布対象、およびhooksである。ルート指示文書はこのテンプレートが正本であり、CLAUDE.mdとAGENTS.mdはどちらもそこから描画される生成物で、手書き入力ではない。.claude/skills/pfdslはgenerated/skills/pfdslへの生成symlinkであり、正本入力でも編集先でもない。将来の中立正本移行では、この入力側だけを差し替え、capability ID・四target mapping・各adapterの出力契約を維持する"
+    location: [ ../scripts/root-instructions-template/INSTRUCTIONS.md, ../.claude/settings.json, ../.claude/skills/, ../.claude/commands/, ../.claude/agents/, ../hooks/ ]
     group: skill_sources
   harness_inventory:
     label: ハーネス中立の配布inventory
@@ -247,10 +247,10 @@ artifact:
     tags: [ f2, gen ]
   claude_adapter_output:
     label: Claude Code adapter 出力
-    description: "harness_capability_modelのclaude-repository・claude-plugin mappingに従い、Claude Codeが読むskill tree・Markdown command・Markdown agent・hooks・Claude plugin manifestとmarketplace記述を生成する。出力closureとClaude target-local consumer probeを通し、既存のClaude Code marketplace導入経路はidentity互換のまま維持する"
-    criteria: scripts/lib/gen-plugin.test.mjs のClaude target-local consumer probeとoutput closureが成功し、scripts/lib/drift-gates.mjs の gen-plugin-bulk がClaude plugin出力の未再生成をpre-commitとCIで検出する
+    description: "harness_capability_modelのclaude-repository・claude-plugin mappingに従い、Claude Codeが読むskill tree・Markdown command・Markdown agent・hooks・Claude plugin manifestとmarketplace記述を生成する。ルート指示文書CLAUDE.mdもclaude-repository mappingの出力であり、AGENTS.mdと同じテンプレートから描画される。出力closureとClaude target-local consumer probeを通し、既存のClaude Code marketplace導入経路はidentity互換のまま維持する"
+    criteria: scripts/lib/gen-plugin.test.mjs のClaude target-local consumer probeとoutput closureが成功し、scripts/lib/drift-gates.mjs の gen-plugin-bulk がClaude plugin出力とCLAUDE.mdの未再生成をpre-commitとCIで検出する
     externalStakeholders: [ Claude Code利用者 ]
-    location: [ ../plugin/pfdsl/skills/pfdsl/, ../plugin/pfdsl/skills/pfd-ecosystem/, ../plugin/pfdsl/skills/pfd-grill/, ../plugin/pfdsl/skills/pfd-ops/, ../plugin/pfdsl/skills/pfd-retro/, ../plugin/pfdsl/commands/, ../plugin/pfdsl/agents/, ../plugin/pfdsl/hooks/, ../plugin/pfdsl/.claude-plugin/plugin.json, ../.claude-plugin/marketplace.json ]
+    location: [ ../CLAUDE.md, ../plugin/pfdsl/skills/pfdsl/, ../plugin/pfdsl/skills/pfd-ecosystem/, ../plugin/pfdsl/skills/pfd-grill/, ../plugin/pfdsl/skills/pfd-ops/, ../plugin/pfdsl/skills/pfd-retro/, ../plugin/pfdsl/commands/, ../plugin/pfdsl/agents/, ../plugin/pfdsl/hooks/, ../plugin/pfdsl/.claude-plugin/plugin.json, ../.claude-plugin/marketplace.json ]
     group: repo_generated
     tags: [ gen ]
   codex_adapter_output:
