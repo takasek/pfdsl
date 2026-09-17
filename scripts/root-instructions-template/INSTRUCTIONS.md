@@ -1,5 +1,3 @@
-<!-- DO NOT EDIT. Authoritative source: scripts/root-instructions-template/INSTRUCTIONS.md. -->
-
 # pfdsl
 
 成果物管理・進捗更新・ワークフロー運用は pfd-ops スキルに従う。作業サイクルの開始時に `.pfdsl/workflow.md` の実行・検証手続きを確認する。
@@ -10,6 +8,13 @@
 小さな修正や方式が確定した作業に設計承認を追加せず、結果を大きく変える未決事項がある場合と、ユーザーが明示した待機点で確認する。
 この方針はスキルの定型手順にも適用する。公開・破壊的操作・権限の拡張は、利用中のハーネスとユーザーの承認範囲に従う。
 
+{{#claude}}
+## Claude Code の作業分担
+
+Claude Code では Opus を中心に作業を進め、調査・実装を必要に応じて委譲する。
+Claude Code のコード変更では自己レビューに加えて別主体のレビューを行い、観点と実施条件は `.pfdsl/workflow.md` の「Claude Code（Opus）でのレビュー」に従う。
+
+{{/claude}}
 ## セットアップ
 
 Claude CodeとCodexのSessionStart hookが、このworktreeのセットアップを検査し、未完了または古い場合は `make setup` を実行する。
@@ -48,6 +53,7 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 コミットメッセージは**英語**。
 
 直近の履歴 (`git log --oneline`) を参考にスタイルを合わせる。
+{{#codex}}
 
 ## Codex の作業分担
 
@@ -57,10 +63,5 @@ Codex では通常の調査・実装を単独の agent で進める。
 レビュー以外の委譲は独立した並行作業に具体的な利点がある場合に行い、固定の orchestrator/worker 構成や多段委譲を要求しない。
 レビューの観点と実施条件は `.pfdsl/workflow.md` の「Codex でのレビュー」に従う。
 
-## Codex 固有の責務境界
-
-この節は本文中の git に関する指示より優先する。
-親 agent が `git fetch`、stage、commit、`git push`、PR の作成・更新、issue の作成・クローズ・コメントを担当する。
-subagent は worktree 内のファイル編集とテスト・検査だけを担当する。
-subagent は git metadata 操作や外部公開操作を実行しない。
-subagent の権限エラーはユーザーへ直接継続を求めず、親 agent へ引き上げる。
+{{{codexWorktreeMetadataInstructions}}}
+{{/codex}}

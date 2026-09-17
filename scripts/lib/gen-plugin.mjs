@@ -23,7 +23,6 @@ import {
 	buildCodexPluginManifest,
 	buildCodexProjectConfig,
 	claudeInstructionsToAgents,
-	claudeRootInstructionsToAgents,
 	commandCapabilityToCodexSkill,
 	hookCapabilityToCodexHooks,
 } from "./gen-codex-assets.mjs";
@@ -43,6 +42,7 @@ import {
 	GENERATED_SKILLS,
 } from "./harness-inventory.mjs";
 import { decodeHarnessSources } from "./harness-source-decoder.mjs";
+import { renderRootInstructions } from "./root-instructions.mjs";
 
 const CODEX_ASSEMBLY_LOCK_DIRECTORY = ".codex-assets-assembly.lock";
 const CODEX_COMMAND_SKILLS_MANIFEST = "codex-command-skills.json";
@@ -110,6 +110,49 @@ function targetOutputEntries(capabilities, target) {
 	);
 }
 
+// Which declared output, if any, owns a surface an adapter actually wrote.
+// Shared by the repository-target disambiguation and the unclassified-write
+// check below so both ask the inventory the same question.
+function findDeclaredOwner(declared, surface) {
+	return declared.find(({ surface: declaredSurface }) => {
+		if (declaredSurface.startsWith("manifest:")) {
+			const manifestPath = declaredSurface.split(":")[1];
+			return manifestPath === surface || manifestPath.startsWith(`${surface}/`);
+		}
+		return (
+			surface === declaredSurface ||
+			surface.startsWith(`${declaredSurface}/`) ||
+			declaredSurface.startsWith(`${surface}/`)
+		);
+	});
+}
+
+/**
+ * Which repository target owns a surface written directly under the repo root.
+ * Both targets write there, so the path prefix cannot tell them apart.
+ *
+ * Deliberately matched against path literals rather than looked up in the
+ * capabilities' declared outputs: this classification is an input to the
+ * output-closure check that compares what was written against what was
+ * declared. Deriving it from the declarations would make that comparison
+ * circular — a declaration renamed away from what the adapter actually writes
+ * would stop being classified at all, and so stop being reported as a
+ * mismatch, instead of failing the check (gen-plugin.test.mjs pins this with a
+ * renamed claude-repository surface).
+ * @param {string} surface a repo-root-relative path an adapter wrote
+ * @returns {"claude-repository" | "codex-repository" | null}
+ */
+function classifyRepositoryRootSurface(surface) {
+	if (surface === "CLAUDE.md") return "claude-repository";
+	if (
+		surface === "AGENTS.md" ||
+		surface.startsWith(".codex/") ||
+		surface.startsWith(".agents/")
+	)
+		return "codex-repository";
+	return null;
+}
+
 function addConcreteAdapterWrites({
 	actualWrites,
 	capabilities,
@@ -121,7 +164,10 @@ function addConcreteAdapterWrites({
 	const roots = [
 		["codex-plugin", codexPluginRoot],
 		["claude-plugin", pluginRoot],
-		["codex-repository", root],
+		// Both repository targets write directly under the repo root, so the
+		// path prefix alone cannot tell them apart — the surface content does,
+		// right below.
+		["repository-root", root],
 	];
 	for (const path of actualWrites) {
 		if (path.includes(".codex-tmp-") || path.includes(".codex-prev-")) continue;
@@ -137,14 +183,9 @@ function addConcreteAdapterWrites({
 		if (!target) continue;
 		const surface = path.slice(targetRoot.length).replace(/^\//, "");
 		if (!surface) continue;
-		if (target === "codex-repository") {
-			if (
-				!surface.startsWith(".codex/") &&
-				!surface.startsWith(".agents/") &&
-				surface !== "AGENTS.md"
-			) {
-				continue;
-			}
+		if (target === "repository-root") {
+			target = classifyRepositoryRootSurface(surface);
+			if (!target) continue;
 		}
 		if (
 			[
@@ -156,20 +197,10 @@ function addConcreteAdapterWrites({
 		) {
 			continue;
 		}
-		const declared = targetOutputEntries(capabilities, target);
-		const owner = declared.find(({ surface: declaredSurface }) => {
-			if (declaredSurface.startsWith("manifest:")) {
-				const manifestPath = declaredSurface.split(":")[1];
-				return (
-					manifestPath === surface || manifestPath.startsWith(`${surface}/`)
-				);
-			}
-			return (
-				surface === declaredSurface ||
-				surface.startsWith(`${declaredSurface}/`) ||
-				declaredSurface.startsWith(`${surface}/`)
-			);
-		});
+		const owner = findDeclaredOwner(
+			targetOutputEntries(capabilities, target),
+			surface,
+		);
 		if (!owner) {
 			observedByTarget[target].push({
 				surface,
@@ -631,6 +662,14 @@ function snapshotPluginGeneration(
 				),
 			],
 			[
+				resolve(root, "CLAUDE.md"),
+				snapshotAssemblyDestination(
+					resolve(root, "CLAUDE.md"),
+					resolve(transactionRoot, "claude-md"),
+					deps,
+				),
+			],
+			[
 				resolve(root, ".claude/skills/pfd-ops/install"),
 				snapshotAssemblyDestination(
 					resolve(root, ".claude/skills/pfd-ops/install"),
@@ -893,7 +932,11 @@ function assembleCodexAssetsUnlocked({
 		staged.push(
 			stageFile(
 				resolve(root, "AGENTS.md"),
-				claudeRootInstructionsToAgents(repositoryInstructions.semantic.body),
+				renderRootInstructions({
+					template: repositoryInstructions.semantic.body,
+					target: "codex",
+					authoritativeSource: repositoryInstructions.source.path,
+				}),
 				deps,
 				runId,
 			),
@@ -1058,16 +1101,25 @@ export function assembleClaudeAssets({ root, pluginRoot, capabilities, deps }) {
 		"claude-repository": [],
 		"claude-plugin": [],
 	};
+	const repositoryInstructions = targetCapabilityRecord(
+		capabilities,
+		"claude-repository",
+		"repository-instructions",
+	);
+	deps.writeFileSync(
+		resolve(root, "CLAUDE.md"),
+		renderRootInstructions({
+			template: repositoryInstructions.semantic.body,
+			target: "claude",
+			authoritativeSource: repositoryInstructions.source.path,
+		}),
+	);
+	console.log(`CLAUDE.md ← ${repositoryInstructions.source.path}`);
 	for (const record of capabilitiesForTarget(
 		capabilities,
 		"claude-repository",
 	)) {
-		if (record.mapping.disposition !== "intentional-exclusion") {
-			observed["claude-repository"].push({
-				surface: record.source.path,
-				capabilityId: record.id,
-			});
-		}
+		observeRecordOutputs(observed["claude-repository"], record);
 	}
 	deps.genInstall(root);
 	console.log(

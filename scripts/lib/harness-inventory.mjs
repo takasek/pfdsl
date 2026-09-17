@@ -219,11 +219,14 @@ export const HARNESS_CAPABILITY_CONTRACT = Object.freeze([
 	capability(
 		"repository-instructions",
 		"repository-instructions",
-		{ encoding: "claude-root-instructions", path: "CLAUDE.md" },
+		{
+			encoding: "root-instructions-template",
+			path: "scripts/root-instructions-template/INSTRUCTIONS.md",
+		},
 		fourTargetMappings(
 			mapping(
 				"claude-repository",
-				"native",
+				"transform",
 				["CLAUDE.md"],
 				PROBES.claudeRepository,
 			),

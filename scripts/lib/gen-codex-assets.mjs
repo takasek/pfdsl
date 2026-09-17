@@ -1,5 +1,3 @@
-import { headingLevel, headingText } from "./markdown-heading.mjs";
-
 const READ_ONLY_TOOLS = "Read, Grep, Bash";
 const WORKSPACE_WRITE_TOOLS = "Bash, Read, Edit, Write, Grep, Glob, Skill";
 const MARKDOWN_GENERATED_NOTICE =
@@ -238,19 +236,7 @@ export function claudeInstructionsToAgents(source) {
 		.replaceAll(".claude/settings.json", ".codex/hooks.json");
 }
 
-const CODEX_EXECUTION_INSTRUCTIONS = [
-	"",
-	"## Codex の作業分担",
-	"",
-	"Codex では通常の調査・実装を単独の agent で進める。",
-	"レビューは、実装時の会話・推論を引き継がない別 agent に依頼する。",
-	"要件・最終差分・必要な一次資料を渡し、実装側の結論や採用理由を先に与えない。自己レビューで代替しない。",
-	"レビュー以外の委譲は独立した並行作業に具体的な利点がある場合に行い、固定の orchestrator/worker 構成や多段委譲を要求しない。",
-	"レビューの観点と実施条件は `.pfdsl/workflow.md` の「Codex でのレビュー」に従う。",
-	"",
-].join("\n");
-
-const CODEX_WORKTREE_METADATA_INSTRUCTIONS = [
+export const CODEX_WORKTREE_METADATA_INSTRUCTIONS = [
 	"",
 	"## Codex 固有の責務境界",
 	"",
@@ -261,25 +247,6 @@ const CODEX_WORKTREE_METADATA_INSTRUCTIONS = [
 	"subagent の権限エラーはユーザーへ直接継続を求めず、親 agent へ引き上げる。",
 	"",
 ].join("\n");
-
-export function claudeRootInstructionsToAgents(source) {
-	let inClaudeSection = false;
-	const sharedInstructions = source
-		.split("\n")
-		.filter((line) => {
-			const level = headingLevel(line);
-			if (level !== null && level <= 2) {
-				inClaudeSection =
-					level === 2 && headingText(line) === "Claude Code の作業分担";
-			}
-			return !inClaudeSection;
-		})
-		.join("\n");
-	return addGeneratedMarkdownNotice(
-		`${claudeInstructionsToAgents(sharedInstructions)}${CODEX_EXECUTION_INSTRUCTIONS}${CODEX_WORKTREE_METADATA_INSTRUCTIONS}`,
-		"CLAUDE.md",
-	);
-}
 
 function codexPfdImplementerDescription() {
 	return "設計が確定済みの実装を委譲する。指定された worktree 内で t-wada 流 TDD によりファイルを編集し、検査する。git metadata 操作は親 agent が担当する。";

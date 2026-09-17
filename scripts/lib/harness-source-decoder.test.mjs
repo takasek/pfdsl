@@ -72,7 +72,7 @@ const CONTRACT = [
 	source(
 		"repository-instructions",
 		"repository-instructions",
-		"claude-root-instructions",
+		"root-instructions-template",
 		"CLAUDE.md",
 	),
 	source(

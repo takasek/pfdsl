@@ -1,7 +1,10 @@
-// Bundled files rendered from another source rather than mirrored verbatim.
-// This mapping is shared by the distribution reviewer and Codex ownership
-// notices so both send maintainers to the same editable source.
+// Files rendered from another source rather than mirrored or hand-authored
+// verbatim — bundled distribution files plus the repository-root instruction
+// documents. This mapping is shared by the distribution reviewer and Codex
+// ownership notices so both send maintainers to the same editable source.
 export const GENERATED_DISTRIBUTION_SOURCES = Object.freeze({
+	"CLAUDE.md": "scripts/root-instructions-template/INSTRUCTIONS.md",
+	"AGENTS.md": "scripts/root-instructions-template/INSTRUCTIONS.md",
 	"plugin/pfdsl-codex/GENERATED.md": "scripts/lib/gen-plugin.mjs",
 	"plugin/pfdsl/skills/pfdsl/SKILL.md": "scripts/skill-template/SKILL.md",
 	"plugin/pfdsl/skills/pfdsl/references/spec.md": "docs/spec/spec.md",
