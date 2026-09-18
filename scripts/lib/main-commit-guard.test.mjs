@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -373,20 +379,28 @@ describe("evaluateMainCommitGuard", () => {
 		assert.equal(result.decision, "allow");
 	});
 
-	it("denies staging when a feature-branch session targets a sibling worktree (#784)", () => {
+	it("asks before staging when a feature-branch session targets another worktree (#1201)", () => {
 		const result = evaluateMainCommitGuard(payload({ command: "git add -A" }), {
 			currentBranch: "feature/other",
 			crossesWorktree: true,
 		});
-		assert.equal(result.decision, "deny");
-		assert.match(result.reason, /sibling worktree/);
-		assert.match(
+		assert.equal(result.decision, "ask");
+		assert.match(result.reason, /worktree/);
+		assert.doesNotMatch(
 			result.reason,
-			/requires starting or reopening a session whose project root is that worktree/,
+			/starting or reopening a session whose project root is that worktree/,
 		);
 	});
 
-	it("asks before restoring files in a sibling worktree (#784)", () => {
+	it("still denies staging on the default branch of another worktree (#1201)", () => {
+		const result = evaluateMainCommitGuard(payload({ command: "git add -A" }), {
+			currentBranch: "main",
+			crossesWorktree: true,
+		});
+		assert.equal(result.decision, "deny");
+	});
+
+	it("asks before restoring files in another worktree (#784)", () => {
 		const result = evaluateMainCommitGuard(
 			payload({ command: "git restore src/x.ts" }),
 			{
@@ -395,7 +409,7 @@ describe("evaluateMainCommitGuard", () => {
 			},
 		);
 		assert.equal(result.decision, "ask");
-		assert.match(result.reason, /sibling worktree/);
+		assert.match(result.reason, /worktree other than the one this session/);
 	});
 
 	it("allows a commit on a feature branch", () => {
@@ -487,15 +501,15 @@ describe("runMainCommitGuard", () => {
 			});
 			assert.deepEqual(visited, ["/worktrees/session", "/worktrees/sibling"]);
 			assert.equal(shouldOutput, true);
-			assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
+			assert.equal(output.hookSpecificOutput.permissionDecision, "ask");
 		}
 	});
 
 	it("aggregates per-segment decisions with deny before ask (#784)", () => {
 		const context = (_payload, targetCwd) => ({
-			currentBranch: "topic",
+			currentBranch: targetCwd === "/repo" ? "main" : "topic",
 			mainBranch: "main",
-			crossesWorktree: targetCwd === "/worktrees/sibling",
+			crossesWorktree: targetCwd !== "/worktrees/session",
 		});
 		const askInput = JSON.stringify(
 			payload({
@@ -509,7 +523,7 @@ describe("runMainCommitGuard", () => {
 		const denyInput = JSON.stringify(
 			payload({
 				command:
-					"git -C /worktrees/sibling restore tracked.txt && git -C /worktrees/sibling add -A",
+					"git -C /worktrees/sibling restore tracked.txt && git -C /repo add -A",
 				cwd: "/worktrees/session",
 			}),
 		);
@@ -564,7 +578,9 @@ describe("main-commit-guard wrapper", () => {
 	}
 
 	before(() => {
-		root = mkdtempSync(join(tmpdir(), "main-commit-guard-"));
+		// realpath: git reports worktree roots resolved, so a symlinked tmpdir
+		// would make the fixture's session and target look like different repos.
+		root = realpathSync(mkdtempSync(join(tmpdir(), "main-commit-guard-")));
 		repo = join(root, "repo");
 		session = join(root, "session");
 		sibling = join(root, "sibling");
@@ -648,6 +664,22 @@ describe("main-commit-guard wrapper", () => {
 		assert.equal(
 			JSON.parse(output).hookSpecificOutput.permissionDecision,
 			"ask",
+		);
+	});
+
+	it("asks instead of denying when a Claude session stages in the worktree it moved into (#1201)", () => {
+		// The harness keeps reporting the root the session started with, so the
+		// worktree the session actually works in reads as a sibling. The human
+		// confirms ownership, which is the fact the guard cannot verify itself.
+		const output = runWrapper(`git -C ${sibling} add -A`, {
+			payloadCwd: repo,
+			claudeProjectDir: repo,
+		});
+		const result = JSON.parse(output).hookSpecificOutput;
+		assert.equal(result.permissionDecision, "ask");
+		assert.doesNotMatch(
+			result.permissionDecisionReason,
+			/starting or reopening a session whose project root is that worktree/,
 		);
 	});
 
@@ -1071,7 +1103,7 @@ describe("main-commit-guard wrapper", () => {
 		);
 	});
 
-	it("denies compound and repeated-C sibling mutations end to end (#784)", () => {
+	it("catches compound and repeated-C sibling mutations end to end (#784)", () => {
 		for (const command of [
 			`git add -A && cd ${sibling} && git add -A`,
 			`cd -- ${sibling} && git add -A`,
@@ -1083,7 +1115,7 @@ describe("main-commit-guard wrapper", () => {
 			assert.notEqual(output, "", command);
 			assert.equal(
 				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
+				"ask",
 				command,
 			);
 		}
@@ -1109,7 +1141,9 @@ describe("main-commit-guard wrapper", () => {
 	it("fails closed for cwd-changing shell builtins the parser cannot model", () => {
 		for (const [command, decision] of [
 			[`builtin cd "${sibling}" && git add -A`, "deny"],
-			[`command cd "${sibling}" && git add -A`, "deny"],
+			// `command cd` resolves to a literal target, so it lands on the
+			// cross-worktree ask rather than the unresolved-cwd deny (#1201).
+			[`command cd "${sibling}" && git add -A`, "ask"],
 			[`pushd "${sibling}" && git add -A`, "deny"],
 			["popd && git restore tracked.txt", "ask"],
 		]) {
@@ -1124,17 +1158,17 @@ describe("main-commit-guard wrapper", () => {
 	});
 
 	it("tracks env chdir prefixes and fails closed for unresolved forms", () => {
-		for (const command of [
-			`env -C ${repo} git add -A`,
-			`env --chdir=${sibling} git add -A`,
-			'WORKTREE=/somewhere; env -C "$WORKTREE" git add -A',
-			"env --chdir= git add -A",
+		for (const [command, decision] of [
+			[`env -C ${repo} git add -A`, "deny"],
+			[`env --chdir=${sibling} git add -A`, "ask"],
+			['WORKTREE=/somewhere; env -C "$WORKTREE" git add -A', "deny"],
+			["env --chdir= git add -A", "deny"],
 		]) {
 			const output = runWrapper(command);
 			assert.notEqual(output, "", command);
 			assert.equal(
 				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
+				decision,
 				command,
 			);
 		}
@@ -1187,18 +1221,18 @@ describe("main-commit-guard wrapper", () => {
 	});
 
 	it("does not let Git repository-target flags or shell prefixes bypass sibling checks", () => {
-		for (const command of [
-			`git --git-dir=${join(repo, ".git")} add -A`,
-			`git --work-tree=${repo} add -A`,
-			`command -- git -C ${sibling} add -A`,
-			`sudo -n git -C ${sibling} add -A`,
-			`>/dev/null git -C ${sibling} add -A`,
+		for (const [command, decision] of [
+			[`git --git-dir=${join(repo, ".git")} add -A`, "deny"],
+			[`git --work-tree=${repo} add -A`, "deny"],
+			[`command -- git -C ${sibling} add -A`, "ask"],
+			[`sudo -n git -C ${sibling} add -A`, "ask"],
+			[`>/dev/null git -C ${sibling} add -A`, "ask"],
 		]) {
 			const output = runWrapper(command);
 			assert.notEqual(output, "", command);
 			assert.equal(
 				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
+				decision,
 				command,
 			);
 		}
@@ -1230,7 +1264,7 @@ describe("main-commit-guard wrapper", () => {
 		assert.notEqual(execution, "");
 		assert.equal(
 			JSON.parse(execution).hookSpecificOutput.permissionDecision,
-			"deny",
+			"ask",
 		);
 
 		for (const query of [
@@ -1242,17 +1276,17 @@ describe("main-commit-guard wrapper", () => {
 	});
 
 	it("skips value-taking sudo and time options before guarded Git", () => {
-		for (const command of [
-			`sudo -u root git -C ${sibling} add -A`,
-			`sudo --user=root git -C ${sibling} add -A`,
-			"sudo -R /jail git add -A",
-			`time -o /tmp/time-output git -C ${sibling} add -A`,
+		for (const [command, decision] of [
+			[`sudo -u root git -C ${sibling} add -A`, "ask"],
+			[`sudo --user=root git -C ${sibling} add -A`, "ask"],
+			["sudo -R /jail git add -A", "deny"],
+			[`time -o /tmp/time-output git -C ${sibling} add -A`, "ask"],
 		]) {
 			const output = runWrapper(command);
 			assert.notEqual(output, "", command);
 			assert.equal(
 				JSON.parse(output).hookSpecificOutput.permissionDecision,
-				"deny",
+				decision,
 				command,
 			);
 		}
