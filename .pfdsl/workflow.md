@@ -40,8 +40,8 @@ worktree を既定とする理由は `.claude/skills/pfd-ops/references/work-cyc
 
 **worktree での git 操作**: `git commit` など git コマンドは worktree ディレクトリを指して実行する（理由は `.claude/skills/pfd-ops/references/work-cycle.md` 手順2 が一次情報）。
 **worktree のパスはシェル変数に入れず literal で書く**。
-`scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）は hook の payload だけを見る静的解析なので `git -C $W commit` の `$W` を解決できず、payload の cwd（cwd が戻っていれば main repo）で判定して deny する。
-`git -C /Users/.../.claude/worktrees/<name> commit` と書けば通る。
+`scripts/main-commit-guard.mjs`（#777。deny / ask の割り当ては CLAUDE.md「コミット粒度」節が一次情報）は hook の payload だけを見る静的解析なので `git -C $W commit` の `$W` を解決できず、fail closed して deny する。
+`git -C /Users/.../.claude/worktrees/<name> commit` と literal で書けば target が解決され、session の root として報告される worktree と一致すれば通り、一致しなければ Claude Code では ask になる（#1201。session が起動後に worktree へ移った場合、harness は起動時の root を報告し続けるため後者になる — 所有権を確認して承認する）。
 なお deny は Bash 呼び出し全体を止めるため、`git -C $W add … && git -C $W commit …` が弾かれたときは add も実行されていない。
 
 ## develop のレビュー
