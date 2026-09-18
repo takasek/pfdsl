@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { runCompanionBindingsCheck } from "./companion-binding-check-steps.mjs";
 
 const PFD_RETRO_PATH = ".pfdsl/bindings/pfd-retro.md";
+const PFD_OPS_PATH = ".pfdsl/bindings/pfd-ops.md";
 
 function baseDeps(overrides = {}) {
 	return {
@@ -46,7 +47,10 @@ describe("runCompanionBindingsCheck", () => {
 			baseDeps({
 				listFiles: () => [".pfdsl/foo.md"],
 				readFile: () => "see `docs/missing.md` for details",
-				exists: (path) => path !== "docs/missing.md" && path !== PFD_RETRO_PATH,
+				exists: (path) =>
+					path !== "docs/missing.md" &&
+					path !== PFD_RETRO_PATH &&
+					path !== PFD_OPS_PATH,
 			}),
 		);
 		assert.equal(result.exitCode, 1);
@@ -62,7 +66,7 @@ describe("runCompanionBindingsCheck", () => {
 			baseDeps({
 				listFiles: () => [".pfdsl/foo.md"],
 				readFile: () => "see `docs/present.md` for details",
-				exists: (path) => path !== PFD_RETRO_PATH,
+				exists: (path) => path !== PFD_RETRO_PATH && path !== PFD_OPS_PATH,
 			}),
 		);
 		assert.equal(result.exitCode, 0);
@@ -110,6 +114,54 @@ describe("runCompanionBindingsCheck", () => {
 				exists: (path) => path === PFD_RETRO_PATH,
 				readFile: (file) =>
 					file === PFD_RETRO_PATH ? "# pfd-retro バインディング\n" : "",
+			}),
+		);
+		assert.equal(result.exitCode, 0);
+	});
+
+	// The work cycle's repo-level steps live in pfd-ops' binding, so a binding
+	// without that section silently drops them from every cycle.
+	it("skips the pfd-ops.md heading check entirely when the file does not exist", () => {
+		const readCalls = [];
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				exists: () => false,
+				readFile: (file) => {
+					readCalls.push(file);
+					return "";
+				},
+			}),
+		);
+		assert.equal(result.exitCode, 0);
+		assert.ok(
+			!readCalls.includes(PFD_OPS_PATH),
+			"pfd-ops.md must not be read when it does not exist",
+		);
+	});
+
+	it("flags a missing required heading in pfd-ops.md (heading check alone)", () => {
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				exists: (path) => path === PFD_OPS_PATH,
+				readFile: (file) =>
+					file === PFD_OPS_PATH ? "# pfd-ops バインディング\n" : "",
+			}),
+		);
+		assert.equal(result.exitCode, 1);
+		assert.match(
+			result.stderrLines[0],
+			/missing required heading "ワークサイクルの追加手順"/,
+		);
+	});
+
+	it("passes when pfd-ops.md exists and has both required headings", () => {
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				exists: (path) => path === PFD_OPS_PATH,
+				readFile: (file) =>
+					file === PFD_OPS_PATH
+						? "# pfd-ops バインディング\n\n## ワークサイクルの追加手順\n"
+						: "",
 			}),
 		);
 		assert.equal(result.exitCode, 0);

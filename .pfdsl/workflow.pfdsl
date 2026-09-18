@@ -360,7 +360,7 @@ artifact:
   bindings_pfd_ops:
     label: pfd-ops バインディング
     description: "pfd-ops 運用に紐づく Claude への恒常指示（PR 本文規約等）。sibling companion でなく独立ファイル（読み込み契機がスキル発火であり PFD グラフ操作と一致しないため）。pfd-ops skill が存在すれば読む"
-    criteria: 記載内容を pfd-ops SKILL.md・work-cycle.md の現行記述に突き合わせて矛盾がない（bindings/ 配下に機械検査は無く、pfd-retro D 層監査で観察する）
+    criteria: 記載内容を pfd-ops SKILL.md・work-cycle.md の現行記述に突き合わせて矛盾がなく、配布層から移設した手順（ADR-0039）が binding 側に揃っている（必須見出しだけ check-companion-bindings が検査し、本文の整合は pfd-retro D 層監査で観察する）
     location: bindings/pfd-ops.md
     group: generation
     tags: [ distilled_doc ]

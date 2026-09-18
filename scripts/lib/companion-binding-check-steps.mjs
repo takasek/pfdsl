@@ -19,6 +19,20 @@ import {
 
 const REQUIRED_PFD_RETRO_BINDING_HEADINGS = ["pfd-retro バインディング"];
 const PFD_RETRO_BINDING_PATH = ".pfdsl/bindings/pfd-retro.md";
+const REQUIRED_PFD_OPS_BINDING_HEADINGS = ["ワークサイクルの追加手順"];
+const PFD_OPS_BINDING_PATH = ".pfdsl/bindings/pfd-ops.md";
+const REQUIRED_BINDING_HEADINGS = [
+	{
+		path: PFD_RETRO_BINDING_PATH,
+		headings: REQUIRED_PFD_RETRO_BINDING_HEADINGS,
+		reason: "pfd-retro's audit protocol depends on it",
+	},
+	{
+		path: PFD_OPS_BINDING_PATH,
+		headings: REQUIRED_PFD_OPS_BINDING_HEADINGS,
+		reason: "pfd-ops' work cycle reads its repo-level steps from it",
+	},
+];
 
 /**
  * @param {{
@@ -51,14 +65,12 @@ export function runCompanionBindingsCheck({ listFiles, readFile, exists }) {
 		}
 	}
 
-	if (exists(PFD_RETRO_BINDING_PATH)) {
-		const text = readFile(PFD_RETRO_BINDING_PATH);
-		for (const heading of findMissingHeadings(
-			text,
-			REQUIRED_PFD_RETRO_BINDING_HEADINGS,
-		)) {
+	for (const { path, headings, reason } of REQUIRED_BINDING_HEADINGS) {
+		if (!exists(path)) continue;
+		const text = readFile(path);
+		for (const heading of findMissingHeadings(text, headings)) {
 			stderrLines.push(
-				`${PFD_RETRO_BINDING_PATH}: missing required heading "${heading}" (pfd-retro's audit protocol depends on it)`,
+				`${path}: missing required heading "${heading}" (${reason})`,
 			);
 			errorCount++;
 		}
