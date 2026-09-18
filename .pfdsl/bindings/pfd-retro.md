@@ -39,3 +39,23 @@ rg --files .pfdsl/bindings/pfd-retro-patterns/
 このリポは pfd-* bundle の上流であるため、そのルールの「自リポが上流である場合」に当たり、配布物への finding 反映をその場での編集として実施してよい（採用リポにこの経路は無い）。
 配布スキル本文（SKILL.md）に取り込めるのは L1 に一般化できる記述のみ。
 昇格の可否基準・スキル間相互参照の可否・一般化できない具体例の置き場は `pfd-ops/references/architecture.md` が一次情報。
+
+## 1 回の実行契約
+
+適用単位は、1回の監査へ入れられる層と情報源を決める。`retro_request` が情報源を必須として指定した後の欠落は非適用による省略ではない。収集前に実行 ID、cutoff、必須情報源集合、任意情報源集合を確定し、cutoff より後の活動をその実行から除外する。
+
+1. 各情報源について、問い合わせ、cutoff、取得結果、coverage 状態、安定したイベント ID を凍結 inventory に記録する。必須情報源を取得できなければ coverage を incomplete とし、計画、監査実行、「特になし」の結論を停止する。任意情報源を取得できなければ unavailable と記録して継続する。
+2. inventory の各イベントについて、どの監査対象に含めるかを非排他的に分類し、理由を付ける。選んだ具体的な PFD、セッション証拠、知識成果物を解決し、参照だけでなく内容を同じ cutoff で凍結してから A・B・C・D の適用層を監査する。
+3. 各 finding に実行 ID と証拠参照を付ける。pfd-retro SKILL.md「出力」節の宛先への振り分けは変更権限ではなく、通常の意思決定経路による人間の disposition だけがリポジトリ保守を許可する。必須情報源の coverage が complete で、選んだ適用層をすべて監査した場合に限り「特になし」と報告できる。
+4. 必要な全消費者が同じ task record へアクセスできるなら、inventory、計画、対象 snapshot はセッション出力のままでよい。ホストが同じ task record を保持する compaction は checkpoint の契機にしない。凍結したリポジトリ snapshot だけを読む read-only subagent へ A・B 監査を委譲するときは transient な C・D evidence を渡さず、公開済み commit または対象ファイルだけを渡すため、session inventory の checkpoint は不要である。実行ごとの恒久的なリポジトリ ledger は作らない。
+5. 受け手が必要な transient evidence へアクセスできない handoff の前だけ、cutoff、情報源別 coverage、受け手の可視性境界で安全な event identifier、未解決 findings の最小 checkpoint を、意図した受け手だけが読める既存の保存先へ置く。内部 session ID、tool metadata、private evidence は public issue・PR へ書かない。public issue・PR を使う場合は、外部書き込みの直前に正確な内容と宛先を人間へ提示し、その書き込み自体の明示承認を得る。retrospective の実行承認を checkpoint の公開承認とみなさない。
+6. 可視性に適合する保存先が無い、または必要な外部書き込みの承認が得られない場合は handoff せず、同じ task・session で監査を完結させる。必要な checkpoint 前に task record を失った場合、その実行を放棄し、新しい実行 ID と cutoff ですべての情報源を再収集する。放棄した実行との同一性を主張しない。
+
+## 知識成果物ライフサイクル監査
+
+知識成果物ライフサイクル監査: 採用する。対象: `.pfdsl/roadmap.pfdsl` の criteria、`.pfdsl/*.md` companion、`docs/adr/`、`docs/pfd_payoff_log.md`
+
+監査項目の本文は配布層の `references/knowledge-lifecycle.md` が持つ。次の2項目は pfdsl の配布機構を前提にするため、配布層でなくこの binding が持ち、上流であるこのリポでだけ適用する。
+
+- **効果の実測**: 対策の前後比較を、`.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 2 の追加」が固定した基準・対象版・条件と照合する。取得を逃した基準は比較不能とし、今の値で埋めない。測定後の変更で根拠が崩れた範囲を再確認し、代理指標や構造検査の成功と実運用の効果を区別する
+- **配布スキル本文の蒸留監査**: 配布スキル本文の手順リストで、複数の追記が同一原則に統合できるものはないか。追記の堆積は原則への蒸留候補である — 各行について「これはまだ原則か、個別事故の傷跡か」を問う。蒸留を実施できるリポも「出力」節の上流変更ルールが決める
