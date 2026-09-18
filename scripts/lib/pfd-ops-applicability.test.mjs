@@ -65,7 +65,7 @@ describe("pfd-ops applicability contract", () => {
 
 	it("assigns record and reapproval evidence without requiring commit chronology", () => {
 		assert.match(githubBackend, /本文とコメント/);
-		assert.match(githubBackend, /投稿・編集時刻と初コミットの比較は行わない/);
+		assert.match(opsBinding, /投稿・編集時刻と初コミットの比較は行わない/);
 		assert.match(fileBackend, /当該項目に追記/);
 		assert.match(fileBackend, /改訂行を書く時点で実在するものを参照/);
 		assert.match(fileBackend, /完了契約/);
@@ -81,9 +81,9 @@ describe("pfd-ops applicability contract", () => {
 	it("uses the format 3 decision-first contract without claiming semantic machine proof", () => {
 		const format2Tokens =
 			/提案:|前提を外した対案:|対案を採らない理由:|案の処分 N:/;
-		const githubMigrationHistory = githubBackend.split("**移行履歴**:")[1];
-		const githubMigrationHistorySection =
-			githubMigrationHistory?.split("\n\n## ")[0];
+		const bindingMigrationHistory = opsBinding.split("**移行履歴**:")[1];
+		const bindingMigrationHistorySection =
+			bindingMigrationHistory?.split("\n\n## ")[0];
 
 		assert.match(opsBinding, /設計記録形式: 3/);
 		// The bundle must no longer teach the record format at all (ADR-0039).
@@ -113,35 +113,50 @@ describe("pfd-ops applicability contract", () => {
 			/表示種別.*ファイル変更.*外部書き込み.*認証情報.*費用発生.*権限を付与しない/,
 		);
 		assert.match(opsBinding, /optionCount.*完全性.*証明/);
-		assert.doesNotMatch(opsBinding, format2Tokens);
 		assert.match(opsBinding, /バックエンドの移行契約が選択する形式/);
 		assert.match(
 			opsBinding,
 			/移行境界は各バックエンドの L3 reference が定める/,
 		);
-		assert.doesNotMatch(opsBinding, /issuecomment|canonical comment URL|対話 /);
-		assert.doesNotMatch(opsBinding, /2026-08-31T01:30:24Z/);
+		// The bundle layer must carry none of the backend-specific record
+		// vocabulary any more: neither the generic cycle nor the L3 preset.
+		assert.doesNotMatch(workCycle, /issuecomment|canonical comment URL|対話 /);
+		assert.doesNotMatch(
+			githubBackend,
+			/issuecomment|canonical comment URL|対話 /,
+		);
+		assert.doesNotMatch(workCycle, /2026-08-31T01:30:24Z/);
+		assert.doesNotMatch(githubBackend, /2026-08-31T01:30:24Z/);
 		assert.match(opsBinding, /以降の新規記録は完全な Format 3/);
 		assert.match(opsBinding, /既存の有効な旧形式記録を書き換えない/);
 		assert.match(opsBinding, /人間による意味的な再検査/);
 
-		assert.match(githubBackend, /2026-08-30T09:32:50Z/);
-		assert.match(githubBackend, /2026-08-31T01:30:24Z/);
-		assert.match(githubBackend, /2026-09-05T14:07:16Z/);
-		assert.match(githubBackend, /host.*owner.*repo/);
-		assert.match(githubBackend, /YYYY-MM-DDTHH:MM:SS/);
-		assert.match(githubBackend, /半角スペース/);
-		assert.match(githubBackend, /comments.*pagination|pagination.*comments/);
-		assert.match(githubBackend, /設計記録形式: 3/);
-		assert.match(githubBackend, /同じコメントを編集/);
-		assert.match(githubBackend, /別コメント.*置換してはならない/);
-		assert.match(githubBackend, /複数.*完全な形式3コメント.*fail-close/);
-		assert.ok(githubMigrationHistorySection);
-		assert.match(githubMigrationHistorySection, format2Tokens);
+		// ADR-0039: the bundle keeps only the placement contract; the format,
+		// the canonical-URL grammar, the reapproval window and the migration
+		// cutoffs are this repo's own rules and live in the binding.
+		assert.match(opsBinding, /2026-08-30T09:32:50Z/);
+		assert.match(opsBinding, /2026-08-31T01:30:24Z/);
+		assert.match(opsBinding, /2026-09-05T14:07:16Z/);
+		assert.match(opsBinding, /host.*owner.*repo/);
+		assert.match(opsBinding, /YYYY-MM-DDTHH:MM:SS/);
+		assert.match(opsBinding, /半角スペース/);
+		assert.match(opsBinding, /comments.*pagination|pagination.*comments/);
+		assert.match(opsBinding, /同じコメントを編集/);
+		assert.match(opsBinding, /別コメント.*置換してはならない/);
+		assert.match(opsBinding, /複数.*完全な形式3コメント.*fail-close/);
+		assert.match(githubBackend, /コメントから正本を同定/);
+		assert.match(
+			githubBackend,
+			/書式と再承認参照の検査は採用リポの binding が定める/,
+		);
+		assert.doesNotMatch(githubBackend, /設計記録形式: 3/);
+		assert.ok(bindingMigrationHistorySection);
+		assert.match(bindingMigrationHistorySection, format2Tokens);
 		assert.doesNotMatch(
-			githubBackend.replace(githubMigrationHistorySection, ""),
+			opsBinding.replace(bindingMigrationHistorySection, ""),
 			format2Tokens,
 		);
+		assert.doesNotMatch(githubBackend, format2Tokens);
 
 		// ADR-0039: the L3 preset delegates the record format to the adopting
 		// repo's binding instead of declaring it itself.
