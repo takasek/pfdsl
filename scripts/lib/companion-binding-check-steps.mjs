@@ -1,9 +1,9 @@
 /**
  * check-companion-bindings.mjs orchestration: two independent checks (dead
- * path references in .pfdsl/*.md companions, and a required heading in
- * .pfdsl/bindings/pfd-retro.md when it exists) merged into one errorCount and
- * one final exit-code branch, none of which was tested (#645) — only the pure
- * extractors/matchers in lib/companion-binding-check.mjs had tests.
+ * path references in .pfdsl/*.md companions, and the required headings of each
+ * binding in REQUIRED_BINDING_HEADINGS that exists) merged into one errorCount
+ * and one final exit-code branch, none of which was tested (#645) — only the
+ * pure extractors/matchers in lib/companion-binding-check.mjs had tests.
  *
  * `listFiles`/`readFile`/`exists` are injected, already bound to the repo
  * root by the caller (so callers pass root-relative paths, matching git
@@ -17,19 +17,15 @@ import {
 	resolveCheckTarget,
 } from "./companion-binding-check.mjs";
 
-const REQUIRED_PFD_RETRO_BINDING_HEADINGS = ["pfd-retro バインディング"];
-const PFD_RETRO_BINDING_PATH = ".pfdsl/bindings/pfd-retro.md";
-const REQUIRED_PFD_OPS_BINDING_HEADINGS = ["ワークサイクルの追加手順"];
-const PFD_OPS_BINDING_PATH = ".pfdsl/bindings/pfd-ops.md";
 const REQUIRED_BINDING_HEADINGS = [
 	{
-		path: PFD_RETRO_BINDING_PATH,
-		headings: REQUIRED_PFD_RETRO_BINDING_HEADINGS,
+		path: ".pfdsl/bindings/pfd-retro.md",
+		headings: ["pfd-retro バインディング"],
 		reason: "pfd-retro's audit protocol depends on it",
 	},
 	{
-		path: PFD_OPS_BINDING_PATH,
-		headings: REQUIRED_PFD_OPS_BINDING_HEADINGS,
+		path: ".pfdsl/bindings/pfd-ops.md",
+		headings: ["ワークサイクルの追加手順"],
 		reason: "pfd-ops' work cycle reads its repo-level steps from it",
 	},
 ];
