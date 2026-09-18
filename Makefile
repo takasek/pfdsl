@@ -18,7 +18,7 @@ build:
 	pnpm -r build
 
 .PHONY: test
-test:
+test: build
 	pnpm -r test
 	node --test "scripts/*.test.mjs" "scripts/lib/*.test.mjs" "scripts/pfdsl/*.test.mjs" "scripts/pfdsl/lib/*.test.mjs" "hooks/*.test.mjs" "hooks/lib/*.test.mjs" "plugin/pfdsl/hooks/lib/*.test.mjs" "plugin/pfdsl-codex/hooks/lib/*.test.mjs" "packages/vscode-extension/smoke/*.test.mjs"
 	node scripts/check-script-imports.mjs
@@ -30,7 +30,7 @@ coverage:
 	pnpm -r coverage
 
 .PHONY: typecheck
-typecheck:
+typecheck: build
 	pnpm -r typecheck
 
 .PHONY: lint
