@@ -23,6 +23,13 @@ Claude CodeとCodexのSessionStart hookが、このworktreeのセットアップ
 Biomeの指摘は自動修正されないため、失敗時は `make format` を実行して再stageする。
 完了判定・依存検査・並行実行制御の詳細は `scripts/setup-completion.mjs`、セットアップ内容は `Makefile` の `setup` / `setup-unlocked` を参照する。
 
+## 検査コマンド
+
+新規 worktree では `make build` を先に通し、その後 `make test` を実行する（build 前の `make test` は packages/vscode-extension のテストで落ちる。2026-09-18 実測）。
+`make test` は各パッケージのテストと `scripts/` `hooks/` の `node --test`、import・shell 文字列・CLI 規約の検査を通しで回す。
+`make lint` は Biome、`make typecheck` は型検査、`make coverage` はカバレッジ。
+単一ファイルは `node --test <path>` で直接回せる。
+
 ## 文字列の言語
 
 ユーザーの目に触れる文字列（`docs/samples/` のサンプル、CLI 出力、エラーメッセージ、README 等の公開ドキュメント）は英語で書く。内部向け（スキル・`docs/spec`・ADR・`.pfdsl` の運用図・companion 等、メンテナが読む資料）は日本語でよい。サンプルの `label:` も英語。判断軸は「読み手が外部ユーザーか、内部メンテナか」。
