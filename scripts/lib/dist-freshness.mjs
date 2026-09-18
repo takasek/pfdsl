@@ -1,10 +1,13 @@
 // Checks whether a dist file (e.g. packages/cli/dist/cli.js) is stale
 // relative to its sibling src/ directory (packages/cli/src/), so the drift
 // gates in scripts/check-drift-gates.mjs can skip instead of trusting a
-// leftover build from before a source change (see #450), and so the hook in
-// scripts/stale-dist-guard.mjs can warn about one (#642). scripts/pre-commit
-// had checks of its own that asked the same question in sh; they moved into
-// the drift gates script (#755, #759).
+// leftover build from before a source change (see #450), and so
+// scripts/check-diag-registry.mjs can refuse to compare against one.
+// scripts/pre-commit had checks of its own that asked the same question in
+// sh; they moved into the drift gates script (#755, #759). A PostToolUse hook
+// once warned after a test or typecheck run had read a stale build (#642);
+// `make test` and `make typecheck` now depend on `build`, so that case no
+// longer arises and the hook is gone.
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 
