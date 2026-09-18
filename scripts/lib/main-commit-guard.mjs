@@ -30,6 +30,12 @@ import {
 } from "./delegation-guard.mjs";
 import { buildPermissionOutput, parseHookPayload } from "./hook-io.mjs";
 
+// The decision splits by target before it splits by subcommand. Against a
+// worktree other than the session's own reported root it is always ask (#1201):
+// the guard cannot separate the session's own worktree from another session's,
+// so the grading below would deny the very arrangement the workflow mandates.
+// On the default branch the subcommand decides.
+//
 // Which subcommands land in which decision follows one rule (#777): deny the
 // ones that create new state on the branch, because "do it in a worktree
 // instead" is an equivalent substitute and fits in the deny message; ask for
@@ -407,23 +413,33 @@ function evaluateGuardedCommand(
 	if (!targetsDefaultBranch && !crossesWorktree) return { decision: "allow" };
 
 	const command = `git ${guarded.subcommand}`;
-	if (guarded.decision === "deny") {
+	// A cross-worktree target is asked about rather than denied, whatever the
+	// subcommand: the guard cannot tell the session's own worktree from another
+	// session's, and the harness keeps reporting the root a session started with,
+	// so a session that moved into its worktree reads as a sibling (#1201). The
+	// old deny named a remediation — reopen the session there — that entering the
+	// worktree does not deliver, which left the mandated workflow with no way to
+	// commit at all. Ownership is a fact only the human has, so the human is
+	// asked. Codex, where ask is unsupported, still falls closed to deny in
+	// runMainCommitGuard.
+	if (
+		guarded.decision === "deny" &&
+		!(crossesWorktree && !targetsDefaultBranch)
+	) {
 		return {
 			decision: "deny",
 			reason:
-				crossesWorktree && !targetsDefaultBranch
-					? `Blocked '${command}' in a sibling worktree: this requires starting or reopening a session whose project root is that worktree before running it there.`
-					: `Blocked '${command}' on '${mainBranch}': this repo's ecosystem requires develop → PR → merge_pr, ` +
-						"and the main checkout's index is shared by processes and sessions targeting that checkout, so anything staged here rides along on " +
-						"the next commit made there. Create or switch to a feature branch first (e.g. via the worktree " +
-						"skill), then run it there.",
+				`Blocked '${command}' on '${mainBranch}': this repo's ecosystem requires develop → PR → merge_pr, ` +
+				"and the main checkout's index is shared by processes and sessions targeting that checkout, so anything staged here rides along on " +
+				"the next commit made there. Create or switch to a feature branch first (e.g. via the worktree " +
+				"skill), then run it there.",
 		};
 	}
 	return {
 		decision: "ask",
 		reason:
 			crossesWorktree && !targetsDefaultBranch
-				? `'${command}' would change a sibling worktree, which can discard another session's uncommitted edits. Confirm only if this session intentionally owns that target worktree.`
+				? `'${command}' targets a worktree other than the one this session reports as its root, which can discard another session's uncommitted edits. Confirm only if this session owns that target worktree — which it does when the session is working in it, even though the harness still reports the root it started with.`
 				: `'${command}' on '${mainBranch}' would change the main checkout's working tree, which every session ` +
 					"shares — it can discard another session's uncommitted edits. It is also how CLAUDE.md says to repair " +
 					"a tree that was written to by mistake, and this hook cannot tell the two apart. Confirm only if this " +
