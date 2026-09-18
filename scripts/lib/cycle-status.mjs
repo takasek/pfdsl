@@ -200,8 +200,8 @@ export function buildDesignRecordTemplate() {
  * `unsettled` は設計の未決定や記録不足を着手前に確認するための報告であり、
  * この値だけでは CLI の終了コードを変えず、追加承認の要否も決めない。
  * true の場合は reason・一次記録・現行のコードと仕様を照合し、未決定の設計や
- * 記録不足を解消する。確認手順と承認境界は pfd-ops の references/work-cycle.md
- * 「選択後の設計確認」に従う。
+ * 記録不足を解消する。確認手順と承認境界は .pfdsl/bindings/pfd-ops.md
+ * 「ワークサイクルの追加手順」の「選択後の設計確認」に従う。
  * 記録投稿の要否は別軸である。roadmap.md の規約上、design-selection record は列挙構造の有無に
  * 関わらず全サイクル必須で、`unsettled: false` を「記録不要」と読むのは
  * 誤読になる（#809）。そのため戻り値には `recordRequired` を独立して持たせる
@@ -327,7 +327,7 @@ export function buildGateCheckCommand(artifactKey, base, issueNumbers = []) {
 const DESIGN_UNSETTLED_PATTERNS = [/design TBD/i, /設計未確定/, /設計未合意/];
 
 /**
- * work-cycle.md 手順1が定義する「設計未合意フレーズ」を issue 本文から検出する。
+ * .pfdsl/bindings/pfd-ops.md の「手順 1 の追加」が定義する「設計未合意フレーズ」を issue 本文から検出する。
  * @param {string | undefined | null} body
  * @param {RegExp[]} patterns
  * @returns {{designUnsettled: boolean, matchedLines: string[]}}

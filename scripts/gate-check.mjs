@@ -474,7 +474,7 @@ if (sizeDeltas.length > 0) {
 // `git rebase` fixes the tree, not those.
 //
 // Printed unconditionally, including the empty case: an empty window is itself
-// the record work-cycle.md's terminal-gate step asks for ("窓が空だったなら1行
+// the record the pfd-ops binding's work-cycle steps ask for ("窓が空だったなら1行
 // そう記録する"). A failed measurement says so out loud, unlike the report
 // blocks above that fall silent — silence here is indistinguishable from the
 // empty window, which is the reading #834 exists to stop.

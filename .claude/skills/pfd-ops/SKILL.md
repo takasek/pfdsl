@@ -38,9 +38,9 @@ node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstr
 各運用 `.pfdsl` を扱うときは同名 sibling `.md` も読み、次の一意な経路で詳細を解決する。
 
 - **閲覧・分類・優先順位**: 採用済み roadmap では `pfdsl status ready <roadmap.pfdsl> --best --json` で着手可能集合と推薦を列挙し、作業項目の分類は roadmap companion が指す採用バックエンドに従う
-- **作業項目への着手**: `references/work-cycle.md` の全手順に従う
-- **終端ゲート**: `references/work-cycle.md` の終端ゲートに従う
-- **知見の振り分け**: `references/work-cycle.md` の運用契約と `.pfdsl/workflow.pfdsl` および sibling companion に従う
+- **作業項目への着手**: `references/work-cycle.md` の全手順に従い、`.pfdsl/bindings/pfd-ops.md` に「ワークサイクルの追加手順」節があれば手順1〜3の各段でその追加手順にも従う
+- **終端ゲート**: `references/work-cycle.md` の終端ゲートと、binding の「ワークサイクルの追加手順」が加える項目に従う
+- **知見の振り分け**: `references/work-cycle.md` の運用契約「知見と機械化」と `.pfdsl/workflow.pfdsl` および sibling companion に従い、再発防止の反映先・機械化の判定・hook の決定軸は binding に従う
 - **GitHub Issues の操作**: roadmap companion が採用を宣言している場合だけ `references/github-issues-backend.md` に従う
 - **ファイルベースの作業項目操作**: roadmap companion が採用を宣言している場合だけ `references/file-based-tracker-backend.md` に従う
 - **変換境界の変更**: `.pfdsl/pipeline.pfdsl` と sibling companion に従う
@@ -49,7 +49,7 @@ node ${CLAUDE_PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstr
 ## References
 
 - 各運用 `.pfdsl` の sibling `.md` companion — リポ固有のバインディングと手続き
-- `references/work-cycle.md` — 運用契約とワークサイクル
+- `references/work-cycle.md` — 運用契約と PFD 固有のワークサイクル手順（リポ固有の規律は `.pfdsl/bindings/pfd-ops.md` が持つ）
 - `references/architecture.md` — 層構成、配置、鮮度チェックの詳細
 - `references/github-issues-backend.md` — GitHub Issues バックエンドのプリセット規約（採用リポのみ）
 - `references/file-based-tracker-backend.md` — ファイルベース・トラッカーのプリセット規約（採用リポのみ）

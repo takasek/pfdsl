@@ -16,7 +16,7 @@ pfd-ops スキルは4層で構成される。各層の「配布可能性」が�
 ## L1: 汎用プロトコル（SKILL.md 本文）
 
 PFD の概念だけで導ける手順。固有名詞なし。
-項目の内容は `references/work-cycle.md` の「運用契約」と4手順が一次情報 — ここには複製しない（列挙ドリフト防止）。
+項目の内容は `references/work-cycle.md` の「運用契約」と4手順が一次情報 — ここには複製しない（列挙ドリフト防止）。採用リポ固有の規律を加える節は `.pfdsl/bindings/<スキル名>.md` が持つ。
 
 ## L2: ディスパッチ（SKILL.md 本文）
 
@@ -119,7 +119,7 @@ pfdsl 開発リポ固有の例:
   SKILL.md                     ← L1 + L2
   references/
     architecture.md            ← このファイル
-    work-cycle.md              ← /pfd-cycle のサイクル4手順（L1 の手順本文を SKILL.md から切り出したもの）
+    work-cycle.md              ← /pfd-cycle のサイクル4手順（L1 の手順本文を SKILL.md から切り出したもの。リポ固有の規律は採用リポの binding）
     github-issues-backend.md   ← L3 プリセット規約
     scaffold/                  ← L4 雛形テンプレート
   scripts/

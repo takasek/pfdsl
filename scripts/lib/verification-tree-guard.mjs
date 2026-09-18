@@ -31,7 +31,7 @@
 // drifted shell that cds back into the worktree is asked about anyway, and
 // one that cds out of it is not asked at all. Splitting the directory change
 // into its own call is what makes either case visible, which is why
-// work-cycle.md tells a cycle to do that rather than chain the two.
+// the pfd-ops binding tells a cycle to do that rather than chain the two.
 
 import {
 	splitSegments,
