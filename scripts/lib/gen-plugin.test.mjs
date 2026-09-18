@@ -544,7 +544,10 @@ describe("assemblePluginDistIndependent", () => {
 			pluginRoot: "/repo/plugin/pfdsl",
 			deps,
 		});
-		const [, path, content] = calls.find((c) => c[0] === "writeFileSync");
+		const [, path, content] = calls.find(
+			(c) =>
+				c[0] === "writeFileSync" && /\.claude-plugin\/plugin\.json$/.test(c[1]),
+		);
 		assert.match(path, /\.claude-plugin\/plugin\.json$/);
 		assert.equal(
 			JSON.parse(content).version,
@@ -2190,7 +2193,7 @@ describe("assembleCodexAssets", () => {
 		assert.equal(files.has("/repo/AGENTS.md/prior.txt"), false);
 		assert.match(
 			files.get("/repo/AGENTS.md"),
-			/^<!-- DO NOT EDIT\. Authoritative source: CLAUDE\.md\. -->$/m,
+			/^<!-- DO NOT EDIT\. Authoritative source: scripts\/root-instructions-template\/INSTRUCTIONS\.md\. -->$/m,
 		);
 		assert.match(
 			files.get("/repo/AGENTS.md"),

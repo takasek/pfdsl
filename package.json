@@ -10,6 +10,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.14",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "mustache": "^4.2.0",
     "typescript": "^5.4.0",
     "yaml": "^2.4.0"
   }

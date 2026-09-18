@@ -13,6 +13,7 @@ import { renderCliSection } from "./lib/skill-cli-section.mjs";
 import { findMissingFields } from "./lib/skill-field-drift.mjs";
 import { injectGeneratedHeader } from "./lib/skill-header.mjs";
 import { parseSkillOutDir } from "./lib/skill-out-dir.mjs";
+import { findUnresolvedTemplateTokens } from "./lib/template-tokens.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -79,7 +80,7 @@ const skillMd = injectGeneratedHeader(templateSrc)
 
 // Fail loudly if the template carries a placeholder nobody substituted — a
 // typo'd or newly-added {{name}} would otherwise ship as a literal to readers.
-const leftover = [...new Set(skillMd.match(/\{\{[^{}]*\}\}/g) ?? [])];
+const leftover = findUnresolvedTemplateTokens(skillMd);
 if (leftover.length > 0) {
 	console.error(
 		`Error: unreplaced template placeholder(s) in generated SKILL.md: ${leftover.join(", ")}`,

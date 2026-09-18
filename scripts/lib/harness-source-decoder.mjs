@@ -248,7 +248,7 @@ function assertDeclaredSourceTypes(root, contract, fs) {
 			case "claude-command":
 			case "claude-agent":
 			case "claude-settings":
-			case "claude-root-instructions":
+			case "root-instructions-template":
 			case "plugin-hooks":
 			case "cli-package-metadata":
 				break;
@@ -396,7 +396,7 @@ function readAndValidateDeclaredSources(root, contract, fs) {
 			);
 			validatePluginHooks(path, parsed);
 			decoded.set(capability.id, parsed);
-		} else if (source.encoding === "claude-root-instructions") {
+		} else if (source.encoding === "root-instructions-template") {
 			decoded.set(capability.id, fs.readFileSync(path, "utf-8"));
 		} else if (source.encoding === "cli-package-metadata") {
 			decoded.set(
@@ -442,7 +442,7 @@ function decodeSemanticRecord(capability, source) {
 				model: source.frontmatter.model,
 				body: source.body,
 			};
-		case "claude-root-instructions":
+		case "root-instructions-template":
 			return { body: source };
 		case "claude-settings":
 			return {

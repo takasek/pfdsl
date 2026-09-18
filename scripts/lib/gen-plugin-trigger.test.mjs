@@ -36,6 +36,8 @@ describe("GEN_PLUGIN_TRIGGER", () => {
 			"scripts/lib/harness-inventory.mjs",
 			"scripts/lib/gen-codex-assets.mjs",
 			"scripts/gen-codex-assets.mjs",
+			"scripts/lib/root-instructions.mjs",
+			"scripts/root-instructions-template/INSTRUCTIONS.md",
 			"AGENTS.md",
 			".agents/skills/pfd-ops/SKILL.md",
 			".codex/agents/pfd-implementer.toml",

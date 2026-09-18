@@ -43,6 +43,11 @@
             "type": "command",
             "command": "node scripts/roadmap-publish-guard.mjs",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node scripts/generated-root-instructions-guard.mjs",
+            "timeout": 10
           }
         ]
       }
