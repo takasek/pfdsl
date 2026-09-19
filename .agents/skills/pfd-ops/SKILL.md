@@ -22,7 +22,7 @@ description: |
 
 ## 適用単位
 
-pfd-ops は、操作に対応する採用済み PFD ごとに適用する。対象の PFD が存在しない、または scaffold のままであれば、その操作だけを非適用として呼び出し元の通常フローへ戻し、ほかの PFD を使う操作は継続する。`.pfdsl/roadmap.pfdsl` が存在しなくても、実データの `.pfdsl/workflow.pfdsl` があれば知見の振り分けなど workflow の操作を実行できる。ユーザーが明示的に PFD の導入または既存 scaffold の実データ化を依頼した場合に限り、pfd-ecosystem スキル（`/pfd-init`）を案内する。
+pfd-ops は、操作に対応する採用済み PFD ごとに適用する。対象の PFD が存在しない、または scaffold のままであれば、その操作だけを非適用として呼び出し元の通常フローへ戻し、ほかの PFD を使う操作は継続する。`.pfdsl/roadmap.pfdsl` が存在しなくても、実データの `.pfdsl/workflow.pfdsl` があれば知見の振り分けなど workflow の操作を実行できる。ユーザーが明示的に PFD の導入または既存 scaffold の実データ化を依頼した場合に限り、pfd-ecosystem スキル（`/pfd-init`）を案内する。**依頼がそれに当たるか判別できない場合は、どちらとも決めずにユーザーへ問う。** scaffold かどうかには機械的な判定があるが、依頼の解釈には無い — 読み手が自分で決めると「案内しない」側にも「勝手に実データ化する」側にも倒れうる。問いが解けるまで、その操作は非適用のままとする。
 
 ## 発火時の必須セルフチェック
 
@@ -32,16 +32,17 @@ pfd-ops は、操作に対応する採用済み PFD ごとに適用する。対�
 node ${PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
 ```
 
-同じタイミングで `.pfdsl/bindings/pfd-ops.md` が存在すれば読み、追加のセルフチェック手順があれば実行する。binding はリポ固有の追加自己点検の一次置き場であり、本ファイルは個別スクリプト名を持たない。
+同じタイミングで `.pfdsl/bindings/pfd-ops.md` が存在すれば、**追加のセルフチェック手順を持つ範囲だけを読み**、あれば実行する。binding はリポ固有の追加自己点検の一次置き場であり、本ファイルは個別スクリプト名を持たない。
+**発火時に binding を全読しない。** binding は工程ごとの節（「ワークサイクルの追加手順」やバックエンド固有の節）も持ち、それらは下の L2 ディスパッチが該当操作へ導く時点で初めて要る。発火はその操作を行わない回も含むので、全読すると使わない節のぶんを毎回払う。節見出しで範囲を絞って読む。
 
 ## 運用ファイルの所在（L2 ディスパッチ）
 
 各運用 `.pfdsl` を扱うときは同名 sibling `.md` も読み、次の一意な経路で詳細を解決する。
 
 - **閲覧・分類・優先順位**: 採用済み roadmap では `pfdsl status ready <roadmap.pfdsl> --best --json` で着手可能集合と推薦を列挙し、作業項目の分類は roadmap companion が指す採用バックエンドに従う
-- **作業項目への着手**: `references/work-cycle.md` の全手順に従う
-- **終端ゲート**: `references/work-cycle.md` の終端ゲートに従う
-- **知見の振り分け**: `references/work-cycle.md` の運用契約と `.pfdsl/workflow.pfdsl` および sibling companion に従う
+- **作業項目への着手**: `references/work-cycle.md` の全手順に従い、`.pfdsl/bindings/pfd-ops.md` に「ワークサイクルの追加手順」節があれば手順1〜3の各段でその追加手順にも従う
+- **終端ゲート**: `references/work-cycle.md` の終端ゲートと、binding の「ワークサイクルの追加手順」が加える項目に従う
+- **知見の振り分け**: `references/work-cycle.md` の運用契約「知見と機械化」と `.pfdsl/workflow.pfdsl` および sibling companion に従い、再発防止の反映先・機械化の判定・hook の決定軸は binding に従う
 - **GitHub Issues の操作**: roadmap companion が採用を宣言している場合だけ `references/github-issues-backend.md` に従う
 - **ファイルベースの作業項目操作**: roadmap companion が採用を宣言している場合だけ `references/file-based-tracker-backend.md` に従う
 - **変換境界の変更**: `.pfdsl/pipeline.pfdsl` と sibling companion に従う
@@ -50,7 +51,7 @@ node ${PLUGIN_ROOT}/skills/pfd-ops/scripts/check-install-sync.mjs --upstream
 ## References
 
 - 各運用 `.pfdsl` の sibling `.md` companion — リポ固有のバインディングと手続き
-- `references/work-cycle.md` — 運用契約とワークサイクル
+- `references/work-cycle.md` — 運用契約と PFD 固有のワークサイクル手順（リポ固有の規律は `.pfdsl/bindings/pfd-ops.md` が持つ）
 - `references/architecture.md` — 層構成、配置、鮮度チェックの詳細
 - `references/github-issues-backend.md` — GitHub Issues バックエンドのプリセット規約（採用リポのみ）
 - `references/file-based-tracker-backend.md` — ファイルベース・トラッカーのプリセット規約（採用リポのみ）

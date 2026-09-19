@@ -262,7 +262,7 @@ artifact:
   retro_skill:
     label: ふりかえり監査スキル
     description: "/pfd-retro コマンド。図・セッションイベント・知識成果物の監査カタログ。ユーザーの監査介入17件から蒸留（手書き、生成対象外）。A・B 層は任意の PFD レビューにも使う"
-    criteria: /pfd-retro を起動すると各層の findings が振り分け先付きで出力される。make gen-plugin が差分なしで完了する
+    criteria: /pfd-retro を起動すると適用した層の findings が振り分け先付きで出力される（D 層は bindings_pfd_retro の採用宣言があるときだけ適用する。ADR-0039）。make gen-plugin が差分なしで完了する
     location: ../.claude/skills/pfd-retro/
     group: generation
     tags: [ distilled_skill ]
@@ -360,7 +360,7 @@ artifact:
   bindings_pfd_ops:
     label: pfd-ops バインディング
     description: "pfd-ops 運用に紐づく Claude への恒常指示（PR 本文規約等）。sibling companion でなく独立ファイル（読み込み契機がスキル発火であり PFD グラフ操作と一致しないため）。pfd-ops skill が存在すれば読む"
-    criteria: 記載内容を pfd-ops SKILL.md・work-cycle.md の現行記述に突き合わせて矛盾がない（bindings/ 配下に機械検査は無く、pfd-retro D 層監査で観察する）
+    criteria: 記載内容を pfd-ops SKILL.md・work-cycle.md の現行記述に突き合わせて矛盾がなく、配布層から移設した手順（ADR-0039）が binding 側に揃っている（必須見出しだけ check-companion-bindings が検査し、本文の整合は pfd-retro D 層監査で観察する）
     location: bindings/pfd-ops.md
     group: generation
     tags: [ distilled_doc ]
@@ -370,7 +370,7 @@ artifact:
       pfd-retro が参照する図・仕様レンズと、検索可能な事例・観察・反例の保存先、運用責任の終了、配布物への finding 反映手続きを持つ。
       bindings/pfd-retro-patterns/ の当時の本文と証拠を保存し、現行手順の適用点を案内する。
       カタログの対策抽出・phase・自動選別には依存しない。
-    criteria: check-companion-bindings が必須見出しを確認し、最終差分レビューで事例の証拠保存と現行手順の到達・非依存を確認する
+    criteria: check-companion-bindings が必須見出しを確認し、最終差分レビューで事例の証拠保存と現行手順の到達・非依存、および1回の実行契約と知識成果物ライフサイクル監査の採用宣言（ADR-0039）の実在を確認する
     location: [ bindings/pfd-retro.md, bindings/pfd-retro-patterns/ ]
     group: generation
     tags: [ distilled_doc ]
