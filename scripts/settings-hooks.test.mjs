@@ -68,6 +68,13 @@ describe(".claude/settings.json hook wiring", () => {
 		);
 	});
 
+	it("leaves Markdown linebreak checks to pre-commit", () => {
+		assert.equal(
+			wiringByCommand().has("node scripts/md-write-check.mjs"),
+			false,
+		);
+	});
+
 	it("does not warn about a stale dist/ after the fact — the build dependency removed the case", () => {
 		assert.equal(
 			wiringByCommand().has("node scripts/stale-dist-guard.mjs"),

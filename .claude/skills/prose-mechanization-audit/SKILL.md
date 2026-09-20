@@ -112,11 +112,11 @@ guard が読むのは生のコマンド行ではなく hook の payload なの�
 ## 各工程の直後に検査する
 
 ```sh
-node scripts/check-md-linebreaks.mjs
 make check-docs
 ```
 
 散文を削除・ポインタ化・書き換えた工程の直後に回す。
+Markdown の改行規約は pre-commit の staged 検査が担う。
 最後にまとめて回すと、どの工程の編集が壊したかを切り分ける手戻りが出る。
 散文を消す編集では `check-companion-bindings`（必須見出しの実在）と `check-entry-path-headings` が特に落ちやすい — 一次情報へのポインタだけを残したつもりで、見出しごと落としている場合がある。
 

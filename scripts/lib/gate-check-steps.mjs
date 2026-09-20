@@ -568,8 +568,7 @@ export function commitSubjectStep({ exec, base, check = checkCommitSubjects }) {
  * migrating one — the one whose absence happened to be noticed — would leave
  * six with the same gap and the same issue waiting to be filed. Whole-repo
  * scope is not a problem in practice: CI runs this same target on every push,
- * so the tree the branch starts from is already clean (the argument
- * md-write-check.mjs makes for reading whole files rather than diffs).
+ * so the tree the branch starts from is already clean.
  */
 export function checkDocsStep({ exec }) {
 	const name = "check-docs";

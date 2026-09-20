@@ -29,21 +29,17 @@ import { gitLsFiles } from "./lib/run-exec.mjs";
 
 /**
  * Reads filePath and runs lib/md-linebreaks.mjs's pure checkFile against it.
- * Kept here (rather than inlined at each call site) so scripts/md-write-check.mjs
- * can import a single file-path-in, violations-out entry point in-process (#650).
  */
 export function checkFile(filePath) {
 	return checkFileText(filePath, readFileSync(filePath, "utf8"));
 }
 
-/** Formats one violation the way the CLI prints it — shared with md-write-check.mjs (#650). */
+/** Formats one violation for the CLI. */
 export function formatViolation(v) {
 	return `${v.file}:${v.line}: mid-sentence line break\n  prev: …${v.prev.slice(-80)}\n  cont: ${v.cont.slice(0, 80)}`;
 }
 
-// CLI mode: `node scripts/check-md-linebreaks.mjs [files...]`. Guarded so
-// scripts/lib/md-write-check.mjs can import checkFile/formatViolation
-// in-process without spawning this as a subprocess.
+// CLI mode: `node scripts/check-md-linebreaks.mjs [files...]`.
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	const args = process.argv.slice(2);
 	const listFiles = () => gitLsFiles(["*.md"]);
