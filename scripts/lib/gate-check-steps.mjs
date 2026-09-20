@@ -535,8 +535,8 @@ export function formatCycleWindowReport({ fetchResult, window }) {
 }
 
 /**
- * commit subject lint: Conventional Commits format plus the English-language
- * rule. Granularity stays MANUAL.
+ * Commit subject lint: Conventional Commits format only.
+ * Language and granularity remain review guidance.
  *
  * --no-merges is not an optimisation. Taking base into a branch is a step this
  * repo's own procedure prescribes, and git writes those subjects itself

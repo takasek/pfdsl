@@ -201,7 +201,7 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 	});
 }
 
-// 7. commit subject lint (Conventional Commits message format and language;
+// 7. commit subject lint (Conventional Commits message format;
 // granularity stays MANUAL)
 results.push(commitSubjectStep({ exec, base }));
 

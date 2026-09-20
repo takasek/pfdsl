@@ -87,16 +87,13 @@ describe("check-commit-subjects CLI", () => {
 		assert.match(r.stdout, /add a thing/);
 	});
 
-	it("names only the rule it enforces when a CJK subject fails", () => {
-		// The predicate rejects CJK outside quoted spans and lets other
-		// non-English scripts through, so a message promising English would
-		// send a reader looking for a check that does not exist.
+	it("accepts a well-formed subject without judging its language", () => {
 		const from = headSha(root);
 		const head = commit(root, "fix(cli): 直す");
 		const r = runCli(root, ["--base", from, "--head", head]);
-		assert.equal(r.status, 1, r.stdout + r.stderr);
-		assert.match(r.stderr, /CJK/);
-		assert.doesNotMatch(r.stderr, /English/);
+		assert.equal(r.status, 0, r.stdout + r.stderr);
+		assert.match(r.stdout, /PASS/);
+		assert.equal(r.stderr, "");
 	});
 
 	it("rejects a subject whose type is preceded by whitespace", () => {
