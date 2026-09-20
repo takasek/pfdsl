@@ -19,6 +19,23 @@ function buildFromSource(src: string) {
 }
 
 describe("exportDot", () => {
+	it("quotes hyphenated group ids, including nested groups", () => {
+		const { graph, frontmatter } = buildFromSource(`---
+group:
+  outer-group: { label: Outer }
+  inner-group: { label: Inner, parent: outer-group }
+process:
+  do-work: { group: inner-group }
+---
+input-data >> do-work -> output-data
+`);
+		const dot = exportDot(graph, frontmatter);
+		expect(dot).toContain('subgraph "cluster_outer-group" {');
+		expect(dot).toContain('subgraph "cluster_inner-group" {');
+		expect(dot).toContain('"input-data" -> "do-work";');
+		expect(dot).toContain('"do-work" -> "output-data";');
+	});
+
 	it("emits a digraph with default rankdir LR", () => {
 		const { graph, frontmatter } = buildFromSource("req >> design -> spec\n");
 		const dot = exportDot(graph, frontmatter);
