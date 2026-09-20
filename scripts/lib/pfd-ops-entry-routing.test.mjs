@@ -52,6 +52,15 @@ describe("pfd-ops entry routing", () => {
 		assert.match(inspectionRoute[0], /採用バックエンド/);
 	});
 
+	// Two independent adoption probes read architecture.md as promising silence
+	// for a repo without the GitHub Issues backend, ran the check, and got two
+	// lines — the prose has to describe what the script does.
+	it("describes the self-check output a non-adopting repo actually sees", () => {
+		assert.doesNotMatch(architecture, /未採用のリポでは何も出ない/);
+		assert.match(architecture, /未採用である旨と `--deploy` の案内が出る/);
+		assert.match(architecture, /案内に従わず未採用のまま進む/);
+	});
+
 	it("keeps mandatory startup actions in the entry", () => {
 		assert.match(
 			skill,

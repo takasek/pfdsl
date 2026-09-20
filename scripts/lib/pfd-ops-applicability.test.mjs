@@ -159,10 +159,16 @@ describe("pfd-ops applicability contract", () => {
 		assert.doesNotMatch(githubBackend, format2Tokens);
 
 		// ADR-0039: the L3 preset delegates the record format to the adopting
-		// repo's binding instead of declaring it itself.
+		// repo's binding instead of declaring it itself — and, with the format
+		// gone from the bundle, must not require a record the binding has not
+		// defined, or an adopting repo is told to invent one.
 		assert.match(
 			fileBackend,
-			/書式と再承認参照の検査は採用リポの binding が定める/,
+			/書式・再承認参照の検査は採用リポの binding が定める/,
+		);
+		assert.match(
+			fileBackend,
+			/binding がそれを定めていなければ、このプリセットは記録を要求しない/,
 		);
 		assert.doesNotMatch(fileBackend, /設計記録形式: 3/);
 		// The declaration token leaving is not enough: the preset must not require
