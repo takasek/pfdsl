@@ -68,10 +68,10 @@ describe(".claude/settings.json hook wiring", () => {
 		);
 	});
 
-	it("wires the stale-dist advisory to PostToolUse, where it reaches the model", () => {
-		assert.deepEqual(
-			wiringByCommand().get("node scripts/stale-dist-guard.mjs"),
-			["PostToolUse[Bash]"],
+	it("does not warn about a stale dist/ after the fact — the build dependency removed the case", () => {
+		assert.equal(
+			wiringByCommand().has("node scripts/stale-dist-guard.mjs"),
+			false,
 		);
 	});
 });
