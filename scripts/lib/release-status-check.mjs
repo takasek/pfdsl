@@ -89,28 +89,6 @@ export function formatDistributionReviewStatus({ record, unreviewedCount }) {
 }
 
 /**
- * Each registered asset-sweep target's currency, one line per target, shown
- * without blocking. `make release` refuses on the same reading
- * (scripts/check-asset-sweep.mjs); this is so that refusal is not a surprise.
- * @param {Array<{target: {label: string, threshold: number}, record: {commit: string|null, date?: string}|null, result: {ok: boolean, base: string, files?: string[], unreachable: boolean}}>} evaluations
- * @returns {string}
- */
-export function formatAssetSweepStatus(evaluations) {
-	return evaluations
-		.map(({ target, record, result }) => {
-			if (result.unreachable)
-				return `  ${target.label} ! cannot determine (recorded sweep commit ${result.base} is not in this clone)`;
-			const at = formatRecordStamp(record);
-			if (!result.ok) {
-				const since = at ? `since ${at}` : "never swept";
-				return `  ${target.label} ! ${result.files.length} added file(s) (${since}, threshold ${target.threshold})`;
-			}
-			return `  ${target.label} ✓ current${at ? ` (${at})` : ""}`;
-		})
-		.join("\n");
-}
-
-/**
  * The spec-history check's currency, shown without blocking. `make release`
  * refuses on the same verdict (scripts/check-spec-history.mjs); this line is
  * so the refusal is not a surprise.

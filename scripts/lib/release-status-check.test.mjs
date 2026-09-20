@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
 	compareVersions,
-	formatAssetSweepStatus,
 	formatDistributionReviewStatus,
 	formatFullReviewStatus,
 	formatResults,
@@ -194,75 +193,6 @@ describe("formatDistributionReviewStatus", () => {
 	});
 });
 
-describe("formatAssetSweepStatus", () => {
-	const target = {
-		label: "retro-pattern sweep (.pfdsl/bindings/pfd-retro-patterns)",
-		threshold: 20,
-	};
-
-	it("shows current when the target's added-file count is under threshold", () => {
-		const out = formatAssetSweepStatus([
-			{
-				target,
-				record: { commit: "a".repeat(40), date: "2026-08-01" },
-				result: {
-					ok: true,
-					base: "a".repeat(40),
-					files: [],
-					unreachable: false,
-				},
-			},
-		]);
-		assert.match(out, /✓/);
-		assert.match(out, /2026-08-01/);
-	});
-
-	it("reports the overdue count and threshold once a target trips", () => {
-		const out = formatAssetSweepStatus([
-			{
-				target,
-				record: { commit: "a".repeat(40), date: "2026-08-01" },
-				result: {
-					ok: false,
-					base: "a".repeat(40),
-					files: Array.from({ length: 22 }, (_, i) => `p${i}.md`),
-					unreachable: false,
-				},
-			},
-		]);
-		assert.match(out, /!/);
-		assert.match(out, /22/);
-		assert.match(out, /20/);
-	});
-
-	it("says never swept when there is no record", () => {
-		const out = formatAssetSweepStatus([
-			{
-				target,
-				record: null,
-				result: {
-					ok: false,
-					base: "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
-					files: Array.from({ length: 22 }, (_, i) => `p${i}.md`),
-					unreachable: false,
-				},
-			},
-		]);
-		assert.match(out, /never/);
-	});
-
-	it("says cannot determine when the recorded sweep commit is unreachable", () => {
-		const out = formatAssetSweepStatus([
-			{
-				target,
-				record: { commit: "b".repeat(40) },
-				result: { ok: false, base: "b".repeat(40), unreachable: true },
-			},
-		]);
-		assert.match(out, /cannot determine/);
-	});
-});
-
 describe("formatSpecHistoryStatus", () => {
 	it("shows current when spec-history.md documents the spec version", () => {
 		const out = formatSpecHistoryStatus({
@@ -320,9 +250,9 @@ describe("needsAction", () => {
 				skillBundleCommits: 0,
 				gates: [
 					{
-						id: "asset-sweep",
+						id: "distribution-review",
 						ok: false,
-						lines: ["The following asset sweeps are overdue:"],
+						lines: ["The distributed prompts have changed since review."],
 					},
 				],
 			}),
@@ -349,7 +279,6 @@ describe("needsAction", () => {
 		skillBundleCommits: 0,
 		gates: [
 			{ id: "distribution-review", ok: true, lines: [] },
-			{ id: "asset-sweep", ok: true, lines: [] },
 			{ id: "spec-history", ok: true, lines: [] },
 		],
 	};
@@ -421,18 +350,6 @@ describe("needsAction", () => {
 			needsAction({
 				...current,
 				gates: [{ id: "spec-history", ok: false, lines: [] }],
-			}),
-			true,
-		);
-	});
-
-	it("is true when a registered asset sweep is overdue", () => {
-		// `make release` refuses here (check-asset-sweep.mjs), and this gate
-		// runs nowhere else — CI is not wired to it, same as distributionReview.
-		assert.equal(
-			needsAction({
-				...current,
-				gates: [{ id: "asset-sweep", ok: false, lines: [] }],
 			}),
 			true,
 		);
