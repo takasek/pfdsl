@@ -67,7 +67,10 @@ describe("pfd-ops applicability contract", () => {
 		assert.match(githubBackend, /本文とコメント/);
 		assert.match(opsBinding, /投稿・編集時刻と初コミットの比較は行わない/);
 		assert.match(fileBackend, /当該項目に追記/);
-		assert.match(fileBackend, /改訂行を書く時点で実在するものを参照/);
+		assert.match(
+			fileBackend,
+			/参照先の実在・本文の意味・各改訂行との対応は人間レビューが確認する/,
+		);
 		assert.match(fileBackend, /完了契約/);
 		assert.match(fileBackend, /一次情報[^\n]+status[^\n]+完了/);
 		assert.match(fileBackend, /終端ゲート/);
@@ -187,8 +190,18 @@ describe("pfd-ops applicability contract", () => {
 		);
 		assert.doesNotMatch(fileBackend, /形式2/);
 		assert.doesNotMatch(fileBackend, format2Tokens);
-		assert.match(fileBackend, /コミット <40桁SHA>/);
-		assert.match(fileBackend, /承認.*コミット.*記録.*コミット/);
+		// The reapproval reference's grammar, what counts as approval evidence,
+		// and the commit split that produces it are discipline the backend fact
+		// does not imply, so they belong to the adopting repo (ADR-0039 category
+		// iii). The preset keeps only the fact that a commit SHA can name a
+		// version here.
+		assert.match(
+			fileBackend,
+			/再承認参照の文法と、何を承認証跡とするかは採用リポの binding が定める/,
+		);
+		assert.doesNotMatch(fileBackend, /コミット <40桁SHA>/);
+		assert.doesNotMatch(fileBackend, /承認履歴:/);
+		assert.doesNotMatch(fileBackend, /40桁の16進 SHA/);
 		assert.match(fileBackend, /解決器が無い/);
 		assert.doesNotMatch(fileBackend, /機械.*検証/);
 	});

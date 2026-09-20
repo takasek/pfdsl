@@ -44,6 +44,12 @@ D 層7項目を `pfd-retro/references/knowledge-lifecycle.md` へ分け、`.pfds
 成功表示や返却 URL が persisted body の証拠にならないのは GitHub API の性質であり、保存内容の一致確認は連携プリセット固有の配布契約（区分 ii）である。
 binding へ委ねるのは Format 3 の書式と再承認参照の検査に限る。
 
+**再承認参照については、backend の事実と、そこから導けない規律を分ける。** 「ファイルベースではコミット SHA で特定の版を指せる」「GitHub のコメントは編集可能なので URL 文字列では自己参照を判定できない」は backend の性質で、区分 ii に属する。
+一方「再承認参照は SHA 形式に限る」「承認と改訂を2コミットに分ける」「`承認履歴:` に追記する」は、その性質からは導けない。
+何を承認証跡とするかは採用リポの設計であり、SHA が唯一安定な識別子だとも言えない。
+したがって参照の文法・承認証跡の定義・それを作るコミット手順は区分 iii とし、両 backend の L3 から外す。
+この線引きは2つの reference を対称にする — 当初は GitHub 側の canonical comment URL 文法だけを移し、file-based 側のコミット SHA 手順を L3 に残していた。
+
 ## Consequences
 
 採用リポは git 衛生・委譲・設計記録の書式・レビュー menu の手順を bundle から受け取らなくなる。
