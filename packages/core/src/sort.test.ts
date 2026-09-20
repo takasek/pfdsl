@@ -119,6 +119,27 @@ a >> p -> b
 });
 
 describe("sort --by topological", () => {
+	it("keeps a producer before a consumer with an additional source input", () => {
+		const src = `---
+artifact:
+  final: {}
+  built: {}
+  other: {}
+  start: {}
+process:
+  P2: {}
+  P1: {}
+---
+start >> P1 -> built
+[built, other] >> P2 -> final
+`;
+		const { output } = sort(src, { by: ["topological"] });
+		expect(nodeOrder(output, "process")).toEqual(["P1", "P2"]);
+		const artifacts = nodeOrder(output, "artifact");
+		expect(artifacts.indexOf("built")).toBeLessThan(artifacts.indexOf("final"));
+		expect(sort(output, { by: ["topological"] }).changed).toBe(false);
+	});
+
 	it("sorts nodes in topological order (source before sink)", () => {
 		const src = `---
 artifact:
