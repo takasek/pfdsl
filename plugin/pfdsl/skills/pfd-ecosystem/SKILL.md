@@ -98,6 +98,8 @@ node <pfd-ops skill root>/scripts/check-install-sync.mjs --deploy
 二者択一ではない — 前向きの列挙を既定の形としつつ、詰まった箇所ごとに grill で掘る。
 
 いずれの経路でも pfdsl スキルの品質ガイドに従って記法を確認する。雛形のプレースホルダは実際のノード名に置き換える（プレースホルダのまま残さない）。
+roadmap の雛形は出力 artifact を `suspended` にして着手候補から外してある。
+ノード名・完了条件を実データに置き換えた後、着手対象の出力 artifact を `todo` に戻す。
 
 ## ステップ 5: 検証とゲート
 

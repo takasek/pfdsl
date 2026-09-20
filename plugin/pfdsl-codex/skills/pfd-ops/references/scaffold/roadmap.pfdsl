@@ -17,7 +17,7 @@ artifact:
   first_milestone:
     label: (最初のマイルストーンに置き換える)
     criteria: (このマイルストーンの完了条件に置き換える。todo でも前宣言として書く)
-    status: todo
+    status: suspended
 
 process:
   start_work:
