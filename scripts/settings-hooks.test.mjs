@@ -75,6 +75,13 @@ describe(".claude/settings.json hook wiring", () => {
 		);
 	});
 
+	it("does not advise on companion prose after ordinary writes", () => {
+		assert.equal(
+			wiringByCommand().has("node scripts/companion-prose-advisory.mjs"),
+			false,
+		);
+	});
+
 	it("does not warn about a stale dist/ after the fact — the build dependency removed the case", () => {
 		assert.equal(
 			wiringByCommand().has("node scripts/stale-dist-guard.mjs"),

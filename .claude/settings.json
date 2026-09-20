@@ -75,16 +75,6 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node scripts/companion-prose-advisory.mjs",
-            "timeout": 10
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {

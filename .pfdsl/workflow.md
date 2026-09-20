@@ -315,11 +315,10 @@ worktree 作成から PR 作成までを一気通貫でやらせる場合のみ 
 
 一般形は上の「workflow.pfdsl に登録する agent の範囲」と同じく、pfd-ops の `references/work-cycle.md`「成果物の門番」が一次情報。
 このリポでの適用対象は `.claude/settings.json` に配線された hook 全般（PreToolUse ガードと PostToolUse advisory の双方）で、登録先は対象 artifact の分類と producer 関係を記録する `workflow.pfdsl`。
-節の名前を PreToolUse に限っていた頃に PostToolUse advisory（`companion-prose-advisory`）が現れ、判定の宛先が無いように読める状態になったため、対象を hook 全般へ広げてある。
-登録しない側に当たるのは `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` / `companion-prose-advisory` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
+登録しない側に当たるのは `command-usage-guard` / `closes-create-guard` / `roadmap-publish-guard` / `verification-tree-guard` / `worktree-write-guard` 等で、いずれも個別事故への対処であって図のプロセスの出力ではない。
 
 artifact 登録済みの一覧とそれぞれの要求元は `workflow.pfdsl` の artifact 定義と各 artifact の producer 関係が一次情報。`node packages/cli/dist/cli.js graph neighbors .pfdsl/workflow.pfdsl <hook artifact ID>` で対象 hook artifact の producer を引き、artifact 定義を参照する。
-PostToolUse advisory であっても、要求元の手順を名指しできれば登録側になる。advisory か guard かは判定軸ではなく、上の列挙で登録しない側に並ぶ `companion-prose-advisory` との違いも、要求元の手順を名指しできるかどうかだけである。
+PostToolUse advisory であっても、要求元の手順を名指しできれば登録側になる。advisory か guard かは判定軸ではなく、要求元の手順を名指しできるかどうかで判定する。
 **issue 番号に紐づくことは非参加者の判定根拠にならない** — 既存の登録 artifact にも issue 由来の機構がある。区別は出自の issue でなく、運用手順がその機構を要求しているか（＝図のプロセスの出力として生まれるか）で付ける。
 
 判定に迷う新規 hook は、その hook を要求している図のプロセスを名指しできるかで振り分ける。
