@@ -165,10 +165,21 @@ describe("pfd-ops applicability contract", () => {
 			/書式と再承認参照の検査は採用リポの binding が定める/,
 		);
 		assert.doesNotMatch(fileBackend, /設計記録形式: 3/);
+		// The declaration token leaving is not enough: the preset must not require
+		// a format by name either, or an adopting repo is told to use one whose
+		// definition the bundle no longer carries.
+		assert.doesNotMatch(fileBackend, /Format 3/);
+		assert.doesNotMatch(githubBackend, /Format 3 は/);
 		assert.match(fileBackend, /当該項目に追記/);
 		assert.match(fileBackend, /実装の初コミットとの順序は判定しない/);
 		assert.doesNotMatch(fileBackend, /投稿時刻|コメント.*編集|createdAt/);
-		assert.match(fileBackend, /移行履歴.*形式2/);
+		// The preset no longer names this repo's format history; it only says the
+		// time-based legacy compatibility is the GitHub backend's alone.
+		assert.match(
+			fileBackend,
+			/時刻による旧形式の互換性は GitHub Issues backend だけに適用する/,
+		);
+		assert.doesNotMatch(fileBackend, /形式2/);
 		assert.doesNotMatch(fileBackend, format2Tokens);
 		assert.match(fileBackend, /コミット <40桁SHA>/);
 		assert.match(fileBackend, /承認.*コミット.*記録.*コミット/);
