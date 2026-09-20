@@ -616,6 +616,40 @@ describe("harness source decoder", () => {
 		);
 	});
 
+	it("keeps enabledPlugins as a Claude-only settings field instead of rejecting it", () => {
+		const subject = fixture();
+		subject.addFile(
+			".claude/settings.json",
+			'{"permissions":{"allow":["Bash(node scripts/*)"]},"hooks":{},"enabledPlugins":{"pfdsl@pfdsl":false}}\n',
+		);
+
+		const records = decodeFixture({
+			root: ROOT,
+			contract: CONTRACT,
+			fs: subject.fs,
+		});
+
+		assert.deepEqual(
+			recordFor(records, "repository-hooks").semantic.enabledPlugins,
+			{
+				"pfdsl@pfdsl": false,
+			},
+		);
+	});
+
+	it("rejects a non-boolean enabledPlugins entry instead of dropping it", () => {
+		const subject = fixture();
+		subject.addFile(
+			".claude/settings.json",
+			'{"permissions":{"allow":["Bash(node scripts/*)"]},"hooks":{},"enabledPlugins":{"pfdsl@pfdsl":"no"}}\n',
+		);
+
+		assert.throws(
+			() => decodeFixture({ root: ROOT, contract: CONTRACT, fs: subject.fs }),
+			/source-schema: claude-settings: .*settings\.json: expected boolean for enabledPlugins\["pfdsl@pfdsl"\]/,
+		);
+	});
+
 	it("rejects an unknown permissions field instead of dropping a permission", () => {
 		const subject = fixture();
 		subject.addFile(

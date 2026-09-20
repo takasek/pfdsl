@@ -18,7 +18,7 @@ const AGENT_FRONTMATTER_KEYS = new Set([
 	"tools",
 	"model",
 ]);
-const SETTINGS_KEYS = new Set(["permissions", "hooks"]);
+const SETTINGS_KEYS = new Set(["permissions", "hooks", "enabledPlugins"]);
 const PERMISSIONS_KEYS = new Set(["allow"]);
 const HOOK_ENTRY_KEYS = new Set(["matcher", "hooks"]);
 const HOOK_COMMAND_KEYS = new Set([
@@ -343,6 +343,24 @@ function validateSettings(path, settings) {
 		"claude-settings",
 	);
 	validateHooks(path, "claude-settings", settings.hooks, SETTINGS_HOOK_EVENTS);
+	validateEnabledPlugins(path, settings.enabledPlugins);
+}
+
+// `enabledPlugins` is Claude-only: it is kept on the semantic record so the
+// repository configuration is not dropped, but no Codex output renders it.
+function validateEnabledPlugins(path, enabledPlugins) {
+	if (enabledPlugins === undefined) return;
+	assertPlainObject(enabledPlugins, path, "claude-settings", "enabledPlugins");
+	for (const [plugin, enabled] of Object.entries(enabledPlugins)) {
+		if (typeof enabled !== "boolean") {
+			sourceSchemaError(
+				path,
+				"claude-settings",
+				`enabledPlugins["${plugin}"]`,
+				"expected boolean for",
+			);
+		}
+	}
 }
 
 function validatePluginHooks(path, manifest) {
@@ -448,6 +466,9 @@ function decodeSemanticRecord(capability, source) {
 			return {
 				permissions: clone(source.permissions),
 				hooks: clone(source.hooks),
+				...(source.enabledPlugins === undefined
+					? {}
+					: { enabledPlugins: clone(source.enabledPlugins) }),
 			};
 		case "plugin-hooks":
 			return { hooks: clone(source.hooks) };
