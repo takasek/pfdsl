@@ -1,6 +1,6 @@
 // Blocks or asks about git commands that change the working tree or index when
 // the target is main (#650, widened in #777) or another worktree in the same
-// repository (#784). CLAUDE.md and work-cycle.md require each session to keep
+// repository (#784). CLAUDE.md and the pfd-ops binding require each session to keep
 // its work inside its own worktree so gate-check and review see one coherent
 // change set.
 //

@@ -6,6 +6,9 @@ const read = (path) => readFileSync(path, "utf8");
 const skill = read(".claude/skills/pfd-ops/SKILL.md");
 const architecture = read(".claude/skills/pfd-ops/references/architecture.md");
 const workCycle = read(".claude/skills/pfd-ops/references/work-cycle.md");
+// ADR-0039 moved this repo's own work discipline out of the bundle, so the
+// rules the entry must not carry now live here rather than in work-cycle.md.
+const opsBinding = read(".pfdsl/bindings/pfd-ops.md");
 const activeCanonicalPaths = [
 	".claude/skills/pfd-ops/SKILL.md",
 	".claude/skills/pfd-ops/references/architecture.md",
@@ -49,6 +52,15 @@ describe("pfd-ops entry routing", () => {
 		assert.match(inspectionRoute[0], /採用バックエンド/);
 	});
 
+	// Two independent adoption probes read architecture.md as promising silence
+	// for a repo without the GitHub Issues backend, ran the check, and got two
+	// lines — the prose has to describe what the script does.
+	it("describes the self-check output a non-adopting repo actually sees", () => {
+		assert.doesNotMatch(architecture, /未採用のリポでは何も出ない/);
+		assert.match(architecture, /未採用である旨と `--deploy` の案内が出る/);
+		assert.match(architecture, /案内に従わず未採用のまま進む/);
+	});
+
 	it("keeps mandatory startup actions in the entry", () => {
 		assert.match(
 			skill,
@@ -72,7 +84,8 @@ describe("pfd-ops entry routing", () => {
 		assert.match(architecture, /--overwrite-local-edits/);
 		assert.match(architecture, /Possible renames/);
 		assert.match(workCycle, /版 artifact を起こす契機/);
-		assert.match(workCycle, /hook の決定を選ぶ軸/);
+		assert.match(opsBinding, /hook の決定を選ぶ軸/);
+		assert.doesNotMatch(workCycle, /hook の決定を選ぶ軸/);
 	});
 
 	it("preserves the decisions needed by representative scenarios", () => {
@@ -100,10 +113,15 @@ describe("pfd-ops entry routing", () => {
 			],
 			["事故対処の道具", /個別の事故への対処[^\n]+参加者ではない/],
 			["pipeline 不在", /pipeline\.pfdsl`? が存在しない[^\n]+別の PFD/],
+		]) {
+			assert.match(workCycle, decision, counterexample);
+		}
+		// The hook-decision counterexamples moved with their rule (ADR-0039).
+		for (const [counterexample, decision] of [
 			["deny retry", /1回の retry[^\n]+対処済み[^\n]+deny/],
 			["ask retry", /payload[^\n]+ask[^\n]+deny[^\n]+retry/],
 		]) {
-			assert.match(workCycle, decision, counterexample);
+			assert.match(opsBinding, decision, counterexample);
 		}
 	});
 

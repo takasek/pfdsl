@@ -1,6 +1,6 @@
 # ADR-0023: L4 companion から配布層への昇格経路
 
-- Status: Accepted
+- Status: Accepted（ADR-0039 で昇格基準を改訂）
 - Date: 2026-07-03
 
 ## Context
