@@ -155,17 +155,13 @@ describe("buildGates", () => {
 		);
 	});
 
-	it("derives one md gate carrying every staged .md path as an argument", () => {
+	it("checks Markdown index contents", () => {
 		const built = gates({ staged: ["README.md", "docs/spec/spec.md"] });
 		const md = built.find((g) => g.id === "md-linebreaks");
 		assert.deepEqual(md.commands, [
-			[
-				"node",
-				["scripts/check-md-linebreaks.mjs", "README.md", "docs/spec/spec.md"],
-			],
+			["node", ["scripts/check-md-linebreaks.mjs", "--staged"]],
 		]);
-		// The runner discards command output, so the hint has to be runnable.
-		assert.match(md.hint, /README\.md docs\/spec\/spec\.md/);
+		assert.match(md.hint, /Fix the reported lines/);
 	});
 
 	it("omits the md gate when no .md file is staged", () => {
@@ -177,8 +173,7 @@ describe("buildGates", () => {
 	});
 
 	it("omits gates for staged deletions, which have no file to check", () => {
-		// check-md-linebreaks.mjs falls back to every tracked .md when given no
-		// paths, so a gate built from an empty list would silently widen its scope.
+		// Deleted paths have no index contents to check.
 		const built = gates({
 			staged: ["README.md", ".pfdsl/roadmap.pfdsl"],
 			stagedPresent: [],

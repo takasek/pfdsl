@@ -17,6 +17,8 @@
  * Usage:
  *   node scripts/check-md-linebreaks.mjs [files...]
  *   (no args → all git-tracked *.md files)
+ *   node scripts/check-md-linebreaks.mjs --staged
+ *   (only staged *.md files, reading their index contents)
  *
  * Exit 0 = clean, Exit 1 = violations found.
  */
@@ -25,7 +27,7 @@ import { readFileSync } from "node:fs";
 import { isCliEntrypoint } from "./lib/cli-entrypoint.mjs";
 import { checkFile as checkFileText } from "./lib/md-linebreaks.mjs";
 import { runMdLinebreaksCheck } from "./lib/md-linebreaks-steps.mjs";
-import { gitLsFiles } from "./lib/run-exec.mjs";
+import { git, gitDiffNames, gitLsFiles } from "./lib/run-exec.mjs";
 
 /**
  * Reads filePath and runs lib/md-linebreaks.mjs's pure checkFile against it.
@@ -42,12 +44,27 @@ export function formatViolation(v) {
 // CLI mode: `node scripts/check-md-linebreaks.mjs [files...]`.
 if (isCliEntrypoint(import.meta.url, process.argv[1])) {
 	const args = process.argv.slice(2);
-	const listFiles = () => gitLsFiles(["*.md"]);
+	const staged = args[0] === "--staged";
+	if (staged && args.length !== 1) {
+		console.error(
+			"--staged checks all staged Markdown files; do not pass paths.",
+		);
+		process.exit(1);
+	}
+	if (args[0] === "--") args.shift();
+	const listFiles = () =>
+		staged
+			? gitDiffNames(["--cached", "--diff-filter=d", "--", "*.md"])
+			: gitLsFiles(["*.md"]);
 
 	const { exitCode, messages } = runMdLinebreaksCheck({
-		args,
+		args: staged ? [] : args,
 		listFiles,
-		readFile: (file) => readFileSync(file, "utf8"),
+		// Keep Git's hook environment, including GIT_INDEX_FILE: commits that
+		// supply an alternate index must check the same content they will write.
+		// Explicit stage 0 keeps a filename like 0:foo.md from selecting foo.md.
+		readFile: (file) =>
+			staged ? git(["show", `:0:${file}`]) : readFileSync(file, "utf8"),
 	});
 	for (const { stream, text } of messages) {
 		if (stream === "log") console.log(text);

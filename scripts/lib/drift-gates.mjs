@@ -7,12 +7,12 @@
  * were still `exit 1` in scripts/pre-commit, so each hid every gate after it
  * and turned one bad commit into as many attempts as it had problems (#759).
  *
- * Both of these cannot be spelled as a fixed argv: `pfdsl fmt` takes one
- * file, and check-md-linebreaks.mjs takes the staged paths. Rather than teach
+ * `pfdsl fmt` takes one file. Rather than teach
  * DriftGate about dynamic arguments — which would also mean teaching the runner
  * to report *which* command in a gate failed, to keep the file name in the hint
  * — the gate list itself became a function of the staged files. The fmt check
  * is then one gate per file, and DriftGate and runDriftGates are unchanged.
+ * Markdown uses --staged to select paths and read their contents from Git's index.
  */
 
 import { GEN_INSTALL_TRIGGER } from "./gen-install-trigger.mjs";
@@ -86,9 +86,8 @@ export function buildGates({ stagedPresent }) {
 			]),
 			hint: `${file} has a location: that does not resolve. Run 'node ${CLI_DIST} meta check-links ${file}' to see which node, then fix the path or restore the file.`,
 		})),
-		// Built only when there are paths to pass: check-md-linebreaks.mjs falls
-		// back to every tracked .md when called with none, so an empty argument
-		// list would quietly turn this into a repo-wide check.
+		// The CLI reads the index, so partial staging cannot hide a violation
+		// or reject a commit because of an unrelated unstaged edit.
 		...(mdFiles.length > 0
 			? [
 					{
@@ -96,12 +95,9 @@ export function buildGates({ stagedPresent }) {
 						trigger: /\.md$/,
 						requireDist: [],
 						commands: /** @type {[string, string[]][]} */ ([
-							["node", ["scripts/check-md-linebreaks.mjs", ...mdFiles]],
+							["node", ["scripts/check-md-linebreaks.mjs", "--staged"]],
 						]),
-						// The runner captures command output, so the violations
-						// themselves are not printed — the hint has to be the command
-						// that prints them.
-						hint: `Markdown prose has mid-sentence line breaks. Run 'node scripts/check-md-linebreaks.mjs ${mdFiles.join(" ")}' to see them, fix, and re-stage.`,
+						hint: "Staged Markdown prose has mid-sentence line breaks. Fix the reported lines, stage the intended content, and retry the commit.",
 					},
 				]
 			: []),
