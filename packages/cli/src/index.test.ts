@@ -2156,6 +2156,37 @@ describe("multifile check — extends", () => {
 });
 
 describe("status ready", () => {
+	it("does not recommend the shipped scaffold until its milestone is activated", async () => {
+		const scaffold = readFileSync(
+			resolve(
+				__dirname,
+				"../../../.claude/skills/pfd-ops/references/scaffold/roadmap.pfdsl",
+			),
+			"utf8",
+		);
+		for (const source of [
+			scaffold,
+			scaffold.replace(/label: .*/g, "label: Example"),
+		]) {
+			const r = await run(
+				["status", "ready", "-", "--best", "--json"],
+				withStdin(source),
+			);
+			expect(r.exitCode).toBe(0);
+			expect(JSON.parse(r.stdout)).toMatchObject({ ok: true, ready: [] });
+			expect(JSON.parse(r.stdout)).not.toHaveProperty("best");
+		}
+		const active = scaffold.replace(
+			"    status: suspended",
+			"    status: todo",
+		);
+		const r = await run(
+			["status", "ready", "-", "--best", "--json"],
+			withStdin(active),
+		);
+		expect(JSON.parse(r.stdout).best.id).toBe("start_work");
+	});
+
 	// Fixtures written in beforeAll(dir):
 	//   valid.pfdsl: "req >> design -> spec\nspec >> impl -> code\n"  (no status)
 	//   invalid.pfdsl: dual generators (V001, always error)

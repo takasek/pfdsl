@@ -90,7 +90,11 @@ export function exportDot(
 	function emitGroupBlock(gid: string, indent: string): void {
 		const gm = groupDefs[gid]!;
 		const inner = `${indent}  `;
-		lines.push(`${indent}subgraph cluster_${gid} {`);
+		const clusterId = `cluster_${gid}`;
+		const dotId = /^[A-Za-z_][A-Za-z0-9_]*$/.test(clusterId)
+			? clusterId
+			: quote(clusterId);
+		lines.push(`${indent}subgraph ${dotId} {`);
 		if (gm.label !== undefined)
 			lines.push(`${inner}label=${quote(String(gm.label))};`);
 		if (gm.color !== undefined) {
