@@ -181,7 +181,7 @@ describe("runCycleStatus", () => {
 		// cannot say whether a check ran and passed or does not exist there (#716).
 		assert.equal(result.ready, undefined);
 		assert.equal(result.best, undefined);
-		assert.equal(result.designUnsettledFor, undefined);
+		assert.equal(result.issueTargets, undefined);
 		assert.equal(result.gateCheckCommand, undefined);
 		assert.equal(result.preArtifactPatterns, undefined);
 		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
@@ -217,7 +217,7 @@ describe("runCycleStatus", () => {
 		assert.match(result.dirtyTree.message, /uncommitted/i);
 		assert.equal(result.ready, undefined);
 		assert.equal(result.best, undefined);
-		assert.equal(result.designUnsettledFor, undefined);
+		assert.equal(result.issueTargets, undefined);
 		assert.equal(result.gateCheckCommand, undefined);
 		assert.equal(result.preArtifactPatterns, undefined);
 		assert.ok(!calls.some(([, args]) => args.includes(CLI_PATH)));
@@ -382,414 +382,15 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.deepEqual(result.designUnsettledFor, [
+		assert.deepEqual(result.issueTargets, [
 			{
 				issue: 669,
 				source: "flag",
-				unsettled: true,
-				reason: "no-enumerated-options",
-				matchedLines: [],
-				optionCount: 0,
-				missingPrefixes: [],
-				record: null,
-				recordRequired: true,
 			},
 		]);
-		assert.equal(result.designUnsettledError, undefined);
+		assert.equal(result.issueError, undefined);
 		assert.ok(calls.some((c) => c[0] === "issue" && c.includes("669")));
 		assert.ok(!calls.some((c) => c[0] === "issue" && c.includes("42")));
-	});
-
-	// #927: the classifier says which required line the elected record is
-	// missing, and that is the whole reason the threshold sits in the classifier
-	// rather than in selectDesignRecord. It has to survive into the output the
-	// runner reads, or the reason value arrives with no way to act on it.
-	it("carries missingPrefixes through to the reported classification", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [669],
-				sh: (_file, args) => {
-					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
-					return "";
-				},
-				readFileSync: () => roadmapWithIssue("proc_a", 42),
-				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({
-							body: "普通の説明文。",
-							comments: [
-								{
-									body: "前提: x\n否定案: y",
-									createdAt: "2026-01-01T00:00:00Z",
-								},
-							],
-						});
-					return JSON.stringify([]);
-				},
-			}),
-		);
-		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
-		assert.deepEqual(result.designUnsettledFor[0].missingPrefixes, [
-			"却下理由:",
-		]);
-	});
-
-	it("carries incomplete format 3 problems without legacy repair prefixes", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [669],
-				sh: (_file, args) =>
-					args.includes(CLI_PATH) ? readyJsonOk("proc_a") : "",
-				readFileSync: () => roadmapWithIssue("proc_a", 42),
-				execGh: async (args) =>
-					args[0] === "issue"
-						? issueJson({
-								body: "普通の説明文。",
-								comments: [
-									{
-										body: "設計記録形式: 3",
-										createdAt: "2026-08-31T01:30:24Z",
-									},
-								],
-							})
-						: JSON.stringify([]),
-			}),
-		);
-		const payload = result.designUnsettledFor[0];
-		assert.equal(payload.reason, "record-incomplete");
-		assert.deepEqual(payload.missingPrefixes, []);
-		assert.ok(payload.problems.some((problem) => problem.includes("決定:")));
-	});
-
-	it("recognizes a decorated format 3 marker before computing repair prefixes", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [669],
-				sh: (_file, args) =>
-					args.includes(CLI_PATH) ? readyJsonOk("proc_a") : "",
-				readFileSync: () => roadmapWithIssue("proc_a", 42),
-				execGh: async (args) =>
-					args[0] === "issue"
-						? issueJson({
-								body: "普通の説明文。",
-								comments: [
-									{
-										body: "> 設計記録形式: 3",
-										createdAt: "2026-08-31T01:30:24Z",
-									},
-								],
-							})
-						: JSON.stringify([]),
-			}),
-		);
-		const payload = result.designUnsettledFor[0];
-		assert.equal(payload.reason, "record-incomplete");
-		assert.deepEqual(payload.missingPrefixes, []);
-		assert.ok(payload.problems.some((problem) => problem.includes("決定:")));
-	});
-
-	it("reports reader-first prefixes missing from a post-cutoff legacy record", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [669],
-				sh: (_file, args) => {
-					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
-					return "";
-				},
-				readFileSync: () => roadmapWithIssue("proc_a", 42),
-				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({
-							body: "普通の説明文。",
-							comments: [
-								{
-									body: "前提: x\n否定案: y\n却下理由: z",
-									createdAt: "2026-08-30T09:32:50Z",
-								},
-							],
-						});
-					return JSON.stringify([]);
-				},
-			}),
-		);
-		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
-		assert.deepEqual(result.designUnsettledFor[0].missingPrefixes, [
-			"提案:",
-			"理由:",
-			"前提を外した対案:",
-			"対案を採らない理由:",
-		]);
-	});
-
-	it("keeps reversed reader-first lines unsettled in the reported classification", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [669],
-				sh: (_file, args) => {
-					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
-					return "";
-				},
-				readFileSync: () => roadmapWithIssue("proc_a", 42),
-				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({
-							body: "普通の説明文。",
-							comments: [
-								{
-									body: "対案を採らない理由: w\n前提を外した対案: z\n理由: y\n提案: x",
-									createdAt: "2026-08-30T09:32:50Z",
-								},
-							],
-						});
-					return JSON.stringify([]);
-				},
-			}),
-		);
-		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
-		assert.equal(result.designUnsettledFor[0].recordRequired, true);
-	});
-
-	it("keeps a malformed comment timestamp unsettled in the reported classification", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [669],
-				sh: (_file, args) => {
-					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
-					return "";
-				},
-				readFileSync: () => roadmapWithIssue("proc_a", 42),
-				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({
-							body: "普通の説明文。",
-							comments: [
-								{
-									body: "提案: x\n理由: y\n前提を外した対案: z\n対案を採らない理由: w",
-									createdAt: "not-an-iso-timestamp",
-								},
-							],
-						});
-					return JSON.stringify([]);
-				},
-			}),
-		);
-		assert.equal(result.designUnsettledFor[0].reason, "record-incomplete");
-		assert.equal(result.designUnsettledFor[0].recordRequired, true);
-	});
-
-	it("resolves the target issue from the best process when --issue is absent", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				sh: (_file, args) => {
-					if (args.includes(CLI_PATH)) return readyJsonOk("proc_a");
-					return "";
-				},
-				readFileSync: () => roadmapWithIssue("proc_a", 42),
-				execGh: async (args) => {
-					if (args[0] === "issue")
-						return issueJson({
-							body: "設計未確定な点がある。",
-						});
-					return JSON.stringify([]);
-				},
-			}),
-		);
-		assert.equal(result.designUnsettledFor.length, 1);
-		assert.equal(result.designUnsettledFor[0].issue, 42);
-		assert.equal(result.designUnsettledFor[0].source, "best-process");
-		assert.equal(result.designUnsettledFor[0].unsettled, true);
-		assert.equal(result.designUnsettledFor[0].reason, "phrase");
-		assert.equal(result.designUnsettledFor[0].recordRequired, true);
-	});
-
-	it("judges every issue the cycle closes, not just the first", async () => {
-		const bodies = {
-			667: "普通の説明文。",
-			668: "## 対応案\n1. 案A\n2. 案B\n",
-		};
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [667, 668],
-				execGh: async (args) => {
-					if (args[0] === "issue") return issueJson({ body: bodies[args[2]] });
-					return JSON.stringify([]);
-				},
-			}),
-		);
-		assert.deepEqual(
-			result.designUnsettledFor.map((d) => [d.issue, d.unsettled]),
-			[
-				[667, true],
-				[668, true],
-			],
-		);
-	});
-
-	it("fetches revised-record edit info by node ID and exposes evidence detail", async () => {
-		const editCalls = [];
-		const recordBody = [
-			"設計記録形式: 3",
-			"決定:",
-			"- 保存方式（実装）: Aを段階導入する",
-			"理由:",
-			"- 保存方式: 障害範囲を限定できる",
-			"案の処分:",
-			"- 採用 — 元候補「A」— 今回採用する",
-			"前提検査 P1:",
-			"対象: 保存方式 / A",
-			"前提: 保存方式と通知方式を同時に変える必要がある",
-			"前提を外した案: 保存方式だけを段階導入する",
-			"既存候補との差分: 元候補は両方式を一組としていた",
-			"検査案の処分 P1: 採用 — 今回の決定に含める",
-			"改訂履歴:",
-			"- A → B — 変更理由 — 再承認: https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
-		].join("\n");
-		const comments = [
-			{
-				id: "IC_record",
-				databaseId: 10,
-				body: recordBody,
-				createdAt: "2026-09-05T15:00:00Z",
-				url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-10",
-			},
-			{
-				id: "IC_approval",
-				databaseId: 20,
-				createdAt: "2026-09-05T15:30:00Z",
-				url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
-			},
-		];
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [1098],
-				githubOps: {
-					listOpenPrs: async () => [],
-					repository: () => TARGET_REPOSITORY,
-					viewIssue: async () => ({
-						body: "普通の説明文。",
-						comments,
-						labels: [],
-					}),
-					designRecordEditInfo: async (params) => {
-						editCalls.push(params);
-						return {
-							status: "edited",
-							editedAtIso: "2026-09-05T16:00:00Z",
-						};
-					},
-				},
-			}),
-		);
-		assert.deepEqual(editCalls, [{ nodeId: "IC_record" }]);
-		assert.equal(result.designUnsettledFor[0].unsettled, false);
-		assert.equal(result.designUnsettledFor[0].reason, "record-posted");
-		assert.match(result.designUnsettledFor[0].detail, /server-recorded/);
-	});
-
-	it("resolves a selected record's edit time when the issue has more than 100 comments", async () => {
-		const editCalls = [];
-		const recordBody = [
-			"設計記録形式: 3",
-			"決定:",
-			"- 保存方式（実装）: Aを段階導入する",
-			"理由:",
-			"- 保存方式: 障害範囲を限定できる",
-			"案の処分:",
-			"- 採用 — 元候補「A」— 今回採用する",
-			"前提検査 P1:",
-			"対象: 保存方式 / A",
-			"前提: 保存方式と通知方式を同時に変える必要がある",
-			"前提を外した案: 保存方式だけを段階導入する",
-			"既存候補との差分: 元候補は両方式を一組としていた",
-			"検査案の処分 P1: 採用 — 今回の決定に含める",
-			"改訂履歴:",
-			"- A → B — 変更理由 — 再承認: https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
-		].join("\n");
-		const comments = [
-			{
-				id: "IC_record",
-				databaseId: 10,
-				body: recordBody,
-				createdAt: "2026-09-05T15:00:00Z",
-				url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-10",
-			},
-			{
-				id: "IC_approval",
-				databaseId: 20,
-				createdAt: "2026-09-05T15:30:00Z",
-				url: "https://github.com/takasek/pfdsl/issues/1098#issuecomment-20",
-			},
-			...Array.from({ length: 99 }, (_, index) => ({
-				id: `IC_noise_${index}`,
-				body: "通常のコメント。",
-				createdAt: "2026-09-05T15:31:00Z",
-			})),
-		];
-		assert.equal(comments.length, 101);
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [1098],
-				githubOps: {
-					listOpenPrs: async () => [],
-					repository: () => TARGET_REPOSITORY,
-					viewIssue: async () => ({
-						body: "普通の説明文。",
-						comments,
-						labels: [],
-					}),
-					designRecordEditInfo: async (params) => {
-						editCalls.push(params);
-						return {
-							status: "edited",
-							editedAtIso: "2026-09-05T16:00:00Z",
-						};
-					},
-				},
-			}),
-		);
-		assert.deepEqual(editCalls, [{ nodeId: "IC_record" }]);
-		assert.equal(result.designUnsettledFor[0].unsettled, false);
-	});
-
-	it("keeps a grandfathered free-form format 3 record settled through the step", async () => {
-		const recordBody = [
-			"設計記録形式: 3",
-			"決定:",
-			"- 保存方式（実装）: Aを段階導入する",
-			"理由:",
-			"- 保存方式: 障害範囲を限定できる",
-			"案の処分:",
-			"- 採用 — 元候補「A」— 今回採用する",
-			"前提検査 P1:",
-			"対象: 保存方式 / A",
-			"前提: 保存方式と通知方式を同時に変える必要がある",
-			"前提を外した案: 保存方式だけを段階導入する",
-			"既存候補との差分: 元候補は両方式を一組としていた",
-			"検査案の処分 P1: 採用 — 今回の決定に含める",
-			"改訂履歴:",
-			"- A → B — 変更理由 — 再承認: このコメント直前のユーザー承認",
-		].join("\n");
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [1098],
-				githubOps: {
-					listOpenPrs: async () => [],
-					viewIssue: async () => ({
-						body: "普通の説明文。",
-						comments: [
-							{
-								id: "IC_record",
-								body: recordBody,
-								createdAt: "2026-09-05T14:07:15Z",
-							},
-						],
-						labels: [],
-					}),
-				},
-			}),
-		);
-		assert.equal(result.designUnsettledFor[0].unsettled, false);
-		assert.equal(result.designUnsettledFor[0].reason, "record-posted");
 	});
 
 	it("keeps the issues it could read when one lookup throws", async () => {
@@ -806,10 +407,10 @@ describe("runCycleStatus", () => {
 			}),
 		);
 		assert.deepEqual(
-			result.designUnsettledFor.map((d) => d.issue),
-			[667],
+			result.issueTargets.map((d) => d.issue),
+			[667, 668],
 		);
-		assert.equal(result.designUnsettledError, "gh: issue not found");
+		assert.equal(result.issueError, "gh: issue not found");
 	});
 
 	it("builds a gate-check command naming every issue the cycle closes", async () => {
@@ -870,29 +471,6 @@ describe("runCycleStatus", () => {
 		assert.equal(result.headStateError, "fatal: not a git repository");
 	});
 
-	it("keeps the format 3 design-record template independent of enumerated option count", async () => {
-		const result = await runCycleStatus(
-			baseDeps({
-				issueNumbers: [721],
-				execGh: async (args) => {
-					if (args[0] === "issue") {
-						return issueJson({
-							body: "## 検討したい方向\n1. 案A\n2. 案B\n3. 案C\n",
-						});
-					}
-					return JSON.stringify([]);
-				},
-			}),
-		);
-		assert.equal(result.designRecordTemplate.lines[0], "設計記録形式: 3");
-		assert.deepEqual(
-			result.designRecordTemplate.lines.filter((line) =>
-				line.startsWith("案の処分 "),
-			),
-			[],
-		);
-	});
-
 	it("does not claim design review is required when an issue enumerates ordinary steps", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
@@ -930,20 +508,7 @@ describe("runCycleStatus", () => {
 		assert.equal("reviewRecordTemplate" in result, false);
 	});
 
-	it("emits the design-record template even when no issue could be resolved", async () => {
-		const result = await runCycleStatus(baseDeps({}));
-		assert.deepEqual(result.designUnsettledFor, []);
-		assert.ok(result.designRecordTemplate.lines.length > 0);
-		assert.ok(result.designRecordTemplate.lines.includes("案の処分:"));
-	});
-
-	it("does not prescribe a review trailer while retaining the design record template", async () => {
-		const result = await runCycleStatus(baseDeps({}));
-		assert.equal("reviewRecordTemplate" in result, false);
-		assert.ok(result.designRecordTemplate.lines.includes("改訂履歴:"));
-	});
-
-	it("returns a null designUnsettledFor with an error when neither --issue nor a best process is available", async () => {
+	it("reports issueTargets with an error when neither --issue nor a best process is available", async () => {
 		const calls = [];
 		const result = await runCycleStatus(
 			baseDeps({
@@ -957,15 +522,15 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.deepEqual(result.designUnsettledFor, []);
+		assert.deepEqual(result.issueTargets, []);
 		assert.equal(
-			result.designUnsettledError,
+			result.issueError,
 			"no --issue given and no best process to resolve an issue number from",
 		);
 		assert.ok(!calls.some((c) => c[0] === "issue"));
 	});
 
-	it("returns a null designUnsettledFor with the roadmap error when the best process has no issue number", async () => {
+	it("reports issueTargets with the roadmap error when the best process has no issue number", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				sh: (_file, args) => {
@@ -975,9 +540,9 @@ describe("runCycleStatus", () => {
 				readFileSync: () => "processes:\n  proc_a:\n    label: x\n",
 			}),
 		);
-		assert.deepEqual(result.designUnsettledFor, []);
+		assert.deepEqual(result.issueTargets, []);
 		assert.equal(
-			result.designUnsettledError,
+			result.issueError,
 			"no issue number found for process 'proc_a' in .pfdsl/roadmap.pfdsl",
 		);
 	});
@@ -998,7 +563,7 @@ describe("runCycleStatus", () => {
 		assert.equal(result.gateCheckCommandError, "roadmap unreadable");
 	});
 
-	it("returns a null designUnsettledFor with the gh error when the gh issue lookup throws", async () => {
+	it("reports issueTargets with the gh error when the gh issue lookup throws", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				issueNumbers: [669],
@@ -1008,8 +573,8 @@ describe("runCycleStatus", () => {
 				},
 			}),
 		);
-		assert.deepEqual(result.designUnsettledFor, []);
-		assert.equal(result.designUnsettledError, "gh: issue not found");
+		assert.deepEqual(result.issueTargets, [{ issue: 669, source: "flag" }]);
+		assert.equal(result.issueError, "gh: issue not found");
 		assert.equal(result.gateCheckCommand, null);
 		assert.equal(
 			result.gateCheckCommandError,
@@ -1455,12 +1020,12 @@ describe("runCycleStatus — issue lookup failure and unregisteredManagedIssues"
 			{ issue: 956, error: "lookup failed for 956" },
 			{ issue: 957, error: "lookup failed for 957" },
 		]);
-		assert.match(result.designUnsettledError, /956.*lookup failed for 956/);
-		assert.match(result.designUnsettledError, /957.*lookup failed for 957/);
+		assert.match(result.issueError, /956.*lookup failed for 956/);
+		assert.match(result.issueError, /957.*lookup failed for 957/);
 		assert.equal(result.blocking, true);
 	});
 
-	it("excludes an issue whose label lookup failed, and says so via designUnsettledError", async () => {
+	it("excludes an issue whose label lookup failed, and says so via issueError", async () => {
 		const result = await runCycleStatus(
 			baseDeps({
 				issueNumbers: [956],
@@ -1479,7 +1044,7 @@ describe("runCycleStatus — issue lookup failure and unregisteredManagedIssues"
 		// unknown); reporting nothing at all would hide that the check never ran.
 		assert.deepEqual(result.unregisteredManagedIssues, []);
 		assert.deepEqual(result.untriagedTargetIssues, []);
-		assert.match(result.designUnsettledError, /network unreachable/);
+		assert.match(result.issueError, /network unreachable/);
 		assert.deepEqual(result.issueLookupFailures, [
 			{ issue: 956, error: "gh: network unreachable" },
 		]);

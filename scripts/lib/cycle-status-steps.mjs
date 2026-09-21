@@ -15,11 +15,8 @@
 
 import { resolve } from "node:path";
 import {
-	buildDesignRecordTemplate,
 	buildGateCheckCommand,
-	classifyDesignSettlement,
 	countBehind,
-	detectEnumeratedOptions,
 	findIssueNumberForProcess,
 	findProcessIdForIssueNumber,
 	isUnregisteredManagedIssue,
@@ -27,12 +24,6 @@ import {
 	parseReadyOutput,
 	summarizeReleasePending,
 } from "./cycle-status.mjs";
-import {
-	classifyFormat3DesignRecord,
-	resolveDesignRecord,
-	toDesignRecordEntries,
-} from "./gate-check.mjs";
-
 /**
  * Return the CLI exit code for a preflight result.
  * @param {{blocking?: boolean, staleTree?: unknown, dirtyTree?: unknown}} result
@@ -46,7 +37,7 @@ export function cycleStatusExitCode(result) {
  * @param {{
  *   sh: (file: string, args: string[]) => string,
  *   shTry: (file: string, args: string[]) => {ok: boolean, out: string, status: number|null},
- *   githubOps: {listOpenPrs: () => Promise<any[]>, viewIssue: (params: {number: number, fields: string[]}) => Promise<any>, repository?: () => {host: string, owner: string, repo: string}, designRecordEditInfo?: (params: {nodeId: string}) => Promise<any>},
+ *   githubOps: {listOpenPrs: () => Promise<any[]>, viewIssue: (params: {number: number, fields: string[]}) => Promise<any>},
  *   existsSync: (path: string) => boolean,
  *   readFileSync: (path: string, encoding: string) => string,
  *   root: string,
@@ -205,20 +196,9 @@ export async function runCycleStatus({
 			"packages/cli/dist/cli.js not built; run 'pnpm -r build' first";
 	}
 
-	// Target issue resolution order: explicit --issue flags win; otherwise
-	// fall back to the best process's roadmap-declared issue. Neither present
-	// means the design-settlement check has nothing to look at (#669). The flag
-	// is repeatable because a cycle can close several issues, and judging one of
-	// them is what let the terminal gate turn green on the one issue that had a
-	// record (#734).
-	//
-	// Each verdict carries the issue and the source it was resolved from, rather
-	// than the single top-level `designUnsettled` field this replaced: that field
-	// left the reader unable to tell which issue had been judged, so a cycle
-	// working on a roadmap-unmanaged issue could take an unrelated verdict as its
-	// own evidence of settlement (#669).
-	const designUnsettledFor = [];
-	let designUnsettledError = null;
+	// Explicit targets take precedence; otherwise resolve the best process.
+	// These identify source material to read, not a design or approval verdict.
+	let issueError = null;
 	let targetIssues = [];
 	let targetSource = null;
 	// Read once and reused below for the gate-check artifact resolution — same
@@ -238,32 +218,18 @@ export async function runCycleStatus({
 				targetIssues = [found];
 				targetSource = "best-process";
 			} else {
-				designUnsettledError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
+				issueError = `no issue number found for process '${best}' in .pfdsl/roadmap.pfdsl`;
 			}
 		} catch (e) {
-			designUnsettledError = e.message;
+			issueError = e.message;
 		}
 	}
 
-	// The record's option count comes from the issue when one is resolvable, and
-	// is 0 otherwise. The template itself is emitted either way: a cycle whose
-	// issue lookup failed still owes a record, and printing nothing is what left
-	// the format invisible at writing time in the first place (#720).
-	// The count shown is the largest across the cycle's issues: a record is owed
-	// on each one separately, and the template is written once.
-	let recordOptionCount = 0;
 	const issueLookupFailures = [];
 	/** @type {Map<number, string[]>} label names of each issue actually fetched */
 	const labelsByIssue = new Map();
 
 	if (targetIssues.length > 0) {
-		let repository;
-		try {
-			repository = githubOps.repository?.();
-		} catch {
-			// URL-shaped reapproval references fail closed when the target identity
-			// cannot be derived from the worktree remote.
-		}
 		for (const targetIssue of targetIssues) {
 			try {
 				const issueJson = await githubOps.viewIssue({
@@ -274,65 +240,6 @@ export async function runCycleStatus({
 					targetIssue,
 					(issueJson.labels ?? []).map((l) => l?.name).filter(Boolean),
 				);
-				const optionCount = detectEnumeratedOptions(issueJson.body).count;
-				recordOptionCount = Math.max(recordOptionCount, optionCount);
-				const entries = toDesignRecordEntries(issueJson);
-				const resolved = resolveDesignRecord(entries);
-				let editInfo;
-				if (resolved.status === "selected") {
-					const parsedFormat3 = classifyFormat3DesignRecord(
-						resolved.record.body,
-						resolved.record.createdAt,
-					);
-					if (
-						parsedFormat3.status === "PASS" &&
-						parsedFormat3.revisions.length > 0
-					) {
-						if (
-							resolved.record.id &&
-							typeof githubOps.designRecordEditInfo === "function"
-						) {
-							editInfo = await githubOps
-								.designRecordEditInfo({ nodeId: resolved.record.id })
-								.catch(() => ({
-									status: "unavailable",
-									editedAtIso: null,
-									note: "edit history unavailable",
-								}));
-						} else {
-							editInfo = {
-								status: "unavailable",
-								editedAtIso: null,
-								note: "edit history unavailable",
-							};
-						}
-					}
-				}
-				const classification = classifyDesignSettlement({
-					body: issueJson.body,
-					comments: issueJson.comments,
-					issueNumber: targetIssue,
-					repository,
-					editInfo,
-				});
-				designUnsettledFor.push({
-					issue: targetIssue,
-					source: targetSource,
-					unsettled: classification.unsettled,
-					reason: classification.reason,
-					matchedLines: classification.matchedLines ?? [],
-					optionCount: classification.optionCount ?? 0,
-					// #927: record-incomplete's whole value to the runner is which
-					// line to add. Dropping it here would leave a reason value with
-					// nothing to act on.
-					missingPrefixes: classification.missingPrefixes ?? [],
-					...(classification.problems
-						? { problems: classification.problems }
-						: {}),
-					...(classification.detail ? { detail: classification.detail } : {}),
-					record: classification.record ?? null,
-					recordRequired: classification.recordRequired,
-				});
 			} catch (e) {
 				issueLookupFailures.push({ issue: targetIssue, error: e.message });
 			}
@@ -344,12 +251,10 @@ export async function runCycleStatus({
 					: issueLookupFailures
 							.map(({ issue, error }) => `issue ${issue}: ${error}`)
 							.join("; ");
-			designUnsettledError = designUnsettledError
-				? `${designUnsettledError}; ${lookupError}`
-				: lookupError;
+			issueError = issueError ? `${issueError}; ${lookupError}` : lookupError;
 		}
-	} else if (!designUnsettledError) {
-		designUnsettledError =
+	} else if (!issueError) {
+		issueError =
 			"no --issue given and no best process to resolve an issue number from";
 	}
 
@@ -397,7 +302,7 @@ export async function runCycleStatus({
 				const labels = labelsByIssue.get(issue);
 				if (labels === undefined) {
 					if (processId === null) {
-						gateCheckCommandError = `cannot determine whether issue ${issue} is flow:exempt because its labels could not be fetched: ${designUnsettledError}`;
+						gateCheckCommandError = `cannot determine whether issue ${issue} is flow:exempt because its labels could not be fetched: ${issueError}`;
 					}
 					continue;
 				}
@@ -457,8 +362,8 @@ export async function runCycleStatus({
 		}
 	} else {
 		gateCheckCommandError =
-			best && designUnsettledError
-				? designUnsettledError
+			best && issueError
+				? issueError
 				: "no --issue given and no best process to resolve a gate-check command";
 	}
 	const gateCheckCommand = gateCheckCommandError
@@ -477,12 +382,15 @@ export async function runCycleStatus({
 		releasePending,
 		ready,
 		best,
-		designUnsettledFor,
+		issueTargets: targetIssues.map((issue) => ({
+			issue,
+			source: targetSource,
+		})),
+		manualChecks: [
+			"MANUAL: Before starting, read the primary issue records for every issueTargets entry and follow 選択後の設計確認 in .pfdsl/bindings/pfd-ops.md. Resolve missing targets or failed reads first; this output does not verify design decisions or approvals.",
+		],
 		issueLookupFailures,
 		blocking: issueLookupFailures.length > 0,
-		designRecordTemplate: buildDesignRecordTemplate({
-			optionCount: recordOptionCount,
-		}),
 		wipUpdateCommand,
 		gateCheckCommand,
 		unregisteredManagedIssues,
@@ -494,7 +402,7 @@ export async function runCycleStatus({
 	if (prError) result.prError = prError;
 	if (releasePendingError) result.releasePendingError = releasePendingError;
 	if (readyError) result.readyError = readyError;
-	if (designUnsettledError) result.designUnsettledError = designUnsettledError;
+	if (issueError) result.issueError = issueError;
 	if (gateCheckCommandError)
 		result.gateCheckCommandError = gateCheckCommandError;
 	return result;

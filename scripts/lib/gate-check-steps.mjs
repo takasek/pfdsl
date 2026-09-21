@@ -14,24 +14,14 @@
  */
 
 import { checkCommitSubjects } from "./commit-subjects.mjs";
-import { detectEnumeratedOptions } from "./cycle-status.mjs";
 import {
-	classifyDesignRecordContent,
-	classifyDesignRecordReapprovals,
-	classifyDesignRecordRequiredFormat,
-	classifyDesignRecordTimestamps,
-	classifyFormat3DesignRecord,
 	classifyOutputArtifactStatus,
 	hasStatusChange,
 	matchesTrigger,
 	NO_ARTIFACT_DETAIL,
-	NO_ISSUE_DETAIL,
 	parseCommitLogLines,
-	resolveDesignRecord,
-	resolveRecordEditedAt,
 	SIZE_TRACKED_PATTERNS,
 	statusChangedForArtifact,
-	toDesignRecordEntries,
 	unionCommitLogEntries,
 	wipTransitionDetected,
 } from "./gate-check.mjs";
@@ -251,158 +241,6 @@ export function wipTransitionStep({
 				? `no status: wip snapshot found for artifact '${artifactKey}'`
 				: "no status: wip found in any commit snapshot",
 	};
-}
-
-/**
- * The row for an issue the gate could not read, shared by both checks that read
- * one so they cannot disagree about what a failed lookup costs. No failure means
- * no `--issue` was given at all, which is a reasoned SKIP; a failure carries its
- * own verdict from classifyIssueLookupFailure (#745).
- * @param {{status: 'SKIP'|'FAIL', detail: string} | null | undefined} issueFailure
- * @returns {{status: 'SKIP'|'FAIL', detail: string}}
- */
-function missingIssueRow(issueFailure) {
-	return issueFailure ?? { status: "SKIP", detail: NO_ISSUE_DETAIL };
-}
-
-/**
- * The GraphQL edit-history fetch for the selected design-selection record
- * comment. Owner/repo resolution and the query itself are github-ops.mjs's
- * responsibility now (designRecordEditInfo).
- * @param {{githubOps: {designRecordEditInfo: (params: {nodeId: string}) => Promise<any>}, nodeId: string}} params
- * @returns {Promise<{status: 'edited'|'unedited', editedAtIso: string | null}>}
- */
-export async function fetchDesignRecordEditInfo({ githubOps, nodeId }) {
-	return await githubOps.designRecordEditInfo({ nodeId });
-}
-
-/**
- * Validate the selected design record, its required structure and reapprovals.
- * A late record or format repair does not require rewriting commit history.
- */
-export function designRecordStep({
-	number,
-	issue,
-	issueFailure,
-	repository,
-	editInfo,
-}) {
-	const name = "design-selection record";
-	if (!issue) return { name, ...missingIssueRow(issueFailure) };
-
-	const body = issue.body ?? "";
-	const optionCount = detectEnumeratedOptions(body).count;
-
-	// The issue body describes the request; the selected comment records the
-	// decision. Keep record resolution independent of commit history.
-	const resolution = resolveDesignRecord(toDesignRecordEntries(issue));
-
-	if (resolution.status === "none") {
-		return { name, status: "FAIL", detail: "no design-selection record found" };
-	}
-	if (resolution.status === "ambiguous")
-		return { name, status: "FAIL", detail: resolution.detail };
-	if (resolution.status === "invalid")
-		return {
-			name,
-			status: "FAIL",
-			detail: resolution.problems.join("; "),
-		};
-	const record = resolution.record;
-
-	// #737 案2: the record's own edit history (editInfo is undefined/null
-	// whenever the GraphQL fetch failed or was unavailable — resolveRecordEditedAt
-	// reports that as a note rather than silently treating it as "unedited").
-	const { editedAtIso, note: editNote } = resolveRecordEditedAt(
-		record,
-		editInfo ?? null,
-	);
-
-	const parsedFormat3 = classifyFormat3DesignRecord(
-		record.body,
-		record.createdAt,
-	);
-	const timestamps = classifyDesignRecordTimestamps(
-		record.createdAt,
-		editedAtIso,
-	);
-	const requiredFormat = classifyDesignRecordRequiredFormat(
-		record.body,
-		record.createdAt,
-	);
-	// Format 3's parser owns a structural verdict. Earlier generations retain
-	// their advisory disposition-content detail for migration compatibility.
-	const content = classifyDesignRecordContent(
-		record.body,
-		optionCount,
-		record.createdAt,
-	);
-	const contentDetail =
-		requiredFormat.status === "PASS" && content.status === "FAIL"
-			? `WARN: ${content.detail}`
-			: undefined;
-	const reapproval = classifyDesignRecordReapprovals({
-		record,
-		comments: toDesignRecordEntries(issue),
-		issueNumber: number,
-		repository,
-		editInfo,
-	});
-	const detail =
-		[
-			timestamps.detail,
-			editNote,
-			requiredFormat.status === "FAIL" ? requiredFormat.detail : undefined,
-			contentDetail,
-			reapproval.detail,
-		]
-			.filter(Boolean)
-			.join("; ") || undefined;
-	return {
-		name,
-		status:
-			requiredFormat.status === "FAIL" ||
-			reapproval.status === "FAIL" ||
-			(parsedFormat3.status === "FAIL" &&
-				record.body
-					.split("\n")
-					.some((line) => line.includes("設計記録形式: 3")))
-				? "FAIL"
-				: timestamps.status,
-		detail,
-	};
-}
-
-/**
- * Fan a single-issue step out over every issue the cycle closes (#734).
- *
- * The two issue-scoped checks used to see one issue per run, so a cycle closing
- * several of them turned green as soon as the one issue that was passed had a
- * record — the other issues were never looked at. One row per issue keeps the
- * verdicts separate; the row name carries the number so a FAIL says which issue
- * it belongs to. An empty list is the no-`--issue` case and keeps the step's own
- * unlabelled SKIP row.
- *
- * @param {(args: object) => import("./gate-check.mjs").GateResult} step
- * @param {{number: number, issue?: object|null,
- *          issueFailure?: {status: 'SKIP'|'FAIL', detail: string}|null,
- *          repository?: {host?: string, owner?: string, repo?: string},
- *          editInfo?: object|null}[]} issues
- * @param {object} [args] arguments shared by every call (exec, base, deltas, …)
- */
-export function perIssueSteps(step, issues, args = {}) {
-	if (issues.length === 0) return [step(args)];
-	return issues.map(({ number, issue, issueFailure, repository, editInfo }) => {
-		const result = step({
-			...args,
-			number,
-			issue,
-			issueFailure,
-			repository,
-			editInfo,
-		});
-		return { ...result, name: `${result.name} (#${number})` };
-	});
 }
 
 /**
