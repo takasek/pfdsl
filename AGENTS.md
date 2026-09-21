@@ -56,7 +56,10 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook）は、mainまたはsibling worktreeを対象にする変更系Gitを保護する。ツールに渡すパスと実行worktreeを一致させる。
 main上では新しい状態を作る操作をdenyとし、破壊・復元操作はClaude Codeでask、askを表現できないCodexでfail-closed denyとする。
-sessionのrootと異なるworktreeを対象にする場合は操作の種類によらずClaude Codeでask、Codexでfail-closed denyとする（hookはsession自身のworktreeを他sessionのものと区別できず、session移動後もharnessは起動時のrootを報告し続けるため、所有権の確認を人間に委ねる）。変更系Gitの実効targetをshell構文から確定できない場合もfail closedとする。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` とする。
+sessionのrootと異なるworktreeを対象にする場合は操作の種類によらずClaude Codeでask、Codexでfail-closed denyとする（hookはsession自身のworktreeを他sessionのものと区別できず、session移動後もharnessは起動時のrootを報告し続けるため、所有権の確認を人間に委ねる）。
+保護の範囲はこのリポジトリのcheckoutに限る。targetのgit common dirがsessionのものと異なれば、ブランチ名が `main` でも素通しする（使い捨てsandboxの既定ブランチが `main` になるため）。
+変更系Gitの実効targetをshell構文から確定できない場合はfail closedとする。
+sessionまたはtargetのgit rootsを解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする（targetのブランチ名が読めなければそもそもブランチ名規則が発火しないため、これが保護として効くのはsession側だけが解決できない場合である）。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` とする。
 
 コミットメッセージは**英語**。
 

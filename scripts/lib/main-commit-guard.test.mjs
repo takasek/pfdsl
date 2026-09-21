@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 import {
 	classifyGitCommand,
-	crossesWorktree,
+	classifyTargetRepository,
 	evaluateMainCommitGuard,
 	resolveCommandCwd,
 	runMainCommitGuard,
@@ -312,28 +312,52 @@ describe("resolveCommandCwd", () => {
 });
 
 describe("evaluateMainCommitGuard", () => {
-	it("recognizes a different worktree only when both roots share one repository", () => {
+	it("tells the session's own worktree, a sibling, an unrelated repository and an unresolved target apart (#1221)", () => {
 		const session = {
 			worktreeRoot: "/repo/.claude/worktrees/a",
 			commonDir: "/repo/.git",
 			mainRoot: "/repo",
 		};
 		assert.equal(
-			crossesWorktree(session, {
+			classifyTargetRepository(session, {
 				...session,
 				worktreeRoot: "/repo/.claude/worktrees/b",
 			}),
-			true,
+			"sibling",
 		);
-		assert.equal(crossesWorktree(session, session), false);
+		assert.equal(classifyTargetRepository(session, session), "own");
 		assert.equal(
-			crossesWorktree(session, {
+			classifyTargetRepository(session, {
 				worktreeRoot: "/other/worktree",
 				commonDir: "/other/.git",
 				mainRoot: "/other",
 			}),
-			false,
+			"foreign",
 		);
+		assert.equal(classifyTargetRepository(session, null), "unknown");
+		assert.equal(classifyTargetRepository(null, session), "unknown");
+	});
+
+	it("allows a state-creating command on an unrelated repository's default branch (#1221)", () => {
+		for (const command of [
+			"git add -A",
+			"git commit -m 'x'",
+			"git restore f",
+		]) {
+			const result = evaluateMainCommitGuard(payload({ command }), {
+				currentBranch: "main",
+				targetRelation: "foreign",
+			});
+			assert.equal(result.decision, "allow");
+		}
+	});
+
+	it("keeps guarding the default branch when the target roots cannot be resolved (#1221)", () => {
+		const result = evaluateMainCommitGuard(payload({ command: "git add -A" }), {
+			currentBranch: "main",
+			targetRelation: "unknown",
+		});
+		assert.equal(result.decision, "deny");
 	});
 
 	it("ignores tools other than Bash", () => {
@@ -382,7 +406,7 @@ describe("evaluateMainCommitGuard", () => {
 	it("asks before staging when a feature-branch session targets another worktree (#1201)", () => {
 		const result = evaluateMainCommitGuard(payload({ command: "git add -A" }), {
 			currentBranch: "feature/other",
-			crossesWorktree: true,
+			targetRelation: "sibling",
 		});
 		assert.equal(result.decision, "ask");
 		assert.match(result.reason, /worktree/);
@@ -395,7 +419,7 @@ describe("evaluateMainCommitGuard", () => {
 	it("still denies staging on the default branch of another worktree (#1201)", () => {
 		const result = evaluateMainCommitGuard(payload({ command: "git add -A" }), {
 			currentBranch: "main",
-			crossesWorktree: true,
+			targetRelation: "sibling",
 		});
 		assert.equal(result.decision, "deny");
 	});
@@ -405,7 +429,7 @@ describe("evaluateMainCommitGuard", () => {
 			payload({ command: "git restore src/x.ts" }),
 			{
 				currentBranch: "feature/other",
-				crossesWorktree: true,
+				targetRelation: "sibling",
 			},
 		);
 		assert.equal(result.decision, "ask");
@@ -495,7 +519,8 @@ describe("runMainCommitGuard", () => {
 					return {
 						currentBranch: "topic",
 						mainBranch: "main",
-						crossesWorktree: targetCwd === "/worktrees/sibling",
+						targetRelation:
+							targetCwd === "/worktrees/sibling" ? "sibling" : "own",
 					};
 				},
 			});
@@ -509,7 +534,7 @@ describe("runMainCommitGuard", () => {
 		const context = (_payload, targetCwd) => ({
 			currentBranch: targetCwd === "/repo" ? "main" : "topic",
 			mainBranch: "main",
-			crossesWorktree: targetCwd !== "/worktrees/session",
+			targetRelation: targetCwd === "/worktrees/session" ? "own" : "sibling",
 		});
 		const askInput = JSON.stringify(
 			payload({
@@ -572,6 +597,7 @@ describe("main-commit-guard wrapper", () => {
 	let repo;
 	let session;
 	let sibling;
+	let unrelated;
 
 	function git(cwd, args) {
 		return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -599,6 +625,13 @@ describe("main-commit-guard wrapper", () => {
 		]);
 		git(repo, ["worktree", "add", "-b", "session", session]);
 		git(repo, ["worktree", "add", "-b", "sibling", sibling]);
+
+		// A throwaway sandbox of the shape distribution-review's probes create:
+		// its own .git, no remote, and the `main` that `git init` hands out
+		// here (#1221).
+		unrelated = join(root, "unrelated");
+		mkdirSync(unrelated);
+		git(root, ["init", "-b", "main", unrelated]);
 	});
 
 	after(() => {
@@ -618,6 +651,34 @@ describe("main-commit-guard wrapper", () => {
 			input: JSON.stringify(payload({ command, cwd: payloadCwd })),
 		}).trim();
 	}
+
+	it("stays silent on an unrelated repository's main while still guarding a sibling (#1221)", () => {
+		assert.equal(runWrapper(`git -C ${unrelated} add -A`), "");
+		// The pair matters: dropping the ownership check altogether would also
+		// make the line above pass, and only the sibling case notices.
+		assert.notEqual(runWrapper(`git -C ${sibling} add -A`), "");
+	});
+
+	it("denies the default branch when only the session root fails to resolve (#1221)", () => {
+		// The one route by which `unknown` reaches a decision: the target
+		// answers `main`, and the session root does not resolve at all. Pinning
+		// it here keeps a later reader from folding `unknown` into `foreign` on
+		// the grounds that nothing distinguishes it.
+		const output = runWrapper(`git -C ${repo} add -A`, {
+			claudeProjectDir: join(root, "no-such-session-dir"),
+		});
+		assert.match(output, /"permissionDecision":"deny"/);
+	});
+
+	it("stays silent when the target is not a git repository at all (#1221)", () => {
+		// The git-is-broken shape: no roots *and* no branch. The branch-name
+		// rule cannot fire without a branch, so this allows — which is what the
+		// guard did before #1221 too. Recorded so the prose describing
+		// `unknown` is not read as covering this case.
+		const notARepo = join(root, "not-a-repo");
+		mkdirSync(notARepo, { recursive: true });
+		assert.equal(runWrapper(`git -C ${notARepo} add -A`), "");
+	});
 
 	it("uses the payload cwd as the session worktree in Codex (#784)", () => {
 		const output = runWrapper(`git -C ${sibling} add -A`, {

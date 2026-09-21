@@ -373,27 +373,41 @@ export function resolveCommandCwd(command, hookCwd, options) {
 }
 
 /**
- * Whether a command targets another worktree of the session's own repository.
+ * How a command's target checkout relates to the session's own one.
+ *
+ * Four states, not two: a boolean collapsed "the session's own worktree" and
+ * "a repository this guard has no business in" onto the same `false`, which
+ * left an unrelated repo's `main` — the default branch `git init` hands every
+ * throwaway sandbox — guarded on the strength of the branch name alone (#1221).
+ * `unknown` stays separate from `foreign` because failing to resolve a root is
+ * not evidence of being out of scope. The case it actually protects is a
+ * session whose own root will not resolve — no `CLAUDE_PROJECT_DIR` and no
+ * payload cwd — against a target that resolves fine and reports the default
+ * branch: mapping that to a pass-through would hand such a session an
+ * unguarded main checkout. It is not the git-is-broken case, where the target
+ * has no readable branch either and `currentBranch === undefined` already
+ * allows further down.
  * @param {{worktreeRoot: string, commonDir: string} | null} sessionRoots
  * @param {{worktreeRoot: string, commonDir: string} | null} targetRoots
+ * @returns {"own" | "sibling" | "foreign" | "unknown"}
  */
-export function crossesWorktree(sessionRoots, targetRoots) {
-	if (!sessionRoots || !targetRoots) return false;
-	return (
-		sessionRoots.commonDir === targetRoots.commonDir &&
-		sessionRoots.worktreeRoot !== targetRoots.worktreeRoot
-	);
+export function classifyTargetRepository(sessionRoots, targetRoots) {
+	if (!sessionRoots || !targetRoots) return "unknown";
+	if (sessionRoots.commonDir !== targetRoots.commonDir) return "foreign";
+	return sessionRoots.worktreeRoot === targetRoots.worktreeRoot
+		? "own"
+		: "sibling";
 }
 
 /**
  * Decide whether a PreToolUse Bash invocation may proceed.
  * @param {object} payload PreToolUse hook payload
- * @param {{currentBranch: string | undefined, mainBranch?: string, crossesWorktree?: boolean}} context
+ * @param {{currentBranch: string | undefined, mainBranch?: string, targetRelation?: "own" | "sibling" | "foreign" | "unknown"}} context
  * @returns {{decision: "allow"} | {decision: "deny" | "ask", reason: string}}
  */
 export function evaluateMainCommitGuard(
 	payload,
-	{ currentBranch, mainBranch = "main", crossesWorktree = false } = {},
+	{ currentBranch, mainBranch = "main", targetRelation = "own" } = {},
 ) {
 	if (payload?.tool_name !== "Bash") return { decision: "allow" };
 	const guarded = classifyGitCommand(payload?.tool_input?.command);
@@ -401,14 +415,22 @@ export function evaluateMainCommitGuard(
 	return evaluateGuardedCommand(guarded, {
 		currentBranch,
 		mainBranch,
-		crossesWorktree,
+		targetRelation,
 	});
 }
 
 function evaluateGuardedCommand(
 	guarded,
-	{ currentBranch, mainBranch = "main", crossesWorktree = false } = {},
+	{ currentBranch, mainBranch = "main", targetRelation = "own" } = {},
 ) {
+	// Out of scope entirely: this guard speaks for one repository's ecosystem,
+	// and another repository's branch names carry none of its meaning (#1221).
+	if (targetRelation === "foreign") return { decision: "allow" };
+
+	// `unknown` rides with `own`, which is where it already sat before the
+	// relation had a name — the branch-name rule still applies, and reaching a
+	// deny through it requires the target's branch to be readable.
+	const crossesWorktree = targetRelation === "sibling";
 	const targetsDefaultBranch = currentBranch === mainBranch;
 	if (!targetsDefaultBranch && !crossesWorktree) return { decision: "allow" };
 
@@ -467,7 +489,7 @@ function evaluateUnresolvedCwd(guarded) {
  * version repeated the tool_name/classify check there and carried a comment
  * asking the next reader to keep the two copies in sync by hand.
  * @param {string} inputText raw stdin payload
- * @param {{resolveBranches: (payload: object, targetCwd: string) => {currentBranch?: string, mainBranch?: string, crossesWorktree?: boolean}}} io
+ * @param {{resolveBranches: (payload: object, targetCwd: string) => {currentBranch?: string, mainBranch?: string, targetRelation?: "own" | "sibling" | "foreign" | "unknown"}}} io
  * @returns {{shouldOutput: boolean, output?: object}}
  */
 export function runMainCommitGuard(
