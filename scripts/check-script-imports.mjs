@@ -19,6 +19,7 @@
  * Usage: node scripts/check-script-imports.mjs
  */
 
+import { lstatSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -42,7 +43,11 @@ const files = gitLsFiles(["scripts/*.mjs", "scripts/**/*.mjs"], {
 	// fails loudly on a broken import — and their own import-statement
 	// fixtures (string literals used as test input, not real imports) would
 	// otherwise be misparsed as real specifiers by the regex below.
-	.filter((f) => !f.endsWith(".test.mjs"));
+	.filter((f) => !f.endsWith(".test.mjs"))
+	// This check reads the working tree, but Git still lists unstaged deletions.
+	// Skip absent sources; surviving imports of them remain broken imports.
+	// lstat keeps dangling symlinks and propagates errors other than absence.
+	.filter((f) => lstatSync(f, { throwIfNoEntry: false }) !== undefined);
 
 const broken = findBrokenImports(files);
 
