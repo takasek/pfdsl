@@ -42,7 +42,12 @@ frontmatter で改行する場合は folded scalar (`>`) を使う。プレー�
 
 ## Markdown の改行
 
-`.md` の散文は CI の `check-md-linebreaks` が検査する。改行してよいのは文境界（。！？.:等）のみで、**読点（、）での改行は違反**（.pfdsl の規約より厳しい）。段落は1文=1行か、文境界で折り返す。字下げの有無を問わず散文全体が対象（#770）。コード片・文法記法はフェンスで囲む — フェンス外に置くと散文として検査される。
+`.md` の散文は pre-commit の `md-linebreaks` gate が staged ファイルを検査する。改行してよいのは文境界（。！？.:等）のみで、**読点（、）での改行は違反**（.pfdsl の規約より厳しい）。段落は1文=1行か、文境界で折り返す。字下げの有無を問わず散文全体が対象（#770）。コード片・文法記法はフェンスで囲む — フェンス外に置くと散文として検査される。
+
+## Markdown の見出し
+
+手続きの見出しには、起動コマンド名よりも内容を表す名前を推奨する。
+この指針は機械検査しない。
 
 ## 実装方針
 
@@ -56,7 +61,10 @@ t-wadaのTDDで。適切な粒度でコミットすること。
 
 変更束はブランチで作業し PR で main に統合する（main 直コミットしない。生態系図の develop→PR→merge_pr が正規経路）。`scripts/main-commit-guard.mjs`（PreToolUse(Bash) hook）は、mainまたはsibling worktreeを対象にする変更系Gitを保護する。ツールに渡すパスと実行worktreeを一致させる。
 main上では新しい状態を作る操作をdenyとし、破壊・復元操作はClaude Codeでask、askを表現できないCodexでfail-closed denyとする。
-sessionのrootと異なるworktreeを対象にする場合は操作の種類によらずClaude Codeでask、Codexでfail-closed denyとする（hookはsession自身のworktreeを他sessionのものと区別できず、session移動後もharnessは起動時のrootを報告し続けるため、所有権の確認を人間に委ねる）。変更系Gitの実効targetをshell構文から確定できない場合もfail closedとする。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` とする。
+sessionのrootと異なるworktreeを対象にする場合は操作の種類によらずClaude Codeでask、Codexでfail-closed denyとする（hookはsession自身のworktreeを他sessionのものと区別できず、session移動後もharnessは起動時のrootを報告し続けるため、所有権の確認を人間に委ねる）。
+保護の範囲はこのリポジトリのcheckoutに限る。targetのgit common dirがsessionのものと異なれば、ブランチ名が `main` でも素通しする（使い捨てsandboxの既定ブランチが `main` になるため）。
+変更系Gitの実効targetをshell構文から確定できない場合はfail closedとする。
+sessionまたはtargetのgit rootsを解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする（targetのブランチ名が読めなければそもそもブランチ名規則が発火しないため、これが保護として効くのはsession側だけが解決できない場合である）。分類と構文対応の一次情報は `scripts/lib/main-commit-guard.mjs` とする。
 
 コミットメッセージは**英語**。
 

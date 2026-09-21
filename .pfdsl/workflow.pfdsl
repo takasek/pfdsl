@@ -92,10 +92,10 @@ artifact:
     group: release
   prose_mechanization_sweep_record:
     label: 散文機械化棚卸し記録
-    description: "prose-mechanization 対象の棚卸し済み commit hash（docs/asset-sweep/prose-mechanization.json）と回ごとの実行記録。check-asset-sweep.mjs が記録以降に scripts/・hooks/ 直下へ追加された機構の件数を SWEEP_TARGETS の閾値と比較し、超過時は release 判断を止める。監査対象は現行の散文と機構で、歴史資料の事例は含めない"
-    criteria: prose-mechanization.json が指す commit と HEAD の間で、scripts/・hooks/ 直下に追加されたエントリポイント数が閾値未満
+    description: "要求時に行った散文・機構監査の commit hash（docs/asset-sweep/prose-mechanization.json）と実行記録。次回の監査範囲を絞るために使い、release 判断は止めない。監査対象は現行の散文と機構で、歴史資料の事例は含めない"
+    criteria: prose-mechanization.json が実在する監査済み commit と実行記録を指し、記録に対象範囲・所見・処遇がある
     location: ../docs/asset-sweep/
-    group: release
+    group: practice
   cli_release_request:
     label: CLIリリース要求
     description: "make release-status の @pfdsl/cli 欄を材料に、公開する版と make release を実行する判断を外化した入力。pipeline.pfdsl が v* tag と npm 公開へ変換する"
@@ -292,8 +292,8 @@ artifact:
     group: generation
   main_branch_guard:
     label: mainブランチ操作ガード
-    description: "main ブランチ上または同一リポジトリの別 worktree 上でツリー・インデックスを変える直接記述の git コマンドを止める PreToolUse(Bash) 事故防止フック（#650、#777、#784）。セッション root は Claude Code の空白でない CLAUDE_PROJECT_DIR を優先し、Codex では hook payload cwd へ fallback する。quoted または escaped literal argv、literal cd、git -C、env -C/--chdir、input を含む先頭 redirection、既知 prefix、Codex routine wrapper の明示 target を実行順に解決する。Git target 環境変数、CDPATH、対応する assignment・export・unset・read・printf・source・dot・eval と target に影響する control flow を追跡し、静的 target が確定できない変更系 Git を fail closed する。対応外の compound は無害でも拒否しうるため raw mutation は単純 command へ分ける。この hook は任意 Bash を完全に解釈する security boundary ではない。Codex の承認なし機械的境界は trusted user wrapper、raw Git を永続 allow しない execpolicy、sandbox の組合せであり、Claude Code に Codex 専用 wrapper は前提化しない。復旧系は Claude Code では ask、ask 未対応の Codex では deny に変換する。session root と異なる worktree を target にする変更系は、hook が自セッションの worktree を他セッションのものと区別できず、session 移動後も harness が起動時の root を報告し続けるため、操作の種類によらず ask とし所有権の確認を人間に委ねる（#1201）。delegation_guard と同じくリポ固有で配布対象外。実体のファイル名は commit のみを見ていた頃のもので、起動中 session の配線を壊さないため据え置く"
-    criteria: main を直接 target にする変更系 git が拒否され、session root と異なる worktree を target にする変更系 git は Claude Code で ask になり、Claude Code は復旧系を ask、Codex は unsupported ask を deny にする。空白でない CLAUDE_PROJECT_DIR の優先、Codex payload cwd fallback、escaped literal argv、cd --、先頭 redirection、git -C、env chdir、routine wrapper target、既知 prefix、Git target 環境変数、変数ごとの export 状態、CDPATH、assignment・export・unset・read・printf の option semantics、dynamic output name、array output variable、target に影響する OR-list・pipeline・background・subshell・AND-list と unsupported compound の fail-closed が scripts/lib/main-commit-guard.test.mjs で検証される。identity Git subprocess は Git target 環境変数を除去し、読み取り系 Git、絶対 cd、literal 操作で安全へ戻した状態、単純な success-path AND-list、target-neutral pipeline・AND-list、変更系 Git より後ろの control flow、session 自身の feature branch 操作は影響を受けない。shared hook は直接形の事故防止であり任意 Bash の security guarantee は主張せず、Codex の永続 allow は trusted wrapper に限定する
+    description: "main ブランチ上または同一リポジトリの別 worktree 上でツリー・インデックスを変える直接記述の git コマンドを止める PreToolUse(Bash) 事故防止フック（#650、#777、#784）。セッション root は Claude Code の空白でない CLAUDE_PROJECT_DIR を優先し、Codex では hook payload cwd へ fallback する。quoted または escaped literal argv、literal cd、git -C、env -C/--chdir、input を含む先頭 redirection、既知 prefix、Codex routine wrapper の明示 target を実行順に解決する。Git target 環境変数、CDPATH、対応する assignment・export・unset・read・printf・source・dot・eval と target に影響する control flow を追跡し、静的 target が確定できない変更系 Git を fail closed する。対応外の compound は無害でも拒否しうるため raw mutation は単純 command へ分ける。この hook は任意 Bash を完全に解釈する security boundary ではない。Codex の承認なし機械的境界は trusted user wrapper、raw Git を永続 allow しない execpolicy、sandbox の組合せであり、Claude Code に Codex 専用 wrapper は前提化しない。復旧系は Claude Code では ask、ask 未対応の Codex では deny に変換する。session root と異なる worktree を target にする変更系は、hook が自セッションの worktree を他セッションのものと区別できず、session 移動後も harness が起動時の root を報告し続けるため、操作の種類によらず ask とし所有権の確認を人間に委ねる（#1201）。保護の作用域は session と git common dir を共有する checkout に限り、無関係なリポジトリの main は素通しする — 使い捨て sandbox の既定ブランチが main になるため、ブランチ名だけでは管轄内外を区別できない（#1221）。roots を解決できない場合は管轄外と区別し、ブランチ名規則を適用したままにする — これが保護として効くのは session 側だけが解決できず target が既定ブランチを返す場合で、target 自体が git リポジトリでなければブランチ名が読めず従来どおり allow になる。delegation_guard と同じくリポ固有で配布対象外。実体のファイル名は commit のみを見ていた頃のもので、起動中 session の配線を壊さないため据え置く"
+    criteria: main を直接 target にする変更系 git が拒否され、session root と異なる worktree を target にする変更系 git は Claude Code で ask になり、Claude Code は復旧系を ask、Codex は unsupported ask を deny にする。session と git common dir を共有しない target は、ブランチ名が main でも素通しし、session root だけが解決できず target が既定ブランチを返す場合は deny が維持され、target が git リポジトリでない場合は従来どおり allow になることが scripts/lib/main-commit-guard.test.mjs で検証される。空白でない CLAUDE_PROJECT_DIR の優先、Codex payload cwd fallback、escaped literal argv、cd --、先頭 redirection、git -C、env chdir、routine wrapper target、既知 prefix、Git target 環境変数、変数ごとの export 状態、CDPATH、assignment・export・unset・read・printf の option semantics、dynamic output name、array output variable、target に影響する OR-list・pipeline・background・subshell・AND-list と unsupported compound の fail-closed が scripts/lib/main-commit-guard.test.mjs で検証される。identity Git subprocess は Git target 環境変数を除去し、読み取り系 Git、絶対 cd、literal 操作で安全へ戻した状態、単純な success-path AND-list、target-neutral pipeline・AND-list、変更系 Git より後ろの control flow、session 自身の feature branch 操作は影響を受けない。shared hook は直接形の事故防止であり任意 Bash の security guarantee は主張せず、Codex の永続 allow は trusted wrapper に限定する
     location: ../scripts/main-commit-guard.mjs
     group: generation
   ecosystem_skill:
@@ -320,7 +320,7 @@ artifact:
   prose_mechanization_audit_skill:
     label: 散文機械化監査スキル
     description: "堆積した運用散文を hook・check の台帳と突き合わせる手順（台帳の実測列挙・機械化済み対策を語る散文・スクリプト出力の再説明・層内の同文再掲・散文と機械の矛盾）。「散文として書く前に機械化を検討する」は書く時点の規律であり、既に書かれた分を洗う工程がこれにあたる。リポローカル・手書き（生成対象外・配布対象外 — 利用側リポは突合の片側である hook・check 台帳を持たず、配布された散文の側もその上流はこのリポなので、直す工程はこちらにしか置けない）"
-    criteria: 起動すると5工程が実行され、記録が docs/asset-sweep/ に残り check-asset-sweep.mjs が exit 0 を返す
+    criteria: 散文と機構の突合を依頼すると5工程が実行され、対象範囲・所見・処遇の記録が docs/asset-sweep/ に残る
     location: ../.claude/skills/prose-mechanization-audit/
     group: generation
     tags: [ distilled_skill ]
@@ -528,9 +528,9 @@ process:
     group: release
   sweep_prose_mechanization:
     label: 散文機械化の棚卸し
-    description: "堆積した運用散文を hook・check の台帳と突き合わせ、機械化済み対策を語る散文・スクリプト出力の再説明・層内の同文再掲・散文と機械の矛盾を刈って棚卸し済み commit を進める。数える単位が散文でなく追加された機構なのは、散文は追記でなく既存ファイルの編集で動くため、その件数が滞留の増分を表さないことによる"
+    description: "ユーザーが求めたときに、堆積した運用散文を hook・check の台帳と突き合わせ、機械化済み対策を語る散文・スクリプト出力の再説明・層内の同文再掲・散文と機械の矛盾を点検して記録する。リリースや追加ファイル数は起動条件にしない"
     command: "/prose-mechanization-audit"
-    group: release
+    group: practice
   update_readme:
     label: README 更新
     description: CLI の提供形態・サンプル構成の変更を導入文書に反映する。CLI コマンドリファレンスは gen-readme-cli が自動化済みのため対象外
@@ -699,12 +699,14 @@ readme >>? update_readme
 distribution_review_skill >>? review_distribution
 
 
-[bindings_pfd_ops, bindings_pfd_retro, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
+[bindings_pfd_ops, bindings_pfd_retro, decisions, delegation_guard, main_branch_guard, ops_skill_general, ops_skill_l3, roadmap_md, workflow_md] >> sweep_prose_mechanization -> prose_mechanization_sweep_record
 
 prose_mechanization_audit_skill >>? sweep_prose_mechanization
 
-[distribution_review_record, prose_mechanization_sweep_record, toolchain] >> decide_cli_release -> cli_release_request
+prose_mechanization_sweep_record >>? sweep_prose_mechanization
 
-[distribution_review_record, prose_mechanization_sweep_record, toolchain] >> decide_libraries_release -> libraries_release_request
+[distribution_review_record, toolchain] >> decide_cli_release -> cli_release_request
 
-[distribution_review_record, prose_mechanization_sweep_record, toolchain] >> decide_vscode_release -> vscode_release_request
+[distribution_review_record, toolchain] >> decide_libraries_release -> libraries_release_request
+
+[distribution_review_record, toolchain] >> decide_vscode_release -> vscode_release_request

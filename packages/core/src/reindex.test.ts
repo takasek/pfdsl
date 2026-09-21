@@ -18,6 +18,19 @@ function indices(src: string): {
 }
 
 describe("reindex", () => {
+	it("numbers a producer before a consumer with an additional source input", () => {
+		const src = `---
+process:
+  P2: {}
+  P1: {}
+---
+start >> P1 -> built
+[built, other] >> P2 -> final
+`;
+		const { output } = reindex(src, { renumber: true });
+		expect(indices(output).process).toEqual({ P1: 1, P2: 2 });
+	});
+
 	it("renumber: assigns topological indices with independent counters", () => {
 		const src = `---
 artifact:

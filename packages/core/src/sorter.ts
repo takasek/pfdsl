@@ -6,9 +6,9 @@ export function sortIsolated(isolatedNodes: Set<string>): string[] {
 }
 
 /**
- * Deterministic topological node order: first appearance across the
- * canonical edge sort (feedback edges are skipped — they carry no rank),
- * then any remaining declared/isolated nodes by id.
+ * Deterministic topological node order: primary-graph rank, with first
+ * appearance in the canonical edge sort breaking ties. Feedback edges
+ * carry no rank. Remaining declared/isolated nodes are appended by id.
  */
 export function computeTopoOrder(
 	edges: NormalizedEdge[],
@@ -32,6 +32,8 @@ export function computeTopoOrder(
 			push(e.artifact);
 		}
 	}
+	const ranks = computeNodeRanks(graph);
+	order.sort((a, b) => ranks.get(a)! - ranks.get(b)!);
 	const remaining = new Set([
 		...graph.nodes.keys(),
 		...Object.keys(frontmatter?.artifact ?? {}),
@@ -39,6 +41,42 @@ export function computeTopoOrder(
 	]);
 	for (const id of [...remaining].sort()) push(id);
 	return order;
+}
+
+function computeNodeRanks(graph: Graph): Map<string, number> {
+	const inDegree = new Map<string, number>();
+	const adjacency = new Map<string, string[]>();
+	for (const id of graph.nodes.keys()) {
+		inDegree.set(id, 0);
+		adjacency.set(id, []);
+	}
+	for (const e of graph.primaryEdges) {
+		inDegree.set(e.to, (inDegree.get(e.to) ?? 0) + 1);
+		adjacency.get(e.from)?.push(e.to);
+	}
+	const ranks = new Map<string, number>();
+	const queue: string[] = [];
+	for (const [id, deg] of inDegree) {
+		if (deg === 0) {
+			ranks.set(id, 0);
+			queue.push(id);
+		}
+	}
+	for (let head = 0; head < queue.length; head++) {
+		const u = queue[head]!;
+		const ru = ranks.get(u)!;
+		for (const v of adjacency.get(u)!) {
+			const rv = ranks.get(v) ?? -1;
+			if (ru + 1 > rv) ranks.set(v, ru + 1);
+			const remaining = inDegree.get(v)! - 1;
+			inDegree.set(v, remaining);
+			if (remaining === 0) queue.push(v);
+		}
+	}
+	for (const id of graph.nodes.keys()) {
+		if (!ranks.has(id)) ranks.set(id, 0);
+	}
+	return ranks;
 }
 
 export function sortEdges(
@@ -80,41 +118,7 @@ export function sortEdges(
 	// Rank = longest-path distance from any source. Computed via Kahn's
 	// topological order in O(V + E). Nodes left unranked (cycles in the primary
 	// graph — already a validation error) fall back to 0.
-	const inDegree = new Map<string, number>();
-	const adjacency = new Map<string, string[]>();
-	for (const id of graph.nodes.keys()) {
-		inDegree.set(id, 0);
-		adjacency.set(id, []);
-	}
-	for (const e of graph.primaryEdges) {
-		inDegree.set(e.to, (inDegree.get(e.to) ?? 0) + 1);
-		adjacency.get(e.from)?.push(e.to);
-	}
-
-	const ranks = new Map<string, number>();
-	const queue: string[] = [];
-	for (const [id, deg] of inDegree) {
-		if (deg === 0) {
-			ranks.set(id, 0);
-			queue.push(id);
-		}
-	}
-
-	for (let head = 0; head < queue.length; head++) {
-		const u = queue[head]!;
-		const ru = ranks.get(u)!;
-		for (const v of adjacency.get(u)!) {
-			const rv = ranks.get(v) ?? -1;
-			if (ru + 1 > rv) ranks.set(v, ru + 1);
-			const remaining = inDegree.get(v)! - 1;
-			inDegree.set(v, remaining);
-			if (remaining === 0) queue.push(v);
-		}
-	}
-
-	for (const id of graph.nodes.keys()) {
-		if (!ranks.has(id)) ranks.set(id, 0);
-	}
+	const ranks = computeNodeRanks(graph);
 
 	function edgeRank(e: NormalizedEdge): number {
 		if (e.kind === "input") return ranks.get(e.artifact) ?? 0;

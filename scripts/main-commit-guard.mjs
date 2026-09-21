@@ -22,7 +22,7 @@
 
 import { readStdinText } from "./lib/hook-io.mjs";
 import {
-	crossesWorktree,
+	classifyTargetRepository,
 	runMainCommitGuard,
 } from "./lib/main-commit-guard.mjs";
 import {
@@ -35,7 +35,7 @@ import {
 /**
  * @param {object} payload PreToolUse hook payload
  * @param {string} targetCwd resolved cwd of one guarded Git segment
- * @returns {{currentBranch: string | undefined, mainBranch: string, crossesWorktree: boolean}}
+ * @returns {{currentBranch: string | undefined, mainBranch: string, targetRelation: "own" | "sibling" | "foreign" | "unknown"}}
  */
 function resolveBranches(payload, targetCwd) {
 	// Each guarded segment supplies its own target, so a compound command that
@@ -66,7 +66,7 @@ function resolveBranches(payload, targetCwd) {
 	return {
 		currentBranch: current.ok ? current.out.trim() : undefined,
 		mainBranch: head.ok ? head.out.trim().replace(/^origin\//, "") : "main",
-		crossesWorktree: crossesWorktree(sessionRoots, targetRoots),
+		targetRelation: classifyTargetRepository(sessionRoots, targetRoots),
 	};
 }
 
