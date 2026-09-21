@@ -3,18 +3,6 @@
  * git/gh I/O lives in the main script; this module stays testable.
  */
 
-import {
-	classifyDesignRecordReapprovals,
-	classifyFormat3DesignRecord,
-	FORMAT_3_DECISION_KINDS,
-	FORMAT_3_DISPOSITIONS,
-	FORMAT_3_MARKER,
-	normalizeRecordLine,
-	presentRequiredPrefixes,
-	resolveDesignRecord,
-	resolveDesignRecordRequiredPrefixes,
-	toDesignRecordEntries,
-} from "./gate-check.mjs";
 /**
  * @param {unknown} readyJson - output of `pfdsl status ready --best --json`
  * @returns {{ready: string[], best: string | null, bestOutputs: string[]}}
@@ -104,213 +92,11 @@ export function isUnregisteredManagedIssue(labelNames, processId) {
 	return (labelNames ?? []).includes("flow:managed");
 }
 
-const HEADING_LINE_PATTERN = /^(#{2,6})\s+(.*)$/;
-const NUMBERED_ITEM_PATTERN = /^\d+\.\s/;
-const LABELED_SUBHEADING_ITEM_PATTERN = /^#{3,6}\s+([A-Za-z]|\d+)[.、]\s/;
-const LABELED_BULLET_ITEM_PATTERN = /^-\s*(案\s*\S+|[A-Za-z]|\d+)[.:：]\s/;
-
-/**
- * 候補列挙の構造検出。issue #669 の対策3: 「選択肢を並べただけで確定させないまま着手する」を
- * 機械的に検出するための入力。markdown 見出し行なら語彙を問わず起点とし、同レベル以上の見出しが
- * 現れるまでの範囲を走査して候補項目を数える（#800: 語彙 allowlist は撤廃済み。偽陽性
- * — 候補列挙でない見出し配下も enumerated:true になりうる — は許容するトレードオフで、
- * allowlist が生んでいた偽陰性の方が実害が大きいという判断による）。
- * @param {string | undefined | null} body
- * @returns {{enumerated: boolean, count: number, headings: string[]}}
- */
-export function detectEnumeratedOptions(body) {
-	if (!body) return { enumerated: false, count: 0, headings: [] };
-	const lines = body.split("\n");
-	const headings = [];
-	let count = 0;
-	for (let i = 0; i < lines.length; i++) {
-		const headingMatch = lines[i].match(HEADING_LINE_PATTERN);
-		if (!headingMatch) continue;
-		const level = headingMatch[1].length;
-		headings.push(lines[i].trim());
-		for (let j = i + 1; j < lines.length; j++) {
-			const nextHeadingMatch = lines[j].match(/^(#{2,6})\s+/);
-			if (nextHeadingMatch && nextHeadingMatch[1].length <= level) break;
-			if (
-				NUMBERED_ITEM_PATTERN.test(lines[j]) ||
-				LABELED_SUBHEADING_ITEM_PATTERN.test(lines[j]) ||
-				LABELED_BULLET_ITEM_PATTERN.test(lines[j])
-			)
-				count++;
-		}
-	}
-	return { enumerated: count >= 2, count, headings };
-}
-
-/**
- * The design-selection record, pre-shaped from the terminal gate's format 3
- * vocabulary so the runner never repeats that contract.
- *
- * Emitted on every cycle, not only when the issue enumerates options: the gate
- * FAILs a missing record regardless of the option count, so a record is owed
- * whenever the cycle names an issue at all.
- * @returns {{note: string, lines: string[]}}
- */
-export function buildDesignRecordTemplate() {
-	const lines = [
-		FORMAT_3_MARKER,
-		"",
-		"決定:",
-		`- <軸名>（<${FORMAT_3_DECISION_KINDS.join(" | ")}>）: <今回確定した範囲>`,
-		"",
-		"理由:",
-		"- <軸名>: <目的との対応>",
-		"",
-		"案の処分:",
-		`- <${FORMAT_3_DISPOSITIONS.join(" | ")}> — 元候補「<候補名>」— <理由または条件>`,
-		"",
-		"前提検査 P1:",
-		"対象: <軸名、決定、または元候補名>",
-		"前提: <候補群が共有する前提>",
-		"前提を外した案: <前提が成立しない場合の検査案>",
-		"既存候補との差分: <一致、包含、組合せを含む具体的な差分>",
-		`検査案の処分 P1: <${FORMAT_3_DISPOSITIONS.join(" | ")}> — <理由または条件>`,
-		"",
-		"改訂履歴:",
-		"- なし",
-	];
-	return {
-		note: "方針と必要な承認を実装着手前に確定し、実行主体が issue コメントへ記録する。記録漏れや書式不備は同じ記録を補修し、初コミットとの時刻を揃えるために履歴を作り直さない。決定を変える場合は必要な再承認を得て改訂履歴に残す。角括弧の雛形を具体的な内容へ置き換え、issue 由来の候補をすべて実名で案の処分へ記録する。案の処分と検査案の処分 Pn の部分採用は、空でない採用部分と、理由を伴う残部: 却下|保留 を書く。候補の網羅性と決定・理由・処分の意味的整合は人間レビューの責務であり、機械検査は保証しない。下書きは投稿前に `node scripts/check-design-record.mjs --file <path>` で検査し、PASS を確認してから投稿する。下書きの置き場は並行セッションと共有されるため、`/tmp/design-record.md` のような用途だけの固定名を避け、ブランチ名等でセッション固有の名前にする。",
-		lines,
-	};
-}
-
-/**
- * issue の設計確定状態を分類する。判定順（前段がヒットしたら後段は評価しない）:
- * 1. 既存の「設計未確定」フレーズがヒット → unsettled (reason: "phrase")
- * 2. `resolveDesignRecord` が完全な記録を一意に同定できる
- *    → settled (reason: "record-posted")
- * 3. 複数の完全な形式3記録がある → unsettled (reason: "record-ambiguous")
- * 4. 構造不正な記録がある → unsettled (reason: "record-incomplete")
- * 5. 候補列挙構造があるのに記録が無い → unsettled (reason: "enumerated-options-without-record")
- * 6. それ以外 → unsettled (reason: "no-enumerated-options")。
- *    列挙構造を検出できなかった回を「設計確認不要」の既定にする（fail-open）と、
- *    散文中に紛れた選択肢が検出をすり抜けたまま既定で通過してしまう（#833・#829）。
- *
- * 記録の同定は終端ゲート（gate-check.mjs）と同じ `resolveDesignRecord`
- * （と、それに entries を渡す `toDesignRecordEntries`）を使う。プリフライトと
- * 終端ゲートが別々の同定ロジックを持つと、どちらかが記録だと見なした文章を
- * もう一方が見なさない、という食い違いが生まれるため。
- *
- * `unsettled` は設計の未決定や記録不足を着手前に確認するための報告であり、
- * この値だけでは CLI の終了コードを変えず、追加承認の要否も決めない。
- * true の場合は reason・一次記録・現行のコードと仕様を照合し、未決定の設計や
- * 記録不足を解消する。確認手順と承認境界は .pfdsl/bindings/pfd-ops.md
- * 「ワークサイクルの追加手順」の「選択後の設計確認」に従う。
- * 記録投稿の要否は別軸である。roadmap.md の規約上、design-selection record は列挙構造の有無に
- * 関わらず全サイクル必須で、`unsettled: false` を「記録不要」と読むのは
- * 誤読になる（#809）。そのため戻り値には `recordRequired` を独立して持たせる
- * — `record-posted` のときだけ false、それ以外は常に true（#868）。
- * @param {{body: string, comments?: Array<{id?: string, databaseId?: number, url?: string, body: string, createdAt?: string}>, issueNumber?: number, repository?: {host?: string, owner?: string, repo?: string}, editInfo?: {status?: string, editedAtIso?: string | null}}} params
- * @returns {{unsettled: boolean, reason: string, matchedLines?: string[], optionCount?: number,
- *            missingPrefixes?: string[], problems?: string[],
- *            record?: {createdAt?: string} | null, detail?: string, recordRequired: boolean}}
- */
-export function classifyDesignSettlement({
-	body,
-	comments,
-	issueNumber,
-	repository,
-	editInfo,
-}) {
-	const phrase = detectDesignUnsettled(body);
-	if (phrase.designUnsettled) {
-		return {
-			unsettled: true,
-			reason: "phrase",
-			matchedLines: phrase.matchedLines,
-			recordRequired: true,
-		};
-	}
-
-	const entries = toDesignRecordEntries({ comments });
-	const resolved = resolveDesignRecord(entries);
-	if (resolved.status === "selected") {
-		const reapproval = classifyDesignRecordReapprovals({
-			record: resolved.record,
-			comments: entries,
-			issueNumber,
-			repository,
-			editInfo,
-		});
-		if (reapproval.status === "FAIL")
-			return {
-				unsettled: true,
-				reason: "record-incomplete",
-				problems: [reapproval.detail],
-				record: { createdAt: resolved.record.createdAt },
-				recordRequired: true,
-			};
-		return {
-			unsettled: false,
-			reason: "record-posted",
-			record: { createdAt: resolved.record.createdAt },
-			...(reapproval.detail ? { detail: reapproval.detail } : {}),
-			recordRequired: false,
-		};
-	}
-	if (resolved.status === "ambiguous")
-		return {
-			unsettled: true,
-			reason: "record-ambiguous",
-			problems: [resolved.detail],
-			recordRequired: true,
-		};
-	if (resolved.status === "invalid") {
-		const parsedFormat3 = classifyFormat3DesignRecord(
-			resolved.record.body,
-			resolved.record.createdAt,
-		);
-		const isFormat3 = resolved.record.body
-			.split("\n")
-			.some((line) => normalizeRecordLine(line) === FORMAT_3_MARKER);
-		return {
-			unsettled: true,
-			reason: "record-incomplete",
-			missingPrefixes: isFormat3
-				? []
-				: resolveDesignRecordRequiredPrefixes(resolved.record).filter(
-						(prefix) =>
-							!presentRequiredPrefixes(
-								resolved.record.body,
-								resolved.record.createdAt,
-							).includes(prefix),
-					),
-			problems: isFormat3 ? parsedFormat3.problems : resolved.problems,
-			record: { createdAt: resolved.record.createdAt },
-			recordRequired: true,
-		};
-	}
-
-	const enumerated = detectEnumeratedOptions(body);
-	if (enumerated.enumerated) {
-		return {
-			unsettled: true,
-			reason: "enumerated-options-without-record",
-			matchedLines: enumerated.headings,
-			optionCount: enumerated.count,
-			recordRequired: true,
-		};
-	}
-
-	return {
-		unsettled: true,
-		reason: "no-enumerated-options",
-		recordRequired: true,
-	};
-}
-
 /**
  * The gate-check invocation for this cycle. `--issue` is folded in for the
  * same reason `--artifact` is: the operator copies this line verbatim, so a
  * flag left out here is a check that silently SKIPs every cycle (#669). It is
- * repeated per issue rather than folded into one value, because gate-check
- * judges each issue on its own row (#734).
+ * repeated per issue so the terminal manual review retains every target.
  * @param {string | null} artifactKey
  * @param {string} base
  * @param {number[]} [issueNumbers]
@@ -322,25 +108,6 @@ export function buildGateCheckCommand(artifactKey, base, issueNumbers = []) {
 		? `--artifact ${artifactKey}`
 		: "--no-artifact";
 	return `node scripts/gate-check.mjs --base ${base} ${artifactFlag}${issueFlags}`;
-}
-
-const DESIGN_UNSETTLED_PATTERNS = [/design TBD/i, /設計未確定/, /設計未合意/];
-
-/**
- * .pfdsl/bindings/pfd-ops.md の「手順 1 の追加」が定義する「設計未合意フレーズ」を issue 本文から検出する。
- * @param {string | undefined | null} body
- * @param {RegExp[]} patterns
- * @returns {{designUnsettled: boolean, matchedLines: string[]}}
- */
-export function detectDesignUnsettled(
-	body,
-	patterns = DESIGN_UNSETTLED_PATTERNS,
-) {
-	if (!body) return { designUnsettled: false, matchedLines: [] };
-	const matchedLines = body
-		.split("\n")
-		.filter((line) => patterns.some((p) => p.test(line)));
-	return { designUnsettled: matchedLines.length > 0, matchedLines };
 }
 
 /**

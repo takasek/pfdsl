@@ -6,7 +6,7 @@ const read = (path) => readFileSync(path, "utf8");
 
 const skill = read(".claude/skills/pfd-ops/SKILL.md");
 const workCycle = read(".claude/skills/pfd-ops/references/work-cycle.md");
-// ADR-0039 keeps the Format 3 record contract in the adopting repo's binding,
+// ADR-0039 keeps the design record contract in the adopting repo's binding,
 // not in the distributed work cycle, so these assertions read the binding.
 const opsBinding = read(".pfdsl/bindings/pfd-ops.md");
 const retro = read(".claude/skills/pfd-retro/SKILL.md");
@@ -81,85 +81,23 @@ describe("pfd-ops applicability contract", () => {
 		assert.match(roadmapScaffold, /roadmap 管理外/);
 	});
 
-	it("uses the format 3 decision-first contract without claiming semantic machine proof", () => {
+	it("keeps placement and readback distributed while record policy belongs to the binding", () => {
 		const format2Tokens =
 			/提案:|前提を外した対案:|対案を採らない理由:|案の処分 N:/;
-		const bindingMigrationHistory = opsBinding.split("**移行履歴**:")[1];
-		const bindingMigrationHistorySection =
-			bindingMigrationHistory?.split("\n\n## ")[0];
-
-		assert.match(opsBinding, /設計記録形式: 3/);
-		// The bundle must no longer teach the record format at all (ADR-0039).
-		assert.doesNotMatch(workCycle, /設計記録形式: 3/);
-		assert.ok(
-			opsBinding.indexOf("決定:") < opsBinding.indexOf("理由:") &&
-				opsBinding.indexOf("理由:") < opsBinding.indexOf("案の処分:") &&
-				opsBinding.indexOf("案の処分:") < opsBinding.indexOf("前提検査 Pn:"),
-		);
-		assert.match(opsBinding, /元候補「<候補名>」/);
-		assert.match(
-			opsBinding,
-			/記録の構造と.*時刻の妥当性・再承認参照を blocking にする/,
-		);
-		assert.match(
-			opsBinding,
-			/採用部分: <範囲>; 残部: <却下 \| 保留> — <理由または再検討条件>/,
-		);
-		assert.match(
-			opsBinding,
-			/改訂行を `-`、旧決定、`→`、新決定、`—`、変更理由、`— 再承認:`、再承認参照の順で書く/,
-		);
-		assert.match(opsBinding, /軸分割が実際の独立性を反映/);
-		assert.match(opsBinding, /保留の再検討条件が実行可能/);
-		assert.match(
-			opsBinding,
-			/表示種別.*ファイル変更.*外部書き込み.*認証情報.*費用発生.*権限を付与しない/,
-		);
-		assert.match(opsBinding, /optionCount.*完全性.*証明/);
-		assert.match(opsBinding, /バックエンドの移行契約が選択する形式/);
-		assert.match(
-			opsBinding,
-			/移行境界は各バックエンドの L3 reference が定める/,
-		);
-		// The bundle layer must carry none of the backend-specific record
-		// vocabulary any more: neither the generic cycle nor the L3 preset.
-		assert.doesNotMatch(workCycle, /issuecomment|canonical comment URL|対話 /);
-		assert.doesNotMatch(
-			githubBackend,
-			/issuecomment|canonical comment URL|対話 /,
-		);
-		assert.doesNotMatch(workCycle, /2026-08-31T01:30:24Z/);
-		assert.doesNotMatch(githubBackend, /2026-08-31T01:30:24Z/);
-		assert.match(opsBinding, /以降の新規記録は完全な Format 3/);
-		assert.match(opsBinding, /既存の有効な旧形式記録を書き換えない/);
-		assert.match(opsBinding, /人間による意味的な再検査/);
-
-		// ADR-0039: the bundle keeps only the placement contract; the format,
-		// the canonical-URL grammar, the reapproval window and the migration
-		// cutoffs are this repo's own rules and live in the binding.
-		assert.match(opsBinding, /2026-08-30T09:32:50Z/);
-		assert.match(opsBinding, /2026-08-31T01:30:24Z/);
-		assert.match(opsBinding, /2026-09-05T14:07:16Z/);
-		assert.match(opsBinding, /host.*owner.*repo/);
-		assert.match(opsBinding, /YYYY-MM-DDTHH:MM:SS/);
-		assert.match(opsBinding, /半角スペース/);
-		assert.match(opsBinding, /comments.*pagination|pagination.*comments/);
-		assert.match(opsBinding, /同じコメントを編集/);
-		assert.match(opsBinding, /別コメント.*置換してはならない/);
-		assert.match(opsBinding, /複数.*完全な形式3コメント.*fail-close/);
 		assert.match(githubBackend, /コメントから正本を同定/);
+		assert.match(githubBackend, /exact-write readback/);
 		assert.match(
 			githubBackend,
 			/書式と再承認参照の検査は採用リポの binding が定める/,
 		);
-		assert.doesNotMatch(githubBackend, /設計記録形式: 3/);
-		assert.ok(bindingMigrationHistorySection);
-		assert.match(bindingMigrationHistorySection, format2Tokens);
 		assert.doesNotMatch(
-			opsBinding.replace(bindingMigrationHistorySection, ""),
-			format2Tokens,
+			workCycle,
+			/設計記録形式: 3|issuecomment|canonical comment URL/,
 		);
-		assert.doesNotMatch(githubBackend, format2Tokens);
+		assert.doesNotMatch(
+			githubBackend,
+			/設計記録形式: 3|canonical comment URL|2026-08-31T01:30:24Z/,
+		);
 
 		// ADR-0039: the L3 preset delegates the record format to the adopting
 		// repo's binding instead of declaring it itself — and, with the format

@@ -18,15 +18,12 @@ import { execFileSync } from "node:child_process";
 import { isGhUnavailableError } from "./gh-compat.mjs";
 import { execGh } from "./gh-exec.mjs";
 import {
-	DESIGN_RECORD_EDIT_QUERY,
 	fetchAllIssues,
 	fetchAllLabels,
-	fetchDesignRecordEditInfo,
 	fetchIssueView,
 	fetchOpenPrs,
 	fetchPullRequestView,
 	mapLabelsResponse,
-	normalizeDesignRecordEditResponse,
 	parseHost,
 	parseOwnerRepo,
 	addIssueLabel as restAddIssueLabel,
@@ -101,34 +98,6 @@ function repositoryFromGitRemote(cwd) {
 }
 
 /**
- * The GraphQL query that reads the selected design-selection record comment's
- * edit timestamp. REST's `updated_at` is not used because it also changes
- * when a comment is added.
- * @param {{nodeId: string}} params
- * @returns {string[]} argv for execGh
- */
-export function buildDesignRecordEditQuery({ nodeId }) {
-	return [
-		"api",
-		"graphql",
-		"-F",
-		`nodeId=${nodeId}`,
-		"-f",
-		`query=${DESIGN_RECORD_EDIT_QUERY}`,
-	];
-}
-
-/**
- * Parse buildDesignRecordEditQuery's response into the shape
- * designRecordEditInfo returns.
- * @param {string} jsonText - execGh's stdout for the graphql call
- * @returns {{status: "edited" | "unedited", editedAtIso: string | null}}
- */
-export function parseDesignRecordEditResponse(jsonText) {
-	return normalizeDesignRecordEditResponse(JSON.parse(jsonText));
-}
-
-/**
  * @param {object} opts
  * @param {string} [opts.cwd]
  * @param {(args: string[], opts: {cwd: string}) => Promise<string>} [opts.execGhImpl]
@@ -155,8 +124,7 @@ export function createGitHubOps({
 
 	/**
 	 * Runs `ghCall`, and on a genuine gh-unavailable ENOENT with a token
-	 * present, resolves this repo's owner/repo unless the operation is already
-	 * addressed by an opaque identifier, then runs `httpCall` with it.
+	 * present, resolves this repo's owner/repo and runs `httpCall` with it.
 	 * Every other case (no ENOENT, or ENOENT with no token) rethrows the
 	 * original error unchanged, so isGhUnavailableError keeps working for
 	 * callers. `httpCall` undefined means this operation has no HTTP
@@ -167,14 +135,8 @@ export function createGitHubOps({
 	 * @param {string} operation
 	 * @param {() => Promise<any>} ghCall
 	 * @param {((ctx: {owner?: string, repo?: string, token: string}) => Promise<any>) | undefined} httpCall
-	 * @param {{resolveOwnerRepo?: boolean}} [options]
 	 */
-	async function withFallback(
-		operation,
-		ghCall,
-		httpCall,
-		{ resolveOwnerRepo = true } = {},
-	) {
+	async function withFallback(operation, ghCall, httpCall) {
 		try {
 			return await ghCall();
 		} catch (e) {
@@ -185,8 +147,7 @@ export function createGitHubOps({
 				throw new Error(
 					`github-ops: '${operation}' has no HTTP backend implementation; the gh CLI is required for this operation`,
 				);
-			const context = resolveOwnerRepo ? ownerRepo() : {};
-			return await httpCall({ ...context, token });
+			return await httpCall({ ...ownerRepo(), token });
 		}
 	}
 
@@ -369,22 +330,6 @@ export function createGitHubOps({
 				},
 				({ owner, repo, token }) =>
 					restEditLabel(owner, repo, token, name, description, fetchImpl),
-			),
-
-		/**
-		 * The selected design-selection record comment's edit history.
-		 * @param {{nodeId: string}} params
-		 * @returns {Promise<{status: "edited" | "unedited", editedAtIso: string | null}>}
-		 */
-		designRecordEditInfo: ({ nodeId }) =>
-			withFallback(
-				"designRecordEditInfo",
-				async () => {
-					const out = await runGh(buildDesignRecordEditQuery({ nodeId }));
-					return parseDesignRecordEditResponse(out);
-				},
-				({ token }) => fetchDesignRecordEditInfo(nodeId, token, fetchImpl),
-				{ resolveOwnerRepo: false },
 			),
 	};
 }
