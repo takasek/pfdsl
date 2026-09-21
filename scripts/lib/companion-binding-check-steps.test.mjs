@@ -180,3 +180,69 @@ describe("runCompanionBindingsCheck", () => {
 		assert.match(result.stderrLines.at(-1), /2 error\(s\)/);
 	});
 });
+
+// The pfd-retro case store is exempt from the dead-path check because its
+// repo-relative references are frozen evidence, but a relative link into
+// another live document is navigation, not evidence — so it is checked even
+// there (#1231 follow-up).
+describe("runCompanionBindingsCheck relative markdown links", () => {
+	const CASE = ".pfdsl/bindings/pfd-retro-patterns/case.md";
+
+	it("flags a dead relative link inside the exempt case store", () => {
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				listFiles: () => [CASE],
+				readFile: () => "現行手順は [binding](../pfd-retro.md) を参照。",
+				exists: () => false,
+			}),
+		);
+		assert.equal(result.exitCode, 1);
+		assert.match(
+			result.stderrLines[0],
+			/dead relative link `\.\.\/pfd-retro\.md` \(resolved: \.pfdsl\/bindings\/pfd-retro\.md\)/,
+		);
+	});
+
+	it("resolves a sibling link against the linking file's own directory", () => {
+		const resolved = ".pfdsl/bindings/pfd-retro-patterns/other.md";
+		const seen = [];
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				listFiles: () => [CASE],
+				readFile: () => "see [other](other.md)",
+				exists: (path) => {
+					seen.push(path);
+					return path === resolved;
+				},
+			}),
+		);
+		assert.equal(result.exitCode, 0);
+		assert.ok(seen.includes(resolved), seen.join(", "));
+	});
+
+	it("keeps the dead-path exemption for the same file (frozen evidence)", () => {
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				listFiles: () => [CASE],
+				readFile: (file) =>
+					file === PFD_RETRO_PATH
+						? "# pfd-retro バインディング\n"
+						: "当時は `scripts/removed-mechanism.mjs` だった。現行は [binding](../pfd-retro.md)。",
+				exists: (path) => path === PFD_RETRO_PATH,
+			}),
+		);
+		assert.equal(result.exitCode, 0);
+	});
+
+	it("checks relative links in ordinary companions too", () => {
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				listFiles: () => [".pfdsl/workflow.md"],
+				readFile: () => "see [gone](./gone.md)",
+				exists: () => false,
+			}),
+		);
+		assert.equal(result.exitCode, 1);
+		assert.match(result.stderrLines[0], /resolved: \.pfdsl\/gone\.md/);
+	});
+});

@@ -14,7 +14,14 @@
  *    exists) — this runs as part of `make check-docs`, which already
  *    assumes that for other checks. Historical pfd-retro-patterns cases retain
  *    references to their original revisions and are outside this live check.
- * 2. If .pfdsl/bindings/pfd-retro.md exists, verifies it has the "pfd-retro
+ * 2. Resolves markdown links written relative to the linking file (`../x.md`,
+ *    a bare sibling name) against that file's own directory, across every
+ *    companion including the pfd-retro-patterns cases. The exemption in 1
+ *    covers frozen evidence about repo paths; a relative link points the
+ *    reader at a live document instead, and 87 cases carry the same
+ *    `../pfd-retro.md` that one rename would break all at once (#1231
+ *    follow-up).
+ * 3. If .pfdsl/bindings/pfd-retro.md exists, verifies it has the "pfd-retro
  *    バインディング" heading pfd-retro's audit protocol depends on being
  *    able to find.
  *
