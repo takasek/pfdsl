@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
 	extractPathReferences,
+	extractRelativeMarkdownLinks,
 	findMissingHeadings,
 	resolveCheckTarget,
 } from "./companion-binding-check.mjs";
@@ -116,5 +117,67 @@ describe("findMissingHeadings", () => {
 		assert.deepEqual(findMissingHeadings(text, ["retro 実行記録"]), [
 			"retro 実行記録",
 		]);
+	});
+});
+
+describe("extractRelativeMarkdownLinks", () => {
+	it("extracts sibling and parent-relative markdown link targets (#1231 follow-up)", () => {
+		const text =
+			"see [a](sibling-case.md) and [b](../pfd-retro.md) and [c](./nested/other.md)";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), [
+			"sibling-case.md",
+			"../pfd-retro.md",
+			"./nested/other.md",
+		]);
+	});
+
+	it("leaves the repo-relative prefixes to extractPathReferences", () => {
+		const text =
+			"see [a](docs/spec/spec.md) and [b](.claude/skills/x/SKILL.md) and [c](scripts/x.mjs) and [d](packages/cli/src/i.ts)";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), []);
+	});
+
+	it("ignores absolute URLs, root-absolute paths and in-page anchors", () => {
+		const text =
+			"[a](https://example.com/x.md) [b](http://e.com/y.md) [c](/abs/z.md) [d](#section) [e](mailto:x@e.invalid)";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), []);
+	});
+
+	it("ignores non-markdown targets, which this check cannot resolve", () => {
+		const text = "[a](image.png) [b](../data.json)";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), []);
+	});
+
+	it("drops an anchor suffix so the file part can be resolved", () => {
+		assert.deepEqual(
+			extractRelativeMarkdownLinks("[a](../pfd-retro.md#出力)"),
+			["../pfd-retro.md"],
+		);
+	});
+
+	it("ignores links inside fenced blocks, as the path check does", () => {
+		const text = "```\n[a](sibling-case.md)\n```\n[b](real-case.md)\n";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), ["real-case.md"]);
+	});
+
+	it("deduplicates repeated targets", () => {
+		const text = "[a](../pfd-retro.md) [b](../pfd-retro.md)";
+		assert.deepEqual(extractRelativeMarkdownLinks(text), ["../pfd-retro.md"]);
+	});
+});
+
+describe("extractRelativeMarkdownLinks title attributes", () => {
+	it("extracts a target carrying a title attribute", () => {
+		assert.deepEqual(
+			extractRelativeMarkdownLinks('[a](../pfd-retro.md "current procedure")'),
+			["../pfd-retro.md"],
+		);
+	});
+
+	it("extracts a target carrying both an anchor and a title", () => {
+		assert.deepEqual(
+			extractRelativeMarkdownLinks('[a](../pfd-retro.md#出力 "out")'),
+			["../pfd-retro.md"],
+		);
 	});
 });
