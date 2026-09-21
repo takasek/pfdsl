@@ -246,3 +246,51 @@ describe("runCompanionBindingsCheck relative markdown links", () => {
 		assert.match(result.stderrLines[0], /resolved: \.pfdsl\/gone\.md/);
 	});
 });
+
+// The two link checks split by where a target resolves, not by how it was
+// spelled. A repo path written in dot-relative form is still a repo path, and
+// in a case file it is frozen evidence the dead-path check deliberately
+// exempts — so the relative-link check has to hand it back rather than demand
+// it stay live (#1231 follow-up review).
+describe("runCompanionBindingsCheck link-check boundary", () => {
+	const CASE = ".pfdsl/bindings/pfd-retro-patterns/case.md";
+
+	it("leaves a target resolving outside .pfdsl/ to the dead-path check", () => {
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				listFiles: () => [CASE],
+				readFile: () =>
+					"当時は [仕様](../../../docs/spec/gone.md) を見ていた。",
+				exists: () => false,
+			}),
+		);
+		assert.equal(result.exitCode, 0, result.stderrLines.join("\n"));
+	});
+
+	it("still checks it in an ordinary companion via the dead-path check", () => {
+		const result = runCompanionBindingsCheck(
+			baseDeps({
+				listFiles: () => [".pfdsl/workflow.md"],
+				readFile: () => "see `docs/spec/gone.md`",
+				exists: () => false,
+			}),
+		);
+		assert.equal(result.exitCode, 1);
+		assert.match(result.stderrLines[0], /dead path reference/);
+	});
+
+	it("reads each file once across both link checks", () => {
+		const reads = [];
+		runCompanionBindingsCheck(
+			baseDeps({
+				listFiles: () => [".pfdsl/workflow.md"],
+				readFile: (file) => {
+					reads.push(file);
+					return "";
+				},
+				exists: () => false,
+			}),
+		);
+		assert.deepEqual(reads, [".pfdsl/workflow.md"]);
+	});
+});

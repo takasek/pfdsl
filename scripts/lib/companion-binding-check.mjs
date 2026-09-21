@@ -17,10 +17,11 @@ const MD_LINK_RE = new RegExp(`\\]\\(((?:${PREFIX_ALT})/[^)\\s]*)\\)`, "g");
 // A link target resolved against the linking file's own directory: no scheme
 // (`https:`, `mailto:`), no leading `/`, not an in-page `#anchor`, not one of
 // the repo-relative prefixes MD_LINK_RE already owns, and ending in `.md`
-// before any anchor. The negative lookahead carries the prefix set so the two
-// extractors partition link targets rather than both claiming some.
+// before any anchor or title attribute. Carrying the prefix set in a negative
+// lookahead keeps the two extractors from both claiming a target; targets that
+// are neither (an image, a `.json`) belong to neither by design.
 const RELATIVE_MD_LINK_RE = new RegExp(
-	`\\]\\((?!(?:${PREFIX_ALT})/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?![/#])([^)\\s]*\\.md(?:#[^)\\s]*)?)\\)`,
+	`\\]\\((?!(?:${PREFIX_ALT})/)(?![a-zA-Z][a-zA-Z0-9+.-]*:)(?![/#])([^)\\s]*\\.md(?:#[^)\\s]*)?)(?:\\s+"[^"]*")?\\)`,
 	"g",
 );
 

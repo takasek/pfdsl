@@ -1,13 +1,14 @@
 /**
  * check-companion-bindings.mjs orchestration: three independent checks (dead
- * path references in .pfdsl/*.md companions, dead file-relative markdown links
- * across all of them, and the required headings of each binding in
- * REQUIRED_BINDING_HEADINGS that exists) merged into one errorCount and one
- * final exit-code branch, none of which was tested (#645) — only the pure
- * extractors/matchers in lib/companion-binding-check.mjs had tests.
+ * file-relative markdown links within .pfdsl/, dead repo-relative path
+ * references in the companions outside the case store, and the required
+ * headings of each binding in REQUIRED_BINDING_HEADINGS that exists) merged
+ * into one errorCount and one final exit-code branch, none of which was tested
+ * (#645) — only the pure extractors/matchers in lib/companion-binding-check.mjs
+ * had tests.
  *
- * The two link checks differ in scope on purpose; see the comments on each
- * loop for which files they cover and why.
+ * The two link checks partition targets by where each one resolves; see the
+ * comments inside the loop for the boundary and why it sits there.
  *
  * `listFiles`/`readFile`/`exists` are injected, already bound to the repo
  * root by the caller (so callers pass root-relative paths, matching git
@@ -23,6 +24,11 @@ import {
 	findMissingHeadings,
 	resolveCheckTarget,
 } from "./companion-binding-check.mjs";
+
+// The tree listFiles draws from. A relative link resolving outside it has left
+// the companions behind and belongs to the dead-path check's territory.
+const COMPANION_ROOT = ".pfdsl";
+const CASE_STORE = ".pfdsl/bindings/pfd-retro-patterns";
 
 const REQUIRED_BINDING_HEADINGS = [
 	{
@@ -46,23 +52,22 @@ const REQUIRED_BINDING_HEADINGS = [
  * @returns {{exitCode: 0|1, stdoutLines: string[], stderrLines: string[]}}
  */
 export function runCompanionBindingsCheck({ listFiles, readFile, exists }) {
-	const allFiles = listFiles();
-	// Historical cases preserve paths and evidence from their original revision.
-	// Their current procedures live in the binding, which is still checked.
-	const files = allFiles.filter(
-		(file) => !file.startsWith(".pfdsl/bindings/pfd-retro-patterns/"),
-	);
 	const stderrLines = [];
 	let errorCount = 0;
 
-	// Relative links run over every file, the exempt cases included: the
-	// exemption covers repo-relative references frozen at the revision a case
-	// was written, while a link relative to the case itself points a reader at
-	// a live document and has to keep resolving.
-	for (const file of allFiles) {
+	for (const file of listFiles()) {
+		const text = readFile(file);
 		const dir = posix.dirname(file);
-		for (const ref of extractRelativeMarkdownLinks(readFile(file))) {
-			const target = posix.normalize(posix.join(dir, ref));
+
+		// Relative links are checked everywhere, the exempt cases included: a
+		// link resolving to another companion points a reader at a live
+		// document, not at the frozen repo paths the exemption below covers.
+		// The split is by where a target lands, not by how it was spelled — a
+		// repo path written `../../../docs/x.md` is still a repo path, and in a
+		// case file it is exactly the frozen evidence the exemption protects.
+		for (const ref of extractRelativeMarkdownLinks(text)) {
+			const target = posix.join(dir, ref);
+			if (!target.startsWith(`${COMPANION_ROOT}/`)) continue;
 			if (!exists(target)) {
 				stderrLines.push(
 					`${file}: dead relative link \`${ref}\` (resolved: ${target})`,
@@ -70,10 +75,12 @@ export function runCompanionBindingsCheck({ listFiles, readFile, exists }) {
 				errorCount++;
 			}
 		}
-	}
 
-	for (const file of files) {
-		const text = readFile(file);
+		// Historical cases preserve paths and evidence from their original
+		// revision. Their current procedures live in the binding, which is
+		// still checked.
+		if (file.startsWith(`${CASE_STORE}/`)) continue;
+
 		for (const ref of extractPathReferences(text)) {
 			const target = resolveCheckTarget(ref);
 			if (target === null) continue; // placeholder, not a concrete path

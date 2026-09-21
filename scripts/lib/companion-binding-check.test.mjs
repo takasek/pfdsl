@@ -165,3 +165,19 @@ describe("extractRelativeMarkdownLinks", () => {
 		assert.deepEqual(extractRelativeMarkdownLinks(text), ["../pfd-retro.md"]);
 	});
 });
+
+describe("extractRelativeMarkdownLinks title attributes", () => {
+	it("extracts a target carrying a title attribute", () => {
+		assert.deepEqual(
+			extractRelativeMarkdownLinks('[a](../pfd-retro.md "current procedure")'),
+			["../pfd-retro.md"],
+		);
+	});
+
+	it("extracts a target carrying both an anchor and a title", () => {
+		assert.deepEqual(
+			extractRelativeMarkdownLinks('[a](../pfd-retro.md#出力 "out")'),
+			["../pfd-retro.md"],
+		);
+	});
+});
