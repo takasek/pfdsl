@@ -37,11 +37,7 @@ try {
 	process.exit(2);
 }
 const base = values.base ?? "main";
-// Repeatable: a cycle that closes several issues owes a record on each one, so
-// the preflight judges them all and the gate-check line it prints names them all
-// (#734). Rejected here rather than coerced, for the same reason parseArgs is
-// strict: a value this script reinterprets is a mode the caller did not ask for
-// (#745).
+// Retain every explicit target in the source reads and terminal review command.
 const parsedIssues = parseIssueNumbers(values.issue);
 if (!parsedIssues.ok) {
 	console.error(`cycle-status: ${parsedIssues.message}`);

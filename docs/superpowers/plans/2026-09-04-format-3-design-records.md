@@ -1,5 +1,7 @@
 # Format 3 Reader-first Design Records Implementation Plan
 
+> Historical implementation plan, superseded by issue #1208 option B. For the current record and human-review requirements, see [.pfdsl/bindings/pfd-ops.md](../../../.pfdsl/bindings/pfd-ops.md#github-issues-バックエンドの設計記録).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the single-proposal reader-first record with a versioned format that presents every decided axis first and records original-option dispositions, premise tests, and pre-implementation revisions without claiming semantic guarantees from structural checks.

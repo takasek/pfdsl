@@ -97,5 +97,3 @@ issue findings の `blocking:` は監査を失敗させ、`advisory:` だけな�
   - 回収スクリプトは `PFDSL_CLI`、リポの `packages/cli/dist/cli.js`、`node_modules/@pfdsl/cli/dist/cli.js` の順に CLI を探す
 
 `audit-issues-flow.mjs` が使う named operation はすべて HTTP backend を持つ。`gh` が存在しない（ENOENT）場合も、`GH_TOKEN` または `GITHUB_TOKEN` があれば HTTP backend へ切り替わるため、token のみの環境で監査を実行できる。`gh` が実行されて認証・通信・引数エラーになった場合は HTTP へ切り替えず、そのエラーを報告する。
-
-`designRecordEditInfo` も HTTP backend を持つ。選択済みコメントの GraphQL node ID を指定して対象コメントだけを取得し、`gh` が無い環境では token を使った GraphQL POST へ fallback する。HTTP または GraphQL で取得不能な場合は取得不能として扱い、改訂行のある記録を不受理にする一方、改訂行のない記録を編集時刻だけを理由に不受理にはしない。

@@ -27,13 +27,10 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 ## プリフライト・ゲート集約スクリプト（#354）
 
 - **選択フェーズ（pfd-ops 手順1）**: `GH_HOST=github.com node scripts/cycle-status.mjs` — fetch 実行・base への遅れコミット数・open PR の一覧・`status ready --best` の結果を1回の JSON 出力に集約する。`--base <branch>` で対象ブランチを変更可能（デフォルト `main`）。加えて次の情報を出力する（#461）:
-  - 対象 issue の本文・コメントを fetch し、設計確定状態を出力する（#669）。実行前に知る必要があるのは対象 issue の決まり方だけで、`--issue <n>` が最優先、無ければ best プロセスの `location:` から解決する。どちらからも対象 issue 番号が得られない場合は設計確定判定を出さないが、この理由だけでは拒否せず終了コードは0になる。対象 issue の取得失敗は issue identity を保持した blocking 結果となり、終了コードも非ゼロになる。フィールドの構造と各値の意味はここに列挙しない（#913）— 設計確定判定は `scripts/lib/cycle-status.mjs` の `classifyDesignSettlement`、取得失敗時の停止は `scripts/lib/cycle-status-steps.mjs` の `runCycleStatus` と `cycleStatusExitCode` が一次情報
-  - `designUnsettledFor` の `unsettled: true` は終了コードを変えない報告である。`reason` を読み、`.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 1 の追加」にある「選択後の設計確認」に従って着手前に対応する。
+  - 対象 issue の本文・コメントを取得し、`issueTargets` に対象と解決元を出力する。`--issue <n>` で明示した全件を優先し、指定なしなら best プロセスの `location:` から解決する。設計の確定・未確定や記録の適否は機械判定せず、`manualChecks` が案内する binding「選択後の設計確認」に従う。対象未解決はエラー情報とコマンド未生成として報告し、その理由だけでは終了コードを変えない。取得失敗は対象 issue を保持して終了コードを非ゼロにする。終了コード0を一次資料や承認の確認済みと読まない。実装は `scripts/lib/cycle-status-steps.mjs` の `runCycleStatus` と `cycleStatusExitCode` が一次情報
   - `behindBase > 0` のときは判定を一切出さず `staleTree`（`{base, message}`）と `behindBase` だけを返し、終了コード 1 で拒否する（#716）。`origin/<base>` を起点にサイクルのブランチを切ってから実行する（遅れたツリーで古い版が走ること・その拒否は拒否する版でしか起きないことは `.pfdsl/bindings/pfd-ops.md`「ワークサイクルの追加手順」の「手順 1 の追加」が一次情報）
   - `currentBranch` と `commitsAheadOfBase`（`origin/<base>..HEAD` の件数）を出力する（#629）。0 でなければ前サイクルのブランチに乗っている可能性を示すが、既存ブランチの意図的な継続もあるためスクリプトは拒否せず判断を残す
   - 作業ツリーに未コミットの変更（追跡外ファイルを含む）があるときは、`behindBase` と同じく判定を一切出さず `uncommittedFiles` と `dirtyTree` だけを返し、終了コード 1 で拒否する（#744）。前サイクルの変更はブランチを切り替えてもツリーに残り、次サイクルの最初のコミットに紛れ込む — `commitsAheadOfBase` が塞ぐのと同じ失敗の型で、経路がコミットでなく作業ツリーであるだけ。`commitsAheadOfBase` と違い判断を残さず拒否するのは、サイクルは clean なツリーから始める前提であり、`git worktree add` がそれを作るため、拒否への答えが「weigh する」でなく「worktree を切る」で済むから。ツリーが base に遅れかつ汚れている場合は遅れの方を返す（走っているスクリプト自身が古い版だという判定が、汚れの判定の信頼性も奪う）
-  - **草案は投稿前に `node scripts/check-design-record.mjs --file <草案のパス>` へ通す（#1114）。** 旧時刻ゲートが補修を妨げた経緯は `.pfdsl/bindings/pfd-retro-patterns/record-timing-anchor-vs-work-unit.md` が一次情報。
-  - 設計選択記録の雛形を `designRecordTemplate`（`{note, lines}`）で毎回出力する（#720）。行頭の語は `gate-check.mjs` の `DESIGN_RECORD_REQUIRED_PREFIXES` / `DISPOSITION_TOKENS` から引いており、散文に転記していない。対象 issue が候補を列挙している場合はその件数を添えた処分の行が加わる
   - 公開 pending を `releasePending`（`{needsAction, report}`）で出力する（#814）。`scripts/release-status.mjs` をそのまま走らせた結果で、`needsAction` はその終了コード、`report` は印字された行。判定でなく報告材料で、pending は公開直後を除いて常に nonzero になる。`needsAction` が何を畳み込むか、なぜそこで止まるかは `scripts/lib/release-status-check.mjs` の `needsAction` の JSDoc が一次情報 — ここには複製しない（#880）。運用上知っておく必要があるのは、false が「公開までにやるべきことが残っていない」であって「`make release` が成功する」ではないこと、true の理由は `report` の行にしか出ないので読むのは行のほうになること、の2点。台帳へ書き写す運用を置かないのは、値の一次情報が npm レジストリ・Marketplace・git であり、書き写した側は無視されたうえに古くなるため
   - このサイクルが着手する issue のうち、`flow:managed` なのに roadmap に process を持たないものを `unregisteredManagedIssues`、roadmap に process がなく `flow:managed` と `flow:exempt` のどちらも持たないものを `untriagedTargetIssues` で出力する（#963、#983）。`audit-issues-flow.mjs` は同じ欠落を全 open issue について報告するが advisory 止まりで、監査を落とさない — roadmap 登録は実装ブランチに乗るため、そのブランチが main へマージされるまで他セッションからは欠落して見え、未分類 issue は GitHub 上で分類されるまで一時的に全セッションから未分類に見える。あるサイクルの差分が消せるのは自分が着手する issue の欠落だけで、他の issue の分は消せない。行動できるのがその1件だけなので、ここが唯一の検査点になる。どちらかが非空で返ってきたら、着手前に roadmap へ依存チェーンを1本足して `flow:managed` を付けるか、`flow:exempt` へ分類するかのどちらかを済ませる — どちらでもないまま進めた回は、その issue の登録または分類が誰の担当でもないまま残る
 
@@ -50,12 +47,12 @@ GitHub Issues。規約と採用手順は `.claude/skills/pfd-ops/references/gith
 対象集合を PR 自身から導くのは、実行主体が渡すフラグに依存させないため。
 `edited` を trigger に含めるのは `check-closes-reference.yml` と同じ理由で、PR 本文の編集が対象集合を変えるからである。
 
-**`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`github-ops.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では HTTP backend へ落ちる（#489・#1044）。`designRecordEditInfo` を含む HTTP backend 対応 operation は token だけの環境でも実行でき、これは選択済みコメントの GraphQL node ID を指定した単体取得である。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、issue 本文の design-unsettled 判定は `issue_read`（`get`）で本文を読んで手動判定、`audit-issues-flow` 相当は対象 issue の `location:`・`updated_at:` を roadmap.pfdsl の記載と手動突合する。
+**`gh` CLI が使えない環境（Claude Code Remote 等）での代替**: `cycle-status.mjs` / `gate-check.mjs`（内部の `audit-issues-flow.mjs`）は `gh` を呼ぶが、`github-ops.mjs` が `GH_TOKEN` / `GITHUB_TOKEN` のある環境では HTTP backend へ落ちる（#489・#1044）。token も無い場合は GitHub MCP server のツール（`list_pull_requests` / `issue_read` / `pull_request_read` 等）で個別に代替する: PR一覧は `list_pull_requests`、設計の確認は `issue_read` で本文とコメントを取得して読む、`audit-issues-flow` 相当は対象 issue の `location:`・`updated_at:` を roadmap.pfdsl の記載と手動突合する。
 `github-ops.mjs` の HTTP backend は上のリポ内スクリプトが必要とする operation の互換層であり、issue コメントや PR 本文の作成・編集を代行する汎用 GitHub write adapter ではない。
 fallback の transport は REST だけではない — `closingIssuesReferences` は REST の pull request payload に存在せず、GraphQL へ直接問い合わせる（#1043）。
 GitHub 側にしか無い読みを本文の正規表現で再構成すると、Development sidebar で手動リンクされた PR が「closing issue 0件」に見える。
 
-`gate-check.mjs` の per-issue 行が SKIP になるのは `gh` バイナリ不在のときだけで、それ以外の lookup 失敗（存在しない issue 番号・認証・ネットワーク・fallback の戻り形不一致）は実エラーを detail に出して FAIL する（#745）。「gh CLI unavailable」と出ていない SKIP は無い — 検査が走らなかった行を環境のせいと読み違える余地を残さないため。
+`gate-check.mjs` の `issue read (#<n>)` 行が SKIP になるのは `gh` バイナリ不在のときだけで、それ以外の lookup 失敗（存在しない issue 番号・認証・ネットワーク・fallback の戻り形不一致）は実エラーを detail に出して FAIL する（#745）。「gh CLI unavailable」と出ていない SKIP は無い — 検査が走らなかった行を環境のせいと読み違える余地を残さないため。
 
 ## 終端ゲート追加項目（issue 固有）
 
@@ -63,11 +60,10 @@ GitHub 側にしか無い読みを本文の正規表現で再構成すると、D
 
 **着手時**: develop ブランチを切った時点で、実装対象の出力 artifact を `todo → wip` に更新する（規則の一次情報は workflow.md「develop 着手時の artifact status 更新」）。
 
-**着手前の選択記録**: 実装着手前に、選んだ方針を issue コメントとして残す。`--issue` を渡す全サイクルが対象で、issue が複数案を列挙しているかどうかは問わない（候補列挙のある回は各案の処分も要る）。選択を記録せず着手すると、issue 本文だけを読んだ第三者が「なぜその方針になったか」を実装差分からしか追えなくなる。
-書式は覚えなくてよい — `cycle-status.mjs` が `designRecordTemplate` として毎回出すので、それを埋めて投稿する。
-投稿した直後に `gate-check.mjs --issue <n>` を回して design-selection record の書式・再承認の判定を通す。
-記録の欠落、形式不備、曖昧な正本、不正な再承認は FAIL にする。記録の投稿・編集と初コミットの時刻比較は行わない。
-記録漏れや書式不備は同じ記録を補修する。決定を変更する場合は必要な再承認と改訂履歴を残し、既存実装との整合を確認して通常の追加コミットで直す。コミットの再作成や日時の変更を回復手順にしない。
+**着手前の選択記録**: 実装着手前に、選んだ方針を issue コメントとして残す。`--issue` で明示した各 issue と、指定なしで best プロセスから解決した issue の双方が対象で、候補の列挙の有無は問わない。既存の採用済み記録があればそれを確認して使い、記録不足だけを理由に再承認を求めない。
+判断・理由・候補の扱い・前提を外した案の検討・決定変更と承認の追跡は binding「GitHub Issues バックエンドの設計記録」に従う。固定の書式・項目順は要求しない。
+投稿・編集直後の exact-write readback は L3 reference に従う。記録の存在・正本・承認根拠への参照と対応は人間が必ず確認し、終端ゲートの成功をその代わりにしない。
+記録の欠落や正本の曖昧さは同じ記録の補修・確認で解消し、決定を変える場合は必要な承認と変更履歴を残す。既存実装との整合は通常の追加コミットで直し、日時の変更やコミットの再作成を回復手順にしない。
 
 汎用ゲート（status 更新 / check 通過 / 論理単位コミット / PR 集約）に加え、**マージ時にのみ**:
 

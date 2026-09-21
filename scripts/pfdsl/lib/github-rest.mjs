@@ -19,33 +19,6 @@ const PER_PAGE = 100;
 // `page` parameter isn't advancing, not that the repo got big.
 const MAX_PAGES = 100;
 
-export const DESIGN_RECORD_EDIT_QUERY = `query($nodeId: ID!) {
-  node(id: $nodeId) {
-    ... on IssueComment { lastEditedAt }
-  }
-}`;
-
-const UNEXPECTED_DESIGN_RECORD_SHAPE_ERROR =
-	"unexpected GraphQL response shape for design-record edit info";
-
-/**
- * Normalize a GraphQL response into the selected design-record comment edit-info contract.
- * @param {unknown} payload
- * @returns {{status: "edited" | "unedited", editedAtIso: string | null}}
- */
-export function normalizeDesignRecordEditResponse(payload) {
-	const node = payload?.data?.node;
-	if (
-		!node ||
-		(node.lastEditedAt !== null && typeof node.lastEditedAt !== "string")
-	)
-		throw new Error(UNEXPECTED_DESIGN_RECORD_SHAPE_ERROR);
-	return {
-		status: node.lastEditedAt === null ? "unedited" : "edited",
-		editedAtIso: node.lastEditedAt,
-	};
-}
-
 /**
  * Extract {owner, repo} from a git remote URL. Handles https, git@ scp-like,
  * and reverse-proxied remotes (this environment's origin is rewritten to a
@@ -303,41 +276,6 @@ export async function fetchIssueView(
 	}
 
 	return result;
-}
-
-/**
- * Ask GraphQL for the selected design-record comment's edit timestamp.
- * REST's `updated_at` also changes when a comment is added, so it cannot
- * establish whether the design record itself was edited.
- * @param {string} nodeId
- * @param {string} token
- * @param {typeof fetch} [fetchImpl]
- * @returns {Promise<{status: "edited" | "unedited", editedAtIso: string | null}>}
- */
-export async function fetchDesignRecordEditInfo(
-	nodeId,
-	token,
-	fetchImpl = proxyAwareFetch,
-) {
-	const res = await request(fetchImpl, `${API_ROOT}/graphql`, {
-		method: "POST",
-		headers: {
-			...authHeaders({ token }),
-			"Content-Type": "application/json",
-		},
-		body: JSON.stringify({
-			query: DESIGN_RECORD_EDIT_QUERY,
-			variables: { nodeId },
-		}),
-	});
-	const payload = await res.json();
-	if (payload.errors?.length)
-		throw new Error(
-			`GitHub GraphQL API error for comment ${nodeId}: ${payload.errors
-				.map((e) => e.message)
-				.join("; ")}`,
-		);
-	return normalizeDesignRecordEditResponse(payload);
 }
 
 /**

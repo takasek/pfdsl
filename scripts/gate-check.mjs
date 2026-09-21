@@ -28,9 +28,7 @@ import {
 	parseAuditTerminals,
 	parseInputConsumedArtifacts,
 	partitionNewTerminals,
-	resolveDesignRecord,
 	sharesSiblingIdNamespace,
-	toDesignRecordEntries,
 	VSCODE_EXT_TRIGGER,
 } from "./lib/gate-check.mjs";
 import {
@@ -41,12 +39,9 @@ import {
 	collectSizeDeltas,
 	commitSubjectStep,
 	deletedFilesSince,
-	designRecordStep,
-	fetchDesignRecordEditInfo,
 	formatCycleWindowReport,
 	genPluginIdentityStep,
 	outputArtifactStatusStep,
-	perIssueSteps,
 	wipTransitionStep,
 } from "./lib/gate-check-steps.mjs";
 import { parseIssueNumbers } from "./lib/issue-args.mjs";
@@ -90,14 +85,7 @@ if (noArtifact && artifactKey) {
 	);
 	process.exit(2);
 }
-// Optional and repeatable: powers the design-selection-record and size-direction
-// checks (#669), which need the linked issue to read from. Without it those
-// checks SKIP rather than guess which issue the cycle belongs to. Every issue
-// the cycle closes belongs here — judging one of them and reporting a single
-// verdict is what let a cycle turn green on the one issue that happened to have
-// a record (#734). A value that is not an issue number is refused here, not
-// coerced: NaN reaches gh and comes back as that issue's checks being
-// unavailable, which reads as a tool outage rather than a typo (#745).
+// Explicit issue targets for source reads and terminal human review.
 const parsedIssues = parseIssueNumbers(values.issue);
 if (!parsedIssues.ok) {
 	console.error(`gate-check: ${parsedIssues.message}`);
@@ -205,54 +193,18 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 // granularity stays MANUAL)
 results.push(commitSubjectStep({ exec, base }));
 
-// The linked issues, fetched once each for the two checks that read them.
-// githubOps keeps the REST fallback that a bare `gh` call would lose in
-// environments without the binary (#489/#492). Only that environment degrades
-// the issue's checks to SKIP — every other failure FAILs, because the check did
-// not run and a SKIP row is one nobody acts on (#745). Either way the other
-// issues stay judged on their own.
-const issues = [];
-let repository;
-try {
-	repository = githubOps.repository();
-} catch {
-	// A missing target identity is passed through as undefined so URL-shaped
-	// reapproval references fail closed in the contextual validator.
-}
+// Preserve ordinary issue reads and their error handling. Reading source
+// material does not validate a design record or establish human approval.
 for (const number of issueNumbers) {
 	try {
-		const issue = await githubOps.viewIssue({
+		await githubOps.viewIssue({
 			number,
 			fields: ["body", "comments", "createdAt"],
 		});
-		const resolution = resolveDesignRecord(toDesignRecordEntries(issue));
-		let editInfo = null;
-		if (resolution.status === "selected") {
-			if (resolution.record.id) {
-				editInfo = await fetchDesignRecordEditInfo({
-					githubOps,
-					nodeId: resolution.record.id,
-				}).catch(() => ({
-					status: "unavailable",
-					editedAtIso: null,
-					note: "edit history unavailable",
-				}));
-			} else {
-				editInfo = {
-					status: "unavailable",
-					editedAtIso: null,
-					note: "selected record has no comment node id",
-				};
-			}
-		}
-		issues.push({ number, issue, editInfo, repository });
 	} catch (e) {
-		issues.push({
-			number,
-			issue: null,
-			issueFailure: classifyIssueLookupFailure(e),
-			editInfo: null,
-			repository,
+		results.push({
+			name: `issue read (#${number})`,
+			...classifyIssueLookupFailure(e),
 		});
 	}
 }
@@ -261,9 +213,6 @@ for (const number of issueNumbers) {
 results.push(
 	wipTransitionStep({ exec, base, artifactKey, noArtifact, changedFiles }),
 );
-
-// 9. Design record structure and reapprovals, one row per linked issue.
-results.push(...perIssueSteps(designRecordStep, issues));
 
 // 10. knowledge-artifact size report: collect the measured deltas regardless of
 // issue metadata so the terminal output always shows changed knowledge artifacts.
@@ -540,4 +489,4 @@ if (sizeDeltas.length > 0) {
 	}
 }
 
-finishGateCheck(results);
+finishGateCheck(results, { issueNumbers });

@@ -495,7 +495,13 @@ process:
     group: planning
   develop:
     label: リポジトリ開発
-    description: "着手可能 issue をブランチ上で実装し、packages/ や scripts/ を含みうるリポジトリ変更束を PR にまとめる。対象パッケージ層（core / cli / graphviz-exporter 等）は gate-check が diff から導出して報告材料として印字する — 明記を求める規定は3度忘れられたうえ、PR body に書く時点では層違いの延期コストを避ける契機を過ぎている（#801）"
+    description: >
+      着手可能 issue をブランチ上で実装し、packages/ や scripts/ を含みうるリポジトリ変更束を PR にまとめる。
+      実行主体は着手前に各対象 issue の一次資料・現行コードと仕様を照合し、未決の方針と必要な承認を解消する。
+      設計記録は issue コメントを正本とし、存在・判断の根拠・承認参照と対象変更の対応は人間の必須確認へ渡す。
+      cycle-status と gate-check は対象と人間確認先を案内し、設計や承認の確認済みを機械判定しない。
+      最終差分の独立レビューと人間のマージ判断を維持する。
+      対象パッケージ層（core / cli / graphviz-exporter 等）は gate-check が diff から導出して報告材料として印字する。
     group: planning
   merge_pr:
     label: レビュー・マージ
