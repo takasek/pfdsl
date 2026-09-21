@@ -379,9 +379,14 @@ export function resolveCommandCwd(command, hookCwd, options) {
  * "a repository this guard has no business in" onto the same `false`, which
  * left an unrelated repo's `main` — the default branch `git init` hands every
  * throwaway sandbox — guarded on the strength of the branch name alone (#1221).
- * `unknown` stays separate from `foreign` on purpose: git failing to answer is
- * not evidence of being out of scope, and mapping it to a pass-through would
- * disable the guard wholesale in an environment where `git` is broken.
+ * `unknown` stays separate from `foreign` because failing to resolve a root is
+ * not evidence of being out of scope. The case it actually protects is a
+ * session whose own root will not resolve — no `CLAUDE_PROJECT_DIR` and no
+ * payload cwd — against a target that resolves fine and reports the default
+ * branch: mapping that to a pass-through would hand such a session an
+ * unguarded main checkout. It is not the git-is-broken case, where the target
+ * has no readable branch either and `currentBranch === undefined` already
+ * allows further down.
  * @param {{worktreeRoot: string, commonDir: string} | null} sessionRoots
  * @param {{worktreeRoot: string, commonDir: string} | null} targetRoots
  * @returns {"own" | "sibling" | "foreign" | "unknown"}
@@ -423,7 +428,8 @@ function evaluateGuardedCommand(
 	if (targetRelation === "foreign") return { decision: "allow" };
 
 	// `unknown` rides with `own`, which is where it already sat before the
-	// relation had a name — the branch-name rule still applies.
+	// relation had a name — the branch-name rule still applies, and reaching a
+	// deny through it requires the target's branch to be readable.
 	const crossesWorktree = targetRelation === "sibling";
 	const targetsDefaultBranch = currentBranch === mainBranch;
 	if (!targetsDefaultBranch && !crossesWorktree) return { decision: "allow" };

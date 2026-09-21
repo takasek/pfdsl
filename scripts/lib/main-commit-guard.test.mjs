@@ -659,6 +659,27 @@ describe("main-commit-guard wrapper", () => {
 		assert.notEqual(runWrapper(`git -C ${sibling} add -A`), "");
 	});
 
+	it("denies the default branch when only the session root fails to resolve (#1221)", () => {
+		// The one route by which `unknown` reaches a decision: the target
+		// answers `main`, and the session root does not resolve at all. Pinning
+		// it here keeps a later reader from folding `unknown` into `foreign` on
+		// the grounds that nothing distinguishes it.
+		const output = runWrapper(`git -C ${repo} add -A`, {
+			claudeProjectDir: join(root, "no-such-session-dir"),
+		});
+		assert.match(output, /"permissionDecision":"deny"/);
+	});
+
+	it("stays silent when the target is not a git repository at all (#1221)", () => {
+		// The git-is-broken shape: no roots *and* no branch. The branch-name
+		// rule cannot fire without a branch, so this allows — which is what the
+		// guard did before #1221 too. Recorded so the prose describing
+		// `unknown` is not read as covering this case.
+		const notARepo = join(root, "not-a-repo");
+		mkdirSync(notARepo, { recursive: true });
+		assert.equal(runWrapper(`git -C ${notARepo} add -A`), "");
+	});
+
 	it("uses the payload cwd as the session worktree in Codex (#784)", () => {
 		const output = runWrapper(`git -C ${sibling} add -A`, {
 			claudeProjectDir: null,
