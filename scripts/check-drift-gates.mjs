@@ -51,8 +51,15 @@ const { failures, notes } = runDriftGates(buildGates({ stagedPresent }), {
 	// keeps that true of the freshness question too, which was the one thing
 	// still asked against process.cwd() (#771).
 	isDistFresh: (path) => !isDistStale(resolve(root, path)),
-	runCommand: (file, args) =>
-		tryRun(file, args, { cwd: root, captureStderr: true }).ok,
+	runCommand: (file, args) => {
+		const result = tryRun(file, args, { cwd: root, captureStderr: true });
+		// Git can discard a temporary commit index before the operator can
+		// rerun the checker, so show its diagnostics while that index exists.
+		if (!result.ok && args[0] === "scripts/check-md-linebreaks.mjs") {
+			console.log(result.out.trimEnd());
+		}
+		return result.ok;
+	},
 });
 
 for (const note of notes) {

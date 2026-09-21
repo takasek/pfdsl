@@ -125,6 +125,23 @@ describe("sortEdges", () => {
 });
 
 describe("computeTopoOrder", () => {
+	it.each([
+		"start >> P1 -> built\n[built, other] >> P2 -> final",
+		"[built, other] >> P2 -> final\nstart >> P1 -> built",
+		"start >> P1 -> built\n[built, other] >> P2 -> final\nfinal >>? P1",
+	])("places every primary source before its target: %s", (source) => {
+		const order = topoOrder(source);
+		for (const [from, to] of [
+			["start", "P1"],
+			["P1", "built"],
+			["built", "P2"],
+			["other", "P2"],
+			["P2", "final"],
+		]) {
+			expect(order.indexOf(from!)).toBeLessThan(order.indexOf(to!));
+		}
+	});
+
 	it("orders a simple chain: artifact, process, artifact, ...", () => {
 		expect(topoOrder("A >> P -> B")).toEqual(["A", "P", "B"]);
 	});

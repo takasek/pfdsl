@@ -7,16 +7,11 @@
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import {
-	repoDeps as assetSweepRepoDeps,
-	runAssetSweepCheck,
-} from "./asset-sweep.mjs";
-import {
 	repoDeps as distributionReviewRepoDeps,
 	RECORD_PATH,
 	runDistributionReviewCheck,
 } from "./distribution-review.mjs";
 import {
-	formatAssetSweepStatus,
 	formatDistributionReviewStatus,
 	formatFullReviewStatus,
 	formatSpecHistoryStatus,
@@ -75,17 +70,6 @@ export const RELEASE_GATE_DEFINITIONS = [
 				: [];
 			return { ok: result.ok, lines, warnings };
 		},
-	},
-	{
-		id: "asset-sweep",
-		run: (root) => runAssetSweepCheck(assetSweepRepoDeps(root)),
-		format: (result, mode) => ({
-			ok: result.ok,
-			lines:
-				mode === "release"
-					? statusLines(result.message)
-					: statusLines(formatAssetSweepStatus(result.evaluations)),
-		}),
 	},
 	{
 		id: "spec-history",

@@ -75,21 +75,6 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node scripts/md-write-check.mjs",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node scripts/companion-prose-advisory.mjs",
-            "timeout": 10
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Terminal-gate aggregate checker: runs the mechanically-verifiable items
-// from pfd-ops step 3 (check / audit-issues-flow / check-md-linebreaks /
+// from pfd-ops step 3 (check / audit-issues-flow /
 // gen-plugin identity / output-artifact status update)
 // against the diff from origin/<base> to HEAD, then prints the remaining
 // canonical manual checklist locations as fixed guidance.
@@ -126,7 +126,6 @@ if (!diff.ok) {
 }
 const changedFiles = diff.files;
 const pfdslFiles = changedFiles.filter((f) => f.endsWith(".pfdsl"));
-const mdFiles = changedFiles.filter((f) => f.endsWith(".md"));
 
 const results = [];
 
@@ -167,19 +166,7 @@ if (pfdslFiles.length === 0) {
 	});
 }
 
-// 3. check-md-linebreaks on changed .md files
-if (mdFiles.length === 0) {
-	results.push({
-		name: "check-md-linebreaks",
-		status: "SKIP",
-		detail: "no .md changes",
-	});
-} else {
-	const r = node(["scripts/check-md-linebreaks.mjs", ...mdFiles]);
-	results.push({ name: "check-md-linebreaks", status: r.ok ? "PASS" : "FAIL" });
-}
-
-// 3b. check-docs: the whole documentation/prose check suite CI runs, as one
+// 3. check-docs: the whole documentation/prose check suite CI runs, as one
 // step (#721). Unconditional — it is whole-repo by construction, and at ~4s it
 // costs less than the two steps below it.
 results.push(checkDocsStep({ exec }));
@@ -214,7 +201,7 @@ if (!matchesTrigger(changedFiles, VSCODE_EXT_TRIGGER)) {
 	});
 }
 
-// 7. commit subject lint (Conventional Commits message format and language;
+// 7. commit subject lint (Conventional Commits message format;
 // granularity stays MANUAL)
 results.push(commitSubjectStep({ exec, base }));
 

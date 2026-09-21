@@ -4,13 +4,9 @@
  * diff HEAD against it, filter the diff to the scope this gate answers for,
  * and compare the in-scope count against a threshold.
  *
- * distribution-review.mjs's `runDistributionReviewCheck` was the first of
- * these (a threshold of 1: any bundled prompt that moved trips it).
- * asset-sweep.mjs reuses this same core with a threshold above 1, so a
- * catalog can accumulate additions for a while before its gate fires.
- * Only the mechanics live here — each caller keeps its own record shape,
- * scope predicate, and failure-message wording, since those are what makes
- * one gate a distribution review and another an asset sweep.
+ * distribution-review.mjs uses a threshold of 1: any bundled prompt that
+ * moved trips it. Only the mechanics live here; the caller keeps its record
+ * shape, scope predicate, and failure-message wording.
  *
  * Every failure path here is fail-closed. An absent record and an
  * unreachable commit both block, because the alternative in each case is to
